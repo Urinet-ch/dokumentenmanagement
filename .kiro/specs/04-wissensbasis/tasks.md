@@ -72,7 +72,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 5.1–5.13, 11.6, 11.7, 13.1–13.8, 14.3_
   - _Abhängig von: 13.2, 13.4, 13.5_
 
-- [ ] 14.2 Entwurf, Diff und Freigabe [Backend]
+- [x] 14.2 Entwurf, Diff und Freigabe [Backend]
   - `DiffDienst` (java-diff-utils, Felddiff), `FreigabeDienst` mit `If-Match`, 412/428, `WissensPruefung` bei jedem Annehmen, Befund 422, Vertraulichkeit nicht senkbar und nur bis `INTERN` erhöhbar (Mindeststufe), kein gesammeltes Annehmen, «neu erzeugen»; Kernaussagen im Ingest-Entwurf
   - Endpunkt-Szenario `@req-12.2`: `treuhaender` erhält am `POST /wissensentwuerfe` HTTP 403; Datenbank und Zugriffsprotokoll bleiben unverändert
   - Transaktion: Seite, Version, Hülle der Version, Quelleneinträge, Links, Hüllen, Log, Zugriffsprotokoll `WISSEN_ANNEHMEN`/`WISSEN_VERWERFEN`, Auftrag `WISSEN_EMBEDDING` (nur einreihen; Handler in 15.1, bis dahin bleibt der Auftrag wartend, der Test prüft nur das Einreihen); Start des nächsten wartenden Ingest
