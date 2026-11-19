@@ -1,6 +1,9 @@
 package ch.urinet.archiv.wissen.adapter.out.okf;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.ablage.TestAblage;
+import ch.urinet.archiv.ablage.domain.Exportdatei;
+import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
@@ -8,6 +11,7 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantVollexportDaten;
 import ch.urinet.archiv.mandant.application.MandantVollexportSchreiber;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
 import ch.urinet.archiv.wissen.application.WissenOkfExportPort;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -20,6 +24,10 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.lang.reflect.Proxy;
@@ -27,6 +35,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,6 +60,127 @@ class OkfExportDatenTest {
     MandantProvisionierung provisionierung;
     @Inject
     Instance<AgroalDataSource> datenbank;
+    @Inject
+    AuftragArbeiter arbeiter;
+
+    @Test
+    void angeforderterExportWirdGeschriebenSigniertUndProtokolliert() throws Exception {
+        MandantCode code = new MandantCode("urinet");
+        if (!vorhanden(code)) {
+            provisionierung.anlegen(code.wert(), null, null);
+        }
+        MandantCode fremder = new MandantCode("vhf-gsk");
+        if (!vorhanden(fremder)) {
+            provisionierung.anlegen(fremder.wert(), null, null);
+        }
+        UUID seitenId = UUID.randomUUID();
+        String pfad = "konzepte/export-" + seitenId;
+        UUID exportId = null;
+        try {
+            seite(code, seitenId, pfad);
+            String token = Testanmeldung.token("inhaber-urinet");
+            var angefordert = given().auth().oauth2(token).when().post("/api/v1/wissensbasis/exporte")
+                    .then().statusCode(202).extract().jsonPath();
+            assertThat(angefordert.getString("status")).isEqualTo("OFFEN");
+            exportId = UUID.fromString(angefordert.getString("id"));
+            given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).when()
+                    .get("/api/v1/wissensbasis/exporte/" + exportId).then().statusCode(404);
+            long frist = System.nanoTime() + TimeUnit.MINUTES.toNanos(1);
+            while ("OFFEN".equals(exportStatus(code, exportId)) && System.nanoTime() < frist) {
+                var laeufe = arbeiter.abholen();
+                if (laeufe.isEmpty()) {
+                    Thread.sleep(100);
+                }
+                for (var lauf : laeufe) {
+                    lauf.get(1, TimeUnit.MINUTES);
+                }
+            }
+            var antwort = given().auth().oauth2(token).when().get("/api/v1/wissensbasis/exporte/" + exportId)
+                    .then().statusCode(200).extract().jsonPath();
+            assertThat(antwort.getString("status")).isEqualTo("FERTIG");
+            assertThat(antwort.getString("url")).isNotBlank();
+            Instant fertig = Instant.parse(antwort.getString("fertig"));
+            assertThat(Instant.parse(antwort.getString("gueltigBis"))).isEqualTo(fertig.plus(Duration.ofHours(24)));
+            String key = Exportdatei.wissensSchluessel(exportId);
+            String version;
+            try (Connection c = datenbank.get().getConnection();
+                 PreparedStatement sql = c.prepareStatement("select s3_version from " + code.schema()
+                         + ".wissens_export where id = ?")) {
+                sql.setObject(1, exportId);
+                try (ResultSet rs = sql.executeQuery()) {
+                    assertThat(rs.next()).isTrue();
+                    version = rs.getString(1);
+                }
+            }
+            byte[] zip = TestAblage.lesen(code.wert(), key, version);
+            assertThat(antwort.getString("sha256")).isEqualTo(Pruefsumme.von(zip));
+            assertThat(dateinamen(zip)).contains(pfad + ".md", "index.md", "log.md", "paket.yaml");
+            try (HttpClient http = HttpClient.newHttpClient()) {
+                HttpResponse<byte[]> download = http.send(
+                        HttpRequest.newBuilder(URI.create(antwort.getString("url"))).GET().build(),
+                        HttpResponse.BodyHandlers.ofByteArray());
+                assertThat(download.statusCode()).isEqualTo(200);
+                assertThat(Pruefsumme.von(download.body())).isEqualTo(Pruefsumme.von(zip));
+            }
+            try (Connection c = datenbank.get().getConnection();
+                 PreparedStatement sql = c.prepareStatement("select count(*) from " + code.schema()
+                         + ".zugriff_protokoll where dokument_id = ? and aktion = 'EXPORTIEREN' "
+                         + "and details ->> 'sha256' = ?")) {
+                sql.setObject(1, exportId);
+                sql.setString(2, Pruefsumme.von(zip));
+                try (ResultSet rs = sql.executeQuery()) {
+                    assertThat(rs.next()).isTrue();
+                    assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(1);
+                }
+            }
+        } finally {
+            try {
+                if (exportId != null) {
+                    String key = Exportdatei.wissensSchluessel(exportId);
+                    try {
+                        TestAblage.loeschen(code.wert(), key, key::equals);
+                    } finally {
+                        try (Connection c = datenbank.get().getConnection()) {
+                            try (PreparedStatement sql = c.prepareStatement(
+                                    "delete from public.auftrag where typ = 'WISSEN_EXPORT' and nutzlast->>'exportId' = ?")) {
+                                sql.setString(1, exportId.toString());
+                                sql.executeUpdate();
+                            }
+                            try (PreparedStatement sql = c.prepareStatement(
+                                    "delete from " + code.schema() + ".wissens_export where id = ?")) {
+                                sql.setObject(1, exportId);
+                                sql.executeUpdate();
+                            }
+                            try (var sql = c.createStatement()) {
+                                sql.execute("set session_replication_role = replica");
+                                try (PreparedStatement log = c.prepareStatement(
+                                        "delete from " + code.schema() + ".zugriff_protokoll where dokument_id = ?")) {
+                                    log.setObject(1, exportId);
+                                    log.executeUpdate();
+                                } finally {
+                                    sql.execute("set session_replication_role = origin");
+                                }
+                            }
+                        }
+                    }
+                }
+            } finally {
+                loeschen(code, seitenId);
+            }
+        }
+    }
+
+    private String exportStatus(MandantCode code, UUID id) throws SQLException {
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement sql = c.prepareStatement("select status from " + code.schema()
+                     + ".wissens_export where id = ?")) {
+            sql.setObject(1, id);
+            try (ResultSet rs = sql.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                return rs.getString(1);
+            }
+        }
+    }
 
     @Test
     void geschaeftsstelleErhaeltBeiEinstellungen403OhneAenderung() throws SQLException {
