@@ -17,12 +17,14 @@ import { KonfigurationService } from '../../gemeinsam/api/api/konfiguration.serv
 import {
   allgemeineFehlermeldung,
   feldEditorFehler,
+  pflichtfelderOrdnen,
   SchemaEditor,
   schemaAusFeldern,
   schemaEditor,
   versionsvergleich,
   verwaltungsFehlerart,
   Versionsaenderung,
+  zusatzPflichtfelder,
 } from './verwaltung-logik';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 
@@ -31,10 +33,14 @@ interface ArtForm {
   name: string;
   beschreibung: string;
   gruppen: string[];
+  /** Im JSON-Modus mit `zusatz.*`, im Feld-Modus ohne (dort setzt der Feld-Editor die Pflicht). */
   pflichtfelder: string;
+  /** Feld-Modus: `zusatz.*` aus den Pflichtfeldern ohne passendes Feld im Schema; bleiben beim Speichern erhalten. */
+  pflichtZusatzOhneFeld: string[];
   schema: SchemaEditor;
   vertraulichkeit: Dokumentart.VertraulichkeitEnum;
-  aufbewahrungJahre: string;
+  /** `type="number"`: Angular liefert eine Zahl, bei leerem Feld `null`. */
+  aufbewahrungJahre: string | number | null;
   unbefristet: boolean;
   aufbewahrungAb: string;
   aufbewahrungFeld: string;
@@ -47,7 +53,7 @@ interface ArtForm {
   kiVorschlag: boolean;
   kiFelder: string;
   kiHinweise: string;
-  reihenfolge: string;
+  reihenfolge: string | number | null;
   grund: string;
 }
 
@@ -67,7 +73,7 @@ interface WertForm {
   code: string;
   name: string;
   beschreibung: string;
-  reihenfolge: string;
+  reihenfolge: string | number | null;
   aktiv: boolean;
   grund: string;
 }
@@ -95,12 +101,26 @@ function objekt(wert: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function zahlText(wert: string | number | null | undefined): string {
+  return wert == null ? '' : String(wert).trim();
+}
+
+function zeilen(text: string): string[] {
+  return text
+    .split('\n')
+    .map((zeile) => zeile.trim())
+    .filter((zeile) => zeile !== '');
+}
+
 function istRegelTyp(wert: string | undefined): wert is RegelAnlegen.TypEnum {
   return wert !== undefined && Object.values(RegelAnlegen.TypEnum).some((typ) => typ === wert);
 }
 
 function istRegelSchwere(wert: string | undefined): wert is RegelAnlegen.SchwereEnum {
-  return wert !== undefined && Object.values(RegelAnlegen.SchwereEnum).some((schwere) => schwere === wert);
+  return (
+    wert !== undefined &&
+    Object.values(RegelAnlegen.SchwereEnum).some((schwere) => schwere === wert)
+  );
 }
 
 function regelFormLeer(): RegelForm {
@@ -147,6 +167,7 @@ function artFormLeer(): ArtForm {
     beschreibung: '',
     gruppen: [],
     pflichtfelder: '',
+    pflichtZusatzOhneFeld: [],
     schema: { modus: 'felder', felder: [] },
     vertraulichkeit: 'NORMAL',
     aufbewahrungJahre: '10',
@@ -168,13 +189,27 @@ function artFormLeer(): ArtForm {
 }
 
 function artFormAus(art: Dokumentart): ArtForm {
+  const schema = schemaEditor(art);
+  const feldCodes = new Set(
+    schema.modus === 'felder' ? schema.felder.map((feld) => feld.code) : [],
+  );
   return {
     code: art.code,
     name: art.name,
     beschreibung: art.beschreibung ?? '',
     gruppen: [...art.gruppen],
-    pflichtfelder: art.pflichtfelder.filter((feld) => !feld.startsWith('zusatz.')).join('\n'),
-    schema: schemaEditor(art),
+    pflichtfelder: (schema.modus === 'json'
+      ? art.pflichtfelder
+      : art.pflichtfelder.filter((feld) => !feld.startsWith('zusatz.'))
+    ).join('\n'),
+    pflichtZusatzOhneFeld:
+      schema.modus === 'json'
+        ? []
+        : art.pflichtfelder.filter(
+            (feld) =>
+              feld.startsWith('zusatz.') && !feldCodes.has(feld.substring('zusatz.'.length)),
+          ),
+    schema,
     vertraulichkeit: art.vertraulichkeit,
     aufbewahrungJahre: art.aufbewahrungJahre == null ? '' : String(art.aufbewahrungJahre),
     unbefristet: art.aufbewahrungJahre == null,
@@ -395,10 +430,7 @@ export class Verwaltung implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.ladeArten();
-    this.ladeKlassifikationen();
-    this.ladeRegeln();
-    this.ladeVersionen();
+    this.ladeStand();
   }
 
   protected artWaehlen(art: Dokumentart): void {
@@ -457,6 +489,8 @@ export class Verwaltung implements OnInit {
           name: '',
           typ: 'text',
           pflicht: false,
+          pflichtInListe: false,
+          pflichtImSchema: false,
           beschreibung: '',
           optionen: [],
           eindeutig: false,
@@ -530,12 +564,9 @@ export class Verwaltung implements OnInit {
       this.speichernFrage.set(null);
       return;
     }
-    const jahre = this.artForm.unbefristet
-      ? null
-      : this.artForm.aufbewahrungJahre.trim() === ''
-        ? 10
-        : Number(this.artForm.aufbewahrungJahre);
-    const reihenfolge = Number(this.artForm.reihenfolge);
+    const jahreText = zahlText(this.artForm.aufbewahrungJahre);
+    const jahre = this.artForm.unbefristet ? null : jahreText === '' ? 10 : Number(jahreText);
+    const reihenfolge = Number(zahlText(this.artForm.reihenfolge));
     if (
       !/^[A-Z][A-Z0-9_]{1,39}$/.test(this.artForm.code.trim()) ||
       this.artForm.name.trim() === '' ||
@@ -546,22 +577,24 @@ export class Verwaltung implements OnInit {
       this.speichernFrage.set(null);
       return;
     }
-    const pflichtZusatz = Array.isArray((schema as Record<string, unknown>)['required'])
-      ? ((schema as Record<string, unknown>)['required'] as unknown[]).filter(
-          (feld): feld is string => typeof feld === 'string',
-        )
-      : [];
+    // Pflichtfelder im Rundlauf: `zusatz.*` kommen im JSON-Modus aus dem Textfeld, im Feld-Modus aus dem Feld-Editor.
+    const pflichtfelder =
+      this.artForm.schema.modus === 'json'
+        ? zeilen(this.artForm.pflichtfelder)
+        : (() => {
+            const felder = this.artForm.schema.felder;
+            const codes = new Set(felder.map((feld) => `zusatz.${feld.code.trim()}`));
+            return [
+              ...zeilen(this.artForm.pflichtfelder).filter((feld) => !feld.startsWith('zusatz.')),
+              ...this.artForm.pflichtZusatzOhneFeld.filter((feld) => !codes.has(feld)),
+              ...zusatzPflichtfelder(felder),
+            ];
+          })();
     const body: DokumentartAenderung = {
       name: this.artForm.name.trim(),
       beschreibung: this.artForm.beschreibung.trim() || null,
       gruppen: this.artForm.gruppen,
-      pflichtfelder: [
-        ...this.artForm.pflichtfelder
-          .split('\n')
-          .map((feld) => feld.trim())
-          .filter((feld) => feld !== '' && !feld.startsWith('zusatz.')),
-        ...pflichtZusatz.map((feld) => `zusatz.${feld}`),
-      ],
+      pflichtfelder: pflichtfelderOrdnen(art?.pflichtfelder ?? [], pflichtfelder),
       zusatzSchema: schema,
       vertraulichkeit: this.artForm.vertraulichkeit,
       aufbewahrungJahre: jahre,
@@ -609,7 +642,7 @@ export class Verwaltung implements OnInit {
         this.beschaeftigt.set(false);
         this.speichernFrage.set(null);
         this.fehler.set(null);
-        this.etagAktualisieren(antwort);
+        this.nachSchreiben(antwort);
         const gespeichert = antwort.body ?? this.artAusForm(body, this.artForm.code.trim());
         this.arten.update((liste) => {
           const ohne = (liste ?? []).filter((eintrag) => eintrag.code !== gespeichert.code);
@@ -637,7 +670,7 @@ export class Verwaltung implements OnInit {
     this.dokumentartenService.apiV1DokumentartenCodeDelete(code, etag, 'response').subscribe({
       next: (antwort) => {
         this.beschaeftigt.set(false);
-        this.etagAktualisieren(antwort);
+        this.nachSchreiben(antwort);
         this.arten.update((liste) => (liste ?? []).filter((art) => art.code !== code));
         this.ausgewaehlteArt.set(null);
         this.artForm = artFormLeer();
@@ -729,7 +762,7 @@ export class Verwaltung implements OnInit {
     anfrage.subscribe({
       next: (antwort) => {
         this.beschaeftigt.set(false);
-        this.etagAktualisieren(antwort);
+        this.nachSchreiben(antwort);
         const gespeichert = klassifikationsListe([antwort.body])[0] ?? {
           ...bestehend,
           ...this.klassifikationForm,
@@ -759,7 +792,7 @@ export class Verwaltung implements OnInit {
     this.konfigurationService.apiV1KlassifikationenCodeDelete(code, etag, 'response').subscribe({
       next: (antwort) => {
         this.beschaeftigt.set(false);
-        this.etagAktualisieren(antwort);
+        this.nachSchreiben(antwort);
         this.klassifikationen.update((liste) =>
           (liste ?? []).filter((eintrag) => eintrag.code !== code),
         );
@@ -795,7 +828,7 @@ export class Verwaltung implements OnInit {
     if (code === null || etag === null) {
       return;
     }
-    const reihenfolge = Number(this.wertForm.reihenfolge);
+    const reihenfolge = Number(zahlText(this.wertForm.reihenfolge));
     if (
       !/^[a-z][a-z0-9_]{0,39}$/.test(this.wertForm.code.trim()) ||
       !this.wertForm.name.trim() ||
@@ -833,7 +866,7 @@ export class Verwaltung implements OnInit {
     anfrage.subscribe({
       next: (antwort) => {
         this.beschaeftigt.set(false);
-        this.etagAktualisieren(antwort);
+        this.nachSchreiben(antwort);
         const gespeichert = werteListe([antwort.body])[0] ?? {
           code: this.wertForm.code,
           name: this.wertForm.name,
@@ -874,7 +907,7 @@ export class Verwaltung implements OnInit {
       .subscribe({
         next: (antwort) => {
           this.beschaeftigt.set(false);
-          this.etagAktualisieren(antwort);
+          this.nachSchreiben(antwort);
           this.klassifikationen.update((liste) =>
             (liste ?? []).map((eintrag) =>
               eintrag.code !== code
@@ -942,7 +975,7 @@ export class Verwaltung implements OnInit {
     anfrage.subscribe({
       next: (antwort) => {
         this.beschaeftigt.set(false);
-        this.etagAktualisieren(antwort);
+        this.nachSchreiben(antwort);
         const gespeichert =
           zuordnungenListe([antwort.body])[0] ??
           ({
@@ -956,7 +989,6 @@ export class Verwaltung implements OnInit {
         ]);
         this.neueZuordnung();
         this.meldung.set(this.texte.gespeichert);
-        this.fehler.set(null);
         this.fehler.set(null);
       },
       error: (fehler: unknown) => this.anfrageFehler(fehler),
@@ -975,11 +1007,12 @@ export class Verwaltung implements OnInit {
       .subscribe({
         next: (antwort) => {
           this.beschaeftigt.set(false);
-          this.etagAktualisieren(antwort);
+          this.nachSchreiben(antwort);
           this.zuordnungen.update((liste) =>
             liste.filter((eintrag) => eintrag.klassifikation !== code),
           );
           this.meldung.set(this.texte.gespeichert);
+          this.fehler.set(null);
         },
         error: (fehler: unknown) => this.anfrageFehler(fehler),
       });
@@ -1066,33 +1099,30 @@ export class Verwaltung implements OnInit {
     const meldung = this.regelForm.meldung.trim();
     const grund = this.regelForm.grund.trim() || null;
     const beiErfolg = (antwort: HttpResponse<Regel>) => {
-        this.beschaeftigt.set(false);
-        this.etagAktualisieren(antwort);
-        const gespeichert = antwort.body;
-        const codeGespeichert = gespeichert?.code;
-        const form = gespeichert === null ? null : regelFormAus(gespeichert);
-        if (gespeichert === null || codeGespeichert === undefined || form === null) {
-          this.fehler.set(this.texte.regeln.antwortUngueltig);
-          this.ladeRegeln();
-          return;
-        }
-        this.regeln.update((liste) => {
-          const ohne = (liste ?? []).filter((eintrag) => eintrag.code !== codeGespeichert);
-          return [...ohne, gespeichert].sort((a, b) =>
-            (a.code ?? '').localeCompare(b.code ?? ''),
-          );
-        });
-        this.ausgewaehlteRegel.set(codeGespeichert);
-        this.regelNeu.set(false);
-        this.regelForm = form;
-        this.meldung.set(
-          gespeichert.betroffeneDokumente == null
-            ? this.texte.regeln.gespeichert
-            : `${this.texte.regeln.gespeichert} ${this.texte.regeln.betroffene(gespeichert.betroffeneDokumente)}`,
-        );
-        this.fehler.set(null);
-        this.ladeVersionen();
-      };
+      this.beschaeftigt.set(false);
+      this.nachSchreiben(antwort);
+      const gespeichert = antwort.body;
+      const codeGespeichert = gespeichert?.code;
+      const form = gespeichert === null ? null : regelFormAus(gespeichert);
+      if (gespeichert === null || codeGespeichert === undefined || form === null) {
+        this.fehler.set(this.texte.regeln.antwortUngueltig);
+        this.ladeStand();
+        return;
+      }
+      this.regeln.update((liste) => {
+        const ohne = (liste ?? []).filter((eintrag) => eintrag.code !== codeGespeichert);
+        return [...ohne, gespeichert].sort((a, b) => (a.code ?? '').localeCompare(b.code ?? ''));
+      });
+      this.ausgewaehlteRegel.set(codeGespeichert);
+      this.regelNeu.set(false);
+      this.regelForm = form;
+      this.meldung.set(
+        gespeichert.betroffeneDokumente == null
+          ? this.texte.regeln.gespeichert
+          : `${this.texte.regeln.gespeichert} ${this.texte.regeln.betroffene(gespeichert.betroffeneDokumente)}`,
+      );
+      this.fehler.set(null);
+    };
     const beiFehler = (fehler: unknown) => this.anfrageFehler(fehler);
     if (istNeu) {
       const payload: RegelAnlegen = {
@@ -1264,6 +1294,11 @@ export class Verwaltung implements OnInit {
     if (!this.dateiEinspielenMoeglich() || !this.dateiInhalt || grund === '') {
       return;
     }
+    // Der Grund geht als Header `X-Aenderungsgrund`; der Browser lässt dort nur Zeichen von U+0020 bis U+00FF zu.
+    if (/[^\u0020-\u00ff]/.test(grund)) {
+      this.fehler.set(this.texte.datei.grundZeichen);
+      return;
+    }
     this.beschaeftigt.set(true);
     this.konfigurationService.apiV1KonfigurationPut(this.dateiInhalt, grund, 'response').subscribe({
       next: (antwort) => {
@@ -1273,7 +1308,8 @@ export class Verwaltung implements OnInit {
         this.einspielenFrage.set(false);
         this.meldung.set(this.texte.datei.einspielenErfolgreich);
         this.fehler.set(null);
-        this.ladeVersionen();
+        // Die Datei ändert alles: Listen und offene Formulare auf den neuen Stand bringen.
+        this.ladeStand();
       },
       error: (fehler: unknown) => this.anfrageFehler(fehler),
     });
@@ -1330,14 +1366,7 @@ export class Verwaltung implements OnInit {
 
   protected neuLaden(): void {
     this.fehler.set(null);
-    this.ladeArten();
-    this.ladeKlassifikationen();
-    this.ladeRegeln();
-    this.ladeVersionen();
-    const art = this.ausgewaehlteArt();
-    if (art !== null) {
-      this.ladeZuordnungen(art);
-    }
+    this.ladeStand();
   }
 
   protected zeitpunkt(zeit: string | undefined): string {
@@ -1358,40 +1387,79 @@ export class Verwaltung implements OnInit {
     }).format(datum);
   }
 
-  private ladeArten(): void {
-    this.dokumentartenService.apiV1DokumentartenGet('response').subscribe({
-      next: (antwort) => {
-        this.etagAktualisieren(antwort);
-        this.arten.set(antwort.body ?? []);
+  /**
+   * Lädt Arten, Klassifikationen und Regeln gemeinsam. Der ETag gilt nur, wenn alle drei Listen denselben Stand
+   * haben; sonst bleibt er leer, und Speichern verlangt erst ein Neuladen (Req 7.6). Offene Formulare bestehender
+   * Einträge übernehmen den geladenen Stand, damit kein veraltetes Formular mit dem neuen ETag speichert.
+   */
+  private ladeStand(): void {
+    forkJoin({
+      arten: this.dokumentartenService.apiV1DokumentartenGet('response'),
+      klassifikationen: this.konfigurationService.apiV1KlassifikationenGet('response'),
+      regeln: this.konfigurationService.apiV1RegelnGet('response'),
+    }).subscribe({
+      next: ({ arten, klassifikationen, regeln }) => {
+        const etags = new Set([arten, klassifikationen, regeln].map((a) => a.headers.get('ETag')));
+        const [etag] = etags;
+        const einheitlich = etags.size === 1 && etag !== null && etag !== undefined;
+        this.etag.set(einheitlich ? etag : null);
+        this.arten.set(arten.body ?? []);
+        this.klassifikationen.set(klassifikationsListe(klassifikationen.body));
+        this.regeln.set(regeln.body ?? []);
+        this.formulareAbgleichen();
+        if (!einheitlich) {
+          this.fehler.set(this.texte.fehlerKonflikt);
+        }
+        this.ladeVersionen();
+        const art = this.ausgewaehlteArt();
+        if (art !== null) {
+          this.ladeZuordnungen(art);
+        }
       },
       error: (fehler: unknown) => this.anfrageFehler(fehler, 'laden'),
     });
   }
 
-  private ladeKlassifikationen(): void {
-    this.konfigurationService.apiV1KlassifikationenGet('response').subscribe({
-      next: (antwort) => {
-        this.etagAktualisieren(antwort);
-        this.klassifikationen.set(klassifikationsListe(antwort.body));
-      },
-      error: (fehler: unknown) => this.anfrageFehler(fehler, 'laden'),
-    });
-  }
-
-  private ladeRegeln(): void {
-    this.konfigurationService.apiV1RegelnGet('response').subscribe({
-      next: (antwort) => {
-        this.etagAktualisieren(antwort);
-        this.regeln.set(antwort.body ?? []);
-      },
-      error: (fehler: unknown) => this.anfrageFehler(fehler, 'laden'),
-    });
+  private formulareAbgleichen(): void {
+    const artCode = this.ausgewaehlteArt();
+    if (artCode !== null && !this.artNeu()) {
+      const art = this.arten()?.find((eintrag) => eintrag.code === artCode);
+      this.artForm = art === undefined ? artFormLeer() : artFormAus(art);
+      this.speichernFrage.set(null);
+      this.artLoeschenFrage.set(false);
+      if (art === undefined) {
+        this.ausgewaehlteArt.set(null);
+        this.zuordnungen.set([]);
+      }
+    }
+    const klassifikationCode = this.ausgewaehlteKlassifikation();
+    if (klassifikationCode !== null && !this.klassifikationNeu()) {
+      const klassifikation = this.klassifikationen()?.find(
+        (eintrag) => eintrag.code === klassifikationCode,
+      );
+      if (klassifikation === undefined) {
+        this.ausgewaehlteKlassifikation.set(null);
+      } else {
+        this.klassifikationWaehlen(klassifikation);
+      }
+    }
+    const regelCode = this.ausgewaehlteRegel();
+    if (regelCode !== null && !this.regelNeu()) {
+      const regel = this.regeln()?.find((eintrag) => eintrag.code === regelCode);
+      const form = regel === undefined ? null : regelFormAus(regel);
+      if (form === null) {
+        this.ausgewaehlteRegel.set(null);
+        this.regelForm = regelFormLeer();
+      } else {
+        this.regelForm = form;
+      }
+    }
   }
 
   private ladeVersionen(): void {
     this.konfigurationService.apiV1KonfigurationVersionenGet('response').subscribe({
       next: (antwort) => {
-        this.etagAktualisieren(antwort);
+        this.standPruefen(antwort);
         const liste = versionenListe(antwort.body);
         this.versionen.set(liste);
         this.versionenGeladen.set(true);
@@ -1407,7 +1475,7 @@ export class Verwaltung implements OnInit {
   private ladeZuordnungen(art: string): void {
     this.konfigurationService.apiV1DokumentartenArtKlassifikationenGet(art, 'response').subscribe({
       next: (antwort) => {
-        this.etagAktualisieren(antwort);
+        this.standPruefen(antwort);
         this.zuordnungen.set(zuordnungenListe(antwort.body));
       },
       error: (fehler: unknown) => this.anfrageFehler(fehler, 'laden'),
@@ -1422,10 +1490,29 @@ export class Verwaltung implements OnInit {
     return etag;
   }
 
+  /** Nur Schreibantworten und `ladeStand` setzen den ETag; er beschreibt dann die angezeigten Listen. */
   private etagAktualisieren(antwort: HttpResponse<unknown>): void {
     const etag = antwort.headers.get('ETag');
     if (etag !== null) {
       this.etag.set(etag);
+    }
+  }
+
+  private nachSchreiben(antwort: HttpResponse<unknown>): void {
+    this.etagAktualisieren(antwort);
+    this.ladeVersionen();
+  }
+
+  /**
+   * Einzelne Lesezugriffe (Zuordnungen, Versionen) übernehmen den ETag nicht: Ein neuerer Stand dort heisst, dass die
+   * angezeigten Listen veraltet sind. Speichern geht dann mit dem alten ETag und endet in 412 statt in einem
+   * verlorenen Update.
+   */
+  private standPruefen(antwort: HttpResponse<unknown>): void {
+    const etag = antwort.headers.get('ETag');
+    const gehalten = this.etag();
+    if (etag !== null && gehalten !== null && etag !== gehalten) {
+      this.fehler.set(this.texte.fehlerKonflikt);
     }
   }
 
@@ -1439,11 +1526,13 @@ export class Verwaltung implements OnInit {
           ? this.texte.datei.fehlerVeraltet
           : fehlerart === 'gebrauch'
             ? this.texte.fehlerGebrauch
-            : fehlerart === 'ungueltig'
-              ? this.texte.fehlerUngueltig
-              : art === 'laden' && !(fehler instanceof HttpErrorResponse && fehler.status > 0)
-                ? this.texte.fehlerLaden
-                : allgemeineFehlermeldung(fehler);
+            : fehlerart === 'existiert'
+              ? this.texte.fehlerExistiert
+              : fehlerart === 'ungueltig'
+                ? this.texte.fehlerUngueltig
+                : art === 'laden' && !(fehler instanceof HttpErrorResponse && fehler.status > 0)
+                  ? this.texte.fehlerLaden
+                  : allgemeineFehlermeldung(fehler);
     if (fehlerart === 'dateiVeraltet') {
       this.dateiPruefung.set(null);
       this.dateiVergleich.set(null);

@@ -21,4 +21,5 @@ Funktionalität: Verwaltungsseiten für Dokumentarten
     Wenn ich die Dokumentart «TEST_ART» mit dem Auswahlfeld «prioritaet» anlege
     Dann wurde die Dokumentart mit dem aktuellen ETag gespeichert
     Und enthält das gesendete Zusatz-Schema die Werte und Beschriftungen des Feld-Editors
+    Und führt die gesendete Dokumentart das Zusatzfeld «prioritaet» als Pflichtfeld
     Und scrollt die Verwaltungsseite nicht horizontal

@@ -4,7 +4,9 @@
 
   @if (fehler()) {
     <p class="meldung fehler" role="alert">{{ fehlerMeldung() }}</p>
-    @if (arten() === null || klassifikationen() === null || regeln() === null || !versionenGeladen()) {
+    @if (
+      arten() === null || klassifikationen() === null || regeln() === null || !versionenGeladen()
+    ) {
       <button type="button" class="sekundaer" (click)="neuLaden()">{{ texte.erneutLaden }}</button>
     }
   }
@@ -83,7 +85,11 @@
           <label>
             {{ texte.dokumentarten.pflichtfelder }}
             <textarea [(ngModel)]="artForm.pflichtfelder" rows="3"></textarea>
-            <span class="hinweis">{{ texte.dokumentarten.pflichtfelderHinweis }}</span>
+            <span class="hinweis">{{
+              artForm.schema.modus === 'json'
+                ? texte.dokumentarten.pflichtfelderHinweisJson
+                : texte.dokumentarten.pflichtfelderHinweis
+            }}</span>
           </label>
 
           <fieldset>
@@ -634,7 +640,9 @@
                   (click)="regelWaehlen(regel)"
                 >
                   <span>{{ regel.code }}</span>
-                  <span>{{ regelTypName(regel.typ) }} · {{ regel.art || texte.regeln.alleArten }}</span>
+                  <span
+                    >{{ regelTypName(regel.typ) }} · {{ regel.art || texte.regeln.alleArten }}</span
+                  >
                   <span class="status">{{ regel.aktiv ? texte.aktiv : texte.inaktiv }}</span>
                 </button>
               </li>

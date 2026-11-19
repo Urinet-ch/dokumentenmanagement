@@ -15,6 +15,10 @@ export interface FeldEntwurf {
   name: string;
   typ: ZusatzTyp;
   pflicht: boolean;
+  /** Pflicht stand bisher in `pflichtfelder` (`zusatz.<code>`); prüft das Archiv erst beim Bestätigen. */
+  pflichtInListe: boolean;
+  /** Pflicht stand bisher im Schema unter `required`; prüft das Archiv schon beim Erfassen und Ändern. */
+  pflichtImSchema: boolean;
   beschreibung: string;
   optionen: FeldOption[];
   minEintraege?: number;
@@ -151,6 +155,12 @@ export function schemaEditor(art: Dokumentart): SchemaEditor {
   }
   const parsed = zusatzFelder(art);
   const properties = objekt(schema['properties']) ?? {};
+  const inListe = new Set(
+    art.pflichtfelder
+      .filter((feld) => feld.startsWith('zusatz.'))
+      .map((feld) => feld.substring('zusatz.'.length)),
+  );
+  const imSchema = new Set(stringListe(schema['required']) ? schema['required'] : []);
   if (Object.keys(properties).length !== parsed.length) {
     return { modus: 'json', inhalt: JSON.stringify(schema, null, 2) };
   }
@@ -161,6 +171,8 @@ export function schemaEditor(art: Dokumentart): SchemaEditor {
       name: feld.titel ?? feld.name,
       typ: feld.typ,
       pflicht: feld.pflicht,
+      pflichtInListe: inListe.has(feld.name),
+      pflichtImSchema: imSchema.has(feld.name),
       beschreibung: feld.beschreibung ?? '',
       optionen: feld.optionen.map((wert) => ({
         wert,
@@ -239,10 +251,11 @@ export function schemaAusFeldern(
         break;
     }
     if (feld.typ === 'liste' || feld.typ === 'mehrfach') {
-      if (feld.minEintraege !== undefined) {
+      // Ein geleertes Zahlenfeld liefert `null`; dann fällt die Grenze weg.
+      if (typeof feld.minEintraege === 'number') {
         definition['minItems'] = feld.minEintraege;
       }
-      if (feld.maxEintraege !== undefined) {
+      if (typeof feld.maxEintraege === 'number') {
         definition['maxItems'] = feld.maxEintraege;
       }
       if (feld.eindeutig) {
@@ -257,11 +270,27 @@ export function schemaAusFeldern(
     properties,
   };
   delete schema['required'];
-  const required = felder.filter((feld) => feld.pflicht).map((feld) => feld.code.trim());
+  // `required` bleibt nur, wo es schon stand: Eine neue Pflicht gilt wie bisher erst beim Bestätigen (`pflichtfelder`).
+  const required = felder
+    .filter((feld) => feld.pflicht && feld.pflichtImSchema)
+    .map((feld) => feld.code.trim());
   if (required.length > 0) {
     schema['required'] = required;
   }
   return schema;
+}
+
+/** Einträge `zusatz.<code>` der Pflichtfelder aus dem Feld-Editor; Gegenstück zu `required` in `schemaAusFeldern`. */
+export function zusatzPflichtfelder(felder: readonly FeldEntwurf[]): string[] {
+  return felder
+    .filter((feld) => feld.pflicht && (feld.pflichtInListe || !feld.pflichtImSchema))
+    .map((feld) => `zusatz.${feld.code.trim()}`);
+}
+
+/** Behält die bisherige Reihenfolge der Pflichtfelder; neue Einträge kommen ans Ende, doppelte fallen weg. */
+export function pflichtfelderOrdnen(vorher: readonly string[], neu: readonly string[]): string[] {
+  const gewuenscht = new Set(neu);
+  return [...new Set([...vorher.filter((feld) => gewuenscht.has(feld)), ...neu])];
 }
 
 export function feldEditorFehler(
@@ -287,8 +316,8 @@ export function feldEditorFehler(
     }
     if (
       (feld.typ === 'liste' || feld.typ === 'mehrfach') &&
-      feld.minEintraege !== undefined &&
-      feld.maxEintraege !== undefined &&
+      typeof feld.minEintraege === 'number' &&
+      typeof feld.maxEintraege === 'number' &&
       feld.minEintraege > feld.maxEintraege
     ) {
       return 'liste';
@@ -297,8 +326,24 @@ export function feldEditorFehler(
   return null;
 }
 
+const SENSIBEL = /(^|[./_-])(kennungen|iban|uid)([./_-]|$)/i;
+
 function sensiblerPfad(pfad: string): boolean {
-  return /(^|[./_-])(kennungen|iban|uid)([./_-]|$)/i.test(pfad);
+  return SENSIBEL.test(pfad);
+}
+
+/** Enthält ein Teilbaum einen sensiblen Schlüssel (z. B. `kennungen` einer Version ohne Elternobjekt in der anderen)? */
+function enthaeltSensibles(wert: unknown): boolean {
+  if (Array.isArray(wert)) {
+    return wert.some(enthaeltSensibles);
+  }
+  const daten = objekt(wert);
+  return (
+    daten !== null &&
+    Object.entries(daten).some(
+      ([schluessel, inhalt]) => SENSIBEL.test(`/${schluessel}`) || enthaeltSensibles(inhalt),
+    )
+  );
 }
 
 function wertText(wert: unknown): string {
@@ -309,6 +354,22 @@ function wertText(wert: unknown): string {
     return wert;
   }
   return JSON.stringify(wert) ?? String(wert);
+}
+
+/** Listen mit eindeutigem `code` (Arten, Klassifikationen, Regeln, Werte) je Eintrag vergleichen, sonst als Ganzes. */
+function nachCode(liste: unknown): Map<string, unknown> | null {
+  if (!Array.isArray(liste)) {
+    return null;
+  }
+  const eintraege = new Map<string, unknown>();
+  for (const eintrag of liste) {
+    const code = objekt(eintrag)?.['code'];
+    if (typeof code !== 'string' || eintraege.has(code)) {
+      return null;
+    }
+    eintraege.set(code, eintrag);
+  }
+  return eintraege;
 }
 
 export function versionsvergleich(alt: unknown, neu: unknown): Versionsaenderung[] {
@@ -328,7 +389,18 @@ export function versionsvergleich(alt: unknown, neu: unknown): Versionsaenderung
       }
       return;
     }
-    const verdeckt = sensiblerPfad(pfad);
+    const linksListe = nachCode(links);
+    const rechtsListe = nachCode(rechts);
+    if (linksListe !== null && rechtsListe !== null) {
+      for (const code of new Set([...linksListe.keys(), ...rechtsListe.keys()])) {
+        vergleichen(linksListe.get(code), rechtsListe.get(code), `${pfad}/${code}`);
+      }
+      return;
+    }
+    if (JSON.stringify(links) === JSON.stringify(rechts)) {
+      return;
+    }
+    const verdeckt = sensiblerPfad(pfad) || enthaeltSensibles(links) || enthaeltSensibles(rechts);
     aenderungen.push({
       pfad: pfad || '/',
       alt: verdeckt ? '' : wertText(links),
@@ -342,7 +414,7 @@ export function versionsvergleich(alt: unknown, neu: unknown): Versionsaenderung
 
 export function verwaltungsFehlerart(
   fehler: unknown,
-): 'konflikt' | 'gebrauch' | 'dateiVeraltet' | 'ungueltig' | null {
+): 'konflikt' | 'gebrauch' | 'existiert' | 'dateiVeraltet' | 'ungueltig' | null {
   if (!(fehler instanceof HttpErrorResponse)) {
     return null;
   }
@@ -353,8 +425,14 @@ export function verwaltungsFehlerart(
   if (fehler.status === 409 && code === 'KONFIGURATION_VERALTET') {
     return 'dateiVeraltet';
   }
-  if (fehler.status === 409 && code === 'KONFIGURATION_IN_GEBRAUCH') {
+  if (
+    fehler.status === 409 &&
+    (code === 'KONFIGURATION_IN_GEBRAUCH' || code === 'DOKUMENTART_IN_GEBRAUCH')
+  ) {
     return 'gebrauch';
+  }
+  if (fehler.status === 409 && code === 'DOKUMENTART_EXISTIERT') {
+    return 'existiert';
   }
   return fehler.status === 422 ? 'ungueltig' : null;
 }

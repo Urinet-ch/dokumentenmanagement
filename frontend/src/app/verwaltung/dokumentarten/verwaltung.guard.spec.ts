@@ -33,6 +33,18 @@ describe('verwaltungGuard', () => {
     expect(TestBed.inject(Router).serializeUrl(ergebnis)).toBe('/nicht-gefunden');
   });
 
+  it('leitet nicht angemeldete Benutzer mit dem Ziel zur Anmeldung', () => {
+    anmeldung.angemeldet.mockReturnValue(false);
+    anmeldung.darf.mockReset();
+
+    const ergebnis = pruefen() as UrlTree;
+
+    expect(TestBed.inject(Router).serializeUrl(ergebnis)).toBe(
+      '/?ziel=%2Fverwaltung%2Fdokumentarten',
+    );
+    expect(anmeldung.darf).not.toHaveBeenCalled();
+  });
+
   it('lässt Benutzer mit A11 durch', () => {
     anmeldung.angemeldet.mockReturnValue(true);
     anmeldung.darf.mockReturnValue(true);

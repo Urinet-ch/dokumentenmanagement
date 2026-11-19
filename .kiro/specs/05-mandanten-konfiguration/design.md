@@ -141,12 +141,23 @@ zusätzlich 422 `KLASSIFIKATION_UNGUELTIG` und 422 `REGEL_VERLETZT` liefern; War
 ## Verwaltungsseiten (Aufgabe 18.3)
 Die Angular-Seite liegt unter `/verwaltung/dokumentarten` und nutzt den generierten API-Client. Der Route-Guard lässt
 nur Benutzer mit A11 auf die Seite; ohne A11 führt er auf eine neutrale 404-Seite, ohne den gemeinsamen Rechte-Guard
-zu verändern. Die Eingaben für einzelne Änderungen verwenden den zuletzt empfangenen Konfigurations-`ETag` als
-`If-Match`. Bei 412 bleibt das Formular unverändert; die Meldung enthält keine Serverdetails.
+zu verändern. Die Eingaben für einzelne Änderungen senden als `If-Match` den Konfigurations-`ETag` des angezeigten
+Stands. Diesen setzen nur zwei Stellen: das gemeinsame Laden von Arten, Klassifikationen und Regeln (nur wenn alle drei
+Listen denselben `ETag` liefern, sonst bleibt er leer und Speichern verlangt erst ein Neuladen) und die Antwort eines
+eigenen Schreibaufrufs. Lesezugriffe auf Zuordnungen und Versionen übernehmen ihn nicht; ein neuerer Stand dort zeigt
+die Konfliktmeldung, und Speichern endet mit dem alten `ETag` in 412 statt in einem verlorenen Update. Neuladen und
+Einspielen einer Datei setzen offene Formulare bestehender Einträge auf den geladenen Stand. Nach jedem Schreibaufruf
+lädt die Seite die Versionsliste neu. Bei 412 bleibt das Formular unverändert; die Meldung enthält keine
+Serverdetails. Ein Änderungsgrund für die Datei mit Zeichen ausserhalb von Latin-1 wird vor dem Senden abgewiesen,
+weil er als Header geht (Nachbesserung Review PR #323).
 
 Der Feld-Editor bildet nur die unterstützten Schemaformen ab. Nicht darstellbare Zusatz-Schemas erscheinen
-ausschliesslich im JSON-Editor. Konfigurationsversionen zeigen Zeitstempel in `Europe/Zurich`; Differenzen unter
-`kennungen`, `iban` oder `uid` zeigen keine Werte. Eine Konfigurationsdatei lässt sich erst nach erfolgreicher Prüfung
+ausschliesslich im JSON-Editor; dort pflegt das Textfeld der Pflichtfelder auch die Einträge `zusatz.<code>`. Im
+Feld-Editor wirkt «Pflicht» nur auf `pflichtfelder` (`zusatz.<code>`, geprüft beim Bestätigen); ein im Schema schon
+vorhandenes `required` (geprüft schon beim Erfassen) bleibt erhalten, ein neues schreibt der Editor nicht. Die
+Reihenfolge der Pflichtfelder bleibt, neue kommen ans Ende. Konfigurationsversionen zeigen Zeitstempel in
+`Europe/Zurich`; der Vergleich zeigt Listen mit `code` je Eintrag, und Differenzen unter `kennungen`, `iban` oder
+`uid` (auch in einem ganz neuen oder entfernten Teilbaum) zeigen keine Werte. Eine Konfigurationsdatei lässt sich erst nach erfolgreicher Prüfung
 und Vergleich mit passender Basisversion einspielen. Bei 409 `KONFIGURATION_VERALTET` bleiben Datei und Grund erhalten,
 die Vorschau wird verworfen und muss neu erstellt werden. Das Einspielen verlangt einen Änderungsgrund im Header
 `X-Aenderungsgrund`; Auswirkungen auf Dokumente zeigt die Vorschau aus `/konfiguration/vergleichen`.

@@ -61,7 +61,6 @@ export const TEXTE = {
     server: 'Das Archiv ist vorübergehend nicht erreichbar. Bitte versuchen Sie es erneut.',
     allgemein: 'Die Anfrage konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
   },
-  folgt: 'Diese Seite folgt in einer späteren Ausbaustufe.',
   seiteNichtGefunden: {
     titel: '404 – Seite nicht gefunden',
     beschreibung: 'Diese Seite wurde nicht gefunden oder ist nicht verfügbar.',
@@ -1003,6 +1002,7 @@ export const TEXTE = {
       'Die Konfiguration wurde inzwischen geändert. Ihre Eingabe bleibt erhalten. Laden Sie den aktuellen Stand und prüfen Sie die Änderung erneut.',
     fehlerGebrauch:
       'Dieser Eintrag wird noch von Dokumenten verwendet und kann nicht gelöscht werden. Deaktivieren Sie ihn stattdessen.',
+    fehlerExistiert: 'Dieser Code ist bereits vergeben. Wählen Sie einen anderen Code.',
     fehlerUngueltig: 'Die Konfiguration ist ungültig. Bitte prüfen Sie Ihre Eingaben.',
     fehlerLaden: 'Die Konfiguration konnte nicht geladen werden. Bitte versuchen Sie es erneut.',
     fehlerSpeichern: 'Die Änderung konnte nicht gespeichert werden. Ihre Eingabe bleibt erhalten.',
@@ -1029,6 +1029,8 @@ export const TEXTE = {
       pflichtfelder: 'Pflichtfelder des Dokuments',
       pflichtfelderHinweis:
         'Ein Feld pro Zeile. Zusatzfelder werden im Feld-Editor als Pflicht markiert.',
+      pflichtfelderHinweisJson:
+        'Ein Feld pro Zeile. Pflichtige Zusatzfelder stehen hier als «zusatz.<Feldcode>».',
       vertraulichkeit: 'Vertraulichkeit',
       vertraulichkeiten: { NORMAL: 'Normal', INTERN: 'Intern', PERSONAL: 'Personal' },
       aufbewahrungJahre: 'Aufbewahrung in Jahren',
@@ -1192,6 +1194,8 @@ export const TEXTE = {
       jsonUngueltig: 'Der Dateiinhalt ist kein gültiges JSON-Objekt.',
       dateiZuGross: 'Die Datei darf höchstens 1 MiB gross sein.',
       grund: 'Änderungsgrund',
+      grundZeichen:
+        'Der Änderungsgrund enthält Zeichen, die nicht übertragen werden können (z. B. «–» oder «€»). Bitte ersetzen Sie sie.',
       exportFehler: 'Die Konfiguration konnte nicht exportiert werden.',
       fehlerLaden: 'Die Vorschau konnte nicht erstellt werden. Ihre Datei bleibt erhalten.',
       fehlerEinspielen: 'Die Datei konnte nicht eingespielt werden. Ihre Eingabe bleibt erhalten.',
