@@ -1,8 +1,11 @@
 package ch.urinet.archiv.wissen.adapter.out.okf;
 
+import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantVollexportDaten;
+import ch.urinet.archiv.mandant.application.MandantVollexportSchreiber;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.wissen.application.WissenOkfExportPort;
 import io.agroal.api.AgroalDataSource;
@@ -10,18 +13,22 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +49,7 @@ class OkfExportDatenTest {
     Instance<AgroalDataSource> datenbank;
 
     @Test
-    void exportLiestNurDasSchemaDesAuftrags() throws Exception {
+    void exportLiestNurDasSchemaDesAuftrags(@TempDir Path temp) throws Exception {
         MandantCode erster = new MandantCode("urinet");
         MandantCode zweiter = new MandantCode("vhf-gsk");
         for (MandantCode code : List.of(erster, zweiter)) {
@@ -61,6 +68,8 @@ class OkfExportDatenTest {
             byte[] zip2 = exportieren(zweiter);
             assertThat(dateinamen(zip1)).contains(pfad1 + ".md").doesNotContain(pfad2 + ".md");
             assertThat(dateinamen(zip2)).contains(pfad2 + ".md").doesNotContain(pfad1 + ".md");
+            byte[] paket = dateiBytes(vollexportieren(erster, temp), "wissensbasis.zip");
+            assertThat(dateinamen(paket)).contains(pfad1 + ".md").doesNotContain(pfad2 + ".md");
         } finally {
             loeschen(erster, id1);
             loeschen(zweiter, id2);
@@ -125,6 +134,34 @@ class OkfExportDatenTest {
         })).get(1, TimeUnit.MINUTES);
     }
 
+    private byte[] vollexportieren(MandantCode code, Path temp) throws Exception {
+        MandantVollexportDaten daten = new MandantVollexportDaten() {
+            public List<Dokument> seite(Optional<UUID> nach, int anzahl) {
+                return List.of();
+            }
+
+            public List<Manifestdatei> manifeste() {
+                return List.of();
+            }
+        };
+        AblagePort ablage = (AblagePort) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{AblagePort.class}, (proxy, methode, args) -> {
+                    throw new AssertionError("Unerwarteter Ablageaufruf: " + methode.getName());
+                });
+        return CompletableFuture.supplyAsync(() -> kontext.mit(code, () -> {
+            ByteArrayOutputStream ziel = new ByteArrayOutputStream();
+            try {
+                new MandantVollexportSchreiber(daten, ablage, export).schreiben(code, UUID.randomUUID(), temp, ziel);
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            return ziel.toByteArray();
+        })).get(1, TimeUnit.MINUTES);
+    }
+
     private List<String> dateinamen(byte[] daten) throws IOException {
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(daten))) {
             java.util.ArrayList<String> namen = new java.util.ArrayList<>();
@@ -136,10 +173,14 @@ class OkfExportDatenTest {
     }
 
     private String datei(byte[] daten, String name) throws IOException {
+        return new String(dateiBytes(daten, name), StandardCharsets.UTF_8);
+    }
+
+    private byte[] dateiBytes(byte[] daten, String name) throws IOException {
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(daten))) {
             for (var eintrag = zip.getNextEntry(); eintrag != null; eintrag = zip.getNextEntry()) {
                 if (eintrag.getName().equals(name)) {
-                    return new String(zip.readAllBytes(), StandardCharsets.UTF_8);
+                    return zip.readAllBytes();
                 }
             }
         }
