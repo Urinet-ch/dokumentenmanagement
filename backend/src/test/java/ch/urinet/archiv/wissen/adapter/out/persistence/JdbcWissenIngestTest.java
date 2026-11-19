@@ -12,6 +12,9 @@ import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
+import ch.urinet.archiv.wissen.application.FreigabeKontext;
+import ch.urinet.archiv.wissen.application.FreigabeSperre;
+import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
@@ -74,6 +77,15 @@ class JdbcWissenIngestTest {
     FreigabeDienst freigabe;
 
     @Inject
+    FreigabeSperre freigabeSperre;
+
+    @Inject
+    JdbcFreigabeRepository freigabeRepository;
+
+    @Inject
+    FreigabeKontext freigabeKontext;
+
+    @Inject
     MandantKontext kontext;
 
     @Inject
@@ -110,12 +122,12 @@ class JdbcWissenIngestTest {
     void aufraeumen() throws SQLException {
         worker.shutdown();
         for (MandantCode code : List.of(URINET, ZWEITER)) {
-            for (UUID id : seiten.get(code)) {
-                ausfuehren("delete from " + code.schema() + ".wissensseite where id = ?", id);
-            }
             for (UUID id : entwuerfe.get(code)) {
                 ausfuehren("delete from " + code.schema() + ".wissens_aenderung where entwurf_id = ?", id);
                 ausfuehren("delete from " + code.schema() + ".wissens_entwurf where id = ?", id);
+            }
+            for (UUID id : seiten.get(code)) {
+                ausfuehren("delete from " + code.schema() + ".wissensseite where id = ?", id);
             }
             for (Long id : verbrauch.get(code)) {
                 ausfuehren("delete from " + code.schema() + ".ki_verbrauch where id = ?", id);
@@ -270,6 +282,73 @@ class JdbcWissenIngestTest {
         })).isInstanceOf(IllegalStateException.class).hasMessage("Testabbruch");
         assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
         assertThat(zeile(URINET, wartend)).containsEntry("status", "WARTEND");
+    }
+
+    @Test
+    void veralteteBasisWirdUnterSperreMarkiertUndBleibtNachCommitErhalten() throws SQLException {
+        UUID seite = seite(URINET, "konzepte/basis-" + UUID.randomUUID(), "Probe", null);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set aktion = 'AENDERN', seite_id = ?, basis_version = 1 "
+                + "where entwurf_id = ?", seite, entwurf);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set version = 2 where id = ?", seite);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+
+        assertThat(im(URINET, () -> {
+            var aenderung = freigabeSperre.laden(inhaber, entwurf, 1, () -> 0);
+            return freigabeSperre.basisAktuell(aenderung);
+        })).isFalse();
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_aenderung where entwurf_id = ? and status = 'VERALTET' and etag = 1", entwurf))
+                .isEqualTo(1);
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+    }
+
+    @Test
+    void freigabePrueftNeueQuellenMitIhrerAktuellenStufe() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        String daten = """
+                {"typ":"Synthese","titel":"Probe","beschreibung":"Ein Satz.","tags":[],
+                 "status":"VERALTET","veraltetAb":null,
+                 "quellen":[{"schluessel":"q1","dokumentId":"%s","seiteVon":1,"seiteBis":1,
+                             "auszug":"Seite 1","quellSeiteId":null}],
+                 "vertraulichkeit":"INTERN","inhalt":"Aussage.[^q1]","wissensquelleId":null}
+                """.formatted(dokument);
+        ausfuehren("update " + URINET.schema()
+                        + ".wissens_aenderung set pfad = 'ueberblick', daten = cast(? as jsonb), "
+                        + "inhalt = 'Aussage.[^q1]' where entwurf_id = ?", daten, entwurf);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+
+        var normal = im(URINET, () -> {
+            var a = freigabeSperre.laden(inhaber, entwurf, 1, () -> 0);
+            var vorschlag = freigabeRepository.vorschlagLaden(a);
+            return freigabeKontext.pruefen(inhaber, entwurf, a, vorschlag, vorschlag.fassung(), "NORMAL");
+        });
+        assertThat(normal.mindeststufe()).isEqualTo(WissensStufe.NORMAL);
+        assertThat(normal.pruefung().befunde()).extracting(WissensPruefung.Befund::code)
+                .doesNotContain(WissensPruefung.Code.STUFE_UEBERBLICK);
+
+        ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'INTERN' where id = ?", dokument);
+        var intern = im(URINET, () -> {
+            var a = freigabeSperre.laden(inhaber, entwurf, 1, () -> 0);
+            var vorschlag = freigabeRepository.vorschlagLaden(a);
+            return freigabeKontext.pruefen(inhaber, entwurf, a, vorschlag, vorschlag.fassung(), "NORMAL");
+        });
+        assertThat(intern.mindeststufe()).isEqualTo(WissensStufe.INTERN);
+        assertThat(intern.pruefung().befunde()).extracting(WissensPruefung.Befund::code)
+                .contains(WissensPruefung.Code.STUFE_UEBERBLICK);
+
+        ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'PERSONAL' where id = ?", dokument);
+        var personal = im(URINET, () -> {
+            var a = freigabeSperre.laden(inhaber, entwurf, 1, () -> 0);
+            var vorschlag = freigabeRepository.vorschlagLaden(a);
+            return freigabeKontext.pruefen(inhaber, entwurf, a, vorschlag, vorschlag.fassung(), null);
+        });
+        assertThat(personal.pruefung().befunde()).extracting(WissensPruefung.Befund::code)
+                .contains(WissensPruefung.Code.QUELLE_PERSONAL);
     }
 
     @Test

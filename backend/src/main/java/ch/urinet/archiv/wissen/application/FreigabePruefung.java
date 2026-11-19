@@ -40,9 +40,11 @@ public class FreigabePruefung {
             } catch (IllegalArgumentException e) {
                 throw new FachFehler(Fehlercode.VERTRAULICHKEIT_UNGUELTIG);
             }
-            if (mindeststufe.hoechste(berechnet) != mindeststufe) {
+            if (mindeststufe.hoechste(berechnet) != mindeststufe
+                    && !("ueberblick".equals(fassung.pfad()) && berechnet == WissensStufe.INTERN)) {
                 throw new FachFehler(Fehlercode.VERTRAULICHKEIT_ZU_TIEF);
             }
+            mindeststufe = mindeststufe.hoechste(berechnet);
         }
         WissensPruefung.Kontext aktuell = new WissensPruefung.Kontext(kontext.maxZeichen(), kontext.bisherigerPfad(),
                 kontext.belegtePfade(), kontext.dokumente(), kontext.seitenIds(), kontext.basisQuellenSchluessel(),
