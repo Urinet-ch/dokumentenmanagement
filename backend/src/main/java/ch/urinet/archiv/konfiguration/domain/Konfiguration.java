@@ -13,22 +13,29 @@ import java.util.regex.Pattern;
 
 /** Unveränderliches Abbild der fachlichen Konfiguration eines Mandanten. */
 public record Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
-                            List<Klassifikation> klassifikationen, List<Regel> regeln) {
+                            List<Klassifikation> klassifikationen, List<Regel> regeln, KiTexte kiTexte) {
 
     /** Schema einer Art ohne Zusatzfelder. */
     public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
+    private static final long PROMPT_ZEICHEN_MAX = 24_000;
+    private static final Pattern GESCHAEFTSJAHR_ENDE = Pattern.compile("^\\d{2}-\\d{2}$");
     private static final Pattern KLASSIFIKATIONSCODE = Pattern.compile("^[a-z][a-z0-9_]{0,39}$");
     private static final Set<String> RESERVIERTE_PUBLIC_PARAMETER = Set.of("q", "reihe", "jahr", "ausgabe", "seite",
             "pro_seite", "dateiname", "id", "sortierung", "gespraech_id", "zugriff", "veroeffentlicht", "seit", "max",
             "referenz", "groesse", "status", "url");
 
     public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten) {
-        this(version, einstellungen, arten, List.of(), List.of());
+        this(version, einstellungen, arten, List.of(), List.of(), KiTexte.LEER);
     }
 
     public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
                          List<Klassifikation> klassifikationen) {
-        this(version, einstellungen, arten, klassifikationen, List.of());
+        this(version, einstellungen, arten, klassifikationen, List.of(), KiTexte.LEER);
+    }
+
+    public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
+                         List<Klassifikation> klassifikationen, List<Regel> regeln) {
+        this(version, einstellungen, arten, klassifikationen, regeln, KiTexte.LEER);
     }
 
     /** Die Arten stehen nach Code sortiert, damit Abbilder aus Migration und App gleich aufgebaut sind. */
@@ -41,6 +48,15 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         regeln = regeln == null ? List.of()
                 : regeln.stream().sorted(Comparator.comparing(Regel::code, Comparator.nullsFirst(String::compareTo)))
                         .toList();
+        kiTexte = kiTexte == null ? KiTexte.LEER : kiTexte;
+    }
+
+    /**
+     * {@code true}, wenn das Abbild keine KI-Texte enthielt (gespeichert vor Changeset 048): Der Konstruktor ersetzt
+     * {@code null} durch genau die Instanz {@link KiTexte#LEER}, gelesene oder gebaute KI-Texte sind eigene Instanzen.
+     */
+    public boolean ohneKiTexte() {
+        return kiTexte == KiTexte.LEER;
     }
 
     /** Liefert alle Prüfungen, die ohne die späteren Konfigurationsattribute möglich sind. */
@@ -49,8 +65,19 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         if (version < 1) {
             befunde.add(new Befund("version", "VERSION_UNGUELTIG", "Die Konfigurationsversion muss positiv sein."));
         }
+        if (codepunkte(kiTexte.rolle()) > 8000 || codepunkte(kiTexte.feldregeln()) > 8000) {
+            befunde.add(new Befund("kiTexte", "TEXT_ZU_LANG", "Ein KI-Text überschreitet 8'000 Zeichen."));
+        }
+        if (promptZeichen() > PROMPT_ZEICHEN_MAX) {
+            befunde.add(new Befund("kiTexte", "TEXTE_ZU_LANG",
+                    "Die Texte im KI-Prompt überschreiten zusammen 24'000 Zeichen."));
+        }
         if (arten.size() > 200) {
             befunde.add(new Befund("arten", "ANZAHL_UNGUELTIG", "Die Konfiguration enthält zu viele Dokumentarten."));
+        }
+        if (einstellungen != null && !geschaeftsjahrEndeGueltig(einstellungen.geschaeftsjahrEnde())) {
+            befunde.add(new Befund("einstellungen.geschaeftsjahrEnde", "DATUM_UNGUELTIG",
+                    "Das Geschäftsjahresende ist kein gültiger Tag im Format MM-TT."));
         }
         Set<String> codes = new HashSet<>();
         Map<String, Art> nachCode = nachCode(arten);
@@ -412,7 +439,8 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     public boolean gleicherInhalt(Konfiguration andere) {
         return andere != null && einstellungen.equals(andere.einstellungen) && arten.equals(andere.arten)
-                && klassifikationen.equals(andere.klassifikationen) && regeln.equals(andere.regeln);
+                && klassifikationen.equals(andere.klassifikationen) && regeln.equals(andere.regeln)
+                && kiTexte.equals(andere.kiTexte);
     }
 
     public List<Aenderung> aenderungen(Konfiguration neu) {
@@ -423,6 +451,9 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 neu.einstellungen.kennungen().uid());
         feld(aenderungen, "einstellungen.kennungen.ibans", einstellungen.kennungen().ibans(),
                 neu.einstellungen.kennungen().ibans());
+        feld(aenderungen, "kiTexte.rolle", kiTexte.rolle(), neu.kiTexte.rolle());
+        feld(aenderungen, "kiTexte.feldregeln", kiTexte.feldregeln(), neu.kiTexte.feldregeln());
+        feld(aenderungen, "kiTexte.kiFreigegeben", kiTexte.kiFreigegeben(), neu.kiTexte.kiFreigegeben());
 
         Map<String, Art> vorher = nachCode(arten);
         Map<String, Art> nachher = nachCode(neu.arten);
@@ -573,9 +604,63 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         }
     }
 
+    /** {@code MM-dd} mit einem Tag, den der Monat hat (29.02. zählt, wie in der Datenbankprüfung). */
+    private static boolean geschaeftsjahrEndeGueltig(String wert) {
+        if (wert == null || !GESCHAEFTSJAHR_ENDE.matcher(wert).matches()) {
+            return false;
+        }
+        try {
+            java.time.MonthDay.of(Integer.parseInt(wert.substring(0, 2)), Integer.parseInt(wert.substring(3)));
+            return true;
+        } catch (java.time.DateTimeException e) {
+            return false;
+        }
+    }
+
+    private static int codepunkte(String wert) {
+        return wert.codePointCount(0, wert.length());
+    }
+
+    /**
+     * Alle Texte, die in den KI-Prompt gelangen (design.md, «Grenzen gegen zu lange Prompts»): KI-Texte sowie Namen,
+     * Beschreibungen und Hinweise der Arten und Klassifikationen (mit Werten), die die KI vorschlagen darf.
+     */
+    private long promptZeichen() {
+        long summe = (long) codepunkte(kiTexte.rolle()) + codepunkte(kiTexte.feldregeln());
+        for (Art art : arten) {
+            if (art.kiVorschlag()) {
+                summe += codepunkteOderNull(art.name()) + codepunkteOderNull(art.beschreibung())
+                        + codepunkteOderNull(art.kiHinweise());
+            }
+        }
+        for (Klassifikation klasse : klassifikationen) {
+            if (klasse.kiVorschlag()) {
+                summe += codepunkteOderNull(klasse.name()) + codepunkteOderNull(klasse.beschreibung());
+                for (KlassifikationWert wert : klasse.werte()) {
+                    summe += codepunkteOderNull(wert.name()) + codepunkteOderNull(wert.beschreibung());
+                }
+            }
+        }
+        return summe;
+    }
+
+    private static int codepunkteOderNull(String wert) {
+        return wert == null ? 0 : codepunkte(wert);
+    }
+
     public record Einstellungen(String geschaeftsjahrEnde, Kennungen kennungen) {
         public Einstellungen {
             kennungen = kennungen == null ? new Kennungen(null, List.of()) : kennungen;
+        }
+
+    }
+
+    public record KiTexte(String rolle, String feldregeln, boolean kiFreigegeben) {
+        public static final KiTexte LEER = new KiTexte("", "", false);
+
+        public KiTexte {
+            rolle = rolle == null ? "" : rolle;
+            feldregeln = feldregeln == null ? "" : feldregeln;
         }
     }
 

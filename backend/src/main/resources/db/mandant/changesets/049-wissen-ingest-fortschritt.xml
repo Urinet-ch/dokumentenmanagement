@@ -5,7 +5,7 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!-- Spec 04, Aufgabe 14.1b: Teilauftragsfortschritt bleibt atomar mit dem Auftrag erhalten. -->
-    <changeSet id="048-wissen-ingest-fortschritt" author="archiv">
+    <changeSet id="049-wissen-ingest-fortschritt" author="archiv">
         <sql>
             alter table wissens_entwurf
                 add column ingest_daten jsonb not null default '{}'::jsonb

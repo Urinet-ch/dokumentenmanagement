@@ -48,7 +48,17 @@ public class PanacheDokumentartRepository implements DokumentartRepository {
 
     @Override
     public void loeschen(String code) {
-        DokumentartEintrag.deleteById(code);
+        DokumentartEintrag eintrag = DokumentartEintrag.findById(code);
+        if (eintrag == null) {
+            return;
+        }
+        if (eintrag.fremdbelegArt != null || eintrag.ohneZahlungsdatenArt != null) {
+            // Verweise zuerst lösen: Löschen zwei Arten, die aufeinander verweisen, scheitert sonst am Fremdschlüssel.
+            eintrag.fremdbelegArt = null;
+            eintrag.ohneZahlungsdatenArt = null;
+            DokumentartEintrag.flush();
+        }
+        eintrag.delete();
     }
 
     private static void uebernehmen(Dokumentart art, DokumentartEintrag eintrag) {

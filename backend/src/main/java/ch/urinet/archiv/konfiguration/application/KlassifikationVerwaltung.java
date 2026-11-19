@@ -222,7 +222,7 @@ public class KlassifikationVerwaltung {
 
     private static Konfiguration mitKlassifikationen(Konfiguration aktuell, List<Klassifikation> klassifikationen) {
         return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), aktuell.arten(), klassifikationen,
-                aktuell.regeln());
+                aktuell.regeln(), aktuell.kiTexte());
     }
 
     private static Konfiguration mitErsetzterKlassifikation(Konfiguration aktuell, Klassifikation neu) {
@@ -247,7 +247,7 @@ public class KlassifikationVerwaltung {
             return mitArtKlassifikationen(art, zuordnungen);
         }).toList();
         return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), arten,
-                aktuell.klassifikationen(), aktuell.regeln());
+                aktuell.klassifikationen(), aktuell.regeln(), aktuell.kiTexte());
     }
 
     private static Konfiguration ohneArtZuordnung(Konfiguration aktuell, String artCode, String code) {
@@ -259,7 +259,7 @@ public class KlassifikationVerwaltung {
                     .filter(zuordnung -> !zuordnung.klassifikation().equals(code)).toList());
         }).toList();
         return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), arten,
-                aktuell.klassifikationen(), aktuell.regeln());
+                aktuell.klassifikationen(), aktuell.regeln(), aktuell.kiTexte());
     }
 
     private static Konfiguration mitArtZuordnungErsetzt(Konfiguration aktuell, String artCode,
@@ -272,7 +272,7 @@ public class KlassifikationVerwaltung {
                     .map(alt -> alt.klassifikation().equals(neu.klassifikation()) ? neu : alt).toList());
         }).toList();
         return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), arten,
-                aktuell.klassifikationen(), aktuell.regeln());
+                aktuell.klassifikationen(), aktuell.regeln(), aktuell.kiTexte());
     }
 
     private static Konfiguration.Art mitArtKlassifikationen(Konfiguration.Art art,

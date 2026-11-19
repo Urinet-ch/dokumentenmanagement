@@ -17,6 +17,7 @@ public interface MandantVollexportDaten {
         }
     }
 
+    /** Versions-ID als Quellenachweis; gelesen wird das Manifest nach Schlüssel und SHA-256. */
     record Manifestdatei(LocalDate datum, String endung, String schluessel, String versionId, String sha256) {
     }
 

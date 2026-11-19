@@ -5,7 +5,7 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!-- Spec 04, Aufgabe 14.1b: gleichzeitige Ingest-Aufträge reservieren ihr Budget atomar. -->
-    <changeSet id="049-wissen-budget-reservierung" author="archiv">
+    <changeSet id="050-wissen-budget-reservierung" author="archiv">
         <sql>
             alter table ki_verbrauch add column ingest_entwurf_id uuid;
             alter table ki_verbrauch add constraint ki_verbrauch_ingest_entwurf_fk

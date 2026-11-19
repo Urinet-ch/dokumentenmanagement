@@ -34,6 +34,7 @@ class ExportSchreiberTest {
 
     private final Map<String, byte[]> objekte = new LinkedHashMap<>();
     private final List<LocalDate[]> manifestAbfragen = new ArrayList<>();
+    private final List<String> manifestAufloesungen = new ArrayList<>();
 
     private ExportBelege.Datei datei(String schluessel, String text) {
         byte[] inhalt = text.getBytes(StandardCharsets.UTF_8);
@@ -42,15 +43,28 @@ class ExportSchreiberTest {
     }
 
     private ExportSchreiber.Quelle quelle() {
-        return (schluessel, version, ziel) -> {
-            byte[] inhalt = objekte.get(schluessel);
-            try {
-                ziel.write(inhalt);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+        return new ExportSchreiber.Quelle() {
+            @Override
+            public Kopie kopieren(String schluessel, String version, OutputStream ziel) {
+                return kopie(schluessel, ziel);
             }
-            return new Kopie(Pruefsumme.von(inhalt), inhalt.length);
+
+            @Override
+            public Kopie kopierenManifest(String schluessel, String sha256, OutputStream ziel) {
+                manifestAufloesungen.add(schluessel + ":" + sha256);
+                return kopie(schluessel, ziel);
+            }
         };
+    }
+
+    private Kopie kopie(String schluessel, OutputStream ziel) {
+        byte[] inhalt = objekte.get(schluessel);
+        try {
+            ziel.write(inhalt);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return new Kopie(Pruefsumme.von(inhalt), inhalt.length);
     }
 
     private ExportBelege belege(List<ExportBelege.Beleg> alle, List<ExportBelege.Manifestdatei> manifeste) {
@@ -94,8 +108,10 @@ class ExportSchreiberTest {
         }
         byte[] json = "manifest".getBytes(StandardCharsets.UTF_8);
         objekte.put("manifest/2026-02-01.json", json);
-        var manifest = new ExportBelege.Manifestdatei(LocalDate.of(2026, 2, 1), "json", "manifest/2026-02-01.json", "v",
-                Pruefsumme.von(json));
+        String manifestSchluessel = "manifest/2026-02-01.json";
+        String manifestSha256 = Pruefsumme.von(json);
+        var manifest = new ExportBelege.Manifestdatei(LocalDate.of(2026, 2, 1), "json", manifestSchluessel,
+                "versions-id-der-quelle", manifestSha256);
         ByteArrayOutputStream aus = new ByteArrayOutputStream();
 
         ExportSchreiber.Ergebnis ergebnis = new ExportSchreiber(belege(alle, List.of(manifest)), quelle(), 2)
@@ -103,6 +119,7 @@ class ExportSchreiberTest {
 
         // 4 Belege am 2026-02-01 mit Manifest, einer am 2027-02-03 ohne
         assertThat(ergebnis).isEqualTo(new ExportSchreiber.Ergebnis(5, 5, 1, 1));
+        assertThat(manifestAufloesungen).containsExactly(manifestSchluessel + ":" + manifestSha256);
         Map<String, byte[]> zip = entpacken(aus.toByteArray());
         assertThat(zip.keySet()).hasSize(8).contains("belege/2026-01-01_QUITTUNG_Q0_Partner.pdf",
                 "manifeste/2026-02-01.json", "belegliste.csv", "pruefsummen.sha256");

@@ -49,6 +49,7 @@
     <include file="changesets/045-klassifikation.xml" relativeToChangelogFile="true"/>
     <include file="changesets/046-regel.xml" relativeToChangelogFile="true"/>
     <include file="changesets/047-wissen-ingest-indizes.xml" relativeToChangelogFile="true"/>
-    <include file="changesets/048-wissen-ingest-fortschritt.xml" relativeToChangelogFile="true"/>
-    <include file="changesets/049-wissen-budget-reservierung.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/048-ki-texte.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/049-wissen-ingest-fortschritt.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/050-wissen-budget-reservierung.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -180,7 +180,13 @@ public class MandantVollexportSchreiber {
                 nummer = 0;
             }
             String pfad = "manifeste/" + datum + "/" + nummer++ + ".bin";
-            kopieren(mandant, zip, pruefsummen, manifest.schluessel(), manifest.versionId(), manifest.sha256(), pfad);
+            zip.putNextEntry(new ZipEntry(pfad));
+            Kopie kopie = ablage.sicherungsManifestKopie(mandant, manifest.schluessel(), manifest.sha256(), zip);
+            zip.closeEntry();
+            if (!kopie.sha256().equalsIgnoreCase(manifest.sha256())) {
+                throw new IllegalStateException("Prüfsumme weicht ab bei einer Manifestdatei des Vollexports");
+            }
+            pruefsumme(pruefsummen, HEX.parseHex(kopie.sha256()), pfad);
         }
     }
 

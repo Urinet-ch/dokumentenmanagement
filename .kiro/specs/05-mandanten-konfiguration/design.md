@@ -152,8 +152,9 @@ Version und Protokoll tragen `wer = 'betreiber:<name>'` und den Grund.
 Schema `backend/src/main/resources/konfiguration/konfiguration.schema.json` (JSON Schema 2020-12). Felder mit `_`
 am Anfang sind Kommentare; das Archiv ignoriert sie beim Einspielen und exportiert sie nicht (Req 6.5). Unbekannte
 Felder sind ungültig. Beim Export setzt das Archiv `basisVersion` auf die aktuelle Version; der Seed hat keine.
-`kiFreigegeben` wird exportiert, beim Einspielen aber nur geprüft: Weicht der Wert vom aktuellen ab, lehnt das Archiv
-die Datei ab (Req 6.6); nur der Seed (Version 1) und `ki-freigeben` setzen ihn. Der Seed eines Mandanten enthält
+`kiFreigegeben` stammt aus der Live-Tabelle `ki_texte` und wird in den aktuellen Versions-Snapshot und Export
+übernommen. Beim Einspielen wird der Wert nur geprüft; weicht er vom Live-Wert ab, lehnt das Archiv die Datei ab und
+bewahrt beim Speichern den Live-Wert (Req 6.6). Nur der Seed und `ki-freigeben` setzen ihn. Der Seed eines Mandanten enthält
 `WISSENSQUELLE` nicht; sie kommt aus dem Seed-Teil `_alle`, und Prüfung und Vergleich laufen über beide zusammen
 (Req 6.7, 9.2). Der Export enthält `WISSENSQUELLE` mit den Ergänzungen des Mandanten.
 
@@ -209,6 +210,31 @@ Beispiel (nur das Format; die Werte für `vhf-gsk` legt Spec 03 fest):
 - Grenzen (für Datei und jeden App-Aufruf gleich): höchstens 200 Arten, 50 Klassifikationen, 500 Werte je
   Klassifikation, 200 Regeln, 20 Belegnummer-Muster je Art, Datei 1 MiB; `name` ≤ 100, `beschreibung` ≤ 1'000,
   `meldung` ≤ 300 Zeichen; KI-Texte nach «Erweiterungen» (`ki/`).
+
+Umsetzung 17.7a (Review PR #310): `PUT /konfiguration` wertet kein `If-Match` aus; massgeblich ist nur die
+`basisVersion` der Datei (Req 7.6), fehlt sie, kommt 422 mit Befund `/basisVersion` (`BASISVERSION_FEHLT`).
+422 `KONFIGURATION_UNGUELTIG` trägt `befunde[]` mit `pfad`, `code`, `meldung`: Schemafehler der Datei als
+JSON-Pointer (`/arten/0/code`, Code = Schlüsselwort des JSON Schemas, unbekannte Namen als `*`), Befunde der
+Prüfungen gepunktet (`arten.<code>.feld`). Die Zuordnung einer Klassifikation heisst in der Datei `code`, im Domain-Modell
+`klassifikation`. Eine in der Datei fehlende Klassifikation bleibt nur erhalten (inaktiv), wenn Dokumente sie tragen;
+Zuordnungen von Arten aus dem Bestand auf solche Klassifikationen werden weder Pflicht noch vorbelegt. Neue Arten
+werden zuerst ohne Artverweise angelegt, wegfallende Arten lösen ihre Verweise vor dem Löschen. `ki_texte.ki_freigegeben`
+startet nur im Schema `m_urinet` mit `true` (Req 8.4), sonst mit `false`.
+
+Nachbesserung 17.7a (Review PR #310, Kopf 9885408b): Abbilder ohne `kiTexte` (Versionen vor 048, Seed älterer
+Releases) erhalten beim Lesen die KI-Texte aus `ki_texte` (`Konfiguration.ohneKiTexte`); Abbilder mit `kiTexte`
+bleiben unverändert, damit ein späteres Ändern der Freigabe eine neue Version erzeugt. Beim Einspielen und im Diff kommt
+`kiFreigegeben` immer aus `ki_texte`, nie aus der Datei (Req 8.4: nur das Admin-Kommando ändert die Freigabe).
+Der Seed (`SEED`) enthält `kiTexte`; der changeSet `048-ki-texte-version` hängt bei bestehenden Mandanten mit Arten
+eine Version `MIGRATION` mit den KI-Texten an, wenn das letzte Abbild keine hat. Die Summe von 24'000 Zeichen zählt
+`rolle`, `feldregeln` sowie Name, Beschreibung und `kiHinweise` aller Arten mit `kiVorschlag` und Name und Beschreibung
+aller Klassifikationen mit `kiVorschlag` samt Werten (auch inaktive, strenger als der tatsächliche Prompt); Befund
+`kiTexte` mit Code `TEXTE_ZU_LANG`. Vor dem Löschen wegfallender Werte oder Klassifikationen setzt das Einspielen
+Standardwerte, die auf sie zeigen, auf `null`; danach schreibt es die Zuordnungen der Datei. Export und `ETag` stammen
+aus demselben Stand. Bei einer KI-Textänderung wird das Vorher-Abbild vor dem Schreiben gesichert und für Version,
+Diff und Zugriffsprotokoll verwendet; das gilt für `PATCH /konfiguration/ki-texte` und das Einspielen einer Datei,
+auch wenn die letzte gespeicherte Version noch kein `kiTexte` enthält. Der Patch antwortet bei zu langen Texten oder
+fehlendem Grund mit 422 `KONFIGURATION_UNGUELTIG` samt `befunde[]`.
 
 ## Regeltypen
 | Typ | Parameter | Prüfung | Wann |
@@ -327,7 +353,8 @@ Umsetzung 17.2 (Review PR #251): Das Abbild enthält `einstellungen` und `arten`
 kanonischer JSON-Text (Schlüssel sortiert, kompakt), damit Migration (jsonb), Client-Text und Vergleich dieselbe Form
 haben. Das Abbild der Migration und das der App sind gleich aufgebaut (Arten nach Code in Byte-Reihenfolge, leere
 Listen statt `null`, `ohne Schema = {"type":"object","properties":{},"additionalProperties":false}`). Ein neuer
-Mandant erhält Version 1 vom Changeset (leer, Quelle `MIGRATION`) und nach dem Seed Version 2 mit Quelle `SEED`.
+Mandant erhält Version 1 vom Changeset; spätere Changesets, die das Abbild ergänzen (u. a. KI-Texte), können weitere
+Versionen mit Quelle `MIGRATION` anfügen. Nach dem Seed kommt die nächste Version mit Quelle `SEED`.
 Änderungen an `PATCH /mandant/einstellungen` erzeugen bis 17.7 keine eigene Version; sie gehen in die nächste Version
 ein (die Bindung an `If-Match` kommt mit 17.7). `basisSicherstellen()` legt für Schemas ohne Version 1 diese beim
 ersten Zugriff an (Quelle `MIGRATION`). Das Zugriffsprotokoll trägt je Änderung die geänderten Pfade mit alt und neu.

@@ -118,6 +118,30 @@ class AblageStubTest {
         assertThat(stub.speicherbedarf(andererMandant)).isEqualTo(7);
     }
 
+    @Test
+    void sicherungsManifestKopieMeldetWieS3Ablage() {
+        AblageStub stub = mitManifesten(1);
+        String schluessel = ManifestTeil.JSON.pfad(LocalDate.of(2026, 1, 1));
+        byte[] inhalt = "{\"tag\":1}".getBytes(StandardCharsets.UTF_8);
+        var ziel = new java.io.ByteArrayOutputStream();
+
+        assertThat(stub.sicherungsManifestKopie(MANDANT, schluessel,
+                ch.urinet.archiv.ablage.domain.Pruefsumme.von(inhalt), ziel).groesse()).isEqualTo(inhalt.length);
+        assertThat(ziel.toByteArray()).isEqualTo(inhalt);
+        assertThatThrownBy(() -> stub.sicherungsManifestKopie(MANDANT, "manifest/2026-01-02.json", "0".repeat(64),
+                new java.io.ByteArrayOutputStream()))
+                .isInstanceOf(IllegalStateException.class).hasMessage("Manifest-Teil fehlt: manifest/2026-01-02.json");
+        assertThatThrownBy(() -> stub.sicherungsManifestKopie(MANDANT, schluessel, "0".repeat(64),
+                new java.io.ByteArrayOutputStream()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Prüfsumme");
+        assertThatThrownBy(() -> stub.sicherungsManifestKopie(MANDANT, schluessel, null,
+                new java.io.ByteArrayOutputStream()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Ungültige Manifest-Referenz");
+        assertThatThrownBy(() -> stub.sicherungsManifestKopie(MANDANT, null, "0".repeat(64),
+                new java.io.ByteArrayOutputStream()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Ungültige Manifest-Referenz");
+    }
+
     private static AblageStub mitManifesten(int anzahl) {
         AblageStub stub = new AblageStub();
         for (int tag = 1; tag <= anzahl; tag++) {
