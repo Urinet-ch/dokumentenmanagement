@@ -4,6 +4,7 @@ import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
 import ch.urinet.archiv.wissen.domain.WissensMarkdown;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
@@ -11,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -29,10 +31,11 @@ public class WissenLesen {
         this.berechtigung = berechtigung;
     }
 
-    public IndexErgebnis index(Benutzer benutzer, Seitentyp typ, String tag, String q, int offset, int groesse) {
+    public IndexErgebnis index(Benutzer benutzer, Seitentyp typ, String tag, String q, UUID dokumentId,
+                               int offset, int groesse) {
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
         WissenLesenRepository.IndexErgebnis treffer = repository.index(Sichtregel.fuer(benutzer),
-                new WissenLesenRepository.IndexAnfrage(typ, tag, q, offset, groesse));
+                new WissenLesenRepository.IndexAnfrage(typ, tag, q, dokumentId, offset, groesse));
         return IndexErgebnis.gruppieren(treffer, offset, groesse);
     }
 
@@ -97,6 +100,39 @@ public class WissenLesen {
     public WissenLesenRepository.LogSeite log(Benutzer benutzer, WissenLesenRepository.LogCursor vor, int groesse) {
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
         return repository.log(Sichtregel.fuer(benutzer), vor, groesse);
+    }
+
+    /**
+     * Anzeigedaten der Quelleneinträge einer Seite nach Schlüssel, unter derselben Sichtregel wie die Seite. Nicht
+     * sichtbare Ziele fehlen im Ergebnis; so entstehen im Frontend weder Nachladeaufrufe noch fremde Protokolleinträge.
+     */
+    public Map<String, QuellenAnzeige> quellenAnzeige(Benutzer benutzer, Wissensseite seite) {
+        Set<UUID> dokumentIds = new java.util.HashSet<>();
+        Set<UUID> seitenIds = new java.util.HashSet<>();
+        for (Quelleneintrag quelle : seite.quellen()) {
+            if (quelle.dokumentId() != null) {
+                dokumentIds.add(quelle.dokumentId());
+            } else if (quelle.quellSeiteId() != null) {
+                seitenIds.add(quelle.quellSeiteId());
+            }
+        }
+        Sichtregel regel = Sichtregel.fuer(benutzer);
+        Map<UUID, WissenLesenRepository.DokumentKopf> dokumente = repository.dokumentKoepfe(regel, dokumentIds);
+        Map<UUID, WissenLesenRepository.SeiteVerweis> seiten = repository.sichtbareSeiten(regel, seitenIds);
+        Map<String, QuellenAnzeige> ergebnis = new java.util.HashMap<>();
+        for (Quelleneintrag quelle : seite.quellen()) {
+            WissenLesenRepository.DokumentKopf dokument = quelle.dokumentId() == null ? null : dokumente.get(quelle.dokumentId());
+            WissenLesenRepository.SeiteVerweis ziel = quelle.quellSeiteId() == null ? null : seiten.get(quelle.quellSeiteId());
+            if (dokument != null) {
+                ergebnis.put(quelle.schluessel(), new QuellenAnzeige(dokument.titel(), dokument.dateiname(), null, null));
+            } else if (ziel != null) {
+                ergebnis.put(quelle.schluessel(), new QuellenAnzeige(null, null, ziel.pfad(), ziel.titel()));
+            }
+        }
+        return ergebnis;
+    }
+
+    public record QuellenAnzeige(String dokumentTitel, String dokumentDateiname, String seitePfad, String seiteTitel) {
     }
 
     public String inhaltDarstellen(Benutzer benutzer, String markdown) {

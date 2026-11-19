@@ -3012,6 +3012,9 @@
           },
           "status" : {
             "type" : "string"
+          },
+          "quellePruefen" : {
+            "type" : "boolean"
           }
         }
       },
@@ -3135,6 +3138,18 @@
           },
           "quellSeiteId" : {
             "$ref" : "#/components/schemas/UUID"
+          },
+          "dokumentTitel" : {
+            "type" : "string"
+          },
+          "dokumentDateiname" : {
+            "type" : "string"
+          },
+          "quellSeitePfad" : {
+            "type" : "string"
+          },
+          "quellSeiteTitel" : {
+            "type" : "string"
           }
         }
       },
@@ -7106,6 +7121,12 @@
         "description" : "Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.",
         "tags" : [ "Wissensbasis" ],
         "parameters" : [ {
+          "name" : "dokumentId",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
           "schema" : {
             "type" : "integer",
             "default" : 50

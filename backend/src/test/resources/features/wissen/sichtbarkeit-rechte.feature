@@ -91,3 +91,9 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Angenommen synthetische Wissensleseproben sind angelegt
     Wenn «mitarbeiter» Index, Seite, Versionen, Diff, Links und Log abruft
     Dann verraten Zähler, Seiten, Versionen, Links und Log keine unsichtbaren Daten
+
+  @req-15.2 @req-15.4
+  Szenario: Dokumentfilter und Prüfhinweis zeigen nur sichtbare Wissensseiten
+    Angenommen synthetische Wissensleseproben sind angelegt
+    Wenn die Wissensseiten nach einem Quelldokument gefiltert werden
+    Dann zeigt der Index nur sichtbare Seiten des eigenen Mandanten und deren Prüfhinweis
