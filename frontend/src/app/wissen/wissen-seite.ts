@@ -22,6 +22,7 @@ interface Inhalt {
   seite: Wissensseite;
   text: Textteil[][];
   quellen: Quelle[];
+  quellenNachSchluessel: Map<string, Quelle>;
   eingehend: WissensIndexZeile[];
   versionen: Wissensversionen;
 }
@@ -106,7 +107,11 @@ export class WissenSeite {
     ).subscribe({
       next: (ergebnis) => {
         if (nummer !== this.anfrage) return;
-        this.inhalt.set({ ...ergebnis, text: wissenText(ergebnis.seite.inhaltHtml ?? '') });
+        this.inhalt.set({
+          ...ergebnis,
+          text: wissenText(ergebnis.seite.inhaltHtml ?? ''),
+          quellenNachSchluessel: new Map(ergebnis.quellen.map((quelle) => [quelle.schluessel, quelle])),
+        });
         this.laedt.set(false);
       },
       error: (fehler: unknown) => {

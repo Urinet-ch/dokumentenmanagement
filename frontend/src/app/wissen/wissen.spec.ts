@@ -72,7 +72,9 @@ describe('Wissensoberfläche', () => {
     const seite = http.expectOne((r) => r.url === '/api/v1/wissensseiten');
     expect(seite.request.params.get('pfad')).toBe('konzepte/probe');
     seite.flush({
-      id: 's1', titel: 'Probe', inhaltHtml: '<p>Belegt <a href="/wissen/ueberblick">Überblick</a></p>',
+      id: 's1', titel: 'Probe', inhaltHtml: '<p>Belegt <a href="/wissen/ueberblick">Überblick</a>'
+        + '<sup class="footnote-ref"><a href="#fn-q1" data-footnote-ref>1</a></sup></p>'
+        + '<section data-footnotes><ol><li><p>q1 <a href="#fnref-q1">↩</a></p></li></ol></section>',
       quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3 }], quellePruefen: true,
     });
     http.expectOne('/api/v1/dokumente/d1').flush({ titel: 'Quelle' });
@@ -83,6 +85,11 @@ describe('Wissensoberfläche', () => {
     expect(element.textContent).toContain(TEXTE.wissen.quellePruefen);
     expect(element.querySelector('article')?.textContent).toContain('Belegt');
     expect(element.querySelector('article a')?.getAttribute('href')).toBe('/wissen/ueberblick');
+    expect(element.querySelector('article a[href*="/dokument/d1"]')?.getAttribute('href'))
+      .toBe('/dokument/d1?seite=3');
+    expect(element.querySelector('article a[href*="/dokument/d1"]')?.getAttribute('aria-label'))
+      .toBe('[1] Quelle · Seite 3');
+    expect(element.querySelector('article')?.textContent).not.toContain('↩');
     expect(element.querySelector('a[href*="/dokument/d1"]')?.getAttribute('href'))
       .toBe('/dokument/d1?seite=3');
   });

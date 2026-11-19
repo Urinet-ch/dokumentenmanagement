@@ -357,6 +357,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
       url: 'https://s3.example/pdfa?sig=alt',
       gueltigBis: new Date(Date.now() - 1000).toISOString(),
     });
+
     await oeffnen();
     port.pdfa = of({ url: 'https://s3.example/pdfa?sig=neu', gueltigBis: zukunft() });
     const fenster = { opener: 'x', location: { href: '' }, close: vi.fn() };
@@ -372,6 +373,20 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(fenster.location.href).toBe('https://s3.example/pdfa?sig=neu');
     expect(element.querySelector('[data-test=pdf-bereit]')).toBeNull();
     expect(port.ansichten).toEqual(['vorschau', 'vorschau']);
+  });
+
+  it('behält die angeforderte Seite beim Erneuern des PDF-Links', async () => {
+    port.pdfa = of({ url: 'https://s3.example/pdfa?sig=alt', gueltigBis: '2020-01-01T00:00:00Z' });
+    await oeffnen();
+    fixture.componentRef.setInput('seite', '2');
+    await fixture.whenStable();
+    port.pdfa = of({ url: 'https://s3.example/pdfa?sig=neu', gueltigBis: zukunft() });
+    const fenster = { opener: null, location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(fenster as unknown as Window);
+    element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!
+      .dispatchEvent(new MouseEvent('click', { cancelable: true, bubbles: true }));
+    await fixture.whenStable();
+    expect(fenster.location.href).toBe('https://s3.example/pdfa?sig=neu#page=2');
   });
 
   it('lässt beim Neuholen der PDF-Adresse nur eine Anfrage laufen und zeigt einen Fehler ohne die Vorschau zu verlieren', async () => {

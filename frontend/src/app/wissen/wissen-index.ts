@@ -17,7 +17,7 @@ export class WissenIndex {
   private readonly http = inject(HttpClient);
   private readonly destroy = inject(DestroyRef);
   protected readonly texte = TEXTE.wissen;
-  protected readonly typen = ['Synthese', 'Quelle', 'Konzept', 'Akteur', 'Projekt', 'Analyse'];
+  protected readonly typen = Object.entries(this.texte.seitentypen);
   protected readonly ergebnis = signal<WissensIndex | null>(null);
   protected readonly fehler = signal<string | null>(null);
   protected readonly laedt = signal(false);

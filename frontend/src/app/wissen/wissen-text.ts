@@ -1,6 +1,7 @@
 export interface Textteil {
   text: string;
   pfad?: string;
+  quelle?: string;
 }
 
 export function wissenText(html: string): Textteil[][] {
@@ -17,6 +18,10 @@ export function wissenText(html: string): Textteil[][] {
     if (node.tagName === 'A') {
       const href = node.getAttribute('href');
       const text = node.textContent ?? '';
+      if (node.hasAttribute('data-footnote-ref') && href?.startsWith('#fn-')) {
+        teile.push({ text: `[${text}]`, quelle: href.slice(4) });
+        return;
+      }
       if (href && /^\/wissen\/(?:ueberblick|(?:quellen|konzepte|akteure|projekte|analysen)\/[a-z0-9-]+)$/.test(href)) {
         teile.push({ text, pfad: href });
       } else {
@@ -33,6 +38,7 @@ export function wissenText(html: string): Textteil[][] {
   }
 
   function sammeln(node: Node): void {
+    if (node instanceof Element && node.hasAttribute('data-footnotes')) return;
     if (node instanceof Element && bloecke.has(node.tagName)) {
       const teile: Textteil[] = [];
       lesen(node, teile);

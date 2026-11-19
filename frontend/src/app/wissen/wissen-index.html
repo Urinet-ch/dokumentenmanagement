@@ -6,7 +6,7 @@
   <label for="wissen-typ">{{ texte.typ }}</label>
   <select id="wissen-typ" [value]="typ" (change)="typ = wert($event)">
     <option value="">{{ texte.alleTypen }}</option>
-    @for (typ of typen; track typ) { <option [value]="typ">{{ typ }}</option> }
+    @for (typ of typen; track typ[0]) { <option [value]="typ[0]">{{ typ[1] }}</option> }
   </select>
   <label for="wissen-tag">{{ texte.schlagwort }}</label>
   <input id="wissen-tag" [value]="tag" (input)="tag = wert($event)" />
@@ -21,7 +21,7 @@
   @if (!ergebnis.gesamt) { <p>{{ texte.keineSeiten }}</p> }
   @for (gruppe of ergebnis.gruppen; track gruppe.typ) {
     <section>
-      <h2>{{ gruppe.typ }}</h2>
+      <h2>{{ texte.seitentypen[gruppe.typ ?? ''] ?? texte.unbekannterTyp }}</h2>
       <ul>
         @for (seite of gruppe.seiten; track seite.id) {
           <li>

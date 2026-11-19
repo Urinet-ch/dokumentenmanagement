@@ -8,9 +8,11 @@
 @if (inhalt(); as inhalt) {
   <h1>{{ inhalt.seite.titel }}</h1>
   @if (inhalt.seite.status === 'VERALTET') { <p>{{ texte.veraltet }}</p> }
+  @if (inhalt.seite.status === 'AKTIV') { <p>{{ texte.aktiv }}</p> }
   @if (inhalt.seite.quellePruefen) { <p>{{ texte.quellePruefen }}</p> }
   @if (inhalt.seite.widerspruchOffen) { <p>{{ texte.widerspruch }}</p> }
   <p>{{ inhalt.seite.beschreibung }}</p>
+  @if (inhalt.seite.version) { <p>{{ texte.stand }}: {{ texte.version(inhalt.seite.version) }}</p> }
   @if (inhalt.seite.freigegebenAm) {
     <p>{{ texte.freigegeben }}: {{ zeitpunkt(inhalt.seite.freigegebenAm) }}</p>
   }
@@ -19,6 +21,16 @@
       <p class="wissen-text">
         @for (teil of abschnitt; track $index) {
           @if (teil.pfad) { <a [routerLink]="teil.pfad">{{ teil.text }}</a> }
+          @else if (inhalt.quellenNachSchluessel.get(teil.quelle ?? ''); as quelle) {
+            @if (quelle.dokumentId) {
+              <a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}"
+                [attr.aria-label]="teil.text + ' ' + quelle.titel + (quelle.seite ? ' · ' + texte.seite(quelle.seite) : '')">
+                {{ teil.text }}
+              </a>
+            } @else if (quelle.pfad) {
+              <a [routerLink]="'/wissen/' + quelle.pfad" [attr.aria-label]="teil.text + ' ' + quelle.titel">{{ teil.text }}</a>
+            } @else { {{ teil.text }} }
+          }
           @else { {{ teil.text }} }
         }
       </p>
