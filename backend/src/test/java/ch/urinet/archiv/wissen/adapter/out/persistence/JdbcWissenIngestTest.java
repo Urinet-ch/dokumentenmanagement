@@ -6,6 +6,7 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
+import ch.urinet.archiv.wissen.domain.WissensStufe;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -53,6 +55,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     JdbcWissenIngest ingest;
+
+    @Inject
+    PanacheWissenHuelleRepository huellen;
 
     @Inject
     MandantKontext kontext;
@@ -119,6 +124,20 @@ class JdbcWissenIngestTest {
         assertThat(quelle.status()).isEqualTo("ARCHIVIERT");
         assertThat(quelle.seiten()).isEqualTo(2);
         assertThat(quelle.pdfaVorhanden()).isTrue();
+    }
+
+    @Test
+    void graphLaedtNeueDokumentquellenNurAusDemEigenenMandanten() throws SQLException {
+        UUID normal = quelle(URINET);
+        UUID intern = quelle(URINET);
+        UUID fremd = quelle(ZWEITER);
+        ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'INTERN' where id = ?", intern);
+
+        var graph = im(URINET, () -> huellen.graphLaden(Set.of(normal, intern, fremd)));
+        assertThat(graph.dokumentStufen()).containsEntry(normal, WissensStufe.NORMAL)
+                .containsEntry(intern, WissensStufe.INTERN).doesNotContainKey(fremd);
+        assertThat(im(ZWEITER, () -> huellen.graphLaden(Set.of(normal, fremd))).dokumentStufen())
+                .containsEntry(fremd, WissensStufe.NORMAL).doesNotContainKey(normal);
     }
 
     @Test
