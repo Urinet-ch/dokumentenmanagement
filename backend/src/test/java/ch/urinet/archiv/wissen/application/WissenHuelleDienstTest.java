@@ -176,7 +176,9 @@ class WissenHuelleDienstTest {
 
         @Override
         public void mindeststufeAnheben(UUID seiteId, WissensStufe mindeststufe) {
-            mindeststufen.put(seiteId, mindeststufe);
+            // wie das SQL im Produktivcode: nie senken
+            mindeststufen.merge(seiteId, mindeststufe, (alt, neu) ->
+                    alt == WissensStufe.INTERN || neu == WissensStufe.INTERN ? WissensStufe.INTERN : WissensStufe.NORMAL);
         }
 
         @Override
