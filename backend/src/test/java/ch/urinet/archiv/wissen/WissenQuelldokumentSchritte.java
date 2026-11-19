@@ -1,0 +1,97 @@
+package ch.urinet.archiv.wissen;
+
+import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import io.agroal.api.AgroalDataSource;
+import io.cucumber.java.After;
+import io.cucumber.java.de.Angenommen;
+import io.cucumber.java.de.Dann;
+import io.cucumber.java.de.Wenn;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.is;
+
+public class WissenQuelldokumentSchritte {
+    @Inject
+    Instance<AgroalDataSource> datenbank;
+
+    private UUID dokument;
+    private UUID seite;
+
+    @Angenommen("eine normale Wissensseite verweist auf ein normales Quelldokument")
+    public void normaleQuelle() throws Exception {
+        dokument = Testdokumente.anlegen(datenbank.get(),
+                new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+        seite = UUID.randomUUID();
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            ausfuehren(verbindung, """
+                    insert into m_urinet.wissensseite (id, pfad, typ, titel, beschreibung, vertraulichkeit, inhalt,
+                        version, erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am)
+                    values (?, ?, 'Konzept', 'Probe', 'Probe', 'NORMAL', 'Unveränderter Inhalt', 1, 'probe',
+                        now(), 'probe', now())
+                    """, seite, "konzepte/quelle-" + seite);
+            ausfuehren(verbindung, """
+                    insert into m_urinet.wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von)
+                    values (?, 'q1', ?, 1)
+                    """, seite, dokument);
+            ausfuehren(verbindung, "insert into m_urinet.wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                    seite, dokument);
+        }
+        given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                .when().get("/api/v1/wissensseiten/" + seite).then().statusCode(200);
+    }
+
+    @Wenn("der Inhaber die Vertraulichkeit des Quelldokuments auf INTERN ändert")
+    public void quelleIntern() {
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/dokumente/" + dokument;
+        String etag = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .extract().header("ETag");
+        given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
+                .body(Map.of("vertraulichkeit", "INTERN", "grund", "Synthetische Quellenprüfung"))
+                .when().patch(pfad).then().statusCode(200);
+    }
+
+    @Dann("sieht der Mitarbeiter die Wissensseite nicht mehr")
+    public void mitarbeiterSiehtSeiteNicht() {
+        given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                .when().get("/api/v1/wissensseiten/" + seite).then().statusCode(404);
+    }
+
+    @Dann("der Inhaber sieht auf der unveränderten Wissensseite den Hinweis «Quelle prüfen»")
+    public void inhaberSiehtPruefhinweis() {
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensseiten/" + seite).then().statusCode(200)
+                .body("quellePruefen", is(true)).body("version", is(1))
+                .body("inhaltHtml", is("<p>Unveränderter Inhalt</p>\n"));
+    }
+
+    @After("@quellen-aenderung")
+    public void aufraeumen() throws Exception {
+        if (seite != null) {
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                ausfuehren(verbindung, "delete from m_urinet.wissensseite where id = ?", seite);
+            }
+        }
+        if (dokument != null) {
+            Testdokumente.loeschen(datenbank.get(), "urinet", List.of(dokument));
+        }
+    }
+
+    private static void ausfuehren(Connection verbindung, String sql, Object... werte) throws Exception {
+        try (PreparedStatement befehl = verbindung.prepareStatement(sql)) {
+            for (int i = 0; i < werte.length; i++) {
+                befehl.setObject(i + 1, werte[i]);
+            }
+            befehl.executeUpdate();
+        }
+    }
+}
