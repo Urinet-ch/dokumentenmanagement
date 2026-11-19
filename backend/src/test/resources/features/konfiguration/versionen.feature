@@ -55,6 +55,13 @@ Funktionalität: Konfigurationsversionen
     Dann antwortet die Konfigurationsverwaltung mit Status 200
     Und ist die Art «PROBE_KONF_VERSION» in dieser Version unter dem Namen "Probe vorher" enthalten
 
+  @req-1.6
+  Szenario: Ein neuer Mandant erhält seine Konfiguration aus dem Seed mit Quelle SEED
+    Wenn der Betreiber den Mandanten «probe-konfig-seed» anlegt
+    Dann ist im Schema «m_probe_konfig_seed» die neueste Konfigurationsversion aus dem Seed und jede frühere aus der Migration
+    Und enthält diese Konfigurationsversion genau die Arten aus «seed/probe-konfig-seed/konfiguration.json» und den Seed-Teil der Wissensquelle
+    Und enthält diese Konfigurationsversion das Geschäftsjahresende «09-30» und die KI-Rolle aus dem Seed
+
   @req-1.4
   Szenario: Bestätigen und Ändern übernehmen die angewandte Konfigurationsversion
     Angenommen die Archivierung ist bereit

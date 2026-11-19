@@ -33,7 +33,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Schritte zu Req 1.1, 1.5 und 9.6: Mandanten anlegen, getrennt halten und migrieren. */
+/** Schritte zu Req 1.1, 1.5 und 9.6 (Spec 05: 1.6): Mandanten anlegen, getrennt halten und migrieren. */
 public class MandantSchritte {
 
     @Inject
@@ -52,6 +52,8 @@ public class MandantSchritte {
     ObjectMapper json;
 
     private MandantFehler fehler;
+
+    private JsonNode seedAbbild;
 
     private final List<String> eingetragen = new ArrayList<>();
 
@@ -154,6 +156,40 @@ public class MandantSchritte {
         assertThat(werte("select code from " + schema + ".dokumentart")).containsExactlyInAnyOrderElementsOf(erwartet);
         assertThat(werte("select vertraulichkeit || '/' || gesetzliche_pflicht from " + schema
                 + ".dokumentart where code = 'PROJEKTDOKUMENT'")).containsExactly("NORMAL/false");
+    }
+
+    /**
+     * Spec 05, Req 1.6: Die Changesets legen auf dem leeren Schema Version 1 mit Quelle {@code MIGRATION} an
+     * (design.md, «Umsetzung 17.2»); der Seed folgt als nächste Version mit Quelle {@code SEED}.
+     */
+    @Dann("ist im Schema «{word}» die neueste Konfigurationsversion aus dem Seed und jede frühere aus der Migration")
+    public void seedVersion(String schema) throws SQLException, IOException {
+        assertThat(fehler).as("Anlegen ohne Fehler erwartet").isNull();
+        List<String> quellen = werte("select quelle from " + schema + ".konfiguration_version order by version");
+        assertThat(quellen).isNotEmpty();
+        assertThat(quellen.getLast()).isEqualTo("SEED");
+        assertThat(quellen.subList(0, quellen.size() - 1)).containsOnly("MIGRATION");
+        seedAbbild = json.readTree(werte("select inhalt::text from " + schema
+                + ".konfiguration_version order by version desc limit 1").getFirst());
+    }
+
+    @Und("enthält diese Konfigurationsversion genau die Arten aus «{word}» und den Seed-Teil der Wissensquelle")
+    public void seedArtenImAbbild(String seed) throws IOException {
+        List<String> erwartet = new ArrayList<>();
+        try (InputStream inhalt = getClass().getClassLoader().getResourceAsStream(seed)) {
+            json.readTree(inhalt).path("arten").forEach(a -> erwartet.add(a.path("code").asText()));
+        }
+        assertThat(erwartet).isNotEmpty();
+        erwartet.add(new KlassenpfadWissensquelleSeed(json).lesen().code());
+        List<String> imAbbild = new ArrayList<>();
+        seedAbbild.path("arten").forEach(a -> imAbbild.add(a.path("code").asText()));
+        assertThat(imAbbild).containsExactlyInAnyOrderElementsOf(erwartet);
+    }
+
+    @Und("enthält diese Konfigurationsversion das Geschäftsjahresende «{word}» und die KI-Rolle aus dem Seed")
+    public void seedEinstellungenImAbbild(String ende) {
+        assertThat(seedAbbild.path("einstellungen").path("geschaeftsjahrEnde").asText()).isEqualTo(ende);
+        assertThat(seedAbbild.path("kiTexte").path("rolle").asText()).isEqualTo("Probe-Rolle aus dem Seed");
     }
 
     @Und("es gibt weder den Registereintrag «{word}» noch das Schema «{word}»")
