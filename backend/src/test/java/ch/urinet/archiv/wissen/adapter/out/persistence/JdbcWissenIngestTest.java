@@ -232,6 +232,38 @@ class JdbcWissenIngestTest {
                 + ".wissensseite where id = ? and quelle_pruefen and vertraulichkeit = 'INTERN'", seite)).isEqualTo(1);
     }
 
+    @Test
+    void kontaktZusammenfuehrenMarkiertQuellseite() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        UUID quelle = UUID.randomUUID();
+        UUID ziel = UUID.randomUUID();
+        try {
+            for (UUID kontakt : List.of(quelle, ziel)) {
+                ausfuehren("insert into " + URINET.schema() + ".kontakt "
+                                + "(id, typ, name, name_normalisiert, quelle) "
+                                + "values (?, 'ORGANISATION', 'Probe', 'probe', 'MANUELL')", kontakt);
+            }
+            ausfuehren("update " + URINET.schema() + ".dokument set partner_id = ? where id = ?", quelle, dokument);
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                    + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                    seite, dokument);
+            String inhaber = Testanmeldung.token("inhaber-urinet");
+            String pfad = "/api/v1/kontakte/" + quelle;
+            String etag = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                    .extract().header("ETag");
+            given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
+                    .body(Map.of("ziel", ziel.toString(), "grund", "Synthetische Zusammenführung"))
+                    .when().post(pfad + "/zusammenfuehren").then().statusCode(200);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite where id = ? and quelle_pruefen", seite)).isEqualTo(1);
+        } finally {
+            ausfuehren("update " + URINET.schema() + ".dokument set partner_id = null where id = ?", dokument);
+            ausfuehren("delete from " + URINET.schema() + ".kontakt where id = ? or id = ?", quelle, ziel);
+        }
+    }
+
     @BeforeEach
     void mandanten() throws SQLException {
         for (MandantCode code : List.of(URINET, ZWEITER)) {
