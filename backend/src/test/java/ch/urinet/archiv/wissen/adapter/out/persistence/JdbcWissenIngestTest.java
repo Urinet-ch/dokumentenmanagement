@@ -10,6 +10,8 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.ki.application.KiPort;
+import ch.urinet.archiv.ki.application.KiVerbrauchPort;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -27,7 +29,10 @@ import ch.urinet.archiv.wissen.domain.Wissensseite;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import ch.urinet.archiv.wissen.application.WissenIngestSpeichern;
+import ch.urinet.archiv.wissen.application.WissenIngestVerarbeiten;
+import ch.urinet.archiv.wissen.application.WissenKonfiguration;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -106,6 +111,15 @@ class JdbcWissenIngestTest {
 
     @Inject
     WissenIngestSpeichern ingestSpeichern;
+
+    @Inject
+    WissenKonfiguration wissenKonfiguration;
+
+    @Inject
+    KiVerbrauchPort kiVerbrauch;
+
+    @Inject
+    ObjectMapper json;
 
     @Inject
     DokumentEreignisse ereignisse;
@@ -648,6 +662,92 @@ class JdbcWissenIngestTest {
                     + ".wissens_aenderung where entwurf_id = ? and status = 'VERALTET' and etag = 1", entwurf))
                     .isEqualTo(1);
         } finally {
+            ausfuehren("delete from public.auftrag where id = ?", auftragId);
+        }
+    }
+
+    @Test
+    void neuErzeugenVerarbeitetAuftragMitAktuellerBasisUndSpeichertDasErgebnis() throws Exception {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = entwurf(URINET, dokument, "OFFEN");
+        String pfad = "konzepte/worker-" + UUID.randomUUID();
+        UUID seiteId = seite(URINET, pfad, "# Aktuelle Fassung", null);
+        aenderung(URINET, entwurf, 1);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set version = 2 where id = ?", seiteId);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set status = 'VERALTET', aktion = 'AENDERN', seite_id = ?, "
+                + "pfad = ?, basis_version = 1, etag = 1 where entwurf_id = ?", seiteId, pfad, entwurf);
+        Quelleneintrag quelle = new Quelleneintrag("q-neu", dokument, 1, 1, "Seite 1", null);
+        Wissensseite vorschlag = new Wissensseite(seiteId, pfad, Seitentyp.KONZEPT, "Probe", "Probe", List.of(),
+                Wissensseite.Status.AKTIV, null, List.of(quelle), Wissensseite.Vertraulichkeit.NORMAL,
+                "# Alter Vorschlag\n\nAussage. [^q-neu]", 1, null, null, null, null, false, false, null);
+        var plan = new WissenIngestPort.Planung(pfad, "AENDERN", "Konzept", "Probe", List.of(1), seiteId, 1, false);
+        var vorschlagDaten = new WissenIngestPort.SeitenVorschlag(1, "AENDERN", seiteId, pfad, 1, vorschlag,
+                "Probe", List.of(), List.of(), List.of(), List.of(), "NORMAL", diffDienst.vergleichen(null, vorschlag));
+        var fortschritt = new WissenIngestPort.Fortschritt(1, 1, false,
+                List.of(new WissenIngestPort.Kernaussage(1, "q-neu", "Aussage.", List.of(1), "Seite 1", true)),
+                List.of(plan), List.of(vorschlagDaten), List.of(), WissensStufe.NORMAL);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_entwurf set ki_modell = 'test-modell', ingest_daten = cast(? as jsonb) where id = ?",
+                json.writeValueAsString(fortschritt), entwurf);
+        long auftragId = im(URINET, () -> {
+            freigabe.neuErzeugen(new Benutzer("inhaber", Rolle.INHABER), entwurf, 1, () -> 1);
+            EntityManager em = entityManager.get();
+            long id = ((Number) em.createNativeQuery("""
+                    select id from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = :id
+                    """).setParameter("id", entwurf.toString()).getSingleResult()).longValue();
+            em.createNativeQuery("update public.auftrag set status = 'LAEUFT' where id = :id")
+                    .setParameter("id", id).executeUpdate();
+            return id;
+        });
+        Auftrag auftrag = new Auftrag(auftragId, URINET, WissenIngestStarten.TYP,
+                new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
+        AtomicReference<KiPort.WissensAnfrage> anfrage = new AtomicReference<>();
+        KiPort ki = new KiPort() {
+            @Override
+            public Antwort metadaten(Anfrage eingabe) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public WissensAntwort wissensIngest(WissensAnfrage eingabe) {
+                anfrage.set(eingabe);
+                return new WissensGueltig(new Seite("Probe", "Probe", List.of(),
+                        "# Neuer Vorschlag\n\nAussage. [^q-neu]", List.of(), List.of(), "Probe"),
+                        new Verbrauch("test-modell", 12, 8));
+            }
+
+            @Override
+            public String antwortschema() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<String> artCodes() {
+                throw new UnsupportedOperationException();
+            }
+        };
+        try {
+            CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
+                try {
+                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst)
+                            .ausfuehren(auftrag, entwurf);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+            assertThat(anfrage.get().schritt()).isEqualTo(KiPort.WissensSchritt.SEITE);
+            assertThat(anfrage.get().nachricht()).contains("# Aktuelle Fassung", "# Alter Vorschlag");
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissens_aenderung where entwurf_id = ? and status = 'OFFEN' and etag = 2 "
+                    + "and basis_version = 2 and inhalt like '%Neuer Vorschlag%'", entwurf)).isEqualTo(1);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".ki_verbrauch where ingest_entwurf_id = ? and tokens_ein = 12 and tokens_aus = 8", entwurf))
+                    .isEqualTo(1);
+        } finally {
+            ausfuehren("delete from " + URINET.schema() + ".ki_verbrauch where ingest_entwurf_id = ?", entwurf);
             ausfuehren("delete from public.auftrag where id = ?", auftragId);
         }
     }
