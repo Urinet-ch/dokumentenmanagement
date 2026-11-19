@@ -11,6 +11,8 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.verarbeitung.application.Auftrag;
+import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
 import ch.urinet.archiv.wissen.application.FreigabeKontext;
@@ -22,6 +24,7 @@ import ch.urinet.archiv.wissen.domain.Seitentyp;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
+import ch.urinet.archiv.wissen.application.WissenIngestSpeichern;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -98,6 +101,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     DiffDienst diffDienst;
+
+    @Inject
+    WissenIngestSpeichern ingestSpeichern;
 
     @Inject
     MandantKontext kontext;
@@ -324,6 +330,44 @@ class JdbcWissenIngestTest {
         assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
         assertThat(anzahl("select count(*) from public.auftrag where typ = 'WISSEN_INGEST' "
                 + "and nutzlast->>'entwurfId' = ?", entwurf.toString())).isZero();
+    }
+
+    @Test
+    void neuErzeugenBrichtBeiZwischenzeitlicherSeitenaenderungOhneUeberschreibenAb() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = entwurf(URINET, dokument, "OFFEN");
+        UUID seiteId = seite(URINET, "konzepte/geaendert-" + UUID.randomUUID(), "Probe", null);
+        aenderung(URINET, entwurf, 1);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set status = 'VERALTET', aktion = 'AENDERN', seite_id = ?, "
+                + "basis_version = 1, etag = 1 where entwurf_id = ?", seiteId, entwurf);
+        long auftragId = im(URINET, () -> {
+            freigabe.neuErzeugen(new Benutzer("inhaber", Rolle.INHABER), entwurf, 1, () -> 1);
+            EntityManager em = entityManager.get();
+            long id = ((Number) em.createNativeQuery("""
+                    select id from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = :id
+                    """).setParameter("id", entwurf.toString()).getSingleResult()).longValue();
+            em.createNativeQuery("update public.auftrag set status = 'LAEUFT' where id = :id")
+                    .setParameter("id", id).executeUpdate();
+            return id;
+        });
+        Auftrag auftrag = new Auftrag(auftragId, URINET, WissenIngestStarten.TYP,
+                new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
+        try {
+            im(URINET, () -> {
+                ingestSpeichern.neuerzeugungSichern(auftrag, entwurf, seiteId, 2, WissensStufe.NORMAL,
+                        WissenIngestPort.Fortschritt.leer(), 10, 5, stand -> {
+                            throw new AssertionError("Eine veraltete Basis darf nicht gespeichert werden");
+                        });
+                return null;
+            });
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissens_aenderung where entwurf_id = ? and status = 'VERALTET' and etag = 1", entwurf))
+                    .isEqualTo(1);
+        } finally {
+            ausfuehren("delete from public.auftrag where id = ?", auftragId);
+        }
     }
 
     @Test

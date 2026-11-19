@@ -2,6 +2,9 @@ package ch.urinet.archiv.wissen.application;
 
 import ch.urinet.archiv.ki.application.KiPort;
 import ch.urinet.archiv.ki.application.KiVerbrauchPort;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.verarbeitung.application.Auftrag;
+import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.BudgetReservierung;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Fortschritt;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Kernaussage;
@@ -70,7 +73,8 @@ class WissenIngestVerarbeitenTest {
 
     @Test
     void schliesstMitFehlerAbWennDieVertraulichkeitWaehrendDesIngestsSinkt() throws InterruptedException {
-        for (String schritt : List.of("KERNAUSSAGEN", "PLANUNG", "SEITE", "QUELLE", "ABSCHLUSS")) {
+        for (String schritt : List.of("KERNAUSSAGEN", "PLANUNG", "SEITE", "QUELLE", "ABSCHLUSS",
+                "NEU_ERZEUGEN")) {
             Speicher speichern = new Speicher(stand(lauf(schritt, false,
                     mitKontextStufe(mitAussage(), WissensStufe.INTERN)), 0, WissensStufe.NORMAL));
             KiAntwort ki = new KiAntwort(null);
@@ -375,6 +379,46 @@ class WissenIngestVerarbeitenTest {
     }
 
     @Test
+    void neuErzeugenRuftKiMitAktuellerFassungAufUndPrueftDenNeuenDiff() throws InterruptedException {
+        UUID seiteId = UUID.randomUUID();
+        SeitenMetadaten alt = new SeitenMetadaten(seiteId, "konzepte/frist", "Konzept", "Frist", "Frist",
+                List.of(), "AKTIV", 2, "NORMAL");
+        SeitenFassung alteFassung = new SeitenFassung(alt, "# Alte Fassung", null, List.of());
+        Fortschritt geplant = new Fortschritt(1, 0, false, mitAussage().kernaussagen(), List.of(
+                new WissenIngestPort.Planung(alt.pfad(), "AENDERN", alt.typ(), "Grund", List.of(1), seiteId,
+                        2, false)), List.of(), List.of(), WissensStufe.NORMAL);
+        Speicher erster = new Speicher(stand(lauf("SEITE", false, geplant), 0, WissensStufe.NORMAL,
+                List.of(alt), Map.of(seiteId, alteFassung)));
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Frist", "Frist", List.of(),
+                "# Frist\n\nFrist. [^q-neu]", List.of(), List.of(), "Neue Frist"),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
+        verarbeiten(erster, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        SeitenMetadaten neu = new SeitenMetadaten(seiteId, alt.pfad(), alt.typ(), alt.titel(), alt.beschreibung(),
+                alt.tags(), alt.status(), 4, alt.vertraulichkeitMindest());
+        SeitenFassung aktuelleFassung = new SeitenFassung(neu, "# Aktuelle Fassung", null, List.of());
+        Speicher speichern = new Speicher(stand(lauf("NEU_ERZEUGEN", false, erster.fortschritt), 0,
+                WissensStufe.NORMAL, List.of(neu), Map.of(seiteId, aktuelleFassung)));
+        Auftrag auftrag = new Auftrag(1, new MandantCode("urinet"), WissenIngestStarten.TYP,
+                new Nutzlast(Map.of("entwurfId", ENTWURF_ID, "aenderungNr", 1)), 0);
+        KiAntwort erneuteKi = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Frist", "Frist", List.of(),
+                "# Frist\n\nNeue Aussage. [^q-neu]", List.of(), List.of(), "Aktualisiert"),
+                new KiPort.Verbrauch("test-modell", 12, 8)));
+
+        verarbeiten(speichern, erneuteKi, new Verbrauch()).ausfuehren(auftrag, ENTWURF_ID);
+
+        assertThat(erneuteKi.aufrufe).isEqualTo(1);
+        assertThat(erneuteKi.anfrage.schritt()).isEqualTo(KiPort.WissensSchritt.SEITE);
+        assertThat(erneuteKi.anfrage.nachricht()).contains("# Aktuelle Fassung", "# Frist\n\nFrist.");
+        assertThat(speichern.aenderungen).singleElement().satisfies(aenderung -> {
+            assertThat(aenderung.basisVersion()).isEqualTo(4);
+            assertThat(aenderung.daten().inhalt()).contains("Neue Aussage");
+            assertThat(aenderung.diff().zeilen()).flatExtracting(WissenZeilendiff.Aenderung::alt)
+                    .contains("# Aktuelle Fassung");
+        });
+    }
+
+    @Test
     void neueKernaussagenZaehlenNachDenSchluesselnFruehererDurchgaengeWeiter() throws InterruptedException {
         String kurz = DOKUMENT_ID.toString().substring(0, 8);
         Fortschritt bisher = new Fortschritt(0, 0, false, List.of(new Kernaussage(1, "q-" + kurz + "-45",
@@ -564,6 +608,19 @@ class WissenIngestVerarbeitenTest {
         }
 
         @Override
+        public void neuerzeugungFehler(Auftrag auftrag, UUID entwurfId, String hinweis) {
+            fehler = hinweis;
+        }
+
+        @Override
+        public void neuerzeugungSichern(Auftrag auftrag, UUID entwurfId, UUID seiteId, int basisVersion,
+                                        WissensStufe quellStufe, Fortschritt fortschritt, long tokensEin,
+                                        long tokensAus, java.util.function.Function<Stand, NeueAenderung> pruefen) {
+            this.fortschritt = fortschritt;
+            this.aenderungen = List.of(pruefen.apply(stand));
+        }
+
+        @Override
         public List<SeitenMetadaten> sichtbareSeiten(
                 Stand geladenerStand) {
             return sichtbar;
@@ -584,6 +641,7 @@ class WissenIngestVerarbeitenTest {
         private final WissensAntwort antwort;
         private int aufrufe;
         private int maxAusgabe;
+        private WissensAnfrage anfrage;
 
         private KiAntwort(WissensAntwort antwort) {
             this.antwort = antwort;
@@ -597,6 +655,7 @@ class WissenIngestVerarbeitenTest {
         @Override
         public WissensAntwort wissensIngest(WissensAnfrage anfrage) {
             aufrufe++;
+            this.anfrage = anfrage;
             maxAusgabe = anfrage.maxAusgabeTokens();
             return antwort;
         }

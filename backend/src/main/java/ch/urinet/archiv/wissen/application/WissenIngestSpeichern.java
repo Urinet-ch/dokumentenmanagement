@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.LinkedHashMap;
+import java.util.function.Function;
 
 @ApplicationScoped
 public class WissenIngestSpeichern {
@@ -189,6 +190,42 @@ public class WissenIngestSpeichern {
     }
 
     @Transactional
+    public void neuerzeugungSichern(Auftrag auftrag, UUID entwurfId, UUID seiteId, int basisVersion,
+                                    WissensStufe quellStufe, Fortschritt fortschritt, long tokensEin, long tokensAus,
+                                    Function<Stand, NeueAenderung> pruefen) {
+        auftraege.anspruchSichern(auftrag);
+        huellen.sperren();
+        Optional<Stand> geladen = laden(entwurfId, Set.of(seiteId));
+        if (geladen.isEmpty() || !"IN_ARBEIT".equals(geladen.get().lauf().entwurfStatus())
+                || !"NEU_ERZEUGEN".equals(geladen.get().lauf().schritt())) {
+            return;
+        }
+        Stand aktuell = geladen.get();
+        SeitenFassung fassung = aktuell.fassungen().get(seiteId);
+        if (!freigegeben(aktuell.lauf()) || aktuell.quellStufe() != quellStufe || fassung == null
+                || fassung.metadaten().version() != basisVersion) {
+            port.neuerzeugungAbbrechen(entwurfId,
+                    "Die Quelle oder Seite hat sich geändert. Bitte die Änderung erneut erzeugen.");
+            return;
+        }
+        NeueAenderung aenderung = pruefen.apply(aktuell);
+        if (aenderung == null) {
+            throw new IllegalStateException("Die erneuerte Wissensänderung hat keinen gültigen Diff");
+        }
+        port.erneuerteAenderungSpeichern(aenderung, fortschritt, tokensEin, tokensAus);
+    }
+
+    @Transactional
+    public void neuerzeugungFehler(Auftrag auftrag, UUID entwurfId, String hinweis) {
+        auftraege.anspruchSichern(auftrag);
+        Optional<Lauf> lauf = port.laufLaden(entwurfId);
+        if (lauf.isPresent() && "IN_ARBEIT".equals(lauf.get().entwurfStatus())
+                && "NEU_ERZEUGEN".equals(lauf.get().schritt())) {
+            port.neuerzeugungAbbrechen(entwurfId, hinweis);
+        }
+    }
+
+    @Transactional
     public void fehlerSichern(Auftrag auftrag, UUID entwurfId, String erwartet, Fortschritt fortschritt,
                               String hinweis) {
         auftraege.anspruchSichern(auftrag);
@@ -209,6 +246,11 @@ public class WissenIngestSpeichern {
     public void nachFehlversuch(UUID entwurfId) {
         Optional<Lauf> lauf = port.laufLaden(entwurfId);
         if (lauf.isEmpty() || !"IN_ARBEIT".equals(lauf.get().entwurfStatus())) {
+            return;
+        }
+        if ("NEU_ERZEUGEN".equals(lauf.get().schritt())) {
+            port.neuerzeugungAbbrechen(entwurfId,
+                    "Die Änderung konnte nach drei Versuchen nicht neu erzeugt werden. Bitte erneut versuchen.");
             return;
         }
         port.entwurfSchliessen(entwurfId, lauf.get().schritt(), "FEHLER", lauf.get().fortschritt(),

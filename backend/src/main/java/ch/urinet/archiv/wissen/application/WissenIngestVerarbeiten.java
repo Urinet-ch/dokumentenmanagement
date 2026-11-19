@@ -101,11 +101,15 @@ public class WissenIngestVerarbeiten {
         long budget = begrenzt(lauf.budgetTokens(), grenzen.budgetTokens());
         long monatsbudget = begrenzt(lauf.monatsbudgetTokens(), grenzen.monatsbudgetTokens());
         if (!"ABSCHLUSS".equals(lauf.schritt()) && stand.monatsverbrauch() >= monatsbudget) {
-            speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt, "Budget erschöpft");
+            fehlerSichern(auftrag, lauf, fortschritt, "Budget erschöpft");
             return;
         }
         if (summe(lauf.tokensEin(), lauf.tokensAus()) >= budget && !"ABSCHLUSS".equals(lauf.schritt())) {
-            budgetAbschluss(auftrag, lauf, fortschritt, 0, 0);
+            if ("NEU_ERZEUGEN".equals(lauf.schritt())) {
+                speichern.neuerzeugungFehler(auftrag, entwurfId, "Budget erschöpft");
+            } else {
+                budgetAbschluss(auftrag, lauf, fortschritt, 0, 0);
+            }
             return;
         }
 
@@ -115,6 +119,7 @@ public class WissenIngestVerarbeiten {
             case "SEITE" -> seite(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
             case "QUELLE" -> quelle(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
             case "ABSCHLUSS" -> abschluss(auftrag, entwurfId, fortschritt, budget);
+            case "NEU_ERZEUGEN" -> neuerzeugen(auftrag, stand, fortschritt, budget, monatsbudget);
             default -> speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt,
                     "Unbekannter Wissens-Ingest-Schritt");
         }
@@ -131,16 +136,22 @@ public class WissenIngestVerarbeiten {
      */
     private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher) {
         if (!WissenIngestSpeichern.freigegeben(stand.lauf()) || stand.quellStufe() == null) {
-            speichern.fehlerSichern(auftrag, stand.lauf().entwurfId(), stand.lauf().schritt(), bisher,
-                    NICHT_FREIGEGEBEN);
+            fehlerSichern(auftrag, stand.lauf(), bisher, NICHT_FREIGEGEBEN);
             return true;
         }
         if (bisher.kontextStufe() != null && stand.quellStufe().ordinal() < bisher.kontextStufe().ordinal()) {
-            speichern.fehlerSichern(auftrag, stand.lauf().entwurfId(), stand.lauf().schritt(), bisher,
-                    STUFE_GESENKT);
+            fehlerSichern(auftrag, stand.lauf(), bisher, STUFE_GESENKT);
             return true;
         }
         return false;
+    }
+
+    private void fehlerSichern(Auftrag auftrag, Lauf lauf, Fortschritt fortschritt, String hinweis) {
+        if ("NEU_ERZEUGEN".equals(lauf.schritt())) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(), hinweis);
+        } else {
+            speichern.fehlerSichern(auftrag, lauf.entwurfId(), lauf.schritt(), fortschritt, hinweis);
+        }
     }
 
     private static Fortschritt mitKontextStufe(Fortschritt bisher, WissensStufe stufe) {
@@ -501,6 +512,55 @@ public class WissenIngestVerarbeiten {
                 });
         return new Planung(vorher.pfad(), vorher.aktion(), vorher.daten().typ().datenbankwert(),
                 vorher.begruendung(), aussagen, vorher.seiteId(), aktuell.metadaten().version(), false);
+    }
+
+    private void neuerzeugen(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher, long budget,
+                             long monatsbudget) throws InterruptedException {
+        int nummer = Math.toIntExact(auftrag.nutzlast().zahl("aenderungNr")
+                .orElseThrow(() -> new IllegalArgumentException("Auftragsnutzlast ohne aenderungNr")));
+        Lauf lauf = stand.lauf();
+        SeitenVorschlag vorher = bisher.vorschlaege().stream().filter(v -> v.nummer() == nummer).findFirst()
+                .orElse(null);
+        if (vorher == null || vorher.seiteId() == null) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die Grundlage der Änderung fehlt. Bitte den Ingest neu starten.");
+            return;
+        }
+        WissenIngestSpeichern.Stand aktuell = laden(lauf.entwurfId(), Set.of(vorher.seiteId())).stand();
+        if (aktuell == null || nichtFreigegeben(auftrag, aktuell, bisher)) {
+            return;
+        }
+        lauf = aktuell.lauf();
+        bisher = mitKontextStufe(bisher, aktuell.quellStufe());
+        SeitenFassung fassung = aktuell.fassungen().get(vorher.seiteId());
+        if (fassung == null) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die aktuelle Seite ist für die Wissensquelle nicht sichtbar.");
+            return;
+        }
+        Planung plan = neuerzeugungsPlan(vorher, bisher, fassung);
+        List<Kernaussage> aussagen = bisher.kernaussagen().stream().filter(Kernaussage::belegt)
+                .filter(a -> plan.aussagen().contains(a.nr())).toList();
+        List<SeitenMetadaten> index = speichern.indexLaden(lauf.entwurfId(),
+                aussagen.stream().map(Kernaussage::text).collect(java.util.stream.Collectors.joining(" ")));
+        String nachricht = seitenNachricht(plan, index, aussagen, fassung)
+                + feld("Bisheriger Vorschlag (Daten)", vorher.daten().titel() + "\n"
+                + vorher.daten().beschreibung() + "\n" + vorher.daten().inhalt());
+        KiErgebnis antwort = aufrufen(lauf, aktuell, KiPort.WissensSchritt.SEITE, nachricht, budget, monatsbudget);
+        if (antwort.ohneZugang() || !(antwort.inhalt() instanceof KiPort.Seite inhalt)) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(), antwort.budgetErreicht()
+                    ? "Budget erschöpft" : "Die Änderung konnte nicht neu erzeugt werden. Bitte erneut versuchen.");
+            return;
+        }
+        SeitenVorschlag neu = seitenVorschlag(plan, nummer, inhalt, aussagen, fassung, lauf, aktuell.quellStufe());
+        List<SeitenVorschlag> vorschlaege = bisher.vorschlaege().stream()
+                .map(v -> v.nummer() == nummer ? neu : v).toList();
+        Fortschritt fortschritt = new Fortschritt(bisher.abschnitt(), bisher.seite(), bisher.quelleErzeugt(),
+                bisher.kernaussagen(), bisher.planung(), vorschlaege, bisher.hinweise(), bisher.kontextStufe());
+        speichern.neuerzeugungSichern(auftrag, lauf.entwurfId(), vorher.seiteId(), plan.basisVersion(),
+                aktuell.quellStufe(), fortschritt, addiere(lauf.tokensEin(), antwort.tokensEin()),
+                addiere(lauf.tokensAus(), antwort.tokensAus()),
+                neuerStand -> aenderungPruefen(neuerStand, fortschritt, neu));
     }
 
     private void quelle(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher, long budget,
