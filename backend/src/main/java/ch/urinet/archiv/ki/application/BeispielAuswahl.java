@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 /**
  * Korrekturbeispiele für den Aufruf der Erfassung (Req 7.9; design.md «KI», {@code BeispielVorauswahl}): Merkmale des
@@ -89,8 +88,8 @@ public class BeispielAuswahl {
         return ergebnis.merkmale();
     }
 
-    static List<Pattern> muster(ErfassungMandant mandant) {
-        return mandant.belegnummerMuster().stream().map(Pattern::compile).toList();
+    static List<String> muster(ErfassungMandant mandant) {
+        return mandant.belegnummerMuster();
     }
 
     /**

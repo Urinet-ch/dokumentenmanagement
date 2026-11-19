@@ -68,6 +68,9 @@ public class KiVorschlagSchritte {
     /** Kennungen des Mandanten vor dem Szenario, wenn ein Schritt sie geändert hat. */
     private String kennungenVorher;
     private boolean kennungenGeaendert;
+    /** Freigabe des Mandanten vor einem Szenario, das die Sperre prüft. */
+    private boolean kiFreigegebenVorher;
+    private boolean kiFreigabeGeaendert;
     /** Kontakt aus dem Szenario, wird danach gelöscht. */
     private UUID kontakt;
     /** {@code version} des Dokuments direkt nach der Änderung durch den Benutzer. */
@@ -91,6 +94,25 @@ public class KiVorschlagSchritte {
     @After
     public void sprachmodellZuruecksetzen() {
         KiWireMock.zuruecksetzen();
+    }
+
+    @After
+    public void kiFreigabeZuruecksetzen() throws Exception {
+        if (kiFreigabeGeaendert) {
+            auftraege.ausfuehren("update " + new MandantCode(MANDANT).schema()
+                    + ".ki_texte set ki_freigegeben = " + kiFreigegebenVorher + " where id = 1");
+            kiFreigabeGeaendert = false;
+        }
+    }
+
+    @Angenommen("die KI-Freigabe des Mandanten ist ausgeschaltet")
+    public void kiFreigabeAusschalten() throws Exception {
+        String schema = new MandantCode(MANDANT).schema();
+        Object wert = auftraege.wertAus("select ki_freigegeben from " + schema + ".ki_texte where id = 1");
+        assertThat(wert).isInstanceOf(Boolean.class);
+        kiFreigegebenVorher = (Boolean) wert;
+        kiFreigabeGeaendert = true;
+        auftraege.ausfuehren("update " + schema + ".ki_texte set ki_freigegeben = false where id = 1");
     }
 
     @Angenommen("der Mandant «{word}» hat die UID «{}»")
@@ -341,11 +363,21 @@ public class KiVorschlagSchritte {
         assertThat(anfrage.path("frequency_penalty").decimalValue()).isEqualByComparingTo("0");
         assertThat(anfrage.path("response_format").path("type").asText()).isEqualTo("json_schema");
         assertThat(anfrage.path("response_format").path("json_schema").path("strict").asBoolean()).isTrue();
-        assertThat(anfrage.path("response_format").path("json_schema").path("schema").path("properties").fieldNames())
+        JsonNode schema = anfrage.path("response_format").path("json_schema").path("schema");
+        assertThat(schema.path("properties").fieldNames())
                 .toIterable().contains("art", "titel", "datum", "partnerName", "belegnummer", "richtung", "betrag",
                         "waehrung", "faelligkeit", "vertraulichkeit", "tags", "sicherheit");
-        assertThat(anfrage.path("response_format").path("json_schema").path("schema"))
-                .isEqualTo(JSON.readTree(AntwortSchema.json()));
+        assertThat(schema.path("properties").path("art").path("enum").toString())
+                .contains("LIEFERANTENBELEG", "AUSGANGSRECHNUNG").doesNotContain("WISSENSQUELLE");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+    }
+
+    @Dann("der Aufruf verwendet die konfigurierten KI-Texte und Arten des Mandanten")
+    public void konfigurierteKiTexte() throws Exception {
+        JsonNode anfrage = JSON.readTree(anfragen().getFirst().getBodyAsString());
+        String systemPrompt = anfrage.path("messages").get(0).path("content").asText();
+        assertThat(systemPrompt).contains("Sozialversicherungen", "Werte aus dem Swiss QR Code",
+                "AUSGANGSRECHNUNG", "LIEFERANTENBELEG");
     }
 
     @Dann("der Aufruf enthält den Belegtext «{}» und die Dokumentarten des Mandanten")

@@ -126,6 +126,18 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         }
     }
 
+    /** Kompiliert ein validiertes Konfigurationsmuster erst innerhalb seiner Laufzeitgrenze. */
+    public static MusterErgebnis musterTrifft(String muster, String text, Frist frist, long ende) {
+        if (frist.uhr().getAsLong() > ende) {
+            return new MusterErgebnis(false, true);
+        }
+        Pattern kompiliert = Pattern.compile(muster);
+        if (frist.uhr().getAsLong() > ende) {
+            return new MusterErgebnis(false, true);
+        }
+        return musterTrifft(kompiliert, text, frist, ende);
+    }
+
     /**
      * Merkmale aus dem Belegtext und der Kreditor-IBAN des Swiss QR Codes. Ein Muster, das die Frist überschreitet,
      * gilt als «trifft nicht zu» (Spec 05, Req 2.4) und steht mit seiner Nummer im Ergebnis, damit der Aufrufer es
@@ -135,7 +147,7 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
      * @param eigeneIbans IBAN des Mandanten
      */
     public static Ergebnis erkennen(String text, Optional<String> qrIban, String eigeneUid,
-                                    Collection<String> eigeneIbans, List<Pattern> muster, Frist frist) {
+                                    Collection<String> eigeneIbans, List<String> muster, Frist frist) {
         String t = text == null ? "" : text;
         Set<String> eigene = new LinkedHashSet<>();
         eigeneIbans.forEach(i -> eigene.add(ibanNormal(i)));
@@ -163,12 +175,13 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         List<Integer> abgebrochen = new ArrayList<>();
         String[] woerter = WORT.split(t.strip());
         long ende = frist.ende();
+        musterPruefung:
         for (int nr = 0; nr < muster.size() && treffer.size() < MAX_JE_TYP; nr++) {
             switch (trifft(muster.get(nr), woerter, frist, ende)) {
-                case JA -> treffer.add(muster.get(nr).pattern());
+                case JA -> treffer.add(muster.get(nr));
                 case ABGEBROCHEN -> {
                     abgebrochen.add(nr);
-                    break;
+                    break musterPruefung;
                 }
                 case NEIN -> {
                 }
@@ -179,13 +192,20 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
 
     private enum Auswertung { JA, NEIN, ABGEBROCHEN }
 
-    private static Auswertung trifft(Pattern muster, String[] woerter, Frist frist, long ende) {
+    private static Auswertung trifft(String muster, String[] woerter, Frist frist, long ende) {
         try {
+            if (frist.uhr().getAsLong() > ende) {
+                return Auswertung.ABGEBROCHEN;
+            }
+            Pattern kompiliert = Pattern.compile(muster);
+            if (frist.uhr().getAsLong() > ende) {
+                return Auswertung.ABGEBROCHEN;
+            }
             for (String wort : woerter) {
                 if (frist.uhr().getAsLong() > ende) {
                     return Auswertung.ABGEBROCHEN;
                 }
-                if (!wort.isEmpty() && muster.matcher(new MitFrist(wort, frist.uhr(), ende)).matches()) {
+                if (!wort.isEmpty() && kompiliert.matcher(new MitFrist(wort, frist.uhr(), ende)).matches()) {
                     return Auswertung.JA;
                 }
             }

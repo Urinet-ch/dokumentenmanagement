@@ -9,6 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Prüft eine Dokumentart über die Domain-Regeln hinaus (Req 9.5): Das Zusatz-Schema ist gültig, und jedes Pflichtfeld
@@ -18,6 +19,7 @@ import java.util.Set;
 @ApplicationScoped
 public class DokumentartPruefung {
 
+    private static final Pattern KI_FELDNAME = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]{0,63}$");
     private final ZusatzSchemaPruefer schemaPruefer;
 
     public DokumentartPruefung(ZusatzSchemaPruefer schemaPruefer) {
@@ -34,19 +36,27 @@ public class DokumentartPruefung {
         Set<String> schemaFelder = schemaPruefer.schemaPruefen(art.zusatzSchema());
         fristfeldPruefen(art);
         pflichtfelderPruefen(art, schemaFelder);
-        if (!schemaFelder.containsAll(kiFelder)
-                || kiFelder.contains("zugriff") || kiFelder.contains("veroeffentlicht")
-                || !schemaPruefer.reservierteFelderGueltig(art.zusatzSchema())) {
-            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
-        }
+        kiFelderPruefen(art, kiFelder, schemaFelder);
     }
 
     /** Wie {@link #pruefen}, für den Seed eines Mandanten mit der Seed-Frist ({@code archiv.dokumentart.seed-zeitgrenze}). */
     public void seedPruefen(Dokumentart art) {
+        seedPruefen(art, List.of());
+    }
+
+    /** Prüft die KI-Felder des Seeds wie beim Ändern über die API. */
+    public void seedPruefen(Dokumentart art, List<String> kiFelder) {
         Set<String> schemaFelder = schemaPruefer.seedSchemaPruefen(art.zusatzSchema());
         fristfeldPruefen(art);
         pflichtfelderPruefen(art, schemaFelder);
-        if (!schemaPruefer.reservierteFelderGueltig(art.zusatzSchema())) {
+        kiFelderPruefen(art, kiFelder, schemaFelder);
+    }
+
+    private void kiFelderPruefen(Dokumentart art, List<String> kiFelder, Set<String> schemaFelder) {
+        if (!schemaFelder.containsAll(kiFelder)
+                || kiFelder.stream().anyMatch(feld -> !KI_FELDNAME.matcher(feld).matches())
+                || kiFelder.contains("zugriff") || kiFelder.contains("veroeffentlicht")
+                || !schemaPruefer.reservierteFelderGueltig(art.zusatzSchema())) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }
     }

@@ -6,15 +6,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MerkmaleTest {
 
     private static final Merkmale.Frist OHNE_GRENZE = new Merkmale.Frist(Duration.ofDays(1), System::nanoTime);
-    private static final List<Pattern> MUSTER = List.of(Pattern.compile("^\\d{4}-\\d{3}$"),
-            Pattern.compile("^O-\\d{4}-\\d{3}$"));
+    private static final List<String> MUSTER = List.of("^\\d{4}-\\d{3}$", "^O-\\d{4}-\\d{3}$");
 
     @Test
     void erkenntIbanMitLeerzeichenUidEmailUndMuster() {
@@ -61,7 +59,19 @@ class MerkmaleTest {
                 frist);
 
         assertThat(e.merkmale().muster()).isEmpty();
-        assertThat(e.abgebrochen()).containsExactly(0, 1);
+        assertThat(e.abgebrochen()).containsExactly(0);
+    }
+
+    @Test
+    void laufzeitgrenzeStopptDiePruefungAuchBeiVielenMustern() {
+        List<String> vieleMuster = java.util.Collections.nCopies(4_000, "^\\d+$");
+        AtomicLong uhr = new AtomicLong();
+        Merkmale.Frist frist = new Merkmale.Frist(Duration.ofNanos(1), () -> uhr.incrementAndGet());
+
+        Merkmale.Ergebnis ergebnis = Merkmale.erkennen("123", Optional.empty(), null, List.of(), vieleMuster, frist);
+
+        assertThat(ergebnis.abgebrochen()).containsExactly(0);
+        assertThat(uhr).hasValue(3);
     }
 
     @Test

@@ -132,19 +132,20 @@ public class MetadatenExtraktion {
         }
         MandantEinstellungen.Werte werte = einstellungen.lesen(eingabe.mandant());
         List<ArtEintrag> alleArten = arten(konfig, zusatzSchema);
-        List<ArtEintrag> arten = alleArten.stream().filter(ArtEintrag::kiVorschlag).toList();
+        Set<String> eigeneArten = alleArten.stream().filter(ArtEintrag::selbstAusgestellt)
+                .map(ArtEintrag::code).collect(Collectors.toUnmodifiableSet());
+        List<ArtEintrag> arten = ErfassungPrompt.schemaArten(
+                alleArten.stream().filter(ArtEintrag::kiVorschlag).toList(), eigeneArten);
         if (arten.isEmpty()) {
             return Optional.empty();
         }
-        Set<String> eigeneArten = alleArten.stream().filter(ArtEintrag::selbstAusgestellt)
-                .map(ArtEintrag::code).collect(Collectors.toUnmodifiableSet());
         ErfassungMandant mandant = new ErfassungMandant(werte.name(), konfig.einstellungen().kennungen().uid(),
                 konfig.einstellungen().kennungen().ibans(), eigeneArten,
                 alleArten.stream().flatMap(art -> art.belegnummerMuster().stream()).toList());
         List<KiKlassifikation> klassifikationen = klassifikationen(konfig, arten);
         String grundPrompt = ErfassungPrompt.system(mandant.name(),
                 ErfassungPrompt.artListe(arten, eigeneArten, mandant.name()),
-                kiRolle(konfig.kiTexte().rolle()), konfig.kiTexte().feldregeln(), klassifikationen);
+                konfig.kiTexte().rolle(), konfig.kiTexte().feldregeln(), klassifikationen);
         String system = grundPrompt;
         Optional<QrDaten> qr = eingabe.qr();
         Optional<byte[]> bild = eingabe.bild();
@@ -189,10 +190,6 @@ public class MetadatenExtraktion {
                 yield Optional.empty();
             }
         };
-    }
-
-    private static String kiRolle(String rolle) {
-        return rolle == null || rolle.isBlank() ? "Archivassistent für ein Schweizer KMU" : rolle;
     }
 
     private static List<ArtEintrag> arten(Konfiguration konfiguration, ZusatzSchemaPruefer zusatzSchema) {

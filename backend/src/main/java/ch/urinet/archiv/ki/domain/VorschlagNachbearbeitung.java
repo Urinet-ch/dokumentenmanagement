@@ -13,7 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -204,14 +203,14 @@ public final class VorschlagNachbearbeitung {
         return new Ergebnis(vorschlag, abgebrochen);
     }
 
-    private record ArtMuster(Pattern muster, String art) {
+    private record ArtMuster(String muster, String art) {
     }
 
     private static List<ArtMuster> muster(List<ArtEintrag> arten) {
         List<ArtMuster> muster = new ArrayList<>();
         for (ArtEintrag art : arten) {
             for (String regex : art.belegnummerMuster()) {
-                muster.add(new ArtMuster(Pattern.compile(regex), art.code()));
+                muster.add(new ArtMuster(regex, art.code()));
             }
         }
         return muster;

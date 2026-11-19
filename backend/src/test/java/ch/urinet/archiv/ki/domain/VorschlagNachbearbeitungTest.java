@@ -301,6 +301,29 @@ class VorschlagNachbearbeitungTest {
     }
 
     @Test
+    void laufzeitgrenzeStopptAuchBeiVielenArtenWeitereMuster() {
+        List<ArtEintrag> arten = new java.util.ArrayList<>();
+        arten.add(art("PROJEKTDOKUMENT", "Projektdokument", "NORMAL", List.of(), true,
+                java.util.Collections.nCopies(20, "^a+$"), null, null));
+        for (int i = 0; i < 199; i++) {
+            arten.add(art("TESTART_" + i, "Testart", "NORMAL", List.of(), true,
+                    java.util.Collections.nCopies(20, "^a+$"), null, null));
+        }
+        ErfassungMandant mandant = new ErfassungMandant("Testfirma AG", UID, List.of(IBAN),
+                arten.stream().map(ArtEintrag::code).collect(java.util.stream.Collectors.toSet()));
+        java.util.concurrent.atomic.AtomicInteger uhr = new java.util.concurrent.atomic.AtomicInteger();
+        Merkmale.Frist frist = new Merkmale.Frist(java.time.Duration.ofNanos(1),
+                () -> uhr.getAndIncrement() < 2 ? 0 : 2_000_000);
+        Rohvorschlag roh = roh("PROJEKTDOKUMENT", "a", new BigDecimal("0.95"), "NORMAL");
+
+        VorschlagNachbearbeitung.Ergebnis ergebnis = VorschlagNachbearbeitung.bearbeiteMitProtokoll(roh,
+                Optional.empty(), EIGENER_KOPF, mandant, arten, List.of(), EINGANG, frist);
+
+        assertThat(ergebnis.abgebrochen()).containsExactly(1);
+        assertThat(ergebnis.vorschlag().art()).isEqualTo("PROJEKTDOKUMENT");
+    }
+
+    @Test
     void lohnabrechnungWirdBeiFremdemQrNichtUmgestuft() {
         QrDaten qr = new QrDaten(FREMDE_IBAN, new BigDecimal("250.5"), "CHF", "NON", null, "Lieferant GmbH");
 

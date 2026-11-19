@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 /**
  * Lernen aus Korrekturen beim Bestätigen (Req 7.7; design.md «KI», Korrektur): Differenz zwischen KI-Vorschlag und
@@ -103,8 +102,8 @@ public class KorrekturLernen {
         if (korrektur.beispiel()) {
             var aktuell = konfiguration.aktuell();
             var kennungen = aktuell.einstellungen().kennungen();
-            List<Pattern> muster = aktuell.arten().stream().filter(art -> art.aktiv())
-                    .flatMap(art -> art.belegnummerMuster().stream()).map(Pattern::compile).toList();
+            List<String> muster = aktuell.arten().stream().filter(art -> art.aktiv())
+                    .flatMap(art -> art.belegnummerMuster().stream()).toList();
             Merkmale.Ergebnis merkmale = Merkmale.erkennen(ErfassungPrompt.gekuerzt(vorher.volltext()),
                     vorher.partnerIban(), kennungen.uid(),
                     kennungen.ibans(), muster, Merkmale.Frist.cpu(zeitgrenze));

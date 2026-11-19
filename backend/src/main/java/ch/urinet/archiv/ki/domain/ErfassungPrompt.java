@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -27,14 +26,15 @@ public final class ErfassungPrompt {
 
     /** Vorlage; Konfiguration, Mandantenname und Artenliste werden je Mandant eingesetzt. */
     public static final String SYSTEM = """
-            Du bist {rolle}. Mandant (eigene Firma): {mandant}.
+            Du bist %s. Mandant (eigene Firma): %s.
             Erfasse die Metadaten des Belegs für das Archiv des Mandanten.
 
             Dokumentarten (Code: Name, Standard-Vertraulichkeit):
-            {dokumentarten}
+            %s
             Regeln:
-            {feldregeln}
+            %s
             """;
+    private static final String STANDARD_ROLLE = "Archivassistent für ein Schweizer KMU";
 
     public static final String BENUTZER = """
             Swiss QR Code: {qr}
@@ -139,14 +139,14 @@ public final class ErfassungPrompt {
     /** Fertig gerenderter System-Prompt, wie ihn das Modell erhält. */
     public static String system(String mandant, String dokumentarten, String rolle, String feldregeln,
                                 List<KiKlassifikation> klassifikationen) {
-        return SYSTEM.replace("{rolle}", rolle).replace("{mandant}", mandant)
-                .replace("{dokumentarten}", dokumentarten)
-                .replace("{feldregeln}", feldregeln + klassifikationen(klassifikationen));
+        String verwendeteRolle = rolle == null || rolle.isBlank() ? STANDARD_ROLLE : rolle;
+        return SYSTEM.formatted(verwendeteRolle, mandant, dokumentarten,
+                feldregeln + klassifikationen(klassifikationen));
     }
 
     /** Für Tests ohne Konfiguration. Produktaufrufe verwenden die vierteilige Variante. */
     public static String system(String mandant, String dokumentarten) {
-        return system(mandant, dokumentarten, "Archivassistent für ein Schweizer KMU", "", List.of());
+        return system(mandant, dokumentarten, STANDARD_ROLLE, "", List.of());
     }
 
     private static String klassifikationen(List<KiKlassifikation> klassifikationen) {
@@ -173,10 +173,8 @@ public final class ErfassungPrompt {
      * {@code arten} (bei Unsicherheit fällt das Modell auf frühe Werte zurück).
      */
     public static String artListe(List<ArtEintrag> arten, Set<String> eigeneArten, String mandant) {
-        List<ArtEintrag> sortiert = new ArrayList<>(arten.stream().filter(a -> !eigeneArten.contains(a.code())).toList());
-        sortiert.addAll(arten.stream().filter(a -> eigeneArten.contains(a.code())).toList());
         StringBuilder sb = new StringBuilder();
-        for (ArtEintrag a : sortiert) {
+        for (ArtEintrag a : schemaArten(arten, eigeneArten)) {
             sb.append("- ").append(a.code()).append(": ").append(a.name());
             if (a.beschreibung() != null && !a.beschreibung().isBlank()) {
                 sb.append(" – ").append(a.beschreibung());
@@ -206,10 +204,12 @@ public final class ErfassungPrompt {
         return sb.toString();
     }
 
-    /** Arten, die das Antwortschema kennt, in dessen Reihenfolge (Reihenfolge der Seed-Tabelle im Golden-Lauf). */
-    public static List<ArtEintrag> schemaArten(List<ArtEintrag> arten, List<String> codes) {
-        return arten.stream().filter(a -> codes.contains(a.code()))
-                .sorted(Comparator.comparingInt(a -> codes.indexOf(a.code()))).toList();
+    /** Dokumentarten in der Reihenfolge des Prompts: fremde zuerst, eigene zuletzt. */
+    public static List<ArtEintrag> schemaArten(List<ArtEintrag> arten, Set<String> eigeneArten) {
+        List<ArtEintrag> sortiert = new ArrayList<>(
+                arten.stream().filter(art -> !eigeneArten.contains(art.code())).toList());
+        sortiert.addAll(arten.stream().filter(art -> eigeneArten.contains(art.code())).toList());
+        return List.copyOf(sortiert);
     }
 
     /** Kennung der Prompt-Fassung: gerenderter System-Prompt, Vorlagen, Schema, Reihenfolge der Art-Codes, Bildweg. */
