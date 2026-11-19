@@ -67,8 +67,8 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   eine kleine Schnittstelle `Fristbezug.datum(dokument)` statt fester Parameter je Fall; Req 4.4 (leeres Feld) ergibt
   «unbefristet».
 - `mandant/` – `MandantProvisionierung` liest `seed/<code>/konfiguration.json` über den Port `KonfigurationSeed`
-  (heute `DokumentartSeed`) und spielt sie zusammen mit dem Seed-Teil `_alle` (Spec 04) als Version 1 mit Quelle
-  `SEED` ein; `SeedPruefung` ruft `Konfiguration.pruefen()` auf. Port `MandantEinstellungen` liefert
+  und spielt sie zusammen mit dem Seed-Teil `_alle` (Spec 04) als Version mit Quelle `SEED` ein, die auf Version 1
+  (Quelle `MIGRATION`) folgt (Req 1.6; Reihenfolge der Provisionierung siehe Spec 01 design.md «Mandant»); `SeedPruefung` ruft `Konfiguration.pruefen()` auf. Port `MandantEinstellungen` liefert
   `geschaeftsjahr_ende` und `kennungen` des aktuellen Mandanten (heute fehlt er, siehe Spec 01 `Aufbewahrung`).
 - `ki/` (Spec 01, Aufgabe 3.2) – `PromptBauer` setzt den festen Aufbau aus Spec 01 design.md zusammen und füllt ihn
   aus der Konfiguration: Rolle und Feldregeln aus den KI-Texten, Liste der Arten (`ki_vorschlag = ja`) mit
@@ -122,7 +122,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | GET, POST, PATCH, DELETE | `/dokumentarten/{art}/klassifikationen[/{code}]` | Klassifikationen einer Art zuordnen mit `pflicht` und `standardWert` (Req 3.4); GET alle Rollen, Schreiben A11 (`inhaber`); `If-Match` Pflicht; 404 `NICHT_GEFUNDEN`, 422 `KONFIGURATION_UNGUELTIG` (u. a. inaktive Klassifikation als Pflicht oder mit Standardwert), 412, 428 | alle Rollen (GET), A11 |
 | GET | `/regeln` | aktive und inaktive Regeln des Mandanten; `ETag` = Konfigurationsversion (Req 7.2: Regeln nur mit A11) | A11 |
 | POST, PATCH | `/regeln`, `/regeln/{code}` | anlegen, ändern, aktivieren oder deaktivieren; `If-Match` Pflicht; Schreibrecht A11; POST und relevante PATCH-Antworten melden `betroffeneDokumente` (Req 5.6); 412, 428 | A11 |
-| DELETE | `/regeln/{code}` | löschen (Req 7.1); in 17.8 nicht umgesetzt (die Aufgabe verlangt Anlegen, Ändern, Aktivieren), folgt in Aufgabe 17.7 | A11 |
+| DELETE | `/regeln/{code}` | löschen (Req 7.1) in einer neuen Konfigurationsversion (Quelle APP, Protokoll `KONFIGURATION_AENDERN`), Dokumente bleiben unverändert; `If-Match` Pflicht; 204 mit neuem `ETag`, 404, 412, 428; umgesetzt in Aufgabe 17.7b | A11 |
 | GET, PATCH | `/konfiguration/ki-texte` | Rolle, Feldregeln, `ki_freigegeben` (nur lesen; setzt das Admin-Kommando) | A11 |
 | GET | `/konfiguration` | Export der aktuellen Konfiguration als Konfigurationsdatei; `ETag` = Version | A11 |
 | GET | `/konfiguration/versionen`, `/konfiguration/versionen/{n}` | Liste (Version, Zeit, Wer, Quelle, SHA-256) bzw. Abbild | A11 |

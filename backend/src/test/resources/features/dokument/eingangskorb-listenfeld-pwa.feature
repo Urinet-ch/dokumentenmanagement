@@ -1,6 +1,6 @@
 # language: de
 # Eingangskorb in der PWA: Zusatzfelder vom Typ Liste (JSON-Schema `array`), z. B. das Pflichtfeld `verband` der Arten
-# von vhf-gsk (Seed vhf-gsk/dokumentarten.json). Die Geschäftsstelle muss es erfassen können, sonst bleibt das Bestätigen
+# von vhf-gsk (Seed vhf-gsk/konfiguration.json). Die Geschäftsstelle muss es erfassen können, sonst bleibt das Bestätigen
 # unmöglich. Die API ist eine Attrappe im Browser-Test (frontend/e2e/hilfen/archiv-attrappe.mjs); das Prüfen der Werte
 # im Archiv belegen die Java-Szenarien (dokument/bestaetigen.feature, mandant/geschaeftsstelle.feature). Darum
 # Teilnachweis (@attrappe). Alle Daten sind synthetisch. Die Kontrollkästchen zeigen die Anzeigetexte aus `x-labels`

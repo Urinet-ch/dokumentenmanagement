@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.BudgetReservierung;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.NeuerEntwurf;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Quelle;
 import org.junit.jupiter.api.Test;
@@ -80,7 +81,7 @@ class WissenIngestStartenTest {
 
     @Test
     void automatischerStartPrueftDieArtAusDerDatenbank() {
-        Speicher speicher = new Speicher(new Quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 null, null));
 
         starten(speicher, new Auftraege(true)).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
@@ -132,7 +133,7 @@ class WissenIngestStartenTest {
     @Test
     void seitenzahlOhnePassendeSeitentrennerVerhindertDenIngest() {
         // zwei Seiten im Volltext, drei im Dokument (Req 5.6)
-        Speicher speicher = new Speicher(new Quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 3,
+        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 3,
                 true, null, null));
         Auftraege auftraege = new Auftraege(true);
 
@@ -147,7 +148,7 @@ class WissenIngestStartenTest {
 
     @Test
     void fehlendePdfaVerhindertDenIngest() {
-        Speicher speicher = new Speicher(new Quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2,
+        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2,
                 false, null, null));
 
         WissenIngestStarten.Ergebnis ergebnis = starten(speicher, new Auftraege(true))
@@ -190,7 +191,7 @@ class WissenIngestStartenTest {
 
     @Test
     void statusKonfliktKommtVorFalscherArtUndUngueltigemSeitenbereich() {
-        Speicher speicher = new Speicher(new Quelle("QUITTUNG", "EINGANGSKORB", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher speicher = new Speicher(quelle("QUITTUNG", "EINGANGSKORB", "NORMAL", "eins\fzwei\f", 2, true,
                 null, null));
 
         assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, 2, 1, "b"))
@@ -200,7 +201,7 @@ class WissenIngestStartenTest {
 
     @Test
     void laufenderIngestKommtVorFalscherArt() {
-        Speicher speicher = new Speicher(new Quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 null, null));
         speicher.laufend = true;
 
@@ -211,7 +212,7 @@ class WissenIngestStartenTest {
 
     @Test
     void falscheArtKommtVorUngueltigemSeitenbereich() {
-        Speicher speicher = new Speicher(new Quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 null, null));
 
         assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, 2, 1, "b"))
@@ -249,9 +250,9 @@ class WissenIngestStartenTest {
 
     @Test
     void budgetDerEinstellungenGehtDerKonfigurationVor() {
-        Speicher hoch = new Speicher(new Quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher hoch = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 1_000_000, null));
-        Speicher tief = new Speicher(new Quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher tief = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 1_000, null));
 
         WissenIngestStarten.Ergebnis durch = new WissenIngestStarten(hoch, STARTWERTE, new Auftraege(true))
@@ -287,6 +288,21 @@ class WissenIngestStartenTest {
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.BUDGET));
     }
 
+    private static Quelle quelle(String art, String status, String vertraulichkeit, String volltext, int seiten,
+                                 boolean pdfaVorhanden, Integer budgetTokens, Integer monatsbudgetTokens) {
+        return new Quelle(art, status, vertraulichkeit, true, volltext, seiten, pdfaVorhanden, budgetTokens,
+                monatsbudgetTokens);
+    }
+
+    private static Quelle quelle(String vertraulichkeit, int seiten) {
+        StringBuilder volltext = new StringBuilder();
+        for (int seite = 1; seite <= seiten; seite++) {
+            volltext.append("Seite ").append(seite).append('\f');
+        }
+        return new Quelle("WISSENSQUELLE", "ARCHIVIERT", vertraulichkeit, true, volltext.toString(), seiten,
+                true, null, null);
+    }
+
     @Test
     void erschoepftesMonatsbudgetErgibtBeimAutomatischenStartEinenFehlerentwurf() {
         Speicher speicher = new Speicher(quelle("NORMAL"));
@@ -302,7 +318,7 @@ class WissenIngestStartenTest {
 
     @Test
     void monatsbudgetDerEinstellungenGehtDerKonfigurationVor() {
-        Speicher speicher = new Speicher(new Quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 null, 100));
 
         assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, null, null, "b"))
@@ -332,8 +348,7 @@ class WissenIngestStartenTest {
     }
 
     private static Quelle quelle(String vertraulichkeit) {
-        return new Quelle("WISSENSQUELLE", "ARCHIVIERT", vertraulichkeit, "Seite eins\fSeite zwei\f", 2, true,
-                null, null);
+        return quelle(vertraulichkeit, 2);
     }
 
     private static final class Speicher implements WissenIngestPort {
@@ -373,6 +388,85 @@ class WissenIngestStartenTest {
         @Override
         public long verbrauchImZeitraum(Instant von, Instant bis) {
             return verbrauch;
+        }
+
+        @Override
+        public BudgetReservierung budgetReservieren(UUID entwurfId, long tokens, long budgetTokens,
+                                                    long monatsbudgetTokens, java.time.Instant von,
+                                                    java.time.Instant bis) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void budgetFreigeben(UUID reservierungId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Lauf> laufLaden(UUID entwurfId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<SeitenMetadaten> seitenMetadatenLaden() {
+            return List.of();
+        }
+
+        @Override
+        public java.util.Set<UUID> personalDokumenteLaden(java.util.Set<UUID> dokumentIds) {
+            return java.util.Set.of();
+        }
+
+        @Override
+        public java.util.Map<UUID, ch.urinet.archiv.wissen.domain.WissensPruefung.DokumentQuelle>
+        dokumentQuellenLaden(java.util.Set<UUID> dokumentIds) {
+            return java.util.Map.of();
+        }
+
+        @Override
+        public List<SeitenMetadaten> seitenIndexLaden(java.util.Set<UUID> seiteIds, String suchtext) {
+            return List.of();
+        }
+
+        @Override
+        public java.util.Optional<UUID> quelleSeiteFinden(UUID dokumentId) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public long hoechsteQuellenNummer(UUID dokumentId) {
+            return 0;
+        }
+
+        @Override
+        public Optional<SeitenFassung> seiteLaden(UUID seiteId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void aenderungAnlegen(NeueAenderung aenderung) {
+        }
+
+        @Override
+        public void fortschrittSichern(UUID entwurfId, String erwarteterSchritt, String neuerSchritt,
+                                       Fortschritt fortschritt, long tokensEin, long tokensAus,
+                                       boolean unvollstaendig, String hinweis) {
+        }
+
+        @Override
+        public void entwurfSchliessen(UUID entwurfId, String erwarteterSchritt, String status,
+                                      Fortschritt fortschritt, long tokensEin, long tokensAus,
+                                      boolean unvollstaendig, String hinweis) {
+        }
+
+        @Override
+        public int handlerFehltNachholen(String hinweis) {
+            return 0;
+        }
+
+        @Override
+        public Optional<UUID> wartendenAktivieren(long monatsbudgetTokens, Instant von, Instant bis) {
+            return Optional.empty();
         }
     }
 

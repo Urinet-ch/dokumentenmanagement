@@ -14,7 +14,7 @@ Funktionalität: Mandanten anlegen und migrieren
   @req-1.5
   Szenario: Der Seed des Mandanten wird ohne Entwurfsfelder eingespielt
     Wenn der Betreiber die Mandanten «urinet» und «probe» anlegt
-    Dann enthält das Schema «m_urinet» genau die Dokumentarten aus «seed/urinet/dokumentarten.json» und den Seed-Teil der Wissensquelle
+    Dann enthält das Schema «m_urinet» genau die Dokumentarten aus «seed/urinet/konfiguration.json» und den Seed-Teil der Wissensquelle
 
   @req-1.5
   Szenario: Ohne Seed wird kein Mandant angelegt
@@ -32,6 +32,22 @@ Funktionalität: Mandanten anlegen und migrieren
   Szenario: Einen Mandanten gibt es nur einmal
     Wenn der Betreiber die Mandanten «urinet» und «probe» anlegt
     Und der Betreiber den Mandanten «urinet» anlegt
+    Dann lehnt das Archiv mit «MANDANT_EXISTIERT» ab
+
+  @req-1.5
+  Szenario: Bricht der Seed ab, bleibt der Mandant inaktiv, und ein neuer Lauf setzt fort
+    Angenommen das Einspielen des Seeds für den Mandanten «probe-fortsetzen» bricht ab
+    Wenn der Betreiber den Mandanten «probe-fortsetzen» anlegt und der Lauf abbricht
+    Dann steht «probe-fortsetzen» inaktiv im Register, und das Schema «m_probe_fortsetzen» hat keine Konfigurationsversion mit Quelle «SEED» und keine Art aus dem Seed
+    Und der Mandant «probe-fortsetzen» ist für das Archiv nicht auflösbar
+    Wenn der Betreiber den Mandanten «probe-fortsetzen» mit Geschäftsjahresende «06-30» anlegt
+    Dann lehnt das Archiv mit «MANDANT_EXISTIERT» ab
+    Und steht «probe-fortsetzen» inaktiv im Register, und das Schema «m_probe_fortsetzen» hat keine Konfigurationsversion mit Quelle «SEED» und keine Art aus dem Seed
+    Wenn der Fehler behoben ist und der Betreiber den Mandanten «probe-fortsetzen» erneut anlegt
+    Dann steht «probe-fortsetzen» aktiv im Register
+    Und ist die neueste Konfigurationsversion im Schema «m_probe_fortsetzen» die Version mit Quelle «SEED»
+    Und enthält diese Konfigurationsversion genau die Arten aus «seed/probe-fortsetzen/konfiguration.json» und den Seed-Teil der Wissensquelle
+    Wenn der Betreiber den Mandanten «probe-fortsetzen» anlegt
     Dann lehnt das Archiv mit «MANDANT_EXISTIERT» ab
 
   @req-1.5

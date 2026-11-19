@@ -304,6 +304,14 @@ public final class WissensPruefung {
         return false;
     }
 
+    /**
+     * Normalisiert Auszug und Seitentext gleich für Ingest und Prüfung: NFKC, Silbentrennung am Zeilenende entfernen,
+     * Leerraum zusammenfassen.
+     */
+    public static String auszugNormalisieren(String text) {
+        return normalisieren(text);
+    }
+
     private static String normalisieren(String text) {
         String normalisiert = Normalizer.normalize(text, Normalizer.Form.NFKC);
         StringBuilder ergebnis = new StringBuilder(normalisiert.length());

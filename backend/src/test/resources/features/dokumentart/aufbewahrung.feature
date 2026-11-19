@@ -63,3 +63,4 @@ Funktionalität: Aufbewahrungsfrist der Dokumente
       | /api/v1/dokumentarten/{art}/klassifikationen/{code} |
       | /api/v1/klassifikationen/{code} |
       | /api/v1/klassifikationen/{code}/werte/{wert} |
+      | /api/v1/regeln/{code} |

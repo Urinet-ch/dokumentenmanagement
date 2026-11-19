@@ -1,7 +1,10 @@
 package ch.urinet.archiv.mandant;
 
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadWissensquelleSeed;
+import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantFehler;
+import ch.urinet.archiv.mandant.application.MandantVerzeichnis;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.mandant.application.MandantMigration;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -33,7 +36,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Schritte zu Req 1.1, 1.5 und 9.6: Mandanten anlegen, getrennt halten und migrieren. */
+/** Schritte zu Req 1.1, 1.5 und 9.6 (Spec 05: 1.6): Mandanten anlegen, getrennt halten und migrieren. */
 public class MandantSchritte {
 
     @Inject
@@ -41,6 +44,12 @@ public class MandantSchritte {
 
     @Inject
     MandantMigration migration;
+
+    @Inject
+    MandantDatenbank mandantDatenbank;
+
+    @Inject
+    MandantVerzeichnis verzeichnis;
 
     @Inject
     Instance<AgroalDataSource> datenbank;
@@ -52,6 +61,8 @@ public class MandantSchritte {
     ObjectMapper json;
 
     private MandantFehler fehler;
+
+    private JsonNode seedAbbild;
 
     private final List<String> eingetragen = new ArrayList<>();
 
@@ -72,6 +83,57 @@ public class MandantSchritte {
     @Wenn("der Betreiber den Mandanten «{word}» mit Geschäftsjahresende «{word}» anlegt")
     public void anlegenMitGeschaeftsjahresende(String code, String ende) {
         versuchen(code, ende);
+    }
+
+    /** Req 1.5: Ein Trigger lässt nur das Speichern der Version mit Quelle SEED scheitern, also den letzten Schritt. */
+    @Angenommen("das Einspielen des Seeds für den Mandanten «{word}» bricht ab")
+    public void seedBrichtAb(String code) throws SQLException {
+        String schema = new MandantCode(code).schema();
+        mandantDatenbank.schemaAnlegen(schema);
+        ausfuehren("create function " + schema + ".seed_abbruch() returns trigger language plpgsql as "
+                + "$$ begin raise exception 'Testabbruch im Seed'; end $$");
+        ausfuehren("create trigger seed_abbruch before insert on " + schema + ".konfiguration_version for each row "
+                + "when (new.quelle = 'SEED') execute function " + schema + ".seed_abbruch()");
+    }
+
+    @Wenn("der Betreiber den Mandanten «{word}» anlegt und der Lauf abbricht")
+    public void anlegenMitAbbruch(String code) {
+        fehler = null;
+        assertThatThrownBy(() -> provisionierung.anlegen(code, null, null))
+                .isNotInstanceOf(MandantFehler.class)
+                .hasStackTraceContaining("Testabbruch im Seed");
+    }
+
+    @Wenn("der Fehler behoben ist und der Betreiber den Mandanten «{word}» erneut anlegt")
+    public void fortsetzen(String code) throws SQLException {
+        ausfuehren("drop trigger seed_abbruch on " + new MandantCode(code).schema() + ".konfiguration_version");
+        versuchen(code, null);
+        assertThat(fehler).as("Fortsetzen ohne Fehler erwartet").isNull();
+    }
+
+    /** Version 1 ({@code MIGRATION}) legt schon die Schema-Migration an; {@code WISSENSQUELLE} darf vorhanden sein. */
+    @Dann("steht «{word}» inaktiv im Register, und das Schema «{word}» hat keine Konfigurationsversion mit Quelle «{word}» und keine Art aus dem Seed")
+    public void inaktivOhneVersion(String code, String schema, String quelle) throws SQLException {
+        assertThat(werte("select aktiv::text from public.mandant where code = ?", code)).containsExactly("false");
+        assertThat(werte("select version::text from " + schema + ".konfiguration_version where quelle = ?", quelle))
+                .isEmpty();
+        assertThat(werte("select code from " + schema + ".dokumentart")).isSubsetOf("WISSENSQUELLE");
+    }
+
+    @Und("der Mandant «{word}» ist für das Archiv nicht auflösbar")
+    public void nichtAufloesbar(String code) {
+        assertThat(verzeichnis.aktivesSchema(new MandantCode(code))).isEmpty();
+    }
+
+    @Dann("steht «{word}» aktiv im Register")
+    public void aktivImRegister(String code) throws SQLException {
+        assertThat(werte("select aktiv::text from public.mandant where code = ?", code)).containsExactly("true");
+    }
+
+    private void ausfuehren(String sql) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement()) {
+            befehl.execute(sql);
+        }
     }
 
     @Dann("lehnt das Archiv mit «{word}» ab")
@@ -144,7 +206,7 @@ public class MandantSchritte {
     public void seedEingespielt(String schema, String seed) throws IOException, SQLException {
         List<String> erwartet = new ArrayList<>();
         try (InputStream inhalt = getClass().getClassLoader().getResourceAsStream(seed)) {
-            json.readTree(inhalt).path("dokumentarten").forEach(a -> erwartet.add(a.path("code").asText()));
+            json.readTree(inhalt).path("arten").forEach(a -> erwartet.add(a.path("code").asText()));
         }
         assertThat(erwartet).hasSize(11);
         String wissensquelle = new KlassenpfadWissensquelleSeed(json).lesen().code();
@@ -154,6 +216,35 @@ public class MandantSchritte {
         assertThat(werte("select code from " + schema + ".dokumentart")).containsExactlyInAnyOrderElementsOf(erwartet);
         assertThat(werte("select vertraulichkeit || '/' || gesetzliche_pflicht from " + schema
                 + ".dokumentart where code = 'PROJEKTDOKUMENT'")).containsExactly("NORMAL/false");
+    }
+
+    /** Spec 05, Req 1.6; die Reihenfolge {@code MIGRATION} vor {@code SEED} prüft konfigurationsdatei.feature. */
+    @Dann("ist die neueste Konfigurationsversion im Schema «{word}» die Version mit Quelle «{word}»")
+    public void neuesteVersion(String schema, String quelle) throws SQLException, IOException {
+        assertThat(fehler).as("Anlegen ohne Fehler erwartet").isNull();
+        assertThat(werte("select quelle from " + schema + ".konfiguration_version order by version desc limit 1"))
+                .containsExactly(quelle);
+        seedAbbild = json.readTree(werte("select inhalt::text from " + schema
+                + ".konfiguration_version order by version desc limit 1").getFirst());
+    }
+
+    @Und("enthält diese Konfigurationsversion genau die Arten aus «{word}» und den Seed-Teil der Wissensquelle")
+    public void seedArtenImAbbild(String seed) throws IOException {
+        List<String> erwartet = new ArrayList<>();
+        try (InputStream inhalt = getClass().getClassLoader().getResourceAsStream(seed)) {
+            json.readTree(inhalt).path("arten").forEach(a -> erwartet.add(a.path("code").asText()));
+        }
+        assertThat(erwartet).isNotEmpty();
+        erwartet.add(new KlassenpfadWissensquelleSeed(json).lesen().code());
+        List<String> imAbbild = new ArrayList<>();
+        seedAbbild.path("arten").forEach(a -> imAbbild.add(a.path("code").asText()));
+        assertThat(imAbbild).containsExactlyInAnyOrderElementsOf(erwartet);
+    }
+
+    @Und("enthält diese Konfigurationsversion das Geschäftsjahresende «{word}» und die KI-Rolle aus dem Seed")
+    public void seedEinstellungenImAbbild(String ende) {
+        assertThat(seedAbbild.path("einstellungen").path("geschaeftsjahrEnde").asText()).isEqualTo(ende);
+        assertThat(seedAbbild.path("kiTexte").path("rolle").asText()).isEqualTo("Probe-Rolle aus dem Seed");
     }
 
     @Und("es gibt weder den Registereintrag «{word}» noch das Schema «{word}»")

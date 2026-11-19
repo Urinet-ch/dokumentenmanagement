@@ -1,0 +1,47 @@
+{
+  "format": 1,
+  "einstellungen": {
+    "geschaeftsjahrEnde": "12-31",
+    "kennungen": {
+      "uid": null,
+      "ibans": []
+    }
+  },
+  "kiTexte": {
+    "rolle": "",
+    "feldregeln": "",
+    "kiFreigegeben": false
+  },
+  "klassifikationen": [],
+  "arten": [
+    {
+      "code": "PROBE_BELEG",
+      "name": "Probe-Beleg",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel",
+        "datum"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
+  ],
+  "regeln": [],
+  "_quelle": "Synthetischer Testseed"
+}

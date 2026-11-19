@@ -29,9 +29,18 @@ public class JdbcMandantVerzeichnis implements MandantVerzeichnis {
 
     @Override
     public Optional<String> aktivesSchema(MandantCode code) {
+        return schema(code, "select schema_name from public.mandant where code = ? and aktiv");
+    }
+
+    @Override
+    public Optional<String> schemaInProvisionierung(MandantCode code) {
+        return schema(code, "select schema_name from public.mandant where code = ? and not aktiv "
+                + "and deaktiviert_am is null and vollexport_bestaetigt is null and not abbau_abgeschlossen");
+    }
+
+    private Optional<String> schema(MandantCode code, String sql) {
         try (Connection verbindung = datenquelle.get().getConnection();
-             PreparedStatement abfrage = verbindung.prepareStatement(
-                     "select schema_name from public.mandant where code = ? and aktiv")) {
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setString(1, code.wert());
             try (ResultSet zeile = abfrage.executeQuery()) {
                 return zeile.next() ? Optional.of(zeile.getString(1)) : Optional.empty();

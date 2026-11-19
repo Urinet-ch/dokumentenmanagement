@@ -14,9 +14,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Stammdaten-Tabelle der Dokumentarten in design.md (Req 9.2, P6) und ihr Gegenstück im Seed. Felder mit {@code _} am
- * Anfang fallen weg, {@code zusatz_schema} und Spec-05-Attribute stehen nur im Seed; sonstige Felder ohne Spalte machen
- * den Vergleich rot. Die Spec-05-Werte werden separat geprüft.
+ * Stammdaten-Tabelle der Dokumentarten in design.md (Req 9.2, P6) und ihr Gegenstück in der Konfigurationsdatei.
+ * Felder mit {@code _} am Anfang fallen weg; nicht-tabellarische Felder müssen ausdrücklich ausgenommen sein.
  */
 final class StammdatenTabelle {
 
@@ -26,25 +25,34 @@ final class StammdatenTabelle {
     static final String ENDE = "<!-- seed:dokumentarten:ende -->";
     /** Einzige Stelle des Tabellenkopfs (Review PR #38). */
     static final List<String> KOPF = List.of("Code", "Name", "Gruppen", "Pflichtfelder", "Vertraulichkeit",
-            "Jahre", "ab", "Pflicht", "Beschreibung");
+            "Jahre", "ab", "Fristfeld", "Pflicht", "Beschreibung", "Selbst ausgestellt", "Belegnummer-Muster",
+            "Fremdbeleg-Art", "Ohne Zahlungsdaten", "KI-Vorschlag", "KI-Felder", "Reihenfolge",
+            "Klassifikationen");
     private static final Pattern TRENNZEILE = Pattern.compile("^\\|( --- \\|)+$");
     private static final Pattern CODE = Pattern.compile("^`([A-Z_]+)`$");
     private static final String LEER = "–";
-    private static final Set<String> SEED_FELDER = Set.of("code", "name", "beschreibung", "gruppen", "pflichtfelder", "zusatz_schema",
-            "vertraulichkeit", "aufbewahrung_jahre", "aufbewahrung_ab", "gesetzliche_pflicht", "aktiv",
-            "selbst_ausgestellt", "belegnummer_muster", "fremdbeleg_art", "ohne_zahlungsdaten_art", "ki_vorschlag",
-            "ki_felder", "ki_hinweise", "reihenfolge");
+    private static final Set<String> ROOT_FELDER = Set.of("format", "einstellungen", "kiTexte", "klassifikationen",
+            "arten", "regeln");
+    private static final Set<String> SEED_FELDER = Set.of("code", "name", "beschreibung", "gruppen", "pflichtfelder",
+            "zusatzSchema", "vertraulichkeit", "aufbewahrung", "gesetzlichePflicht", "aktiv", "selbstAusgestellt",
+            "belegnummerMuster", "fremdbelegArt", "ohneZahlungsdatenArt", "kiVorschlag", "kiFelder", "kiHinweise",
+            "reihenfolge", "klassifikationen");
 
     /**
-     * Eine Zeile der Tabelle; {@code jahre} und {@code ab} sind {@code null} bei «unbefristet» bzw. «–»,
-     * {@code beschreibung} bei «–».
+     * Eine Zeile der Tabelle; optionale Werte entsprechen «–».
      */
     record Art(String code, String name, List<String> gruppen, List<String> pflichtfelder, String vertraulichkeit,
-               Integer jahre, String ab, boolean pflicht, boolean aktiv, String beschreibung) {
+               Integer jahre, String ab, String fristfeld, boolean pflicht, boolean aktiv, String beschreibung,
+               boolean selbstAusgestellt, List<String> belegnummerMuster, String fremdbelegArt,
+               String ohneZahlungsdatenArt, boolean kiVorschlag, List<String> kiFelder, int reihenfolge,
+               List<String> klassifikationen) {
 
         Art {
             gruppen = List.copyOf(gruppen);
             pflichtfelder = List.copyOf(pflichtfelder);
+            belegnummerMuster = List.copyOf(belegnummerMuster);
+            kiFelder = List.copyOf(kiFelder);
+            klassifikationen = List.copyOf(klassifikationen);
         }
     }
 
@@ -83,45 +91,47 @@ final class StammdatenTabelle {
             }
             arten.add(new Art(code.group(1), z.get(1), liste(z.get(2)), liste(z.get(3)), z.get(4),
                     z.get(5).equals("unbefristet") ? null : Integer.valueOf(z.get(5)),
-                    z.get(6).equals(LEER) ? null : z.get(6), janein(z.get(7)), true,
-                    z.get(8).equals(LEER) ? null : z.get(8)));
+                    nullable(z.get(6)), nullable(z.get(7)), janein(z.get(8)), true, nullable(z.get(9)),
+                    janein(z.get(10)), liste(z.get(11)), nullable(z.get(12)), nullable(z.get(13)),
+                    janein(z.get(14)), liste(z.get(15)), Integer.parseInt(z.get(16)), liste(z.get(17))));
         }
         return arten;
     }
 
-    /**
-     * Liest den Seed so streng wie {@code KlassenpfadDokumentartSeed}: {@code gesetzliche_pflicht} muss boolesch sein,
-     * {@code aufbewahrung_jahre} eine Zahl oder ausdrücklich {@code null}, {@code beschreibung} fehlt oder ist ein nicht
-     * leerer Text, {@code aktiv} gilt ohne Angabe als {@code true}.
-     */
+    /** Liest den Seed so streng wie die Konfigurationsdatei: unbekannte Fachfelder bleiben nicht unbemerkt. */
     static List<Art> ausSeed(JsonNode seed) {
         seed.fieldNames().forEachRemaining(feld -> {
-            if (!feld.startsWith("_") && !feld.equals("dokumentarten")) {
+            if (!feld.startsWith("_") && !ROOT_FELDER.contains(feld)) {
                 throw new IllegalArgumentException("Unbekanntes Feld im Seed: " + feld);
             }
         });
         List<Art> arten = new ArrayList<>();
-        for (JsonNode art : seed.path("dokumentarten")) {
+        for (JsonNode art : seed.path("arten")) {
             art.fieldNames().forEachRemaining(feld -> {
                 if (!feld.startsWith("_") && !SEED_FELDER.contains(feld)) {
                     throw new IllegalArgumentException("Feld ohne Spalte in der Stammdaten-Tabelle: " + feld);
                 }
             });
+            JsonNode aufbewahrung = art.path("aufbewahrung");
             arten.add(new Art(art.path("code").asText(), art.path("name").asText(), texte(art.path("gruppen")),
-                    texte(art.path("pflichtfelder")), art.path("vertraulichkeit").asText(),
-                    jahre(art), art.path("aufbewahrung_ab").isNull() ? null : art.path("aufbewahrung_ab").asText(),
-                    pflicht(art), art.path("aktiv").asBoolean(true), beschreibung(art)));
+                    texte(art.path("pflichtfelder")), art.path("vertraulichkeit").asText(), jahre(aufbewahrung),
+                    textOderNull(aufbewahrung.path("ab")), textOderNull(aufbewahrung.path("feld")), pflicht(art),
+                    art.path("aktiv").asBoolean(true), beschreibung(art),
+                    art.path("selbstAusgestellt").asBoolean(false), texte(art.path("belegnummerMuster")),
+                    textOderNull(art.path("fremdbelegArt")), textOderNull(art.path("ohneZahlungsdatenArt")),
+                    art.path("kiVorschlag").asBoolean(true), texte(art.path("kiFelder")),
+                    art.path("reihenfolge").asInt(0), codes(art.path("klassifikationen"))));
         }
         return arten;
     }
 
-    private static Integer jahre(JsonNode art) {
-        JsonNode jahre = art.path("aufbewahrung_jahre");
+    private static Integer jahre(JsonNode aufbewahrung) {
+        JsonNode jahre = aufbewahrung.path("jahre");
         if (jahre.isNull()) {
             return null;
         }
         if (!jahre.isIntegralNumber() || !jahre.canConvertToInt()) {
-            throw new IllegalArgumentException("aufbewahrung_jahre fehlt oder ist keine Zahl: " + art.path("code"));
+            throw new IllegalArgumentException("aufbewahrung.jahre fehlt oder ist keine Zahl");
         }
         return jahre.intValue();
     }
@@ -138,10 +148,20 @@ final class StammdatenTabelle {
     }
 
     private static boolean pflicht(JsonNode art) {
-        if (!art.path("gesetzliche_pflicht").isBoolean()) {
-            throw new IllegalArgumentException("gesetzliche_pflicht fehlt oder ist nicht boolesch: " + art.path("code"));
+        if (!art.path("gesetzlichePflicht").isBoolean()) {
+            throw new IllegalArgumentException("gesetzlichePflicht fehlt oder ist nicht boolesch: " + art.path("code"));
         }
-        return art.path("gesetzliche_pflicht").booleanValue();
+        return art.path("gesetzlichePflicht").booleanValue();
+    }
+
+    private static List<String> codes(JsonNode klassifikationen) {
+        List<String> codes = new ArrayList<>();
+        klassifikationen.forEach(zuordnung -> codes.add(zuordnung.path("code").asText()));
+        return codes;
+    }
+
+    private static String textOderNull(JsonNode wert) {
+        return wert.isMissingNode() || wert.isNull() ? null : wert.asText();
     }
 
     private static List<String> zellen(String zeile) {
@@ -162,6 +182,10 @@ final class StammdatenTabelle {
             case "nein" -> false;
             default -> throw new IllegalArgumentException("Pflicht weder «ja» noch «nein»: " + zelle);
         };
+    }
+
+    private static String nullable(String zelle) {
+        return zelle.equals(LEER) ? null : zelle;
     }
 
     private static List<String> texte(JsonNode liste) {

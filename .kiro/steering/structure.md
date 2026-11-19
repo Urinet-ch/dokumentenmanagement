@@ -39,8 +39,7 @@ dokumentenmanagement/
 │   └── src/main/resources/
 │       ├── db/public/       Liquibase: Mandantenregister, Aufträge, API-Clients
 │       ├── db/mandant/      Liquibase: Schema je Mandant
-│       ├── seed/urinet/dokumentarten.json   Stammdaten der Dokumentarten (bis Spec 05, Aufgabe 17.7)
-│       ├── seed/<code>/konfiguration.json   Konfiguration je Mandant (Spec 05, ersetzt seed/<code>/dokumentarten.json)
+│       ├── seed/<code>/konfiguration.json   Konfiguration je Mandant, einschliesslich Dokumentarten (Spec 05)
 │       └── seed/_alle/dokumentarten-wissen.json   Art WISSENSQUELLE für jeden Mandanten (Spec 04)
 │   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>, je Datei genau ein @spec-NN); Spec 04 unter features/wissen/, Spec 05 unter features/konfiguration/
 ├── frontend/                Angular PWA (Build über Quinoa)

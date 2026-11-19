@@ -11,4 +11,12 @@ import java.util.Optional;
 public interface MandantVerzeichnis {
 
     Optional<String> aktivesSchema(MandantCode code);
+
+    /**
+     * Schema eines eingetragenen, noch nie aktivierten Mandanten (Provisionierung, Req 1.5); leer für jeden anderen
+     * Zustand. Standard leer, damit ein Verzeichnis ohne diese Angabe fail closed bleibt.
+     */
+    default Optional<String> schemaInProvisionierung(MandantCode code) {
+        return Optional.empty();
+    }
 }

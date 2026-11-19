@@ -165,12 +165,20 @@ public class HybridSuche {
         }
         List<UUID> reihenfolge = new ArrayList<>(belegnummern);
         Map<UUID, Suchtreffer> details = new HashMap<>();
+        Map<UUID, Double> relevanzen = new HashMap<>();
         if (!gesendet.isEmpty()) {
-            Optional<RerankerReihenfolge> sortiert = sortieren(anfrage.begriff(), texte);
+            Optional<RerankerPort.Sortiert> sortiert = sortieren(anfrage.begriff(), texte);
             if (sortiert.isEmpty()) {
                 return Optional.empty();
             }
-            List<UUID> rerankerIds = sortiert.get().indizes().stream().map(gesendet::get).toList();
+            List<UUID> rerankerIds = new ArrayList<>();
+            List<Double> scores = new ArrayList<>();
+            for (int i = 0; i < sortiert.get().indizes().size(); i++) {
+                UUID id = gesendet.get(sortiert.get().indizes().get(i));
+                rerankerIds.add(id);
+                scores.add(sortiert.get().werte().get(i));
+                relevanzen.put(id, sortiert.get().werte().get(i));
+            }
             if (aktualitaetsregel.aktiviert()) {
                 List<Abschnitttreffer> nachladen = rerankerIds.stream().filter(id -> !ausVolltext.containsKey(id))
                         .map(ausVektor::get).toList();
@@ -185,8 +193,7 @@ public class HybridSuche {
                         daten.put(id, dokument.datum());
                     }
                 });
-                rerankerIds = Aktualitaetsranking.ordnen(rerankerIds, sortiert.get().scores(), daten,
-                        aktualitaetsregel, uhr);
+                rerankerIds = Aktualitaetsranking.ordnen(rerankerIds, scores, daten, aktualitaetsregel, uhr);
             }
             reihenfolge.addAll(rerankerIds);
         }
@@ -204,7 +211,8 @@ public class HybridSuche {
             Suchtreffer t = ausVolltext.containsKey(id) ? ausVolltext.get(id) : details.get(id);
             if (t != null) {
                 Abschnitttreffer abschnitt = ausVektor.get(id);
-                ergebnis.add(new Hybridtreffer(t, abschnitt == null ? null : abschnitt.fundstelle()));
+                ergebnis.add(new Hybridtreffer(t, abschnitt == null ? null : abschnitt.fundstelle(),
+                        relevanzen.get(id)));
             }
         }
         return Optional.of(List.copyOf(ergebnis));
@@ -228,11 +236,11 @@ public class HybridSuche {
     }
 
     /** Schritt 4: Indizes in {@code texte} in der Reihenfolge des Rerankers; leer heisst Rückfall. */
-    private Optional<RerankerReihenfolge> sortieren(String begriff, List<String> texte) {
+    private Optional<RerankerPort.Sortiert> sortieren(String begriff, List<String> texte) {
         return switch (reranker.sortieren(begriff, texte, texte.size())) {
             case RerankerPort.Sortiert s -> {
                 erfassen(s.verbrauch());
-                yield Optional.of(new RerankerReihenfolge(s.indizes(), s.werte()));
+                yield Optional.of(s);
             }
             case RerankerPort.Ausfall a -> {
                 erfassenMitTokens(a.verbrauch());
@@ -241,9 +249,6 @@ public class HybridSuche {
             case RerankerPort.OhneSortierung o -> ohne("Reranker", "Dev-Stub");
             case RerankerPort.OhneZugang o -> ohne("Reranker", "kein Token");
         };
-    }
-
-    private record RerankerReihenfolge(List<Integer> indizes, List<Double> scores) {
     }
 
     private static <T> Optional<T> rueckfall(String teil, String grund) {

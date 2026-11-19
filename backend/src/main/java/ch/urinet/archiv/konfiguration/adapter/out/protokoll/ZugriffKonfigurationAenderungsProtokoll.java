@@ -34,17 +34,20 @@ public class ZugriffKonfigurationAenderungsProtokoll implements KonfigurationAen
     }
 
     @Override
-    public void schreiben(int version, KonfigurationQuelle quelle, String grund,
+    public void schreiben(int version, KonfigurationQuelle quelle, String wer, String grund,
                           List<Konfiguration.Aenderung> aenderungen) {
         var details = ProtokollDetails.konfiguration(grund,
                 new ProtokollDetails.Konfiguration(version, quelle.name(), aenderungen.stream()
                         .map(a -> new ProtokollDetails.Aenderung(a.pfad(), a.alt(), a.neu(), a.ohneWerte())).toList()));
-        protokoll.schreiben(new ZugriffEintrag(benutzer(), rolle(), ProtokollAktion.KONFIGURATION_AENDERN,
+        protokoll.schreiben(new ZugriffEintrag(benutzer(wer), rolle(), ProtokollAktion.KONFIGURATION_AENDERN,
                 Optional.empty(), ip(), details));
     }
 
-    private Optional<String> benutzer() {
-        return identitaet.isAnonymous() ? Optional.empty() : Optional.ofNullable(identitaet.getPrincipal().getName());
+    private Optional<String> benutzer(String wer) {
+        if (identitaet.isAnonymous()) {
+            return Optional.ofNullable(wer).filter(w -> !w.isBlank());
+        }
+        return Optional.ofNullable(identitaet.getPrincipal().getName());
     }
 
     private Optional<String> rolle() {

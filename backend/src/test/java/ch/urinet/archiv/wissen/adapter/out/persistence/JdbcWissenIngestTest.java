@@ -5,6 +5,7 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
+import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -64,7 +65,10 @@ class JdbcWissenIngestTest {
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Map<MandantCode, List<UUID>> dokumente = new HashMap<>();
+    private final Map<MandantCode, List<UUID>> entwuerfe = new HashMap<>();
     private final Map<MandantCode, List<Long>> verbrauch = new HashMap<>();
+    private final Map<MandantCode, Monatsbudget> monatsbudgets = new HashMap<>();
+    private final Map<MandantCode, List<UUID>> seiten = new HashMap<>();
 
     @BeforeEach
     void mandanten() throws SQLException {
@@ -73,7 +77,10 @@ class JdbcWissenIngestTest {
                 provisionierung.anlegen(code.wert(), null, null);
             }
             dokumente.put(code, new ArrayList<>());
+            entwuerfe.put(code, new ArrayList<>());
             verbrauch.put(code, new ArrayList<>());
+            seiten.put(code, new ArrayList<>());
+            monatsbudgets.put(code, monatsbudget(code));
         }
     }
 
@@ -81,8 +88,22 @@ class JdbcWissenIngestTest {
     void aufraeumen() throws SQLException {
         worker.shutdown();
         for (MandantCode code : List.of(URINET, ZWEITER)) {
+            for (UUID id : seiten.get(code)) {
+                ausfuehren("delete from " + code.schema() + ".wissensseite where id = ?", id);
+            }
+            for (UUID id : entwuerfe.get(code)) {
+                ausfuehren("delete from " + code.schema() + ".wissens_aenderung where entwurf_id = ?", id);
+                ausfuehren("delete from " + code.schema() + ".wissens_entwurf where id = ?", id);
+            }
             for (Long id : verbrauch.get(code)) {
                 ausfuehren("delete from " + code.schema() + ".ki_verbrauch where id = ?", id);
+            }
+            Monatsbudget vorher = monatsbudgets.get(code);
+            if (vorher.vorhanden()) {
+                ausfuehren("update " + code.schema() + ".wissens_einstellung set monatsbudget_tokens = ? where id = 1",
+                        vorher.wert());
+            } else {
+                ausfuehren("delete from " + code.schema() + ".wissens_einstellung where id = 1");
             }
             Testdokumente.loeschen(datenbank.get(), code.wert(), dokumente.get(code));
         }
@@ -148,12 +169,171 @@ class JdbcWissenIngestTest {
     void entwurfLandetImEigenenSchema() throws SQLException {
         UUID dokument = quelle(ZWEITER);
         UUID id = UUID.randomUUID();
+        entwuerfe.get(ZWEITER).add(id);
         im(ZWEITER, () -> ingest.entwurfAnlegen(new WissenIngestPort.NeuerEntwurf(id, dokument, 1, 2, "FEHLER",
                 "KERNAUSSAGEN", "test-modell", "process:wissen-ingest", "Probe")));
 
         assertThat(anzahl("select count(*) from " + ZWEITER.schema() + ".wissens_entwurf where id = ?", id))
                 .isEqualTo(1);
         assertThat(anzahl("select count(*) from " + URINET.schema() + ".wissens_entwurf where id = ?", id)).isZero();
+    }
+
+    @Test
+    void wartenderIngestWirdBeiAusgeschoepftemMonatsbudgetMitFehlerAbgeschlossen() throws SQLException {
+        UUID entwurf = entwurf(URINET, quelle(URINET), "WARTEND");
+        verbrauch(URINET, "WISSEN_INGEST", 1_000, VON.plusSeconds(60));
+        monatsbudgetSetzen(URINET, 1_000);
+
+        assertThat(im(URINET, () -> ingest.wartendenAktivieren(1_000, VON, BIS))).isEmpty();
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "FEHLER")
+                .containsEntry("hinweis", "Budget erschöpft");
+    }
+
+    @Test
+    void wartenderIngestWirdNichtBeiOffenemIngestAktiviert() throws SQLException {
+        UUID wartend = entwurf(URINET, quelle(URINET), "WARTEND");
+        entwurf(URINET, quelle(URINET), "OFFEN");
+
+        assertThat(im(URINET, () -> ingest.wartendenAktivieren(1_000_000, VON, BIS))).isEmpty();
+        assertThat(zeile(URINET, wartend)).containsEntry("status", "WARTEND");
+    }
+
+    @Test
+    void wartenderIngestWirdBeiVerfuegbaremBudgetAktiviert() throws SQLException {
+        UUID wartend = entwurf(URINET, quelle(URINET), "WARTEND");
+
+        assertThat(im(URINET, () -> ingest.wartendenAktivieren(1_000_000, VON, BIS))).contains(wartend);
+        assertThat(zeile(URINET, wartend)).containsEntry("status", "IN_ARBEIT");
+    }
+
+    @Test
+    void budgetReservierungZaehltLaufUndMonatNurImEigenenSchema() throws SQLException {
+        UUID lauf = entwurf(URINET, quelle(URINET), "IN_ARBEIT");
+        // nur ein aktiver Ingest je Mandant; für die Reservierung zählt der Status nicht
+        UUID andererLauf = entwurf(URINET, quelle(URINET), "WARTEND");
+        UUID fremderLauf = entwurf(ZWEITER, quelle(ZWEITER), "IN_ARBEIT");
+        // Reservierungen anderer Tests laufen nach 5 Minuten ab; sie zählen hier als Sockel mit
+        long monat = reserviert(URINET) + 1_000;
+
+        WissenIngestPort.BudgetReservierung erste = im(URINET,
+                () -> ingest.budgetReservieren(lauf, 600, 1_000, monat, VON, BIS));
+        assertThat(erste.reserviert()).isTrue();
+
+        WissenIngestPort.BudgetReservierung lauflimit = im(URINET,
+                () -> ingest.budgetReservieren(lauf, 500, 1_000, monat + 10_000, VON, BIS));
+        assertThat(lauflimit.reserviert()).isFalse();
+        assertThat(lauflimit.monatsbudgetErschoepft()).isFalse();
+
+        WissenIngestPort.BudgetReservierung monatslimit = im(URINET,
+                () -> ingest.budgetReservieren(andererLauf, 500, 1_000, monat, VON, BIS));
+        assertThat(monatslimit.reserviert()).isFalse();
+        assertThat(monatslimit.monatsbudgetErschoepft()).isTrue();
+
+        long fremdesMonatsbudget = reserviert(ZWEITER) + 1_000;
+        assertThat(im(ZWEITER, () -> ingest.budgetReservieren(fremderLauf, 900, 1_000, fremdesMonatsbudget,
+                VON, BIS)).reserviert()).isTrue();
+        assertThat(im(URINET, () -> ingest.budgetReservieren(andererLauf, 400, 1_000, monat, VON, BIS))
+                .reserviert()).isTrue();
+
+        im(URINET, () -> {
+            ingest.budgetFreigeben(erste.id());
+            return null;
+        });
+        assertThat(im(URINET, () -> ingest.budgetReservieren(lauf, 500, 1_000, monat, VON, BIS)).reserviert())
+                .isTrue();
+
+        ausfuehren("update " + URINET.schema() + ".ki_verbrauch_reservierung set ablauf = now() - interval '1 second' "
+                + "where entwurf_id in (?, ?)", lauf, andererLauf);
+        assertThat(im(URINET, () -> ingest.budgetReservieren(lauf, 1_000, 1_000, monat, VON, BIS)).reserviert())
+                .isTrue();
+        assertThat(anzahl("select count(*) from " + URINET.schema() + ".ki_verbrauch_reservierung "
+                + "where entwurf_id = ?", andererLauf)).isZero();
+    }
+
+    @Test
+    void holtNurHandlerFehltEntwuerfeOhneNeuerenIngestNach() throws SQLException {
+        UUID alt = entwurf(URINET, quelle(URINET), "FEHLER", WissenIngestStarten.HANDLER_FEHLT);
+        UUID neuer = entwurf(URINET, quelle(URINET), "FEHLER", "Neuerer Entwurf");
+        ausfuehren("update " + URINET.schema() + ".wissens_entwurf set erstellt = erstellt + interval '1 second' "
+                + "where id = ?", neuer);
+
+        assertThat(im(URINET, () -> ingest.handlerFehltNachholen(WissenIngestStarten.HANDLER_FEHLT))).isEqualTo(1);
+        assertThat(zeile(URINET, alt)).containsEntry("status", "WARTEND").containsEntry("hinweis", null);
+        assertThat(zeile(URINET, neuer)).containsEntry("status", "FEHLER");
+    }
+
+    @Test
+    void indexsucheVerbindetDieWoerterDerKernaussagenMitOder() throws SQLException {
+        UUID lohn = seite(URINET, "probe/index-lohn", "Die Lohndeklaration ist bis Ende Januar fällig.", null);
+        UUID uvg = seite(URINET, "probe/index-uvg", "Die Unfallversicherung wird jährlich abgerechnet.", null);
+        UUID fremd = seite(URINET, "probe/index-fremd", "Ein Text über Fussballvereine.", null);
+        String suchtext = "Die Lohndeklaration ist fällig.\nDie Unfallversicherung wird abgerechnet.";
+
+        assertThat(im(URINET, () -> ingest.seitenIndexLaden(java.util.Set.of(lohn, uvg, fremd), suchtext)))
+                .extracting(WissenIngestPort.SeitenMetadaten::id).containsExactlyInAnyOrder(lohn, uvg);
+        assertThat(im(ZWEITER, () -> ingest.seitenIndexLaden(java.util.Set.of(lohn, uvg, fremd), suchtext)))
+                .isEmpty();
+        assertThat(JdbcWissenIngest.oderSuche("Am 1. April: UVG-Prämie, uvg!")).isEqualTo("april or uvg or prämie");
+        assertThat(JdbcWissenIngest.oderSuche("ab 12 zu")).isEmpty();
+    }
+
+    @Test
+    void findetDieQuelleSeiteNurImEigenenSchema() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID ohneSeite = quelle(URINET);
+        UUID seite = seite(URINET, "quellen/probe-" + dokument.toString().substring(0, 8), "Quelle", dokument);
+
+        assertThat(im(URINET, () -> ingest.quelleSeiteFinden(dokument))).contains(seite);
+        assertThat(im(URINET, () -> ingest.quelleSeiteFinden(ohneSeite))).isEmpty();
+        assertThat(im(ZWEITER, () -> ingest.quelleSeiteFinden(dokument))).isEmpty();
+    }
+
+    @Test
+    void hoechsteQuellenNummerAusSeitenUndVorschlaegenNurImEigenenSchema() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID anderes = quelle(URINET);
+        String kurz = dokument.toString().substring(0, 8);
+        UUID seite = seite(URINET, "quellen/probe-" + kurz, "Quelle", dokument);
+        for (String schluessel : List.of("q-" + kurz + "-7", "q-" + kurz + "-12", "q-" + kurz + "-x", "fremd-99")) {
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle (seite_id, schluessel, dokument_id, "
+                    + "seite_von, seite_bis, auszug) values (?, ?, ?, 1, 1, 'Seite')", seite, schluessel, dokument);
+        }
+
+        assertThat(im(URINET, () -> ingest.hoechsteQuellenNummer(dokument))).isEqualTo(12);
+        assertThat(im(URINET, () -> ingest.hoechsteQuellenNummer(anderes))).isZero();
+        assertThat(im(ZWEITER, () -> ingest.hoechsteQuellenNummer(dokument))).isZero();
+
+        UUID entwurf = entwurf(URINET, dokument, "ABGELEHNT");
+        ausfuehren("insert into " + URINET.schema() + ".wissens_aenderung (entwurf_id, nr, aktion, pfad, daten, "
+                + "inhalt, diff, status) values (?, 1, 'NEU', 'konzepte/probe', cast(? as jsonb), 'Probe', "
+                + "'[]'::jsonb, 'VERWORFEN')", entwurf, "{\"quellen\": [{\"schluessel\": \"q-" + kurz
+                + "-31\", \"dokumentId\": \"" + dokument + "\"}, {\"schluessel\": \"q-" + kurz
+                + "-77\", \"dokumentId\": \"" + anderes + "\"}]}");
+
+        assertThat(im(URINET, () -> ingest.hoechsteQuellenNummer(dokument))).isEqualTo(31);
+        assertThat(im(ZWEITER, () -> ingest.hoechsteQuellenNummer(dokument))).isZero();
+    }
+
+    @Test
+    void holtHandlerFehltNichtNachWennDasDokumentKeineWissensquelleMehrIst() throws SQLException {
+        UUID dokument = quelle(URINET);
+        ausfuehren("update " + URINET.schema() + ".dokument set art = 'PROJEKTDOKUMENT' where id = ?", dokument);
+        UUID entwurf = entwurf(URINET, dokument, "FEHLER", WissenIngestStarten.HANDLER_FEHLT);
+
+        im(URINET, () -> ingest.handlerFehltNachholen(WissenIngestStarten.HANDLER_FEHLT));
+
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "FEHLER");
+    }
+
+    private UUID seite(MandantCode code, String pfad, String inhalt, UUID wissensquelle) throws SQLException {
+        UUID id = UUID.randomUUID();
+        seiten.get(code).add(id);
+        ausfuehren("insert into " + code.schema() + ".wissensseite (id, pfad, typ, titel, beschreibung, "
+                        + "vertraulichkeit, inhalt, version, erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am, "
+                        + "wissensquelle_id) values (?, ?, ?, 'Probe', 'Probe', 'NORMAL', ?, 1, 'probe', now(), "
+                        + "'probe', now(), ?)",
+                id, pfad, wissensquelle == null ? "Konzept" : "Quelle", inhalt, wissensquelle);
+        return id;
     }
 
     private UUID quelle(MandantCode code) throws SQLException {
@@ -166,10 +346,50 @@ class JdbcWissenIngestTest {
     }
 
     private UUID entwurf(MandantCode code, UUID dokument, String status) throws SQLException {
+        return entwurf(code, dokument, status, null);
+    }
+
+    private UUID entwurf(MandantCode code, UUID dokument, String status, String hinweis) throws SQLException {
         UUID id = UUID.randomUUID();
-        ausfuehren("insert into " + code.schema() + ".wissens_entwurf (id, anlass, dokument_id, status, erstellt_von, "
-                + "erstellt) values (?, 'INGEST', ?, ?, 'probe', now())", id, dokument, status);
+        entwuerfe.get(code).add(id);
+        ausfuehren("insert into " + code.schema()
+                        + ".wissens_entwurf (id, anlass, dokument_id, status, schritt, hinweis, erstellt_von, erstellt) "
+                        + "values (?, 'INGEST', ?, ?, case when ? = 'WARTEND' then 'KERNAUSSAGEN' end, ?, 'probe', now())",
+                id, dokument, status, status, hinweis);
         return id;
+    }
+
+    private void monatsbudgetSetzen(MandantCode code, int tokens) throws SQLException {
+        ausfuehren("update " + code.schema() + ".wissens_einstellung set monatsbudget_tokens = ? where id = 1",
+                tokens);
+    }
+
+    private Monatsbudget monatsbudget(MandantCode code) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select monatsbudget_tokens from " + code.schema() + ".wissens_einstellung where id = 1");
+             ResultSet ergebnis = abfrage.executeQuery()) {
+            if (!ergebnis.next()) {
+                return new Monatsbudget(false, null);
+            }
+            int wert = ergebnis.getInt(1);
+            return new Monatsbudget(true, ergebnis.wasNull() ? null : wert);
+        }
+    }
+
+    private Map<String, Object> zeile(MandantCode code, UUID id) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select status, hinweis from " + code.schema()
+                     + ".wissens_entwurf where id = ?")) {
+            abfrage.setObject(1, id);
+            try (ResultSet ergebnis = abfrage.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                Map<String, Object> werte = new HashMap<>();
+                werte.put("status", ergebnis.getString(1));
+                werte.put("hinweis", ergebnis.getString(2));
+                return werte;
+            }
+        }
     }
 
     private void verbrauch(MandantCode code, String zweck, int tokens, Instant zeit) throws SQLException {
@@ -209,6 +429,16 @@ class JdbcWissenIngestTest {
         }
     }
 
+    private long reserviert(MandantCode code) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select coalesce(sum(tokens), 0) from "
+                     + code.schema() + ".ki_verbrauch_reservierung where ablauf > now()");
+             ResultSet z = abfrage.executeQuery()) {
+            z.next();
+            return z.getLong(1);
+        }
+    }
+
     private void ausfuehren(String sql, Object... werte) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement befehl = verbindung.prepareStatement(sql)) {
@@ -227,5 +457,8 @@ class JdbcWissenIngestTest {
                 return zeile.next();
             }
         }
+    }
+
+    private record Monatsbudget(boolean vorhanden, Integer wert) {
     }
 }
