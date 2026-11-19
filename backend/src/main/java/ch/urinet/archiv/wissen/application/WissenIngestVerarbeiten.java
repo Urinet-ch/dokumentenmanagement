@@ -526,6 +526,11 @@ public class WissenIngestVerarbeiten {
                     "Die Grundlage der Änderung fehlt. Bitte den Ingest neu starten.");
             return;
         }
+        if (vorher.daten().typ() == Seitentyp.QUELLE) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die Quelle-Seite kann noch nicht neu erzeugt werden. Bitte den Ingest neu starten.");
+            return;
+        }
         WissenIngestSpeichern.Stand aktuell = laden(lauf.entwurfId(), Set.of(vorher.seiteId())).stand();
         if (aktuell == null || nichtFreigegeben(auftrag, aktuell, bisher)) {
             return;

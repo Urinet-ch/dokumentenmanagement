@@ -419,6 +419,31 @@ class WissenIngestVerarbeitenTest {
     }
 
     @Test
+    void erneuertQuelleSeiteNichtMitDemFachseitenPrompt() throws InterruptedException {
+        UUID seiteId = UUID.randomUUID();
+        SeitenMetadaten metadaten = new SeitenMetadaten(seiteId, "quellen/2026-04-probe-12345678", "Quelle",
+                "Probe", "Probe", List.of(), "AKTIV", 2, "NORMAL");
+        SeitenFassung fassung = new SeitenFassung(metadaten,
+                "## Zusammenfassung\n\nProbe.\n\n## Kernaussagen\n\n## Berührte Seiten\n", DOKUMENT_ID, List.of());
+        Speicher erster = new Speicher(stand(lauf("QUELLE", false, mitAussage()), 0, WissensStufe.NORMAL,
+                List.of(metadaten), Map.of(seiteId, fassung)));
+        erster.quelleSeite = Optional.of(seiteId);
+        verarbeiten(erster, quelleAntwort(), new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        Speicher speichern = new Speicher(stand(lauf("NEU_ERZEUGEN", false, erster.fortschritt), 0,
+                WissensStufe.NORMAL, List.of(metadaten), Map.of(seiteId, fassung)));
+        KiAntwort ki = new KiAntwort(null);
+        Auftrag auftrag = new Auftrag(1, new MandantCode("urinet"), WissenIngestStarten.TYP,
+                new Nutzlast(Map.of("entwurfId", ENTWURF_ID, "aenderungNr", 1)), 0);
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(auftrag, ENTWURF_ID);
+
+        assertThat(ki.aufrufe).isZero();
+        assertThat(speichern.fehler).contains("Quelle-Seite", "Ingest neu starten");
+        assertThat(speichern.aenderungen).isNull();
+    }
+
+    @Test
     void neueKernaussagenZaehlenNachDenSchluesselnFruehererDurchgaengeWeiter() throws InterruptedException {
         String kurz = DOKUMENT_ID.toString().substring(0, 8);
         Fortschritt bisher = new Fortschritt(0, 0, false, List.of(new Kernaussage(1, "q-" + kurz + "-45",
