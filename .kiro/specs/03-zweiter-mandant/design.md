@@ -198,7 +198,7 @@ vorsignierten URL von `/datei` bei Stufe `oeffentlich`) und URLs von Seiten der 
   - CSV-Import (Aufgabe 10.5): `archiv alte-links importieren <csv> --mandant <code>` ist standardmässig ein Trockenlauf; nur `--ausfuehren --wer <name> --grund <text>` schreibt. Der Import verwendet `CsvLeser` (BOM, UTF-8/Windows-1252, Komma/Semikolon, RFC-4180-Anführungszeichen und mehrzeilige Felder), höchstens `archiv.import.max-groesse` (Standard 5 MiB) und 10'000 Datensätze sowie ausschliesslich `AlteUrl.normalisieren`. Er verlangt die Spalten `alte_url` und kanonische `dokument_id`; Dubletten nach Normalisierung und Zuordnungswidersprüche lehnt er ab. Ziel-IDs müssen im gewählten Mandanten vorhanden und `ARCHIVIERT` sein; die Veröffentlichung wird beim Import nicht geprüft, weil die Umleitung den festen Sichtfilter anwendet. Sobald eine Zeile abgelehnt wird, schreibt der Import keine Zuordnung. Wiederholte Läufe melden identische Zuordnungen als «schon vorhanden». Die Ausgabe enthält nur CSV-Datensatznummer, normalisierte URL, Status und Grund; je neuer Zuordnung entsteht in derselben Transaktion ein `AENDERN`-Eintrag mit `cli:<wer>`, Grund und Dokument-ID, ohne URL-Inhalt. Trockenläufe und Läufe ohne neue Zuordnung schreiben kein Protokoll.
   - Fehler: 400, 401, 403 (nach `LeseZugriffFilter`), 404 (Details, Datei, Umleitung) und 503 `UEBERLASTET` stehen im Vertrag je Endpunkt; 429 `ZU_VIELE_ANFRAGEN` kommt mit den Grenzen (11.11 umgesetzt, Abschnitt «Grenzen»; 11.8 für Streams), die Drosselung je IP mit Traefik (11.6, nicht hier). Die Suche verbraucht Embedding- und Reranker-Tokens (Zweck `SUCHE`, ohne Limit, Spec 02, Req 2.8); die Grenze je Schlüssel (strenger für die Suche) setzt 11.11 durch.
   - Entschieden von Fabian am 16.11.2026: `seite` 1-basiert (in Version 1 fest); Datei-Link nur `oeffentlich`, `mitglieder`/`vorstand` 404 bis 11.8 (11.8 vor dem Plugin-Download 11.5); Suche über Partner und Tags (Gewicht B) angenommen; 11.11 und 11.6 vor dem Livegang der Webseite von VHF/GSK, bis dahin nur Urinet und Testmandanten.
-  - Nachweis: `features/integration/webseiten-lesen.feature` (`@req-5.1`, `5.2`, `5.3`, `5.4`, `5.5`, `5.8`, `5.9`, `5.10`, `5.11`, `15.3`, `15.4`) mit je einer Filterachse als eigenem Beispiel gegen alle Endpunkte; JUnit `AlteUrlTest`, `IpAdresseTest`, `VertraulichkeitFilterWebseiteTest`, `PublicVertragTest` (Code = Datei, Gegenprobe nur auf ihren Pfad beschränkt).
+  - Nachweis: `features/integration/webseiten-lesen.feature` (`@req-5.1`, `5.2`, `5.3`, `5.4`, `5.5`, `5.8`, `5.9`, `5.10`, `5.11`, `5.12`, `15.3`, `15.4`) mit je einer Filterachse als eigenem Beispiel gegen alle Endpunkte; JUnit `AlteUrlTest`, `IpAdresseTest`, `VertraulichkeitFilterWebseiteTest`, `PublicVertragTest` (Code = Datei, Gegenprobe nur auf ihren Pfad beschränkt).
 - Fester Filter in allen Abfragen (geändert 13.11.2026, E-C; bisher `(zusatz->>'zugriff'='oeffentlich' OR :mitglied)`): `status='ARCHIVIERT' AND vertraulichkeit='NORMAL' AND zusatz -> 'veroeffentlicht' = 'true'::jsonb AND zusatz->>'zugriff' = ANY(:stufen)` mit `:stufen = min(gemeldete Stufe, Stufe des Schlüssels).bisUndMit()` (Requirement 3.4, 3.6, 3.7, 5.3). Seit 11.1 läuft der Vergleich als `jsonb` (siehe «Umsetzung (Aufgabe 11.1)»): Nur JSON-`true` zählt. `->> 'veroeffentlicht' = 'true'` liesse den String `"true"` durch und darf nicht kopiert werden; `ZUSATZ_UNGUELTIG` genügt als Sperre nicht, weil sie nur beim Schreiben greift, nicht bei bestehenden Zeilen.
 - `/datei`: Der Medientyp der Antwort hängt von der Stufe des Dokuments ab; die Details liefern `zugriff`, damit die Webseite vorab weiss, was kommt. Die Variante ist die PDF/A-Fassung mit gespeicherter Versions-ID wie Spec 01, 14.6.
 - Klassifikationen (Spec 05 ergänzt, Spec 05, Req 8.6; umgesetzt in Aufgaben 11.2 und 11.5): Die Liste filtert zusätzlich nach den Codes der Klassifikationen mit `oeffentlich_filter` (z. B. `?fachgebiet=bad`, `?verband=gsk`) und gibt nur diese Klassifikationen aus; der feste Sicherheitsfilter oben bleibt unverändert davor. Feste Parameter, die kein Klassifikations-Code sein dürfen: `q`, `reihe`, `jahr`, `ausgabe`, `seite`, `pro_seite`, `id`, `sortierung`, `gespraech_id`, `zugriff`, `veroeffentlicht`, `seit`, `max`, `referenz`, `groesse`, `status`, `url` (die letzten sechs ergänzt 13.11.2026, weil Feed, Umleitung und Erfassung sie im selben Vertrag nutzen; Spec 05 design.md führt dieselbe Liste).
@@ -225,6 +225,47 @@ vorsignierten URL von `/datei` bei Stufe `oeffentlich`) und URLs von Seiten der 
   - Entschieden von Fabian am 16.11.2026: Monatsbudget 2'000'000 Tokens je Mandant, Grenze 600 Fragen/h je Webseite, ohne `X-Archiv-Client` ein gemeinsamer Zähler, Aufbewahrung je Mandant einstellbar (Standard 90, VHF/GSK 30 Tage). Offen als Hinweis, nicht blockierend: der Kontakt der Geschäftsstelle von VHF/GSK ist noch einzuholen und wird je Mandant unter `archiv.mandant.<code>.chat-geschaeftsstelle` konfiguriert (Schlüssel geändert mit der Nachbesserung Review PR #321).
   - Nachprüfung Aufgabe 11.3: Der Reranker-Score wird bis zum öffentlichen Werkzeug durchgereicht; Treffer unter `archiv.webseite.chat.min-relevanz` (Startwert 0.15, bewusst niedriger vorläufiger Boden gegen sehr schwache Treffer, vor Produktion mit freigegebenen Fragen zu kalibrieren) und unbewertete unscharfe Rückfalltreffer gelten als kein Beleg. Exakte Dokumentnummern bleiben deterministische Treffer. Der öffentliche Dienst gibt Modelltext erst nach Quellenprüfung aus und ersetzt eine quelllose Antwort durch den festen Hinweis auf die Geschäftsstelle samt optionalem, mandantenspezifischem Kontakt. Quellen enthalten zusätzlich Jahr und eine plausible Fundstellenseite, falls aus den Werkzeugen verfügbar; Seitenzahlen werden nie ergänzt oder geraten. `fertig.hinweis` stellt den im Vertrag festgelegten Hinweis zu automatisch erstellten Antworten und massgebenden Originaldokumenten bereit; die Anzeige übernimmt das Plugin (Aufgabe 11.5). Schema und Fake-Server-Prüflauf für den späteren Fragenkatalog liegen im Testcode; echte Fragen bleiben ausserhalb des Repositorys.
   - Nachbesserung Review PR #321: Wirft die Hybridsuche und läuft der Volltext-Rückfall, gilt dort ebenfalls nur ein Treffer mit exakter Dokumentnummer als Beleg (unbewertete unscharfe Treffer werden verworfen, `gesamt` zählt nur die behaltenen; `OeffentlicheAbfragenTest`). `fertig.hinweis` ist je Mandant konfigurierbar (`archiv.mandant.<code>.chat-hinweis`, einzeilig, Steuerzeichen entfernt); VHF/GSK behält den Wortlaut «automatisch aus Verbandsdokumenten», andere Mandanten erhalten den neutralen Standard «automatisch aus Dokumenten des Archivs». Die Skala von `min-relevanz` hängt vom Reranker-Modell ab: Ein Wechsel von `archiv.ki.reranker-modell` (z. B. auf die Reserve `Qwen/Qwen3-Reranker-0.6B`) braucht eine neue Kalibrierung. Der Prüflauf bricht bei 401, 403 und 429 `BUDGET` nach der ersten Frage ab (429 `ZU_VIELE_ANFRAGEN` zählt als falsche Antwort), prüft `fertig.hinweis` gegen den Wortlaut aus `ARCHIV_OEFFENTLICHER_CHAT_HINWEIS` (ohne Angabe nur «nicht leer»), und eine Prüffrage darf leere `quellen` haben (Frage ohne Beleg).
+
+#### Aktualitätsgewichtung der öffentlichen Suche (S5, Requirement 5.12)
+
+Befund: `datum` steht bereits in jedem Suchtreffer (`docs/schnittstelle/public-v1.yaml`, Schema `WebseiteTreffer`,
+Feld `datum`; Tabelle «Felder» oben) und kommt aus `dokument.datum`, kann fehlen. Die Hybridsuche berücksichtigte es
+nicht: Der Reranker ordnet Textpassagen, `HybridSuche` verwarf seine Werte.
+
+Umsetzung (Aufgabe 11.14), eine optionale Korrektur je Mandant nach dem Reranker:
+
+- Konfiguration unter `archiv.suche.aktualitaet.mandanten.<code>` mit `aktiviert`, `faktor` und `halbwertzeit-tage`;
+  ohne Eintrag ist die Gewichtung aus. Der Mandant stammt aus dem verifizierten API-Schlüssel, nie aus Suchparametern.
+  `KonfigurierteAktualitaetsregel` (`suche/adapter/out/konfiguration`) prüft die Einträge beim Start: Ein ungültiger
+  Mandant-Code (z. B. `vhf_gsk`), `faktor` ausserhalb 0 bis 1 oder `halbwertzeit-tage` unter 1 bricht den Start mit dem
+  betroffenen Schlüssel ab. Ein gültiger, aber nicht angelegter Code wirkt nicht und lässt sich beim Start nicht prüfen,
+  weil Mandanten zur Laufzeit angelegt werden.
+- Normierung: Die Werte des Rerankers werden je Kandidatenmenge auf 0 bis 1 normiert (Min-Max), weil ihre Skala vom
+  Modell abhängt (`RerankerPort`); so bleibt `faktor` als Anteil der Spannweite modellunabhängig. Grenze: Bei wenigen
+  Kandidaten bestimmt die Spannweite das Ergebnis; bei zwei Kandidaten werden sie zu 1 und 0 und tauschen nie, solange
+  `faktor` unter 1 liegt. Die öffentliche Suche gibt bis zu 30 Kandidaten an den Reranker, darum wirkt die Korrektur
+  in der Regel unter nahezu gleich relevanten Treffern.
+- Abwertung: `faktor * (1 - 2^(-alterTage / halbwertzeitTage))`; ein Datum in der Zukunft zählt wie heute, ein Treffer
+  ohne Erscheinungsdatum bleibt unverändert. Die Korrektur beträgt höchstens `faktor`: Ein älterer Treffer mit einem
+  grösseren Relevanzabstand bleibt vor einem weniger relevanten neueren. Bei Gleichstand entscheidet die Reihenfolge
+  des Rerankers. «Heute» gilt in `Europe/Zurich` (das Erscheinungsdatum ist ein Schweizer Kalendertag); die Uhr ist in
+  `HybridSuche` für Tests einsetzbar.
+- Vorschlag Standard und Parameter (vorgeschlagen 19.11.2026, Fabian entscheidet mit dem Merge dieses PR): Standard
+  «aus» für jeden Mandanten, damit bestehende Mandanten ihr Ranking behalten. Beim Einschalten `faktor=0.05` (5 %) und
+  `halbwertzeit-tage=365`. Begründung: Nur nahezu gleich relevante Treffer werden umgeordnet; nach einem Jahr wirkt die
+  halbe Abwertung, ab etwa drei Jahren fast die ganze. Das Einschalten für `vhf-gsk` in `prod` entscheidet Fabian
+  gesondert; bis dahin hat kein Produktivprofil einen Eintrag. Nur das Testprofil aktiviert sie für `vhf-gsk`, damit das
+  Szenario reproduzierbar bleibt.
+- Kein neuer Vertragsparameter, keine Änderung an Vertrag, Frontend, Reranker-Modell oder Rückfall: Fällt der Reranker
+  aus, gilt wie bisher die Reihenfolge des Volltexts, ohne Gewichtung.
+- Abgrenzung: Der öffentliche Chat (`OeffentlicheAbfragen`) ruft die Hybridsuche ohne Aktualitätsregel auf; seine
+  Quellen werden nicht gewichtet. Folgepunkt, falls der Verband es auch dort wünscht.
+- Nachweis: `features/integration/webseiten-lesen.feature` (`@req-5.12`): Szenariogrundriss mit drei Beispielen
+  (gleiche Relevanz: neu vor alt; Abstand unter dem Faktor: neu vor alt; Abstand über dem Faktor: alt bleibt vorn) und
+  ein Mandant ohne Eintrag (Reihenfolge des Rerankers bleibt). Der Schritt «der Reranker ordnet die Dokumente so:»
+  legt die Werte je Dokument fest, unabhängig von der Reihenfolge der Anfrage; «lief die Suche ohne Rückfall auf den
+  Volltext» schliesst den Rückfall aus. JUnit `AktualitaetsrankingTest` (feste Uhr, Grenzen, Zukunft, Zürich-Datum),
+  `KonfigurierteAktualitaetsregelTest` (Startprüfung, Mandant ohne Eintrag), `HybridSucheTest`.
 
 ### Webseiten-Schnittstelle: Erfassung (`/public/v1/erfassung`, Erfassungs-Schlüssel)
 Neu 13.11.2026 (Requirement 10; entschieden von Fabian am 13.11.2026, E-A). Alle Endpunkte delegieren an dieselben

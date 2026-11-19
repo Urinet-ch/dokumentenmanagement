@@ -138,6 +138,36 @@ und verlangen ab dieser Spec ebenfalls `If-Match` (Folgeänderung Spec 01); `PAT
 zusätzlich 422 `KLASSIFIKATION_UNGUELTIG` und 422 `REGEL_VERLETZT` liefern; Warnungen erscheinen in `warnungen[]` wie
 `BELEGNUMMER_BEKANNT`. `GET/PATCH /mandant/einstellungen` verliert `eigene_arten` (Req 2.2).
 
+## Verwaltungsseiten (Aufgabe 18.3)
+Die Angular-Seite liegt unter `/verwaltung/dokumentarten` und nutzt den generierten API-Client. Der Route-Guard lässt
+nur Benutzer mit A11 auf die Seite; ohne A11 führt er auf eine neutrale 404-Seite, ohne den gemeinsamen Rechte-Guard
+zu verändern. Die Eingaben für einzelne Änderungen senden als `If-Match` den Konfigurations-`ETag` des angezeigten
+Stands. Diesen setzen nur zwei Stellen: das gemeinsame Laden von Arten, Klassifikationen und Regeln (nur wenn alle drei
+Listen denselben `ETag` liefern, sonst bleibt er leer und Speichern verlangt erst ein Neuladen) und die Antwort eines
+eigenen Schreibaufrufs. Lesezugriffe auf Zuordnungen und Versionen übernehmen ihn nicht; ein neuerer Stand dort zeigt
+die Konfliktmeldung, und Speichern endet mit dem alten `ETag` in 412 statt in einem verlorenen Update. Neuladen und
+Einspielen einer Datei setzen offene Formulare bestehender Einträge auf den geladenen Stand. Nach jedem Schreibaufruf
+lädt die Seite die Versionsliste neu. Bei 412 bleibt das Formular unverändert; die Meldung enthält keine
+Serverdetails. Ein Änderungsgrund für die Datei mit Zeichen ausserhalb von Latin-1 wird vor dem Senden abgewiesen,
+weil er als Header geht (Nachbesserung Review PR #323).
+
+Der Feld-Editor bildet nur die unterstützten Schemaformen ab. Nicht darstellbare Zusatz-Schemas erscheinen
+ausschliesslich im JSON-Editor; dort pflegt das Textfeld der Pflichtfelder auch die Einträge `zusatz.<code>`. Im
+Feld-Editor wirkt «Pflicht» nur auf `pflichtfelder` (`zusatz.<code>`, geprüft beim Bestätigen); ein im Schema schon
+vorhandenes `required` (geprüft schon beim Erfassen) bleibt erhalten, ein neues schreibt der Editor nicht. Die
+Reihenfolge der Pflichtfelder bleibt, neue kommen ans Ende. Konfigurationsversionen zeigen Zeitstempel in
+`Europe/Zurich`; der Vergleich zeigt Listen mit `code` je Eintrag, und Differenzen unter `kennungen`, `iban` oder
+`uid` (auch in einem ganz neuen oder entfernten Teilbaum) zeigen keine Werte. Eine Konfigurationsdatei lässt sich erst nach erfolgreicher Prüfung
+und Vergleich mit passender Basisversion einspielen. Bei 409 `KONFIGURATION_VERALTET` bleiben Datei und Grund erhalten,
+die Vorschau wird verworfen und muss neu erstellt werden. Das Einspielen verlangt einen Änderungsgrund im Header
+`X-Aenderungsgrund`; Auswirkungen auf Dokumente zeigt die Vorschau aus `/konfiguration/vergleichen`.
+
+Das Backend verlangt die Gruppe `frei`, sobald ein Pflichtfeld `zusatz.*` steht; die Seite setzt sie dann beim Speichern
+selbst (Checkbox sichtbar, Hinweis unter den Gruppen). Antworten von Prüfen und Vergleichen einer früher gewählten Datei
+und von Zuordnungen einer früher gewählten Art werden verworfen; die Dateiauswahl ist während einer Anfrage gesperrt.
+Ein 403 vom Backend zeigt bewusst die gemeinsame Meldung «nicht berechtigt» (Guard und Rechte entscheidet das Backend);
+eine Weiterleitung auf die 404-Seite gibt es nur über den Guard (Nachbesserung Review PR #323).
+
 ## Admin-Kommando
 ```
 archiv mandant konfiguration exportieren <code> [<datei>]

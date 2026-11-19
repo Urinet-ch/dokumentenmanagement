@@ -9,6 +9,7 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.domain.Abschnitttreffer;
+import ch.urinet.archiv.suche.domain.Aktualitaetsregel;
 import ch.urinet.archiv.suche.domain.AuszugTeil;
 import ch.urinet.archiv.suche.domain.Fundstelle;
 import ch.urinet.archiv.suche.domain.Hybridergebnis;
@@ -23,7 +24,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -62,7 +66,8 @@ class HybridSucheTest {
 
     @BeforeEach
     void aufbauen() {
-        suche = new HybridSuche(volltext, vektor, embedding, reranker, verbrauch, transaktion);
+        suche = new HybridSuche(volltext, vektor, embedding, reranker, verbrauch, transaktion,
+                Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
     }
 
     @Test
@@ -92,6 +97,24 @@ class HybridSucheTest {
         assertThat(volltext.anfrage.groesse()).isEqualTo(HybridSuche.VOLLTEXT);
         assertThat(volltext.anfrage.sortierung()).isEqualTo(Sortierung.RELEVANZ);
         assertThat(vektor.anzahl).isEqualTo(HybridSuche.VEKTOR);
+    }
+
+    @Test
+    void aktualitaetOrdnetTrefferBeiGleicherRerankerRelevanzNeu() {
+        UUID alt = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID neu = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        titel.put(alt, "Altes Merkblatt");
+        titel.put(neu, "Neues Merkblatt");
+        volltext.treffer = List.of(treffer(alt, null, LocalDate.of(2000, 1, 1)),
+                treffer(neu, null, LocalDate.of(2020, 1, 1)));
+        vektor.abschnitte = List.of(abschnitt(alt, 1, 1, 1), abschnitt(neu, 1, 1, 1));
+        reranker.antwort = new RerankerPort.Sortiert(List.of(0, 1), List.of(0.7, 0.7),
+                new KiPort.Verbrauch("reranker", 10, 0));
+
+        Hybridergebnis ergebnis = suche.suchen(anfrage("Merkblatt"), REGEL, false, 30,
+                new Aktualitaetsregel(true, 0.05, 365));
+
+        assertThat(ids(ergebnis)).containsExactly(neu, alt);
     }
 
     @Test
@@ -262,7 +285,11 @@ class HybridSucheTest {
     }
 
     private Suchtreffer treffer(UUID id, String belegnummer) {
-        return new Suchtreffer(id, "VERSICHERUNG", titel.get(id), null, Instant.EPOCH, "ARCHIVIERT", "NORMAL",
+        return treffer(id, belegnummer, null);
+    }
+
+    private Suchtreffer treffer(UUID id, String belegnummer, LocalDate datum) {
+        return new Suchtreffer(id, "VERSICHERUNG", titel.get(id), datum, Instant.EPOCH, "ARCHIVIERT", "NORMAL",
                 List.of(), null, null, null, belegnummer, null, null, null, List.of(new AuszugTeil("Volltext", true)),
                 titel.get(id) + ".pdf");
     }

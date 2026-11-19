@@ -1,0 +1,924 @@
+<div class="verwaltung">
+  <h1>{{ texte.dokumentarten.titel }}</h1>
+  <p>{{ texte.dokumentarten.einleitung }}</p>
+
+  @if (fehler()) {
+    <p class="meldung fehler" role="alert">{{ fehlerMeldung() }}</p>
+    @if (neuLadenNoetig()) {
+      <button type="button" class="sekundaer" (click)="neuLaden()">{{ texte.erneutLaden }}</button>
+    }
+  }
+  @if (meldung()) {
+    <p class="meldung erfolg" role="status" aria-live="polite">{{ meldung() }}</p>
+  }
+
+  <nav [attr.aria-label]="texte.navigation" class="sprungmarken">
+    <a href="#dokumentarten">{{ texte.dokumentarten.titel }}</a>
+    <a href="#klassifikationen">{{ texte.klassifikationen.titel }}</a>
+    <a href="#regeln">{{ texte.regeln.titel }}</a>
+    <a href="#versionen">{{ texte.versionen.titel }}</a>
+    <a href="#konfigurationsdatei">{{ texte.datei.titel }}</a>
+  </nav>
+
+  <section id="dokumentarten" aria-labelledby="dokumentarten-titel">
+    <h2 id="dokumentarten-titel">{{ texte.dokumentarten.titel }}</h2>
+    <div class="zweispaltig">
+      <aside aria-label="{{ texte.dokumentarten.liste }}">
+        <h3>{{ texte.dokumentarten.liste }}</h3>
+        @if (arten() === null) {
+          <p>{{ texte.laden }}</p>
+        } @else if (arten()?.length === 0) {
+          <p>{{ texte.dokumentarten.keine }}</p>
+        } @else {
+          <ul class="auswahlliste">
+            @for (art of arten() ?? []; track art.code) {
+              <li>
+                <button
+                  type="button"
+                  class="auswahl"
+                  [attr.aria-current]="ausgewaehlteArt() === art.code ? 'true' : null"
+                  (click)="artWaehlen(art)"
+                >
+                  <span>{{ art.name }}</span>
+                  <code>{{ art.code }}</code>
+                  <span class="status">{{ art.aktiv ? texte.aktiv : texte.inaktiv }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+        <button type="button" (click)="neueArt()">{{ texte.dokumentarten.neu }}</button>
+      </aside>
+
+      @if (ausgewaehlteArt() !== null || artNeu()) {
+        <div class="formular">
+          <h3>{{ artNeu() ? texte.dokumentarten.neu : artForm.name }}</h3>
+          <label>
+            {{ texte.dokumentarten.code }}
+            <input [(ngModel)]="artForm.code" [disabled]="!artNeu()" autocomplete="off" />
+          </label>
+          <label>
+            {{ texte.dokumentarten.name }}
+            <input [(ngModel)]="artForm.name" autocomplete="off" />
+          </label>
+          <label>
+            {{ texte.dokumentarten.beschreibung }}
+            <textarea [(ngModel)]="artForm.beschreibung" rows="2"></textarea>
+          </label>
+
+          <fieldset>
+            <legend>{{ texte.dokumentarten.gruppen }}</legend>
+            @for (gruppe of gruppen; track gruppe) {
+              <label class="inline">
+                <input
+                  type="checkbox"
+                  [checked]="artForm.gruppen.includes(gruppe)"
+                  (change)="artGruppeSetzen(gruppe, checkboxWert($event))"
+                />
+                {{ texte.dokumentarten.gruppe[gruppe] }}
+              </label>
+            }
+            <p class="hinweis">{{ texte.dokumentarten.gruppeFreiHinweis }}</p>
+          </fieldset>
+
+          <label>
+            {{ texte.dokumentarten.pflichtfelder }}
+            <textarea [(ngModel)]="artForm.pflichtfelder" rows="3"></textarea>
+            <span class="hinweis">{{
+              artForm.schema.modus === 'json'
+                ? texte.dokumentarten.pflichtfelderHinweisJson
+                : texte.dokumentarten.pflichtfelderHinweis
+            }}</span>
+          </label>
+
+          <fieldset>
+            <legend>{{ texte.dokumentarten.zusatzSchema }}</legend>
+            @if (artForm.schema.modus === 'json') {
+              <p class="hinweis">{{ texte.dokumentarten.schemaJsonHinweis }}</p>
+              <label>
+                {{ texte.dokumentarten.schemaJson }}
+                <textarea
+                  [(ngModel)]="artForm.schema.inhalt"
+                  rows="12"
+                  spellcheck="false"
+                ></textarea>
+              </label>
+            } @else {
+              @for (feld of artForm.schema.felder; track $index; let feldIndex = $index) {
+                <fieldset class="feld-editor">
+                  <legend>{{ texte.dokumentarten.feldCode }} {{ feldIndex + 1 }}</legend>
+                  <label>
+                    {{ texte.dokumentarten.feldCode }}
+                    <input [(ngModel)]="feld.code" autocomplete="off" />
+                  </label>
+                  <label>
+                    {{ texte.dokumentarten.feldName }}
+                    <input [(ngModel)]="feld.name" />
+                  </label>
+                  <label>
+                    {{ texte.dokumentarten.feldTyp }}
+                    <select [(ngModel)]="feld.typ">
+                      @for (typ of felderTypen; track typ) {
+                        <option [value]="typ">{{ texte.dokumentarten.feldtypen[typ] }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label class="inline">
+                    <input
+                      type="checkbox"
+                      [(ngModel)]="feld.pflicht"
+                      [disabled]="feld.pflichtImSchema"
+                    />
+                    {{ texte.dokumentarten.feldPflicht }}
+                  </label>
+                  @if (feld.pflichtImSchema) {
+                    <small>{{ texte.dokumentarten.feldPflichtSchemaHinweis }}</small>
+                  }
+                  <label>
+                    {{ texte.dokumentarten.feldBeschreibung }}
+                    <textarea [(ngModel)]="feld.beschreibung" rows="2"></textarea>
+                  </label>
+                  @if (feld.typ === 'auswahl' || feld.typ === 'mehrfach') {
+                    <fieldset>
+                      <legend>{{ texte.dokumentarten.feldOptionen }}</legend>
+                      @for (option of feld.optionen; track $index; let optionIndex = $index) {
+                        <div class="option-zeile">
+                          <label>
+                            {{ texte.dokumentarten.feldWert }}
+                            <input [(ngModel)]="option.wert" autocomplete="off" />
+                          </label>
+                          <label>
+                            {{ texte.dokumentarten.feldBeschriftung }}
+                            <input [(ngModel)]="option.beschriftung" />
+                          </label>
+                          <button
+                            type="button"
+                            class="sekundaer"
+                            (click)="optionEntfernen(feldIndex, optionIndex)"
+                          >
+                            {{ texte.dokumentarten.optionEntfernen }}
+                          </button>
+                        </div>
+                      }
+                      <button
+                        type="button"
+                        class="sekundaer"
+                        (click)="optionHinzufuegen(feldIndex)"
+                      >
+                        {{ texte.dokumentarten.optionHinzufuegen }}
+                      </button>
+                    </fieldset>
+                  }
+                  @if (feld.typ === 'liste' || feld.typ === 'mehrfach') {
+                    <label>
+                      {{ texte.dokumentarten.feldMin }}
+                      <input type="number" min="0" [(ngModel)]="feld.minEintraege" />
+                    </label>
+                    <label>
+                      {{ texte.dokumentarten.feldMax }}
+                      <input type="number" min="0" [(ngModel)]="feld.maxEintraege" />
+                    </label>
+                    <label class="inline">
+                      <input type="checkbox" [(ngModel)]="feld.eindeutig" />
+                      {{ texte.dokumentarten.feldEindeutig }}
+                    </label>
+                  }
+                  <button type="button" class="sekundaer" (click)="feldEntfernen(feldIndex)">
+                    {{ texte.dokumentarten.feldEntfernen }}
+                  </button>
+                </fieldset>
+              }
+              @if (feldEditorFehler()) {
+                <p class="meldung fehler" role="alert">{{ feldEditorFehler() }}</p>
+              }
+              <button type="button" class="sekundaer" (click)="feldHinzufuegen()">
+                {{ texte.dokumentarten.feldHinzufuegen }}
+              </button>
+            }
+          </fieldset>
+
+          <label>
+            {{ texte.dokumentarten.vertraulichkeit }}
+            <select [(ngModel)]="artForm.vertraulichkeit">
+              <option value="NORMAL">{{ texte.dokumentarten.vertraulichkeiten.NORMAL }}</option>
+              <option value="INTERN">{{ texte.dokumentarten.vertraulichkeiten.INTERN }}</option>
+              <option value="PERSONAL">{{ texte.dokumentarten.vertraulichkeiten.PERSONAL }}</option>
+            </select>
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="artForm.unbefristet" />
+            {{ texte.dokumentarten.unbefristet }}
+          </label>
+          @if (!artForm.unbefristet) {
+            <label>
+              {{ texte.dokumentarten.aufbewahrungJahre }}
+              <input type="number" min="0" [(ngModel)]="artForm.aufbewahrungJahre" />
+            </label>
+          }
+          <label>
+            {{ texte.dokumentarten.aufbewahrungAb }}
+            <select [(ngModel)]="artForm.aufbewahrungAb">
+              @for (bezug of aufbewahrungBezug; track bezug) {
+                <option [value]="bezug">
+                  {{ texte.dokumentarten.aufbewahrungAbWerte[bezug] }}
+                </option>
+              }
+            </select>
+          </label>
+          @if (artForm.aufbewahrungAb === 'FELD') {
+            <label>
+              {{ texte.dokumentarten.aufbewahrungFeld }}
+              <input [(ngModel)]="artForm.aufbewahrungFeld" />
+            </label>
+          }
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="artForm.gesetzlichePflicht" />
+            {{ texte.dokumentarten.gesetzlichePflicht }}
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="artForm.selbstAusgestellt" />
+            {{ texte.dokumentarten.selbstAusgestellt }}
+          </label>
+          <label>
+            {{ texte.dokumentarten.belegnummerMuster }}
+            <textarea [(ngModel)]="artForm.belegnummerMuster" rows="3"></textarea>
+            <span class="hinweis">{{ texte.dokumentarten.belegnummerMusterHinweis }}</span>
+          </label>
+          <label>
+            {{ texte.dokumentarten.fremdbelegArt }}
+            <select [(ngModel)]="artForm.fremdbelegArt">
+              <option value=""></option>
+              @for (art of arten() ?? []; track art.code) {
+                @if (art.aktiv) {
+                  <option [value]="art.code">{{ art.name }} ({{ art.code }})</option>
+                }
+              }
+            </select>
+          </label>
+          <label>
+            {{ texte.dokumentarten.ohneZahlungsdatenArt }}
+            <select [(ngModel)]="artForm.ohneZahlungsdatenArt">
+              <option value=""></option>
+              @for (art of arten() ?? []; track art.code) {
+                @if (art.aktiv) {
+                  <option [value]="art.code">{{ art.name }} ({{ art.code }})</option>
+                }
+              }
+            </select>
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="artForm.kiVorschlag" />
+            {{ texte.dokumentarten.kiVorschlag }}
+          </label>
+          <label>
+            {{ texte.dokumentarten.kiFelder }}
+            <textarea [(ngModel)]="artForm.kiFelder" rows="3"></textarea>
+            <span class="hinweis">{{ texte.dokumentarten.kiFelderHinweis }}</span>
+          </label>
+          <label>
+            {{ texte.dokumentarten.kiHinweise }}
+            <textarea [(ngModel)]="artForm.kiHinweise" rows="3"></textarea>
+          </label>
+          <label>
+            {{ texte.dokumentarten.reihenfolge }}
+            <input type="number" [(ngModel)]="artForm.reihenfolge" />
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="artForm.aktiv" />
+            {{ texte.aktiv }}
+          </label>
+          <label>
+            {{ texte.aenderungsgrund }}
+            <input [(ngModel)]="artForm.grund" maxlength="1000" />
+          </label>
+
+          @if (!artNeu()) {
+            <p class="hinweis">{{ texte.wirkungWarnung }}</p>
+          }
+          @if (speichernFrage() === 'art') {
+            <div class="bestaetigung" role="group" aria-labelledby="art-speichern-frage">
+              <p id="art-speichern-frage">{{ texte.wirkungWarnung }}</p>
+              <button type="button" [disabled]="beschaeftigt()" (click)="artSpeichernBestaetigt()">
+                {{ texte.speichern }}
+              </button>
+              <button type="button" class="sekundaer" (click)="speichernFrage.set(null)">
+                {{ texte.abbrechen }}
+              </button>
+            </div>
+          } @else {
+            <button type="button" [disabled]="beschaeftigt()" (click)="artSpeichernStarten()">
+              {{ texte.speichern }}
+            </button>
+          }
+          @if (!artNeu()) {
+            @if (artLoeschenFrage()) {
+              <div class="bestaetigung" role="group" aria-labelledby="art-loeschen-frage">
+                <p id="art-loeschen-frage">{{ texte.bestaetigenLoeschen }}</p>
+                <button type="button" [disabled]="beschaeftigt()" (click)="artLoeschen()">
+                  {{ texte.loeschen }}
+                </button>
+                <button type="button" class="sekundaer" (click)="artLoeschenFrage.set(false)">
+                  {{ texte.abbrechen }}
+                </button>
+              </div>
+            } @else {
+              <button type="button" class="sekundaer" (click)="artLoeschenFrage.set(true)">
+                {{ texte.loeschen }}
+              </button>
+            }
+          }
+        </div>
+      }
+    </div>
+
+    @if (ausgewaehlteArt() !== null && !artNeu()) {
+      <section class="zuordnungen" aria-labelledby="art-zuordnungen-titel">
+        <h3 id="art-zuordnungen-titel">{{ texte.dokumentarten.zuordnungen }}</h3>
+        @if (zuordnungen().length === 0) {
+          <p>{{ texte.dokumentarten.keineKlassifikationen }}</p>
+        } @else {
+          <ul class="zuordnungsliste">
+            @for (zuordnung of zuordnungen(); track zuordnung.klassifikation) {
+              <li>
+                <span>{{ klassifikationName(zuordnung.klassifikation) }}</span>
+                <span>{{ zuordnung.pflicht ? texte.ja : texte.nein }}</span>
+                @if (zuordnung.standardWert) {
+                  <span
+                    >{{ texte.dokumentarten.klassifikationStandard }}:
+                    {{ zuordnung.standardWert }}</span
+                  >
+                }
+                <button type="button" class="sekundaer" (click)="zuordnungWaehlen(zuordnung)">
+                  {{ texte.bearbeiten }}
+                </button>
+                <button
+                  type="button"
+                  class="sekundaer"
+                  (click)="zuordnungEntfernen(zuordnung.klassifikation)"
+                >
+                  {{ texte.dokumentarten.klassifikationEntfernen }}
+                </button>
+              </li>
+            }
+          </ul>
+        }
+        <div class="formular">
+          <label>
+            {{ texte.dokumentarten.klassifikationHinzufuegen }}
+            <select
+              [(ngModel)]="zuordnungForm.klassifikation"
+              [disabled]="zuordnungBearbeiten !== null"
+            >
+              <option value=""></option>
+              @for (klassifikation of zuordnungsKlassifikationen(); track klassifikation.code) {
+                <option [value]="klassifikation.code">
+                  {{ klassifikation.name }} ({{ klassifikation.code }})
+                </option>
+              }
+            </select>
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="zuordnungForm.pflicht" />
+            {{ texte.dokumentarten.klassifikationPflicht }}
+          </label>
+          @if (zuordnungForm.klassifikation) {
+            <label>
+              {{ texte.dokumentarten.klassifikationStandard }}
+              <select [(ngModel)]="zuordnungForm.standardWert">
+                <option value=""></option>
+                @for (wert of zuordnungsWerte(); track wert.code) {
+                  <option [value]="wert.code" [disabled]="wert.aktiv === false">
+                    {{ wert.name }} ({{ wert.code }})
+                  </option>
+                }
+              </select>
+            </label>
+          }
+          <button type="button" [disabled]="beschaeftigt()" (click)="zuordnungSpeichern()">
+            {{ texte.speichern }}
+          </button>
+          @if (zuordnungBearbeiten !== null) {
+            <button type="button" class="sekundaer" (click)="neueZuordnung()">
+              {{ texte.abbrechen }}
+            </button>
+          }
+        </div>
+      </section>
+    }
+  </section>
+
+  <section id="klassifikationen" aria-labelledby="klassifikationen-titel">
+    <h2 id="klassifikationen-titel">{{ texte.klassifikationen.titel }}</h2>
+    <p>{{ texte.klassifikationen.einleitung }}</p>
+    <div class="zweispaltig">
+      <aside aria-label="{{ texte.klassifikationen.liste }}">
+        <h3>{{ texte.klassifikationen.liste }}</h3>
+        @if (klassifikationen() === null) {
+          <p>{{ texte.laden }}</p>
+        } @else if (klassifikationen()?.length === 0) {
+          <p>{{ texte.klassifikationen.keine }}</p>
+        } @else {
+          <ul class="auswahlliste">
+            @for (klassifikation of klassifikationen() ?? []; track klassifikation.code) {
+              <li>
+                <button
+                  type="button"
+                  class="auswahl"
+                  [attr.aria-current]="
+                    ausgewaehlteKlassifikation() === klassifikation.code ? 'true' : null
+                  "
+                  (click)="klassifikationWaehlen(klassifikation)"
+                >
+                  <span>{{ klassifikation.name }}</span>
+                  <code>{{ klassifikation.code }}</code>
+                  <span class="status">
+                    {{ klassifikation.aktiv ? texte.aktiv : texte.inaktiv }}
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+        <button type="button" (click)="neueKlassifikation()">
+          {{ texte.klassifikationen.neueKlassifikation }}
+        </button>
+      </aside>
+      @if (ausgewaehlteKlassifikation() !== null || klassifikationNeu()) {
+        <div class="formular">
+          <h3>
+            {{
+              klassifikationNeu()
+                ? texte.klassifikationen.neueKlassifikation
+                : klassifikationForm.name
+            }}
+          </h3>
+          <label>
+            {{ texte.klassifikationen.code }}
+            <input
+              [(ngModel)]="klassifikationForm.code"
+              [disabled]="!klassifikationNeu()"
+              autocomplete="off"
+            />
+          </label>
+          <label>
+            {{ texte.klassifikationen.name }}
+            <input [(ngModel)]="klassifikationForm.name" />
+          </label>
+          <label>
+            {{ texte.klassifikationen.beschreibung }}
+            <textarea [(ngModel)]="klassifikationForm.beschreibung" rows="2"></textarea>
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="klassifikationForm.mehrfach" />
+            {{ texte.klassifikationen.mehrfach }}
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="klassifikationForm.kiVorschlag" />
+            {{ texte.klassifikationen.kiVorschlag }}
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="klassifikationForm.suchfilter" />
+            {{ texte.klassifikationen.suchfilter }}
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="klassifikationForm.oeffentlichFilter" />
+            {{ texte.klassifikationen.oeffentlichFilter }}
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="klassifikationForm.aktiv" />
+            {{ texte.aktiv }}
+          </label>
+          <label>
+            {{ texte.aenderungsgrund }}
+            <input [(ngModel)]="klassifikationForm.grund" maxlength="1000" />
+          </label>
+          <p class="hinweis">{{ texte.wirkungWarnung }}</p>
+          <button type="button" [disabled]="beschaeftigt()" (click)="klassifikationSpeichern()">
+            {{ texte.speichern }}
+          </button>
+          @if (!klassifikationNeu()) {
+            @if (klassifikationLoeschenFrage()) {
+              <div
+                class="bestaetigung"
+                role="group"
+                aria-labelledby="klassifikation-loeschen-frage"
+              >
+                <p id="klassifikation-loeschen-frage">{{ texte.bestaetigenLoeschen }}</p>
+                <button
+                  type="button"
+                  [disabled]="beschaeftigt()"
+                  (click)="klassifikationLoeschen()"
+                >
+                  {{ texte.loeschen }}
+                </button>
+                <button
+                  type="button"
+                  class="sekundaer"
+                  (click)="klassifikationLoeschenFrage.set(false)"
+                >
+                  {{ texte.abbrechen }}
+                </button>
+              </div>
+            } @else {
+              <button
+                type="button"
+                class="sekundaer"
+                (click)="klassifikationLoeschenFrage.set(true)"
+              >
+                {{ texte.loeschen }}
+              </button>
+            }
+          }
+
+          @if (!klassifikationNeu()) {
+            <section aria-labelledby="werte-titel">
+              <h4 id="werte-titel">{{ texte.klassifikationen.werte }}</h4>
+              <ul class="werteliste">
+                @for (wert of klassifikationWerte(); track wert.code) {
+                  <li>
+                    <span>{{ wert.name }} ({{ wert.code }})</span>
+                    <span>{{ wert.aktiv ? texte.aktiv : texte.inaktiv }}</span>
+                    <button type="button" class="sekundaer" (click)="wertBearbeitenStarten(wert)">
+                      {{ texte.bearbeiten }}
+                    </button>
+                    @if (wertLoeschenFrage() === wert.code) {
+                      <span role="group">
+                        {{ texte.bestaetigenLoeschen }}
+                        <button
+                          type="button"
+                          [disabled]="beschaeftigt()"
+                          (click)="wertLoeschen(wert.code!)"
+                        >
+                          {{ texte.klassifikationen.wertLoeschen }}
+                        </button>
+                        <button
+                          type="button"
+                          class="sekundaer"
+                          (click)="wertLoeschenFrage.set(null)"
+                        >
+                          {{ texte.abbrechen }}
+                        </button>
+                      </span>
+                    } @else {
+                      <button
+                        type="button"
+                        class="sekundaer"
+                        (click)="wertLoeschenFrage.set(wert.code ?? null)"
+                      >
+                        {{ texte.klassifikationen.wertLoeschen }}
+                      </button>
+                    }
+                  </li>
+                }
+              </ul>
+              @if (wertBearbeiten !== null || ausgewaehlteKlassifikation() !== null) {
+                <div class="wert-formular">
+                  <h5>
+                    {{
+                      wertBearbeiten === null
+                        ? texte.klassifikationen.wertHinzufuegen
+                        : texte.klassifikationen.wertSpeichern
+                    }}
+                  </h5>
+                  <label>
+                    {{ texte.klassifikationen.wertCode }}
+                    <input
+                      [(ngModel)]="wertForm.code"
+                      [disabled]="wertBearbeiten !== null"
+                      autocomplete="off"
+                    />
+                  </label>
+                  <label>
+                    {{ texte.klassifikationen.wertName }}
+                    <input [(ngModel)]="wertForm.name" />
+                  </label>
+                  <label>
+                    {{ texte.klassifikationen.wertBeschreibung }}
+                    <input [(ngModel)]="wertForm.beschreibung" />
+                  </label>
+                  <label>
+                    {{ texte.klassifikationen.reihenfolge }}
+                    <input type="number" [(ngModel)]="wertForm.reihenfolge" />
+                  </label>
+                  <label class="inline">
+                    <input type="checkbox" [(ngModel)]="wertForm.aktiv" />
+                    {{ texte.aktiv }}
+                  </label>
+                  <label>
+                    {{ texte.aenderungsgrund }}
+                    <input [(ngModel)]="wertForm.grund" maxlength="1000" />
+                  </label>
+                  <button type="button" [disabled]="beschaeftigt()" (click)="wertSpeichern()">
+                    {{ texte.klassifikationen.wertSpeichern }}
+                  </button>
+                  @if (wertBearbeiten !== null) {
+                    <button type="button" class="sekundaer" (click)="neuerWert()">
+                      {{ texte.abbrechen }}
+                    </button>
+                  }
+                </div>
+              }
+            </section>
+          }
+        </div>
+      }
+    </div>
+  </section>
+
+  <section id="regeln" aria-labelledby="regeln-titel">
+    <h2 id="regeln-titel">{{ texte.regeln.titel }}</h2>
+    <p>{{ texte.regeln.einleitung }}</p>
+    <div class="zweispaltig">
+      <aside [attr.aria-label]="texte.regeln.liste">
+        <h3>{{ texte.regeln.liste }}</h3>
+        @if (regeln() === null) {
+          <p>{{ texte.laden }}</p>
+        } @else if (regeln()?.length === 0) {
+          <p>{{ texte.regeln.keine }}</p>
+        } @else {
+          <ul class="auswahlliste">
+            @for (regel of regeln() ?? []; track regel.code) {
+              <li>
+                <button
+                  type="button"
+                  class="auswahl"
+                  [attr.aria-current]="ausgewaehlteRegel() === regel.code ? 'true' : null"
+                  (click)="regelWaehlen(regel)"
+                >
+                  <span>{{ regel.code }}</span>
+                  <span
+                    >{{ regelTypName(regel.typ) }} · {{ regel.art || texte.regeln.alleArten }}</span
+                  >
+                  <span class="status">{{ regel.aktiv ? texte.aktiv : texte.inaktiv }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+        <button type="button" (click)="neueRegel()">{{ texte.regeln.neueRegel }}</button>
+      </aside>
+
+      @if (ausgewaehlteRegel() !== null || regelNeu()) {
+        <div class="formular">
+          <h3>{{ regelNeu() ? texte.regeln.neueRegel : regelForm.code }}</h3>
+          <label>
+            {{ texte.regeln.code }}
+            <input [(ngModel)]="regelForm.code" [disabled]="!regelNeu()" autocomplete="off" />
+          </label>
+          <label>
+            {{ texte.regeln.art }}
+            <select [(ngModel)]="regelForm.art">
+              <option value=""></option>
+              @for (art of arten() ?? []; track art.code) {
+                <option [value]="art.code">{{ art.name }} ({{ art.code }})</option>
+              }
+            </select>
+          </label>
+          <label>
+            {{ texte.regeln.typ }}
+            <select [(ngModel)]="regelForm.typ">
+              @for (typ of regelTypen; track typ) {
+                <option [value]="typ">{{ regelTypName(typ) }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            {{ texte.regeln.parameter }}
+            <textarea [(ngModel)]="regelForm.parameter" rows="8" spellcheck="false"></textarea>
+            <span class="hinweis">{{ texte.regeln.parameterHinweis }}</span>
+          </label>
+          <label>
+            {{ texte.regeln.schwere }}
+            <select [(ngModel)]="regelForm.schwere">
+              @for (schwere of regelSchweren; track schwere) {
+                <option [value]="schwere">{{ texte.regeln.schweren[schwere] }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            {{ texte.regeln.meldung }}
+            <textarea [(ngModel)]="regelForm.meldung" rows="2"></textarea>
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="regelForm.aktiv" />
+            {{ texte.aktiv }}
+          </label>
+          <label>
+            {{ texte.aenderungsgrund }}
+            <input [(ngModel)]="regelForm.grund" maxlength="1000" />
+          </label>
+          @if (!regelNeu()) {
+            <p class="hinweis">{{ texte.regeln.warnungBetroffene }}</p>
+          }
+          <button type="button" [disabled]="beschaeftigt()" (click)="regelSpeichern()">
+            {{ texte.speichern }}
+          </button>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section id="versionen" aria-labelledby="versionen-titel">
+    <h2 id="versionen-titel">{{ texte.versionen.titel }}</h2>
+    <p>{{ texte.versionen.einleitung }}</p>
+    @if (!versionenGeladen()) {
+      <p>{{ texte.laden }}</p>
+    } @else if (versionen().length === 0) {
+      <p>{{ texte.versionen.keineVersionen }}</p>
+    } @else {
+      <div class="tabellen-rahmen">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{{ texte.versionen.version }}</th>
+              <th scope="col">{{ texte.versionen.zeit }}</th>
+              <th scope="col">{{ texte.versionen.wer }}</th>
+              <th scope="col">{{ texte.versionen.grund }}</th>
+              <th scope="col">{{ texte.versionen.quelle }}</th>
+              <th scope="col">{{ texte.versionen.sha256 }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (version of versionen(); track version.version) {
+              <tr>
+                <td>{{ version.version }}</td>
+                <td>{{ zeitpunkt(version.zeit) }}</td>
+                <td>{{ version.wer }}</td>
+                <td>{{ version.grund ?? '—' }}</td>
+                <td>{{ version.quelle }}</td>
+                <td>
+                  <code>{{ version.sha256 }}</code>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+    <div class="vergleich-formular">
+      <label>
+        {{ texte.versionen.auswaehlenAlt }}
+        <select [ngModel]="versionAlt()" (ngModelChange)="versionAuswahlAendern('alt', $event)">
+          <option [ngValue]="null"></option>
+          @for (version of versionen(); track version.version) {
+            <option [ngValue]="version.version">{{ version.version }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        {{ texte.versionen.auswaehlenNeu }}
+        <select [ngModel]="versionNeu()" (ngModelChange)="versionAuswahlAendern('neu', $event)">
+          <option [ngValue]="null"></option>
+          @for (version of versionen(); track version.version) {
+            <option [ngValue]="version.version">{{ version.version }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" [disabled]="beschaeftigt()" (click)="versionenVergleichen()">
+        {{ texte.versionen.vergleichen }}
+      </button>
+    </div>
+    @if (vergleichAusgefuehrt()) {
+      @if (diff().length === 0) {
+        <p>{{ texte.versionen.keineAenderungen }}</p>
+      } @else {
+        <div class="tabellen-rahmen">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">{{ texte.versionen.aenderungspfad }}</th>
+                <th scope="col">{{ texte.versionen.alt }}</th>
+                <th scope="col">{{ texte.versionen.neu }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (aenderung of diff(); track aenderung.pfad) {
+                <tr>
+                  <td>{{ aenderung.pfad }}</td>
+                  <td>
+                    {{ aenderung.werteVerdeckt ? texte.versionen.werteVerdeckt : aenderung.alt }}
+                  </td>
+                  <td>
+                    {{ aenderung.werteVerdeckt ? texte.versionen.werteVerdeckt : aenderung.neu }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  </section>
+
+  <section id="konfigurationsdatei" aria-labelledby="datei-titel">
+    <h2 id="datei-titel">{{ texte.datei.titel }}</h2>
+    <p>{{ texte.datei.einleitung }}</p>
+    <button type="button" [disabled]="beschaeftigt()" (click)="dateiExportieren()">
+      {{ texte.datei.exportieren }}
+    </button>
+    <label>
+      {{ texte.datei.dateiAuswaehlen }}
+      <input
+        type="file"
+        accept="application/json,.json"
+        [disabled]="beschaeftigt()"
+        (change)="dateiAuswaehlen($event)"
+      />
+    </label>
+    @if (dateiGelesen()) {
+      <p role="status">{{ texte.datei.dateiBereit }}</p>
+    }
+    <div class="datei-aktionen">
+      <button type="button" [disabled]="beschaeftigt()" (click)="dateiPruefen()">
+        {{ texte.datei.pruefen }}
+      </button>
+      <button type="button" [disabled]="beschaeftigt()" (click)="dateiVergleichen()">
+        {{ texte.datei.vergleichen }}
+      </button>
+    </div>
+    @if (dateiPruefung(); as pruefung) {
+      <section aria-labelledby="datei-pruefung-titel">
+        <h3 id="datei-pruefung-titel">{{ texte.datei.pruefung }}</h3>
+        <p>{{ texte.datei.basisVersion }}: {{ pruefung.basisVersion ?? '—' }}</p>
+        <p>{{ texte.datei.aktuelleVersion }}: {{ pruefung.aktuelleVersion ?? '—' }}</p>
+        @if ((pruefung.befunde?.length ?? 0) === 0) {
+          <p>{{ texte.datei.keineBefunde }}</p>
+        } @else {
+          <ul>
+            @for (befund of pruefung.befunde ?? []; track $index) {
+              <li>{{ befund.pfad }}: {{ befund.meldung }}</li>
+            }
+          </ul>
+        }
+      </section>
+    }
+    @if (dateiVergleich(); as vergleich) {
+      <section aria-labelledby="datei-vergleich-titel">
+        <h3 id="datei-vergleich-titel">{{ texte.datei.vorschau }}</h3>
+        <p>{{ texte.datei.basisVersion }}: {{ vergleich.basisVersion ?? '—' }}</p>
+        <p>{{ texte.datei.aktuelleVersion }}: {{ vergleich.aktuelleVersion ?? '—' }}</p>
+        @if (aenderungen(vergleich).length === 0) {
+          <p>{{ texte.datei.keineAenderungen }}</p>
+        } @else {
+          <div class="tabellen-rahmen">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">{{ texte.versionen.aenderungspfad }}</th>
+                  <th scope="col">{{ texte.versionen.alt }}</th>
+                  <th scope="col">{{ texte.versionen.neu }}</th>
+                  <th scope="col">{{ texte.datei.betroffene }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (aenderung of aenderungen(vergleich); track $index; let index = $index) {
+                  <tr>
+                    <td>{{ aenderung.pfad }}</td>
+                    <td>
+                      {{ aenderung.werteVerdeckt ? texte.versionen.werteVerdeckt : aenderung.alt }}
+                    </td>
+                    <td>
+                      {{ aenderung.werteVerdeckt ? texte.versionen.werteVerdeckt : aenderung.neu }}
+                    </td>
+                    <td>
+                      @if (vergleich.aenderungen?.[index]; as eintrag) {
+                        {{ eintrag.betroffeneDokumente ?? 0 }}
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+    <label>
+      {{ texte.datei.grund }}
+      <input [(ngModel)]="dateiGrund" maxlength="1000" />
+    </label>
+    @if (dateiEinspielenMoeglich() && !einspielenFrage()) {
+      <button type="button" [disabled]="beschaeftigt()" (click)="dateiEinspielen()">
+        {{ texte.datei.einspielen }}
+      </button>
+    } @else if (einspielenFrage()) {
+      <div class="bestaetigung" role="group" aria-labelledby="datei-einspielen-frage">
+        <p id="datei-einspielen-frage">{{ texte.datei.einspielenFrage }}</p>
+        <p>{{ texte.datei.basisVersion }}: {{ dateiVergleich()?.basisVersion ?? '—' }}</p>
+        <button
+          type="button"
+          [disabled]="beschaeftigt() || dateiGrund.trim() === ''"
+          (click)="dateiEinspielenBestaetigen()"
+        >
+          {{ texte.datei.einspielenBestaetigen }}
+        </button>
+        <button type="button" class="sekundaer" (click)="einspielenFrage.set(false)">
+          {{ texte.abbrechen }}
+        </button>
+      </div>
+    }
+    @if (dateiErfolgreichEingespielt()) {
+      <p role="status">{{ texte.datei.einspielenErfolgreich }}</p>
+    }
+  </section>
+</div>
