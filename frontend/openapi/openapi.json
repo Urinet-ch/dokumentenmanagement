@@ -6795,7 +6795,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber" ]
         } ]
       },
       "get" : {
@@ -6821,7 +6821,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber" ]
         } ]
       }
     },
@@ -6849,7 +6849,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber" ]
         } ]
       }
     },
@@ -6888,7 +6888,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber" ]
         } ]
       }
     },

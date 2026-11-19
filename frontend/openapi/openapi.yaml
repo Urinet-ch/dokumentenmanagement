@@ -5734,9 +5734,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
-        - geschaeftsstelle
     get:
       summary: Wissenseinstellungen lesen
       description: Nur Inhaber (A19); null bedeutet den konfigurierten Startwert.
@@ -5756,9 +5753,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
-        - geschaeftsstelle
   /api/v1/wissensbasis/exporte:
     post:
       summary: OKF-Export anfordern
@@ -5779,9 +5773,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
-        - geschaeftsstelle
   /api/v1/wissensbasis/exporte/{id}:
     get:
       summary: OKF-Export abrufen
@@ -5810,9 +5801,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
-        - geschaeftsstelle
   /api/v1/wissensbasis/log:
     get:
       summary: Wissensbasis-Log
