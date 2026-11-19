@@ -953,6 +953,7 @@ export class Verwaltung implements OnInit {
       return;
     }
     const body = JSON.stringify({
+      ...(this.zuordnungBearbeiten === null ? { klassifikation } : {}),
       pflicht: this.zuordnungForm.pflicht,
       standardWert: this.zuordnungForm.standardWert || null,
     });
@@ -1367,6 +1368,18 @@ export class Verwaltung implements OnInit {
   protected neuLaden(): void {
     this.fehler.set(null);
     this.ladeStand();
+  }
+
+  protected neuLadenNoetig(): boolean {
+    return (
+      this.arten() === null ||
+      this.klassifikationen() === null ||
+      this.regeln() === null ||
+      !this.versionenGeladen() ||
+      this.etag() === null ||
+      this.fehler() === this.texte.fehlerKonflikt ||
+      this.fehler() === this.texte.fehlerLaden
+    );
   }
 
   protected zeitpunkt(zeit: string | undefined): string {

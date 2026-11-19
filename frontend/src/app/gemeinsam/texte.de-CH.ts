@@ -1063,6 +1063,7 @@ export const TEXTE = {
       feldName: 'Name',
       feldTyp: 'Typ',
       feldPflicht: 'Pflicht',
+      feldPflichtSchemaHinweis: 'Im Zusatz-Schema als Pflicht definiert; hier nicht änderbar.',
       feldBeschreibung: 'Beschreibung',
       feldOptionen: 'Werteliste',
       feldWert: 'Wert',

@@ -5,6 +5,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { DokumentartenService } from '../../gemeinsam/api/api/dokumentarten.service';
 import { KonfigurationService } from '../../gemeinsam/api/api/konfiguration.service';
 import { Dokumentart } from '../../gemeinsam/api/model/dokumentart';
+import { Klassifikation } from '../../gemeinsam/api/model/klassifikation';
 import { KonfigurationsVersion } from '../../gemeinsam/api/model/konfigurations-version';
 import { Regel } from '../../gemeinsam/api/model/regel';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
@@ -84,6 +85,7 @@ describe('Verwaltung der Dokumentarten', () => {
     versionen: KonfigurationsVersion[] = [],
     arten: Dokumentart[] = [ART],
     regelnEtag = '"konfig-7"',
+    klassifikationen: Klassifikation[] = [],
   ) {
     dokumentartenService.apiV1DokumentartenGet.mockReset().mockReturnValue(of(antwort(arten)));
     dokumentartenService.apiV1DokumentartenPost.mockReset().mockReturnValue(of(antwort(ART)));
@@ -91,7 +93,9 @@ describe('Verwaltung der Dokumentarten', () => {
     dokumentartenService.apiV1DokumentartenCodeDelete
       .mockReset()
       .mockReturnValue(of(antwort(undefined)));
-    konfigurationService.apiV1KlassifikationenGet.mockReset().mockReturnValue(of(antwort([])));
+    konfigurationService.apiV1KlassifikationenGet
+      .mockReset()
+      .mockReturnValue(of(antwort(klassifikationen)));
     konfigurationService.apiV1KonfigurationVersionenGet
       .mockReset()
       .mockReturnValue(of(antwort(versionen)));
@@ -208,7 +212,49 @@ describe('Verwaltung der Dokumentarten', () => {
     expect(element.querySelector('[role=alert]')?.textContent).toContain(
       TEXTE.verwaltung.fehlerKonflikt,
     );
+    expect(element.textContent).toContain(TEXTE.verwaltung.erneutLaden);
     expect(element.textContent).not.toContain('CH0000000000000000000');
+  });
+
+  it('lädt nach einem 412 den neuen Stand und ermöglicht danach wieder Speichern', async () => {
+    await starten();
+    dokumentartenService.apiV1DokumentartenCodePatch
+      .mockReturnValueOnce(
+        throwError(() => new HttpErrorResponse({ status: 412 })),
+      )
+      .mockReturnValueOnce(of(antwort({ ...ART, name: 'Neue Rechnung' }, '"konfig-9"')));
+
+    await ersteArtSpeichern();
+    await speichernBestaetigen();
+    expect(element.textContent).toContain(TEXTE.verwaltung.erneutLaden);
+
+    dokumentartenService.apiV1DokumentartenGet.mockReturnValue(
+      of(antwort([{ ...ART, name: 'Serverstand' }], '"konfig-8"')),
+    );
+    konfigurationService.apiV1KlassifikationenGet.mockReturnValue(of(antwort([], '"konfig-8"')));
+    konfigurationService.apiV1RegelnGet.mockReturnValue(
+      of(antwort([REGEL], '"konfig-8"')),
+    );
+    konfigurationService.apiV1KonfigurationVersionenGet.mockReturnValue(
+      of(antwort([], '"konfig-8"')),
+    );
+    konfigurationService.apiV1DokumentartenArtKlassifikationenGet.mockReturnValue(
+      of(antwort([], '"konfig-8"')),
+    );
+
+    knopf(TEXTE.verwaltung.erneutLaden).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(eingabe(TEXTE.verwaltung.dokumentarten.name).value).toBe('Serverstand');
+    expect(element.querySelector('[role=alert]')).toBeNull();
+    const name = eingabe(TEXTE.verwaltung.dokumentarten.name);
+    name.value = 'Aktualisierte Rechnung';
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    await speichernBestaetigen();
+
+    expect(dokumentartenService.apiV1DokumentartenCodePatch.mock.calls[1][1]).toBe('"konfig-8"');
   });
 
   it('meldet 409 ohne Serverdetails und empfiehlt Deaktivieren statt Löschen', async () => {
@@ -304,6 +350,98 @@ describe('Verwaltung der Dokumentarten', () => {
     expect(body.zusatzSchema).toEqual(bank.zusatzSchema);
   });
 
+  it('zeigt vorhandene required-Felder als nicht änderbare Pflicht an', async () => {
+    const requiredArt: Dokumentart = {
+      ...ART,
+      zusatzSchema: {
+        type: 'object',
+        properties: { status: { type: 'string' } },
+        required: ['status'],
+      },
+    };
+    await starten(of(antwort(requiredArt)), [], [requiredArt]);
+
+    element.querySelector<HTMLButtonElement>('.auswahl')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const pflichtCheckbox = element.querySelector<HTMLInputElement>(
+      'fieldset.feld-editor label.inline input[type="checkbox"]',
+    );
+    expect(pflichtCheckbox?.disabled).toBe(true);
+    expect(element.textContent).toContain(
+      TEXTE.verwaltung.dokumentarten.feldPflichtSchemaHinweis,
+    );
+  });
+
+  it('sendet den Klassifikationscode beim Anlegen einer Zuordnung mit', async () => {
+    const klassifikation: Klassifikation = {
+      code: 'PROBE',
+      name: 'Probe',
+      aktiv: true,
+    };
+    await starten(of(antwort(ART)), [], [ART], '"konfig-7"', [klassifikation]);
+    konfigurationService.apiV1DokumentartenArtKlassifikationenPost.mockReturnValue(
+      of(antwort({ klassifikation: 'PROBE', pflicht: false })),
+    );
+
+    element.querySelector<HTMLButtonElement>('.auswahl')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const klassifikationSelect = auswahl(TEXTE.verwaltung.dokumentarten.klassifikationHinzufuegen);
+    klassifikationSelect.value = 'PROBE';
+    klassifikationSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges();
+    const formular = element.querySelector<HTMLElement>('.zuordnungen .formular')!;
+    [...formular.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.verwaltung.speichern)!
+      .click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const anfrage = konfigurationService.apiV1DokumentartenArtKlassifikationenPost.mock.calls[0];
+    expect(anfrage[0]).toBe(ART.code);
+    expect(JSON.parse(anfrage[1])).toEqual({
+      klassifikation: 'PROBE',
+      pflicht: false,
+      standardWert: null,
+    });
+  });
+
+  it('lässt den Klassifikationscode beim Ändern einer Zuordnung im Pfad', async () => {
+    await starten();
+    konfigurationService.apiV1DokumentartenArtKlassifikationenGet.mockReturnValue(
+      of(antwort([{ klassifikation: 'PROBE', pflicht: false }])),
+    );
+    konfigurationService.apiV1DokumentartenArtKlassifikationenCodePatch.mockReturnValue(
+      of(antwort({ klassifikation: 'PROBE', pflicht: true })),
+    );
+
+    element.querySelector<HTMLButtonElement>('.auswahl')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    element.querySelector<HTMLButtonElement>('.zuordnungen li button')!.click();
+    fixture.detectChanges();
+    const pflicht = element.querySelector<HTMLInputElement>(
+      '.zuordnungen .formular input[type="checkbox"]',
+    )!;
+    pflicht.checked = true;
+    pflicht.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges();
+    const formular = element.querySelector<HTMLElement>('.zuordnungen .formular')!;
+    [...formular.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.verwaltung.speichern)!
+      .click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const anfrage =
+      konfigurationService.apiV1DokumentartenArtKlassifikationenCodePatch.mock.calls[0];
+    expect(anfrage[0]).toBe(ART.code);
+    expect(anfrage[1]).toBe('PROBE');
+    expect(JSON.parse(anfrage[2])).toEqual({ pflicht: true, standardWert: null });
+  });
+
   it('speichert eine über das Zahlenfeld geänderte Aufbewahrungsdauer', async () => {
     await starten();
 
@@ -342,6 +480,7 @@ describe('Verwaltung der Dokumentarten', () => {
     expect(element.querySelector('[role=alert]')?.textContent).toContain(
       TEXTE.verwaltung.fehlerKonflikt,
     );
+    expect(element.textContent).toContain(TEXTE.verwaltung.erneutLaden);
 
     await ersteArtSpeichern();
     await speichernBestaetigen();

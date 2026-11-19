@@ -4,9 +4,7 @@
 
   @if (fehler()) {
     <p class="meldung fehler" role="alert">{{ fehlerMeldung() }}</p>
-    @if (
-      arten() === null || klassifikationen() === null || regeln() === null || !versionenGeladen()
-    ) {
+    @if (neuLadenNoetig()) {
       <button type="button" class="sekundaer" (click)="neuLaden()">{{ texte.erneutLaden }}</button>
     }
   }
@@ -125,9 +123,16 @@
                     </select>
                   </label>
                   <label class="inline">
-                    <input type="checkbox" [(ngModel)]="feld.pflicht" />
+                    <input
+                      type="checkbox"
+                      [(ngModel)]="feld.pflicht"
+                      [disabled]="feld.pflichtImSchema"
+                    />
                     {{ texte.dokumentarten.feldPflicht }}
                   </label>
+                  @if (feld.pflichtImSchema) {
+                    <small>{{ texte.dokumentarten.feldPflichtSchemaHinweis }}</small>
+                  }
                   <label>
                     {{ texte.dokumentarten.feldBeschreibung }}
                     <textarea [(ngModel)]="feld.beschreibung" rows="2"></textarea>
