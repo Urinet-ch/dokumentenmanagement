@@ -25,6 +25,7 @@ import { betrag, datum, zeitpunkt } from '../gemeinsam/format';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentPort, Variante } from './dokument-port';
 import { MetadatenFormular } from './metadaten-formular';
+import { WissenVerwendung } from '../wissen/wissen-verwendung';
 
 type Laden = 'laedt' | 'ok' | 'fehlt' | 'fehler' | 'verbindung';
 type Vorschau = 'laedt' | 'ok' | 'fehlt' | 'fehler';
@@ -59,7 +60,7 @@ interface Zusatzfeld {
  */
 @Component({
   selector: 'app-dokument-ansicht',
-  imports: [MatButtonModule, MatProgressBarModule, RouterLink, MetadatenFormular, TitelAnzeige],
+  imports: [MatButtonModule, MatProgressBarModule, RouterLink, MetadatenFormular, TitelAnzeige, WissenVerwendung],
   templateUrl: './dokument-ansicht.html',
   styleUrl: './dokument-ansicht.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

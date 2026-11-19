@@ -27,6 +27,7 @@
           <li>
             <a [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a>
             @if (seite.status === 'VERALTET') { <span>{{ texte.veraltet }}</span> }
+            @if (seite.quellePruefen) { <span>{{ texte.quellePruefen }}</span> }
             <p>{{ seite.beschreibung }}</p>
           </li>
         }

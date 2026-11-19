@@ -238,6 +238,8 @@
         </section>
       </div>
 
+      <app-wissen-verwendung [dokumentId]="d.id" />
+
       <section class="karte versionen" aria-labelledby="versionen-titel" data-test="versionen">
         <h2 id="versionen-titel">{{ texte.versionen }}</h2>
         @if (d.versionen.length === 0) {

@@ -31,10 +31,11 @@ public interface WissenLesenRepository {
 
     LogSeite log(Sichtregel sichtregel, LogCursor vor, int groesse);
 
-    record IndexAnfrage(Seitentyp typ, String tag, String q, int offset, int groesse) {
+    record IndexAnfrage(Seitentyp typ, String tag, String q, UUID dokumentId, int offset, int groesse) {
     }
 
-    record IndexZeile(UUID id, Seitentyp typ, String pfad, String titel, String beschreibung, String status) {
+    record IndexZeile(UUID id, Seitentyp typ, String pfad, String titel, String beschreibung, String status,
+                      boolean quellePruefen) {
     }
 
     record IndexErgebnis(List<IndexZeile> seiten, long gesamt) {

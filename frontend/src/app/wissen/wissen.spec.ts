@@ -6,6 +6,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { WissenIndex } from './wissen-index';
 import { WissenLog } from './wissen-log';
 import { WissenSeite } from './wissen-seite';
+import { WissenVerwendung } from './wissen-verwendung';
 import { wissenText } from './wissen-text';
 
 describe('Wissensoberfläche', () => {
@@ -24,11 +25,12 @@ describe('Wissensoberfläche', () => {
     const fixture = TestBed.createComponent(WissenIndex);
     http.expectOne((anfrage) => anfrage.url === '/api/v1/wissensseiten')
       .flush({ gesamt: 1, gruppen: [{ typ: 'Konzept', seiten: [
-        { id: '1', pfad: 'konzepte/probe', titel: 'Probe', status: 'VERALTET' },
+        { id: '1', pfad: 'konzepte/probe', titel: 'Probe', status: 'VERALTET', quellePruefen: true },
       ] }] });
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).toContain('Probe');
     expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.veraltet);
+    expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.quellePruefen);
 
     const eingabe = fixture.nativeElement.querySelector('#wissen-suche') as HTMLInputElement;
     eingabe.value = 'Begriff';
@@ -121,5 +123,33 @@ describe('Wissensoberfläche', () => {
     await fixture.whenStable();
     expect(element.textContent).toContain(TEXTE.httpFehler.nichtGefunden);
     expect(element.textContent).not.toContain('Frühere Fassung');
+  });
+
+  it('zeigt nur die vom Dokumentfilter gelieferten Seiten und setzt Paging beim Dokumentwechsel zurück', async () => {
+    const fixture = TestBed.createComponent(WissenVerwendung);
+    fixture.componentRef.setInput('dokumentId', 'd1');
+    fixture.detectChanges();
+    const erste = http.expectOne((r) => r.url === '/api/v1/wissensseiten');
+    expect(erste.request.params.get('dokumentId')).toBe('d1');
+    expect(erste.request.params.get('offset')).toBe('0');
+    erste.flush({ gesamt: 51, gruppen: [{ typ: 'Konzept', seiten: [
+      { id: 's1', pfad: 'konzepte/probe', titel: 'Sichtbare Seite' },
+    ] }] });
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('a')?.getAttribute('href')).toBe('/wissen/konzepte/probe');
+    element.querySelector('button')!.click();
+    const zweite = http.expectOne((r) => r.url === '/api/v1/wissensseiten');
+    expect(zweite.request.params.get('offset')).toBe('50');
+    zweite.flush({ gesamt: 51, gruppen: [] });
+    fixture.componentRef.setInput('dokumentId', 'd2');
+    fixture.detectChanges();
+    const wechsel = http.expectOne((r) => r.url === '/api/v1/wissensseiten');
+    expect(wechsel.request.params.get('dokumentId')).toBe('d2');
+    expect(wechsel.request.params.get('offset')).toBe('0');
+    wechsel.flush({ gesamt: 0, gruppen: [] });
+    await fixture.whenStable();
+    expect(element.textContent).toContain(TEXTE.wissen.keineSeiten);
+    expect(element.textContent).not.toContain('Sichtbare Seite');
   });
 });

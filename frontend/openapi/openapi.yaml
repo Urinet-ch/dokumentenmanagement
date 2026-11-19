@@ -2736,6 +2736,8 @@ components:
           type: string
         status:
           type: string
+        quellePruefen:
+          type: boolean
     WissensLog:
       type: object
       properties:
@@ -5672,6 +5674,10 @@ paths:
       tags:
       - Wissensbasis
       parameters:
+      - name: dokumentId
+        in: query
+        schema:
+          type: string
       - schema:
           type: integer
           default: 50

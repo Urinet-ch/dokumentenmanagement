@@ -29,10 +29,11 @@ public class WissenLesen {
         this.berechtigung = berechtigung;
     }
 
-    public IndexErgebnis index(Benutzer benutzer, Seitentyp typ, String tag, String q, int offset, int groesse) {
+    public IndexErgebnis index(Benutzer benutzer, Seitentyp typ, String tag, String q, UUID dokumentId,
+                               int offset, int groesse) {
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
         WissenLesenRepository.IndexErgebnis treffer = repository.index(Sichtregel.fuer(benutzer),
-                new WissenLesenRepository.IndexAnfrage(typ, tag, q, offset, groesse));
+                new WissenLesenRepository.IndexAnfrage(typ, tag, q, dokumentId, offset, groesse));
         return IndexErgebnis.gruppieren(treffer, offset, groesse);
     }
 

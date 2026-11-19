@@ -48,6 +48,7 @@ export const TEXTE = {
     widerspruch: 'Widerspruch offen',
     quellen: 'Quellen',
     eingehend: 'Verweisende Seiten',
+    verwendung: 'In der Wissensbasis verwendet',
     versionen: 'Versionen',
     versionSchliessen: 'Version schliessen',
     freigegeben: 'Freigegeben',
