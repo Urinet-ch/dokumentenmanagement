@@ -122,7 +122,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | GET, POST, PATCH, DELETE | `/dokumentarten/{art}/klassifikationen[/{code}]` | Klassifikationen einer Art zuordnen mit `pflicht` und `standardWert` (Req 3.4); GET alle Rollen, Schreiben A11 (`inhaber`); `If-Match` Pflicht; 404 `NICHT_GEFUNDEN`, 422 `KONFIGURATION_UNGUELTIG` (u. a. inaktive Klassifikation als Pflicht oder mit Standardwert), 412, 428 | alle Rollen (GET), A11 |
 | GET | `/regeln` | aktive und inaktive Regeln des Mandanten; `ETag` = Konfigurationsversion (Req 7.2: Regeln nur mit A11) | A11 |
 | POST, PATCH | `/regeln`, `/regeln/{code}` | anlegen, ändern, aktivieren oder deaktivieren; `If-Match` Pflicht; Schreibrecht A11; POST und relevante PATCH-Antworten melden `betroffeneDokumente` (Req 5.6); 412, 428 | A11 |
-| DELETE | `/regeln/{code}` | löschen (Req 7.1); in 17.8 nicht umgesetzt (die Aufgabe verlangt Anlegen, Ändern, Aktivieren), folgt | A11 |
+| DELETE | `/regeln/{code}` | löschen (Req 7.1); in 17.8 nicht umgesetzt (die Aufgabe verlangt Anlegen, Ändern, Aktivieren), folgt in Aufgabe 17.7 | A11 |
 | GET, PATCH | `/konfiguration/ki-texte` | Rolle, Feldregeln, `ki_freigegeben` (nur lesen; setzt das Admin-Kommando) | A11 |
 | GET | `/konfiguration` | Export der aktuellen Konfiguration als Konfigurationsdatei; `ETag` = Version | A11 |
 | GET | `/konfiguration/versionen`, `/konfiguration/versionen/{n}` | Liste (Version, Zeit, Wer, Quelle, SHA-256) bzw. Abbild | A11 |

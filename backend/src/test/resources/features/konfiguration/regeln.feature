@@ -98,6 +98,54 @@ Funktionalität: Regeln je Mandant
     Wenn «inhaber-urinet» deaktiviert die Regel «probe_referenz_eindeutig»
     Dann führt «inhaber-urinet» die Regel «probe_referenz_eindeutig» mit aktiv «false» in genau einer neuen Konfigurationsversion
 
+  @req-5.6 @req-7.6
+  Szenario: Verschärfen einer aktiven Regel über Parameter oder Schwere meldet die betroffenen Dokumente und übernimmt die übrigen Felder
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Wenn «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_REGEL", "name": "Regelprobe", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
+       "gesetzlichePflicht": false,
+       "zusatzSchema": {"type": "object", "properties": {"referenz": {"type": "string", "maxLength": 40}}}}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 201
+    Angenommen «inhaber-urinet» legt ein Dokument «Regel Alt 1» der Art «PROBE_DA_REGEL» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
+    Und das Dokument «Regel Alt 1» hat den Titel «Gilt»
+    Und «inhaber-urinet» legt ein Dokument «Regel Alt 2» der Art «PROBE_DA_REGEL» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
+    Und das Dokument «Regel Alt 2» hat den Titel «Gilt»
+    Wenn «inhaber-urinet» eine Regel mit dem aktuellen Stand anlegt:
+      """
+      {"code":"probe_datum_pflicht","art":"PROBE_DA_REGEL","typ":"PFLICHT_WENN",
+       "parameter":{"wenn":{"feld":"titel","gleich":"Anders"},"dann":["datum"]},
+       "schwere":"WARNUNG","meldung":"Belegdatum fehlt."}
+      """
+    Dann antwortet die Regelverwaltung mit Status 201
+    Und meldet die Regelverwaltung 0 betroffene Dokumente
+    Angenommen der Konfigurationsstand von «urinet» ist gemerkt
+    Wenn «inhaber-urinet» die Regel «probe_datum_pflicht» mit dem aktuellen Stand ändert:
+      """
+      {"parameter":{"wenn":{"feld":"titel","gleich":"Gilt"},"dann":["datum"]}}
+      """
+    Dann führt «inhaber-urinet» die Regel «probe_datum_pflicht» in genau einer neuen Konfigurationsversion mit:
+      | feld      | wert                                                  |
+      | parameter | {"wenn":{"feld":"titel","gleich":"Gilt"},"dann":["datum"]} |
+      | schwere   | "WARNUNG"                                             |
+      | meldung   | "Belegdatum fehlt."                                   |
+      | aktiv     | true                                                  |
+    Und meldet die Regelverwaltung 2 betroffene Dokumente
+    Angenommen der Konfigurationsstand von «urinet» ist gemerkt
+    Wenn «inhaber-urinet» die Regel «probe_datum_pflicht» mit dem aktuellen Stand ändert:
+      """
+      {"schwere":"FEHLER"}
+      """
+    Dann führt «inhaber-urinet» die Regel «probe_datum_pflicht» in genau einer neuen Konfigurationsversion mit:
+      | feld      | wert                                                  |
+      | parameter | {"wenn":{"feld":"titel","gleich":"Gilt"},"dann":["datum"]} |
+      | schwere   | "FEHLER"                                              |
+      | meldung   | "Belegdatum fehlt."                                   |
+      | aktiv     | true                                                  |
+    Und meldet die Regelverwaltung 2 betroffene Dokumente
+    Und sind im Mandanten «urinet» weiterhin 2 bestätigte Dokumente der Art «PROBE_DA_REGEL» archiviert
+
   @req-7.2
   Szenario: Die Regeln liest nur, wer das Recht A11 hat
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -163,6 +211,35 @@ Funktionalität: Regeln je Mandant
       {"aktiv":false}
       """
     Dann antwortet die Regelverwaltung mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+
+  @req-7.1
+  Szenariogrundriss: Regeln anlegen und ändern darf ausser dem Inhaber keine Rolle, auch nicht <benutzer>
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und der Stand des Zugriffsprotokolls von «<mandant>» ist gemerkt
+    Wenn «<benutzer>» eine Regel mit der Version «1» anlegt:
+      """
+      {"code":"probe_ohne_recht","art":"AUSGANGSRECHNUNG","typ":"EINDEUTIG",
+       "parameter":{"felder":["titel"]},"schwere":"WARNUNG","meldung":"Probe."}
+      """
+    Dann antwortet die Regelverwaltung mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag:
+      | benutzer   | rolle   | aktion     | dokument | ip | grund | fehlercode    |
+      | <benutzer> | <rolle> | VERWEIGERT |          |    | A11   | NICHT_ERLAUBT |
+    Angenommen der Stand des Zugriffsprotokolls von «<mandant>» ist gemerkt
+    Wenn «<benutzer>» die Regel «<regel>» mit der Version «1» ändert:
+      """
+      {"aktiv":false}
+      """
+    Dann antwortet die Regelverwaltung mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag:
+      | benutzer   | rolle   | aktion     | dokument | ip | grund | fehlercode    |
+      | <benutzer> | <rolle> | VERWEIGERT |          |    | A11   | NICHT_ERLAUBT |
+
+    Beispiele:
+      | benutzer                 | mandant | rolle            | regel                  |
+      | mitarbeiter-urinet       | urinet  | MITARBEITER      | ausgangsrechnung_folge |
+      | treuhaender-urinet       | urinet  | TREUHAENDER      | ausgangsrechnung_folge |
+      | geschaeftsstelle-vhf-gsk | vhf-gsk | GESCHAEFTSSTELLE | probe_ohne_recht       |
 
   @req-1.2
   Szenario: Eine Regel des einen Mandanten ist im anderen weder sichtbar noch änderbar

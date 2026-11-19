@@ -80,6 +80,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
     die Test-Seeds), `KonfigurationSeedTest` ersetzt `DokumentartSeedTest` (`StammdatenTabelle` und Spalten der
     Stammdaten-Tabelle in Spec 01 design.md im selben PR), Endpunkte der KI-Texte, `If-Match` für alle Elemente,
     Umfang A11 und Lesen für alle Rollen, Migrationstest mit Schema im Stand vor Spec 05.
+  - `DELETE /regeln/{code}` (Req 7.1 «löschen»; in 17.8 offen geblieben, Review PR #317) mit neuer
+    Konfigurationsversion, `If-Match` und Recht A11.
   - _Anforderungen: 1.6, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 7.1, 7.2, 7.6, 9.1, 9.2_
   - _Abhängig von: 17.4, 17.6_
 

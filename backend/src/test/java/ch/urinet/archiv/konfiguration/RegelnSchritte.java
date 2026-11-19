@@ -10,7 +10,10 @@ import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.konfiguration.domain.Regel;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
+import io.cucumber.datatable.DataTable;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
@@ -48,6 +51,8 @@ public class RegelnSchritte {
                         order by r.code collate "C") from regel r), '[]'::jsonb)) as inhalt
                 from (select inhalt from konfiguration_version order by version desc limit 1) a) i
             """;
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private record Eingerichtet(String mandant, String code) {
     }
@@ -255,21 +260,51 @@ public class RegelnSchritte {
 
     /** Antwort, Tabelle, Konfigurationsversion und Protokoll führen dieselbe Änderung (Req 1.3, 5.6, 7.6). */
     @Dann("führt «{word}» die Regel «{word}» mit aktiv «{word}» in genau einer neuen Konfigurationsversion")
-    public void regelInNeuerVersion(String benutzer, String code, String aktiv) throws SQLException {
+    public void regelInNeuerVersion(String benutzer, String code, String aktiv) throws Exception {
         boolean erwartet = Boolean.parseBoolean(aktiv);
+        JsonNode abbild = neueVersionPruefen(benutzer, code);
+        assertThat(antwort.jsonPath().getBoolean("aktiv")).as("Antwort").isEqualTo(erwartet);
+        assertThat(abbild.path("aktiv").asText()).as("Abbild der Version").isEqualTo(aktiv);
+        assertThat(gegeben(benutzer).get("/api/v1/regeln").jsonPath()
+                .<Boolean>getList("findAll { it.code == '" + code + "' }.aktiv")).as("Liste").containsExactly(erwartet);
+    }
+
+    /**
+     * Teiländerung (Req 5.6, 7.6): Antwort, Liste und Abbild der neuen Version führen die gesetzten und die
+     * übernommenen Felder; Werte in der Tabelle als JSON.
+     */
+    @Dann("führt «{word}» die Regel «{word}» in genau einer neuen Konfigurationsversion mit:")
+    public void regelMitFeldernInNeuerVersion(String benutzer, String code, DataTable tabelle) throws Exception {
+        JsonNode abbild = neueVersionPruefen(benutzer, code);
+        JsonNode inAntwort = JSON.readTree(antwort.asString());
+        JsonNode inListe = null;
+        for (JsonNode regel : JSON.readTree(gegeben(benutzer).get("/api/v1/regeln").asString())) {
+            if (regel.path("code").asText().equals(code)) {
+                inListe = regel;
+            }
+        }
+        assertThat(inListe).as("Regel in der Liste").isNotNull();
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            String feld = zeile.get("feld");
+            JsonNode erwartet = JSON.readTree(zeile.get("wert"));
+            assertThat(inAntwort.get(feld)).as("Antwort: " + feld).isEqualTo(erwartet);
+            assertThat(inListe.get(feld)).as("Liste: " + feld).isEqualTo(erwartet);
+            assertThat(abbild.get(feld)).as("Abbild der Version: " + feld).isEqualTo(erwartet);
+        }
+    }
+
+    /** Status 200, ETag und Liste auf der nächsten Version, genau eine neue Version (APP) und ein Protokolleintrag. */
+    private JsonNode neueVersionPruefen(String benutzer, String code) throws Exception {
         int neueVersion = gemerkteVersion + 1;
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
         assertThat(antwort.jsonPath().getString("code")).isEqualTo(code);
-        assertThat(antwort.jsonPath().getBoolean("aktiv")).as("Antwort").isEqualTo(erwartet);
         assertThat(antwort.getHeader("ETag")).isEqualTo("\"" + neueVersion + "\"");
         Response liste = gegeben(benutzer).get("/api/v1/regeln");
         assertThat(liste.statusCode()).as(liste.asString()).isEqualTo(200);
         assertThat(liste.getHeader("ETag")).isEqualTo("\"" + neueVersion + "\"");
-        assertThat(liste.jsonPath().<Boolean>getList("findAll { it.code == '" + code + "' }.aktiv"))
-                .as("Liste").containsExactly(erwartet);
         String schema = new MandantCode(mandant(benutzer)).schema();
         try (Connection verbindung = datenbank.get().getConnection();
-             PreparedStatement versionen = verbindung.prepareStatement("select v.version, v.quelle, r ->> 'aktiv' "
+             PreparedStatement versionen = verbindung.prepareStatement("select v.version, v.quelle, r::text "
                      + "from " + schema + ".konfiguration_version v "
                      + "left join lateral jsonb_array_elements(v.inhalt -> 'regeln') r on r ->> 'code' = ? "
                      + "where v.version > ?");
@@ -277,11 +312,13 @@ public class RegelnSchritte {
                      + ".zugriff_protokoll where id > ? and aktion = 'KONFIGURATION_AENDERN'")) {
             versionen.setString(1, code);
             versionen.setInt(2, gemerkteVersion);
+            JsonNode abbild;
             try (var ergebnis = versionen.executeQuery()) {
                 assertThat(ergebnis.next()).as("neue Konfigurationsversion").isTrue();
                 assertThat(ergebnis.getInt(1)).isEqualTo(neueVersion);
                 assertThat(ergebnis.getString(2)).isEqualTo("APP");
-                assertThat(ergebnis.getString(3)).as("Abbild der Version").isEqualTo(aktiv);
+                assertThat(ergebnis.getString(3)).as("Regel im Abbild der Version").isNotNull();
+                abbild = JSON.readTree(ergebnis.getString(3));
                 assertThat(ergebnis.next()).as("genau eine neue Version").isFalse();
             }
             protokoll.setLong(1, gemerktesProtokoll);
@@ -289,6 +326,7 @@ public class RegelnSchritte {
                 assertThat(ergebnis.next()).isTrue();
                 assertThat(ergebnis.getLong(1)).as("Konfigurationseinträge im Zugriffsprotokoll").isEqualTo(1);
             }
+            return abbild;
         }
     }
 

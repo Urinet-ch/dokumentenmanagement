@@ -114,8 +114,10 @@ public class RegelResource {
     @APIResponse(responseCode = "403", description = "NICHT_ERLAUBT")
     public Response liste() {
         aufloesung.pruefen();
+        // Version vor der Liste: Liegt eine Änderung dazwischen, ist der ETag älter als die Liste (412 statt stillem Überschreiben).
+        int version = verwaltung.aktuelleVersion();
         return Response.ok(verwaltung.alle().stream().map(regel -> RegelDto.aus(regel, null)).toList())
-                .tag(new EntityTag(Integer.toString(verwaltung.aktuelleVersion()))).build();
+                .tag(new EntityTag(Integer.toString(version))).build();
     }
 
     @POST
