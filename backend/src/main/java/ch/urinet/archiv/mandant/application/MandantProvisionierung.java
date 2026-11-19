@@ -9,12 +9,15 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.util.Optional;
+
 /**
  * Legt einen Mandanten an (Req 1.1, 1.5, 9.6; ADR-002): Prüfung des Seeds ({@link SeedPruefung}, vor jeder
- * Änderung), Schema {@code m_<code>} über {@code db/mandant}, vollständiger Konfigurationsseed, Prüfung des neuen
- * Schemas gegen das Mapping (Req 1.7), Bucket {@code <präfix><code>}; erst danach der
- * Eintrag im Register, damit ein abgebrochener Lauf keinen aktiven Mandanten hinterlässt. Ein erneuter Lauf nach einem
- * Abbruch setzt fort.
+ * Änderung), Schema {@code m_<code>} über {@code db/mandant}, Eintrag im Register als <b>inaktiv</b>, vollständiger
+ * Konfigurationsseed im Kontext {@link MandantKontext#zurProvisionierung}, Prüfung des Schemas samt Seed gegen das
+ * Mapping (Req 1.7), Bucket {@code <präfix><code>} und erst zuletzt die Aktivierung. Ein abgebrochener Lauf hinterlässt
+ * darum keinen aktiven Mandanten; ein erneuter Lauf mit demselben Code setzt fort (Schema, Seed und Bucket sind
+ * idempotent). Weichen Name oder Geschäftsjahresende des neuen Laufs vom Eintrag ab, bricht er ab.
  */
 @ApplicationScoped
 public class MandantProvisionierung {
@@ -59,11 +62,15 @@ public class MandantProvisionierung {
         } catch (IllegalArgumentException e) {
             throw new MandantFehler(MandantFehler.Grund.UNGUELTIG, e.getMessage(), e);
         }
-        if (register.existiert(mandantCode)) {
+        Optional<Mandant> fortsetzen = register.inProvisionierung(mandantCode);
+        if (fortsetzen.isEmpty() && register.existiert(mandantCode)) {
             throw new MandantFehler(MandantFehler.Grund.MANDANT_EXISTIERT, "Mandant existiert schon: " + code);
         }
         Konfiguration seedKonfiguration = seed.lesen(mandantCode);
         seedPruefung.pruefen(mandantCode, seedKonfiguration);
+        if (ende == null && fortsetzen.isPresent()) {
+            ende = fortsetzen.get().geschaeftsjahresende();
+        }
         if (ende == null) {
             try {
                 ende = new Geschaeftsjahresende(seedKonfiguration.einstellungen().geschaeftsjahrEnde());
@@ -72,17 +79,28 @@ public class MandantProvisionierung {
                         "Geschäftsjahresende des Seeds für Mandant " + code + " ist ungültig", e);
             }
         }
+        String anzeigename = name == null || name.isBlank()
+                ? fortsetzen.map(Mandant::name).orElse(code) : name;
+        Mandant mandant = new Mandant(mandantCode, anzeigename, mandantCode.schema(), bucketName, ende, false);
+        if (fortsetzen.isPresent() && !fortsetzen.get().equals(mandant)) {
+            throw new MandantFehler(MandantFehler.Grund.MANDANT_EXISTIERT,
+                    "Mandant " + code + " ist in Provisionierung mit anderen Angaben (Name oder Geschäftsjahresende)");
+        }
         Konfiguration konfigurationFuerMandant = new Konfiguration(seedKonfiguration.version(),
                 new Konfiguration.Einstellungen(ende.wert(), seedKonfiguration.einstellungen().kennungen()),
                 seedKonfiguration.arten(), seedKonfiguration.klassifikationen(), seedKonfiguration.regeln(),
                 seedKonfiguration.kiTexte());
         datenbank.schemaAnlegen(mandantCode.schema());
+        if (fortsetzen.isEmpty()) {
+            register.eintragen(mandant);
+        } else {
+            LOG.infof("Mandant %s: abgebrochene Provisionierung wird fortgesetzt", code);
+        }
+        kontext.zurProvisionierung(mandantCode, () -> konfiguration.seedEinspielen(konfigurationFuerMandant));
         schemaPruefung.pruefen(mandantCode.schema());
         bucket.einrichten(bucketName);
-        Mandant mandant = new Mandant(mandantCode, name == null || name.isBlank() ? code : name,
-                mandantCode.schema(), bucketName, ende, true);
-        register.eintragen(mandant);
-        kontext.mit(mandantCode, () -> konfiguration.seedEinspielen(konfigurationFuerMandant));
+        register.aktivieren(mandantCode);
+        mandant = new Mandant(mandantCode, anzeigename, mandantCode.schema(), bucketName, ende, true);
         LOG.infof("Mandant %s angelegt (Schema %s, Bucket %s, %d Dokumentarten)", code, mandant.schema(), bucketName,
                 konfigurationFuerMandant.arten().size());
         return mandant;

@@ -61,6 +61,18 @@ public class RegelVerwaltung {
         return new Ergebnis(repository.finden(code).orElseThrow(), neueVersion, betroffeneDokumente);
     }
 
+    /** Löscht die Regel in einer neuen Konfigurationsversion (Req 7.1); Dokumente bleiben unverändert. */
+    public int loeschen(String code, int version, String wer, String grund) {
+        konfiguration.aenderungStarten(version);
+        repository.finden(code).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        List<Regel> uebrige = repository.alle().stream().filter(regel -> !regel.code().equals(code)).toList();
+        Konfiguration vorher = konfiguration.aktuell();
+        pruefen(new Konfiguration(vorher.version() + 1, vorher.einstellungen(), vorher.arten(),
+                vorher.klassifikationen(), uebrige));
+        repository.ersetzen(uebrige);
+        return konfiguration.aenderungSpeichern(wer, grund);
+    }
+
     private static void pruefen(Konfiguration neu) {
         if (!neu.pruefen().isEmpty()) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);

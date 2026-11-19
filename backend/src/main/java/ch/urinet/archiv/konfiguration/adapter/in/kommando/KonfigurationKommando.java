@@ -1,6 +1,7 @@
 package ch.urinet.archiv.konfiguration.adapter.in.kommando;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung.Analyse;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung.DiffEintrag;
@@ -10,16 +11,28 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.logging.Logger;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
-/** Betreiberkommando zum Exportieren, Prüfen, Vergleichen und Einspielen einer Mandantenkonfiguration. */
+/**
+ * Betreiberkommando zum Exportieren, Prüfen, Vergleichen und Einspielen einer Mandantenkonfiguration. Dateien liest es
+ * höchstens 1 MiB weit (auch aus einer Pipe); der Export legt eine neue Datei mit Rechten 600 an und überschreibt nie.
+ * Technische Fehler nennen nur die Fehlerklasse, nie Meldung oder Inhalt.
+ */
 @ApplicationScoped
 public class KonfigurationKommando {
 
@@ -30,6 +43,7 @@ public class KonfigurationKommando {
                    archiv mandant konfiguration einspielen  <code> <datei> --wer <name> --grund <text> [--json]""";
     private static final int DATEI_MAX = 1024 * 1024;
     private static final int TECHNISCHER_FEHLER = 3;
+    private static final Logger LOG = Logger.getLogger(KonfigurationKommando.class);
 
     private final KonfigurationsdateiVerwaltung verwaltung;
     private final MandantKontext kontext;
@@ -169,20 +183,56 @@ public class KonfigurationKommando {
             };
         } catch (FachFehler e) {
             fehler.printf("%s: %s%n", e.code(), e.getMessage());
+            List<BefundAusgabe> befunde = e instanceof KonfigurationUngueltig ungueltig
+                    ? ungueltig.befunde().stream().map(b -> new BefundAusgabe(b.pfad(), b.code(), b.meldung())).toList()
+                    : List.of();
+            befunde.forEach(befund -> fehler.printf("%s: %s: %s%n", befund.pfad(), befund.code(), befund.meldung()));
+            fehlerAlsJson(aufruf, aus, new FehlerAusgabe(e.code().name(), e.getMessage(), befunde));
             return 1;
+        } catch (DateiFehler e) {
+            fehler.println(e.getMessage());
+            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("DATEI", e.getMessage(), List.of()));
+            return TECHNISCHER_FEHLER;
         } catch (IOException e) {
-            fehler.printf("Datei nicht lesbar oder nicht schreibbar: %s%n", e.getMessage());
+            String meldung = "Datei nicht lesbar oder nicht schreibbar (" + e.getClass().getSimpleName() + ").";
+            fehler.println(meldung);
+            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("DATEI", meldung, List.of()));
             return TECHNISCHER_FEHLER;
         } catch (RuntimeException e) {
-            fehler.printf("Technischer Fehler: %s%n", e.getMessage());
+            LOG.errorf("Konfigurationskommando %s für Mandant %s: technischer Fehler %s", aufruf.operation(),
+                    aufruf.mandant().wert(), e.getClass().getName());
+            String meldung = "Technischer Fehler (" + e.getClass().getSimpleName() + "); nichts geändert, Details im Log.";
+            fehler.println(meldung);
+            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("TECHNISCHER_FEHLER", meldung, List.of()));
             return TECHNISCHER_FEHLER;
+        }
+    }
+
+    record FehlerAusgabe(String code, String meldung, List<BefundAusgabe> befunde) {
+    }
+
+    private void fehlerAlsJson(Aufruf aufruf, PrintStream aus, FehlerAusgabe ausgabe) {
+        if (!aufruf.json()) {
+            return;
+        }
+        try {
+            aus.println(json.writeValueAsString(ausgabe));
+        } catch (JsonProcessingException e) {
+            LOG.errorf("Fehlerausgabe als JSON nicht möglich: %s", e.getClass().getName());
+        }
+    }
+
+    /** Fehler an der Datei des Betreibers mit fester, inhaltsfreier Meldung. */
+    static final class DateiFehler extends IOException {
+        DateiFehler(String meldung) {
+            super(meldung);
         }
     }
 
     private int exportieren(Aufruf aufruf, PrintStream aus) throws IOException {
         String datei = kontext.mit(aufruf.mandant(), () -> verwaltung.exportieren().datei());
         if (aufruf.datei().isPresent()) {
-            Files.writeString(aufruf.datei().get(), datei, StandardCharsets.UTF_8);
+            dateiSchreiben(aufruf.datei().get(), datei);
             aus.printf("Konfiguration exportiert: %s%n", aufruf.datei().get());
         } else {
             aus.println(datei);
@@ -221,11 +271,37 @@ public class KonfigurationKommando {
         return 0;
     }
 
-    private static String dateiLesen(Path pfad) throws IOException {
-        if (Files.size(pfad) > DATEI_MAX) {
-            throw new IOException("Die Datei überschreitet 1 MiB.");
+    /** Liest höchstens {@code DATEI_MAX + 1} Bytes; {@code Files.size} ist bei Pipes 0 und taugt nicht als Grenze. */
+    static String dateiLesen(Path pfad) throws IOException {
+        byte[] inhalt;
+        try (InputStream ein = Files.newInputStream(pfad)) {
+            inhalt = ein.readNBytes(DATEI_MAX + 1);
         }
-        return Files.readString(pfad, StandardCharsets.UTF_8);
+        if (inhalt.length > DATEI_MAX) {
+            throw new DateiFehler("Die Datei überschreitet 1 MiB.");
+        }
+        try {
+            return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(inhalt)).toString();
+        } catch (java.nio.charset.CharacterCodingException e) {
+            throw new DateiFehler("Die Datei ist kein gültiges UTF-8.");
+        }
+    }
+
+    /** Legt die Datei neu an (nie überschreiben, keinem Symlink folgen), unter POSIX mit Rechten 600. */
+    static void dateiSchreiben(Path pfad, String inhalt) throws IOException {
+        Set<StandardOpenOption> optionen = Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+        byte[] bytes = inhalt.getBytes(StandardCharsets.UTF_8);
+        try (SeekableByteChannel kanal = pfad.getFileSystem().supportedFileAttributeViews().contains("posix")
+                ? Files.newByteChannel(pfad, optionen,
+                        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
+                : Files.newByteChannel(pfad, optionen)) {
+            ByteBuffer puffer = ByteBuffer.wrap(bytes);
+            while (puffer.hasRemaining()) {
+                kanal.write(puffer);
+            }
+        } catch (FileAlreadyExistsException e) {
+            throw new DateiFehler("Die Datei existiert schon; der Export überschreibt keine Datei.");
+        }
     }
 
     private static void aenderungAusgeben(PrintStream aus, DiffEintrag aenderung) {

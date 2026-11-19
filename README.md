@@ -98,7 +98,10 @@ java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsja
 ```
 - Das Kommando startet keinen HTTP-Server und keine Start-Migration, braucht aber die Secret-Dateien `archiv_db_app`,
   `archiv_db_owner`, `s3_app_zugang_id`, `s3_app_zugang_geheimnis` und `infomaniak_ai_token` unter `/run/secrets/`; fehlt eine oder ist sie
-  leer, bricht der Start ab. Seed: `seed/<code>/konfiguration.json`.
+  leer, bricht der Start ab. Seed: `seed/<code>/konfiguration.json`. Ohne `--geschaeftsjahr-ende` gilt das
+  Geschäftsjahresende aus dem Seed (`einstellungen.geschaeftsjahrEnde`, für `urinet` und `vhf-gsk` `12-31`).
+- Der Mandant wird erst nach Seed, Schema-Prüfung und Bucket aktiv. Bricht ein Lauf ab, bleibt er inaktiv im Register;
+  derselbe Aufruf noch einmal setzt fort (mit abweichendem Namen oder Geschäftsjahresende: `MANDANT_EXISTIERT`).
 - Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf (geprüft
   vor dem Start, mit Aufrufhilfe), 3 technischer Fehler, auch ein abgebrochener Start (design.md, «Mandant»).
 
@@ -117,6 +120,11 @@ sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/com
   von `docker compose run`. Der Name geht in den Prompt des KI-Vorschlags ein: Nur mit genau «UriNet Aschwanden» (und
   den Seed-Arten) entspricht die Prompt-Kennung der von Gate 0 (`v6-7a39224f2f5e`), sonst warnt das Log bei jedem
   Aufruf.
+- Dateien der Konfiguration: Der Wegwerf-Container sieht keine Dateien des Hosts. `exportieren <code>` ohne `<datei>`
+  schreibt auf die Standardausgabe (Logs gehen auf stderr), also `… <kommando> > konfiguration.json`. Für `pruefen`,
+  `vergleichen` und `einspielen` die Datei nur lesend einbinden, z. B. `run … -v "$PWD/konfiguration.json:/arbeit/konfiguration.json:ro" …`
+  und `/arbeit/konfiguration.json` als `<datei>` angeben. Gelesen wird höchstens 1 MiB; ein Export in eine Datei
+  überschreibt nie und legt sie mit Rechten 600 an.
 - Der Wegwerf-Container belegt für einige Sekunden ein zweites `mem_limit` der API; nicht während einer Messung des
   Speicherbudgets (Aufgabe 1.10) starten.
 

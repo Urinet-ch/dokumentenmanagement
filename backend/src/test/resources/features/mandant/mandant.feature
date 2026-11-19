@@ -35,6 +35,22 @@ Funktionalität: Mandanten anlegen und migrieren
     Dann lehnt das Archiv mit «MANDANT_EXISTIERT» ab
 
   @req-1.5
+  Szenario: Bricht der Seed ab, bleibt der Mandant inaktiv, und ein neuer Lauf setzt fort
+    Angenommen das Einspielen des Seeds für den Mandanten «probe-fortsetzen» bricht ab
+    Wenn der Betreiber den Mandanten «probe-fortsetzen» anlegt und der Lauf abbricht
+    Dann steht «probe-fortsetzen» inaktiv im Register, und das Schema «m_probe_fortsetzen» hat keine Konfigurationsversion mit Quelle «SEED» und keine Art aus dem Seed
+    Und der Mandant «probe-fortsetzen» ist für das Archiv nicht auflösbar
+    Wenn der Betreiber den Mandanten «probe-fortsetzen» mit Geschäftsjahresende «06-30» anlegt
+    Dann lehnt das Archiv mit «MANDANT_EXISTIERT» ab
+    Und steht «probe-fortsetzen» inaktiv im Register, und das Schema «m_probe_fortsetzen» hat keine Konfigurationsversion mit Quelle «SEED» und keine Art aus dem Seed
+    Wenn der Fehler behoben ist und der Betreiber den Mandanten «probe-fortsetzen» erneut anlegt
+    Dann steht «probe-fortsetzen» aktiv im Register
+    Und ist die neueste Konfigurationsversion im Schema «m_probe_fortsetzen» die Version mit Quelle «SEED»
+    Und enthält diese Konfigurationsversion genau die Arten aus «seed/probe-fortsetzen/konfiguration.json» und den Seed-Teil der Wissensquelle
+    Wenn der Betreiber den Mandanten «probe-fortsetzen» anlegt
+    Dann lehnt das Archiv mit «MANDANT_EXISTIERT» ab
+
+  @req-1.5
   Szenario: Beim Start bringt das Archiv alle aktiven Mandanten auf den aktuellen Stand
     Angenommen im Register steht der aktive Mandant «probe-migration» mit leerem Schema
     Wenn das Archiv die aktiven Mandanten migriert

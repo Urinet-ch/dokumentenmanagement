@@ -1,7 +1,10 @@
 package ch.urinet.archiv.mandant;
 
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadWissensquelleSeed;
+import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantFehler;
+import ch.urinet.archiv.mandant.application.MandantVerzeichnis;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.mandant.application.MandantMigration;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -43,6 +46,12 @@ public class MandantSchritte {
     MandantMigration migration;
 
     @Inject
+    MandantDatenbank mandantDatenbank;
+
+    @Inject
+    MandantVerzeichnis verzeichnis;
+
+    @Inject
     Instance<AgroalDataSource> datenbank;
 
     @Inject
@@ -74,6 +83,57 @@ public class MandantSchritte {
     @Wenn("der Betreiber den Mandanten «{word}» mit Geschäftsjahresende «{word}» anlegt")
     public void anlegenMitGeschaeftsjahresende(String code, String ende) {
         versuchen(code, ende);
+    }
+
+    /** Req 1.5: Ein Trigger lässt nur das Speichern der Version mit Quelle SEED scheitern, also den letzten Schritt. */
+    @Angenommen("das Einspielen des Seeds für den Mandanten «{word}» bricht ab")
+    public void seedBrichtAb(String code) throws SQLException {
+        String schema = new MandantCode(code).schema();
+        mandantDatenbank.schemaAnlegen(schema);
+        ausfuehren("create function " + schema + ".seed_abbruch() returns trigger language plpgsql as "
+                + "$$ begin raise exception 'Testabbruch im Seed'; end $$");
+        ausfuehren("create trigger seed_abbruch before insert on " + schema + ".konfiguration_version for each row "
+                + "when (new.quelle = 'SEED') execute function " + schema + ".seed_abbruch()");
+    }
+
+    @Wenn("der Betreiber den Mandanten «{word}» anlegt und der Lauf abbricht")
+    public void anlegenMitAbbruch(String code) {
+        fehler = null;
+        assertThatThrownBy(() -> provisionierung.anlegen(code, null, null))
+                .isNotInstanceOf(MandantFehler.class)
+                .hasStackTraceContaining("Testabbruch im Seed");
+    }
+
+    @Wenn("der Fehler behoben ist und der Betreiber den Mandanten «{word}» erneut anlegt")
+    public void fortsetzen(String code) throws SQLException {
+        ausfuehren("drop trigger seed_abbruch on " + new MandantCode(code).schema() + ".konfiguration_version");
+        versuchen(code, null);
+        assertThat(fehler).as("Fortsetzen ohne Fehler erwartet").isNull();
+    }
+
+    /** Version 1 ({@code MIGRATION}) legt schon die Schema-Migration an; {@code WISSENSQUELLE} darf vorhanden sein. */
+    @Dann("steht «{word}» inaktiv im Register, und das Schema «{word}» hat keine Konfigurationsversion mit Quelle «{word}» und keine Art aus dem Seed")
+    public void inaktivOhneVersion(String code, String schema, String quelle) throws SQLException {
+        assertThat(werte("select aktiv::text from public.mandant where code = ?", code)).containsExactly("false");
+        assertThat(werte("select version::text from " + schema + ".konfiguration_version where quelle = ?", quelle))
+                .isEmpty();
+        assertThat(werte("select code from " + schema + ".dokumentart")).isSubsetOf("WISSENSQUELLE");
+    }
+
+    @Und("der Mandant «{word}» ist für das Archiv nicht auflösbar")
+    public void nichtAufloesbar(String code) {
+        assertThat(verzeichnis.aktivesSchema(new MandantCode(code))).isEmpty();
+    }
+
+    @Dann("steht «{word}» aktiv im Register")
+    public void aktivImRegister(String code) throws SQLException {
+        assertThat(werte("select aktiv::text from public.mandant where code = ?", code)).containsExactly("true");
+    }
+
+    private void ausfuehren(String sql) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement()) {
+            befehl.execute(sql);
+        }
     }
 
     @Dann("lehnt das Archiv mit «{word}» ab")

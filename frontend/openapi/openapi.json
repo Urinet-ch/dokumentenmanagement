@@ -6550,6 +6550,57 @@
       }
     },
     "/api/v1/regeln/{code}" : {
+      "delete" : {
+        "summary" : "Dokumentregel löschen",
+        "description" : "Neue Konfigurationsversion; bestehende Dokumente bleiben unverändert. If-Match mit Konfigurationsversion ist Pflicht (Spec 05, Req 7.1).",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Gelöscht",
+            "headers" : {
+              "ETag" : {
+                "description" : "Neue Konfigurationsversion"
+              }
+            }
+          },
+          "403" : {
+            "description" : "NICHT_ERLAUBT"
+          },
+          "404" : {
+            "description" : "NICHT_GEFUNDEN"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
       "patch" : {
         "summary" : "Dokumentregel ändern, aktivieren oder deaktivieren",
         "description" : "Code bleibt unverändert. If-Match mit Konfigurationsversion ist Pflicht.",

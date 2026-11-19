@@ -20,11 +20,15 @@ import java.util.function.Supplier;
  * Ein neuer Kontext darf nicht in einer laufenden JTA-Transaktion beginnen: Die Hibernate-Session hängt an der
  * Transaktion und behielte den Mandanten des ersten {@code mit}, ein zweites {@code mit} mit anderem Mandanten läse und
  * schriebe im fremden Schema (fail closed, design.md «Mandant»). Die Transaktion gehört darum in den Block.
+ * <p>
+ * {@link #zurProvisionierung} lässt zusätzlich genau den Mandanten zu, den die Provisionierung eingetragen, aber noch
+ * nicht aktiviert hat (Req 1.5); nur ohne Anmeldung und nur für diesen Thread.
  */
 @ApplicationScoped
 public class MandantKontext {
 
     private static final ThreadLocal<MandantCode> AKTUELL = new ThreadLocal<>();
+    private static final ThreadLocal<MandantCode> PROVISIONIERUNG = new ThreadLocal<>();
 
     private final Instance<RequestContextController> kontrollen;
     private final MandantAusAnmeldung anmeldung;
@@ -39,6 +43,24 @@ public class MandantKontext {
 
     public Optional<MandantCode> aktuell() {
         return Optional.ofNullable(AKTUELL.get());
+    }
+
+    /** Nur für die Provisionierung: Kontext für einen eingetragenen, noch nicht aktivierten Mandanten. */
+    public void zurProvisionierung(MandantCode code, Runnable arbeit) {
+        if (AKTUELL.get() != null || PROVISIONIERUNG.get() != null) {
+            throw new IllegalStateException("Provisionierung nur ausserhalb eines Mandanten-Kontexts");
+        }
+        PROVISIONIERUNG.set(code);
+        try {
+            mit(code, arbeit);
+        } finally {
+            PROVISIONIERUNG.remove();
+        }
+    }
+
+    /** Wahr, wenn der aktuelle Thread genau diesen Mandanten provisioniert. */
+    public boolean inProvisionierung(MandantCode code) {
+        return code.equals(PROVISIONIERUNG.get());
     }
 
     public void mit(MandantCode code, Runnable arbeit) {
