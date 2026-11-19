@@ -5,6 +5,7 @@ umask 077
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
 backend="$repo_root/backend"
 compose_file="$repo_root/deploy/backup/test/restore-compose.yml"
+mandanten=(urinet vhf-gsk)
 temp=$(mktemp -d "${TMPDIR:-/tmp}/archiv-restore.XXXXXX")
 chmod 700 "$temp"
 project="archiv-restore-$$"
@@ -261,8 +262,7 @@ test_maven() {
     "-Darchiv.restore.stufe=$stufe"
     "-Darchiv.restore.bucket-praefix=$praefix"
     "-Darchiv.restore.state=$temp/zustand.properties"
-    "-Darchiv.restore.inventar=$temp/entschluesselt/inventar-urinet.jsonl"
-    "-Darchiv.restore.bucket=$temp/entschluesselt/bucket-urinet.bin"
+    "-Darchiv.restore.verzeichnis=$temp/entschluesselt"
     "-Dsmallrye.config.source.file.locations=$temp/secrets"
     "-Dquarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:$db_port/$datenbank"
     "-Dquarkus.datasource.username=archiv_app"
@@ -278,6 +278,26 @@ test_maven() {
     grep -E 'Tests run:|BUILD FAILURE|\[ERROR\]' "$temp/$phase-test.log" | tail -n 12 >&2 || true
     exit 3
   fi
+}
+
+pruefe_mandantendateien() {
+  local mandant datei
+  for mandant in "${mandanten[@]}"; do
+    for datei in "inventar-$mandant.jsonl" "bucket-$mandant.bin"; do
+      [[ -s $temp/entschluesselt/$datei ]] \
+        || fehler "Sicherungspaket für Mandant $mandant ist unvollständig ($datei fehlt)."
+    done
+  done
+}
+
+pruefe_schema() {
+  local mandant=$1 schema=${1//-/_} relation
+  schema="m_$schema"
+  relation=$(compose exec -T db psql --no-psqlrc --username=postgres --dbname=archiv_restore \
+    --tuples-only --no-align --command "select to_regclass('$schema.dokument')") \
+    || fehler "Schema für Mandant $mandant konnte nach der Wiederherstellung nicht geprüft werden."
+  [[ $relation == "$schema.dokument" ]] \
+    || fehler "Wiederhergestelltes Schema für Mandant $mandant fehlt."
 }
 
 start_dienste db minio kc
@@ -304,7 +324,7 @@ test_maven quelle A urinet-archiv-a- archiv
 start=$SECONDS
 if ARCHIV_COMPOSE_FILE="$compose_file" \
   ARCHIV_SICHERUNGSVERZEICHNIS="$temp/backup" \
-  ARCHIV_MANDANTEN=urinet \
+  ARCHIV_MANDANTEN="${mandanten[*]}" \
   ARCHIV_AGE_EMPFAENGER_SICHERUNG="$sicherung_empfaenger" \
   ARCHIV_AGE_EMPFAENGER_PROBE="$probe_empfaenger" \
   ARCHIV_VOLLEXPORT=1 \
@@ -354,6 +374,7 @@ for artefakt in "$lauf"/*.age; do
   cmp -- "$temp/entschluesselt/${dateiname%.age}" "$temp/entschluesselt-probe/${dateiname%.age}" \
     || fehler "Sicherungs- und Probe-Schlüssel liefern verschiedene Exportdateien."
 done
+pruefe_mandantendateien
 tar -tf "$temp/entschluesselt/keycloak-realm.tar" >/dev/null \
   || fehler "Wiederhergestelltes Keycloak-Realm-Archiv ist ungültig."
 openssl pkey -in "$temp/entschluesselt/manifest.key" -noout >/dev/null 2>&1 \
@@ -370,6 +391,9 @@ else
   tail -n 12 "$temp/archiv-pg-restore.log" >&2 || true
   fehler "Archiv-Datenbankdump konnte nicht eingespielt werden."
 fi
+for mandant in "${mandanten[@]}"; do
+  pruefe_schema "$mandant"
+done
 
 compose exec -T db createdb --username=postgres --owner=keycloak keycloak_restore \
   || fehler "Leere Keycloak-Ziel-Datenbank konnte nicht angelegt werden."
