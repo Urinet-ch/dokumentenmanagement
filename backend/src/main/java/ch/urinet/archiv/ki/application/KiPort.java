@@ -32,6 +32,11 @@ public interface KiPort {
         return antwortschema();
     }
 
+    /** Stabile Darstellung des Antwortschemas für die Prompt-Kennung. */
+    default String antwortschemaFuerKennung(Anfrage anfrage) {
+        return antwortschema(anfrage);
+    }
+
     /** Mandantenspezifische Art-Codes in der Reihenfolge des Antwortschemas. */
     default List<String> artCodes(Anfrage anfrage) {
         return anfrage.arten().stream().map(ArtEintrag::code).toList();

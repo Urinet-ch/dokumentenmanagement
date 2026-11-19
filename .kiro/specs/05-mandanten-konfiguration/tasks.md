@@ -86,7 +86,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Abhängig von: 17.4, 17.6_
 
 ## Welle 18 — Wirkung und Oberfläche
-- [ ] 18.1 KI aus der Konfiguration [Backend]
+- [x] 18.1 KI aus der Konfiguration [Backend]
   - Prompt und Antwortschema aus Arten, `ki_felder` und Klassifikationen, KI-Texte, Nachbearbeitung über
     Art-Attribute, Belegnummer-Muster aus den Arten mit Zeitgrenze zur Laufzeit (inkl. ReDoS-Test mit `(a+)+$` gegen langen
     Eingabetext: gilt als «trifft nicht zu» und landet im Protokoll; 17.3 prüft nur Syntax und Länge), Schalter `ki_freigegeben` und

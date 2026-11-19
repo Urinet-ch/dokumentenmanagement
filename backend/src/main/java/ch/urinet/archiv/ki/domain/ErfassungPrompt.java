@@ -176,11 +176,9 @@ public final class ErfassungPrompt {
         StringBuilder sb = new StringBuilder();
         for (ArtEintrag a : schemaArten(arten, eigeneArten)) {
             sb.append("- ").append(a.code()).append(": ").append(a.name());
-            if (a.beschreibung() != null && !a.beschreibung().isBlank()) {
-                sb.append(" – ").append(a.beschreibung());
-            }
-            if (a.kiHinweise() != null && !a.kiHinweise().isBlank()) {
-                sb.append(" KI-Hinweis: ").append(a.kiHinweise().replace("{mandant}", mandant));
+            String artbeschreibung = a.kiHinweise() == null ? a.beschreibung() : a.kiHinweise();
+            if (artbeschreibung != null && !artbeschreibung.isBlank()) {
+                sb.append(" – ").append(artbeschreibung.replace("{mandant}", mandant));
             }
             sb.append(", ").append(a.vertraulichkeit());
             if (eigeneArten.contains(a.code())) {

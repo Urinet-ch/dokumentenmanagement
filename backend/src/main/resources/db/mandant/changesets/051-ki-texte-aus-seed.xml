@@ -29,22 +29,77 @@
             end
             $$;
 
+            do $$
+            begin
+                if current_schema() = 'm_urinet' then
+                    update dokumentart set ki_hinweise = case code
+                        when 'AUSGANGSRECHNUNG' then 'nur wenn {mandant} im Briefkopf als Absender steht'
+                        when 'LIEFERANTENBELEG' then
+                            'Rechnung, Facture, Fattura oder Gutschrift eines Lieferanten an {mandant} (Eingangsrechnung)'
+                        when 'QUITTUNG' then
+                            'Kassenbon, Zahlungsbestätigung, Billett, Parkticket; bereits bezahlt'
+                        else ''
+                    end
+                    where code in ('AUSGANGSRECHNUNG', 'BANK', 'BEHOERDE', 'KORRESPONDENZ',
+                        'LIEFERANTENBELEG', 'LOHNABRECHNUNG', 'OFFERTE', 'PROJEKTDOKUMENT',
+                        'QUITTUNG', 'VERSICHERUNG', 'VERTRAG')
+                      and ki_hinweise is null;
+                    update dokumentart set reihenfolge = case code
+                        when 'LIEFERANTENBELEG' then 0
+                        when 'QUITTUNG' then 1
+                        when 'VERTRAG' then 2
+                        when 'VERSICHERUNG' then 3
+                        when 'BEHOERDE' then 4
+                        when 'BANK' then 5
+                        when 'PROJEKTDOKUMENT' then 6
+                        when 'KORRESPONDENZ' then 7
+                        when 'AUSGANGSRECHNUNG' then 8
+                        when 'OFFERTE' then 9
+                        when 'LOHNABRECHNUNG' then 10
+                    end
+                    where code in ('AUSGANGSRECHNUNG', 'BANK', 'BEHOERDE', 'KORRESPONDENZ',
+                        'LIEFERANTENBELEG', 'LOHNABRECHNUNG', 'OFFERTE', 'PROJEKTDOKUMENT',
+                        'QUITTUNG', 'VERSICHERUNG', 'VERTRAG')
+                      and reihenfolge = 0;
+                end if;
+            end
+            $$;
+
             with aktuell as (
                 select inhalt from konfiguration_version order by version desc limit 1
             ),
             naechste as (
                 select coalesce(max(version), 0) + 1 as version from konfiguration_version
             ),
+            arten_neu as (
+                select jsonb_agg(
+                    case when d.code is not null then
+                        jsonb_set(
+                            case when d.ki_hinweise is not null then
+                                jsonb_set(art.element, '{kiHinweise}', to_jsonb(d.ki_hinweise), true)
+                            else art.element end,
+                            '{reihenfolge}', to_jsonb(coalesce(d.reihenfolge, 0)), true)
+                    else art.element end
+                    order by art.position) as inhalt
+                from aktuell a
+                cross join lateral jsonb_array_elements(a.inhalt->'arten')
+                    with ordinality as art(element, position)
+                left join dokumentart d on d.code = art.element->>'code'
+            ),
             abbild as (
-                select n.version, a.inhalt || jsonb_build_object('version', n.version, 'kiTexte', (
-                    select jsonb_build_object('rolle', t.rolle, 'feldregeln', t.feldregeln,
-                        'kiFreigegeben', t.ki_freigegeben)
-                    from ki_texte t where t.id = 1)) as inhalt
-                from aktuell a, naechste n, ki_texte t
+                select n.version, jsonb_set(
+                    a.inhalt || jsonb_build_object('version', n.version, 'kiTexte', (
+                        select jsonb_build_object('rolle', t.rolle, 'feldregeln', t.feldregeln,
+                            'kiFreigegeben', t.ki_freigegeben)
+                        from ki_texte t where t.id = 1)),
+                    '{arten}', coalesce(arten_neu.inhalt, a.inhalt->'arten'), true) as inhalt
+                from aktuell a, naechste n, ki_texte t, arten_neu
                 where t.id = 1 and (
                     a.inhalt #>> '{kiTexte,rolle}' is distinct from t.rolle
                     or a.inhalt #>> '{kiTexte,feldregeln}' is distinct from t.feldregeln
-                    or a.inhalt #>> '{kiTexte,kiFreigegeben}' is distinct from t.ki_freigegeben::text)
+                    or a.inhalt #>> '{kiTexte,kiFreigegeben}' is distinct from t.ki_freigegeben::text
+                    or a.inhalt->'arten' is distinct from
+                        coalesce(arten_neu.inhalt, a.inhalt->'arten'))
             )
             insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
             select version, 'system:migration', 'KI-Texte gemäss Mandantenkonfiguration', 'MIGRATION', inhalt,

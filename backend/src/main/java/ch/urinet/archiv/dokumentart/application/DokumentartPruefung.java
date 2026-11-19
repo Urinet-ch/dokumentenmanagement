@@ -41,7 +41,10 @@ public class DokumentartPruefung {
 
     /** Wie {@link #pruefen}, für den Seed eines Mandanten mit der Seed-Frist ({@code archiv.dokumentart.seed-zeitgrenze}). */
     public void seedPruefen(Dokumentart art) {
-        seedPruefen(art, List.of());
+        Set<String> schemaFelder = schemaPruefer.seedSchemaPruefen(art.zusatzSchema());
+        fristfeldPruefen(art);
+        pflichtfelderPruefen(art, schemaFelder);
+        kiFelderPruefen(art, List.of(), schemaFelder);
     }
 
     /** Prüft die KI-Felder des Seeds wie beim Ändern über die API. */

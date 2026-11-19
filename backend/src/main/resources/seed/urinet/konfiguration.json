@@ -43,7 +43,8 @@
       ],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "nur wenn {mandant} im Briefkopf als Absender steht",
+      "reihenfolge": 8,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -80,7 +81,8 @@
       ],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 9,
       "zusatzSchema": {
         "type": "object",
         "properties": {
@@ -121,6 +123,7 @@
       ],
       "kiVorschlag": true,
       "kiFelder": [],
+      "kiHinweise": "Rechnung, Facture, Fattura oder Gutschrift eines Lieferanten an {mandant} (Eingangsrechnung)",
       "reihenfolge": 0,
       "zusatzSchema": {
         "type": "object",
@@ -154,7 +157,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "Kassenbon, Zahlungsbestätigung, Billett, Parkticket; bereits bezahlt",
+      "reihenfolge": 1,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -189,7 +193,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 10,
       "zusatzSchema": {
         "type": "object",
         "properties": {
@@ -229,7 +234,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 2,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -261,7 +267,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 3,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -292,7 +299,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 4,
       "zusatzSchema": {
         "type": "object",
         "properties": {
@@ -332,7 +340,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 5,
       "zusatzSchema": {
         "type": "object",
         "properties": {
@@ -368,7 +377,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 6,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -398,7 +408,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 7,
       "zusatzSchema": {
         "type": "object",
         "properties": {

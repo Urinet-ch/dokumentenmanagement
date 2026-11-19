@@ -1,8 +1,10 @@
 package ch.urinet.archiv.ki.adapter.out.langchain4j;
 
 import ch.urinet.archiv.ki.application.KiPort;
+import ch.urinet.archiv.ki.domain.ArtEintrag;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.ki.domain.Feld;
+import ch.urinet.archiv.ki.domain.KiKlassifikation;
 import ch.urinet.archiv.ki.domain.Rohvorschlag;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +17,8 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.internal.JsonSchemaElementUtils;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
+import dev.langchain4j.model.chat.request.json.JsonEnumSchema;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.request.json.JsonRawSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -192,6 +196,11 @@ public class LangChain4jKiAdapter implements KiPort {
     }
 
     @Override
+    public String antwortschemaFuerKennung(Anfrage anfrage) {
+        return schemaFuerKennung(anfrage.arten(), anfrage.klassifikationen());
+    }
+
+    @Override
     public List<String> artCodes() {
         return List.of();
     }
@@ -205,6 +214,25 @@ public class LangChain4jKiAdapter implements KiPort {
     /** Art-Codes werden je Anfrage aus der Konfiguration gebildet. */
     public static List<String> codes() {
         return List.of();
+    }
+
+    static String schemaFuerKennung(List<ArtEintrag> arten, List<KiKlassifikation> klassifikationen) {
+        boolean dynamischeFelder = arten.stream().flatMap(art -> art.kiFelder().stream())
+                .anyMatch(feld -> !feld.equals("zugriff") && !feld.equals("veroeffentlicht"));
+        boolean finanzfelder = arten.stream().anyMatch(art -> art.gruppen().contains("finanz"));
+        if (arten.isEmpty() || !klassifikationen.isEmpty() || dynamischeFelder || !finanzfelder) {
+            return AntwortSchema.json(arten, klassifikationen);
+        }
+
+        JsonObjectSchema basis = (JsonObjectSchema) JsonSchemaElementUtils
+                .jsonSchemaElementFrom(MetadatenVorschlag.class);
+        JsonEnumSchema art = JsonEnumSchema.builder()
+                .description("Code der Dokumentart aus der Liste")
+                .enumValues(arten.stream().map(ArtEintrag::code).toList())
+                .build();
+        JsonObjectSchema wurzel = basis.toBuilder().addProperty("art", art).build();
+        return JsonSchema.builder().name(MetadatenVorschlag.class.getSimpleName()).rootElement(wurzel)
+                .build().toString();
     }
 
     static Rohvorschlag roh(String inhalt) {

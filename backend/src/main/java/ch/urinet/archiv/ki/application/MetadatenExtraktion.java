@@ -154,8 +154,9 @@ public class MetadatenExtraktion {
                 ErfassungPrompt.gekuerzt(eingabe.text()), qr.map(QrDaten::iban), mandant);
         KiPort.Anfrage anfrage = new KiPort.Anfrage(system, ErfassungPrompt.qr(qr), text, bild, Optional.empty(),
                 auswahl, arten, klassifikationen);
-        String schema = ki.antwortschema(anfrage);
-        String kennung = ErfassungPrompt.hash(grundPrompt, schema, ki.artCodes(anfrage), ErfassungPrompt.BILDWEG);
+        String schemaKennung = ki.antwortschemaFuerKennung(anfrage);
+        String kennung = ErfassungPrompt.hash(grundPrompt, schemaKennung, ki.artCodes(anfrage),
+                ErfassungPrompt.BILDWEG);
         if (!ErfassungPrompt.GATE_KENNUNG.equals(kennung)) {
             LOG.warnf("KI-Vorschlag für Dokument %s mit Prompt %s statt %s aus Gate 0 (Mandantenname oder Arten "
                     + "weichen ab)", eingabe.dokumentId(), kennung, ErfassungPrompt.GATE_KENNUNG);

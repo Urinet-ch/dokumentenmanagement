@@ -3,6 +3,10 @@ package ch.urinet.archiv.ki;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.ki.adapter.out.langchain4j.AntwortSchema;
+import ch.urinet.archiv.konfiguration.application.KonfigurationCache;
+import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
+import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe;
@@ -35,6 +39,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
@@ -62,14 +67,20 @@ public class KiVorschlagSchritte {
     @Inject
     AuftragTestHilfe auftraege;
 
+    @Inject
+    KonfigurationCache konfigurationCache;
+
+    @Inject
+    KonfigurationVerwaltung konfiguration;
+
+    @Inject
+    MandantKontext mandantKontext;
+
     private WireMock modell;
     private UUID id;
     private long verbrauchStand;
-    /** Kennungen des Mandanten vor dem Szenario, wenn ein Schritt sie geändert hat. */
-    private String kennungenVorher;
     private boolean kennungenGeaendert;
-    /** Freigabe des Mandanten vor einem Szenario, das die Sperre prüft. */
-    private boolean kiFreigegebenVorher;
+    private MandantCode kennungenMandant;
     private boolean kiFreigabeGeaendert;
     /** Kontakt aus dem Szenario, wird danach gelöscht. */
     private UUID kontakt;
@@ -97,38 +108,42 @@ public class KiVorschlagSchritte {
     }
 
     @After
-    public void kiFreigabeZuruecksetzen() throws Exception {
+    public void kiFreigabeZuruecksetzen() {
         if (kiFreigabeGeaendert) {
-            auftraege.ausfuehren("update " + new MandantCode(MANDANT).schema()
-                    + ".ki_texte set ki_freigegeben = " + kiFreigegebenVorher + " where id = 1");
+            konfigurationCache.invalidieren(new MandantCode(MANDANT));
             kiFreigabeGeaendert = false;
         }
     }
 
     @Angenommen("die KI-Freigabe des Mandanten ist ausgeschaltet")
     public void kiFreigabeAusschalten() throws Exception {
-        String schema = new MandantCode(MANDANT).schema();
-        Object wert = auftraege.wertAus("select ki_freigegeben from " + schema + ".ki_texte where id = 1");
-        assertThat(wert).isInstanceOf(Boolean.class);
-        kiFreigegebenVorher = (Boolean) wert;
+        MandantCode mandant = new MandantCode(MANDANT);
+        Konfiguration vorher = aktuelleKonfiguration(mandant);
+        assertThat(vorher.kiTexte().kiFreigegeben()).isTrue();
         kiFreigabeGeaendert = true;
-        auftraege.ausfuehren("update " + schema + ".ki_texte set ki_freigegeben = false where id = 1");
+        konfigurationCache.speichern(mandant, new Konfiguration(vorher.version(), vorher.einstellungen(),
+                vorher.arten(), vorher.klassifikationen(), vorher.regeln(),
+                new Konfiguration.KiTexte(vorher.kiTexte().rolle(), vorher.kiTexte().feldregeln(), false)));
     }
 
     @Angenommen("der Mandant «{word}» hat die UID «{}»")
     public void uid(String mandant, String uid) throws Exception {
-        kennungenVorher = hilfe.kennungen(mandant);
+        MandantCode code = new MandantCode(mandant);
+        Konfiguration vorher = aktuelleKonfiguration(code);
+        Konfiguration.Einstellungen einstellungen = new Konfiguration.Einstellungen(
+                vorher.einstellungen().geschaeftsjahrEnde(), new Konfiguration.Kennungen(uid, List.of()));
+        konfigurationCache.speichern(code, new Konfiguration(vorher.version(), einstellungen, vorher.arten(),
+                vorher.klassifikationen(), vorher.regeln(), vorher.kiTexte()));
+        kennungenMandant = code;
         kennungenGeaendert = true;
-        ObjectNode kennungen = JSON.createObjectNode().put("uid", uid);
-        kennungen.putArray("ibans");
-        hilfe.kennungenSetzen(mandant, JSON.writeValueAsString(kennungen));
     }
 
     @After
     public void kennungenZuruecksetzen() throws Exception {
         if (kennungenGeaendert) {
-            hilfe.kennungenSetzen(MANDANT, kennungenVorher);
+            konfigurationCache.invalidieren(kennungenMandant);
             kennungenGeaendert = false;
+            kennungenMandant = null;
         }
         if (kontakt != null) {
             hilfe.kontaktLoeschen(MANDANT, kontakt);
@@ -489,6 +504,12 @@ public class KiVorschlagSchritte {
 
     private JsonNode vorschlag() throws Exception {
         return JSON.readTree((String) hilfe.kiVorschlag(MANDANT, id).get("ki_vorschlag"));
+    }
+
+    private Konfiguration aktuelleKonfiguration(MandantCode mandant) throws Exception {
+        try (var worker = Executors.newSingleThreadExecutor()) {
+            return worker.submit(() -> mandantKontext.mit(mandant, konfiguration::aktuell)).get();
+        }
     }
 
     private JsonNode sicherheit() throws Exception {
