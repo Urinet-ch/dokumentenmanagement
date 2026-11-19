@@ -110,9 +110,16 @@ describe('Wissensoberfläche', () => {
     const buttons = Array.from(element.querySelectorAll('button'));
     expect(buttons.some((b) => b.textContent?.includes('Version 1'))).toBe(false);
     buttons.find((b) => b.textContent?.includes('Version 2'))!.click();
+    http.expectOne('/api/v1/wissensseiten/s1/versionen/2').flush({
+      nummer: 2, inhaltHtml: '<p>Frühere Fassung</p>',
+    });
+    await fixture.whenStable();
+    expect(element.textContent).toContain('Frühere Fassung');
+    buttons.find((b) => b.textContent?.includes('Version 2'))!.click();
     http.expectOne('/api/v1/wissensseiten/s1/versionen/2')
       .flush({}, { status: 404, statusText: 'Not Found' });
     await fixture.whenStable();
     expect(element.textContent).toContain(TEXTE.httpFehler.nichtGefunden);
+    expect(element.textContent).not.toContain('Frühere Fassung');
   });
 });
