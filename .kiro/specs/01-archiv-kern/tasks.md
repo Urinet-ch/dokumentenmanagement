@@ -609,5 +609,7 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
 
 - [x]* O.10 Eingangskorb-Entwurf bleibt bei Sitzungsablauf (401) [Frontend] [Fabian]
   - Herkunft: Review von PR #238; der frühere Ausschlussgrund (#228/#229) ist mit deren Merge entfallen
-  - Entwurfsentscheid Fabian, 17.11.2026: Speicherung in `sessionStorage` (Verfall mit der Sitzung beim Schliessen des Tabs); nur Metadaten und Zusatzfeldwerte, keine Datei- oder Dokumentinhalte und keine Tokens. Beim Abmelden und Benutzerwechsel löschen; nach erneuter Anmeldung wiederherstellen.
-  - Nach erneuter Anmeldung den Entwurf wiederherstellen; Test für den Ablauf
+  - Entwurfsentscheid Fabian, 17.11.2026: Speicherung in `sessionStorage` (Verfall mit dem Browser-Tab); nur Metadaten und Zusatzfeldwerte, keine Datei- oder Dokumentinhalte und keine Tokens. Ein 401 löscht den Entwurf nicht; gelöscht wird er beim Abmelden und Benutzerwechsel. Nach erneuter Anmeldung wird er wiederhergestellt.
+  - Geltungsbereich: Gesichert wird nur bei einem 401 beim Speichern oder Bestätigen. Ein Refresh-Fehler während reiner Feldbearbeitung löst keine Sicherung aus.
+  - Stand Umsetzung (PR #329): Komponententests für Sicherung nach 401, Wiederherstellung, Löschen nach Erfolg, Rohwerte von Listenfeldern sowie Speicherfehler und Grössenlimit; App-Tests für Abmelden und Benutzerwechsel.
+  - _Anforderungen: keine_
