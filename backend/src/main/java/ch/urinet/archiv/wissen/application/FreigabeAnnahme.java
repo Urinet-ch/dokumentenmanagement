@@ -91,7 +91,8 @@ public class FreigabeAnnahme {
         String erzeugt;
         if (bearbeitung != null) {
             erzeugt = "human:" + benutzer.id();
-        } else if ("INGEST".equals(aenderung.anlass())) {
+        } else if ("INGEST".equals(aenderung.anlass())
+                || ("MANUELL".equals(aenderung.anlass()) && vorschlag.modell() != null)) {
             if (vorschlag.modell() == null || vorschlag.modell().isBlank()) {
                 throw new IllegalStateException("Modell des Ingest-Entwurfs fehlt");
             }

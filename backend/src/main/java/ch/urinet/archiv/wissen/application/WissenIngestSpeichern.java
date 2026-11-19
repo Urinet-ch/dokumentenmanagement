@@ -147,7 +147,8 @@ public class WissenIngestSpeichern {
             dokumente.add(vorschlag.wissensquelleId());
         }
         for (var quelle : vorschlag.quellen()) {
-            if ((quelle.dokumentId() == null) == (quelle.quellSeiteId() == null)) {
+            if (quelle.schluessel() == null || quelle.schluessel().isBlank()
+                    || (quelle.dokumentId() == null) == (quelle.quellSeiteId() == null)) {
                 return false;
             }
             if (quelle.dokumentId() != null) {

@@ -587,8 +587,8 @@ public class WissenIngestVerarbeiten {
                 neuerStand -> aenderungPruefen(neuerStand, fortschritt, neu));
     }
 
-    private static boolean quelleStrukturErhalten(SeitenFassung aktuell, SeitenVorschlag vorher, KiPort.Seite neu,
-                                                   List<Kernaussage> aussagen, UUID dokumentId) {
+    static boolean quelleStrukturErhalten(SeitenFassung aktuell, SeitenVorschlag vorher, KiPort.Seite neu,
+                                          List<Kernaussage> aussagen, UUID dokumentId) {
         String text = neu.inhalt();
         if (!quelleAbschnitteGueltig(text) || !quelleAbschnitteGueltig(aktuell.inhalt())
                 || !quelleAbschnitteGueltig(vorher.daten().inhalt())) {
@@ -1210,7 +1210,7 @@ public class WissenIngestVerarbeiten {
                 + seite.beschreibung() + " | " + String.join(", ", seite.tags());
     }
 
-    private static String feld(String bezeichnung, Object wert) {
+    static String feld(String bezeichnung, Object wert) {
         String text = wert == null ? "" : wert.toString();
         return bezeichnung + " (" + text.length() + " Zeichen; Daten):\n" + text + "\n";
     }

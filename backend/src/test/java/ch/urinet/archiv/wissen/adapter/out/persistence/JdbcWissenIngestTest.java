@@ -21,6 +21,10 @@ import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
 import ch.urinet.archiv.wissen.application.FreigabeKontext;
 import ch.urinet.archiv.wissen.application.FreigabeSperre;
+import ch.urinet.archiv.wissen.application.ManuellerWissensentwurf;
+import ch.urinet.archiv.wissen.application.ManuelleNeuerzeugung;
+import ch.urinet.archiv.wissen.application.ManuelleNeuerzeugungSpeichern;
+import ch.urinet.archiv.wissen.application.WissenIngestHandler;
 import ch.urinet.archiv.wissen.application.DiffDienst;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
@@ -112,6 +116,12 @@ class JdbcWissenIngestTest {
 
     @Inject
     WissenIngestSpeichern ingestSpeichern;
+
+    @Inject
+    ManuellerWissensentwurf manuellerEntwurfDienst;
+
+    @Inject
+    ManuelleNeuerzeugungSpeichern manuellSpeichern;
 
     @Inject
     WissenKonfiguration wissenKonfiguration;
@@ -818,6 +828,227 @@ class JdbcWissenIngestTest {
             ausfuehren("delete from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = ?",
                     entwurf.toString());
         }
+    }
+
+    @Test
+    void manuellerEntwurfWirdMitKiNeuErzeugtUndAlsKiFassungFreigegeben() throws Exception {
+        UUID dokument = quelle(URINET);
+        String pfad = "konzepte/manuell-" + UUID.randomUUID();
+        UUID seiteId = seite(URINET, pfad, "# Bisher", null);
+        Quelleneintrag quelle = new Quelleneintrag("q1", dokument, 1, 1, "Seite 1", null);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+        UUID entwurf = im(URINET, () -> manuellerEntwurfDienst.anlegen(inhaber,
+                new ManuellerWissensentwurf.Eingabe(seiteId, pfad, "Konzept", "Probe", "Probe", List.of(), null,
+                        List.of(quelle), "# Manuell\n\nAussage. [^q1]", "Probe", List.of())));
+        entwuerfe.get(URINET).add(entwurf);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set version = 2, inhalt = '# Aktuell' where id = ?",
+                seiteId);
+        assertThat(im(URINET, () -> freigabeSperre.basisAktuell(
+                freigabeSperre.laden(inhaber, entwurf, 1, () -> 0)))).isFalse();
+        long auftragId = im(URINET, () -> {
+            freigabe.neuErzeugen(inhaber, entwurf, 1, () -> 1);
+            EntityManager em = entityManager.get();
+            long id = ((Number) em.createNativeQuery("""
+                    select id from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = :id
+                    """).setParameter("id", entwurf.toString()).getSingleResult()).longValue();
+            em.createNativeQuery("update public.auftrag set status = 'LAEUFT' where id = :id")
+                    .setParameter("id", id).executeUpdate();
+            return id;
+        });
+        Auftrag auftrag = new Auftrag(auftragId, URINET, WissenIngestStarten.TYP,
+                new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
+        AtomicReference<KiPort.WissensAnfrage> anfrage = new AtomicReference<>();
+        AtomicBoolean quelleWechselt = new AtomicBoolean(true);
+        KiPort testKi = new KiPort() {
+            @Override
+            public Antwort metadaten(Anfrage eingabe) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public WissensAntwort wissensIngest(WissensAnfrage eingabe) {
+                anfrage.set(eingabe);
+                if (quelleWechselt.get()) {
+                    try {
+                        ausfuehren("update " + URINET.schema()
+                                + ".dokument set vertraulichkeit = 'PERSONAL' where id = ?", dokument);
+                    } catch (SQLException e) {
+                        throw new IllegalStateException(e);
+                    }
+                }
+                return new WissensGueltig(new Seite("Probe", "Probe", List.of(),
+                        "# Neuer Vorschlag\n\nAussage. [^q1]", List.of(), List.of(), "Probe"),
+                        new Verbrauch("test-modell", 12, 8));
+            }
+
+            @Override
+            public String antwortschema() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<String> artCodes() {
+                throw new UnsupportedOperationException();
+            }
+        };
+        try {
+            var verarbeiten = new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, testKi, kiVerbrauch,
+                    diffDienst);
+            var manuell = new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration);
+            var handler = new WissenIngestHandler(verarbeiten, ingestSpeichern, manuell, manuellSpeichern);
+            CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
+                try {
+                    handler.ausfuehren(auftrag);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+            assertThat(anfrage.get().schritt()).isEqualTo(KiPort.WissensSchritt.SEITE);
+            assertThat(anfrage.get().nachricht()).contains("# Aktuell", "# Manuell");
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissens_aenderung where entwurf_id = ? and status = 'VERALTET' and etag = 1 "
+                    + "and basis_version = 1 and inhalt like '%Manuell%'", entwurf)).isEqualTo(1);
+
+            ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'NORMAL' where id = ?",
+                    dokument);
+            ausfuehren("update public.auftrag set status = 'FEHLER' where id = ?", auftragId);
+            long neuerAuftragId = im(URINET, () -> {
+                freigabe.neuErzeugen(inhaber, entwurf, 1, () -> 1);
+                EntityManager em = entityManager.get();
+                long id = ((Number) em.createNativeQuery("""
+                        select max(id) from public.auftrag where typ = 'WISSEN_INGEST'
+                            and nutzlast->>'entwurfId' = :id
+                        """).setParameter("id", entwurf.toString()).getSingleResult()).longValue();
+                em.createNativeQuery("update public.auftrag set status = 'LAEUFT' where id = :id")
+                        .setParameter("id", id).executeUpdate();
+                return id;
+            });
+            quelleWechselt.set(false);
+            Auftrag neuerAuftrag = new Auftrag(neuerAuftragId, URINET, WissenIngestStarten.TYP,
+                    new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
+            CompletableFuture.runAsync(() -> kontext.mit(URINET,
+                    () -> handler.nachLetztemFehlversuch(auftrag, UUID.randomUUID())), worker)
+                    .get(1, TimeUnit.MINUTES);
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "IN_ARBEIT");
+            CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
+                try {
+                    handler.ausfuehren(neuerAuftrag);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissens_aenderung where entwurf_id = ? and status = 'OFFEN' and etag = 2 "
+                    + "and basis_version = 2 and inhalt like '%Neuer Vorschlag%'", entwurf)).isEqualTo(1);
+            im(URINET, () -> {
+                freigabe.annehmen(inhaber, entwurf, 1, () -> 2, null, null, null, null);
+                return null;
+            });
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_version where entwurf_id = ? and erzeugt_von = ?",
+                    entwurf, "infomaniak/" + wissenKonfiguration.modell())).isEqualTo(1);
+        } finally {
+            ausfuehren("delete from " + URINET.schema() + ".ki_verbrauch where ingest_entwurf_id = ?", entwurf);
+            ausfuehren("delete from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = ?",
+                    entwurf.toString());
+            annahmeBereinigen(entwurf);
+        }
+    }
+
+    @Test
+    void manuellerEntwurfRuftBeiPersonalOderErschoepftemBudgetKeineKiAuf() throws Exception {
+        UUID dokument = quelle(URINET);
+        String pfad = "konzepte/ki-schutz-" + UUID.randomUUID();
+        UUID seiteId = seite(URINET, pfad, "# Bisher", null);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+        UUID entwurf = im(URINET, () -> manuellerEntwurfDienst.anlegen(inhaber,
+                new ManuellerWissensentwurf.Eingabe(seiteId, pfad, "Konzept", "Probe", "Probe", List.of(), null,
+                        List.of(new Quelleneintrag("q1", dokument, 1, 1, "Seite 1", null)),
+                        "# Vorschlag\n\nAussage. [^q1]", "Probe", List.of())));
+        entwuerfe.get(URINET).add(entwurf);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set status = 'VERALTET', etag = 1 where entwurf_id = ?", entwurf);
+        AtomicBoolean aufgerufen = new AtomicBoolean();
+        KiPort testKi = new KiPort() {
+            @Override
+            public Antwort metadaten(Anfrage eingabe) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public WissensAntwort wissensIngest(WissensAnfrage eingabe) {
+                aufgerufen.set(true);
+                throw new AssertionError("Die KI darf nicht aufgerufen werden");
+            }
+
+            @Override
+            public String antwortschema() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<String> artCodes() {
+                throw new UnsupportedOperationException();
+            }
+        };
+        var verarbeiten = new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, testKi, kiVerbrauch,
+                diffDienst);
+        var handler = new WissenIngestHandler(verarbeiten, ingestSpeichern,
+                new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration), manuellSpeichern);
+        try {
+            ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'PERSONAL' where id = ?",
+                    dokument);
+            Auftrag erster = neuerzeugungStarten(entwurf, inhaber);
+            CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
+                try {
+                    handler.ausfuehren(erster);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+            assertThat(zeile(URINET, entwurf).get("hinweis").toString()).contains("Quellen");
+            assertThat(aufgerufen).isFalse();
+
+            ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'NORMAL' where id = ?",
+                    dokument);
+            ausfuehren("insert into " + URINET.schema()
+                    + ".wissens_einstellung (id, monatsbudget_tokens) values (1, 1) "
+                    + "on conflict (id) do update set monatsbudget_tokens = 1");
+            Auftrag zweiter = neuerzeugungStarten(entwurf, inhaber);
+            CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
+                try {
+                    handler.ausfuehren(zweiter);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN")
+                    .containsEntry("hinweis", "Budget erschöpft");
+            assertThat(aufgerufen).isFalse();
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissens_aenderung where entwurf_id = ? and status = 'VERALTET' and etag = 1",
+                    entwurf)).isEqualTo(1);
+        } finally {
+            ausfuehren("delete from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = ?",
+                    entwurf.toString());
+        }
+    }
+
+    private Auftrag neuerzeugungStarten(UUID entwurf, Benutzer inhaber) {
+        long id = im(URINET, () -> {
+            freigabe.neuErzeugen(inhaber, entwurf, 1, () -> 1);
+            EntityManager em = entityManager.get();
+            long auftragId = ((Number) em.createNativeQuery("""
+                    select max(id) from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = :id
+                    """).setParameter("id", entwurf.toString()).getSingleResult()).longValue();
+            em.createNativeQuery("update public.auftrag set status = 'LAEUFT' where id = :id")
+                    .setParameter("id", auftragId).executeUpdate();
+            return auftragId;
+        });
+        return new Auftrag(id, URINET, WissenIngestStarten.TYP,
+                new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
     }
 
     @Test

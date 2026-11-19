@@ -87,6 +87,38 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
     }
 
     @Override
+    public Optional<NeuerzeugungsDaten> neuerzeugungsDaten(UUID entwurfId) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = em.get().createNativeQuery("""
+                select anlass, tokens_ein, tokens_aus from wissens_entwurf
+                where id = :id and status = 'IN_ARBEIT' and schritt = 'NEU_ERZEUGEN'
+                """).setParameter("id", entwurfId).getResultList();
+        return zeilen.stream().findFirst().map(z -> new NeuerzeugungsDaten((String) z[0],
+                ((Number) z[1]).intValue(), ((Number) z[2]).intValue()));
+    }
+
+    @Override
+    public void neuerzeugungsModellSetzen(UUID entwurfId, String modell) {
+        int geschrieben = em.get().createNativeQuery("""
+                update wissens_entwurf set ki_modell = :modell
+                where id = :id and anlass = 'MANUELL' and status = 'IN_ARBEIT' and schritt = 'NEU_ERZEUGEN'
+                """).setParameter("modell", modell).setParameter("id", entwurfId).executeUpdate();
+        if (geschrieben != 1) {
+            throw new IllegalStateException("Modell für die Neuerzeugung konnte nicht gespeichert werden");
+        }
+    }
+
+    @Override
+    public boolean neuererNeuerzeugungsauftrag(UUID entwurfId, String mandant, long auftragId) {
+        return Boolean.TRUE.equals(em.get().createNativeQuery("""
+                select exists(select 1 from public.auftrag where id > :auftrag and mandant = :mandant
+                    and typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = :entwurf
+                    and nutzlast->>'aenderungNr' is not null)
+                """).setParameter("auftrag", auftragId).setParameter("mandant", mandant)
+                .setParameter("entwurf", entwurfId.toString()).getSingleResult());
+    }
+
+    @Override
     public Vorschlag vorschlagLaden(Aenderung aenderung) {
         Object[] zeile = (Object[]) em.get().createNativeQuery("""
                 select cast(a.daten as text), a.inhalt, cast(a.entfernte_aussagen as text),

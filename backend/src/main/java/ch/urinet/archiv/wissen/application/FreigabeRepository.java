@@ -18,6 +18,12 @@ public interface FreigabeRepository {
 
     void neuerzeugungStarten(UUID entwurfId);
 
+    Optional<NeuerzeugungsDaten> neuerzeugungsDaten(UUID entwurfId);
+
+    void neuerzeugungsModellSetzen(UUID entwurfId, String modell);
+
+    boolean neuererNeuerzeugungsauftrag(UUID entwurfId, String mandant, long auftragId);
+
     Vorschlag vorschlagLaden(Aenderung aenderung);
 
     void fassungSpeichern(UUID entwurfId, Aenderung aenderung, Wissensseite fassung, WissensStufe mindeststufe,
@@ -32,6 +38,9 @@ public interface FreigabeRepository {
 
     record Aenderung(long id, UUID seiteId, String entwurfStatus, String anlass, String status, int etag,
                      String aktion, String pfad, Integer basisVersion) {
+    }
+
+    record NeuerzeugungsDaten(String anlass, int tokensEin, int tokensAus) {
     }
 
     record Vorschlag(Wissensseite fassung, Set<String> entfernteAussagen, String kontextstufe,

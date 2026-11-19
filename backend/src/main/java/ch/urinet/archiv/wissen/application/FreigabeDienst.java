@@ -67,7 +67,7 @@ public class FreigabeDienst {
     @Transactional
     public void neuErzeugen(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch) {
         FreigabeRepository.Aenderung aenderung = sperre.zumNeuErzeugenLaden(benutzer, entwurfId, nummer, ifMatch);
-        if (!"INGEST".equals(aenderung.anlass())) {
+        if (!"INGEST".equals(aenderung.anlass()) && !"MANUELL".equals(aenderung.anlass())) {
             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }
         repository.neuerzeugungStarten(entwurfId);
