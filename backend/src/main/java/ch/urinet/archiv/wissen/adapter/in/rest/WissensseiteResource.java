@@ -77,7 +77,8 @@ public class WissensseiteResource {
     }
 
     @Schema(name = "WissensIndexZeile")
-    public record IndexZeileDto(UUID id, String pfad, String typ, String titel, String beschreibung, String status) {
+    public record IndexZeileDto(UUID id, String pfad, String typ, String titel, String beschreibung, String status,
+                                boolean quellePruefen) {
     }
 
     @Schema(name = "Wissensseite")
@@ -90,7 +91,8 @@ public class WissensseiteResource {
 
     @Schema(name = "Wissensquelleneintrag")
     public record QuelleDto(String schluessel, UUID dokumentId, Integer seiteVon, Integer seiteBis, String auszug,
-                            UUID quellSeiteId) {
+                            UUID quellSeiteId, String dokumentTitel, String dokumentDateiname, String quellSeitePfad,
+                            String quellSeiteTitel) {
     }
 
     @Schema(name = "Wissensversion")
@@ -138,6 +140,7 @@ public class WissensseiteResource {
             @QueryParam("tag") String tag,
             @QueryParam("q") String q,
             @QueryParam("pfad") String pfad,
+            @QueryParam("dokumentId") String dokumentId,
             @QueryParam("offset") @Parameter(schema = @Schema(type = SchemaType.INTEGER, defaultValue = "0"))
             String offset,
             @QueryParam("groesse") @Parameter(schema = @Schema(type = SchemaType.INTEGER, defaultValue = "50"))
@@ -157,7 +160,9 @@ public class WissensseiteResource {
         String schlagwort = textFilter(tag, 100);
         int start = zahl(offset, 0, MAX_OFFSET);
         int anzahl = zahl(groesse, INDEX_STANDARD, INDEX_MAX);
-        WissenLesen.IndexErgebnis ergebnis = lesen.index(benutzer, seitentyp, schlagwort, suchbegriff, start, anzahl);
+        UUID dokument = dokumentFilter(dokumentId);
+        WissenLesen.IndexErgebnis ergebnis = lesen.index(benutzer, seitentyp, schlagwort, suchbegriff, dokument,
+                start, anzahl);
         List<IndexGruppeDto> gruppen = ergebnis.gruppen().stream()
                 .map(gruppe -> new IndexGruppeDto(gruppe.typ().datenbankwert(), gruppe.seiten().stream()
                         .map(WissensseiteResource::dto).toList()))
@@ -282,20 +287,38 @@ public class WissensseiteResource {
     private WissensseiteDto dto(Benutzer benutzer, Wissensseite seite) {
         return new WissensseiteDto(seite.id(), seite.pfad(), seite.typ().datenbankwert(), seite.titel(),
                 seite.beschreibung(), seite.tags(), seite.status().name(), seite.veraltetAb(),
-                seite.vertraulichkeit().name(), seite.quellen().stream().map(WissensseiteResource::dto).toList(),
+                seite.vertraulichkeit().name(), quellen(benutzer, seite),
                 lesen.inhaltDarstellen(benutzer, seite.inhalt()), seite.version(), seite.erzeugtVon(), seite.erzeugtAm(),
                 seite.freigegebenVon(), seite.freigegebenAm(), seite.quellePruefen(), seite.widerspruchOffen(),
                 seite.wissensquelleId());
     }
 
-    private static QuelleDto dto(Quelleneintrag quelle) {
+    private List<QuelleDto> quellen(Benutzer benutzer, Wissensseite seite) {
+        Map<String, WissenLesen.QuellenAnzeige> anzeige = lesen.quellenAnzeige(benutzer, seite);
+        return seite.quellen().stream().map(quelle -> dto(quelle, anzeige.get(quelle.schluessel()))).toList();
+    }
+
+    private static QuelleDto dto(Quelleneintrag quelle, WissenLesen.QuellenAnzeige anzeige) {
         return new QuelleDto(quelle.schluessel(), quelle.dokumentId(), quelle.seiteVon(), quelle.seiteBis(),
-                quelle.auszug(), quelle.quellSeiteId());
+                quelle.auszug(), quelle.quellSeiteId(),
+                anzeige == null ? null : anzeige.dokumentTitel(), anzeige == null ? null : anzeige.dokumentDateiname(),
+                anzeige == null ? null : anzeige.seitePfad(), anzeige == null ? null : anzeige.seiteTitel());
     }
 
     private static IndexZeileDto dto(WissenLesenRepository.IndexZeile seite) {
         return new IndexZeileDto(seite.id(), seite.pfad(), seite.typ().datenbankwert(), seite.titel(),
-                seite.beschreibung(), seite.status());
+                seite.beschreibung(), seite.status(), seite.quellePruefen());
+    }
+
+    private static UUID dokumentFilter(String wert) {
+        if (wert == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(wert);
+        } catch (IllegalArgumentException e) {
+            throw ungueltigeAnfrage();
+        }
     }
 
     private VersionDto dto(Benutzer benutzer, WissenLesenRepository.WissensVersion version) {

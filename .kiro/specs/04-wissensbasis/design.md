@@ -762,7 +762,7 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
 ### REST (`/api/v1`, Fehler als RFC 9457)
 | Methode | Pfad | Zweck |
 | --- | --- | --- |
-| GET | `/wissensseiten?typ=&tag=&q=` | Index bzw. Suche (A15) |
+| GET | `/wissensseiten?typ=&tag=&q=&dokumentId=` | Index bzw. Suche (A15); optionaler Dokumentfilter für den Rückverweis |
 | GET | `/wissensseiten/{id}` und `?pfad=` | Seite mit gerenderten Fussnoten, ETag (A15) |
 | GET | `/wissensseiten/{id}/versionen`, `/versionen/{n}`, `/diff?von=&bis=` | Versionen (A15, Sichtbarkeit je Version) |
 | GET | `/wissensseiten/{id}/eingehend` | eingehende Links (A15) |
@@ -798,8 +798,13 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 ### Frontend (`frontend/src/app/wissen/`)
 - Routen: `/wissen` (Index, Filter, Suche), `/wissen/ueberblick`, `/wissen/:ordner/:name` (Seite), `/wissen/log`,
   `/wissen/entwuerfe`, `/wissen/entwuerfe/:id` (Diff und Aktionen). Angular standalone, Signals, OnPush.
-- Seite: gerendertes HTML vom Server (bereits ohne HTML-Eingabe erzeugt) über `[innerHTML]` mit Angular-Sanitizer;
-  Quellenliste mit Chips zum Dokument (`/dokument/:id?seite=n`); Banner für Hinweise.
+- Seite: gerendertes HTML vom Server wird ohne `[innerHTML]` in sichere Textknoten und interne Links umgewandelt;
+  Quellenliste mit Chips zum Dokument (`/dokument/:id?seite=n`); Banner für Hinweise. Der Index liefert den Hinweis
+  `quellePruefen` und filtert auf Wunsch nach einer Dokument-ID, jeweils unter demselben Sichtbarkeitsfilter wie
+  der übrige Index. Die Seite liefert je Quelleneintrag `dokumentTitel`, `dokumentDateiname`, `quellSeitePfad` und
+  `quellSeiteTitel` unter derselben Sichtregel mit (nur Anzeige, kein Nachladen je Quelle im Frontend, damit keine
+  fremden Zugriffsprotokoll-Einträge entstehen); der Hinweis «Abgelaufen» erscheint, wenn `veraltetAb` erreicht
+  und der Status nicht VERALTET ist.
 - Diff: ab 1024 px nebeneinander, darunter untereinander; Zeilen mit `−`/`+` und Farbe; Aktionen je Änderung mit
   Bestätigungsdialog, kein gesammeltes Annehmen. Ingest-Entwurf mit Liste der Kernaussagen (Seite, Auszug,
   Prüfergebnis, «keiner Änderung zugeordnet»).
