@@ -590,6 +590,10 @@ export class Verwaltung implements OnInit {
               ...zusatzPflichtfelder(felder),
             ];
           })();
+    // Das Backend verlangt die Gruppe `frei`, sobald ein Pflichtfeld `zusatz.*` steht (Dokumentart.java): Sie wird gesetzt und bleibt im Formular sichtbar.
+    if (pflichtfelder.some((feld) => feld.startsWith('zusatz.'))) {
+      this.artGruppeSetzen('frei', true);
+    }
     const body: DokumentartAenderung = {
       name: this.artForm.name.trim(),
       beschreibung: this.artForm.beschreibung.trim() || null,
@@ -1239,15 +1243,25 @@ export class Verwaltung implements OnInit {
       return;
     }
     this.beschaeftigt.set(true);
+    const lauf = this.dateiLeseLauf;
     this.konfigurationService
       .apiV1KonfigurationPruefenPost(this.dateiInhalt!, 'response')
       .subscribe({
         next: (antwort) => {
           this.beschaeftigt.set(false);
+          if (lauf !== this.dateiLeseLauf) {
+            return;
+          }
           this.dateiPruefung.set(analysiereAntwort(antwort.body));
           this.fehler.set(null);
         },
-        error: (fehler: unknown) => this.anfrageFehler(fehler),
+        error: (fehler: unknown) => {
+          if (lauf === this.dateiLeseLauf) {
+            this.anfrageFehler(fehler);
+          } else {
+            this.beschaeftigt.set(false);
+          }
+        },
       });
   }
 
@@ -1256,15 +1270,25 @@ export class Verwaltung implements OnInit {
       return;
     }
     this.beschaeftigt.set(true);
+    const lauf = this.dateiLeseLauf;
     this.konfigurationService
       .apiV1KonfigurationVergleichenPost(this.dateiInhalt!, 'response')
       .subscribe({
         next: (antwort) => {
           this.beschaeftigt.set(false);
+          if (lauf !== this.dateiLeseLauf) {
+            return;
+          }
           this.dateiVergleich.set(analysiereAntwort(antwort.body));
           this.fehler.set(null);
         },
-        error: (fehler: unknown) => this.anfrageFehler(fehler),
+        error: (fehler: unknown) => {
+          if (lauf === this.dateiLeseLauf) {
+            this.anfrageFehler(fehler);
+          } else {
+            this.beschaeftigt.set(false);
+          }
+        },
       });
   }
 
@@ -1488,10 +1512,17 @@ export class Verwaltung implements OnInit {
   private ladeZuordnungen(art: string): void {
     this.konfigurationService.apiV1DokumentartenArtKlassifikationenGet(art, 'response').subscribe({
       next: (antwort) => {
+        if (this.ausgewaehlteArt() !== art) {
+          return;
+        }
         this.standPruefen(antwort);
         this.zuordnungen.set(zuordnungenListe(antwort.body));
       },
-      error: (fehler: unknown) => this.anfrageFehler(fehler, 'laden'),
+      error: (fehler: unknown) => {
+        if (this.ausgewaehlteArt() === art) {
+          this.anfrageFehler(fehler, 'laden');
+        }
+      },
     });
   }
 

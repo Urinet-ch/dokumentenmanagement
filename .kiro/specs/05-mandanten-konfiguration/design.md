@@ -162,6 +162,12 @@ und Vergleich mit passender Basisversion einspielen. Bei 409 `KONFIGURATION_VERA
 die Vorschau wird verworfen und muss neu erstellt werden. Das Einspielen verlangt einen Änderungsgrund im Header
 `X-Aenderungsgrund`; Auswirkungen auf Dokumente zeigt die Vorschau aus `/konfiguration/vergleichen`.
 
+Das Backend verlangt die Gruppe `frei`, sobald ein Pflichtfeld `zusatz.*` steht; die Seite setzt sie dann beim Speichern
+selbst (Checkbox sichtbar, Hinweis unter den Gruppen). Antworten von Prüfen und Vergleichen einer früher gewählten Datei
+und von Zuordnungen einer früher gewählten Art werden verworfen; die Dateiauswahl ist während einer Anfrage gesperrt.
+Ein 403 vom Backend zeigt bewusst die gemeinsame Meldung «nicht berechtigt» (Guard und Rechte entscheidet das Backend);
+eine Weiterleitung auf die 404-Seite gibt es nur über den Guard (Nachbesserung Review PR #323).
+
 ## Admin-Kommando
 ```
 archiv mandant konfiguration exportieren <code> [<datei>]

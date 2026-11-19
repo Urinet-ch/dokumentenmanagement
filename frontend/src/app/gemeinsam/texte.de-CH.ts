@@ -1025,6 +1025,8 @@ export const TEXTE = {
       name: 'Name',
       beschreibung: 'Beschreibung',
       gruppen: 'Gruppen',
+      gruppeFreiHinweis:
+        'Ein Pflichtfeld aus den Zusatzfeldern setzt beim Speichern die Gruppe «Frei» automatisch.',
       gruppe: { finanz: 'Finanz', vertrag: 'Vertrag', frei: 'Frei' },
       pflichtfelder: 'Pflichtfelder des Dokuments',
       pflichtfelderHinweis:

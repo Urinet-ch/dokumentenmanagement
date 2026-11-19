@@ -200,6 +200,8 @@ Then(
       aenderung.body.pflichtfelder.includes(`zusatz.${feldcode}`),
       JSON.stringify(aenderung.body.pflichtfelder),
     );
+    // Das Backend lehnt `zusatz.*` ohne die Gruppe `frei` ab; die Seite setzt sie selbst.
+    assert.ok(aenderung.body.gruppen.includes('frei'), JSON.stringify(aenderung.body.gruppen));
     assert.equal(aenderung.body.zusatzSchema.required, undefined);
   },
 );

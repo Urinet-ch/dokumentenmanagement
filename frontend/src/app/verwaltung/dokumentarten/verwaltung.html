@@ -78,6 +78,7 @@
                 {{ texte.dokumentarten.gruppe[gruppe] }}
               </label>
             }
+            <p class="hinweis">{{ texte.dokumentarten.gruppeFreiHinweis }}</p>
           </fieldset>
 
           <label>
@@ -817,7 +818,12 @@
     </button>
     <label>
       {{ texte.datei.dateiAuswaehlen }}
-      <input type="file" accept="application/json,.json" (change)="dateiAuswaehlen($event)" />
+      <input
+        type="file"
+        accept="application/json,.json"
+        [disabled]="beschaeftigt()"
+        (change)="dateiAuswaehlen($event)"
+      />
     </label>
     @if (dateiGelesen()) {
       <p role="status">{{ texte.datei.dateiBereit }}</p>

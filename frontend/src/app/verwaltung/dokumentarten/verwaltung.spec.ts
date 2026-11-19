@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import axe from 'axe-core';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, Subject, of, throwError } from 'rxjs';
 import { DokumentartenService } from '../../gemeinsam/api/api/dokumentarten.service';
 import { KonfigurationService } from '../../gemeinsam/api/api/konfiguration.service';
 import { Dokumentart } from '../../gemeinsam/api/model/dokumentart';
@@ -219,9 +219,7 @@ describe('Verwaltung der Dokumentarten', () => {
   it('lädt nach einem 412 den neuen Stand und ermöglicht danach wieder Speichern', async () => {
     await starten();
     dokumentartenService.apiV1DokumentartenCodePatch
-      .mockReturnValueOnce(
-        throwError(() => new HttpErrorResponse({ status: 412 })),
-      )
+      .mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 412 })))
       .mockReturnValueOnce(of(antwort({ ...ART, name: 'Neue Rechnung' }, '"konfig-9"')));
 
     await ersteArtSpeichern();
@@ -232,9 +230,7 @@ describe('Verwaltung der Dokumentarten', () => {
       of(antwort([{ ...ART, name: 'Serverstand' }], '"konfig-8"')),
     );
     konfigurationService.apiV1KlassifikationenGet.mockReturnValue(of(antwort([], '"konfig-8"')));
-    konfigurationService.apiV1RegelnGet.mockReturnValue(
-      of(antwort([REGEL], '"konfig-8"')),
-    );
+    konfigurationService.apiV1RegelnGet.mockReturnValue(of(antwort([REGEL], '"konfig-8"')));
     konfigurationService.apiV1KonfigurationVersionenGet.mockReturnValue(
       of(antwort([], '"konfig-8"')),
     );
@@ -369,9 +365,7 @@ describe('Verwaltung der Dokumentarten', () => {
       'fieldset.feld-editor label.inline input[type="checkbox"]',
     );
     expect(pflichtCheckbox?.disabled).toBe(true);
-    expect(element.textContent).toContain(
-      TEXTE.verwaltung.dokumentarten.feldPflichtSchemaHinweis,
-    );
+    expect(element.textContent).toContain(TEXTE.verwaltung.dokumentarten.feldPflichtSchemaHinweis);
   });
 
   it('sendet den Klassifikationscode beim Anlegen einer Zuordnung mit', async () => {
@@ -920,5 +914,191 @@ describe('Verwaltung der Dokumentarten', () => {
     expect(element.textContent).toContain(TEXTE.verwaltung.datei.dateiBereit);
     expect(element.textContent).not.toContain(TEXTE.verwaltung.datei.einspielen);
     expect(konfigurationService.apiV1KonfigurationPut).toHaveBeenCalledOnce();
+  });
+
+  it('setzt bei einem Pflicht-Zusatzfeld die Gruppe frei und zeigt sie im Formular', async () => {
+    const bank: Dokumentart = {
+      ...ART,
+      code: 'BANK',
+      gruppen: ['finanz'],
+      pflichtfelder: ['titel', 'zusatz.periode_von'],
+      zusatzSchema: {
+        type: 'object',
+        properties: { periode_von: { type: 'string', format: 'date' } },
+        additionalProperties: false,
+      },
+    };
+    await starten(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+      [],
+      [bank],
+    );
+
+    await ersteArtSpeichern();
+    await speichernBestaetigen();
+
+    const body = dokumentartenService.apiV1DokumentartenCodePatch.mock.calls[0][2];
+    expect(body.gruppen).toEqual(['finanz', 'frei']);
+    const frei = [...element.querySelectorAll<HTMLInputElement>('fieldset input[type=checkbox]')]
+      .filter((feld) => feld.closest('label')?.textContent?.includes('Frei'))
+      .pop()!;
+    expect(frei.checked).toBe(true);
+    expect(element.textContent).toContain(TEXTE.verwaltung.dokumentarten.gruppeFreiHinweis);
+  });
+
+  it('lässt die Gruppen ohne Pflicht-Zusatzfeld unverändert', async () => {
+    await starten();
+
+    await ersteArtSpeichern();
+    await speichernBestaetigen();
+
+    expect(dokumentartenService.apiV1DokumentartenCodePatch.mock.calls[0][2].gruppen).toEqual([
+      'finanz',
+    ]);
+  });
+
+  const FEHLERFAELLE: [number, () => string, Record<string, string>][] = [
+    [0, () => TEXTE.httpFehler.verbindung, {}],
+    [401, () => TEXTE.anmeldung.abgelaufen, {}],
+    [403, () => TEXTE.httpFehler.keinZugriff, {}],
+    [404, () => TEXTE.httpFehler.nichtGefunden, {}],
+    [422, () => TEXTE.verwaltung.fehlerUngueltig, {}],
+    [429, () => TEXTE.httpFehler.zuViele(7), { 'Retry-After': '7' }],
+    [500, () => TEXTE.httpFehler.server, {}],
+  ];
+
+  it.each(FEHLERFAELLE)(
+    'zeigt beim Speichern bei Status %i die Meldung, ohne Eingaben oder Serverdetails zu verlieren',
+    async (status, erwartet, kopf) => {
+      await starten(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status,
+              headers: new HttpHeaders(kopf),
+              error: { detail: 'private value' },
+            }),
+        ),
+      );
+
+      await ersteArtSpeichern();
+      await speichernBestaetigen();
+
+      expect(element.querySelector('[role=alert]')?.textContent).toContain(erwartet());
+      expect(eingabe(TEXTE.verwaltung.dokumentarten.name).value).toBe('Geänderter Name');
+      expect(element.textContent).not.toContain('private value');
+    },
+  );
+
+  it.each(FEHLERFAELLE.filter(([status]) => status !== 422))(
+    'zeigt beim Laden bei Status %i die Meldung ohne Serverdetails',
+    async (status, erwartet, kopf) => {
+      await starten();
+      konfigurationService.apiV1DokumentartenArtKlassifikationenGet.mockReturnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status,
+              headers: new HttpHeaders(kopf),
+              error: { detail: 'private value' },
+            }),
+        ),
+      );
+
+      element.querySelector<HTMLButtonElement>('.auswahl')!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const text = element.querySelector('[role=alert]')?.textContent ?? '';
+      expect(text).toContain(status === 0 ? TEXTE.verwaltung.fehlerLaden : erwartet());
+      expect(text).not.toContain('private value');
+    },
+  );
+
+  it('zeigt beim Laden einer Art mit Status 422 die Meldung für ungültige Konfiguration', async () => {
+    await starten();
+    konfigurationService.apiV1DokumentartenArtKlassifikationenGet.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 422 })),
+    );
+
+    element.querySelector<HTMLButtonElement>('.auswahl')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(
+      TEXTE.verwaltung.fehlerUngueltig,
+    );
+  });
+
+  it('verwirft die Zuordnungen einer zuvor gewählten Art, wenn deren Antwort zu spät kommt', async () => {
+    const andere: Dokumentart = { ...ART, code: 'VERTRAG', name: 'Vertrag' };
+    await starten(of(antwort(ART)), [], [ART, andere]);
+    const spaet = new Subject<HttpResponse<unknown>>();
+    konfigurationService.apiV1DokumentartenArtKlassifikationenGet
+      .mockReturnValueOnce(spaet)
+      .mockReturnValueOnce(of(antwort([])));
+
+    const knoepfe = element.querySelectorAll<HTMLButtonElement>('#dokumentarten .auswahl');
+    knoepfe[0].click();
+    knoepfe[1].click();
+    spaet.next(antwort([{ klassifikation: 'ZUSPAET', pflicht: false, standardWert: null }]));
+    spaet.complete();
+    fixture.detectChanges();
+
+    expect(element.textContent).not.toContain('ZUSPAET');
+  });
+
+  it('lehnt eine Konfigurationsdatei über 1 MiB ab, ohne sie zu lesen', async () => {
+    await starten();
+    const dateiFeld = element.querySelector<HTMLInputElement>('input[type=file]')!;
+    const gross = new File([new Uint8Array(1024 * 1024 + 1)], 'k.json');
+    Object.defineProperty(dateiFeld, 'files', { value: [gross] });
+    const lesen = vi.spyOn(gross, 'text');
+
+    dateiFeld.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(
+      TEXTE.verwaltung.datei.dateiZuGross,
+    );
+    expect(lesen).not.toHaveBeenCalled();
+    expect(element.textContent).not.toContain(TEXTE.verwaltung.datei.dateiBereit);
+    expect(konfigurationService.apiV1KonfigurationPruefenPost).not.toHaveBeenCalled();
+  });
+
+  it('sperrt die Dateiauswahl während einer Anfrage und verwirft späte Antworten einer früheren Datei', async () => {
+    await starten();
+    const spaet = new Subject<HttpResponse<unknown>>();
+    konfigurationService.apiV1KonfigurationPruefenPost.mockReturnValue(spaet);
+    const dateiFeld = element.querySelector<HTMLInputElement>('input[type=file]')!;
+    const waehlen = async (inhalt: string) => {
+      Object.defineProperty(dateiFeld, 'files', {
+        value: [new File([inhalt], 'k.json')],
+        configurable: true,
+      });
+      dateiFeld.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    await waehlen('{"a":1}');
+    knopf(TEXTE.verwaltung.datei.pruefen).click();
+    fixture.detectChanges();
+    expect(dateiFeld.disabled).toBe(true);
+
+    await waehlen('{"b":2}');
+    spaet.next(
+      antwort({ basisVersion: 7, aktuelleVersion: 7, gueltig: true, befunde: [], aenderungen: [] }),
+    );
+    spaet.complete();
+    fixture.detectChanges();
+
+    expect(
+      element.querySelector('#konfigurationsdatei [role=status]')?.textContent ?? '',
+    ).toContain(TEXTE.verwaltung.datei.dateiBereit);
+    expect(
+      element.querySelector('#konfigurationsdatei .befund, #konfigurationsdatei table'),
+    ).toBeNull();
   });
 });
