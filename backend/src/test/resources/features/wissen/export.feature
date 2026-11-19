@@ -22,3 +22,10 @@ Funktionalität: Export der Wissensbasis
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Wenn der Inhaber einen Wissensexport anfordert und ausführen lässt
     Dann ist der Download 24 Stunden ab Fertigstellung gültig und seine Prüfsumme protokolliert
+
+  @req-17.5
+  Szenario: Der Vollexport enthält die Wissensbasis des Mandanten
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine synthetische freigegebene Wissensseite ist vorhanden
+    Wenn ein Vollexport des Mandanten «urinet» mit seiner Wissensbasis erstellt wird
+    Dann enthält der Vollexport ein Wissenspaket mit dieser Seite

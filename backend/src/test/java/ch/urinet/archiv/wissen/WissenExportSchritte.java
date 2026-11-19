@@ -1,11 +1,17 @@
 package ch.urinet.archiv.wissen;
 
 import ch.urinet.archiv.ablage.TestAblage;
+import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.Exportdatei;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.application.MandantVollexportDaten;
+import ch.urinet.archiv.mandant.application.MandantVollexportSchreiber;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
+import ch.urinet.archiv.wissen.application.WissenOkfExportPort;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
@@ -19,11 +25,16 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -32,7 +43,9 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipInputStream;
 
@@ -46,6 +59,12 @@ public class WissenExportSchritte {
     @Inject
     AuftragArbeiter arbeiter;
 
+    @Inject
+    MandantKontext kontext;
+
+    @Inject
+    WissenOkfExportPort wissenExport;
+
     private UUID exportId;
     private UUID seitenId;
     private String seitenPfad;
@@ -53,6 +72,7 @@ public class WissenExportSchritte {
     private String referenzPfad;
     private UUID dokumentId;
     private Response antwort;
+    private byte[] vollexport;
 
     @Angenommen("eine synthetische freigegebene Wissensseite ist vorhanden")
     public void seiteAnlegen() throws Exception {
@@ -172,6 +192,62 @@ public class WissenExportSchritte {
         assertThat(dokument.get("auszug")).isEqualTo("Probe");
         assertThat(seite.get("id")).isEqualTo("q2");
         assertThat(seite.get("resource")).isEqualTo("/" + referenzPfad + ".md");
+    }
+
+    @Wenn("ein Vollexport des Mandanten «urinet» mit seiner Wissensbasis erstellt wird")
+    public void vollexportErstellen() throws Exception {
+        MandantVollexportDaten daten = new MandantVollexportDaten() {
+            public List<Dokument> seite(Optional<UUID> nach, int anzahl) {
+                return List.of();
+            }
+
+            public List<Manifestdatei> manifeste() {
+                return List.of();
+            }
+        };
+        AblagePort ablage = (AblagePort) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{AblagePort.class}, (proxy, methode, args) -> {
+                    throw new AssertionError("Unerwarteter Ablageaufruf: " + methode.getName());
+                });
+        Path temp = Files.createTempDirectory("wissen-vollexport-");
+        try {
+            MandantCode code = new MandantCode("urinet");
+            vollexport = CompletableFuture.supplyAsync(() -> kontext.mit(code, () -> {
+                ByteArrayOutputStream ziel = new ByteArrayOutputStream();
+                try {
+                    new MandantVollexportSchreiber(daten, ablage, wissenExport)
+                            .schreiben(code, UUID.randomUUID(), temp, ziel);
+                } catch (IOException e) {
+                    throw new IllegalStateException(e);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+                return ziel.toByteArray();
+            })).get(1, TimeUnit.MINUTES);
+        } finally {
+            Files.deleteIfExists(temp);
+        }
+    }
+
+    @Dann("enthält der Vollexport ein Wissenspaket mit dieser Seite")
+    public void vollexportPruefen() throws Exception {
+        byte[] paket = null;
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(vollexport))) {
+            for (var eintrag = zip.getNextEntry(); eintrag != null; eintrag = zip.getNextEntry()) {
+                if ("wissensbasis.zip".equals(eintrag.getName())) {
+                    paket = zip.readAllBytes();
+                }
+            }
+        }
+        assertThat(paket).isNotNull();
+        boolean gefunden = false;
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(paket))) {
+            for (var eintrag = zip.getNextEntry(); eintrag != null; eintrag = zip.getNextEntry()) {
+                gefunden |= (seitenPfad + ".md").equals(eintrag.getName());
+            }
+        }
+        assertThat(gefunden).isTrue();
     }
 
     @Dann("ist der Download 24 Stunden ab Fertigstellung gültig und seine Prüfsumme protokolliert")
