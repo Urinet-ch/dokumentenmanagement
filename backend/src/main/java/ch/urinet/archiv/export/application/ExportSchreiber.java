@@ -56,10 +56,15 @@ public class ExportSchreiber {
     static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
     private static final HexFormat HEX = HexFormat.of();
 
-    /** Liest eine Version aus dem Object Storage stromweise in das Ziel (Ablage, {@code AblagePort#kopieren}). */
+    /** Liest archivierte Belege anhand ihrer gespeicherten Versions-ID. */
     @FunctionalInterface
     public interface Quelle {
         Kopie kopieren(String schluessel, String versionId, OutputStream ziel);
+
+        /** Liest einen Manifest-Teil anhand des Schlüssels und seiner erwarteten SHA-256. */
+        default Kopie kopierenManifest(String schluessel, String sha256, OutputStream ziel) {
+            throw new UnsupportedOperationException("Manifest-Kopie nach Schlüssel und SHA-256 nicht angebunden");
+        }
     }
 
     /**
@@ -141,7 +146,7 @@ public class ExportSchreiber {
         for (ExportBelege.Manifestdatei m : belege.manifeste(von, bis)) {
             unterbrochen();
             String pfad = MANIFESTE + m.datum() + "." + m.endung();
-            Kopie kopie = eintrag(zip, pfad, null, m.schluessel(), m.versionId());
+            Kopie kopie = manifestEintrag(zip, pfad, m.schluessel(), m.sha256());
             if (!kopie.sha256().equalsIgnoreCase(m.sha256())) {
                 throw new PruefsummeWeichtAb(m.schluessel());
             }
@@ -178,6 +183,14 @@ public class ExportSchreiber {
         }
         zip.putNextEntry(eintrag);
         Kopie kopie = quelle.kopieren(schluessel, versionId, zip);
+        zip.closeEntry();
+        return kopie;
+    }
+
+    private Kopie manifestEintrag(ZipOutputStream zip, String pfad, String schluessel, String sha256)
+            throws IOException {
+        zip.putNextEntry(new ZipEntry(pfad));
+        Kopie kopie = quelle.kopierenManifest(schluessel, sha256, zip);
         zip.closeEntry();
         return kopie;
     }

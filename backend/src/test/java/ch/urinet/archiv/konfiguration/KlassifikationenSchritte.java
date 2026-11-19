@@ -137,7 +137,7 @@ public class KlassifikationenSchritte {
         }
     }
 
-    @Angenommen("«{word}» legt ein Dokument «{word}» der Art «{word}» mit der Klassifikation «{word}» und dem Wert «{word}» im Status «{word}» an")
+    @Angenommen("«{word}» legt ein Dokument «{}» der Art «{word}» mit der Klassifikation «{word}» und dem Wert «{word}» im Status «{word}» an")
     public void dokumentAnlegen(String benutzer, String name, String art, String code, String wert, String status)
             throws SQLException {
         String mandant = benutzer.substring(benutzer.indexOf('-') + 1);
@@ -169,7 +169,7 @@ public class KlassifikationenSchritte {
         }
     }
 
-    @Angenommen("das Dokument «{word}» hat das Zusatzfeld «{word}» mit dem Wert «{word}»")
+    @Angenommen("das Dokument «{}» hat das Zusatzfeld «{word}» mit dem Wert «{word}»")
     public void zusatzSetzen(String name, String feld, String wert) throws SQLException {
         Dokument dokument = dokument(name);
         try (Connection verbindung = datenbank.get().getConnection();
@@ -179,6 +179,18 @@ public class KlassifikationenSchritte {
             aendern.setString(1, feld);
             aendern.setString(2, wert);
             aendern.setObject(3, dokument.id());
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    @Angenommen("das Dokument «{}» hat den Titel «{}»")
+    public void titelSetzen(String name, String titel) throws SQLException {
+        Dokument dokument = dokument(name);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement("update "
+                     + new MandantCode(dokument.mandant()).schema() + ".dokument set titel = ? where id = ?")) {
+            aendern.setString(1, titel);
+            aendern.setObject(2, dokument.id());
             assertThat(aendern.executeUpdate()).isEqualTo(1);
         }
     }

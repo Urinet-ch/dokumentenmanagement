@@ -3,6 +3,7 @@ package ch.urinet.archiv.export.application;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.application.Exportziel;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
+import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.export.domain.Export;
 import ch.urinet.archiv.export.domain.ExportFehlerart;
@@ -19,6 +20,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.io.OutputStream;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -78,8 +80,18 @@ public class ExportJahrHandler implements AuftragHandler {
         Geschaeftsjahr jahr = new Geschaeftsjahr(export.geschaeftsjahr(),
                 einstellungen.lesen(mandant).geschaeftsjahresende().monatTag());
         ablage.exportLebenszyklusSichern(mandant);
-        ExportSchreiber schreiber = new ExportSchreiber(belege,
-                (schluessel, version, ziel) -> ablage.kopieren(mandant, schluessel, version, ziel), SEITE);
+        ExportSchreiber.Quelle quelle = new ExportSchreiber.Quelle() {
+            @Override
+            public Kopie kopieren(String schluessel, String version, OutputStream ziel) {
+                return ablage.kopieren(mandant, schluessel, version, ziel);
+            }
+
+            @Override
+            public Kopie kopierenManifest(String schluessel, String sha256, OutputStream ziel) {
+                return ablage.sicherungsManifestKopie(mandant, schluessel, sha256, ziel);
+            }
+        };
+        ExportSchreiber schreiber = new ExportSchreiber(belege, quelle, SEITE);
         ExportSchreiber.Ergebnis ergebnis;
         AbgelegteDatei zip;
         try (Exportziel ziel = ablage.exportSchreiben(mandant, id)) {

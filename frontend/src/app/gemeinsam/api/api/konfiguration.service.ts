@@ -18,6 +18,12 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
 import { KonfigurationsdateiAnalyse } from '../model/konfigurationsdatei-analyse';
+// @ts-ignore
+import { Regel } from '../model/regel';
+// @ts-ignore
+import { RegelAenderung } from '../model/regel-aenderung';
+// @ts-ignore
+import { RegelAnlegen } from '../model/regel-anlegen';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -1314,6 +1320,220 @@ export class KonfigurationService extends BaseService {
         return this.httpClient.request<any>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Dokumentregel ändern, aktivieren oder deaktivieren
+     * Code bleibt unverändert. If-Match mit Konfigurationsversion ist Pflicht.
+     * @endpoint patch /api/v1/regeln/{code}
+     * @param code 
+     * @param ifMatch 
+     * @param regelAenderung 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1RegelnCodePatch(code: string, ifMatch: string, regelAenderung: RegelAenderung, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Regel>;
+    public apiV1RegelnCodePatch(code: string, ifMatch: string, regelAenderung: RegelAenderung, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Regel>>;
+    public apiV1RegelnCodePatch(code: string, ifMatch: string, regelAenderung: RegelAenderung, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Regel>>;
+    public apiV1RegelnCodePatch(code: string, ifMatch: string, regelAenderung: RegelAenderung, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (code === null || code === undefined) {
+            throw new Error('Required parameter code was null or undefined when calling apiV1RegelnCodePatch.');
+        }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1RegelnCodePatch.');
+        }
+        if (regelAenderung === null || regelAenderung === undefined) {
+            throw new Error('Required parameter regelAenderung was null or undefined when calling apiV1RegelnCodePatch.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/regeln/${this.configuration.encodeParam({name: "code", value: code, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Regel>('patch', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: regelAenderung,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Regeln des Mandanten auflisten
+     * Nur mit Recht A11 (Spec 05, Req 7.2).
+     * @endpoint get /api/v1/regeln
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1RegelnGet(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<Regel>>;
+    public apiV1RegelnGet(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<Regel>>>;
+    public apiV1RegelnGet(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<Regel>>>;
+    public apiV1RegelnGet(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/regeln`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Array<Regel>>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Dokumentregel anlegen
+     * If-Match mit Konfigurationsversion ist Pflicht.
+     * @endpoint post /api/v1/regeln
+     * @param ifMatch 
+     * @param regelAnlegen 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1RegelnPost(ifMatch: string, regelAnlegen: RegelAnlegen, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Regel>;
+    public apiV1RegelnPost(ifMatch: string, regelAnlegen: RegelAnlegen, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Regel>>;
+    public apiV1RegelnPost(ifMatch: string, regelAnlegen: RegelAnlegen, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Regel>>;
+    public apiV1RegelnPost(ifMatch: string, regelAnlegen: RegelAnlegen, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1RegelnPost.');
+        }
+        if (regelAnlegen === null || regelAnlegen === undefined) {
+            throw new Error('Required parameter regelAnlegen was null or undefined when calling apiV1RegelnPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/regeln`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Regel>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: regelAnlegen,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,
