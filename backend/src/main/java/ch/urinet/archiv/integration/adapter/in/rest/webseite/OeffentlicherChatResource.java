@@ -27,6 +27,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.sse.OutboundSseEvent;
 import jakarta.ws.rs.sse.Sse;
+import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.ParameterIn;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
@@ -52,18 +53,20 @@ import java.util.UUID;
 public class OeffentlicherChatResource {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    static final String CHAT_HINWEIS = "Antworten werden automatisch aus Verbandsdokumenten erstellt. Massgebend "
-            + "sind die verlinkten Originaldokumente; für verbindliche Auskünfte wenden Sie sich bitte an die Geschäftsstelle.";
+    static final String HINWEIS_STANDARD = "archiv.webseite.chat.hinweis";
 
     private final OeffentlicheFragen fragen;
     private final MandantAufloesung aufloesung;
     private final LeseAnfrage anfrage;
+    private final Config konfiguration;
 
     @Inject
-    public OeffentlicherChatResource(OeffentlicheFragen fragen, MandantAufloesung aufloesung, LeseAnfrage anfrage) {
+    public OeffentlicherChatResource(OeffentlicheFragen fragen, MandantAufloesung aufloesung, LeseAnfrage anfrage,
+                                     Config konfiguration) {
         this.fragen = fragen;
         this.aufloesung = aufloesung;
         this.anfrage = anfrage;
+        this.konfiguration = konfiguration;
     }
 
     @Schema(name = "ChatFrage")
@@ -113,12 +116,13 @@ public class OeffentlicherChatResource {
         Eingabe eingabe = eingabe(body);
         OeffentlicheFragen.Annahme annahme = fragen.annehmen(mandant, anfrage.zugriff(), eingabe.frage(),
                 eingabe.gespraechId());
+        String hinweis = hinweis(konfiguration, mandant);
         ChatAbbruch abbruch = new ChatAbbruch();
         // sofort starten und puffern, bis Quarkus abonniert: der Platz wird auch frei, wenn nie jemand abonniert
         UnicastProcessor<OutboundSseEvent> strom = UnicastProcessor.create();
         fragen.starten(annahme, ausgabe -> {
             strom.onNext(sse.newEventBuilder().name(ausgabe.name()).mediaType(MediaType.TEXT_PLAIN_TYPE)
-                    .data(String.class, daten(ausgabe)).build());
+                    .data(String.class, daten(ausgabe, hinweis)).build());
             if (ausgabe.letzte()) {
                 strom.onComplete();
             }
@@ -158,14 +162,34 @@ public class OeffentlicherChatResource {
         }
     }
 
-    /** JSON in {@code data:} eines Ereignisses. */
-    static String daten(OeffentlicheAusgabe ausgabe) {
+    /**
+     * Hinweis unter dem Chatfenster ({@code fertig.hinweis}): {@code archiv.mandant.<code>.chat-hinweis}, sonst der
+     * mandantenneutrale Standard {@value #HINWEIS_STANDARD}; einzeilig, ohne Steuerzeichen.
+     */
+    static String hinweis(Config konfiguration, MandantCode mandant) {
+        Optional<String> eigener = mandant == null ? Optional.empty() : konfiguration.getOptionalValue(
+                "archiv.mandant." + mandant.wert() + ".chat-hinweis", String.class).map(OeffentlicherChatResource::einzeilig);
+        return eigener.filter(h -> !h.isEmpty()).orElseGet(() -> {
+            String standard = einzeilig(konfiguration.getValue(HINWEIS_STANDARD, String.class));
+            if (standard.isEmpty()) {
+                throw new IllegalStateException(HINWEIS_STANDARD + " darf nicht leer sein");
+            }
+            return standard;
+        });
+    }
+
+    private static String einzeilig(String wert) {
+        return wert.replaceAll("[\\p{Cc}\\p{Cf}]", " ").replaceAll("\\s+", " ").strip();
+    }
+
+    /** JSON in {@code data:} eines Ereignisses; {@code hinweis} nur für {@code fertig}. */
+    static String daten(OeffentlicheAusgabe ausgabe, String hinweis) {
         return switch (ausgabe) {
             case OeffentlicheAusgabe.Werkzeug w -> JSON.createObjectNode().put("werkzeug", w.werkzeug()).toString();
             case OeffentlicheAusgabe.Text t -> JSON.createObjectNode().put("delta", t.delta()).toString();
             case OeffentlicheAusgabe.Quellen q -> quellen(q).toString();
             case OeffentlicheAusgabe.Fertig f -> JSON.createObjectNode().put("gespraechId", f.gespraechId().toString())
-                    .put("hinweis", CHAT_HINWEIS).toString();
+                    .put("hinweis", hinweis).toString();
             case OeffentlicheAusgabe.Fehler f -> JSON.createObjectNode().put("meldung", f.meldung())
                     .put("gespraechId", f.gespraechId().toString()).toString();
         };

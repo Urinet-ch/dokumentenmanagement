@@ -134,9 +134,10 @@ public class OeffentlicheAbfragen {
                 daten.nurLesend();
                 return suche.suchen(anfrage, sicht, false);
             });
-            treffer = volltext.treffer();
+            // Rückfall nach einer Ausnahme: ohne Bewertung gilt dieselbe Regel wie im degradierten Hybridergebnis
+            treffer = volltext.treffer().stream().filter(t -> exakteNummer(begriff, t)).toList();
             degradiert = true;
-            gesamt = volltext.gesamt();
+            gesamt = treffer.size();
         }
         // zweite Schicht: jeder Treffer nochmals über den festen Filter, mit Titel, Reihe und Ausgabe
         Map<UUID, OeffentlichesDokument> sichtbar = sichtbare(treffer.stream().map(Suchtreffer::id).toList(), zugriff);
@@ -155,7 +156,11 @@ public class OeffentlicheAbfragen {
         // Ohne Modellbewertung bleibt nur die exakte Dokumentnummer als deterministischer Beleg.
         return ergebnis.treffer().stream().filter(h -> h.relevanz() != null
                 ? h.relevanz() >= minRelevanz
-                : begriff.equals(h.treffer().belegnummer())).toList();
+                : exakteNummer(begriff, h.treffer())).toList();
+    }
+
+    private static boolean exakteNummer(String begriff, Suchtreffer treffer) {
+        return begriff.equals(treffer.belegnummer());
     }
 
     /** {@code dokument_zeigen}: ID nach der Zuordnung der Gesprächsnummer; nur Dokumente, die der Filter liefert. */

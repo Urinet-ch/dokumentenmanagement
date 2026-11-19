@@ -63,9 +63,10 @@ paths:
           unmittelbar vor `fertig`. `jahr` und `fundstelle` können `null` sein. Die Quellen stammen aus den
           Werkzeugergebnissen und sind über den festen Filter geprüft; nie Stufe, Status oder Dateiname. Den Link auf die
           Dokumentseite bildet die Webseite aus `dokumentId`.
-        - `fertig` `{gespraechId, hinweis}`: Ende der Antwort. Die Webseite zeigt `hinweis` unter dem Chatfenster:
-          «Antworten werden automatisch aus Verbandsdokumenten erstellt. Massgebend sind die verlinkten
-          Originaldokumente; für verbindliche Auskünfte wenden Sie sich bitte an die Geschäftsstelle.» Das Gespräch
+        - `fertig` `{gespraechId, hinweis}`: Ende der Antwort. Die Webseite zeigt `hinweis` unter dem Chatfenster.
+          Der Wortlaut ist je Mandant konfiguriert und einzeilig, für VHF/GSK: «Antworten werden automatisch aus
+          Verbandsdokumenten erstellt. Massgebend sind die verlinkten Originaldokumente; für verbindliche Auskünfte
+          wenden Sie sich bitte an die Geschäftsstelle.» Die Webseite übernimmt ihn unverändert. Das Gespräch
           lebt höchstens 30 Minuten im Speicher des Archivs, nur für denselben Client; eine unbekannte, fremde oder
           abgelaufene ID beginnt ein neues Gespräch.
         - `fehler` `{meldung, gespraechId}`: fester Text, beendet den Stream ohne `fertig`.

@@ -616,7 +616,8 @@ public class OeffentlicherChatSchritte {
     @Dann("enthält das fertig-Ereignis einen Hinweis zur massgebenden Quelle")
     public void hinweisImFertigEreignis() {
         JsonNode fertig = ereignisse.stream().filter(e -> "fertig".equals(e.name())).findFirst().orElseThrow().daten();
-        assertThat(fertig.path("hinweis").asText()).contains("automatisch aus Verbandsdokumenten", "Massgebend",
+        // Standardtext des Testmandanten; den Wortlaut je Mandant prüft OeffentlicherChatResourceTest
+        assertThat(fertig.path("hinweis").asText()).contains("automatisch aus Dokumenten des Archivs", "Massgebend",
                 "Originaldokumente");
     }
 

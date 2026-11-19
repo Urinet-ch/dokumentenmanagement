@@ -32,11 +32,15 @@ class OeffentlicherChatPrueflaufTest {
     private static final String CLIENT = "a".repeat(64);
     private static final UUID DOKUMENT = UUID.fromString("00000000-0000-4000-8000-000000000071");
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final String HINWEIS = "Antworten werden automatisch aus Verbandsdokumenten erstellt. "
+            + "Massgebend sind die verlinkten Originaldokumente.";
 
     private HttpServer server;
     private URI basis;
     private final List<String> anfragen = new CopyOnWriteArrayList<>();
     private final List<String> autorisierungen = new CopyOnWriteArrayList<>();
+    private volatile int fehlerStatus;
+    private volatile String fehlercode;
 
     @BeforeEach
     void serverStarten() throws IOException {
@@ -64,8 +68,8 @@ class OeffentlicherChatPrueflaufTest {
     @Test
     void prueflisteLaeuftGegenAusschliesslichLokalenFakeServer() throws Exception {
         List<Frage> fragen = fragen();
-        Lauf lauf = new OeffentlicherChatPrueflauf(basis, TOKEN, CLIENT, Duration.ZERO, Duration.ofSeconds(5))
-                .laufen(fragen);
+        Lauf lauf = new OeffentlicherChatPrueflauf(basis, TOKEN, CLIENT, Duration.ZERO, Duration.ofSeconds(5),
+                HINWEIS).laufen(fragen);
 
         assertThat(lauf.abgebrochen()).isFalse();
         assertThat(lauf.ergebnisse()).hasSize(40).allSatisfy(e -> {
@@ -81,6 +85,49 @@ class OeffentlicherChatPrueflaufTest {
                 .doesNotContain(TOKEN);
     }
 
+    @Test
+    void brichtBeiGesperrtemSchluesselUndErschoepftemBudgetSofortAb() throws Exception {
+        for (var fall : List.of(new Object[]{403, "ZUGRIFF_VERWEIGERT"}, new Object[]{429, "BUDGET"})) {
+            anfragen.clear();
+            fehlerStatus = (int) fall[0];
+            fehlercode = (String) fall[1];
+            Lauf lauf = new OeffentlicherChatPrueflauf(basis, TOKEN, CLIENT, Duration.ZERO, Duration.ofSeconds(5),
+                    null).laufen(fragen());
+            assertThat(lauf.abgebrochen()).as(fehlercode).isTrue();
+            assertThat(lauf.abbruchStatus()).isEqualTo(fehlerStatus);
+            assertThat(anfragen).as(fehlercode).hasSize(1);
+        }
+    }
+
+    @Test
+    void zuVieleAnfragenBrichtNichtAbSondernWirdAlsFalschGezaehlt() throws Exception {
+        fehlerStatus = 429;
+        fehlercode = "ZU_VIELE_ANFRAGEN";
+        Lauf lauf = new OeffentlicherChatPrueflauf(basis, TOKEN, CLIENT, Duration.ZERO, Duration.ofSeconds(5), null)
+                .laufen(fragen());
+        assertThat(lauf.abgebrochen()).isFalse();
+        assertThat(anfragen).hasSize(40);
+        assertThat(lauf.ergebnisse()).allSatisfy(e -> assertThat(e.antwortRichtig()).isFalse());
+    }
+
+    @Test
+    void frageOhneBelegErwartetKeineQuelleUndHinweisWirdGegenDenMandantentextGeprueft() {
+        ArrayNode katalog = katalog(40);
+        ((ObjectNode) katalog.get(0).path("erwartet")).putArray("quellen");
+        Frage ohneBeleg = OeffentlicheChatPruefliste.aus(katalog).getFirst();
+        assertThat(ohneBeleg.quellen()).isEmpty();
+
+        var antwort = new OeffentlicherChatPrueflauf.Antwort(200, "Testwert 2071 bei der Geschäftsstelle", List.of(),
+                true, " " + HINWEIS + " ", null);
+        var ergebnis = OeffentlicherChatPrueflauf.bewerten(ohneBeleg, antwort, HINWEIS);
+        assertThat(ergebnis.quellenRichtig()).isTrue();
+        assertThat(ergebnis.hinweisRichtig()).isTrue();
+        assertThat(OeffentlicherChatPrueflauf.bewerten(ohneBeleg, antwort, "Anderer Mandantentext").hinweisRichtig())
+                .isFalse();
+        var ohneHinweis = new OeffentlicherChatPrueflauf.Antwort(200, "Testwert 2071", List.of(), true, " ", null);
+        assertThat(OeffentlicherChatPrueflauf.bewerten(ohneBeleg, ohneHinweis, null).hinweisRichtig()).isFalse();
+    }
+
     private void behandeln(HttpExchange x) throws IOException {
         try (x) {
             autorisierungen.add(x.getRequestHeaders().getFirst("Authorization"));
@@ -93,6 +140,14 @@ class OeffentlicherChatPrueflaufTest {
                 x.sendResponseHeaders(401, -1);
                 return;
             }
+            if (fehlerStatus != 0) {
+                byte[] problem = JSON.writeValueAsString(JSON.createObjectNode().put("status", fehlerStatus)
+                        .put("fehlercode", fehlercode)).getBytes(StandardCharsets.UTF_8);
+                x.getResponseHeaders().add("Content-Type", "application/problem+json");
+                x.sendResponseHeaders(fehlerStatus, problem.length);
+                x.getResponseBody().write(problem);
+                return;
+            }
             byte[] strom = strom().getBytes(StandardCharsets.UTF_8);
             x.getResponseHeaders().add("Content-Type", "text/event-stream; charset=utf-8");
             x.sendResponseHeaders(200, strom.length);
@@ -102,8 +157,7 @@ class OeffentlicherChatPrueflaufTest {
 
     private static String strom() throws IOException {
         String text = JSON.writeValueAsString("Die Nordbahn wurde nach Testwert 2071 erneuert.");
-        String hinweis = JSON.writeValueAsString("Antworten werden automatisch aus Verbandsdokumenten erstellt. "
-                + "Massgebend sind die verlinkten Originaldokumente.");
+        String hinweis = JSON.writeValueAsString(HINWEIS);
         ObjectNode quelle = JSON.createObjectNode().put("dokumentId", DOKUMENT.toString())
                 .put("titel", "Synthetisches Testdokument").put("ausgabe", "1/2071").put("jahr", 2071);
         quelle.putObject("reihe").put("code", "TEST").put("name", "Testreihe");

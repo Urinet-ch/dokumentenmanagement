@@ -54,8 +54,11 @@ public final class OeffentlicherChatPrueflauf {
     private final String clientHash;
     private final Duration pause;
     private final Duration frist;
+    private final String erwarteterHinweis;
 
-    public OeffentlicherChatPrueflauf(URI basis, String token, String clientHash, Duration pause, Duration frist) {
+    /** @param erwarteterHinweis Wortlaut von {@code fertig.hinweis} des Mandanten; {@code null}: nur «nicht leer» prüfen */
+    public OeffentlicherChatPrueflauf(URI basis, String token, String clientHash, Duration pause, Duration frist,
+                                      String erwarteterHinweis) {
         if (token == null || token.isBlank()) {
             throw new IllegalArgumentException("Kein Zugriffstoken");
         }
@@ -67,6 +70,8 @@ public final class OeffentlicherChatPrueflauf {
         this.clientHash = clientHash;
         this.pause = pause;
         this.frist = frist;
+        this.erwarteterHinweis = erwarteterHinweis == null || erwarteterHinweis.isBlank() ? null
+                : erwarteterHinweis.strip();
     }
 
     public Lauf laufen(List<Frage> fragen) throws InterruptedException {
@@ -78,12 +83,21 @@ public final class OeffentlicherChatPrueflauf {
             }
             erste = false;
             Antwort antwort = fragen(frage.frage());
-            if (antwort.status() == 401) {
-                return new Lauf(List.copyOf(ergebnisse), true, 401);
+            if (aussichtslos(antwort)) {
+                return new Lauf(List.copyOf(ergebnisse), true, antwort.status());
             }
-            ergebnisse.add(bewerten(frage, antwort));
+            ergebnisse.add(bewerten(frage, antwort, erwarteterHinweis));
         }
         return new Lauf(List.copyOf(ergebnisse), false, 0);
+    }
+
+    /**
+     * Abbruch statt stundenlangem Weiterlaufen: 401 (Schlüssel ungültig), 403 (Schlüssel gesperrt, ohne Scope oder Stufe)
+     * und 429 {@code BUDGET} (Monatsbudget erschöpft) ändern sich während des Laufs nicht.
+     */
+    static boolean aussichtslos(Antwort antwort) {
+        return antwort.status() == 401 || antwort.status() == 403
+                || antwort.status() == 429 && "HTTP 429 BUDGET".equals(antwort.fehlermeldung());
     }
 
     Antwort fragen(String frage) {
@@ -101,7 +115,9 @@ public final class OeffentlicherChatPrueflauf {
             HttpResponse<InputStream> r = client.send(anfrage, HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream rumpf = r.body()) {
                 if (r.statusCode() != 200) {
-                    return new Antwort(r.statusCode(), "", List.of(), false, null, "HTTP " + r.statusCode());
+                    String code = fehlercode(rumpf);
+                    return new Antwort(r.statusCode(), "", List.of(), false, null,
+                            "HTTP " + r.statusCode() + (code == null ? "" : " " + code));
                 }
                 return lesen(rumpf);
             }
@@ -110,6 +126,16 @@ public final class OeffentlicherChatPrueflauf {
             return new Antwort(0, "", List.of(), false, null, "unterbrochen");
         } catch (IOException | RuntimeException e) {
             return new Antwort(0, "", List.of(), false, null, e.getClass().getSimpleName());
+        }
+    }
+
+    /** Nur der Fehlercode der Problem Details (z. B. {@code BUDGET}); sonst {@code null}. */
+    private static String fehlercode(InputStream rumpf) {
+        try {
+            String code = JSON.readTree(rumpf.readNBytes(16 * 1024)).path("fehlercode").asString(null);
+            return code != null && code.matches("[A-Z_]{1,40}") ? code : null;
+        } catch (IOException | RuntimeException e) {
+            return null;
         }
     }
 
@@ -161,7 +187,7 @@ public final class OeffentlicherChatPrueflauf {
                 seite.isTextual() ? seite.asString() : null);
     }
 
-    static Ergebnis bewerten(Frage frage, Antwort antwort) {
+    static Ergebnis bewerten(Frage frage, Antwort antwort, String erwarteterHinweis) {
         String text = normal(antwort.text());
         List<String> fehlend = frage.kernwerte().stream().filter(k -> !text.contains(normal(k))).toList();
         List<String> fehlendeQuellen = new ArrayList<>();
@@ -174,9 +200,8 @@ public final class OeffentlicherChatPrueflauf {
         boolean statusOk = antwort.status() == 200 && antwort.fertig() && antwort.fehlermeldung() == null;
         boolean alleQuellenErwartet = antwort.quellen().size() == frage.quellen().size()
                 && antwort.quellen().stream().allMatch(g -> frage.quellen().stream().anyMatch(e -> quellePasst(e, g)));
-        boolean hinweisOk = antwort.hinweis() != null
-                && antwort.hinweis().contains("automatisch aus Verbandsdokumenten")
-                && antwort.hinweis().contains("Massgebend");
+        boolean hinweisOk = antwort.hinweis() != null && !antwort.hinweis().isBlank()
+                && (erwarteterHinweis == null || erwarteterHinweis.equals(antwort.hinweis().strip()));
         return new Ergebnis(frage, antwort, statusOk && fehlend.isEmpty(), statusOk && alleQuellenErwartet,
                 statusOk && hinweisOk, fehlend, List.copyOf(fehlendeQuellen));
     }

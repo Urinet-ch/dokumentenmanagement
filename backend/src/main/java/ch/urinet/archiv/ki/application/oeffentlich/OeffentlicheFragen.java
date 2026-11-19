@@ -105,6 +105,10 @@ public class OeffentlicheFragen {
         this.einstellungen = einstellungen;
         this.konfiguration = konfiguration;
         this.maxFrage = maxFrage;
+        if (konfiguration.getOptionalValue("archiv.webseite.chat.geschaeftsstelle", String.class).isPresent()) {
+            LOG.warn("archiv.webseite.chat.geschaeftsstelle wird nicht mehr gelesen; den Kontakt je Mandant unter "
+                    + "archiv.mandant.<code>.chat-geschaeftsstelle setzen");
+        }
     }
 
     /** Angenommene Frage: Gespräch, Anfrage an den Agenten und belegter Platz (bis {@link #starten} ihn freigibt). */
@@ -272,7 +276,7 @@ public class OeffentlicheFragen {
     }
 
     private String kontakt(MandantCode mandant) {
-        return konfiguration.getOptionalValue("archiv.mandant." + mandant.wert() + ".chat.geschaeftsstelle",
+        return konfiguration.getOptionalValue("archiv.mandant." + mandant.wert() + ".chat-geschaeftsstelle",
                 String.class).map(OeffentlicheFragen::ohneSteuerzeichen).filter(k -> !k.isEmpty())
                 .map(k -> " (" + k + ")").orElse("");
     }

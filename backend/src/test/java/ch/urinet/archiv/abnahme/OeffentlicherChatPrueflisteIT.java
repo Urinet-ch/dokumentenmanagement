@@ -36,7 +36,10 @@ class OeffentlicherChatPrueflisteIT {
                 .isGreaterThanOrEqualTo(Duration.ofMinutes(3));
         List<Frage> fragen = OeffentlicheChatPruefliste.lesen(golden.resolve("oeffentlicher-chat-pruefliste.yaml"));
 
-        Lauf lauf = new OeffentlicherChatPrueflauf(basis, token, clientHash, pause, Duration.ofMinutes(2)).laufen(fragen);
+        String hinweis = System.getenv("ARCHIV_OEFFENTLICHER_CHAT_HINWEIS");
+
+        Lauf lauf = new OeffentlicherChatPrueflauf(basis, token, clientHash, pause, Duration.ofMinutes(2), hinweis)
+                .laufen(fragen);
         Map<String, Path> dateien = OeffentlicherChatPrueflauf.schreiben(lauf, golden);
 
         System.out.println("ÖFFENTLICHE PRÜFLISTE Repo-Teil (ohne Inhalte):");
