@@ -393,8 +393,13 @@ public class MailSchritte {
 
     @Dann("hat das Archiv im Mandanten «{word}» zur Mail genau ein Dokument angelegt")
     public void genauEines(String mandant) throws SQLException {
-        assertThat(dokumentIds(mandant, nachrichten.getLast())).hasSize(1);
-        assertThat(emailDokumente(mandant)).isEqualTo(vorher.get(mandant) + 1);
+        String messageId = nachrichten.getLast();
+        List<UUID> ids = dokumentIds(mandant, messageId);
+        long gesamt = emailDokumente(mandant);
+        long erwartet = vorher.get(mandant) + 1;
+        String diagnose = ids.size() == 1 && gesamt == erwartet ? "" : mailDiagnose(mandant, messageId);
+        assertThat(ids).as("Mail-Eingang: %s", diagnose).hasSize(1);
+        assertThat(gesamt).as("Mail-Eingang: %s", diagnose).isEqualTo(erwartet);
         // Stand für die nächste Mail desselben Szenarios
         vorher.put(mandant, vorher.get(mandant) + 1);
     }
@@ -686,6 +691,25 @@ public class MailSchritte {
                 return Arrays.asList((UUID[]) ids.getArray());
             }
         }
+    }
+
+    private String mailDiagnose(String mandant, String messageId) throws SQLException {
+        String status = "kein Eintrag";
+        String dokumente = "kein Eintrag";
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select status, dokument_ids from " + schema(mandant)
+                        + ".mail_eingang where message_id = ?")) {
+            abfrage.setString(1, gespeichert(messageId));
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                if (zeile.next()) {
+                    status = zeile.getString(1);
+                    Array ids = zeile.getArray(2);
+                    dokumente = ids == null ? "null" : Arrays.asList((UUID[]) ids.getArray()).toString();
+                }
+            }
+        }
+        return "message_id=" + gespeichert(messageId) + ", status=" + status + ", dokument_ids=" + dokumente
+                + ", dokumente_email=" + emailDokumente(mandant);
     }
 
     private String status(String mandant, String messageId) throws SQLException {

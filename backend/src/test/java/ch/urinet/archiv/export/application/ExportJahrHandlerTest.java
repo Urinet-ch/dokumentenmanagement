@@ -140,9 +140,12 @@ class ExportJahrHandlerTest {
             assertThat(speichern.fehlerExportId).isEqualTo(EXPORT_ID);
             assertThat(speichern.fehlerId).isEqualTo(FEHLER_ID);
             assertThat(speichern.fehlerart).isEqualTo(ExportFehlerart.VERWAIST);
-            assertThat(log.eintraege()).filteredOn(e -> ExportJahrHandler.class.getName().equals(e.getLoggerName()))
-                    .singleElement().satisfies(e -> assertThat(log.nachricht(e))
-                            .isEqualTo("Export " + EXPORT_ID + " gescheitert (fehler-id=" + FEHLER_ID + ", art=VERWAIST)"));
+            List<String> meldungen = log.eintraege().stream()
+                    .filter(e -> ExportJahrHandler.class.getName().equals(e.getLoggerName()))
+                    .map(log::nachricht)
+                    .toList();
+            assertThat(meldungen).as("Logmeldungen von ExportJahrHandler")
+                    .containsExactly("Export " + EXPORT_ID + " gescheitert (fehler-id=" + FEHLER_ID + ", art=VERWAIST)");
         }
     }
 
