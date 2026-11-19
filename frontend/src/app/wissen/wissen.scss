@@ -4,4 +4,4 @@ input, select, button { max-width: 100%; min-height: 2.75rem; }
 section { margin-block: 1.5rem; }
 li { margin-block: .75rem; }
 nav { margin-block: 1rem; }
-.wissen-text { white-space: pre-wrap; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }

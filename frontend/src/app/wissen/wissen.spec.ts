@@ -57,12 +57,12 @@ describe('Wissensoberfläche', () => {
   });
 
   it('übernimmt nur interne Wissenslinks und stellt fremde Inhalte als Text dar', () => {
-    const teile = wissenText('<p>Text <a href="/wissen/konzepte/probe">Probe</a> '
+    const teile = wissenText('<p>Text <a href="/konzepte/probe">Probe</a> '
       + '<a href="javascript:alert(1)">Fremd</a><script>unsichtbar</script></p>');
-    expect(teile).toEqual([[
-      { text: 'Text ' }, { text: 'Probe', pfad: '/wissen/konzepte/probe' },
-      { text: ' ' }, { text: 'Fremd' },
-    ]]);
+    expect(teile).toEqual([{ art: 'p', kinder: [
+      { art: 'text', text: 'Text ' }, { art: 'link', text: 'Probe', pfad: '/wissen/konzepte/probe' },
+      { art: 'text', text: ' ' }, { art: 'text', text: 'Fremd' },
+    ] }]);
   });
 
   it('zeigt Quellendokumente mit Seitennummer und filtert die Darstellung auf Text und interne Links', async () => {
@@ -72,7 +72,8 @@ describe('Wissensoberfläche', () => {
     const seite = http.expectOne((r) => r.url === '/api/v1/wissensseiten');
     expect(seite.request.params.get('pfad')).toBe('konzepte/probe');
     seite.flush({
-      id: 's1', titel: 'Probe', inhaltHtml: '<p>Belegt <a href="/wissen/ueberblick">Überblick</a>'
+      id: 's1', titel: 'Probe', inhaltHtml: '<h2>Abschnitt</h2><ul><li>Eintrag</li></ul>'
+        + '<p>Belegt <a href="/ueberblick">Überblick</a>'
         + '<sup class="footnote-ref"><a href="#fn-q1" data-footnote-ref>1</a></sup></p>'
         + '<section data-footnotes><ol><li><p>q1 <a href="#fnref-q1">↩</a></p></li></ol></section>',
       quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3 }], quellePruefen: true,
@@ -84,6 +85,8 @@ describe('Wissensoberfläche', () => {
     const element = fixture.nativeElement as HTMLElement;
     expect(element.textContent).toContain(TEXTE.wissen.quellePruefen);
     expect(element.querySelector('article')?.textContent).toContain('Belegt');
+    expect(element.querySelector('article h2')?.textContent).toBe('Abschnitt');
+    expect(element.querySelector('article ul > li')?.textContent).toBe('Eintrag');
     expect(element.querySelector('article a')?.getAttribute('href')).toBe('/wissen/ueberblick');
     expect(element.querySelector('article a[href*="/dokument/d1"]')?.getAttribute('href'))
       .toBe('/dokument/d1?seite=3');

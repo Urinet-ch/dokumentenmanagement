@@ -24,7 +24,8 @@ Given('synthetische Wissensseiten sind für die Oberfläche verfügbar', async f
     } else if (url.searchParams.has('pfad')) {
       antwort = {
         ...zeile, version: 1, freigegebenAm: '2026-01-01T10:00:00Z',
-        inhaltHtml: '<p>Belegte Aussage.<sup class="footnote-ref">'
+        inhaltHtml: '<h2>Aussagen</h2><ul><li>Synthetischer Eintrag</li></ul>'
+          + '<p>Belegte Aussage. <a href="/ueberblick">Überblick</a><sup class="footnote-ref">'
           + '<a href="#fn-q1" data-footnote-ref>1</a></sup></p>',
         quellen: [{ schluessel: 'q1', dokumentId: dokument.id, seiteVon: 2 }],
       };
@@ -62,6 +63,9 @@ Then('sind Index, Seite, Quellen und Log ohne horizontales Scrollen und ohne axe
   await pruefen(seite);
   await seite.getByRole('link', { name: zeile.titel }).click();
   await seite.getByRole('heading', { name: zeile.titel }).waitFor();
+  await seite.getByRole('heading', { name: 'Aussagen' }).waitFor();
+  assert.equal(await seite.locator('article').getByRole('link', { name: 'Überblick' }).getAttribute('href'),
+    '/wissen/ueberblick');
   await pruefen(seite);
   const fussnote = seite.locator('article').getByRole('link', { name: `[1] ${dokument.titel} · Seite 2` });
   assert.equal(await fussnote.getAttribute('href'), `/dokument/${dokument.id}?seite=2`);

@@ -17,24 +17,8 @@
     <p>{{ texte.freigegeben }}: {{ zeitpunkt(inhalt.seite.freigegebenAm) }}</p>
   }
   <article>
-    @for (abschnitt of inhalt.text; track $index) {
-      <p class="wissen-text">
-        @for (teil of abschnitt; track $index) {
-          @if (teil.pfad) { <a [routerLink]="teil.pfad">{{ teil.text }}</a> }
-          @else if (inhalt.quellenNachSchluessel.get(teil.quelle ?? ''); as quelle) {
-            @if (quelle.dokumentId) {
-              <a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}"
-                [attr.aria-label]="teil.text + ' ' + quelle.titel + (quelle.seite ? ' · ' + texte.seite(quelle.seite) : '')">
-                {{ teil.text }}
-              </a>
-            } @else if (quelle.pfad) {
-              <a [routerLink]="'/wissen/' + quelle.pfad" [attr.aria-label]="teil.text + ' ' + quelle.titel">{{ teil.text }}</a>
-            } @else { {{ teil.text }} }
-          }
-          @else { {{ teil.text }} }
-        }
-      </p>
-    }
+    <ng-container [ngTemplateOutlet]="textbaum"
+      [ngTemplateOutletContext]="{ $implicit: inhalt.text, quellen: inhalt.quellenNachSchluessel }" />
   </article>
   <section>
     <h2>{{ texte.quellen }}</h2>
@@ -82,14 +66,42 @@
     @if (versionsText(); as version) {
       <h3>{{ texte.version(version.nummer) }}</h3>
       <button type="button" (click)="versionSchliessen()">{{ texte.versionSchliessen }}</button>
-      @for (abschnitt of version.text; track $index) {
-        <p class="wissen-text">
-          @for (teil of abschnitt; track $index) {
-            @if (teil.pfad) { <a [routerLink]="teil.pfad">{{ teil.text }}</a> }
-            @else { {{ teil.text }} }
-          }
-        </p>
-      }
+      <ng-container [ngTemplateOutlet]="textbaum"
+        [ngTemplateOutletContext]="{ $implicit: version.text, quellen: null }" />
     }
+    <ng-template #textbaum let-teile let-quellen="quellen">
+      @for (teil of teile; track $index) {
+        @switch (teil.art) {
+          @case ('text') {<ng-container>{{ teil.text }}</ng-container>}
+          @case ('link') { <a [routerLink]="teil.pfad">{{ teil.text }}</a> }
+          @case ('quelle') {
+            @if (quellen?.get(teil.quelle); as quelle) {
+              @if (quelle.dokumentId) {
+                <a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}"
+                  [attr.aria-label]="teil.text + ' ' + quelle.titel + (quelle.seite ? ' · ' + texte.seite(quelle.seite) : '')">{{ teil.text }}</a>
+              } @else if (quelle.pfad) {
+                <a [routerLink]="'/wissen/' + quelle.pfad" [attr.aria-label]="teil.text + ' ' + quelle.titel">{{ teil.text }}</a>
+              } @else {<ng-container>{{ teil.text }}</ng-container>}
+            } @else {<ng-container>{{ teil.text }}</ng-container>}
+          }
+          @case ('p') { <p><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></p> }
+          @case ('h1') { <h2><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h2> }
+          @case ('h2') { <h2><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h2> }
+          @case ('h3') { <h3><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h3> }
+          @case ('h4') { <h4><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h4> }
+          @case ('h5') { <h5><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h5> }
+          @case ('h6') { <h6><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h6> }
+          @case ('ul') { <ul><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></ul> }
+          @case ('ol') { <ol><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></ol> }
+          @case ('li') { <li><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></li> }
+          @case ('blockquote') { <blockquote><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></blockquote> }
+          @case ('pre') { <pre><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></pre> }
+          @case ('em') { <em><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></em> }
+          @case ('strong') { <strong><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></strong> }
+          @case ('code') { <code><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></code> }
+          @case ('br') { <br> }
+        }
+      }
+    </ng-template>
   </section>
 }

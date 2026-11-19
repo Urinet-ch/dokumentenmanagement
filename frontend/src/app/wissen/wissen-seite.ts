@@ -1,4 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
@@ -20,7 +21,7 @@ interface Quelle {
 
 interface Inhalt {
   seite: Wissensseite;
-  text: Textteil[][];
+  text: Textteil[];
   quellen: Quelle[];
   quellenNachSchluessel: Map<string, Quelle>;
   eingehend: WissensIndexZeile[];
@@ -29,7 +30,7 @@ interface Inhalt {
 
 @Component({
   selector: 'app-wissen-seite',
-  imports: [RouterLink],
+  imports: [RouterLink, NgTemplateOutlet],
   templateUrl: './wissen-seite.html',
   styleUrl: './wissen.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,7 +46,7 @@ export class WissenSeite {
   protected readonly inhalt = signal<Inhalt | null>(null);
   protected readonly fehler = signal<string | null>(null);
   protected readonly laedt = signal(false);
-  protected readonly versionsText = signal<{ nummer: number; text: Textteil[][] } | null>(null);
+  protected readonly versionsText = signal<{ nummer: number; text: Textteil[] } | null>(null);
   protected readonly versionsFehler = signal<string | null>(null);
   protected readonly versionLaedt = signal(false);
   private anfrage = 0;

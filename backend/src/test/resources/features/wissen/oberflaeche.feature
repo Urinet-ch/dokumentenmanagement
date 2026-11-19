@@ -1,3 +1,4 @@
+# language: de
 @spec-04 @browser
 Funktionalität: Wissensbasis auf schmalen Bildschirmen lesen
 
