@@ -6,9 +6,8 @@ Funktionalität: Verwaltungsseiten für Dokumentarten
   Hintergrund:
     Angenommen die Verwaltungsseite liefert synthetische Konfigurationsdaten
     Und die Verwaltungsseite wird auf 375 px geprüft
-    Und Keycloak kennt mich als «inhaber» im Mandanten «urinet»
     Und ich die Seite «/verwaltung/dokumentarten» öffne
-    Und ich mich anmelde
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
 
   @req-7.3
   Szenario: Eine Regel wird mit der aktuellen Konfigurationsversion gespeichert
