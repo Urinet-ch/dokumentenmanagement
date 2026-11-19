@@ -134,7 +134,7 @@ public interface WissenIngestPort {
                            Wissensseite daten, String begruendung, List<KiPort.Widerspruch> widersprueche,
                            List<KiPort.EntfernteAussage> entfernteAussagen,
                            List<WissensPruefung.Befund> befunde, List<WissensPruefung.Hinweis> hinweise,
-                           String vertraulichkeitKontext) {
+                           String vertraulichkeitKontext, DiffDienst.Diff diff) {
         public SeitenVorschlag {
             widersprueche = widersprueche == null ? List.of() : List.copyOf(widersprueche);
             entfernteAussagen = entfernteAussagen == null ? List.of() : List.copyOf(entfernteAussagen);
@@ -160,7 +160,7 @@ public interface WissenIngestPort {
     record NeueAenderung(UUID entwurfId, int nummer, String aktion, UUID seiteId, String pfad, Integer basisVersion,
                          Wissensseite daten, String begruendung, List<KiPort.Widerspruch> widersprueche,
                          List<KiPort.EntfernteAussage> entfernteAussagen, List<WissensPruefung.Befund> befunde,
-                         List<WissensPruefung.Hinweis> hinweise, String diff, String vertraulichkeitKontext) {
+                         List<WissensPruefung.Hinweis> hinweise, DiffDienst.Diff diff, String vertraulichkeitKontext) {
         public NeueAenderung {
             widersprueche = widersprueche == null ? List.of() : List.copyOf(widersprueche);
             entfernteAussagen = entfernteAussagen == null ? List.of() : List.copyOf(entfernteAussagen);

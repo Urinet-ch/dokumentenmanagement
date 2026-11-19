@@ -67,13 +67,15 @@ public class WissenIngestVerarbeiten {
     private final WissenKonfiguration konfiguration;
     private final KiPort ki;
     private final KiVerbrauchPort verbrauch;
+    private final DiffDienst diffDienst;
 
     public WissenIngestVerarbeiten(WissenIngestSpeichern speichern, WissenKonfiguration konfiguration,
-                                   KiPort ki, KiVerbrauchPort verbrauch) {
+                                   KiPort ki, KiVerbrauchPort verbrauch, DiffDienst diffDienst) {
         this.speichern = speichern;
         this.konfiguration = konfiguration;
         this.ki = ki;
         this.verbrauch = verbrauch;
+        this.diffDienst = diffDienst;
     }
 
     public void ausfuehren(Auftrag auftrag, UUID entwurfId) throws InterruptedException {
@@ -412,7 +414,8 @@ public class WissenIngestVerarbeiten {
             Wissensseite daten = seiteAusFassung(fassung, lauf, stand.quellStufe(), true);
             SeitenVorschlag entwurf = new SeitenVorschlag(index + 1, "VERALTEN", plan.seiteId(), plan.pfad(),
                     plan.basisVersion(), daten, plan.grund(), List.of(), List.of(), List.of(), List.of(),
-                    stand.quellStufe().name());
+                    stand.quellStufe().name(), diffDienst.vergleichen(seiteAusFassung(fassung, lauf,
+                            stand.quellStufe(), false), daten));
             speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "SEITE",
                     mitVorschlag(bisher, entwurf, index + 1, null), lauf.tokensEin(), lauf.tokensAus(), false, null);
             return;
@@ -579,8 +582,10 @@ public class WissenIngestVerarbeiten {
         for (SeitenVorschlag vorschlag : fortschritt.vorschlaege()) {
             SeitenMetadaten bisherige = vorschlag.seiteId() == null ? null : seitenNachPfad.get(vorschlag.pfad());
             SeitenFassung fassung = vorschlag.seiteId() == null ? null : stand.fassungen().get(vorschlag.seiteId());
-            Set<String> basis = fassung == null ? Set.of()
-                    : fassung.quellen().stream().map(Quelleneintrag::schluessel).collect(java.util.stream.Collectors.toSet());
+            List<Quelleneintrag> basisQuellen = vorschlag.diff() != null ? vorschlag.diff().quellen().alt()
+                    : fassung == null ? List.of() : fassung.quellen();
+            Set<String> basis = basisQuellen.stream().map(Quelleneintrag::schluessel)
+                    .collect(java.util.stream.Collectors.toSet());
             Set<String> entfernt = vorschlag.entfernteAussagen().stream().map(KiPort.EntfernteAussage::schluessel)
                     .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
             boolean quelleSeite = vorschlag.daten() != null && vorschlag.daten().typ() == Seitentyp.QUELLE
@@ -605,7 +610,18 @@ public class WissenIngestVerarbeiten {
             befunde.addAll(pruefung.befunde());
             List<WissensPruefung.Hinweis> hinweise = new ArrayList<>(vorschlag.hinweise());
             hinweise.addAll(pruefung.hinweise());
-            String diff = "{}";
+            DiffDienst.Diff diff = vorschlag.diff();
+            if (diff == null) {
+                if (vorschlag.seiteId() != null && (fassung == null || vorschlag.basisVersion() == null
+                        || fassung.metadaten().version() != vorschlag.basisVersion())) {
+                    speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt,
+                            "Die Basisversion für den Diff ist nicht mehr verfügbar. Bitte den Ingest neu starten.");
+                    return;
+                }
+                Wissensseite basisSeite = fassung == null ? null : seiteAusFassung(fassung, lauf,
+                        stand.quellStufe(), false);
+                diff = diffDienst.vergleichen(basisSeite, vorschlag.daten());
+            }
             aenderungen.add(new NeueAenderung(lauf.entwurfId(), vorschlag.nummer(), vorschlag.aktion(),
                     vorschlag.seiteId(), vorschlag.pfad(), vorschlag.basisVersion(), vorschlag.daten(),
                     vorschlag.begruendung(), vorschlag.widersprueche(), vorschlag.entfernteAussagen(),
@@ -724,7 +740,8 @@ public class WissenIngestVerarbeiten {
                 !inhalt.widersprueche().isEmpty(), bisherige == null ? null : bisherige.wissensquelleId());
         return new SeitenVorschlag(nummer, plan.aktion(), plan.seiteId(), plan.pfad(), plan.basisVersion(),
                 daten, inhalt.begruendung(), inhalt.widersprueche(), inhalt.entfernteAussagen(),
-                List.copyOf(befunde), List.of(), stufe.name());
+                List.copyOf(befunde), List.of(), stufe.name(), diffDienst.vergleichen(
+                        bisherige == null ? null : seiteAusFassung(bisherige, lauf, stufe, false), daten));
     }
 
     /**
@@ -815,7 +832,8 @@ public class WissenIngestVerarbeiten {
                     Instant.now(), null, null, false, false, lauf.dokumentId());
             return new SeitenVorschlag(nummer, "AENDERN", m.id(), m.pfad(), m.version(), daten,
                     "Aktualisierung der Quelle-Seite nach erneutem Ingest", List.of(), entfernt, List.copyOf(befunde),
-                    List.of(), stand.quellStufe().name());
+                    List.of(), stand.quellStufe().name(), diffDienst.vergleichen(
+                            seiteAusFassung(bestehende, lauf, stand.quellStufe(), false), daten));
         }
         String slug = slug(inhalt.titel());
         if (slug.isEmpty()) {
@@ -834,7 +852,7 @@ public class WissenIngestVerarbeiten {
                 lauf.dokumentId());
         return new SeitenVorschlag(nummer, "NEU", null, pfad, null, daten,
                 "Zusammenfassung der Wissensquelle", List.of(), List.of(), List.copyOf(befunde), List.of(),
-                stand.quellStufe().name());
+                stand.quellStufe().name(), diffDienst.vergleichen(null, daten));
     }
 
     private static Quelleneintrag eintrag(Kernaussage aussage, UUID dokumentId) {
@@ -902,7 +920,7 @@ public class WissenIngestVerarbeiten {
         List<WissensPruefung.Hinweis> hinweise = hinweis == null ? List.of()
                 : List.of(new WissensPruefung.Hinweis(hinweis, meldung));
         return new SeitenVorschlag(nummer, plan.aktion(), null, plan.pfad(), null, daten, plan.grund(),
-                List.of(), List.of(), befunde, hinweise, stand.quellStufe().name());
+                List.of(), List.of(), befunde, hinweise, stand.quellStufe().name(), diffDienst.vergleichen(null, daten));
     }
 
     private Wissensseite seiteAusFassung(SeitenFassung fassung, Lauf lauf, WissensStufe stufe,

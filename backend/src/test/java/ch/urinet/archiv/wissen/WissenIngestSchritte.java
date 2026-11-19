@@ -289,7 +289,8 @@ public class WissenIngestSchritte {
     @Dann("aktualisiert der Ingest die Quelle-Seite von «{word}» ohne Befund")
     public void quelleSeiteAktualisiert(String name) throws SQLException {
         String kurz = ort(name).id().toString().substring(0, 8);
-        Map<String, Object> aenderung = zeile("select aktion, seite_id, basis_version, inhalt, befunde::text as befunde, "
+        Map<String, Object> aenderung = zeile("select aktion, seite_id, basis_version, inhalt, diff::text as diff, "
+                + "befunde::text as befunde, "
                 + "entfernte_aussagen::text as entfernt from m_urinet.wissens_aenderung where entwurf_id = ? and pfad = ?", entwurfId,
                 "quellen/2026-04-fristen-" + kurz);
         assertThat(aenderung).containsEntry("aktion", "AENDERN").containsEntry("basis_version", 2);
@@ -298,6 +299,8 @@ public class WissenIngestSchritte {
                 "- Die Abgabefrist endet am 30. April. [^q-" + kurz + "-100]").doesNotContain("Frühere Fassung");
         assertThat((String) aenderung.get("entfernt")).contains("\"q-" + kurz + "-1\"")
                 .doesNotContain("q-" + kurz + "-99");
+        assertThat((String) aenderung.get("diff")).contains("Frühere Fassung der Frist",
+                "Die Abgabefrist endet am 30. April.", "\"zeilen\"", "\"quellen\"");
         assertThat(String.valueOf(aenderung.get("befunde")))
                 .doesNotContain("QUELLE_NICHT_BELEGT", "AUSSAGE_ENTFERNT", "QUELLE_UNGUELTIG");
         assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "

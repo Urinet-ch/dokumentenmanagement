@@ -11,10 +11,13 @@ import ch.urinet.archiv.wissen.application.WissenIngestPort.SeitenFassung;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.SeitenMetadaten;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.SeitenVorschlag;
 import ch.urinet.archiv.wissen.application.WissenIngestSpeichern.Stand;
+import ch.urinet.archiv.wissen.adapter.out.diff.JavaWissenZeilendiff;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.WissensGraph;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -216,7 +219,7 @@ class WissenIngestVerarbeitenTest {
     }
 
     @Test
-    void erneuterIngestBehaeltFruehereAussagenUndErsetztNurDieselbeTextstelle() throws InterruptedException {
+    void erneuterIngestBehaeltFruehereAussagenUndErsetztNurDieselbeTextstelle() throws Exception {
         UUID seiteId = UUID.randomUUID();
         SeitenMetadaten metadaten = new SeitenMetadaten(seiteId, "quellen/2026-04-alt-12345678", "Quelle",
                 "Alt", "Alt", List.of(), "AKTIV", 3, null);
@@ -252,13 +255,40 @@ class WissenIngestVerarbeitenTest {
                 .singleElement().extracting(KiPort.EntfernteAussage::begruendung)
                 .isEqualTo("Durch [^q-neu] mit derselben Textstelle ersetzt.");
 
-        Speicher abschluss = new Speicher(stand(lauf("ABSCHLUSS", false, speichern.fortschritt), 0,
-                WissensStufe.NORMAL, List.of(metadaten), Map.of(seiteId, fassung)));
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        Fortschritt gespeichert = mapper.readValue(mapper.writeValueAsString(speichern.fortschritt), Fortschritt.class);
+        assertThat(gespeichert).isEqualTo(speichern.fortschritt);
+        SeitenMetadaten spaetereMetadaten = new SeitenMetadaten(seiteId, metadaten.pfad(), "Quelle",
+                "Später geändert", "Später geändert", List.of(), "AKTIV", 4, null);
+        SeitenFassung spaetereFassung = new SeitenFassung(spaetereMetadaten, "Späterer Inhalt",
+                DOKUMENT_ID, List.of());
+        Speicher abschluss = new Speicher(stand(lauf("ABSCHLUSS", false, gespeichert), 0,
+                WissensStufe.NORMAL, List.of(spaetereMetadaten), Map.of(seiteId, spaetereFassung)));
         verarbeiten(abschluss, new KiAntwort(null), new Verbrauch()).ausfuehren(null, ENTWURF_ID);
 
-        assertThat(abschluss.aenderungen).singleElement().satisfies(aenderung ->
-                assertThat(aenderung.befunde()).extracting(WissensPruefung.Befund::code).doesNotContain(
-                        WissensPruefung.Code.QUELLE_NICHT_BELEGT, WissensPruefung.Code.AUSSAGE_ENTFERNT));
+        assertThat(abschluss.aenderungen).singleElement().satisfies(aenderung -> {
+            assertThat(aenderung.befunde()).extracting(WissensPruefung.Befund::code).doesNotContain(
+                    WissensPruefung.Code.QUELLE_NICHT_BELEGT, WissensPruefung.Code.AUSSAGE_ENTFERNT);
+            assertThat(aenderung.basisVersion()).isEqualTo(3);
+            assertThat(aenderung.diff().titel().alt()).isEqualTo("Alt");
+            assertThat(aenderung.diff().zeilen()).flatExtracting(WissenZeilendiff.Aenderung::alt)
+                    .contains("- Frühere Fassung. [^q-gleich]");
+        });
+
+        ObjectNode alteDaten = mapper.valueToTree(gespeichert);
+        ((ObjectNode) alteDaten.path("vorschlaege").get(0)).remove("diff");
+        Fortschritt alterFortschritt = mapper.treeToValue(alteDaten, Fortschritt.class);
+        Speicher unveraenderterAbschluss = new Speicher(stand(lauf("ABSCHLUSS", false, alterFortschritt), 0,
+                WissensStufe.NORMAL, List.of(metadaten), Map.of(seiteId, fassung)));
+        verarbeiten(unveraenderterAbschluss, new KiAntwort(null), new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+        assertThat(unveraenderterAbschluss.aenderungen).singleElement().satisfies(aenderung ->
+                assertThat(aenderung.diff().titel().alt()).isEqualTo("Alt"));
+
+        Speicher alterAbschluss = new Speicher(stand(lauf("ABSCHLUSS", false, alterFortschritt), 0,
+                WissensStufe.NORMAL, List.of(spaetereMetadaten), Map.of(seiteId, spaetereFassung)));
+        verarbeiten(alterAbschluss, new KiAntwort(null), new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+        assertThat(alterAbschluss.fehler).contains("Basisversion", "Ingest neu starten");
+        assertThat(alterAbschluss.aenderungenGesichert).isFalse();
     }
 
     @Test
@@ -384,7 +414,8 @@ class WissenIngestVerarbeitenTest {
     private static WissenIngestVerarbeiten verarbeiten(Speicher speichern, KiAntwort ki, Verbrauch verbrauch) {
         WissenKonfiguration konfiguration = new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
                 20_000, 12_000, 300_000, 1_000_000);
-        return new WissenIngestVerarbeiten(speichern, konfiguration, ki, verbrauch);
+        return new WissenIngestVerarbeiten(speichern, konfiguration, ki, verbrauch,
+                new DiffDienst(new JavaWissenZeilendiff()));
     }
 
     private static Stand stand(Lauf lauf, long monatsverbrauch) {

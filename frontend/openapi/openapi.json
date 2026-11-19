@@ -6714,6 +6714,76 @@
         } ]
       }
     },
+    "/api/v1/wissensentwuerfe" : {
+      "get" : {
+        "summary" : "Wissensentwürfe auflisten",
+        "description" : "A17 sieht alle Entwürfe; A18 nur den Status eigener Analysevorschläge.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Entwürfe",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf keine Entwürfe lesen"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{id}" : {
+      "get" : {
+        "summary" : "Wissensentwurf abrufen",
+        "description" : "A17 sieht Fassungen und Diffs; A18 nur Status, Entscheide und Gründe eigener Analysen.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Entwurf",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf den Entwurf nicht lesen"
+          },
+          "404" : {
+            "description" : "Entwurf nicht gefunden"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/wissensseiten" : {
       "get" : {
         "summary" : "Wissensseiten-Index",

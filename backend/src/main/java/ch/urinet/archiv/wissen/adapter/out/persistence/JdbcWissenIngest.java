@@ -415,7 +415,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
                         aenderung.daten().quellen(), aenderung.daten().vertraulichkeit().name(),
                         aenderung.daten().inhalt(), aenderung.daten().wissensquelleId())))
                 .setParameter("inhalt", aenderung.daten().inhalt())
-                .setParameter("diff", aenderung.diff())
+                .setParameter("diff", json(aenderung.diff()))
                 .setParameter("begruendung", aenderung.begruendung())
                 .setParameter("widersprueche", json(aenderung.widersprueche()))
                 .setParameter("entfernte", json(aenderung.entfernteAussagen()))
