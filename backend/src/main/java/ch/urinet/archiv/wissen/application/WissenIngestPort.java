@@ -66,6 +66,11 @@ public interface WissenIngestPort {
 
     void aenderungAnlegen(NeueAenderung aenderung);
 
+    void erneuerteAenderungSpeichern(NeueAenderung aenderung, Fortschritt fortschritt, long tokensEin,
+                                     long tokensAus);
+
+    void neuerzeugungAbbrechen(UUID entwurfId, String hinweis);
+
     void fortschrittSichern(UUID entwurfId, String erwarteterSchritt, String neuerSchritt, Fortschritt fortschritt,
                             long tokensEin, long tokensAus, boolean unvollstaendig, String hinweis);
 

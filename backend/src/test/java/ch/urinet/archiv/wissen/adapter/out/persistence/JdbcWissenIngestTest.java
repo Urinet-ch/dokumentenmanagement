@@ -15,6 +15,7 @@ import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
 import ch.urinet.archiv.wissen.application.FreigabeKontext;
 import ch.urinet.archiv.wissen.application.FreigabeSperre;
+import ch.urinet.archiv.wissen.application.DiffDienst;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
@@ -94,6 +95,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     FreigabeKontext freigabeKontext;
+
+    @Inject
+    DiffDienst diffDienst;
 
     @Inject
     MandantKontext kontext;
@@ -250,6 +254,52 @@ class JdbcWissenIngestTest {
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.VERSION_KONFLIKT));
         assertThat(im(URINET, () -> freigabeSperre.zumNeuErzeugenLaden(inhaber, entwurf, 1, () -> 1)).status())
                 .isEqualTo("VERALTET");
+    }
+
+    @Test
+    void erneuerteAenderungWirdAtomarUndNurImEigenenMandantenGespeichert() throws SQLException {
+        UUID entwurf = manuellerEntwurf(URINET);
+        UUID seiteId = seite(URINET, "konzepte/neu-" + UUID.randomUUID(), "Probe", null);
+        aenderung(URINET, entwurf, 1);
+        String pfad = im(URINET, () -> ingest.seiteLaden(seiteId).orElseThrow().metadaten().pfad());
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set status = 'VERALTET', aktion = 'AENDERN', seite_id = ?, "
+                + "pfad = ?, basis_version = 1, etag = 1, vertraulichkeit_kontext = 'INTERN' "
+                + "where entwurf_id = ?", seiteId, pfad, entwurf);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_entwurf set status = 'IN_ARBEIT', schritt = 'NEU_ERZEUGEN' where id = ?", entwurf);
+        Wissensseite fassung = new Wissensseite(seiteId, pfad, Seitentyp.KONZEPT, "Neu", "Beschreibung",
+                List.of(), Wissensseite.Status.AKTIV, null, List.of(), Wissensseite.Vertraulichkeit.NORMAL,
+                "Neuer Inhalt", 2, null, null, null, null, false, false, null);
+        var erneuert = new WissenIngestPort.NeueAenderung(entwurf, 1, "AENDERN", seiteId, pfad, 2, fassung,
+                "Grund", List.of(), List.of(), List.of(), List.of(), diffDienst.vergleichen(null, fassung), "NORMAL");
+        var fortschritt = WissenIngestPort.Fortschritt.leer();
+
+        assertThatThrownBy(() -> im(ZWEITER, () -> {
+            ingest.erneuerteAenderungSpeichern(erneuert, fortschritt, 10, 5);
+            return null;
+        })).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> im(URINET, () -> {
+            ingest.erneuerteAenderungSpeichern(erneuert, fortschritt, 10, 5);
+            throw new IllegalStateException("Testabbruch");
+        })).hasMessage("Testabbruch");
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "IN_ARBEIT");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_aenderung where entwurf_id = ? and status = 'VERALTET' and etag = 1", entwurf))
+                .isEqualTo(1);
+        im(URINET, () -> {
+            ingest.erneuerteAenderungSpeichern(erneuert, fortschritt, 10, 5);
+            return null;
+        });
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_aenderung where entwurf_id = ? and status = 'OFFEN' and etag = 2 "
+                + "and basis_version = 2 and inhalt = 'Neuer Inhalt' and vertraulichkeit_kontext = 'INTERN'",
+                entwurf)).isEqualTo(1);
+        assertThatThrownBy(() -> im(URINET, () -> {
+            ingest.erneuerteAenderungSpeichern(erneuert, fortschritt, 10, 5);
+            return null;
+        })).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

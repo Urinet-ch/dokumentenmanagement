@@ -448,6 +448,17 @@ class WissenIngestStartenTest {
         }
 
         @Override
+        public void erneuerteAenderungSpeichern(NeueAenderung aenderung, Fortschritt fortschritt, long tokensEin,
+                                                long tokensAus) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void neuerzeugungAbbrechen(UUID entwurfId, String hinweis) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void fortschrittSichern(UUID entwurfId, String erwarteterSchritt, String neuerSchritt,
                                        Fortschritt fortschritt, long tokensEin, long tokensAus,
                                        boolean unvollstaendig, String hinweis) {
