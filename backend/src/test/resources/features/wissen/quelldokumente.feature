@@ -29,3 +29,10 @@ Funktionalität: Änderungen an Quelldokumenten
     Und eine normale Wissensseite verweist auf ein normales Quelldokument
     Wenn der Inhaber den Titel des Quelldokuments ändert
     Dann zeigt der Quelleneintrag den neuen Titel
+
+  @req-15.5
+  Szenario: Ein simuliertes Löschereignis kennzeichnet die betroffene Wissensseite
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine normale Wissensseite verweist auf ein normales Quelldokument
+    Wenn das Dokumentereignis vor einer späteren Löschung simuliert wird
+    Dann der Inhaber sieht auf der unveränderten Wissensseite den Hinweis «Quelle prüfen»

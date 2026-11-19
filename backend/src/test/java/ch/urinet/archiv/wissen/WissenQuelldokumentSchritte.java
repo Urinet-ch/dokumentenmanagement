@@ -1,12 +1,16 @@
 package ch.urinet.archiv.wissen;
 
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.dokument.application.DokumentEreignisse;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
@@ -14,7 +18,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +30,10 @@ import static org.hamcrest.Matchers.is;
 public class WissenQuelldokumentSchritte {
     @Inject
     Instance<AgroalDataSource> datenbank;
+    @Inject
+    DokumentEreignisse ereignisse;
+    @Inject
+    MandantKontext kontext;
 
     private UUID dokument;
     private UUID seite;
@@ -94,6 +105,15 @@ public class WissenQuelldokumentSchritte {
         given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
                 .body(Map.of("titel", "Neuer synthetischer Titel", "grund", "Quellenprüfung"))
                 .when().patch(pfad).then().statusCode(200);
+    }
+
+    @Wenn("das Dokumentereignis vor einer späteren Löschung simuliert wird")
+    public void loeschereignisSimulieren() throws Exception {
+        CompletableFuture.runAsync(() -> kontext.mit(new MandantCode("urinet"),
+                () -> QuarkusTransaction.requiringNew().run(() -> {
+                    ereignisse.vorAenderung();
+                    ereignisse.geaendert(dokument, Set.of("loeschung"));
+                }))).get(1, TimeUnit.MINUTES);
     }
 
     @Dann("zeigt der Quelleneintrag den neuen Titel")
