@@ -835,6 +835,13 @@ public class WissenIngestVerarbeiten {
 
     private KiErgebnis aufrufen(Lauf lauf, WissenIngestSpeichern.Stand stand, KiPort.WissensSchritt schritt,
                                String nachricht, long budget, long monatsbudget) throws InterruptedException {
+        return aufrufen(lauf.entwurfId(), lauf.modell(), lauf.tokensEin(), lauf.tokensAus(), stand.monatsverbrauch(),
+                schritt, nachricht, budget, monatsbudget);
+    }
+
+    KiErgebnis aufrufen(UUID entwurfId, String modell, long bisherEin, long bisherAus, long monatsverbrauch,
+                        KiPort.WissensSchritt schritt, String nachricht, long budget, long monatsbudget)
+            throws InterruptedException {
         long tokensEin = 0;
         long tokensAus = 0;
         String auftragstext = nachricht;
@@ -842,8 +849,8 @@ public class WissenIngestVerarbeiten {
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException("Wissens-Ingest unterbrochen");
             }
-            long verbraucht = summe(lauf.tokensEin(), lauf.tokensAus(), tokensEin, tokensAus);
-            long monatVerbraucht = addiere(stand.monatsverbrauch(), summe(tokensEin, tokensAus));
+            long verbraucht = summe(bisherEin, bisherAus, tokensEin, tokensAus);
+            long monatVerbraucht = addiere(monatsverbrauch, summe(tokensEin, tokensAus));
             long frei = Math.min(budget - verbraucht, monatsbudget - monatVerbraucht);
             long eingeschaetzt = schaetzen(SYSTEM_PROMPT.length() + auftragstext.length());
             long eingabeObergrenze = Math.max(eingeschaetzt,
@@ -855,7 +862,7 @@ public class WissenIngestVerarbeiten {
             // max_tokens nie über das Restbudget hinaus, aber auch nie über die längste erwartete Antwort
             int maxAusgabe = (int) Math.min(frei - eingabeObergrenze, maxAusgabeTokens());
             WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.now());
-            var reservierung = speichern.budgetReservieren(lauf.entwurfId(),
+            var reservierung = speichern.budgetReservieren(entwurfId,
                     addiere(eingabeObergrenze, maxAusgabe), budget, monatsbudget, monat.von(), monat.bis());
             if (!reservierung.reserviert()) {
                 return new KiErgebnis(null, tokensEin, tokensAus, true,
@@ -865,13 +872,13 @@ public class WissenIngestVerarbeiten {
             KiPort.Verbrauch aufrufVerbrauch;
             boolean protokolliert = false;
             try {
-                antwort = ki.wissensIngest(new KiPort.WissensAnfrage(schritt, lauf.modell(),
+                antwort = ki.wissensIngest(new KiPort.WissensAnfrage(schritt, modell,
                         SYSTEM_PROMPT, auftragstext, maxAusgabe));
                 aufrufVerbrauch = antwort.verbrauch() == null
-                        ? new KiPort.Verbrauch(lauf.modell(), 0, 0) : antwort.verbrauch();
+                        ? new KiPort.Verbrauch(modell, 0, 0) : antwort.verbrauch();
                 verbrauch.erfassen(KiVerbrauchPort.WISSEN_INGEST,
-                        new KiPort.Verbrauch(lauf.modell(), aufrufVerbrauch.tokensEin(), aufrufVerbrauch.tokensAus()),
-                        lauf.entwurfId());
+                        new KiPort.Verbrauch(modell, aufrufVerbrauch.tokensEin(), aufrufVerbrauch.tokensAus()),
+                        entwurfId);
                 protokolliert = true;
                 tokensEin = addiere(tokensEin, aufrufVerbrauch.tokensEin());
                 tokensAus = addiere(tokensAus, aufrufVerbrauch.tokensAus());
@@ -890,9 +897,9 @@ public class WissenIngestVerarbeiten {
                 throw new IllegalStateException("Wissens-KI nicht verfügbar: " + ausfall.getClass().getSimpleName());
             }
             if (antwort instanceof KiPort.WissensGueltig gueltig) {
-                boolean monatsbudgetErreicht = addiere(stand.monatsverbrauch(), summe(tokensEin, tokensAus))
+                boolean monatsbudgetErreicht = addiere(monatsverbrauch, summe(tokensEin, tokensAus))
                         >= monatsbudget;
-                boolean budgetErreicht = summe(lauf.tokensEin(), lauf.tokensAus(), tokensEin, tokensAus) >= budget
+                boolean budgetErreicht = summe(bisherEin, bisherAus, tokensEin, tokensAus) >= budget
                         || monatsbudgetErreicht;
                 return new KiErgebnis(gueltig.inhalt(), tokensEin, tokensAus, budgetErreicht,
                         monatsbudgetErreicht, false);
@@ -901,8 +908,8 @@ public class WissenIngestVerarbeiten {
                 auftragstext += "\n\nDie vorherige Antwort war ungültig. Gib die angeforderte Struktur vollständig zurück.";
             }
         }
-        boolean monatsbudgetErreicht = addiere(stand.monatsverbrauch(), summe(tokensEin, tokensAus)) >= monatsbudget;
-        boolean budgetErreicht = summe(lauf.tokensEin(), lauf.tokensAus(), tokensEin, tokensAus) >= budget
+        boolean monatsbudgetErreicht = addiere(monatsverbrauch, summe(tokensEin, tokensAus)) >= monatsbudget;
+        boolean budgetErreicht = summe(bisherEin, bisherAus, tokensEin, tokensAus) >= budget
                 || monatsbudgetErreicht;
         return new KiErgebnis(null, tokensEin, tokensAus, budgetErreicht, monatsbudgetErreicht, false);
     }
@@ -1265,7 +1272,7 @@ public class WissenIngestVerarbeiten {
     private record OptionalStand(WissenIngestSpeichern.Stand stand) {
     }
 
-    private record KiErgebnis(KiPort.WissensInhalt inhalt, long tokensEin, long tokensAus, boolean budgetErreicht,
-                              boolean monatsbudgetErreicht, boolean ohneZugang) {
+    record KiErgebnis(KiPort.WissensInhalt inhalt, long tokensEin, long tokensAus, boolean budgetErreicht,
+                      boolean monatsbudgetErreicht, boolean ohneZugang) {
     }
 }

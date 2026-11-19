@@ -130,6 +130,20 @@ public class JdbcWissenIngest implements WissenIngestPort {
     }
 
     @Override
+    public BudgetEinstellungen budgetEinstellungenLaden() {
+        zeitgrenze();
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = em().createNativeQuery(
+                "select budget_tokens, monatsbudget_tokens from wissens_einstellung where id = 1").getResultList();
+        if (zeilen.isEmpty()) {
+            return new BudgetEinstellungen(null, null);
+        }
+        Object[] zeile = zeilen.getFirst();
+        return new BudgetEinstellungen(zeile[0] == null ? null : ((Number) zeile[0]).intValue(),
+                zeile[1] == null ? null : ((Number) zeile[1]).intValue());
+    }
+
+    @Override
     public BudgetReservierung budgetReservieren(UUID entwurfId, long tokens, long budgetTokens,
                                                 long monatsbudgetTokens, Instant von, Instant bis) {
         zeitgrenze();

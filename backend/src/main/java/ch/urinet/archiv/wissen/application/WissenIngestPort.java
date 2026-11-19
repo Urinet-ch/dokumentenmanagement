@@ -33,6 +33,8 @@ public interface WissenIngestPort {
     /** Summe der Tokens aus {@code ki_verbrauch} mit Zweck {@code WISSEN_*} im Zeitraum [von, bis) (Req 13.6). */
     long verbrauchImZeitraum(Instant von, Instant bis);
 
+    BudgetEinstellungen budgetEinstellungenLaden();
+
     BudgetReservierung budgetReservieren(UUID entwurfId, long tokens, long budgetTokens, long monatsbudgetTokens,
                                          Instant von, Instant bis);
 
@@ -93,6 +95,9 @@ public interface WissenIngestPort {
         public boolean reserviert() {
             return id != null;
         }
+    }
+
+    record BudgetEinstellungen(Integer budgetTokens, Integer monatsbudgetTokens) {
     }
 
     record Lauf(UUID entwurfId, UUID dokumentId, String entwurfStatus, String dokumentStatus, String art,

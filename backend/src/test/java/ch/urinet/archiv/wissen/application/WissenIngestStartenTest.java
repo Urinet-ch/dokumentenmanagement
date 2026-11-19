@@ -391,6 +391,11 @@ class WissenIngestStartenTest {
         }
 
         @Override
+        public BudgetEinstellungen budgetEinstellungenLaden() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public BudgetReservierung budgetReservieren(UUID entwurfId, long tokens, long budgetTokens,
                                                     long monatsbudgetTokens, java.time.Instant von,
                                                     java.time.Instant bis) {
