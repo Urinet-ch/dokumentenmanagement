@@ -22,3 +22,10 @@ Funktionalität: Änderungen an Quelldokumenten
     Wenn der Inhaber die Vertraulichkeit des Quelldokuments auf «INTERN» ändert
     Und der Inhaber die Quellenprüfung der Wissensseite bestätigt
     Dann ist der Quellenhinweis entfernt und die Bestätigung protokolliert
+
+  @req-15.3
+  Szenario: Quelleneinträge zeigen den aktuellen Dokumenttitel
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine normale Wissensseite verweist auf ein normales Quelldokument
+    Wenn der Inhaber den Titel des Quelldokuments ändert
+    Dann zeigt der Quelleneintrag den neuen Titel

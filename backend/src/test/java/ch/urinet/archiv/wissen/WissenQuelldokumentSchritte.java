@@ -85,6 +85,24 @@ public class WissenQuelldokumentSchritte {
                 .when().post(pfad + "/quelle-geprueft").then().statusCode(204);
     }
 
+    @Wenn("der Inhaber den Titel des Quelldokuments ändert")
+    public void titelAendern() {
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/dokumente/" + dokument;
+        String etag = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .extract().header("ETag");
+        given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
+                .body(Map.of("titel", "Neuer synthetischer Titel", "grund", "Quellenprüfung"))
+                .when().patch(pfad).then().statusCode(200);
+    }
+
+    @Dann("zeigt der Quelleneintrag den neuen Titel")
+    public void quelleneintragZeigtTitel() {
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensseiten/" + seite).then().statusCode(200)
+                .body("quellen[0].dokumentTitel", is("Neuer synthetischer Titel"));
+    }
+
     @Dann("ist der Quellenhinweis entfernt und die Bestätigung protokolliert")
     public void bestaetigungProtokolliert() throws Exception {
         given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
