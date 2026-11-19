@@ -135,7 +135,7 @@ class RegelPruefungTest {
         Konfiguration abbild = new Konfiguration(1, new Konfiguration.Einstellungen("12-31", null),
                 List.of(), List.of(), regeln);
         KonfigurationVerwaltung konfiguration = new KonfigurationVerwaltung(null, null, null, null, null, null,
-                null, null, null, null) {
+                null, null, null, null, null) {
             @Override
             public Konfiguration aktuell() {
                 return abbild;
@@ -159,6 +159,11 @@ class RegelPruefungTest {
 
             @Override
             public void wertePruefen(String schemaJson, String werteJson) {
+            }
+
+            @Override
+            public List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson) {
+                throw new UnsupportedOperationException();
             }
 
             @Override

@@ -54,6 +54,20 @@ class ProblemAbbildungTest {
     }
 
     @Test
+    void ungueltigeKonfigurationNenntDieBefunde() {
+        var fehler = new ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig(java.util.List.of(
+                new ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig.Befund("/arten/0", "required",
+                        "Die Datei verletzt das Schema.")));
+        try (Response antwort = abbildung.fachFehler(fehler)) {
+            assertThat(antwort.getStatus()).isEqualTo(422);
+            assertThat(antwort.getEntity()).asString()
+                    .contains("\"fehlercode\":\"KONFIGURATION_UNGUELTIG\"")
+                    .contains("\"befunde\":[{\"pfad\":\"/arten/0\",\"code\":\"required\","
+                            + "\"meldung\":\"Die Datei verletzt das Schema.\"}]");
+        }
+    }
+
+    @Test
     void zyklischeUrsachenketteWirdBegrenzt() {
         Throwable zyklus = new RuntimeException("synthetischer Zyklus") {
             @Override

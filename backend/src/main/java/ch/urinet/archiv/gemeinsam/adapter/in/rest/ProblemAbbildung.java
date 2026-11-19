@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.KlassifikationUngueltig;
+import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
@@ -35,6 +36,9 @@ public class ProblemAbbildung {
         if (fehler instanceof KlassifikationUngueltig klassifikation) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "klassifikationen",
                     klassifikation.klassifikationen())).build();
+        }
+        if (fehler instanceof KonfigurationUngueltig konfiguration) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "befunde", konfiguration.befunde())).build();
         }
         if (fehler instanceof RegelVerletzt regel) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "regeln", regel.regeln())).build();

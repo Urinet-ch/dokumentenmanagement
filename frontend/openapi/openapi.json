@@ -139,6 +139,20 @@
           }
         }
       },
+      "Befund" : {
+        "type" : "object",
+        "properties" : {
+          "pfad" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "meldung" : {
+            "type" : "string"
+          }
+        }
+      },
       "Bestaetigung" : {
         "description" : "Bestätigte Metadaten (A7, Req 8.2–8.5, 8.8, 8.9). Ersetzt die Grundfelder sowie die Felder der Gruppen finanz und vertrag vollständig; fehlende Felder sind leer. Zusatzfelder kommen aus dem gespeicherten Dokument.",
         "type" : "object",
@@ -401,6 +415,27 @@
             "items" : {
               "$ref" : "#/components/schemas/ChatNachricht"
             }
+          }
+        }
+      },
+      "DiffEintrag" : {
+        "type" : "object",
+        "properties" : {
+          "pfad" : {
+            "type" : "string"
+          },
+          "alt" : {
+            "type" : "string"
+          },
+          "neu" : {
+            "type" : "string"
+          },
+          "betroffeneDokumente" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "werteVerdeckt" : {
+            "type" : "boolean"
           }
         }
       },
@@ -1735,6 +1770,20 @@
           }
         }
       },
+      "KonfigurationKiTexte" : {
+        "type" : "object",
+        "properties" : {
+          "rolle" : {
+            "type" : "string"
+          },
+          "feldregeln" : {
+            "type" : "string"
+          },
+          "kiFreigegeben" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "KonfigurationsVersion" : {
         "type" : "object",
         "required" : [ "version", "zeit", "wer", "quelle", "sha256" ],
@@ -1773,6 +1822,52 @@
           },
           "inhalt" : {
             "description" : "Unveränderliches Konfigurationsabbild"
+          }
+        }
+      },
+      "KonfigurationsdateiAnalyse" : {
+        "type" : "object",
+        "properties" : {
+          "aktuelleVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "basisVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "gueltig" : {
+            "type" : "boolean"
+          },
+          "befunde" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Befund"
+            }
+          },
+          "aenderungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DiffEintrag"
+            }
+          }
+        }
+      },
+      "KonfigurationsdateiErgebnis" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "geaendert" : {
+            "type" : "boolean"
+          },
+          "aenderungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DiffEintrag"
+            }
           }
         }
       },
@@ -5129,6 +5224,244 @@
           },
           "428" : {
             "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/konfiguration" : {
+      "get" : {
+        "summary" : "Konfiguration als Datei exportieren",
+        "tags" : [ "Konfiguration" ],
+        "responses" : {
+          "200" : {
+            "description" : "Aktuelle Konfiguration als JSON-Datei",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "403" : {
+            "description" : "NICHT_ERLAUBT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "put" : {
+        "summary" : "Konfigurationsdatei einspielen",
+        "description" : "Massgeblich ist die basisVersion in der Datei; weicht sie vom aktuellen Stand ab, kommt 409. Ein If-Match wird nicht ausgewertet.",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "X-Aenderungsgrund",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Eingespielt oder bereits aktuell",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "409" : {
+            "description" : "KONFIGURATION_VERALTET"
+          },
+          "413" : {
+            "description" : "DATEI_ZU_GROSS"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/konfiguration/ki-texte" : {
+      "patch" : {
+        "summary" : "KI-Texte ändern",
+        "description" : "kiFreigegeben kann nur der Betreiber setzen.",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Geändert",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "get" : {
+        "summary" : "KI-Texte des Mandanten ansehen",
+        "tags" : [ "Konfiguration" ],
+        "responses" : {
+          "200" : {
+            "description" : "Rolle, Feldregeln und Freigabestatus",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/konfiguration/pruefen" : {
+      "post" : {
+        "summary" : "Konfigurationsdatei prüfen",
+        "description" : "Prüft die Datei, ohne Änderungen vorzunehmen.",
+        "tags" : [ "Konfiguration" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Befunde und Vergleich",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/KonfigurationsdateiAnalyse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "DATEI_ZU_GROSS"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/konfiguration/vergleichen" : {
+      "post" : {
+        "summary" : "Konfigurationsdatei vergleichen",
+        "description" : "Vergleicht die Datei mit dem aktuellen Stand.",
+        "tags" : [ "Konfiguration" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Änderungen und betroffene Dokumente",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/KonfigurationsdateiAnalyse"
+                }
+              }
+            }
+          },
+          "413" : {
+            "description" : "DATEI_ZU_GROSS"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
           },
           "401" : {
             "description" : "Not Authorized"

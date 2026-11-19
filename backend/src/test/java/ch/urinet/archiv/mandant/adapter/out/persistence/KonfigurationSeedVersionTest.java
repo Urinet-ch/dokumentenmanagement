@@ -36,6 +36,7 @@ class KonfigurationSeedVersionTest {
 
     private static final String SCHEMA = "m_probe_konf_seed";
     private static final String MIGRATION_SCHEMA = "m_probe_konf_migration";
+    private static final String KI_MIGRATION_SCHEMA = "m_probe_ki_migration";
 
     @Inject
     MandantDatenbank datenbank;
@@ -58,6 +59,9 @@ class KonfigurationSeedVersionTest {
                         true)));
 
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+            befehl.execute("update " + SCHEMA
+                    + ".ki_texte set rolle = 'Synthetische Rolle', feldregeln = 'Synthetische Feldregeln', "
+                    + "ki_freigegeben = true where id = 1");
             befehl.execute("insert into " + SCHEMA + ".regel (code, art, typ, parameter, schwere, meldung, aktiv) "
                     + "values ('seed_folge', 'SEED_A', 'FOLGE', "
                     + "'{\"feld\":\"geschaeftsjahr\",\"zeitraum\":\"GESAMT\"}', 'WARNUNG', 'Nummer fehlt', true)");
@@ -79,6 +83,11 @@ class KonfigurationSeedVersionTest {
                     + ".konfiguration_version where version = 2")).isEqualTo("array");
             assertThat(wert(befehl, "select inhalt #>> '{regeln,0,code}' from " + SCHEMA
                     + ".konfiguration_version where version = 2")).isEqualTo("seed_folge");
+            assertThat(wert(befehl, "select inhalt #>> '{kiTexte,kiFreigegeben}' from " + SCHEMA
+                    + ".konfiguration_version where version = 2")).isEqualTo("true");
+            // 048-ki-texte-version lief ohne Arten: keine Zusatzversion vor dem Seed
+            assertThat(wert(befehl, "select inhalt -> 'kiTexte' is null from " + SCHEMA
+                    + ".konfiguration_version where version = 1")).isEqualTo("t");
         }
     }
 
@@ -235,6 +244,21 @@ class KonfigurationSeedVersionTest {
                         """)).isEqualTo("bankbeleg_erwartet=PARTNER,lohnabrechnung_erwartet=zusatz.person");
                 assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
                         + "from konfiguration_version where version = 2")).isEqualTo("t");
+
+                // 048: Abbild ohne kiTexte erhält die Freigabe aus ki_texte (Req 6.6, 8.4)
+                liquibase(verbindung, "m_urinet", "048-ki-texte.xml");
+                verbindung.commit();
+
+                assertThat(wert(befehl, "select max(version) from konfiguration_version")).isEqualTo("3");
+                assertThat(wert(befehl, "select quelle from konfiguration_version where version = 3"))
+                        .isEqualTo("MIGRATION");
+                assertThat(wert(befehl, "select inhalt #>> '{kiTexte,kiFreigegeben}' "
+                        + "from konfiguration_version where version = 3")).isEqualTo("true");
+                assertThat(wert(befehl, "select (inhalt - 'version' - 'kiTexte') = (select inhalt - 'version' "
+                        + "from konfiguration_version where version = 2) from konfiguration_version where version = 3"))
+                        .isEqualTo("t");
+                assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
+                        + "from konfiguration_version where version = 3")).isEqualTo("t");
             }
         } finally {
             try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {
