@@ -492,3 +492,28 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
   `prompt=login` mit dem Cookie-Zweig des Browser-Flows, Aufruf `execute-actions-email` ohne vorhandenes Passwort.
 - Grenzwerte (Katalog, Raten, Gültigkeiten) sind Vorschläge; sie gelten mit dem Merge dieses PR und sind Klasse (b), also ohne
   Codeänderung, nur per Konfiguration und Deploy anpassbar (`archiv.verwaltung.*`).
+
+## Umsetzung 19.1 — Spike Keycloak 26.8.2
+
+Der Dev-Service-Test bestätigt, dass der Issuer aus der Discovery-Antwort mit dem `iss`-Claim des Dienstkonto-Tokens
+übereinstimmt. `GET /users?q=mandant:urinet` liefert nur Testbenutzer mit diesem Attribut; `GET /roles/inhaber/users`
+liefert dagegen Inhaber aus beiden Testmandanten. Der Adapter muss daher weiterhin jede Antwort nach `mandant` filtern.
+Das Dienstkonto erhält ein Token mit den direkt zugewiesenen Rollen `query-users`, `view-users` und `manage-users` sowie
+der erwarteten `realm-management`-Audience. Im Test-Realm ist `view-users` zusammengesetzt und bringt zusätzlich
+`query-groups` in den effektiven Token-Rollen mit.
+
+Ein Aufruf der Admin-REST-API mit diesem Token (`GET /users?max=1`) antwortete mit HTTP 401. Der Token hatte dabei den
+erwarteten Issuer, die Audience und die drei direkt zugewiesenen Rollen (sowie das von `view-users` geerbte
+`query-groups`). Auch ein diagnostischer Versuch mit zusätzlich zugewiesenem `realm-admin` änderte den Status nicht.
+Die Ursache ist nicht geklärt; damit sind weder der produktive Dienstkonto-Aufruf noch dessen FGAP-Wirkung nachgewiesen.
+
+Keycloaks [Dokumentation zu FGAP v2 für Version 26.8.2](https://github.com/keycloak/keycloak/blob/26.8.2/docs/documentation/server_admin/topics/admin-console-permissions/fine-grain-v2.adoc)
+beschreibt `map-role` als Scope der Rollen-Ressource. Dieselbe Dokumentation hält fest, dass administrative RBAC-Rollen wie
+`manage-users` die FGAP-Prüfung umgehen. Damit kann FGAP die Zuweisung auf die vier Archiv-Rollen nicht begrenzen, solange
+Requirement 5.2 zugleich `manage-users` verlangt. Diese Rechtevorgaben widersprechen sich; bis zum Entscheid darf der
+Realm-Export FGAP nicht als Begrenzung der Rollenzuweisung ausweisen.
+
+Nicht nachgewiesen wurden die interne Compose-Adresse `http://kc:8080` samt Backchannel-Issuer, überlappende Secret-Rotation,
+`auth_time` in einem interaktiven Benutzertoken, `prompt=login` gegen den Cookie-Zweig und `execute-actions-email` ohne
+Passwort mit `VERIFY_EMAIL`, `UPDATE_PASSWORD` und `CONFIGURE_TOTP`. Der Test-Realm führt keinen Browser-Flow- und
+SMTP-Nachweis aus; diese Punkte bleiben vor der Realm-Änderung offen.
