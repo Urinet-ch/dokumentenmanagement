@@ -12,6 +12,7 @@ import ch.urinet.archiv.wissen.application.WissenIngestPort.SeitenMetadaten;
 import ch.urinet.archiv.wissen.domain.WissensGraph;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -133,6 +134,43 @@ public class WissenIngestSpeichern {
         return port.hoechsteQuellenNummer(dokumentId);
     }
 
+    @Transactional
+    public boolean vorschlagFuerKiZulaessig(Wissensseite vorschlag, WissensStufe quellStufe) {
+        huellen.sperren();
+        return vorschlagFuerKiZulaessigGesperrt(vorschlag, quellStufe);
+    }
+
+    private boolean vorschlagFuerKiZulaessigGesperrt(Wissensseite vorschlag, WissensStufe quellStufe) {
+        Set<UUID> dokumente = new HashSet<>();
+        Set<UUID> quellseiten = new HashSet<>();
+        if (vorschlag.wissensquelleId() != null) {
+            dokumente.add(vorschlag.wissensquelleId());
+        }
+        for (var quelle : vorschlag.quellen()) {
+            if ((quelle.dokumentId() == null) == (quelle.quellSeiteId() == null)) {
+                return false;
+            }
+            if (quelle.dokumentId() != null) {
+                dokumente.add(quelle.dokumentId());
+            } else {
+                quellseiten.add(quelle.quellSeiteId());
+            }
+        }
+        WissensGraph graph = huellen.graphLaden(dokumente);
+        if (quellseiten.stream().anyMatch(id -> !graph.kenntSeite(id))) {
+            return false;
+        }
+        quellseiten.forEach(id -> dokumente.addAll(graph.dokumente(id)));
+        Map<UUID, WissensPruefung.DokumentQuelle> quellen = port.dokumentQuellenLaden(dokumente);
+        if (!quellen.keySet().containsAll(dokumente)
+                || quellen.values().stream().anyMatch(q -> !q.archiviert() || q.personal())
+                || !port.personalDokumenteLaden(dokumente).isEmpty()) {
+            return false;
+        }
+        return graph.wirksameStufeNachAnnahme(dokumente, quellseiten, WissensStufe.NORMAL,
+                WissensStufe.NORMAL).ordinal() <= quellStufe.ordinal();
+    }
+
     /**
      * Prüft bei jedem Teilauftrag erneut, ob die Quelle noch für den Ingest freigegeben ist (Req 5.6, 5.7): archiviert,
      * bestätigt, Art WISSENSQUELLE und nicht PERSONAL.
@@ -202,8 +240,13 @@ public class WissenIngestSpeichern {
         }
         Stand aktuell = geladen.get();
         SeitenFassung fassung = aktuell.fassungen().get(seiteId);
+        int nummer = Math.toIntExact(auftrag.nutzlast().zahl("aenderungNr")
+                .orElseThrow(() -> new IllegalArgumentException("Auftragsnutzlast ohne aenderungNr")));
+        WissenIngestPort.SeitenVorschlag vorschlag = aktuell.lauf().fortschritt().vorschlaege().stream()
+                .filter(v -> nummer == v.nummer() && seiteId.equals(v.seiteId())).findFirst().orElse(null);
         if (!freigegeben(aktuell.lauf()) || aktuell.quellStufe() != quellStufe || fassung == null
-                || fassung.metadaten().version() != basisVersion) {
+                || fassung.metadaten().version() != basisVersion || vorschlag == null
+                || !vorschlagFuerKiZulaessigGesperrt(vorschlag.daten(), quellStufe)) {
             port.neuerzeugungAbbrechen(entwurfId,
                     "Die Quelle oder Seite hat sich geändert. Bitte die Änderung erneut erzeugen.");
             return;

@@ -538,6 +538,12 @@ public class WissenIngestVerarbeiten {
                     "Die aktuelle Seite ist für die Wissensquelle nicht sichtbar.");
             return;
         }
+        if (!speichern.vorschlagFuerKiZulaessig(vorher.daten(), aktuell.quellStufe())) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die Quellen des bisherigen Vorschlags sind für die KI nicht mehr zulässig. "
+                            + "Bitte den Ingest neu starten.");
+            return;
+        }
         Planung plan = neuerzeugungsPlan(vorher, bisher, fassung);
         List<Kernaussage> aussagen = bisher.kernaussagen().stream().filter(Kernaussage::belegt)
                 .filter(a -> plan.aussagen().contains(a.nr())).toList();

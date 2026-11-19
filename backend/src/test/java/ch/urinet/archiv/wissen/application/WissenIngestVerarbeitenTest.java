@@ -19,6 +19,7 @@ import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.WissensGraph;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
@@ -416,6 +417,15 @@ class WissenIngestVerarbeitenTest {
             assertThat(aenderung.diff().zeilen()).flatExtracting(WissenZeilendiff.Aenderung::alt)
                     .contains("# Aktuelle Fassung");
         });
+
+        Speicher nichtZulaessig = new Speicher(stand(lauf("NEU_ERZEUGEN", false, erster.fortschritt), 0,
+                WissensStufe.NORMAL, List.of(neu), Map.of(seiteId, aktuelleFassung)));
+        nichtZulaessig.vorschlagZulaessig = false;
+        KiAntwort darfNichtAufgerufenWerden = new KiAntwort(null);
+        verarbeiten(nichtZulaessig, darfNichtAufgerufenWerden, new Verbrauch()).ausfuehren(auftrag, ENTWURF_ID);
+        assertThat(darfNichtAufgerufenWerden.aufrufe).isZero();
+        assertThat(nichtZulaessig.fehler).contains("Quellen", "nicht mehr zulässig");
+        assertThat(nichtZulaessig.aenderungen).isNull();
     }
 
     @Test
@@ -614,6 +624,7 @@ class WissenIngestVerarbeitenTest {
         private long hoechsteNummer;
         private UUID geprueftesDokument;
         private long reservierteTokens;
+        private boolean vorschlagZulaessig = true;
 
         private Speicher(Stand stand) {
             super(null, null, null, null);
@@ -623,6 +634,11 @@ class WissenIngestVerarbeitenTest {
         @Override
         public Optional<Stand> laden(UUID entwurfId, Set<UUID> seitenIds) {
             return Optional.of(stand);
+        }
+
+        @Override
+        public boolean vorschlagFuerKiZulaessig(Wissensseite vorschlag, WissensStufe quellStufe) {
+            return vorschlagZulaessig;
         }
 
         @Override

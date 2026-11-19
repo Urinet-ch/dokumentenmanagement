@@ -63,6 +63,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -667,6 +668,32 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void bisherigerVorschlagDarfKeineUnzulaessigenQuellenAnDieKiGeben() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID zitiert = quelle(URINET);
+        UUID quellseite = seite(URINET, "quellen/ki-" + dokument, "Probe", dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", quellseite, zitiert);
+        Wissensseite vorschlag = new Wissensseite(null, "konzepte/probe", Seitentyp.KONZEPT, "Probe", "Probe",
+                List.of(), Wissensseite.Status.AKTIV, null,
+                List.of(new Quelleneintrag("q1", dokument, 1, 1, "Seite 1", null),
+                        new Quelleneintrag("q2", null, null, null, null, quellseite)),
+                Wissensseite.Vertraulichkeit.NORMAL, "Probe.", 1, null, null, null, null, false, false, null);
+        assertThat(im(URINET, () -> ingestSpeichern.vorschlagFuerKiZulaessig(vorschlag, WissensStufe.NORMAL)))
+                .isTrue();
+        assertThat(im(ZWEITER, () -> ingestSpeichern.vorschlagFuerKiZulaessig(vorschlag, WissensStufe.INTERN)))
+                .isFalse();
+        ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'INTERN' where id = ?", dokument);
+        assertThat(im(URINET, () -> ingestSpeichern.vorschlagFuerKiZulaessig(vorschlag, WissensStufe.NORMAL)))
+                .isFalse();
+        assertThat(im(URINET, () -> ingestSpeichern.vorschlagFuerKiZulaessig(vorschlag, WissensStufe.INTERN)))
+                .isTrue();
+        ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'PERSONAL' where id = ?", zitiert);
+        assertThat(im(URINET, () -> ingestSpeichern.vorschlagFuerKiZulaessig(vorschlag, WissensStufe.INTERN)))
+                .isFalse();
+    }
+
+    @Test
     void neuErzeugenVerarbeitetAuftragMitAktuellerBasisUndSpeichertDasErgebnis() throws Exception {
         UUID dokument = quelle(URINET);
         UUID entwurf = entwurf(URINET, dokument, "OFFEN");
@@ -703,6 +730,7 @@ class JdbcWissenIngestTest {
         Auftrag auftrag = new Auftrag(auftragId, URINET, WissenIngestStarten.TYP,
                 new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
         AtomicReference<KiPort.WissensAnfrage> anfrage = new AtomicReference<>();
+        AtomicBoolean quelleWechselt = new AtomicBoolean();
         KiPort ki = new KiPort() {
             @Override
             public Antwort metadaten(Anfrage eingabe) {
@@ -712,6 +740,14 @@ class JdbcWissenIngestTest {
             @Override
             public WissensAntwort wissensIngest(WissensAnfrage eingabe) {
                 anfrage.set(eingabe);
+                if (quelleWechselt.get()) {
+                    try {
+                        ausfuehren("update " + URINET.schema()
+                                + ".dokument set vertraulichkeit = 'PERSONAL' where id = ?", dokument);
+                    } catch (SQLException e) {
+                        throw new IllegalStateException(e);
+                    }
+                }
                 return new WissensGueltig(new Seite("Probe", "Probe", List.of(),
                         "# Neuer Vorschlag\n\nAussage. [^q-neu]", List.of(), List.of(), "Probe"),
                         new Verbrauch("test-modell", 12, 8));
@@ -746,9 +782,41 @@ class JdbcWissenIngestTest {
             assertThat(anzahl("select count(*) from " + URINET.schema()
                     + ".ki_verbrauch where ingest_entwurf_id = ? and tokens_ein = 12 and tokens_aus = 8", entwurf))
                     .isEqualTo(1);
+
+            ausfuehren("update " + URINET.schema() + ".wissensseite set version = 3 where id = ?", seiteId);
+            ausfuehren("update " + URINET.schema()
+                    + ".wissens_aenderung set status = 'VERALTET', etag = 3 where entwurf_id = ?", entwurf);
+            long zweiterAuftrag = im(URINET, () -> {
+                freigabe.neuErzeugen(new Benutzer("inhaber", Rolle.INHABER), entwurf, 1, () -> 3);
+                EntityManager em = entityManager.get();
+                long id = ((Number) em.createNativeQuery("""
+                        select max(id) from public.auftrag where typ = 'WISSEN_INGEST'
+                            and nutzlast->>'entwurfId' = :id
+                        """).setParameter("id", entwurf.toString()).getSingleResult()).longValue();
+                em.createNativeQuery("update public.auftrag set status = 'LAEUFT' where id = :id")
+                        .setParameter("id", id).executeUpdate();
+                return id;
+            });
+            quelleWechselt.set(true);
+            Auftrag zweiter = new Auftrag(zweiterAuftrag, URINET, WissenIngestStarten.TYP,
+                    new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
+            CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
+                try {
+                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst)
+                            .ausfuehren(zweiter, entwurf);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissens_aenderung where entwurf_id = ? and status = 'VERALTET' and etag = 3 "
+                    + "and basis_version = 2 and inhalt like '%Neuer Vorschlag%'", entwurf)).isEqualTo(1);
         } finally {
             ausfuehren("delete from " + URINET.schema() + ".ki_verbrauch where ingest_entwurf_id = ?", entwurf);
-            ausfuehren("delete from public.auftrag where id = ?", auftragId);
+            ausfuehren("delete from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = ?",
+                    entwurf.toString());
         }
     }
 
