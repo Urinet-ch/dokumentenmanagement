@@ -37,7 +37,7 @@ public final class OkfSchreiber {
     private static final int MAX_FRONTMATTER = 16 * 1024;
     private static final int MAX_SEITEN = 200;
 
-    public record Dokument(UUID id, String sha256, String titel, LocalDate datum) {
+    public record Dokument(UUID id, String sha256, String titel, Instant geaendert) {
     }
 
     public record Seitenverweis(UUID id, String pfad, String titel, Instant geaendert) {
@@ -176,13 +176,15 @@ public final class OkfSchreiber {
                     "Dokumentquelle fehlt");
             if (!quelle.dokumentId().equals(dokument.id()) || dokument.sha256() == null
                     || !dokument.sha256().matches("[0-9a-fA-F]{64}") || quelle.seiteVon() == null
-                    || quelle.seiteVon() < 1 || (quelle.seiteBis() != null && quelle.seiteBis() < quelle.seiteVon())) {
+                    || quelle.seiteVon() < 1 || (quelle.seiteBis() != null && quelle.seiteBis() < quelle.seiteVon())
+                    || quelle.auszug() == null || quelle.auszug().isBlank()
+                    || quelle.auszug().codePointCount(0, quelle.auszug().length()) > 300) {
                 throw new IllegalArgumentException("Ungültige Dokumentquelle im Wissenspaket");
             }
             ergebnis.put("resource", "urn:urinet-archiv:" + paket.mandant().wert() + ":dokument:"
                     + dokument.id() + "#page=" + quelle.seiteVon());
             ergebnis.put("title", nichtLeer(dokument.titel(), "quellentitel"));
-            ergebnis.put("last_modified", dokument.datum() == null ? null : dokument.datum().toString());
+            ergebnis.put("last_modified", dokument.geaendert() == null ? null : dokument.geaendert().toString());
             ergebnis.put("sha256", dokument.sha256().toLowerCase(java.util.Locale.ROOT));
             ergebnis.put("seite", quelle.seiteBis() == null || quelle.seiteVon().equals(quelle.seiteBis())
                     ? quelle.seiteVon().toString() : quelle.seiteVon() + "-" + quelle.seiteBis());

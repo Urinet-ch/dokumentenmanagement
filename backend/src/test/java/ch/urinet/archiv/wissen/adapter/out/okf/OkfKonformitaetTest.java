@@ -19,7 +19,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -49,8 +48,7 @@ class OkfKonformitaetTest {
         Wissensseite konzept = seite(KONZEPT, "konzepte/probe", Seitentyp.KONZEPT, "Konzept",
                 "[Quelle](/quellen/probe).[^q2]\n`[Code](/quellen/probe)`", List.of(seite), null,
                 Wissensseite.Vertraulichkeit.NORMAL);
-        OkfSchreiber.Dokument dokumentDaten = new OkfSchreiber.Dokument(DOKUMENT, HASH, "Dokument",
-                LocalDate.of(2026, 1, 1));
+        OkfSchreiber.Dokument dokumentDaten = new OkfSchreiber.Dokument(DOKUMENT, HASH, "Dokument", ZEIT);
         OkfSchreiber.Seitenverweis verweis = new OkfSchreiber.Seitenverweis(QUELLSEITE, quellseite.pfad(),
                 quellseite.titel(), ZEIT);
         List<OkfSchreiber.Seite> seiten = List.of(
