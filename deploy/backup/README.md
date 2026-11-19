@@ -38,6 +38,13 @@ Manifest-Schlüssel bleiben Secret-Dateien in den Compose-Diensten; das Skript g
 weder als Argument noch in Logs aus. Der Manifest-Schlüssel wird nur als Datei aus dem API-
 Container kopiert und sofort verschlüsselt.
 
+Für die Sicherung beider Mandanten muss `ARCHIV_MANDANTEN` die Codes `urinet` und `vhf-gsk`
+enthalten; `taeglich.sh` gleicht dazu vor dem Export alle Mandantenschemas `m_*` der Datenbank mit der Liste ab
+und bricht mit Exit 2 ab, wenn ein Mandant fehlt (kein stilles Überspringen). `taeglich.sh` erstellt Inventar und Bucket-Export je Mandant; die lokale Restore-Übung
+stellt und prüft beide Mandanten (die Mandantenliste der Übung ist bewusst fest verdrahtet: Sie prüft genau
+die zwei Mandanten der Sollausstattung, nicht die Konfiguration des Betriebs). Transport der Läufe, Zweitkopie und `backup-gate.sh` gehören
+zum Infra-Repository und sind nicht Teil dieser Skripte.
+
 Der Ordner `.zustand/` ausserhalb von `laeufe/` enthält das letzte Inventar unverschlüsselt,
 mit restriktiven Dateirechten. Es wird ausschliesslich als Vorinventar für den nächsten
 `zuwachs`-Aufruf benötigt und gehört nicht zu den Dateien, die das Infra-Repository abholt.
