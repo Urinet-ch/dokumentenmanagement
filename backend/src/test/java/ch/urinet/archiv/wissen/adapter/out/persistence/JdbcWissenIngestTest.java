@@ -2,10 +2,13 @@ package ch.urinet.archiv.wissen.adapter.out.persistence;
 
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.dokument.application.DokumentEreignisse;
+import ch.urinet.archiv.dokument.application.DokumentWiederholen;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import io.agroal.api.AgroalDataSource;
@@ -62,6 +65,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     DokumentEreignisse ereignisse;
+
+    @Inject
+    DokumentWiederholen wiederholen;
 
     @Inject
     Instance<EntityManager> entityManager;
@@ -150,6 +156,27 @@ class JdbcWissenIngestTest {
         given().auth().oauth2(mitarbeiter).when().get(seitenPfad).then().statusCode(404);
         given().auth().oauth2(inhaber).when().get(seitenPfad).then().statusCode(200)
                 .body("quellePruefen", org.hamcrest.Matchers.is(true));
+    }
+
+    @Test
+    void erneuteArchivierungMarkiertVerwendendeSeite() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        ausfuehren("update " + URINET.schema() + ".dokument set status = 'ARCHIVIERUNG_FEHLER' where id = ?",
+                dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                seite, dokument);
+
+        assertThatThrownBy(() -> im(URINET, () -> {
+            wiederholen.wiederholen(new Benutzer("probe", Rolle.INHABER), dokument, 0);
+            long anzahl = ((Number) entityManager.get().createNativeQuery(
+                            "select count(*) from wissensseite where id = :id and quelle_pruefen")
+                    .setParameter("id", seite).getSingleResult()).longValue();
+            assertThat(anzahl).isEqualTo(1);
+            throw new IllegalStateException("Rollback-Probe");
+        })).hasMessage("Rollback-Probe");
     }
 
     @BeforeEach
