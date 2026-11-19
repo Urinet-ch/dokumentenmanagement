@@ -33,11 +33,14 @@ export interface Formular {
 export type TextFeld = Exclude<keyof Formular, 'zusatz'>;
 
 /** `mehrfach`: Liste aus festen Werten (`items.enum`), `liste`: Liste freier Texte (`items.type` string). */
-export type ZusatzTyp = 'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'auswahl' | 'mehrfach' | 'liste';
+export type ZusatzTyp =
+  'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'auswahl' | 'mehrfach' | 'liste';
 
 /** Eingabefeld für einen Eintrag unter `properties` des Zusatz-Schemas der Art. */
 export interface ZusatzFeld {
   name: string;
+  titel?: string;
+  beschreibung?: string;
   typ: ZusatzTyp;
   optionen: readonly string[];
   /** Optionale Anzeigetexte je Enum-Wert (`x-labels` im Schema); fehlt ein Wert, gilt der Rohwert. */
@@ -50,7 +53,8 @@ export interface ZusatzFeld {
 }
 
 /** Listenwerte stehen im Formular als ein Text, ein Eintrag je Zeile (wie die übrigen Zusatzwerte als Text). */
-export const istListe = (feld: ZusatzFeld): boolean => feld.typ === 'mehrfach' || feld.typ === 'liste';
+export const istListe = (feld: ZusatzFeld): boolean =>
+  feld.typ === 'mehrfach' || feld.typ === 'liste';
 
 export function listeAus(wert: string): string[] {
   return wert
@@ -104,7 +108,9 @@ function text(wert: unknown): string {
 }
 
 function objekt(wert: unknown): Record<string, unknown> {
-  return wert && typeof wert === 'object' && !Array.isArray(wert) ? (wert as Record<string, unknown>) : {};
+  return wert && typeof wert === 'object' && !Array.isArray(wert)
+    ? (wert as Record<string, unknown>)
+    : {};
 }
 
 function stringListe(wert: unknown): wert is string[] {
@@ -167,7 +173,10 @@ function beschriftungenAus(
 }
 
 /** Anzeigetext eines gespeicherten Werts: die Beschriftung aus dem Schema, sonst der Rohwert. */
-export function anzeigeText(feld: Pick<ZusatzFeld, 'beschriftungen'> | undefined, wert: string): string {
+export function anzeigeText(
+  feld: Pick<ZusatzFeld, 'beschriftungen'> | undefined,
+  wert: string,
+): string {
   const b = feld?.beschriftungen;
   return b && Object.hasOwn(b, wert) ? b[wert] : wert;
 }
@@ -206,9 +215,13 @@ function typAus(schema: Record<string, unknown>): ZusatzTyp | null {
 export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
   const schema = objekt(art?.zusatzSchema);
   // Pflicht ist, was in `pflichtfelder` als «zusatz.<name>» steht oder im Schema unter `required` (so im Seed vhf-gsk).
-  const required = Array.isArray(schema['required']) ? schema['required'].filter((n) => typeof n === 'string') : [];
+  const required = Array.isArray(schema['required'])
+    ? schema['required'].filter((n) => typeof n === 'string')
+    : [];
   const pflicht = new Set([
-    ...(art?.pflichtfelder ?? []).filter((p) => p.startsWith('zusatz.')).map((p) => p.substring('zusatz.'.length)),
+    ...(art?.pflichtfelder ?? [])
+      .filter((p) => p.startsWith('zusatz.'))
+      .map((p) => p.substring('zusatz.'.length)),
     ...required,
   ]);
   return Object.entries(objekt(schema['properties'])).flatMap(([name, eigenschaft]) => {
@@ -218,8 +231,18 @@ export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
       return [];
     }
     const optionen =
-      typ === 'auswahl' ? (e['enum'] as string[]) : typ === 'mehrfach' ? (objekt(e['items'])['enum'] as string[]) : [];
+      typ === 'auswahl'
+        ? (e['enum'] as string[])
+        : typ === 'mehrfach'
+          ? (objekt(e['items'])['enum'] as string[])
+          : [];
     const feld: ZusatzFeld = { name, typ, optionen, pflicht: pflicht.has(name) };
+    if (typeof e['title'] === 'string') {
+      feld.titel = e['title'];
+    }
+    if (typeof e['description'] === 'string') {
+      feld.beschreibung = e['description'];
+    }
     const beschriftungen = beschriftungenAus(e, optionen);
     if (beschriftungen) {
       feld.beschriftungen = beschriftungen;
@@ -310,7 +333,12 @@ export type Ergebnis = { aenderung: DokumentAenderung } | { pruefung: Pruefung }
  * Body für den PATCH oder eine Prüfmeldung. Finanz- und Vertragsfelder gehen nur mit, wenn die (gewählte) Art die
  * Gruppe hat (sonst 400); `zusatz` ersetzt alle Zusatzwerte und geht darum ganz mit, sobald sich einer ändert.
  */
-export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular, kontext: Kontext): Ergebnis {
+export function aenderungAus(
+  dokument: Dokument,
+  start: Formular,
+  neu: Formular,
+  kontext: Kontext,
+): Ergebnis {
   const archiviert = dokument.status === 'ARCHIVIERT';
   const gruppen = kontext.art?.gruppen ?? [];
   const felder: string[] = [];
@@ -373,12 +401,19 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
     }
   }
   const zusatz = zusatzFelder(kontext.art);
-  const zusatzGeaendert = zusatz.filter((f) => (neu.zusatz[f.name] ?? '').trim() !== (start.zusatz[f.name] ?? '').trim());
+  const zusatzGeaendert = zusatz.filter(
+    (f) => (neu.zusatz[f.name] ?? '').trim() !== (start.zusatz[f.name] ?? '').trim(),
+  );
   const artGewechselt = aenderung['art'] !== undefined;
   if (zusatzGeaendert.length > 0 || artGewechselt) {
     // Altbestand: Eine Pflichtliste, die schon vorher leer war, bleibt erlaubt (wie im Archiv, DokumentAendern).
     const ungueltig = zusatz.filter(
-      (f) => !zusatzGueltig(f, neu.zusatz[f.name] ?? '', !artGewechselt && (start.zusatz[f.name] ?? '').trim() === ''),
+      (f) =>
+        !zusatzGueltig(
+          f,
+          neu.zusatz[f.name] ?? '',
+          !artGewechselt && (start.zusatz[f.name] ?? '').trim() === '',
+        ),
     );
     if (ungueltig.length > 0) {
       felder.push(...ungueltig.map((f) => `zusatz.${f.name}`));
@@ -386,12 +421,18 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
       // Bei einem Artwechsel nur Schlüssel der neuen Art behalten (additionalProperties false im Schema).
       const bekannt = new Set(Object.keys(objekt(objekt(kontext.art?.zusatzSchema)['properties'])));
       const werte: Record<string, unknown> = artGewechselt
-        ? Object.fromEntries(Object.entries(objekt(dokument.zusatz)).filter(([k]) => bekannt.has(k)))
+        ? Object.fromEntries(
+            Object.entries(objekt(dokument.zusatz)).filter(([k]) => bekannt.has(k)),
+          )
         : { ...objekt(dokument.zusatz) };
       for (const f of zusatz) {
         const wert = neu.zusatz[f.name] ?? '';
         // Unveränderte Listen bleiben im Originalwert (kein stilles Trimmen oder Aufteilen von Bestandsdaten).
-        if (istListe(f) && wert.trim() === (start.zusatz[f.name] ?? '').trim() && werte[f.name] !== undefined) {
+        if (
+          istListe(f) &&
+          wert.trim() === (start.zusatz[f.name] ?? '').trim() &&
+          werte[f.name] !== undefined
+        ) {
           continue;
         }
         if (wert.trim() === '') {

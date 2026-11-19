@@ -5,31 +5,24 @@ import { HttpUploadService } from './erfassen/http-upload.service';
 import { UploadPort } from './erfassen/upload-port';
 import { HttpKontakteService } from './kontakte/http-kontakte.service';
 import { KontaktePort } from './kontakte/kontakte-port';
-import { Folgt } from './folgt/folgt';
 import { erfassenGuard } from './gemeinsam/anmeldung/erfassen.guard';
 import { rechtGuard } from './gemeinsam/anmeldung/recht.guard';
-import { Aktion } from './gemeinsam/anmeldung/rechte';
 import { TEXTE } from './gemeinsam/texte.de-CH';
 import { Rueckruf } from './start/rueckruf';
 import { Start } from './start/start';
 import { HttpSucheService } from './suche/http-suche.service';
 import { SuchePort } from './suche/suche-port';
+import { verwaltungGuard } from './verwaltung/dokumentarten/verwaltung.guard';
 
 const titel = (seite: string) => `${seite} · ${TEXTE.appTitel}`;
 
-// Seiten späterer Aufgaben: Route und Recht stehen, der Inhalt folgt (design.md «Frontend»)
-function folgt(path: string, seite: string, aktion: Aktion): Route {
-  return {
-    path,
-    component: Folgt,
-    canActivate: [rechtGuard(aktion)],
-    data: { titel: seite },
-    title: titel(seite),
-  };
-}
-
 export const routes: Routes = [
   { path: '', pathMatch: 'full', component: Start, title: TEXTE.appTitel },
+  {
+    path: 'nicht-gefunden',
+    loadComponent: () => import('./start/nicht-gefunden').then((m) => m.NichtGefunden),
+    title: TEXTE.seiteNichtGefunden.titel,
+  },
   { path: 'anmeldung', component: Rueckruf, title: TEXTE.appTitel },
   {
     path: 'erfassen',
@@ -84,7 +77,12 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A12')],
     title: titel(TEXTE.menue.importe),
   },
-  folgt('verwaltung/dokumentarten', TEXTE.menue.dokumentarten, 'A11'),
+  {
+    path: 'verwaltung/dokumentarten',
+    loadComponent: () => import('./verwaltung/dokumentarten/verwaltung').then((m) => m.Verwaltung),
+    canActivate: [verwaltungGuard],
+    title: titel(TEXTE.menue.dokumentarten),
+  },
   {
     path: 'verwaltung/protokoll',
     loadComponent: () => import('./verwaltung/protokoll/protokoll').then((m) => m.Protokoll),

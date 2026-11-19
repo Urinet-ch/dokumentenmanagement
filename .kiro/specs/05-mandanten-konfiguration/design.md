@@ -136,6 +136,19 @@ und verlangen ab dieser Spec ebenfalls `If-Match` (Folgeänderung Spec 01); `PAT
 zusätzlich 422 `KLASSIFIKATION_UNGUELTIG` und 422 `REGEL_VERLETZT` liefern; Warnungen erscheinen in `warnungen[]` wie
 `BELEGNUMMER_BEKANNT`. `GET/PATCH /mandant/einstellungen` verliert `eigene_arten` (Req 2.2).
 
+## Verwaltungsseiten (Aufgabe 18.3)
+Die Angular-Seite liegt unter `/verwaltung/dokumentarten` und nutzt den generierten API-Client. Der Route-Guard lässt
+nur Benutzer mit A11 auf die Seite; ohne A11 führt er auf eine neutrale 404-Seite, ohne den gemeinsamen Rechte-Guard
+zu verändern. Die Eingaben für einzelne Änderungen verwenden den zuletzt empfangenen Konfigurations-`ETag` als
+`If-Match`. Bei 412 bleibt das Formular unverändert; die Meldung enthält keine Serverdetails.
+
+Der Feld-Editor bildet nur die unterstützten Schemaformen ab. Nicht darstellbare Zusatz-Schemas erscheinen
+ausschliesslich im JSON-Editor. Konfigurationsversionen zeigen Zeitstempel in `Europe/Zurich`; Differenzen unter
+`kennungen`, `iban` oder `uid` zeigen keine Werte. Eine Konfigurationsdatei lässt sich erst nach erfolgreicher Prüfung
+und Vergleich mit passender Basisversion einspielen. Bei 409 `KONFIGURATION_VERALTET` bleiben Datei und Grund erhalten,
+die Vorschau wird verworfen und muss neu erstellt werden. Das Einspielen verlangt einen Änderungsgrund im Header
+`X-Aenderungsgrund`; Auswirkungen auf Dokumente zeigt die Vorschau aus `/konfiguration/vergleichen`.
+
 ## Admin-Kommando
 ```
 archiv mandant konfiguration exportieren <code> [<datei>]
