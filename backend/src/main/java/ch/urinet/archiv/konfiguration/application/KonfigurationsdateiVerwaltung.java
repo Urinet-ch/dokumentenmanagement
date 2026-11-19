@@ -127,6 +127,31 @@ public class KonfigurationsdateiVerwaltung {
                 aktuell.klassifikationen(), aktuell.regeln(), texte);
     }
 
+    /**
+     * Spielt den Seed eines neuen Mandanten als eine Version mit Quelle {@code SEED} ein (Req 1.5). Idempotent: Hat der
+     * Mandant schon eine solche Version (abgebrochene Provisionierung nach dem Seed), bleibt alles unverändert.
+     */
+    public int seedEinspielen(Konfiguration seed) {
+        List<Befund> befunde = new ArrayList<>(seed.pruefen());
+        // Die KI-Texte gibt erst der Inhaber frei (Req 6.6, 8.4); ein Seed mit Freigabe ergäbe ein Abbild, das nicht
+        // zur Tabelle ki_texte passt.
+        if (seed.kiTexte() != null && seed.kiTexte().kiFreigegeben()) {
+            befunde.add(new Befund("kiTexte.kiFreigegeben", "KI_FREIGABE_UNGUELTIG",
+                    "Ein Seed darf die KI-Texte nicht freigeben."));
+        }
+        if (!befunde.isEmpty()) {
+            throw new KonfigurationUngueltig(befunde.stream()
+                    .map(befund -> new KonfigurationUngueltig.Befund(befund.pfad(), befund.code(), befund.meldung()))
+                    .toList());
+        }
+        konfiguration.aenderungStarten(konfiguration.aktuelleVersion());
+        if (konfiguration.versionen().stream().anyMatch(v -> v.quelle() == KonfigurationQuelle.SEED)) {
+            return konfiguration.aktuelleVersion();
+        }
+        speichern(seed);
+        return konfiguration.aenderungSpeichern("system:seed", null, KonfigurationQuelle.SEED);
+    }
+
     public KiTexte kiTexte() {
         return kiTexte.lesen();
     }

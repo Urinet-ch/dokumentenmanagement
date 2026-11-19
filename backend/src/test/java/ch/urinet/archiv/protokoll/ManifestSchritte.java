@@ -132,6 +132,8 @@ public class ManifestSchritte {
     private final List<StubMapping> stoerungen = new ArrayList<>();
     /** Erwartete kanonische Zeile je {@code <tabelle>/<id>}, unabhängig von {@code JdbcManifestDaten} gebildet. */
     private final Map<String, Map<String, Object>> zeilen = new LinkedHashMap<>();
+    private int protokollZeilen;
+    private int dokumentVersionsZeilen;
     private long auftrag;
     private LocalDate planerGestern;
     private List<String> versionenVorher = List.of();
@@ -288,6 +290,7 @@ public class ManifestSchritte {
             p.setTimestamp(1, Timestamp.from(zeit(datum, uhrzeit)));
             p.executeUpdate();
         }
+        protokollZeilen++;
     }
 
     @Angenommen("das Dokument «{word}» von «{word}» hat eine PDF\\/A-Fassung")
@@ -330,6 +333,7 @@ public class ManifestSchritte {
         zeile.put("ip", "192.0.2.7/32");
         zeile.put("details", JSON.readValue(details, Map.class));
         zeilen.put("zugriff_protokoll/" + id, zeile);
+        protokollZeilen++;
     }
 
     @Angenommen("im Mandanten «{word}» steht am «{word}» um «{word}» eine Metadaten-Version des Dokuments «{word}»")
@@ -358,6 +362,7 @@ public class ManifestSchritte {
         zeile.put("geaendert_von", "inhaber");
         zeile.put("grund", "Probe");
         zeilen.put("dokument_version/" + id, zeile);
+        dokumentVersionsZeilen++;
     }
 
     @Angenommen("der Pfad «{word}» des Zeitstempeldiensts antwortet mit HTTP {int}")
@@ -617,9 +622,8 @@ public class ManifestSchritte {
                 assertThat(sha256(Jcs.utf8(geaendert))).as(e.getKey() + " " + spalte).isNotEqualTo(blatt.getFirst());
             }
         }
-        assertThat(daten(alias, "select count(*) from %s.protokoll_blatt")).containsExactly(
-                daten(alias, "select (select count(*) from %s.zugriff_protokoll) + (select count(*) from "
-                        + schema(alias) + ".dokument_version)").getFirst());
+        assertThat(daten(alias, "select count(*) from %s.protokoll_blatt"))
+                .containsExactly((long) protokollZeilen + dokumentVersionsZeilen);
     }
 
     @Dann("das Manifest «{word}» von «{word}» nennt nur den eigenen Mandanten und genau seine Dokumente")

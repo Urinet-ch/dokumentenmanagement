@@ -112,7 +112,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         KonfigurationsVersion gespeichert = repository.anlegen(neu.version(), wer, grund,
                 quelle, neu);
         cache.invalidieren(mandantAktuell());
-        protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), grund, vorher.aenderungen(neu));
+        protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), wer, grund, vorher.aenderungen(neu));
         return gespeichert.version();
     }
 

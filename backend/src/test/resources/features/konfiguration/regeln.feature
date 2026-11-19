@@ -212,6 +212,43 @@ Funktionalität: Regeln je Mandant
       """
     Dann antwortet die Regelverwaltung mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
 
+  @req-7.1 @req-1.3 @req-7.6
+  Szenario: Der Inhaber löscht eine Regel in genau einer neuen Konfigurationsversion
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Wenn «inhaber-urinet» eine Regel mit dem aktuellen Stand anlegt:
+      """
+      {"code":"probe_loeschen","art":"AUSGANGSRECHNUNG","typ":"EINDEUTIG",
+       "parameter":{"felder":["titel"]},"schwere":"WARNUNG","meldung":"Probe."}
+      """
+    Dann antwortet die Regelverwaltung mit Status 201
+    Wenn «inhaber-urinet» die Regel «probe_loeschen» ohne If-Match löscht
+    Dann antwortet die Regelverwaltung mit Status 428 und Fehlercode «VERSION_FEHLT»
+    Wenn «inhaber-urinet» die Regel «probe_loeschen» mit der Version «1» löscht
+    Dann antwortet die Regelverwaltung mit Status 412 und Fehlercode «VERSION_KONFLIKT»
+    Wenn «inhaber-vhf-gsk» die Regel «probe_loeschen» mit dem aktuellen Stand löscht
+    Dann antwortet die Regelverwaltung mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Angenommen der Konfigurationsstand von «urinet» ist gemerkt
+    Wenn «inhaber-urinet» die Regel «probe_loeschen» mit dem aktuellen Stand löscht
+    Dann ist die Regel «probe_loeschen» von «inhaber-urinet» in genau einer neuen Konfigurationsversion gelöscht
+    Wenn «inhaber-urinet» die Regel «probe_loeschen» mit dem aktuellen Stand löscht
+    Dann antwortet die Regelverwaltung mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+
+  @req-7.1
+  Szenariogrundriss: Regeln löschen darf ausser dem Inhaber keine Rolle, auch nicht <benutzer>
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und der Stand des Zugriffsprotokolls von «<mandant>» ist gemerkt
+    Wenn «<benutzer>» die Regel «<regel>» mit der Version «1» löscht
+    Dann antwortet die Regelverwaltung mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag:
+      | benutzer   | rolle   | aktion     | dokument | ip | grund | fehlercode    |
+      | <benutzer> | <rolle> | VERWEIGERT |          |    | A11   | NICHT_ERLAUBT |
+
+    Beispiele:
+      | benutzer                 | mandant | rolle            | regel                  |
+      | mitarbeiter-urinet       | urinet  | MITARBEITER      | ausgangsrechnung_folge |
+      | treuhaender-urinet       | urinet  | TREUHAENDER      | ausgangsrechnung_folge |
+      | geschaeftsstelle-vhf-gsk | vhf-gsk | GESCHAEFTSSTELLE | probe_ohne_recht       |
+
   @req-7.1
   Szenariogrundriss: Regeln anlegen und ändern darf ausser dem Inhaber keine Rolle, auch nicht <benutzer>
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt

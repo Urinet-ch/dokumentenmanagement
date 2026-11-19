@@ -61,7 +61,8 @@ archivieren(pdf_pfad, {"art": "OFFERTE", "titel": titel, "datum": datum.isoforma
                        "zusatz": {"angebot_gueltig_bis": gueltig_bis.isoformat()}})
 ```
 
-Pflicht sind die Pflichtfelder der Art (Seed `dokumentarten.json`, Feldnamen in camelCase). Ist der Standard der
+Pflicht sind die Pflichtfelder der Art (Konfiguration des Mandanten, Seed `seed/<code>/konfiguration.json`, Feldnamen
+in camelCase). Ist der Standard der
 Art `PERSONAL` (z. B. `LOHNABRECHNUNG`), sind zusätzlich `vertraulichkeit` und `personBenutzer` (Keycloak-ID `sub`
 des betroffenen Mitarbeiters) Pflicht. Zusatzfelder der Art stehen unter `zusatz`.
 

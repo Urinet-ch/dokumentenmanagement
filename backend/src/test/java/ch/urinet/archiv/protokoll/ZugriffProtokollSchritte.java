@@ -145,7 +145,7 @@ public class ZugriffProtokollSchritte {
     public void kennungenProtokollieren(String mandant) {
         CompletableFuture.runAsync(() -> kontext.mit(new MandantCode(mandant),
                 () -> QuarkusTransaction.requiringNew().run(() -> konfigurationsProtokoll.schreiben(
-                        7, KonfigurationQuelle.APP, "Synthetische Kennungsprobe", List.of(
+                        7, KonfigurationQuelle.APP, "test:kennungen", "Synthetische Kennungsprobe", List.of(
                                 new Konfiguration.Aenderung("einstellungen.kennungen.uid",
                                         "CHE-000.000.001", "CHE-000.000.002"),
                                 new Konfiguration.Aenderung("einstellungen.kennungen.ibans",

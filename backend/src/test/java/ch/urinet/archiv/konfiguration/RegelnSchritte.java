@@ -244,6 +244,67 @@ public class RegelnSchritte {
         antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(body).patch("/api/v1/regeln/" + code);
     }
 
+    @Wenn("«{word}» die Regel «{word}» ohne If-Match löscht")
+    public void regelOhneVersionLoeschen(String benutzer, String code) {
+        antwort = gegeben(benutzer).delete("/api/v1/regeln/" + code);
+    }
+
+    @Wenn("«{word}» die Regel «{word}» mit der Version «{word}» löscht")
+    public void regelMitVersionLoeschen(String benutzer, String code, String version) {
+        antwort = gegeben(benutzer).header("If-Match", "\"" + version + "\"").delete("/api/v1/regeln/" + code);
+    }
+
+    @Wenn("«{word}» die Regel «{word}» mit dem aktuellen Stand löscht")
+    public void regelLoeschen(String benutzer, String code) {
+        antwort = mitVersion(benutzer).delete("/api/v1/regeln/" + code);
+    }
+
+    /** Req 7.1, 1.3: 204 mit neuem ETag, Regel weg aus Tabelle, Liste und neuer Version (APP), ein Protokolleintrag. */
+    @Dann("ist die Regel «{word}» von «{word}» in genau einer neuen Konfigurationsversion gelöscht")
+    public void regelGeloescht(String code, String benutzer) throws SQLException {
+        int neueVersion = gemerkteVersion + 1;
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(204);
+        assertThat(antwort.getHeader("ETag")).isEqualTo("\"" + neueVersion + "\"");
+        Response liste = gegeben(benutzer).get("/api/v1/regeln");
+        assertThat(liste.getHeader("ETag")).isEqualTo("\"" + neueVersion + "\"");
+        assertThat(liste.jsonPath().<String>getList("code")).doesNotContain(code).isNotEmpty();
+        String schema = new MandantCode(mandant(benutzer)).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement versionen = verbindung.prepareStatement("select v.version, v.quelle, v.wer, "
+                     + "jsonb_path_exists(v.inhalt, '$.regeln[*] ? (@.code == $c)', jsonb_build_object('c', ?::text)), "
+                     + "jsonb_array_length(v.inhalt -> 'regeln') from " + schema + ".konfiguration_version v "
+                     + "where v.version > ?");
+             PreparedStatement tabelle = verbindung.prepareStatement("select count(*) from " + schema
+                     + ".regel where code = ?");
+             PreparedStatement protokoll = verbindung.prepareStatement("select count(*), min(benutzer) from "
+                     + schema + ".zugriff_protokoll where id > ? and aktion = 'KONFIGURATION_AENDERN'")) {
+            String wer;
+            versionen.setString(1, code);
+            versionen.setInt(2, gemerkteVersion);
+            try (var ergebnis = versionen.executeQuery()) {
+                assertThat(ergebnis.next()).as("neue Konfigurationsversion").isTrue();
+                assertThat(ergebnis.getInt(1)).isEqualTo(neueVersion);
+                assertThat(ergebnis.getString(2)).isEqualTo("APP");
+                wer = ergebnis.getString(3);
+                assertThat(wer).as("wer der Version").isNotBlank();
+                assertThat(ergebnis.getBoolean(4)).as("Regel im Abbild der Version").isFalse();
+                assertThat(ergebnis.getInt(5)).as("übrige Regeln bleiben").isPositive();
+                assertThat(ergebnis.next()).as("genau eine neue Version").isFalse();
+            }
+            tabelle.setString(1, code);
+            try (var ergebnis = tabelle.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getLong(1)).as("Regel in der Tabelle").isZero();
+            }
+            protokoll.setLong(1, gemerktesProtokoll);
+            try (var ergebnis = protokoll.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getLong(1)).as("Konfigurationseinträge im Zugriffsprotokoll").isEqualTo(1);
+                assertThat(ergebnis.getString(2)).as("Benutzer im Protokoll wie wer der Version").isEqualTo(wer);
+            }
+        }
+    }
+
     @Angenommen("der Konfigurationsstand von «{word}» ist gemerkt")
     public void konfigurationsstandMerken(String mandant) throws SQLException {
         String schema = new MandantCode(mandant).schema();

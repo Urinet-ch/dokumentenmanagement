@@ -1,0 +1,44 @@
+{
+  "format": 1,
+  "einstellungen": {
+    "geschaeftsjahrEnde": "12-31",
+    "kennungen": {
+      "uid": null,
+      "ibans": []
+    }
+  },
+  "kiTexte": {
+    "rolle": "",
+    "feldregeln": "",
+    "kiFreigegeben": false
+  },
+  "klassifikationen": [],
+  "arten": [
+    {
+      "code": "KI_PROBE",
+      "name": "KI-Probe",
+      "gruppen": [],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": 10,
+        "ab": "GESCHAEFTSJAHR"
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "additionalProperties": false,
+        "type": "object"
+      }
+    }
+  ],
+  "regeln": [],
+  "_zweck": "Synthetischer Seed nur für Tests (Nachprüfung PR #109, Changeset 022)"
+}

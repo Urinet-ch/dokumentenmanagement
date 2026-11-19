@@ -50,6 +50,32 @@ public class PanacheMandantRegister implements MandantRegister, MandantAbbauRegi
 
     @Override
     @Transactional
+    public Optional<Mandant> inProvisionierung(MandantCode code) {
+        MandantEintrag eintrag = MandantEintrag.findById(code.wert());
+        if (eintrag == null || !inProvisionierung(eintrag)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Mandant(code, eintrag.name, eintrag.schemaName, eintrag.bucket,
+                new Geschaeftsjahresende(eintrag.geschaeftsjahrEnde), false));
+    }
+
+    @Override
+    @Transactional
+    public void aktivieren(MandantCode code) {
+        MandantEintrag eintrag = MandantEintrag.findById(code.wert());
+        if (eintrag == null || !inProvisionierung(eintrag)) {
+            throw new IllegalStateException("Mandant nicht in Provisionierung: " + code.wert());
+        }
+        eintrag.aktiv = true;
+    }
+
+    private static boolean inProvisionierung(MandantEintrag eintrag) {
+        return !eintrag.aktiv && eintrag.deaktiviertAm == null && eintrag.vollexportBestaetigt == null
+                && !eintrag.abbauAbgeschlossen;
+    }
+
+    @Override
+    @Transactional
     public Optional<Instant> erstellt(MandantCode code) {
         MandantEintrag eintrag = MandantEintrag.findById(code.wert());
         return eintrag == null ? Optional.empty() : Optional.of(eintrag.erstellt.toInstant());

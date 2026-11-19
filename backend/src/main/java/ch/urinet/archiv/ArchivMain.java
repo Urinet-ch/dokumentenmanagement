@@ -3,6 +3,7 @@ package ch.urinet.archiv;
 import ch.urinet.archiv.integration.adapter.in.kommando.AlteLinksKommando;
 import ch.urinet.archiv.integration.adapter.in.kommando.MailKommando;
 import ch.urinet.archiv.integration.adapter.in.kommando.MailPasswortEingabe;
+import ch.urinet.archiv.konfiguration.adapter.in.kommando.KonfigurationKommando;
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
@@ -70,6 +71,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     MandantKommando mandant;
+
+    @Inject
+    KonfigurationKommando konfiguration;
 
     @Inject
     TokenKommando token;
@@ -165,8 +169,10 @@ public class ArchivMain implements QuarkusApplication {
         List<String> liste = List.of(argumente);
         List<String> rest = liste.subList(1, liste.size());
         return switch (liste.getFirst()) {
-            case "mandant" -> MandantKommando.gueltig(rest) ? Optional.empty()
-                    : Optional.of(MandantKommando.AUFRUF);
+            case "mandant" -> !rest.isEmpty() && rest.getFirst().equals("konfiguration")
+                    ? KonfigurationKommando.gueltig(rest.subList(1, rest.size())) ? Optional.empty()
+                            : Optional.of(KonfigurationKommando.AUFRUF)
+                    : MandantKommando.gueltig(rest) ? Optional.empty() : Optional.of(MandantKommando.AUFRUF);
             case "token" -> TokenKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(TokenKommando.AUFRUF);
             case "webseite" -> rest.size() >= 1 && rest.getFirst().equals("schluessel")
@@ -236,6 +242,9 @@ public class ArchivMain implements QuarkusApplication {
             case "mail" -> mail.ausfuehren(rest, MailPasswortEingabe::nehmen, System.err);
             case "alte-links" -> alteLinks.ausfuehren(rest, ergebnis, System.err);
             case "embedding" -> embedding.ausfuehren(rest, ergebnis, System.err);
+            case "mandant" -> !rest.isEmpty() && rest.getFirst().equals("konfiguration")
+                    ? konfiguration.ausfuehren(rest.subList(1, rest.size()), ergebnis, System.err)
+                    : mandant.ausfuehren(rest, ergebnis, System.err);
             default -> mandant.ausfuehren(rest, ergebnis, System.err);
         };
     }

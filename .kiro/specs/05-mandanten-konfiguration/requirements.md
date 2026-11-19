@@ -85,8 +85,9 @@ damit ein Verband andere Kategorien, Fristen und Regeln erhält als eine Firma, 
    Nachweis: JUnit (Test gegen `UPDATE`, `DELETE` und `TRUNCATE`).
 6. WENN ein neuer Mandant angelegt wird (Spec 01, 1.5; Spec 03, 1.1), DANN SOLL das Archiv seine Konfiguration
    aus `backend/src/main/resources/seed/<code>/konfiguration.json` und dem mandantenunabhängigen Seed-Teil
-   (Spec 04, 1.1) als Version 1 mit Quelle `SEED` einspielen. Spec 05 ergänzt Spec 01, 1.5: Diese Datei ersetzt
-   `seed/<code>/dokumentarten.json`.
+   (Spec 04, 1.1) mit Quelle `SEED` einspielen. Der Konfigurations-Snapshot aus der Schema-Migration bleibt Version 1
+   mit Quelle `MIGRATION`; der Seed wird als nächste Konfigurationsversion angelegt. Spec 05 ergänzt Spec 01, 1.5:
+   Diese Datei ersetzt `seed/<code>/dokumentarten.json`.
 7. WENN sich die Konfiguration ändert, während Dokumente in Verarbeitung oder im Eingangskorb liegen, DANN SOLL das
    Archiv diese Dokumente bei der Bestätigung nach der dann gültigen Version prüfen; ein schon erzeugter
    KI-Vorschlag SOLL bleiben, Werte, die es in der neuen Version nicht mehr gibt, SOLL der Eingangskorb als

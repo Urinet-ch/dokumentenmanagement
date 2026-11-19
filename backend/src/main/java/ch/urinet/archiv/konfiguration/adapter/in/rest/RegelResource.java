@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.PATCH;
@@ -186,6 +187,28 @@ public class RegelResource {
                 grund(objekt));
         return Response.ok(RegelDto.aus(ergebnis.regel(), ergebnis.betroffeneDokumente()))
                 .tag(new EntityTag(Integer.toString(ergebnis.version()))).build();
+    }
+
+    @DELETE
+    @Path("/{code}")
+    @ErfordertAktion(Aktion.A11)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Dokumentregel löschen",
+            description = "Neue Konfigurationsversion; bestehende Dokumente bleiben unverändert. "
+                    + "If-Match mit Konfigurationsversion ist Pflicht (Spec 05, Req 7.1).")
+    @APIResponse(responseCode = "204", description = "Gelöscht",
+            headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
+                    name = "ETag", description = "Neue Konfigurationsversion"))
+    @APIResponse(responseCode = "403", description = "NICHT_ERLAUBT")
+    @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN")
+    @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
+    @APIResponse(responseCode = "422", description = "KONFIGURATION_UNGUELTIG")
+    @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
+    public Response loeschen(@PathParam("code") String code,
+                             @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch) {
+        aufloesung.pruefen();
+        int neueVersion = verwaltung.loeschen(code, version(ifMatch), wer(), null);
+        return Response.noContent().tag(new EntityTag(Integer.toString(neueVersion))).build();
     }
 
     private String wer() {

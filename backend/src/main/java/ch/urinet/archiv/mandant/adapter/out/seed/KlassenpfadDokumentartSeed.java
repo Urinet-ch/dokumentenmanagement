@@ -15,8 +15,9 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Liest {@code seed/<code>/dokumentarten.json} vom Klassenpfad. Felder mit {@code _} am Anfang (Entwurf, Fragen) fallen
- * weg; jedes andere unbekannte Feld bricht ab, damit Seed und Tabelle nicht still auseinanderlaufen.
+ * Übergangshilfe für KI-Tests; die Mandanten-Provisionierung liest {@code konfiguration.json} über
+ * {@link KlassenpfadKonfigurationSeed}. Der statische Leser bleibt für den mandantenunabhängigen Seed der
+ * {@code WISSENSQUELLE} zuständig.
  */
 @ApplicationScoped
 public class KlassenpfadDokumentartSeed implements DokumentartSeed {
@@ -34,15 +35,113 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
 
     @Override
     public List<DokumentartVorlage> lesen(MandantCode code) {
-        String pfad = "seed/" + code.wert() + "/dokumentarten.json";
+        String pfad = "seed/" + code.wert() + "/konfiguration.json";
         try (InputStream inhalt = KlassenpfadDokumentartSeed.class.getClassLoader().getResourceAsStream(pfad)) {
             if (inhalt == null) {
                 throw new MandantFehler(MandantFehler.Grund.SEED_FEHLT, "Kein Seed für Mandant " + code.wert());
             }
-            return vorlagen(json.readTree(inhalt), pfad);
+            JsonNode wurzel = json.readTree(inhalt);
+            JsonNode arten = wurzel.path("arten");
+            if (!arten.isArray() || arten.isEmpty()) {
+                throw ungueltig(pfad, "keine Dokumentarten");
+            }
+            List<DokumentartVorlage> ergebnis = new ArrayList<>();
+            for (JsonNode art : arten) {
+                JsonNode aufbewahrung = art.path("aufbewahrung");
+                ergebnis.add(new DokumentartVorlage(konfigText(art, "code", pfad), konfigText(art, "name", pfad),
+                        konfigOptionalText(art, "beschreibung", pfad), konfigListe(art, "gruppen", pfad),
+                        konfigListe(art, "pflichtfelder", pfad),
+                        art.path("zusatzSchema").isMissingNode() ? null : art.path("zusatzSchema").toString(),
+                        konfigText(art, "vertraulichkeit", pfad), konfigJahre(aufbewahrung, pfad),
+                        konfigOptionalText(aufbewahrung, "ab", pfad), konfigBoolesch(art, "gesetzlichePflicht", pfad),
+                        konfigBoolesch(art, "aktiv", true, pfad), konfigBoolesch(art, "selbstAusgestellt", false, pfad),
+                        konfigListe(art, "belegnummerMuster", pfad), konfigOptionalText(art, "fremdbelegArt", pfad),
+                        konfigOptionalText(art, "ohneZahlungsdatenArt", pfad),
+                        konfigBoolesch(art, "kiVorschlag", true, pfad), konfigListe(art, "kiFelder", pfad),
+                        konfigOptionalText(art, "kiHinweise", pfad), konfigGanzzahl(art, "reihenfolge", 0, pfad),
+                        konfigOptionalText(aufbewahrung, "feld", pfad)));
+            }
+            return List.copyOf(ergebnis);
         } catch (IOException e) {
             throw new MandantFehler(MandantFehler.Grund.SEED_UNGUELTIG, "Seed nicht lesbar: " + pfad, e);
         }
+    }
+
+    private static Integer konfigJahre(JsonNode aufbewahrung, String pfad) {
+        JsonNode jahre = aufbewahrung.path("jahre");
+        if (jahre.isNull()) {
+            return null;
+        }
+        if (!jahre.isIntegralNumber() || !jahre.canConvertToInt()) {
+            throw ungueltig(pfad, "Feld aufbewahrung.jahre fehlt oder ist keine Zahl");
+        }
+        return jahre.intValue();
+    }
+
+    private static String konfigText(JsonNode objekt, String feld, String pfad) {
+        JsonNode wert = objekt.path(feld);
+        if (!wert.isTextual() || wert.asText().isBlank()) {
+            throw ungueltig(pfad, "Feld " + feld + " fehlt");
+        }
+        return wert.asText();
+    }
+
+    private static String konfigOptionalText(JsonNode objekt, String feld, String pfad) {
+        JsonNode wert = objekt.path(feld);
+        if (wert.isMissingNode() || wert.isNull()) {
+            return null;
+        }
+        if (!wert.isTextual() || wert.asText().isBlank()) {
+            throw ungueltig(pfad, "Feld " + feld + " ist kein nicht leerer Text");
+        }
+        return wert.asText();
+    }
+
+    private static boolean konfigBoolesch(JsonNode objekt, String feld, String pfad) {
+        if (!objekt.path(feld).isBoolean()) {
+            throw ungueltig(pfad, "Feld " + feld + " fehlt oder ist nicht boolesch");
+        }
+        return objekt.path(feld).booleanValue();
+    }
+
+    private static boolean konfigBoolesch(JsonNode objekt, String feld, boolean standard, String pfad) {
+        JsonNode wert = objekt.path(feld);
+        if (wert.isMissingNode()) {
+            return standard;
+        }
+        if (!wert.isBoolean()) {
+            throw ungueltig(pfad, "Feld " + feld + " ist nicht boolesch");
+        }
+        return wert.booleanValue();
+    }
+
+    private static int konfigGanzzahl(JsonNode objekt, String feld, int standard, String pfad) {
+        JsonNode wert = objekt.path(feld);
+        if (wert.isMissingNode()) {
+            return standard;
+        }
+        if (!wert.isIntegralNumber() || !wert.canConvertToInt()) {
+            throw ungueltig(pfad, "Feld " + feld + " ist keine Ganzzahl");
+        }
+        return wert.intValue();
+    }
+
+    private static List<String> konfigListe(JsonNode objekt, String feld, String pfad) {
+        JsonNode knoten = objekt.path(feld);
+        if (knoten.isMissingNode()) {
+            return List.of();
+        }
+        if (!knoten.isArray()) {
+            throw ungueltig(pfad, "Feld " + feld + " ist kein Array");
+        }
+        List<String> werte = new ArrayList<>();
+        for (JsonNode wert : knoten) {
+            if (!wert.isTextual()) {
+                throw ungueltig(pfad, "Feld " + feld + " enthält einen Nicht-Text");
+            }
+            werte.add(wert.textValue());
+        }
+        return werte;
     }
 
     static List<DokumentartVorlage> vorlagen(JsonNode wurzel, String pfad) {
