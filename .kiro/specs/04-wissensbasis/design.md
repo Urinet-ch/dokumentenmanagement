@@ -1069,7 +1069,7 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
 - `GET /dokumente/{id}` liefert die direkt verwendenden, nach A15 und Hülle sichtbaren Seiten als `wissensseiten`;
   der bestehende Dokumentfilter im Index bleibt für die Oberfläche erhalten. Die spätere Löschfunktion muss das
   Dokumentereignis vor dem Entfernen der Hülle auslösen. Lint und Werkzeug `wissen_seite_zeigen` folgen in ihren
-  eigenen Aufgaben 15.3 und 15.2.
+  eigenen Aufgaben 15.4 und 15.2.
 
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).

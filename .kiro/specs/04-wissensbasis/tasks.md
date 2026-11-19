@@ -89,9 +89,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 7.1–7.5_
   - _Abhängig von: 14.2_
 
-- [ ] 14.4 Änderungen an Quelldokumenten [Backend]
+- [x] 14.4 Änderungen an Quelldokumenten [Backend]
   - `QuelldokumentBeobachter` auf `DokumentEreignisse.geaendert` (Metadaten-Versionen, Vertraulichkeit, Art und Status); Neuberechnung nie unter die Mindeststufe; Hinweis «Quelle prüfen» und Bestätigung (A17, Logeintrag `UPDATE`); Dokument wird `PERSONAL` → «Quelle prüfen», vom Lint ausgenommen; aktueller Dokumenttitel in Quelleneinträgen; `GET /dokumente/{id}` liefert verwendende Seiten
   - Szenario: Dokument nach A8 auf `INTERN` → `mitarbeiter` sieht die Seite ab der nächsten Anfrage nicht mehr
+  - Vermerk: Lint, Chat-Werkzeug und Löschfunktion entstehen erst in 15.4, 15.2 bzw. Spec 01, 9.9; dort sind die
+    Ausnahmen für `PERSONAL`, der Prüfhinweis und die Ereignismeldung beim Löschen nachzuweisen.
   - _Anforderungen: 11.3, 15.1–15.5_
   - _Abhängig von: 13.5, 14.1 (Port `DokumentEreignisse`)_
 
