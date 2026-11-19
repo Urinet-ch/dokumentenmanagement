@@ -47,6 +47,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -442,6 +443,36 @@ public class AblageStub implements AblagePort {
             throw new IllegalArgumentException("Nur Versionen unter archiv/, manifest/ oder eingang/: " + schluessel);
         }
         return kopieSchreiben(mandant, schluessel, versionId, ziel);
+    }
+
+    @Override
+    public synchronized Kopie sicherungsManifestKopie(MandantCode mandant, String schluessel, String sha256,
+                                                        OutputStream ziel) {
+        Objects.requireNonNull(ziel, "ziel");
+        if (schluessel == null || sha256 == null || !schluessel.startsWith("manifest/")
+                || !sha256.matches("[0-9a-fA-F]{64}")) {
+            throw new IllegalArgumentException("Ungültige Manifest-Referenz");
+        }
+        // gleiche Reihenfolge und Meldungen wie S3Ablage; der Stub kennt keine Löschmarken, nur Versionen
+        List<Version> vorhanden = liste(mandant, schluessel);
+        if (vorhanden.isEmpty()) {
+            throw new IllegalStateException("Manifest-Teil fehlt: " + schluessel);
+        }
+        if (vorhanden.size() > 1) {
+            throw new IllegalStateException("Unter " + schluessel + " liegen weitere Versionen oder Löschmarken");
+        }
+        Version version = vorhanden.getFirst();
+        byte[] daten = lesen(version);
+        String tatsaechlich = Pruefsumme.von(daten);
+        if (!tatsaechlich.equalsIgnoreCase(sha256)) {
+            throw new IllegalStateException("Prüfsumme des Manifest-Teils weicht ab: " + schluessel);
+        }
+        try {
+            ziel.write(daten);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return new Kopie(tatsaechlich, daten.length);
     }
 
     private Kopie kopieSchreiben(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {

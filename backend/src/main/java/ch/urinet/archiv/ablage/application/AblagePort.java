@@ -115,11 +115,13 @@ public interface AblagePort {
                                    Optional<LocalDate> spaetestesAufbewahrenBis);
 
     /**
-     * Liest die älteste Version eines Manifest-Teils (Aufgabe 5.2: Wiederholung und Prüfwerkzeug); leer, wenn er fehlt
-     * (auch wenn unter dem Schlüssel nur Löschmarken liegen). {@link ManifestDatei#weitere()} zählt weitere Versionen und
-     * Löschmarken. Teile über {@link #MANIFEST_MAX_GROESSE} brechen ab, damit der Heap begrenzt bleibt (Req 16.18). Ist
-     * die älteste Version nicht eindeutig, bricht der Aufruf mit {@code MehrdeutigeVersion} ab; ist der Object Storage
-     * vorübergehend gestört, mit {@code AblageGestoert} (Prüflauf, Aufgabe 5.3).
+     * Liest den Manifest-Teil über seinen Schlüssel, leer, wenn er fehlt (auch wenn unter dem Schlüssel nur
+     * Löschmarken liegen). Die zurückgegebene Versions-ID ist nur Zusatzinformation: Nach einer Wiederherstellung ist
+     * sie neu vergeben; Prüflauf und Export vergleichen die gelesene SHA-256 mit dem festgehaltenen Hash. {@link
+     * ManifestDatei#weitere()} zählt weitere Versionen und Löschmarken. Teile über {@link #MANIFEST_MAX_GROESSE}
+     * brechen ab, damit der Heap begrenzt bleibt (Req 16.18). Ist die älteste Version nicht eindeutig, bricht der
+     * Aufruf mit {@code MehrdeutigeVersion} ab; ist der Object Storage vorübergehend gestört, mit {@code AblageGestoert}
+     * (Prüflauf, Aufgabe 5.3).
      */
     Optional<ManifestDatei> lesenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil);
 
@@ -211,6 +213,12 @@ public interface AblagePort {
      * Sicherungsexport: liest eine Version unter {@code archiv/}, {@code manifest/} oder {@code eingang/} stromweise.
      */
     Kopie sicherungsKopie(MandantCode mandant, String schluessel, String versionId, OutputStream ziel);
+
+    /**
+     * Liest einen Manifest-Teil nach Schlüssel und erwarteter SHA-256. Die Versions-ID aus der Datenbank wird bewusst
+     * nicht verwendet, weil sie nach einer Wiederherstellung auf die Quelle statt auf den Ziel-Bucket zeigt.
+     */
+    Kopie sicherungsManifestKopie(MandantCode mandant, String schluessel, String sha256, OutputStream ziel);
 
     /**
      * Jahresexport (Spec 02, Req 7.1): öffnet {@code exporte/<exportId>.zip} zum stromweisen Schreiben, ohne Sperre.
