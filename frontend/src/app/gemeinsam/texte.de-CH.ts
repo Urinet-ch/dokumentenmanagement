@@ -49,6 +49,7 @@ export const TEXTE = {
     quellen: 'Quellen',
     eingehend: 'Verweisende Seiten',
     versionen: 'Versionen',
+    versionSchliessen: 'Version schliessen',
     freigegeben: 'Freigegeben',
     stand: 'Stand',
     keineEintraege: 'Keine Einträge vorhanden.',

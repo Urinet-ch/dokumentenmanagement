@@ -54,11 +54,30 @@
     <ul>
       @for (version of inhalt.versionen.versionen; track version.nummer) {
         @if (version.nummer) {
-          <li>{{ texte.version(version.nummer) }}
+          <li>
+            @if (version.zeit) {
+              <button type="button" (click)="versionOeffnen(version.nummer)">{{ texte.version(version.nummer) }}</button>
+            } @else {
+              {{ texte.version(version.nummer) }}
+            }
             @if (version.zeit) { · {{ zeitpunkt(version.zeit) }} }
           </li>
         }
       }
     </ul>
+    @if (versionLaedt()) { <p role="status">{{ texte.laedt }}</p> }
+    @if (versionsFehler(); as meldung) { <p role="alert">{{ meldung }}</p> }
+    @if (versionsText(); as version) {
+      <h3>{{ texte.version(version.nummer) }}</h3>
+      <button type="button" (click)="versionSchliessen()">{{ texte.versionSchliessen }}</button>
+      @for (abschnitt of version.text; track $index) {
+        <p class="wissen-text">
+          @for (teil of abschnitt; track $index) {
+            @if (teil.pfad) { <a [routerLink]="teil.pfad">{{ teil.text }}</a> }
+            @else { {{ teil.text }} }
+          }
+        </p>
+      }
+    }
   </section>
 }

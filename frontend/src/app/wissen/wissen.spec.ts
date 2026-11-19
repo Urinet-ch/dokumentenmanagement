@@ -94,4 +94,25 @@ describe('Wissensoberfläche', () => {
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).toContain(TEXTE.httpFehler.nichtGefunden);
   });
+
+  it('fragt sichtbare Versionen beim Öffnen erneut ab und bietet unsichtbare nicht an', async () => {
+    const fixture = TestBed.createComponent(WissenSeite);
+    fixture.componentRef.setInput('pfad', 'konzepte/probe');
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/v1/wissensseiten')
+      .flush({ id: 's1', titel: 'Probe', quellen: [] });
+    http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
+    http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [
+      { nummer: 1 }, { nummer: 2, zeit: '2026-01-01T10:00:00Z' },
+    ] });
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    const buttons = Array.from(element.querySelectorAll('button'));
+    expect(buttons.some((b) => b.textContent?.includes('Version 1'))).toBe(false);
+    buttons.find((b) => b.textContent?.includes('Version 2'))!.click();
+    http.expectOne('/api/v1/wissensseiten/s1/versionen/2')
+      .flush({}, { status: 404, statusText: 'Not Found' });
+    await fixture.whenStable();
+    expect(element.textContent).toContain(TEXTE.httpFehler.nichtGefunden);
+  });
 });

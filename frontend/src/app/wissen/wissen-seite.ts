@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { forkJoin, map, of, switchMap } from 'rxjs';
-import { Dokument, WissensIndexZeile, Wissensseite, Wissensversionen } from '../gemeinsam/api';
+import { Dokument, WissensIndexZeile, Wissensseite, Wissensversion, Wissensversionen } from '../gemeinsam/api';
 import { anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { zeitpunkt } from '../gemeinsam/format';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
@@ -44,7 +44,11 @@ export class WissenSeite {
   protected readonly inhalt = signal<Inhalt | null>(null);
   protected readonly fehler = signal<string | null>(null);
   protected readonly laedt = signal(false);
+  protected readonly versionsText = signal<{ nummer: number; text: Textteil[][] } | null>(null);
+  protected readonly versionsFehler = signal<string | null>(null);
+  protected readonly versionLaedt = signal(false);
   private anfrage = 0;
+  private versionsAnfrage = 0;
   private aktuellerPfad = '';
 
   constructor() {
@@ -59,6 +63,7 @@ export class WissenSeite {
 
   protected laden(): void {
     const nummer = ++this.anfrage;
+    this.versionSchliessen();
     this.fehler.set(null);
     this.inhalt.set(null);
     this.laedt.set(true);
@@ -110,5 +115,34 @@ export class WissenSeite {
         this.laedt.set(false);
       },
     });
+  }
+
+  protected versionOeffnen(nummer: number): void {
+    const id = this.inhalt()?.seite.id;
+    if (!id) return;
+    const anfrage = ++this.versionsAnfrage;
+    this.versionsText.set(null);
+    this.versionsFehler.set(null);
+    this.versionLaedt.set(true);
+    this.http.get<Wissensversion>(`/api/v1/wissensseiten/${encodeURIComponent(id)}/versionen/${nummer}`)
+      .pipe(takeUntilDestroyed(this.destroy)).subscribe({
+        next: (version) => {
+          if (anfrage !== this.versionsAnfrage) return;
+          this.versionsText.set({ nummer, text: wissenText(version.inhaltHtml ?? '') });
+          this.versionLaedt.set(false);
+        },
+        error: (fehler: unknown) => {
+          if (anfrage !== this.versionsAnfrage) return;
+          this.versionsFehler.set(httpFehlerMeldung(fehler));
+          this.versionLaedt.set(false);
+        },
+      });
+  }
+
+  protected versionSchliessen(): void {
+    this.versionsAnfrage++;
+    this.versionsText.set(null);
+    this.versionsFehler.set(null);
+    this.versionLaedt.set(false);
   }
 }
