@@ -73,6 +73,7 @@ export class DokumentAnsicht {
   readonly id = input.required<string>();
   /** Art aus dem Eingangskorb (`?art=`, Review #106): öffnet das Formular mit dieser Art als Artwechsel. */
   readonly art = input<string | undefined>();
+  readonly seite = input<string | undefined>();
 
   protected readonly texte = TEXTE.dokument;
   protected readonly neuLadenText = TEXTE.eingangskorb.neuLaden;
@@ -86,7 +87,7 @@ export class DokumentAnsicht {
   protected readonly dokument = signal<Dokument | null>(null);
   protected readonly vorschau = signal<Vorschau>('laedt');
   private readonly pdfa = signal<DownloadAdresse | null>(null);
-  protected readonly pdfaUrl = computed(() => sichereAdresse(this.pdfa()?.url));
+  protected readonly pdfaUrl = computed(() => this.adresseMitSeite(this.pdfa()?.url));
   protected readonly dateiFehler = signal(false);
   /**
    * Zuletzt per Klick geholte Adresse: `window.open` läuft erst nach der Antwort und damit ausserhalb der Klick-Geste;
@@ -129,10 +130,17 @@ export class DokumentAnsicht {
   protected readonly breit = signal(
     typeof window.matchMedia === 'function' && window.matchMedia(BREIT).matches,
   );
-  private readonly bild = signal<{ id: string; url: string } | null>(null);
+  protected readonly gewuenschteSeite = computed(() => {
+    const wert = this.seite();
+    if (!wert || !/^[1-9]\d*$/.test(wert)) return null;
+    const nummer = Number(wert);
+    return Number.isSafeInteger(nummer) ? nummer : null;
+  });
+  private readonly bild = signal<{ id: string; seite: number; url: string } | null>(null);
   protected readonly bildUrl = computed(() => {
     const bild = this.bild();
-    return bild && bild.id === this.dokument()?.id ? bild.url : null;
+    return bild && bild.id === this.dokument()?.id && bild.seite === (this.gewuenschteSeite() ?? 1)
+      ? bild.url : null;
   });
   private readonly bildNoetig = computed(() => {
     const d = this.dokument();
@@ -198,6 +206,7 @@ export class DokumentAnsicht {
       }
     });
     effect(() => {
+      this.gewuenschteSeite();
       if (this.bildNoetig()) {
         untracked(() => this.bildLaden());
       }
@@ -257,14 +266,15 @@ export class DokumentAnsicht {
 
   private bildLaden(): void {
     const id = this.dokument()?.id;
-    if (!id || this.bild()?.id === id) {
+    const seite = this.gewuenschteSeite() ?? 1;
+    if (!id || (this.bild()?.id === id && this.bild()?.seite === seite)) {
       return;
     }
     this.bildAbo.unsubscribe();
-    this.bildAbo = this.port.vorschau(id, 1).subscribe({
+    this.bildAbo = this.port.vorschau(id, seite).subscribe({
       next: (blob) => {
         this.bildFreigeben();
-        this.bild.set({ id, url: URL.createObjectURL(blob) });
+        this.bild.set({ id, seite, url: URL.createObjectURL(blob) });
       },
       error: () => undefined,
     });
@@ -365,7 +375,7 @@ export class DokumentAnsicht {
       this.port.adresse(this.id(), 'pdfa', 'vorschau').subscribe({
         next: (adresse) => {
           this.pdfaLaedt.set(false);
-          const url = sichereAdresse(adresse.url);
+          const url = this.adresseMitSeite(adresse.url);
           if (!url) {
             fenster.close();
             this.dateiFehler.set(true);
@@ -400,6 +410,15 @@ export class DokumentAnsicht {
         error: () => this.dateiFehler.set(true),
       }),
     );
+  }
+
+  private adresseMitSeite(adresse: string | null | undefined): string | null {
+    const sicher = sichereAdresse(adresse);
+    const seite = this.gewuenschteSeite();
+    if (!sicher || !seite) return sicher;
+    const url = new URL(sicher);
+    url.hash = `page=${seite}`;
+    return url.href;
   }
 }
 

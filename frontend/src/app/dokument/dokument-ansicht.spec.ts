@@ -678,6 +678,32 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(freigeben).toHaveBeenCalledWith('blob:bild-1');
   });
 
+  it('öffnet die angeforderte PDF-Seite auch in der mobilen Vorschau', async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:bild'), revokeObjectURL: vi.fn() });
+    port.dokument = of({ ...DOKUMENT, seiten: 3 });
+    fixture = TestBed.createComponent(DokumentAnsicht);
+    fixture.componentRef.setInput('id', 'd1');
+    fixture.componentRef.setInput('seite', '2');
+    element = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+    expect(port.bilder).toEqual([2]);
+    expect(element.querySelector<HTMLImageElement>('[data-test=bild]')!.alt)
+      .toBe(TEXTE.dokument.bildSeite('Rechnung 2026-003', 2));
+    fixture.componentRef.setInput('seite', '3');
+    await fixture.whenStable();
+    expect(port.bilder).toEqual([2, 3]);
+  });
+
+  it('hängt die angeforderte Seite an den PDF-Vorschaulink', async () => {
+    fixture = TestBed.createComponent(DokumentAnsicht);
+    fixture.componentRef.setInput('id', 'd1');
+    fixture.componentRef.setInput('seite', '2');
+    element = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+    expect(element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.href)
+      .toBe('https://s3.example/pdfa?sig=1#page=2');
+  });
+
   it('bestellt den Abruf des Vorschaubilds beim Verlassen ab und legt keine Object-URL mehr an', async () => {
     const erstellen = vi.fn(() => 'blob:spaet');
     Object.assign(URL, { createObjectURL: erstellen, revokeObjectURL: vi.fn() });

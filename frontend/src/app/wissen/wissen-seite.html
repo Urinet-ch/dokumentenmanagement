@@ -1,0 +1,64 @@
+<a routerLink="/wissen">{{ texte.zurueck }}</a>
+@if (laedt()) { <p role="status">{{ texte.laedt }}</p> }
+@if (fehler(); as meldung) {
+  <h1>{{ texte.titel }}</h1>
+  <p role="alert">{{ meldung }}</p>
+  <button type="button" (click)="laden()">{{ texte.erneut }}</button>
+}
+@if (inhalt(); as inhalt) {
+  <h1>{{ inhalt.seite.titel }}</h1>
+  @if (inhalt.seite.status === 'VERALTET') { <p>{{ texte.veraltet }}</p> }
+  @if (inhalt.seite.quellePruefen) { <p>{{ texte.quellePruefen }}</p> }
+  @if (inhalt.seite.widerspruchOffen) { <p>{{ texte.widerspruch }}</p> }
+  <p>{{ inhalt.seite.beschreibung }}</p>
+  @if (inhalt.seite.freigegebenAm) {
+    <p>{{ texte.freigegeben }}: {{ zeitpunkt(inhalt.seite.freigegebenAm) }}</p>
+  }
+  <article>
+    @for (abschnitt of inhalt.text; track $index) {
+      <p class="wissen-text">
+        @for (teil of abschnitt; track $index) {
+          @if (teil.pfad) { <a [routerLink]="teil.pfad">{{ teil.text }}</a> }
+          @else { {{ teil.text }} }
+        }
+      </p>
+    }
+  </article>
+  <section>
+    <h2>{{ texte.quellen }}</h2>
+    <ul>
+      @for (quelle of inhalt.quellen; track quelle.schluessel) {
+        <li>
+          @if (quelle.dokumentId) {
+            <a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}">
+              {{ quelle.titel }} @if (quelle.seite) { · {{ texte.seite(quelle.seite) }} }
+            </a>
+          } @else if (quelle.pfad) {
+            <a [routerLink]="'/wissen/' + quelle.pfad">{{ quelle.titel }}</a>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+  <section>
+    <h2>{{ texte.eingehend }}</h2>
+    @if (!inhalt.eingehend.length) { <p>{{ texte.keineEintraege }}</p> }
+    <ul>
+      @for (seite of inhalt.eingehend; track seite.id) {
+        <li><a [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a></li>
+      }
+    </ul>
+  </section>
+  <section>
+    <h2>{{ texte.versionen }}</h2>
+    <ul>
+      @for (version of inhalt.versionen.versionen; track version.nummer) {
+        @if (version.nummer) {
+          <li>{{ texte.version(version.nummer) }}
+            @if (version.zeit) { · {{ zeitpunkt(version.zeit) }} }
+          </li>
+        }
+      }
+    </ul>
+  </section>
+}
