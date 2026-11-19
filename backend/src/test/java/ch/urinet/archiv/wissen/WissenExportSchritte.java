@@ -3,6 +3,7 @@ package ch.urinet.archiv.wissen;
 import ch.urinet.archiv.ablage.TestAblage;
 import ch.urinet.archiv.ablage.domain.Exportdatei;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
 import io.agroal.api.AgroalDataSource;
@@ -29,6 +30,7 @@ import java.sql.ResultSet;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -47,6 +49,9 @@ public class WissenExportSchritte {
     private UUID exportId;
     private UUID seitenId;
     private String seitenPfad;
+    private UUID referenzId;
+    private String referenzPfad;
+    private UUID dokumentId;
     private Response antwort;
 
     @Angenommen("eine synthetische freigegebene Wissensseite ist vorhanden")
@@ -63,6 +68,57 @@ public class WissenExportSchritte {
             sql.setObject(1, seitenId);
             sql.setString(2, seitenPfad);
             sql.executeUpdate();
+        }
+    }
+
+    @Angenommen("eine synthetische Wissensseite verweist auf ein Dokument und eine andere Seite")
+    public void quellenAnlegen() throws Exception {
+        seiteAnlegen();
+        referenzId = UUID.randomUUID();
+        referenzPfad = "konzepte/quelle-" + referenzId;
+        dokumentId = Testdokumente.anlegen(datenbank.get(),
+                new Testdokumente.Angaben("urinet", null, "NORMAL", true, "probe", null, "ARCHIVIERT"));
+        try (Connection c = datenbank.get().getConnection()) {
+            try (PreparedStatement sql = c.prepareStatement("""
+                    insert into m_urinet.wissensseite
+                    (id,pfad,typ,titel,beschreibung,vertraulichkeit,inhalt,version,erzeugt_von,erzeugt_am,
+                     freigegeben_von,freigegeben_am)
+                    values (?,?,'Konzept','Quelle','Beschreibung','NORMAL','Probetext',1,'probe',now(),'probe',now())
+                    """)) {
+                sql.setObject(1, referenzId);
+                sql.setString(2, referenzPfad);
+                sql.executeUpdate();
+            }
+            try (PreparedStatement sql = c.prepareStatement("""
+                    insert into m_urinet.dokument_datei (dokument_id,nr,rolle,sha256)
+                    values (?,1,'ORIGINAL',?)
+                    """)) {
+                sql.setObject(1, dokumentId);
+                sql.setString(2, "a".repeat(64));
+                sql.executeUpdate();
+            }
+            try (PreparedStatement sql = c.prepareStatement("""
+                    insert into m_urinet.wissensseite_quelle
+                    (seite_id,schluessel,dokument_id,seite_von,auszug) values (?,'q1',?,2,'Probe')
+                    """)) {
+                sql.setObject(1, seitenId);
+                sql.setObject(2, dokumentId);
+                sql.executeUpdate();
+            }
+            try (PreparedStatement sql = c.prepareStatement("""
+                    insert into m_urinet.wissensseite_quelle (seite_id,schluessel,quell_seite_id)
+                    values (?,'q2',?)
+                    """)) {
+                sql.setObject(1, seitenId);
+                sql.setObject(2, referenzId);
+                sql.executeUpdate();
+            }
+            try (PreparedStatement sql = c.prepareStatement(
+                    "update m_urinet.wissensseite set inhalt = ? where id = ?")) {
+                sql.setString(1, "[Quelle](/" + referenzPfad + ").[^q1] [^q2]");
+                sql.setObject(2, seitenId);
+                sql.executeUpdate();
+            }
         }
     }
 
@@ -87,12 +143,7 @@ public class WissenExportSchritte {
 
     @Dann("enthält das ZIP die Seite mit OKF-Frontmatter sowie Index und Log")
     public void paketPruefen() throws Exception {
-        Map<String, String> dateien = new HashMap<>();
-        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(download()))) {
-            for (var eintrag = zip.getNextEntry(); eintrag != null; eintrag = zip.getNextEntry()) {
-                dateien.put(eintrag.getName(), new String(zip.readAllBytes(), StandardCharsets.UTF_8));
-            }
-        }
+        Map<String, String> dateien = dateien();
         assertThat(dateien).containsKeys(seitenPfad + ".md", "index.md", "log.md");
         Map<?, ?> kopf = frontmatter(dateien.get(seitenPfad + ".md"));
         assertThat(kopf.keySet().stream().map(Object::toString).toList())
@@ -102,6 +153,25 @@ public class WissenExportSchritte {
         assertThat(kopf.get("status")).isEqualTo("stable");
         assertThat(frontmatter(dateien.get("index.md")).get("okf_version")).isEqualTo("0.2");
         assertThat(dateien.get("log.md")).contains("# Update Log");
+    }
+
+    @Dann("enthält das ZIP URN und Seitenpfad statt Dokumentdateien und schreibt den Markdown-Link um")
+    public void verweisePruefen() throws Exception {
+        Map<String, String> dateien = dateien();
+        assertThat(dateien.keySet()).allMatch(name -> name.endsWith(".md") || name.equals("paket.yaml"));
+        String markdown = dateien.get(seitenPfad + ".md");
+        assertThat(markdown).contains("[Quelle](/" + referenzPfad + ".md).[^q1] [^q2]");
+        List<?> quellen = (List<?>) frontmatter(markdown).get("sources");
+        assertThat(quellen).hasSize(2);
+        Map<?, ?> dokument = (Map<?, ?>) quellen.get(0);
+        Map<?, ?> seite = (Map<?, ?>) quellen.get(1);
+        assertThat(dokument.get("id")).isEqualTo("q1");
+        assertThat(dokument.get("resource")).isEqualTo("urn:urinet-archiv:urinet:dokument:" + dokumentId + "#page=2");
+        assertThat(dokument.get("sha256")).isEqualTo("a".repeat(64));
+        assertThat(dokument.get("seite")).isEqualTo("2");
+        assertThat(dokument.get("auszug")).isEqualTo("Probe");
+        assertThat(seite.get("id")).isEqualTo("q2");
+        assertThat(seite.get("resource")).isEqualTo("/" + referenzPfad + ".md");
     }
 
     @Dann("ist der Download 24 Stunden ab Fertigstellung gültig und seine Prüfsumme protokolliert")
@@ -134,6 +204,16 @@ public class WissenExportSchritte {
         }
     }
 
+    private Map<String, String> dateien() throws Exception {
+        Map<String, String> dateien = new HashMap<>();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(download()))) {
+            for (var eintrag = zip.getNextEntry(); eintrag != null; eintrag = zip.getNextEntry()) {
+                dateien.put(eintrag.getName(), new String(zip.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+        return dateien;
+    }
+
     private Map<?, ?> frontmatter(String markdown) {
         assertThat(markdown).startsWith("---\n");
         int ende = markdown.indexOf("\n---\n", 4);
@@ -146,11 +226,19 @@ public class WissenExportSchritte {
         try {
             exportLoeschen();
         } finally {
-            if (seitenId != null) {
+            try {
                 try (Connection c = datenbank.get().getConnection();
                      PreparedStatement sql = c.prepareStatement("delete from m_urinet.wissensseite where id = ?")) {
-                    sql.setObject(1, seitenId);
-                    sql.executeUpdate();
+                    for (UUID id : new UUID[]{seitenId, referenzId}) {
+                        if (id != null) {
+                            sql.setObject(1, id);
+                            sql.executeUpdate();
+                        }
+                    }
+                }
+            } finally {
+                if (dokumentId != null) {
+                    Testdokumente.loeschen(datenbank.get(), "urinet", List.of(dokumentId));
                 }
             }
         }
