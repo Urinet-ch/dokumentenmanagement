@@ -27,8 +27,8 @@ export function wissenText(html: string): Textteil[] {
       if (node.hasAttribute('data-footnote-ref') && href?.startsWith('#fn-')) {
         return [{ art: 'quelle', text: `[${text}]`, quelle: href.slice(4) }];
       }
-      if (href && /^\/(?:ueberblick|(?:quellen|konzepte|akteure|projekte|analysen)\/[a-z0-9-]+)$/.test(href)) {
-        return [{ art: 'link', text, pfad: `/wissen${href}` }];
+      if (href && /^\/wissen\/(?:ueberblick|(?:quellen|konzepte|akteure|projekte|analysen)\/[a-z0-9-]+)$/.test(href)) {
+        return [{ art: 'link', text, pfad: href }];
       }
       return [{ art: 'text', text }];
     }

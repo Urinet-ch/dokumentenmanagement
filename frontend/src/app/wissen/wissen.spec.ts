@@ -57,7 +57,7 @@ describe('Wissensoberfläche', () => {
   });
 
   it('übernimmt nur interne Wissenslinks und stellt fremde Inhalte als Text dar', () => {
-    const teile = wissenText('<p>Text <a href="/konzepte/probe">Probe</a> '
+    const teile = wissenText('<p>Text <a href="/wissen/konzepte/probe">Probe</a> '
       + '<a href="javascript:alert(1)">Fremd</a><script>unsichtbar</script></p>');
     expect(teile).toEqual([{ art: 'p', kinder: [
       { art: 'text', text: 'Text ' }, { art: 'link', text: 'Probe', pfad: '/wissen/konzepte/probe' },
@@ -73,7 +73,7 @@ describe('Wissensoberfläche', () => {
     expect(seite.request.params.get('pfad')).toBe('konzepte/probe');
     seite.flush({
       id: 's1', titel: 'Probe', inhaltHtml: '<h2>Abschnitt</h2><ul><li>Eintrag</li></ul>'
-        + '<p>Belegt <a href="/ueberblick">Überblick</a>'
+        + '<p>Belegt <a href="/wissen/ueberblick">Überblick</a>'
         + '<sup class="footnote-ref"><a href="#fn-q1" data-footnote-ref>1</a></sup></p>'
         + '<section data-footnotes><ol><li><p>q1 <a href="#fnref-q1">↩</a></p></li></ol></section>',
       quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3 }], quellePruefen: true,
