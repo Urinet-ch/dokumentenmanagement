@@ -226,6 +226,33 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void neuErzeugenSperrtNurVeralteteAenderungenMitAktuellemEtag() throws SQLException {
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+        Benutzer treuhaender = new Benutzer("treuhaender", Rolle.TREUHAENDER);
+
+        assertThatThrownBy(() -> im(ZWEITER,
+                () -> freigabeSperre.zumNeuErzeugenLaden(inhaber, entwurf, 1, () -> 0)))
+                .isInstanceOf(Verweigerung.class);
+        assertThatThrownBy(() -> im(URINET,
+                () -> freigabeSperre.zumNeuErzeugenLaden(treuhaender, entwurf, 1, () -> 0)))
+                .isInstanceOf(Verweigerung.class);
+        assertThatThrownBy(() -> im(URINET,
+                () -> freigabeSperre.zumNeuErzeugenLaden(inhaber, entwurf, 1, () -> 0)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set status = 'VERALTET', etag = 1 where entwurf_id = ?", entwurf);
+        assertThatThrownBy(() -> im(URINET,
+                () -> freigabeSperre.zumNeuErzeugenLaden(inhaber, entwurf, 1, () -> 0)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.VERSION_KONFLIKT));
+        assertThat(im(URINET, () -> freigabeSperre.zumNeuErzeugenLaden(inhaber, entwurf, 1, () -> 1)).status())
+                .isEqualTo("VERALTET");
+    }
+
+    @Test
     void verwerfenRolltBeiNachfolgendemFehlerZurueck() throws SQLException {
         UUID entwurf = manuellerEntwurf(URINET);
         aenderung(URINET, entwurf, 1);

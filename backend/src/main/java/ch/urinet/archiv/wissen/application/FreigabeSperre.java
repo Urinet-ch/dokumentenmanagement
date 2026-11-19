@@ -30,17 +30,23 @@ public class FreigabeSperre {
 
     @Transactional(Transactional.TxType.MANDATORY)
     public FreigabeRepository.Aenderung laden(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch) {
-        return laden(benutzer, entwurfId, nummer, ifMatch, false);
+        return laden(benutzer, entwurfId, nummer, ifMatch, Zweck.ANNEHMEN);
     }
 
     @Transactional(Transactional.TxType.MANDATORY)
     public FreigabeRepository.Aenderung zumVerwerfenLaden(Benutzer benutzer, UUID entwurfId, int nummer,
                                                            IntSupplier ifMatch) {
-        return laden(benutzer, entwurfId, nummer, ifMatch, true);
+        return laden(benutzer, entwurfId, nummer, ifMatch, Zweck.VERWERFEN);
+    }
+
+    @Transactional(Transactional.TxType.MANDATORY)
+    public FreigabeRepository.Aenderung zumNeuErzeugenLaden(Benutzer benutzer, UUID entwurfId, int nummer,
+                                                            IntSupplier ifMatch) {
+        return laden(benutzer, entwurfId, nummer, ifMatch, Zweck.NEU_ERZEUGEN);
     }
 
     private FreigabeRepository.Aenderung laden(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch,
-                                                boolean veraltetErlaubt) {
+                                                Zweck zweck) {
         huelle.sperren();
         Optional<FreigabeRepository.Aenderung> gefunden = repository.sperren(entwurfId, nummer);
         boolean sichtbar = gefunden.filter(a -> a.seiteId() == null
@@ -50,11 +56,19 @@ public class FreigabeSperre {
         if (ifMatch.getAsInt() != aenderung.etag()) {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
         }
-        if (!"OFFEN".equals(aenderung.entwurfStatus()) || !("OFFEN".equals(aenderung.status())
-                || veraltetErlaubt && "VERALTET".equals(aenderung.status()))) {
+        boolean erlaubt = switch (zweck) {
+            case ANNEHMEN -> "OFFEN".equals(aenderung.status());
+            case VERWERFEN -> "OFFEN".equals(aenderung.status()) || "VERALTET".equals(aenderung.status());
+            case NEU_ERZEUGEN -> "VERALTET".equals(aenderung.status()) && !"IMPORT".equals(aenderung.anlass());
+        };
+        if (!"OFFEN".equals(aenderung.entwurfStatus()) || !erlaubt) {
             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }
         return aenderung;
+    }
+
+    private enum Zweck {
+        ANNEHMEN, VERWERFEN, NEU_ERZEUGEN
     }
 
     @Transactional(Transactional.TxType.MANDATORY)
