@@ -1,0 +1,43 @@
+<h1>{{ texte.titel }}</h1>
+<nav><a routerLink="/wissen/log">{{ texte.log }}</a></nav>
+<form (submit)="suchen($event)">
+  <label for="wissen-suche">{{ texte.suchbegriff }}</label>
+  <input id="wissen-suche" type="search" [value]="q" (input)="q = wert($event)" />
+  <label for="wissen-typ">{{ texte.typ }}</label>
+  <select id="wissen-typ" [value]="typ" (change)="typ = wert($event)">
+    <option value="">{{ texte.alleTypen }}</option>
+    @for (typ of typen; track typ[0]) { <option [value]="typ[0]">{{ typ[1] }}</option> }
+  </select>
+  <label for="wissen-tag">{{ texte.schlagwort }}</label>
+  <input id="wissen-tag" [value]="tag" (input)="tag = wert($event)" />
+  <button type="submit">{{ texte.suchen }}</button>
+</form>
+@if (laedt()) { <p role="status">{{ texte.laedt }}</p> }
+@if (fehler(); as meldung) {
+  <p role="alert">{{ meldung }}</p>
+  <button type="button" (click)="laden()">{{ texte.erneut }}</button>
+}
+@if (ergebnis(); as ergebnis) {
+  @if (!ergebnis.gesamt) { <p>{{ texte.keineSeiten }}</p> }
+  @for (gruppe of ergebnis.gruppen; track gruppe.typ) {
+    <section>
+      <h2>{{ texte.seitentypen[gruppe.typ ?? ''] ?? texte.unbekannterTyp }}</h2>
+      <ul>
+        @for (seite of gruppe.seiten; track seite.id) {
+          <li>
+            <a [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a>
+            @if (seite.status === 'VERALTET') { <span>{{ texte.veraltet }}</span> }
+            @if (seite.quellePruefen) { <span>{{ texte.quellePruefen }}</span> }
+            <p>{{ seite.beschreibung }}</p>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+  @if (offset > 0) {
+    <button type="button" (click)="wechseln(offset - 50)">{{ texte.zurueckSeite }}</button>
+  }
+  @if (offset + 50 < (ergebnis.gesamt || 0)) {
+    <button type="button" (click)="wechseln(offset + 50)">{{ texte.weiter }}</button>
+  }
+}

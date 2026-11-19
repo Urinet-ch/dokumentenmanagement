@@ -2,7 +2,7 @@
 
 Je Entscheid eine Datei `ADR-<nnn>-<stichwort>.md` (Status, Kontext, Entscheid, Alternativen,
 Folgen, Verweise). Quelle der Liste: `.kiro/specs/01-archiv-kern/design.md`, Abschnitt Overview;
-ADR-013: `.kiro/specs/04-wissensbasis/design.md`; ADR-014: `.kiro/specs/03-zweiter-mandant/design.md`.
+ADR-013: `.kiro/specs/04-wissensbasis/design.md`; ADR-014: `.kiro/specs/03-zweiter-mandant/design.md`; ADR-015: `.kiro/specs/06-verwaltung-einstellungen-benutzer/design.md`.
 Freigabe: per Merge im Rahmen von Aufgabe 0.6 (Gate 0).
 
 | ADR | Entscheid | Status |
@@ -21,3 +21,4 @@ Freigabe: per Merge im Rahmen von Aufgabe 0.6 (Gate 0).
 | [ADR-012](ADR-012-lokales-modell-entwicklung.md) | Ein lokales Sprachmodell über LM Studio ist nur im Profil `lokal` auf dem Entwicklerrechner erlaubt, nur an `localhost`, nie für Gate 0, Golden-Lauf, Abnahmen, CI oder Betrieb; das Archiv prüft die KI-Basis-URL beim Start. | Vorgeschlagen (Freigabe per eigenem Merge, nicht Teil von 0.6) |
 | [ADR-013](ADR-013-wissensbasis-nach-llm-wiki-muster.md) | Die Wissensbasis folgt dem LLM-Wiki-Muster (OKF), liegt im Mandanten-Schema, und die KI schreibt nur Entwürfe, die ein Mensch mit Recht A17 freigibt. | Vorgeschlagen (Freigabe per eigenem Merge mit Spec 04) |
 | [ADR-014](ADR-014-webseiten-schnittstelle.md) | Webseiten binden das Archiv nur serverseitig über einen versionierten Vertrag `/public/v<n>` ein, mit getrennten Lese- und Erfassungs-Schlüsseln je Mandant und Webseite, drei Zugriffsstufen, Stream statt Datei-URL für geschützte Dokumente und einem Änderungs-Feed statt Webhooks. | Vorgeschlagen (Freigabe per Merge mit der Erweiterung von Spec 03) |
+| [ADR-015](ADR-015-benutzerverwaltung-keycloak-admin-api.md) | Benutzer, Rollen und Einladungen verwaltet der Inhaber über die Keycloak-Admin-API mit eigenem Dienstkonto ohne Realm-Admin-Rechte; Keycloak bleibt Identitätsquelle, die Mandantentrennung erzwingt das Archiv; Rollen statt einzelner Rechte, Step-up, Deaktivieren vor Löschen. | Vorgeschlagen (Freigabe per Merge des Spec-PR von Spec 06) |

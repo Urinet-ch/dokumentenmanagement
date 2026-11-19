@@ -250,6 +250,20 @@ pruefe_dienst "$ARCHIV_API_SERVICE"
 pruefe_dienst "$ARCHIV_DB_SERVICE"
 pruefe_dienst "$ARCHIV_KEYCLOAK_SERVICE"
 
+# Jedes Mandantenschema m_* der Datenbank muss in ARCHIV_MANDANTEN stehen (Code mit «-» statt «_»): Sonst steckt der Mandant
+# im pg_dump, hätte aber weder Inventar noch Bucket-Export, und der Lauf bliebe grün (Aufgabe 10.6: nicht still überspringen).
+schemas=$(compose exec -T "$ARCHIV_DB_SERVICE" psql --no-psqlrc --no-password --username=postgres \
+  --dbname="$ARCHIV_DB_NAME" --tuples-only --no-align \
+  --command "select nspname from pg_namespace where nspname like 'm\\_%' order by 1") \
+  || fehler 3 "Mandantenschemas konnten nicht gelesen werden."
+while IFS= read -r schema; do
+  [[ -n $schema ]] || continue
+  code=${schema#m_}
+  code=${code//_/-}
+  [[ " ${mandanten[*]} " == *" $code "* ]] \
+    || fehler 2 "Mandantenschema $schema fehlt in ARCHIV_MANDANTEN: Der Mandant würde nicht gesichert."
+done <<< "$schemas"
+
 loesche_alte_lauefe() {
   local verzeichnis name
   local alte_lauefe="$arbeitsverzeichnis/alte-laeufe"

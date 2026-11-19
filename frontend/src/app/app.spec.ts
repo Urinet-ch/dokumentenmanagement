@@ -136,6 +136,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.erfassen,
         TEXTE.menue.eingangskorb,
         TEXTE.menue.suche,
+        TEXTE.menue.wissen,
         TEXTE.menue.chat,
         TEXTE.menue.kontakte,
         TEXTE.menue.importe,
@@ -145,18 +146,19 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.export,
       ],
     ],
-    ['mitarbeiter', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat]],
+    ['mitarbeiter', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.wissen, TEXTE.menue.chat]],
     [
       'geschaeftsstelle',
       [
         TEXTE.menue.erfassen,
         TEXTE.menue.eingangskorb,
         TEXTE.menue.suche,
+        TEXTE.menue.wissen,
         TEXTE.menue.chat,
         TEXTE.menue.kontakte,
       ],
     ],
-    ['treuhaender', [TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.export]],
+    ['treuhaender', [TEXTE.menue.suche, TEXTE.menue.wissen, TEXTE.menue.chat, TEXTE.menue.export]],
   ])('zeigt der Rolle %s nur die erlaubten Menüpunkte', async (rolle, erwartet) => {
     anmeldung.als(rolle);
     const element = await zeigen();

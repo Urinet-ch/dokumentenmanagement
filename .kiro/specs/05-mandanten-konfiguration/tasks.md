@@ -104,7 +104,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
 
 - [x] 18.3 Verwaltungsseiten [Frontend]
   - Seiten für Dokumentarten (Platzhalter `/verwaltung/dokumentarten`) mit Feld-Editor, Klassifikationen, Regeln,
-    Versionen mit Vergleich, Import mit Vorschau.
+    Versionen mit Vergleich, Import mit Vorschau. Spec 06 ergänzt die Seiten `/verwaltung/einstellungen` und
+    `/verwaltung/benutzer` (Aufgaben 20.5 bis 20.7); die Platzhalter hier bleiben.
   - _Anforderungen: 7.3, 7.4_
   - _Abhängig von: 17.7_
 

@@ -47,3 +47,23 @@ Funktionalität: Anmeldung über Keycloak mit zweitem Faktor und Rollen
       | treuhaender-urinet       | treuhaender      | urinet  |
       | inhaber-vhf-gsk          | inhaber          | vhf-gsk |
       | geschaeftsstelle-vhf-gsk | geschaeftsstelle | vhf-gsk |
+
+  @req-2.25
+  Szenario: Konfiguration: Google ist erst nach der ausdrücklichen Freigabe verfügbar
+    Dann ist Google im Realm-Export als deaktivierter, nicht vertrauender Provider vorbereitet
+
+  @req-2.26
+  Szenario: Konfiguration: Der Google-Erstlogin sieht die Ablehnung unbekannter Konten vor (Konfigurationsnachweis, kein Anmeldelauf)
+    Dann verweigert der Google-Erstlogin unbekannte Konten
+
+  @req-2.27
+  Szenario: Konfiguration: Verknüpfung nur durch den Administrator (vorläufige Voreinstellung, Entscheid O.8 offen)
+    Dann ist die Google-Verknüpfung nur administrativ möglich
+
+  @req-2.28
+  Szenario: Konfiguration: Der Post-Broker-Flow verlangt TOTP (Konfigurationsnachweis, kein Anmeldelauf)
+    Dann verlangt die Google-Anmeldung weiterhin TOTP
+
+  @req-2.29
+  Szenario: Konfiguration: Das Google-Geheimnis bleibt ein Platzhalter
+    Dann bleibt das Google-Clientgeheimnis ein Platzhalter und die Anmeldeereignisse sind aktiviert

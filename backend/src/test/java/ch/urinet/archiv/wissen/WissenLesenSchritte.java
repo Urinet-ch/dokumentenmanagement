@@ -41,11 +41,16 @@ public class WissenLesenSchritte {
     private final UUID verweisendeSeite = UUID.randomUUID();
     private final String kennung = UUID.randomUUID().toString();
     private final String tag = "leseprobe-" + kennung;
+    private final String zweiterPfad = "konzepte/leseprobe-zweit-" + kennung;
     private OffsetDateTime probeBeginn;
     private String normaleSeitePfad;
     private String interneSeiteTitel;
     private Response indexErsteSeite;
     private Response indexZweiteSeite;
+    private Response dokumentIndex;
+    private Response unsichtbarerDokumentIndex;
+    private Response fremderDokumentIndex;
+    private Response ungueltigerDokumentIndex;
     private Response seite;
     private Response seitePerPfad;
     private Response interneSeiteAntwort;
@@ -66,7 +71,6 @@ public class WissenLesenSchritte {
         probeBeginn = OffsetDateTime.now(ZoneOffset.UTC);
         normaleSeitePfad = "konzepte/leseprobe-" + kennung;
         interneSeiteTitel = "Interne Leseprobe " + kennung;
-        String zweiterPfad = "konzepte/leseprobe-zweit-" + kennung;
         String quellenPfad = "quellen/leseprobe-" + kennung;
         String verweisPfad = "konzepte/leseprobe-verweis-" + kennung;
         try (Connection verbindung = datenbank.get().getConnection()) {
@@ -89,10 +93,16 @@ public class WissenLesenSchritte {
             seite(verbindung, ANDERER_SCHEMA, normaleSeite, normaleSeitePfad, "Konzept",
                     "Fremdmandant " + kennung, tag, "NORMAL", null);
             huelle(verbindung, ANDERER_SCHEMA, normaleSeite, interneQuelle);
+            quelle(verbindung, ANDERER_SCHEMA, normaleSeite, "intern", interneQuelle);
             quelle(verbindung, normaleSeite, "normal", normaleQuelle);
             quelle(verbindung, interneSeite, "intern", interneQuelle);
             quelle(verbindung, quellenSeite, "quelle", wissensquelle);
             quelle(verbindung, verweisendeSeite, "quelle", wissensquelle);
+            try (PreparedStatement query = verbindung.prepareStatement(
+                    "update m_urinet.wissensseite set quelle_pruefen = true where id = ?")) {
+                query.setObject(1, normaleSeite);
+                query.executeUpdate();
+            }
             huelle(verbindung, SCHEMA, normaleSeite, normaleQuelle);
             huelle(verbindung, SCHEMA, interneSeite, interneQuelle);
             huelle(verbindung, SCHEMA, quellenSeite, wissensquelle);
@@ -120,6 +130,31 @@ public class WissenLesenSchritte {
                     + "[Fehlende Seite](/konzepte/leseprobe-fehlt-" + kennung + ") "
                     + "[Sichtbare Seite](/" + zweiterPfad + ")");
         }
+    }
+
+    @Wenn("die Wissensseiten nach einem Quelldokument gefiltert werden")
+    public void dokumentIndexLesen() {
+        dokumentIndex = get("/api/v1/wissensseiten?tag=" + tag + "&dokumentId=" + normaleQuelle);
+        unsichtbarerDokumentIndex = get("/api/v1/wissensseiten?tag=" + tag + "&dokumentId=" + interneQuelle);
+        fremderDokumentIndex = given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).when()
+                .get("/api/v1/wissensseiten?tag=" + tag + "&dokumentId=" + interneQuelle).andReturn();
+        ungueltigerDokumentIndex = get("/api/v1/wissensseiten?dokumentId=keine-uuid");
+    }
+
+    @Dann("zeigt der Index nur sichtbare Seiten des eigenen Mandanten und deren Prüfhinweis")
+    public void dokumentIndexPruefen() {
+        dokumentIndex.then().statusCode(200);
+        assertThat(dokumentIndex.jsonPath().getLong("gesamt")).isEqualTo(1);
+        assertThat(dokumentIndex.jsonPath().getBoolean("gruppen.find { it.typ == 'Konzept' }.seiten[0].quellePruefen"))
+                .isTrue();
+        assertThat(dokumentIndex.body().asString()).contains(normaleSeitePfad).doesNotContain(interneSeiteTitel);
+        unsichtbarerDokumentIndex.then().statusCode(200);
+        assertThat(unsichtbarerDokumentIndex.jsonPath().getLong("gesamt")).isZero();
+        fremderDokumentIndex.then().statusCode(200);
+        assertThat(fremderDokumentIndex.jsonPath().getLong("gesamt")).isEqualTo(1);
+        assertThat(fremderDokumentIndex.body().asString()).contains("Fremdmandant " + kennung)
+                .doesNotContain("Normale Leseprobe " + kennung);
+        ungueltigerDokumentIndex.then().statusCode(400);
     }
 
     @Wenn("«mitarbeiter» Index, Seite, Versionen, Diff, Links und Log abruft")
@@ -185,6 +220,7 @@ public class WissenLesenSchritte {
         assertThat(seite.body().asString()).doesNotContain(interneSeiteTitel);
         assertThat(seite.jsonPath().getList("quellen.dokumentId", String.class))
                 .containsExactly(normaleQuelle.toString());
+        assertThat(seite.jsonPath().getList("quellen.dokumentTitel", String.class)).containsExactly("Quelle NORMAL");
 
         versionen.then().statusCode(200);
         List<Map<String, Object>> versionZeilen = versionen.jsonPath().getList("versionen");
@@ -242,7 +278,8 @@ public class WissenLesenSchritte {
             assertThat(ch.urinet.archiv.sicherheit.ProblemDetails.pruefen(ungueltig, 404))
                     .isEqualTo("NICHT_GEFUNDEN");
         }
-        assertThat(seite.jsonPath().getString("inhaltHtml")).contains("Sichtbare Seite", "Seite nicht vorhanden")
+        assertThat(seite.jsonPath().getString("inhaltHtml"))
+                .contains("Sichtbare Seite", "Seite nicht vorhanden", "href=\"/wissen/" + zweiterPfad + "\"")
                 .doesNotContain("Interne Seite", "Fehlende Seite");
         zugriffsprotokollPruefen();
     }
@@ -312,12 +349,13 @@ public class WissenLesenSchritte {
             throws Exception {
         try (PreparedStatement query = verbindung.prepareStatement("""
                 insert into %s.dokument (id, quelle, vertraulichkeit, erstellt_von, status, bestaetigt,
-                                                bestaetigt_von)
-                values (?, 'UPLOAD', ?, 'synthetisch', 'ARCHIVIERT', ?, 'inhaber')
+                                                bestaetigt_von, titel)
+                values (?, 'UPLOAD', ?, 'synthetisch', 'ARCHIVIERT', ?, 'inhaber', 'Quelle ' || ?)
                 """.formatted(schema))) {
             query.setObject(1, id);
             query.setString(2, vertraulichkeit);
             query.setObject(3, OffsetDateTime.now(ZoneOffset.UTC));
+            query.setString(4, vertraulichkeit);
             query.executeUpdate();
         }
     }
@@ -347,10 +385,15 @@ public class WissenLesenSchritte {
     }
 
     private static void quelle(Connection verbindung, UUID seite, String schluessel, UUID dokument) throws Exception {
+        quelle(verbindung, SCHEMA, seite, schluessel, dokument);
+    }
+
+    private static void quelle(Connection verbindung, String schema, UUID seite, String schluessel, UUID dokument)
+            throws Exception {
         try (PreparedStatement query = verbindung.prepareStatement("""
-                insert into m_urinet.wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von, auszug)
+                insert into %s.wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von, auszug)
                 values (?, ?, ?, 1, 'synthetischer Auszug')
-                """)) {
+                """.formatted(schema))) {
             query.setObject(1, seite);
             query.setString(2, schluessel);
             query.setObject(3, dokument);

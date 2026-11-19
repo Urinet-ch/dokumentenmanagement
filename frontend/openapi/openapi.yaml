@@ -2780,6 +2780,8 @@ components:
           type: string
         status:
           type: string
+        quellePruefen:
+          type: boolean
     WissensLog:
       type: object
       properties:
@@ -2862,6 +2864,14 @@ components:
           type: string
         quellSeiteId:
           $ref: "#/components/schemas/UUID"
+        dokumentTitel:
+          type: string
+        dokumentDateiname:
+          type: string
+        quellSeitePfad:
+          type: string
+        quellSeiteTitel:
+          type: string
     Wissensseite:
       type: object
       properties:
@@ -5745,6 +5755,10 @@ paths:
       tags:
       - Wissensbasis
       parameters:
+      - name: dokumentId
+        in: query
+        schema:
+          type: string
       - schema:
           type: integer
           default: 50

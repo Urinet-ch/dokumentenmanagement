@@ -1,0 +1,24 @@
+<a routerLink="/wissen">{{ texte.zurueck }}</a>
+<h1>{{ texte.log }}</h1>
+@if (laedt()) { <p role="status">{{ texte.laedt }}</p> }
+@if (fehler(); as meldung) {
+  <p role="alert">{{ meldung }}</p>
+  <button type="button" (click)="laden()">{{ texte.erneut }}</button>
+}
+@if (seite(); as seite) {
+  @if (!seite.eintraege?.length) { <p>{{ texte.keineEintraege }}</p> }
+  <ol>
+    @for (eintrag of seite.eintraege; track eintrag.id) {
+      <li>
+        @if (eintrag.zeit) { <time>{{ zeitpunkt(eintrag.zeit) }}</time> }
+        <p>{{ eintrag.text }}</p>
+        @for (verweis of eintrag.seiten; track verweis.id) {
+          <a [routerLink]="'/wissen/' + verweis.pfad">{{ verweis.titel }}</a>
+        }
+      </li>
+    }
+  </ol>
+  @if (seite.naechstesVor; as cursor) {
+    <button type="button" (click)="weiter(cursor)">{{ texte.weiter }}</button>
+  }
+}
