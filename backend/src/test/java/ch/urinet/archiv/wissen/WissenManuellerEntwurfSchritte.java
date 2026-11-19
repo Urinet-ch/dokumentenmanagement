@@ -5,6 +5,7 @@ import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
@@ -15,6 +16,8 @@ import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.is;
 
 public class WissenManuellerEntwurfSchritte {
     @Inject
@@ -23,6 +26,7 @@ public class WissenManuellerEntwurfSchritte {
     private final String pfad = "konzepte/manuell-" + UUID.randomUUID();
     private UUID entwurf;
     private int status;
+    private Response antwort;
 
     @Wenn("der Inhaber einen manuellen Wissensentwurf ohne Titel anlegt")
     public void inhaberLegtEntwurfAn() {
@@ -69,6 +73,37 @@ public class WissenManuellerEntwurfSchritte {
                 assertThat(ergebnis.getInt(1)).isEqualTo(1);
             }
         }
+    }
+
+    @Wenn("der Inhaber diese Änderung ohne If-Match annehmen möchte")
+    public void annehmenOhneVersion() {
+        status = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .contentType("application/json").body("{}")
+                .when().post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen").statusCode();
+    }
+
+    @Dann("wird die Annahme mit 428 abgelehnt")
+    public void versionFehlt() {
+        assertThat(status).isEqualTo(428);
+    }
+
+    @Wenn("der Inhaber die Änderung mit aktueller Version annehmen möchte")
+    public void annehmenMitVersion() {
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        int etag = given().auth().oauth2(inhaber).when().get("/api/v1/wissensentwuerfe/" + entwurf)
+                .then().statusCode(200).extract().path("aenderungen[0].etag");
+        antwort = given().auth().oauth2(inhaber).header("If-Match", "\"" + etag + "\"")
+                .contentType("application/json").body("{}")
+                .when().post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen");
+    }
+
+    @Dann("wird die Annahme mit 422 und dem Befund «FELD_FEHLT» abgelehnt und bleibt offen")
+    public void annahmeBleibtOffen() {
+        antwort.then().statusCode(422).body("fehlercode", is("ENTWURF_BEFUND"))
+                .body("befunde", hasItem("FELD_FEHLT"));
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensentwuerfe/" + entwurf).then().statusCode(200)
+                .body("aenderungen[0].status", is("OFFEN"));
     }
 
     @After("@wissen-manuell")
