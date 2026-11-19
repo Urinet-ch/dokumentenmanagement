@@ -609,5 +609,5 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
 
 - [x]* O.10 Eingangskorb-Entwurf bleibt bei Sitzungsablauf (401) [Frontend] [Fabian]
   - Herkunft: Review von PR #238; der frühere Ausschlussgrund (#228/#229) ist mit deren Merge entfallen
-  - Entwurfsentscheid [Fabian]: Wohin der Entwurf bei 401 geht (z. B. sessionStorage nur mit Metadaten, keine Dateiinhalte), Verfall und Löschung beim Abmelden
+  - Entwurfsentscheid Fabian, 17.11.2026: Speicherung in `sessionStorage` (Verfall mit der Sitzung beim Schliessen des Tabs); nur Metadaten und Zusatzfeldwerte, keine Datei- oder Dokumentinhalte und keine Tokens. Beim Abmelden und Benutzerwechsel löschen; nach erneuter Anmeldung wiederherstellen.
   - Nach erneuter Anmeldung den Entwurf wiederherstellen; Test für den Ablauf
