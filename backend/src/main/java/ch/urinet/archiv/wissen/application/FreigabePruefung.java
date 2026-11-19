@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class FreigabePruefung {
-    public record Ergebnis(WissensStufe mindeststufe, WissensPruefung.Ergebnis pruefung) {
+    public record Ergebnis(WissensStufe mindeststufe, WissensStufe wirksameStufe, WissensPruefung.Ergebnis pruefung) {
     }
 
     public Ergebnis pruefen(Wissensseite fassung, WissensGraph graph, WissensStufe bisherigeMindeststufe,
@@ -33,29 +33,30 @@ public class FreigabePruefung {
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         WissensStufe berechnet = graph.wirksameStufeNachAnnahme(dokumente, quellseiten, bisherigeMindeststufe,
                 kontextstufe);
-        WissensStufe mindeststufe = berechnet;
+        WissensStufe mindeststufe = graph.mindeststufeNachAnnahme(quellseiten, bisherigeMindeststufe, kontextstufe);
         if (gewuenschteStufe != null) {
             try {
-                mindeststufe = WissensStufe.valueOf(gewuenschteStufe);
+                WissensStufe gewuenscht = WissensStufe.valueOf(gewuenschteStufe);
+                if (gewuenscht.hoechste(berechnet) != gewuenscht
+                        && !("ueberblick".equals(fassung.pfad()) && berechnet == WissensStufe.INTERN)) {
+                    throw new FachFehler(Fehlercode.VERTRAULICHKEIT_ZU_TIEF);
+                }
+                mindeststufe = mindeststufe.hoechste(gewuenscht);
             } catch (IllegalArgumentException e) {
                 throw new FachFehler(Fehlercode.VERTRAULICHKEIT_UNGUELTIG);
             }
-            if (mindeststufe.hoechste(berechnet) != mindeststufe
-                    && !("ueberblick".equals(fassung.pfad()) && berechnet == WissensStufe.INTERN)) {
-                throw new FachFehler(Fehlercode.VERTRAULICHKEIT_ZU_TIEF);
-            }
-            mindeststufe = mindeststufe.hoechste(berechnet);
         }
+        WissensStufe wirksam = berechnet.hoechste(mindeststufe);
         WissensPruefung.Kontext aktuell = new WissensPruefung.Kontext(kontext.maxZeichen(), kontext.bisherigerPfad(),
                 kontext.belegtePfade(), kontext.dokumente(), kontext.seitenIds(), kontext.basisQuellenSchluessel(),
                 kontext.entfernteAussagen(), kontext.kernaussagenSchluessel(), kontext.ingest(), kontext.veralten(),
                 kontext.pfadHoehereStufe(), kontext.bisherigeVertraulichkeit(),
-                Wissensseite.Vertraulichkeit.valueOf(mindeststufe.name()));
+                Wissensseite.Vertraulichkeit.valueOf(wirksam.name()));
         Wissensseite gepruefteFassung = new Wissensseite(fassung.id(), fassung.pfad(), fassung.typ(), fassung.titel(),
                 fassung.beschreibung(), fassung.tags(), fassung.status(), fassung.veraltetAb(), fassung.quellen(),
-                Wissensseite.Vertraulichkeit.valueOf(mindeststufe.name()), fassung.inhalt(), fassung.version(),
+                Wissensseite.Vertraulichkeit.valueOf(wirksam.name()), fassung.inhalt(), fassung.version(),
                 fassung.erzeugtVon(), fassung.erzeugtAm(), fassung.freigegebenVon(), fassung.freigegebenAm(),
                 fassung.quellePruefen(), fassung.widerspruchOffen(), fassung.wissensquelleId());
-        return new Ergebnis(mindeststufe, WissensPruefung.pruefen(gepruefteFassung, aktuell));
+        return new Ergebnis(mindeststufe, wirksam, WissensPruefung.pruefen(gepruefteFassung, aktuell));
     }
 }

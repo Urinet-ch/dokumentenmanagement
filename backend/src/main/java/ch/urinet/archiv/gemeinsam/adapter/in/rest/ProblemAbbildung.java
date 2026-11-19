@@ -1,6 +1,7 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.KlassifikationUngueltig;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
@@ -33,6 +34,9 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper
     public Response fachFehler(FachFehler fehler) {
+        if (fehler instanceof EntwurfBefunde entwurf) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "befunde", entwurf.befunde())).build();
+        }
         if (fehler instanceof KlassifikationUngueltig klassifikation) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "klassifikationen",
                     klassifikation.klassifikationen())).build();

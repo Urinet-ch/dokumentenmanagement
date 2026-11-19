@@ -166,6 +166,41 @@
           }
         }
       },
+      "Bearbeitung" : {
+        "type" : "object",
+        "properties" : {
+          "titel" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "tags" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "veraltetAb" : {
+            "$ref" : "#/components/schemas/LocalDate"
+          },
+          "quellen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Quelleneintrag"
+            }
+          },
+          "inhalt" : {
+            "type" : "string"
+          },
+          "entfernteAussagen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EntfernteAussage"
+            }
+          }
+        }
+      },
       "Befund" : {
         "type" : "object",
         "properties" : {
@@ -1118,6 +1153,17 @@
           "groesse" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "EntfernteAussage" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "begruendung" : {
+            "type" : "string"
           }
         }
       },
@@ -2389,6 +2435,31 @@
           }
         }
       },
+      "Quelleneintrag" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "dokumentId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "seiteVon" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "seiteBis" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "auszug" : {
+            "type" : "string"
+          },
+          "quellSeiteId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
       "Regel" : {
         "type" : "object",
         "properties" : {
@@ -2776,6 +2847,20 @@
           "meldung" : {
             "type" : [ "string", "null" ],
             "description" : "Meldung der Dokumentregel"
+          }
+        }
+      },
+      "WissenAnnehmen" : {
+        "type" : "object",
+        "properties" : {
+          "fassung" : {
+            "$ref" : "#/components/schemas/Bearbeitung"
+          },
+          "vertraulichkeit" : {
+            "type" : "string"
+          },
+          "grund" : {
+            "type" : "string"
           }
         }
       },
@@ -6748,6 +6833,77 @@
           },
           "401" : {
             "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/annehmen" : {
+      "post" : {
+        "summary" : "Eine Wissensänderung annehmen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "entwurfId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "nr",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenAnnehmen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Änderung angenommen"
+          },
+          "403" : {
+            "description" : "Rolle darf Änderungen nicht annehmen"
+          },
+          "404" : {
+            "description" : "Änderung nicht gefunden oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Änderung ist nicht offen"
+          },
+          "412" : {
+            "description" : "Version veraltet"
+          },
+          "422" : {
+            "description" : "Fassung hat Befunde oder die Vertraulichkeit ist ungültig"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "400" : {
+            "description" : "Bad Request"
           }
         },
         "security" : [ {

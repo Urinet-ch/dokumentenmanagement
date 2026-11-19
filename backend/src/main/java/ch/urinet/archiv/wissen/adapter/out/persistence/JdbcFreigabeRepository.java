@@ -4,6 +4,7 @@ import ch.urinet.archiv.wissen.application.FreigabeRepository;
 import ch.urinet.archiv.ki.application.KiPort;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
+import ch.urinet.archiv.wissen.domain.WissensStufe;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -11,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
@@ -69,7 +71,7 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
     public Vorschlag vorschlagLaden(Aenderung aenderung) {
         Object[] zeile = (Object[]) em.get().createNativeQuery("""
                 select cast(a.daten as text), a.inhalt, cast(a.entfernte_aussagen as text),
-                       a.vertraulichkeit_kontext, e.dokument_id, e.ki_modell
+                       a.vertraulichkeit_kontext, e.dokument_id, e.ki_modell, e.erstellt_von
                 from wissens_aenderung a join wissens_entwurf e on e.id = a.entwurf_id
                 where a.id = :id
                 """).setParameter("id", aenderung.id()).getSingleResult();
@@ -79,13 +81,15 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                     .orElseThrow(() -> new IllegalStateException("Gespeicherter Seitentyp ist ungültig"));
             Set<String> entfernt = zeile[2] == null ? Set.of()
                     : json.readValue((String) zeile[2], new TypeReference<List<KiPort.EntfernteAussage>>() { })
-                    .stream().map(KiPort.EntfernteAussage::schluessel).filter(java.util.Objects::nonNull)
+                    .stream().filter(a -> a.begruendung() != null && !a.begruendung().isBlank())
+                    .map(KiPort.EntfernteAussage::schluessel).filter(java.util.Objects::nonNull)
                     .collect(Collectors.toUnmodifiableSet());
             Wissensseite fassung = new Wissensseite(aenderung.seiteId(), aenderung.pfad(), typ, daten.titel(),
                     daten.beschreibung(), daten.tags(), Wissensseite.Status.AKTIV, daten.veraltetAb(),
                     daten.quellen(), Wissensseite.Vertraulichkeit.NORMAL, (String) zeile[1], 0,
                     null, null, null, null, false, false, daten.wissensquelleId());
-            return new Vorschlag(fassung, entfernt, (String) zeile[3], (UUID) zeile[4], (String) zeile[5]);
+            return new Vorschlag(fassung, entfernt, (String) zeile[3], (UUID) zeile[4], (String) zeile[5],
+                    (String) zeile[6]);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Gespeicherte Änderung ist nicht lesbar", e);
         }
@@ -94,6 +98,101 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
     private record FassungDaten(String typ, String titel, String beschreibung, List<String> tags, String status,
                                 java.time.LocalDate veraltetAb, List<Quelleneintrag> quellen, String vertraulichkeit,
                                 String inhalt, UUID wissensquelleId) {
+    }
+
+    @Override
+    public void fassungSpeichern(UUID entwurfId, Aenderung aenderung, Wissensseite fassung,
+                                 WissensStufe mindeststufe, WissensStufe wirksameStufe, String erzeugtVon,
+                                 String benutzer, String grund, Set<String> links) {
+        String tags;
+        String quellen;
+        try {
+            tags = json.writeValueAsString(fassung.tags());
+            quellen = json.writeValueAsString(fassung.quellen());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Wissensseitenfassung ist nicht serialisierbar", e);
+        }
+        Query schreiben = em.get().createNativeQuery("""
+                insert into wissensseite
+                    (id, pfad, typ, titel, beschreibung, tags, status, veraltet_ab, vertraulichkeit,
+                     vertraulichkeit_mindest, inhalt, version, erzeugt_von, erzeugt_am, freigegeben_von,
+                     freigegeben_am, wissensquelle_id)
+                values (:id, :pfad, :typ, :titel, :beschreibung,
+                        array(select jsonb_array_elements_text(cast(:tags as jsonb))), :status,
+                        cast(:veraltet as date), :wirksam, :mindest, :inhalt, :version, :erzeugt, now(),
+                        :freigegeben, now(), :quelle)
+                on conflict (id) do update set
+                    typ = excluded.typ, titel = excluded.titel, beschreibung = excluded.beschreibung, tags = excluded.tags,
+                    status = excluded.status, veraltet_ab = excluded.veraltet_ab,
+                    vertraulichkeit = excluded.vertraulichkeit,
+                    vertraulichkeit_mindest = excluded.vertraulichkeit_mindest,
+                    inhalt = excluded.inhalt, version = excluded.version, erzeugt_von = excluded.erzeugt_von,
+                    erzeugt_am = excluded.erzeugt_am, freigegeben_von = excluded.freigegeben_von,
+                    freigegeben_am = excluded.freigegeben_am, wissensquelle_id = excluded.wissensquelle_id
+                """);
+        schreiben.setParameter("id", fassung.id()).setParameter("pfad", fassung.pfad())
+                .setParameter("typ", fassung.typ().datenbankwert()).setParameter("titel", fassung.titel())
+                .setParameter("beschreibung", fassung.beschreibung()).setParameter("tags", tags)
+                .setParameter("status", fassung.status().name()).setParameter("veraltet", fassung.veraltetAb())
+                .setParameter("mindest", mindeststufe.name()).setParameter("wirksam", wirksameStufe.name())
+                .setParameter("inhalt", fassung.inhalt())
+                .setParameter("version", fassung.version()).setParameter("erzeugt", erzeugtVon)
+                .setParameter("freigegeben", "human:" + benutzer).setParameter("quelle", fassung.wissensquelleId())
+                .executeUpdate();
+        em.get().createNativeQuery("""
+                insert into wissensseite_version
+                    (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit, grund, entwurf_id,
+                     aenderung_id)
+                select s.id, s.version,
+                       jsonb_build_object('pfad', s.pfad, 'typ', s.typ, 'titel', s.titel,
+                           'beschreibung', s.beschreibung, 'tags', to_jsonb(s.tags), 'status', s.status,
+                           'veraltet_ab', s.veraltet_ab, 'vertraulichkeit', s.vertraulichkeit,
+                           'vertraulichkeit_mindest', s.vertraulichkeit_mindest,
+                           'quellen', cast(:quellen as jsonb), 'wissensquelle_id', s.wissensquelle_id),
+                       s.inhalt, s.erzeugt_von, s.freigegeben_von, now(), :grund, :entwurf, :aenderung
+                from wissensseite s where s.id = :id
+                """).setParameter("quellen", quellen).setParameter("grund", grund)
+                .setParameter("entwurf", entwurfId).setParameter("aenderung", aenderung.id())
+                .setParameter("id", fassung.id()).executeUpdate();
+        em.get().createNativeQuery("delete from wissensseite_quelle where seite_id = :id")
+                .setParameter("id", fassung.id()).executeUpdate();
+        for (Quelleneintrag quelle : fassung.quellen()) {
+            em.get().createNativeQuery("""
+                    insert into wissensseite_quelle
+                        (seite_id, schluessel, dokument_id, quell_seite_id, seite_von, seite_bis, auszug)
+                    values (:seite, :schluessel, :dokument, :quellseite, :von, :bis, :auszug)
+                    """).setParameter("seite", fassung.id()).setParameter("schluessel", quelle.schluessel())
+                    .setParameter("dokument", quelle.dokumentId()).setParameter("quellseite", quelle.quellSeiteId())
+                    .setParameter("von", quelle.seiteVon()).setParameter("bis", quelle.seiteBis())
+                    .setParameter("auszug", quelle.auszug()).executeUpdate();
+        }
+        em.get().createNativeQuery("delete from wissensseite_link where von_seite_id = :id")
+                .setParameter("id", fassung.id()).executeUpdate();
+        for (String link : links) {
+            em.get().createNativeQuery("insert into wissensseite_link (von_seite_id, nach_pfad) values (:id, :pfad)")
+                    .setParameter("id", fassung.id()).setParameter("pfad", link).executeUpdate();
+        }
+        int entschieden = em.get().createNativeQuery("""
+                update wissens_aenderung set status = 'ANGENOMMEN', seite_id = :seite, ergebnis_version = :version,
+                    entschieden_von = :benutzer, entschieden_am = now(), grund = :grund, etag = etag + 1
+                where id = :id and status = 'OFFEN' and etag = :etag
+                """).setParameter("seite", fassung.id()).setParameter("version", fassung.version())
+                .setParameter("benutzer", benutzer).setParameter("grund", grund)
+                .setParameter("id", aenderung.id()).setParameter("etag", aenderung.etag()).executeUpdate();
+        if (entschieden != 1) {
+            throw new IllegalStateException("Gesperrte Wissensänderung konnte nicht angenommen werden");
+        }
+        String aktion = switch (aenderung.aktion()) {
+            case "NEU" -> "CREATION";
+            case "AENDERN" -> "UPDATE";
+            case "VERALTEN" -> "DEPRECATION";
+            default -> throw new IllegalStateException("Ungültige Wissensänderungsaktion");
+        };
+        em.get().createNativeQuery("""
+                insert into wissens_log (zeit, aktion, akteur, seiten, entwurf_id)
+                values (now(), :aktion, :akteur, array[cast(:seite as uuid)], :entwurf)
+                """).setParameter("aktion", aktion).setParameter("akteur", "human:" + benutzer)
+                .setParameter("seite", fassung.id()).setParameter("entwurf", entwurfId).executeUpdate();
     }
 
     @Override

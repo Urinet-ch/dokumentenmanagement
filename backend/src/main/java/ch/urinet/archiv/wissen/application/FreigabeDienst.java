@@ -19,13 +19,22 @@ public class FreigabeDienst {
     private final FreigabeSperre sperre;
     private final WissenIngestSpeichern ingest;
     private final FreigabeProtokoll protokoll;
+    private final FreigabeTransaktion annahme;
 
     public FreigabeDienst(FreigabeRepository repository, FreigabeSperre sperre,
-                          WissenIngestSpeichern ingest, FreigabeProtokoll protokoll) {
+                          WissenIngestSpeichern ingest, FreigabeProtokoll protokoll, FreigabeTransaktion annahme) {
         this.repository = repository;
         this.sperre = sperre;
         this.ingest = ingest;
         this.protokoll = protokoll;
+        this.annahme = annahme;
+    }
+
+    public void annehmen(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch,
+                         FreigabeAnnahme.Bearbeitung bearbeitung, String stufe, String grund, String realIp) {
+        if (!annahme.annehmen(benutzer, entwurfId, nummer, ifMatch, bearbeitung, stufe, grund, realIp)) {
+            throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
+        }
     }
 
     @Transactional

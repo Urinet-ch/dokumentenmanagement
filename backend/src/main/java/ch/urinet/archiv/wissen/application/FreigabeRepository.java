@@ -1,6 +1,7 @@
 package ch.urinet.archiv.wissen.application;
 
 import ch.urinet.archiv.wissen.domain.Wissensseite;
+import ch.urinet.archiv.wissen.domain.WissensStufe;
 
 import java.util.Optional;
 import java.util.Set;
@@ -15,6 +16,10 @@ public interface FreigabeRepository {
 
     Vorschlag vorschlagLaden(Aenderung aenderung);
 
+    void fassungSpeichern(UUID entwurfId, Aenderung aenderung, Wissensseite fassung, WissensStufe mindeststufe,
+                          WissensStufe wirksameStufe, String erzeugtVon, String benutzer, String grund,
+                          Set<String> links);
+
     void verwerfen(long aenderungId, int etag, String benutzer, String grund);
 
     boolean entwurfAbschliessen(UUID entwurfId);
@@ -26,7 +31,7 @@ public interface FreigabeRepository {
     }
 
     record Vorschlag(Wissensseite fassung, Set<String> entfernteAussagen, String kontextstufe,
-                     UUID wissensquelleId, String modell) {
+                     UUID wissensquelleId, String modell, String erstelltVon) {
         public Vorschlag {
             entfernteAussagen = Set.copyOf(entfernteAussagen);
         }

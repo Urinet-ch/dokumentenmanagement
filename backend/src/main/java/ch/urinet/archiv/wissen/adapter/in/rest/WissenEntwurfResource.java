@@ -11,6 +11,7 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenEntwurfLesen;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
+import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.GET;
@@ -78,6 +79,34 @@ public class WissenEntwurfResource {
 
     @Schema(name = "WissenVerwerfen")
     public record VerwerfenDto(String grund) {
+    }
+
+    @Schema(name = "WissenAnnehmen")
+    public record AnnehmenDto(FreigabeAnnahme.Bearbeitung fassung, String vertraulichkeit, String grund) {
+    }
+
+    @POST
+    @Path("/{entwurfId}/aenderungen/{nr}/annehmen")
+    @AlleArchivRollen
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Eine Wissensänderung annehmen")
+    @APIResponse(responseCode = "204", description = "Änderung angenommen")
+    @APIResponse(responseCode = "403", description = "Rolle darf Änderungen nicht annehmen")
+    @APIResponse(responseCode = "404", description = "Änderung nicht gefunden oder nicht sichtbar")
+    @APIResponse(responseCode = "409", description = "Änderung ist nicht offen")
+    @APIResponse(responseCode = "412", description = "Version veraltet")
+    @APIResponse(responseCode = "422", description = "Fassung hat Befunde oder die Vertraulichkeit ist ungültig")
+    @APIResponse(responseCode = "428", description = "If-Match fehlt")
+    public Response annehmen(@PathParam("entwurfId") UUID entwurfId, @PathParam("nr") int nummer,
+                             @HeaderParam("If-Match") @Parameter(required = true) String ifMatch,
+                             @HeaderParam("X-Real-Ip") @Parameter(hidden = true) String realIp,
+                             AnnehmenDto angaben) {
+        mandant.pruefen();
+        freigabe.annehmen(benutzer(), entwurfId, nummer, () -> Versionskopf.version(ifMatch),
+                angaben == null ? null : angaben.fassung(), angaben == null ? null : angaben.vertraulichkeit(),
+                angaben == null ? null : angaben.grund(), realIp);
+        return Response.noContent().build();
     }
 
     @POST

@@ -12,9 +12,13 @@ import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
+import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
 import ch.urinet.archiv.wissen.application.FreigabeKontext;
 import ch.urinet.archiv.wissen.application.FreigabeSperre;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
+import ch.urinet.archiv.wissen.domain.Quelleneintrag;
+import ch.urinet.archiv.wissen.domain.Seitentyp;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
@@ -42,17 +46,20 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.hasItem;
 
 /**
  * Lesen und Anlegen für den Ingest-Start (Spec 04, Aufgabe 14.1a) je Mandant: Jeder Mandant sieht nur Dokumente,
@@ -75,6 +82,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     FreigabeDienst freigabe;
+
+    @Inject
+    FreigabeAnnahme freigabeAnnahme;
 
     @Inject
     FreigabeSperre freigabeSperre;
@@ -337,7 +347,8 @@ class JdbcWissenIngestTest {
             var vorschlag = freigabeRepository.vorschlagLaden(a);
             return freigabeKontext.pruefen(inhaber, entwurf, a, vorschlag, vorschlag.fassung(), "NORMAL");
         });
-        assertThat(intern.mindeststufe()).isEqualTo(WissensStufe.INTERN);
+        assertThat(intern.mindeststufe()).isEqualTo(WissensStufe.NORMAL);
+        assertThat(intern.wirksameStufe()).isEqualTo(WissensStufe.INTERN);
         assertThat(intern.pruefung().befunde()).extracting(WissensPruefung.Befund::code)
                 .contains(WissensPruefung.Code.STUFE_UEBERBLICK);
 
@@ -349,6 +360,250 @@ class JdbcWissenIngestTest {
         });
         assertThat(personal.pruefung().befunde()).extracting(WissensPruefung.Befund::code)
                 .contains(WissensPruefung.Code.QUELLE_PERSONAL);
+    }
+
+    @Test
+    void fassungMitVersionQuellenLinksUndLogIstTeilDerTransaktion() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        UUID seite = UUID.randomUUID();
+        Wissensseite fassung = new Wissensseite(seite, "konzepte/probe", Seitentyp.KONZEPT, "Probe",
+                "Ein Satz.", List.of("probe"), Wissensseite.Status.AKTIV, null,
+                List.of(new Quelleneintrag("q1", dokument, 1, 1, "Seite 1", null)),
+                Wissensseite.Vertraulichkeit.INTERN, "Aussage.[^q1]", 1,
+                null, null, null, null, false, false, null);
+
+        assertThatThrownBy(() -> im(URINET, () -> {
+            var aenderung = freigabeRepository.sperren(entwurf, 1).orElseThrow();
+            freigabeRepository.fassungSpeichern(entwurf, aenderung, fassung, WissensStufe.INTERN,
+                    WissensStufe.INTERN, "human:probe", "inhaber", null, Set.of("konzepte/andere"));
+            EntityManager em = entityManager.get();
+            assertThat(((Number) em.createNativeQuery("select count(*) from wissensseite_version where seite_id = :id")
+                    .setParameter("id", seite).getSingleResult()).intValue()).isEqualTo(1);
+            assertThat(((Number) em.createNativeQuery("select count(*) from wissensseite_quelle where seite_id = :id")
+                    .setParameter("id", seite).getSingleResult()).intValue()).isEqualTo(1);
+            assertThat(((Number) em.createNativeQuery("select count(*) from wissensseite_link where von_seite_id = :id")
+                    .setParameter("id", seite).getSingleResult()).intValue()).isEqualTo(1);
+            assertThat(((Number) em.createNativeQuery("select count(*) from wissens_log where entwurf_id = :id")
+                    .setParameter("id", entwurf).getSingleResult()).intValue()).isEqualTo(1);
+            assertThat(em.createNativeQuery("select status from wissens_aenderung where id = :id")
+                    .setParameter("id", aenderung.id()).getSingleResult()).isEqualTo("ANGENOMMEN");
+            throw new IllegalStateException("rollback");
+        })).hasMessage("rollback");
+        assertThat(anzahl("select count(*) from " + URINET.schema() + ".wissensseite where id = ?", seite)).isZero();
+        assertThat(anzahl("select count(*) from " + ZWEITER.schema() + ".wissensseite where id = ?", seite)).isZero();
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_log where entwurf_id = ?", entwurf)).isZero();
+    }
+
+    @Test
+    void annehmenPrueftAktuelleQuelleUndSchreibtAtomar() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        String daten = """
+                {"typ":"Konzept","titel":"Probe","beschreibung":"Ein Satz.","tags":[],
+                 "status":"VERALTET","veraltetAb":null,
+                 "quellen":[{"schluessel":"q1","dokumentId":"%s","seiteVon":1,"seiteBis":1,
+                             "auszug":"Seite 1","quellSeiteId":null}],
+                 "vertraulichkeit":"INTERN","inhalt":"Aussage.[^q1]","wissensquelleId":null}
+                """.formatted(dokument);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set daten = cast(? as jsonb), inhalt = 'Aussage.[^q1]' "
+                + "where entwurf_id = ?", daten, entwurf);
+        String pfad = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen";
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String treuhaender = Testanmeldung.token("treuhaender-urinet");
+        try {
+            given().auth().oauth2(treuhaender).contentType("application/json").body("{}")
+                    .when().post(pfad).then().statusCode(403);
+            given().auth().oauth2(inhaber).contentType("application/json").body("{}")
+                    .when().post(pfad).then().statusCode(428);
+            ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'PERSONAL' where id = ?",
+                    dokument);
+            given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json").body("{}")
+                    .when().post(pfad).then().statusCode(422).body("befunde", hasItem("QUELLE_PERSONAL"));
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissens_log where entwurf_id = ?", entwurf)).isZero();
+            ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'NORMAL' where id = ?",
+                    dokument);
+            given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json").body("{}")
+                    .when().post(pfad).then().statusCode(204);
+            given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json").body("{}")
+                    .when().post(pfad).then().statusCode(412);
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "ERLEDIGT");
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_version where entwurf_id = ? and version = 1", entwurf)).isEqualTo(1);
+            assertThat(anzahl("select count(*) from " + URINET.schema() + ".wissensseite s join "
+                    + URINET.schema() + ".wissens_aenderung a on a.seite_id = s.id "
+                    + "where a.entwurf_id = ? and s.status = 'AKTIV' and s.vertraulichkeit = 'NORMAL'",
+                    entwurf)).isEqualTo(1);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_version_dokument h join " + URINET.schema()
+                    + ".wissensseite_version v on v.seite_id = h.seite_id and v.version = h.version "
+                    + "where v.entwurf_id = ?", entwurf)).isEqualTo(1);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_ANNEHMEN'", entwurf))
+                    .isEqualTo(1);
+            assertThat(anzahl("select count(*) from public.auftrag where typ = 'WISSEN_EMBEDDING' and "
+                    + "nutzlast->>'seiteId' in (select seite_id::text from " + URINET.schema()
+                    + ".wissens_aenderung where entwurf_id = ?)", entwurf)).isEqualTo(1);
+        } finally {
+            annahmeBereinigen(entwurf);
+        }
+    }
+
+    @Test
+    void annahmeRolltMitAuftragProtokollUndVersionshuelleZurueck() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        String daten = """
+                {"typ":"Konzept","titel":"Probe","beschreibung":"Ein Satz.","tags":[],
+                 "status":"AKTIV","veraltetAb":null,
+                 "quellen":[{"schluessel":"q1","dokumentId":"%s","seiteVon":1,"seiteBis":1,
+                             "auszug":"Seite 1","quellSeiteId":null}],
+                 "vertraulichkeit":"NORMAL","inhalt":"Aussage.[^q1]","wissensquelleId":null}
+                """.formatted(dokument);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set daten = cast(? as jsonb), inhalt = 'Aussage.[^q1]' "
+                + "where entwurf_id = ?", daten, entwurf);
+        AtomicReference<UUID> seite = new AtomicReference<>();
+        assertThatThrownBy(() -> im(URINET, () -> {
+            assertThat(freigabeAnnahme.ausfuehren(new Benutzer("inhaber", Rolle.INHABER),
+                    entwurf, 1, () -> 0, null, null, null, null)).isTrue();
+            EntityManager em = entityManager.get();
+            seite.set((UUID) em.createNativeQuery("select seite_id from wissens_aenderung where entwurf_id = :id")
+                    .setParameter("id", entwurf).getSingleResult());
+            assertThat(((Number) em.createNativeQuery("select count(*) from wissensseite_version_dokument "
+                    + "where seite_id = :id").setParameter("id", seite.get()).getSingleResult()).intValue())
+                    .isEqualTo(1);
+            assertThat(((Number) em.createNativeQuery("select count(*) from public.auftrag "
+                    + "where typ = 'WISSEN_EMBEDDING' and nutzlast->>'seiteId' = :id")
+                    .setParameter("id", seite.get().toString()).getSingleResult()).intValue()).isEqualTo(1);
+            throw new IllegalStateException("Testabbruch");
+        })).hasMessage("Testabbruch");
+        assertThat(seite.get()).isNotNull();
+        assertThat(anzahl("select count(*) from " + URINET.schema() + ".wissensseite where id = ?", seite.get()))
+                .isZero();
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_ANNEHMEN'", entwurf)).isZero();
+        assertThat(anzahl("select count(*) from public.auftrag where typ = 'WISSEN_EMBEDDING' "
+                + "and nutzlast->>'seiteId' = ?", seite.get().toString())).isZero();
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+    }
+
+    @Test
+    void annahmeVeralteterBasisMeldet412UndBehaeltMarkierung() throws SQLException {
+        UUID seite = seite(URINET, "konzepte/basis-" + UUID.randomUUID(), "Probe", null);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set aktion = 'AENDERN', seite_id = ?, basis_version = 1 "
+                + "where entwurf_id = ?", seite, entwurf);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set version = 2 where id = ?", seite);
+        String pfad = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen";
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).header("If-Match", "\"0\"")
+                .contentType("application/json").body("{}").when().post(pfad).then().statusCode(412);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_aenderung where entwurf_id = ? and status = 'VERALTET' and etag = 1", entwurf))
+                .isEqualTo(1);
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+    }
+
+    @Test
+    void paralleleAnnahmenErzeugenNurEineVersion() throws Exception {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        String daten = """
+                {"typ":"Konzept","titel":"Probe","beschreibung":"Ein Satz.","tags":[],
+                 "status":"AKTIV","veraltetAb":null,
+                 "quellen":[{"schluessel":"q1","dokumentId":"%s","seiteVon":1,"seiteBis":1,
+                             "auszug":"Seite 1","quellSeiteId":null}],
+                 "vertraulichkeit":"NORMAL","inhalt":"Aussage.[^q1]","wissensquelleId":null}
+                """.formatted(dokument);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set daten = cast(? as jsonb), inhalt = 'Aussage.[^q1]' "
+                + "where entwurf_id = ?", daten, entwurf);
+        String pfad = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen";
+        String token = Testanmeldung.token("inhaber-urinet");
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService parallel = Executors.newFixedThreadPool(2)) {
+            var erster = parallel.submit(() -> {
+                start.await();
+                return given().auth().oauth2(token).header("If-Match", "\"0\"")
+                        .contentType("application/json").body("{}").when().post(pfad).statusCode();
+            });
+            var zweiter = parallel.submit(() -> {
+                start.await();
+                return given().auth().oauth2(token).header("If-Match", "\"0\"")
+                        .contentType("application/json").body("{}").when().post(pfad).statusCode();
+            });
+            start.countDown();
+            assertThat(List.of(erster.get(30, TimeUnit.SECONDS), zweiter.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(204, 412);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_version where entwurf_id = ?", entwurf)).isEqualTo(1);
+        } finally {
+            annahmeBereinigen(entwurf);
+        }
+    }
+
+    @Test
+    void ueberblickMitInternerZitatseiteZeigtBefundImEndpunkt() throws SQLException {
+        UUID quellseite = seite(URINET, "konzepte/intern-" + UUID.randomUUID(), "Probe", null);
+        ausfuehren("update " + URINET.schema()
+                + ".wissensseite set vertraulichkeit = 'INTERN', vertraulichkeit_mindest = 'INTERN' where id = ?",
+                quellseite);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        String daten = """
+                {"typ":"Synthese","titel":"Überblick","beschreibung":"Ein Satz.","tags":[],
+                 "status":"AKTIV","veraltetAb":null,
+                 "quellen":[{"schluessel":"q1","dokumentId":null,"seiteVon":null,"seiteBis":null,
+                             "auszug":null,"quellSeiteId":"%s"}],
+                 "vertraulichkeit":"NORMAL","inhalt":"Aussage.[^q1]","wissensquelleId":null}
+                """.formatted(quellseite);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set pfad = 'ueberblick', daten = cast(? as jsonb), "
+                + "inhalt = 'Aussage.[^q1]' where entwurf_id = ?", daten, entwurf);
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).header("If-Match", "\"0\"")
+                .contentType("application/json").body("{\"vertraulichkeit\":\"NORMAL\"}")
+                .when().post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen")
+                .then().statusCode(422).body("befunde", hasItem("STUFE_UEBERBLICK"));
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissensseite_version where entwurf_id = ?", entwurf)).isZero();
+    }
+
+    private void annahmeBereinigen(UUID entwurf) throws SQLException {
+        String schema = URINET.schema();
+        String ids = "(select seite_id from " + schema
+                + ".wissens_aenderung where entwurf_id = ? and aktion = 'NEU' and seite_id is not null)";
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            verbindung.setAutoCommit(false);
+            try (var befehl = verbindung.createStatement()) {
+                befehl.execute("set local session_replication_role = replica");
+            }
+            for (String sql : List.of(
+                    "delete from public.auftrag where typ = 'WISSEN_EMBEDDING' and nutzlast->>'seiteId' in "
+                            + "(select seite_id::text from " + schema + ".wissens_aenderung where entwurf_id = ?)",
+                    "delete from " + schema + ".wissensseite_version_dokument where seite_id in " + ids,
+                    "delete from " + schema + ".wissensseite_version where entwurf_id = ?",
+                    "delete from " + schema + ".wissens_log where entwurf_id = ?",
+                    "delete from " + schema + ".zugriff_protokoll where dokument_id = ?",
+                    "delete from " + schema + ".wissensseite_quelle where seite_id in " + ids,
+                    "delete from " + schema + ".wissensseite_dokument where seite_id in " + ids,
+                    "delete from " + schema + ".wissensseite_link where von_seite_id in " + ids,
+                    "delete from " + schema + ".wissensseite where id in " + ids)) {
+                try (PreparedStatement befehl = verbindung.prepareStatement(sql)) {
+                    befehl.setObject(1, entwurf);
+                    befehl.executeUpdate();
+                }
+            }
+            verbindung.commit();
+        }
     }
 
     @Test
