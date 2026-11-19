@@ -5817,8 +5817,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
         - geschaeftsstelle
   /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/annehmen:
     post:

@@ -92,7 +92,7 @@ public class WissenEntwurfResource {
 
     @POST
     @ErfordertAktion(Aktion.A17)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
     @Consumes(MediaType.APPLICATION_JSON)
     @Operation(summary = "Manuellen Wissensentwurf anlegen")
     @APIResponse(responseCode = "201", description = "Entwurf angelegt und geprüft")

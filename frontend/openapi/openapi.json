@@ -6932,7 +6932,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       }
     },
