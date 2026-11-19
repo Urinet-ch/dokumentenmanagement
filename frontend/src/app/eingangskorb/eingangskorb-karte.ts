@@ -263,6 +263,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         this.entwurf.set(gespeichert.entwurf);
         this.zusatzEingaben.set(gespeichert.zusatz);
         this.entwurfWiederhergestellt.set(true);
+        this.vertraulichkeitGewaehlt = gespeichert.entwurf.vertraulichkeit !== '';
       }
     }
     if (!dokument.seiten || dokument.seiten < 1) {

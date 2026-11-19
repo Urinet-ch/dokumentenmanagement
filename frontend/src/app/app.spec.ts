@@ -242,6 +242,18 @@ describe('App (Req 2.6, 8.6)', () => {
     expect(anmeldung.abmelden).toHaveBeenCalledOnce();
   });
 
+  it('schreibt bei der Anmeldung ohne Entwurf nichts in den sessionStorage', async () => {
+    window.sessionStorage.clear();
+    anmeldung.als('inhaber');
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const eingangskorbEintraege = Object.keys(window.sessionStorage).filter((k) =>
+      k.startsWith('archiv.eingangskorb.'),
+    );
+    expect(eingangskorbEintraege).toEqual([]);
+  });
+
   it('löscht Eingangskorb-Entwürfe beim Wechsel des angemeldeten Benutzers', async () => {
     window.sessionStorage.clear();
     anmeldung.als('inhaber');

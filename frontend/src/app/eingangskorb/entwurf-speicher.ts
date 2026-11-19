@@ -45,7 +45,7 @@ export class EingangskorbEntwurfSpeicher {
     }
     const speicher = this.speicher();
     if (speicher) {
-      this.benutzerSetzen(speicher, benutzerId);
+      this.fremdeEintraegeLoeschen(speicher, benutzerId);
     }
   }
 
@@ -91,9 +91,10 @@ export class EingangskorbEntwurfSpeicher {
       return null;
     }
     const speicher = this.speicher();
-    if (!speicher || !this.benutzerSetzen(speicher, benutzerId)) {
+    if (!speicher) {
       return null;
     }
+    this.fremdeEintraegeLoeschen(speicher, benutzerId);
     const schluessel = this.entwurfSchluessel(benutzerId, dokumentId);
     if (!schluessel) {
       return null;
@@ -144,15 +145,15 @@ export class EingangskorbEntwurfSpeicher {
     }
   }
 
-  private benutzerSetzen(speicher: Storage, benutzerId: string): boolean {
+  /** Löscht Einträge eines anderen Benutzers. Schreibt nie (der Marker entsteht erst in speichern()). */
+  private fremdeEintraegeLoeschen(speicher: Storage, benutzerId: string): void {
     const vorher = this.lesenWert(speicher, BENUTZER_SCHLUESSEL);
-    if (vorher === benutzerId) {
-      return true;
+    if (vorher === null || vorher === benutzerId) {
+      return;
     }
     for (const schluessel of this.schluesselMitPraefix(speicher)) {
       this.entfernen(speicher, schluessel);
     }
-    return this.schreiben(speicher, BENUTZER_SCHLUESSEL, benutzerId);
   }
 
   private speicher(): Storage | null {
