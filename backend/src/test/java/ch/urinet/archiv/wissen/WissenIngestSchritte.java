@@ -221,6 +221,19 @@ public class WissenIngestSchritte {
         KiWireMock.wissenFolge(gueltigeAntworten(dokumente.values().iterator().next().id()));
     }
 
+    @Angenommen("WireMock liefert eine zugeordnete und eine nicht zugeordnete Kernaussage")
+    public void antwortenMitNichtZugeordneterAussage() {
+        List<String> antworten = new ArrayList<>(gueltigeAntworten(dokumente.values().iterator().next().id()));
+        antworten.set(0, """
+                {"aussagen":[{"nr":1,"text":"Die Abgabefrist endet am 30. April.","seiten":[1],
+                "auszug":"Die Abgabefrist endet am 30. April."},
+                {"nr":2,"text":"Die Frist ist im April.","seiten":[1],
+                "auszug":"Dieser Auszug steht nicht im Dokument."}]}
+                """);
+        KiWireMock.zuruecksetzen();
+        KiWireMock.wissenFolge(antworten);
+    }
+
     @Angenommen("WireMock liefert gültige Antworten ohne Überblicksschritt")
     public void gueltigeAntwortenOhneUeberblick() {
         List<String> antworten = gueltigeAntworten(dokumente.values().iterator().next().id());
@@ -479,6 +492,13 @@ public class WissenIngestSchritte {
         entwurfWarten("OFFEN");
         assertThat(KiWireMock.client().find(postRequestedFor(urlPathEqualTo(KiWireMock.CHAT_PFAD))))
                 .hasSize(4);
+    }
+
+    @Dann("die Entwurfsansicht kennzeichnet beide Kernaussagen entsprechend ihrer Zuordnung")
+    public void zuordnungDerKernaussagen() {
+        var ansicht = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensentwuerfe/" + entwurfId).then().statusCode(200).extract().jsonPath();
+        assertThat(ansicht.getList("kernaussagen.zugeordnet", Boolean.class)).containsExactly(true, false);
     }
 
     @Dann("der Ingest-Entwurf wird mit drei KI-Aufrufen «OFFEN»")
