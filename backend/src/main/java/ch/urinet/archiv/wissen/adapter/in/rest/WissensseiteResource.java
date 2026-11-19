@@ -6,7 +6,6 @@ import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.protokoll.application.Protokolliert;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
-import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -194,8 +193,7 @@ public class WissensseiteResource {
     @POST
     @Path("/wissensseiten/{id}/quelle-geprueft")
     @ErfordertAktion(Aktion.A17)
-    @AlleArchivRollen
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
     @Operation(summary = "Prüfung der Quellen bestätigen",
             description = "Entfernt den Hinweis nur für den mit If-Match angegebenen aktuellen Seitenstand.")
     @APIResponse(responseCode = "204", description = "Quellenprüfung bestätigt")

@@ -5882,8 +5882,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
         - geschaeftsstelle
   /api/v1/wissensseiten/{id}/versionen:
     get:
