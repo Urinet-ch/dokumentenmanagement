@@ -45,6 +45,31 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.suche),
   },
   {
+    path: 'wissen',
+    loadComponent: () => import('./wissen/wissen-index').then((m) => m.WissenIndex),
+    canActivate: [rechtGuard('A15')],
+    title: titel(TEXTE.wissen.titel),
+  },
+  {
+    path: 'wissen/log',
+    loadComponent: () => import('./wissen/wissen-log').then((m) => m.WissenLog),
+    canActivate: [rechtGuard('A15')],
+    title: titel(TEXTE.wissen.log),
+  },
+  {
+    path: 'wissen/ueberblick',
+    loadComponent: () => import('./wissen/wissen-seite').then((m) => m.WissenSeite),
+    canActivate: [rechtGuard('A15')],
+    data: { pfad: 'ueberblick' },
+    title: titel(TEXTE.wissen.titel),
+  },
+  {
+    path: 'wissen/:ordner/:name',
+    loadComponent: () => import('./wissen/wissen-seite').then((m) => m.WissenSeite),
+    canActivate: [rechtGuard('A15')],
+    title: titel(TEXTE.wissen.titel),
+  },
+  {
     path: 'dokument/:id',
     loadComponent: () => import('./dokument/dokument-ansicht').then((m) => m.DokumentAnsicht),
     canActivate: [rechtGuard('A2')],

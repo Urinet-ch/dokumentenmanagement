@@ -14,7 +14,7 @@ inclusion: always
 | OCR | OCRmyPDF + Tesseract (`deu`, `eng`), img2pdf, libheif | im Worker-Image installiert, Aufruf per `ProcessBuilder` |
 | Textextraktion | Apache Tika (nur für digitale PDFs/Office ohne OCR) | |
 | KI | Quarkus LangChain4j (`quarkus-langchain4j-openai`) gegen Infomaniak AI Services (OpenAI-kompatibel) | Sprachmodelle: Erfassung `google/gemma-4-31B-it` (Gate 0), Chat und Wissensbasis `mistralai/Mistral-Small-4-119B-2603`; Embeddings BGE Multilingual Gemma2; Reranker `BAAI/bge-reranker-v2-m3` |
-| Anmeldung | Keycloak (OIDC, PKCE, TOTP-2FA), `quarkus-oidc` | bleibt (externer Treuhänder, Mandant 2); Mandant kommt aus dem Token-Claim `mandant` |
+| Anmeldung | Keycloak (OIDC, PKCE, TOTP-2FA), `quarkus-oidc` | bleibt (externer Treuhänder, Mandant 2); Mandant kommt aus dem Token-Claim `mandant`; Benutzerverwaltung der App über die Admin-API mit Dienstkonto `archiv-verwaltung` (Spec 06, ADR-015, Secret-Datei `keycloak_verwaltung_secret`) |
 | Frontend | Angular (aktuelle Version), Standalone Components, Signals, Angular Material, PWA (`@angular/pwa`) | über Quinoa im API-Artefakt ausgeliefert; Offline-Warteschlange in IndexedDB |
 | CSV | Apache Commons CSV, ICU4J (Zeichensatz-Erkennung) | |
 | Betrieb | Docker Compose (`deploy/infomaniak/compose.yml`), Traefik (Labels), in zwei Stufen: Stufe A auf der bestehenden Infomaniak-VPS (nur Testdaten), Stufe B auf einer eigenen Infomaniak-VPS | Domains `archiv.apps.urinet.ch`, `archiv-auth.apps.urinet.ch`; Details unter «Plattform und Betrieb» |
@@ -82,7 +82,7 @@ Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was
 
 ## Tests und Qualität
 - Jedes Akzeptanzkriterium hat mindestens ein Cucumber-Szenario mit dem Tag `@req-<x.y>` (z. B. `@req-3.4` für Requirement 3, Kriterium 4). EARS-Kriterien werden direkt als Szenario geschrieben. Feature-Dateien unter `backend/src/test/resources/features/<fachbereich>/`, per Tag an Java-Runner (REST-assured) oder Cucumber.js + Playwright geroutet.
-- Jede Feature-Datei trägt auf Feature-Ebene genau einen Spec-Tag (`@spec-01` bis `@spec-05`). Die Abdeckungsprüfung (Req 16.14) vergleicht `@req`-Tags nur innerhalb derselben Spec; fehlt der Spec-Tag oder stehen mehrere, bricht sie ab.
+- Jede Feature-Datei trägt auf Feature-Ebene genau einen Spec-Tag (`@spec-01` bis `@spec-06`). Die Abdeckungsprüfung (Req 16.14) vergleicht `@req`-Tags nur innerhalb derselben Spec; fehlt der Spec-Tag oder stehen mehrere, bricht sie ab.
 - Domain-Logik zusätzlich mit JUnit-Unit-Tests (Jupiter 6, über die Quarkus-BOM), ohne Quarkus.
 - Mandantentrennung wird in jedem Repository-Test mit zwei Mandanten geprüft.
 - KI-Aufrufe in Unit- und Integrationstests mit WireMock.

@@ -1,0 +1,7 @@
+:host { display: block; min-width: 0; overflow-wrap: anywhere; }
+form { display: grid; gap: .5rem; max-width: 36rem; }
+input, select, button { max-width: 100%; min-height: 2.75rem; }
+section { margin-block: 1.5rem; }
+li { margin-block: .75rem; }
+nav { margin-block: 1rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
