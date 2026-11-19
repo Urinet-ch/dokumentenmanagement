@@ -569,7 +569,8 @@ public class WissenIngestVerarbeiten {
                     "Die Quelle-Seite konnte nicht vollständig neu erzeugt werden. Bitte erneut versuchen.");
             return;
         }
-        SeitenVorschlag neu = seitenVorschlag(plan, nummer, inhalt, aussagen, fassung, lauf, aktuell.quellStufe());
+        SeitenVorschlag neu = seitenVorschlag(plan, nummer, inhalt, aussagen, fassung, lauf, aktuell.quellStufe(),
+                quelleSeite ? vorher.daten().quellen() : List.of());
         List<SeitenVorschlag> vorschlaege = bisher.vorschlaege().stream()
                 .map(v -> v.nummer() == nummer ? neu : v).toList();
         Fortschritt fortschritt = new Fortschritt(bisher.abschnitt(), bisher.seite(), bisher.quelleErzeugt(),
@@ -583,8 +584,8 @@ public class WissenIngestVerarbeiten {
     private static boolean quelleStrukturErhalten(SeitenFassung aktuell, SeitenVorschlag vorher, KiPort.Seite neu,
                                                    List<Kernaussage> aussagen, UUID dokumentId) {
         String text = neu.inhalt();
-        if (text == null || !text.lines().map(String::strip).collect(java.util.stream.Collectors.toSet())
-                .containsAll(Set.of("## Zusammenfassung", "## Kernaussagen", "## Berührte Seiten"))) {
+        if (!quelleAbschnitteGueltig(text) || !quelleAbschnitteGueltig(aktuell.inhalt())
+                || !quelleAbschnitteGueltig(vorher.daten().inhalt())) {
             return false;
         }
         Map<String, String> neueAussagen = kernaussageZeilen(text);
@@ -620,6 +621,41 @@ public class WissenIngestVerarbeiten {
         Set<String> links = beruehrteSeitenZeilen(text).keySet();
         return links.containsAll(beruehrteSeitenZeilen(aktuell.inhalt()).keySet())
                 && links.containsAll(beruehrteSeitenZeilen(vorher.daten().inhalt()).keySet());
+    }
+
+    private static boolean quelleAbschnitteGueltig(String text) {
+        if (text == null) {
+            return false;
+        }
+        List<String> ueberschriften = List.of("## Zusammenfassung", "## Kernaussagen", "## Berührte Seiten");
+        Set<String> aussagen = new HashSet<>();
+        Set<String> links = new HashSet<>();
+        int abschnitt = -1;
+        for (String zeile : text.split("\\R")) {
+            if (zeile.startsWith("## ")) {
+                if (abschnitt + 1 >= ueberschriften.size()
+                        || !ueberschriften.get(abschnitt + 1).equals(zeile.strip())) {
+                    return false;
+                }
+                abschnitt++;
+            } else if (!zeile.isBlank()) {
+                if (abschnitt < 0) {
+                    return false;
+                }
+                if (abschnitt == 1) {
+                    var treffer = KERNAUSSAGE_ZEILE.matcher(zeile);
+                    if (!treffer.matches() || !aussagen.add(treffer.group(1))) {
+                        return false;
+                    }
+                } else if (abschnitt == 2) {
+                    var treffer = BERUEHRTE_SEITE_ZEILE.matcher(zeile);
+                    if (!treffer.matches() || !links.add(treffer.group(1))) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return abschnitt == 2;
     }
 
     private void quelle(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher, long budget,
@@ -868,11 +904,23 @@ public class WissenIngestVerarbeiten {
     private SeitenVorschlag seitenVorschlag(Planung plan, int nummer, KiPort.Seite inhalt,
                                             List<Kernaussage> aussagen, SeitenFassung bisherige, Lauf lauf,
                                             WissensStufe stufe) {
+        return seitenVorschlag(plan, nummer, inhalt, aussagen, bisherige, lauf, stufe, List.of());
+    }
+
+    private SeitenVorschlag seitenVorschlag(Planung plan, int nummer, KiPort.Seite inhalt,
+                                            List<Kernaussage> aussagen, SeitenFassung bisherige, Lauf lauf,
+                                            WissensStufe stufe, List<Quelleneintrag> weitereQuellen) {
         Map<String, Quelleneintrag> quellenNachSchluessel = new HashMap<>();
+        List<WissensPruefung.Befund> befunde = new ArrayList<>();
         if (bisherige != null) {
             bisherige.quellen().forEach(quelle -> quellenNachSchluessel.put(quelle.schluessel(), quelle));
         }
-        List<WissensPruefung.Befund> befunde = new ArrayList<>();
+        for (Quelleneintrag quelle : weitereQuellen) {
+            Quelleneintrag vorhanden = quellenNachSchluessel.putIfAbsent(quelle.schluessel(), quelle);
+            if (vorhanden != null && !gleicherBeleg(vorhanden, quelle)) {
+                befunde.add(kollision(quelle.schluessel()));
+            }
+        }
         for (Kernaussage aussage : aussagen) {
             Quelleneintrag neu = eintrag(aussage, lauf.dokumentId());
             Quelleneintrag vorhanden = quellenNachSchluessel.get(aussage.schluessel());

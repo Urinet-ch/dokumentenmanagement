@@ -449,10 +449,11 @@ class WissenIngestVerarbeitenTest {
 
         Speicher vollstaendig = new Speicher(stand(lauf("NEU_ERZEUGEN", false, erster.fortschritt), 0,
                 WissensStufe.NORMAL, List.of(metadaten), Map.of(seiteId, fassung)));
-        KiAntwort passendeKi = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Quelle", "Beschreibung",
-                List.of(), "## Zusammenfassung\n\nProbe. [^q-alt]\n\n## Kernaussagen\n\n"
+        String gueltig = "## Zusammenfassung\n\nProbe. [^q-alt]\n\n## Kernaussagen\n\n"
                 + "- Alte Aussage. [^q-alt]\n- Die Frist endet am 30. April. [^q-neu]\n\n"
-                + "## Berührte Seiten\n\n- [Frist](/konzepte/frist)\n",
+                + "## Berührte Seiten\n\n- [Frist](/konzepte/frist)\n";
+        KiAntwort passendeKi = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Quelle", "Beschreibung",
+                List.of(), gueltig,
                 List.of(), List.of(), "Erneuert"), new KiPort.Verbrauch("test-modell", 10, 10)));
         verarbeiten(vollstaendig, passendeKi, new Verbrauch()).ausfuehren(auftrag, ENTWURF_ID);
 
@@ -463,6 +464,20 @@ class WissenIngestVerarbeitenTest {
             assertThat(aenderung.daten().inhalt()).contains("- Alte Aussage. [^q-alt]",
                     "- Die Frist endet am 30. April. [^q-neu]", "[Frist](/konzepte/frist)");
         });
+        for (String ungueltig : List.of(
+                gueltig + "\n## Kernaussagen\n- Weitere Aussage. [^q-alt]\n",
+                gueltig.replace("- Alte Aussage. [^q-alt]", "- Alte Aussage. [^q-alt]\nNicht erkannte Aussage"),
+                gueltig.replace("- [Frist](/konzepte/frist)", ""),
+                gueltig.replace("- Die Frist endet am 30. April. [^q-neu]", ""))) {
+            Speicher abgelehnt = new Speicher(stand(lauf("NEU_ERZEUGEN", false, erster.fortschritt), 0,
+                    WissensStufe.NORMAL, List.of(metadaten), Map.of(seiteId, fassung)));
+            KiAntwort ungueltigeKi = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite(
+                    "Quelle", "Beschreibung", List.of(), ungueltig, List.of(), List.of(), "Erneuert"),
+                    new KiPort.Verbrauch("test-modell", 10, 10)));
+            verarbeiten(abgelehnt, ungueltigeKi, new Verbrauch()).ausfuehren(auftrag, ENTWURF_ID);
+            assertThat(abgelehnt.fehler).contains("nicht vollständig");
+            assertThat(abgelehnt.aenderungen).isNull();
+        }
     }
 
     @Test
