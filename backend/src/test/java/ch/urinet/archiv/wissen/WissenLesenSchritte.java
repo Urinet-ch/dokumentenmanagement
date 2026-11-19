@@ -41,6 +41,7 @@ public class WissenLesenSchritte {
     private final UUID verweisendeSeite = UUID.randomUUID();
     private final String kennung = UUID.randomUUID().toString();
     private final String tag = "leseprobe-" + kennung;
+    private final String zweiterPfad = "konzepte/leseprobe-zweit-" + kennung;
     private OffsetDateTime probeBeginn;
     private String normaleSeitePfad;
     private String interneSeiteTitel;
@@ -70,7 +71,6 @@ public class WissenLesenSchritte {
         probeBeginn = OffsetDateTime.now(ZoneOffset.UTC);
         normaleSeitePfad = "konzepte/leseprobe-" + kennung;
         interneSeiteTitel = "Interne Leseprobe " + kennung;
-        String zweiterPfad = "konzepte/leseprobe-zweit-" + kennung;
         String quellenPfad = "quellen/leseprobe-" + kennung;
         String verweisPfad = "konzepte/leseprobe-verweis-" + kennung;
         try (Connection verbindung = datenbank.get().getConnection()) {
