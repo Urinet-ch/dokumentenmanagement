@@ -39,6 +39,11 @@ public class WissenLesen {
         return IndexErgebnis.gruppieren(treffer, offset, groesse);
     }
 
+    public List<WissenLesenRepository.SeiteVerweis> seitenFuerDokument(Benutzer benutzer, UUID dokumentId) {
+        berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
+        return repository.seitenFuerDokument(Sichtregel.fuer(benutzer), dokumentId);
+    }
+
     /** Eine ungültige Seiten-ID gilt wie eine unsichtbare Seite als nicht vorhanden (404, {@code VERWEIGERT}). */
     public void ungueltigeSeitenId(Benutzer benutzer) {
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, false);

@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -46,9 +47,11 @@ public class ArchivierungSpeichern {
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public boolean festhalten(Auftrag auftrag, UUID id, List<Archiviert> dateien, LocalDate sperreBis) {
         auftraege.anspruchSichern(auftrag);
+        ereignisse.vorAenderung();
         if (!dokumente.festhalten(id, dateien, sperreBis)) {
             return false;
         }
+        ereignisse.geaendert(id, Set.of("status"));
         ereignisse.archiviert(id, dokumente.laden(id).map(Archivierungsstand::art).orElse(null));
         if (auftraege.hatHandler(EmbeddingSpeichern.EMBEDDING)) {
             auftraege.einreihen(EmbeddingSpeichern.EMBEDDING, EmbeddingSpeichern.einzeln(id));
@@ -60,12 +63,17 @@ public class ArchivierungSpeichern {
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public boolean fehlerSetzen(Auftrag auftrag, UUID id, String fehlertext) {
         auftraege.anspruchSichern(auftrag);
-        return dokumente.fehlerSetzen(id, fehlertext);
+        return fehlerSetzen(id, fehlertext);
     }
 
     /** Für den Hook nach dem letzten Fehlversuch: der Auftrag ist schon {@code FEHLER}, darum ohne Anspruch. */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public boolean fehlerSetzen(UUID id, String fehlertext) {
-        return dokumente.fehlerSetzen(id, fehlertext);
+        ereignisse.vorAenderung();
+        boolean geaendert = dokumente.fehlerSetzen(id, fehlertext);
+        if (geaendert) {
+            ereignisse.geaendert(id, Set.of("status"));
+        }
+        return geaendert;
     }
 }
