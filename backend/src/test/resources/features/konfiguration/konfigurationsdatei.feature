@@ -12,6 +12,11 @@ Funktionalität: Konfigurationsdatei
     Dann antwortet die Konfigurationsverwaltung mit Status 200
     Und enthält der Export die aktuelle Basisversion und alle Konfigurationsteile
 
+  @req-1.6
+  Szenario: Ein neuer Mandant erhält nach dem Migrations-Snapshot seine Seed-Konfiguration
+    Wenn der Betreiber den Mandanten «probe-version» anlegt
+    Dann hat der Mandant «probe-version» die erste Version aus der Migration und die letzte aus dem Seed
+
   @req-6.2
   Szenario: Das Prüfen einer unveränderten Datei verändert die Konfiguration nicht
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
