@@ -663,6 +663,13 @@
               "type" : "string"
             },
             "description" : "Codes der Klassifikationen, an denen die nächste Speicherung nach der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern"
+          },
+          "wissensseiten" : {
+            "type" : [ "array", "null" ],
+            "items" : {
+              "$ref" : "#/components/schemas/DokumentWissensseitenVerweis"
+            },
+            "description" : "Sichtbare Wissensseiten mit diesem Dokument als Quelle; nur beim Einzelabruf"
           }
         }
       },
@@ -892,6 +899,20 @@
             }, {
               "type" : "null"
             } ]
+          }
+        }
+      },
+      "DokumentWissensseitenVerweis" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "pfad" : {
+            "type" : "string"
+          },
+          "titel" : {
+            "type" : "string"
           }
         }
       },
@@ -6923,6 +6944,53 @@
           },
           "403" : {
             "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensseiten/{id}/quelle-geprueft" : {
+      "post" : {
+        "summary" : "Prüfung der Quellen bestätigen",
+        "description" : "Entfernt den Hinweis nur für den mit If-Match angegebenen aktuellen Seitenstand.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Quellenprüfung bestätigt"
+          },
+          "403" : {
+            "description" : "Kein Freigaberecht"
+          },
+          "404" : {
+            "description" : "Seite nicht vorhanden"
+          },
+          "409" : {
+            "description" : "Kein Quellenhinweis vorhanden"
+          },
+          "412" : {
+            "description" : "Seitenstand geändert"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
           }
         },
         "security" : [ {

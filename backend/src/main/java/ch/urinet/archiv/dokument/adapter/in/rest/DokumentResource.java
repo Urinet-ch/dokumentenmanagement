@@ -31,6 +31,7 @@ import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.wissen.application.WissenLesen;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -100,13 +101,14 @@ public class DokumentResource {
     private final ObjectMapper json;
     private final DokumentKlassifikationenPort klassifikationen;
     private final KlassifikationVerwaltung klassifikationVerwaltung;
+    private final WissenLesen wissenLesen;
 
     public DokumentResource(DokumentLesen lesen, DokumentDatei datei, DokumentAendern aendern,
                             DokumentBestaetigen bestaetigen, DokumentVerwerfen verwerfen,
                             DokumentWiederholen wiederholen, MandantAufloesung aufloesung,
                             Berechtigung berechtigung, SecurityIdentity identitaet, ObjectMapper json,
                             DokumentKlassifikationenPort klassifikationen,
-                            KlassifikationVerwaltung klassifikationVerwaltung) {
+                            KlassifikationVerwaltung klassifikationVerwaltung, WissenLesen wissenLesen) {
         this.lesen = lesen;
         this.datei = datei;
         this.aendern = aendern;
@@ -119,6 +121,7 @@ public class DokumentResource {
         this.json = json;
         this.klassifikationen = klassifikationen;
         this.klassifikationVerwaltung = klassifikationVerwaltung;
+        this.wissenLesen = wissenLesen;
     }
 
     @Schema(name = "Warnung", description = "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)")
@@ -310,7 +313,13 @@ public class DokumentResource {
                     + "der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. "
                     + "Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; "
                     + "fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern")
-                    List<String> klassifikationenUngueltig) {
+                    List<String> klassifikationenUngueltig,
+            @Schema(nullable = true, description = "Sichtbare Wissensseiten mit diesem Dokument als Quelle; "
+                    + "nur beim Einzelabruf") List<WissensseitenVerweisDto> wissensseiten) {
+    }
+
+    @Schema(name = "DokumentWissensseitenVerweis")
+    public record WissensseitenVerweisDto(UUID id, String pfad, String titel) {
     }
 
     @GET
@@ -330,9 +339,11 @@ public class DokumentResource {
         DokumentLesen.Ansicht ansicht = lesen.ansicht(benutzer, id);
         Dokument dokument = ansicht.dokument();
         Map<String, List<String>> klassifikationswerte = klassifikationen.laden(id);
+        List<WissensseitenVerweisDto> wissensseiten = wissenLesen.seitenFuerDokument(benutzer, id).stream()
+                .map(s -> new WissensseitenVerweisDto(s.id(), s.pfad(), s.titel())).toList();
         return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen(),
                 klassifikationswerte, klassifikationVerwaltung.markierteDokumentKlassifikationen(dokument.art(),
-                        klassifikationswerte, dokument.bestaetigt() != null)))
+                        klassifikationswerte, dokument.bestaetigt() != null), wissensseiten))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -692,6 +703,12 @@ public class DokumentResource {
     static DokumentDto dto(Dokument d, ObjectMapper json, List<Warnung> warnungen, BigDecimal schwelle,
                            List<Fassung> fassungen, Map<String, List<String>> klassifikationen,
                            List<String> klassifikationenUngueltig) {
+        return dto(d, json, warnungen, schwelle, fassungen, klassifikationen, klassifikationenUngueltig, null);
+    }
+
+    private static DokumentDto dto(Dokument d, ObjectMapper json, List<Warnung> warnungen, BigDecimal schwelle,
+                           List<Fassung> fassungen, Map<String, List<String>> klassifikationen,
+                           List<String> klassifikationenUngueltig, List<WissensseitenVerweisDto> wissensseiten) {
         boolean eingangskorb = DokumentStatus.EINGANGSKORB_STATUS.contains(d.status());
         JsonNode vorschlag = eingangskorb ? lesenJson(d, d.kiVorschlag(), "ki_vorschlag", json) : null;
         List<String> unsicher = eingangskorb
@@ -703,7 +720,8 @@ public class DokumentResource {
                 warnungen.stream().map(WarnungDto::aus).toList(), d.fehler(), d.pdfaFehlt(), d.seiten(),
                 d.partnerId(), d.partnerName(), vorschlag, unsicher, d.projekt(), d.personBenutzer(), d.dateiname(),
                 FinanzDto.aus(d.finanz()), VertragDto.aus(d.vertrag()),
-                fassungen.stream().map(VersionDto::aus).toList(), klassifikationen, klassifikationenUngueltig);
+                fassungen.stream().map(VersionDto::aus).toList(), klassifikationen, klassifikationenUngueltig,
+                wissensseiten);
     }
 
     static Map<String, List<String>> klassifikationen(Map<String, List<String>> eingabe) {

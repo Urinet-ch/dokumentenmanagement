@@ -160,6 +160,74 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void quellenpruefungSchuetztGegenSpaetereAenderungUndProtokolliertBestaetigung() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                seite, dokument);
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String mitarbeiter = Testanmeldung.token("mitarbeiter-urinet");
+        String pfad = "/api/v1/wissensseiten/" + seite;
+        im(URINET, () -> {
+            ereignisse.vorAenderung();
+            ereignisse.geaendert(dokument, Set.of("titel"));
+            return null;
+        });
+        String alterStand = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .body("quellePruefen", org.hamcrest.Matchers.is(true)).extract().header("ETag");
+        given().auth().oauth2(mitarbeiter).header("If-Match", alterStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(403);
+        given().auth().oauth2(Testanmeldung.token("treuhaender-urinet")).header("If-Match", alterStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(403);
+        given().auth().oauth2(inhaber).when().post(pfad + "/quelle-geprueft").then().statusCode(428);
+
+        im(URINET, () -> {
+            ereignisse.vorAenderung();
+            ereignisse.geaendert(dokument, Set.of("titel"));
+            return null;
+        });
+        given().auth().oauth2(inhaber).header("If-Match", alterStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(412);
+        String aktuellerStand = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .body("quellePruefen", org.hamcrest.Matchers.is(true)).extract().header("ETag");
+        assertThat(aktuellerStand).isNotEqualTo(alterStand);
+        given().auth().oauth2(inhaber).header("If-Match", aktuellerStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(204);
+        given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .body("quellePruefen", org.hamcrest.Matchers.is(false)).body("version", org.hamcrest.Matchers.is(1));
+        given().auth().oauth2(inhaber).header("If-Match", aktuellerStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(412);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_log where aktion = 'UPDATE' and ? = any(seiten)"
+                + " and angaben @> '{\"quelle_geprueft\":true}'::jsonb", seite)).isEqualTo(1);
+        given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).header("If-Match", aktuellerStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(404);
+    }
+
+    @Test
+    void dokumentAbrufLiefertNurSichtbareVerwendendeSeiten() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID sichtbar = seite(URINET, "probe/offen-" + dokument, "Inhalt", null);
+        UUID intern = seite(URINET, "probe/intern-" + dokument, "Inhalt", null);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set vertraulichkeit = 'INTERN', "
+                + "vertraulichkeit_mindest = 'INTERN' where id = ?", intern);
+        for (UUID id : List.of(sichtbar, intern)) {
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                    + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", id, dokument);
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                    id, dokument);
+        }
+        String pfad = "/api/v1/dokumente/" + dokument;
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).when().get(pfad).then().statusCode(200)
+                .body("wissensseiten.id", org.hamcrest.Matchers.containsInAnyOrder(sichtbar.toString(), intern.toString()));
+        given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet")).when().get(pfad).then().statusCode(200)
+                .body("wissensseiten.id", org.hamcrest.Matchers.contains(sichtbar.toString()));
+        given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).when().get(pfad).then().statusCode(404);
+    }
+
+    @Test
     void erneuteArchivierungMarkiertVerwendendeSeite() throws SQLException {
         UUID dokument = quelle(URINET);
         UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);

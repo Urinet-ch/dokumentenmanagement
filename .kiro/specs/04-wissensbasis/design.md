@@ -1057,6 +1057,20 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
 - Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
   Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
 
+### Umsetzung 14.4
+- Änderungen eines Dokuments nehmen vor der Dokumentzeile die mandantenweite Hüllensperre. Der Beobachter berechnet
+  die betroffenen Hüllen und Vertraulichkeiten in derselben Transaktion neu und setzt «Quelle prüfen», ohne den
+  Seiteninhalt zu ändern. Bei `PERSONAL` bleibt die Seite mit mindestens `INTERN` nur für Benutzer sichtbar, welche
+  auch das Dokument sehen dürfen.
+- Ein Seiten-ETag enthält Inhaltsversion und Quellenrevision (`"<version>-<revision>"`). Jede Quellenänderung
+  erhöht die Revision auch dann, wenn der Hinweis bereits gesetzt war. `quelle-geprueft` prüft Sichtbarkeit und A17
+  vor `If-Match`, sperrt denselben Mandanten und die Seite und schreibt Bestätigung und `UPDATE`-Log atomar; ein
+  älteres ETag kann eine spätere Quellenänderung nicht löschen. Historische Versions- und Diff-ETags bleiben wie zuvor.
+- `GET /dokumente/{id}` liefert die direkt verwendenden, nach A15 und Hülle sichtbaren Seiten als `wissensseiten`;
+  der bestehende Dokumentfilter im Index bleibt für die Oberfläche erhalten. Die spätere Löschfunktion muss das
+  Dokumentereignis vor dem Entfernen der Hülle auslösen. Lint und Werkzeug `wissen_seite_zeigen` folgen in ihren
+  eigenen Aufgaben 15.3 und 15.2.
+
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).
   Danach Entwurf `FEHLER` mit Hinweis «Die Wissensquelle konnte nicht verarbeitet werden. Sie ist archiviert; der

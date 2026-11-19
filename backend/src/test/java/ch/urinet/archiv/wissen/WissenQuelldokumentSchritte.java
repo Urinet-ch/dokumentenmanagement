@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.is;
 
 public class WissenQuelldokumentSchritte {
@@ -72,6 +73,35 @@ public class WissenQuelldokumentSchritte {
                 .when().get("/api/v1/wissensseiten/" + seite).then().statusCode(200)
                 .body("quellePruefen", is(true)).body("version", is(1))
                 .body("inhaltHtml", is("<p>Unveränderter Inhalt</p>\n"));
+    }
+
+    @Wenn("der Inhaber die Quellenprüfung der Wissensseite bestätigt")
+    public void quellenpruefungBestaetigen() {
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/wissensseiten/" + seite;
+        String etag = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .extract().header("ETag");
+        given().auth().oauth2(inhaber).header("If-Match", etag)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(204);
+    }
+
+    @Dann("ist der Quellenhinweis entfernt und die Bestätigung protokolliert")
+    public void bestaetigungProtokolliert() throws Exception {
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensseiten/" + seite).then().statusCode(200)
+                .body("quellePruefen", is(false)).body("version", is(1));
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement("""
+                     select count(*) from m_urinet.wissens_log
+                     where aktion = 'UPDATE' and ? = any(seiten)
+                       and angaben @> '{"quelle_geprueft":true}'::jsonb
+                     """)) {
+            befehl.setObject(1, seite);
+            try (var ergebnis = befehl.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getInt(1)).isEqualTo(1);
+            }
+        }
     }
 
     @After("@quellen-aenderung")

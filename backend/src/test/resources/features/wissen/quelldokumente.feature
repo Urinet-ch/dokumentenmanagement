@@ -14,3 +14,11 @@ Funktionalität: Änderungen an Quelldokumenten
       | stufe    |
       | INTERN   |
       | PERSONAL |
+
+  @req-15.2
+  Szenario: Eine berechtigte Person bestätigt die Prüfung einer geänderten Quelle
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine normale Wissensseite verweist auf ein normales Quelldokument
+    Wenn der Inhaber die Vertraulichkeit des Quelldokuments auf «INTERN» ändert
+    Und der Inhaber die Quellenprüfung der Wissensseite bestätigt
+    Dann ist der Quellenhinweis entfernt und die Bestätigung protokolliert
