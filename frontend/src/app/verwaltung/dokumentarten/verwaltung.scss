@@ -1,0 +1,291 @@
+:host {
+  display: block;
+  max-width: 72rem;
+  min-width: 0;
+}
+
+.verwaltung {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  margin: 0;
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+}
+
+h2 {
+  font: var(--mat-sys-title-large);
+}
+
+h3 {
+  font: var(--mat-sys-title-medium);
+}
+
+p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+section {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.sprungmarken,
+.datei-aktionen,
+.bestaetigung {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sprungmarken a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.6rem;
+  color: var(--urinet-gelb);
+  text-underline-offset: 0.2em;
+}
+
+.zweispaltig {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 2fr);
+  gap: 1rem;
+  align-items: start;
+  min-width: 0;
+}
+
+aside,
+.formular,
+.zuordnungen,
+.wert-formular,
+.bestaetigung,
+.feld-editor {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 0.5rem;
+}
+
+aside,
+.formular,
+.wert-formular,
+.zuordnungen {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.auswahlliste,
+.zuordnungsliste,
+.werteliste {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.auswahl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem;
+  text-align: start;
+}
+
+.auswahl span:first-child,
+.auswahl code {
+  overflow-wrap: anywhere;
+}
+
+.auswahl .status {
+  grid-column: 1 / -1;
+}
+
+.formular label,
+.wert-formular label,
+.vergleich-formular label,
+#konfigurationsdatei > label {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+  font-weight: 600;
+}
+
+input:not([type='checkbox']),
+select,
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.5rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 0.25rem;
+  background: var(--urinet-karte);
+  color: var(--urinet-hell);
+  font: inherit;
+}
+
+textarea {
+  min-height: 5rem;
+  resize: vertical;
+  overflow-wrap: anywhere;
+}
+
+input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--urinet-gelb);
+}
+
+.inline {
+  display: flex !important;
+  align-items: center;
+  gap: 0.55rem !important;
+  min-height: 2.75rem;
+}
+
+fieldset {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 0.35rem;
+}
+
+legend {
+  padding: 0 0.25rem;
+  font-weight: 700;
+}
+
+.feld-editor {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.option-zeile {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.5rem;
+  align-items: end;
+}
+
+button {
+  min-height: 2.75rem;
+  max-width: 100%;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--urinet-gelb);
+  border-radius: 0.3rem;
+  background: var(--urinet-gelb);
+  color: var(--urinet-dunkel);
+  font: inherit;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+button.sekundaer {
+  border-color: var(--urinet-linie);
+  background: transparent;
+  color: var(--urinet-hell);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--urinet-gelb);
+  outline-offset: 2px;
+}
+
+.hinweis,
+.status {
+  color: var(--urinet-gedaempft);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.meldung {
+  padding: 0.65rem;
+  border-inline-start: 0.25rem solid currentColor;
+  overflow-wrap: anywhere;
+}
+
+.fehler {
+  color: var(--urinet-fehler);
+}
+
+.erfolg {
+  color: var(--urinet-erfolg);
+}
+
+.tabellen-rahmen {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  min-width: 6rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--urinet-linie);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+td code {
+  word-break: break-all;
+}
+
+.vergleich-formular {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem;
+  align-items: end;
+  min-width: 0;
+}
+
+.zuordnungsliste li,
+.werteliste li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+@media (max-width: 48rem) {
+  .zweispaltig {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
