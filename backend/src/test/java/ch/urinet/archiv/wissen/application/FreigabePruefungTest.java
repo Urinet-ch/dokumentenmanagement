@@ -49,6 +49,20 @@ class FreigabePruefungTest {
                 .contains(WissensPruefung.Code.STUFE_UEBERBLICK);
     }
 
+    @Test
+    void vorhandeneUndManuelleMindeststufeBleibenErhalten() {
+        WissensGraph graph = new WissensGraph(Map.of(quelle, Set.of()), Map.of(quelle, Set.of()), Map.of(),
+                Map.of(quelle, WissensStufe.NORMAL));
+        Wissensseite seite = seite("konzepte/probe", Seitentyp.KONZEPT);
+
+        assertThat(pruefung.pruefen(seite, graph, WissensStufe.INTERN, WissensStufe.NORMAL, null,
+                WissensPruefung.Kontext.leer()).mindeststufe()).isEqualTo(WissensStufe.INTERN);
+        assertThat(pruefung.pruefen(seite, graph, WissensStufe.NORMAL, WissensStufe.NORMAL, "INTERN",
+                WissensPruefung.Kontext.leer()).mindeststufe()).isEqualTo(WissensStufe.INTERN);
+        assertThat(pruefung.pruefen(seite, graph, WissensStufe.NORMAL, WissensStufe.INTERN, null,
+                WissensPruefung.Kontext.leer()).mindeststufe()).isEqualTo(WissensStufe.INTERN);
+    }
+
     private Wissensseite seite(String pfad, Seitentyp typ) {
         return new Wissensseite(null, pfad, typ, "Probe", "Beschreibung.", List.of(),
                 Wissensseite.Status.AKTIV, null, List.of(new Quelleneintrag("q1", null, null, null, null, quelle)),
