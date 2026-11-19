@@ -171,6 +171,10 @@ public final class WissensMarkdown {
         return ausgabe.toString();
     }
 
+    public static boolean gueltigerSeitenpfad(String pfad) {
+        return pfad != null && internerPfad("/" + pfad) != null;
+    }
+
     private static int zielEnde(String markdown, Link link) {
         List<SourceSpan> spans = link.getSourceSpans();
         if (spans.isEmpty()) {
