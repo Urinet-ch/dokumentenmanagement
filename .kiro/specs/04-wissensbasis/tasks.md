@@ -95,7 +95,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 11.3, 15.1–15.5_
   - _Abhängig von: 13.5, 14.1 (Port `DokumentEreignisse`)_
 
-- [ ] 14.5 Oberfläche Wissensbasis [Frontend]
+- [x] 14.5 Oberfläche Wissensbasis [Frontend]
   - Routen `/wissen`, `/wissen/ueberblick`, `/wissen/:ordner/:name`, `/wissen/log`; Index mit Filtern, Seite mit Quellen-Chips (öffnen `/dokument/:id?seite=n`), Hinweis-Bannern, eingehenden Links und Versionen; Abschnitt «In der Wissensbasis verwendet» und Parameter `seite` in der Dokumentansicht
   - 375 px, WCAG 2.1 AA (axe), Texte nur in `texte.de-CH.ts`; Szenarien mit Cucumber.js + Playwright
   - _Anforderungen: 3.6, 3.8, 15.4, 16.1, 16.2, 16.4, 16.5, 16.7_
