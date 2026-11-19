@@ -79,6 +79,11 @@ class MetadatenExtraktionTest {
             }
 
             @Override
+            public WissensAntwort wissensIngest(WissensAnfrage anfrage) {
+                return new WissensAusfall("nicht verwendet", new Verbrauch("test", 0, 0));
+            }
+
+            @Override
             public String antwortschema() {
                 return "{}";
             }

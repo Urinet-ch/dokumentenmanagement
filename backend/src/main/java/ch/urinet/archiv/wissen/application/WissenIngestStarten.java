@@ -182,6 +182,9 @@ public class WissenIngestStarten implements DokumentEreignisse {
     }
 
     private static Optional<String> hindernis(Quelle quelle) {
+        if (!quelle.bestaetigt()) {
+            return Optional.of("Dokumentart ist noch nicht bestätigt.");
+        }
         if (PERSONAL.equals(quelle.vertraulichkeit())) {
             return Optional.of("Vertraulichkeit PERSONAL");
         }
