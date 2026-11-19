@@ -14,4 +14,6 @@ public interface RegelRepository {
     void anlegen(Regel regel);
 
     void speichern(Regel regel);
+
+    void ersetzen(List<Regel> regeln);
 }

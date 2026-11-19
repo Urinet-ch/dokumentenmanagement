@@ -1,5 +1,6 @@
 package ch.urinet.archiv.dokumentart.application;
 
+import java.util.List;
 import java.util.Set;
 import java.util.Map;
 import java.time.LocalDate;
@@ -25,6 +26,22 @@ public interface ZusatzSchemaPruefer {
 
     /** Prüft Zusatzwerte (JSON-Objekt) gegen ein gültiges Schema. */
     void wertePruefen(String schemaJson, String werteJson);
+
+    /**
+     * Prüft eine Konfigurationsdatei bis 1 MiB gegen das gespeicherte Schema und liefert höchstens
+     * {@link #MAX_VERLETZUNGEN} Verletzungen (leer = gültig). Ist die Datei kein lesbares JSON-Objekt, folgt
+     * {@code FachFehler(ZUSATZ_UNGUELTIG)}.
+     */
+    List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson);
+
+    int MAX_VERLETZUNGEN = 100;
+
+    /**
+     * Eine Schemaverletzung ohne Werte aus der Datei: JSON-Pointer (Namen, die kein einfacher Bezeichner sind,
+     * erscheinen als {@code *}) und das verletzte Schlüsselwort.
+     */
+    record Verletzung(String pfad, String schluesselwort) {
+    }
 
     /** Liest ein bereits geprüftes Zusatzobjekt als unveränderliche Werte für deklarative Regeln. */
     Map<String, Object> werteLesen(String werteJson);

@@ -75,6 +75,12 @@ class RegelVerwaltungTest {
         public void speichern(Regel regel) {
             regeln.replaceAll(alt -> alt.code().equals(regel.code()) ? regel : alt);
         }
+
+        @Override
+        public void ersetzen(List<Regel> neu) {
+            regeln.clear();
+            regeln.addAll(neu);
+        }
     }
 
     private static class KonfigurationStand extends KonfigurationVerwaltung {
@@ -82,7 +88,7 @@ class RegelVerwaltungTest {
         private int version = 1;
 
         KonfigurationStand(Speicher speicher) {
-            super(null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null);
             this.speicher = speicher;
         }
 

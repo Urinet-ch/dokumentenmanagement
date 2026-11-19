@@ -1,6 +1,7 @@
 package ch.urinet.archiv.dokumentart.adapter.out.schema;
 
 import ch.urinet.archiv.dokumentart.adapter.out.schema.NetworkntZusatzSchemaPruefer.Uhren;
+import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -785,6 +786,21 @@ class NetworkntZusatzSchemaPrueferTest {
         long gelesen() {
             return gelesen.get();
         }
+    }
+
+    @Test
+    void konfigurationsbefundeNennenDenPfadAberKeineFremdenNamen() {
+        String schema = """
+                {"type":"object","additionalProperties":false,
+                 "properties":{"arten":{"type":"array","items":{"type":"object","required":["code"],
+                   "properties":{"code":{"type":"string","pattern":"^[A-Z]+$"}}}}}}""";
+        var befunde = pruefer.konfigurationPruefen(schema,
+                "{\"mandant\":1,\"a-b\":2,\"arten\":[{\"code\":\"x\"},{}]}");
+        assertThat(befunde).containsExactlyInAnyOrder(
+                new ZusatzSchemaPruefer.Verletzung("/mandant", "additionalProperties"),
+                new ZusatzSchemaPruefer.Verletzung("/*", "additionalProperties"),
+                new ZusatzSchemaPruefer.Verletzung("/arten/0/code", "pattern"),
+                new ZusatzSchemaPruefer.Verletzung("/arten/1/code", "required"));
     }
 
     private static void assertUngueltig(org.assertj.core.api.ThrowableAssert.ThrowingCallable aufruf) {

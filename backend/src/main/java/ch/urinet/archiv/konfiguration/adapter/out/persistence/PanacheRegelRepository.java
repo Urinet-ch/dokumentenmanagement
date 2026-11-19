@@ -38,6 +38,12 @@ public class PanacheRegelRepository implements RegelRepository {
     }
 
     @Override
+    public void ersetzen(List<Regel> regeln) {
+        em.get().createNativeQuery("delete from regel").executeUpdate();
+        regeln.forEach(this::anlegen);
+    }
+
+    @Override
     public Optional<Regel> finden(String code) {
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = em.get().createNativeQuery(SPALTEN + " where code = :code")

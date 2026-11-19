@@ -90,7 +90,9 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
 
     static final int MAX_SCHEMA_BYTES = 16 * 1024;
     static final int MAX_WERTE_BYTES = 64 * 1024;
+    static final int MAX_KONFIGURATION_BYTES = 1024 * 1024;
     static final int MAX_TIEFE = 10;
+    private static final Pattern EINFACHER_NAME = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]{0,63}$");
     static final int MAX_MUSTER_ZEICHEN = 1_000;
     private static final int CACHE_GROESSE = 32;
     private static final String DIALEKT = "https://json-schema.org/draft/2020-12/schema";
@@ -239,9 +241,9 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     private void aufwaermen() {
         mitFrist(AUFWAERMEN_NANOS, () -> {
             geprueft(AUFWAERMEN_SCHEMA);
-            werteGegen(AUFWAERMEN_SCHEMA, AUFWAERMEN_GUELTIG);
+            werteGegen(AUFWAERMEN_SCHEMA, AUFWAERMEN_GUELTIG, MAX_WERTE_BYTES);
             try {
-                werteGegen(AUFWAERMEN_SCHEMA, AUFWAERMEN_UNGUELTIG);
+                werteGegen(AUFWAERMEN_SCHEMA, AUFWAERMEN_UNGUELTIG, MAX_WERTE_BYTES);
             } catch (FachFehler erwartet) {
                 // ungültige Werte: der Fehlerweg soll ebenfalls warm sein
             }
@@ -302,9 +304,47 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     @Override
     public void wertePruefen(String schemaJson, String werteJson) {
         mitFrist(zeitgrenzeNanos, () -> {
-            werteGegen(schemaJson, werteJson);
+            werteGegen(schemaJson, werteJson, MAX_WERTE_BYTES);
             return null;
         });
+    }
+
+    @Override
+    public List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson) {
+        return mitFrist(zeitgrenzeNanos, () -> {
+            JsonNode datei = lesen(dateiJson, MAX_KONFIGURATION_BYTES, true);
+            if (!datei.isObject() || tiefe(datei) > MAX_TIEFE) {
+                throw ungueltig();
+            }
+            try {
+                return geprueft(schemaJson).kompiliert().validate(Jackson3Baum.wert(datei)).stream()
+                        .map(fehler -> new Verletzung(zeiger(fehler.getInstanceLocation(), fehler.getProperty()),
+                                fehler.getKeyword()))
+                        .distinct().limit(MAX_VERLETZUNGEN).toList();
+            } catch (RuntimeException | StackOverflowError e) {
+                throw ungueltig();
+            }
+        });
+    }
+
+    /** JSON-Pointer ohne Werte: nur Indizes und einfache Bezeichner, andere Namen als {@code *}. */
+    static String zeiger(NodePath ort, String eigenschaft) {
+        StringBuilder zeiger = new StringBuilder();
+        for (int i = 0; ort != null && i < ort.getNameCount(); i++) {
+            zeiger.append('/').append(segment(ort.getElement(i)));
+        }
+        if (eigenschaft != null) {
+            zeiger.append('/').append(segment(eigenschaft));
+        }
+        return zeiger.toString();
+    }
+
+    private static String segment(Object element) {
+        if (element instanceof Integer index) {
+            return index.toString();
+        }
+        String name = String.valueOf(element);
+        return EINFACHER_NAME.matcher(name).matches() ? name : "*";
     }
 
     @Override
@@ -492,9 +532,9 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         return false;
     }
 
-    private void werteGegen(String schemaJson, String werteJson) {
+    private void werteGegen(String schemaJson, String werteJson, int maxBytes) {
         // genau (BigDecimal), damit geprüft wird, was gespeichert wird (Review PR #95)
-        JsonNode werte = lesen(werteJson, MAX_WERTE_BYTES, true);
+        JsonNode werte = lesen(werteJson, maxBytes, true);
         if (!werte.isObject() || tiefe(werte) > MAX_TIEFE) {
             throw ungueltig();
         }

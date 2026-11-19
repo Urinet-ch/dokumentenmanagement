@@ -153,7 +153,7 @@ public class RegelnSchritte {
         Konfiguration abbild = new Konfiguration(1, new Konfiguration.Einstellungen("12-31", null), List.of(),
                 List.of(), List.of(regel));
         KonfigurationVerwaltung verwaltung = new KonfigurationVerwaltung(null, null, null, null, null, null,
-                null, null, null, null) {
+                null, null, null, null, null) {
             @Override
             public Konfiguration aktuell() {
                 return abbild;

@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UriNet Archiv – Konfigurationsdatei",
+  "type": "object",
+  "required": ["format", "einstellungen", "kiTexte", "klassifikationen", "arten", "regeln"],
+  "properties": {
+    "format": { "const": 1 },
+    "basisVersion": { "type": "integer", "minimum": 1 },
+    "einstellungen": { "$ref": "#/$defs/einstellungen" },
+    "kiTexte": { "$ref": "#/$defs/kiTexte" },
+    "klassifikationen": {
+      "type": "array",
+      "maxItems": 50,
+      "items": { "$ref": "#/$defs/klassifikation" }
+    },
+    "arten": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/art" }
+    },
+    "regeln": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/regel" }
+    }
+  },
+  "patternProperties": {
+    "^_": { "$ref": "#/$defs/kommentar" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "kommentar": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "codeArt": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+    },
+    "codeKlassifikation": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,39}$"
+    },
+    "einstellungen": {
+      "type": "object",
+      "required": ["geschaeftsjahrEnde", "kennungen"],
+      "properties": {
+        "geschaeftsjahrEnde": {
+          "type": "string",
+          "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
+        "kennungen": { "$ref": "#/$defs/kennungen" }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "kennungen": {
+      "type": "object",
+      "required": ["uid", "ibans"],
+      "properties": {
+        "uid": { "type": ["string", "null"] },
+        "ibans": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "kiTexte": {
+      "type": "object",
+      "required": ["rolle", "feldregeln", "kiFreigegeben"],
+      "properties": {
+        "rolle": { "type": "string", "maxLength": 8000 },
+        "feldregeln": { "type": "string", "maxLength": 8000 },
+        "kiFreigegeben": { "type": "boolean" }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "klassifikation": {
+      "type": "object",
+      "required": ["code", "name", "werte", "mehrfach", "kiVorschlag", "suchfilter", "oeffentlichFilter"],
+      "properties": {
+        "code": { "$ref": "#/$defs/codeKlassifikation" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "beschreibung": { "type": ["string", "null"], "maxLength": 1000 },
+        "werte": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/klassifikationsWert" }
+        },
+        "mehrfach": { "type": "boolean" },
+        "kiVorschlag": { "type": "boolean" },
+        "suchfilter": { "type": "boolean" },
+        "oeffentlichFilter": { "type": "boolean" },
+        "aktiv": { "type": "boolean", "default": true }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "klassifikationsWert": {
+      "type": "object",
+      "required": ["code", "name"],
+      "properties": {
+        "code": { "$ref": "#/$defs/codeKlassifikation" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "beschreibung": { "type": ["string", "null"], "maxLength": 1000 },
+        "reihenfolge": { "type": "integer", "default": 0 },
+        "aktiv": { "type": "boolean", "default": true }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "art": {
+      "type": "object",
+      "required": [
+        "code", "name", "gruppen", "pflichtfelder", "vertraulichkeit", "aufbewahrung",
+        "gesetzlichePflicht", "selbstAusgestellt", "zusatzSchema"
+      ],
+      "properties": {
+        "code": { "$ref": "#/$defs/codeArt" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "beschreibung": { "type": ["string", "null"], "maxLength": 1000 },
+        "gruppen": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["finanz", "vertrag", "frei"] }
+        },
+        "pflichtfelder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+        },
+        "vertraulichkeit": { "enum": ["NORMAL", "INTERN", "PERSONAL"] },
+        "aufbewahrung": { "$ref": "#/$defs/aufbewahrung" },
+        "gesetzlichePflicht": { "type": "boolean" },
+        "aktiv": { "type": "boolean", "default": true },
+        "selbstAusgestellt": { "type": "boolean" },
+        "belegnummerMuster": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        },
+        "fremdbelegArt": { "anyOf": [{ "$ref": "#/$defs/codeArt" }, { "type": "null" }] },
+        "ohneZahlungsdatenArt": { "anyOf": [{ "$ref": "#/$defs/codeArt" }, { "type": "null" }] },
+        "kiVorschlag": { "type": "boolean", "default": true },
+        "kiFelder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+        },
+        "kiHinweise": { "type": ["string", "null"], "maxLength": 1000 },
+        "reihenfolge": { "type": "integer", "default": 0 },
+        "zusatzSchema": { "type": "object" },
+        "klassifikationen": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artKlassifikation" }
+        }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "aufbewahrung": {
+      "type": "object",
+      "required": ["jahre"],
+      "properties": {
+        "jahre": { "type": ["integer", "null"], "minimum": 0 },
+        "ab": {
+          "anyOf": [
+            { "enum": ["GESCHAEFTSJAHR", "GUELTIG_BIS", "BELEGDATUM", "FELD"] },
+            { "type": "null" }
+          ]
+        },
+        "feld": { "type": ["string", "null"], "minLength": 1, "maxLength": 63 }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "artKlassifikation": {
+      "type": "object",
+      "required": ["code", "pflicht"],
+      "properties": {
+        "code": { "$ref": "#/$defs/codeKlassifikation" },
+        "pflicht": { "type": "boolean" },
+        "standardWert": { "type": ["string", "null"], "minLength": 1, "maxLength": 40 }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "regel": {
+      "type": "object",
+      "required": ["code", "typ", "parameter", "schwere", "meldung"],
+      "properties": {
+        "code": { "$ref": "#/$defs/codeKlassifikation" },
+        "art": { "anyOf": [{ "$ref": "#/$defs/codeArt" }, { "type": "null" }] },
+        "typ": { "enum": ["PFLICHT_WENN", "EINDEUTIG", "FOLGE", "ERWARTET"] },
+        "parameter": { "type": "object" },
+        "schwere": { "enum": ["FEHLER", "WARNUNG"] },
+        "meldung": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "aktiv": { "type": "boolean", "default": true }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "typ": { "const": "PFLICHT_WENN" } }, "required": ["typ"] },
+          "then": { "properties": { "parameter": { "$ref": "#/$defs/pflichtWenn" } } }
+        },
+        {
+          "if": { "properties": { "typ": { "const": "EINDEUTIG" } }, "required": ["typ"] },
+          "then": { "properties": { "parameter": { "$ref": "#/$defs/eindeutig" } } }
+        },
+        {
+          "if": { "properties": { "typ": { "const": "FOLGE" } }, "required": ["typ"] },
+          "then": { "properties": { "parameter": { "$ref": "#/$defs/folge" } } }
+        },
+        {
+          "if": { "properties": { "typ": { "const": "ERWARTET" } }, "required": ["typ"] },
+          "then": { "properties": { "parameter": { "$ref": "#/$defs/erwartet" } } }
+        }
+      ],
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "pflichtWenn": {
+      "type": "object",
+      "required": ["wenn", "dann"],
+      "properties": {
+        "wenn": { "$ref": "#/$defs/wenn" },
+        "dann": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+        }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "wenn": {
+      "type": "object",
+      "required": ["feld", "gleich"],
+      "properties": {
+        "feld": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "gleich": { "type": ["string", "number", "boolean"] }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "eindeutig": {
+      "type": "object",
+      "required": ["felder"],
+      "properties": {
+        "felder": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+        },
+        "ueberAlleArten": { "type": "boolean", "default": false }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "folge": {
+      "type": "object",
+      "required": ["zeitraum"],
+      "properties": {
+        "feld": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "muster": { "const": true },
+        "zeitraum": {
+          "oneOf": [
+            { "enum": ["GESCHAEFTSJAHR", "GESAMT"] },
+            { "$ref": "#/$defs/zeitraumFeld" }
+          ]
+        },
+        "beginn": { "type": "integer", "minimum": 1, "default": 1 }
+      },
+      "oneOf": [
+        { "required": ["feld"], "not": { "required": ["muster"] } },
+        { "required": ["muster"], "not": { "required": ["feld"] } }
+      ],
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "zeitraumFeld": {
+      "type": "object",
+      "required": ["feld"],
+      "properties": {
+        "feld": { "type": "string", "minLength": 1, "maxLength": 100 }
+      },
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    },
+    "erwartet": {
+      "type": "object",
+      "required": ["je", "datum"],
+      "properties": {
+        "je": { "enum": ["MONAT", "JAHR"] },
+        "datum": {
+          "anyOf": [
+            { "const": "BELEGDATUM" },
+            { "type": "string", "minLength": 1, "maxLength": 100 }
+          ]
+        },
+        "ab": { "type": "string", "format": "date" },
+        "nurMonat": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "gruppe": {
+          "oneOf": [
+            { "const": "PARTNER" },
+            { "type": "string", "pattern": "^zusatz\\.[a-z][a-z0-9_]{0,39}$" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "je": { "const": "JAHR" } }, "required": ["je"] },
+          "then": { "not": { "anyOf": [{ "required": ["nurMonat"] }, { "required": ["gruppe"] }] } }
+        }
+      ],
+      "patternProperties": {
+        "^_": { "$ref": "#/$defs/kommentar" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
