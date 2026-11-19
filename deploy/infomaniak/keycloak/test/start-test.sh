@@ -24,10 +24,10 @@ pruefen() {
   : > "$temp/secrets/google_client_id"
   : > "$temp/secrets/google_client_secret"
   if [[ "$id" != "<leer>" ]]; then
-    printf '%s\n' "$id" > "$temp/secrets/google_client_id"
+    printf "$id" > "$temp/secrets/google_client_id"
   fi
   if [[ "$secret" != "<leer>" ]]; then
-    printf '%s\n' "$secret" > "$temp/secrets/google_client_secret"
+    printf "$secret" > "$temp/secrets/google_client_secret"
   fi
   ARCHIV_SECRETS_DIR="$temp/secrets" \
   KEYCLOAK_BIN="$temp/bin/keycloak-stub" \
@@ -38,9 +38,14 @@ pruefen() {
   [[ $(<"$temp/out/args") == "start --optimized --import-realm" ]]
 }
 
-pruefen "<leer>" "synthetisches-secret" "" ""
-pruefen "synthetische-id" "<leer>" "" ""
-pruefen "synthetische-id" "synthetisches-secret" "synthetische-id" "synthetisches-secret"
+# Das Skript übergibt nur Umgebungsvariablen; «enabled» bleibt im Export fest false (siehe jq unten).
+pruefen "<leer>" "synthetisches-secret\n" "" ""
+pruefen "synthetische-id\n" "<leer>" "" ""
+pruefen "\n" "synthetisches-secret\n" "" ""
+pruefen "synthetische-id\n" "\n" "" ""
+pruefen "   \n" "synthetisches-secret\n" "" ""
+pruefen "synthetische-id\n" " \r\n" "" ""
+pruefen "synthetische-id\n" "synthetisches-secret\n" "synthetische-id" "synthetisches-secret"
 jq -e '.identityProviders[] | select(.alias == "google" and .enabled == false)' \
   "$repo/deploy/keycloak/realm-export.json" >/dev/null
-echo "Keycloak-Start aktiviert Google nur mit nichtleerer ID und Secret."
+echo "Keycloak-Start übergibt leere Werte für Google bei leerer, fehlender oder nur aus Leerraum bestehender ID oder Secret."

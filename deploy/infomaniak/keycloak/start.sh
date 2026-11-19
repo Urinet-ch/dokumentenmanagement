@@ -19,7 +19,8 @@ secrets="${ARCHIV_SECRETS_DIR:-/run/secrets}"
 if [[ -s "$secrets/google_client_id" && -s "$secrets/google_client_secret" ]]; then
   GOOGLE_CLIENT_ID=$(lesen google_client_id)
   GOOGLE_CLIENT_SECRET=$(lesen google_client_secret)
-  if [[ -z "$GOOGLE_CLIENT_ID" || -z "$GOOGLE_CLIENT_SECRET" ]]; then
+  # Nur Leerraum (Leerzeichen, Zeilenumbruch, CRLF) zählt als leer.
+  if [[ -z "${GOOGLE_CLIENT_ID//[[:space:]]/}" || -z "${GOOGLE_CLIENT_SECRET//[[:space:]]/}" ]]; then
     GOOGLE_CLIENT_ID=
     GOOGLE_CLIENT_SECRET=
   fi

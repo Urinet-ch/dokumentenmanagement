@@ -25,7 +25,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 /** Lokaler OpenID-Connect-Test-IdP für die Keycloak-Broker-Szenarien. */
 final class OidcTestIdp implements AutoCloseable {
 
-    record Identitaet(String sub, String email) {
+    /** {@code zusatz}: feindliche Zusatzclaims (z. B. mandant, roles), die Keycloak nie übernehmen darf. */
+    record Identitaet(String sub, String email, Map<String, Object> zusatz) {
+        Identitaet(String sub, String email) {
+            this(sub, email, Map.of());
+        }
     }
 
     private record Pending(Identitaet identitaet, String nonce) {
@@ -73,6 +77,10 @@ final class OidcTestIdp implements AutoCloseable {
 
     void identitaetSetzen(Identitaet wert) {
         identitaet = wert;
+    }
+
+    int tokenAnfragen() {
+        return tokenAnfragen.get();
     }
 
     String diagnose() {
@@ -137,12 +145,13 @@ final class OidcTestIdp implements AutoCloseable {
             antwort(austausch, 401, "Ungültiges OIDC-Testtoken");
             return;
         }
-        antwortJson(austausch, 200, Map.of(
-                "sub", aktuelleIdentitaet.sub(),
-                "email", aktuelleIdentitaet.email(),
-                "email_verified", true,
-                "preferred_username", aktuelleIdentitaet.email(),
-                "name", "Synthetischer OIDC-Testbenutzer"));
+        Map<String, Object> inhalt = new java.util.LinkedHashMap<>(aktuelleIdentitaet.zusatz());
+        inhalt.put("sub", aktuelleIdentitaet.sub());
+        inhalt.put("email", aktuelleIdentitaet.email());
+        inhalt.put("email_verified", true);
+        inhalt.put("preferred_username", aktuelleIdentitaet.email());
+        inhalt.put("name", "Synthetischer OIDC-Testbenutzer");
+        antwortJson(austausch, 200, inhalt);
     }
 
     private void jwks(HttpExchange austausch) throws IOException {
@@ -159,15 +168,16 @@ final class OidcTestIdp implements AutoCloseable {
     private String idToken(Pending pending, long jetzt) {
         try {
             String header = base64(JSON.writeValueAsBytes(Map.of("alg", "RS256", "typ", "JWT", "kid", KEY_ID)));
-            String inhalt = base64(JSON.writeValueAsBytes(Map.of(
-                    "iss", basisUrl(),
-                    "sub", pending.identitaet().sub(),
-                    "aud", "archiv-test-oidc",
-                    "iat", jetzt,
-                    "exp", jetzt + 60,
-                    "nonce", pending.nonce(),
-                    "email", pending.identitaet().email(),
-                    "email_verified", true)));
+            Map<String, Object> claims = new java.util.LinkedHashMap<>(pending.identitaet().zusatz());
+            claims.put("iss", basisUrl());
+            claims.put("sub", pending.identitaet().sub());
+            claims.put("aud", "archiv-test-oidc");
+            claims.put("iat", jetzt);
+            claims.put("exp", jetzt + 60);
+            claims.put("nonce", pending.nonce());
+            claims.put("email", pending.identitaet().email());
+            claims.put("email_verified", true);
+            String inhalt = base64(JSON.writeValueAsBytes(claims));
             String signiert = header + "." + inhalt;
             Signature signature = Signature.getInstance("SHA256withRSA");
             signature.initSign(schluessel.getPrivate());

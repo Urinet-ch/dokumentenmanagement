@@ -1,5 +1,6 @@
 package ch.urinet.archiv.sicherheit;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -117,16 +118,28 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
                 Map.entry("validateSignature", "true"),
                 Map.entry("jwksUrl", basis + "/jwks"),
                 Map.entry("useJwksUrl", "true"));
+        JsonNode google = null;
+        for (JsonNode knoten : provider) {
+            if ("google".equals(knoten.path("alias").asText())) {
+                google = knoten;
+            }
+        }
+        if (google == null) {
+            throw new IllegalStateException("Provider google fehlt im Realm-Export");
+        }
+        // Flows, trustEmail und syncMode stammen aus dem Export, damit der Test-IdP dem Google-Provider folgt.
+        Map<String, String> config = new java.util.HashMap<>(oidcConfig);
+        config.put("syncMode", google.path("config").path("syncMode").asText());
         provider.add(mapper.valueToTree(Map.of(
                 "alias", "archiv-test-oidc",
                 "displayName", "Lokaler OIDC-Test-IdP",
                 "providerId", "oidc",
                 "enabled", true,
-                "trustEmail", false,
+                "trustEmail", google.path("trustEmail").asBoolean(),
                 "storeToken", false,
-                "firstBrokerLoginFlowAlias", "google-nur-verknuepft",
-                "postBrokerLoginFlowAlias", "google-totp-pflicht",
-                "config", oidcConfig)));
+                "firstBrokerLoginFlowAlias", google.path("firstBrokerLoginFlowAlias").asText(),
+                "postBrokerLoginFlowAlias", google.path("postBrokerLoginFlowAlias").asText(),
+                "config", config)));
 
         ArrayNode clients = realm.withArray("clients");
         clients.add(mapper.valueToTree(Map.of(

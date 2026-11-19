@@ -36,6 +36,7 @@ bash deploy/infomaniak/keycloak/test/google-idp-einrichten-vorlage-test.sh
 bash -n deploy/infomaniak/keycloak/start.sh
 bash deploy/infomaniak/keycloak/test/start-test.sh
 ```
+`start-test.sh` belegt nur, dass leere oder nur aus Leerraum bestehende Werte als leere Umgebung ankommen; der Provider bleibt, weil der Export ihn fest mit `enabled: false` führt. Der Test läuft nicht in der CI.
 
 ## Nachbesserung Review (PR #334)
 

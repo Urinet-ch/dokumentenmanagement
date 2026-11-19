@@ -43,7 +43,7 @@ public class GoogleAnmeldungSchritte {
     private static final Pattern INPUT = Pattern.compile("(?is)<input\\b[^>]*>");
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    private String adminToken;
+    private int tokenAnfragenVorher;
     private String benutzerId;
     private String email;
     private String sub;
@@ -67,6 +67,7 @@ public class GoogleAnmeldungSchritte {
     @Angenommen("ein Archivbenutzer ist mit der Google-Identität verknüpft")
     public void kontoIstVerknuepft() {
         identitaetVorbereiten("verknuepft");
+        feindlicheClaimsSetzen();
         benutzerAnlegen(true);
         federierteIdentitaetAnlegen();
     }
@@ -93,14 +94,25 @@ public class GoogleAnmeldungSchritte {
 
     @Dann("weist Keycloak das unbekannte Konto ab")
     public void unbekanntAbgewiesen() {
-        assertThat(rueckruf).isNull();
+        abgewiesenDurchFlow();
         assertThat(benutzerNachEmail(email)).isEmpty();
     }
 
     @Dann("wird das Konto trotz gleicher E-Mail nicht automatisch verknüpft")
     public void eEmailVerknuepftNicht() {
-        assertThat(rueckruf).isNull();
+        abgewiesenDurchFlow();
         assertThat(federierteIdentitaeten()).isEmpty();
+        assertThat(benutzerNachEmail(email)).hasSize(1);
+    }
+
+    /** Der Broker-Lauf hat stattgefunden (Test-IdP erreicht) und endete ohne Rückruf und ohne TOTP-Formular. */
+    private void abgewiesenDurchFlow() {
+        assertThat(ExportKeycloak.oidcTestIdp.tokenAnfragen())
+                .as("Keycloak hat den Test-IdP nicht erreicht: %s", ExportKeycloak.oidcTestIdp.diagnose())
+                .isGreaterThan(tokenAnfragenVorher);
+        assertThat(rueckruf).as("Unerwarteter Rückruf: %s", diagnoseSeite(seite)).isNull();
+        assertThat(seite).as("Abweisungsseite: %s", diagnoseSeite(seite))
+                .doesNotContain("name=\"otp\"").doesNotContain("name=\"password\"");
     }
 
     @Dann("der verknüpfte Benutzer erhält erst nach erfolgreichem TOTP einen Keycloak-Token")
@@ -109,11 +121,11 @@ public class GoogleAnmeldungSchritte {
         JsonNode payload = JSON.readTree(sitzungsTokenPayload);
         List<String> rollen = new ArrayList<>();
         payload.path("realm_access").path("roles").forEach(rolle -> rollen.add(rolle.asText()));
-        assertThat(rollen).contains("inhaber");
+        assertThat(rollen).contains("inhaber").doesNotContain("admin");
         assertThat(payload.path("mandant").asText()).isEqualTo("urinet");
     }
 
-    @Wenn("der verknüpfte Benutzer sich anmeldet, entkoppelt und abgemeldet wird")
+    @Wenn("der verknüpfte Benutzer sich anmeldet, die Verknüpfung gelöst und der Benutzer per logout abgemeldet wird")
     public void anmeldenEntkoppelnUndAbmelden() throws IOException, InterruptedException {
         ueberTestIdpAnmelden();
         mitTotpAbschliessen();
@@ -123,25 +135,30 @@ public class GoogleAnmeldungSchritte {
         given().auth().oauth2(adminToken()).post(adminPfad("/users/{id}/logout"), benutzerId).then().statusCode(204);
     }
 
-    @Dann("stehen Verknüpfen und Lösen im Admin-Ereignisprotokoll und die Sitzung ist beendet")
+    @Dann("stehen Verknüpfen und Lösen dieses Benutzers im Admin-Ereignisprotokoll und der logout beendet die Sitzung")
     public void adminEreignisseUndSitzung() {
-        List<Map<String, Object>> ereignisse = given().auth().oauth2(adminToken())
-                .get(adminPfad("/admin-events?max=100")).then().statusCode(200).extract().jsonPath().getList("$");
-        assertThat(ereignisse).anySatisfy(ereignis -> {
-            assertThat(ereignis.get("operationType")).isEqualTo("CREATE");
-            assertThat(ereignis.get("resourcePath").toString()).contains("federated-identity/" + PROVIDER);
-        });
-        assertThat(ereignisse).anySatisfy(ereignis -> {
-            assertThat(ereignis.get("operationType")).isEqualTo("DELETE");
-            assertThat(ereignis.get("resourcePath").toString()).contains("federated-identity/" + PROVIDER);
-        });
+        String pfad = "users/" + benutzerId + "/federated-identity/" + PROVIDER;
+        for (String art : List.of("CREATE", "DELETE")) {
+            List<Map<String, Object>> ereignisse = given().auth().oauth2(adminToken())
+                    .queryParam("operationTypes", art).queryParam("resourcePath", pfad).queryParam("max", 20)
+                    .get(adminPfad("/admin-events")).then().statusCode(200).extract().jsonPath().getList("$");
+            assertThat(ereignisse).as("Admin-Ereignis %s für %s", art, pfad)
+                    .anySatisfy(ereignis -> assertThat(ereignis.get("resourcePath")).isEqualTo(pfad));
+        }
         assertThat(sitzungen()).isEmpty();
+    }
+
+    private void feindlicheClaimsSetzen() {
+        ExportKeycloak.oidcTestIdp.identitaetSetzen(new OidcTestIdp.Identitaet(sub, email,
+                Map.of("mandant", "fremd", "roles", List.of("admin"), "groups", List.of("admin"),
+                        "realm_access", Map.of("roles", List.of("admin")))));
     }
 
     private void identitaetVorbereiten(String kennung) {
         email = kennung + "-" + UUID.randomUUID() + "@example.invalid";
         sub = "oidc-" + kennung + "-" + UUID.randomUUID();
         ExportKeycloak.oidcTestIdp.identitaetSetzen(new OidcTestIdp.Identitaet(sub, email));
+        tokenAnfragenVorher = ExportKeycloak.oidcTestIdp.tokenAnfragen();
     }
 
     private void benutzerAnlegen(boolean mitTotp) {
@@ -199,14 +216,11 @@ public class GoogleAnmeldungSchritte {
                 .then().statusCode(200).extract().jsonPath().getList("$");
     }
 
-    private String adminToken() {
-        if (adminToken == null) {
-            adminToken = given().formParam("grant_type", "password").formParam("client_id", "admin-cli")
-                    .formParam("username", ExportKeycloak.ADMIN).formParam("password", ExportKeycloak.ADMIN_PASSWORT)
-                    .post(ExportKeycloak.basisUrl + "/realms/master/protocol/openid-connect/token")
-                    .then().statusCode(200).extract().path("access_token");
-        }
-        return adminToken;
+    private static String adminToken() {
+        return given().formParam("grant_type", "password").formParam("client_id", "admin-cli")
+                .formParam("username", ExportKeycloak.ADMIN).formParam("password", ExportKeycloak.ADMIN_PASSWORT)
+                .post(ExportKeycloak.basisUrl + "/realms/master/protocol/openid-connect/token")
+                .then().statusCode(200).extract().path("access_token");
     }
 
     private static String adminPfad(String pfad) {
@@ -238,7 +252,7 @@ public class GoogleAnmeldungSchritte {
             }
             Matcher idpLink = IDP_LINK.matcher(seite.html());
             if (!idpLink.find()) {
-                return seite;
+                throw new AssertionError("Link zum Test-IdP fehlt auf der Keycloak-Seite: " + diagnoseSeite(seite.html()));
             }
             return weiter(seite.uri().resolve(idpLink.group(1).replace("&amp;", "&")), null);
         }
