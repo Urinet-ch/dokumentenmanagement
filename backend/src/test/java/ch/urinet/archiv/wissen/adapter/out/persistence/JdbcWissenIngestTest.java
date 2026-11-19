@@ -499,8 +499,15 @@ class JdbcWissenIngestTest {
         String inhaber = Testanmeldung.token("inhaber-urinet");
         String treuhaender = Testanmeldung.token("treuhaender-urinet");
         try {
+            long verweigert = anzahl("select count(*) from " + URINET.schema()
+                    + ".zugriff_protokoll where aktion = ?", "VERWEIGERT");
             given().auth().oauth2(treuhaender).contentType("application/json").body("{}")
                     .when().post(pfad).then().statusCode(403);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".zugriff_protokoll where aktion = ?", "VERWEIGERT")).isEqualTo(verweigert + 1);
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_version where entwurf_id = ?", entwurf)).isZero();
             given().auth().oauth2(inhaber).contentType("application/json").body("{}")
                     .when().post(pfad).then().statusCode(428);
             ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'PERSONAL' where id = ?",
