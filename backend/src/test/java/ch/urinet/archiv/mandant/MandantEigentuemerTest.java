@@ -107,6 +107,7 @@ class MandantEigentuemerTest {
     void zugriffProtokollNurEinfuegen() throws SQLException {
         provisionierung.anlegen("probe-protokoll", null, null);
         String tabelle = "m_probe_protokoll.zugriff_protokoll";
+        long anzahlNachher;
         try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
             assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'INSERT')")).isTrue();
             assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'SELECT')")).isTrue();
@@ -115,8 +116,10 @@ class MandantEigentuemerTest {
             }
             assertThat(wahr(befehl, "has_sequence_privilege('m_probe_protokoll.zugriff_protokoll_id_seq', 'USAGE')"))
                     .isTrue();
+            long anzahlVorher = Long.parseLong(wert(befehl, "select count(*) from " + tabelle));
             befehl.execute("insert into " + tabelle + " (benutzer, rolle, aktion) values ('probe', 'INHABER', 'ANZEIGEN')");
-            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+            anzahlNachher = anzahlVorher + 1;
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo(Long.toString(anzahlNachher));
             verweigert(befehl, "update " + tabelle + " set benutzer = 'x'");
             verweigert(befehl, "delete from " + tabelle);
             verweigert(befehl, "truncate " + tabelle);
@@ -128,7 +131,7 @@ class MandantEigentuemerTest {
                 assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
                         .hasMessageContaining("nur Einfügen erlaubt");
             }
-            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo(Long.toString(anzahlNachher));
         }
     }
 
