@@ -28,7 +28,9 @@ public class WissenManuellerEntwurfSchritte {
     private final String pfad = "konzepte/manuell-" + UUID.randomUUID();
     private UUID entwurf;
     private UUID zweiterEntwurf;
+    private UUID dritterEntwurf;
     private UUID seite;
+    private UUID zitierteSeite;
     private int status;
     private Response antwort;
 
@@ -129,8 +131,10 @@ public class WissenManuellerEntwurfSchritte {
                             p.details->'wissen'->>'seiteId' = s.id::text,
                             p.details->'wissen'->>'neueVersion',
                             exists (select 1 from public.auftrag o where o.typ = 'WISSEN_EMBEDDING'
-                                    and o.nutzlast->>'seiteId' = s.id::text)
+                                    and o.nutzlast->>'seiteId' = s.id::text),
+                            e.status, s.id
                      from m_urinet.wissens_aenderung a
+                     join m_urinet.wissens_entwurf e on e.id = a.entwurf_id
                      join m_urinet.wissensseite s on s.id = a.seite_id
                      join m_urinet.wissensseite_version v on v.seite_id = s.id and v.version = s.version
                      join m_urinet.zugriff_protokoll p
@@ -146,9 +150,116 @@ public class WissenManuellerEntwurfSchritte {
                 assertThat(ergebnis.getBoolean(5)).isTrue();
                 assertThat(ergebnis.getString(6)).isEqualTo("1");
                 assertThat(ergebnis.getBoolean(7)).isTrue();
+                assertThat(ergebnis.getString(8)).isEqualTo("ERLEDIGT");
+                seite = ergebnis.getObject(9, UUID.class);
                 assertThat(ergebnis.next()).isFalse();
             }
         }
+    }
+
+    @Wenn("der Inhaber zwei Änderungen derselben Seite erstellt und die erste annimmt")
+    public void zweiAenderungenAnlegen() {
+        String token = Testanmeldung.token("inhaber-urinet");
+        Map<String, Object> eingabe = Map.of("seiteId", seite, "pfad", pfad, "typ", "Konzept",
+                "titel", "Probe", "beschreibung", "Ein Satz.", "tags", List.of(), "quellen", List.of(),
+                "inhalt", "");
+        zweiterEntwurf = UUID.fromString(given().auth().oauth2(token).contentType("application/json").body(eingabe)
+                .when().post("/api/v1/wissensentwuerfe").then().statusCode(201).extract().path("id"));
+        dritterEntwurf = UUID.fromString(given().auth().oauth2(token).contentType("application/json").body(eingabe)
+                .when().post("/api/v1/wissensentwuerfe").then().statusCode(201).extract().path("id"));
+        given().auth().oauth2(token).header("If-Match", "\"0\"").contentType("application/json").body("{}")
+                .when().post("/api/v1/wissensentwuerfe/" + dritterEntwurf + "/aenderungen/1/annehmen")
+                .then().statusCode(204);
+    }
+
+    @Dann("wird die zweite Änderung als veraltet abgelehnt und kann neu erzeugt werden")
+    public void veralteteAenderungNeuErzeugen() {
+        String token = Testanmeldung.token("inhaber-urinet");
+        String url = "/api/v1/wissensentwuerfe/" + zweiterEntwurf + "/aenderungen/1";
+        given().auth().oauth2(token).header("If-Match", "\"0\"").contentType("application/json").body("{}")
+                .when().post(url + "/annehmen").then().statusCode(412).body("fehlercode", is("VERSION_KONFLIKT"));
+        int etag = given().auth().oauth2(token).when().get("/api/v1/wissensentwuerfe/" + zweiterEntwurf)
+                .then().statusCode(200).body("aenderungen[0].status", is("VERALTET"))
+                .extract().path("aenderungen[0].etag");
+        given().auth().oauth2(token).header("If-Match", "\"" + etag + "\"")
+                .when().post(url + "/neu-erzeugen").then().statusCode(202);
+    }
+
+    @Wenn("ein Mitarbeiter einen entschiedenen Analysevorschlag hat")
+    public void analysevorschlagAnlegen() throws Exception {
+        entwurf = UUID.randomUUID();
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement e = c.prepareStatement("""
+                     insert into m_urinet.wissens_entwurf (id, anlass, status, erstellt_von, erstellt)
+                     values (?, 'ANALYSE', 'ABGELEHNT', ?, now())
+                     """);
+             PreparedStatement a = c.prepareStatement("""
+                     insert into m_urinet.wissens_aenderung
+                         (entwurf_id, nr, aktion, pfad, daten, inhalt, diff, status, grund)
+                     values (?, 1, 'NEU', ?, '{}'::jsonb, 'Probe', '{"inhalt":"Probe"}'::jsonb, 'VERWORFEN', 'Grund')
+                     """)) {
+            e.setObject(1, entwurf);
+            e.setString(2, Testanmeldung.sub("mitarbeiter-urinet"));
+            e.executeUpdate();
+            a.setObject(1, entwurf);
+            a.setString(2, pfad);
+            a.executeUpdate();
+        }
+    }
+
+    @Dann("sieht er im Entwurfszugriff den Entscheid ohne Fassung und Diff")
+    public void analysevorschlagNurStatus() {
+        var json = given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                .when().get("/api/v1/wissensentwuerfe/" + entwurf)
+                .then().statusCode(200).extract().jsonPath();
+        assertThat(json.getString("status")).isEqualTo("ABGELEHNT");
+        assertThat(json.getString("entscheidungen[0].status")).isEqualTo("VERWORFEN");
+        assertThat(json.getString("entscheidungen[0].grund")).isEqualTo("Grund");
+        assertThat(json.<String, Object>getMap("$")).containsOnlyKeys("id", "status", "entscheidungen");
+    }
+
+    @Wenn("der Inhaber eine Übersicht mit einer internen zitierten Seite annehmen möchte")
+    public void ueberblickAnnehmen() throws Exception {
+        zitierteSeite = UUID.randomUUID();
+        entwurf = UUID.randomUUID();
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement s = c.prepareStatement("""
+                     insert into m_urinet.wissensseite
+                         (id, pfad, typ, titel, beschreibung, vertraulichkeit, vertraulichkeit_mindest,
+                          inhalt, version, erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am)
+                     values (?, ?, 'Konzept', 'Probe', 'Probe', 'INTERN', 'INTERN', '', 1,
+                             'probe', now(), 'probe', now())
+                     """);
+             PreparedStatement e = c.prepareStatement("""
+                     insert into m_urinet.wissens_entwurf (id, anlass, status, erstellt_von, erstellt)
+                     values (?, 'MANUELL', 'OFFEN', 'probe', now())
+                     """);
+             PreparedStatement a = c.prepareStatement("""
+                     insert into m_urinet.wissens_aenderung
+                         (entwurf_id, nr, aktion, pfad, daten, inhalt, diff, status)
+                     values (?, 1, 'NEU', 'ueberblick', cast(? as jsonb), 'Aussage.[^q1]', '{}'::jsonb, 'OFFEN')
+                     """)) {
+            s.setObject(1, zitierteSeite);
+            s.setString(2, pfad);
+            s.executeUpdate();
+            e.setObject(1, entwurf);
+            e.executeUpdate();
+            a.setObject(1, entwurf);
+            a.setString(2, """
+                    {"typ":"Synthese","titel":"Überblick","beschreibung":"Ein Satz.","tags":[],
+                     "status":"AKTIV","quellen":[{"schluessel":"q1","quellSeiteId":"%s"}],
+                     "vertraulichkeit":"NORMAL","inhalt":"Aussage.[^q1]"}
+                    """.formatted(zitierteSeite));
+            a.executeUpdate();
+        }
+        antwort = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).header("If-Match", "\"0\"")
+                .contentType("application/json").body("{\"vertraulichkeit\":\"NORMAL\"}")
+                .when().post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen");
+    }
+
+    @Dann("wird die Freigabe mit dem Befund «STUFE_UEBERBLICK» abgelehnt")
+    public void ueberblickAbgelehnt() {
+        antwort.then().statusCode(422).body("befunde", hasItem("STUFE_UEBERBLICK"));
     }
 
     @Wenn("der Inhaber die korrigierte Fassung zuerst als PERSONAL und dann als INTERN annehmen möchte")
@@ -219,11 +330,26 @@ public class WissenManuellerEntwurfSchritte {
             try (var befehl = verbindung.createStatement()) {
                 befehl.execute("set local session_replication_role = replica");
             }
-            if (zweiterEntwurf != null) {
+            for (UUID weiterer : new UUID[]{zweiterEntwurf, dritterEntwurf}) {
+                if (weiterer == null) {
+                    continue;
+                }
+                try (PreparedStatement befehl = verbindung.prepareStatement(
+                        "delete from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = ?")) {
+                    befehl.setString(1, weiterer.toString());
+                    befehl.executeUpdate();
+                }
+                for (String tabelle : List.of("wissensseite_version", "wissens_log", "zugriff_protokoll")) {
+                    try (PreparedStatement befehl = verbindung.prepareStatement("delete from m_urinet." + tabelle
+                            + (tabelle.equals("zugriff_protokoll") ? " where dokument_id = ?" : " where entwurf_id = ?"))) {
+                        befehl.setObject(1, weiterer);
+                        befehl.executeUpdate();
+                    }
+                }
                 for (String tabelle : List.of("wissens_aenderung", "wissens_entwurf")) {
                     try (PreparedStatement befehl = verbindung.prepareStatement("delete from m_urinet." + tabelle
                             + (tabelle.equals("wissens_aenderung") ? " where entwurf_id = ?" : " where id = ?"))) {
-                        befehl.setObject(1, zweiterEntwurf);
+                        befehl.setObject(1, weiterer);
                         befehl.executeUpdate();
                     }
                 }
@@ -250,6 +376,13 @@ public class WissenManuellerEntwurfSchritte {
                 try (PreparedStatement befehl = verbindung.prepareStatement("delete from m_urinet." + tabelle
                         + (tabelle.equals("wissens_aenderung") ? " where entwurf_id = ?" : " where id = ?"))) {
                     befehl.setObject(1, entwurf);
+                    befehl.executeUpdate();
+                }
+            }
+            if (zitierteSeite != null) {
+                try (PreparedStatement befehl = verbindung.prepareStatement(
+                        "delete from m_urinet.wissensseite where id = ?")) {
+                    befehl.setObject(1, zitierteSeite);
                     befehl.executeUpdate();
                 }
             }
