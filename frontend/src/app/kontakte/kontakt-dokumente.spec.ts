@@ -35,7 +35,7 @@ describe('KontaktDokumente', () => {
   }
 
   function ergebnis(treffer: Suchtreffer[], gesamt = 40): Suchergebnis {
-    return { treffer, gesamt, seite: 0, groesse: DOKUMENTE_GROESSE };
+    return { treffer, facetten: [], gesamt, seite: 0, groesse: DOKUMENTE_GROESSE };
   }
 
   function treffer(id: string, titel: string, art: string | null = 'QUITTUNG'): Suchtreffer {

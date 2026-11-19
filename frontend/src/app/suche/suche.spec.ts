@@ -39,7 +39,7 @@ const treffer = (werte: Partial<Suchtreffer>): Suchtreffer => ({
   ...werte,
 });
 
-const ergebnis = (...liste: Suchtreffer[]): Suchergebnis => ({ treffer: liste, gesamt: liste.length, seite: 0, groesse: 20 });
+const ergebnis = (...liste: Suchtreffer[]): Suchergebnis => ({ treffer: liste, facetten: [], gesamt: liste.length, seite: 0, groesse: 20 });
 
 describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
   let fixture: ComponentFixture<Suche>;
@@ -219,6 +219,7 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
       Array.from({ length: n }, (_, i) => treffer({ id: `d${i}`, titel: `Treffer ${String(n - i).padStart(2, '0')}` }));
     const hybridAntwort = (n: number, mehr: Partial<Suchergebnis> = {}): Suchergebnis => ({
       treffer: dreissigUndMehr(n),
+      facetten: [],
       gesamt: n,
       seite: 0,
       groesse: 30,
