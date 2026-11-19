@@ -5,6 +5,8 @@ import { SwUpdate } from '@angular/service-worker';
 import { Subject } from 'rxjs';
 import { App, SEITE_NEU_LADEN } from './app';
 import { WarteschlangeService } from './erfassen/handy/warteschlange/warteschlange.service';
+import { EingangskorbEntwurfSpeicher } from './eingangskorb/entwurf-speicher';
+import { Entwurf } from './eingangskorb/entwurf';
 import { BrandingService, STANDARD_BRANDING } from './gemeinsam/branding.service';
 import {
   AnmeldungService,
@@ -40,6 +42,24 @@ class ZaehlerAttrappe extends EingangskorbZaehler {
 class Leer {}
 
 describe('App (Req 2.6, 8.6)', () => {
+  const LEERER_ENTWURF: Entwurf = {
+    art: '',
+    titel: '',
+    datum: '',
+    partnerId: '',
+    partnerName: '',
+    projekt: '',
+    belegnummer: '',
+    richtung: '',
+    betrag: '',
+    waehrung: '',
+    faelligkeit: '',
+    qrReferenz: '',
+    gueltigAb: '',
+    gueltigBis: '',
+    vertraulichkeit: '',
+    tags: [],
+  };
   let anmeldung: AnmeldungAttrappe;
   let zaehler: ZaehlerAttrappe;
   let warteschlangeGestartet: boolean;
@@ -210,11 +230,31 @@ describe('App (Req 2.6, 8.6)', () => {
   it('meldet über Keycloak ab', async () => {
     anmeldung.als('mitarbeiter');
     const element = await zeigen();
+    window.sessionStorage.clear();
+    const entwurfSpeicher = TestBed.inject(EingangskorbEntwurfSpeicher);
+    entwurfSpeicher.speichern('u', 'd1', LEERER_ENTWURF, {});
+    expect(window.sessionStorage.getItem('archiv.eingangskorb.entwurf.v1:u:d1')).not.toBeNull();
     const abmelden = [...element.querySelectorAll('button')].find(
       (b) => b.textContent?.trim() === TEXTE.anmeldung.abmelden,
     );
     abmelden!.click();
+    expect(window.sessionStorage.getItem('archiv.eingangskorb.entwurf.v1:u:d1')).toBeNull();
     expect(anmeldung.abmelden).toHaveBeenCalledOnce();
+  });
+
+  it('löscht Eingangskorb-Entwürfe beim Wechsel des angemeldeten Benutzers', async () => {
+    window.sessionStorage.clear();
+    anmeldung.als('inhaber');
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const entwurfSpeicher = TestBed.inject(EingangskorbEntwurfSpeicher);
+    entwurfSpeicher.speichern('u', 'd1', LEERER_ENTWURF, {});
+    expect(window.sessionStorage.getItem('archiv.eingangskorb.entwurf.v1:u:d1')).not.toBeNull();
+
+    anmeldung.benutzer.set({ id: 'u2', name: 'Anderer Benutzer', mandant: 'urinet', rolle: 'inhaber' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(window.sessionStorage.getItem('archiv.eingangskorb.entwurf.v1:u:d1')).toBeNull();
   });
 
   it('bietet «Abmelden» auch nach Ablauf der Sitzung an (Keycloak-Sitzung beenden)', async () => {
