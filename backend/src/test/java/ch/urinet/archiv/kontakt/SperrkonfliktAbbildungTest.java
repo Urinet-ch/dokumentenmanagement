@@ -1,14 +1,19 @@
 package ch.urinet.archiv.kontakt;
 
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.dokument.application.DokumentEreignisse;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.QuelldokumentBeobachter;
+import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import io.agroal.api.AgroalDataSource;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
+import jakarta.enterprise.context.Dependent;
+import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
@@ -33,7 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * /dokumente/{id}}). Beide laufen als HTTP-Anfragen durch die echten Anwendungsfälle und Adapter gegen Postgres. Die
  * Pfade sperren in umgekehrter Reihenfolge (Zusammenführen: Kontakte, dann Dokumente; Ändern: Dokument, dann Kontakt
  * {@code for share}). {@link SperrReihenfolgeHaken} legt nur den Zeitpunkt fest, an dem beide ihre erste Sperre halten;
- * so tritt der Konflikt in jedem Lauf auf. Erwartet ist nie 500: Die unterlegene Anfrage meldet 409 STATUS_KONFLIKT
+ * so tritt der Konflikt in jedem Lauf auf. Die vorgelagerte Wissenssperre wird nur für diese erzwungene
+ * Gegenprobe ausgeschaltet; ihre Serialisierung wird separat geprüft. Erwartet ist nie 500: Die unterlegene Anfrage meldet 409 STATUS_KONFLIKT
  * (Verklemmung 40P01 oder abgelaufene Wartezeit 55P03), die andere gelingt, und die Daten bleiben in sich stimmig.
  * Die reine Abbildung der Ursachen-Kette prüft {@code ProblemAbbildungTest}. Nachweis zu Req 17.12 und 17.16
  * (design.md «Fehlerbehandlung»).
@@ -46,7 +52,34 @@ class SperrkonfliktAbbildungTest {
     public static class SperrtestProfil implements QuarkusTestProfile {
         @Override
         public Set<Class<?>> getEnabledAlternatives() {
-            return Set.of(SperrReihenfolgeHaken.class);
+            return Set.of(SperrReihenfolgeHaken.class, EreignisseOhneVorsperre.class);
+        }
+    }
+
+    @Alternative
+    @Dependent
+    public static class EreignisseOhneVorsperre implements DokumentEreignisse {
+        private final WissenIngestStarten ingest;
+        private final QuelldokumentBeobachter beobachter;
+
+        @Inject
+        public EreignisseOhneVorsperre(WissenIngestStarten ingest, QuelldokumentBeobachter beobachter) {
+            this.ingest = ingest;
+            this.beobachter = beobachter;
+        }
+
+        @Override
+        public void archiviert(UUID dokumentId, String art) {
+            ingest.archiviert(dokumentId, art);
+        }
+
+        @Override
+        public void vorAenderung() {
+        }
+
+        @Override
+        public void geaendert(UUID dokumentId, Set<String> felder) {
+            beobachter.geaendert(dokumentId);
         }
     }
 
