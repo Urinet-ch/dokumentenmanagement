@@ -513,7 +513,7 @@ beschreibt `map-role` als Scope der Rollen-Ressource. Dieselbe Dokumentation hä
 Requirement 5.2 zugleich `manage-users` verlangt. Diese Rechtevorgaben widersprechen sich; bis zum Entscheid darf der
 Realm-Export FGAP nicht als Begrenzung der Rollenzuweisung ausweisen.
 
-Nicht nachgewiesen wurden die interne Compose-Adresse `http://kc:8080` samt Backchannel-Issuer, überlappende Secret-Rotation,
-`auth_time` in einem interaktiven Benutzertoken, `prompt=login` gegen den Cookie-Zweig und `execute-actions-email` ohne
-Passwort mit `VERIFY_EMAIL`, `UPDATE_PASSWORD` und `CONFIGURE_TOTP`. Der Test-Realm führt keinen Browser-Flow- und
-SMTP-Nachweis aus; diese Punkte bleiben vor der Realm-Änderung offen.
+Nicht nachgewiesen wurden die interne Compose-Adresse samt Backchannel-Issuer, überlappende Secret-Rotation, `auth_time`
+in einem interaktiven Benutzertoken, `prompt=login` gegen den Cookie-Zweig und `execute-actions-email` ohne Passwort mit
+`VERIFY_EMAIL`, `UPDATE_PASSWORD` und `CONFIGURE_TOTP`. Der Test-Realm führt keinen Browser-Flow- und SMTP-Nachweis aus;
+diese Punkte bleiben vor der Realm-Änderung offen.
