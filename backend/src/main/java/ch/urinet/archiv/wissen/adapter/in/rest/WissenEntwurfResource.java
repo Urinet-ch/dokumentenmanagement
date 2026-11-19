@@ -152,6 +152,24 @@ public class WissenEntwurfResource {
         return Response.noContent().build();
     }
 
+    @POST
+    @Path("/{entwurfId}/aenderungen/{nr}/neu-erzeugen")
+    @AlleArchivRollen
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Operation(summary = "Veraltete Wissensänderung neu erzeugen")
+    @APIResponse(responseCode = "202", description = "Neuerzeugung eingereiht")
+    @APIResponse(responseCode = "403", description = "Rolle darf Änderungen nicht neu erzeugen")
+    @APIResponse(responseCode = "404", description = "Änderung nicht gefunden oder nicht sichtbar")
+    @APIResponse(responseCode = "409", description = "Änderung kann nicht neu erzeugt werden")
+    @APIResponse(responseCode = "412", description = "Version veraltet")
+    @APIResponse(responseCode = "428", description = "If-Match fehlt")
+    public Response neuErzeugen(@PathParam("entwurfId") UUID entwurfId, @PathParam("nr") int nummer,
+                                @HeaderParam("If-Match") @Parameter(required = true) String ifMatch) {
+        mandant.pruefen();
+        freigabe.neuErzeugen(benutzer(), entwurfId, nummer, () -> Versionskopf.version(ifMatch));
+        return Response.accepted().build();
+    }
+
     private Benutzer benutzer() {
         Rolle rolle = Rolle.ausRealmRollen(identitaet.getRoles())
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_ERLAUBT));

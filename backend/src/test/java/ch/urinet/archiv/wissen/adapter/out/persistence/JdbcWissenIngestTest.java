@@ -584,6 +584,37 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void neuErzeugenEndpunktPrueftRechteMandantVersionUndDoppelstart() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = entwurf(URINET, dokument, "OFFEN");
+        UUID seiteId = seite(URINET, "konzepte/erneuern-" + UUID.randomUUID(), "Probe", null);
+        aenderung(URINET, entwurf, 1);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set status = 'VERALTET', aktion = 'AENDERN', seite_id = ?, "
+                + "basis_version = 1, etag = 1 where entwurf_id = ?", seiteId, entwurf);
+        String pfad = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/neu-erzeugen";
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        try {
+            given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).header("If-Match", "\"1\"")
+                    .when().post(pfad).then().statusCode(404);
+            given().auth().oauth2(Testanmeldung.token("treuhaender-urinet")).header("If-Match", "\"1\"")
+                    .when().post(pfad).then().statusCode(403);
+            given().auth().oauth2(inhaber).when().post(pfad).then().statusCode(428);
+            given().auth().oauth2(inhaber).header("If-Match", "\"0\"").when().post(pfad).then().statusCode(412);
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+            given().auth().oauth2(inhaber).header("If-Match", "\"1\"").when().post(pfad).then().statusCode(202);
+            given().auth().oauth2(inhaber).header("If-Match", "\"1\"").when().post(pfad).then().statusCode(409);
+            assertThat(zeile(URINET, entwurf)).containsEntry("status", "IN_ARBEIT");
+            assertThat(anzahl("select count(*) from public.auftrag where typ = 'WISSEN_INGEST' "
+                    + "and nutzlast->>'entwurfId' = ? and nutzlast->>'aenderungNr' = '1'", entwurf.toString()))
+                    .isEqualTo(1);
+        } finally {
+            ausfuehren("delete from public.auftrag where typ = 'WISSEN_INGEST' and nutzlast->>'entwurfId' = ?",
+                    entwurf.toString());
+        }
+    }
+
+    @Test
     void neuErzeugenBrichtBeiZwischenzeitlicherSeitenaenderungOhneUeberschreibenAb() throws SQLException {
         UUID dokument = quelle(URINET);
         UUID entwurf = entwurf(URINET, dokument, "OFFEN");

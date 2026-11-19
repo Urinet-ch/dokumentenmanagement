@@ -5888,6 +5888,49 @@ paths:
         - mitarbeiter
         - treuhaender
         - geschaeftsstelle
+  /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/neu-erzeugen:
+    post:
+      summary: Veraltete Wissensänderung neu erzeugen
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: entwurfId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: nr
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Neuerzeugung eingereiht
+        "403":
+          description: Rolle darf Änderungen nicht neu erzeugen
+        "404":
+          description: Änderung nicht gefunden oder nicht sichtbar
+        "409":
+          description: Änderung kann nicht neu erzeugt werden
+        "412":
+          description: Version veraltet
+        "428":
+          description: If-Match fehlt
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/verwerfen:
     post:
       summary: Wissensänderung verwerfen
