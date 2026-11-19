@@ -120,13 +120,15 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | GET | `/klassifikationen` | aktive und inaktive Klassifikationen und Werte mit `aktiv` (Req 7.2) | alle Rollen |
 | POST, PATCH, DELETE | `/klassifikationen[/{code}]`, `/klassifikationen/{code}/werte[/{wert}]` | anlegen, ändern, deaktivieren, löschen; 409 `KONFIGURATION_IN_GEBRAUCH`, 422 `KONFIGURATION_UNGUELTIG`, 412, 428 | A11 |
 | GET, POST, PATCH, DELETE | `/dokumentarten/{art}/klassifikationen[/{code}]` | Klassifikationen einer Art zuordnen mit `pflicht` und `standardWert` (Req 3.4); GET alle Rollen, Schreiben A11 (`inhaber`); `If-Match` Pflicht; 404 `NICHT_GEFUNDEN`, 422 `KONFIGURATION_UNGUELTIG` (u. a. inaktive Klassifikation als Pflicht oder mit Standardwert), 412, 428 | alle Rollen (GET), A11 |
-| GET, POST, PATCH, DELETE | `/regeln[/{code}]` | Regeln pflegen; POST/PATCH melden `betroffeneDokumente` (Req 5.6); 412, 428 | A11 |
+| GET | `/regeln` | aktive und inaktive Regeln des Mandanten; `ETag` = Konfigurationsversion (Req 7.2: Regeln nur mit A11) | A11 |
+| POST, PATCH | `/regeln`, `/regeln/{code}` | anlegen, ändern, aktivieren oder deaktivieren; `If-Match` Pflicht; Schreibrecht A11; POST und relevante PATCH-Antworten melden `betroffeneDokumente` (Req 5.6); 412, 428 | A11 |
+| DELETE | `/regeln/{code}` | löschen (Req 7.1); in 17.8 nicht umgesetzt (die Aufgabe verlangt Anlegen, Ändern, Aktivieren), folgt in Aufgabe 17.7 | A11 |
 | GET, PATCH | `/konfiguration/ki-texte` | Rolle, Feldregeln, `ki_freigegeben` (nur lesen; setzt das Admin-Kommando) | A11 |
 | GET | `/konfiguration` | Export der aktuellen Konfiguration als Konfigurationsdatei; `ETag` = Version | A11 |
 | GET | `/konfiguration/versionen`, `/konfiguration/versionen/{n}` | Liste (Version, Zeit, Wer, Quelle, SHA-256) bzw. Abbild | A11 |
 | POST | `/konfiguration/pruefen`, `/konfiguration/vergleichen` | Datei im Body; Befunde bzw. Diff; ändert nichts | A11 |
 | PUT | `/konfiguration` | Datei einspielen; 200 mit neuer Version und Diff (bzw. ohne Version bei keinem Unterschied); 409 `KONFIGURATION_VERALTET`, 422 | A11 |
-| GET | `/berichte/luecken?art=&jahr=` | Lückenbericht nach `FOLGE`/`ERWARTET` | `inhaber`, `treuhaender`, `geschaeftsstelle` (Req 5.4) |
+| GET | `/berichte/luecken?geschaeftsjahr=` | Lückenbericht nach `FOLGE`/`ERWARTET`, Antwortform `VollstaendigkeitAbfrage.Antwort` (wie das Werkzeug `vollstaendigkeit`; bisher geplant `?art=&jahr=`: Parameter heisst wie beim Werkzeug, ohne Filter `art`, jede Kategorie nennt ihre Art); nur Rollen mit uneingeschränkter Sicht (Req 5.4); `@RolesAllowed` nennt alle Rollen (`@AlleArchivRollen`), der Endpunkt prüft die Sicht und meldet die Verweigerung (403 `NICHT_ERLAUBT`) ins Zugriffsprotokoll (Spec 01, Req 10.7) | `inhaber`, `treuhaender`, `geschaeftsstelle` |
 | GET | `/mandant/funktionen` | `{finanz: bool}` (Req 8.8) | alle Rollen |
 
 Alle Änderungen einzelner Elemente verlangen `If-Match` mit der Konfigurationsversion (Req 7.6); jede Antwort trägt

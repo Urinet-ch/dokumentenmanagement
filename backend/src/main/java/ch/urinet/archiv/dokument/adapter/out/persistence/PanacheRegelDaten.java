@@ -1,12 +1,15 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.konfiguration.application.RegelDatenPort;
+import ch.urinet.archiv.konfiguration.application.RegelVerletzungsZaehler;
+import ch.urinet.archiv.konfiguration.domain.Regel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
@@ -16,7 +19,7 @@ import java.util.UUID;
 
 @ApplicationScoped
 @Transactional(Transactional.TxType.MANDATORY)
-public class PanacheRegelDaten implements RegelDatenPort {
+public class PanacheRegelDaten implements RegelDatenPort, RegelVerletzungsZaehler {
 
     private static final Map<String, String> FELDER = Map.ofEntries(
             Map.entry("titel", "to_jsonb(d.titel)"),
@@ -101,14 +104,109 @@ public class PanacheRegelDaten implements RegelDatenPort {
         return (Boolean) abfrage.getSingleResult();
     }
 
+    @Override
+    public long anzahlBetroffeneDokumente(Regel regel) {
+        Regel.Parameter parameter = regel.typisierteParameter();
+        if (parameter instanceof Regel.PflichtWenn pflicht) {
+            return pflichtVerletzungen(regel, pflicht);
+        }
+        if (parameter instanceof Regel.Eindeutig eindeutig) {
+            return eindeutigVerletzungen(regel, eindeutig);
+        }
+        // FOLGE und ERWARTET melden Lücken, keine Verletzung eines einzelnen Dokuments.
+        return 0;
+    }
+
+    private long pflichtVerletzungen(Regel regel, Regel.PflichtWenn pflicht) {
+        List<String> gebundeneFelder = new ArrayList<>();
+        String wennTyp = ausdruck(pflicht.wennFeld(), gebundeneFelder);
+        String wennArray = ausdruck(pflicht.wennFeld(), gebundeneFelder);
+        String wennEinzelwert = ausdruck(pflicht.wennFeld(), gebundeneFelder);
+        List<String> fehlende = new ArrayList<>();
+        for (String feld : pflicht.dann()) {
+            fehlende.add(leer(feld, gebundeneFelder));
+        }
+        String bedingung = "case when jsonb_typeof(" + wennTyp + ") = 'array' then "
+                + "exists (select 1 from jsonb_array_elements(" + wennArray + ") as items(value) "
+                + "where value = cast(:gleich as jsonb)) else " + wennEinzelwert
+                + " = cast(:gleich as jsonb) end";
+        String sql = "select count(*) " + dokumenteVonRegel(regel)
+                + " and (" + bedingung + ") and (" + String.join(" or ", fehlende) + ")";
+        Query abfrage = entityManager().createNativeQuery(sql)
+                .setParameter("gleich", serialisieren(pflicht.gleich()));
+        felderBinden(abfrage, gebundeneFelder);
+        if (regel.art() != null) {
+            abfrage.setParameter("art", regel.art());
+        }
+        return ((Number) abfrage.getSingleResult()).longValue();
+    }
+
+    private long eindeutigVerletzungen(Regel regel, Regel.Eindeutig eindeutig) {
+        List<String> gebundeneFelder = new ArrayList<>();
+        List<String> ausdruecke = new ArrayList<>(eindeutig.felder().size());
+        List<String> vorhanden = new ArrayList<>(eindeutig.felder().size());
+        for (String feld : eindeutig.felder()) {
+            ausdruecke.add(ausdruck(feld, gebundeneFelder));
+            vorhanden.add("not " + leer(feld, gebundeneFelder));
+        }
+        // Vergleichsmenge wie RegelPruefung: alle Arten ohne Art oder mit ueberAlleArten; gezählt nur Dokumente der Art.
+        String vergleichFilter = regel.art() == null || eindeutig.ueberAlleArten() ? "" : " and d.art = :art";
+        String sql = "with basis as (select d.art, jsonb_build_array(" + String.join(", ", ausdruecke)
+                + ") as schluessel " + dokumenteVonRegel(regel, vergleichFilter) + " and "
+                + String.join(" and ", vorhanden) + "), doppelt as (select schluessel from basis "
+                + "group by schluessel having count(*) > 1) "
+                + "select count(*) from basis b join doppelt g on g.schluessel = b.schluessel"
+                + (regel.art() == null ? "" : " where b.art = :art");
+        Query abfrage = entityManager().createNativeQuery(sql);
+        felderBinden(abfrage, gebundeneFelder);
+        if (regel.art() != null) {
+            abfrage.setParameter("art", regel.art());
+        }
+        return ((Number) abfrage.getSingleResult()).longValue();
+    }
+
+    private static String dokumenteVonRegel(Regel regel) {
+        return dokumenteVonRegel(regel, regel.art() == null ? "" : " and d.art = :art");
+    }
+
+    private static String dokumenteVonRegel(Regel regel, String artFilter) {
+        return """
+                from dokument d
+                left join dokument_finanz f on f.dokument_id = d.id
+                left join dokument_vertrag v on v.dokument_id = d.id
+                where d.bestaetigt is not null
+                and (d.status in ('ARCHIVIERUNG', 'ARCHIVIERUNG_FEHLER', 'ARCHIVIERT')
+                    or d.quelle = 'GENERATOR' and d.status in ('NEU', 'VERARBEITUNG', 'FEHLER'))"""
+                + artFilter;
+    }
+
+    private static String leer(String feld, List<String> gebundeneFelder) {
+        return "(" + ausdruck(feld, gebundeneFelder) + " is null or "
+                + ausdruck(feld, gebundeneFelder) + " = 'null'::jsonb or "
+                + ausdruck(feld, gebundeneFelder) + " in ('\"\"'::jsonb, '[]'::jsonb, '{}'::jsonb) or "
+                + "(jsonb_typeof(" + ausdruck(feld, gebundeneFelder) + ") = 'string' and "
+                + ausdruck(feld, gebundeneFelder) + " #>> '{}' ~ '^[[:space:]]*$'))";
+    }
+
+    private static void felderBinden(Query abfrage, List<String> felder) {
+        for (int i = 0; i < felder.size(); i++) {
+            String feld = felder.get(i);
+            if (feld.startsWith("zusatz.")) {
+                abfrage.setParameter("feld" + i, feld.substring("zusatz.".length()));
+            } else if (feld.startsWith("klassifikation.")) {
+                abfrage.setParameter("feld" + i, feld.substring("klassifikation.".length()));
+            }
+        }
+    }
+
     private static String ausdruck(String feld, int index) {
         if (feld.startsWith("zusatz.")) {
-            return "d.zusatz -> :feld" + index;
+            return "d.zusatz -> cast(:feld" + index + " as text)";
         }
         if (feld.startsWith("klassifikation.")) {
             return "(select coalesce(jsonb_agg(k.wert order by k.wert collate \"C\"), '[]'::jsonb) "
                     + "from dokument_klassifikation k where k.dokument_id = d.id "
-                    + "and k.klassifikation = :feld" + index + ")";
+                    + "and k.klassifikation = cast(:feld" + index + " as text))";
         }
         String ausdruck = FELDER.get(feld);
         if (ausdruck == null) {
@@ -117,7 +215,13 @@ public class PanacheRegelDaten implements RegelDatenPort {
         return ausdruck;
     }
 
-    private String serialisieren(List<Object> werte) {
+    private static String ausdruck(String feld, List<String> gebundeneFelder) {
+        int index = gebundeneFelder.size();
+        gebundeneFelder.add(feld);
+        return ausdruck(feld, index);
+    }
+
+    private String serialisieren(Object werte) {
         try {
             return json.writeValueAsString(werte);
         } catch (JsonProcessingException e) {
