@@ -419,12 +419,14 @@ class WissenIngestVerarbeitenTest {
     }
 
     @Test
-    void erneuertQuelleSeiteNichtMitDemFachseitenPrompt() throws InterruptedException {
+    void erneuertQuelleSeiteNurMitVollstaendigerStruktur() throws InterruptedException {
         UUID seiteId = UUID.randomUUID();
         SeitenMetadaten metadaten = new SeitenMetadaten(seiteId, "quellen/2026-04-probe-12345678", "Quelle",
                 "Probe", "Probe", List.of(), "AKTIV", 2, "NORMAL");
         SeitenFassung fassung = new SeitenFassung(metadaten,
-                "## Zusammenfassung\n\nProbe.\n\n## Kernaussagen\n\n## Berührte Seiten\n", DOKUMENT_ID, List.of());
+                "## Zusammenfassung\n\nProbe. [^q-alt]\n\n## Kernaussagen\n\n"
+                        + "- Alte Aussage. [^q-alt]\n\n## Berührte Seiten\n\n- [Frist](/konzepte/frist)\n",
+                DOKUMENT_ID, List.of(new Quelleneintrag("q-alt", DOKUMENT_ID, 1, 1, "Alt", null)));
         Speicher erster = new Speicher(stand(lauf("QUELLE", false, mitAussage()), 0, WissensStufe.NORMAL,
                 List.of(metadaten), Map.of(seiteId, fassung)));
         erster.quelleSeite = Optional.of(seiteId);
@@ -432,15 +434,35 @@ class WissenIngestVerarbeitenTest {
 
         Speicher speichern = new Speicher(stand(lauf("NEU_ERZEUGEN", false, erster.fortschritt), 0,
                 WissensStufe.NORMAL, List.of(metadaten), Map.of(seiteId, fassung)));
-        KiAntwort ki = new KiAntwort(null);
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Quelle", "Beschreibung", List.of(),
+                "## Zusammenfassung\n\nProbe.\n\n## Kernaussagen\n\n## Berührte Seiten\n",
+                List.of(), List.of(), "Erneuert"), new KiPort.Verbrauch("test-modell", 10, 10)));
         Auftrag auftrag = new Auftrag(1, new MandantCode("urinet"), WissenIngestStarten.TYP,
                 new Nutzlast(Map.of("entwurfId", ENTWURF_ID, "aenderungNr", 1)), 0);
 
         verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(auftrag, ENTWURF_ID);
 
-        assertThat(ki.aufrufe).isZero();
-        assertThat(speichern.fehler).contains("Quelle-Seite", "Ingest neu starten");
+        assertThat(ki.aufrufe).isEqualTo(1);
+        assertThat(ki.anfrage.schritt()).isEqualTo(KiPort.WissensSchritt.SEITE);
+        assertThat(speichern.fehler).contains("Quelle-Seite", "nicht vollständig");
         assertThat(speichern.aenderungen).isNull();
+
+        Speicher vollstaendig = new Speicher(stand(lauf("NEU_ERZEUGEN", false, erster.fortschritt), 0,
+                WissensStufe.NORMAL, List.of(metadaten), Map.of(seiteId, fassung)));
+        KiAntwort passendeKi = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Quelle", "Beschreibung",
+                List.of(), "## Zusammenfassung\n\nProbe. [^q-alt]\n\n## Kernaussagen\n\n"
+                + "- Alte Aussage. [^q-alt]\n- Die Frist endet am 30. April. [^q-neu]\n\n"
+                + "## Berührte Seiten\n\n- [Frist](/konzepte/frist)\n",
+                List.of(), List.of(), "Erneuert"), new KiPort.Verbrauch("test-modell", 10, 10)));
+        verarbeiten(vollstaendig, passendeKi, new Verbrauch()).ausfuehren(auftrag, ENTWURF_ID);
+
+        assertThat(vollstaendig.fehler).isNull();
+        assertThat(vollstaendig.aenderungen).singleElement().satisfies(aenderung -> {
+            assertThat(aenderung.daten().quellen()).extracting(Quelleneintrag::schluessel)
+                    .containsExactlyInAnyOrder("q-alt", "q-neu");
+            assertThat(aenderung.daten().inhalt()).contains("- Alte Aussage. [^q-alt]",
+                    "- Die Frist endet am 30. April. [^q-neu]", "[Frist](/konzepte/frist)");
+        });
     }
 
     @Test

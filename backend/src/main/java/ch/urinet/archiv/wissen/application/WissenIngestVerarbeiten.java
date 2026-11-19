@@ -526,11 +526,6 @@ public class WissenIngestVerarbeiten {
                     "Die Grundlage der Änderung fehlt. Bitte den Ingest neu starten.");
             return;
         }
-        if (vorher.daten().typ() == Seitentyp.QUELLE) {
-            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
-                    "Die Quelle-Seite kann noch nicht neu erzeugt werden. Bitte den Ingest neu starten.");
-            return;
-        }
         WissenIngestSpeichern.Stand aktuell = laden(lauf.entwurfId(), Set.of(vorher.seiteId())).stand();
         if (aktuell == null || nichtFreigegeben(auftrag, aktuell, bisher)) {
             return;
@@ -551,10 +546,27 @@ public class WissenIngestVerarbeiten {
         String nachricht = seitenNachricht(plan, index, aussagen, fassung)
                 + feld("Bisheriger Vorschlag (Daten)", vorher.daten().titel() + "\n"
                 + vorher.daten().beschreibung() + "\n" + vorher.daten().inhalt());
+        boolean quelleSeite = vorher.daten().typ() == Seitentyp.QUELLE;
+        if (quelleSeite) {
+            if (!lauf.dokumentId().equals(fassung.wissensquelleId())) {
+                speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                        "Die Quelle-Seite gehört nicht mehr zur Wissensquelle. Bitte den Ingest neu starten.");
+                return;
+            }
+            nachricht += feld("Quelle-Seite",
+                    "Erhalte die Abschnitte «Zusammenfassung», «Kernaussagen» und «Berührte Seiten». "
+                            + "Übernimm vorhandene Kernaussagen und berührte Seiten aus beiden Fassungen; "
+                            + "ergänze die mitgelieferten Kernaussagen mit ihren Fussnoten.");
+        }
         KiErgebnis antwort = aufrufen(lauf, aktuell, KiPort.WissensSchritt.SEITE, nachricht, budget, monatsbudget);
         if (antwort.ohneZugang() || !(antwort.inhalt() instanceof KiPort.Seite inhalt)) {
             speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(), antwort.budgetErreicht()
                     ? "Budget erschöpft" : "Die Änderung konnte nicht neu erzeugt werden. Bitte erneut versuchen.");
+            return;
+        }
+        if (quelleSeite && !quelleStrukturErhalten(fassung, vorher, inhalt, aussagen, lauf.dokumentId())) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die Quelle-Seite konnte nicht vollständig neu erzeugt werden. Bitte erneut versuchen.");
             return;
         }
         SeitenVorschlag neu = seitenVorschlag(plan, nummer, inhalt, aussagen, fassung, lauf, aktuell.quellStufe());
@@ -566,6 +578,48 @@ public class WissenIngestVerarbeiten {
                 aktuell.quellStufe(), fortschritt, addiere(lauf.tokensEin(), antwort.tokensEin()),
                 addiere(lauf.tokensAus(), antwort.tokensAus()),
                 neuerStand -> aenderungPruefen(neuerStand, fortschritt, neu));
+    }
+
+    private static boolean quelleStrukturErhalten(SeitenFassung aktuell, SeitenVorschlag vorher, KiPort.Seite neu,
+                                                   List<Kernaussage> aussagen, UUID dokumentId) {
+        String text = neu.inhalt();
+        if (text == null || !text.lines().map(String::strip).collect(java.util.stream.Collectors.toSet())
+                .containsAll(Set.of("## Zusammenfassung", "## Kernaussagen", "## Berührte Seiten"))) {
+            return false;
+        }
+        Map<String, String> neueAussagen = kernaussageZeilen(text);
+        Map<String, String> alteAussagen = new HashMap<>(kernaussageZeilen(aktuell.inhalt()));
+        for (var alt : kernaussageZeilen(vorher.daten().inhalt()).entrySet()) {
+            String vorhanden = alteAussagen.putIfAbsent(alt.getKey(), alt.getValue());
+            if (vorhanden != null && !vorhanden.equals(alt.getValue())) {
+                return false;
+            }
+        }
+        for (var alt : alteAussagen.entrySet()) {
+            if (alt.getValue().equals(neueAussagen.get(alt.getKey()))) {
+                continue;
+            }
+            Quelleneintrag alterBeleg = aktuell.quellen().stream()
+                    .filter(q -> alt.getKey().equals(q.schluessel())).findFirst().orElse(null);
+            boolean begruendet = neu.entfernteAussagen().stream().anyMatch(e -> e != null
+                    && alt.getKey().equals(e.schluessel()) && e.begruendung() != null
+                    && !e.begruendung().isBlank());
+            boolean ersetzt = alterBeleg != null && aussagen.stream().anyMatch(a ->
+                    gleicherBeleg(alterBeleg, eintrag(a, dokumentId))
+                            && neueAussagen.containsKey(a.schluessel()));
+            if (!begruendet || !ersetzt) {
+                return false;
+            }
+        }
+        for (Kernaussage aussage : aussagen) {
+            if (!("- " + aussage.text() + " [^" + aussage.schluessel() + "]")
+                    .equals(neueAussagen.get(aussage.schluessel()))) {
+                return false;
+            }
+        }
+        Set<String> links = beruehrteSeitenZeilen(text).keySet();
+        return links.containsAll(beruehrteSeitenZeilen(aktuell.inhalt()).keySet())
+                && links.containsAll(beruehrteSeitenZeilen(vorher.daten().inhalt()).keySet());
     }
 
     private void quelle(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher, long budget,
