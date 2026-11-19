@@ -33,6 +33,14 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
     }
 
     @Override
+    public void manuellenEntwurfAnlegen(UUID entwurfId, String benutzer) {
+        em.get().createNativeQuery("""
+                insert into wissens_entwurf (id, anlass, status, erstellt_von, erstellt)
+                values (:id, 'MANUELL', 'OFFEN', :benutzer, now())
+                """).setParameter("id", entwurfId).setParameter("benutzer", benutzer).executeUpdate();
+    }
+
+    @Override
     public Optional<Aenderung> sperren(UUID entwurfId, int nummer) {
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = em.get().createNativeQuery("""
@@ -128,7 +136,8 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                     vertraulichkeit_mindest = excluded.vertraulichkeit_mindest,
                     inhalt = excluded.inhalt, version = excluded.version, erzeugt_von = excluded.erzeugt_von,
                     erzeugt_am = excluded.erzeugt_am, freigegeben_von = excluded.freigegeben_von,
-                    freigegeben_am = excluded.freigegeben_am, wissensquelle_id = excluded.wissensquelle_id
+                    freigegeben_am = excluded.freigegeben_am, wissensquelle_id = excluded.wissensquelle_id,
+                    quelle_pruefen = false
                 """);
         schreiben.setParameter("id", fassung.id()).setParameter("pfad", fassung.pfad())
                 .setParameter("typ", fassung.typ().datenbankwert()).setParameter("titel", fassung.titel())

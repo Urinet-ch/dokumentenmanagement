@@ -8,6 +8,8 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface FreigabeRepository {
+    void manuellenEntwurfAnlegen(UUID entwurfId, String benutzer);
+
     Optional<Aenderung> sperren(UUID entwurfId, int nummer);
 
     Optional<Integer> seitenVersionSperren(UUID seiteId);
