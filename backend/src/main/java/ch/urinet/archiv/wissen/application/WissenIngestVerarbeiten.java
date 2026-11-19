@@ -596,63 +596,73 @@ public class WissenIngestVerarbeiten {
                 && !bisher.hinweise().contains(UEBERBLICK_HOEHER) ? mitHinweis(bisher, UEBERBLICK_HOEHER) : bisher;
         Lauf lauf = stand.lauf();
         List<NeueAenderung> aenderungen = new ArrayList<>();
-        Map<String, SeitenMetadaten> seitenNachPfad = stand.seiten().stream()
-                .collect(java.util.stream.Collectors.toMap(SeitenMetadaten::pfad, seite -> seite));
-        Set<UUID> sichtbar = speichern.sichtbareSeiten(stand).stream().map(SeitenMetadaten::id)
-                .collect(java.util.stream.Collectors.toSet());
-        List<Kernaussage> belegte = belegteAussagen(fortschritt);
         for (SeitenVorschlag vorschlag : fortschritt.vorschlaege()) {
-            SeitenMetadaten bisherige = vorschlag.seiteId() == null ? null : seitenNachPfad.get(vorschlag.pfad());
-            SeitenFassung fassung = vorschlag.seiteId() == null ? null : stand.fassungen().get(vorschlag.seiteId());
-            List<Quelleneintrag> basisQuellen = vorschlag.diff() != null ? vorschlag.diff().quellen().alt()
-                    : fassung == null ? List.of() : fassung.quellen();
-            Set<String> basis = basisQuellen.stream().map(Quelleneintrag::schluessel)
-                    .collect(java.util.stream.Collectors.toSet());
-            Set<String> entfernt = vorschlag.entfernteAussagen().stream().map(KiPort.EntfernteAussage::schluessel)
-                    .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
-            boolean quelleSeite = vorschlag.daten() != null && vorschlag.daten().typ() == Seitentyp.QUELLE
-                    && lauf.dokumentId().equals(vorschlag.daten().wissensquelleId());
-            Set<String> genutzt = belegte.stream().filter(a -> quelleSeite || fortschritt.planung().stream()
-                            .filter(p -> p.pfad().equals(vorschlag.pfad()))
-                            .anyMatch(p -> p.aussagen().contains(a.nr())))
-                    .map(Kernaussage::schluessel).collect(java.util.stream.Collectors.toSet());
-            boolean hoeher = vorschlag.seiteId() == null && stand.seiten().stream()
-                    .anyMatch(seite -> seite.pfad().equals(vorschlag.pfad()) && !sichtbar.contains(seite.id())
-                            && !speichern.zugaenglich(seite, lauf, stand.graph(), stand.personalDokumente()));
-            WissensPruefung.Kontext kontext = new WissensPruefung.Kontext(konfiguration.ingest().seiteMaxZeichen(),
-                    bisherige == null ? null : bisherige.pfad(),
-                    stand.seiten().stream().map(SeitenMetadaten::pfad).collect(java.util.stream.Collectors.toSet()),
-                    stand.dokumentQuellen(), sichtbar, basis, entfernt, genutzt, true,
-                    "VERALTEN".equals(vorschlag.aktion()), hoeher,
-                    bisherige == null ? null : vertraulichkeit(stand.graph().wirksameStufe(bisherige.id(),
-                            stand.graph().dokumente(bisherige.id()))),
-                    vertraulichkeit(stand.quellStufe()));
-            WissensPruefung.Ergebnis pruefung = WissensPruefung.pruefen(vorschlag.daten(), kontext);
-            List<WissensPruefung.Befund> befunde = new ArrayList<>(vorschlag.befunde());
-            befunde.addAll(pruefung.befunde());
-            List<WissensPruefung.Hinweis> hinweise = new ArrayList<>(vorschlag.hinweise());
-            hinweise.addAll(pruefung.hinweise());
-            DiffDienst.Diff diff = vorschlag.diff();
-            if (diff == null) {
-                if (vorschlag.seiteId() != null && (fassung == null || vorschlag.basisVersion() == null
-                        || fassung.metadaten().version() != vorschlag.basisVersion())) {
-                    speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt,
-                            "Die Basisversion für den Diff ist nicht mehr verfügbar. Bitte den Ingest neu starten.");
-                    return;
-                }
-                Wissensseite basisSeite = fassung == null ? null : seiteAusFassung(fassung, lauf,
-                        stand.quellStufe(), false);
-                diff = diffDienst.vergleichen(basisSeite, vorschlag.daten());
+            NeueAenderung aenderung = aenderungPruefen(stand, fortschritt, vorschlag);
+            if (aenderung == null) {
+                speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt,
+                        "Die Basisversion für den Diff ist nicht mehr verfügbar. Bitte den Ingest neu starten.");
+                return;
             }
-            aenderungen.add(new NeueAenderung(lauf.entwurfId(), vorschlag.nummer(), vorschlag.aktion(),
-                    vorschlag.seiteId(), vorschlag.pfad(), vorschlag.basisVersion(), vorschlag.daten(),
-                    vorschlag.begruendung(), vorschlag.widersprueche(), vorschlag.entfernteAussagen(),
-                    befunde, hinweise, diff, vorschlag.vertraulichkeitKontext()));
+            aenderungen.add(aenderung);
         }
         speichern.aenderungenSichern(auftrag, entwurfId, lauf.schritt(), aenderungen, fortschritt,
                 lauf.tokensEin(), lauf.tokensAus(), lauf.unvollstaendig()
                         || summe(lauf.tokensEin(), lauf.tokensAus()) >= budget,
                 fortschritt.hinweise().isEmpty() ? null : String.join("; ", fortschritt.hinweise()));
+    }
+
+    private NeueAenderung aenderungPruefen(WissenIngestSpeichern.Stand stand, Fortschritt fortschritt,
+                                           SeitenVorschlag vorschlag) {
+        Lauf lauf = stand.lauf();
+        Map<String, SeitenMetadaten> seitenNachPfad = stand.seiten().stream()
+                .collect(java.util.stream.Collectors.toMap(SeitenMetadaten::pfad, seite -> seite));
+        Set<UUID> sichtbar = speichern.sichtbareSeiten(stand).stream().map(SeitenMetadaten::id)
+                .collect(java.util.stream.Collectors.toSet());
+        List<Kernaussage> belegte = belegteAussagen(fortschritt);
+        SeitenMetadaten bisherige = vorschlag.seiteId() == null ? null : seitenNachPfad.get(vorschlag.pfad());
+        SeitenFassung fassung = vorschlag.seiteId() == null ? null : stand.fassungen().get(vorschlag.seiteId());
+        List<Quelleneintrag> basisQuellen = vorschlag.diff() != null ? vorschlag.diff().quellen().alt()
+                : fassung == null ? List.of() : fassung.quellen();
+        Set<String> basis = basisQuellen.stream().map(Quelleneintrag::schluessel)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> entfernt = vorschlag.entfernteAussagen().stream().map(KiPort.EntfernteAussage::schluessel)
+                .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        boolean quelleSeite = vorschlag.daten() != null && vorschlag.daten().typ() == Seitentyp.QUELLE
+                && lauf.dokumentId().equals(vorschlag.daten().wissensquelleId());
+        Set<String> genutzt = belegte.stream().filter(a -> quelleSeite || fortschritt.planung().stream()
+                        .filter(p -> p.pfad().equals(vorschlag.pfad()))
+                        .anyMatch(p -> p.aussagen().contains(a.nr())))
+                .map(Kernaussage::schluessel).collect(java.util.stream.Collectors.toSet());
+        boolean hoeher = vorschlag.seiteId() == null && stand.seiten().stream()
+                .anyMatch(seite -> seite.pfad().equals(vorschlag.pfad()) && !sichtbar.contains(seite.id())
+                        && !speichern.zugaenglich(seite, lauf, stand.graph(), stand.personalDokumente()));
+        WissensPruefung.Kontext kontext = new WissensPruefung.Kontext(konfiguration.ingest().seiteMaxZeichen(),
+                bisherige == null ? null : bisherige.pfad(),
+                stand.seiten().stream().map(SeitenMetadaten::pfad).collect(java.util.stream.Collectors.toSet()),
+                stand.dokumentQuellen(), sichtbar, basis, entfernt, genutzt, true,
+                "VERALTEN".equals(vorschlag.aktion()), hoeher,
+                bisherige == null ? null : vertraulichkeit(stand.graph().wirksameStufe(bisherige.id(),
+                        stand.graph().dokumente(bisherige.id()))),
+                vertraulichkeit(stand.quellStufe()));
+        WissensPruefung.Ergebnis pruefung = WissensPruefung.pruefen(vorschlag.daten(), kontext);
+        List<WissensPruefung.Befund> befunde = new ArrayList<>(vorschlag.befunde());
+        befunde.addAll(pruefung.befunde());
+        List<WissensPruefung.Hinweis> hinweise = new ArrayList<>(vorschlag.hinweise());
+        hinweise.addAll(pruefung.hinweise());
+        DiffDienst.Diff diff = vorschlag.diff();
+        if (diff == null) {
+            if (vorschlag.seiteId() != null && (fassung == null || vorschlag.basisVersion() == null
+                    || fassung.metadaten().version() != vorschlag.basisVersion())) {
+                return null;
+            }
+            Wissensseite basisSeite = fassung == null ? null : seiteAusFassung(fassung, lauf,
+                    stand.quellStufe(), false);
+            diff = diffDienst.vergleichen(basisSeite, vorschlag.daten());
+        }
+        return new NeueAenderung(lauf.entwurfId(), vorschlag.nummer(), vorschlag.aktion(),
+                vorschlag.seiteId(), vorschlag.pfad(), vorschlag.basisVersion(), vorschlag.daten(),
+                vorschlag.begruendung(), vorschlag.widersprueche(), vorschlag.entfernteAussagen(),
+                befunde, hinweise, diff, vorschlag.vertraulichkeitKontext());
     }
 
     private void budgetAbschluss(Auftrag auftrag, Lauf lauf, Fortschritt bisher, long tokensEin, long tokensAus) {
