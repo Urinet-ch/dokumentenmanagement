@@ -4,6 +4,13 @@ import ch.urinet.archiv.ki.application.KiPort;
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.Rohvorschlag;
 import dev.langchain4j.data.image.Image;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.internal.JsonSchemaElementUtils;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ChatRequestParameters;
+import dev.langchain4j.model.chat.request.json.JsonSchema;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.Result;
 import dev.langchain4j.service.output.JsonSchemas;
@@ -11,10 +18,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -64,6 +73,53 @@ public class LangChain4jKiAdapter implements KiPort {
         }
     }
 
+    @Override
+    public WissensAntwort wissensIngest(WissensAnfrage anfrage) {
+        if (!modell.bereit()) {
+            return new WissensOhneZugang(new Verbrauch(anfrage.modell(), 0, 0));
+        }
+        zaehler.zuruecksetzen();
+        try {
+            Class<?> antworttyp = WissenIngestSchemas.antworttyp(anfrage.schritt());
+            JsonSchema schema = JsonSchema.builder()
+                    .name("wissen_ingest_" + anfrage.schritt().name().toLowerCase(Locale.ROOT))
+                    .rootElement(JsonSchemaElementUtils.jsonSchemaElementFrom(antworttyp))
+                    .build();
+            ChatRequest request = ChatRequest.builder()
+                    .messages(SystemMessage.from(anfrage.systemPrompt()), UserMessage.from(anfrage.nachricht()))
+                    .parameters(ChatRequestParameters.builder()
+                            .modelName(anfrage.modell())
+                            .temperature(0.0)
+                            .topP(1.0)
+                            .presencePenalty(0.0)
+                            .frequencyPenalty(0.0)
+                            .maxOutputTokens(anfrage.maxAusgabeTokens())
+                            .responseFormat(schema)
+                            .build())
+                    .build();
+            ChatResponse ergebnis = modell.get().chat(request);
+            String roh = ergebnis == null || ergebnis.aiMessage() == null ? null : ergebnis.aiMessage().text();
+            TokenUsage tokenUsage = ergebnis == null ? null : ergebnis.tokenUsage();
+            Verbrauch verbrauch = tokenUsage == null || tokenUsage.inputTokenCount() == null
+                    || tokenUsage.outputTokenCount() == null
+                    ? new Verbrauch(anfrage.modell(),
+                            anfrage.systemPrompt().getBytes(StandardCharsets.UTF_8).length
+                                    + anfrage.nachricht().getBytes(StandardCharsets.UTF_8).length + 64L,
+                            anfrage.maxAusgabeTokens())
+                    : verbrauch(tokenUsage, anfrage.modell());
+            if (!AntwortSchema.gueltig(roh, antworttyp)) {
+                return new WissensSchemafehler("Antwort ausserhalb des Schemas", verbrauch);
+            }
+            return new WissensGueltig(WissenIngestSchemas.lesen(roh, anfrage.schritt()), verbrauch);
+        } catch (RuntimeException e) {
+            Verbrauch verbrauch = verbrauch(null, anfrage.modell());
+            return KiFehler.istSchemafehler(e) ? new WissensSchemafehler(KiFehler.grund(e), verbrauch)
+                    : new WissensAusfall(KiFehler.grund(e), verbrauch);
+        } finally {
+            zaehler.zuruecksetzen();
+        }
+    }
+
     /** Ohne Beispiele genau die Methoden des Gate-Laufs, damit die Nachricht unverändert bleibt. */
     private Result<MetadatenVorschlag> aufrufen(Anfrage a) {
         String b = a.beispiele();
@@ -91,11 +147,15 @@ public class LangChain4jKiAdapter implements KiPort {
 
     /** Tokens aus dem Listener (auch bei nicht parsebarer Antwort), sonst aus dem Ergebnis. */
     private Verbrauch verbrauch(TokenUsage nutzung) {
+        return verbrauch(nutzung, modell.modell());
+    }
+
+    private Verbrauch verbrauch(TokenUsage nutzung, String modellname) {
         TokenZaehler.Stand stand = zaehler.stand();
         if (stand.antworten() > 0 || nutzung == null) {
-            return new Verbrauch(modell.modell(), stand.ein(), stand.aus());
+            return new Verbrauch(modellname, stand.ein(), stand.aus());
         }
-        return new Verbrauch(modell.modell(), nutzung.inputTokenCount() == null ? 0 : nutzung.inputTokenCount(),
+        return new Verbrauch(modellname, nutzung.inputTokenCount() == null ? 0 : nutzung.inputTokenCount(),
                 nutzung.outputTokenCount() == null ? 0 : nutzung.outputTokenCount());
     }
 

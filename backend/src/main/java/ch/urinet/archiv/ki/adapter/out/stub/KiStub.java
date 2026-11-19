@@ -35,6 +35,18 @@ public class KiStub implements KiPort {
     }
 
     @Override
+    public WissensAntwort wissensIngest(WissensAnfrage anfrage) {
+        WissensInhalt inhalt = switch (anfrage.schritt()) {
+            case KERNAUSSAGEN -> new Kernaussagen(List.of());
+            case PLANUNG -> new Planung(List.of());
+            case SEITE -> new Seite("Vorschlag des Dev-Stubs", "Ein Stub-Vorschlag.", List.of(), "", List.of(),
+                    List.of(), "Dev-Stub");
+            case QUELLE -> new Quelle("Vorschlag des Dev-Stubs", "Ein Stub-Vorschlag.", List.of(), List.of());
+        };
+        return new WissensGueltig(inhalt, new Verbrauch(MODELL, 0, 0));
+    }
+
+    @Override
     public String antwortschema() {
         return LangChain4jKiAdapter.schema();
     }
