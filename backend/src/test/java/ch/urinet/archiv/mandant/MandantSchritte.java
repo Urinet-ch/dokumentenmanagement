@@ -144,7 +144,7 @@ public class MandantSchritte {
     public void seedEingespielt(String schema, String seed) throws IOException, SQLException {
         List<String> erwartet = new ArrayList<>();
         try (InputStream inhalt = getClass().getClassLoader().getResourceAsStream(seed)) {
-            json.readTree(inhalt).path("dokumentarten").forEach(a -> erwartet.add(a.path("code").asText()));
+            json.readTree(inhalt).path("arten").forEach(a -> erwartet.add(a.path("code").asText()));
         }
         assertThat(erwartet).hasSize(11);
         String wissensquelle = new KlassenpfadWissensquelleSeed(json).lesen().code();

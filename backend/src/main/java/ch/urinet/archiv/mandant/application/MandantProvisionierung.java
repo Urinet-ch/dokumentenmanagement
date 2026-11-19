@@ -54,6 +54,7 @@ public class MandantProvisionierung {
         String bucketName;
         try {
             mandantCode = new MandantCode(code);
+            ende = geschaeftsjahresende == null ? null : new Geschaeftsjahresende(geschaeftsjahresende);
             bucketName = mandantCode.bucket(bucketPraefix);
         } catch (IllegalArgumentException e) {
             throw new MandantFehler(MandantFehler.Grund.UNGUELTIG, e.getMessage(), e);
@@ -63,23 +64,27 @@ public class MandantProvisionierung {
         }
         Konfiguration seedKonfiguration = seed.lesen(mandantCode);
         seedPruefung.pruefen(mandantCode, seedKonfiguration);
-        try {
-            ende = geschaeftsjahresende == null
-                    ? new Geschaeftsjahresende(seedKonfiguration.einstellungen().geschaeftsjahrEnde())
-                    : new Geschaeftsjahresende(geschaeftsjahresende);
-        } catch (IllegalArgumentException e) {
-            throw new MandantFehler(MandantFehler.Grund.SEED_UNGUELTIG,
-                    "Geschäftsjahresende des Seeds für Mandant " + code + " ist ungültig", e);
+        if (ende == null) {
+            try {
+                ende = new Geschaeftsjahresende(seedKonfiguration.einstellungen().geschaeftsjahrEnde());
+            } catch (IllegalArgumentException e) {
+                throw new MandantFehler(MandantFehler.Grund.SEED_UNGUELTIG,
+                        "Geschäftsjahresende des Seeds für Mandant " + code + " ist ungültig", e);
+            }
         }
+        Konfiguration konfigurationFuerMandant = new Konfiguration(seedKonfiguration.version(),
+                new Konfiguration.Einstellungen(ende.wert(), seedKonfiguration.einstellungen().kennungen()),
+                seedKonfiguration.arten(), seedKonfiguration.klassifikationen(), seedKonfiguration.regeln(),
+                seedKonfiguration.kiTexte());
         datenbank.schemaAnlegen(mandantCode.schema());
         schemaPruefung.pruefen(mandantCode.schema());
         bucket.einrichten(bucketName);
         Mandant mandant = new Mandant(mandantCode, name == null || name.isBlank() ? code : name,
                 mandantCode.schema(), bucketName, ende, true);
         register.eintragen(mandant);
-        kontext.mit(mandantCode, () -> konfiguration.seedEinspielen(seedKonfiguration));
+        kontext.mit(mandantCode, () -> konfiguration.seedEinspielen(konfigurationFuerMandant));
         LOG.infof("Mandant %s angelegt (Schema %s, Bucket %s, %d Dokumentarten)", code, mandant.schema(), bucketName,
-                seedKonfiguration.arten().size());
+                konfigurationFuerMandant.arten().size());
         return mandant;
     }
 
