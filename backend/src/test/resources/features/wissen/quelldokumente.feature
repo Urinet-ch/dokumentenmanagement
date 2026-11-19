@@ -36,3 +36,25 @@ Funktionalität: Änderungen an Quelldokumenten
     Und eine normale Wissensseite verweist auf ein normales Quelldokument
     Wenn das Dokumentereignis vor einer späteren Löschung simuliert wird
     Dann der Inhaber sieht auf der unveränderten Wissensseite den Hinweis «Quelle prüfen»
+
+  @req-11.3
+  Szenario: Die Neuberechnung nach einer Quelländerung fällt nicht unter die Mindeststufe der Seite
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine normale Wissensseite verweist auf ein normales Quelldokument
+    Und die Wissensseite hat die Mindeststufe «INTERN»
+    Wenn der Inhaber den Titel des Quelldokuments ändert
+    Dann sieht der Mitarbeiter die Wissensseite nicht mehr
+    Und der Inhaber sieht auf der unveränderten Wissensseite den Hinweis «Quelle prüfen»
+
+  @req-15.1
+  Szenariogrundriss: Statuswechsel und Artänderung des Quelldokuments lösen «Quelle prüfen» aus
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine normale Wissensseite verweist auf ein Quelldokument im Status «<status>»
+    Wenn der Inhaber am Quelldokument die Änderung «<aenderung>» auslöst
+    Dann der Inhaber sieht auf der unveränderten Wissensseite den Hinweis «Quelle prüfen»
+
+    Beispiele:
+      | status     | aenderung  |
+      | FEHLER     | VERWERFEN  |
+      | FEHLER     | WIEDERHOLEN |
+      | ARCHIVIERT | ART        |

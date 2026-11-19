@@ -1072,6 +1072,13 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   der bestehende Dokumentfilter im Index bleibt für die Oberfläche erhalten. Die spätere Löschfunktion muss das
   Dokumentereignis vor dem Entfernen der Hülle auslösen. Lint und Werkzeug `wissen_seite_zeigen` folgen in ihren
   eigenen Aufgaben 15.4 und 15.2.
+- Bekannte Grenzen (Review PR #337): Jede gemeldete Dokumentänderung gilt als Auslöser; `felder` aus
+  `DokumentEreignisse.geaendert` wird nicht ausgewertet. Die Fachaufrufer melden nur Metadaten, Status und `partnerId`,
+  und ein Ereignis ohne Quellenbezug kostet nur die Abfrage der verwendenden Seiten. `KontaktZusammenfuehren` meldet
+  jedes umgehängte Dokument einzeln; bei sehr vielen Quelldokumenten wiederholt sich die Graphberechnung unter der
+  Hüllensperre. Eine Sammelmeldung folgt, sobald das in der Praxis messbar wird. Die A17-Rollenprüfung von
+  `quelle-geprueft` läuft über `@ErfordertAktion` vor den Sperren; nur die Sichtbarkeit der Seite wird nach der
+  Zeilensperre geprüft.
 
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).

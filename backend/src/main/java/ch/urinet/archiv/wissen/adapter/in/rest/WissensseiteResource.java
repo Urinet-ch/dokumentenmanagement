@@ -193,6 +193,7 @@ public class WissensseiteResource {
 
     @POST
     @Path("/wissensseiten/{id}/quelle-geprueft")
+    @ErfordertAktion(Aktion.A17)
     @AlleArchivRollen
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "Prüfung der Quellen bestätigen",

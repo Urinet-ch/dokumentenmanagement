@@ -95,6 +95,10 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Vermerk: Lint, Chat-Werkzeug und Löschfunktion entstehen erst in 15.4, 15.2 bzw. Spec 01, 9.9; dort sind die
     Ausnahmen für `PERSONAL`, der Prüfhinweis und die Ereignismeldung beim Löschen nachzuweisen. Das Szenario zu
     15.5 simuliert bis dahin nur das Dokumentereignis vor dem Entfernen, nicht die Löschfunktion.
+  - Offen aus 15.2: Der Hinweis «Quelle prüfen» entfällt auch «mit der Freigabe einer Änderung der Seite». Das
+    Zurücksetzen bei Freigabe einer neuen Seitenversion gehört zu 14.2; dort ist das Szenario `@req-15.2` nachzuweisen.
+  - Die Auslöser Status (verwerfen, wiederholen) und Art sind mit Szenarien in `quelldokumente.feature` belegt, die
+    Mindeststufe beim Absenken der Quelle mit `@req-11.3`.
   - _Anforderungen: 11.3, 15.1–15.5_
   - _Abhängig von: 13.5, 14.1 (Port `DokumentEreignisse`)_
 

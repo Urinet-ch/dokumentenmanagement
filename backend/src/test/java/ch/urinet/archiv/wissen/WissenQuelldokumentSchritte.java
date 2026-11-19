@@ -40,8 +40,13 @@ public class WissenQuelldokumentSchritte {
 
     @Angenommen("eine normale Wissensseite verweist auf ein normales Quelldokument")
     public void normaleQuelle() throws Exception {
+        quelleMitStatus("ARCHIVIERT");
+    }
+
+    @Angenommen("eine normale Wissensseite verweist auf ein Quelldokument im Status «{word}»")
+    public void quelleMitStatus(String status) throws Exception {
         dokument = Testdokumente.anlegen(datenbank.get(),
-                new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+                new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, status));
         seite = UUID.randomUUID();
         try (Connection verbindung = datenbank.get().getConnection()) {
             ausfuehren(verbindung, """
@@ -94,6 +99,34 @@ public class WissenQuelldokumentSchritte {
                 .extract().header("ETag");
         given().auth().oauth2(inhaber).header("If-Match", etag)
                 .when().post(pfad + "/quelle-geprueft").then().statusCode(204);
+    }
+
+    @Wenn("der Inhaber am Quelldokument die Änderung «{word}» auslöst")
+    public void statusOderArtAendern(String aenderung) {
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/dokumente/" + dokument;
+        String etag = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .extract().header("ETag");
+        switch (aenderung) {
+            case "VERWERFEN" -> given().auth().oauth2(inhaber).header("If-Match", etag)
+                    .contentType("application/json").body(Map.of("grund", "Synthetische Quellenprüfung"))
+                    .when().post(pfad + "/verwerfen").then().statusCode(204);
+            case "WIEDERHOLEN" -> given().auth().oauth2(inhaber).header("If-Match", etag)
+                    .when().post(pfad + "/wiederholen").then().statusCode(202);
+            case "ART" -> given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
+                    .body(Map.of("art", "PROJEKTDOKUMENT", "projekt", "Synthetisches Projekt",
+                            "grund", "Synthetische Quellenprüfung"))
+                    .when().patch(pfad).then().statusCode(200);
+            default -> throw new IllegalArgumentException(aenderung);
+        }
+    }
+
+    @Angenommen("die Wissensseite hat die Mindeststufe «INTERN»")
+    public void mindeststufeIntern() throws Exception {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            ausfuehren(verbindung, "update m_urinet.wissensseite set vertraulichkeit_mindest = 'INTERN', "
+                    + "vertraulichkeit = 'INTERN' where id = ?", seite);
+        }
     }
 
     @Wenn("der Inhaber den Titel des Quelldokuments ändert")
