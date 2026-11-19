@@ -452,6 +452,27 @@ public class KonfigurationsVersionSchritte {
         assertThat(version.jsonPath().getString("version.quelle")).isEqualTo(quelle);
     }
 
+    @Dann("hat der Mandant «{word}» die erste Version aus der Migration und die letzte aus dem Seed")
+    public void seedVersion(String code) throws SQLException {
+        String schema = new MandantCode(code).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+                PreparedStatement abfrage = verbindung.prepareStatement(
+                        "select version, quelle from " + schema + ".konfiguration_version order by version");
+                var ergebnis = abfrage.executeQuery()) {
+            assertThat(ergebnis.next()).as("Migrationsversion vorhanden").isTrue();
+            assertThat(ergebnis.getInt(1)).isEqualTo(1);
+            assertThat(ergebnis.getString(2)).isEqualTo("MIGRATION");
+            int letzteVersion = ergebnis.getInt(1);
+            String letzteQuelle = ergebnis.getString(2);
+            while (ergebnis.next()) {
+                letzteVersion = ergebnis.getInt(1);
+                letzteQuelle = ergebnis.getString(2);
+            }
+            assertThat(letzteVersion).isGreaterThan(1);
+            assertThat(letzteQuelle).isEqualTo("SEED");
+        }
+    }
+
     @Dann("ist die Konfigurationsversion von «{word}» unverändert")
     public void gemerkteVersionUnveraendert(String benutzer) {
         assertThat(aktuelleNummer(benutzer)).isEqualTo(gemerkteVersionen.get(benutzer));
