@@ -1,6 +1,33 @@
 {
   "components" : {
     "schemas" : {
+      "Antwort" : {
+        "type" : "object",
+        "properties" : {
+          "geschaeftsjahr" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "kategorien" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Kategorie"
+            }
+          },
+          "nichtGeprueft" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "datenstand" : {
+            "$ref" : "#/components/schemas/Datenstand"
+          },
+          "hinweis" : {
+            "type" : "string"
+          }
+        }
+      },
       "ApiToken" : {
         "type" : "object",
         "properties" : {
@@ -415,6 +442,18 @@
             "items" : {
               "$ref" : "#/components/schemas/ChatNachricht"
             }
+          }
+        }
+      },
+      "Datenstand" : {
+        "type" : "object",
+        "properties" : {
+          "zeitpunkt" : {
+            "type" : "string"
+          },
+          "anzahl" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -1714,6 +1753,41 @@
       "JsonObjekt" : {
         "type" : "object"
       },
+      "Kategorie" : {
+        "type" : "object",
+        "properties" : {
+          "regel" : {
+            "$ref" : "#/components/schemas/Regel1"
+          },
+          "art" : {
+            "type" : "string"
+          },
+          "je" : {
+            "type" : "string"
+          },
+          "hinweis" : {
+            "type" : "string"
+          },
+          "belege" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "ohneZuordnung" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "reihenGesamt" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "reihen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Reihe"
+            }
+          }
+        }
+      },
       "Klassifikation" : {
         "type" : "object",
         "properties" : {
@@ -2312,6 +2386,135 @@
           "groesse" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "Regel" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "art" : {
+            "type" : "string"
+          },
+          "typ" : {
+            "type" : "string"
+          },
+          "parameter" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "schwere" : {
+            "type" : "string"
+          },
+          "meldung" : {
+            "type" : "string"
+          },
+          "aktiv" : {
+            "type" : "boolean"
+          },
+          "betroffeneDokumente" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Zahl bestätigter Dokumente, die die Regel verletzen"
+          }
+        }
+      },
+      "Regel1" : {
+        "type" : "string",
+        "enum" : [ "FOLGE", "ERWARTET" ]
+      },
+      "RegelAenderung" : {
+        "type" : "object",
+        "properties" : {
+          "art" : {
+            "type" : [ "string", "null" ]
+          },
+          "typ" : {
+            "type" : "string",
+            "enum" : [ "PFLICHT_WENN", "EINDEUTIG", "FOLGE", "ERWARTET" ]
+          },
+          "parameter" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "schwere" : {
+            "type" : "string",
+            "enum" : [ "FEHLER", "WARNUNG" ]
+          },
+          "meldung" : {
+            "type" : "string"
+          },
+          "aktiv" : {
+            "type" : "boolean"
+          },
+          "grund" : {
+            "type" : [ "string", "null" ],
+            "maxLength" : 1000
+          }
+        }
+      },
+      "RegelAnlegen" : {
+        "type" : "object",
+        "required" : [ "code", "typ", "parameter", "schwere", "meldung" ],
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "pattern" : "^[a-z][a-z0-9_]{0,39}$"
+          },
+          "art" : {
+            "type" : [ "string", "null" ]
+          },
+          "typ" : {
+            "type" : "string",
+            "enum" : [ "PFLICHT_WENN", "EINDEUTIG", "FOLGE", "ERWARTET" ]
+          },
+          "parameter" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "schwere" : {
+            "type" : "string",
+            "enum" : [ "FEHLER", "WARNUNG" ]
+          },
+          "meldung" : {
+            "type" : "string"
+          },
+          "aktiv" : {
+            "type" : "boolean"
+          },
+          "grund" : {
+            "type" : [ "string", "null" ],
+            "maxLength" : 1000
+          }
+        }
+      },
+      "Reihe" : {
+        "type" : "object",
+        "properties" : {
+          "gruppe" : {
+            "type" : "string"
+          },
+          "ab" : {
+            "type" : "string"
+          },
+          "hoechste" : {
+            "type" : "string"
+          },
+          "vorhanden" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "anzahlFehlend" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "fehlend" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
           }
         }
       },
@@ -2925,6 +3128,8 @@
   "tags" : [ {
     "name" : "API-Tokens"
   }, {
+    "name" : "Berichte"
+  }, {
     "name" : "Branding"
   }, {
     "name" : "Chat"
@@ -3112,6 +3317,47 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/berichte/luecken" : {
+      "get" : {
+        "summary" : "Lückenbericht für ein Geschäftsjahr",
+        "description" : "Liefert Lücken nur für Rollen mit uneingeschränkter Sicht auf alle Vertraulichkeitsstufen.",
+        "tags" : [ "Berichte" ],
+        "parameters" : [ {
+          "description" : "Geschäftsjahr (2000 bis zum nächsten Kalenderjahr)",
+          "required" : true,
+          "name" : "geschaeftsjahr",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Lückenbericht",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Antwort"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "ANFRAGE_UNGUELTIG"
+          },
+          "403" : {
+            "description" : "NICHT_ERLAUBT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
         } ]
       }
     },
@@ -6199,6 +6445,173 @@
           },
           "403" : {
             "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/regeln" : {
+      "get" : {
+        "summary" : "Regeln des Mandanten auflisten",
+        "description" : "Nur mit Recht A11 (Spec 05, Req 7.2).",
+        "tags" : [ "Konfiguration" ],
+        "responses" : {
+          "200" : {
+            "description" : "Aktive und inaktive Regeln",
+            "headers" : {
+              "ETag" : {
+                "description" : "Aktuelle Konfigurationsversion für If-Match"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Regel"
+                  }
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "NICHT_ERLAUBT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "Dokumentregel anlegen",
+        "description" : "If-Match mit Konfigurationsversion ist Pflicht.",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegelAnlegen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Angelegt; betroffeneDokumente zählt bestätigte Verstösse.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Neue Konfigurationsversion"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Regel"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "NICHT_ERLAUBT"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/regeln/{code}" : {
+      "patch" : {
+        "summary" : "Dokumentregel ändern, aktivieren oder deaktivieren",
+        "description" : "Code bleibt unverändert. If-Match mit Konfigurationsversion ist Pflicht.",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegelAenderung"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Geändert",
+            "headers" : {
+              "ETag" : {
+                "description" : "Neue Konfigurationsversion"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Regel"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "NICHT_ERLAUBT"
+          },
+          "404" : {
+            "description" : "NICHT_GEFUNDEN"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
           }
         },
         "security" : [ {
