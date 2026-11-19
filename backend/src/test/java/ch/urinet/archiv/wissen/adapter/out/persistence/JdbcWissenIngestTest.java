@@ -2,6 +2,7 @@ package ch.urinet.archiv.wissen.adapter.out.persistence;
 
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.dokument.application.DokumentEreignisse;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -40,6 +41,7 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
@@ -123,6 +125,31 @@ class JdbcWissenIngestTest {
         assertThat(anzahl("select count(*) from " + ZWEITER.schema()
                 + ".wissensseite where id = ? and not quelle_pruefen and vertraulichkeit = 'NORMAL'", fremdeSeite))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void vertraulichkeitPerDokumentApiAendernEntziehtMitarbeiterDieSeite() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                seite, dokument);
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String mitarbeiter = Testanmeldung.token("mitarbeiter-urinet");
+        String dokumentPfad = "/api/v1/dokumente/" + dokument;
+        String seitenPfad = "/api/v1/wissensseiten/" + seite;
+
+        given().auth().oauth2(mitarbeiter).when().get(seitenPfad).then().statusCode(200);
+        String etag = given().auth().oauth2(inhaber).when().get(dokumentPfad).then().statusCode(200)
+                .extract().header("ETag");
+        given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
+                .body(Map.of("vertraulichkeit", "INTERN", "grund", "Synthetische Quellenprüfung"))
+                .when().patch(dokumentPfad).then().statusCode(200);
+
+        given().auth().oauth2(mitarbeiter).when().get(seitenPfad).then().statusCode(404);
+        given().auth().oauth2(inhaber).when().get(seitenPfad).then().statusCode(200)
+                .body("quellePruefen", org.hamcrest.Matchers.is(true));
     }
 
     @BeforeEach
