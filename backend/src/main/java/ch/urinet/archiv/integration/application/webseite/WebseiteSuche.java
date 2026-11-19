@@ -5,7 +5,9 @@ import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteDokument;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteTreffer;
+import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import ch.urinet.archiv.suche.application.AktualitaetsregelPort;
 import ch.urinet.archiv.suche.application.HybridSuche;
 import ch.urinet.archiv.suche.domain.Hybridergebnis;
 import ch.urinet.archiv.suche.domain.Hybridtreffer;
@@ -42,10 +44,15 @@ public class WebseiteSuche {
 
     private final HybridSuche suche;
     private final WebseitenLesePort port;
+    private final MandantAufloesung mandant;
+    private final AktualitaetsregelPort aktualitaet;
 
-    public WebseiteSuche(HybridSuche suche, WebseitenLesePort port) {
+    public WebseiteSuche(HybridSuche suche, WebseitenLesePort port, MandantAufloesung mandant,
+                         AktualitaetsregelPort aktualitaet) {
         this.suche = suche;
         this.port = port;
+        this.mandant = mandant;
+        this.aktualitaet = aktualitaet;
     }
 
     /** {@code begriff} ist Pflicht (leer oder zu lang: 400 {@code ANFRAGE_UNGUELTIG}). */
@@ -54,7 +61,8 @@ public class WebseiteSuche {
                 null, null, null, Sortierung.RELEVANZ, 0, HybridSuche.PWA);
         Sichtregel regel = Sichtregel.fuerWebseite(
                 new Sichtregel.Webseite(zugriff.stufen(), filter.jahr(), filter.ausgabe()));
-        Hybridergebnis ergebnis = suche.suchen(anfrage, regel, false, HybridSuche.PWA);
+        Hybridergebnis ergebnis = suche.suchen(anfrage, regel, false, HybridSuche.PWA,
+                aktualitaet.fuer(mandant.pruefen().wert()));
         List<UUID> ids = ergebnis.treffer().stream().map(t -> t.treffer().id()).toList();
         Map<UUID, Integer> seiten = new HashMap<>();
         for (Hybridtreffer t : ergebnis.treffer()) {

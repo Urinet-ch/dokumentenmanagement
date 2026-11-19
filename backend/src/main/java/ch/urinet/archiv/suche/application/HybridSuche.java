@@ -9,6 +9,8 @@ import ch.urinet.archiv.ki.application.RerankerPort;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.domain.Abschnitttreffer;
+import ch.urinet.archiv.suche.domain.Aktualitaetsranking;
+import ch.urinet.archiv.suche.domain.Aktualitaetsregel;
 import ch.urinet.archiv.suche.domain.Hybridergebnis;
 import ch.urinet.archiv.suche.domain.Hybridtreffer;
 import ch.urinet.archiv.suche.domain.Rrf;
@@ -16,9 +18,12 @@ import ch.urinet.archiv.suche.domain.Sortierung;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
 import ch.urinet.archiv.suche.domain.Suchtreffer;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -69,15 +74,24 @@ public class HybridSuche {
     private final RerankerPort reranker;
     private final KiVerbrauchPort verbrauch;
     private final SucheTransaktion transaktion;
+    private final Clock uhr;
 
+    @Inject
     public HybridSuche(SuchePort volltext, VektorSuchePort vektor, EmbeddingPort embedding, RerankerPort reranker,
                        KiVerbrauchPort verbrauch, SucheTransaktion transaktion) {
+        this(volltext, vektor, embedding, reranker, verbrauch, transaktion, Clock.systemUTC());
+    }
+
+    /** {@code uhr} bestimmt «heute» der Aktualitätsgewichtung (Spec 03, Req 5.12); in Tests eine feste Uhr. */
+    HybridSuche(SuchePort volltext, VektorSuchePort vektor, EmbeddingPort embedding, RerankerPort reranker,
+                KiVerbrauchPort verbrauch, SucheTransaktion transaktion, Clock uhr) {
         this.volltext = volltext;
         this.vektor = vektor;
         this.embedding = embedding;
         this.reranker = reranker;
         this.verbrauch = verbrauch;
         this.transaktion = transaktion;
+        this.uhr = uhr;
     }
 
     /** Suche der PWA: mit Dateinamen in Auszug und Treffer (Req 14.8, 14.9), höchstens {@value #PWA} Treffer. */
@@ -91,6 +105,12 @@ public class HybridSuche {
      * @param k            1 bis {@value #RERANKER}
      */
     public Hybridergebnis suchen(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname, int k) {
+        return suchen(anfrage, regel, mitDateiname, k, Aktualitaetsregel.AUS);
+    }
+
+    /** Wie {@link #suchen(Suchanfrage, Sichtregel, boolean, int)}, mit optionaler mandantenspezifischer Gewichtung. */
+    public Hybridergebnis suchen(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname, int k,
+                                 Aktualitaetsregel aktualitaetsregel) {
         if (anfrage.begriff() == null) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -103,7 +123,7 @@ public class HybridSuche {
                 0, VOLLTEXT);
         List<Suchtreffer> treffer = transaktion.ausfuehren(
                 () -> volltext.suchen(besteVolltext, regel, mitDateiname)).treffer();
-        return hybrid(anfrage, regel, mitDateiname, k, treffer)
+        return hybrid(anfrage, regel, mitDateiname, k, treffer, aktualitaetsregel)
                 .map(t -> new Hybridergebnis(t, false))
                 .orElseGet(() -> new Hybridergebnis(treffer.stream().limit(k).map(t -> new Hybridtreffer(t, null))
                         .toList(), true));
@@ -111,7 +131,8 @@ public class HybridSuche {
 
     /** Schritte 2–4; leer heisst Rückfall auf den Volltext (schon geloggt). */
     private Optional<List<Hybridtreffer>> hybrid(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname, int k,
-                                                 List<Suchtreffer> volltextTreffer) {
+                                                 List<Suchtreffer> volltextTreffer,
+                                                 Aktualitaetsregel aktualitaetsregel) {
         Optional<float[]> frage = frage(anfrage.begriff());
         if (frage.isEmpty()) {
             return Optional.empty();
@@ -143,24 +164,44 @@ public class HybridSuche {
             }
         }
         List<UUID> reihenfolge = new ArrayList<>(belegnummern);
+        Map<UUID, Suchtreffer> details = new HashMap<>();
         Map<UUID, Double> relevanzen = new HashMap<>();
         if (!gesendet.isEmpty()) {
             Optional<RerankerPort.Sortiert> sortiert = sortieren(anfrage.begriff(), texte);
             if (sortiert.isEmpty()) {
                 return Optional.empty();
             }
+            List<UUID> rerankerIds = new ArrayList<>();
+            List<Double> scores = new ArrayList<>();
             for (int i = 0; i < sortiert.get().indizes().size(); i++) {
-                int index = sortiert.get().indizes().get(i);
-                UUID id = gesendet.get(index);
-                reihenfolge.add(id);
+                UUID id = gesendet.get(sortiert.get().indizes().get(i));
+                rerankerIds.add(id);
+                scores.add(sortiert.get().werte().get(i));
                 relevanzen.put(id, sortiert.get().werte().get(i));
             }
+            if (aktualitaetsregel.aktiviert()) {
+                List<Abschnitttreffer> nachladen = rerankerIds.stream().filter(id -> !ausVolltext.containsKey(id))
+                        .map(ausVektor::get).toList();
+                if (!nachladen.isEmpty()) {
+                    transaktion.ausfuehren(() -> vektor.details(nachladen, anfrage, regel, mitDateiname))
+                            .forEach(t -> details.put(t.id(), t));
+                }
+                Map<UUID, LocalDate> daten = new HashMap<>();
+                rerankerIds.forEach(id -> {
+                    Suchtreffer dokument = ausVolltext.containsKey(id) ? ausVolltext.get(id) : details.get(id);
+                    if (dokument != null) {
+                        daten.put(id, dokument.datum());
+                    }
+                });
+                rerankerIds = Aktualitaetsranking.ordnen(rerankerIds, scores, daten, aktualitaetsregel, uhr);
+            }
+            reihenfolge.addAll(rerankerIds);
         }
         List<UUID> beste = reihenfolge.stream().limit(k).toList();
 
-        List<Abschnitttreffer> nachladen = beste.stream().filter(id -> !ausVolltext.containsKey(id))
+        List<Abschnitttreffer> nachladen = beste.stream()
+                .filter(id -> !ausVolltext.containsKey(id) && !details.containsKey(id))
                 .map(ausVektor::get).toList();
-        Map<UUID, Suchtreffer> details = new HashMap<>();
         if (!nachladen.isEmpty()) {
             transaktion.ausfuehren(() -> vektor.details(nachladen, anfrage, regel, mitDateiname))
                     .forEach(t -> details.put(t.id(), t));
