@@ -46,6 +46,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -58,6 +59,8 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
@@ -183,7 +186,7 @@ public class WebseitenLesenSchritte {
     }
 
     /**
-     * Spalten (alle ausser name optional): art, ausgabe, jahr, datum, zugriff (Standard oeffentlich),
+     * Spalten (alle ausser name optional): art, ausgabe, jahr, datum («heute» ist das Datum in Zürich), zugriff (Standard oeffentlich),
      * veroeffentlicht (Standard true), status (ARCHIVIERT), vertraulichkeit (NORMAL), bestaetigt (ja), seiten, text.
      * «-» lässt das Feld weg; Bezeichner stehen als JSON-String, alles andere («1», «null», «["x"]», «"öffentlich"»)
      * roh, damit auch falsche Typen im Zusatzfeld geprüft werden.
@@ -215,6 +218,9 @@ public class WebseitenLesenSchritte {
                 felder.add("\"jahr\": " + jahr);
             }
             String datum = wert(zeile, "datum", "-");
+            if ("heute".equals(datum)) {
+                datum = LocalDate.now(ZoneId.of("Europe/Zurich")).toString();
+            }
             String seiten = wert(zeile, "seiten", "-");
             ausfuehren("update " + new MandantCode(mandant).schema() + ".dokument set titel = ?, zusatz = ?::jsonb, "
                     + "datum = ?::date, seiten = ?::int, volltext = ? where id = ?", "webtest-" + name,
@@ -849,11 +855,56 @@ public class WebseitenLesenSchritte {
                         + KiWireMock.TOKENS_JE_TEXT + ",\"total_tokens\":" + KiWireMock.TOKENS_JE_TEXT + "}}")));
     }
 
-    @Angenommen("der Reranker bewertet die Treffer gleich")
-    public void rerankerBewertetGleich() {
-        KiWireMock.client().register(post(urlPathEqualTo(KiWireMock.RERANKER_PFAD)).atPriority(5)
-                .willReturn(okJson("{\"results\":[{\"index\":0,\"relevance_score\":0.7},"
-                        + "{\"index\":1,\"relevance_score\":0.7}],\"usage\":{\"prompt_tokens\":10}}")));
+    /**
+     * Der Reranker (WireMock) liefert die Abschnitte der genannten Dokumente in der Reihenfolge der Tabelle mit dem
+     * Wert der Spalte {@code wert}, gleich in welcher Reihenfolge die Suche sie sendet: Je Reihenfolge der Anfrage gibt
+     * es einen Stub, der die Texte am Präfix {@code webtest-<name>} erkennt (höchstens 4 Dokumente). Sendet die Suche
+     * andere oder mehr Texte, greift kein Stub oder die Zahl der Ergebnisse stimmt nicht, und die Suche fällt auf den
+     * Volltext zurück (Schritt «lief die Suche ohne Rückfall auf den Volltext»).
+     */
+    @Angenommen("der Reranker ordnet die Dokumente so:")
+    public void rerankerOrdnet(DataTable tabelle) {
+        List<Map<String, String>> zeilen = tabelle.asMaps();
+        assertThat(zeilen).hasSizeBetween(1, 4);
+        List<String> namen = zeilen.stream().map(z -> z.get("name")).toList();
+        for (List<String> gesendet : reihenfolgen(namen)) {
+            var stub = post(urlPathEqualTo(KiWireMock.RERANKER_PFAD)).atPriority(4);
+            for (int i = 0; i < gesendet.size(); i++) {
+                stub = stub.withRequestBody(matchingJsonPath("$.documents[" + i + "]",
+                        containing("webtest-" + gesendet.get(i) + " ")));
+            }
+            List<String> ergebnisse = new ArrayList<>();
+            for (Map<String, String> zeile : zeilen) {
+                ergebnisse.add("{\"index\":" + gesendet.indexOf(zeile.get("name")) + ",\"relevance_score\":"
+                        + zeile.get("wert") + "}");
+            }
+            KiWireMock.client().register(stub.willReturn(okJson("{\"results\":[" + String.join(",", ergebnisse)
+                    + "],\"usage\":{\"prompt_tokens\":10}}")));
+        }
+    }
+
+    private static List<List<String>> reihenfolgen(List<String> namen) {
+        if (namen.size() <= 1) {
+            return List.of(namen);
+        }
+        List<List<String>> alle = new ArrayList<>();
+        for (String erster : namen) {
+            List<String> rest = new ArrayList<>(namen);
+            rest.remove(erster);
+            for (List<String> folge : reihenfolgen(rest)) {
+                List<String> ganz = new ArrayList<>();
+                ganz.add(erster);
+                ganz.addAll(folge);
+                alle.add(ganz);
+            }
+        }
+        return alle;
+    }
+
+    @Dann("lief die Suche ohne Rückfall auf den Volltext")
+    public void nichtDegradiert() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<Boolean>path("degradiert")).isFalse();
     }
 
     /** Spalte {@code seiten}: «von-bis» oder «-» ohne Seitenbereich; der Vektor liegt nahe bei der Frage. */

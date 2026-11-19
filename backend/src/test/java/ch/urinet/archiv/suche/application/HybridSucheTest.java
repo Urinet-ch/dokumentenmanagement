@@ -24,8 +24,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -64,7 +66,8 @@ class HybridSucheTest {
 
     @BeforeEach
     void aufbauen() {
-        suche = new HybridSuche(volltext, vektor, embedding, reranker, verbrauch, transaktion);
+        suche = new HybridSuche(volltext, vektor, embedding, reranker, verbrauch, transaktion,
+                Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
     }
 
     @Test

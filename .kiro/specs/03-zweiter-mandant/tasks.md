@@ -182,6 +182,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Herkunft: S5-Auftrag; ergänzt Requirement 5.12
   - Erscheinungsdatum ist bereits im öffentlichen Suchtreffer enthalten, fliesst aber noch nicht ins Ranking ein. Gewichtung je Mandant konfigurierbar und standardmässig aus; Vorschlag: maximal 5 % Abwertung bei 365 Tagen Halbwertszeit, Dokumente ohne Datum unverändert. Festuhr-Tests für gleiche Relevanz (neuer vor alt) und deutlichen Relevanzvorsprung (alt vor schwach relevant neu); öffentliches Szenario
   - Keine Reranker-Modell-, Vertrags- oder Frontendänderung
+  - Abgehakt, obwohl 11.2 offen ist: `/public/v1/suche` besteht seit 11.2 Teil 1; nachgewiesen mit den Szenarien `@req-5.12` in `webseiten-lesen.feature` (Rangfolge mit und ohne Eintrag)
   - _Anforderungen: 5.12_
   - _Abhängig von: 11.2, 11.13_
 

@@ -18,6 +18,7 @@ import ch.urinet.archiv.suche.domain.Sortierung;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
 import ch.urinet.archiv.suche.domain.Suchtreffer;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
@@ -73,15 +74,24 @@ public class HybridSuche {
     private final RerankerPort reranker;
     private final KiVerbrauchPort verbrauch;
     private final SucheTransaktion transaktion;
+    private final Clock uhr;
 
+    @Inject
     public HybridSuche(SuchePort volltext, VektorSuchePort vektor, EmbeddingPort embedding, RerankerPort reranker,
                        KiVerbrauchPort verbrauch, SucheTransaktion transaktion) {
+        this(volltext, vektor, embedding, reranker, verbrauch, transaktion, Clock.systemUTC());
+    }
+
+    /** {@code uhr} bestimmt «heute» der Aktualitätsgewichtung (Spec 03, Req 5.12); in Tests eine feste Uhr. */
+    HybridSuche(SuchePort volltext, VektorSuchePort vektor, EmbeddingPort embedding, RerankerPort reranker,
+                KiVerbrauchPort verbrauch, SucheTransaktion transaktion, Clock uhr) {
         this.volltext = volltext;
         this.vektor = vektor;
         this.embedding = embedding;
         this.reranker = reranker;
         this.verbrauch = verbrauch;
         this.transaktion = transaktion;
+        this.uhr = uhr;
     }
 
     /** Suche der PWA: mit Dateinamen in Auszug und Treffer (Req 14.8, 14.9), höchstens {@value #PWA} Treffer. */
@@ -176,7 +186,7 @@ public class HybridSuche {
                     }
                 });
                 rerankerIds = Aktualitaetsranking.ordnen(rerankerIds, sortiert.get().scores(), daten,
-                        aktualitaetsregel, Clock.systemUTC());
+                        aktualitaetsregel, uhr);
             }
             reihenfolge.addAll(rerankerIds);
         }

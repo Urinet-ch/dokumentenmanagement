@@ -2,7 +2,7 @@ package ch.urinet.archiv.suche.domain;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -12,8 +12,13 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
-/** Begrenzte Abwertung älterer Suchtreffer relativ zur Spannweite der Reranker-Scores. */
+/**
+ * Begrenzte Abwertung älterer Suchtreffer relativ zur Spannweite der Reranker-Scores (Spec 03, Req 5.12; design.md
+ * «Aktualitätsgewichtung der öffentlichen Suche»). «Heute» gilt in {@code Europe/Zurich}, wie das Belegdatum.
+ */
 public final class Aktualitaetsranking {
+
+    private static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
 
     private Aktualitaetsranking() {
     }
@@ -38,7 +43,7 @@ public final class Aktualitaetsranking {
         double minimum = scores.stream().mapToDouble(Double::doubleValue).min().orElseThrow();
         double maximum = scores.stream().mapToDouble(Double::doubleValue).max().orElseThrow();
         double spannweite = maximum - minimum;
-        LocalDate heute = LocalDate.now(uhr.withZone(ZoneOffset.UTC));
+        LocalDate heute = LocalDate.now(uhr.withZone(ZUERICH));
         List<Bewertung> bewertungen = new ArrayList<>(ids.size());
         IntStream.range(0, ids.size()).forEach(index -> {
             UUID id = ids.get(index);

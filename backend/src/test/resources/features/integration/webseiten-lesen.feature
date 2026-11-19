@@ -193,25 +193,63 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Dann nennt die Antwort genau die Dokumente «»
 
   @req-5.12
-  Szenario: Bei gleicher Relevanz erscheint das neuere Dokument zuerst
+  Szenariogrundriss: Die Aktualitätsgewichtung ordnet höchstens um den Faktor um (<fall>)
+    Der Reranker nennt «alt» bei Gleichstand zuerst; ohne Gewichtung bliebe «alt» in jedem Fall vorn. Die Werte werden
+    auf 0 bis 1 normiert (0.80 → 1, 0.0 → 0); «alt» verliert fast den ganzen Faktor 0.05, «neu» nichts.
     Angenommen der Webseiten-Lesezugang «vhf-lesen» der Webseite «probe-lesen» im Mandanten «vhf-gsk» hat die höchste Stufe «vorstand»
     Und im Mandanten «vhf-gsk» sind diese Reihen angelegt:
-      | code        | name              | aktiv |
-      | WEBTEST_AKT | Probe-Aktualität  | true  |
+      | code        | name             | aktiv |
+      | WEBTEST_AKT | Probe-Aktualität | true  |
     Und im Mandanten «vhf-gsk» liegen diese Webseiten-Dokumente:
-      | name | art         | datum      | text                            |
-      | alt  | WEBTEST_AKT | 2000-01-01 | Aktualitaetsprobe Merkblatt     |
-      | neu  | WEBTEST_AKT | 2020-01-01 | Aktualitaetsprobe Merkblatt     |
+      | name    | art         | datum      | text                        |
+      | neu     | WEBTEST_AKT | heute      | Aktualitaetsprobe Merkblatt |
+      | alt     | WEBTEST_AKT | 2000-01-01 | Aktualitaetsprobe Merkblatt |
+      | schwach | WEBTEST_AKT | -          | Aktualitaetsprobe Merkblatt |
     Und das Embedding-Modell bettet jede Frage der Webseiten-Suche gleich ein
-    Und der Reranker bewertet die Treffer gleich
+    Und der Reranker ordnet die Dokumente so:
+      | name    | wert       |
+      | alt     | 0.80       |
+      | neu     | <wert_neu> |
+      | schwach | 0.0        |
     Und das Dokument «alt» hat diese Abschnitte nahe der Frage:
       | nr | seiten |
       | 1  | 1-1    |
     Und das Dokument «neu» hat diese Abschnitte nahe der Frage:
       | nr | seiten |
       | 1  | 1-1    |
+    Und das Dokument «schwach» hat diese Abschnitte nahe der Frage:
+      | nr | seiten |
+      | 1  | 1-1    |
     Wenn der Webseiten-Lesezugang «vhf-lesen» «/public/v1/suche?q=Aktualitaetsprobe» mit der Stufe «vorstand» aufruft
-    Dann nennt die Antwort genau die Dokumente «neu,alt»
+    Dann lief die Suche ohne Rückfall auf den Volltext
+    Und nennt die Antwort die Dokumente «<reihenfolge>» in dieser Reihenfolge
+
+    Beispiele:
+      | fall                                     | wert_neu | reihenfolge     |
+      | gleiche Relevanz: neu vor alt            | 0.80     | neu,alt,schwach |
+      | Abstand unter dem Faktor: neu vor alt    | 0.78     | neu,alt,schwach |
+      | klar relevanteres altes bleibt vorn      | 0.72     | alt,neu,schwach |
+
+  @req-5.12
+  Szenario: Ein Mandant ohne Eintrag behält die Reihenfolge des Rerankers
+    Angenommen im Mandanten «urinet» liegen diese Webseiten-Dokumente:
+      | name | art         | datum      | text                        |
+      | neu  | WEBTEST_BUL | heute      | Aktualitaetsprobe Merkblatt |
+      | alt  | WEBTEST_BUL | 2000-01-01 | Aktualitaetsprobe Merkblatt |
+    Und das Embedding-Modell bettet jede Frage der Webseiten-Suche gleich ein
+    Und der Reranker ordnet die Dokumente so:
+      | name | wert |
+      | alt  | 0.80 |
+      | neu  | 0.80 |
+    Und das Dokument «alt» hat diese Abschnitte nahe der Frage:
+      | nr | seiten |
+      | 1  | 1-1    |
+    Und das Dokument «neu» hat diese Abschnitte nahe der Frage:
+      | nr | seiten |
+      | 1  | 1-1    |
+    Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/suche?q=Aktualitaetsprobe» mit der Stufe «vorstand» aufruft
+    Dann lief die Suche ohne Rückfall auf den Volltext
+    Und nennt die Antwort die Dokumente «alt,neu» in dieser Reihenfolge
 
   @req-5.1
   Szenariogrundriss: Die Suche filtert nach Reihe, Jahr und Ausgabe
