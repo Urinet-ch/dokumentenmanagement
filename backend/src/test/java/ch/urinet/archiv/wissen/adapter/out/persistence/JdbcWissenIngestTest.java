@@ -20,6 +20,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,6 +81,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     Instance<AgroalDataSource> datenbank;
+
+    @Inject
+    Instance<EntityManager> entityManager;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Map<MandantCode, List<UUID>> dokumente = new HashMap<>();
@@ -237,6 +241,35 @@ class JdbcWissenIngestTest {
         assertThat(anzahl("select count(*) from " + URINET.schema()
                 + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_VERWERFEN' "
                 + "and details->>'grund' = 'Probe'", entwurf)).isEqualTo(1);
+    }
+
+    @Test
+    void letzterIngestEntscheidSchreibtLogUndStartetWartendenAuftragAtomar() throws SQLException {
+        assumeFalse(im(URINET, () -> ingest.warteschlangeBelegt()), "Ingest-Warteschlange ist bereits belegt");
+        UUID entwurf = entwurf(URINET, quelle(URINET), "OFFEN");
+        UUID wartend = entwurf(URINET, quelle(URINET), "WARTEND");
+        aenderung(URINET, entwurf, 1);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+
+        assertThatThrownBy(() -> im(URINET, () -> {
+            freigabe.verwerfen(inhaber, entwurf, 1, () -> 0, "Grund", null);
+            assertThat(entityManager.get().createNativeQuery(
+                            "select status from wissens_entwurf where id = :id")
+                    .setParameter("id", entwurf).getSingleResult()).isEqualTo("ERLEDIGT");
+            assertThat(entityManager.get().createNativeQuery(
+                            "select status from wissens_entwurf where id = :id")
+                    .setParameter("id", wartend).getSingleResult()).isEqualTo("IN_ARBEIT");
+            assertThat(((Number) entityManager.get().createNativeQuery(
+                            "select count(*) from wissens_log where entwurf_id = :id and aktion = 'INGEST'")
+                    .setParameter("id", entwurf).getSingleResult()).longValue()).isEqualTo(1);
+            assertThat(((Number) entityManager.get().createNativeQuery(
+                            "select count(*) from public.auftrag where typ = 'WISSEN_INGEST' "
+                                    + "and nutzlast->>'entwurfId' = :id")
+                    .setParameter("id", wartend.toString()).getSingleResult()).longValue()).isEqualTo(1);
+            throw new IllegalStateException("Testabbruch");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("Testabbruch");
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+        assertThat(zeile(URINET, wartend)).containsEntry("status", "WARTEND");
     }
 
     @Test

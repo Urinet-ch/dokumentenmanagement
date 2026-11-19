@@ -2696,6 +2696,11 @@ components:
           - "null"
           format: int32
           minimum: 1
+    WissenVerwerfen:
+      type: object
+      properties:
+        grund:
+          type: string
     WissensIndex:
       type: object
       properties:
@@ -5685,6 +5690,59 @@ paths:
           description: Rolle darf keine Entwürfe lesen
         "401":
           description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/verwerfen:
+    post:
+      summary: Wissensänderung verwerfen
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: entwurfId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: nr
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WissenVerwerfen"
+        required: true
+      responses:
+        "204":
+          description: Änderung verworfen
+        "403":
+          description: Rolle darf Änderungen nicht verwerfen
+        "404":
+          description: Änderung nicht gefunden oder nicht sichtbar
+        "409":
+          description: Änderung ist nicht offen
+        "412":
+          description: Version veraltet
+        "422":
+          description: Grund fehlt
+        "428":
+          description: If-Match fehlt
+        "401":
+          description: Not Authorized
+        "400":
+          description: Bad Request
       security:
       - SecurityScheme:
         - inhaber

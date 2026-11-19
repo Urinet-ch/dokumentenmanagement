@@ -26,6 +26,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -93,7 +94,8 @@ public class WissenEntwurfResource {
     @APIResponse(responseCode = "422", description = "Grund fehlt")
     @APIResponse(responseCode = "428", description = "If-Match fehlt")
     public Response verwerfen(@PathParam("entwurfId") UUID entwurfId, @PathParam("nr") int nummer,
-                              @HeaderParam("If-Match") String ifMatch, @HeaderParam("X-Real-Ip") String realIp,
+                              @HeaderParam("If-Match") @Parameter(required = true) String ifMatch,
+                              @HeaderParam("X-Real-Ip") @Parameter(hidden = true) String realIp,
                               VerwerfenDto angaben) {
         mandant.pruefen();
         freigabe.verwerfen(benutzer(), entwurfId, nummer, () -> Versionskopf.version(ifMatch),
