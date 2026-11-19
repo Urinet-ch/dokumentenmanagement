@@ -3,12 +3,16 @@ package ch.urinet.archiv.mandant;
 import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -39,12 +43,16 @@ class WissensquelleBestandTest {
     @Inject
     Instance<AgroalDataSource> datenbank;
 
+    @Inject
+    ObjectMapper json;
+
     @Test
     void bestehenderMandantErhaeltDieWissensquelleWieAusDemSeedUndEineNeueKonfiguration() throws SQLException {
         anlegenWennFehlt(MANDANT);
         String s = MANDANT.schema();
         String ausSeed = wissensquelle(s);
-        String vorherKonfiguration = wert("select ((inhalt - 'version') - 'regeln')::text from " + s
+        // 044 ist unveränderlich und schreibt kein kiTexte; beim Lesen ergänzt KonfigurationVerwaltung sie aus ki_texte
+        String vorherKonfiguration = wert("select ((inhalt - 'version') - 'regeln' - 'kiTexte')::text from " + s
                 + ".konfiguration_version order by version desc limit 1");
         // Stand vor 13.2: Konfiguration ohne die Art
         ausfuehren("insert into " + s + ".konfiguration_version (version, wer, grund, quelle, inhalt, sha256) "
@@ -62,8 +70,9 @@ class WissensquelleBestandTest {
         assertThat(wissensquelle(s)).isEqualTo(ausSeed);
         assertThat(wert("select quelle || '/' || wer from " + s
                 + ".konfiguration_version order by version desc limit 1")).isEqualTo("MIGRATION/system:migration");
-        assertThat(wert("select (inhalt - 'version')::text from " + s
-                + ".konfiguration_version order by version desc limit 1")).isEqualTo(vorherKonfiguration);
+        assertThat(normalisieren(wert("select (inhalt - 'version')::text from " + s
+                + ".konfiguration_version order by version desc limit 1")))
+                .isEqualTo(normalisieren(vorherKonfiguration));
     }
 
     @Test
@@ -103,6 +112,34 @@ class WissensquelleBestandTest {
 
     private String wissensquelle(String s) throws SQLException {
         return wert("select to_jsonb(a)::text from " + s + ".dokumentart a where code = 'WISSENSQUELLE'");
+    }
+
+    private JsonNode normalisieren(String inhalt) throws SQLException {
+        try {
+            ObjectNode konfiguration = (ObjectNode) json.readTree(inhalt);
+            if (konfiguration.path("klassifikationen").isMissingNode()) {
+                konfiguration.putArray("klassifikationen");
+            }
+            for (JsonNode art : konfiguration.path("arten")) {
+                if (art instanceof ObjectNode objekt) {
+                    if (objekt.path("klassifikationen").isMissingNode()) {
+                        objekt.putArray("klassifikationen");
+                    }
+                    JsonNode schema = objekt.get("zusatzSchema");
+                    if (schema != null && schema.isTextual()) {
+                        objekt.set("zusatzSchema", json.readTree(schema.textValue()));
+                    }
+                    JsonNode aufbewahrung = objekt.path("aufbewahrung");
+                    if (aufbewahrung instanceof ObjectNode objektAufbewahrung
+                            && objektAufbewahrung.path("feld").isNull()) {
+                        objektAufbewahrung.remove("feld");
+                    }
+                }
+            }
+            return konfiguration;
+        } catch (IOException e) {
+            throw new SQLException("Konfiguration ist kein gültiges JSON", e);
+        }
     }
 
     private int ausfuehren(String sql) throws SQLException {

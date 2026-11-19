@@ -134,6 +134,8 @@ case "$subcommand" in
     if [[ $service == kc ]]; then
       if [[ $MOCK_FAIL_REALM == 1 ]]; then exit 3; fi
       [[ $volume == *:/archiv-export ]] || exit 1
+      # Keycloak 26.8 bricht den Export ab, wenn der Bootstrap-Admin ohne Passwort gesetzt ist
+      [[ ${1:-} == -c && ${2:-} == *'unset KC_BOOTSTRAP_ADMIN_USERNAME;'*'kc.sh export'* ]] || exit 1
       quelle=${volume%%:*}
       [[ -d $quelle ]] || exit 1
       printf '{"realm":"synthetic"}\n' > "$quelle/urinet-archiv-realm.json"
@@ -601,6 +603,18 @@ if [[ -n $echtes_age && -n $echtes_age_keygen ]]; then
   "$echtes_age_keygen" -o "$temp/fremd.key" 2> /dev/null
   if "$echtes_age" --decrypt --identity "$temp/fremd.key" "$age_lauf/archiv.dump.age" > /dev/null 2>&1; then
     printf 'Eine fremde Identität darf das Chiffrat nicht entschlüsseln.\n' >&2
+    exit 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    checksum=(sha256sum)
+  else
+    checksum=(shasum -a 256)
+  fi
+  (cd "$age_lauf" && "${checksum[@]}" --check SHA256SUMS >/dev/null)
+  null_hash=$(printf '%064d' 0)
+  sed -E "1s/^[0-9a-fA-F]{64}/$null_hash/" "$age_lauf/SHA256SUMS" > "$temp/SHA256SUMS.manipuliert"
+  if (cd "$age_lauf" && "${checksum[@]}" --check "$temp/SHA256SUMS.manipuliert" >/dev/null 2>&1); then
+    printf 'Eine manipulierte SHA256SUMS-Datei darf die Prüfung nicht bestehen.\n' >&2
     exit 1
   fi
 else

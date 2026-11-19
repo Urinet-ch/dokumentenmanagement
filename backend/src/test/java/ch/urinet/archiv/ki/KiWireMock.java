@@ -22,9 +22,11 @@ import java.util.List;
 import java.util.Map;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 
@@ -100,6 +102,18 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
     public static MappingBuilder standardReranker() {
         return post(urlPathEqualTo(RERANKER_PFAD)).atPriority(10)
                 .willReturn(ResponseDefinitionBuilder.responseDefinition().withTransformers(RERANKER_ANTWORT));
+    }
+
+    /** Simuliert einen festen Score für alle Treffer des Rerankers. */
+    public static void rerankerMitRelevanz(double relevanz) {
+        if (!Double.isFinite(relevanz) || relevanz < 0 || relevanz > 1) {
+            throw new IllegalArgumentException("Relevanz muss zwischen 0 und 1 liegen");
+        }
+        int tokens = RERANKER_TOKENS_JE_TEXT;
+        String antwort = "{\"id\":\"score-test\",\"model\":\"" + RERANKER_MODELL + "\",\"usage\":"
+                + "{\"prompt_tokens\":" + tokens + ",\"total_tokens\":" + tokens + "},\"results\":["
+                + "{\"index\":0,\"relevance_score\":" + relevanz + "}]}";
+        client().register(post(urlPathEqualTo(RERANKER_PFAD)).atPriority(1).willReturn(okJson(antwort)));
     }
 
     // ---- Chat-Modell (gestreamt) -------------------------------------------------------------------------------
@@ -228,6 +242,59 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
         client().register(gestreamt().willReturn(strom(antwort).withFixedDelay(millis)));
     }
 
+    /** Antworten auf die nicht gestreamten JSON-Schema-Aufrufe des Wissens-Ingests, in der angegebenen Reihenfolge. */
+    public static void wissenFolge(List<String> inhalte) {
+        wissenFolge(inhalte, 0);
+    }
+
+    /** Wie {@link #wissenFolge(List)}; verzögert optional die erste Antwort für Warteschlangen-Szenarien. */
+    public static void wissenFolge(List<String> inhalte, int ersteVerzoegerungMillis) {
+        wissenFolge(inhalte, ersteVerzoegerungMillis, 100, 50);
+    }
+
+    /** Wie {@link #wissenFolge(List, int)}; setzt den simulierten Verbrauch je Antwort. */
+    public static void wissenFolge(List<String> inhalte, int ersteVerzoegerungMillis,
+                                   int tokensEin, int tokensAus) {
+        WireMock modell = client();
+        for (int i = 0; i < inhalte.size(); i++) {
+            boolean letzte = i == inhalte.size() - 1;
+            ResponseDefinitionBuilder antwort = okJson(wissenAntwort(inhalte.get(i), tokensEin, tokensAus));
+            if (i == 0 && ersteVerzoegerungMillis > 0) {
+                antwort.withFixedDelay(ersteVerzoegerungMillis);
+            }
+            var stub = post(urlPathEqualTo(CHAT_PFAD))
+                    .withRequestBody(matchingJsonPath("$.response_format.json_schema.name",
+                            matching("wissen_ingest_.*")))
+                    .atPriority(5)
+                    .inScenario("wissen-ingest")
+                    .whenScenarioStateIs(i == 0 ? com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED
+                            : "antwort-" + i)
+                    .willReturn(antwort);
+            if (!letzte) {
+                stub.willSetStateTo("antwort-" + (i + 1));
+            }
+            modell.register(stub);
+        }
+    }
+
+    /** JSON-Anfragen aller vier Wissens-Ingest-Schritte aus dem WireMock-Journal. */
+    public static List<String> wissenAnfragen() {
+        return client().find(RequestPatternBuilder.newRequestPattern(
+                        com.github.tomakehurst.wiremock.http.RequestMethod.POST, urlPathEqualTo(CHAT_PFAD))
+                .withRequestBody(matchingJsonPath("$.response_format.json_schema.name",
+                        matching("wissen_ingest_.*"))))
+                .stream().map(LoggedRequest::getBodyAsString).toList();
+    }
+
+    private static String wissenAntwort(String inhalt, int tokensEin, int tokensAus) {
+        return """
+                {"id":"wissen-test","object":"chat.completion","created":1773565200,
+                 "model":"google/gemma-4-31B-it",
+                 "choices":[{"index":0,"message":{"role":"assistant","content":%s},"finish_reason":"stop"}],
+                 "usage":{"prompt_tokens":%d,"completion_tokens":%d,"total_tokens":%d}}
+                """.formatted(jsonText(inhalt), tokensEin, tokensAus, tokensEin + tokensAus);
+    }
+
     /** Gestreamte Anfragen an das Chat-Modell im Journal, älteste zuerst, als JSON-Text. */
     public static List<String> chatAnfragen() {
         List<String> koerper = new ArrayList<>();
@@ -265,6 +332,33 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
     public static WireMock client() {
         int port = ConfigProvider.getConfig().getValue("archiv.ki.wiremock-port", Integer.class);
         return new WireMock("localhost", port);
+    }
+
+    /** {@code top_n} des letzten Aufrufs, ohne Suchfrage oder Texte auszugeben. */
+    public static int letzterRerankerTopN() {
+        List<LoggedRequest> anfragen = client().find(postRequestedFor(urlPathEqualTo(RERANKER_PFAD)));
+        if (anfragen.isEmpty()) {
+            throw new IllegalStateException("Reranker wurde nicht aufgerufen");
+        }
+        try {
+            return new ObjectMapper().readTree(anfragen.getLast().getBodyAsString()).path("top_n").asInt(-1);
+        } catch (IOException e) {
+            throw new IllegalStateException("Reranker-Anfrage nicht lesbar", e);
+        }
+    }
+
+    /** Score des letzten Reranker-Aufrufs; prüft, dass ein Szenario-Stub tatsächlich geantwortet hat. */
+    public static double letzterRerankerScore() {
+        ServeEvent ereignis = client().getServeEvents().stream()
+                .filter(e -> RERANKER_PFAD.equals(e.getRequest().getUrl()))
+                .reduce((a, b) -> b)
+                .orElseThrow(() -> new IllegalStateException("Reranker wurde nicht aufgerufen"));
+        try {
+            return new ObjectMapper().readTree(ereignis.getResponse().getBodyAsString()).path("results").path(0)
+                    .path("relevance_score").asDouble(Double.NaN);
+        } catch (IOException e) {
+            throw new IllegalStateException("Reranker-Antwort nicht lesbar", e);
+        }
     }
 
     /** Antwort im Format von {@code POST /embeddings} (OpenAI-kompatibel) zu den Eingaben der Anfrage. */

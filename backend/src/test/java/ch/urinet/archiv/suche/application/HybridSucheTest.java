@@ -83,6 +83,8 @@ class HybridSucheTest {
         assertThat(ids(ergebnis)).containsExactly(beleg, nurVolltext, nurVektor, beide);
         assertThat(ergebnis.treffer()).extracting(Hybridtreffer::fundstelle)
                 .containsExactly(null, null, new Fundstelle(2, 3, 4), new Fundstelle(1, null, null));
+        assertThat(ergebnis.treffer()).extracting(Hybridtreffer::relevanz)
+                .containsExactly(null, 1.0, 1.0, 1.0);
         // reiner Vektortreffer mit nachgeladenen Details, Volltexttreffer mit ihrem Auszug
         assertThat(vektor.nachgeladen).containsExactly(nurVektor);
         assertThat(ergebnis.treffer().get(1).treffer().auszug()).containsExactly(new AuszugTeil("Volltext", true));

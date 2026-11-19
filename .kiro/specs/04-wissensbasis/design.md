@@ -168,7 +168,10 @@ flowchart LR
   ihrer eigenen Hülle gefiltert werden (Requirement 4.4).
 - Mindeststufe `vertraulichkeit_mindest` (`NORMAL` | `INTERN`): Maximum aus der Erhöhung von Hand (Requirement 6.8)
   und den Kontextstufen aller angenommenen Änderungen (`wissens_aenderung.vertraulichkeit_kontext`, Requirement
-  11.7); sie sinkt nie. Die wirksame Stufe `vertraulichkeit = max(Hülle, vertraulichkeit_mindest)`.
+  11.7) sowie den Mindeststufen zitierter Quellseiten (11.10, Entscheid Fabian vom 18.11.2026); sie sinkt nie.
+  Quellseiten werden rekursiv mit Zyklenschutz berücksichtigt; ab Tiefe 129 oder bei unbekannter Quellseite gilt
+  vorsorglich `INTERN`. Die wirksame Stufe `vertraulichkeit = max(Hülle, vertraulichkeit_mindest)`. Bei Freigabe
+  einer Quellseite werden ihre abhängigen Seiten unter derselben Mandantensperre neu berechnet.
 - `WissenSichtbarkeit` hängt an jede Abfrage auf Seiten (Index, Suche, Zähler, Log, eingehende Links, Versionen,
   Diff, Werkzeuge) denselben Filter. Er nutzt den `VertraulichkeitFilter` aus Spec 01 (ADR-009) und wertet live aus,
   damit eine Änderung nach A8 sofort wirkt (Requirement 11.3):
@@ -180,7 +183,8 @@ flowchart LR
       AND NOT (<Sichtbarkeitsfilter des Benutzers für d nach Spec 01, 2.6, Zeilen A2 bis A4>))
     AND <Stufe s.vertraulichkeit_mindest für den Benutzer nach A2/A3 sichtbar>   -- mitarbeiter: nur NORMAL
   ```
-  Für eine Version gilt derselbe Filter mit `wissensseite_version_dokument` und der Mindeststufe aus `daten`.
+  Für eine Version gilt derselbe Filter mit `wissensseite_version_dokument`, der Mindeststufe aus `daten` und der
+  aktuellen Mindeststufe der Seite; historische Versionen bleiben unveränderlich.
   Unsichtbare Versionen erscheinen in der Liste nur als Nummer; `/versionen/{n}` antwortet mit 404, `/diff` nur,
   wenn beide Versionen sichtbar sind.
 - `wissensseite.vertraulichkeit` ist die gespeicherte wirksame Stufe (Anzeige, Lint-Paare nach 10.4). Für den
@@ -203,13 +207,22 @@ flowchart LR
   Fachbereichen läuft nur über `application` (ADR-011). Manuell: `POST /dokumente/{id}/wissen-ingest` (A16).
 - Reihenfolge je Mandant (Requirement 5.13): Gibt es schon einen Ingest-Entwurf `IN_ARBEIT`, `OFFEN` oder `WARTEND`,
   entsteht der neue als `WARTEND` ohne Auftrag; ein neuer Start überholt so keinen wartenden (Review PR #307). Wird ein Ingest-Entwurf `ERLEDIGT`, `FEHLER` oder `ABGELEHNT`, setzt dieselbe
-  Transaktion den ältesten `WARTEND` auf `IN_ARBEIT` und reiht seinen ersten Teilauftrag ein. Erzwungen über einen
-  partiellen Unique-Index auf eine Konstante (siehe Data Models).
+  Transaktion den ältesten `WARTEND` auf `IN_ARBEIT` und reiht seinen ersten Teilauftrag ein. 14.1b stellt dafür
+  `WissenIngestSpeichern.wartendenIngestStarten()` bereit; Fehlerabschlüsse rufen es auf, und 14.2 ruft es beim
+  Annehmen oder Verwerfen eines Entwurfs auf. Erzwungen über einen partiellen Unique-Index auf eine Konstante (siehe
+  Data Models).
 - Der Entwurf (`anlass = INGEST`) hält den Fortschritt in `schritt`; jeder Teilauftrag macht höchstens einen
   KI-Aufruf und reiht den nächsten ein (Requirement 13.7).
+- Wartende Ingests reservieren kein Monatsbudget. Beim Hochstufen sperrt `JdbcWissenIngest` die mandanteneigene
+  Warteschlange und das Budget, prüft erneut `IN_ARBEIT`/`OFFEN`, wählt den ältesten wartenden Entwurf und berechnet
+  Verbrauch sowie aktive Reservierungen im Zürcher Kalendermonat. Ist das Monatsbudget erschöpft, enden die wartenden
+  Entwürfe mit `FEHLER` und dem Hinweis «Budget erschöpft» statt eines neuen KI-Auftrags.
 - Vorprüfung ohne KI: Art, Vertraulichkeit ≠ `PERSONAL`, Volltext vorhanden, PDF/A vorhanden und Zahl der
   `\f`-Seiten = `dokument.seiten`, kein laufender oder wartender Ingest desselben Dokuments (Requirement 5.6, 5.7,
   5.10), Monatsbudget der Wissensbasis (Requirement 13.6) und Schätzung gegen `budget-tokens` (Requirement 13.4).
+  Die archivierte Vertraulichkeit ist die Grenze für Personendaten: eine als `PERSONAL` eingestufte Quelle wird vor
+  jedem KI-Aufruf abgelehnt. Es gibt keine automatische Erkennung von Personendaten in anders eingestuften
+  Volltexten; deren korrekte Einstufung erfolgt bei der Dokumenterfassung.
   Schätzung je Schritt mit Ein- und Ausgabe:
   `(Zeichen Text + Index + ueberblick + 2 × max-seiten × seite-max-zeichen + Anzahl Aufrufe × Systemprompt) / 3 × 1.3`
   Tokens. Ein WireMock-Szenario vergleicht die Schätzung mit `wissens_entwurf.tokens_*`.
@@ -248,6 +261,74 @@ flowchart LR
     zurück und `ARCHIVIEREN` wird nach Spec 01 wiederholt; ein fachliches Hindernis ist dagegen ein Entwurf `FEHLER`.
   - Systemakteur der Entwürfe aus dem automatischen Start: `process:wissen-ingest` («Akteure»).
   - Die Zeitgrenze `archiv.auftrag.zeitgrenze.WISSEN_INGEST` stand schon vor 14.1a in `application.properties`.
+- Umsetzung 14.1b (PR #319): `WissenIngestNachholen` reaktiviert beim Worker-Start einmalig alte
+  `HANDLER_FEHLT`-Entwürfe, wenn kein neuerer Ingest desselben Dokuments existiert; danach läuft die normale
+  Warteschlange. Bei einem Fehler in einem Mandanten wird die Wiederherstellung protokolliert und im nächsten Takt
+  erneut versucht. Der Indexloader begrenzt Suchtreffer auf höchstens 40 Zeilen und schliesst `ueberblick` bei
+  `INTERN` auch als Index-Metadaten aus. Monatsverbrauch, Reservierungen und Ingest-Schritte verwenden dasselbe
+  Monatsfenster `Europe/Zurich`.
+- Nachbesserung 14.1b (Review PR #319):
+  - Die Eingrenzung des Index (5.4) sucht die Wörter der Kernaussagen mit ODER verknüpft
+    (`websearch_to_tsquery('german', 'wort or wort …')`, Wörter ab drei Zeichen, Zahlen ausgenommen), damit nicht
+    jede Seite alle Wörter enthalten muss; ohne Suchwort bleibt der Index leer. Der Suchtext enthält nur die Aussagetexte.
+  - Vor jedem Schritt und nach jedem erneuten Laden prüft der Ingest, ob die Quelle noch `ARCHIVIERT`, von der Art
+    `WISSENSQUELLE`, bestätigt und nicht `PERSONAL` ist; sonst endet der Entwurf ohne weiteren KI-Aufruf mit `FEHLER`
+    «Die Wissensquelle ist nicht mehr für den Ingest freigegeben.» (5.6, 5.7). Das Nachholen von `HANDLER_FEHLT`
+    berücksichtigt nur Dokumente der Art `WISSENSQUELLE`.
+  - Eine schemagültige, leere Planung ist kein Fehler: Der Ingest geht mit dem Hinweis «Die Seitenplanung nennt keine
+    betroffenen Seiten.» direkt zur Quelle-Seite. `AENDERN` auf einen Pfad ohne sichtbare Seite wird zu `NEU` (mit
+    Hinweis), `VERALTEN` ohne Seite und Pfade von Seiten im Status `VERALTET` werden mit Hinweis verworfen; eine
+    veraltete Seite gilt nicht als «höhere Vertraulichkeit».
+  - Der Hinweis «Überblick nicht aktualisiert (höhere Vertraulichkeit)» steht bei einer Quelle über `NORMAL` immer
+    im Entwurf, auch wenn die KI den Überblick nicht plant (5.11).
+  - Quelle-Seite: Pfad `quellen/<JJJJ-MM>-<stichwort>-<dokid8>` (die ersten 8 Zeichen der Dokument-ID, damit zwei
+    Quellen mit gleichem Titel im selben Monat nicht kollidieren; bei Kollision Suffix `-2`). Gibt es zur
+    Wissensquelle schon eine Quelle-Seite (`wissensseite.wissensquelle_id` ist eindeutig), schlägt ein erneuter
+    Ingest `AENDERN` dieser Seite vor (Pfad, Seiten-ID und Basisversion bleiben); Quelleneinträge und Kernaussagen
+    der bisherigen Fassung, die der neue Lauf nicht mehr ergibt (z. B. Seitenbereich nach 5.2), bleiben erhalten.
+    Ist die bestehende Quelle-Seite nicht `AKTIV` oder für den Ingest nicht sichtbar, entfällt die Änderung mit
+    Hinweis. Ohne Belegdatum oder ohne belegte Kernaussage entfällt nur die Quelle-Seite, nicht der ganze Ingest.
+  - Die Auszugsprüfung des Ingests normalisiert wie `WissensPruefung` (NFKC, Trennstrich am Zeilenende, Leerraum);
+    der Seitenbereich einer Fussnote umfasst nur Seiten, auf denen der Auszug steht.
+  - Budgets ≤ 0 gelten als nicht gesetzt (Startwert).
+  - Quellenschlüssel (Review PR #319, Kopf 99c72b0c, M1): `q-<dokid8>-<n>` zählt je Wissensquelle über alle
+    Durchgänge weiter. `KERNAUSSAGEN` beginnt nach der höchsten Nummer `n`, die schon in `wissensseite_quelle` (zu
+    diesem Dokument) oder in den Quellen eines Änderungsvorschlags (`wissens_aenderung.daten.quellen`, jeder Status)
+    oder in den Kernaussagen des laufenden Entwurfs vorkommt; ein erneuter Ingest vergibt so keinen Schlüssel einer
+    früheren Aussage. Gleichzeitige Ingests desselben Dokuments verhindert die Vorprüfung. Ergibt ein Lauf eine
+    Aussage mit demselben Beleg (Dokument, Seiten, normalisierter Auszug) wie ein bisheriger Quelleneintrag der
+    Quelle-Seite, ersetzt die neue Aussage den alten Eintrag; der alte Schlüssel steht dann in `entfernte_aussagen`
+    mit «Durch [^neu] mit derselben Textstelle ersetzt.». Trifft ein neuer Schlüssel dennoch auf einen bestehenden
+    Eintrag mit anderem Beleg (Quelle- oder Fachseite), bleibt der bestehende Eintrag unverändert und der Vorschlag
+    erhält den Befund `QUELLE_UNGUELTIG` «Der Quellenschlüssel «…» belegt schon eine andere Textstelle; die neue
+    Aussage wurde nicht übernommen.» (blockiert die Annahme).
+  - Quelle-Seiten nur im Schritt `QUELLE` (Review PR #319, S1): Ein Planungseintrag mit Typ `Quelle` oder auf eine
+    bestehende Seite vom Typ `Quelle` wird mit dem Hinweis «Quelle-Seiten entstehen nur im Schritt QUELLE; der
+    Vorschlag für «…» wurde verworfen.» verworfen, damit ein Entwurf nie zwei Änderungen derselben Seite enthält.
+  - Pfade in Hinweisen, die aus der KI-Antwort stammen, sind auf 120 Zeichen gekürzt (mit «…»).
+  - Steigt die Vertraulichkeit der Wissensquelle während des Laufs (z. B. `NORMAL` → `INTERN`), gilt für die
+    folgenden Schritte die neue Stufe (sie wird je Schritt neu geladen; `PERSONAL` beendet den Lauf, siehe oben);
+    schon gespeicherte Vorschläge behalten die Kontextstufe ihres Schritts. Die Prüfung beim Annehmen gehört zu 14.2.
+  - Sinkt die Vertraulichkeit während des Laufs (Review PR #319, Kopf b8f64e41, M1): Der Fortschritt
+    (`ingest_daten`) führt `kontextStufe`, die höchste Stufe der Wissensquelle, die schon in einem Schritt in den
+    Kontext gelangt ist. Liegt die geladene Stufe vor einem Schritt oder nach einem erneuten Laden darunter (z. B.
+    `INTERN` → `NORMAL`), endet der Entwurf ohne weiteren KI-Aufruf mit `FEHLER` «Die Vertraulichkeit der
+    Wissensquelle wurde während des Ingests gesenkt; bitte den Ingest neu starten.» (11.7). Sonst trügen spätere
+    Vorschläge (z. B. `ueberblick`) eine zu tiefe Kontextstufe, obwohl frühere Schritte den `INTERN`-Text gesehen
+    haben. Der Hinweis «Überblick nicht aktualisiert (höhere Vertraulichkeit)» bleibt so im Entwurf zutreffend.
+  - Ausgabegrenze und Reservierung (Review PR #319, Kopf b8f64e41, S1): `max_tokens` je KI-Aufruf ist höchstens
+    das Restbudget nach der Eingabe und höchstens die geschätzte Tokenzahl der doppelten
+    `archiv.wissen.seite-max-zeichen` (`⌈2 × seite-max-zeichen × 13 / 30⌉`, bei 20'000 Zeichen 17'334 Tokens),
+    damit Eingabe und Ausgabe ins Kontextfenster des Modells passen; ein eigener Konfigurationsschlüssel entfällt.
+    Reserviert wird `Eingabe-Obergrenze + max_tokens`, nicht mehr das ganze Restbudget, damit parallele Ingests
+    das Monatsbudget nicht vorzeitig blockieren. Vor Gate Phase 4 gegen das Kontextfenster bei Infomaniak
+    gegenprüfen.
+  - Berührte Seiten der Quelle-Seite (Review PR #319, Kopf b8f64e41, P2 S1): Bei einem erneuten Ingest bleiben die
+    Links im Abschnitt «Berührte Seiten» der bestehenden Quelle-Seite erhalten; neue Pfade aus der Planung werden
+    angehängt, je Pfad einmal. Ein Teil-Ingest (5.2) hängt so die Fachseiten früherer Läufe nicht ab.
+  - Changesets: Die Changesets von 14.1b tragen die Nummern `049-wissen-ingest-fortschritt` und
+    `050-wissen-budget-reservierung`, weil `048-ki-texte-version` (Spec 05) vorher auf `main` kam.
+  - Diff (`diff = '{}'`) und Kennzeichnung der Kernaussagen ohne Änderung im Entwurf gehören zu 14.2 (`DiffDienst`).
 - Kontextstufe: Jeder Teilauftrag, der eine Änderung erzeugt, speichert in `wissens_aenderung.vertraulichkeit_kontext`
   die höchste Stufe der Wissensquelle und aller ihm gezeigten Seiten (Requirement 11.7).
 - Schritte:
@@ -256,8 +337,8 @@ flowchart LR
 | --- | --- | --- | --- |
 | `KERNAUSSAGEN` je Abschnitt | Abschnittstext mit Markern `[Seite n]`, Dokumenttitel, Datum | `{aussagen:[{nr, text, seiten:[n], auszug}]}`, höchstens 40 | Auszug auf Seite prüfen; Aussagen ohne gültigen Auszug bleiben mit Befund markiert und werden im Entwurf gezeigt (Requirement 6.1) |
 | `PLANUNG` | Index (gefiltert nach 5.5, ggf. eingegrenzt nach 5.4), `ueberblick` nur bei Wissensquelle `NORMAL` (5.3, 5.11), Kernaussagen (Nr. + Text) | `{seiten:[{pfad, aktion, typ, grund, aussagen:[nr]}]}` | `AENDERN` nur für vorhandene, im Kontext sichtbare Pfade; `NEU` auf einem von einer unsichtbaren Seite belegten Pfad → Änderung bleibt leer mit Befund `PFAD_UNGUELTIG` und Hinweis `HOEHERE_STUFE_VORHANDEN`, ohne Teilauftrag `SEITE` (5.12); `ueberblick` bei höherer Stufe verworfen mit Hinweis (5.11); Kürzung auf `max-seiten`; fehlt `ueberblick`, wird sie bei `NORMAL` als `NEU` ergänzt (2.3) |
-| `SEITE` je geplanter Seite | aktuelle Fassung (Felder + Inhalt) bzw. leer, zugeordnete Kernaussagen mit Schlüssel `q-<kurz>-<nr>`, Index-Zeilen der Nachbarn | `{titel, beschreibung, tags, inhalt, widersprueche:[{bestehend, neu, text}], entfernte_aussagen:[{schluessel, begruendung}], begruendung}` | Quelleneinträge aus den Kernaussagen erzeugen (Dokument-ID, Seiten, Auszug stammen nie aus diesem Schritt), prüfen, Diff |
-| `QUELLE` | Kernaussagen, geplante Seiten | `{titel, beschreibung, tags, zusammenfassung:[{text, aussagen:[nr]}]}` | Abschnitte «Zusammenfassung» (Fussnoten aus `aussagen`), «Kernaussagen» (aus den geprüften Kernaussagen, je mit Fussnote) und «Berührte Seiten» (aus der Planung) ohne KI erzeugen; Pfad `quellen/<JJJJ-MM>-<stichwort>` |
+| `SEITE` je geplanter Seite | aktuelle Fassung (Felder + Inhalt) bzw. leer, zugeordnete Kernaussagen mit Schlüssel `q-<dokid8>-<n>`, Index-Zeilen der Nachbarn | `{titel, beschreibung, tags, inhalt, widersprueche:[{bestehend, neu, text}], entfernte_aussagen:[{schluessel, begruendung}], begruendung}` | Quelleneinträge aus den Kernaussagen erzeugen (Dokument-ID, Seiten, Auszug stammen nie aus diesem Schritt), prüfen, Diff |
+| `QUELLE` | Kernaussagen, geplante Seiten | `{titel, beschreibung, tags, zusammenfassung:[{text, aussagen:[nr]}]}` | Abschnitte «Zusammenfassung» (Fussnoten aus `aussagen`), «Kernaussagen» (aus den geprüften Kernaussagen, je mit Fussnote) und «Berührte Seiten» (bisherige Links der Quelle-Seite und Pfade der Planung, je Pfad einmal) ohne KI erzeugen; Pfad `quellen/<JJJJ-MM>-<stichwort>-<dokid8>`, bei erneutem Ingest `AENDERN` der bestehenden Quelle-Seite |
 | `ABSCHLUSS` (ohne KI-Aufruf) | – | – | `WissensPruefung` für alle Änderungen, Kernaussagen ohne Änderung kennzeichnen, `status = OFFEN` |
 
 - Systemprompt (deutsch): Rolle «pflegt die Wissensbasis», Regeln: nur belegte Aussagen, jede mit Fussnote auf
@@ -278,7 +359,11 @@ flowchart LR
   `unvollstaendig = true` (Requirement 13.5). Monatsbudget: Summe `ki_verbrauch` mit Zweck `WISSEN_*` im Monat gegen
   `wissens_einstellung.monatsbudget_tokens`, sonst den Startwert `archiv.wissen.monatsbudget-tokens` (1'000'000); `public.mandant_budget` (Chatbot, Spec 03) wird
   weder gelesen noch geschrieben. Erschöpft: manuell 429 `BUDGET`, automatisch Entwurf `FEHLER` mit Hinweis «Budget
-  erschöpft» (Requirement 13.6).
+  erschöpft» (Requirement 13.6). Vor jedem Ingest-KI-Aufruf reserviert `ki_verbrauch_reservierung` die höchstmögliche
+  Tokenzahl dieses Aufrufs (Eingabe-Obergrenze + `max_tokens`) in einer Transaktion mit mandantenspezifischer Advisory-Sperre; `ki_verbrauch.ingest_entwurf_id`
+  ordnet auch fehlgeschlagene Versuche dem Entwurf zu. Nach protokolliertem Verbrauch wird die Reservierung freigegeben;
+  bleibt die Protokollierung aus, läuft sie nach fünf Minuten ab. So zählen parallele Aufträge und Wiederholungen in
+  die harte Monats- und Ingest-Grenze.
 
 ### Entwurf und Freigabe (`wissen/application`)
 - `DiffDienst`: zeilenbasiert über Markdown (java-diff-utils), dazu Felddiff (Titel, Beschreibung, Schlagwörter,
@@ -701,7 +786,7 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 
 | Aktion | Endpunkt bzw. Auslöser |
 | --- | --- |
-| `WISSEN_ANZEIGEN` | `GET /wissensseiten/{id}`, `/versionen/{n}`, `GET /wissensentwuerfe/{id}` |
+| `WISSEN_ANZEIGEN` | `GET /wissensseiten/{id}`, `/wissensseiten?pfad=…`, `/versionen/{n}`, `/diff`, `/eingehend`, `GET /wissensentwuerfe/{id}` |
 | `WISSEN_ANNEHMEN` | `…/annehmen` (Seite, Entwurf, Basisversion, neue Version) |
 | `WISSEN_VERWERFEN` | `…/verwerfen` (mit Grund) |
 | `WISSEN_INGEST` | `POST /dokumente/{id}/wissen-ingest` (mit Dokument-ID) |
@@ -941,6 +1026,31 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   `wissensseite_pfad_uk`); es setzt voraus, dass kein anderer Test dort `ueberblick` committet (Review PR #300, K5). Eine Lese-API für Seiten, Log oder
   Entwürfe gehört nicht zu 13.5; die Rechte für eingeschränkten Zugriff auf eigene Analysevorschläge nach 12.3 sind
   bereits in `Berechtigung` modelliert und werden beim späteren Entwurfszugriff verwendet.
+
+### Umsetzung 13.6
+- `WissenLesen` und `PanacheWissenLesenRepository` liefern Index mit sichtbarkeitsgefiltertem Zähler und Paging,
+  Seite, Versionen, Diff, eingehende Links und Log. Die SQL-Prädikate für aktuelle Seiten, Versionen und Quelldokumente
+  verwenden die gemeinsame Sichtregel; Sortierung und Zähler werden vor dem Paging angewandt.
+- Quelleneinträge und eingehende Links enthalten nur sichtbare Seiten und Dokumente. Beim Rendern interner Markdown-
+  Links werden fehlende und unsichtbare Ziele gleich als «Seite nicht vorhanden» ohne Linktitel ausgegeben.
+- Versionen zeigen Erzeuger, Freigeber, Entwurf samt Anlass und auslösendes Dokument nur, wenn diese Angaben für den
+  Benutzer sichtbar sind; unsichtbare Versionen bleiben auf ihre Nummer beschränkt. Einzelseiten, Versionen, Diff,
+  eingehende Links und Log bleiben privat und tragen ETags, wo eine einzelne Fassung abgerufen wird.
+- Das Log erzeugt Anzeigetexte aus den strukturierten Feldern und sichtbaren Seiten, nie aus `angaben`; Einträge ohne
+  sichtbare Seite werden ausgelassen. Der Index und das Log selbst erzeugen keine `WISSEN_ANZEIGEN`-Zugriffsprotokolleinträge;
+  ein Seitenabruf über `?pfad=` protokolliert die Seiten-ID wie `GET /wissensseiten/{id}`. Die `entwurfId` eines
+  Logeintrags erscheint nur, wenn das auslösende Dokument des Entwurfs sichtbar ist (gleiche Regel wie bei den
+  Versionen). Ein Log-Cursor `vor`, der sich nicht dekodieren lässt, eine ID kleiner 1 oder eine Zeit ausserhalb
+  0001–9999 enthält, ergibt 400 `ANFRAGE_UNGUELTIG` (Review PR #311).
+- Version und Diff entscheiden über 404 aus dem Ergebnis der Abfrage mit Sichtprädikat; ändert sich die Sichtbarkeit
+  zwischen Prüfung und Abfrage, bleibt es bei 404 statt eines Serverfehlers (Review PR #311).
+- Eine Seiten-ID im Pfad, die keine UUID ist, gilt wie eine unsichtbare Seite: 404 `NICHT_GEFUNDEN` über
+  `Berechtigung.wissensseitenAktion` und damit ein `VERWEIGERT`-Eintrag (Req 14.4; Review PR #311).
+- Die Dokumentensicht entsteht für SQL (Suche, Wissensbasis) und HQL (Dokumentlisten) aus derselben Quelle
+  `SichtregelSql.praedikat` mit Spaltennamen je Sprache; `VertraulichkeitFilterTest` vergleicht beide für alle Regeln
+  (Review PR #311).
+- Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
+  Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
 
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).

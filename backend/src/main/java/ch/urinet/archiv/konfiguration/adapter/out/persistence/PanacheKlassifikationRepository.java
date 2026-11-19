@@ -97,6 +97,23 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
     }
 
     @Override
+    public long dokumentAnzahl(String code) {
+        Number count = (Number) entityManager().createNativeQuery("""
+                select count(distinct dokument_id) from dokument_klassifikation where klassifikation = :code""")
+                .setParameter("code", code).getSingleResult();
+        return count.longValue();
+    }
+
+    @Override
+    public long wertDokumentAnzahl(String code, String wert) {
+        Number count = (Number) entityManager().createNativeQuery("""
+                select count(distinct dokument_id) from dokument_klassifikation
+                where klassifikation = :code and wert = :wert""")
+                .setParameter("code", code).setParameter("wert", wert).getSingleResult();
+        return count.longValue();
+    }
+
+    @Override
     public boolean mehrfachWirdVerletzt(String code) {
         Number count = (Number) entityManager().createNativeQuery("""
                 select count(*) from (

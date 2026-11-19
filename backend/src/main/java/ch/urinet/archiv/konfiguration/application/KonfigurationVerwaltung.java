@@ -24,6 +24,7 @@ import java.util.Optional;
 public class KonfigurationVerwaltung implements KonfigurationVersionsPort, KonfigurationLesen {
 
     private final KonfigurationVersionsRepository repository;
+    private final KiTexteRepository kiTexteRepository;
     private final KonfigurationCache cache;
     private final DokumentartRepository dokumentarten;
     private final ZusatzSchemaPruefer zusatzSchema;
@@ -35,11 +36,13 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     private final KonfigurationAenderungsProtokoll protokoll;
 
     public KonfigurationVerwaltung(KonfigurationVersionsRepository repository, KonfigurationCache cache,
+                                   KiTexteRepository kiTexteRepository,
                                    DokumentartRepository dokumentarten, ZusatzSchemaPruefer zusatzSchema,
                                    KlassifikationRepository klassifikationen, RegelRepository regeln,
                                    MandantEinstellungen einstellungen, MandantAufloesung aufloesung,
                                    MandantKontext kontext, KonfigurationAenderungsProtokoll protokoll) {
         this.repository = repository;
+        this.kiTexteRepository = kiTexteRepository;
         this.cache = cache;
         this.dokumentarten = dokumentarten;
         this.zusatzSchema = zusatzSchema;
@@ -87,19 +90,37 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     }
 
     public int aenderungSpeichern(String wer, String grund) {
-        KonfigurationsVersion vorher = mitFeldTypen(basisSicherstellen());
+        return aenderungSpeichern(wer, grund, KonfigurationQuelle.APP);
+    }
+
+    public int aenderungSpeichern(String wer, String grund, KonfigurationQuelle quelle) {
+        Konfiguration vorher = mitFeldTypen(basisSicherstellen()).inhalt();
+        return aenderungSpeichern(wer, grund, quelle, vorher);
+    }
+
+    int aenderungSpeichern(String wer, String grund, KonfigurationQuelle quelle, Konfiguration vorher) {
+        if (basisSicherstellen().version() != vorher.version()) {
+            throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
+        }
         Konfiguration neu = abbild(vorher.version() + 1);
-        if (vorher.inhalt().gleicherInhalt(neu)) {
+        if (vorher.gleicherInhalt(neu)) {
             return vorher.version();
         }
         if (!neu.pruefen().isEmpty()) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }
         KonfigurationsVersion gespeichert = repository.anlegen(neu.version(), wer, grund,
-                KonfigurationQuelle.APP, neu);
+                quelle, neu);
         cache.invalidieren(mandantAktuell());
-        protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), grund, vorher.inhalt().aenderungen(neu));
+        protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), wer, grund, vorher.aenderungen(neu));
         return gespeichert.version();
+    }
+
+    public void dateiAenderungStarten(int basisVersion) {
+        repository.sperren();
+        if (basisSicherstellen().version() != basisVersion) {
+            throw new FachFehler(Fehlercode.KONFIGURATION_VERALTET);
+        }
     }
 
     /** Gespeicherte Version, ohne die abgeleiteten Feldtypen ({@link #mitFeldTypen}). */
@@ -127,12 +148,16 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     /**
      * Die Typen der Zusatzfelder gehören nicht ins gespeicherte Abbild; sie werden beim Lesen aus dem Zusatz-Schema
      * abgeleitet, damit Abbilder aus Migration und App gleich sind und Regeln mit {@code zusatz.} prüfbar bleiben.
+     * Ein Abbild ohne {@code kiTexte} (vor Changeset 048 oder von einem älteren Release) erhält die KI-Texte aus
+     * {@code ki_texte}; sonst gälte die KI als nicht freigegeben und Export und Protokoll zeigten falsche Werte
+     * (Req 6.6, 8.4).
      */
     private KonfigurationsVersion mitFeldTypen(KonfigurationsVersion stand) {
         Konfiguration inhalt = stand.inhalt();
         Konfiguration ergaenzt = new Konfiguration(inhalt.version(), inhalt.einstellungen(), inhalt.arten().stream()
                 .map(art -> art.mitZusatzFeldTypen(zusatzSchema.feldTypen(art.zusatzSchema()))).toList(),
-                inhalt.klassifikationen(), inhalt.regeln());
+                inhalt.klassifikationen(), inhalt.regeln(),
+                inhalt.ohneKiTexte() ? kiTexteRepository.lesen() : inhalt.kiTexte());
         return new KonfigurationsVersion(stand.version(), stand.zeit(), stand.wer(), stand.grund(), stand.quelle(),
                 ergaenzt, stand.sha256());
     }
@@ -141,7 +166,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         MandantEinstellungen.Werte werte = einstellungen.lesen(mandantAktuell());
         return new Konfiguration(version, new Konfiguration.Einstellungen(werte.geschaeftsjahresende().wert(),
                 new Kennungen(werte.uid().isBlank() ? null : werte.uid(), werte.ibans())), dokumentarten.alle().stream()
-                .map(this::art).toList(), klassifikationen.alle(), regeln.alle());
+                .map(this::art).toList(), klassifikationen.alle(), regeln.alle(), kiTexteRepository.lesen());
     }
 
     private Konfiguration.Art art(Dokumentart art) {

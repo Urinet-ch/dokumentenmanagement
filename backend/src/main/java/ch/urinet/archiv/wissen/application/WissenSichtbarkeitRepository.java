@@ -1,14 +1,15 @@
 package ch.urinet.archiv.wissen.application;
 
+import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface WissenSichtbarkeitRepository {
 
-    List<WissensHuelleZugriff> aktuelleSeiten();
+    List<UUID> sichtbareSeiten(Sichtregel regel);
 
-    Optional<WissensHuelleZugriff> aktuelleSeite(UUID seiteId);
+    boolean aktuelleSeiteSichtbar(UUID seiteId, Sichtregel regel);
 
-    Optional<WissensHuelleZugriff> version(UUID seiteId, int nummer);
+    boolean versionSichtbar(UUID seiteId, int nummer, Sichtregel regel);
 }

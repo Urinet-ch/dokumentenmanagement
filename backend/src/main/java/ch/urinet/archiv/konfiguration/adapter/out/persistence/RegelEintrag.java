@@ -9,6 +9,8 @@ import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+// Nur für die Schemaprüfung (Hibernate validate). Lesen und Schreiben laufen nativ in PanacheRegelRepository,
+// weil die Entität im Persistenzkontext ein natives UPDATE derselben Transaktion nicht sähe.
 @Entity
 @Immutable
 @Table(name = "regel")

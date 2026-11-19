@@ -1,8 +1,10 @@
 package ch.urinet.archiv.ki.domain.chat;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,18 +29,22 @@ public final class Quellen {
         boolean gezeigt = ergebnisse.stream().anyMatch(e -> DOKUMENT_ZEIGEN.equals(e.name()));
         Set<Quelle> quellen = new LinkedHashSet<>();
         Set<UUID> dokumente = new HashSet<>();
+        Map<UUID, String> seiten = new LinkedHashMap<>();
+        ergebnisse.stream().filter(e -> DOKUMENTE_SUCHEN.equals(e.name()))
+                .flatMap(e -> e.dokumente().stream()).filter(d -> d.seite() != null)
+                .forEach(d -> seiten.putIfAbsent(d.id(), d.seite()));
         int treffer = 0;
         for (ChatEreignis.WerkzeugErgebnis ergebnis : ergebnisse) {
             if (DOKUMENT_ZEIGEN.equals(ergebnis.name())) {
                 for (ChatEreignis.QuellDokument d : ergebnis.dokumente()) {
                     if (dokumente.add(d.id())) {
-                        quellen.add(new Quelle.Dokument(d.id(), d.titel()));
+                        quellen.add(new Quelle.Dokument(d.id(), d.titel(), seiten.get(d.id())));
                     }
                 }
             } else if (DOKUMENTE_SUCHEN.equals(ergebnis.name()) && !gezeigt) {
                 for (ChatEreignis.QuellDokument d : ergebnis.dokumente()) {
                     if (treffer < MAX_TREFFER && dokumente.add(d.id())) {
-                        quellen.add(new Quelle.Dokument(d.id(), d.titel()));
+                        quellen.add(new Quelle.Dokument(d.id(), d.titel(), d.seite()));
                         treffer++;
                     }
                 }

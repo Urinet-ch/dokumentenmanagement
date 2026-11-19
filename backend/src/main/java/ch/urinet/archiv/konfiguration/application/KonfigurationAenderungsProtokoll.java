@@ -7,5 +7,11 @@ import java.util.List;
 
 public interface KonfigurationAenderungsProtokoll {
 
-    void schreiben(int version, KonfigurationQuelle quelle, String grund, List<Konfiguration.Aenderung> aenderungen);
+    /**
+     * Schreibt den Eintrag {@code KONFIGURATION_AENDERN}. Ohne Anmeldung (Admin-Kommando, Seed bei der Provisionierung)
+     * steht {@code wer} (z. B. {@code betreiber:<name>}, {@code system:seed}) als Benutzer im Protokoll, sonst die
+     * angemeldete Identität.
+     */
+    void schreiben(int version, KonfigurationQuelle quelle, String wer, String grund,
+                   List<Konfiguration.Aenderung> aenderungen);
 }

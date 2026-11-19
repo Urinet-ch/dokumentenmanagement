@@ -1,0 +1,115 @@
+{
+  "format": 1,
+  "einstellungen": {
+    "geschaeftsjahrEnde": "12-31",
+    "kennungen": {
+      "uid": null,
+      "ibans": []
+    }
+  },
+  "kiTexte": {
+    "rolle": "",
+    "feldregeln": "",
+    "kiFreigegeben": false
+  },
+  "klassifikationen": [],
+  "arten": [
+    {
+      "code": "PROBE_VHF_BULLETIN",
+      "name": "Probe-Bulletin",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "code": "WISSENSQUELLE",
+      "name": "Wissensquelle",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel",
+        "datum"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": false,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "herausgeber": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient."
+    }
+  ],
+  "regeln": [],
+  "_zweck": "Synthetischer Seed nur für Tests (Aufgabe 1.4, Mandantentrennung); der echte Seed für vhf-gsk folgt mit Spec 03"
+}

@@ -1,6 +1,24 @@
 ---
 components:
   schemas:
+    Antwort:
+      type: object
+      properties:
+        geschaeftsjahr:
+          type: integer
+          format: int32
+        kategorien:
+          type: array
+          items:
+            $ref: "#/components/schemas/Kategorie"
+        nichtGeprueft:
+          type: array
+          items:
+            type: string
+        datenstand:
+          $ref: "#/components/schemas/Datenstand"
+        hinweis:
+          type: string
     ApiToken:
       type: object
       properties:
@@ -120,6 +138,15 @@ components:
           type: string
         treffer:
           type: boolean
+    Befund:
+      type: object
+      properties:
+        pfad:
+          type: string
+        code:
+          type: string
+        meldung:
+          type: string
     Bestaetigung:
       description: "Bestätigte Metadaten (A7, Req 8.2–8.5, 8.8, 8.9). Ersetzt die\
         \ Grundfelder sowie die Felder der Gruppen finanz und vertrag vollständig;\
@@ -382,6 +409,28 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ChatNachricht"
+    Datenstand:
+      type: object
+      properties:
+        zeitpunkt:
+          type: string
+        anzahl:
+          type: integer
+          format: int64
+    DiffEintrag:
+      type: object
+      properties:
+        pfad:
+          type: string
+        alt:
+          type: string
+        neu:
+          type: string
+        betroffeneDokumente:
+          type: integer
+          format: int64
+        werteVerdeckt:
+          type: boolean
     Dokument:
       description: Metadaten eines sichtbaren Dokuments
       type: object
@@ -1648,6 +1697,30 @@ components:
       - 2022-03-10T16:15:50Z
     JsonObjekt:
       type: object
+    Kategorie:
+      type: object
+      properties:
+        regel:
+          $ref: "#/components/schemas/Regel1"
+        art:
+          type: string
+        je:
+          type: string
+        hinweis:
+          type: string
+        belege:
+          type: integer
+          format: int64
+        ohneZuordnung:
+          type: integer
+          format: int64
+        reihenGesamt:
+          type: integer
+          format: int64
+        reihen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reihe"
     Klassifikation:
       type: object
       properties:
@@ -1684,6 +1757,15 @@ components:
           type: integer
           format: int32
         aktiv:
+          type: boolean
+    KonfigurationKiTexte:
+      type: object
+      properties:
+        rolle:
+          type: string
+        feldregeln:
+          type: string
+        kiFreigegeben:
           type: boolean
     KonfigurationsVersion:
       type: object
@@ -1728,6 +1810,37 @@ components:
           $ref: "#/components/schemas/KonfigurationsVersion"
         inhalt:
           description: Unveränderliches Konfigurationsabbild
+    KonfigurationsdateiAnalyse:
+      type: object
+      properties:
+        aktuelleVersion:
+          type: integer
+          format: int32
+        basisVersion:
+          type: integer
+          format: int32
+        gueltig:
+          type: boolean
+        befunde:
+          type: array
+          items:
+            $ref: "#/components/schemas/Befund"
+        aenderungen:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiffEintrag"
+    KonfigurationsdateiErgebnis:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        geaendert:
+          type: boolean
+        aenderungen:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiffEintrag"
     Kontakt:
       type: object
       properties:
@@ -2159,6 +2272,125 @@ components:
         groesse:
           type: integer
           format: int32
+    Regel:
+      type: object
+      properties:
+        code:
+          type: string
+        art:
+          type: string
+        typ:
+          type: string
+        parameter:
+          type: object
+          additionalProperties: {}
+        schwere:
+          type: string
+        meldung:
+          type: string
+        aktiv:
+          type: boolean
+        betroffeneDokumente:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "Zahl bestätigter Dokumente, die die Regel verletzen"
+    Regel1:
+      type: string
+      enum:
+      - FOLGE
+      - ERWARTET
+    RegelAenderung:
+      type: object
+      properties:
+        art:
+          type:
+          - string
+          - "null"
+        typ:
+          type: string
+          enum:
+          - PFLICHT_WENN
+          - EINDEUTIG
+          - FOLGE
+          - ERWARTET
+        parameter:
+          type: object
+          additionalProperties: {}
+        schwere:
+          type: string
+          enum:
+          - FEHLER
+          - WARNUNG
+        meldung:
+          type: string
+        aktiv:
+          type: boolean
+        grund:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+    RegelAnlegen:
+      type: object
+      required:
+      - code
+      - typ
+      - parameter
+      - schwere
+      - meldung
+      properties:
+        code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{0,39}$"
+        art:
+          type:
+          - string
+          - "null"
+        typ:
+          type: string
+          enum:
+          - PFLICHT_WENN
+          - EINDEUTIG
+          - FOLGE
+          - ERWARTET
+        parameter:
+          type: object
+          additionalProperties: {}
+        schwere:
+          type: string
+          enum:
+          - FEHLER
+          - WARNUNG
+        meldung:
+          type: string
+        aktiv:
+          type: boolean
+        grund:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+    Reihe:
+      type: object
+      properties:
+        gruppe:
+          type: string
+        ab:
+          type: string
+        hoechste:
+          type: string
+        vorhanden:
+          type: integer
+          format: int64
+        anzahlFehlend:
+          type: integer
+          format: int64
+        fehlend:
+          type: array
+          items:
+            type: string
     Suchergebnis:
       type: object
       required:
@@ -2464,6 +2696,206 @@ components:
           - "null"
           format: int32
           minimum: 1
+    WissensIndex:
+      type: object
+      properties:
+        gruppen:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensIndexGruppe"
+        gesamt:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int32
+        groesse:
+          type: integer
+          format: int32
+    WissensIndexGruppe:
+      type: object
+      properties:
+        typ:
+          type: string
+        seiten:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensIndexZeile"
+    WissensIndexZeile:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        typ:
+          type: string
+        titel:
+          type: string
+        beschreibung:
+          type: string
+        status:
+          type: string
+    WissensLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        zeit:
+          $ref: "#/components/schemas/Instant"
+        aktion:
+          type: string
+        akteur:
+          type: string
+        seiten:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensLogVerweis"
+        text:
+          type: string
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+        entwurfId:
+          $ref: "#/components/schemas/UUID"
+    WissensLogSeite:
+      type: object
+      properties:
+        eintraege:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensLog"
+        naechstesVor:
+          type: string
+    WissensLogVerweis:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        titel:
+          type: string
+    Wissensdiff:
+      type: object
+      properties:
+        von:
+          type: integer
+          format: int32
+        bis:
+          type: integer
+          format: int32
+        vorher:
+          type: array
+          items:
+            type: string
+        entfernt:
+          type: array
+          items:
+            type: string
+        hinzugefuegt:
+          type: array
+          items:
+            type: string
+        nachher:
+          type: array
+          items:
+            type: string
+    Wissensquelleneintrag:
+      type: object
+      properties:
+        schluessel:
+          type: string
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+        seiteVon:
+          type: integer
+          format: int32
+        seiteBis:
+          type: integer
+          format: int32
+        auszug:
+          type: string
+        quellSeiteId:
+          $ref: "#/components/schemas/UUID"
+    Wissensseite:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        typ:
+          type: string
+        titel:
+          type: string
+        beschreibung:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        veraltetAb:
+          $ref: "#/components/schemas/LocalDate"
+        vertraulichkeit:
+          type: string
+        quellen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Wissensquelleneintrag"
+        inhaltHtml:
+          type: string
+        version:
+          type: integer
+          format: int32
+        erzeugtVon:
+          type: string
+        erzeugtAm:
+          $ref: "#/components/schemas/Instant"
+        freigegebenVon:
+          type: string
+        freigegebenAm:
+          $ref: "#/components/schemas/Instant"
+        quellePruefen:
+          type: boolean
+        widerspruchOffen:
+          type: boolean
+        wissensquelleId:
+          $ref: "#/components/schemas/UUID"
+    Wissensversion:
+      type: object
+      properties:
+        nummer:
+          type: integer
+          format: int32
+        daten:
+          type: object
+          additionalProperties: {}
+        inhaltHtml:
+          type: string
+        erzeugtVon:
+          type: string
+        freigegebenVon:
+          type: string
+        zeit:
+          $ref: "#/components/schemas/Instant"
+        grund:
+          type: string
+        entwurfId:
+          $ref: "#/components/schemas/UUID"
+        entwurfAnlass:
+          type: string
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+    Wissensversionen:
+      type: object
+      properties:
+        versionen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Wissensversion"
   securitySchemes:
     SecurityScheme:
       type: openIdConnect
@@ -2472,6 +2904,7 @@ components:
 openapi: 3.1.0
 tags:
 - name: API-Tokens
+- name: Berichte
 - name: Branding
 - name: Chat
 - name: Dokumentarten
@@ -2481,6 +2914,7 @@ tags:
 - name: Konfiguration
 - name: Kontakte
 - name: Protokoll
+- name: Wissensbasis
 paths:
   /api/v1/api-tokens:
     get:
@@ -2605,6 +3039,40 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/berichte/luecken:
+    get:
+      summary: Lückenbericht für ein Geschäftsjahr
+      description: Liefert Lücken nur für Rollen mit uneingeschränkter Sicht auf alle
+        Vertraulichkeitsstufen.
+      tags:
+      - Berichte
+      parameters:
+      - description: Geschäftsjahr (2000 bis zum nächsten Kalenderjahr)
+        required: true
+        name: geschaeftsjahr
+        in: query
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Lückenbericht
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Antwort"
+        "400":
+          description: ANFRAGE_UNGUELTIG
+        "403":
+          description: NICHT_ERLAUBT
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/branding:
     get:
       summary: Lädt das Branding für eine registrierte Domain oder das neutrale Standard-Branding.
@@ -4288,6 +4756,173 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/konfiguration:
+    get:
+      summary: Konfiguration als Datei exportieren
+      tags:
+      - Konfiguration
+      responses:
+        "200":
+          description: Aktuelle Konfiguration als JSON-Datei
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: NICHT_ERLAUBT
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+    put:
+      summary: Konfigurationsdatei einspielen
+      description: "Massgeblich ist die basisVersion in der Datei; weicht sie vom\
+        \ aktuellen Stand ab, kommt 409. Ein If-Match wird nicht ausgewertet."
+      tags:
+      - Konfiguration
+      parameters:
+      - name: X-Aenderungsgrund
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: Eingespielt oder bereits aktuell
+          content:
+            application/json:
+              schema: {}
+        "409":
+          description: KONFIGURATION_VERALTET
+        "413":
+          description: DATEI_ZU_GROSS
+        "422":
+          description: KONFIGURATION_UNGUELTIG
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/konfiguration/ki-texte:
+    patch:
+      summary: KI-Texte ändern
+      description: kiFreigegeben kann nur der Betreiber setzen.
+      tags:
+      - Konfiguration
+      parameters:
+      - name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: Geändert
+          content:
+            application/json:
+              schema: {}
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
+        "422":
+          description: KONFIGURATION_UNGUELTIG
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+    get:
+      summary: KI-Texte des Mandanten ansehen
+      tags:
+      - Konfiguration
+      responses:
+        "200":
+          description: "Rolle, Feldregeln und Freigabestatus"
+          content:
+            application/json:
+              schema: {}
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/konfiguration/pruefen:
+    post:
+      summary: Konfigurationsdatei prüfen
+      description: "Prüft die Datei, ohne Änderungen vorzunehmen."
+      tags:
+      - Konfiguration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: Befunde und Vergleich
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KonfigurationsdateiAnalyse"
+        "413":
+          description: DATEI_ZU_GROSS
+        "422":
+          description: KONFIGURATION_UNGUELTIG
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/konfiguration/vergleichen:
+    post:
+      summary: Konfigurationsdatei vergleichen
+      description: Vergleicht die Datei mit dem aktuellen Stand.
+      tags:
+      - Konfiguration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: Änderungen und betroffene Dokumente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KonfigurationsdateiAnalyse"
+        "413":
+          description: DATEI_ZU_GROSS
+        "422":
+          description: KONFIGURATION_UNGUELTIG
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
   /api/v1/konfiguration/versionen:
     get:
       summary: Konfigurationsversionen auflisten
@@ -4840,6 +5475,413 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/regeln:
+    get:
+      summary: Regeln des Mandanten auflisten
+      description: "Nur mit Recht A11 (Spec 05, Req 7.2)."
+      tags:
+      - Konfiguration
+      responses:
+        "200":
+          description: Aktive und inaktive Regeln
+          headers:
+            ETag:
+              description: Aktuelle Konfigurationsversion für If-Match
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Regel"
+        "403":
+          description: NICHT_ERLAUBT
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+    post:
+      summary: Dokumentregel anlegen
+      description: If-Match mit Konfigurationsversion ist Pflicht.
+      tags:
+      - Konfiguration
+      parameters:
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegelAnlegen"
+        required: true
+      responses:
+        "201":
+          description: Angelegt; betroffeneDokumente zählt bestätigte Verstösse.
+          headers:
+            ETag:
+              description: Neue Konfigurationsversion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Regel"
+        "403":
+          description: NICHT_ERLAUBT
+        "412":
+          description: VERSION_KONFLIKT
+        "422":
+          description: KONFIGURATION_UNGUELTIG
+        "428":
+          description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/regeln/{code}:
+    delete:
+      summary: Dokumentregel löschen
+      description: "Neue Konfigurationsversion; bestehende Dokumente bleiben unverä\
+        ndert. If-Match mit Konfigurationsversion ist Pflicht (Spec 05, Req 7.1)."
+      tags:
+      - Konfiguration
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Gelöscht
+          headers:
+            ETag:
+              description: Neue Konfigurationsversion
+        "403":
+          description: NICHT_ERLAUBT
+        "404":
+          description: NICHT_GEFUNDEN
+        "412":
+          description: VERSION_KONFLIKT
+        "422":
+          description: KONFIGURATION_UNGUELTIG
+        "428":
+          description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+    patch:
+      summary: "Dokumentregel ändern, aktivieren oder deaktivieren"
+      description: Code bleibt unverändert. If-Match mit Konfigurationsversion ist
+        Pflicht.
+      tags:
+      - Konfiguration
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegelAenderung"
+        required: true
+      responses:
+        "200":
+          description: Geändert
+          headers:
+            ETag:
+              description: Neue Konfigurationsversion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Regel"
+        "403":
+          description: NICHT_ERLAUBT
+        "404":
+          description: NICHT_GEFUNDEN
+        "412":
+          description: VERSION_KONFLIKT
+        "422":
+          description: KONFIGURATION_UNGUELTIG
+        "428":
+          description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/wissensbasis/log:
+    get:
+      summary: Wissensbasis-Log
+      description: Neueste Einträge zuerst; Einträge ohne sichtbare Seite werden ausgelassen.
+      tags:
+      - Wissensbasis
+      parameters:
+      - schema:
+          type: integer
+          default: 50
+        name: groesse
+        in: query
+      - description: Cursor aus dem vorherigen Ergebnis
+        name: vor
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Gefilterte Logseite
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Ungültiger Cursor oder Pagingwert
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten:
+    get:
+      summary: Wissensseiten-Index
+      description: Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur
+        sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.
+      tags:
+      - Wissensbasis
+      parameters:
+      - schema:
+          type: integer
+          default: 50
+        name: groesse
+        in: query
+      - schema:
+          type: integer
+          default: 0
+        name: offset
+        in: query
+      - name: pfad
+        in: query
+        schema:
+          type: string
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: tag
+        in: query
+        schema:
+          type: string
+      - name: typ
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Index oder Seite
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Ungültiger Filter oder Pagingwert
+        "404":
+          description: Seite zum Pfad nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}:
+    get:
+      summary: Wissensseite abrufen
+      description: Sichtbare Seite mit gerendertem Inhalt und ETag.
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Seite
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: Seite nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}/diff:
+    get:
+      summary: Zwei sichtbare Wissensseitenversionen vergleichen
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bis
+        in: query
+        schema:
+          type: string
+      - name: von
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Diff mit ETag
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Version fehlt oder ist ungültig
+        "404":
+          description: Seite oder Version nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}/eingehend:
+    get:
+      summary: Eingehende Wissensseiten-Links
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "Sichtbare Seiten, die auf die Seite verweisen"
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: Seite nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}/versionen:
+    get:
+      summary: Versionen einer Wissensseite
+      description: Unsichtbare Versionen erscheinen ausschliesslich mit ihrer Nummer.
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Versionen
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: Seite nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}/versionen/{nummer}:
+    get:
+      summary: Wissensseitenversion abrufen
+      description: "Antwortet mit 404, wenn die Seite oder ihre Version unsichtbar\
+        \ ist."
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: nummer
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Version mit ETag
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: Version nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
 info:
   title: UriNet Archiv API
   version: v1

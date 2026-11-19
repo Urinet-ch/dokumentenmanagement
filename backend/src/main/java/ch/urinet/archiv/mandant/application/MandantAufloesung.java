@@ -5,7 +5,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Bestimmt das Schema jeder Datenbank-Session (Schema pro Mandant, ADR-002). Fail closed: Ohne Mandant gilt nur
- * {@code public}, wo es keine Mandanten-Tabellen gibt; ein ungültiger oder inaktiver Mandant bricht ab.
+ * {@code public}, wo es keine Mandanten-Tabellen gibt; ein ungültiger oder inaktiver Mandant bricht ab. Einzige
+ * Ausnahme: ohne Anmeldung im Kontext {@link MandantKontext#zurProvisionierung} das Schema des Mandanten, der gerade
+ * provisioniert und noch nie aktiviert wurde (Req 1.5).
  */
 @ApplicationScoped
 public class MandantAufloesung {
@@ -33,6 +35,10 @@ public class MandantAufloesung {
             if (!(ausAnmeldung instanceof MandantAusAnmeldung.Anonym)
                     && !(ausAnmeldung instanceof MandantAusAnmeldung.Gueltig g && g.code().equals(code))) {
                 throw new MandantVerweigert("Mandanten-Kontext widerspricht der Anmeldung");
+            }
+            if (ausAnmeldung instanceof MandantAusAnmeldung.Anonym && kontext.inProvisionierung(code)) {
+                return verzeichnis.aktivesSchema(code).or(() -> verzeichnis.schemaInProvisionierung(code))
+                        .orElseThrow(() -> new MandantVerweigert("Mandant unbekannt oder inaktiv"));
             }
             return aktivesSchema(code);
         }

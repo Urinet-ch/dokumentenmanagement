@@ -43,6 +43,16 @@ class QuellenTest {
     }
 
     @Test
+    void gezeigteQuelleUebernimmtFundstellenseiteAusDerSuche() {
+        ChatEreignis.QuellDokument treffer = new ChatEreignis.QuellDokument(new UUID(0, 1), "Dokument 1", "7-8");
+        List<Quelle> quellen = Quellen.aus(List.of(
+                ergebnis("dokumente_suchen", List.of(treffer), Optional.empty()),
+                ergebnis("dokument_zeigen", List.of(dok(1)), Optional.empty())));
+
+        assertThat(quellen).containsExactly(new Quelle.Dokument(new UUID(0, 1), "Dokument 1", "7-8"));
+    }
+
+    @Test
     void suchtrefferOhneDokumentZeigenHoechstensFuenfUeberAlleSuchen() {
         List<ChatEreignis.QuellDokument> sieben = IntStream.rangeClosed(1, 4).mapToObj(QuellenTest::dok).toList();
         List<Quelle> quellen = Quellen.aus(List.of(

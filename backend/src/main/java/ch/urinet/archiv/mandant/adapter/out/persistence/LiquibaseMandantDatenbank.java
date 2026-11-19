@@ -184,6 +184,10 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                                 and m.kennungen ->> 'uid' <> '' then m.kennungen -> 'uid' end,
                             'ibans', case when jsonb_typeof(m.kennungen -> 'ibans') = 'array'
                                 then m.kennungen -> 'ibans' else '[]'::jsonb end)),
+                    'kiTexte', jsonb_build_object(
+                        'rolle', k.rolle,
+                        'feldregeln', k.feldregeln,
+                        'kiFreigegeben', k.ki_freigegeben),
                     'arten', coalesce((
                         select jsonb_agg(jsonb_build_object(
                             'code', a.code,
@@ -220,10 +224,18 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                             'meldung', r.meldung,
                             'aktiv', r.aktiv)
                             order by r.code collate "C")
-                        from regel r), '[]'::jsonb)
+                        from regel r), '[]'::jsonb),
+                    'kiTexte', (
+                        select jsonb_build_object(
+                            'rolle', t.rolle,
+                            'feldregeln', t.feldregeln,
+                            'kiFreigegeben', t.ki_freigegeben)
+                        from ki_texte t where t.id = 1)
                 ) as inhalt
-                from naechste n, (select current_schema() as schema_name) s
+                from naechste n
+                cross join (select current_schema() as schema_name) s
                 left join public.mandant m on m.schema_name = s.schema_name
+                join ki_texte k on k.id = 1
             )
             insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
             select nummer, 'system:seed', null, 'SEED', inhalt,

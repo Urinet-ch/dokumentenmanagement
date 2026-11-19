@@ -199,7 +199,7 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Und steht im Zugriffsprotokoll von «urinet» kein neuer Eintrag
     Und belegt die API noch 0 Plätze für Streams
 
-  @req-13.3
+  @req-13.3 @webseiten-datei-messfall
   Szenario: Messfall 50 MB an einen langsamen Client: die Datei kommt vollständig an, ohne dass die API sie im Speicher hält
     Angenommen das Dokument «b3» hat eine Datei von 50 MB
     Wenn der Webseiten-Lesezugang «vorstand» die Datei von «b3» mit der Stufe «mitglieder» langsam liest

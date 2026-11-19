@@ -22,6 +22,10 @@ public interface KlassifikationRepository {
 
     boolean wertInGebrauch(String code, String wert);
 
+    long dokumentAnzahl(String code);
+
+    long wertDokumentAnzahl(String code, String wert);
+
     boolean mehrfachWirdVerletzt(String code);
 
     List<ArtKlassifikation> zuordnungen(String art);

@@ -27,6 +27,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.sse.OutboundSseEvent;
 import jakarta.ws.rs.sse.Sse;
+import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.ParameterIn;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
@@ -52,16 +53,20 @@ import java.util.UUID;
 public class OeffentlicherChatResource {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    static final String HINWEIS_STANDARD = "archiv.webseite.chat.hinweis";
 
     private final OeffentlicheFragen fragen;
     private final MandantAufloesung aufloesung;
     private final LeseAnfrage anfrage;
+    private final Config konfiguration;
 
     @Inject
-    public OeffentlicherChatResource(OeffentlicheFragen fragen, MandantAufloesung aufloesung, LeseAnfrage anfrage) {
+    public OeffentlicherChatResource(OeffentlicheFragen fragen, MandantAufloesung aufloesung, LeseAnfrage anfrage,
+                                     Config konfiguration) {
         this.fragen = fragen;
         this.aufloesung = aufloesung;
         this.anfrage = anfrage;
+        this.konfiguration = konfiguration;
     }
 
     @Schema(name = "ChatFrage")
@@ -82,10 +87,11 @@ public class OeffentlicherChatResource {
     @Operation(summary = "Frage an den öffentlichen Chatbot",
             description = "Antwort als Server-Sent Events mit benannten Ereignissen, JSON in data: «werkzeug» "
                     + "{werkzeug} je Werkzeugaufruf, «text» {delta}, genau ein «quellen» [{dokumentId, titel, reihe "
-                    + "{code, name}, ausgabe}] vor «fertig» {gespraechId}; «fehler» {meldung, gespraechId} mit festem "
+                    + "{code, name}, ausgabe, jahr, fundstelle {seite}}] vor «fertig» {gespraechId, hinweis}; "
+                    + "«fehler» {meldung, gespraechId} mit festem "
                     + "Text beendet den Stream ohne «fertig». Der Chatbot antwortet nur aus veröffentlichten Dokumenten "
-                    + "bis zur gemeldeten Stufe; findet er keine passende Publikation, sagt er das und verweist auf die "
-                    + "Geschäftsstelle (und «quellen» ist leer). Die Links auf die Dokumentseiten bildet die Webseite aus "
+                    + "bis zur gemeldeten Stufe; ohne passende Quelle wird keine Modellantwort ausgegeben und «quellen» "
+                    + "ist leer. Die Webseite zeigt «hinweis» unter dem Chatfenster und bildet Dokumentlinks aus "
                     + "dokumentId. Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 403 NICHT_ERLAUBT, 429 ZU_VIELE_ANFRAGEN mit "
                     + "Retry-After und dem Feld grund (STUNDENLIMIT: mehr als 20 Fragen je Client oder je Webseite in "
                     + "60 Minuten; LAEUFT: schon eine Frage des Clients, Retry-After 5 s) oder 429 BUDGET (Monatsbudget "
@@ -110,12 +116,13 @@ public class OeffentlicherChatResource {
         Eingabe eingabe = eingabe(body);
         OeffentlicheFragen.Annahme annahme = fragen.annehmen(mandant, anfrage.zugriff(), eingabe.frage(),
                 eingabe.gespraechId());
+        String hinweis = hinweis(konfiguration, mandant);
         ChatAbbruch abbruch = new ChatAbbruch();
         // sofort starten und puffern, bis Quarkus abonniert: der Platz wird auch frei, wenn nie jemand abonniert
         UnicastProcessor<OutboundSseEvent> strom = UnicastProcessor.create();
         fragen.starten(annahme, ausgabe -> {
             strom.onNext(sse.newEventBuilder().name(ausgabe.name()).mediaType(MediaType.TEXT_PLAIN_TYPE)
-                    .data(String.class, daten(ausgabe)).build());
+                    .data(String.class, daten(ausgabe, hinweis)).build());
             if (ausgabe.letzte()) {
                 strom.onComplete();
             }
@@ -155,14 +162,34 @@ public class OeffentlicherChatResource {
         }
     }
 
-    /** JSON in {@code data:} eines Ereignisses. */
-    static String daten(OeffentlicheAusgabe ausgabe) {
+    /**
+     * Hinweis unter dem Chatfenster ({@code fertig.hinweis}): {@code archiv.mandant.<code>.chat-hinweis}, sonst der
+     * mandantenneutrale Standard {@value #HINWEIS_STANDARD}; einzeilig, ohne Steuerzeichen.
+     */
+    static String hinweis(Config konfiguration, MandantCode mandant) {
+        Optional<String> eigener = mandant == null ? Optional.empty() : konfiguration.getOptionalValue(
+                "archiv.mandant." + mandant.wert() + ".chat-hinweis", String.class).map(OeffentlicherChatResource::einzeilig);
+        return eigener.filter(h -> !h.isEmpty()).orElseGet(() -> {
+            String standard = einzeilig(konfiguration.getValue(HINWEIS_STANDARD, String.class));
+            if (standard.isEmpty()) {
+                throw new IllegalStateException(HINWEIS_STANDARD + " darf nicht leer sein");
+            }
+            return standard;
+        });
+    }
+
+    private static String einzeilig(String wert) {
+        return wert.replaceAll("[\\p{Cc}\\p{Cf}]", " ").replaceAll("\\s+", " ").strip();
+    }
+
+    /** JSON in {@code data:} eines Ereignisses; {@code hinweis} nur für {@code fertig}. */
+    static String daten(OeffentlicheAusgabe ausgabe, String hinweis) {
         return switch (ausgabe) {
             case OeffentlicheAusgabe.Werkzeug w -> JSON.createObjectNode().put("werkzeug", w.werkzeug()).toString();
             case OeffentlicheAusgabe.Text t -> JSON.createObjectNode().put("delta", t.delta()).toString();
             case OeffentlicheAusgabe.Quellen q -> quellen(q).toString();
             case OeffentlicheAusgabe.Fertig f -> JSON.createObjectNode().put("gespraechId", f.gespraechId().toString())
-                    .toString();
+                    .put("hinweis", hinweis).toString();
             case OeffentlicheAusgabe.Fehler f -> JSON.createObjectNode().put("meldung", f.meldung())
                     .put("gespraechId", f.gespraechId().toString()).toString();
         };
@@ -179,6 +206,16 @@ public class OeffentlicherChatResource {
                 knoten.putNull("ausgabe");
             } else {
                 knoten.put("ausgabe", quelle.ausgabe());
+            }
+            if (quelle.jahr() == null) {
+                knoten.putNull("jahr");
+            } else {
+                knoten.put("jahr", quelle.jahr());
+            }
+            if (quelle.seite() == null) {
+                knoten.putNull("fundstelle");
+            } else {
+                knoten.putObject("fundstelle").put("seite", quelle.seite());
             }
         }
         return liste;

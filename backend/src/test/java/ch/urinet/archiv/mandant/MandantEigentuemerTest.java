@@ -107,6 +107,7 @@ class MandantEigentuemerTest {
     void zugriffProtokollNurEinfuegen() throws SQLException {
         provisionierung.anlegen("probe-protokoll", null, null);
         String tabelle = "m_probe_protokoll.zugriff_protokoll";
+        long anzahlNachher;
         try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
             assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'INSERT')")).isTrue();
             assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'SELECT')")).isTrue();
@@ -115,8 +116,10 @@ class MandantEigentuemerTest {
             }
             assertThat(wahr(befehl, "has_sequence_privilege('m_probe_protokoll.zugriff_protokoll_id_seq', 'USAGE')"))
                     .isTrue();
+            long anzahlVorher = Long.parseLong(wert(befehl, "select count(*) from " + tabelle));
             befehl.execute("insert into " + tabelle + " (benutzer, rolle, aktion) values ('probe', 'INHABER', 'ANZEIGEN')");
-            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+            anzahlNachher = anzahlVorher + 1;
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo(Long.toString(anzahlNachher));
             verweigert(befehl, "update " + tabelle + " set benutzer = 'x'");
             verweigert(befehl, "delete from " + tabelle);
             verweigert(befehl, "truncate " + tabelle);
@@ -128,7 +131,7 @@ class MandantEigentuemerTest {
                 assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
                         .hasMessageContaining("nur Einfügen erlaubt");
             }
-            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo(Long.toString(anzahlNachher));
         }
     }
 
@@ -150,12 +153,16 @@ class MandantEigentuemerTest {
                     .isTrue();
             befehl.execute("insert into m_probe_version.dokument (id, quelle, erstellt_von, status) values "
                     + "('00000000-0000-4000-8000-0000000000a1', 'UPLOAD', 'probe', 'NEU')");
-            // Version 1 (Migration, leer) und Version 2 (Seed) legt die Provisionierung an; Dokumente erhalten die letzte
+            // Änderungen durch Changesets können weitere MIGRATION-Versionen anfügen; Dokumente erhalten die letzte.
+            String letzteKonfigurationsversion = wert(befehl,
+                    "select max(version) from m_probe_version.konfiguration_version");
             assertThat(wert(befehl, "select konfiguration_version from m_probe_version.dokument"
-                    + " where id = '00000000-0000-4000-8000-0000000000a1'")).isEqualTo("2");
+                    + " where id = '00000000-0000-4000-8000-0000000000a1'"))
+                    .isEqualTo(letzteKonfigurationsversion);
             befehl.execute("insert into " + tabelle + " (dokument_id, version, daten, geaendert_von, grund) values "
                     + "('00000000-0000-4000-8000-0000000000a1', 0, '{}', 'probe', 'Probe')");
-            assertThat(wert(befehl, "select konfiguration_version from " + tabelle)).isEqualTo("2");
+            assertThat(wert(befehl, "select konfiguration_version from " + tabelle))
+                    .isEqualTo(letzteKonfigurationsversion);
             assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
             verweigert(befehl, "update " + tabelle + " set grund = 'x'");
             verweigert(befehl, "delete from " + tabelle);
@@ -180,6 +187,7 @@ class MandantEigentuemerTest {
     void benutzerVerzeichnisNurEinfuegen() throws SQLException {
         provisionierung.anlegen("probe-verzeichnis", null, null);
         String tabelle = "m_probe_verzeichnis.benutzer_verzeichnis";
+        String anzahlNachher;
         try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
             assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'INSERT')")).isTrue();
             assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'SELECT')")).isTrue();
@@ -188,12 +196,15 @@ class MandantEigentuemerTest {
             }
             assertThat(wahr(befehl,
                     "has_sequence_privilege('m_probe_verzeichnis.benutzer_verzeichnis_id_seq', 'USAGE')")).isTrue();
+            long anzahlVorher = Long.parseLong(wert(befehl, "select count(*) from " + tabelle));
             befehl.execute("insert into " + tabelle + " (benutzer, name, rolle, gueltig_von, anlass) values "
                     + "('probe', 'Probe Person', 'MITARBEITER', clock_timestamp(), 'AKTION')");
-            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+            anzahlNachher = Long.toString(anzahlVorher + 1);
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo(anzahlNachher);
             verweigert(befehl, "update " + tabelle + " set name = 'x'");
             verweigert(befehl, "delete from " + tabelle);
             verweigert(befehl, "truncate " + tabelle);
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo(anzahlNachher);
         }
         try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
              Statement befehl = eigentuemer.createStatement()) {
@@ -202,7 +213,7 @@ class MandantEigentuemerTest {
                 assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
                         .hasMessageContaining("nur Einfügen erlaubt");
             }
-            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo(anzahlNachher);
         }
     }
 
@@ -289,12 +300,13 @@ class MandantEigentuemerTest {
         String versionen = schema + ".konfiguration_version";
         try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
              Statement befehl = eigentuemer.createStatement()) {
+            String anzahlVorher = wert(befehl, "select count(*) from " + versionen);
             for (String sql : List.of("update " + versionen + " set wer = 'geändert'",
                     "delete from " + versionen)) {
                 assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
                         .hasMessageContaining("nur Einfügen erlaubt");
             }
-            assertThat(wert(befehl, "select count(*) from " + versionen)).isEqualTo("2");
+            assertThat(wert(befehl, "select count(*) from " + versionen)).isEqualTo(anzahlVorher);
         }
         try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
              Statement befehl = eigentuemer.createStatement()) {

@@ -1,0 +1,48 @@
+{
+  "format": 1,
+  "einstellungen": {
+    "geschaeftsjahrEnde": "12-31",
+    "kennungen": {
+      "uid": null,
+      "ibans": []
+    }
+  },
+  "kiTexte": {
+    "rolle": "",
+    "feldregeln": "",
+    "kiFreigegeben": false
+  },
+  "klassifikationen": [],
+  "arten": [
+    {
+      "code": "PROBE_BELEG",
+      "name": "Probebeleg",
+      "gruppen": [
+        "finanz"
+      ],
+      "pflichtfelder": [
+        "titel",
+        "datum"
+      ],
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung": {
+        "jahre": 10,
+        "ab": "GESCHAEFTSJAHR"
+      },
+      "gesetzlichePflicht": true,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
+  ],
+  "regeln": [],
+  "_zweck": "Synthetischer Seed nur für Tests (Aufgabe 5.5b, features/protokoll/manifest.feature)"
+}
