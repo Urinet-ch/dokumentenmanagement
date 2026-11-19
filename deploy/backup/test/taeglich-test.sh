@@ -272,6 +272,8 @@ if grep -q ' exec -T api' "$MOCK_LOG"; then
   exit 1
 fi
 assert grep -q 'sicherung zuwachs --mandant urinet' "$MOCK_LOG"
+assert grep -q 'sicherung inventar --mandant vhf-gsk' "$MOCK_LOG"
+assert grep -q 'sicherung zuwachs --mandant vhf-gsk' "$MOCK_LOG"
 inventar_zeile=$(grep -n 'sicherung inventar --mandant urinet' "$MOCK_LOG" | head -n 1 | cut -d: -f1)
 zuwachs_zeile=$(grep -n 'sicherung zuwachs --mandant urinet' "$MOCK_LOG" | head -n 1 | cut -d: -f1)
 assert test "$inventar_zeile" -lt "$zuwachs_zeile"
@@ -282,6 +284,8 @@ festhalten_aufrufe=$(grep -c 'sicherung festhalten ' "$MOCK_LOG" || true)
 assert test "$age_dateien" -eq 8
 assert test "$festhalten_aufrufe" -eq "$age_dateien"
 assert grep -q 'festhalten --art bucket --mandant urinet' "$MOCK_LOG"
+assert grep -q 'festhalten --art bucket --mandant vhf-gsk' "$MOCK_LOG"
+assert grep -q 'festhalten --art inventar --mandant vhf-gsk' "$MOCK_LOG"
 assert grep -q 'festhalten --art db --sha256' "$MOCK_LOG"
 while read -r summe _; do
   assert grep -q -- "--sha256 $summe" "$MOCK_LOG"
