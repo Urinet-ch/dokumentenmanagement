@@ -101,6 +101,7 @@ Schnittstelle gilt für jede Webseite, nicht nur WordPress; sie ist der lesende 
 9. FALLS die gemeldete Stufe über der Stufe des Lese-Schlüssels liegt, DANN SOLL das Archiv mit HTTP 403 `NICHT_ERLAUBT` antworten und nichts liefern; FALLS der Wert unbekannt ist, mit HTTP 400 `ANFRAGE_UNGUELTIG` (neu 13.11.2026, entschieden von Fabian am 13.11.2026, E-C).
 10. WENN die Webseite zu einer alten URL (4.3) die Dokument-ID abfragt, DANN SOLL das Archiv die ID nur liefern, wenn das Dokument nach 5.3 bis zur Stufe der Anfrage sichtbar ist, sonst mit HTTP 404 antworten (neu 13.11.2026, vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR).
 11. Liste, Suche, Details und Chat-Quellen SOLLEN Dokumente nur mit `dokumentId` und den Angaben aus design.md («Antwortfelder») bezeichnen und nie eine URL einer Seite der Webseite; den Link auf die Dokumentseite bildet die Webseite selbst (neu 13.11.2026, vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR).
+12. Die öffentliche Hybridsuche SOLL eine je Mandant konfigurierbare, standardmässig ausgeschaltete Aktualitätsgewichtung unterstützen. WENN sie aktiviert ist, SOLLEN Treffer mit Erscheinungsdatum sanft nach Alter abgewertet werden; Treffer ohne Datum erhalten keine Korrektur. Ein klar relevanterer älterer Treffer SOLL nicht unter einen irrelevanteren neueren rutschen (neu, Auftrag S5).
 
 ### Requirement 6: Öffentlicher Chatbot
 **User Story:** Als Verbandsmitglied möchte ich Fachfragen stellen und die passenden Bulletins finden,

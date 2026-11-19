@@ -186,6 +186,27 @@ neue Felder sind additiv):
 Nie enthalten: Dateiname, Vertraulichkeit, Status, `veroeffentlicht`, Referenzen, Speicher-URLs (ausser der
 vorsignierten URL von `/datei` bei Stufe `oeffentlich`) und URLs von Seiten der Webseite.
 
+#### Aktualitätsgewichtung der öffentlichen Suche (S5, Requirement 5.12)
+
+`datum` wird bereits je Suchtreffer aus `dokument.datum` geliefert und ist nullable. Die Hybridsuche berücksichtigt es
+bisher nicht: Der Reranker ordnet Textpassagen, sein Ergebnis enthält Scores, die `HybridSuche` bisher verwirft.
+
+Vorschlag für eine optionale, mandantenspezifische Korrektur nach dem Reranker:
+
+- Konfiguration unter `archiv.suche.aktualitaet.mandanten.<mandant>` mit `aktiviert`, `faktor` und
+  `halbwertzeit-tage`; ein fehlender Mandanteneintrag bedeutet «aus». Der Mandant stammt aus dem verifizierten
+  API-Schlüssel, nicht aus Suchparametern.
+- `faktor` ist die maximale Abwertung als Anteil der Spannweite der Reranker-Scores; Vorschlag: `0.05` (5 %) und
+  `halbwertzeit-tage=365`. Für den Vergleich werden die Scores innerhalb der Kandidaten auf 0 bis 1 normiert.
+- Abwertung: `faktor * (1 - 2^(-alterTage / halbwertzeitTage))`; ein Datum in der Zukunft zählt wie heute. Ohne
+  Erscheinungsdatum wird der Score nicht verändert. Damit beträgt die Korrektur höchstens den Faktor: Ein alter
+  Treffer mit einem grösseren Relevanzabstand als dieser bleibt vor einem irrelevanteren neueren Treffer.
+- Die Gewichtung bleibt standardmässig aus, damit bestehende Mandanten ihr Ranking behalten. Kein Reranker-Ausfall,
+  Volltext-Rückfall oder neuer Vertragsparameter. Das Feld `datum` ist bereits im Vertrag; es gibt keine
+  Vertrags- oder Frontendänderung.
+
+Die Werte sind ein Vorschlag, kein Entscheid zur Aktivierung. Insbesondere bleibt das Einschalten für `vhf-gsk` offen.
+
 - Umsetzung (Aufgabe 11.2, mandantenneutrale Vorstufe; Teil 1 mit Liste, Suche, Details, Datei-Link, Filter und Umleitung):
   - Pakete: `WebseitenLesenResource` (`integration/adapter/in/rest/webseite`, Pfad `/public/v1`, Header über `@BeanParam LeseKopf` im Vertrag), Use Cases `WebseiteLesen` (Liste, Details, Filter, Umleitung), `WebseiteSuche` (Hybridsuche) und `WebseiteDatei` (Datei-Link) in `integration/application/webseite`, Port `WebseitenLesePort` mit `SqlWebseitenLese` (`integration/adapter/out/persistence`), Domain-Typen `AlteUrl`, `ListenFilter`, `WebseiteDokument` u. a. in `integration/domain/webseite`. Schemas des Vertrags heissen `Webseite…`, weil die App-OpenAPI Namen wie `Dokument` und `Fundstelle` schon belegt (der Vertragstest liest Code und App in einem Index).
   - Fester Filter in jeder Abfrage: Der SQL-Adapter hängt `FesterFilter.bedingung("d")` und `d.bestaetigt is not null` (eine Art ohne Bestätigung wirkt als `PERSONAL`, Spec 01, 2.21) an jede Abfrage; die Hybridsuche läuft über die neue Sicht `Sichtregel.fuerWebseite(Sichtregel.Webseite(stufen, jahr, ausgabe))`, die `VertraulichkeitFilter.sql` in jede Teilabfrage (Volltext, Vektor, Texte, Details) übersetzt, und `SqlWebseitenLese` lädt die Felder der Treffer unter demselben Filter noch einmal. Die HQL-Variante für die App lehnt die Regel ab (`IllegalStateException`, nie eine zu weite Sicht). `stufen` ist immer `Lesezugriff.stufen()`, nie ein Wert aus der Anfrage; `zugriff`, `veroeffentlicht`, `status`, `mandant` und alle übrigen festen Namen werden nie gelesen, unbekannte Parameter ignoriert.
