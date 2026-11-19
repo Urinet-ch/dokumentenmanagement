@@ -21,6 +21,7 @@ export * from './dokument-aenderung';
 export * from './dokument-finanz';
 export * from './dokument-version';
 export * from './dokument-vertrag';
+export * from './dokument-wissensseiten-verweis';
 export * from './dokumentart';
 export * from './dokumentart-aenderung';
 export * from './download-adresse';

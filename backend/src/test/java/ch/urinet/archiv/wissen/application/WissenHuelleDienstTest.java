@@ -80,6 +80,29 @@ class WissenHuelleDienstTest {
     }
 
     @Test
+    void quelldokumentAenderungMarkiertAlleBetroffenenUndBewahrtDieMindeststufe() {
+        TestRepository repository = new TestRepository(new WissensGraph(
+                Map.of(QUELLE, Set.of(DOKUMENT)), Map.of(SEITE, Set.of(QUELLE)),
+                Map.of(DOKUMENT, WissensStufe.INTERN),
+                Map.of(QUELLE, WissensStufe.INTERN, SEITE, WissensStufe.NORMAL)));
+        repository.mitDokument.addAll(Set.of(QUELLE, SEITE));
+        Set<UUID> markiert = new HashSet<>();
+        QuelldokumentBeobachter beobachter = new QuelldokumentBeobachter(new WissenHuelleDienst(repository),
+                markiert::addAll);
+
+        beobachter.sperren();
+        beobachter.geaendert(DOKUMENT);
+
+        assertThat(repository.aufrufe).containsExactly("sperren", "sperren", "seiten", "graph");
+        assertThat(markiert).containsExactlyInAnyOrder(QUELLE, SEITE);
+        assertThat(repository.stufen).containsEntry(QUELLE, WissensStufe.INTERN)
+                .containsEntry(SEITE, WissensStufe.INTERN);
+        assertThat(repository.mindeststufen).containsEntry(QUELLE, WissensStufe.INTERN)
+                .containsEntry(SEITE, WissensStufe.INTERN);
+        assertThat(repository.versionen).isEmpty();
+    }
+
+    @Test
     void freigabeBerechnetAuchSeitenNeuDieDieFreigegebeneSeiteZitieren() {
         TestRepository repository = new TestRepository(new WissensGraph(
                 Map.of(SEITE, Set.of(DOKUMENT)),

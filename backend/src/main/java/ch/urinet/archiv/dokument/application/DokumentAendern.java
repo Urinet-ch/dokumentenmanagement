@@ -86,12 +86,14 @@ public class DokumentAendern {
     private final AuftragService auftraege;
     private final KlassifikationVerwaltung klassifikationen;
     private final RegelPruefung regelPruefung;
+    private final DokumentEreignisse ereignisse;
 
     public DokumentAendern(DokumentRepository repository, DokumentAenderungPort port, DokumentStatusPort status,
                            SperrKonfliktProtokollPort konfliktProtokoll, AblagePort ablage,
                            DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
                            MandantEinstellungen einstellungen, AuftragService auftraege,
-                           KlassifikationVerwaltung klassifikationen, RegelPruefung regelPruefung) {
+                           KlassifikationVerwaltung klassifikationen, RegelPruefung regelPruefung,
+                           DokumentEreignisse ereignisse) {
         this.repository = repository;
         this.port = port;
         this.status = status;
@@ -104,6 +106,7 @@ public class DokumentAendern {
         this.auftraege = auftraege;
         this.klassifikationen = klassifikationen;
         this.regelPruefung = regelPruefung;
+        this.ereignisse = ereignisse;
     }
 
     /**
@@ -118,6 +121,7 @@ public class DokumentAendern {
         if (dokument.version() != erwarteteVersion) {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
         }
+        ereignisse.vorAenderung();
         Metadaten alt = port.ladenUndSperren(id).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (alt.version() != erwarteteVersion) {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
@@ -175,6 +179,7 @@ public class DokumentAendern {
             port.versionSichern(id, benutzer.id(), grund);
         }
         int version = port.speichern(neu);
+        ereignisse.geaendert(id, Set.of("metadaten"));
         // ein schon offenes EMBEDDING liest beim Lauf den neuen Stand; die Zeilensperre des Dokuments
         // (ladenUndSperren) ordnet zwei Änderungen, die zweite sieht den Auftrag der ersten
         if (archiviert && kopfzeileGeaendert(alt, neu) && auftraege.hatHandler(EmbeddingSpeichern.EMBEDDING)

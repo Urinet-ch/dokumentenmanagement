@@ -39,6 +39,7 @@ model/dokument-aenderung.ts
 model/dokument-finanz.ts
 model/dokument-version.ts
 model/dokument-vertrag.ts
+model/dokument-wissensseiten-verweis.ts
 model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts
