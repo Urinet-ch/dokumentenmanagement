@@ -304,7 +304,8 @@ realm_container_angelegt=1
 # /tmp des Dienstes ist ein 32-MiB-tmpfs, und tmpfs-Inhalt überlebt das Containerende nicht (docker cp erfasst ihn
 # nicht). Darum schreibt der Export in ein Bind-Mount unter dem Arbeitsverzeichnis. Der Keycloak-Benutzer (uid 1000)
 # braucht Schreibrecht; das übergeordnete Arbeitsverzeichnis ist 700, andere Benutzer erreichen das Verzeichnis nicht.
-realm_export_befehl='set -euo pipefail; umask 022; export KC_DB_PASSWORD="$(< /run/secrets/keycloak_db)"; exec /opt/keycloak/bin/kc.sh export --optimized --dir /archiv-export --realm urinet-archiv --users same_file'
+# Der Export braucht keinen Bootstrap-Admin; Keycloak 26.8 bricht ab, wenn der Name ohne Passwort gesetzt ist.
+realm_export_befehl='set -euo pipefail; umask 022; unset KC_BOOTSTRAP_ADMIN_USERNAME; export KC_DB_PASSWORD="$(< /run/secrets/keycloak_db)"; exec /opt/keycloak/bin/kc.sh export --optimized --dir /archiv-export --realm urinet-archiv --users same_file'
 chmod 777 "$plain/realm" || fehler 3 "Verzeichnis für den Realm-Export konnte nicht vorbereitet werden."
 compose run --no-deps -T --name "$realm_container" --volume "$plain/realm:/archiv-export" --entrypoint /bin/bash \
   "$ARCHIV_KEYCLOAK_SERVICE" -c "$realm_export_befehl" \
