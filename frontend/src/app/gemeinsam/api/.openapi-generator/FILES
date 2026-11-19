@@ -24,6 +24,7 @@ model/api-token-neu.ts
 model/api-token.ts
 model/art-klassifikation.ts
 model/auszug-teil.ts
+model/bearbeitung.ts
 model/befund.ts
 model/bestaetigung.ts
 model/branding-dto.ts
@@ -42,7 +43,9 @@ model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts
 model/download-adresse.ts
+model/eingabe.ts
 model/eingangskorb-seite.ts
+model/entfernte-aussage.ts
 model/export-anfrage.ts
 model/export.ts
 model/fundstelle.ts
@@ -84,6 +87,7 @@ model/models.ts
 model/protokoll-aktion.ts
 model/protokoll-eintrag.ts
 model/protokoll-seite.ts
+model/quelleneintrag.ts
 model/regel-aenderung.ts
 model/regel-anlegen.ts
 model/regel.ts
@@ -96,8 +100,10 @@ model/upload-fehler.ts
 model/verwerfen.ts
 model/verzeichnis-eintrag.ts
 model/warnung.ts
+model/wissen-annehmen.ts
 model/wissen-ingest-auftrag.ts
 model/wissen-ingest-start.ts
+model/wissen-verwerfen.ts
 model/wissens-index-gruppe.ts
 model/wissens-index-zeile.ts
 model/wissens-index.ts
