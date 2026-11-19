@@ -31,6 +31,7 @@ import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIOException;
 
 class OkfKonformitaetTest {
     private static final Instant ZEIT = Instant.parse("2026-01-02T03:04:05Z");
@@ -117,6 +118,32 @@ class OkfKonformitaetTest {
                 paket(Set.of(intern.pfad()), "cloud"),
                 List.of(new OkfSchreiber.Seite(intern, Map.of(), Map.of())), List.of(),
                 new ByteArrayOutputStream()));
+    }
+
+    @Test
+    void importgrenzenWerdenVorEinerUnbrauchbarenAusgabeErzwungen() {
+        Set<String> zuViele = java.util.stream.IntStream.range(0, 201)
+                .mapToObj(n -> "konzepte/seite-" + n).collect(java.util.stream.Collectors.toSet());
+        assertThatIllegalArgumentException().isThrownBy(() -> paket(zuViele, "lokal"));
+
+        Wissensseite langerTitel = seite(KONZEPT, "konzepte/probe", Seitentyp.KONZEPT, "x".repeat(17_000),
+                "Text", List.of(), null, Wissensseite.Vertraulichkeit.NORMAL);
+        assertThatIllegalArgumentException().isThrownBy(() -> OkfSchreiber.schreiben(
+                paket(Set.of(langerTitel.pfad()), "lokal"),
+                List.of(new OkfSchreiber.Seite(langerTitel, Map.of(), Map.of())), List.of(),
+                new ByteArrayOutputStream()));
+
+        assertThatIOException().isThrownBy(() -> OkfSchreiber.schreiben(
+                paket(Set.of(), "lokal"), List.of(),
+                List.of(new OkfSchreiber.Logzeile(ZEIT, "Ingest", "x".repeat(128 * 1024))),
+                new ByteArrayOutputStream()));
+
+        Wissensseite starkKomprimierbar = seite(KONZEPT, "konzepte/probe", Seitentyp.KONZEPT, "Konzept",
+                "x".repeat(100_000), List.of(), null, Wissensseite.Vertraulichkeit.NORMAL);
+        assertThatIOException().isThrownBy(() -> OkfSchreiber.schreiben(
+                paket(Set.of(starkKomprimierbar.pfad()), "lokal"),
+                List.of(new OkfSchreiber.Seite(starkKomprimierbar, Map.of(), Map.of())), List.of(),
+                new ByteArrayOutputStream())).withMessageContaining("Kompressionsverhältnis");
     }
 
     private static Wissensseite seite(UUID id, String pfad, Seitentyp typ, String titel, String inhalt,

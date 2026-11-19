@@ -29,6 +29,12 @@ import java.util.zip.ZipOutputStream;
 
 /** Schreibt aktuelle Wissensseiten als OKF- und importierbares Wissenspaket, ohne Dokumentdateien. */
 public final class OkfSchreiber {
+    private static final long MAX_ZIP = 10L * 1024 * 1024;
+    private static final long MAX_ENTPACKT = 20L * 1024 * 1024;
+    private static final int MAX_DATEI = 128 * 1024;
+    private static final int MAX_FRONTMATTER = 16 * 1024;
+    private static final int MAX_SEITEN = 200;
+
     public record Dokument(UUID id, String sha256, String titel, LocalDate datum) {
     }
 
@@ -57,7 +63,8 @@ public final class OkfSchreiber {
                 throw new IllegalArgumentException("Ungültige Herkunft des Wissenspakets");
             }
             pfade = Set.copyOf(pfade);
-            if (pfade.stream().anyMatch(pfad -> !WissensMarkdown.gueltigerSeitenpfad(pfad))) {
+            if (pfade.size() > MAX_SEITEN
+                    || pfade.stream().anyMatch(pfad -> !WissensMarkdown.gueltigerSeitenpfad(pfad))) {
                 throw new IllegalArgumentException("Ungültiger Seitenpfad im Wissenspaket");
             }
         }
@@ -78,7 +85,7 @@ public final class OkfSchreiber {
         Map<Seitentyp, List<Indexzeile>> index = new EnumMap<>(Seitentyp.class);
         Set<String> geschrieben = new HashSet<>();
         Wissensseite.Vertraulichkeit stufe = Wissensseite.Vertraulichkeit.NORMAL;
-        try (ZipOutputStream zip = new ZipOutputStream(new NichtSchliessend(ziel), StandardCharsets.UTF_8)) {
+        try (PaketZip zip = new PaketZip(ziel)) {
             for (Seite daten : seiten) {
                 unterbrochen();
                 Wissensseite seite = daten.seite();
@@ -94,8 +101,11 @@ public final class OkfSchreiber {
                         == Wissensseite.Vertraulichkeit.INTERN) {
                     stufe = Wissensseite.Vertraulichkeit.INTERN;
                 }
-                datei(zip, seite.pfad() + ".md", frontmatter(seitenkopf(paket, daten))
-                        + WissensMarkdown.fuerOkf(seite.inhalt()));
+                String kopf = frontmatter(seitenkopf(paket, daten));
+                if (kopf.getBytes(StandardCharsets.UTF_8).length > MAX_FRONTMATTER) {
+                    throw new IllegalArgumentException("Frontmatter des Wissenspakets ist zu gross");
+                }
+                datei(zip, seite.pfad() + ".md", kopf + WissensMarkdown.fuerOkf(seite.inhalt()));
                 index.computeIfAbsent(seite.typ(), typ -> new ArrayList<>())
                         .add(new Indexzeile(seite.pfad(), seite.titel(), seite.beschreibung()));
             }
@@ -209,9 +219,9 @@ public final class OkfSchreiber {
         return text.toString();
     }
 
-    private static void log(ZipOutputStream zip, Iterable<Logzeile> zeilen) throws IOException, InterruptedException {
-        zip.putNextEntry(new ZipEntry("log.md"));
-        schreiben(zip, "# Update Log\n");
+    private static void log(PaketZip zip, Iterable<Logzeile> zeilen) throws IOException, InterruptedException {
+        zip.beginnen("log.md");
+        zip.schreiben("# Update Log\n");
         LocalDate letzterTag = null;
         Instant letzteZeit = null;
         for (Logzeile zeile : zeilen) {
@@ -221,13 +231,13 @@ public final class OkfSchreiber {
             }
             LocalDate tag = zeile.zeit().atZone(ZoneOffset.UTC).toLocalDate();
             if (!tag.equals(letzterTag)) {
-                schreiben(zip, "\n## " + tag + "\n\n");
+                zip.schreiben("\n## " + tag + "\n\n");
                 letzterTag = tag;
             }
-            schreiben(zip, "* **" + markdownText(zeile.aktion()) + "**: " + markdownText(zeile.text()) + "\n");
+            zip.schreiben("* **" + markdownText(zeile.aktion()) + "**: " + markdownText(zeile.text()) + "\n");
             letzteZeit = zeile.zeit();
         }
-        zip.closeEntry();
+        zip.ende();
     }
 
     private static String markdownText(String text) {
@@ -254,19 +264,85 @@ public final class OkfSchreiber {
         return new Yaml(optionen).dump(daten);
     }
 
-    private static void datei(ZipOutputStream zip, String name, String inhalt) throws IOException {
-        zip.putNextEntry(new ZipEntry(name));
-        schreiben(zip, inhalt);
-        zip.closeEntry();
-    }
-
-    private static void schreiben(OutputStream ziel, String text) throws IOException {
-        ziel.write(text.getBytes(StandardCharsets.UTF_8));
+    private static void datei(PaketZip zip, String name, String inhalt) throws IOException {
+        zip.beginnen(name);
+        zip.schreiben(inhalt);
+        zip.ende();
     }
 
     private static void unterbrochen() throws InterruptedException {
         if (Thread.currentThread().isInterrupted()) {
             throw new InterruptedException("OKF-Export unterbrochen");
+        }
+    }
+
+    private static final class PaketZip implements AutoCloseable {
+        private final ZipOutputStream zip;
+        private ZipEntry eintrag;
+        private long dateiGroesse;
+        private long gesamtGroesse;
+
+        private PaketZip(OutputStream ziel) {
+            zip = new ZipOutputStream(new BegrenzteAusgabe(ziel), StandardCharsets.UTF_8);
+        }
+
+        private void beginnen(String name) throws IOException {
+            eintrag = new ZipEntry(name);
+            dateiGroesse = 0;
+            zip.putNextEntry(eintrag);
+        }
+
+        private void schreiben(String text) throws IOException {
+            byte[] daten = text.getBytes(StandardCharsets.UTF_8);
+            dateiGroesse += daten.length;
+            gesamtGroesse += daten.length;
+            if (dateiGroesse > MAX_DATEI || gesamtGroesse > MAX_ENTPACKT) {
+                throw new IOException("Wissenspaket überschreitet die Importgrössengrenzen");
+            }
+            zip.write(daten);
+        }
+
+        private void ende() throws IOException {
+            zip.closeEntry();
+            if (eintrag.getSize() > eintrag.getCompressedSize() * 100) {
+                throw new IOException("Wissenspaket überschreitet das zulässige Kompressionsverhältnis");
+            }
+        }
+
+        private void finish() throws IOException {
+            zip.finish();
+        }
+
+        @Override
+        public void close() throws IOException {
+            zip.close();
+        }
+    }
+
+    private static final class BegrenzteAusgabe extends FilterOutputStream {
+        private long groesse;
+
+        private BegrenzteAusgabe(OutputStream ziel) {
+            super(new NichtSchliessend(ziel));
+        }
+
+        @Override
+        public void write(int wert) throws IOException {
+            pruefen(1);
+            out.write(wert);
+        }
+
+        @Override
+        public void write(byte[] daten, int offset, int laenge) throws IOException {
+            pruefen(laenge);
+            out.write(daten, offset, laenge);
+        }
+
+        private void pruefen(int laenge) throws IOException {
+            groesse += laenge;
+            if (groesse > MAX_ZIP) {
+                throw new IOException("Wissenspaket überschreitet die zulässige ZIP-Grösse");
+            }
         }
     }
 
