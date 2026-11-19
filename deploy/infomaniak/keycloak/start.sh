@@ -15,11 +15,13 @@ lesen() {
 # Befehlsersetzung entfernt den abschliessenden Zeilenumbruch
 KC_DB_PASSWORD=$(lesen keycloak_db)
 KC_BOOTSTRAP_ADMIN_PASSWORD=$(lesen keycloak_admin)
-GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-if [[ -n "$GOOGLE_CLIENT_ID" && -s "${ARCHIV_SECRETS_DIR:-/run/secrets}/google_client_secret" ]]; then
+secrets="${ARCHIV_SECRETS_DIR:-/run/secrets}"
+if [[ -s "$secrets/google_client_id" && -s "$secrets/google_client_secret" ]]; then
+  GOOGLE_CLIENT_ID=$(lesen google_client_id)
   GOOGLE_CLIENT_SECRET=$(lesen google_client_secret)
-  if [[ -z "$GOOGLE_CLIENT_SECRET" ]]; then
+  if [[ -z "$GOOGLE_CLIENT_ID" || -z "$GOOGLE_CLIENT_SECRET" ]]; then
     GOOGLE_CLIENT_ID=
+    GOOGLE_CLIENT_SECRET=
   fi
 else
   GOOGLE_CLIENT_ID=

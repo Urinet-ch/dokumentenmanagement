@@ -593,7 +593,7 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
 
 - [ ]* O.8 Anmeldung mit Google [Infra] [Backend] [Fabian]
   - Herkunft: Auftrag Fabian vom 12.11.2026; Entscheide [Fabian]: Stufe (2.25), Verknüpfung durch Benutzer oder Admin (2.27), Verzicht auf TOTP (2.28, Vorschlag: nein), Aufbewahrung der Keycloak-Ereignisse
-  - Google-OAuth-Client (Redirect-URI `https://archiv-auth.apps.urinet.ch/realms/urinet-archiv/broker/google/endpoint`) anlegen und Geheimnis als GitHub-Secret `GOOGLE_CLIENT_SECRET` setzen [Fabian]
+  - Google-OAuth-Client (Redirect-URI `https://archiv-auth.apps.urinet.ch/realms/urinet-archiv/broker/google/endpoint`) anlegen und Client-ID und Geheimnis als GitHub-Secrets `GOOGLE_CLIENT_ID` und `GOOGLE_CLIENT_SECRET` setzen [Fabian]; Client-ID im Realm-Export als Platzhalter `${GOOGLE_CLIENT_ID}` angeschlossen (Nachbesserung PR #334), Bereitstellung beider Dateien im Deploy-Workflow bleibt bei Fabian
   - Identity Provider, Flows und Ereignisse im Realm-Export, `start.sh` setzt den Platzhalter, Pflichtprüfung des Secrets im Deploy-Workflow, `RealmExportTest` und `RealmExportKeycloakTest` angepasst; bei Stufe A einmalige Einrichtung im bestehenden Realm per `kcadm.sh` im Wegwerf-Container
   - Szenarien gegen einen `oidc`-Test-IdP: unbekanntes Konto abgelehnt, E-Mail allein verknüpft nicht, verknüpftes Konto angemeldet mit TOTP, Rollen und `mandant` nur aus Keycloak, Lösen der Verknüpfung im Ereignisprotokoll und Sitzungen beendet
   - ab Stufe B: Google als Empfänger der Anmeldedaten im Verzeichnis der Bearbeitungen und im Datenschutzhinweis [Fabian]

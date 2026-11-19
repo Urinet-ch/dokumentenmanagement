@@ -120,6 +120,7 @@ class RealmExportKeycloakTest {
         assertThat(google.get("postBrokerLoginFlowAlias")).isEqualTo("google-totp-pflicht");
         Map<String, String> googleConfig = (Map<String, String>) google.get("config");
         assertThat(googleConfig.get("syncMode")).isEqualTo("IMPORT");
+        assertThat(googleConfig.get("clientId")).isEqualTo("synthetische-google-client-id.apps.test");
         assertThat(googleConfig.get("clientSecret")).isEqualTo("**********");
         Object mappers = google.get("mappers");
         assertThat(mappers == null || mappers.equals(List.of())).isTrue();

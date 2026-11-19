@@ -21,12 +21,15 @@ mkdir "$temp/out"
 
 pruefen() {
   local id=$1 secret=$2 erwartet_id=$3 erwartet_secret=$4
+  : > "$temp/secrets/google_client_id"
   : > "$temp/secrets/google_client_secret"
+  if [[ "$id" != "<leer>" ]]; then
+    printf '%s\n' "$id" > "$temp/secrets/google_client_id"
+  fi
   if [[ "$secret" != "<leer>" ]]; then
     printf '%s\n' "$secret" > "$temp/secrets/google_client_secret"
   fi
   ARCHIV_SECRETS_DIR="$temp/secrets" \
-  GOOGLE_CLIENT_ID="$id" \
   KEYCLOAK_BIN="$temp/bin/keycloak-stub" \
   START_TEST_AUSGABE="$temp/out" \
     bash "$start" >/dev/null
@@ -35,7 +38,7 @@ pruefen() {
   [[ $(<"$temp/out/args") == "start --optimized --import-realm" ]]
 }
 
-pruefen "" "synthetisches-secret" "" ""
+pruefen "<leer>" "synthetisches-secret" "" ""
 pruefen "synthetische-id" "<leer>" "" ""
 pruefen "synthetische-id" "synthetisches-secret" "synthetische-id" "synthetisches-secret"
 jq -e '.identityProviders[] | select(.alias == "google" and .enabled == false)' \

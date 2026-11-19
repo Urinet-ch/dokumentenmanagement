@@ -1,17 +1,18 @@
 # Google-IdP
 
-Der Realm-Export enthält den deaktivierten Provider `google`, beide Anmeldeflows und die Ereignistypen. `start.sh` liest
-`google_client_secret` aus `/run/secrets/` und verwendet die nichtgeheime `GOOGLE_CLIENT_ID` nur, wenn beide Werte nicht
-leer sind. Fehlt einer, werden beide beim Realm-Import leer übergeben; der Provider im Export bleibt deaktiviert. Das
-Produktions-Compose-File bindet das Secret noch nicht ein: Der Deploy-Workflow muss die Datei erst nach dem Entscheid zu
-OAuth-Client und GitHub-Secret bereitstellen.
+Der Realm-Export enthält den deaktivierten Provider `google`, beide Anmeldeflows und die Ereignistypen. `start.sh` kann
+`google_client_id` und `google_client_secret` aus `/run/secrets/` lesen und die Werte beim erstmaligen Import als
+`GOOGLE_CLIENT_ID` und `GOOGLE_CLIENT_SECRET` bereitstellen, wenn beide nicht leer sind. Fehlt einer, werden beide beim
+Realm-Import leer übergeben; der Provider im Export bleibt deaktiviert. Das Produktions-Compose-File bindet die Dateien
+noch nicht ein: Der Deploy-Workflow muss sie erst nach dem Entscheid zu OAuth-Client und GitHub-Secrets
+(`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) bereitstellen.
 
 `--import-realm` überspringt einen Realm, der bereits in der Datenbank vorhanden ist. Die Vorlage
 [`google-idp-einrichten-vorlage.sh`](./google-idp-einrichten-vorlage.sh) bildet darum die einmalige Nachrüstung ab. Sie
-ist für einen Wegwerf-Container mit authentifiziertem `kcadm.sh`, `jq` und einer Secret-Datei unter
-`/run/secrets/google_client_secret` gedacht. Die Vorlage wurde mit einem `kcadm.sh`-Stub und synthetischem Secret
-geprüft, aber nicht gegen einen bestehenden Realm oder einen Betriebsserver ausgeführt. Sie legt den Provider absichtlich
-deaktiviert an.
+ist für einen Wegwerf-Container mit authentifiziertem `kcadm.sh`, `jq` und Secret-Dateien unter
+`/run/secrets/google_client_id` und `/run/secrets/google_client_secret` gedacht. Die Vorlage wurde mit einem
+`kcadm.sh`-Stub und synthetischen Testwerten geprüft, aber nicht gegen einen bestehenden Realm oder einen Betriebsserver
+ausgeführt. Sie legt den Provider absichtlich deaktiviert an.
 
 Zum Verknüpfen eines Kontos ausschliesslich als Administrator:
 
@@ -49,6 +50,7 @@ bash deploy/infomaniak/keycloak/test/start-test.sh
   `oidc`-Test-IdP.
 - `eventsListeners` ist in Realm-Export und Vorlage gleich (`[]`, Ereignisse nur in der Datenbank); `eventsExpiration` ist
   bewusst nicht gesetzt (unbegrenzte Aufbewahrung, Zugriffsprotokoll nach Req 2.27).
-- `start.sh` übergibt Google-ID und -Secret nur gemeinsam, wenn beide nicht leer sind. Der Stub-Test prüft beide
-  Leerlauf-Fälle und den Fall mit synthetischen Werten; er läuft nicht in der CI (Workflow-Änderung liegt bei Fabian).
-- Der Stub-Test der Vorlage läuft nicht in der CI (Workflow-Änderung liegt bei Fabian) und wird von Hand gestartet.
+- `start.sh` setzt fehlende `google_client_id` und `google_client_secret` auf leer; das gilt nur bei deaktiviertem Provider.
+  Mit der Freigabe werden die Dateien Pflicht (offen für Fabian, Workflow-Prüfung). Der Start-Stub-Test prüft beide leeren
+  Fälle und beide synthetischen Werte; er läuft nicht in der CI (Workflow-Änderung liegt bei Fabian).
+- Der Stub-Test der Vorlage läuft nicht in der CI und wird von Hand gestartet.

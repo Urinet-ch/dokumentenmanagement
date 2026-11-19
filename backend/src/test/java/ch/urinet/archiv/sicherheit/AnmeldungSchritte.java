@@ -168,6 +168,8 @@ public class AnmeldungSchritte {
     @Dann("bleibt das Google-Clientgeheimnis ein Platzhalter und die Anmeldeereignisse sind aktiviert")
     public void googleSecretUndEreignisse() throws IOException {
         JsonNode realm = export();
+        assertThat(realm.path("identityProviders").path(0).path("config").path("clientId").asText())
+                .isEqualTo("${GOOGLE_CLIENT_ID}");
         assertThat(realm.path("identityProviders").path(0).path("config").path("clientSecret").asText())
                 .isEqualTo("${GOOGLE_CLIENT_SECRET}");
         assertThat(realm.path("eventsEnabled").asBoolean()).isTrue();
