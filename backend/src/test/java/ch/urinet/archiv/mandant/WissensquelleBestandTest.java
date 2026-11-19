@@ -44,7 +44,8 @@ class WissensquelleBestandTest {
         anlegenWennFehlt(MANDANT);
         String s = MANDANT.schema();
         String ausSeed = wissensquelle(s);
-        String vorherKonfiguration = wert("select ((inhalt - 'version') - 'regeln')::text from " + s
+        // 044 ist unveränderlich und schreibt kein kiTexte; beim Lesen ergänzt KonfigurationVerwaltung sie aus ki_texte
+        String vorherKonfiguration = wert("select ((inhalt - 'version') - 'regeln' - 'kiTexte')::text from " + s
                 + ".konfiguration_version order by version desc limit 1");
         // Stand vor 13.2: Konfiguration ohne die Art
         ausfuehren("insert into " + s + ".konfiguration_version (version, wer, grund, quelle, inhalt, sha256) "
