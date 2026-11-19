@@ -54,7 +54,7 @@ public class WissenExportResource {
 
     @POST
     @ErfordertAktion(Aktion.A19)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @RolesAllowed("inhaber")
     @Operation(summary = "OKF-Export anfordern", description = "Nur Inhaber (A19); reiht WISSEN_EXPORT ein.")
     @APIResponse(responseCode = "202", description = "Export angelegt und eingereiht",
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ExportDto.class)))
@@ -66,7 +66,7 @@ public class WissenExportResource {
     @GET
     @Path("/{id}")
     @ErfordertAktion(Aktion.A19)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @RolesAllowed("inhaber")
     @Operation(summary = "OKF-Export abrufen", description = "Nur Inhaber (A19); Download ab Abschluss für 24 Stunden.")
     @APIResponse(responseCode = "200", description = "Exportstatus und gegebenenfalls Download-Adresse",
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ExportDto.class)))

@@ -15,8 +15,11 @@ import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
 import ch.urinet.archiv.wissen.application.WissenOkfExportPort;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.yaml.snakeyaml.Yaml;
@@ -51,7 +54,18 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.is;
 
 @QuarkusTest
+@Tag("start-4")
+@TestProfile(OkfExportDatenTest.ExportProfil.class)
 class OkfExportDatenTest {
+    public static class ExportProfil implements QuarkusTestProfile {
+        private static final String SUFFIX = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of("quarkus.datasource.devservices.db-name", "archiv_okf_export_" + SUFFIX);
+        }
+    }
+
     @Inject
     WissenOkfExportPort export;
     @Inject

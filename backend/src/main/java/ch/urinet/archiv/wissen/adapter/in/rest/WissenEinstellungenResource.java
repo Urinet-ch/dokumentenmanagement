@@ -45,7 +45,7 @@ public class WissenEinstellungenResource {
 
     @GET
     @ErfordertAktion(Aktion.A19)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @RolesAllowed("inhaber")
     @Operation(summary = "Wissenseinstellungen lesen",
             description = "Nur Inhaber (A19); null bedeutet den konfigurierten Startwert.")
     public WerteDto lesen() {
@@ -55,7 +55,7 @@ public class WissenEinstellungenResource {
 
     @PUT
     @ErfordertAktion(Aktion.A19)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @RolesAllowed("inhaber")
     @Operation(summary = "Wissenseinstellungen ersetzen",
             description = "Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.")
     @APIResponse(responseCode = "200", description = "Einstellungen gespeichert",
