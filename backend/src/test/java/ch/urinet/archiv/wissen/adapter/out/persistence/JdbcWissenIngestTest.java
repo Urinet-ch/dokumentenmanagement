@@ -324,6 +324,33 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void veralteteAenderungKannMitAktuellemEtagVerworfenWerden() throws SQLException {
+        UUID seite = seite(URINET, "konzepte/veraltet-" + UUID.randomUUID(), "Probe", null);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set aktion = 'AENDERN', seite_id = ?, basis_version = 1 "
+                + "where entwurf_id = ?", seite, entwurf);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set version = 2 where id = ?", seite);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+        assertThat(im(URINET, () -> freigabeSperre.basisAktuell(
+                freigabeSperre.laden(inhaber, entwurf, 1, () -> 0)))).isFalse();
+        String pfad = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/verwerfen";
+        String token = Testanmeldung.token("inhaber-urinet");
+        given().auth().oauth2(token).header("If-Match", "\"0\"").contentType("application/json")
+                .body("{\"grund\":\"Überholt\"}").when().post(pfad).then().statusCode(412);
+        given().auth().oauth2(token).header("If-Match", "\"1\"").contentType("application/json")
+                .body("{\"grund\":\"Überholt\"}").when().post(pfad).then().statusCode(204);
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "ERLEDIGT");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_aenderung where entwurf_id = ? and status = 'VERWORFEN' and etag = 2", entwurf))
+                .isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_VERWERFEN'", entwurf))
+                .isEqualTo(1);
+    }
+
+    @Test
     void freigabePrueftNeueQuellenMitIhrerAktuellenStufe() throws SQLException {
         UUID dokument = quelle(URINET);
         UUID entwurf = manuellerEntwurf(URINET);

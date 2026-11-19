@@ -40,7 +40,7 @@ public class FreigabeDienst {
     @Transactional
     public void verwerfen(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch, String grund,
                           String realIp) {
-        FreigabeRepository.Aenderung aenderung = sperre.laden(benutzer, entwurfId, nummer, ifMatch);
+        FreigabeRepository.Aenderung aenderung = sperre.zumVerwerfenLaden(benutzer, entwurfId, nummer, ifMatch);
         String text = grund == null ? "" : grund.strip();
         if (text.isEmpty()) {
             throw new PflichtfelderFehlen(List.of("grund"));

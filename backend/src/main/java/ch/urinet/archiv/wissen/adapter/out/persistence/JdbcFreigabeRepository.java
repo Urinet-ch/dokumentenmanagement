@@ -210,7 +210,7 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                 update wissens_aenderung
                 set status = 'VERWORFEN', entschieden_von = :benutzer, entschieden_am = clock_timestamp(),
                     grund = :grund, etag = etag + 1
-                where id = :id and status = 'OFFEN' and etag = :etag
+                where id = :id and status in ('OFFEN', 'VERALTET') and etag = :etag
                 """).setParameter("benutzer", benutzer).setParameter("grund", grund)
                 .setParameter("id", aenderungId).setParameter("etag", etag).executeUpdate();
         if (geaendert != 1) {

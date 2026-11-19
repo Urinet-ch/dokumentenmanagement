@@ -30,6 +30,17 @@ public class FreigabeSperre {
 
     @Transactional(Transactional.TxType.MANDATORY)
     public FreigabeRepository.Aenderung laden(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch) {
+        return laden(benutzer, entwurfId, nummer, ifMatch, false);
+    }
+
+    @Transactional(Transactional.TxType.MANDATORY)
+    public FreigabeRepository.Aenderung zumVerwerfenLaden(Benutzer benutzer, UUID entwurfId, int nummer,
+                                                           IntSupplier ifMatch) {
+        return laden(benutzer, entwurfId, nummer, ifMatch, true);
+    }
+
+    private FreigabeRepository.Aenderung laden(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch,
+                                                boolean veraltetErlaubt) {
         huelle.sperren();
         Optional<FreigabeRepository.Aenderung> gefunden = repository.sperren(entwurfId, nummer);
         boolean sichtbar = gefunden.filter(a -> a.seiteId() == null
@@ -39,7 +50,8 @@ public class FreigabeSperre {
         if (ifMatch.getAsInt() != aenderung.etag()) {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
         }
-        if (!"OFFEN".equals(aenderung.entwurfStatus()) || !"OFFEN".equals(aenderung.status())) {
+        if (!"OFFEN".equals(aenderung.entwurfStatus()) || !("OFFEN".equals(aenderung.status())
+                || veraltetErlaubt && "VERALTET".equals(aenderung.status()))) {
             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }
         return aenderung;
