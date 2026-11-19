@@ -49,7 +49,7 @@ class WissenEntwurfLesenTest {
     void a17SiehtFassungenUndZuordnungDerKernaussagen() {
         WissenEntwurfLesen.Vollansicht ansicht = (WissenEntwurfLesen.Vollansicht) lesen.lesen(INHABER, ID);
         assertThat(ansicht.aenderungen()).singleElement().satisfies(a -> {
-            assertThat(a.inhalt()).isEqualTo("Fassung");
+            assertThat(a.inhalt()).isEqualTo("Fassung [^q-1] und \\[^q-2]");
             assertThat(a.diff()).containsEntry("inhalt", "Diff");
         });
         assertThat(ansicht.kernaussagen()).extracting(WissenEntwurfLesen.Aussage::zugeordnet)
@@ -57,9 +57,18 @@ class WissenEntwurfLesenTest {
         assertThat(repository.inhaltGeladen).isTrue();
     }
 
+    @Test
+    void fussnoteOhneQuelleneintragOrdnetKeineKernaussageZu() {
+        repository.ohneQuellen = true;
+        WissenEntwurfLesen.Vollansicht ansicht = (WissenEntwurfLesen.Vollansicht) lesen.lesen(INHABER, ID);
+        assertThat(ansicht.kernaussagen()).extracting(WissenEntwurfLesen.Aussage::zugeordnet)
+                .containsExactly(false, false);
+    }
+
     private static final class Speicher implements WissenEntwurfLesenRepository {
         private Kopf kopf = new Kopf(ID, "ANALYSE", "OFFEN", MITARBEITER.id(), Instant.EPOCH, null, false, "Hinweis");
         private boolean inhaltGeladen;
+        private boolean ohneQuellen;
         private String eigenerAnalyseVorschlag;
 
         @Override
@@ -83,7 +92,9 @@ class WissenEntwurfLesenTest {
         public List<Aenderung> aenderungen(UUID id) {
             inhaltGeladen = true;
             return List.of(new Aenderung(1, 1, "NEU", null, "analyse/test", null,
-                    Map.of("quellen", List.of(Map.of("schluessel", "q-1"))), "Fassung", Map.of("inhalt", "Diff"),
+                    ohneQuellen ? Map.of()
+                            : Map.of("quellen", List.of(Map.of("schluessel", "q-1"), Map.of("schluessel", "q-2"))),
+                    "Fassung [^q-1] und \\[^q-2]", Map.of("inhalt", "Diff"),
                     "Begründung", List.of(), List.of(), List.of(), List.of(), "NORMAL", "OFFEN",
                     null, null, null, null, 0));
         }

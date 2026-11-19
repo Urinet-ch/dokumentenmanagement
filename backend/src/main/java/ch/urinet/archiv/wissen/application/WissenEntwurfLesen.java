@@ -6,6 +6,7 @@ import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
+import ch.urinet.archiv.wissen.domain.WissensMarkdown;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -50,7 +51,7 @@ public class WissenEntwurfLesen {
             return new StatusAnsicht(entwurf.id(), entwurf.status(), repository.entscheidungen(id));
         }
         List<WissenEntwurfLesenRepository.Aenderung> aenderungen = repository.aenderungen(id);
-        Set<String> genutzteSchluessel = aenderungen.stream().flatMap(a -> quellenSchluessel(a.daten()).stream())
+        Set<String> genutzteSchluessel = aenderungen.stream().flatMap(a -> genutzteQuellen(a).stream())
                 .collect(Collectors.toSet());
         List<Aussage> aussagen = repository.kernaussagen(id).stream()
                 .map(a -> new Aussage(a.nr(), a.schluessel(), a.text(), a.seiten(), a.auszug(), a.belegt(),
@@ -66,6 +67,13 @@ public class WissenEntwurfLesen {
         return liste.stream().map(quelle -> quelle instanceof java.util.Map<?, ?> map ? map.get("schluessel") : null)
                 .filter(String.class::isInstance)
                 .map(String.class::cast).collect(Collectors.toSet());
+    }
+
+    private static Set<String> genutzteQuellen(WissenEntwurfLesenRepository.Aenderung aenderung) {
+        Set<String> fussnoten = WissensMarkdown.analysieren(aenderung.inhalt(),
+                WissensMarkdown.MAX_EINGABE_ZEICHEN).fussnoten();
+        return quellenSchluessel(aenderung.daten()).stream().filter(fussnoten::contains)
+                .collect(Collectors.toSet());
     }
 
     public sealed interface Ansicht permits Vollansicht, StatusAnsicht {

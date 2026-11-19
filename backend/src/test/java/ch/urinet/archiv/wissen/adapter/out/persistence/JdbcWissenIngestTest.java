@@ -674,6 +674,68 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void paralleleFreigabenErhaltenMindeststufeZitierterSeiten() throws Exception {
+        UUID dokument = quelle(URINET);
+        String quellpfad = "konzepte/parallel-quelle-" + UUID.randomUUID();
+        UUID quellseite = seite(URINET, quellpfad, "Probe", null);
+        UUID quellEntwurf = manuellerEntwurf(URINET);
+        UUID zitierEntwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, quellEntwurf, 1);
+        aenderung(URINET, zitierEntwurf, 1);
+        String quellDaten = """
+                {"typ":"Konzept","titel":"Quelle","beschreibung":"Ein Satz.","tags":[],
+                 "status":"AKTIV","quellen":[{"schluessel":"q1","dokumentId":"%s","seiteVon":1,
+                 "seiteBis":1,"auszug":"Seite 1"}],"inhalt":"Aussage.[^q1]"}
+                """.formatted(dokument);
+        String zitierDaten = """
+                {"typ":"Konzept","titel":"Zitat","beschreibung":"Ein Satz.","tags":[],
+                 "status":"AKTIV","quellen":[{"schluessel":"q1","quellSeiteId":"%s"}],
+                 "inhalt":"Aussage.[^q1]"}
+                """.formatted(quellseite);
+        ausfuehren("update " + URINET.schema()
+                        + ".wissens_aenderung set aktion = 'AENDERN', seite_id = ?, basis_version = 1, pfad = ?, "
+                        + "daten = cast(? as jsonb), inhalt = 'Aussage.[^q1]' where entwurf_id = ?",
+                quellseite, quellpfad, quellDaten, quellEntwurf);
+        ausfuehren("update " + URINET.schema()
+                        + ".wissens_aenderung set pfad = ?, daten = cast(? as jsonb), "
+                        + "inhalt = 'Aussage.[^q1]' where entwurf_id = ?",
+                "konzepte/parallel-zitat-" + UUID.randomUUID(), zitierDaten, zitierEntwurf);
+        String token = Testanmeldung.token("inhaber-urinet");
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService parallel = Executors.newFixedThreadPool(2)) {
+            var quelle = parallel.submit(() -> {
+                start.await();
+                return given().auth().oauth2(token).header("If-Match", "\"0\"")
+                        .contentType("application/json").body("{\"vertraulichkeit\":\"INTERN\"}")
+                        .when().post("/api/v1/wissensentwuerfe/" + quellEntwurf + "/aenderungen/1/annehmen")
+                        .statusCode();
+            });
+            var zitat = parallel.submit(() -> {
+                start.await();
+                return given().auth().oauth2(token).header("If-Match", "\"0\"")
+                        .contentType("application/json").body("{}")
+                        .when().post("/api/v1/wissensentwuerfe/" + zitierEntwurf + "/aenderungen/1/annehmen")
+                        .statusCode();
+            });
+            start.countDown();
+            assertThat(List.of(quelle.get(30, TimeUnit.SECONDS), zitat.get(30, TimeUnit.SECONDS)))
+                    .containsExactly(204, 204);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite s join " + URINET.schema()
+                    + ".wissens_aenderung a on a.seite_id = s.id where a.entwurf_id in (?, ?) "
+                    + "and s.vertraulichkeit = 'INTERN'", quellEntwurf, zitierEntwurf)).isEqualTo(2);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_version where entwurf_id in (?, ?)", quellEntwurf, zitierEntwurf))
+                    .isEqualTo(2);
+        } finally {
+            annahmeBereinigen(zitierEntwurf);
+            annahmeBereinigen(quellEntwurf);
+            ausfuehren("delete from " + URINET.schema() + ".wissensseite_quelle where seite_id = ?", quellseite);
+            ausfuehren("delete from " + URINET.schema() + ".wissensseite_dokument where seite_id = ?", quellseite);
+        }
+    }
+
+    @Test
     void ueberblickMitInternerZitatseiteZeigtBefundImEndpunkt() throws SQLException {
         UUID quellseite = seite(URINET, "konzepte/intern-" + UUID.randomUUID(), "Probe", null);
         ausfuehren("update " + URINET.schema()
@@ -711,7 +773,9 @@ class JdbcWissenIngestTest {
             for (String sql : List.of(
                     "delete from public.auftrag where typ = 'WISSEN_EMBEDDING' and nutzlast->>'seiteId' in "
                             + "(select seite_id::text from " + schema + ".wissens_aenderung where entwurf_id = ?)",
-                    "delete from " + schema + ".wissensseite_version_dokument where seite_id in " + ids,
+                    "delete from " + schema + ".wissensseite_version_dokument h using " + schema
+                            + ".wissensseite_version v where h.seite_id = v.seite_id and h.version = v.version "
+                            + "and v.entwurf_id = ?",
                     "delete from " + schema + ".wissensseite_version where entwurf_id = ?",
                     "delete from " + schema + ".wissens_log where entwurf_id = ?",
                     "delete from " + schema + ".zugriff_protokoll where dokument_id = ?",
@@ -1040,10 +1104,12 @@ class JdbcWissenIngestTest {
         }
     }
 
-    private long anzahl(String sql, Object wert) throws SQLException {
+    private long anzahl(String sql, Object... werte) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
-            abfrage.setObject(1, wert);
+            for (int i = 0; i < werte.length; i++) {
+                abfrage.setObject(i + 1, werte[i]);
+            }
             try (ResultSet z = abfrage.executeQuery()) {
                 z.next();
                 return z.getLong(1);
