@@ -1097,6 +1097,37 @@ components:
         gueltigBis:
           type: string
           $ref: "#/components/schemas/Instant"
+    Eingabe:
+      type: object
+      properties:
+        seiteId:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        typ:
+          type: string
+        titel:
+          type: string
+        beschreibung:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        veraltetAb:
+          $ref: "#/components/schemas/LocalDate"
+        quellen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quelleneintrag"
+        inhalt:
+          type: string
+        begruendung:
+          type: string
+        entfernteAussagen:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntfernteAussage"
     EingangskorbSeite:
       type: object
       required:
@@ -5744,6 +5775,33 @@ paths:
               schema: {}
         "403":
           description: Rolle darf keine Entwürfe lesen
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+    post:
+      summary: Manuellen Wissensentwurf anlegen
+      tags:
+      - Wissensbasis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Eingabe"
+        required: true
+      responses:
+        "201":
+          description: Entwurf angelegt und geprüft
+        "400":
+          description: Anfrage ungültig
+        "403":
+          description: Rolle darf keine Entwürfe anlegen
+        "404":
+          description: Seite nicht vorhanden oder nicht sichtbar
         "401":
           description: Not Authorized
       security:
