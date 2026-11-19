@@ -45,8 +45,8 @@ export class KonfigurationService extends BaseService {
      * Klassifikation einer Dokumentart entfernen
      * @endpoint delete /api/v1/dokumentarten/{art}/klassifikationen/{code}
      * @param art 
-     * @param code 
-     * @param ifMatch 
+     * @param code
+     * @param ifMatch
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
@@ -1334,8 +1334,8 @@ export class KonfigurationService extends BaseService {
      * Dokumentregel löschen
      * Neue Konfigurationsversion; bestehende Dokumente bleiben unverändert. If-Match mit Konfigurationsversion ist Pflicht (Spec 05, Req 7.1).
      * @endpoint delete /api/v1/regeln/{code}
-     * @param code 
-     * @param ifMatch 
+     * @param code
+     * @param ifMatch
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
