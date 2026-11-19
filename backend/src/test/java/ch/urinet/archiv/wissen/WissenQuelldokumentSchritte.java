@@ -37,6 +37,7 @@ public class WissenQuelldokumentSchritte {
 
     private UUID dokument;
     private UUID seite;
+    private UUID entwurf;
 
     @Angenommen("eine normale Wissensseite verweist auf ein normales Quelldokument")
     public void normaleQuelle() throws Exception {
@@ -140,6 +141,31 @@ public class WissenQuelldokumentSchritte {
                 .when().patch(pfad).then().statusCode(200);
     }
 
+    @Wenn("der Inhaber eine Änderung dieser Wissensseite freigibt")
+    public void seitenAenderungFreigeben() throws Exception {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            ausfuehren(verbindung, "update m_urinet.dokument set volltext = 'Seite 1' || chr(12), seiten = 1, "
+                    + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false where id = ?", dokument);
+        }
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        Map<String, Object> daten = Map.of("seiteId", seite, "pfad", "konzepte/quelle-" + seite,
+                "typ", "Konzept", "titel", "Probe", "beschreibung", "Ein Satz.", "inhalt", "Aussage.[^q1]",
+                "quellen", List.of(Map.of("schluessel", "q1", "dokumentId", dokument,
+                        "seiteVon", 1, "seiteBis", 1, "auszug", "Seite 1")));
+        entwurf = UUID.fromString(given().auth().oauth2(inhaber).contentType("application/json").body(daten)
+                .when().post("/api/v1/wissensentwuerfe").then().statusCode(201).extract().path("id"));
+        given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json").body("{}")
+                .when().post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen")
+                .then().statusCode(204);
+    }
+
+    @Dann("ist der Quellenhinweis durch die Freigabe entfernt")
+    public void freigabeEntferntHinweis() {
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensseiten/" + seite).then().statusCode(200)
+                .body("quellePruefen", is(false)).body("version", is(2));
+    }
+
     @Wenn("das Dokumentereignis vor einer späteren Löschung simuliert wird")
     public void loeschereignisSimulieren() throws Exception {
         CompletableFuture.runAsync(() -> kontext.mit(new MandantCode("urinet"),
@@ -179,7 +205,28 @@ public class WissenQuelldokumentSchritte {
     public void aufraeumen() throws Exception {
         if (seite != null) {
             try (Connection verbindung = datenbank.get().getConnection()) {
+                if (entwurf != null) {
+                    verbindung.setAutoCommit(false);
+                    try (var befehl = verbindung.createStatement()) {
+                        befehl.execute("set local session_replication_role = replica");
+                    }
+                    ausfuehren(verbindung, "delete from public.auftrag where typ = 'WISSEN_EMBEDDING' "
+                            + "and nutzlast->>'seiteId' = ?", seite.toString());
+                    ausfuehren(verbindung, "delete from m_urinet.wissensseite_version_dokument where seite_id = ?",
+                            seite);
+                    ausfuehren(verbindung, "delete from m_urinet.wissensseite_version where entwurf_id = ?", entwurf);
+                    ausfuehren(verbindung, "delete from m_urinet.wissens_log where entwurf_id = ?", entwurf);
+                    ausfuehren(verbindung, "delete from m_urinet.zugriff_protokoll where dokument_id = ?", entwurf);
+                    ausfuehren(verbindung, "delete from m_urinet.wissens_aenderung where entwurf_id = ?", entwurf);
+                    ausfuehren(verbindung, "delete from m_urinet.wissens_entwurf where id = ?", entwurf);
+                    ausfuehren(verbindung, "delete from m_urinet.wissensseite_quelle where seite_id = ?", seite);
+                    ausfuehren(verbindung, "delete from m_urinet.wissensseite_dokument where seite_id = ?", seite);
+                    ausfuehren(verbindung, "delete from m_urinet.wissensseite_link where von_seite_id = ?", seite);
+                }
                 ausfuehren(verbindung, "delete from m_urinet.wissensseite where id = ?", seite);
+                if (entwurf != null) {
+                    verbindung.commit();
+                }
             }
         }
         if (dokument != null) {

@@ -80,7 +80,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - wirksame Stufe nach Annahme über `WissensGraph.wirksameStufeNachAnnahme` als `Kontext.wirksameVertraulichkeit`, Seitenstufe = Mindeststufe; zuerst `WissenHuelleDienst.sperren()`, dann Seite und Version, dann `versionFreigeben` in derselben Transaktion; Test mit zwei parallelen Freigaben (Review PR #300, S1, S2)
   - Szenario `@req-12.3` über den Entwurfszugriff: eigener Analysevorschlag ohne Fassung und Diff (Review PR #300, S4)
   - Szenario `@req-11.8` Ende zu Ende: Annehmen einer Fassung von `ueberblick`, deren wirksame Stufe über `NORMAL` liegt, ergibt 422 mit dem Befund `STUFE_UEBERBLICK` (Review PR #300, ebc9d0b6, K3); Mindeststufen zitierter Quellseiten fliessen in die wirksame Stufe ein (geklärt durch Req 11.10 / 13.5b, PR #318, Entscheid vom 18.11.2026); der Endpunkt-Test prüft 422 `STUFE_UEBERBLICK` auch mit einer Zitat-Quelle höherer Stufe
-  - Szenario `@req-15.2`: Freigabe einer Seitenänderung entfernt den Hinweis «Quelle prüfen»; der Endpunkt- und Rollback-Test sind vorhanden, der Szenarionachweis folgt nach dem Merge von 14.4 (Review PR #337).
+  - Szenario `@req-15.2`: Freigabe einer Seitenänderung entfernt den Hinweis «Quelle prüfen»; Endpunkt- und Rollback-Test sind grün. Das Szenario ist angelegt, sein Nachweis nach Korrektur der synthetischen Seitentext-Abgrenzung noch offen (Review PR #337).
   - _Anforderungen: 6.1–6.10, 7.6, 14.1_
   - _Abhängig von: 14.1_
 
