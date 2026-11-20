@@ -214,7 +214,7 @@ Funktionalität: Klassifikationen in Suche und Funktionen des Mandanten
     Und steht jedes importierte Dokument im Status «NEU» als «PERSONAL», unbestätigt und nicht archiviert
     Und hat jedes importierte Dokument die Klassifikation «fachgebiet» mit dem Wert «bau»
 
-  @req-8.7
+  @req-8.7 @req-9.3
   Szenariogrundriss: Ungültige Multipart-Vorbelegung hinterlässt in keinem Mandanten Importdaten
     Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
       """

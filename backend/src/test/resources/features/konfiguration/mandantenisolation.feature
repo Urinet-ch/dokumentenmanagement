@@ -19,3 +19,8 @@ Funktionalität: Isolation der Mandantenkonfiguration
     Angenommen der synthetische Probeverband ist für die Abnahme bereit
     Wenn der Probeverband eine synthetische Sitzungsunterlage erfasst und bestätigt
     Dann ist die Sitzungsunterlage mit Feldfrist archiviert, in Suche und Lückenbericht enthalten und ihre Nummer eindeutig
+
+  @req-9.3
+  Szenario: Auch KI-Texte und vollständige Versionsabbilder bleiben in der API des Mandanten
+    Angenommen der synthetische Probeverband ist für die Abnahme bereit
+    Dann bleiben Konfiguration, KI-Texte und Versionsabbilder des Probeverbands in seiner API

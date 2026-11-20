@@ -189,6 +189,32 @@ public class ProbeverbandSchritte {
         });
     }
 
+    @Dann("bleiben Konfiguration, KI-Texte und Versionsabbilder des Probeverbands in seiner API")
+    public void apiIsolation() {
+        int versionVerband = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                .get("/api/v1/konfiguration/versionen").then().statusCode(200).extract().jsonPath()
+                .getList("version", Integer.class).stream().max(Integer::compareTo).orElseThrow();
+        int versionUrinet = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).when()
+                .get("/api/v1/konfiguration/versionen").then().statusCode(200).extract().jsonPath()
+                .getList("version", Integer.class).stream().max(Integer::compareTo).orElseThrow();
+        for (String pfad : List.of("/api/v1/konfiguration", "/api/v1/konfiguration/versionen/{version}",
+                "/api/v1/konfiguration/ki-texte")) {
+            String verband = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                    .get(pfad.replace("{version}", Integer.toString(versionVerband)))
+                    .then().statusCode(200).extract().asString();
+            String urinet = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).when()
+                    .get(pfad.replace("{version}", Integer.toString(versionUrinet)))
+                    .then().statusCode(200).extract().asString();
+            assertThat(verband).as(pfad).contains("Probeverband").doesNotContain("AUSGANGSRECHNUNG");
+            assertThat(urinet).as(pfad)
+                    .doesNotContain("Probeverband", "VERBANDSSITZUNG", "sitzungsthema", "sitzung_nummer_folge");
+            if (!pfad.endsWith("/ki-texte")) {
+                assertThat(verband).as(pfad).contains("VERBANDSSITZUNG", "sitzungsthema", "sitzung_nummer_folge");
+                assertThat(urinet).as(pfad).contains("AUSGANGSRECHNUNG");
+            }
+        }
+    }
+
     private String etag() {
         return etag(dokument);
     }

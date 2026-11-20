@@ -117,13 +117,22 @@ abstract class MandantenIsolationIT {
         assertThat(in("urinet", () -> konfiguration.version(urinet.version()).inhalt()).arten())
                 .extracting(Konfiguration.Art::code).contains("AUSGANGSRECHNUNG")
                 .doesNotContain("VERBANDSSITZUNG");
+        Konfiguration verbandsVersion = in("probe-verband",
+                () -> konfiguration.version(verband.version()).inhalt());
+        Konfiguration urinetVersion = in("urinet", () -> konfiguration.version(urinet.version()).inhalt());
+        assertThat(verbandsVersion.klassifikationen()).extracting(Klassifikation::code).contains("sitzungsthema");
+        assertThat(urinetVersion.klassifikationen()).extracting(Klassifikation::code).doesNotContain("sitzungsthema");
+        assertThat(verbandsVersion.regeln()).extracting(Regel::code).contains("sitzung_nummer_folge");
+        assertThat(urinetVersion.regeln()).extracting(Regel::code).doesNotContain("sitzung_nummer_folge");
+        assertThat(verbandsVersion.kiTexte().rolle()).contains("Probeverband");
+        assertThat(urinetVersion.kiTexte().rolle()).doesNotContain("Probeverband");
 
         String exportVerband = exportieren("probe-verband");
         String exportUrinet = exportieren("urinet");
-        assertThat(exportVerband).contains("VERBANDSSITZUNG", "sitzungsthema", "sitzung_nummer_folge")
+        assertThat(exportVerband).contains("VERBANDSSITZUNG", "sitzungsthema", "sitzung_nummer_folge", "Probeverband")
                 .doesNotContain("AUSGANGSRECHNUNG");
         assertThat(exportUrinet).contains("AUSGANGSRECHNUNG")
-                .doesNotContain("VERBANDSSITZUNG", "sitzungsthema", "sitzung_nummer_folge");
+                .doesNotContain("VERBANDSSITZUNG", "sitzungsthema", "sitzung_nummer_folge", "Probeverband");
     }
 
     @Test
