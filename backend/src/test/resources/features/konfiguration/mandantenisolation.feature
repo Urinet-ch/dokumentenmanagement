@@ -13,3 +13,9 @@ Funktionalität: Isolation der Mandantenkonfiguration
     Dann enthält der Export die Art «PROBE_VHF_BULLETIN»
     Und enthält der Export die Art «AUSGANGSRECHNUNG» nicht
     Und enthält der Export die Art «WISSENSQUELLE»
+
+  @req-9.4
+  Szenario: Der Probeverband erfasst und archiviert eine Sitzungsunterlage
+    Angenommen der synthetische Probeverband ist für die Abnahme bereit
+    Wenn der Probeverband eine synthetische Sitzungsunterlage erfasst und bestätigt
+    Dann ist die Sitzungsunterlage mit Feldfrist archiviert und in Suche und Lückenbericht enthalten
