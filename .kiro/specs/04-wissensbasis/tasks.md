@@ -166,7 +166,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.25, 19.27_
   - _Abhängig von: 13.4 (`WissensPruefung`), Paketformat aus 15.6 (`WissensPaketLeser`)_
 
-- [ ] 15.8 Oberfläche Import [Frontend]
+- [x] 15.8 Oberfläche Import [Frontend]
   - Route `/wissen/entwuerfe/import` (Upload, Prüfbericht mit Zählern und Befunden je Seite, Link zum Entwurf); Entwurfsansicht für Anlass `IMPORT` mit Herkunft, Quellenzuordnung und Auszugsprüfung je Quelle, Hinweis zur Regel für Cloud-Modelle, Aktion «Prüfung wiederholen»; kein gesammeltes Annehmen
   - 375 px, WCAG 2.1 AA (axe), Texte nur in `texte.de-CH.ts`; Szenarien mit Cucumber.js + Playwright; `mitarbeiter` sieht die Route nicht
   - _Anforderungen: 19.28, 16.3, 16.4, 16.7_
