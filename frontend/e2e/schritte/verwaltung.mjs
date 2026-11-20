@@ -1,5 +1,6 @@
-import { Given, Then, When } from '@cucumber/cucumber';
+import { After, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { backend, echtesToken } from '../hilfen/echtes-backend.mjs';
 
 const ETAG = '"konfig-7"';
@@ -109,6 +110,54 @@ Given('die Verwaltungsseite wird auf 375 px geprüft', async function () {
   await this.seite.setViewportSize({ width: 375, height: 812 });
 });
 
+async function klassifikationsAnfrage(mandant, methode, pfad, body) {
+  const authorization = `Bearer ${await echtesToken('inhaber', mandant)}`;
+  const stand = await fetch(`${backend().api}/api/v1/klassifikationen`, {
+    headers: { authorization },
+  });
+  assert.equal(stand.status, 200);
+  const etag = stand.headers.get('etag');
+  assert.ok(etag);
+  return fetch(`${backend().api}/api/v1/klassifikationen${pfad}`, {
+    method: methode,
+    headers: {
+      authorization,
+      'if-match': etag,
+      ...(body ? { 'content-type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+Given(
+  'beide Mandanten haben je eine synthetische Klassifikation',
+  { timeout: 60_000 },
+  async function () {
+    this.isolationsKlassifikationen = [];
+    for (const mandant of ['urinet', 'vhf-gsk']) {
+      const code = `probe_${randomUUID().replaceAll('-', '')}`;
+      const antwort = await klassifikationsAnfrage(mandant, 'POST', '', {
+        code,
+        name: `Probe ${code}`,
+        werte: [],
+        mehrfach: false,
+        kiVorschlag: false,
+        suchfilter: false,
+        oeffentlichFilter: false,
+      });
+      assert.equal(antwort.status, 201, await antwort.text());
+      this.isolationsKlassifikationen.push({ mandant, code });
+    }
+  },
+);
+
+After({ timeout: 60_000 }, async function () {
+  for (const { mandant, code } of this.isolationsKlassifikationen ?? []) {
+    const antwort = await klassifikationsAnfrage(mandant, 'DELETE', `/${code}`);
+    assert.equal(antwort.status, 204, await antwort.text());
+  }
+});
+
 Then(
   /^zeigt die Verwaltung die eigene Art «(.+)» und nicht die fremde Art «(.+)»$/,
   async function (eigene, fremde) {
@@ -117,6 +166,19 @@ Then(
     const codes = await liste.locator('code').allTextContents();
     assert.ok(codes.includes(eigene));
     assert.ok(!codes.includes(fremde), `fremde Art «${fremde}» sichtbar`);
+  },
+);
+
+Then(
+  'zeigt die Verwaltung die eigene und nicht die fremde synthetische Klassifikation',
+  async function () {
+    const mandant = this.keycloak.benutzer.mandant;
+    const eigene = this.isolationsKlassifikationen.find((eintrag) => eintrag.mandant === mandant);
+    const fremde = this.isolationsKlassifikationen.find((eintrag) => eintrag.mandant !== mandant);
+    assert.ok(eigene && fremde);
+    const codes = await this.seite.locator('#klassifikationen aside code').allTextContents();
+    assert.ok(codes.includes(eigene.code));
+    assert.ok(!codes.includes(fremde.code));
   },
 );
 
