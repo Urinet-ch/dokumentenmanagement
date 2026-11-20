@@ -304,6 +304,52 @@ class KonfigurationSeedVersionTest {
     }
 
     @Test
+    void changeset054ErgaenztVhfGskTexteUndErhaeltEigeneArten() throws Exception {
+        String name = "probe_vhf_migration_" + Long.toHexString(System.nanoTime());
+        try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {
+            befehl.execute("create database " + name);
+        }
+        try {
+            try (Connection verbindung = verbinden(name); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("create schema m_vhf_gsk");
+                befehl.execute("set search_path to m_vhf_gsk");
+                befehl.execute("create table ki_texte (id integer primary key, rolle text, feldregeln text,"
+                        + " ki_freigegeben boolean)");
+                befehl.execute("insert into ki_texte values (1, '', '', false)");
+                befehl.execute("create table dokumentart (code text primary key, ki_hinweise text, reihenfolge integer)");
+                befehl.execute("insert into dokumentart values ('PROBE', 'Eigener Hinweis', 7)");
+                befehl.execute("create table konfiguration_version (version integer primary key, wer text,"
+                        + " grund text, quelle text, inhalt jsonb, sha256 text)");
+                befehl.execute("""
+                        insert into konfiguration_version values (1, 'system:migration', null, 'MIGRATION',
+                            '{"version":1,"arten":[{"code":"PROBE","kiHinweise":"Eigener Hinweis","reihenfolge":7}],
+                            "kiTexte":{"rolle":"","feldregeln":"","kiFreigegeben":false}}', 'alt')
+                        """);
+                liquibase(verbindung, "m_vhf_gsk", "054-ki-texte-aus-seed.xml");
+                verbindung.commit();
+
+                assertThat(wert(befehl, "select feldregeln from ki_texte where id = 1"))
+                        .contains("Mandantenhinweise zur Einordnung:", "Reihe; Ausgabe-Nr.; Erscheinungsjahr; Fachgebiet");
+                assertThat(wert(befehl, "select ki_freigegeben::text from ki_texte where id = 1")).isEqualTo("false");
+                assertThat(wert(befehl, "select ki_hinweise || ':' || reihenfolge from dokumentart"))
+                        .isEqualTo("Eigener Hinweis:7");
+                assertThat(wert(befehl, "select quelle from konfiguration_version where version = 2"))
+                        .isEqualTo("MIGRATION");
+                assertThat(wert(befehl, "select inhalt #>> '{kiTexte,feldregeln}' from konfiguration_version "
+                        + "where version = 2")).isEqualTo(wert(befehl, "select feldregeln from ki_texte where id = 1"));
+                assertThat(wert(befehl, "select inhalt #>> '{arten,0,kiHinweise}' from konfiguration_version "
+                        + "where version = 2")).isEqualTo("Eigener Hinweis");
+                assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
+                        + "from konfiguration_version where version = 2")).isEqualTo("t");
+            }
+        } finally {
+            try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {
+                befehl.execute("drop database if exists " + name + " with (force)");
+            }
+        }
+    }
+
+    @Test
     void changeset040OhneMandantenzeileBehaeltDefaultsUndFuehrtWissensquelleOhneKi() throws Exception {
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
             befehl.execute("drop schema if exists " + MIGRATION_SCHEMA + " cascade");
