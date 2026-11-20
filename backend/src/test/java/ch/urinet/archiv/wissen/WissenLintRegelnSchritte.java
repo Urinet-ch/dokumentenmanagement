@@ -78,6 +78,41 @@ public class WissenLintRegelnSchritte {
                 assertThat(paar.veraltet()).containsExactly(new WissensLint.VeraltetKandidat(A, "q", NEU)));
     }
 
+    @Angenommen("Lint-Seiten mit fehlendem Link, abgelaufenem «veraltet ab», «Quelle prüfen», fehlendem Querverweis, "
+            + "einer Quellseite ohne berührte Seiten und einer Aussage ohne Beleg bestehen")
+    public void befundSeiten() {
+        seiten = List.of(
+                seite(A, "konzepte/a", Seitentyp.KONZEPT, ALT, null,
+                        "Aussage. [^q] [Fehlt](/konzepte/fehlend)", null, false),
+                seite(B, "konzepte/b", Seitentyp.KONZEPT, ALT, null,
+                        "Aussage. [^q]", LocalDate.of(2026, 11, 20), true),
+                seite(C, "konzepte/c", Seitentyp.KONZEPT, ALT, null, "Aussage ohne Beleg.", null, false),
+                seite(NEU, "quellen/2026-01-neu", Seitentyp.QUELLE, ALT, ALT,
+                        "## Zusammenfassung\n\nAussage. [^q]\n\n## Kernaussagen\n\nAussage. [^q]\n\n"
+                                + "## Berührte Seiten", null, false));
+        graph = new WissensGraph(Map.of(A, Set.of(ALT), B, Set.of(ALT), C, Set.of(ALT), NEU, Set.of(ALT)),
+                Map.of(), Map.of(ALT, WissensStufe.NORMAL),
+                Map.of(A, WissensStufe.NORMAL, B, WissensStufe.NORMAL, C, WissensStufe.NORMAL,
+                        NEU, WissensStufe.NORMAL));
+        dokumente = Map.of(ALT, quelle(2025));
+        historie = Map.of();
+    }
+
+    @Dann("zählt der Lint je Befundart mindestens einen Befund ohne KI")
+    public void befundArten() {
+        assertThat(ergebnis.befunde()).extracting(WissensLint.Befund::code).contains(
+                "LINK_FEHLT", "VERALTET_AB", "QUELLE_PRUEFEN", "QUERVERWEIS_FEHLT",
+                "QUELLE_OHNE_BERUEHRTE_SEITEN", "AUSSAGE_OHNE_BELEG");
+    }
+
+    private static Wissensseite seite(UUID id, String pfad, Seitentyp typ, UUID dokument, UUID wissensquelle,
+                                      String inhalt, LocalDate veraltetAb, boolean quellePruefen) {
+        return new Wissensseite(id, pfad, typ, "Probe", "Probe", List.of("eins", "zwei"),
+                Wissensseite.Status.AKTIV, veraltetAb, List.of(new Quelleneintrag("q", dokument, 1, 1, null, null)),
+                Wissensseite.Vertraulichkeit.NORMAL, inhalt, 1, "probe", Instant.EPOCH, "probe", Instant.EPOCH,
+                quellePruefen, false, wissensquelle);
+    }
+
     private static Wissensseite seite(UUID id, String pfad, Seitentyp typ, UUID dokument, UUID wissensquelle,
                                       String inhalt) {
         return new Wissensseite(id, pfad, typ, "Probe", "Probe", List.of("eins", "zwei"),

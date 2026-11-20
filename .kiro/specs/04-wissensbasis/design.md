@@ -474,7 +474,10 @@ flowchart LR
   `ingest_daten` des LINT-Entwurfs. Der Entwurf dient auch als Budgetanker und bleibt ohne Änderungen mit Status
   `ERLEDIGT` bestehen. Vor jedem KI-Aufruf wird die aktuelle Hülle erneut geprüft; vor dem Seitenauftrag müssen
   Version und Quellenrevision aller beteiligten Seiten noch zum Paarauftrag passen. Änderungen verwenden die
-  bestehende Freigabeprüfung und werden nicht unmittelbar angewendet.
+  bestehende Freigabeprüfung und werden nicht unmittelbar angewendet. Bricht der Lauf wegen Budget oder fehlendem
+  KI-Zugang ab, gelten Paare, deren Seitenaufträge nicht ausgeführt wurden, nicht als geprüft (Review PR #376); sie
+  behalten ihren Vorrang im nächsten Lauf. Die Nachweise für 10.2 (Befundarten ohne KI inkl. Formfehler) liegen als
+  Szenario `@req-10.2` in `lint.feature`.
 
 ### OKF-Export (`wissen/adapter/out`)
 - `WISSEN_EXPORT` schreibt ein ZIP stromweise nach S3 `exporte/wissen-<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage

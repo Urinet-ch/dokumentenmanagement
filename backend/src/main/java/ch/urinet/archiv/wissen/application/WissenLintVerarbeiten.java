@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -269,11 +270,30 @@ public class WissenLintVerarbeiten {
         if (hinweis != null) {
             stand = neu(stand, append(stand.befunde(), List.of(new WissensLint.Befund(null,
                             "Budget erschöpft".equals(hinweis) ? "BUDGET_ERSCHOEPFT" : "LINT_UNVOLLSTAENDIG", null))),
-                    stand.paare(), stand.paarIndex(), stand.seiten(), stand.seitenIndex(), stand.geprueft(),
+                    stand.paare(), stand.paarIndex(), stand.seiten(), stand.seitenIndex(), ohneUnausgefuehrte(stand),
                     null, false, append(stand.hinweise(), List.of(hinweis)), stand.aenderungen());
         }
         speichern.abschliessen(auftrag, lauf.id(), lauf.schritt(), stand, aktuell.ein(), aktuell.aus(),
                 unvollstaendig, hinweis, !stand.aenderungen().isEmpty());
+    }
+
+    /**
+     * Paare, deren Seitenaufträge wegen Abbruch oder Budget nicht ausgeführt wurden, gelten nicht als geprüft
+     * (Req 10.3): Sie rücken im nächsten Lauf nicht nach hinten, die Änderung wird dort nachgeholt.
+     */
+    static List<WissensLint.PaarId> ohneUnausgefuehrte(Fortschritt stand) {
+        Set<WissensLint.PaarId> offen = new HashSet<>();
+        for (int i = Math.min(stand.seitenIndex(), stand.seiten().size()); i < stand.seiten().size(); i++) {
+            AuftragSeite seite = stand.seiten().get(i);
+            for (Bezug bezug : seite.bezuege()) {
+                int vergleich = seite.seiteId().compareTo(bezug.seiteId());
+                if (vergleich != 0) {
+                    offen.add(vergleich < 0 ? new WissensLint.PaarId(seite.seiteId(), bezug.seiteId())
+                            : new WissensLint.PaarId(bezug.seiteId(), seite.seiteId()));
+                }
+            }
+        }
+        return stand.geprueft().stream().filter(p -> !offen.contains(p)).toList();
     }
 
     private static void gruppieren(List<AuftragSeite> seiten, WissenLintAuswertung.Seitenauftrag a,

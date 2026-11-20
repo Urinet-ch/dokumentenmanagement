@@ -58,6 +58,12 @@ Funktionalität: Lint der Wissensbasis starten
     Und die Originale, Arbeitsfassung, PDF-A, Volltext und Metadaten bleiben unverändert
     Und Bericht und Protokolle enthalten keine Seiten- oder Dokumentinhalte
 
+  @req-10.2
+  Szenario: Der Lint zählt die Befundarten ohne KI (Links, veraltet ab, Quelle prüfen, Querverweise, Quellseiten, Formfehler)
+    Angenommen Lint-Seiten mit fehlendem Link, abgelaufenem «veraltet ab», «Quelle prüfen», fehlendem Querverweis, einer Quellseite ohne berührte Seiten und einer Aussage ohne Beleg bestehen
+    Wenn der Lint höchstens zwei Seitenpaare auswählt
+    Dann zählt der Lint je Befundart mindestens einen Befund ohne KI
+
   @req-10.3
   Szenario: Die am längsten nicht geprüften Paare kommen zuerst
     Angenommen drei verwandte Lint-Seiten sind verschieden lange oder noch nie geprüft
