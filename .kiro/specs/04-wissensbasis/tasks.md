@@ -118,10 +118,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
 ## Welle 15 — Suche, Chat, Lint und Export (parallel)
 
-- [ ] 15.1 Seiten-Embeddings und Suche [Backend] [Frontend]
+- [x] 15.1 Seiten-Embeddings und Suche [Backend] [Frontend]
   - _Zwischenstand #354: Suchpipeline, Embedding-Aufträge, hybrider Ingest-Index und Suchoberfläche umgesetzt; Auftrags-/Vektornachweise, Verbrauchsbuchung, Anspruchsverlust, Budget-429 und Szenarien grün. p95-Nachweis für 2'000 Seiten fehlt (keine künstliche Last auf der geteilten Umgebung erlaubt); daher kein Haken. Gesamt-Verify hatte sechs bestehende Spec-01-Testdatenfehler und elf Docker-Poolfehler; gezielter Verify und einmalige Wiederholung der betroffenen Startklassen grün._
   - `wissensseite_chunk`, Aufträge `WISSEN_EMBEDDING`/`WISSEN_EMBEDDING_ALLE`, `WissensSuche` (Volltext + Vektor + RRF + Reranker, Rückfall), `GET /wissensseiten?q=`; Abschnitt «Wissen» auf der Suchseite
   - Eingrenzung des Ingest-Index (14.1) auf Hybridsuche umstellen; Profil `lokal` nur Volltext; Lasttest 2'000 Seiten p95 ≤ 1 s
+  - Lokaler Nachweis 20.11.2026 (einmaliger Lauf ausdrücklich freigegeben): `WissenssucheLeistungIT` über `tools/last/wissenssuche.sh --freigabe`, eigene Wegwerf-Datenbank, 2'000 Seiten, 200 HTTP-Hybridsuchen nach 20 Aufwärmanfragen; p50 63.365 ms, p95 69.613 ms (HTTP-Obergrenze der Serverzeit). Nur Embedding-/Reranker-Attrappen, echte Suche und Sichtfilter. Kein CI-Lastlauf; der VPS-Nachweis bleibt Fabian vorbehalten.
   - _Anforderungen: 9.1–9.6, 13.2_
   - _Abhängig von: 14.2, Spec 02: 6.3, 6.4_
 

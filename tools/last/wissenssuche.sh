@@ -41,6 +41,7 @@ if docker volume inspect "$name" >/dev/null 2>&1; then
 fi
 volume="$(docker volume create --label "ch.urinet.wissen-leistung=$kennung" "$name")"
 container="$(docker create --pull=never --name "$name" --label "ch.urinet.wissen-leistung=$kennung" \
+  --memory=512m --cpus=2 \
   -p 127.0.0.1::5432 --mount "type=volume,source=$volume,target=/var/lib/postgresql/data" \
   -e POSTGRES_DB=wissen_leistung -e POSTGRES_PASSWORD=lokales-testpasswort \
   pgvector/pgvector:0.8.7-pg17-trixie)"

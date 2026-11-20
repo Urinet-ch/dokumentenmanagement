@@ -470,8 +470,16 @@ flowchart LR
 - Nachweise 15.1: JDBC prüft den echten Handler mit WireMock-Vektor und `WISSEN_EMBEDDING`-Buchung sowie
   Rollback bei verlorenem Auftragsanspruch, Versions-/Mandantentrennung und Stubschutz. Szenarien prüfen
   Volltextgewichtung, Hybrid-/Stub-Rückfall und A17-Nachberechnung; der Browser prüft den Wissensabschnitt,
-  Seitenlink und Barrierefreiheit bei 375 px. Die Lastmessung mit 2'000 Seiten (9.5) steht noch aus;
-  auf der geteilten Umgebung wird gemäss Auftrag keine künstliche Last erzeugt.
+  Seitenlink und Barrierefreiheit bei 375 px. Der ausdrücklich freigegebene einmalige lokale Messlauf
+  (20.11.2026) nutzt `tools/last/wissenssuche.sh --freigabe` unter der Docker-Sperre:
+  eigene leere PostgreSQL-Datenbank, 2'000 tatsächlich gespeicherte synthetische Seiten (davon 200 `INTERN`),
+  20 Aufwärmanfragen und 200 HTTP-Hybridsuchen als Mitarbeiter über zehn Suchbegriffe. Die echte Pipeline
+  umfasst SQL-Sichtfilter, Volltext, Vektor, RRF und Reranker; WireMock liefert lediglich Embeddings und
+  Rerankerantworten (je 220 geprüfte Aufrufe). Alle Antworten sind nicht degradiert, haben 30 Treffer und
+  enthalten keine interne Seite. PostgreSQL ist auf 512 MiB und zwei CPU begrenzt.
+  HTTP einschliesslich Client als konservative Obergrenze der Serverzeit: p50 63.365 ms, p95 69.613 ms,
+  Maximum 77.146 ms (9.5: p95 ≤ 1 s). Der Messlauf ist nicht Teil der CI; Container und benanntes Volume
+  werden auch bei Fehlern entfernt. Die lokale Messung ersetzt den Nachweis auf der VPS durch Fabian nicht.
 
 ### Lint (`wissen/application`)
 - `WISSEN_LINT` (Scheduler mit `archiv.wissen.lint-zeitplan`, nur Rolle `worker`; manuell A17), je KI-Aufruf ein

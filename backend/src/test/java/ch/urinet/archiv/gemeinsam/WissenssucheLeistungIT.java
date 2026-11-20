@@ -66,6 +66,7 @@ class WissenssucheLeistungIT {
                     Map.entry("quarkus.devservices.enabled", "false"),
                     Map.entry("quarkus.compose.devservices.enabled", "false"),
                     Map.entry("quarkus.datasource.devservices.enabled", "false"),
+                    Map.entry("quarkus.http.host", "127.0.0.1"),
                     Map.entry("archiv.ablage.stub", "true"),
                     Map.entry("quarkus.s3.aws.credentials.type", "anonymous"),
                     Map.entry("quarkus.s3.endpoint-override", "http://127.0.0.1:1"),
@@ -120,6 +121,11 @@ class WissenssucheLeistungIT {
         UUID intern = Testdokumente.anlegen(datenbank.get(),
                 new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "INTERN", true, "probe", null, "ARCHIVIERT"));
         Set<String> interneSeiten = anlegen(normal, intern);
+        try (Connection c = datenbank.get().getConnection(); Statement s = c.createStatement();
+             var zeilen = s.executeQuery("select count(*) from m_urinet.wissensseite")) {
+            assertThat(zeilen.next()).isTrue();
+            assertThat(zeilen.getInt(1)).as("Tatsächlich gespeicherte synthetische Wissensseiten").isEqualTo(SEITEN);
+        }
         KiWireMock.zuruecksetzen();
         String issuer = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
         HttpClient client = HttpClient.newHttpClient();
