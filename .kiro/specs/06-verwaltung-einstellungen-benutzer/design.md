@@ -47,7 +47,7 @@ Dokumente sind dann ohnehin lesbar. Das Dienstkonto fügt **neue** Möglichkeite
 | Benutzer anlegen, auch mit Rolle `inhaber`, in jedem Mandanten | nur `manage-users`; Alarm bei jeder Vergabe von `inhaber` (6.7); täglicher Abgleich meldet jede Rolle `inhaber` ohne Vorgang im Protokoll (6.5); Keycloak-Admin-Ereignisse als zweite Spur (6.9) | Einbruch bleibt bis zum Alarm unbemerkt (höchstens Minuten bis 24 h) |
 | Passwörter setzen, Zugangsdaten zurücksetzen, Benutzer übernehmen | das Archiv ruft `reset-password` nie auf (ArchUnit); technisch erlaubt `manage-users` es dennoch; Ereignisse (Admin-Ereignisse) und Abgleich erfassen Änderungen von Zugangsdaten | wie oben |
 | Realm, Clients, Identity Provider, Authentifizierungsflüsse, Redirect-URIs ändern | **nicht möglich**: Dienstkonto ohne `manage-realm`, `manage-clients`, `manage-identity-providers`, `manage-authorization`, `realm-admin`; kein Zugang zum Realm `master` | keines |
-| Sich selbst oder anderen Realm-Admin-Rechte geben | Rollenzuweisung (Realm-Rollen) auf die vier Archiv-Rollen begrenzen: Das Archiv sendet nur diese; Härtung mit feingranularen Admin-Rechten (FGAP v2, Recht `map-roles` nur auf diese vier Rollen), in Aufgabe 19.1 gegen Keycloak 26.8.2 zu prüfen | ohne FGAP v2: Archiv-Code ist die einzige Sperre |
+| Sich selbst oder anderen Realm-Admin-Rechte geben | Rollenzuweisung (Realm-Rollen) auf die vier Archiv-Rollen begrenzen: Das Archiv sendet nur diese; Härtung mit feingranularen Admin-Rechten (FGAP v2, Recht `map-roles` nur auf diese vier Rollen), in Aufgabe 19.1 gegen Keycloak 26.8.2 zu prüfen (Ergebnis: FGAP begrenzt die Zuweisung nicht, solange `manage-users` gehalten wird, siehe «Umsetzung 19.1» und Open Points) | ohne FGAP v2: Archiv-Code ist die einzige Sperre, und das gilt derzeit auch mit FGAP v2 |
 | Benutzer massenhaft löschen oder sperren (Verfügbarkeit) | Raten, Höchstzahl, Alarm (6.6, 6.7); Notfallweg Betreiber; Sicherung enthält die Keycloak-Datenbank (Spec 01, Plattform und Betrieb) | Wiederherstellung aus der Sicherung nötig |
 | Geheimnis des Dienstkontos entwenden | nur Datei `/run/secrets/keycloak_verwaltung_secret`, kein Umgebungswert, nie im Log; Rotation über den definierten Weg (19.3, 21.5); Admin-API nur im internen Netz erreichbar, nicht öffentlich | wer den Container übernimmt, hat das Geheimnis |
 
@@ -320,7 +320,7 @@ ein neuer Benutzer nie als früherer erscheint.
 Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anmeldung und Benutzer bleiben unverändert:
 1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, Secret `${KEYCLOAK_VERWALTUNG_SECRET}`
    (Platzhalter, wie bei Google); Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
-   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1.
+   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1. Ergebnis des Spikes: FGAP wirkt nicht, solange `manage-users` gehalten wird (siehe «Umsetzung 19.1»; Entscheid offen).
 2. SMTP des Realms (Host, Port, Absender `archiv@urinet.ch`, Anzeigename «UriNet Archiv», Zugang als Secret
    `keycloak_smtp_passwort`); ohne SMTP kann Keycloak keine Einladung senden.
 3. Passwort-Richtlinie `length(12) and notUsername and notEmail`.
@@ -487,6 +487,11 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
   `wissens_einstellung`); sonst Aufgabe 20.3 mit Migration.
 - [offen: Entscheid Fabian] Alarm-Empfänger und Monatsbudget des öffentlichen Chats bleiben beim Betreiber (Klasse (b)).
   Empfehlung: ja (Personendaten, Kostenhoheit).
+- [offen: Entscheid Fabian] Rollenzuweisung des Dienstkontos: Requirement 5.2 verlangt `manage-users`, das die FGAP-Prüfung
+  umgeht (Spike 19.1). Optionen: (a) `manage-users` behalten, der Archiv-Code ist die einzige Sperre auf die vier Archiv-Rollen
+  (Ist-Stand, Realm-Export weist FGAP nicht aus); (b) `manage-users` durch feingranulare Rechte (FGAP v2 mit `manage`-Scope
+  auf Benutzer und `map-role` auf die vier Rollen) ersetzen und Requirement 5.2 anpassen. Empfehlung: (a), solange (b) nicht
+  gegen Keycloak 26.8.2 nachgewiesen ist.
 - Aufgabe 19.1 klärt gegen Keycloak 26.8.2: feingranulare Admin-Rechte (`map-roles`) für das Dienstkonto, interne Adresse und
   Aussteller des Tokens, Rotation des Client-Secrets mit Überlappung, `auth_time` im Access-Token, Verhalten von
   `prompt=login` mit dem Cookie-Zweig des Browser-Flows, Aufruf `execute-actions-email` ohne vorhandenes Passwort.
@@ -502,10 +507,15 @@ Das Dienstkonto erhält ein Token mit den direkt zugewiesenen Rollen `query-user
 der erwarteten `realm-management`-Audience. Im Test-Realm ist `view-users` zusammengesetzt und bringt zusätzlich
 `query-groups` in den effektiven Token-Rollen mit.
 
-Ein Aufruf der Admin-REST-API mit diesem Token (`GET /users?max=1`) antwortete mit HTTP 401. Der Token hatte dabei den
-erwarteten Issuer, die Audience und die drei direkt zugewiesenen Rollen (sowie das von `view-users` geerbte
-`query-groups`). Auch ein diagnostischer Versuch mit zusätzlich zugewiesenem `realm-admin` änderte den Status nicht.
-Die Ursache ist nicht geklärt; damit sind weder der produktive Dienstkonto-Aufruf noch dessen FGAP-Wirkung nachgewiesen.
+Ein Aufruf der Admin-REST-API mit diesem Token (`GET /users?max=1`) antwortete zunächst mit HTTP 401, auch mit zusätzlich
+zugewiesenem `realm-admin`. Ursache (Keycloak-Log, Test `KeycloakVerwaltungSpikeTest`): Keycloak 26.8 prüft die Audience der
+Admin-API («Failed to verify identity token: Expected audience not available in the token»). Das Token braucht den Client-Scope
+`kc-admin-api`, der die Audience `<Basis>/admin/realms/<Realm>` einträgt und den Scope `kc-admin-api` setzt. Der Scope ist im
+Realm vorhanden, aber nicht Standard-Scope eines neuen Clients. Der Test weist beides nach: Ohne den Scope als Standard-Scope des
+Dienstkontos antwortet die Admin-API mit 401, mit ihm mit 200. Die Vermutung eines Issuer-Fehlers ist damit widerlegt (der Issuer
+stimmt). Folge für Aufgabe 19.2: Der Client `archiv-verwaltung` im Realm-Export muss `kc-admin-api` als Standard-Scope tragen
+(`defaultClientScopes`), sonst scheitert jeder Aufruf des Adapters. Die Wirkung von FGAP ist weiterhin nur aus der Dokumentation
+belegt, nicht durch einen Test.
 
 Keycloaks [Dokumentation zu FGAP v2 für Version 26.8.2](https://github.com/keycloak/keycloak/blob/26.8.2/docs/documentation/server_admin/topics/admin-console-permissions/fine-grain-v2.adoc)
 beschreibt `map-role` als Scope der Rollen-Ressource. Dieselbe Dokumentation hält fest, dass administrative RBAC-Rollen wie
@@ -517,3 +527,8 @@ Nicht nachgewiesen wurden die interne Compose-Adresse samt Backchannel-Issuer, �
 in einem interaktiven Benutzertoken, `prompt=login` gegen den Cookie-Zweig und `execute-actions-email` ohne Passwort mit
 `VERIFY_EMAIL`, `UPDATE_PASSWORD` und `CONFIGURE_TOTP`. Der Test-Realm führt keinen Browser-Flow- und SMTP-Nachweis aus;
 diese Punkte bleiben vor der Realm-Änderung offen.
+
+Stand Aufgabe 19.1: Nachgewiesen sind Mandantensuche, Rollenmitglieder, Issuer, Token-Rollen, die Ursache des 401 und der
+erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Secret-Rotation, `auth_time`, `prompt=login` und
+`execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Aufgabe 19.2 darf erst mit diesen Entscheiden
+beginnen.
