@@ -145,8 +145,8 @@ unbemerkt verändere.
     Sperren anwenden (Spec 01, Regel 2).
 13. Das Archiv SOLL die Einstellungen der Wissensbasis (A19: Budget je Ingest, Budget des Lint, Monatsbudget,
     Lint-Zeitplan) nach derselben Mechanik führen; der Pfad `/wissensbasis/einstellungen` und das Recht A19 bleiben
-    (Spec 04, design.md). [offen: Überführung der Tabelle `wissens_einstellung` in die Konfiguration – Entscheid Fabian
-    im PR dieser Spec; bis dahin gilt Spec 04 unverändert.]
+    (Spec 04, design.md). [entschieden 20.11.2026, Fabian: ja, Überführung der Tabelle `wissens_einstellung`
+    in die Konfiguration, Aufgabe 20.3; bis dahin gilt Spec 04 unverändert.]
 14. FALLS eine Anfrage an die Einstellungen mehrere Fehler zugleich hätte, DANN SOLL das Archiv die Reihenfolge von
     Spec 01 einhalten: 401, 403, 428/412, 409 `BESTAETIGUNG_NOETIG`, 422.
 

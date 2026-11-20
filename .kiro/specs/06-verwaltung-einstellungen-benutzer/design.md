@@ -320,7 +320,7 @@ ein neuer Benutzer nie als früherer erscheint.
 Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anmeldung und Benutzer bleiben unverändert:
 1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, Secret `${KEYCLOAK_VERWALTUNG_SECRET}`
    (Platzhalter, wie bei Google); Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
-   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1. Ergebnis des Spikes: FGAP wirkt nicht, solange `manage-users` gehalten wird (siehe «Umsetzung 19.1»; Entscheid offen).
+   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1. Ergebnis des Spikes: FGAP wirkt nicht, solange `manage-users` gehalten wird (siehe «Umsetzung 19.1»; entschieden 20.11.2026: `manage-users` bleibt, Option (a)).
 2. SMTP des Realms (Host, Port, Absender `archiv@urinet.ch`, Anzeigename «UriNet Archiv», Zugang als Secret
    `keycloak_smtp_passwort`); ohne SMTP kann Keycloak keine Einladung senden.
 3. Passwort-Richtlinie `length(12) and notUsername and notEmail`.
@@ -453,7 +453,7 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 | Spec 01, requirements.md 2.6 | Absatz nach der Tabelle: Zeilen A20 bis A23 stehen in Spec 06, Requirement 4.1 (Tabelle bleibt unverändert; Test mit 19.5) |
 | Spec 01, design.md | mit der jeweiligen Aufgabe: Fehlercodes (Tabelle), Aktionen (Tabelle Protokoll), `anlass`, Dienstkonto in «Sicherheit», Secret `keycloak_verwaltung_secret` in «Secrets und Konfiguration» |
 | Spec 03, 3.5 | Entscheid der Rechte der Geschäftsstelle umfasst A20 bis A23 (Open Point) |
-| Spec 04, design.md `/wissensbasis/einstellungen` | Nachtrag: nach Spec 06, 2.13 gleiche Mechanik wie die Konfiguration (Entscheid offen) |
+| Spec 04, design.md `/wissensbasis/einstellungen` | Nachtrag: nach Spec 06, 2.13 gleiche Mechanik wie die Konfiguration (entschieden 20.11.2026: ja) |
 | Spec 05, requirements.md 7.6 und design.md | Verweis: `einstellungen.*` wächst nach Spec 06; Seiten der Verwaltung unter `/verwaltung/…` ergänzt Spec 06 (18.3 bleibt) |
 | `tech.md` | Tag `@spec-06`; Dienstkonto und Secret `keycloak_verwaltung_secret` im Abschnitt Secrets |
 | `docs/umsetzungsplan.md` | Zeile Spec 06, Wellen 19 bis 21 |
@@ -476,18 +476,18 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 - **Verknüpfen von Google-Konten durch das Archiv:** abgelehnt; es bräuchte die Google-Kennung `sub`; bleibt bei O.8.
 
 ## Open Points
-- [offen: Entscheid Fabian] Benutzerverwaltung im Mandanten `vhf-gsk` (kein Benutzer mit Rolle `inhaber`, Spec 03, 3.5;
+- [entschieden 20.11.2026, Fabian: Empfehlung übernommen] Benutzerverwaltung im Mandanten `vhf-gsk` (kein Benutzer mit Rolle `inhaber`, Spec 03, 3.5;
   Requirement 4.1, Fussnote). Empfehlung: Betreiber verwaltet `vhf-gsk` per Admin-Kommando, A20 bis A23 für `geschaeftsstelle`
   403, bis Spec 03, 3.5 entscheidet.
-- [offen: Entscheid Fabian] Löschfrist 30 Tage und keine Pseudonymisierung der Protokolle (Rechtsgrundlagen revDSG und GeBüV
+- [entschieden 20.11.2026, Fabian: Empfehlung übernommen; Rechtsgrundlagen revDSG und GeBüV bestätigt Fabian oder der Datenschutzberater separat] Löschfrist 30 Tage und keine Pseudonymisierung der Protokolle (Rechtsgrundlagen revDSG und GeBüV
   durch Fabian oder den Datenschutzberater bestätigen). Empfehlung: 30 Tage, Deaktivieren als Standard, Pseudonymisierung
   nur mit der Löschfunktion (Spec 01, 9.9).
-- [offen: Entscheid Fabian] Einstellungen der Wissensbasis (A19) in die Konfigurationsversion überführen (Requirement 2.13).
+- [entschieden 20.11.2026, Fabian: ja] Einstellungen der Wissensbasis (A19) in die Konfigurationsversion überführen (Requirement 2.13).
   Empfehlung: ja, solange `PUT /wissensbasis/einstellungen` noch nicht umgesetzt ist (heute liest nur der Ingest die Tabelle
   `wissens_einstellung`); sonst Aufgabe 20.3 mit Migration.
-- [offen: Entscheid Fabian] Alarm-Empfänger und Monatsbudget des öffentlichen Chats bleiben beim Betreiber (Klasse (b)).
+- [entschieden 20.11.2026, Fabian: ja] Alarm-Empfänger und Monatsbudget des öffentlichen Chats bleiben beim Betreiber (Klasse (b)).
   Empfehlung: ja (Personendaten, Kostenhoheit).
-- [offen: Entscheid Fabian] Rollenzuweisung des Dienstkontos: Requirement 5.2 verlangt `manage-users`, das die FGAP-Prüfung
+- [entschieden 20.11.2026, Fabian: Option (a)] Rollenzuweisung des Dienstkontos: Requirement 5.2 verlangt `manage-users`, das die FGAP-Prüfung
   umgeht (Spike 19.1). Optionen: (a) `manage-users` behalten, der Archiv-Code ist die einzige Sperre auf die vier Archiv-Rollen
   (Ist-Stand, Realm-Export weist FGAP nicht aus); (b) `manage-users` durch feingranulare Rechte (FGAP v2 mit `manage`-Scope
   auf Benutzer und `map-role` auf die vier Rollen) ersetzen und Requirement 5.2 anpassen. Empfehlung: (a), solange (b) nicht
@@ -530,5 +530,5 @@ diese Punkte bleiben vor der Realm-Änderung offen.
 
 Stand Aufgabe 19.1: Nachgewiesen sind Mandantensuche, Rollenmitglieder, Issuer, Token-Rollen, die Ursache des 401 und der
 erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Secret-Rotation, `auth_time`, `prompt=login` und
-`execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Aufgabe 19.2 darf erst mit diesen Entscheiden
-beginnen.
+`execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
+Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.
