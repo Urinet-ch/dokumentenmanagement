@@ -76,6 +76,12 @@ export const routes: Routes = [
     title: titel(TEXTE.wissen.entwuerfe.titel),
   },
   {
+    path: 'wissen/entwuerfe/import',
+    loadComponent: () => import('./wissen/wissen-import').then((m) => m.WissenImport),
+    canActivate: [rechtGuard('A17')],
+    title: titel(TEXTE.wissen.import.titel),
+  },
+  {
     path: 'wissen/entwuerfe/:id',
     loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
     canActivate: [rechtGuard('A17')],

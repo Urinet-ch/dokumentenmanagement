@@ -3,9 +3,10 @@
 @if (laedt()) { <p role="status">{{ wissen.laedt }}</p> }
 @if (fehler(); as meldung) {
   <p role="alert">{{ meldung }}</p>
-  <button type="button" (click)="laden()">{{ wissen.erneut }}</button>
+  <button type="button" (click)="laden(true)">{{ wissen.erneut }}</button>
 }
 @if (!id()) {
+  <a routerLink="/wissen/entwuerfe/import">{{ importe.titel }}</a>
   <form (ngSubmit)="laden()">
     <label for="entwurf-status">{{ texte.status }}</label>
     <select id="entwurf-status" name="status" [(ngModel)]="status">
@@ -25,6 +26,29 @@
 @if (entwurf(); as ansicht) {
   <a routerLink="/wissen/entwuerfe">{{ texte.zurListe }}</a>
   <p>{{ ansicht.entwurf.anlass }} · {{ ansicht.entwurf.status }} · {{ zeitpunkt(ansicht.entwurf.erstellt) }}</p>
+  @if (ansicht.entwurf.anlass === 'IMPORT') {
+    <section class="importherkunft">
+      <h2>{{ importe.herkunft }}</h2>
+      @if (ansicht.entwurf.herkunft; as herkunft) {
+        <dl>
+          <dt>{{ importe.erzeugtVon }}</dt><dd>{{ herkunft.kopf.erzeugtVon }}</dd>
+          <dt>{{ importe.erzeugtMit }}</dt><dd>{{ herkunft.kopf.erzeugtMit }}</dd>
+          <dt>{{ importe.kontextStufe }}</dt><dd>{{ herkunft.kopf.kontextStufe }}</dd>
+          <dt>{{ importe.erzeugtAm }}</dt><dd>{{ zeitpunkt(herkunft.kopf.erzeugtAm) }}</dd>
+          <dt>{{ importe.importiertVon }}</dt><dd>{{ ansicht.entwurf.erstelltVon }}</dd>
+          <dt>{{ importe.importiertAm }}</dt><dd>{{ zeitpunkt(ansicht.entwurf.erstellt) }}</dd>
+          <dt>{{ importe.sha256 }}</dt><dd><code>{{ herkunft.paketSha256 }}</code></dd>
+        </dl>
+      } @else { <p role="alert">{{ importe.herkunftFehlt }}</p> }
+      <p>{{ importe.cloudHinweis }}</p>
+      @if (ansicht.entwurf.status === 'OFFEN') {
+        <button type="button" [disabled]="sendet()" (click)="neuPruefen()">{{ importe.neuPruefen }}</button>
+      }
+      @if (prueft()) { <p role="status">{{ importe.prueft }}</p> }
+      @if (pruefFehler(); as meldung) { <p role="alert">{{ meldung }}</p> }
+      @if (bearbeitet !== undefined) { <p>{{ importe.bearbeitungBehalten }}</p> }
+    </section>
+  }
   @if (ansicht.entwurf.unvollstaendig) { <p>{{ texte.unvollstaendig }}</p> }
   @if (ansicht.entwurf.hinweis) { <p>{{ ansicht.entwurf.hinweis }}</p> }
   @if (ansicht.kernaussagen?.length) {
@@ -48,6 +72,18 @@
       <p>{{ aenderung.aktion }} · {{ aenderung.status }}</p>
       <p>{{ texte.basis }}: {{ aenderung.basisVersion ?? 0 }}</p>
       <p>{{ texte.kontext }}: {{ aenderung.vertraulichkeitKontext }}</p>
+      @if (ansicht.entwurf.anlass === 'IMPORT') {
+        <h3>{{ importe.quellenPruefung }}</h3>
+        @if (aenderung.daten.quellenPruefung; as pruefungen) {
+          @if (!pruefungen.length) { <p>{{ importe.keineDokumentquellen }}</p> }
+          <ul>
+            @for (quelle of pruefungen; track quelle.schluessel) {
+              <li>{{ quelle.schluessel }} · {{ importe.zuordnung }}: {{ quelle.zuordnung }}
+                · {{ importe.auszug }}: {{ auszugText(quelle.auszug) }}</li>
+            }
+          </ul>
+        } @else { <p role="alert">{{ importe.quellenPruefungFehlt }}</p> }
+      }
       <h3>{{ texte.begruendung }}</h3><p>{{ aenderung.begruendung }}</p>
       <h3>{{ texte.diff }}</h3>
       @for (name of diffFelder; track name) {

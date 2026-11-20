@@ -602,6 +602,17 @@ die Importherkunft und je Quellenschlüssel die Zuordnung und das Ergebnis aus
 Leere und vollständig unveränderte Pakete bleiben gemäss 19.18 `OFFEN`; es wird keine zusätzliche Abschlussaktion
 oder automatische Freigabe eingeführt. Der offene Punkt 19-a bleibt unverändert offen.
 
+**Oberfläche (Aufgabe 15.8):** Die A17-Route `/wissen/entwuerfe/import` steht vor der dynamischen
+Entwurfsroute. Sie sendet genau den Multipart-Teil `paket`, prüft den vollständigen Antwortbericht und
+zeigt Zähler, Seitenpfade und Befundcodes. 409 verlinkt den vorhandenen Entwurf; 422 zeigt die
+Paketbefunde ohne automatischen Wiederholungsversuch. Herkunft und Quellenprüfungen stammen aus
+`entwurf.herkunft` und `aenderung.daten.quellenPruefung`, nicht aus einer Client-Paketanalyse.
+«Prüfung wiederholen» lädt nach 204 die aktuellen Änderungs-ETags neu und bewahrt ungespeicherte
+Bearbeitungen; diese sind nicht Bestandteil des neu geprüften Serverberichts. Bei Benutzer-, Rollen-
+oder Mandantenwechsel werden laufende Anfragen und Bestätigungen abgebrochen und alte Inhalte
+einschliesslich Dateiauswahl entfernt. Eine Tokenaktualisierung im gleichen Benutzerkontext löscht
+keine Eingaben. Keine KI-Neuerzeugung für Import und kein gesammeltes Annehmen.
+
 Der gemeinsame synthetische Korpus unter `backend/src/test/resources/wissen-pakete/` beschreibt Pakete textuell;
 `WissensPaketBeispiele` erzeugt die ZIP-Bytes einschliesslich gezielter Metadatenangriffe nur für Tests.
 `PaketRegelnGleichheitTest` vergleicht den Leser und den REST-Import; Aufgabe 15.7 erweitert diesen Nachweis um das
