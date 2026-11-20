@@ -271,28 +271,44 @@ public final class WissensPruefung {
                     "Das Quelldokument fehlt im Mandanten oder ist nicht archiviert."));
             return;
         }
-        if (quelle.seiteVon() == null) {
-            befunde.add(new Befund(Code.SEITE_FEHLT, "Der Dokumentquelle fehlt die PDF-Seite."));
-            return;
-        }
-        Optional<Seitentext> seitentext = dokument.seitentext();
-        if (seitentext.isEmpty() || dokument.seiten() == null) {
-            befunde.add(new Befund(kontext.paket() ? Code.AUSZUG_NICHT_PRUEFBAR : Code.SEITE_FEHLT,
+        switch (auszugPruefen(quelle, dokument)) {
+            case SEITE_FEHLT -> befunde.add(new Befund(Code.SEITE_FEHLT, "Der Dokumentquelle fehlt die PDF-Seite."));
+            case NICHT_PRUEFBAR -> befunde.add(new Befund(kontext.paket() ? Code.AUSZUG_NICHT_PRUEFBAR : Code.SEITE_FEHLT,
                     "Für das Quelldokument sind keine prüfbaren PDF-Seiten verfügbar."));
-            return;
+            case QUELLE_UNGUELTIG -> befunde.add(new Befund(Code.QUELLE_UNGUELTIG,
+                    "Die PDF-Seitenangabe liegt ausserhalb der Seitenzahl des Quelldokuments."));
+            case NICHT_GEFUNDEN -> befunde.add(new Befund(Code.AUSZUG_NICHT_GEFUNDEN,
+                    "Der wörtliche Auszug wurde auf der angegebenen PDF-Seite nicht gefunden."));
+            case FEHLT -> {
+                if (quelle.auszug() != null) {
+                    befunde.add(new Befund(Code.AUSZUG_NICHT_GEFUNDEN,
+                            "Der wörtliche Auszug wurde auf der angegebenen PDF-Seite nicht gefunden."));
+                }
+            }
+            case GEFUNDEN -> { }
         }
-        Seitentext seiten = seitentext.get();
+    }
+
+    public enum AuszugsErgebnis { GEFUNDEN, NICHT_GEFUNDEN, NICHT_PRUEFBAR, SEITE_FEHLT, QUELLE_UNGUELTIG, FEHLT }
+
+    public static AuszugsErgebnis auszugPruefen(Quelleneintrag quelle, DokumentQuelle dokument) {
+        if (quelle.seiteVon() == null) {
+            return AuszugsErgebnis.SEITE_FEHLT;
+        }
+        if (dokument.seitentext().isEmpty() || dokument.seiten() == null) {
+            return AuszugsErgebnis.NICHT_PRUEFBAR;
+        }
+        Seitentext seiten = dokument.seitentext().orElseThrow();
         int bis = quelle.seiteBis() == null ? quelle.seiteVon() : quelle.seiteBis();
         if (quelle.seiteVon() < 1 || bis < quelle.seiteVon() || bis > seiten.anzahl()
                 || dokument.seiten() != seiten.anzahl()) {
-            befunde.add(new Befund(Code.QUELLE_UNGUELTIG,
-                    "Die PDF-Seitenangabe liegt ausserhalb der Seitenzahl des Quelldokuments."));
-            return;
+            return AuszugsErgebnis.QUELLE_UNGUELTIG;
         }
-        if (quelle.auszug() != null && !auszugGefunden(quelle.auszug(), seiten, quelle.seiteVon(), bis)) {
-            befunde.add(new Befund(Code.AUSZUG_NICHT_GEFUNDEN,
-                    "Der wörtliche Auszug wurde auf der angegebenen PDF-Seite nicht gefunden."));
+        if (quelle.auszug() == null || quelle.auszug().isBlank()) {
+            return AuszugsErgebnis.FEHLT;
         }
+        return auszugGefunden(quelle.auszug(), seiten, quelle.seiteVon(), bis)
+                ? AuszugsErgebnis.GEFUNDEN : AuszugsErgebnis.NICHT_GEFUNDEN;
     }
 
     private static boolean auszugGefunden(String auszug, Seitentext seiten, int von, int bis) {

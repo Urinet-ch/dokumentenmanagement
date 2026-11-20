@@ -2,6 +2,7 @@ package ch.urinet.archiv.wissen.adapter.out.persistence;
 
 import ch.urinet.archiv.wissen.application.WissenImportRepository;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
+import ch.urinet.archiv.wissen.application.WissenImport;
 import ch.urinet.archiv.wissen.domain.paket.PaketKopf;
 import ch.urinet.archiv.wissen.domain.paket.PaketSeite;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -29,7 +30,8 @@ public class JdbcWissenImport implements WissenImportRepository {
 
     @Override
     public void sperren(long verbleibendeMillis) {
-        em.get().createNativeQuery("select set_config('statement_timeout', :zeit, true)")
+        em.get().createNativeQuery("select set_config('statement_timeout', :zeit, true), "
+                + "set_config('transaction_timeout', :zeit, true)")
                 .setParameter("zeit", verbleibendeMillis + "ms").getSingleResult();
         em.get().createNativeQuery("select pg_advisory_xact_lock(hashtextextended(current_schema() "
                 + "|| ':wissen-import', 0))").getSingleResult();
@@ -117,6 +119,18 @@ public class JdbcWissenImport implements WissenImportRepository {
             return json.writeValueAsString(wert);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Importangaben sind nicht serialisierbar", e);
+        }
+    }
+
+    @Override
+    public void quellenPruefungSpeichern(UUID id, int nummer, List<WissenImport.QuellenPruefung> pruefungen) {
+        int geschrieben = em.get().createNativeQuery("""
+                update wissens_aenderung set daten = jsonb_set(daten, '{quellenPruefung}', cast(:pruefungen as jsonb))
+                where entwurf_id = :id and nr = :nr
+                """).setParameter("pruefungen", schreiben(pruefungen))
+                .setParameter("id", id).setParameter("nr", nummer).executeUpdate();
+        if (geschrieben != 1) {
+            throw new IllegalStateException("Importierte Quellenprüfung fehlt");
         }
     }
 

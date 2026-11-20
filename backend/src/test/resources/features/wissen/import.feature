@@ -58,3 +58,19 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
   @req-19.18
   Szenario: Wissenspaket überschreitet den Zeitrahmen
     Dann ein überschrittener Zeitrahmen beendet den Wissensimport ohne Entwurf
+
+  @req-19.18
+  Szenario: Wissenspaketspeicherung bleibt trotz interner SQL-Zeitlimitwechsel begrenzt
+    Dann eine blockierte Speicherung überschreitet auch nach SQL-Zeitlimitwechseln nicht den Importrahmen
+
+  @req-19.6 @req-19.7 @req-19.20
+  Szenario: Wissenspaketeingang prüft Multipart und die exakte ZIP-Grenze ohne Inhaltslogs
+    Dann Multipart und ZIP-Grenze werden ohne Paketinhalt in Antwort oder Log geprüft
+
+  @req-19.23 @req-17.2
+  Szenario: Lokaler OKF-Export durchläuft denselben Paketleser und Import mit SHA-Quellen
+    Dann ein OKF-Export mit lokaler Herkunft ist ohne ID-Zuordnung als Wissenspaket importierbar
+
+  @req-19.2 @req-19.3 @req-19.4 @req-19.6 @req-19.7 @req-19.8 @req-19.21
+  Szenario: Wissenspaketangriffe und Markdown werden durch gemeinsame Regeln geprüft
+    Dann der Paketleser und der REST-Import beurteilen die gemeinsamen Beispielpakete gleich

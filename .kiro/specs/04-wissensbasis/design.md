@@ -555,6 +555,26 @@ Spesen sind innert 30 Tagen mit Beleg einzureichen.[^q-ab12-1] Die Unterlage ist
   Angaben aus `paket.yaml` übernommen. `verified`, `generated` und `status` verwirft der Import (Requirement 7.6, 19.4).
 
 #### Import-Dienst (`WissensImport`, `wissen/application`)
+**Umsetzung (Aufgabe 15.6):** Die Anwendungsklasse heisst entsprechend den bestehenden `Wissen…`-Diensten
+`WissenImport`. `WissenImportResource` liest den genau einmal vorhandenen Multipart-Teil begrenzt in den Speicher;
+`TransaktionalerWissenPaketImport` berechnet seine SHA-256 mit `Pruefsumme` und umschliesst Lesen, Zuordnung,
+Änderungen und Zugriffsprotokoll mit einer JTA-Transaktion. Eine monotone Deadline reicht vom Beginn der
+Ressourcenmethode bis zur letzten Prüfung vor der Antwort. Ein mandantenspezifisches Advisory Lock serialisiert
+Idempotenz und die Quote; der Hüllen-Lock hält Quellen und Seiten während der Prüfung konsistent.
+PostgreSQL 17 erhält zusätzlich ein transaktionslokales `transaction_timeout` aus der verbleibenden Zeit;
+dadurch können interne Änderungen von `statement_timeout` die gesamte Transaktionsfrist nicht verlängern.
+SQLSTATE `25P04` und `57014` werden nach dem Rollback als `PAKET_UNGUELTIG` mit Grund `ZEIT` gemeldet.
+`neu-pruefen` bewahrt bereits erreichte Kontextstufen und erhöht die Änderungs-ETags. Die A17-Leseansicht liefert
+die Importherkunft und je Quellenschlüssel die Zuordnung und das Ergebnis aus
+`WissensPruefung.auszugPruefen`; dieselbe Auszugsprüfung wird beim Annehmen erneut ausgeführt.
+Leere und vollständig unveränderte Pakete bleiben gemäss 19.18 `OFFEN`; es wird keine zusätzliche Abschlussaktion
+oder automatische Freigabe eingeführt. Der offene Punkt 19-a bleibt unverändert offen.
+
+Der gemeinsame synthetische Korpus unter `backend/src/test/resources/wissen-pakete/` beschreibt Pakete textuell;
+`WissensPaketBeispiele` erzeugt die ZIP-Bytes einschliesslich gezielter Metadatenangriffe nur für Tests.
+`PaketRegelnGleichheitTest` vergleicht den Leser und den REST-Import; Aufgabe 15.7 erweitert diesen Nachweis um das
+Prüfwerkzeug. Die Beispielpakete enthalten keine echten Belege oder Zugangsdaten.
+
 `WissensImport.importieren(benutzer, zipStrom)` in einer Transaktion; der Endpunkt reicht den Strom nur bis zur Grenze
 `archiv.wissen.import.max-zip-bytes` weiter und rechnet währenddessen die SHA-256 des ZIP:
 1. **Rechte und Kontext:** A17, nur OIDC (kein API-Token), Mandant und Benutzer aus dem Anfragekontext; keine Daten

@@ -14,6 +14,7 @@ import ch.urinet.archiv.wissen.domain.paket.WissensPaketLeser;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.narayana.jta.QuarkusTransactionException;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.PersistenceException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
@@ -57,8 +58,9 @@ public class TransaktionalerWissenPaketImport implements WissenPaketImport {
                 case DATEITYP_UNBEKANNT -> new FachFehler(Fehlercode.DATEITYP_UNBEKANNT);
                 default -> new PaketUngueltig(e.code().name(), e.pfad());
             };
-        } catch (QuarkusTransactionException e) {
-            if (System.nanoTime() >= deadline || Ursachen.enthaeltSqlState(e, "57014")) {
+        } catch (QuarkusTransactionException | PersistenceException e) {
+            if (System.nanoTime() >= deadline || Ursachen.enthaeltSqlState(e, "57014")
+                    || Ursachen.enthaeltSqlState(e, "25P04")) {
                 throw new PaketUngueltig("ZEIT", "paket.yaml");
             }
             throw e;

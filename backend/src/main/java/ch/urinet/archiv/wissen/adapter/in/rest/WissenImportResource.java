@@ -69,7 +69,9 @@ public class WissenImportResource {
     @APIResponse(responseCode = "413", description = "Paket zu gross")
     @APIResponse(responseCode = "415", description = "Kein ZIP oder falscher Medientyp")
     @APIResponse(responseCode = "422", description = "Paket ungültig; Codes und Pfade ohne Inhalte")
-    public Response importieren(@RestForm("paket") FileUpload paket,
+    public Response importieren(@RestForm("paket")
+                                @Parameter(description = "ZIP mit paket.yaml und Wissensseiten", required = true)
+                                FileUpload paket,
                                 @Parameter(hidden = true) MultipartFormDataInput formular,
                                 @HeaderParam("X-Real-Ip") @Parameter(hidden = true) String realIp) throws IOException {
         var code = mandant.pruefen();
@@ -107,7 +109,8 @@ public class WissenImportResource {
     @APIResponse(responseCode = "204", description = "Prüfung erneuert; Änderungs-ETags erhöht")
     @APIResponse(responseCode = "403", description = "Prüfung nicht erlaubt")
     @APIResponse(responseCode = "404", description = "Importentwurf nicht gefunden")
-    public Response neuPruefen(@PathParam("id") UUID id) {
+    @APIResponse(responseCode = "409", description = "Entwurf ist kein offener Import")
+    public Response neuPruefen(@PathParam("id") @Parameter(description = "ID des Importentwurfs") UUID id) {
         mandant.pruefen();
         importieren.neuPruefen(benutzer(), id);
         return Response.noContent().build();

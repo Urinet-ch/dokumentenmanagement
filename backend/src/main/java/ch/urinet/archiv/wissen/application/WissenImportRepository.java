@@ -4,6 +4,7 @@ import ch.urinet.archiv.wissen.domain.paket.PaketKopf;
 import ch.urinet.archiv.wissen.domain.paket.PaketSeite;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface WissenImportRepository {
@@ -15,4 +16,5 @@ public interface WissenImportRepository {
     PaketSeite seiteLaden(UUID id, int nummer);
     void paketSeiteSpeichern(UUID id, int nummer, PaketSeite seite, boolean veraltet);
     void pruefungSpeichern(WissenIngestPort.NeueAenderung aenderung);
+    void quellenPruefungSpeichern(UUID id, int nummer, List<WissenImport.QuellenPruefung> pruefungen);
 }

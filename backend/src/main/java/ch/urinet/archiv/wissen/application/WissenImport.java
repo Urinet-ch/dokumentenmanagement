@@ -133,6 +133,7 @@ public class WissenImport {
             daten.aenderungAnlegen(aenderung);
             boolean veraltet = seite.basis() != null && !Objects.equals(seite.version(), seite.basis().metadaten().version());
             repository.paketSeiteSpeichern(id, nr, seite.seite(), veraltet);
+            repository.quellenPruefungSpeichern(id, nr, seite.aufgeloest().quellenPruefung());
             if (seite.basis() == null) { neu++; } else { aendern++; }
             aenderung.befunde().forEach(b -> befunde.add(Map.of("pfad", aenderung.pfad(), "code", b.code().name())));
             aenderung.hinweise().forEach(h -> hinweise.add(Map.of("pfad", aenderung.pfad(), "code", h.code().name())));
@@ -163,9 +164,11 @@ public class WissenImport {
             var basis = gesperrt.seiteId() == null ? null : daten.seiteLaden(gesperrt.seiteId()).orElseThrow();
             var aufgeloest = aufloesen(benutzer, kopf, seite, basis);
             var stufe = aufgeloest.stufe().hoechste(WissensStufe.valueOf(eintrag.vertraulichkeitKontext()));
-            aufgeloest = new Aufgeloest(aufgeloest.fassung(), stufe, aufgeloest.befunde(), aufgeloest.hinweise());
+            aufgeloest = new Aufgeloest(aufgeloest.fassung(), stufe, aufgeloest.befunde(), aufgeloest.hinweise(),
+                    aufgeloest.quellenPruefung());
             repository.pruefungSpeichern(aenderung(benutzer, id, eintrag.nr(),
                     new Vorbereitet(seite, basis, aufgeloest, gesperrt.basisVersion(), aufgeloest.hinweise(), false)));
+            repository.quellenPruefungSpeichern(id, eintrag.nr(), aufgeloest.quellenPruefung());
         }
     }
 
@@ -210,6 +213,7 @@ public class WissenImport {
         List<Quelleneintrag> eintraege = new ArrayList<>();
         List<WissensPruefung.Befund> befunde = new ArrayList<>();
         List<WissensPruefung.Hinweis> hinweise = new ArrayList<>();
+        List<QuellenPruefung> pruefungen = new ArrayList<>();
         WissensStufe stufe = WissensStufe.valueOf(kopf.kontextStufe());
         UUID wissensquelleId = null;
         int markiert = 0;
@@ -222,14 +226,23 @@ public class WissenImport {
             UUID seitenId = null;
             Integer von = null;
             Integer bis = null;
+            String zuordnung = "QUELLE_UNBEKANNT";
+            WissensPruefung.DokumentQuelle dokument = null;
             if (quelle.sha256() != null) {
                 var aufloesung = quellen.aufloesen(benutzer, quelle.sha256());
+                zuordnung = switch (aufloesung.status()) {
+                    case DOKUMENT -> "ZUGEORDNET";
+                    case PERSONAL -> "QUELLE_PERSONAL";
+                    case MEHRDEUTIG -> "QUELLE_UNGUELTIG";
+                    case UNBEKANNT -> "QUELLE_UNBEKANNT";
+                };
                 switch (aufloesung.status()) {
                     case UNBEKANNT -> befunde.add(befund(WissensPruefung.Code.QUELLE_UNBEKANNT));
                     case PERSONAL -> befunde.add(befund(WissensPruefung.Code.QUELLE_PERSONAL));
                     case MEHRDEUTIG -> befunde.add(befund(WissensPruefung.Code.QUELLE_UNGUELTIG));
                     case DOKUMENT -> {
                         dokumentId = aufloesung.dokumentId();
+                        dokument = aufloesung.dokument();
                         stufe = stufe.hoechste(aufloesung.stufe());
                         if (aufloesung.dokument().seitentext().isEmpty()) {
                             befunde.add(befund(WissensPruefung.Code.AUSZUG_NICHT_PRUEFBAR));
@@ -258,12 +271,15 @@ public class WissenImport {
                     var ziel = seiten.get(pfad.substring(1, pfad.length() - 3));
                     if (ziel != null) {
                         seitenId = ziel.id();
+                        zuordnung = "ZUGEORDNET";
                         stufe = stufe.hoechste(quellGraph.wirksameStufe(ziel.id(), quellGraph.dokumente(ziel.id())));
                     }
                 }
             }
-            eintraege.add(new Quelleneintrag(quelle.id(), dokumentId, von, bis, quelle.auszug(), seitenId,
-                    quelle.sha256()));
+            var eintrag = new Quelleneintrag(quelle.id(), dokumentId, von, bis, quelle.auszug(), seitenId, quelle.sha256());
+            eintraege.add(eintrag);
+            pruefungen.add(new QuellenPruefung(quelle.id(), zuordnung,
+                    dokument == null ? null : WissensPruefung.auszugPruefen(eintrag, dokument)));
         }
         if ("Quelle".equals(seite.typ()) && markiert != 1) {
             befunde.add(befund(WissensPruefung.Code.QUELLE_UNGUELTIG));
@@ -283,7 +299,7 @@ public class WissenImport {
                 Wissensseite.Vertraulichkeit.valueOf(stufe.name()), WissensMarkdown.ausOkf(seite.inhalt()),
                 basis == null ? 0 : basis.metadaten().version(), "extern:" + erzeugt, null, null, null,
                 false, false, wissensquelleId);
-        return new Aufgeloest(fassung, stufe, befunde, hinweise);
+        return new Aufgeloest(fassung, stufe, befunde, hinweise, pruefungen);
     }
 
     private WissenIngestPort.NeueAenderung aenderung(Benutzer benutzer, UUID id, int nr, Vorbereitet seite) {
@@ -353,12 +369,15 @@ public class WissenImport {
     }
 
     public record Aufgeloest(Wissensseite fassung, WissensStufe stufe, List<WissensPruefung.Befund> befunde,
-                             List<WissensPruefung.Hinweis> hinweise) {
+                             List<WissensPruefung.Hinweis> hinweise, List<QuellenPruefung> quellenPruefung) {
         public Aufgeloest {
             befunde = List.copyOf(befunde);
             hinweise = List.copyOf(hinweise);
+            quellenPruefung = List.copyOf(quellenPruefung);
         }
     }
+
+    public record QuellenPruefung(String schluessel, String zuordnung, WissensPruefung.AuszugsErgebnis auszug) { }
 
     public record Anzahl(int neu, int aendern, int unveraendert, int ignoriert) {
     }

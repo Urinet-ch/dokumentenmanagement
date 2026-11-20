@@ -80,4 +80,19 @@ class WissenPaketImportTest {
     void zeitgrenze() throws Exception {
         schritte.zeitgrenze();
     }
+
+    @Test
+    void zeitgrenzeBeimSchreiben() throws Exception {
+        schritte.zeitgrenzeBeimSchreiben();
+    }
+
+    @Test
+    void eingangsformatUndLogs() throws Exception {
+        schritte.eingangsformatUndLogs();
+    }
+
+    @Test
+    void rundlaufLokalerExport() throws Exception {
+        schritte.rundlaufLokalerExport();
+    }
 }

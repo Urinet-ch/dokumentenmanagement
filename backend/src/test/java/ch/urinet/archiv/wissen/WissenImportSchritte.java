@@ -3,6 +3,7 @@ package ch.urinet.archiv.wissen;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -10,13 +11,19 @@ import ch.urinet.archiv.gemeinsam.domain.PaketUngueltig;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenPaketImport;
+import ch.urinet.archiv.wissen.adapter.out.okf.OkfSchreiber;
+import ch.urinet.archiv.wissen.domain.Quelleneintrag;
+import ch.urinet.archiv.wissen.domain.Seitentyp;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
+import ch.urinet.archiv.wissen.domain.paket.WissensPaketBeispiele;
+import ch.urinet.archiv.wissen.domain.paket.WissensPaketException;
+import ch.urinet.archiv.wissen.domain.paket.WissensPaketLeser;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.restassured.response.Response;
-import jakarta.enterprise.context.Dependent;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
@@ -26,10 +33,12 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
@@ -40,8 +49,8 @@ import java.util.zip.ZipOutputStream;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
-@Dependent
 public class WissenImportSchritte {
     private static final String API = "/api/v1/wissensentwuerfe";
     @Inject Instance<AgroalDataSource> datenbank;
@@ -96,6 +105,14 @@ public class WissenImportSchritte {
         assertThat(antwort.jsonPath().getString("status")).isEqualTo("OFFEN");
         assertThat(antwort.jsonPath().getInt("anzahl.neu")).isEqualTo(1);
         assertThat(antwort.jsonPath().getList("befunde")).isEmpty();
+        var detail = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).get(API + "/" + entwurf)
+                .then().statusCode(200).extract().jsonPath();
+        assertThat(detail.getString("entwurf.herkunft.paketSha256"))
+                .isEqualTo(antwort.jsonPath().getString("paketSha256"));
+        assertThat(detail.getString("entwurf.herkunft.kopf.erzeugtMit")).isEqualTo("lokal");
+        assertThat(detail.getString("entwurf.herkunft.kopf.erzeugtVon")).isEqualTo("probe");
+        assertThat(detail.getString("aenderungen[0].daten.quellenPruefung[0].zuordnung")).isEqualTo("ZUGEORDNET");
+        assertThat(detail.getString("aenderungen[0].daten.quellenPruefung[0].auszug")).isEqualTo("GEFUNDEN");
         assertThat(anzahl("select count(*) from m_urinet.wissensseite where pfad = ?", pfad)).isZero();
         assertThat(anzahl("select count(*) from m_urinet.ki_verbrauch")).isEqualTo(kiVorher);
         assertThat(anzahl("select count(*) from m_urinet.ki_verbrauch_reservierung")).isEqualTo(reservierungenVorher);
@@ -172,6 +189,8 @@ public class WissenImportSchritte {
         var detail = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).get(API + "/" + entwurf)
                 .then().statusCode(200).extract().jsonPath();
         assertThat(detail.getList("aenderungen[0].befunde")).isEmpty();
+        assertThat(detail.getString("aenderungen[0].daten.quellenPruefung[0].zuordnung")).isEqualTo("ZUGEORDNET");
+        assertThat(detail.getString("aenderungen[0].daten.quellenPruefung[0].auszug")).isEqualTo("GEFUNDEN");
         assertThat(detail.getInt("aenderungen[0].etag")).isEqualTo(1);
         entscheiden(entwurf, 1, 0, "annehmen", "{}").then().statusCode(412);
         entscheiden(entwurf, 1, 1, "annehmen", "{}").then().statusCode(204);
@@ -219,9 +238,18 @@ public class WissenImportSchritte {
         entwurf = UUID.fromString(antwort.jsonPath().getString("entwurfId"));
         assertThat(antwort.jsonPath().getList("hinweise.code", String.class)).contains("STUFE_IGNORIERT");
         entscheiden(entwurf, 1, 0, "annehmen", "{\"vertraulichkeit\":\"NORMAL\"}").then().statusCode(422);
-        entscheiden(entwurf, 1, 0, "annehmen", "{}").then().statusCode(204);
+        ausfuehren("update m_urinet.dokument set vertraulichkeit = 'NORMAL' where id = ?",
+                dokumente.get("urinet").getFirst());
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).post(API + "/" + entwurf + "/neu-pruefen")
+                .then().statusCode(204);
+        assertThat(anzahl("select count(*) from m_urinet.wissens_aenderung where entwurf_id = ? "
+                + "and vertraulichkeit_kontext = 'INTERN'", entwurf)).isEqualTo(1);
+        entscheiden(entwurf, 1, 1, "annehmen", "{\"vertraulichkeit\":\"NORMAL\"}").then().statusCode(422);
+        entscheiden(entwurf, 1, 1, "annehmen", "{}").then().statusCode(204);
         assertThat(anzahl("select count(*) from m_urinet.wissensseite where pfad = ? "
                 + "and vertraulichkeit_mindest = 'INTERN'", pfad)).isEqualTo(1);
+        ausfuehren("update m_urinet.dokument set vertraulichkeit = 'INTERN' where id = ?",
+                dokumente.get("urinet").getFirst());
         pfad += "-cloud";
         antwort = post(paket("cloud", "NORMAL", seite(pfad, sha, "Seite 1", null, "Aussage.")));
         antwort.then().statusCode(201);
@@ -336,6 +364,134 @@ public class WissenImportSchritte {
         }
         assertThat(anzahl("select count(*) from m_urinet.wissens_entwurf where paket_sha256 = ?",
                 Pruefsumme.von(zip))).isZero();
+    }
+
+    @Dann("eine blockierte Speicherung überschreitet auch nach SQL-Zeitlimitwechseln nicht den Importrahmen")
+    public void zeitgrenzeBeimSchreiben() throws Exception {
+        byte[] zip = paket("lokal", "NORMAL", seite(pfad, sha, "Seite 1", null, "Aussage."));
+        String hash = Pruefsumme.von(zip);
+        String name = "probe_import_zeit_" + UUID.randomUUID().toString().replace("-", "");
+        try {
+            ausfuehren("""
+                    create function m_urinet.%s() returns trigger language plpgsql as $$
+                    begin
+                      if exists (select 1 from m_urinet.wissens_entwurf
+                        where id = new.entwurf_id and paket_sha256 = '%s') then
+                        perform pg_sleep(2);
+                      end if;
+                      return new;
+                    end $$
+                    """.formatted(name, hash));
+            ausfuehren("create trigger " + name + " before insert on m_urinet.wissens_aenderung "
+                    + "for each row execute function m_urinet." + name + "()");
+            try (var pool = Executors.newSingleThreadExecutor()) {
+                long beginn = System.nanoTime();
+                var abbruch = pool.submit(() -> kontext.mit(new MandantCode("urinet"),
+                        () -> paketImport.importieren(new Benutzer("probe", Rolle.INHABER), "urinet", zip,
+                                beginn + TimeUnit.MILLISECONDS.toNanos(250), null)));
+                assertThatExceptionOfType(ExecutionException.class)
+                        .isThrownBy(() -> abbruch.get(5, TimeUnit.SECONDS))
+                        .satisfies(e -> assertThat(e.getCause()).isInstanceOfSatisfying(PaketUngueltig.class,
+                                p -> assertThat(p.befunde()).containsExactly(
+                                        Map.of("code", "ZEIT", "pfad", "paket.yaml"))));
+                assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - beginn)).isLessThan(1000);
+            }
+            assertThat(anzahl("select count(*) from m_urinet.wissens_entwurf where paket_sha256 = ?", hash)).isZero();
+            assertThat(anzahl("select count(*) from m_urinet.wissens_aenderung where pfad = ?", pfad)).isZero();
+            assertThat(anzahl("select count(*) from m_urinet.zugriff_protokoll "
+                    + "where aktion = 'WISSEN_IMPORT' and details->>'sha256' = ?", hash)).isZero();
+        } finally {
+            ausfuehren("drop trigger if exists " + name + " on m_urinet.wissens_aenderung");
+            ausfuehren("drop function if exists m_urinet." + name + "()");
+        }
+    }
+
+    @Dann("Multipart und ZIP-Grenze werden ohne Paketinhalt in Antwort oder Log geprüft")
+    public void eingangsformatUndLogs() throws Exception {
+        String marker = "SYNTHETISCHER_PAKETINHALT_" + UUID.randomUUID();
+        byte[] zip = paket("lokal", "NORMAL", seite(pfad, sha, "Seite 1", null, marker));
+        try (var log = LogMitschnitt.starten()) {
+            var gueltig = post(zip);
+            assertThat(gueltig.statusCode()).isEqualTo(201);
+            assertFalse(gueltig.asString().contains(marker), "Importantwort enthält Paketinhalt");
+            assertThat(given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .multiPart("andererTeil", "wissen.zip", zip, "application/zip")
+                    .post(API + "/import").statusCode()).isEqualTo(400);
+            assertThat(given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .multiPart("paket", "eins.zip", zip, "application/zip")
+                    .multiPart("paket", "zwei.zip", zip, "application/zip")
+                    .post(API + "/import").statusCode()).isEqualTo(400);
+            var keinZip = post(marker.getBytes(StandardCharsets.UTF_8));
+            assertThat(keinZip.statusCode()).isEqualTo(415);
+            assertFalse(keinZip.asString().contains(marker), "Problemantwort enthält Paketinhalt");
+            assertThat(post(new byte[10 * 1024 * 1024]).statusCode()).isEqualTo(415);
+            assertThat(post(new byte[10 * 1024 * 1024 + 1]).statusCode()).isEqualTo(413);
+            assertFalse(log.volltext().contains(marker), "Importlog enthält Paketinhalt");
+        }
+    }
+
+    @Dann("ein OKF-Export mit lokaler Herkunft ist ohne ID-Zuordnung als Wissenspaket importierbar")
+    public void rundlaufLokalerExport() throws Exception {
+        UUID dokument = dokumente.get("urinet").getFirst();
+        Instant jetzt = Instant.now();
+        var seite = new Wissensseite(UUID.randomUUID(), pfad, Seitentyp.KONZEPT, "Probe", "Beschreibung",
+                List.of(), Wissensseite.Status.AKTIV, null,
+                List.of(new Quelleneintrag("q1", dokument, 1, null, "Seite 1", null)),
+                Wissensseite.Vertraulichkeit.NORMAL, "Aussage.[^q1]", 1, "human:probe", jetzt,
+                "probe", jetzt, false, false, null);
+        var paket = new OkfSchreiber.Paket(new MandantCode("urinet"), "urinet-archiv", "lokal", jetzt,
+                ConfigProvider.getConfig().getValue("archiv.wissen.instanz-id", String.class), Set.of(pfad));
+        var bytes = new ByteArrayOutputStream();
+        OkfSchreiber.schreiben(paket, List.of(new OkfSchreiber.Seite(seite,
+                Map.of(dokument, new OkfSchreiber.Dokument(dokument, sha, "Probe", jetzt)), Map.of())),
+                List.of(), bytes);
+        var gelesen = new WissensPaketLeser().lesen(bytes.toByteArray());
+        assertThat(gelesen.kopf().erzeugtMit()).isEqualTo("lokal");
+        assertThat(gelesen.seiten().getFirst().sources().getFirst().sha256()).isEqualTo(sha);
+        antwort = post(bytes.toByteArray());
+        antwort.then().statusCode(201);
+        assertThat(antwort.jsonPath().getList("befunde")).isEmpty();
+        assertThat(antwort.jsonPath().getInt("anzahl.ignoriert")).isEqualTo(2);
+        entwurf = UUID.fromString(antwort.jsonPath().getString("entwurfId"));
+        entscheiden(entwurf, 1, 0, "annehmen", "{}").then().statusCode(204);
+        assertThat(anzahl("select count(*) from m_urinet.wissensseite where pfad = ? "
+                + "and erzeugt_von = 'extern:urinet-archiv'", pfad)).isEqualTo(1);
+    }
+
+    public void regelgleichheit(WissensPaketBeispiele.Beispiel beispiel) {
+        String code = null;
+        List<Map<String, String>> erwarteteHinweise = List.of();
+        try {
+            var gelesen = new WissensPaketLeser().lesen(beispiel.zip());
+            erwarteteHinweise = gelesen.hinweise().stream()
+                    .map(h -> Map.of("code", h.code().name(), "pfad", h.pfad())).toList();
+        } catch (WissensPaketException e) {
+            code = e.code().name();
+        }
+        assertThat(code).as(beispiel.name()).isEqualTo(beispiel.readerCode());
+        var ergebnis = post(beispiel.zip());
+        if (code == null) {
+            ergebnis.then().statusCode(201);
+            assertThat(ergebnis.jsonPath().getList("befunde.code", String.class)).containsAll(beispiel.befunde());
+            assertThat(ergebnis.jsonPath().getList("hinweise")).containsAll(erwarteteHinweise);
+        } else {
+            int status = switch (code) {
+                case "DATEI_ZU_GROSS" -> 413;
+                case "DATEITYP_UNBEKANNT" -> 415;
+                default -> 422;
+            };
+            ergebnis.then().statusCode(status);
+            if (status == 422) {
+                assertThat(ergebnis.jsonPath().getList("befunde.code", String.class)).contains(code);
+            }
+        }
+    }
+
+    @Dann("der Paketleser und der REST-Import beurteilen die gemeinsamen Beispielpakete gleich")
+    public void gemeinsameRegeln() throws Exception {
+        for (var beispiel : WissensPaketBeispiele.alle()) {
+            regelgleichheit(beispiel);
+        }
     }
 
     private byte[] paket(String erzeugtMit, String stufe, Seite... seiten) throws Exception {
