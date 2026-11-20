@@ -2765,6 +2765,71 @@ components:
           type: string
         grund:
           type: string
+    WissenEinstellungen:
+      type: object
+      properties:
+        budgetTokens:
+          type:
+          - integer
+          - "null"
+          format: int32
+          minimum: 1
+        lintBudgetTokens:
+          type:
+          - integer
+          - "null"
+          format: int32
+          minimum: 1
+        lintZeitplan:
+          type:
+          - string
+          - "null"
+        monatsbudgetTokens:
+          type:
+          - integer
+          - "null"
+          format: int32
+          minimum: 1
+    WissenExport:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        status:
+          type: string
+        erstellt:
+          $ref: "#/components/schemas/Instant"
+        fertig:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        gueltigBis:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        groesse:
+          type:
+          - integer
+          - "null"
+          format: int64
+        sha256:
+          type:
+          - string
+          - "null"
+        url:
+          type:
+          - string
+          - "null"
+        fehlerId:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
     WissenIngestAuftrag:
       description: Eingereihter Ingest-Entwurf.
       type: object
@@ -5745,6 +5810,103 @@ paths:
           description: VERSION_FEHLT
         "401":
           description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/wissensbasis/einstellungen:
+    put:
+      summary: Wissenseinstellungen ersetzen
+      description: Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.
+      tags:
+      - Wissensbasis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WissenEinstellungen"
+        required: true
+      responses:
+        "200":
+          description: Einstellungen gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenEinstellungen"
+        "422":
+          description: Budget oder Zeitplan ungültig
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+    get:
+      summary: Wissenseinstellungen lesen
+      description: Nur Inhaber (A19); null bedeutet den konfigurierten Startwert.
+      tags:
+      - Wissensbasis
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenEinstellungen"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/wissensbasis/exporte:
+    post:
+      summary: OKF-Export anfordern
+      description: Nur Inhaber (A19); reiht WISSEN_EXPORT ein.
+      tags:
+      - Wissensbasis
+      responses:
+        "202":
+          description: Export angelegt und eingereiht
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenExport"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/wissensbasis/exporte/{id}:
+    get:
+      summary: OKF-Export abrufen
+      description: Nur Inhaber (A19); Download ab Abschluss für 24 Stunden.
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Exportstatus und gegebenenfalls Download-Adresse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenExport"
+        "404":
+          description: Export nicht gefunden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
       security:
       - SecurityScheme:
         - inhaber

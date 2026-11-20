@@ -19,6 +19,7 @@ import org.commonmark.node.ListItem;
 import org.commonmark.node.Node;
 import org.commonmark.node.Paragraph;
 import org.commonmark.node.SoftLineBreak;
+import org.commonmark.node.SourceSpan;
 import org.commonmark.node.Text;
 import org.commonmark.parser.IncludeSourceSpans;
 import org.commonmark.parser.Parser;
@@ -45,6 +46,8 @@ public final class WissensMarkdown {
     private static final Pattern FUSSNOTE = Pattern.compile("\\[\\^([^\\s\\[\\]\\\\]+)]");
     private static final Parser PARSER = Parser.builder().extensions(EXTENSIONS)
             .includeSourceSpans(IncludeSourceSpans.BLOCKS).build();
+    private static final Parser EXPORT_PARSER = Parser.builder().extensions(EXTENSIONS)
+            .includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES).build();
     private static final HtmlRenderer RENDERER = HtmlRenderer.builder()
             .extensions(EXTENSIONS)
             .escapeHtml(true)
@@ -134,6 +137,75 @@ public final class WissensMarkdown {
             throw new IllegalArgumentException("Das Markdown ueberschreitet die zulaessige Groesse oder Verschachtelung.");
         }
         return analyse.html();
+    }
+
+    /** Schreibt nur erkannte interne Linkziele um; insbesondere Fussnoten und Code bleiben unverändert. */
+    public static String fuerOkf(String markdown) {
+        if (markdown == null) {
+            throw new IllegalArgumentException("Markdown fehlt");
+        }
+        Analyse analyse = analysieren(markdown, MAX_EINGABE_ZEICHEN);
+        if (analyse.zuGross() || analyse.zuTief() || analyse.ungueltigerLink()
+                || analyse.htmlVorhanden() || analyse.bildVorhanden() || analyse.wikilink()
+                || analyse.fussnotenDefinition()) {
+            throw new IllegalArgumentException("Markdown ist für den OKF-Export ungültig");
+        }
+        Deque<Node> offen = new ArrayDeque<>();
+        offen.push(EXPORT_PARSER.parse(markdown));
+        List<Integer> einfuegen = new ArrayList<>();
+        while (!offen.isEmpty()) {
+            Node node = offen.pop();
+            if (node instanceof Link link) {
+                if (internerPfad(link.getDestination()) == null) {
+                    throw new IllegalArgumentException("Ungültiges Linkziel im OKF-Export");
+                }
+                einfuegen.add(zielEnde(markdown, link));
+            }
+            for (Node kind = node.getFirstChild(); kind != null; kind = kind.getNext()) {
+                offen.push(kind);
+            }
+        }
+        StringBuilder ausgabe = new StringBuilder(markdown);
+        einfuegen.sort(Collections.reverseOrder());
+        einfuegen.forEach(index -> ausgabe.insert(index, ".md"));
+        return ausgabe.toString();
+    }
+
+    public static boolean gueltigerSeitenpfad(String pfad) {
+        return pfad != null && internerPfad("/" + pfad) != null;
+    }
+
+    private static int zielEnde(String markdown, Link link) {
+        List<SourceSpan> spans = link.getSourceSpans();
+        if (spans.isEmpty()) {
+            throw new IllegalArgumentException("Linkposition im Markdown fehlt");
+        }
+        int ende = spans.getLast().getInputIndex() + spans.getLast().getLength();
+        Node letzter = link.getLastChild();
+        List<SourceSpan> kindSpans = letzter == null ? List.of() : letzter.getSourceSpans();
+        int ab = kindSpans.isEmpty() ? spans.getFirst().getInputIndex() + 1
+                : kindSpans.getLast().getInputIndex() + kindSpans.getLast().getLength();
+        int klammer = markdown.indexOf("](", ab);
+        if (klammer < 0 || klammer >= ende) {
+            throw new IllegalArgumentException("Linkziel im Markdown nicht gefunden");
+        }
+        int start = klammer + 2;
+        while (start < ende && Character.isWhitespace(markdown.charAt(start))) {
+            start++;
+        }
+        boolean spitz = start < ende && markdown.charAt(start) == '<';
+        int pos = spitz ? start + 1 : start;
+        while (pos < ende) {
+            char zeichen = markdown.charAt(pos);
+            if (zeichen == '\\' && pos + 1 < ende) {
+                pos += 2;
+            } else if (spitz ? zeichen == '>' : zeichen == ')' || Character.isWhitespace(zeichen)) {
+                return pos;
+            } else {
+                pos++;
+            }
+        }
+        throw new IllegalArgumentException("Linkziel im Markdown nicht abgeschlossen");
     }
 
     private static String rendern(Node dokument, Set<String> sichtbarePfade) {

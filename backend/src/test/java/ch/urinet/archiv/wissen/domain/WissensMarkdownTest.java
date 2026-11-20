@@ -3,8 +3,35 @@ package ch.urinet.archiv.wissen.domain;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class WissensMarkdownTest {
+
+    @Test
+    void okfSchreibtNurEchteLinkzieleUmUndLaesstFussnotenUndCodeUnveraendert() {
+        String markdown = "[**Regel**](/konzepte/arbeit \"Titel\") und [Übersicht](</ueberblick>)." +
+                "[^q-1]\n\n`[Code](/konzepte/arbeit)`\n\n```\n[Code](/ueberblick)\n```\n";
+
+        assertThat(WissensMarkdown.fuerOkf(markdown)).isEqualTo(
+                "[**Regel**](/konzepte/arbeit.md \"Titel\") und [Übersicht](</ueberblick.md>)." +
+                        "[^q-1]\n\n`[Code](/konzepte/arbeit)`\n\n```\n[Code](/ueberblick)\n```\n");
+    }
+
+    @Test
+    void okfErhaeltMehrzeiligeLinksUndMaskierteZeichen() {
+        String markdown = "[Regel](\n  /konzepte/arbeits\\-zeit \"Titel\")\r\n"
+                + "[Zweite](/konzepte/zweite)\r\n";
+
+        assertThat(WissensMarkdown.fuerOkf(markdown)).isEqualTo(
+                "[Regel](\n  /konzepte/arbeits\\-zeit.md \"Titel\")\r\n"
+                        + "[Zweite](/konzepte/zweite.md)\r\n");
+    }
+
+    @Test
+    void okfLehntNichtZulaessigeLinksAb() {
+        assertThatIllegalArgumentException().isThrownBy(
+                () -> WissensMarkdown.fuerOkf("[extern](https://example.invalid)"));
+    }
 
     @Test
     void fussnotenUndInterneLinksWerdenGemeinsamGeparst() {
