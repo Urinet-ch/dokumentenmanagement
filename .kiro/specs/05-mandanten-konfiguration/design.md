@@ -88,6 +88,10 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   Der Snapshot-Test (Req 8.3) vergleicht Prompt, Schema und eine Liste von Nachbearbeitungsfällen vor und nach dem
   Umstellen. Grenzen gegen zu lange Prompts: KI-Texte je höchstens 8'000 Zeichen, `ki_hinweise` je Art 1'000,
   Summe aller Texte und Beschreibungen im Prompt höchstens 24'000 Zeichen (Prüfung in `Konfiguration.pruefen`).
+  Für das Basisschema ohne dynamische KI-Felder oder Klassifikationen bleibt die Gate-0-Darstellung für die
+  Prompt-Kennung erhalten; Art-Codes bleiben dabei dynamisch. An das Modell geht weiterhin das dynamische, strikt
+  validierte Schema. Sobald KI-Felder oder Klassifikationen das Schema erweitern, wird diese Darstellung auch für die
+  Kennung verwendet.
   Ohne Abnahme nach Req 8.4 (Schalter `ki_freigegeben` in den KI-Texten, setzt nur der Betreiber mit Verweis auf die
   Abnahme) erzeugt der Worker für den Mandanten keinen Auftrag `KI_VORSCHLAG`; `urinet` startet mit `true`.
   Abnahme eines Mandanten ohne Golden-Datensatz (Req 8.9, Entscheid Fabian 17.11.2026): Stichprobe mit der

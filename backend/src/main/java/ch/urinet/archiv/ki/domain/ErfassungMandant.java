@@ -9,11 +9,17 @@ import java.util.Set;
  * Arten und Kennungen ({@code uid}, {@code ibans}), an denen die Nachbearbeitung den Mandanten als Aussteller erkennt
  * (Req 7.5, 7.12). Ohne Kennungen ist der Mandant nie Aussteller.
  */
-public record ErfassungMandant(String name, String uid, List<String> ibans, Set<String> eigeneArten) {
+public record ErfassungMandant(String name, String uid, List<String> ibans, Set<String> eigeneArten,
+                               List<String> belegnummerMuster) {
 
     public ErfassungMandant {
         Objects.requireNonNull(name, "name");
         ibans = List.copyOf(ibans);
         eigeneArten = Set.copyOf(eigeneArten);
+        belegnummerMuster = belegnummerMuster == null ? List.of() : List.copyOf(belegnummerMuster);
+    }
+
+    public ErfassungMandant(String name, String uid, List<String> ibans, Set<String> eigeneArten) {
+        this(name, uid, ibans, eigeneArten, List.of());
     }
 }

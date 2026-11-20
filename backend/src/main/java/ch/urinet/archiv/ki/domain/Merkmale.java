@@ -85,6 +85,10 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
             return new Frist(grenze, cpuUhr());
         }
 
+        public long ende() {
+            return uhr.getAsLong() + grenze.toNanos();
+        }
+
         private static LongSupplier cpuUhr() {
             ThreadMXBean threads = ManagementFactory.getThreadMXBean();
             if (threads.isCurrentThreadCpuTimeSupported()) {
@@ -105,6 +109,35 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         }
     }
 
+    public record MusterErgebnis(boolean trifftZu, boolean abgebrochen) {
+    }
+
+    /** Prüft ein ganzes Feld mit derselben Zeitgrenze, die auch für die Beispielmerkmale gilt. */
+    public static MusterErgebnis musterTrifft(Pattern muster, String text, Frist frist, long ende) {
+        try {
+            if (frist.uhr().getAsLong() > ende) {
+                return new MusterErgebnis(false, true);
+            }
+            boolean trifftZu = muster.matcher(new MitFrist(text, frist.uhr(), ende)).matches();
+            return frist.uhr().getAsLong() > ende
+                    ? new MusterErgebnis(false, true) : new MusterErgebnis(trifftZu, false);
+        } catch (FristAbgelaufen e) {
+            return new MusterErgebnis(false, true);
+        }
+    }
+
+    /** Kompiliert ein validiertes Konfigurationsmuster erst innerhalb seiner Laufzeitgrenze. */
+    public static MusterErgebnis musterTrifft(String muster, String text, Frist frist, long ende) {
+        if (frist.uhr().getAsLong() > ende) {
+            return new MusterErgebnis(false, true);
+        }
+        Pattern kompiliert = Pattern.compile(muster);
+        if (frist.uhr().getAsLong() > ende) {
+            return new MusterErgebnis(false, true);
+        }
+        return musterTrifft(kompiliert, text, frist, ende);
+    }
+
     /**
      * Merkmale aus dem Belegtext und der Kreditor-IBAN des Swiss QR Codes. Ein Muster, das die Frist überschreitet,
      * gilt als «trifft nicht zu» (Spec 05, Req 2.4) und steht mit seiner Nummer im Ergebnis, damit der Aufrufer es
@@ -114,7 +147,7 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
      * @param eigeneIbans IBAN des Mandanten
      */
     public static Ergebnis erkennen(String text, Optional<String> qrIban, String eigeneUid,
-                                    Collection<String> eigeneIbans, List<Pattern> muster, Frist frist) {
+                                    Collection<String> eigeneIbans, List<String> muster, Frist frist) {
         String t = text == null ? "" : text;
         Set<String> eigene = new LinkedHashSet<>();
         eigeneIbans.forEach(i -> eigene.add(ibanNormal(i)));
@@ -142,9 +175,12 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         List<Integer> abgebrochen = new ArrayList<>();
         String[] woerter = WORT.split(t.strip());
         for (int nr = 0; nr < muster.size() && treffer.size() < MAX_JE_TYP; nr++) {
-            switch (trifft(muster.get(nr), woerter, frist)) {
-                case JA -> treffer.add(muster.get(nr).pattern());
-                case ABGEBROCHEN -> abgebrochen.add(nr);
+            // Zeitgrenze je Muster (Spec 05, Req 2.4): ein abgebrochenes Muster trifft nicht zu, die übrigen laufen weiter
+            switch (trifft(muster.get(nr), woerter, frist, frist.ende())) {
+                case JA -> treffer.add(muster.get(nr));
+                case ABGEBROCHEN -> {
+                    abgebrochen.add(nr + 1);
+                }
                 case NEIN -> {
                 }
             }
@@ -154,14 +190,20 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
 
     private enum Auswertung { JA, NEIN, ABGEBROCHEN }
 
-    private static Auswertung trifft(Pattern muster, String[] woerter, Frist frist) {
-        long ende = frist.uhr().getAsLong() + frist.grenze().toNanos();
+    private static Auswertung trifft(String muster, String[] woerter, Frist frist, long ende) {
         try {
+            if (frist.uhr().getAsLong() > ende) {
+                return Auswertung.ABGEBROCHEN;
+            }
+            Pattern kompiliert = Pattern.compile(muster);
+            if (frist.uhr().getAsLong() > ende) {
+                return Auswertung.ABGEBROCHEN;
+            }
             for (String wort : woerter) {
                 if (frist.uhr().getAsLong() > ende) {
                     return Auswertung.ABGEBROCHEN;
                 }
-                if (!wort.isEmpty() && muster.matcher(new MitFrist(wort, frist.uhr(), ende)).matches()) {
+                if (!wort.isEmpty() && kompiliert.matcher(new MitFrist(wort, frist.uhr(), ende)).matches()) {
                     return Auswertung.JA;
                 }
             }

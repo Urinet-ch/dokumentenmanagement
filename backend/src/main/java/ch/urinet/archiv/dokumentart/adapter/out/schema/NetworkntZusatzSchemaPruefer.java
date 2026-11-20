@@ -283,6 +283,28 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         });
     }
 
+    @Override
+    public Map<String, String> feldBeschreibungen(String schemaJson) {
+        return mitFrist(zeitgrenzeNanos, () -> {
+            try {
+                geprueft(schemaJson);
+                JsonNode schema = StrengesJson.lesen(schemaJson);
+                JsonNode properties = schema.path("properties");
+                Map<String, String> beschreibungen = new LinkedHashMap<>();
+                properties.fields().forEachRemaining(eintrag -> {
+                    JsonNode definition = definition(schema, eintrag.getValue());
+                    String beschreibung = definition.path("description").asText();
+                    if (!beschreibung.isBlank()) {
+                        beschreibungen.put(eintrag.getKey(), beschreibung);
+                    }
+                });
+                return Collections.unmodifiableMap(beschreibungen);
+            } catch (JsonProcessingException e) {
+                throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            }
+        });
+    }
+
     private static JsonNode definition(JsonNode schema, JsonNode definition) {
         Set<String> gesehen = new LinkedHashSet<>();
         JsonNode aktuelle = definition;
