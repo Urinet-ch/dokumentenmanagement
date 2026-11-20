@@ -114,7 +114,7 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Und das Dokument «y» hat eine Datei
     Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «y» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 200
-    Und nennt die Antwort eine Adresse der Datei, die höchstens 5 Minuten gilt
+    Und ist die Antwort eine gültige signierte S3-Adresse der Datei «y» mit höchstens 300 Sekunden Gültigkeit
     Und der Stand des Zugriffsprotokolls von «urinet» ist für die Webseite gemerkt
     Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «x» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
