@@ -46,11 +46,12 @@ container="$(docker create --pull=never --name "$name" --label "ch.urinet.wissen
   -e POSTGRES_DB=wissen_leistung -e POSTGRES_PASSWORD=lokales-testpasswort \
   pgvector/pgvector:0.8.7-pg17-trixie)"
 docker start "$container" >/dev/null
+# TCP statt Socket: das Image startet zuerst einen Init-Server nur auf dem Socket und danach neu
 for i in {1..60}; do
-  if docker exec "$container" pg_isready -U postgres -d wissen_leistung >/dev/null 2>&1; then break; fi
+  if docker exec "$container" pg_isready -h 127.0.0.1 -U postgres -d wissen_leistung >/dev/null 2>&1; then break; fi
   sleep 1
 done
-docker exec "$container" pg_isready -U postgres -d wissen_leistung >/dev/null
+docker exec "$container" pg_isready -h 127.0.0.1 -U postgres -d wissen_leistung >/dev/null
 port="$(docker port "$container" 5432/tcp | sed 's/.*://')"
 TMPDIR="$arbeitsordner" mvn -B -ntp -f backend/pom.xml test-compile surefire:test \
   -Djava.io.tmpdir="$arbeitsordner" -Dquarkus.http.test-port=0 \

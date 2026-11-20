@@ -24,16 +24,21 @@ public class PanacheWissensSuche implements WissensSuchePort {
 
     @Override
     public List<Treffer> volltext(String frage, Filter filter, int groesse) {
+        // Ingest-Kontext (ohne Sichtregel): Kernaussagen mit ODER verknüpfen, sonst findet UND kaum eine Seite (Req 5.4)
+        boolean ingest = filter.regel() == null;
+        String suchtext = ingest ? JdbcWissenIngest.oderSuche(frage) : frage;
+        if (suchtext.isEmpty()) return List.of();
+        String tsquery = ingest ? "websearch_to_tsquery('german', :frage)" : "plainto_tsquery('german', :frage)";
         return lesen("select " + FELDER + ", " + TEXT + " from wissensseite s where %s"
-                + " and s.inhalt_tsv @@ plainto_tsquery('german', :frage)"
-                + " order by ts_rank_cd(s.inhalt_tsv, plainto_tsquery('german', :frage)) desc, s.id limit :groesse",
-                filter, Map.of("frage", frage, "groesse", groesse, "zeichen", HybridSuche.TEXT_ZEICHEN));
+                + " and s.inhalt_tsv @@ " + tsquery
+                + " order by ts_rank_cd(s.inhalt_tsv, " + tsquery + ") desc, s.id limit :groesse",
+                filter, Map.of("frage", suchtext, "groesse", groesse, "zeichen", HybridSuche.TEXT_ZEICHEN));
     }
 
     @Override
     public List<Treffer> vektor(float[] frage, Filter filter, int groesse) {
         em.get().createNativeQuery("set local hnsw.ef_search = 100").executeUpdate();
-        em.get().createNativeQuery("set local hnsw.iterative_scan = 'relaxed_order'").executeUpdate();
+        em.get().createNativeQuery("set local hnsw.iterative_scan = 'strict_order'").executeUpdate();
         return lesen("select " + FELDER + ", left(c.text, :zeichen) from wissensseite_chunk c"
                 + " join wissensseite s on s.id = c.seite_id and s.version = c.version where %s"
                 + " and c.embedding is not null order by c.embedding OPERATOR(public.<=>)"

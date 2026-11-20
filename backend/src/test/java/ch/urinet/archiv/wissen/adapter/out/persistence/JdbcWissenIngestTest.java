@@ -2052,6 +2052,19 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void ingestKontextDerWissensSucheVerbindetKernaussagenMitOder() throws SQLException {
+        UUID lohn = seite(URINET, "probe/ws-lohn", "Die Lohndeklaration ist bis Ende Januar fällig.", null);
+        UUID uvg = seite(URINET, "probe/ws-uvg", "Die Unfallversicherung wird jährlich abgerechnet.", null);
+        UUID fremd = seite(URINET, "probe/ws-fremd", "Ein Text über Fussballvereine.", null);
+        String suchtext = "Die Lohndeklaration ist fällig.\nDie Unfallversicherung wird abgerechnet.";
+        var ingestFilter = new WissensSuchePort.Filter(null, null, null, null, java.util.Set.of(lohn, uvg, fremd));
+
+        assertThat(im(URINET, () -> wissensSuche.volltext(suchtext, ingestFilter, 10)))
+                .extracting(t -> t.seite().id()).containsExactlyInAnyOrder(lohn, uvg);
+        assertThat(im(URINET, () -> wissensSuche.volltext("ab 12 zu", ingestFilter, 10))).isEmpty();
+    }
+
+    @Test
     void findetDieQuelleSeiteNurImEigenenSchema() throws SQLException {
         UUID dokument = quelle(URINET);
         UUID ohneSeite = quelle(URINET);
