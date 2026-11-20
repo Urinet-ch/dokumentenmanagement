@@ -1,10 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { WissenEntwurfZaehler } from './wissen-entwurf-zaehler';
 import { WissenEntwuerfe } from './wissen-entwuerfe';
+import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 
 const daten = {
   entwurf: { id: 'e1', status: 'OFFEN', anlass: 'INGEST', erstellt: '2026-01-01T10:00:00Z' },
@@ -20,12 +22,15 @@ const daten = {
 describe('Wissensentwürfe', () => {
   let http: HttpTestingController;
   const auffrischen = vi.fn();
+  const benutzer = signal({ id: 'u1', mandant: 'urinet', rolle: 'inhaber' });
 
   beforeEach(() => {
     auffrischen.mockClear();
+    benutzer.set({ id: 'u1', mandant: 'urinet', rolle: 'inhaber' });
     TestBed.configureTestingModule({
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: WissenEntwurfZaehler, useValue: { auffrischen } }],
+        { provide: WissenEntwurfZaehler, useValue: { auffrischen } },
+        { provide: AnmeldungService, useValue: { benutzer, darf: () => benutzer().rolle === 'inhaber' } }],
     });
     http = TestBed.inject(HttpTestingController);
   });
@@ -166,5 +171,59 @@ describe('Wissensentwürfe', () => {
     expect(fixture.nativeElement.textContent).toContain('VERTRAULICHKEIT_ZU_TIEF');
     expect(auffrischen).not.toHaveBeenCalled();
     http.expectNone((r) => r.method === 'POST');
+  });
+
+  const importDaten = { ...daten,
+    entwurf: { ...daten.entwurf, anlass: 'IMPORT', erstelltVon: 'u1', herkunft: {
+      paketSha256: 'a'.repeat(64), unveraendert: 2, ignoriert: 1,
+      kopf: { erzeugtVon: 'synthetisch', erzeugtMit: 'lokal', kontextStufe: 'INTERN', erzeugtAm: daten.entwurf.erstellt },
+    } },
+    aenderungen: [{ ...daten.aenderungen[0], daten: { ...daten.aenderungen[0].daten,
+      quellenPruefung: [{ schluessel: 'q1', zuordnung: 'QUELLE_UNBEKANNT', auszug: null }] } }],
+  };
+
+  it('zeigt Importherkunft und ungeprüfte Auszüge und lädt nach Neuprüfung frische ETags ohne Eingabeverlust', async () => {
+    const fixture = await zeigen(importDaten);
+    expect(fixture.nativeElement.textContent).toContain('synthetisch');
+    expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.import.auszugNichtGeprueft);
+    expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.import.zuordnungen['QUELLE_UNBEKANNT']);
+    klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.entscheiden);
+    fixture.detectChanges();
+    klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.bearbeiten);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const markdown = fixture.nativeElement.querySelector('textarea.markdown') as HTMLTextAreaElement;
+    markdown.value = 'Eigene Bearbeitung.';
+    markdown.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    klicken(fixture.nativeElement, TEXTE.wissen.import.neuPruefen);
+    const pruefung = http.expectOne('/api/v1/wissensentwuerfe/e1/neu-pruefen');
+    expect(pruefung.request.method).toBe('POST');
+    pruefung.flush(null, { status: 204, statusText: 'No Content' });
+    http.expectOne('/api/v1/wissensentwuerfe/e1').flush({ ...importDaten,
+      aenderungen: [{ ...importDaten.aenderungen[0], etag: 10 }] });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('textarea.markdown').value).toBe('Eigene Bearbeitung.');
+    klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.geaendertAnnehmen);
+    await fixture.whenStable();
+    klicken(document.querySelector('.cdk-overlay-container') as HTMLElement, TEXTE.wissen.entwuerfe.annehmen);
+    await vi.waitFor(() => expect(document.querySelector('mat-dialog-container')).toBeNull());
+    const annahme = http.expectOne('/api/v1/wissensentwuerfe/e1/aenderungen/2/annehmen');
+    expect(annahme.request.headers.get('If-Match')).toBe('"10"');
+    expect(annahme.request.body.fassung.inhalt).toBe('Eigene Bearbeitung.');
+    expect(annahme.request.body.fassung.quellenPruefung).toBeUndefined();
+    annahme.flush({ fehlercode: 'VERSION_KONFLIKT' }, { status: 412, statusText: 'Precondition Failed' });
+    await fixture.whenStable();
+  });
+
+  it('bricht die Neuprüfung bei Rechtewechsel ab und entfernt alte Importdaten', async () => {
+    const fixture = await zeigen(importDaten);
+    klicken(fixture.nativeElement, TEXTE.wissen.import.neuPruefen);
+    const pruefung = http.expectOne('/api/v1/wissensentwuerfe/e1/neu-pruefen');
+    benutzer.set({ id: 'u2', mandant: 'urinet', rolle: 'mitarbeiter' });
+    await fixture.whenStable();
+    expect(pruefung.cancelled).toBe(true);
+    expect(fixture.nativeElement.textContent).not.toContain('synthetisch');
+    http.expectNone((r) => r.method === 'GET');
   });
 });

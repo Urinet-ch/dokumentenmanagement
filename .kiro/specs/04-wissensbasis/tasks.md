@@ -136,7 +136,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 6.10, 8.8, 12.3, 12.4, 16.6_
   - _Abhängig von: 15.2, 14.2, Spec 02: 7.4_
 
-- [ ] 15.4 Lint [Backend]
+- [x] 15.4 Lint [Backend]
   - Scheduler und manueller Start (A17, Protokoll `WISSEN_LINT`); Prüfungen ohne KI inkl. fehlender Querverweise und Kandidaten «veraltet»; KI-Paare auch verschiedener Vertraulichkeit (ohne `PERSONAL`-Hülle), Änderung nur an der höher eingestuften Seite, mit `lint-paare` und Budget; Vorschläge als Entwurf `LINT`; `wissens_lint`; Logeintrag `LINT` (auch «Budget erschöpft»)
   - _Anforderungen: 10.1–10.6, 14.3_
   - _Abhängig von: 14.2, 14.3_
@@ -166,7 +166,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.25, 19.27_
   - _Abhängig von: 13.4 (`WissensPruefung`), Paketformat aus 15.6 (`WissensPaketLeser`)_
 
-- [ ] 15.8 Oberfläche Import [Frontend]
+- [x] 15.8 Oberfläche Import [Frontend]
   - Route `/wissen/entwuerfe/import` (Upload, Prüfbericht mit Zählern und Befunden je Seite, Link zum Entwurf); Entwurfsansicht für Anlass `IMPORT` mit Herkunft, Quellenzuordnung und Auszugsprüfung je Quelle, Hinweis zur Regel für Cloud-Modelle, Aktion «Prüfung wiederholen»; kein gesammeltes Annehmen
   - 375 px, WCAG 2.1 AA (axe), Texte nur in `texte.de-CH.ts`; Szenarien mit Cucumber.js + Playwright; `mitarbeiter` sieht die Route nicht
   - _Anforderungen: 19.28, 16.3, 16.4, 16.7_

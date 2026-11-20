@@ -218,3 +218,5 @@ textarea {
 .verwerfen-knopf {
   --mat-button-text-label-text-color: var(--gefahr);
 }
+.importherkunft dd { margin: 0 0 .75rem; overflow-wrap: anywhere; }
+.importherkunft code { white-space: normal; overflow-wrap: anywhere; }

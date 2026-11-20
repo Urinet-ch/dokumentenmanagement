@@ -1,0 +1,7 @@
+:host { display: block; min-width: 0; }
+form { display: grid; gap: .75rem; margin-block: 1.5rem; }
+input[type='file'] { width: 100%; min-width: 0; }
+button { justify-self: start; }
+.anzahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: 1rem; }
+dd { margin: .25rem 0 0; font-weight: 600; }
+code, li, p { overflow-wrap: anywhere; }
