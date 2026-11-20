@@ -75,6 +75,8 @@ public enum Fehlercode {
             "Nur Dokumente der Art «Wissensquelle» können in die Wissensbasis übernommen werden."),
     ENTWURF_BEFUND(422, "Entwurf mit Befund",
             "Der Entwurf hat Befunde und kann so nicht übernommen werden. Bitte beheben Sie die Befunde."),
+    PAKET_UNGUELTIG(422, "Wissenspaket ungültig",
+            "Das Wissenspaket hat ein ungültiges Format oder überschreitet eine Grenze. Bitte prüfen Sie den Bericht und erstellen Sie das Paket erneut."),
     VERTRAULICHKEIT_ZU_TIEF(422, "Vertraulichkeit zu tief",
             "Die Vertraulichkeit liegt unter der Stufe der Quellen. Bitte wählen Sie eine höhere Stufe."),
     VERTRAULICHKEIT_UNGUELTIG(422, "Vertraulichkeit ungültig",

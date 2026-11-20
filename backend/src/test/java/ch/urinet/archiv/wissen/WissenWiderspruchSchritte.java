@@ -45,6 +45,7 @@ public class WissenWiderspruchSchritte {
             dokumente.add(id);
             try (Connection c = datenbank.get().getConnection()) {
                 sql(c, "update m_urinet.dokument set seiten = 1, volltext = 'Synthetische Quelle' || chr(12), "
+                                + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false, "
                                 + "datum = cast(? as date) where id = ?",
                         jahr + "-01-01", id);
             }
