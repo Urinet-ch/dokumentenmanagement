@@ -28,7 +28,7 @@ public interface FreigabeRepository {
 
     void fassungSpeichern(UUID entwurfId, Aenderung aenderung, Wissensseite fassung, WissensStufe mindeststufe,
                           WissensStufe wirksameStufe, String erzeugtVon, String benutzer, String grund,
-                          Set<String> links);
+                          Set<String> links, boolean widerspruchAufgeloest);
 
     void verwerfen(long aenderungId, int etag, String benutzer, String grund);
 

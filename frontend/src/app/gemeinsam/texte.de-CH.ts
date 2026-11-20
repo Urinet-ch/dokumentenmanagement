@@ -104,6 +104,7 @@ export const TEXTE = {
     versionSchliessen: 'Version schliessen',
     freigegeben: 'Freigegeben',
     stand: 'Stand',
+    quellendatum: 'Quellendatum',
     keineEintraege: 'Keine Einträge vorhanden.',
     seiteNichtVorhanden: 'Seite nicht vorhanden',
     seite: (nummer: number) => `Seite ${nummer}`,
@@ -283,6 +284,11 @@ export const TEXTE = {
     fehlerWiederholt:
       'Der Upload ist dreimal fehlgeschlagen (Verbindung oder Archiv). Bitte später erneut versuchen.',
     offlineErfassen: 'Ohne Verbindung erfassen',
+    vorzeile: 'Papier und digitale Belege',
+    untertitel:
+      'Jedes Dokument wird einmal erfasst, in PDF/A umgewandelt, per Texterkennung gelesen und landet mit KI-Vorschlag im Eingangskorb.',
+    warteschlange: 'Warteschlange',
+    warteschlangeHinweis: 'wird auch offline gehalten',
   },
   eingangskorb: {
     titel: 'Eingangskorb',

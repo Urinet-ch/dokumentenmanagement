@@ -16,6 +16,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { httpFehlerText } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { UploadErgebnis, UploadFehler, UploadPort } from './upload-port';
 import { uploadProblem } from './upload-problem';
@@ -39,7 +40,7 @@ export interface Zeile {
 /** Seite «Erfassen»: Upload im Browser (Req 3.1, 3.3–3.8). Die Typprüfung macht das Archiv am Inhalt (Req 3.3). */
 @Component({
   selector: 'app-upload',
-  imports: [MatButtonModule, MatCheckboxModule, MatProgressBarModule, RouterLink],
+  imports: [MatButtonModule, MatCheckboxModule, MatProgressBarModule, RouterLink, Symbol],
   templateUrl: './upload.html',
   styleUrl: './upload.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

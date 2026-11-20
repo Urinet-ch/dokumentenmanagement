@@ -40,6 +40,7 @@ export const SYMBOLE = {
   warnung: 'M12 3.5 21.5 20h-19zM12 10v4.5M12 17.2v.3',
   wiederholen: 'M20 11a8 8 0 0 0-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16M20 20v-4h-4',
   zusammenfuehren: `${kreis(6, 5.5, 2)}${kreis(6, 18.5, 2)}${kreis(18, 12, 2)}M6 7.5v9M6 9c0 3 3 3 6 3h4`,
+  kamera: `M4 8h3.5L9 5.5h6L16.5 8H20v11H4z${kreis(12, 13, 3.5)}`,
 } as const;
 
 export type SymbolName = keyof typeof SYMBOLE;
