@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.adapter.out.AblageEinstellungen;
 import ch.urinet.archiv.ablage.adapter.out.s3.S3Ablage;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
@@ -42,6 +43,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyFactory;
@@ -71,6 +73,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 
+import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Echter Export-/Datenbank-/Bucket-Roundtrip; wird nur vom lokalen Restore-Skript aktiviert. */
@@ -169,6 +172,30 @@ class SicherungPaketRoundtripTest {
         for (String code : MANDANTEN) {
             wiederhergestelltenMandantenPruefen(code);
         }
+    }
+
+    @Test
+    void wiederhergestellteOidcAnmeldungPruefen() throws Exception {
+        Assumptions.assumeTrue("ziel".equals(System.getProperty("archiv.restore.phase")));
+
+        String oidcUrl = erforderlicheEigenschaft("archiv.restore.oidc-url");
+        String client = erforderlicheEigenschaft("archiv.restore.oidc-client");
+        String benutzer = erforderlicheEigenschaft("archiv.restore.oidc-benutzer");
+        String passwortDatei = erforderlicheEigenschaft("archiv.restore.oidc-passwort-datei");
+        String passwort = Files.readString(Path.of(passwortDatei), StandardCharsets.UTF_8).trim();
+        var anmeldung = Testanmeldung.anmelden(oidcUrl, client, benutzer, passwort, null);
+        assertThat(anmeldung.statusCode()).as("Anmeldung am wiederhergestellten Realm").isEqualTo(200);
+        String token = anmeldung.path("access_token");
+        assertThat(token).isNotBlank();
+        given().auth().oauth2(token).when().get("/api/v1/dokumentarten").then().statusCode(200);
+    }
+
+    private static String erforderlicheEigenschaft(String name) {
+        String wert = System.getProperty(name);
+        if (wert == null || wert.isBlank()) {
+            throw new IllegalStateException("Erforderliche Restore-Testeigenschaft fehlt: " + name);
+        }
+        return wert;
     }
 
     private void wiederhergestelltenMandantenPruefen(String code) throws Exception {
@@ -439,7 +466,8 @@ class SicherungPaketRoundtripTest {
         @Override
         public Map<String, String> getConfigOverrides() {
             boolean probe = "P".equals(System.getProperty("archiv.restore.stufe"));
-            return Map.ofEntries(
+            boolean ziel = "ziel".equals(System.getProperty("archiv.restore.phase"));
+            Map<String, String> konfiguration = new HashMap<>(Map.ofEntries(
                     Map.entry("archiv.rolle", "api"),
                     Map.entry("archiv.stufe", probe ? "P" : "A"),
                     Map.entry("archiv.ablage.bucket-praefix",
@@ -456,7 +484,17 @@ class SicherungPaketRoundtripTest {
                     Map.entry("quarkus.keycloak.devservices.enabled", "false"),
                     Map.entry("quarkus.oidc.tenant-enabled", "false"),
                     Map.entry("quarkus.oidc.health.enabled", "false"),
-                    Map.entry("quarkus.mailer.mock", "true"));
+                    Map.entry("quarkus.mailer.mock", "true")));
+            if (ziel) {
+                String oidcUrl = System.getProperty("archiv.restore.oidc-url");
+                if (oidcUrl == null || oidcUrl.isBlank()) {
+                    throw new IllegalStateException("OIDC-URL des wiederhergestellten Keycloak fehlt");
+                }
+                konfiguration.put("quarkus.oidc.auth-server-url", oidcUrl);
+                konfiguration.put("quarkus.oidc.tenant-enabled", "true");
+                konfiguration.put("quarkus.oidc.health.enabled", "true");
+            }
+            return konfiguration;
         }
     }
 
