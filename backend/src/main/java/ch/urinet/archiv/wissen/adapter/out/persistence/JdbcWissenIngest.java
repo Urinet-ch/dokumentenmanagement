@@ -130,6 +130,20 @@ public class JdbcWissenIngest implements WissenIngestPort {
     }
 
     @Override
+    public BudgetEinstellungen budgetEinstellungenLaden() {
+        zeitgrenze();
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = em().createNativeQuery(
+                "select budget_tokens, monatsbudget_tokens from wissens_einstellung where id = 1").getResultList();
+        if (zeilen.isEmpty()) {
+            return new BudgetEinstellungen(null, null);
+        }
+        Object[] zeile = zeilen.getFirst();
+        return new BudgetEinstellungen(zeile[0] == null ? null : ((Number) zeile[0]).intValue(),
+                zeile[1] == null ? null : ((Number) zeile[1]).intValue());
+    }
+
+    @Override
     public BudgetReservierung budgetReservieren(UUID entwurfId, long tokens, long budgetTokens,
                                                 long monatsbudgetTokens, Instant von, Instant bis) {
         zeitgrenze();
@@ -392,8 +406,27 @@ public class JdbcWissenIngest implements WissenIngestPort {
 
     @Override
     public void aenderungAnlegen(NeueAenderung aenderung) {
+        aenderungSchreiben(aenderung, false);
+    }
+
+    private void aenderungSchreiben(NeueAenderung aenderung, boolean erneuern) {
         zeitgrenze();
-        em().createNativeQuery("""
+        String konflikt = erneuern ? """
+                on conflict (entwurf_id, nr) do update set
+                    basis_version = excluded.basis_version, daten = excluded.daten, inhalt = excluded.inhalt,
+                    diff = excluded.diff, begruendung = excluded.begruendung, widersprueche = excluded.widersprueche,
+                    entfernte_aussagen = excluded.entfernte_aussagen, befunde = excluded.befunde,
+                    hinweise = excluded.hinweise,
+                    vertraulichkeit_kontext = case
+                        when wissens_aenderung.vertraulichkeit_kontext = 'INTERN'
+                          or excluded.vertraulichkeit_kontext = 'INTERN' then 'INTERN'
+                        else 'NORMAL' end,
+                    status = 'OFFEN', etag = wissens_aenderung.etag + 1
+                where wissens_aenderung.status = 'VERALTET'
+                    and wissens_aenderung.seite_id = excluded.seite_id
+                    and wissens_aenderung.pfad = excluded.pfad and wissens_aenderung.aktion = excluded.aktion
+                """ : "on conflict (entwurf_id, nr) do nothing";
+        int geschrieben = em().createNativeQuery("""
                         insert into wissens_aenderung (entwurf_id, nr, aktion, seite_id, pfad, basis_version,
                             daten, inhalt, diff, begruendung, widersprueche, entfernte_aussagen, befunde, hinweise,
                             vertraulichkeit_kontext, status)
@@ -401,7 +434,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
                             cast(:daten as jsonb), :inhalt, cast(:diff as jsonb), :begruendung,
                             cast(:widersprueche as jsonb), cast(:entfernte as jsonb), cast(:befunde as jsonb),
                             cast(:hinweise as jsonb), :kontext, 'OFFEN')
-                        on conflict (entwurf_id, nr) do nothing""")
+                        """ + konflikt)
                 .unwrap(NativeQuery.class)
                 .setParameter("entwurfId", aenderung.entwurfId())
                 .setParameter("nr", aenderung.nummer())
@@ -415,7 +448,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
                         aenderung.daten().quellen(), aenderung.daten().vertraulichkeit().name(),
                         aenderung.daten().inhalt(), aenderung.daten().wissensquelleId())))
                 .setParameter("inhalt", aenderung.daten().inhalt())
-                .setParameter("diff", aenderung.diff())
+                .setParameter("diff", json(aenderung.diff()))
                 .setParameter("begruendung", aenderung.begruendung())
                 .setParameter("widersprueche", json(aenderung.widersprueche()))
                 .setParameter("entfernte", json(aenderung.entfernteAussagen()))
@@ -423,6 +456,48 @@ public class JdbcWissenIngest implements WissenIngestPort {
                 .setParameter("hinweise", json(aenderung.hinweise()))
                 .setParameter("kontext", aenderung.vertraulichkeitKontext())
                 .executeUpdate();
+        if (erneuern && geschrieben != 1) {
+            throw new IllegalStateException("Veraltete Wissensänderung konnte nicht erneuert werden");
+        }
+    }
+
+    @Override
+    public void erneuerteAenderungSpeichern(NeueAenderung aenderung, Fortschritt fortschritt, long tokensEin,
+                                            long tokensAus) {
+        List<?> gesperrt = em().createNativeQuery("""
+                select a.id from wissens_aenderung a join wissens_entwurf e on e.id = a.entwurf_id
+                where a.entwurf_id = :id and a.nr = :nr and a.status = 'VERALTET'
+                    and e.status = 'IN_ARBEIT' and e.schritt = 'NEU_ERZEUGEN'
+                for update of e, a
+                """).setParameter("id", aenderung.entwurfId()).setParameter("nr", aenderung.nummer())
+                .getResultList();
+        if (gesperrt.size() != 1) {
+            throw new IllegalStateException("Veraltete Wissensänderung für Neu-Erzeugen fehlt");
+        }
+        aenderungSchreiben(aenderung, true);
+        int geschrieben = em().createNativeQuery("""
+                update wissens_entwurf set status = 'OFFEN', schritt = null,
+                    ingest_daten = cast(:fortschritt as jsonb), tokens_ein = :ein, tokens_aus = :aus,
+                    hinweis = null
+                where id = :id and status = 'IN_ARBEIT' and schritt = 'NEU_ERZEUGEN'
+                """).setParameter("fortschritt", json(fortschritt))
+                .setParameter("ein", Math.toIntExact(Math.min(Integer.MAX_VALUE, Math.max(0, tokensEin))))
+                .setParameter("aus", Math.toIntExact(Math.min(Integer.MAX_VALUE, Math.max(0, tokensAus))))
+                .setParameter("id", aenderung.entwurfId()).executeUpdate();
+        if (geschrieben != 1) {
+            throw new IllegalStateException("Neu-Erzeugen des Wissensentwurfs ist nicht mehr aktuell");
+        }
+    }
+
+    @Override
+    public void neuerzeugungAbbrechen(UUID entwurfId, String hinweis) {
+        int geschrieben = em().createNativeQuery("""
+                update wissens_entwurf set status = 'OFFEN', schritt = null, hinweis = :hinweis
+                where id = :id and status = 'IN_ARBEIT' and schritt = 'NEU_ERZEUGEN'
+                """).setParameter("id", entwurfId).setParameter("hinweis", hinweis).executeUpdate();
+        if (geschrieben != 1) {
+            throw new IllegalStateException("Neu-Erzeugen des Wissensentwurfs ist nicht mehr aktuell");
+        }
     }
 
     @Override
