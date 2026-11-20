@@ -52,7 +52,7 @@ public record Dokumentart(String code, String name, String beschreibung, List<St
         if (!gueltigerCode(code) || !text(name, NAME_MAX) || beschreibung != null && !text(beschreibung, BESCHREIBUNG_MAX)
                 || gruppen == null || pflichtfelder == null || zusatzSchema == null || vertraulichkeit == null
                 || aufbewahrung == null || belegnummerMuster == null || kiFelder == null
-                || kiHinweise != null && !text(kiHinweise, BESCHREIBUNG_MAX)) {
+                || kiHinweise != null && !kiHinweise.isEmpty() && !text(kiHinweise, BESCHREIBUNG_MAX)) {
             throw ungueltig();
         }
         name = name.strip();

@@ -1,9 +1,11 @@
 package ch.urinet.archiv.ki.adapter.out.langchain4j;
 
 import ch.urinet.archiv.ki.application.KiPort;
+import ch.urinet.archiv.ki.domain.ArtEintrag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,7 +35,7 @@ class KiZugangTest {
         modell.basisUrl = INFOMANIAK;
         modell.modell = "google/gemma-4-31B-it";
         modell.token = Optional.empty();
-        LangChain4jKiAdapter adapter = new LangChain4jKiAdapter(null, new TokenZaehler(), modell);
+        LangChain4jKiAdapter adapter = new LangChain4jKiAdapter(new TokenZaehler(), modell);
 
         KiPort.Antwort antwort = adapter.metadaten(new KiPort.Anfrage("System", "", "Text", Optional.empty(),
                 Optional.empty()));
@@ -52,13 +54,18 @@ class KiZugangTest {
                 "sicherheit":{"art":0.9,"titel":0.9,"datum":0.9,"partnerName":0,"belegnummer":0,"richtung":0.9,
                 "betrag":0.9,"waehrung":0.9,"faelligkeit":0,"vertraulichkeit":0.9}}""";
 
-        assertThat(AntwortSchema.gueltig(gueltig)).isTrue();
-        assertThat(AntwortSchema.gueltig("{}")).isFalse();
-        assertThat(AntwortSchema.gueltig(gueltig.replace("\"qrReferenz\":null,", ""))).isFalse();
-        assertThat(AntwortSchema.gueltig(gueltig.replace("{\"art\"", "{\"extra\":1,\"art\""))).isFalse();
-        assertThat(AntwortSchema.gueltig(gueltig.replace("\"QUITTUNG\"", "\"RECHNUNG\""))).isFalse();
-        assertThat(AntwortSchema.gueltig("kein JSON")).isFalse();
-        assertThat(AntwortSchema.gueltig(null)).isFalse();
-        assertThat(AntwortSchema.gueltig(" ")).isFalse();
+        String schema = AntwortSchema.json(List.of(new ArtEintrag("QUITTUNG", "Quittung", null, "INTERN",
+                List.of("finanz"), false, true, List.of(), null, null, List.of(), null, 0,
+                "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}", java.util.Map.of(),
+                List.of())), List.of());
+
+        assertThat(AntwortSchema.gueltig(gueltig, schema)).isTrue();
+        assertThat(AntwortSchema.gueltig("{}", schema)).isFalse();
+        assertThat(AntwortSchema.gueltig(gueltig.replace("\"qrReferenz\":null,", ""), schema)).isFalse();
+        assertThat(AntwortSchema.gueltig(gueltig.replace("{\"art\"", "{\"extra\":1,\"art\""), schema)).isFalse();
+        assertThat(AntwortSchema.gueltig(gueltig.replace("\"QUITTUNG\"", "\"RECHNUNG\""), schema)).isFalse();
+        assertThat(AntwortSchema.gueltig("kein JSON", schema)).isFalse();
+        assertThat(AntwortSchema.gueltig(null, schema)).isFalse();
+        assertThat(AntwortSchema.gueltig(" ", schema)).isFalse();
     }
 }

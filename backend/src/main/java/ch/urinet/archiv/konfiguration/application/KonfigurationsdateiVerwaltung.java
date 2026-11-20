@@ -180,6 +180,32 @@ public class KonfigurationsdateiVerwaltung {
         return konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.APP, vorher);
     }
 
+    public int kiFreigeben(String wer, String abnahme) {
+        List<KonfigurationUngueltig.Befund> befunde = new ArrayList<>();
+        if (wer == null || wer.isBlank() || codepunkte(wer) > 80 || steuerzeichen(wer)) {
+            befunde.add(new KonfigurationUngueltig.Befund("wer", "WER_UNGUELTIG",
+                    "Der Betreibername fehlt oder ist ungültig."));
+        }
+        if (abnahme == null || abnahme.isBlank() || codepunkte(abnahme) > 1000 || steuerzeichen(abnahme)) {
+            befunde.add(new KonfigurationUngueltig.Befund("abnahme", "ABNAHME_UNGUELTIG",
+                    "Der Verweis auf die Abnahme fehlt oder ist ungültig."));
+        }
+        if (!befunde.isEmpty()) {
+            throw new KonfigurationUngueltig(befunde);
+        }
+        konfiguration.aenderungStarten(konfiguration.aktuelleVersion());
+        KiTexte texte = kiTexte.lesen();
+        if (texte.kiFreigegeben()) {
+            return konfiguration.aktuelleVersion();
+        }
+        kiTexte.speichern(new KiTexte(texte.rolle(), texte.feldregeln(), true));
+        return konfiguration.aenderungSpeichern(wer, abnahme, KonfigurationQuelle.APP);
+    }
+
+    private static boolean steuerzeichen(String text) {
+        return text.codePoints().anyMatch(Character::isISOControl);
+    }
+
     private Analyse analysieren(Konfiguration aktuell, KonfigurationsdateiCodec.Datei datei) {
         Konfiguration ziel = fehlendesAusBestandErhalten(aktuell, datei.inhalt());
         List<Befund> befunde = new ArrayList<>(ziel.pruefen());

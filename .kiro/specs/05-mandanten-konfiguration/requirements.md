@@ -116,9 +116,10 @@ im Code stehen.
    höchstens 1'000 Zeichen, Spec 01 design.md), DANN SOLL das Archiv die Änderung mit HTTP 422
    `KONFIGURATION_UNGUELTIG` ablehnen. Das Archiv SOLL jedes Muster auch zur Laufzeit (Vorauswahl der Beispiele,
    KI-Nachbearbeitung, Lückenbericht) nur mit der Zeitgrenze `archiv.dokumentart.muster-zeitgrenze` auswerten und
-   ein Muster, das sie überschreitet, als «trifft nicht zu» behandeln und protokollieren.
+   ein Muster, das sie überschreitet, als «trifft nicht zu» behandeln und protokollieren. Nachweis zur Laufzeit: JUnit
+   (`MerkmaleTest`, `VorschlagNachbearbeitungTest`: Zeitgrenze je Muster, die übrigen Muster laufen weiter).
 5. Das Archiv SOLL Arten mit `ki_vorschlag = nein` nie in die Liste der Dokumentarten für den KI-Vorschlag
-   aufnehmen (Spec 01, 7.1).
+   aufnehmen (Spec 01, 7.1). Nachweis: JUnit (`ErfassungPromptTest`).
 6. Spec 05 ergänzt Spec 04, 1.1 und 1.5: WO die Art `WISSENSQUELLE` besteht (ab Spec 04, Aufgabe 13.2), SOLL sie
    in jeder Konfiguration vorhanden sein und Code, Gruppe `frei`, mindestens die Pflichtfelder `titel` und `datum`,
    Fristregel «unbefristet», `gesetzliche_pflicht = nein` und `ki_vorschlag = nein` fest tragen (Entscheid Fabian
@@ -312,7 +313,8 @@ kennen, damit ich keine fremden Kategorien sehe.
    `ki_felder` der Arten mit Typ und Beschreibung, die Klassifikationen mit «KI darf vorschlagen» und ihre aktiven
    Werte; das Antwortschema SOLL nur diese Codes und Werte zulassen. Werte, die nicht in der Konfiguration stehen,
    SOLL das Archiv als «kein Vorschlag» für dieses Feld behandeln. `zugriff` und `veroeffentlicht` schlägt die KI
-   nie vor (Spec 03, 3.3).
+   nie vor (Spec 03, 3.3). Nachweis: JUnit (`ErfassungPromptTest`,
+   `VorschlagNachbearbeitungTest`) und ein Szenario für die Herkunft der Texte.
 2. Das Archiv SOLL die festen Texte des Prompts (Rolle und Feldregeln, Spec 01 design.md, Abschnitt «KI (`ki`)») als
    KI-Texte des Mandanten führen und die Nachbearbeitung (Umstufungen, Begrenzung der Sicherheit der Belegnummer)
    nur über die Art-Attribute nach 2.1 und `kennungen` steuern.
