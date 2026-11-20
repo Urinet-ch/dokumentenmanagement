@@ -1379,6 +1379,7 @@ export const TEXTE = {
       ALLGEMEIN: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
     } as Record<string, string>,
     fehlerListe: 'Die letzten Gespräche konnten nicht geladen werden.',
+    vorzeile: 'Fragen an das Archiv',
   },
   protokoll: {
     titel: 'Zugriffsprotokoll',

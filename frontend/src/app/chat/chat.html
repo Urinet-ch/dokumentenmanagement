@@ -1,8 +1,11 @@
-<h1>{{ texte.titel }}</h1>
-<p class="einleitung">{{ texte.einleitung }}</p>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ texte.vorzeile }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
 
 <div class="layout" [class.mobil]="mobil()">
-  <aside class="gespraeche" aria-labelledby="gespraeche-titel">
+  <aside class="gespraeche karte" aria-labelledby="gespraeche-titel">
     <div class="kopf">
       <h2 id="gespraeche-titel">{{ texte.gespraeche }}</h2>
       @if (mobil()) {
@@ -24,6 +27,7 @@
       (click)="neuesGespraech()"
       [disabled]="laeuft()"
     >
+      <app-symbol name="plus" />
       {{ texte.neuesGespraech }}
     </button>
     <div id="gespraech-liste" [hidden]="!listeOffen()">
@@ -61,17 +65,20 @@
     </div>
   </aside>
 
-  <section class="gespraech" aria-labelledby="verlauf-titel">
+  <section class="gespraech karte" aria-labelledby="verlauf-titel">
     <h2 id="verlauf-titel" class="nur-screenreader">{{ texte.verlauf }}</h2>
     @if (laedt()) {
       <p class="gedaempft" role="status">{{ texte.gespraechLaden }}</p>
     } @else if (nachrichten().length === 0) {
-      <p class="gedaempft">{{ texte.leer }}</p>
+      <div class="anfang">
+        <app-symbol name="chat" />
+        <p>{{ texte.leer }}</p>
+      </div>
     }
     <ol class="verlauf">
       @for (n of nachrichten(); track $index) {
         <li
-          class="nachricht karte"
+          class="nachricht"
           [class.frage]="n.rolle === 'BENUTZER'"
           [attr.data-test]="n.rolle === 'BENUTZER' ? 'frage' : 'antwort'"
         >
@@ -79,17 +86,17 @@
             >{{ n.rolle === 'BENUTZER' ? texte.frage : texte.antwort }}:</span
           >
           <!-- reiner Text: Interpolation, nie innerHTML; Zeilenumbrüche über white-space -->
-          <p class="inhalt">{{ n.inhalt }}</p>
+          <p class="inhalt" [class.leer]="n.inhalt === ''">{{ n.inhalt }}</p>
           @if (n.quellen.length > 0) {
             <div class="quellen" data-test="quellen">
-              <span class="nur-screenreader">{{ texte.quellen }}:</span>
+              <span class="quellen-titel">{{ texte.quellen }}</span>
               <ul>
                 @for (chip of chips(n.quellen); track $index) {
                   <li>
                     @if (chip.link) {
-                      <a class="chip link" [routerLink]="chip.link" data-test="quelle">{{
-                        chip.text
-                      }}</a>
+                      <a class="chip link" [routerLink]="chip.link" data-test="quelle"
+                        ><app-symbol name="dokument" /><span>{{ chip.text }}</span></a
+                      >
                     } @else {
                       <span class="chip" data-test="quelle">{{ chip.text }}</span>
                     }
@@ -111,9 +118,9 @@
 
     <p class="hinweis" role="status" aria-live="polite" data-test="hinweis">
       @if (hinweis()) {
-        {{ hinweis() }}
+        <span class="kreisel" aria-hidden="true"></span>{{ hinweis() }}
       } @else if (wartet()) {
-        {{ texte.wartet }}
+        <span class="kreisel" aria-hidden="true"></span>{{ texte.wartet }}
       }
     </p>
 
@@ -138,16 +145,19 @@
           aria-describedby="frage-hinweis"
         ></textarea>
       </label>
-      <p id="frage-hinweis" class="gedaempft">{{ texte.frageHinweis }}</p>
-      <div class="knoepfe">
-        <button mat-flat-button type="submit" [disabled]="!sendenMoeglich()">
-          {{ texte.senden }}
-        </button>
-        @if (laeuft()) {
-          <button mat-stroked-button type="button" (click)="abbrechen()">
-            {{ texte.abbrechen }}
+      <div class="zeile">
+        <p id="frage-hinweis" class="gedaempft">{{ texte.frageHinweis }}</p>
+        <div class="knoepfe">
+          <button mat-flat-button type="submit" [disabled]="!sendenMoeglich()">
+            <app-symbol name="senden" />
+            {{ texte.senden }}
           </button>
-        }
+          @if (laeuft()) {
+            <button mat-stroked-button type="button" (click)="abbrechen()">
+              {{ texte.abbrechen }}
+            </button>
+          }
+        </div>
       </div>
     </form>
   </section>
