@@ -63,7 +63,7 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
       | vorstand    | vorstand    | -          | true            | NORMAL          | ja         | ARCHIVIERT   |
 
   @req-1.4 @req-9.1
-  Szenariogrundriss: Ein Schlüssel eines anderen Mandanten kann keine Datei abrufen, der eigene Mandant schon
+  Szenariogrundriss: Ein Schlüssel eines anderen Mandanten kann keine Datei streamen, der eigene Mandant schon
     Der Aufrufer erreicht die Stufe des Dokuments (Schlüssel «vorstand» mit Stufe «vorstand»); nur die Mandantentrennung
     kann die 404 erklären. Die Gegenprobe im eigenen Mandanten mit gleichen Angaben liefert die Datei.
     Angenommen im Mandanten «vhf-gsk» sind diese Reihen angelegt:
@@ -84,13 +84,12 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Und belegt die API noch 0 Plätze für Streams
 
     Beispiele:
-      | zugriff     |
-      | oeffentlich |
-      | mitglieder  |
-      | vorstand    |
+      | zugriff    |
+      | mitglieder |
+      | vorstand   |
 
   @req-1.4 @req-9.1
-  Szenario: Ein Schlüssel von vhf-gsk kann keine Datei von urinet abrufen
+  Szenario: Ein Schlüssel von vhf-gsk kann keine Datei von urinet streamen
     Angenommen der Webseiten-Lesezugang «fremd» der Webseite «probe-vhf» im Mandanten «vhf-gsk» hat die höchste Stufe «vorstand»
     Und das Dokument «b3» hat eine Datei
     Und das Dokument «v1» hat eine Datei
@@ -98,6 +97,28 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Wenn der Webseiten-Lesezugang «fremd» die Datei des Dokuments «v1» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und belegt die API noch 0 Plätze für Streams
+
+  @req-1.4 @req-9.1
+  Szenario: Ein fremder Mandant erhält keinen S3-Link für eine öffentliche Datei
+    Angenommen im Mandanten «vhf-gsk» sind diese Reihen angelegt:
+      | code        | name                  | aktiv |
+      | WEBTEST_VHF | Fremdmandanten-Reihe  | true  |
+    Und im Mandanten «vhf-gsk» liegen diese Webseiten-Dokumente:
+      | name | art         | zugriff     | text          |
+      | x    | WEBTEST_VHF | oeffentlich | Fremdmandant  |
+    Und im Mandanten «urinet» liegen diese Webseiten-Dokumente:
+      | name | art         | zugriff     | text          |
+      | y    | WEBTEST_BUL | oeffentlich | Eigenmandant  |
+    Und das Dokument «x» hat eine Datei
+    Und das Dokument «y» hat eine Datei
+    Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «y» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 200
+    Und nennt die Antwort eine Adresse der Datei, die höchstens 5 Minuten gilt
+    Und der Stand des Zugriffsprotokolls von «urinet» ist für die Webseite gemerkt
+    Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «x» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und steht im Zugriffsprotokoll von «urinet» kein neuer Eintrag
     Und belegt die API noch 0 Plätze für Streams
 
   @req-13.2
