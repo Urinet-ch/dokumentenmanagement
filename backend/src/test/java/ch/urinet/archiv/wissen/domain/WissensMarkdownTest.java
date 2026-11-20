@@ -7,6 +7,15 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 
 class WissensMarkdownTest {
     @Test
+    void zaehltNurEchteFussnotenverweiseFuerDieQuellenrangfolge() {
+        String text = "Erste.[^q1] Zweite.[^q1] Dritte.[^q2]\n\n"
+                + "`[^q2]` und \\[^q2]\n\n```\n[^q2]\n```";
+
+        assertThat(WissensMarkdown.analysieren(text, 20_000).fussnotenHaeufigkeit())
+                .containsOnlyKeys("q1", "q2").containsEntry("q1", 2).containsEntry("q2", 1);
+    }
+
+    @Test
     void widerspruchsvergleichErkenntGeaenderteUndMehrfacheBloeckeAberKeinenCode() {
         String block = "> ⚠️ Widerspruch: Alt.[^alt] Neu.[^neu]";
         assertThat(WissensMarkdown.entfernteWidersprueche(block, block.replace("Alt.", "Anders."))).hasSize(1);
