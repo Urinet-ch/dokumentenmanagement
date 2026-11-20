@@ -47,7 +47,7 @@ Dokumente sind dann ohnehin lesbar. Das Dienstkonto fügt **neue** Möglichkeite
 | Benutzer anlegen, auch mit Rolle `inhaber`, in jedem Mandanten | nur `manage-users`; Alarm bei jeder Vergabe von `inhaber` (6.7); täglicher Abgleich meldet jede Rolle `inhaber` ohne Vorgang im Protokoll (6.5); Keycloak-Admin-Ereignisse als zweite Spur (6.9) | Einbruch bleibt bis zum Alarm unbemerkt (höchstens Minuten bis 24 h) |
 | Passwörter setzen, Zugangsdaten zurücksetzen, Benutzer übernehmen | das Archiv ruft `reset-password` nie auf (ArchUnit); technisch erlaubt `manage-users` es dennoch; Ereignisse (Admin-Ereignisse) und Abgleich erfassen Änderungen von Zugangsdaten | wie oben |
 | Realm, Clients, Identity Provider, Authentifizierungsflüsse, Redirect-URIs ändern | **nicht möglich**: Dienstkonto ohne `manage-realm`, `manage-clients`, `manage-identity-providers`, `manage-authorization`, `realm-admin`; kein Zugang zum Realm `master` | keines |
-| Sich selbst oder anderen Realm-Admin-Rechte geben | Rollenzuweisung (Realm-Rollen) auf die vier Archiv-Rollen begrenzen: Das Archiv sendet nur diese; Härtung mit feingranularen Admin-Rechten (FGAP v2, Recht `map-roles` nur auf diese vier Rollen), in Aufgabe 19.1 gegen Keycloak 26.8.2 zu prüfen | ohne FGAP v2: Archiv-Code ist die einzige Sperre |
+| Sich selbst oder anderen Realm-Admin-Rechte geben | Rollenzuweisung (Realm-Rollen) auf die vier Archiv-Rollen begrenzen: Das Archiv sendet nur diese; Härtung mit feingranularen Admin-Rechten (FGAP v2, Recht `map-roles` nur auf diese vier Rollen), in Aufgabe 19.1 gegen Keycloak 26.8.2 zu prüfen (Ergebnis: FGAP begrenzt die Zuweisung nicht, solange `manage-users` gehalten wird, siehe «Umsetzung 19.1» und Open Points) | ohne FGAP v2: Archiv-Code ist die einzige Sperre, und das gilt derzeit auch mit FGAP v2 |
 | Benutzer massenhaft löschen oder sperren (Verfügbarkeit) | Raten, Höchstzahl, Alarm (6.6, 6.7); Notfallweg Betreiber; Sicherung enthält die Keycloak-Datenbank (Spec 01, Plattform und Betrieb) | Wiederherstellung aus der Sicherung nötig |
 | Geheimnis des Dienstkontos entwenden | nur Datei `/run/secrets/keycloak_verwaltung_secret`, kein Umgebungswert, nie im Log; Rotation über den definierten Weg (19.3, 21.5); Admin-API nur im internen Netz erreichbar, nicht öffentlich | wer den Container übernimmt, hat das Geheimnis |
 
@@ -123,7 +123,7 @@ Die Oberfläche zeigt für kein Geheimnis einen Status; das Fehlen meldet nur di
 ```
 backend/src/main/java/ch/urinet/archiv/
   benutzer/                      (neu, hexagonal)
-    domain/      Benutzer, Benutzerstatus, Vergaberegeln (Eskalationsschutz, letzter Inhaber), Vorgang, Antrag
+    domain/      Benutzer, Benutzerstatus, Vorgang, Antrag
     application/ BenutzerVerwaltung (Use Cases), Abgleich, StepUp, VerwaltungGrenzen
     adapter/in/rest/   BenutzerResource, RollenResource, AntragResource
     adapter/in/kommando/ InhaberEinladen, BenutzerAbgleichen   (Admin-Kommando, Spec 01, 1.3)
@@ -134,9 +134,11 @@ backend/src/main/java/ch/urinet/archiv/
     application/ EinstellungenVerwaltung (lesen, vorschau, aendern, zuruecksetzen)
     adapter/in/rest/ MandantEinstellungenResource (erweitert)
   sicherheit/                    (Spec 01, hier erweitert)
-    domain/Rechtematrix, Aktion (A20–A23), RechteUebersicht
+    domain/Rechtematrix, Aktion (A20–A23), RechteUebersicht, Vergaberegeln
     adapter/in/rest/ ZugangFilter (+ Token-Widerruf, Step-up), SicherheitsHeader
 ```
+- `Vergaberegeln` bleibt bei `sicherheit.domain`, weil es die vorhandene Rolle und Rechtematrix direkt nutzt; so entsteht
+  weder eine Abhängigkeit von `benutzer.domain` nach `sicherheit.domain` noch eine zweite Rangfolgen-Implementierung.
 - **Port `IdentitaetsDienst`** (`benutzer/application`, driven): `benutzerSuchen(mandant, q, seite)`, `benutzerLesen(id)`,
   `anlegen(Benutzer, rolle)`, `aktualisieren(id, Aenderung)`, `rolleSetzen(id, rolle)`, `aktivieren(id, boolean)`,
   `einladen(id, aktionen, gueltigkeit)`, `sitzungenBeenden(id)`, `otpEntfernen(id)`, `sperreAufheben(id)`,
@@ -320,7 +322,7 @@ ein neuer Benutzer nie als früherer erscheint.
 Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anmeldung und Benutzer bleiben unverändert:
 1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, Secret `${KEYCLOAK_VERWALTUNG_SECRET}`
    (Platzhalter, wie bei Google); Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
-   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1.
+   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1. Ergebnis des Spikes: FGAP wirkt nicht, solange `manage-users` gehalten wird (siehe «Umsetzung 19.1»; entschieden 20.11.2026: `manage-users` bleibt, Option (a)).
 2. SMTP des Realms (Host, Port, Absender `archiv@urinet.ch`, Anzeigename «UriNet Archiv», Zugang als Secret
    `keycloak_smtp_passwort`); ohne SMTP kann Keycloak keine Einladung senden.
 3. Passwort-Richtlinie `length(12) and notUsername and notEmail`.
@@ -453,7 +455,7 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 | Spec 01, requirements.md 2.6 | Absatz nach der Tabelle: Zeilen A20 bis A23 stehen in Spec 06, Requirement 4.1 (Tabelle bleibt unverändert; Test mit 19.5) |
 | Spec 01, design.md | mit der jeweiligen Aufgabe: Fehlercodes (Tabelle), Aktionen (Tabelle Protokoll), `anlass`, Dienstkonto in «Sicherheit», Secret `keycloak_verwaltung_secret` in «Secrets und Konfiguration» |
 | Spec 03, 3.5 | Entscheid der Rechte der Geschäftsstelle umfasst A20 bis A23 (Open Point) |
-| Spec 04, design.md `/wissensbasis/einstellungen` | Nachtrag: nach Spec 06, 2.13 gleiche Mechanik wie die Konfiguration (Entscheid offen) |
+| Spec 04, design.md `/wissensbasis/einstellungen` | Nachtrag: nach Spec 06, 2.13 gleiche Mechanik wie die Konfiguration (entschieden 20.11.2026: ja) |
 | Spec 05, requirements.md 7.6 und design.md | Verweis: `einstellungen.*` wächst nach Spec 06; Seiten der Verwaltung unter `/verwaltung/…` ergänzt Spec 06 (18.3 bleibt) |
 | `tech.md` | Tag `@spec-06`; Dienstkonto und Secret `keycloak_verwaltung_secret` im Abschnitt Secrets |
 | `docs/umsetzungsplan.md` | Zeile Spec 06, Wellen 19 bis 21 |
@@ -476,19 +478,59 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 - **Verknüpfen von Google-Konten durch das Archiv:** abgelehnt; es bräuchte die Google-Kennung `sub`; bleibt bei O.8.
 
 ## Open Points
-- [offen: Entscheid Fabian] Benutzerverwaltung im Mandanten `vhf-gsk` (kein Benutzer mit Rolle `inhaber`, Spec 03, 3.5;
+- [entschieden 20.11.2026, Fabian: Empfehlung übernommen] Benutzerverwaltung im Mandanten `vhf-gsk` (kein Benutzer mit Rolle `inhaber`, Spec 03, 3.5;
   Requirement 4.1, Fussnote). Empfehlung: Betreiber verwaltet `vhf-gsk` per Admin-Kommando, A20 bis A23 für `geschaeftsstelle`
   403, bis Spec 03, 3.5 entscheidet.
-- [offen: Entscheid Fabian] Löschfrist 30 Tage und keine Pseudonymisierung der Protokolle (Rechtsgrundlagen revDSG und GeBüV
+- [entschieden 20.11.2026, Fabian: Empfehlung übernommen; Rechtsgrundlagen revDSG und GeBüV bestätigt Fabian oder der Datenschutzberater separat] Löschfrist 30 Tage und keine Pseudonymisierung der Protokolle (Rechtsgrundlagen revDSG und GeBüV
   durch Fabian oder den Datenschutzberater bestätigen). Empfehlung: 30 Tage, Deaktivieren als Standard, Pseudonymisierung
   nur mit der Löschfunktion (Spec 01, 9.9).
-- [offen: Entscheid Fabian] Einstellungen der Wissensbasis (A19) in die Konfigurationsversion überführen (Requirement 2.13).
+- [entschieden 20.11.2026, Fabian: ja] Einstellungen der Wissensbasis (A19) in die Konfigurationsversion überführen (Requirement 2.13).
   Empfehlung: ja, solange `PUT /wissensbasis/einstellungen` noch nicht umgesetzt ist (heute liest nur der Ingest die Tabelle
   `wissens_einstellung`); sonst Aufgabe 20.3 mit Migration.
-- [offen: Entscheid Fabian] Alarm-Empfänger und Monatsbudget des öffentlichen Chats bleiben beim Betreiber (Klasse (b)).
+- [entschieden 20.11.2026, Fabian: ja] Alarm-Empfänger und Monatsbudget des öffentlichen Chats bleiben beim Betreiber (Klasse (b)).
   Empfehlung: ja (Personendaten, Kostenhoheit).
+- [entschieden 20.11.2026, Fabian: Option (a)] Rollenzuweisung des Dienstkontos: Requirement 5.2 verlangt `manage-users`, das die FGAP-Prüfung
+  umgeht (Spike 19.1). Optionen: (a) `manage-users` behalten, der Archiv-Code ist die einzige Sperre auf die vier Archiv-Rollen
+  (Ist-Stand, Realm-Export weist FGAP nicht aus); (b) `manage-users` durch feingranulare Rechte (FGAP v2 mit `manage`-Scope
+  auf Benutzer und `map-role` auf die vier Rollen) ersetzen und Requirement 5.2 anpassen. Empfehlung: (a), solange (b) nicht
+  gegen Keycloak 26.8.2 nachgewiesen ist.
 - Aufgabe 19.1 klärt gegen Keycloak 26.8.2: feingranulare Admin-Rechte (`map-roles`) für das Dienstkonto, interne Adresse und
   Aussteller des Tokens, Rotation des Client-Secrets mit Überlappung, `auth_time` im Access-Token, Verhalten von
   `prompt=login` mit dem Cookie-Zweig des Browser-Flows, Aufruf `execute-actions-email` ohne vorhandenes Passwort.
 - Grenzwerte (Katalog, Raten, Gültigkeiten) sind Vorschläge; sie gelten mit dem Merge dieses PR und sind Klasse (b), also ohne
   Codeänderung, nur per Konfiguration und Deploy anpassbar (`archiv.verwaltung.*`).
+
+## Umsetzung 19.1 — Spike Keycloak 26.8.2
+
+Der Dev-Service-Test bestätigt, dass der Issuer aus der Discovery-Antwort mit dem `iss`-Claim des Dienstkonto-Tokens
+übereinstimmt. `GET /users?q=mandant:urinet` liefert nur Testbenutzer mit diesem Attribut; `GET /roles/inhaber/users`
+liefert dagegen Inhaber aus beiden Testmandanten. Der Adapter muss daher weiterhin jede Antwort nach `mandant` filtern.
+Das Dienstkonto erhält ein Token mit den direkt zugewiesenen Rollen `query-users`, `view-users` und `manage-users` sowie
+der erwarteten `realm-management`-Audience. Im Test-Realm ist `view-users` zusammengesetzt und bringt zusätzlich
+`query-groups` in den effektiven Token-Rollen mit.
+
+Ein Aufruf der Admin-REST-API mit diesem Token (`GET /users?max=1`) antwortete zunächst mit HTTP 401, auch mit zusätzlich
+zugewiesenem `realm-admin`. Ursache (Keycloak-Log, Test `KeycloakVerwaltungSpikeTest`): Keycloak 26.8 prüft die Audience der
+Admin-API («Failed to verify identity token: Expected audience not available in the token»). Das Token braucht den Client-Scope
+`kc-admin-api`, der die Audience `<Basis>/admin/realms/<Realm>` einträgt und den Scope `kc-admin-api` setzt. Der Scope ist im
+Realm vorhanden, aber nicht Standard-Scope eines neuen Clients. Der Test weist beides nach: Ohne den Scope als Standard-Scope des
+Dienstkontos antwortet die Admin-API mit 401, mit ihm mit 200. Die Vermutung eines Issuer-Fehlers ist damit widerlegt (der Issuer
+stimmt). Folge für Aufgabe 19.2: Der Client `archiv-verwaltung` im Realm-Export muss `kc-admin-api` als Standard-Scope tragen
+(`defaultClientScopes`), sonst scheitert jeder Aufruf des Adapters. Die Wirkung von FGAP ist weiterhin nur aus der Dokumentation
+belegt, nicht durch einen Test.
+
+Keycloaks [Dokumentation zu FGAP v2 für Version 26.8.2](https://github.com/keycloak/keycloak/blob/26.8.2/docs/documentation/server_admin/topics/admin-console-permissions/fine-grain-v2.adoc)
+beschreibt `map-role` als Scope der Rollen-Ressource. Dieselbe Dokumentation hält fest, dass administrative RBAC-Rollen wie
+`manage-users` die FGAP-Prüfung umgehen. Damit kann FGAP die Zuweisung auf die vier Archiv-Rollen nicht begrenzen, solange
+Requirement 5.2 zugleich `manage-users` verlangt. Diese Rechtevorgaben widersprechen sich; bis zum Entscheid darf der
+Realm-Export FGAP nicht als Begrenzung der Rollenzuweisung ausweisen.
+
+Nicht nachgewiesen wurden die interne Compose-Adresse samt Backchannel-Issuer, überlappende Secret-Rotation, `auth_time`
+in einem interaktiven Benutzertoken, `prompt=login` gegen den Cookie-Zweig und `execute-actions-email` ohne Passwort mit
+`VERIFY_EMAIL`, `UPDATE_PASSWORD` und `CONFIGURE_TOTP`. Der Test-Realm führt keinen Browser-Flow- und SMTP-Nachweis aus;
+diese Punkte bleiben vor der Realm-Änderung offen.
+
+Stand Aufgabe 19.1: Nachgewiesen sind Mandantensuche, Rollenmitglieder, Issuer, Token-Rollen, die Ursache des 401 und der
+erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Secret-Rotation, `auth_time`, `prompt=login` und
+`execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
+Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.

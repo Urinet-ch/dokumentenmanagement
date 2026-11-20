@@ -17,6 +17,11 @@ public enum Rolle {
         return name().toLowerCase(Locale.ROOT);
     }
 
+    /** Ob diese Rolle in der Rangfolge gleich stark oder stärker ist als die zu vergebende Rolle. */
+    public boolean darfVergeben(Rolle zuVergeben) {
+        return RANGFOLGE.indexOf(this) <= RANGFOLGE.indexOf(zuVergeben);
+    }
+
     /**
      * Die stärkste Archiv-Rolle unter den Realm-Rollen (Req 2.2: {@code inhaber} > {@code geschaeftsstelle} >
      * {@code mitarbeiter} > {@code treuhaender}); die übrigen Archiv-Rollen zählen nicht, auch nicht aus Composite- oder
