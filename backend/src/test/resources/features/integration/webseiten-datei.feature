@@ -63,7 +63,7 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
       | vorstand    | vorstand    | -          | true            | NORMAL          | ja         | ARCHIVIERT   |
 
   @req-1.4 @req-9.1
-  Szenariogrundriss: Ein Schlüssel eines anderen Mandanten kann keine Datei streamen, der eigene Mandant schon
+  Szenariogrundriss: Ein Schlüssel eines anderen Mandanten kann keine Datei abrufen, der eigene Mandant schon
     Der Aufrufer erreicht die Stufe des Dokuments (Schlüssel «vorstand» mit Stufe «vorstand»); nur die Mandantentrennung
     kann die 404 erklären. Die Gegenprobe im eigenen Mandanten mit gleichen Angaben liefert die Datei.
     Angenommen im Mandanten «vhf-gsk» sind diese Reihen angelegt:
@@ -84,12 +84,13 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Und belegt die API noch 0 Plätze für Streams
 
     Beispiele:
-      | zugriff    |
-      | mitglieder |
-      | vorstand   |
+      | zugriff     |
+      | oeffentlich |
+      | mitglieder  |
+      | vorstand    |
 
   @req-1.4 @req-9.1
-  Szenario: Ein Schlüssel von vhf-gsk kann keine Datei von urinet streamen
+  Szenario: Ein Schlüssel von vhf-gsk kann keine Datei von urinet abrufen
     Angenommen der Webseiten-Lesezugang «fremd» der Webseite «probe-vhf» im Mandanten «vhf-gsk» hat die höchste Stufe «vorstand»
     Und das Dokument «b3» hat eine Datei
     Und das Dokument «v1» hat eine Datei
