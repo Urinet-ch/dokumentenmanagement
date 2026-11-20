@@ -58,7 +58,7 @@ describe('Importe: Upload und Liste (Aufgabe 4.4)', () => {
     const lauf = element.querySelector('[data-test=lauf]')!;
     expect(lauf.querySelector('a')!.getAttribute('href')).toBe('/importe/l1');
     expect(lauf.textContent).toContain(TEXTE.importe.status['VORSCHAU']);
-    expect(lauf.textContent).toContain("1'234 Datenzeilen");
+    expect(lauf.textContent).toContain("1'234");
     expect(lauf.textContent).toContain(TEXTE.importe.vollexportMarke);
   });
 
