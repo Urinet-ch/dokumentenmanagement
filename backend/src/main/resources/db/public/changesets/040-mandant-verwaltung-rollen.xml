@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="040-mandant-verwaltung-rollen" author="archiv">
+        <addColumn tableName="mandant">
+            <column name="verwaltung_rollen" type="text[]"
+                    defaultValueComputed="'{inhaber,mitarbeiter,treuhaender}'::text[]">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>
+            alter table mandant add constraint mandant_verwaltung_rollen_ck
+                check (cardinality(verwaltung_rollen) &gt; 0
+                    and verwaltung_rollen &lt;@ array['inhaber', 'mitarbeiter', 'treuhaender', 'geschaeftsstelle']::text[]);
+            update mandant set verwaltung_rollen = array['geschaeftsstelle']::text[] where code = 'vhf-gsk';
+        </sql>
+    </changeSet>
+</databaseChangeLog>
