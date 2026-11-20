@@ -103,3 +103,18 @@ export function abschnitte(punkte: readonly Menuepunkt[]): Menueabschnitt[] {
     }))
     .filter((a) => a.punkte.length > 0);
 }
+
+/**
+ * Der Menüpunkt zur aktuellen Adresse: der längste Pfad, der die Adresse ist oder ihr Anfang bis zu «/», «?» oder «#».
+ * So bleibt «Wissen» auf einer Wissensseite aktiv, auf «/wissen/entwuerfe» aber nur «Wissensentwürfe».
+ */
+export function aktiverPfad(url: string, pfade: readonly string[]): string | null {
+  const passend = pfade.filter(
+    (pfad) =>
+      url === pfad || (['/', '?', '#'].includes(url.charAt(pfad.length)) && url.startsWith(pfad)),
+  );
+  return passend.reduce<string | null>(
+    (laengster, pfad) => (laengster === null || pfad.length > laengster.length ? pfad : laengster),
+    null,
+  );
+}
