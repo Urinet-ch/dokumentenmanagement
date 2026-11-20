@@ -1,5 +1,6 @@
 import { Dokument, DokumentAenderung, Dokumentart } from '../gemeinsam/api';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { KlassifikationFeld } from './klassifikationen';
 
 /**
  * Formular «Metadaten bearbeiten» (Req 10.1) und der Body für `PATCH /dokumente/{id}` (design.md «Umsetzung 3.5»):
@@ -27,13 +28,15 @@ export interface Formular {
   kuendigungsfrist: string;
   naechsteFrist: string;
   zusatz: Readonly<Record<string, string>>;
+  klassifikationen: Readonly<Record<string, readonly string[]>>;
   grund: string;
 }
 
-export type TextFeld = Exclude<keyof Formular, 'zusatz'>;
+export type TextFeld = Exclude<keyof Formular, 'zusatz' | 'klassifikationen'>;
 
 /** `mehrfach`: Liste aus festen Werten (`items.enum`), `liste`: Liste freier Texte (`items.type` string). */
-export type ZusatzTyp = 'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'auswahl' | 'mehrfach' | 'liste';
+export type ZusatzTyp =
+  'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'auswahl' | 'mehrfach' | 'liste';
 
 /** Eingabefeld für einen Eintrag unter `properties` des Zusatz-Schemas der Art. */
 export interface ZusatzFeld {
@@ -52,7 +55,8 @@ export interface ZusatzFeld {
 }
 
 /** Listenwerte stehen im Formular als ein Text, ein Eintrag je Zeile (wie die übrigen Zusatzwerte als Text). */
-export const istListe = (feld: ZusatzFeld): boolean => feld.typ === 'mehrfach' || feld.typ === 'liste';
+export const istListe = (feld: ZusatzFeld): boolean =>
+  feld.typ === 'mehrfach' || feld.typ === 'liste';
 
 export function listeAus(wert: string): string[] {
   return wert
@@ -106,7 +110,9 @@ function text(wert: unknown): string {
 }
 
 function objekt(wert: unknown): Record<string, unknown> {
-  return wert && typeof wert === 'object' && !Array.isArray(wert) ? (wert as Record<string, unknown>) : {};
+  return wert && typeof wert === 'object' && !Array.isArray(wert)
+    ? (wert as Record<string, unknown>)
+    : {};
 }
 
 function stringListe(wert: unknown): wert is string[] {
@@ -143,6 +149,9 @@ export function formularAus(d: Dokument): Formular {
     kuendigungsfrist: v?.kuendigungsfrist ?? '',
     naechsteFrist: v?.naechsteFrist ?? '',
     zusatz,
+    klassifikationen: Object.fromEntries(
+      Object.entries(d.klassifikationen ?? {}).map(([code, werte]) => [code, [...werte]]),
+    ),
     grund: '',
   };
 }
@@ -169,7 +178,10 @@ function beschriftungenAus(
 }
 
 /** Anzeigetext eines gespeicherten Werts: die Beschriftung aus dem Schema, sonst der Rohwert. */
-export function anzeigeText(feld: Pick<ZusatzFeld, 'beschriftungen'> | undefined, wert: string): string {
+export function anzeigeText(
+  feld: Pick<ZusatzFeld, 'beschriftungen'> | undefined,
+  wert: string,
+): string {
   const b = feld?.beschriftungen;
   return b && Object.hasOwn(b, wert) ? b[wert] : wert;
 }
@@ -208,9 +220,13 @@ function typAus(schema: Record<string, unknown>): ZusatzTyp | null {
 export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
   const schema = objekt(art?.zusatzSchema);
   // Pflicht ist, was in `pflichtfelder` als «zusatz.<name>» steht oder im Schema unter `required` (so im Seed vhf-gsk).
-  const required = Array.isArray(schema['required']) ? schema['required'].filter((n) => typeof n === 'string') : [];
+  const required = Array.isArray(schema['required'])
+    ? schema['required'].filter((n) => typeof n === 'string')
+    : [];
   const pflicht = new Set([
-    ...(art?.pflichtfelder ?? []).filter((p) => p.startsWith('zusatz.')).map((p) => p.substring('zusatz.'.length)),
+    ...(art?.pflichtfelder ?? [])
+      .filter((p) => p.startsWith('zusatz.'))
+      .map((p) => p.substring('zusatz.'.length)),
     ...required,
   ]);
   return Object.entries(objekt(schema['properties'])).flatMap(([name, eigenschaft]) => {
@@ -220,7 +236,11 @@ export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
       return [];
     }
     const optionen =
-      typ === 'auswahl' ? (e['enum'] as string[]) : typ === 'mehrfach' ? (objekt(e['items'])['enum'] as string[]) : [];
+      typ === 'auswahl'
+        ? (e['enum'] as string[])
+        : typ === 'mehrfach'
+          ? (objekt(e['items'])['enum'] as string[])
+          : [];
     const feld: ZusatzFeld = { name, typ, optionen, pflicht: pflicht.has(name) };
     if (typeof e['title'] === 'string') {
       feld.titel = e['title'];
@@ -255,6 +275,19 @@ function tagsAus(wert: string): string[] {
 function betragLesen(wert: string): number | null {
   const roh = wert.trim().replace(/'/g, '');
   return roh === '' ? null : Number(roh.replace(',', '.'));
+}
+
+/** Mengenvergleich je Code: Reihenfolge und leere Listen zählen nicht als Änderung. */
+export function gleicheKlassifikationen(
+  links: Readonly<Record<string, readonly string[]>>,
+  rechts: Readonly<Record<string, readonly string[]>>,
+): boolean {
+  const codes = new Set([...Object.keys(links), ...Object.keys(rechts)]);
+  return [...codes].every((code) => {
+    const a = new Set(links[code] ?? []);
+    const b = new Set(rechts[code] ?? []);
+    return a.size === b.size && [...a].every((wert) => b.has(wert));
+  });
 }
 
 function zusatzWert(feld: ZusatzFeld, wert: string): unknown {
@@ -310,6 +343,7 @@ export interface Kontext {
   art: Dokumentart | undefined;
   /** Recht A8: nur dann geht die Vertraulichkeit mit. */
   darfVertraulichkeit: boolean;
+  klassifikationen?: readonly KlassifikationFeld[];
 }
 
 export type Ergebnis = { aenderung: DokumentAenderung } | { pruefung: Pruefung };
@@ -318,7 +352,12 @@ export type Ergebnis = { aenderung: DokumentAenderung } | { pruefung: Pruefung }
  * Body für den PATCH oder eine Prüfmeldung. Finanz- und Vertragsfelder gehen nur mit, wenn die (gewählte) Art die
  * Gruppe hat (sonst 400); `zusatz` ersetzt alle Zusatzwerte und geht darum ganz mit, sobald sich einer ändert.
  */
-export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular, kontext: Kontext): Ergebnis {
+export function aenderungAus(
+  dokument: Dokument,
+  start: Formular,
+  neu: Formular,
+  kontext: Kontext,
+): Ergebnis {
   const archiviert = dokument.status === 'ARCHIVIERT';
   const gruppen = kontext.art?.gruppen ?? [];
   const felder: string[] = [];
@@ -381,12 +420,33 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
     }
   }
   const zusatz = zusatzFelder(kontext.art);
-  const zusatzGeaendert = zusatz.filter((f) => (neu.zusatz[f.name] ?? '').trim() !== (start.zusatz[f.name] ?? '').trim());
+  const zusatzGeaendert = zusatz.filter(
+    (f) => (neu.zusatz[f.name] ?? '').trim() !== (start.zusatz[f.name] ?? '').trim(),
+  );
   const artGewechselt = aenderung['art'] !== undefined;
+  const klassifikationenGeaendert = !gleicheKlassifikationen(
+    start.klassifikationen,
+    neu.klassifikationen,
+  );
+  if (Object.keys(aenderung).length > 0 || klassifikationenGeaendert || artGewechselt) {
+    for (const feld of kontext.klassifikationen ?? []) {
+      const werte =
+        neu.klassifikationen[feld.code] ??
+        (artGewechselt && feld.standardWert ? [feld.standardWert] : []);
+      if (feld.pflicht && werte.length === 0) {
+        felder.push(`klassifikationen.${feld.code}`);
+      }
+    }
+  }
   if (zusatzGeaendert.length > 0 || artGewechselt) {
     // Altbestand: Eine Pflichtliste, die schon vorher leer war, bleibt erlaubt (wie im Archiv, DokumentAendern).
     const ungueltig = zusatz.filter(
-      (f) => !zusatzGueltig(f, neu.zusatz[f.name] ?? '', !artGewechselt && (start.zusatz[f.name] ?? '').trim() === ''),
+      (f) =>
+        !zusatzGueltig(
+          f,
+          neu.zusatz[f.name] ?? '',
+          !artGewechselt && (start.zusatz[f.name] ?? '').trim() === '',
+        ),
     );
     if (ungueltig.length > 0) {
       felder.push(...ungueltig.map((f) => `zusatz.${f.name}`));
@@ -394,12 +454,18 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
       // Bei einem Artwechsel nur Schlüssel der neuen Art behalten (additionalProperties false im Schema).
       const bekannt = new Set(Object.keys(objekt(objekt(kontext.art?.zusatzSchema)['properties'])));
       const werte: Record<string, unknown> = artGewechselt
-        ? Object.fromEntries(Object.entries(objekt(dokument.zusatz)).filter(([k]) => bekannt.has(k)))
+        ? Object.fromEntries(
+            Object.entries(objekt(dokument.zusatz)).filter(([k]) => bekannt.has(k)),
+          )
         : { ...objekt(dokument.zusatz) };
       for (const f of zusatz) {
         const wert = neu.zusatz[f.name] ?? '';
         // Unveränderte Listen bleiben im Originalwert (kein stilles Trimmen oder Aufteilen von Bestandsdaten).
-        if (istListe(f) && wert.trim() === (start.zusatz[f.name] ?? '').trim() && werte[f.name] !== undefined) {
+        if (
+          istListe(f) &&
+          wert.trim() === (start.zusatz[f.name] ?? '').trim() &&
+          werte[f.name] !== undefined
+        ) {
           continue;
         }
         if (wert.trim() === '') {
@@ -410,6 +476,23 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
       }
       aenderung['zusatz'] = werte;
     }
+  }
+  if (klassifikationenGeaendert || artGewechselt) {
+    const klassifikationen: Record<string, string[]> = {};
+    for (const feld of kontext.klassifikationen ?? []) {
+      const werte = neu.klassifikationen[feld.code] ?? [];
+      const vorbelegt =
+        artGewechselt &&
+        !Object.hasOwn(neu.klassifikationen, feld.code) &&
+        werte.length === 0 &&
+        feld.standardWert
+          ? [feld.standardWert]
+          : [...werte];
+      if (vorbelegt.length > 0) {
+        klassifikationen[feld.code] = vorbelegt;
+      }
+    }
+    aenderung['klassifikationen'] = klassifikationen;
   }
   if (felder.length > 0) {
     return { pruefung: { meldung: T.ungueltig(felder.map(feldText).join(', ')), felder } };
@@ -434,6 +517,9 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
 export function feldText(feld: string): string {
   if (feld.startsWith('zusatz.')) {
     return TEXTE.eingangskorb.zusatzFeld(feld.substring('zusatz.'.length));
+  }
+  if (feld.startsWith('klassifikationen.')) {
+    return TEXTE.eingangskorb.klassifikationFeld(feld.substring('klassifikationen.'.length));
   }
   const camel = feld.replace(/_([a-z])/g, (_, b: string) => b.toUpperCase());
   return T.feld[camel] ?? TEXTE.eingangskorb.feld[camel] ?? feld;

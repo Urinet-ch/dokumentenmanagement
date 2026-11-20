@@ -50,6 +50,7 @@ export async function archivAttrappe(welt) {
   const archiv = {
     eintraege: [],
     arten: ARTEN,
+    klassifikationen: [],
     kontakte: [],
     aktionen: [],
     ablehnung: null,
@@ -61,7 +62,9 @@ export async function archivAttrappe(welt) {
     url.origin === origin &&
     (url.pathname === '/api/v1/eingangskorb' ||
       url.pathname === '/api/v1/dokumentarten' ||
+      url.pathname === '/api/v1/klassifikationen' ||
       url.pathname === '/api/v1/kontakte' ||
+      /^\/api\/v1\/dokumentarten\/[^/]+\/klassifikationen$/.test(url.pathname) ||
       /^\/api\/v1\/dokumente\/[^/]+\/(vorschau|bestaetigen|verwerfen|wiederholen)$/.test(
         url.pathname,
       ) ||
@@ -83,6 +86,12 @@ export async function archivAttrappe(welt) {
     }
     if (url.pathname === '/api/v1/dokumentarten') {
       return json(route, 200, archiv.arten);
+    }
+    if (url.pathname === '/api/v1/klassifikationen') {
+      return json(route, 200, archiv.klassifikationen);
+    }
+    if (/^\/api\/v1\/dokumentarten\/[^/]+\/klassifikationen$/.test(url.pathname)) {
+      return json(route, 200, []);
     }
     if (url.pathname === '/api/v1/kontakte') {
       const q = (url.searchParams.get('q') ?? '').toLowerCase();

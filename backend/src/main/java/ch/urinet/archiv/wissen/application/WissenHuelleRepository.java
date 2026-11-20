@@ -13,6 +13,9 @@ public interface WissenHuelleRepository {
 
     WissensGraph graphLaden();
 
+    /** Berücksichtigt auch Dokumente einer noch nicht freigegebenen Fassung. */
+    WissensGraph graphLaden(Set<UUID> weitereDokumente);
+
     Set<UUID> seitenMitDokument(UUID dokumentId);
 
     void aktuelleHuelleSetzen(UUID seiteId, Set<UUID> dokumente);

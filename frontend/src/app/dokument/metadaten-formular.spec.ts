@@ -7,6 +7,11 @@ import { Rolle, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentPort } from './dokument-port';
 import { MetadatenFormular } from './metadaten-formular';
+import {
+  DokumentKlassifikationen,
+  DokumentKlassifikationenService,
+  LEERE_DOKUMENT_KLASSIFIKATIONEN,
+} from './klassifikationen';
 
 const T = TEXTE.dokument.bearbeiten;
 
@@ -16,7 +21,10 @@ const ARTEN: Dokumentart[] = [
     name: 'Behördenschreiben',
     gruppen: [],
     pflichtfelder: ['titel', 'datum'],
-    zusatzSchema: { type: 'object', properties: { aktenzeichen: { type: 'string' }, frist: { type: 'string', format: 'date' } } },
+    zusatzSchema: {
+      type: 'object',
+      properties: { aktenzeichen: { type: 'string' }, frist: { type: 'string', format: 'date' } },
+    },
     vertraulichkeit: 'NORMAL',
     gesetzlichePflicht: false,
     aktiv: true,
@@ -49,12 +57,21 @@ const ARTEN: Dokumentart[] = [
     zusatzSchema: {
       type: 'object',
       properties: {
-        zugriff: { type: 'string', enum: ['oeffentlich', 'mitglieder', 'vorstand'], default: 'mitglieder' },
+        zugriff: {
+          type: 'string',
+          enum: ['oeffentlich', 'mitglieder', 'vorstand'],
+          default: 'mitglieder',
+        },
         reihe: { type: 'string' },
         ausgabe: { type: 'string' },
         jahr: { type: 'integer' },
         fachgebiet: { type: 'string' },
-        verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] }, minItems: 1, uniqueItems: true },
+        verband: {
+          type: 'array',
+          items: { type: 'string', enum: ['vhf', 'gsk'] },
+          minItems: 1,
+          uniqueItems: true,
+        },
         veroeffentlicht: { type: 'boolean', default: false },
       },
     },
@@ -111,12 +128,22 @@ describe('MetadatenFormular (Req 10.1)', () => {
   let element: HTMLElement;
   let rolle: Rolle;
 
-  async function oeffnen(dokument: Dokument = DOKUMENT) {
+  async function oeffnen(
+    dokument: Dokument = DOKUMENT,
+    klassifikationen: DokumentKlassifikationen = LEERE_DOKUMENT_KLASSIFIKATIONEN,
+  ) {
     TestBed.configureTestingModule({
       imports: [MetadatenFormular],
       providers: [
         { provide: DokumentPort, useValue: port },
-        { provide: AnmeldungService, useValue: { darf: (a: Parameters<typeof darf>[1]) => darf(rolle, a) } },
+        {
+          provide: DokumentKlassifikationenService,
+          useValue: { fuerArt: () => of(klassifikationen) },
+        },
+        {
+          provide: AnmeldungService,
+          useValue: { darf: (a: Parameters<typeof darf>[1]) => darf(rolle, a) },
+        },
       ],
     });
     fixture = TestBed.createComponent(MetadatenFormular);
@@ -132,7 +159,9 @@ describe('MetadatenFormular (Req 10.1)', () => {
   });
 
   function eingeben(selektor: string, wert: string) {
-    const feld = element.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(selektor)!;
+    const feld = element.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      selektor,
+    )!;
     feld.value = wert;
     feld.dispatchEvent(new Event(feld instanceof HTMLSelectElement ? 'change' : 'input'));
   }
@@ -146,10 +175,50 @@ describe('MetadatenFormular (Req 10.1)', () => {
 
   it('zeigt Zusatzfelder aus dem Schema und ohne Finanzgruppe keine Finanzangaben', async () => {
     await oeffnen();
-    expect(element.querySelector<HTMLInputElement>('#bearbeiten-zusatz-aktenzeichen')!.value).toBe('AZ-1');
+    expect(element.querySelector<HTMLInputElement>('#bearbeiten-zusatz-aktenzeichen')!.value).toBe(
+      'AZ-1',
+    );
     expect(element.querySelector<HTMLInputElement>('#bearbeiten-zusatz-frist')!.type).toBe('date');
     expect(element.querySelector('[data-test=finanz]')).toBeNull();
     expect(element.querySelector('#bearbeiten-grund')!.getAttribute('aria-required')).toBe('true');
+  });
+
+  it('bearbeitet Klassifikationswerte und sendet sie im Patch', async () => {
+    const daten: DokumentKlassifikationen = {
+      alle: [
+        {
+          code: 'fachgebiet',
+          name: 'Fachgebiet',
+          aktiv: true,
+          mehrfach: false,
+          werte: [
+            { code: 'technik', name: 'Technik', aktiv: true },
+            { code: 'recht', name: 'Recht', aktiv: true },
+          ],
+        },
+      ],
+      art: [
+        {
+          code: 'fachgebiet',
+          name: 'Fachgebiet',
+          aktiv: true,
+          mehrfach: false,
+          pflicht: true,
+          standardWert: null,
+          werte: [
+            { code: 'technik', name: 'Technik', aktiv: true },
+            { code: 'recht', name: 'Recht', aktiv: true },
+          ],
+        },
+      ],
+    };
+    await oeffnen({ ...DOKUMENT, klassifikationen: { fachgebiet: ['technik'] } }, daten);
+    eingeben('#bearbeiten-klassifikationen-fachgebiet', 'recht');
+    eingeben('#bearbeiten-grund', 'Klassifikation korrigiert');
+    await speichern();
+
+    expect(port.aufrufe).toHaveLength(1);
+    expect(port.aufrufe[0].aenderung.klassifikationen).toEqual({ fachgebiet: ['recht'] });
   });
 
   it('zeigt nach einem Artwechsel die Finanzangaben der neuen Art', async () => {
@@ -168,41 +237,46 @@ describe('MetadatenFormular (Req 10.1)', () => {
       zusatz: { zugriff: 'mitglieder', veroeffentlicht: false },
     };
     await oeffnen(bulletin);
-    expect(element.querySelector('label[for="bearbeiten-zusatz-zugriff"]')?.textContent).toContain('Zugriffsstufe');
-    expect(element.querySelector('#bearbeiten-zusatz-zugriff option[value="mitglieder"]')?.textContent).toContain(
-      'Mitglieder',
+    expect(element.querySelector('label[for="bearbeiten-zusatz-zugriff"]')?.textContent).toContain(
+      'Zugriffsstufe',
     );
+    expect(
+      element.querySelector('#bearbeiten-zusatz-zugriff option[value="mitglieder"]')?.textContent,
+    ).toContain('Mitglieder');
     expect(element.querySelector('#bearbeiten-zusatz-veroeffentlicht')).toBeNull();
 
     TestBed.resetTestingModule();
     await oeffnen({ ...bulletin, status: 'ARCHIVIERT' });
-    expect(element.querySelector('label[for="bearbeiten-zusatz-veroeffentlicht"]')?.textContent).toContain(
-      'Veröffentlicht',
-    );
+    expect(
+      element.querySelector('label[for="bearbeiten-zusatz-veroeffentlicht"]')?.textContent,
+    ).toContain('Veröffentlicht');
     expect(element.querySelector('#bearbeiten-zusatz-veroeffentlicht')).not.toBeNull();
   });
 
   it.each([
     { vorher: false, wert: 'true', grund: 'Veröffentlichung aktiviert' },
     { vorher: true, wert: 'false', grund: 'Veröffentlichung zurückgezogen' },
-  ])('veröffentlicht oder zieht eine archivierte Publikation zurück', async ({ vorher, wert, grund }) => {
-    await oeffnen({
-      ...DOKUMENT,
-      art: 'BULLETIN',
-      zusatz: { zugriff: 'mitglieder', verband: ['vhf'], veroeffentlicht: vorher },
-    });
-    eingeben('#bearbeiten-zusatz-veroeffentlicht', wert);
-    eingeben('#bearbeiten-grund', grund);
-    await speichern();
+  ])(
+    'veröffentlicht oder zieht eine archivierte Publikation zurück',
+    async ({ vorher, wert, grund }) => {
+      await oeffnen({
+        ...DOKUMENT,
+        art: 'BULLETIN',
+        zusatz: { zugriff: 'mitglieder', verband: ['vhf'], veroeffentlicht: vorher },
+      });
+      eingeben('#bearbeiten-zusatz-veroeffentlicht', wert);
+      eingeben('#bearbeiten-grund', grund);
+      await speichern();
 
-    expect(port.aufrufe).toHaveLength(1);
-    expect(port.aufrufe[0].aenderung.zusatz).toEqual({
-      zugriff: 'mitglieder',
-      verband: ['vhf'],
-      veroeffentlicht: wert === 'true',
-    });
-    expect(port.aufrufe[0].aenderung.grund).toBe(grund);
-  });
+      expect(port.aufrufe).toHaveLength(1);
+      expect(port.aufrufe[0].aenderung.zusatz).toEqual({
+        zugriff: 'mitglieder',
+        verband: ['vhf'],
+        veroeffentlicht: wert === 'true',
+      });
+      expect(port.aufrufe[0].aenderung.grund).toBe(grund);
+    },
+  );
 
   it('sucht nach dem Entfernen eines Partners mit demselben Begriff erneut', async () => {
     await oeffnen({ ...DOKUMENT, partnerId: 'p1', partnerName: 'Testverein' });
@@ -308,7 +382,10 @@ describe('MetadatenFormular (Req 10.1)', () => {
       box('gsk').click();
       eingeben('#bearbeiten-grund', 'Verband ergänzt');
       await speichern();
-      expect(port.aufrufe[0].aenderung).toEqual({ zusatz: { verband: ['vhf', 'gsk'] }, grund: 'Verband ergänzt' });
+      expect(port.aufrufe[0].aenderung).toEqual({
+        zusatz: { verband: ['vhf', 'gsk'] },
+        grund: 'Verband ergänzt',
+      });
     });
 
     it('lässt ein leeres Pflichtfeld nicht zu und markiert es', async () => {
@@ -366,15 +443,23 @@ describe('MetadatenFormular (Req 10.1)', () => {
 
   it('markiert fehlende Pflichtfelder aus der Antwort des Archivs', async () => {
     port.antwort = throwError(
-      () => new HttpErrorResponse({ status: 422, error: { fehlercode: 'PFLICHTFELD_FEHLT', felder: ['datum', 'zusatz.frist'] } }),
+      () =>
+        new HttpErrorResponse({
+          status: 422,
+          error: { fehlercode: 'PFLICHTFELD_FEHLT', felder: ['datum', 'zusatz.frist'] },
+        }),
     );
     await oeffnen();
     eingeben('#bearbeiten-datum', '');
     eingeben('#bearbeiten-grund', 'Datum unklar');
     await speichern();
-    expect(fehler()).toBe(T.fehlerPflichtfelder(`Belegdatum, ${TEXTE.eingangskorb.zusatzFeld('frist')}`));
+    expect(fehler()).toBe(
+      T.fehlerPflichtfelder(`Belegdatum, ${TEXTE.eingangskorb.zusatzFeld('frist')}`),
+    );
     expect(element.querySelector('#bearbeiten-datum')!.getAttribute('aria-invalid')).toBe('true');
-    expect(element.querySelector('#bearbeiten-zusatz-frist')!.getAttribute('aria-invalid')).toBe('true');
+    expect(element.querySelector('#bearbeiten-zusatz-frist')!.getAttribute('aria-invalid')).toBe(
+      'true',
+    );
   });
 
   it('meldet einen Konflikt (412) an die Ansicht, damit sie neu lädt', async () => {
@@ -391,7 +476,9 @@ describe('MetadatenFormular (Req 10.1)', () => {
   });
 
   it('meldet 403 ohne Recht verständlich', async () => {
-    port.antwort = throwError(() => new HttpErrorResponse({ status: 403, error: { fehlercode: 'ZUGRIFF_VERWEIGERT' } }));
+    port.antwort = throwError(
+      () => new HttpErrorResponse({ status: 403, error: { fehlercode: 'ZUGRIFF_VERWEIGERT' } }),
+    );
     await oeffnen();
     eingeben('#bearbeiten-titel', 'Neu');
     eingeben('#bearbeiten-grund', 'Korrektur');
