@@ -18,6 +18,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { RouterLink } from '@angular/router';
 import { Observable, Subscription } from 'rxjs';
 import { ImportLauf, ImportLaufMitZeilen, ImportZeile, ImporteService } from '../gemeinsam/api';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import {
   Entscheid,
@@ -66,7 +67,7 @@ interface Zaehler {
  */
 @Component({
   selector: 'app-import-lauf',
-  imports: [MatButtonModule, MatCheckboxModule, RouterLink],
+  imports: [MatButtonModule, MatCheckboxModule, RouterLink, Symbol],
   templateUrl: './import-lauf.html',
   styleUrl: './import-lauf.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -116,6 +117,8 @@ export class ImportLaufSeite {
   );
   protected readonly zeilen = computed<readonly ImportZeile[]>(() => this.antwort()?.eintraege ?? []);
   protected readonly kontakte = computed(() => this.antwort()?.kontakte ?? {});
+  /** Spalte «Entscheid» nur, wenn auf dieser Seite mögliche Dubletten stehen. */
+  protected readonly hatDubletten = computed(() => this.zeilen().some((z) => z.ergebnis === 'DUBLETTE'));
 
   protected readonly spalten = computed(() => this.antwort()?.spalten ?? []);
   protected readonly zielFelder = computed(() => FELDER[this.art()]);

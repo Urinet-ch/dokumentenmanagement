@@ -6,23 +6,23 @@
 
 @switch (laden()) {
   @case ('laedt') {
-    <h1>{{ texte.titel }}</h1>
+    <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
     <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laeuft" />
     <p class="nur-screenreader" aria-live="polite">{{ texte.laeuft }}</p>
   }
   @case ('fehlt') {
-    <h1>{{ texte.titel }}</h1>
+    <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
     <p role="alert" class="fehler" data-test="fehler">{{ texte.nichtGefunden }}</p>
   }
   @case ('verbindung') {
-    <h1>{{ texte.titel }}</h1>
+    <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
     <p role="alert" class="fehler" data-test="fehler">{{ texte.fehlerVerbindung }}</p>
     <button mat-button type="button" data-test="erneut-laden" (click)="neuLaden()">
       {{ neuLadenText }}
     </button>
   }
   @case ('fehler') {
-    <h1>{{ texte.titel }}</h1>
+    <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
     <p role="alert" class="fehler" data-test="fehler">{{ texte.fehlerAllgemein }}</p>
     <button mat-button type="button" data-test="erneut-laden" (click)="neuLaden()">
       {{ neuLadenText }}
@@ -30,7 +30,41 @@
   }
   @case ('ok') {
     @if (dokument(); as d) {
-      <h1 data-test="titel"><app-titel-anzeige [anzeige]="anzeige()" /></h1>
+      <div class="seitenkopf kopf">
+        <div class="kopf-text">
+          <h1 data-test="titel"><app-titel-anzeige [anzeige]="anzeige()" /></h1>
+          <p>
+            {{ artName() }}
+            @if (d.partnerId || d.partnerName) {
+              · {{ d.partnerName || d.partnerId }}
+            }
+          </p>
+        </div>
+        <div class="kopf-aktionen">
+          <p
+            class="pille"
+            [class.ok]="d.status === 'ARCHIVIERT'"
+            [class.akzent]="d.status === 'EINGANGSKORB'"
+            [class.gefahr]="d.status === 'FEHLER' || d.status === 'ARCHIVIERUNG_FEHLER'"
+          >
+            @if (d.status === 'ARCHIVIERT') {
+              <app-symbol name="schloss" />
+            }
+            <span class="nur-screenreader">{{ texte.status }}:</span>
+            <span data-test="status">{{ stati[d.status] || d.status }}</span>
+          </p>
+          @if (darfBearbeiten() && !bearbeiten()) {
+            <button
+              mat-flat-button
+              type="button"
+              data-test="bearbeiten"
+              (click)="bearbeitenOeffnen()"
+            >
+              <app-symbol name="bearbeiten" />{{ texte.bearbeiten.knopf }}
+            </button>
+          }
+        </div>
+      </div>
       @if (d.fristAbgelaufen) {
         <p class="hinweis">{{ texte.fristAbgelaufen }}</p>
       }
@@ -38,152 +72,6 @@
         <p class="warnung" data-test="regelwarnung">{{ warnung.meldung || warnung.code }}</p>
       }
       <div class="spalten">
-        <section class="karte metadaten" aria-labelledby="metadaten-titel">
-          <h2 id="metadaten-titel">{{ texte.metadaten }}</h2>
-          @if (bearbeiten()) {
-            <app-metadaten-formular
-              [dokument]="d"
-              [arten]="arten()"
-              [artVorbelegung]="vorbelegung()"
-              (gespeichert)="gespeichert($event)"
-              (abgebrochen)="bearbeitenSchliessen()"
-              (veraltet)="veraltet($event)"
-            />
-          } @else {
-            @if (darfBearbeiten()) {
-              <div class="aktionen oben">
-                <button
-                  mat-stroked-button
-                  type="button"
-                  data-test="bearbeiten"
-                  (click)="bearbeitenOeffnen()"
-                >
-                  {{ texte.bearbeiten.knopf }}
-                </button>
-              </div>
-            }
-            <dl>
-              <dt>{{ texte.art }}</dt>
-              <dd data-test="art">{{ artName() }}</dd>
-              @if (d.datum) {
-                <dt>{{ texte.datum }}</dt>
-                <dd data-test="datum">{{ datum(d.datum) }}</dd>
-              }
-              @if (d.partnerId || d.partnerName) {
-                <dt>{{ texte.partner }}</dt>
-                <dd data-test="partner">
-                  @if (darfKontakt() && d.partnerId) {
-                    <a [routerLink]="['/kontakte', d.partnerId]" data-test="partner-link">{{
-                      d.partnerName || d.partnerId
-                    }}</a>
-                  } @else {
-                    {{ d.partnerName || d.partnerId }}
-                  }
-                </dd>
-              }
-              @if (d.projekt) {
-                <dt>{{ texte.projekt }}</dt>
-                <dd>{{ d.projekt }}</dd>
-              }
-              @if (d.finanz; as f) {
-                @if (f.belegnummer) {
-                  <dt>{{ texte.belegnummer }}</dt>
-                  <dd data-test="belegnummer">{{ f.belegnummer }}</dd>
-                }
-                @if (f.richtung) {
-                  <dt>{{ texte.richtung }}</dt>
-                  <dd>{{ richtungen[f.richtung] || f.richtung }}</dd>
-                }
-                @if (f.betrag !== null && f.betrag !== undefined) {
-                  <dt>{{ texte.betrag }}</dt>
-                  <dd data-test="betrag">{{ betrag(f.betrag, f.waehrung) }}</dd>
-                }
-                @if (f.faelligkeit) {
-                  <dt>{{ texte.faelligkeit }}</dt>
-                  <dd>{{ datum(f.faelligkeit) }}</dd>
-                }
-              }
-              @if (d.vertrag; as v) {
-                @if (v.gueltigAb) {
-                  <dt>{{ texte.gueltigAb }}</dt>
-                  <dd>{{ datum(v.gueltigAb) }}</dd>
-                }
-                @if (v.gueltigBis) {
-                  <dt>{{ texte.gueltigBis }}</dt>
-                  <dd>{{ datum(v.gueltigBis) }}</dd>
-                }
-              }
-              <dt>{{ texte.eingang }}</dt>
-              <dd>{{ zeitpunkt(d.eingang) }}</dd>
-              @if (d.dateiname) {
-                <dt>{{ texte.dateiname }}</dt>
-                <dd data-test="dateiname">
-                  <bdi>{{ d.dateiname }}</bdi>
-                </dd>
-              }
-              <dt>{{ texte.quelle }}</dt>
-              <dd>{{ d.quelle }}</dd>
-              <dt>{{ texte.status }}</dt>
-              <dd data-test="status">{{ stati[d.status] || d.status }}</dd>
-              <dt>{{ texte.vertraulichkeit }}</dt>
-              <dd>{{ texte.vertraulichkeiten[d.vertraulichkeit] || d.vertraulichkeit }}</dd>
-              <dt>{{ texte.bestaetigt }}</dt>
-              <dd>{{ d.bestaetigt ? zeitpunkt(d.bestaetigt) : texte.nichtBestaetigt }}</dd>
-              @if (d.geschaeftsjahr) {
-                <dt>{{ texte.geschaeftsjahr }}</dt>
-                <dd>{{ d.geschaeftsjahr }}</dd>
-              }
-              @if (d.tags.length > 0) {
-                <dt>{{ texte.tags }}</dt>
-                <dd>{{ d.tags.join(', ') }}</dd>
-              }
-              @if (d.aufbewahrenBis) {
-                <dt>{{ texte.aufbewahrenBis }}</dt>
-                <dd>{{ datum(d.aufbewahrenBis) }}</dd>
-              }
-              @if (d.sperreBis) {
-                <dt>{{ texte.sperreBis }}</dt>
-                <dd>{{ datum(d.sperreBis) }}</dd>
-              }
-            </dl>
-            @if (zusatz().length > 0) {
-              <h3>{{ texte.zusatz }}</h3>
-              <dl>
-                @for (z of zusatz(); track z.name) {
-                  <dt>{{ z.name }}</dt>
-                  <dd [class.fehler]="z.ungueltig">
-                    {{ z.wert }}
-                    @if (z.ungueltig) {
-                      <span role="alert">{{ korb.zusatzWertUngueltig(z.name) }}</span>
-                    }
-                  </dd>
-                }
-              </dl>
-            }
-            @if (klassifikationenStatus().status === 'laedt') {
-              <p class="hinweis" role="status">{{ korb.klassifikationenLaedt }}</p>
-            } @else if (klassifikationenStatus().status === 'fehler') {
-              <p class="fehler" role="alert">{{ korb.klassifikationenFehler }}</p>
-            }
-            @if (klassifikationenAnzeige().length > 0) {
-              <h3>{{ korb.klassifikationen }}</h3>
-              <dl data-test="klassifikationen">
-                @for (klassifikation of klassifikationenAnzeige(); track klassifikation.name) {
-                  <dt>{{ klassifikation.name }}</dt>
-                  <dd [class.fehler]="klassifikation.ungueltig">
-                    {{ klassifikation.werte }}
-                    @if (klassifikation.ungueltig) {
-                      <span role="alert">{{
-                        korb.klassifikationUngueltig(klassifikation.name)
-                      }}</span>
-                    }
-                  </dd>
-                }
-              </dl>
-            }
-          }
-        </section>
-
         <section class="karte vorschau" aria-labelledby="vorschau-titel">
           <h2 id="vorschau-titel">{{ texte.vorschau }}</h2>
           @switch (vorschau()) {
@@ -204,17 +92,18 @@
                   (click)="pdfaKlick($event)"
                   [attr.aria-label]="texte.vorschauTitel(titel())"
                 >
-                  {{ texte.pdfOeffnen }}
+                  <app-symbol name="dokument" />
+                  <span>{{ texte.pdfOeffnen }}</span>
                 </a>
               }
               <div class="aktionen">
                 <button
-                  mat-flat-button
+                  mat-stroked-button
                   type="button"
                   data-test="download"
                   (click)="pdfaHerunterladen()"
                 >
-                  {{ texte.herunterladen }}
+                  <app-symbol name="herunterladen" />{{ texte.herunterladen }}
                 </button>
               </div>
               <p class="klein">{{ texte.downloadHinweis }}</p>
@@ -226,8 +115,8 @@
               }
               <p data-test="vorschau-fehlt">{{ texte.vorschauFehlt }}</p>
               <div class="aktionen">
-                <button mat-flat-button type="button" (click)="originalHerunterladen()">
-                  {{ texte.originalHerunterladen }}
+                <button mat-stroked-button type="button" (click)="originalHerunterladen()">
+                  <app-symbol name="herunterladen" />{{ texte.originalHerunterladen }}
                 </button>
               </div>
             }
@@ -265,29 +154,181 @@
             <p class="fehler" role="alert" data-test="datei-fehler">{{ texte.fehlerDatei }}</p>
           }
         </section>
-      </div>
-
-      <app-wissen-verwendung [dokumentId]="d.id" />
-
-      <section class="karte versionen" aria-labelledby="versionen-titel" data-test="versionen">
-        <h2 id="versionen-titel">{{ texte.versionen }}</h2>
-        @if (d.versionen.length === 0) {
-          <p class="klein">{{ texte.versionenLeer }}</p>
-        } @else {
-          <p class="klein">{{ texte.versionenHinweis }}</p>
-          <ol>
-            @for (v of d.versionen; track v.version) {
-              <li data-test="version">
-                <span class="version">{{ texte.version(v.version) }}</span>
-                <span
-                  >{{ zeitpunkt(v.zeit) }}, {{ texte.geaendertVon }} {{ wer(v.geaendertVon) }}</span
-                >
-                <span class="grund">{{ v.grund || texte.ohneGrund }}</span>
-              </li>
+        <div class="rechts">
+          <section class="karte metadaten" aria-labelledby="metadaten-titel">
+            <h2 id="metadaten-titel">{{ texte.metadaten }}</h2>
+            @if (bearbeiten()) {
+              <app-metadaten-formular
+                [dokument]="d"
+                [arten]="arten()"
+                [artVorbelegung]="vorbelegung()"
+                (gespeichert)="gespeichert($event)"
+                (abgebrochen)="bearbeitenSchliessen()"
+                (veraltet)="veraltet($event)"
+              />
+            } @else {
+              <dl>
+                <dt>{{ texte.art }}</dt>
+                <dd data-test="art">{{ artName() }}</dd>
+                @if (d.datum) {
+                  <dt>{{ texte.datum }}</dt>
+                  <dd data-test="datum">{{ datum(d.datum) }}</dd>
+                }
+                @if (d.partnerId || d.partnerName) {
+                  <dt>{{ texte.partner }}</dt>
+                  <dd data-test="partner">
+                    @if (darfKontakt() && d.partnerId) {
+                      <a [routerLink]="['/kontakte', d.partnerId]" data-test="partner-link">{{
+                        d.partnerName || d.partnerId
+                      }}</a>
+                    } @else {
+                      {{ d.partnerName || d.partnerId }}
+                    }
+                  </dd>
+                }
+                @if (d.projekt) {
+                  <dt>{{ texte.projekt }}</dt>
+                  <dd>{{ d.projekt }}</dd>
+                }
+                @if (d.finanz; as f) {
+                  @if (f.belegnummer) {
+                    <dt>{{ texte.belegnummer }}</dt>
+                    <dd class="mono" data-test="belegnummer">{{ f.belegnummer }}</dd>
+                  }
+                  @if (f.richtung) {
+                    <dt>{{ texte.richtung }}</dt>
+                    <dd>{{ richtungen[f.richtung] || f.richtung }}</dd>
+                  }
+                  @if (f.betrag !== null && f.betrag !== undefined) {
+                    <dt>{{ texte.betrag }}</dt>
+                    <dd data-test="betrag">{{ betrag(f.betrag, f.waehrung) }}</dd>
+                  }
+                  @if (f.faelligkeit) {
+                    <dt>{{ texte.faelligkeit }}</dt>
+                    <dd>{{ datum(f.faelligkeit) }}</dd>
+                  }
+                }
+                @if (d.vertrag; as v) {
+                  @if (v.gueltigAb) {
+                    <dt>{{ texte.gueltigAb }}</dt>
+                    <dd>{{ datum(v.gueltigAb) }}</dd>
+                  }
+                  @if (v.gueltigBis) {
+                    <dt>{{ texte.gueltigBis }}</dt>
+                    <dd>{{ datum(v.gueltigBis) }}</dd>
+                  }
+                }
+                <dt>{{ texte.eingang }}</dt>
+                <dd>{{ zeitpunkt(d.eingang) }}</dd>
+                @if (d.dateiname) {
+                  <dt>{{ texte.dateiname }}</dt>
+                  <dd class="mono" data-test="dateiname">
+                    <bdi>{{ d.dateiname }}</bdi>
+                  </dd>
+                }
+                <dt>{{ texte.quelle }}</dt>
+                <dd>{{ d.quelle }}</dd>
+                <dt>{{ texte.vertraulichkeit }}</dt>
+                <dd>
+                  <span
+                    class="pille"
+                    [class.akzent]="d.vertraulichkeit === 'INTERN'"
+                    [class.warnung]="d.vertraulichkeit === 'PERSONAL'"
+                    >{{ texte.vertraulichkeiten[d.vertraulichkeit] || d.vertraulichkeit }}</span
+                  >
+                </dd>
+                <dt>{{ texte.bestaetigt }}</dt>
+                <dd>{{ d.bestaetigt ? zeitpunkt(d.bestaetigt) : texte.nichtBestaetigt }}</dd>
+                @if (d.geschaeftsjahr) {
+                  <dt>{{ texte.geschaeftsjahr }}</dt>
+                  <dd>{{ d.geschaeftsjahr }}</dd>
+                }
+                @if (d.tags.length > 0) {
+                  <dt>{{ texte.tags }}</dt>
+                  <dd>
+                    <ul class="chips">
+                      @for (tag of d.tags; track $index) {
+                        <li class="pille">{{ tag }}</li>
+                      }
+                    </ul>
+                  </dd>
+                }
+              </dl>
+              @if (zusatz().length > 0) {
+                <h3>{{ texte.zusatz }}</h3>
+                <dl>
+                  @for (z of zusatz(); track z.name) {
+                    <dt>{{ z.name }}</dt>
+                    <dd [class.fehler]="z.ungueltig">
+                      {{ z.wert }}
+                      @if (z.ungueltig) {
+                        <span role="alert">{{ korb.zusatzWertUngueltig(z.name) }}</span>
+                      }
+                    </dd>
+                  }
+                </dl>
+              }
+              @if (klassifikationenStatus().status === 'laedt') {
+                <p class="klein" role="status">{{ korb.klassifikationenLaedt }}</p>
+              } @else if (klassifikationenStatus().status === 'fehler') {
+                <p class="fehler" role="alert">{{ korb.klassifikationenFehler }}</p>
+              }
+              @if (klassifikationenAnzeige().length > 0) {
+                <h3>{{ korb.klassifikationen }}</h3>
+                <dl data-test="klassifikationen">
+                  @for (klassifikation of klassifikationenAnzeige(); track klassifikation.name) {
+                    <dt>{{ klassifikation.name }}</dt>
+                    <dd [class.fehler]="klassifikation.ungueltig">
+                      {{ klassifikation.werte }}
+                      @if (klassifikation.ungueltig) {
+                        <span role="alert">{{
+                          korb.klassifikationUngueltig(klassifikation.name)
+                        }}</span>
+                      }
+                    </dd>
+                  }
+                </dl>
+              }
             }
-          </ol>
-        }
-      </section>
+          </section>
+
+          @if (d.aufbewahrenBis || d.sperreBis) {
+            <section class="karte ablage" aria-labelledby="ablage-titel">
+              <h2 id="ablage-titel">{{ texte.aufbewahrung }}</h2>
+              <dl class="integ">
+                @if (d.sperreBis) {
+                  <dt><app-symbol name="schloss" />{{ texte.sperreBis }}</dt>
+                  <dd>{{ datum(d.sperreBis) }}</dd>
+                }
+                @if (d.aufbewahrenBis) {
+                  <dt><app-symbol name="uhr" />{{ texte.aufbewahrenBis }}</dt>
+                  <dd>{{ datum(d.aufbewahrenBis) }}</dd>
+                }
+              </dl>
+            </section>
+          }
+          <section class="karte versionen" aria-labelledby="versionen-titel" data-test="versionen">
+            <h2 id="versionen-titel">{{ texte.versionen }}</h2>
+            @if (d.versionen.length === 0) {
+              <p class="klein">{{ texte.versionenLeer }}</p>
+            } @else {
+              <p class="klein">{{ texte.versionenHinweis }}</p>
+              <ol>
+                @for (v of d.versionen; track v.version) {
+                  <li data-test="version">
+                    <span class="version">{{ texte.version(v.version) }}</span>
+                    <span class="wann"
+                      >{{ zeitpunkt(v.zeit) }}, {{ texte.geaendertVon }} {{ wer(v.geaendertVon) }}</span
+                    >
+                    <span class="grund">{{ v.grund || texte.ohneGrund }}</span>
+                  </li>
+                }
+              </ol>
+            }
+          </section>
+          <app-wissen-verwendung class="karte wissen" [dokumentId]="d.id" />
+        </div>
+      </div>
     }
   }
 }

@@ -26,6 +26,17 @@ export const SYMBOLE = {
   mond: 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z',
   abmelden: 'M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14M10 16l-4-4 4-4M6 12h10',
   archiv: 'M4 7h16M4 12h16M4 17h10',
+  plus: 'M12 5v14M5 12h14',
+  senden: 'M4 12 20 4l-5 16-3.5-6.5zM11.5 13.5 20 4',
+  dokument: 'M6.5 3h7.5l4.5 4.5V21h-12zM14 3v4.5h4.5M9 13h6M9 16.5h4',
+  tabelle:
+    'M5 4.5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM4 9.5h16M4 14.5h16M10 9.5v10',
+  schloss:
+    'M7 10.5h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zM8 10.5V8a4 4 0 0 1 8 0v2.5',
+  uhr: `${kreis(12, 12, 8.5)}M12 7.5V12l3 2`,
+  herunterladen: 'M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14',
+  haken: 'M5 12.5l4.5 4.5L19 7.5',
+  bearbeiten: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
 } as const;
 
 export type SymbolName = keyof typeof SYMBOLE;

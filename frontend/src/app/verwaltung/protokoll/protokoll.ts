@@ -33,6 +33,7 @@ export class Protokoll implements OnInit {
   private readonly protokoll = inject(ProtokollService);
 
   protected readonly texte = TEXTE.protokoll;
+  protected readonly gruppe = TEXTE.menueGruppen.verwaltung;
   protected readonly aktionen = AKTIONEN;
   protected readonly zeitpunkt = zeitpunkt;
   protected readonly wer = wer;
