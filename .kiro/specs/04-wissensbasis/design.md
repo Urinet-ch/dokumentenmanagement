@@ -371,7 +371,11 @@ flowchart LR
 - `FreigabeDienst.annehmen(aenderungId, ifMatch, fassung?)`:
   1. Rechte A17, ETag (428/412), Status `OFFEN`.
   2. Basisversion = aktuelle Version? Sonst `aenderung.status = VERALTET`, 412 (Requirement 6.6). «Neu erzeugen»
-     reiht einen Teilauftrag `SEITE` gegen die aktuelle Version ein.
+     reiht einen Teilauftrag `SEITE` gegen die aktuelle Version ein. Bei manuellen Entwürfen ohne Ingest-Quelle
+     verwendet er die zulässigen Quellen der aktuellen Fassung und des bisherigen Vorschlags. Vor dem KI-Aufruf und
+     vor dem Speichern werden die Quellen geprüft. Eine veränderte Basis und bei manuellen Entwürfen auch ein
+     veränderter Graph führen vorsorglich zum Abbruch. Quelle-Seiten werden nur bei erhaltener Pflichtstruktur und
+     erhaltenen Kernaussagen übernommen.
   3. `WissensPruefung` bei jedem `annehmen` erneut (Fassung aus dem Entwurf oder geänderte Fassung) gegen den
      aktuellen Stand; Befund → 422 `ENTWURF_BEFUND`. Ein inzwischen vergebener `NEU`-Pfad ergibt `PFAD_UNGUELTIG`,
      nie eine Unique-Verletzung.

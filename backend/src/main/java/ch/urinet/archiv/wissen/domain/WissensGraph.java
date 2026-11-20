@@ -69,6 +69,11 @@ public record WissensGraph(Map<UUID, Set<UUID>> dokumenteJeSeite, Map<UUID, Set<
                 .hoechste(mindeststufeVonQuellen(quellseitenJeSeite.getOrDefault(seiteId, Set.of())));
     }
 
+    public WissensStufe mindeststufeNachAnnahme(Set<UUID> quellseiten, WissensStufe mindeststufe,
+                                               WissensStufe kontextstufe) {
+        return mindeststufe.hoechste(kontextstufe).hoechste(mindeststufeVonQuellen(quellseiten));
+    }
+
     /**
      * Wirksame Stufe einer vorgeschlagenen Fassung vor der Annahme (Req 11.1, 6.8): Maximum aus den Dokumenten der
      * Fassung, den Hüllen und Mindeststufen ihrer Quellseiten, der Mindeststufe der Seite und der Kontextstufe der
@@ -76,7 +81,7 @@ public record WissensGraph(Map<UUID, Set<UUID>> dokumenteJeSeite, Map<UUID, Set<
      */
     public WissensStufe wirksameStufeNachAnnahme(Set<UUID> dokumente, Set<UUID> quellseiten,
                                                  WissensStufe mindeststufe, WissensStufe kontextstufe) {
-        WissensStufe stufe = mindeststufe.hoechste(kontextstufe).hoechste(mindeststufeVonQuellen(quellseiten));
+        WissensStufe stufe = mindeststufeNachAnnahme(quellseiten, mindeststufe, kontextstufe);
         Set<UUID> huelle = new HashSet<>(dokumente);
         for (UUID quellseite : quellseiten) {
             if (!kenntSeite(quellseite)) {

@@ -1,6 +1,7 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
 import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
 import jakarta.persistence.PersistenceException;
 import jakarta.ws.rs.core.Response;
@@ -50,6 +51,16 @@ class ProblemAbbildungTest {
             assertThat(antwort.getEntity()).asString()
                     .contains("\"fehlercode\":\"REGEL_VERLETZT\"")
                     .contains("\"regeln\":[{\"code\":\"datum_pflicht\",\"meldung\":\"Belegdatum fehlt.\"}]");
+        }
+    }
+
+    @Test
+    void entwurfsbefundNenntDieBefundcodes() {
+        try (Response antwort = abbildung.fachFehler(new EntwurfBefunde(java.util.List.of("STUFE_UEBERBLICK")))) {
+            assertThat(antwort.getStatus()).isEqualTo(422);
+            assertThat(antwort.getEntity()).asString()
+                    .contains("\"fehlercode\":\"ENTWURF_BEFUND\"")
+                    .contains("\"befunde\":[\"STUFE_UEBERBLICK\"]");
         }
     }
 
