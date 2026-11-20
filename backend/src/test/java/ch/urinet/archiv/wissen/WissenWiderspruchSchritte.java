@@ -77,7 +77,10 @@ public class WissenWiderspruchSchritte {
     public void ohneGrund() {
         entwurf = anlegen("Neue Frist.[^neu]" + UNABHAENGIG, quellen(true));
         given().auth().oauth2(token()).get("/api/v1/wissensentwuerfe/" + entwurf)
-                .then().statusCode(200).body("aenderungen[0].diff.entfernteWidersprueche.size()", is(1));
+                .then().statusCode(200).body("aenderungen[0].diff.entfernteWidersprueche.size()", is(1))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].text", containsString("Alte Frist."))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].fussnoten", hasItem("alt"))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].fussnoten", hasItem("neu"));
         antwort = annehmen(Map.of());
     }
 

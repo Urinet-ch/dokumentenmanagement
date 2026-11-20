@@ -855,6 +855,9 @@ Fassung prüft erneut der Freigabedienst. Die API verwendet versiegelte Leseansi
 generierte Angular-Modelle; dafür enthält die Oberfläche lokale, typisierte Vertragsansichten.
 Der Diff steht ab 1024 px nebeneinander, darunter untereinander. Cucumber.js/Playwright misst Positionen
 bei 375, 1023, 1024 und 1280 px und prüft Überlauf, WCAG 2.1 AA mit axe, Einzelbestätigung und Zähler.
+Der integrierte Widerspruchsschutz (14.3, PR #351) liefert `diff.widersprueche` und
+`diff.entfernteWidersprueche`. Die Auflösungsmarkierung verwendet den echten Vertrag auch ohne KI-Blockliste;
+der REST-Nachweis prüft Text und Fussnotenschlüssel, Frontend- und Browsernachweise prüfen die Hervorhebung.
 
 ### Konfiguration und Aufträge
 | Schlüssel | Startwert |

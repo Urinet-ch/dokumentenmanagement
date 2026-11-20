@@ -85,6 +85,16 @@ describe('Wissensentwürfe', () => {
     expect(fixture.nativeElement.textContent).toContain('+ Neue strittige Aussage · q1, q3');
   });
 
+  it('hebt die Auflösung aus dem Backend-Diffvertrag ohne KI-Blockliste hervor', async () => {
+    const block = { text: 'Widerspruch: Alte Frist. Neue Frist.', fussnoten: ['alt', 'neu'] };
+    const antwort = { ...daten, aenderungen: [{ ...daten.aenderungen[0],
+      diff: { ...daten.aenderungen[0].diff, widersprueche: { alt: [block], neu: [] },
+        entfernteWidersprueche: [block] } }] };
+    const fixture = await zeigen(antwort);
+    expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.entwuerfe.aufloesung);
+    expect(fixture.nativeElement.textContent).toContain('− Widerspruch: Alte Frist. Neue Frist. · alt, neu');
+  });
+
   it('verwirft nicht ohne Grund und sendet bei abgebrochener Bestätigung nichts', async () => {
     const fixture = await zeigen();
     klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.entscheiden);

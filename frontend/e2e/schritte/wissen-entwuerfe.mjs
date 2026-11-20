@@ -5,6 +5,7 @@ import axe from 'axe-core';
 Given('synthetische Wissensentwürfe sind für die Oberfläche verfügbar', async function () {
   this.wissensEntscheide = [];
   const kopf = { id: 'e1', status: 'OFFEN', anlass: 'INGEST', erstellt: '2026-01-01T10:00:00Z' };
+  const widerspruch = { text: 'Synthetischer Widerspruch', fussnoten: ['alt', 'neu'] };
   const ansicht = {
     entwurf: kopf,
     kernaussagen: [{ nr: 1, schluessel: 'q1', text: 'Synthetische Kernaussage', seiten: [1],
@@ -12,9 +13,10 @@ Given('synthetische Wissensentwürfe sind für die Oberfläche verfügbar', asyn
     aenderungen: [{
       nr: 2, pfad: 'konzepte/probe', status: 'OFFEN', etag: 7, vertraulichkeitKontext: 'INTERN',
       daten: { titel: 'Probe', beschreibung: 'Eine Probe.', tags: [], quellen: [] }, inhalt: 'Neue Fassung.',
-      diff: { zeilen: [{ alt: ['Alte Zeile ' + 'a'.repeat(400)], neu: ['Neue Zeile'] }] },
+      diff: { zeilen: [{ alt: ['Alte Zeile ' + 'a'.repeat(400)], neu: ['Neue Zeile'] }],
+        widersprueche: { alt: [widerspruch], neu: [] }, entfernteWidersprueche: [widerspruch] },
       befunde: [], hinweise: [{ code: 'STUFE_STEIGT', text: 'Stufe steigt' }],
-      begruendung: 'Synthetische Begründung', widersprueche: [{ text: 'Synthetischer Widerspruch' }],
+      begruendung: 'Synthetische Begründung', widersprueche: [],
       entfernteAussagen: [{ schluessel: 'alt', begruendung: 'Synthetische Entfernung' }],
     }],
   };
@@ -53,7 +55,8 @@ Then('sehe ich Diffzeichen, Befunde, Kontext und nicht zugeordnete Kernaussagen'
   await seite.getByText('Keiner Änderung zugeordnet', { exact: true }).waitFor();
   await seite.getByRole('heading', { name: 'Sperrende Befunde' }).waitFor();
   await seite.getByRole('heading', { name: 'Entfernte Aussagen' }).waitFor();
-  await seite.getByText('Synthetischer Widerspruch', { exact: false }).waitFor();
+  await seite.getByText('Synthetischer Widerspruch', { exact: false }).first().waitFor();
+  await seite.getByText('Widerspruch wird aufgelöst', { exact: true }).waitFor();
 });
 
 Then('die Entwurfsansicht hat keinen horizontalen Überlauf und keinen axe-Befund', async function () {
