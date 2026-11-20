@@ -826,6 +826,15 @@ export const TEXTE = {
     fehlerVerbindung:
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
+    // Gestaltung nach Prototyp (Entscheid Fabian 20.11.2026)
+    vorzeile: 'Kontakte und Verkaufschancen',
+    spalteDatei: 'Datei',
+    spalteZeilen: 'Datenzeilen',
+    spalteHochgeladen: 'Hochgeladen',
+    spalteStatus: 'Status',
+    spalteZeile: 'Zeile',
+    spalteWerte: 'Werte in der Datei',
+    spalteKontakt: 'Kontakt im Archiv',
   },
   // Kontakte ansehen und pflegen (Aufgabe 4.12; Req 17; Rechte A6 ansehen, A12 ändern)
   kontakte: {
@@ -1047,6 +1056,27 @@ export const TEXTE = {
     fehlerNichtErreichbar:
       'Das Archiv ist gerade nicht erreichbar, zum Beispiel wegen eines Neustarts. Bitte versuchen Sie es in einer Minute erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
+    // Gestaltung nach Prototyp (Entscheid Fabian 20.11.2026)
+    vorzeile: 'Abschluss für den Treuhänder',
+    inArbeit: (jahr: number) => `Export ${jahr} wird erstellt …`,
+    fortschritt: 'Export wird erstellt',
+    inhaltTitel: 'Inhalt des ZIP',
+    /** Aufbau nach Req 7.1 und design.md «ZIP-Aufbau» (Spec 02). */
+    inhalt: {
+      belege: {
+        name: 'belege/',
+        text: 'PDF/A-Fassung jedes archivierten Belegs des Jahres, sonst das Original; Dateiname Datum_Art_Belegnummer_Partner',
+      },
+      belegliste: {
+        name: 'belegliste.csv',
+        text: 'ID, Art, Datum, Partner, Belegnummer, Richtung, Betrag, Währung, SHA-256, Dateiname',
+      },
+      pruefsummen: { name: 'pruefsummen.sha256', text: 'SHA-256 jeder Datei im ZIP' },
+      manifeste: {
+        name: 'manifeste/',
+        text: 'Tages-Manifeste des Jahres mit Signatur und Zeitstempel',
+      },
+    },
   },
   apiTokens: {
     titel: 'API-Tokens',
