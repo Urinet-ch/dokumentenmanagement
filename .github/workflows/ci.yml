@@ -163,6 +163,12 @@ jobs:
       - name: Frontend-Abhängigkeiten
         working-directory: frontend
         run: npm ci
+      # Das JAR des OpenAPI-Generators lädt die CLI sonst bei jedem Lauf von Maven Central, weil npm ci node_modules
+      # leert; HTTP 429 liess den Build scheitern (20.11.2026). Version aus openapitools.json, Wiederherstellen nach npm ci
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: frontend/node_modules/@openapitools/openapi-generator-cli/versions
+          key: openapi-generator-${{ hashFiles('frontend/openapitools.json') }}
 
       - name: Build über Quinoa (ohne Tests, die laufen in den Backend-Jobs)
         run: mvn -B -ntp -f backend/pom.xml package -Dmaven.test.skip=true
