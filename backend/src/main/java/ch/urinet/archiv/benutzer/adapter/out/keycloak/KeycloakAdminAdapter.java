@@ -62,7 +62,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9._~-]+");
 
     private final ObjectMapper json;
-    private final URI basis;
+    private final Optional<URI> basis;
     private final String realm;
     private final String clientId;
     private final String clientSecret;
@@ -82,13 +82,11 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Inject
     public KeycloakAdminAdapter(
             ObjectMapper json,
-            @ConfigProperty(name = "archiv.verwaltung.keycloak.basis-url",
-                    defaultValue = "http://localhost:8080") String basisUrl,
+            @ConfigProperty(name = "archiv.verwaltung.keycloak.basis-url") Optional<String> basisUrl,
             @ConfigProperty(name = "archiv.verwaltung.keycloak.realm", defaultValue = "urinet-archiv") String realm,
             @ConfigProperty(name = "archiv.verwaltung.keycloak.client-id",
                     defaultValue = "archiv-verwaltung") String clientId,
-            @ConfigProperty(name = "archiv.verwaltung.keycloak.client-secret",
-                    defaultValue = "") String clientSecret,
+            @ConfigProperty(name = "archiv.verwaltung.keycloak.client-secret") Optional<String> clientSecret,
             @ConfigProperty(name = "archiv.verwaltung.keycloak.einladungs-client-id",
                     defaultValue = "archiv-pwa") String einladungsClientId,
             @ConfigProperty(name = "archiv.verwaltung.keycloak.einladungs-redirect-uri")
@@ -104,15 +102,19 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     KeycloakAdminAdapter(ObjectMapper json, String basisUrl, String realm, String clientId, String clientSecret,
                          String einladungsClientId, String einladungsRedirectUri, Duration verbindungsZeitgrenze,
                          Duration anfrageZeitgrenze, Clock clock) {
+        this(json, Optional.ofNullable(basisUrl), realm, clientId, Optional.ofNullable(clientSecret),
+                einladungsClientId, einladungsRedirectUri, verbindungsZeitgrenze, anfrageZeitgrenze, clock);
+    }
+
+    private KeycloakAdminAdapter(ObjectMapper json, Optional<String> basisUrl, String realm, String clientId,
+                                 Optional<String> clientSecret, String einladungsClientId,
+                                 String einladungsRedirectUri, Duration verbindungsZeitgrenze,
+                                 Duration anfrageZeitgrenze, Clock clock) {
         this.json = json;
-        this.basis = URI.create(basisUrl.replaceAll("/+$", ""));
-        if (!Set.of("http", "https").contains(basis.getScheme()) || basis.getHost() == null
-                || basis.getRawQuery() != null || basis.getRawFragment() != null || basis.getRawUserInfo() != null) {
-            throw new IllegalArgumentException("Ungültige Keycloak-Basisadresse");
-        }
+        this.basis = basisUrl.filter(url -> !url.isBlank()).map(KeycloakAdminAdapter::basisAdresse);
         this.realm = segment(realm);
         this.clientId = clientId;
-        this.clientSecret = clientSecret;
+        this.clientSecret = clientSecret.filter(secret -> !secret.isBlank()).orElse("");
         this.einladungsClientId = einladungsClientId;
         this.einladungsRedirectUri = einladungsRedirectUri;
         this.anfrageZeitgrenze = anfrageZeitgrenze;
@@ -401,7 +403,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         }
         try {
             pruefeSchutzschalter();
-            URI uri = URI.create(basis + path + (query == null || query.isBlank() ? "" : "?" + query));
+            URI uri = basis().resolve(path + (query == null || query.isBlank() ? "" : "?" + query));
             HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(anfrageZeitgrenze)
                     .header("Accept", "application/json");
             if (body != null) {
@@ -467,6 +469,10 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     }
 
     private String token() {
+        URI adminBasis = basis();
+        if (clientSecret.isBlank()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
+        }
         Token aktuell = token;
         if (aktuell != null && aktuell.gueltigBis().isAfter(clock.instant())) {
             return aktuell.wert();
@@ -478,7 +484,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             }
             String form = "grant_type=client_credentials&client_id=" + query(clientId)
                     + "&client_secret=" + query(clientSecret);
-            HttpRequest request = HttpRequest.newBuilder(URI.create(basis + tokenPath()))
+            HttpRequest request = HttpRequest.newBuilder(adminBasis.resolve(tokenPath()))
                     .timeout(anfrageZeitgrenze)
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .header("Accept", "application/json")
@@ -556,6 +562,20 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
 
     private String admin(String pfad) {
         return "/admin/realms/" + realm + pfad;
+    }
+
+    private URI basis() {
+        return basis.orElseThrow(() -> fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+    }
+
+    private static URI basisAdresse(String basisUrl) {
+        URI adresse = URI.create(basisUrl.replaceAll("/+$", ""));
+        if (!Set.of("http", "https").contains(adresse.getScheme()) || adresse.getHost() == null
+                || adresse.getRawQuery() != null || adresse.getRawFragment() != null
+                || adresse.getRawUserInfo() != null) {
+            throw new IllegalArgumentException("Ungültige Keycloak-Basisadresse");
+        }
+        return adresse;
     }
 
     private String tokenPath() {

@@ -52,6 +52,24 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void fehlendeVerbindungsdatenMeldenDienstAlsNichtErreichbar() {
+        KeycloakAdminAdapter ohneAdresse = new KeycloakAdminAdapter(new ObjectMapper(), null, "urinet-archiv",
+                "archiv-verwaltung", "synthetic-client-secret", "archiv-pwa", "", Duration.ofSeconds(2),
+                Duration.ofSeconds(1), Clock.systemUTC());
+        KeycloakAdminAdapter ohneSecret = new KeycloakAdminAdapter(new ObjectMapper(), server.baseUrl(),
+                "urinet-archiv", "archiv-verwaltung", "", "archiv-pwa", "", Duration.ofSeconds(2),
+                Duration.ofSeconds(1), Clock.systemUTC());
+
+        assertThatThrownBy(ohneAdresse::verbindungPruefen)
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+        assertThatThrownBy(ohneSecret::verbindungPruefen)
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+        server.verify(0, postRequestedFor(urlPathEqualTo(TOKEN)));
+    }
+
+    @Test
     void abgelehntesDienstkontoWirdAls502Abgebildet() {
         server.stubFor(post(urlPathEqualTo(TOKEN)).willReturn(aResponse().withStatus(401)
                 .withBody("{\"error\":\"synthetic private detail\"}")));
