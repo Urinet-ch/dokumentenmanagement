@@ -16,6 +16,12 @@ import { HttpClient, HttpHeaders, HttpParams,
 import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
+// @ts-ignore
+import { Eingabe } from '../model/eingabe';
+// @ts-ignore
+import { WissenAnnehmen } from '../model/wissen-annehmen';
+// @ts-ignore
+import { WissenVerwerfen } from '../model/wissen-verwerfen';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -102,6 +108,438 @@ export class WissensbasisService extends BaseService {
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Eine Wissensänderung annehmen
+     * @endpoint post /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/annehmen
+     * @param entwurfId 
+     * @param nr 
+     * @param ifMatch 
+     * @param wissenAnnehmen 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrAnnehmenPost(entwurfId: string, nr: number, ifMatch: string, wissenAnnehmen: WissenAnnehmen, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrAnnehmenPost(entwurfId: string, nr: number, ifMatch: string, wissenAnnehmen: WissenAnnehmen, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrAnnehmenPost(entwurfId: string, nr: number, ifMatch: string, wissenAnnehmen: WissenAnnehmen, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrAnnehmenPost(entwurfId: string, nr: number, ifMatch: string, wissenAnnehmen: WissenAnnehmen, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (entwurfId === null || entwurfId === undefined) {
+            throw new Error('Required parameter entwurfId was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrAnnehmenPost.');
+        }
+        if (nr === null || nr === undefined) {
+            throw new Error('Required parameter nr was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrAnnehmenPost.');
+        }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrAnnehmenPost.');
+        }
+        if (wissenAnnehmen === null || wissenAnnehmen === undefined) {
+            throw new Error('Required parameter wissenAnnehmen was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrAnnehmenPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/wissensentwuerfe/${this.configuration.encodeParam({name: "entwurfId", value: entwurfId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/aenderungen/${this.configuration.encodeParam({name: "nr", value: nr, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int32"})}/annehmen`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: wissenAnnehmen,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Veraltete Wissensänderung neu erzeugen
+     * @endpoint post /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/neu-erzeugen
+     * @param entwurfId 
+     * @param nr 
+     * @param ifMatch 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrNeuErzeugenPost(entwurfId: string, nr: number, ifMatch: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrNeuErzeugenPost(entwurfId: string, nr: number, ifMatch: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrNeuErzeugenPost(entwurfId: string, nr: number, ifMatch: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrNeuErzeugenPost(entwurfId: string, nr: number, ifMatch: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (entwurfId === null || entwurfId === undefined) {
+            throw new Error('Required parameter entwurfId was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrNeuErzeugenPost.');
+        }
+        if (nr === null || nr === undefined) {
+            throw new Error('Required parameter nr was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrNeuErzeugenPost.');
+        }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrNeuErzeugenPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/wissensentwuerfe/${this.configuration.encodeParam({name: "entwurfId", value: entwurfId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/aenderungen/${this.configuration.encodeParam({name: "nr", value: nr, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int32"})}/neu-erzeugen`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Wissensänderung verwerfen
+     * @endpoint post /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/verwerfen
+     * @param entwurfId 
+     * @param nr 
+     * @param ifMatch 
+     * @param wissenVerwerfen 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrVerwerfenPost(entwurfId: string, nr: number, ifMatch: string, wissenVerwerfen: WissenVerwerfen, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrVerwerfenPost(entwurfId: string, nr: number, ifMatch: string, wissenVerwerfen: WissenVerwerfen, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrVerwerfenPost(entwurfId: string, nr: number, ifMatch: string, wissenVerwerfen: WissenVerwerfen, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1WissensentwuerfeEntwurfIdAenderungenNrVerwerfenPost(entwurfId: string, nr: number, ifMatch: string, wissenVerwerfen: WissenVerwerfen, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (entwurfId === null || entwurfId === undefined) {
+            throw new Error('Required parameter entwurfId was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrVerwerfenPost.');
+        }
+        if (nr === null || nr === undefined) {
+            throw new Error('Required parameter nr was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrVerwerfenPost.');
+        }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrVerwerfenPost.');
+        }
+        if (wissenVerwerfen === null || wissenVerwerfen === undefined) {
+            throw new Error('Required parameter wissenVerwerfen was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAenderungenNrVerwerfenPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/wissensentwuerfe/${this.configuration.encodeParam({name: "entwurfId", value: entwurfId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/aenderungen/${this.configuration.encodeParam({name: "nr", value: nr, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int32"})}/verwerfen`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: wissenVerwerfen,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Wissensentwürfe auflisten
+     * A17 sieht alle Entwürfe; A18 nur den Status eigener Analysevorschläge.
+     * @endpoint get /api/v1/wissensentwuerfe
+     * @param status 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1WissensentwuerfeGet(status?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1WissensentwuerfeGet(status?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1WissensentwuerfeGet(status?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1WissensentwuerfeGet(status?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'status',
+            <any>status,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/wissensentwuerfe`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Wissensentwurf abrufen
+     * A17 sieht Fassungen und Diffs; A18 nur Status, Entscheide und Gründe eigener Analysen.
+     * @endpoint get /api/v1/wissensentwuerfe/{id}
+     * @param id 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1WissensentwuerfeIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1WissensentwuerfeIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1WissensentwuerfeIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1WissensentwuerfeIdGet(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (id === null || id === undefined) {
+            throw new Error('Required parameter id was null or undefined when calling apiV1WissensentwuerfeIdGet.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/wissensentwuerfe/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Manuellen Wissensentwurf anlegen
+     * @endpoint post /api/v1/wissensentwuerfe
+     * @param eingabe 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1WissensentwuerfePost(eingabe: Eingabe, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1WissensentwuerfePost(eingabe: Eingabe, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1WissensentwuerfePost(eingabe: Eingabe, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1WissensentwuerfePost(eingabe: Eingabe, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (eingabe === null || eingabe === undefined) {
+            throw new Error('Required parameter eingabe was null or undefined when calling apiV1WissensentwuerfePost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/wissensentwuerfe`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: eingabe,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

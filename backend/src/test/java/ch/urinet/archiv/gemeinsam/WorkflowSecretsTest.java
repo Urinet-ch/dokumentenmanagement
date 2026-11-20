@@ -44,4 +44,13 @@ class WorkflowSecretsTest {
     void ohneFreigabeIstJedesVorkommenEinFund(String workflow) {
         assertThat(WorkflowSecrets.funde(workflow, Set.of())).hasSize(1);
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"})
+    void googleAnmeldungNurImDeployErlaubt(String name) {
+        String workflow = "env:\n  X: ${{ secrets." + name + " }}";
+        assertThat(WorkflowSecrets.funde(workflow, WorkflowSecrets.ERLAUBT.get("infomaniak-deploy.yml"))).isEmpty();
+        assertThat(WorkflowSecrets.funde(workflow, WorkflowSecrets.ERLAUBT.getOrDefault("ci.yml", Set.of())))
+                .hasSize(1);
+    }
 }
