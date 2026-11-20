@@ -34,6 +34,8 @@ public class WissenWiderspruchSchritte {
     private UUID seite;
     private UUID entwurf;
     private Response antwort;
+    private int altEtag;
+    private String altStatus;
     private static final String BLOCK = "> ⚠️ Widerspruch: Alte Frist.[^alt] Neue Frist.[^neu]";
     private static final String UNABHAENGIG = "\n\nUnabhängige Aussage.[^dritte]";
 
@@ -83,6 +85,63 @@ public class WissenWiderspruchSchritte {
                 .body("aenderungen[0].diff.entfernteWidersprueche[0].fussnoten", hasItem("alt"))
                 .body("aenderungen[0].diff.entfernteWidersprueche[0].fussnoten", hasItem("neu"));
         antwort = annehmen(Map.of());
+    }
+
+    @Wenn("ein vor dem Widerspruchsschutz gespeicherter Entwurf nach einer weiteren Freigabe gelesen wird")
+    public void altdiff() throws Exception {
+        UUID alt = anlegen("Neue Frist.[^neu]" + UNABHAENGIG, quellen(true));
+        try (Connection c = datenbank.get().getConnection()) {
+            sql(c, """
+                    update m_urinet.wissens_aenderung
+                    set diff = diff - 'widersprueche' - 'entfernteWidersprueche'
+                    where entwurf_id = ?
+                    """, alt);
+        }
+        entwurf = anlegen("Neue Frist.[^neu]" + UNABHAENGIG, quellen(true));
+        annehmen(Map.of("grund", "Neue Frist gilt")).then().statusCode(204);
+        entwurf = alt;
+        given().auth().oauth2(token()).get("/api/v1/wissensseiten/" + seite)
+                .then().statusCode(200).body("version", is(3)).body("widerspruchOffen", is(false));
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement s = c.prepareStatement(
+                     "select etag, status from m_urinet.wissens_aenderung where entwurf_id = ?")) {
+            s.setObject(1, entwurf);
+            try (var r = s.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                altEtag = r.getInt(1);
+                altStatus = r.getString(2);
+            }
+        }
+        antwort = given().auth().oauth2(token()).get("/api/v1/wissensentwuerfe/" + entwurf);
+    }
+
+    @Dann("enthält dessen Diff den entfernten Widerspruch ohne die gespeicherten Entwurfsdaten zu ändern")
+    public void altdiffErgaenzt() throws Exception {
+        antwort.then().statusCode(200).body("aenderungen[0].basisVersion", is(2))
+                .body("aenderungen[0].etag", is(altEtag)).body("aenderungen[0].status", is(altStatus))
+                .body("aenderungen[0].diff.entfernteWidersprueche.size()", is(1))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].text", containsString("Alte Frist."))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].fussnoten", hasItem("alt"))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].fussnoten", hasItem("neu"))
+                .body("aenderungen[0].diff.widersprueche.alt.size()", is(1))
+                .body("aenderungen[0].diff.widersprueche.neu.size()", is(0));
+        given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk"))
+                .get("/api/v1/wissensentwuerfe/" + entwurf).then().statusCode(404);
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement s = c.prepareStatement("""
+                     select jsonb_exists(diff, 'entfernteWidersprueche'),
+                            jsonb_exists(diff, 'widersprueche'), etag, status
+                     from m_urinet.wissens_aenderung where entwurf_id = ?
+                     """)) {
+            s.setObject(1, entwurf);
+            try (var r = s.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                assertThat(r.getBoolean(1)).isFalse();
+                assertThat(r.getBoolean(2)).isFalse();
+                assertThat(r.getInt(3)).isEqualTo(altEtag);
+                assertThat(r.getString(4)).isEqualTo(altStatus);
+            }
+        }
     }
 
     @Dann("wird die Auflösung mit 422 «PFLICHTFELD_FEHLT» abgelehnt")
