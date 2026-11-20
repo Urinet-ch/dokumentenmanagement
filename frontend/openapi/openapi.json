@@ -3349,6 +3349,14 @@
           }
         }
       },
+      "WissenLintAuftrag" : {
+        "type" : "object",
+        "properties" : {
+          "lintId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
       "WissenVerwerfen" : {
         "type" : "object",
         "properties" : {
@@ -7420,6 +7428,39 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensbasis/lint" : {
+      "post" : {
+        "summary" : "Lint der Wissensbasis starten",
+        "responses" : {
+          "202" : {
+            "description" : "Lint eingereiht",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenLintAuftrag"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf keinen Lint starten"
+          },
+          "409" : {
+            "description" : "Ein Lint läuft bereits"
+          },
+          "429" : {
+            "description" : "Monatsbudget der Wissensbasis erschöpft"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "tags" : [ "Wissen Lint Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       }
     },

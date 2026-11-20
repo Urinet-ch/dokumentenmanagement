@@ -491,14 +491,26 @@ flowchart LR
 - Kandidaten «veraltet» ohne KI (Requirement 10.3): Aussagen einer Seite, deren Quelldokument ein älteres
   Dokumentdatum hat als eine Wissensquelle, deren Quelle-Seite auf die Seite verlinkt oder mit ihr eine Quelle teilt.
 - Mit KI (Requirement 10.3, 10.4): Paare, die einander verlinken, eine Quelle teilen oder ≥ 2 Schlagwörter teilen,
-  ohne Seiten mit `PERSONAL`-Dokument in der Hülle, Paare mit `QUERVERWEIS_FEHLT` oder Kandidaten «veraltet» zuerst,
-  sonst nach `lint_geprueft_am`, höchstens `lint-paare`. Antwort `{widersprueche:[{seite, schluessel, gegenseite,
+  ohne Seiten mit `PERSONAL`-Dokument in der Hülle, nach letztem Prüfzeitpunkt und bei Gleichstand Paare mit
+  `QUERVERWEIS_FEHLT` oder Kandidaten «veraltet» zuerst, höchstens `lint-paare`. Antwort `{widersprueche:[{seite, schluessel, gegenseite,
   gegenschluessel, text}], veraltet:[{seite, schluessel, neuere_quelle, text}], links:[{seite, ziel, text}]}`. Für
   jede betroffene Seite folgt ein Teilauftrag `SEITE` (gleiches Schema wie beim Ingest) mit dem Befund als Auftrag;
   bei Paaren verschiedener Vertraulichkeit nur für die höher eingestufte Seite, die andere erhält nur einen Befund
   (IDs). Kontextstufe = höchste Stufe des Paars.
 - Erschöpftes Monatsbudget: kein KI-Teil, Logeintrag `LINT` mit Befund «Budget erschöpft» (Requirement 13.6).
 - Ergebnis in `wissens_lint` (Befunde nur als IDs und Codes) und ggf. Entwurf `anlass = LINT`; Logeintrag `LINT`.
+- Umsetzung 15.4: Vorrang haben nach Requirement 10.3 die am längsten nicht geprüften Paare; Kandidaten sind bei
+  gleichem Prüfzeitpunkt das zweite Sortierkriterium. Der Fortschritt und die Paarhistorie liegen im
+  `ingest_daten` des LINT-Entwurfs. Der Entwurf dient auch als Budgetanker und bleibt ohne Änderungen mit Status
+  `ERLEDIGT` bestehen. Vor jedem KI-Aufruf wird die aktuelle Hülle erneut geprüft; vor dem Seitenauftrag müssen
+  Version und Quellenrevision aller beteiligten Seiten noch zum Paarauftrag passen. Änderungen verwenden die
+  bestehende Freigabeprüfung und werden nicht unmittelbar angewendet. Bricht der Lauf wegen Budget oder fehlendem
+  KI-Zugang ab, bei endgültigem KI-Fehler (Fehlerpfad) oder wird ein Seitenauftrag übersprungen (Seite geändert oder
+  nicht mehr freigegeben, Quellenschlüssel uneindeutig, KI-Antwort nach Nachfrage ungültig), gelten Paare, deren
+  Seitenaufträge nicht ausgeführt wurden, nicht als geprüft (Review PR #376); sie behalten ihren Vorrang im nächsten
+  Lauf. Der Nachweis für 10.1 (Zeitplan reiht je Mandant einen Auftrag ein, derselbe Termin startet nicht doppelt) ist
+  das Szenario `@req-10.1` in `lint.feature`. Die Nachweise für 10.2 (Befundarten ohne KI inkl. Formfehler) liegen als
+  Szenario `@req-10.2` in `lint.feature`.
 
 ### OKF-Export (`wissen/adapter/out`)
 - `WISSEN_EXPORT` schreibt ein ZIP stromweise nach S3 `exporte/wissen-<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage
@@ -920,6 +932,11 @@ bei 375, 1023, 1024 und 1280 px und prüft Überlauf, WCAG 2.1 AA mit axe, Einze
 Der integrierte Widerspruchsschutz (14.3, PR #351) liefert `diff.widersprueche` und
 `diff.entfernteWidersprueche`. Die Auflösungsmarkierung verwendet den echten Vertrag auch ohne KI-Blockliste;
 der REST-Nachweis prüft Text und Fussnotenschlüssel, Frontend- und Browsernachweise prüfen die Hervorhebung.
+Vor 14.3 gespeicherte Diffs erhalten fehlende Widerspruchsmarker beim Lesen aus der unveränderbaren
+historischen Basisversion und der gespeicherten Fassung, nie aus dem aktuellen Seiteninhalt.
+Gespeicherter Diff, Status und ETag bleiben unverändert; eine fehlende Änderungsbasis ist ein Fehler.
+Das Altdaten-Szenario liest Basisversion 2 nach einer weiteren Freigabe auf Version 3 und prüft zusätzlich
+die Mandantentrennung.
 
 ### Konfiguration und Aufträge
 | Schlüssel | Startwert |
@@ -1072,12 +1089,12 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Deploy und Rollback gleich, und `wiederverwenden` (Spec 01, Req 15.6) bricht nicht ab. Die Quellenbezüge
   (`wissensseite_version_dokument`) stehen nicht im Manifest, weil Req 4.6 nur Versionen und Log nennt; sie sind
   INSERT-only, aber nicht gehasht (Review PR #295, K7).
-- Req 4.7 ist offen: In der Sicherung ist die Wissensbasis ohne eigenen Schritt, weil `taeglich.sh` die ganze
-  Archiv-Datenbank mit `pg_dump` sichert. Die Restore-Probe im Repo stellt aber nur Bucket-Objekte wieder her
-  (`archiv sicherung wiederherstellen` und `sperren-pruefen`); `pg_dump` in eine leere Datenbank einspielen und mit der Quelle
-  vergleichen kommt erst mit Spec 01, Aufgabe 5.12. Der Vergleich von Anzahl Seiten und Versionen folgt mit dieser
-  Kette; bis dahin bleibt 13.3 offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein
-  Nachweis (Review PR #295, M1).
+- Req 4.7 ist offen: Die Sicherung erfasst die ganze Archiv-Datenbank mit `pg_dump`. Seit PR #357 stellt
+  `restore-uebung-lokal.sh` den Datenbankdump tatsächlich mit `pg_restore` in einer eigenen Ziel-Datenbank
+  wieder her (Spec 01, Aufgabe 5.12). Noch fehlt der Nachweis, dass dabei ein nichtleerer Wissensseiten- und
+  Versionsbestand vor und nach dem Restore verglichen wird (Nachprüfung 20.11.2026). Deshalb bleibt 13.3
+  offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis
+  (Review PR #295, M1).
 
 ### Umsetzung 13.5 (PR #300)
 - `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe

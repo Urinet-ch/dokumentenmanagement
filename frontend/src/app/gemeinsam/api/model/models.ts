@@ -98,6 +98,7 @@ export * from './wissen-einstellungen';
 export * from './wissen-export';
 export * from './wissen-ingest-auftrag';
 export * from './wissen-ingest-start';
+export * from './wissen-lint-auftrag';
 export * from './wissen-verwerfen';
 export * from './wissens-embedding-auftrag';
 export * from './wissens-index';

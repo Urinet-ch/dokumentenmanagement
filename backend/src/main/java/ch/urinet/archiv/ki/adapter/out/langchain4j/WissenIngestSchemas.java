@@ -21,6 +21,7 @@ public final class WissenIngestSchemas {
             case PLANUNG -> Planung.class;
             case SEITE -> Seite.class;
             case QUELLE -> Quelle.class;
+            case LINT_PAAR -> LintPaar.class;
         };
     }
 
@@ -52,6 +53,16 @@ public final class WissenIngestSchemas {
                     yield new KiPort.Quelle(antwort.titel(), antwort.beschreibung(), antwort.tags(),
                             antwort.zusammenfassung().stream()
                                     .map(s -> new KiPort.Zusammenfassung(s.text(), s.aussagen())).toList());
+                }
+                case LINT_PAAR -> {
+                    LintPaar antwort = MAPPER.readValue(json, LintPaar.class);
+                    yield new KiPort.LintPaar(antwort.widersprueche().stream()
+                            .map(w -> new KiPort.LintWiderspruch(w.seite(), w.schluessel(), w.gegenseite(),
+                                    w.gegenschluessel(), w.text())).toList(),
+                            antwort.veraltet().stream().map(v -> new KiPort.LintVeraltet(v.seite(), v.schluessel(),
+                                    v.neuere_quelle(), v.text())).toList(),
+                            antwort.links().stream().map(l -> new KiPort.LintLink(l.seite(), l.ziel(), l.text()))
+                                    .toList());
                 }
             };
         } catch (JsonProcessingException e) {
@@ -89,5 +100,18 @@ public final class WissenIngestSchemas {
     }
 
     public record Zusammenfassung(String text, List<Integer> aussagen) {
+    }
+
+    public record LintPaar(List<LintWiderspruch> widersprueche, List<LintVeraltet> veraltet, List<LintLink> links) {
+    }
+
+    public record LintWiderspruch(String seite, String schluessel, String gegenseite, String gegenschluessel,
+                                  String text) {
+    }
+
+    public record LintVeraltet(String seite, String schluessel, String neuere_quelle, String text) {
+    }
+
+    public record LintLink(String seite, String ziel, String text) {
     }
 }

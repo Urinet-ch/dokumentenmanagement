@@ -85,6 +85,8 @@ describe('App (Req 2.6, 8.6)', () => {
           { path: 'erfassen', component: Leer },
           { path: 'suche', component: Leer },
           { path: 'chat', component: Leer },
+          { path: 'wissen', component: Leer },
+          { path: 'wissen/entwuerfe', component: Leer },
         ]),
         { provide: WarteschlangeService, useFactory: () => ((warteschlangeGestartet = true), {}) },
         { provide: AnmeldungService, useValue: anmeldung },
@@ -337,5 +339,17 @@ describe('App (Req 2.6, 8.6)', () => {
     expect(window.localStorage.getItem('archiv.farbschema')).toBe(nachher);
     window.localStorage.removeItem('archiv.farbschema');
     delete document.documentElement.dataset['farbschema'];
+  });
+
+  it('hebt nur den genauesten Menüpunkt hervor', async () => {
+    anmeldung.als('inhaber');
+    const fixture = TestBed.createComponent(App);
+    await TestBed.inject(Router).navigateByUrl('/wissen/entwuerfe');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const aktiv = [...(fixture.nativeElement as HTMLElement).querySelectorAll('nav a[aria-current=page]')].map((a) =>
+      a.getAttribute('href'),
+    );
+    expect(aktiv).toEqual(['/wissen/entwuerfe']);
   });
 });
