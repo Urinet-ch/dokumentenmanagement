@@ -7,7 +7,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const FILTER: Filterwerte = { ...LEERE_FILTER, q: '2026', art: 'QUITTUNG' };
 const ANFRAGE: Suchanfrage = { modus: 'volltext', q: '2026', seite: 4, groesse: 20 };
-const ERGEBNIS: Suchergebnis = { treffer: [], gesamt: 1, seite: 4, groesse: 20 };
+const ERGEBNIS: Suchergebnis = { treffer: [], facetten: [], gesamt: 1, seite: 4, groesse: 20 };
 
 describe('SucheZustand', () => {
   it('setzt den vor dem ersten Besitzer gesetzten Stand zurück', () => {

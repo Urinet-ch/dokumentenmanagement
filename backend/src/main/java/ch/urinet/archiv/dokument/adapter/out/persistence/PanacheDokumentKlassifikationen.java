@@ -47,11 +47,20 @@ public class PanacheDokumentKlassifikationen implements DokumentKlassifikationen
     public void ersetzen(UUID dokumentId, Map<String, List<String>> klassifikationen) {
         entityManager().createNativeQuery("delete from dokument_klassifikation where dokument_id = :id")
                 .setParameter("id", dokumentId).executeUpdate();
-        klassifikationen.forEach((code, values) -> values.forEach(wert ->
-                entityManager().createNativeQuery("""
-                        insert into dokument_klassifikation (dokument_id, klassifikation, wert)
-                        values (:id, :klasse, :wert)""")
-                        .setParameter("id", dokumentId).setParameter("klasse", code).setParameter("wert", wert)
-                        .executeUpdate()));
+        // Ein einziges Insert: der Statement-Trigger rechnet den Volltext so nur einmal neu
+        StringBuilder sql = new StringBuilder("insert into dokument_klassifikation (dokument_id, klassifikation, wert) values ");
+        List<String[]> paare = new ArrayList<>();
+        klassifikationen.forEach((code, values) -> values.forEach(wert -> paare.add(new String[]{code, wert})));
+        if (paare.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < paare.size(); i++) {
+            sql.append(i == 0 ? "" : ", ").append("(:id, :k").append(i).append(", :w").append(i).append(')');
+        }
+        var abfrage = entityManager().createNativeQuery(sql.toString()).setParameter("id", dokumentId);
+        for (int i = 0; i < paare.size(); i++) {
+            abfrage.setParameter("k" + i, paare.get(i)[0]).setParameter("w" + i, paare.get(i)[1]);
+        }
+        abfrage.executeUpdate();
     }
 }

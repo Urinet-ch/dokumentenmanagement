@@ -1,6 +1,6 @@
 package ch.urinet.archiv.ki.application.chat;
 
-import ch.urinet.archiv.dokumentart.application.Funktionen;
+import ch.urinet.archiv.konfiguration.application.Funktionen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;

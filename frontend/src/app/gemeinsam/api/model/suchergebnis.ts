@@ -7,11 +7,13 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Klassifikationsfacette } from './klassifikationsfacette';
 import { Suchtreffer } from './suchtreffer';
 
 
 export interface Suchergebnis { 
     treffer: Array<Suchtreffer>;
+    facetten: Array<Klassifikationsfacette>;
     /**
      * Modus volltext: Zahl aller sichtbaren Treffer. Modus hybrid: Zahl der gelieferten Treffer (höchstens 30), keine Gesamtzahl
      */

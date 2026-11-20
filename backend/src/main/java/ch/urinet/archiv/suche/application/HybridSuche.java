@@ -120,7 +120,7 @@ public class HybridSuche {
         Suchanfrage besteVolltext = new Suchanfrage(anfrage.begriff(), anfrage.art(), anfrage.partner(),
                 anfrage.datumVon(), anfrage.datumBis(), anfrage.betragVon(), anfrage.betragBis(), anfrage.richtung(),
                 anfrage.tags(), anfrage.status(), anfrage.geschaeftsjahr(), anfrage.belegnummer(), Sortierung.RELEVANZ,
-                0, VOLLTEXT);
+                0, VOLLTEXT, anfrage.jahr(), anfrage.veroeffentlicht(), anfrage.klassifikationen());
         List<Suchtreffer> treffer = transaktion.ausfuehren(
                 () -> volltext.suchen(besteVolltext, regel, mitDateiname)).treffer();
         return hybrid(anfrage, regel, mitDateiname, k, treffer, aktualitaetsregel)

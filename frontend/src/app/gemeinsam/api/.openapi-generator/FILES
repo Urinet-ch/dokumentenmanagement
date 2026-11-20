@@ -77,6 +77,8 @@ model/import-zuordnung.ts
 model/kategorie.ts
 model/klassifikation-wert.ts
 model/klassifikation.ts
+model/klassifikationsfacette.ts
+model/klassifikationswert-facette.ts
 model/konfiguration-ki-texte.ts
 model/konfigurations-version-detail.ts
 model/konfigurations-version.ts
@@ -93,6 +95,7 @@ model/kontakt-zusammenfuehren.ts
 model/kontakt-zusammengefuehrt.ts
 model/kontakt.ts
 model/kopf.ts
+model/mandantenfunktionen.ts
 model/models.ts
 model/paket-kopf.ts
 model/protokoll-aktion.ts

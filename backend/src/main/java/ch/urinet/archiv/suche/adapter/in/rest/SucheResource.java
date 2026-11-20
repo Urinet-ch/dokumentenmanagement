@@ -10,6 +10,8 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.suche.application.DokumentSuche;
 import ch.urinet.archiv.suche.application.HybridSuche;
+import ch.urinet.archiv.suche.application.Suchfacetten;
+import ch.urinet.archiv.suche.application.SuchfacettenPort;
 import ch.urinet.archiv.suche.domain.AuszugTeil;
 import ch.urinet.archiv.suche.domain.Fundstelle;
 import ch.urinet.archiv.suche.domain.Hybridergebnis;
@@ -26,7 +28,9 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.UriInfo;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -37,7 +41,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -50,7 +56,8 @@ import java.util.function.Function;
  * Modus (Spec 02, Req 2.7, Aufgabe 6.4): ohne {@code modus} oder mit {@code volltext} die Volltextsuche unverändert;
  * mit {@code hybrid} die {@link HybridSuche} mit Pflicht {@code q}, ohne {@code sortierung=DATUM}, {@code seite} und
  * {@code groesse}, höchstens {@value HybridSuche#PWA} Treffer ohne Blättern; {@code gesamt} ist dann die Zahl der
- * gelieferten Treffer. Die neuen Felder fehlen im Modus {@code volltext}, damit dessen Antwort gleich bleibt.
+ * gelieferten Treffer. Klassifikationsfilter und Facetten gelten in beiden Modi; nur {@code fundstelle}, {@code modus}
+ * und {@code degradiert} sind im Modus {@code volltext} nicht gesetzt.
  */
 @Path("/dokumente")
 @Tag(name = "Dokumente")
@@ -64,13 +71,15 @@ public class SucheResource {
 
     private final DokumentSuche suche;
     private final HybridSuche hybrid;
+    private final Suchfacetten facetten;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
 
-    public SucheResource(DokumentSuche suche, HybridSuche hybrid, MandantAufloesung aufloesung,
-                         SecurityIdentity identitaet) {
+    public SucheResource(DokumentSuche suche, HybridSuche hybrid, Suchfacetten facetten,
+                         MandantAufloesung aufloesung, SecurityIdentity identitaet) {
         this.suche = suche;
         this.hybrid = hybrid;
+        this.facetten = facetten;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
     }
@@ -118,6 +127,7 @@ public class SucheResource {
 
     @Schema(name = "Suchergebnis")
     public record SuchergebnisDto(@Schema(required = true) List<SuchtrefferDto> treffer,
+                                  @Schema(required = true) List<KlassifikationsfacetteDto> facetten,
                                   @Schema(required = true, description = "Modus volltext: Zahl aller sichtbaren "
                                           + "Treffer. Modus hybrid: Zahl der gelieferten Treffer (höchstens 30), keine "
                                           + "Gesamtzahl") long gesamt,
@@ -131,6 +141,20 @@ public class SucheResource {
                                           + "wurde (Rückfall, Spec 02, Req 2.3)") Boolean degradiert) {
     }
 
+    @Schema(name = "Klassifikationsfacette")
+    public record KlassifikationsfacetteDto(@Schema(required = true) String code,
+                                              @Schema(required = true) String name,
+                                              @Schema(required = true) List<KlassifikationswertDto> werte) {
+    }
+
+    @Schema(name = "KlassifikationswertFacette")
+    public record KlassifikationswertDto(@Schema(required = true) String code,
+                                          @Schema(required = true) String name,
+                                          @Schema(required = true, description = "Anzahl sichtbarer Dokumente; "
+                                                  + "im Modus hybrid nur unter den gelieferten Treffern")
+                                          long anzahl) {
+    }
+
     @GET
     @ErfordertAktion(Aktion.A2)
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
@@ -140,7 +164,9 @@ public class SucheResource {
                     + "sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. "
                     + "Mit modus=hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, "
                     + "ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei "
-                    + "Rückfall auf den Volltext. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.")
+                    + "Rückfall auf den Volltext. Klassifikationsfilter als wiederholbare Parameter "
+                    + "klassifikation.<code>=<wert>; Antwort enthält sichtbarkeitsgeprüfte Facetten. "
+                    + "Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.")
     public SuchergebnisDto suchen(
             @QueryParam("q") @Parameter(description = "Suchbegriff (Websuche-Syntax: \"Wortfolge\", -ohne, or), "
                     + "höchstens 200 Zeichen") String q,
@@ -173,7 +199,8 @@ public class SucheResource {
                     format = "int32", defaultValue = "20")) String groesse,
             @QueryParam("modus") @Parameter(description = "Standard volltext; hybrid nur mit q, ohne sortierung=DATUM, "
                     + "seite und groesse (Spec 02, Req 2.7)", schema = @Schema(type = SchemaType.STRING,
-                    enumeration = {VOLLTEXT, HYBRID})) String modus) {
+                    enumeration = {VOLLTEXT, HYBRID})) String modus,
+            @Context UriInfo uriInfo) {
         aufloesung.pruefen();
         if (status != null && !STATUS.contains(status)) {
             throw ungueltig();
@@ -190,18 +217,38 @@ public class SucheResource {
                 lesen(betragVon, BigDecimal::new), lesen(betragBis, BigDecimal::new),
                 lesen(richtung, Richtung::valueOf), tag, leer(status), lesen(geschaeftsjahr, Integer::valueOf),
                 leer(belegnummer), lesen(sortierung, Sortierung::valueOf),
-                zahl(seite, 0), zahl(groesse, Suchanfrage.GROESSE_STANDARD));
+                zahl(seite, 0), zahl(groesse, Suchanfrage.GROESSE_STANDARD), null, null,
+                klassifikationen(uriInfo));
+        facetten.pruefen(anfrage);
         if (mitHybrid) {
             if (anfrage.begriff() == null || anfrage.sortierung() == Sortierung.DATUM) {
                 throw ungueltig();
             }
             Hybridergebnis ergebnis = hybrid.suchen(benutzer(), anfrage);
             List<SuchtrefferDto> treffer = ergebnis.treffer().stream().map(SucheResource::dto).toList();
-            return new SuchergebnisDto(treffer, treffer.size(), 0, HybridSuche.PWA, HYBRID, ergebnis.degradiert());
+            return new SuchergebnisDto(treffer, facettenDto(facetten.suchen(benutzer(), anfrage, ergebnis)),
+                    treffer.size(), 0, HybridSuche.PWA, HYBRID, ergebnis.degradiert());
         }
         Suchergebnis ergebnis = suche.suchen(benutzer(), anfrage);
-        return new SuchergebnisDto(ergebnis.treffer().stream().map(t -> dto(t, null)).toList(), ergebnis.gesamt(),
-                anfrage.seite(), anfrage.groesse(), null, null);
+        return new SuchergebnisDto(ergebnis.treffer().stream().map(t -> dto(t, null)).toList(),
+                facettenDto(facetten.suchen(benutzer(), anfrage)), ergebnis.gesamt(), anfrage.seite(),
+                anfrage.groesse(), null, null);
+    }
+
+    private static List<KlassifikationsfacetteDto> facettenDto(List<SuchfacettenPort.Facette> facetten) {
+        return facetten.stream().map(f -> new KlassifikationsfacetteDto(f.code(), f.name(),
+                f.werte().stream().map(w -> new KlassifikationswertDto(w.code(), w.name(), w.anzahl())).toList()))
+                .toList();
+    }
+
+    private static Map<String, List<String>> klassifikationen(UriInfo uriInfo) {
+        Map<String, List<String>> werte = new LinkedHashMap<>();
+        uriInfo.getQueryParameters().forEach((name, liste) -> {
+            if (name.startsWith("klassifikation.")) {
+                werte.put(name.substring("klassifikation.".length()), List.copyOf(liste));
+            }
+        });
+        return werte;
     }
 
     /** Der ZugangFilter hat Rolle und Benutzer-ID schon geprüft (sonst 403). */
