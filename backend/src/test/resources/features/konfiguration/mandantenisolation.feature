@@ -18,4 +18,4 @@ Funktionalität: Isolation der Mandantenkonfiguration
   Szenario: Der Probeverband erfasst und archiviert eine Sitzungsunterlage
     Angenommen der synthetische Probeverband ist für die Abnahme bereit
     Wenn der Probeverband eine synthetische Sitzungsunterlage erfasst und bestätigt
-    Dann ist die Sitzungsunterlage mit Feldfrist archiviert und in Suche und Lückenbericht enthalten
+    Dann ist die Sitzungsunterlage mit Feldfrist archiviert, in Suche und Lückenbericht enthalten und ihre Nummer eindeutig

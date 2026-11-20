@@ -58,6 +58,7 @@ public class ProbeverbandSchritte {
     private String benutzerId;
     private String benutzer;
     private UUID dokument;
+    private UUID duplikat;
 
     @Angenommen("der synthetische Probeverband ist für die Abnahme bereit")
     public void bereit() throws Exception {
@@ -141,8 +142,8 @@ public class ProbeverbandSchritte {
         auftraege.abarbeiten();
     }
 
-    @Dann("ist die Sitzungsunterlage mit Feldfrist archiviert und in Suche und Lückenbericht enthalten")
-    public void pruefen() throws SQLException {
+    @Dann("ist die Sitzungsunterlage mit Feldfrist archiviert, in Suche und Lückenbericht enthalten und ihre Nummer eindeutig")
+    public void pruefen() throws Exception {
         assertThat(verarbeitung.dokument(MANDANT, dokument)).containsEntry("status", "ARCHIVIERT");
         try (Connection verbindung = datenbank.getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
                 "select aufbewahren_bis from " + CODE.schema() + ".dokument where id = ?")) {
@@ -152,6 +153,22 @@ public class ProbeverbandSchritte {
                 assertThat(zeile.getDate(1).toLocalDate()).hasToString("2038-02-28");
             }
         }
+        byte[] pdf = OcrTestdateien.textPdf("Zweite Sitzungsunterlage Probe", UUID.randomUUID().toString());
+        Response upload = given().auth().oauth2(Testanmeldung.token(benutzer))
+                .multiPart("dateien", "sitzung-zwei.pdf", pdf, "application/pdf")
+                .when().post("/api/v1/dokumente");
+        assertThat(upload.statusCode()).as(upload.asString()).isEqualTo(202);
+        duplikat = UUID.fromString(upload.jsonPath().getString("[0].id"));
+        verarbeitung.abarbeiten();
+        assertThat(verarbeitung.dokument(MANDANT, duplikat)).containsEntry("status", "EINGANGSKORB");
+        Response doppelteNummer = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag(duplikat))
+                .contentType(ContentType.JSON)
+                .body(Map.of("art", "VERBANDSSITZUNG", "zusatz", Map.of("sitzung", "2028-03-01", "nummer", 1),
+                        "klassifikationen", Map.of("sitzungsthema", List.of("betrieb"))))
+                .when().patch("/api/v1/dokumente/" + duplikat);
+        assertThat(doppelteNummer.statusCode()).as(doppelteNummer.asString()).isEqualTo(422);
+        assertThat(doppelteNummer.jsonPath().getString("fehlercode")).isEqualTo("REGEL_VERLETZT");
+
         Response suche = given().auth().oauth2(Testanmeldung.token(benutzer))
                 .queryParam("klassifikation.sitzungsthema", "projekte")
                 .when().get("/api/v1/dokumente");
@@ -173,19 +190,23 @@ public class ProbeverbandSchritte {
     }
 
     private String etag() {
+        return etag(dokument);
+    }
+
+    private String etag(UUID id) {
         Response antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
-                .get("/api/v1/dokumente/" + dokument);
+                .get("/api/v1/dokumente/" + id);
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
         return antwort.header("ETag");
     }
 
     @After
     public void aufraeumen() throws SQLException {
-        if (dokument != null) {
-            auftraege.ausfuehren("delete from public.auftrag where nutzlast ->> 'dokumentId' = '" + dokument + "'");
-            Testdokumente.loeschen(datenbank, MANDANT, List.of(dokument));
+        for (UUID id : java.util.stream.Stream.of(dokument, duplikat).filter(java.util.Objects::nonNull).toList()) {
+            auftraege.ausfuehren("delete from public.auftrag where nutzlast ->> 'dokumentId' = '" + id + "'");
+            Testdokumente.loeschen(datenbank, MANDANT, List.of(id));
             for (String praefix : List.of("eingang/", "archiv/", "vorschau/")) {
-                TestAblage.loeschen(MANDANT, praefix, schluessel -> schluessel.contains("/" + dokument + "/"));
+                TestAblage.loeschen(MANDANT, praefix, schluessel -> schluessel.contains("/" + id + "/"));
             }
         }
         if (benutzerId != null) {
