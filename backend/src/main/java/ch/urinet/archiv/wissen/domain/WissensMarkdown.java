@@ -117,7 +117,7 @@ public final class WissensMarkdown {
         merkmale.eigeneDefinitionen.forEach(Node::unlink);
         return new Analyse(rendern(dokument, sichtbarePfade), links, fussnoten, abschnitte, aussagen, merkmale.html,
                 merkmale.bild, merkmale.ungueltigerLink, merkmale.wikilink,
-                !merkmale.eigeneDefinitionen.isEmpty(), false, false);
+                !merkmale.eigeneDefinitionen.isEmpty(), false, false, merkmale.widersprueche);
     }
 
     public static String darstellen(String markdown) {
@@ -197,6 +197,9 @@ public final class WissensMarkdown {
                     || node instanceof BlockQuote blockQuote && widerspruchsblock(blockQuote);
             boolean fussnotenDefinition = besuch.inFussnote()
                     || node instanceof FootnoteDefinition;
+            if (blockZitat && !besuch.widerspruch() && !fussnotenDefinition) {
+                merkmale.widersprueche.add(new Aussage(text(node), alleFussnotenIn(node)));
+            }
 
             if (node instanceof HtmlInline || node instanceof HtmlBlock) {
                 merkmale.html = true;
@@ -504,20 +507,32 @@ public final class WissensMarkdown {
         }
     }
 
+    public static List<Aussage> entfernteWidersprueche(String basis, String fassung) {
+        List<Aussage> verblieben = new ArrayList<>(analysieren(fassung, MAX_EINGABE_ZEICHEN).widersprueche());
+        List<Aussage> entfernt = new ArrayList<>();
+        for (Aussage block : analysieren(basis, MAX_EINGABE_ZEICHEN).widersprueche()) {
+            if (!verblieben.remove(block)) {
+                entfernt.add(block);
+            }
+        }
+        return List.copyOf(entfernt);
+    }
+
     public record Analyse(String html, Set<String> links, Set<String> fussnoten, Set<String> abschnitte,
                           List<Aussage> aussagen, boolean htmlVorhanden, boolean bildVorhanden,
                           boolean ungueltigerLink, boolean wikilink, boolean fussnotenDefinition, boolean zuGross,
-                          boolean zuTief) {
+                          boolean zuTief, List<Aussage> widersprueche) {
         public Analyse {
             links = Collections.unmodifiableSet(new LinkedHashSet<>(links));
             fussnoten = Collections.unmodifiableSet(new LinkedHashSet<>(fussnoten));
             abschnitte = Collections.unmodifiableSet(new LinkedHashSet<>(abschnitte));
             aussagen = List.copyOf(aussagen);
+            widersprueche = List.copyOf(widersprueche);
         }
 
         private static Analyse abgelehnt(boolean zuGross, boolean zuTief) {
             return new Analyse("", Set.of(), Set.of(), Set.of(), List.of(), false, false, false, false, false,
-                    zuGross, zuTief);
+                    zuGross, zuTief, List.of());
         }
     }
 
@@ -532,5 +547,6 @@ public final class WissensMarkdown {
         private boolean wikilink;
         private boolean zuTief;
         private final List<Node> eigeneDefinitionen = new ArrayList<>();
+        private final List<Aussage> widersprueche = new ArrayList<>();
     }
 }

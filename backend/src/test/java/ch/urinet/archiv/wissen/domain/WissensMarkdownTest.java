@@ -5,6 +5,17 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WissensMarkdownTest {
+    @Test
+    void widerspruchsvergleichErkenntGeaenderteUndMehrfacheBloeckeAberKeinenCode() {
+        String block = "> ⚠️ Widerspruch: Alt.[^alt] Neu.[^neu]";
+        assertThat(WissensMarkdown.entfernteWidersprueche(block, block.replace("Alt.", "Anders."))).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block + "\n\n" + block, block)).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block, block.replace(" ", "  "))).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block + "\r\n", block + "\n")).isEmpty();
+        assertThat(WissensMarkdown.analysieren("```\n" + block + "\n```",
+                WissensMarkdown.MAX_EINGABE_ZEICHEN).widersprueche()).isEmpty();
+    }
+
 
     @Test
     void fussnotenUndInterneLinksWerdenGemeinsamGeparst() {

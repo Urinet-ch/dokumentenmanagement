@@ -405,6 +405,21 @@ flowchart LR
   - `vertraulichkeit_kontext` = höchste Stufe aller Dokumente, die Werkzeuge im Gespräch bis zu dieser Nachricht
     geliefert haben; Quellen müssen für den Vorschlagenden sichtbar sein.
 
+#### Umsetzung 14.3
+- Derselbe CommonMark-Baum erkennt Widerspruchsblöcke für Belegprüfung, Diff und Freigabe. Der Diff enthält
+  beide Fassungen der Blöcke und die entfernten Blöcke mit ihren Quellenschlüsseln. Auch eine Änderung am Text
+  oder den Schlüsseln gilt vorsorglich als Auflösung; identische mehrfach vorhandene Blöcke werden einzeln gezählt.
+- Bei jeder Annahme wird gegen die gesperrte aktuelle Basis geprüft: Eine Auflösung braucht einen nicht leeren
+  Grund, auch wenn die Schlüssel anderswo weiter vorkommen. Der Grund entschuldigt nur die Schlüssel der
+  aufgelösten Blöcke, nicht sonstige entfernte Aussagen. Version und Änderung speichern den Grund; das Log hält
+  das strukturierte Kennzeichen `widerspruchAufgeloest` und erzeugt daraus «Widerspruch aufgelöst».
+- `widerspruch_offen` entsteht aus dem geprüften Inhalt, nie aus KI-Feldern, und wird mit der aktuellen Seite und
+  der vollständigen Version gespeichert. Die bestehende Seitenansicht zeigt den Hinweis. Quellendatum und
+  Freigabezeit werden getrennt geliefert und dargestellt; das Alter einer Quelle ändert keine Seitenfassung.
+- Nachweis: `widerspruch.feature` (Req 7.1–7.5), `WissensMarkdownTest`, `DiffDienstTest`, vorhandene
+  Freigabe-/Quellendokument-Szenarien und `JdbcWissenIngestTest`. Die Chat-Werkzeuge bleiben Aufgabe 15.2;
+  sie übernehmen das gelieferte Kennzeichen nach dem bestehenden Vertrag.
+
 ### Chat-Werkzeuge (Ergänzung zu `ArchivWerkzeuge`, Spec 02)
 | Werkzeug | Parameter | Rückgabe |
 | --- | --- | --- |

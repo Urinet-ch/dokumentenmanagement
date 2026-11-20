@@ -3171,6 +3171,9 @@
           },
           "quellSeiteTitel" : {
             "type" : "string"
+          },
+          "dokumentDatum" : {
+            "$ref" : "#/components/schemas/LocalDate"
           }
         }
       },

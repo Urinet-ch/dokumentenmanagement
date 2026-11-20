@@ -2937,6 +2937,8 @@ components:
           type: string
         quellSeiteTitel:
           type: string
+        dokumentDatum:
+          $ref: "#/components/schemas/LocalDate"
     Wissensseite:
       type: object
       properties:
