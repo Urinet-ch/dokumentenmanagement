@@ -221,6 +221,53 @@ public class WissenIngestSchritte {
         KiWireMock.wissenFolge(gueltigeAntworten(dokumente.values().iterator().next().id()));
     }
 
+    @Angenommen("WireMock liefert eine zugeordnete und eine nicht zugeordnete Kernaussage")
+    public void antwortenMitNichtZugeordneterAussage() {
+        List<String> antworten = new ArrayList<>(gueltigeAntworten(dokumente.values().iterator().next().id()));
+        antworten.set(0, """
+                {"aussagen":[{"nr":1,"text":"Die Abgabefrist endet am 30. April.","seiten":[1],
+                "auszug":"Die Abgabefrist endet am 30. April."},
+                {"nr":2,"text":"Die Frist ist im April.","seiten":[1],
+                "auszug":"Dieser Auszug steht nicht im Dokument."}]}
+                """);
+        KiWireMock.zuruecksetzen();
+        KiWireMock.wissenFolge(antworten);
+    }
+
+    @Angenommen("WireMock liefert eine Seitenantwort mit manipulierten Freigabefeldern")
+    public void antwortMitFreigabefeldern() {
+        List<String> antworten = new ArrayList<>(gueltigeAntworten(dokumente.values().iterator().next().id()));
+        antworten.add(2, antworten.get(2).replace("\"titel\":\"Überblick\"",
+                "\"status\":\"VERALTET\",\"vertraulichkeit\":\"INTERN\","
+                        + "\"freigegeben_von\":\"angreifer\",\"freigegeben_am\":\"2026-01-01T00:00:00Z\","
+                        + "\"version\":999,\"titel\":\"Überblick\""));
+        KiWireMock.zuruecksetzen();
+        KiWireMock.wissenFolge(antworten);
+    }
+
+    @Dann("Status, Stufe und Freigabe stammen nicht aus der manipulierten KI-Antwort")
+    public void freigabefelderNichtUebernommen() throws SQLException {
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement sql = c.prepareStatement("""
+                     select status, daten->>'status', daten->>'vertraulichkeit',
+                            jsonb_exists_any(daten,
+                                array['freigegebenVon', 'freigegeben_von', 'freigegeben_am', 'version']),
+                            seite_id
+                     from m_urinet.wissens_aenderung where entwurf_id = ? and pfad = 'ueberblick'
+                     """)) {
+            sql.setObject(1, entwurfId);
+            try (ResultSet rs = sql.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).isEqualTo("OFFEN");
+                assertThat(rs.getString(2)).isEqualTo("AKTIV");
+                assertThat(rs.getString(3)).isEqualTo("NORMAL");
+                assertThat(rs.getBoolean(4)).isFalse();
+                assertThat(rs.getObject(5)).isNull();
+                assertThat(rs.next()).isFalse();
+            }
+        }
+    }
+
     @Angenommen("WireMock liefert gültige Antworten ohne Überblicksschritt")
     public void gueltigeAntwortenOhneUeberblick() {
         List<String> antworten = gueltigeAntworten(dokumente.values().iterator().next().id());
@@ -289,7 +336,8 @@ public class WissenIngestSchritte {
     @Dann("aktualisiert der Ingest die Quelle-Seite von «{word}» ohne Befund")
     public void quelleSeiteAktualisiert(String name) throws SQLException {
         String kurz = ort(name).id().toString().substring(0, 8);
-        Map<String, Object> aenderung = zeile("select aktion, seite_id, basis_version, inhalt, befunde::text as befunde, "
+        Map<String, Object> aenderung = zeile("select aktion, seite_id, basis_version, inhalt, diff::text as diff, "
+                + "befunde::text as befunde, "
                 + "entfernte_aussagen::text as entfernt from m_urinet.wissens_aenderung where entwurf_id = ? and pfad = ?", entwurfId,
                 "quellen/2026-04-fristen-" + kurz);
         assertThat(aenderung).containsEntry("aktion", "AENDERN").containsEntry("basis_version", 2);
@@ -298,6 +346,8 @@ public class WissenIngestSchritte {
                 "- Die Abgabefrist endet am 30. April. [^q-" + kurz + "-100]").doesNotContain("Frühere Fassung");
         assertThat((String) aenderung.get("entfernt")).contains("\"q-" + kurz + "-1\"")
                 .doesNotContain("q-" + kurz + "-99");
+        assertThat((String) aenderung.get("diff")).contains("Frühere Fassung der Frist",
+                "Die Abgabefrist endet am 30. April.", "\"zeilen\"", "\"quellen\"");
         assertThat(String.valueOf(aenderung.get("befunde")))
                 .doesNotContain("QUELLE_NICHT_BELEGT", "AUSSAGE_ENTFERNT", "QUELLE_UNGUELTIG");
         assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "
@@ -476,6 +526,21 @@ public class WissenIngestSchritte {
         entwurfWarten("OFFEN");
         assertThat(KiWireMock.client().find(postRequestedFor(urlPathEqualTo(KiWireMock.CHAT_PFAD))))
                 .hasSize(4);
+    }
+
+    @Dann("der Ingest-Entwurf wird mit fünf KI-Aufrufen «OFFEN»")
+    public void entwurfOffenMitFuenfAufrufen()
+            throws SQLException, InterruptedException, ExecutionException, TimeoutException {
+        entwurfWarten("OFFEN");
+        assertThat(KiWireMock.client().find(postRequestedFor(urlPathEqualTo(KiWireMock.CHAT_PFAD))))
+                .hasSize(5);
+    }
+
+    @Dann("die Entwurfsansicht kennzeichnet beide Kernaussagen entsprechend ihrer Zuordnung")
+    public void zuordnungDerKernaussagen() {
+        var ansicht = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensentwuerfe/" + entwurfId).then().statusCode(200).extract().jsonPath();
+        assertThat(ansicht.getList("kernaussagen.zugeordnet", Boolean.class)).containsExactly(true, false);
     }
 
     @Dann("der Ingest-Entwurf wird mit drei KI-Aufrufen «OFFEN»")

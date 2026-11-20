@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="053-wissen-quellenrevision" author="archiv">
+        <sql>
+            alter table wissensseite add column quellen_revision bigint not null default 0
+                constraint wissensseite_quellen_revision_ck check (quellen_revision >= 0);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

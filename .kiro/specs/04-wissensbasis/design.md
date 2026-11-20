@@ -371,7 +371,11 @@ flowchart LR
 - `FreigabeDienst.annehmen(aenderungId, ifMatch, fassung?)`:
   1. Rechte A17, ETag (428/412), Status `OFFEN`.
   2. Basisversion = aktuelle Version? Sonst `aenderung.status = VERALTET`, 412 (Requirement 6.6). «Neu erzeugen»
-     reiht einen Teilauftrag `SEITE` gegen die aktuelle Version ein.
+     reiht einen Teilauftrag `SEITE` gegen die aktuelle Version ein. Bei manuellen Entwürfen ohne Ingest-Quelle
+     verwendet er die zulässigen Quellen der aktuellen Fassung und des bisherigen Vorschlags. Vor dem KI-Aufruf und
+     vor dem Speichern werden die Quellen geprüft. Eine veränderte Basis und bei manuellen Entwürfen auch ein
+     veränderter Graph führen vorsorglich zum Abbruch. Quelle-Seiten werden nur bei erhaltener Pflichtstruktur und
+     erhaltenen Kernaussagen übernommen.
   3. `WissensPruefung` bei jedem `annehmen` erneut (Fassung aus dem Entwurf oder geänderte Fassung) gegen den
      aktuellen Stand; Befund → 422 `ENTWURF_BEFUND`. Ein inzwischen vergebener `NEU`-Pfad ergibt `PFAD_UNGUELTIG`,
      nie eine Unique-Verletzung.
@@ -1058,6 +1062,27 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   (Review PR #311).
 - Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
   Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
+
+### Umsetzung 14.4
+- Änderungen eines Dokuments nehmen vor der Dokumentzeile die mandantenweite Hüllensperre. Der Beobachter berechnet
+  die betroffenen Hüllen und Vertraulichkeiten in derselben Transaktion neu und setzt «Quelle prüfen», ohne den
+  Seiteninhalt zu ändern. Bei `PERSONAL` bleibt die Seite mit mindestens `INTERN` nur für Benutzer sichtbar, welche
+  auch das Dokument sehen dürfen.
+- Ein Seiten-ETag enthält Inhaltsversion und Quellenrevision (`"<version>-<revision>"`). Jede Quellenänderung
+  erhöht die Revision auch dann, wenn der Hinweis bereits gesetzt war. `quelle-geprueft` prüft Sichtbarkeit und A17
+  vor `If-Match`, sperrt denselben Mandanten und die Seite und schreibt Bestätigung und `UPDATE`-Log atomar; ein
+  älteres ETag kann eine spätere Quellenänderung nicht löschen. Historische Versions- und Diff-ETags bleiben wie zuvor.
+- `GET /dokumente/{id}` liefert die direkt verwendenden, nach A15 und Hülle sichtbaren Seiten als `wissensseiten`;
+  der bestehende Dokumentfilter im Index bleibt für die Oberfläche erhalten. Die spätere Löschfunktion muss das
+  Dokumentereignis vor dem Entfernen der Hülle auslösen. Lint und Werkzeug `wissen_seite_zeigen` folgen in ihren
+  eigenen Aufgaben 15.4 und 15.2.
+- Bekannte Grenzen (Review PR #337): Jede gemeldete Dokumentänderung gilt als Auslöser; `felder` aus
+  `DokumentEreignisse.geaendert` wird nicht ausgewertet. Die Fachaufrufer melden nur Metadaten, Status und `partnerId`,
+  und ein Ereignis ohne Quellenbezug kostet nur die Abfrage der verwendenden Seiten. `KontaktZusammenfuehren` meldet
+  jedes umgehängte Dokument einzeln; bei sehr vielen Quelldokumenten wiederholt sich die Graphberechnung unter der
+  Hüllensperre. Eine Sammelmeldung folgt, sobald das in der Praxis messbar wird. Die A17-Rollenprüfung von
+  `quelle-geprueft` läuft über `@ErfordertAktion` vor den Sperren; nur die Sichtbarkeit der Seite wird nach der
+  Zeilensperre geprüft.
 
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).

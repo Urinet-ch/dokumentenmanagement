@@ -9,6 +9,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Reiht Aufträge ein (Req 1.6): Der Mandant stammt aus dem Mandanten-Kontext des Workers oder aus der verifizierten
@@ -37,6 +39,12 @@ public class AuftragService {
             throw new IllegalArgumentException("Kein Handler für den Auftragstyp " + typ);
         }
         return schlange.einfuegen(mandant(), typ, nutzlast);
+    }
+
+    /** Der Handler folgt in Aufgabe 15.1; bis dahin holt kein Worker diesen Auftragstyp. */
+    public long wissensEmbeddingEinreihen(UUID seiteId, int version) {
+        return schlange.einfuegen(mandant(), new AuftragTyp("WISSEN_EMBEDDING"),
+                new Nutzlast(Map.of("seiteId", seiteId, "version", version)));
     }
 
     /** Ob für den Typ ein Handler besteht, also {@link #einreihen} ihn annimmt. */

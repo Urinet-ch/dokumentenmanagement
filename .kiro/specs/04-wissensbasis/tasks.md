@@ -72,14 +72,17 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 5.1–5.13, 11.6, 11.7, 13.1–13.8, 14.3_
   - _Abhängig von: 13.2, 13.4, 13.5_
 
-- [ ] 14.2 Entwurf, Diff und Freigabe [Backend]
+- [x] 14.2 Entwurf, Diff und Freigabe [Backend]
   - `DiffDienst` (java-diff-utils, Felddiff), `FreigabeDienst` mit `If-Match`, 412/428, `WissensPruefung` bei jedem Annehmen, Befund 422, Vertraulichkeit nicht senkbar und nur bis `INTERN` erhöhbar (Mindeststufe), kein gesammeltes Annehmen, «neu erzeugen»; Kernaussagen im Ingest-Entwurf
-  - Endpunkt-Szenario `@req-12.2`: `treuhaender` erhält am `POST /wissensentwuerfe` HTTP 403; Datenbank und Zugriffsprotokoll bleiben unverändert
+  - Endpunkt-Szenario `@req-12.2`: `treuhaender` erhält am `POST /wissensentwuerfe` HTTP 403; Datenbank und Zugriffsprotokoll bleiben unverändert (Auslegung: Zeilenzahlen von `wissens_entwurf`, `wissens_aenderung`, `wissens_log` und der `WISSEN_*`-Einträge im Zugriffsprotokoll sind vor und nach dem Aufruf gleich; der `VERWEIGERT`-Eintrag nach Req 14.4 ist ausdrücklich zulässig. Nachweis: `WissenManuellerEntwurfSchritte.treuhaenderAbgewiesen`; Nachbesserung Review PR #336)
+  - Nachweis-Vermerk zu 6.1–6.10 (Review PR #336), Kriterium → Test: 6.10 Abschlusslog `INGEST` → `JdbcWissenIngestTest.letzterIngestEntscheidSchreibtLogUndStartetWartendenAuftragAtomar`; 6.10 Abschlusslog `ANALYSE` → `JdbcWissenIngestTest.abschlussAnalyseSchreibtLogMitVorschlagendemUndAngenommenenSeiten`; 6.8 Hinweis `STUFE_STEIGT` → `WissensPruefungTest`; 6.1 Diff und Zeilenenden → `DiffDienstTest`; 6.9 Anlass `IMPORT` gehört zu Spec 04 Aufgabe 19
+  - Auslegungen (Review PR #336): Für `ueberblick` mit berechneter Stufe `INTERN` und gewünschter Stufe `NORMAL` lautet der Befund `STUFE_UEBERBLICK` statt `VERTRAULICHKEIT_ZU_TIEF` (Req 11.8 hat für die Übersicht Vorrang). «Neu erzeugen» gilt nur für die Anlässe `INGEST` und `MANUELL` (`ANALYSE` arbeitet ohne KI, `LINT` folgt mit 15.4). Die Rolle (A17) wird vor jeder Sperre geprüft; Rollen ohne A17 erhalten 403 ohne Sperre.
   - Transaktion: Seite, Version, Hülle der Version, Quelleneinträge, Links, Hüllen, Log, Zugriffsprotokoll `WISSEN_ANNEHMEN`/`WISSEN_VERWERFEN`, Auftrag `WISSEN_EMBEDDING` (nur einreihen; Handler in 15.1, bis dahin bleibt der Auftrag wartend, der Test prüft nur das Einreihen); Start des nächsten wartenden Ingest
   - manueller Entwurf `POST /wissensentwuerfe`; Felder nach 7.6 nur vom System
   - wirksame Stufe nach Annahme über `WissensGraph.wirksameStufeNachAnnahme` als `Kontext.wirksameVertraulichkeit`, Seitenstufe = Mindeststufe; zuerst `WissenHuelleDienst.sperren()`, dann Seite und Version, dann `versionFreigeben` in derselben Transaktion; Test mit zwei parallelen Freigaben (Review PR #300, S1, S2)
   - Szenario `@req-12.3` über den Entwurfszugriff: eigener Analysevorschlag ohne Fassung und Diff (Review PR #300, S4)
   - Szenario `@req-11.8` Ende zu Ende: Annehmen einer Fassung von `ueberblick`, deren wirksame Stufe über `NORMAL` liegt, ergibt 422 mit dem Befund `STUFE_UEBERBLICK` (Review PR #300, ebc9d0b6, K3); Mindeststufen zitierter Quellseiten fliessen in die wirksame Stufe ein (geklärt durch Req 11.10 / 13.5b, PR #318, Entscheid vom 18.11.2026); der Endpunkt-Test prüft 422 `STUFE_UEBERBLICK` auch mit einer Zitat-Quelle höherer Stufe
+  - Szenario `@req-15.2`: Freigabe einer Seitenänderung entfernt den Hinweis «Quelle prüfen»; Endpunkt, Rollback und das Ereignis des Quelldokuments sind geprüft (Review PR #337).
   - _Anforderungen: 6.1–6.10, 7.6, 14.1_
   - _Abhängig von: 14.1_
 
@@ -89,9 +92,16 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 7.1–7.5_
   - _Abhängig von: 14.2_
 
-- [ ] 14.4 Änderungen an Quelldokumenten [Backend]
+- [x] 14.4 Änderungen an Quelldokumenten [Backend]
   - `QuelldokumentBeobachter` auf `DokumentEreignisse.geaendert` (Metadaten-Versionen, Vertraulichkeit, Art und Status); Neuberechnung nie unter die Mindeststufe; Hinweis «Quelle prüfen» und Bestätigung (A17, Logeintrag `UPDATE`); Dokument wird `PERSONAL` → «Quelle prüfen», vom Lint ausgenommen; aktueller Dokumenttitel in Quelleneinträgen; `GET /dokumente/{id}` liefert verwendende Seiten
   - Szenario: Dokument nach A8 auf `INTERN` → `mitarbeiter` sieht die Seite ab der nächsten Anfrage nicht mehr
+  - Vermerk: Lint, Chat-Werkzeug und Löschfunktion entstehen erst in 15.4, 15.2 bzw. Spec 01, 9.9; dort sind die
+    Ausnahmen für `PERSONAL`, der Prüfhinweis und die Ereignismeldung beim Löschen nachzuweisen. Das Szenario zu
+    15.5 simuliert bis dahin nur das Dokumentereignis vor dem Entfernen, nicht die Löschfunktion.
+  - Offen aus 15.2: Der Hinweis «Quelle prüfen» entfällt auch «mit der Freigabe einer Änderung der Seite». Das
+    Zurücksetzen bei Freigabe einer neuen Seitenversion gehört zu 14.2; dort ist das Szenario `@req-15.2` nachzuweisen.
+  - Die Auslöser Status (verwerfen, wiederholen) und Art sind mit Szenarien in `quelldokumente.feature` belegt, die
+    Mindeststufe beim Absenken der Quelle mit `@req-11.3`.
   - _Anforderungen: 11.3, 15.1–15.5_
   - _Abhängig von: 13.5, 14.1 (Port `DokumentEreignisse`)_
 

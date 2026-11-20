@@ -11,6 +11,7 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenLesen;
 import ch.urinet.archiv.wissen.application.WissenLesenRepository;
+import ch.urinet.archiv.wissen.application.QuellenPruefung;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
@@ -18,6 +19,8 @@ import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -56,13 +59,16 @@ public class WissensseiteResource {
     private static final Instant CURSOR_MAX = Instant.parse("9999-12-31T23:59:59Z");
 
     private final WissenLesen lesen;
+    private final QuellenPruefung quellenPruefung;
     private final WissensseiteAbrufProtokoll abrufProtokoll;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
 
-    public WissensseiteResource(WissenLesen lesen, WissensseiteAbrufProtokoll abrufProtokoll,
+    public WissensseiteResource(WissenLesen lesen, QuellenPruefung quellenPruefung,
+                                WissensseiteAbrufProtokoll abrufProtokoll,
                                 MandantAufloesung aufloesung, SecurityIdentity identitaet) {
         this.lesen = lesen;
+        this.quellenPruefung = quellenPruefung;
         this.abrufProtokoll = abrufProtokoll;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
@@ -184,6 +190,25 @@ public class WissensseiteResource {
         return seitenAntwort(benutzer, lesen.seite(benutzer, uuid(benutzer, id)));
     }
 
+    @POST
+    @Path("/wissensseiten/{id}/quelle-geprueft")
+    @ErfordertAktion(Aktion.A17)
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
+    @Operation(summary = "Prüfung der Quellen bestätigen",
+            description = "Entfernt den Hinweis nur für den mit If-Match angegebenen aktuellen Seitenstand.")
+    @APIResponse(responseCode = "204", description = "Quellenprüfung bestätigt")
+    @APIResponse(responseCode = "403", description = "Kein Freigaberecht")
+    @APIResponse(responseCode = "404", description = "Seite nicht vorhanden")
+    @APIResponse(responseCode = "409", description = "Kein Quellenhinweis vorhanden")
+    @APIResponse(responseCode = "412", description = "Seitenstand geändert")
+    @APIResponse(responseCode = "428", description = "If-Match fehlt")
+    public Response quelleGeprueft(@PathParam("id") String id, @HeaderParam("If-Match") String ifMatch) {
+        aufloesung.pruefen();
+        Benutzer benutzer = benutzer();
+        quellenPruefung.bestaetigen(benutzer, uuid(benutzer, id), () -> WissensseitenVersionskopf.lesen(ifMatch));
+        return Response.noContent().build();
+    }
+
     @GET
     @Path("/wissensseiten/{id}/versionen")
     @ErfordertAktion(Aktion.A15)
@@ -274,7 +299,8 @@ public class WissensseiteResource {
     }
 
     private Response seitenAntwort(Benutzer benutzer, Wissensseite seite) {
-        return privateAntwort(dto(benutzer, seite)).tag(new EntityTag(Integer.toString(seite.version()))).build();
+        return privateAntwort(dto(benutzer, seite))
+                .tag(new EntityTag(seite.version() + "-" + seite.quellenRevision())).build();
     }
 
     private static Response.ResponseBuilder privateAntwort(Object entity) {

@@ -75,12 +75,13 @@ public class DokumentBestaetigen {
     private final KorrekturLernen lernen;
     private final KlassifikationVerwaltung klassifikationen;
     private final RegelPruefung regelPruefung;
+    private final DokumentEreignisse ereignisse;
 
     public DokumentBestaetigen(DokumentRepository repository, DokumentStatusPort status, FristKennzeichen frist,
                                DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
                                MandantEinstellungen einstellungen, AuftragService auftraege,
                                KorrekturLernen lernen, KlassifikationVerwaltung klassifikationen,
-                               RegelPruefung regelPruefung) {
+                               RegelPruefung regelPruefung, DokumentEreignisse ereignisse) {
         this.repository = repository;
         this.status = status;
         this.frist = frist;
@@ -92,6 +93,7 @@ public class DokumentBestaetigen {
         this.lernen = lernen;
         this.klassifikationen = klassifikationen;
         this.regelPruefung = regelPruefung;
+        this.ereignisse = ereignisse;
     }
 
     /** @return die neue Version des Dokuments (für das ETag) */
@@ -152,12 +154,14 @@ public class DokumentBestaetigen {
         regelPruefung.pruefen(art.code(), RegelMetadaten.aus(b, art.vertraulichkeit().name(), finanz,
                 regelPruefung.zusatzWerte(dokument.zusatz())), null, id);
         Optional<KiBeispielPort.Lernstand> vorher = lernen.vorher(id);
+        ereignisse.vorAenderung();
         if (!status.bestaetigen(id, erwarteteVersion, daten)) {
             // inzwischen geändert: zuerst die Version, dann der Status (wie oben)
             Stand jetzt = status.stand(id, false).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
             throw new FachFehler(jetzt.version() != erwarteteVersion ? Fehlercode.VERSION_KONFLIKT
                     : Fehlercode.STATUS_KONFLIKT);
         }
+        ereignisse.geaendert(id, Set.of("status", "metadaten"));
         if (eigeneArt && finanz && b.belegnummer() != null) {
             if (!status.belegnummerReservieren(art.code(), b.belegnummer(), id)) {
                 throw new FachFehler(Fehlercode.BELEGNUMMER_VERGEBEN);

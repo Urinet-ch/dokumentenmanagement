@@ -12,6 +12,7 @@ import ch.urinet.archiv.wissen.application.WissenIngestPort.SeitenMetadaten;
 import ch.urinet.archiv.wissen.domain.WissensGraph;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -24,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.LinkedHashMap;
+import java.util.function.Function;
 
 @ApplicationScoped
 public class WissenIngestSpeichern {
@@ -132,6 +134,44 @@ public class WissenIngestSpeichern {
         return port.hoechsteQuellenNummer(dokumentId);
     }
 
+    @Transactional
+    public boolean vorschlagFuerKiZulaessig(Wissensseite vorschlag, WissensStufe quellStufe) {
+        huellen.sperren();
+        return vorschlagFuerKiZulaessigGesperrt(vorschlag, quellStufe);
+    }
+
+    private boolean vorschlagFuerKiZulaessigGesperrt(Wissensseite vorschlag, WissensStufe quellStufe) {
+        Set<UUID> dokumente = new HashSet<>();
+        Set<UUID> quellseiten = new HashSet<>();
+        if (vorschlag.wissensquelleId() != null) {
+            dokumente.add(vorschlag.wissensquelleId());
+        }
+        for (var quelle : vorschlag.quellen()) {
+            if (quelle.schluessel() == null || quelle.schluessel().isBlank()
+                    || (quelle.dokumentId() == null) == (quelle.quellSeiteId() == null)) {
+                return false;
+            }
+            if (quelle.dokumentId() != null) {
+                dokumente.add(quelle.dokumentId());
+            } else {
+                quellseiten.add(quelle.quellSeiteId());
+            }
+        }
+        WissensGraph graph = huellen.graphLaden(dokumente);
+        if (quellseiten.stream().anyMatch(id -> !graph.kenntSeite(id))) {
+            return false;
+        }
+        quellseiten.forEach(id -> dokumente.addAll(graph.dokumente(id)));
+        Map<UUID, WissensPruefung.DokumentQuelle> quellen = port.dokumentQuellenLaden(dokumente);
+        if (!quellen.keySet().containsAll(dokumente)
+                || quellen.values().stream().anyMatch(q -> !q.archiviert() || q.personal())
+                || !port.personalDokumenteLaden(dokumente).isEmpty()) {
+            return false;
+        }
+        return graph.wirksameStufeNachAnnahme(dokumente, quellseiten, WissensStufe.NORMAL,
+                WissensStufe.NORMAL).ordinal() <= quellStufe.ordinal();
+    }
+
     /**
      * Prüft bei jedem Teilauftrag erneut, ob die Quelle noch für den Ingest freigegeben ist (Req 5.6, 5.7): archiviert,
      * bestätigt, Art WISSENSQUELLE und nicht PERSONAL.
@@ -189,6 +229,47 @@ public class WissenIngestSpeichern {
     }
 
     @Transactional
+    public void neuerzeugungSichern(Auftrag auftrag, UUID entwurfId, UUID seiteId, int basisVersion,
+                                    WissensStufe quellStufe, Fortschritt fortschritt, long tokensEin, long tokensAus,
+                                    Function<Stand, NeueAenderung> pruefen) {
+        auftraege.anspruchSichern(auftrag);
+        huellen.sperren();
+        Optional<Stand> geladen = laden(entwurfId, Set.of(seiteId));
+        if (geladen.isEmpty() || !"IN_ARBEIT".equals(geladen.get().lauf().entwurfStatus())
+                || !"NEU_ERZEUGEN".equals(geladen.get().lauf().schritt())) {
+            return;
+        }
+        Stand aktuell = geladen.get();
+        SeitenFassung fassung = aktuell.fassungen().get(seiteId);
+        int nummer = Math.toIntExact(auftrag.nutzlast().zahl("aenderungNr")
+                .orElseThrow(() -> new IllegalArgumentException("Auftragsnutzlast ohne aenderungNr")));
+        WissenIngestPort.SeitenVorschlag vorschlag = aktuell.lauf().fortschritt().vorschlaege().stream()
+                .filter(v -> nummer == v.nummer() && seiteId.equals(v.seiteId())).findFirst().orElse(null);
+        if (!freigegeben(aktuell.lauf()) || aktuell.quellStufe() != quellStufe || fassung == null
+                || fassung.metadaten().version() != basisVersion || vorschlag == null
+                || !vorschlagFuerKiZulaessigGesperrt(vorschlag.daten(), quellStufe)) {
+            port.neuerzeugungAbbrechen(entwurfId,
+                    "Die Quelle oder Seite hat sich geändert. Bitte die Änderung erneut erzeugen.");
+            return;
+        }
+        NeueAenderung aenderung = pruefen.apply(aktuell);
+        if (aenderung == null) {
+            throw new IllegalStateException("Die erneuerte Wissensänderung hat keinen gültigen Diff");
+        }
+        port.erneuerteAenderungSpeichern(aenderung, fortschritt, tokensEin, tokensAus);
+    }
+
+    @Transactional
+    public void neuerzeugungFehler(Auftrag auftrag, UUID entwurfId, String hinweis) {
+        auftraege.anspruchSichern(auftrag);
+        Optional<Lauf> lauf = port.laufLaden(entwurfId);
+        if (lauf.isPresent() && "IN_ARBEIT".equals(lauf.get().entwurfStatus())
+                && "NEU_ERZEUGEN".equals(lauf.get().schritt())) {
+            port.neuerzeugungAbbrechen(entwurfId, hinweis);
+        }
+    }
+
+    @Transactional
     public void fehlerSichern(Auftrag auftrag, UUID entwurfId, String erwartet, Fortschritt fortschritt,
                               String hinweis) {
         auftraege.anspruchSichern(auftrag);
@@ -209,6 +290,11 @@ public class WissenIngestSpeichern {
     public void nachFehlversuch(UUID entwurfId) {
         Optional<Lauf> lauf = port.laufLaden(entwurfId);
         if (lauf.isEmpty() || !"IN_ARBEIT".equals(lauf.get().entwurfStatus())) {
+            return;
+        }
+        if ("NEU_ERZEUGEN".equals(lauf.get().schritt())) {
+            port.neuerzeugungAbbrechen(entwurfId,
+                    "Die Änderung konnte nach drei Versuchen nicht neu erzeugt werden. Bitte erneut versuchen.");
             return;
         }
         port.entwurfSchliessen(entwurfId, lauf.get().schritt(), "FEHLER", lauf.get().fortschritt(),

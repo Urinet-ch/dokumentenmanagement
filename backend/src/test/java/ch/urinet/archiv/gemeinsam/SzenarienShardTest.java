@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam;
 import ch.urinet.archiv.SzenarienRestTest;
 import ch.urinet.archiv.SzenarienShards;
 import ch.urinet.archiv.SzenarienTest;
+import ch.urinet.archiv.GoogleAnmeldungSzenarienTest;
 import ch.urinet.archiv.integration.WebseitenDateiMessfallTest;
 import io.cucumber.gherkin.GherkinParser;
 import io.cucumber.messages.types.Envelope;
@@ -55,6 +56,8 @@ class SzenarienShardTest {
         assertThat(SzenarienTest.class.getAnnotation(CucumberOptions.class).tags()).isEqualTo(SzenarienShards.SHARD_1);
         assertThat(SzenarienRestTest.class.getAnnotation(CucumberOptions.class).tags())
                 .isEqualTo(SzenarienShards.SHARD_2);
+        assertThat(GoogleAnmeldungSzenarienTest.class.getAnnotation(CucumberOptions.class).tags())
+                .isEqualTo("@google-oidc");
         assertThat(WebseitenDateiMessfallTest.class.getAnnotation(CucumberOptions.class).tags())
                 .isEqualTo(SzenarienShards.SHARD_3);
     }
@@ -70,7 +73,8 @@ class SzenarienShardTest {
                 List.of("@spec-02", "@sicherung"),          // nie im Backend
                 List.of("@spec-03", "@mandant-bericht"),   // nie im Backend
                 List.of("@spec-04", "@wissen-sichtbarkeit"), // eigene Klasse
-                List.of("@spec-03", "@webseiten-datei-messfall")); // eigener Runner
+                List.of("@spec-03", "@webseiten-datei-messfall"), // eigener Runner
+                List.of("@spec-01", "@google-oidc")); // eigener Runner
 
         assertThat(fehler(szenarien)).isEmpty();
         assertThat(szenarien.stream().filter(TagExpressionParser.parse(SzenarienShards.SHARD_2)::evaluate)).hasSize(3);

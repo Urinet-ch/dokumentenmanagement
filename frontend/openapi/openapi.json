@@ -166,6 +166,41 @@
           }
         }
       },
+      "Bearbeitung" : {
+        "type" : "object",
+        "properties" : {
+          "titel" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "tags" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "veraltetAb" : {
+            "$ref" : "#/components/schemas/LocalDate"
+          },
+          "quellen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Quelleneintrag"
+            }
+          },
+          "inhalt" : {
+            "type" : "string"
+          },
+          "entfernteAussagen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EntfernteAussage"
+            }
+          }
+        }
+      },
       "Befund" : {
         "type" : "object",
         "properties" : {
@@ -663,6 +698,13 @@
               "type" : "string"
             },
             "description" : "Codes der Klassifikationen, an denen die nächste Speicherung nach der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern"
+          },
+          "wissensseiten" : {
+            "type" : [ "array", "null" ],
+            "items" : {
+              "$ref" : "#/components/schemas/DokumentWissensseitenVerweis"
+            },
+            "description" : "Sichtbare Wissensseiten mit diesem Dokument als Quelle; nur beim Einzelabruf"
           }
         }
       },
@@ -895,6 +937,20 @@
           }
         }
       },
+      "DokumentWissensseitenVerweis" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "pfad" : {
+            "type" : "string"
+          },
+          "titel" : {
+            "type" : "string"
+          }
+        }
+      },
       "Dokumentart" : {
         "type" : "object",
         "required" : [ "code", "name", "gruppen", "pflichtfelder", "zusatzSchema", "vertraulichkeit", "gesetzlichePflicht", "aktiv", "selbstAusgestellt", "belegnummerMuster", "kiVorschlag", "kiFelder", "reihenfolge" ],
@@ -1096,6 +1152,53 @@
           }
         }
       },
+      "Eingabe" : {
+        "type" : "object",
+        "properties" : {
+          "seiteId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "pfad" : {
+            "type" : "string"
+          },
+          "typ" : {
+            "type" : "string"
+          },
+          "titel" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "tags" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "veraltetAb" : {
+            "$ref" : "#/components/schemas/LocalDate"
+          },
+          "quellen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Quelleneintrag"
+            }
+          },
+          "inhalt" : {
+            "type" : "string"
+          },
+          "begruendung" : {
+            "type" : "string"
+          },
+          "entfernteAussagen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EntfernteAussage"
+            }
+          }
+        }
+      },
       "EingangskorbSeite" : {
         "type" : "object",
         "required" : [ "eintraege", "gesamt", "seite", "groesse" ],
@@ -1118,6 +1221,17 @@
           "groesse" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "EntfernteAussage" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "begruendung" : {
+            "type" : "string"
           }
         }
       },
@@ -2389,6 +2503,31 @@
           }
         }
       },
+      "Quelleneintrag" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "dokumentId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "seiteVon" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "seiteBis" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "auszug" : {
+            "type" : "string"
+          },
+          "quellSeiteId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
       "Regel" : {
         "type" : "object",
         "properties" : {
@@ -2779,6 +2918,20 @@
           }
         }
       },
+      "WissenAnnehmen" : {
+        "type" : "object",
+        "properties" : {
+          "fassung" : {
+            "$ref" : "#/components/schemas/Bearbeitung"
+          },
+          "vertraulichkeit" : {
+            "type" : "string"
+          },
+          "grund" : {
+            "type" : "string"
+          }
+        }
+      },
       "WissenIngestAuftrag" : {
         "description" : "Eingereihter Ingest-Entwurf.",
         "type" : "object",
@@ -2812,6 +2965,14 @@
             "type" : [ "integer", "null" ],
             "format" : "int32",
             "minimum" : 1
+          }
+        }
+      },
+      "WissenVerwerfen" : {
+        "type" : "object",
+        "properties" : {
+          "grund" : {
+            "type" : "string"
           }
         }
       },
@@ -6729,6 +6890,307 @@
         } ]
       }
     },
+    "/api/v1/wissensentwuerfe" : {
+      "get" : {
+        "summary" : "Wissensentwürfe auflisten",
+        "description" : "A17 sieht alle Entwürfe; A18 nur den Status eigener Analysevorschläge.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Entwürfe",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf keine Entwürfe lesen"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "Manuellen Wissensentwurf anlegen",
+        "tags" : [ "Wissensbasis" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Eingabe"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Entwurf angelegt und geprüft"
+          },
+          "400" : {
+            "description" : "Anfrage ungültig"
+          },
+          "403" : {
+            "description" : "Rolle darf keine Entwürfe anlegen"
+          },
+          "404" : {
+            "description" : "Seite nicht vorhanden oder nicht sichtbar"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/annehmen" : {
+      "post" : {
+        "summary" : "Eine Wissensänderung annehmen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "entwurfId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "nr",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenAnnehmen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Änderung angenommen"
+          },
+          "403" : {
+            "description" : "Rolle darf Änderungen nicht annehmen"
+          },
+          "404" : {
+            "description" : "Änderung nicht gefunden oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Änderung ist nicht offen"
+          },
+          "412" : {
+            "description" : "Version veraltet"
+          },
+          "422" : {
+            "description" : "Fassung hat Befunde oder die Vertraulichkeit ist ungültig"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/neu-erzeugen" : {
+      "post" : {
+        "summary" : "Veraltete Wissensänderung neu erzeugen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "entwurfId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "nr",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "202" : {
+            "description" : "Neuerzeugung eingereiht"
+          },
+          "403" : {
+            "description" : "Rolle darf Änderungen nicht neu erzeugen"
+          },
+          "404" : {
+            "description" : "Änderung nicht gefunden oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Änderung kann nicht neu erzeugt werden"
+          },
+          "412" : {
+            "description" : "Version veraltet"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/verwerfen" : {
+      "post" : {
+        "summary" : "Wissensänderung verwerfen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "entwurfId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "nr",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenVerwerfen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Änderung verworfen"
+          },
+          "403" : {
+            "description" : "Rolle darf Änderungen nicht verwerfen"
+          },
+          "404" : {
+            "description" : "Änderung nicht gefunden oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Änderung ist nicht offen"
+          },
+          "412" : {
+            "description" : "Version veraltet"
+          },
+          "422" : {
+            "description" : "Grund fehlt"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{id}" : {
+      "get" : {
+        "summary" : "Wissensentwurf abrufen",
+        "description" : "A17 sieht Fassungen und Diffs; A18 nur Status, Entscheide und Gründe eigener Analysen.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Entwurf",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf den Entwurf nicht lesen"
+          },
+          "404" : {
+            "description" : "Entwurf nicht gefunden"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/wissensseiten" : {
       "get" : {
         "summary" : "Wissensseiten-Index",
@@ -6927,6 +7389,53 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensseiten/{id}/quelle-geprueft" : {
+      "post" : {
+        "summary" : "Prüfung der Quellen bestätigen",
+        "description" : "Entfernt den Hinweis nur für den mit If-Match angegebenen aktuellen Seitenstand.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Quellenprüfung bestätigt"
+          },
+          "403" : {
+            "description" : "Kein Freigaberecht"
+          },
+          "404" : {
+            "description" : "Seite nicht vorhanden"
+          },
+          "409" : {
+            "description" : "Kein Quellenhinweis vorhanden"
+          },
+          "412" : {
+            "description" : "Seitenstand geändert"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       }
     },
