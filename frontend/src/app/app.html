@@ -74,8 +74,12 @@
             }
           }
           @if (wissensentwurfZaehler.fehler()) {
-            <p role="alert">{{ texte.wissen.entwuerfe.zaehlerFehler }}</p>
-            <button type="button" class="knopf breit" (click)="wissensentwurfZaehler.auffrischen()">{{ texte.wissen.erneut }}</button>
+            <div class="nav-fehler">
+              <p role="alert">{{ texte.wissen.entwuerfe.zaehlerFehler }}</p>
+              <button type="button" class="knopf breit" (click)="wissensentwurfZaehler.auffrischen()">
+                <app-symbol name="wiederholen" />{{ texte.wissen.erneut }}
+              </button>
+            </div>
           }
         </nav>
       </div>
