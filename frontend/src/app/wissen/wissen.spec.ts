@@ -135,13 +135,17 @@ describe('Wissensoberfläche', () => {
         + '<p>Belegt <a href="/wissen/ueberblick">Überblick</a>'
         + '<sup class="footnote-ref"><a href="#fn-q1" data-footnote-ref>1</a></sup></p>'
         + '<section data-footnotes><ol><li><p>q1 <a href="#fnref-q1">↩</a></p></li></ol></section>',
-      quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3, dokumentTitel: 'Quelle' }], quellePruefen: true,
+      quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3, dokumentTitel: 'Quelle', dokumentDatum: '2000-01-01' }],
+      quellePruefen: true, widerspruchOffen: true, freigegebenAm: '2026-01-02T10:00:00Z',
     });
     http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
     http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     expect(element.textContent).toContain(TEXTE.wissen.quellePruefen);
+    expect(element.textContent).toContain(TEXTE.wissen.widerspruch);
+    expect(element.textContent).toContain(`${TEXTE.wissen.quellendatum}: 01.01.2000`);
+    expect(element.textContent).toContain('02.01.2026');
     expect(element.querySelector('article')?.textContent).toContain('Belegt');
     expect(element.querySelector('article h2')?.textContent).toBe('Abschnitt');
     expect(element.querySelector('article ul > li')?.textContent).toBe('Eintrag');

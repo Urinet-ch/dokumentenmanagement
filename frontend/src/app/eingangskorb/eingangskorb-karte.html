@@ -3,545 +3,590 @@
 @let k = klassifikationenStatus();
 <article
   class="karte eintrag"
+  [class.fehlerhaft]="!imKorb()"
   [attr.aria-labelledby]="'titel-' + d.id"
   data-test="eintrag"
   [attr.data-status]="d.status"
 >
+  @if (vorschauUrl(); as url) {
+    <img class="vorschau" [src]="url" [alt]="texte.vorschau(titel())" data-test="vorschau" />
+  } @else {
+    <div class="vorschau leer" aria-hidden="true">{{ texte.ohneVorschau }}</div>
+  }
   <div class="kopf">
-    @if (vorschauUrl(); as url) {
-      <img class="vorschau" [src]="url" [alt]="texte.vorschau(titel())" data-test="vorschau" />
-    } @else {
-      <div class="vorschau leer" aria-hidden="true">{{ texte.ohneVorschau }}</div>
-    }
-    <div class="angaben">
-      <h2 [id]="'titel-' + d.id" class="titel">
-        <app-titel-anzeige [anzeige]="anzeige()" />
-        @if (!d.titel && e.titel && bittePruefen('titel')) {
-          <span class="pruefen">{{ texte.bittePruefen }}</span>
+    <h2 [id]="'titel-' + d.id" class="titel">
+      <app-titel-anzeige [anzeige]="anzeige()" />
+      @if (!d.titel && e.titel && bittePruefen('titel')) {
+        <span class="pruefen">{{ texte.bittePruefen }}</span>
+      }
+    </h2>
+    <p class="meta">
+      <span class="pille" [class.akzent]="imKorb()" [class.gefahr]="!imKorb()">
+        @if (!imKorb()) {
+          <app-symbol name="warnung" />
         }
-      </h2>
-      <p class="status">
-        <span [class.fehler-status]="!imKorb()">{{ texte.status[d.status] ?? d.status }}</span> ·
-        {{ eingang() }}
-      </p>
-      @if (angaben().length > 0) {
-        <dl>
-          @for (zeile of angaben(); track zeile.feld) {
-            <div class="zeile" [attr.data-feld]="zeile.feld">
-              <dt>{{ feldText(zeile.feld) }}</dt>
-              <dd>
-                {{ zeile.wert }}
-                @if (bittePruefen(zeile.feld)) {
-                  <span class="pruefen" data-test="bitte-pruefen">{{ texte.bittePruefen }}</span>
-                }
-              </dd>
-            </div>
-          }
-        </dl>
-      }
-      @if (erkannterPartner(); as name) {
-        <p class="hinweis" data-test="partner-vorschlag">{{ texte.partnerVorschlag(name) }}</p>
-      }
-    </div>
+        {{ texte.status[d.status] ?? d.status }}
+      </span>
+      <span class="pille"><app-symbol name="uhr" />{{ eingang() }}</span>
+    </p>
   </div>
 
-  @if (d.fehler && !imKorb()) {
-    <p class="warnung" data-test="fehlertext">{{ d.fehler }}</p>
-  }
-  @if (entwurfWiederhergestellt()) {
-    <div class="hinweis" role="status" data-test="entwurf-wiederhergestellt">
-      <span>{{ texte.entwurfWiederhergestellt }}</span>
-      <button mat-button type="button" data-test="entwurf-verwerfen" (click)="entwurfVerwerfen()">
-        {{ texte.entwurfVerwerfen }}
-      </button>
-    </div>
-  }
-  @if (d.pdfaFehlt) {
-    <p class="warnung" data-test="hinweis-pdfa">{{ texte.hinweisPdfa }}</p>
-  }
-  @if (d.fristAbgelaufen) {
-    <p class="warnung" data-test="hinweis-frist">{{ texte.hinweisFrist }}</p>
-  }
-  @if (darfBestaetigen() && zusatzFehlt().length > 0) {
-    <p class="warnung" data-test="hinweis-zusatz">
-      {{ texte.hinweisZusatz(zusatzNamen()) }}
-      @if (artUebernehmen(); as uebernehmen) {
-        {{ texte.zusatzErgaenzenArt(art()?.name ?? uebernehmen.art) }}
-      } @else if (artInaktiv()) {
-        <span data-test="art-inaktiv">{{ texte.zusatzArtInaktiv(art()!.name) }}</span>
-      }
-      @if (darfAendern()) {
-        @if (zusatzFelder().length > 0) {
-          <button
-            mat-button
-            type="button"
-            data-test="zusatz-ergaenzen"
-            (click)="oeffnen('formular')"
+  <div class="rumpf">
+    @if (angaben().length > 0) {
+      <dl class="vorschlag">
+        @for (zeile of angaben(); track zeile.feld) {
+          <div
+            class="zeile"
+            [class.unsicher]="bittePruefen(zeile.feld)"
+            [attr.data-feld]="zeile.feld"
           >
-            {{ texte.zusatzFormularOeffnen }}
-          </button>
-        } @else {
-          <a
-            [routerLink]="['/dokument', d.id]"
-            [queryParams]="artUebernehmen()"
-            data-test="zusatz-ergaenzen"
-            >{{ texte.zusatzErgaenzen }}</a
-          >
+            <dt>{{ feldText(zeile.feld) }}</dt>
+            <dd>
+              {{ zeile.wert }}
+              @if (bittePruefen(zeile.feld)) {
+                <span class="pruefen" data-test="bitte-pruefen">{{ texte.bittePruefen }}</span>
+              }
+            </dd>
+          </div>
         }
-      }
-    </p>
-  }
-  @for (warnung of belegnummerWarnungen(); track $index) {
-    <p class="warnung" data-test="warnung-belegnummer">
-      {{ texte.warnungBelegnummer }}
-      @if (warnung.vorhandenId) {
-        <a [routerLink]="['/dokument', warnung.vorhandenId]">{{ texte.zumVorhandenen }}</a>
-      }
-    </p>
-  }
-  @for (warnung of regelWarnungen(); track $index) {
-    <p class="warnung" data-test="regelwarnung">{{ warnung.meldung || warnung.code }}</p>
-  }
+      </dl>
+    }
+    @if (erkannterPartner(); as name) {
+      <p class="hinweis" data-test="partner-vorschlag">{{ texte.partnerVorschlag(name) }}</p>
+    }
 
-  @if (fehler()) {
-    <div class="fehler" role="alert" tabindex="-1" data-test="fehler">
-      <p>{{ fehler() }}</p>
-      @if (konfliktNeuLaden()) {
-        <button
-          mat-button
-          type="button"
-          data-test="konflikt-neu-laden"
-          (click)="neuLadenNachKonflikt()"
-        >
-          {{ texte.neuLaden }}
+    @if (d.fehler && !imKorb()) {
+      <p class="box gefahr" data-test="fehlertext">
+        <app-symbol name="warnung" /><span>{{ d.fehler }}</span>
+      </p>
+    }
+    @if (entwurfWiederhergestellt()) {
+      <div class="box info" role="status" data-test="entwurf-wiederhergestellt">
+        <span>{{ texte.entwurfWiederhergestellt }}</span>
+        <button mat-button type="button" data-test="entwurf-verwerfen" (click)="entwurfVerwerfen()">
+          {{ texte.entwurfVerwerfen }}
         </button>
-      }
-    </div>
-  }
-
-  @switch (modus()) {
-    @case ('rueckfragePdfa') {
-      <div
-        class="rueckfrage"
-        role="group"
-        [attr.aria-label]="texte.rueckfragePdfa"
-        data-test="rueckfrage"
-      >
-        <p>{{ texte.rueckfragePdfa }}</p>
-        <div class="knoepfe">
-          <button
-            mat-flat-button
-            type="button"
-            data-fokus="rueckfragePdfa"
-            [disabled]="laeuft()"
-            (click)="rueckfrageJa()"
-          >
-            {{ texte.rueckfragePdfaJa }}
-          </button>
-          <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
-            {{ texte.abbrechen }}
-          </button>
-        </div>
       </div>
     }
-    @case ('rueckfrageFrist') {
-      <div
-        class="rueckfrage"
-        role="group"
-        [attr.aria-label]="texte.rueckfrageFrist"
-        data-test="rueckfrage"
-      >
-        <p>{{ texte.rueckfrageFrist }}</p>
-        <div class="knoepfe">
-          <button
-            mat-flat-button
-            type="button"
-            data-fokus="rueckfrageFrist"
-            [disabled]="laeuft()"
-            (click)="rueckfrageJa()"
-          >
-            {{ texte.rueckfrageFristJa }}
-          </button>
-          <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
-            {{ texte.abbrechen }}
-          </button>
-        </div>
-      </div>
+    @if (d.pdfaFehlt) {
+      <p class="box warnung" data-test="hinweis-pdfa">
+        <app-symbol name="warnung" /><span>{{ texte.hinweisPdfa }}</span>
+      </p>
     }
-    @case ('verwerfen') {
-      <form
-        class="verwerfen"
-        (submit)="$event.preventDefault(); verwerfen()"
-        data-test="verwerfen-formular"
-      >
-        <p [id]="'verwerfen-' + d.id">{{ texte.rueckfrageVerwerfen }}</p>
-        <label [for]="d.id + '-grund'">{{ texte.grund }}</label>
-        <textarea
-          [id]="d.id + '-grund'"
-          data-fokus="verwerfen"
-          rows="3"
-          maxlength="1000"
-          aria-required="true"
-          [attr.aria-invalid]="ungueltig('grund') || null"
-          [attr.aria-describedby]="'verwerfen-' + d.id + ' ' + d.id + '-grund-hinweis'"
-          [value]="grund()"
-          (input)="grund.set(wert($event))"
-        ></textarea>
-        <p class="hinweis" [id]="d.id + '-grund-hinweis'">{{ texte.grundHinweis }}</p>
-        <div class="knoepfe">
-          <button mat-flat-button class="gefahr" type="submit" [disabled]="laeuft()">
-            {{ texte.verwerfenJa }}
-          </button>
-          <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
-            {{ texte.abbrechen }}
-          </button>
-        </div>
-      </form>
+    @if (d.fristAbgelaufen) {
+      <p class="box warnung" data-test="hinweis-frist">
+        <app-symbol name="uhr" /><span>{{ texte.hinweisFrist }}</span>
+      </p>
     }
-    @case ('formular') {
-      <form
-        class="formular"
-        [attr.aria-label]="texte.angaben(titel())"
-        (submit)="$event.preventDefault(); bestaetigen()"
-        data-test="formular"
-      >
-        <div class="feld">
-          <label [for]="d.id + '-art'"
-            >{{ texte.feld['art'] }}<span aria-hidden="true"> *</span></label
-          >
-          <select
-            [id]="d.id + '-art'"
-            data-fokus="formular"
-            aria-required="true"
-            [attr.aria-invalid]="ungueltig('art') || null"
-            (change)="setze('art', wert($event))"
-          >
-            <option value="" [selected]="!e.art">{{ texte.artWaehlen }}</option>
-            @for (art of artenWahl(); track art.code) {
-              <option [value]="art.code" [selected]="art.code === e.art">{{ art.name }}</option>
-            }
-          </select>
-        </div>
-        <div class="feld">
-          <label [for]="d.id + '-titel'"
-            >{{ texte.feld['titel'] }}
-            @if (pflicht('titel')) {
-              <span aria-hidden="true"> *</span>
-            }
-          </label>
-          <input
-            [id]="d.id + '-titel'"
-            type="text"
-            [attr.aria-required]="pflicht('titel') || null"
-            [attr.aria-invalid]="ungueltig('titel') || null"
-            [value]="e.titel"
-            (input)="setze('titel', wert($event))"
-          />
-        </div>
-        <div class="feld">
-          <label [for]="d.id + '-datum'"
-            >{{ texte.feld['datum'] }}
-            @if (pflicht('datum')) {
-              <span aria-hidden="true"> *</span>
-            }
-          </label>
-          <input
-            [id]="d.id + '-datum'"
-            type="date"
-            [attr.aria-required]="pflicht('datum') || null"
-            [attr.aria-invalid]="ungueltig('datum') || null"
-            [value]="e.datum"
-            (input)="setze('datum', wert($event))"
-          />
-        </div>
-        <div class="feld">
-          @if (e.partnerId) {
-            <span class="label">{{ texte.feld['partner'] }}</span>
-            <p class="gewaehlt">
-              <span>{{ e.partnerName || e.partnerId }}</span>
+    @if (darfBestaetigen() && zusatzFehlt().length > 0) {
+      <p class="box warnung" data-test="hinweis-zusatz">
+        <app-symbol name="warnung" />
+        <span>
+          {{ texte.hinweisZusatz(zusatzNamen()) }}
+          @if (artUebernehmen(); as uebernehmen) {
+            {{ texte.zusatzErgaenzenArt(art()?.name ?? uebernehmen.art) }}
+          } @else if (artInaktiv()) {
+            <span data-test="art-inaktiv">{{ texte.zusatzArtInaktiv(art()!.name) }}</span>
+          }
+          @if (darfAendern()) {
+            @if (zusatzFelder().length > 0) {
               <button
                 mat-button
                 type="button"
-                data-test="partner-gewaehlt"
-                [attr.aria-label]="texte.partnerEntfernen + ': ' + (e.partnerName || e.partnerId)"
-                (click)="partnerEntfernen()"
+                data-test="zusatz-ergaenzen"
+                (click)="oeffnen('formular')"
               >
-                {{ texte.partnerEntfernen }}
+                {{ texte.zusatzFormularOeffnen }}
               </button>
-            </p>
-          } @else {
-            <label [for]="d.id + '-partner'"
-              >{{ texte.partnerSuchen }}
-              @if (pflicht('partner')) {
-                <span aria-hidden="true"> *</span>
-              }
-            </label>
-            <input
-              [id]="d.id + '-partner'"
-              type="search"
-              autocomplete="off"
-              data-test="partner-suche"
-              [attr.aria-required]="pflicht('partner') || null"
-              [attr.aria-invalid]="ungueltig('partner') || null"
-              [attr.aria-describedby]="d.id + '-partner-hinweis'"
-              (input)="partnerSuchen(wert($event))"
-            />
-            <p class="hinweis" [id]="d.id + '-partner-hinweis'">
-              @if (erkannterPartner(); as name) {
-                {{ texte.partnerVorschlag(name) }}.
-              }
-              {{ texte.partnerSuchenHinweis }}
-            </p>
-            @if (treffer(); as liste) {
-              <div aria-live="polite">
-                @if (liste.length === 0) {
-                  <p class="hinweis">{{ texte.partnerKeine }}</p>
-                } @else {
-                  <ul class="treffer" data-test="partner-treffer">
-                    @for (kontakt of liste; track kontakt.id) {
-                      <li>
-                        <button mat-stroked-button type="button" (click)="partnerWaehlen(kontakt)">
-                          {{ kontaktName(kontakt) }}
-                        </button>
-                      </li>
-                    }
-                  </ul>
-                }
-              </div>
+            } @else {
+              <a
+                [routerLink]="['/dokument', d.id]"
+                [queryParams]="artUebernehmen()"
+                data-test="zusatz-ergaenzen"
+                >{{ texte.zusatzErgaenzen }}</a
+              >
             }
           }
-        </div>
-        @if (mitFinanz()) {
-          <div class="feld">
-            <label [for]="d.id + '-richtung'"
-              >{{ texte.feld['richtung'] }}
-              @if (pflicht('richtung')) {
-                <span aria-hidden="true"> *</span>
-              }
-            </label>
-            <select
-              [id]="d.id + '-richtung'"
-              [attr.aria-required]="pflicht('richtung') || null"
-              [attr.aria-invalid]="ungueltig('richtung') || null"
-              (change)="setze('richtung', wert($event))"
+        </span>
+      </p>
+    }
+    @for (warnung of belegnummerWarnungen(); track $index) {
+      <p class="box warnung" data-test="warnung-belegnummer">
+        <app-symbol name="warnung" />
+        <span>
+          {{ texte.warnungBelegnummer }}
+          @if (warnung.vorhandenId) {
+            <a [routerLink]="['/dokument', warnung.vorhandenId]">{{ texte.zumVorhandenen }}</a>
+          }
+        </span>
+      </p>
+    }
+    @for (warnung of regelWarnungen(); track $index) {
+      <p class="box warnung" data-test="regelwarnung">
+        <app-symbol name="warnung" /><span>{{ warnung.meldung || warnung.code }}</span>
+      </p>
+    }
+
+    @if (fehler()) {
+      <div class="box gefahr" role="alert" tabindex="-1" data-test="fehler">
+        <app-symbol name="warnung" />
+        <p>{{ fehler() }}</p>
+        @if (konfliktNeuLaden()) {
+          <button
+            mat-button
+            type="button"
+            data-test="konflikt-neu-laden"
+            (click)="neuLadenNachKonflikt()"
+          >
+            {{ texte.neuLaden }}
+          </button>
+        }
+      </div>
+    }
+
+    @switch (modus()) {
+      @case ('rueckfragePdfa') {
+        <div
+          class="rueckfrage"
+          role="group"
+          [attr.aria-label]="texte.rueckfragePdfa"
+          data-test="rueckfrage"
+        >
+          <p>{{ texte.rueckfragePdfa }}</p>
+          <div class="knoepfe">
+            <button
+              mat-flat-button
+              type="button"
+              data-fokus="rueckfragePdfa"
+              [disabled]="laeuft()"
+              (click)="rueckfrageJa()"
             >
-              <option value="" [selected]="!e.richtung"></option>
-              @for (r of richtungen; track r) {
-                <option [value]="r" [selected]="r === e.richtung">{{ texte.richtung[r] }}</option>
+              {{ texte.rueckfragePdfaJa }}
+            </button>
+            <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
+              {{ texte.abbrechen }}
+            </button>
+          </div>
+        </div>
+      }
+      @case ('rueckfrageFrist') {
+        <div
+          class="rueckfrage"
+          role="group"
+          [attr.aria-label]="texte.rueckfrageFrist"
+          data-test="rueckfrage"
+        >
+          <p>{{ texte.rueckfrageFrist }}</p>
+          <div class="knoepfe">
+            <button
+              mat-flat-button
+              type="button"
+              data-fokus="rueckfrageFrist"
+              [disabled]="laeuft()"
+              (click)="rueckfrageJa()"
+            >
+              {{ texte.rueckfrageFristJa }}
+            </button>
+            <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
+              {{ texte.abbrechen }}
+            </button>
+          </div>
+        </div>
+      }
+      @case ('verwerfen') {
+        <form
+          class="verwerfen"
+          (submit)="$event.preventDefault(); verwerfen()"
+          data-test="verwerfen-formular"
+        >
+          <p [id]="'verwerfen-' + d.id">{{ texte.rueckfrageVerwerfen }}</p>
+          <label [for]="d.id + '-grund'">{{ texte.grund }}</label>
+          <textarea
+            [id]="d.id + '-grund'"
+            data-fokus="verwerfen"
+            rows="3"
+            maxlength="1000"
+            aria-required="true"
+            [attr.aria-invalid]="ungueltig('grund') || null"
+            [attr.aria-describedby]="'verwerfen-' + d.id + ' ' + d.id + '-grund-hinweis'"
+            [value]="grund()"
+            (input)="grund.set(wert($event))"
+          ></textarea>
+          <p class="hinweis" [id]="d.id + '-grund-hinweis'">{{ texte.grundHinweis }}</p>
+          <div class="knoepfe">
+            <button mat-flat-button class="gefahr" type="submit" [disabled]="laeuft()">
+              {{ texte.verwerfenJa }}
+            </button>
+            <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
+              {{ texte.abbrechen }}
+            </button>
+          </div>
+        </form>
+      }
+      @case ('formular') {
+        <form
+          class="formular"
+          [attr.aria-label]="texte.angaben(titel())"
+          (submit)="$event.preventDefault(); bestaetigen()"
+          data-test="formular"
+        >
+          <div class="feld">
+            <label [for]="d.id + '-art'"
+              >{{ texte.feld['art'] }}<span aria-hidden="true"> *</span></label
+            >
+            <select
+              [id]="d.id + '-art'"
+              data-fokus="formular"
+              aria-required="true"
+              [attr.aria-invalid]="ungueltig('art') || null"
+              (change)="setze('art', wert($event))"
+            >
+              <option value="" [selected]="!e.art">{{ texte.artWaehlen }}</option>
+              @for (art of artenWahl(); track art.code) {
+                <option [value]="art.code" [selected]="art.code === e.art">{{ art.name }}</option>
               }
             </select>
           </div>
-        }
-        @for (f of weitereFelder(); track f.feld) {
           <div class="feld">
-            <label [for]="d.id + '-' + f.feld"
-              >{{ feldText(f.feld) }}
-              @if (pflicht(f.feld)) {
+            <label [for]="d.id + '-titel'"
+              >{{ texte.feld['titel'] }}
+              @if (pflicht('titel')) {
                 <span aria-hidden="true"> *</span>
               }
             </label>
             <input
-              [id]="d.id + '-' + f.feld"
-              [type]="f.typ"
-              [attr.inputmode]="f.modus ?? null"
-              [attr.placeholder]="f.feld === 'betrag' ? texte.betragHinweis : null"
-              [attr.aria-required]="pflicht(f.feld) || null"
-              [attr.aria-invalid]="ungueltig(f.feld) || null"
-              [value]="e[f.feld]"
-              (input)="setze(f.feld, wert($event))"
+              [id]="d.id + '-titel'"
+              type="text"
+              [attr.aria-required]="pflicht('titel') || null"
+              [attr.aria-invalid]="ungueltig('titel') || null"
+              [value]="e.titel"
+              (input)="setze('titel', wert($event))"
             />
-            @if (bittePruefen(f.feld)) {
-              <span class="pruefen">{{ texte.bittePruefen }}</span>
-            }
           </div>
-        }
-        @if (zusatzFelder().length > 0) {
-          <fieldset class="zusatzfelder" data-test="zusatzfelder">
-            <legend>{{ texte.zusatzTitel }}</legend>
-            @for (f of zusatzFelder(); track f.name) {
-              @if (istListe(f)) {
-                <app-listenfeld
-                  [feld]="f"
-                  [kennung]="d.id + '-zusatz-' + f.name"
-                  [beschriftung]="zusatzBeschriftung(f)"
-                  [wert]="zusatzWerte()[f.name] ?? ''"
-                  [ungueltig]="
-                    ungueltig('zusatz.' + f.name) || zusatzUngueltig().includes('zusatz.' + f.name)
-                  "
-                  (geaendert)="setzeZusatz(f.name, $event)"
-                />
-              } @else {
-                <div class="feld">
-                  <label [for]="d.id + '-zusatz-' + f.name"
-                    >{{ zusatzBeschriftung(f) }}
-                    @if (f.pflicht) {
-                      <span aria-hidden="true"> *</span>
-                    }
-                  </label>
-                  @if (f.name === 'zugriff' || f.typ === 'auswahl') {
-                    <select
-                      [id]="d.id + '-zusatz-' + f.name"
-                      [attr.aria-required]="f.pflicht || null"
-                      [attr.aria-invalid]="
-                        ungueltig('zusatz.' + f.name) ||
-                        zusatzUngueltig().includes('zusatz.' + f.name) ||
-                        null
-                      "
-                      [value]="zusatzWerte()[f.name] ?? ''"
-                      (change)="setzeZusatz(f.name, wert($event))"
-                    >
-                      <option value="" [selected]="!(zusatzWerte()[f.name] ?? '')"></option>
-                      @for (
-                        option of f.name === 'zugriff' ? zugriffOptionen : f.optionen;
-                        track option
-                      ) {
-                        <option [value]="option" [selected]="option === zusatzWerte()[f.name]">
-                          {{ zusatzOption(f, option) }}
-                        </option>
-                      }
-                    </select>
-                  } @else if (f.typ === 'janein') {
-                    <select
-                      [id]="d.id + '-zusatz-' + f.name"
-                      [attr.aria-required]="f.pflicht || null"
-                      [attr.aria-invalid]="
-                        ungueltig('zusatz.' + f.name) ||
-                        zusatzUngueltig().includes('zusatz.' + f.name) ||
-                        null
-                      "
-                      [value]="zusatzWerte()[f.name] ?? ''"
-                      (change)="setzeZusatz(f.name, wert($event))"
-                    >
-                      <option value=""></option>
-                      <option value="true">{{ texte.ja }}</option>
-                      <option value="false">{{ texte.nein }}</option>
-                    </select>
+          <div class="feld">
+            <label [for]="d.id + '-datum'"
+              >{{ texte.feld['datum'] }}
+              @if (pflicht('datum')) {
+                <span aria-hidden="true"> *</span>
+              }
+            </label>
+            <input
+              [id]="d.id + '-datum'"
+              type="date"
+              [attr.aria-required]="pflicht('datum') || null"
+              [attr.aria-invalid]="ungueltig('datum') || null"
+              [value]="e.datum"
+              (input)="setze('datum', wert($event))"
+            />
+          </div>
+          <div class="feld">
+            @if (e.partnerId) {
+              <span class="label">{{ texte.feld['partner'] }}</span>
+              <p class="gewaehlt">
+                <span>{{ e.partnerName || e.partnerId }}</span>
+                <button
+                  mat-button
+                  type="button"
+                  data-test="partner-gewaehlt"
+                  [attr.aria-label]="texte.partnerEntfernen + ': ' + (e.partnerName || e.partnerId)"
+                  (click)="partnerEntfernen()"
+                >
+                  {{ texte.partnerEntfernen }}
+                </button>
+              </p>
+            } @else {
+              <label [for]="d.id + '-partner'"
+                >{{ texte.partnerSuchen }}
+                @if (pflicht('partner')) {
+                  <span aria-hidden="true"> *</span>
+                }
+              </label>
+              <input
+                [id]="d.id + '-partner'"
+                type="search"
+                autocomplete="off"
+                data-test="partner-suche"
+                [attr.aria-required]="pflicht('partner') || null"
+                [attr.aria-invalid]="ungueltig('partner') || null"
+                [attr.aria-describedby]="d.id + '-partner-hinweis'"
+                (input)="partnerSuchen(wert($event))"
+              />
+              <p class="hinweis" [id]="d.id + '-partner-hinweis'">
+                @if (erkannterPartner(); as name) {
+                  {{ texte.partnerVorschlag(name) }}.
+                }
+                {{ texte.partnerSuchenHinweis }}
+              </p>
+              @if (treffer(); as liste) {
+                <div aria-live="polite">
+                  @if (liste.length === 0) {
+                    <p class="hinweis">{{ texte.partnerKeine }}</p>
                   } @else {
-                    <input
-                      [id]="d.id + '-zusatz-' + f.name"
-                      [type]="f.typ === 'datum' ? 'date' : 'text'"
-                      [attr.inputmode]="
-                        f.typ === 'zahl' ? 'decimal' : f.typ === 'ganzzahl' ? 'numeric' : null
-                      "
-                      [attr.aria-required]="f.pflicht || null"
-                      [attr.aria-invalid]="
-                        ungueltig('zusatz.' + f.name) ||
-                        zusatzUngueltig().includes('zusatz.' + f.name) ||
-                        null
-                      "
-                      [value]="zusatzWerte()[f.name] ?? ''"
-                      (input)="setzeZusatz(f.name, wert($event))"
-                    />
+                    <ul class="treffer" data-test="partner-treffer">
+                      @for (kontakt of liste; track kontakt.id) {
+                        <li>
+                          <button
+                            mat-stroked-button
+                            type="button"
+                            (click)="partnerWaehlen(kontakt)"
+                          >
+                            {{ kontaktName(kontakt) }}
+                          </button>
+                        </li>
+                      }
+                    </ul>
                   }
                 </div>
               }
             }
-          </fieldset>
-        }
-        @for (alt of zusatzAlt(); track alt.name) {
-          <p class="warnung" data-test="zusatz-alt">
-            {{ texte.zusatzAlteWerte(alt.name, alt.wert) }}
-          </p>
-        }
-        @if (k.status === 'laedt') {
-          <p class="hinweis" role="status">{{ texte.klassifikationenLaedt }}</p>
-        } @else if (k.status === 'fehler') {
-          <p class="fehler" role="alert">{{ texte.klassifikationenFehler }}</p>
-        } @else {
-          @if (k.daten.art.length > 0) {
-            <app-klassifikationen-formular
-              [felder]="k.daten.art"
-              [kennung]="d.id + '-klassifikationen'"
-              [werte]="klassifikationenWerte()"
-              [ungueltigeCodes]="klassifikationUngueltigeCodes()"
-              (geaendert)="setzeKlassifikationen($event)"
-            />
+          </div>
+          @if (mitFinanz()) {
+            <div class="feld">
+              <label [for]="d.id + '-richtung'"
+                >{{ texte.feld['richtung'] }}
+                @if (pflicht('richtung')) {
+                  <span aria-hidden="true"> *</span>
+                }
+              </label>
+              <select
+                [id]="d.id + '-richtung'"
+                [attr.aria-required]="pflicht('richtung') || null"
+                [attr.aria-invalid]="ungueltig('richtung') || null"
+                (change)="setze('richtung', wert($event))"
+              >
+                <option value="" [selected]="!e.richtung"></option>
+                @for (r of richtungen; track r) {
+                  <option [value]="r" [selected]="r === e.richtung">{{ texte.richtung[r] }}</option>
+                }
+              </select>
+            </div>
           }
-          @for (alt of klassifikationenAlt(); track alt.name) {
-            <p class="warnung" data-test="klassifikation-alt">
-              {{ texte.klassifikationAlteWerte(alt.name, alt.werte) }}
+          @for (f of weitereFelder(); track f.feld) {
+            <div class="feld">
+              <label [for]="d.id + '-' + f.feld"
+                >{{ feldText(f.feld) }}
+                @if (pflicht(f.feld)) {
+                  <span aria-hidden="true"> *</span>
+                }
+              </label>
+              <input
+                [id]="d.id + '-' + f.feld"
+                [type]="f.typ"
+                [attr.inputmode]="f.modus ?? null"
+                [attr.placeholder]="f.feld === 'betrag' ? texte.betragHinweis : null"
+                [attr.aria-required]="pflicht(f.feld) || null"
+                [attr.aria-invalid]="ungueltig(f.feld) || null"
+                [value]="e[f.feld]"
+                (input)="setze(f.feld, wert($event))"
+              />
+              @if (bittePruefen(f.feld)) {
+                <span class="pruefen">{{ texte.bittePruefen }}</span>
+              }
+            </div>
+          }
+          @if (zusatzFelder().length > 0) {
+            <fieldset class="zusatzfelder" data-test="zusatzfelder">
+              <legend>{{ texte.zusatzTitel }}</legend>
+              @for (f of zusatzFelder(); track f.name) {
+                @if (istListe(f)) {
+                  <app-listenfeld
+                    [feld]="f"
+                    [kennung]="d.id + '-zusatz-' + f.name"
+                    [beschriftung]="zusatzBeschriftung(f)"
+                    [wert]="zusatzWerte()[f.name] ?? ''"
+                    [ungueltig]="
+                      ungueltig('zusatz.' + f.name) ||
+                      zusatzUngueltig().includes('zusatz.' + f.name)
+                    "
+                    (geaendert)="setzeZusatz(f.name, $event)"
+                  />
+                } @else {
+                  <div class="feld">
+                    <label [for]="d.id + '-zusatz-' + f.name"
+                      >{{ zusatzBeschriftung(f) }}
+                      @if (f.pflicht) {
+                        <span aria-hidden="true"> *</span>
+                      }
+                    </label>
+                    @if (f.name === 'zugriff' || f.typ === 'auswahl') {
+                      <select
+                        [id]="d.id + '-zusatz-' + f.name"
+                        [attr.aria-required]="f.pflicht || null"
+                        [attr.aria-invalid]="
+                          ungueltig('zusatz.' + f.name) ||
+                          zusatzUngueltig().includes('zusatz.' + f.name) ||
+                          null
+                        "
+                        [value]="zusatzWerte()[f.name] ?? ''"
+                        (change)="setzeZusatz(f.name, wert($event))"
+                      >
+                        <option value="" [selected]="!(zusatzWerte()[f.name] ?? '')"></option>
+                        @for (
+                          option of f.name === 'zugriff' ? zugriffOptionen : f.optionen;
+                          track option
+                        ) {
+                          <option [value]="option" [selected]="option === zusatzWerte()[f.name]">
+                            {{ zusatzOption(f, option) }}
+                          </option>
+                        }
+                      </select>
+                    } @else if (f.typ === 'janein') {
+                      <select
+                        [id]="d.id + '-zusatz-' + f.name"
+                        [attr.aria-required]="f.pflicht || null"
+                        [attr.aria-invalid]="
+                          ungueltig('zusatz.' + f.name) ||
+                          zusatzUngueltig().includes('zusatz.' + f.name) ||
+                          null
+                        "
+                        [value]="zusatzWerte()[f.name] ?? ''"
+                        (change)="setzeZusatz(f.name, wert($event))"
+                      >
+                        <option value=""></option>
+                        <option value="true">{{ texte.ja }}</option>
+                        <option value="false">{{ texte.nein }}</option>
+                      </select>
+                    } @else {
+                      <input
+                        [id]="d.id + '-zusatz-' + f.name"
+                        [type]="f.typ === 'datum' ? 'date' : 'text'"
+                        [attr.inputmode]="
+                          f.typ === 'zahl' ? 'decimal' : f.typ === 'ganzzahl' ? 'numeric' : null
+                        "
+                        [attr.aria-required]="f.pflicht || null"
+                        [attr.aria-invalid]="
+                          ungueltig('zusatz.' + f.name) ||
+                          zusatzUngueltig().includes('zusatz.' + f.name) ||
+                          null
+                        "
+                        [value]="zusatzWerte()[f.name] ?? ''"
+                        (input)="setzeZusatz(f.name, wert($event))"
+                      />
+                    }
+                  </div>
+                }
+              }
+            </fieldset>
+          }
+          @for (alt of zusatzAlt(); track alt.name) {
+            <p class="warnung" data-test="zusatz-alt">
+              {{ texte.zusatzAlteWerte(alt.name, alt.wert) }}
             </p>
           }
-        }
-        @if (darfVertraulichkeit()) {
-          <div class="feld">
-            <label [for]="d.id + '-vertraulichkeit'">{{ texte.feld['vertraulichkeit'] }}</label>
-            <select
-              [id]="d.id + '-vertraulichkeit'"
-              (change)="setze('vertraulichkeit', wert($event))"
-            >
-              @for (v of vertraulichkeiten; track v) {
-                <option [value]="v" [selected]="v === e.vertraulichkeit">
-                  {{ texte.vertraulichkeit[v] }}
-                </option>
-              }
-            </select>
+          @if (k.status === 'laedt') {
+            <p class="hinweis" role="status">{{ texte.klassifikationenLaedt }}</p>
+          } @else if (k.status === 'fehler') {
+            <p class="fehler" role="alert">{{ texte.klassifikationenFehler }}</p>
+          } @else {
+            @if (k.daten.art.length > 0) {
+              <app-klassifikationen-formular
+                [felder]="k.daten.art"
+                [kennung]="d.id + '-klassifikationen'"
+                [werte]="klassifikationenWerte()"
+                [ungueltigeCodes]="klassifikationUngueltigeCodes()"
+                (geaendert)="setzeKlassifikationen($event)"
+              />
+            }
+            @for (alt of klassifikationenAlt(); track alt.name) {
+              <p class="warnung" data-test="klassifikation-alt">
+                {{ texte.klassifikationAlteWerte(alt.name, alt.werte) }}
+              </p>
+            }
+          }
+          @if (darfVertraulichkeit()) {
+            <div class="feld">
+              <label [for]="d.id + '-vertraulichkeit'">{{ texte.feld['vertraulichkeit'] }}</label>
+              <select
+                [id]="d.id + '-vertraulichkeit'"
+                (change)="setze('vertraulichkeit', wert($event))"
+              >
+                @for (v of vertraulichkeiten; track v) {
+                  <option [value]="v" [selected]="v === e.vertraulichkeit">
+                    {{ texte.vertraulichkeit[v] }}
+                  </option>
+                }
+              </select>
+            </div>
+          }
+          <div class="knoepfe">
+            <button mat-flat-button type="submit" [disabled]="laeuft() || k.status !== 'ok'">
+              {{ laeuft() ? texte.bestaetigenLaeuft : texte.bestaetigen }}
+            </button>
+            <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
+              {{ texte.aendernSchliessen }}
+            </button>
           </div>
-        }
-        <div class="knoepfe">
-          <button mat-flat-button type="submit" [disabled]="laeuft() || k.status !== 'ok'">
-            {{ laeuft() ? texte.bestaetigenLaeuft : texte.bestaetigen }}
-          </button>
-          <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
-            {{ texte.aendernSchliessen }}
-          </button>
+        </form>
+      }
+      @default {
+        <div class="knoepfe" data-test="aktionen">
+          @if (darfBestaetigen()) {
+            <button
+              mat-flat-button
+              type="button"
+              [disabled]="laeuft()"
+              (click)="bestaetigen()"
+              [attr.aria-describedby]="'titel-' + d.id"
+            >
+              <app-symbol name="haken" />{{
+                laeuft() ? texte.bestaetigenLaeuft : texte.bestaetigen
+              }}
+            </button>
+          }
+          @if (darfAendern()) {
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="laeuft()"
+              (click)="oeffnen('formular')"
+              [attr.aria-describedby]="'titel-' + d.id"
+            >
+              <app-symbol name="bearbeiten" />{{ texte.aendern }}
+            </button>
+          }
+          @if (darfWiederholen()) {
+            <button
+              mat-flat-button
+              type="button"
+              [disabled]="laeuft()"
+              (click)="wiederholen()"
+              [attr.aria-describedby]="'titel-' + d.id"
+            >
+              <app-symbol name="wiederholen" />{{
+                d.status === 'ARCHIVIERUNG_FEHLER'
+                  ? texte.archivierungWiederholen
+                  : texte.erneutVerarbeiten
+              }}
+            </button>
+          }
+          @if (darfVerwerfen()) {
+            <button
+              mat-button
+              class="verwerfen-knopf"
+              type="button"
+              [disabled]="laeuft()"
+              (click)="oeffnen('verwerfen')"
+              [attr.aria-describedby]="'titel-' + d.id"
+            >
+              {{ texte.verwerfen }}
+            </button>
+          }
+          @if (ohneAktion()) {
+            <p class="hinweis">{{ texte.keineAktion }}</p>
+          }
+          @if (imKorb()) {
+            @if (unsichereFelder() > 0) {
+              <span class="pille warnung stand" data-test="unsichere-felder">
+                <app-symbol name="warnung" />{{ texte.unsichereFelder(unsichereFelder()) }}
+              </span>
+            } @else if (vorschlagVollstaendig()) {
+              <span class="pille ok stand" data-test="vorschlag-vollstaendig">
+                <app-symbol name="haken" />{{ texte.vorschlagVollstaendig }}
+              </span>
+            }
+          }
         </div>
-      </form>
+      }
     }
-    @default {
-      <div class="knoepfe" data-test="aktionen">
-        @if (darfBestaetigen()) {
-          <button
-            mat-flat-button
-            type="button"
-            [disabled]="laeuft()"
-            (click)="bestaetigen()"
-            [attr.aria-describedby]="'titel-' + d.id"
-          >
-            {{ laeuft() ? texte.bestaetigenLaeuft : texte.bestaetigen }}
-          </button>
-        }
-        @if (darfAendern()) {
-          <button
-            mat-stroked-button
-            type="button"
-            [disabled]="laeuft()"
-            (click)="oeffnen('formular')"
-            [attr.aria-describedby]="'titel-' + d.id"
-          >
-            {{ texte.aendern }}
-          </button>
-        }
-        @if (darfWiederholen()) {
-          <button
-            mat-flat-button
-            type="button"
-            [disabled]="laeuft()"
-            (click)="wiederholen()"
-            [attr.aria-describedby]="'titel-' + d.id"
-          >
-            {{
-              d.status === 'ARCHIVIERUNG_FEHLER'
-                ? texte.archivierungWiederholen
-                : texte.erneutVerarbeiten
-            }}
-          </button>
-        }
-        @if (darfVerwerfen()) {
-          <button
-            mat-button
-            type="button"
-            [disabled]="laeuft()"
-            (click)="oeffnen('verwerfen')"
-            [attr.aria-describedby]="'titel-' + d.id"
-          >
-            {{ texte.verwerfen }}
-          </button>
-        }
-        @if (ohneAktion()) {
-          <p class="hinweis">{{ texte.keineAktion }}</p>
-        }
-      </div>
-    }
-  }
+  </div>
 </article>

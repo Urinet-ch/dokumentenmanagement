@@ -15,6 +15,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { AnmeldungService } from '../../gemeinsam/anmeldung/anmeldung.service';
 import { aufnahmeName, aufnahmeZeit } from '../../gemeinsam/aufnahme-name';
+import { Symbol } from '../../gemeinsam/symbol';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { Upload } from '../upload';
 import { Ecken } from './scanner/ecken';
@@ -50,7 +51,7 @@ const ORIGINAL_QUALITAET = 0.95;
  */
 @Component({
   selector: 'app-handy-erfassung',
-  imports: [MatButtonModule, Upload, Zuschnitt],
+  imports: [MatButtonModule, Symbol, Upload, Zuschnitt],
   templateUrl: './handy-erfassung.html',
   styleUrl: './handy-erfassung.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -66,14 +66,19 @@ public interface WissenLesenRepository {
         }
     }
 
-    record DokumentKopf(String titel, String dateiname) {
+    record DokumentKopf(String titel, String dateiname, java.time.LocalDate datum) {
     }
 
     record SeiteVerweis(UUID id, String pfad, String titel) {
     }
 
     record LogEintrag(long id, Instant zeit, String aktion, String akteur, List<SeiteVerweis> seiten,
-                      UUID dokumentId, UUID entwurfId) {
+                      UUID dokumentId, UUID entwurfId, boolean widerspruchAufgeloest) {
+        public LogEintrag(long id, Instant zeit, String aktion, String akteur, List<SeiteVerweis> seiten,
+                          UUID dokumentId, UUID entwurfId) {
+            this(id, zeit, aktion, akteur, seiten, dokumentId, entwurfId, false);
+        }
+
         public LogEintrag {
             seiten = List.copyOf(seiten);
         }

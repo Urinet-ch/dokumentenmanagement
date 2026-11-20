@@ -195,6 +195,73 @@ describe('EingangskorbKarte Klassifikationen (Req 18.4)', () => {
     await fixture.whenStable();
   });
 
+  it('sendet beim Bearbeiten nur zugeordnete Klassifikationen im ersetzenden PATCH', async () => {
+    const bulletin = art('BULLETIN');
+    await zeigen(
+      dokument({
+        art: bulletin.code,
+        klassifikationen: { fachgebiet: ['technik'], entfernt: ['altwert'] },
+      }),
+      [bulletin],
+      new Map([[bulletin.code, klassifikationen('fachgebiet', ['technik', 'recht'])]]),
+    );
+
+    await klicken(T.aendern);
+    expect(element.querySelector('[data-test=klassifikation-alt]')?.textContent).toContain(
+      'altwert',
+    );
+    const select = element.querySelector<HTMLSelectElement>('#d1-klassifikationen-fachgebiet')!;
+    select.value = 'recht';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    await klicken(T.bestaetigen);
+
+    const patch = http.expectOne({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+    expect(patch.request.body.klassifikationen).toEqual({ fachgebiet: ['recht'] });
+    patch.flush(
+      dokument({ art: bulletin.code, version: 4, klassifikationen: { fachgebiet: ['recht'] } }),
+    );
+    await fixture.whenStable();
+    http.expectOne({ method: 'POST', url: '/api/v1/dokumente/d1/bestaetigen' }).flush(null, {
+      status: 202,
+      statusText: 'Accepted',
+    });
+    await fixture.whenStable();
+  });
+
+  it('sendet beim blossen Wechsel einer vorhandenen Art ein PATCH vor der Bestätigung', async () => {
+    const alt = art('ALT');
+    const neu = art('NEU');
+    await zeigen(
+      dokument({ art: alt.code }),
+      [alt, neu],
+      new Map([
+        [alt.code, LEERE_DOKUMENT_KLASSIFIKATIONEN],
+        [neu.code, LEERE_DOKUMENT_KLASSIFIKATIONEN],
+      ]),
+    );
+
+    await klicken(T.aendern);
+    const artWahl = element.querySelector<HTMLSelectElement>('#d1-art')!;
+    artWahl.value = neu.code;
+    artWahl.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await klicken(T.bestaetigen);
+
+    const patch = http.expectOne({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+    expect(patch.request.body).toMatchObject({ art: neu.code, klassifikationen: {} });
+    patch.flush(dokument({ art: neu.code, version: 4 }));
+    await fixture.whenStable();
+    const bestaetigung = http.expectOne({
+      method: 'POST',
+      url: '/api/v1/dokumente/d1/bestaetigen',
+    });
+    expect(bestaetigung.request.headers.get('If-Match')).toBe('"4"');
+    bestaetigung.flush(null, { status: 202, statusText: 'Accepted' });
+    await fixture.whenStable();
+  });
+
   it('zeigt nicht übertragbare Klassifikationen beim Artwechsel an und sendet sie nicht mit', async () => {
     const alt = art('ALT');
     const neu = art('NEU');

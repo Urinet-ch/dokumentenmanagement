@@ -26,6 +26,20 @@ export const SYMBOLE = {
   mond: 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z',
   abmelden: 'M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14M10 16l-4-4 4-4M6 12h10',
   archiv: 'M4 7h16M4 12h16M4 17h10',
+  plus: 'M12 5v14M5 12h14',
+  senden: 'M4 12 20 4l-5 16-3.5-6.5zM11.5 13.5 20 4',
+  dokument: 'M6.5 3h7.5l4.5 4.5V21h-12zM14 3v4.5h4.5M9 13h6M9 16.5h4',
+  tabelle:
+    'M5 4.5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM4 9.5h16M4 14.5h16M10 9.5v10',
+  schloss:
+    'M7 10.5h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zM8 10.5V8a4 4 0 0 1 8 0v2.5',
+  uhr: `${kreis(12, 12, 8.5)}M12 7.5V12l3 2`,
+  herunterladen: 'M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14',
+  haken: 'M5 12.5l4.5 4.5L19 7.5',
+  bearbeiten: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
+  warnung: 'M12 3.5 21.5 20h-19zM12 10v4.5M12 17.2v.3',
+  wiederholen: 'M20 11a8 8 0 0 0-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16M20 20v-4h-4',
+  kamera: `M4 8h3.5L9 5.5h6L16.5 8H20v11H4z${kreis(12, 13, 3.5)}`,
 } as const;
 
 export type SymbolName = keyof typeof SYMBOLE;
