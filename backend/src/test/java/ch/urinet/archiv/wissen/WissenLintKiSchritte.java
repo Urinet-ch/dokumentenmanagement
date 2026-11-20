@@ -11,6 +11,7 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.nio.charset.StandardCharsets;
@@ -29,7 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Ende-zu-Ende-Lint mit synthetischen Dokumenten und WireMock. */
 public class WissenLintKiSchritte {
-    @Inject AgroalDataSource datenbank;
+    @Inject Instance<AgroalDataSource> datenbankInstanz;
+
+    private AgroalDataSource datenbank() {
+        return datenbankInstanz.get();
+    }
     @Inject AuftragArbeiter arbeiter;
 
     private final List<UUID> dokumente = new ArrayList<>();
@@ -92,7 +97,7 @@ public class WissenLintKiSchritte {
     }
 
     private UUID dokument(String stufe) throws SQLException {
-        UUID id = Testdokumente.anlegen(datenbank, new Testdokumente.Angaben(
+        UUID id = Testdokumente.anlegen(datenbank(), new Testdokumente.Angaben(
                 "urinet", "WISSENSQUELLE", stufe, true, "probe", null, "ARCHIVIERT"));
         dokumente.add(id);
         sql("update m_urinet.dokument set seiten = 1, volltext = 'Synthetischer Volltext' where id = ?", id);
@@ -145,7 +150,7 @@ public class WissenLintKiSchritte {
 
     @Angenommen("das Lint-Laufbudget erlaubt zwei KI-Aufrufe und danach keinen weiteren")
     public void budgetBegrenzen() throws SQLException {
-        try (Connection c = datenbank.getConnection();
+        try (Connection c = datenbank().getConnection();
              var p = c.prepareStatement("select lint_budget_tokens from m_urinet.wissens_einstellung where id = 1");
              var r = p.executeQuery()) {
             assertThat(r.next()).isTrue();
@@ -299,7 +304,7 @@ public class WissenLintKiSchritte {
     }
 
     private void sql(String sql, Object... argumente) throws SQLException {
-        try (Connection c = datenbank.getConnection(); var p = c.prepareStatement(sql)) {
+        try (Connection c = datenbank().getConnection(); var p = c.prepareStatement(sql)) {
             for (int i = 0; i < argumente.length; i++) {
                 p.setObject(i + 1, argumente[i]);
             }
@@ -308,7 +313,7 @@ public class WissenLintKiSchritte {
     }
 
     private List<String> zeilen(String sql, Object... argumente) throws SQLException {
-        try (Connection c = datenbank.getConnection(); var p = c.prepareStatement(sql)) {
+        try (Connection c = datenbank().getConnection(); var p = c.prepareStatement(sql)) {
             for (int i = 0; i < argumente.length; i++) {
                 p.setObject(i + 1, argumente[i]);
             }
@@ -324,11 +329,11 @@ public class WissenLintKiSchritte {
 
     @After
     public void aufraeumen() throws SQLException {
-        TestWissenLint.loeschen(datenbank, lintId);
+        TestWissenLint.loeschen(datenbank(), lintId);
         for (UUID seite : seiten) {
             sql("delete from m_urinet.wissensseite where id = ?", seite);
         }
-        Testdokumente.loeschen(datenbank, "urinet", dokumente);
+        Testdokumente.loeschen(datenbank(), "urinet", dokumente);
         if (praefix != null) {
             TestAblage.loeschen("urinet", praefix, key -> key.startsWith(praefix));
         }

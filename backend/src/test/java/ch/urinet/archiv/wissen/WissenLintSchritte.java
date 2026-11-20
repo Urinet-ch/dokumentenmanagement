@@ -11,6 +11,7 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.restassured.response.Response;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.sql.SQLException;
@@ -23,7 +24,11 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class WissenLintSchritte {
-    @Inject AgroalDataSource datenbank;
+    @Inject Instance<AgroalDataSource> datenbankInstanz;
+
+    private AgroalDataSource datenbank() {
+        return datenbankInstanz.get();
+    }
     @Inject MandantKontext kontext;
     @Inject WissenLintStarten lint;
     @Inject AuftragArbeiter arbeiter;
@@ -54,7 +59,7 @@ public class WissenLintSchritte {
 
     @Dann("der Lint ist im Mandanten «urinet» eingereiht und protokolliert")
     public void eingereihtUndProtokolliert() throws SQLException {
-        try (var verbindung = datenbank.getConnection();
+        try (var verbindung = datenbank().getConnection();
              var auftrag = verbindung.prepareStatement("""
                      select count(*) from public.auftrag
                      where typ = 'WISSEN_LINT' and nutzlast->>'lintId' = ?
@@ -84,7 +89,7 @@ public class WissenLintSchritte {
 
     @Dann("ist kein Lint-Auftrag eingereiht und «BUDGET_ERSCHOEPFT» im Lint-Log gezählt")
     public void budgetLog() throws SQLException {
-        try (var verbindung = datenbank.getConnection();
+        try (var verbindung = datenbank().getConnection();
              var pruefung = verbindung.prepareStatement("""
                      select l.beendet is not null,
                             w.angaben->>'BUDGET_ERSCHOEPFT',
@@ -110,7 +115,7 @@ public class WissenLintSchritte {
         while (System.nanoTime() < ende) {
             var laeufe = arbeiter.abholen();
             CompletableFuture.allOf(laeufe.toArray(CompletableFuture[]::new)).get(30, TimeUnit.SECONDS);
-            try (var verbindung = datenbank.getConnection();
+            try (var verbindung = datenbank().getConnection();
                  var pruefung = verbindung.prepareStatement("""
                          select l.beendet is not null,
                                 l.befunde @> jsonb_build_array(jsonb_build_object(
@@ -142,7 +147,7 @@ public class WissenLintSchritte {
         if (lintId == null) {
             return;
         }
-        TestWissenLint.loeschen(datenbank, lintId);
+        TestWissenLint.loeschen(datenbank(), lintId);
         lintId = null;
     }
 }

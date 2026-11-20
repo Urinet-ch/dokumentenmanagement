@@ -39,7 +39,7 @@ public class WissenLintResource {
 
     @POST
     @ErfordertAktion(Aktion.A17)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
     @Protokolliert(aktion = ProtokollAktion.WISSEN_LINT)
     @Operation(summary = "Lint der Wissensbasis starten")
     @APIResponse(responseCode = "202", description = "Lint eingereiht",

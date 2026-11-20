@@ -7404,7 +7404,7 @@
         },
         "tags" : [ "Wissen Lint Resource" ],
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       }
     },
