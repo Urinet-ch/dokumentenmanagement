@@ -3100,6 +3100,21 @@
           }
         }
       },
+      "WissensSuchergebnis" : {
+        "type" : "object",
+        "required" : [ "treffer", "degradiert" ],
+        "properties" : {
+          "treffer" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/WissensIndexZeile"
+            }
+          },
+          "degradiert" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "Wissensdiff" : {
         "type" : "object",
         "properties" : {
@@ -6846,6 +6861,27 @@
         } ]
       }
     },
+    "/api/v1/wissensbasis/embeddings" : {
+      "post" : {
+        "summary" : "Seiten-Embeddings neu berechnen",
+        "description" : "Auftrag im verifizierten Mandanten, A17.",
+        "tags" : [ "Wissensbasis" ],
+        "responses" : {
+          "202" : {
+            "description" : "Nachberechnung eingereiht oder schon laufend"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/wissensbasis/log" : {
       "get" : {
         "summary" : "Wissensbasis-Log",
@@ -7194,7 +7230,7 @@
     "/api/v1/wissensseiten" : {
       "get" : {
         "summary" : "Wissensseiten-Index",
-        "description" : "Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.",
+        "description" : "Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen. modus=hybrid oder volltext liefert höchstens 30 rangierte Treffer ohne Gesamtzahl/Paging, hybrid mit Volltext-Rückfall und degradiert. Ohne modus bleibt der Index unverändert.",
         "tags" : [ "Wissensbasis" ],
         "parameters" : [ {
           "name" : "dokumentId",
@@ -7209,6 +7245,12 @@
           },
           "name" : "groesse",
           "in" : "query"
+        }, {
+          "name" : "modus",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
         }, {
           "schema" : {
             "type" : "integer",
@@ -7243,10 +7285,18 @@
         } ],
         "responses" : {
           "200" : {
-            "description" : "Index oder Seite",
+            "description" : "Index, Seite oder rangiertes Suchergebnis",
             "content" : {
               "application/json" : {
-                "schema" : { }
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/WissensIndex"
+                  }, {
+                    "$ref" : "#/components/schemas/Wissensseite"
+                  }, {
+                    "$ref" : "#/components/schemas/WissensSuchergebnis"
+                  } ]
+                }
               }
             }
           },

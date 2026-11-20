@@ -430,6 +430,21 @@ flowchart LR
   `RerankerClient`; Sichtbarkeitsfilter vor Verdichtung und Reranker; Rückfall `degradiert=true` wie Spec 02.
 - REST `GET /api/v1/wissensseiten?q=…` und Abschnitt «Wissen» auf der Suchseite (`GET /api/v1/dokumente?q=` bleibt
   unverändert; die Suchseite ruft beide auf).
+- Umsetzung 15.1 (20.11.2026): `modus=hybrid` bzw. `modus=volltext` liefert `{treffer,degradiert}` mit
+  höchstens 30 Seiten, ohne Gesamtzahl und Paging. Ohne `modus` bleibt der bestehende Indexvertrag unverändert.
+  Nur Suchbegriff und Modus werden mit der Dokumentensuche geteilt; ihre Dokumentfilter gelten nicht für Seiten.
+  Fehler, Abbruch und Wiederholung der beiden Anfragen sind unabhängig.
+- `POST /api/v1/wissensbasis/embeddings` verlangt A17 und liefert den Nachberechnungsauftrag (202).
+  Die Nachberechnung reiht Teilaufträge für höchstens 500 Seiten ein; Nutzlasten enthalten nur IDs und Versionen.
+  Schreiben sperrt die Seite, prüft ihre Version und sichert den Auftragsanspruch in derselben Transaktion.
+  Ein Stub überschreibt keine vorhandenen Vektoren derselben Version.
+- Modellaufrufe laufen ausserhalb von Datenbanktransaktionen. Wissenssuche und Seiten-Embeddings buchen
+  `WISSEN_EMBEDDING`; vor jeder Frage, jedem Reranker-Aufruf und jedem Embedding-Batch wird das
+  mandantenspezifische Monatsbudget geprüft. Fehler bei diesen Verbrauchsbuchungen bleiben Fehler.
+- `WissenIngestIndex` nutzt dieselbe Rangierung bei überschrittenem Zeichenbudget. Seine erlaubten IDs werden
+  aus dem aktuellen Ingest-/Hüllenkontext vor jeder Abfrage und nach der Rangierung neu berechnet, nicht aus
+  einer erfundenen Benutzerrolle. `PERSONAL` und der Überblick bei `INTERN` bleiben ausgeschlossen;
+  bei `NORMAL` wird der sichtbare Überblick vor den begrenzten Treffern ergänzt.
 
 ### Lint (`wissen/application`)
 - `WISSEN_LINT` (Scheduler mit `archiv.wissen.lint-zeitplan`, nur Rolle `worker`; manuell A17), je KI-Aufruf ein

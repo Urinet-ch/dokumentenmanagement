@@ -12,9 +12,14 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.ki.application.KiPort;
 import ch.urinet.archiv.ki.application.KiVerbrauchPort;
+import ch.urinet.archiv.ki.application.ChunkPort;
+import ch.urinet.archiv.ki.domain.Chunk;
+import ch.urinet.archiv.ki.application.EmbeddingPort;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import ch.urinet.archiv.wissen.application.WissensSuchePort;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
@@ -33,6 +38,7 @@ import ch.urinet.archiv.wissen.domain.Wissensseite;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import ch.urinet.archiv.wissen.application.WissenIngestSpeichern;
+import ch.urinet.archiv.wissen.application.WissenIngestIndex;
 import ch.urinet.archiv.wissen.application.WissenIngestVerarbeiten;
 import ch.urinet.archiv.wissen.application.WissenKonfiguration;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
@@ -76,6 +82,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.not;
 
 /**
  * Lesen und Anlegen für den Ingest-Start (Spec 04, Aufgabe 14.1a) je Mandant: Jeder Mandant sieht nur Dokumente,
@@ -92,6 +102,12 @@ class JdbcWissenIngestTest {
 
     @Inject
     JdbcWissenIngest ingest;
+
+    @Inject
+    PanacheWissensSuche wissensSuche;
+
+    @Inject
+    JdbcWissensEmbedding wissensEmbedding;
 
     @Inject
     PanacheWissenHuelleRepository huellen;
@@ -116,6 +132,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     WissenIngestSpeichern ingestSpeichern;
+
+    @Inject
+    WissenIngestIndex ingestIndex;
 
     @Inject
     ManuellerWissensentwurf manuellerEntwurfDienst;
@@ -156,6 +175,85 @@ class JdbcWissenIngestTest {
     private final Map<MandantCode, List<Long>> verbrauch = new HashMap<>();
     private final Map<MandantCode, Monatsbudget> monatsbudgets = new HashMap<>();
     private final Map<MandantCode, List<UUID>> seiten = new HashMap<>();
+
+    @Test
+    void wissensVolltextGewichtetTitelVorBeschreibungVorInhaltUndTrenntMandanten() throws SQLException {
+        String q = "Wissenssuchprobe Vertrag";
+        UUID titel = seite(URINET, "konzepte/suche-titel", "anderer Inhalt", null);
+        UUID beschreibung = seite(URINET, "konzepte/suche-beschreibung", "anderer Inhalt", null);
+        UUID inhalt = seite(URINET, "konzepte/suche-inhalt", "Wissenssuchprobe Verträge", null);
+        UUID geheim = seite(URINET, "konzepte/suche-geheim", q, null);
+        UUID fremd = seite(ZWEITER, "konzepte/suche-fremd", q, null);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set titel = ? where id = ?", q, titel);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set beschreibung = ? where id = ?", q, beschreibung);
+        UUID dokument = quelle(URINET);
+        ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'INTERN' where id = ?", dokument);
+        ausfuehren("insert into " + URINET.schema()
+                + ".wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)",
+                geheim, dokument);
+        ausfuehren("insert into " + URINET.schema()
+                + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)", geheim, dokument);
+        var filter = new WissensSuchePort.Filter(Sichtregel.fuer(new Benutzer("mitarbeiter", Rolle.MITARBEITER)),
+                null, null, null);
+        var treffer = im(URINET, () -> wissensSuche.volltext(q, filter, 3));
+        assertThat(treffer).extracting(t -> t.seite().id()).containsExactly(titel, beschreibung, inhalt);
+        assertThat(im(ZWEITER, () -> wissensSuche.volltext(q, filter, 3)))
+                .extracting(t -> t.seite().id()).containsExactly(fremd);
+        assertThat(im(URINET, () -> wissensSuche.sichtbar(List.of(geheim, fremd), filter))).isEmpty();
+        given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                .queryParam("q", q).queryParam("modus", "volltext")
+                .when().get("/api/v1/wissensseiten").then().statusCode(200)
+                .body("treffer.id", contains(titel.toString(), beschreibung.toString(), inhalt.toString()))
+                .body("degradiert", is(false)).body("$", not(hasKey("gesamt")));
+    }
+
+    @Test
+    void wissensChunksSindVersionsgebundenStubSicherUndMandantengetrennt() throws SQLException {
+        UUID id = seite(URINET, "konzepte/embedding", "Text", null);
+        UUID fremd = seite(ZWEITER, "konzepte/embedding", "Fremd", null);
+        var eigeneSeiten = Map.of(URINET, id, ZWEITER, fremd);
+        try {
+            for (var eintrag : eigeneSeiten.entrySet()) {
+                ausfuehren("insert into " + eintrag.getKey().schema()
+                        + ".wissensseite_version (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit) "
+                        + "values (?, 1, '{}'::jsonb, 'Text', 'probe', 'probe', now())", eintrag.getValue());
+            }
+            float[] vektor = new float[EmbeddingPort.DIMENSION];
+            vektor[0] = 1;
+            var eingebettet = List.of(new ChunkPort.Eingebettet(new Chunk(1, "Text", null, null), vektor));
+            assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isTrue();
+            assertThat(im(ZWEITER, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isFalse();
+            assertThat(im(ZWEITER, () -> wissensEmbedding.ersetzen(fremd, 1, eingebettet))).isTrue();
+            assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1,
+                    List.of(new ChunkPort.Eingebettet(new Chunk(1, "Stub", null, null), null))))).isFalse();
+            var filter = new WissensSuchePort.Filter(Sichtregel.fuer(new Benutzer("inhaber", Rolle.INHABER)),
+                    null, null, null);
+            assertThat(im(URINET, () -> wissensSuche.vektor(vektor, filter, 50)))
+                    .extracting(t -> t.seite().id()).containsExactly(id);
+            assertThat(im(ZWEITER, () -> wissensSuche.vektor(vektor, filter, 50)))
+                    .extracting(t -> t.seite().id()).containsExactly(fremd);
+            ausfuehren("update " + URINET.schema() + ".wissensseite set version = 2 where id = ?", id);
+            assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isFalse();
+            assertThat(im(URINET, () -> wissensSuche.vektor(vektor, filter, 50))).isEmpty();
+        } finally {
+            for (var eintrag : eigeneSeiten.entrySet()) {
+                ausfuehren("delete from " + eintrag.getKey().schema() + ".wissensseite_chunk where seite_id = ?",
+                        eintrag.getValue());
+                try (var verbindung = datenbank.get().getConnection()) {
+                    verbindung.setAutoCommit(false);
+                    try (var befehl = verbindung.createStatement()) {
+                        befehl.execute("set local session_replication_role = replica");
+                    }
+                    try (var befehl = verbindung.prepareStatement("delete from " + eintrag.getKey().schema()
+                            + ".wissensseite_version where seite_id = ?")) {
+                        befehl.setObject(1, eintrag.getValue());
+                        befehl.executeUpdate();
+                    }
+                    verbindung.commit();
+                }
+            }
+        }
+    }
 
     @Test
     void quellenAenderungBleibtTransaktionalUndImMandanten() throws SQLException {
@@ -776,7 +874,7 @@ class JdbcWissenIngestTest {
         try {
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
                 try {
-                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst)
+                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst, ingestIndex)
                             .ausfuehren(auftrag, entwurf);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -812,7 +910,7 @@ class JdbcWissenIngestTest {
                     new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
                 try {
-                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst)
+                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst, ingestIndex)
                             .ausfuehren(zweiter, entwurf);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -893,7 +991,7 @@ class JdbcWissenIngestTest {
         };
         try {
             var verarbeiten = new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, testKi, kiVerbrauch,
-                    diffDienst);
+                    diffDienst, ingestIndex);
             var manuell = new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration);
             var handler = new WissenIngestHandler(verarbeiten, ingestSpeichern, manuell, manuellSpeichern);
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
@@ -993,7 +1091,7 @@ class JdbcWissenIngestTest {
             }
         };
         var verarbeiten = new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, testKi, kiVerbrauch,
-                diffDienst);
+                diffDienst, ingestIndex);
         var handler = new WissenIngestHandler(verarbeiten, ingestSpeichern,
                 new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration), manuellSpeichern);
         try {

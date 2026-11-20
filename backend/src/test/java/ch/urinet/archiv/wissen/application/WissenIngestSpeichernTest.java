@@ -25,7 +25,7 @@ class WissenIngestSpeichernTest {
         Speicher speichern = new Speicher(stand("INTERN", List.of(ueberblick, intern)),
                 List.of(ueberblick, intern));
 
-        assertThat(speichern.indexLaden(UUID.randomUUID(), "Frist"))
+        assertThat(new WissenIngestIndex(speichern, null, konfiguration()).laden(UUID.randomUUID(), "Frist"))
                 .extracting(SeitenMetadaten::pfad)
                 .containsExactly("konzepte/intern");
     }
@@ -35,14 +35,44 @@ class WissenIngestSpeichernTest {
         SeitenMetadaten ueberblick = seite("ueberblick");
         Speicher speichern = new Speicher(stand("NORMAL", List.of(ueberblick)), List.of(ueberblick));
 
-        assertThat(speichern.indexLaden(UUID.randomUUID(), "Frist"))
+        assertThat(new WissenIngestIndex(speichern, null, konfiguration()).laden(UUID.randomUUID(), "Frist"))
                 .extracting(SeitenMetadaten::pfad)
                 .containsExactly("ueberblick");
+    }
+
+    @Test
+    void grosserIndexVerwendetHybridsucheUndEntferntInzwischenUnsichtbareSeiten() {
+        var seiten = java.util.stream.IntStream.range(0, 70).mapToObj(i -> new SeitenMetadaten(UUID.randomUUID(),
+                "konzepte/seite-" + i, "Konzept", "Titel", "Beschreibung ".repeat(80), List.of(),
+                "AKTIV", 1, "NORMAL")).toList();
+        Speicher speichern = new Speicher(stand("NORMAL", seiten), seiten);
+        var suche = new WissensSuche(null, null, null, null, null) {
+            @Override
+            Ergebnis rangieren(String frage, java.util.function.Supplier<WissensSuchePort.Filter> kontext,
+                               int k, boolean hybrid) {
+                assertThat(frage).isEqualTo("Frist");
+                assertThat(hybrid).isTrue();
+                assertThat(k).isLessThanOrEqualTo(40);
+                assertThat(kontext.get().erlaubteSeiten()).hasSize(70);
+                speichern.sichtbar = List.of(seiten.get(1));
+                assertThat(kontext.get().erlaubteSeiten()).containsExactly(seiten.get(1).id());
+                return new Ergebnis(seiten.subList(0, 2).stream().map(s -> new WissenLesenRepository.IndexZeile(
+                        s.id(), ch.urinet.archiv.wissen.domain.Seitentyp.KONZEPT, s.pfad(), s.titel(),
+                        s.beschreibung(), s.status(), false)).toList(), false);
+            }
+        };
+        assertThat(new WissenIngestIndex(speichern, suche, konfiguration()).laden(UUID.randomUUID(), "Frist"))
+                .extracting(SeitenMetadaten::id).containsExactly(seiten.get(1).id());
     }
 
     private static SeitenMetadaten seite(String pfad) {
         return new SeitenMetadaten(UUID.randomUUID(), pfad, "Konzept", pfad, "Beschreibung", List.of(),
                 "FREIGEGEBEN", 1, "NORMAL");
+    }
+
+    private static WissenKonfiguration konfiguration() {
+        return new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
+                20_000, 12_000, 300_000, 1_000_000);
     }
 
     private static Stand stand(String vertraulichkeit, List<SeitenMetadaten> seiten) {
@@ -57,7 +87,7 @@ class WissenIngestSpeichernTest {
 
     private static final class Speicher extends WissenIngestSpeichern {
         private final Stand stand;
-        private final List<SeitenMetadaten> sichtbar;
+        private List<SeitenMetadaten> sichtbar;
 
         private Speicher(Stand stand, List<SeitenMetadaten> sichtbar) {
             super(null, null, new WissenKonfiguration("test-modell", 30_000, 15, 60_000,

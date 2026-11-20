@@ -33,6 +33,16 @@ public class EmbeddingService {
 
     /** Je Abschnitt ein Vektor in derselben Reihenfolge; leer ohne Vektoren (Stub, kein Token). */
     public Optional<List<float[]>> einbetten(UUID dokumentId, List<Chunk> chunks) throws InterruptedException {
+        return einbetten(dokumentId, chunks, KiVerbrauchPort.EMBEDDING);
+    }
+
+    public Optional<List<float[]>> einbetten(UUID dokumentId, List<Chunk> chunks, String zweck)
+            throws InterruptedException {
+        return einbetten(dokumentId, chunks, zweck, () -> { });
+    }
+
+    public Optional<List<float[]>> einbetten(UUID dokumentId, List<Chunk> chunks, String zweck, Runnable vorAufruf)
+            throws InterruptedException {
         List<float[]> vektoren = new ArrayList<>(chunks.size());
         for (int start = 0; start < chunks.size(); start += EmbeddingPort.BATCH) {
             if (Thread.currentThread().isInterrupted()) {
@@ -40,13 +50,14 @@ public class EmbeddingService {
             }
             List<String> texte = chunks.subList(start, Math.min(chunks.size(), start + EmbeddingPort.BATCH)).stream()
                     .map(Chunk::text).toList();
+            vorAufruf.run();
             switch (port.einbetten(texte)) {
                 case EmbeddingPort.Vektoren v -> {
-                    erfassen(v.verbrauch());
+                    erfassen(v.verbrauch(), zweck);
                     vektoren.addAll(v.vektoren());
                 }
                 case EmbeddingPort.Ausfall a -> {
-                    erfassen(a.verbrauch());
+                    erfassen(a.verbrauch(), zweck);
                     throw new EmbeddingAusfall(dokumentId, a.grund());
                 }
                 case EmbeddingPort.OhneVektoren o -> {
@@ -62,9 +73,13 @@ public class EmbeddingService {
         return Optional.of(List.copyOf(vektoren));
     }
 
-    private void erfassen(KiPort.Verbrauch eintrag) {
+    private void erfassen(KiPort.Verbrauch eintrag, String zweck) {
+        if (KiVerbrauchPort.WISSEN_EMBEDDING.equals(zweck)) {
+            verbrauch.erfassen(zweck, eintrag);
+            return;
+        }
         try {
-            verbrauch.erfassen(KiVerbrauchPort.EMBEDDING, eintrag);
+            verbrauch.erfassen(zweck, eintrag);
         } catch (RuntimeException e) {
             LOG.warnf("KI-Verbrauch nicht gespeichert (%s)", e.getClass().getName());
         }

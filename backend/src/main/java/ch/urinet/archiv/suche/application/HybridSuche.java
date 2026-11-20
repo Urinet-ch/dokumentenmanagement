@@ -133,7 +133,7 @@ public class HybridSuche {
     private Optional<List<Hybridtreffer>> hybrid(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname, int k,
                                                  List<Suchtreffer> volltextTreffer,
                                                  Aktualitaetsregel aktualitaetsregel) {
-        Optional<float[]> frage = frage(anfrage.begriff());
+        Optional<float[]> frage = frageEinbetten(anfrage.begriff());
         if (frage.isEmpty()) {
             return Optional.empty();
         }
@@ -167,7 +167,7 @@ public class HybridSuche {
         Map<UUID, Suchtreffer> details = new HashMap<>();
         Map<UUID, Double> relevanzen = new HashMap<>();
         if (!gesendet.isEmpty()) {
-            Optional<RerankerPort.Sortiert> sortiert = sortieren(anfrage.begriff(), texte);
+            Optional<RerankerPort.Sortiert> sortiert = texteSortieren(anfrage.begriff(), texte);
             if (sortiert.isEmpty()) {
                 return Optional.empty();
             }
@@ -219,15 +219,19 @@ public class HybridSuche {
     }
 
     /** Schritt 2a: die Frage einbetten; leer heisst Rückfall. */
-    private Optional<float[]> frage(String begriff) {
+    public Optional<float[]> frageEinbetten(String begriff) {
+        return frageEinbetten(begriff, KiVerbrauchPort.SUCHE);
+    }
+
+    public Optional<float[]> frageEinbetten(String begriff, String zweck) {
         return switch (embedding.einbettenFrage(begriff)) {
             case EmbeddingPort.Vektoren v -> {
-                erfassen(v.verbrauch());
+                erfassen(v.verbrauch(), zweck);
                 yield v.vektoren().size() == 1 ? Optional.of(v.vektoren().getFirst())
                         : rueckfall("Embedding", "falsche Anzahl Vektoren");
             }
             case EmbeddingPort.Ausfall a -> {
-                erfassenMitTokens(a.verbrauch());
+                erfassenMitTokens(a.verbrauch(), zweck);
                 yield rueckfall("Embedding", a.grund());
             }
             case EmbeddingPort.OhneVektoren o -> ohne("Embedding", "Dev-Stub");
@@ -236,14 +240,18 @@ public class HybridSuche {
     }
 
     /** Schritt 4: Indizes in {@code texte} in der Reihenfolge des Rerankers; leer heisst Rückfall. */
-    private Optional<RerankerPort.Sortiert> sortieren(String begriff, List<String> texte) {
+    public Optional<RerankerPort.Sortiert> texteSortieren(String begriff, List<String> texte) {
+        return texteSortieren(begriff, texte, KiVerbrauchPort.SUCHE);
+    }
+
+    public Optional<RerankerPort.Sortiert> texteSortieren(String begriff, List<String> texte, String zweck) {
         return switch (reranker.sortieren(begriff, texte, texte.size())) {
             case RerankerPort.Sortiert s -> {
-                erfassen(s.verbrauch());
+                erfassen(s.verbrauch(), zweck);
                 yield Optional.of(s);
             }
             case RerankerPort.Ausfall a -> {
-                erfassenMitTokens(a.verbrauch());
+                erfassenMitTokens(a.verbrauch(), zweck);
                 yield rueckfall("Reranker", a.grund());
             }
             case RerankerPort.OhneSortierung o -> ohne("Reranker", "Dev-Stub");
@@ -263,13 +271,17 @@ public class HybridSuche {
     }
 
     /** Ungültige Antwort mit Tokens: eine Zeile; ohne Antwort (Zeitüberschreitung, Verbindung) keine. */
-    private void erfassenMitTokens(KiPort.Verbrauch eintrag) {
+    private void erfassenMitTokens(KiPort.Verbrauch eintrag, String zweck) {
         if (eintrag != null && (eintrag.tokensEin() > 0 || eintrag.tokensAus() > 0)) {
-            erfassen(eintrag);
+            erfassen(eintrag, zweck);
         }
     }
 
-    private void erfassen(KiPort.Verbrauch eintrag) {
+    private void erfassen(KiPort.Verbrauch eintrag, String zweck) {
+        if (!KiVerbrauchPort.SUCHE.equals(zweck)) {
+            verbrauch.erfassen(zweck, eintrag);
+            return;
+        }
         try {
             verbrauch.erfassen(KiVerbrauchPort.SUCHE, eintrag);
         } catch (RuntimeException e) {

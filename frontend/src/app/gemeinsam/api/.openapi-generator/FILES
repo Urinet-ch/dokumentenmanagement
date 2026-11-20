@@ -22,6 +22,7 @@ model/api-token-ablauf.ts
 model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts
+model/api-v1-wissensseiten-get200-response.ts
 model/art-klassifikation.ts
 model/auszug-teil.ts
 model/bearbeitung.ts
@@ -111,6 +112,7 @@ model/wissens-index.ts
 model/wissens-log-seite.ts
 model/wissens-log-verweis.ts
 model/wissens-log.ts
+model/wissens-suchergebnis.ts
 model/wissensdiff.ts
 model/wissensquelleneintrag.ts
 model/wissensseite.ts

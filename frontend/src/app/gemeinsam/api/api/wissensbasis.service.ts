@@ -17,6 +17,8 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
+import { ApiV1WissensseitenGet200Response } from '../model/api-v1-wissensseiten-get200-response';
+// @ts-ignore
 import { Eingabe } from '../model/eingabe';
 // @ts-ignore
 import { WissenAnnehmen } from '../model/wissen-annehmen';
@@ -37,6 +39,61 @@ export class WissensbasisService extends BaseService {
 
     constructor(protected httpClient: HttpClient, @Optional() @Inject(BASE_PATH) basePath: string|string[], @Optional() configuration?: Configuration) {
         super(basePath, configuration);
+    }
+
+    /**
+     * Seiten-Embeddings neu berechnen
+     * Auftrag im verifizierten Mandanten, A17.
+     * @endpoint post /api/v1/wissensbasis/embeddings
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1WissensbasisEmbeddingsPost(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1WissensbasisEmbeddingsPost(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1WissensbasisEmbeddingsPost(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1WissensbasisEmbeddingsPost(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/wissensbasis/embeddings`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
     }
 
     /**
@@ -552,10 +609,11 @@ export class WissensbasisService extends BaseService {
 
     /**
      * Wissensseiten-Index
-     * Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.
+     * Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen. modus&#x3D;hybrid oder volltext liefert höchstens 30 rangierte Treffer ohne Gesamtzahl/Paging, hybrid mit Volltext-Rückfall und degradiert. Ohne modus bleibt der Index unverändert.
      * @endpoint get /api/v1/wissensseiten
      * @param dokumentId 
      * @param groesse 
+     * @param modus 
      * @param offset 
      * @param pfad 
      * @param q 
@@ -565,10 +623,10 @@ export class WissensbasisService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, modus?: string, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ApiV1WissensseitenGet200Response>;
+    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, modus?: string, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ApiV1WissensseitenGet200Response>>;
+    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, modus?: string, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ApiV1WissensseitenGet200Response>>;
+    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, modus?: string, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
 
@@ -585,6 +643,15 @@ export class WissensbasisService extends BaseService {
             localVarQueryParameters,
             'groesse',
             <any>groesse,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'modus',
+            <any>modus,
             QueryParamStyle.Form,
             true,
         );
@@ -665,7 +732,7 @@ export class WissensbasisService extends BaseService {
 
         let localVarPath = `/api/v1/wissensseiten`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<any>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<ApiV1WissensseitenGet200Response>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),
