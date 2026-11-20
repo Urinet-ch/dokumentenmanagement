@@ -125,7 +125,7 @@ Lösch- und Archivierungsszenarien bleiben vollständig erhalten.
 
 | Massnahme | Einsparung | Risiko | Wer setzt um |
 | --- | --- | --- | --- |
-| Verteilung der Starttests aus Gruppe 4 neu ausbalancieren | geschätzt 0,8–1,2 min vom normalen kritischen Pfad; Queue-P90 unverändert | niedrig: nur Gruppen-Tags, gleiche Tests; mit mehreren Vorher-/Nachher-Läufen messen | Copilot |
+| Verteilung der Starttests aus Gruppe 4 neu ausbalancieren | 0,7–1,0 min im Gruppenpfad; zwei Nachher-Läufe | niedrig: nur Gruppen-Tags, gleiche Tests; Gesamtmedian/P90 bleibt wegen kleiner Stichprobe offen | Copilot |
 | Veraltete `main`-CI-Läufe bei neuem `main`-Push abbrechen | keine garantierte Grundzeit; kann unter Queue-Druck bis zu 24 min beobachtete Wartezeit vermeiden | mittel: ältere SHA haben dann keinen eigenen grünen Push-Lauf; aktueller `main`-Kopf muss weiterhin vollständig grün sein | Fabian |
 | Doppelte Spec-Testausführung im vollen Lauf auslassen, Spec-Job aber erfolgreich lassen | rund 0,7 Runner-Minuten; Wandzeit nur bei Queue-Druck | mittel: `NurSpecTest` anpassen und Deploy-Nachweis für Jobabschluss prüfen | Fabian |
 | Playwright-Browser cachen | nicht empfohlen; Einsparung nicht belegt | Cache-Restore kann so lange dauern wie Download, Linux-Systemabhängigkeiten bleiben uncachebar | — |
@@ -137,9 +137,30 @@ Workflowdateien geändert.
 ## Zeitabschätzung
 
 Gemessener Ausgangswert: **18,0 min Median**, **25,6 min P90**. Die
-Tag-Umverteilung ergibt für Läufe ohne Scheduler-Queue einen vorsichtigen
-Zielwert von **rund 17 min Median**. Für den P90 ist ohne Umsetzung und neue
-Messreihe keine belastbare Zahl möglich; die beobachtete Queue kann die
-Einsparung vollständig überdecken. Das Abbrechen überholter `main`-Läufe könnte
-den P90 stärker beeinflussen, ist aber aus der vorliegenden Stichprobe nicht
-seriös quantifizierbar.
+Tag-Umverteilung sollte für Läufe ohne Scheduler-Queue rund eine Minute sparen.
+Der Zielwert von **rund 17 min Median** bleibt eine Schätzung, nicht eine neue
+Messung des vollständigen CI-Laufs. Für den P90 ist keine belastbare Zahl
+möglich; die beobachtete Queue kann die Einsparung vollständig überdecken. Das
+Abbrechen überholter `main`-Läufe könnte den P90 stärker beeinflussen, ist aber
+aus der vorliegenden Stichprobe nicht seriös quantifizierbar.
+
+## Nachher-Messung der Startgruppen (PR #372)
+
+Nach der Verschiebung von `VerarbeitenZeitgrenzeTest` und `MandantKommandoTest`
+von `start-4` nach `start-2` wurden zwei vollständige CI-Läufe desselben Commits
+gemessen. Die Werte sind Jobdauern einschliesslich Einrichtung:
+
+| Gruppe | Vorher Median (n=22) | Nachher Lauf 1 | Nachher Lauf 2 | Nachher Median (n=2) |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 8,0 min | 9,0 min | 7,9 min | 8,4 min |
+| 2 | 6,9 min | 8,5 min | 8,7 min | 8,6 min |
+| 3 | 8,5 min | 8,2 min | 7,8 min | 8,0 min |
+| 4 | 9,6 min | 7,6 min | 8,9 min | 8,2 min |
+
+Der längste Gruppenjob dauerte 9,0 bzw. 8,9 Minuten; der bisher langsamste
+Job hatte einen Median von 9,6 Minuten. Die zwei Nachher-Läufe deuten auf rund
+0,7–1,0 Minuten weniger im Gruppenpfad und eine ausgeglichenere Verteilung hin.
+Sie reichen nicht, den Median oder P90 der vollständigen CI-Laufzeit neu zu
+bestimmen. Zwischen den beiden vollständigen Messläufen wurde nur der wegen
+Maven Central HTTP 429 fehlgeschlagene Backend-Verify-Job erneut ausgeführt;
+der Retry war erfolgreich und zählt nicht als zusätzlicher Gruppenlauf.
