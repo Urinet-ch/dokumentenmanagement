@@ -4,7 +4,11 @@
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
+  "accessTokenLifespan": 300,
+  "actionTokenGeneratedByAdminLifespan": 86400,
+  "passwordPolicy": "length(12) and notUsername and notEmail",
   "eventsEnabled": true,
+  "eventsExpiration": 34560000,
   "eventsListeners": [],
   "enabledEventTypes": [
     "LOGIN_ERROR",
@@ -570,6 +574,23 @@
   ],
   "clients": [
     {
+      "clientId": "archiv-verwaltung",
+      "name": "UriNet Archiv (Verwaltung)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "${KEYCLOAK_VERWALTUNG_SECRET}",
+      "defaultClientScopes": [
+        "kc-admin-api",
+        "roles"
+      ]
+    },
+    {
       "clientId": "archiv-pwa",
       "name": "UriNet Archiv (PWA)",
       "enabled": true,
@@ -963,6 +984,20 @@
         "clientSecret": "${GOOGLE_CLIENT_SECRET}",
         "syncMode": "IMPORT",
         "defaultScope": "openid email profile"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-archiv-verwaltung",
+      "enabled": true,
+      "serviceAccountClientId": "archiv-verwaltung",
+      "clientRoles": {
+        "realm-management": [
+          "query-users",
+          "view-users",
+          "manage-users"
+        ]
       }
     }
   ],
