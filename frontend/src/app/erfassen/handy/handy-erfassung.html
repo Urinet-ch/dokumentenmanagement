@@ -1,7 +1,12 @@
-<h1>{{ texte.titel }}</h1>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ texte.vorzeile }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.untertitel }}</p>
+</div>
 
 @if (!anmeldung.angemeldet()) {
-  <div class="karte hinweis">
+  <div class="hinweis">
+    <app-symbol name="schloss" />
     <p role="alert">
       {{ anmeldung.zustand() === 'abgelaufen' ? anmeldeTexte.abgelaufen : texte.ohneAnmeldung }}
     </p>
@@ -11,11 +16,11 @@
 
 @if (warteschlange.fremdeFrage(); as frage) {
   <section class="karte frage" aria-labelledby="fremde-titel" data-test="fremde-frage">
-    <h2 id="fremde-titel">{{ texte.fremdeTitel }}</h2>
+    <h2 id="fremde-titel"><app-symbol name="warnung" />{{ texte.fremdeTitel }}</h2>
     <p>{{ texte.fremdeFrage(frage.anzahl) }}</p>
-    <p data-test="fremde-zeitpunkte">{{ texte.fremdeZeitpunkte }} {{ zeitpunkte(frage.aufgenommen) }}</p>
+    <p class="gedaempft" data-test="fremde-zeitpunkte">{{ texte.fremdeZeitpunkte }} {{ zeitpunkte(frage.aufgenommen) }}</p>
     @if (fremdeBestaetigen()) {
-      <p role="alert" data-test="fremde-loeschen-frage">{{ texte.fremdeLoeschenFrage(frage.anzahl) }}</p>
+      <p class="fehler" role="alert" data-test="fremde-loeschen-frage">{{ texte.fremdeLoeschenFrage(frage.anzahl) }}</p>
       <div class="aktionen">
         <button mat-flat-button type="button" data-test="fremde-loeschen-ja" (click)="fremdeLoeschen(frage.ids)">
           {{ texte.fremdeLoeschenBestaetigen }}
@@ -35,126 +40,146 @@
   </section>
 }
 
-<p class="zaehler" role="status" data-test="wartet">{{ texte.wartet(warteschlange.wartend()) }}</p>
+<!-- Mobil zuerst Kamera und Warteschlange (Hauptfall), breit rechts neben dem Upload (Prototyp «Erfassen») -->
+<div class="raster" [class.mit-upload]="anmeldung.darf('A1')">
+  <section class="karte kamera-karte" aria-labelledby="kamera-titel">
+    <h2 id="kamera-titel"><app-symbol name="kamera" />{{ texte.kameraTitel }}</h2>
+    <p class="gedaempft">{{ texte.einleitung }}</p>
 
-@if (warteschlange.fehlerhaft().length > 0) {
-  <h2>{{ texte.fehlerhaft }}</h2>
-  <ul class="liste">
-    @for (eintrag of warteschlange.fehlerhaft(); track eintrag.id) {
-      <li class="karte" data-test="fehlerhaft">
-        <strong>{{ texte.erfassung(name(eintrag.aufgenommen), eintrag.seiten.length) }}</strong>
-        <p class="fehler" data-test="meldung">{{ eintrag.meldung }}</p>
-        @if (loeschenFuer() === eintrag.id) {
-          <p role="alert" data-test="loeschen-frage">{{ texte.loeschenFrage }}</p>
-          <div class="aktionen">
-            <button mat-flat-button type="button" data-test="loeschen-ja" (click)="eintragLoeschen(eintrag.id)">
-              {{ texte.loeschenBestaetigen }}
-            </button>
-            <button mat-button type="button" (click)="loeschenFuer.set(null)">{{ texte.loeschenAbbrechen }}</button>
-          </div>
-        } @else {
-          <div class="aktionen">
-            <button mat-stroked-button type="button" (click)="warteschlange.wiederholen(eintrag.id)">
-              {{ texte.erneutVersuchen }}
-            </button>
-            <button mat-button type="button" data-test="loeschen" (click)="meldung.set(null); loeschenFuer.set(eintrag.id)">
-              {{ texte.loeschen }}
-            </button>
-          </div>
-        }
-      </li>
+    <video #video class="kamera" playsinline muted [hidden]="kamera() !== 'an'" [attr.aria-label]="texte.kamera"></video>
+    @switch (kamera()) {
+      @case ('aus') {
+        <button mat-flat-button type="button" (click)="kameraStarten()">
+          <app-symbol name="kamera" />{{ texte.kameraOeffnen }}
+        </button>
+      }
+      @case ('startet') {
+        <p role="status">{{ texte.kameraLaeuft }}</p>
+      }
+      @case ('an') {
+        <button mat-flat-button type="button" class="ausloeser" [disabled]="speichert()" (click)="aufnehmen()">
+          <app-symbol name="kamera" />{{ texte.aufnehmen }}
+        </button>
+      }
+      @case ('nicht-verfuegbar') {
+        <p>{{ texte.keineKamera }}</p>
+        <button mat-stroked-button type="button" [disabled]="speichert()" (click)="foto.click()">{{ texte.fotoWaehlen }}</button>
+        <input
+          #foto
+          hidden
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          [disabled]="speichert()"
+          (change)="dateienGewaehlt($event)"
+        />
+      }
     }
-  </ul>
-}
 
-<section aria-labelledby="kamera-titel">
-  <h2 id="kamera-titel">{{ texte.kameraTitel }}</h2>
-  <p>{{ texte.einleitung }}</p>
-
-  <video #video class="kamera" playsinline muted [hidden]="kamera() !== 'an'" [attr.aria-label]="texte.kamera"></video>
-  @switch (kamera()) {
-    @case ('aus') {
-      <button mat-flat-button type="button" (click)="kameraStarten()">{{ texte.kameraOeffnen }}</button>
-    }
-    @case ('startet') {
-      <p role="status">{{ texte.kameraLaeuft }}</p>
-    }
-    @case ('an') {
-      <button mat-flat-button type="button" class="ausloeser" [disabled]="speichert()" (click)="aufnehmen()">{{ texte.aufnehmen }}</button>
-    }
-    @case ('nicht-verfuegbar') {
-      <p>{{ texte.keineKamera }}</p>
-      <button mat-stroked-button type="button" [disabled]="speichert()" (click)="foto.click()">{{ texte.fotoWaehlen }}</button>
-      <input
-        #foto
-        hidden
-        type="file"
-        accept="image/*"
-        capture="environment"
-        multiple
-        [disabled]="speichert()"
-        (change)="dateienGewaehlt($event)"
+    @if (inBearbeitung(); as seite) {
+      <h3>{{ texte.zuschnitt }}</h3>
+      <app-zuschnitt
+        [bild]="seite.originalUrl"
+        [breite]="seite.breite"
+        [hoehe]="seite.hoehe"
+        [ecken]="seite.ecken"
+        (uebernehmen)="zuschnittUebernehmen($event)"
+        (abbrechen)="bearbeitet.set(null)"
       />
     }
-  }
 
-  @if (inBearbeitung(); as seite) {
-    <h3>{{ texte.zuschnitt }}</h3>
-    <app-zuschnitt
-      [bild]="seite.originalUrl"
-      [breite]="seite.breite"
-      [hoehe]="seite.hoehe"
-      [ecken]="seite.ecken"
-      (uebernehmen)="zuschnittUebernehmen($event)"
-      (abbrechen)="bearbeitet.set(null)"
-    />
-  }
+    @if (seiten().length > 0) {
+      <h3>{{ texte.seiten }}</h3>
+      <ol class="liste seiten">
+        @for (seite of seiten(); track seite.nr; let i = $index) {
+          <li data-test="seite" [class.mit-fehler]="seite.hinweis === 'fehler'" [attr.data-hinweis]="seite.hinweis">
+            @if (seite.vorschauUrl) {
+              <img [src]="seite.vorschauUrl" [alt]="texte.vorschau(i + 1)" />
+            }
+            <div class="tx">
+              <b>{{ texte.seite(i + 1) }}</b>
+              <p role="status" [class.fehler]="seite.hinweis === 'fehler' || seite.hinweis === 'anpassenFehler'">{{ hinweisText(seite.hinweis) }}</p>
+              <div class="aktionen">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [disabled]="!seite.arbeitsfassung || seite.hinweis === 'laeuft' || speichert()"
+                  [attr.aria-label]="texte.anpassen(i + 1)"
+                  (click)="bearbeitet.set(seite.nr)"
+                >
+                  {{ texte.zuschnitt }}
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="speichert()"
+                  [attr.aria-label]="texte.verwerfen(i + 1)"
+                  (click)="verwerfen(seite.nr)"
+                >
+                  {{ texte.verwerfenKurz }}
+                </button>
+              </div>
+            </div>
+          </li>
+        }
+      </ol>
+      <button mat-flat-button type="button" [disabled]="!abschliessbar()" (click)="abschliessen()">
+        <app-symbol name="haken" />{{ texte.abschliessen }}
+      </button>
+    }
+    @if (speichert()) {
+      <p role="status">{{ texte.speichert }}</p>
+    }
+    @if (meldung(); as text) {
+      <p class="meldung" role="status" data-test="erfassung-meldung">{{ text }}</p>
+    }
+  </section>
 
-  @if (seiten().length > 0) {
-    <h3>{{ texte.seiten }}</h3>
-    <ol class="liste seiten">
-      @for (seite of seiten(); track seite.nr; let i = $index) {
-        <li class="karte" data-test="seite" [class.mit-fehler]="seite.hinweis === 'fehler'" [attr.data-hinweis]="seite.hinweis">
-          @if (seite.vorschauUrl) {
-            <img [src]="seite.vorschauUrl" [alt]="texte.vorschau(i + 1)" />
-          }
-          <div>
-            <strong>{{ texte.seite(i + 1) }}</strong>
-            <p role="status" [class.fehler]="seite.hinweis === 'fehler' || seite.hinweis === 'anpassenFehler'">{{ hinweisText(seite.hinweis) }}</p>
-            <button
-              mat-stroked-button
-              type="button"
-              [disabled]="!seite.arbeitsfassung || seite.hinweis === 'laeuft' || speichert()"
-              [attr.aria-label]="texte.anpassen(i + 1)"
-              (click)="bearbeitet.set(seite.nr)"
-            >
-              {{ texte.zuschnitt }}
-            </button>
-            <button
-              mat-button
-              type="button"
-              [disabled]="speichert()"
-              [attr.aria-label]="texte.verwerfen(i + 1)"
-              (click)="verwerfen(seite.nr)"
-            >
-              {{ texte.verwerfenKurz }}
-            </button>
-          </div>
-        </li>
-      }
-    </ol>
-    <button mat-flat-button type="button" [disabled]="!abschliessbar()" (click)="abschliessen()">
-      {{ texte.abschliessen }}
-    </button>
-  }
-  @if (speichert()) {
-    <p role="status">{{ texte.speichert }}</p>
-  }
-  @if (meldung(); as text) {
-    <p role="status" data-test="erfassung-meldung">{{ text }}</p>
-  }
-</section>
+  <section class="karte schlange" aria-labelledby="schlange-titel">
+    <div class="kopf">
+      <h2 id="schlange-titel">{{ texte.warteschlange }}</h2>
+      <span class="gedaempft">{{ texte.warteschlangeHinweis }}</span>
+    </div>
+    <p class="zaehler" role="status" data-test="wartet">
+      <span class="ic"><app-symbol name="uhr" /></span>{{ texte.wartet(warteschlange.wartend()) }}
+    </p>
 
-@if (anmeldung.darf('A1')) {
-  <app-upload />
-}
+    @if (warteschlange.fehlerhaft().length > 0) {
+      <h3>{{ texte.fehlerhaft }}</h3>
+      <ul class="liste">
+        @for (eintrag of warteschlange.fehlerhaft(); track eintrag.id) {
+          <li data-test="fehlerhaft">
+            <span class="ic warnung"><app-symbol name="warnung" /></span>
+            <div class="tx">
+              <b>{{ texte.erfassung(name(eintrag.aufgenommen), eintrag.seiten.length) }}</b>
+              <p class="fehler" data-test="meldung">{{ eintrag.meldung }}</p>
+              @if (loeschenFuer() === eintrag.id) {
+                <p role="alert" data-test="loeschen-frage">{{ texte.loeschenFrage }}</p>
+                <div class="aktionen">
+                  <button mat-flat-button type="button" data-test="loeschen-ja" (click)="eintragLoeschen(eintrag.id)">
+                    {{ texte.loeschenBestaetigen }}
+                  </button>
+                  <button mat-button type="button" (click)="loeschenFuer.set(null)">{{ texte.loeschenAbbrechen }}</button>
+                </div>
+              } @else {
+                <div class="aktionen">
+                  <button mat-stroked-button type="button" (click)="warteschlange.wiederholen(eintrag.id)">
+                    <app-symbol name="wiederholen" />{{ texte.erneutVersuchen }}
+                  </button>
+                  <button mat-button type="button" data-test="loeschen" (click)="meldung.set(null); loeschenFuer.set(eintrag.id)">
+                    {{ texte.loeschen }}
+                  </button>
+                </div>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (anmeldung.darf('A1')) {
+    <app-upload />
+  }
+</div>

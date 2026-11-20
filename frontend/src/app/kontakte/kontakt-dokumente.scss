@@ -1,32 +1,68 @@
-.dokumente {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+// Dokumente des Kontakts als Liste mit Trennlinien (Prototyp kontaktDetail)
+:host {
   display: grid;
   gap: 0.5rem;
 }
 
-.eintrag {
-  padding: 0.75rem 1rem;
-  overflow-wrap: anywhere;
+section {
+  display: grid;
+  gap: 0.5rem;
   min-width: 0;
 }
 
+.dokumente {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.eintrag {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.6875rem 0;
+  border-bottom: 1px solid var(--linie);
+  overflow-wrap: anywhere;
+  min-width: 0;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.symbol {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  background: var(--karte-2);
+  color: var(--text-2);
+}
+
 .titel {
-  font: var(--mat-sys-title-medium);
   display: block;
   max-width: 100%;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 .angaben {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 0.75rem;
-  margin: 0.25rem 0 0;
-  color: var(--urinet-gedaempft);
+  margin: 0.125rem 0 0;
+  font-size: 13px;
+  color: var(--text-gedaempft);
 }
 
-.anzahl {
-  color: var(--urinet-gedaempft);
-  font: var(--mat-sys-body-medium);
+.leer {
+  color: var(--text-gedaempft);
+  margin: 0;
 }

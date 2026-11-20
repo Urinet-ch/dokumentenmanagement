@@ -14,19 +14,20 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
-import { MatListModule } from '@angular/material/list';
 import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
 import { filter, map } from 'rxjs';
 import { AnmeldungService } from './gemeinsam/anmeldung/anmeldung.service';
 import { BrandingService } from './gemeinsam/branding.service';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { EingangskorbEntwurfSpeicher } from './eingangskorb/entwurf-speicher';
-import { MENUE } from './gemeinsam/navigation';
+import { FarbschemaService } from './gemeinsam/farbschema';
+import { MENUE, abschnitte, aktiverPfad } from './gemeinsam/navigation';
+import { Symbol } from './gemeinsam/symbol';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
+import { WissenEntwurfZaehler } from './wissen/wissen-entwurf-zaehler';
 
 export const SEITE_NEU_LADEN = new InjectionToken<() => void>('SEITE_NEU_LADEN', {
   providedIn: 'root',
@@ -42,7 +43,7 @@ export const SEITE_NEU_LADEN = new InjectionToken<() => void>('SEITE_NEU_LADEN',
 });
 
 @Component({
-  imports: [MatButtonModule, MatListModule, MatSidenavModule, MatToolbarModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [MatButtonModule, MatSidenavModule, RouterLink, RouterLinkActive, RouterOutlet, Symbol],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',
@@ -53,6 +54,7 @@ export class App {
   protected readonly anmeldung = inject(AnmeldungService);
   protected readonly branding = inject(BrandingService);
   protected readonly zaehler = inject(EingangskorbZaehler);
+  protected readonly wissensentwurfZaehler = inject(WissenEntwurfZaehler);
   private readonly entwurfSpeicher = inject(EingangskorbEntwurfSpeicher);
   protected readonly online = inject(ONLINE);
   protected readonly updateBereit = signal(false);
@@ -68,6 +70,18 @@ export class App {
     { initialValue: true },
   );
   protected readonly menue = computed(() => MENUE.filter((punkt) => this.anmeldung.darf(punkt.aktion)));
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((ereignis) => ereignis instanceof NavigationEnd),
+      map(() => this.router.url),
+    ),
+    { initialValue: this.router.url },
+  );
+  /** Nur der genaueste Menüpunkt ist aktiv: auf /wissen/entwuerfe «Wissensentwürfe», nicht zusätzlich «Wissen». */
+  protected readonly aktiverPfad = computed(() => aktiverPfad(this.url(), this.menue().map((punkt) => punkt.pfad)));
+  protected readonly abschnitte = computed(() => abschnitte(this.menue()));
+  protected readonly darfSuchen = computed(() => this.menue().length > 0 && this.anmeldung.darf('A2'));
+  protected readonly farbschema = inject(FarbschemaService);
 
   constructor() {
     effect(() => {
@@ -107,6 +121,19 @@ export class App {
         void this.router.navigate(['/'], { queryParams });
       }
     });
+  }
+
+  /** Suche aus der Kopfzeile: führt zur Seite «Suche» mit dem Begriff (`?q=`). */
+  protected suchen(ereignis: Event, feld: HTMLInputElement): void {
+    ereignis.preventDefault();
+    const q = feld.value.trim();
+    void this.router.navigate(['/suche'], { queryParams: q ? { q } : {} });
+    feld.value = '';
+  }
+
+  protected initialen(name: string): string {
+    const teile = name.trim().split(/\s+/).filter(Boolean);
+    return (teile.length > 1 ? teile[0][0] + teile[teile.length - 1][0] : (teile[0] ?? '?').slice(0, 2)).toUpperCase();
   }
 
   protected zumInhalt(inhalt: HTMLElement): void {

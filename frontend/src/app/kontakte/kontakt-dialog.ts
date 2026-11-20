@@ -47,18 +47,23 @@ const FOKUSSIERBAR =
       overflow-x: hidden;
       padding: 1rem;
       box-sizing: border-box;
-      background-color: rgba(0, 0, 0, 0.7);
+      background-color: color-mix(in srgb, var(--urinet-schwarz) 55%, transparent);
+      backdrop-filter: blur(2px);
     }
     .dialog {
       box-sizing: border-box;
       width: min(100%, 36rem);
       min-width: 0;
-      padding: 1rem;
+      padding: 1.25rem;
+      box-shadow: 0 24px 60px -20px color-mix(in srgb, var(--urinet-schwarz) 45%, transparent);
       margin: auto 0;
       overflow-wrap: anywhere;
     }
     h2 {
-      font: var(--mat-sys-title-large);
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: -0.02em;
       margin: 0 0 0.75rem;
     }
   `,

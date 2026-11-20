@@ -271,7 +271,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
                 .mapToObj(index -> ":dokument" + index).collect(java.util.stream.Collectors.joining(", "));
         Query query = em().createNativeQuery("""
                 select d.id, (d.status = 'ARCHIVIERT'), (d.bestaetigt is null or d.vertraulichkeit = 'PERSONAL'),
-                       d.seiten, d.datum, d.volltext
+                       d.seiten, d.datum, case when d.s3_pdfa is not null then d.volltext end
                 from dokument d where d.id in (%s)
                 """.formatted(parameter));
         for (int i = 0; i < ids.size(); i++) {
@@ -376,7 +376,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = em().createNativeQuery("""
                         select s.id, s.pfad, s.typ, s.titel, s.beschreibung, to_json(s.tags), s.status, s.version,
-                               s.vertraulichkeit_mindest, s.inhalt, s.wissensquelle_id
+                               s.vertraulichkeit_mindest, s.inhalt, s.wissensquelle_id, s.veraltet_ab
                         from wissensseite s where s.id = :id""")
                 .setParameter("id", seiteId)
                 .getResultList();
@@ -387,7 +387,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
         SeitenMetadaten metadaten = new SeitenMetadaten(uuid(s[0]), (String) s[1], (String) s[2], (String) s[3],
                 (String) s[4], tags(s[5]), (String) s[6], ((Number) s[7]).intValue(), (String) s[8]);
         return Optional.of(new SeitenFassung(metadaten, (String) s[9],
-                s[10] == null ? null : uuid(s[10]), quellenLaden(seiteId)));
+                s[10] == null ? null : uuid(s[10]), quellenLaden(seiteId), datum(s[11])));
     }
 
     private List<Quelleneintrag> quellenLaden(UUID seiteId) {

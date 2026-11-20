@@ -99,8 +99,9 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 2.3, 2.4, 2.5, 2.9, 8.1, 8.2, 8.3, 8.4_
   - _Abhängig von: 17.7; Spec 01: 3.2_
 
-- [ ] 18.2 Suche, Generator, Import und Funktionen [Backend]
-  - Vermerk (Spec 02, Aufgabe 7.1b, 14.11.2026): `Funktionen.finanzVerfuegbar()` besteht minimal in `dokumentart.application` (mindestens eine aktive Art mit der Gruppe `finanz`) und trägt `kennzahl`/`offene_posten`; 18.2 verschiebt es nach `konfiguration`, ergänzt `GET /mandant/funktionen` und löst die Übergangskonfiguration `archiv.mandant.<code>.kennzahl.*-arten` ab
+- [x] 18.2 Suche, Generator, Import und Funktionen [Backend]
+  - Vermerk (Spec 02, Aufgabe 7.1b, 14.11.2026): `Funktionen.finanzVerfuegbar()` besteht minimal in `dokumentart.application` (mindestens eine aktive Art mit der Gruppe `finanz`) und trägt `kennzahl`/`offene_posten`; 18.2 verschiebt es nach `konfiguration` und ergänzt `GET /mandant/funktionen`.
+  - Entscheid Fabian (20.11.2026): Die Übergangskonfiguration `archiv.mandant.<code>.kennzahl.*-arten` bleibt unverändert wirksam. Ihre Ablösung erfolgt später in einer eigenen Aufgabe.
   - Klassifikationsfilter, Facetten und Volltext, Klassifikationen im Generator und Drive-Import,
     `GET /mandant/funktionen`.
   - _Anforderungen: 8.5, 8.7, 8.8_

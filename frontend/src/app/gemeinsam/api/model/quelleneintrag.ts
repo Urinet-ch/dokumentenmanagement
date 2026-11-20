@@ -16,5 +16,6 @@ export interface Quelleneintrag {
     seiteBis?: number;
     auszug?: string;
     quellSeiteId?: string;
+    sha256?: string;
 }
 

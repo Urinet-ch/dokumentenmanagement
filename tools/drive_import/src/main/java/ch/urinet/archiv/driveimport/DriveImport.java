@@ -16,11 +16,13 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.regex.Pattern;
 
 /**
  * Einmaliger Import des Google-Drive-Altbestands (Spec 01, Requirement 12; Aufgabe 4.8). Liest einen lokalen Ordner
@@ -43,6 +45,8 @@ public final class DriveImport implements Callable<Integer> {
     public static final int ABGEBROCHEN = 3;
     static final String STANDARD_ARCHIV = "https://archiv.apps.urinet.ch";
     private static final Set<String> LOKAL = Set.of("localhost", "127.0.0.1", "[::1]");
+    private static final Pattern ART_CODE = Pattern.compile("^[A-Z][A-Z0-9_]{1,39}$");
+    private static final Pattern KLASSIFIKATIONSCODE = Pattern.compile("^[a-z][a-z0-9_]{0,39}$");
 
     @Parameters(index = "0", paramLabel = "ORDNER", description = "Startordner, z. B. «~/Google Drive/UriNet»")
     Path ordner;
@@ -58,6 +62,14 @@ public final class DriveImport implements Callable<Integer> {
             description = "Datei mit dem API-Token (Scope «import», Rechte 600); sonst $" + TokenDatei.UMGEBUNG
                     + ", sonst ~/.config/urinet-archiv/token")
     Path tokenDatei;
+
+    @Option(names = "--art", paramLabel = "CODE",
+            description = "Dokumentart für die unbestätigte Vorbelegung; erforderlich mit --klassifikation")
+    String art;
+
+    @Option(names = "--klassifikation", paramLabel = "CODE=WERT",
+            description = "Klassifikationswert nach Code; wiederholbar, zusammen mit --art")
+    List<String> klassifikationsangaben = new ArrayList<>();
 
     @Option(names = {"-h", "--hilfe", "--help"}, usageHelp = true, description = "Diese Hilfe anzeigen")
     boolean hilfe;
@@ -108,6 +120,10 @@ public final class DriveImport implements Callable<Integer> {
     public Integer call() throws InterruptedException {
         URI ziel = archivAdresse();
         if (ziel == null) {
+            return UNGUELTIG;
+        }
+        Map<String, List<String>> klassifikationen = klassifikationen();
+        if (klassifikationen == null) {
             return UNGUELTIG;
         }
         Path wurzel;
@@ -170,7 +186,8 @@ public final class DriveImport implements Callable<Integer> {
                         aus.println("würde übertragen: " + pfad + "  [" + hinweis + "]");
                     } else {
                         String name = OrdnerHinweis.sauber(fund.pfad().getFileName().toString());
-                        ArchivClient.Ergebnis ergebnis = client.senden(fund.pfad(), name, hinweis);
+                        ArchivClient.Ergebnis ergebnis = client.senden(fund.pfad(), name, hinweis, art,
+                                klassifikationen);
                         switch (ergebnis.status()) {
                             case UEBERTRAGEN -> {
                                 bericht.uebertragen();
@@ -200,6 +217,43 @@ public final class DriveImport implements Callable<Integer> {
             return ABGEBROCHEN;
         }
         return bericht.abgelehnt() > 0 ? ABGELEHNT : OK;
+    }
+
+    private Map<String, List<String>> klassifikationen() {
+        if (art == null && klassifikationsangaben.isEmpty()) {
+            return Map.of();
+        }
+        if (art == null || !ART_CODE.matcher(art).matches() || klassifikationsangaben.isEmpty()) {
+            fehler.println("--art und --klassifikation: bitte eine gültige Art und mindestens einen CODE=WERT angeben.");
+            return null;
+        }
+        Map<String, List<String>> werte = new LinkedHashMap<>();
+        for (String angabe : klassifikationsangaben) {
+            int trenner = angabe.indexOf('=');
+            if (trenner < 1 || trenner == angabe.length() - 1) {
+                fehler.println("--klassifikation: Format CODE=WERT ist ungültig.");
+                return null;
+            }
+            String code = angabe.substring(0, trenner);
+            String wert = angabe.substring(trenner + 1);
+            if (!KLASSIFIKATIONSCODE.matcher(code).matches()
+                    || !KLASSIFIKATIONSCODE.matcher(wert).matches()) {
+                fehler.println("--klassifikation: Code oder Wert ist ungültig.");
+                return null;
+            }
+            List<String> liste = werte.computeIfAbsent(code, ignored -> new ArrayList<>());
+            if (liste.contains(wert) || liste.size() >= 500) {
+                fehler.println("--klassifikation: Wert doppelt oder zu viele Werte.");
+                return null;
+            }
+            liste.add(wert);
+        }
+        if (werte.size() > 50) {
+            fehler.println("--klassifikation: zu viele Klassifikationen.");
+            return null;
+        }
+        return werte.entrySet().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                Map.Entry::getKey, eintrag -> List.copyOf(eintrag.getValue())));
     }
 
     /** Gefundene Datei; {@code problem} gesetzt, wenn sie nicht gesendet werden kann. */

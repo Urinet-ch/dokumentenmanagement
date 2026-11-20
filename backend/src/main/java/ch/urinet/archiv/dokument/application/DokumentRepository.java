@@ -18,6 +18,8 @@ public interface DokumentRepository {
 
     boolean sichtbar(UUID id, Sichtregel regel);
 
+    List<UUID> wissensquellenNachSha256(String sha256, Sichtregel regel);
+
     /**
      * Gesicherte Fassungen eines Dokuments (Req 10.1) mit {@code version < bisVersion}, neueste zuerst, ohne
      * Sichtregel: Der Aufrufer hat das Dokument vorher mit {@link #finden} für den Benutzer gelesen und übergibt

@@ -160,7 +160,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         }
         SichtregelSql.Ausdruck sicht = SichtregelSql.dokument(sichtregel, "dd");
         Query query = em.get().createNativeQuery("""
-                select dd.id, dd.titel, dd.dateiname from dokument dd
+                select dd.id, dd.titel, dd.dateiname, dd.datum from dokument dd
                 where dd.id in (:ids) and %s
                 """.formatted(sicht.bedingung()));
         query.setParameter("ids", ids);
@@ -169,7 +169,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         List<Object[]> rows = query.getResultList();
         Map<UUID, DokumentKopf> ergebnis = new HashMap<>();
         for (Object[] row : rows) {
-            ergebnis.put((UUID) row[0], new DokumentKopf((String) row[1], (String) row[2]));
+            ergebnis.put((UUID) row[0], new DokumentKopf((String) row[1], (String) row[2], datum(row[3])));
         }
         return ergebnis;
     }
@@ -339,7 +339,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                        ) then l.dokument_id end,
                        case when e.id is not null and (e.dokument_id is null or exists (
                            select 1 from dokument d where d.id = e.dokument_id and %s
-                       )) then l.entwurf_id end
+                       )) then l.entwurf_id end,
+                       coalesce(l.angaben->>'widerspruchAufgeloest' = 'true', false)
                 from wissens_log l
                 left join wissens_entwurf e on e.id = l.entwurf_id
                 where exists (
@@ -413,7 +414,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                             text(p.get("titel"))))
                     .toList();
             return new LogEintrag(((Number) row[0]).longValue(), zeit(row[1]), text(row[2]), text(row[3]), seiten,
-                    uuidNullable(row[5]), uuidNullable(row[6]));
+                    uuidNullable(row[5]), uuidNullable(row[6]), Boolean.TRUE.equals(row[7]));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Wissensbasis-Log ist ungültig", e);
         }

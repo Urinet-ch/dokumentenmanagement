@@ -33,7 +33,7 @@ Funktionalität: Jahresexport in der PWA
     Wenn ich die Seite «/export» öffne
     Und ich mich anmelde
     Dann bin ich auf der Seite «/»
-    Und sehe ich im Menü genau «Erfassen, Eingangskorb, Suche, Wissen, Chat»
+    Und sehe ich im Menü genau «Übersicht, Eingangskorb, Erfassen, Suche, Chat, Wissen»
     Und hat die PWA die Export-Schnittstelle nicht aufgerufen
 
   @req-7.1

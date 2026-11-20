@@ -19,6 +19,7 @@ import org.commonmark.node.ListItem;
 import org.commonmark.node.Node;
 import org.commonmark.node.Paragraph;
 import org.commonmark.node.SoftLineBreak;
+import org.commonmark.node.SourceSpan;
 import org.commonmark.node.Text;
 import org.commonmark.parser.IncludeSourceSpans;
 import org.commonmark.parser.Parser;
@@ -45,6 +46,8 @@ public final class WissensMarkdown {
     private static final Pattern FUSSNOTE = Pattern.compile("\\[\\^([^\\s\\[\\]\\\\]+)]");
     private static final Parser PARSER = Parser.builder().extensions(EXTENSIONS)
             .includeSourceSpans(IncludeSourceSpans.BLOCKS).build();
+    private static final Parser EXPORT_PARSER = Parser.builder().extensions(EXTENSIONS)
+            .includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES).build();
     private static final HtmlRenderer RENDERER = HtmlRenderer.builder()
             .extensions(EXTENSIONS)
             .escapeHtml(true)
@@ -117,7 +120,7 @@ public final class WissensMarkdown {
         merkmale.eigeneDefinitionen.forEach(Node::unlink);
         return new Analyse(rendern(dokument, sichtbarePfade), links, fussnoten, abschnitte, aussagen, merkmale.html,
                 merkmale.bild, merkmale.ungueltigerLink, merkmale.wikilink,
-                !merkmale.eigeneDefinitionen.isEmpty(), false, false);
+                !merkmale.eigeneDefinitionen.isEmpty(), false, false, merkmale.widersprueche);
     }
 
     public static String darstellen(String markdown) {
@@ -134,6 +137,111 @@ public final class WissensMarkdown {
             throw new IllegalArgumentException("Das Markdown ueberschreitet die zulaessige Groesse oder Verschachtelung.");
         }
         return analyse.html();
+    }
+
+    /** Schreibt nur erkannte interne Linkziele um; insbesondere Fussnoten und Code bleiben unverändert. */
+    public static String fuerOkf(String markdown) {
+        if (markdown == null) {
+            throw new IllegalArgumentException("Markdown fehlt");
+        }
+        Analyse analyse = analysieren(markdown, MAX_EINGABE_ZEICHEN);
+        if (analyse.zuGross() || analyse.zuTief() || analyse.ungueltigerLink()
+                || analyse.htmlVorhanden() || analyse.bildVorhanden() || analyse.wikilink()
+                || analyse.fussnotenDefinition()) {
+            throw new IllegalArgumentException("Markdown ist für den OKF-Export ungültig");
+        }
+        Deque<Node> offen = new ArrayDeque<>();
+        offen.push(EXPORT_PARSER.parse(markdown));
+        List<Integer> einfuegen = new ArrayList<>();
+        while (!offen.isEmpty()) {
+            Node node = offen.pop();
+            if (node instanceof Link link) {
+                if (internerPfad(link.getDestination()) == null) {
+                    throw new IllegalArgumentException("Ungültiges Linkziel im OKF-Export");
+                }
+                int ende = zielEnde(markdown, link);
+                if (ende < 0) {
+                    throw new IllegalArgumentException("Linkziel im Markdown nicht gefunden");
+                }
+                einfuegen.add(ende);
+            }
+            for (Node kind = node.getFirstChild(); kind != null; kind = kind.getNext()) {
+                offen.push(kind);
+            }
+        }
+        StringBuilder ausgabe = new StringBuilder(markdown);
+        einfuegen.sort(Collections.reverseOrder());
+        einfuegen.forEach(index -> ausgabe.insert(index, ".md"));
+        return ausgabe.toString();
+    }
+
+    public static boolean gueltigerSeitenpfad(String pfad) {
+        return pfad != null && internerPfad("/" + pfad) != null;
+    }
+
+    /** Entfernt die OKF-Endung nur an erkannten internen Linkzielen, nicht in Code oder Fussnoten. */
+    public static String ausOkf(String markdown) {
+        if (markdown == null) {
+            throw new IllegalArgumentException("Markdown fehlt");
+        }
+        if (zeichen(markdown) > MAX_EINGABE_ZEICHEN || tiefeUeberschritten(markdown)) {
+            return markdown;
+        }
+        Deque<Node> offen = new ArrayDeque<>();
+        offen.push(EXPORT_PARSER.parse(markdown));
+        List<Integer> entfernen = new ArrayList<>();
+        while (!offen.isEmpty()) {
+            Node node = offen.pop();
+            if (node instanceof Link link && link.getDestination().endsWith(".md")
+                    && internerPfad(link.getDestination().substring(0, link.getDestination().length() - 3)) != null) {
+                int ende = zielEnde(markdown, link);
+                if (ende < 0) {
+                    // Referenz-Link ([a][r] oder [a]): kein Inline-Ziel, die Definition bleibt unverändert.
+                } else if (ende >= 3 && markdown.regionMatches(ende - 3, ".md", 0, 3)) {
+                    entfernen.add(ende - 3);
+                }
+            }
+            for (Node kind = node.getFirstChild(); kind != null; kind = kind.getNext()) {
+                offen.push(kind);
+            }
+        }
+        StringBuilder ausgabe = new StringBuilder(markdown);
+        entfernen.sort(Collections.reverseOrder());
+        entfernen.forEach(index -> ausgabe.delete(index, index + 3));
+        return ausgabe.toString();
+    }
+
+    private static int zielEnde(String markdown, Link link) {
+        List<SourceSpan> spans = link.getSourceSpans();
+        if (spans.isEmpty()) {
+            throw new IllegalArgumentException("Linkposition im Markdown fehlt");
+        }
+        int ende = spans.getLast().getInputIndex() + spans.getLast().getLength();
+        Node letzter = link.getLastChild();
+        List<SourceSpan> kindSpans = letzter == null ? List.of() : letzter.getSourceSpans();
+        int ab = kindSpans.isEmpty() ? spans.getFirst().getInputIndex() + 1
+                : kindSpans.getLast().getInputIndex() + kindSpans.getLast().getLength();
+        int klammer = markdown.indexOf("](", ab);
+        if (klammer < 0 || klammer >= ende) {
+            return -1;
+        }
+        int start = klammer + 2;
+        while (start < ende && Character.isWhitespace(markdown.charAt(start))) {
+            start++;
+        }
+        boolean spitz = start < ende && markdown.charAt(start) == '<';
+        int pos = spitz ? start + 1 : start;
+        while (pos < ende) {
+            char zeichen = markdown.charAt(pos);
+            if (zeichen == '\\' && pos + 1 < ende) {
+                pos += 2;
+            } else if (spitz ? zeichen == '>' : zeichen == ')' || Character.isWhitespace(zeichen)) {
+                return pos;
+            } else {
+                pos++;
+            }
+        }
+        throw new IllegalArgumentException("Linkziel im Markdown nicht abgeschlossen");
     }
 
     private static String rendern(Node dokument, Set<String> sichtbarePfade) {
@@ -197,6 +305,9 @@ public final class WissensMarkdown {
                     || node instanceof BlockQuote blockQuote && widerspruchsblock(blockQuote);
             boolean fussnotenDefinition = besuch.inFussnote()
                     || node instanceof FootnoteDefinition;
+            if (blockZitat && !besuch.widerspruch() && !fussnotenDefinition) {
+                merkmale.widersprueche.add(new Aussage(text(node), alleFussnotenIn(node)));
+            }
 
             if (node instanceof HtmlInline || node instanceof HtmlBlock) {
                 merkmale.html = true;
@@ -504,20 +615,32 @@ public final class WissensMarkdown {
         }
     }
 
+    public static List<Aussage> entfernteWidersprueche(String basis, String fassung) {
+        List<Aussage> verblieben = new ArrayList<>(analysieren(fassung, MAX_EINGABE_ZEICHEN).widersprueche());
+        List<Aussage> entfernt = new ArrayList<>();
+        for (Aussage block : analysieren(basis, MAX_EINGABE_ZEICHEN).widersprueche()) {
+            if (!verblieben.remove(block)) {
+                entfernt.add(block);
+            }
+        }
+        return List.copyOf(entfernt);
+    }
+
     public record Analyse(String html, Set<String> links, Set<String> fussnoten, Set<String> abschnitte,
                           List<Aussage> aussagen, boolean htmlVorhanden, boolean bildVorhanden,
                           boolean ungueltigerLink, boolean wikilink, boolean fussnotenDefinition, boolean zuGross,
-                          boolean zuTief) {
+                          boolean zuTief, List<Aussage> widersprueche) {
         public Analyse {
             links = Collections.unmodifiableSet(new LinkedHashSet<>(links));
             fussnoten = Collections.unmodifiableSet(new LinkedHashSet<>(fussnoten));
             abschnitte = Collections.unmodifiableSet(new LinkedHashSet<>(abschnitte));
             aussagen = List.copyOf(aussagen);
+            widersprueche = List.copyOf(widersprueche);
         }
 
         private static Analyse abgelehnt(boolean zuGross, boolean zuTief) {
             return new Analyse("", Set.of(), Set.of(), Set.of(), List.of(), false, false, false, false, false,
-                    zuGross, zuTief);
+                    zuGross, zuTief, List.of());
         }
     }
 
@@ -532,5 +655,6 @@ public final class WissensMarkdown {
         private boolean wikilink;
         private boolean zuTief;
         private final List<Node> eigeneDefinitionen = new ArrayList<>();
+        private final List<Aussage> widersprueche = new ArrayList<>();
     }
 }

@@ -10,8 +10,9 @@
   min-width: 0;
   margin: 0;
   padding: 0.5rem;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 0.25rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
 }
 
 .klassifikationen {
@@ -38,10 +39,10 @@ legend {
     height: 1.5rem;
     flex: none;
     margin: 0;
-    accent-color: var(--urinet-gelb);
+    accent-color: var(--akzent-text);
 
     &[aria-invalid='true'] {
-      outline: 2px solid var(--urinet-fehler);
+      outline: 2px solid var(--gefahr);
     }
   }
 }
@@ -58,13 +59,13 @@ select {
   min-height: 2.75rem;
   padding: 0.5rem;
   font: inherit;
-  color: var(--urinet-hell);
-  background: var(--urinet-dunkel);
-  border: 1px solid var(--urinet-gedaempft);
-  border-radius: 0.25rem;
+  color: var(--text);
+  background: var(--karte);
+  border: 1px solid var(--text-gedaempft);
+  border-radius: var(--radius-klein);
 
   &[aria-invalid='true'] {
-    border-color: var(--urinet-fehler);
+    border-color: var(--gefahr);
   }
 }
 
@@ -74,10 +75,10 @@ select {
 }
 
 .hinweis {
-  color: var(--urinet-gedaempft);
+  color: var(--text-gedaempft);
   font: var(--mat-sys-body-small);
 }
 
 .fehler {
-  color: var(--urinet-fehler);
+  color: var(--gefahr);
 }

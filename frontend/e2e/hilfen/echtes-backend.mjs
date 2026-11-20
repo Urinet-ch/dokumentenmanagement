@@ -229,10 +229,10 @@ const istJson = (typ) => /[/+]json\b/.test(typ ?? '');
  * Leitet die Anfragen der PWA an /api/v1/** an das Archiv im Testmodus weiter (einmal je Szenario, vor der Anmeldung
  * oder vor der ersten Anfrage). `passt(anfrage)` wählt aus, Standard alle; die übrigen gehen mit route.fallback() an die
  * Routen dahinter (Attrappen). Jede weitergeleitete Anfrage steht in welt.weiterleitung.anfragen mit Methode, Pfad,
- * Query, If-Match, JSON-Körper und, sobald da, Status, Headern und JSON der Antwort; `merken(anfrage)` ergänzt den
- * Eintrag (z. B. die Felder eines FormData, die Chromium nicht herausgibt). Scheitert die Weiterleitung, bricht die
- * Anfrage ab und der Fehler steht in welt.weiterleitung.fehler. Mit welt.weiterleitung.sitzungAbgelaufen bleibt das
- * Token der Attrappe.
+ * Query, If-Match, JSON-Körper und, sobald der Körper der Antwort gelesen ist, zugleich Status, Headern und JSON der
+ * Antwort; `merken(anfrage)` ergänzt den Eintrag (z. B. die Felder eines FormData, die Chromium nicht herausgibt).
+ * Scheitert die Weiterleitung, bricht die Anfrage ab und der Fehler steht in welt.weiterleitung.fehler. Mit
+ * welt.weiterleitung.sitzungAbgelaufen bleibt das Token der Attrappe.
  */
 export async function weiterleiten(welt, { passt = () => true, merken = async () => ({}) } = {}) {
   if (welt.weiterleitung) {
@@ -244,11 +244,12 @@ export async function weiterleiten(welt, { passt = () => true, merken = async ()
   welt.seite.on('response', async (antwort) => {
     const eintrag = eintraege.get(antwort.request());
     if (eintrag) {
-      eintrag.status = antwort.status();
-      eintrag.headers = antwort.headers();
-      eintrag.antwort = istJson(eintrag.headers['content-type'])
-        ? await antwort.json().catch(() => null)
-        : null;
+      // Status, Header und Antwort zusammen, erst wenn der Körper gelesen ist (das Ereignis kommt mit den Headern):
+      // Wer auf den Status wartet, sieht nie einen Eintrag ohne Antwort.
+      const status = antwort.status();
+      const headers = antwort.headers();
+      const json = istJson(headers['content-type']) ? await antwort.json().catch(() => null) : null;
+      Object.assign(eintrag, { status, headers, antwort: json });
     }
   });
   const origin = new URL(basisUrl).origin;

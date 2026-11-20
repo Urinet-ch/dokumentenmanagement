@@ -3,6 +3,7 @@ package ch.urinet.archiv.mandant.application;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.WissenOkfExportPort;
 
 import java.io.BufferedWriter;
 import java.io.FilterOutputStream;
@@ -33,14 +34,17 @@ public class MandantVollexportSchreiber {
     private static final String METADATEN_JSON = "metadaten.json";
     private static final String METADATEN_CSV = "metadaten.csv";
     private static final String MANIFESTE_CSV = "manifeste.csv";
+    private static final String WISSENSBASIS = "wissensbasis.zip";
     private static final String PRUEFSUMMEN = "pruefsummen.sha256";
 
     private final MandantVollexportDaten daten;
     private final AblagePort ablage;
+    private final WissenOkfExportPort wissen;
 
-    public MandantVollexportSchreiber(MandantVollexportDaten daten, AblagePort ablage) {
+    public MandantVollexportSchreiber(MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen) {
         this.daten = Objects.requireNonNull(daten, "daten");
         this.ablage = Objects.requireNonNull(ablage, "ablage");
+        this.wissen = Objects.requireNonNull(wissen, "wissen");
     }
 
     public int schreiben(MandantCode mandant, UUID exportId, Path arbeitsverzeichnis, OutputStream ziel)
@@ -63,6 +67,11 @@ public class MandantVollexportSchreiber {
             schreibeMetadatenCsv(zip, pruefsummen);
             int dokumente = schreibeDateien(mandant, zip, pruefsummen);
             schreibeManifeste(mandant, zip, pruefsummen);
+            zip.putNextEntry(new ZipEntry(WISSENSBASIS));
+            MessageDigest wissenDigest = sha256();
+            wissen.schreiben(mandant, new DigestOutputStream(zip, wissenDigest));
+            zip.closeEntry();
+            pruefsumme(pruefsummen, wissenDigest.digest(), WISSENSBASIS);
             pruefsummen.flush();
             zip.putNextEntry(new ZipEntry(PRUEFSUMMEN));
             Files.copy(pruefsummenDatei, zip);

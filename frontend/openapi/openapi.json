@@ -1,6 +1,97 @@
 {
   "components" : {
     "schemas" : {
+      "Aenderung" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "nr" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aktion" : {
+            "type" : "string"
+          },
+          "seiteId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "pfad" : {
+            "type" : "string"
+          },
+          "basisVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "daten" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "inhalt" : {
+            "type" : "string"
+          },
+          "diff" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "begruendung" : {
+            "type" : "string"
+          },
+          "widersprueche" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "entfernteAussagen" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "befunde" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "hinweise" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "vertraulichkeitKontext" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "entschiedenVon" : {
+            "type" : "string"
+          },
+          "entschiedenAm" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "grund" : {
+            "type" : "string"
+          },
+          "ergebnisVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "etag" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "Antwort" : {
         "type" : "object",
         "properties" : {
@@ -25,6 +116,62 @@
           },
           "hinweis" : {
             "type" : "string"
+          }
+        }
+      },
+      "Antwort1" : {
+        "type" : "object",
+        "properties" : {
+          "entwurfId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "anzahl" : {
+            "$ref" : "#/components/schemas/Anzahl"
+          },
+          "paketSha256" : {
+            "type" : "string"
+          },
+          "befunde" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            }
+          },
+          "hinweise" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            }
+          }
+        }
+      },
+      "Anzahl" : {
+        "type" : "object",
+        "properties" : {
+          "neu" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aendern" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unveraendert" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ignoriert" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -150,6 +297,37 @@
           },
           "standardWert" : {
             "type" : "string"
+          }
+        }
+      },
+      "Aussage" : {
+        "type" : "object",
+        "properties" : {
+          "nr" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "schluessel" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "seiten" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          "auszug" : {
+            "type" : "string"
+          },
+          "belegt" : {
+            "type" : "boolean"
+          },
+          "zugeordnet" : {
+            "type" : "boolean"
           }
         }
       },
@@ -1235,6 +1413,21 @@
           }
         }
       },
+      "Entscheidung" : {
+        "type" : "object",
+        "properties" : {
+          "nr" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "grund" : {
+            "type" : "string"
+          }
+        }
+      },
       "Export" : {
         "description" : "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link (24 Stunden ab Fertigstellung) gilt nicht mehr",
         "type" : "object",
@@ -1484,6 +1677,25 @@
           },
           "naechsteFrist" : {
             "$ref" : "#/components/schemas/LocalDate"
+          }
+        }
+      },
+      "ImportHerkunft" : {
+        "type" : "object",
+        "properties" : {
+          "paketSha256" : {
+            "type" : "string"
+          },
+          "kopf" : {
+            "$ref" : "#/components/schemas/PaketKopf"
+          },
+          "unveraendert" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ignoriert" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -1958,6 +2170,41 @@
           }
         }
       },
+      "Klassifikationsfacette" : {
+        "type" : "object",
+        "required" : [ "code", "name", "werte" ],
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "werte" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/KlassifikationswertFacette"
+            }
+          }
+        }
+      },
+      "KlassifikationswertFacette" : {
+        "type" : "object",
+        "required" : [ "code", "name", "anzahl" ],
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "anzahl" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Anzahl sichtbarer Dokumente; im Modus hybrid nur unter den gelieferten Treffern"
+          }
+        }
+      },
       "KonfigurationKiTexte" : {
         "type" : "object",
         "properties" : {
@@ -2426,14 +2673,83 @@
           }
         }
       },
+      "Kopf" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "anlass" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "erstelltVon" : {
+            "type" : "string"
+          },
+          "erstellt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "dokumentId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "unvollstaendig" : {
+            "type" : "boolean"
+          },
+          "hinweis" : {
+            "type" : "string"
+          },
+          "herkunft" : {
+            "$ref" : "#/components/schemas/ImportHerkunft"
+          }
+        }
+      },
       "LocalDate" : {
         "type" : "string",
         "format" : "date",
         "examples" : [ "2022-03-10" ]
       },
+      "Mandantenfunktionen" : {
+        "type" : "object",
+        "required" : [ "finanzVerfuegbar" ],
+        "properties" : {
+          "finanzVerfuegbar" : {
+            "type" : "boolean",
+            "description" : "Mindestens eine aktive Dokumentart hat die Gruppe «finanz» (Spec 05, Req 8.8)"
+          }
+        }
+      },
+      "PaketKopf" : {
+        "type" : "object",
+        "properties" : {
+          "paketFormat" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "mandant" : {
+            "type" : "string"
+          },
+          "erzeugtVon" : {
+            "type" : "string"
+          },
+          "erzeugtMit" : {
+            "type" : "string"
+          },
+          "kontextStufe" : {
+            "type" : "string"
+          },
+          "erzeugtAm" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "instanz" : {
+            "type" : "string"
+          }
+        }
+      },
       "ProtokollAktion" : {
         "type" : "string",
-        "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV" ]
+        "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "WISSEN_IMPORT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV" ]
       },
       "ProtokollEintrag" : {
         "description" : "Eintrag des Zugriffsprotokolls; Name und Rolle aus dem Benutzerverzeichnis zur Zeit des Eintrags (Req 10.10)",
@@ -2525,6 +2841,9 @@
           },
           "quellSeiteId" : {
             "$ref" : "#/components/schemas/UUID"
+          },
+          "sha256" : {
+            "type" : "string"
           }
         }
       },
@@ -2657,14 +2976,37 @@
           }
         }
       },
+      "StatusAnsicht" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "entscheidungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Entscheidung"
+            }
+          }
+        }
+      },
       "Suchergebnis" : {
         "type" : "object",
-        "required" : [ "treffer", "gesamt", "seite", "groesse" ],
+        "required" : [ "treffer", "facetten", "gesamt", "seite", "groesse" ],
         "properties" : {
           "treffer" : {
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/Suchtreffer"
+            }
+          },
+          "facetten" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Klassifikationsfacette"
             }
           },
           "gesamt" : {
@@ -2894,6 +3236,26 @@
           }
         }
       },
+      "Vollansicht" : {
+        "type" : "object",
+        "properties" : {
+          "entwurf" : {
+            "$ref" : "#/components/schemas/Kopf"
+          },
+          "kernaussagen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Aussage"
+            }
+          },
+          "aenderungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Aenderung"
+            }
+          }
+        }
+      },
       "Warnung" : {
         "type" : "object",
         "description" : "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)",
@@ -2932,6 +3294,76 @@
           }
         }
       },
+      "WissenEinstellungen" : {
+        "type" : "object",
+        "properties" : {
+          "budgetTokens" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "lintBudgetTokens" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "lintZeitplan" : {
+            "type" : [ "string", "null" ]
+          },
+          "monatsbudgetTokens" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "minimum" : 1
+          }
+        }
+      },
+      "WissenExport" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "erstellt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "fertig" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "gueltigBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "groesse" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64"
+          },
+          "sha256" : {
+            "type" : [ "string", "null" ]
+          },
+          "url" : {
+            "type" : [ "string", "null" ]
+          },
+          "fehlerId" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/UUID"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        }
+      },
       "WissenIngestAuftrag" : {
         "description" : "Eingereihter Ingest-Entwurf.",
         "type" : "object",
@@ -2965,6 +3397,14 @@
             "type" : [ "integer", "null" ],
             "format" : "int32",
             "minimum" : 1
+          }
+        }
+      },
+      "WissenLintAuftrag" : {
+        "type" : "object",
+        "properties" : {
+          "lintId" : {
+            "$ref" : "#/components/schemas/UUID"
           }
         }
       },
@@ -3171,6 +3611,9 @@
           },
           "quellSeiteTitel" : {
             "type" : "string"
+          },
+          "dokumentDatum" : {
+            "$ref" : "#/components/schemas/LocalDate"
           }
         }
       },
@@ -4081,7 +4524,7 @@
     "/api/v1/dokumente" : {
       "post" : {
         "summary" : "Dateien hochladen",
-        "description" : "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».",
+        "description" : "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen» als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprüft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».",
         "tags" : [ "Dokumente" ],
         "requestBody" : {
           "content" : {
@@ -4107,6 +4550,12 @@
                     "type" : "boolean"
                   },
                   "hinweis" : {
+                    "type" : "string"
+                  },
+                  "art" : {
+                    "type" : "string"
+                  },
+                  "klassifikationen" : {
                     "type" : "string"
                   }
                 }
@@ -4162,7 +4611,7 @@
       },
       "get" : {
         "summary" : "Dokumente suchen",
-        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
+        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Klassifikationsfilter als wiederholbare Parameter klassifikation.<code>=<wert>; Antwort enthält sichtbarkeitsgeprüfte Facetten. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
         "tags" : [ "Dokumente" ],
         "parameters" : [ {
           "description" : "Code der Dokumentart",
@@ -6484,6 +6933,33 @@
         } ]
       }
     },
+    "/api/v1/mandant/funktionen" : {
+      "get" : {
+        "summary" : "Verfügbare Funktionen des Mandanten",
+        "tags" : [ "Konfiguration" ],
+        "responses" : {
+          "200" : {
+            "description" : "Funktionen des aktuellen Mandanten",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Mandantenfunktionen"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/protokoll" : {
       "get" : {
         "summary" : "Zugriffsprotokoll durchsuchen",
@@ -6846,6 +7322,176 @@
         } ]
       }
     },
+    "/api/v1/wissensbasis/einstellungen" : {
+      "put" : {
+        "summary" : "Wissenseinstellungen ersetzen",
+        "description" : "Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.",
+        "tags" : [ "Wissensbasis" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenEinstellungen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Einstellungen gespeichert",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenEinstellungen"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Budget oder Zeitplan ungültig"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "get" : {
+        "summary" : "Wissenseinstellungen lesen",
+        "description" : "Nur Inhaber (A19); null bedeutet den konfigurierten Startwert.",
+        "tags" : [ "Wissensbasis" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenEinstellungen"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensbasis/exporte" : {
+      "post" : {
+        "summary" : "OKF-Export anfordern",
+        "description" : "Nur Inhaber (A19); reiht WISSEN_EXPORT ein.",
+        "tags" : [ "Wissensbasis" ],
+        "responses" : {
+          "202" : {
+            "description" : "Export angelegt und eingereiht",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenExport"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensbasis/exporte/{id}" : {
+      "get" : {
+        "summary" : "OKF-Export abrufen",
+        "description" : "Nur Inhaber (A19); Download ab Abschluss für 24 Stunden.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Exportstatus und gegebenenfalls Download-Adresse",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenExport"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Export nicht gefunden"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensbasis/lint" : {
+      "post" : {
+        "summary" : "Lint der Wissensbasis starten",
+        "responses" : {
+          "202" : {
+            "description" : "Lint eingereiht",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenLintAuftrag"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf keinen Lint starten"
+          },
+          "409" : {
+            "description" : "Ein Lint läuft bereits"
+          },
+          "429" : {
+            "description" : "Monatsbudget der Wissensbasis erschöpft"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "tags" : [ "Wissen Lint Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/wissensbasis/log" : {
       "get" : {
         "summary" : "Wissensbasis-Log",
@@ -6947,6 +7593,65 @@
           },
           "404" : {
             "description" : "Seite nicht vorhanden oder nicht sichtbar"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/import" : {
+      "post" : {
+        "summary" : "Wissenspaket synchron als Entwurf importieren",
+        "description" : "A17, nur OIDC. Keine KI, keine Freigabe. Höchstens 10 MiB ZIP und 60 Sekunden.",
+        "tags" : [ "Wissensbasis" ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "paket" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Importentwurf angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Antwort1"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Teil paket fehlt oder ist mehrfach vorhanden"
+          },
+          "403" : {
+            "description" : "Import nicht erlaubt"
+          },
+          "409" : {
+            "description" : "Paket bereits importiert oder zu viele offene Importe"
+          },
+          "413" : {
+            "description" : "Paket zu gross"
+          },
+          "415" : {
+            "description" : "Kein ZIP oder falscher Medientyp"
+          },
+          "422" : {
+            "description" : "Paket ungültig; Codes und Pfade ohne Inhalte"
           },
           "401" : {
             "description" : "Not Authorized"
@@ -7169,10 +7874,16 @@
         } ],
         "responses" : {
           "200" : {
-            "description" : "Entwurf",
+            "description" : "Entwurf mit Importherkunft für A17; nur Status für A18",
             "content" : {
               "application/json" : {
-                "schema" : { }
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/Vollansicht"
+                  }, {
+                    "$ref" : "#/components/schemas/StatusAnsicht"
+                  } ]
+                }
               }
             }
           },
@@ -7181,6 +7892,41 @@
           },
           "404" : {
             "description" : "Entwurf nicht gefunden"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{id}/neu-pruefen" : {
+      "post" : {
+        "summary" : "Quellen und Befunde eines Importentwurfs ohne KI neu prüfen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "description" : "ID des Importentwurfs",
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Prüfung erneuert; Änderungs-ETags erhöht"
+          },
+          "403" : {
+            "description" : "Prüfung nicht erlaubt"
+          },
+          "404" : {
+            "description" : "Importentwurf nicht gefunden"
+          },
+          "409" : {
+            "description" : "Entwurf ist kein offener Import"
           },
           "401" : {
             "description" : "Not Authorized"

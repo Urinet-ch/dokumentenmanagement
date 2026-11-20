@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="055-klassifikation-volltext" author="copilot">
+        <sql>alter table dokument alter column volltext_tsv drop expression</sql>
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_dokument_volltext_tsv(p_id uuid, p_titel text, p_partner text, p_tags text[],
+                                                         p_volltext text, p_dateiname text)
+            returns tsvector language sql stable parallel safe set search_path from current as $$
+                select setweight(to_tsvector('german'::regconfig, coalesce(p_titel, '')), 'A')
+                    || setweight(to_tsvector('german'::regconfig, coalesce(p_partner, '')), 'B')
+                    || setweight(to_tsvector('german'::regconfig, archiv_tags_text(p_tags)), 'B')
+                    || setweight(to_tsvector('german'::regconfig, coalesce((
+                        select string_agg(w.name, ' ')
+                        from dokument_klassifikation dk
+                        join klassifikation_wert w
+                          on w.klassifikation = dk.klassifikation and w.code = dk.wert
+                        where dk.dokument_id = p_id
+                    ), '')), 'C')
+                    || setweight(to_tsvector('german'::regconfig, coalesce(p_volltext, '')), 'C')
+                    || setweight(to_tsvector('german'::regconfig, archiv_dateiname_text(p_dateiname)), 'D')
+            $$
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_dokument_volltext_vorher() returns trigger language plpgsql
+            set search_path from current as $$
+            begin
+                new.volltext_tsv := archiv_dokument_volltext_tsv(
+                    new.id, new.titel, new.partner_name, new.tags, new.volltext, new.dateiname);
+                return new;
+            end
+            $$
+        ]]></sql>
+        <sql>create trigger dokument_volltext_vorher before insert or update of id, titel, partner_name, tags, volltext, dateiname on dokument for each row execute function archiv_dokument_volltext_vorher()</sql>
+        <!-- Statement-Trigger: je Anweisung wird jedes betroffene Dokument nur einmal neu tokenisiert -->
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_dokument_klassifikation_volltext_einfuegen() returns trigger language plpgsql
+            set search_path from current as $$
+            begin
+                update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(
+                    d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)
+                where d.id in (select dokument_id from neu);
+                return null;
+            end
+            $$
+        ]]></sql>
+        <sql>create trigger dokument_klassifikation_volltext_einfuegen after insert on dokument_klassifikation referencing new table as neu for each statement execute function archiv_dokument_klassifikation_volltext_einfuegen()</sql>
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_dokument_klassifikation_volltext_loeschen() returns trigger language plpgsql
+            set search_path from current as $$
+            begin
+                update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(
+                    d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)
+                where d.id in (select dokument_id from alt);
+                return null;
+            end
+            $$
+        ]]></sql>
+        <sql>create trigger dokument_klassifikation_volltext_loeschen after delete on dokument_klassifikation referencing old table as alt for each statement execute function archiv_dokument_klassifikation_volltext_loeschen()</sql>
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_dokument_klassifikation_volltext_aendern() returns trigger language plpgsql
+            set search_path from current as $$
+            begin
+                update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(
+                    d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)
+                where d.id in (select dokument_id from alt union select dokument_id from neu);
+                return null;
+            end
+            $$
+        ]]></sql>
+        <sql>create trigger dokument_klassifikation_volltext_aendern after update on dokument_klassifikation referencing old table as alt new table as neu for each statement execute function archiv_dokument_klassifikation_volltext_aendern()</sql>
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_klassifikation_wert_volltext_nachher() returns trigger language plpgsql
+            set search_path from current as $$
+            begin
+                update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(
+                    d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)
+                where exists (
+                    select 1 from dokument_klassifikation dk
+                    where dk.dokument_id = d.id and dk.klassifikation = new.klassifikation and dk.wert = new.code
+                );
+                return null;
+            end
+            $$
+        ]]></sql>
+        <sql>create trigger klassifikation_wert_volltext_nachher after update of name on klassifikation_wert for each row execute function archiv_klassifikation_wert_volltext_nachher()</sql>
+        <sql>update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)</sql>
+        <rollback>
+            <sql>drop trigger if exists klassifikation_wert_volltext_nachher on klassifikation_wert</sql>
+            <sql>drop trigger if exists dokument_klassifikation_volltext_einfuegen on dokument_klassifikation</sql>
+            <sql>drop trigger if exists dokument_klassifikation_volltext_loeschen on dokument_klassifikation</sql>
+            <sql>drop trigger if exists dokument_klassifikation_volltext_aendern on dokument_klassifikation</sql>
+            <sql>drop trigger if exists dokument_volltext_vorher on dokument</sql>
+            <!-- PostgreSQL 17 kann eine normale Spalte nicht mit SET EXPRESSION wieder generieren.
+                 Nur den abgeleiteten Indexwert neu anlegen; die Dokumentdaten bleiben unverändert. -->
+            <sql>alter table dokument drop column volltext_tsv</sql>
+            <sql>alter table dokument add column volltext_tsv tsvector generated always as (
+                setweight(to_tsvector('german'::regconfig, coalesce(titel, '')), 'A')
+                || setweight(to_tsvector('german'::regconfig, coalesce(partner_name, '')), 'B')
+                || setweight(to_tsvector('german'::regconfig, archiv_tags_text(tags)), 'B')
+                || setweight(to_tsvector('german'::regconfig, coalesce(volltext, '')), 'C')
+                || setweight(to_tsvector('german'::regconfig, archiv_dateiname_text(dateiname)), 'D')) stored</sql>
+            <sql>create index dokument_volltext_ix on dokument using gin (volltext_tsv)</sql>
+            <sql>create index dokument_volltext_ohne_dateiname_ix on dokument
+                using gin (ts_filter(volltext_tsv, cast('{a,b,c}' as "char"[])))</sql>
+            <sql>drop function if exists archiv_klassifikation_wert_volltext_nachher()</sql>
+            <sql>drop function if exists archiv_dokument_klassifikation_volltext_einfuegen()</sql>
+            <sql>drop function if exists archiv_dokument_klassifikation_volltext_loeschen()</sql>
+            <sql>drop function if exists archiv_dokument_klassifikation_volltext_aendern()</sql>
+            <sql>drop function if exists archiv_dokument_volltext_vorher()</sql>
+            <sql>drop function if exists archiv_dokument_volltext_tsv(uuid, text, text, text[], text, text)</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

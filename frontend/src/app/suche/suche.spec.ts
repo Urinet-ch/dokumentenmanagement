@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Observable, Subject, of } from 'rxjs';
 import { Dokumentart, Kontakt, Suchergebnis, Suchtreffer } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
@@ -39,7 +39,7 @@ const treffer = (werte: Partial<Suchtreffer>): Suchtreffer => ({
   ...werte,
 });
 
-const ergebnis = (...liste: Suchtreffer[]): Suchergebnis => ({ treffer: liste, gesamt: liste.length, seite: 0, groesse: 20 });
+const ergebnis = (...liste: Suchtreffer[]): Suchergebnis => ({ treffer: liste, facetten: [], gesamt: liste.length, seite: 0, groesse: 20 });
 
 describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
   let fixture: ComponentFixture<Suche>;
@@ -137,6 +137,14 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
     });
   });
 
+  it('übernimmt den Begriff aus der Suche in der Kopfzeile (?q=) und sucht sofort', async () => {
+    await antworten(ergebnis());
+    await TestBed.inject(Router).navigateByUrl('/?q=Hostpoint');
+    await fixture.whenStable();
+    expect(port.anfragen.at(-1)).toEqual({ modus: 'hybrid', q: 'Hostpoint' });
+    expect((element.querySelector('[name=q]') as HTMLInputElement).value).toBe('Hostpoint');
+  });
+
   it('meldet ungültige Eingaben, ohne das Archiv zu fragen', async () => {
     await antworten(ergebnis());
     eingeben('geschaeftsjahr', '26');
@@ -219,6 +227,7 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
       Array.from({ length: n }, (_, i) => treffer({ id: `d${i}`, titel: `Treffer ${String(n - i).padStart(2, '0')}` }));
     const hybridAntwort = (n: number, mehr: Partial<Suchergebnis> = {}): Suchergebnis => ({
       treffer: dreissigUndMehr(n),
+      facetten: [],
       gesamt: n,
       seite: 0,
       groesse: 30,

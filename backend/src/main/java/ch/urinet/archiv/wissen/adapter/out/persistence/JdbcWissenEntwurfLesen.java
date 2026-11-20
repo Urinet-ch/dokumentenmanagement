@@ -3,6 +3,9 @@ package ch.urinet.archiv.wissen.adapter.out.persistence;
 import ch.urinet.archiv.wissen.application.WissenEntwurfLesenRepository;
 import ch.urinet.archiv.wissen.application.WissenEntwurfLesen.Entscheidung;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Kernaussage;
+import ch.urinet.archiv.wissen.application.DiffDienst;
+import ch.urinet.archiv.wissen.domain.WissensMarkdown;
+import ch.urinet.archiv.wissen.domain.paket.PaketKopf;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +18,7 @@ import jakarta.transaction.Transactional;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,7 +28,8 @@ import java.util.UUID;
 @Transactional(Transactional.TxType.MANDATORY)
 public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
     private static final String KOPF = """
-            id, anlass, status, erstellt_von, erstellt, dokument_id, unvollstaendig, hinweis
+            id, anlass, status, erstellt_von, erstellt, dokument_id, unvollstaendig, hinweis,
+            paket_sha256, cast(paket_angaben as text)
             """;
     private static final TypeReference<Map<String, Object>> OBJEKT = new TypeReference<>() { };
     private static final TypeReference<List<Map<String, Object>>> OBJEKTE = new TypeReference<>() { };
@@ -56,7 +61,7 @@ public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
         }
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();
-        return rows.stream().map(JdbcWissenEntwurfLesen::kopf).toList();
+        return rows.stream().map(this::kopf).toList();
     }
 
     @Override
@@ -64,7 +69,7 @@ public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = em.get().createNativeQuery("select " + KOPF + " from wissens_entwurf where id = :id")
                 .setParameter("id", id).getResultList();
-        return rows.stream().findFirst().map(JdbcWissenEntwurfLesen::kopf);
+        return rows.stream().findFirst().map(this::kopf);
     }
 
     @Override
@@ -80,18 +85,39 @@ public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
     public List<Aenderung> aenderungen(UUID id) {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = em.get().createNativeQuery("""
-                select id, nr, aktion, seite_id, pfad, basis_version, cast(daten as text), inhalt,
-                       cast(diff as text), begruendung, cast(widersprueche as text), cast(entfernte_aussagen as text),
-                       cast(befunde as text), cast(hinweise as text), vertraulichkeit_kontext, status,
-                       entschieden_von, entschieden_am, grund, ergebnis_version, etag
-                from wissens_aenderung where entwurf_id = :id order by nr
+                select a.id, a.nr, a.aktion, a.seite_id, a.pfad, a.basis_version, cast(a.daten as text), a.inhalt,
+                       cast(a.diff as text), a.begruendung, cast(a.widersprueche as text),
+                       cast(a.entfernte_aussagen as text), cast(a.befunde as text), cast(a.hinweise as text),
+                       a.vertraulichkeit_kontext, a.status, a.entschieden_von, a.entschieden_am,
+                       a.grund, a.ergebnis_version, a.etag, v.inhalt
+                from wissens_aenderung a
+                left join wissensseite_version v on v.seite_id = a.seite_id and v.version = a.basis_version
+                where a.entwurf_id = :id order by a.nr
                 """).setParameter("id", id).getResultList();
         return rows.stream().map(row -> new Aenderung(((Number) row[0]).longValue(), ((Number) row[1]).intValue(),
                 (String) row[2], uuid(row[3]), (String) row[4], integer(row[5]), lesen((String) row[6], OBJEKT),
-                (String) row[7], lesen((String) row[8], OBJEKT), (String) row[9], liste(row[10]),
+                (String) row[7], diff(row), (String) row[9], liste(row[10]),
                 liste(row[11]), liste(row[12]), liste(row[13]), (String) row[14], (String) row[15],
                 (String) row[16], zeit(row[17]), (String) row[18], integer(row[19]), ((Number) row[20]).intValue()))
                 .toList();
+    }
+
+    private Map<String, Object> diff(Object[] row) {
+        Map<String, Object> diff = new HashMap<>(lesen((String) row[8], OBJEKT));
+        if (diff.get("widersprueche") != null && diff.get("entfernteWidersprueche") != null) {
+            return diff;
+        }
+        String basis = (String) row[21];
+        if ("AENDERN".equals(row[2]) && basis == null) {
+            throw new IllegalStateException("Gespeicherte Entwurfsbasis fehlt");
+        }
+        String alt = basis == null ? "" : basis;
+        String neu = (String) row[7];
+        diff.putIfAbsent("widersprueche", new DiffDienst.Feld<>(
+                WissensMarkdown.analysieren(alt, WissensMarkdown.MAX_EINGABE_ZEICHEN).widersprueche(),
+                WissensMarkdown.analysieren(neu, WissensMarkdown.MAX_EINGABE_ZEICHEN).widersprueche()));
+        diff.putIfAbsent("entfernteWidersprueche", WissensMarkdown.entfernteWidersprueche(alt, neu));
+        return diff;
     }
 
     @Override
@@ -116,10 +142,24 @@ public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
         }
     }
 
-    private static Kopf kopf(Object[] row) {
+    private Kopf kopf(Object[] row) {
+        ImportHerkunft herkunft = null;
+        if (row[8] != null || row[9] != null) {
+            if (row[8] == null || row[9] == null) {
+                throw new IllegalStateException("Gespeicherte Importherkunft ist unvollständig");
+            }
+            try {
+                ImportAngaben angaben = json.readValue((String) row[9], ImportAngaben.class);
+                herkunft = new ImportHerkunft((String) row[8], angaben.kopf(), angaben.unveraendert(), angaben.ignoriert());
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Gespeicherte Importherkunft ist nicht lesbar", e);
+            }
+        }
         return new Kopf(uuid(row[0]), (String) row[1], (String) row[2], (String) row[3], zeit(row[4]),
-                uuid(row[5]), Boolean.TRUE.equals(row[6]), (String) row[7]);
+                uuid(row[5]), Boolean.TRUE.equals(row[6]), (String) row[7], herkunft);
     }
+
+    private record ImportAngaben(PaketKopf kopf, int unveraendert, int ignoriert) { }
 
     private static UUID uuid(Object wert) {
         return wert == null ? null : wert instanceof UUID id ? id : UUID.fromString(wert.toString());

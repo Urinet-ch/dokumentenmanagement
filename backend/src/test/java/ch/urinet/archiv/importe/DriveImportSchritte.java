@@ -145,9 +145,14 @@ public class DriveImportSchritte {
 
     @Wenn("der Drive-Import den Ordner «{}» ins Archiv lädt")
     public void laden(String ordner) throws SQLException {
-        starten("--archiv", "http://localhost:" + ConfigProvider.getConfig()
-                .getValue("quarkus.http.test-port", Integer.class), "--token-datei", tokenDatei.toString(),
-                verzeichnis.resolve(ordner).toString());
+        ladenMitVorbelegung(ordner, null, null, null);
+    }
+
+    @Wenn("der Drive-Import den Ordner «{}» ins Archiv lädt und dabei Art «{word}» sowie Klassifikation «{word}» "
+            + "mit Wert «{word}» vorbelegt")
+    public void ladenMitKlassifikation(String ordner, String art, String klassifikation, String wert)
+            throws SQLException {
+        ladenMitVorbelegung(ordner, art, klassifikation, wert);
     }
 
     @Wenn("der Drive-Import den Ordner «{}» im Trockenlauf durchgeht")
@@ -273,6 +278,16 @@ public class DriveImportSchritte {
         }
     }
 
+    @Dann("hat jedes importierte Dokument die Klassifikation «{word}» mit dem Wert «{word}»")
+    public void klassifikation(String code, String wert) throws SQLException {
+        assertThat(importiert).isNotEmpty();
+        for (UUID id : importiert) {
+            assertThat(abfragen("select wert from " + schema(mandant)
+                    + ".dokument_klassifikation where dokument_id = ?::uuid and klassifikation = ?",
+                    id.toString(), code)).as(id.toString()).containsExactly(Map.of("wert", wert));
+        }
+    }
+
     @Dann("ist für jedes importierte Dokument genau ein Auftrag «{word}» eingereiht")
     public void auftrag(String typ) throws SQLException {
         assertThat(importiert).isNotEmpty();
@@ -308,6 +323,17 @@ public class DriveImportSchritte {
                 importiert.add(UUID.fromString(zeile.get("id")));
             }
         }
+    }
+
+    private void ladenMitVorbelegung(String ordner, String art, String klassifikation, String wert)
+            throws SQLException {
+        List<String> argumente = new ArrayList<>(List.of("--archiv", "http://localhost:" + ConfigProvider.getConfig()
+                .getValue("quarkus.http.test-port", Integer.class), "--token-datei", tokenDatei.toString()));
+        if (art != null) {
+            argumente.addAll(List.of("--art", art, "--klassifikation", klassifikation + "=" + wert));
+        }
+        argumente.add(verzeichnis.resolve(ordner).toString());
+        starten(argumente.toArray(String[]::new));
     }
 
     private List<String> abschnitt(String titel) {

@@ -41,6 +41,7 @@ import {
   LEERE_DOKUMENT_KLASSIFIKATIONEN,
 } from './klassifikationen';
 import { WissenVerwendung } from '../wissen/wissen-verwendung';
+import { Symbol } from '../gemeinsam/symbol';
 
 type Laden = 'laedt' | 'ok' | 'fehlt' | 'fehler' | 'verbindung';
 type Vorschau = 'laedt' | 'ok' | 'fehlt' | 'fehler';
@@ -83,6 +84,7 @@ interface Zusatzfeld {
     MetadatenFormular,
     TitelAnzeige,
     WissenVerwendung,
+    Symbol,
   ],
   templateUrl: './dokument-ansicht.html',
   styleUrl: './dokument-ansicht.scss',

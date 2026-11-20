@@ -249,9 +249,11 @@ describe('Kontakte: Liste (Req 17.1, 17.2)', () => {
       groesse: 25,
     });
     await antworten(liste(80, eintrag({})));
-    expect(element.querySelector<HTMLSelectElement>('[data-test=filter-status]')!.value).toBe(
-      'ALLE',
-    );
+    expect(
+      element
+        .querySelector('[data-test=filter-status] [aria-pressed=true]')!
+        .getAttribute('data-status'),
+    ).toBe('ALLE');
     expect(element.querySelector<HTMLSelectElement>('[data-test=filter-quelle]')!.value).toBe(
       'MANUELL',
     );
@@ -264,9 +266,9 @@ describe('Kontakte: Liste (Req 17.1, 17.2)', () => {
   it('setzt jeden Filter in die Adresse und beginnt wieder auf der ersten Seite', async () => {
     await oeffnen('/kontakte?seite=3');
     await antworten(liste(100, eintrag({})));
-    const status = element.querySelector<HTMLSelectElement>('[data-test=filter-status]')!;
-    status.value = 'INAKTIV';
-    status.dispatchEvent(new Event('change'));
+    element
+      .querySelector<HTMLButtonElement>('[data-test=filter-status] [data-status=INAKTIV]')!
+      .click();
     await harness.fixture.whenStable();
     expect(url()).toBe('/kontakte?status=INAKTIV');
     expect(port.listeAnfragen.at(-1)).toMatchObject({ status: 'INAKTIV', seite: 0 });
@@ -284,11 +286,12 @@ describe('Kontakte: Liste (Req 17.1, 17.2)', () => {
     expect(port.listeAnfragen.at(-1)!.nichtImExport).toBe(true);
     expect(url()).toBe('/kontakte?status=INAKTIV&quelle=CSV_IMPORT&nichtImExport=true');
 
+    // «Filter zurücksetzen» betrifft die Filterleiste; der Status steht sichtbar in der Kopfzeile und bleibt
     (element.querySelector('[data-test=zuruecksetzen]') as HTMLButtonElement).click();
     await harness.fixture.whenStable();
-    expect(url()).toBe('/kontakte');
+    expect(url()).toBe('/kontakte?status=INAKTIV');
     expect(port.listeAnfragen.at(-1)).toMatchObject({
-      status: 'AKTIV',
+      status: 'INAKTIV',
       quelle: undefined,
       nichtImExport: undefined,
     });

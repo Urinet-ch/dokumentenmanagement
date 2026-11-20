@@ -115,7 +115,8 @@ public interface KiPort {
         KERNAUSSAGEN,
         PLANUNG,
         SEITE,
-        QUELLE
+        QUELLE,
+        LINT_PAAR
     }
 
     record WissensAnfrage(WissensSchritt schritt, String modell, String systemPrompt, String nachricht,
@@ -148,7 +149,7 @@ public interface KiPort {
     record WissensOhneZugang(Verbrauch verbrauch) implements WissensAntwort {
     }
 
-    sealed interface WissensInhalt permits Kernaussagen, Planung, Seite, Quelle {
+    sealed interface WissensInhalt permits Kernaussagen, Planung, Seite, Quelle, LintPaar {
     }
 
     record Kernaussagen(List<Aussage> aussagen) implements WissensInhalt {
@@ -194,5 +195,24 @@ public interface KiPort {
     }
 
     record Zusammenfassung(String text, List<Integer> aussagen) {
+    }
+
+    record LintPaar(List<LintWiderspruch> widersprueche, List<LintVeraltet> veraltet, List<LintLink> links)
+            implements WissensInhalt {
+        public LintPaar {
+            widersprueche = widersprueche == null ? List.of() : List.copyOf(widersprueche);
+            veraltet = veraltet == null ? List.of() : List.copyOf(veraltet);
+            links = links == null ? List.of() : List.copyOf(links);
+        }
+    }
+
+    record LintWiderspruch(String seite, String schluessel, String gegenseite, String gegenschluessel,
+                           String text) {
+    }
+
+    record LintVeraltet(String seite, String schluessel, String neuereQuelle, String text) {
+    }
+
+    record LintLink(String seite, String ziel, String text) {
     }
 }

@@ -1,21 +1,25 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { WissensIndex } from '../gemeinsam/api';
+import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
 @Component({
   selector: 'app-wissen-index',
-  imports: [RouterLink],
+  imports: [RouterLink, MatButtonModule, Symbol],
   templateUrl: './wissen-index.html',
-  styleUrl: './wissen.scss',
+  styleUrls: ['./wissen.scss', './wissen-index.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WissenIndex {
   private readonly http = inject(HttpClient);
   private readonly destroy = inject(DestroyRef);
+  protected readonly anmeldung = inject(AnmeldungService);
   protected readonly texte = TEXTE.wissen;
   protected readonly typen = Object.entries(this.texte.seitentypen);
   protected readonly ergebnis = signal<WissensIndex | null>(null);

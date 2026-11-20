@@ -1,5 +1,8 @@
-<h1>{{ texte.titel }}</h1>
-<p>{{ texte.einleitung }}</p>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ gruppe }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
 
 <form class="karte filter" (submit)="$event.preventDefault(); anzeigen()" [attr.aria-label]="texte.filterTitel">
   <h2>{{ texte.filterTitel }}</h2>
@@ -66,31 +69,53 @@
   } @else if (eintraege()!.length === 0) {
     <p role="status">{{ texte.keineEintraege }}</p>
   } @else {
-    <ul class="liste">
-      @for (eintrag of eintraege(); track eintrag.id) {
-        <li class="karte eintrag" data-test="eintrag">
-          <span class="kopf">
-            <time [attr.datetime]="eintrag.zeit">{{ zeitpunkt(eintrag.zeit) }}</time>
-            <span class="marke" [attr.data-aktion]="eintrag.aktion">{{ aktionText(eintrag.aktion) }}</span>
-          </span>
-          <span class="wer">{{ wer(eintrag) }}</span>
-          @if (eintrag.benutzer) {
-            <span class="angaben kennung">{{ texte.kennung(eintrag.benutzer) }}</span>
-          }
-          @if (eintrag.dokumentId) {
-            <a class="angaben" [routerLink]="['/dokument', eintrag.dokumentId]">
-              {{ texte.zumDokument }} {{ eintrag.dokumentId }}
-            </a>
-          }
-          @if (eintrag.ip) {
-            <span class="angaben">{{ texte.ip(eintrag.ip) }}</span>
-          }
-          @if (eintrag.details && eintrag.details !== '{}') {
-            <span class="angaben details">{{ texte.details }}: {{ eintrag.details }}</span>
-          }
-        </li>
-      }
-    </ul>
+    <div class="karte tabelle">
+      <div class="tabellen-rahmen">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{{ texte.spalteZeit }}</th>
+              <th scope="col">{{ texte.spalteBenutzer }}</th>
+              <th scope="col">{{ texte.aktion }}</th>
+              <th scope="col">{{ texte.dokument }}</th>
+              <th scope="col">{{ texte.spalteIp }}</th>
+              <th scope="col">{{ texte.details }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (eintrag of eintraege(); track eintrag.id) {
+              <tr data-test="eintrag">
+                <td class="zahl">
+                  <time [attr.datetime]="eintrag.zeit">{{ zeitpunkt(eintrag.zeit) }}</time>
+                </td>
+                <td>
+                  <span class="wer">{{ wer(eintrag) }}</span>
+                  @if (eintrag.benutzer) {
+                    <span class="angaben mono kennung">{{ texte.kennung(eintrag.benutzer) }}</span>
+                  }
+                </td>
+                <td>
+                  <span class="pille" [attr.data-aktion]="eintrag.aktion">{{ aktionText(eintrag.aktion) }}</span>
+                </td>
+                <td>
+                  @if (eintrag.dokumentId) {
+                    <a class="mono" [routerLink]="['/dokument', eintrag.dokumentId]">
+                      {{ texte.zumDokument }} {{ eintrag.dokumentId }}
+                    </a>
+                  }
+                </td>
+                <td class="mono angaben">{{ eintrag.ip }}</td>
+                <td>
+                  @if (eintrag.details && eintrag.details !== '{}') {
+                    <span class="details mono">{{ eintrag.details }}</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
     <nav class="blaettern" [attr.aria-label]="texte.eintraege">
       <button mat-button type="button" [disabled]="seite() === 0" (click)="laden(seite() - 1)">{{ texte.zurueck }}</button>
       <span>{{ texte.seiteVon(bereich().von, bereich().bis, bereich().gesamt) }}</span>
@@ -113,43 +138,64 @@
   } @else if (verzeichnis()!.length === 0) {
     <p>{{ texte.keinVerzeichnis }}</p>
   } @else {
-    <ul class="liste">
-      @for (zeile of verzeichnis(); track zeile.id) {
-        <li class="karte zeile" data-test="verzeichnis">
-          <span class="wer">{{ person(zeile.name, zeile.rolle) }}</span>
-          <span class="angaben kennung">{{ texte.kennung(zeile.benutzer) }}</span>
-          <span class="angaben">
-            {{ texte.anlaesse[zeile.anlass] }} ·
-            {{ texte.gueltig(zeitpunkt(zeile.gueltigVon), zeile.gueltigBis ? zeitpunkt(zeile.gueltigBis) : null) }}
-            @if (zeile.erfasstVon) {
-              · {{ texte.erfasstVon(zeile.erfasstVon) }}
-            }
-          </span>
-          @if (austrittMoeglich(zeile)) {
-            @if (austrittFuer() === zeile.benutzer) {
-              <span class="frage">{{ texte.austrittFrage(zeile.name || zeile.benutzer) }}</span>
-              <span class="knoepfe">
-                <button mat-flat-button type="button" [disabled]="laeuft()" (click)="austritt(zeile)">
-                  {{ texte.austrittBestaetigen }}
-                </button>
-                <button mat-button type="button" [disabled]="laeuft()" (click)="austrittFuer.set(null)">
-                  {{ texte.abbrechen }}
-                </button>
-              </span>
-            } @else {
-              <button
-                mat-stroked-button
-                type="button"
-                class="austritt"
-                [disabled]="laeuft()"
-                (click)="meldung.set(null); austrittFuer.set(zeile.benutzer)"
-              >
-                {{ texte.austritt }}
-              </button>
-            }
+    <div class="karte tabelle">
+      <div class="tabellen-rahmen">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{{ texte.spaltePerson }}</th>
+              <th scope="col">{{ texte.benutzer }}</th>
+              <th scope="col">{{ texte.spalteGueltigkeit }}</th>
+              <th scope="col"><span class="nur-screenreader">{{ texte.spalteAktionen }}</span></th>
+            </tr>
+          </thead>
+          @for (zeile of verzeichnis(); track zeile.id) {
+            <tbody data-test="verzeichnis">
+              <tr>
+                <td><span class="wer">{{ person(zeile.name, zeile.rolle) }}</span></td>
+                <td><span class="angaben mono kennung">{{ zeile.benutzer }}</span></td>
+                <td class="angaben">
+                  {{ texte.anlaesse[zeile.anlass] }} ·
+                  {{ texte.gueltig(zeitpunkt(zeile.gueltigVon), zeile.gueltigBis ? zeitpunkt(zeile.gueltigBis) : null) }}
+                  @if (zeile.erfasstVon) {
+                    · {{ texte.erfasstVon(zeile.erfasstVon) }}
+                  }
+                </td>
+                <td class="rechts">
+                  @if (austrittMoeglich(zeile) && austrittFuer() !== zeile.benutzer) {
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      class="austritt"
+                      [disabled]="laeuft()"
+                      (click)="meldung.set(null); austrittFuer.set(zeile.benutzer)"
+                    >
+                      {{ texte.austritt }}
+                    </button>
+                  }
+                </td>
+              </tr>
+              @if (austrittMoeglich(zeile) && austrittFuer() === zeile.benutzer) {
+                <tr class="nachfrage">
+                  <td colspan="4">
+                    <div class="bestaetigung">
+                      <span class="frage">{{ texte.austrittFrage(zeile.name || zeile.benutzer) }}</span>
+                      <span class="knoepfe">
+                        <button mat-flat-button type="button" [disabled]="laeuft()" (click)="austritt(zeile)">
+                          {{ texte.austrittBestaetigen }}
+                        </button>
+                        <button mat-button type="button" [disabled]="laeuft()" (click)="austrittFuer.set(null)">
+                          {{ texte.abbrechen }}
+                        </button>
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
           }
-        </li>
-      }
-    </ul>
+        </table>
+      </div>
+    </div>
   }
 </section>

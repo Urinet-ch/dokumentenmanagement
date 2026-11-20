@@ -1778,6 +1778,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 422 | `CSV_UNGUELTIG`, `CSV_LEER` | Req 13.10, 13.11 |
 | 422 | `KEINE_WISSENSQUELLE` | Ingest für ein Dokument einer anderen Art als `WISSENSQUELLE` (Spec 04, Req 5.7) |
 | 422 | `ENTWURF_BEFUND` | Änderung der Wissensbasis mit Befund, mit Liste der Befund-Codes (Spec 04, Req 6.3) |
+| 422 | `PAKET_UNGUELTIG` | Wissenspaket mit Format-, Grenz-, Mandanten- oder Zeitfehler; Codes und Pfade ohne Inhalte (Spec 04, Req 19.7) |
 | 422 | `VERTRAULICHKEIT_ZU_TIEF` | Vertraulichkeit einer Wissensseite unter der berechneten Stufe (Spec 04, Req 6.8) |
 | 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
 | 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
@@ -1868,7 +1869,7 @@ Start migriert bzw. geprüft sind (`SchemaBereitschaftCheck`, ergänzt 13.11.202
 | Speicherbudget Stufe A | Messung in Aufgabe 1.10 mit synthetischen Belegen | Spitzenverbrauch je Dienst gegen das Budget aus `tech.md`, Health und Speicher der anderen Apps (Req 16.18) |
 | KI-Qualität | `GoldenDatensatzIT`, nur manuell gestartet, Daten aus `ARCHIV_GOLDEN_DIR` ausserhalb des Repos, echter AI-Aufruf | Bericht je Feld, getrennt nach Abstimmungs- (30) und Prüfteil (20); Gate ≥ 18/20 und Req 0.9 (Nachweis manuell) |
 | Frontend | Vitest, Playwright (mobile Viewport 375 px) | Erfassen mit Testbild mit und ohne Kanten, Offline-Warteschlange (Dublette, 4xx, 5xx, offline), Eingangskorb bestätigen in ≤ 2 Tipps |
-| Betrieb | Restore-Probe, monatlich und nach Änderungen, auf der Stufe-B-VPS mit `archiv.stufe=P`; in Stufe A nur als Funktionstest (Req 16.19) | Datenbanken und Dateien wiederherstellen, Anzahl Objekte = Einträge, Sperren (Ist aus dem Inventar ≥ Soll aus der DB, Modus gleich, aktive Sperre, Löschen ohne Bypass scheitert), Anmeldung, Dokument öffnen, Prüflauf grün (Req 16.3, 16.23, 16.27); JUnit: Stufenregel und Konfiguration der Stufe P, `DeployStufeTest` weist P in `deploy/infomaniak/` ab (Req 16.24), Wiederherstellungswerkzeug kappt nur beim Präfix `urinet-archiv-p-` (Req 16.27) |
+| Betrieb | Restore-Probe, monatlich und nach Änderungen, auf der Stufe-B-VPS mit `archiv.stufe=P`; in Stufe A nur als Funktionstest (Req 16.19) | Datenbanken und Dateien wiederherstellen, Anzahl Objekte = Einträge, Sperren (Ist aus dem Inventar ≥ Soll aus der DB, Modus gleich, aktive Sperre, Löschen ohne Bypass scheitert), Anmeldung, Dokument öffnen, Prüflauf grün (Req 16.3, 16.23, 16.27); der lokale Sicherungs-Roundtrip prüft zusätzlich die OIDC-Anmeldung am wiederhergestellten Realm und einen geschützten API-Aufruf; JUnit: Stufenregel und Konfiguration der Stufe P, `DeployStufeTest` weist P in `deploy/infomaniak/` ab (Req 16.24), Wiederherstellungswerkzeug kappt nur beim Präfix `urinet-archiv-p-` (Req 16.27) |
 
 Umsetzung der Architekturregeln (Aufgabe 1.6, `ArchitekturTest`, Req 16.13):
 - `domain` hängt nur vom JDK und von Domain-Typen ab. `application` hängt zusätzlich nur von `application`, CDI,

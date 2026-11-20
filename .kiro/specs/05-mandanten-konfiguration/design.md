@@ -108,6 +108,14 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   selben Sichtbarkeitsfilter wie Spec 01, 14.5; die Namen der zugeordneten Werte gehen mit Gewicht C in den
   `tsvector` (Neuberechnung bei Zuordnung und bei Namensänderung des Werts). Klassifikations-Codes kommen nur aus der
   geprüften Konfiguration, nie als SQL-Bezeichner aus der Anfrage.
+  Review-Nacharbeit zu Aufgabe 18.2 (20.11.2026): Im Modus `hybrid` zählen die Facetten dieselben höchstens
+  30 gelieferten Dokumente wie `gesamt`, auch beim Rückfall; keine Volltextbedingung schliesst semantische Treffer
+  nachträglich aus. Sicht und sämtliche Filter werden bei der Zählung erneut geprüft. Im Modus `volltext` bleibt
+  die bisherige Zählung über alle Treffer mit Auslassen des eigenen Klassifikationsfilters unverändert.
+  Der Rollback des noch nicht gemergten Changesets 055 stellt unter PostgreSQL 17 die generierte
+  `volltext_tsv`-Spalte und beide GIN-Indizes neu her; ausschliesslich abgeleitete Suchdaten werden ersetzt.
+  Die Vorwärtsmigration und ihre Prüfsumme bleiben unverändert. Ein Liquibase-Test prüft Bestand, zwei Schemas,
+  den Rollback und anschliessendes erneutes Migrieren.
 - `integration/webseite/` (bisher `integration/wordpress/`; Spec 03, Folgeänderung; umgesetzt in Spec 03, Aufgaben
   11.2 und 11.5) – Parameter der öffentlichen Liste: zusätzlich die Codes der Klassifikationen
   mit `oeffentlich_filter`, z. B. `?fachgebiet=bad`; der feste Sicherheitsfilter aus Spec 03 design.md bleibt
@@ -133,7 +141,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | POST | `/konfiguration/pruefen`, `/konfiguration/vergleichen` | Datei im Body; Befunde bzw. Diff; ändert nichts | A11 |
 | PUT | `/konfiguration` | Datei einspielen; 200 mit neuer Version und Diff (bzw. ohne Version bei keinem Unterschied); 409 `KONFIGURATION_VERALTET`, 422 | A11 |
 | GET | `/berichte/luecken?geschaeftsjahr=` | Lückenbericht nach `FOLGE`/`ERWARTET`, Antwortform `VollstaendigkeitAbfrage.Antwort` (wie das Werkzeug `vollstaendigkeit`; bisher geplant `?art=&jahr=`: Parameter heisst wie beim Werkzeug, ohne Filter `art`, jede Kategorie nennt ihre Art); nur Rollen mit uneingeschränkter Sicht (Req 5.4); `@RolesAllowed` nennt alle Rollen (`@AlleArchivRollen`), der Endpunkt prüft die Sicht und meldet die Verweigerung (403 `NICHT_ERLAUBT`) ins Zugriffsprotokoll (Spec 01, Req 10.7) | `inhaber`, `treuhaender`, `geschaeftsstelle` |
-| GET | `/mandant/funktionen` | `{finanz: bool}` (Req 8.8) | alle Rollen |
+| GET | `/mandant/funktionen` | `{finanzVerfuegbar: bool}` (Req 8.8; Feldname so umgesetzt, Aufgabe 18.2) | alle Rollen |
 
 Alle Änderungen einzelner Elemente verlangen `If-Match` mit der Konfigurationsversion (Req 7.6); jede Antwort trägt
 die neue Version als `ETag`. Bestehende Endpunkte: `POST/PATCH/DELETE /dokumentarten` nehmen die neuen Attribute an
@@ -171,6 +179,17 @@ selbst (Checkbox sichtbar, Hinweis unter den Gruppen). Antworten von Prüfen und
 und von Zuordnungen einer früher gewählten Art werden verworfen; die Dateiauswahl ist während einer Anfrage gesperrt.
 Ein 403 vom Backend zeigt bewusst die gemeinsame Meldung «nicht berechtigt» (Guard und Rechte entscheidet das Backend);
 eine Weiterleitung auf die 404-Seite gibt es nur über den Guard (Nachbesserung Review PR #323).
+
+## Eingangskorb und Artwechsel (Aufgabe 18.4)
+Bei einem Wechsel einer bereits gesetzten Art sendet der Eingangskorb vor der Bestätigung ein PATCH mit der neuen Art
+und den Klassifikationen der neuen Art, auch wenn sonst keine Werte geändert wurden. Das ersetzt Auslegungspunkt 4
+aus PR #332; die Bestätigung verwendet die vom PATCH gelieferte Version. Nicht zugeordnete Klassifikationen bleiben
+im Formular sichtbar. Ein ersetzendes Klassifikations-PATCH enthält nur Zuordnungen der gewählten Art: Nicht
+zugeordnete Werte entfallen dabei, auch wenn die Art nicht gewechselt hat. Ohne Änderung wird kein solches PATCH
+gesendet; die Prüfung bei der Bestätigung bleibt Aufgabe des Backends (Req 3.5).
+
+Abweichung von Spec 01 design.md «Metadaten bearbeiten»: Zusatzwerte ausserhalb der neuen Art werden im Formular
+separat angezeigt und bei einem Artwechsel nicht mitgesendet; sie bleiben nicht auf dem Dokument erhalten.
 
 ## Admin-Kommando
 ```
