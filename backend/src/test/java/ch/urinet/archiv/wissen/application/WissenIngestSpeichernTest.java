@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class WissenIngestSpeichernTest {
 
@@ -63,6 +64,13 @@ class WissenIngestSpeichernTest {
         };
         assertThat(new WissenIngestIndex(speichern, suche, konfiguration()).laden(UUID.randomUUID(), "Frist"))
                 .extracting(SeitenMetadaten::id).containsExactly(seiten.get(1).id());
+    }
+
+    @Test
+    void inzwischenPersonaleQuelleWirdNichtAlsLeererErfolgAnDiePlanungWeitergereicht() {
+        Speicher speichern = new Speicher(stand("PERSONAL", List.of()), List.of());
+        assertThatThrownBy(() -> new WissenIngestIndex(speichern, null, konfiguration())
+                .laden(UUID.randomUUID(), "Frist")).isInstanceOf(ch.urinet.archiv.gemeinsam.domain.FachFehler.class);
     }
 
     private static SeitenMetadaten seite(String pfad) {

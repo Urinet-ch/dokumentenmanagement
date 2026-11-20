@@ -121,6 +121,23 @@ class WissensSucheTest {
         assertThat(reranker.aufrufe).isZero();
     }
 
+    @Test
+    void lokalerStubSuchtOhneBudgetabfrageNurImVolltext() {
+        var a = seite("A", 1);
+        port.volltext = List.of(a);
+        port.aktuell = List.of(a);
+        embedding.antwort = new EmbeddingPort.OhneVektoren();
+        var lokal = new WissensSuche(port,
+                new HybridSuche(null, null, embedding, reranker, (zweck, verbrauch) -> zwecke.add(zweck),
+                        new SucheTransaktion()),
+                transaktion, new Berechtigung(null, null), new WissenModellBudget(null, null, true, true));
+        var ergebnis = lokal.suchen(BENUTZER, "Frage", null, null, null, 30, true);
+        assertThat(ergebnis.treffer()).containsExactly(a.seite());
+        assertThat(ergebnis.degradiert()).isTrue();
+        assertThat(reranker.aufrufe).isZero();
+        assertThat(zwecke).isEmpty();
+    }
+
     private WissensSuche.Ergebnis suchen(boolean hybrid) {
         return suche.suchen(BENUTZER, "Frage", null, null, null, 30, hybrid);
     }
@@ -141,8 +158,10 @@ class WissensSucheTest {
 
     private class Budget extends WissenModellBudget {
         boolean erschoepft;
-        Budget() { super(null, null); }
-        @Override public void pruefen() {
+        Budget() { super(null, null, false, false); }
+        @Override public void embeddingPruefen() { pruefen(); }
+        @Override public void rerankerPruefen() { pruefen(); }
+        private void pruefen() {
             assertThat(transaktion.aktiv).isFalse();
             if (erschoepft) throw new FachFehler(Fehlercode.BUDGET);
         }

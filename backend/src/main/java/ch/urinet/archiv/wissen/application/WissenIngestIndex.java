@@ -2,6 +2,8 @@ package ch.urinet.archiv.wissen.application;
 
 import ch.urinet.archiv.wissen.application.WissenIngestPort.SeitenMetadaten;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -59,7 +61,9 @@ public class WissenIngestIndex {
     private List<SeitenMetadaten> kontext(UUID entwurfId) {
         var stand = speichern.laden(entwurfId, java.util.Set.of())
                 .orElseThrow(() -> new IllegalStateException("Ingest-Entwurf nicht gefunden"));
-        if (!WissenIngestSpeichern.freigegeben(stand.lauf()) || stand.quellStufe() == null) return List.of();
+        if (!WissenIngestSpeichern.freigegeben(stand.lauf()) || stand.quellStufe() == null) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
         return speichern.sichtbareSeiten(stand).stream()
                 .filter(s -> stand.quellStufe() != WissensStufe.INTERN || !"ueberblick".equals(s.pfad())).toList();
     }

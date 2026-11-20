@@ -15,12 +15,16 @@ import ch.urinet.archiv.ki.application.KiVerbrauchPort;
 import ch.urinet.archiv.ki.application.ChunkPort;
 import ch.urinet.archiv.ki.domain.Chunk;
 import ch.urinet.archiv.ki.application.EmbeddingPort;
+import ch.urinet.archiv.ki.TestEmbeddingPort;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.wissen.application.WissensSuchePort;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
+import ch.urinet.archiv.verarbeitung.application.AuftragService;
+import ch.urinet.archiv.verarbeitung.application.AuftragService.AnspruchVerloren;
+import ch.urinet.archiv.wissen.application.WissensEmbeddingSpeichern;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
@@ -108,6 +112,12 @@ class JdbcWissenIngestTest {
 
     @Inject
     JdbcWissensEmbedding wissensEmbedding;
+
+    @Inject
+    TestEmbeddingPort embeddingModell;
+
+    @Inject
+    AuftragService auftraege;
 
     @Inject
     PanacheWissenHuelleRepository huellen;
@@ -205,6 +215,16 @@ class JdbcWissenIngestTest {
                 .when().get("/api/v1/wissensseiten").then().statusCode(200)
                 .body("treffer.id", contains(titel.toString(), beschreibung.toString(), inhalt.toString()))
                 .body("degradiert", is(false)).body("$", not(hasKey("gesamt")));
+        embeddingModell.setzen(TestEmbeddingPort.Ersatz.STUB);
+        try {
+            given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                    .queryParam("q", q).queryParam("modus", "hybrid")
+                    .when().get("/api/v1/wissensseiten").then().statusCode(200)
+                    .body("treffer.id", contains(titel.toString(), beschreibung.toString(), inhalt.toString()))
+                    .body("degradiert", is(true)).body("$", not(hasKey("gesamt")));
+        } finally {
+            embeddingModell.setzen(null);
+        }
     }
 
     @Test
@@ -224,6 +244,14 @@ class JdbcWissenIngestTest {
             assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isTrue();
             assertThat(im(ZWEITER, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isFalse();
             assertThat(im(ZWEITER, () -> wissensEmbedding.ersetzen(fremd, 1, eingebettet))).isTrue();
+            var ohneAnspruch = new Auftrag(Long.MAX_VALUE, URINET, WissensEmbeddingSpeichern.EINZELN,
+                    new Nutzlast(Map.of("seiteId", id, "version", 1)), 0);
+            assertThatThrownBy(() -> im(URINET, () -> new WissensEmbeddingSpeichern(wissensEmbedding, auftraege)
+                    .ersetzen(ohneAnspruch, id, 1,
+                            List.of(new ChunkPort.Eingebettet(new Chunk(1, "Nicht speichern", null, null), vektor)))))
+                    .isInstanceOf(AnspruchVerloren.class);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_chunk where seite_id = ? and text = 'Text'", id)).isEqualTo(1);
             assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1,
                     List.of(new ChunkPort.Eingebettet(new Chunk(1, "Stub", null, null), null))))).isFalse();
             var filter = new WissensSuchePort.Filter(Sichtregel.fuer(new Benutzer("inhaber", Rolle.INHABER)),

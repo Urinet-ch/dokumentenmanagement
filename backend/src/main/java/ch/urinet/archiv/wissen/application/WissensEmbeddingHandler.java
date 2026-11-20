@@ -41,7 +41,7 @@ public class WissensEmbeddingHandler implements AuftragHandler {
             return;
         }
         var chunks = Chunker.zerlegen(stand.get().quelle());
-        var vektoren = embedding.einbetten(id, chunks, KiVerbrauchPort.WISSEN_EMBEDDING, budget::pruefen);
+        var vektoren = embedding.einbetten(id, chunks, KiVerbrauchPort.WISSEN_EMBEDDING, budget::embeddingPruefen);
         if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Wissensembedding unterbrochen");
         var eingebettet = new ArrayList<ChunkPort.Eingebettet>(chunks.size());
         for (int i = 0; i < chunks.size(); i++) {

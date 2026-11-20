@@ -50,7 +50,7 @@ public class WissensSuche {
         }
         var volltext = transaktion.ausfuehren(() -> port.volltext(frage, kontext.get(), HybridSuche.VOLLTEXT));
         if (!hybrid) return volltextErgebnis(volltext, kontext, k, false);
-        budget.pruefen();
+        budget.embeddingPruefen();
         var vektor = modelle.frageEinbetten(frage, KiVerbrauchPort.WISSEN_EMBEDDING);
         if (vektor.isEmpty()) return rueckfall(volltext, kontext, k);
         var abschnitte = transaktion.ausfuehren(() -> port.vektor(vektor.get(), kontext.get(), HybridSuche.VEKTOR));
@@ -65,7 +65,7 @@ public class WissensSuche {
             var abschnitt = ausVektor.get(t.seite().id());
             return abschnitt != null && abschnitt.version() == t.version() ? abschnitt.text() : t.text();
         }).toList();
-        budget.pruefen();
+        budget.rerankerPruefen();
         var sortiert = modelle.texteSortieren(frage, texte, KiVerbrauchPort.WISSEN_EMBEDDING);
         if (sortiert.isEmpty()) return rueckfall(volltext, kontext, k);
         var beste = sortiert.get().indizes().stream().limit(k).map(i -> kandidaten.get(i).seite().id()).toList();
