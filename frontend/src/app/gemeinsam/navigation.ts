@@ -6,6 +6,7 @@ export interface Menuepunkt {
   text: string;
   aktion: Aktion;
   eingangskorbZaehler?: boolean;
+  wissensentwurfZaehler?: boolean;
 }
 
 // Routen aus design.md «Frontend»; sichtbar nur mit dem Recht der Rechtematrix (Req 2.6)
@@ -19,6 +20,7 @@ export const MENUE: readonly Menuepunkt[] = [
   },
   { pfad: '/suche', text: TEXTE.menue.suche, aktion: 'A2' },
   { pfad: '/wissen', text: TEXTE.menue.wissen, aktion: 'A15' },
+  { pfad: '/wissen/entwuerfe', text: TEXTE.wissen.entwuerfe.titel, aktion: 'A17', wissensentwurfZaehler: true },
   { pfad: '/chat', text: TEXTE.menue.chat, aktion: 'A2' },
   { pfad: '/kontakte', text: TEXTE.menue.kontakte, aktion: 'A6' },
   { pfad: '/importe', text: TEXTE.menue.importe, aktion: 'A12' },

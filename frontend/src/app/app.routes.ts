@@ -64,6 +64,18 @@ export const routes: Routes = [
     title: titel(TEXTE.wissen.titel),
   },
   {
+    path: 'wissen/entwuerfe',
+    loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
+    canActivate: [rechtGuard('A17')],
+    title: titel(TEXTE.wissen.entwuerfe.titel),
+  },
+  {
+    path: 'wissen/entwuerfe/:id',
+    loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
+    canActivate: [rechtGuard('A17')],
+    title: titel(TEXTE.wissen.entwuerfe.titel),
+  },
+  {
     path: 'wissen/:ordner/:name',
     loadComponent: () => import('./wissen/wissen-seite').then((m) => m.WissenSeite),
     canActivate: [rechtGuard('A15')],
