@@ -42,7 +42,7 @@ public class KlassenpfadKonfigurationSeed implements KonfigurationSeed {
             if (inhalt == null) {
                 throw new MandantFehler(MandantFehler.Grund.SEED_FEHLT, "Kein Seed für Mandant " + code.wert());
             }
-            Konfiguration konfiguration = codec.lesen(new String(inhalt.readAllBytes(), StandardCharsets.UTF_8))
+            Konfiguration konfiguration = codec.seedLesen(new String(inhalt.readAllBytes(), StandardCharsets.UTF_8))
                     .inhalt();
             return mitWissensquelleWennFehlt(konfiguration, wissensquelleSeed, zusatzSchema);
         } catch (IOException e) {
