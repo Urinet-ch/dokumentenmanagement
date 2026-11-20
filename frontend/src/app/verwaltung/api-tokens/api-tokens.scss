@@ -1,47 +1,152 @@
+// Gestaltung nach Prototyp (docs/oberflaeche/prototyp.html, V['api-tokens']): Tokens als Tabelle in einer Karte
 :host {
-  display: block;
-  max-width: 64rem;
+  display: grid;
+  gap: 1rem;
+  max-width: 72rem;
   min-width: 0;
 }
 
-h1 {
-  font: var(--mat-sys-headline-small);
-  margin-top: 0;
+:host > p {
+  margin: 0;
 }
 
-.liste {
-  display: grid;
-  gap: 0.5rem;
-  list-style: none;
-  padding: 0;
+.meldung:empty {
+  margin: 0;
 }
 
-.token {
+.fehler {
+  color: var(--gefahr);
+  background: var(--gefahr-weich);
+  border-radius: var(--radius-klein);
+  padding: 0.6rem 0.75rem;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  letter-spacing: -0.01em;
+}
+
+// Tabelle in eigener Bildlaufleiste, damit die Seite bei 375 px nicht seitlich scrollt
+.tabelle {
+  padding: 0.25rem 0;
+  min-width: 0;
+}
+
+.tabellen-rahmen {
+  overflow-x: auto;
+  container-type: inline-size;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  text-align: start;
+  font-weight: 600;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-gedaempft);
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--linie);
+  white-space: nowrap;
+}
+
+td {
+  padding: 0.6875rem 0.75rem;
+  border-bottom: 1px solid var(--linie);
+  vertical-align: middle;
+}
+
+tbody:last-child tr:last-child td {
+  border-bottom: 0;
+}
+
+// Zeile mit Hinweis, Ablaufdatum oder Nachfrage gehört zum Token darüber
+tbody tr:has(+ .zusatz) td {
+  border-bottom: 0;
+}
+
+.zusatz td {
+  padding-top: 0;
+}
+
+.zusatz-inhalt {
+  position: sticky;
+  inset-inline-start: 0.75rem;
   display: grid;
   gap: 0.75rem;
-  min-width: 0;
+  max-width: calc(100cqi - 1.5rem);
   padding: 0.75rem;
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
 }
 
-.angaben {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
-  min-width: 0;
+.name {
+  display: block;
+  font-weight: 600;
+  min-width: 8rem;
+  max-width: 18rem;
+  overflow-wrap: anywhere;
 }
 
-.feld {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
+.zahl {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rechts {
+  text-align: end;
+}
+
+.gedaempft,
+.label {
+  color: var(--text-gedaempft);
 }
 
 .label {
-  color: var(--urinet-gedaempft);
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.wert {
-  overflow-wrap: anywhere;
+.pille {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+  background: var(--karte-2);
+  color: var(--text-2);
+  border: 1px solid var(--linie);
+
+  &[data-status='aktiv'] {
+    background: var(--ok-weich);
+    color: var(--ok);
+    border-color: transparent;
+  }
+
+  &[data-status='abgelaufen'] {
+    background: var(--gefahr-weich);
+    color: var(--gefahr);
+    border-color: transparent;
+  }
+}
+
+.hinweis,
+span[data-status='abgelaufen'] {
+  color: var(--gefahr);
+  font-weight: 600;
+}
+
+.hinweis {
+  margin: 0;
 }
 
 .bestaetigung,
@@ -55,20 +160,23 @@ h1 {
 .ablauf {
   display: grid;
   justify-items: start;
-  gap: 0.5rem;
+  gap: 0.3rem;
 }
 
-.ablauf input {
+input {
+  font: inherit;
+  color: var(--text);
+  background: var(--karte);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
   min-height: 2.75rem;
+  padding: 0 0.7rem;
   max-width: 100%;
+  box-sizing: border-box;
 }
 
-.hinweis,
-[data-status='abgelaufen'] {
-  color: var(--urinet-fehler);
-  font-weight: 700;
-}
-
-.fehler {
-  color: var(--urinet-fehler);
+// Widerrufen: dezenter Knopf in Gefahrfarbe
+.gefahr {
+  --mat-button-text-label-text-color: var(--gefahr);
+  --mat-button-text-state-layer-color: var(--gefahr);
 }
