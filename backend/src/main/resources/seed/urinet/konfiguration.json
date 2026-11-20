@@ -9,7 +9,7 @@
   },
   "kiTexte": {
     "rolle": "",
-    "feldregeln": "",
+    "feldregeln": "- art: genau ein Code aus der Liste. Arten mit «stellt der Mandant selbst aus» nur, wenn der Mandant der Aussteller ist (sein Name steht als Absender im Briefkopf, nicht nur im Adressfeld). Steht der Mandant im Adressfeld oder ist der Zahlungsempfänger im Swiss QR Code ein anderer, ist es ein fremder Beleg, auch wenn die Nummer wie eine eigene aussieht. Belege von Dritten sind nie eine solche Art: Kassenbons und Quittungen sind QUITTUNG, Rechnungen und Gutschriften von Lieferanten LIEFERANTENBELEG, Schreiben, Verfügungen und Rechnungen von Ämtern und Steuerverwaltungen BEHOERDE, Policen, Nachträge und Kündigungen von Versicherungen VERSICHERUNG. Prämienrechnungen von Versicherern und Mahnungen mit Mahngebühr oder Verzugszins sind LIEFERANTENBELEG, auch wenn sie eine Prämie betreffen; Mahnungen ohne Gebühr und ohne Zins sind KORRESPONDENZ.\n- Sozialversicherungen (AHV-Ausgleichskassen, IV, EO, FAK; frz. caisse de compensation, ital. cassa di compensazione) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften; Policen von UVG-, Krankentaggeld- und BVG-Versicherern sind VERSICHERUNG, ihre Prämienrechnungen LIEFERANTENBELEG.\n- partnerName: die Gegenpartei aus Sicht des Mandanten (bei fremden Belegen der Aussteller, bei eigenen Belegen der Empfänger, bei Quittungen wer das Geld erhalten hat), nie der Mandant selbst und nie eine Zahlungsart; so geschrieben wie auf dem Beleg.\n- datum: Belegdatum (Ausstellungsdatum) als JJJJ-MM-TT; zweistellige Jahre wie in 8.11.26 sind 20xx. Erfinde kein Datum: steht keines auf dem Beleg, null.\n- betrag: zu zahlender bzw. bezahlter Endbetrag; Gutschriften negativ; ohne Betrag null (nicht 0). Bei Offerten das einmalige Total; wiederkehrende Beträge (pro Monat oder Jahr) zählen nicht.\n- belegnummer: Nummer des Belegs ohne Beschriftung, z. B. nach «Rechnung», «Nr.», «Bon», «Beleg», «Quittung», «Ticket», «Bestellung», «Referenz», «Police», «Verfügung» oder «Antrag»; nicht die QR-Referenz und nicht die Kundennummer; fehlt sie, null.\n- richtung: EINNAHME oder AUSGABE aus Sicht des Mandanten; ohne Betrag null.\n- faelligkeit: Zahlungsfrist als JJJJ-MM-TT; bei «zahlbar innert N Tagen» Belegdatum plus N Tage; sonst null.\n- Werte aus dem Swiss QR Code sind verlässlich und haben Vorrang vor dem Text.\n- sicherheit: je Feld eine Zahl zwischen 0 und 1, wie sicher der Wert stimmt.",
     "kiFreigegeben": false
   },
   "klassifikationen": [],
@@ -43,7 +43,8 @@
       ],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "nur wenn {mandant} im Briefkopf als Absender steht",
+      "reihenfolge": 8,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -80,7 +81,8 @@
       ],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 9,
       "zusatzSchema": {
         "type": "object",
         "properties": {
@@ -121,6 +123,7 @@
       ],
       "kiVorschlag": true,
       "kiFelder": [],
+      "kiHinweise": "Rechnung, Facture, Fattura oder Gutschrift eines Lieferanten an {mandant} (Eingangsrechnung)",
       "reihenfolge": 0,
       "zusatzSchema": {
         "type": "object",
@@ -154,7 +157,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "Kassenbon, Zahlungsbestätigung, Billett, Parkticket; bereits bezahlt",
+      "reihenfolge": 1,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -189,7 +193,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 10,
       "zusatzSchema": {
         "type": "object",
         "properties": {
@@ -229,7 +234,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 2,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -261,7 +267,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 3,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -292,7 +299,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 4,
       "zusatzSchema": {
         "type": "object",
         "properties": {
@@ -332,7 +340,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 5,
       "zusatzSchema": {
         "type": "object",
         "properties": {
@@ -368,7 +377,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 6,
       "zusatzSchema": {
         "type": "object",
         "properties": {},
@@ -398,7 +408,8 @@
       "belegnummerMuster": [],
       "kiVorschlag": true,
       "kiFelder": [],
-      "reihenfolge": 0,
+      "kiHinweise": "",
+      "reihenfolge": 7,
       "zusatzSchema": {
         "type": "object",
         "properties": {

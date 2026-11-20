@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ki.adapter.out.stub;
 
 import ch.urinet.archiv.ki.adapter.out.langchain4j.LangChain4jKiAdapter;
+import ch.urinet.archiv.ki.adapter.out.langchain4j.AntwortSchema;
 import ch.urinet.archiv.ki.application.KiPort;
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.Rohvorschlag;
@@ -13,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Dev-Stub von {@link KiPort}: feste, gültige Antwort statt Infomaniak AI Services (Art {@code KORRESPONDENZ}, ohne
- * Beträge); aktiv mit {@code archiv.ki.stub=true} (Profil dev). Antwortschema und Art-Codes wie der echte Adapter.
+ * Dev-Stub von {@link KiPort}: feste, synthetische Antwort statt Infomaniak AI Services; aktiv mit
+ * {@code archiv.ki.stub=true} (Profil dev). Antwortschema und Art-Codes wie der echte Adapter.
  */
 @ApplicationScoped
 @Typed(KiStub.class)
@@ -29,7 +30,8 @@ public class KiStub implements KiPort {
         sicherheit.put(Feld.TITEL, new BigDecimal("0.9"));
         sicherheit.put(Feld.RICHTUNG, new BigDecimal("0.5"));
         sicherheit.put(Feld.VERTRAULICHKEIT, new BigDecimal("0.9"));
-        Rohvorschlag roh = new Rohvorschlag("KORRESPONDENZ", "Vorschlag des Dev-Stubs", null, null, null, null, null,
+        String art = anfrage.arten().stream().findFirst().map(a -> a.code()).orElse(null);
+        Rohvorschlag roh = new Rohvorschlag(art, "Vorschlag des Dev-Stubs", null, null, null, null, null,
                 null, null, null, null, null, null, null, List.of(), sicherheit);
         return new Gueltig(roh, new Verbrauch(MODELL, 0, 0));
     }
@@ -52,7 +54,12 @@ public class KiStub implements KiPort {
     }
 
     @Override
+    public String antwortschema(Anfrage anfrage) {
+        return AntwortSchema.json(anfrage.arten(), anfrage.klassifikationen());
+    }
+
+    @Override
     public List<String> artCodes() {
-        return LangChain4jKiAdapter.codes();
+        return List.of();
     }
 }

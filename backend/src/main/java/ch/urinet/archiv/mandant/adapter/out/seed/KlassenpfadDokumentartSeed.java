@@ -58,7 +58,7 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
                         konfigListe(art, "belegnummerMuster", pfad), konfigOptionalText(art, "fremdbelegArt", pfad),
                         konfigOptionalText(art, "ohneZahlungsdatenArt", pfad),
                         konfigBoolesch(art, "kiVorschlag", true, pfad), konfigListe(art, "kiFelder", pfad),
-                        konfigOptionalText(art, "kiHinweise", pfad), konfigGanzzahl(art, "reihenfolge", 0, pfad),
+                        kiHinweise(art, pfad), konfigGanzzahl(art, "reihenfolge", 0, pfad),
                         konfigOptionalText(aufbewahrung, "feld", pfad)));
             }
             return List.copyOf(ergebnis);
@@ -93,6 +93,17 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
         }
         if (!wert.isTextual() || wert.asText().isBlank()) {
             throw ungueltig(pfad, "Feld " + feld + " ist kein nicht leerer Text");
+        }
+        return wert.asText();
+    }
+
+    private static String kiHinweise(JsonNode art, String pfad) {
+        JsonNode wert = art.path("kiHinweise");
+        if (wert.isMissingNode() || wert.isNull()) {
+            return null;
+        }
+        if (!wert.isTextual()) {
+            throw ungueltig(pfad, "Feld kiHinweise ist kein Text");
         }
         return wert.asText();
     }
