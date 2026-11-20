@@ -105,9 +105,9 @@
                   }
                 </td>
                 <td class="mono angaben">{{ eintrag.ip }}</td>
-                <td class="details mono">
+                <td>
                   @if (eintrag.details && eintrag.details !== '{}') {
-                    {{ eintrag.details }}
+                    <span class="details mono">{{ eintrag.details }}</span>
                   }
                 </td>
               </tr>
@@ -152,8 +152,8 @@
           @for (zeile of verzeichnis(); track zeile.id) {
             <tbody data-test="verzeichnis">
               <tr>
-                <td class="wer">{{ person(zeile.name, zeile.rolle) }}</td>
-                <td class="angaben mono kennung">{{ zeile.benutzer }}</td>
+                <td><span class="wer">{{ person(zeile.name, zeile.rolle) }}</span></td>
+                <td><span class="angaben mono kennung">{{ zeile.benutzer }}</span></td>
                 <td class="angaben">
                   {{ texte.anlaesse[zeile.anlass] }} ·
                   {{ texte.gueltig(zeitpunkt(zeile.gueltigVon), zeile.gueltigBis ? zeitpunkt(zeile.gueltigBis) : null) }}

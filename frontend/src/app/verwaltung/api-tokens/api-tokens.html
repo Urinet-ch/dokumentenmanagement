@@ -47,7 +47,7 @@
                   <span class="gedaempft">{{ texte.nieGenutzt }}</span>
                 }
               </td>
-              <td class="zahl">
+              <td>
                 @if (token.gueltigBis) {
                   <span [attr.data-status]="tokenStatus(token)">{{ texte.laeuftAbAm(ablaufdatumText(token)) }}</span>
                 } @else {

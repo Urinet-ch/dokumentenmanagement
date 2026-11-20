@@ -51,13 +51,13 @@ th {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-gedaempft);
-  padding: 0.625rem 0.75rem;
+  padding: 0.625rem 0.625rem;
   border-bottom: 1px solid var(--linie);
   white-space: nowrap;
 }
 
 td {
-  padding: 0.6875rem 0.75rem;
+  padding: 0.6875rem 0.625rem;
   border-bottom: 1px solid var(--linie);
   vertical-align: middle;
 }
@@ -89,8 +89,8 @@ tbody tr:has(+ .zusatz) td {
 .name {
   display: block;
   font-weight: 600;
-  min-width: 8rem;
-  max-width: 18rem;
+  min-width: 7rem;
+  max-width: 11rem;
   overflow-wrap: anywhere;
 }
 
@@ -101,6 +101,7 @@ tbody tr:has(+ .zusatz) td {
 
 .rechts {
   text-align: end;
+  white-space: nowrap;
 }
 
 .gedaempft,
