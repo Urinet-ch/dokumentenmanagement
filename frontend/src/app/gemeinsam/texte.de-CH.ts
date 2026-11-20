@@ -646,6 +646,7 @@ export const TEXTE = {
       } as Record<string, string>,
       fehlerPflichtfelder: (felder: string) => `Bitte ergänzen: ${felder}.`,
     },
+    aufbewahrung: 'Aufbewahrung',
   },
   importe: {
     titel: 'CSV-Import aus 21.CRM',

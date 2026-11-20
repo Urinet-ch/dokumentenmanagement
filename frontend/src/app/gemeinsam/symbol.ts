@@ -36,6 +36,7 @@ export const SYMBOLE = {
   uhr: `${kreis(12, 12, 8.5)}M12 7.5V12l3 2`,
   herunterladen: 'M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14',
   haken: 'M5 12.5l4.5 4.5L19 7.5',
+  bearbeiten: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
 } as const;
 
 export type SymbolName = keyof typeof SYMBOLE;
