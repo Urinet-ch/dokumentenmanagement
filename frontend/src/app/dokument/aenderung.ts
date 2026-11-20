@@ -277,15 +277,16 @@ function betragLesen(wert: string): number | null {
   return roh === '' ? null : Number(roh.replace(',', '.'));
 }
 
-function gleicheKlassifikationen(
+/** Mengenvergleich je Code: Reihenfolge und leere Listen zählen nicht als Änderung. */
+export function gleicheKlassifikationen(
   links: Readonly<Record<string, readonly string[]>>,
   rechts: Readonly<Record<string, readonly string[]>>,
 ): boolean {
   const codes = new Set([...Object.keys(links), ...Object.keys(rechts)]);
   return [...codes].every((code) => {
-    const a = links[code] ?? [];
-    const b = rechts[code] ?? [];
-    return a.length === b.length && a.every((wert, index) => wert === b[index]);
+    const a = new Set(links[code] ?? []);
+    const b = new Set(rechts[code] ?? []);
+    return a.size === b.size && [...a].every((wert) => b.has(wert));
   });
 }
 

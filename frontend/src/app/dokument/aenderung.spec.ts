@@ -7,6 +7,7 @@ import {
   feldText,
   formularAus,
   formularFeld,
+  gleicheKlassifikationen,
   zusatzFelder,
   zusatzGueltig,
 } from './aenderung';
@@ -524,4 +525,19 @@ describe('Anzeigetexte je Enum-Wert (x-labels)', () => {
       },
     });
   }
+});
+
+describe('gleicheKlassifikationen', () => {
+  it('erkennt gleiche Werte je Code, auch ohne Reihenfolge und mit leeren Listen', () => {
+    expect(gleicheKlassifikationen({ f: ['a'] }, { f: ['a'] })).toBe(true);
+    expect(gleicheKlassifikationen({ f: ['a', 'b'] }, { f: ['b', 'a'] })).toBe(true);
+    expect(gleicheKlassifikationen({ f: [] }, {})).toBe(true);
+    expect(gleicheKlassifikationen({}, {})).toBe(true);
+  });
+
+  it('erkennt unterschiedliche Werte und Codes', () => {
+    expect(gleicheKlassifikationen({ f: ['a'] }, { f: ['b'] })).toBe(false);
+    expect(gleicheKlassifikationen({ f: ['a'] }, {})).toBe(false);
+    expect(gleicheKlassifikationen({ f: ['a'] }, { g: ['a'] })).toBe(false);
+  });
 });

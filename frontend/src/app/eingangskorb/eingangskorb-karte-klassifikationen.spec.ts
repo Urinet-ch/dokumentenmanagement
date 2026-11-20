@@ -176,6 +176,25 @@ describe('EingangskorbKarte Klassifikationen (Req 18.4)', () => {
     await fixture.whenStable();
   });
 
+  it('bestätigt ein Dokument mit gesetzten Klassifikationen ohne Änderung ohne PATCH', async () => {
+    const bulletin = art('BULLETIN');
+    await zeigen(
+      dokument({ art: bulletin.code, klassifikationen: { fachgebiet: ['technik'] } }),
+      [bulletin],
+      new Map([[bulletin.code, klassifikationen('fachgebiet', ['technik', 'recht'])]]),
+    );
+
+    await klicken(T.aendern);
+    await klicken(T.bestaetigen);
+
+    http.expectNone({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+    http.expectOne({ method: 'POST', url: '/api/v1/dokumente/d1/bestaetigen' }).flush(null, {
+      status: 202,
+      statusText: 'Accepted',
+    });
+    await fixture.whenStable();
+  });
+
   it('zeigt nicht übertragbare Klassifikationen beim Artwechsel an und sendet sie nicht mit', async () => {
     const alt = art('ALT');
     const neu = art('NEU');

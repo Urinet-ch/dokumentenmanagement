@@ -45,6 +45,7 @@ import { EingangskorbEntwurfSpeicher } from './entwurf-speicher';
 import {
   ZusatzFeld,
   anzeigeText,
+  gleicheKlassifikationen,
   istListe,
   listeAus,
   listeZu,
@@ -76,24 +77,6 @@ import {
 
 type Modus = 'ansicht' | 'formular' | 'rueckfragePdfa' | 'rueckfrageFrist' | 'verwerfen';
 type Zusatz = { ohnePdfa?: boolean; fristAbgelaufenAkzeptiert?: boolean };
-
-function gleicheKlassifikationen(
-  links: Readonly<Record<string, readonly string[]>>,
-  rechts: Readonly<Record<string, readonly string[]>>,
-): boolean {
-  const linksCodes = Object.keys(links).sort();
-  const rechtsCodes = Object.keys(rechts).sort();
-  return (
-    linksCodes.length === rechtsCodes.length &&
-    linksCodes.every((code, index) => {
-      const a = links[code] ?? [];
-      const b = rechts[index] ? (rechts[rechtsCodes[index]] ?? []) : [];
-      return (
-        code === rechtsCodes[index] && a.length === b.length && a.every((wert, i) => wert === b[i])
-      );
-    })
-  );
-}
 
 const NEU_LADEN = new Set(['STATUS_KONFLIKT', 'VERSION_KONFLIKT', 'NICHT_GEFUNDEN']);
 const IM_FORMULAR: Record<string, string> = {
@@ -657,10 +640,11 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     const klassifikationenBody = this.klassifikationenBody();
     const bisherigerZusatz = objekt(this.dokument().zusatz);
     const bisherigeKlassifikationen = this.dokument().klassifikationen ?? {};
-    const klassifikationenGeaendert = !gleicheKlassifikationen(
-      this.klassifikationenWerte(),
-      bisherigeKlassifikationen,
-    );
+    // Bei einem Artwechsel gehen die Klassifikationen immer mit (nur Werte der neuen Art).
+    const artGewechselt = !!artNeu && !!this.dokument().art;
+    const klassifikationenGeaendert =
+      artGewechselt ||
+      !gleicheKlassifikationen(this.klassifikationenWerte(), bisherigeKlassifikationen);
     const aendern = this.aenderungGespeichert()
       ? of(this.dokument())
       : JSON.stringify(zusatzBody) === JSON.stringify(bisherigerZusatz) &&
