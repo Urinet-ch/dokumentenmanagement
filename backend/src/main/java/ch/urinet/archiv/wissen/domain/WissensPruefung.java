@@ -253,6 +253,9 @@ public final class WissensPruefung {
     }
 
     private static void pruefeDokumentQuelle(Quelleneintrag quelle, Kontext kontext, List<Befund> befunde) {
+        if (kontext.paket() && (quelle.auszug() == null || quelle.auszug().isBlank())) {
+            befunde.add(new Befund(Code.AUSZUG_FEHLT, "Der Dokumentquelle des Pakets fehlt ein wörtlicher Auszug."));
+        }
         DokumentQuelle dokument = kontext.dokumente().get(quelle.dokumentId());
         if (dokument == null || !dokument.gleicherMandant()) {
             befunde.add(new Befund(Code.QUELLE_UNGUELTIG,
@@ -274,7 +277,8 @@ public final class WissensPruefung {
         }
         Optional<Seitentext> seitentext = dokument.seitentext();
         if (seitentext.isEmpty() || dokument.seiten() == null) {
-            befunde.add(new Befund(Code.SEITE_FEHLT, "Für das Quelldokument sind keine PDF-Seiten verfügbar."));
+            befunde.add(new Befund(kontext.paket() ? Code.AUSZUG_NICHT_PRUEFBAR : Code.SEITE_FEHLT,
+                    "Für das Quelldokument sind keine prüfbaren PDF-Seiten verfügbar."));
             return;
         }
         Seitentext seiten = seitentext.get();
@@ -446,10 +450,14 @@ public final class WissensPruefung {
         FUSSNOTE_DEFINITION,
         AUSSAGE_OHNE_BELEG,
         QUELLE_UNGUELTIG,
+        QUELLE_UNBEKANNT,
         SEITE_FEHLT,
         QUELLE_PERSONAL,
         QUELLE_NICHT_BELEGT,
         AUSZUG_NICHT_GEFUNDEN,
+        AUSZUG_FEHLT,
+        AUSZUG_NICHT_PRUEFBAR,
+        CLOUD_STUFE_UNZULAESSIG,
         LINK_UNGUELTIG,
         AUSSAGE_ENTFERNT,
         ZU_GROSS,
@@ -460,7 +468,12 @@ public final class WissensPruefung {
     public enum Hinweiscode {
         ABSCHNITT_FEHLT,
         HOEHERE_STUFE_VORHANDEN,
-        STUFE_STEIGT
+        STUFE_STEIGT,
+        BASIS_UNBEKANNT,
+        STUFE_IGNORIERT,
+        FELD_IGNORIERT,
+        FELD_UNBEKANNT,
+        DATEI_IGNORIERT
     }
 
     public record Befund(Code code, String meldung) {
@@ -493,7 +506,18 @@ public final class WissensPruefung {
                           Set<String> basisQuellenSchluessel, Set<String> entfernteAussagen,
                           Set<String> kernaussagenSchluessel, boolean ingest, boolean veralten,
                           boolean pfadHoehereStufe, Wissensseite.Vertraulichkeit bisherigeVertraulichkeit,
-                          Wissensseite.Vertraulichkeit wirksameVertraulichkeit) {
+                          Wissensseite.Vertraulichkeit wirksameVertraulichkeit, boolean paket) {
+
+        public Kontext(int maxZeichen, String bisherigerPfad, Set<String> belegtePfade,
+                       Map<UUID, DokumentQuelle> dokumente, Set<UUID> seitenIds,
+                       Set<String> basisQuellenSchluessel, Set<String> entfernteAussagen,
+                       Set<String> kernaussagenSchluessel, boolean ingest, boolean veralten,
+                       boolean pfadHoehereStufe, Wissensseite.Vertraulichkeit bisherigeVertraulichkeit,
+                       Wissensseite.Vertraulichkeit wirksameVertraulichkeit) {
+            this(maxZeichen, bisherigerPfad, belegtePfade, dokumente, seitenIds, basisQuellenSchluessel,
+                    entfernteAussagen, kernaussagenSchluessel, ingest, veralten, pfadHoehereStufe,
+                    bisherigeVertraulichkeit, wirksameVertraulichkeit, false);
+        }
 
         public Kontext {
             if (maxZeichen < 1) {

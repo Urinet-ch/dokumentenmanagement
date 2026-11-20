@@ -30,10 +30,12 @@ public class FreigabeAnnahme {
     private final WissenKonfiguration konfiguration;
     private final FreigabeProtokoll protokoll;
     private final AuftragService auftraege;
+    private final WissenImport importieren;
 
     public FreigabeAnnahme(FreigabeSperre sperre, FreigabeRepository repository, FreigabeKontext kontext,
                            WissenIngestPort daten, WissenHuelleDienst huelle, WissenIngestSpeichern ingest,
-                           WissenKonfiguration konfiguration, FreigabeProtokoll protokoll, AuftragService auftraege) {
+                           WissenKonfiguration konfiguration, FreigabeProtokoll protokoll, AuftragService auftraege,
+                           WissenImport importieren) {
         this.sperre = sperre;
         this.repository = repository;
         this.kontext = kontext;
@@ -43,6 +45,7 @@ public class FreigabeAnnahme {
         this.konfiguration = konfiguration;
         this.protokoll = protokoll;
         this.auftraege = auftraege;
+        this.importieren = importieren;
     }
 
     @Transactional(Transactional.TxType.MANDATORY)
@@ -58,6 +61,20 @@ public class FreigabeAnnahme {
         FreigabeRepository.Vorschlag vorschlag = repository.vorschlagLaden(aenderung);
         Wissensseite entwurf = vorschlag.fassung();
         Set<String> entfernt = vorschlag.entfernteAussagen();
+        String importErzeugt = null;
+        if ("IMPORT".equals(aenderung.anlass())) {
+            var basis = aenderung.seiteId() == null ? null : daten.seiteLaden(aenderung.seiteId()).orElseThrow();
+            var aufgeloest = importieren.fuerAnnahme(benutzer, entwurfId, nummer, basis, bearbeitung);
+            if (!aufgeloest.befunde().isEmpty()) {
+                throw new EntwurfBefunde(aufgeloest.befunde().stream().map(b -> b.code().name()).toList());
+            }
+            entwurf = aufgeloest.fassung();
+            importErzeugt = entwurf.erzeugtVon();
+            vorschlag = new FreigabeRepository.Vorschlag(entwurf, entfernt,
+                    ch.urinet.archiv.wissen.domain.WissensStufe.valueOf(vorschlag.kontextstufe())
+                            .hoechste(aufgeloest.stufe()).name(),
+                    null, null, vorschlag.erstelltVon());
+        }
         if (bearbeitung != null) {
             if (ManuellerWissensentwurf.enthaeltNull(bearbeitung.tags())
                     || ManuellerWissensentwurf.enthaeltNull(bearbeitung.quellen())) {
@@ -70,7 +87,8 @@ public class FreigabeAnnahme {
                     .map(KiPort.EntfernteAussage::schluessel).collect(Collectors.toUnmodifiableSet());
             entwurf = new Wissensseite(entwurf.id(), entwurf.pfad(), entwurf.typ(), bearbeitung.titel(),
                     bearbeitung.beschreibung(), bearbeitung.tags(), entwurf.status(), bearbeitung.veraltetAb(),
-                    bearbeitung.quellen(), entwurf.vertraulichkeit(), bearbeitung.inhalt(), entwurf.version(),
+                    "IMPORT".equals(aenderung.anlass()) ? entwurf.quellen() : bearbeitung.quellen(),
+                    entwurf.vertraulichkeit(), bearbeitung.inhalt(), entwurf.version(),
                     null, null, null, null, false, false, entwurf.wissensquelleId());
         }
         var gepruefterVorschlag = new FreigabeRepository.Vorschlag(entwurf, entfernt, vorschlag.kontextstufe(),
@@ -91,6 +109,8 @@ public class FreigabeAnnahme {
         String erzeugt;
         if (bearbeitung != null) {
             erzeugt = "human:" + benutzer.id();
+        } else if ("IMPORT".equals(aenderung.anlass())) {
+            erzeugt = java.util.Objects.requireNonNull(importErzeugt);
         } else if ("INGEST".equals(aenderung.anlass())
                 || ("MANUELL".equals(aenderung.anlass()) && vorschlag.modell() != null)) {
             if (vorschlag.modell() == null || vorschlag.modell().isBlank()) {

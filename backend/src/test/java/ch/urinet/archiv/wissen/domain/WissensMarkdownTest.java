@@ -8,6 +8,22 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class WissensMarkdownTest {
 
     @Test
+    void importRundlaufErhaeltLinksFussnotenCodeUndZeilenenden() {
+        String markdown = "[**Regel**](\n /konzepte/arbeits\\-zeit \"Titel\") und [Übersicht](</ueberblick>)."
+                + "[^q-1]\r\n\r\n`[Code](/konzepte/arbeit.md)`\r\n";
+        org.junit.jupiter.api.Assertions.assertTrue(
+                markdown.equals(WissensMarkdown.ausOkf(WissensMarkdown.fuerOkf(markdown))));
+    }
+
+    @Test
+    void importLaesstExterneUndUngueltigeLinksFuerDiePruefungUnveraendert() {
+        String markdown = "[Extern](https://example.invalid/x.md) [Falsch](/falsch.md) "
+                + "<script>untrusted</script>.[^q-1]";
+        org.junit.jupiter.api.Assertions.assertTrue(markdown.equals(WissensMarkdown.ausOkf(markdown)));
+        assertThat(WissensMarkdown.analysieren(WissensMarkdown.ausOkf(markdown), 20_000).ungueltigerLink()).isTrue();
+    }
+
+    @Test
     void okfSchreibtNurEchteLinkzieleUmUndLaesstFussnotenUndCodeUnveraendert() {
         String markdown = "[**Regel**](/konzepte/arbeit \"Titel\") und [Übersicht](</ueberblick>)." +
                 "[^q-1]\n\n`[Code](/konzepte/arbeit)`\n\n```\n[Code](/ueberblick)\n```\n";
