@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -9,6 +10,7 @@ import { Quelleneintrag } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { zeitpunkt } from '../gemeinsam/format';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { WissenEntwurfZaehler } from './wissen-entwurf-zaehler';
 
@@ -42,13 +44,13 @@ type Aktion = 'annehmen' | 'verwerfen' | 'neu-erzeugen';
 
 @Component({
   selector: 'app-wissen-entscheid-bestaetigung',
-  imports: [MatDialogModule],
+  imports: [MatDialogModule, MatButtonModule],
   template: `
     <h2 mat-dialog-title>{{ texte.bestaetigung }}</h2>
     <mat-dialog-content><p>{{ texte.einzelpruefung }}</p><p>{{ daten.pfad }}</p></mat-dialog-content>
-    <mat-dialog-actions>
-      <button type="button" [mat-dialog-close]="true">{{ daten.aktion }}</button>
-      <button type="button" [mat-dialog-close]="false">{{ texte.abbrechen }}</button>
+    <mat-dialog-actions align="end">
+      <button mat-button type="button" [mat-dialog-close]="false">{{ texte.abbrechen }}</button>
+      <button mat-flat-button type="button" [mat-dialog-close]="true">{{ daten.aktion }}</button>
     </mat-dialog-actions>`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -59,7 +61,7 @@ export class WissenEntscheidBestaetigung {
 
 @Component({
   selector: 'app-wissen-entwuerfe',
-  imports: [RouterLink, FormsModule, MatDialogModule],
+  imports: [RouterLink, FormsModule, MatDialogModule, MatButtonModule, Symbol],
   templateUrl: './wissen-entwuerfe.html',
   styleUrls: ['./wissen.scss', './wissen-entwuerfe.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -255,6 +257,12 @@ export class WissenEntwuerfe {
   protected aktionsTitel(aktion: Aktion): string {
     return aktion === 'annehmen' ? this.texte.annehmen
       : aktion === 'verwerfen' ? this.texte.verwerfen : this.texte.neuErzeugen;
+  }
+
+  // Farbe der Status-Pille in der Liste; der Status steht immer auch als Text daneben
+  protected ton(status: string): string {
+    return status === 'OFFEN' ? 'akzent' : status === 'ERLEDIGT' ? 'ok'
+      : status === 'FEHLER' || status === 'ABGELEHNT' ? 'gefahr' : '';
   }
 
   protected feld(wert: unknown): string {
