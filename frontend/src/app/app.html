@@ -13,42 +13,6 @@
 @if (updateFehler()) {
   <p class="pwa-hinweis" role="alert" data-test="update-fehler">{{ texte.updateFehler }}</p>
 }
-<mat-toolbar class="kopf">
-  @if (menue().length > 0 && mobil()) {
-    <button
-      mat-icon-button
-      type="button"
-      [attr.aria-label]="nav.opened ? texte.menueSchliessen : texte.menueOeffnen"
-      [attr.aria-expanded]="nav.opened"
-      aria-controls="hauptnavigation"
-      (click)="nav.toggle()"
-    >
-      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
-        <path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
-      </svg>
-    </button>
-  }
-  <a class="titel" routerLink="/">
-    @if (branding.branding().logoUrl; as logoUrl) {
-      <img class="logo" [src]="logoUrl" alt="" />
-    }
-    {{ branding.branding().name }}
-  </a>
-  <span class="abstand"></span>
-  @if (anmeldung.angemeldet()) {
-    @if (anmeldung.benutzer(); as benutzer) {
-      <span class="benutzer" data-test="benutzer">
-        {{ benutzer.name }}
-        @if (benutzer.mandant) {
-          <span class="mandant">· {{ benutzer.mandant }}</span>
-        }
-      </span>
-    }
-  }
-  @if (anmeldung.zustand() !== 'abgemeldet') {
-    <button mat-button type="button" (click)="abmelden()">{{ texte.anmeldung.abmelden }}</button>
-  }
-</mat-toolbar>
 <mat-sidenav-container class="rahmen">
   <mat-sidenav
     #nav
@@ -59,30 +23,126 @@
     [class.leer]="menue().length === 0"
   >
     @if (menue().length > 0) {
-      <nav [attr.aria-label]="texte.hauptnavigation">
-        <mat-nav-list>
-          @for (punkt of menue(); track punkt.pfad) {
-            <a
-              mat-list-item
-              [routerLink]="punkt.pfad"
-              routerLinkActive="aktiv"
-              ariaCurrentWhenActive="page"
-              (click)="mobil() && nav.close()"
-            >
-              <span class="punkt">
-                {{ punkt.text }}
-                @if (punkt.eingangskorbZaehler && zaehler.anzahl() !== null) {
-                  <span class="zaehler" aria-hidden="true" data-test="eingangskorb-zaehler">{{ zaehler.anzahl() }}</span>
-                  <span class="nur-screenreader">, {{ texte.eingangskorbAnzahl(zaehler.anzahl()!) }}</span>
-                }
-              </span>
-            </a>
+      <div class="seitenleiste">
+        <a class="marke" routerLink="/" (click)="mobil() && nav.close()">
+          @if (branding.branding().logoUrl; as logoUrl) {
+            <img class="logo" [src]="logoUrl" alt="" />
+          } @else {
+            <span class="zeichen"><app-symbol name="archiv" /></span>
           }
-        </mat-nav-list>
-      </nav>
+          <span class="name">
+            {{ branding.branding().name }}
+            @if (anmeldung.benutzer()?.mandant; as mandant) {
+              <small>{{ texte.kopf.mandant(mandant) }}</small>
+            }
+          </span>
+        </a>
+        <nav [attr.aria-label]="texte.hauptnavigation">
+          <a
+            class="link"
+            routerLink="/"
+            routerLinkActive="aktiv"
+            [routerLinkActiveOptions]="{ exact: true }"
+            ariaCurrentWhenActive="page"
+            (click)="mobil() && nav.close()"
+          >
+            <app-symbol name="uebersicht" />
+            <span class="punkt">{{ texte.menue.uebersicht }}</span>
+          </a>
+          @for (abschnitt of abschnitte(); track abschnitt.gruppe) {
+            <div class="gruppe" aria-hidden="true">{{ abschnitt.titel }}</div>
+            @for (punkt of abschnitt.punkte; track punkt.pfad) {
+              <a
+                class="link"
+                [routerLink]="punkt.pfad"
+                routerLinkActive="aktiv"
+                ariaCurrentWhenActive="page"
+                (click)="mobil() && nav.close()"
+              >
+                <app-symbol [name]="punkt.symbol" />
+                <span class="punkt">{{ punkt.text }}
+                  @if (punkt.eingangskorbZaehler && zaehler.anzahl() !== null) {
+                    <span class="zaehler" aria-hidden="true" data-test="eingangskorb-zaehler">{{ zaehler.anzahl() }}</span>
+                    <span class="nur-screenreader">, {{ texte.eingangskorbAnzahl(zaehler.anzahl()!) }}</span>
+                  }
+                </span>
+              </a>
+            }
+          }
+        </nav>
+      </div>
     }
   </mat-sidenav>
   <mat-sidenav-content>
+    <header class="kopf">
+      @if (menue().length > 0 && mobil()) {
+        <button
+          type="button"
+          class="knopf"
+          [attr.aria-label]="nav.opened ? texte.menueSchliessen : texte.menueOeffnen"
+          [attr.aria-expanded]="nav.opened"
+          aria-controls="hauptnavigation"
+          (click)="nav.toggle()"
+        >
+          <app-symbol name="menue" />
+        </button>
+      }
+      @if (menue().length === 0 || mobil()) {
+        <a class="titel" routerLink="/">
+          @if (branding.branding().logoUrl; as logoUrl) {
+            <img class="logo" [src]="logoUrl" alt="" />
+          }
+          {{ branding.branding().name }}
+        </a>
+      }
+      @if (darfSuchen()) {
+        <form class="kopfsuche" role="search" (submit)="suchen($event, suchfeld)">
+          <app-symbol name="suche" />
+          <input
+            #suchfeld
+            type="search"
+            name="q"
+            [attr.aria-label]="texte.kopf.suche"
+            [placeholder]="texte.kopf.suchePlatzhalter"
+            autocomplete="off"
+          />
+        </form>
+      }
+      <span class="abstand"></span>
+      <button
+        type="button"
+        class="knopf"
+        data-test="farbschema"
+        [attr.aria-label]="farbschema.dunkel() ? texte.kopf.hell : texte.kopf.dunkel"
+        (click)="farbschema.umschalten()"
+      >
+        <app-symbol [name]="farbschema.dunkel() ? 'sonne' : 'mond'" />
+      </button>
+      @if (anmeldung.angemeldet()) {
+        @if (anmeldung.benutzer(); as benutzer) {
+          <span class="benutzer" data-test="benutzer">
+            <span class="avatar" aria-hidden="true">{{ initialen(benutzer.name) }}</span>
+            <span class="wer">
+              {{ benutzer.name }}
+              <small>
+                @if (benutzer.rolle) {
+                  {{ texte.kopf.rollen[benutzer.rolle] }}
+                }
+                @if (benutzer.mandant) {
+                  <span class="mandant">· {{ benutzer.mandant }}</span>
+                }
+              </small>
+            </span>
+          </span>
+        }
+      }
+      @if (anmeldung.zustand() !== 'abgemeldet') {
+        <button type="button" class="knopf breit" (click)="abmelden()">
+          <app-symbol name="abmelden" />
+          <span class="nur-breit">{{ texte.anmeldung.abmelden }}</span>
+        </button>
+      }
+    </header>
     <main #inhalt id="inhalt" tabindex="-1">
       <router-outlet />
     </main>
