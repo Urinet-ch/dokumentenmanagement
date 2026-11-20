@@ -45,3 +45,58 @@ Funktionalität: Lint der Wissensbasis starten
     Wenn der geplante Lint für «urinet» fällig wird
     Dann ist kein Lint-Auftrag eingereiht und «BUDGET_ERSCHOEPFT» im Lint-Log gezählt
     Und es erfolgt kein KI-Aufruf
+
+  @req-1.4 @req-10.3 @req-10.4 @req-10.5 @req-13.7 @req-13.9
+  Szenario: Ein gemischtes Paar erzeugt nur für die höhere Seite einen Entwurf
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und zwei verknüpfbare Lint-Seiten mit Stufen NORMAL und INTERN und eine PERSONAL-Hülle bestehen
+    Und WireMock erkennt den Lint-Widerspruch und liefert Seitenänderungen
+    Wenn der Inhaber den Lint für das Seitenpaar startet
+    Dann der Lint verarbeitet die Teilaufträge mit höchstens einem KI-Aufruf je Auftrag
+    Und nur die interne Seite erhält einen Lint-Entwurf und PERSONAL erreicht die KI nicht
+    Und die Originale, Arbeitsfassung, PDF-A, Volltext und Metadaten bleiben unverändert
+    Und Bericht und Protokolle enthalten keine Seiten- oder Dokumentinhalte
+
+  @req-10.3
+  Szenario: Die am längsten nicht geprüften Paare kommen zuerst
+    Angenommen drei verwandte Lint-Seiten sind verschieden lange oder noch nie geprüft
+    Wenn der Lint höchstens zwei Seitenpaare auswählt
+    Dann kommen das ungeprüfte und danach das am längsten nicht geprüfte Paar
+
+  @req-10.3
+  Szenario: Ein neueres Dokument bestimmt einen Veraltet-Kandidaten
+    Angenommen eine neuere Wissensquelle verweist auf eine Seite mit älterem Quelldokument
+    Wenn der Lint höchstens zwei Seitenpaare auswählt
+    Dann erkennt der Lint die ältere Aussage als Veraltet-Kandidaten für die neuere Quelle
+
+  @req-10.4 @req-13.7
+  Szenario: Eine nachträglich persönliche Quelle verhindert den nächsten Lint-KI-Aufruf
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und zwei verknüpfbare Lint-Seiten mit Stufen NORMAL und INTERN und eine PERSONAL-Hülle bestehen
+    Und WireMock erkennt den Lint-Widerspruch und liefert Seitenänderungen
+    Wenn der Inhaber den Lint für das Seitenpaar startet
+    Und nach dem Paarauftrag wird die normale Quelle PERSONAL
+    Dann der Lint verarbeitet die Teilaufträge mit höchstens einem KI-Aufruf je Auftrag
+    Und nach dem PERSONAL-Wechsel erfolgt kein weiterer KI-Aufruf und keine Änderung
+
+  @req-13.8
+  Szenario: Nach zwei ungültigen Paarantworten fehlt die Änderung mit Hinweis
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und zwei verknüpfbare Lint-Seiten mit Stufen NORMAL und INTERN und eine PERSONAL-Hülle bestehen
+    Und die Lint-KI liefert zweimal eine ungültige Paarantwort
+    Wenn der Inhaber den Lint für das Seitenpaar startet
+    Dann der Lint verarbeitet die Teilaufträge mit höchstens einem KI-Aufruf je Auftrag
+    Und der Lint fragt einmal nach und beendet ohne Änderung mit Hinweis
+
+  @req-13.5 @req-13.6 @req-13.7
+  Szenario: Das Laufbudget stoppt weitere Änderungen und bewahrt den bisherigen Entwurf
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und zwei verknüpfbare Lint-Seiten mit Stufe NORMAL bestehen
+    Und das Lint-Laufbudget erlaubt zwei KI-Aufrufe und danach keinen weiteren
+    Wenn der Inhaber den Lint für das Seitenpaar startet
+    Dann der Lint verarbeitet die Teilaufträge mit höchstens einem KI-Aufruf je Auftrag
+    Und das erreichte Lint-Budget hinterlässt die bisherige Änderung als unvollständigen Entwurf
