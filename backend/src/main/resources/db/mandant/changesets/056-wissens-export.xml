@@ -4,7 +4,7 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="052-wissens-export" author="archiv">
+    <changeSet id="056-wissens-export" author="archiv">
         <sql>
             create table wissens_export (
                 id uuid not null constraint wissens_export_pk primary key,
