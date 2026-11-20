@@ -11,10 +11,10 @@ Funktionalität: Navigation der PWA nach Rolle
 
     Beispiele:
       | rolle            | menü                                                                       |
-      | inhaber          | Erfassen, Eingangskorb, Suche, Wissen, Chat, Kontakte, Importe, Dokumentarten, Zugriffsprotokoll, API-Tokens, Jahresexport |
+      | inhaber          | Erfassen, Eingangskorb, Suche, Wissen, Wissensentwürfe, Chat, Kontakte, Importe, Dokumentarten, Zugriffsprotokoll, API-Tokens, Jahresexport |
       | mitarbeiter      | Erfassen, Eingangskorb, Suche, Wissen, Chat                                              |
       | treuhaender      | Suche, Wissen, Chat, Jahresexport                                                       |
-      | geschaeftsstelle | Erfassen, Eingangskorb, Suche, Wissen, Chat, Kontakte                                   |
+      | geschaeftsstelle | Erfassen, Eingangskorb, Suche, Wissen, Wissensentwürfe, Chat, Kontakte                                   |
 
   @req-2.6
   Szenario: Ohne Mandant im Token zeigt die PWA kein Menü
