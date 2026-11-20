@@ -66,6 +66,52 @@ public class WissenWiderspruchSchritte {
         annehmen(Map.of()).then().statusCode(204);
     }
 
+    @Wenn("der Inhaber einen Widerspruch und eine weitere Aussage mit demselben Quellenschlüssel freigibt")
+    public void widerspruchMitGeteiltemSchluessel() {
+        entwurf = anlegen(BLOCK + UNABHAENGIG + "\n\nWeitere Aussage.[^alt]", quellen(true));
+        annehmen(Map.of()).then().statusCode(204);
+    }
+
+    @Wenn("der Inhaber beides mit einem Grund für den Widerspruch entfernen möchte")
+    public void geteiltenSchluesselEntfernen() {
+        entwurf = anlegen("Neue Frist.[^neu]" + UNABHAENGIG, quellen(true));
+        antwort = annehmen(Map.of("grund", "Neue Frist gilt"));
+    }
+
+    @Wenn("er die weitere Aussage zusätzlich ausdrücklich begründet entfernt")
+    public void geteiltenSchluesselBegruenden() {
+        Map<String, Object> bearbeitung = new java.util.HashMap<>(
+                fassung("Neue Frist.[^neu]" + UNABHAENGIG, quellen(true)));
+        bearbeitung.put("entfernteAussagen", List.of(Map.of("schluessel", "alt", "begruendung", "Überholt")));
+        antwort = annehmen(Map.of("grund", "Neue Frist gilt", "fassung", bearbeitung));
+    }
+
+    @Dann("wird die Änderung angenommen")
+    public void aenderungAngenommen() {
+        antwort.then().statusCode(204);
+        given().auth().oauth2(token()).get("/api/v1/wissensseiten/" + seite)
+                .then().statusCode(200).body("version", is(3)).body("widerspruchOffen", is(false));
+    }
+
+    @Wenn("der Inhaber einen Entwurf zur Auflösung vorbereitet")
+    public void aufloesungVorbereiten() {
+        entwurf = anlegen("Neue Frist.[^neu]" + UNABHAENGIG, quellen(true));
+    }
+
+    @Dann("erhalten Mitarbeiter und Treuhänder beim Annehmen mit Grund 403 und die Seite bleibt unverändert")
+    public void ohneFreigaberecht() {
+        int etag = given().auth().oauth2(token()).get("/api/v1/wissensentwuerfe/" + entwurf)
+                .then().statusCode(200).extract().path("aenderungen[0].etag");
+        for (String rolle : List.of("mitarbeiter-urinet", "treuhaender-urinet")) {
+            given().auth().oauth2(Testanmeldung.token(rolle)).header("If-Match", "\"" + etag + "\"")
+                    .contentType("application/json").body(Map.of("grund", "Neue Frist gilt"))
+                    .post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen")
+                    .then().statusCode(403);
+        }
+        given().auth().oauth2(token()).get("/api/v1/wissensseiten/" + seite)
+                .then().statusCode(200).body("version", is(2)).body("widerspruchOffen", is(true));
+    }
+
     @Dann("bleiben beide Quellen mit ihren Daten und dem Hinweis «Widerspruch offen» sichtbar")
     public void beideQuellen() {
         given().auth().oauth2(token()).get("/api/v1/wissensseiten/" + seite).then().statusCode(200)
