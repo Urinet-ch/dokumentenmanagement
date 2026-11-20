@@ -132,14 +132,14 @@ Der Compose-Stack (`deploy/backup/test/restore-compose.yml`) hat zwei Netze. Que
 `intern` (`internal: true`) und veröffentlichen keine Ports; ihre HTTP-Prüfungen laufen per `compose exec` aus dem
 Datenbank-Container. PostgreSQL und MinIO hängen zusätzlich am Netz `hostzugang` und sind an `127.0.0.1` veröffentlicht,
 weil Maven-Test und Wiederherstellungskommando vom Host aus auf sie zugreifen. Das wiederhergestellte Keycloak erhält
-Ebenfalls einen zufälligen Loopback-Port, damit der Maven-Test mit einem Token aus dem wiederhergestellten Realm die
+ebenfalls einen zufälligen Loopback-Port, damit der Maven-Test mit einem Token aus dem wiederhergestellten Realm die
 geschützte API aufrufen kann. Vor dem Export legt die Übung im temporären Quell-Realm dafür einen synthetischen
-Benutzer und einen kurzlebigen Client mit Rolle und Mandanten-Claim an. Die JSON-Dateien dafür werden mit `jq` erzeugt
-und vor dem Keycloak-Aufruf geprüft. Beides bleibt ausschliesslich in den Wegwerf-Datenbanken; Realm-Dateien und
-Identitätsdienst werden nicht geändert. Die OIDC-Issuer-URL des Ziel-Realm ist
-an den Loopback-Port gebunden. Die Daten von PostgreSQL und MinIO
-liegen in tmpfs; es entstehen keine Volumes. Keycloak und die API haben ein `mem_limit` von 768 MiB, Keycloak dazu eine
-Heap-Grenze; ohne sie beendet der OOM-Killer einer knappen Docker-VM Keycloak.
+Dienstkonto-Client mit Mandanten-Mapper und Rolle an. Seine JSON-Dateien werden mit `jq` erzeugt und vor dem
+Keycloak-Aufruf geprüft. Der Client und sein Dienstkonto bleiben ausschliesslich in den Wegwerf-Datenbanken;
+Realm-Dateien, TOTP-Pflicht und Produktionsflows werden nicht geändert. Die OIDC-Issuer-URL des Ziel-Realm ist an den
+Loopback-Port gebunden. Die Daten von PostgreSQL und MinIO liegen in tmpfs; es entstehen keine Volumes. Keycloak und
+die API haben ein `mem_limit` von 768 MiB, Keycloak dazu eine Heap-Grenze; ohne sie beendet der OOM-Killer einer
+knappen Docker-VM Keycloak.
 
 Das temporäre Verzeichnis entsteht unter `${TMPDIR:-/tmp}`. Läuft Docker in einer VM, die nur das Home-Verzeichnis
 einbindet (z. B. Colima unter macOS), muss `TMPDIR` auf ein Verzeichnis darunter zeigen:
@@ -153,10 +153,10 @@ weist einen falschen Schlüssel und eine manipulierte Prüfsumme zurück und ent
 Wegwerf-Schlüsseln.
 
 Der Lauf spielt den Archiv- und Keycloak-Dump in neue Datenbanken ein. Danach startet er Keycloak mit der
-wiederhergestellten Datenbank und prüft den Realm über den Issuer seiner OIDC-Konfiguration. Der Maven-Test soll sich
-mit dem synthetischen Benutzer am wiederhergestellten Realm anmelden und mit dem Token einen geschützten API-Endpunkt
-aufrufen. Aktuell scheitert der Passwort-Grant, weil der Direct-Grant-Flow TOTP verlangt und dem synthetischen
-Benutzer noch kein OTP-Credential zugeordnet ist; deshalb ist der vollständige Roundtrip nicht bestanden. Der
+wiederhergestellten Datenbank und prüft den Realm über den Issuer seiner OIDC-Konfiguration. Der Maven-Test fordert
+ein `client_credentials`-Token für das Dienstkonto im wiederhergestellten Realm an und ruft damit einen geschützten
+API-Endpunkt auf. Der Passwort-Grant ist für diesen synthetischen Test ungeeignet, weil der Direct-Grant-Flow TOTP
+verlangt; darum verwendet der Funktionstest ein Dienstkonto, ohne TOTP-Pflicht oder Produktionsflows zu ändern. Der
 Bucket-Strom wird mit `archiv sicherung wiederherstellen`
 in den neuen `urinet-archiv-p-`-Bucket eingespielt; eine absichtlich unvollständige Inventarliste ohne Manifest wird
 vorher zurückgewiesen. Die Quarkus-Testanwendung startet gegen die wiederhergestellte Archivdatenbank und prüft
