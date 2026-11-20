@@ -1125,6 +1125,7 @@ export const TEXTE = {
       'Das Token ist abgelaufen und lässt sich nicht mehr verlängern. Bitte widerrufen Sie es und stellen Sie ein neues Token aus.',
     fehlerAblauf:
       'Das Ablaufdatum konnte nicht geändert werden. Bitte versuchen Sie es später erneut.',
+    spalteAktionen: 'Aktionen',
   },
   verwaltung: {
     titel: 'Dokumentarten und Konfiguration',
@@ -1357,6 +1358,8 @@ export const TEXTE = {
       fehlerVeraltet:
         'Die Datei beruht auf einer veralteten Konfigurationsversion. Prüfen und vergleichen Sie sie erneut; sie wurde nicht eingespielt.',
     },
+    /** Kurzform als Pille in der Liste der Dokumentarten (Gestaltung nach Prototyp) */
+    gebuev: 'GeBüV',
   },
   /** Seite «Chat» (Spec 02, Aufgabe 7.4; Req 6.1–6.3, 4.3); Menüpunkt seit Aufgabe 7.4b. */
   chat: {
@@ -1501,5 +1504,12 @@ export const TEXTE = {
     fehlerVerbindung:
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
+    // Spaltenköpfe der Tabellen (Gestaltung nach Prototyp)
+    spalteZeit: 'Zeit',
+    spalteBenutzer: 'Benutzer',
+    spalteIp: 'IP',
+    spaltePerson: 'Person',
+    spalteGueltigkeit: 'Anlass und Gültigkeit',
+    spalteAktionen: 'Aktionen',
   },
 } as const;

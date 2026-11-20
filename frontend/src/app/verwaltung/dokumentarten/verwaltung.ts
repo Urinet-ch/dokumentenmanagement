@@ -349,6 +349,7 @@ function analysiereAntwort(wert: unknown): KonfigurationsdateiAnalyse | null {
 })
 export class Verwaltung implements OnInit {
   protected readonly texte = TEXTE.verwaltung;
+  protected readonly gruppe = TEXTE.menueGruppen.verwaltung;
   protected readonly arten = signal<Dokumentart[] | null>(null);
   protected readonly ausgewaehlteArt = signal<string | null>(null);
   protected readonly klassifikationen = signal<Klassifikation[] | null>(null);
