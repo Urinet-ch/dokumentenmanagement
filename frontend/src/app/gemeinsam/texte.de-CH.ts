@@ -109,6 +109,15 @@ export const TEXTE = {
     seiteNichtVorhanden: 'Seite nicht vorhanden',
     seite: (nummer: number) => `Seite ${nummer}`,
     version: (nummer: number) => `Version ${nummer}`,
+    vorzeile: 'Kuratiertes Wissen aus Wissensquellen',
+    einleitung: 'Seiten nach dem LLM-Wiki-Muster: jede Aussage mit Fussnote auf ihre Quelle. '
+      + 'Änderungen werden erst nach Freigabe wirksam.',
+    logEinleitung: 'Journal der Wissensbasis, neueste Einträge zuerst.',
+    filter: 'Seiten filtern',
+    spalteSeite: 'Seite',
+    spalteStatus: 'Status',
+    anzahl: (anzahl: number) => (anzahl === 1 ? '1 Seite' : `${anzahl} Seiten`),
+    pfad: 'Pfad',
   },
   wissenEinstellungen: {
     titel: 'Wissensbasis: Einstellungen und Export',
