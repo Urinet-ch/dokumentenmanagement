@@ -12,7 +12,7 @@ import java.util.List;
  * ArchUnit), im Schema ebenfalls {@code number}.
  */
 public record MetadatenVorschlag(
-        @Description("Code der Dokumentart aus der Liste") ArtCode art,
+        @Description("Code der Dokumentart aus der Liste") String art,
         String titel,
         @Description("Belegdatum als ISO-Datum JJJJ-MM-TT") String datum,
         @Description("Gegenpartei aus Sicht des Mandanten, nie der Mandant selbst") String partnerName,
@@ -30,12 +30,6 @@ public record MetadatenVorschlag(
         Sicherheit sicherheit) {
 
     public enum Richtung { EINNAHME, AUSGABE }
-
-    /** Codes der Seed-Tabelle, fremde Arten zuerst (Prompt v6); als Enum im Schema, damit das Modell keine fremden Werte liefert. */
-    public enum ArtCode {
-        LIEFERANTENBELEG, QUITTUNG, VERTRAG, VERSICHERUNG, BEHOERDE, BANK, PROJEKTDOKUMENT, KORRESPONDENZ,
-        AUSGANGSRECHNUNG, OFFERTE, LOHNABRECHNUNG
-    }
 
     public enum Vertraulichkeit { NORMAL, INTERN, PERSONAL }
 

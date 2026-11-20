@@ -23,11 +23,14 @@ auf Server oder Secrets aus der Sitzung.
     Tokens (`KC_HOSTNAME_BACKCHANNEL_DYNAMIC`); Rotation des Client-Secrets mit Überlappung; `auth_time` im Access-Token;
     `prompt=login` gegen den Cookie-Zweig von `browser-totp-pflicht`; `execute-actions-email` für einen Benutzer ohne Passwort
     mit den drei Aktionen; Suche `q=mandant:<m>`; Rollenmitglieder (`/roles/{rolle}/users`).
+  - Stand: nachgewiesen sind Suche `q=mandant:<m>`, Rollenmitglieder, Issuer, Token-Rollen und der Dienstkonto-Aufruf (401 ohne
+    Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»). Offen: interne Adresse, Secret-Rotation,
+    `auth_time`, `prompt=login`, `execute-actions-email`; Entscheid FGAP gegen `manage-users` (design.md, Open Points).
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
 - [ ] 19.2 Realm-Export und Realm-Tests [Infra]
-  - Client `archiv-verwaltung` mit Platzhalter für das Secret und den drei Rollen des Dienstkontos (Härtung nach 19.1);
+  - Client `archiv-verwaltung` mit Platzhalter für das Secret und den drei Rollen des Dienstkontos und dem Standard-Scope `kc-admin-api` (Härtung nach 19.1);
     Passwort-Richtlinie; Access-Token-Lebensdauer 300 s; Lebensdauer der Aktions-Links; Ereignisse und Admin-Ereignisse mit
     400 Tagen; `auth_time`-Mapper; Test-Realm mit Dienstkonto und SMTP an Mailpit; `RealmExportTest` und `ExportKeycloak`
     erweitert (nur diese Rollen, kein Secret, kein Realm-Admin, Benutzerprofil unverändert).
@@ -51,7 +54,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.3, 5.1, 5.4, 5.5, 5.6, 5.8, 5.9, 5.10_
   - _Abhängig von: 19.1_
 
-- [ ] 19.5 Domain-Regeln und Rechtematrix A20 bis A23 [Backend]
+- [x] 19.5 Domain-Regeln und Rechtematrix A20 bis A23 [Backend]
   - `Vergaberegeln` (Eskalationsschutz, Satz der Rollen, letzter Inhaber, Rollen ausserhalb der vier), `Benutzerstatus` und
     Statusautomat, `Aktion` A20 bis A23 mit Zeilen der Matrix, `RechteUebersicht`; `RechtematrixSpecTest` liest die Tabelle aus
     Spec 06; Absatz unter der Tabelle in Spec 01 requirements.md 2.6; Changeset `public.mandant.verwaltung_rollen`.
@@ -78,6 +81,9 @@ auf Server oder Secrets aus der Sitzung.
   - `sperren`, `entsperren` (inkl. Sperre durch Fehlversuche), `deaktivieren` (Zeile `AUSTRITT`), `reaktivieren`,
     `zugang-zuruecksetzen` (TOTP entfernen), `PATCH` für E-Mail mit `VERIFY_EMAIL` und Mitteilung an die alte Adresse,
     `DELETE …/google-verknuepfung` (WO O.8), `If-Match` und `ETag` des Benutzers.
+  - Selbstaktionen (sperren, deaktivieren, löschen, Zugang zurücksetzen auf sich selbst) prüft
+    `Vergaberegeln.pruefeSelbstzugriff` (403 `ESKALATION_VERBOTEN`, Req 4.6); HTTP-Nachweis je Rolle und Zeile A20 bis A23
+    mit `VERWEIGERT` über `Berechtigung` kommt mit 19.7 bis 19.9 (Req 4.2).
   - _Anforderungen: 3.8, 3.9, 3.10, 3.13, 3.14, 3.15, 3.17, 3.18_
   - _Abhängig von: 19.7_
 

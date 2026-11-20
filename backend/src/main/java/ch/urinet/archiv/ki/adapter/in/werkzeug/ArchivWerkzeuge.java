@@ -75,7 +75,7 @@ public class ArchivWerkzeuge {
     public String dokumenteSuchen(
             @ToolMemoryId Object laufId,
             @P("Suchbegriffe, 1 bis 200 Zeichen") String frage,
-            @P(value = "Code der Dokumentart, z. B. AUSGANGSRECHNUNG", required = false) String art,
+            @P(value = "Code der Dokumentart aus der Artenliste", required = false) String art,
             @P(value = "NUR der Name einer Firma oder Person (Kunde, Lieferant), auch nur ein Teil davon; nie ein Produkt oder Suchwort, bei Unsicherheit weglassen und das Wort in frage schreiben", required = false) String partner,
             @P(value = "Belegdatum ab, JJJJ-MM-TT", required = false) String von,
             @P(value = "Belegdatum bis, JJJJ-MM-TT", required = false) String bis,

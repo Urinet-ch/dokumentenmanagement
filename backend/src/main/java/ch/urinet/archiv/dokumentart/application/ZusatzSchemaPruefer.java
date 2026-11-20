@@ -18,6 +18,11 @@ public interface ZusatzSchemaPruefer {
     /** JSON-Typen der direkten Schemafelder; {@code format: date} wird als {@code date} ausgewiesen. */
     Map<String, String> feldTypen(String schemaJson);
 
+    /** Beschreibungen der direkten Schemafelder, sofern sie gesetzt sind. */
+    default Map<String, String> feldBeschreibungen(String schemaJson) {
+        return Map.of();
+    }
+
     /**
      * Wie {@link #schemaPruefen}, aber für den Seed eines Mandanten (Admin-Kommando, Quelle im Repo) mit der eigenen,
      * grösseren Frist {@code archiv.dokumentart.seed-zeitgrenze}.

@@ -108,6 +108,7 @@ public class KiVorschlagSpeichern {
         if (!v.tags().isEmpty()) {
             werte.put("tags", v.tags());
         }
+        werte.putAll(v.dynamischeWerte());
         return werte;
     }
 
@@ -120,6 +121,8 @@ public class KiVorschlagSpeichern {
                 sicherheit.put(feld.schluessel(), v.sicherheit(feld));
             }
         }
+        v.dynamischeWerte().keySet().forEach(feld -> sicherheit.put(feld,
+                v.dynamischeSicherheit().getOrDefault(feld, BigDecimal.ZERO)));
         return sicherheit;
     }
 
