@@ -100,7 +100,7 @@ public class WissenImport {
             boolean fremdeBasis = paket.kopf().instanz() != null && !instanz.equals(paket.kopf().instanz())
                     && seite.basisVersion() != null && seite.basisVersion() > 0
                     && seite.basisVersion() <= Integer.MAX_VALUE;
-            if (basis == null && seite.basisVersion() != null && seite.basisVersion() != 0 && !fremdeBasis) {
+            if (metadaten == null && seite.basisVersion() != null && seite.basisVersion() != 0 && !fremdeBasis) {
                 throw new PaketUngueltig("FORMAT", seite.pfad());
             }
             var aufgeloest = aufloesen(benutzer, paket.kopf(), seite, basis);

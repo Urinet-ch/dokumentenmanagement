@@ -159,7 +159,11 @@ public final class WissensMarkdown {
                 if (internerPfad(link.getDestination()) == null) {
                     throw new IllegalArgumentException("Ungültiges Linkziel im OKF-Export");
                 }
-                einfuegen.add(zielEnde(markdown, link));
+                int ende = zielEnde(markdown, link);
+                if (ende < 0) {
+                    throw new IllegalArgumentException("Linkziel im Markdown nicht gefunden");
+                }
+                einfuegen.add(ende);
             }
             for (Node kind = node.getFirstChild(); kind != null; kind = kind.getNext()) {
                 offen.push(kind);
@@ -191,7 +195,9 @@ public final class WissensMarkdown {
             if (node instanceof Link link && link.getDestination().endsWith(".md")
                     && internerPfad(link.getDestination().substring(0, link.getDestination().length() - 3)) != null) {
                 int ende = zielEnde(markdown, link);
-                if (ende >= 3 && markdown.regionMatches(ende - 3, ".md", 0, 3)) {
+                if (ende < 0) {
+                    // Referenz-Link ([a][r] oder [a]): kein Inline-Ziel, die Definition bleibt unverändert.
+                } else if (ende >= 3 && markdown.regionMatches(ende - 3, ".md", 0, 3)) {
                     entfernen.add(ende - 3);
                 }
             }
@@ -217,7 +223,7 @@ public final class WissensMarkdown {
                 : kindSpans.getLast().getInputIndex() + kindSpans.getLast().getLength();
         int klammer = markdown.indexOf("](", ab);
         if (klammer < 0 || klammer >= ende) {
-            throw new IllegalArgumentException("Linkziel im Markdown nicht gefunden");
+            return -1;
         }
         int start = klammer + 2;
         while (start < ende && Character.isWhitespace(markdown.charAt(start))) {

@@ -204,4 +204,14 @@ class WissensMarkdownTest {
         assertThat(zuTief.zuTief()).isTrue();
         assertThat(WissensMarkdown.analysieren("    Code mit [Klammer]", 20_000).zuTief()).isFalse();
     }
+
+    @Test
+    void okfLaesstReferenzLinksUnveraendertStattAbzubrechen() {
+        for (String markdown : new String[] {"[a][]\n\n[a]: /ueberblick.md\n", "[a]\n\n[a]: /ueberblick.md\n",
+                "[a][r]\n\n[r]: /ueberblick.md\n"}) {
+            assertThat(WissensMarkdown.ausOkf(markdown)).isEqualTo(markdown);
+        }
+        assertThat(WissensMarkdown.ausOkf("[a][r] und [b](/konzepte/x.md)\n\n[r]: /ueberblick.md\n"))
+                .isEqualTo("[a][r] und [b](/konzepte/x)\n\n[r]: /ueberblick.md\n");
+    }
 }

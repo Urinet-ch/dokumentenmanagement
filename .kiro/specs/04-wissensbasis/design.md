@@ -570,7 +570,9 @@ Eine positive Archivversion aus einer ausdrücklich anderen Herkunftsinstanz ist
 Sie bleibt im ursprünglichen Paket gespeichert, wird wie bei `AENDERN` aus fremder Herkunft nicht als
 Zielversion übernommen und erzeugt `BASIS_UNBEKANNT`. So bleibt der lokale Export in ein anderes Archiv
 auch für unbekannte Zielpfade importierbar. Negative Werte, Werte ausserhalb der Archiv-Versionsspanne und
-positive NEU-Basisversionen ohne fremde Herkunft brechen weiterhin mit `FORMAT` ohne Entwurf ab.
+positive NEU-Basisversionen ohne fremde Herkunft brechen weiterhin mit `FORMAT` ohne Entwurf ab, sofern der Pfad im
+Mandanten nicht existiert. Existiert der Pfad, ist die Seite für den Benutzer aber unsichtbar (höhere Stufe), wird die
+Basisversion nicht ausgewertet: Die Änderung entsteht als `NEU` mit `PFAD_UNGUELTIG` und `HOEHERE_STUFE_VORHANDEN` (19.9).
 Herkunft ist nur Metadatum, kein Recht und kein Quellen- oder Mandantenselektor; die Zielbasis wird nicht
 aus ihr gelesen. Der REST-Rundlauf exportiert aus einer anderen Instanz mit fremder Dokument-ID und
 übernimmt eine dort erzeugte Seite im Ziel neu, ausschliesslich mit SHA-Zuordnung.
