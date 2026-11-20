@@ -140,7 +140,8 @@ class WissenLintAblaufTest {
                                     .executeUpdate();
                         }
                         // Seiten anderer Tests im selben Mandanten dürfen keine Paare bilden (Rollback am Ende).
-                        em.createNativeQuery("update wissensseite set tags = array[]::text[]").executeUpdate();
+                        em.createNativeQuery("update wissensseite set tags = array[]::text[], inhalt = ''").executeUpdate();
+                        em.createNativeQuery("delete from wissensseite_quelle").executeUpdate();
                         String paarTag = UUID.randomUUID().toString();
                         seite(em, A, "lint-a", "NORMAL", "q-a", dokumentA, paarTag);
                         seite(em, B, "lint-b", "INTERN", "q-b", dokumentB, paarTag);
