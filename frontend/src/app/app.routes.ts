@@ -45,6 +45,12 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.suche),
   },
   {
+    path: 'wissensbasis/einstellungen',
+    loadComponent: () => import('./wissen/wissen-einstellungen').then((m) => m.WissenEinstellungenSeite),
+    canActivate: [rechtGuard('A19')],
+    title: titel(TEXTE.wissenEinstellungen.titel),
+  },
+  {
     path: 'wissen',
     loadComponent: () => import('./wissen/wissen-index').then((m) => m.WissenIndex),
     canActivate: [rechtGuard('A15')],

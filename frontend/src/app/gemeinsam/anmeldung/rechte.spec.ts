@@ -25,6 +25,13 @@ describe('Rechte (Req 2.2, 2.6)', () => {
     expect(darf('geschaeftsstelle', 'EXPORT')).toBe(false);
   });
 
+  it('erlaubt Wissenseinstellungen und OKF-Export nur dem Inhaber (A19)', () => {
+    expect(darf('inhaber', 'A19')).toBe(true);
+    for (const rolle of ['treuhaender', 'mitarbeiter', 'geschaeftsstelle'] as const) {
+      expect(darf(rolle, 'A19')).toBe(false);
+    }
+  });
+
   it('erlaubt Eingangskorb-Aktionen A6–A10 nur Inhaber und Geschäftsstelle (Req 2.6)', () => {
     for (const aktion of ['A6', 'A7', 'A8', 'A9', 'A10'] as const) {
       expect(darf('inhaber', aktion)).toBe(true);

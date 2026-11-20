@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { WissensIndex } from '../gemeinsam/api';
+import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
@@ -16,6 +17,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
 export class WissenIndex {
   private readonly http = inject(HttpClient);
   private readonly destroy = inject(DestroyRef);
+  protected readonly anmeldung = inject(AnmeldungService);
   protected readonly texte = TEXTE.wissen;
   protected readonly typen = Object.entries(this.texte.seitentypen);
   protected readonly ergebnis = signal<WissensIndex | null>(null);
