@@ -246,8 +246,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
 | A23 | Rollen zuweisen | erlaubt | 403 | 403 | 403 |
 
    ¹ Für `geschaeftsstelle` gilt 403, bis Spec 03, 3.5 die Rechte A11 bis A14 entscheidet; ob die Geschäftsstelle von
-   `vhf-gsk` A21 bis A23 erhält, entscheidet derselbe Schritt [offen: Benutzerverwaltung im Mandanten `vhf-gsk` –
-   Entscheid Fabian im PR dieser Spec; Empfehlung: Betreiber verwaltet die Benutzer von `vhf-gsk` per Admin-Kommando].
+   `vhf-gsk` A21 bis A23 erhält, entscheidet derselbe Schritt [entschieden 20.11.2026, Fabian: Der Betreiber
+   verwaltet die Benutzer von `vhf-gsk` per Admin-Kommando; A20 bis A23 bleiben für `geschaeftsstelle` gesperrt, bis Spec 03, 3.5
+   entscheidet].
    Ein Benutzer braucht für das Anlegen A22 und A23, weil das Anlegen eine Rolle vergibt.
 2. FALLS ein Benutzer ohne das Recht einer Aktion A20 bis A23 sie ausführt, DANN SOLL das Archiv mit HTTP 403
    `NICHT_ERLAUBT` antworten und `VERWEIGERT` protokollieren (Spec 01, 10.7). Nachweis: Szenarien je Rolle und Zeile.
