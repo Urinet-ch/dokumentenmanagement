@@ -15,6 +15,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { Dokument, Dokumentart, DokumentartenService, DokumenteService } from '../gemeinsam/api';
 import { EingangskorbZaehler } from '../gemeinsam/eingangskorb-zaehler';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { EingangskorbKarte } from './eingangskorb-karte';
 
@@ -23,7 +24,7 @@ const GROESSE = 20;
 /** Eingangskorb, neueste zuerst (Req 8.1); das Archiv liefert nur, was der Benutzer sehen darf (Req 2.3, 2.24). */
 @Component({
   selector: 'app-eingangskorb',
-  imports: [MatButtonModule, EingangskorbKarte],
+  imports: [MatButtonModule, EingangskorbKarte, Symbol],
   templateUrl: './eingangskorb.html',
   styleUrl: './eingangskorb.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
