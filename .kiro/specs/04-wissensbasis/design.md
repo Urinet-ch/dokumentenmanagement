@@ -565,9 +565,15 @@ PostgreSQL 17 erhält zusätzlich ein transaktionslokales `transaction_timeout` 
 dadurch können interne Änderungen von `statement_timeout` die gesamte Transaktionsfrist nicht verlängern.
 SQLSTATE `25P04` und `57014` werden nach dem Rollback als `PAKET_UNGUELTIG` mit Grund `ZEIT` gemeldet.
 `neu-pruefen` bewahrt bereits erreichte Kontextstufen und erhöht die Änderungs-ETags.
-Bei `NEU` wird eine vorhandene Basisversion vor der Auswertung nur als `0` angenommen; alle anderen Werte
-brechen das Paket mit `FORMAT` ohne Entwurf ab (19.9). Der REST-Rundlauf des lokalen Exports verwendet eine
-bereits vorhandene Seite mit passender Basisversion und weist die Änderung statt einer neuen Seite nach.
+**Gemeinsame Auslegung 19.9/19.10/19.23 (Aufgabe 15.6):** Bei `NEU` ist die Zielbasis fehlend (entspricht 0).
+Eine positive Archivversion aus einer ausdrücklich anderen Herkunftsinstanz ist keine Zielbasis:
+Sie bleibt im ursprünglichen Paket gespeichert, wird wie bei `AENDERN` aus fremder Herkunft nicht als
+Zielversion übernommen und erzeugt `BASIS_UNBEKANNT`. So bleibt der lokale Export in ein anderes Archiv
+auch für unbekannte Zielpfade importierbar. Negative Werte, Werte ausserhalb der Archiv-Versionsspanne und
+positive NEU-Basisversionen ohne fremde Herkunft brechen weiterhin mit `FORMAT` ohne Entwurf ab.
+Herkunft ist nur Metadatum, kein Recht und kein Quellen- oder Mandantenselektor; die Zielbasis wird nicht
+aus ihr gelesen. Der REST-Rundlauf exportiert aus einer anderen Instanz mit fremder Dokument-ID und
+übernimmt eine dort erzeugte Seite im Ziel neu, ausschliesslich mit SHA-Zuordnung.
 Die A17-Leseansicht liefert
 die Importherkunft und je Quellenschlüssel die Zuordnung und das Ergebnis aus
 `WissensPruefung.auszugPruefen`; dieselbe Auszugsprüfung wird beim Annehmen erneut ausgeführt.

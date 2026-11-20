@@ -97,7 +97,10 @@ public class WissenImport {
             var metadaten = seiten.get(seite.pfad());
             var basis = metadaten == null || !sichtbar.contains(metadaten.id()) ? null
                     : daten.seiteLaden(metadaten.id()).orElseThrow();
-            if (basis == null && seite.basisVersion() != null && seite.basisVersion() != 0) {
+            boolean fremdeBasis = paket.kopf().instanz() != null && !instanz.equals(paket.kopf().instanz())
+                    && seite.basisVersion() != null && seite.basisVersion() > 0
+                    && seite.basisVersion() <= Integer.MAX_VALUE;
+            if (basis == null && seite.basisVersion() != null && seite.basisVersion() != 0 && !fremdeBasis) {
                 throw new PaketUngueltig("FORMAT", seite.pfad());
             }
             var aufgeloest = aufloesen(benutzer, paket.kopf(), seite, basis);
@@ -108,6 +111,9 @@ public class WissenImport {
             }
             Integer version = null;
             List<WissensPruefung.Hinweis> hinweise = new ArrayList<>(aufgeloest.hinweise());
+            if (basis == null && fremdeBasis) {
+                hinweise.add(hinweis(WissensPruefung.Hinweiscode.BASIS_UNBEKANNT));
+            }
             if (basis != null) {
                 if (instanz.equals(paket.kopf().instanz()) && seite.basisVersion() != null) {
                     if (seite.basisVersion() > Integer.MAX_VALUE || seite.basisVersion() < 1) {

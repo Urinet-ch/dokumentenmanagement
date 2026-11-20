@@ -108,4 +108,14 @@ class WissenPaketImportTest {
         schritte.neueBasisNull();
         schritte.nurEntwurf();
     }
+
+    @Test
+    void negativeFremdeBasis() throws Exception {
+        schritte.ungueltigeNeueBasis(-1, "fremde-quelle");
+    }
+
+    @Test
+    void positiveBasisOhneHerkunft() throws Exception {
+        schritte.ungueltigeNeueBasis(1, null);
+    }
 }

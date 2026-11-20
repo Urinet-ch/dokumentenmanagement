@@ -432,21 +432,19 @@ public class WissenImportSchritte {
 
     @Dann("ein OKF-Export mit lokaler Herkunft ist ohne ID-Zuordnung als Wissenspaket importierbar")
     public void rundlaufLokalerExport() throws Exception {
-        importieren();
-        nurEntwurf();
-        annehmen();
         UUID dokument = dokumente.get("urinet").getFirst();
+        UUID fremdesDokument = UUID.randomUUID();
         Instant jetzt = Instant.now();
         var seite = new Wissensseite(UUID.randomUUID(), pfad, Seitentyp.KONZEPT, "Probe", "Beschreibung",
                 List.of(), Wissensseite.Status.AKTIV, null,
-                List.of(new Quelleneintrag("q-1", dokument, 1, null, "Seite 1", null)),
+                List.of(new Quelleneintrag("q-1", fremdesDokument, 1, null, "Seite 1", null)),
                 Wissensseite.Vertraulichkeit.NORMAL, "Aussage.[^q-1]", 1, "human:probe", jetzt,
                 "probe", jetzt, false, false, null);
         var paket = new OkfSchreiber.Paket(new MandantCode("urinet"), "urinet-archiv", "lokal", jetzt,
-                ConfigProvider.getConfig().getValue("archiv.wissen.instanz-id", String.class), Set.of(pfad));
+                "lokale-quelle-" + UUID.randomUUID(), Set.of(pfad));
         var bytes = new ByteArrayOutputStream();
         OkfSchreiber.schreiben(paket, List.of(new OkfSchreiber.Seite(seite,
-                Map.of(dokument, new OkfSchreiber.Dokument(dokument, sha, "Probe", jetzt)), Map.of())),
+                Map.of(fremdesDokument, new OkfSchreiber.Dokument(fremdesDokument, sha, "Probe", jetzt)), Map.of())),
                 List.of(), bytes);
         var gelesen = new WissensPaketLeser().lesen(bytes.toByteArray());
         assertThat(gelesen.kopf().erzeugtMit()).isEqualTo("lokal");
@@ -454,18 +452,28 @@ public class WissenImportSchritte {
         antwort = post(bytes.toByteArray());
         antwort.then().statusCode(201);
         assertThat(antwort.jsonPath().getList("befunde")).isEmpty();
-        assertThat(antwort.jsonPath().getInt("anzahl.aendern")).isEqualTo(1);
-        assertThat(antwort.jsonPath().getInt("anzahl.neu")).isZero();
+        assertThat(antwort.jsonPath().getInt("anzahl.aendern")).isZero();
+        assertThat(antwort.jsonPath().getInt("anzahl.neu")).isEqualTo(1);
+        assertThat(antwort.jsonPath().getList("hinweise.code", String.class)).contains("BASIS_UNBEKANNT");
         assertThat(antwort.jsonPath().getInt("anzahl.ignoriert")).isEqualTo(2);
         entwurf = UUID.fromString(antwort.jsonPath().getString("entwurfId"));
+        assertThat(anzahl("select count(*) from m_urinet.wissens_aenderung where entwurf_id = ? "
+                + "and aktion = 'NEU' and basis_version is null", entwurf)).isEqualTo(1);
+        var detail = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .get(API + "/" + entwurf).then().statusCode(200).extract().jsonPath();
+        assertThat(detail.getString("aenderungen[0].daten.quellen[0].dokumentId")).isEqualTo(dokument.toString());
         entscheiden(entwurf, 1, 0, "annehmen", "{}").then().statusCode(204);
         assertThat(anzahl("select count(*) from m_urinet.wissensseite where pfad = ? "
-                + "and version = 2 and erzeugt_von = 'extern:urinet-archiv'", pfad)).isEqualTo(1);
+                + "and version = 1 and erzeugt_von = 'extern:urinet-archiv'", pfad)).isEqualTo(1);
     }
 
     @Dann("eine neue Seite mit Basisversion {long} verwirft das gesamte Wissenspaket")
     public void ungueltigeNeueBasis(long version) throws Exception {
-        byte[] zip = paket("lokal", "NORMAL",
+        ungueltigeNeueBasis(version, ConfigProvider.getConfig().getValue("archiv.wissen.instanz-id", String.class));
+    }
+
+    public void ungueltigeNeueBasis(long version, String instanz) throws Exception {
+        byte[] zip = paket("lokal", "NORMAL", instanz,
                 seite(pfad, sha, "Seite 1", null, "Aussage."),
                 seite(pfad + "-ungueltig", sha, "Seite 1", version, "Aussage."));
         var abbruch = post(zip);
@@ -522,6 +530,11 @@ public class WissenImportSchritte {
     }
 
     private byte[] paket(String erzeugtMit, String stufe, Seite... seiten) throws Exception {
+        return paket(erzeugtMit, stufe,
+                ConfigProvider.getConfig().getValue("archiv.wissen.instanz-id", String.class), seiten);
+    }
+
+    private byte[] paket(String erzeugtMit, String stufe, String instanz, Seite... seiten) throws Exception {
         var bytes = new ByteArrayOutputStream();
         try (var zip = new ZipOutputStream(bytes, StandardCharsets.UTF_8)) {
             eintrag(zip, "paket.yaml", """
@@ -531,10 +544,8 @@ public class WissenImportSchritte {
                     erzeugt_mit: %s
                     kontext_stufe: %s
                     erzeugt_am: '2026-11-20T12:00:00Z'
-                    herkunft:
-                      instanz: %s
-                    """.formatted(erzeugtMit, stufe, ConfigProvider.getConfig()
-                            .getValue("archiv.wissen.instanz-id", String.class)));
+                    %s""".formatted(erzeugtMit, stufe,
+                    instanz == null ? "" : "herkunft:\n  instanz: " + instanz + "\n"));
             for (Seite seite : seiten) {
                 eintrag(zip, seite.pfad() + ".md", """
                         ---
