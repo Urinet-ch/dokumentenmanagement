@@ -88,7 +88,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      # Maven-Cache je Job statt des gemeinsamen von setup-java: Den gemeinsamen speicherte der Job, der zuerst fertig
+      # war (oft «Spec-Prüfungen» mit nur «mvn test»); Plugins für verify/package fehlten dann darin, und jeder Lauf
+      # lud sie von Maven Central, das GitHub-Runner mit HTTP 429 abweist (20.11.2026). So enthält jeder Cache, was
+      # sein Job braucht; ein neuer Schlüssel startet aus dem eigenen oder einem anderen Cache
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ github.job }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ github.job }}-
+            maven-
       # Jede Testklasse, die .kiro/ oder docs/ liest: Abdeckung @req (Req 16.14), Fehlercodes, Rechtematrix,
       # Stammdaten-Tabelle gegen den Seed; dazu die Regel selbst (NurSpecTest, CiNachweisTest). NurSpecTest prüft, dass
       # jede Klasse mit einem Pfad nach .kiro/ oder docs/ (oder ihr Nutzer) hier steht, und dass es jede genannte gibt
@@ -126,7 +136,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      # Maven-Cache je Job statt des gemeinsamen von setup-java: Den gemeinsamen speicherte der Job, der zuerst fertig
+      # war (oft «Spec-Prüfungen» mit nur «mvn test»); Plugins für verify/package fehlten dann darin, und jeder Lauf
+      # lud sie von Maven Central, das GitHub-Runner mit HTTP 429 abweist (20.11.2026). So enthält jeder Cache, was
+      # sein Job braucht; ein neuer Schlüssel startet aus dem eigenen oder einem anderen Cache
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ github.job }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ github.job }}-
+            maven-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
@@ -179,7 +199,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      # Maven-Cache je Job statt des gemeinsamen von setup-java: Den gemeinsamen speicherte der Job, der zuerst fertig
+      # war (oft «Spec-Prüfungen» mit nur «mvn test»); Plugins für verify/package fehlten dann darin, und jeder Lauf
+      # lud sie von Maven Central, das GitHub-Runner mit HTTP 429 abweist (20.11.2026). So enthält jeder Cache, was
+      # sein Job braucht; ein neuer Schlüssel startet aus dem eigenen oder einem anderen Cache
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ github.job }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ github.job }}-
+            maven-
       # Quinoa baut die PWA im Job «build»; hier nur verify ohne die Klassen mit eigenem Start und ohne die
       # Szenario-Runner (Job «gruppen»). Gruppenliste synchron halten mit der Matrix des Jobs «gruppen», den Argumenten
       # der Testzahl-Prüfung, GRUPPEN in StartGruppenTest und den Tags der Szenario-Runner
@@ -224,7 +254,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      # Maven-Cache je Job statt des gemeinsamen von setup-java: Den gemeinsamen speicherte der Job, der zuerst fertig
+      # war (oft «Spec-Prüfungen» mit nur «mvn test»); Plugins für verify/package fehlten dann darin, und jeder Lauf
+      # lud sie von Maven Central, das GitHub-Runner mit HTTP 429 abweist (20.11.2026). So enthält jeder Cache, was
+      # sein Job braucht; ein neuer Schlüssel startet aus dem eigenen oder einem anderen Cache
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ github.job }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ github.job }}-
+            maven-
       - name: Devservices-Images vorladen (parallel zum Kompilieren)
         run: nohup setsid .github/scripts/lade-devservices-images.sh > /dev/null 2>&1 &
       - name: mvn test (nur ${{ matrix.name }}, Tags ${{ matrix.tags }})
@@ -301,7 +341,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      # Maven-Cache je Job statt des gemeinsamen von setup-java: Den gemeinsamen speicherte der Job, der zuerst fertig
+      # war (oft «Spec-Prüfungen» mit nur «mvn test»); Plugins für verify/package fehlten dann darin, und jeder Lauf
+      # lud sie von Maven Central, das GitHub-Runner mit HTTP 429 abweist (20.11.2026). So enthält jeder Cache, was
+      # sein Job braucht; ein neuer Schlüssel startet aus dem eigenen oder einem anderen Cache
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ github.job }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ github.job }}-
+            maven-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
