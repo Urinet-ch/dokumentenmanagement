@@ -1,0 +1,83 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.klassifikationen,
+.klassifikation {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 0.25rem;
+}
+
+.klassifikationen {
+  gap: 0.75rem;
+}
+
+legend,
+label {
+  font-weight: 600;
+}
+
+legend {
+  padding: 0 0.25rem;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+
+  input {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    margin: 0;
+    accent-color: var(--urinet-gelb);
+
+    &[aria-invalid='true'] {
+      outline: 2px solid var(--urinet-fehler);
+    }
+  }
+}
+
+.feld {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem;
+  font: inherit;
+  color: var(--urinet-hell);
+  background: var(--urinet-dunkel);
+  border: 1px solid var(--urinet-gedaempft);
+  border-radius: 0.25rem;
+
+  &[aria-invalid='true'] {
+    border-color: var(--urinet-fehler);
+  }
+}
+
+.hinweis,
+.fehler {
+  margin: 0;
+}
+
+.hinweis {
+  color: var(--urinet-gedaempft);
+  font: var(--mat-sys-body-small);
+}
+
+.fehler {
+  color: var(--urinet-fehler);
+}
