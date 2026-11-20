@@ -92,7 +92,7 @@ public final class WissenPaketCli implements Callable<Integer> {
             if (ziel.startsWith(eingabe.toRealPath()) || quellen != null && ziel.startsWith(quellen.toRealPath()))
                 throw new IOException();
             if (Files.exists(ausgabe, LinkOption.NOFOLLOW_LINKS)) {
-                if (Files.isSymbolicLink(ausgabe) || gemeinsam(eingabe, ausgabe)
+                if (!Files.isRegularFile(ausgabe, LinkOption.NOFOLLOW_LINKS) || gemeinsam(eingabe, ausgabe)
                         || quellen != null && gemeinsam(quellen, ausgabe)) throw new IOException();
             }
             Instant.parse(erzeugtAm);
