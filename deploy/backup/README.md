@@ -134,8 +134,9 @@ Datenbank-Container. PostgreSQL und MinIO hängen zusätzlich am Netz `hostzugan
 weil Maven-Test und Wiederherstellungskommando vom Host aus auf sie zugreifen. Das wiederhergestellte Keycloak erhält
 Ebenfalls einen zufälligen Loopback-Port, damit der Maven-Test mit einem Token aus dem wiederhergestellten Realm die
 geschützte API aufrufen kann. Vor dem Export legt die Übung im temporären Quell-Realm dafür einen synthetischen
-Benutzer und einen kurzlebigen Client mit Rolle und Mandanten-Claim an. Beides bleibt ausschliesslich in den
-Wegwerf-Datenbanken; Realm-Dateien und Identitätsdienst werden nicht geändert. Die OIDC-Issuer-URL des Ziel-Realm ist
+Benutzer und einen kurzlebigen Client mit Rolle und Mandanten-Claim an. Die JSON-Dateien dafür werden mit `jq` erzeugt
+und vor dem Keycloak-Aufruf geprüft. Beides bleibt ausschliesslich in den Wegwerf-Datenbanken; Realm-Dateien und
+Identitätsdienst werden nicht geändert. Die OIDC-Issuer-URL des Ziel-Realm ist
 an den Loopback-Port gebunden. Die Daten von PostgreSQL und MinIO
 liegen in tmpfs; es entstehen keine Volumes. Keycloak und die API haben ein `mem_limit` von 768 MiB, Keycloak dazu eine
 Heap-Grenze; ohne sie beendet der OOM-Killer einer knappen Docker-VM Keycloak.
@@ -152,9 +153,11 @@ weist einen falschen Schlüssel und eine manipulierte Prüfsumme zurück und ent
 Wegwerf-Schlüsseln.
 
 Der Lauf spielt den Archiv- und Keycloak-Dump in neue Datenbanken ein. Danach startet er Keycloak mit der
-wiederhergestellten Datenbank und prüft den Realm über den Issuer seiner OIDC-Konfiguration. Der Maven-Test meldet sich
-Mit dem synthetischen Benutzer am wiederhergestellten Realm an und ruft mit dem ausgestellten Token einen geschützten
-API-Endpunkt auf. Der Bucket-Strom wird mit `archiv sicherung wiederherstellen`
+wiederhergestellten Datenbank und prüft den Realm über den Issuer seiner OIDC-Konfiguration. Der Maven-Test soll sich
+mit dem synthetischen Benutzer am wiederhergestellten Realm anmelden und mit dem Token einen geschützten API-Endpunkt
+aufrufen. Aktuell scheitert der Passwort-Grant, weil der Direct-Grant-Flow TOTP verlangt und dem synthetischen
+Benutzer noch kein OTP-Credential zugeordnet ist; deshalb ist der vollständige Roundtrip nicht bestanden. Der
+Bucket-Strom wird mit `archiv sicherung wiederherstellen`
 in den neuen `urinet-archiv-p-`-Bucket eingespielt; eine absichtlich unvollständige Inventarliste ohne Manifest wird
 vorher zurückgewiesen. Die Quarkus-Testanwendung startet gegen die wiederhergestellte Archivdatenbank und prüft
 Dokumentanzahl, IDs, SHA-256 und Lesbarkeit der Dateien. `archiv manifest pruefen` validiert danach das signierte

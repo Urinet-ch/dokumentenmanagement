@@ -184,7 +184,8 @@ class SicherungPaketRoundtripTest {
         String passwortDatei = erforderlicheEigenschaft("archiv.restore.oidc-passwort-datei");
         String passwort = Files.readString(Path.of(passwortDatei), StandardCharsets.UTF_8).trim();
         var anmeldung = Testanmeldung.anmelden(oidcUrl, client, benutzer, passwort, null);
-        assertThat(anmeldung.statusCode()).as("Anmeldung am wiederhergestellten Realm").isEqualTo(200);
+        assertThat(anmeldung.statusCode()).as("Anmeldung am wiederhergestellten Realm: " + anmeldung.asString())
+                .isEqualTo(200);
         String token = anmeldung.path("access_token");
         assertThat(token).isNotBlank();
         given().auth().oauth2(token).when().get("/api/v1/dokumentarten").then().statusCode(200);

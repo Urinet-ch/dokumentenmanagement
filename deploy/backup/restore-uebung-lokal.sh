@@ -80,7 +80,7 @@ trap aufräumen EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-for programm in bash mvn docker age age-keygen openssl curl tar awk grep cmp python3; do
+for programm in bash mvn docker age age-keygen openssl curl tar awk grep cmp python3 jq; do
   voraussetzung "$programm"
 done
 if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
@@ -119,6 +119,27 @@ for geheimnis in postgres_password archiv_db_owner archiv_db_app keycloak_db key
   geheimnis_erzeugen "$geheimnis"
 done
 { printf 'A1!'; openssl rand -hex 32; } > "$temp/secrets/restore_oidc_password"
+jq -n --arg benutzer "$oidc_benutzer" \
+  '{username:$benutzer, enabled:true, attributes:{mandant:["urinet"]}}' \
+  > "$temp/secrets/restore_oidc_user.json"
+jq -e '.username and .enabled and .attributes.mandant == ["urinet"]' \
+  "$temp/secrets/restore_oidc_user.json" >/dev/null
+jq -n --arg client "$oidc_client" '{
+  clientId:$client,
+  enabled:true,
+  publicClient:true,
+  directAccessGrantsEnabled:true,
+  standardFlowEnabled:false,
+  protocolMappers:[
+    {name:"archiv-api-audience", protocol:"openid-connect", protocolMapper:"oidc-audience-mapper",
+      config:{"included.client.audience":"archiv-api", "access.token.claim":"true", "id.token.claim":"false"}},
+    {name:"mandant", protocol:"openid-connect", protocolMapper:"oidc-usermodel-attribute-mapper",
+      config:{"user.attribute":"mandant", "claim.name":"mandant", "jsonType.label":"String",
+        "access.token.claim":"true", "id.token.claim":"true"}}
+  ]
+}' > "$temp/secrets/restore_oidc_client.json"
+jq -e '.clientId and .enabled and .directAccessGrantsEnabled and (.protocolMappers | length == 2)' \
+  "$temp/secrets/restore_oidc_client.json" >/dev/null
 printf '%s' archiv-dev > "$temp/secrets/s3_app_zugang_id"
 printf '%s' archiv-dev-zugang > "$temp/secrets/s3_app_zugang_geheimnis"
 printf '%s' archiv-dev > "$temp/secrets/zugang_id"
@@ -268,22 +289,13 @@ oidc_testanmeldung_vorbereiten() {
     config=$(mktemp -d /tmp/kcadm-restore.XXXXXX)
     trap '\''rm -rf -- "$config"'\'' EXIT
     config="$config/kcadm.config"
+    printf "Keycloak-Testclient anmelden\\n"
     "$cli" config credentials --server http://kc:8080 --realm master \
       --user archiv-admin --password "$admin_password" --config "$config" >/dev/null
-    client_id=$("$cli" create clients -r urinet-archiv -i \
-      -s "clientId=$1" -s enabled=true -s publicClient=true \
-      -s directAccessGrantsEnabled=true -s standardFlowEnabled=false --config "$config")
-    test -n "$client_id"
-    "$cli" create "clients/$client_id/protocol-mappers/models" -r urinet-archiv \
-      -s name=archiv-api-audience -s protocol=openid-connect -s protocolMapper=oidc-audience-mapper \
-      -s config.included.client.audience=archiv-api -s config.access.token.claim=true \
-      -s config.id.token.claim=false --config "$config" >/dev/null
-    "$cli" create "clients/$client_id/protocol-mappers/models" -r urinet-archiv \
-      -s name=mandant -s protocol=openid-connect -s protocolMapper=oidc-usermodel-attribute-mapper \
-      -s config.user.attribute=mandant -s config.claim.name=mandant -s config.jsonType.label=String \
-      -s config.access.token.claim=true -s config.id.token.claim=true --config "$config" >/dev/null
-    "$cli" create users -r urinet-archiv -s "username=$2" -s enabled=true \
-      -s '\''attributes.mandant=["urinet"]'\'' --config "$config" >/dev/null
+    printf "Keycloak-Testclient im synthetischen Quell-Realm anlegen\\n"
+    "$cli" create clients -r urinet-archiv -f /run/secrets/restore_oidc_client --config "$config"
+    printf "Synthetischen OIDC-Testbenutzer aus geprüfter JSON-Datei anlegen\\n"
+    "$cli" create users -r urinet-archiv -f /run/secrets/restore_oidc_user --config "$config" >/dev/null
     "$cli" set-password -r urinet-archiv --username "$2" --new-password "$test_password" \
       --config "$config" >/dev/null
     "$cli" add-roles -r urinet-archiv --uusername "$2" --rolename inhaber \
@@ -292,6 +304,7 @@ oidc_testanmeldung_vorbereiten() {
     bericht OK "Synthetische OIDC-Testanmeldung für den Roundtrip vorbereiten" "$((SECONDS - start))"
   else
     tail -n 12 "$temp/oidc-testlogin.log" >&2 || true
+    compose logs --no-color --tail 40 kc >&2 || true
     fehler "Synthetische OIDC-Testanmeldung konnte nicht vorbereitet werden."
   fi
 }
@@ -330,6 +343,9 @@ test_maven() {
     local status=$?
     bericht FEHLER "Sicherungs-Roundtrip Phase $phase (Exit $status)" "$((SECONDS - start))"
     grep -E 'Tests run:|BUILD FAILURE|\[ERROR\]' "$temp/$phase-test.log" | tail -n 12 >&2 || true
+    if [[ $phase == ziel ]]; then
+      compose logs --no-color --tail 60 kc_restore >&2 || true
+    fi
     exit 3
   fi
 }
