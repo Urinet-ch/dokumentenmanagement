@@ -142,28 +142,7 @@ public class WissenLintSchritte {
         if (lintId == null) {
             return;
         }
-        try (var verbindung = datenbank.getConnection();
-             var auftrag = verbindung.prepareStatement("""
-                     delete from public.auftrag where typ = 'WISSEN_LINT' and nutzlast->>'lintId' = ?
-                     """);
-             var log = verbindung.prepareStatement("""
-                     delete from m_urinet.wissens_log
-                     where entwurf_id = (select entwurf_id from m_urinet.wissens_lint where id = ?)
-                     """);
-             var entwurf = verbindung.prepareStatement("""
-                     with geloescht as (
-                         delete from m_urinet.wissens_lint where id = ? returning entwurf_id
-                     )
-                     delete from m_urinet.wissens_entwurf
-                     where id in (select entwurf_id from geloescht)
-                     """)) {
-            auftrag.setString(1, lintId.toString());
-            auftrag.executeUpdate();
-            log.setObject(1, lintId);
-            log.executeUpdate();
-            entwurf.setObject(1, lintId);
-            entwurf.executeUpdate();
-        }
+        TestWissenLint.loeschen(datenbank, lintId);
         lintId = null;
     }
 }

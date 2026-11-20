@@ -46,6 +46,7 @@ public class WissenLintKiSchritte {
     private List<String> dateiVorher;
     private List<String> versionenVorher;
     private long letzterProtokollEintrag;
+    private final String paarTag = UUID.randomUUID().toString();
 
     @Angenommen("zwei verknüpfbare Lint-Seiten mit Stufen NORMAL und INTERN und eine PERSONAL-Hülle bestehen")
     public void gemischtesPaar() throws SQLException {
@@ -105,9 +106,9 @@ public class WissenLintKiSchritte {
                 insert into m_urinet.wissensseite
                     (id, pfad, typ, titel, beschreibung, tags, status, vertraulichkeit, vertraulichkeit_mindest,
                      inhalt, version, erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am)
-                values (?, ?, 'Konzept', ?, 'Synthetische Beschreibung', array['lintprobe', 'synthetisch'],
+                values (?, ?, 'Konzept', ?, 'Synthetische Beschreibung', array['lintprobe', ?],
                         'AKTIV', ?, ?, ?, 1, 'probe', now(), 'probe', now())
-                """, id, "konzepte/lint-" + name + "-" + id, marker, stufe, stufe,
+                """, id, "konzepte/lint-" + name + "-" + id, marker, paarTag, stufe, stufe,
                 "Aussage " + marker + ". [^" + schluessel + "]");
         sql("""
                 insert into m_urinet.wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von)
@@ -133,13 +134,13 @@ public class WissenLintKiSchritte {
                 "entfernte_aussagen":[],"begruendung":"Prüfung"}
                 """;
         KiWireMock.zuruecksetzen();
-        KiWireMock.wissenFolge(List.of(paar, aenderung, aenderung), 0, ein, aus);
+        KiWireMock.wissenFolge(List.of(paar, aenderung, aenderung), 0, ein, aus, paarTag);
     }
 
     @Angenommen("die Lint-KI liefert zweimal eine ungültige Paarantwort")
     public void ungueltigeAntworten() {
         KiWireMock.zuruecksetzen();
-        KiWireMock.wissenFolge(List.of("ungültig", "ungültig"));
+        KiWireMock.wissenFolge(List.of("ungültig", "ungültig"), 0, 100, 50, paarTag);
     }
 
     @Angenommen("das Lint-Laufbudget erlaubt zwei KI-Aufrufe und danach keinen weiteren")
@@ -166,10 +167,10 @@ public class WissenLintKiSchritte {
     @Wenn("nach dem Paarauftrag wird die normale Quelle PERSONAL")
     public void persoenlichNachPaar() throws Exception {
         long ende = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
-        while (KiWireMock.wissenAnfragen().isEmpty() && System.nanoTime() < ende) {
+        while (kiAnfragen().isEmpty() && System.nanoTime() < ende) {
             einenTakt();
         }
-        assertThat(KiWireMock.wissenAnfragen()).hasSize(1);
+        assertThat(kiAnfragen()).hasSize(1);
         sql("update m_urinet.dokument set vertraulichkeit = 'PERSONAL' where id = ?", normalDokument);
     }
 
@@ -189,10 +190,10 @@ public class WissenLintKiSchritte {
     }
 
     private void einenTakt() throws Exception {
-        int vorher = KiWireMock.wissenAnfragen().size();
+        int vorher = kiAnfragen().size();
         var laeufe = arbeiter.abholen();
         CompletableFuture.allOf(laeufe.toArray(CompletableFuture[]::new)).get(30, TimeUnit.SECONDS);
-        assertThat(KiWireMock.wissenAnfragen().size() - vorher).isBetween(0, 1);
+        assertThat(kiAnfragen().size() - vorher).isBetween(0, 1);
         if (laeufe.isEmpty()) {
             Thread.sleep(100);
         }
@@ -200,8 +201,8 @@ public class WissenLintKiSchritte {
 
     @Dann("nur die interne Seite erhält einen Lint-Entwurf und PERSONAL erreicht die KI nicht")
     public void nurIntern() throws SQLException {
-        assertThat(KiWireMock.wissenAnfragen()).hasSize(2);
-        assertThat(String.join("\n", KiWireMock.wissenAnfragen()))
+        assertThat(kiAnfragen()).hasSize(2);
+        assertThat(String.join("\n", kiAnfragen()))
                 .contains("NORMAL_MARKER", "INTERN_MARKER").doesNotContain("PERSONAL_MARKER");
         assertThat(zeilen("""
                 select a.seite_id::text || ':' || a.vertraulichkeit_kontext || ':' || a.basis_version::text
@@ -252,7 +253,7 @@ public class WissenLintKiSchritte {
 
     @Dann("nach dem PERSONAL-Wechsel erfolgt kein weiterer KI-Aufruf und keine Änderung")
     public void personalSchutz() throws SQLException {
-        assertThat(KiWireMock.wissenAnfragen()).hasSize(1);
+        assertThat(kiAnfragen()).hasSize(1);
         assertThat(zeilen("""
                 select a.id::text from m_urinet.wissens_aenderung a
                 join m_urinet.wissens_lint l on l.entwurf_id = a.entwurf_id where l.id = ?
@@ -261,8 +262,8 @@ public class WissenLintKiSchritte {
 
     @Dann("der Lint fragt einmal nach und beendet ohne Änderung mit Hinweis")
     public void nachfrage() throws SQLException {
-        assertThat(KiWireMock.wissenAnfragen()).hasSize(2);
-        assertThat(KiWireMock.wissenAnfragen()).anyMatch(anfrage -> anfrage.contains("vorige Antwort war ungültig"));
+        assertThat(kiAnfragen()).hasSize(2);
+        assertThat(kiAnfragen()).anyMatch(anfrage -> anfrage.contains("vorige Antwort war ungültig"));
         assertThat(zeilen("""
                 select e.unvollstaendig::text || ':' || (e.hinweis is not null)::text
                 from m_urinet.wissens_lint l join m_urinet.wissens_entwurf e on e.id = l.entwurf_id where l.id = ?
@@ -275,7 +276,9 @@ public class WissenLintKiSchritte {
 
     @Dann("das erreichte Lint-Budget hinterlässt die bisherige Änderung als unvollständigen Entwurf")
     public void budgetErreicht() throws SQLException {
-        assertThat(KiWireMock.wissenAnfragen()).hasSize(2);
+        assertThat(kiAnfragen()).hasSize(2);
+        assertThat(kiAnfragen().stream().filter(a -> a.contains("wissen_ingest_lint_paar"))).hasSize(1);
+        assertThat(kiAnfragen().stream().filter(a -> a.contains("wissen_ingest_seite"))).hasSize(1);
         assertThat(zeilen("""
                 select e.status || ':' || e.unvollstaendig::text || ':' || count(a.id)::text
                 from m_urinet.wissens_lint l join m_urinet.wissens_entwurf e on e.id = l.entwurf_id
@@ -287,6 +290,12 @@ public class WissenLintKiSchritte {
                 join m_urinet.wissens_lint l on l.entwurf_id = v.ingest_entwurf_id
                 where l.id = ? and v.zweck = 'WISSEN_LINT'
                 """, lintId)).containsExactly("2");
+    }
+
+    private List<String> kiAnfragen() {
+        return KiWireMock.wissenAnfragen().stream()
+                .filter(anfrage -> seiten.stream().anyMatch(id -> anfrage.contains(id.toString())))
+                .toList();
     }
 
     private void sql(String sql, Object... argumente) throws SQLException {
@@ -315,18 +324,7 @@ public class WissenLintKiSchritte {
 
     @After
     public void aufraeumen() throws SQLException {
-        if (lintId != null) {
-            sql("delete from public.auftrag where typ = 'WISSEN_LINT' and nutzlast->>'lintId' = ?", lintId.toString());
-            for (String tabelle : List.of("ki_verbrauch", "ki_verbrauch_reservierung", "wissens_aenderung", "wissens_log")) {
-                sql("delete from m_urinet." + tabelle
-                        + " where " + (tabelle.equals("ki_verbrauch") ? "ingest_entwurf_id" : "entwurf_id")
-                        + " = (select entwurf_id from m_urinet.wissens_lint where id = ?)", lintId);
-            }
-            sql("""
-                    with geloescht as (delete from m_urinet.wissens_lint where id = ? returning entwurf_id)
-                    delete from m_urinet.wissens_entwurf where id in (select entwurf_id from geloescht)
-                    """, lintId);
-        }
+        TestWissenLint.loeschen(datenbank, lintId);
         for (UUID seite : seiten) {
             sql("delete from m_urinet.wissensseite where id = ?", seite);
         }

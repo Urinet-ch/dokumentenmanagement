@@ -139,8 +139,9 @@ class WissenLintAblaufTest {
                                     .setParameter("key", praefix + name).setParameter("version", versionen.get(name))
                                     .executeUpdate();
                         }
-                        seite(em, A, "lint-a", "NORMAL", "q-a", dokumentA);
-                        seite(em, B, "lint-b", "INTERN", "q-b", dokumentB);
+                        String paarTag = UUID.randomUUID().toString();
+                        seite(em, A, "lint-a", "NORMAL", "q-a", dokumentA, paarTag);
+                        seite(em, B, "lint-b", "INTERN", "q-b", dokumentB, paarTag);
                         @SuppressWarnings("unchecked")
                         List<String> vorher = em.createNativeQuery("""
                                 select row_to_json(d)::text from dokument d where id in (:a, :b) order by id
@@ -268,13 +269,15 @@ class WissenLintAblaufTest {
         return id;
     }
 
-    private static void seite(EntityManager em, UUID id, String pfad, String stufe, String schluessel, UUID dokument) {
+    private static void seite(EntityManager em, UUID id, String pfad, String stufe, String schluessel, UUID dokument,
+                              String paarTag) {
         em.createNativeQuery("""
                 insert into wissensseite (id, pfad, typ, titel, beschreibung, tags, status, vertraulichkeit,
                     vertraulichkeit_mindest, inhalt, version, erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am)
-                values (:id, :pfad, 'Konzept', 'Probe', 'Probe', array['lintprobe', 'synthetisch'], 'AKTIV',
+                values (:id, :pfad, 'Konzept', 'Probe', 'Probe', array['lintprobe', :paarTag], 'AKTIV',
                     :stufe, :stufe, :inhalt, 1, 'probe', now(), 'probe', now())
                 """).setParameter("id", id).setParameter("pfad", "konzepte/" + pfad).setParameter("stufe", stufe)
+                .setParameter("paarTag", paarTag)
                 .setParameter("inhalt", "Aussage. [^" + schluessel + "]").executeUpdate();
         em.createNativeQuery("""
                 insert into wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von)
