@@ -181,6 +181,22 @@ describe('Wissensoberfläche', () => {
     expect(element.querySelector('a[href*="/dokument/d3"]')?.textContent).toContain('q3');
   });
 
+  it('hebt Widerspruchsblöcke als Warn-Hinweis hervor, gewöhnliche Zitate nicht', async () => {
+    const fixture = TestBed.createComponent(WissenSeite);
+    fixture.componentRef.setInput('pfad', 'konzepte/probe');
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/v1/wissensseiten').flush({
+      id: 's1', titel: 'Probe', quellen: [],
+      inhaltHtml: '<blockquote><p>⚠️ Widerspruch: A nennt 1, B nennt 2.</p></blockquote><blockquote><p>Zitat</p></blockquote>',
+    });
+    http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
+    http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+    await fixture.whenStable();
+    const bloecke = (fixture.nativeElement as HTMLElement).querySelectorAll('article blockquote');
+    expect(bloecke[0].classList).toContain('widerspruch');
+    expect(bloecke[1].classList).not.toContain('widerspruch');
+  });
+
   it('zeigt keinen Abgelaufen-Hinweis bei künftigem Datum oder Status VERALTET', async () => {
     for (const seite of [{ status: 'AKTIV', veraltetAb: '2999-01-01' }, { status: 'VERALTET', veraltetAb: '2000-01-01' }]) {
       const fixture = TestBed.createComponent(WissenSeite);
