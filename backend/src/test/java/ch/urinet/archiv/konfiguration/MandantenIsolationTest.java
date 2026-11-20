@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,7 @@ abstract class MandantenIsolationIT {
     MetadatenExtraktion extraktion;
 
     @Inject
-    AgroalDataSource datenbank;
+    Instance<AgroalDataSource> datenbank;
 
     @TempDir
     Path ordner;
@@ -80,7 +81,7 @@ abstract class MandantenIsolationIT {
     @BeforeEach
     void mandantenAnlegen() throws SQLException {
         for (String code : List.of("urinet", "vhf-gsk", "probe-verband")) {
-            try (Connection verbindung = datenbank.getConnection();
+            try (Connection verbindung = datenbank.get().getConnection();
                  PreparedStatement abfrage = verbindung.prepareStatement(
                          "select 1 from public.mandant where code = ? and aktiv")) {
                 abfrage.setString(1, code);

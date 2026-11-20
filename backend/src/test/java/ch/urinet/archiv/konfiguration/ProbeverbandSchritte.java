@@ -17,7 +17,9 @@ import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.net.URI;
@@ -46,12 +48,10 @@ public class ProbeverbandSchritte {
     @Inject
     VerarbeitungTestHilfe verarbeitung;
     @Inject
-    AgroalDataSource datenbank;
+    Instance<AgroalDataSource> datenbank;
 
     @ConfigProperty(name = "archiv.ablage.bucket-praefix")
     String bucketPraefix;
-    @ConfigProperty(name = "quarkus.oidc.auth-server-url")
-    String realmUrl;
 
     private String admin;
     private String adminPfad;
@@ -62,13 +62,14 @@ public class ProbeverbandSchritte {
 
     @Angenommen("der synthetische Probeverband ist für die Abnahme bereit")
     public void bereit() throws Exception {
+        String realmUrl = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
         URI realm = URI.create(realmUrl);
         if (!"http".equals(realm.getScheme())
                 || !List.of("localhost", "127.0.0.1").contains(realm.getHost())) {
             throw new IllegalStateException("Der Probeverband benötigt einen lokalen Keycloak-Dev-Service");
         }
         for (String code : List.of("urinet", MANDANT)) {
-            try (Connection verbindung = datenbank.getConnection();
+            try (Connection verbindung = datenbank.get().getConnection();
                  PreparedStatement abfrage = verbindung.prepareStatement(
                          "select 1 from public.mandant where code = ? and aktiv")) {
                 abfrage.setString(1, code);
@@ -145,7 +146,7 @@ public class ProbeverbandSchritte {
     @Dann("ist die Sitzungsunterlage mit Feldfrist archiviert, in Suche und Lückenbericht enthalten und ihre Nummer eindeutig")
     public void pruefen() throws Exception {
         assertThat(verarbeitung.dokument(MANDANT, dokument)).containsEntry("status", "ARCHIVIERT");
-        try (Connection verbindung = datenbank.getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
                 "select aufbewahren_bis from " + CODE.schema() + ".dokument where id = ?")) {
             abfrage.setObject(1, dokument);
             try (ResultSet zeile = abfrage.executeQuery()) {
@@ -230,7 +231,7 @@ public class ProbeverbandSchritte {
     public void aufraeumen() throws SQLException {
         for (UUID id : java.util.stream.Stream.of(dokument, duplikat).filter(java.util.Objects::nonNull).toList()) {
             auftraege.ausfuehren("delete from public.auftrag where nutzlast ->> 'dokumentId' = '" + id + "'");
-            Testdokumente.loeschen(datenbank, MANDANT, List.of(id));
+            Testdokumente.loeschen(datenbank.get(), MANDANT, List.of(id));
             for (String praefix : List.of("eingang/", "archiv/", "vorschau/")) {
                 TestAblage.loeschen(MANDANT, praefix, schluessel -> schluessel.contains("/" + id + "/"));
             }

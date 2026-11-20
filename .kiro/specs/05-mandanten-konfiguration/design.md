@@ -527,6 +527,8 @@ Ebenso trägt die Aufgabe, die das Recht A11 erweitert, das in Spec 01, 2.6 und 
   Der Multipart-Import prüft zusätzlich unbekannte und inaktive Arten, fremde Klassifikationen und
   mehrere Werte einer einfachen Klassifikation: Dokumente, Dateien, Aufträge und Ablage bleiben
   nach der Ablehnung in beiden Mandanten unverändert.
+  Die Testfixture bezieht Datenquelle und OIDC-URL erst bei der Szenarioausführung; sie erzwingt
+  keine Datenbank oder Anmeldung beim Start anderer Testprofile oder Kommando-Tests.
 - Migration: Test mit einem Schema im Stand vor Spec 05 (Arten von `urinet` und ein Dokument mit Sperre) → nach der
   Migration gleiche Arten, Frist und Sperre, Version 1 (Req 9.1, 9.2).
 
