@@ -25,7 +25,9 @@ public record VerzeichnisEintrag(long id, Instant zeit, String benutzer, Optiona
         /** Austritt einer Person, erfasst vom Inhaber */
         AUSTRITT,
         /** Widerruf eines API-Tokens (A14) */
-        WIDERRUF
+        WIDERRUF,
+        ANLAGE,
+        UEBERNAHME
     }
 
     public VerzeichnisEintrag {

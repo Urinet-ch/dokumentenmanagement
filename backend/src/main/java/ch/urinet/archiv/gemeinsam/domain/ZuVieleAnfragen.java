@@ -19,7 +19,9 @@ public class ZuVieleAnfragen extends FachFehler {
         /** Grenze je Erfassungs-Schlüssel: Uploads je Stunde. */
         UPLOADS,
         /** Neue oder nicht im Prüf-Cache enthaltene API-Token-Prüfungen je vertrauenswürdiger Quelladresse. */
-        SCHLUESSELPRUEFUNG
+        SCHLUESSELPRUEFUNG,
+        /** Grenze für Verwaltungsaktionen (Spec 06, 6.6). */
+        VERWALTUNG
     }
 
     private final Grund grund;
