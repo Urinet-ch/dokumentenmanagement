@@ -868,6 +868,29 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
   Aktion «Als Analyse vorschlagen» nur bei zulässigen Gesprächen (Requirement 12.4, 16.6); Parameter `seite` in der
   Dokumentansicht (Requirement 16.2). Texte nur in `texte.de-CH.ts`.
 
+#### Umsetzung 14.6 (PR #352)
+
+Die beiden Entwurfsrouten und der Navigationszähler verlangen A17; Mitarbeiter und Treuhänder erhalten
+keinen Entwurfsmenüpunkt. Der Zähler liest nur offene Entwürfe, erneuert sich bei Entscheidungen und
+gedrosselt bei Navigation; Benutzer- und Mandantenwechsel brechen alte Anfragen ab. Ein Ausfall erscheint
+mit Wiederholungsmöglichkeit, nicht als scheinbar leere Liste.
+
+Jede Änderung wird einzeln ausgewählt und in einem Dialog bestätigt. Der POST verwendet genau den
+angezeigten ETag; während Dialog und Anfrage sind weitere Entscheidungen gesperrt. Bei 412 oder 422
+bleiben Eingaben erhalten, neue fachliche Befunde sind sichtbar; kein automatischer zweiter POST.
+Veraltete Änderungen lassen sich verwerfen, bei MANUELL und INGEST auch neu erzeugen, nicht bei IMPORT.
+Eine leere Stufenauswahl überlässt die Mindeststufenberechnung dem Backend.
+
+Titel, Beschreibung, Tags, Datum und Markdown haben eigene Eingaben. Quellen und begründete entfernte
+Aussagen werden als JSON-Listen bearbeitet; Syntax und Listenform prüft die Oberfläche, die vollständige
+Fassung prüft erneut der Freigabedienst. Die API verwendet versiegelte Leseansichten ohne konkret
+generierte Angular-Modelle; dafür enthält die Oberfläche lokale, typisierte Vertragsansichten.
+Der Diff steht ab 1024 px nebeneinander, darunter untereinander. Cucumber.js/Playwright misst Positionen
+bei 375, 1023, 1024 und 1280 px und prüft Überlauf, WCAG 2.1 AA mit axe, Einzelbestätigung und Zähler.
+Der integrierte Widerspruchsschutz (14.3, PR #351) liefert `diff.widersprueche` und
+`diff.entfernteWidersprueche`. Die Auflösungsmarkierung verwendet den echten Vertrag auch ohne KI-Blockliste;
+der REST-Nachweis prüft Text und Fussnotenschlüssel, Frontend- und Browsernachweise prüfen die Hervorhebung.
+
 ### Konfiguration und Aufträge
 | Schlüssel | Startwert |
 | --- | --- |

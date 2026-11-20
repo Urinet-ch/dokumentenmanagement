@@ -61,6 +61,7 @@ export async function archivAttrappe(welt) {
   const zustaendig = (url) =>
     url.origin === origin &&
     (url.pathname === '/api/v1/eingangskorb' ||
+      url.pathname === '/api/v1/wissensentwuerfe' ||
       url.pathname === '/api/v1/dokumentarten' ||
       url.pathname === '/api/v1/klassifikationen' ||
       url.pathname === '/api/v1/kontakte' ||
@@ -83,6 +84,9 @@ export async function archivAttrappe(welt) {
       const seite = Number(url.searchParams.get('seite') ?? 0);
       const eintraege = archiv.eintraege.slice(seite * groesse, (seite + 1) * groesse);
       return json(route, 200, { eintraege, gesamt: archiv.eintraege.length, seite, groesse });
+    }
+    if (url.pathname === '/api/v1/wissensentwuerfe') {
+      return json(route, 200, []);
     }
     if (url.pathname === '/api/v1/dokumentarten') {
       return json(route, 200, archiv.arten);

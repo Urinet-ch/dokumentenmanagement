@@ -111,7 +111,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 3.6, 3.8, 15.4, 16.1, 16.2, 16.4, 16.5, 16.7_
   - _Abhängig von: 13.6_
 
-- [ ] 14.6 Oberfläche Entwürfe [Frontend]
+- [x] 14.6 Oberfläche Entwürfe [Frontend]
   - `/wissen/entwuerfe`, `/wissen/entwuerfe/:id`: Diff nebeneinander bzw. am Handy untereinander mit `−`/`+`, Befunde, Hinweise, Kontextstufe, Widersprüche, entfernte Aussagen, Kernaussagen (nicht zugeordnete markiert); Aktionen je Änderung mit Bestätigung, kein gesammeltes Annehmen; Zähler offener Entwürfe in der Navigation
   - _Anforderungen: 6.4, 6.11, 16.3, 16.4_
   - _Abhängig von: 14.2_

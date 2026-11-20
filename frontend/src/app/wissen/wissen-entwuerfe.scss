@@ -1,0 +1,10 @@
+.aenderung { border-block-start: 1px solid currentColor; padding-block: 1rem; }
+.diff { display: grid; gap: .5rem; grid-template-columns: minmax(0, 1fr); }
+pre { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; padding: .5rem; }
+.alt { border-inline-start: 3px solid #f2efe7; }
+.neu { border-inline-start: 3px solid #eeb111; }
+label { display: grid; gap: .5rem; margin-block: .75rem; }
+textarea { min-height: 6rem; max-width: 100%; }
+.markdown { min-height: 12rem; }
+.aktionen { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: 1rem; }
+@media (min-width: 1024px) { .diff { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
