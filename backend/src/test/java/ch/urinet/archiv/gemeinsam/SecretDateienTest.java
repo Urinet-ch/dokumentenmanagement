@@ -36,20 +36,21 @@ public class SecretDateienTest {
 
     /** Profil {@code prod} ohne Datenbank, Keycloak und PWA; nur die Secret-Dateien kommen aus {@code verzeichnis}. */
     public static Map<String, String> prodOhneDienste(String verzeichnis) {
-        return Map.of(
-                "smallrye.config.source.file.locations",
-                Path.of("src/test/resources/secrets-test", verzeichnis).toAbsolutePath().toString(),
-                "quarkus.datasource.devservices.enabled", "false",
-                "quarkus.hibernate-orm.active", "false",
-                "archiv.db.url-pflicht", "false",
-                "quarkus.oidc.tenant-enabled", "false",
-                "quarkus.quinoa", "false",
-                "quarkus.compose.devservices.enabled", "false",
+        return Map.ofEntries(
+                Map.entry("smallrye.config.source.file.locations",
+                        Path.of("src/test/resources/secrets-test", verzeichnis).toAbsolutePath().toString()),
+                Map.entry("quarkus.datasource.devservices.enabled", "false"),
+                Map.entry("quarkus.hibernate-orm.active", "false"),
+                Map.entry("archiv.db.url-pflicht", "false"),
+                Map.entry("quarkus.oidc.tenant-enabled", "false"),
+                Map.entry("quarkus.quinoa", "false"),
+                Map.entry("quarkus.compose.devservices.enabled", "false"),
                 // /var/lib/archiv/arbeit gibt es nur im Image
-                "archiv.arbeit.verzeichnis", Path.of("target", "arbeit-prod").toAbsolutePath().toString(),
+                Map.entry("archiv.arbeit.verzeichnis", Path.of("target", "arbeit-prod").toAbsolutePath().toString()),
                 // wie compose.yml; ohne Dienst bricht TsaStartpruefung den Start ab
-                "archiv.tsa.dienste", "sgpki,freetsa",
-                "archiv.manifest.beim-start", "false");
+                Map.entry("archiv.tsa.dienste", "sgpki,freetsa"),
+                Map.entry("archiv.manifest.beim-start", "false"),
+                Map.entry("archiv.verwaltung.keycloak.basis-url", "http://localhost:8080"));
     }
 
     @Test
@@ -64,6 +65,8 @@ public class SecretDateienTest {
         assertThat(config.getValue("infomaniak_ai_token", String.class).strip()).isEqualTo("attrappe-ki-token");
         assertThat(config.getValue("archiv.manifest.schluessel", String.class))
                 .isEqualTo("attrappe-manifest-schluessel");
+        assertThat(config.getValue("archiv.verwaltung.keycloak.client-secret", String.class))
+                .isEqualTo("attrappe-keycloak-client");
     }
 
     /**

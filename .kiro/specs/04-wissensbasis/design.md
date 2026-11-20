@@ -450,6 +450,36 @@ flowchart LR
   `RerankerClient`; Sichtbarkeitsfilter vor Verdichtung und Reranker; Rückfall `degradiert=true` wie Spec 02.
 - REST `GET /api/v1/wissensseiten?q=…` und Abschnitt «Wissen» auf der Suchseite (`GET /api/v1/dokumente?q=` bleibt
   unverändert; die Suchseite ruft beide auf).
+- Umsetzung 15.1 (20.11.2026): `modus=hybrid` bzw. `modus=volltext` liefert `{treffer,degradiert}` mit
+  höchstens 30 Seiten, ohne Gesamtzahl und Paging. Ohne `modus` bleibt der bestehende Indexvertrag unverändert.
+  Nur Suchbegriff und Modus werden mit der Dokumentensuche geteilt; ihre Dokumentfilter gelten nicht für Seiten.
+  Fehler, Abbruch und Wiederholung der beiden Anfragen sind unabhängig.
+- `POST /api/v1/wissensbasis/embeddings` verlangt A17 und liefert den Nachberechnungsauftrag (202).
+  Die Antwort ist das typisierte `{auftragId}`; ein erschöpftes Monatsbudget wird vor dem manuellen Start
+  mit 429 abgewiesen. In `lokal` umgehen die Embedding-/Reranker-Stubs die Budgetabfrage.
+  Die Nachberechnung reiht Teilaufträge für höchstens 500 Seiten ein; Nutzlasten enthalten nur IDs und Versionen.
+  Schreiben sperrt die Seite, prüft ihre Version und sichert den Auftragsanspruch in derselben Transaktion.
+  Ein Stub überschreibt keine vorhandenen Vektoren derselben Version.
+- Modellaufrufe laufen ausserhalb von Datenbanktransaktionen. Wissenssuche und Seiten-Embeddings buchen
+  `WISSEN_EMBEDDING`; vor jeder Frage, jedem Reranker-Aufruf und jedem Embedding-Batch wird das
+  mandantenspezifische Monatsbudget geprüft. Fehler bei diesen Verbrauchsbuchungen bleiben Fehler.
+- `WissenIngestIndex` nutzt dieselbe Rangierung bei überschrittenem Zeichenbudget. Seine erlaubten IDs werden
+  aus dem aktuellen Ingest-/Hüllenkontext vor jeder Abfrage und nach der Rangierung neu berechnet, nicht aus
+  einer erfundenen Benutzerrolle. `PERSONAL` und der Überblick bei `INTERN` bleiben ausgeschlossen;
+  bei `NORMAL` wird der sichtbare Überblick vor den begrenzten Treffern ergänzt.
+- Nachweise 15.1: JDBC prüft den echten Handler mit WireMock-Vektor und `WISSEN_EMBEDDING`-Buchung sowie
+  Rollback bei verlorenem Auftragsanspruch, Versions-/Mandantentrennung und Stubschutz. Szenarien prüfen
+  Volltextgewichtung, Hybrid-/Stub-Rückfall und A17-Nachberechnung; der Browser prüft den Wissensabschnitt,
+  Seitenlink und Barrierefreiheit bei 375 px. Der ausdrücklich freigegebene einmalige lokale Messlauf
+  (20.11.2026) nutzt `tools/last/wissenssuche.sh --freigabe` unter der Docker-Sperre:
+  eigene leere PostgreSQL-Datenbank, 2'000 tatsächlich gespeicherte synthetische Seiten (davon 200 `INTERN`),
+  20 Aufwärmanfragen und 200 HTTP-Hybridsuchen als Mitarbeiter über zehn Suchbegriffe. Die echte Pipeline
+  umfasst SQL-Sichtfilter, Volltext, Vektor, RRF und Reranker; WireMock liefert lediglich Embeddings und
+  Rerankerantworten (je 220 geprüfte Aufrufe). Alle Antworten sind nicht degradiert, haben 30 Treffer und
+  enthalten keine interne Seite. PostgreSQL ist auf 512 MiB und zwei CPU begrenzt.
+  HTTP einschliesslich Client als konservative Obergrenze der Serverzeit: p50 63.365 ms, p95 69.613 ms,
+  Maximum 77.146 ms (9.5: p95 ≤ 1 s). Der Messlauf ist nicht Teil der CI; Container und benanntes Volume
+  werden auch bei Fehlern entfernt. Die lokale Messung ersetzt den Nachweis auf der VPS durch Fabian nicht.
 
 ### Lint (`wissen/application`)
 - `WISSEN_LINT` (Scheduler mit `archiv.wissen.lint-zeitplan`, nur Rolle `worker`; manuell A17), je KI-Aufruf ein

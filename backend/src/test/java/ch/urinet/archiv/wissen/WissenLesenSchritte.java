@@ -1,10 +1,12 @@
 package ch.urinet.archiv.wissen;
 
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.ki.TestEmbeddingPort;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.cucumber.java.After;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -28,6 +30,9 @@ public class WissenLesenSchritte {
 
     @Inject
     Instance<AgroalDataSource> datenbank;
+
+    @Inject
+    TestEmbeddingPort embeddingModell;
 
     private final UUID normaleQuelle = UUID.randomUUID();
     private final UUID interneQuelle = UUID.randomUUID();
@@ -65,6 +70,88 @@ public class WissenLesenSchritte {
     private Response logZweiteSeite;
     private List<Response> ungueltigeCursor;
     private List<Response> ungueltigeIds;
+    private final String suchbegriff = "wissenssuchprobe" + kennung.replace("-", "");
+    private Response suchergebnis;
+    private long auftragsStand;
+    private long nachberechnungId;
+
+    @Wenn("der Inhaber die Nachberechnung der Wissensembeddings zweimal startet")
+    public void nachberechnungStarten() throws Exception {
+        try (var verbindung = datenbank.get().getConnection();
+             var query = verbindung.createStatement();
+             var ergebnis = query.executeQuery("select coalesce(max(id), 0) from public.auftrag")) {
+            ergebnis.next();
+            auftragsStand = ergebnis.getLong(1);
+        }
+        nachberechnungId = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(202)
+                .extract().jsonPath().getLong("auftragId");
+        long nochmals = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(202)
+                .extract().jsonPath().getLong("auftragId");
+        assertThat(nochmals).isEqualTo(nachberechnungId);
+    }
+
+    @Dann("ist die Nachberechnung ein Auftrag und für Mitarbeiter und Treuhänder gesperrt")
+    public void nachberechnungPruefen() {
+        assertThat(nachberechnungId).isPositive();
+        for (String benutzer : List.of("mitarbeiter-urinet", "treuhaender-urinet")) {
+            given().auth().oauth2(Testanmeldung.token(benutzer))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(403);
+        }
+    }
+
+    @After("@wissensnachberechnung")
+    public void nachberechnungAufraeumen() throws Exception {
+        if (nachberechnungId <= auftragsStand) return;
+        try (var verbindung = datenbank.get().getConnection();
+             var query = verbindung.prepareStatement("delete from public.auftrag where id = ?")) {
+            query.setLong(1, nachberechnungId);
+            query.executeUpdate();
+        }
+    }
+
+    @Angenommen("Titel, Beschreibung und Inhalt enthalten denselben synthetischen Wissenssuchbegriff")
+    public void suchGewichteAnlegen() throws Exception {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            for (var eintrag : Map.of(normaleSeite, "titel", zweiteNormaleSeite, "beschreibung",
+                    verweisendeSeite, "inhalt", interneSeite, "titel").entrySet()) {
+                try (PreparedStatement query = verbindung.prepareStatement(
+                        "update m_urinet.wissensseite set " + eintrag.getValue() + " = ? where id = ?")) {
+                    query.setString(1, suchbegriff);
+                    query.setObject(2, eintrag.getKey());
+                    query.executeUpdate();
+                }
+            }
+        }
+    }
+
+    @Wenn("der Mitarbeiter Wissensseiten im Modus {string} mit höchstens drei Treffern sucht")
+    public void wissensSuche(String modus) {
+        if ("hybrid".equals(modus)) embeddingModell.setzen(TestEmbeddingPort.Ersatz.STUB);
+        try {
+            suchergebnis = given().auth().oauth2(Testanmeldung.token(MITARBEITER))
+                    .queryParam("q", suchbegriff).queryParam("modus", modus).queryParam("groesse", 3)
+                    .when().get("/api/v1/wissensseiten").andReturn();
+        } finally {
+            embeddingModell.setzen(null);
+        }
+    }
+
+    @Dann("liefert die Wissenssuche Titel vor Beschreibung vor Inhalt ohne die interne Seite")
+    public void wissensGewichtePruefen() {
+        suchergebnis.then().statusCode(200);
+        assertThat(suchergebnis.jsonPath().<String>getList("treffer.id"))
+                .containsExactly(normaleSeite.toString(), zweiteNormaleSeite.toString(),
+                        verweisendeSeite.toString());
+        assertThat(suchergebnis.jsonPath().getMap("$")).containsKeys("treffer", "degradiert")
+                .doesNotContainKey("gesamt");
+    }
+
+    @Dann("meldet die Wissenssuche den Rückfall {string}")
+    public void wissensRueckfallPruefen(String degradiert) {
+        assertThat(suchergebnis.jsonPath().getBoolean("degradiert")).isEqualTo(Boolean.valueOf(degradiert));
+    }
 
     @Angenommen("synthetische Wissensleseproben sind angelegt")
     public void probeAnlegen() throws Exception {

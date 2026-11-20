@@ -18,6 +18,16 @@ describe('HttpSucheService (Req 14.2)', () => {
 
   afterEach(() => http.verify());
 
+  it('sucht Wissensseiten getrennt ohne Dokumentfilter und reicht den Volltextmodus durch', () => {
+    dienst.wissen('Miete', 'volltext').subscribe();
+    const anfrage = http.expectOne((r) => r.url === '/api/v1/wissensseiten');
+    expect(anfrage.request.params.keys().sort()).toEqual(['groesse', 'modus', 'q']);
+    expect(anfrage.request.params.get('q')).toBe('Miete');
+    expect(anfrage.request.params.get('modus')).toBe('volltext');
+    expect(anfrage.request.params.get('groesse')).toBe('30');
+    anfrage.flush({ treffer: [], degradiert: false });
+  });
+
   it('sendet die Filter als Query-Parameter und Tags einzeln', () => {
     dienst
       
