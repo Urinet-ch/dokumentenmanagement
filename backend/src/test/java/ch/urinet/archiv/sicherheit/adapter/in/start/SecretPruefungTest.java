@@ -74,11 +74,27 @@ class SecretPruefungTest {
     @Test
     void eigentuemerNurBeiMigration() throws IOException {
         dateien("archiv_db_app", "s3_app_zugang_id", "s3_app_zugang_geheimnis", "infomaniak_ai_token",
-                "archiv_manifest_key");
+                "archiv_manifest_key", "keycloak_verwaltung_secret");
         assertThatCode(() -> config("worker", Map.of()).getValue(DB_APP, String.class)).as("Worker")
                 .doesNotThrowAnyException();
         assertThatThrownBy(() -> config("api", Map.of()).getValue(DB_APP, String.class)).as("API")
                 .hasMessageContaining("archiv_db_owner");
+    }
+
+    @Test
+    void keycloakSecretNurFuerApiUndKommando() throws IOException {
+        dateien("archiv_db_app");
+        Map<String, String> ohneMigration = Map.of(SecretPruefung.PFLICHT, "archiv_db_app",
+                SecretPruefung.MIGRIEREN, "false");
+
+        assertThatThrownBy(() -> config("api", ohneMigration).getValue(DB_APP, String.class))
+                .hasMessageContaining("keycloak_verwaltung_secret");
+        assertThatThrownBy(() -> config("kommando", ohneMigration).getValue(DB_APP, String.class))
+                .hasMessageContaining("keycloak_verwaltung_secret");
+        assertThatCode(() -> config("worker", ohneMigration).getValue(DB_APP, String.class))
+                .doesNotThrowAnyException();
+        assertThat(config("worker", ohneMigration)
+                .getOptionalValue("archiv.verwaltung.keycloak.client-secret", String.class)).isEmpty();
     }
 
     @Test
@@ -90,7 +106,8 @@ class SecretPruefungTest {
     @Test
     @Tag("req-16.24")
     void stufePOhneKiUndManifestSchluesselZulaessigUndStufeBVerlangtKiToken() throws IOException {
-        dateien("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis");
+        dateien("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis",
+                "keycloak_verwaltung_secret");
         String pflichtOhneKiOderManifest = "archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis";
         SmallRyeConfig stufeP = config("api", Map.of(SecretPruefung.PFLICHT, pflichtOhneKiOderManifest));
 
@@ -107,7 +124,7 @@ class SecretPruefungTest {
 
     private void alleDateien() throws IOException {
         dateien("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis",
-                "infomaniak_ai_token", "archiv_manifest_key");
+                "infomaniak_ai_token", "archiv_manifest_key", "keycloak_verwaltung_secret");
     }
 
     private void dateien(String... namen) throws IOException {
@@ -129,7 +146,8 @@ class SecretPruefungTest {
         werte.put("%prod." + SecretPruefung.PFLICHT_MIGRATION, "archiv_db_owner");
         werte.put(SecretPruefung.MIGRIEREN, "true");
         werte.put("%prod.smallrye.config.source.file.locations", verzeichnis.toString());
-        SecretPruefung.ZIELE.forEach((ziel, datei) -> werte.put("%prod." + ziel, "${" + datei + "}"));
+        SecretPruefung.ZIELE.forEach((ziel, datei) -> werte.put("%prod." + ziel,
+                "${" + datei + (datei.equals("keycloak_verwaltung_secret") ? ":" : "") + "}"));
         return new SmallRyeConfigBuilder()
                 .addDefaultInterceptors()
                 .addDiscoveredInterceptors()
