@@ -556,6 +556,30 @@ class NetworkntZusatzSchemaPrueferTest {
                 .seedSchemaPruefen(OFFERTE));
     }
 
+    /**
+     * Die Konfigurationsdatei des Seeds hat die Seed-Frist, eine hochgeladene Datei die kurze Frist: Dieselbe Prüfung,
+     * die 100 ms dauert, scheitert über die API und gelingt für den Seed (instabile CI, «Seed ungültig», 20.11.2026).
+     */
+    @Test
+    void seedKonfigurationHatDieSeedFrist() {
+        String schema = """
+                {"type":"object","properties":{"arten":{"type":"array","items":{"type":"object",
+                  "properties":{"code":{"type":"string","pattern":"^[A-Z]+$"}}}}}}""";
+        String datei = "{\"arten\":[{\"code\":\"OFFERTE\"}]}";
+        long ablesen = uhr.gelesen();
+        assertThat(pruefer.seedKonfigurationPruefen(schema, datei)).isEmpty();
+        Duration schritt = GRENZE.multipliedBy(2).dividedBy(Math.max(1, uhr.gelesen() - ablesen));
+
+        var api = new TestUhr();
+        api.schritt(schritt);
+        assertUngueltig(() -> new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> Uhren.eine(api))
+                .konfigurationPruefen(schema, datei));
+        var seed = new TestUhr();
+        seed.schritt(schritt);
+        assertThat(new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> Uhren.eine(seed))
+                .seedKonfigurationPruefen(schema, datei)).isEmpty();
+    }
+
     /** Wie {@link #gedrosselt(LongSupplier)}; die Wartezeit fällt beim zweiten Ablesen der Wanduhr an. */
     private static Uhren gedrosselt(Uhren uhren) {
         return new Uhren(gedrosselt(uhren.wand()), uhren.rechen());

@@ -76,7 +76,7 @@ public final class AntwortSchema {
         }
     }
 
-    private static Schema schemaFuer(String jsonSchema) {
+    static Schema schemaFuer(String jsonSchema) {
         synchronized (SCHEMAS) {
             return SCHEMAS.computeIfAbsent(jsonSchema, AntwortSchema::schema);
         }

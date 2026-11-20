@@ -194,7 +194,9 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
-          name: surefire-backend
+          # Versuch im Namen: Nach «Re-run failed jobs» bleiben die Berichte früherer Versuche im Lauf; die Prüfung
+          # «Backend-Tests vollständig» nimmt je Job nur den neuesten (pruefe-testaufteilung.py)
+          name: surefire-backend-${{ github.run_attempt }}
           path: backend/target/surefire-reports/TEST-*.xml
           retention-days: 3
 
@@ -237,7 +239,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
-          name: surefire-${{ matrix.name }}
+          name: surefire-${{ matrix.name }}-${{ github.run_attempt }}
           path: backend/target/surefire-reports/TEST-*.xml
           retention-days: 3
 
@@ -255,6 +257,7 @@ jobs:
           pattern: surefire-*
           path: berichte
       - run: |
+          python3 .github/scripts/test_pruefe_testaufteilung.py
           python3 .github/scripts/pruefe-testaufteilung.py backend/src/test/java backend=berichte/surefire-backend \
             gruppe-1=berichte/surefire-gruppe-1 gruppe-2=berichte/surefire-gruppe-2 \
             gruppe-3=berichte/surefire-gruppe-3 gruppe-4=berichte/surefire-gruppe-4

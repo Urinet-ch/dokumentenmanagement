@@ -41,11 +41,18 @@ def berichte(verzeichnis):
     return erg
 
 
+def neuester(pfad):
+    """Verzeichnis des neuesten Versuchs: Artefakte heissen `<name>-<versuch>` (github.run_attempt); nach
+    «Re-run failed jobs» liegen auch die Berichte früherer Versuche im Lauf und dürfen nicht mitzählen."""
+    basis = pathlib.Path(pfad)
+    versuche = [p for p in basis.parent.glob(basis.name + "-*") if p.name[len(basis.name) + 1:].isdigit()]
+    return max(versuche, key=lambda p: int(p.name[len(basis.name) + 1:])) if versuche else basis
+
 def main(argv):
     quellen = pathlib.Path(argv[1])
     jobs = dict(arg.split("=", 1) for arg in argv[2:])
     erwartet = erwartete_klassen(quellen)
-    gelaufen = {job: berichte(pfad) for job, pfad in jobs.items()}
+    gelaufen = {job: berichte(neuester(pfad)) for job, pfad in jobs.items()}
     fehler = []
     zeilen = ["| Job | Klassen | Tests | übersprungen |", "| --- | ---: | ---: | ---: |"]
     for job, klassen in gelaufen.items():
