@@ -187,6 +187,11 @@ class WissenHuelleDienstTest {
         }
 
         @Override
+        public WissensGraph graphLaden(Set<UUID> weitereDokumente) {
+            return graphLaden();
+        }
+
+        @Override
         public Set<UUID> seitenMitDokument(UUID dokumentId) {
             aufrufe.add("seiten");
             return mitDokument;

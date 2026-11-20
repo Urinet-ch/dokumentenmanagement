@@ -140,6 +140,14 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             zahl(knoten, "verkaufschancen", kontakte.verkaufschancen());
             zahl(knoten, "korrekturbeispiele", kontakte.korrekturbeispiele());
         }
+        ProtokollDetails.WissensEntscheid entscheid = details.wissensEntscheid();
+        if (entscheid != null) {
+            ObjectNode wissen = knoten.putObject("wissen");
+            wissen.put("aenderungNr", entscheid.aenderungNr());
+            uuid(wissen, "seiteId", entscheid.seiteId());
+            zahl(wissen, "basisVersion", entscheid.basisVersion());
+            zahl(wissen, "neueVersion", entscheid.neueVersion());
+        }
         ProtokollDetails.Konfiguration konfiguration = details.konfiguration();
         if (konfiguration != null) {
             knoten.put("version", konfiguration.version());
