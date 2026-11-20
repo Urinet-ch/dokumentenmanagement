@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Observable, Subject, of } from 'rxjs';
 import {
   Dokumentart,
@@ -205,6 +205,22 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
       betragVon: '1000',
       belegnummer: '2026-003',
     });
+  });
+
+  it('übernimmt den Begriff aus der Suche in der Kopfzeile (?q=) und sucht sofort', async () => {
+    await antworten(ergebnis());
+    await TestBed.inject(Router).navigateByUrl('/?q=Hostpoint');
+    await fixture.whenStable();
+    expect(port.anfragen.at(-1)).toEqual({ modus: 'hybrid', q: 'Hostpoint' });
+    expect((element.querySelector('[name=q]') as HTMLInputElement).value).toBe('Hostpoint');
+  });
+
+  it('startet beim Öffnen mit Kopfzeilenbegriff keine zweite Wissenssuche mit altem Zustand', async () => {
+    await antworten(ergebnis());
+    fixture.destroy();
+    await TestBed.inject(Router).navigateByUrl('/?q=Vertrag');
+    await oeffnen();
+    expect(port.wissensAnfragen).toEqual([{ q: 'Vertrag', modus: 'hybrid' }]);
   });
 
   it('meldet ungültige Eingaben, ohne das Archiv zu fragen', async () => {

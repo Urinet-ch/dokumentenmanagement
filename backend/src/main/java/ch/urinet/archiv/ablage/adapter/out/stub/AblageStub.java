@@ -491,7 +491,15 @@ public class AblageStub implements AblagePort {
     /** Im Stub über eine Datei im Stub-Verzeichnis; sie wird beim Abschluss als neue Version übernommen. */
     @Override
     public synchronized Exportziel exportSchreiben(MandantCode mandant, UUID exportId) {
-        String key = Exportdatei.schluessel(exportId);
+        return exportSchreiben(mandant, Exportdatei.schluessel(exportId));
+    }
+
+    @Override
+    public synchronized Exportziel wissensExportSchreiben(MandantCode mandant, UUID exportId) {
+        return exportSchreiben(mandant, Exportdatei.wissensSchluessel(exportId));
+    }
+
+    private Exportziel exportSchreiben(MandantCode mandant, String key) {
         try {
             if (wurzel == null) {
                 wurzel = Files.createTempDirectory("archiv-ablage-stub-");

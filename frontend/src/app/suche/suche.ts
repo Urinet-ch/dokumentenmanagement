@@ -13,7 +13,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   Subject,
   Subscription,
@@ -141,9 +141,24 @@ export class Suche {
       this.laufend?.unsubscribe();
       this.wissenLaufend?.unsubscribe();
     });
-    if (this.ergebnis() === null) {
+    // Begriff aus der Suche in der Kopfzeile (`/suche?q=`): ersetzt die übrigen Filter und sucht sofort
+    let ausKopfzeile = false;
+    const begriff = inject(ActivatedRoute, { optional: true })
+      ?.queryParamMap.pipe(
+        map((p) => p.get('q')),
+        distinctUntilChanged(),
+      )
+      .subscribe((q) => {
+        if (q !== null) {
+          ausKopfzeile = true;
+          this.filter.set({ ...LEERE_FILTER, q });
+          this.suchen(0, false);
+        }
+      });
+    this.zerstoert.onDestroy(() => begriff?.unsubscribe());
+    if (!ausKopfzeile && this.ergebnis() === null) {
       this.suchen(0, false);
-    } else if (this.zustand.gesendet()) {
+    } else if (!ausKopfzeile && this.zustand.gesendet()) {
       this.wissenSuchen(this.zustand.gesendet()!);
     }
   }

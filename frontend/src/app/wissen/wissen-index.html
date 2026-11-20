@@ -1,5 +1,10 @@
 <h1>{{ texte.titel }}</h1>
-<nav><a routerLink="/wissen/log">{{ texte.log }}</a></nav>
+<nav>
+  <a routerLink="/wissen/log">{{ texte.log }}</a>
+  @if (anmeldung.darf('A19')) {
+    <a routerLink="/wissensbasis/einstellungen">{{ texte.einstellungen }}</a>
+  }
+</nav>
 <form (submit)="suchen($event)">
   <label for="wissen-suche">{{ texte.suchbegriff }}</label>
   <input id="wissen-suche" type="search" [value]="q" (input)="q = wert($event)" />

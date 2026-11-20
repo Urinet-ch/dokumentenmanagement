@@ -6,7 +6,7 @@ import { RouterLink } from '@angular/router';
 import { forkJoin, of, switchMap } from 'rxjs';
 import { WissensIndexZeile, Wissensseite, Wissensversion, Wissensversionen } from '../gemeinsam/api';
 import { anzeigeTitel } from '../gemeinsam/anzeige-titel';
-import { zeitpunkt } from '../gemeinsam/format';
+import { datum, zeitpunkt } from '../gemeinsam/format';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { Textteil, wissenText } from './wissen-text';
@@ -23,6 +23,7 @@ interface Quelle {
   dokumentId?: string;
   seite?: number;
   pfad?: string;
+  datum?: string;
 }
 
 interface Inhalt {
@@ -49,6 +50,7 @@ export class WissenSeite {
   readonly name = input<string>();
   protected readonly texte = TEXTE.wissen;
   protected readonly zeitpunkt = zeitpunkt;
+  protected readonly datum = datum;
   protected readonly inhalt = signal<Inhalt | null>(null);
   protected readonly fehler = signal<string | null>(null);
   protected readonly laedt = signal(false);
@@ -96,6 +98,7 @@ export class WissenSeite {
               titel: bekannt ? anzeigeTitel(quelle.dokumentTitel, null, quelle.dokumentDateiname).text : schluessel,
               dokumentId: quelle.dokumentId,
               seite: quelle.seiteVon,
+              datum: quelle.dokumentDatum,
             };
           }
           return { schluessel, titel: quelle.quellSeiteTitel || schluessel, pfad: quelle.quellSeitePfad };

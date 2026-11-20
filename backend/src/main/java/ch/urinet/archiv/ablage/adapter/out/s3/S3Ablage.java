@@ -1004,6 +1004,12 @@ public class S3Ablage implements AblagePort {
     }
 
     @Override
+    public Exportziel wissensExportSchreiben(MandantCode mandant, UUID exportId) {
+        return new S3Exportziel(s3, bucket(mandant), Exportdatei.wissensSchluessel(exportId),
+                einstellungen.exportTeil());
+    }
+
+    @Override
     public VorsignierteUrl exportUrl(MandantCode mandant, String schluessel, String versionId, Instant gueltigBis,
                                      String dateiname) {
         if (schluessel == null || !schluessel.startsWith(Exportdatei.PRAEFIX) || ohneVersion(versionId)) {

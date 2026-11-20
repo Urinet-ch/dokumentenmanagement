@@ -30,6 +30,7 @@
             <a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}">
               {{ quelle.titel }} @if (quelle.seite) { · {{ texte.seite(quelle.seite) }} }
             </a>
+            @if (quelle.datum) { <span> · {{ texte.quellendatum }}: {{ datum(quelle.datum) }}</span> }
           } @else if (quelle.pfad) {
             <a [routerLink]="'/wissen/' + quelle.pfad">{{ quelle.titel }}</a>
           }

@@ -2,8 +2,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideApi } from '../gemeinsam/api';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { WissenIndex } from './wissen-index';
+import { WissenEinstellungenSeite } from './wissen-einstellungen';
 import { WissenLog } from './wissen-log';
 import { WissenSeite } from './wissen-seite';
 import { WissenVerwendung } from './wissen-verwendung';
@@ -14,12 +16,69 @@ describe('Wissensoberfläche', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), provideApi('')],
     });
     http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => http.verify());
+
+  it('speichert Einstellungen und setzt leere Felder auf den Startwert zurück', async () => {
+    const fixture = TestBed.createComponent(WissenEinstellungenSeite);
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({ budgetTokens: 123 });
+    await fixture.whenStable();
+    const eingabe = fixture.nativeElement.querySelector('#wissen-budget') as HTMLInputElement;
+    eingabe.value = '456';
+    fixture.nativeElement.querySelector('form').dispatchEvent(new Event('submit', { cancelable: true }));
+    const anfrage = http.expectOne('/api/v1/wissensbasis/einstellungen');
+    expect(anfrage.request.method).toBe('PUT');
+    expect(anfrage.request.body).toEqual({
+      budgetTokens: 456, lintBudgetTokens: null, lintZeitplan: null, monatsbudgetTokens: null,
+    });
+    anfrage.flush(anfrage.request.body);
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain(TEXTE.wissenEinstellungen.gespeichert);
+  });
+
+  it('fragt den Exportstatus ab und zeigt nach Abschluss Download und Prüfsumme', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const fixture = TestBed.createComponent(WissenEinstellungenSeite);
+      http.expectOne('/api/v1/wissensbasis/einstellungen').flush({});
+      fixture.detectChanges();
+      const element = fixture.nativeElement as HTMLElement;
+      const start = [...element.querySelectorAll('button')]
+        .find((button) => button.textContent?.includes(TEXTE.wissenEinstellungen.exportStart))!;
+      start.click();
+      http.expectOne('/api/v1/wissensbasis/exporte').flush({ id: 'e1', status: 'OFFEN' });
+      fixture.detectChanges();
+      expect(start.disabled).toBe(true);
+      vi.advanceTimersByTime(5000);
+      http.expectOne('/api/v1/wissensbasis/exporte/e1').flush({
+        id: 'e1', status: 'FERTIG', url: 'https://example.invalid/export', sha256: 'a'.repeat(64),
+        gueltigBis: '2026-11-20T12:00:00Z',
+      });
+      fixture.detectChanges();
+      expect(element.querySelector('a[href="https://example.invalid/export"]')).toBeTruthy();
+      expect(element.textContent).toContain('a'.repeat(64));
+      fixture.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('zeigt einen unvollständigen fertigen Export nicht als Download an', async () => {
+    const fixture = TestBed.createComponent(WissenEinstellungenSeite);
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({});
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    [...element.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes(TEXTE.wissenEinstellungen.exportStart))!.click();
+    http.expectOne('/api/v1/wissensbasis/exporte').flush({ id: 'e1', status: 'FERTIG' });
+    await fixture.whenStable();
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.wissenEinstellungen.exportUngueltig);
+    expect(element.textContent).not.toContain(TEXTE.wissenEinstellungen.herunterladen);
+  });
 
   it('filtert den Index über die API und zeigt die sichtbaren Ergebnisse', async () => {
     const fixture = TestBed.createComponent(WissenIndex);
@@ -76,13 +135,17 @@ describe('Wissensoberfläche', () => {
         + '<p>Belegt <a href="/wissen/ueberblick">Überblick</a>'
         + '<sup class="footnote-ref"><a href="#fn-q1" data-footnote-ref>1</a></sup></p>'
         + '<section data-footnotes><ol><li><p>q1 <a href="#fnref-q1">↩</a></p></li></ol></section>',
-      quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3, dokumentTitel: 'Quelle' }], quellePruefen: true,
+      quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3, dokumentTitel: 'Quelle', dokumentDatum: '2000-01-01' }],
+      quellePruefen: true, widerspruchOffen: true, freigegebenAm: '2026-01-02T10:00:00Z',
     });
     http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
     http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     expect(element.textContent).toContain(TEXTE.wissen.quellePruefen);
+    expect(element.textContent).toContain(TEXTE.wissen.widerspruch);
+    expect(element.textContent).toContain(`${TEXTE.wissen.quellendatum}: 01.01.2000`);
+    expect(element.textContent).toContain('02.01.2026');
     expect(element.querySelector('article')?.textContent).toContain('Belegt');
     expect(element.querySelector('article h2')?.textContent).toBe('Abschnitt');
     expect(element.querySelector('article ul > li')?.textContent).toBe('Eintrag');

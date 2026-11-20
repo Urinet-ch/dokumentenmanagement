@@ -1459,7 +1459,7 @@ class JdbcWissenIngestTest {
         assertThatThrownBy(() -> im(URINET, () -> {
             var aenderung = freigabeRepository.sperren(entwurf, 1).orElseThrow();
             freigabeRepository.fassungSpeichern(entwurf, aenderung, fassung, WissensStufe.INTERN,
-                    WissensStufe.INTERN, "human:probe", "inhaber", null, Set.of("konzepte/andere"));
+                    WissensStufe.INTERN, "human:probe", "inhaber", null, Set.of("konzepte/andere"), false);
             EntityManager em = entityManager.get();
             assertThat(((Number) em.createNativeQuery("select count(*) from wissensseite_version where seite_id = :id")
                     .setParameter("id", seite).getSingleResult()).intValue()).isEqualTo(1);
@@ -1495,7 +1495,7 @@ class JdbcWissenIngestTest {
         assertThatThrownBy(() -> im(URINET, () -> {
             var aenderung = freigabeRepository.sperren(entwurf, 1).orElseThrow();
             freigabeRepository.fassungSpeichern(entwurf, aenderung, fassung, WissensStufe.NORMAL,
-                    WissensStufe.NORMAL, "human:probe", "inhaber", null, Set.of());
+                    WissensStufe.NORMAL, "human:probe", "inhaber", null, Set.of(), false);
             assertThat(entityManager.get().createNativeQuery("select quelle_pruefen from wissensseite where id = :id")
                     .setParameter("id", seite).getSingleResult()).isEqualTo(false);
             throw new IllegalStateException("rollback");

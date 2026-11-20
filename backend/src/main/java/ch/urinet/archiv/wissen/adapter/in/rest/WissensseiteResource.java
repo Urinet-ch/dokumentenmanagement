@@ -120,7 +120,7 @@ public class WissensseiteResource {
     @Schema(name = "Wissensquelleneintrag")
     public record QuelleDto(String schluessel, UUID dokumentId, Integer seiteVon, Integer seiteBis, String auszug,
                             UUID quellSeiteId, String dokumentTitel, String dokumentDateiname, String quellSeitePfad,
-                            String quellSeiteTitel) {
+                            String quellSeiteTitel, java.time.LocalDate dokumentDatum) {
     }
 
     @Schema(name = "Wissensversion")
@@ -377,7 +377,8 @@ public class WissensseiteResource {
         return new QuelleDto(quelle.schluessel(), quelle.dokumentId(), quelle.seiteVon(), quelle.seiteBis(),
                 quelle.auszug(), quelle.quellSeiteId(),
                 anzeige == null ? null : anzeige.dokumentTitel(), anzeige == null ? null : anzeige.dokumentDateiname(),
-                anzeige == null ? null : anzeige.seitePfad(), anzeige == null ? null : anzeige.seiteTitel());
+                anzeige == null ? null : anzeige.seitePfad(), anzeige == null ? null : anzeige.seiteTitel(),
+                anzeige == null ? null : anzeige.dokumentDatum());
     }
 
     private static IndexZeileDto dto(WissenLesenRepository.IndexZeile seite) {
@@ -414,6 +415,9 @@ public class WissensseiteResource {
             case "ANALYSE" -> "Analyse übernommen";
             default -> throw new IllegalStateException("Unbekannte Wissensbasis-Logaktion");
         };
+        if (eintrag.widerspruchAufgeloest()) {
+            text += " – Widerspruch aufgelöst";
+        }
         if (!seiten.isBlank()) {
             text += ": " + seiten;
         }

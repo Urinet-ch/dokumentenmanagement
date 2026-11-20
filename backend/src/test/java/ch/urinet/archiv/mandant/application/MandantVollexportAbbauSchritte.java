@@ -95,7 +95,7 @@ public class MandantVollexportAbbauSchritte {
             assertThat(java.util.Collections.list(z.entries()).stream().map(java.util.zip.ZipEntry::getName))
                     .contains("dateien/" + DOKUMENT + "/ORIGINAL-1.bin", "dateien/" + DOKUMENT + "/ARBEITSFASSUNG-1.bin",
                             "dateien/" + DOKUMENT + "/pdfa.pdf", "metadaten.json", "metadaten.csv",
-                            "manifeste/2026-01-02/0.bin", "pruefsummen.sha256");
+                            "manifeste/2026-01-02/0.bin", "wissensbasis.zip", "pruefsummen.sha256");
             pruefsummen = new String(z.getInputStream(z.getEntry("pruefsummen.sha256")).readAllBytes(),
                     StandardCharsets.UTF_8);
         }
@@ -109,7 +109,7 @@ public class MandantVollexportAbbauSchritte {
                 byte[] inhalt = z.getInputStream(z.getEntry(teile[1])).readAllBytes();
                 assertThat(sha(inhalt)).as(teile[1]).isEqualTo(teile[0]);
             }
-            assertThat(pruefsummen.split("\n")).hasSize(7);
+            assertThat(pruefsummen.split("\n")).hasSize(8);
         }
     }
 
@@ -206,7 +206,8 @@ public class MandantVollexportAbbauSchritte {
                 });
         Path ziel = temp.resolve("export.zip");
         try (OutputStream strom = Files.newOutputStream(ziel)) {
-            new MandantVollexportSchreiber(daten, ablage).schreiben(mandant, java.util.UUID.randomUUID(), temp, strom);
+            new MandantVollexportSchreiber(daten, ablage, (code, wissensstrom) -> {}).schreiben(mandant,
+                    java.util.UUID.randomUUID(), temp, strom);
         }
         return ziel;
     }

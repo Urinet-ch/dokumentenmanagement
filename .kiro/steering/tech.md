@@ -79,6 +79,7 @@ Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was
 - Deutsch (Schweiz) als einzige Sprache, trotzdem Texte in einer Datei `texte.de-CH.ts` sammeln.
 - Mobile first (Handy-Erfassung ist der Hauptfall), WCAG 2.1 AA.
 - Farben aus dem UriNet-Branding: Dunkel `#05070c`, Karten `#0d1017`, Gelb `#eeb111`, Hell `#f2efe7`; Schrift Inter.
+- Gestaltung nach dem Prototyp `docs/oberflaeche/prototyp.html` (Entscheid Fabian 20.11.2026): schwebende Seitenleiste mit Gruppen «Archiv», «Bestand», «Verwaltung», Kopfzeile mit Suche, Karten mit weichem Schatten. Hell und dunkel: Das Farbschema des Systems gilt, ein Knopf in der Kopfzeile übersteuert es (nur im Browser gemerkt). Farben nur über die Tokens in `styles.scss` (`light-dark()`), keine festen Farbwerte in Komponenten; Text auf Gelb immer `--urinet-schwarz`, Schrift in Akzentfarbe `--akzent-text`. Symbole über `app-symbol` (Pfade in `gemeinsam/symbol.ts`), keine Icon-Schrift und kein CDN.
 
 ## Tests und Qualität
 - Jedes Akzeptanzkriterium hat mindestens ein Cucumber-Szenario mit dem Tag `@req-<x.y>` (z. B. `@req-3.4` für Requirement 3, Kriterium 4). EARS-Kriterien werden direkt als Szenario geschrieben. Feature-Dateien unter `backend/src/test/resources/features/<fachbereich>/`, per Tag an Java-Runner (REST-assured) oder Cucumber.js + Playwright geroutet.

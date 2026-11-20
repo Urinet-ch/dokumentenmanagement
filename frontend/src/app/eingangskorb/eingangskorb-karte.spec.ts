@@ -311,6 +311,27 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(erledigt).toEqual([T.erfolgBestaetigt('Rechnung Muster AG')]);
   });
 
+  it('zählt die unsicheren Felder in einer Pille, nicht nur über die Farbe (Req 8.1)', async () => {
+    await zeigen(MIT_VORSCHLAG);
+    const pille = element.querySelector('[data-test=unsichere-felder]');
+    expect(pille?.textContent?.trim()).toBe(T.unsichereFelder(1));
+    expect(element.querySelector('[data-feld=betrag]')?.classList).toContain('unsicher');
+    expect(element.querySelector('[data-test=vorschlag-vollstaendig]')).toBeNull();
+    expect(knoepfe()).toEqual([T.bestaetigen, T.aendern, T.verwerfen]);
+  });
+
+  it('nennt den Vorschlag vollständig nur mit Vorschlag und ohne unsichere Felder', async () => {
+    await zeigen(dokument({ vorschlag: { art: 'LIEFERANTENRECHNUNG', titel: 'Rechnung' } }));
+    expect(element.querySelector('[data-test=vorschlag-vollstaendig]')?.textContent?.trim()).toBe(
+      T.vorschlagVollstaendig,
+    );
+    expect(element.querySelector('[data-test=unsichere-felder]')).toBeNull();
+    TestBed.resetTestingModule();
+    await zeigen(dokument());
+    expect(element.querySelector('[data-test=vorschlag-vollstaendig]')).toBeNull();
+    expect(element.querySelector('[data-test=unsichere-felder]')).toBeNull();
+  });
+
   it('zeigt Zusatzfelder je Art und setzt die Zugriffsstufe manuell auf Mitglieder', async () => {
     await zeigen(
       dokument({
