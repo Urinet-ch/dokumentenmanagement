@@ -987,12 +987,12 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Deploy und Rollback gleich, und `wiederverwenden` (Spec 01, Req 15.6) bricht nicht ab. Die Quellenbezüge
   (`wissensseite_version_dokument`) stehen nicht im Manifest, weil Req 4.6 nur Versionen und Log nennt; sie sind
   INSERT-only, aber nicht gehasht (Review PR #295, K7).
-- Req 4.7 ist offen: In der Sicherung ist die Wissensbasis ohne eigenen Schritt, weil `taeglich.sh` die ganze
-  Archiv-Datenbank mit `pg_dump` sichert. Die Restore-Probe im Repo stellt aber nur Bucket-Objekte wieder her
-  (`archiv sicherung wiederherstellen` und `sperren-pruefen`); `pg_dump` in eine leere Datenbank einspielen und mit der Quelle
-  vergleichen kommt erst mit Spec 01, Aufgabe 5.12. Der Vergleich von Anzahl Seiten und Versionen folgt mit dieser
-  Kette; bis dahin bleibt 13.3 offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein
-  Nachweis (Review PR #295, M1).
+- Req 4.7 ist offen: Die Sicherung erfasst die ganze Archiv-Datenbank mit `pg_dump`. Seit PR #357 stellt
+  `restore-uebung-lokal.sh` den Datenbankdump tatsächlich mit `pg_restore` in einer eigenen Ziel-Datenbank
+  wieder her (Spec 01, Aufgabe 5.12). Noch fehlt der Nachweis, dass dabei ein nichtleerer Wissensseiten- und
+  Versionsbestand vor und nach dem Restore verglichen wird (Nachprüfung 20.11.2026). Deshalb bleibt 13.3
+  offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis
+  (Review PR #295, M1).
 
 ### Umsetzung 13.5 (PR #300)
 - `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe
