@@ -16,6 +16,8 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -189,6 +191,31 @@ abstract class MandantenIsolationIT {
                 .when().get("/api/v1/dokumente").then().statusCode(400);
         given().auth().oauth2(vhf).queryParam("klassifikation.sitzungsthema", "projekte")
                 .when().get("/api/v1/dokumente").then().statusCode(400);
+    }
+
+    @Test
+    void fremderMandantInHeaderQueryUndKonfigurationsdateiAendertNichtDenZielmandanten() throws Exception {
+        String urinet = Testanmeldung.token("inhaber-urinet");
+        String vhf = Testanmeldung.token("inhaber-vhf-gsk");
+        String eigeneDatei = given().auth().oauth2(urinet).when().get("/api/v1/konfiguration")
+                .then().statusCode(200).extract().asString();
+        String andereDatei = given().auth().oauth2(vhf).when().get("/api/v1/konfiguration")
+                .then().statusCode(200).extract().asString();
+
+        String mitFremdemMandanten = given().auth().oauth2(urinet)
+                .header("X-Mandant", "vhf-gsk").queryParam("mandant", "vhf-gsk")
+                .when().get("/api/v1/konfiguration").then().statusCode(200).extract().asString();
+        assertThat(mitFremdemMandanten).isEqualTo(eigeneDatei);
+
+        ObjectNode datei = (ObjectNode) new ObjectMapper().readTree(eigeneDatei);
+        datei.put("mandant", "vhf-gsk");
+        String fehlercode = given().auth().oauth2(urinet).contentType("application/json").body(datei.toString())
+                .when().put("/api/v1/konfiguration").then().statusCode(422).extract().path("fehlercode");
+        assertThat(fehlercode).isEqualTo("KONFIGURATION_UNGUELTIG");
+        assertThat(given().auth().oauth2(urinet).when().get("/api/v1/konfiguration")
+                .then().statusCode(200).extract().asString()).isEqualTo(eigeneDatei);
+        assertThat(given().auth().oauth2(vhf).when().get("/api/v1/konfiguration")
+                .then().statusCode(200).extract().asString()).isEqualTo(andereDatei);
     }
 
     private String exportieren(String mandant) throws Exception {
