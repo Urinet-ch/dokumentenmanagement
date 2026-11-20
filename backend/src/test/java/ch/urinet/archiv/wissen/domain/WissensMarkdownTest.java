@@ -6,6 +6,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class WissensMarkdownTest {
+    @Test
+    void widerspruchsvergleichErkenntGeaenderteUndMehrfacheBloeckeAberKeinenCode() {
+        String block = "> ⚠️ Widerspruch: Alt.[^alt] Neu.[^neu]";
+        assertThat(WissensMarkdown.entfernteWidersprueche(block, block.replace("Alt.", "Anders."))).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block + "\n\n" + block, block)).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block, block.replace(" ", "  "))).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block + "\r\n", block + "\n")).isEmpty();
+        assertThat(WissensMarkdown.analysieren("```\n" + block + "\n```",
+                WissensMarkdown.MAX_EINGABE_ZEICHEN).widersprueche()).isEmpty();
+    }
+
 
     @Test
     void importRundlaufErhaeltLinksFussnotenCodeUndZeilenenden() {
@@ -213,5 +224,14 @@ class WissensMarkdownTest {
         }
         assertThat(WissensMarkdown.ausOkf("[a][r] und [b](/konzepte/x.md)\n\n[r]: /ueberblick.md\n"))
                 .isEqualTo("[a][r] und [b](/konzepte/x)\n\n[r]: /ueberblick.md\n");
+    }
+
+    @Test
+    void geteilterSchluesselBleibtBeiAussageAusserhalbDesBlocksSichtbar() {
+        var analyse = WissensMarkdown.analysieren(
+                "> ⚠️ Widerspruch: A.[^a] B.[^b]\n\nWichtige Aussage.[^a]", 20_000);
+        assertThat(analyse.widersprueche()).singleElement()
+                .satisfies(b -> assertThat(b.fussnoten()).containsExactlyInAnyOrder("a", "b"));
+        assertThat(analyse.aussagen()).extracting(a -> a.fussnoten()).containsExactly(java.util.Set.of("a"));
     }
 }
