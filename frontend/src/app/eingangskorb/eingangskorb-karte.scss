@@ -18,7 +18,7 @@
   width: 100%;
   aspect-ratio: 210 / 297;
   object-fit: contain;
-  background: var(--urinet-hell);
+  background: var(--urinet-papier);
   border: 1px solid var(--urinet-linie);
 
   &.leer {
@@ -74,7 +74,7 @@ dd {
   padding: 0 0.375rem;
   border-radius: 0.25rem;
   background: var(--urinet-gelb);
-  color: var(--urinet-dunkel);
+  color: var(--urinet-schwarz);
   font-size: 0.8125rem;
   font-weight: 600;
 }
@@ -108,7 +108,7 @@ dd {
 
 .gefahr {
   --mat-button-filled-container-color: var(--urinet-fehler);
-  --mat-button-filled-label-text-color: var(--urinet-dunkel);
+  --mat-button-filled-label-text-color: var(--urinet-schwarz);
 }
 
 .formular,

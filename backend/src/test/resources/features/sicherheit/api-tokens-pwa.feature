@@ -36,6 +36,6 @@ Funktionalität: API-Tokens in der PWA
 
     Beispiele:
       | rolle            | mandant | menü                          |
-      | mitarbeiter      | urinet  | Erfassen, Eingangskorb, Suche, Wissen, Chat |
-      | treuhaender      | urinet  | Suche, Wissen, Chat, Jahresexport           |
-      | geschaeftsstelle | vhf-gsk | Erfassen, Eingangskorb, Suche, Wissen, Wissensentwürfe, Chat, Kontakte |
+      | mitarbeiter      | urinet  | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Wissen |
+      | treuhaender      | urinet  | Übersicht, Suche, Chat, Wissen, Jahresexport           |
+      | geschaeftsstelle | vhf-gsk | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Kontakte, Wissen, Wissensentwürfe |
