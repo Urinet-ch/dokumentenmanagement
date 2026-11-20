@@ -33,13 +33,16 @@ Given('ein synthetischer Wissenspaketimport mit Ergebnis {string} ist verfügbar
     assert.equal(pfad, '/api/v1/wissensentwuerfe/import', 'Unerwarteter Einzelentscheid oder KI-Aufruf');
     assert.match(request.headers()['content-type'], /^multipart\/form-data; boundary=/);
     assert.match(request.postData(), /name="paket"; filename="probe.zip"/);
-    if (ergebnis === '422') {
+    if (ergebnis === '409') {
+      await route.fulfill({ status: 409, json: { detail: 'Paket bereits importiert.', entwurfId: 'import1' } });
+    } else if (ergebnis === '422') {
       await route.fulfill({ status: 422, json: { detail: 'Paket ungültig.',
         befunde: [{ code: 'FRONTMATTER_UNGUELTIG', pfad: 'konzepte/probe.md' }] } });
     } else {
       await route.fulfill({ status: 201, json: { entwurfId: 'import1', status: 'OFFEN', paketSha256: 'a'.repeat(64),
         anzahl: { neu: 1, aendern: 2, unveraendert: 3, ignoriert: 4 },
-        befunde: [{ code: 'AUSZUG_NICHT_GEFUNDEN', pfad: 'konzepte/probe.md' }], hinweise: [] } });
+        befunde: [{ code: 'AUSZUG_NICHT_GEFUNDEN', pfad: 'konzepte/probe.md' }],
+        hinweise: [{ code: 'KONTEXTSTUFE_SELBSTAUSKUNFT', pfad: 'konzepte/probe.md' }] } });
     }
   });
 });
@@ -60,9 +63,20 @@ Then('sehe ich Importzähler und Seitenbefunde und kann Quellen ohne KI erneut p
   await this.seite.getByRole('heading', { name: 'Prüfbericht' }).waitFor();
   assert.deepEqual(await this.seite.locator('.anzahlen dd').allTextContents(), ['1', '2', '3', '4']);
   await this.seite.getByText('konzepte/probe.md · AUSZUG_NICHT_GEFUNDEN').waitFor();
+  await this.seite.getByText('konzepte/probe.md · KONTEXTSTUFE_SELBSTAUSKUNFT').waitFor();
   await importBarrierefreiheit(this.seite);
   await this.seite.getByRole('link', { name: 'Entwurf prüfen', exact: true }).click();
-  await this.seite.getByText('synthetisches-modell', { exact: true }).waitFor();
+  const herkunft = this.seite.locator('.importherkunft');
+  const feld = (name) => herkunft.locator('dt', { hasText: name }).locator('xpath=following-sibling::dd[1]');
+  await herkunft.getByText('synthetisches-modell', { exact: true }).waitFor();
+  assert.equal(await feld('Erzeugt mit').textContent(), 'lokal');
+  assert.equal(await feld('Kontextstufe im Paket').textContent(), 'INTERN');
+  assert.equal(await feld('SHA-256 des ZIP').textContent(), 'a'.repeat(64));
+  assert.equal(await feld('Importiert von').textContent(), 'synthetischer-importeur');
+  assert.ok((await feld('Paket erzeugt am').textContent()).trim().length > 0);
+  assert.ok((await feld('Importiert am').textContent()).trim().length > 0);
+  await herkunft.getByText(/^Cloud-Modelle dürfen nur Quellen der Stufe NORMAL/).waitFor();
+  await this.seite.getByText(/q1 · Quellenzuordnung: Zugeordnet/).waitFor();
   await this.seite.getByText(/q1.*Auszug.*Nicht gefunden/).waitFor();
   await this.seite.getByRole('button', { name: 'Prüfung wiederholen' }).click();
   await this.seite.getByText(/q1.*Auszug.*Gefunden/).waitFor();
@@ -74,6 +88,15 @@ Then('sehe ich Importzähler und Seitenbefunde und kann Quellen ohne KI erneut p
 Then('sehe ich den Paketfehler mit Seitenpfad ohne Entwurf und ohne Wiederholung', async function () {
   await this.seite.getByText('konzepte/probe.md · FRONTMATTER_UNGUELTIG').waitFor();
   assert.equal(await this.seite.getByRole('heading', { name: 'Prüfbericht' }).count(), 0);
+  assert.deepEqual(this.importPosts, ['/api/v1/wissensentwuerfe/import']);
+  await importBarrierefreiheit(this.seite);
+});
+
+Then('sehe ich den Link auf den vorhandenen Entwurf ohne zweiten Entwurf', async function () {
+  await this.seite.getByRole('link', { name: 'Vorhandenen Entwurf öffnen' }).waitFor();
+  assert.equal(await this.seite.getByRole('heading', { name: 'Prüfbericht' }).count(), 0);
+  await this.seite.getByRole('link', { name: 'Vorhandenen Entwurf öffnen' }).click();
+  await this.seite.getByText('synthetisches-modell', { exact: true }).waitFor();
   assert.deepEqual(this.importPosts, ['/api/v1/wissensentwuerfe/import']);
   await importBarrierefreiheit(this.seite);
 });

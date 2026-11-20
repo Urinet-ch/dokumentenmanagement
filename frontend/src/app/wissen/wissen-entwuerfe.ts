@@ -250,6 +250,10 @@ export class WissenEntwuerfe {
       }));
   }
 
+  protected zuordnungText(code: string): string {
+    return this.importe.zuordnungen[code] ?? code;
+  }
+
   protected auszugText(code: string | null | undefined): string {
     return code == null ? this.importe.auszugNichtGeprueft : this.importe.auszugsErgebnisse[code] ?? code;
   }

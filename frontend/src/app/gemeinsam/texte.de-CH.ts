@@ -103,6 +103,9 @@ export const TEXTE = {
         GEFUNDEN: 'Gefunden', NICHT_GEFUNDEN: 'Nicht gefunden', NICHT_PRUEFBAR: 'Nicht prüfbar',
         SEITE_FEHLT: 'PDF-Seite fehlt', QUELLE_UNGUELTIG: 'Quelle ungültig', FEHLT: 'Auszug fehlt',
       } as Record<string, string>,
+      zuordnungen: {
+        ZUGEORDNET: 'Zugeordnet', QUELLE_UNBEKANNT: 'Quelle unbekannt', QUELLE_PERSONAL: 'Personaldokument',
+      } as Record<string, string>,
     },
     entwuerfe: {
       titel: 'Wissensentwürfe', zurListe: 'Zur Entwurfsliste', keine: 'Keine Entwürfe vorhanden.',

@@ -105,7 +105,7 @@
           @if (!pruefungen.length) { <p>{{ importe.keineDokumentquellen }}</p> }
           <ul>
             @for (quelle of pruefungen; track quelle.schluessel) {
-              <li>{{ quelle.schluessel }} · {{ importe.zuordnung }}: {{ quelle.zuordnung }}
+              <li>{{ quelle.schluessel }} · {{ importe.zuordnung }}: {{ zuordnungText(quelle.zuordnung) }}
                 · {{ importe.auszug }}: {{ auszugText(quelle.auszug) }}</li>
             }
           </ul>

@@ -186,6 +186,7 @@ describe('Wissensentwürfe', () => {
     const fixture = await zeigen(importDaten);
     expect(fixture.nativeElement.textContent).toContain('synthetisch');
     expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.import.auszugNichtGeprueft);
+    expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.import.zuordnungen['QUELLE_UNBEKANNT']);
     klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.entscheiden);
     fixture.detectChanges();
     klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.bearbeiten);
