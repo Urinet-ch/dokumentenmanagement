@@ -16,11 +16,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
+import java.net.HttpCookie;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,7 +74,8 @@ class RealmExportKeycloakTest {
                 .post(ExportKeycloak.basisUrl + "/realms/master/protocol/openid-connect/token").path("access_token");
         // Benutzer und Probe-Clients entstehen erst nach dem Import, wie es ein Administrator täte
         importieren(Map.of("ifResourceExists", "SKIP",
-                "users", List.of(benutzer("ohne-totp", false), benutzer("mit-totp-1", true), benutzer("mit-totp-2", true)),
+                "users", List.of(benutzer("ohne-totp", false), benutzer("mit-totp-1", true),
+                        benutzer("mit-totp-2", true), benutzer("step-up", true)),
                 "clients", List.of(probeClient("probe-fremd", false), probeClient("probe-mit-audience", true))));
         // Ohne offene Pflichtaktion: geprüft wird die Flow-Bindung, nicht CONFIGURE_TOTP als Standardaktion
         String id = adminGet(REALM + "/users?exact=true&username=ohne-totp").path("[0].id");
@@ -200,6 +212,122 @@ class RealmExportKeycloakTest {
                     .then().statusCode(200).body("total", org.hamcrest.Matchers.greaterThanOrEqualTo(1));
         } finally {
             loeschen("/users/" + id);
+        }
+    }
+
+    @Test
+    @Order(2)
+    void pwaBrowserAnmeldungUndErneuteAnmeldungLiefernAuthTime() throws Exception {
+        String client = clientId("archiv-pwa");
+        String erlaubteUmleitung = adminGet(REALM + "/clients/{id}", client)
+                .jsonPath().<String>getList("redirectUris").getFirst();
+        String rueckruf = erlaubteUmleitung.replace("*", "test-callback");
+        var browser = new PwaBrowser(rueckruf);
+
+        JsonNode zuerst = browser.anmelden(false, true);
+        assertThat(zuerst.path("auth_time").isIntegralNumber()).isTrue();
+        long ersteZeit = zuerst.path("auth_time").asLong();
+        assertThat(ersteZeit).isPositive();
+
+        JsonNode sso = browser.anmelden(false, false);
+        assertThat(sso.path("auth_time").asLong()).isEqualTo(ersteZeit);
+
+        Thread.sleep(1100);
+        JsonNode erneut = browser.anmelden(true, true);
+        assertThat(erneut.path("auth_time").isIntegralNumber()).isTrue();
+        assertThat(erneut.path("auth_time").asLong()).isGreaterThan(ersteZeit);
+    }
+
+    private static final class PwaBrowser {
+        private static final Pattern FORM = Pattern.compile("(?is)<form\\b([^>]*)>(.*?)</form>");
+        private static final Pattern ACTION = Pattern.compile("(?i)\\baction\\s*=\\s*['\"]([^'\"]*)['\"]");
+        private final HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+        private final Map<String, String> cookies = new HashMap<>();
+        private final String rueckruf;
+        private final String verifier = "synthetischer-pkce-verifier-" + UUID.randomUUID();
+
+        private PwaBrowser(String rueckruf) {
+            this.rueckruf = rueckruf;
+        }
+
+        private JsonNode anmelden(boolean prompt, boolean interaktiv) throws Exception {
+            String challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII)));
+            String url = realmUrl() + "/protocol/openid-connect/auth?client_id=archiv-pwa&response_type=code"
+                    + "&scope=openid&redirect_uri=" + enc(rueckruf)
+                    + "&code_challenge_method=S256&code_challenge=" + enc(challenge)
+                    + "&state=" + enc(UUID.randomUUID().toString())
+                    + (prompt ? "&prompt=login" : "");
+            HttpResponse<String> antwort = senden(HttpRequest.newBuilder(URI.create(url)).GET());
+            if (interaktiv) {
+                assertThat(antwort.statusCode()).isEqualTo(200);
+                assertThat(antwort.body().contains("name=\"password\"")).as("Passwortformular vorhanden").isTrue();
+                antwort = absenden(antwort, "password", Map.of("username", "step-up", "password", PASSWORT));
+                assertThat(antwort.statusCode()).as("Passwort-Anmeldung: Sitzungsfehler=%s, Zugangsdatenfehler=%s",
+                        antwort.body().contains("session has expired"), antwort.body().contains("Invalid username or password"))
+                        .isEqualTo(200);
+                assertThat(antwort.body().contains("name=\"otp\"")).as("TOTP-Formular vorhanden").isTrue();
+                antwort = absenden(antwort, "otp", Map.of("otp",
+                        Testanmeldung.totp(Testanmeldung.OTP_SECRET, System.currentTimeMillis() / 1000)));
+            }
+            for (int i = 0; i < 10; i++) {
+                assertThat(antwort.statusCode()).isBetween(300, 399);
+                URI ziel = antwort.uri().resolve(antwort.headers().firstValue("location").orElseThrow());
+                if (ziel.toString().startsWith(rueckruf + "?")) {
+                    String code = java.util.Arrays.stream(ziel.getRawQuery().split("&"))
+                            .filter(paar -> paar.startsWith("code=")).findFirst().orElseThrow().substring(5);
+                    String token = given().formParam("grant_type", "authorization_code")
+                            .formParam("client_id", "archiv-pwa").formParam("redirect_uri", rueckruf)
+                            .formParam("code_verifier", verifier)
+                            .formParam("code", java.net.URLDecoder.decode(code, StandardCharsets.UTF_8))
+                            .post(realmUrl() + "/protocol/openid-connect/token")
+                            .then().statusCode(200).extract().path("access_token");
+                    return new ObjectMapper().readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
+                }
+                antwort = senden(HttpRequest.newBuilder(ziel).GET());
+            }
+            throw new IllegalStateException("Zu viele Weiterleitungen bei der PWA-Anmeldung");
+        }
+
+        private HttpResponse<String> absenden(HttpResponse<String> seite, String feld, Map<String, String> werte)
+                throws Exception {
+            Matcher form = FORM.matcher(seite.body());
+            while (form.find()) {
+                if (form.group(2).contains("name=\"" + feld + "\"")) {
+                    Matcher action = ACTION.matcher(form.group(1));
+                    if (!action.find()) {
+                        throw new IllegalStateException("Anmeldeformular ohne Ziel");
+                    }
+                    URI ziel = seite.uri().resolve(action.group(1).replace("&amp;", "&"));
+                    String body = werte.entrySet().stream().map(e -> enc(e.getKey()) + "=" + enc(e.getValue()))
+                            .collect(java.util.stream.Collectors.joining("&"));
+                    return senden(HttpRequest.newBuilder(ziel)
+                                    .header("Content-Type", "application/x-www-form-urlencoded")
+                                    .POST(HttpRequest.BodyPublishers.ofString(body)));
+                }
+            }
+            throw new IllegalStateException("Anmeldeformular fehlt");
+        }
+
+        private HttpResponse<String> senden(HttpRequest.Builder anfrage) throws Exception {
+            if (!cookies.isEmpty()) {
+                anfrage.header("Cookie", cookies.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue())
+                        .collect(java.util.stream.Collectors.joining("; ")));
+            }
+            HttpResponse<String> antwort = client.send(anfrage.build(), HttpResponse.BodyHandlers.ofString());
+            antwort.headers().allValues("set-cookie").stream().flatMap(c -> HttpCookie.parse(c).stream())
+                    .forEach(c -> {
+                        if (c.hasExpired()) {
+                            cookies.remove(c.getName());
+                        } else {
+                            cookies.put(c.getName(), c.getValue());
+                        }
+                    });
+            return antwort;
+        }
+
+        private static String enc(String wert) {
+            return URLEncoder.encode(wert, StandardCharsets.UTF_8);
         }
     }
 
