@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer.adapter.out.keycloak;
 
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -53,13 +54,14 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     static final Duration FEHLERFENSTER = Duration.ofSeconds(30);
     static final Duration SCHUTZSCHALTER_DAUER = Duration.ofSeconds(30);
     static final Duration TOKEN_PUFFER = Duration.ofSeconds(30);
+    static final Duration KOMPENSATION_WARTEZEIT = Duration.ofSeconds(2);
     static final int MAX_PARALLEL = 2;
     static final int MAX_FEHLER = 3;
 
     private static final Logger LOG = Logger.getLogger(KeycloakAdminAdapter.class);
     private static final Set<String> ARCHIV_ROLLEN = Set.of(
             "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle");
-    private static final Pattern ID = Pattern.compile("[A-Za-z0-9._~-]+");
+    private static final Pattern ID = Pattern.compile("(?!\\.+$)[A-Za-z0-9._~-]+");
 
     private final ObjectMapper json;
     private final Optional<URI> basis;
@@ -178,9 +180,11 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             return id;
         } catch (RuntimeException fehler) {
             try {
-                request("DELETE", user(id), null, null, false, Set.of(204, 404));
+                // Kompensation umgeht den Schutzschalter: Sie ist gerade dann nötig, wenn der Dienst ausfällt.
+                request("DELETE", user(id), null, null, false, Set.of(204, 404), true);
             } catch (RuntimeException kompensation) {
                 LOG.error("Kompensation nach Benutzeranlage fehlgeschlagen; Benutzerzustand ist unklar.");
+                fehler.addSuppressed(kompensation);
             }
             throw fehler;
         }
@@ -205,20 +209,31 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     public void rolleSetzen(String mandant, String id, Rolle rolle) {
         pruefeRolle(rolle);
         benutzerAbrufen(mandant, id);
+        // Zielrolle zuerst holen und hinzufügen, erst danach die übrigen Archiv-Rollen entfernen:
+        // Bei einem Fehler dazwischen behält der Benutzer mindestens eine gültige Rolle.
+        JsonNode ziel = json(request("GET", admin("/roles/" + segment(rolle.code())), null, null, true, Set.of()));
         JsonNode vorher = json(request("GET", user(id) + "/role-mappings/realm", null, null, true, Set.of()));
-        List<JsonNode> archivRollen = new ArrayList<>();
+        if (ziel == null || vorher == null || !vorher.isArray()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        List<JsonNode> uebrige = new ArrayList<>();
+        boolean zielVorhanden = false;
         for (JsonNode role : vorher) {
-            if (ARCHIV_ROLLEN.contains(role.path("name").asText())) {
-                archivRollen.add(role);
+            String name = role.path("name").asText();
+            if (rolle.code().equals(name)) {
+                zielVorhanden = true;
+            } else if (ARCHIV_ROLLEN.contains(name)) {
+                uebrige.add(role);
             }
         }
-        if (!archivRollen.isEmpty()) {
-            request("DELETE", user(id) + "/role-mappings/realm", null, json.valueToTree(archivRollen),
+        if (!zielVorhanden) {
+            request("POST", user(id) + "/role-mappings/realm", null, json.createArrayNode().add(ziel),
                     false, Set.of(204));
         }
-        JsonNode ziel = json(request("GET", admin("/roles/" + segment(rolle.code())), null, null, true, Set.of()));
-        request("POST", user(id) + "/role-mappings/realm", null, json.createArrayNode().add(ziel),
-                false, Set.of(204));
+        if (!uebrige.isEmpty()) {
+            request("DELETE", user(id) + "/role-mappings/realm", null, json.valueToTree(uebrige),
+                    false, Set.of(204));
+        }
     }
 
     @Override
@@ -285,11 +300,14 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         long anzahl = 0;
         for (int first = 0; ; first += SEITENGROESSE) {
             JsonNode treffer = json(request("GET", admin("/roles/inhaber/users"),
-                    "max=" + SEITENGROESSE + "&first=" + first, null, true, Set.of()));
+                    "briefRepresentation=false&max=" + SEITENGROESSE + "&first=" + first, null, true, Set.of()));
             if (!treffer.isArray() || treffer.size() > SEITENGROESSE) {
                 throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
-            for (JsonNode user : treffer) {
+            for (JsonNode eintrag : treffer) {
+                // Fehlt das Attributfeld (Kurzdarstellung), wird der Benutzer einzeln gelesen statt als 0 gezählt.
+                JsonNode user = eintrag.has("attributes") ? eintrag
+                        : benutzerDirekt(segment(eintrag.path("id").asText()));
                 if (mandantPasst(user, mandant) && user.path("enabled").asBoolean()) {
                     anzahl++;
                 }
@@ -309,7 +327,11 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             if (!erlaubt) {
                 throw fehler(Fehlercode.UEBERLASTET);
             }
-            token();
+            // Echter Tokenabruf: ein gültiger Cache-Token würde einen Ausfall bis zu rund 270 s verdecken.
+            synchronized (tokenSperre) {
+                token = null;
+            }
+            token(true);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw fehler(Fehlercode.UEBERLASTET);
@@ -318,6 +340,14 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 plaetze.release();
             }
         }
+    }
+
+    private JsonNode benutzerDirekt(String id) {
+        JsonNode benutzer = json(request("GET", user(id), null, null, true, Set.of(404)));
+        if (benutzer == null) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        return benutzer;
     }
 
     private JsonNode benutzerAbrufen(String mandant, String id) {
@@ -383,18 +413,41 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     }
 
     private boolean hatGoogle(String id) {
-        JsonNode identity = json(request("GET", user(id) + "/federated-identity/google",
+        JsonNode identitaeten = json(request("GET", user(id) + "/federated-identity",
                 null, null, true, Set.of(404)));
-        return identity != null && (identity.isArray() ? !identity.isEmpty() : !identity.isNull());
+        if (identitaeten == null) {
+            return false;
+        }
+        if (!identitaeten.isArray()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        for (JsonNode identitaet : identitaeten) {
+            if ("google".equals(identitaet.path("identityProvider").asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Antwort request(String method, String path, String query, JsonNode body,
                             boolean lesend, Set<Integer> weitereErfolge) {
+        return request(method, path, query, body, lesend, weitereErfolge, false);
+    }
+
+    /**
+     * Zählen für den Schutzschalter nur Transportfehler, Zeitüberschreitungen, 5xx sowie 401/403 des Dienstkontos.
+     * Andere 4xx sind Fehler des Aufrufs; 409 wird als {@link KonfliktException} weitergereicht.
+     */
+    private Antwort request(String method, String path, String query, JsonNode body,
+                            boolean lesend, Set<Integer> weitereErfolge, boolean kompensation) {
         pruefePositivliste(method, path);
-        pruefeSchutzschalter();
+        if (!kompensation) {
+            pruefeSchutzschalter();
+        }
         boolean erlaubt = false;
         try {
-            erlaubt = plaetze.tryAcquire(WARTEZEIT_PARALLEL.toMillis(), TimeUnit.MILLISECONDS);
+            long wartezeit = (kompensation ? KOMPENSATION_WARTEZEIT : WARTEZEIT_PARALLEL).toMillis();
+            erlaubt = plaetze.tryAcquire(wartezeit, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -402,36 +455,53 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             throw fehler(Fehlercode.UEBERLASTET);
         }
         try {
-            pruefeSchutzschalter();
+            if (!kompensation) {
+                pruefeSchutzschalter();
+            }
             URI uri = basis().resolve(path + (query == null || query.isBlank() ? "" : "?" + query));
-            HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(anfrageZeitgrenze)
-                    .header("Accept", "application/json");
-            if (body != null) {
-                builder.header("Content-Type", "application/json")
-                        .method(method, HttpRequest.BodyPublishers.ofByteArray(bytes(body)));
-            } else if ("POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method)) {
-                builder.method(method, HttpRequest.BodyPublishers.noBody());
-            } else {
-                builder.method(method, HttpRequest.BodyPublishers.noBody());
+            boolean mitToken = !path.equals(tokenPath());
+            boolean erneuert = false;
+            while (true) {
+                HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(anfrageZeitgrenze)
+                        .header("Accept", "application/json");
+                if (body != null) {
+                    builder.header("Content-Type", "application/json")
+                            .method(method, HttpRequest.BodyPublishers.ofByteArray(bytes(body)));
+                } else {
+                    builder.method(method, HttpRequest.BodyPublishers.noBody());
+                }
+                String verwendet = null;
+                if (mitToken) {
+                    verwendet = token(!kompensation);
+                    builder.header("Authorization", "Bearer " + verwendet);
+                }
+                HttpResponse<byte[]> response = senden(builder.build(), lesend);
+                int status = response.statusCode();
+                if (status >= 200 && status < 300 || weitereErfolge.contains(status)) {
+                    erfolg();
+                    return new Antwort(status, response.body(), response.headers().firstValue("Location").orElse(null));
+                }
+                if (status >= 500) {
+                    fehlgeschlagen();
+                    throw fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
+                }
+                if (status == 401 && mitToken) {
+                    // Gecachter Token ungültig (Neustart, Schlüsselrotation, Widerruf): verwerfen.
+                    tokenVerwerfen(verwendet);
+                    if (lesend && !erneuert) {
+                        erneuert = true;
+                        continue;
+                    }
+                }
+                if (status == 401 || status == 403) {
+                    fehlgeschlagen();
+                } else if (status == 409) {
+                    throw new KonfliktException();
+                }
+                LOG.errorf("Keycloak-Dienstkonto abgelehnt: Fehler-ID %s, Ursache %s, HTTP-Status %d.",
+                        java.util.UUID.randomUUID(), "KeycloakAntwort", status);
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
-            if (!path.equals(tokenPath())) {
-                builder.header("Authorization", "Bearer " + token());
-            }
-            HttpRequest request = builder.build();
-            HttpResponse<byte[]> response = senden(request, lesend);
-            if (response.statusCode() >= 200 && response.statusCode() < 300
-                    || weitereErfolge.contains(response.statusCode())) {
-                erfolg();
-                return new Antwort(response.statusCode(), response.body(), response.headers().firstValue("Location").orElse(null));
-            }
-            if (response.statusCode() >= 500) {
-                fehlgeschlagen();
-                throw fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
-            }
-            fehlgeschlagen();
-            LOG.errorf("Keycloak-Dienstkonto abgelehnt: Fehler-ID %s, Ursache %s, HTTP-Status %d.",
-                    java.util.UUID.randomUUID(), "KeycloakAntwort", response.statusCode());
-            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
@@ -440,6 +510,15 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             throw fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
         } finally {
             plaetze.release();
+        }
+    }
+
+    private void tokenVerwerfen(String verwendet) {
+        synchronized (tokenSperre) {
+            Token aktuell = token;
+            if (aktuell != null && aktuell.wert().equals(verwendet)) {
+                token = null;
+            }
         }
     }
 
@@ -468,7 +547,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         Thread.sleep(WIEDERHOLUNGSABSTAND.toMillis());
     }
 
-    private String token() {
+    private String token(boolean schalterPruefen) {
         URI adminBasis = basis();
         if (clientSecret.isBlank()) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
@@ -490,7 +569,9 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                     .header("Accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(form)).build();
             try {
-                pruefeSchutzschalter();
+                if (schalterPruefen) {
+                    pruefeSchutzschalter();
+                }
                 pruefePositivliste("POST", tokenPath());
                 HttpResponse<byte[]> antwort = http.send(request, info -> new BegrenzterBody());
                 if (antwort.statusCode() < 200 || antwort.statusCode() >= 300) {
@@ -583,6 +664,12 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     }
 
     void pruefePositivliste(String method, String path) {
+        for (String teil : path.split("/", -1)) {
+            String klein = teil.toLowerCase(java.util.Locale.ROOT);
+            if (klein.matches("\\.+") || klein.contains("%2e") || klein.contains("%2f") || klein.contains("%5c")) {
+                throw new IllegalArgumentException("Nicht freigegebener Keycloak-Aufruf");
+            }
+        }
         String rootPath = "/admin/realms/" + realm;
         String rootMuster = "/admin/realms/" + Pattern.quote(realm);
         String id = "[A-Za-z0-9._~%-]+";
@@ -599,8 +686,9 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 || path.matches(usersMuster + "/" + id + "/credentials") && method.equals("GET")
                 || path.matches(usersMuster + "/" + id + "/credentials/" + id)
                 && method.equals("DELETE")
+                || path.matches(usersMuster + "/" + id + "/federated-identity") && method.equals("GET")
                 || path.matches(usersMuster + "/" + id + "/federated-identity/google")
-                && Set.of("GET", "DELETE").contains(method)
+                && method.equals("DELETE")
                 || path.matches(rootMuster + "/attack-detection/brute-force/users/" + id)
                 && method.equals("DELETE")
                 || path.matches(rootMuster + "/roles/" + id) && method.equals("GET");
@@ -640,7 +728,8 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         synchronized (schutzschalterSperre) {
             fehlerfensterBeginn = null;
             fehlerInFolge = 0;
-            schutzschalterOffenBis = null;
+            // schutzschalterOffenBis bleibt unberührt: Ein parallel gestarteter, erfolgreicher Aufruf schliesst
+            // den Schalter nicht; das Schliessen übernimmt allein pruefeSchutzschalter() nach Ablauf.
         }
     }
 

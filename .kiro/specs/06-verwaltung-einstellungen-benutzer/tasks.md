@@ -51,6 +51,8 @@ auf Server oder Secrets aus der Sitzung.
     `keycloak_verwaltung_secret` für `api` und Kommando; Konfiguration `archiv.verwaltung.keycloak.*`; WireMock-Tests
     (Zeitüberschreitung, 5xx, 401 des Dienstkontos, Schutzschalter, kein Wiederholungssturm).
   - Codes `IDENTITAETSDIENST_FEHLER`, `IDENTITAETSDIENST_NICHT_ERREICHBAR` in Spec 01 und Enum.
+  - Folgt später: Alarm bei 502 (Req 5.6) mit 19.13, Belegung von `ARCHIV_KEYCLOAK_ADMIN_URL` in prod (Req 5.3) mit 19.3,
+    Abbildung `KonfliktException` auf 409 `BENUTZER_EXISTIERT` mit 19.7.
   - _Anforderungen: 3.3, 5.1, 5.4, 5.5, 5.6, 5.8, 5.9, 5.10_
   - _Abhängig von: 19.1_
 

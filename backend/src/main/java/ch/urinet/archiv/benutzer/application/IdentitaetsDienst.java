@@ -12,6 +12,17 @@ import java.util.Set;
  */
 public interface IdentitaetsDienst {
 
+    /**
+     * Der Identitätsdienst meldet einen fachlichen Konflikt (HTTP 409, z. B. Benutzername oder E-Mail vergeben).
+     * Der Konflikt ist kein Ausfall des Dienstes und zählt nicht für den Schutzschalter. Die Abbildung auf den
+     * REST-Fehler {@code BENUTZER_EXISTIERT} folgt mit Aufgabe 19.7; die Meldung nennt weder Feld noch Mandant.
+     */
+    final class KonfliktException extends RuntimeException {
+        public KonfliktException() {
+            super("Konflikt im Identitätsdienst", null, false, false);
+        }
+    }
+
     enum ErforderlicheAktion {
         VERIFY_EMAIL, UPDATE_PASSWORD, CONFIGURE_TOTP
     }

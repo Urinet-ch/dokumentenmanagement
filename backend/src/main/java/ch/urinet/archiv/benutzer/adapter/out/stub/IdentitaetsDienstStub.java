@@ -29,10 +29,10 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
     @Override
     public synchronized java.util.List<Benutzer> benutzerSuchen(String mandant, String suche, int seite) {
         Objects.requireNonNull(mandant);
-        if (seite < 0 || suche == null || suche.length() > 40) {
+        if (seite < 0 || (suche != null && suche.length() > 40)) {
             throw new IllegalArgumentException("Ungültige Suchanfrage");
         }
-        String filter = suche.toLowerCase(Locale.ROOT);
+        String filter = suche == null ? "" : suche.toLowerCase(Locale.ROOT);
         var treffer = new ArrayList<Benutzer>();
         benutzer.values().stream().filter(e -> e.mandant.equals(mandant))
                 .map(e -> e.wert)

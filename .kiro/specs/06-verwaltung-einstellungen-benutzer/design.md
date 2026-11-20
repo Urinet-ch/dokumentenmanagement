@@ -148,9 +148,9 @@ backend/src/main/java/ch/urinet/archiv/
   `/components`, `/partial-import`, Rollen-Definitionen und `client-secret`.
 - **Aufrufe an Keycloak** (Realm `urinet-archiv`): `POST /protocol/openid-connect/token` (Client-Credentials, Token bis
   30 Sekunden vor Ablauf wiederverwendet, ein Abruf gleichzeitig); `GET /admin/realms/…/users?q=mandant:<m>&max=50`,
-  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users`,
+  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
   `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
-  `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET/DELETE …/users/{id}/federated-identity/google`,
+  `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET …/users/{id}/federated-identity` (Liste, Filter auf `identityProvider = google`; unter `…/federated-identity/google` kennt Keycloak nur POST und DELETE), `DELETE …/users/{id}/federated-identity/google`,
   `DELETE …/attack-detection/brute-force/users/{id}`. Interne Adresse und Aussteller des Tokens sind in Aufgabe 19.1 zu
   prüfen (`KC_HOSTNAME` zeigt auf die öffentliche Adresse; für den internen Weg nötigenfalls
   `KC_HOSTNAME_BACKCHANNEL_DYNAMIC`).
@@ -158,6 +158,14 @@ backend/src/main/java/ch/urinet/archiv/
   (`Semaphore`, Wartezeit 200 ms, sonst 503 `UEBERLASTET`); Schreibaufrufe nie wiederholt; Leseaufrufe höchstens einmal nach
   200 ms; Schutzschalter nach 3 Fehlern in Folge innerhalb 30 s für 30 s (ohne Bibliothek, ein Zähler und ein Zeitstempel).
   Keine Ausnahme der Keycloak-Meldungen in Antworten oder Logs (Requirement 5.6).
+  Nachbesserung Review PR 348: Für den Schutzschalter zählen nur Transportfehler, Zeitüberschreitungen, 5xx und 401/403 des
+  Dienstkontos; andere 4xx (400, 404, 405) zählen nicht. 409 wird als `IdentitaetsDienst.KonfliktException` weitergereicht
+  (Abbildung auf `BENUTZER_EXISTIERT` mit 19.7). Bei 401 wird der gecachte Token verworfen, ein lesender Aufruf wird genau
+  einmal mit neuem Token wiederholt. Die Kompensation in `anlegen()` umgeht den Schutzschalter (Wartezeit 2 s auf einen
+  Platz); scheitert sie, hängt der Adapter den Fehler als Suppressed an die Ausnahme. `rolleSetzen` holt die Zielrolle zuerst,
+  fügt sie hinzu und entfernt erst danach die übrigen Archiv-Rollen. `verbindungPruefen` erzwingt einen echten Tokenabruf.
+  Pfadwerte `.` und `..` (und `%2e`) werden abgelehnt. Offen (Kann): `aktualisieren`/`aktivieren` lesen und schreiben die
+  volle Darstellung (Lost Update); die Vorgangssperre (19.6) serialisiert die Aufrufer.
 - **Detail-Health:** Prüfung `identitaetsdienst` (Token holbar, Dienstkonto gültig); sie beeinflusst die Readiness der API
   nicht (Requirement 5.8).
 
