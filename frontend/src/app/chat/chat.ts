@@ -13,6 +13,7 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { Subscription, map } from 'rxjs';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import {
   ChatEreignis,
@@ -53,7 +54,7 @@ interface Chip {
  */
 @Component({
   selector: 'app-chat',
-  imports: [MatButtonModule, RouterLink],
+  imports: [MatButtonModule, RouterLink, Symbol],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

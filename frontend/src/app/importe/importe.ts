@@ -6,6 +6,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ImportLauf, ImporteService } from '../gemeinsam/api';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { ImportArt, MAX_GROESSE, fehlerText, groesse, zahl, zeit } from './import-logik';
 
@@ -14,7 +15,7 @@ const SEITE = 20;
 /** Seite «Importe»: CSV hochladen und Liste der Läufe (Aufgabe 4.4; Req 13.2, 13.7, 13.10; Recht A12). */
 @Component({
   selector: 'app-importe',
-  imports: [MatButtonModule, MatCheckboxModule, MatProgressBarModule, RouterLink],
+  imports: [MatButtonModule, MatCheckboxModule, MatProgressBarModule, RouterLink, Symbol],
   templateUrl: './importe.html',
   styleUrl: './importe.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

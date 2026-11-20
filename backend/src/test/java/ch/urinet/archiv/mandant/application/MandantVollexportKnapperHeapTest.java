@@ -58,7 +58,7 @@ class MandantVollexportKnapperHeapTest {
                 });
         Path zipPfad = temp.resolve("vollexport.zip");
         try (OutputStream ziel = Files.newOutputStream(zipPfad)) {
-            new MandantVollexportSchreiber(daten, ablage).schreiben(new MandantCode("vhf-gsk"),
+            new MandantVollexportSchreiber(daten, ablage, (mandant, strom) -> {}).schreiben(new MandantCode("vhf-gsk"),
                     UUID.randomUUID(), temp, ziel);
         }
 

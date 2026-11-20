@@ -61,11 +61,13 @@ class MandantVollexportSchreiberTest {
             assertThat(text(zip, "metadaten.json")).contains(id.toString());
             assertThat(text(zip, "metadaten.csv")).contains(id.toString(), "ARCHIVIERT");
             assertThat(text(zip, "manifeste.csv")).contains("manifest/m");
+            assertThat(text(zip, "wissensbasis.zip")).isEqualTo("Wissenspaket");
             assertThat(text(zip, "pruefsummen.sha256"))
                     .contains(sha(inhalt.get("archiv/o")) + "  dateien/" + id + "/ORIGINAL-1.bin")
                     .contains(sha(inhalt.get("archiv/p")) + "  dateien/" + id + "/pdfa.pdf")
                     .contains(sha(inhalt.get("manifest/m")) + "  manifeste/2026-01-02/0.bin")
-                    .contains("  metadaten.json");
+                    .contains("  metadaten.json")
+                    .contains(sha("Wissenspaket".getBytes()) + "  wissensbasis.zip");
         }
     }
 
@@ -117,8 +119,10 @@ class MandantVollexportSchreiberTest {
     private static Path schreiben(Path temp, MandantVollexportDaten daten, AblagePort ablage) throws Exception {
         Path zipPfad = temp.resolve("export-" + UUID.randomUUID() + ".zip");
         try (OutputStream ziel = Files.newOutputStream(zipPfad)) {
-            new MandantVollexportSchreiber(daten, ablage).schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(),
-                    temp, ziel);
+            new MandantVollexportSchreiber(daten, ablage, (mandant, strom) -> {
+                assertThat(mandant).isEqualTo(new MandantCode("vhf-gsk"));
+                strom.write("Wissenspaket".getBytes());
+            }).schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(), temp, ziel);
         }
         return zipPfad;
     }

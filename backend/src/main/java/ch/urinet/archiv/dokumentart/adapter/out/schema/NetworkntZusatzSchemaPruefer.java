@@ -333,7 +333,16 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
 
     @Override
     public List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson) {
-        return mitFrist(zeitgrenzeNanos, () -> {
+        return konfigurationPruefen(zeitgrenzeNanos, schemaJson, dateiJson);
+    }
+
+    @Override
+    public List<Verletzung> seedKonfigurationPruefen(String schemaJson, String dateiJson) {
+        return konfigurationPruefen(seedZeitgrenzeNanos, schemaJson, dateiJson);
+    }
+
+    private List<Verletzung> konfigurationPruefen(long fristNanos, String schemaJson, String dateiJson) {
+        return mitFrist(fristNanos, () -> {
             JsonNode datei = lesen(dateiJson, MAX_KONFIGURATION_BYTES, true);
             if (!datei.isObject() || tiefe(datei) > MAX_TIEFE) {
                 throw ungueltig();

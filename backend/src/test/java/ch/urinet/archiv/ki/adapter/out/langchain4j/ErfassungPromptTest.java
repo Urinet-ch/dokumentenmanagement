@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ErfassungPromptTest {
 
@@ -216,6 +217,35 @@ class ErfassungPromptTest {
                 .contains("\"format\":\"date\"");
     }
 
+    @Test
+    void antwortschemaLehntVerschachteltenVerweisAlsKonfigurationsfehlerAb() {
+        ArtEintrag art = new ArtEintrag("DOKUMENT_A", "Dokument", null, "NORMAL", List.of("frei"),
+                false, true, List.of(), null, null, List.of("eintrag"),
+                null, 0, "{\"type\":\"object\",\"properties\":{\"eintrag\":{\"type\":\"array\","
+                + "\"items\":{\"$ref\":\"#/$defs/text\"}}},\"$defs\":{\"text\":{\"type\":\"string\"}}}",
+                Map.of(), List.of(), Map.of());
+
+        assertThatThrownBy(() -> AntwortSchema.json(List.of(art), List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("KI-Feld mit verschachteltem Verweis im Zusatz-Schema");
+    }
+
+    @Test
+    void antwortschemaCacheVerdraengtDenAmLaengstenNichtBenutztenEintrag() {
+        String prefix = "{\"type\":\"string\",\"title\":\"cache-test-";
+        String erstes = prefix + "0\"}";
+        String zweites = prefix + "1\"}";
+        var erstesSchema = AntwortSchema.schemaFuer(erstes);
+        var zweitesSchema = AntwortSchema.schemaFuer(zweites);
+        for (int i = 2; i < 64; i++) {
+            AntwortSchema.schemaFuer(prefix + i + "\"}");
+        }
+        assertThat(AntwortSchema.schemaFuer(erstes)).isSameAs(erstesSchema);
+        AntwortSchema.schemaFuer(prefix + "64\"}");
+        assertThat(AntwortSchema.schemaFuer(erstes)).isSameAs(erstesSchema);
+        assertThat(AntwortSchema.schemaFuer(zweites)).isNotSameAs(zweitesSchema);
+    }
+
     /**
      * Req 2.9, design.md «Tests»: kein Art-Code von urinet im Quelltext. Ausnahmen: {@code WISSENSQUELLE} (feste Art
      * des Systems) und {@code DokumentErfassen.ART_KORRESPONDENZ} (Mail-Eingang, Spec 02; wird nur gesetzt, wenn der
@@ -227,12 +257,19 @@ class ErfassungPromptTest {
                 "VERSICHERUNG", "BEHOERDE", "KORRESPONDENZ", "PROJEKTDOKUMENT", "OFFERTE");
         List<Path> quellen;
         try (Stream<Path> baum = Files.walk(Path.of("src/main/java"))) {
-            quellen = baum.filter(p -> p.toString().endsWith(".java"))
-                    .filter(p -> !p.endsWith("DokumentErfassen.java")).toList();
+            quellen = baum.filter(p -> p.toString().endsWith(".java")).toList();
         }
         assertThat(quellen).hasSizeGreaterThan(100);
         for (Path quelle : quellen) {
-            assertThat(Files.readString(quelle)).as(quelle.toString()).doesNotContain(codes.toArray(String[]::new));
+            String inhalt = Files.readString(quelle);
+            if (quelle.endsWith("dokument/application/DokumentErfassen.java")) {
+                String ausnahme = "public static final String ART_KORRESPONDENZ = \"KORRESPONDENZ\";";
+                assertThat(inhalt).containsOnlyOnce(ausnahme);
+                inhalt = inhalt.replace(ausnahme, "")
+                        .replace("repository.artVorbelegen(id, ART_KORRESPONDENZ)", "")
+                        .replace("{@value #ART_KORRESPONDENZ}", "");
+            }
+            assertThat(inhalt).as(quelle.toString()).doesNotContain(codes.toArray(String[]::new));
         }
     }
 }

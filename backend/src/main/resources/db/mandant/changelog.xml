@@ -55,4 +55,5 @@
     <include file="changesets/053-wissen-quellenrevision.xml" relativeToChangelogFile="true"/>
     <include file="changesets/054-ki-texte-aus-seed.xml" relativeToChangelogFile="true"/>
     <include file="changesets/055-klassifikation-volltext.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/056-wissens-export.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

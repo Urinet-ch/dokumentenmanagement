@@ -172,6 +172,17 @@ und von Zuordnungen einer früher gewählten Art werden verworfen; die Dateiausw
 Ein 403 vom Backend zeigt bewusst die gemeinsame Meldung «nicht berechtigt» (Guard und Rechte entscheidet das Backend);
 eine Weiterleitung auf die 404-Seite gibt es nur über den Guard (Nachbesserung Review PR #323).
 
+## Eingangskorb und Artwechsel (Aufgabe 18.4)
+Bei einem Wechsel einer bereits gesetzten Art sendet der Eingangskorb vor der Bestätigung ein PATCH mit der neuen Art
+und den Klassifikationen der neuen Art, auch wenn sonst keine Werte geändert wurden. Das ersetzt Auslegungspunkt 4
+aus PR #332; die Bestätigung verwendet die vom PATCH gelieferte Version. Nicht zugeordnete Klassifikationen bleiben
+im Formular sichtbar. Ein ersetzendes Klassifikations-PATCH enthält nur Zuordnungen der gewählten Art: Nicht
+zugeordnete Werte entfallen dabei, auch wenn die Art nicht gewechselt hat. Ohne Änderung wird kein solches PATCH
+gesendet; die Prüfung bei der Bestätigung bleibt Aufgabe des Backends (Req 3.5).
+
+Abweichung von Spec 01 design.md «Metadaten bearbeiten»: Zusatzwerte ausserhalb der neuen Art werden im Formular
+separat angezeigt und bei einem Artwechsel nicht mitgesendet; sie bleiben nicht auf dem Dokument erhalten.
+
 ## Admin-Kommando
 ```
 archiv mandant konfiguration exportieren <code> [<datei>]

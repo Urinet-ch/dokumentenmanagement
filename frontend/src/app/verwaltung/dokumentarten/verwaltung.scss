@@ -1,3 +1,4 @@
+// Gestaltung nach Prototyp (docs/oberflaeche/prototyp.html, V.dokumentarten): Bereiche als Karten, Pillen, Knöpfe
 :host {
   display: block;
   max-width: 72rem;
@@ -18,16 +19,14 @@ h5 {
   margin: 0;
 }
 
-h1 {
-  font: var(--mat-sys-headline-small);
-}
-
 h2 {
-  font: var(--mat-sys-title-large);
+  font-size: 17px;
+  font-weight: 600;
 }
 
 h3 {
-  font: var(--mat-sys-title-medium);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 p {
@@ -54,9 +53,19 @@ section {
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;
-  padding: 0.35rem 0.6rem;
-  color: var(--urinet-gelb);
-  text-underline-offset: 0.2em;
+  padding: 0 0.85rem;
+  border: 1px solid var(--linie);
+  border-radius: 99px;
+  background: var(--karte);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    border-color: var(--linie-stark);
+    color: var(--text);
+  }
 }
 
 .zweispaltig {
@@ -74,9 +83,15 @@ aside,
 .bestaetigung,
 .feld-editor {
   min-width: 0;
-  padding: 0.75rem;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 0.5rem;
+  padding: 0.875rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
+}
+
+.bestaetigung {
+  border-color: transparent;
+  background: var(--akzent-weich);
 }
 
 aside,
@@ -98,13 +113,38 @@ aside,
   min-width: 0;
 }
 
+// Auswahl in der Liste: Karte, die gewählte gelb markiert
 .auswahl {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.5rem;
   width: 100%;
   min-height: 2.75rem;
-  padding: 0.5rem;
+  padding: 0.6rem 0.75rem;
   text-align: start;
+  border-color: var(--linie);
+  background: var(--karte);
+  color: var(--text);
+  font-weight: 400;
+
+  &:not(:disabled):hover {
+    filter: none;
+    border-color: var(--linie-stark);
+  }
+
+  &[aria-current='true'] {
+    border-color: var(--urinet-gelb);
+    background: var(--akzent-weich);
+    box-shadow: inset 3px 0 0 var(--urinet-gelb);
+  }
+
+  .name {
+    font-weight: 600;
+  }
+
+  code {
+    color: var(--text-gedaempft);
+  }
 }
 
 .auswahl span:first-child,
@@ -116,6 +156,46 @@ aside,
   grid-column: 1 / -1;
 }
 
+.pillen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.pille {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid var(--linie);
+  border-radius: 99px;
+  background: var(--karte-2);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.1;
+
+  &.ok,
+  &.akzent,
+  &.info {
+    border-color: transparent;
+  }
+
+  &.ok {
+    background: var(--ok-weich);
+    color: var(--ok);
+  }
+
+  &.akzent {
+    background: var(--akzent-weich);
+    color: var(--akzent-text);
+  }
+
+  &.info {
+    background: var(--warnung-weich);
+    color: var(--warnung);
+  }
+}
+
 .formular label,
 .wert-formular label,
 .vergleich-formular label,
@@ -123,6 +203,8 @@ aside,
   display: grid;
   gap: 0.3rem;
   min-width: 0;
+  color: var(--text-2);
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -133,12 +215,13 @@ textarea {
   width: 100%;
   min-width: 0;
   min-height: 2.75rem;
-  padding: 0.5rem;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 0.25rem;
-  background: var(--urinet-karte);
-  color: var(--urinet-hell);
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+  background: var(--karte);
+  color: var(--text);
   font: inherit;
+  font-weight: 400;
 }
 
 textarea {
@@ -167,13 +250,13 @@ fieldset {
   min-width: 0;
   margin: 0;
   padding: 0.75rem;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 0.35rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
 }
 
 legend {
   padding: 0 0.25rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .feld-editor {
@@ -188,24 +271,39 @@ legend {
   align-items: end;
 }
 
+// Knöpfe wie im Prototyp (.btn): Hauptaktion gelb, sonst neutral; Löschen dezent in Gefahrfarbe
 button {
   min-height: 2.75rem;
   max-width: 100%;
-  padding: 0.45rem 0.8rem;
+  padding: 0.45rem 0.875rem;
   border: 1px solid var(--urinet-gelb);
-  border-radius: 0.3rem;
+  border-radius: var(--radius-klein);
   background: var(--urinet-gelb);
-  color: var(--urinet-dunkel);
+  color: var(--urinet-schwarz);
   font: inherit;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   overflow-wrap: anywhere;
   cursor: pointer;
 }
 
+button:not(:disabled):hover {
+  filter: brightness(0.96);
+}
+
 button.sekundaer {
-  border-color: var(--urinet-linie);
-  background: transparent;
-  color: var(--urinet-hell);
+  border-color: var(--linie-stark);
+  background: var(--karte);
+  color: var(--text);
+
+  &:not(:disabled):hover {
+    filter: none;
+    background: var(--karte-2);
+  }
+}
+
+button.gefahr {
+  color: var(--gefahr);
 }
 
 button:disabled {
@@ -224,23 +322,31 @@ textarea:focus-visible {
 
 .hinweis,
 .status {
-  color: var(--urinet-gedaempft);
+  color: var(--text-gedaempft);
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
 
 .meldung {
-  padding: 0.65rem;
-  border-inline-start: 0.25rem solid currentColor;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-klein);
   overflow-wrap: anywhere;
 }
 
 .fehler {
-  color: var(--urinet-fehler);
+  color: var(--gefahr);
+}
+
+.meldung.fehler {
+  background: var(--gefahr-weich);
 }
 
 .erfolg {
-  color: var(--urinet-erfolg);
+  color: var(--ok);
+}
+
+.meldung.erfolg {
+  background: var(--ok-weich);
 }
 
 .tabellen-rahmen {
@@ -251,16 +357,34 @@ textarea:focus-visible {
 table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
 }
 
 th,
 td {
   min-width: 6rem;
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--urinet-linie);
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--linie);
   text-align: start;
   vertical-align: top;
   overflow-wrap: anywhere;
+}
+
+th {
+  color: var(--text-gedaempft);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
 }
 
 td code {
