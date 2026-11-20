@@ -3,9 +3,12 @@ package ch.urinet.archiv.sicherheit;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import io.restassured.response.Response;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -18,11 +21,16 @@ import java.util.UUID;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("start-2")
 @QuarkusTest
+@TestProfile(KeycloakVerwaltungSpikeTest.DevService.class)
 class KeycloakVerwaltungSpikeTest {
 
     private static final String REALM = "urinet-archiv";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    public static class DevService implements QuarkusTestProfile {
+    }
 
     @ConfigProperty(name = "archiv.entwicklung.mailpit-port")
     int mailpitPort;

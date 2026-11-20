@@ -14,8 +14,17 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
-import { Dokumentart, Kontakt, Suchtreffer } from '../gemeinsam/api';
+import {
+  Subject,
+  Subscription,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  of,
+  switchMap,
+} from 'rxjs';
+import { Dokumentart, Kontakt, Suchtreffer, WissensIndexZeile } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { AnzeigeTitel, TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { betrag, datum } from '../gemeinsam/format';
@@ -74,6 +83,14 @@ export class Suche {
   protected readonly pruefFehler = signal<Pruefung[]>([]);
   protected readonly fehler = signal<string | null>(null);
   protected readonly wiederholbar = signal(false);
+  protected readonly wissenTreffer = signal<WissensIndexZeile[]>([]);
+  protected readonly wissenLaeuft = signal(false);
+  protected readonly wissenFehler = signal<string | null>(null);
+  protected readonly wissenDegradiert = signal(false);
+  protected readonly wissenBegriff = signal<string | null>(null);
+  protected readonly wissenWiederholbar = signal(false);
+  private wissenAnfrage?: Suchanfrage;
+  private wissenLaufend?: Subscription;
 
   protected readonly darfKontakte = computed(() => this.anmeldung.darf('A6'));
   protected readonly partnerEingabe = signal('');
@@ -84,7 +101,8 @@ export class Suche {
   protected readonly anzahlFilter = computed(() => aktiveFilter(this.filter()));
   protected readonly artName = computed(() => {
     const namen = new Map(this.arten().map((a) => [a.code, a.name]));
-    return (code: string | null | undefined) => (code ? (namen.get(code) ?? code) : this.texte.ohneArt);
+    return (code: string | null | undefined) =>
+      code ? (namen.get(code) ?? code) : this.texte.ohneArt;
   });
   /** Massgebend ist der Modus der gesendeten Anfrage, nicht die Antwort allein. */
   protected readonly hybrid = computed(() => this.zustand.gesendet()?.modus === 'hybrid');
@@ -121,6 +139,7 @@ export class Suche {
       arten.unsubscribe();
       partner.unsubscribe();
       this.laufend?.unsubscribe();
+      this.wissenLaufend?.unsubscribe();
     });
     // Begriff aus der Suche in der Kopfzeile (`/suche?q=`): ersetzt die übrigen Filter und sucht sofort
     let ausKopfzeile = false;
@@ -139,6 +158,8 @@ export class Suche {
     this.zerstoert.onDestroy(() => begriff?.unsubscribe());
     if (!ausKopfzeile && this.ergebnis() === null) {
       this.suchen(0, false);
+    } else if (!ausKopfzeile && this.zustand.gesendet()) {
+      this.wissenSuchen(this.zustand.gesendet()!);
     }
   }
 
@@ -219,6 +240,35 @@ export class Suche {
     }
   }
 
+  protected wissenWiederholen(): void {
+    if (this.wissenAnfrage) this.wissenSuchen(this.wissenAnfrage);
+  }
+
+  private wissenSuchen(anfrage: Suchanfrage): void {
+    this.wissenLaufend?.unsubscribe();
+    this.wissenAnfrage = anfrage;
+    this.wissenTreffer.set([]);
+    this.wissenFehler.set(null);
+    this.wissenDegradiert.set(false);
+    this.wissenWiederholbar.set(false);
+    this.wissenBegriff.set(anfrage.q ?? null);
+    this.wissenLaeuft.set(!!anfrage.q);
+    if (!anfrage.q) return;
+    this.wissenLaufend = this.port.wissen(anfrage.q, anfrage.modus).subscribe({
+      next: (ergebnis) => {
+        this.wissenTreffer.set(ergebnis.treffer);
+        this.wissenDegradiert.set(ergebnis.degradiert);
+        this.wissenLaeuft.set(false);
+      },
+      error: (fehler: unknown) => {
+        this.wissenFehler.set(meldung(fehler));
+        this.wissenLaeuft.set(false);
+        const status = fehler instanceof HttpErrorResponse ? fehler.status : 0;
+        this.wissenWiederholbar.set(status === 0 || status === 429 || status >= 500);
+      },
+    });
+  }
+
   /** Ohne Titel der Dateiname als Platzhalter, auch in NEU, VERARBEITUNG und FEHLER (Req 14.9). */
   protected titel(t: Suchtreffer): AnzeigeTitel {
     return anzeigeTitel(t.titel, null, t.dateiname);
@@ -236,6 +286,7 @@ export class Suche {
   }
 
   private senden(anfrage: Suchanfrage, fokus: boolean): void {
+    this.wissenSuchen(anfrage);
     this.fehler.set(null);
     this.wiederholbar.set(false);
     this.laeuft.set(true);

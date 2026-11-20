@@ -56,6 +56,7 @@ class SecretEigentuemerFehltTest {
             werte.put("quarkus.datasource.devservices.password", APP_PASSWORT);
             werte.put("quarkus.datasource.devservices.db-name", "quarkus");
             werte.put("quarkus.datasource.devservices.port", port());
+            werte.put("archiv.verwaltung.keycloak.basis-url", "http://localhost:8080");
             werte.put("quarkus.oidc.tenant-enabled", "false");
             werte.put("quarkus.quinoa", "false");
             werte.put("quarkus.compose.devservices.enabled", "false");

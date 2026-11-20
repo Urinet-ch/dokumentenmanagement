@@ -3,17 +3,32 @@ import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { Observable, Subject, of } from 'rxjs';
-import { Dokumentart, Kontakt, Suchergebnis, Suchtreffer } from '../gemeinsam/api';
+import {
+  Dokumentart,
+  Kontakt,
+  Suchergebnis,
+  Suchtreffer,
+  WissensSuchergebnis,
+} from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { Suche } from './suche';
-import { Suchanfrage, SuchePort } from './suche-port';
+import { Modus, Suchanfrage, SuchePort } from './suche-port';
 
 class SucheAttrappe extends SuchePort {
   anfragen: Suchanfrage[] = [];
   antworten: Subject<Suchergebnis>[] = [];
   kontaktAnfragen: string[] = [];
   kontaktListe: Kontakt[] = [];
+  wissensAnfragen: { q: string; modus: Modus }[] = [];
+  wissensAntworten: Subject<WissensSuchergebnis>[] = [];
+  wissenManuell = false;
+  wissen(q: string, modus: Modus): Observable<WissensSuchergebnis> {
+    this.wissensAnfragen.push({ q, modus });
+    const antwort = new Subject<WissensSuchergebnis>();
+    this.wissensAntworten.push(antwort);
+    return this.wissenManuell ? antwort : of({ treffer: [], degradiert: false });
+  }
   suchen(anfrage: Suchanfrage): Observable<Suchergebnis> {
     this.anfragen.push(anfrage);
     const antwort = new Subject<Suchergebnis>();
@@ -98,6 +113,7 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
   }
 
   it('sucht beim Öffnen ohne Filter und zeigt die Treffer', async () => {
+    expect(port.wissensAnfragen).toEqual([]);
     expect(port.anfragen).toEqual([{ modus: 'volltext', seite: 0, groesse: 20 }]);
     await antworten(
       ergebnis(
@@ -109,6 +125,60 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
     expect(eintrag.textContent).toContain("CHF 1'234.50");
     expect(eintrag.querySelector('[data-test=belegnummer]')!.textContent).toBe('2026-003');
     expect(eintrag.querySelector('a')!.getAttribute('href')).toBe('/dokument/d1');
+  });
+
+  it('zeigt Wissensseiten über Dokumenten und verwirft Antworten der vorherigen Suche', async () => {
+    port.wissenManuell = true;
+    eingeben('q', 'Miete');
+    await absenden();
+    const alt = port.wissensAntworten.at(-1)!;
+    eingeben('q', 'Vertrag');
+    await absenden();
+    alt.next({ treffer: [{ id: 'alt', titel: 'Nicht mehr passend' }], degradiert: false });
+    port.wissensAntworten.at(-1)!.next({
+      treffer: [
+        {
+          id: 'w1',
+          pfad: 'konzepte/vertrag',
+          titel: 'Vertragswissen',
+          typ: 'Konzept',
+          beschreibung: 'Fristen',
+        },
+      ],
+      degradiert: false,
+    });
+    await antworten(ergebnis(treffer({ titel: 'Dokument' })));
+    const wissen = element.querySelector<HTMLElement>('[data-test=wissen]')!;
+    expect(wissen.textContent).toContain('Vertragswissen');
+    expect(wissen.textContent).toContain('Konzept');
+    expect(wissen.textContent).toContain('Fristen');
+    expect(wissen.textContent).not.toContain('Nicht mehr passend');
+    expect(wissen.querySelector('a')!.getAttribute('href')).toBe('/wissen/konzepte/vertrag');
+    expect(
+      wissen.compareDocumentPosition(
+        element.querySelector('section[aria-labelledby=treffer-titel]')!,
+      ),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(port.wissensAnfragen.at(-1)).toEqual({ q: 'Vertrag', modus: 'hybrid' });
+  });
+
+  it('zeigt Wissensfehler unabhängig von Dokumenten und wiederholt nur die Wissenssuche', async () => {
+    port.wissenManuell = true;
+    eingeben('q', 'Miete');
+    await absenden();
+    port.wissensAntworten.at(-1)!.error(new HttpErrorResponse({ status: 503 }));
+    await antworten(ergebnis(treffer({ titel: 'Dokument bleibt sichtbar' })));
+    const wissen = element.querySelector<HTMLElement>('[data-test=wissen]')!;
+    expect(wissen.querySelector('[role=alert]')!.textContent).toContain(TEXTE.suche.wissenFehler);
+    expect(element.textContent).toContain('Dokument bleibt sichtbar');
+    const dokumentAnfragen = port.anfragen.length;
+    wissen.querySelector<HTMLButtonElement>('button')!.click();
+    await fixture.whenStable();
+    expect(port.anfragen.length).toBe(dokumentAnfragen);
+    port.wissensAntworten.at(-1)!.next({ treffer: [], degradiert: true });
+    await fixture.whenStable();
+    expect(wissen.querySelector('[role=status]')!.textContent).toContain(TEXTE.suche.nurVolltext);
+    expect(wissen.querySelector('[role=alert]')).toBeNull();
   });
 
   it('hebt die Fundstelle als <mark> hervor, ohne HTML aus dem Text zu übernehmen (Req 14.1)', async () => {
@@ -143,6 +213,14 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
     await fixture.whenStable();
     expect(port.anfragen.at(-1)).toEqual({ modus: 'hybrid', q: 'Hostpoint' });
     expect((element.querySelector('[name=q]') as HTMLInputElement).value).toBe('Hostpoint');
+  });
+
+  it('startet beim Öffnen mit Kopfzeilenbegriff keine zweite Wissenssuche mit altem Zustand', async () => {
+    await antworten(ergebnis());
+    fixture.destroy();
+    await TestBed.inject(Router).navigateByUrl('/?q=Vertrag');
+    await oeffnen();
+    expect(port.wissensAnfragen).toEqual([{ q: 'Vertrag', modus: 'hybrid' }]);
   });
 
   it('meldet ungültige Eingaben, ohne das Archiv zu fragen', async () => {

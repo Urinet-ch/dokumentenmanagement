@@ -68,14 +68,16 @@ public class WissenIngestVerarbeiten {
     private final KiPort ki;
     private final KiVerbrauchPort verbrauch;
     private final DiffDienst diffDienst;
+    private final WissenIngestIndex index;
 
     public WissenIngestVerarbeiten(WissenIngestSpeichern speichern, WissenKonfiguration konfiguration,
-                                   KiPort ki, KiVerbrauchPort verbrauch, DiffDienst diffDienst) {
+                                   KiPort ki, KiVerbrauchPort verbrauch, DiffDienst diffDienst, WissenIngestIndex index) {
         this.speichern = speichern;
         this.konfiguration = konfiguration;
         this.ki = ki;
         this.verbrauch = verbrauch;
         this.diffDienst = diffDienst;
+        this.index = index;
     }
 
     public void ausfuehren(Auftrag auftrag, UUID entwurfId) throws InterruptedException {
@@ -248,7 +250,7 @@ public class WissenIngestVerarbeiten {
         List<Kernaussage> belegt = belegteAussagen(bisher);
         String aussagenText = belegt.stream().map(a -> a.nr() + " [" + a.schluessel() + "] " + a.text())
                 .collect(java.util.stream.Collectors.joining("\n"));
-        List<SeitenMetadaten> index = speichern.indexLaden(lauf.entwurfId(), belegt.stream().map(Kernaussage::text)
+        List<SeitenMetadaten> index = this.index.laden(lauf.entwurfId(), belegt.stream().map(Kernaussage::text)
                 .collect(java.util.stream.Collectors.joining("\n")));
         String indexText = index.stream().map(WissenIngestVerarbeiten::indexZeile)
                 .collect(java.util.stream.Collectors.joining("\n"));
@@ -450,7 +452,7 @@ public class WissenIngestVerarbeiten {
             return;
         }
 
-        List<SeitenMetadaten> indexSeiten = speichern.indexLaden(lauf.entwurfId(),
+        List<SeitenMetadaten> indexSeiten = this.index.laden(lauf.entwurfId(),
                 aussagen.stream().map(Kernaussage::text).collect(java.util.stream.Collectors.joining(" ")));
         String nachricht = seitenNachricht(plan, indexSeiten, aussagen, aktuelleFassung);
         KiErgebnis antwort = aufrufen(lauf, stand, KiPort.WissensSchritt.SEITE, nachricht, budget, monatsbudget);
@@ -547,7 +549,7 @@ public class WissenIngestVerarbeiten {
         Planung plan = neuerzeugungsPlan(vorher, bisher, fassung);
         List<Kernaussage> aussagen = bisher.kernaussagen().stream().filter(Kernaussage::belegt)
                 .filter(a -> plan.aussagen().contains(a.nr())).toList();
-        List<SeitenMetadaten> index = speichern.indexLaden(lauf.entwurfId(),
+        List<SeitenMetadaten> index = this.index.laden(lauf.entwurfId(),
                 aussagen.stream().map(Kernaussage::text).collect(java.util.stream.Collectors.joining(" ")));
         String nachricht = seitenNachricht(plan, index, aussagen, fassung)
                 + feld("Bisheriger Vorschlag (Daten)", vorher.daten().titel() + "\n"

@@ -221,6 +221,34 @@
   </div>
 </form>
 
+@if (wissenBegriff()) {
+  <section class="treffer" aria-labelledby="wissen-titel" [attr.aria-busy]="wissenLaeuft()" data-test="wissen">
+    <h2 id="wissen-titel">{{ texte.wissen }}</h2>
+    <p>{{ texte.wissenHinweis }}</p>
+    @if (wissenLaeuft()) {
+      <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.wissenLaeuft" />
+    } @else if (wissenFehler(); as fehler) {
+      <p role="alert">{{ texte.wissenFehler }} {{ fehler }}</p>
+      @if (wissenWiederholbar()) {
+        <button mat-button type="button" (click)="wissenWiederholen()">{{ texte.wiederholen }}</button>
+      }
+    } @else {
+      @if (wissenDegradiert()) {
+        <p role="status">{{ texte.nurVolltext }}</p>
+      }
+      @for (seite of wissenTreffer(); track seite.id) {
+        <article data-test="wissens-treffer">
+          <h3><a [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a></h3>
+          <p>{{ seite.typ }}</p>
+          <p>{{ seite.beschreibung }}</p>
+        </article>
+      } @empty {
+        <p>{{ texte.keinWissen }}</p>
+      }
+    }
+  </section>
+}
+
 <section class="treffer" aria-labelledby="treffer-titel" [attr.aria-busy]="laeuft()">
   <h2 id="treffer-titel" tabindex="-1" #trefferUeberschrift>
     {{ texte.treffer }}
