@@ -241,7 +241,7 @@ Werten gelesen. Das Abbild übernimmt die neuen Werte aus der zuletzt gespeicher
 Änderung eine Version erzeugt. Dateiimport und Seed übergeben die neuen Werte ausdrücklich. Wochentage im Abbild sind
 ISO-Namen (`MONDAY` bis `SUNDAY`). Der Anzeigename folgt der bestehenden Zeichen-Positivliste des Brandings mit höchstens
 60 Zeichen. Der Katalog stellt für Zahlen die Auflösung eigener Wert → bisheriger Startwert → Katalogstandard bereit.
-Die Umstellung der Verbraucher und die Übernahme bisheriger Werte gehören zu 20.3; die offene Entscheidung zu
+Die Umstellung der Verbraucher und die Übernahme bisheriger Werte gehören zu 20.4; die offene Entscheidung zu
 `wissens_einstellung` wird dadurch nicht vorweggenommen.
 
 **Schnittstelle** (Erweiterung von `GET/PATCH /mandant/einstellungen`, Spec 01 und 05; die Form der bestehenden Felder

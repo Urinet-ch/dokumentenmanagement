@@ -64,7 +64,7 @@ final class EinstellungskatalogSchema {
                 case IBANS -> {
                     eigenschaft.put("type", "array");
                     eigenschaft.put("maxItems", Einstellungskatalog.IBAN_ANZAHL_MAX);
-                    eigenschaft.putObject("items").put("type", "string");
+                    eigenschaft.putObject("items").put("type", "string").put("maxLength", Einstellungskatalog.IBAN_LAENGE_MAX);
                 }
                 case TEXT -> {
                     eigenschaft.putArray("type").add("string").add("null");

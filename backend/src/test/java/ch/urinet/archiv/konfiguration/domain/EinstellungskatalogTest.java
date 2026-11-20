@@ -88,6 +88,10 @@ class EinstellungskatalogTest {
         assertThat(Einstellungskatalog.ibansGueltig(java.util.Collections.nCopies(20, "synthetisch"))).isTrue();
         assertThat(Einstellungskatalog.ibansGueltig(java.util.Collections.nCopies(21, "synthetisch"))).isFalse();
         assertThat(Einstellungskatalog.ibansGueltig(List.of("a\nb"))).isFalse();
+        assertThat(Einstellungskatalog.ibansGueltig(List.of("x".repeat(34)))).isTrue();
+        assertThat(Einstellungskatalog.ibansGueltig(List.of("x".repeat(35)))).isFalse();
+        assertThat(Einstellungskatalog.uidGueltig("CHE-000.000.000 TVA")).isTrue();
+        assertThat(Einstellungskatalog.uidGueltig("CHE-000.000.000 IVA")).isTrue();
     }
 
     @Test

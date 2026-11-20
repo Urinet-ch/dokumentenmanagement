@@ -14,8 +14,10 @@ public final class Einstellungskatalog {
     private static final Pattern FARBE = Pattern.compile("^#[0-9a-fA-F]{6}$");
     private static final Pattern BRANDING_NAME =
             Pattern.compile("^[\\p{L}\\p{N}][\\p{L}\\p{N} &'’().,/-]{0,59}$");
-    public static final String UID_MUSTER = "(?i)^CHE[-. ]?\\d{3}[. ]?\\d{3}[. ]?\\d{3}(?: *MWST)?$";
+    public static final String UID_MUSTER = "(?i)^CHE[-. ]?\\d{3}[. ]?\\d{3}[. ]?\\d{3}(?: *(?:MWST|TVA|IVA))?$";
     public static final int IBAN_ANZAHL_MAX = 20;
+    /** Längste IBAN-Schreibweise (34 Zeichen); je Eintrag begrenzt, damit kein Freitext in Konfiguration und Export gelangt. */
+    public static final int IBAN_LAENGE_MAX = 34;
     private static final Pattern UID = Pattern.compile(UID_MUSTER);
 
     public enum Gruppe { GESCHAEFTSJAHR, KENNUNGEN, BRANDING, CHAT, WEBSEITEN_CHAT, WISSEN }
@@ -139,6 +141,6 @@ public final class Einstellungskatalog {
 
     public static boolean ibansGueltig(List<String> ibans) {
         return ibans.size() <= IBAN_ANZAHL_MAX && ibans.stream()
-                .allMatch(wert -> !wert.isBlank() && wert.codePoints().noneMatch(Character::isISOControl));
+                .allMatch(wert -> !wert.isBlank() && wert.length() <= IBAN_LAENGE_MAX && wert.codePoints().noneMatch(Character::isISOControl));
     }
 }

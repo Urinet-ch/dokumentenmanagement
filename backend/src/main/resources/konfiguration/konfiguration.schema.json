@@ -66,12 +66,12 @@
       "properties": {
         "uid": {
           "type": ["string", "null"],
-          "pattern": "(?i)^CHE[-. ]?\\d{3}[. ]?\\d{3}[. ]?\\d{3}(?: *MWST)?$"
+          "pattern": "(?i)^CHE[-. ]?\\d{3}[. ]?\\d{3}[. ]?\\d{3}(?: *(?:MWST|TVA|IVA))?$"
         },
         "ibans": {
           "type": "array",
           "maxItems": 20,
-          "items": { "type": "string" }
+          "items": { "type": "string", "maxLength": 34 }
         }
       },
       "patternProperties": {

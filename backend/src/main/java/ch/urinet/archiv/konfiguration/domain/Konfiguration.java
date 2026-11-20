@@ -87,7 +87,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             }
             if (!Einstellungskatalog.ibansGueltig(einstellungen.kennungen().ibans())) {
                 befunde.add(new Befund("einstellungen.kennungen.ibans", "WERT_UNGUELTIG",
-                        "Die Liste darf höchstens 20 nicht leere Einträge ohne Steuerzeichen enthalten."));
+                        "Die Liste darf höchstens 20 nicht leere Einträge mit höchstens 34 Zeichen und ohne Steuerzeichen enthalten."));
             }
             if (!Einstellungskatalog.brandingNameGueltig(einstellungen.branding().name())) {
                 befunde.add(new Befund("einstellungen.branding.name", "WERT_UNGUELTIG",
