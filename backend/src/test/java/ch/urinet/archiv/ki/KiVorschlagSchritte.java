@@ -3,6 +3,10 @@ package ch.urinet.archiv.ki;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.ki.adapter.out.langchain4j.AntwortSchema;
+import ch.urinet.archiv.konfiguration.application.KonfigurationCache;
+import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
+import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe;
@@ -35,6 +39,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
@@ -62,12 +67,21 @@ public class KiVorschlagSchritte {
     @Inject
     AuftragTestHilfe auftraege;
 
+    @Inject
+    KonfigurationCache konfigurationCache;
+
+    @Inject
+    KonfigurationVerwaltung konfiguration;
+
+    @Inject
+    MandantKontext mandantKontext;
+
     private WireMock modell;
     private UUID id;
     private long verbrauchStand;
-    /** Kennungen des Mandanten vor dem Szenario, wenn ein Schritt sie geändert hat. */
-    private String kennungenVorher;
     private boolean kennungenGeaendert;
+    private MandantCode kennungenMandant;
+    private boolean kiFreigabeGeaendert;
     /** Kontakt aus dem Szenario, wird danach gelöscht. */
     private UUID kontakt;
     /** {@code version} des Dokuments direkt nach der Änderung durch den Benutzer. */
@@ -93,20 +107,55 @@ public class KiVorschlagSchritte {
         KiWireMock.zuruecksetzen();
     }
 
+    @After
+    public void kiFreigabeZuruecksetzen() {
+        if (kiFreigabeGeaendert) {
+            konfigurationCache.invalidieren(new MandantCode(MANDANT));
+            kiFreigabeGeaendert = false;
+        }
+    }
+
+    @Angenommen("die KI-Freigabe des Mandanten ist ausgeschaltet")
+    public void kiFreigabeAusschalten() throws Exception {
+        MandantCode mandant = new MandantCode(MANDANT);
+        Konfiguration vorher = aktuelleKonfiguration(mandant);
+        assertThat(vorher.kiTexte().kiFreigegeben()).isTrue();
+        kiFreigabeGeaendert = true;
+        konfigurationCache.speichern(mandant, new Konfiguration(vorher.version(), vorher.einstellungen(),
+                vorher.arten(), vorher.klassifikationen(), vorher.regeln(),
+                new Konfiguration.KiTexte(vorher.kiTexte().rolle(), vorher.kiTexte().feldregeln(), false)));
+    }
+
+    /** Req 8.1: Rolle und Feldregeln nur in der Konfiguration des Mandanten ändern; sie dürfen nicht aus dem Code kommen. */
+    @Angenommen("die KI-Texte des Mandanten tragen die Kennung «{}»")
+    public void kiTexteMitKennung(String kennung) throws Exception {
+        MandantCode mandant = new MandantCode(MANDANT);
+        Konfiguration vorher = aktuelleKonfiguration(mandant);
+        kiFreigabeGeaendert = true;
+        konfigurationCache.speichern(mandant, new Konfiguration(vorher.version(), vorher.einstellungen(),
+                vorher.arten(), vorher.klassifikationen(), vorher.regeln(),
+                new Konfiguration.KiTexte(kennung + " Rolle", kennung + " Feldregeln",
+                        vorher.kiTexte().kiFreigegeben())));
+    }
+
     @Angenommen("der Mandant «{word}» hat die UID «{}»")
     public void uid(String mandant, String uid) throws Exception {
-        kennungenVorher = hilfe.kennungen(mandant);
+        MandantCode code = new MandantCode(mandant);
+        Konfiguration vorher = aktuelleKonfiguration(code);
+        Konfiguration.Einstellungen einstellungen = new Konfiguration.Einstellungen(
+                vorher.einstellungen().geschaeftsjahrEnde(), new Konfiguration.Kennungen(uid, List.of()));
+        konfigurationCache.speichern(code, new Konfiguration(vorher.version(), einstellungen, vorher.arten(),
+                vorher.klassifikationen(), vorher.regeln(), vorher.kiTexte()));
+        kennungenMandant = code;
         kennungenGeaendert = true;
-        ObjectNode kennungen = JSON.createObjectNode().put("uid", uid);
-        kennungen.putArray("ibans");
-        hilfe.kennungenSetzen(mandant, JSON.writeValueAsString(kennungen));
     }
 
     @After
     public void kennungenZuruecksetzen() throws Exception {
         if (kennungenGeaendert) {
-            hilfe.kennungenSetzen(MANDANT, kennungenVorher);
+            konfigurationCache.invalidieren(kennungenMandant);
             kennungenGeaendert = false;
+            kennungenMandant = null;
         }
         if (kontakt != null) {
             hilfe.kontaktLoeschen(MANDANT, kontakt);
@@ -341,11 +390,28 @@ public class KiVorschlagSchritte {
         assertThat(anfrage.path("frequency_penalty").decimalValue()).isEqualByComparingTo("0");
         assertThat(anfrage.path("response_format").path("type").asText()).isEqualTo("json_schema");
         assertThat(anfrage.path("response_format").path("json_schema").path("strict").asBoolean()).isTrue();
-        assertThat(anfrage.path("response_format").path("json_schema").path("schema").path("properties").fieldNames())
+        JsonNode schema = anfrage.path("response_format").path("json_schema").path("schema");
+        assertThat(schema.path("properties").fieldNames())
                 .toIterable().contains("art", "titel", "datum", "partnerName", "belegnummer", "richtung", "betrag",
                         "waehrung", "faelligkeit", "vertraulichkeit", "tags", "sicherheit");
-        assertThat(anfrage.path("response_format").path("json_schema").path("schema"))
-                .isEqualTo(JSON.readTree(AntwortSchema.json()));
+        assertThat(schema.path("properties").path("art").path("enum").toString())
+                .contains("LIEFERANTENBELEG", "AUSGANGSRECHNUNG").doesNotContain("WISSENSQUELLE");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+    }
+
+    @Dann("der Aufruf verwendet die konfigurierten KI-Texte und Arten des Mandanten")
+    public void konfigurierteKiTexte() throws Exception {
+        JsonNode anfrage = JSON.readTree(anfragen().getFirst().getBodyAsString());
+        String systemPrompt = anfrage.path("messages").get(0).path("content").asText();
+        assertThat(systemPrompt).contains("Sozialversicherungen", "Werte aus dem Swiss QR Code",
+                "AUSGANGSRECHNUNG", "LIEFERANTENBELEG");
+    }
+
+    @Dann("der Aufruf enthält die Kennung «{}» der KI-Texte")
+    public void kennungImAufruf(String kennung) throws Exception {
+        String systemPrompt = JSON.readTree(anfragen().getFirst().getBodyAsString())
+                .path("messages").get(0).path("content").asText();
+        assertThat(systemPrompt).contains(kennung + " Rolle", kennung + " Feldregeln");
     }
 
     @Dann("der Aufruf enthält den Belegtext «{}» und die Dokumentarten des Mandanten")
@@ -457,6 +523,12 @@ public class KiVorschlagSchritte {
 
     private JsonNode vorschlag() throws Exception {
         return JSON.readTree((String) hilfe.kiVorschlag(MANDANT, id).get("ki_vorschlag"));
+    }
+
+    private Konfiguration aktuelleKonfiguration(MandantCode mandant) throws Exception {
+        try (var worker = Executors.newSingleThreadExecutor()) {
+            return worker.submit(() -> mandantKontext.mit(mandant, konfiguration::aktuell)).get();
+        }
     }
 
     private JsonNode sicherheit() throws Exception {

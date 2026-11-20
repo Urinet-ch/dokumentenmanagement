@@ -52,7 +52,7 @@ public class SeedPruefung {
                         + ": Dokumentart WISSENSQUELLE weicht von den festen Eigenschaften ab");
             }
             try {
-                pruefung.seedPruefen(art(vorlage));
+                pruefung.seedPruefen(art(vorlage), vorlage.kiFelder());
             } catch (FachFehler e) {
                 throw new MandantFehler(MandantFehler.Grund.SEED_UNGUELTIG, "Seed für Mandant " + mandant.wert()
                         + ": Dokumentart " + vorlage.code() + " ist ungültig (" + e.code().name() + ")", e);
