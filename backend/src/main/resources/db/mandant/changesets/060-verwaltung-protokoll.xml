@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="060-verwaltung-protokoll" author="copilot">
+        <sql>
+            alter table benutzer_verzeichnis drop constraint benutzer_verzeichnis_anlass_ck;
+            alter table benutzer_verzeichnis add constraint benutzer_verzeichnis_anlass_ck
+                check (anlass in ('AKTION', 'AUSTRITT', 'WIDERRUF', 'ANLAGE', 'UEBERNAHME'));
+            alter table zugriff_protokoll drop constraint zugriff_protokoll_aktion_ck;
+            alter table zugriff_protokoll add constraint zugriff_protokoll_aktion_ck
+                check (aktion in ('ERFASSEN', 'ANZEIGEN', 'HERUNTERLADEN', 'AENDERN', 'BESTAETIGEN',
+                    'VERWERFEN', 'WIEDERHOLEN', 'EXPORTIEREN', 'VERWEIGERT', 'SPERRE_KONFLIKT',
+                    'REGEL_AENDERN', 'KONFIGURATION_AENDERN', 'WISSEN_ANZEIGEN', 'WISSEN_ANNEHMEN',
+                    'WISSEN_VERWERFEN', 'WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_IMPORT',
+                    'KONTAKT_ZUSAMMENFUEHREN', 'KONTAKT_INAKTIV', 'KONTAKT_AKTIV',
+                    'BENUTZER_ANLEGEN', 'BENUTZER_AENDERN', 'BENUTZER_LOESCHEN',
+                    'ROLLE_ZUWEISEN', 'BENUTZER_ANTRAG', 'BENUTZER_ABWEICHUNG'));
+            create table benutzer_status (
+                benutzer text primary key,
+                art text not null check (art in ('GESPERRT', 'DEAKTIVIERT')),
+                seit timestamptz not null,
+                grund text not null,
+                von text not null
+            );
+            create table verwaltung_antrag (
+                id uuid primary key,
+                art text not null check (art in ('INHABER_ROLLE', 'LOESCHEN')),
+                ziel text not null,
+                rolle text,
+                grund text,
+                beantragt_von text not null,
+                beantragt_am timestamptz not null,
+                gueltig_bis timestamptz not null,
+                status text not null check (status in ('OFFEN', 'BESTAETIGT', 'ABGELEHNT', 'ABGELAUFEN', 'ZURUECKGEZOGEN')),
+                entschieden_von text,
+                entschieden_am timestamptz
+            );
+        </sql>
+    </changeSet>
+</databaseChangeLog>
