@@ -7,7 +7,6 @@ import picocli.CommandLine.*;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
@@ -48,6 +47,7 @@ public final class WissenPaketCli implements Callable<Integer> {
 
         abstract byte[] daten() throws IOException;
         void schreiben(byte[] zip) throws IOException {}
+        List<OfflinePruefung.Meldung> weitereHinweise() { return List.of(); }
 
         @Override public Integer call() {
             try {
@@ -55,6 +55,7 @@ public final class WissenPaketCli implements Callable<Integer> {
                 WissensPaket paket = new WissensPaketLeser().lesen(zip);
                 OfflinePruefung.Bericht bericht = OfflinePruefung.pruefen(paket);
                 List<OfflinePruefung.Meldung> hinweise = new ArrayList<>(bericht.hinweise());
+                hinweise.addAll(weitereHinweise());
                 if (quellen != null) hinweise.addAll(LokaleQuellen.pruefen(paket, quellen));
                 if (bericht.gueltig()) schreiben(zip);
                 ausgeben(spec.commandLine().getOut(), json, bericht.befunde(), hinweise);
@@ -70,9 +71,19 @@ public final class WissenPaketCli implements Callable<Integer> {
 
     @Command(name = "validate", mixinStandardHelpOptions = true)
     static final class Validate extends Befehl {
+        private boolean kopfErgaenzt;
+
         @Override byte[] daten() throws IOException {
-            return Files.isDirectory(eingabe, LinkOption.NOFOLLOW_LINKS)
-                    ? PaketDateien.ordner(eingabe, null) : PaketDateien.zipLesen(eingabe);
+            kopfErgaenzt = false;
+            if (!Files.isDirectory(eingabe, LinkOption.NOFOLLOW_LINKS)) return PaketDateien.zipLesen(eingabe);
+            var paket = PaketDateien.ordner(eingabe,
+                    PaketDateien.kopf("offline", "wissen_paket", "lokal", "NORMAL", "1970-01-01T00:00:00Z"));
+            kopfErgaenzt = paket.kopfErgaenzt();
+            return paket.zip();
+        }
+
+        @Override List<OfflinePruefung.Meldung> weitereHinweise() {
+            return kopfErgaenzt ? List.of(new OfflinePruefung.Meldung("PAKETKOPF_NICHT_GEPRUEFT", "paket.yaml")) : List.of();
         }
     }
 
@@ -96,10 +107,7 @@ public final class WissenPaketCli implements Callable<Integer> {
                         || quellen != null && gemeinsam(quellen, ausgabe)) throw new IOException();
             }
             Instant.parse(erzeugtAm);
-            String kopf = "paket_format: 1\nmandant: " + quote(mandant) + "\nerzeugt_von: " + quote(erzeugtVon)
-                    + "\nerzeugt_mit: " + quote(erzeugtMit) + "\nkontext_stufe: " + quote(stufe)
-                    + "\nerzeugt_am: " + quote(erzeugtAm) + "\n";
-            return PaketDateien.ordner(eingabe, kopf.getBytes(StandardCharsets.UTF_8));
+            return PaketDateien.ordner(eingabe, PaketDateien.kopf(mandant, erzeugtVon, erzeugtMit, stufe, erzeugtAm)).zip();
         }
 
         @Override void schreiben(byte[] zip) throws IOException {
@@ -112,8 +120,6 @@ public final class WissenPaketCli implements Callable<Integer> {
                         LinkOption.NOFOLLOW_LINKS)) { out.write(zip); }
             }
         }
-        private static String quote(String text) { return "'" + text.replace("'", "''") + "'"; }
-
         private static boolean gemeinsam(Path ordner, Path ziel) throws IOException {
             try (var lauf = Files.walk(ordner)) {
                 for (Iterator<Path> it = lauf.iterator(); it.hasNext();) {

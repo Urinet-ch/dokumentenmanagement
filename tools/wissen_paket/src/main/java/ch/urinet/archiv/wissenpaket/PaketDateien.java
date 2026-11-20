@@ -9,6 +9,16 @@ import java.util.zip.*;
 
 final class PaketDateien {
     private static final PaketGrenzen G = PaketGrenzen.standard();
+    record OrdnerPaket(byte[] zip, boolean kopfErgaenzt) {}
+
+    static byte[] kopf(String mandant, String erzeugtVon, String erzeugtMit, String stufe, String erzeugtAm) {
+        String yaml = "paket_format: 1\nmandant: " + quote(mandant) + "\nerzeugt_von: " + quote(erzeugtVon)
+                + "\nerzeugt_mit: " + quote(erzeugtMit) + "\nkontext_stufe: " + quote(stufe)
+                + "\nerzeugt_am: " + quote(erzeugtAm) + "\n";
+        return yaml.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static String quote(String text) { return "'" + text.replace("'", "''") + "'"; }
 
     static byte[] zipLesen(Path datei) throws IOException {
         if (Files.isSymbolicLink(datei) || !Files.isRegularFile(datei, LinkOption.NOFOLLOW_LINKS))
@@ -20,7 +30,7 @@ final class PaketDateien {
         }
     }
 
-    static byte[] ordner(Path wurzel, byte[] kopf) throws IOException {
+    static OrdnerPaket ordner(Path wurzel, byte[] kopf) throws IOException {
         if (Files.isSymbolicLink(wurzel) || !Files.isDirectory(wurzel, LinkOption.NOFOLLOW_LINKS))
             throw new WissensPaketException(WissensPaketException.Code.PFAD, "");
         Map<String, byte[]> dateien = new TreeMap<>();
@@ -51,7 +61,8 @@ final class PaketDateien {
         } catch (UncheckedIOException ex) {
             throw ex.getCause();
         }
-        if (kopf != null && !dateien.containsKey("paket.yaml")) dateien.put("paket.yaml", kopf);
+        boolean kopfErgaenzt = !dateien.containsKey("paket.yaml");
+        if (kopfErgaenzt) dateien.put("paket.yaml", kopf);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
             for (var eintrag : dateien.entrySet()) {
@@ -75,7 +86,7 @@ final class PaketDateien {
         }
         byte[] daten = out.toByteArray();
         if (daten.length > G.zipBytes()) throw new WissensPaketException(WissensPaketException.Code.DATEI_ZU_GROSS, "");
-        return daten;
+        return new OrdnerPaket(daten, kopfErgaenzt);
     }
 
     private static long komprimierteGroesse(byte[] daten) {

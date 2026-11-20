@@ -38,8 +38,9 @@ Cloud-Modell geben. Im Zweifel: lokales Modell.
    entpacken; dann tragen die Seiten die `basis_version`.
 2. Claude Code, Copilot CLI oder ein lokales Modell schreiben `<pfad>.md` nach den Seitenregeln (Frontmatter, jede Aussage
    mit Fussnote, Quellen mit `sha256`, `seite` und wörtlichem `auszug`). Beachte Abschnitt 1: Cloud-Modelle nur mit `NORMAL`.
-3. Ein Ordner mit `paket.yaml` lässt sich mit `java -jar wissen-paket-<version>.jar validate <ordner>
-   --quellen <ordner-mit-pdfs>` prüfen. Ohne `paket.yaml` zuerst bauen; dabei wird der Inhalt ebenfalls geprüft:
+3. Den Ordner mit `java -jar wissen-paket-<version>.jar validate <ordner> --quellen <ordner-mit-pdfs>` prüfen.
+   Ohne `paket.yaml` prüft das Werkzeug die Seiten mit einem vorläufigen Kopf im Speicher und meldet
+   `PAKETKOPF_NICHT_GEPRUEFT`: Herkunft und Kontextstufe sind damit nicht geprüft.
 4. `java -jar wissen-paket-<version>.jar bauen <ordner> -o <paket.zip> --mandant urinet --erzeugt-von <modell>
    --erzeugt-mit lokal|cloud --kontext-stufe NORMAL|INTERN --quellen <ordner-mit-pdfs>`
    Das ZIP anschliessend mit `validate <paket.zip>` prüfen. Weitere Hinweise zu Zeitstempel und Überschreiben
@@ -50,7 +51,7 @@ Nur Befund-Codes und Pfade, nie Inhalte; Rückgabewert 0 = kein sperrender Befun
 - Sperrend: `FELD_FEHLT`, `PFAD_UNGUELTIG`, `AUSSAGE_OHNE_BELEG`, `FUSSNOTE_OHNE_QUELLE`, `LINK_UNGUELTIG` (HTML, externer Link,
   Bild), `AUSZUG_FEHLT`, `ZU_GROSS` sowie Formatcodes wie `GRENZE`, `PFAD`, `YAML` und `ZIP_BOMBE`.
 - Hinweise: `QUELLE_NICHT_GEPRUEFT` (Zuordnung geht nur im Archiv), `AUSZUG_LOKAL_NICHT_GEFUNDEN` (nicht massgeblich: das Archiv prüft
-  gegen den Text der PDF/A-Fassung), `FELD_IGNORIERT`.
+  gegen den Text der PDF/A-Fassung), `FELD_IGNORIERT`, `PAKETKOPF_NICHT_GEPRUEFT` (vorläufiger Kopf).
 - Das Archiv prüft jedes Paket beim Import erneut. Das Werkzeug spart nur den Umweg.
 
 ## 6. Hochladen und freigeben

@@ -10,7 +10,10 @@ java -jar tools/wissen_paket/target/wissen-paket-0.1.0-SNAPSHOT.jar bauen okf-or
   --mandant urinet --erzeugt-von lokales-werkzeug --erzeugt-mit lokal --kontext-stufe NORMAL
 ```
 
-`validate` erwartet im Ordner ebenfalls `paket.yaml`. `bauen` übernimmt eine vorhandene `paket.yaml`
+`validate` prüft auch einen OKF-Ordner ohne `paket.yaml` mit einem vorläufigen Kopf im Speicher. Der Hinweis
+`PAKETKOPF_NICHT_GEPRUEFT` bedeutet: Mandant, Erzeuger, Herkunft und Kontextstufe sind noch nicht geprüft;
+insbesondere lässt sich die Kombination `cloud` und `INTERN` ohne diese Angaben nicht beurteilen.
+Ein ZIP muss dagegen `paket.yaml` enthalten. `bauen` übernimmt eine vorhandene `paket.yaml`
 unverändert; fehlt sie, erzeugt es diese nur im ZIP aus den angegebenen Optionen. Die Eingabe und das
 Quellenverzeichnis bleiben unverändert. Das Ziel muss ausserhalb beider Ordner liegen und darf nur mit
 `--ueberschreiben` ersetzt werden. Das ZIP wird vor dem Schreiben mit dem Import-Leser erneut geprüft.

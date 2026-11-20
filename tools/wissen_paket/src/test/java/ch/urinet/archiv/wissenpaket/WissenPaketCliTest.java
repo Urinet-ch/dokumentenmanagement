@@ -108,6 +108,25 @@ class WissenPaketCliTest {
         vorher.forEach((name, inhalt) -> assertThat(nachher.get(name)).isEqualTo(inhalt));
     }
 
+    @Test void validiertOkfOrdnerOhnePaketkopfImSpeicherUndPrueftVorhandenenKopf() throws Exception {
+        Map<String, byte[]> vorher = dateien();
+        assertThat(aufruf("validate", eingabe.toString(), "--quellen", quellen.toString(), "--json")).isZero();
+        assertThat(text.toString()).contains("PAKETKOPF_NICHT_GEPRUEFT", "paket.yaml");
+        Map<String, byte[]> nachher = dateien();
+        assertThat(nachher.keySet()).isEqualTo(vorher.keySet());
+        vorher.forEach((name, inhalt) -> assertThat(nachher.get(name)).isEqualTo(inhalt));
+
+        Path seite = eingabe.resolve("konzepte/test.md");
+        Files.writeString(seite, Files.readString(seite) + "\n<script>geheim</script>\n");
+        assertThat(aufruf("validate", eingabe.toString(), "--json")).isEqualTo(1);
+        assertThat(text.toString()).contains("LINK_UNGUELTIG").doesNotContain("geheim");
+        Files.writeString(seite, Files.readString(seite).replace("<script>geheim</script>", "# Beispiel"));
+
+        Files.writeString(eingabe.resolve("paket.yaml"), "paket_format: 1\n");
+        assertThat(aufruf("validate", eingabe.toString(), "--json")).isEqualTo(1);
+        assertThat(text.toString()).contains("FORMAT", "paket.yaml").doesNotContain("PAKETKOPF_NICHT_GEPRUEFT");
+    }
+
     private Map<String, byte[]> dateien() throws IOException {
         Map<String, byte[]> ergebnis = new TreeMap<>();
         try (var lauf = Files.walk(arbeit)) {
