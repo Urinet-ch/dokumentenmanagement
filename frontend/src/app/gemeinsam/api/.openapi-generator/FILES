@@ -13,6 +13,7 @@ api/konfiguration.service.ts
 api/kontakte.service.ts
 api/protokoll.service.ts
 api/wissen-ingest-resource.service.ts
+api/wissen-lint-resource.service.ts
 api/wissensbasis.service.ts
 configuration.ts
 encoder.ts
@@ -117,6 +118,7 @@ model/wissen-einstellungen.ts
 model/wissen-export.ts
 model/wissen-ingest-auftrag.ts
 model/wissen-ingest-start.ts
+model/wissen-lint-auftrag.ts
 model/wissen-verwerfen.ts
 model/wissens-index-gruppe.ts
 model/wissens-index-zeile.ts
