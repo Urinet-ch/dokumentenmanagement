@@ -79,8 +79,9 @@ describe('Kontakte: Logik (Req 17.2, 17.6)', () => {
       expect(filterAusParametern(convertToParamMap({ seite: '1.5' })).seite).toBe(0);
     });
 
-    it('zählt gesetzte Filter ohne den Standard «aktiv»', () => {
+    it('zählt die Filter der Filterleiste, ohne Status (steht sichtbar in der Kopfzeile)', () => {
       expect(anzahlFilter(LEERER_FILTER)).toBe(0);
+      expect(anzahlFilter({ ...LEERER_FILTER, status: 'INAKTIV' })).toBe(0);
       expect(
         anzahlFilter({
           ...LEERER_FILTER,
@@ -88,7 +89,7 @@ describe('Kontakte: Logik (Req 17.2, 17.6)', () => {
           quelle: 'MANUELL',
           nichtImExport: true,
         }),
-      ).toBe(3);
+      ).toBe(2);
     });
 
     it('rechnet die Seitenzahl', () => {

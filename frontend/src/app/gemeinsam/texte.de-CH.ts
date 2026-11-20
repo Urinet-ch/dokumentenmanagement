@@ -1019,6 +1019,9 @@ export const TEXTE = {
       'Seine Dokumente bleiben unverändert; Sie können ihn später wieder aktivieren.',
     inaktivAusfuehren: 'Als inaktiv markieren',
     sendet: 'Wird gesendet …',
+    // Gestaltung nach Prototyp (20.11.2026)
+    vorzeile: 'Aus 21.CRM und manuell erfasst',
+    statusKnoepfe: { AKTIV: 'Aktiv', INAKTIV: 'Inaktiv', ALLE: 'Alle' } as Record<string, string>,
   },
   // Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe 5.1; Req 10.5, 10.10; Recht A13)
   /** Seite «Export» (Spec 02, Aufgabe 6.5; Req 7.1, 7.2, 7.5): nur Inhaber und Treuhänder. */

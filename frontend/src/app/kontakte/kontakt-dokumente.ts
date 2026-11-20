@@ -24,6 +24,7 @@ import {
 import { Dokumentart, Suchergebnis, Suchtreffer } from '../gemeinsam/api';
 import { AnzeigeTitel, TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { datum } from '../gemeinsam/format';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DOKUMENTE_GROESSE, seitenAnzahl } from './kontakt-logik';
 import { KontaktePort } from './kontakte-port';
@@ -34,7 +35,7 @@ import { KontaktePort } from './kontakte-port';
  */
 @Component({
   selector: 'app-kontakt-dokumente',
-  imports: [MatButtonModule, MatProgressBarModule, RouterLink, TitelAnzeige],
+  imports: [MatButtonModule, MatProgressBarModule, RouterLink, Symbol, TitelAnzeige],
   templateUrl: './kontakt-dokumente.html',
   styleUrls: ['./kontakte-gemeinsam.scss', './kontakt-dokumente.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,

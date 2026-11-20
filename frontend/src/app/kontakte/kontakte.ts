@@ -28,6 +28,7 @@ import {
   tap,
 } from 'rxjs';
 import { KontaktEintrag, KontaktListe } from '../gemeinsam/api';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import {
   LISTE_GROESSE,
@@ -56,7 +57,7 @@ const VERZOEGERUNG_MS = 300;
  */
 @Component({
   selector: 'app-kontakte',
-  imports: [MatButtonModule, MatProgressBarModule, RouterLink],
+  imports: [MatButtonModule, MatProgressBarModule, RouterLink, Symbol],
   templateUrl: './kontakte.html',
   styleUrls: ['./kontakte-gemeinsam.scss', './kontakte.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -184,8 +185,9 @@ export class Kontakte {
     this.navigieren({ ...this.filter(), ...teil }, false);
   }
 
+  /** Setzt die Filterleiste zurück; Suchbegriff und Status der Kopfzeile bleiben. */
   protected zuruecksetzen(): void {
-    this.navigieren({ ...LEERER_FILTER, q: this.filter().q }, false);
+    this.navigieren({ ...LEERER_FILTER, q: this.filter().q, status: this.filter().status }, false);
   }
 
   protected blaettern(richtung: -1 | 1): void {
@@ -212,15 +214,15 @@ export class Kontakte {
     return ortZeile(k);
   }
 
-  protected marken(k: KontaktEintrag): { text: string; inaktiv: boolean }[] {
+  protected marken(k: KontaktEintrag): { text: string; art: 'inaktiv' | 'herkunft' | 'export' }[] {
     const t = this.texte;
     return [
-      ...(k.aktiv === false ? [{ text: t.kennzeichenInaktiv, inaktiv: true }] : []),
+      ...(k.aktiv === false ? [{ text: t.kennzeichenInaktiv, art: 'inaktiv' as const }] : []),
       {
         text: k.quelle === 'CSV_IMPORT' ? t.kennzeichenImport : t.kennzeichenManuell,
-        inaktiv: false,
+        art: 'herkunft' as const,
       },
-      ...(k.nichtImExport ? [{ text: t.kennzeichenNichtImExport, inaktiv: false }] : []),
+      ...(k.nichtImExport ? [{ text: t.kennzeichenNichtImExport, art: 'export' as const }] : []),
     ];
   }
 
