@@ -60,7 +60,7 @@ dd {
   border: 1px solid var(--urinet-linie);
   border-radius: 8px;
   background-color: var(--urinet-karte);
-  color: var(--urinet-gelb);
+  color: var(--akzent-text);
   font-weight: 600;
   text-align: center;
 }
@@ -78,7 +78,7 @@ dd {
 }
 
 .hinweis {
-  color: var(--urinet-gelb);
+  color: var(--akzent-text);
 }
 
 .fehler {
@@ -90,7 +90,7 @@ dd {
 }
 
 .meldung {
-  color: var(--urinet-gelb);
+  color: var(--akzent-text);
 }
 
 .aktionen.oben {
