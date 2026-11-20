@@ -6,6 +6,7 @@ import ch.urinet.archiv.wissen.domain.WissensStufe;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,6 +38,11 @@ public class PanacheWissenHuelleRepository implements WissenHuelleRepository {
 
     @Override
     public WissensGraph graphLaden() {
+        return graphLaden(Set.of());
+    }
+
+    @Override
+    public WissensGraph graphLaden(Set<UUID> weitereDokumente) {
         Map<UUID, Set<UUID>> dokumenteJeSeite = new HashMap<>();
         Map<UUID, Set<UUID>> quellseitenJeSeite = new HashMap<>();
         for (Object[] zeile : zeilen("select seite_id, dokument_id, quell_seite_id from wissensseite_quelle")) {
@@ -60,9 +66,15 @@ public class PanacheWissenHuelleRepository implements WissenHuelleRepository {
                     case when coalesce(d.bestaetigt is null or d.vertraulichkeit <> 'NORMAL', true)
                          then 'INTERN' else 'NORMAL' end
                 from dokument d
-                join wissensseite_quelle q on q.dokument_id = d.id
-                """;
-        for (Object[] zeile : zeilen(dokumentStufenSql)) {
+                where exists (select 1 from wissensseite_quelle q where q.dokument_id = d.id)
+                """ + (weitereDokumente.isEmpty() ? "" : " or d.id in (:weitereDokumente)");
+        Query abfrage = entityManager().createNativeQuery(dokumentStufenSql);
+        if (!weitereDokumente.isEmpty()) {
+            abfrage.setParameter("weitereDokumente", weitereDokumente);
+        }
+        @SuppressWarnings("unchecked")
+        List<Object[]> dokumentZeilen = abfrage.getResultList();
+        for (Object[] zeile : dokumentZeilen) {
             dokumentStufen.put(uuid(zeile[0]), WissensStufe.valueOf((String) zeile[1]));
         }
 
