@@ -9,6 +9,7 @@ import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfigBuilder;
 import org.testcontainers.Testcontainers;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.MountableFile;
 
@@ -29,15 +30,24 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
 
     static final String ADMIN = "admin";
     static final String ADMIN_PASSWORT = "admin-nur-test";
+    static final String VERWALTUNG_TESTWERT = "verwaltung-nur-testwert";
     static String basisUrl;
+    static String mailpitUrl;
     static OidcTestIdp oidcTestIdp;
 
     private GenericContainer<?> keycloak;
+    private GenericContainer<?> mailpit;
+    private Network netz;
     private Path exportTemporaer;
 
     @Override
     public Map<String, String> start() {
         Path export = Path.of(System.getProperty("archiv.realm-export", "../deploy/keycloak/realm-export.json"));
+        netz = Network.newNetwork();
+        mailpit = new GenericContainer<>("axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce")
+                .withNetwork(netz).withNetworkAliases("mailpit").withExposedPorts(8025);
+        mailpit.start();
+        mailpitUrl = "http://" + mailpit.getHost() + ":" + mailpit.getMappedPort(8025);
         try {
             oidcTestIdp = new OidcTestIdp();
             oidcTestIdp.start();
@@ -47,10 +57,12 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
             throw new UncheckedIOException(e);
         }
         keycloak = new GenericContainer<>(image())
+                .withNetwork(netz)
                 .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN)
                 .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
                 .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
                 .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
+                .withEnv("KEYCLOAK_VERWALTUNG_SECRET", VERWALTUNG_TESTWERT)
                 .withCopyFileToContainer(MountableFile.forHostPath(exportTemporaer.toAbsolutePath()),
                         "/opt/keycloak/data/import/realm-export.json")
                 .withCommand("start-dev", "--import-realm")
@@ -66,6 +78,12 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
     public void stop() {
         if (keycloak != null) {
             keycloak.stop();
+        }
+        if (mailpit != null) {
+            mailpit.stop();
+        }
+        if (netz != null) {
+            netz.close();
         }
         if (oidcTestIdp != null) {
             oidcTestIdp.close();
@@ -99,6 +117,9 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
     private Path exportMitOidcTestIdp(Path quelle) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode realm = (ObjectNode) mapper.readTree(quelle.toFile());
+        realm.set("smtpServer", mapper.valueToTree(Map.of("host", "mailpit", "port", "1025",
+                "from", "archiv@example.invalid", "fromDisplayName", "UriNet Archiv",
+                "auth", "false", "ssl", "false", "starttls", "false")));
         ArrayNode provider = realm.withArray("identityProviders");
         for (int i = provider.size() - 1; i >= 0; i--) {
             if ("archiv-test-oidc".equals(provider.get(i).path("alias").asText())) {

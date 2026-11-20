@@ -613,6 +613,18 @@
       },
       "protocolMappers": [
         {
+          "name": "auth_time",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "AUTH_TIME",
+            "claim.name": "auth_time",
+            "jsonType.label": "long",
+            "access.token.claim": "true"
+          }
+        },
+        {
           "name": "mandant",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",

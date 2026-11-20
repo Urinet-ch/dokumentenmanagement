@@ -16,8 +16,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der Realm-Export enthält keine Benutzer und keine Secrets ausser dem festgelegten Google-Platzhalter; der Test-Realm
- * ist der Export plus Testanteile (Benutzer, Clients {@code archiv-test*}, localhost für {@code archiv-pwa}).
+ * Der Realm-Export enthält nur das Dienstkonto und festgelegte Secret-Platzhalter; der Test-Realm ist der Export
+ * plus Testanteile (Benutzer, Clients {@code archiv-test*}, localhost für {@code archiv-pwa}).
  */
 class RealmExportTest {
 
@@ -31,7 +31,7 @@ class RealmExportTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @Test
-    void exportOhneBenutzerUndOhneSecrets() throws IOException {
+    void exportOhnePersonenUndOhneSecrets() throws IOException {
         JsonNode export = JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile());
         JsonNode google = export.path("identityProviders").path(0);
         assertThat(export.path("identityProviders").size()).isEqualTo(1);
@@ -47,17 +47,55 @@ class RealmExportTest {
         assertThat(google.path("config").path("clientSecret").asText()).isEqualTo("${GOOGLE_CLIENT_SECRET}");
         assertThat(google.path("mappers").isMissingNode()).isTrue();
 
-        JsonNode exportOhneIdp = export.deepCopy();
-        ((ObjectNode) exportOhneIdp).remove("identityProviders");
-        assertThat(heikleFelder(exportOhneIdp)).as("Benutzer oder Secrets im Realm-Export").isEmpty();
+        JsonNode verwaltung = client(export, "archiv-verwaltung");
+        assertThat(verwaltung.path("secret").asText()).isEqualTo("${KEYCLOAK_VERWALTUNG_SECRET}");
+        assertThat(verwaltung.path("publicClient").asBoolean(true)).isFalse();
+        assertThat(verwaltung.path("bearerOnly").asBoolean(true)).isFalse();
+        assertThat(verwaltung.path("serviceAccountsEnabled").asBoolean()).isTrue();
+        assertThat(verwaltung.path("standardFlowEnabled").asBoolean(true)).isFalse();
+        assertThat(verwaltung.path("implicitFlowEnabled").asBoolean(true)).isFalse();
+        assertThat(verwaltung.path("directAccessGrantsEnabled").asBoolean(true)).isFalse();
+        assertThat(verwaltung.path("defaultClientScopes")).extracting(JsonNode::asText).contains("kc-admin-api", "roles");
+        assertThat(export.path("users")).hasSize(1);
+        JsonNode dienstkonto = export.path("users").get(0);
+        assertThat(dienstkonto.path("serviceAccountClientId").asText()).isEqualTo("archiv-verwaltung");
+        assertThat(dienstkonto.path("username").asText()).isEqualTo("service-account-archiv-verwaltung");
+        assertThat(dienstkonto.path("clientRoles").size()).isEqualTo(1);
+        assertThat(dienstkonto.path("clientRoles").path("realm-management")).extracting(JsonNode::asText)
+                .containsExactlyInAnyOrder("query-users", "view-users", "manage-users");
+        assertThat(dienstkonto.has("realmRoles")).isFalse();
+        ObjectNode bereinigt = export.deepCopy();
+        bereinigt.remove("identityProviders");
+        ((ObjectNode) client(bereinigt, "archiv-verwaltung")).remove("secret");
+        ((ObjectNode) bereinigt.path("users").get(0)).remove("clientRoles");
+        ArrayNode konten = (ArrayNode) bereinigt.remove("users");
+        assertThat(heikleFelder(konten)).isEmpty();
+        assertThat(heikleFelder(bereinigt)).as("Personen oder Secrets im Realm-Export").isEmpty();
         for (JsonNode client : export.path("clients")) {
-            boolean ohneSecret = client.path("publicClient").asBoolean() || client.path("bearerOnly").asBoolean();
+            boolean ohneSecret = client.path("publicClient").asBoolean() || client.path("bearerOnly").asBoolean()
+                    || "archiv-verwaltung".equals(client.path("clientId").asText());
             assertThat(ohneSecret).as(client.path("clientId").asText()).isTrue();
         }
         assertThat(export.toString()).doesNotContain("localhost");
         assertThat(export.path("eventsEnabled").asBoolean()).isTrue();
         assertThat(export.path("adminEventsEnabled").asBoolean()).isTrue();
         assertThat(export.path("adminEventsDetailsEnabled").asBoolean()).isFalse();
+        assertThat(export.path("eventsExpiration").asInt()).isEqualTo(400 * 24 * 60 * 60);
+        assertThat(export.path("accessTokenLifespan").asInt()).isEqualTo(300);
+        assertThat(export.path("actionTokenGeneratedByAdminLifespan").asInt()).isEqualTo(86400);
+        assertThat(export.path("passwordPolicy").asText()).isEqualTo("length(12) and notUsername and notEmail");
+        List<JsonNode> mapper = new ArrayList<>();
+        client(export, "archiv-pwa").path("protocolMappers").forEach(k -> {
+            if ("auth_time".equals(k.path("name").asText())) {
+                mapper.add(k);
+            }
+        });
+        assertThat(mapper).hasSize(1);
+        assertThat(mapper.getFirst().path("protocolMapper").asText()).isEqualTo("oidc-usersessionmodel-note-mapper");
+        assertThat(mapper.getFirst().path("config").path("user.session.note").asText()).isEqualTo("AUTH_TIME");
+        assertThat(mapper.getFirst().path("config").path("claim.name").asText()).isEqualTo("auth_time");
+        assertThat(mapper.getFirst().path("config").path("jsonType.label").asText()).isEqualTo("long");
+        assertThat(mapper.getFirst().path("config").path("access.token.claim").asText()).isEqualTo("true");
         assertThat(export.path("enabledEventTypes"))
                 .extracting(JsonNode::asText)
                 .contains("LOGIN_ERROR", "IDENTITY_PROVIDER_LOGIN", "IDENTITY_PROVIDER_LOGIN_ERROR",
@@ -91,7 +129,18 @@ class RealmExportTest {
     void testRealmIstExportPlusTestanteile() throws IOException {
         ObjectNode test = (ObjectNode) JSON.readTree(KEYCLOAK.resolve("realm-test.json").toFile());
         assertThat(test.path("users")).isNotEmpty();
-        test.remove("users");
+        assertThat(test.path("smtpServer").path("host").asText()).isEqualTo("mailpit");
+        assertThat(test.path("smtpServer").path("port").asText()).isEqualTo("1025");
+        test.remove("smtpServer");
+        ObjectNode verwaltung = (ObjectNode) client(test, "archiv-verwaltung");
+        assertThat(verwaltung.path("secret").asText()).isEqualTo(ExportKeycloak.VERWALTUNG_TESTWERT);
+        verwaltung.put("secret", "${KEYCLOAK_VERWALTUNG_SECRET}");
+        ArrayNode benutzer = (ArrayNode) test.path("users");
+        for (int i = benutzer.size() - 1; i >= 0; i--) {
+            if (!"archiv-verwaltung".equals(benutzer.get(i).path("serviceAccountClientId").asText())) {
+                benutzer.remove(i);
+            }
+        }
         ArrayNode clients = (ArrayNode) test.path("clients");
         for (int i = clients.size() - 1; i >= 0; i--) {
             JsonNode client = clients.get(i);
@@ -142,6 +191,17 @@ class RealmExportTest {
         List<String> funde = new ArrayList<>();
         durchsuchen(wurzel, "$", funde);
         return funde;
+    }
+
+    private static JsonNode client(JsonNode realm, String clientId) {
+        List<JsonNode> treffer = new ArrayList<>();
+        realm.path("clients").forEach(client -> {
+            if (clientId.equals(client.path("clientId").asText())) {
+                treffer.add(client);
+            }
+        });
+        assertThat(treffer).hasSize(1);
+        return treffer.getFirst();
     }
 
     private static void durchsuchen(JsonNode knoten, String pfad, List<String> funde) {

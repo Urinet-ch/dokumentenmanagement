@@ -1,6 +1,8 @@
 package ch.urinet.archiv.sicherheit;
 
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -140,10 +143,64 @@ class RealmExportKeycloakTest {
         Map<String, Object> realm = adminGet(REALM).as(Map.class);
         assertThat(realm.get("eventsEnabled")).isEqualTo(true);
         assertThat(realm.get("adminEventsEnabled")).isEqualTo(true);
+        assertThat(realm.get("adminEventsDetailsEnabled")).isEqualTo(false);
+        assertThat(realm.get("eventsExpiration")).isEqualTo(34560000);
+        assertThat(realm.get("accessTokenLifespan")).isEqualTo(300);
+        assertThat(realm.get("actionTokenGeneratedByAdminLifespan")).isEqualTo(86400);
+        assertThat(realm.get("passwordPolicy")).isEqualTo("length(12) and notUsername and notEmail");
         assertThat((List<String>) realm.get("enabledEventTypes"))
                 .contains("LOGIN_ERROR", "IDENTITY_PROVIDER_LOGIN", "IDENTITY_PROVIDER_LOGIN_ERROR",
                         "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR", "FEDERATED_IDENTITY_LINK",
                         "REMOVE_FEDERATED_IDENTITY");
+    }
+
+    @Test
+    @Order(2)
+    void verwaltungDienstkontoHatNurVorgeseheneRechte() throws Exception {
+        String client = clientId("archiv-verwaltung");
+        String konto = adminGet(REALM + "/clients/{id}/service-account-user", client).path("id");
+        String realmManagement = clientId("realm-management");
+        List<String> rollen = adminGet(REALM + "/users/{user}/role-mappings/clients/{client}", konto, realmManagement)
+                .jsonPath().getList("name");
+        assertThat(rollen).containsExactlyInAnyOrder("query-users", "view-users", "manage-users");
+        assertThat(adminGet(REALM + "/users/{user}/role-mappings/realm", konto).jsonPath().<String>getList("name"))
+                .doesNotContain("realm-admin");
+
+        String token = given().formParam("grant_type", "client_credentials")
+                .formParam("client_id", "archiv-verwaltung")
+                .formParam("client_secret", ExportKeycloak.VERWALTUNG_TESTWERT)
+                .post(realmUrl() + "/protocol/openid-connect/token")
+                .then().statusCode(200).extract().path("access_token");
+        JsonNode claims = new ObjectMapper().readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
+        assertThat(claims.path("scope").asText()).contains("kc-admin-api");
+        assertThat(claims.path("resource_access").path("realm-management").path("roles").toString())
+                .contains("query-users", "view-users", "manage-users")
+                .doesNotContain("realm-admin", "manage-realm", "manage-clients", "impersonation");
+        given().auth().oauth2(token).get(ExportKeycloak.basisUrl + REALM + "/users?max=1").then().statusCode(200);
+        given().auth().oauth2(token).get(ExportKeycloak.basisUrl + REALM + "/clients").then().statusCode(403);
+    }
+
+    @Test
+    @Order(2)
+    void einladungOhnePasswortErreichtMailpit() {
+        String name = "einladung-test";
+        Map<String, Object> benutzer = Map.of("username", name, "enabled", true,
+                "email", "einladung@example.invalid", "firstName", "Probe", "lastName", "Einladung",
+                "attributes", Map.of("mandant", List.of("urinet")));
+        given().auth().oauth2(admin).contentType(ContentType.JSON).body(benutzer)
+                .post(ExportKeycloak.basisUrl + REALM + "/users").then().statusCode(201);
+        String id = adminGet(REALM + "/users?exact=true&username={name}", name).path("[0].id");
+        try {
+            given().auth().oauth2(admin).contentType(ContentType.JSON)
+                    .body(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP"))
+                    .queryParam("lifespan", 86400)
+                    .put(ExportKeycloak.basisUrl + REALM + "/users/{id}/execute-actions-email", id)
+                    .then().statusCode(204);
+            given().queryParam("query", "to:einladung@example.invalid").get(ExportKeycloak.mailpitUrl + "/api/v1/search")
+                    .then().statusCode(200).body("total", org.hamcrest.Matchers.greaterThanOrEqualTo(1));
+        } finally {
+            loeschen("/users/" + id);
+        }
     }
 
     @Test
@@ -248,8 +305,8 @@ class RealmExportKeycloakTest {
     private static Map<String, Object> probeClient(String clientId, boolean mitAudience) {
         List<Map<String, Object>> mapper = mitAudience
                 ? List.of(Map.of("name", "audience-archiv-api", "protocol", "openid-connect",
-                        "protocolMapper", "oidc-audience-mapper",
-                        "config", Map.of("included.client.audience", "archiv-api", "access.token.claim", "true")))
+                    "protocolMapper", "oidc-audience-mapper",
+                    "config", Map.of("included.client.audience", "archiv-api", "access.token.claim", "true")))
                 : List.of();
         return Map.of("clientId", clientId, "enabled", true, "publicClient", true, "standardFlowEnabled", false,
                 "directAccessGrantsEnabled", true, "protocolMappers", mapper);

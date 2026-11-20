@@ -7,6 +7,15 @@
   "accessTokenLifespan": 300,
   "actionTokenGeneratedByAdminLifespan": 86400,
   "passwordPolicy": "length(12) and notUsername and notEmail",
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "archiv@example.invalid",
+    "fromDisplayName": "UriNet Archiv",
+    "auth": "false",
+    "ssl": "false",
+    "starttls": "false"
+  },
   "eventsEnabled": true,
   "eventsExpiration": 34560000,
   "eventsListeners": [],
@@ -584,7 +593,7 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "secret": "${KEYCLOAK_VERWALTUNG_SECRET}",
+      "secret": "verwaltung-nur-testwert",
       "defaultClientScopes": [
         "kc-admin-api",
         "roles"
@@ -614,6 +623,18 @@
         "post.logout.redirect.uris": "https://archiv.apps.urinet.ch/*##http://localhost:8080/*"
       },
       "protocolMappers": [
+        {
+          "name": "auth_time",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "AUTH_TIME",
+            "claim.name": "auth_time",
+            "jsonType.label": "long",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "mandant",
           "protocol": "openid-connect",
