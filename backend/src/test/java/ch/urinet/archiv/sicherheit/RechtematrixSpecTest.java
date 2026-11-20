@@ -27,6 +27,8 @@ class RechtematrixSpecTest {
 
     private static final Path REQUIREMENTS = Path.of("../.kiro/specs/01-archiv-kern/requirements.md");
     private static final Path WISSEN_REQUIREMENTS = Path.of("../.kiro/specs/04-wissensbasis/requirements.md");
+    private static final Path VERWALTUNG_REQUIREMENTS =
+            Path.of("../.kiro/specs/06-verwaltung-einstellungen-benutzer/requirements.md");
     private static final Pattern ZEILE = Pattern.compile("^\\| (A\\d+) \\|.*");
     private static final Pattern TRENNZEILE = Pattern.compile("^\\|( --- \\|)+$");
     private static final List<String> KOPF = List.of("Nr.", "Aktion", "`inhaber`", "`mitarbeiter`", "`treuhaender`",
@@ -37,8 +39,12 @@ class RechtematrixSpecTest {
         Map<Aktion, Map<Rolle, Ergebnis>> spec = new java.util.LinkedHashMap<>(
                 lesen(Files.readAllLines(REQUIREMENTS)));
         Map<Aktion, Map<Rolle, Ergebnis>> wissen = lesen(Files.readAllLines(WISSEN_REQUIREMENTS));
+        Map<Aktion, Map<Rolle, Ergebnis>> verwaltung = lesen(Files.readAllLines(VERWALTUNG_REQUIREMENTS));
         assertThat(spec.keySet()).doesNotContainAnyElementsOf(wissen.keySet());
+        assertThat(spec.keySet()).doesNotContainAnyElementsOf(verwaltung.keySet());
+        assertThat(wissen.keySet()).doesNotContainAnyElementsOf(verwaltung.keySet());
         spec.putAll(wissen);
+        spec.putAll(verwaltung);
 
         assertThat(spec.keySet()).containsExactly(Aktion.values());
         spec.forEach((aktion, zeile) -> zeile.forEach((rolle, ergebnis) ->
