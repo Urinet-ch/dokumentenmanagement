@@ -172,4 +172,13 @@ class WissensMarkdownTest {
         assertThat(zuTief.zuTief()).isTrue();
         assertThat(WissensMarkdown.analysieren("    Code mit [Klammer]", 20_000).zuTief()).isFalse();
     }
+
+    @Test
+    void geteilterSchluesselBleibtBeiAussageAusserhalbDesBlocksSichtbar() {
+        var analyse = WissensMarkdown.analysieren(
+                "> ⚠️ Widerspruch: A.[^a] B.[^b]\n\nWichtige Aussage.[^a]", 20_000);
+        assertThat(analyse.widersprueche()).singleElement()
+                .satisfies(b -> assertThat(b.fussnoten()).containsExactlyInAnyOrder("a", "b"));
+        assertThat(analyse.aussagen()).extracting(a -> a.fussnoten()).containsExactly(java.util.Set.of("a"));
+    }
 }

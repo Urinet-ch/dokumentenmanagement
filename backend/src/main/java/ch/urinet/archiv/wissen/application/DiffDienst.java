@@ -22,7 +22,9 @@ public class DiffDienst {
                        List<WissensMarkdown.Aussage> entfernteWidersprueche) {
         public Diff {
             zeilen = List.copyOf(zeilen);
-            entfernteWidersprueche = List.copyOf(entfernteWidersprueche);
+            // Altdaten (vor 14.3 als JSON gespeichert) kennen die beiden Komponenten nicht: null-sichere Vorgaben.
+            widersprueche = widersprueche == null ? new Feld<>(List.of(), List.of()) : widersprueche;
+            entfernteWidersprueche = entfernteWidersprueche == null ? List.of() : List.copyOf(entfernteWidersprueche);
         }
     }
 

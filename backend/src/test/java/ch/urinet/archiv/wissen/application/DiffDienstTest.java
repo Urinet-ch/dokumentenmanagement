@@ -27,6 +27,18 @@ class DiffDienstTest {
     }
 
     @Test
+    void altesDiffJsonOhneWiderspruchsfelderBleibtLesbar() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var diff = mapper.readValue(
+                "{\"zeilen\":[],\"titel\":{\"alt\":\"A\",\"neu\":\"B\"},\"beschreibung\":{\"alt\":null,\"neu\":\"x\"},"
+                        + "\"tags\":{\"alt\":[],\"neu\":[]},\"quellen\":{\"alt\":[],\"neu\":[]}}",
+                DiffDienst.Diff.class);
+        assertThat(diff.widersprueche().alt()).isEmpty();
+        assertThat(diff.widersprueche().neu()).isEmpty();
+        assertThat(diff.entfernteWidersprueche()).isEmpty();
+    }
+
+    @Test
     void zeilenUndGeaenderteFelderSindGetrenntErkennbar() {
         Quelleneintrag quelle = new Quelleneintrag("q1", UUID.randomUUID(), 1, 1, "Probe", null);
         DiffDienst.Diff diff = dienst.vergleichen(

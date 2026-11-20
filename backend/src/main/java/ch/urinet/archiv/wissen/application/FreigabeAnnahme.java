@@ -82,8 +82,19 @@ public class FreigabeAnnahme {
                 throw new FachFehler(Fehlercode.PFLICHTFELD_FEHLT);
             }
             entfernt = new HashSet<>(entfernt);
+            // Nur Schlüssel entschuldigen, die die Basis ausserhalb von Widerspruchsblöcken nicht nutzt;
+            // geteilte Schlüssel decken sonst die Entfernung einer normalen Aussage mit ab.
+            Set<String> ausserhalbBloecken = new HashSet<>();
+            for (var aussage : WissensMarkdown.analysieren(basisInhalt, WissensMarkdown.MAX_EINGABE_ZEICHEN)
+                    .aussagen()) {
+                ausserhalbBloecken.addAll(aussage.fussnoten());
+            }
             for (var block : aufgeloesteWidersprueche) {
-                entfernt.addAll(block.fussnoten());
+                for (String schluessel : block.fussnoten()) {
+                    if (!ausserhalbBloecken.contains(schluessel)) {
+                        entfernt.add(schluessel);
+                    }
+                }
             }
         }
         var gepruefterVorschlag = new FreigabeRepository.Vorschlag(entwurf, entfernt, vorschlag.kontextstufe(),
