@@ -86,12 +86,16 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Abhängig von: 17.4, 17.6_
 
 ## Welle 18 — Wirkung und Oberfläche
-- [ ] 18.1 KI aus der Konfiguration [Backend]
+- [x] 18.1 KI aus der Konfiguration [Backend]
   - Prompt und Antwortschema aus Arten, `ki_felder` und Klassifikationen, KI-Texte, Nachbearbeitung über
     Art-Attribute, Belegnummer-Muster aus den Arten mit Zeitgrenze zur Laufzeit (inkl. ReDoS-Test mit `(a+)+$` gegen langen
     Eingabetext: gilt als «trifft nicht zu» und landet im Protokoll; 17.3 prüft nur Syntax und Länge), Schalter `ki_freigegeben` und
     Admin-Kommando `ki-freigeben`, Snapshot-Test gegen den Stand von Spec 01, Aufgabe 3.2, Quelltext-Test ohne
     Art-Codes.
+  - Offen für Fabian: Probelauf-Betriebsart (design.md, Open Points); Auslegung der Gate-0-Darstellung der
+    Prompt-Kennung beim Basisschema und der Reihenfolge der Arten (Spec 01 design.md). Der Quelltext-Test deckt
+    ganz `src/main/java` ab, ausser `DokumentErfassen.ART_KORRESPONDENZ` (Mail-Eingang, Spec 02): Ableitung aus der
+    Konfiguration braucht ein neues Art-Attribut und ist offen.
   - _Anforderungen: 2.3, 2.4, 2.5, 2.9, 8.1, 8.2, 8.3, 8.4_
   - _Abhängig von: 17.7; Spec 01: 3.2_
 
@@ -109,7 +113,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 7.3, 7.4_
   - _Abhängig von: 17.7_
 
-- [ ] 18.4 Felder und Klassifikationen je Art im Eingangskorb und in der Detailansicht [Frontend]
+- [x] 18.4 Felder und Klassifikationen je Art im Eingangskorb und in der Detailansicht [Frontend]
   - Darstellung aus Zusatz-Schema und Klassifikationen der Art, Wechsel der Art, Warnungen aus Regeln, ungültige
     Werte nach Konfigurationsänderung.
   - _Anforderungen: 7.5_

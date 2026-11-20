@@ -147,7 +147,7 @@ class KiVorschlagHandlerFristTest {
             }
         };
         MetadatenExtraktion extraktion = new MetadatenExtraktion(null, (dokument, seiten) -> Optional.empty(),
-                seitenbild, null, null, null, null) {
+                seitenbild, null, null, null, null, null, null) {
             @Override
             public Optional<Vorschlag> vorschlagen(Eingabe eingabe) {
                 eingaben.add(eingabe);

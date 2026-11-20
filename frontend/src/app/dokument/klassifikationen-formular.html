@@ -1,0 +1,86 @@
+@if (felder().length > 0) {
+  <fieldset class="klassifikationen" [attr.data-test]="kennung()">
+    <legend>{{ texte.klassifikationen }}</legend>
+    @for (feld of felder(); track feld.code) {
+      @if (feld.mehrfach) {
+        <fieldset
+          class="klassifikation"
+          [attr.aria-describedby]="kennung() + '-' + feld.code + '-hinweis'"
+        >
+          <legend>
+            {{ feld.name }}
+            @if (feld.pflicht) {
+              <span aria-hidden="true"> *</span>
+            }
+          </legend>
+          @for (wert of optionen(feld); track wert.code) {
+            <label class="option">
+              <input
+                type="checkbox"
+                [value]="wert.code"
+                [checked]="gewaehlt(feld.code, wert.code)"
+                [disabled]="!darfWaehlen(feld, wert)"
+                [attr.aria-required]="feld.pflicht || null"
+                [attr.aria-invalid]="feldUngueltig(feld.code) || null"
+                (change)="umschalten(feld.code, wert.code, $event)"
+              />
+              <span>{{ wert.name }}</span>
+            </label>
+          }
+          <p class="hinweis" [id]="kennung() + '-' + feld.code + '-hinweis'">
+            @if (feld.pflicht) {
+              {{ texte.klassifikationPflicht }}
+            } @else if (!feld.aktiv) {
+              {{ texte.klassifikationInaktiv }}
+            } @else {
+              {{ texte.klassifikationOptional }}
+            }
+          </p>
+          @if (feldUngueltig(feld.code)) {
+            <p class="fehler" role="alert">{{ texte.klassifikationUngueltig(feld.name) }}</p>
+          }
+          @if (alteWerte(feld).length > 0) {
+            <p class="fehler" data-test="klassifikation-alt">
+              {{ texte.klassifikationAlteWerte(feld.name, alteWerte(feld).join(', ')) }}
+            </p>
+          }
+        </fieldset>
+      } @else {
+        <div class="feld">
+          <label [for]="kennung() + '-' + feld.code">
+            {{ feld.name }}
+            @if (feld.pflicht) {
+              <span aria-hidden="true"> *</span>
+            }
+          </label>
+          <select
+            [id]="kennung() + '-' + feld.code"
+            [value]="werte()[feld.code]?.[0] ?? ''"
+            [attr.aria-required]="feld.pflicht || null"
+            [attr.aria-invalid]="feldUngueltig(feld.code) || null"
+            (change)="einzelGeaendert(feld.code, $event)"
+          >
+            <option value=""></option>
+            @for (wert of optionen(feld); track wert.code) {
+              <option
+                [value]="wert.code"
+                [disabled]="!darfWaehlen(feld, wert)"
+                [selected]="wert.code === (werte()[feld.code]?.[0] ?? '')"
+              >
+                {{ wert.name }}
+              </option>
+            }
+          </select>
+          @if (feldUngueltig(feld.code)) {
+            <p class="fehler" role="alert">{{ texte.klassifikationUngueltig(feld.name) }}</p>
+          }
+          @if (alteWerte(feld).length > 0) {
+            <p class="fehler" data-test="klassifikation-alt">
+              {{ texte.klassifikationAlteWerte(feld.name, alteWerte(feld).join(', ')) }}
+            </p>
+          }
+        </div>
+      }
+    }
+  </fieldset>
+}

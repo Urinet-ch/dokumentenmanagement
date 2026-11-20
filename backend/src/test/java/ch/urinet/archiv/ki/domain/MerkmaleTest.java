@@ -6,15 +6,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MerkmaleTest {
 
     private static final Merkmale.Frist OHNE_GRENZE = new Merkmale.Frist(Duration.ofDays(1), System::nanoTime);
-    private static final List<Pattern> MUSTER = List.of(Pattern.compile("^\\d{4}-\\d{3}$"),
-            Pattern.compile("^O-\\d{4}-\\d{3}$"));
+    private static final List<String> MUSTER = List.of("^\\d{4}-\\d{3}$", "^O-\\d{4}-\\d{3}$");
 
     @Test
     void erkenntIbanMitLeerzeichenUidEmailUndMuster() {
@@ -61,7 +59,20 @@ class MerkmaleTest {
                 frist);
 
         assertThat(e.merkmale().muster()).isEmpty();
-        assertThat(e.abgebrochen()).containsExactly(0, 1);
+        assertThat(e.abgebrochen()).containsExactly(1, 2);
+    }
+
+    @Test
+    @org.junit.jupiter.api.Timeout(10)
+    void abgebrochenesMusterBeendetDiePruefungDerWeiterenMusterNicht() {
+        List<String> muster = List.of("^(.*a){20}$", "^a+!$");
+        Merkmale.Frist frist = Merkmale.Frist.cpu(Duration.ofMillis(100));
+
+        Merkmale.Ergebnis ergebnis = Merkmale.erkennen("a".repeat(28) + "!", Optional.empty(), null, List.of(),
+                muster, frist);
+
+        assertThat(ergebnis.abgebrochen()).containsExactly(1);
+        assertThat(ergebnis.merkmale().muster()).containsExactly("^a+!$");
     }
 
     @Test

@@ -40,7 +40,8 @@ public class KonfigurationKommando {
             Aufruf: archiv mandant konfiguration exportieren <code> [<datei>] [--json]
                    archiv mandant konfiguration pruefen     <code> <datei> [--json]
                    archiv mandant konfiguration vergleichen <code> <datei> [--json]
-                   archiv mandant konfiguration einspielen  <code> <datei> --wer <name> --grund <text> [--json]""";
+                   archiv mandant konfiguration einspielen  <code> <datei> --wer <name> --grund <text> [--json]
+                   archiv mandant konfiguration ki-freigeben <code> --wer <name> --abnahme <verweis> [--json]""";
     private static final int DATEI_MAX = 1024 * 1024;
     private static final int TECHNISCHER_FEHLER = 3;
     private static final Logger LOG = Logger.getLogger(KonfigurationKommando.class);
@@ -57,11 +58,14 @@ public class KonfigurationKommando {
     }
 
     enum Operation {
-        EXPORTIEREN, PRUEFEN, VERGLEICHEN, EINSPIELEN
+        EXPORTIEREN, PRUEFEN, VERGLEICHEN, EINSPIELEN, KI_FREIGEBEN
     }
 
     record Aufruf(Operation operation, MandantCode mandant, Optional<Path> datei, String wer, String grund,
-                  boolean json) {
+                  String abnahme, boolean json) {
+    }
+
+    record FreigabeAusgabe(int version, boolean kiFreigegeben) {
     }
 
     record AnalyseAusgabe(int aktuelleVersion, Integer basisVersion, boolean gueltig,
@@ -87,6 +91,7 @@ public class KonfigurationKommando {
             case "pruefen" -> Operation.PRUEFEN;
             case "vergleichen" -> Operation.VERGLEICHEN;
             case "einspielen" -> Operation.EINSPIELEN;
+            case "ki-freigeben" -> Operation.KI_FREIGEBEN;
             default -> null;
         };
         if (operation == null) {
@@ -101,25 +106,28 @@ public class KonfigurationKommando {
 
         int index = 2;
         Optional<Path> datei = Optional.empty();
-        if (operation == Operation.EXPORTIEREN) {
-            if (index < argumente.size() && !argumente.get(index).startsWith("--")) {
+        if (operation != Operation.KI_FREIGEBEN) {
+            if (operation == Operation.EXPORTIEREN) {
+                if (index < argumente.size() && !argumente.get(index).startsWith("--")) {
+                    datei = pfad(argumente.get(index++));
+                    if (datei.isEmpty()) {
+                        return Optional.empty();
+                    }
+                }
+            } else {
+                if (index >= argumente.size() || argumente.get(index).startsWith("--")) {
+                    return Optional.empty();
+                }
                 datei = pfad(argumente.get(index++));
                 if (datei.isEmpty()) {
                     return Optional.empty();
                 }
             }
-        } else {
-            if (index >= argumente.size() || argumente.get(index).startsWith("--")) {
-                return Optional.empty();
-            }
-            datei = pfad(argumente.get(index++));
-            if (datei.isEmpty()) {
-                return Optional.empty();
-            }
         }
 
         String wer = null;
         String grund = null;
+        String abnahme = null;
         boolean maschinenlesbar = false;
         while (index < argumente.size()) {
             String option = argumente.get(index++);
@@ -131,7 +139,13 @@ public class KonfigurationKommando {
                     maschinenlesbar = true;
                 }
                 case "--wer", "--grund" -> {
-                    if (operation != Operation.EINSPIELEN || index >= argumente.size()) {
+                    boolean erlaubt = option.equals("--wer")
+                            ? operation == Operation.EINSPIELEN || operation == Operation.KI_FREIGEBEN
+                            : operation == Operation.EINSPIELEN;
+                    if (!erlaubt) {
+                        return Optional.empty();
+                    }
+                    if (index >= argumente.size()) {
                         return Optional.empty();
                     }
                     String wert = argumente.get(index++);
@@ -152,6 +166,17 @@ public class KonfigurationKommando {
                         grund = wert;
                     }
                 }
+                case "--abnahme" -> {
+                    if (operation != Operation.KI_FREIGEBEN || index >= argumente.size() || abnahme != null) {
+                        return Optional.empty();
+                    }
+                    String wert = argumente.get(index++);
+                    if (wert.isBlank() || wert.startsWith("--") || wert.codePointCount(0, wert.length()) > 1000
+                            || wert.codePoints().anyMatch(Character::isISOControl)) {
+                        return Optional.empty();
+                    }
+                    abnahme = wert;
+                }
                 default -> {
                     return Optional.empty();
                 }
@@ -160,7 +185,10 @@ public class KonfigurationKommando {
         if (operation == Operation.EINSPIELEN && (wer == null || grund == null)) {
             return Optional.empty();
         }
-        return Optional.of(new Aufruf(operation, mandant, datei, wer, grund, maschinenlesbar));
+        if (operation == Operation.KI_FREIGEBEN && (wer == null || abnahme == null)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Aufruf(operation, mandant, datei, wer, grund, abnahme, maschinenlesbar));
     }
 
     public static boolean gueltig(List<String> argumente) {
@@ -180,6 +208,7 @@ public class KonfigurationKommando {
                 case PRUEFEN -> analysieren(aufruf, aus, true);
                 case VERGLEICHEN -> analysieren(aufruf, aus, false);
                 case EINSPIELEN -> einspielen(aufruf, aus);
+                case KI_FREIGEBEN -> kiFreigeben(aufruf, aus);
             };
         } catch (FachFehler e) {
             fehler.printf("%s: %s%n", e.code(), e.getMessage());
@@ -267,6 +296,18 @@ public class KonfigurationKommando {
             aus.printf("Konfiguration eingespielt: Version %d, %d Änderung(en)%n",
                     ergebnis.version(), ergebnis.aenderungen().size());
             ergebnis.aenderungen().forEach(aenderung -> aenderungAusgeben(aus, aenderung));
+        }
+        return 0;
+    }
+
+    private int kiFreigeben(Aufruf aufruf, PrintStream aus) throws IOException {
+        int version = kontext.mit(aufruf.mandant(), () -> verwaltung.kiFreigeben("betreiber:" + aufruf.wer(),
+                aufruf.abnahme()));
+        if (aufruf.json()) {
+            aus.println(json.writeValueAsString(new FreigabeAusgabe(version, true)));
+        } else {
+            aus.printf("KI für Mandant %s freigegeben: Konfigurationsversion %d%n",
+                    aufruf.mandant().wert(), version);
         }
         return 0;
     }

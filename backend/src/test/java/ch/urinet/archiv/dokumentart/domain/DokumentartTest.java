@@ -68,6 +68,15 @@ class DokumentartTest {
                 Dokumentart.OHNE_ZUSATZ, Vertraulichkeit.NORMAL, Aufbewahrungsregel.UNBEFRISTET, false, true));
     }
 
+    @Test
+    void kiHinweisDarfBewusstLeerSein() {
+        Dokumentart art = new Dokumentart("SPENDE", "Spende", null, List.of("frei"), List.of("titel"),
+                Dokumentart.OHNE_ZUSATZ, Vertraulichkeit.NORMAL, Aufbewahrungsregel.UNBEFRISTET, false, true, false,
+                List.of(), null, null, true, List.of(), "", 0);
+
+        assertThat(art.kiHinweise()).isEmpty();
+    }
+
     private static Dokumentart art(String code, List<String> gruppen, List<String> pflichtfelder) {
         return new Dokumentart(code, " Spende ", null, gruppen, pflichtfelder, Dokumentart.OHNE_ZUSATZ,
                 Vertraulichkeit.NORMAL, new Aufbewahrungsregel(10, AufbewahrungAb.GESCHAEFTSJAHR), false, true);
