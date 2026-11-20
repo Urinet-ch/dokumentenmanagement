@@ -1,99 +1,140 @@
-<h1>{{ texte.titel }}</h1>
-<p>{{ texte.einleitung }}</p>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ texte.vorzeile }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
 
-<section class="karte anfordern" aria-labelledby="anfordern-titel">
-  <h2 id="anfordern-titel">{{ texte.anfordernTitel }}</h2>
-  <label class="feld">
-    <span>{{ texte.jahr }}</span>
-    <input
-      type="number"
-      inputmode="numeric"
-      [min]="min"
-      [max]="max"
-      step="1"
-      [value]="jahr() ?? ''"
-      [disabled]="laeuft()"
-      (input)="jahrSetzen($any($event.target).value)"
-      aria-describedby="jahr-hinweis"
-      data-test="jahr"
-    />
-  </label>
-  <p id="jahr-hinweis" class="hinweis">{{ texte.jahrHinweis }}</p>
-  <button mat-flat-button type="button" (click)="anfordern()" [disabled]="laeuft() || !jahrOk()">
-    {{ texte.anfordern }}
-  </button>
-  <p class="status" role="status" aria-live="polite">{{ meldung() }}</p>
-  @if (fehler()) {
-    <p class="fehler" role="alert">{{ fehler() }}</p>
-  }
-</section>
-
-<section aria-labelledby="liste-titel">
-  <h2 id="liste-titel">{{ texte.liste }}</h2>
-  @if (downloadFehler()) {
-    <p class="fehler" role="alert">{{ downloadFehler() }}</p>
-  }
-  @if (listeFehler()) {
-    <p class="fehler" role="alert">{{ listeFehler() }}</p>
-  }
-  @if (liste() === null) {
-    @if (!listeFehler()) {
-      <p>{{ texte.laden }}</p>
+<div class="raster">
+  <section class="karte anfordern" aria-labelledby="anfordern-titel">
+    <h2 id="anfordern-titel">{{ texte.anfordernTitel }}</h2>
+    <div class="formular">
+      <label class="feld">
+        <span>{{ texte.jahr }}</span>
+        <input
+          type="number"
+          inputmode="numeric"
+          [min]="min"
+          [max]="max"
+          step="1"
+          [value]="jahr() ?? ''"
+          [disabled]="laeuft()"
+          (input)="jahrSetzen($any($event.target).value)"
+          aria-describedby="jahr-hinweis"
+          data-test="jahr"
+        />
+      </label>
+      <button
+        mat-flat-button
+        type="button"
+        (click)="anfordern()"
+        [disabled]="laeuft() || !jahrOk()"
+      >
+        <app-symbol name="export" />
+        {{ texte.anfordern }}
+      </button>
+    </div>
+    <p id="jahr-hinweis" class="hinweis">{{ texte.jahrHinweis }}</p>
+    <p class="status" role="status" aria-live="polite">{{ meldung() }}</p>
+    @if (fehler()) {
+      <p class="fehler" role="alert">{{ fehler() }}</p>
     }
-  } @else if (liste()!.length === 0) {
-    <p>{{ texte.keine }}</p>
-  } @else {
-    <ul class="exporte">
-      @for (eintrag of liste(); track eintrag.id) {
-        <li class="karte eintrag" data-test="export">
-          <span class="kopf">
-            <span>{{ texte.zeile(eintrag.geschaeftsjahr, zeit(eintrag.erstellt)) }}</span>
-            <span class="marke" [attr.data-status]="eintrag.status">{{
-              texte.status[eintrag.status]
-            }}</span>
+    @if (offen(); as eintrag) {
+      <div class="laufend">
+        <app-symbol name="uhr" />
+        <div class="tx">
+          <span>{{ texte.inArbeit(eintrag.geschaeftsjahr) }}</span>
+          <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.fortschritt" />
+        </div>
+      </div>
+    }
+
+    <h3>{{ texte.inhaltTitel }}</h3>
+    <ul class="liste inhalt">
+      @for (teil of inhalt; track teil.name) {
+        <li>
+          <span class="ic"><app-symbol [name]="teil.symbol" /></span>
+          <span class="tx">
+            <b
+              ><code>{{ teil.name }}</code></b
+            >
+            <small>{{ teil.text }}</small>
           </span>
-          @switch (eintrag.status) {
-            @case ('FERTIG') {
-              <span class="angaben">
-                {{
-                  texte.fertigZeile(
-                    zahl(eintrag.anzahl),
-                    groesse(eintrag.groesse ?? 0),
-                    zeit(eintrag.gueltigBis)
-                  )
-                }}
-              </span>
-              <span class="pruefsumme"
-                >{{ texte.pruefsumme }}: <code>{{ eintrag.sha256 }}</code></span
-              >
-              <button mat-stroked-button type="button" (click)="herunterladen(eintrag)">
-                {{ texte.herunterladen(eintrag.geschaeftsjahr) }}
-              </button>
-            }
-            @case ('ABGELAUFEN') {
-              <span class="angaben">{{ texte.abgelaufenHinweis }}</span>
-            }
-            @case ('FEHLER') {
-              <span class="angaben" data-test="fehler-art">{{ fehlerArtText(eintrag) }}</span>
-              @if (eintrag.fehlerId) {
-                <span class="pruefsumme"
-                  >{{ texte.fehlerId }}:
-                  <code data-test="fehler-id">{{ eintrag.fehlerId }}</code></span
-                >
-              }
-              <button
-                mat-stroked-button
-                type="button"
-                (click)="erneutAnfordern(eintrag)"
-                [disabled]="laeuft()"
-                [attr.aria-label]="texte.erneutAnfordernFuer(eintrag.geschaeftsjahr)"
-              >
-                {{ texte.erneutAnfordern }}
-              </button>
-            }
-          }
         </li>
       }
     </ul>
-  }
-</section>
+  </section>
+
+  <section class="karte bisher" aria-labelledby="liste-titel">
+    <h2 id="liste-titel">{{ texte.liste }}</h2>
+    @if (downloadFehler()) {
+      <p class="fehler" role="alert">{{ downloadFehler() }}</p>
+    }
+    @if (listeFehler()) {
+      <p class="fehler" role="alert">{{ listeFehler() }}</p>
+    }
+    @if (liste() === null) {
+      @if (!listeFehler()) {
+        <p class="hinweis">{{ texte.laden }}</p>
+      }
+    } @else if (liste()!.length === 0) {
+      <p class="hinweis">{{ texte.keine }}</p>
+    } @else {
+      <ul class="liste exporte">
+        @for (eintrag of liste(); track eintrag.id) {
+          <li class="eintrag" data-test="export">
+            <span class="ic"><app-symbol name="export" /></span>
+            <span class="tx">
+              <span class="kopf">
+                <b>{{ texte.zeile(eintrag.geschaeftsjahr, zeit(eintrag.erstellt)) }}</b>
+                <span class="marke" [attr.data-status]="eintrag.status">{{
+                  texte.status[eintrag.status]
+                }}</span>
+              </span>
+              @switch (eintrag.status) {
+                @case ('FERTIG') {
+                  <small class="angaben">
+                    {{
+                      texte.fertigZeile(
+                        zahl(eintrag.anzahl),
+                        groesse(eintrag.groesse ?? 0),
+                        zeit(eintrag.gueltigBis)
+                      )
+                    }}
+                  </small>
+                  <small class="pruefsumme"
+                    >{{ texte.pruefsumme }}: <code>{{ eintrag.sha256 }}</code></small
+                  >
+                  <button mat-stroked-button type="button" (click)="herunterladen(eintrag)">
+                    <app-symbol name="herunterladen" />
+                    {{ texte.herunterladen(eintrag.geschaeftsjahr) }}
+                  </button>
+                }
+                @case ('ABGELAUFEN') {
+                  <small class="angaben">{{ texte.abgelaufenHinweis }}</small>
+                }
+                @case ('FEHLER') {
+                  <small class="angaben" data-test="fehler-art">{{ fehlerArtText(eintrag) }}</small>
+                  @if (eintrag.fehlerId) {
+                    <small class="pruefsumme"
+                      >{{ texte.fehlerId }}:
+                      <code data-test="fehler-id">{{ eintrag.fehlerId }}</code></small
+                    >
+                  }
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="erneutAnfordern(eintrag)"
+                    [disabled]="laeuft()"
+                    [attr.aria-label]="texte.erneutAnfordernFuer(eintrag.geschaeftsjahr)"
+                  >
+                    {{ texte.erneutAnfordern }}
+                  </button>
+                }
+              }
+            </span>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</div>
