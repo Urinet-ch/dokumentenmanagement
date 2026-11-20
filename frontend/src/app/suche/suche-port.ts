@@ -1,5 +1,5 @@
 import { Observable } from 'rxjs';
-import { Dokumentart, Kontakt, Suchergebnis } from '../gemeinsam/api';
+import { Dokumentart, Kontakt, Suchergebnis, WissensSuchergebnis } from '../gemeinsam/api';
 
 // Schnittstelle nach design.md «Suche» (GET /api/v1/dokumente, Req 14); HttpSucheService setzt sie mit dem generierten
 // OpenAPI-Client um (Aufgabe 4.6).
@@ -40,6 +40,7 @@ export interface Suchanfrage {
 
 export abstract class SuchePort {
   abstract suchen(anfrage: Suchanfrage): Observable<Suchergebnis>;
+  abstract wissen(q: string, modus: Modus): Observable<WissensSuchergebnis>;
   abstract dokumentarten(): Observable<Dokumentart[]>;
   /** Nur mit Recht A6 (GET /kontakte verlangt es); andere Rollen filtern über den Partner eines Treffers. */
   abstract kontakte(q: string): Observable<Kontakt[]>;
