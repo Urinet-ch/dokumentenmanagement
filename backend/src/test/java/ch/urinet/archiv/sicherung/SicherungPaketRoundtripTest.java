@@ -4,7 +4,6 @@ import ch.urinet.archiv.ablage.adapter.out.AblageEinstellungen;
 import ch.urinet.archiv.ablage.adapter.out.s3.S3Ablage;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
-import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
@@ -180,10 +179,12 @@ class SicherungPaketRoundtripTest {
 
         String oidcUrl = erforderlicheEigenschaft("archiv.restore.oidc-url");
         String client = erforderlicheEigenschaft("archiv.restore.oidc-client");
-        String benutzer = erforderlicheEigenschaft("archiv.restore.oidc-benutzer");
-        String passwortDatei = erforderlicheEigenschaft("archiv.restore.oidc-passwort-datei");
-        String passwort = Files.readString(Path.of(passwortDatei), StandardCharsets.UTF_8).trim();
-        var anmeldung = Testanmeldung.anmelden(oidcUrl, client, benutzer, passwort, null);
+        String secretDatei = erforderlicheEigenschaft("archiv.restore.oidc-client-secret-datei");
+        String secret = Files.readString(Path.of(secretDatei), StandardCharsets.UTF_8).trim();
+        var anmeldung = given().formParam("grant_type", "client_credentials")
+                .formParam("client_id", client)
+                .formParam("client_secret", secret)
+                .when().post(oidcUrl + "/protocol/openid-connect/token");
         assertThat(anmeldung.statusCode()).as("Anmeldung am wiederhergestellten Realm: " + anmeldung.asString())
                 .isEqualTo(200);
         String token = anmeldung.path("access_token");

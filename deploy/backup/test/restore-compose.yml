@@ -54,9 +54,9 @@ services:
     secrets:
       - keycloak_db
       - keycloak_admin
-      - restore_oidc_password
+      - restore_oidc_client_secret
       - restore_oidc_client
-      - restore_oidc_user
+      - restore_oidc_service_account
     depends_on:
       db:
         condition: service_healthy
@@ -142,12 +142,12 @@ secrets:
     file: ${ARCHIV_RESTORE_TMP:?}/secrets/keycloak_db
   keycloak_admin:
     file: ${ARCHIV_RESTORE_TMP:?}/secrets/keycloak_admin
-  restore_oidc_password:
-    file: ${ARCHIV_RESTORE_TMP:?}/secrets/restore_oidc_password
-  restore_oidc_user:
-    file: ${ARCHIV_RESTORE_TMP:?}/secrets/restore_oidc_user.json
+  restore_oidc_client_secret:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/restore_oidc_client_secret
   restore_oidc_client:
     file: ${ARCHIV_RESTORE_TMP:?}/secrets/restore_oidc_client.json
+  restore_oidc_service_account:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/restore_oidc_service_account.json
 
 # Docker veröffentlicht auf einem Netz mit «internal: true» keine Ports. Darum hängen nur PostgreSQL und MinIO, die die
 # Maven-Phasen vom Host aus brauchen, zusätzlich an «hostzugang» (Ports nur an 127.0.0.1). Keycloak und die API bleiben

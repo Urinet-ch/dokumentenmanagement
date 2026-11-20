@@ -10,11 +10,11 @@ temp=$(mktemp -d "${TMPDIR:-/tmp}/archiv-restore.XXXXXX")
 chmod 700 "$temp"
 project="archiv-restore-$$"
 oidc_client="archiv-restore-$$"
-oidc_benutzer="restore-oidc-$$"
 compose_started=0
 network_retry=0
 export ARCHIV_RESTORE_TMP="$temp"
 export COMPOSE_PROJECT_NAME="$project"
+export ARCHIV_RESTORE_OIDC_CLIENT="$oidc_client"
 
 bericht() {
   printf '%-7s %s (%ss)\n' "$1" "$2" "$3"
@@ -98,7 +98,6 @@ kc_restore_port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0
 kc_restore_base_url="http://127.0.0.1:$kc_restore_port"
 export ARCHIV_RESTORE_KC_PORT="$kc_restore_port"
 export ARCHIV_RESTORE_KC_BASE_URL="$kc_restore_base_url"
-
 compose config --quiet || fehler "Restore-Compose-Konfiguration ist ungültig."
 images=$(erwartete_images | LC_ALL=C sort -u) || fehler "Test-Images konnten nicht ermittelt werden."
 [[ -n $images ]] || fehler "Test-Images konnten nicht ermittelt werden."
@@ -115,21 +114,18 @@ geheimnis_erzeugen() {
   openssl rand -hex 32 > "$temp/secrets/$1"
 }
 
-for geheimnis in postgres_password archiv_db_owner archiv_db_app keycloak_db keycloak_admin restore_oidc_password; do
+for geheimnis in postgres_password archiv_db_owner archiv_db_app keycloak_db keycloak_admin restore_oidc_client_secret; do
   geheimnis_erzeugen "$geheimnis"
 done
-{ printf 'A1!'; openssl rand -hex 32; } > "$temp/secrets/restore_oidc_password"
-jq -n --arg benutzer "$oidc_benutzer" \
-  '{username:$benutzer, enabled:true, attributes:{mandant:["urinet"]}}' \
-  > "$temp/secrets/restore_oidc_user.json"
-jq -e '.username and .enabled and .attributes.mandant == ["urinet"]' \
-  "$temp/secrets/restore_oidc_user.json" >/dev/null
-jq -n --arg client "$oidc_client" '{
+jq -n --arg client "$oidc_client" --rawfile secret "$temp/secrets/restore_oidc_client_secret" '{
   clientId:$client,
   enabled:true,
-  publicClient:true,
-  directAccessGrantsEnabled:true,
+  clientAuthenticatorType:"client-secret",
+  publicClient:false,
+  serviceAccountsEnabled:true,
+  directAccessGrantsEnabled:false,
   standardFlowEnabled:false,
+  secret:($secret | rtrimstr("\n")),
   protocolMappers:[
     {name:"archiv-api-audience", protocol:"openid-connect", protocolMapper:"oidc-audience-mapper",
       config:{"included.client.audience":"archiv-api", "access.token.claim":"true", "id.token.claim":"false"}},
@@ -138,8 +134,9 @@ jq -n --arg client "$oidc_client" '{
         "access.token.claim":"true", "id.token.claim":"true"}}
   ]
 }' > "$temp/secrets/restore_oidc_client.json"
-jq -e '.clientId and .enabled and .directAccessGrantsEnabled and (.protocolMappers | length == 2)' \
+jq -e '.clientId and .enabled and .serviceAccountsEnabled and (.secret | length > 0) and (.protocolMappers | length == 2)' \
   "$temp/secrets/restore_oidc_client.json" >/dev/null
+printf '{}' > "$temp/secrets/restore_oidc_service_account.json"
 printf '%s' archiv-dev > "$temp/secrets/s3_app_zugang_id"
 printf '%s' archiv-dev-zugang > "$temp/secrets/s3_app_zugang_geheimnis"
 printf '%s' archiv-dev > "$temp/secrets/zugang_id"
@@ -282,31 +279,48 @@ warte_keycloak_realm() {
 
 oidc_testanmeldung_vorbereiten() {
   local start=$SECONDS
-  if compose exec -T kc sh -eu -c '
+  local client_id service_account service_account_id service_account_name
+  keycloak_admin create clients -r urinet-archiv -f /run/secrets/restore_oidc_client >/dev/null \
+    || fehler "OIDC-Testclient konnte im Wegwerf-Realm nicht angelegt werden."
+  client_id=$(keycloak_admin get clients -r urinet-archiv -q "clientId=$oidc_client" |
+    jq -er --arg client "$oidc_client" \
+      '[.[] | select(.clientId == $client)] | if length == 1 then .[0].id else error("Client fehlt oder ist mehrdeutig") end') \
+    || fehler "ID des OIDC-Testclients fehlt."
+  service_account=$(keycloak_admin get "clients/$client_id/service-account-user" -r urinet-archiv) \
+    || fehler "Dienstkonto des OIDC-Testclients konnte nicht gelesen werden."
+  service_account_id=$(jq -er '.id | select(type == "string" and length > 0)' <<< "$service_account") \
+    || fehler "ID des OIDC-Testdienstkontos fehlt."
+  service_account_name=$(jq -er '.username | select(type == "string" and length > 0)' <<< "$service_account") \
+    || fehler "Benutzername des OIDC-Testdienstkontos fehlt."
+  [[ $service_account_name == "service-account-$oidc_client" ]] \
+    || fehler "Keycloak hat ein unerwartetes OIDC-Testdienstkonto zurückgegeben."
+
+  jq -n --arg id "$service_account_id" --arg username "$service_account_name" \
+    '{id:$id, username:$username, enabled:true, requiredActions:[], attributes:{mandant:["urinet"]}}' \
+    > "$temp/restore-oidc-service-account.json"
+  chmod 644 "$temp/secrets/restore_oidc_service_account.json"
+  cat "$temp/restore-oidc-service-account.json" > "$temp/secrets/restore_oidc_service_account.json"
+  chmod 444 "$temp/secrets/restore_oidc_service_account.json"
+  keycloak_admin update "users/$service_account_id" -r urinet-archiv \
+    -f /run/secrets/restore_oidc_service_account >/dev/null \
+    || fehler "Mandantenattribut des OIDC-Testdienstkontos konnte nicht gesetzt werden."
+  keycloak_admin add-roles -r urinet-archiv --uusername "$service_account_name" \
+    --rolename inhaber >/dev/null \
+    || fehler "Rolle des OIDC-Testdienstkontos konnte nicht gesetzt werden."
+  bericht OK "OIDC-Testdienstkonto mit Mandant und Rolle vorbereiten" "$((SECONDS - start))"
+}
+
+keycloak_admin() {
+  compose exec -T kc sh -eu -c '
     admin_password=$(cat /run/secrets/keycloak_admin)
-    test_password=$(cat /run/secrets/restore_oidc_password)
     cli=/opt/keycloak/bin/kcadm.sh
     config=$(mktemp -d /tmp/kcadm-restore.XXXXXX)
     trap '\''rm -rf -- "$config"'\'' EXIT
     config="$config/kcadm.config"
-    printf "Keycloak-Testclient anmelden\\n"
     "$cli" config credentials --server http://kc:8080 --realm master \
       --user archiv-admin --password "$admin_password" --config "$config" >/dev/null
-    printf "Keycloak-Testclient im synthetischen Quell-Realm anlegen\\n"
-    "$cli" create clients -r urinet-archiv -f /run/secrets/restore_oidc_client --config "$config"
-    printf "Synthetischen OIDC-Testbenutzer aus geprüfter JSON-Datei anlegen\\n"
-    "$cli" create users -r urinet-archiv -f /run/secrets/restore_oidc_user --config "$config" >/dev/null
-    "$cli" set-password -r urinet-archiv --username "$2" --new-password "$test_password" \
-      --config "$config" >/dev/null
-    "$cli" add-roles -r urinet-archiv --uusername "$2" --rolename inhaber \
-      --config "$config" >/dev/null
-  ' sh "$oidc_client" "$oidc_benutzer" >"$temp/oidc-testlogin.log" 2>&1; then
-    bericht OK "Synthetische OIDC-Testanmeldung für den Roundtrip vorbereiten" "$((SECONDS - start))"
-  else
-    tail -n 12 "$temp/oidc-testlogin.log" >&2 || true
-    compose logs --no-color --tail 40 kc >&2 || true
-    fehler "Synthetische OIDC-Testanmeldung konnte nicht vorbereitet werden."
-  fi
+    "$cli" "$@" --config "$config"
+  ' sh "$@"
 }
 
 test_maven() {
@@ -333,8 +347,7 @@ test_maven() {
     args+=(
       "-Darchiv.restore.oidc-url=$kc_restore_base_url/realms/urinet-archiv"
       "-Darchiv.restore.oidc-client=$oidc_client"
-      "-Darchiv.restore.oidc-benutzer=$oidc_benutzer"
-      "-Darchiv.restore.oidc-passwort-datei=$temp/secrets/restore_oidc_password"
+      "-Darchiv.restore.oidc-client-secret-datei=$temp/secrets/restore_oidc_client_secret"
     )
   fi
   if (cd "$backend" && mvn "${args[@]}" test) >"$temp/$phase-test.log" 2>&1; then
