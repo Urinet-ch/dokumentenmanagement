@@ -33,30 +33,43 @@
             $$
         ]]></sql>
         <sql>create trigger dokument_volltext_vorher before insert or update of id, titel, partner_name, tags, volltext, dateiname on dokument for each row execute function archiv_dokument_volltext_vorher()</sql>
+        <!-- Statement-Trigger: je Anweisung wird jedes betroffene Dokument nur einmal neu tokenisiert -->
         <sql splitStatements="false"><![CDATA[
-            create function archiv_dokument_klassifikation_volltext_nachher() returns trigger language plpgsql
+            create function archiv_dokument_klassifikation_volltext_einfuegen() returns trigger language plpgsql
             set search_path from current as $$
-            declare
-                dokument_id uuid;
             begin
-                if tg_op = 'UPDATE' and old.dokument_id is distinct from new.dokument_id then
-                    update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(
-                        d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)
-                    where d.id = old.dokument_id;
-                end if;
-                if tg_op = 'DELETE' then
-                    dokument_id := old.dokument_id;
-                else
-                    dokument_id := new.dokument_id;
-                end if;
                 update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(
                     d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)
-                where d.id = dokument_id;
+                where d.id in (select dokument_id from neu);
                 return null;
             end
             $$
         ]]></sql>
-        <sql>create trigger dokument_klassifikation_volltext_nachher after insert or update or delete on dokument_klassifikation for each row execute function archiv_dokument_klassifikation_volltext_nachher()</sql>
+        <sql>create trigger dokument_klassifikation_volltext_einfuegen after insert on dokument_klassifikation referencing new table as neu for each statement execute function archiv_dokument_klassifikation_volltext_einfuegen()</sql>
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_dokument_klassifikation_volltext_loeschen() returns trigger language plpgsql
+            set search_path from current as $$
+            begin
+                update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(
+                    d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)
+                where d.id in (select dokument_id from alt);
+                return null;
+            end
+            $$
+        ]]></sql>
+        <sql>create trigger dokument_klassifikation_volltext_loeschen after delete on dokument_klassifikation referencing old table as alt for each statement execute function archiv_dokument_klassifikation_volltext_loeschen()</sql>
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_dokument_klassifikation_volltext_aendern() returns trigger language plpgsql
+            set search_path from current as $$
+            begin
+                update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(
+                    d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)
+                where d.id in (select dokument_id from alt union select dokument_id from neu);
+                return null;
+            end
+            $$
+        ]]></sql>
+        <sql>create trigger dokument_klassifikation_volltext_aendern after update on dokument_klassifikation referencing old table as alt new table as neu for each statement execute function archiv_dokument_klassifikation_volltext_aendern()</sql>
         <sql splitStatements="false"><![CDATA[
             create function archiv_klassifikation_wert_volltext_nachher() returns trigger language plpgsql
             set search_path from current as $$
@@ -75,7 +88,9 @@
         <sql>update dokument d set volltext_tsv = archiv_dokument_volltext_tsv(d.id, d.titel, d.partner_name, d.tags, d.volltext, d.dateiname)</sql>
         <rollback>
             <sql>drop trigger if exists klassifikation_wert_volltext_nachher on klassifikation_wert</sql>
-            <sql>drop trigger if exists dokument_klassifikation_volltext_nachher on dokument_klassifikation</sql>
+            <sql>drop trigger if exists dokument_klassifikation_volltext_einfuegen on dokument_klassifikation</sql>
+            <sql>drop trigger if exists dokument_klassifikation_volltext_loeschen on dokument_klassifikation</sql>
+            <sql>drop trigger if exists dokument_klassifikation_volltext_aendern on dokument_klassifikation</sql>
             <sql>drop trigger if exists dokument_volltext_vorher on dokument</sql>
             <sql>alter table dokument alter column volltext_tsv set expression as (
                 setweight(to_tsvector('german'::regconfig, coalesce(titel, '')), 'A')
@@ -84,7 +99,9 @@
                 || setweight(to_tsvector('german'::regconfig, coalesce(volltext, '')), 'C')
                 || setweight(to_tsvector('german'::regconfig, archiv_dateiname_text(dateiname)), 'D'))</sql>
             <sql>drop function if exists archiv_klassifikation_wert_volltext_nachher()</sql>
-            <sql>drop function if exists archiv_dokument_klassifikation_volltext_nachher()</sql>
+            <sql>drop function if exists archiv_dokument_klassifikation_volltext_einfuegen()</sql>
+            <sql>drop function if exists archiv_dokument_klassifikation_volltext_loeschen()</sql>
+            <sql>drop function if exists archiv_dokument_klassifikation_volltext_aendern()</sql>
             <sql>drop function if exists archiv_dokument_volltext_vorher()</sql>
             <sql>drop function if exists archiv_dokument_volltext_tsv(uuid, text, text, text[], text, text)</sql>
         </rollback>

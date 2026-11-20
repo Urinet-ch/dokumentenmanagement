@@ -129,7 +129,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | POST | `/konfiguration/pruefen`, `/konfiguration/vergleichen` | Datei im Body; Befunde bzw. Diff; ändert nichts | A11 |
 | PUT | `/konfiguration` | Datei einspielen; 200 mit neuer Version und Diff (bzw. ohne Version bei keinem Unterschied); 409 `KONFIGURATION_VERALTET`, 422 | A11 |
 | GET | `/berichte/luecken?geschaeftsjahr=` | Lückenbericht nach `FOLGE`/`ERWARTET`, Antwortform `VollstaendigkeitAbfrage.Antwort` (wie das Werkzeug `vollstaendigkeit`; bisher geplant `?art=&jahr=`: Parameter heisst wie beim Werkzeug, ohne Filter `art`, jede Kategorie nennt ihre Art); nur Rollen mit uneingeschränkter Sicht (Req 5.4); `@RolesAllowed` nennt alle Rollen (`@AlleArchivRollen`), der Endpunkt prüft die Sicht und meldet die Verweigerung (403 `NICHT_ERLAUBT`) ins Zugriffsprotokoll (Spec 01, Req 10.7) | `inhaber`, `treuhaender`, `geschaeftsstelle` |
-| GET | `/mandant/funktionen` | `{finanz: bool}` (Req 8.8) | alle Rollen |
+| GET | `/mandant/funktionen` | `{finanzVerfuegbar: bool}` (Req 8.8; Feldname so umgesetzt, Aufgabe 18.2) | alle Rollen |
 
 Alle Änderungen einzelner Elemente verlangen `If-Match` mit der Konfigurationsversion (Req 7.6); jede Antwort trägt
 die neue Version als `ETag`. Bestehende Endpunkte: `POST/PATCH/DELETE /dokumentarten` nehmen die neuen Attribute an

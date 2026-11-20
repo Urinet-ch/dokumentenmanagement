@@ -265,6 +265,11 @@ public class SucheSchritte {
         given().queryParam("q", "Rechnung").when().get("/api/v1/dokumente").then().statusCode(status);
     }
 
+    @Dann("antwortet die Suche mit Status {int} und Fehlercode «{word}»")
+    public void statusUndFehlercode(int status, String fehlercode) {
+        assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(fehlercode);
+    }
+
     @Dann("ist die Gesamtzahl {int}")
     public void gesamt(int gesamt) {
         assertThat(antwort.statusCode()).isEqualTo(200);

@@ -33,6 +33,52 @@ Funktionalität: Klassifikationen in Suche und Funktionen des Mandanten
       | q | Elektro |
     Dann lauten die Treffer der Reihe nach «FACH_ELEKTRO»
 
+  @req-8.5
+  Szenario: Mehrere Werte gelten als ODER, mehrere Klassifikationen als UND, Facetten behalten Werte ohne Treffer
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fachgebiet","name":"Fachgebiet","werte":[{"code":"bau","name":"Bau"},{"code":"elektro","name":"Elektro"}],
+       "mehrfach":true,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"phase","name":"Phase","werte":[{"code":"planung","name":"Planung"},{"code":"ausfuehrung","name":"Ausführung"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «bau» zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» ordnet die Klassifikation «phase» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «planung» zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Angenommen im Mandanten «urinet» liegen diese Suchdokumente:
+      | name      | titel  | art             | partner | tags | datum | betrag | richtung | belegnummer | vertraulichkeit | bestaetigt | erfasser       | person | status     | text                 | klassifikationen              |
+      | MK_BAU_P  | Plan A | PROJEKTDOKUMENT |         |      |       |        |          |             | NORMAL          | ja         | inhaber-urinet |        | ARCHIVIERT | Unterlagen Projekt A | fachgebiet=bau,phase=planung  |
+      | MK_BAU_A  | Plan B | PROJEKTDOKUMENT |         |      |       |        |          |             | NORMAL          | ja         | inhaber-urinet |        | ARCHIVIERT | Unterlagen Projekt B | fachgebiet=bau,phase=ausfuehrung |
+      | MK_ELEK_P | Plan C | PROJEKTDOKUMENT |         |      |       |        |          |             | NORMAL          | ja         | inhaber-urinet |        | ARCHIVIERT | Unterlagen Projekt C | fachgebiet=elektro,phase=planung |
+    Wenn «mitarbeiter-urinet» sucht mit:
+      | klassifikation.fachgebiet | bau     |
+      | klassifikation.fachgebiet | elektro |
+      | groesse                   | 100     |
+    Dann ist die Gesamtzahl 3
+    Wenn «mitarbeiter-urinet» sucht mit:
+      | klassifikation.fachgebiet | bau      |
+      | klassifikation.phase      | planung  |
+    Dann lauten die Treffer der Reihe nach «MK_BAU_P»
+    Wenn «mitarbeiter-urinet» sucht mit:
+      | klassifikation.fachgebiet | elektro     |
+      | klassifikation.phase      | ausfuehrung |
+    Dann ist die Gesamtzahl 0
+    Und zeigt die Suche diese Klassifikationsfacetten:
+      | klassifikation | name       | wert        | wertName   | anzahl |
+      | fachgebiet     | Fachgebiet | bau         | Bau        | 1      |
+      | fachgebiet     | Fachgebiet | elektro     | Elektro    | 0      |
+      | phase          | Phase      | planung     | Planung    | 1      |
+      | phase          | Phase      | ausfuehrung | Ausführung | 0      |
+    Wenn «mitarbeiter-urinet» sucht mit:
+      | klassifikation.unbekannt | x |
+    Dann antwortet die Suche mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+
   @req-8.8
   Szenario: Verfügbarkeit ist mandantenbezogen und wird vor dem Jahresexport geprüft
     Wenn «inhaber-urinet» fragt die Funktionen des Mandanten ab

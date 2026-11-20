@@ -341,7 +341,10 @@ public class DokumentErfassen {
         transaktion.registerInterposedSynchronization(new EingangAufraeumen(mandant, jahr, id));
         if (!anfrage.klassifikationen().isEmpty()) {
             if (!repository.artVorbelegen(id, anfrage.art())) {
-                throw new IllegalStateException("Art für unbestätigten Import konnte nicht vorbelegt werden");
+                // Art inaktiv, unbekannt oder zwischenzeitlich deaktiviert: Eingabefehler, kein 500
+                LOG.infof("Upload abgelehnt: mandant=%s fehlercode=%s (Art nicht aktiv)", mandant.wert(),
+                        Fehlercode.ANFRAGE_UNGUELTIG);
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
             }
             dokumentKlassifikationen.ersetzen(id, anfrage.klassifikationen());
         }

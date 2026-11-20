@@ -123,7 +123,7 @@ public class PanacheDokumentSuche implements SuchePort, SuchfacettenPort {
                 werte.add(":" + wert);
             }
             klassifikationsFilter.add("(c.code = :" + klasse + " or exists (select 1 from "
-                    + "dokument_klassifikation fk where fk.dokument_id = t.id and fk.klassifikation = :" + klasse
+                    + "dokument_klassifikation fk where fk.dokument_id = dk.dokument_id and fk.klassifikation = :" + klasse
                     + " and fk.wert in (" + String.join(", ", werte) + ")))");
             index++;
         }
@@ -138,13 +138,13 @@ public class PanacheDokumentSuche implements SuchePort, SuchfacettenPort {
                 from klassifikation c
                 join klassifikation_wert w on w.klassifikation = c.code
                 left join dokument_klassifikation dk on dk.klassifikation = c.code and dk.wert = w.code
-                left join treffer t on t.id = dk.dokument_id
+                left join treffer t on t.id = dk.dokument_id %s
                 where c.aktiv and c.suchfilter and w.aktiv
-                  %s
                 group by c.code, c.name, w.code, w.name, w.reihenfolge
                 order by c.code, w.reihenfolge, w.code
                 """.formatted(String.join("\n      and ", bedingungen),
                 klassifikationsFilter.isEmpty() ? "" : "and " + String.join("\n      and ", klassifikationsFilter));
+        // Die Filter der übrigen Klassifikationen stehen in der Join-Bedingung: Werte ohne Treffer bleiben mit Anzahl 0
 
         EntityManager em = DokumentEintrag.getEntityManager();
         em.createNativeQuery("select set_config('statement_timeout', :ms, true)")
