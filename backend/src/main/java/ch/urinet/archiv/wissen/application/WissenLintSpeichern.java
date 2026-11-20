@@ -316,7 +316,8 @@ public class WissenLintSpeichern {
             List<WissensLint.Befund> befunde = new java.util.ArrayList<>(alt.befunde());
             befunde.add(new WissensLint.Befund(null, "LINT_UNVOLLSTAENDIG", null));
             var stand = new WissenLintRepository.Fortschritt(befunde, alt.paare(), alt.paarIndex(), alt.seiten(),
-                    alt.seitenIndex(), alt.geprueft(), alt.kontextstufe(), null, false, alt.hinweise(),
+                    alt.seitenIndex(), WissenLintVerarbeiten.ohneUnausgefuehrte(alt), alt.kontextstufe(), null, false,
+                    alt.hinweise(),
                     alt.aenderungen());
             stand.aenderungen().forEach(ingest::aenderungAnlegen);
             lint.abschliessen(id, stand, lauf.ein(), lauf.aus(), true,

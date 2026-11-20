@@ -284,16 +284,21 @@ public class WissenLintVerarbeiten {
     static List<WissensLint.PaarId> ohneUnausgefuehrte(Fortschritt stand) {
         Set<WissensLint.PaarId> offen = new HashSet<>();
         for (int i = Math.min(stand.seitenIndex(), stand.seiten().size()); i < stand.seiten().size(); i++) {
-            AuftragSeite seite = stand.seiten().get(i);
-            for (Bezug bezug : seite.bezuege()) {
-                int vergleich = seite.seiteId().compareTo(bezug.seiteId());
-                if (vergleich != 0) {
-                    offen.add(vergleich < 0 ? new WissensLint.PaarId(seite.seiteId(), bezug.seiteId())
-                            : new WissensLint.PaarId(bezug.seiteId(), seite.seiteId()));
-                }
-            }
+            offen.addAll(paareVon(stand.seiten().get(i)));
         }
         return stand.geprueft().stream().filter(p -> !offen.contains(p)).toList();
+    }
+
+    private static Set<WissensLint.PaarId> paareVon(AuftragSeite seite) {
+        Set<WissensLint.PaarId> paare = new HashSet<>();
+        for (Bezug bezug : seite.bezuege()) {
+            int vergleich = seite.seiteId().compareTo(bezug.seiteId());
+            if (vergleich != 0) {
+                paare.add(vergleich < 0 ? new WissensLint.PaarId(seite.seiteId(), bezug.seiteId())
+                        : new WissensLint.PaarId(bezug.seiteId(), seite.seiteId()));
+            }
+        }
+        return paare;
     }
 
     private static void gruppieren(List<AuftragSeite> seiten, WissenLintAuswertung.Seitenauftrag a,
@@ -340,9 +345,18 @@ public class WissenLintVerarbeiten {
                 stand.aenderungen());
     }
 
-    private static Fortschritt hinweis(Fortschritt alt, String text, boolean paar) {
+    /**
+     * Ein übersprungener Seitenauftrag erzeugt keine Änderung: Seine Paare gelten nicht als geprüft (Req 10.3),
+     * damit sie im nächsten Lauf nicht nach hinten rücken.
+     */
+    static Fortschritt hinweis(Fortschritt alt, String text, boolean paar) {
+        List<WissensLint.PaarId> geprueft = alt.geprueft();
+        if (!paar && alt.seitenIndex() < alt.seiten().size()) {
+            Set<WissensLint.PaarId> uebersprungen = paareVon(alt.seiten().get(alt.seitenIndex()));
+            geprueft = geprueft.stream().filter(p -> !uebersprungen.contains(p)).toList();
+        }
         return neu(alt, alt.befunde(), alt.paare(), alt.paarIndex() + (paar ? 1 : 0), alt.seiten(),
-                alt.seitenIndex() + (paar ? 0 : 1), alt.geprueft(), null, false,
+                alt.seitenIndex() + (paar ? 0 : 1), geprueft, null, false,
                 append(alt.hinweise(), List.of(text)), alt.aenderungen());
     }
 

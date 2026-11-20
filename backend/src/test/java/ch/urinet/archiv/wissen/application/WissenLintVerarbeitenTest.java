@@ -35,4 +35,18 @@ class WissenLintVerarbeitenTest {
 
         assertThat(WissenLintVerarbeiten.ohneUnausgefuehrte(stand)).containsExactly(new PaarId(A, B));
     }
+
+    @Test
+    void uebersprungenerSeitenauftragEntferntSeinePaareAusGeprueft() {
+        var a = new AuftragSeite(A, 1, 1, List.of(new Bezug(B, 1, 1)), WissensStufe.NORMAL, List.of("x"));
+        var c = new AuftragSeite(C, 1, 1, List.of(new Bezug(B, 1, 1)), WissensStufe.NORMAL, List.of("x"));
+        var stand = new Fortschritt(List.of(), List.of(), 2, List.of(a, c), 0,
+                List.of(new PaarId(A, B), new PaarId(B, C)), null, null, false, List.of(), List.of());
+
+        var weiter = WissenLintVerarbeiten.hinweis(stand, "x", false);
+
+        assertThat(weiter.seitenIndex()).isEqualTo(1);
+        assertThat(weiter.geprueft()).containsExactly(new PaarId(B, C));
+        assertThat(WissenLintVerarbeiten.ohneUnausgefuehrte(stand)).isEmpty();
+    }
 }

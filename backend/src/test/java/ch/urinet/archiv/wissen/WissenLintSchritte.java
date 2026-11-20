@@ -87,6 +87,44 @@ public class WissenLintSchritte {
                 () -> lint.geplant(Instant.now()).orElseThrow())).get(30, TimeUnit.SECONDS);
     }
 
+    @Dann("ist der Lint im Mandanten «urinet» als geplanter Auftrag eingereiht")
+    public void geplanterAuftrag() throws SQLException {
+        try (var verbindung = datenbank().getConnection();
+             var auftrag = verbindung.prepareStatement("""
+                     select count(*) from public.auftrag
+                     where typ = 'WISSEN_LINT' and nutzlast->>'lintId' = ?
+                     """);
+             var lauf = verbindung.prepareStatement(
+                     "select ausgeloest_von from m_urinet.wissens_lint where id = ?")) {
+            auftrag.setString(1, lintId.toString());
+            try (var zeilen = auftrag.executeQuery()) {
+                assertThat(zeilen.next()).isTrue();
+                assertThat(zeilen.getInt(1)).isEqualTo(1);
+            }
+            lauf.setObject(1, lintId);
+            try (var zeilen = lauf.executeQuery()) {
+                assertThat(zeilen.next()).isTrue();
+                assertThat(zeilen.getString(1)).isEqualTo("process:wissen-lint");
+            }
+        }
+    }
+
+    @Dann("derselbe Termin startet im Mandanten «urinet» keinen zweiten Lint")
+    public void keinZweiterLint() throws Exception {
+        Instant termin = Instant.now().minusSeconds(600);
+        var nochmals = CompletableFuture.supplyAsync(() -> kontext.mit(new MandantCode("urinet"),
+                () -> lint.geplant(termin))).get(30, TimeUnit.SECONDS);
+        assertThat(nochmals).isEmpty();
+        try (var verbindung = datenbank().getConnection();
+             var anzahl = verbindung.prepareStatement(
+                     "select count(*) from m_urinet.wissens_lint where ausgeloest_von = 'process:wissen-lint'")) {
+            try (var zeilen = anzahl.executeQuery()) {
+                assertThat(zeilen.next()).isTrue();
+                assertThat(zeilen.getInt(1)).isEqualTo(1);
+            }
+        }
+    }
+
     @Dann("ist kein Lint-Auftrag eingereiht und «BUDGET_ERSCHOEPFT» im Lint-Log gezählt")
     public void budgetLog() throws SQLException {
         try (var verbindung = datenbank().getConnection();

@@ -36,6 +36,14 @@ Funktionalität: Lint der Wissensbasis starten
     Dann antwortet der Lint-Endpunkt mit Status 429 und Fehlercode «BUDGET»
     Und es erfolgt kein KI-Aufruf
 
+  @req-10.1
+  Szenario: Der geplante Lint reiht je Mandant einen Auftrag ein und startet denselben Termin nicht doppelt
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Wenn der geplante Lint für «urinet» fällig wird
+    Dann ist der Lint im Mandanten «urinet» als geplanter Auftrag eingereiht
+    Und derselbe Termin startet im Mandanten «urinet» keinen zweiten Lint
+
   @req-10.6 @req-13.6
   Szenario: Ein geplanter Lint entfällt bei erschöpftem Monatsbudget mit Logeintrag
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt

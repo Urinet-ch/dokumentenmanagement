@@ -475,8 +475,11 @@ flowchart LR
   `ERLEDIGT` bestehen. Vor jedem KI-Aufruf wird die aktuelle Hülle erneut geprüft; vor dem Seitenauftrag müssen
   Version und Quellenrevision aller beteiligten Seiten noch zum Paarauftrag passen. Änderungen verwenden die
   bestehende Freigabeprüfung und werden nicht unmittelbar angewendet. Bricht der Lauf wegen Budget oder fehlendem
-  KI-Zugang ab, gelten Paare, deren Seitenaufträge nicht ausgeführt wurden, nicht als geprüft (Review PR #376); sie
-  behalten ihren Vorrang im nächsten Lauf. Die Nachweise für 10.2 (Befundarten ohne KI inkl. Formfehler) liegen als
+  KI-Zugang ab, bei endgültigem KI-Fehler (Fehlerpfad) oder wird ein Seitenauftrag übersprungen (Seite geändert oder
+  nicht mehr freigegeben, Quellenschlüssel uneindeutig, KI-Antwort nach Nachfrage ungültig), gelten Paare, deren
+  Seitenaufträge nicht ausgeführt wurden, nicht als geprüft (Review PR #376); sie behalten ihren Vorrang im nächsten
+  Lauf. Der Nachweis für 10.1 (Zeitplan reiht je Mandant einen Auftrag ein, derselbe Termin startet nicht doppelt) ist
+  das Szenario `@req-10.1` in `lint.feature`. Die Nachweise für 10.2 (Befundarten ohne KI inkl. Formfehler) liegen als
   Szenario `@req-10.2` in `lint.feature`.
 
 ### OKF-Export (`wissen/adapter/out`)
