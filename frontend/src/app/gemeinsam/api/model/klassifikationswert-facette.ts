@@ -13,7 +13,7 @@ export interface KlassifikationswertFacette {
     code: string;
     name: string;
     /**
-     * Anzahl sichtbarer Dokumente
+     * Anzahl sichtbarer Dokumente; im Modus hybrid nur unter den gelieferten Treffern
      */
     anzahl: number;
 }

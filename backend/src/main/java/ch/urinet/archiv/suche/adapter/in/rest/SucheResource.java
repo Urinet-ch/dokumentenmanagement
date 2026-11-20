@@ -150,7 +150,8 @@ public class SucheResource {
     @Schema(name = "KlassifikationswertFacette")
     public record KlassifikationswertDto(@Schema(required = true) String code,
                                           @Schema(required = true) String name,
-                                          @Schema(required = true, description = "Anzahl sichtbarer Dokumente")
+                                          @Schema(required = true, description = "Anzahl sichtbarer Dokumente; "
+                                                  + "im Modus hybrid nur unter den gelieferten Treffern")
                                           long anzahl) {
     }
 
@@ -225,8 +226,8 @@ public class SucheResource {
             }
             Hybridergebnis ergebnis = hybrid.suchen(benutzer(), anfrage);
             List<SuchtrefferDto> treffer = ergebnis.treffer().stream().map(SucheResource::dto).toList();
-            return new SuchergebnisDto(treffer, facettenDto(facetten.suchen(benutzer(), anfrage)), treffer.size(), 0,
-                    HybridSuche.PWA, HYBRID, ergebnis.degradiert());
+            return new SuchergebnisDto(treffer, facettenDto(facetten.suchen(benutzer(), anfrage, ergebnis)),
+                    treffer.size(), 0, HybridSuche.PWA, HYBRID, ergebnis.degradiert());
         }
         Suchergebnis ergebnis = suche.suchen(benutzer(), anfrage);
         return new SuchergebnisDto(ergebnis.treffer().stream().map(t -> dto(t, null)).toList(),

@@ -7,6 +7,7 @@ import ch.urinet.archiv.konfiguration.domain.Klassifikation;
 import ch.urinet.archiv.konfiguration.domain.KlassifikationWert;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import ch.urinet.archiv.suche.domain.Hybridergebnis;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -49,6 +50,12 @@ public class Suchfacetten {
 
     public java.util.List<SuchfacettenPort.Facette> suchen(Benutzer benutzer, Suchanfrage anfrage) {
         return port.facetten(anfrage, Sichtregel.fuer(benutzer), true);
+    }
+
+    public java.util.List<SuchfacettenPort.Facette> suchen(Benutzer benutzer, Suchanfrage anfrage,
+                                                          Hybridergebnis ergebnis) {
+        return port.facetten(anfrage, Sichtregel.fuer(benutzer),
+                ergebnis.treffer().stream().map(t -> t.treffer().id()).toList());
     }
 
     private static FachFehler ungueltig() {

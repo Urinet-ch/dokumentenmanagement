@@ -206,6 +206,10 @@ public class SucheSchritte {
 
     @Dann("zeigt die Suche diese Klassifikationsfacetten:")
     public void klassifikationsfacetten(DataTable tabelle) {
+        klassifikationsfacetten(antwort, tabelle);
+    }
+
+    static void klassifikationsfacetten(Response antwort, DataTable tabelle) {
         assertThat(antwort.statusCode()).isEqualTo(200);
         List<Map<String, Object>> facetten = antwort.jsonPath().getList("facetten");
         for (Map<String, String> zeile : tabelle.asMaps()) {

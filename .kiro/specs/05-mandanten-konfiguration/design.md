@@ -108,6 +108,14 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   selben Sichtbarkeitsfilter wie Spec 01, 14.5; die Namen der zugeordneten Werte gehen mit Gewicht C in den
   `tsvector` (Neuberechnung bei Zuordnung und bei Namensänderung des Werts). Klassifikations-Codes kommen nur aus der
   geprüften Konfiguration, nie als SQL-Bezeichner aus der Anfrage.
+  Review-Nacharbeit zu Aufgabe 18.2 (20.11.2026): Im Modus `hybrid` zählen die Facetten dieselben höchstens
+  30 gelieferten Dokumente wie `gesamt`, auch beim Rückfall; keine Volltextbedingung schliesst semantische Treffer
+  nachträglich aus. Sicht und sämtliche Filter werden bei der Zählung erneut geprüft. Im Modus `volltext` bleibt
+  die bisherige Zählung über alle Treffer mit Auslassen des eigenen Klassifikationsfilters unverändert.
+  Der Rollback des noch nicht gemergten Changesets 055 stellt unter PostgreSQL 17 die generierte
+  `volltext_tsv`-Spalte und beide GIN-Indizes neu her; ausschliesslich abgeleitete Suchdaten werden ersetzt.
+  Die Vorwärtsmigration und ihre Prüfsumme bleiben unverändert. Ein Liquibase-Test prüft Bestand, zwei Schemas,
+  den Rollback und anschliessendes erneutes Migrieren.
 - `integration/webseite/` (bisher `integration/wordpress/`; Spec 03, Folgeänderung; umgesetzt in Spec 03, Aufgaben
   11.2 und 11.5) – Parameter der öffentlichen Liste: zusätzlich die Codes der Klassifikationen
   mit `oeffentlich_filter`, z. B. `?fachgebiet=bad`; der feste Sicherheitsfilter aus Spec 03 design.md bleibt

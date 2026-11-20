@@ -2011,7 +2011,8 @@ components:
         anzahl:
           type: integer
           format: int64
-          description: Anzahl sichtbarer Dokumente
+          description: Anzahl sichtbarer Dokumente; im Modus hybrid nur unter den
+            gelieferten Treffern
     KonfigurationKiTexte:
       type: object
       properties:

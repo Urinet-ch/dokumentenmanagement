@@ -92,12 +92,18 @@
             <sql>drop trigger if exists dokument_klassifikation_volltext_loeschen on dokument_klassifikation</sql>
             <sql>drop trigger if exists dokument_klassifikation_volltext_aendern on dokument_klassifikation</sql>
             <sql>drop trigger if exists dokument_volltext_vorher on dokument</sql>
-            <sql>alter table dokument alter column volltext_tsv set expression as (
+            <!-- PostgreSQL 17 kann eine normale Spalte nicht mit SET EXPRESSION wieder generieren.
+                 Nur den abgeleiteten Indexwert neu anlegen; die Dokumentdaten bleiben unverändert. -->
+            <sql>alter table dokument drop column volltext_tsv</sql>
+            <sql>alter table dokument add column volltext_tsv tsvector generated always as (
                 setweight(to_tsvector('german'::regconfig, coalesce(titel, '')), 'A')
                 || setweight(to_tsvector('german'::regconfig, coalesce(partner_name, '')), 'B')
                 || setweight(to_tsvector('german'::regconfig, archiv_tags_text(tags)), 'B')
                 || setweight(to_tsvector('german'::regconfig, coalesce(volltext, '')), 'C')
-                || setweight(to_tsvector('german'::regconfig, archiv_dateiname_text(dateiname)), 'D'))</sql>
+                || setweight(to_tsvector('german'::regconfig, archiv_dateiname_text(dateiname)), 'D')) stored</sql>
+            <sql>create index dokument_volltext_ix on dokument using gin (volltext_tsv)</sql>
+            <sql>create index dokument_volltext_ohne_dateiname_ix on dokument
+                using gin (ts_filter(volltext_tsv, cast('{a,b,c}' as "char"[])))</sql>
             <sql>drop function if exists archiv_klassifikation_wert_volltext_nachher()</sql>
             <sql>drop function if exists archiv_dokument_klassifikation_volltext_einfuegen()</sql>
             <sql>drop function if exists archiv_dokument_klassifikation_volltext_loeschen()</sql>

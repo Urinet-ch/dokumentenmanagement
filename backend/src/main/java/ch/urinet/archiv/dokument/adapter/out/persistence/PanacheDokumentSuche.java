@@ -102,9 +102,26 @@ public class PanacheDokumentSuche implements SuchePort, SuchfacettenPort {
 
     @Override
     public List<SuchfacettenPort.Facette> facetten(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname) {
+        return facetten(anfrage, regel, mitDateiname, null);
+    }
+
+    @Override
+    public List<SuchfacettenPort.Facette> facetten(Suchanfrage anfrage, Sichtregel regel, List<UUID> trefferIds) {
+        return facetten(anfrage, regel, true, List.copyOf(trefferIds));
+    }
+
+    private List<SuchfacettenPort.Facette> facetten(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname,
+                                                   List<UUID> trefferIds) {
         Map<String, Object> parameter = new HashMap<>();
-        List<String> bedingungen = SuchFilter.bedingungen(anfrage, regel, parameter, true);
-        if (anfrage.begriff() != null) {
+        List<String> bedingungen = SuchFilter.bedingungen(anfrage, regel, parameter, trefferIds == null);
+        if (trefferIds != null) {
+            if (trefferIds.isEmpty()) {
+                bedingungen.add("false");
+            } else {
+                bedingungen.add("d.id in (:trefferIds)");
+                parameter.put("trefferIds", trefferIds);
+            }
+        } else if (anfrage.begriff() != null) {
             String vektor = mitDateiname ? "d.volltext_tsv" : OHNE_DATEINAME;
             bedingungen.add(1, "(" + vektor + " @@ " + TSQ + " or d.id = any (array(select b.dokument_id "
                     + "from dokument_finanz b where b.belegnummer = :begriff)))");
@@ -113,7 +130,8 @@ public class PanacheDokumentSuche implements SuchePort, SuchfacettenPort {
 
         List<String> klassifikationsFilter = new ArrayList<>();
         int index = 0;
-        for (Map.Entry<String, List<String>> eintrag : anfrage.klassifikationen().entrySet()) {
+        for (Map.Entry<String, List<String>> eintrag : (trefferIds == null
+                ? anfrage.klassifikationen() : Map.<String, List<String>>of()).entrySet()) {
             String klasse = "facetKlasse" + index;
             parameter.put(klasse, eintrag.getKey());
             List<String> werte = new ArrayList<>();

@@ -213,6 +213,38 @@ public class HybridSchritte {
         modus(false);
     }
 
+    @Angenommen("haben diese Hybrid-Dokumente diese Klassifikationen:")
+    public void klassifikationen(DataTable tabelle) throws SQLException {
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            klassifikation(ort(zeile.get("name")), zeile.get("klassifikation"), zeile.get("wert"));
+        }
+    }
+
+    @Angenommen("alle Hybrid-Dokumente des Mandanten «{word}» haben die Klassifikation «{word}» mit Wert «{word}»")
+    public void alleKlassifizieren(String mandant, String klassifikation, String wert) throws SQLException {
+        for (Ort ort : dokumente.values()) {
+            if (ort.mandant().equals(mandant)) {
+                klassifikation(ort, klassifikation, wert);
+            }
+        }
+    }
+
+    private void klassifikation(Ort ort, String klassifikation, String wert) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement befehl = verbindung
+                .prepareStatement("insert into " + new MandantCode(ort.mandant()).schema()
+                        + ".dokument_klassifikation (dokument_id, klassifikation, wert) values (?, ?, ?)")) {
+            befehl.setObject(1, ort.id());
+            befehl.setString(2, klassifikation);
+            befehl.setString(3, wert);
+            befehl.executeUpdate();
+        }
+    }
+
+    @Dann("zeigt die Hybridsuche diese Klassifikationsfacetten:")
+    public void klassifikationsfacetten(DataTable tabelle) {
+        SucheSchritte.klassifikationsfacetten(antwort, tabelle);
+    }
+
     @Dann("ist die Hybridsuche degradiert")
     public void degradiert() {
         modus(true);

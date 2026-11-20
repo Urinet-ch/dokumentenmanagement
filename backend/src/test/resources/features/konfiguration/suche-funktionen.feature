@@ -79,6 +79,91 @@ Funktionalität: Klassifikationen in Suche und Funktionen des Mandanten
       | klassifikation.unbekannt | x |
     Dann antwortet die Suche mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
 
+  @req-8.5
+  Szenario: Hybridfacetten zählen semantische Treffer unter derselben Sicht und denselben Filtern
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fachgebiet","name":"Fachgebiet","werte":[{"code":"bau","name":"Bau"},{"code":"elektro","name":"Elektro"}],
+       "mehrfach":true,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"phase","name":"Phase","werte":[{"code":"planung","name":"Planung"},{"code":"ausfuehrung","name":"Ausführung"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Angenommen die Hybridsuche ist bereit
+    Und im Mandanten «urinet» liegen diese Hybrid-Dokumente:
+      | name          | art          | vertraulichkeit | bestaetigt | erfasser       | person | text                   | abschnitte |
+      | SEM_BAU       | VERSICHERUNG | NORMAL          | ja         | inhaber-urinet |        | Police UVG Prämie 2026 | 0.1@1-1    |
+      | SEM_ELEKTRO   | VERSICHERUNG | NORMAL          | ja         | inhaber-urinet |        | Police UVG Prämie 2026 | 0.2@1-1    |
+      | SEM_INTERN    | VERSICHERUNG | INTERN          | ja         | inhaber-urinet |        | Police UVG Prämie 2026 | 0.1@1-1    |
+    Und im Mandanten «vhf-gsk» liegen diese Hybrid-Dokumente:
+      | name          | art          | vertraulichkeit | bestaetigt | erfasser        | person | text                   | abschnitte |
+      | SEM_FREMD     |              | NORMAL          | ja         | inhaber-vhf-gsk |        | Police UVG Prämie 2026 | 0.1@1-1    |
+    Und haben diese Hybrid-Dokumente diese Klassifikationen:
+      | name        | klassifikation | wert        |
+      | SEM_BAU     | fachgebiet     | bau         |
+      | SEM_BAU     | phase          | planung     |
+      | SEM_ELEKTRO | fachgebiet     | elektro     |
+      | SEM_ELEKTRO | phase          | ausfuehrung |
+      | SEM_INTERN  | fachgebiet     | bau         |
+    Wenn «mitarbeiter-urinet» hybrid sucht mit:
+      | q | Unfallversicherung |
+    Dann lauten die Hybridtreffer «SEM_BAU,SEM_ELEKTRO»
+    Und ist die Hybridsuche nicht degradiert
+    Und zeigt die Hybridsuche diese Klassifikationsfacetten:
+      | klassifikation | name       | wert    | wertName | anzahl |
+      | fachgebiet     | Fachgebiet | bau     | Bau      | 1      |
+      | fachgebiet     | Fachgebiet | elektro | Elektro  | 1      |
+    Wenn «mitarbeiter-urinet» hybrid sucht mit:
+      | q                         | Unfallversicherung |
+      | klassifikation.fachgebiet | bau                |
+      | klassifikation.fachgebiet | elektro            |
+      | klassifikation.phase      | planung            |
+    Dann lauten die Hybridtreffer «SEM_BAU»
+    Und zeigt die Hybridsuche diese Klassifikationsfacetten:
+      | klassifikation | name       | wert    | wertName | anzahl |
+      | fachgebiet     | Fachgebiet | bau     | Bau      | 1      |
+      | fachgebiet     | Fachgebiet | elektro | Elektro  | 0      |
+    Wenn «mitarbeiter-urinet» hybrid sucht mit:
+      | q                         | Unfallversicherung |
+      | klassifikation.fachgebiet | bau                |
+      | klassifikation.phase      | ausfuehrung        |
+    Dann lauten die Hybridtreffer «»
+    Und zeigt die Hybridsuche diese Klassifikationsfacetten:
+      | klassifikation | name       | wert    | wertName | anzahl |
+      | fachgebiet     | Fachgebiet | bau     | Bau      | 0      |
+      | fachgebiet     | Fachgebiet | elektro | Elektro  | 0      |
+
+  @req-8.5
+  Szenario: Hybridfacetten zählen höchstens die gelieferten 30 Treffer auch beim Rückfall
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fachgebiet","name":"Fachgebiet","werte":[{"code":"bau","name":"Bau"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Angenommen die Hybridsuche ist bereit
+    Und im Mandanten «urinet» liegen 40 Hybrid-Dokumente «VIELE» mit dem Text "Versicherung" und je einem nahen Abschnitt
+    Und alle Hybrid-Dokumente des Mandanten «urinet» haben die Klassifikation «fachgebiet» mit Wert «bau»
+    Wenn «inhaber-urinet» hybrid sucht mit:
+      | q | Versicherung |
+    Dann ist die Hybridsuche nicht degradiert
+    Und hat die Hybridantwort 30 Treffer, gesamt 30, seite 0 und groesse 30
+    Und zeigt die Hybridsuche diese Klassifikationsfacetten:
+      | klassifikation | name       | wert | wertName | anzahl |
+      | fachgebiet     | Fachgebiet | bau  | Bau      | 30     |
+    Angenommen der Reranker antwortet mit Status 503
+    Wenn «inhaber-urinet» hybrid sucht mit:
+      | q | Versicherung |
+    Dann ist die Hybridsuche degradiert
+    Und hat die Hybridantwort 30 Treffer, gesamt 30, seite 0 und groesse 30
+    Und zeigt die Hybridsuche diese Klassifikationsfacetten:
+      | klassifikation | name       | wert | wertName | anzahl |
+      | fachgebiet     | Fachgebiet | bau  | Bau      | 30     |
+
   @req-8.8
   Szenario: Verfügbarkeit ist mandantenbezogen und wird vor dem Jahresexport geprüft
     Wenn «inhaber-urinet» fragt die Funktionen des Mandanten ab
