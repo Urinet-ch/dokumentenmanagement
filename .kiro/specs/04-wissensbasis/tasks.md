@@ -23,7 +23,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Art nicht in der Artenliste des KI-Vorschlags (Test: Prompt aus Spec 01 unverändert); Szenarien: Art im Eingangskorb von Hand gewählt, Upload bis `ARCHIVIERT` ohne Sperre, Datei im Manifest, Titel aus `dokument.titel`, Jahresexport ohne Wissensquelle
   - Satz zu GeBüV in der Verfahrensbeschreibung (Nachweis Dokument, zusammen mit der Folgeänderung zu Spec 01, 16.6)
   - Spec 05 ergänzt: Die Ergänzung für `vhf-gsk` (`zugriff`, `veroeffentlicht`) kommt aus der Konfiguration von `vhf-gsk`, nicht aus dem Seed-Teil; `WISSENSQUELLE` trägt fest `ki_vorschlag = nein` (Spec 05, Req 2.6; Aufgabe 17.3)
-  - Teil erledigt (PR #297): Seed-Teil, Art in `seed/vhf-gsk/dokumentarten.json` mit `zugriff` und `veroeffentlicht`, Prüfung der festen Eigenschaften beim Anlegen, Changeset `044-wissensquelle-bestand` für bestehende Mandanten, Archivierung ohne Sperre, Manifest, Jahresexport ohne Wissensquelle, Verfahrensbeschreibung (Req 1.1–1.3, 1.5, 1.6; design.md, «Umsetzung 13.2»). Offen: Req 1.4, nachgewiesen erst mit Ingest, Freigabe und Lint (14.x)
+  - Teil erledigt (PR #297): Seed-Teil, Art in `seed/vhf-gsk/dokumentarten.json` mit `zugriff` und `veroeffentlicht`, Prüfung der festen Eigenschaften beim Anlegen, Changeset `044-wissensquelle-bestand` für bestehende Mandanten, Archivierung ohne Sperre, Manifest, Jahresexport ohne Wissensquelle, Verfahrensbeschreibung (Req 1.1–1.3, 1.5, 1.6; design.md, «Umsetzung 13.2»). Nachprüfung 20.11.2026: Ingest und Freigabe sind gemergt, Req 1.4 bleibt bis zum Unveränderbarkeitsnachweis des Lints (15.4) offen.
   - _Anforderungen: 1.1–1.6_
   - _Abhängig von: Spec 01: Feld `dokument.titel` (vorhanden, Requirement 7.2)_
 
@@ -33,6 +33,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Manifest um Zeilen von `wissensseite_version` und `wissens_log` erweitern; Restore-Probe vergleicht Anzahl Seiten und Versionen
   - Logs nur mit IDs (Test über Log-Ausgabe)
   - Teil erledigt (PR #295): Paket, Changeset `043-wissen-datenmodell`, Rechte und INSERT-only, Manifest (Req 4.1–4.3, 4.6); `public` nur über `auftrag` prüft die allgemeine ArchUnit-Regel `publicNurUeberAuftrag`. Offen: Req 4.7, der Vergleich von Anzahl Seiten und Versionen in der Restore-Probe; er braucht die Restore-Kette mit Datenbank-Restore aus Spec 01, Aufgabe 5.12 (design.md, «Umsetzung 13.3»). 13.9 weisen die Ingest- und Freigabepfade nach (14.x)
+  - Nachprüfung 20.11.2026: PR #357 liefert den echten lokalen Datenbank-Restore (`restore-uebung-lokal.sh`); der Vergleich nichtleerer Wissensseiten- und Versionsbestände vor und nach diesem Restore ist noch nicht belegt. Deshalb bleibt 13.3 offen; ein Bucket-Restore mit Zählen derselben Datenbank reicht weiterhin nicht.
   - _Anforderungen: 4.1–4.3, 4.6, 4.7, 13.9_
 
 - [x] 13.4 Seitenmodell, Markdown und Prüfung [Backend]
@@ -86,7 +87,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 6.1–6.10, 7.6, 14.1_
   - _Abhängig von: 14.1_
 
-- [ ] 14.3 Widerspruchsschutz [Backend]
+- [x] 14.3 Widerspruchsschutz [Backend]
   - Widerspruchsblöcke erkennen und im Diff markieren, Befund `AUSSAGE_ENTFERNT`, Grund beim Auflösen (sonst 422 `PFLICHTFELD_FEHLT`, Grund gilt für die entfernten Schlüssel), Logeintrag «Widerspruch aufgelöst», Flag `widerspruch_offen`
   - Szenario: neue Quelle widerspricht bestehender Aussage → beide Fussnoten bleiben, nichts überschrieben
   - _Anforderungen: 7.1–7.5_
@@ -111,7 +112,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 3.6, 3.8, 15.4, 16.1, 16.2, 16.4, 16.5, 16.7_
   - _Abhängig von: 13.6_
 
-- [ ] 14.6 Oberfläche Entwürfe [Frontend]
+- [x] 14.6 Oberfläche Entwürfe [Frontend]
   - `/wissen/entwuerfe`, `/wissen/entwuerfe/:id`: Diff nebeneinander bzw. am Handy untereinander mit `−`/`+`, Befunde, Hinweise, Kontextstufe, Widersprüche, entfernte Aussagen, Kernaussagen (nicht zugeordnete markiert); Aktionen je Änderung mit Bestätigung, kein gesammeltes Annehmen; Zähler offener Entwürfe in der Navigation
   - _Anforderungen: 6.4, 6.11, 16.3, 16.4_
   - _Abhängig von: 14.2_
@@ -140,13 +141,14 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 10.1–10.6, 14.3_
   - _Abhängig von: 14.2, 14.3_
 
-- [ ] 15.5 OKF-Export [Backend] [Frontend]
+- [x] 15.5 OKF-Export [Backend] [Frontend]
   - Auftrag `WISSEN_EXPORT`, ZIP mit Frontmatter (SnakeYAML), `index.md`, `log.md`, URN-Verweise, Links im Inhalt auf `.md` umgeschrieben; Download 24 h; Protokoll mit SHA-256; Einstellungen `/wissensbasis/einstellungen` (A19, `geschaeftsstelle` erhält 403)
   - `OkfKonformitaetTest` (JUnit, Nachweis für 17.3, im PR verlinkt); Vollexport nach Spec 03, 8.2 (Aufgabe 12.2) um den OKF-Export ergänzen
+  - Nachprüfung 20.11.2026: PR #328 ist gemergt, einschliesslich Changeset `056-wissens-export` und Changelog-Einbindung. Nachweise: `export.feature` (@req-17.1, @req-17.2, @req-17.4, @req-17.5), `OkfKonformitaetTest` (@req-17.3), `WissenExportTest` (exakte 24-Stunden-Grenze und SHA-256), `WissenEinstellungenTest`, `MandantVollexportSchreiber` mit `wissensbasis.zip`. Kein Export oder Paketformat neu gebaut.
   - _Anforderungen: 17.1–17.5, 14.3_
   - _Abhängig von: 13.6_
 
-- [ ] 15.6 Import eines Wissenspakets als Entwurf [Backend]
+- [x] 15.6 Import eines Wissenspakets als Entwurf [Backend]
   - `WissensPaketLeser` und `PaketKopf`/`PaketSeite` in `wissen/domain/paket` (nur im Speicher lesen; Grenzen, Pfadnormalisierung, Symlinks, Zip-Bombe über gezählte Bytes; Frontmatter über den YAML-Ereignisstrom ohne Tags, Anker, Aliase; Konfiguration `archiv.wissen.import.*` und `archiv.wissen.instanz-id`); ArchUnit-Regel `wissenDomainOhneFramework`
   - `WissensImport` und `QuellenAufloeser` in `wissen/application` (Zuordnung per SHA-256 über den Lesezugriff auf `dokument/application`, nur Art `WISSENSQUELLE`, `ARCHIVIERT`, sichtbar; Ergebnis `UNBEKANNT` für unbekannt, andere Art, unsichtbar, fremder Mandant); neue Befunde `QUELLE_UNBEKANNT`, `AUSZUG_FEHLT`, `AUSZUG_NICHT_PRUEFBAR`, `CLOUD_STUFE_UNZULAESSIG` und Ergebnistyp `NICHT_PRUEFBAR` in `WissensPruefung`; Auszugsprüfung mit `Seitentext` wie beim Ingest
   - REST `POST /wissensentwuerfe/import` (multipart, 201/400/403/409/413/415/422) und `POST /wissensentwuerfe/{id}/neu-pruefen` (A17, nur OIDC); Anlass `IMPORT`, Spalten `paket_sha256` (eindeutig) und `paket_angaben`, Changeset; Akteur `extern:<erzeugt_von>`; Zugriffsprotokoll `WISSEN_IMPORT`; Logeintrag `IMPORT` beim Abschluss; «neu erzeugen» für `IMPORT` nicht angeboten

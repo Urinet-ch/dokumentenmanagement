@@ -38,4 +38,4 @@ Funktionalität: API-Tokens in der PWA
       | rolle            | mandant | menü                          |
       | mitarbeiter      | urinet  | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Wissen |
       | treuhaender      | urinet  | Übersicht, Suche, Chat, Wissen, Jahresexport           |
-      | geschaeftsstelle | vhf-gsk | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Kontakte, Wissen |
+      | geschaeftsstelle | vhf-gsk | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Kontakte, Wissen, Wissensentwürfe |

@@ -51,7 +51,7 @@ public class FreigabePruefung {
                 kontext.belegtePfade(), kontext.dokumente(), kontext.seitenIds(), kontext.basisQuellenSchluessel(),
                 kontext.entfernteAussagen(), kontext.kernaussagenSchluessel(), kontext.ingest(), kontext.veralten(),
                 kontext.pfadHoehereStufe(), kontext.bisherigeVertraulichkeit(),
-                Wissensseite.Vertraulichkeit.valueOf(wirksam.name()));
+                Wissensseite.Vertraulichkeit.valueOf(wirksam.name()), kontext.paket());
         Wissensseite gepruefteFassung = new Wissensseite(fassung.id(), fassung.pfad(), fassung.typ(), fassung.titel(),
                 fassung.beschreibung(), fassung.tags(), fassung.status(), fassung.veraltetAb(), fassung.quellen(),
                 Wissensseite.Vertraulichkeit.valueOf(wirksam.name()), fassung.inhalt(), fassung.version(),

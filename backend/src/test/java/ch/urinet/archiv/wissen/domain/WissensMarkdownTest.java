@@ -6,6 +6,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class WissensMarkdownTest {
+    @Test
+    void widerspruchsvergleichErkenntGeaenderteUndMehrfacheBloeckeAberKeinenCode() {
+        String block = "> ⚠️ Widerspruch: Alt.[^alt] Neu.[^neu]";
+        assertThat(WissensMarkdown.entfernteWidersprueche(block, block.replace("Alt.", "Anders."))).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block + "\n\n" + block, block)).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block, block.replace(" ", "  "))).hasSize(1);
+        assertThat(WissensMarkdown.entfernteWidersprueche(block + "\r\n", block + "\n")).isEmpty();
+        assertThat(WissensMarkdown.analysieren("```\n" + block + "\n```",
+                WissensMarkdown.MAX_EINGABE_ZEICHEN).widersprueche()).isEmpty();
+    }
+
+
+    @Test
+    void importRundlaufErhaeltLinksFussnotenCodeUndZeilenenden() {
+        String markdown = "[**Regel**](\n /konzepte/arbeits\\-zeit \"Titel\") und [Übersicht](</ueberblick>)."
+                + "[^q-1]\r\n\r\n`[Code](/konzepte/arbeit.md)`\r\n";
+        org.junit.jupiter.api.Assertions.assertTrue(
+                markdown.equals(WissensMarkdown.ausOkf(WissensMarkdown.fuerOkf(markdown))));
+    }
+
+    @Test
+    void importLaesstExterneUndUngueltigeLinksFuerDiePruefungUnveraendert() {
+        String markdown = "[Extern](https://example.invalid/x.md) [Falsch](/falsch.md) "
+                + "<script>untrusted</script>.[^q-1]";
+        org.junit.jupiter.api.Assertions.assertTrue(markdown.equals(WissensMarkdown.ausOkf(markdown)));
+        assertThat(WissensMarkdown.analysieren(WissensMarkdown.ausOkf(markdown), 20_000).ungueltigerLink()).isTrue();
+    }
 
     @Test
     void okfSchreibtNurEchteLinkzieleUmUndLaesstFussnotenUndCodeUnveraendert() {
@@ -187,5 +214,24 @@ class WissensMarkdownTest {
         assertThat(zuGross.zuGross()).isTrue();
         assertThat(zuTief.zuTief()).isTrue();
         assertThat(WissensMarkdown.analysieren("    Code mit [Klammer]", 20_000).zuTief()).isFalse();
+    }
+
+    @Test
+    void okfLaesstReferenzLinksUnveraendertStattAbzubrechen() {
+        for (String markdown : new String[] {"[a][]\n\n[a]: /ueberblick.md\n", "[a]\n\n[a]: /ueberblick.md\n",
+                "[a][r]\n\n[r]: /ueberblick.md\n"}) {
+            assertThat(WissensMarkdown.ausOkf(markdown)).isEqualTo(markdown);
+        }
+        assertThat(WissensMarkdown.ausOkf("[a][r] und [b](/konzepte/x.md)\n\n[r]: /ueberblick.md\n"))
+                .isEqualTo("[a][r] und [b](/konzepte/x)\n\n[r]: /ueberblick.md\n");
+    }
+
+    @Test
+    void geteilterSchluesselBleibtBeiAussageAusserhalbDesBlocksSichtbar() {
+        var analyse = WissensMarkdown.analysieren(
+                "> ⚠️ Widerspruch: A.[^a] B.[^b]\n\nWichtige Aussage.[^a]", 20_000);
+        assertThat(analyse.widersprueche()).singleElement()
+                .satisfies(b -> assertThat(b.fussnoten()).containsExactlyInAnyOrder("a", "b"));
+        assertThat(analyse.aussagen()).extracting(a -> a.fussnoten()).containsExactly(java.util.Set.of("a"));
     }
 }

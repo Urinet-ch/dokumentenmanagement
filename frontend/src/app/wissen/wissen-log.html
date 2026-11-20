@@ -1,24 +1,39 @@
-<a routerLink="/wissen">{{ texte.zurueck }}</a>
-<h1>{{ texte.log }}</h1>
-@if (laedt()) { <p role="status">{{ texte.laedt }}</p> }
+<a class="zurueck" routerLink="/wissen"><span aria-hidden="true">←&nbsp;</span>{{ texte.zurueck }}</a>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ texte.titel }}</p>
+  <h1>{{ texte.log }}</h1>
+  <p>{{ texte.logEinleitung }}</p>
+</div>
+@if (laedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
 @if (fehler(); as meldung) {
-  <p role="alert">{{ meldung }}</p>
-  <button type="button" (click)="laden()">{{ texte.erneut }}</button>
+  <p class="fehler" role="alert">{{ meldung }}</p>
+  <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button></div>
 }
 @if (seite(); as seite) {
-  @if (!seite.eintraege?.length) { <p>{{ texte.keineEintraege }}</p> }
-  <ol>
-    @for (eintrag of seite.eintraege; track eintrag.id) {
-      <li>
-        @if (eintrag.zeit) { <time>{{ zeitpunkt(eintrag.zeit) }}</time> }
-        <p>{{ eintrag.text }}</p>
-        @for (verweis of eintrag.seiten; track verweis.id) {
-          <a [routerLink]="'/wissen/' + verweis.pfad">{{ verweis.titel }}</a>
-        }
-      </li>
-    }
-  </ol>
+  @if (!seite.eintraege?.length) { <p class="karte gedaempft">{{ texte.keineEintraege }}</p> }
+  @else {
+    <ol class="karte eintraege">
+      @for (eintrag of seite.eintraege; track eintrag.id) {
+        <li>
+          @if (eintrag.aktion) { <span class="pille akzent mono">{{ eintrag.aktion }}</span> }
+          <div class="eintrag">
+            <p>{{ eintrag.text }}</p>
+            @if (eintrag.seiten?.length) {
+              <span class="verweise">
+                @for (verweis of eintrag.seiten; track verweis.id) {
+                  <a class="chip" [routerLink]="'/wissen/' + verweis.pfad">{{ verweis.titel }}</a>
+                }
+              </span>
+            }
+            @if (eintrag.zeit) { <time class="gedaempft" [attr.datetime]="eintrag.zeit">{{ zeitpunkt(eintrag.zeit) }}</time> }
+          </div>
+        </li>
+      }
+    </ol>
+  }
   @if (seite.naechstesVor; as cursor) {
-    <button type="button" (click)="weiter(cursor)">{{ texte.weiter }}</button>
+    <div class="knoepfe">
+      <button mat-stroked-button type="button" (click)="weiter(cursor)">{{ texte.weiter }}</button>
+    </div>
   }
 }

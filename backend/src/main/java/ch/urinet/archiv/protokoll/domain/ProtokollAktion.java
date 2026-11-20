@@ -17,7 +17,7 @@ public enum ProtokollAktion {
     REGEL_AENDERN,
     /** Konfiguration geändert; Details enthalten Version, Quelle und die geänderten Elemente mit alten und neuen Werten. */
     KONFIGURATION_AENDERN,
-    WISSEN_ANZEIGEN, WISSEN_ANNEHMEN, WISSEN_VERWERFEN, WISSEN_INGEST, WISSEN_LINT,
+    WISSEN_ANZEIGEN, WISSEN_ANNEHMEN, WISSEN_VERWERFEN, WISSEN_INGEST, WISSEN_LINT, WISSEN_IMPORT,
     /**
      * Kontakt zusammengeführt (Req 17.7, 17.8): ein Eintrag ohne Dokument mit Quelle, Ziel, Grund und Zahlen, dazu je
      * umgehängtes Dokument einer mit Dokument-ID

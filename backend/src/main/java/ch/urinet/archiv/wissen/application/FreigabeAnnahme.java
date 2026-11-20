@@ -14,6 +14,7 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.IntSupplier;
@@ -30,10 +31,12 @@ public class FreigabeAnnahme {
     private final WissenKonfiguration konfiguration;
     private final FreigabeProtokoll protokoll;
     private final AuftragService auftraege;
+    private final WissenImport importieren;
 
     public FreigabeAnnahme(FreigabeSperre sperre, FreigabeRepository repository, FreigabeKontext kontext,
                            WissenIngestPort daten, WissenHuelleDienst huelle, WissenIngestSpeichern ingest,
-                           WissenKonfiguration konfiguration, FreigabeProtokoll protokoll, AuftragService auftraege) {
+                           WissenKonfiguration konfiguration, FreigabeProtokoll protokoll, AuftragService auftraege,
+                           WissenImport importieren) {
         this.sperre = sperre;
         this.repository = repository;
         this.kontext = kontext;
@@ -43,6 +46,7 @@ public class FreigabeAnnahme {
         this.konfiguration = konfiguration;
         this.protokoll = protokoll;
         this.auftraege = auftraege;
+        this.importieren = importieren;
     }
 
     @Transactional(Transactional.TxType.MANDATORY)
@@ -58,6 +62,20 @@ public class FreigabeAnnahme {
         FreigabeRepository.Vorschlag vorschlag = repository.vorschlagLaden(aenderung);
         Wissensseite entwurf = vorschlag.fassung();
         Set<String> entfernt = vorschlag.entfernteAussagen();
+        String importErzeugt = null;
+        if ("IMPORT".equals(aenderung.anlass())) {
+            var basis = aenderung.seiteId() == null ? null : daten.seiteLaden(aenderung.seiteId()).orElseThrow();
+            var aufgeloest = importieren.fuerAnnahme(benutzer, entwurfId, nummer, basis, bearbeitung);
+            if (!aufgeloest.befunde().isEmpty()) {
+                throw new EntwurfBefunde(aufgeloest.befunde().stream().map(b -> b.code().name()).toList());
+            }
+            entwurf = aufgeloest.fassung();
+            importErzeugt = entwurf.erzeugtVon();
+            vorschlag = new FreigabeRepository.Vorschlag(entwurf, entfernt,
+                    ch.urinet.archiv.wissen.domain.WissensStufe.valueOf(vorschlag.kontextstufe())
+                            .hoechste(aufgeloest.stufe()).name(),
+                    null, null, vorschlag.erstelltVon());
+        }
         if (bearbeitung != null) {
             if (ManuellerWissensentwurf.enthaeltNull(bearbeitung.tags())
                     || ManuellerWissensentwurf.enthaeltNull(bearbeitung.quellen())) {
@@ -70,8 +88,32 @@ public class FreigabeAnnahme {
                     .map(KiPort.EntfernteAussage::schluessel).collect(Collectors.toUnmodifiableSet());
             entwurf = new Wissensseite(entwurf.id(), entwurf.pfad(), entwurf.typ(), bearbeitung.titel(),
                     bearbeitung.beschreibung(), bearbeitung.tags(), entwurf.status(), bearbeitung.veraltetAb(),
-                    bearbeitung.quellen(), entwurf.vertraulichkeit(), bearbeitung.inhalt(), entwurf.version(),
+                    "IMPORT".equals(aenderung.anlass()) ? entwurf.quellen() : bearbeitung.quellen(),
+                    entwurf.vertraulichkeit(), bearbeitung.inhalt(), entwurf.version(),
                     null, null, null, null, false, false, entwurf.wissensquelleId());
+        }
+        String basisInhalt = aenderung.seiteId() == null ? ""
+                : daten.seiteLaden(aenderung.seiteId()).orElseThrow().inhalt();
+        var aufgeloesteWidersprueche = WissensMarkdown.entfernteWidersprueche(basisInhalt, entwurf.inhalt());
+        if (!aufgeloesteWidersprueche.isEmpty()) {
+            if (grund == null || grund.isBlank()) {
+                throw new FachFehler(Fehlercode.PFLICHTFELD_FEHLT);
+            }
+            entfernt = new HashSet<>(entfernt);
+            // Nur Schlüssel entschuldigen, die die Basis ausserhalb von Widerspruchsblöcken nicht nutzt;
+            // geteilte Schlüssel decken sonst die Entfernung einer normalen Aussage mit ab.
+            Set<String> ausserhalbBloecken = new HashSet<>();
+            for (var aussage : WissensMarkdown.analysieren(basisInhalt, WissensMarkdown.MAX_EINGABE_ZEICHEN)
+                    .aussagen()) {
+                ausserhalbBloecken.addAll(aussage.fussnoten());
+            }
+            for (var block : aufgeloesteWidersprueche) {
+                for (String schluessel : block.fussnoten()) {
+                    if (!ausserhalbBloecken.contains(schluessel)) {
+                        entfernt.add(schluessel);
+                    }
+                }
+            }
         }
         var gepruefterVorschlag = new FreigabeRepository.Vorschlag(entwurf, entfernt, vorschlag.kontextstufe(),
                 vorschlag.wissensquelleId(), vorschlag.modell(), vorschlag.erstelltVon());
@@ -87,10 +129,14 @@ public class FreigabeAnnahme {
         Wissensseite fassung = new Wissensseite(seiteId, entwurf.pfad(), entwurf.typ(), entwurf.titel(),
                 entwurf.beschreibung(), entwurf.tags(), status, entwurf.veraltetAb(), entwurf.quellen(),
                 Wissensseite.Vertraulichkeit.valueOf(ergebnis.wirksameStufe().name()), entwurf.inhalt(), version,
-                null, null, null, null, false, false, entwurf.wissensquelleId());
+                null, null, null, null, false,
+                !WissensMarkdown.analysieren(entwurf.inhalt(), konfiguration.ingest().seiteMaxZeichen())
+                        .widersprueche().isEmpty(), entwurf.wissensquelleId());
         String erzeugt;
         if (bearbeitung != null) {
             erzeugt = "human:" + benutzer.id();
+        } else if ("IMPORT".equals(aenderung.anlass())) {
+            erzeugt = java.util.Objects.requireNonNull(importErzeugt);
         } else if ("INGEST".equals(aenderung.anlass())
                 || ("MANUELL".equals(aenderung.anlass()) && vorschlag.modell() != null)) {
             if (vorschlag.modell() == null || vorschlag.modell().isBlank()) {
@@ -103,7 +149,7 @@ public class FreigabeAnnahme {
         Set<String> links = WissensMarkdown.analysieren(fassung.inhalt(),
                 konfiguration.ingest().seiteMaxZeichen()).links();
         repository.fassungSpeichern(entwurfId, aenderung, fassung, ergebnis.mindeststufe(), ergebnis.wirksameStufe(),
-                erzeugt, benutzer.id(), grund, links);
+                erzeugt, benutzer.id(), grund, links, !aufgeloesteWidersprueche.isEmpty());
         huelle.versionFreigeben(seiteId, version);
         protokoll.angenommen(benutzer, entwurfId, nummer, seiteId, aenderung.basisVersion(), version, realIp);
         auftraege.wissensEmbeddingEinreihen(seiteId, version);

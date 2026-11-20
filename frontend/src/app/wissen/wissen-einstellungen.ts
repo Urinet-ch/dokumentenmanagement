@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { WissenEinstellungen, WissenExport, WissensbasisService } from '../gemeinsam/api';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
@@ -8,7 +9,7 @@ import { zeit } from '../importe/import-logik';
 
 @Component({
   selector: 'app-wissen-einstellungen',
-  imports: [RouterLink],
+  imports: [RouterLink, MatButtonModule],
   templateUrl: './wissen-einstellungen.html',
   styleUrl: './wissen.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

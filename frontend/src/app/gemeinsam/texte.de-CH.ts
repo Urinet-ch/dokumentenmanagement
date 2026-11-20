@@ -69,6 +69,35 @@ export const TEXTE = {
     wissen: 'Wissen',
   },
   wissen: {
+    entwuerfe: {
+      titel: 'Wissensentwürfe', zurListe: 'Zur Entwurfsliste', keine: 'Keine Entwürfe vorhanden.',
+      status: 'Entwurfsstatus', filtern: 'Filtern', unvollstaendig: 'Entwurf unvollständig',
+      statuswerte: [
+        { code: '', text: 'Alle' }, { code: 'OFFEN', text: 'Offen' }, { code: 'IN_ARBEIT', text: 'In Arbeit' },
+        { code: 'WARTEND', text: 'Wartend' }, { code: 'ERLEDIGT', text: 'Erledigt' },
+        { code: 'ABGELEHNT', text: 'Abgelehnt' }, { code: 'FEHLER', text: 'Fehler' },
+      ],
+      kernaussagen: 'Kernaussagen', pdfSeiten: 'PDF-Seiten', belegt: 'Auszug belegt',
+      nichtBelegt: 'Auszug nicht belegt', nichtZugeordnet: 'Keiner Änderung zugeordnet',
+      basis: 'Basisversion', kontext: 'Kontextstufe', begruendung: 'Begründung', diff: 'Änderungsvergleich',
+      fassung: 'Vorgeschlagene Fassung', befunde: 'Sperrende Befunde', hinweise: 'Hinweise',
+      widersprueche: 'Widersprüche', aufloesung: 'Widerspruch wird aufgelöst',
+      entfernteAussagen: 'Entfernte Aussagen', grund: 'Grund für den Entscheid',
+      entscheiden: 'Prüfen und entscheiden', bearbeiten: 'Fassung bearbeiten', markdown: 'Inhalt (Markdown)',
+      quellenJson: 'Quelleneinträge (JSON-Liste)', entfernteJson: 'Entfernte Aussagen mit Begründung (JSON-Liste)',
+      jsonUngueltig: 'Die Quelleneinträge und entfernten Aussagen müssen gültige JSON-Listen sein. Bitte korrigieren.',
+      grundFehlt: 'Bitte einen Grund für das Verwerfen angeben.',
+      stufe: 'Vertraulichkeit nach Annahme', berechnet: 'Vom Archiv berechnen', veraltetAb: 'Veraltet ab',
+      annehmen: 'Einzeln annehmen', geaendertAnnehmen: 'Geändert einzeln annehmen', verwerfen: 'Verwerfen',
+      neuErzeugen: 'Neu erzeugen', bestaetigung: 'Einzelentscheid bestätigen', abbrechen: 'Abbrechen',
+      einzelpruefung: 'Bestätigen Sie nur diese Änderung, nachdem Sie den Vergleich und die Quellen geprüft haben.',
+      feldnamen: { titel: 'Titel', beschreibung: 'Beschreibung', tags: 'Schlagwörter (mit Komma getrennt)', quellen: 'Quelleneinträge' },
+      anzahl: (anzahl: number) => `${anzahl} offene Wissensentwürfe`,
+      zaehlerFehler: 'Die Zahl offener Wissensentwürfe konnte nicht geladen werden.',
+      einleitung: 'Jede vorgeschlagene Änderung einzeln prüfen: annehmen, ändern oder verwerfen.',
+      position: (nr: number, anzahl: number) => `Änderung ${nr} von ${anzahl}`,
+      bisher: 'Bisher', neu: 'Neu', leer: 'Keine',
+    },
     titel: 'Wissen',
     log: 'Änderungslog',
     einstellungen: 'Einstellungen und Export',
@@ -104,10 +133,20 @@ export const TEXTE = {
     versionSchliessen: 'Version schliessen',
     freigegeben: 'Freigegeben',
     stand: 'Stand',
+    quellendatum: 'Quellendatum',
     keineEintraege: 'Keine Einträge vorhanden.',
     seiteNichtVorhanden: 'Seite nicht vorhanden',
     seite: (nummer: number) => `Seite ${nummer}`,
     version: (nummer: number) => `Version ${nummer}`,
+    vorzeile: 'Kuratiertes Wissen aus Wissensquellen',
+    einleitung: 'Seiten nach dem LLM-Wiki-Muster: jede Aussage mit Fussnote auf ihre Quelle. '
+      + 'Änderungen werden erst nach Freigabe wirksam.',
+    logEinleitung: 'Journal der Wissensbasis, neueste Einträge zuerst.',
+    filter: 'Seiten filtern',
+    spalteSeite: 'Seite',
+    spalteStatus: 'Status',
+    anzahl: (anzahl: number) => (anzahl === 1 ? '1 Seite' : `${anzahl} Seiten`),
+    pfad: 'Pfad',
   },
   wissenEinstellungen: {
     titel: 'Wissensbasis: Einstellungen und Export',
@@ -283,6 +322,11 @@ export const TEXTE = {
     fehlerWiederholt:
       'Der Upload ist dreimal fehlgeschlagen (Verbindung oder Archiv). Bitte später erneut versuchen.',
     offlineErfassen: 'Ohne Verbindung erfassen',
+    vorzeile: 'Papier und digitale Belege',
+    untertitel:
+      'Jedes Dokument wird einmal erfasst, in PDF/A umgewandelt, per Texterkennung gelesen und landet mit KI-Vorschlag im Eingangskorb.',
+    warteschlange: 'Warteschlange',
+    warteschlangeHinweis: 'wird auch offline gehalten',
   },
   eingangskorb: {
     titel: 'Eingangskorb',
@@ -1008,6 +1052,9 @@ export const TEXTE = {
       'Seine Dokumente bleiben unverändert; Sie können ihn später wieder aktivieren.',
     inaktivAusfuehren: 'Als inaktiv markieren',
     sendet: 'Wird gesendet …',
+    // Gestaltung nach Prototyp (20.11.2026)
+    vorzeile: 'Aus 21.CRM und manuell erfasst',
+    statusKnoepfe: { AKTIV: 'Aktiv', INAKTIV: 'Inaktiv', ALLE: 'Alle' } as Record<string, string>,
   },
   // Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe 5.1; Req 10.5, 10.10; Recht A13)
   /** Seite «Export» (Spec 02, Aufgabe 6.5; Req 7.1, 7.2, 7.5): nur Inhaber und Treuhänder. */

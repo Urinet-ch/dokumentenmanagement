@@ -55,8 +55,8 @@
               <a
                 class="link"
                 [routerLink]="punkt.pfad"
-                routerLinkActive="aktiv"
-                ariaCurrentWhenActive="page"
+                [class.aktiv]="punkt.pfad === aktiverPfad()"
+                [attr.aria-current]="punkt.pfad === aktiverPfad() ? 'page' : null"
                 (click)="mobil() && nav.close()"
               >
                 <app-symbol [name]="punkt.symbol" />
@@ -65,9 +65,21 @@
                     <span class="zaehler" aria-hidden="true" data-test="eingangskorb-zaehler">{{ zaehler.anzahl() }}</span>
                     <span class="nur-screenreader">, {{ texte.eingangskorbAnzahl(zaehler.anzahl()!) }}</span>
                   }
+                  @if (punkt.wissensentwurfZaehler && wissensentwurfZaehler.anzahl() !== null) {
+                    <span class="zaehler" aria-hidden="true">{{ wissensentwurfZaehler.anzahl() }}</span>
+                    <span class="nur-screenreader">, {{ texte.wissen.entwuerfe.anzahl(wissensentwurfZaehler.anzahl()!) }}</span>
+                  }
                 </span>
               </a>
             }
+          }
+          @if (wissensentwurfZaehler.fehler()) {
+            <div class="nav-fehler">
+              <p role="alert">{{ texte.wissen.entwuerfe.zaehlerFehler }}</p>
+              <button type="button" class="knopf breit" (click)="wissensentwurfZaehler.auffrischen()">
+                <app-symbol name="wiederholen" />{{ texte.wissen.erneut }}
+              </button>
+            </div>
           }
         </nav>
       </div>

@@ -1,108 +1,147 @@
-<a routerLink="/wissen">{{ texte.zurueck }}</a>
-@if (laedt()) { <p role="status">{{ texte.laedt }}</p> }
+<a class="zurueck" routerLink="/wissen"><span aria-hidden="true">←&nbsp;</span>{{ texte.zurueck }}</a>
+@if (laedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
 @if (fehler(); as meldung) {
-  <h1>{{ texte.titel }}</h1>
-  <p role="alert">{{ meldung }}</p>
-  <button type="button" (click)="laden()">{{ texte.erneut }}</button>
+  <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
+  <p class="fehler" role="alert">{{ meldung }}</p>
+  <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button></div>
 }
 @if (inhalt(); as inhalt) {
-  <h1>{{ inhalt.seite.titel }}</h1>
-  @if (inhalt.seite.status === 'VERALTET') { <p>{{ texte.veraltet }}</p> }
-  @if (abgelaufen(inhalt.seite)) { <p>{{ texte.abgelaufen }}</p> }
-  @if (inhalt.seite.status === 'AKTIV') { <p>{{ texte.aktiv }}</p> }
-  @if (inhalt.seite.quellePruefen) { <p>{{ texte.quellePruefen }}</p> }
-  @if (inhalt.seite.widerspruchOffen) { <p>{{ texte.widerspruch }}</p> }
-  <p>{{ inhalt.seite.beschreibung }}</p>
-  @if (inhalt.seite.version) { <p>{{ texte.stand }}: {{ texte.version(inhalt.seite.version) }}</p> }
-  @if (inhalt.seite.freigegebenAm) {
-    <p>{{ texte.freigegeben }}: {{ zeitpunkt(inhalt.seite.freigegebenAm) }}</p>
-  }
-  <article>
-    <ng-container [ngTemplateOutlet]="textbaum"
-      [ngTemplateOutletContext]="{ $implicit: inhalt.text, quellen: inhalt.quellenNachSchluessel }" />
-  </article>
-  <section>
-    <h2>{{ texte.quellen }}</h2>
-    <ul>
-      @for (quelle of inhalt.quellen; track quelle.schluessel) {
-        <li>
-          @if (quelle.dokumentId) {
-            <a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}">
-              {{ quelle.titel }} @if (quelle.seite) { · {{ texte.seite(quelle.seite) }} }
-            </a>
-          } @else if (quelle.pfad) {
-            <a [routerLink]="'/wissen/' + quelle.pfad">{{ quelle.titel }}</a>
-          }
-        </li>
+  <div class="seitenkopf kopf">
+    <div>
+      @if (inhalt.seite.typ) {
+        <p class="vorzeile">{{ texte.seitentypen[inhalt.seite.typ] ?? texte.unbekannterTyp }}</p>
       }
-    </ul>
-  </section>
-  <section>
-    <h2>{{ texte.eingehend }}</h2>
-    @if (!inhalt.eingehend.length) { <p>{{ texte.keineEintraege }}</p> }
-    <ul>
-      @for (seite of inhalt.eingehend; track seite.id) {
-        <li><a [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a></li>
+      <h1>{{ inhalt.seite.titel }}</h1>
+      @if (inhalt.seite.beschreibung) { <p>{{ inhalt.seite.beschreibung }}</p> }
+    </div>
+    <div class="pillen">
+      @if (inhalt.seite.status === 'VERALTET') { <p class="pille warnung">{{ texte.veraltet }}</p> }
+      @if (abgelaufen(inhalt.seite)) { <p class="pille warnung">{{ texte.abgelaufen }}</p> }
+      @if (inhalt.seite.status === 'AKTIV') { <p class="pille ok">{{ texte.aktiv }}</p> }
+      @if (inhalt.seite.quellePruefen) { <p class="pille warnung">{{ texte.quellePruefen }}</p> }
+      @if (inhalt.seite.widerspruchOffen) {
+        <p class="pille gefahr"><app-symbol name="warnung" />{{ texte.widerspruch }}</p>
       }
-    </ul>
-  </section>
-  <section>
-    <h2>{{ texte.versionen }}</h2>
-    <ul>
-      @for (version of inhalt.versionen.versionen; track version.nummer) {
-        @if (version.nummer) {
-          <li>
-            @if (version.zeit) {
-              <button type="button" (click)="versionOeffnen(version.nummer)">{{ texte.version(version.nummer) }}</button>
-            } @else {
-              {{ texte.version(version.nummer) }}
-            }
-            @if (version.zeit) { · {{ zeitpunkt(version.zeit) }} }
-          </li>
-        }
-      }
-    </ul>
-    @if (versionLaedt()) { <p role="status">{{ texte.laedt }}</p> }
-    @if (versionsFehler(); as meldung) { <p role="alert">{{ meldung }}</p> }
-    @if (versionsText(); as version) {
-      <h3>{{ texte.version(version.nummer) }}</h3>
-      <button type="button" (click)="versionSchliessen()">{{ texte.versionSchliessen }}</button>
-      <ng-container [ngTemplateOutlet]="textbaum"
-        [ngTemplateOutletContext]="{ $implicit: version.text, quellen: null }" />
+    </div>
+  </div>
+  <dl class="angaben">
+    @if (inhalt.seite.pfad) {
+      <div><dt>{{ texte.pfad }}</dt><dd class="mono">{{ inhalt.seite.pfad }}</dd></div>
     }
-    <ng-template #textbaum let-teile let-quellen="quellen">
-      @for (teil of teile; track $index) {
-        @switch (teil.art) {
-          @case ('text') {<ng-container>{{ teil.text }}</ng-container>}
-          @case ('link') { <a [routerLink]="teil.pfad">{{ teil.text }}</a> }
-          @case ('quelle') {
-            @if (quellen?.get(teil.quelle); as quelle) {
-              @if (quelle.dokumentId) {
-                <a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}"
-                  [attr.aria-label]="teil.text + ' ' + quelle.titel + (quelle.seite ? ' · ' + texte.seite(quelle.seite) : '')">{{ teil.text }}</a>
-              } @else if (quelle.pfad) {
-                <a [routerLink]="'/wissen/' + quelle.pfad" [attr.aria-label]="teil.text + ' ' + quelle.titel">{{ teil.text }}</a>
-              } @else {<ng-container>{{ teil.text }}</ng-container>}
-            } @else {<ng-container>{{ teil.text }}</ng-container>}
+    @if (inhalt.seite.version) {
+      <div><dt>{{ texte.stand }}</dt><dd>{{ texte.version(inhalt.seite.version) }}</dd></div>
+    }
+    @if (inhalt.seite.freigegebenAm) {
+      <div><dt>{{ texte.freigegeben }}</dt><dd>{{ zeitpunkt(inhalt.seite.freigegebenAm) }}</dd></div>
+    }
+  </dl>
+  <div class="spalten">
+    <div class="haupt">
+      <article class="karte text">
+        <ng-container [ngTemplateOutlet]="textbaum"
+          [ngTemplateOutletContext]="{ $implicit: inhalt.text, quellen: inhalt.quellenNachSchluessel }" />
+      </article>
+      <section class="karte versionen" aria-labelledby="wissen-versionen">
+        <h2 id="wissen-versionen">{{ texte.versionen }}</h2>
+        <ol>
+          @for (version of inhalt.versionen.versionen; track version.nummer) {
+            @if (version.nummer) {
+              <li>
+                @if (version.zeit) {
+                  <button mat-button type="button" (click)="versionOeffnen(version.nummer)">{{ texte.version(version.nummer) }}</button>
+                } @else {
+                  <span class="version">{{ texte.version(version.nummer) }}</span>
+                }
+                @if (version.zeit) { <span class="gedaempft">{{ zeitpunkt(version.zeit) }}</span> }
+              </li>
+            }
           }
-          @case ('p') { <p><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></p> }
-          @case ('h1') { <h2><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h2> }
-          @case ('h2') { <h2><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h2> }
-          @case ('h3') { <h3><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h3> }
-          @case ('h4') { <h4><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h4> }
-          @case ('h5') { <h5><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h5> }
-          @case ('h6') { <h6><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h6> }
-          @case ('ul') { <ul><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></ul> }
-          @case ('ol') { <ol><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></ol> }
-          @case ('li') { <li><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></li> }
-          @case ('blockquote') { <blockquote><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></blockquote> }
-          @case ('pre') { <pre><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></pre> }
-          @case ('em') { <em><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></em> }
-          @case ('strong') { <strong><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></strong> }
-          @case ('code') { <code><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></code> }
-          @case ('br') { <br> }
+        </ol>
+        @if (versionLaedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
+        @if (versionsFehler(); as meldung) { <p class="fehler" role="alert">{{ meldung }}</p> }
+        @if (versionsText(); as version) {
+          <div class="fruehere">
+            <div class="knoepfe zwischenkopf">
+              <h3>{{ texte.version(version.nummer) }}</h3>
+              <button mat-stroked-button type="button" (click)="versionSchliessen()">{{ texte.versionSchliessen }}</button>
+            </div>
+            <div class="text">
+              <ng-container [ngTemplateOutlet]="textbaum"
+                [ngTemplateOutletContext]="{ $implicit: version.text, quellen: null }" />
+            </div>
+          </div>
         }
-      }
-    </ng-template>
-  </section>
+      </section>
+    </div>
+    <div class="leiste">
+      <section class="karte" aria-labelledby="wissen-quellen">
+        <h2 id="wissen-quellen">{{ texte.quellen }}</h2>
+        <ul class="quellen">
+          @for (quelle of inhalt.quellen; track quelle.schluessel) {
+            <li>
+              @if (quelle.dokumentId) {
+                <app-symbol name="dokument" />
+                <span>
+                  <a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}">
+                    {{ quelle.titel }} @if (quelle.seite) { · {{ texte.seite(quelle.seite) }} }
+                  </a>
+                  @if (quelle.datum) { <span class="gedaempft"> · {{ texte.quellendatum }}: {{ datum(quelle.datum) }}</span> }
+                </span>
+              } @else if (quelle.pfad) {
+                <app-symbol name="wissen" />
+                <a [routerLink]="'/wissen/' + quelle.pfad">{{ quelle.titel }}</a>
+              }
+            </li>
+          }
+        </ul>
+      </section>
+      <section class="karte" aria-labelledby="wissen-eingehend">
+        <h2 id="wissen-eingehend">{{ texte.eingehend }}</h2>
+        @if (!inhalt.eingehend.length) { <p class="gedaempft">{{ texte.keineEintraege }}</p> }
+        @else {
+          <ul class="chips">
+            @for (seite of inhalt.eingehend; track seite.id) {
+              <li><a class="chip" [routerLink]="'/wissen/' + seite.pfad"><app-symbol name="wissen" />{{ seite.titel }}</a></li>
+            }
+          </ul>
+        }
+      </section>
+    </div>
+  </div>
 }
+<ng-template #textbaum let-teile let-quellen="quellen">
+  @for (teil of teile; track $index) {
+    @switch (teil.art) {
+      @case ('text') {<ng-container>{{ teil.text }}</ng-container>}
+      @case ('link') { <a [routerLink]="teil.pfad">{{ teil.text }}</a> }
+      @case ('quelle') {
+        @if (quellen?.get(teil.quelle); as quelle) {
+          @if (quelle.dokumentId) {
+            <sup class="fussnote"><a [routerLink]="['/dokument', quelle.dokumentId]" [queryParams]="{seite: quelle.seite}"
+              [attr.aria-label]="teil.text + ' ' + quelle.titel + (quelle.seite ? ' · ' + texte.seite(quelle.seite) : '')">{{ teil.text }}</a></sup>
+          } @else if (quelle.pfad) {
+            <sup class="fussnote"><a [routerLink]="'/wissen/' + quelle.pfad" [attr.aria-label]="teil.text + ' ' + quelle.titel">{{ teil.text }}</a></sup>
+          } @else {<sup class="fussnote">{{ teil.text }}</sup>}
+        } @else {<sup class="fussnote">{{ teil.text }}</sup>}
+      }
+      @case ('p') { <p><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></p> }
+      @case ('h1') { <h2><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h2> }
+      @case ('h2') { <h2><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h2> }
+      @case ('h3') { <h3><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h3> }
+      @case ('h4') { <h4><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h4> }
+      @case ('h5') { <h5><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h5> }
+      @case ('h6') { <h6><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></h6> }
+      @case ('ul') { <ul><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></ul> }
+      @case ('ol') { <ol><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></ol> }
+      @case ('li') { <li><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></li> }
+      @case ('blockquote') {
+        <blockquote [class.widerspruch]="widerspruch(teil)"><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></blockquote>
+      }
+      @case ('pre') { <pre><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></pre> }
+      @case ('em') { <em><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></em> }
+      @case ('strong') { <strong><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></strong> }
+      @case ('code') { <code><ng-container [ngTemplateOutlet]="textbaum" [ngTemplateOutletContext]="{ $implicit: teil.kinder, quellen }" /></code> }
+      @case ('br') { <br> }
+    }
+  }
+</ng-template>

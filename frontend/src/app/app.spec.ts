@@ -17,6 +17,7 @@ import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
+import { WissenEntwurfZaehler } from './wissen/wissen-entwurf-zaehler';
 
 class AnmeldungAttrappe {
   readonly zustand = signal<Sitzungszustand>('abgemeldet');
@@ -84,11 +85,14 @@ describe('App (Req 2.6, 8.6)', () => {
           { path: 'erfassen', component: Leer },
           { path: 'suche', component: Leer },
           { path: 'chat', component: Leer },
+          { path: 'wissen', component: Leer },
+          { path: 'wissen/entwuerfe', component: Leer },
         ]),
         { provide: WarteschlangeService, useFactory: () => ((warteschlangeGestartet = true), {}) },
         { provide: AnmeldungService, useValue: anmeldung },
         { provide: BrandingService, useValue: { branding: signal(STANDARD_BRANDING) } },
         { provide: EingangskorbZaehler, useValue: zaehler },
+        { provide: WissenEntwurfZaehler, useValue: { anzahl: signal(3), fehler: signal(null), auffrischen: vi.fn() } },
         { provide: ONLINE, useValue: online },
         {
           provide: SwUpdate,
@@ -140,6 +144,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.chat,
         TEXTE.menue.kontakte,
         TEXTE.menue.wissen,
+        TEXTE.wissen.entwuerfe.titel,
         TEXTE.menue.importe,
         TEXTE.menue.export,
         TEXTE.menue.dokumentarten,
@@ -161,6 +166,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.chat,
         TEXTE.menue.kontakte,
         TEXTE.menue.wissen,
+        TEXTE.wissen.entwuerfe.titel,
       ],
     ],
     ['treuhaender', [TEXTE.menue.uebersicht, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen, TEXTE.menue.export]],
@@ -333,5 +339,17 @@ describe('App (Req 2.6, 8.6)', () => {
     expect(window.localStorage.getItem('archiv.farbschema')).toBe(nachher);
     window.localStorage.removeItem('archiv.farbschema');
     delete document.documentElement.dataset['farbschema'];
+  });
+
+  it('hebt nur den genauesten Menüpunkt hervor', async () => {
+    anmeldung.als('inhaber');
+    const fixture = TestBed.createComponent(App);
+    await TestBed.inject(Router).navigateByUrl('/wissen/entwuerfe');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const aktiv = [...(fixture.nativeElement as HTMLElement).querySelectorAll('nav a[aria-current=page]')].map((a) =>
+      a.getAttribute('href'),
+    );
+    expect(aktiv).toEqual(['/wissen/entwuerfe']);
   });
 });

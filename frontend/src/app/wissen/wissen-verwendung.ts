@@ -1,16 +1,18 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { WissensIndex } from '../gemeinsam/api';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
 @Component({
   selector: 'app-wissen-verwendung',
-  imports: [RouterLink],
+  imports: [RouterLink, MatButtonModule, Symbol],
   templateUrl: './wissen-verwendung.html',
-  styleUrl: './wissen.scss',
+  styleUrl: './wissen-verwendung.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WissenVerwendung {

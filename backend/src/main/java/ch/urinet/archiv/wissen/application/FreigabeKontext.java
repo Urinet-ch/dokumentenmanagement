@@ -70,7 +70,7 @@ public class FreigabeKontext {
                 seiten.stream().map(WissenIngestPort.SeitenMetadaten::pfad).collect(Collectors.toSet()),
                 daten.dokumentQuellenLaden(quellenDokumente), Set.copyOf(sichtbarkeit.sichtbareSeiten(benutzer)),
                 basisSchluessel, vorschlag.entfernteAussagen(), kernaussagen, "INGEST".equals(aenderung.anlass()),
-                "VERALTEN".equals(aenderung.aktion()), false, bisher, null);
+                "VERALTEN".equals(aenderung.aktion()), false, bisher, null, "IMPORT".equals(aenderung.anlass()));
         return pruefung.pruefen(fassung, graph, mindeststufe, WissensStufe.valueOf(vorschlag.kontextstufe()),
                 gewuenschteStufe, kontext);
     }

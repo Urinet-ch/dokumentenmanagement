@@ -40,7 +40,7 @@ When('ich die Wissensoberfläche auf 375 Pixeln öffne', async function () {
   await this.seite.setViewportSize({ width: 375, height: 812 });
   await this.seite.getByRole('button', { name: 'Menü öffnen' }).click();
   await this.seite.getByRole('navigation', { name: 'Hauptnavigation' })
-    .getByRole('link', { name: 'Wissen' }).click();
+    .getByRole('link', { name: 'Wissen', exact: true }).click();
   await this.seite.getByRole('heading', { name: 'Wissen', exact: true }).waitFor();
   await this.seite.addScriptTag({ content: axe.source });
 });

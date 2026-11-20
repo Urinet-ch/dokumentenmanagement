@@ -16,6 +16,29 @@ class DiffDienstTest {
     private final DiffDienst dienst = new DiffDienst(new JavaWissenZeilendiff());
 
     @Test
+    void aufgeloesterBlockIstImDiffMitBeidenQuellenMarkiert() {
+        String block = "> ⚠️ Widerspruch: Alt.[^alt] Neu.[^neu]";
+        var diff = dienst.vergleichen(seite("Titel", List.of(), List.of(), block),
+                seite("Titel", List.of(), List.of(), "Neu.[^neu]"));
+        assertThat(diff.widersprueche().alt()).hasSize(1);
+        assertThat(diff.widersprueche().neu()).isEmpty();
+        assertThat(diff.entfernteWidersprueche()).singleElement()
+                .satisfies(b -> assertThat(b.fussnoten()).containsExactlyInAnyOrder("alt", "neu"));
+    }
+
+    @Test
+    void altesDiffJsonOhneWiderspruchsfelderBleibtLesbar() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var diff = mapper.readValue(
+                "{\"zeilen\":[],\"titel\":{\"alt\":\"A\",\"neu\":\"B\"},\"beschreibung\":{\"alt\":null,\"neu\":\"x\"},"
+                        + "\"tags\":{\"alt\":[],\"neu\":[]},\"quellen\":{\"alt\":[],\"neu\":[]}}",
+                DiffDienst.Diff.class);
+        assertThat(diff.widersprueche().alt()).isEmpty();
+        assertThat(diff.widersprueche().neu()).isEmpty();
+        assertThat(diff.entfernteWidersprueche()).isEmpty();
+    }
+
+    @Test
     void zeilenUndGeaenderteFelderSindGetrenntErkennbar() {
         Quelleneintrag quelle = new Quelleneintrag("q1", UUID.randomUUID(), 1, 1, "Probe", null);
         DiffDienst.Diff diff = dienst.vergleichen(

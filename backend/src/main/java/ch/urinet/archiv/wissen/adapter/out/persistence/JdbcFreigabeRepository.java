@@ -148,13 +148,14 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
 
     private record FassungDaten(String typ, String titel, String beschreibung, List<String> tags, String status,
                                 java.time.LocalDate veraltetAb, List<Quelleneintrag> quellen, String vertraulichkeit,
-                                String inhalt, UUID wissensquelleId) {
+                                String inhalt, UUID wissensquelleId,
+                                ch.urinet.archiv.wissen.domain.paket.PaketSeite paketSeite) {
     }
 
     @Override
     public void fassungSpeichern(UUID entwurfId, Aenderung aenderung, Wissensseite fassung,
                                  WissensStufe mindeststufe, WissensStufe wirksameStufe, String erzeugtVon,
-                                 String benutzer, String grund, Set<String> links) {
+                                 String benutzer, String grund, Set<String> links, boolean widerspruchAufgeloest) {
         String tags;
         String quellen;
         try {
@@ -167,11 +168,11 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                 insert into wissensseite
                     (id, pfad, typ, titel, beschreibung, tags, status, veraltet_ab, vertraulichkeit,
                      vertraulichkeit_mindest, inhalt, version, erzeugt_von, erzeugt_am, freigegeben_von,
-                     freigegeben_am, wissensquelle_id)
+                     freigegeben_am, wissensquelle_id, widerspruch_offen)
                 values (:id, :pfad, :typ, :titel, :beschreibung,
                         array(select jsonb_array_elements_text(cast(:tags as jsonb))), :status,
                         cast(:veraltet as date), :wirksam, :mindest, :inhalt, :version, :erzeugt, now(),
-                        :freigegeben, now(), :quelle)
+                        :freigegeben, now(), :quelle, :widerspruch)
                 on conflict (id) do update set
                     typ = excluded.typ, titel = excluded.titel, beschreibung = excluded.beschreibung, tags = excluded.tags,
                     status = excluded.status, veraltet_ab = excluded.veraltet_ab,
@@ -180,7 +181,7 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                     inhalt = excluded.inhalt, version = excluded.version, erzeugt_von = excluded.erzeugt_von,
                     erzeugt_am = excluded.erzeugt_am, freigegeben_von = excluded.freigegeben_von,
                     freigegeben_am = excluded.freigegeben_am, wissensquelle_id = excluded.wissensquelle_id,
-                    quelle_pruefen = false
+                    quelle_pruefen = false, widerspruch_offen = excluded.widerspruch_offen
                 """);
         schreiben.setParameter("id", fassung.id()).setParameter("pfad", fassung.pfad())
                 .setParameter("typ", fassung.typ().datenbankwert()).setParameter("titel", fassung.titel())
@@ -190,6 +191,7 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                 .setParameter("inhalt", fassung.inhalt())
                 .setParameter("version", fassung.version()).setParameter("erzeugt", erzeugtVon)
                 .setParameter("freigegeben", "human:" + benutzer).setParameter("quelle", fassung.wissensquelleId())
+                .setParameter("widerspruch", fassung.widerspruchOffen())
                 .executeUpdate();
         em.get().createNativeQuery("""
                 insert into wissensseite_version
@@ -200,7 +202,8 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                            'beschreibung', s.beschreibung, 'tags', to_jsonb(s.tags), 'status', s.status,
                            'veraltet_ab', s.veraltet_ab, 'vertraulichkeit', s.vertraulichkeit,
                            'vertraulichkeit_mindest', s.vertraulichkeit_mindest,
-                           'quellen', cast(:quellen as jsonb), 'wissensquelle_id', s.wissensquelle_id),
+                           'quellen', cast(:quellen as jsonb), 'wissensquelle_id', s.wissensquelle_id,
+                           'widerspruch_offen', s.widerspruch_offen),
                        s.inhalt, s.erzeugt_von, s.freigegeben_von, now(), :grund, :entwurf, :aenderung
                 from wissensseite s where s.id = :id
                 """).setParameter("quellen", quellen).setParameter("grund", grund)
@@ -241,10 +244,12 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
             default -> throw new IllegalStateException("Ungültige Wissensänderungsaktion");
         };
         em.get().createNativeQuery("""
-                insert into wissens_log (zeit, aktion, akteur, seiten, entwurf_id)
-                values (now(), :aktion, :akteur, array[cast(:seite as uuid)], :entwurf)
+                insert into wissens_log (zeit, aktion, akteur, seiten, entwurf_id, angaben)
+                values (now(), :aktion, :akteur, array[cast(:seite as uuid)], :entwurf,
+                        jsonb_build_object('widerspruchAufgeloest', :aufgeloest))
                 """).setParameter("aktion", aktion).setParameter("akteur", "human:" + benutzer)
-                .setParameter("seite", fassung.id()).setParameter("entwurf", entwurfId).executeUpdate();
+                .setParameter("seite", fassung.id()).setParameter("entwurf", entwurfId)
+                .setParameter("aufgeloest", widerspruchAufgeloest).executeUpdate();
     }
 
     @Override
@@ -264,7 +269,10 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
     @Override
     public boolean entwurfAbschliessen(UUID entwurfId) {
         return em.get().createNativeQuery("""
-                update wissens_entwurf e set status = 'ERLEDIGT', abgeschlossen = clock_timestamp()
+                update wissens_entwurf e set status = case when e.anlass = 'IMPORT'
+                    and not exists(select 1 from wissens_aenderung a where a.entwurf_id = e.id
+                        and a.status = 'ANGENOMMEN') then 'ABGELEHNT' else 'ERLEDIGT' end,
+                    abgeschlossen = clock_timestamp()
                 where e.id = :id and e.status = 'OFFEN'
                   and not exists (select 1 from wissens_aenderung a where a.entwurf_id = e.id
                                   and a.status in ('OFFEN', 'VERALTET'))
@@ -285,7 +293,7 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                        case when e.anlass = 'ANALYSE'
                             then jsonb_build_object('vorschlagender', e.erstellt_von) else null end
                 from wissens_entwurf e
-                where e.id = :id and (e.anlass = 'INGEST' or
+                where e.id = :id and (e.anlass in ('INGEST', 'IMPORT') or
                       (e.anlass = 'ANALYSE' and exists (
                           select 1 from wissens_aenderung a
                           where a.entwurf_id = e.id and a.status = 'ANGENOMMEN')))
