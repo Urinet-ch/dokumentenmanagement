@@ -87,6 +87,10 @@ public enum Fehlercode {
     INTERNER_FEHLER(500, "Interner Fehler",
             "Im Archiv ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut und "
                     + "nennen Sie bei Rückfragen die Fehler-ID."),
+    IDENTITAETSDIENST_FEHLER(502, "Identitätsdienst fehlerhaft",
+            "Der Identitätsdienst hat die Anfrage abgelehnt. Bitte versuchen Sie es später erneut."),
+    IDENTITAETSDIENST_NICHT_ERREICHBAR(503, "Identitätsdienst nicht erreichbar",
+            "Der Identitätsdienst ist gerade nicht erreichbar. Bitte versuchen Sie es später erneut."),
     UEBERLASTET(503, "Archiv ausgelastet",
             "Das Archiv prüft gerade zu viele Anmeldungen gleichzeitig. Bitte versuchen Sie es in einigen Sekunden "
                     + "erneut."),

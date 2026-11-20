@@ -42,7 +42,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 5.2, 5.3, 5.4, 6.9, 7.4_
   - _Abhängig von: 19.2_
 
-- [ ] 19.4 Port `IdentitaetsDienst` und Adapter Keycloak [Backend]
+- [x] 19.4 Port `IdentitaetsDienst` und Adapter Keycloak [Backend]
   - Port, Dev-Stub, `KeycloakAdminAdapter` (JDK-HTTP-Client, Positivliste der Aufrufe, Token-Cache, Zeitgrenzen, zwei gleichzeitige
     Aufrufe, Schutzschalter, Fehlerabbildung auf 502 und 503, Filter auf `mandant`), Detail-Health; `SecretPruefung` verlangt
     `keycloak_verwaltung_secret` für `api` und Kommando; Konfiguration `archiv.verwaltung.keycloak.*`; WireMock-Tests

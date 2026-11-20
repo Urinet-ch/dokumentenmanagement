@@ -517,3 +517,17 @@ Nicht nachgewiesen wurden die interne Compose-Adresse samt Backchannel-Issuer, �
 in einem interaktiven Benutzertoken, `prompt=login` gegen den Cookie-Zweig und `execute-actions-email` ohne Passwort mit
 `VERIFY_EMAIL`, `UPDATE_PASSWORD` und `CONFIGURE_TOTP`. Der Test-Realm führt keinen Browser-Flow- und SMTP-Nachweis aus;
 diese Punkte bleiben vor der Realm-Änderung offen.
+
+## Umsetzung 19.4 — Keycloak-Adapter
+
+`KeycloakAdminAdapter` ist nur im Profil `prod` aktiv; Dev und Tests verwenden den speicherbasierten Stub. Der Adapter
+nutzt den JDK-HTTP-Client, eine feste Positivliste aus Methode und Pfad sowie Antworten bis 1 MiB. Er cached das
+Client-Credentials-Token bis 30 Sekunden vor Ablauf, begrenzt Verbindung und Anfrage gemäss Konfiguration und erlaubt
+höchstens zwei gleichzeitige Aufrufe. Schreibaufrufe werden nicht wiederholt; Leseaufrufe nach Transportfehler oder 5xx
+höchstens einmal nach 200 ms. Drei Fehler innerhalb 30 Sekunden öffnen den Schutzschalter für 30 Sekunden.
+
+Die Admin-Basisadresse kommt im Profil `prod` aus `ARCHIV_KEYCLOAK_ADMIN_URL`; das Dienstkonto-Secret wird nur aus
+`keycloak_verwaltung_secret` gelesen und von `SecretPruefung` für `api` und `kommando` verlangt. Eine eigene
+`@HealthGroup("detail")` prüft, ob ein Token geholt werden kann; sie gehört weder zur Liveness noch zur Readiness.
+WireMock-Tests decken Mandantenfilter, Zeitüberschreitung, 5xx-Wiederholung, 401, Schreibaufruf ohne Wiederholung und
+Schutzschalter ab.

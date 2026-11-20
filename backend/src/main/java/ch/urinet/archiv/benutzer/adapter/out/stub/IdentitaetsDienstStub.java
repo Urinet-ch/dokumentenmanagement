@@ -6,6 +6,7 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
+import io.quarkus.arc.profile.UnlessBuildProfile;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -19,7 +20,8 @@ import java.util.UUID;
 
 /** Speicherbasierter Identitätsdienst für Entwicklung und Tests, ohne tatsächlichen Mailversand. */
 @ApplicationScoped
-@Typed(IdentitaetsDienstStub.class)
+@UnlessBuildProfile("prod")
+@Typed(IdentitaetsDienst.class)
 public class IdentitaetsDienstStub implements IdentitaetsDienst {
     private static final int SEITENGROESSE = 50;
     private final Map<String, Eintrag> benutzer = new HashMap<>();

@@ -31,6 +31,7 @@ public class ProblemAbbildung {
     static final String BEARER = "Bearer";
     /** Wartezeit für {@code SPEICHER_NICHT_ERREICHBAR} (design.md «Error Handling»), Auslegung Aufgabe 2.4. */
     static final String SPEICHER_NOCHMALS_NACH_SEKUNDEN = "30";
+    static final String DIENST_NOCHMALS_NACH_SEKUNDEN = "1";
 
     @ServerExceptionMapper
     public Response fachFehler(FachFehler fehler) {
@@ -55,7 +56,10 @@ public class ProblemAbbildung {
                     .header(HttpHeaders.RETRY_AFTER, Long.toString(zuViele.wartezeitSekunden())).build();
         }
         Response.ResponseBuilder antwort = builder(ProblemAntwort.fuer(fehler.code()));
-        if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {
+        if (fehler.code() == Fehlercode.UEBERLASTET
+                || fehler.code() == Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR) {
+            antwort.header(HttpHeaders.RETRY_AFTER, DIENST_NOCHMALS_NACH_SEKUNDEN);
+        } else if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {
             antwort.header(HttpHeaders.RETRY_AFTER, SPEICHER_NOCHMALS_NACH_SEKUNDEN);
         }
         return antwort.build();
