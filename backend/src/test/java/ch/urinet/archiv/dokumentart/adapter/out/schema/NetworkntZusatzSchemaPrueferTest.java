@@ -4,6 +4,7 @@ import ch.urinet.archiv.dokumentart.adapter.out.schema.NetworkntZusatzSchemaPrue
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.mandant.MandantProvisionierungTestadapter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.InvalidSchemaException;
 import com.networknt.schema.Schema;
@@ -500,6 +501,44 @@ class NetworkntZusatzSchemaPrueferTest {
         }
         pruefend.join(Duration.ofSeconds(10));
         assertThat(ergebnis.get()).isEqualTo(Set.of("angebot_gueltig_bis"));
+    }
+
+    /**
+     * Die Provisionierung der Tests ({@link MandantProvisionierungTestadapter}) prüft den Seed wie das Kommando auf
+     * einem Plattform-Thread, also mit der Rechenzeit: Wartet die Prüfung länger als die Frist an der Sperre des Caches,
+     * ist das Schema trotzdem gültig. Im virtuellen Thread zählte die Wanduhr das Warten (instabile CI, «Seed ungültig
+     * für Mandant urinet» in {@code VerarbeitenZeitgrenzeTest}, 20.11.2026).
+     */
+    @Test
+    void provisionierungDerTestsMisstDieSeedFristAlsRechenzeit() throws Exception {
+        assumeTrue(ManagementFactory.getThreadMXBean().isCurrentThreadCpuTimeSupported(), "CPU-Zeit des Threads");
+        var anwendung = new NetworkntZusatzSchemaPruefer(GRENZE, GRENZE);
+        AtomicReference<Thread> pruefend = new AtomicReference<>();
+        AtomicReference<Object> ergebnis = new AtomicReference<>();
+        Thread aufrufer;
+        synchronized (anwendung.cache) {
+            aufrufer = Thread.ofPlatform().start(() -> {
+                try {
+                    ergebnis.set(MandantProvisionierungTestadapter.aufFrischemThread(() -> {
+                        pruefend.set(Thread.currentThread());
+                        return anwendung.seedSchemaPruefen(OFFERTE);
+                    }));
+                } catch (RuntimeException e) {
+                    ergebnis.set(e);
+                }
+            });
+            long bis = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            // Thread.getState statt wartetAufSperre: ThreadMXBean kennt keine virtuellen Threads, der Test soll auch dort
+            // am Ergebnis scheitern, nicht am Warten auf die Sperre
+            while (pruefend.get() == null || pruefend.get().getState() != Thread.State.BLOCKED) {
+                assertThat(System.nanoTime() - bis).as("Prüfung wartet an der Sperre des Caches").isNegative();
+                Thread.onSpinWait();
+            }
+            schlafen();
+        }
+        aufrufer.join(Duration.ofSeconds(10));
+        assertThat(ergebnis.get()).isEqualTo(Set.of("angebot_gueltig_bis"));
+        assertThat(pruefend.get().isVirtual()).as("virtueller Thread").isFalse();
     }
 
     private static boolean wartetAufSperre(Thread thread, Object sperre) {
