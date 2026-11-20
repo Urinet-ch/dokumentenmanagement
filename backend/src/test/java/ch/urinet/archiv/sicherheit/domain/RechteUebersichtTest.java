@@ -22,4 +22,20 @@ class RechteUebersichtTest {
             }
         }
     }
+
+    @Test
+    void fussnotenStammenAusDerRechtematrix() {
+        RechteUebersicht uebersicht = RechteUebersicht.ausRechtematrix();
+        for (RechteUebersicht.AktionRechte zeile : uebersicht.aktionen()) {
+            assertThat(zeile.fussnoten()).containsOnlyKeys(Rolle.values());
+            for (Rolle rolle : Rolle.values()) {
+                assertThat(zeile.fussnoten().get(rolle)).isEqualTo(Rechtematrix.fussnoten(rolle, zeile.aktion()));
+            }
+        }
+        assertThat(Rechtematrix.fussnoten(Rolle.GESCHAEFTSSTELLE, Aktion.A22)).containsExactly(Fussnote.GESCHAEFTSSTELLE_OFFEN);
+        assertThat(Rechtematrix.fussnoten(Rolle.GESCHAEFTSSTELLE, Aktion.A11)).containsExactly(Fussnote.GESCHAEFTSSTELLE_OFFEN);
+        assertThat(Rechtematrix.fussnoten(Rolle.MITARBEITER, Aktion.A4)).containsExactly(Fussnote.NUR_EIGENE);
+        assertThat(Rechtematrix.fussnoten(Rolle.INHABER, Aktion.A22)).isEmpty();
+        assertThat(Rechtematrix.fussnoten(Rolle.GESCHAEFTSSTELLE, Aktion.A1)).isEmpty();
+    }
 }

@@ -27,4 +27,16 @@ class RollenGrenzeTest {
         assertThat(Rolle.GESCHAEFTSSTELLE.darfVergeben(Rolle.INHABER)).isFalse();
         assertThat(Rolle.MITARBEITER.darfVergeben(Rolle.GESCHAEFTSSTELLE)).isFalse();
     }
+
+    @Test
+    void rangfolgeAusSpecGiltFuerAlleSechzehnPaare() {
+        // Req 4.6: inhaber > geschaeftsstelle > mitarbeiter > treuhaender; vergeben darf man gleich starke oder schwächere
+        List<Rolle> rang = List.of(Rolle.INHABER, Rolle.GESCHAEFTSSTELLE, Rolle.MITARBEITER, Rolle.TREUHAENDER);
+        for (int a = 0; a < rang.size(); a++) {
+            for (int z = 0; z < rang.size(); z++) {
+                assertThat(rang.get(a).darfVergeben(rang.get(z))).as("%s vergibt %s", rang.get(a), rang.get(z))
+                        .isEqualTo(z >= a);
+            }
+        }
+    }
 }

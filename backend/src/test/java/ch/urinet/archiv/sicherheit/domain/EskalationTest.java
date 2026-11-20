@@ -65,4 +65,18 @@ class EskalationTest {
         }
         return ERLAUBT;
     }
+
+    @Test
+    void selbstzugriffAufSichSelbstIstVerbotenAufAndereErlaubt() {
+        Benutzer inhaber = new Benutzer("a", Rolle.INHABER);
+        Benutzer anderer = new Benutzer("b", Rolle.MITARBEITER);
+        for (Vergaberegeln.Selbstaktion aktion : Vergaberegeln.Selbstaktion.values()) {
+            assertThat(Vergaberegeln.pruefeSelbstzugriff(inhaber, inhaber, aktion))
+                    .as("%s gegen sich selbst", aktion).isEqualTo(Vergaberegeln.Pruefung.ESKALATION_VERBOTEN);
+            assertThat(Vergaberegeln.pruefeSelbstzugriff(inhaber, anderer, aktion))
+                    .as("%s gegen andere", aktion).isEqualTo(Vergaberegeln.Pruefung.ERLAUBT);
+            assertThat(Vergaberegeln.pruefeSelbstzugriff(anderer, anderer, aktion))
+                    .as("%s ohne A22", aktion).isEqualTo(Vergaberegeln.Pruefung.NICHT_ERLAUBT);
+        }
+    }
 }

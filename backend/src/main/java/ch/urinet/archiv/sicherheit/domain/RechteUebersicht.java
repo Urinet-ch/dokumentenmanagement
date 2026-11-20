@@ -19,17 +19,25 @@ public record RechteUebersicht(List<AktionRechte> aktionen) {
             for (Rolle rolle : Rolle.values()) {
                 rechte.put(rolle, Rechtematrix.ergebnis(rolle, aktion));
             }
-            return new AktionRechte(aktion, aktion.bezeichnung(), rechte);
+            Map<Rolle, List<Fussnote>> fussnoten = new EnumMap<>(Rolle.class);
+            for (Rolle rolle : Rolle.values()) {
+                fussnoten.put(rolle, Rechtematrix.fussnoten(rolle, aktion));
+            }
+            return new AktionRechte(aktion, aktion.bezeichnung(), rechte, fussnoten);
         }).toList();
         return new RechteUebersicht(aktionen);
     }
 
-    public record AktionRechte(Aktion aktion, String bezeichnung, Map<Rolle, Ergebnis> rollen) {
+    public record AktionRechte(Aktion aktion, String bezeichnung, Map<Rolle, Ergebnis> rollen,
+                         Map<Rolle, List<Fussnote>> fussnoten) {
 
         public AktionRechte {
             EnumMap<Rolle, Ergebnis> kopie = new EnumMap<>(Rolle.class);
             kopie.putAll(rollen);
             rollen = Collections.unmodifiableMap(kopie);
+            EnumMap<Rolle, List<Fussnote>> notenKopie = new EnumMap<>(Rolle.class);
+            fussnoten.forEach((rolle, noten) -> notenKopie.put(rolle, List.copyOf(noten)));
+            fussnoten = Collections.unmodifiableMap(notenKopie);
         }
     }
 }

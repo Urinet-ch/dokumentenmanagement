@@ -257,7 +257,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
 4. Das Archiv SOLL je Mandant einen festen Satz vergebbarer Rollen führen (Spalte `public.mandant.verwaltung_rollen`,
    gesetzt vom Betreiber beim Anlegen oder per Admin-Kommando, nie über die Oberfläche; Standard `inhaber`,
    `mitarbeiter`, `treuhaender`; `vhf-gsk`: `geschaeftsstelle`). FALLS ein Aufruf eine andere Rolle verlangt, DANN SOLL
-   das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` antworten.
+   das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` antworten. «Andere Rolle» heisst: keine der vier Archiv-Rollen
+   (unbekannt, etwa eine Realm-Rolle). Eine bekannte Archiv-Rolle ausserhalb des Satzes des Mandanten fällt unter 4.6
+   (403 `ESKALATION_VERBOTEN`).
 5. WENN ein Benutzer mit Recht A23 die Rolle eines Benutzers ändert (Step-up), DANN SOLL das Archiv in Keycloak die
    neue Rolle setzen und alle anderen der vier Archiv-Rollen entfernen und den Token-Widerruf setzen (4.9); hat ein
    Benutzer in Keycloak mehrere Archiv-Rollen (von Hand gesetzt), SOLL die Verwaltung das als Abweichung

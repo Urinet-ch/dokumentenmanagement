@@ -33,6 +33,7 @@ public class BenutzerRollenSchritte {
     private int aktiveInhaber;
     private Rolle pruefRolle;
     private Aktion pruefAktion;
+    private Vergaberegeln.Selbstaktion selbstaktion;
 
     @Dann("gelten für A20 bis A23 diese Rechte:")
     public void rechte(DataTable tabelle) {
@@ -84,6 +85,18 @@ public class BenutzerRollenSchritte {
     @Wenn("die Rollenvergabe geprüft wird")
     public void rollenvergabePruefen() {
         pruefung = Vergaberegeln.pruefeRollenvergabe(akteur, ziel, rollenCode, mandantenRollen);
+    }
+
+    @Angenommen("«{word}» richtet die Aktion «{word}» gegen sich selbst")
+    public void selbstaktion(String rolle, String aktion) {
+        akteur = new Benutzer("selbst", rolle(rolle));
+        ziel = akteur;
+        selbstaktion = Vergaberegeln.Selbstaktion.valueOf(aktion);
+    }
+
+    @Wenn("der Selbstzugriff geprüft wird")
+    public void selbstzugriffPruefen() {
+        pruefung = Vergaberegeln.pruefeSelbstzugriff(akteur, ziel, selbstaktion);
     }
 
     @Dann("lautet das Ergebnis «{word}»")

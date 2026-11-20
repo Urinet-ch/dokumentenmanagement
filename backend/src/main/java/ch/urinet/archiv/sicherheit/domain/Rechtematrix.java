@@ -1,6 +1,8 @@
 package ch.urinet.archiv.sicherheit.domain;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -67,6 +69,23 @@ public final class Rechtematrix {
 
     public static Ergebnis ergebnis(Rolle rolle, Aktion aktion) {
         return ZEILEN.get(aktion).get(rolle);
+    }
+
+    /**
+     * Fussnoten der Zelle (Req 4.12): ¹ für {@code geschaeftsstelle} bei A11 bis A14 und A20 bis A23 (403, bis Spec 03
+     * entscheidet), ² bei «nur eigene».
+     */
+    public static List<Fussnote> fussnoten(Rolle rolle, Aktion aktion) {
+        List<Fussnote> fussnoten = new ArrayList<>();
+        if (rolle == Rolle.GESCHAEFTSSTELLE && ergebnis(rolle, aktion) == VERBOTEN
+                && (aktion.compareTo(Aktion.A11) >= 0 && aktion.compareTo(Aktion.A14) <= 0
+                || aktion.compareTo(Aktion.A20) >= 0 && aktion.compareTo(Aktion.A23) <= 0)) {
+            fussnoten.add(Fussnote.GESCHAEFTSSTELLE_OFFEN);
+        }
+        if (ergebnis(rolle, aktion) == NUR_EIGENE) {
+            fussnoten.add(Fussnote.NUR_EIGENE);
+        }
+        return List.copyOf(fussnoten);
     }
 
     /**

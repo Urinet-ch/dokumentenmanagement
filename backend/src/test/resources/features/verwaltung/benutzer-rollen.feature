@@ -36,6 +36,19 @@ Funktionalität: Benutzerrollen und Berechtigungen
     Wenn die Rollenvergabe geprüft wird
     Dann lautet das Ergebnis «ESKALATION_VERBOTEN»
 
+  @req-4.6
+  Szenariogrundriss: Der Inhaber kann sich nicht selbst sperren, deaktivieren, löschen oder den Zugang zurücksetzen
+    Angenommen «inhaber» richtet die Aktion «<aktion>» gegen sich selbst
+    Wenn der Selbstzugriff geprüft wird
+    Dann lautet das Ergebnis «ESKALATION_VERBOTEN»
+
+    Beispiele:
+      | aktion               |
+      | SPERREN              |
+      | DEAKTIVIEREN         |
+      | LOESCHEN             |
+      | ZUGANG_ZURUECKSETZEN |
+
   @req-4.7
   Szenario: Der letzte aktive Inhaber kann nicht entfernt werden
     Angenommen die Zielrolle «inhaber» gehört zu einem aktiven Benutzer und es gibt 1 aktive Inhaber
