@@ -65,9 +65,17 @@
                     <span class="zaehler" aria-hidden="true" data-test="eingangskorb-zaehler">{{ zaehler.anzahl() }}</span>
                     <span class="nur-screenreader">, {{ texte.eingangskorbAnzahl(zaehler.anzahl()!) }}</span>
                   }
+                  @if (punkt.wissensentwurfZaehler && wissensentwurfZaehler.anzahl() !== null) {
+                    <span class="zaehler" aria-hidden="true">{{ wissensentwurfZaehler.anzahl() }}</span>
+                    <span class="nur-screenreader">, {{ texte.wissen.entwuerfe.anzahl(wissensentwurfZaehler.anzahl()!) }}</span>
+                  }
                 </span>
               </a>
             }
+          }
+          @if (wissensentwurfZaehler.fehler()) {
+            <p role="alert">{{ texte.wissen.entwuerfe.zaehlerFehler }}</p>
+            <button type="button" class="knopf breit" (click)="wissensentwurfZaehler.auffrischen()">{{ texte.wissen.erneut }}</button>
           }
         </nav>
       </div>

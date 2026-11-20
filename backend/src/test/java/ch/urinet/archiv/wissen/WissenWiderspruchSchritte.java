@@ -45,6 +45,7 @@ public class WissenWiderspruchSchritte {
             dokumente.add(id);
             try (Connection c = datenbank.get().getConnection()) {
                 sql(c, "update m_urinet.dokument set seiten = 1, volltext = 'Synthetische Quelle' || chr(12), "
+                                + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false, "
                                 + "datum = cast(? as date) where id = ?",
                         jahr + "-01-01", id);
             }
@@ -77,7 +78,10 @@ public class WissenWiderspruchSchritte {
     public void ohneGrund() {
         entwurf = anlegen("Neue Frist.[^neu]" + UNABHAENGIG, quellen(true));
         given().auth().oauth2(token()).get("/api/v1/wissensentwuerfe/" + entwurf)
-                .then().statusCode(200).body("aenderungen[0].diff.entfernteWidersprueche.size()", is(1));
+                .then().statusCode(200).body("aenderungen[0].diff.entfernteWidersprueche.size()", is(1))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].text", containsString("Alte Frist."))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].fussnoten", hasItem("alt"))
+                .body("aenderungen[0].diff.entfernteWidersprueche[0].fussnoten", hasItem("neu"));
         antwort = annehmen(Map.of());
     }
 

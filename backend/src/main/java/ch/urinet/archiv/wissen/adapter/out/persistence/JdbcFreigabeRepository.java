@@ -148,7 +148,8 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
 
     private record FassungDaten(String typ, String titel, String beschreibung, List<String> tags, String status,
                                 java.time.LocalDate veraltetAb, List<Quelleneintrag> quellen, String vertraulichkeit,
-                                String inhalt, UUID wissensquelleId) {
+                                String inhalt, UUID wissensquelleId,
+                                ch.urinet.archiv.wissen.domain.paket.PaketSeite paketSeite) {
     }
 
     @Override
@@ -268,7 +269,10 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
     @Override
     public boolean entwurfAbschliessen(UUID entwurfId) {
         return em.get().createNativeQuery("""
-                update wissens_entwurf e set status = 'ERLEDIGT', abgeschlossen = clock_timestamp()
+                update wissens_entwurf e set status = case when e.anlass = 'IMPORT'
+                    and not exists(select 1 from wissens_aenderung a where a.entwurf_id = e.id
+                        and a.status = 'ANGENOMMEN') then 'ABGELEHNT' else 'ERLEDIGT' end,
+                    abgeschlossen = clock_timestamp()
                 where e.id = :id and e.status = 'OFFEN'
                   and not exists (select 1 from wissens_aenderung a where a.entwurf_id = e.id
                                   and a.status in ('OFFEN', 'VERALTET'))
@@ -289,7 +293,7 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
                        case when e.anlass = 'ANALYSE'
                             then jsonb_build_object('vorschlagender', e.erstellt_von) else null end
                 from wissens_entwurf e
-                where e.id = :id and (e.anlass = 'INGEST' or
+                where e.id = :id and (e.anlass in ('INGEST', 'IMPORT') or
                       (e.anlass = 'ANALYSE' and exists (
                           select 1 from wissens_aenderung a
                           where a.entwurf_id = e.id and a.status = 'ANGENOMMEN')))

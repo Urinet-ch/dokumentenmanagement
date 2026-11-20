@@ -11,6 +11,7 @@ export interface Menuepunkt {
   gruppe: Menuegruppe;
   symbol: SymbolName;
   eingangskorbZaehler?: boolean;
+  wissensentwurfZaehler?: boolean;
 }
 
 // Routen aus design.md «Frontend»; sichtbar nur mit dem Recht der Rechtematrix (Req 2.6).
@@ -41,6 +42,14 @@ export const MENUE: readonly Menuepunkt[] = [
     symbol: 'kontakte',
   },
   { pfad: '/wissen', text: TEXTE.menue.wissen, aktion: 'A15', gruppe: 'bestand', symbol: 'wissen' },
+  {
+    pfad: '/wissen/entwuerfe',
+    text: TEXTE.wissen.entwuerfe.titel,
+    aktion: 'A17',
+    gruppe: 'bestand',
+    symbol: 'wissen',
+    wissensentwurfZaehler: true,
+  },
   {
     pfad: '/importe',
     text: TEXTE.menue.importe,

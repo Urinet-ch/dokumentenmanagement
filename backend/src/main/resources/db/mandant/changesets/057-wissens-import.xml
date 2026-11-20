@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="057-wissens-import" author="copilot">
+        <sql splitStatements="false"><![CDATA[
+            alter table wissens_entwurf drop constraint wissens_entwurf_anlass_ck;
+            alter table wissens_entwurf add constraint wissens_entwurf_anlass_ck
+                check (anlass in ('INGEST', 'LINT', 'MANUELL', 'ANALYSE', 'IMPORT'));
+            alter table wissens_entwurf add column paket_sha256 text, add column paket_angaben jsonb;
+            alter table wissens_entwurf add constraint wissens_entwurf_paket_ck check (
+                (anlass = 'IMPORT') = (paket_sha256 is not null)
+                and (paket_sha256 is null or paket_sha256 ~ '^[0-9a-f]{64}$')
+                and (paket_angaben is null or jsonb_typeof(paket_angaben) = 'object'));
+            create unique index wissens_entwurf_paket_ux on wissens_entwurf (paket_sha256)
+                where paket_sha256 is not null;
+            alter table wissens_log drop constraint wissens_log_aktion_ck;
+            alter table wissens_log add constraint wissens_log_aktion_ck
+                check (aktion in ('INGEST', 'CREATION', 'UPDATE', 'DEPRECATION', 'LINT', 'ANALYSE', 'IMPORT'));
+            alter table zugriff_protokoll drop constraint zugriff_protokoll_aktion_ck;
+            alter table zugriff_protokoll add constraint zugriff_protokoll_aktion_ck
+                check (aktion in ('ERFASSEN', 'ANZEIGEN', 'HERUNTERLADEN', 'AENDERN', 'BESTAETIGEN',
+                    'VERWERFEN', 'WIEDERHOLEN', 'EXPORTIEREN', 'VERWEIGERT', 'SPERRE_KONFLIKT',
+                    'REGEL_AENDERN', 'KONFIGURATION_AENDERN', 'WISSEN_ANZEIGEN', 'WISSEN_ANNEHMEN',
+                    'WISSEN_VERWERFEN', 'WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_IMPORT',
+                    'KONTAKT_ZUSAMMENFUEHREN', 'KONTAKT_INAKTIV', 'KONTAKT_AKTIV'));
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

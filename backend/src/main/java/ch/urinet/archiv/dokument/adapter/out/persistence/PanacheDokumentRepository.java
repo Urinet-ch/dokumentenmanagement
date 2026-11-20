@@ -87,6 +87,20 @@ public class PanacheDokumentRepository implements DokumentRepository {
     }
 
     @Override
+    public List<UUID> wissensquellenNachSha256(String sha256, Sichtregel regel) {
+        VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
+        var abfrage = DokumentEintrag.getEntityManager().createNativeQuery("""
+                select distinct d.id from dokument d join dokument_datei f on f.dokument_id = d.id
+                where f.sha256 = :sha and f.rolle = 'ORIGINAL' and f.status = 'AKTIV'
+                  and d.status = 'ARCHIVIERT' and d.art = 'WISSENSQUELLE' and
+                """ + sicht.bedingung(), UUID.class).setParameter("sha", sha256);
+        sicht.parameter().forEach(abfrage::setParameter);
+        @SuppressWarnings("unchecked")
+        List<UUID> treffer = abfrage.getResultList();
+        return List.copyOf(treffer);
+    }
+
+    @Override
     public List<Fassung> fassungen(UUID id, int bisVersion) {
         return DokumentVersionEintrag.<DokumentVersionEintrag>find("dokumentId = ?1 and version < ?2",
                         Sort.descending("version", "id"), id, bisVersion)
