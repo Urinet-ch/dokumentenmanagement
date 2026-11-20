@@ -110,19 +110,33 @@ class RealmExportTest {
      * (Review PR #88, S4); Vor- und Nachname darf der Benutzer selbst ändern.
      */
     @Test
-    void benutzernameAendertNurDerAdmin() throws IOException {
+    void benutzerprofilBehaeltSeineBerechtigungen() throws IOException {
         JsonNode export = JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile());
         assertThat(export.path("editUsernameAllowed").asBoolean(true)).isFalse();
         List<JsonNode> profile = export.findValues("kc.user.profile.config");
         assertThat(profile).hasSize(1);
         JsonNode attribute = JSON.readTree(profile.getFirst().get(0).asText()).path("attributes");
-        List<String> bearbeiten = new ArrayList<>();
+        Map<String, List<String>> bearbeiten = new java.util.HashMap<>();
+        Map<String, List<String>> ansehen = new java.util.HashMap<>();
         for (JsonNode attribut : attribute) {
-            if ("username".equals(attribut.path("name").asText())) {
-                attribut.path("permissions").path("edit").forEach(r -> bearbeiten.add(r.asText()));
-            }
+            String name = attribut.path("name").asText();
+            List<String> edit = new ArrayList<>();
+            List<String> view = new ArrayList<>();
+            attribut.path("permissions").path("edit").forEach(r -> edit.add(r.asText()));
+            attribut.path("permissions").path("view").forEach(r -> view.add(r.asText()));
+            assertThat(bearbeiten.put(name, edit)).as("Doppeltes Profilattribut").isNull();
+            ansehen.put(name, view);
         }
-        assertThat(bearbeiten).containsExactly("admin");
+        assertThat(bearbeiten).containsOnlyKeys("username", "email", "firstName", "lastName", "mandant");
+        assertThat(bearbeiten.get("username")).containsExactly("admin");
+        assertThat(bearbeiten.get("email")).containsExactly("admin");
+        assertThat(bearbeiten.get("mandant")).containsExactly("admin");
+        assertThat(bearbeiten.get("firstName")).containsExactly("admin", "user");
+        assertThat(bearbeiten.get("lastName")).containsExactly("admin", "user");
+        assertThat(ansehen.get("mandant")).containsExactly("admin");
+        for (String name : List.of("username", "email", "firstName", "lastName")) {
+            assertThat(ansehen.get(name)).containsExactly("admin", "user");
+        }
     }
 
     @Test

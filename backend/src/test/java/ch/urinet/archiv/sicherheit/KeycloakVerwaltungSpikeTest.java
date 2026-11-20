@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.response.Response;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -22,6 +23,37 @@ class KeycloakVerwaltungSpikeTest {
 
     private static final String REALM = "urinet-archiv";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    @ConfigProperty(name = "archiv.entwicklung.mailpit-port")
+    int mailpitPort;
+
+    @Test
+    void testRealmSendetEinladungAnMailpit() {
+        String oidcUrl = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
+        String basisUrl = oidcUrl.substring(0, oidcUrl.indexOf("/realms/"));
+        String admin = given().formParam("grant_type", "password").formParam("client_id", "admin-cli")
+                .formParam("username", "admin").formParam("password", "admin")
+                .post(basisUrl + "/realms/master/protocol/openid-connect/token")
+                .then().statusCode(200).extract().path("access_token");
+        String adminUrl = basisUrl + "/admin/realms/" + REALM;
+        String name = "einladung-" + UUID.randomUUID();
+        String email = name + "@example.invalid";
+        given().auth().oauth2(admin).contentType("application/json")
+                .body(Map.of("username", name, "enabled", true, "email", email, "firstName", "Probe",
+                        "lastName", "Einladung", "attributes", Map.of("mandant", List.of("urinet"))))
+                .post(adminUrl + "/users").then().statusCode(201);
+        String id = adminGet(adminUrl + "/users?username={name}&exact=true", admin, name).path("[0].id");
+        try {
+            given().auth().oauth2(admin).contentType("application/json")
+                    .body(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP"))
+                    .put(adminUrl + "/users/{id}/execute-actions-email", id).then().statusCode(204);
+            given().baseUri("http://localhost:" + mailpitPort).queryParam("query", "to:" + email)
+                    .get("/api/v1/search").then().statusCode(200)
+                    .body("total", org.hamcrest.Matchers.greaterThanOrEqualTo(1));
+        } finally {
+            given().auth().oauth2(admin).delete(adminUrl + "/users/{id}", id).then().statusCode(204);
+        }
+    }
 
     @Test
     void devServiceZeigtMandantensucheRollenmitgliederUndDienstkontoToken() throws IOException {
