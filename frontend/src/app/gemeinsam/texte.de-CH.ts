@@ -437,6 +437,10 @@ export const TEXTE = {
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     fehlerAllgemein: 'Die Aktion ist fehlgeschlagen. Bitte versuchen Sie es später erneut.',
+    vorzeile: 'Prüfen und bestätigen',
+    unsichereFelder: (anzahl: number) =>
+      anzahl === 1 ? '1 unsicheres Feld' : `${anzahl} unsichere Felder`,
+    vorschlagVollstaendig: 'Vorschlag vollständig',
   },
   listenfeld: {
     hinweisMehrfach: (min: number) =>
