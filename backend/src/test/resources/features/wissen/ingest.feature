@@ -26,6 +26,30 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Dann antwortet der Ingest-Endpunkt mit Status 202
     Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
 
+  @req-6.1
+  Szenario: Nicht zugeordnete Kernaussagen bleiben im Ingest-Entwurf sichtbar
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert eine zugeordnete und eine nicht zugeordnete Kernaussage
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und die Entwurfsansicht kennzeichnet beide Kernaussagen entsprechend ihrer Zuordnung
+
+  @req-7.6
+  Szenario: Eine KI-Antwort setzt keine Freigabefelder oder Seitenstufe
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert eine Seitenantwort mit manipulierten Freigabefeldern
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit fünf KI-Aufrufen «OFFEN»
+    Und Status, Stufe und Freigabe stammen nicht aus der manipulierten KI-Antwort
+
   @req-5.3 @req-5.8 @req-13.7 @req-13.8
   Szenario: Jeder Ingest-Teilauftrag fragt nach einer ungültigen Antwort einmal nach
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»

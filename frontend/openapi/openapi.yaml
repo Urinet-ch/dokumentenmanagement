@@ -138,6 +138,29 @@ components:
           type: string
         treffer:
           type: boolean
+    Bearbeitung:
+      type: object
+      properties:
+        titel:
+          type: string
+        beschreibung:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        veraltetAb:
+          $ref: "#/components/schemas/LocalDate"
+        quellen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quelleneintrag"
+        inhalt:
+          type: string
+        entfernteAussagen:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntfernteAussage"
     Befund:
       type: object
       properties:
@@ -1091,6 +1114,37 @@ components:
         gueltigBis:
           type: string
           $ref: "#/components/schemas/Instant"
+    Eingabe:
+      type: object
+      properties:
+        seiteId:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        typ:
+          type: string
+        titel:
+          type: string
+        beschreibung:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        veraltetAb:
+          $ref: "#/components/schemas/LocalDate"
+        quellen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quelleneintrag"
+        inhalt:
+          type: string
+        begruendung:
+          type: string
+        entfernteAussagen:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntfernteAussage"
     EingangskorbSeite:
       type: object
       required:
@@ -1113,6 +1167,13 @@ components:
         groesse:
           type: integer
           format: int32
+    EntfernteAussage:
+      type: object
+      properties:
+        schluessel:
+          type: string
+        begruendung:
+          type: string
     Export:
       description: "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link\
         \ (24 Stunden ab Fertigstellung) gilt nicht mehr"
@@ -2289,6 +2350,23 @@ components:
         groesse:
           type: integer
           format: int32
+    Quelleneintrag:
+      type: object
+      properties:
+        schluessel:
+          type: string
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+        seiteVon:
+          type: integer
+          format: int32
+        seiteBis:
+          type: integer
+          format: int32
+        auszug:
+          type: string
+        quellSeiteId:
+          $ref: "#/components/schemas/UUID"
     Regel:
       type: object
       properties:
@@ -2678,6 +2756,15 @@ components:
           - string
           - "null"
           description: Meldung der Dokumentregel
+    WissenAnnehmen:
+      type: object
+      properties:
+        fassung:
+          $ref: "#/components/schemas/Bearbeitung"
+        vertraulichkeit:
+          type: string
+        grund:
+          type: string
     WissenEinstellungen:
       type: object
       properties:
@@ -2778,6 +2865,11 @@ components:
           - "null"
           format: int32
           minimum: 1
+    WissenVerwerfen:
+      type: object
+      properties:
+        grund:
+          type: string
     WissensIndex:
       type: object
       properties:
@@ -5847,6 +5939,238 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensentwuerfe:
+    get:
+      summary: Wissensentwürfe auflisten
+      description: A17 sieht alle Entwürfe; A18 nur den Status eigener Analysevorschläge.
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Entwürfe
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: Rolle darf keine Entwürfe lesen
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+    post:
+      summary: Manuellen Wissensentwurf anlegen
+      tags:
+      - Wissensbasis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Eingabe"
+        required: true
+      responses:
+        "201":
+          description: Entwurf angelegt und geprüft
+        "400":
+          description: Anfrage ungültig
+        "403":
+          description: Rolle darf keine Entwürfe anlegen
+        "404":
+          description: Seite nicht vorhanden oder nicht sichtbar
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
+  /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/annehmen:
+    post:
+      summary: Eine Wissensänderung annehmen
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: entwurfId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: nr
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WissenAnnehmen"
+        required: true
+      responses:
+        "204":
+          description: Änderung angenommen
+        "403":
+          description: Rolle darf Änderungen nicht annehmen
+        "404":
+          description: Änderung nicht gefunden oder nicht sichtbar
+        "409":
+          description: Änderung ist nicht offen
+        "412":
+          description: Version veraltet
+        "422":
+          description: Fassung hat Befunde oder die Vertraulichkeit ist ungültig
+        "428":
+          description: If-Match fehlt
+        "401":
+          description: Not Authorized
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/neu-erzeugen:
+    post:
+      summary: Veraltete Wissensänderung neu erzeugen
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: entwurfId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: nr
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Neuerzeugung eingereiht
+        "403":
+          description: Rolle darf Änderungen nicht neu erzeugen
+        "404":
+          description: Änderung nicht gefunden oder nicht sichtbar
+        "409":
+          description: Änderung kann nicht neu erzeugt werden
+        "412":
+          description: Version veraltet
+        "428":
+          description: If-Match fehlt
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/verwerfen:
+    post:
+      summary: Wissensänderung verwerfen
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: entwurfId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: nr
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WissenVerwerfen"
+        required: true
+      responses:
+        "204":
+          description: Änderung verworfen
+        "403":
+          description: Rolle darf Änderungen nicht verwerfen
+        "404":
+          description: Änderung nicht gefunden oder nicht sichtbar
+        "409":
+          description: Änderung ist nicht offen
+        "412":
+          description: Version veraltet
+        "422":
+          description: Grund fehlt
+        "428":
+          description: If-Match fehlt
+        "401":
+          description: Not Authorized
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensentwuerfe/{id}:
+    get:
+      summary: Wissensentwurf abrufen
+      description: "A17 sieht Fassungen und Diffs; A18 nur Status, Entscheide und\
+        \ Gründe eigener Analysen."
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Entwurf
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: Rolle darf den Entwurf nicht lesen
+        "404":
+          description: Entwurf nicht gefunden
+        "401":
+          description: Not Authorized
       security:
       - SecurityScheme:
         - inhaber

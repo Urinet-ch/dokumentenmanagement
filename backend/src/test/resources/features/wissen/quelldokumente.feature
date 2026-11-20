@@ -23,6 +23,15 @@ Funktionalität: Änderungen an Quelldokumenten
     Und der Inhaber die Quellenprüfung der Wissensseite bestätigt
     Dann ist der Quellenhinweis entfernt und die Bestätigung protokolliert
 
+  @req-15.2 @quellen-freigabe
+  Szenario: Die Freigabe einer Seitenänderung entfernt den Quellenhinweis
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine normale Wissensseite verweist auf ein normales Quelldokument
+    Wenn der Inhaber den Titel des Quelldokuments ändert
+    Dann der Inhaber sieht auf der unveränderten Wissensseite den Hinweis «Quelle prüfen»
+    Wenn der Inhaber eine Änderung dieser Wissensseite freigibt
+    Dann ist der Quellenhinweis durch die Freigabe entfernt
+
   @req-15.3
   Szenario: Quelleneinträge zeigen den aktuellen Dokumenttitel
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
