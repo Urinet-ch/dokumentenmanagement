@@ -86,6 +86,7 @@ export * from './wissen-annehmen';
 export * from './wissen-ingest-auftrag';
 export * from './wissen-ingest-start';
 export * from './wissen-verwerfen';
+export * from './wissens-embedding-auftrag';
 export * from './wissens-index';
 export * from './wissens-index-gruppe';
 export * from './wissens-index-zeile';

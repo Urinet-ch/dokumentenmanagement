@@ -435,6 +435,8 @@ flowchart LR
   Nur Suchbegriff und Modus werden mit der Dokumentensuche geteilt; ihre Dokumentfilter gelten nicht für Seiten.
   Fehler, Abbruch und Wiederholung der beiden Anfragen sind unabhängig.
 - `POST /api/v1/wissensbasis/embeddings` verlangt A17 und liefert den Nachberechnungsauftrag (202).
+  Die Antwort ist das typisierte `{auftragId}`; ein erschöpftes Monatsbudget wird vor dem manuellen Start
+  mit 429 abgewiesen. In `lokal` umgehen die Embedding-/Reranker-Stubs die Budgetabfrage.
   Die Nachberechnung reiht Teilaufträge für höchstens 500 Seiten ein; Nutzlasten enthalten nur IDs und Versionen.
   Schreiben sperrt die Seite, prüft ihre Version und sichert den Auftragsanspruch in derselben Transaktion.
   Ein Stub überschreibt keine vorhandenen Vektoren derselben Version.
@@ -445,6 +447,11 @@ flowchart LR
   aus dem aktuellen Ingest-/Hüllenkontext vor jeder Abfrage und nach der Rangierung neu berechnet, nicht aus
   einer erfundenen Benutzerrolle. `PERSONAL` und der Überblick bei `INTERN` bleiben ausgeschlossen;
   bei `NORMAL` wird der sichtbare Überblick vor den begrenzten Treffern ergänzt.
+- Nachweise 15.1: JDBC prüft den echten Handler mit WireMock-Vektor und `WISSEN_EMBEDDING`-Buchung sowie
+  Rollback bei verlorenem Auftragsanspruch, Versions-/Mandantentrennung und Stubschutz. Szenarien prüfen
+  Volltextgewichtung, Hybrid-/Stub-Rückfall und A17-Nachberechnung; der Browser prüft den Wissensabschnitt,
+  Seitenlink und Barrierefreiheit bei 375 px. Die Lastmessung mit 2'000 Seiten (9.5) steht noch aus;
+  auf der geteilten Umgebung wird gemäss Auftrag keine künstliche Last erzeugt.
 
 ### Lint (`wissen/application`)
 - `WISSEN_LINT` (Scheduler mit `archiv.wissen.lint-zeitplan`, nur Rolle `worker`; manuell A17), je KI-Aufruf ein

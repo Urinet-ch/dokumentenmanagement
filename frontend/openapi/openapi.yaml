@@ -2805,6 +2805,14 @@ components:
       properties:
         grund:
           type: string
+    WissensEmbeddingAuftrag:
+      type: object
+      required:
+      - auftragId
+      properties:
+        auftragId:
+          type: integer
+          format: int64
     WissensIndex:
       type: object
       properties:
@@ -5769,10 +5777,16 @@ paths:
       responses:
         "202":
           description: Nachberechnung eingereiht oder schon laufend
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissensEmbeddingAuftrag"
+        "403":
+          description: Kein Freigaberecht
+        "429":
+          description: Monatsbudget der Wissensbasis erschöpft
         "401":
           description: Not Authorized
-        "403":
-          description: Not Allowed
       security:
       - SecurityScheme:
         - inhaber

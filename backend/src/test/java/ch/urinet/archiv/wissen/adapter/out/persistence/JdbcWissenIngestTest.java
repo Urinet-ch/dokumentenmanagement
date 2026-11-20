@@ -25,6 +25,7 @@ import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.application.AuftragService.AnspruchVerloren;
 import ch.urinet.archiv.wissen.application.WissensEmbeddingSpeichern;
+import ch.urinet.archiv.wissen.application.WissensEmbeddingHandler;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
@@ -112,6 +113,12 @@ class JdbcWissenIngestTest {
 
     @Inject
     JdbcWissensEmbedding wissensEmbedding;
+
+    @Inject
+    WissensEmbeddingSpeichern embeddingSpeichern;
+
+    @Inject
+    WissensEmbeddingHandler seitenEmbeddingHandler;
 
     @Inject
     TestEmbeddingPort embeddingModell;
@@ -228,16 +235,36 @@ class JdbcWissenIngestTest {
     }
 
     @Test
-    void wissensChunksSindVersionsgebundenStubSicherUndMandantengetrennt() throws SQLException {
+    void wissensChunksSindVersionsgebundenStubSicherUndMandantengetrennt() throws Exception {
         UUID id = seite(URINET, "konzepte/embedding", "Text", null);
         UUID fremd = seite(ZWEITER, "konzepte/embedding", "Fremd", null);
         var eigeneSeiten = Map.of(URINET, id, ZWEITER, fremd);
+        long verbrauchVorher = anzahl("select coalesce(max(id), 0) from " + URINET.schema() + ".ki_verbrauch");
+        long embeddingAuftrag = 0;
         try {
             for (var eintrag : eigeneSeiten.entrySet()) {
                 ausfuehren("insert into " + eintrag.getKey().schema()
                         + ".wissensseite_version (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit) "
                         + "values (?, 1, '{}'::jsonb, 'Text', 'probe', 'probe', now())", eintrag.getValue());
             }
+            var nutzlast = new Nutzlast(Map.of("seiteId", id, "version", 1));
+            embeddingAuftrag = im(URINET, () -> auftraege.einreihen(WissensEmbeddingSpeichern.EINZELN, nutzlast));
+            ausfuehren("update public.auftrag set status = 'LAEUFT', versuche = 1 where id = ?", embeddingAuftrag);
+            var wirklicherAuftrag = new Auftrag(embeddingAuftrag, URINET, WissensEmbeddingSpeichern.EINZELN,
+                    nutzlast, 1);
+            CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
+                try {
+                    seitenEmbeddingHandler.ausfuehren(wirklicherAuftrag);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_chunk where seite_id = ? and version = 1 and embedding is not null", id))
+                    .isEqualTo(1);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".ki_verbrauch where id > ? and zweck = 'WISSEN_EMBEDDING'", verbrauchVorher)).isEqualTo(1);
             float[] vektor = new float[EmbeddingPort.DIMENSION];
             vektor[0] = 1;
             var eingebettet = List.of(new ChunkPort.Eingebettet(new Chunk(1, "Text", null, null), vektor));
@@ -246,7 +273,7 @@ class JdbcWissenIngestTest {
             assertThat(im(ZWEITER, () -> wissensEmbedding.ersetzen(fremd, 1, eingebettet))).isTrue();
             var ohneAnspruch = new Auftrag(Long.MAX_VALUE, URINET, WissensEmbeddingSpeichern.EINZELN,
                     new Nutzlast(Map.of("seiteId", id, "version", 1)), 0);
-            assertThatThrownBy(() -> im(URINET, () -> new WissensEmbeddingSpeichern(wissensEmbedding, auftraege)
+            assertThatThrownBy(() -> im(URINET, () -> embeddingSpeichern
                     .ersetzen(ohneAnspruch, id, 1,
                             List.of(new ChunkPort.Eingebettet(new Chunk(1, "Nicht speichern", null, null), vektor)))))
                     .isInstanceOf(AnspruchVerloren.class);
@@ -264,6 +291,15 @@ class JdbcWissenIngestTest {
             assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isFalse();
             assertThat(im(URINET, () -> wissensSuche.vektor(vektor, filter, 50))).isEmpty();
         } finally {
+            if (embeddingAuftrag > 0) ausfuehren("delete from public.auftrag where id = ?", embeddingAuftrag);
+            try (var verbindung = datenbank.get().getConnection();
+                 var query = verbindung.prepareStatement("select id from " + URINET.schema()
+                         + ".ki_verbrauch where id > ? and zweck = 'WISSEN_EMBEDDING'")) {
+                query.setLong(1, verbrauchVorher);
+                try (var ergebnis = query.executeQuery()) {
+                    while (ergebnis.next()) verbrauch.get(URINET).add(ergebnis.getLong(1));
+                }
+            }
             for (var eintrag : eigeneSeiten.entrySet()) {
                 ausfuehren("delete from " + eintrag.getKey().schema() + ".wissensseite_chunk where seite_id = ?",
                         eintrag.getValue());
@@ -280,6 +316,41 @@ class JdbcWissenIngestTest {
                     verbindung.commit();
                 }
             }
+        }
+    }
+
+    @Test
+    void embeddingNachberechnungIstEinWiederverwendeterAuftragMitA17() throws SQLException {
+        long vorher;
+        try (var verbindung = datenbank.get().getConnection();
+             var query = verbindung.createStatement();
+             var ergebnis = query.executeQuery("select coalesce(max(id), 0) from public.auftrag")) {
+            ergebnis.next();
+            vorher = ergebnis.getLong(1);
+        }
+        long auftragId = 0;
+        try {
+            given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(403);
+            given().auth().oauth2(Testanmeldung.token("treuhaender-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(403);
+            auftragId = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(202)
+                    .extract().jsonPath().getLong("auftragId");
+            long wiederverwendet = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(202)
+                    .extract().jsonPath().getLong("auftragId");
+            assertThat(wiederverwendet).isEqualTo(auftragId);
+            assertThat(auftragId).isPositive();
+            ausfuehren("insert into " + URINET.schema()
+                    + ".wissens_einstellung (id, monatsbudget_tokens) values (1, 1) "
+                    + "on conflict (id) do update set monatsbudget_tokens = 1");
+            verbrauch(URINET, KiVerbrauchPort.WISSEN_EMBEDDING, 1, Instant.now());
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(429)
+                    .body("fehlercode", is("BUDGET"));
+        } finally {
+            if (auftragId > vorher) ausfuehren("delete from public.auftrag where id = ?", auftragId);
         }
     }
 

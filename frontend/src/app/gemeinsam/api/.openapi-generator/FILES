@@ -106,6 +106,7 @@ model/wissen-annehmen.ts
 model/wissen-ingest-auftrag.ts
 model/wissen-ingest-start.ts
 model/wissen-verwerfen.ts
+model/wissens-embedding-auftrag.ts
 model/wissens-index-gruppe.ts
 model/wissens-index-zeile.ts
 model/wissens-index.ts

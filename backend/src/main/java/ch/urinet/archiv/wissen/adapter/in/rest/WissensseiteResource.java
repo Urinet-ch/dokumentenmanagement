@@ -14,6 +14,7 @@ import ch.urinet.archiv.wissen.application.WissenLesenRepository;
 import ch.urinet.archiv.wissen.application.QuellenPruefung;
 import ch.urinet.archiv.wissen.application.WissensSuche;
 import ch.urinet.archiv.wissen.application.WissensEmbeddingSpeichern;
+import ch.urinet.archiv.wissen.application.WissenModellBudget;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
@@ -70,11 +71,13 @@ public class WissensseiteResource {
     private final WissensSuche suche;
     private final WissensEmbeddingSpeichern embeddings;
     private final Berechtigung rechte;
+    private final WissenModellBudget budget;
 
     public WissensseiteResource(WissenLesen lesen, QuellenPruefung quellenPruefung,
                                 WissensseiteAbrufProtokoll abrufProtokoll,
                                 MandantAufloesung aufloesung, SecurityIdentity identitaet,
-                                WissensSuche suche, WissensEmbeddingSpeichern embeddings, Berechtigung rechte) {
+                                WissensSuche suche, WissensEmbeddingSpeichern embeddings, Berechtigung rechte,
+                                WissenModellBudget budget) {
         this.lesen = lesen;
         this.quellenPruefung = quellenPruefung;
         this.abrufProtokoll = abrufProtokoll;
@@ -83,6 +86,7 @@ public class WissensseiteResource {
         this.suche = suche;
         this.embeddings = embeddings;
         this.rechte = rechte;
+        this.budget = budget;
     }
 
     @Schema(name = "WissensIndex")
@@ -92,6 +96,9 @@ public class WissensseiteResource {
     @Schema(name = "WissensSuchergebnis")
     public record SuchDto(@Schema(required = true) List<IndexZeileDto> treffer,
                           @Schema(required = true) boolean degradiert) { }
+
+    @Schema(name = "WissensEmbeddingAuftrag")
+    public record EmbeddingAuftragDto(@Schema(required = true) long auftragId) { }
 
     @Schema(name = "WissensIndexGruppe")
     public record IndexGruppeDto(String typ, List<IndexZeileDto> seiten) {
@@ -207,11 +214,15 @@ public class WissensseiteResource {
     @ErfordertAktion(Aktion.A17)
     @RolesAllowed({"inhaber", "geschaeftsstelle"})
     @Operation(summary = "Seiten-Embeddings neu berechnen", description = "Auftrag im verifizierten Mandanten, A17.")
-    @APIResponse(responseCode = "202", description = "Nachberechnung eingereiht oder schon laufend")
+    @APIResponse(responseCode = "202", description = "Nachberechnung eingereiht oder schon laufend",
+            content = @Content(schema = @Schema(implementation = EmbeddingAuftragDto.class)))
+    @APIResponse(responseCode = "403", description = "Kein Freigaberecht")
+    @APIResponse(responseCode = "429", description = "Monatsbudget der Wissensbasis erschöpft")
     public Response embeddings() {
         aufloesung.pruefen();
         rechte.wissensseitenAktion(benutzer(), Aktion.A17, true);
-        return privateAntwort(Map.of("auftragId", embeddings.starten())).status(202).build();
+        budget.embeddingPruefen();
+        return privateAntwort(new EmbeddingAuftragDto(embeddings.starten())).status(202).build();
     }
 
     @GET

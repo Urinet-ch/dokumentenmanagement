@@ -248,6 +248,9 @@ export async function sucheAttrappe(welt) {
     if (pfad === '/api/v1/kontakte') {
       return json(route, 200, []);
     }
+    if (pfad === '/api/v1/wissensseiten') {
+      return json(route, 200, { treffer: [], degradiert: false });
+    }
     if (pfad === '/api/v1/dokumente') {
       zustand.anfragen.push(url.searchParams);
       const p = url.searchParams;
