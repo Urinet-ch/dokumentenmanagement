@@ -4,6 +4,8 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
+import ch.urinet.archiv.wissen.domain.WissensMarkdown;
+import ch.urinet.archiv.wissen.domain.paket.WissensPaketLeser;
 import org.commonmark.node.Link;
 import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
@@ -59,6 +61,20 @@ class OkfKonformitaetTest {
         OkfSchreiber.schreiben(paket(Set.of(quellseite.pfad(), konzept.pfad()), "lokal"), seiten,
                 List.of(new OkfSchreiber.Logzeile(ZEIT, "Ingest", "Quelle ergänzt")), ausgabe);
 
+        var gelesen = new WissensPaketLeser().lesen(ausgabe.toByteArray());
+        assertThat(gelesen.kopf().erzeugtMit()).isEqualTo("lokal");
+        assertThat(gelesen.kopf().kontextStufe()).isEqualTo("INTERN");
+        assertThat(gelesen.seiten()).hasSize(2);
+        var quelleImport = gelesen.seiten().stream().filter(s -> s.pfad().equals(quellseite.pfad()))
+                .findFirst().orElseThrow();
+        assertThat(quelleImport.sources()).singleElement().satisfies(q -> {
+            assertThat(q.sha256()).isEqualTo(HASH);
+            assertThat(q.seite()).isEqualTo("2-4");
+            assertThat(q.wissensquelle()).isTrue();
+        });
+        var konzeptImport = gelesen.seiten().stream().filter(s -> s.pfad().equals(konzept.pfad()))
+                .findFirst().orElseThrow();
+        assertThat(WissensMarkdown.ausOkf(konzeptImport.inhalt())).isEqualTo(konzept.inhalt());
         Map<String, String> dateien = zip(ausgabe.toByteArray());
         assertThat(dateien.keySet()).containsExactlyInAnyOrder(
                 "quellen/probe.md", "konzepte/probe.md", "paket.yaml", "index.md", "log.md");

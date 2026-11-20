@@ -29,6 +29,7 @@ import jakarta.ws.rs.core.CacheControl;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
@@ -74,7 +75,9 @@ public class WissenEntwurfResource {
     @Protokolliert(aktion = ProtokollAktion.WISSEN_ANZEIGEN)
     @Operation(summary = "Wissensentwurf abrufen",
             description = "A17 sieht Fassungen und Diffs; A18 nur Status, Entscheide und Gründe eigener Analysen.")
-    @APIResponse(responseCode = "200", description = "Entwurf")
+    @APIResponse(responseCode = "200", description = "Entwurf mit Importherkunft für A17; nur Status für A18",
+            content = @Content(schema = @Schema(oneOf = {
+                    WissenEntwurfLesen.Vollansicht.class, WissenEntwurfLesen.StatusAnsicht.class})))
     @APIResponse(responseCode = "403", description = "Rolle darf den Entwurf nicht lesen")
     @APIResponse(responseCode = "404", description = "Entwurf nicht gefunden")
     public Response lesen(@PathParam("id") UUID id) {

@@ -159,7 +159,11 @@ public final class WissensMarkdown {
                 if (internerPfad(link.getDestination()) == null) {
                     throw new IllegalArgumentException("Ungültiges Linkziel im OKF-Export");
                 }
-                einfuegen.add(zielEnde(markdown, link));
+                int ende = zielEnde(markdown, link);
+                if (ende < 0) {
+                    throw new IllegalArgumentException("Linkziel im Markdown nicht gefunden");
+                }
+                einfuegen.add(ende);
             }
             for (Node kind = node.getFirstChild(); kind != null; kind = kind.getNext()) {
                 offen.push(kind);
@@ -175,6 +179,38 @@ public final class WissensMarkdown {
         return pfad != null && internerPfad("/" + pfad) != null;
     }
 
+    /** Entfernt die OKF-Endung nur an erkannten internen Linkzielen, nicht in Code oder Fussnoten. */
+    public static String ausOkf(String markdown) {
+        if (markdown == null) {
+            throw new IllegalArgumentException("Markdown fehlt");
+        }
+        if (zeichen(markdown) > MAX_EINGABE_ZEICHEN || tiefeUeberschritten(markdown)) {
+            return markdown;
+        }
+        Deque<Node> offen = new ArrayDeque<>();
+        offen.push(EXPORT_PARSER.parse(markdown));
+        List<Integer> entfernen = new ArrayList<>();
+        while (!offen.isEmpty()) {
+            Node node = offen.pop();
+            if (node instanceof Link link && link.getDestination().endsWith(".md")
+                    && internerPfad(link.getDestination().substring(0, link.getDestination().length() - 3)) != null) {
+                int ende = zielEnde(markdown, link);
+                if (ende < 0) {
+                    // Referenz-Link ([a][r] oder [a]): kein Inline-Ziel, die Definition bleibt unverändert.
+                } else if (ende >= 3 && markdown.regionMatches(ende - 3, ".md", 0, 3)) {
+                    entfernen.add(ende - 3);
+                }
+            }
+            for (Node kind = node.getFirstChild(); kind != null; kind = kind.getNext()) {
+                offen.push(kind);
+            }
+        }
+        StringBuilder ausgabe = new StringBuilder(markdown);
+        entfernen.sort(Collections.reverseOrder());
+        entfernen.forEach(index -> ausgabe.delete(index, index + 3));
+        return ausgabe.toString();
+    }
+
     private static int zielEnde(String markdown, Link link) {
         List<SourceSpan> spans = link.getSourceSpans();
         if (spans.isEmpty()) {
@@ -187,7 +223,7 @@ public final class WissensMarkdown {
                 : kindSpans.getLast().getInputIndex() + kindSpans.getLast().getLength();
         int klammer = markdown.indexOf("](", ab);
         if (klammer < 0 || klammer >= ende) {
-            throw new IllegalArgumentException("Linkziel im Markdown nicht gefunden");
+            return -1;
         }
         int start = klammer + 2;
         while (start < ende && Character.isWhitespace(markdown.charAt(start))) {

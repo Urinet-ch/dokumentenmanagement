@@ -225,8 +225,8 @@ export async function sucheAttrappe(welt) {
     if (anfrage.method() !== 'GET' && !aendern) {
       return route.fallback();
     }
-    if (pfad === '/api/v1/branding') {
-      // Öffentlicher Endpunkt ohne Token: gehört nicht zur Such-API und zählt nicht als abgelehnt.
+    if (pfad === '/api/v1/branding' || pfad === '/api/v1/wissensentwuerfe') {
+      // Diese Endpunkte gehören nicht zur Such-API; die jeweils zuständige Attrappe beantwortet sie.
       return route.fallback();
     }
     if ((await anfrage.headerValue('authorization')) !== `Bearer ${welt.keycloak?.accessToken}`) {

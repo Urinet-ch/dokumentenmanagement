@@ -111,7 +111,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 3.6, 3.8, 15.4, 16.1, 16.2, 16.4, 16.5, 16.7_
   - _Abhängig von: 13.6_
 
-- [ ] 14.6 Oberfläche Entwürfe [Frontend]
+- [x] 14.6 Oberfläche Entwürfe [Frontend]
   - `/wissen/entwuerfe`, `/wissen/entwuerfe/:id`: Diff nebeneinander bzw. am Handy untereinander mit `−`/`+`, Befunde, Hinweise, Kontextstufe, Widersprüche, entfernte Aussagen, Kernaussagen (nicht zugeordnete markiert); Aktionen je Änderung mit Bestätigung, kein gesammeltes Annehmen; Zähler offener Entwürfe in der Navigation
   - _Anforderungen: 6.4, 6.11, 16.3, 16.4_
   - _Abhängig von: 14.2_
@@ -148,7 +148,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 17.1–17.5, 14.3_
   - _Abhängig von: 13.6_
 
-- [ ] 15.6 Import eines Wissenspakets als Entwurf [Backend]
+- [x] 15.6 Import eines Wissenspakets als Entwurf [Backend]
   - `WissensPaketLeser` und `PaketKopf`/`PaketSeite` in `wissen/domain/paket` (nur im Speicher lesen; Grenzen, Pfadnormalisierung, Symlinks, Zip-Bombe über gezählte Bytes; Frontmatter über den YAML-Ereignisstrom ohne Tags, Anker, Aliase; Konfiguration `archiv.wissen.import.*` und `archiv.wissen.instanz-id`); ArchUnit-Regel `wissenDomainOhneFramework`
   - `WissensImport` und `QuellenAufloeser` in `wissen/application` (Zuordnung per SHA-256 über den Lesezugriff auf `dokument/application`, nur Art `WISSENSQUELLE`, `ARCHIVIERT`, sichtbar; Ergebnis `UNBEKANNT` für unbekannt, andere Art, unsichtbar, fremder Mandant); neue Befunde `QUELLE_UNBEKANNT`, `AUSZUG_FEHLT`, `AUSZUG_NICHT_PRUEFBAR`, `CLOUD_STUFE_UNZULAESSIG` und Ergebnistyp `NICHT_PRUEFBAR` in `WissensPruefung`; Auszugsprüfung mit `Seitentext` wie beim Ingest
   - REST `POST /wissensentwuerfe/import` (multipart, 201/400/403/409/413/415/422) und `POST /wissensentwuerfe/{id}/neu-pruefen` (A17, nur OIDC); Anlass `IMPORT`, Spalten `paket_sha256` (eindeutig) und `paket_angaben`, Changeset; Akteur `extern:<erzeugt_von>`; Zugriffsprotokoll `WISSEN_IMPORT`; Logeintrag `IMPORT` beim Abschluss; «neu erzeugen» für `IMPORT` nicht angeboten

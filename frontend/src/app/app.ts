@@ -27,6 +27,7 @@ import { MENUE, abschnitte } from './gemeinsam/navigation';
 import { Symbol } from './gemeinsam/symbol';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
+import { WissenEntwurfZaehler } from './wissen/wissen-entwurf-zaehler';
 
 export const SEITE_NEU_LADEN = new InjectionToken<() => void>('SEITE_NEU_LADEN', {
   providedIn: 'root',
@@ -53,6 +54,7 @@ export class App {
   protected readonly anmeldung = inject(AnmeldungService);
   protected readonly branding = inject(BrandingService);
   protected readonly zaehler = inject(EingangskorbZaehler);
+  protected readonly wissensentwurfZaehler = inject(WissenEntwurfZaehler);
   private readonly entwurfSpeicher = inject(EingangskorbEntwurfSpeicher);
   protected readonly online = inject(ONLINE);
   protected readonly updateBereit = signal(false);

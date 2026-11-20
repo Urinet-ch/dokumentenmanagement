@@ -3,6 +3,7 @@ package ch.urinet.archiv.wissen.adapter.out.persistence;
 import ch.urinet.archiv.wissen.application.WissenEntwurfLesenRepository;
 import ch.urinet.archiv.wissen.application.WissenEntwurfLesen.Entscheidung;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Kernaussage;
+import ch.urinet.archiv.wissen.domain.paket.PaketKopf;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,7 +25,8 @@ import java.util.UUID;
 @Transactional(Transactional.TxType.MANDATORY)
 public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
     private static final String KOPF = """
-            id, anlass, status, erstellt_von, erstellt, dokument_id, unvollstaendig, hinweis
+            id, anlass, status, erstellt_von, erstellt, dokument_id, unvollstaendig, hinweis,
+            paket_sha256, cast(paket_angaben as text)
             """;
     private static final TypeReference<Map<String, Object>> OBJEKT = new TypeReference<>() { };
     private static final TypeReference<List<Map<String, Object>>> OBJEKTE = new TypeReference<>() { };
@@ -56,7 +58,7 @@ public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
         }
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();
-        return rows.stream().map(JdbcWissenEntwurfLesen::kopf).toList();
+        return rows.stream().map(this::kopf).toList();
     }
 
     @Override
@@ -64,7 +66,7 @@ public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = em.get().createNativeQuery("select " + KOPF + " from wissens_entwurf where id = :id")
                 .setParameter("id", id).getResultList();
-        return rows.stream().findFirst().map(JdbcWissenEntwurfLesen::kopf);
+        return rows.stream().findFirst().map(this::kopf);
     }
 
     @Override
@@ -116,10 +118,24 @@ public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
         }
     }
 
-    private static Kopf kopf(Object[] row) {
+    private Kopf kopf(Object[] row) {
+        ImportHerkunft herkunft = null;
+        if (row[8] != null || row[9] != null) {
+            if (row[8] == null || row[9] == null) {
+                throw new IllegalStateException("Gespeicherte Importherkunft ist unvollständig");
+            }
+            try {
+                ImportAngaben angaben = json.readValue((String) row[9], ImportAngaben.class);
+                herkunft = new ImportHerkunft((String) row[8], angaben.kopf(), angaben.unveraendert(), angaben.ignoriert());
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Gespeicherte Importherkunft ist nicht lesbar", e);
+            }
+        }
         return new Kopf(uuid(row[0]), (String) row[1], (String) row[2], (String) row[3], zeit(row[4]),
-                uuid(row[5]), Boolean.TRUE.equals(row[6]), (String) row[7]);
+                uuid(row[5]), Boolean.TRUE.equals(row[6]), (String) row[7], herkunft);
     }
+
+    private record ImportAngaben(PaketKopf kopf, int unveraendert, int ignoriert) { }
 
     private static UUID uuid(Object wert) {
         return wert == null ? null : wert instanceof UUID id ? id : UUID.fromString(wert.toString());

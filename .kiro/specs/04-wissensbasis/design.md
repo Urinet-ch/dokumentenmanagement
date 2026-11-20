@@ -605,6 +605,38 @@ Spesen sind innert 30 Tagen mit Beleg einzureichen.[^q-ab12-1] Die Unterlage ist
   Angaben aus `paket.yaml` übernommen. `verified`, `generated` und `status` verwirft der Import (Requirement 7.6, 19.4).
 
 #### Import-Dienst (`WissensImport`, `wissen/application`)
+**Umsetzung (Aufgabe 15.6):** Die Anwendungsklasse heisst entsprechend den bestehenden `Wissen…`-Diensten
+`WissenImport`. `WissenImportResource` liest den genau einmal vorhandenen Multipart-Teil begrenzt in den Speicher;
+`TransaktionalerWissenPaketImport` berechnet seine SHA-256 mit `Pruefsumme` und umschliesst Lesen, Zuordnung,
+Änderungen und Zugriffsprotokoll mit einer JTA-Transaktion. Eine monotone Deadline reicht vom Beginn der
+Ressourcenmethode bis zur letzten Prüfung vor der Antwort. Ein mandantenspezifisches Advisory Lock serialisiert
+Idempotenz und die Quote; der Hüllen-Lock hält Quellen und Seiten während der Prüfung konsistent.
+PostgreSQL 17 erhält zusätzlich ein transaktionslokales `transaction_timeout` aus der verbleibenden Zeit;
+dadurch können interne Änderungen von `statement_timeout` die gesamte Transaktionsfrist nicht verlängern.
+SQLSTATE `25P04` und `57014` werden nach dem Rollback als `PAKET_UNGUELTIG` mit Grund `ZEIT` gemeldet.
+`neu-pruefen` bewahrt bereits erreichte Kontextstufen und erhöht die Änderungs-ETags.
+**Gemeinsame Auslegung 19.9/19.10/19.23 (Aufgabe 15.6):** Bei `NEU` ist die Zielbasis fehlend (entspricht 0).
+Eine positive Archivversion aus einer ausdrücklich anderen Herkunftsinstanz ist keine Zielbasis:
+Sie bleibt im ursprünglichen Paket gespeichert, wird wie bei `AENDERN` aus fremder Herkunft nicht als
+Zielversion übernommen und erzeugt `BASIS_UNBEKANNT`. So bleibt der lokale Export in ein anderes Archiv
+auch für unbekannte Zielpfade importierbar. Negative Werte, Werte ausserhalb der Archiv-Versionsspanne und
+positive NEU-Basisversionen ohne fremde Herkunft brechen weiterhin mit `FORMAT` ohne Entwurf ab, sofern der Pfad im
+Mandanten nicht existiert. Existiert der Pfad, ist die Seite für den Benutzer aber unsichtbar (höhere Stufe), wird die
+Basisversion nicht ausgewertet: Die Änderung entsteht als `NEU` mit `PFAD_UNGUELTIG` und `HOEHERE_STUFE_VORHANDEN` (19.9).
+Herkunft ist nur Metadatum, kein Recht und kein Quellen- oder Mandantenselektor; die Zielbasis wird nicht
+aus ihr gelesen. Der REST-Rundlauf exportiert aus einer anderen Instanz mit fremder Dokument-ID und
+übernimmt eine dort erzeugte Seite im Ziel neu, ausschliesslich mit SHA-Zuordnung.
+Die A17-Leseansicht liefert
+die Importherkunft und je Quellenschlüssel die Zuordnung und das Ergebnis aus
+`WissensPruefung.auszugPruefen`; dieselbe Auszugsprüfung wird beim Annehmen erneut ausgeführt.
+Leere und vollständig unveränderte Pakete bleiben gemäss 19.18 `OFFEN`; es wird keine zusätzliche Abschlussaktion
+oder automatische Freigabe eingeführt. Der offene Punkt 19-a bleibt unverändert offen.
+
+Der gemeinsame synthetische Korpus unter `backend/src/test/resources/wissen-pakete/` beschreibt Pakete textuell;
+`WissensPaketBeispiele` erzeugt die ZIP-Bytes einschliesslich gezielter Metadatenangriffe nur für Tests.
+`PaketRegelnGleichheitTest` vergleicht den Leser und den REST-Import; Aufgabe 15.7 erweitert diesen Nachweis um das
+Prüfwerkzeug. Die Beispielpakete enthalten keine echten Belege oder Zugangsdaten.
+
 `WissensImport.importieren(benutzer, zipStrom)` in einer Transaktion; der Endpunkt reicht den Strom nur bis zur Grenze
 `archiv.wissen.import.max-zip-bytes` weiter und rechnet währenddessen die SHA-256 des ZIP:
 1. **Rechte und Kontext:** A17, nur OIDC (kein API-Token), Mandant und Benutzer aus dem Anfragekontext; keine Daten
@@ -865,6 +897,29 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 - Dokumentansicht: Abschnitt «In der Wissensbasis verwendet» (Requirement 15.4); Chat: Chip-Symbol für Seiten und
   Aktion «Als Analyse vorschlagen» nur bei zulässigen Gesprächen (Requirement 12.4, 16.6); Parameter `seite` in der
   Dokumentansicht (Requirement 16.2). Texte nur in `texte.de-CH.ts`.
+
+#### Umsetzung 14.6 (PR #352)
+
+Die beiden Entwurfsrouten und der Navigationszähler verlangen A17; Mitarbeiter und Treuhänder erhalten
+keinen Entwurfsmenüpunkt. Der Zähler liest nur offene Entwürfe, erneuert sich bei Entscheidungen und
+gedrosselt bei Navigation; Benutzer- und Mandantenwechsel brechen alte Anfragen ab. Ein Ausfall erscheint
+mit Wiederholungsmöglichkeit, nicht als scheinbar leere Liste.
+
+Jede Änderung wird einzeln ausgewählt und in einem Dialog bestätigt. Der POST verwendet genau den
+angezeigten ETag; während Dialog und Anfrage sind weitere Entscheidungen gesperrt. Bei 412 oder 422
+bleiben Eingaben erhalten, neue fachliche Befunde sind sichtbar; kein automatischer zweiter POST.
+Veraltete Änderungen lassen sich verwerfen, bei MANUELL und INGEST auch neu erzeugen, nicht bei IMPORT.
+Eine leere Stufenauswahl überlässt die Mindeststufenberechnung dem Backend.
+
+Titel, Beschreibung, Tags, Datum und Markdown haben eigene Eingaben. Quellen und begründete entfernte
+Aussagen werden als JSON-Listen bearbeitet; Syntax und Listenform prüft die Oberfläche, die vollständige
+Fassung prüft erneut der Freigabedienst. Die API verwendet versiegelte Leseansichten ohne konkret
+generierte Angular-Modelle; dafür enthält die Oberfläche lokale, typisierte Vertragsansichten.
+Der Diff steht ab 1024 px nebeneinander, darunter untereinander. Cucumber.js/Playwright misst Positionen
+bei 375, 1023, 1024 und 1280 px und prüft Überlauf, WCAG 2.1 AA mit axe, Einzelbestätigung und Zähler.
+Der integrierte Widerspruchsschutz (14.3, PR #351) liefert `diff.widersprueche` und
+`diff.entfernteWidersprueche`. Die Auflösungsmarkierung verwendet den echten Vertrag auch ohne KI-Blockliste;
+der REST-Nachweis prüft Text und Fussnotenschlüssel, Frontend- und Browsernachweise prüfen die Hervorhebung.
 
 ### Konfiguration und Aufträge
 | Schlüssel | Startwert |

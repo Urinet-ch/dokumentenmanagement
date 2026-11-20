@@ -1,0 +1,20 @@
+# Name	Reader-Code (leer = akzeptiert)	Offline-Markdown-Befunde (kommagetrennt)
+# WissensPaketBeispiele.alle() erzeugt die ZIPs im Speicher; Befunde enthalten keine Archivannahmen.
+gueltig		
+hinweise		
+sha-und-urn		
+zip-slip	PFAD	
+symlink	SYMLINK	
+verschluesselt	VERSCHLUESSELT	
+split	ZIP_UNGUELTIG	
+zip-bombe	ZIP_BOMBE	
+normalisierte-dublette	DUPLIKAT	
+dateigrenze	GRENZE	
+entpackgrenze	GRENZE	
+unbekannter-dateityp	PFAD	
+yaml-tag	YAML	
+yaml-anker	YAML	
+yaml-alias	YAML	
+yaml-mehrfachdokument	YAML	
+rohhtml		LINK_UNGUELTIG
+externer-link		LINK_UNGUELTIG
