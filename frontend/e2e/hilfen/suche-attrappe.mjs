@@ -239,6 +239,12 @@ export async function sucheAttrappe(welt) {
     if (pfad === '/api/v1/dokumentarten') {
       return json(route, 200, ARTEN);
     }
+    if (pfad === '/api/v1/klassifikationen') {
+      return json(route, 200, []);
+    }
+    if (/^\/api\/v1\/dokumentarten\/[^/]+\/klassifikationen$/.test(pfad)) {
+      return json(route, 200, []);
+    }
     if (pfad === '/api/v1/kontakte') {
       return json(route, 200, []);
     }

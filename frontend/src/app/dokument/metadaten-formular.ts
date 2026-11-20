@@ -13,10 +13,20 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
-import { Observable, Subject, catchError, of, switchMap, timer } from 'rxjs';
+import {
+  Observable,
+  Subject,
+  catchError,
+  distinctUntilChanged,
+  map,
+  of,
+  startWith,
+  switchMap,
+  timer,
+} from 'rxjs';
 import { Dokument, Dokumentart, Kontakt } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { anzeigeTitel } from '../gemeinsam/anzeige-titel';
@@ -37,6 +47,12 @@ import {
   zusatzFelder,
 } from './aenderung';
 import { DokumentPort } from './dokument-port';
+import { KlassifikationenFormular } from './klassifikationen-formular';
+import {
+  DokumentKlassifikationenService,
+  KlassifikationenLadezustand,
+  LEERE_DOKUMENT_KLASSIFIKATIONEN,
+} from './klassifikationen';
 import { Listenfeld } from './listenfeld';
 
 const NEU_LADEN = new Set(['STATUS_KONFLIKT', 'VERSION_KONFLIKT', 'NICHT_GEFUNDEN']);
@@ -44,6 +60,7 @@ const IM_FORMULAR: Record<string, string> = {
   BELEGNUMMER_VERGEBEN: 'belegnummer',
   PARTNER_UNBEKANNT: 'partnerId',
   ZUSATZ_UNGUELTIG: '',
+  KLASSIFIKATION_UNGUELTIG: '',
   ANFRAGE_UNGUELTIG: '',
 };
 
@@ -67,13 +84,14 @@ const TYPEN: Partial<Record<TextFeld, Eingabe['typ']>> = {
  */
 @Component({
   selector: 'app-metadaten-formular',
-  imports: [MatButtonModule, NgTemplateOutlet, Listenfeld],
+  imports: [MatButtonModule, NgTemplateOutlet, Listenfeld, KlassifikationenFormular],
   templateUrl: './metadaten-formular.html',
   styleUrl: './metadaten-formular.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MetadatenFormular {
   private readonly port = inject(DokumentPort);
+  private readonly klassifikationenService = inject(DokumentKlassifikationenService);
   private readonly anmeldung = inject(AnmeldungService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -122,10 +140,14 @@ export class MetadatenFormular {
   protected readonly art = computed(() => this.arten().find((a) => a.code === this.formular().art));
   protected readonly vorbelegt = computed(() => {
     const code = this.artVorbelegung();
-    return code && code === this.formular().art && code !== this.dokument().art ? (this.art()?.name ?? code) : null;
+    return code && code === this.formular().art && code !== this.dokument().art
+      ? (this.art()?.name ?? code)
+      : null;
   });
   protected readonly artenWahl = computed(() =>
-    this.arten().filter((a) => a.aktiv || a.code === this.formular().art || a.code === this.dokument().art),
+    this.arten().filter(
+      (a) => a.aktiv || a.code === this.formular().art || a.code === this.dokument().art,
+    ),
   );
   protected readonly finanz = computed<Eingabe[]>(() =>
     this.art()?.gruppen.includes('finanz')
@@ -145,6 +167,60 @@ export class MetadatenFormular {
   protected readonly zusatz = computed<ZusatzFeld[]>(() =>
     zusatzFelder(this.art()).filter((feld) => feld.name !== 'veroeffentlicht' || this.archiviert()),
   );
+  protected readonly klassifikationenStatus = toSignal(
+    toObservable(this.art).pipe(
+      map((art) => art?.code ?? ''),
+      distinctUntilChanged(),
+      switchMap((code): Observable<KlassifikationenLadezustand> =>
+        code
+          ? this.klassifikationenService.fuerArt(code).pipe(
+              map((daten) => ({ status: 'ok', daten }) as const),
+              catchError(() => of({ status: 'fehler' }) as Observable<KlassifikationenLadezustand>),
+              startWith({ status: 'laedt' } as const),
+            )
+          : of({ status: 'ok', daten: LEERE_DOKUMENT_KLASSIFIKATIONEN } as const),
+      ),
+    ),
+    { initialValue: { status: 'laedt' } as const },
+  );
+  protected readonly klassifikationenWerte = computed(() => {
+    const formular = this.formular();
+    const status = this.klassifikationenStatus();
+    const werte = { ...formular.klassifikationen };
+    if (status.status === 'ok' && formular.art !== this.dokument().art) {
+      for (const feld of status.daten.art) {
+        if (!Object.hasOwn(werte, feld.code) && feld.standardWert) {
+          werte[feld.code] = [feld.standardWert];
+        }
+      }
+    }
+    return werte;
+  });
+  protected readonly klassifikationenAlt = computed(() => {
+    const status = this.klassifikationenStatus();
+    if (status.status !== 'ok') {
+      return [];
+    }
+    const zugeordnet = new Set(status.daten.art.map((feld) => feld.code));
+    return Object.entries(this.klassifikationenWerte())
+      .filter(([code, werte]) => werte.length > 0 && !zugeordnet.has(code))
+      .map(([code, werte]) => {
+        const definition = status.daten.alle.find((feld) => feld.code === code);
+        const anzeigename = new Map(definition?.werte.map((wert) => [wert.code, wert.name]) ?? []);
+        return {
+          name: definition?.name ?? code,
+          werte: werte.map((wert) => anzeigename.get(wert) ?? wert).join(', '),
+        };
+      });
+  });
+  protected readonly klassifikationUngueltigeCodes = computed(() => [
+    ...new Set([
+      ...(this.dokument().klassifikationenUngueltig ?? []),
+      ...this.fehlerFelder()
+        .filter((feld) => feld.startsWith('klassifikationen.'))
+        .map((feld) => feld.substring('klassifikationen.'.length)),
+    ]),
+  ]);
 
   constructor() {
     this.suche
@@ -154,7 +230,9 @@ export class MetadatenFormular {
         switchMap((q): Observable<readonly Kontakt[] | null> =>
           q.length < 2
             ? of(null)
-            : timer(300).pipe(switchMap(() => this.port.kontakte(q).pipe(catchError(() => of([]))))),
+            : timer(300).pipe(
+                switchMap(() => this.port.kontakte(q).pipe(catchError(() => of([])))),
+              ),
         ),
         takeUntilDestroyed(),
       )
@@ -167,7 +245,8 @@ export class MetadatenFormular {
   }
 
   protected pflicht(feld: string): boolean {
-    const snake = feld === 'partnerId' ? 'partner' : feld.replace(/[A-Z]/g, (b) => `_${b.toLowerCase()}`);
+    const snake =
+      feld === 'partnerId' ? 'partner' : feld.replace(/[A-Z]/g, (b) => `_${b.toLowerCase()}`);
     return this.art()?.pflichtfelder.includes(snake) ?? false;
   }
 
@@ -189,6 +268,10 @@ export class MetadatenFormular {
 
   protected setzeZusatz(name: string, wert: string): void {
     this.formular.update((f) => ({ ...f, zusatz: { ...f.zusatz, [name]: wert } }));
+  }
+
+  protected setzeKlassifikationen(werte: Readonly<Record<string, readonly string[]>>): void {
+    this.formular.update((f) => ({ ...f, klassifikationen: werte }));
   }
 
   protected partnerSuchen(q: string): void {
@@ -221,9 +304,15 @@ export class MetadatenFormular {
   }
 
   protected speichern(): void {
+    const status = this.klassifikationenStatus();
+    if (status.status !== 'ok') {
+      this.melden(this.korb.klassifikationenFehler, []);
+      return;
+    }
     const ergebnis = aenderungAus(this.dokument(), this.start(), this.formular(), {
       art: this.art(),
       darfVertraulichkeit: this.darfVertraulichkeit(),
+      klassifikationen: status.daten.art,
     });
     if ('pruefung' in ergebnis) {
       this.melden(ergebnis.pruefung.meldung, ergebnis.pruefung.felder);
@@ -263,7 +352,8 @@ export class MetadatenFormular {
     }
     if (code in IM_FORMULAR) {
       const feld = IM_FORMULAR[code];
-      const felder = fehler.felder.length > 0 ? fehler.felder.map(formularFeld) : feld ? [feld] : [];
+      const felder =
+        fehler.felder.length > 0 ? fehler.felder.map(formularFeld) : feld ? [feld] : [];
       this.melden(this.texte.fehlercode[code], felder);
       return;
     }
