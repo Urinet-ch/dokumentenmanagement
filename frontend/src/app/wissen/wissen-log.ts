@@ -1,17 +1,19 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { WissensLogSeite } from '../gemeinsam/api';
 import { zeitpunkt } from '../gemeinsam/format';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
 @Component({
   selector: 'app-wissen-log',
-  imports: [RouterLink],
+  imports: [RouterLink, MatButtonModule],
   templateUrl: './wissen-log.html',
-  styleUrl: './wissen.scss',
+  styleUrls: ['./wissen.scss', './wissen-log.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WissenLog {
