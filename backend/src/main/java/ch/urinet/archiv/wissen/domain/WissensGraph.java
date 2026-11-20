@@ -10,6 +10,8 @@ import java.util.UUID;
 public record WissensGraph(Map<UUID, Set<UUID>> dokumenteJeSeite, Map<UUID, Set<UUID>> quellseitenJeSeite,
                            Map<UUID, WissensStufe> dokumentStufen, Map<UUID, WissensStufe> mindeststufen) {
 
+    static final int MAX_QUELLTIEFE = 128;
+
     public WissensGraph {
         dokumenteJeSeite = kopieren(dokumenteJeSeite);
         quellseitenJeSeite = kopieren(quellseitenJeSeite);
@@ -55,9 +57,21 @@ public record WissensGraph(Map<UUID, Set<UUID>> dokumenteJeSeite, Map<UUID, Set<
     }
 
     public WissensStufe wirksameStufe(UUID seiteId, Set<UUID> dokumente) {
-        WissensStufe stufe = mindeststufen.getOrDefault(seiteId, WissensStufe.NORMAL);
+        WissensStufe stufe = wirksameMindeststufe(seiteId);
         for (UUID dokumentId : dokumente) {
             stufe = stufe.hoechste(dokumentStufen.getOrDefault(dokumentId, WissensStufe.INTERN));
+        }
+        return stufe;
+    }
+
+    public WissensStufe wirksameMindeststufe(UUID seiteId) {
+        QuellenAufloesung aufloesung = zitierteSeiten(Set.of(seiteId), 0);
+        if (aufloesung.failClosed()) {
+            return WissensStufe.INTERN;
+        }
+        WissensStufe stufe = WissensStufe.NORMAL;
+        for (UUID quelle : aufloesung.seiten()) {
+            stufe = stufe.hoechste(mindeststufen.getOrDefault(quelle, WissensStufe.INTERN));
         }
         return stufe;
     }
@@ -71,17 +85,53 @@ public record WissensGraph(Map<UUID, Set<UUID>> dokumenteJeSeite, Map<UUID, Set<
                                                  WissensStufe mindeststufe, WissensStufe kontextstufe) {
         WissensStufe stufe = mindeststufe.hoechste(kontextstufe);
         Set<UUID> huelle = new HashSet<>(dokumente);
-        for (UUID quellseite : quellseiten) {
-            if (!kenntSeite(quellseite)) {
-                return WissensStufe.INTERN;
-            }
-            huelle.addAll(dokumente(quellseite));
+        QuellenAufloesung aufloesung = zitierteSeiten(quellseiten, 1);
+        if (aufloesung.failClosed()) {
+            return WissensStufe.INTERN;
+        }
+        for (UUID quellseite : aufloesung.seiten()) {
+            stufe = stufe.hoechste(mindeststufen.getOrDefault(quellseite, WissensStufe.INTERN));
+            huelle.addAll(dokumenteJeSeite.getOrDefault(quellseite, Set.of()));
         }
         for (UUID dokumentId : huelle) {
             stufe = stufe.hoechste(dokumentStufen.getOrDefault(dokumentId, WissensStufe.INTERN));
         }
         return stufe;
     }
+
+    private QuellenAufloesung zitierteSeiten(Set<UUID> startseiten, int starttiefe) {
+        Map<UUID, Integer> tiefen = new HashMap<>();
+        ArrayDeque<UUID> offen = new ArrayDeque<>();
+        for (UUID seiteId : startseiten) {
+            if (!kenntSeite(seiteId) || starttiefe > MAX_QUELLTIEFE) {
+                return new QuellenAufloesung(Set.of(), true);
+            }
+            if (tiefen.putIfAbsent(seiteId, starttiefe) == null) {
+                offen.addLast(seiteId);
+            }
+        }
+
+        while (!offen.isEmpty()) {
+            UUID seiteId = offen.removeFirst();
+            int naechsteTiefe = tiefen.get(seiteId) + 1;
+            for (UUID quellseite : quellseitenJeSeite.getOrDefault(seiteId, Set.of())) {
+                if (!kenntSeite(quellseite)) {
+                    return new QuellenAufloesung(Set.of(), true);
+                }
+                if (tiefen.containsKey(quellseite)) {
+                    continue;
+                }
+                if (naechsteTiefe > MAX_QUELLTIEFE) {
+                    return new QuellenAufloesung(Set.of(), true);
+                }
+                tiefen.put(quellseite, naechsteTiefe);
+                offen.addLast(quellseite);
+            }
+        }
+        return new QuellenAufloesung(Set.copyOf(tiefen.keySet()), false);
+    }
+
+    private record QuellenAufloesung(Set<UUID> seiten, boolean failClosed) {}
 
     private static Map<UUID, Set<UUID>> kopieren(Map<UUID, Set<UUID>> quelle) {
         Map<UUID, Set<UUID>> kopie = new HashMap<>();

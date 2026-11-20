@@ -95,6 +95,20 @@ public class PanacheWissenHuelleRepository implements WissenHuelleRepository {
     }
 
     @Override
+    public void mindeststufeErhoehen(UUID seiteId, WissensStufe stufe) {
+        entityManager().createNativeQuery("""
+                        update wissensseite
+                        set vertraulichkeit_mindest =
+                            case when vertraulichkeit_mindest = 'INTERN' or :stufe = 'INTERN'
+                                 then 'INTERN' else 'NORMAL' end
+                        where id = :seiteId
+                        """)
+                .setParameter("stufe", stufe.name())
+                .setParameter("seiteId", seiteId)
+                .executeUpdate();
+    }
+
+    @Override
     public void vertraulichkeitSetzen(UUID seiteId, WissensStufe stufe) {
         entityManager().createNativeQuery("update wissensseite set vertraulichkeit = :stufe where id = :seiteId")
                 .setParameter("stufe", stufe.name())

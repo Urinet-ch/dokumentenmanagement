@@ -78,8 +78,10 @@ public class WissenSichtbarkeitSchritte {
     private final Map<String, Integer> huellenGroessen = new HashMap<>();
     private final Map<String, Object> isolation = new HashMap<>();
     private final Map<String, String> uebersichtStufen = new HashMap<>();
+    private final Map<String, String> zitatStufen = new HashMap<>();
     private final Map<String, WissensStufe> fassungStufen = new HashMap<>();
     private final Map<String, Set<WissensPruefung.Code>> fassungBefunde = new HashMap<>();
+    private UUID zitierendeSeite;
 
     @Wenn("rekursive Wissenshüllen und Sichtbarkeit in beiden Mandanten bei gleichzeitigen Daten des anderen Mandanten geprüft werden")
     public void sichtbarkeitPruefen() throws Exception {
@@ -301,6 +303,77 @@ public class WissenSichtbarkeitSchritte {
     public void uebersichtFassungNormal() {
         assertThat(fassungStufen).containsEntry("normal", WissensStufe.NORMAL);
         assertThat(fassungBefunde.get("normal")).isEmpty();
+    }
+
+    @Wenn("eine zitierte Quellseite eine erhöhte Mindeststufe erhält und später herabgestuft wird")
+    public void zitierteSeiteHerabstufen() throws Exception {
+        imMandantenKontext("urinet", () -> {
+            zitierendeSeite = UUID.randomUUID();
+            UUID quellseiteId = UUID.randomUUID();
+            UUID tiefsteQuellseiteId = UUID.randomUUID();
+            UUID quellDokument = UUID.randomUUID();
+            String schema = new MandantCode("urinet").schema();
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                dokumentEinfuegen(verbindung, schema, quellDokument, "NORMAL");
+                seiteEinfuegen(verbindung, schema, zitierendeSeite, "probe/" + UUID.randomUUID(), "NORMAL");
+                seiteEinfuegen(verbindung, schema, quellseiteId, "probe/" + UUID.randomUUID(), "NORMAL");
+                seiteEinfuegen(verbindung, schema, tiefsteQuellseiteId, "probe/" + UUID.randomUUID(), "NORMAL");
+                quellEintragen(verbindung, schema, zitierendeSeite, "quelle", null, quellseiteId);
+                quellEintragen(verbindung, schema, quellseiteId, "quelle", null, tiefsteQuellseiteId);
+                quellEintragen(verbindung, schema, tiefsteQuellseiteId, "dokument", quellDokument, null);
+                versionEinfuegen(verbindung, schema, zitierendeSeite, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+                versionEinfuegen(verbindung, schema, quellseiteId, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+                versionEinfuegen(verbindung, schema, tiefsteQuellseiteId, 1,
+                        "{\"vertraulichkeit_mindest\":\"INTERN\"}");
+                versionEinfuegen(verbindung, schema, tiefsteQuellseiteId, 2,
+                        "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+                try (PreparedStatement p = verbindung.prepareStatement(
+                        "update " + schema + ".wissensseite set vertraulichkeit_mindest = 'INTERN' where id = ?")) {
+                    p.setObject(1, tiefsteQuellseiteId);
+                    p.executeUpdate();
+                }
+            }
+
+            huellen.versionFreigeben(tiefsteQuellseiteId, 1);
+            huellen.versionFreigeben(quellseiteId, 1);
+            huellen.versionFreigeben(zitierendeSeite, 1);
+            zitatStufen.put("vorher", mindeststufeLesen("urinet", zitierendeSeite));
+
+            try (Connection verbindung = datenbank.get().getConnection();
+                 PreparedStatement p = verbindung.prepareStatement(
+                         "update " + schema + ".wissensseite set vertraulichkeit_mindest = 'NORMAL', "
+                                 + "vertraulichkeit = 'NORMAL' where id = ?")) {
+                p.setObject(1, tiefsteQuellseiteId);
+                p.executeUpdate();
+            }
+            huellen.versionFreigeben(tiefsteQuellseiteId, 2);
+
+            zitatStufen.put("nachher", mindeststufeLesen("urinet", zitierendeSeite));
+            zitatStufen.put("wirksam", stufeLesen("urinet", zitierendeSeite));
+            rollenSichtbarkeitErfassen("urinet", "zitat-herabgestuft", zitierendeSeite, null);
+            rollenSichtbarkeitErfassen("urinet", "zitat-herabgestuft-version", zitierendeSeite, 1);
+            for (Rolle rolle : ROLLEN) {
+                sichtbarkeiten.put("urinet/zitat-herabgestuft/liste/" + rolle.code(),
+                        sichtbarkeit.sichtbareSeiten(benutzer(rolle)).contains(zitierendeSeite));
+            }
+        });
+    }
+
+    @Dann("bleibt die zitierende Seite INTERN und für «mitarbeiter» unsichtbar")
+    public void zitierendeSeiteBleibtIntern() {
+        assertThat(zitatStufen).containsEntry("vorher", "INTERN")
+                .containsEntry("nachher", "INTERN")
+                .containsEntry("wirksam", "INTERN");
+        for (Rolle benutzerRolle : ROLLEN) {
+            boolean erwartet = benutzerRolle != Rolle.MITARBEITER;
+            assertThat(sichtbarkeiten).as(benutzerRolle.code())
+                    .containsEntry(schluessel("urinet", "zitat-herabgestuft", zitierendeSeite, benutzerRolle), erwartet);
+            assertThat(sichtbarkeiten).as(benutzerRolle.code() + " Index")
+                    .containsEntry("urinet/zitat-herabgestuft/liste/" + benutzerRolle.code(), erwartet);
+            assertThat(sichtbarkeiten).as(benutzerRolle.code() + " Version")
+                    .containsEntry(schluessel("urinet", "zitat-herabgestuft-version", zitierendeSeite, benutzerRolle),
+                            erwartet);
+        }
     }
 
     @Wenn("eine normale Seite mit einer Quelle ohne gespeicherte Hülle gelesen wird")
@@ -631,6 +704,19 @@ public class WissenSichtbarkeitSchritte {
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement p = verbindung.prepareStatement(
                      "select vertraulichkeit from " + schema + ".wissensseite where id = ?")) {
+            p.setObject(1, seiteId);
+            try (ResultSet rs = p.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                return rs.getString(1);
+            }
+        }
+    }
+
+    private String mindeststufeLesen(String code, UUID seiteId) throws Exception {
+        String schema = new MandantCode(code).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement p = verbindung.prepareStatement(
+                     "select vertraulichkeit_mindest from " + schema + ".wissensseite where id = ?")) {
             p.setObject(1, seiteId);
             try (ResultSet rs = p.executeQuery()) {
                 assertThat(rs.next()).isTrue();

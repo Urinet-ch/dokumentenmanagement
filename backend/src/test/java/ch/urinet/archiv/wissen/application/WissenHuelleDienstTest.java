@@ -94,6 +94,28 @@ class WissenHuelleDienstTest {
     }
 
     @Test
+    void freigabeErhoehtDieMindeststufeZitierenderSeiten() {
+        TestRepository repository = new TestRepository(new WissensGraph(
+                Map.of(), Map.of(ZITIERENDE, Set.of(SEITE)), Map.of(),
+                Map.of(SEITE, WissensStufe.INTERN, ZITIERENDE, WissensStufe.NORMAL)));
+
+        new WissenHuelleDienst(repository).versionFreigeben(SEITE, 1);
+
+        assertThat(repository.mindeststufen).containsEntry(ZITIERENDE, WissensStufe.INTERN);
+    }
+
+    @Test
+    void neuberechnungNachHerabstufungDerQuellseiteSenktDieMindeststufeNicht() {
+        TestRepository repository = new TestRepository(new WissensGraph(
+                Map.of(), Map.of(ZITIERENDE, Set.of(SEITE)), Map.of(),
+                Map.of(SEITE, WissensStufe.NORMAL, ZITIERENDE, WissensStufe.INTERN)));
+
+        new WissenHuelleDienst(repository).versionFreigeben(SEITE, 1);
+
+        assertThat(repository.mindeststufen).containsEntry(ZITIERENDE, WissensStufe.INTERN);
+    }
+
+    @Test
     void sperrenVorDerFreigabeNimmtDieMandantensperreVorDemGraphen() {
         TestRepository repository = new TestRepository(new WissensGraph(
                 Map.of(SEITE, Set.of(DOKUMENT)), Map.of(),
@@ -111,6 +133,7 @@ class WissenHuelleDienstTest {
         private final WissensGraph graph;
         private final Map<UUID, Set<UUID>> aktuelle = new HashMap<>();
         private final Map<UUID, WissensStufe> stufen = new HashMap<>();
+        private final Map<UUID, WissensStufe> mindeststufen = new HashMap<>();
         private final Map<UUID, Set<UUID>> versionen = new HashMap<>();
         private final Set<UUID> mitDokument = new HashSet<>();
         private final List<String> aufrufe = new ArrayList<>();
@@ -139,6 +162,11 @@ class WissenHuelleDienstTest {
         @Override
         public void aktuelleHuelleSetzen(UUID seiteId, Set<UUID> dokumente) {
             aktuelle.put(seiteId, dokumente);
+        }
+
+        @Override
+        public void mindeststufeErhoehen(UUID seiteId, WissensStufe stufe) {
+            mindeststufen.merge(seiteId, stufe, WissensStufe::hoechste);
         }
 
         @Override

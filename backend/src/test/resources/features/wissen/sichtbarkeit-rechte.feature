@@ -39,6 +39,11 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Dann ergibt die Fassung mit der internen Quellseite die wirksame Vertraulichkeit INTERN und den Befund «STUFE_UEBERBLICK»
     Und ergibt die Fassung mit der normalen Quellseite die wirksame Vertraulichkeit NORMAL und keinen Befund
 
+  @req-11.1 @req-11.2
+  Szenario: Die Mindeststufe zitierter Quellseiten wirkt rekursiv und sinkt bei Neuberechnung nicht
+    Wenn eine zitierte Quellseite eine erhöhte Mindeststufe erhält und später herabgestuft wird
+    Dann bleibt die zitierende Seite INTERN und für «mitarbeiter» unsichtbar
+
   @req-11.2 @req-11.5
   Szenario: Eine aktuelle Seite mit Quellen, aber ohne gespeicherte Hülle, ist nur für Rollen mit Recht A3 sichtbar
     Wenn eine normale Seite mit einer Quelle ohne gespeicherte Hülle gelesen wird
