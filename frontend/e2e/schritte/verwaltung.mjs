@@ -1,5 +1,6 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { backend, echtesToken } from '../hilfen/echtes-backend.mjs';
 
 const ETAG = '"konfig-7"';
 const ART = {
@@ -116,6 +117,41 @@ Then(
     const codes = await liste.locator('code').allTextContents();
     assert.ok(codes.includes(eigene));
     assert.ok(!codes.includes(fremde), `fremde Art «${fremde}» sichtbar`);
+  },
+);
+
+Then(
+  /^zeigt die Verwaltung nur Konfigurationsversionen des Mandanten «(.+)» statt «(.+)»$/,
+  { timeout: 60_000 },
+  async function (mandant, anderer) {
+    async function versionen(code) {
+      const antwort = await fetch(`${backend().api}/api/v1/konfiguration/versionen`, {
+        headers: { authorization: `Bearer ${await echtesToken('inhaber', code)}` },
+      });
+      assert.equal(antwort.status, 200);
+      return (await antwort.json()).map((version) => version.sha256);
+    }
+    const eigene = await versionen(mandant);
+    const fremde = await versionen(anderer);
+    assert.ok(eigene.length > 0 && fremde.length > 0);
+    const eigeneUnterschiedliche = eigene.filter((hash) => !fremde.includes(hash));
+    const fremdeUnterschiedliche = fremde.filter((hash) => !eigene.includes(hash));
+    assert.ok(eigeneUnterschiedliche.length > 0 && fremdeUnterschiedliche.length > 0);
+    const angezeigte = this.seite.locator('#versionen tbody code');
+    await angezeigte.first().waitFor();
+    const angezeigt = await angezeigte.allTextContents();
+    assert.deepEqual(angezeigt, eigene);
+    assert.ok(fremdeUnterschiedliche.every((hash) => !angezeigt.includes(hash)));
+  },
+);
+
+Then(
+  /^ist die Urinet-Regel «(.+)» in der Verwaltung «(sichtbar|nicht sichtbar)»$/,
+  async function (code, sicht) {
+    const codes = await this.seite
+      .locator('#regeln aside ul button span:first-child')
+      .allTextContents();
+    assert.equal(codes.includes(code), sicht === 'sichtbar');
   },
 );
 

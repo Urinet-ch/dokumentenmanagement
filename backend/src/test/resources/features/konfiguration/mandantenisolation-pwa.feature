@@ -7,8 +7,10 @@ Funktionalität: Mandantenkonfiguration in der Verwaltungsoberfläche
     Und ich bin als «inhaber» im Mandanten «<mandant>» angemeldet
     Wenn ich im Menü «Dokumentarten» wähle
     Dann zeigt die Verwaltung die eigene Art «<eigene>» und nicht die fremde Art «<fremde>»
+    Und zeigt die Verwaltung nur Konfigurationsversionen des Mandanten «<mandant>» statt «<anderer>»
+    Und ist die Urinet-Regel «ausgangsrechnung_folge» in der Verwaltung «<regel>»
 
     Beispiele:
-      | mandant | eigene             | fremde             |
-      | urinet  | AUSGANGSRECHNUNG  | PROBE_VHF_BULLETIN |
-      | vhf-gsk | PROBE_VHF_BULLETIN | AUSGANGSRECHNUNG  |
+      | mandant | anderer | eigene             | fremde             | regel           |
+      | urinet  | vhf-gsk | AUSGANGSRECHNUNG   | PROBE_VHF_BULLETIN | sichtbar        |
+      | vhf-gsk | urinet  | PROBE_VHF_BULLETIN | AUSGANGSRECHNUNG   | nicht sichtbar  |
