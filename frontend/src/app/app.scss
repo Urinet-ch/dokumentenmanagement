@@ -161,6 +161,27 @@ nav {
   text-align: center;
 }
 
+// Fehler des Entwurfszählers unter der Navigation, wie Hinweise im App-Rahmen
+.nav-fehler {
+  display: grid;
+  gap: 6px;
+  margin: 10px 4px 0;
+
+  p {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--gefahr-weich);
+    color: var(--gefahr);
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  .knopf {
+    width: 100%;
+  }
+}
+
 // Kopfzeile
 .kopf {
   position: sticky;
