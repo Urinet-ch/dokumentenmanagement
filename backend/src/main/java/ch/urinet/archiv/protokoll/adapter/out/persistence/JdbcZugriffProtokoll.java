@@ -100,7 +100,7 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         }
     }
 
-    private static String json(ProtokollDetails details) {
+    static String json(ProtokollDetails details) {
         if (details.leer()) {
             return null;
         }
@@ -124,8 +124,25 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             knoten.put("seiten", details.wissensImportSeiten());
         }
         if (details.verwaltung() != null) {
-            uuid(knoten, "vorgangId", details.verwaltung().vorgangId());
-            knoten.put("phase", details.verwaltung().phase().name());
+            ProtokollDetails.Verwaltung verwaltung = details.verwaltung();
+            uuid(knoten, "vorgangId", verwaltung.vorgangId());
+            knoten.put("phase", verwaltung.phase().name());
+            uuid(knoten, "ziel", verwaltung.ziel());
+            if (verwaltung.vorgang() != null) {
+                knoten.put("vorgang", verwaltung.vorgang().name());
+            }
+            if (verwaltung.rolleAlt() != null) {
+                knoten.put("rolleAlt", verwaltung.rolleAlt().name().toLowerCase(java.util.Locale.ROOT));
+            }
+            if (verwaltung.rolleNeu() != null) {
+                knoten.put("rolleNeu", verwaltung.rolleNeu().name().toLowerCase(java.util.Locale.ROOT));
+            }
+            if (!verwaltung.felder().isEmpty()) {
+                ObjectNode felder = knoten.putObject("felder");
+                for (ProtokollDetails.Verwaltungsfeld feld : verwaltung.felder()) {
+                    felder.put(feld.name().toLowerCase(java.util.Locale.ROOT), "geändert");
+                }
+            }
         }
         if (details.regelAenderung() != null) {
             knoten.put("dokumentart", details.regelAenderung().dokumentart());

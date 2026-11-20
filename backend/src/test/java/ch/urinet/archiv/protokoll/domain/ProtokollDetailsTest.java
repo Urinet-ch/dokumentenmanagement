@@ -45,6 +45,18 @@ class ProtokollDetailsTest {
     }
 
     @Test
+    void verwaltungNimmtNurKennungUndVorgegebeneFeldnamen() {
+        var felder = new java.util.ArrayList<>(java.util.List.of(ProtokollDetails.Verwaltungsfeld.EMAIL));
+        var verwaltung = new ProtokollDetails.Verwaltung(UUID.randomUUID(),
+                ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN, UUID.randomUUID(),
+                ProtokollDetails.Verwaltungsvorgang.EMAIL_AENDERN, null, null, felder);
+        felder.add(ProtokollDetails.Verwaltungsfeld.VORNAME);
+        assertThat(verwaltung.felder()).containsExactly(ProtokollDetails.Verwaltungsfeld.EMAIL);
+        assertThatThrownBy(() -> verwaltung.felder().add(ProtokollDetails.Verwaltungsfeld.NACHNAME))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
     void regelaenderungNurMitCodesUndBeidenRegeln() {
         var alt = new ProtokollDetails.Regel(10, "GESCHAEFTSJAHR", true);
         var neu = new ProtokollDetails.Regel(null, null, false);

@@ -35,6 +35,11 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
     private static final Pattern CODE = Pattern.compile("^[A-Z][A-Z0-9_]*$");
 
     public ProtokollDetails {
+        if (verwaltung != null && (grund != null || sha256 != null || fehlercode != null || regelAenderung != null
+                || fristKonflikt != null || kontakte != null || konfiguration != null || tokenId != null
+                || wissensEntscheid != null || wissensImportSeiten != null)) {
+            throw new IllegalArgumentException("Verwaltungsdetails dürfen nicht mit anderen Details vermischt werden");
+        }
         if (wissensImportSeiten != null && (wissensImportSeiten < 0 || wissensImportSeiten > 200)) {
             throw new IllegalArgumentException("Ungültige Seitenzahl des Wissensimports");
         }
@@ -221,10 +226,29 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         ANGEFRAGT, ABGESCHLOSSEN, FEHLGESCHLAGEN, UNKLAR
     }
 
-    public record Verwaltung(UUID vorgangId, Verwaltungsphase phase) {
+    public enum Verwaltungsvorgang {
+        ANLEGEN, SPERREN, ENTSPERREN, DEAKTIVIEREN, REAKTIVIEREN, ZUGANG_ZURUECKSETZEN,
+        EINLADUNG_ERNEUT, EMAIL_AENDERN, GOOGLE_LOESEN, LOESCHEN, ROLLE_ZUWEISEN, ANTRAG, ABWEICHUNG
+    }
+
+    public enum Verwaltungsrolle {
+        INHABER, MITARBEITER, TREUHAENDER, GESCHAEFTSSTELLE
+    }
+
+    public enum Verwaltungsfeld {
+        EMAIL, VORNAME, NACHNAME
+    }
+
+    public record Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
+                             Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder) {
         public Verwaltung {
             Objects.requireNonNull(vorgangId);
             Objects.requireNonNull(phase);
+            felder = felder == null ? List.of() : List.copyOf(felder);
+        }
+
+        public Verwaltung(UUID vorgangId, Verwaltungsphase phase) {
+            this(vorgangId, phase, null, null, null, null, List.of());
         }
     }
 
