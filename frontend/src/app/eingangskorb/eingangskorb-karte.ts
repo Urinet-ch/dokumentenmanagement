@@ -40,6 +40,7 @@ import {
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { httpFehlerText } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { EingangskorbEntwurfSpeicher } from './entwurf-speicher';
 import {
@@ -89,7 +90,14 @@ const IM_FORMULAR: Record<string, string> = {
 /** Ein Dokument im Eingangskorb mit Vorschau, Vorschlag und den Aktionen nach Rechtematrix (Req 8.1, 8.5, 8.7). */
 @Component({
   selector: 'app-eingangskorb-karte',
-  imports: [MatButtonModule, RouterLink, TitelAnzeige, Listenfeld, KlassifikationenFormular],
+  imports: [
+    MatButtonModule,
+    RouterLink,
+    TitelAnzeige,
+    Listenfeld,
+    KlassifikationenFormular,
+    Symbol,
+  ],
   templateUrl: './eingangskorb-karte.html',
   styleUrl: './eingangskorb-karte.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -371,6 +379,19 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     ];
     return zeilen.filter((z) => z.wert !== '');
   });
+  /** Felder mit «bitte prüfen» auf der Karte (Titel und Übersicht), für die Pille im Prototyp. */
+  protected readonly unsichereFelder = computed(
+    () =>
+      (!this.dokument().titel && this.entwurf().titel && this.bittePruefen('titel') ? 1 : 0) +
+      this.angaben().filter((z) => this.bittePruefen(z.feld)).length,
+  );
+  /** «Vorschlag vollständig» nur mit Vorschlag, ohne unsichere Felder und ohne fehlende Pflichtangaben der Art. */
+  protected readonly vorschlagVollstaendig = computed(
+    () =>
+      Object.keys(this.dokument().vorschlag ?? {}).length > 0 &&
+      this.unsichereFelder() === 0 &&
+      this.zusatzFehlt().length === 0,
+  );
 
   protected readonly weitereFelder = computed(() => {
     const felder: { feld: EntwurfFeld; typ: string; modus?: string }[] = [
