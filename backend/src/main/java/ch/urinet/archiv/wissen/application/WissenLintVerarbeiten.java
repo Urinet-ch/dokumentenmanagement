@@ -288,14 +288,15 @@ public class WissenLintVerarbeiten {
             }
         }
         AuftragSeite bisher = index < 0
-                ? new AuftragSeite(ziel.id(), ziel.version(), List.of(), paar.kontextstufe(), List.of())
+                ? new AuftragSeite(ziel.id(), ziel.version(), ziel.quellenRevision(), List.of(), paar.kontextstufe(),
+                        List.of())
                 : seiten.get(index);
         List<Bezug> bezuege = new ArrayList<>(bisher.bezuege());
-        Bezug bezug = new Bezug(gegen.id(), gegen.version());
+        Bezug bezug = new Bezug(gegen.id(), gegen.version(), gegen.quellenRevision());
         if (!bezuege.contains(bezug)) {
             bezuege.add(bezug);
         }
-        AuftragSeite neu = new AuftragSeite(ziel.id(), bisher.seiteVersion(), bezuege,
+        AuftragSeite neu = new AuftragSeite(ziel.id(), bisher.seiteVersion(), bisher.quellenRevision(), bezuege,
                 bisher.kontextstufe().hoechste(paar.kontextstufe()), append(bisher.auftraege(), List.of(a.anweisung())));
         if (index < 0) {
             seiten.add(neu);

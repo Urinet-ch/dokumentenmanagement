@@ -63,10 +63,11 @@ public class WissenLintSpeichern {
     @Transactional
     public WissensLint.Ergebnis planen(LocalDate heute) {
         huellen.sperren();
-        WissensGraph graph = huellen.graphLaden();
         List<Wissensseite> seiten = lint.seitenLaden();
+        WissensGraph graph = huellen.graphLaden(quellDokumente(seiten));
         Set<UUID> dokumente = new HashSet<>();
         seiten.forEach(seite -> dokumente.addAll(graph.dokumente(seite.id())));
+        dokumente.addAll(quellDokumente(seiten));
         Map<UUID, WissensPruefung.DokumentQuelle> quellen = ingest.dokumentQuellenLaden(dokumente);
         return WissensLint.pruefen(seiten.stream().map(WissensLint.Seite::new).toList(), graph, quellen,
                 lint.paarZeiten(), heute, konfiguration.ingest().seiteMaxZeichen(), maxPaare);
@@ -76,13 +77,13 @@ public class WissenLintSpeichern {
     @Transactional
     public Optional<PaarKontext> paarLaden(WissensLint.PaarId paar) {
         huellen.sperren();
-        WissensGraph graph = huellen.graphLaden();
+        Map<UUID, Wissensseite> seiten = lint.seitenLaden().stream()
+                .collect(Collectors.toUnmodifiableMap(Wissensseite::id, s -> s));
+        WissensGraph graph = huellen.graphLaden(quellDokumente(seiten.values()));
         Set<UUID> ids = Set.of(paar.erste(), paar.zweite());
         if (!bekannteHuelle(ids, graph)) {
             return Optional.empty();
         }
-        Map<UUID, Wissensseite> seiten = lint.seitenLaden().stream()
-                .collect(Collectors.toUnmodifiableMap(Wissensseite::id, s -> s));
         if (!seiten.keySet().containsAll(ids)) {
             return Optional.empty();
         }
@@ -105,19 +106,21 @@ public class WissenLintSpeichern {
     @Transactional
     public Optional<SeitenKontext> seitenLaden(WissenLintRepository.AuftragSeite auftrag) {
         huellen.sperren();
-        WissensGraph graph = huellen.graphLaden();
+        Map<UUID, Wissensseite> alle = lint.seitenLaden().stream()
+                .collect(Collectors.toUnmodifiableMap(Wissensseite::id, s -> s));
+        WissensGraph graph = huellen.graphLaden(quellDokumente(alle.values()));
         Set<UUID> ids = new HashSet<>();
         ids.add(auftrag.seiteId());
         auftrag.bezuege().forEach(b -> ids.add(b.seiteId()));
         if (!bekannteHuelle(ids, graph)) {
             return Optional.empty();
         }
-        Map<UUID, Wissensseite> alle = lint.seitenLaden().stream()
-                .collect(Collectors.toUnmodifiableMap(Wissensseite::id, s -> s));
         Wissensseite ziel = alle.get(auftrag.seiteId());
         if (ziel == null || ziel.version() != auftrag.seiteVersion()
+                || ziel.quellenRevision() != auftrag.quellenRevision()
                 || auftrag.bezuege().stream().anyMatch(b -> !alle.containsKey(b.seiteId())
-                || alle.get(b.seiteId()).version() != b.version())) {
+                || alle.get(b.seiteId()).version() != b.version()
+                || alle.get(b.seiteId()).quellenRevision() != b.quellenRevision())) {
             return Optional.empty();
         }
         Set<UUID> dokumente = new HashSet<>();
@@ -182,6 +185,7 @@ public class WissenLintSpeichern {
                 if (fassung == null) {
                     throw new IllegalStateException("Quellseite während Lint-Ladung entfernt");
                 }
+
                 if (fassung.wissensquelleId() != null) {
                     dokumente.add(fassung.wissensquelleId());
                 }
@@ -189,6 +193,11 @@ public class WissenLintSpeichern {
             }
         }
         return dokumente;
+    }
+
+    private static Set<UUID> quellDokumente(java.util.Collection<Wissensseite> seiten) {
+        return seiten.stream().map(Wissensseite::wissensquelleId).filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     private static boolean bekannteHuelle(Set<UUID> seiten, WissensGraph graph) {

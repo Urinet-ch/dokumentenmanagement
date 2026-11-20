@@ -3,6 +3,7 @@ package ch.urinet.archiv.wissen.domain;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,7 +42,7 @@ public final class WissensLint {
         for (Seite eintrag : seiten) {
             Wissensseite seite = eintrag.fassung();
             UUID id = seite.id();
-            Set<UUID> huelle = graph.dokumente(id);
+            Set<UUID> huelle = huelle(id, graph, nachId);
             huellen.put(id, huelle);
             Wissensseite.Vertraulichkeit stufe = graph.wirksameStufe(id, huelle) == WissensStufe.NORMAL
                     ? Wissensseite.Vertraulichkeit.NORMAL : Wissensseite.Vertraulichkeit.INTERN;
@@ -125,6 +126,24 @@ public final class WissensLint {
                 .thenComparing(p -> !(p.querverweisFehlt() || !p.veraltet().isEmpty()))
                 .thenComparing(p -> p.id().erste()).thenComparing(p -> p.id().zweite()));
         return new Ergebnis(befunde, paare.stream().limit(maxPaare).toList());
+    }
+
+    private static Set<UUID> huelle(UUID id, WissensGraph graph, Map<UUID, Seite> seiten) {
+        Set<UUID> dokumente = new HashSet<>(graph.dokumente(id));
+        Set<UUID> besucht = new HashSet<>();
+        ArrayDeque<UUID> offen = new ArrayDeque<>();
+        offen.add(id);
+        while (!offen.isEmpty()) {
+            UUID aktuell = offen.removeFirst();
+            if (besucht.add(aktuell)) {
+                Seite seite = seiten.get(aktuell);
+                if (seite != null && seite.fassung().wissensquelleId() != null) {
+                    dokumente.add(seite.fassung().wissensquelleId());
+                }
+                offen.addAll(graph.quellseitenJeSeite().getOrDefault(aktuell, Set.of()));
+            }
+        }
+        return Set.copyOf(dokumente);
     }
 
     private static void veraltet(Wissensseite seite, Wissensseite quelle, Map<UUID, Set<String>> links,

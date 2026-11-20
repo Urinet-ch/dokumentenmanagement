@@ -173,7 +173,7 @@ public class JdbcWissenLint implements WissenLintRepository {
                          from jsonb_array_elements(cast(:befunde as jsonb)) b group by b->>'code') x), '{}'::jsonb)
                 """).unwrap(NativeQuery.class).setParameter("akteur", lauf.get().akteur())
                 .setParameter("befunde", befunde)
-                .setParameter("entwurf", hatAenderungen ? lauf.get().entwurfId() : null, UUID.class)
+                .setParameter("entwurf", lauf.get().entwurfId(), UUID.class)
                 .executeUpdate();
     }
 

@@ -461,14 +461,20 @@ flowchart LR
 - Kandidaten «veraltet» ohne KI (Requirement 10.3): Aussagen einer Seite, deren Quelldokument ein älteres
   Dokumentdatum hat als eine Wissensquelle, deren Quelle-Seite auf die Seite verlinkt oder mit ihr eine Quelle teilt.
 - Mit KI (Requirement 10.3, 10.4): Paare, die einander verlinken, eine Quelle teilen oder ≥ 2 Schlagwörter teilen,
-  ohne Seiten mit `PERSONAL`-Dokument in der Hülle, Paare mit `QUERVERWEIS_FEHLT` oder Kandidaten «veraltet» zuerst,
-  sonst nach `lint_geprueft_am`, höchstens `lint-paare`. Antwort `{widersprueche:[{seite, schluessel, gegenseite,
+  ohne Seiten mit `PERSONAL`-Dokument in der Hülle, nach letztem Prüfzeitpunkt und bei Gleichstand Paare mit
+  `QUERVERWEIS_FEHLT` oder Kandidaten «veraltet» zuerst, höchstens `lint-paare`. Antwort `{widersprueche:[{seite, schluessel, gegenseite,
   gegenschluessel, text}], veraltet:[{seite, schluessel, neuere_quelle, text}], links:[{seite, ziel, text}]}`. Für
   jede betroffene Seite folgt ein Teilauftrag `SEITE` (gleiches Schema wie beim Ingest) mit dem Befund als Auftrag;
   bei Paaren verschiedener Vertraulichkeit nur für die höher eingestufte Seite, die andere erhält nur einen Befund
   (IDs). Kontextstufe = höchste Stufe des Paars.
 - Erschöpftes Monatsbudget: kein KI-Teil, Logeintrag `LINT` mit Befund «Budget erschöpft» (Requirement 13.6).
 - Ergebnis in `wissens_lint` (Befunde nur als IDs und Codes) und ggf. Entwurf `anlass = LINT`; Logeintrag `LINT`.
+- Umsetzung 15.4: Vorrang haben nach Requirement 10.3 die am längsten nicht geprüften Paare; Kandidaten sind bei
+  gleichem Prüfzeitpunkt das zweite Sortierkriterium. Der Fortschritt und die Paarhistorie liegen im
+  `ingest_daten` des LINT-Entwurfs. Der Entwurf dient auch als Budgetanker und bleibt ohne Änderungen mit Status
+  `ERLEDIGT` bestehen. Vor jedem KI-Aufruf wird die aktuelle Hülle erneut geprüft; vor dem Seitenauftrag müssen
+  Version und Quellenrevision aller beteiligten Seiten noch zum Paarauftrag passen. Änderungen verwenden die
+  bestehende Freigabeprüfung und werden nicht unmittelbar angewendet.
 
 ### OKF-Export (`wissen/adapter/out`)
 - `WISSEN_EXPORT` schreibt ein ZIP stromweise nach S3 `exporte/wissen-<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage

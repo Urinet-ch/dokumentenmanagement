@@ -57,6 +57,19 @@ class WissensLintTest {
     }
 
     @Test
+    void quelldokumentDerQuellseiteZaehltAuchOhneEigenenQuelleneintrag() {
+        Wissensseite a = seite(A, "konzepte/a", Seitentyp.KONZEPT, List.of(),
+                "Text.[^q]", List.of(dokument(ALT)), null, false, null);
+        Wissensseite q = seite(Q, "quellen/2026-01-q", Seitentyp.QUELLE, List.of(),
+                "[A](/konzepte/a)", List.of(), null, false, NEU);
+        var normal = pruefen(List.of(a, q), Map.of(ALT, quelle(2025, false), NEU, quelle(2026, false)), 30);
+        assertThat(normal.paare()).singleElement().satisfies(paar ->
+                assertThat(paar.veraltet()).containsExactly(new WissensLint.VeraltetKandidat(A, "q", NEU)));
+        var personal = pruefen(List.of(a, q), Map.of(ALT, quelle(2025, false), NEU, quelle(2026, true)), 30);
+        assertThat(personal.paare()).isEmpty();
+    }
+
+    @Test
     void fehlenderQuerverweisGiltInBeidenRichtungenUndPaareSindBegrenzt() {
         Wissensseite a = seite(A, "konzepte/a", Seitentyp.KONZEPT, List.of("eins", "zwei"),
                 "Text.[^q]", List.of(dokument(ALT)), null, false, null);

@@ -34,10 +34,10 @@ public interface WissenLintRepository {
                 Fortschritt fortschritt) {
     }
 
-    record Bezug(UUID seiteId, int version) {
+    record Bezug(UUID seiteId, int version, long quellenRevision) {
     }
 
-    record AuftragSeite(UUID seiteId, int seiteVersion, List<Bezug> bezuege,
+    record AuftragSeite(UUID seiteId, int seiteVersion, long quellenRevision, List<Bezug> bezuege,
                         WissensStufe kontextstufe, List<String> auftraege) {
         public AuftragSeite {
             bezuege = List.copyOf(bezuege);
