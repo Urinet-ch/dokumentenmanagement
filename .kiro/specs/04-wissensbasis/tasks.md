@@ -86,7 +86,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 6.1–6.10, 7.6, 14.1_
   - _Abhängig von: 14.1_
 
-- [ ] 14.3 Widerspruchsschutz [Backend]
+- [x] 14.3 Widerspruchsschutz [Backend]
   - Widerspruchsblöcke erkennen und im Diff markieren, Befund `AUSSAGE_ENTFERNT`, Grund beim Auflösen (sonst 422 `PFLICHTFELD_FEHLT`, Grund gilt für die entfernten Schlüssel), Logeintrag «Widerspruch aufgelöst», Flag `widerspruch_offen`
   - Szenario: neue Quelle widerspricht bestehender Aussage → beide Fussnoten bleiben, nichts überschrieben
   - _Anforderungen: 7.1–7.5_

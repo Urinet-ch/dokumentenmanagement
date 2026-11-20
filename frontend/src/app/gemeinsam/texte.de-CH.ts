@@ -104,6 +104,7 @@ export const TEXTE = {
     versionSchliessen: 'Version schliessen',
     freigegeben: 'Freigegeben',
     stand: 'Stand',
+    quellendatum: 'Quellendatum',
     keineEintraege: 'Keine Einträge vorhanden.',
     seiteNichtVorhanden: 'Seite nicht vorhanden',
     seite: (nummer: number) => `Seite ${nummer}`,
