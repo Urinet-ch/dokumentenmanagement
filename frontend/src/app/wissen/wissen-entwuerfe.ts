@@ -30,6 +30,7 @@ interface Aenderung {
   widersprueche: { text?: string; schluessel?: string[] }[];
   entfernteAussagen: { schluessel: string; begruendung: string }[];
   diff: { zeilen?: Zeile[]; titel?: Feld; beschreibung?: Feld; tags?: Feld; quellen?: Feld;
+    widersprueche?: { alt: { text: string; fussnoten: string[] }[]; neu: { text: string; fussnoten: string[] }[] };
     entfernteWidersprueche?: { text: string; fussnoten: string[] }[] };
 }
 interface Entwurf { entwurf: Kopf; aenderungen: Aenderung[]; kernaussagen: Aussage[] }

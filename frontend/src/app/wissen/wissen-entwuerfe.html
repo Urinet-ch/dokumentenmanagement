@@ -70,7 +70,12 @@
       <h3>{{ texte.hinweise }}</h3>
       @for (hinweis of aenderung.hinweise; track $index) { <p>{{ hinweis.code }} · {{ hinweis.meldung ?? hinweis.text }}</p> }
       <h3>{{ texte.widersprueche }}</h3>
-      @for (block of aenderung.widersprueche; track $index) { <pre>{{ feld(block) }}</pre> }
+      @if (aenderung.diff.widersprueche; as bloecke) {
+        @for (block of bloecke.alt; track $index) { <pre>− {{ block.text }} · {{ block.fussnoten.join(', ') }}</pre> }
+        @for (block of bloecke.neu; track $index) { <pre>+ {{ block.text }} · {{ block.fussnoten.join(', ') }}</pre> }
+      } @else {
+        @for (block of aenderung.widersprueche; track $index) { <pre>{{ feld(block) }}</pre> }
+      }
       @for (block of aenderung.diff.entfernteWidersprueche; track $index) {
         <p>{{ texte.aufloesung }}</p><pre>− {{ block.text }} · {{ block.fussnoten.join(', ') }}</pre>
       }

@@ -74,6 +74,17 @@ describe('Wissensentwürfe', () => {
     await fixture.whenStable();
   });
 
+  it('zeigt erkannte manuelle Widersprüche aus dem Diff auch ohne KI-Blockliste', async () => {
+    const antwort = { ...daten, aenderungen: [{ ...daten.aenderungen[0],
+      diff: { ...daten.aenderungen[0].diff, widersprueche: {
+        alt: [{ text: 'Alte strittige Aussage', fussnoten: ['q1', 'q2'] }],
+        neu: [{ text: 'Neue strittige Aussage', fussnoten: ['q1', 'q3'] }],
+      } } }] };
+    const fixture = await zeigen(antwort);
+    expect(fixture.nativeElement.textContent).toContain('− Alte strittige Aussage · q1, q2');
+    expect(fixture.nativeElement.textContent).toContain('+ Neue strittige Aussage · q1, q3');
+  });
+
   it('verwirft nicht ohne Grund und sendet bei abgebrochener Bestätigung nichts', async () => {
     const fixture = await zeigen();
     klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.entscheiden);
