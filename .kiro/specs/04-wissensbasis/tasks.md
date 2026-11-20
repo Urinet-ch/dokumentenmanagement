@@ -136,7 +136,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 6.10, 8.8, 12.3, 12.4, 16.6_
   - _Abhängig von: 15.2, 14.2, Spec 02: 7.4_
 
-- [ ] 15.4 Lint [Backend]
+- [x] 15.4 Lint [Backend]
   - Scheduler und manueller Start (A17, Protokoll `WISSEN_LINT`); Prüfungen ohne KI inkl. fehlender Querverweise und Kandidaten «veraltet»; KI-Paare auch verschiedener Vertraulichkeit (ohne `PERSONAL`-Hülle), Änderung nur an der höher eingestuften Seite, mit `lint-paare` und Budget; Vorschläge als Entwurf `LINT`; `wissens_lint`; Logeintrag `LINT` (auch «Budget erschöpft»)
   - _Anforderungen: 10.1–10.6, 14.3_
   - _Abhängig von: 14.2, 14.3_
