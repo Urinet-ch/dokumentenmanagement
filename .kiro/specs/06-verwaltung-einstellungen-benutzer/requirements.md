@@ -145,8 +145,8 @@ unbemerkt verändere.
     Sperren anwenden (Spec 01, Regel 2).
 13. Das Archiv SOLL die Einstellungen der Wissensbasis (A19: Budget je Ingest, Budget des Lint, Monatsbudget,
     Lint-Zeitplan) nach derselben Mechanik führen; der Pfad `/wissensbasis/einstellungen` und das Recht A19 bleiben
-    (Spec 04, design.md). [offen: Überführung der Tabelle `wissens_einstellung` in die Konfiguration – Entscheid Fabian
-    im PR dieser Spec; bis dahin gilt Spec 04 unverändert.]
+    (Spec 04, design.md). [entschieden 20.11.2026, Fabian: ja, Überführung der Tabelle `wissens_einstellung`
+    in die Konfiguration, Aufgabe 20.3; bis dahin gilt Spec 04 unverändert.]
 14. FALLS eine Anfrage an die Einstellungen mehrere Fehler zugleich hätte, DANN SOLL das Archiv die Reihenfolge von
     Spec 01 einhalten: 401, 403, 428/412, 409 `BESTAETIGUNG_NOETIG`, 422.
 
@@ -246,8 +246,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
 | A23 | Rollen zuweisen | erlaubt | 403 | 403 | 403 |
 
    ¹ Für `geschaeftsstelle` gilt 403, bis Spec 03, 3.5 die Rechte A11 bis A14 entscheidet; ob die Geschäftsstelle von
-   `vhf-gsk` A21 bis A23 erhält, entscheidet derselbe Schritt [offen: Benutzerverwaltung im Mandanten `vhf-gsk` –
-   Entscheid Fabian im PR dieser Spec; Empfehlung: Betreiber verwaltet die Benutzer von `vhf-gsk` per Admin-Kommando].
+   `vhf-gsk` A21 bis A23 erhält, entscheidet derselbe Schritt [entschieden 20.11.2026, Fabian: Der Betreiber
+   verwaltet die Benutzer von `vhf-gsk` per Admin-Kommando; A20 bis A23 bleiben für `geschaeftsstelle` gesperrt, bis Spec 03, 3.5
+   entscheidet].
    Ein Benutzer braucht für das Anlegen A22 und A23, weil das Anlegen eine Rolle vergibt.
 2. FALLS ein Benutzer ohne das Recht einer Aktion A20 bis A23 sie ausführt, DANN SOLL das Archiv mit HTTP 403
    `NICHT_ERLAUBT` antworten und `VERWEIGERT` protokollieren (Spec 01, 10.7). Nachweis: Szenarien je Rolle und Zeile.
@@ -257,7 +258,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
 4. Das Archiv SOLL je Mandant einen festen Satz vergebbarer Rollen führen (Spalte `public.mandant.verwaltung_rollen`,
    gesetzt vom Betreiber beim Anlegen oder per Admin-Kommando, nie über die Oberfläche; Standard `inhaber`,
    `mitarbeiter`, `treuhaender`; `vhf-gsk`: `geschaeftsstelle`). FALLS ein Aufruf eine andere Rolle verlangt, DANN SOLL
-   das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` antworten.
+   das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` antworten. «Andere Rolle» heisst: keine der vier Archiv-Rollen
+   (unbekannt, etwa eine Realm-Rolle). Eine bekannte Archiv-Rolle ausserhalb des Satzes des Mandanten fällt unter 4.6
+   (403 `ESKALATION_VERBOTEN`).
 5. WENN ein Benutzer mit Recht A23 die Rolle eines Benutzers ändert (Step-up), DANN SOLL das Archiv in Keycloak die
    neue Rolle setzen und alle anderen der vier Archiv-Rollen entfernen und den Token-Widerruf setzen (4.9); hat ein
    Benutzer in Keycloak mehrere Archiv-Rollen (von Hand gesetzt), SOLL die Verwaltung das als Abweichung

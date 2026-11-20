@@ -30,6 +30,22 @@ class KonfigurationKommandoTest {
     }
 
     @Test
+    void kiFreigebenVerlangtBetreiberUndAbnahmeverweis() {
+        var aufruf = KonfigurationKommando.lesen(List.of("ki-freigeben", "vhf-gsk",
+                "--wer", "Fabian", "--abnahme", "auswertung-2026-11"));
+
+        assertThat(aufruf).isPresent().get().satisfies(gelesen -> {
+            assertThat(gelesen.operation()).isEqualTo(KonfigurationKommando.Operation.KI_FREIGEBEN);
+            assertThat(gelesen.mandant().wert()).isEqualTo("vhf-gsk");
+            assertThat(gelesen.wer()).isEqualTo("Fabian");
+            assertThat(gelesen.abnahme()).isEqualTo("auswertung-2026-11");
+        });
+        assertThat(KonfigurationKommando.lesen(List.of("ki-freigeben", "vhf-gsk", "--wer", "Fabian"))).isEmpty();
+        assertThat(KonfigurationKommando.lesen(List.of("ki-freigeben", "vhf-gsk",
+                "--wer", "Fabian", "--abnahme", " "))).isEmpty();
+    }
+
+    @Test
     void exportKannDateiUndJsonAusgabeAngeben() {
         var aufruf = KonfigurationKommando.lesen(List.of("exportieren", "vhf-gsk", "konfiguration.json", "--json"));
 

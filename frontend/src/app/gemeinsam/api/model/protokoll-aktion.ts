@@ -27,6 +27,7 @@ export const ProtokollAktion = {
     WissenVerwerfen: 'WISSEN_VERWERFEN',
     WissenIngest: 'WISSEN_INGEST',
     WissenLint: 'WISSEN_LINT',
+    WissenImport: 'WISSEN_IMPORT',
     KontaktZusammenfuehren: 'KONTAKT_ZUSAMMENFUEHREN',
     KontaktInaktiv: 'KONTAKT_INAKTIV',
     KontaktAktiv: 'KONTAKT_AKTIV',

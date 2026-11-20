@@ -45,6 +45,12 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.suche),
   },
   {
+    path: 'wissensbasis/einstellungen',
+    loadComponent: () => import('./wissen/wissen-einstellungen').then((m) => m.WissenEinstellungenSeite),
+    canActivate: [rechtGuard('A19')],
+    title: titel(TEXTE.wissenEinstellungen.titel),
+  },
+  {
     path: 'wissen',
     loadComponent: () => import('./wissen/wissen-index').then((m) => m.WissenIndex),
     canActivate: [rechtGuard('A15')],
@@ -62,6 +68,18 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A15')],
     data: { pfad: 'ueberblick' },
     title: titel(TEXTE.wissen.titel),
+  },
+  {
+    path: 'wissen/entwuerfe',
+    loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
+    canActivate: [rechtGuard('A17')],
+    title: titel(TEXTE.wissen.entwuerfe.titel),
+  },
+  {
+    path: 'wissen/entwuerfe/:id',
+    loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
+    canActivate: [rechtGuard('A17')],
+    title: titel(TEXTE.wissen.entwuerfe.titel),
   },
   {
     path: 'wissen/:ordner/:name',

@@ -19,4 +19,8 @@ public final class Exportdatei {
     public static String schluessel(UUID exportId) {
         return PRAEFIX + Objects.requireNonNull(exportId, "exportId") + ".zip";
     }
+
+    public static String wissensSchluessel(UUID exportId) {
+        return PRAEFIX + "wissen-" + Objects.requireNonNull(exportId, "exportId") + ".zip";
+    }
 }

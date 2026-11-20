@@ -1,6 +1,9 @@
 <div class="verwaltung">
-  <h1>{{ texte.dokumentarten.titel }}</h1>
-  <p>{{ texte.dokumentarten.einleitung }}</p>
+  <div class="seitenkopf">
+    <p class="vorzeile">{{ gruppe }}</p>
+    <h1>{{ texte.dokumentarten.titel }}</h1>
+    <p>{{ texte.dokumentarten.einleitung }}</p>
+  </div>
 
   @if (fehler()) {
     <p class="meldung fehler" role="alert">{{ fehlerMeldung() }}</p>
@@ -20,7 +23,7 @@
     <a href="#konfigurationsdatei">{{ texte.datei.titel }}</a>
   </nav>
 
-  <section id="dokumentarten" aria-labelledby="dokumentarten-titel">
+  <section id="dokumentarten" class="karte" aria-labelledby="dokumentarten-titel">
     <h2 id="dokumentarten-titel">{{ texte.dokumentarten.titel }}</h2>
     <div class="zweispaltig">
       <aside aria-label="{{ texte.dokumentarten.liste }}">
@@ -39,9 +42,18 @@
                   [attr.aria-current]="ausgewaehlteArt() === art.code ? 'true' : null"
                   (click)="artWaehlen(art)"
                 >
-                  <span>{{ art.name }}</span>
+                  <span class="name">{{ art.name }}</span>
                   <code>{{ art.code }}</code>
-                  <span class="status">{{ art.aktiv ? texte.aktiv : texte.inaktiv }}</span>
+                  <span class="status pillen">
+                    <span class="pille" [class.ok]="art.aktiv">{{ art.aktiv ? texte.aktiv : texte.inaktiv }}</span>
+                    <span class="pille">{{ texte.dokumentarten.vertraulichkeiten[art.vertraulichkeit] }}</span>
+                    @if (art.selbstAusgestellt) {
+                      <span class="pille akzent">{{ texte.dokumentarten.selbstAusgestellt }}</span>
+                    }
+                    @if (art.gesetzlichePflicht) {
+                      <span class="pille info" [attr.title]="texte.dokumentarten.gesetzlichePflicht">{{ texte.gebuev }}</span>
+                    }
+                  </span>
                 </button>
               </li>
             }
@@ -322,7 +334,7 @@
                 </button>
               </div>
             } @else {
-              <button type="button" class="sekundaer" (click)="artLoeschenFrage.set(true)">
+              <button type="button" class="sekundaer gefahr" (click)="artLoeschenFrage.set(true)">
                 {{ texte.loeschen }}
               </button>
             }
@@ -407,7 +419,7 @@
     }
   </section>
 
-  <section id="klassifikationen" aria-labelledby="klassifikationen-titel">
+  <section id="klassifikationen" class="karte" aria-labelledby="klassifikationen-titel">
     <h2 id="klassifikationen-titel">{{ texte.klassifikationen.titel }}</h2>
     <p>{{ texte.klassifikationen.einleitung }}</p>
     <div class="zweispaltig">
@@ -429,10 +441,12 @@
                   "
                   (click)="klassifikationWaehlen(klassifikation)"
                 >
-                  <span>{{ klassifikation.name }}</span>
+                  <span class="name">{{ klassifikation.name }}</span>
                   <code>{{ klassifikation.code }}</code>
-                  <span class="status">
-                    {{ klassifikation.aktiv ? texte.aktiv : texte.inaktiv }}
+                  <span class="status pillen">
+                    <span class="pille" [class.ok]="klassifikation.aktiv">{{
+                      klassifikation.aktiv ? texte.aktiv : texte.inaktiv
+                    }}</span>
                   </span>
                 </button>
               </li>
@@ -522,7 +536,7 @@
             } @else {
               <button
                 type="button"
-                class="sekundaer"
+                class="sekundaer gefahr"
                 (click)="klassifikationLoeschenFrage.set(true)"
               >
                 {{ texte.loeschen }}
@@ -625,7 +639,7 @@
     </div>
   </section>
 
-  <section id="regeln" aria-labelledby="regeln-titel">
+  <section id="regeln" class="karte" aria-labelledby="regeln-titel">
     <h2 id="regeln-titel">{{ texte.regeln.titel }}</h2>
     <p>{{ texte.regeln.einleitung }}</p>
     <div class="zweispaltig">
@@ -645,11 +659,13 @@
                   [attr.aria-current]="ausgewaehlteRegel() === regel.code ? 'true' : null"
                   (click)="regelWaehlen(regel)"
                 >
-                  <span>{{ regel.code }}</span>
+                  <span class="name">{{ regel.code }}</span>
                   <span
                     >{{ regelTypName(regel.typ) }} · {{ regel.art || texte.regeln.alleArten }}</span
                   >
-                  <span class="status">{{ regel.aktiv ? texte.aktiv : texte.inaktiv }}</span>
+                  <span class="status pillen">
+                    <span class="pille" [class.ok]="regel.aktiv">{{ regel.aktiv ? texte.aktiv : texte.inaktiv }}</span>
+                  </span>
                 </button>
               </li>
             }
@@ -718,7 +734,7 @@
     </div>
   </section>
 
-  <section id="versionen" aria-labelledby="versionen-titel">
+  <section id="versionen" class="karte" aria-labelledby="versionen-titel">
     <h2 id="versionen-titel">{{ texte.versionen.titel }}</h2>
     <p>{{ texte.versionen.einleitung }}</p>
     @if (!versionenGeladen()) {
@@ -810,7 +826,7 @@
     }
   </section>
 
-  <section id="konfigurationsdatei" aria-labelledby="datei-titel">
+  <section id="konfigurationsdatei" class="karte" aria-labelledby="datei-titel">
     <h2 id="datei-titel">{{ texte.datei.titel }}</h2>
     <p>{{ texte.datei.einleitung }}</p>
     <button type="button" [disabled]="beschaeftigt()" (click)="dateiExportieren()">

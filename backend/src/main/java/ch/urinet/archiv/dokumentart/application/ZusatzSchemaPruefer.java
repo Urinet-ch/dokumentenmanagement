@@ -18,6 +18,11 @@ public interface ZusatzSchemaPruefer {
     /** JSON-Typen der direkten Schemafelder; {@code format: date} wird als {@code date} ausgewiesen. */
     Map<String, String> feldTypen(String schemaJson);
 
+    /** Beschreibungen der direkten Schemafelder, sofern sie gesetzt sind. */
+    default Map<String, String> feldBeschreibungen(String schemaJson) {
+        return Map.of();
+    }
+
     /**
      * Wie {@link #schemaPruefen}, aber für den Seed eines Mandanten (Admin-Kommando, Quelle im Repo) mit der eigenen,
      * grösseren Frist {@code archiv.dokumentart.seed-zeitgrenze}.
@@ -33,6 +38,15 @@ public interface ZusatzSchemaPruefer {
      * {@code FachFehler(ZUSATZ_UNGUELTIG)}.
      */
     List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson);
+
+    /**
+     * Wie {@link #konfigurationPruefen}, aber für den Seed eines Mandanten (Quelle im Repo) mit der grösseren Frist
+     * {@code archiv.dokumentart.seed-zeitgrenze}: Die ganze Seed-Datei mit allen Arten braucht mit kalter JVM mehr als
+     * die Frist einer einzelnen Anfrage (instabile CI, «Seed ungültig für Mandant urinet», 20.11.2026).
+     */
+    default List<Verletzung> seedKonfigurationPruefen(String schemaJson, String dateiJson) {
+        return konfigurationPruefen(schemaJson, dateiJson);
+    }
 
     int MAX_VERLETZUNGEN = 100;
 

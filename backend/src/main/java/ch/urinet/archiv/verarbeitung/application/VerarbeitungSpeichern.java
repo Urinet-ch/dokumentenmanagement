@@ -4,6 +4,7 @@ import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort;
 import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort.Verarbeitungsergebnis;
 import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort.Verarbeitungsstand;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.konfiguration.application.KonfigurationLesen;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -27,10 +28,13 @@ public class VerarbeitungSpeichern {
 
     private final DokumentVerarbeitungPort dokumente;
     private final AuftragService auftraege;
+    private final KonfigurationLesen konfiguration;
 
-    public VerarbeitungSpeichern(DokumentVerarbeitungPort dokumente, AuftragService auftraege) {
+    public VerarbeitungSpeichern(DokumentVerarbeitungPort dokumente, AuftragService auftraege,
+                                 KonfigurationLesen konfiguration) {
         this.dokumente = dokumente;
         this.auftraege = auftraege;
+        this.konfiguration = konfiguration;
     }
 
     @Transactional(Transactional.TxType.REQUIRES_NEW)
@@ -63,8 +67,8 @@ public class VerarbeitungSpeichern {
 
     /**
      * Speichert das Ergebnis und reiht {@code KI_VORSCHLAG} in derselben Transaktion ein (kein doppelter Folgeauftrag).
-     * Status: {@code EINGANGSKORB} bei {@code pdfa_fehlt} (Req 5.9, die KI läuft trotzdem) und ohne Handler für
-     * {@code KI_VORSCHLAG} (nur in Tests) ohne Vorschlag; sonst bleibt {@code VERARBEITUNG}, bis der
+     * Status: {@code EINGANGSKORB} bei {@code pdfa_fehlt} (Req 5.9) und ohne freigegebene KI oder Handler ohne Vorschlag;
+     * sonst bleibt {@code VERARBEITUNG}, bis der
      * {@link KiVorschlagHandler} fertig ist (Aufgabe 3.2). Die Nutzlast von {@code KI_VORSCHLAG} trägt die
      * {@code version} nach dem Speichern ({@link VerarbeitenHandler#DOKUMENT_VERSION}).
      * <p>
@@ -88,7 +92,7 @@ public class VerarbeitungSpeichern {
             }
             return true;
         }
-        boolean ki = auftraege.hatHandler(KI_VORSCHLAG);
+        boolean ki = auftraege.hatHandler(KI_VORSCHLAG) && konfiguration.aktuell().kiTexte().kiFreigegeben();
         DokumentStatus status = ergebnis.pdfaFehlt() || !ki ? DokumentStatus.EINGANGSKORB : DokumentStatus.VERARBEITUNG;
         OptionalInt version = dokumente.ergebnisSpeichern(id, ergebnis, status);
         if (version.isEmpty()) {

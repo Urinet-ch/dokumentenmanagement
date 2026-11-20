@@ -34,8 +34,7 @@ class KeycloakVerwaltungSpikeTest {
     @Test
     void devServiceZeigtMandantensucheRollenmitgliederUndDienstkontoToken() throws IOException {
         String oidcUrl = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
-        assertThat(ConfigProvider.getConfig().getValue("quarkus.keycloak.devservices.image-name", String.class))
-                .isEqualTo("quay.io/keycloak/keycloak:26.8.2");
+        String imageTag = ConfigProvider.getConfig().getValue("quarkus.keycloak.devservices.image-name", String.class);
 
         String issuer = given().get(oidcUrl + "/.well-known/openid-configuration")
                 .then().statusCode(200).extract().path("issuer");
@@ -49,6 +48,12 @@ class KeycloakVerwaltungSpikeTest {
                 .post(basisUrl + "/realms/master/protocol/openid-connect/token")
                 .then().statusCode(200).extract().path("access_token");
         String adminUrl = basisUrl + "/admin/realms/" + REALM;
+
+        // Die Version wird am laufenden Server gemessen, nicht nur an der Konfiguration.
+        String serverVersion = given().auth().oauth2(adminToken).get(basisUrl + "/admin/serverinfo")
+                .then().statusCode(200).extract().path("systemInfo.version");
+        assertThat(serverVersion).isEqualTo("26.8.2");
+        assertThat(imageTag).endsWith(":" + serverVersion);
 
         List<Map<String, Object>> urinetBenutzer = OBJECT_MAPPER.readValue(
                 adminGet(adminUrl + "/users?q=mandant:urinet&max=50", adminToken).asByteArray(),
@@ -106,11 +111,17 @@ class KeycloakVerwaltungSpikeTest {
                             realmManagementId)
                     .then().statusCode(204);
 
-            String serviceToken = given().formParam("grant_type", "client_credentials")
-                    .formParam("client_id", clientIdName)
-                    .formParam("client_secret", clientSecret)
-                    .post(basisUrl + "/realms/" + REALM + "/protocol/openid-connect/token")
-                    .then().statusCode(200).extract().path("access_token");
+            // Ursache des früheren HTTP 401 (Befund 19.1): Keycloak 26.8 verlangt für die Admin-API den Scope
+            // kc-admin-api, der die Audience <Basis>/admin/realms/<Realm> mitbringt. Ohne ihn gilt das Token nicht.
+            String ohneScope = dienstkontoToken(basisUrl, clientIdName, clientSecret);
+            assertThat(given().auth().oauth2(ohneScope).get(adminUrl + "/users?max=1").statusCode()).isEqualTo(401);
+
+            String adminApiScopeId = adminGet(adminUrl + "/client-scopes", adminToken)
+                    .jsonPath().getString("find { it.name == 'kc-admin-api' }.id");
+            given().auth().oauth2(adminToken)
+                    .put(adminUrl + "/clients/{client}/default-client-scopes/{scope}", clientId, adminApiScopeId)
+                    .then().statusCode(204);
+            String serviceToken = dienstkontoToken(basisUrl, clientIdName, clientSecret);
             List<String> tokenRoles = new ArrayList<>();
             var serviceClaims = OBJECT_MAPPER.readTree(
                     Base64.getUrlDecoder().decode(serviceToken.split("\\.")[1]));
@@ -118,12 +129,33 @@ class KeycloakVerwaltungSpikeTest {
                     .forEach(role -> tokenRoles.add(role.asText()));
             assertThat(serviceClaims.path("iss").asText()).isEqualTo(basisUrl + "/realms/" + REALM);
             assertThat(tokenRoles).contains("query-users", "view-users", "manage-users", "query-groups");
-            assertThat(serviceClaims.path("aud").toString()).contains("realm-management");
+            assertThat(serviceClaims.path("aud").toString()).contains("realm-management").contains(adminUrl);
+            // Mit dem Scope funktioniert der Aufruf der Admin-API mit dem Dienstkonto-Token (Requirement 5.2).
+            given().auth().oauth2(serviceToken).get(adminUrl + "/users?max=1").then().statusCode(200);
         } finally {
-            if (clientId != null) {
-                given().auth().oauth2(adminToken).delete(adminUrl + "/clients/{id}", clientId).then().statusCode(204);
+            // Kein Assert im finally: ein Fehler beim Aufräumen darf den ursprünglichen Testfehler nicht überdecken.
+            try {
+                String id = clientId != null ? clientId
+                        : given().auth().oauth2(adminToken).get(adminUrl + "/clients?clientId={client}", clientIdName)
+                                .path("[0].id");
+                if (id != null) {
+                    int status = given().auth().oauth2(adminToken).delete(adminUrl + "/clients/{id}", id).statusCode();
+                    if (status != 204) {
+                        System.err.println("Aufräumen Spike-Client " + clientIdName + ": Status " + status);
+                    }
+                }
+            } catch (RuntimeException e) {
+                System.err.println("Aufräumen Spike-Client " + clientIdName + " fehlgeschlagen: " + e);
             }
         }
+    }
+
+    private static String dienstkontoToken(String basisUrl, String clientIdName, String clientSecret) {
+        return given().formParam("grant_type", "client_credentials")
+                .formParam("client_id", clientIdName)
+                .formParam("client_secret", clientSecret)
+                .post(basisUrl + "/realms/" + REALM + "/protocol/openid-connect/token")
+                .then().statusCode(200).extract().path("access_token");
     }
 
     private static Response adminGet(String url, String adminToken, Object... pathParameters) {

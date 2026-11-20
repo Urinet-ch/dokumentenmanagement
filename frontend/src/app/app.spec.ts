@@ -17,6 +17,7 @@ import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
+import { WissenEntwurfZaehler } from './wissen/wissen-entwurf-zaehler';
 
 class AnmeldungAttrappe {
   readonly zustand = signal<Sitzungszustand>('abgemeldet');
@@ -89,6 +90,7 @@ describe('App (Req 2.6, 8.6)', () => {
         { provide: AnmeldungService, useValue: anmeldung },
         { provide: BrandingService, useValue: { branding: signal(STANDARD_BRANDING) } },
         { provide: EingangskorbZaehler, useValue: zaehler },
+        { provide: WissenEntwurfZaehler, useValue: { anzahl: signal(3), fehler: signal(null), auffrischen: vi.fn() } },
         { provide: ONLINE, useValue: online },
         {
           provide: SwUpdate,
@@ -133,32 +135,39 @@ describe('App (Req 2.6, 8.6)', () => {
     [
       'inhaber',
       [
-        TEXTE.menue.erfassen,
+        TEXTE.menue.uebersicht,
         TEXTE.menue.eingangskorb,
+        TEXTE.menue.erfassen,
         TEXTE.menue.suche,
-        TEXTE.menue.wissen,
         TEXTE.menue.chat,
         TEXTE.menue.kontakte,
+        TEXTE.menue.wissen,
+        TEXTE.wissen.entwuerfe.titel,
         TEXTE.menue.importe,
+        TEXTE.menue.export,
         TEXTE.menue.dokumentarten,
         TEXTE.menue.protokoll,
         TEXTE.menue.apiTokens,
-        TEXTE.menue.export,
       ],
     ],
-    ['mitarbeiter', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.wissen, TEXTE.menue.chat]],
+    [
+      'mitarbeiter',
+      [TEXTE.menue.uebersicht, TEXTE.menue.eingangskorb, TEXTE.menue.erfassen, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen],
+    ],
     [
       'geschaeftsstelle',
       [
-        TEXTE.menue.erfassen,
+        TEXTE.menue.uebersicht,
         TEXTE.menue.eingangskorb,
+        TEXTE.menue.erfassen,
         TEXTE.menue.suche,
-        TEXTE.menue.wissen,
         TEXTE.menue.chat,
         TEXTE.menue.kontakte,
+        TEXTE.menue.wissen,
+        TEXTE.wissen.entwuerfe.titel,
       ],
     ],
-    ['treuhaender', [TEXTE.menue.suche, TEXTE.menue.wissen, TEXTE.menue.chat, TEXTE.menue.export]],
+    ['treuhaender', [TEXTE.menue.uebersicht, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen, TEXTE.menue.export]],
   ])('zeigt der Rolle %s nur die erlaubten Menüpunkte', async (rolle, erwartet) => {
     anmeldung.als(rolle);
     const element = await zeigen();
@@ -301,5 +310,32 @@ describe('App (Req 2.6, 8.6)', () => {
     anmeldung.zustand.set('abgelaufen');
     await fixture.whenStable();
     expect(router.url).toBe('/erfassen');
+  });
+
+  it('führt mit der Suche in der Kopfzeile zur Seite «Suche» mit dem Begriff', async () => {
+    anmeldung.als('inhaber');
+    const element = await zeigen();
+    const feld = element.querySelector<HTMLInputElement>('.kopfsuche input')!;
+    feld.value = ' Hostpoint ';
+    feld.form!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await vi.waitFor(() => expect(TestBed.inject(Router).url).toBe('/suche?q=Hostpoint'));
+  });
+
+  it('bietet die Suche in der Kopfzeile nur mit Recht A2 und Menü an', async () => {
+    expect((await zeigen()).querySelector('.kopfsuche')).toBeNull();
+  });
+
+  it('wechselt das Farbschema und merkt es sich', async () => {
+    window.localStorage.removeItem('archiv.farbschema');
+    const element = await zeigen();
+    const knopf = element.querySelector<HTMLButtonElement>('[data-test=farbschema]')!;
+    const vorher = document.documentElement.dataset['farbschema'];
+    knopf.click();
+    const nachher = document.documentElement.dataset['farbschema'];
+    expect(nachher === 'hell' || nachher === 'dunkel').toBe(true);
+    expect(nachher).not.toBe(vorher);
+    expect(window.localStorage.getItem('archiv.farbschema')).toBe(nachher);
+    window.localStorage.removeItem('archiv.farbschema');
+    delete document.documentElement.dataset['farbschema'];
   });
 });

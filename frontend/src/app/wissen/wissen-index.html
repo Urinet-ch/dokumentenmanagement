@@ -1,43 +1,90 @@
-<h1>{{ texte.titel }}</h1>
-<nav><a routerLink="/wissen/log">{{ texte.log }}</a></nav>
-<form (submit)="suchen($event)">
-  <label for="wissen-suche">{{ texte.suchbegriff }}</label>
-  <input id="wissen-suche" type="search" [value]="q" (input)="q = wert($event)" />
-  <label for="wissen-typ">{{ texte.typ }}</label>
-  <select id="wissen-typ" [value]="typ" (change)="typ = wert($event)">
-    <option value="">{{ texte.alleTypen }}</option>
-    @for (typ of typen; track typ[0]) { <option [value]="typ[0]">{{ typ[1] }}</option> }
-  </select>
-  <label for="wissen-tag">{{ texte.schlagwort }}</label>
-  <input id="wissen-tag" [value]="tag" (input)="tag = wert($event)" />
-  <button type="submit">{{ texte.suchen }}</button>
+<div class="seitenkopf kopf">
+  <div>
+    <p class="vorzeile">{{ texte.vorzeile }}</p>
+    <h1>{{ texte.titel }}</h1>
+    <p>{{ texte.einleitung }}</p>
+  </div>
+  <div class="knoepfe">
+    <a mat-stroked-button routerLink="/wissen/log"><app-symbol name="protokoll" />{{ texte.log }}</a>
+    @if (anmeldung.darf('A19')) {
+      <a mat-stroked-button routerLink="/wissensbasis/einstellungen">{{ texte.einstellungen }}</a>
+    }
+  </div>
+</div>
+
+<form class="karte felder" (submit)="suchen($event)" [attr.aria-label]="texte.filter">
+  <div class="feld">
+    <label for="wissen-suche">{{ texte.suchbegriff }}</label>
+    <input id="wissen-suche" type="search" [value]="q" (input)="q = wert($event)" />
+  </div>
+  <div class="feld">
+    <label for="wissen-typ">{{ texte.typ }}</label>
+    <select id="wissen-typ" [value]="typ" (change)="typ = wert($event)">
+      <option value="">{{ texte.alleTypen }}</option>
+      @for (typ of typen; track typ[0]) { <option [value]="typ[0]">{{ typ[1] }}</option> }
+    </select>
+  </div>
+  <div class="feld">
+    <label for="wissen-tag">{{ texte.schlagwort }}</label>
+    <input id="wissen-tag" [value]="tag" (input)="tag = wert($event)" />
+  </div>
+  <div class="knoepfe">
+    <button mat-flat-button type="submit"><app-symbol name="suche" />{{ texte.suchen }}</button>
+  </div>
 </form>
-@if (laedt()) { <p role="status">{{ texte.laedt }}</p> }
+
+@if (laedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
 @if (fehler(); as meldung) {
-  <p role="alert">{{ meldung }}</p>
-  <button type="button" (click)="laden()">{{ texte.erneut }}</button>
+  <p class="fehler" role="alert">{{ meldung }}</p>
+  <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button></div>
 }
 @if (ergebnis(); as ergebnis) {
-  @if (!ergebnis.gesamt) { <p>{{ texte.keineSeiten }}</p> }
+  @if (!ergebnis.gesamt) { <p class="karte gedaempft">{{ texte.keineSeiten }}</p> }
   @for (gruppe of ergebnis.gruppen; track gruppe.typ) {
-    <section>
-      <h2>{{ texte.seitentypen[gruppe.typ ?? ''] ?? texte.unbekannterTyp }}</h2>
-      <ul>
-        @for (seite of gruppe.seiten; track seite.id) {
-          <li>
-            <a [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a>
-            @if (seite.status === 'VERALTET') { <span>{{ texte.veraltet }}</span> }
-            @if (seite.quellePruefen) { <span>{{ texte.quellePruefen }}</span> }
-            <p>{{ seite.beschreibung }}</p>
-          </li>
-        }
-      </ul>
+    <section class="karte gruppe" [attr.aria-labelledby]="'wissen-gruppe-' + $index">
+      <div class="gruppenkopf">
+        <h2 [id]="'wissen-gruppe-' + $index">{{ texte.seitentypen[gruppe.typ ?? ''] ?? texte.unbekannterTyp }}</h2>
+        <span class="gedaempft">{{ texte.anzahl(gruppe.seiten?.length ?? 0) }}</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">{{ texte.spalteSeite }}</th>
+            <th scope="col">{{ texte.spalteStatus }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (seite of gruppe.seiten; track seite.id) {
+            <tr>
+              <td>
+                <a class="titel" [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a>
+                <span class="mono gedaempft">{{ seite.pfad }}</span>
+                @if (seite.beschreibung) { <p class="beschreibung">{{ seite.beschreibung }}</p> }
+              </td>
+              <td>
+                <span class="pillen">
+                  @if (seite.status === 'VERALTET') {
+                    <span class="pille warnung">{{ texte.veraltet }}</span>
+                  } @else if (seite.status === 'AKTIV') {
+                    <span class="pille ok">{{ texte.aktiv }}</span>
+                  }
+                  @if (seite.quellePruefen) { <span class="pille warnung">{{ texte.quellePruefen }}</span> }
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
     </section>
   }
-  @if (offset > 0) {
-    <button type="button" (click)="wechseln(offset - 50)">{{ texte.zurueckSeite }}</button>
-  }
-  @if (offset + 50 < (ergebnis.gesamt || 0)) {
-    <button type="button" (click)="wechseln(offset + 50)">{{ texte.weiter }}</button>
+  @if (offset > 0 || offset + 50 < (ergebnis.gesamt || 0)) {
+    <div class="knoepfe">
+      @if (offset > 0) {
+        <button mat-stroked-button type="button" (click)="wechseln(offset - 50)">{{ texte.zurueckSeite }}</button>
+      }
+      @if (offset + 50 < (ergebnis.gesamt || 0)) {
+        <button mat-stroked-button type="button" (click)="wechseln(offset + 50)">{{ texte.weiter }}</button>
+      }
+    </div>
   }
 }

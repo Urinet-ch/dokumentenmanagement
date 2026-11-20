@@ -62,9 +62,9 @@ export function parameterAusFilter(f: ListenFilter): Params {
   };
 }
 
-/** Anzahl gesetzter Filter ohne Suchbegriff (Status «aktiv» ist der Standard). */
+/** Anzahl gesetzter Filter der Filterleiste; Suchbegriff und Status stehen sichtbar in der Kopfzeile der Liste. */
 export function anzahlFilter(f: ListenFilter): number {
-  return (f.status !== 'AKTIV' ? 1 : 0) + (f.quelle ? 1 : 0) + (f.nichtImExport ? 1 : 0);
+  return (f.quelle ? 1 : 0) + (f.nichtImExport ? 1 : 0);
 }
 
 export function seitenAnzahl(gesamt: number, groesse: number): number {

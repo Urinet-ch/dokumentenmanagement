@@ -136,7 +136,7 @@ select {
 }
 
 .status {
-  color: var(--urinet-gelb);
+  color: var(--akzent-text);
 }
 
 .auszug {
@@ -144,7 +144,7 @@ select {
 
   mark {
     background-color: var(--urinet-gelb);
-    color: var(--urinet-dunkel);
+    color: var(--urinet-schwarz);
     border-radius: 2px;
     padding: 0 0.1em;
   }

@@ -88,6 +88,10 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   Der Snapshot-Test (Req 8.3) vergleicht Prompt, Schema und eine Liste von Nachbearbeitungsfällen vor und nach dem
   Umstellen. Grenzen gegen zu lange Prompts: KI-Texte je höchstens 8'000 Zeichen, `ki_hinweise` je Art 1'000,
   Summe aller Texte und Beschreibungen im Prompt höchstens 24'000 Zeichen (Prüfung in `Konfiguration.pruefen`).
+  Für das Basisschema ohne dynamische KI-Felder oder Klassifikationen bleibt die Gate-0-Darstellung für die
+  Prompt-Kennung erhalten; Art-Codes bleiben dabei dynamisch. An das Modell geht weiterhin das dynamische, strikt
+  validierte Schema. Sobald KI-Felder oder Klassifikationen das Schema erweitern, wird diese Darstellung auch für die
+  Kennung verwendet.
   Ohne Abnahme nach Req 8.4 (Schalter `ki_freigegeben` in den KI-Texten, setzt nur der Betreiber mit Verweis auf die
   Abnahme) erzeugt der Worker für den Mandanten keinen Auftrag `KI_VORSCHLAG`; `urinet` startet mit `true`.
   Abnahme eines Mandanten ohne Golden-Datensatz (Req 8.9, Entscheid Fabian 17.11.2026): Stichprobe mit der
@@ -167,6 +171,17 @@ selbst (Checkbox sichtbar, Hinweis unter den Gruppen). Antworten von Prüfen und
 und von Zuordnungen einer früher gewählten Art werden verworfen; die Dateiauswahl ist während einer Anfrage gesperrt.
 Ein 403 vom Backend zeigt bewusst die gemeinsame Meldung «nicht berechtigt» (Guard und Rechte entscheidet das Backend);
 eine Weiterleitung auf die 404-Seite gibt es nur über den Guard (Nachbesserung Review PR #323).
+
+## Eingangskorb und Artwechsel (Aufgabe 18.4)
+Bei einem Wechsel einer bereits gesetzten Art sendet der Eingangskorb vor der Bestätigung ein PATCH mit der neuen Art
+und den Klassifikationen der neuen Art, auch wenn sonst keine Werte geändert wurden. Das ersetzt Auslegungspunkt 4
+aus PR #332; die Bestätigung verwendet die vom PATCH gelieferte Version. Nicht zugeordnete Klassifikationen bleiben
+im Formular sichtbar. Ein ersetzendes Klassifikations-PATCH enthält nur Zuordnungen der gewählten Art: Nicht
+zugeordnete Werte entfallen dabei, auch wenn die Art nicht gewechselt hat. Ohne Änderung wird kein solches PATCH
+gesendet; die Prüfung bei der Bestätigung bleibt Aufgabe des Backends (Req 3.5).
+
+Abweichung von Spec 01 design.md «Metadaten bearbeiten»: Zusatzwerte ausserhalb der neuen Art werden im Formular
+separat angezeigt und bei einem Artwechsel nicht mitgesendet; sie bleiben nicht auf dem Dokument erhalten.
 
 ## Admin-Kommando
 ```
