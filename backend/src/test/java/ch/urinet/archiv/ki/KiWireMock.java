@@ -255,6 +255,12 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
     /** Wie {@link #wissenFolge(List, int)}; setzt den simulierten Verbrauch je Antwort. */
     public static void wissenFolge(List<String> inhalte, int ersteVerzoegerungMillis,
                                    int tokensEin, int tokensAus) {
+        wissenFolge(inhalte, ersteVerzoegerungMillis, tokensEin, tokensAus, null);
+    }
+
+    /** Antwortfolge nur für die mit einem eindeutigen Fixture-Marker versehenen Anfragen. */
+    public static void wissenFolge(List<String> inhalte, int ersteVerzoegerungMillis,
+                                   int tokensEin, int tokensAus, String marker) {
         WireMock modell = client();
         for (int i = 0; i < inhalte.size(); i++) {
             boolean letzte = i == inhalte.size() - 1;
@@ -266,10 +272,13 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
                     .withRequestBody(matchingJsonPath("$.response_format.json_schema.name",
                             matching("wissen_ingest_.*")))
                     .atPriority(5)
-                    .inScenario("wissen-ingest")
+                    .inScenario(marker == null ? "wissen-ingest" : "wissen-ingest-" + marker)
                     .whenScenarioStateIs(i == 0 ? com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED
                             : "antwort-" + i)
                     .willReturn(antwort);
+            if (marker != null) {
+                stub.withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.containing(marker));
+            }
             if (!letzte) {
                 stub.willSetStateTo("antwort-" + (i + 1));
             }

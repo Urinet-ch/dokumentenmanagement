@@ -46,7 +46,7 @@ class WerkzeugeNurLesendTest {
             "ch.urinet.archiv.mandant.application.MandantKontext", Set.of("mit", "aktuell"),
             "ch.urinet.archiv.mandant.application.MandantEinstellungen", Set.of("lesen"),
             // Angebot von kennzahl und offene_posten (7.1b, Spec 05, Req 8.8)
-            "ch.urinet.archiv.dokumentart.application.Funktionen", Set.of("finanzVerfuegbar"),
+            "ch.urinet.archiv.konfiguration.application.Funktionen", Set.of("finanzVerfuegbar"),
             // E4: das Zugriffsprotokoll ist der einzige schreibende Port (Anzeige und Verweigerung mit Kanal Chat)
             "ch.urinet.archiv.protokoll.application.ZugriffProtokoll", Set.of("schreiben"));
 

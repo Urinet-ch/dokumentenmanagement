@@ -16,12 +16,16 @@ import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
 /**
  * Provisionierung ist ein Admin-Kommando ohne Request-Kontext. Tests rufen den Dienst oft aus einem aktiven
- * Quarkus-Testkontext auf; der Adapter führt ihn deshalb wie das Kommando auf einem frischen Thread aus.
+ * Quarkus-Testkontext auf; der Adapter führt ihn deshalb wie das Kommando auf einem frischen Thread aus, und zwar wie
+ * das Kommando ({@code ArchivMain}) auf einem Plattform-Thread: Die Seed-Prüfung misst ihre Frist
+ * ({@code archiv.dokumentart.seed-zeitgrenze}) dort als CPU-Zeit, in einem virtuellen Thread nur mit der Wanduhr, die
+ * auch Warten auf CPU, GC-Pausen und Sperren zählt (instabile CI, «Seed ungültig für Mandant urinet», 20.11.2026).
  */
 @Alternative
 @Priority(1)
@@ -39,10 +43,15 @@ public class MandantProvisionierungTestadapter extends MandantProvisionierung {
 
     @Override
     public Mandant anlegen(String code, String name, String geschaeftsjahresende) {
-        FutureTask<Mandant> aufgabe = new FutureTask<>(() -> super.anlegen(code, name, geschaeftsjahresende));
-        Thread.ofVirtual().start(aufgabe);
+        return aufFrischemThread(() -> super.anlegen(code, name, geschaeftsjahresende));
+    }
+
+    /** Führt {@code aufgabe} auf einem frischen Plattform-Thread aus und gibt Fehler unverändert weiter. */
+    public static <T> T aufFrischemThread(Callable<T> aufgabe) {
+        FutureTask<T> lauf = new FutureTask<>(aufgabe);
+        Thread.ofPlatform().name("mandant-provisionierung-test").start(lauf);
         try {
-            return aufgabe.get();
+            return lauf.get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Mandanten-Provisionierung wurde unterbrochen", e);

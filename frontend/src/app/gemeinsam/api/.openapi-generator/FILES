@@ -13,6 +13,7 @@ api/konfiguration.service.ts
 api/kontakte.service.ts
 api/protokoll.service.ts
 api/wissen-ingest-resource.service.ts
+api/wissen-lint-resource.service.ts
 api/wissensbasis.service.ts
 configuration.ts
 encoder.ts
@@ -76,6 +77,8 @@ model/import-zuordnung.ts
 model/kategorie.ts
 model/klassifikation-wert.ts
 model/klassifikation.ts
+model/klassifikationsfacette.ts
+model/klassifikationswert-facette.ts
 model/konfiguration-ki-texte.ts
 model/konfigurations-version-detail.ts
 model/konfigurations-version.ts
@@ -92,6 +95,7 @@ model/kontakt-zusammenfuehren.ts
 model/kontakt-zusammengefuehrt.ts
 model/kontakt.ts
 model/kopf.ts
+model/mandantenfunktionen.ts
 model/models.ts
 model/paket-kopf.ts
 model/protokoll-aktion.ts
@@ -117,6 +121,7 @@ model/wissen-einstellungen.ts
 model/wissen-export.ts
 model/wissen-ingest-auftrag.ts
 model/wissen-ingest-start.ts
+model/wissen-lint-auftrag.ts
 model/wissen-verwerfen.ts
 model/wissens-index-gruppe.ts
 model/wissens-index-zeile.ts

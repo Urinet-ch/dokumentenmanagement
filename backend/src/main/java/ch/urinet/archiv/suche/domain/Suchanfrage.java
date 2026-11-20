@@ -5,7 +5,10 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -29,11 +32,13 @@ import java.util.regex.Pattern;
  * @param sortierung     ohne Angabe {@code RELEVANZ} mit Suchbegriff, sonst {@code DATUM}
  * @param seite          ab 0
  * @param groesse        1–{@value #GROESSE_MAX}
+ * @param klassifikationen Filter nach Klassifikations-Code; mehrere Werte je Code gelten als ODER
  */
 public record Suchanfrage(String begriff, String art, UUID partner, LocalDate datumVon, LocalDate datumBis,
                           BigDecimal betragVon, BigDecimal betragBis, Richtung richtung, List<String> tags,
                           String status, Integer geschaeftsjahr, String belegnummer, Sortierung sortierung, int seite,
-                          int groesse, Integer jahr, Boolean veroeffentlicht) {
+                          int groesse, Integer jahr, Boolean veroeffentlicht,
+                          Map<String, List<String>> klassifikationen) {
 
     public static final int BEGRIFF_MAX = 200;
     public static final int TAGS_MAX = 10;
@@ -46,18 +51,45 @@ public record Suchanfrage(String begriff, String art, UUID partner, LocalDate da
     private static final BigDecimal BETRAG_MAX = new BigDecimal("9999999999.99");
     private static final Pattern ART = Pattern.compile("^[A-Z][A-Z0-9_]{1,39}$");
     private static final Pattern STATUS = Pattern.compile("^[A-Z_]{1,30}$");
+    private static final Pattern KLASSIFIKATIONSCODE = Pattern.compile("^[a-z][a-z0-9_]{0,39}$");
 
     public Suchanfrage(String begriff, String art, UUID partner, LocalDate datumVon, LocalDate datumBis,
                        BigDecimal betragVon, BigDecimal betragBis, Richtung richtung, List<String> tags,
                        String status, Integer geschaeftsjahr, String belegnummer, Sortierung sortierung, int seite,
                        int groesse) {
         this(begriff, art, partner, datumVon, datumBis, betragVon, betragBis, richtung, tags, status, geschaeftsjahr,
-                belegnummer, sortierung, seite, groesse, null, null);
+                belegnummer, sortierung, seite, groesse, null, null, Map.of());
+    }
+
+    public Suchanfrage(String begriff, String art, UUID partner, LocalDate datumVon, LocalDate datumBis,
+                       BigDecimal betragVon, BigDecimal betragBis, Richtung richtung, List<String> tags,
+                       String status, Integer geschaeftsjahr, String belegnummer, Sortierung sortierung, int seite,
+                       int groesse, Integer jahr, Boolean veroeffentlicht) {
+        this(begriff, art, partner, datumVon, datumBis, betragVon, betragBis, richtung, tags, status, geschaeftsjahr,
+                belegnummer, sortierung, seite, groesse, jahr, veroeffentlicht, Map.of());
     }
 
     public Suchanfrage {
         begriff = begriff == null || begriff.isBlank() ? null : begriff.strip();
         tags = tags == null ? List.of() : List.copyOf(tags);
+        Map<String, List<String>> filter = new TreeMap<>();
+        boolean filterGueltig = klassifikationen == null || klassifikationen.size() <= 50;
+        if (klassifikationen != null) {
+            for (Map.Entry<String, List<String>> eintrag : klassifikationen.entrySet()) {
+                String code = eintrag.getKey();
+                List<String> werte = eintrag.getValue();
+                if (code == null || !KLASSIFIKATIONSCODE.matcher(code).matches() || werte == null
+                        || werte.isEmpty() || werte.size() > 500
+                        || werte.stream().anyMatch(wert -> wert == null || wert.isBlank()
+                                || wert.length() > 40 || !ohneSteuerzeichen(wert))) {
+                    filterGueltig = false;
+                } else {
+                    filter.put(code, werte.stream().distinct().toList());
+                }
+            }
+        }
+        pruefen(filterGueltig);
+        klassifikationen = Collections.unmodifiableMap(filter);
         pruefen(begriff == null || (begriff.length() <= BEGRIFF_MAX && ohneSteuerzeichen(begriff)));
         pruefen(art == null || ART.matcher(art).matches());
         pruefen(datumVon == null || datumBis == null || !datumVon.isAfter(datumBis));

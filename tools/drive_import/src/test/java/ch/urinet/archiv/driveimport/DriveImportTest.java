@@ -136,6 +136,28 @@ class DriveImportTest {
     }
 
     @Test
+    void sendetArtUndKlassifikationenAlsUnbestaetigteVorbelegung() throws IOException {
+        datei("a.pdf", "%PDF-a");
+
+        assertThat(lauf("--art", "PROJEKTDOKUMENT", "--klassifikation", "fachgebiet=bau"))
+                .isEqualTo(DriveImport.OK);
+
+        assertThat(anfragen).singleElement().asString()
+                .contains("name=\"art\"", "PROJEKTDOKUMENT", "name=\"klassifikationen\"",
+                        "{\"fachgebiet\":[\"bau\"]}", "name=\"dateien\"");
+    }
+
+    @Test
+    void klassifikationenOhneArtWerdenAbgelehntOhneAnfrage() throws IOException {
+        datei("a.pdf", "%PDF-a");
+
+        assertThat(lauf("--klassifikation", "fachgebiet=bau")).isEqualTo(DriveImport.UNGUELTIG);
+
+        assertThat(anfragen).isEmpty();
+        assertThat(fehler.toString()).contains("--art und --klassifikation");
+    }
+
+    @Test
     void wiederholt503NachRetryAfterUndBrichtBei401Ab() throws IOException {
         datei("a.pdf", "%PDF-a");
         datei("b.pdf", "%PDF-b");

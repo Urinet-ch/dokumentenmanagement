@@ -12,9 +12,10 @@
 @if (laedt()) { <p class="status" role="status">{{ wissen.laedt }}</p> }
 @if (fehler(); as meldung) {
   <p class="fehler" role="alert">{{ meldung }}</p>
-  <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ wissen.erneut }}</button></div>
+  <div class="knoepfe"><button mat-button type="button" (click)="laden(true)">{{ wissen.erneut }}</button></div>
 }
 @if (!id()) {
+  <div class="knoepfe"><a mat-stroked-button routerLink="/wissen/entwuerfe/import">{{ importe.titel }}</a></div>
   <form class="karte felder" (ngSubmit)="laden()">
     <div class="feld">
       <label for="entwurf-status">{{ texte.status }}</label>
@@ -46,6 +47,29 @@
     </div>
     @if (ansicht.entwurf.hinweis) { <p>{{ ansicht.entwurf.hinweis }}</p> }
   </div>
+  @if (ansicht.entwurf.anlass === 'IMPORT') {
+    <section class="karte importherkunft">
+      <h2>{{ importe.herkunft }}</h2>
+      @if (ansicht.entwurf.herkunft; as herkunft) {
+        <dl>
+          <dt>{{ importe.erzeugtVon }}</dt><dd>{{ herkunft.kopf.erzeugtVon }}</dd>
+          <dt>{{ importe.erzeugtMit }}</dt><dd>{{ herkunft.kopf.erzeugtMit }}</dd>
+          <dt>{{ importe.kontextStufe }}</dt><dd>{{ herkunft.kopf.kontextStufe }}</dd>
+          <dt>{{ importe.erzeugtAm }}</dt><dd>{{ zeitpunkt(herkunft.kopf.erzeugtAm) }}</dd>
+          <dt>{{ importe.importiertVon }}</dt><dd>{{ ansicht.entwurf.erstelltVon }}</dd>
+          <dt>{{ importe.importiertAm }}</dt><dd>{{ zeitpunkt(ansicht.entwurf.erstellt) }}</dd>
+          <dt>{{ importe.sha256 }}</dt><dd><code>{{ herkunft.paketSha256 }}</code></dd>
+        </dl>
+      } @else { <p role="alert">{{ importe.herkunftFehlt }}</p> }
+      <p>{{ importe.cloudHinweis }}</p>
+      @if (ansicht.entwurf.status === 'OFFEN') {
+        <button mat-stroked-button type="button" [disabled]="sendet()" (click)="neuPruefen()">{{ importe.neuPruefen }}</button>
+      }
+      @if (prueft()) { <p role="status">{{ importe.prueft }}</p> }
+      @if (pruefFehler(); as meldung) { <p role="alert">{{ meldung }}</p> }
+      @if (bearbeitet !== undefined) { <p>{{ importe.bearbeitungBehalten }}</p> }
+    </section>
+  }
   @if (ansicht.kernaussagen?.length) {
     <section class="karte">
       <h2>{{ texte.kernaussagen }}</h2>
@@ -75,6 +99,18 @@
         <span class="pille">{{ texte.basis }}: {{ aenderung.basisVersion ?? 0 }}</span>
         <span class="pille"><app-symbol name="schloss" />{{ texte.kontext }}: {{ aenderung.vertraulichkeitKontext }}</span>
       </div>
+      @if (ansicht.entwurf.anlass === 'IMPORT') {
+        <h3>{{ importe.quellenPruefung }}</h3>
+        @if (aenderung.daten.quellenPruefung; as pruefungen) {
+          @if (!pruefungen.length) { <p>{{ importe.keineDokumentquellen }}</p> }
+          <ul>
+            @for (quelle of pruefungen; track quelle.schluessel) {
+              <li>{{ quelle.schluessel }} · {{ importe.zuordnung }}: {{ zuordnungText(quelle.zuordnung) }}
+                · {{ importe.auszug }}: {{ auszugText(quelle.auszug) }}</li>
+            }
+          </ul>
+        } @else { <p role="alert">{{ importe.quellenPruefungFehlt }}</p> }
+      }
       <h3>{{ texte.begruendung }}</h3><p>{{ aenderung.begruendung || texte.leer }}</p>
       <h3>{{ texte.diff }}</h3>
       @for (name of diffFelder; track name) {

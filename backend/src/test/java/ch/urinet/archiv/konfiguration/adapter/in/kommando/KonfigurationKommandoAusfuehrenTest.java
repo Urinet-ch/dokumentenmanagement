@@ -167,7 +167,9 @@ class KonfigurationKommandoAusfuehrenTest {
         fehler.reset();
         FutureTask<Integer> aufgabe = new FutureTask<>(() -> kommando.ausfuehren(List.of(argumente),
                 new PrintStream(aus, true, StandardCharsets.UTF_8), new PrintStream(fehler, true, StandardCharsets.UTF_8)));
-        Thread.ofVirtual().start(aufgabe);
+        // Plattform-Thread wie das Kommando (ArchivMain): Die Frist der Schema-Prüfung misst dort CPU-Zeit, in einem
+        // virtuellen Thread die Wanduhr mit jedem Warten (MandantProvisionierungTestadapter)
+        Thread.ofPlatform().start(aufgabe);
         return aufgabe.get();
     }
 

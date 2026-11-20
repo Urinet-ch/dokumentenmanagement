@@ -2,11 +2,14 @@ package ch.urinet.archiv.export.application;
 
 import ch.urinet.archiv.export.domain.Export;
 import ch.urinet.archiv.export.domain.ExportStatus;
+import ch.urinet.archiv.konfiguration.application.Funktionen;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -60,7 +63,10 @@ class ExportVerwaltungTest {
             }
         };
 
-        List<Export> ergebnis = new ExportVerwaltung(repository, null, null, null, null)
+        Konfiguration.Art art = new Konfiguration.Art("RECHNUNG", "Rechnung", null, List.of("finanz"), List.of(),
+                null, "NORMAL", new Konfiguration.Aufbewahrung(null, null, null), false, true);
+        Funktionen funktionen = new Funktionen(() -> new Konfiguration(1, null, List.of(art)));
+        List<Export> ergebnis = new ExportVerwaltung(repository, null, null, null, null, funktionen, Clock.systemUTC())
                 .liste(new Benutzer("synthetischer-benutzer", Rolle.INHABER));
 
         assertThat(angeforderteGrenzen).containsExactly(ExportVerwaltung.LISTE);

@@ -3,7 +3,9 @@ package ch.urinet.archiv.dokument.application;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -11,12 +13,23 @@ import java.util.Optional;
  * Eingabe des Uploads (design.md «Upload»): je Seite das Original als temporäre Datei des Servers mit dem Namen aus dem
  * Upload (nur zur Anzeige), von der Handy-App dazu die Arbeitsfassung (Req 4.7).
  */
-public record UploadAnfrage(List<Seite> seiten, boolean zusammenfassen, Optional<String> hinweis, Erfasser erfasser) {
+public record UploadAnfrage(List<Seite> seiten, boolean zusammenfassen, Optional<String> hinweis, Erfasser erfasser,
+                            String art, Map<String, List<String>> klassifikationen) {
+
+    public UploadAnfrage(List<Seite> seiten, boolean zusammenfassen, Optional<String> hinweis, Erfasser erfasser) {
+        this(seiten, zusammenfassen, hinweis, erfasser, null, Map.of());
+    }
 
     public UploadAnfrage {
         seiten = List.copyOf(seiten);
         Objects.requireNonNull(hinweis, "hinweis");
         Objects.requireNonNull(erfasser, "erfasser");
+        art = art == null || art.isBlank() ? null : art.strip();
+        Map<String, List<String>> kopie = new LinkedHashMap<>();
+        if (klassifikationen != null) {
+            klassifikationen.forEach((code, werte) -> kopie.put(code, List.copyOf(werte)));
+        }
+        klassifikationen = Map.copyOf(kopie);
     }
 
     public record Seite(Path original, String name, Optional<Path> arbeitsfassung) {
