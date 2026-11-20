@@ -2,6 +2,8 @@ package ch.urinet.archiv.protokoll.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -27,6 +29,19 @@ class ProtokollDetailsTest {
         assertThat(new ProtokollDetails(" ", null, null).leer()).isTrue();
         assertThat(ProtokollDetails.KEINE.leer()).isTrue();
         assertThat(new ProtokollDetails("A7", null, null).leer()).isFalse();
+    }
+
+    @Test
+    void verwaltungsvorgangErfordertIdUndPhaseUndBleibtBeimKanalErhalten() {
+        UUID id = UUID.randomUUID();
+        var vorgang = new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        var details = ProtokollDetails.verwaltung(vorgang);
+        assertThat(details.leer()).isFalse();
+        assertThat(details.mitKanal(ProtokollDetails.KANAL_CHAT).verwaltung()).isEqualTo(vorgang);
+        assertThatThrownBy(() -> new ProtokollDetails.Verwaltung(null, ProtokollDetails.Verwaltungsphase.ANGEFRAGT))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new ProtokollDetails.Verwaltung(id, null))
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test

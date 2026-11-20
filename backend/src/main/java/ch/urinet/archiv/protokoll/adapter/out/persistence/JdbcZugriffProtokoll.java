@@ -123,6 +123,10 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         if (details.wissensImportSeiten() != null) {
             knoten.put("seiten", details.wissensImportSeiten());
         }
+        if (details.verwaltung() != null) {
+            uuid(knoten, "vorgangId", details.verwaltung().vorgangId());
+            knoten.put("phase", details.verwaltung().phase().name());
+        }
         if (details.regelAenderung() != null) {
             knoten.put("dokumentart", details.regelAenderung().dokumentart());
             regel(knoten.putObject("alt"), details.regelAenderung().alt());

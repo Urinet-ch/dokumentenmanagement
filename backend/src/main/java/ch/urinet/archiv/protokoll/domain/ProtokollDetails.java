@@ -3,6 +3,7 @@ package ch.urinet.archiv.protokoll.domain;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -22,7 +23,7 @@ import java.util.regex.Pattern;
 public record ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
                                FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
                                String kanal, String tokenId, WissensEntscheid wissensEntscheid,
-                               Integer wissensImportSeiten) {
+                               Integer wissensImportSeiten, Verwaltung verwaltung) {
 
     public static final ProtokollDetails KEINE = new ProtokollDetails(null, null, null);
     private static final Pattern TOKEN_ID = Pattern.compile("^[a-z0-9]{12}$");
@@ -55,6 +56,14 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         if (tokenId != null && !TOKEN_ID.matcher(tokenId).matches()) {
             throw new IllegalArgumentException("tokenId ist keine Token-ID");
         }
+    }
+
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                            FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
+                            String kanal, String tokenId, WissensEntscheid wissensEntscheid,
+                            Integer wissensImportSeiten) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration, kanal, tokenId,
+                wissensEntscheid, wissensImportSeiten, null);
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
@@ -125,16 +134,21 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         return new ProtokollDetails(null, sha256, null, null, null, null, null, null, null, null, seiten);
     }
 
+    public static ProtokollDetails verwaltung(Verwaltung verwaltung) {
+        return new ProtokollDetails(null, null, null, null, null, null, null, null, null, null, null,
+                Objects.requireNonNull(verwaltung));
+    }
+
     public boolean leer() {
         return grund == null && sha256 == null && fehlercode == null && regelAenderung == null
                 && fristKonflikt == null && kontakte == null && konfiguration == null && kanal == null
-                && tokenId == null && wissensEntscheid == null && wissensImportSeiten == null;
+                && tokenId == null && wissensEntscheid == null && wissensImportSeiten == null && verwaltung == null;
     }
 
     /** Dieselben Details mit dem Kanal {@code kanal}. */
     public ProtokollDetails mitKanal(String kanal) {
         return new ProtokollDetails(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration,
-                kanal, tokenId, wissensEntscheid, wissensImportSeiten);
+                kanal, tokenId, wissensEntscheid, wissensImportSeiten, verwaltung);
     }
 
     /** Details eines Eintrags zu einem API-Token: dessen ID (kein Geheimnis). */
@@ -201,6 +215,17 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
     }
 
     public record WissensEntscheid(int aenderungNr, UUID seiteId, Integer basisVersion, Integer neueVersion) {
+    }
+
+    public enum Verwaltungsphase {
+        ANGEFRAGT, ABGESCHLOSSEN, FEHLGESCHLAGEN, UNKLAR
+    }
+
+    public record Verwaltung(UUID vorgangId, Verwaltungsphase phase) {
+        public Verwaltung {
+            Objects.requireNonNull(vorgangId);
+            Objects.requireNonNull(phase);
+        }
     }
 
     /** Version, Quelle und geänderte Elemente der Fachkonfiguration mit alten und neuen Werten (Spec 05, Req 1.3). */
