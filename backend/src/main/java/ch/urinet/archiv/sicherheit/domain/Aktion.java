@@ -1,8 +1,8 @@
 package ch.urinet.archiv.sicherheit.domain;
 
 /**
- * Zeilen der Rechtematrix (Req 2.6). Die Nummer entspricht der Spalte «Nr.» in requirements.md; Spec 04 hängt A15–A19
- * hinten an (Requirement 12.1).
+ * Zeilen der Rechtematrix (Req 2.6). Die Nummer entspricht der Spalte «Nr.» in requirements.md; Spec 04 ergänzt A15–A19
+ * und Spec 06 A20–A23.
  */
 public enum Aktion {
     A1("Dokumente erfassen (Upload, Handy)"),
@@ -23,7 +23,12 @@ public enum Aktion {
     A16("Ingest einer Wissensquelle starten oder wiederholen"),
     A17("Entwürfe einsehen, Seiten von Hand ändern, Änderungen annehmen oder verwerfen, Lint starten"),
     A18("Chat-Antwort als Analyse vorschlagen, Status eigener Vorschläge sehen"),
-    A19("Wissensbasis verwalten (Einstellungen, OKF-Export)");
+    A19("Wissensbasis verwalten (Einstellungen, OKF-Export)"),
+    A20("Mandanten-Einstellungen ansehen und ändern (Katalog, Gruppen Mandant, Kennungen, Chat und Aufbewahrung)"),
+    A21("Benutzer, Rollen und Rechte-Übersicht ansehen"),
+    A22("Benutzer verwalten (einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, E-Mail ändern, "
+            + "Google-Verknüpfung lösen, löschen)"),
+    A23("Rollen zuweisen");
 
     private final String bezeichnung;
 

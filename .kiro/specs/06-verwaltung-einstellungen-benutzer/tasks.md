@@ -54,7 +54,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.3, 5.1, 5.4, 5.5, 5.6, 5.8, 5.9, 5.10_
   - _Abhängig von: 19.1_
 
-- [ ] 19.5 Domain-Regeln und Rechtematrix A20 bis A23 [Backend]
+- [x] 19.5 Domain-Regeln und Rechtematrix A20 bis A23 [Backend]
   - `Vergaberegeln` (Eskalationsschutz, Satz der Rollen, letzter Inhaber, Rollen ausserhalb der vier), `Benutzerstatus` und
     Statusautomat, `Aktion` A20 bis A23 mit Zeilen der Matrix, `RechteUebersicht`; `RechtematrixSpecTest` liest die Tabelle aus
     Spec 06; Absatz unter der Tabelle in Spec 01 requirements.md 2.6; Changeset `public.mandant.verwaltung_rollen`.
@@ -81,6 +81,9 @@ auf Server oder Secrets aus der Sitzung.
   - `sperren`, `entsperren` (inkl. Sperre durch Fehlversuche), `deaktivieren` (Zeile `AUSTRITT`), `reaktivieren`,
     `zugang-zuruecksetzen` (TOTP entfernen), `PATCH` für E-Mail mit `VERIFY_EMAIL` und Mitteilung an die alte Adresse,
     `DELETE …/google-verknuepfung` (WO O.8), `If-Match` und `ETag` des Benutzers.
+  - Selbstaktionen (sperren, deaktivieren, löschen, Zugang zurücksetzen auf sich selbst) prüft
+    `Vergaberegeln.pruefeSelbstzugriff` (403 `ESKALATION_VERBOTEN`, Req 4.6); HTTP-Nachweis je Rolle und Zeile A20 bis A23
+    mit `VERWEIGERT` über `Berechtigung` kommt mit 19.7 bis 19.9 (Req 4.2).
   - _Anforderungen: 3.8, 3.9, 3.10, 3.13, 3.14, 3.15, 3.17, 3.18_
   - _Abhängig von: 19.7_
 

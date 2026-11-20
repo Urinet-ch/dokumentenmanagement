@@ -123,7 +123,7 @@ Die Oberfläche zeigt für kein Geheimnis einen Status; das Fehlen meldet nur di
 ```
 backend/src/main/java/ch/urinet/archiv/
   benutzer/                      (neu, hexagonal)
-    domain/      Benutzer, Benutzerstatus, Vergaberegeln (Eskalationsschutz, letzter Inhaber), Vorgang, Antrag
+    domain/      Benutzer, Benutzerstatus, Vorgang, Antrag
     application/ BenutzerVerwaltung (Use Cases), Abgleich, StepUp, VerwaltungGrenzen
     adapter/in/rest/   BenutzerResource, RollenResource, AntragResource
     adapter/in/kommando/ InhaberEinladen, BenutzerAbgleichen   (Admin-Kommando, Spec 01, 1.3)
@@ -134,9 +134,11 @@ backend/src/main/java/ch/urinet/archiv/
     application/ EinstellungenVerwaltung (lesen, vorschau, aendern, zuruecksetzen)
     adapter/in/rest/ MandantEinstellungenResource (erweitert)
   sicherheit/                    (Spec 01, hier erweitert)
-    domain/Rechtematrix, Aktion (A20–A23), RechteUebersicht
+    domain/Rechtematrix, Aktion (A20–A23), RechteUebersicht, Vergaberegeln
     adapter/in/rest/ ZugangFilter (+ Token-Widerruf, Step-up), SicherheitsHeader
 ```
+- `Vergaberegeln` bleibt bei `sicherheit.domain`, weil es die vorhandene Rolle und Rechtematrix direkt nutzt; so entsteht
+  weder eine Abhängigkeit von `benutzer.domain` nach `sicherheit.domain` noch eine zweite Rangfolgen-Implementierung.
 - **Port `IdentitaetsDienst`** (`benutzer/application`, driven): `benutzerSuchen(mandant, q, seite)`, `benutzerLesen(id)`,
   `anlegen(Benutzer, rolle)`, `aktualisieren(id, Aenderung)`, `rolleSetzen(id, rolle)`, `aktivieren(id, boolean)`,
   `einladen(id, aktionen, gueltigkeit)`, `sitzungenBeenden(id)`, `otpEntfernen(id)`, `sperreAufheben(id)`,
