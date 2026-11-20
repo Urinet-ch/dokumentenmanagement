@@ -890,6 +890,11 @@ bei 375, 1023, 1024 und 1280 px und prüft Überlauf, WCAG 2.1 AA mit axe, Einze
 Der integrierte Widerspruchsschutz (14.3, PR #351) liefert `diff.widersprueche` und
 `diff.entfernteWidersprueche`. Die Auflösungsmarkierung verwendet den echten Vertrag auch ohne KI-Blockliste;
 der REST-Nachweis prüft Text und Fussnotenschlüssel, Frontend- und Browsernachweise prüfen die Hervorhebung.
+Vor 14.3 gespeicherte Diffs erhalten fehlende Widerspruchsmarker beim Lesen aus der unveränderbaren
+historischen Basisversion und der gespeicherten Fassung, nie aus dem aktuellen Seiteninhalt.
+Gespeicherter Diff, Status und ETag bleiben unverändert; eine fehlende Änderungsbasis ist ein Fehler.
+Das Altdaten-Szenario liest Basisversion 2 nach einer weiteren Freigabe auf Version 3 und prüft zusätzlich
+die Mandantentrennung.
 
 ### Konfiguration und Aufträge
 | Schlüssel | Startwert |

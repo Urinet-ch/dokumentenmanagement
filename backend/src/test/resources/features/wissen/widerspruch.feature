@@ -14,3 +14,11 @@ Funktionalität: Widersprüche bleiben bis zur begründeten Entscheidung sichtba
     Dann bleibt die Annahme durch «AUSSAGE_ENTFERNT» gesperrt
     Wenn der Inhaber nur den Widerspruch mit Grund auflöst
     Dann sind der Grund und «Widerspruch aufgelöst» protokolliert und die alte Version bleibt erhalten
+
+  @req-7.3
+  Szenario: Ein gespeicherter Altdiff erhält die Auflösungsmarkierung aus seiner historischen Basis
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine Wissensseite enthält eine alte belegte Aussage und eine unabhängige Aussage
+    Wenn der Inhaber eine widersprechende neue Quelle als Widerspruchsblock freigibt
+    Und ein vor dem Widerspruchsschutz gespeicherter Entwurf nach einer weiteren Freigabe gelesen wird
+    Dann enthält dessen Diff den entfernten Widerspruch ohne die gespeicherten Entwurfsdaten zu ändern
