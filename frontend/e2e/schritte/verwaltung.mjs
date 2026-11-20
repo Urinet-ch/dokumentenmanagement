@@ -108,6 +108,17 @@ Given('die Verwaltungsseite wird auf 375 px geprüft', async function () {
   await this.seite.setViewportSize({ width: 375, height: 812 });
 });
 
+Then(
+  /^zeigt die Verwaltung die eigene Art «(.+)» und nicht die fremde Art «(.+)»$/,
+  async function (eigene, fremde) {
+    const liste = this.seite.locator('#dokumentarten aside');
+    await liste.locator('code', { hasText: eigene }).waitFor();
+    const codes = await liste.locator('code').allTextContents();
+    assert.ok(codes.includes(eigene));
+    assert.ok(!codes.includes(fremde), `fremde Art «${fremde}» sichtbar`);
+  },
+);
+
 When(/^ich die neue Regel «(.+)» mit der Meldung «(.+)» anlege$/, async function (code, meldung) {
   const regeln = this.seite.locator('#regeln');
   await regeln.getByRole('button', { name: 'Neue Regel', exact: true }).click();

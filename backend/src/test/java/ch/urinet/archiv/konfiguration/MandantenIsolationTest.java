@@ -1,8 +1,11 @@
 package ch.urinet.archiv.konfiguration;
 
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.ki.KiWireMock;
+import ch.urinet.archiv.ki.application.MetadatenExtraktion;
 import ch.urinet.archiv.ki.application.chat.Lueckenbericht;
 import ch.urinet.archiv.konfiguration.adapter.in.kommando.KonfigurationKommando;
+import ch.urinet.archiv.konfiguration.application.KonfigurationCache;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
 import ch.urinet.archiv.konfiguration.domain.Klassifikation;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
@@ -30,11 +33,16 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 import java.util.function.Supplier;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,6 +62,12 @@ abstract class MandantenIsolationIT {
 
     @Inject
     Lueckenbericht lueckenbericht;
+
+    @Inject
+    KonfigurationCache cache;
+
+    @Inject
+    MetadatenExtraktion extraktion;
 
     @Inject
     AgroalDataSource datenbank;
@@ -121,6 +135,44 @@ abstract class MandantenIsolationIT {
                 .contains("VERBANDSSITZUNG").doesNotContain("AUSGANGSRECHNUNG");
         assertThat(urinet.kategorien()).extracting(Lueckenbericht.Kategorie::art)
                 .doesNotContain("VERBANDSSITZUNG");
+    }
+
+    @Test
+    void kiVerwendetAusschliesslichDieKonfigurationDesMandanten() throws Exception {
+        MandantCode verbandCode = new MandantCode("probe-verband");
+        Konfiguration verband = in("probe-verband", konfiguration::aktuell);
+        assertThat(verband.kiTexte().kiFreigegeben()).isFalse();
+        cache.speichern(verbandCode, new Konfiguration(verband.version(), verband.einstellungen(), verband.arten(),
+                verband.klassifikationen(), verband.regeln(),
+                new Konfiguration.KiTexte(verband.kiTexte().rolle(), verband.kiTexte().feldregeln(), true)));
+        try {
+            KiWireMock.zuruecksetzen();
+            kiAnfrage("probe-verband", "synthetischer Verbandstext");
+            kiAnfrage("urinet", "synthetischer Urinettext");
+            List<String> anfragen = KiWireMock.client()
+                    .find(postRequestedFor(urlPathEqualTo(KiWireMock.CHAT_PFAD))).stream()
+                    .map(anfrage -> anfrage.getBodyAsString()).toList();
+            List<String> verbandsAnfragen = anfragen.stream()
+                    .filter(anfrage -> anfrage.contains("synthetischer Verbandstext")).toList();
+            List<String> urinetAnfragen = anfragen.stream()
+                    .filter(anfrage -> anfrage.contains("synthetischer Urinettext")).toList();
+            assertThat(verbandsAnfragen).isNotEmpty().allSatisfy(anfrage -> assertThat(anfrage)
+                    .contains("Probeverband", "VERBANDSSITZUNG", "sitzungsthema")
+                    .doesNotContain("AUSGANGSRECHNUNG"));
+            assertThat(urinetAnfragen).isNotEmpty().allSatisfy(anfrage -> assertThat(anfrage)
+                    .contains("AUSGANGSRECHNUNG")
+                    .doesNotContain("Probeverband", "VERBANDSSITZUNG", "sitzungsthema"));
+        } finally {
+            cache.invalidieren(verbandCode);
+            KiWireMock.zuruecksetzen();
+        }
+    }
+
+    private void kiAnfrage(String mandant, String text) throws Exception {
+        MandantCode code = new MandantCode(mandant);
+        in(mandant, () -> QuarkusTransaction.requiringNew().call(() -> extraktion.vorschlagen(
+                new MetadatenExtraktion.Eingabe(UUID.randomUUID(), code, text, Optional.empty(), Optional.empty(),
+                        LocalDate.of(2026, 11, 20)))));
     }
 
     @Test
