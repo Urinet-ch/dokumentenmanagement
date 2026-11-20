@@ -92,6 +92,10 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
     Eingabetext: gilt als «trifft nicht zu» und landet im Protokoll; 17.3 prüft nur Syntax und Länge), Schalter `ki_freigegeben` und
     Admin-Kommando `ki-freigeben`, Snapshot-Test gegen den Stand von Spec 01, Aufgabe 3.2, Quelltext-Test ohne
     Art-Codes.
+  - Offen für Fabian: Probelauf-Betriebsart (design.md, Open Points); Auslegung der Gate-0-Darstellung der
+    Prompt-Kennung beim Basisschema und der Reihenfolge der Arten (Spec 01 design.md). Der Quelltext-Test deckt
+    ganz `src/main/java` ab, ausser `DokumentErfassen.ART_KORRESPONDENZ` (Mail-Eingang, Spec 02): Ableitung aus der
+    Konfiguration braucht ein neues Art-Attribut und ist offen.
   - _Anforderungen: 2.3, 2.4, 2.5, 2.9, 8.1, 8.2, 8.3, 8.4_
   - _Abhängig von: 17.7; Spec 01: 3.2_
 

@@ -103,6 +103,7 @@ public class KorrekturLernen {
             var aktuell = konfiguration.aktuell();
             var kennungen = aktuell.einstellungen().kennungen();
             List<String> muster = aktuell.arten().stream().filter(art -> art.aktiv())
+                    .sorted(java.util.Comparator.comparingInt(ch.urinet.archiv.konfiguration.domain.Konfiguration.Art::reihenfolge))
                     .flatMap(art -> art.belegnummerMuster().stream()).toList();
             Merkmale.Ergebnis merkmale = Merkmale.erkennen(ErfassungPrompt.gekuerzt(vorher.volltext()),
                     vorher.partnerIban(), kennungen.uid(),

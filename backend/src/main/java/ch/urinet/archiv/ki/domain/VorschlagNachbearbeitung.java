@@ -122,17 +122,16 @@ public final class VorschlagNachbearbeitung {
         boolean musterGesetzt = false;
         List<Integer> abgebrochen = new ArrayList<>();
         if (aussteller && belegnummer != null) {
-            long ende = frist.ende();
             List<ArtMuster> muster = muster(arten);
             for (int i = 0; i < muster.size(); i++) {
                 ArtMuster m = muster.get(i);
                 if (!aktiv(arten, m.art())) {
                     continue;
                 }
-                Merkmale.MusterErgebnis ergebnis = Merkmale.musterTrifft(m.muster(), belegnummer, frist, ende);
+                Merkmale.MusterErgebnis ergebnis = Merkmale.musterTrifft(m.muster(), belegnummer, frist, frist.ende());
                 if (ergebnis.abgebrochen()) {
                     abgebrochen.add(i + 1);
-                    break;
+                    continue;
                 }
                 if (ergebnis.trifftZu()) {
                     art = m.art();

@@ -301,26 +301,21 @@ class VorschlagNachbearbeitungTest {
     }
 
     @Test
-    void laufzeitgrenzeStopptAuchBeiVielenArtenWeitereMuster() {
-        List<ArtEintrag> arten = new java.util.ArrayList<>();
-        arten.add(art("PROJEKTDOKUMENT", "Projektdokument", "NORMAL", List.of(), true,
-                java.util.Collections.nCopies(20, "^a+$"), null, null));
-        for (int i = 0; i < 199; i++) {
-            arten.add(art("TESTART_" + i, "Testart", "NORMAL", List.of(), true,
-                    java.util.Collections.nCopies(20, "^a+$"), null, null));
-        }
+    @org.junit.jupiter.api.Timeout(10)
+    void abgebrochenesMusterBeendetDieWeiterenMusterNicht() {
+        List<ArtEintrag> arten = List.of(
+                art("EIGENE_TESTART", "Eigene Testart", "NORMAL", List.of(), true, List.of("^(.*a){20}$"), null, null),
+                art("ZWEITE_TESTART", "Zweite Testart", "NORMAL", List.of(), true, List.of("^a+!$"), null, null));
         ErfassungMandant mandant = new ErfassungMandant("Testfirma AG", UID, List.of(IBAN),
-                arten.stream().map(ArtEintrag::code).collect(java.util.stream.Collectors.toSet()));
-        java.util.concurrent.atomic.AtomicInteger uhr = new java.util.concurrent.atomic.AtomicInteger();
-        Merkmale.Frist frist = new Merkmale.Frist(java.time.Duration.ofNanos(1),
-                () -> uhr.getAndIncrement() < 2 ? 0 : 2_000_000);
-        Rohvorschlag roh = roh("PROJEKTDOKUMENT", "a", new BigDecimal("0.95"), "NORMAL");
+                Set.of("EIGENE_TESTART", "ZWEITE_TESTART"));
+        Merkmale.Frist frist = Merkmale.Frist.cpu(java.time.Duration.ofMillis(100));
+        Rohvorschlag roh = roh("EIGENE_TESTART", "a".repeat(28) + "!", new BigDecimal("0.95"), "NORMAL");
 
         VorschlagNachbearbeitung.Ergebnis ergebnis = VorschlagNachbearbeitung.bearbeiteMitProtokoll(roh,
                 Optional.empty(), EIGENER_KOPF, mandant, arten, List.of(), EINGANG, frist);
 
         assertThat(ergebnis.abgebrochen()).containsExactly(1);
-        assertThat(ergebnis.vorschlag().art()).isEqualTo("PROJEKTDOKUMENT");
+        assertThat(ergebnis.vorschlag().art()).isEqualTo("ZWEITE_TESTART");
     }
 
     @Test

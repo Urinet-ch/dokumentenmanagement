@@ -126,6 +126,18 @@ public class KiVorschlagSchritte {
                 new Konfiguration.KiTexte(vorher.kiTexte().rolle(), vorher.kiTexte().feldregeln(), false)));
     }
 
+    /** Req 8.1: Rolle und Feldregeln nur in der Konfiguration des Mandanten ändern; sie dürfen nicht aus dem Code kommen. */
+    @Angenommen("die KI-Texte des Mandanten tragen die Kennung «{}»")
+    public void kiTexteMitKennung(String kennung) throws Exception {
+        MandantCode mandant = new MandantCode(MANDANT);
+        Konfiguration vorher = aktuelleKonfiguration(mandant);
+        kiFreigabeGeaendert = true;
+        konfigurationCache.speichern(mandant, new Konfiguration(vorher.version(), vorher.einstellungen(),
+                vorher.arten(), vorher.klassifikationen(), vorher.regeln(),
+                new Konfiguration.KiTexte(kennung + " Rolle", kennung + " Feldregeln",
+                        vorher.kiTexte().kiFreigegeben())));
+    }
+
     @Angenommen("der Mandant «{word}» hat die UID «{}»")
     public void uid(String mandant, String uid) throws Exception {
         MandantCode code = new MandantCode(mandant);
@@ -393,6 +405,13 @@ public class KiVorschlagSchritte {
         String systemPrompt = anfrage.path("messages").get(0).path("content").asText();
         assertThat(systemPrompt).contains("Sozialversicherungen", "Werte aus dem Swiss QR Code",
                 "AUSGANGSRECHNUNG", "LIEFERANTENBELEG");
+    }
+
+    @Dann("der Aufruf enthält die Kennung «{}» der KI-Texte")
+    public void kennungImAufruf(String kennung) throws Exception {
+        String systemPrompt = JSON.readTree(anfragen().getFirst().getBodyAsString())
+                .path("messages").get(0).path("content").asText();
+        assertThat(systemPrompt).contains(kennung + " Rolle", kennung + " Feldregeln");
     }
 
     @Dann("der Aufruf enthält den Belegtext «{}» und die Dokumentarten des Mandanten")

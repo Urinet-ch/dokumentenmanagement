@@ -59,19 +59,20 @@ class MerkmaleTest {
                 frist);
 
         assertThat(e.merkmale().muster()).isEmpty();
-        assertThat(e.abgebrochen()).containsExactly(0);
+        assertThat(e.abgebrochen()).containsExactly(1, 2);
     }
 
     @Test
-    void laufzeitgrenzeStopptDiePruefungAuchBeiVielenMustern() {
-        List<String> vieleMuster = java.util.Collections.nCopies(4_000, "^\\d+$");
-        AtomicLong uhr = new AtomicLong();
-        Merkmale.Frist frist = new Merkmale.Frist(Duration.ofNanos(1), () -> uhr.incrementAndGet());
+    @org.junit.jupiter.api.Timeout(10)
+    void abgebrochenesMusterBeendetDiePruefungDerWeiterenMusterNicht() {
+        List<String> muster = List.of("^(.*a){20}$", "^a+!$");
+        Merkmale.Frist frist = Merkmale.Frist.cpu(Duration.ofMillis(100));
 
-        Merkmale.Ergebnis ergebnis = Merkmale.erkennen("123", Optional.empty(), null, List.of(), vieleMuster, frist);
+        Merkmale.Ergebnis ergebnis = Merkmale.erkennen("a".repeat(28) + "!", Optional.empty(), null, List.of(),
+                muster, frist);
 
-        assertThat(ergebnis.abgebrochen()).containsExactly(0);
-        assertThat(uhr).hasValue(3);
+        assertThat(ergebnis.abgebrochen()).containsExactly(1);
+        assertThat(ergebnis.merkmale().muster()).containsExactly("^a+!$");
     }
 
     @Test

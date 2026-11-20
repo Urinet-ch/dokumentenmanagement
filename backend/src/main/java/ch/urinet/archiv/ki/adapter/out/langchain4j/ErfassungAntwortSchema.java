@@ -23,6 +23,26 @@ final class ErfassungAntwortSchema {
     private ErfassungAntwortSchema() {
     }
 
+    /**
+     * Löst lokale Verweise ({@code #/$defs/x}) einer Felddefinition auf, denn das Antwortschema trägt die {@code $defs}
+     * des Zusatz-Schemas nicht. Verweise, die danach bleiben (verschachtelt, entfernt), sind ein Konfigurationsfehler.
+     */
+    private static JsonNode verweisAufloesen(JsonNode zusatz, JsonNode typ) {
+        JsonNode aktuell = typ;
+        for (int tiefe = 0; aktuell.has("$ref") && tiefe < 8; tiefe++) {
+            String ref = aktuell.get("$ref").asText();
+            JsonNode ziel = ref.startsWith("#/") ? zusatz.at(ref.substring(1)) : null;
+            if (ziel == null || ziel.isMissingNode() || !ziel.isObject()) {
+                throw new IllegalStateException("KI-Feld mit nicht auflösbarem Verweis im Zusatz-Schema");
+            }
+            aktuell = ziel;
+        }
+        if (aktuell.toString().contains("\"$ref\"")) {
+            throw new IllegalStateException("KI-Feld mit verschachteltem Verweis im Zusatz-Schema");
+        }
+        return aktuell;
+    }
+
     static String json(List<ArtEintrag> arten, List<KiKlassifikation> klassifikationen) {
         ObjectNode schema = (ObjectNode) lesen(AntwortSchema.json());
         ObjectNode eigenschaften = (ObjectNode) schema.path("properties");
@@ -43,6 +63,7 @@ final class ErfassungAntwortSchema {
                     if (typ == null) {
                         throw new IllegalStateException("KI-Feld fehlt im Zusatz-Schema");
                     }
+                    typ = verweisAufloesen(zusatz, typ);
                     zusatzSchemas.computeIfAbsent("zusatz." + feld, ignoriert -> new ArrayList<>())
                             .add(nullable(typ));
                 }

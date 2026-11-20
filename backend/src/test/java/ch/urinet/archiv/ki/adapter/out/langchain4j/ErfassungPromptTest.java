@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -200,17 +201,36 @@ class ErfassungPromptTest {
     }
 
     @Test
+    void antwortschemaLoestLokaleVerweiseDesKiFeldsAuf() throws IOException {
+        ArtEintrag art = new ArtEintrag("DOKUMENT_A", "Dokument", null, "NORMAL", List.of("frei"),
+                false, true, List.of(), null, null, List.of("sitzung"),
+                null, 0, "{\"type\":\"object\",\"properties\":{\"sitzung\":{\"$ref\":\"#/$defs/datum\"}},"
+                + "\"$defs\":{\"datum\":{\"type\":\"string\",\"format\":\"date\"}},"
+                + "\"additionalProperties\":false}",
+                Map.of("sitzung", "date"), List.of(), Map.of());
+
+        String json = AntwortSchema.json(List.of(art), List.of());
+
+        assertThat(json).doesNotContain("$ref");
+        assertThat(new ObjectMapper().readTree(json).path("properties").path("zusatz.sitzung").toString())
+                .contains("\"format\":\"date\"");
+    }
+
+    /**
+     * Req 2.9, design.md «Tests»: kein Art-Code von urinet im Quelltext. Ausnahmen: {@code WISSENSQUELLE} (feste Art
+     * des Systems) und {@code DokumentErfassen.ART_KORRESPONDENZ} (Mail-Eingang, Spec 02; wird nur gesetzt, wenn der
+     * Mandant die Art aktiv führt; Ableitung aus der Konfiguration ist offen, siehe tasks.md 18.1).
+     */
+    @Test
     void erfassungsquelltextEnthaeltKeineFestVerdrahtetenArtCodes() throws IOException {
-        List<Path> quellen = List.of(
-                Path.of("src/main/java/ch/urinet/archiv/ki/domain/ErfassungPrompt.java"),
-                Path.of("src/main/java/ch/urinet/archiv/ki/domain/VorschlagNachbearbeitung.java"),
-                Path.of("src/main/java/ch/urinet/archiv/ki/domain/Merkmale.java"),
-                Path.of("src/main/java/ch/urinet/archiv/ki/application/MetadatenExtraktion.java"),
-                Path.of("src/main/java/ch/urinet/archiv/ki/adapter/out/langchain4j/ErfassungAntwortSchema.java"),
-                Path.of("src/main/java/ch/urinet/archiv/ki/adapter/out/stub/KiStub.java"));
         List<String> codes = List.of("AUSGANGSRECHNUNG", "LIEFERANTENBELEG", "QUITTUNG", "LOHNABRECHNUNG",
                 "VERSICHERUNG", "BEHOERDE", "KORRESPONDENZ", "PROJEKTDOKUMENT", "OFFERTE");
-
+        List<Path> quellen;
+        try (Stream<Path> baum = Files.walk(Path.of("src/main/java"))) {
+            quellen = baum.filter(p -> p.toString().endsWith(".java"))
+                    .filter(p -> !p.endsWith("DokumentErfassen.java")).toList();
+        }
+        assertThat(quellen).hasSizeGreaterThan(100);
         for (Path quelle : quellen) {
             assertThat(Files.readString(quelle)).as(quelle.toString()).doesNotContain(codes.toArray(String[]::new));
         }

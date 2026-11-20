@@ -11,9 +11,10 @@ import com.networknt.schema.SpecificationVersion;
 import dev.langchain4j.internal.JsonSchemaElementUtils;
 import dev.langchain4j.service.output.JsonSchemas;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.Map;
 
 /**
  * Prüft die Rohantwort des Modells gegen das strikte Antwortschema, wie es im {@code response_format} hinausgeht (Req
@@ -22,7 +23,15 @@ import java.util.concurrent.ConcurrentMap;
  */
 public final class AntwortSchema {
 
-    private static final ConcurrentMap<String, Schema> SCHEMAS = new ConcurrentHashMap<>();
+    /** Begrenzt (zuletzt benutzte zuerst verdrängt): jede Konfigurationsänderung ergibt ein neues Schema. */
+    private static final int MAX_SCHEMAS = 64;
+    private static final Map<String, Schema> SCHEMAS = Collections.synchronizedMap(
+            new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Schema> aeltester) {
+                    return size() > MAX_SCHEMAS;
+                }
+            });
 
     private AntwortSchema() {
     }
@@ -61,10 +70,15 @@ public final class AntwortSchema {
             return false;
         }
         try {
-            return SCHEMAS.computeIfAbsent(jsonSchema, AntwortSchema::schema).validate(roh, InputFormat.JSON)
-                    .isEmpty();
+            return schemaFuer(jsonSchema).validate(roh, InputFormat.JSON).isEmpty();
         } catch (RuntimeException e) {
             return false;
+        }
+    }
+
+    private static Schema schemaFuer(String jsonSchema) {
+        synchronized (SCHEMAS) {
+            return SCHEMAS.computeIfAbsent(jsonSchema, AntwortSchema::schema);
         }
     }
 

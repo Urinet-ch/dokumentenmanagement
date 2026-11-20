@@ -174,14 +174,12 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         Set<String> treffer = new LinkedHashSet<>();
         List<Integer> abgebrochen = new ArrayList<>();
         String[] woerter = WORT.split(t.strip());
-        long ende = frist.ende();
-        musterPruefung:
         for (int nr = 0; nr < muster.size() && treffer.size() < MAX_JE_TYP; nr++) {
-            switch (trifft(muster.get(nr), woerter, frist, ende)) {
+            // Zeitgrenze je Muster (Spec 05, Req 2.4): ein abgebrochenes Muster trifft nicht zu, die übrigen laufen weiter
+            switch (trifft(muster.get(nr), woerter, frist, frist.ende())) {
                 case JA -> treffer.add(muster.get(nr));
                 case ABGEBROCHEN -> {
-                    abgebrochen.add(nr);
-                    break musterPruefung;
+                    abgebrochen.add(nr + 1);
                 }
                 case NEIN -> {
                 }
