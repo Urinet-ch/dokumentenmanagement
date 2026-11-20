@@ -99,10 +99,15 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     }
 
     int aenderungSpeichern(String wer, String grund, KonfigurationQuelle quelle, Konfiguration vorher) {
+        return aenderungSpeichern(wer, grund, quelle, vorher, vorher.einstellungen());
+    }
+
+    int aenderungSpeichern(String wer, String grund, KonfigurationQuelle quelle, Konfiguration vorher,
+                          Konfiguration.Einstellungen einstellungenNeu) {
         if (basisSicherstellen().version() != vorher.version()) {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
         }
-        Konfiguration neu = abbild(vorher.version() + 1);
+        Konfiguration neu = abbild(vorher.version() + 1, einstellungenNeu);
         if (vorher.gleicherInhalt(neu)) {
             return vorher.version();
         }
@@ -135,7 +140,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         if (aktuell.isPresent()) {
             return aktuell.get();
         }
-        Konfiguration initial = abbild(1);
+        Konfiguration initial = abbild(1, null);
         if (!initial.pruefen().isEmpty()) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }
@@ -162,10 +167,13 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
                 ergaenzt, stand.sha256());
     }
 
-    private Konfiguration abbild(int version) {
+    private Konfiguration abbild(int version, Konfiguration.Einstellungen bisher) {
         MandantEinstellungen.Werte werte = einstellungen.lesen(mandantAktuell());
         return new Konfiguration(version, new Konfiguration.Einstellungen(werte.geschaeftsjahresende().wert(),
-                new Kennungen(werte.uid().isBlank() ? null : werte.uid(), werte.ibans())), dokumentarten.alle().stream()
+                new Kennungen(werte.uid().isBlank() ? null : werte.uid(), werte.ibans()),
+                bisher == null ? null : bisher.branding(), bisher == null ? null : bisher.chat(),
+                bisher == null ? null : bisher.webseitenChat(), bisher == null ? null : bisher.wissen()),
+                dokumentarten.alle().stream()
                 .map(this::art).toList(), klassifikationen.alle(), regeln.alle(), kiTexteRepository.lesen());
     }
 

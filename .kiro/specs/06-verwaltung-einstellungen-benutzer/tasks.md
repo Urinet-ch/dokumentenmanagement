@@ -116,7 +116,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Abhängig von: 19.6, 19.11_
 
 ## Welle 20 — Einstellungen und Oberfläche
-- [ ] 20.1 Einstellungskatalog und Abbild [Backend]
+- [x] 20.1 Einstellungskatalog und Abbild [Backend]
   - `Einstellungskatalog` (Domain), Abschnitt `einstellungen` im Abbild und in `konfiguration.schema.json` (Test
     `EinstellungskatalogSchemaTest`), Prüfung in `Konfiguration.pruefen`, Standardwerte, `EinstellungsInventarTest`,
     `EinstellungskatalogTest` (nur Klasse (a)), Konfigurationsdatei und Export mit dem erweiterten Abschnitt.

@@ -396,6 +396,36 @@ public class KonfigurationsVersionSchritte {
         ((ObjectNode) datei.path("einstellungen")).put("geschaeftsjahrEnde", datum);
     }
 
+    @Wenn("in der Datei die erweiterten Einstellungen mit Testwerten gesetzt werden")
+    public void erweiterteEinstellungenSetzen() {
+        ObjectNode einstellungen = (ObjectNode) datei.path("einstellungen");
+        ((ObjectNode) einstellungen.path("branding")).put("name", "Testarchiv").put("primaerfarbe", "#eeb111");
+        ((ObjectNode) einstellungen.path("chat")).put("aufbewahrungMonate", 17);
+        ((ObjectNode) einstellungen.path("webseitenChat")).put("aufbewahrungTage", 31);
+        ObjectNode wissen = (ObjectNode) einstellungen.path("wissen");
+        wissen.put("budgetTokens", 123456).put("lintBudgetTokens", 12345).put("monatsbudgetTokens", 1234567);
+        ((ObjectNode) wissen.path("lintZeitplan")).put("wochentag", "MONDAY").put("stunde", 7);
+    }
+
+    @Wenn("in der Datei die Chat-Aufbewahrung auf {int} Monate gesetzt wird")
+    public void chatAufbewahrungSetzen(int monate) {
+        ((ObjectNode) datei.path("einstellungen").path("chat")).put("aufbewahrungMonate", monate);
+    }
+
+    @Dann("enthält der Export die erweiterten Testwerte")
+    public void exportEnthaeltErweiterteTestwerte() {
+        JsonNode einstellungen = datei.path("einstellungen");
+        assertThat(einstellungen.path("branding").path("name").asText()).isEqualTo("Testarchiv");
+        assertThat(einstellungen.path("branding").path("primaerfarbe").asText()).isEqualTo("#eeb111");
+        assertThat(einstellungen.path("chat").path("aufbewahrungMonate").asInt()).isEqualTo(17);
+        assertThat(einstellungen.path("webseitenChat").path("aufbewahrungTage").asInt()).isEqualTo(31);
+        assertThat(einstellungen.path("wissen").path("budgetTokens").asInt()).isEqualTo(123456);
+        assertThat(einstellungen.path("wissen").path("lintBudgetTokens").asInt()).isEqualTo(12345);
+        assertThat(einstellungen.path("wissen").path("monatsbudgetTokens").asInt()).isEqualTo(1234567);
+        assertThat(einstellungen.path("wissen").path("lintZeitplan").path("wochentag").asText()).isEqualTo("MONDAY");
+        assertThat(einstellungen.path("wissen").path("lintZeitplan").path("stunde").asInt()).isEqualTo(7);
+    }
+
     @Wenn("in der Datei der KI-Rollentext geändert wird")
     public void kiRollentextAendern() {
         kiTexteWiederherstellen = true;

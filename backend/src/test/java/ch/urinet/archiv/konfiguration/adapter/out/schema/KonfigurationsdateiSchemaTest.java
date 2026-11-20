@@ -69,6 +69,7 @@ class KonfigurationsdateiSchemaTest {
                   "klassifikationen":[],"arten":[],"regeln":[],
                   "mandant":"vhf-gsk"
                 }
+
                 """;
         String falscherParameter = """
                 {
@@ -86,6 +87,35 @@ class KonfigurationsdateiSchemaTest {
 
         assertThat(SCHEMA.validate(unbekannt, InputFormat.JSON)).isNotEmpty();
         assertThat(SCHEMA.validate(falscherParameter, InputFormat.JSON)).isNotEmpty();
+    }
+
+    @Test
+    void erweiterteEinstellungenAkzeptierenGrenzenUndKeineFremdenSchluessel() {
+        String datei = """
+                {
+                  "format":1,
+                  "einstellungen":{
+                    "geschaeftsjahrEnde":"12-31", "kennungen":{"uid":null,"ibans":[]},
+                    "branding":{"name":"Archiv","primaerfarbe":"#eeb111"},
+                    "chat":{"aufbewahrungMonate":1}, "webseitenChat":{"aufbewahrungTage":365},
+                    "wissen":{"budgetTokens":10000,"lintBudgetTokens":1000000,"monatsbudgetTokens":100000,
+                      "lintZeitplan":{"wochentag":"SUNDAY","stunde":23}}
+                  },
+                  "kiTexte":{"rolle":"","feldregeln":"","kiFreigegeben":false},
+                  "klassifikationen":[],"arten":[],"regeln":[]
+                }
+                """;
+        assertThat(SCHEMA.validate(datei, InputFormat.JSON)).isEmpty();
+        assertThat(SCHEMA.validate(datei.replace("\"aufbewahrungMonate\":1", "\"aufbewahrungMonate\":0"),
+                InputFormat.JSON)).isNotEmpty();
+        assertThat(SCHEMA.validate(datei.replace("\"aufbewahrungTage\":365", "\"aufbewahrungTage\":366"),
+                InputFormat.JSON)).isNotEmpty();
+        assertThat(SCHEMA.validate(datei.replace("\"stunde\":23", "\"stunde\":24"), InputFormat.JSON)).isNotEmpty();
+        assertThat(SCHEMA.validate(datei.replace("\"wochentag\":\"SUNDAY\"", "\"wochentag\":\"morgen\""),
+                InputFormat.JSON)).isNotEmpty();
+        assertThat(SCHEMA.validate(datei.replace("\"aufbewahrungMonate\":1",
+                "\"aufbewahrungMonate\":1,\"basisUrl\":\"ungueltig\""),
+                InputFormat.JSON)).isNotEmpty();
     }
 
     private static Schema schema() {

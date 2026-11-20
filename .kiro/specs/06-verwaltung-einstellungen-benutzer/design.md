@@ -67,7 +67,7 @@ Stand: `application.properties` (Präfixe `archiv.*`), Umgebung und Compose, Kon
 `wissens_einstellung` (Spec 04), `public.mandant` und `public.mandant_budget` (Spec 01 und 03). Klassen: **(a)** im
 Betrieb in der App änderbar, je Mandant, mit Versionen, Prüfung und Protokoll; **(b)** nur über Deployment oder
 Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 1.1) prüft die Präfixe dieser Tabelle gegen
-`application.properties`.
+`application.properties`. Einzelne Schlüssel in Klasse (a) gehen einem allgemeineren Präfix in Klasse (b) vor.
 
 ### Klasse (a): in der App änderbar (Einstellungskatalog)
 | Einstellung | Heute | Grenzen und Standard | riskant | Recht | Begründung der Klasse |
@@ -97,9 +97,11 @@ Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 
 | `archiv.chat.*` (Raten je Benutzer, Gleichzeitigkeit, Aufräumzeit) | Konfiguration | Schutz der Instanz |
 | `archiv.mail.*` (Postfach, Intervall, Ordner, Grössen) | Konfiguration | ein Postfach und ein Abrufer je Instanz (Spec 02) |
 | `archiv.ueberwachung.*`, `archiv.oidc.waechter.*`, `archiv.kennzahlen.*`, `archiv.mandant.bericht.*` | Konfiguration | Betrieb und Alarmschwellen der Instanz |
+| `archiv.adresse`, `archiv.integration.*` | Konfiguration | Instanzweite Adresse und Integrationsadapter; keine Mandanten-Einstellung |
+| `archiv.wissen.*` | Konfiguration | Instanzweite Modelle und technische Grenzen; die oben einzeln genannten Startwerte der Klasse (a) sind ausgenommen |
 | `archiv.benachrichtigung.empfaenger.<code>` | Umgebung `ARCHIV_ALARM_EMPFAENGER_<CODE>` | E-Mail-Adressen sind Personendaten und gehören nicht in unveränderliche Konfigurationsversionen; Umleiten der Alarme wäre ein Missbrauchsweg (Entscheid Fabian offen, Open Points) |
 | `archiv.branding.mandanten.<code>.domain`, `…logo-url` | Konfiguration, Traefik | Domain ist DNS und Router; eine fremde Logo-URL wäre ein Tracking- und Phishing-Weg |
-| `archiv.mandant.<code>.fristen.*`, `….kennzahl.*` | Konfiguration | fachliche Werte von `urinet`; Kandidaten für Spec 05, nicht für diese Spec |
+| `archiv.mandant.<code>.fristen.*`, `archiv.mandant.<code>.kennzahl.*`, `archiv.mandant.<code>.chat-hinweis` | Konfiguration | fachliche Werte und Hinweise; nicht Bestandteil des Einstellungskatalogs dieser Spec |
 | `public.mandant.name`, `public.mandant.verwaltung_rollen`, `public.mandant_budget` (Monatsbudget öffentlicher Chat) | Datenbank, Admin-Kommando | Name geht in den Prompt (Gate 0); Rollensatz und Kostenhoheit gehören dem Betreiber; die Oberfläche zeigt Budget und Verbrauch nur lesend |
 | `ki_freigegeben` | Admin-Kommando (Spec 05, 8.4) | gebunden an die Abnahme; nie über die Oberfläche |
 | Rollen und Rechtematrix | Code (`Rechtematrix`) | Quelle der Wahrheit; Änderung ist ein Release mit Test |
@@ -231,6 +233,14 @@ Teil `einstellungen` von `konfiguration.schema.json` (`EinstellungskatalogSchema
 die Prüfung in `Konfiguration.pruefen` (Pfad, Code, Meldung, wie Spec 05), die Vorschau (`Auswirkung`) und die Oberfläche.
 Konfigurationsdatei, Export, Vergleich, Versionen, `If-Match`, Rundlauf und Protokoll `KONFIGURATION_AENDERN` gelten
 unverändert; neu ist nur die Bestätigung riskanter Änderungen und die erweiterte Prüfung.
+
+**Umsetzung 20.1:** Der erweiterte Abschnitt ist rückwärtskompatibel optional; fehlende Gruppen werden mit leeren
+Werten gelesen. Das Abbild übernimmt die neuen Werte aus der zuletzt gespeicherten Konfiguration, auch wenn eine andere
+Änderung eine Version erzeugt. Dateiimport und Seed übergeben die neuen Werte ausdrücklich. Wochentage im Abbild sind
+ISO-Namen (`MONDAY` bis `SUNDAY`). Der Anzeigename folgt der bestehenden Zeichen-Positivliste des Brandings mit höchstens
+60 Zeichen. Der Katalog stellt für Zahlen die Auflösung eigener Wert → bisheriger Startwert → Katalogstandard bereit.
+Die Umstellung der Verbraucher und die Übernahme bisheriger Werte gehören zu 20.3; die offene Entscheidung zu
+`wissens_einstellung` wird dadurch nicht vorweggenommen.
 
 **Schnittstelle** (Erweiterung von `GET/PATCH /mandant/einstellungen`, Spec 01 und 05; die Form der bestehenden Felder
 bleibt, neue Felder kommen flach dazu; die genaue Form legt Aufgabe 20.2 gegen den Stand von Spec 05, 17.3 fest):

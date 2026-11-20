@@ -49,7 +49,11 @@
           "type": "string",
           "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
         },
-        "kennungen": { "$ref": "#/$defs/kennungen" }
+        "kennungen": { "$ref": "#/$defs/kennungen" },
+        "branding": { "$ref": "#/$defs/einstellungenBranding" },
+        "chat": { "$ref": "#/$defs/chatEinstellungen" },
+        "webseitenChat": { "$ref": "#/$defs/webseitenChatEinstellungen" },
+        "wissen": { "$ref": "#/$defs/wissenEinstellungen" }
       },
       "patternProperties": {
         "^_": { "$ref": "#/$defs/kommentar" }
@@ -60,15 +64,67 @@
       "type": "object",
       "required": ["uid", "ibans"],
       "properties": {
-        "uid": { "type": ["string", "null"] },
+        "uid": {
+          "type": ["string", "null"],
+          "pattern": "(?i)^CHE[-. ]?\\d{3}[. ]?\\d{3}[. ]?\\d{3}(?: *MWST)?$"
+        },
         "ibans": {
           "type": "array",
+          "maxItems": 20,
           "items": { "type": "string" }
         }
       },
       "patternProperties": {
         "^_": { "$ref": "#/$defs/kommentar" }
       },
+      "additionalProperties": false
+    },
+    "einstellungenBranding": {
+      "type": ["object", "null"],
+      "properties": {
+        "name": { "type": ["string", "null"], "minLength": 1, "maxLength": 60 },
+        "primaerfarbe": { "type": ["string", "null"], "pattern": "^#[0-9a-fA-F]{6}$" }
+      },
+      "patternProperties": { "^_": { "$ref": "#/$defs/kommentar" } },
+      "additionalProperties": false
+    },
+    "chatEinstellungen": {
+      "type": ["object", "null"],
+      "properties": {
+        "aufbewahrungMonate": { "type": ["integer", "null"], "minimum": 1, "maximum": 60 }
+      },
+      "patternProperties": { "^_": { "$ref": "#/$defs/kommentar" } },
+      "additionalProperties": false
+    },
+    "webseitenChatEinstellungen": {
+      "type": ["object", "null"],
+      "properties": {
+        "aufbewahrungTage": { "type": ["integer", "null"], "minimum": 1, "maximum": 365 }
+      },
+      "patternProperties": { "^_": { "$ref": "#/$defs/kommentar" } },
+      "additionalProperties": false
+    },
+    "wissenEinstellungen": {
+      "type": ["object", "null"],
+      "properties": {
+        "budgetTokens": { "type": ["integer", "null"], "minimum": 10000, "maximum": 5000000 },
+        "lintBudgetTokens": { "type": ["integer", "null"], "minimum": 10000, "maximum": 1000000 },
+        "monatsbudgetTokens": { "type": ["integer", "null"], "minimum": 100000, "maximum": 20000000 },
+        "lintZeitplan": { "$ref": "#/$defs/lintZeitplan" }
+      },
+      "patternProperties": { "^_": { "$ref": "#/$defs/kommentar" } },
+      "additionalProperties": false
+    },
+    "lintZeitplan": {
+      "type": ["object", "null"],
+      "properties": {
+        "wochentag": {
+          "type": ["string", "null"],
+          "enum": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY", null]
+        },
+        "stunde": { "type": ["integer", "null"], "minimum": 0, "maximum": 23 }
+      },
+      "patternProperties": { "^_": { "$ref": "#/$defs/kommentar" } },
       "additionalProperties": false
     },
     "kiTexte": {

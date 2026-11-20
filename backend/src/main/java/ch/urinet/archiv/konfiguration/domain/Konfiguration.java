@@ -1,5 +1,6 @@
 package ch.urinet.archiv.konfiguration.domain;
 
+import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -78,6 +79,35 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         if (einstellungen != null && !geschaeftsjahrEndeGueltig(einstellungen.geschaeftsjahrEnde())) {
             befunde.add(new Befund("einstellungen.geschaeftsjahrEnde", "DATUM_UNGUELTIG",
                     "Das Geschäftsjahresende ist kein gültiger Tag im Format MM-TT."));
+        }
+        if (einstellungen != null) {
+            if (!Einstellungskatalog.uidGueltig(einstellungen.kennungen().uid())) {
+                befunde.add(new Befund("einstellungen.kennungen.uid", "WERT_UNGUELTIG",
+                        "Die UID hat nicht das erwartete Format."));
+            }
+            if (!Einstellungskatalog.ibansGueltig(einstellungen.kennungen().ibans())) {
+                befunde.add(new Befund("einstellungen.kennungen.ibans", "WERT_UNGUELTIG",
+                        "Die Liste darf höchstens 20 nicht leere Einträge ohne Steuerzeichen enthalten."));
+            }
+            if (!Einstellungskatalog.brandingNameGueltig(einstellungen.branding().name())) {
+                befunde.add(new Befund("einstellungen.branding.name", "WERT_UNGUELTIG",
+                        "Der Name muss 1 bis 60 Zeichen lang sein und darf keine Steuerzeichen oder Markup enthalten."));
+            }
+            if (!Einstellungskatalog.primaerfarbeGueltig(einstellungen.branding().primaerfarbe())) {
+                befunde.add(new Befund("einstellungen.branding.primaerfarbe", "WERT_UNGUELTIG",
+                        "Die Farbe muss ein gültiger RGB-Wert mit genügend Kontrast sein."));
+            }
+            zahlPruefen(befunde, Einstellungskatalog.Zahl.CHAT_AUFBEWAHRUNG,
+                    einstellungen.chat().aufbewahrungMonate());
+            zahlPruefen(befunde, Einstellungskatalog.Zahl.WEBSEITEN_CHAT_AUFBEWAHRUNG,
+                    einstellungen.webseitenChat().aufbewahrungTage());
+            zahlPruefen(befunde, Einstellungskatalog.Zahl.WISSEN_BUDGET, einstellungen.wissen().budgetTokens());
+            zahlPruefen(befunde, Einstellungskatalog.Zahl.WISSEN_LINT_BUDGET,
+                    einstellungen.wissen().lintBudgetTokens());
+            zahlPruefen(befunde, Einstellungskatalog.Zahl.WISSEN_MONATSBUDGET,
+                    einstellungen.wissen().monatsbudgetTokens());
+            zahlPruefen(befunde, Einstellungskatalog.Zahl.WISSEN_LINT_STUNDE,
+                    einstellungen.wissen().lintZeitplan().stunde());
         }
         Set<String> codes = new HashSet<>();
         Map<String, Art> nachCode = nachCode(arten);
@@ -451,6 +481,24 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 neu.einstellungen.kennungen().uid());
         feld(aenderungen, "einstellungen.kennungen.ibans", einstellungen.kennungen().ibans(),
                 neu.einstellungen.kennungen().ibans());
+        feld(aenderungen, "einstellungen.branding.name", einstellungen.branding().name(),
+                neu.einstellungen.branding().name());
+        feld(aenderungen, "einstellungen.branding.primaerfarbe", einstellungen.branding().primaerfarbe(),
+                neu.einstellungen.branding().primaerfarbe());
+        feld(aenderungen, "einstellungen.chat.aufbewahrungMonate", einstellungen.chat().aufbewahrungMonate(),
+                neu.einstellungen.chat().aufbewahrungMonate());
+        feld(aenderungen, "einstellungen.webseitenChat.aufbewahrungTage",
+                einstellungen.webseitenChat().aufbewahrungTage(), neu.einstellungen.webseitenChat().aufbewahrungTage());
+        feld(aenderungen, "einstellungen.wissen.budgetTokens", einstellungen.wissen().budgetTokens(),
+                neu.einstellungen.wissen().budgetTokens());
+        feld(aenderungen, "einstellungen.wissen.lintBudgetTokens", einstellungen.wissen().lintBudgetTokens(),
+                neu.einstellungen.wissen().lintBudgetTokens());
+        feld(aenderungen, "einstellungen.wissen.monatsbudgetTokens", einstellungen.wissen().monatsbudgetTokens(),
+                neu.einstellungen.wissen().monatsbudgetTokens());
+        feld(aenderungen, "einstellungen.wissen.lintZeitplan.wochentag",
+                einstellungen.wissen().lintZeitplan().wochentag(), neu.einstellungen.wissen().lintZeitplan().wochentag());
+        feld(aenderungen, "einstellungen.wissen.lintZeitplan.stunde",
+                einstellungen.wissen().lintZeitplan().stunde(), neu.einstellungen.wissen().lintZeitplan().stunde());
         feld(aenderungen, "kiTexte.rolle", kiTexte.rolle(), neu.kiTexte.rolle());
         feld(aenderungen, "kiTexte.feldregeln", kiTexte.feldregeln(), neu.kiTexte.feldregeln());
         feld(aenderungen, "kiTexte.kiFreigegeben", kiTexte.kiFreigegeben(), neu.kiTexte.kiFreigegeben());
@@ -648,11 +696,46 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         return wert == null ? 0 : codepunkte(wert);
     }
 
-    public record Einstellungen(String geschaeftsjahrEnde, Kennungen kennungen) {
-        public Einstellungen {
-            kennungen = kennungen == null ? new Kennungen(null, List.of()) : kennungen;
+    private static void zahlPruefen(List<Befund> befunde, Einstellungskatalog.Zahl einstellung, Integer wert) {
+        if (!einstellung.gueltig(wert)) {
+            befunde.add(new Befund("einstellungen." + einstellung.schluessel(), "WERT_UNGUELTIG",
+                    "Der Wert muss zwischen " + einstellung.minimum() + " und " + einstellung.maximum() + " liegen."));
+        }
+    }
+
+    public record Einstellungen(String geschaeftsjahrEnde, Kennungen kennungen, EinstellungenBranding branding,
+                                ChatEinstellungen chat, WebseitenChatEinstellungen webseitenChat,
+                                WissenEinstellungen wissen) {
+        public Einstellungen(String geschaeftsjahrEnde, Kennungen kennungen) {
+            this(geschaeftsjahrEnde, kennungen, null, null, null, null);
         }
 
+        public Einstellungen {
+            kennungen = kennungen == null ? new Kennungen(null, List.of()) : kennungen;
+            branding = branding == null ? new EinstellungenBranding(null, null) : branding;
+            chat = chat == null ? new ChatEinstellungen(null) : chat;
+            webseitenChat = webseitenChat == null ? new WebseitenChatEinstellungen(null) : webseitenChat;
+            wissen = wissen == null ? new WissenEinstellungen(null, null, null, null) : wissen;
+        }
+    }
+
+    public record EinstellungenBranding(String name, String primaerfarbe) {
+    }
+
+    public record ChatEinstellungen(Integer aufbewahrungMonate) {
+    }
+
+    public record WebseitenChatEinstellungen(Integer aufbewahrungTage) {
+    }
+
+    public record WissenEinstellungen(Integer budgetTokens, Integer lintBudgetTokens, Integer monatsbudgetTokens,
+                                     LintZeitplan lintZeitplan) {
+        public WissenEinstellungen {
+            lintZeitplan = lintZeitplan == null ? new LintZeitplan(null, null) : lintZeitplan;
+        }
+    }
+
+    public record LintZeitplan(DayOfWeek wochentag, Integer stunde) {
     }
 
     public record KiTexte(String rolle, String feldregeln, boolean kiFreigegeben) {
