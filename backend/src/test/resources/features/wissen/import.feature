@@ -16,6 +16,19 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
   Szenario: Wissenspaket gegen die aktuellen Seiten abgleichen
     Dann unterscheidet der Import neue geänderte und unveränderte Seiten ohne Seitenbereichsfehler
 
+  @req-19.7 @req-19.9 @req-19.18
+  Szenariogrundriss: Neue Wissensseiten lassen keine fremde Basisversion zu
+    Dann eine neue Seite mit Basisversion <Version> verwirft das gesamte Wissenspaket
+    Beispiele:
+      | Version |
+      | -1      |
+      | 1       |
+
+  @req-19.9
+  Szenario: Neue Wissensseite mit Basisversion 0 bleibt zulässig
+    Wenn der Inhaber eine neue Wissensseite mit Basisversion 0 importiert
+    Dann liegt ausschliesslich ein offener Importentwurf mit SHA-Protokoll vor
+
   @req-19.12 @req-19.13 @req-19.14 @req-19.15
   Szenariogrundriss: Wissenspaket mit unzulässiger oder unbelegter Quelle
     Wenn das Wissenspaket die Quellenabweichung "<Fall>" enthält

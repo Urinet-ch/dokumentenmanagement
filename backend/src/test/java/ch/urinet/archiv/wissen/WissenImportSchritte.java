@@ -432,12 +432,15 @@ public class WissenImportSchritte {
 
     @Dann("ein OKF-Export mit lokaler Herkunft ist ohne ID-Zuordnung als Wissenspaket importierbar")
     public void rundlaufLokalerExport() throws Exception {
+        importieren();
+        nurEntwurf();
+        annehmen();
         UUID dokument = dokumente.get("urinet").getFirst();
         Instant jetzt = Instant.now();
         var seite = new Wissensseite(UUID.randomUUID(), pfad, Seitentyp.KONZEPT, "Probe", "Beschreibung",
                 List.of(), Wissensseite.Status.AKTIV, null,
-                List.of(new Quelleneintrag("q1", dokument, 1, null, "Seite 1", null)),
-                Wissensseite.Vertraulichkeit.NORMAL, "Aussage.[^q1]", 1, "human:probe", jetzt,
+                List.of(new Quelleneintrag("q-1", dokument, 1, null, "Seite 1", null)),
+                Wissensseite.Vertraulichkeit.NORMAL, "Aussage.[^q-1]", 1, "human:probe", jetzt,
                 "probe", jetzt, false, false, null);
         var paket = new OkfSchreiber.Paket(new MandantCode("urinet"), "urinet-archiv", "lokal", jetzt,
                 ConfigProvider.getConfig().getValue("archiv.wissen.instanz-id", String.class), Set.of(pfad));
@@ -451,11 +454,35 @@ public class WissenImportSchritte {
         antwort = post(bytes.toByteArray());
         antwort.then().statusCode(201);
         assertThat(antwort.jsonPath().getList("befunde")).isEmpty();
+        assertThat(antwort.jsonPath().getInt("anzahl.aendern")).isEqualTo(1);
+        assertThat(antwort.jsonPath().getInt("anzahl.neu")).isZero();
         assertThat(antwort.jsonPath().getInt("anzahl.ignoriert")).isEqualTo(2);
         entwurf = UUID.fromString(antwort.jsonPath().getString("entwurfId"));
         entscheiden(entwurf, 1, 0, "annehmen", "{}").then().statusCode(204);
         assertThat(anzahl("select count(*) from m_urinet.wissensseite where pfad = ? "
-                + "and erzeugt_von = 'extern:urinet-archiv'", pfad)).isEqualTo(1);
+                + "and version = 2 and erzeugt_von = 'extern:urinet-archiv'", pfad)).isEqualTo(1);
+    }
+
+    @Dann("eine neue Seite mit Basisversion {long} verwirft das gesamte Wissenspaket")
+    public void ungueltigeNeueBasis(long version) throws Exception {
+        byte[] zip = paket("lokal", "NORMAL",
+                seite(pfad, sha, "Seite 1", null, "Aussage."),
+                seite(pfad + "-ungueltig", sha, "Seite 1", version, "Aussage."));
+        var abbruch = post(zip);
+        abbruch.then().statusCode(422).body("befunde[0].code", org.hamcrest.Matchers.equalTo("FORMAT"));
+        String hash = Pruefsumme.von(zip);
+        assertThat(anzahl("select count(*) from m_urinet.wissens_entwurf where paket_sha256 = ?", hash)).isZero();
+        assertThat(anzahl("select count(*) from m_urinet.wissens_aenderung where pfad in (?,?)",
+                pfad, pfad + "-ungueltig")).isZero();
+        assertThat(anzahl("select count(*) from m_urinet.wissensseite where pfad in (?,?)",
+                pfad, pfad + "-ungueltig")).isZero();
+        assertThat(anzahl("select count(*) from m_urinet.zugriff_protokoll "
+                + "where aktion = 'WISSEN_IMPORT' and details->>'sha256' = ?", hash)).isZero();
+    }
+
+    @Wenn("der Inhaber eine neue Wissensseite mit Basisversion 0 importiert")
+    public void neueBasisNull() throws Exception {
+        antwort = post(paket("lokal", "NORMAL", seite(pfad, sha, "Seite 1", 0L, "Aussage.")));
     }
 
     public void regelgleichheit(WissensPaketBeispiele.Beispiel beispiel) {

@@ -794,7 +794,7 @@ export class WissensbasisService extends BaseService {
      * Wissenspaket synchron als Entwurf importieren
      * A17, nur OIDC. Keine KI, keine Freigabe. Höchstens 10 MiB ZIP und 60 Sekunden.
      * @endpoint post /api/v1/wissensentwuerfe/import
-     * @param paket
+     * @param paket 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options

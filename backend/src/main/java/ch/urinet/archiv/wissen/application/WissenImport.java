@@ -97,6 +97,9 @@ public class WissenImport {
             var metadaten = seiten.get(seite.pfad());
             var basis = metadaten == null || !sichtbar.contains(metadaten.id()) ? null
                     : daten.seiteLaden(metadaten.id()).orElseThrow();
+            if (basis == null && seite.basisVersion() != null && seite.basisVersion() != 0) {
+                throw new PaketUngueltig("FORMAT", seite.pfad());
+            }
             var aufgeloest = aufloesen(benutzer, paket.kopf(), seite, basis);
             if (basis != null && unveraendert(basis, aufgeloest.fassung())
                     && aufgeloest.befunde().isEmpty()) {

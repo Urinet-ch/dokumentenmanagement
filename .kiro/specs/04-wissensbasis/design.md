@@ -564,7 +564,11 @@ Idempotenz und die Quote; der Hüllen-Lock hält Quellen und Seiten während der
 PostgreSQL 17 erhält zusätzlich ein transaktionslokales `transaction_timeout` aus der verbleibenden Zeit;
 dadurch können interne Änderungen von `statement_timeout` die gesamte Transaktionsfrist nicht verlängern.
 SQLSTATE `25P04` und `57014` werden nach dem Rollback als `PAKET_UNGUELTIG` mit Grund `ZEIT` gemeldet.
-`neu-pruefen` bewahrt bereits erreichte Kontextstufen und erhöht die Änderungs-ETags. Die A17-Leseansicht liefert
+`neu-pruefen` bewahrt bereits erreichte Kontextstufen und erhöht die Änderungs-ETags.
+Bei `NEU` wird eine vorhandene Basisversion vor der Auswertung nur als `0` angenommen; alle anderen Werte
+brechen das Paket mit `FORMAT` ohne Entwurf ab (19.9). Der REST-Rundlauf des lokalen Exports verwendet eine
+bereits vorhandene Seite mit passender Basisversion und weist die Änderung statt einer neuen Seite nach.
+Die A17-Leseansicht liefert
 die Importherkunft und je Quellenschlüssel die Zuordnung und das Ergebnis aus
 `WissensPruefung.auszugPruefen`; dieselbe Auszugsprüfung wird beim Annehmen erneut ausgeführt.
 Leere und vollständig unveränderte Pakete bleiben gemäss 19.18 `OFFEN`; es wird keine zusätzliche Abschlussaktion
