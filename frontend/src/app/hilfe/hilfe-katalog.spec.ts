@@ -72,6 +72,44 @@ describe('Hilfe-Katalog (Spec 07, Req 7.2)', () => {
     }
   });
 
+  it('führt die Abschnitte in der Reihenfolge von Req 6.1 und Unterabschnitte nur unter ihrem Abschnitt', () => {
+    // Req 6.1; die Abschnitte kommen mit 22.5 bis 22.7, darum genügt hier die Reihenfolge der vorhandenen.
+    const reihenfolge = ['erste-schritte', 'erfassen', 'eingangskorb', 'suche', 'chat', 'dokument', 'kontakte', 'wissen',
+      'importe', 'jahresexport', 'verwaltung', 'probleme'];
+    const abschnitte = HILFE_KATALOG.filter((e) => !e.eltern).map((e) => e.anker);
+    expect(abschnitte.every((a) => reihenfolge.includes(a)), abschnitte.join(', ')).toBe(true);
+    expect(abschnitte).toEqual(reihenfolge.filter((a) => abschnitte.includes(a)));
+    HILFE_KATALOG.forEach((eintrag, index) => {
+      if (!eintrag.eltern) return;
+      const vorher = HILFE_KATALOG.slice(0, index).filter((e) => !e.eltern).at(-1);
+      expect(vorher?.anker, eintrag.anker).toBe(eintrag.eltern);
+      expect(eintrag.anker.startsWith(`${eintrag.eltern}-`), eintrag.anker).toBe(true);
+    });
+  });
+
+  it('Bestand und Verwaltung nach design.md «Hilfe-Katalog» (Aufgabe 22.7)', () => {
+    const erwartet: Record<string, { eine: string[]; eltern?: string; pfade?: string[] }> = {
+      importe: { eine: ['A12'], pfade: ['/importe'] },
+      jahresexport: { eine: ['EXPORT'], pfade: ['/export'] },
+      verwaltung: { eine: ['A11', 'A13', 'A14'] },
+      'verwaltung-dokumentarten': { eine: ['A11'], eltern: 'verwaltung', pfade: ['/verwaltung/dokumentarten'] },
+      'verwaltung-protokoll': { eine: ['A13'], eltern: 'verwaltung', pfade: ['/verwaltung/protokoll'] },
+      'verwaltung-api-tokens': { eine: ['A14'], eltern: 'verwaltung', pfade: ['/verwaltung/api-tokens'] },
+    };
+    for (const [anker, soll] of Object.entries(erwartet)) {
+      const eintrag = HILFE_KATALOG.find((e) => e.anker === anker);
+      expect(eintrag?.bedingung, anker).toEqual({ eine: soll.eine });
+      expect(eintrag?.eltern, anker).toBe(soll.eltern);
+      expect(eintrag?.pfade, anker).toEqual(soll.pfade);
+      expect(eintrag?.abgemeldet, anker).toBeUndefined();
+    }
+    // Nur der Inhaber hat heute A11 bis A14 und A12; der Jahresexport gehört Inhaber und Treuhänder (rechte.ts).
+    const verwaltung = HILFE_KATALOG.find((e) => e.anker === 'verwaltung');
+    expect(ROLLEN.filter((rolle) => bedingungErfuellt(verwaltung?.bedingung, rolle))).toEqual(['inhaber']);
+    const jahresexport = HILFE_KATALOG.find((e) => e.anker === 'jahresexport');
+    expect(ROLLEN.filter((rolle) => bedingungErfuellt(jahresexport?.bedingung, rolle))).toEqual(['inhaber', 'treuhaender']);
+  });
+
   it('enthält die allgemeinen Abschnitte «erste-schritte» und «probleme», auch abgemeldet', () => {
     for (const anker of ['erste-schritte', 'probleme']) {
       const eintrag = HILFE_KATALOG.find((e) => e.anker === anker);
