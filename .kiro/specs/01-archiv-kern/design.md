@@ -1838,11 +1838,13 @@ decken Kriterien von `[Frontend]`-Aufgaben ab, für Kriterien abgehakter `[Backe
 (Review PR #44).
 
 Entwicklungsumgebung (Aufgabe 1.2): In `dev` und in Tests starten PostgreSQL 17 mit pgvector
-(`pgvector/pgvector:0.8.7-pg17-trixie`) und Keycloak (`quay.io/keycloak/keycloak:26.8.2`, Realm aus
+(`pgvector/pgvector:0.8.7-pg17-trixie`) und Keycloak (`quay.io/keycloak/keycloak:26.8.2-3`, Realm aus
 `deploy/keycloak/realm-test.json`) als Dev Services der Extensions, MinIO und Mailpit als Compose Dev Services aus
 `backend/compose-devservices.yml` (statt Testcontainers, weil Compose dev und Tests mit einer Datei abdeckt; entschieden
-von Fabian am 09.11.2026). MinIO veröffentlicht keine Images mehr auf Docker Hub (Upstream seit 24.04.2026 archiviert); verwendet wird
-`cgr.dev/chainguard/minio` (aus dem Fork `chainguard-forks/minio`) mit festem Digest, Ausweiche `docker.io/pgsty/silo`.
+von Fabian am 09.11.2026). Das Keycloak-Deploy-Image übernimmt diese Distribution, baut und startet sie aber wie das
+API-Image mit Temurin 25.0.5.1+2 (JDK und JRE, behoben für CVE-2026-114938). MinIO veröffentlicht keine Images mehr
+auf Docker Hub (Upstream seit 24.04.2026 archiviert); verwendet wird `cgr.dev/chainguard/minio` (aus dem Fork
+`chainguard-forks/minio`) mit festem Digest, Ausweiche `docker.io/pgsty/silo`.
 MinIO verdeckt Eigenheiten von Ceph RGW (Fehlercodes, Deny-Policy gilt nicht für den Root-Zugang, Versions-ID bei
 `CopyObject`); die prüft gegen Infomaniak nur `InfomaniakAblageSmokeIT` von Hand. Zusätzlich laufen `S3AblageTest`, die
 Ablage-Szenarien und `InfomaniakAblageSmokeIT` nicht blockierend gegen einen Einzelcontainer mit Ceph RGW (Workflow
