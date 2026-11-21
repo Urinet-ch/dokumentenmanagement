@@ -1,0 +1,120 @@
+import { Then, When } from '@cucumber/cucumber';
+import assert from 'node:assert/strict';
+
+const dialog = (seite) => seite.getByRole('dialog', { name: 'Hilfe', exact: true });
+
+When('ich die Hilfe-Leiste öffne', async function () {
+  await this.seite.getByRole('button', { name: 'Hilfe', exact: true }).click();
+  await dialog(this.seite).waitFor();
+});
+
+When(/^ich die Hilfe-Leiste über «(.+)» schliesse$/, async function (name) {
+  await dialog(this.seite).getByRole('button', { name, exact: true }).click();
+  await dialog(this.seite).waitFor({ state: 'detached' });
+});
+
+When('ich in der Hilfe-Leiste weitertabbe', async function () {
+  for (let i = 0; i < 20; i++) {
+    await this.seite.keyboard.press('Tab');
+    assert.equal(
+      await dialog(this.seite).evaluate((element) => element.contains(document.activeElement)),
+      true,
+      'Fokus hat die Hilfe-Leiste verlassen',
+    );
+  }
+});
+
+When('ich die Hilfe-Leiste mit Escape schliesse', async function () {
+  await this.seite.keyboard.press('Escape');
+  await dialog(this.seite).waitFor({ state: 'detached' });
+});
+
+When(/^ich in der Hilfe-Leiste den Abschnitt «(.+)» wähle$/, async function (titel) {
+  await dialog(this.seite).getByRole('navigation', { name: 'Inhalt der Anleitung' }).getByRole('link', { name: titel, exact: true }).click();
+});
+
+When(/^ich den Link «(.+)» in der Hilfe-Leiste wähle$/, async function (text) {
+  await dialog(this.seite).getByRole('link', { name: text, exact: true }).click();
+});
+
+Then(/^ist der Knopf «(.+)» mit seinem zugänglichen Namen sichtbar$/, async function (name) {
+  const knopf = this.seite.getByRole('button', { name, exact: true });
+  await knopf.waitFor();
+  assert.equal(await knopf.getAttribute('aria-label'), name);
+});
+
+Then(/^zeigt der Knopf das Symbol «(.+)»$/, async function (symbol) {
+  await this.seite.getByRole('button', { name: 'Hilfe', exact: true }).locator(`app-symbol[name="${symbol}"]`).waitFor();
+});
+
+Then(/^ist der Hilfetext (sichtbar|verborgen)$/, async function (status) {
+  const text = this.seite.getByRole('button', { name: 'Hilfe', exact: true }).locator('span');
+  const visuellSichtbar = await text.evaluate((element) => {
+    const stil = getComputedStyle(element);
+    return stil.position !== 'absolute' || stil.width !== '1px' || stil.height !== '1px';
+  });
+  assert.equal(visuellSichtbar, status === 'sichtbar');
+});
+
+Then(/^zeigt die Hilfe-Leiste den Abschnitt «(.+)»$/, async function (titel) {
+  await dialog(this.seite).getByRole('heading', { name: titel, level: 3, exact: true }).waitFor();
+});
+
+Then(/^zeigt die Hilfe-Leiste ihr Inhaltsverzeichnis «(.+)»$/, async function (name) {
+  await dialog(this.seite).getByRole('navigation', { name, exact: true }).waitFor();
+});
+
+Then('zeigt die Hilfe-Leiste keinen ausgewählten Abschnitt', async function () {
+  assert.equal(await dialog(this.seite).locator('.hilfe-abschnitt').count(), 0);
+});
+
+Then(/^hat der Hilfe-Dialog den Namen «(.+)»$/, async function (name) {
+  await this.seite.getByRole('dialog', { name, exact: true }).waitFor();
+});
+
+Then('liegt der Fokus auf der Überschrift der Hilfe-Leiste', async function () {
+  await this.seite.waitForFunction(
+    () => document.activeElement?.id === 'hilfe-leiste-titel',
+  );
+});
+
+Then('bleibt der Fokus in der Hilfe-Leiste', async function () {
+  assert.equal(await dialog(this.seite).evaluate((element) => element.contains(document.activeElement)), true);
+});
+
+Then(/^ist der Knopf «(.+)» wieder fokussiert$/, async function (name) {
+  await this.seite.waitForFunction(
+    (text) => document.activeElement?.matches('button[aria-label]') &&
+      document.activeElement.getAttribute('aria-label') === text,
+    name,
+  );
+});
+
+Then('ist die Hilfe-Leiste geschlossen', async function () {
+  await dialog(this.seite).waitFor({ state: 'detached' });
+});
+
+const leistenBreite = (seite) => dialog(seite).evaluate((element) => element.closest('mat-sidenav').getBoundingClientRect().width);
+
+Then(/^ist die Hilfe-Leiste (\d+) Pixel breit$/, async function (breite) {
+  await this.seite.waitForFunction(
+    (soll) => Math.round(document.querySelector('#hilfe-leiste').getBoundingClientRect().width) === soll,
+    Number(breite),
+  );
+  assert.equal(Math.round(await leistenBreite(this.seite)), Number(breite));
+});
+
+Then(/^ist die Hilfe-Leiste höchstens (\d+) Pixel breit$/, async function (breite) {
+  await this.seite.waitForFunction(
+    (soll) => {
+      const b = document.querySelector('#hilfe-leiste').getBoundingClientRect().width;
+      return b > 0 && b <= soll;
+    },
+    Number(breite),
+  );
+});
+
+Then(/^enthält das Inhaltsverzeichnis der Hilfe-Leiste den Abschnitt «(.+)» nicht$/, async function (titel) {
+  const verzeichnis = dialog(this.seite).getByRole('navigation', { name: 'Inhalt der Anleitung' });
+  assert.equal(await verzeichnis.getByRole('link', { name: titel, exact: true }).count(), 0);
+});

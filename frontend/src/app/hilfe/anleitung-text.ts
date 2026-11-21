@@ -30,6 +30,8 @@ export class AnleitungText {
   readonly eintrag = input.required<HilfeEintrag>();
   /** Stufen, um die Überschriften der Datei tiefer stehen (z. B. 1: «##» wird h3 unter dem h2 des Abschnitts). */
   readonly versatz = input(0);
+  /** Auf `/hilfe` kann derselbe Text zugleich in der Leiste stehen; dort bleiben Überschriften-IDs weg. */
+  readonly ids = input(true);
   /** In der Hilfe-Leiste: Links auf Abschnitte navigieren nicht, sondern melden nur «abschnitt» (Req 4.4). */
   readonly leiste = input(false);
   /** Ein Link auf einen Abschnitt (`#anker`) wurde gewählt. */

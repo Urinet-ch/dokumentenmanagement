@@ -45,7 +45,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 6.2, 6.3, 6.5, 7.6_
   - _Abhängig von: 22.1_
 
-- [ ] 22.3 Knopf «Hilfe» und Hilfe-Leiste [Frontend]
+- [x] 22.3 Knopf «Hilfe» und Hilfe-Leiste [Frontend]
   - Symbol `hilfe` am Ende von `SYMBOLE`; Knopf in der Kopfzeile von `app.html` für jeden Besucher; zweiter `mat-sidenav`
     (`position="end"`, `mode="over"`) mit `@defer`, Dienst `HilfeLeiste`, Kontext über den Katalog und `aktiverPfad`,
     Inhaltsverzeichnis ohne Kontext, Links in der Leiste (Abschnitt wechselt den Inhalt, App-Pfad navigiert und schliesst),
