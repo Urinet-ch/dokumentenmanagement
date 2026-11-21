@@ -130,6 +130,12 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
     }
 
     @Override
+    public synchronized long benutzerZaehlen(String mandant) {
+        Objects.requireNonNull(mandant);
+        return benutzer.values().stream().filter(e -> e.mandant.equals(mandant)).count();
+    }
+
+    @Override
     public synchronized long inhaberZaehlen(String mandant) {
         return benutzer.values().stream().filter(e -> e.mandant.equals(mandant))
                 .map(e -> e.wert)

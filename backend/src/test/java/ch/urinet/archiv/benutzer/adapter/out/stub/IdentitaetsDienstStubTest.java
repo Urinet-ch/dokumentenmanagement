@@ -41,6 +41,22 @@ class IdentitaetsDienstStubTest {
     }
 
     @Test
+    void benutzerzahlEnthaeltNurNichtGeloeschteBenutzerDesMandanten() {
+        var dienst = new IdentitaetsDienstStub();
+        String aktiv = dienst.anlegen("a", new Neuanlage("eins", "eins@example.test", "Test", "Person"),
+                Rolle.MITARBEITER);
+        String deaktiviert = dienst.anlegen("a", new Neuanlage("zwei", "zwei@example.test", "Test", "Person"),
+                Rolle.MITARBEITER);
+        dienst.anlegen("b", new Neuanlage("drei", "drei@example.test", "Test", "Person"), Rolle.MITARBEITER);
+        dienst.aktivieren("a", deaktiviert, false);
+
+        assertThat(dienst.benutzerZaehlen("a")).isEqualTo(2);
+        assertThat(dienst.benutzerZaehlen("b")).isEqualTo(1);
+        dienst.loeschen("a", aktiv);
+        assertThat(dienst.benutzerZaehlen("a")).isEqualTo(1);
+    }
+
+    @Test
     void benutzerSeitenSindAuf50Begrenzt() {
         var dienst = new IdentitaetsDienstStub();
         for (int i = 0; i < 51; i++) {

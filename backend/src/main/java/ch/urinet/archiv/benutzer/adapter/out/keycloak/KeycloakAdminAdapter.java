@@ -39,6 +39,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
 
 /**
@@ -323,7 +324,35 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     }
 
     @Override
+    public long benutzerZaehlen(String mandant) {
+        return zaehlen(mandant, (id, eintrag) -> {
+            JsonNode user = eintrag.path("attributes").has("mandant") ? eintrag : benutzerDirekt(id);
+            JsonNode werte = user.path("attributes").path("mandant");
+            if (!werte.isMissingNode() && (!werte.isArray() || werte.size() != 1 || !werte.get(0).isTextual())) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            return mandantPasst(user, mandant);
+        });
+    }
+
+    @Override
     public long inhaberZaehlen(String mandant) {
+        return zaehlen(mandant, (id, eintrag) -> {
+            JsonNode user = eintrag.has("attributes") && eintrag.has("enabled")
+                    && eintrag.has("requiredActions") ? eintrag : benutzerDirekt(id);
+            if (!mandantPasst(user, mandant)) {
+                return false;
+            }
+            if (!user.path("enabled").isBoolean()) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            return user.path("enabled").asBoolean() && rollen(id).contains(Rolle.INHABER)
+                    && erforderlicheAktionen(user).isEmpty();
+        });
+    }
+
+    private long zaehlen(String mandant, BiPredicate<String, JsonNode> zaehlt) {
+        Objects.requireNonNull(mandant);
         long anzahl = 0;
         long offset = 0;
         while (true) {
@@ -339,17 +368,8 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 } catch (IllegalArgumentException e) {
                     throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
                 }
-                JsonNode user = eintrag.has("attributes") && eintrag.has("enabled")
-                        && eintrag.has("requiredActions") ? eintrag
-                        : benutzerDirekt(id);
-                if (mandantPasst(user, mandant)) {
-                    if (!user.path("enabled").isBoolean()) {
-                        throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
-                    }
-                    if (user.path("enabled").asBoolean() && rollen(id).contains(Rolle.INHABER)
-                            && erforderlicheAktionen(user).isEmpty()) {
-                        anzahl++;
-                    }
+                if (zaehlt.test(id, eintrag)) {
+                    anzahl++;
                 }
             }
             if (treffer.size() < MAX_SEITENGROESSE) {

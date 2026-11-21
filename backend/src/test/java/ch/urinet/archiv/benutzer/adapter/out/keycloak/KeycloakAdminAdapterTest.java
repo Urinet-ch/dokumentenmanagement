@@ -440,6 +440,45 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void benutzerZaehlenPrueftMandantenAufAllenSeitenUndZaehltDeaktivierte() {
+        tokenAntwort();
+        String ersteSeite = java.util.stream.IntStream.range(0, 50)
+                .mapToObj(i -> "{\"id\":\"u" + i + "\",\"attributes\":{\"mandant\":[\""
+                        + (i == 49 ? "vhf-gsk" : "urinet") + "\"]}}")
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        server.stubFor(get(urlPathEqualTo(USERS))
+                .withQueryParam("q", equalTo("mandant:urinet")).withQueryParam("first", equalTo("0"))
+                .withQueryParam("max", equalTo("50")).willReturn(okJson(ersteSeite)));
+        server.stubFor(get(urlPathEqualTo(USERS))
+                .withQueryParam("q", equalTo("mandant:urinet")).withQueryParam("first", equalTo("50"))
+                .withQueryParam("max", equalTo("50")).willReturn(okJson("""
+                        [{"id":"deaktiviert","enabled":false,"attributes":{"mandant":["urinet"]}},
+                         {"id":"ohne-attribute"},{"id":"ohne-mandant","attributes":{}}]
+                        """)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/ohne-attribute"))
+                .willReturn(okJson("{\"id\":\"ohne-attribute\",\"attributes\":{\"mandant\":[\"vhf-gsk\"]}}")));
+        server.stubFor(get(urlPathEqualTo(USERS + "/ohne-mandant"))
+                .willReturn(okJson("{\"id\":\"ohne-mandant\",\"attributes\":{\"mandant\":[\"urinet\"]}}")));
+
+        assertThat(adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).benutzerZaehlen("urinet")).isEqualTo(51);
+        server.verify(1, getRequestedFor(urlPathEqualTo(USERS + "/ohne-attribute")));
+        server.verify(1, getRequestedFor(urlPathEqualTo(USERS + "/ohne-mandant")));
+        server.verify(0, getRequestedFor(urlPathEqualTo(USERS + "/deaktiviert/credentials")));
+    }
+
+    @Test
+    void benutzerZaehlenBrichtBeiMehrdeutigemMandantenattributAb() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS)).willReturn(okJson("""
+                [{"id":"mehrdeutig","attributes":{"mandant":["urinet","vhf-gsk"]}}]
+                """)));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).benutzerZaehlen("urinet"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+    }
+
+    @Test
     void inhaberZaehlenBrichtBeiUnvollstaendigenOderUnbekanntenAktionenAb() {
         tokenAntwort();
         server.stubFor(get(urlPathEqualTo(USERS))

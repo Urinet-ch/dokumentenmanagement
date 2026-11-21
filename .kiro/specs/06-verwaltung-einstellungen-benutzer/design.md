@@ -169,6 +169,8 @@ backend/src/main/java/ch/urinet/archiv/
   `VerwaltungVorgang` übernimmt die gültige Zielkennung in den Fehlerabschluss; eine nicht bestätigte Entfernung oder
   ungültige Kennung bleibt `UNKLAR`, auch wenn der Aufrufer die Kompensation als geklärt meldet. Eine bestätigte
   Entfernung allein beweist noch nicht, dass keine verspätete externe Wirkung eintrifft.
+  `benutzerZaehlen` zählt alle nicht gelöschten Benutzer des Mandanten, auch deaktivierte, und prüft das
+  Mandantenattribut nach jeder Keycloak-Antwort; bei fehlenden Attributen liest es die Einzelangabe nach.
   `rolleSetzen` holt die Zielrolle zuerst,
   fügt sie hinzu und entfernt erst danach die übrigen Archiv-Rollen. `verbindungPruefen` erzwingt einen echten Tokenabruf.
   Pfadwerte `.` und `..` (und `%2e`) werden abgelehnt. Offen (Kann): `aktualisieren`/`aktivieren` lesen und schreiben die

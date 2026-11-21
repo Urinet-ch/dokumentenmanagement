@@ -130,6 +130,9 @@ public interface IdentitaetsDienst {
 
     void loeschen(String mandant, String id);
 
+    /** Alle nicht gelöschten Benutzer des Mandanten, auch deaktivierte und eingeladene. */
+    long benutzerZaehlen(String mandant);
+
     long inhaberZaehlen(String mandant);
 
     /** Prüft die Verbindung des Dienstkontos; Fehler werden nicht als Erfolg dargestellt. */
