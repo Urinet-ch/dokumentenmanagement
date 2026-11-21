@@ -1483,6 +1483,9 @@ export const TEXTE = {
     quellen: 'Quellen',
     datenstand: (zeitpunkt: string, anzahl: string) =>
       `Datenstand: ${zeitpunkt}, ${anzahl} ${anzahl === '1' ? 'Beleg' : 'Belege'}`,
+    wissensquelle: (titel: string) => `Wissensseite: ${titel}`,
+    dokumentquelle: (titel: string) => `Dokument: ${titel}`,
+    dokumentMitSeiten: (titel: string, seiten: string) => `${titel}, Seite ${seiten}`,
     /** Hinweis während eines Werkzeugaufrufs (Req 6.2), fest je Werkzeug. */
     werkzeuge: {
       dokumente_suchen: 'suche Dokumente …',

@@ -74,6 +74,16 @@ function quelle(wert: unknown): Quelle | null {
   if (!objekt(wert)) {
     return null;
   }
+  const wissen = wert['wissen'];
+  if (objekt(wissen) && typeof wissen['titel'] === 'string' && typeof wissen['link'] === 'string'
+      && Array.isArray(wert['dokumente'])) {
+    const dokumente = wert['dokumente'].flatMap((d) =>
+      objekt(d) && typeof d['titel'] === 'string' && typeof d['link'] === 'string'
+        ? [{ titel: d['titel'], link: d['link'],
+             ...(typeof d['seiten'] === 'string' ? { seiten: d['seiten'] } : {}) }] : [],
+    );
+    return { wissen: { titel: wissen['titel'], link: wissen['link'] }, dokumente };
+  }
   if (typeof wert['titel'] === 'string' && typeof wert['link'] === 'string') {
     return { titel: wert['titel'], link: wert['link'] };
   }
@@ -82,7 +92,6 @@ function quelle(wert: unknown): Quelle | null {
   if (typeof stand === 'string' && typeof wert['belege'] === 'number') {
     return { datenstand: { zeitpunkt: stand, anzahl: wert['belege'] } };
   }
-  // andere Formen (z. B. Wissensseiten aus Spec 04) zeigt diese Fassung noch nicht
   return null;
 }
 

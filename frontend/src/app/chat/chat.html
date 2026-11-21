@@ -95,7 +95,8 @@
                   <li>
                     @if (chip.link) {
                       <a class="chip link" [routerLink]="chip.link" data-test="quelle"
-                        ><app-symbol name="dokument" /><span>{{ chip.text }}</span></a
+                        [attr.aria-label]="chip.art === 'wissen' ? texte.wissensquelle(chip.text) : texte.dokumentquelle(chip.text)"
+                        ><app-symbol [name]="chip.art === 'wissen' ? 'wissen' : 'dokument'" /><span>{{ chip.text }}</span></a
                       >
                     } @else {
                       <span class="chip" data-test="quelle">{{ chip.text }}</span>

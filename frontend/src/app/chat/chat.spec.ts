@@ -201,10 +201,29 @@ describe('Chat (Req 6.1–6.3)', () => {
         { datenstand: { zeitpunkt: '2026-11-14T08:00:00Z', anzahl: 1234 } },
       ],
     });
+
     const quellen = [...element.querySelectorAll('[data-test=quelle]')];
     expect(quellen.map((q) => q.tagName)).toEqual(['A', 'SPAN', 'SPAN', 'SPAN', 'SPAN']);
     expect(quellen[0].getAttribute('href')).toBe('/dokument/d1');
     expect(quellen[4].textContent).toBe("Datenstand: 14.11.2026 09:00, 1'234 Belege");
+  });
+
+  it('unterscheidet Wissensseiten und ihre Dokumente und verlinkt nur gültige Seitenpfade', async () => {
+    await senden('Wissen?');
+    await ereignis({
+      typ: 'quellen',
+      quellen: [
+        { wissen: { titel: 'Konzept', link: '/wissen/konzepte/test' },
+          dokumente: [{ titel: 'Beleg', link: '/dokument/d1', seiten: '1–2' }] },
+        { wissen: { titel: 'Fremd', link: '/wissen/../verwaltung' }, dokumente: [] },
+      ],
+    });
+    const quellen = [...element.querySelectorAll('[data-test=quelle]')];
+    expect(quellen.map((q) => q.tagName)).toEqual(['A', 'A', 'SPAN']);
+    expect(quellen[0].getAttribute('href')).toBe('/wissen/konzepte/test');
+    expect(quellen[0].getAttribute('aria-label')).toBe('Wissensseite: Konzept');
+    expect(quellen[1].getAttribute('href')).toBe('/dokument/d1');
+    expect(quellen[1].getAttribute('aria-label')).toBe('Dokument: Beleg, Seite 1–2');
   });
 
   it('zeigt die Meldung aus fehler und übernimmt die gespraechId', async () => {

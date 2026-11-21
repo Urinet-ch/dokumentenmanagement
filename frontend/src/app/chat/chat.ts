@@ -31,6 +31,7 @@ import {
   istDatenstand,
   tag,
   werkzeugHinweis,
+  wissenLink,
 } from './chat-logik';
 
 /** Eine Nachricht im Verlauf; `fehler` ist die Meldung zu einer Antwort, die nicht fertig wurde. */
@@ -46,6 +47,7 @@ export interface Nachricht {
 interface Chip {
   text: string;
   link: string | null;
+  art: 'dokument' | 'wissen' | 'datenstand';
 }
 
 /**
@@ -117,11 +119,20 @@ export class Chat {
   }
 
   protected chips(quellen: readonly Quelle[]): Chip[] {
-    return quellen.map((q) =>
-      istDatenstand(q)
-        ? { text: datenstandText(q), link: null }
-        : { text: q.titel, link: dokumentLink(q.link) },
-    );
+    return quellen.flatMap((q): Chip[] => {
+      if (istDatenstand(q)) return [{ text: datenstandText(q), link: null, art: 'datenstand' }];
+      if ('wissen' in q) {
+        return [
+          { text: q.wissen.titel, link: wissenLink(q.wissen.link), art: 'wissen' },
+          ...q.dokumente.map((d): Chip => ({
+            text: d.seiten ? this.texte.dokumentMitSeiten(d.titel, d.seiten) : d.titel,
+            link: dokumentLink(d.link),
+            art: 'dokument',
+          })),
+        ];
+      }
+      return [{ text: q.titel, link: dokumentLink(q.link), art: 'dokument' }];
+    });
   }
 
   protected listeUmschalten(): void {

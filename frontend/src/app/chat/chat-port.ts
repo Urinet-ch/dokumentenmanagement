@@ -7,6 +7,7 @@ import { Observable } from 'rxjs';
 export interface DokumentQuelle {
   titel: string;
   link: string;
+  seiten?: string;
 }
 
 /** Quelle «Datenstand: <Zeitpunkt>, <n> Belege» der zählenden Werkzeuge (Req 4.1). */
@@ -14,7 +15,12 @@ export interface DatenstandQuelle {
   datenstand: { zeitpunkt: string; anzahl: number };
 }
 
-export type Quelle = DokumentQuelle | DatenstandQuelle;
+export interface WissenQuelle {
+  wissen: { titel: string; link: string };
+  dokumente: DokumentQuelle[];
+}
+
+export type Quelle = DokumentQuelle | DatenstandQuelle | WissenQuelle;
 
 /** Ereignisse des Stroms (`event:`-Name und JSON aus `data:`); unbekannte Ereignisse lässt der Leser weg. */
 export type ChatEreignis =
