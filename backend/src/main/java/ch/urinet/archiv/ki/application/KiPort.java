@@ -1,6 +1,8 @@
 package ch.urinet.archiv.ki.application;
 
 import ch.urinet.archiv.ki.domain.Rohvorschlag;
+import ch.urinet.archiv.ki.domain.ArtEintrag;
+import ch.urinet.archiv.ki.domain.KiKlassifikation;
 
 import java.util.List;
 import java.util.Objects;
@@ -25,6 +27,21 @@ public interface KiPort {
     /** Codes der Dokumentarten im Antwortschema, in seiner Reihenfolge. */
     List<String> artCodes();
 
+    /** Mandantenspezifisches Antwortschema; Implementierungen dürfen es aus {@code arten} und Klassifikationen bauen. */
+    default String antwortschema(Anfrage anfrage) {
+        return antwortschema();
+    }
+
+    /** Stabile Darstellung des Antwortschemas für die Prompt-Kennung. */
+    default String antwortschemaFuerKennung(Anfrage anfrage) {
+        return antwortschema(anfrage);
+    }
+
+    /** Mandantenspezifische Art-Codes in der Reihenfolge des Antwortschemas. */
+    default List<String> artCodes(Anfrage anfrage) {
+        return anfrage.arten().stream().map(ArtEintrag::code).toList();
+    }
+
     /**
      * @param systemPrompt fertig gerenderter System-Prompt ({@code ErfassungPrompt.system})
      * @param qr           Zeile zum Swiss QR Code ({@code ErfassungPrompt.qr})
@@ -35,7 +52,7 @@ public interface KiPort {
      *                     bleibt die Nachricht die des Gate-Laufs
      */
     record Anfrage(String systemPrompt, String qr, String text, Optional<byte[]> bildJpeg, Optional<String> fehler,
-                   String beispiele) {
+                   String beispiele, List<ArtEintrag> arten, List<KiKlassifikation> klassifikationen) {
         public Anfrage {
             Objects.requireNonNull(systemPrompt, "systemPrompt");
             Objects.requireNonNull(qr, "qr");
@@ -43,15 +60,23 @@ public interface KiPort {
             Objects.requireNonNull(bildJpeg, "bildJpeg");
             Objects.requireNonNull(fehler, "fehler");
             Objects.requireNonNull(beispiele, "beispiele");
+            arten = List.copyOf(arten);
+            klassifikationen = List.copyOf(klassifikationen);
+        }
+
+        public Anfrage(String systemPrompt, String qr, String text, Optional<byte[]> bildJpeg,
+                       Optional<String> fehler, String beispiele) {
+            this(systemPrompt, qr, text, bildJpeg, fehler, beispiele, List.of(), List.of());
         }
 
         public Anfrage(String systemPrompt, String qr, String text, Optional<byte[]> bildJpeg,
                        Optional<String> fehler) {
-            this(systemPrompt, qr, text, bildJpeg, fehler, "");
+            this(systemPrompt, qr, text, bildJpeg, fehler, "", List.of(), List.of());
         }
 
         public Anfrage nachfrage(String grund) {
-            return new Anfrage(systemPrompt, qr, text, bildJpeg, Optional.of(grund), beispiele);
+            return new Anfrage(systemPrompt, qr, text, bildJpeg, Optional.of(grund), beispiele, arten,
+                    klassifikationen);
         }
     }
 
@@ -90,7 +115,8 @@ public interface KiPort {
         KERNAUSSAGEN,
         PLANUNG,
         SEITE,
-        QUELLE
+        QUELLE,
+        LINT_PAAR
     }
 
     record WissensAnfrage(WissensSchritt schritt, String modell, String systemPrompt, String nachricht,
@@ -123,7 +149,7 @@ public interface KiPort {
     record WissensOhneZugang(Verbrauch verbrauch) implements WissensAntwort {
     }
 
-    sealed interface WissensInhalt permits Kernaussagen, Planung, Seite, Quelle {
+    sealed interface WissensInhalt permits Kernaussagen, Planung, Seite, Quelle, LintPaar {
     }
 
     record Kernaussagen(List<Aussage> aussagen) implements WissensInhalt {
@@ -169,5 +195,24 @@ public interface KiPort {
     }
 
     record Zusammenfassung(String text, List<Integer> aussagen) {
+    }
+
+    record LintPaar(List<LintWiderspruch> widersprueche, List<LintVeraltet> veraltet, List<LintLink> links)
+            implements WissensInhalt {
+        public LintPaar {
+            widersprueche = widersprueche == null ? List.of() : List.copyOf(widersprueche);
+            veraltet = veraltet == null ? List.of() : List.copyOf(veraltet);
+            links = links == null ? List.of() : List.copyOf(links);
+        }
+    }
+
+    record LintWiderspruch(String seite, String schluessel, String gegenseite, String gegenschluessel,
+                           String text) {
+    }
+
+    record LintVeraltet(String seite, String schluessel, String neuereQuelle, String text) {
+    }
+
+    record LintLink(String seite, String ziel, String text) {
     }
 }

@@ -157,7 +157,7 @@ export class ChatService extends BaseService {
 
     /**
      * Frage an den Chat
-     * Antwort als Server-Sent Events mit benannten Ereignissen, JSON in data: «werkzeug» {name} je Werkzeugaufruf, «text» {delta}, genau ein «quellen» [{id, titel, link} | {werkzeug, datenstand, belege}] vor «fertig» {gespraechId, tokens: {ein, aus}}; «fehler» {meldung, gespraechId} beendet den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 NICHT_GEFUNDEN (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After und dem Feld grund der Problem Details (STUNDENLIMIT: mehr als 100 Fragen in 60 Minuten; LAEUFT: schon eine laufende Frage, Retry-After höchstens 5 s). Nur beschreibend: der generierte Client liest den Stream nicht.
+     * Antwort als Server-Sent Events mit benannten Ereignissen, JSON in data: «werkzeug» {name} je Werkzeugaufruf, «text» {delta}, genau ein «quellen» [{id, titel, link} | {werkzeug, datenstand, belege} | {wissen: {titel, link, stand}, dokumente: [{titel, link, seiten}]}] vor «fertig» {gespraechId, nachrichtId, tokens: {ein, aus}}; «fehler» {meldung, gespraechId} beendet den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 NICHT_GEFUNDEN (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After und dem Feld grund der Problem Details (STUNDENLIMIT: mehr als 100 Fragen in 60 Minuten; LAEUFT: schon eine laufende Frage, Retry-After höchstens 5 s). Nur beschreibend: der generierte Client liest den Stream nicht.
      * @endpoint post /api/v1/chat
      * @param chatFrage 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.

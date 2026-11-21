@@ -117,6 +117,25 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
   - **Gate Phase 2:** alle 7 Beispielfragen und ≥ 18 von 20 richtig mit Quelle
   - _Anforderungen: 3.8, 13.1, 13.2_
 
+
+## Welle 10 — Bewertung von Chat-Antworten (Entscheid Fabian 21.11.2026, Requirement 15)
+- [ ] 10.1 Bewertung speichern und Rechtematrix A20 [Backend]
+  - Changeset `chat_bewertung`, REST `PUT/DELETE/GET /chat/nachrichten/{id}/bewertung`, Grenze, Textbereinigung, Mandantentrennung, Recht A20 in der Rechtematrix; Szenarien `@req-15.2` bis `@req-15.4`.
+  - _Anforderungen: 15.2, 15.3, 15.4, 15.5 (Recht)_
+  - _Abhängig von: 7.3_
+- [ ] 10.2 Oberfläche Sterne und Hinweis [Frontend]
+  - Sterne, Grundauswahl, Freitext, Datenschutzhinweis; Anleitung `chat.md` und Hilfe-Katalog nachziehen; Browser-Szenario, axe, `npm run pruefe:gestaltung`.
+  - _Anforderungen: 15.1, 15.9_
+  - _Abhängig von: 10.1, 7.4_
+- [ ] 10.3 Auswertung, Export und Schwärzung [Backend] [Frontend]
+  - `GET /chat/auswertung`, `POST /chat/auswertung/export` (ZIP, `schema.json`, README), Domain-Dienst `Schwaerzung`, Seite «Chat-Auswertung», Step-up, Protokoll `CHAT_BEWERTUNG_EXPORT`; Marker `[offen: …]` im Design auflösen.
+  - _Anforderungen: 15.5, 15.6, 15.7, 15.8, 15.10_
+  - _Abhängig von: 10.1, Spec 06: 19.10 (Step-up)_
+- [ ] 10.4 Isolations- und Abnahmetests [QA]
+  - Fremdes Gespräch (404), Rechte (A20, Geschäftsstelle, API-Token), Schwärzung mit allen Mustern, 5'000 Zeilen, Löschung nach 12 Monaten, Schematest; ergänzt Welle 9.
+  - _Anforderungen: 15.11_
+  - _Abhängig von: 10.3_
+
 ## Optionen
 Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit den Aufgaben 10.x von Spec 03 kollidieren. Spec 04 belegt die Nummern O.4–O.6.
 

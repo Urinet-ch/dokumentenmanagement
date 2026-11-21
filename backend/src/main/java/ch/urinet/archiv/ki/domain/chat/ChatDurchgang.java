@@ -15,6 +15,7 @@ public final class ChatDurchgang {
 
     private final StringBuilder text = new StringBuilder();
     private final List<ChatEreignis.WerkzeugErgebnis> ergebnisse = new ArrayList<>();
+    private final List<String> ausstehendeWerkzeuge = new ArrayList<>();
     private ChatEreignis.Ende ende;
     private ChatEreignis.Ausfall ausfall;
 
@@ -24,12 +25,18 @@ public final class ChatDurchgang {
             return;
         }
         switch (ereignis) {
-            case ChatEreignis.WerkzeugStart start -> weiter.accept(start);
+            case ChatEreignis.WerkzeugStart start -> {
+                ausstehendeWerkzeuge.add(start.name());
+                weiter.accept(start);
+            }
             case ChatEreignis.Text teil -> {
                 text.append(teil.delta());
                 weiter.accept(teil);
             }
-            case ChatEreignis.WerkzeugErgebnis ergebnis -> ergebnisse.add(ergebnis);
+            case ChatEreignis.WerkzeugErgebnis ergebnis -> {
+                ergebnisse.add(ergebnis);
+                ausstehendeWerkzeuge.remove(ergebnis.name());
+            }
             case ChatEreignis.Ende e -> ende = e;
             case ChatEreignis.Ausfall a -> ausfall = a;
         }
@@ -63,6 +70,6 @@ public final class ChatDurchgang {
         ChatStatus status = ende != null && ausfall == null ? ChatStatus.OK
                 : abgebrochen ? ChatStatus.ABGEBROCHEN : ChatStatus.FEHLER;
         return new ChatAntwort(text.toString(), ergebnisse.stream().map(WerkzeugAufruf::aus).toList(),
-                Quellen.aus(ergebnisse), Optional.ofNullable(ende), status);
+                Quellen.aus(ergebnisse), Optional.ofNullable(ende), status, ausstehendeWerkzeuge.isEmpty());
     }
 }

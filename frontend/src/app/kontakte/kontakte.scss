@@ -1,24 +1,79 @@
+// Liste als Karte: Kopfzeile mit Suche, Status-Segment und Filter; darunter Tabelle bzw. Zeilen (Prototyp V.kontakte)
+.liste {
+  display: grid;
+  gap: 0.875rem;
+  min-width: 0;
+}
+
+.kopfzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
 .suchzeile {
-  margin-bottom: 0.5rem;
+  flex: 1 1 18rem;
+  max-width: 26rem;
+  min-width: 0;
+}
+
+.suchfeld {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--linie-stark);
+  border-radius: 12px;
+  background: var(--karte);
+  color: var(--text-gedaempft);
+
+  &:focus-within {
+    outline: 3px solid var(--urinet-gelb);
+    outline-offset: 2px;
+  }
+
+  input {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    outline: 0;
+  }
+}
+
+.werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .filterleiste {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
   gap: 0.75rem 1rem;
-  padding: 0.75rem 1rem;
-  margin: 0 0 1rem;
+  padding: 0.75rem;
+  margin: 0;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
+
+  &[hidden] {
+    display: none;
+  }
 
   .haken {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     align-self: end;
-    min-height: 44px;
+    min-height: 2.75rem;
 
     input {
       width: auto;
       min-height: 0;
+      accent-color: var(--urinet-gelb);
     }
   }
 
@@ -27,43 +82,46 @@
   }
 }
 
-.anzahl {
-  color: var(--urinet-gedaempft);
-  font: var(--mat-sys-body-medium);
+section {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
-.karten {
+.name {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// Handy: Zeilen mit Trennlinie statt Tabelle
+.zeilen {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
-  gap: 0.5rem;
 }
 
 .kontakt {
-  padding: 0.75rem 1rem;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--linie);
   overflow-wrap: anywhere;
 
+  &:last-child {
+    border-bottom: 0;
+  }
+
   .name {
-    font: var(--mat-sys-title-medium);
+    font-size: 15px;
   }
 
   p {
-    margin: 0.25rem 0;
-  }
-}
-
-.tabelle {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-
-  th,
-  td {
-    text-align: left;
-    padding: 0.5rem;
-    border-bottom: 1px solid var(--urinet-linie);
-    overflow-wrap: anywhere;
-    vertical-align: top;
+    margin: 0;
+    font-size: 13px;
   }
 }

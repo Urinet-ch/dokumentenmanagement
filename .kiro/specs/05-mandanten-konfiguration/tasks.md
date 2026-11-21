@@ -86,17 +86,22 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Abhängig von: 17.4, 17.6_
 
 ## Welle 18 — Wirkung und Oberfläche
-- [ ] 18.1 KI aus der Konfiguration [Backend]
+- [x] 18.1 KI aus der Konfiguration [Backend]
   - Prompt und Antwortschema aus Arten, `ki_felder` und Klassifikationen, KI-Texte, Nachbearbeitung über
     Art-Attribute, Belegnummer-Muster aus den Arten mit Zeitgrenze zur Laufzeit (inkl. ReDoS-Test mit `(a+)+$` gegen langen
     Eingabetext: gilt als «trifft nicht zu» und landet im Protokoll; 17.3 prüft nur Syntax und Länge), Schalter `ki_freigegeben` und
     Admin-Kommando `ki-freigeben`, Snapshot-Test gegen den Stand von Spec 01, Aufgabe 3.2, Quelltext-Test ohne
     Art-Codes.
+  - Offen für Fabian: Probelauf-Betriebsart (design.md, Open Points); Auslegung der Gate-0-Darstellung der
+    Prompt-Kennung beim Basisschema und der Reihenfolge der Arten (Spec 01 design.md). Der Quelltext-Test deckt
+    ganz `src/main/java` ab, ausser `DokumentErfassen.ART_KORRESPONDENZ` (Mail-Eingang, Spec 02): Ableitung aus der
+    Konfiguration braucht ein neues Art-Attribut und ist offen.
   - _Anforderungen: 2.3, 2.4, 2.5, 2.9, 8.1, 8.2, 8.3, 8.4_
   - _Abhängig von: 17.7; Spec 01: 3.2_
 
-- [ ] 18.2 Suche, Generator, Import und Funktionen [Backend]
-  - Vermerk (Spec 02, Aufgabe 7.1b, 14.11.2026): `Funktionen.finanzVerfuegbar()` besteht minimal in `dokumentart.application` (mindestens eine aktive Art mit der Gruppe `finanz`) und trägt `kennzahl`/`offene_posten`; 18.2 verschiebt es nach `konfiguration`, ergänzt `GET /mandant/funktionen` und löst die Übergangskonfiguration `archiv.mandant.<code>.kennzahl.*-arten` ab
+- [x] 18.2 Suche, Generator, Import und Funktionen [Backend]
+  - Vermerk (Spec 02, Aufgabe 7.1b, 14.11.2026): `Funktionen.finanzVerfuegbar()` besteht minimal in `dokumentart.application` (mindestens eine aktive Art mit der Gruppe `finanz`) und trägt `kennzahl`/`offene_posten`; 18.2 verschiebt es nach `konfiguration` und ergänzt `GET /mandant/funktionen`.
+  - Entscheid Fabian (20.11.2026): Die Übergangskonfiguration `archiv.mandant.<code>.kennzahl.*-arten` bleibt unverändert wirksam. Ihre Ablösung erfolgt später in einer eigenen Aufgabe.
   - Klassifikationsfilter, Facetten und Volltext, Klassifikationen im Generator und Drive-Import,
     `GET /mandant/funktionen`.
   - _Anforderungen: 8.5, 8.7, 8.8_
@@ -109,13 +114,13 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 7.3, 7.4_
   - _Abhängig von: 17.7_
 
-- [ ] 18.4 Felder und Klassifikationen je Art im Eingangskorb und in der Detailansicht [Frontend]
+- [x] 18.4 Felder und Klassifikationen je Art im Eingangskorb und in der Detailansicht [Frontend]
   - Darstellung aus Zusatz-Schema und Klassifikationen der Art, Wechsel der Art, Warnungen aus Regeln, ungültige
     Werte nach Konfigurationsänderung.
   - _Anforderungen: 7.5_
   - _Abhängig von: 17.7; Spec 01: 3.6, 4.6_
 
-- [ ] 18.5 Isolation und Abnahme [QA]
+- [x] 18.5 Isolation und Abnahme [QA]
   - `MandantenIsolationIT` anlegen oder erweitern, Beispiel-Mandant `probe-verband` durchgängig.
   - _Anforderungen: 9.3, 9.4_
   - _Abhängig von: 18.1, 18.2, 18.3, 18.4_

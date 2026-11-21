@@ -1,0 +1,49 @@
+<a class="zurueck" routerLink="/wissen/entwuerfe"><span aria-hidden="true">←&nbsp;</span>{{ texte.zurListe }}</a>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ entwuerfe.titel }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
+<p class="hinweis warnung"><app-symbol name="warnung" />{{ texte.cloudHinweis }}</p>
+<form class="karte" (ngSubmit)="importieren()" [attr.aria-busy]="sendet()">
+  <div class="feld">
+    <label for="wissenspaket">{{ texte.datei }}</label>
+    <input #paket id="wissenspaket" type="file" accept=".zip,application/zip"
+      [disabled]="sendet() || !anmeldung.darf('A17')" (change)="waehlen(paket.files?.item(0) ?? null)">
+  </div>
+  @if (datei(); as gewaehlt) { <p class="pille mono">{{ gewaehlt.name }}</p> }
+  <div class="knoepfe">
+    <button mat-flat-button type="submit" [disabled]="sendet() || !datei() || !anmeldung.darf('A17')">
+      <app-symbol name="importe" />{{ texte.importieren }}
+    </button>
+  </div>
+</form>
+@if (sendet()) { <p class="status" role="status">{{ texte.laedt }}</p> }
+@if (fehler(); as meldung) {
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
+  @if (fehlerBefunde().length) {
+    <ul class="karte befunde">@for (befund of fehlerBefunde(); track $index) { <li><span class="mono">{{ befund.pfad }}</span> · <span class="pille gefahr mono">{{ befund.code }}</span></li> }</ul>
+  }
+}
+@if (vorhandenerEntwurf(); as id) {
+  <div class="knoepfe"><a mat-stroked-button [routerLink]="['/wissen/entwuerfe', id]">{{ texte.vorhandenenOeffnen }}</a></div>
+}
+@if (bericht(); as ergebnis) {
+  <section class="karte" aria-labelledby="importbericht">
+    <h2 id="importbericht">{{ texte.bericht }}</h2>
+    <p class="pille ok" role="status"><app-symbol name="haken" />{{ texte.nurEntwurf }}</p>
+    <dl class="anzahlen">
+      <div><dt>{{ texte.neu }}</dt><dd>{{ ergebnis.anzahl.neu }}</dd></div>
+      <div><dt>{{ texte.aendern }}</dt><dd>{{ ergebnis.anzahl.aendern }}</dd></div>
+      <div><dt>{{ texte.unveraendert }}</dt><dd>{{ ergebnis.anzahl.unveraendert }}</dd></div>
+      <div><dt>{{ texte.ignoriert }}</dt><dd>{{ ergebnis.anzahl.ignoriert }}</dd></div>
+    </dl>
+    <p class="gedaempft">{{ texte.sha256 }}: <code class="mono">{{ ergebnis.paketSha256 }}</code></p>
+    <h3>{{ texte.befunde }}</h3>
+    @if (!ergebnis.befunde.length) { <p class="gedaempft">{{ texte.keineBefunde }}</p> }
+    <ul class="befunde">@for (befund of ergebnis.befunde; track $index) { <li><span class="mono">{{ befund.pfad }}</span> · <span class="pille gefahr mono">{{ befund.code }}</span></li> }</ul>
+    <h3>{{ texte.hinweise }}</h3>
+    <ul class="befunde">@for (hinweis of ergebnis.hinweise; track $index) { <li><span class="mono">{{ hinweis.pfad }}</span> · <span class="pille warnung mono">{{ hinweis.code }}</span></li> }</ul>
+    <div class="knoepfe"><a mat-flat-button [routerLink]="['/wissen/entwuerfe', ergebnis.entwurfId]">{{ texte.entwurfOeffnen }}</a></div>
+  </section>
+}

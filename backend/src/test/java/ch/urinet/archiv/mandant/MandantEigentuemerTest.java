@@ -59,7 +59,8 @@ class MandantEigentuemerTest {
                     assertThat(wahr(befehl, "has_table_privilege('m_probe_eigner." + tabelle + "', '" + recht + "')"))
                             .as(tabelle + " " + recht).isFalse();
                 }
-                for (String tabelle : List.of("mandant", "auftrag", "api_client")) {
+
+                for (String tabelle : List.of("mandant", "auftrag", "api_client", "verwaltung_vorgang")) {
                     assertThat(wahr(befehl, "has_table_privilege('public." + tabelle + "', '" + recht + "')"))
                             .as("public." + tabelle + " " + recht).isTrue();
                 }
@@ -95,6 +96,31 @@ class MandantEigentuemerTest {
             assertThat(wert(befehl, "select nextval('m_probe_eigner.spaeter_seq')")).isEqualTo("1");
             assertThat(wahr(befehl, "has_sequence_privilege('m_probe_eigner.spaeter_seq', 'USAGE')")).isTrue();
             assertThat(wahr(befehl, "has_sequence_privilege('m_probe_eigner.spaeter_seq', 'SELECT')")).isTrue();
+        }
+    }
+
+    @Test
+    void verwaltungsschemaIstJeMandantGetrenntUndProtokollBleibtNurAnfuegend() throws SQLException {
+        provisionierung.anlegen("probe-praefix", null, null);
+        provisionierung.anlegen("probe-kommando", null, null);
+        try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
+            befehl.execute("insert into public.verwaltung_vorgang values "
+                    + "('probe-praefix', '00000000-0000-4000-8000-000000000001', now() + interval '15 seconds')");
+            befehl.execute("insert into m_probe_praefix.benutzer_status values "
+                    + "('kennung-a', 'GESPERRT', now(), 'KORREKTUR', 'akteur-a')");
+            assertThat(wert(befehl, "select count(*) from m_probe_kommando.benutzer_status")).isEqualTo("0");
+            befehl.execute("insert into m_probe_kommando.benutzer_verzeichnis "
+                    + "(benutzer, rolle, gueltig_von, anlass) values "
+                    + "('kennung-b', 'INHABER', now(), 'ANLAGE'), ('kennung-c', 'MITARBEITER', now(), 'UEBERNAHME')");
+            befehl.execute("insert into m_probe_kommando.zugriff_protokoll (benutzer, rolle, aktion) values "
+                    + "('kennung-b', 'INHABER', 'BENUTZER_ANLEGEN')");
+            assertThat(wert(befehl, "select count(*) from m_probe_praefix.zugriff_protokoll "
+                    + "where aktion = 'BENUTZER_ANLEGEN'")).isEqualTo("0");
+            verweigert(befehl, "update m_probe_kommando.zugriff_protokoll set benutzer = 'x'");
+            verweigert(befehl, "delete from m_probe_kommando.benutzer_verzeichnis");
+            assertThatThrownBy(() -> befehl.execute("insert into m_probe_praefix.benutzer_status values "
+                    + "('kennung-b', 'UNGUELTIG', now(), 'KORREKTUR', 'akteur-a')"))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("check constraint");
         }
     }
 

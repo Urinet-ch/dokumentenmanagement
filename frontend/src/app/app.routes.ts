@@ -24,6 +24,12 @@ export const routes: Routes = [
     title: TEXTE.seiteNichtGefunden.titel,
   },
   { path: 'anmeldung', component: Rueckruf, title: TEXTE.appTitel },
+  // Benutzeranleitung (Spec 07, Req 5.1): ohne Rechte-Wächter, die Seite blendet nach Rolle aus (Req 6.2, 6.3)
+  {
+    path: 'hilfe',
+    loadComponent: () => import('./hilfe/hilfe-seite').then((m) => m.HilfeSeite),
+    title: titel(TEXTE.hilfe.titel),
+  },
   {
     path: 'erfassen',
     loadComponent: () => import('./erfassen/handy/handy-erfassung').then((m) => m.HandyErfassung),
@@ -45,6 +51,12 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.suche),
   },
   {
+    path: 'wissensbasis/einstellungen',
+    loadComponent: () => import('./wissen/wissen-einstellungen').then((m) => m.WissenEinstellungenSeite),
+    canActivate: [rechtGuard('A19')],
+    title: titel(TEXTE.wissenEinstellungen.titel),
+  },
+  {
     path: 'wissen',
     loadComponent: () => import('./wissen/wissen-index').then((m) => m.WissenIndex),
     canActivate: [rechtGuard('A15')],
@@ -62,6 +74,36 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A15')],
     data: { pfad: 'ueberblick' },
     title: titel(TEXTE.wissen.titel),
+  },
+  {
+    path: 'wissen/entwuerfe',
+    loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
+    canActivate: [rechtGuard('A17')],
+    title: titel(TEXTE.wissen.entwuerfe.titel),
+  },
+  {
+    path: 'wissen/entwuerfe/import',
+    loadComponent: () => import('./wissen/wissen-import').then((m) => m.WissenImport),
+    canActivate: [rechtGuard('A17')],
+    title: titel(TEXTE.wissen.import.titel),
+  },
+  {
+    path: 'wissen/entwuerfe/meine',
+    loadComponent: () => import('./wissen/meine-analysen').then((m) => m.MeineAnalysen),
+    canActivate: [rechtGuard('A18')],
+    title: titel(TEXTE.chat.analysen),
+  },
+  {
+    path: 'wissen/entwuerfe/meine/:id',
+    loadComponent: () => import('./wissen/meine-analysen').then((m) => m.MeineAnalysen),
+    canActivate: [rechtGuard('A18')],
+    title: titel(TEXTE.chat.analysen),
+  },
+  {
+    path: 'wissen/entwuerfe/:id',
+    loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
+    canActivate: [rechtGuard('A17')],
+    title: titel(TEXTE.wissen.entwuerfe.titel),
   },
   {
     path: 'wissen/:ordner/:name',

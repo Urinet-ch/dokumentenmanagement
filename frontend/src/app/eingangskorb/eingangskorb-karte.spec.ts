@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { Dokument, Dokumentart, provideApi } from '../gemeinsam/api';
 import {
   AnmeldungService,
@@ -12,6 +13,10 @@ import {
 } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle, Aktion, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import {
+  DokumentKlassifikationenService,
+  LEERE_DOKUMENT_KLASSIFIKATIONEN,
+} from '../dokument/klassifikationen';
 import { EingangskorbKarte } from './eingangskorb-karte';
 import { feldName } from './entwurf';
 import { EingangskorbEntwurfSpeicher } from './entwurf-speicher';
@@ -90,7 +95,11 @@ const VHF_ART: Dokumentart = {
       ausgabe: { type: 'string' },
       jahr: { type: 'integer' },
       fachgebiet: { type: 'string', enum: ['Bad', 'Eis', 'Technik', 'Recht', 'Allgemein'] },
-      zugriff: { type: 'string', enum: ['oeffentlich', 'mitglieder', 'vorstand'], default: 'mitglieder' },
+      zugriff: {
+        type: 'string',
+        enum: ['oeffentlich', 'mitglieder', 'vorstand'],
+        default: 'mitglieder',
+      },
       veroeffentlicht: { type: 'boolean', default: false },
     },
   },
@@ -193,7 +202,14 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
         },
         {
           provide: FENSTER,
-          useValue: { location: { origin: 'https://test.invalid', assign: vi.fn() }, sessionStorage: speicher },
+          useValue: {
+            location: { origin: 'https://test.invalid', assign: vi.fn() },
+            sessionStorage: speicher,
+          },
+        },
+        {
+          provide: DokumentKlassifikationenService,
+          useValue: { fuerArt: () => of(LEERE_DOKUMENT_KLASSIFIKATIONEN) },
         },
       ],
     });
@@ -235,6 +251,11 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     statusText = 'OK',
     headers?: HttpHeaders,
   ) {
+    const patches = http.match({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+    for (const patch of patches) {
+      patch.flush(dokument({ version: 4 }));
+      await fixture.whenStable();
+    }
     const anfrage = http.expectOne(url);
     anfrage.flush(body, { status, statusText, headers });
     await fixture.whenStable();
@@ -269,6 +290,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(knoepfe()).toEqual([T.bestaetigen, T.aendern, T.verwerfen]);
 
     await klicken(T.bestaetigen);
+    expect(http.match({ method: 'PATCH', url: '/api/v1/dokumente/d1' })).toHaveLength(0);
     const anfrage = await antworten('/api/v1/dokumente/d1/bestaetigen', null, 202, 'Accepted');
     expect(anfrage.headers.get('If-Match')).toBe('"3"');
     expect(anfrage.body).toEqual(
@@ -289,6 +311,27 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(erledigt).toEqual([T.erfolgBestaetigt('Rechnung Muster AG')]);
   });
 
+  it('zählt die unsicheren Felder in einer Pille, nicht nur über die Farbe (Req 8.1)', async () => {
+    await zeigen(MIT_VORSCHLAG);
+    const pille = element.querySelector('[data-test=unsichere-felder]');
+    expect(pille?.textContent?.trim()).toBe(T.unsichereFelder(1));
+    expect(element.querySelector('[data-feld=betrag]')?.classList).toContain('warnung');
+    expect(element.querySelector('[data-test=vorschlag-vollstaendig]')).toBeNull();
+    expect(knoepfe()).toEqual([T.bestaetigen, T.aendern, T.verwerfen]);
+  });
+
+  it('nennt den Vorschlag vollständig nur mit Vorschlag und ohne unsichere Felder', async () => {
+    await zeigen(dokument({ vorschlag: { art: 'LIEFERANTENRECHNUNG', titel: 'Rechnung' } }));
+    expect(element.querySelector('[data-test=vorschlag-vollstaendig]')?.textContent?.trim()).toBe(
+      T.vorschlagVollstaendig,
+    );
+    expect(element.querySelector('[data-test=unsichere-felder]')).toBeNull();
+    TestBed.resetTestingModule();
+    await zeigen(dokument());
+    expect(element.querySelector('[data-test=vorschlag-vollstaendig]')).toBeNull();
+    expect(element.querySelector('[data-test=unsichere-felder]')).toBeNull();
+  });
+
   it('zeigt Zusatzfelder je Art und setzt die Zugriffsstufe manuell auf Mitglieder', async () => {
     await zeigen(
       dokument({
@@ -306,9 +349,13 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(element.querySelector('#d1-zusatz-jahr')).not.toBeNull();
     expect(element.querySelector('#d1-zusatz-fachgebiet')).not.toBeNull();
     expect(element.querySelector<HTMLInputElement>('#d1-zusatz-veroeffentlicht')).toBeNull();
-    expect(element.querySelector<HTMLSelectElement>('#d1-zusatz-zugriff')?.value).toBe('mitglieder');
+    expect(element.querySelector<HTMLSelectElement>('#d1-zusatz-zugriff')?.value).toBe(
+      'mitglieder',
+    );
     expect(
-      [...element.querySelectorAll<HTMLSelectElement>('#d1-zusatz-zugriff option')].map((o) => o.value),
+      [...element.querySelectorAll<HTMLSelectElement>('#d1-zusatz-zugriff option')].map(
+        (o) => o.value,
+      ),
     ).toEqual(['', 'oeffentlich', 'mitglieder', 'vorstand']);
     expect(element.querySelector('#d1-betrag')).toBeNull();
   });
@@ -322,7 +369,11 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
         type: 'object',
         properties: {
           ...(VHF_ART.zusatzSchema as { properties: Record<string, unknown> }).properties,
-          zugriff: { type: 'string', enum: ['oeffentlich', 'mitglieder', 'vorstand'], default: 'vorstand' },
+          zugriff: {
+            type: 'string',
+            enum: ['oeffentlich', 'mitglieder', 'vorstand'],
+            default: 'vorstand',
+          },
         },
       },
     };
@@ -491,28 +542,35 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
   it.each([
     [409, 'Conflict'],
     [412, 'Precondition Failed'],
-  ] as const)('behält Formulareingaben bei HTTP %s, bis der Benutzer die aktuelle Version neu lädt', async (status, statusText) => {
-    await zeigen({ ...MIT_VORSCHLAG, partnerId: 'k1' });
-    await klicken(T.aendern);
-    const titel = element.querySelector<HTMLInputElement>('#d1-titel')!;
-    titel.value = 'Entwurf bleibt erhalten';
-    titel.dispatchEvent(new Event('input'));
-    await fixture.whenStable();
-    await klicken(T.bestaetigen);
-    await antworten(
-      '/api/v1/dokumente/d1/bestaetigen',
-      { fehlercode: 'VERSION_KONFLIKT' },
-      status,
-      statusText,
-    );
-    expect(veraltet).toEqual([]);
-    expect(element.querySelector('[data-test=formular]')).not.toBeNull();
-    expect(element.querySelector<HTMLInputElement>('#d1-titel')?.value).toBe('Entwurf bleibt erhalten');
-    expect(element.querySelector('[data-test=konflikt-neu-laden]')?.textContent).toContain(T.neuLaden);
+  ] as const)(
+    'behält Formulareingaben bei HTTP %s, bis der Benutzer die aktuelle Version neu lädt',
+    async (status, statusText) => {
+      await zeigen({ ...MIT_VORSCHLAG, partnerId: 'k1' });
+      await klicken(T.aendern);
+      const titel = element.querySelector<HTMLInputElement>('#d1-titel')!;
+      titel.value = 'Entwurf bleibt erhalten';
+      titel.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+      await klicken(T.bestaetigen);
+      await antworten(
+        '/api/v1/dokumente/d1/bestaetigen',
+        { fehlercode: 'VERSION_KONFLIKT' },
+        status,
+        statusText,
+      );
+      expect(veraltet).toEqual([]);
+      expect(element.querySelector('[data-test=formular]')).not.toBeNull();
+      expect(element.querySelector<HTMLInputElement>('#d1-titel')?.value).toBe(
+        'Entwurf bleibt erhalten',
+      );
+      expect(element.querySelector('[data-test=konflikt-neu-laden]')?.textContent).toContain(
+        T.neuLaden,
+      );
 
-    await klicken(T.neuLaden);
-    expect(veraltet).toEqual([T.fehlercode['VERSION_KONFLIKT']]);
-  });
+      await klicken(T.neuLaden);
+      expect(veraltet).toEqual([T.fehlercode['VERSION_KONFLIKT']]);
+    },
+  );
 
   it('zeigt bei 409 mit fachlichem Code dessen Text, behält die Eingaben und bietet kein «Neu laden» an', async () => {
     await zeigen({ ...MIT_VORSCHLAG, partnerId: 'k1' });
@@ -522,8 +580,15 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     titel.dispatchEvent(new Event('input'));
     await fixture.whenStable();
     await klicken(T.bestaetigen);
-    await antworten('/api/v1/dokumente/d1/bestaetigen', { fehlercode: 'BELEGNUMMER_VERGEBEN' }, 409, 'Conflict');
-    expect(element.querySelector('[data-test=fehler]')?.textContent).toContain(T.fehlercode['BELEGNUMMER_VERGEBEN']);
+    await antworten(
+      '/api/v1/dokumente/d1/bestaetigen',
+      { fehlercode: 'BELEGNUMMER_VERGEBEN' },
+      409,
+      'Conflict',
+    );
+    expect(element.querySelector('[data-test=fehler]')?.textContent).toContain(
+      T.fehlercode['BELEGNUMMER_VERGEBEN'],
+    );
     expect(element.querySelector<HTMLInputElement>('#d1-titel')?.value).toBe('Bleibt');
     expect(element.querySelector('[data-test=konflikt-neu-laden]')).toBeNull();
   });
@@ -538,7 +603,9 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       'Too Many Requests',
       new HttpHeaders({ 'Retry-After': '42' }),
     );
-    expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.httpFehler.zuViele(42));
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(
+      TEXTE.httpFehler.zuViele(42),
+    );
     expect(knoepfe()).toContain(T.erneutVerarbeiten);
     expect(veraltet).toEqual([]);
   });
@@ -584,7 +651,9 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     const anfrage = await antworten('/api/v1/dokumente/d1/bestaetigen', null, 202, 'Accepted');
     expect((anfrage.body as { titel?: unknown }).titel ?? null).toBeNull();
     expect(JSON.stringify(anfrage.body)).not.toContain('Scan_Rechnung');
-    expect(erledigt).toEqual([T.erfolgBestaetigt('Ohne Titel · \u2068Scan_Rechnung-2026.pdf\u2069')]);
+    expect(erledigt).toEqual([
+      T.erfolgBestaetigt('Ohne Titel · \u2068Scan_Rechnung-2026.pdf\u2069'),
+    ]);
   });
 
   it('nimmt den vorgeschlagenen Titel vor dem Dateinamen (Req 8.11)', async () => {
@@ -694,14 +763,18 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     await zeigen(dokument({ vorschlag: { art: 'LOHNABRECHNUNG' } }));
     const hinweis = element.querySelector('[data-test=hinweis-zusatz]');
     expect(hinweis?.textContent).toContain(T.zusatzErgaenzenArt('Lohnabrechnung'));
-    expect(hinweis?.querySelector('a')?.getAttribute('href')).toBe('/dokument/d1?art=LOHNABRECHNUNG');
+    expect(hinweis?.querySelector('a')?.getAttribute('href')).toBe(
+      '/dokument/d1?art=LOHNABRECHNUNG',
+    );
   });
 
   it('gibt eine inaktive Vorschlags-Art nicht weiter und verlangt zuerst eine aktive Art (Review #107)', async () => {
     const arten = ARTEN.map((a) => (a.code === 'LOHNABRECHNUNG' ? { ...a, aktiv: false } : a));
     await zeigen(dokument({ vorschlag: { art: 'LOHNABRECHNUNG' } }), 'inhaber', arten);
     const hinweis = element.querySelector('[data-test=hinweis-zusatz]');
-    expect(hinweis?.querySelector('[data-test=art-inaktiv]')?.textContent).toBe(T.zusatzArtInaktiv('Lohnabrechnung'));
+    expect(hinweis?.querySelector('[data-test=art-inaktiv]')?.textContent).toBe(
+      T.zusatzArtInaktiv('Lohnabrechnung'),
+    );
     expect(hinweis?.textContent).not.toContain(T.zusatzErgaenzenArt('Lohnabrechnung'));
     expect(hinweis?.querySelector('a')?.getAttribute('href')).toBe('/dokument/d1');
   });
@@ -845,6 +918,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     it('speichert bei 401 nur Metadaten, stellt sie sichtbar wieder her und löscht nach Erfolg', async () => {
       const d = dokument({
         id: 'doc-401',
+        art: 'LIEFERANTENRECHNUNG',
         vorschlag: {
           art: 'LIEFERANTENRECHNUNG',
           titel: 'Vorgeschlagener Titel',
@@ -907,6 +981,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       async (zustandSpeicher) => {
         const d = dokument({
           id: 'doc-storage',
+          art: 'LIEFERANTENRECHNUNG',
           vorschlag: { art: 'LIEFERANTENRECHNUNG', titel: 'Probe' },
         });
         await zeigen(d);
@@ -929,6 +1004,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     it('speichert keinen Entwurf oberhalb der Grössengrenze', async () => {
       const d = dokument({
         id: 'doc-gross',
+        art: 'LIEFERANTENRECHNUNG',
         vorschlag: { art: 'LIEFERANTENRECHNUNG', titel: 'x'.repeat(20_000) },
       });
       await zeigen(d);
@@ -972,7 +1048,9 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       fachgebiet.dispatchEvent(new Event('change'));
     };
     const checkbox = (wert: string) =>
-      element.querySelector<HTMLInputElement>(`[data-test=listenfeld] input[type=checkbox][value=${wert}]`)!;
+      element.querySelector<HTMLInputElement>(
+        `[data-test=listenfeld] input[type=checkbox][value=${wert}]`,
+      )!;
     async function umschalten(wert: string) {
       checkbox(wert).click();
       await fixture.whenStable();
@@ -984,14 +1062,21 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       const gruppe = element.querySelector<HTMLFieldSetElement>('fieldset[data-test=listenfeld]')!;
       expect(gruppe.querySelector('legend')?.textContent).toContain('Verband');
       expect(gruppe.querySelector('legend')?.textContent).toContain('*');
-      expect([...gruppe.querySelectorAll('label')].map((l) => l.textContent?.trim())).toEqual(['VHF', 'GSK']);
+      expect([...gruppe.querySelectorAll('label')].map((l) => l.textContent?.trim())).toEqual([
+        'VHF',
+        'GSK',
+      ]);
       expect(checkbox('vhf').checked).toBe(false);
       expect(checkbox('vhf').getAttribute('aria-required')).toBe('true');
       expect(gruppe.textContent).toContain('Mindestens einen Wert auswählen.');
     });
 
     it('zeigt die gespeicherten Werte als gewählt', async () => {
-      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['gsk'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await zeigen(
+        dokument({ art: 'BULLETIN', zusatz: { verband: ['gsk'] } }),
+        'geschaeftsstelle',
+        [VERBAND_ART],
+      );
       await klicken(T.aendern);
       expect(checkbox('vhf').checked).toBe(false);
       expect(checkbox('gsk').checked).toBe(true);
@@ -1014,14 +1099,21 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
           type: 'object',
           properties: {
             ...(VERBAND_ART.zusatzSchema as { properties: object }).properties,
-            verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] }, minItems: 1 },
+            verband: {
+              type: 'array',
+              items: { type: 'string', enum: ['vhf', 'gsk'] },
+              minItems: 1,
+            },
           },
         },
       };
       await zeigen(dokument({ art: 'BULLETIN' }), 'geschaeftsstelle', [ohne]);
       await klicken(T.aendern);
       const gruppe = element.querySelector<HTMLFieldSetElement>('fieldset[data-test=listenfeld]')!;
-      expect([...gruppe.querySelectorAll('label')].map((l) => l.textContent?.trim())).toEqual(['vhf', 'gsk']);
+      expect([...gruppe.querySelectorAll('label')].map((l) => l.textContent?.trim())).toEqual([
+        'vhf',
+        'gsk',
+      ]);
     });
 
     it('sendet die gewählten Werte als Array an PATCH und bestätigt danach', async () => {
@@ -1035,13 +1127,19 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       expect(patch.request.body.zusatz.verband).toEqual(['vhf', 'gsk']);
       patch.flush(dokument({ art: 'BULLETIN', version: 4, zusatz: patch.request.body.zusatz }));
       await fixture.whenStable();
-      http.expectOne('/api/v1/dokumente/d1/bestaetigen').flush(null, { status: 202, statusText: 'Accepted' });
+      http
+        .expectOne('/api/v1/dokumente/d1/bestaetigen')
+        .flush(null, { status: 202, statusText: 'Accepted' });
       await fixture.whenStable();
       expect(erledigt).toHaveLength(1);
     });
 
     it('lässt Auswahl wieder abwählen und meldet dann den Pflichtfehler', async () => {
-      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await zeigen(
+        dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }),
+        'geschaeftsstelle',
+        [VERBAND_ART],
+      );
       await klicken(T.bestaetigen);
       feldAusfuellen();
       await umschalten('vhf');
@@ -1051,7 +1149,11 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     });
 
     it('bearbeitet eine Liste freier Texte mit Hinzufügen (Knopf und Enter) und Entfernen', async () => {
-      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await zeigen(
+        dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }),
+        'geschaeftsstelle',
+        [VERBAND_ART],
+      );
       await klicken(T.aendern);
       const eingabe = element.querySelector<HTMLInputElement>('#d1-zusatz-stichworte')!;
       eingabe.value = 'Eis';
@@ -1060,27 +1162,39 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       eingabe.value = 'Bad';
       await klicken('Hinzufügen');
       const eintraege = () =>
-        [...element.querySelectorAll('.eintraege li > span:first-child')].map((e) => e.textContent?.trim());
+        [...element.querySelectorAll('.eintraege li > span:first-child')].map((e) =>
+          e.textContent?.trim(),
+        );
       expect(eintraege()).toEqual(['Eis', 'Bad']);
       await klicken('Entfernen');
       expect(eintraege()).toEqual(['Bad']);
     });
 
     it('übernimmt einen getippten, nicht bestätigten Eintrag beim Verlassen des Felds', async () => {
-      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await zeigen(
+        dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }),
+        'geschaeftsstelle',
+        [VERBAND_ART],
+      );
       await klicken(T.aendern);
       const eingabe = element.querySelector<HTMLInputElement>('#d1-zusatz-stichworte')!;
       eingabe.value = 'Rechnung';
       eingabe.dispatchEvent(new Event('blur'));
       await fixture.whenStable();
-      expect([...element.querySelectorAll('.eintraege li > span:first-child')].map((e) => e.textContent?.trim())).toEqual([
-        'Rechnung',
-      ]);
+      expect(
+        [...element.querySelectorAll('.eintraege li > span:first-child')].map((e) =>
+          e.textContent?.trim(),
+        ),
+      ).toEqual(['Rechnung']);
       expect(eingabe.value).toBe('');
     });
 
     it('zeigt einen Altwert ausserhalb des Schemas als gewählt und lässt ihn abwählen', async () => {
-      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['alt', 'vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await zeigen(
+        dokument({ art: 'BULLETIN', zusatz: { verband: ['alt', 'vhf'] } }),
+        'geschaeftsstelle',
+        [VERBAND_ART],
+      );
       await klicken(T.aendern);
       expect(checkbox('alt').checked).toBe(true);
       await umschalten('gsk');

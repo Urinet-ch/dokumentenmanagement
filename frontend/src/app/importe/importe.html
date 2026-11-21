@@ -1,5 +1,8 @@
-<h1>{{ texte.titel }}</h1>
-<p>{{ texte.einleitung }}</p>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ texte.vorzeile }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
 
 <section class="karte hochladen" aria-labelledby="hochladen-titel">
   <h2 id="hochladen-titel">{{ texte.hochladenTitel }}</h2>
@@ -11,19 +14,22 @@
     </select>
   </label>
   @if (art() === 'kontakt') {
-    <mat-checkbox
-      [checked]="vollexport()"
-      [disabled]="laeuft()"
-      (change)="vollexport.set($event.checked)"
-      aria-describedby="vollexport-hinweis"
-      data-test="vollexport"
-    >
-      {{ texte.vollexport }}
-    </mat-checkbox>
-    <p id="vollexport-hinweis" class="hinweis">{{ texte.vollexportHinweis }}</p>
+    <div class="vollexport">
+      <mat-checkbox
+        [checked]="vollexport()"
+        [disabled]="laeuft()"
+        (change)="vollexport.set($event.checked)"
+        aria-describedby="vollexport-hinweis"
+        data-test="vollexport"
+      >
+        {{ texte.vollexport }}
+      </mat-checkbox>
+      <p id="vollexport-hinweis" class="nebentext">{{ texte.vollexportHinweis }}</p>
+    </div>
   }
   <div class="datei">
     <button mat-stroked-button type="button" (click)="dateiwahl.click()" [disabled]="laeuft()">
+      <app-symbol name="dokument" />
       {{ texte.dateiwahl }}
     </button>
     <input
@@ -36,10 +42,13 @@
     />
     <span class="dateiname" data-test="dateiname">{{ datei()?.name ?? texte.keineDatei }}</span>
   </div>
-  <p class="hinweis">{{ texte.grenze }}</p>
-  <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || !datei()">
-    {{ texte.hochladen }}
-  </button>
+  <p class="nebentext">{{ texte.grenze }}</p>
+  <div>
+    <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || !datei()">
+      <app-symbol name="importe" />
+      {{ texte.hochladen }}
+    </button>
+  </div>
   @if (laeuft()) {
     <mat-progress-bar mode="determinate" [value]="prozent()" [attr.aria-label]="texte.fortschritt" />
   }
@@ -53,30 +62,48 @@
   }
 </section>
 
-<section aria-labelledby="laeufe-titel">
+<section class="karte laeufe" aria-labelledby="laeufe-titel">
   <h2 id="laeufe-titel">{{ texte.laeufe }}</h2>
   @if (listeFehler()) {
     <p class="fehler" role="alert">{{ listeFehler() }}</p>
   } @else if (laeufe() === null) {
-    <p>{{ texte.laden }}</p>
+    <p class="nebentext">{{ texte.laden }}</p>
   } @else if (laeufe()!.length === 0) {
-    <p>{{ texte.keineLaeufe }}</p>
+    <p class="nebentext">{{ texte.keineLaeufe }}</p>
   } @else {
-    <ul class="laeufe">
-      @for (lauf of laeufe(); track lauf.id) {
-        <li class="karte lauf" data-test="lauf">
-          <a [routerLink]="['/importe', lauf.id]">{{ lauf.dateiname || texte.ohneDateiname }}</a>
-          <span class="marke" [attr.data-status]="lauf.status">{{ texte.status[lauf.status ?? ''] }}</span>
-          <span class="angaben">
-            {{ texte.arten[lauf.art ?? ''] }}
-            @if (lauf.vollexport) {
-              · {{ texte.vollexportMarke }}
-            }
-            · {{ texte.laufZeile(zahl(lauf.zeilen), zeit(lauf.erstellt)) }}
-          </span>
-        </li>
-      }
-    </ul>
+    <div class="tabelle-rahmen randbuendig" tabindex="0" role="region" aria-labelledby="laeufe-titel">
+      <table class="tabelle">
+        <thead>
+          <tr>
+            <th scope="col">{{ texte.spalteDatei }}</th>
+            <th scope="col">{{ texte.art }}</th>
+            <th scope="col" class="zahl">{{ texte.spalteZeilen }}</th>
+            <th scope="col">{{ texte.spalteHochgeladen }}</th>
+            <th scope="col">{{ texte.spalteStatus }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (lauf of laeufe(); track lauf.id) {
+            <tr data-test="lauf">
+              <td class="datei-name">
+                <a [routerLink]="['/importe', lauf.id]">{{ lauf.dateiname || texte.ohneDateiname }}</a>
+              </td>
+              <td>
+                {{ texte.arten[lauf.art ?? ''] }}
+                @if (lauf.vollexport) {
+                  <span class="pille">{{ texte.vollexportMarke }}</span>
+                }
+              </td>
+              <td class="zahl">{{ zahl(lauf.zeilen) }}</td>
+              <td class="zeit">{{ zeit(lauf.erstellt) }}</td>
+              <td>
+                <span class="pille marke" [class]="ton[lauf.status ?? ''] ?? ''" [attr.data-status]="lauf.status">{{ texte.status[lauf.status ?? ''] }}</span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
     <nav class="blaettern" [attr.aria-label]="texte.laeufe">
       <button mat-button type="button" [disabled]="seite() === 0" (click)="laden(seite() - 1)">{{ texte.zurueck }}</button>
       <span>{{ texte.seiteVon(bereich().von, bereich().bis, bereich().gesamt) }}</span>

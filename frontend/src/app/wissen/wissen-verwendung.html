@@ -1,24 +1,28 @@
 <section aria-labelledby="wissen-verwendung-titel">
   <h2 id="wissen-verwendung-titel">{{ texte.verwendung }}</h2>
-  @if (laedt()) { <p role="status">{{ texte.laedt }}</p> }
+  @if (laedt()) { <p class="klein" role="status">{{ texte.laedt }}</p> }
   @if (fehler(); as meldung) {
-    <p role="alert">{{ meldung }}</p>
-    <button type="button" (click)="erneut()">{{ texte.erneut }}</button>
+    <p class="fehler" role="alert">{{ meldung }}</p>
+    <div class="aktionen"><button mat-button type="button" (click)="erneut()">{{ texte.erneut }}</button></div>
   }
   @if (ergebnis(); as ergebnis) {
-    @if (!ergebnis.gesamt) { <p>{{ texte.keineSeiten }}</p> }
-    <ul>
+    @if (!ergebnis.gesamt) { <p class="klein">{{ texte.keineSeiten }}</p> }
+    <ul class="chips">
       @for (gruppe of ergebnis.gruppen; track gruppe.typ) {
         @for (seite of gruppe.seiten; track seite.id) {
-          <li><a [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a></li>
+          <li><a class="chip" [routerLink]="'/wissen/' + seite.pfad"><app-symbol name="wissen" />{{ seite.titel }}</a></li>
         }
       }
     </ul>
-    @if (offset() > 0) {
-      <button type="button" (click)="wechseln(offset() - 50)">{{ texte.zurueckSeite }}</button>
-    }
-    @if (offset() + 50 < (ergebnis.gesamt || 0)) {
-      <button type="button" (click)="wechseln(offset() + 50)">{{ texte.weiter }}</button>
+    @if (offset() > 0 || offset() + 50 < (ergebnis.gesamt || 0)) {
+      <div class="aktionen">
+        @if (offset() > 0) {
+          <button mat-button type="button" (click)="wechseln(offset() - 50)">{{ texte.zurueckSeite }}</button>
+        }
+        @if (offset() + 50 < (ergebnis.gesamt || 0)) {
+          <button mat-button type="button" (click)="wechseln(offset() + 50)">{{ texte.weiter }}</button>
+        }
+      </div>
     }
   }
 </section>

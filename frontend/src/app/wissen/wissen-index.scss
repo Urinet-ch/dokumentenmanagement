@@ -1,0 +1,46 @@
+// Seitenliste je Seitentyp als Tabelle (Prototyp: Seite mit Pfad in Mono, Status als Pille)
+.gruppe {
+  padding-bottom: 0.25rem;
+}
+
+.gruppenkopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.gruppe .tabelle {
+  table-layout: fixed;
+
+  td {
+    vertical-align: top;
+  }
+
+  th:last-child {
+    width: 7rem;
+  }
+}
+
+.titel {
+  display: block;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration-color: var(--linie-stark);
+
+  &:hover {
+    color: var(--akzent-text);
+  }
+}
+
+td > .mono {
+  display: block;
+  margin-top: 0.125rem;
+}
+
+.beschreibung {
+  color: var(--text-2);
+  margin: 0.375rem 0 0;
+  max-width: 70ch;
+}

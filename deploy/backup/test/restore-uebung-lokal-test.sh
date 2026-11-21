@@ -181,9 +181,17 @@ if [[ ${1:-} == compose ]]; then
         exit 1
       fi
       ;;
+    *" exec -T kc "*)
+      if [[ $* == *" get clients/"*"/service-account-user "* ]]; then
+        printf '{"id":"synthetic-service-account-id","username":"service-account-%s"}\n' "$ARCHIV_RESTORE_OIDC_CLIENT"
+      elif [[ $* == *" get clients "* ]]; then
+        printf '[{"id":"synthetic-client-id","clientId":"%s"}]\n' "$ARCHIV_RESTORE_OIDC_CLIENT"
+      fi
+      ;;
     # Wie Docker bei Diensten ohne veröffentlichten Port: Exit 0 mit Port 0.
     *" port db 5432 "*) printf '127.0.0.1:25432\n' ;;
     *" port minio 9000 "*) [[ ${MOCK_PORT_NULL:-0} == 1 ]] && printf ':0\n' || printf '127.0.0.1:29000\n' ;;
+    *" port kc_restore 8080 "*) printf '127.0.0.1:%s\n' "$ARCHIV_RESTORE_KC_PORT" ;;
     *" port "*) printf ':0\n' ;;
     *" exec -T db timeout "*" bash -c "*)
       dienst=${*: -3:1}
@@ -194,7 +202,7 @@ if [[ ${1:-} == compose ]]; then
       esac
       printf 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n'
       if [[ $pfad == */.well-known/openid-configuration ]]; then
-        printf '{"issuer":"http://kc_restore:8080/realms/urinet-archiv"}\n'
+        printf '{"issuer":"%s/realms/urinet-archiv"}\n' "$ARCHIV_RESTORE_KC_BASE_URL"
       fi
       ;;
   esac
@@ -248,7 +256,7 @@ MOCK
 cat > "$bin/curl" <<'MOCK'
 #!/bin/bash
 if [[ "$*" == *'.well-known/openid-configuration'* ]]; then
-  printf '{"issuer":"http://kc_restore:8080/realms/urinet-archiv"}\n'
+  printf '{"issuer":"%s/realms/urinet-archiv"}\n' "$ARCHIV_RESTORE_KC_BASE_URL"
 fi
 exit 0
 MOCK
@@ -267,24 +275,35 @@ assert grep -q '^OK      Archiv-Datenbankdump in neue Datenbank einspielen' "$te
 assert grep -q '^OK      Keycloak-Datenbankdump in neue Datenbank einspielen' "$temp/erfolg.stdout"
 assert grep -q '^OK      Echter Sicherungs-Roundtrip: Phase ziel' "$temp/erfolg.stdout"
 assert grep -q '^OK      Vollständiger lokaler Sicherungs-Roundtrip abgeschlossen' "$temp/erfolg.stdout"
+assert grep -q 'OIDC-Testdienstkonto mit Mandant und Rolle vorbereiten' "$temp/erfolg.stdout"
 assert grep -q "shelltest $MOCK_BACKUP_TEST" "$MOCK_LOG"
 assert grep -q "taeglich $MOCK_TAEGLICH_SCRIPT" "$MOCK_LOG"
 assert grep -q "mvn cwd=$repo_root/backend -ntp -DskipTests package" "$MOCK_LOG"
 assert grep -q 'mvn cwd=.*-Darchiv.restore.phase=quelle' "$MOCK_LOG"
 assert grep -q 'mvn cwd=.*-Darchiv.restore.phase=ziel' "$MOCK_LOG"
 assert grep -q -- '-Darchiv.restore.verzeichnis=' "$MOCK_LOG"
+assert grep -q -- '-Darchiv.restore.oidc-client=archiv-restore-' "$MOCK_LOG"
+assert grep -q -- '-Darchiv.restore.oidc-client-secret-datei=' "$MOCK_LOG"
+assert grep -q 'create clients .*restore_oidc_client' "$MOCK_LOG"
+assert grep -q 'service-account-user' "$MOCK_LOG"
+assert grep -q 'update users/synthetic-service-account-id .*restore_oidc_service_account' "$MOCK_LOG"
+assert grep -q 'add-roles .*service-account-archiv-restore-' "$MOCK_LOG"
+assert grep -q 'client_credentials' "$repo_root/backend/src/test/java/ch/urinet/archiv/sicherung/SicherungPaketRoundtripTest.java"
+assert grep -q 'restore_oidc_service_account' "$compose_file"
+assert grep -q 'add-roles ' "$MOCK_LOG"
 assert grep -q '^ARCHIV_MANDANTEN=urinet vhf-gsk$' "$MOCK_LOG"
 assert grep -q 'docker compose --project-name archiv-restore-' "$MOCK_LOG"
 assert grep -q 'down --remove-orphans' "$MOCK_LOG"
 assert grep -q '^OK      SHA256SUMS des Sicherungspakets prüfen' "$temp/erfolg.stdout"
 assert grep -q '^OK      Manipulierte SHA256SUMS zurückweisen' "$temp/erfolg.stdout"
 assert grep -q '^OK      Wiederhergestellter Keycloak-Realm erreichbar' "$temp/erfolg.stdout"
+assert grep -q 'port kc_restore 8080$' "$MOCK_LOG"
 for ziel in 'kc 9000 /health/ready' 'api 8080 /q/health/ready' 'kc_restore 9000 /health/ready' \
   'kc_restore 8080 /realms/urinet-archiv/.well-known/openid-configuration'; do
   assert grep -q "exec -T db timeout 3 bash -c .* _ $ziel\$" "$MOCK_LOG"
 done
-if grep -Eq ' port (kc|api|kc_restore) ' "$MOCK_LOG"; then
-  printf 'Keycloak und API dürfen keinen Host-Port brauchen.\n' >&2
+if grep -Eq ' port (kc|api) ' "$MOCK_LOG"; then
+  printf 'Quell-Keycloak und API dürfen keinen Host-Port brauchen.\n' >&2
   exit 1
 fi
 if grep -Eq 'down -v|prune' "$script"; then

@@ -15,7 +15,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Admin-Kommando {@code archiv mandant anlegen <code>} (ADR-002) über denselben Einstieg wie der Dienst, ohne Server. */
-@Tag("start-4")
+@Tag("start-2")
 @QuarkusMainTest
 class MandantKommandoTest {
 

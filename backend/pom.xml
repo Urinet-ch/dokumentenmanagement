@@ -33,11 +33,13 @@
         <tika.version>4.2.0</tika.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <commonmark.version>0.32.0</commonmark.version>
+        <java-diff-utils.version>4.18</java-diff-utils.version>
         <icu4j.version>79.1</icu4j.version>
         <!-- Swiss QR Code (Aufgabe 3.2, Req 7.11): dieselbe Version wie im Golden-Lauf (spikes/golden-lauf) -->
         <zxing.version>3.5.4</zxing.version>
         <wiremock.version>3.13.2</wiremock.version>
         <greenmail.version>2.1.15</greenmail.version>
+        <snakeyaml-engine.version>3.0.1</snakeyaml-engine.version>
     </properties>
 
     <dependencyManagement>
@@ -86,6 +88,11 @@
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>org.snakeyaml</groupId>
+            <artifactId>snakeyaml-engine</artifactId>
+            <version>${snakeyaml-engine.version}</version>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-rest-jackson</artifactId>
@@ -177,6 +184,16 @@
             <groupId>org.commonmark</groupId>
             <artifactId>commonmark-ext-footnotes</artifactId>
             <version>${commonmark.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.java-diff-utils</groupId>
+            <artifactId>java-diff-utils</artifactId>
+            <version>${java-diff-utils.version}</version>
         </dependency>
         <dependency>
             <groupId>io.quarkiverse.amazonservices</groupId>
@@ -336,7 +353,7 @@
                 </executions>
             </plugin>
             <plugin>
-                <!-- Drive-Import (Aufgabe 4.8): die Cucumber-Szenarien @req-12.x rufen das Werkzeug direkt auf -->
+                <!-- Werkzeugquellen nur für Tests: Drive-Import und Gleichheit von Wissenspaket und REST-Import. -->
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
                 <version>${build-helper-plugin.version}</version>
@@ -350,6 +367,7 @@
                         <configuration>
                             <sources>
                                 <source>${project.basedir}/../tools/drive_import/src/main/java</source>
+                                <source>${project.basedir}/../tools/wissen_paket/src/main/java</source>
                             </sources>
                         </configuration>
                     </execution>

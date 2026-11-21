@@ -1,129 +1,196 @@
 :host {
   display: block;
+  container-type: inline-size;
 }
 
+// Schmal: Vorschau klein neben dem Kopf; breit: links über die ganze Höhe (Prototyp `.kk`)
 .eintrag {
-  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  grid-template-areas: 'bild kopf' 'rumpf rumpf';
+  gap: 0.75rem 0.875rem;
   overflow-wrap: anywhere;
+
+  &.fehlerhaft {
+    border-color: color-mix(in srgb, var(--gefahr) 45%, var(--linie));
+  }
 }
 
-.kopf {
-  display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
-  gap: 0.75rem;
-  align-items: start;
+@container (min-width: 34rem) {
+  .eintrag {
+    grid-template-columns: 120px minmax(0, 1fr);
+    grid-template-areas: 'bild kopf' 'bild rumpf';
+    grid-template-rows: auto 1fr;
+    gap: 0 1.125rem;
+  }
 }
 
 .vorschau {
+  grid-area: bild;
+  box-sizing: border-box;
   width: 100%;
   aspect-ratio: 210 / 297;
   object-fit: contain;
-  background: var(--urinet-hell);
-  border: 1px solid var(--urinet-linie);
+  background: var(--urinet-papier);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
 
-  &.leer {
+  &.ohne-bild {
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    background: transparent;
-    color: var(--urinet-gedaempft);
-    font-size: 0.75rem;
+    background: var(--karte-2);
+    color: var(--text-gedaempft);
+    font-size: 11px;
   }
+}
+
+.kopf,
+.rumpf,
+.feld {
+  min-width: 0;
+}
+
+.kopf {
+  grid-area: kopf;
+}
+
+.rumpf {
+  grid-area: rumpf;
 }
 
 .titel {
-  font: var(--mat-sys-title-medium);
   margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
 }
 
-.status {
-  margin: 0.25rem 0;
-  color: var(--urinet-gedaempft);
-}
-
-.fehler-status {
-  color: var(--urinet-fehler);
-}
-
-dl {
-  margin: 0.25rem 0 0;
-}
-
-.zeile {
+.meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 0.5rem;
+  gap: 0.375rem;
+  margin: 0.375rem 0 0;
 }
 
-dt {
-  color: var(--urinet-gedaempft);
-
-  &::after {
-    content: ':';
-  }
+// Vorschlag als Kacheln; `.zeile` bleibt für das Szenario
+.vorschlag {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.625rem;
+  margin: 0.875rem 0 0;
 }
 
-dd {
-  margin: 0;
+.vorschlag .wert {
+  hyphens: auto;
 }
 
 .pruefen {
   display: inline-block;
   margin-left: 0.25rem;
   padding: 0 0.375rem;
-  border-radius: 0.25rem;
-  background: var(--urinet-gelb);
-  color: var(--urinet-dunkel);
-  font-size: 0.8125rem;
+  border: 1px solid var(--warnung);
+  border-radius: 99px;
+  background: var(--karte);
+  color: var(--warnung);
+  font-size: 11.5px;
   font-weight: 600;
+  letter-spacing: 0;
+  vertical-align: 1px;
 }
 
-.hinweis {
-  color: var(--urinet-gedaempft);
-  margin: 0.25rem 0;
+.nebentext {
+  color: var(--text-gedaempft);
+  font-size: 13px;
+  margin: 0.375rem 0;
 }
 
-.warnung {
-  border-left: 3px solid var(--urinet-gelb);
-  padding-left: 0.5rem;
+// Entwurf wiederhergestellt: Knopf rechts daneben
+.rumpf > .hinweis {
+  margin: 0.625rem 0 0;
 }
 
-.fehler {
-  color: var(--urinet-fehler);
-  border-left: 3px solid var(--urinet-fehler);
-  padding-left: 0.5rem;
+.rumpf > .hinweis.info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.knoepfe,
+.gewaehlt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .knoepfe {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  margin-top: 0.875rem;
 
-  button {
-    min-height: 2.75rem;
+  .nebentext {
+    margin: 0;
   }
 }
 
-.gefahr {
-  --mat-button-filled-container-color: var(--urinet-fehler);
-  --mat-button-filled-label-text-color: var(--urinet-dunkel);
+button {
+  min-height: 2.75rem;
+
+  app-symbol {
+    --symbol-groesse: 16px;
+    margin-inline-end: 0.375rem;
+    vertical-align: -3px;
+  }
+}
+
+.stand {
+  margin-left: auto;
+}
+
+.verwerfen-knopf {
+  --mat-button-text-label-text-color: var(--gefahr);
+}
+
+button.gefahr {
+  --mat-button-filled-container-color: var(--gefahr);
+  --mat-button-filled-label-text-color: var(--karte);
 }
 
 .formular,
-.verwerfen {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-}
-
+.verwerfen,
+.rueckfrage,
 .zusatzfelder {
   display: grid;
   gap: 0.75rem;
+  margin: 0.875rem 0 0;
+}
+
+.verwerfen,
+.rueckfrage,
+.zusatzfelder {
+  padding: 0.875rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
+
+  > p:first-child {
+    margin: 0;
+  }
+
+  .knoepfe {
+    margin-top: 0;
+  }
+}
+
+.verwerfen {
+  border-color: color-mix(in srgb, var(--gefahr) 40%, var(--linie));
+}
+
+.zusatzfelder {
   margin: 0;
   padding: 0.75rem;
-  border: 1px solid var(--urinet-linie);
 
   legend {
     padding: 0 0.25rem;
@@ -134,12 +201,13 @@ dd {
 .feld {
   display: grid;
   gap: 0.25rem;
-  min-width: 0;
 }
 
 label,
 .label {
+  font-size: 13px;
   font-weight: 600;
+  color: var(--text-2);
 }
 
 input,
@@ -150,13 +218,13 @@ textarea {
   min-height: 2.75rem;
   padding: 0.5rem;
   font: inherit;
-  color: var(--urinet-hell);
-  background: var(--urinet-dunkel);
-  border: 1px solid var(--urinet-gedaempft);
-  border-radius: 0.25rem;
+  color: var(--text);
+  background: var(--karte);
+  border: 1px solid var(--text-gedaempft);
+  border-radius: var(--radius-klein);
 
   &[aria-invalid='true'] {
-    border-color: var(--urinet-fehler);
+    border-color: var(--gefahr);
   }
 }
 
@@ -165,10 +233,6 @@ textarea {
 }
 
 .gewaehlt {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
   margin: 0;
 }
 

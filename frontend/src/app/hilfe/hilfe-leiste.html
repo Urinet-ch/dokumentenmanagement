@@ -1,0 +1,36 @@
+<section class="hilfe-leiste" role="dialog" aria-modal="true" aria-labelledby="hilfe-leiste-titel">
+  <header class="hilfe-kopf">
+    <h2 id="hilfe-leiste-titel" tabindex="-1">{{ texte.titel }}</h2>
+    <button mat-button type="button" (click)="hilfe.schliessen()">{{ texte.schliessen }}</button>
+  </header>
+
+  <nav class="hilfe-inhalt" [attr.aria-label]="texte.inhalt">
+    @for (eintrag of eintraege(); track eintrag.anker) {
+      <a
+        [href]="'/hilfe#' + eintrag.anker"
+        [attr.aria-current]="ausgewaehlt()?.anker === eintrag.anker ? 'location' : null"
+        (click)="waehlen($event, eintrag.anker)"
+      >{{ eintrag.titel }}</a>
+    }
+  </nav>
+
+  @if (ausgewaehlt(); as eintrag) {
+    <section class="hilfe-abschnitt karte" aria-labelledby="hilfe-abschnitt-titel">
+      <h3 id="hilfe-abschnitt-titel">{{ eintrag.titel }}</h3>
+      <app-anleitung-text
+        [eintrag]="eintrag"
+        [leiste]="true"
+        [ids]="false"
+        (abschnitt)="hilfe.wechseln($event)"
+        (navigiert)="hilfe.schliessen()"
+      />
+    </section>
+  }
+
+  <a
+    class="ganze-anleitung"
+    routerLink="/hilfe"
+    [fragment]="ausgewaehlt()?.anker ?? undefined"
+    (click)="navigiert.emit()"
+  >{{ texte.ganzeAnleitung }}</a>
+</section>

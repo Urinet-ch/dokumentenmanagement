@@ -111,8 +111,8 @@ Funktionalität: Handy-Erfassung
   @req-4.6
   Szenario: Nach drei Fehlversuchen mit HTTP 5xx ist die Erfassung fehlerhaft und lässt sich wiederholen
     Angenommen ein Handy, dessen Rückkamera «ein Blatt» filmt
-    Und die Uhr des Handys lässt sich vorstellen
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und die Uhr des Handys lässt sich vorstellen
     Und das Archiv antwortet auf die nächsten 3 Uploads mit Status 503
     Wenn ich im Menü «Erfassen» wähle
     Und ich 1 Seite aufnehme

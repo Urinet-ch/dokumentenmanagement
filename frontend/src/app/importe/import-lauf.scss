@@ -1,57 +1,84 @@
 :host {
   display: block;
-  max-width: 64rem;
+  max-width: 72rem;
 }
 
-h1 {
-  font: var(--mat-sys-headline-small);
-  margin-top: 0;
+.seitenkopf h1 {
   overflow-wrap: anywhere;
+}
+
+.zurueck {
+  margin: 0 0 0.5rem;
 }
 
 h2,
 h3 {
-  font: var(--mat-sys-title-medium);
+  font-size: 1rem;
+  font-weight: 650;
+  margin: 0 0 0.5rem;
 }
 
-.angaben,
-.hinweis {
-  color: var(--urinet-gedaempft);
-}
-
-.hinweis {
+p {
   margin: 0;
 }
 
-.fehler {
-  color: var(--urinet-fehler);
+.angaben,
+.nebentext {
+  color: var(--text-gedaempft);
 }
 
-.status-titel:focus {
-  outline: none;
+.fehler {
+  color: var(--gefahr);
+}
+
+.status-titel {
+  display: inline-block;
+  margin-bottom: 1rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 99px;
+  background: var(--akzent-weich);
+  color: var(--akzent-text);
+  font-size: 0.875rem;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.laufhinweis p {
+  margin-bottom: 1rem;
 }
 
 .karte {
-  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.zu-lange,
+.zuordnung,
+.bilanz,
+.bestaetigen {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
 }
 
 .feld {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.3rem;
+  width: 100%;
 }
 
 select {
   font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: var(--karte);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
   min-height: 2.75rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0 0.625rem;
   width: 100%;
   max-width: 28rem;
-}
-
-.zuordnung {
-  display: grid;
-  gap: 0.5rem;
-  justify-items: start;
 }
 
 .spalten {
@@ -62,92 +89,89 @@ select {
   gap: 0.75rem;
   width: 100%;
 
+  @media (min-width: 48rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   li {
     display: grid;
     gap: 0.125rem;
+    min-width: 0;
   }
 }
 
+// Kennzahlen als Kacheln (Baustein button.kachel), zugleich Filter
 .zaehler {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.chip {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 1.25rem;
-  min-height: 2.75rem;
-  padding: 0.25rem 0.875rem;
-  cursor: pointer;
-
-  &[aria-pressed='true'] {
-    border-color: var(--urinet-gelb);
-    box-shadow: inset 0 0 0 1px var(--urinet-gelb);
-  }
-
-  .anzahl {
-    font-weight: 700;
-  }
-}
-
-.zeilen {
-  list-style: none;
-  padding: 0;
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.625rem;
+  margin: 0.5rem 0 1rem;
 }
 
-.zeile {
-  display: grid;
-  gap: 0.375rem;
+// Tabelle der Zeilen (Baustein .tabelle) in eigenem kartenartigem Rahmen, breit in eigenem Scrollbereich
+.vorschau .tabelle {
+  min-width: 44rem;
 
-  p {
-    margin: 0;
+  :is(th, td) {
+    vertical-align: top;
   }
 }
 
-.zeile-kopf {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
+.vorschau {
+  .tabelle-rahmen {
+    margin-bottom: 0.75rem;
+    background: var(--karte);
+    border: 1px solid var(--linie);
+    border-radius: var(--radius);
+    box-shadow: var(--schatten);
+  }
+
+  tbody th {
+    font-weight: 400;
+    white-space: nowrap;
+  }
 }
 
 .nr {
+  display: block;
   font-weight: 600;
+  margin-bottom: 0.25rem;
 }
 
-.marke {
-  border: 1px solid var(--urinet-linie);
-  border-radius: 1rem;
-  padding: 0 0.5rem;
+.zeile[data-ergebnis='DUBLETTE'] > * {
+  background: color-mix(in srgb, var(--warnung-weich) 50%, transparent);
+}
 
-  &[data-ergebnis='NEU'],
-  &[data-ergebnis='GEAENDERT'] {
-    border-color: var(--urinet-erfolg);
+.werte-zelle {
+  min-width: 18rem;
+
+  .meldung {
+    color: var(--gefahr);
+    margin-bottom: 0.25rem;
   }
-  &[data-ergebnis='DUBLETTE'] {
-    border-color: var(--urinet-gelb);
-  }
-  &[data-ergebnis='FEHLER'] {
-    border-color: var(--urinet-fehler);
-  }
+}
+
+.kontakt-zelle {
+  min-width: 11rem;
+}
+
+.entscheid-zelle select {
+  min-width: 13rem;
 }
 
 .felder {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-  gap: 0.25rem 1rem;
+  gap: 0.125rem;
   margin: 0;
 
+  div {
+    display: grid;
+    grid-template-columns: minmax(6rem, 10rem) minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
   dt {
-    color: var(--urinet-gedaempft);
-    font-size: 0.875em;
+    color: var(--text-gedaempft);
   }
 
   dd {
@@ -164,7 +188,7 @@ select {
 
 .kandidaten ul {
   margin: 0.125rem 0 0;
-  padding-left: 1.25rem;
+  padding-left: 1.125rem;
 }
 
 .blaettern,
@@ -176,9 +200,22 @@ select {
 }
 
 .blaettern {
+  justify-content: flex-end;
   margin-bottom: 1rem;
+  color: var(--text-gedaempft);
+}
+
+.bilanz ul {
+  margin: 0;
+  padding-left: 1.125rem;
 }
 
 .bestaetigen {
-  border: 1px solid var(--urinet-gelb);
+  border-color: var(--urinet-gelb);
+}
+
+button app-symbol {
+  --symbol-groesse: 16px;
+  vertical-align: -0.2em;
+  margin-right: 0.375rem;
 }

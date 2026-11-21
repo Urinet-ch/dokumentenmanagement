@@ -1,6 +1,9 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
+import ch.urinet.archiv.gemeinsam.domain.PaketUngueltig;
+import ch.urinet.archiv.gemeinsam.domain.PaketBereitsImportiert;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.KlassifikationUngueltig;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
@@ -30,9 +33,19 @@ public class ProblemAbbildung {
     static final String BEARER = "Bearer";
     /** Wartezeit für {@code SPEICHER_NICHT_ERREICHBAR} (design.md «Error Handling»), Auslegung Aufgabe 2.4. */
     static final String SPEICHER_NOCHMALS_NACH_SEKUNDEN = "30";
+    static final String DIENST_NOCHMALS_NACH_SEKUNDEN = "1";
 
     @ServerExceptionMapper
     public Response fachFehler(FachFehler fehler) {
+        if (fehler instanceof PaketUngueltig paket) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "befunde", paket.befunde())).build();
+        }
+        if (fehler instanceof PaketBereitsImportiert paket) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "entwurfId", paket.entwurfId())).build();
+        }
+        if (fehler instanceof EntwurfBefunde entwurf) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "befunde", entwurf.befunde())).build();
+        }
         if (fehler instanceof KlassifikationUngueltig klassifikation) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "klassifikationen",
                     klassifikation.klassifikationen())).build();
@@ -51,7 +64,10 @@ public class ProblemAbbildung {
                     .header(HttpHeaders.RETRY_AFTER, Long.toString(zuViele.wartezeitSekunden())).build();
         }
         Response.ResponseBuilder antwort = builder(ProblemAntwort.fuer(fehler.code()));
-        if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {
+        if (fehler.code() == Fehlercode.UEBERLASTET
+                || fehler.code() == Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR) {
+            antwort.header(HttpHeaders.RETRY_AFTER, DIENST_NOCHMALS_NACH_SEKUNDEN);
+        } else if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {
             antwort.header(HttpHeaders.RETRY_AFTER, SPEICHER_NOCHMALS_NACH_SEKUNDEN);
         }
         return antwort.build();

@@ -279,7 +279,7 @@ public class VollstaendigkeitSchritte {
         return id;
     }
 
-    private static String imFremdenThread(Callable<String> aufruf) {
+    private static <T> T imFremdenThread(Callable<T> aufruf) {
         ExecutorService thread = Executors.newSingleThreadExecutor();
         try {
             return thread.submit(aufruf).get(60, TimeUnit.SECONDS);
@@ -426,7 +426,7 @@ public class VollstaendigkeitSchritte {
         WerkzeugKontext kontext = WerkzeugKontext.fuer(new MandantCode(benutzer.substring(trenner + 1)),
                 new Benutzer("test-" + benutzer, Rolle.valueOf(benutzer.substring(0, trenner)
                         .toUpperCase(Locale.ROOT))), null);
-        List<String> namen = auswahl.angeboten(kontext);
+        List<String> namen = imFremdenThread(() -> auswahl.angeboten(kontext));
         assertThat(namen).as(benutzer).contains("dokumente_suchen", "dokument_zeigen", "fristen");
         return namen;
     }

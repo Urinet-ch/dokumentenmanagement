@@ -88,6 +88,10 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   Der Snapshot-Test (Req 8.3) vergleicht Prompt, Schema und eine Liste von Nachbearbeitungsfällen vor und nach dem
   Umstellen. Grenzen gegen zu lange Prompts: KI-Texte je höchstens 8'000 Zeichen, `ki_hinweise` je Art 1'000,
   Summe aller Texte und Beschreibungen im Prompt höchstens 24'000 Zeichen (Prüfung in `Konfiguration.pruefen`).
+  Für das Basisschema ohne dynamische KI-Felder oder Klassifikationen bleibt die Gate-0-Darstellung für die
+  Prompt-Kennung erhalten; Art-Codes bleiben dabei dynamisch. An das Modell geht weiterhin das dynamische, strikt
+  validierte Schema. Sobald KI-Felder oder Klassifikationen das Schema erweitern, wird diese Darstellung auch für die
+  Kennung verwendet.
   Ohne Abnahme nach Req 8.4 (Schalter `ki_freigegeben` in den KI-Texten, setzt nur der Betreiber mit Verweis auf die
   Abnahme) erzeugt der Worker für den Mandanten keinen Auftrag `KI_VORSCHLAG`; `urinet` startet mit `true`.
   Abnahme eines Mandanten ohne Golden-Datensatz (Req 8.9, Entscheid Fabian 17.11.2026): Stichprobe mit der
@@ -104,6 +108,14 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   selben Sichtbarkeitsfilter wie Spec 01, 14.5; die Namen der zugeordneten Werte gehen mit Gewicht C in den
   `tsvector` (Neuberechnung bei Zuordnung und bei Namensänderung des Werts). Klassifikations-Codes kommen nur aus der
   geprüften Konfiguration, nie als SQL-Bezeichner aus der Anfrage.
+  Review-Nacharbeit zu Aufgabe 18.2 (20.11.2026): Im Modus `hybrid` zählen die Facetten dieselben höchstens
+  30 gelieferten Dokumente wie `gesamt`, auch beim Rückfall; keine Volltextbedingung schliesst semantische Treffer
+  nachträglich aus. Sicht und sämtliche Filter werden bei der Zählung erneut geprüft. Im Modus `volltext` bleibt
+  die bisherige Zählung über alle Treffer mit Auslassen des eigenen Klassifikationsfilters unverändert.
+  Der Rollback des noch nicht gemergten Changesets 055 stellt unter PostgreSQL 17 die generierte
+  `volltext_tsv`-Spalte und beide GIN-Indizes neu her; ausschliesslich abgeleitete Suchdaten werden ersetzt.
+  Die Vorwärtsmigration und ihre Prüfsumme bleiben unverändert. Ein Liquibase-Test prüft Bestand, zwei Schemas,
+  den Rollback und anschliessendes erneutes Migrieren.
 - `integration/webseite/` (bisher `integration/wordpress/`; Spec 03, Folgeänderung; umgesetzt in Spec 03, Aufgaben
   11.2 und 11.5) – Parameter der öffentlichen Liste: zusätzlich die Codes der Klassifikationen
   mit `oeffentlich_filter`, z. B. `?fachgebiet=bad`; der feste Sicherheitsfilter aus Spec 03 design.md bleibt
@@ -129,7 +141,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | POST | `/konfiguration/pruefen`, `/konfiguration/vergleichen` | Datei im Body; Befunde bzw. Diff; ändert nichts | A11 |
 | PUT | `/konfiguration` | Datei einspielen; 200 mit neuer Version und Diff (bzw. ohne Version bei keinem Unterschied); 409 `KONFIGURATION_VERALTET`, 422 | A11 |
 | GET | `/berichte/luecken?geschaeftsjahr=` | Lückenbericht nach `FOLGE`/`ERWARTET`, Antwortform `VollstaendigkeitAbfrage.Antwort` (wie das Werkzeug `vollstaendigkeit`; bisher geplant `?art=&jahr=`: Parameter heisst wie beim Werkzeug, ohne Filter `art`, jede Kategorie nennt ihre Art); nur Rollen mit uneingeschränkter Sicht (Req 5.4); `@RolesAllowed` nennt alle Rollen (`@AlleArchivRollen`), der Endpunkt prüft die Sicht und meldet die Verweigerung (403 `NICHT_ERLAUBT`) ins Zugriffsprotokoll (Spec 01, Req 10.7) | `inhaber`, `treuhaender`, `geschaeftsstelle` |
-| GET | `/mandant/funktionen` | `{finanz: bool}` (Req 8.8) | alle Rollen |
+| GET | `/mandant/funktionen` | `{finanzVerfuegbar: bool}` (Req 8.8; Feldname so umgesetzt, Aufgabe 18.2) | alle Rollen |
 
 Alle Änderungen einzelner Elemente verlangen `If-Match` mit der Konfigurationsversion (Req 7.6); jede Antwort trägt
 die neue Version als `ETag`. Bestehende Endpunkte: `POST/PATCH/DELETE /dokumentarten` nehmen die neuen Attribute an
@@ -167,6 +179,17 @@ selbst (Checkbox sichtbar, Hinweis unter den Gruppen). Antworten von Prüfen und
 und von Zuordnungen einer früher gewählten Art werden verworfen; die Dateiauswahl ist während einer Anfrage gesperrt.
 Ein 403 vom Backend zeigt bewusst die gemeinsame Meldung «nicht berechtigt» (Guard und Rechte entscheidet das Backend);
 eine Weiterleitung auf die 404-Seite gibt es nur über den Guard (Nachbesserung Review PR #323).
+
+## Eingangskorb und Artwechsel (Aufgabe 18.4)
+Bei einem Wechsel einer bereits gesetzten Art sendet der Eingangskorb vor der Bestätigung ein PATCH mit der neuen Art
+und den Klassifikationen der neuen Art, auch wenn sonst keine Werte geändert wurden. Das ersetzt Auslegungspunkt 4
+aus PR #332; die Bestätigung verwendet die vom PATCH gelieferte Version. Nicht zugeordnete Klassifikationen bleiben
+im Formular sichtbar. Ein ersetzendes Klassifikations-PATCH enthält nur Zuordnungen der gewählten Art: Nicht
+zugeordnete Werte entfallen dabei, auch wenn die Art nicht gewechselt hat. Ohne Änderung wird kein solches PATCH
+gesendet; die Prüfung bei der Bestätigung bleibt Aufgabe des Backends (Req 3.5).
+
+Abweichung von Spec 01 design.md «Metadaten bearbeiten»: Zusatzwerte ausserhalb der neuen Art werden im Formular
+separat angezeigt und bei einem Artwechsel nicht mitgesendet; sie bleiben nicht auf dem Dokument erhalten.
 
 ## Admin-Kommando
 ```
@@ -496,6 +519,16 @@ Ebenso trägt die Aufgabe, die das Recht A11 erweitert, das in Spec 01, 2.6 und 
   `src/test/resources/seed/` prüft `KonfigurationSeedTest` gegen Schema und Prüfungen, aber nicht gegen eine
   Stammdaten-Tabelle.
 - Isolation: `MandantenIsolationIT` mit den Wegen nach Req 9.3.
+- Umsetzung 18.5: `MandantenIsolationIT` in `MandantenIsolationTest` prüft Abbild, Versionsinhalt,
+  Admin-Export, API, Suchfilter, KI-Anfragen und Lückenbericht mit getrennten Mandanten. Die Browser-Szenarien
+  `mandantenisolation-pwa.feature` prüfen die sichtbaren Verwaltungslisten gegen die echte Test-API.
+  `mandantenisolation.feature` ergänzt vollständige API-Abbilder und KI-Texte sowie den Ablauf des
+  synthetischen `probe-verband` mit Klassifikation, EINDEUTIG-Regel, Archivierung und Fristbezug `FELD`.
+  Der Multipart-Import prüft zusätzlich unbekannte und inaktive Arten, fremde Klassifikationen und
+  mehrere Werte einer einfachen Klassifikation: Dokumente, Dateien, Aufträge und Ablage bleiben
+  nach der Ablehnung in beiden Mandanten unverändert.
+  Die Testfixture bezieht Datenquelle und OIDC-URL erst bei der Szenarioausführung; sie erzwingt
+  keine Datenbank oder Anmeldung beim Start anderer Testprofile oder Kommando-Tests.
 - Migration: Test mit einem Schema im Stand vor Spec 05 (Arten von `urinet` und ein Dokument mit Sperre) → nach der
   Migration gleiche Arten, Frist und Sperre, Version 1 (Req 9.1, 9.2).
 

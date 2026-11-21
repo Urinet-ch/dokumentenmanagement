@@ -10,7 +10,7 @@ Funktionalität: Auftragsschlange
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Und die Auftragsschlange ist leer
 
-  @req-1.6
+  @req-1.6 @req-1.4 @req-9.1
   Szenario: Jeder Auftrag läuft im Kontext seines Mandanten
     Angenommen im Mandanten «vhf-gsk» ist ein Auftrag «TEST_OK» eingereiht
     Und im Mandanten «urinet» ist ein Auftrag «TEST_OK» eingereiht

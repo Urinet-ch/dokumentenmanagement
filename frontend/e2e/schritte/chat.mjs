@@ -35,9 +35,77 @@ Given('der Chat hat keine Gespräche', function () {
   chat.verlauf.clear();
 });
 
+Given('ein Chatgespräch enthält eine Wissensquelle und einen Analysevorschlag', async function () {
+  const chat = attrappe(this);
+  const gespraech = chat.gespraeche[0];
+  gespraech.titel = 'Wissen zur Probe';
+  chat.verlauf.set(gespraech.id, [
+    {
+      id: '101', rolle: 'ASSISTENT', inhalt: 'Eine belegte Antwort.', status: 'OK', analyseMoeglich: true,
+      zeit: '2026-11-02T09:15:00Z',
+      quellen: [{
+        wissen: { titel: 'Synthetische Wissensseite', link: '/wissen/konzepte/probe',
+          stand: '2026-01-01T10:00:00Z' },
+        dokumente: [{ titel: SEEDORF.titel, link: `/dokument/${SEEDORF.id}`, seiten: '2' }],
+      }],
+    },
+    {
+      id: '102', rolle: 'ASSISTENT', inhalt: 'Eine Kennzahl.', status: 'OK', analyseMoeglich: false,
+      zeit: '2026-11-02T09:16:00Z', quellen: [],
+    },
+  ]);
+  const id = '11111111-1111-4111-8111-111111111111';
+  await this.seite.route((url) => url.pathname.startsWith('/api/v1/wissensentwuerfe'), async (route) => {
+    const anfrage = route.request();
+    if (anfrage.method() === 'POST' && new URL(anfrage.url()).pathname.endsWith('/analyse')) {
+      assert.deepEqual(anfrage.postDataJSON(), { nachrichtId: '101' });
+      await route.fulfill({ status: 201, json: { id } });
+    } else {
+      await route.fulfill({ status: 200, json: {
+        id, status: 'ERLEDIGT', entscheidungen: [{ nr: 1, status: 'ABGELEHNT', grund: 'Synthetischer Grund' }],
+      } });
+    }
+  });
+});
+
+Then('sind Wissensseite und Quelldokument im Chat unterscheidbar', async function () {
+  const antwort = antworten(this.seite).first();
+  await antwort.getByRole('link', { name: 'Wissensseite: Synthetische Wissensseite' }).waitFor();
+  await antwort.getByRole('link', { name: `${SEEDORF.titel}, Seite 2` }).waitFor();
+});
+
+When('ich im Chat die Wissensquelle öffne', async function () {
+  await antworten(this.seite).first().getByRole('link', { name: 'Wissensseite: Synthetische Wissensseite' }).click();
+});
+
+Then('sehe ich die Wissensseite «Synthetische Wissensseite»', async function () {
+  await this.seite.getByRole('heading', { name: 'Synthetische Wissensseite' }).waitFor();
+});
+
+Then('gibt es nur für die zulässige Antwort die Aktion «Als Analyse vorschlagen»', async function () {
+  const knoepfe = this.seite.getByRole('button', { name: 'Als Analyse vorschlagen', exact: true });
+  await knoepfe.first().waitFor();
+  assert.equal(await knoepfe.count(), 1);
+  assert.equal(await antworten(this.seite).last().getByRole('button', { name: 'Als Analyse vorschlagen' }).count(), 0);
+});
+
+When('ich die zulässige Antwort als Analyse vorschlage', async function () {
+  await antworten(this.seite).first().getByRole('button', { name: 'Als Analyse vorschlagen' }).click();
+});
+
+When('ich den Status des Analysevorschlags öffne', async function () {
+  await this.seite.getByRole('link', { name: 'Analyse vorgeschlagen. Status anzeigen' }).click();
+});
+
+Then('sehe ich den Entscheid und Grund meines Analysevorschlags', async function () {
+  await this.seite.getByText('ABGELEHNT', { exact: false }).waitFor();
+  await this.seite.getByText('Synthetischer Grund', { exact: false }).waitFor();
+});
+
 When(/^ich die Frage «(.+)» sende$/, async function (frage) {
   const feld = this.seite.getByRole('textbox', { name: 'Frage', exact: true });
   await feld.fill(frage);
+  await this.seite.locator('form.eingabe button[type="submit"]:enabled').waitFor();
   await feld.press('Enter');
 });
 
@@ -55,7 +123,7 @@ When(/^ich das Gespräch «(.+)» öffne$/, async function (titel) {
 });
 
 When(/^ich auf die Quelle «(.+)» tippe$/, async function (titel) {
-  await letzteAntwort(this.seite).getByRole('link', { name: titel, exact: true }).click();
+  await letzteAntwort(this.seite).locator('a[data-test=quelle]').filter({ hasText: titel }).click();
 });
 
 Then(/^sehe ich unter den letzten Gesprächen «(.+)» vom «(.+)»$/, async function (titel, datum) {

@@ -31,12 +31,18 @@ public class WissenLesen {
         this.berechtigung = berechtigung;
     }
 
+    @Transactional
     public IndexErgebnis index(Benutzer benutzer, Seitentyp typ, String tag, String q, UUID dokumentId,
                                int offset, int groesse) {
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
         WissenLesenRepository.IndexErgebnis treffer = repository.index(Sichtregel.fuer(benutzer),
                 new WissenLesenRepository.IndexAnfrage(typ, tag, q, dokumentId, offset, groesse));
         return IndexErgebnis.gruppieren(treffer, offset, groesse);
+    }
+
+    public List<WissenLesenRepository.SeiteVerweis> seitenFuerDokument(Benutzer benutzer, UUID dokumentId) {
+        berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
+        return repository.seitenFuerDokument(Sichtregel.fuer(benutzer), dokumentId);
     }
 
     /** Eine ungültige Seiten-ID gilt wie eine unsichtbare Seite als nicht vorhanden (404, {@code VERWEIGERT}). */
@@ -124,15 +130,17 @@ public class WissenLesen {
             WissenLesenRepository.DokumentKopf dokument = quelle.dokumentId() == null ? null : dokumente.get(quelle.dokumentId());
             WissenLesenRepository.SeiteVerweis ziel = quelle.quellSeiteId() == null ? null : seiten.get(quelle.quellSeiteId());
             if (dokument != null) {
-                ergebnis.put(quelle.schluessel(), new QuellenAnzeige(dokument.titel(), dokument.dateiname(), null, null));
+                ergebnis.put(quelle.schluessel(), new QuellenAnzeige(dokument.titel(), dokument.dateiname(),
+                        null, null, dokument.datum()));
             } else if (ziel != null) {
-                ergebnis.put(quelle.schluessel(), new QuellenAnzeige(null, null, ziel.pfad(), ziel.titel()));
+                ergebnis.put(quelle.schluessel(), new QuellenAnzeige(null, null, ziel.pfad(), ziel.titel(), null));
             }
         }
         return ergebnis;
     }
 
-    public record QuellenAnzeige(String dokumentTitel, String dokumentDateiname, String seitePfad, String seiteTitel) {
+    public record QuellenAnzeige(String dokumentTitel, String dokumentDateiname, String seitePfad, String seiteTitel,
+                                 java.time.LocalDate dokumentDatum) {
     }
 
     public String inhaltDarstellen(Benutzer benutzer, String markdown) {

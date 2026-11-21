@@ -1,8 +1,11 @@
-<h1>{{ texte.titel }}</h1>
-<p>{{ texte.einleitung }}</p>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ gruppe }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
 <p class="meldung" role="status" aria-live="polite">{{ meldung() }}</p>
 @if (fehler()) {
-  <p class="fehler" role="alert">{{ fehler() }}</p>
+  <p class="hinweis gefahr" role="alert">{{ fehler() }}</p>
 }
 @if (tokens() === null) {
   @if (!fehler()) {
@@ -15,126 +18,143 @@
 } @else if (tokens()!.length === 0) {
   <p role="status">{{ texte.keine }}</p>
 } @else {
-  <ul class="liste" aria-label="API-Tokens">
-    @for (token of tokens(); track token.id ?? $index) {
-      <li class="karte token" data-test="token">
-        <div class="angaben">
-          <span class="feld">
-            <span class="label">{{ texte.name }}</span>
-            <bdi class="wert">{{ token.name }}</bdi>
-          </span>
-          <span class="feld">
-            <span class="label">{{ texte.scope }}</span>
-            <code class="wert">{{ scopeText(token.scope) }}</code>
-          </span>
-          <span class="feld">
-            <span class="label">{{ texte.erstellt }}</span>
-            <time class="wert" [attr.datetime]="token.erstellt ?? null">{{
-              zeitpunkt(token.erstellt)
-            }}</time>
-          </span>
-          <span class="feld">
-            <span class="label">{{ texte.zuletzt }}</span>
-            @if (token.zuletzt) {
-              <time class="wert" [attr.datetime]="token.zuletzt">{{
-                zeitpunkt(token.zuletzt)
-              }}</time>
-            } @else {
-              <span class="wert">{{ texte.nieGenutzt }}</span>
+  <div class="karte tabellen-karte">
+    <div class="tabelle-rahmen">
+      <table class="tabelle" aria-label="API-Tokens">
+        <thead>
+          <tr>
+            <th scope="col">{{ texte.name }}</th>
+            <th scope="col">{{ texte.scope }}</th>
+            <th scope="col">{{ texte.erstellt }}</th>
+            <th scope="col">{{ texte.zuletzt }}</th>
+            <th scope="col">{{ texte.ablaufdatum }}</th>
+            <th scope="col">{{ texte.status }}</th>
+            <th scope="col"><span class="nur-screenreader">{{ texte.spalteAktionen }}</span></th>
+          </tr>
+        </thead>
+        @for (token of tokens(); track token.id ?? $index) {
+          <tbody data-test="token">
+            <tr>
+              <td><bdi class="wert name">{{ token.name }}</bdi></td>
+              <td><code class="pille mono">{{ scopeText(token.scope) }}</code></td>
+              <td class="zeit">
+                <time [attr.datetime]="token.erstellt ?? null">{{ zeitpunkt(token.erstellt) }}</time>
+              </td>
+              <td class="zeit">
+                @if (token.zuletzt) {
+                  <time [attr.datetime]="token.zuletzt">{{ zeitpunkt(token.zuletzt) }}</time>
+                } @else {
+                  <span class="gedaempft">{{ texte.nieGenutzt }}</span>
+                }
+              </td>
+              <td>
+                @if (token.gueltigBis) {
+                  <span [attr.data-status]="tokenStatus(token)">{{ texte.laeuftAbAm(ablaufdatumText(token)) }}</span>
+                } @else {
+                  <span class="gedaempft">{{ texte.keinAblauf }}</span>
+                }
+              </td>
+              <td>
+                <span
+                  class="pille"
+                  [class.ok]="tokenStatus(token) === 'aktiv'"
+                  [class.gefahr]="tokenStatus(token) === 'abgelaufen'"
+                  [attr.data-status]="tokenStatus(token)"
+                >{{ statusText(token) }}</span>
+              </td>
+              <td class="rechts">
+                @if (token.aktiv === true && bestaetigung() !== token.id) {
+                  <button
+                    mat-button
+                    type="button"
+                    class="gefahr"
+                    [disabled]="widerrufLaeuft() !== null || !token.id"
+                    (click)="bestaetigungAnzeigen(token)"
+                  >
+                    {{ texte.widerrufen }}
+                  </button>
+                }
+              </td>
+            </tr>
+            @if (
+              (token.aktiv === true && !token.gueltigBis && langeUngenutzt(token)) ||
+              tokenStatus(token) === 'abgelaufen' ||
+              ablaufBearbeitbar(token) ||
+              (token.aktiv === true && bestaetigung() === token.id)
+            ) {
+              <tr class="zusatz">
+                <td colspan="7">
+                  <div class="zusatz-inhalt">
+                    @if (token.aktiv === true && !token.gueltigBis && langeUngenutzt(token)) {
+                      <p class="gefahrtext">{{ texte.hinweisOhneAblauf }}</p>
+                    }
+                    @if (tokenStatus(token) === 'abgelaufen') {
+                      <p class="gefahrtext">{{ texte.hinweisAbgelaufen }}</p>
+                    }
+                    @if (ablaufBearbeitbar(token)) {
+                      <div class="ablauf">
+                        <label class="label" [for]="'ablaufdatum-' + token.id">{{ texte.ablaufdatumEingeben }}</label>
+                        <div class="knoepfe">
+                          <input
+                            [id]="'ablaufdatum-' + token.id"
+                            type="date"
+                            [value]="ablaufWert(token)"
+                            [min]="heute"
+                            [max]="spaetestesAblaufdatum"
+                            [disabled]="ablaufLaeuft() !== null"
+                            (input)="ablaufdatumAendern(token, $event)"
+                          />
+                          <button
+                            mat-flat-button
+                            type="button"
+                            [disabled]="ablaufLaeuft() !== null || !ablaufdatumGueltig(ablaufWert(token), heute)"
+                            (click)="ablaufSpeichern(token)"
+                          >
+                            {{ texte.ablaufSpeichern }}
+                          </button>
+                          @if (token.gueltigBis) {
+                            <button
+                              mat-button
+                              type="button"
+                              [disabled]="ablaufLaeuft() !== null"
+                              (click)="ablaufEntfernen(token)"
+                            >
+                              {{ texte.ablaufEntfernen }}
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    }
+                    @if (token.aktiv === true && bestaetigung() === token.id) {
+                      <div class="bestaetigung">
+                        <span>{{ texte.widerrufFrage }}</span>
+                        <div class="knoepfe">
+                          <button
+                            mat-flat-button
+                            type="button"
+                            [disabled]="widerrufLaeuft() !== null"
+                            (click)="widerrufen(token)"
+                          >
+                            {{ texte.widerrufBestaetigen }}
+                          </button>
+                          <button
+                            mat-button
+                            type="button"
+                            [disabled]="widerrufLaeuft() !== null"
+                            (click)="abbrechen()"
+                          >
+                            {{ texte.abbrechen }}
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </td>
+              </tr>
             }
-          </span>
-          <span class="feld">
-            <span class="label">{{ texte.ablaufdatum }}</span>
-            @if (token.gueltigBis) {
-              <span class="wert" [attr.data-status]="tokenStatus(token)">{{
-                texte.laeuftAbAm(ablaufdatumText(token))
-              }}</span>
-            } @else {
-              <span class="wert">{{ texte.keinAblauf }}</span>
-            }
-          </span>
-          <span class="feld">
-            <span class="label">{{ texte.status }}</span>
-            <span class="wert" [attr.data-status]="tokenStatus(token)">{{
-              statusText(token)
-            }}</span>
-          </span>
-        </div>
-        @if (token.aktiv === true && !token.gueltigBis && langeUngenutzt(token)) {
-          <p class="hinweis">{{ texte.hinweisOhneAblauf }}</p>
+          </tbody>
         }
-        @if (tokenStatus(token) === 'abgelaufen') {
-          <p class="hinweis">{{ texte.hinweisAbgelaufen }}</p>
-        }
-        @if (ablaufBearbeitbar(token)) {
-          <div class="ablauf">
-            <label class="label" [for]="'ablaufdatum-' + token.id">{{ texte.ablaufdatumEingeben }}</label>
-            <input
-              [id]="'ablaufdatum-' + token.id"
-              type="date"
-              [value]="ablaufWert(token)"
-              [min]="heute"
-              [max]="spaetestesAblaufdatum"
-              [disabled]="ablaufLaeuft() !== null"
-              (input)="ablaufdatumAendern(token, $event)"
-            />
-            <div class="knoepfe">
-              <button
-                mat-flat-button
-                type="button"
-                [disabled]="ablaufLaeuft() !== null || !ablaufdatumGueltig(ablaufWert(token), heute)"
-                (click)="ablaufSpeichern(token)"
-              >
-                {{ texte.ablaufSpeichern }}
-              </button>
-              @if (token.gueltigBis) {
-                <button
-                  mat-button
-                  type="button"
-                  [disabled]="ablaufLaeuft() !== null"
-                  (click)="ablaufEntfernen(token)"
-                >
-                  {{ texte.ablaufEntfernen }}
-                </button>
-              }
-            </div>
-          </div>
-        }
-        @if (token.aktiv === true) {
-          @if (bestaetigung() === token.id) {
-            <div class="bestaetigung">
-              <span>{{ texte.widerrufFrage }}</span>
-              <div class="knoepfe">
-                <button
-                  mat-flat-button
-                  type="button"
-                  [disabled]="widerrufLaeuft() !== null"
-                  (click)="widerrufen(token)"
-                >
-                  {{ texte.widerrufBestaetigen }}
-                </button>
-                <button
-                  mat-button
-                  type="button"
-                  [disabled]="widerrufLaeuft() !== null"
-                  (click)="abbrechen()"
-                >
-                  {{ texte.abbrechen }}
-                </button>
-              </div>
-            </div>
-          } @else {
-            <button
-              mat-stroked-button
-              type="button"
-              [disabled]="widerrufLaeuft() !== null || !token.id"
-              (click)="bestaetigungAnzeigen(token)"
-            >
-              {{ texte.widerrufen }}
-            </button>
-          }
-        }
-      </li>
-    }
-  </ul>
+      </table>
+    </div>
+  </div>
 }

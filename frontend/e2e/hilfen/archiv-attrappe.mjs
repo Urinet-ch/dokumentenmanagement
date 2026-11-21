@@ -50,6 +50,7 @@ export async function archivAttrappe(welt) {
   const archiv = {
     eintraege: [],
     arten: ARTEN,
+    klassifikationen: [],
     kontakte: [],
     aktionen: [],
     ablehnung: null,
@@ -60,8 +61,11 @@ export async function archivAttrappe(welt) {
   const zustaendig = (url) =>
     url.origin === origin &&
     (url.pathname === '/api/v1/eingangskorb' ||
+      url.pathname === '/api/v1/wissensentwuerfe' ||
       url.pathname === '/api/v1/dokumentarten' ||
+      url.pathname === '/api/v1/klassifikationen' ||
       url.pathname === '/api/v1/kontakte' ||
+      /^\/api\/v1\/dokumentarten\/[^/]+\/klassifikationen$/.test(url.pathname) ||
       /^\/api\/v1\/dokumente\/[^/]+\/(vorschau|bestaetigen|verwerfen|wiederholen)$/.test(
         url.pathname,
       ) ||
@@ -81,8 +85,17 @@ export async function archivAttrappe(welt) {
       const eintraege = archiv.eintraege.slice(seite * groesse, (seite + 1) * groesse);
       return json(route, 200, { eintraege, gesamt: archiv.eintraege.length, seite, groesse });
     }
+    if (url.pathname === '/api/v1/wissensentwuerfe') {
+      return json(route, 200, []);
+    }
     if (url.pathname === '/api/v1/dokumentarten') {
       return json(route, 200, archiv.arten);
+    }
+    if (url.pathname === '/api/v1/klassifikationen') {
+      return json(route, 200, archiv.klassifikationen);
+    }
+    if (/^\/api\/v1\/dokumentarten\/[^/]+\/klassifikationen$/.test(url.pathname)) {
+      return json(route, 200, []);
     }
     if (url.pathname === '/api/v1/kontakte') {
       const q = (url.searchParams.get('q') ?? '').toLowerCase();

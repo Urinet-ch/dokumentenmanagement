@@ -120,7 +120,8 @@ Then(/^hat die PWA die Art «(.+)» mit den Zusatzwerten (.+) und dem Grund gese
   await this.seite.locator('[data-test=bearbeiten-formular]').waitFor({ state: 'detached' });
   assert.equal(this.suche.aenderungen.length, 1);
   const [{ body }] = this.suche.aenderungen;
-  assert.deepEqual(Object.keys(body).sort(), ['art', 'grund', 'zusatz']);
+  assert.deepEqual(Object.keys(body).sort(), ['art', 'grund', 'klassifikationen', 'zusatz']);
   assert.equal(body.art, art);
+  assert.deepEqual(body.klassifikationen, {});
   assert.deepEqual(body.zusatz, JSON.parse(zusatz));
 });

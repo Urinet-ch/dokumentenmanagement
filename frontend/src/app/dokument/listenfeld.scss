@@ -9,8 +9,9 @@
   margin: 0;
   padding: 0.5rem;
   min-width: 0;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 0.25rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
 }
 
 legend,
@@ -30,10 +31,10 @@ legend,
     height: 1.5rem;
     flex: none;
     margin: 0;
-    accent-color: var(--urinet-gelb);
+    accent-color: var(--akzent-text);
 
     &[aria-invalid='true'] {
-      outline: 2px solid var(--urinet-fehler);
+      outline: 2px solid var(--gefahr);
     }
   }
 }
@@ -66,24 +67,24 @@ legend,
     min-height: 2.75rem;
     padding: 0.5rem;
     font: inherit;
-    color: var(--urinet-hell);
-    background: var(--urinet-dunkel);
-    border: 1px solid var(--urinet-gedaempft);
-    border-radius: 0.25rem;
+    color: var(--text);
+    background: var(--karte);
+    border: 1px solid var(--text-gedaempft);
+    border-radius: var(--radius-klein);
 
     &[aria-invalid='true'] {
-      border-color: var(--urinet-fehler);
+      border-color: var(--gefahr);
     }
   }
 }
 
-.hinweis {
+.nebentext {
   margin: 0;
-  color: var(--urinet-gedaempft);
+  color: var(--text-gedaempft);
   font: var(--mat-sys-body-small);
 }
 
 .fehler {
   margin: 0;
-  color: var(--urinet-fehler);
+  color: var(--gefahr);
 }

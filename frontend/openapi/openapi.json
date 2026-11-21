@@ -1,6 +1,97 @@
 {
   "components" : {
     "schemas" : {
+      "Aenderung" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "nr" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aktion" : {
+            "type" : "string"
+          },
+          "seiteId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "pfad" : {
+            "type" : "string"
+          },
+          "basisVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "daten" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "inhalt" : {
+            "type" : "string"
+          },
+          "diff" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "begruendung" : {
+            "type" : "string"
+          },
+          "widersprueche" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "entfernteAussagen" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "befunde" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "hinweise" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "vertraulichkeitKontext" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "entschiedenVon" : {
+            "type" : "string"
+          },
+          "entschiedenAm" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "grund" : {
+            "type" : "string"
+          },
+          "ergebnisVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "etag" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "Antwort" : {
         "type" : "object",
         "properties" : {
@@ -25,6 +116,62 @@
           },
           "hinweis" : {
             "type" : "string"
+          }
+        }
+      },
+      "Antwort1" : {
+        "type" : "object",
+        "properties" : {
+          "entwurfId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "anzahl" : {
+            "$ref" : "#/components/schemas/Anzahl"
+          },
+          "paketSha256" : {
+            "type" : "string"
+          },
+          "befunde" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            }
+          },
+          "hinweise" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            }
+          }
+        }
+      },
+      "Anzahl" : {
+        "type" : "object",
+        "properties" : {
+          "neu" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aendern" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unveraendert" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ignoriert" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -153,6 +300,37 @@
           }
         }
       },
+      "Aussage" : {
+        "type" : "object",
+        "properties" : {
+          "nr" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "schluessel" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "seiten" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          "auszug" : {
+            "type" : "string"
+          },
+          "belegt" : {
+            "type" : "boolean"
+          },
+          "zugeordnet" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "AuszugTeil" : {
         "description" : "Stück der Textstelle; treffer = hervorgehobener Suchbegriff (Req 14.4)",
         "type" : "object",
@@ -163,6 +341,41 @@
           },
           "treffer" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "Bearbeitung" : {
+        "type" : "object",
+        "properties" : {
+          "titel" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "tags" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "veraltetAb" : {
+            "$ref" : "#/components/schemas/LocalDate"
+          },
+          "quellen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Quelleneintrag"
+            }
+          },
+          "inhalt" : {
+            "type" : "string"
+          },
+          "entfernteAussagen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EntfernteAussage"
+            }
           }
         }
       },
@@ -362,8 +575,12 @@
       },
       "ChatNachricht" : {
         "type" : "object",
-        "required" : [ "rolle", "inhalt", "quellen", "zeit" ],
+        "required" : [ "id", "rolle", "inhalt", "quellen", "zeit", "analyseMoeglich" ],
         "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "Nachrichten-ID als Dezimalzahl"
+          },
           "rolle" : {
             "type" : "string",
             "enum" : [ "BENUTZER", "ASSISTENT" ]
@@ -385,12 +602,29 @@
           "zeit" : {
             "type" : "string",
             "$ref" : "#/components/schemas/Instant"
+          },
+          "analyseMoeglich" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ChatQuelldokument" : {
+        "type" : "object",
+        "properties" : {
+          "titel" : {
+            "type" : "string"
+          },
+          "link" : {
+            "type" : "string"
+          },
+          "seiten" : {
+            "type" : "string"
           }
         }
       },
       "ChatQuelle" : {
         "type" : "object",
-        "description" : "Dokument (id, titel, link) oder Datenstand eines Zahlenwerkzeugs (werkzeug, datenstand, belege)",
+        "description" : "Dokument (id, titel, link), Datenstand eines Zahlenwerkzeugs (werkzeug, datenstand, belege) oder Wissensseite mit direkten Quelldokumenten (wissen, dokumente)",
         "properties" : {
           "id" : {
             "anyOf" : [ {
@@ -420,6 +654,19 @@
           "belege" : {
             "type" : [ "integer", "null" ],
             "format" : "int32"
+          },
+          "wissen" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ChatWissensquelle"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "dokumente" : {
+            "type" : [ "array", "null" ],
+            "items" : {
+              "$ref" : "#/components/schemas/ChatQuelldokument"
+            }
           }
         }
       },
@@ -442,6 +689,20 @@
             "items" : {
               "$ref" : "#/components/schemas/ChatNachricht"
             }
+          }
+        }
+      },
+      "ChatWissensquelle" : {
+        "type" : "object",
+        "properties" : {
+          "titel" : {
+            "type" : "string"
+          },
+          "link" : {
+            "type" : "string"
+          },
+          "stand" : {
+            "$ref" : "#/components/schemas/Instant"
           }
         }
       },
@@ -663,6 +924,13 @@
               "type" : "string"
             },
             "description" : "Codes der Klassifikationen, an denen die nächste Speicherung nach der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern"
+          },
+          "wissensseiten" : {
+            "type" : [ "array", "null" ],
+            "items" : {
+              "$ref" : "#/components/schemas/DokumentWissensseitenVerweis"
+            },
+            "description" : "Sichtbare Wissensseiten mit diesem Dokument als Quelle; nur beim Einzelabruf"
           }
         }
       },
@@ -895,6 +1163,20 @@
           }
         }
       },
+      "DokumentWissensseitenVerweis" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "pfad" : {
+            "type" : "string"
+          },
+          "titel" : {
+            "type" : "string"
+          }
+        }
+      },
       "Dokumentart" : {
         "type" : "object",
         "required" : [ "code", "name", "gruppen", "pflichtfelder", "zusatzSchema", "vertraulichkeit", "gesetzlichePflicht", "aktiv", "selbstAusgestellt", "belegnummerMuster", "kiVorschlag", "kiFelder", "reihenfolge" ],
@@ -1096,6 +1378,53 @@
           }
         }
       },
+      "Eingabe" : {
+        "type" : "object",
+        "properties" : {
+          "seiteId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "pfad" : {
+            "type" : "string"
+          },
+          "typ" : {
+            "type" : "string"
+          },
+          "titel" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "tags" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "veraltetAb" : {
+            "$ref" : "#/components/schemas/LocalDate"
+          },
+          "quellen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Quelleneintrag"
+            }
+          },
+          "inhalt" : {
+            "type" : "string"
+          },
+          "begruendung" : {
+            "type" : "string"
+          },
+          "entfernteAussagen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EntfernteAussage"
+            }
+          }
+        }
+      },
       "EingangskorbSeite" : {
         "type" : "object",
         "required" : [ "eintraege", "gesamt", "seite", "groesse" ],
@@ -1118,6 +1447,32 @@
           "groesse" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "EntfernteAussage" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "begruendung" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Entscheidung" : {
+        "type" : "object",
+        "properties" : {
+          "nr" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "grund" : {
+            "type" : "string"
           }
         }
       },
@@ -1370,6 +1725,25 @@
           },
           "naechsteFrist" : {
             "$ref" : "#/components/schemas/LocalDate"
+          }
+        }
+      },
+      "ImportHerkunft" : {
+        "type" : "object",
+        "properties" : {
+          "paketSha256" : {
+            "type" : "string"
+          },
+          "kopf" : {
+            "$ref" : "#/components/schemas/PaketKopf"
+          },
+          "unveraendert" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ignoriert" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -1844,6 +2218,41 @@
           }
         }
       },
+      "Klassifikationsfacette" : {
+        "type" : "object",
+        "required" : [ "code", "name", "werte" ],
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "werte" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/KlassifikationswertFacette"
+            }
+          }
+        }
+      },
+      "KlassifikationswertFacette" : {
+        "type" : "object",
+        "required" : [ "code", "name", "anzahl" ],
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "anzahl" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Anzahl sichtbarer Dokumente; im Modus hybrid nur unter den gelieferten Treffern"
+          }
+        }
+      },
       "KonfigurationKiTexte" : {
         "type" : "object",
         "properties" : {
@@ -2312,14 +2721,83 @@
           }
         }
       },
+      "Kopf" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "anlass" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "erstelltVon" : {
+            "type" : "string"
+          },
+          "erstellt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "dokumentId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "unvollstaendig" : {
+            "type" : "boolean"
+          },
+          "hinweis" : {
+            "type" : "string"
+          },
+          "herkunft" : {
+            "$ref" : "#/components/schemas/ImportHerkunft"
+          }
+        }
+      },
       "LocalDate" : {
         "type" : "string",
         "format" : "date",
         "examples" : [ "2022-03-10" ]
       },
+      "Mandantenfunktionen" : {
+        "type" : "object",
+        "required" : [ "finanzVerfuegbar" ],
+        "properties" : {
+          "finanzVerfuegbar" : {
+            "type" : "boolean",
+            "description" : "Mindestens eine aktive Dokumentart hat die Gruppe «finanz» (Spec 05, Req 8.8)"
+          }
+        }
+      },
+      "PaketKopf" : {
+        "type" : "object",
+        "properties" : {
+          "paketFormat" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "mandant" : {
+            "type" : "string"
+          },
+          "erzeugtVon" : {
+            "type" : "string"
+          },
+          "erzeugtMit" : {
+            "type" : "string"
+          },
+          "kontextStufe" : {
+            "type" : "string"
+          },
+          "erzeugtAm" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "instanz" : {
+            "type" : "string"
+          }
+        }
+      },
       "ProtokollAktion" : {
         "type" : "string",
-        "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV" ]
+        "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "WISSEN_IMPORT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV", "BENUTZER_ANLEGEN", "BENUTZER_AENDERN", "BENUTZER_LOESCHEN", "ROLLE_ZUWEISEN", "BENUTZER_ANTRAG", "BENUTZER_ABWEICHUNG" ]
       },
       "ProtokollEintrag" : {
         "description" : "Eintrag des Zugriffsprotokolls; Name und Rolle aus dem Benutzerverzeichnis zur Zeit des Eintrags (Req 10.10)",
@@ -2386,6 +2864,34 @@
           "groesse" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "Quelleneintrag" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "dokumentId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "seiteVon" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "seiteBis" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "auszug" : {
+            "type" : "string"
+          },
+          "quellSeiteId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "sha256" : {
+            "type" : "string"
           }
         }
       },
@@ -2518,14 +3024,37 @@
           }
         }
       },
+      "StatusAnsicht" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "entscheidungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Entscheidung"
+            }
+          }
+        }
+      },
       "Suchergebnis" : {
         "type" : "object",
-        "required" : [ "treffer", "gesamt", "seite", "groesse" ],
+        "required" : [ "treffer", "facetten", "gesamt", "seite", "groesse" ],
         "properties" : {
           "treffer" : {
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/Suchtreffer"
+            }
+          },
+          "facetten" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Klassifikationsfacette"
             }
           },
           "gesamt" : {
@@ -2747,11 +3276,31 @@
           },
           "anlass" : {
             "type" : "string",
-            "enum" : [ "AKTION", "AUSTRITT", "WIDERRUF" ]
+            "enum" : [ "AKTION", "AUSTRITT", "WIDERRUF", "ANLAGE", "UEBERNAHME" ]
           },
           "erfasstVon" : {
             "type" : [ "string", "null" ],
             "description" : "Kennung, die Austritt oder Widerruf erfasst hat"
+          }
+        }
+      },
+      "Vollansicht" : {
+        "type" : "object",
+        "properties" : {
+          "entwurf" : {
+            "$ref" : "#/components/schemas/Kopf"
+          },
+          "kernaussagen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Aussage"
+            }
+          },
+          "aenderungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Aenderung"
+            }
           }
         }
       },
@@ -2776,6 +3325,98 @@
           "meldung" : {
             "type" : [ "string", "null" ],
             "description" : "Meldung der Dokumentregel"
+          }
+        }
+      },
+      "WissenAnalyse" : {
+        "type" : "object",
+        "properties" : {
+          "nachrichtId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "WissenAnnehmen" : {
+        "type" : "object",
+        "properties" : {
+          "fassung" : {
+            "$ref" : "#/components/schemas/Bearbeitung"
+          },
+          "vertraulichkeit" : {
+            "type" : "string"
+          },
+          "grund" : {
+            "type" : "string"
+          }
+        }
+      },
+      "WissenEinstellungen" : {
+        "type" : "object",
+        "properties" : {
+          "budgetTokens" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "lintBudgetTokens" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "lintZeitplan" : {
+            "type" : [ "string", "null" ]
+          },
+          "monatsbudgetTokens" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "minimum" : 1
+          }
+        }
+      },
+      "WissenExport" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "erstellt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "fertig" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "gueltigBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "groesse" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64"
+          },
+          "sha256" : {
+            "type" : [ "string", "null" ]
+          },
+          "url" : {
+            "type" : [ "string", "null" ]
+          },
+          "fehlerId" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/UUID"
+            }, {
+              "type" : "null"
+            } ]
           }
         }
       },
@@ -2812,6 +3453,32 @@
             "type" : [ "integer", "null" ],
             "format" : "int32",
             "minimum" : 1
+          }
+        }
+      },
+      "WissenLintAuftrag" : {
+        "type" : "object",
+        "properties" : {
+          "lintId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
+      "WissenVerwerfen" : {
+        "type" : "object",
+        "properties" : {
+          "grund" : {
+            "type" : "string"
+          }
+        }
+      },
+      "WissensEmbeddingAuftrag" : {
+        "type" : "object",
+        "required" : [ "auftragId" ],
+        "properties" : {
+          "auftragId" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -2939,6 +3606,21 @@
           }
         }
       },
+      "WissensSuchergebnis" : {
+        "type" : "object",
+        "required" : [ "treffer", "degradiert" ],
+        "properties" : {
+          "treffer" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/WissensIndexZeile"
+            }
+          },
+          "degradiert" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "Wissensdiff" : {
         "type" : "object",
         "properties" : {
@@ -3010,6 +3692,9 @@
           },
           "quellSeiteTitel" : {
             "type" : "string"
+          },
+          "dokumentDatum" : {
+            "$ref" : "#/components/schemas/LocalDate"
           }
         }
       },
@@ -3408,7 +4093,7 @@
     "/api/v1/chat" : {
       "post" : {
         "summary" : "Frage an den Chat",
-        "description" : "Antwort als Server-Sent Events mit benannten Ereignissen, JSON in data: «werkzeug» {name} je Werkzeugaufruf, «text» {delta}, genau ein «quellen» [{id, titel, link} | {werkzeug, datenstand, belege}] vor «fertig» {gespraechId, tokens: {ein, aus}}; «fehler» {meldung, gespraechId} beendet den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 NICHT_GEFUNDEN (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After und dem Feld grund der Problem Details (STUNDENLIMIT: mehr als 100 Fragen in 60 Minuten; LAEUFT: schon eine laufende Frage, Retry-After höchstens 5 s). Nur beschreibend: der generierte Client liest den Stream nicht.",
+        "description" : "Antwort als Server-Sent Events mit benannten Ereignissen, JSON in data: «werkzeug» {name} je Werkzeugaufruf, «text» {delta}, genau ein «quellen» [{id, titel, link} | {werkzeug, datenstand, belege} | {wissen: {titel, link, stand}, dokumente: [{titel, link, seiten}]}] vor «fertig» {gespraechId, nachrichtId, tokens: {ein, aus}}; «fehler» {meldung, gespraechId} beendet den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 NICHT_GEFUNDEN (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After und dem Feld grund der Problem Details (STUNDENLIMIT: mehr als 100 Fragen in 60 Minuten; LAEUFT: schon eine laufende Frage, Retry-After höchstens 5 s). Nur beschreibend: der generierte Client liest den Stream nicht.",
         "tags" : [ "Chat" ],
         "requestBody" : {
           "content" : {
@@ -3920,7 +4605,7 @@
     "/api/v1/dokumente" : {
       "post" : {
         "summary" : "Dateien hochladen",
-        "description" : "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».",
+        "description" : "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen» als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprüft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».",
         "tags" : [ "Dokumente" ],
         "requestBody" : {
           "content" : {
@@ -3946,6 +4631,12 @@
                     "type" : "boolean"
                   },
                   "hinweis" : {
+                    "type" : "string"
+                  },
+                  "art" : {
+                    "type" : "string"
+                  },
+                  "klassifikationen" : {
                     "type" : "string"
                   }
                 }
@@ -4001,7 +4692,7 @@
       },
       "get" : {
         "summary" : "Dokumente suchen",
-        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
+        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Klassifikationsfilter als wiederholbare Parameter klassifikation.<code>=<wert>; Antwort enthält sichtbarkeitsgeprüfte Facetten. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
         "tags" : [ "Dokumente" ],
         "parameters" : [ {
           "description" : "Code der Dokumentart",
@@ -6323,6 +7014,33 @@
         } ]
       }
     },
+    "/api/v1/mandant/funktionen" : {
+      "get" : {
+        "summary" : "Verfügbare Funktionen des Mandanten",
+        "tags" : [ "Konfiguration" ],
+        "responses" : {
+          "200" : {
+            "description" : "Funktionen des aktuellen Mandanten",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Mandantenfunktionen"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/protokoll" : {
       "get" : {
         "summary" : "Zugriffsprotokoll durchsuchen",
@@ -6685,6 +7403,207 @@
         } ]
       }
     },
+    "/api/v1/wissensbasis/einstellungen" : {
+      "put" : {
+        "summary" : "Wissenseinstellungen ersetzen",
+        "description" : "Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.",
+        "tags" : [ "Wissensbasis" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenEinstellungen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Einstellungen gespeichert",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenEinstellungen"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Budget oder Zeitplan ungültig"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "get" : {
+        "summary" : "Wissenseinstellungen lesen",
+        "description" : "Nur Inhaber (A19); null bedeutet den konfigurierten Startwert.",
+        "tags" : [ "Wissensbasis" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenEinstellungen"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensbasis/embeddings" : {
+      "post" : {
+        "summary" : "Seiten-Embeddings neu berechnen",
+        "description" : "Auftrag im verifizierten Mandanten, A17.",
+        "tags" : [ "Wissensbasis" ],
+        "responses" : {
+          "202" : {
+            "description" : "Nachberechnung eingereiht oder schon laufend",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissensEmbeddingAuftrag"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Kein Freigaberecht"
+          },
+          "429" : {
+            "description" : "Monatsbudget der Wissensbasis erschöpft"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensbasis/exporte" : {
+      "post" : {
+        "summary" : "OKF-Export anfordern",
+        "description" : "Nur Inhaber (A19); reiht WISSEN_EXPORT ein.",
+        "tags" : [ "Wissensbasis" ],
+        "responses" : {
+          "202" : {
+            "description" : "Export angelegt und eingereiht",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenExport"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensbasis/exporte/{id}" : {
+      "get" : {
+        "summary" : "OKF-Export abrufen",
+        "description" : "Nur Inhaber (A19); Download ab Abschluss für 24 Stunden.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Exportstatus und gegebenenfalls Download-Adresse",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenExport"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Export nicht gefunden"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensbasis/lint" : {
+      "post" : {
+        "summary" : "Lint der Wissensbasis starten",
+        "responses" : {
+          "202" : {
+            "description" : "Lint eingereiht",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenLintAuftrag"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf keinen Lint starten"
+          },
+          "409" : {
+            "description" : "Ein Lint läuft bereits"
+          },
+          "429" : {
+            "description" : "Monatsbudget der Wissensbasis erschöpft"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "tags" : [ "Wissen Lint Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/wissensbasis/log" : {
       "get" : {
         "summary" : "Wissensbasis-Log",
@@ -6729,10 +7648,450 @@
         } ]
       }
     },
+    "/api/v1/wissensentwuerfe" : {
+      "get" : {
+        "summary" : "Wissensentwürfe auflisten",
+        "description" : "A17 sieht alle Entwürfe; A18 nur den Status eigener Analysevorschläge.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Entwürfe",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf keine Entwürfe lesen"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "Manuellen Wissensentwurf anlegen",
+        "tags" : [ "Wissensbasis" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Eingabe"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Entwurf angelegt und geprüft"
+          },
+          "400" : {
+            "description" : "Anfrage ungültig"
+          },
+          "403" : {
+            "description" : "Rolle darf keine Entwürfe anlegen"
+          },
+          "404" : {
+            "description" : "Seite nicht vorhanden oder nicht sichtbar"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/analyse" : {
+      "post" : {
+        "summary" : "Eigene Chat-Antwort als Analyse vorschlagen",
+        "tags" : [ "Wissensbasis" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenAnalyse"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Analyseentwurf angelegt"
+          },
+          "400" : {
+            "description" : "Nachrichten-ID ungültig"
+          },
+          "403" : {
+            "description" : "Rolle darf keine Analyse vorschlagen"
+          },
+          "404" : {
+            "description" : "Antwort oder Quelle nicht sichtbar"
+          },
+          "422" : {
+            "description" : "Analyse aus diesem Gespräch nicht möglich"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/import" : {
+      "post" : {
+        "summary" : "Wissenspaket synchron als Entwurf importieren",
+        "description" : "A17, nur OIDC. Keine KI, keine Freigabe. Höchstens 10 MiB ZIP und 60 Sekunden.",
+        "tags" : [ "Wissensbasis" ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "paket" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Importentwurf angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Antwort1"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Teil paket fehlt oder ist mehrfach vorhanden"
+          },
+          "403" : {
+            "description" : "Import nicht erlaubt"
+          },
+          "409" : {
+            "description" : "Paket bereits importiert oder zu viele offene Importe"
+          },
+          "413" : {
+            "description" : "Paket zu gross"
+          },
+          "415" : {
+            "description" : "Kein ZIP oder falscher Medientyp"
+          },
+          "422" : {
+            "description" : "Paket ungültig; Codes und Pfade ohne Inhalte"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/annehmen" : {
+      "post" : {
+        "summary" : "Eine Wissensänderung annehmen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "entwurfId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "nr",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenAnnehmen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Änderung angenommen"
+          },
+          "403" : {
+            "description" : "Rolle darf Änderungen nicht annehmen"
+          },
+          "404" : {
+            "description" : "Änderung nicht gefunden oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Änderung ist nicht offen"
+          },
+          "412" : {
+            "description" : "Version veraltet"
+          },
+          "422" : {
+            "description" : "Fassung hat Befunde oder die Vertraulichkeit ist ungültig"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/neu-erzeugen" : {
+      "post" : {
+        "summary" : "Veraltete Wissensänderung neu erzeugen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "entwurfId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "nr",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "202" : {
+            "description" : "Neuerzeugung eingereiht"
+          },
+          "403" : {
+            "description" : "Rolle darf Änderungen nicht neu erzeugen"
+          },
+          "404" : {
+            "description" : "Änderung nicht gefunden oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Änderung kann nicht neu erzeugt werden"
+          },
+          "412" : {
+            "description" : "Version veraltet"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/verwerfen" : {
+      "post" : {
+        "summary" : "Wissensänderung verwerfen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "entwurfId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "name" : "nr",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenVerwerfen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Änderung verworfen"
+          },
+          "403" : {
+            "description" : "Rolle darf Änderungen nicht verwerfen"
+          },
+          "404" : {
+            "description" : "Änderung nicht gefunden oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Änderung ist nicht offen"
+          },
+          "412" : {
+            "description" : "Version veraltet"
+          },
+          "422" : {
+            "description" : "Grund fehlt"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{id}" : {
+      "get" : {
+        "summary" : "Wissensentwurf abrufen",
+        "description" : "A17 sieht Fassungen und Diffs; A18 nur Status, Entscheide und Gründe eigener Analysen.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Entwurf mit Importherkunft für A17; nur Status für A18",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/Vollansicht"
+                  }, {
+                    "$ref" : "#/components/schemas/StatusAnsicht"
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Rolle darf den Entwurf nicht lesen"
+          },
+          "404" : {
+            "description" : "Entwurf nicht gefunden"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/{id}/neu-pruefen" : {
+      "post" : {
+        "summary" : "Quellen und Befunde eines Importentwurfs ohne KI neu prüfen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "description" : "ID des Importentwurfs",
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Prüfung erneuert; Änderungs-ETags erhöht"
+          },
+          "403" : {
+            "description" : "Prüfung nicht erlaubt"
+          },
+          "404" : {
+            "description" : "Importentwurf nicht gefunden"
+          },
+          "409" : {
+            "description" : "Entwurf ist kein offener Import"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/wissensseiten" : {
       "get" : {
         "summary" : "Wissensseiten-Index",
-        "description" : "Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.",
+        "description" : "Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen. modus=hybrid oder volltext liefert höchstens 30 rangierte Treffer ohne Gesamtzahl/Paging, hybrid mit Volltext-Rückfall und degradiert. Ohne modus bleibt der Index unverändert.",
         "tags" : [ "Wissensbasis" ],
         "parameters" : [ {
           "name" : "dokumentId",
@@ -6747,6 +8106,12 @@
           },
           "name" : "groesse",
           "in" : "query"
+        }, {
+          "name" : "modus",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
         }, {
           "schema" : {
             "type" : "integer",
@@ -6781,10 +8146,18 @@
         } ],
         "responses" : {
           "200" : {
-            "description" : "Index oder Seite",
+            "description" : "Index, Seite oder rangiertes Suchergebnis",
             "content" : {
               "application/json" : {
-                "schema" : { }
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/WissensIndex"
+                  }, {
+                    "$ref" : "#/components/schemas/Wissensseite"
+                  }, {
+                    "$ref" : "#/components/schemas/WissensSuchergebnis"
+                  } ]
+                }
               }
             }
           },
@@ -6927,6 +8300,53 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensseiten/{id}/quelle-geprueft" : {
+      "post" : {
+        "summary" : "Prüfung der Quellen bestätigen",
+        "description" : "Entfernt den Hinweis nur für den mit If-Match angegebenen aktuellen Seitenstand.",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Quellenprüfung bestätigt"
+          },
+          "403" : {
+            "description" : "Kein Freigaberecht"
+          },
+          "404" : {
+            "description" : "Seite nicht vorhanden"
+          },
+          "409" : {
+            "description" : "Kein Quellenhinweis vorhanden"
+          },
+          "412" : {
+            "description" : "Seitenstand geändert"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       }
     },

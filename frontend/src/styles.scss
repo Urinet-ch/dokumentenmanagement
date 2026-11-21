@@ -2,25 +2,58 @@
 @use './theme-colors' as farben;
 
 // UriNet-Branding (tech.md, Konventionen Frontend). Inter liegt lokal im Build (@fontsource-variable/inter), kein CDN.
+// Hell und dunkel nach Prototyp `docs/oberflaeche/prototyp.html` (Entscheid Fabian 20.11.2026): Das System gibt das
+// Farbschema vor, der Knopf in der Kopfzeile übersteuert es (`data-farbschema` auf <html>, siehe farbschema.ts).
+// Jede Farbe ist ein Token mit light-dark(); Komponenten verwenden nur Tokens.
 :root {
-  --urinet-dunkel: #05070c;
-  --urinet-karte: #0d1017;
+  // feste Markenfarben
   --urinet-gelb: #eeb111;
-  --urinet-hell: #f2efe7;
-  --urinet-gedaempft: #b9b4a8;
-  --urinet-linie: #2a2f3a;
-  --urinet-fehler: #ffb4ab;
-  --urinet-erfolg: #8fd19e;
+  --urinet-schwarz: #05070c;
+  --urinet-papier: #f2efe7;
+
+  // Flächen und Text je Farbschema
+  --flaeche: light-dark(#f2efe7, #05070c);
+  --karte: light-dark(#fffdf8, #0d1017);
+  --karte-2: light-dark(#f7f3e8, #131722);
+  --glas: light-dark(rgb(255 253 248 / 72%), rgb(13 16 23 / 78%));
+  --linie: light-dark(#e7e0cd, #1f2431);
+  --linie-stark: light-dark(#d6cdb4, #2c3242);
+  --text: light-dark(#05070c, #f2efe7);
+  --text-2: light-dark(#3a3d45, #cfccc3);
+  --text-gedaempft: light-dark(#6f6a5a, #8d909a);
+  --akzent-text: light-dark(#7a5900, #f2c13a);
+  --akzent-weich: light-dark(#fbefc8, rgb(238 177 17 / 14%));
+  --leuchten: light-dark(rgb(238 177 17 / 22%), rgb(238 177 17 / 10%));
+  --ok: light-dark(#21734a, #5cc488);
+  --ok-weich: light-dark(#e1f2e7, rgb(92 196 136 / 13%));
+  --warnung: light-dark(#9a5b00, #f0a940);
+  --warnung-weich: light-dark(#fdf0d8, rgb(240 169 64 / 13%));
+  --gefahr: light-dark(#b3261e, #ffb4ab);
+  --gefahr-weich: light-dark(#fbe4e1, rgb(255 180 171 / 13%));
+  --schatten: 0 1px 2px light-dark(rgb(40 30 0 / 5%), rgb(0 0 0 / 40%)),
+    0 8px 24px -12px light-dark(rgb(40 30 0 / 18%), rgb(0 0 0 / 70%));
+  --radius: 16px;
+  --radius-klein: 10px;
+  --schrift-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  // Frühere Namen, jetzt je Farbschema (von den Seiten verwendet)
+  --urinet-dunkel: var(--flaeche);
+  --urinet-karte: var(--karte);
+  --urinet-hell: var(--text);
+  --urinet-gedaempft: var(--text-gedaempft);
+  --urinet-linie: var(--linie);
+  --urinet-fehler: var(--gefahr);
+  --urinet-erfolg: var(--ok);
 }
 
 html {
   height: 100%;
-  color-scheme: dark;
-  // Material-Palette aus #eeb111 (ng generate @angular/material:theme-color); das Branding ist dunkel
+  color-scheme: light dark;
+  // Material-Palette aus #eeb111 (ng generate @angular/material:theme-color), beide Farbschemata über light-dark()
   @include mat.theme(
     (
       color: (
-        theme-type: dark,
+        theme-type: color-scheme,
         primary: farben.$primary-palette,
         tertiary: farben.$tertiary-palette,
       ),
@@ -33,24 +66,55 @@ html {
   );
   @include mat.sidenav-overrides(
     (
-      container-background-color: var(--urinet-dunkel),
-      content-background-color: var(--urinet-dunkel),
+      container-background-color: transparent,
+      content-background-color: transparent,
       container-shape: 0,
+      container-divider-color: transparent,
     )
   );
+  // Hauptaktion in Gelb mit dunkler Schrift, in beiden Farbschemata
+  @include mat.button-overrides(
+    (
+      filled-container-color: var(--urinet-gelb),
+      filled-label-text-color: var(--urinet-schwarz),
+      filled-container-shape: var(--radius-klein),
+      outlined-container-shape: var(--radius-klein),
+      text-container-shape: var(--radius-klein),
+    )
+  );
+
+  &[data-farbschema='hell'] {
+    color-scheme: light;
+  }
+
+  &[data-farbschema='dunkel'] {
+    color-scheme: dark;
+  }
 }
 
 body {
-  background-color: var(--urinet-dunkel);
-  color: var(--urinet-hell);
+  background-color: var(--flaeche);
+  background-image:
+    radial-gradient(900px 520px at 88% -8%, var(--leuchten), transparent 70%),
+    radial-gradient(700px 600px at -10% 110%, light-dark(rgb(5 7 12 / 5%), rgb(242 239 231 / 3%)), transparent 70%);
+  background-attachment: fixed;
+  color: var(--text);
   font: var(--mat-sys-body-medium);
   font-family: 'Inter Variable', Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
   margin: 0;
   height: 100%;
 }
 
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
 a {
-  color: var(--urinet-gelb);
+  color: var(--akzent-text);
 }
 
 // Sichtbarer Fokus für Tastaturbedienung (WCAG 2.4.7)
@@ -72,8 +136,330 @@ a {
 }
 
 .karte {
-  background-color: var(--urinet-karte);
-  border: 1px solid var(--urinet-linie);
-  border-radius: 12px;
-  padding: 1rem;
+  background-color: var(--karte);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten);
+  padding: 1rem 1.125rem;
+}
+
+// Seitenkopf: kleine Zeile darüber, Titel, Untertitel
+.seitenkopf {
+  margin: 0.25rem 0 1.25rem;
+
+  .vorzeile {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--akzent-text);
+    margin: 0 0 0.375rem;
+  }
+
+  h1 {
+    font-size: clamp(22px, 2.6vw, 28px);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0;
+  }
+
+  p {
+    color: var(--text-gedaempft);
+    margin: 0.25rem 0 0;
+  }
+}
+
+// Bausteine des Leitfadens (docs/oberflaeche/README.md, «Bausteine»): Seiten verwenden diese Klassen, statt sie
+// lokal nachzubauen (npm run pruefe:gestaltung). Werte nach Prototyp (.pill, .hint, .tbl, .seg, .vf, .empty, .mono).
+
+// Mono für Belegnummern, IDs, Pfade, Prüfsummen, Scopes und Aktionscodes
+.mono {
+  font-family: var(--schrift-mono);
+  font-size: 0.86em;
+  letter-spacing: -0.01em;
+}
+
+// Pille: kleines Etikett; Text oder Symbol ist Pflicht, die Farbe allein sagt nichts (WCAG 1.4.1)
+.pille {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid var(--linie);
+  border-radius: 99px;
+  background: var(--karte-2);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  --symbol-groesse: 13px;
+
+  &.ok,
+  &.warnung,
+  &.gefahr,
+  &.info,
+  &.akzent {
+    border-color: transparent;
+    background: var(--grund);
+    color: var(--schrift);
+  }
+
+  &.ok {
+    --grund: var(--ok-weich);
+    --schrift: var(--ok);
+  }
+
+  &.warnung {
+    --grund: var(--warnung-weich);
+    --schrift: var(--warnung);
+  }
+
+  &.gefahr {
+    --grund: var(--gefahr-weich);
+    --schrift: var(--gefahr);
+  }
+
+  // Info und Akzent teilen die Akzentflächen (kein eigenes Info-Token)
+  &.info,
+  &.akzent {
+    --grund: var(--akzent-weich);
+    --schrift: var(--akzent-text);
+  }
+
+  &.mono {
+    font-family: var(--schrift-mono);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+}
+
+// Hinweis: Box mit Symbol links und Text rechts; Fehler mit role="alert" (setzt die Seite). Ohne Symbol trägt der
+// Text die Zustandsfarbe, damit der Zustand nicht nur an der Fläche hängt.
+// Der Chat hat noch eine eigene Klasse «hinweis» (Statuszeile) und ist ausgenommen, bis Umstellung nach #399.
+.hinweis:not(app-chat *) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.25rem 0.625rem;
+  align-items: start;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-klein);
+  background: var(--grund, var(--karte-2));
+  color: var(--text-2);
+  font-size: 13px;
+  --symbol-groesse: 16px;
+
+  > app-symbol {
+    color: var(--schrift, var(--text-gedaempft));
+    margin-top: 1px;
+  }
+
+  > :not(app-symbol) {
+    grid-column: 2;
+    margin: 0;
+  }
+
+  &:not(:has(> app-symbol)) {
+    grid-template-columns: minmax(0, 1fr);
+    color: var(--schrift, var(--text-2));
+
+    > * {
+      grid-column: 1;
+    }
+  }
+
+  &.warnung {
+    --grund: var(--warnung-weich);
+    --schrift: var(--warnung);
+  }
+
+  &.gefahr {
+    --grund: var(--gefahr-weich);
+    --schrift: var(--gefahr);
+  }
+
+  &.info {
+    --grund: var(--akzent-weich);
+    --schrift: var(--akzent-text);
+  }
+
+  &.ok {
+    --grund: var(--ok-weich);
+    --schrift: var(--ok);
+  }
+}
+
+// Tabelle: <div class="tabelle-rahmen"><table class="tabelle">; der Rahmen scrollt selbst, damit die Seite bei
+// 375 px nicht seitlich scrollt. `.randbuendig` zieht den Rahmen in einer Karte bis an deren Rand.
+.tabelle-rahmen {
+  overflow-x: auto;
+  container-type: inline-size;
+  min-width: 0;
+
+  &.randbuendig {
+    margin-inline: -1.125rem;
+
+    .tabelle :is(th, td):first-child {
+      padding-inline-start: 1.125rem;
+    }
+
+    .tabelle :is(th, td):last-child {
+      padding-inline-end: 1.125rem;
+    }
+  }
+}
+
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th,
+  td {
+    padding: 0.6875rem 0.75rem;
+    border-bottom: 1px solid var(--linie);
+    text-align: start;
+    vertical-align: middle;
+  }
+
+  thead th {
+    padding-block: 0.625rem;
+    color: var(--text-gedaempft);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  tbody:last-child tr:last-child > * {
+    border-bottom: 0;
+  }
+
+  tbody tr:hover > * {
+    background: var(--karte-2);
+  }
+
+  .zahl {
+    text-align: end;
+  }
+}
+
+.zahl {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+// Kachel: Kennzahl oder Feld mit Beschriftung oben; auffällige Werte mit Rahmen in Zustandsfarbe und Text
+.kachel {
+  display: grid;
+  gap: 0.125rem;
+  align-content: start;
+  min-width: 0;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte);
+  color: var(--text);
+
+  .beschriftung {
+    color: var(--text-gedaempft);
+    font-size: 12px;
+  }
+
+  .wert {
+    margin: 0;
+    font-weight: 600;
+    overflow-wrap: break-word;
+  }
+
+  .kennzahl {
+    display: block;
+    color: var(--text);
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.warnung {
+    border-color: var(--warnung);
+    background: var(--warnung-weich);
+  }
+
+  &.gefahr {
+    border-color: var(--gefahr);
+    background: var(--gefahr-weich);
+  }
+}
+
+// Kachel als Filterknopf (aria-pressed)
+button.kachel {
+  min-height: 2.75rem;
+  color: var(--text-gedaempft);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+
+  &.warnung {
+    color: var(--warnung);
+  }
+
+  &.gefahr {
+    color: var(--gefahr);
+  }
+
+  &[aria-pressed='true'] {
+    border-color: var(--akzent-text);
+    box-shadow: inset 0 0 0 1px var(--akzent-text);
+  }
+}
+
+// Segment: Umschalter-Gruppe aus Knöpfen mit aria-pressed
+.segment {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
+
+  // [aria-pressed] hebt die Spezifität über lokale `button { min-height }` der Seiten
+  > button[aria-pressed] {
+    min-height: 2.375rem;
+    padding: 0 0.75rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-gedaempft);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      background: var(--karte);
+      color: var(--text);
+      box-shadow: var(--schatten);
+    }
+  }
+}
+
+// Leerzustand: ein Satz, was hier erscheint
+.leer {
+  margin: 0;
+  padding: 1.5rem 0.5rem;
+  color: var(--text-gedaempft);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

@@ -9,10 +9,12 @@ mandanten=(urinet vhf-gsk)
 temp=$(mktemp -d "${TMPDIR:-/tmp}/archiv-restore.XXXXXX")
 chmod 700 "$temp"
 project="archiv-restore-$$"
+oidc_client="archiv-restore-$$"
 compose_started=0
 network_retry=0
 export ARCHIV_RESTORE_TMP="$temp"
 export COMPOSE_PROJECT_NAME="$project"
+export ARCHIV_RESTORE_OIDC_CLIENT="$oidc_client"
 
 bericht() {
   printf '%-7s %s (%ss)\n' "$1" "$2" "$3"
@@ -78,7 +80,7 @@ trap aufräumen EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-for programm in bash mvn docker age age-keygen openssl curl tar awk grep cmp; do
+for programm in bash mvn docker age age-keygen openssl curl tar awk grep cmp python3 jq; do
   voraussetzung "$programm"
 done
 if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
@@ -91,6 +93,11 @@ if ! docker info >/dev/null 2>&1; then
   exit 2
 fi
 
+kc_restore_port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+[[ $kc_restore_port =~ ^[0-9]+$ ]] || fehler "Loopback-Port für die OIDC-Prüfung konnte nicht bestimmt werden."
+kc_restore_base_url="http://127.0.0.1:$kc_restore_port"
+export ARCHIV_RESTORE_KC_PORT="$kc_restore_port"
+export ARCHIV_RESTORE_KC_BASE_URL="$kc_restore_base_url"
 compose config --quiet || fehler "Restore-Compose-Konfiguration ist ungültig."
 images=$(erwartete_images | LC_ALL=C sort -u) || fehler "Test-Images konnten nicht ermittelt werden."
 [[ -n $images ]] || fehler "Test-Images konnten nicht ermittelt werden."
@@ -107,9 +114,29 @@ geheimnis_erzeugen() {
   openssl rand -hex 32 > "$temp/secrets/$1"
 }
 
-for geheimnis in postgres_password archiv_db_owner archiv_db_app keycloak_db keycloak_admin; do
+for geheimnis in postgres_password archiv_db_owner archiv_db_app keycloak_db keycloak_admin keycloak_verwaltung_secret restore_oidc_client_secret; do
   geheimnis_erzeugen "$geheimnis"
 done
+jq -n --arg client "$oidc_client" --rawfile secret "$temp/secrets/restore_oidc_client_secret" '{
+  clientId:$client,
+  enabled:true,
+  clientAuthenticatorType:"client-secret",
+  publicClient:false,
+  serviceAccountsEnabled:true,
+  directAccessGrantsEnabled:false,
+  standardFlowEnabled:false,
+  secret:($secret | rtrimstr("\n")),
+  protocolMappers:[
+    {name:"archiv-api-audience", protocol:"openid-connect", protocolMapper:"oidc-audience-mapper",
+      config:{"included.client.audience":"archiv-api", "access.token.claim":"true", "id.token.claim":"false"}},
+    {name:"mandant", protocol:"openid-connect", protocolMapper:"oidc-usermodel-attribute-mapper",
+      config:{"user.attribute":"mandant", "claim.name":"mandant", "jsonType.label":"String",
+        "access.token.claim":"true", "id.token.claim":"true"}}
+  ]
+}' > "$temp/secrets/restore_oidc_client.json"
+jq -e '.clientId and .enabled and .serviceAccountsEnabled and (.secret | length > 0) and (.protocolMappers | length == 2)' \
+  "$temp/secrets/restore_oidc_client.json" >/dev/null
+printf '{}' > "$temp/secrets/restore_oidc_service_account.json"
 printf '%s' archiv-dev > "$temp/secrets/s3_app_zugang_id"
 printf '%s' archiv-dev-zugang > "$temp/secrets/s3_app_zugang_geheimnis"
 printf '%s' archiv-dev > "$temp/secrets/zugang_id"
@@ -241,13 +268,59 @@ warte_keycloak_realm() {
   for ((versuch = 0; versuch < 90; versuch++)); do
     if antwort=$(http_intern kc_restore 8080 /realms/urinet-archiv/.well-known/openid-configuration) \
       && http_ok "$antwort" \
-      && grep -Fq '"issuer":"http://kc_restore:8080/realms/urinet-archiv"' <<< "$antwort"; then
+      && grep -Fq "\"issuer\":\"$kc_restore_base_url/realms/urinet-archiv\"" <<< "$antwort"; then
       bericht OK "Wiederhergestellter Keycloak-Realm erreichbar" 0
       return 0
     fi
     sleep 2
   done
   fehler "Wiederhergestellter Keycloak-Realm nicht bereit."
+}
+
+oidc_testanmeldung_vorbereiten() {
+  local start=$SECONDS
+  local client_id service_account service_account_id service_account_name
+  keycloak_admin create clients -r urinet-archiv -f /run/secrets/restore_oidc_client >/dev/null \
+    || fehler "OIDC-Testclient konnte im Wegwerf-Realm nicht angelegt werden."
+  client_id=$(keycloak_admin get clients -r urinet-archiv -q "clientId=$oidc_client" |
+    jq -er --arg client "$oidc_client" \
+      '[.[] | select(.clientId == $client)] | if length == 1 then .[0].id else error("Client fehlt oder ist mehrdeutig") end') \
+    || fehler "ID des OIDC-Testclients fehlt."
+  service_account=$(keycloak_admin get "clients/$client_id/service-account-user" -r urinet-archiv) \
+    || fehler "Dienstkonto des OIDC-Testclients konnte nicht gelesen werden."
+  service_account_id=$(jq -er '.id | select(type == "string" and length > 0)' <<< "$service_account") \
+    || fehler "ID des OIDC-Testdienstkontos fehlt."
+  service_account_name=$(jq -er '.username | select(type == "string" and length > 0)' <<< "$service_account") \
+    || fehler "Benutzername des OIDC-Testdienstkontos fehlt."
+  [[ $service_account_name == "service-account-$oidc_client" ]] \
+    || fehler "Keycloak hat ein unerwartetes OIDC-Testdienstkonto zurückgegeben."
+
+  jq -n --arg id "$service_account_id" --arg username "$service_account_name" \
+    '{id:$id, username:$username, enabled:true, requiredActions:[], attributes:{mandant:["urinet"]}}' \
+    > "$temp/restore-oidc-service-account.json"
+  chmod 644 "$temp/secrets/restore_oidc_service_account.json"
+  cat "$temp/restore-oidc-service-account.json" > "$temp/secrets/restore_oidc_service_account.json"
+  chmod 444 "$temp/secrets/restore_oidc_service_account.json"
+  keycloak_admin update "users/$service_account_id" -r urinet-archiv \
+    -f /run/secrets/restore_oidc_service_account >/dev/null \
+    || fehler "Mandantenattribut des OIDC-Testdienstkontos konnte nicht gesetzt werden."
+  keycloak_admin add-roles -r urinet-archiv --uusername "$service_account_name" \
+    --rolename inhaber >/dev/null \
+    || fehler "Rolle des OIDC-Testdienstkontos konnte nicht gesetzt werden."
+  bericht OK "OIDC-Testdienstkonto mit Mandant und Rolle vorbereiten" "$((SECONDS - start))"
+}
+
+keycloak_admin() {
+  compose exec -T kc sh -eu -c '
+    admin_password=$(cat /run/secrets/keycloak_admin)
+    cli=/opt/keycloak/bin/kcadm.sh
+    config=$(mktemp -d /tmp/kcadm-restore.XXXXXX)
+    trap '\''rm -rf -- "$config"'\'' EXIT
+    config="$config/kcadm.config"
+    "$cli" config credentials --server http://kc:8080 --realm master \
+      --user archiv-admin --password "$admin_password" --config "$config" >/dev/null
+    "$cli" "$@" --config "$config"
+  ' sh "$@"
 }
 
 test_maven() {
@@ -270,12 +343,22 @@ test_maven() {
     "-Dquarkus.s3.endpoint-override=http://127.0.0.1:$minio_port"
     "-Dquarkus.s3.aws.region=us-east-1"
   )
+  if [[ $phase == ziel ]]; then
+    args+=(
+      "-Darchiv.restore.oidc-url=$kc_restore_base_url/realms/urinet-archiv"
+      "-Darchiv.restore.oidc-client=$oidc_client"
+      "-Darchiv.restore.oidc-client-secret-datei=$temp/secrets/restore_oidc_client_secret"
+    )
+  fi
   if (cd "$backend" && mvn "${args[@]}" test) >"$temp/$phase-test.log" 2>&1; then
     bericht OK "Echter Sicherungs-Roundtrip: Phase $phase" "$((SECONDS - start))"
   else
     local status=$?
     bericht FEHLER "Sicherungs-Roundtrip Phase $phase (Exit $status)" "$((SECONDS - start))"
     grep -E 'Tests run:|BUILD FAILURE|\[ERROR\]' "$temp/$phase-test.log" | tail -n 12 >&2 || true
+    if [[ $phase == ziel ]]; then
+      compose logs --no-color --tail 60 kc_restore >&2 || true
+    fi
     exit 3
   fi
 }
@@ -312,6 +395,7 @@ done
 bericht OK "PostgreSQL bereit" 0
 warte_url minio 9000 /minio/health/ready "MinIO bereit"
 warte_intern kc 9000 /health/ready "Keycloak bereit"
+oidc_testanmeldung_vorbereiten
 
 start_dienste api
 warte_intern api 8080 /q/health/ready "Quell-Anwendung bereit"
@@ -407,6 +491,8 @@ else
 fi
 
 start_dienste kc_restore
+[[ $(dienstport kc_restore 8080) == "$kc_restore_port" ]] \
+  || fehler "Der veröffentlichte Loopback-Port des wiederhergestellten Keycloak stimmt nicht."
 warte_intern kc_restore 9000 /health/ready "Wiederhergestelltes Keycloak bereit"
 warte_keycloak_realm
 

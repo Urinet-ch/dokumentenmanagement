@@ -17,6 +17,8 @@ import org.eclipse.microprofile.config.ConfigProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -36,7 +38,6 @@ class KonfigurationSeedVersionTest {
 
     private static final String SCHEMA = "m_probe_konf_seed";
     private static final String MIGRATION_SCHEMA = "m_probe_konf_migration";
-    private static final String KI_MIGRATION_SCHEMA = "m_probe_ki_migration";
 
     @Inject
     MandantDatenbank datenbank;
@@ -70,22 +71,24 @@ class KonfigurationSeedVersionTest {
         datenbank.konfigurationSeedAnlegen(SCHEMA);
 
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
-            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".konfiguration_version")).isEqualTo("2");
+            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".konfiguration_version")).isEqualTo("3");
             assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 1"))
                     .isEqualTo("MIGRATION");
             assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 2"))
+                    .isEqualTo("MIGRATION");
+            assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 3"))
                     .isEqualTo("SEED");
             assertThat(wert(befehl, "select inhalt #>> '{arten,0,code}' from " + SCHEMA
-                    + ".konfiguration_version where version = 2")).isEqualTo("SEED_A");
+                    + ".konfiguration_version where version = 3")).isEqualTo("SEED_A");
             assertThat(wert(befehl, "select jsonb_typeof(inhalt #> '{arten,1,zusatzSchema}') from " + SCHEMA
-                    + ".konfiguration_version where version = 2")).isEqualTo("string");
+                    + ".konfiguration_version where version = 3")).isEqualTo("string");
             assertThat(wert(befehl, "select jsonb_typeof(inhalt #> '{arten,0,gruppen}') from " + SCHEMA
-                    + ".konfiguration_version where version = 2")).isEqualTo("array");
+                    + ".konfiguration_version where version = 3")).isEqualTo("array");
             assertThat(wert(befehl, "select inhalt #>> '{regeln,0,code}' from " + SCHEMA
-                    + ".konfiguration_version where version = 2")).isEqualTo("seed_folge");
+                    + ".konfiguration_version where version = 3")).isEqualTo("seed_folge");
             assertThat(wert(befehl, "select inhalt #>> '{kiTexte,kiFreigegeben}' from " + SCHEMA
-                    + ".konfiguration_version where version = 2")).isEqualTo("true");
-            // 048-ki-texte-version lief ohne Arten: keine Zusatzversion vor dem Seed
+                    + ".konfiguration_version where version = 3")).isEqualTo("true");
+            // 048 lief ohne Arten; 054 hängt die migrierten KI-Texte an, danach folgt der Seed.
             assertThat(wert(befehl, "select inhalt -> 'kiTexte' is null from " + SCHEMA
                     + ".konfiguration_version where version = 1")).isEqualTo("t");
         }
@@ -178,7 +181,8 @@ class KonfigurationSeedVersionTest {
                             inhalt jsonb not null, sha256 text not null)
                         """);
                 for (String code : List.of("AUSGANGSRECHNUNG", "OFFERTE", "LIEFERANTENBELEG", "QUITTUNG",
-                        "WISSENSQUELLE", "LOHNABRECHNUNG", "BANK", "X")) {
+                        "WISSENSQUELLE", "LOHNABRECHNUNG", "BANK", "BEHOERDE", "KORRESPONDENZ", "PROJEKTDOKUMENT",
+                        "VERSICHERUNG", "VERTRAG", "X")) {
                     befehl.execute("insert into dokumentart values ('" + code + "', '" + code
                             + "', null, '{}', '{}', '{\"type\":\"object\"}', 'NORMAL', 10, 'GESCHAEFTSJAHR', false, true)");
                 }
@@ -202,7 +206,7 @@ class KonfigurationSeedVersionTest {
                         + "where code = 'LIEFERANTENBELEG'")).isEqualTo("QUITTUNG");
                 assertThat(wert(befehl, "select ki_vorschlag::text from dokumentart where code = 'WISSENSQUELLE'"))
                         .isEqualTo("false");
-                assertThat(wert(befehl, "select count(*) from dokumentart where ki_vorschlag")).isEqualTo("7");
+                assertThat(wert(befehl, "select count(*) from dokumentart where ki_vorschlag")).isEqualTo("12");
                 // Abbild der Migration trägt dieselben Werte und die Mandanten-Einstellungen
                 assertThat(wert(befehl, "select inhalt #>> '{einstellungen,kennungen,uid}' from konfiguration_version"))
                         .isEqualTo("CHE-1");
@@ -259,6 +263,84 @@ class KonfigurationSeedVersionTest {
                         .isEqualTo("t");
                 assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
                         + "from konfiguration_version where version = 3")).isEqualTo("t");
+
+                // 054 setzt in m_urinet die KI-Texte und Arten-Hinweise; sie müssen dem Seed entsprechen
+                liquibase(verbindung, "m_urinet", "054-ki-texte-aus-seed.xml");
+                verbindung.commit();
+
+                JsonNode seed;
+                try (var in = KonfigurationSeedVersionTest.class.getClassLoader()
+                        .getResourceAsStream("seed/urinet/konfiguration.json")) {
+                    seed = new ObjectMapper().readTree(in);
+                }
+                assertThat(wert(befehl, "select feldregeln from ki_texte where id = 1"))
+                        .isEqualTo(seed.at("/kiTexte/feldregeln").asText());
+                for (JsonNode art : seed.get("arten")) {
+                    String code = art.get("code").asText();
+                    if (code.equals("WISSENSQUELLE")) {
+                        continue;
+                    }
+                    assertThat(wert(befehl, "select reihenfolge from dokumentart where code = '" + code + "'"))
+                            .as("reihenfolge " + code).isEqualTo(art.get("reihenfolge").asText());
+                    assertThat(wert(befehl, "select coalesce(ki_hinweise, '') from dokumentart where code = '"
+                            + code + "'")).as("kiHinweise " + code).isEqualTo(art.path("kiHinweise").asText(""));
+                }
+                assertThat(wert(befehl, "select max(version) from konfiguration_version")).isEqualTo("4");
+                assertThat(wert(befehl, "select quelle from konfiguration_version where version = 4"))
+                        .isEqualTo("MIGRATION");
+                assertThat(wert(befehl, "select inhalt #>> '{kiTexte,feldregeln}' from konfiguration_version "
+                        + "where version = 4")).isEqualTo(seed.at("/kiTexte/feldregeln").asText());
+                assertThat(wert(befehl, "select a ->> 'reihenfolge' from konfiguration_version, "
+                        + "jsonb_array_elements(inhalt -> 'arten') a where version = 4 and a ->> 'code' = 'BANK'"))
+                        .isEqualTo("5");
+                assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
+                        + "from konfiguration_version where version = 4")).isEqualTo("t");
+            }
+        } finally {
+            try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {
+                befehl.execute("drop database if exists " + name + " with (force)");
+            }
+        }
+    }
+
+    @Test
+    void changeset054ErgaenztVhfGskTexteUndErhaeltEigeneArten() throws Exception {
+        String name = "probe_vhf_migration_" + Long.toHexString(System.nanoTime());
+        try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {
+            befehl.execute("create database " + name);
+        }
+        try {
+            try (Connection verbindung = verbinden(name); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("create schema m_vhf_gsk");
+                befehl.execute("set search_path to m_vhf_gsk");
+                befehl.execute("create table ki_texte (id integer primary key, rolle text, feldregeln text,"
+                        + " ki_freigegeben boolean)");
+                befehl.execute("insert into ki_texte values (1, '', '', false)");
+                befehl.execute("create table dokumentart (code text primary key, ki_hinweise text, reihenfolge integer)");
+                befehl.execute("insert into dokumentart values ('PROBE', 'Eigener Hinweis', 7)");
+                befehl.execute("create table konfiguration_version (version integer primary key, wer text,"
+                        + " grund text, quelle text, inhalt jsonb, sha256 text)");
+                befehl.execute("""
+                        insert into konfiguration_version values (1, 'system:migration', null, 'MIGRATION',
+                            '{"version":1,"arten":[{"code":"PROBE","kiHinweise":"Eigener Hinweis","reihenfolge":7}],
+                            "kiTexte":{"rolle":"","feldregeln":"","kiFreigegeben":false}}', 'alt')
+                        """);
+                liquibase(verbindung, "m_vhf_gsk", "054-ki-texte-aus-seed.xml");
+                verbindung.commit();
+
+                assertThat(wert(befehl, "select feldregeln from ki_texte where id = 1"))
+                        .contains("Mandantenhinweise zur Einordnung:", "Reihe; Ausgabe-Nr.; Erscheinungsjahr; Fachgebiet");
+                assertThat(wert(befehl, "select ki_freigegeben::text from ki_texte where id = 1")).isEqualTo("false");
+                assertThat(wert(befehl, "select ki_hinweise || ':' || reihenfolge from dokumentart"))
+                        .isEqualTo("Eigener Hinweis:7");
+                assertThat(wert(befehl, "select quelle from konfiguration_version where version = 2"))
+                        .isEqualTo("MIGRATION");
+                assertThat(wert(befehl, "select inhalt #>> '{kiTexte,feldregeln}' from konfiguration_version "
+                        + "where version = 2")).isEqualTo(wert(befehl, "select feldregeln from ki_texte where id = 1"));
+                assertThat(wert(befehl, "select inhalt #>> '{arten,0,kiHinweise}' from konfiguration_version "
+                        + "where version = 2")).isEqualTo("Eigener Hinweis");
+                assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
+                        + "from konfiguration_version where version = 2")).isEqualTo("t");
             }
         } finally {
             try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {

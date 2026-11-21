@@ -1,8 +1,7 @@
 # Wissen lokal erarbeiten und ins Archiv übertragen
 
-> **Entwurf, nicht umgesetzt.** Diese Anleitung beschreibt, wie es nach den Aufgaben 15.6 (Import) und 15.7
-> (Prüfwerkzeug `wissen_paket`) von Spec 04 funktionieren soll (Requirement 19, entschieden von Fabian am 18.11.2026).
-> Bis dahin gibt es weder den Upload noch das Werkzeug. Platzhalter stehen in `<spitzen Klammern>`.
+> Import-Endpunkt, Oberfläche zum Hochladen (Aufgabe 15.8), OKF-Export (Aufgabe 15.5) und Offline-Werkzeug sind
+> umgesetzt. Offen ist nur der CI-Schritt von Aufgabe 15.7. Platzhalter stehen in `<spitzen Klammern>`.
 
 Das Archiv nimmt Wissen von aussen nur als **Entwurf** an. Wirksam wird jede Änderung erst, wenn du sie im Archiv
 einzeln ansiehst und annimmst. Das Archiv ruft dabei keine KI auf.
@@ -17,12 +16,15 @@ einzeln ansiehst und annimmst. Das Archiv ruft dabei keine KI auf.
 | `INTERN` mit Personendaten, `PERSONAL` | nein | nein |
 
 Das Archiv kann das ausserhalb nicht erzwingen. Du bestätigst die Regel mit den Angaben `erzeugt_mit` und `kontext_stufe`
-im Paket; das Archiv hält sie fest und lehnt Widersprüche ab (z. B. `cloud` mit `INTERN`). Im Zweifel: lokales Modell.
+im Paket; das Archiv hält sie fest und lehnt Widersprüche ab (z. B. `cloud` mit `INTERN`). Diese Angaben sind
+Selbstauskünfte, kein Nachweis der Einhaltung. Nie `INTERN`, `PERSONAL` oder daraus Abgeleitetes an ein
+Cloud-Modell geben. Im Zweifel: lokales Modell.
 
 ## 2. Vorbereitung (einmalig)
 1. Die Wissensquelle (PDF) muss im produktiven Archiv als Dokument der Art `WISSENSQUELLE` bestätigt sein. Das Paket
    verweist auf sie über die SHA-256 der Originaldatei, nicht über eine Archiv-ID.
-2. Die Prüfsumme bestimmst du lokal (`shasum -a 256 <datei.pdf>`) oder mit `wissen_paket validate --quellen <ordner>`.
+2. Die Prüfsumme bestimmst du lokal (`shasum -a 256 <datei.pdf>`). `--quellen` gleicht die im Paket
+   angegebenen Prüfsummen ab, gibt aber keine Prüfsummen oder Inhalte aus.
 3. Prüfwerkzeug bauen: `mvn -B -ntp -f tools/wissen_paket/pom.xml verify` (ergibt `wissen-paket-<version>.jar`).
 
 ## 3. Weg A: lokale Archiv-Instanz (für neue Wissensgebiete)
@@ -36,16 +38,20 @@ im Paket; das Archiv hält sie fest und lehnt Widersprüche ab (z. B. `cloud` mi
    entpacken; dann tragen die Seiten die `basis_version`.
 2. Claude Code, Copilot CLI oder ein lokales Modell schreiben `<pfad>.md` nach den Seitenregeln (Frontmatter, jede Aussage
    mit Fussnote, Quellen mit `sha256`, `seite` und wörtlichem `auszug`). Beachte Abschnitt 1: Cloud-Modelle nur mit `NORMAL`.
-3. Prüfen: `java -jar wissen-paket-<version>.jar validate <ordner> --quellen <ordner-mit-pdfs>`
-4. Bauen: `java -jar wissen-paket-<version>.jar bauen <ordner> -o <paket.zip> --mandant urinet --erzeugt-von <modell>
-   --erzeugt-mit lokal|cloud --kontext-stufe NORMAL|INTERN`
+3. Den Ordner mit `java -jar wissen-paket-<version>.jar validate <ordner> --quellen <ordner-mit-pdfs>` prüfen.
+   Ohne `paket.yaml` prüft das Werkzeug die Seiten mit einem vorläufigen Kopf im Speicher und meldet
+   `PAKETKOPF_NICHT_GEPRUEFT`: Herkunft und Kontextstufe sind damit nicht geprüft.
+4. `java -jar wissen-paket-<version>.jar bauen <ordner> -o <paket.zip> --mandant urinet --erzeugt-von <modell>
+   --erzeugt-mit lokal|cloud --kontext-stufe NORMAL|INTERN --quellen <ordner-mit-pdfs>`
+   Das ZIP anschliessend mit `validate <paket.zip>` prüfen. Weitere Hinweise zu Zeitstempel und Überschreiben
+   stehen in der [Werkzeug-Anleitung](../tools/wissen_paket/README.md).
 
 ## 5. Was das Prüfwerkzeug meldet
 Nur Befund-Codes und Pfade, nie Inhalte; Rückgabewert 0 = kein sperrender Befund. Es arbeitet offline und braucht keine Zugangsdaten.
 - Sperrend: `FELD_FEHLT`, `PFAD_UNGUELTIG`, `AUSSAGE_OHNE_BELEG`, `FUSSNOTE_OHNE_QUELLE`, `LINK_UNGUELTIG` (HTML, externer Link,
-  Bild), `AUSZUG_FEHLT`, `ZU_GROSS`, `PAKET_UNGUELTIG` (ZIP-Grenzen, unzulässige Dateien, YAML).
+  Bild), `AUSZUG_FEHLT`, `ZU_GROSS` sowie Formatcodes wie `GRENZE`, `PFAD`, `YAML` und `ZIP_BOMBE`.
 - Hinweise: `QUELLE_NICHT_GEPRUEFT` (Zuordnung geht nur im Archiv), `AUSZUG_LOKAL_NICHT_GEFUNDEN` (nicht massgeblich: das Archiv prüft
-  gegen den Text der PDF/A-Fassung), `FELD_IGNORIERT`.
+  gegen den Text der PDF/A-Fassung), `FELD_IGNORIERT`, `PAKETKOPF_NICHT_GEPRUEFT` (vorläufiger Kopf).
 - Das Archiv prüft jedes Paket beim Import erneut. Das Werkzeug spart nur den Umweg.
 
 ## 6. Hochladen und freigeben

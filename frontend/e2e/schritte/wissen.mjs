@@ -29,6 +29,8 @@ Given('synthetische Wissensseiten sind für die Oberfläche verfügbar', async f
           + '<a href="#fn-q1" data-footnote-ref>1</a></sup></p>',
         quellen: [{ schluessel: 'q1', dokumentId: dokument.id, seiteVon: 2, dokumentTitel: dokument.titel }],
       };
+    } else if (url.searchParams.has('modus')) {
+      antwort = { treffer: [zeile], degradiert: true };
     } else {
       antwort = { gesamt: 1, gruppen: [{ typ: 'Konzept', seiten: [zeile] }] };
     }
@@ -40,7 +42,7 @@ When('ich die Wissensoberfläche auf 375 Pixeln öffne', async function () {
   await this.seite.setViewportSize({ width: 375, height: 812 });
   await this.seite.getByRole('button', { name: 'Menü öffnen' }).click();
   await this.seite.getByRole('navigation', { name: 'Hauptnavigation' })
-    .getByRole('link', { name: 'Wissen' }).click();
+    .getByRole('link', { name: 'Wissen', exact: true }).click();
   await this.seite.getByRole('heading', { name: 'Wissen', exact: true }).waitFor();
   await this.seite.addScriptTag({ content: axe.source });
 });
@@ -56,6 +58,24 @@ async function pruefen(seite) {
   }));
   assert.deepEqual(ergebnis.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) })), []);
 }
+
+Then('stehen Wissensseiten mit Titel, Typ und Beschreibung über den Dokumenttreffern und öffnen ihre Seite',
+  async function () {
+    const wissen = this.seite.locator('[data-test=wissen]');
+    await wissen.getByRole('link', { name: zeile.titel }).waitFor();
+    await this.seite.locator('[data-test=treffer]').first().waitFor();
+    await wissen.getByText(zeile.typ, { exact: true }).waitFor();
+    await wissen.getByText(zeile.beschreibung, { exact: true }).waitFor();
+    const wissensBereich = await wissen.boundingBox();
+    const dokumentBereich = await this.seite.locator('[aria-labelledby=treffer-titel]').boundingBox();
+    assert.ok(wissensBereich.y + wissensBereich.height <= dokumentBereich.y);
+    await this.seite.addScriptTag({ content: axe.source });
+    await pruefen(this.seite);
+    const link = wissen.getByRole('link', { name: zeile.titel });
+    assert.equal(await link.getAttribute('href'), `/wissen/${zeile.pfad}`);
+    await link.click();
+    await this.seite.getByRole('heading', { name: zeile.titel }).waitFor();
+  });
 
 Then('sind Index, Seite, Quellen und Log ohne horizontales Scrollen und ohne axe-Befund bedienbar', async function () {
   const seite = this.seite;

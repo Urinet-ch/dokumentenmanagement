@@ -33,6 +33,8 @@ public interface WissenIngestPort {
     /** Summe der Tokens aus {@code ki_verbrauch} mit Zweck {@code WISSEN_*} im Zeitraum [von, bis) (Req 13.6). */
     long verbrauchImZeitraum(Instant von, Instant bis);
 
+    BudgetEinstellungen budgetEinstellungenLaden();
+
     BudgetReservierung budgetReservieren(UUID entwurfId, long tokens, long budgetTokens, long monatsbudgetTokens,
                                          Instant von, Instant bis);
 
@@ -66,6 +68,11 @@ public interface WissenIngestPort {
 
     void aenderungAnlegen(NeueAenderung aenderung);
 
+    void erneuerteAenderungSpeichern(NeueAenderung aenderung, Fortschritt fortschritt, long tokensEin,
+                                     long tokensAus);
+
+    void neuerzeugungAbbrechen(UUID entwurfId, String hinweis);
+
     void fortschrittSichern(UUID entwurfId, String erwarteterSchritt, String neuerSchritt, Fortschritt fortschritt,
                             long tokensEin, long tokensAus, boolean unvollstaendig, String hinweis);
 
@@ -88,6 +95,9 @@ public interface WissenIngestPort {
         public boolean reserviert() {
             return id != null;
         }
+    }
+
+    record BudgetEinstellungen(Integer budgetTokens, Integer monatsbudgetTokens) {
     }
 
     record Lauf(UUID entwurfId, UUID dokumentId, String entwurfStatus, String dokumentStatus, String art,
@@ -134,7 +144,7 @@ public interface WissenIngestPort {
                            Wissensseite daten, String begruendung, List<KiPort.Widerspruch> widersprueche,
                            List<KiPort.EntfernteAussage> entfernteAussagen,
                            List<WissensPruefung.Befund> befunde, List<WissensPruefung.Hinweis> hinweise,
-                           String vertraulichkeitKontext) {
+                           String vertraulichkeitKontext, DiffDienst.Diff diff) {
         public SeitenVorschlag {
             widersprueche = widersprueche == null ? List.of() : List.copyOf(widersprueche);
             entfernteAussagen = entfernteAussagen == null ? List.of() : List.copyOf(entfernteAussagen);
@@ -151,7 +161,11 @@ public interface WissenIngestPort {
     }
 
     record SeitenFassung(SeitenMetadaten metadaten, String inhalt, UUID wissensquelleId,
-                         List<Quelleneintrag> quellen) {
+                         List<Quelleneintrag> quellen, LocalDate veraltetAb) {
+        public SeitenFassung(SeitenMetadaten metadaten, String inhalt, UUID wissensquelleId,
+                             List<Quelleneintrag> quellen) {
+            this(metadaten, inhalt, wissensquelleId, quellen, null);
+        }
         public SeitenFassung {
             quellen = quellen == null ? List.of() : List.copyOf(quellen);
         }
@@ -160,7 +174,7 @@ public interface WissenIngestPort {
     record NeueAenderung(UUID entwurfId, int nummer, String aktion, UUID seiteId, String pfad, Integer basisVersion,
                          Wissensseite daten, String begruendung, List<KiPort.Widerspruch> widersprueche,
                          List<KiPort.EntfernteAussage> entfernteAussagen, List<WissensPruefung.Befund> befunde,
-                         List<WissensPruefung.Hinweis> hinweise, String diff, String vertraulichkeitKontext) {
+                         List<WissensPruefung.Hinweis> hinweise, DiffDienst.Diff diff, String vertraulichkeitKontext) {
         public NeueAenderung {
             widersprueche = widersprueche == null ? List.of() : List.copyOf(widersprueche);
             entfernteAussagen = entfernteAussagen == null ? List.of() : List.copyOf(entfernteAussagen);

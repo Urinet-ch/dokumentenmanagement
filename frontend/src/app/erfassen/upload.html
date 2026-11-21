@@ -1,8 +1,7 @@
 <h2>{{ texte.titel }}</h2>
-<p>{{ texte.einleitung }}</p>
 
 <section
-  class="ablage karte"
+  class="ablage"
   [class.ziehen]="ziehen()"
   [attr.aria-label]="texte.ablegen"
   (dragover)="ueberZiehen($event)"
@@ -10,8 +9,9 @@
   (drop)="abgelegt($event)"
   data-test="ablage"
 >
+  <span class="gross" aria-hidden="true"><app-symbol name="erfassen" /></span>
   <p class="ablage-text" aria-hidden="true">{{ texte.ablegen }}</p>
-  <p class="ablage-oder" aria-hidden="true">{{ texte.oder }}</p>
+  <p class="gedaempft" aria-hidden="true">{{ texte.oder }}</p>
   <button mat-flat-button type="button" (click)="auswaehlen()" [disabled]="laeuft()">{{ texte.auswaehlen }}</button>
   <input
     #dateiwahl
@@ -22,9 +22,10 @@
     [attr.aria-label]="texte.dateiwahl"
     (change)="gewaehlt(dateiwahl)"
   />
+  <p class="gedaempft">{{ texte.einleitung }}</p>
 </section>
 
-<section class="liste" aria-labelledby="liste-titel">
+<section class="karte liste" aria-labelledby="liste-titel">
   @if (abgeschlossen()) {
     <h3 id="liste-titel" tabindex="-1" #ergebnisUeberschrift>{{ texte.ergebnisse }}</h3>
   } @else {
@@ -35,8 +36,9 @@
   } @else {
     <ol class="dateien">
       @for (zeile of zeilen(); track zeile.datei; let i = $index, erste = $first, letzte = $last) {
-        <li class="datei karte" [attr.data-ausgang]="zeile.ausgang ?? null">
+        <li class="datei" [attr.data-ausgang]="zeile.ausgang ?? null">
           <div class="datei-kopf">
+            <span class="ic" aria-hidden="true"><app-symbol name="dokument" /></span>
             <span class="datei-name">{{ zeile.datei.name }}</span>
             @if (!abgeschlossen()) {
               <span class="datei-aktionen">
@@ -98,35 +100,35 @@
       }
     </ol>
   }
-</section>
 
-@if (!abgeschlossen()) {
-  <section class="optionen">
-    <mat-checkbox
-      [checked]="zusammenfassen()"
-      [disabled]="!zusammenfassenMoeglich() || laeuft()"
-      (change)="zusammenfassenGewaehlt.set($event.checked)"
-      aria-describedby="zusammenfassen-hinweis"
-    >
-      {{ texte.alsEinDokument }}
-    </mat-checkbox>
-    <p id="zusammenfassen-hinweis" class="hinweis">{{ texte.alsEinDokumentHinweis }}</p>
-    <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || dateien().length === 0">
-      {{ gesamtFehler() ? texte.erneutHochladen : texte.hochladen }}
-    </button>
-  </section>
-} @else {
-  <button mat-stroked-button type="button" (click)="neu()">{{ texte.neu }}</button>
-}
-
-@if (laeuft()) {
-  <mat-progress-bar mode="determinate" [value]="prozent()" [attr.aria-label]="texte.fortschritt" />
-}
-<p class="status" role="status" aria-live="polite">
-  @if (laeuft()) {
-    {{ texte.fortschrittProzent(prozent()) }}
+  @if (!abgeschlossen()) {
+    <section class="optionen">
+      <mat-checkbox
+        [checked]="zusammenfassen()"
+        [disabled]="!zusammenfassenMoeglich() || laeuft()"
+        (change)="zusammenfassenGewaehlt.set($event.checked)"
+        aria-describedby="zusammenfassen-hinweis"
+      >
+        {{ texte.alsEinDokument }}
+      </mat-checkbox>
+      <p id="zusammenfassen-hinweis" class="gedaempft">{{ texte.alsEinDokumentHinweis }}</p>
+      <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || dateien().length === 0">
+        {{ gesamtFehler() ? texte.erneutHochladen : texte.hochladen }}
+      </button>
+    </section>
+  } @else {
+    <button mat-stroked-button type="button" (click)="neu()">{{ texte.neu }}</button>
   }
-</p>
-@if (gesamtFehler()) {
-  <p class="gesamtfehler" role="alert">{{ gesamtFehler() }}</p>
-}
+
+  @if (laeuft()) {
+    <mat-progress-bar mode="determinate" [value]="prozent()" [attr.aria-label]="texte.fortschritt" />
+  }
+  <p class="status" role="status" aria-live="polite">
+    @if (laeuft()) {
+      {{ texte.fortschrittProzent(prozent()) }}
+    }
+  </p>
+  @if (gesamtFehler()) {
+    <p class="hinweis gefahr" role="alert"><app-symbol name="warnung" /><span>{{ gesamtFehler() }}</span></p>
+  }
+</section>

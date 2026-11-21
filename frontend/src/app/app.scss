@@ -11,8 +11,8 @@
   gap: 0.5rem;
   margin: 0;
   padding: 0.25rem 1rem;
-  background: var(--urinet-karte);
-  color: var(--urinet-hell);
+  background: var(--karte);
+  border-bottom: 1px solid var(--linie);
   text-align: center;
 }
 
@@ -26,90 +26,318 @@
     top: 0.5rem;
     padding: 0.5rem 1rem;
     background: var(--urinet-gelb);
-    color: var(--urinet-dunkel);
+    color: var(--urinet-schwarz);
     border: 0;
     border-radius: 4px;
   }
 }
 
-.kopf {
-  background-color: var(--urinet-dunkel);
-  border-bottom: 1px solid var(--urinet-linie);
-  color: var(--urinet-hell);
-  gap: 0.5rem;
-}
-
-.titel {
-  background-color: var(--brand-primary, var(--urinet-gelb));
-  color: var(--brand-text, var(--urinet-dunkel));
-  border-radius: 4px;
-  font: var(--mat-sys-title-large);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-}
-
-.logo {
-  max-width: 8rem;
-  max-height: 2rem;
-  object-fit: contain;
-}
-
+.rahmen,
 .abstand {
   flex: 1;
 }
 
-.benutzer {
-  font: var(--mat-sys-body-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 40vw;
-}
-
-.rahmen {
-  flex: 1;
-}
-
+// Seitenleiste: schwebendes Glas-Panel (Prototyp docs/oberflaeche/)
 mat-sidenav {
-  width: 15rem;
-  background-color: var(--urinet-karte);
-  border-right: 1px solid var(--urinet-linie);
+  width: 276px;
+  border: 0;
 
-  &.leer {
+  &.ohne-menue {
     display: none;
   }
 }
 
-.aktiv {
-  background-color: rgb(238 177 17 / 0.16);
+.seitenleiste {
+  box-sizing: border-box;
+  margin: 12px 0 12px 12px;
+  min-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 12px;
+  background: var(--glas);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--linie);
+  border-radius: 20px;
 }
 
+// Marke, Navigationslinks und Titel: Symbol und Text in einer Zeile
+.marke,
+.link,
+.titel,
 .punkt {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.titel,
+.punkt {
   gap: 0.5rem;
 }
 
-.zaehler {
-  min-width: 1.5rem;
-  padding: 0 0.4rem;
-  border-radius: 0.75rem;
-  background-color: var(--brand-primary, var(--urinet-gelb));
-  color: var(--brand-text, var(--urinet-dunkel));
+.marke {
+  padding: 2px 8px 14px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+
+  .zeichen {
+    --symbol-groesse: 20px;
+  }
+
+  .name small {
+    font-size: 11px;
+    letter-spacing: 0;
+  }
+
+  .logo {
+    max-height: 2rem;
+  }
+}
+
+.logo {
+  max-width: 8rem;
+  object-fit: contain;
+}
+
+// Markenfarbe: Zeichen, Zähler und Titel
+.zeichen,
+.zaehler,
+.titel {
+  background: var(--brand-primary, var(--urinet-gelb));
+  color: var(--brand-text, var(--urinet-schwarz));
+}
+
+.zeichen,
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.marke .name small,
+.wer small {
+  display: block;
+  font-weight: 500;
+  color: var(--text-gedaempft);
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gruppe {
+  font-size: 10.5px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-gedaempft);
+  padding: 16px 10px 6px;
+}
+
+.link {
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text-2);
+  font-weight: 500;
+
+  &:hover {
+    background: var(--karte-2);
+    color: var(--text);
+  }
+
+  &.aktiv {
+    background: var(--karte);
+    border-color: var(--linie);
+    box-shadow: var(--schatten);
+    color: var(--text);
+
+    app-symbol {
+      color: var(--akzent-text);
+    }
+  }
+}
+
+.punkt {
+  flex: 1;
+}
+
+.zaehler {
+  margin-left: auto;
+  min-width: 1.25rem;
+  padding: 3px 7px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
   text-align: center;
 }
 
+// Fehler des Entwurfszählers unter der Navigation (.hinweis gefahr)
+.nav-fehler {
+  display: grid;
+  gap: 6px;
+  margin: 10px 4px 0;
+
+  .knopf {
+    width: 100%;
+  }
+}
+
+// Kopfzeile
+.kopf {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px 10px;
+  background: linear-gradient(var(--flaeche) 70%, transparent);
+}
+
+// Knöpfe, Suche und Benutzer: gleiche Höhe und Fläche
+.knopf,
+.kopfsuche,
+.benutzer {
+  height: 42px;
+  border: 1px solid var(--linie);
+  border-radius: 12px;
+  background: var(--karte);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.knopf {
+  min-width: 42px;
+  padding: 0 11px;
+  color: var(--text-2);
+  justify-content: center;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text);
+    border-color: var(--linie-stark);
+  }
+}
+
+.titel {
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 0.4rem 0.6rem;
+  white-space: nowrap;
+
+  .logo {
+    max-height: 1.5rem;
+  }
+}
+
+.kopfsuche {
+  flex: 1;
+  max-width: 520px;
+  min-width: 0;
+  padding: 0 12px;
+  color: var(--text-gedaempft);
+
+  &:focus-within {
+    outline: 3px solid var(--urinet-gelb);
+    outline-offset: 2px;
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+  }
+}
+
+.benutzer {
+  gap: 10px;
+  padding: 0 10px 0 4px;
+  max-width: 40vw;
+  min-width: 0;
+}
+
+.avatar {
+  background: var(--urinet-schwarz);
+  color: var(--urinet-gelb);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wer {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  small {
+    font-size: 11.5px;
+  }
+}
+
 main {
-  padding: 1rem;
+  padding: 4px 20px 40px;
   outline: none;
 }
 
+@media (max-width: 959.98px) {
+  .seitenleiste {
+    margin: 0;
+    min-height: 100%;
+    border-radius: 0 20px 20px 0;
+    background: var(--karte);
+    padding-top: calc(18px + env(safe-area-inset-top, 0px));
+  }
+
+  .kopf {
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+  }
+
+  main {
+    padding: 4px 16px 32px;
+  }
+
+  .wer {
+    display: none;
+  }
+
+  .benutzer {
+    padding: 0 4px;
+  }
+}
+
 @media (max-width: 599.98px) {
-  .mandant {
+  // Text bleibt für Screenreader der Name des Knopfs
+  .nur-breit {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .kopf:has(.kopfsuche) .titel {
     display: none;
   }
 }

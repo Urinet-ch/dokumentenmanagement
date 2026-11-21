@@ -15,13 +15,26 @@ public record Vorschlag(String art, String titel, LocalDate datum, String partne
                         String partnerIban, String partnerEmail, String belegnummer, String richtung, BigDecimal betrag,
                         String waehrung, LocalDate faelligkeit, String qrReferenz, String vertraulichkeit,
                         List<String> tags, Map<Feld, BigDecimal> sicherheit, boolean mandantIstAussteller,
-                        String umstufung) {
+                        String umstufung, Map<String, Object> dynamischeWerte,
+                        Map<String, BigDecimal> dynamischeSicherheit) {
 
     public Vorschlag {
         tags = List.copyOf(tags);
         Map<Feld, BigDecimal> kopie = new EnumMap<>(Feld.class);
         kopie.putAll(sicherheit);
         sicherheit = java.util.Collections.unmodifiableMap(kopie);
+        dynamischeWerte = dynamischeWerte == null ? Map.of() : Map.copyOf(dynamischeWerte);
+        dynamischeSicherheit = dynamischeSicherheit == null ? Map.of() : Map.copyOf(dynamischeSicherheit);
+    }
+
+    public Vorschlag(String art, String titel, LocalDate datum, String partnerName, String partnerUid,
+                     String partnerIban, String partnerEmail, String belegnummer, String richtung, BigDecimal betrag,
+                     String waehrung, LocalDate faelligkeit, String qrReferenz, String vertraulichkeit,
+                     List<String> tags, Map<Feld, BigDecimal> sicherheit, boolean mandantIstAussteller,
+                     String umstufung) {
+        this(art, titel, datum, partnerName, partnerUid, partnerIban, partnerEmail, belegnummer, richtung, betrag,
+                waehrung, faelligkeit, qrReferenz, vertraulichkeit, tags, sicherheit, mandantIstAussteller,
+                umstufung, Map.of(), Map.of());
     }
 
     public BigDecimal sicherheit(Feld feld) {

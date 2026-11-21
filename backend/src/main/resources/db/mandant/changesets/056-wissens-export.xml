@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="056-wissens-export" author="archiv">
+        <sql>
+            create table wissens_export (
+                id uuid not null constraint wissens_export_pk primary key,
+                status text not null constraint wissens_export_status_ck check (status in ('OFFEN', 'FERTIG', 'FEHLER')),
+                benutzer text not null,
+                rolle text not null,
+                erstellt timestamptz not null default clock_timestamp(),
+                fertig timestamptz,
+                s3_schluessel text,
+                s3_version text,
+                sha256 text constraint wissens_export_sha256_ck check (sha256 ~ '^[0-9a-f]{64}$'),
+                groesse bigint constraint wissens_export_groesse_ck check (groesse >= 0),
+                fehler_id uuid,
+                constraint wissens_export_fertig_ck check ((status = 'FERTIG') =
+                    (fertig is not null and s3_schluessel is not null and s3_version is not null
+                        and sha256 is not null and groesse is not null))
+            );
+            create index wissens_export_erstellt_ix on wissens_export (erstellt desc);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

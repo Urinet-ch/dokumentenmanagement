@@ -42,13 +42,25 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
             if (stream == null) {
                 throw new IllegalStateException("Konfigurationsschema fehlt");
             }
-            this.schema = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            ObjectNode geladen = (ObjectNode) json.readTree(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+            ObjectNode definitionen = (ObjectNode) geladen.path("$defs");
+            EinstellungskatalogSchema.erzeugen(json).forEach(definitionen::set);
+            this.schema = json.writeValueAsString(geladen);
         } catch (IOException e) {
             throw new IllegalStateException("Konfigurationsschema nicht lesbar", e);
         }
     }
 
     public Datei lesen(String text) {
+        return lesen(text, false);
+    }
+
+    @Override
+    public Datei seedLesen(String text) {
+        return lesen(text, true);
+    }
+
+    private Datei lesen(String text, boolean seed) {
         if (text == null) {
             throw ungueltig();
         }
@@ -56,7 +68,9 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
             throw new FachFehler(Fehlercode.DATEI_ZU_GROSS);
         }
         try {
-            List<ZusatzSchemaPruefer.Verletzung> verletzungen = schemaPruefer.konfigurationPruefen(schema, text);
+            List<ZusatzSchemaPruefer.Verletzung> verletzungen = seed
+                    ? schemaPruefer.seedKonfigurationPruefen(schema, text)
+                    : schemaPruefer.konfigurationPruefen(schema, text);
             if (!verletzungen.isEmpty()) {
                 throw new KonfigurationUngueltig(verletzungen.stream().map(verletzung ->
                         new KonfigurationUngueltig.Befund(verletzung.pfad(), verletzung.schluesselwort(),

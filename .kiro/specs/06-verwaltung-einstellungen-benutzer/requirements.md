@@ -48,6 +48,7 @@ eine Aufgabe.
 - **Benutzerstatus** – `EINGELADEN` (angelegt, Einladung offen), `AKTIV`, `GESPERRT` (vorübergehend, umkehrbar),
   `DEAKTIVIERT` (Austritt, umkehrbar bis zum Löschen), `GELOESCHT` (nur noch im Protokoll und im Benutzerverzeichnis).
 - **Step-up** – erneute Anmeldung mit Passwort und TOTP kurz vor einer kritischen Aktion (Requirement 7.2).
+- **Passkey** – Anmeldedaten nach WebAuthn (Gerät wie iPhone, Mac/Schlüsselbund oder Sicherheitsschlüssel); das Gerät prüft die Person (Fingerabdruck, Gesicht, PIN), das Archiv speichert nur den öffentlichen Schlüssel in Keycloak (Requirement 10).
 - **Token-Widerruf** – Zeitpunkt je Benutzer, vor dem ausgestellte Access-Tokens das Archiv nicht mehr annimmt
   (Requirement 4.9); er schliesst die Lücke zwischen Sperren in Keycloak und Ablauf des JWT.
 - **Vorgang** – eine Verwaltungsaktion mit Wirkung in Keycloak; sie wird als Absicht und Abschluss protokolliert
@@ -145,8 +146,8 @@ unbemerkt verändere.
     Sperren anwenden (Spec 01, Regel 2).
 13. Das Archiv SOLL die Einstellungen der Wissensbasis (A19: Budget je Ingest, Budget des Lint, Monatsbudget,
     Lint-Zeitplan) nach derselben Mechanik führen; der Pfad `/wissensbasis/einstellungen` und das Recht A19 bleiben
-    (Spec 04, design.md). [offen: Überführung der Tabelle `wissens_einstellung` in die Konfiguration – Entscheid Fabian
-    im PR dieser Spec; bis dahin gilt Spec 04 unverändert.]
+    (Spec 04, design.md). [entschieden 20.11.2026, Fabian: ja, Überführung der Tabelle `wissens_einstellung`
+    in die Konfiguration, Aufgabe 20.3; bis dahin gilt Spec 04 unverändert.]
 14. FALLS eine Anfrage an die Einstellungen mehrere Fehler zugleich hätte, DANN SOLL das Archiv die Reihenfolge von
     Spec 01 einhalten: 401, 403, 428/412, 409 `BESTAETIGUNG_NOETIG`, 422.
 
@@ -168,11 +169,16 @@ dass ein Passwort durch meine Hände oder durch das Archiv geht, damit ich Zugä
    nie einen Einladungslink kennen. Nachweis: JUnit (der Adapter ruft weder `reset-password` noch einen Endpunkt
    auf, der einen Link zurückgibt; ArchUnit auf die erlaubten Aufrufe).
 4. FALLS Benutzername, E-Mail, Vorname, Nachname oder Grund die Formregeln verletzen (Benutzername 3 bis 40 Zeichen aus
-   `a–z`, `0–9`, `.`, `_`, `-`; E-Mail höchstens 254 Zeichen und genau ein `@`; Namen 1 bis 60 Zeichen; Grund 10 bis
-   500 Zeichen; keine Steuerzeichen), DANN SOLL das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` und `befunde[]`
+   `a–z`, `0–9`, `.`, `_`, `-`; E-Mail höchstens 254 Zeichen und genau ein `@`; Namen 1 bis 60 Zeichen; Grund eine der festen Kategorien
+   `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`, `KORREKTUR`, `SONSTIGES`; keine Steuerzeichen), DANN SOLL das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` und `befunde[]`
    antworten. FALLS Benutzername oder E-Mail im Realm schon vergeben sind oder der Benutzername je im
    Benutzerverzeichnis einer anderen Kennung gehörte, DANN SOLL das Archiv mit HTTP 409 `BENUTZER_EXISTIERT`
    antworten, ohne zu nennen, welches Feld oder welcher Mandant betroffen ist.
+   Die Sperre eines je vergebenen Benutzernamens SOLL auch den Abbau eines Mandanten überdauern: Das Archiv SOLL für jeden vergebenen
+   Benutzernamen einen Eintrag in einer gemeinsamen Sperrliste im Schema `public` führen, der nur einen gesalzenen Hash des
+   normalisierten Namens (HMAC-SHA-256 mit Salz aus der Konfiguration), keinen Klarnamen, keine E-Mail, keinen Mandanten und keine
+   Kennung enthält; der Abbau eines Mandanten (Spec 03, 8.3) SOLL diesen Eintrag nicht löschen (Entscheid Fabian 21.11.2026, Weg A;
+   Spec 06 und Spec 03 waren widersprüchlich).
 5. FALLS ein Mandant die Höchstzahl der Benutzer erreicht hat (`archiv.verwaltung.max-benutzer`, Standard 25, nicht
    gelöschte), DANN SOLL das Archiv das Anlegen mit HTTP 409 `STATUS_KONFLIKT` ablehnen.
 6. WENN ein Benutzer mit Recht A22 die Einladung eines Benutzers im Status `EINGELADEN` erneut sendet, DANN SOLL das
@@ -246,8 +252,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
 | A23 | Rollen zuweisen | erlaubt | 403 | 403 | 403 |
 
    ¹ Für `geschaeftsstelle` gilt 403, bis Spec 03, 3.5 die Rechte A11 bis A14 entscheidet; ob die Geschäftsstelle von
-   `vhf-gsk` A21 bis A23 erhält, entscheidet derselbe Schritt [offen: Benutzerverwaltung im Mandanten `vhf-gsk` –
-   Entscheid Fabian im PR dieser Spec; Empfehlung: Betreiber verwaltet die Benutzer von `vhf-gsk` per Admin-Kommando].
+   `vhf-gsk` A21 bis A23 erhält, entscheidet derselbe Schritt [entschieden 20.11.2026, Fabian: Der Betreiber
+   verwaltet die Benutzer von `vhf-gsk` per Admin-Kommando; A20 bis A23 bleiben für `geschaeftsstelle` gesperrt, bis Spec 03, 3.5
+   entscheidet].
    Ein Benutzer braucht für das Anlegen A22 und A23, weil das Anlegen eine Rolle vergibt.
 2. FALLS ein Benutzer ohne das Recht einer Aktion A20 bis A23 sie ausführt, DANN SOLL das Archiv mit HTTP 403
    `NICHT_ERLAUBT` antworten und `VERWEIGERT` protokollieren (Spec 01, 10.7). Nachweis: Szenarien je Rolle und Zeile.
@@ -257,7 +264,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
 4. Das Archiv SOLL je Mandant einen festen Satz vergebbarer Rollen führen (Spalte `public.mandant.verwaltung_rollen`,
    gesetzt vom Betreiber beim Anlegen oder per Admin-Kommando, nie über die Oberfläche; Standard `inhaber`,
    `mitarbeiter`, `treuhaender`; `vhf-gsk`: `geschaeftsstelle`). FALLS ein Aufruf eine andere Rolle verlangt, DANN SOLL
-   das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` antworten.
+   das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` antworten. «Andere Rolle» heisst: keine der vier Archiv-Rollen
+   (unbekannt, etwa eine Realm-Rolle). Eine bekannte Archiv-Rolle ausserhalb des Satzes des Mandanten fällt unter 4.6
+   (403 `ESKALATION_VERBOTEN`).
 5. WENN ein Benutzer mit Recht A23 die Rolle eines Benutzers ändert (Step-up), DANN SOLL das Archiv in Keycloak die
    neue Rolle setzen und alle anderen der vier Archiv-Rollen entfernen und den Token-Widerruf setzen (4.9); hat ein
    Benutzer in Keycloak mehrere Archiv-Rollen (von Hand gesetzt), SOLL die Verwaltung das als Abweichung
@@ -268,8 +277,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
    403 `ESKALATION_VERBOTEN` antworten, nichts ändern und `VERWEIGERT` mit dem Fehlercode protokollieren.
 7. FALLS ein Vorgang den Mandanten ohne aktiven Inhaber (Status `AKTIV` mit Rolle `inhaber`) liesse (Rolle ändern,
    sperren, deaktivieren, löschen), DANN SOLL das Archiv mit HTTP 409 `LETZTER_INHABER` antworten und nichts ändern. Das
-   Archiv SOLL gleichzeitige Verwaltungsvorgänge eines Mandanten nacheinander ausführen (eine Vorgangssperre mit Ablauf
-   nach höchstens 15 Sekunden; ein zweiter Vorgang erhält HTTP 409 `STATUS_KONFLIKT`), damit zwei Inhaber sich nicht
+   Archiv SOLL gleichzeitige Verwaltungsvorgänge eines Mandanten nacheinander ausführen (eine Vorgangssperre; eine vor externer Wirkung
+   vorbereitete Sperre läuft nach höchstens 15 Sekunden ab, ein Vorgang `ANGEFRAGT` oder `UNKLAR` bleibt bis zum Abgleich
+   oder zur Klärung gesperrt, weil eine externe Wirkung noch eintreffen kann (Entscheid Fabian 21.11.2026); ein zweiter Vorgang erhält HTTP 409 `STATUS_KONFLIKT`), damit zwei Inhaber sich nicht
    gleichzeitig entfernen. Nachweis: Szenario mit gleichzeitigen Aufrufen und JUnit (`LetzterInhaberTest`).
 8. Das Archiv SOLL den Mandanten nie aus Pfad, Query, Header oder Body übernehmen: Der Mandant stammt aus dem
    verifizierten Token; jeder Zielbenutzer SOLL vor jeder Aktion (nicht nur in Listen) auf genau diesen Wert des
@@ -305,7 +315,7 @@ und nur im Mandanten des Inhabers anfasst, damit ein Fehler oder ein Einbruch in
 #### Acceptance Criteria
 1. Das Archiv SOLL Keycloak als einzige Quelle für Benutzer, Zugangsdaten, Rollen und das Attribut `mandant` behalten
    und über Spec 01, 10.10 hinaus keine Kopie von Personendaten führen (keine E-Mail, keine Vor- und Nachnamen in
-   Tabellen des Archivs).
+   Tabellen des Archivs). Nachweis: JUnit (`KeycloakAdminAdapterTest`).
 2. Das Archiv SOLL die Admin-REST-API von Keycloak nur über das Dienstkonto `archiv-verwaltung` im Realm
    `urinet-archiv` aufrufen (Client-Credentials, nur Dienstkonto, kein Browser-Fluss, kein Direct Grant). Das Dienstkonto
    SOLL nur die Rechte `query-users`, `view-users` und `manage-users` des Clients `realm-management` tragen, keines
@@ -317,18 +327,21 @@ und nur im Mandanten des Inhabers anfasst, damit ein Fehler oder ein Einbruch in
    (Spec 01, Plattform und Betrieb). Nachweis: JUnit (`ComposeRoutenTest`-Muster aus Spec 01, Aufgabe 1.9).
 4. Das Archiv SOLL das Geheimnis des Dienstkontos nur als Secret-Datei `keycloak_verwaltung_secret` führen (GitHub-Secret
    `KEYCLOAK_VERWALTUNG_SECRET`; nie im Realm-Export, im Repository, in Umgebungsvariablen, Logs oder Antworten); die
-   Startprüfung `SecretPruefung` SOLL die Datei in `prod` für die Laufart `api` und das Admin-Kommando verlangen.
+   Startprüfung `SecretPruefung` SOLL die Datei in `prod` für die Laufart `api` und das Admin-Kommando verlangen, sobald die
+   Admin-Adresse (`archiv.verwaltung.keycloak.basis-url`) gesetzt ist.
    Nachweis: JUnit (`SecretPruefungTest` erweitert, `RealmExportTest`).
 5. Das Archiv SOLL Verbindungsaufbau und Anfrage zu Keycloak begrenzen (Standard 2 und 5 Sekunden,
    `archiv.verwaltung.keycloak.verbindungs-zeitgrenze` und `….zeitgrenze`), höchstens 2 Aufrufe gleichzeitig zulassen
    (Wartezeit 200 Millisekunden, danach HTTP 503 `UEBERLASTET` mit `Retry-After: 1`), schreibende Aufrufe nie
    automatisch wiederholen, lesende höchstens einmal, und nach 3 Fehlern in Folge innerhalb von 30 Sekunden für 30
    Sekunden ohne Aufruf mit HTTP 503 `IDENTITAETSDIENST_NICHT_ERREICHBAR` antworten (Schutzschalter, kein Wiederholungssturm).
+   Nachweis: JUnit (`KeycloakAdminAdapterTest`, `ProblemAbbildungTest`).
 6. FALLS Keycloak nicht erreichbar ist, die Zeit überschreitet oder mit 5xx antwortet, DANN SOLL das Archiv mit HTTP
    503 `IDENTITAETSDIENST_NICHT_ERREICHBAR` und `Retry-After` antworten; FALLS Keycloak mit einem unerwarteten 4xx
    (insbesondere 401 oder 403 für das Dienstkonto) antwortet, DANN SOLL es mit HTTP 502 `IDENTITAETSDIENST_FEHLER`
    antworten und einen Alarm auslösen (6.7). Antworten und Logs SOLLEN keine Meldungen, Namen oder Werte von
-   Keycloak enthalten, nur Fehler-ID, Klasse und Status.
+   Keycloak enthalten, nur Fehler-ID, Klasse und Status. Nachweis: JUnit (`KeycloakAdminAdapterTest`,
+   `ProblemAbbildungTest`).
 7. Das Archiv SOLL mehrstufige Vorgänge (Anlegen, Rolle setzen, Einladung senden) so ausführen, dass entweder alles
    gelingt oder der Zustand vor dem Vorgang wiederhergestellt wird (Kompensation, z. B. den eben angelegten Benutzer
    entfernen); gelingt die Kompensation nicht, SOLL der Vorgang als `UNKLAR` gelten und der Abgleich (6.5) ihn melden.
@@ -336,9 +349,10 @@ und nur im Mandanten des Inhabers anfasst, damit ein Fehler oder ein Einbruch in
 8. SOLANGE Keycloak für die Verwaltung nicht erreichbar ist, SOLL das Archiv Anmeldung, Dokumente, Einstellungen und alle
    übrigen Endpunkte unverändert bedienen; nur die Endpunkte der Benutzer und Rollen antworten nach 5.5 und 5.6. Die
    Readiness der API ändert sich nicht (Spec 01, Plattform und Betrieb); der Zustand des Dienstkontos erscheint im
-   internen Detail-Health.
+   internen Detail-Health. Nachweis: JUnit (`IdentitaetsdienstHealthCheckTest`).
 9. Das Archiv SOLL bei jeder Keycloak-Antwort mit Benutzern nur solche weiterverarbeiten, deren Attribut `mandant` genau
    ein Wert ist und dem Mandanten des Akteurs entspricht (Prüfung im Archiv, nicht nur über die Suchanfrage).
+   Nachweis: JUnit (`KeycloakAdminAdapterTest`).
 10. Das Archiv SOLL das Speicherbudget der Stufe A einhalten: Die Anbindung nutzt den JDK-HTTP-Client und Jackson ohne
     Keycloak-Admin-Bibliothek, Antworten sind auf höchstens 50 Benutzer je Aufruf und 1 MiB begrenzt, der Heap der
     API wächst dadurch um höchstens 4 MiB. Nachweis: manuell [Fabian] (Messung wie Spec 01, Aufgabe 1.10, mit
@@ -357,7 +371,7 @@ auffälliger Häufung gewarnt werden, damit ein Missbrauch auffällt.
    Die Aktionen und Fehlercodes kommen mit der jeweiligen Aufgabe in Spec 01 und in die Enums (`FehlercodeSpecTest`).
 2. Das Archiv SOLL je Eintrag den Akteur (`benutzer` = Keycloak-`sub`, Rolle), die Zeit, die IP und im Feld `details`
    die `vorgangId`, das Ziel nur als Keycloak-`sub` (`ziel`), den Vorgang, bei Rollenwechsel die Rollennamen alt und neu,
-   bei E-Mail, Vorname und Nachname nur Feldname und «geändert» und den Grund (höchstens 500 Zeichen) enthalten, nie
+   bei E-Mail, Vorname und Nachname nur Feldname und «geändert» und den Grund (feste Kategorie, Entscheid Fabian 21.11.2026) enthalten, nie
    E-Mail-Adressen, Vor- und Nachnamen, Passwörter, Links, Codes oder Tokens; `dokument_id` bleibt leer. Nachweis: Szenarien
    und JUnit (`VerwaltungProtokollTest` sucht in `details` nach E-Mail-Mustern, Namen aus dem Test und Link-Mustern).
 3. WENN das Archiv einen Benutzer anlegt oder bei der Übernahme (9.4) erfasst, DANN SOLL es in derselben Transaktion eine
@@ -411,8 +425,9 @@ oder Missbrauch wird, damit der Schutz der Dokumente nicht an einer Verwaltungsf
 4. Das Archiv SOLL die Einladung ohne Passwort ausstellen, den Link nur an die in Keycloak hinterlegte Adresse senden
    lassen, nach Ablauf (3.2) den Status `EINGELADEN` mit Kennzeichen «abgelaufen» zeigen und die erforderliche Einrichtung
    von TOTP im selben Ablauf erzwingen (ein Benutzer ohne TOTP kann sich nie anmelden, Spec 01, 2.1). Der Realm SOLL für
-   Passwörter eine Richtlinie führen (mindestens 12 Zeichen, nicht Benutzername und nicht E-Mail-Adresse). Nachweis:
-   JUnit (`RealmExportTest`) und Szenario gegen Keycloak mit Mailpit.
+   Passwörter eine Richtlinie führen (mindestens 12 Zeichen, nicht Benutzername und nicht E-Mail-Adresse).
+   Nachweis: JUnit (`RealmExportTest`; `RealmExportKeycloakTest.einladungOhnePasswortErreichtMailpit` gegen Keycloak mit
+   Mailpit: Theme `urinet-archiv`, Einmal-Link, Gültigkeit und Betreff ohne Namen) und Szenario gegen Keycloak mit Mailpit.
 5. Das Archiv SOLL beim Lesen und Ändern von Benutzern nicht verraten, ob eine Kennung in einem anderen Mandanten
    existiert: Fremde oder unbekannte IDs ergeben denselben Status 404; die Suche (`q`, höchstens 40 Zeichen) sucht nur im
    Mandanten; die Meldung bei `BENUTZER_EXISTIERT` nennt weder Feld noch Mandant (Restrisiko: ein Inhaber kann durch
@@ -454,7 +469,9 @@ folgenreichen Schritt gewarnt werden, damit ich nichts versehentlich auslöse.
    503 `IDENTITAETSDIENST_NICHT_ERREICHBAR` mit «Später erneut versuchen»; Netzwerkfehler wie 5xx. Verwaltungsaktionen
    werden nie in die Offline-Warteschlange gestellt.
 6. Die App SOLL nie ein Passwort, einen Einladungslink oder ein Geheimnis anzeigen; nach dem Einladen steht, dass die
-   Person eine E-Mail erhält, und der Status zeigt «Einladung offen seit …».
+   Person eine E-Mail erhält, und der Status zeigt «Einladung offen seit …». Nachweis: JUnit
+   (`RealmExportKeycloakTest.einladungOhnePasswortErreichtMailpit`: Text der Einladung nennt Einmal-Link und nächste
+   Schritte; Betriebsdokumentation `deploy/infomaniak/keycloak/README.md`) und Szenarien der Oberfläche.
 7. Die Seite der Einstellungen SOLL die Gruppen des Katalogs, je Einstellung Grenzen, Standard, «wirksam ab» und
    «auf Standard», eine Vorschau vor dem Speichern und den Verlauf der Versionen mit Vergleich (nur die Pfade unter
    `einstellungen.*`, Kennungen ohne Werte) zeigen; die Seite der Benutzer SOLL die Rechte-Übersicht je Benutzer und je
@@ -508,6 +525,41 @@ einen ersten Inhaber ohne Passwort im Terminal erhalten, damit Betrieb und Abnah
 
 ---
 
+### Requirement 10: Passkey als zusätzlicher Anmeldeweg (ohne Konzept-ID)
+**User Story:** Als Benutzer möchte ich mich mit einem Passkey auf meinem iPhone oder Mac anmelden können, damit ich ohne Passwort und
+Einmalcode sicher und schnell ins Archiv komme, ohne dass der Schutz sinkt.
+
+Entscheid Fabian 21.11.2026: Der Passkey ist ein **zusätzlicher Weg**, der Passwort und TOTP ersetzt (er deckt beide Faktoren ab:
+Besitz des Geräts und Prüfung der Person); Passwort plus TOTP bleibt für alle ohne Passkey. Verlorene Passkeys setzt ein Admin zurück
+(wie TOTP). Der Passkey genügt als Step-up (7.2). Die Google-Anmeldung bleibt unverändert (verknüpftes Konto plus TOTP).
+
+#### Acceptance Criteria
+1. WENN ein Benutzer angemeldet ist, DANN SOLL er in der Kontoverwaltung von Keycloak einen oder mehrere Passkeys einrichten und
+   wieder entfernen können (iPhone, Mac/Schlüsselbund, Sicherheitsschlüssel); die Einrichtung ist freiwillig, kein Benutzer wird dazu
+   gezwungen.
+2. Der Realm SOLL auf der Anmeldeseite die Anmeldung mit Passkey ohne Passwort und ohne TOTP erlauben; das Gerät MUSS die Person prüfen
+   (Benutzerverifikation «required», auffindbarer Schlüssel «required», Attestation «none»). Die Anmeldung mit Passkey zählt als zwei
+   Faktoren und setzt `auth_time` wie die Anmeldung mit Passwort und TOTP.
+3. Das Archiv SOLL einem Benutzer ohne Passkey die Anmeldung weiter nur mit Passwort und TOTP erlauben; ein eingerichteter Passkey
+   schaltet TOTP nicht ab (Rückfall bei Geräteverlust). Der Zugang ohne zweiten Faktor bleibt ausgeschlossen (Spec 01, 2.1).
+4. WENN eine Aktion der Liste «Step-up» eintrifft, DANN SOLL eine erneute Anmeldung mit Passkey (`max_age=0`, `prompt=login`) den
+   Step-up erfüllen wie Passwort und TOTP (7.2). Nachweis gegen echtes Keycloak.
+5. WENN ein Admin «Zugang zurücksetzen» für einen Benutzer ausführt, DANN SOLL das Archiv wahlweise dessen Passkeys löschen können
+   (gleiche Rollen, gleiche Step-up- und Vier-Augen-Regeln, gleiches Protokoll wie TOTP zurücksetzen, 3.x); der Benutzer richtet beim
+   nächsten Anmelden mit Passwort und TOTP einen neuen Passkey ein.
+6. Das Archiv SOLL im Benutzerdetail «Passkey eingerichtet: ja/nein» und die Anzahl zeigen, **nicht** Gerätenamen, Schlüsselkennungen
+   oder andere Gerätedaten; die Liste der Benutzer SOLL danach filtern können.
+7. Das Archiv SOLL die Ereignisse Passkey eingerichtet, entfernt und zurückgesetzt im Verwaltungsprotokoll ohne Gerätedaten führen
+   (Spec 06, 6.x); Keycloak-Ereignisse nach den bestehenden Regeln aufbewahren.
+8. Die Relying-Party-ID (Domain der App) SOLL eine Betriebsangabe sein: im Realm-Export ein Platzhalter, der Wert kommt beim Einspielen
+   (Betrieb, nicht im Repo). Ein Domainwechsel macht Passkeys ungültig; die Dokumentation SOLL das nennen, der Rückfall ist Passwort
+   plus TOTP.
+9. Die Google-Anmeldung SOLL unverändert bleiben (verknüpftes Konto, TOTP-Pflicht, Admin-only-Verknüpfung).
+10. Das Archiv SOLL keine biometrischen Daten erhalten oder speichern; sie bleiben auf dem Gerät.
+11. Das Archiv SOLL den Passkey-Weg mit einem **virtuellen Authenticator** (Browser-Automatisierung, WebAuthn-CDP) gegen ein
+    Wegwerf-Keycloak prüfen: Einrichten, Anmelden, Step-up, Entfernen, Zurücksetzen durch den Admin. Nachweis auf echten Geräten
+    (iPhone, Mac) ist Aufgabe von Fabian bei der Inbetriebnahme.
+
 ## Rückverfolgung Auftrag → Spec
 | Auftrag Fabian (18.11.2026) | Requirement |
 | --- | --- |
@@ -517,3 +569,4 @@ einen ersten Inhaber ohne Passwort im Terminal erhalten, damit Betrieb und Abnah
 | Protokoll, Fehlerfälle, Grenzen, Alarm | 5, 6 |
 | Sicherheit und Bedrohungsmodell | 5, 7 (design.md «Bedrohungsmodell») |
 | Inbetriebnahme, Migration, Tests, Abnahme, Mandantenabbau | 9 |
+| Passkey als Anmeldeweg (iPhone, Mac), Entscheid 21.11.2026 | 10 |

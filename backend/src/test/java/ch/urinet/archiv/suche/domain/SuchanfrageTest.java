@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -49,6 +50,11 @@ class SuchanfrageTest {
     private static Suchanfrage sortiert(String begriff, Sortierung sortierung) {
         return new Suchanfrage(begriff, null, null, null, null, null, null, null, null, null, null, null, sortierung,
                 0, 20);
+    }
+
+    private static Suchanfrage klassifikationen(Map<String, List<String>> klassifikationen) {
+        return new Suchanfrage(null, null, null, null, null, null, null, null, null, null, null, null, null, 0, 20,
+                null, null, klassifikationen);
     }
 
     @Test
@@ -96,6 +102,26 @@ class SuchanfrageTest {
         assertThatThrownBy(() -> tags(List.of(" "))).isInstanceOf(FachFehler.class);
         assertThatThrownBy(() -> tags(List.of("a".repeat(101)))).isInstanceOf(FachFehler.class);
         assertThatThrownBy(() -> tags(List.of("a\nb"))).isInstanceOf(FachFehler.class);
+    }
+
+    @Test
+    void klassifikationenWerdenBegrenztUndUnveraenderlichKopiert() {
+        List<String> werte = new java.util.ArrayList<>(List.of("bau", "elektro", "bau"));
+        Suchanfrage anfrage = klassifikationen(Map.of("fachgebiet", werte));
+
+        werte.add("hochbau");
+
+        assertThat(anfrage.klassifikationen()).containsEntry("fachgebiet", List.of("bau", "elektro"));
+        assertThatThrownBy(() -> anfrage.klassifikationen().get("fachgebiet").add("hochbau"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> klassifikationen(Map.of("Fachgebiet", List.of("bau"))))
+                .isInstanceOf(FachFehler.class);
+        assertThatThrownBy(() -> klassifikationen(Map.of("fachgebiet", List.of(""))))
+                .isInstanceOf(FachFehler.class);
+        assertThatThrownBy(() -> klassifikationen(Map.of("fachgebiet", List.of("x".repeat(41)))))
+                .isInstanceOf(FachFehler.class);
+        assertThatThrownBy(() -> klassifikationen(Map.of("fachgebiet",
+                Collections.nCopies(501, "bau")))).isInstanceOf(FachFehler.class);
     }
 
     @Test

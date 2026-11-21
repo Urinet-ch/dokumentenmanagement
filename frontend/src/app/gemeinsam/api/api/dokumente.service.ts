@@ -137,7 +137,7 @@ export class DokumenteService extends BaseService {
 
     /**
      * Dokumente suchen
-     * Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus&#x3D;hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung&#x3D;DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.
+     * Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus&#x3D;hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung&#x3D;DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Klassifikationsfilter als wiederholbare Parameter klassifikation.&lt;code&gt;&#x3D;&lt;wert&gt;; Antwort enthält sichtbarkeitsgeprüfte Facetten. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.
      * @endpoint get /api/v1/dokumente
      * @param art Code der Dokumentart
      * @param belegnummer exakte Belegnummer
@@ -879,20 +879,22 @@ export class DokumenteService extends BaseService {
 
     /**
      * Dateien hochladen
-     * PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».
+     * PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen» als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprüft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».
      * @endpoint post /api/v1/dokumente
      * @param dateien 
      * @param arbeitsfassungen 
      * @param zusammenfassen 
      * @param hinweis 
+     * @param art 
+     * @param klassifikationen 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<UploadErgebnis>>;
-    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<UploadErgebnis>>>;
-    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<UploadErgebnis>>>;
-    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<UploadErgebnis>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<UploadErgebnis>>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<UploadErgebnis>>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -955,6 +957,12 @@ export class DokumenteService extends BaseService {
         }
         if (hinweis !== undefined) {
             localVarFormParams = localVarFormParams.append('hinweis', <any>hinweis) as any || localVarFormParams;
+        }
+        if (art !== undefined) {
+            localVarFormParams = localVarFormParams.append('art', <any>art) as any || localVarFormParams;
+        }
+        if (klassifikationen !== undefined) {
+            localVarFormParams = localVarFormParams.append('klassifikationen', <any>klassifikationen) as any || localVarFormParams;
         }
 
         let responseType_: 'text' | 'json' | 'blob' = 'json';

@@ -50,7 +50,7 @@ class ArchivWerkzeugeTest {
                 .filter(m -> m.isAnnotationPresent(Tool.class)).toList();
         assertThat(werkzeuge).extracting(m -> m.getAnnotation(Tool.class).name())
                 .containsExactlyInAnyOrder("dokumente_suchen", "dokument_zeigen", "fristen", "kennzahl", "offene_posten",
-                        "vollstaendigkeit");
+                        "vollstaendigkeit", "wissen_index", "wissen_seite_zeigen");
         for (Method methode : werkzeuge) {
             int memoryIds = 0;
             for (Parameter parameter : methode.getParameters()) {
@@ -224,7 +224,7 @@ class ArchivWerkzeugeTest {
                 return new Ansicht("Metadaten (bestätigt)\nBelegnummer: 1100745\nBetrag: CHF 123.45"
                         + "\nDatum: 10.03.2071", "OCR-Text 1190745", null, null, null, id.toString(), "OCR-Ziffernprobe",
                         "AUSGANGSRECHNUNG", "10.03.2071", null, "1100745", "CHF 123.45", null, null,
-                        true, "/dokument/" + id);
+                        true, "/dokument/" + id, "NORMAL");
             }
         };
         ArchivWerkzeuge werkzeuge = werkzeuge(new DokumenteSuchen(null, null, null, null, null, null,
@@ -251,7 +251,7 @@ class ArchivWerkzeugeTest {
                             gekuerzt ? DokumentZeigen.INHALT_MAX : null,
                             gekuerzt ? DokumentZeigen.HINWEIS_GEKUERZT.formatted(DokumentZeigen.INHALT_MAX) : null,
                             id.toString(), "Bericht", "KORRESPONDENZ", null, null, null, null, null, null, true,
-                            "/dokument/" + id);
+                            "/dokument/" + id, "NORMAL");
                 }
             };
             ArchivWerkzeuge werkzeuge = werkzeuge(new DokumenteSuchen(null, null, null, null, null, null,
@@ -303,6 +303,6 @@ class ArchivWerkzeugeTest {
         };
         Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(m -> true), mandanten);
         return new ArchivWerkzeuge(lauf, suchen, zeigen, fristen, kennzahl, offenePosten,
-                new VollstaendigkeitAbfrage(null, null, null), new ObjectMapper());
+                new VollstaendigkeitAbfrage(null, null, null), null, new ObjectMapper());
     }
 }

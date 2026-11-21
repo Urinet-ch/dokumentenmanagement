@@ -18,7 +18,10 @@ const MOTIV_DATEI = { 'blatt.png': 'ein Blatt', 'leer.png': 'eine leere Fläche'
 
 /** Startet den Browser neu als Handy (390 × 844, Touch); mit Motiv filmt die Rückkamera dieses Bild. */
 async function handy(welt, { motiv, serviceWorker = false, zeitzone = 'Europe/Zurich' }) {
-  await welt.browser?.close();
+  await welt.kontext?.close();
+  if (welt.browser !== welt.standardBrowser) {
+    await welt.browser?.close();
+  }
   const args = [];
   welt.kennung = randomInt(2 ** 32);
   if (motiv) {
@@ -111,7 +114,14 @@ function mitschreiben() {
   };
 }
 
+/**
+ * Beantwortet bzw. leitet die Uploads weiter; jeder Versuch steht in welt.handy.anfragen. Status und Antwort kommen
+ * zusammen, erst wenn der Körper gelesen ist: Das Ereignis «response» kommt mit den Headern, der Körper später, und ein
+ * Schritt, der auf den Status wartet, darf keinen Eintrag ohne Antwort sehen. Zugeordnet wird über die Anfrage, nicht
+ * über den letzten Eintrag.
+ */
 async function uploadsBeantworten(welt) {
+  const weitergeleitet = new Map();
   await welt.seite.route(`${basisUrl}/api/v1/dokumente`, async (route) => {
     const anfrage = route.request();
     if (anfrage.method() !== 'POST') {
@@ -134,6 +144,7 @@ async function uploadsBeantworten(welt) {
           body: JSON.stringify(vorgabe.body),
         });
       }
+      weitergeleitet.set(anfrage, eintrag);
       await anfrageWeiterleiten(route, welt.keycloak.benutzer);
     } catch (fehler) {
       welt.handy.fehler = fehler;
@@ -141,16 +152,14 @@ async function uploadsBeantworten(welt) {
     }
   });
   welt.seite.on('response', async (antwort) => {
-    if (
-      antwort.request().method() === 'POST' &&
-      new URL(antwort.url()).pathname === '/api/v1/dokumente'
-    ) {
-      const eintrag = welt.handy.anfragen.at(-1);
-      if (eintrag && eintrag.status === null) {
-        eintrag.status = antwort.status();
-        eintrag.antwort = await antwort.json().catch(() => null);
-      }
+    const eintrag = weitergeleitet.get(antwort.request());
+    if (!eintrag) {
+      return;
     }
+    weitergeleitet.delete(antwort.request());
+    const status = antwort.status();
+    const koerper = await antwort.json().catch((fehler) => ({ unlesbar: String(fehler) }));
+    Object.assign(eintrag, { status, antwort: koerper });
   });
 }
 
@@ -227,6 +236,18 @@ Given('ein Handy ohne Kamera', { timeout: 60_000 }, async function () {
 
 Given('die Uhr des Handys lässt sich vorstellen', async function () {
   await this.kontext.clock.install();
+  await this.seite.evaluate(() => {
+    window.__uploadWartezeiten = [];
+    const original = window.setTimeout;
+    window.setTimeout = function (callback, verzug, ...argumente) {
+      const id = original(callback, verzug, ...argumente);
+      // Nur den Timer der Warteschlange erfassen, nicht etwa die Token-Erneuerung.
+      if (typeof callback === 'function' && /this\s*\.\s*verarbeiten\s*\(/.test(callback.toString())) {
+        window.__uploadWartezeiten.push(verzug);
+      }
+      return id;
+    };
+  });
 });
 
 Given(
@@ -359,6 +380,12 @@ When(
   { timeout: 60_000 },
   async function () {
     const vorher = this.handy.anfragen.length;
+    await warten(
+      this,
+      () => this.seite.evaluate((verzug) => window.__uploadWartezeiten.includes(verzug), vorher * 30_000),
+      `Wiederholungstimer nach Versuch ${vorher}`,
+      50_000,
+    );
     await this.kontext.clock.fastForward('03:00');
     await warten(this, () => this.handy.anfragen.length > vorher, 'neuer Upload-Versuch');
   },

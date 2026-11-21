@@ -21,4 +21,7 @@
     <include file="changesets/037-api-token-gueltig-bis.xml" relativeToChangelogFile="true"/>
     <include file="changesets/038-chat-budget-reservierung.xml" relativeToChangelogFile="true"/>
     <include file="changesets/039-chat-budget-reservierung-lease.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/040-mandant-verwaltung-rollen.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/041-verwaltung-vorgang.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/042-verwaltung-vorgang-phase.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

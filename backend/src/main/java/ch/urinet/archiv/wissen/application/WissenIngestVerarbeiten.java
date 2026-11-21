@@ -67,13 +67,17 @@ public class WissenIngestVerarbeiten {
     private final WissenKonfiguration konfiguration;
     private final KiPort ki;
     private final KiVerbrauchPort verbrauch;
+    private final DiffDienst diffDienst;
+    private final WissenIngestIndex index;
 
     public WissenIngestVerarbeiten(WissenIngestSpeichern speichern, WissenKonfiguration konfiguration,
-                                   KiPort ki, KiVerbrauchPort verbrauch) {
+                                   KiPort ki, KiVerbrauchPort verbrauch, DiffDienst diffDienst, WissenIngestIndex index) {
         this.speichern = speichern;
         this.konfiguration = konfiguration;
         this.ki = ki;
         this.verbrauch = verbrauch;
+        this.diffDienst = diffDienst;
+        this.index = index;
     }
 
     public void ausfuehren(Auftrag auftrag, UUID entwurfId) throws InterruptedException {
@@ -99,11 +103,15 @@ public class WissenIngestVerarbeiten {
         long budget = begrenzt(lauf.budgetTokens(), grenzen.budgetTokens());
         long monatsbudget = begrenzt(lauf.monatsbudgetTokens(), grenzen.monatsbudgetTokens());
         if (!"ABSCHLUSS".equals(lauf.schritt()) && stand.monatsverbrauch() >= monatsbudget) {
-            speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt, "Budget erschöpft");
+            fehlerSichern(auftrag, lauf, fortschritt, "Budget erschöpft");
             return;
         }
         if (summe(lauf.tokensEin(), lauf.tokensAus()) >= budget && !"ABSCHLUSS".equals(lauf.schritt())) {
-            budgetAbschluss(auftrag, lauf, fortschritt, 0, 0);
+            if ("NEU_ERZEUGEN".equals(lauf.schritt())) {
+                speichern.neuerzeugungFehler(auftrag, entwurfId, "Budget erschöpft");
+            } else {
+                budgetAbschluss(auftrag, lauf, fortschritt, 0, 0);
+            }
             return;
         }
 
@@ -113,6 +121,7 @@ public class WissenIngestVerarbeiten {
             case "SEITE" -> seite(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
             case "QUELLE" -> quelle(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
             case "ABSCHLUSS" -> abschluss(auftrag, entwurfId, fortschritt, budget);
+            case "NEU_ERZEUGEN" -> neuerzeugen(auftrag, stand, fortschritt, budget, monatsbudget);
             default -> speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt,
                     "Unbekannter Wissens-Ingest-Schritt");
         }
@@ -129,16 +138,22 @@ public class WissenIngestVerarbeiten {
      */
     private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher) {
         if (!WissenIngestSpeichern.freigegeben(stand.lauf()) || stand.quellStufe() == null) {
-            speichern.fehlerSichern(auftrag, stand.lauf().entwurfId(), stand.lauf().schritt(), bisher,
-                    NICHT_FREIGEGEBEN);
+            fehlerSichern(auftrag, stand.lauf(), bisher, NICHT_FREIGEGEBEN);
             return true;
         }
         if (bisher.kontextStufe() != null && stand.quellStufe().ordinal() < bisher.kontextStufe().ordinal()) {
-            speichern.fehlerSichern(auftrag, stand.lauf().entwurfId(), stand.lauf().schritt(), bisher,
-                    STUFE_GESENKT);
+            fehlerSichern(auftrag, stand.lauf(), bisher, STUFE_GESENKT);
             return true;
         }
         return false;
+    }
+
+    private void fehlerSichern(Auftrag auftrag, Lauf lauf, Fortschritt fortschritt, String hinweis) {
+        if ("NEU_ERZEUGEN".equals(lauf.schritt())) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(), hinweis);
+        } else {
+            speichern.fehlerSichern(auftrag, lauf.entwurfId(), lauf.schritt(), fortschritt, hinweis);
+        }
     }
 
     private static Fortschritt mitKontextStufe(Fortschritt bisher, WissensStufe stufe) {
@@ -235,7 +250,7 @@ public class WissenIngestVerarbeiten {
         List<Kernaussage> belegt = belegteAussagen(bisher);
         String aussagenText = belegt.stream().map(a -> a.nr() + " [" + a.schluessel() + "] " + a.text())
                 .collect(java.util.stream.Collectors.joining("\n"));
-        List<SeitenMetadaten> index = speichern.indexLaden(lauf.entwurfId(), belegt.stream().map(Kernaussage::text)
+        List<SeitenMetadaten> index = this.index.laden(lauf.entwurfId(), belegt.stream().map(Kernaussage::text)
                 .collect(java.util.stream.Collectors.joining("\n")));
         String indexText = index.stream().map(WissenIngestVerarbeiten::indexZeile)
                 .collect(java.util.stream.Collectors.joining("\n"));
@@ -412,7 +427,8 @@ public class WissenIngestVerarbeiten {
             Wissensseite daten = seiteAusFassung(fassung, lauf, stand.quellStufe(), true);
             SeitenVorschlag entwurf = new SeitenVorschlag(index + 1, "VERALTEN", plan.seiteId(), plan.pfad(),
                     plan.basisVersion(), daten, plan.grund(), List.of(), List.of(), List.of(), List.of(),
-                    stand.quellStufe().name());
+                    stand.quellStufe().name(), diffDienst.vergleichen(seiteAusFassung(fassung, lauf,
+                            stand.quellStufe(), false), daten));
             speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "SEITE",
                     mitVorschlag(bisher, entwurf, index + 1, null), lauf.tokensEin(), lauf.tokensAus(), false, null);
             return;
@@ -436,17 +452,9 @@ public class WissenIngestVerarbeiten {
             return;
         }
 
-        List<SeitenMetadaten> indexSeiten = speichern.indexLaden(lauf.entwurfId(),
+        List<SeitenMetadaten> indexSeiten = this.index.laden(lauf.entwurfId(),
                 aussagen.stream().map(Kernaussage::text).collect(java.util.stream.Collectors.joining(" ")));
-        String nachricht = feld("Geplanter Pfad", plan.pfad()) + feld("Geplante Aktion", plan.aktion())
-                + feld("Begründung", plan.grund())                 + feld("Index der sichtbaren Seiten",
-                indexSeiten.stream().map(WissenIngestVerarbeiten::indexZeile)
-                        .collect(java.util.stream.Collectors.joining("\n")))
-                + feld("Kernaussagen", aussagen.stream().map(a -> a.schluessel() + " " + a.text())
-                        .collect(java.util.stream.Collectors.joining("\n")))
-                + (aktuelleFassung == null ? "" : feld("Bestehende Seite (Daten)",
-                        aktuelleFassung.metadaten().titel() + "\n" + aktuelleFassung.metadaten().beschreibung()
-                                + "\n" + aktuelleFassung.inhalt()));
+        String nachricht = seitenNachricht(plan, indexSeiten, aussagen, aktuelleFassung);
         KiErgebnis antwort = aufrufen(lauf, stand, KiPort.WissensSchritt.SEITE, nachricht, budget, monatsbudget);
         if (antwort.ohneZugang()) {
             speichern.fehlerSichern(auftrag, lauf.entwurfId(), lauf.schritt(), bisher,
@@ -476,6 +484,186 @@ public class WissenIngestVerarbeiten {
                 antwort.budgetErreicht() ? "ABSCHLUSS" : "SEITE", neu,
                 addiere(lauf.tokensEin(), antwort.tokensEin()), addiere(lauf.tokensAus(), antwort.tokensAus()),
                 antwort.budgetErreicht(), antwort.budgetErreicht() ? "Budget erschöpft" : null);
+    }
+
+    private static String seitenNachricht(Planung plan, List<SeitenMetadaten> indexSeiten,
+                                          List<Kernaussage> aussagen, SeitenFassung aktuelleFassung) {
+        return feld("Geplanter Pfad", plan.pfad()) + feld("Geplante Aktion", plan.aktion())
+                + feld("Begründung", plan.grund()) + feld("Index der sichtbaren Seiten",
+                indexSeiten.stream().map(WissenIngestVerarbeiten::indexZeile)
+                        .collect(java.util.stream.Collectors.joining("\n")))
+                + feld("Kernaussagen", aussagen.stream().map(a -> a.schluessel() + " " + a.text())
+                        .collect(java.util.stream.Collectors.joining("\n")))
+                + (aktuelleFassung == null ? "" : feld("Bestehende Seite (Daten)",
+                        aktuelleFassung.metadaten().titel() + "\n" + aktuelleFassung.metadaten().beschreibung()
+                                + "\n" + aktuelleFassung.inhalt()));
+    }
+
+    static Planung neuerzeugungsPlan(SeitenVorschlag vorher, Fortschritt fortschritt, SeitenFassung aktuell) {
+        if (vorher.seiteId() == null || !vorher.seiteId().equals(aktuell.metadaten().id())
+                || !vorher.pfad().equals(aktuell.metadaten().pfad())) {
+            throw new IllegalStateException("Die aktuelle Seite passt nicht zur veralteten Änderung");
+        }
+        List<Integer> aussagen = fortschritt.planung().stream()
+                .filter(plan -> plan.pfad().equals(vorher.pfad()))
+                .findFirst().map(Planung::aussagen).orElseGet(() -> {
+                    Set<String> schluessel = vorher.daten().quellen().stream().map(Quelleneintrag::schluessel)
+                            .collect(java.util.stream.Collectors.toSet());
+                    return fortschritt.kernaussagen().stream()
+                            .filter(a -> schluessel.contains(a.schluessel())).map(Kernaussage::nr).toList();
+                });
+        return new Planung(vorher.pfad(), vorher.aktion(), vorher.daten().typ().datenbankwert(),
+                vorher.begruendung(), aussagen, vorher.seiteId(), aktuell.metadaten().version(), false);
+    }
+
+    private void neuerzeugen(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher, long budget,
+                             long monatsbudget) throws InterruptedException {
+        int nummer = Math.toIntExact(auftrag.nutzlast().zahl("aenderungNr")
+                .orElseThrow(() -> new IllegalArgumentException("Auftragsnutzlast ohne aenderungNr")));
+        Lauf lauf = stand.lauf();
+        SeitenVorschlag vorher = bisher.vorschlaege().stream().filter(v -> v.nummer() == nummer).findFirst()
+                .orElse(null);
+        if (vorher == null || vorher.seiteId() == null) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die Grundlage der Änderung fehlt. Bitte den Ingest neu starten.");
+            return;
+        }
+        WissenIngestSpeichern.Stand aktuell = laden(lauf.entwurfId(), Set.of(vorher.seiteId())).stand();
+        if (aktuell == null || nichtFreigegeben(auftrag, aktuell, bisher)) {
+            return;
+        }
+        lauf = aktuell.lauf();
+        bisher = mitKontextStufe(bisher, aktuell.quellStufe());
+        SeitenFassung fassung = aktuell.fassungen().get(vorher.seiteId());
+        if (fassung == null) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die aktuelle Seite ist für die Wissensquelle nicht sichtbar.");
+            return;
+        }
+        if (!speichern.vorschlagFuerKiZulaessig(vorher.daten(), aktuell.quellStufe())) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die Quellen des bisherigen Vorschlags sind für die KI nicht mehr zulässig. "
+                            + "Bitte den Ingest neu starten.");
+            return;
+        }
+        Planung plan = neuerzeugungsPlan(vorher, bisher, fassung);
+        List<Kernaussage> aussagen = bisher.kernaussagen().stream().filter(Kernaussage::belegt)
+                .filter(a -> plan.aussagen().contains(a.nr())).toList();
+        List<SeitenMetadaten> index = this.index.laden(lauf.entwurfId(),
+                aussagen.stream().map(Kernaussage::text).collect(java.util.stream.Collectors.joining(" ")));
+        String nachricht = seitenNachricht(plan, index, aussagen, fassung)
+                + feld("Bisheriger Vorschlag (Daten)", vorher.daten().titel() + "\n"
+                + vorher.daten().beschreibung() + "\n" + vorher.daten().inhalt());
+        boolean quelleSeite = vorher.daten().typ() == Seitentyp.QUELLE;
+        if (quelleSeite) {
+            if (!lauf.dokumentId().equals(fassung.wissensquelleId())) {
+                speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                        "Die Quelle-Seite gehört nicht mehr zur Wissensquelle. Bitte den Ingest neu starten.");
+                return;
+            }
+            nachricht += feld("Quelle-Seite",
+                    "Erhalte die Abschnitte «Zusammenfassung», «Kernaussagen» und «Berührte Seiten». "
+                            + "Übernimm vorhandene Kernaussagen und berührte Seiten aus beiden Fassungen; "
+                            + "ergänze die mitgelieferten Kernaussagen mit ihren Fussnoten.");
+        }
+        KiErgebnis antwort = aufrufen(lauf, aktuell, KiPort.WissensSchritt.SEITE, nachricht, budget, monatsbudget);
+        if (antwort.ohneZugang() || !(antwort.inhalt() instanceof KiPort.Seite inhalt)) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(), antwort.budgetErreicht()
+                    ? "Budget erschöpft" : "Die Änderung konnte nicht neu erzeugt werden. Bitte erneut versuchen.");
+            return;
+        }
+        if (quelleSeite && !quelleStrukturErhalten(fassung, vorher, inhalt, aussagen, lauf.dokumentId())) {
+            speichern.neuerzeugungFehler(auftrag, lauf.entwurfId(),
+                    "Die Quelle-Seite konnte nicht vollständig neu erzeugt werden. Bitte erneut versuchen.");
+            return;
+        }
+        SeitenVorschlag neu = seitenVorschlag(plan, nummer, inhalt, aussagen, fassung, lauf, aktuell.quellStufe(),
+                quelleSeite ? vorher.daten().quellen() : List.of());
+        List<SeitenVorschlag> vorschlaege = bisher.vorschlaege().stream()
+                .map(v -> v.nummer() == nummer ? neu : v).toList();
+        Fortschritt fortschritt = new Fortschritt(bisher.abschnitt(), bisher.seite(), bisher.quelleErzeugt(),
+                bisher.kernaussagen(), bisher.planung(), vorschlaege, bisher.hinweise(), bisher.kontextStufe());
+        speichern.neuerzeugungSichern(auftrag, lauf.entwurfId(), vorher.seiteId(), plan.basisVersion(),
+                aktuell.quellStufe(), fortschritt, addiere(lauf.tokensEin(), antwort.tokensEin()),
+                addiere(lauf.tokensAus(), antwort.tokensAus()),
+                neuerStand -> aenderungPruefen(neuerStand, fortschritt, neu));
+    }
+
+    static boolean quelleStrukturErhalten(SeitenFassung aktuell, SeitenVorschlag vorher, KiPort.Seite neu,
+                                          List<Kernaussage> aussagen, UUID dokumentId) {
+        String text = neu.inhalt();
+        if (!quelleAbschnitteGueltig(text) || !quelleAbschnitteGueltig(aktuell.inhalt())
+                || !quelleAbschnitteGueltig(vorher.daten().inhalt())) {
+            return false;
+        }
+        Map<String, String> neueAussagen = kernaussageZeilen(text);
+        Map<String, String> alteAussagen = new HashMap<>(kernaussageZeilen(aktuell.inhalt()));
+        for (var alt : kernaussageZeilen(vorher.daten().inhalt()).entrySet()) {
+            String vorhanden = alteAussagen.putIfAbsent(alt.getKey(), alt.getValue());
+            if (vorhanden != null && !vorhanden.equals(alt.getValue())) {
+                return false;
+            }
+        }
+        for (var alt : alteAussagen.entrySet()) {
+            if (alt.getValue().equals(neueAussagen.get(alt.getKey()))) {
+                continue;
+            }
+            Quelleneintrag alterBeleg = aktuell.quellen().stream()
+                    .filter(q -> alt.getKey().equals(q.schluessel())).findFirst().orElse(null);
+            boolean begruendet = neu.entfernteAussagen().stream().anyMatch(e -> e != null
+                    && alt.getKey().equals(e.schluessel()) && e.begruendung() != null
+                    && !e.begruendung().isBlank());
+            boolean ersetzt = alterBeleg != null && aussagen.stream().anyMatch(a ->
+                    gleicherBeleg(alterBeleg, eintrag(a, dokumentId))
+                            && neueAussagen.containsKey(a.schluessel()));
+            if (!begruendet || !ersetzt) {
+                return false;
+            }
+        }
+        for (Kernaussage aussage : aussagen) {
+            if (!("- " + aussage.text() + " [^" + aussage.schluessel() + "]")
+                    .equals(neueAussagen.get(aussage.schluessel()))) {
+                return false;
+            }
+        }
+        Set<String> links = beruehrteSeitenZeilen(text).keySet();
+        return links.containsAll(beruehrteSeitenZeilen(aktuell.inhalt()).keySet())
+                && links.containsAll(beruehrteSeitenZeilen(vorher.daten().inhalt()).keySet());
+    }
+
+    private static boolean quelleAbschnitteGueltig(String text) {
+        if (text == null) {
+            return false;
+        }
+        List<String> ueberschriften = List.of("## Zusammenfassung", "## Kernaussagen", "## Berührte Seiten");
+        Set<String> aussagen = new HashSet<>();
+        Set<String> links = new HashSet<>();
+        int abschnitt = -1;
+        for (String zeile : text.split("\\R")) {
+            if (zeile.startsWith("## ")) {
+                if (abschnitt + 1 >= ueberschriften.size()
+                        || !ueberschriften.get(abschnitt + 1).equals(zeile.strip())) {
+                    return false;
+                }
+                abschnitt++;
+            } else if (!zeile.isBlank()) {
+                if (abschnitt < 0) {
+                    return false;
+                }
+                if (abschnitt == 1) {
+                    var treffer = KERNAUSSAGE_ZEILE.matcher(zeile);
+                    if (!treffer.matches() || !aussagen.add(treffer.group(1))) {
+                        return false;
+                    }
+                } else if (abschnitt == 2) {
+                    var treffer = BERUEHRTE_SEITE_ZEILE.matcher(zeile);
+                    if (!treffer.matches() || !links.add(treffer.group(1))) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return abschnitt == 2;
     }
 
     private void quelle(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher, long budget,
@@ -571,50 +759,73 @@ public class WissenIngestVerarbeiten {
                 && !bisher.hinweise().contains(UEBERBLICK_HOEHER) ? mitHinweis(bisher, UEBERBLICK_HOEHER) : bisher;
         Lauf lauf = stand.lauf();
         List<NeueAenderung> aenderungen = new ArrayList<>();
-        Map<String, SeitenMetadaten> seitenNachPfad = stand.seiten().stream()
-                .collect(java.util.stream.Collectors.toMap(SeitenMetadaten::pfad, seite -> seite));
-        Set<UUID> sichtbar = speichern.sichtbareSeiten(stand).stream().map(SeitenMetadaten::id)
-                .collect(java.util.stream.Collectors.toSet());
-        List<Kernaussage> belegte = belegteAussagen(fortschritt);
         for (SeitenVorschlag vorschlag : fortschritt.vorschlaege()) {
-            SeitenMetadaten bisherige = vorschlag.seiteId() == null ? null : seitenNachPfad.get(vorschlag.pfad());
-            SeitenFassung fassung = vorschlag.seiteId() == null ? null : stand.fassungen().get(vorschlag.seiteId());
-            Set<String> basis = fassung == null ? Set.of()
-                    : fassung.quellen().stream().map(Quelleneintrag::schluessel).collect(java.util.stream.Collectors.toSet());
-            Set<String> entfernt = vorschlag.entfernteAussagen().stream().map(KiPort.EntfernteAussage::schluessel)
-                    .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
-            boolean quelleSeite = vorschlag.daten() != null && vorschlag.daten().typ() == Seitentyp.QUELLE
-                    && lauf.dokumentId().equals(vorschlag.daten().wissensquelleId());
-            Set<String> genutzt = belegte.stream().filter(a -> quelleSeite || fortschritt.planung().stream()
-                            .filter(p -> p.pfad().equals(vorschlag.pfad()))
-                            .anyMatch(p -> p.aussagen().contains(a.nr())))
-                    .map(Kernaussage::schluessel).collect(java.util.stream.Collectors.toSet());
-            boolean hoeher = vorschlag.seiteId() == null && stand.seiten().stream()
-                    .anyMatch(seite -> seite.pfad().equals(vorschlag.pfad()) && !sichtbar.contains(seite.id())
-                            && !speichern.zugaenglich(seite, lauf, stand.graph(), stand.personalDokumente()));
-            WissensPruefung.Kontext kontext = new WissensPruefung.Kontext(konfiguration.ingest().seiteMaxZeichen(),
-                    bisherige == null ? null : bisherige.pfad(),
-                    stand.seiten().stream().map(SeitenMetadaten::pfad).collect(java.util.stream.Collectors.toSet()),
-                    stand.dokumentQuellen(), sichtbar, basis, entfernt, genutzt, true,
-                    "VERALTEN".equals(vorschlag.aktion()), hoeher,
-                    bisherige == null ? null : vertraulichkeit(stand.graph().wirksameStufe(bisherige.id(),
-                            stand.graph().dokumente(bisherige.id()))),
-                    vertraulichkeit(stand.quellStufe()));
-            WissensPruefung.Ergebnis pruefung = WissensPruefung.pruefen(vorschlag.daten(), kontext);
-            List<WissensPruefung.Befund> befunde = new ArrayList<>(vorschlag.befunde());
-            befunde.addAll(pruefung.befunde());
-            List<WissensPruefung.Hinweis> hinweise = new ArrayList<>(vorschlag.hinweise());
-            hinweise.addAll(pruefung.hinweise());
-            String diff = "{}";
-            aenderungen.add(new NeueAenderung(lauf.entwurfId(), vorschlag.nummer(), vorschlag.aktion(),
-                    vorschlag.seiteId(), vorschlag.pfad(), vorschlag.basisVersion(), vorschlag.daten(),
-                    vorschlag.begruendung(), vorschlag.widersprueche(), vorschlag.entfernteAussagen(),
-                    befunde, hinweise, diff, vorschlag.vertraulichkeitKontext()));
+            NeueAenderung aenderung = aenderungPruefen(stand, fortschritt, vorschlag);
+            if (aenderung == null) {
+                speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt,
+                        "Die Basisversion für den Diff ist nicht mehr verfügbar. Bitte den Ingest neu starten.");
+                return;
+            }
+            aenderungen.add(aenderung);
         }
         speichern.aenderungenSichern(auftrag, entwurfId, lauf.schritt(), aenderungen, fortschritt,
                 lauf.tokensEin(), lauf.tokensAus(), lauf.unvollstaendig()
                         || summe(lauf.tokensEin(), lauf.tokensAus()) >= budget,
                 fortschritt.hinweise().isEmpty() ? null : String.join("; ", fortschritt.hinweise()));
+    }
+
+    private NeueAenderung aenderungPruefen(WissenIngestSpeichern.Stand stand, Fortschritt fortschritt,
+                                           SeitenVorschlag vorschlag) {
+        Lauf lauf = stand.lauf();
+        Map<String, SeitenMetadaten> seitenNachPfad = stand.seiten().stream()
+                .collect(java.util.stream.Collectors.toMap(SeitenMetadaten::pfad, seite -> seite));
+        Set<UUID> sichtbar = speichern.sichtbareSeiten(stand).stream().map(SeitenMetadaten::id)
+                .collect(java.util.stream.Collectors.toSet());
+        List<Kernaussage> belegte = belegteAussagen(fortschritt);
+        SeitenMetadaten bisherige = vorschlag.seiteId() == null ? null : seitenNachPfad.get(vorschlag.pfad());
+        SeitenFassung fassung = vorschlag.seiteId() == null ? null : stand.fassungen().get(vorschlag.seiteId());
+        List<Quelleneintrag> basisQuellen = vorschlag.diff() != null ? vorschlag.diff().quellen().alt()
+                : fassung == null ? List.of() : fassung.quellen();
+        Set<String> basis = basisQuellen.stream().map(Quelleneintrag::schluessel)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> entfernt = vorschlag.entfernteAussagen().stream().map(KiPort.EntfernteAussage::schluessel)
+                .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        boolean quelleSeite = vorschlag.daten() != null && vorschlag.daten().typ() == Seitentyp.QUELLE
+                && lauf.dokumentId().equals(vorschlag.daten().wissensquelleId());
+        Set<String> genutzt = belegte.stream().filter(a -> quelleSeite || fortschritt.planung().stream()
+                        .filter(p -> p.pfad().equals(vorschlag.pfad()))
+                        .anyMatch(p -> p.aussagen().contains(a.nr())))
+                .map(Kernaussage::schluessel).collect(java.util.stream.Collectors.toSet());
+        boolean hoeher = vorschlag.seiteId() == null && stand.seiten().stream()
+                .anyMatch(seite -> seite.pfad().equals(vorschlag.pfad()) && !sichtbar.contains(seite.id())
+                        && !speichern.zugaenglich(seite, lauf, stand.graph(), stand.personalDokumente()));
+        WissensPruefung.Kontext kontext = new WissensPruefung.Kontext(konfiguration.ingest().seiteMaxZeichen(),
+                bisherige == null ? null : bisherige.pfad(),
+                stand.seiten().stream().map(SeitenMetadaten::pfad).collect(java.util.stream.Collectors.toSet()),
+                stand.dokumentQuellen(), sichtbar, basis, entfernt, genutzt, true,
+                "VERALTEN".equals(vorschlag.aktion()), hoeher,
+                bisherige == null ? null : vertraulichkeit(stand.graph().wirksameStufe(bisherige.id(),
+                        stand.graph().dokumente(bisherige.id()))),
+                vertraulichkeit(stand.quellStufe()));
+        WissensPruefung.Ergebnis pruefung = WissensPruefung.pruefen(vorschlag.daten(), kontext);
+        List<WissensPruefung.Befund> befunde = new ArrayList<>(vorschlag.befunde());
+        befunde.addAll(pruefung.befunde());
+        List<WissensPruefung.Hinweis> hinweise = new ArrayList<>(vorschlag.hinweise());
+        hinweise.addAll(pruefung.hinweise());
+        DiffDienst.Diff diff = vorschlag.diff();
+        if (diff == null) {
+            if (vorschlag.seiteId() != null && (fassung == null || vorschlag.basisVersion() == null
+                    || fassung.metadaten().version() != vorschlag.basisVersion())) {
+                return null;
+            }
+            Wissensseite basisSeite = fassung == null ? null : seiteAusFassung(fassung, lauf,
+                    stand.quellStufe(), false);
+            diff = diffDienst.vergleichen(basisSeite, vorschlag.daten());
+        }
+        return new NeueAenderung(lauf.entwurfId(), vorschlag.nummer(), vorschlag.aktion(),
+                vorschlag.seiteId(), vorschlag.pfad(), vorschlag.basisVersion(), vorschlag.daten(),
+                vorschlag.begruendung(), vorschlag.widersprueche(), vorschlag.entfernteAussagen(),
+                befunde, hinweise, diff, vorschlag.vertraulichkeitKontext());
     }
 
     private void budgetAbschluss(Auftrag auftrag, Lauf lauf, Fortschritt bisher, long tokensEin, long tokensAus) {
@@ -626,6 +837,13 @@ public class WissenIngestVerarbeiten {
 
     private KiErgebnis aufrufen(Lauf lauf, WissenIngestSpeichern.Stand stand, KiPort.WissensSchritt schritt,
                                String nachricht, long budget, long monatsbudget) throws InterruptedException {
+        return aufrufen(lauf.entwurfId(), lauf.modell(), lauf.tokensEin(), lauf.tokensAus(), stand.monatsverbrauch(),
+                schritt, nachricht, budget, monatsbudget);
+    }
+
+    KiErgebnis aufrufen(UUID entwurfId, String modell, long bisherEin, long bisherAus, long monatsverbrauch,
+                        KiPort.WissensSchritt schritt, String nachricht, long budget, long monatsbudget)
+            throws InterruptedException {
         long tokensEin = 0;
         long tokensAus = 0;
         String auftragstext = nachricht;
@@ -633,8 +851,8 @@ public class WissenIngestVerarbeiten {
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException("Wissens-Ingest unterbrochen");
             }
-            long verbraucht = summe(lauf.tokensEin(), lauf.tokensAus(), tokensEin, tokensAus);
-            long monatVerbraucht = addiere(stand.monatsverbrauch(), summe(tokensEin, tokensAus));
+            long verbraucht = summe(bisherEin, bisherAus, tokensEin, tokensAus);
+            long monatVerbraucht = addiere(monatsverbrauch, summe(tokensEin, tokensAus));
             long frei = Math.min(budget - verbraucht, monatsbudget - monatVerbraucht);
             long eingeschaetzt = schaetzen(SYSTEM_PROMPT.length() + auftragstext.length());
             long eingabeObergrenze = Math.max(eingeschaetzt,
@@ -646,7 +864,7 @@ public class WissenIngestVerarbeiten {
             // max_tokens nie über das Restbudget hinaus, aber auch nie über die längste erwartete Antwort
             int maxAusgabe = (int) Math.min(frei - eingabeObergrenze, maxAusgabeTokens());
             WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.now());
-            var reservierung = speichern.budgetReservieren(lauf.entwurfId(),
+            var reservierung = speichern.budgetReservieren(entwurfId,
                     addiere(eingabeObergrenze, maxAusgabe), budget, monatsbudget, monat.von(), monat.bis());
             if (!reservierung.reserviert()) {
                 return new KiErgebnis(null, tokensEin, tokensAus, true,
@@ -656,13 +874,13 @@ public class WissenIngestVerarbeiten {
             KiPort.Verbrauch aufrufVerbrauch;
             boolean protokolliert = false;
             try {
-                antwort = ki.wissensIngest(new KiPort.WissensAnfrage(schritt, lauf.modell(),
+                antwort = ki.wissensIngest(new KiPort.WissensAnfrage(schritt, modell,
                         SYSTEM_PROMPT, auftragstext, maxAusgabe));
                 aufrufVerbrauch = antwort.verbrauch() == null
-                        ? new KiPort.Verbrauch(lauf.modell(), 0, 0) : antwort.verbrauch();
+                        ? new KiPort.Verbrauch(modell, 0, 0) : antwort.verbrauch();
                 verbrauch.erfassen(KiVerbrauchPort.WISSEN_INGEST,
-                        new KiPort.Verbrauch(lauf.modell(), aufrufVerbrauch.tokensEin(), aufrufVerbrauch.tokensAus()),
-                        lauf.entwurfId());
+                        new KiPort.Verbrauch(modell, aufrufVerbrauch.tokensEin(), aufrufVerbrauch.tokensAus()),
+                        entwurfId);
                 protokolliert = true;
                 tokensEin = addiere(tokensEin, aufrufVerbrauch.tokensEin());
                 tokensAus = addiere(tokensAus, aufrufVerbrauch.tokensAus());
@@ -681,9 +899,9 @@ public class WissenIngestVerarbeiten {
                 throw new IllegalStateException("Wissens-KI nicht verfügbar: " + ausfall.getClass().getSimpleName());
             }
             if (antwort instanceof KiPort.WissensGueltig gueltig) {
-                boolean monatsbudgetErreicht = addiere(stand.monatsverbrauch(), summe(tokensEin, tokensAus))
+                boolean monatsbudgetErreicht = addiere(monatsverbrauch, summe(tokensEin, tokensAus))
                         >= monatsbudget;
-                boolean budgetErreicht = summe(lauf.tokensEin(), lauf.tokensAus(), tokensEin, tokensAus) >= budget
+                boolean budgetErreicht = summe(bisherEin, bisherAus, tokensEin, tokensAus) >= budget
                         || monatsbudgetErreicht;
                 return new KiErgebnis(gueltig.inhalt(), tokensEin, tokensAus, budgetErreicht,
                         monatsbudgetErreicht, false);
@@ -692,8 +910,8 @@ public class WissenIngestVerarbeiten {
                 auftragstext += "\n\nDie vorherige Antwort war ungültig. Gib die angeforderte Struktur vollständig zurück.";
             }
         }
-        boolean monatsbudgetErreicht = addiere(stand.monatsverbrauch(), summe(tokensEin, tokensAus)) >= monatsbudget;
-        boolean budgetErreicht = summe(lauf.tokensEin(), lauf.tokensAus(), tokensEin, tokensAus) >= budget
+        boolean monatsbudgetErreicht = addiere(monatsverbrauch, summe(tokensEin, tokensAus)) >= monatsbudget;
+        boolean budgetErreicht = summe(bisherEin, bisherAus, tokensEin, tokensAus) >= budget
                 || monatsbudgetErreicht;
         return new KiErgebnis(null, tokensEin, tokensAus, budgetErreicht, monatsbudgetErreicht, false);
     }
@@ -701,11 +919,23 @@ public class WissenIngestVerarbeiten {
     private SeitenVorschlag seitenVorschlag(Planung plan, int nummer, KiPort.Seite inhalt,
                                             List<Kernaussage> aussagen, SeitenFassung bisherige, Lauf lauf,
                                             WissensStufe stufe) {
+        return seitenVorschlag(plan, nummer, inhalt, aussagen, bisherige, lauf, stufe, List.of());
+    }
+
+    private SeitenVorschlag seitenVorschlag(Planung plan, int nummer, KiPort.Seite inhalt,
+                                            List<Kernaussage> aussagen, SeitenFassung bisherige, Lauf lauf,
+                                            WissensStufe stufe, List<Quelleneintrag> weitereQuellen) {
         Map<String, Quelleneintrag> quellenNachSchluessel = new HashMap<>();
+        List<WissensPruefung.Befund> befunde = new ArrayList<>();
         if (bisherige != null) {
             bisherige.quellen().forEach(quelle -> quellenNachSchluessel.put(quelle.schluessel(), quelle));
         }
-        List<WissensPruefung.Befund> befunde = new ArrayList<>();
+        for (Quelleneintrag quelle : weitereQuellen) {
+            Quelleneintrag vorhanden = quellenNachSchluessel.putIfAbsent(quelle.schluessel(), quelle);
+            if (vorhanden != null && !gleicherBeleg(vorhanden, quelle)) {
+                befunde.add(kollision(quelle.schluessel()));
+            }
+        }
         for (Kernaussage aussage : aussagen) {
             Quelleneintrag neu = eintrag(aussage, lauf.dokumentId());
             Quelleneintrag vorhanden = quellenNachSchluessel.get(aussage.schluessel());
@@ -724,7 +954,8 @@ public class WissenIngestVerarbeiten {
                 !inhalt.widersprueche().isEmpty(), bisherige == null ? null : bisherige.wissensquelleId());
         return new SeitenVorschlag(nummer, plan.aktion(), plan.seiteId(), plan.pfad(), plan.basisVersion(),
                 daten, inhalt.begruendung(), inhalt.widersprueche(), inhalt.entfernteAussagen(),
-                List.copyOf(befunde), List.of(), stufe.name());
+                List.copyOf(befunde), List.of(), stufe.name(), diffDienst.vergleichen(
+                        bisherige == null ? null : seiteAusFassung(bisherige, lauf, stufe, false), daten));
     }
 
     /**
@@ -815,7 +1046,8 @@ public class WissenIngestVerarbeiten {
                     Instant.now(), null, null, false, false, lauf.dokumentId());
             return new SeitenVorschlag(nummer, "AENDERN", m.id(), m.pfad(), m.version(), daten,
                     "Aktualisierung der Quelle-Seite nach erneutem Ingest", List.of(), entfernt, List.copyOf(befunde),
-                    List.of(), stand.quellStufe().name());
+                    List.of(), stand.quellStufe().name(), diffDienst.vergleichen(
+                            seiteAusFassung(bestehende, lauf, stand.quellStufe(), false), daten));
         }
         String slug = slug(inhalt.titel());
         if (slug.isEmpty()) {
@@ -834,7 +1066,7 @@ public class WissenIngestVerarbeiten {
                 lauf.dokumentId());
         return new SeitenVorschlag(nummer, "NEU", null, pfad, null, daten,
                 "Zusammenfassung der Wissensquelle", List.of(), List.of(), List.copyOf(befunde), List.of(),
-                stand.quellStufe().name());
+                stand.quellStufe().name(), diffDienst.vergleichen(null, daten));
     }
 
     private static Quelleneintrag eintrag(Kernaussage aussage, UUID dokumentId) {
@@ -902,7 +1134,7 @@ public class WissenIngestVerarbeiten {
         List<WissensPruefung.Hinweis> hinweise = hinweis == null ? List.of()
                 : List.of(new WissensPruefung.Hinweis(hinweis, meldung));
         return new SeitenVorschlag(nummer, plan.aktion(), null, plan.pfad(), null, daten, plan.grund(),
-                List.of(), List.of(), befunde, hinweise, stand.quellStufe().name());
+                List.of(), List.of(), befunde, hinweise, stand.quellStufe().name(), diffDienst.vergleichen(null, daten));
     }
 
     private Wissensseite seiteAusFassung(SeitenFassung fassung, Lauf lauf, WissensStufe stufe,
@@ -980,7 +1212,7 @@ public class WissenIngestVerarbeiten {
                 + seite.beschreibung() + " | " + String.join(", ", seite.tags());
     }
 
-    private static String feld(String bezeichnung, Object wert) {
+    static String feld(String bezeichnung, Object wert) {
         String text = wert == null ? "" : wert.toString();
         return bezeichnung + " (" + text.length() + " Zeichen; Daten):\n" + text + "\n";
     }
@@ -1042,7 +1274,7 @@ public class WissenIngestVerarbeiten {
     private record OptionalStand(WissenIngestSpeichern.Stand stand) {
     }
 
-    private record KiErgebnis(KiPort.WissensInhalt inhalt, long tokensEin, long tokensAus, boolean budgetErreicht,
-                              boolean monatsbudgetErreicht, boolean ohneZugang) {
+    record KiErgebnis(KiPort.WissensInhalt inhalt, long tokensEin, long tokensAus, boolean budgetErreicht,
+                      boolean monatsbudgetErreicht, boolean ohneZugang) {
     }
 }

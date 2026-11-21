@@ -1,6 +1,8 @@
 package ch.urinet.archiv.sicherheit.domain;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -14,8 +16,8 @@ import static ch.urinet.archiv.sicherheit.domain.Ergebnis.VERBOTEN;
 
 /**
  * Rechtematrix Rolle × Aktion als einzige Domain-Regel (Req 2.6, ADR-009). Quelle ist die Tabelle in requirements.md;
- * {@code RechtematrixSpecTest} vergleicht jede Zelle. Eine neue Zeile (A15–A19, Spec 04) braucht eine Konstante in
- * {@link Aktion} und einen Eintrag hier; fehlt eine Zelle, scheitert schon das Laden der Klasse.
+ * {@code RechtematrixSpecTest} vergleicht jede Zelle. Eine neue Zeile braucht eine Konstante in {@link Aktion} und
+ * einen Eintrag hier; fehlt eine Zelle, scheitert schon das Laden der Klasse.
  */
 public final class Rechtematrix {
 
@@ -43,6 +45,10 @@ public final class Rechtematrix {
         zeile(Aktion.A17, ERLAUBT, VERBOTEN, VERBOTEN, ERLAUBT);
         zeile(Aktion.A18, ERLAUBT, ERLAUBT, VERBOTEN, ERLAUBT);
         zeile(Aktion.A19, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A20, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A21, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A22, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A23, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
         if (ZEILEN.size() != Aktion.values().length) {
             throw new IllegalStateException("Rechtematrix unvollständig");
         }
@@ -63,6 +69,23 @@ public final class Rechtematrix {
 
     public static Ergebnis ergebnis(Rolle rolle, Aktion aktion) {
         return ZEILEN.get(aktion).get(rolle);
+    }
+
+    /**
+     * Fussnoten der Zelle (Req 4.12): ¹ für {@code geschaeftsstelle} bei A11 bis A14 und A20 bis A23 (403, bis Spec 03
+     * entscheidet), ² bei «nur eigene».
+     */
+    public static List<Fussnote> fussnoten(Rolle rolle, Aktion aktion) {
+        List<Fussnote> fussnoten = new ArrayList<>();
+        if (rolle == Rolle.GESCHAEFTSSTELLE && ergebnis(rolle, aktion) == VERBOTEN
+                && (aktion.compareTo(Aktion.A11) >= 0 && aktion.compareTo(Aktion.A14) <= 0
+                || aktion.compareTo(Aktion.A20) >= 0 && aktion.compareTo(Aktion.A23) <= 0)) {
+            fussnoten.add(Fussnote.GESCHAEFTSSTELLE_OFFEN);
+        }
+        if (ergebnis(rolle, aktion) == NUR_EIGENE) {
+            fussnoten.add(Fussnote.NUR_EIGENE);
+        }
+        return List.copyOf(fussnoten);
     }
 
     /**

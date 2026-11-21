@@ -1,6 +1,7 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
 import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
 import jakarta.persistence.PersistenceException;
 import jakarta.ws.rs.core.Response;
@@ -42,6 +43,24 @@ class ProblemAbbildungTest {
     }
 
     @Test
+    void identitaetsdienstFehlerWerdenMitRetryAfterAbgebildet() {
+        try (Response nichtErreichbar = abbildung.fachFehler(
+                new ch.urinet.archiv.gemeinsam.domain.FachFehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+             Response ueberlastet = abbildung.fachFehler(
+                     new ch.urinet.archiv.gemeinsam.domain.FachFehler(Fehlercode.UEBERLASTET))) {
+            assertThat(nichtErreichbar.getStatus()).isEqualTo(503);
+            assertThat(nichtErreichbar.getHeaderString("Retry-After")).isEqualTo("1");
+            assertThat(ueberlastet.getStatus()).isEqualTo(503);
+            assertThat(ueberlastet.getHeaderString("Retry-After")).isEqualTo("1");
+        }
+        try (Response fehler = abbildung.fachFehler(
+                new ch.urinet.archiv.gemeinsam.domain.FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER))) {
+            assertThat(fehler.getStatus()).isEqualTo(502);
+            assertThat(fehler.getHeaderString("Retry-After")).isNull();
+        }
+    }
+
+    @Test
     void regelverletzungEnthaeltNurDieRegelcodesUndMeldungen() {
         var fehler = new RegelVerletzt(java.util.List.of(
                 new RegelVerletzt.Befund("datum_pflicht", "Belegdatum fehlt.")));
@@ -50,6 +69,16 @@ class ProblemAbbildungTest {
             assertThat(antwort.getEntity()).asString()
                     .contains("\"fehlercode\":\"REGEL_VERLETZT\"")
                     .contains("\"regeln\":[{\"code\":\"datum_pflicht\",\"meldung\":\"Belegdatum fehlt.\"}]");
+        }
+    }
+
+    @Test
+    void entwurfsbefundNenntDieBefundcodes() {
+        try (Response antwort = abbildung.fachFehler(new EntwurfBefunde(java.util.List.of("STUFE_UEBERBLICK")))) {
+            assertThat(antwort.getStatus()).isEqualTo(422);
+            assertThat(antwort.getEntity()).asString()
+                    .contains("\"fehlercode\":\"ENTWURF_BEFUND\"")
+                    .contains("\"befunde\":[\"STUFE_UEBERBLICK\"]");
         }
     }
 

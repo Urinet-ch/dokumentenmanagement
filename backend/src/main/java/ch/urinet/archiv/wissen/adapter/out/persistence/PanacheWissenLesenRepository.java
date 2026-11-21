@@ -34,7 +34,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
     private static final String SEITENFELDER = """
             s.id, s.pfad, s.typ, s.titel, s.beschreibung, cast(array_to_json(s.tags) as text),
             s.status, s.veraltet_ab, s.vertraulichkeit, s.inhalt, s.version, s.erzeugt_von, s.erzeugt_am,
-            s.freigegeben_von, s.freigegeben_am, s.quelle_pruefen, s.widerspruch_offen, s.wissensquelle_id
+            s.freigegeben_von, s.freigegeben_am, s.quelle_pruefen, s.widerspruch_offen, s.wissensquelle_id,
+            s.quellen_revision
             """;
 
     private final Instance<EntityManager> em;
@@ -88,7 +89,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                     limit :groesse offset :offset
                 )
                 select anzahl.gesamt, seite.id, seite.typ, seite.pfad, seite.titel, seite.beschreibung, seite.status,
-                       seite.quelle_pruefen
+                       seite.quelle_pruefen, seite.vertraulichkeit
                 from anzahl left join seite on true
                 order by %s, seite.titel, seite.pfad
                 """.formatted(SEITENFELDER, filter, typSortierung("gefiltert"), typSortierung("seite")));
@@ -98,9 +99,26 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         long gesamt = rows.isEmpty() ? 0 : ((Number) rows.getFirst()[0]).longValue();
         List<IndexZeile> seiten = rows.stream().filter(row -> row[1] != null)
                 .map(row -> new IndexZeile(uuid(row[1]), seitentyp(text(row[2])), text(row[3]), text(row[4]),
-                        text(row[5]), text(row[6]), bool(row[7])))
+                        text(row[5]), text(row[6]), bool(row[7]),
+                        Wissensseite.Vertraulichkeit.valueOf(text(row[8]))))
                 .toList();
         return new IndexErgebnis(seiten, gesamt);
+    }
+
+    @Override
+    public List<SeiteVerweis> seitenFuerDokument(Sichtregel sichtregel, UUID dokumentId) {
+        WissenSichtbarkeitSql.Ausdruck sicht = WissenSichtbarkeitSql.aktuell("s", sichtregel);
+        Query query = em.get().createNativeQuery("""
+                select s.id, s.pfad, s.titel from wissensseite s
+                where %s and exists (
+                    select 1 from wissensseite_quelle q where q.seite_id = s.id and q.dokument_id = :dokumentId
+                ) order by s.titel, s.pfad
+                """.formatted(sicht.bedingung()));
+        query.setParameter("dokumentId", dokumentId);
+        sicht.parameter().forEach(query::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+        return rows.stream().map(row -> new SeiteVerweis(uuid(row[0]), text(row[1]), text(row[2]))).toList();
     }
 
     @Override
@@ -143,7 +161,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         }
         SichtregelSql.Ausdruck sicht = SichtregelSql.dokument(sichtregel, "dd");
         Query query = em.get().createNativeQuery("""
-                select dd.id, dd.titel, dd.dateiname from dokument dd
+                select dd.id, dd.titel, dd.dateiname, dd.datum from dokument dd
                 where dd.id in (:ids) and %s
                 """.formatted(sicht.bedingung()));
         query.setParameter("ids", ids);
@@ -152,7 +170,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         List<Object[]> rows = query.getResultList();
         Map<UUID, DokumentKopf> ergebnis = new HashMap<>();
         for (Object[] row : rows) {
-            ergebnis.put((UUID) row[0], new DokumentKopf((String) row[1], (String) row[2]));
+            ergebnis.put((UUID) row[0], new DokumentKopf((String) row[1], (String) row[2], datum(row[3])));
         }
         return ergebnis;
     }
@@ -196,7 +214,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                 tags(text(row[5])), Wissensseite.Status.valueOf(text(row[6])), datum(row[7]), quellen(id, sichtregel),
                 Wissensseite.Vertraulichkeit.valueOf(text(row[8])), text(row[9]),
                 ((Number) row[10]).intValue(), text(row[11]), zeit(row[12]), text(row[13]), zeit(row[14]),
-                bool(row[15]), bool(row[16]), uuidNullable(row[17])));
+                bool(row[15]), bool(row[16]), uuidNullable(row[17]), ((Number) row[18]).longValue()));
     }
 
     @Override
@@ -275,7 +293,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         WissenSichtbarkeitSql.Ausdruck zielSicht = WissenSichtbarkeitSql.aktuell("z", sichtregel);
         WissenSichtbarkeitSql.Ausdruck quelleSicht = WissenSichtbarkeitSql.aktuell("s", sichtregel);
         Query query = em.get().createNativeQuery("""
-                select s.id, s.typ, s.pfad, s.titel, s.beschreibung, s.status, s.quelle_pruefen
+                select s.id, s.typ, s.pfad, s.titel, s.beschreibung, s.status, s.quelle_pruefen, s.vertraulichkeit
                 from wissensseite z
                 join wissensseite s on s.id <> z.id
                 where z.id = :seiteId and %s and %s
@@ -292,7 +310,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();
         return rows.stream().map(row -> new IndexZeile(uuid(row[0]), seitentyp(text(row[1])), text(row[2]),
-                text(row[3]), text(row[4]), text(row[5]), bool(row[6]))).toList();
+                text(row[3]), text(row[4]), text(row[5]), bool(row[6]),
+                Wissensseite.Vertraulichkeit.valueOf(text(row[7])))).toList();
     }
 
     @Override
@@ -322,7 +341,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                        ) then l.dokument_id end,
                        case when e.id is not null and (e.dokument_id is null or exists (
                            select 1 from dokument d where d.id = e.dokument_id and %s
-                       )) then l.entwurf_id end
+                       )) then l.entwurf_id end,
+                       coalesce(l.angaben->>'widerspruchAufgeloest' = 'true', false)
                 from wissens_log l
                 left join wissens_entwurf e on e.id = l.entwurf_id
                 where exists (
@@ -396,7 +416,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                             text(p.get("titel"))))
                     .toList();
             return new LogEintrag(((Number) row[0]).longValue(), zeit(row[1]), text(row[2]), text(row[3]), seiten,
-                    uuidNullable(row[5]), uuidNullable(row[6]));
+                    uuidNullable(row[5]), uuidNullable(row[6]), Boolean.TRUE.equals(row[7]));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Wissensbasis-Log ist ungültig", e);
         }

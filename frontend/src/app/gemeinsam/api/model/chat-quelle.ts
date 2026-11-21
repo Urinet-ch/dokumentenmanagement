@@ -7,10 +7,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ChatQuelldokument } from './chat-quelldokument';
+import { ChatWissensquelle } from './chat-wissensquelle';
 
 
 /**
- * Dokument (id, titel, link) oder Datenstand eines Zahlenwerkzeugs (werkzeug, datenstand, belege)
+ * Dokument (id, titel, link), Datenstand eines Zahlenwerkzeugs (werkzeug, datenstand, belege) oder Wissensseite mit direkten Quelldokumenten (wissen, dokumente)
  */
 export interface ChatQuelle { 
     id?: string | null;
@@ -22,5 +24,7 @@ export interface ChatQuelle {
     werkzeug?: string | null;
     datenstand?: string | null;
     belege?: number | null;
+    wissen?: ChatWissensquelle | null;
+    dokumente?: Array<ChatQuelldokument> | null;
 }
 

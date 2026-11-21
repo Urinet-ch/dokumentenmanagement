@@ -27,6 +27,7 @@ import {
   zusatzPflichtfelder,
 } from './verwaltung-logik';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { DokumentKlassifikationenService } from '../../dokument/klassifikationen';
 
 interface ArtForm {
   code: string;
@@ -348,6 +349,7 @@ function analysiereAntwort(wert: unknown): KonfigurationsdateiAnalyse | null {
 })
 export class Verwaltung implements OnInit {
   protected readonly texte = TEXTE.verwaltung;
+  protected readonly gruppe = TEXTE.menueGruppen.verwaltung;
   protected readonly arten = signal<Dokumentart[] | null>(null);
   protected readonly ausgewaehlteArt = signal<string | null>(null);
   protected readonly klassifikationen = signal<Klassifikation[] | null>(null);
@@ -427,6 +429,7 @@ export class Verwaltung implements OnInit {
   constructor(
     private readonly dokumentartenService: DokumentartenService,
     private readonly konfigurationService: KonfigurationService,
+    private readonly klassifikationenService: DokumentKlassifikationenService,
   ) {}
 
   ngOnInit(): void {
@@ -1544,6 +1547,7 @@ export class Verwaltung implements OnInit {
 
   private nachSchreiben(antwort: HttpResponse<unknown>): void {
     this.etagAktualisieren(antwort);
+    this.klassifikationenService.aktualisieren();
     this.ladeVersionen();
   }
 

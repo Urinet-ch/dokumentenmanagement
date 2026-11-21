@@ -14,10 +14,21 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { Observable, Subject, catchError, of, switchMap, tap, timer } from 'rxjs';
+import {
+  Observable,
+  Subject,
+  catchError,
+  distinctUntilChanged,
+  map,
+  of,
+  startWith,
+  switchMap,
+  tap,
+  timer,
+} from 'rxjs';
 import {
   Dokument,
   DokumentAenderung,
@@ -29,16 +40,25 @@ import {
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { httpFehlerText } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { EingangskorbEntwurfSpeicher } from './entwurf-speicher';
 import {
   ZusatzFeld,
+  anzeigeText,
+  gleicheKlassifikationen,
   istListe,
   listeAus,
   listeZu,
   zusatzFelder as schemaZusatzFelder,
   zusatzGueltig,
 } from '../dokument/aenderung';
+import { KlassifikationenFormular } from '../dokument/klassifikationen-formular';
+import {
+  DokumentKlassifikationenService,
+  KlassifikationenLadezustand,
+  LEERE_DOKUMENT_KLASSIFIKATIONEN,
+} from '../dokument/klassifikationen';
 import { Listenfeld } from '../dokument/listenfeld';
 import {
   AktionFehler,
@@ -63,13 +83,21 @@ const NEU_LADEN = new Set(['STATUS_KONFLIKT', 'VERSION_KONFLIKT', 'NICHT_GEFUNDE
 const IM_FORMULAR: Record<string, string> = {
   BELEGNUMMER_VERGEBEN: 'belegnummer',
   PARTNER_UNBEKANNT: 'partner',
+  KLASSIFIKATION_UNGUELTIG: '',
   ANFRAGE_UNGUELTIG: '',
 };
 
 /** Ein Dokument im Eingangskorb mit Vorschau, Vorschlag und den Aktionen nach Rechtematrix (Req 8.1, 8.5, 8.7). */
 @Component({
   selector: 'app-eingangskorb-karte',
-  imports: [MatButtonModule, RouterLink, TitelAnzeige, Listenfeld],
+  imports: [
+    MatButtonModule,
+    RouterLink,
+    TitelAnzeige,
+    Listenfeld,
+    KlassifikationenFormular,
+    Symbol,
+  ],
   templateUrl: './eingangskorb-karte.html',
   styleUrl: './eingangskorb-karte.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -77,6 +105,7 @@ const IM_FORMULAR: Record<string, string> = {
 export class EingangskorbKarte implements OnInit, OnDestroy {
   private readonly api = inject(DokumenteService);
   private readonly kontakte = inject(KontakteService);
+  private readonly klassifikationenService = inject(DokumentKlassifikationenService);
   private readonly anmeldung = inject(AnmeldungService);
   private readonly entwurfSpeicher = inject(EingangskorbEntwurfSpeicher);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -95,9 +124,21 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected readonly vertraulichkeiten = ['', 'NORMAL', 'INTERN', 'PERSONAL'];
 
   protected readonly entwurf = linkedSignal<Entwurf>(() => entwurfAus(this.dokument()));
-  protected readonly zusatzEingaben = linkedSignal<Record<string, string>>(() => this.zusatzStart());
+  protected readonly zusatzEingaben = linkedSignal<Record<string, string>>(() =>
+    this.zusatzStart(),
+  );
+  protected readonly klassifikationEingaben = linkedSignal<
+    Readonly<Record<string, readonly string[]>>
+  >(() =>
+    Object.fromEntries(
+      Object.entries(this.dokument().klassifikationen ?? {}).map(([code, werte]) => [
+        code,
+        [...werte],
+      ]),
+    ),
+  );
   private readonly aktuelleVersion = linkedSignal(() => this.dokument().version);
-  private readonly zusatzGespeichert = signal(false);
+  private readonly aenderungGespeichert = signal(false);
   protected readonly modus = signal<Modus>('ansicht');
   protected readonly laeuft = signal(false);
   protected readonly fehler = signal('');
@@ -138,10 +179,94 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     () => !this.darfBestaetigen() && !this.darfVerwerfen() && !this.darfWiederholen(),
   );
   protected readonly art = computed(() => this.arten().get(this.entwurf().art));
+  protected readonly klassifikationenStatus = toSignal(
+    toObservable(this.art).pipe(
+      map((art) => art?.code ?? ''),
+      distinctUntilChanged(),
+      switchMap((code): Observable<KlassifikationenLadezustand> =>
+        code
+          ? this.klassifikationenService.fuerArt(code).pipe(
+              map((daten) => ({ status: 'ok', daten }) as const),
+              catchError(() => of({ status: 'fehler' }) as Observable<KlassifikationenLadezustand>),
+              startWith({ status: 'laedt' } as const),
+            )
+          : of({ status: 'ok', daten: LEERE_DOKUMENT_KLASSIFIKATIONEN } as const),
+      ),
+    ),
+    { initialValue: { status: 'laedt' } as const },
+  );
+  protected readonly klassifikationenWerte = computed(() => {
+    const werte = { ...this.klassifikationEingaben() };
+    const status = this.klassifikationenStatus();
+    if (status.status === 'ok') {
+      for (const feld of status.daten.art) {
+        if (!Object.hasOwn(werte, feld.code) && feld.standardWert) {
+          werte[feld.code] = [feld.standardWert];
+        }
+      }
+    }
+    return werte;
+  });
+  protected readonly klassifikationenAlt = computed(() => {
+    const status = this.klassifikationenStatus();
+    if (status.status !== 'ok') {
+      return [];
+    }
+    const zugeordnet = new Set(status.daten.art.map((feld) => feld.code));
+    return Object.entries(this.klassifikationenWerte())
+      .filter(([code, werte]) => werte.length > 0 && !zugeordnet.has(code))
+      .map(([code, werte]) => {
+        const definition = status.daten.alle.find((feld) => feld.code === code);
+        const anzeigename = new Map(definition?.werte.map((wert) => [wert.code, wert.name]) ?? []);
+        return {
+          name: definition?.name ?? code,
+          werte: werte.map((wert) => anzeigename.get(wert) ?? wert).join(', '),
+        };
+      });
+  });
+  protected readonly klassifikationUngueltigeCodes = computed(() => [
+    ...new Set([
+      ...(this.dokument().klassifikationenUngueltig ?? []),
+      ...this.fehlerFelder()
+        .filter((feld) => feld.startsWith('klassifikationen.'))
+        .map((feld) => feld.substring('klassifikationen.'.length)),
+    ]),
+  ]);
+  protected readonly klassifikationFehlt = computed(() => {
+    const status = this.klassifikationenStatus();
+    if (status.status !== 'ok') {
+      return [];
+    }
+    return status.daten.art
+      .filter(
+        (feld) => feld.pflicht && (this.klassifikationenWerte()[feld.code] ?? []).length === 0,
+      )
+      .map((feld) => `klassifikationen.${feld.code}`);
+  });
   protected readonly mitFinanz = computed(() => this.art()?.gruppen.includes('finanz') ?? false);
   protected readonly zusatzFelder = computed(() =>
     schemaZusatzFelder(this.art()).filter((feld) => feld.name !== 'veroeffentlicht'),
   );
+  protected readonly zusatzWerte = computed(() => {
+    const werte = { ...this.zusatzEingaben() };
+    const eigenschaften = objekt(objekt(this.art()?.zusatzSchema)['properties']);
+    for (const feld of schemaZusatzFelder(this.art())) {
+      if (Object.hasOwn(werte, feld.name)) {
+        continue;
+      }
+      const standard = objekt(eigenschaften[feld.name])['default'];
+      const wert =
+        standard ??
+        (feld.name === 'zugriff' ? 'mitglieder' : feld.name === 'veroeffentlicht' ? false : '');
+      werte[feld.name] =
+        wert === null || wert === undefined
+          ? ''
+          : Array.isArray(wert)
+            ? listeZu(wert.map(String))
+            : String(wert);
+    }
+    return werte;
+  });
   protected readonly istListe = istListe;
   protected readonly zugriffOptionen = ['oeffentlich', 'mitglieder', 'vorstand'];
   protected readonly artenWahl = computed(() =>
@@ -157,29 +282,62 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     );
   });
   protected readonly zusatzFehlt = computed(() => {
-    const werte = this.zusatzEingaben();
+    const werte = this.zusatzWerte();
     // Auch Pflicht nur über `required` im Schema (Seed vhf-gsk) zählt.
-    const ausSchema = this.zusatzFelder().filter((f) => f.pflicht).map((f) => `zusatz.${f.name}`);
-    const pflicht = new Set([...(this.art()?.pflichtfelder ?? []).filter((f) => f.startsWith('zusatz.')), ...ausSchema]);
-    return [...pflicht]
-      .filter((f) => {
-        const name = f.substring('zusatz.'.length);
-        const wert = werte[name];
-        return wert === undefined || wert.trim() === ''
-          || name === 'zugriff' && !this.zugriffOptionen.includes(wert);
-      });
+    const ausSchema = this.zusatzFelder()
+      .filter((f) => f.pflicht)
+      .map((f) => `zusatz.${f.name}`);
+    const pflicht = new Set([
+      ...(this.art()?.pflichtfelder ?? []).filter((f) => f.startsWith('zusatz.')),
+      ...ausSchema,
+    ]);
+    return [...pflicht].filter((f) => {
+      const name = f.substring('zusatz.'.length);
+      const wert = werte[name];
+      return (
+        wert === undefined ||
+        wert.trim() === '' ||
+        (name === 'zugriff' && !this.zugriffOptionen.includes(wert))
+      );
+    });
   });
   protected readonly zusatzFehltImFormular = computed(() => {
     const bearbeitbar = new Set(schemaZusatzFelder(this.art()).map((feld) => feld.name));
     return this.zusatzFehlt().filter((feld) => bearbeitbar.has(feld.substring('zusatz.'.length)));
   });
   protected readonly zusatzUngueltig = computed(() => {
-    const werte = this.zusatzEingaben();
+    const werte = this.zusatzWerte();
     return schemaZusatzFelder(this.art())
       .filter((feld) => feld.name !== 'veroeffentlicht' && feld.name !== 'zugriff')
       .filter((feld) => !zusatzGueltig(feld, werte[feld.name] ?? ''))
       .map((feld) => `zusatz.${feld.name}`);
   });
+  protected readonly zusatzAlt = computed(() => {
+    const bekannt = new Set(this.zusatzFelder().map((feld) => feld.name));
+    const alteFelder = new Map(
+      schemaZusatzFelder(this.arten().get(this.dokument().art ?? '')).map((feld) => [
+        feld.name,
+        feld,
+      ]),
+    );
+    return Object.entries(this.zusatzWerte())
+      .filter(([name, wert]) => wert.trim() !== '' && !bekannt.has(name))
+      .map(([name, wert]) => {
+        const feld = alteFelder.get(name);
+        const werte =
+          feld && istListe(feld)
+            ? listeAus(wert)
+                .map((eintrag) => anzeigeText(feld, eintrag))
+                .join(', ')
+            : feld
+              ? anzeigeText(feld, wert)
+              : wert;
+        return { name: feld ? this.zusatzBeschriftung(feld) : name, wert: werte };
+      });
+  });
+  protected readonly regelWarnungen = computed(() =>
+    this.dokument().warnungen.filter((warnung) => warnung.code !== 'BELEGNUMMER_BEKANNT'),
+  );
   /**
    * Steht die Art nur im KI-Vorschlag oder ist sie hier ungespeichert gewählt, geht sie als `?art=` an die
    * Dokumentansicht; dort gilt sie als Artwechsel, damit die Zusatzfelder dieser Art erscheinen (Review #106). Die
@@ -210,7 +368,10 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       ...(this.mitFinanz()
         ? [
             { feld: 'belegnummer' as const, wert: e.belegnummer },
-            { feld: 'richtung' as const, wert: e.richtung ? (this.texte.richtung[e.richtung] ?? e.richtung) : '' },
+            {
+              feld: 'richtung' as const,
+              wert: e.richtung ? (this.texte.richtung[e.richtung] ?? e.richtung) : '',
+            },
             { feld: 'betrag' as const, wert: e.betrag ? betragAnzeige(e.betrag, e.waehrung) : '' },
             { feld: 'faelligkeit' as const, wert: datumAnzeige(e.faelligkeit) },
           ]
@@ -218,9 +379,24 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     ];
     return zeilen.filter((z) => z.wert !== '');
   });
+  /** Felder mit «bitte prüfen» auf der Karte (Titel und Übersicht), für die Pille im Prototyp. */
+  protected readonly unsichereFelder = computed(
+    () =>
+      (!this.dokument().titel && this.entwurf().titel && this.bittePruefen('titel') ? 1 : 0) +
+      this.angaben().filter((z) => this.bittePruefen(z.feld)).length,
+  );
+  /** «Vorschlag vollständig» nur mit Vorschlag, ohne unsichere Felder und ohne fehlende Pflichtangaben der Art. */
+  protected readonly vorschlagVollstaendig = computed(
+    () =>
+      Object.keys(this.dokument().vorschlag ?? {}).length > 0 &&
+      this.unsichereFelder() === 0 &&
+      this.zusatzFehlt().length === 0,
+  );
 
   protected readonly weitereFelder = computed(() => {
-    const felder: { feld: EntwurfFeld; typ: string; modus?: string }[] = [{ feld: 'projekt', typ: 'text' }];
+    const felder: { feld: EntwurfFeld; typ: string; modus?: string }[] = [
+      { feld: 'projekt', typ: 'text' },
+    ];
     if (this.mitFinanz()) {
       felder.unshift(
         { feld: 'belegnummer', typ: 'text' },
@@ -293,6 +469,18 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     return this.zusatzFehlt().map(feldName).join(', ');
   }
 
+  protected klassifikationNamen(felder: readonly string[]): string {
+    const status = this.klassifikationenStatus();
+    return felder
+      .map((feld) => {
+        const code = feld.substring('klassifikationen.'.length);
+        return status.status === 'ok'
+          ? (status.daten.art.find((klassifikation) => klassifikation.code === code)?.name ?? code)
+          : code;
+      })
+      .join(', ');
+  }
+
   protected bittePruefen(feld: EntwurfFeld): boolean {
     return bittePruefen(this.dokument(), feld);
   }
@@ -314,7 +502,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
 
   protected setze(feld: EntwurfFeld, wert: string): void {
     if (feld === 'art') {
-      this.zusatzGespeichert.set(false);
+      this.aenderungGespeichert.set(false);
     }
     if (feld === 'vertraulichkeit') {
       this.vertraulichkeitGewaehlt = true;
@@ -331,8 +519,13 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   }
 
   protected setzeZusatz(name: string, wert: string): void {
-    this.zusatzGespeichert.set(false);
+    this.aenderungGespeichert.set(false);
     this.zusatzEingaben.update((werte) => ({ ...werte, [name]: wert }));
+  }
+
+  protected setzeKlassifikationen(werte: Readonly<Record<string, readonly string[]>>): void {
+    this.aenderungGespeichert.set(false);
+    this.klassifikationEingaben.set(werte);
   }
 
   protected zusatzBeschriftung(feld: ZusatzFeld): string {
@@ -393,7 +586,8 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     if (this.modus() === 'formular') {
       this.entwurf.set(entwurfAus(this.dokument()));
       this.zusatzEingaben.set(this.zusatzStart());
-      this.zusatzGespeichert.set(false);
+      this.klassifikationEingaben.set(this.dokument().klassifikationen ?? {});
+      this.aenderungGespeichert.set(false);
       this.vertraulichkeitGewaehlt = false;
     }
     const ziel =
@@ -414,12 +608,16 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     }
     this.entwurf.set(entwurfAus(this.dokument()));
     this.zusatzEingaben.set(this.zusatzStart());
-    this.zusatzGespeichert.set(false);
+    this.aenderungGespeichert.set(false);
     this.vertraulichkeitGewaehlt = false;
     this.entwurfWiederhergestellt.set(false);
   }
 
   protected bestaetigen(zusatz: Zusatz = {}): void {
+    if (this.klassifikationenStatus().status !== 'ok') {
+      this.imFormular(this.texte.klassifikationenFehler, []);
+      return;
+    }
     const benutzerId = this.anmeldung.benutzer()?.id ?? '';
     const entwurf = this.entwurf();
     if (!entwurf.art) {
@@ -446,23 +644,43 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       );
       return;
     }
+    const fehlendeKlassifikationen = this.klassifikationFehlt();
+    if (fehlendeKlassifikationen.length > 0) {
+      this.imFormular(
+        this.texte.fehlerPflichtfelder(this.klassifikationNamen(fehlendeKlassifikationen)),
+        fehlendeKlassifikationen,
+      );
+      return;
+    }
     if (this.dokument().pdfaFehlt && !zusatz.ohnePdfa) {
       this.rueckfrage('rueckfragePdfa', zusatz);
       return;
     }
     const artNeu = this.artNeu();
     const zusatzBody = this.zusatzBody();
+    const klassifikationenBody = this.klassifikationenBody();
     const bisherigerZusatz = objekt(this.dokument().zusatz);
-    const aendern = this.zusatzGespeichert()
+    const bisherigeKlassifikationen = this.dokument().klassifikationen ?? {};
+    // Bei einem Artwechsel gehen die Klassifikationen immer mit (nur Werte der neuen Art).
+    const artGewechselt = !!artNeu && !!this.dokument().art;
+    const klassifikationenGeaendert =
+      artGewechselt ||
+      !gleicheKlassifikationen(this.klassifikationenWerte(), bisherigeKlassifikationen);
+    const aendern = this.aenderungGespeichert()
       ? of(this.dokument())
-      : JSON.stringify(zusatzBody) === JSON.stringify(bisherigerZusatz)
+      : JSON.stringify(zusatzBody) === JSON.stringify(bisherigerZusatz) &&
+          !klassifikationenGeaendert
         ? of(this.dokument())
         : this.api
-            .apiV1DokumenteIdPatch(this.id(), this.etag(), { ...(artNeu ? { art: artNeu } : {}), zusatz: zusatzBody } as DokumentAenderung)
+            .apiV1DokumenteIdPatch(this.id(), this.etag(), {
+              ...(artNeu ? { art: artNeu } : {}),
+              zusatz: zusatzBody,
+              ...(klassifikationenGeaendert ? { klassifikationen: klassifikationenBody } : {}),
+            } as DokumentAenderung)
             .pipe(
               tap((dokument) => {
                 this.aktuelleVersion.set(dokument.version);
-                this.zusatzGespeichert.set(true);
+                this.aenderungGespeichert.set(true);
               }),
             );
     this.ausfuehren(
@@ -518,8 +736,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   private zusatzStart(): Record<string, string> {
     const dokument = this.dokument();
     const vorhandene = objekt(dokument.zusatz);
-    const eigenschaften = objekt(objekt(this.art()?.zusatzSchema)['properties']);
-    const werte = Object.fromEntries(
+    return Object.fromEntries(
       Object.entries(vorhandene).map(([name, wert]) => [
         name,
         typeof wert === 'string' || typeof wert === 'number' || typeof wert === 'boolean'
@@ -529,31 +746,32 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
             : '',
       ]),
     );
-    for (const feld of schemaZusatzFelder(this.art())) {
-      if (werte[feld.name] !== undefined && werte[feld.name] !== '') {
-        continue;
-      }
-        const standard = objekt(eigenschaften[feld.name])['default'];
-        const wert =
-          standard ??
-          (feld.name === 'zugriff' ? 'mitglieder' : feld.name === 'veroeffentlicht' ? false : '');
-        werte[feld.name] =
-          wert === null || wert === undefined
-            ? ''
-            : Array.isArray(wert)
-              ? listeZu(wert.map(String))
-              : String(wert);
+  }
+
+  private klassifikationenBody(): Record<string, string[]> {
+    const status = this.klassifikationenStatus();
+    if (status.status !== 'ok') {
+      return {};
     }
-    return werte;
+    const result: Record<string, string[]> = {};
+    for (const feld of status.daten.art) {
+      const werte = this.klassifikationenWerte()[feld.code] ?? [];
+      if (werte.length > 0) {
+        result[feld.code] = [...werte];
+      }
+    }
+    return result;
   }
 
   private zusatzBody(): Record<string, unknown> {
     // Bei abweichender Art nur Schlüssel der gewählten Art behalten (additionalProperties false im Schema).
     const bekannt = new Set(Object.keys(objekt(objekt(this.art()?.zusatzSchema)['properties'])));
     const body = Object.fromEntries(
-      Object.entries(objekt(this.dokument().zusatz)).filter(([k]) => !this.artNeu() || bekannt.has(k)),
+      Object.entries(objekt(this.dokument().zusatz)).filter(
+        ([k]) => !this.artNeu() || bekannt.has(k),
+      ),
     );
-    const werte = this.zusatzEingaben();
+    const werte = this.zusatzWerte();
     for (const feld of schemaZusatzFelder(this.art())) {
       if (feld.name === 'veroeffentlicht') {
         body[feld.name] = false;
@@ -614,8 +832,17 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       error: (fehler: unknown) => {
         this.laeuft.set(false);
         const aktionFehler = fehlerAus(fehler);
-        if (aktionFehler.status === 401 && benutzerId && this.anmeldung.zustand() === 'abgelaufen') {
-          this.entwurfSpeicher.speichern(benutzerId, this.id(), this.entwurf(), this.zusatzEingaben());
+        if (
+          aktionFehler.status === 401 &&
+          benutzerId &&
+          this.anmeldung.zustand() === 'abgelaufen'
+        ) {
+          this.entwurfSpeicher.speichern(
+            benutzerId,
+            this.id(),
+            this.entwurf(),
+            this.zusatzEingaben(),
+          );
         }
         this.fehlerBehandeln(aktionFehler, zusatz);
       },
@@ -656,7 +883,8 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     }
     if (code in IM_FORMULAR && this.modus() !== 'verwerfen') {
       const feld = IM_FORMULAR[code];
-      this.imFormular(this.texte.fehlercode[code], feld ? [feld] : []);
+      const felder = fehler.felder.length > 0 ? fehler.felder.map(camel) : feld ? [feld] : [];
+      this.imFormular(this.texte.fehlercode[code], felder);
       return;
     }
     this.fehler.set(this.meldung(fehler));
@@ -664,7 +892,10 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
 
   private meldung(fehler: AktionFehler): string {
     // 409 mit fachlichem Code: dessen Text statt «Bitte neu laden», denn hier gibt es keinen «Neu laden»-Knopf
-    const fachlich = fehler.status === 409 && fehler.fehlercode ? this.texte.fehlercode[fehler.fehlercode] : undefined;
+    const fachlich =
+      fehler.status === 409 && fehler.fehlercode
+        ? this.texte.fehlercode[fehler.fehlercode]
+        : undefined;
     if (fachlich) {
       return fachlich;
     }
@@ -715,5 +946,7 @@ function camel(feld: string): string {
 }
 
 function objekt(wert: unknown): Record<string, unknown> {
-  return wert && typeof wert === 'object' && !Array.isArray(wert) ? (wert as Record<string, unknown>) : {};
+  return wert && typeof wert === 'object' && !Array.isArray(wert)
+    ? (wert as Record<string, unknown>)
+    : {};
 }

@@ -1,16 +1,23 @@
-<h1 tabindex="-1" #ueberschrift>{{ texte.titel }}</h1>
-<p>{{ texte.einleitung }}</p>
+<div class="seitenkopf">
+  <p class="vorzeile">{{ texte.vorzeile }}</p>
+  <h1 tabindex="-1" #ueberschrift>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
 
 <p class="meldung" role="status" data-test="meldung">{{ meldung() }}</p>
 
 @if (fehlerLaden()) {
-  <div class="fehler" role="alert">
+  <div class="hinweis gefahr" role="alert">
+    <app-symbol name="warnung" />
     <p>{{ fehlerLaden() }}</p>
-    <button mat-stroked-button type="button" (click)="laden(fehlerWeitere())">{{ texte.neuLaden }}</button>
+    <button mat-stroked-button type="button" (click)="laden(fehlerWeitere())">
+      {{ texte.neuLaden }}
+    </button>
   </div>
 }
 @if (fehlerArten(); as fehler) {
-  <div class="fehler" role="alert" data-test="fehler-arten">
+  <div class="hinweis gefahr" role="alert" data-test="fehler-arten">
+    <app-symbol name="warnung" />
     <p>{{ fehler }}</p>
     <button mat-stroked-button type="button" (click)="ladenArten()">{{ texte.neuLaden }}</button>
   </div>
@@ -19,7 +26,10 @@
 @if (laedt() && eintraege().length === 0) {
   <p aria-busy="true">{{ texte.laedt }}</p>
 } @else if (!fehlerLaden() && eintraege().length === 0) {
-  <p data-test="leer">{{ texte.leer }}</p>
+  <div class="karte erledigt">
+    <app-symbol name="haken" />
+    <p data-test="leer">{{ texte.leer }}</p>
+  </div>
 } @else if (eintraege().length > 0) {
   <p class="anzahl" data-test="anzahl">{{ texte.anzahl(eintraege().length, gesamt()) }}</p>
   <ol class="liste" [attr.aria-label]="texte.titel">

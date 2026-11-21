@@ -32,12 +32,33 @@ public sealed interface ChatEreignis {
      *                   {@code vollstaendigkeit})
      */
     record WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
-                            Optional<Datenstand> datenstand) implements ChatEreignis {
+                            Optional<Datenstand> datenstand, Optional<QuellWissen> wissen,
+                            Optional<Kontextstufe> kontextstufe) implements ChatEreignis {
         public WerkzeugErgebnis {
             Objects.requireNonNull(name, "name");
             parameter = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(parameter, "parameter")));
             dokumente = List.copyOf(dokumente);
             Objects.requireNonNull(datenstand, "datenstand");
+            Objects.requireNonNull(wissen, "wissen");
+            Objects.requireNonNull(kontextstufe, "kontextstufe");
+        }
+
+        public WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
+                                Optional<Datenstand> datenstand, Optional<QuellWissen> wissen) {
+            this(name, parameter, dokumente, datenstand, wissen, Optional.empty());
+        }
+
+        public WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
+                                Optional<Datenstand> datenstand) {
+            this(name, parameter, dokumente, datenstand, Optional.empty(), Optional.empty());
+        }
+    }
+
+    enum Kontextstufe {
+        NORMAL, INTERN, PERSONAL;
+
+        public Kontextstufe hoechste(Kontextstufe andere) {
+            return ordinal() >= andere.ordinal() ? this : andere;
         }
     }
 
@@ -77,6 +98,21 @@ public sealed interface ChatEreignis {
 
         public QuellDokument(UUID id, String titel) {
             this(id, titel, null);
+        }
+    }
+
+    record QuellWissen(String pfad, String titel, Instant stand, List<QuellDokument> dokumente,
+                       List<UUID> alleDokumentIds) {
+        public QuellWissen {
+            Objects.requireNonNull(pfad, "pfad");
+            Objects.requireNonNull(titel, "titel");
+            Objects.requireNonNull(stand, "stand");
+            dokumente = List.copyOf(dokumente);
+            alleDokumentIds = List.copyOf(alleDokumentIds);
+        }
+
+        public QuellWissen(String pfad, String titel, Instant stand, List<QuellDokument> dokumente) {
+            this(pfad, titel, stand, dokumente, dokumente.stream().map(QuellDokument::id).toList());
         }
     }
 

@@ -1,76 +1,215 @@
 :host {
   display: block;
-  max-width: 48rem;
-}
-
-h1 {
-  font: var(--mat-sys-headline-small);
-  margin-top: 0;
+  max-width: 72rem;
 }
 
 h2 {
-  font: var(--mat-sys-title-large);
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1rem;
+  font-weight: 650;
+  margin: 0;
 }
 
 h3 {
-  font: var(--mat-sys-title-medium);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-gedaempft);
+  margin: 0.5rem 0 0;
 }
 
-.hinweis,
-.liste > li {
-  padding: 1rem;
+p {
+  margin: 0;
 }
 
-.zaehler {
-  font: var(--mat-sys-title-medium);
-}
-
-.liste {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.seiten > li {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.seiten img {
-  width: 6rem;
-  height: auto;
-  border: 1px solid var(--urinet-linie);
-}
-
-.kamera {
-  display: block;
-  width: 100%;
-  max-height: 60vh;
-  background: #000;
-  margin-bottom: 0.5rem;
-}
-
-.ausloeser {
-  width: 100%;
+.gedaempft {
+  color: var(--text-gedaempft);
 }
 
 .fehler {
-  color: var(--urinet-fehler);
+  color: var(--gefahr);
 }
 
-.seiten > li.mit-fehler {
-  outline: 2px solid var(--urinet-fehler);
-}
+button {
+  min-height: 2.75rem;
 
-.frage {
-  padding: 1rem;
-  margin-bottom: 1rem;
+  app-symbol {
+    --symbol-groesse: 16px;
+    vertical-align: -0.2em;
+    margin-right: 0.375rem;
+  }
 }
 
 .aktionen {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+// Nicht angemeldet oder Sitzung abgelaufen: .hinweis (styles.scss), Knopf unter dem Text
+:host > .hinweis {
+  margin: 0 0 1rem;
+
+  button {
+    justify-self: start;
+  }
+}
+
+.frage {
+  display: grid;
+  gap: 0.625rem;
+  margin-bottom: 1rem;
+
+  h2 app-symbol {
+    color: var(--warnung);
+  }
+}
+
+// Mobil eine Spalte; breit Upload links, Kamera und Warteschlange rechts (Prototyp «Erfassen»)
+.raster {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+
+  @media (min-width: 60rem) {
+    &.mit-upload {
+      grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+      grid-template-rows: auto 1fr;
+      grid-template-areas: 'upload kamera' 'upload schlange';
+
+      app-upload {
+        grid-area: upload;
+      }
+      .kamera-karte {
+        grid-area: kamera;
+      }
+      .schlange {
+        grid-area: schlange;
+      }
+    }
+  }
+
+  > * {
+    min-width: 0;
+  }
+}
+
+.kamera-karte,
+.schlange {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+
+  > * {
+    max-width: 100%;
+  }
+}
+
+.kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  width: 100%;
+
+  span {
+    font-size: 0.75rem;
+  }
+}
+
+.kamera {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  background: #000; // gestaltung-ausnahme: Kamerabild, in beiden Farbschemata schwarz
+  border-radius: var(--radius-klein);
+}
+
+// `display: block` überstimmt sonst das Attribut `hidden` (schwarze Fläche vor dem Öffnen)
+.kamera[hidden] {
+  display: none;
+}
+
+.kamera-karte app-zuschnitt,
+.ausloeser {
+  width: 100%;
+}
+
+.meldung {
+  color: var(--text-2);
+}
+
+// Symbol im Kästchen links (Prototyp `.li .ic`)
+.ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  background: var(--karte-2);
+  color: var(--text-2);
+
+  &.warnung {
+    background: var(--gefahr-weich);
+    color: var(--gefahr);
+  }
+}
+
+.zaehler {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+}
+
+// Zeilen mit Trennlinie (Prototyp `.list`/`.li`)
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  width: 100%;
+
+  > li {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--linie);
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  .tx {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 0.375rem;
+  }
+
+  b {
+    font-weight: 600;
+  }
+}
+
+.seiten {
+  img {
+    flex: none;
+    width: 5rem;
+    height: auto;
+    border: 1px solid var(--linie);
+    border-radius: 8px;
+  }
+
+  > li.mit-fehler {
+    padding-inline: 0.5rem;
+    border-radius: var(--radius-klein);
+    outline: 2px solid var(--gefahr);
+    outline-offset: -2px;
+  }
 }

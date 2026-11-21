@@ -83,7 +83,7 @@ public final class Testanmeldung {
     }
 
     /** RFC 6238 mit HmacSHA1, 30 s, 6 Stellen; Keycloak verwendet die UTF-8-Bytes des Secrets als Schlüssel. */
-    static String totp(String secret, long sekunden) {
+    public static String totp(String secret, long sekunden) {
         try {
             Mac mac = Mac.getInstance("HmacSHA1");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA1"));

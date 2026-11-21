@@ -225,6 +225,9 @@ public interface AblagePort {
      */
     Exportziel exportSchreiben(MandantCode mandant, UUID exportId);
 
+    /** OKF-Export der Wissensbasis unter {@code exporte/wissen-<id>.zip}, mit demselben Lebenszyklus. */
+    Exportziel wissensExportSchreiben(MandantCode mandant, UUID exportId);
+
     /**
      * Jahresexport (Spec 02, Req 7.2): Download-Adresse nur für GET auf genau diese Version unter {@code exporte/},
      * gültig bis {@code gueltigBis} (höchstens 7 Tage, Grenze von SigV4), mit {@code dateiname} als Name beim Speichern.

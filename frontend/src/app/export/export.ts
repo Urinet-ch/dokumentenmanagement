@@ -3,17 +3,21 @@ import {
   Component,
   DestroyRef,
   OnInit,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Export as ExportEintrag, ExporteService } from '../gemeinsam/api';
+import { Symbol, SymbolName } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { groesse, zahl, zeit } from '../importe/import-logik';
 import {
   ABFRAGE_MS,
   JAHR_MAX,
   JAHR_MIN,
+  STATUS_TON,
   fehlerArtText,
   fehlerText,
   inArbeit,
@@ -28,7 +32,7 @@ import {
  */
 @Component({
   selector: 'app-export',
-  imports: [MatButtonModule],
+  imports: [MatButtonModule, MatProgressBarModule, Symbol],
   templateUrl: './export.html',
   styleUrl: './export.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -41,6 +45,7 @@ export class Export implements OnInit {
   protected readonly texte = TEXTE.export;
   protected readonly zahl = zahl;
   protected readonly zeit = zeit;
+  protected readonly ton = STATUS_TON;
   protected readonly fehlerArtText = fehlerArtText;
   protected readonly groesse = groesse;
   protected readonly min = JAHR_MIN;
@@ -53,6 +58,18 @@ export class Export implements OnInit {
   protected readonly liste = signal<readonly ExportEintrag[] | null>(null);
   protected readonly listeFehler = signal<string | null>(null);
   protected readonly downloadFehler = signal<string | null>(null);
+  /** Der Export in Arbeit (Status `OFFEN`); ohne Fortschritt in Prozent, den liefert die API nicht. */
+  protected readonly offen = computed(
+    () => this.liste()?.find((e) => e.status === 'OFFEN') ?? null,
+  );
+
+  /** Aufbau des ZIP nach Req 7.1 (Spec 02, design.md «ZIP-Aufbau»), ohne Zahlen. */
+  protected readonly inhalt: readonly { symbol: SymbolName; name: string; text: string }[] = [
+    { symbol: 'dokument', ...this.texte.inhalt.belege },
+    { symbol: 'tabelle', ...this.texte.inhalt.belegliste },
+    { symbol: 'protokoll', ...this.texte.inhalt.pruefsummen },
+    { symbol: 'schloss', ...this.texte.inhalt.manifeste },
+  ];
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {

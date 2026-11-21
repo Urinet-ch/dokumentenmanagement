@@ -47,7 +47,7 @@ Dokumente sind dann ohnehin lesbar. Das Dienstkonto fügt **neue** Möglichkeite
 | Benutzer anlegen, auch mit Rolle `inhaber`, in jedem Mandanten | nur `manage-users`; Alarm bei jeder Vergabe von `inhaber` (6.7); täglicher Abgleich meldet jede Rolle `inhaber` ohne Vorgang im Protokoll (6.5); Keycloak-Admin-Ereignisse als zweite Spur (6.9) | Einbruch bleibt bis zum Alarm unbemerkt (höchstens Minuten bis 24 h) |
 | Passwörter setzen, Zugangsdaten zurücksetzen, Benutzer übernehmen | das Archiv ruft `reset-password` nie auf (ArchUnit); technisch erlaubt `manage-users` es dennoch; Ereignisse (Admin-Ereignisse) und Abgleich erfassen Änderungen von Zugangsdaten | wie oben |
 | Realm, Clients, Identity Provider, Authentifizierungsflüsse, Redirect-URIs ändern | **nicht möglich**: Dienstkonto ohne `manage-realm`, `manage-clients`, `manage-identity-providers`, `manage-authorization`, `realm-admin`; kein Zugang zum Realm `master` | keines |
-| Sich selbst oder anderen Realm-Admin-Rechte geben | Rollenzuweisung (Realm-Rollen) auf die vier Archiv-Rollen begrenzen: Das Archiv sendet nur diese; Härtung mit feingranularen Admin-Rechten (FGAP v2, Recht `map-roles` nur auf diese vier Rollen), in Aufgabe 19.1 gegen Keycloak 26.8.2 zu prüfen | ohne FGAP v2: Archiv-Code ist die einzige Sperre |
+| Sich selbst oder anderen Realm-Admin-Rechte geben | Rollenzuweisung (Realm-Rollen) auf die vier Archiv-Rollen begrenzen: Das Archiv sendet nur diese; Härtung mit feingranularen Admin-Rechten (FGAP v2, Recht `map-roles` nur auf diese vier Rollen), in Aufgabe 19.1 gegen Keycloak 26.8.2 zu prüfen (Ergebnis: FGAP begrenzt die Zuweisung nicht, solange `manage-users` gehalten wird, siehe «Umsetzung 19.1» und Open Points) | ohne FGAP v2: Archiv-Code ist die einzige Sperre, und das gilt derzeit auch mit FGAP v2 |
 | Benutzer massenhaft löschen oder sperren (Verfügbarkeit) | Raten, Höchstzahl, Alarm (6.6, 6.7); Notfallweg Betreiber; Sicherung enthält die Keycloak-Datenbank (Spec 01, Plattform und Betrieb) | Wiederherstellung aus der Sicherung nötig |
 | Geheimnis des Dienstkontos entwenden | nur Datei `/run/secrets/keycloak_verwaltung_secret`, kein Umgebungswert, nie im Log; Rotation über den definierten Weg (19.3, 21.5); Admin-API nur im internen Netz erreichbar, nicht öffentlich | wer den Container übernimmt, hat das Geheimnis |
 
@@ -67,7 +67,7 @@ Stand: `application.properties` (Präfixe `archiv.*`), Umgebung und Compose, Kon
 `wissens_einstellung` (Spec 04), `public.mandant` und `public.mandant_budget` (Spec 01 und 03). Klassen: **(a)** im
 Betrieb in der App änderbar, je Mandant, mit Versionen, Prüfung und Protokoll; **(b)** nur über Deployment oder
 Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 1.1) prüft die Präfixe dieser Tabelle gegen
-`application.properties`.
+`application.properties`. Einzelne Schlüssel in Klasse (a) gehen einem allgemeineren Präfix in Klasse (b) vor.
 
 ### Klasse (a): in der App änderbar (Einstellungskatalog)
 | Einstellung | Heute | Grenzen und Standard | riskant | Recht | Begründung der Klasse |
@@ -97,9 +97,11 @@ Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 
 | `archiv.chat.*` (Raten je Benutzer, Gleichzeitigkeit, Aufräumzeit) | Konfiguration | Schutz der Instanz |
 | `archiv.mail.*` (Postfach, Intervall, Ordner, Grössen) | Konfiguration | ein Postfach und ein Abrufer je Instanz (Spec 02) |
 | `archiv.ueberwachung.*`, `archiv.oidc.waechter.*`, `archiv.kennzahlen.*`, `archiv.mandant.bericht.*` | Konfiguration | Betrieb und Alarmschwellen der Instanz |
+| `archiv.adresse`, `archiv.integration.*` | Konfiguration | Instanzweite Adresse und Integrationsadapter; keine Mandanten-Einstellung |
+| `archiv.wissen.*` | Konfiguration | Instanzweite Modelle und technische Grenzen; die oben einzeln genannten Startwerte der Klasse (a) sind ausgenommen |
 | `archiv.benachrichtigung.empfaenger.<code>` | Umgebung `ARCHIV_ALARM_EMPFAENGER_<CODE>` | E-Mail-Adressen sind Personendaten und gehören nicht in unveränderliche Konfigurationsversionen; Umleiten der Alarme wäre ein Missbrauchsweg (Entscheid Fabian offen, Open Points) |
 | `archiv.branding.mandanten.<code>.domain`, `…logo-url` | Konfiguration, Traefik | Domain ist DNS und Router; eine fremde Logo-URL wäre ein Tracking- und Phishing-Weg |
-| `archiv.mandant.<code>.fristen.*`, `….kennzahl.*` | Konfiguration | fachliche Werte von `urinet`; Kandidaten für Spec 05, nicht für diese Spec |
+| `archiv.mandant.<code>.fristen.*`, `archiv.mandant.<code>.kennzahl.*`, `archiv.mandant.<code>.chat-hinweis` | Konfiguration | fachliche Werte und Hinweise; nicht Bestandteil des Einstellungskatalogs dieser Spec |
 | `public.mandant.name`, `public.mandant.verwaltung_rollen`, `public.mandant_budget` (Monatsbudget öffentlicher Chat) | Datenbank, Admin-Kommando | Name geht in den Prompt (Gate 0); Rollensatz und Kostenhoheit gehören dem Betreiber; die Oberfläche zeigt Budget und Verbrauch nur lesend |
 | `ki_freigegeben` | Admin-Kommando (Spec 05, 8.4) | gebunden an die Abnahme; nie über die Oberfläche |
 | Rollen und Rechtematrix | Code (`Rechtematrix`) | Quelle der Wahrheit; Änderung ist ein Release mit Test |
@@ -123,7 +125,7 @@ Die Oberfläche zeigt für kein Geheimnis einen Status; das Fehlen meldet nur di
 ```
 backend/src/main/java/ch/urinet/archiv/
   benutzer/                      (neu, hexagonal)
-    domain/      Benutzer, Benutzerstatus, Vergaberegeln (Eskalationsschutz, letzter Inhaber), Vorgang, Antrag
+    domain/      Benutzer, Benutzerstatus, Vorgang, Antrag
     application/ BenutzerVerwaltung (Use Cases), Abgleich, StepUp, VerwaltungGrenzen
     adapter/in/rest/   BenutzerResource, RollenResource, AntragResource
     adapter/in/kommando/ InhaberEinladen, BenutzerAbgleichen   (Admin-Kommando, Spec 01, 1.3)
@@ -134,9 +136,11 @@ backend/src/main/java/ch/urinet/archiv/
     application/ EinstellungenVerwaltung (lesen, vorschau, aendern, zuruecksetzen)
     adapter/in/rest/ MandantEinstellungenResource (erweitert)
   sicherheit/                    (Spec 01, hier erweitert)
-    domain/Rechtematrix, Aktion (A20–A23), RechteUebersicht
+    domain/Rechtematrix, Aktion (A20–A23), RechteUebersicht, Vergaberegeln
     adapter/in/rest/ ZugangFilter (+ Token-Widerruf, Step-up), SicherheitsHeader
 ```
+- `Vergaberegeln` bleibt bei `sicherheit.domain`, weil es die vorhandene Rolle und Rechtematrix direkt nutzt; so entsteht
+  weder eine Abhängigkeit von `benutzer.domain` nach `sicherheit.domain` noch eine zweite Rangfolgen-Implementierung.
 - **Port `IdentitaetsDienst`** (`benutzer/application`, driven): `benutzerSuchen(mandant, q, seite)`, `benutzerLesen(id)`,
   `anlegen(Benutzer, rolle)`, `aktualisieren(id, Aenderung)`, `rolleSetzen(id, rolle)`, `aktivieren(id, boolean)`,
   `einladen(id, aktionen, gueltigkeit)`, `sitzungenBeenden(id)`, `otpEntfernen(id)`, `sperreAufheben(id)`,
@@ -146,9 +150,9 @@ backend/src/main/java/ch/urinet/archiv/
   `/components`, `/partial-import`, Rollen-Definitionen und `client-secret`.
 - **Aufrufe an Keycloak** (Realm `urinet-archiv`): `POST /protocol/openid-connect/token` (Client-Credentials, Token bis
   30 Sekunden vor Ablauf wiederverwendet, ein Abruf gleichzeitig); `GET /admin/realms/…/users?q=mandant:<m>&max=50`,
-  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users`,
+  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
   `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
-  `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET/DELETE …/users/{id}/federated-identity/google`,
+  `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET …/users/{id}/federated-identity` (Liste, Filter auf `identityProvider = google`; unter `…/federated-identity/google` kennt Keycloak nur POST und DELETE), `DELETE …/users/{id}/federated-identity/google`,
   `DELETE …/attack-detection/brute-force/users/{id}`. Interne Adresse und Aussteller des Tokens sind in Aufgabe 19.1 zu
   prüfen (`KC_HOSTNAME` zeigt auf die öffentliche Adresse; für den internen Weg nötigenfalls
   `KC_HOSTNAME_BACKCHANNEL_DYNAMIC`).
@@ -156,6 +160,14 @@ backend/src/main/java/ch/urinet/archiv/
   (`Semaphore`, Wartezeit 200 ms, sonst 503 `UEBERLASTET`); Schreibaufrufe nie wiederholt; Leseaufrufe höchstens einmal nach
   200 ms; Schutzschalter nach 3 Fehlern in Folge innerhalb 30 s für 30 s (ohne Bibliothek, ein Zähler und ein Zeitstempel).
   Keine Ausnahme der Keycloak-Meldungen in Antworten oder Logs (Requirement 5.6).
+  Nachbesserung Review PR 348: Für den Schutzschalter zählen nur Transportfehler, Zeitüberschreitungen, 5xx und 401/403 des
+  Dienstkontos; andere 4xx (400, 404, 405) zählen nicht. 409 wird als `IdentitaetsDienst.KonfliktException` weitergereicht
+  (Abbildung auf `BENUTZER_EXISTIERT` mit 19.7). Bei 401 wird der gecachte Token verworfen, ein lesender Aufruf wird genau
+  einmal mit neuem Token wiederholt. Die Kompensation in `anlegen()` umgeht den Schutzschalter (Wartezeit 2 s auf einen
+  Platz); scheitert sie, hängt der Adapter den Fehler als Suppressed an die Ausnahme. `rolleSetzen` holt die Zielrolle zuerst,
+  fügt sie hinzu und entfernt erst danach die übrigen Archiv-Rollen. `verbindungPruefen` erzwingt einen echten Tokenabruf.
+  Pfadwerte `.` und `..` (und `%2e`) werden abgelehnt. Offen (Kann): `aktualisieren`/`aktivieren` lesen und schreiben die
+  volle Darstellung (Lost Update); die Vorgangssperre (19.6) serialisiert die Aufrufer.
 - **Detail-Health:** Prüfung `identitaetsdienst` (Token holbar, Dienstkonto gültig); sie beeinflusst die Readiness der API
   nicht (Requirement 5.8).
 
@@ -169,10 +181,26 @@ Ein Vorgang mit Wirkung in Keycloak lässt sich nicht in der Datenbank-Transakti
    aufgerufen (Spec 01, 10.8).
 4. Aufrufe an Keycloak (mit Zeitgrenze); bei Fehler Kompensation (z. B. neu angelegten Benutzer entfernen).
 5. Transaktion 2: Protokolleintrag `phase=ABGESCHLOSSEN` oder `FEHLGESCHLAGEN` (bzw. `UNKLAR`, wenn die Kompensation
-   scheitert), Benutzerverzeichnis (`ANLAGE`, `AUSTRITT`), `benutzer_status`, Antrag, Token-Widerruf.
-6. Vorgangssperre freigeben (auch bei Fehler; sonst läuft sie nach 15 s ab).
+   scheitert, ungewiss ist oder fehlt; `FEHLGESCHLAGEN` und `UNKLAR` tragen das `ziel` aus dem Ergebnis der Arbeit, bei
+   der Anlage also den neuen Keycloak-`sub`), Benutzerverzeichnis (`ANLAGE`, `AUSTRITT`), `benutzer_status`, Antrag, Token-Widerruf.
+   Die Kompensation meldet `GEKLAERT` nur, wenn der Ausgangszustand wiederhergestellt ist und keine verspätete externe
+   Wirkung mehr eintreffen kann. Nur dann wird `FEHLGESCHLAGEN` mit Freigabe der Sperre transaktional geschrieben;
+   bei Ungewissheit, Fehler oder Fristablauf bleibt der Vorgang `UNKLAR` gesperrt.
+6. Die Sperre nach eindeutigem Abschluss freigeben; eine vor externer Wirkung vorbereitete Sperre läuft nach 15 s ab.
+   Entscheid Fabian 21.11.2026: Ein ungeklärter Vorgang (`UNKLAR`) hält die Sperre bis zum Abgleich (19.13) oder bis
+   ein Admin ihn klärt; bei `UNKLAR` wird alarmiert. Das weicht von der pauschalen 15-Sekunden-Grenze in Req 4.7 ab.
+   Auch ein `ANGEFRAGT` ohne Abschluss bleibt gesperrt: Eine verspätete externe Wirkung kann noch eintreffen.
+   Trifft ein erfolgreicher Abschluss nach Ablauf der Frist ein, wird er nicht als eindeutig abgeschlossen
+   übernommen; die Datenbanktransaktion wird zurückgerollt und der Vorgang als ungeklärt behandelt.
+   Die bestehende Überwachung meldet `UNKLAR` und abgelaufene `ANGEFRAGT`-Vorgänge je Mandant mit der Vorgangs-ID;
+   bei gescheitertem Mailversand versucht sie es beim nächsten Takt erneut.
 Der Abgleich (täglich, beim Start des Workers) findet Einträge `ANGEFRAGT` ohne Abschluss nach 5 Minuten, liest den
 Zustand in Keycloak und schreibt den Abschluss `UNKLAR` mit Alarm; er ändert nie etwas in Keycloak.
+
+Für den Protokollgrund sind ausschliesslich die festen Kategorien `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`,
+`KORREKTUR` und `SONSTIGES` zulässig. So können Namen, E-Mail-Adressen und Geheimnisse nicht durch Freitext ins
+append-only Protokoll gelangen. Die Kategorie muss beim Vorgang explizit gewählt werden; Freitext wird nicht
+automatisch umgedeutet. Die Anbindung der Eingaben und Pflichtprüfung folgt mit den Verwaltungsendpunkten.
 
 ### Statusautomat
 | Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |
@@ -205,6 +233,22 @@ Richtung): Lesen, sperren, deaktivieren, Einladung erneut senden. `StepUp` liest
 `browser-totp-pflicht` verlangt dann Passwort und TOTP (der Cookie-Zweig greift bei `prompt=login` nicht; Nachweis im
 Test gegen echtes Keycloak).
 
+### Passkey (Requirement 10)
+Entscheid Fabian 21.11.2026: zusätzlicher Anmeldeweg, ersetzt Passwort und TOTP; Passwort plus TOTP bleibt; Admin setzt zurück;
+Step-up per Passkey; Google unverändert. Der Browser-Flow des Realms bietet zusätzlich die Anmeldung mit Passkey (WebAuthn
+passwordless, auffindbarer Schlüssel, Benutzerverifikation «required», Attestation «none», Unterstützung der Anmeldung per
+Vorschlag im Feld Benutzername) und fällt auf `browser-totp-pflicht` (Passwort plus TOTP) zurück. `auth_time` und `amr` des Tokens
+bleiben die Quelle für den Step-up; `StepUp` prüft weiter nur `auth_time` (kein Wissen über die Methode). Die Einrichtung geschieht in
+der Kontoverwaltung von Keycloak (Theme 20.8: deutsche Texte); das Archiv bekommt dafür keine eigene Oberfläche, nur Anzeige
+(«Passkey eingerichtet», Anzahl) und die Admin-Aktion «Passkeys zurücksetzen» als Teil von «Zugang zurücksetzen» (REST,
+Step-up, Protokoll ohne Gerätedaten). Der Adapter liest die Zahl über die Admin-API (Credentials des Benutzers, Typ
+`webauthn-passwordless`) und löscht sie auf Anforderung; er gibt keine Schlüsselkennungen weiter. Die Relying-Party-ID ist die
+Domain der App und eine Betriebsangabe (Platzhalter im Export). Tests: virtueller Authenticator gegen ein Wegwerf-Keycloak
+(Einrichten, Anmelden, Step-up, Entfernen, Zurücksetzen); echte Geräte bei der Inbetriebnahme (Fabian).
+`[offen: genaue Flow-Konstruktion in Keycloak 26.8.2 (Passkey-Authenticator mit bedingter Anzeige gegen eigener Teilfluss),
+Setzen von auth_time bei Passkey, Auswirkung auf Direct-Grant und die Wegwerf-Tests (Direct Grant bleibt TOTP-Pflicht) — Spike
+in Aufgabe 24.1 klärt das und ergänzt diesen Abschnitt]`
+
 ### Abgleich
 `Abgleich` liest die Benutzer des Mandanten (Seiten zu 50), gleicht mit `benutzer_status`, dem Benutzerverzeichnis und dem
 Protokoll ab und meldet die Abweichungen nach Requirement 6.5 als `BENUTZER_ABWEICHUNG` (Code: `ROLLE_OHNE_VORGANG`,
@@ -231,6 +275,14 @@ Teil `einstellungen` von `konfiguration.schema.json` (`EinstellungskatalogSchema
 die Prüfung in `Konfiguration.pruefen` (Pfad, Code, Meldung, wie Spec 05), die Vorschau (`Auswirkung`) und die Oberfläche.
 Konfigurationsdatei, Export, Vergleich, Versionen, `If-Match`, Rundlauf und Protokoll `KONFIGURATION_AENDERN` gelten
 unverändert; neu ist nur die Bestätigung riskanter Änderungen und die erweiterte Prüfung.
+
+**Umsetzung 20.1:** Der erweiterte Abschnitt ist rückwärtskompatibel optional; fehlende Gruppen werden mit leeren
+Werten gelesen. Das Abbild übernimmt die neuen Werte aus der zuletzt gespeicherten Konfiguration, auch wenn eine andere
+Änderung eine Version erzeugt. Dateiimport und Seed übergeben die neuen Werte ausdrücklich. Wochentage im Abbild sind
+ISO-Namen (`MONDAY` bis `SUNDAY`). Der Anzeigename folgt der bestehenden Zeichen-Positivliste des Brandings mit höchstens
+60 Zeichen. Der Katalog stellt für Zahlen die Auflösung eigener Wert → bisheriger Startwert → Katalogstandard bereit.
+Die Umstellung der Verbraucher und die Übernahme bisheriger Werte gehören zu 20.4; die offene Entscheidung zu
+`wissens_einstellung` wird dadurch nicht vorweggenommen.
 
 **Schnittstelle** (Erweiterung von `GET/PATCH /mandant/einstellungen`, Spec 01 und 05; die Form der bestehenden Felder
 bleibt, neue Felder kommen flach dazu; die genaue Form legt Aufgabe 20.2 gegen den Stand von Spec 05, 17.3 fest):
@@ -318,9 +370,9 @@ ein neuer Benutzer nie als früherer erscheint.
 
 ## Realm-Änderungen (Keycloak, Betreiber)
 Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anmeldung und Benutzer bleiben unverändert:
-1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, Secret `${KEYCLOAK_VERWALTUNG_SECRET}`
-   (Platzhalter, wie bei Google); Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
-   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1.
+1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, im Export kein Secret;
+   Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
+   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1. Ergebnis des Spikes: FGAP wirkt nicht, solange `manage-users` gehalten wird (siehe «Umsetzung 19.1»; entschieden 20.11.2026: `manage-users` bleibt, Option (a)).
 2. SMTP des Realms (Host, Port, Absender `archiv@urinet.ch`, Anzeigename «UriNet Archiv», Zugang als Secret
    `keycloak_smtp_passwort`); ohne SMTP kann Keycloak keine Einladung senden.
 3. Passwort-Richtlinie `length(12) and notUsername and notEmail`.
@@ -331,6 +383,7 @@ Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anm
 6. Anzeige: E-Mail-Texte und Theme auf Deutsch (Aufgabe 20.8); Benutzerprofil unverändert (E-Mail, Benutzername und
    `mandant` nur Admin).
 7. `auth_time` im Access-Token von `archiv-pwa` (Mapper, falls nicht schon vorhanden).
+8. Passkey-Anmeldeweg (Aufgabe 24.1, Requirement 10): Relying-Party-ID als Platzhalter im Export; Wert beim Einspielen (Betrieb).
 Auf bestehenden Instanzen (Stufe A) legt Aufgabe 19.3 diese Änderungen einmalig per `kcadm.sh` im Wegwerf-Container an (der
 Realm-Import wirkt nur beim ersten Start); der Export bleibt die Quelle für Stufe B.
 
@@ -338,13 +391,14 @@ Realm-Import wirkt nur beim ersten Start); der Export bleibt die Quelle für Stu
 `db/public` (neue Changesets, bestehende unverändert):
 ```
 mandant:                + verwaltung_rollen text[] not null default '{inhaber,mitarbeiter,treuhaender}'
-verwaltung_vorgang(mandant text pk, vorgang_id uuid, bis timestamptz)           -- Vorgangssperre (Lease)
+verwaltung_vorgang(mandant text pk, vorgang_id uuid, bis timestamptz,
+                   phase text)  -- Vorgangssperre (Lease); phase VORBEREITET -> ANGEFRAGT -> gelöscht oder UNKLAR (Changeset 042)
 token_widerruf(benutzer text pk, ab timestamptz)                                -- Zeile mit Upsert; Aufräumen nach 1 Tag
 ```
 `db/mandant` je Mandant:
 ```
 benutzer_status(benutzer text pk, art text check (art in ('GESPERRT','DEAKTIVIERT')), seit timestamptz,
-                grund text, von text)                      -- Zeile entfällt beim Entsperren und Reaktivieren; Verlauf steht im Protokoll
+                grund text check (Kategorie nach 4.4), von text)  -- Zeile entfällt beim Entsperren und Reaktivieren; Verlauf steht im Protokoll
 verwaltung_antrag(id uuid pk, art text check (art in ('INHABER_ROLLE','LOESCHEN')), ziel text, rolle text null,
                   grund text, beantragt_von text, beantragt_am timestamptz, gueltig_bis timestamptz,
                   status text check (status in ('OFFEN','BESTAETIGT','ABGELEHNT','ABGELAUFEN','ZURUECKGEZOGEN')),
@@ -354,7 +408,7 @@ zugriff_protokoll:      aktion erhält die Werte BENUTZER_ANLEGEN, BENUTZER_AEND
                         BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG (Check-Constraint per neuem Changeset, falls vorhanden)
 ```
 Es gibt keine Tabelle mit E-Mail, Namen oder Zugangsdaten. `benutzer_status` und `verwaltung_antrag` enthalten nur
-Kennungen (`sub`) und Texte der Inhaber (Grund). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
+Kennungen (`sub`) und Texte der Inhaber (Grund; in `benutzer_status` nur die feste Kategorie nach 4.4). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
 
 ## Error Handling (neue Codes)
 Die Aufgabe, die einen Code einführt, trägt ihn im selben PR in die Tabelle in Spec 01 design.md («Error Handling») und ins
@@ -426,7 +480,12 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 5. Mandantenabbau (Spec 03, 8.3): Der Betreiber-Schritt «Mandant deaktivieren» deaktiviert zusätzlich alle Keycloak-Benutzer
    des Mandanten und beendet ihre Sitzungen (`archiv mandant benutzer-sperren <code>`); `MandantVerweigert` (403) wirkt ohnehin
    sofort. Nach der Frist von 30 Tagen löscht der Abbau die Keycloak-Benutzer des Mandanten; Protokoll und Benutzerverzeichnis
-   bleiben mit dem Schema (Aufbewahrung, Spec 01, 10.9). Der Abgleich meldet Benutzer eines inaktiven Mandanten, die noch aktiv sind.
+   bleiben mit dem Schema (Aufbewahrung, Spec 01, 10.9). Die Namenssperre überlebt den Abbau (Req 3.4, Entscheid 21.11.2026, Weg A): Tabelle `benutzername_sperre(hash bytea primary key,
+   erstellt timestamptz not null)` im Schema `public`; `hash` = HMAC-SHA-256 über den kleingeschriebenen Benutzernamen mit dem Salz
+   `archiv.verwaltung.namenssperre-salz` (Secret-Datei, nie im Repo). Die Anlage schreibt den Eintrag in derselben Transaktion wie `ANLAGE`;
+   die Prüfung liest zuerst die Sperrliste, dann Realm und Benutzerverzeichnis; der Mandantenabbau löscht die Tabelle nicht. Bestandsnamen
+   werden mit einem Changeset aus dem Benutzerverzeichnis aller Mandanten eingetragen. Die Antwort 409 `BENUTZER_EXISTIERT` bleibt
+   unverändert (kein Hinweis auf Quelle oder Mandant). Der Abgleich meldet Benutzer eines inaktiven Mandanten, die noch aktiv sind.
 6. Rückfall: Die Verwaltung lässt sich abschalten (`archiv.verwaltung.aktiv=false`, Klasse (b)); Endpunkte antworten 404, Betrieb wie bisher
    per `kcadm.sh`.
 
@@ -453,7 +512,7 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 | Spec 01, requirements.md 2.6 | Absatz nach der Tabelle: Zeilen A20 bis A23 stehen in Spec 06, Requirement 4.1 (Tabelle bleibt unverändert; Test mit 19.5) |
 | Spec 01, design.md | mit der jeweiligen Aufgabe: Fehlercodes (Tabelle), Aktionen (Tabelle Protokoll), `anlass`, Dienstkonto in «Sicherheit», Secret `keycloak_verwaltung_secret` in «Secrets und Konfiguration» |
 | Spec 03, 3.5 | Entscheid der Rechte der Geschäftsstelle umfasst A20 bis A23 (Open Point) |
-| Spec 04, design.md `/wissensbasis/einstellungen` | Nachtrag: nach Spec 06, 2.13 gleiche Mechanik wie die Konfiguration (Entscheid offen) |
+| Spec 04, design.md `/wissensbasis/einstellungen` | Nachtrag: nach Spec 06, 2.13 gleiche Mechanik wie die Konfiguration (entschieden 20.11.2026: ja) |
 | Spec 05, requirements.md 7.6 und design.md | Verweis: `einstellungen.*` wächst nach Spec 06; Seiten der Verwaltung unter `/verwaltung/…` ergänzt Spec 06 (18.3 bleibt) |
 | `tech.md` | Tag `@spec-06`; Dienstkonto und Secret `keycloak_verwaltung_secret` im Abschnitt Secrets |
 | `docs/umsetzungsplan.md` | Zeile Spec 06, Wellen 19 bis 21 |
@@ -476,19 +535,97 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 - **Verknüpfen von Google-Konten durch das Archiv:** abgelehnt; es bräuchte die Google-Kennung `sub`; bleibt bei O.8.
 
 ## Open Points
-- [offen: Entscheid Fabian] Benutzerverwaltung im Mandanten `vhf-gsk` (kein Benutzer mit Rolle `inhaber`, Spec 03, 3.5;
+- [entschieden 20.11.2026, Fabian: Empfehlung übernommen] Benutzerverwaltung im Mandanten `vhf-gsk` (kein Benutzer mit Rolle `inhaber`, Spec 03, 3.5;
   Requirement 4.1, Fussnote). Empfehlung: Betreiber verwaltet `vhf-gsk` per Admin-Kommando, A20 bis A23 für `geschaeftsstelle`
   403, bis Spec 03, 3.5 entscheidet.
-- [offen: Entscheid Fabian] Löschfrist 30 Tage und keine Pseudonymisierung der Protokolle (Rechtsgrundlagen revDSG und GeBüV
+- [entschieden 20.11.2026, Fabian: Empfehlung übernommen; Rechtsgrundlagen revDSG und GeBüV bestätigt Fabian oder der Datenschutzberater separat] Löschfrist 30 Tage und keine Pseudonymisierung der Protokolle (Rechtsgrundlagen revDSG und GeBüV
   durch Fabian oder den Datenschutzberater bestätigen). Empfehlung: 30 Tage, Deaktivieren als Standard, Pseudonymisierung
   nur mit der Löschfunktion (Spec 01, 9.9).
-- [offen: Entscheid Fabian] Einstellungen der Wissensbasis (A19) in die Konfigurationsversion überführen (Requirement 2.13).
+- [entschieden 20.11.2026, Fabian: ja] Einstellungen der Wissensbasis (A19) in die Konfigurationsversion überführen (Requirement 2.13).
   Empfehlung: ja, solange `PUT /wissensbasis/einstellungen` noch nicht umgesetzt ist (heute liest nur der Ingest die Tabelle
   `wissens_einstellung`); sonst Aufgabe 20.3 mit Migration.
-- [offen: Entscheid Fabian] Alarm-Empfänger und Monatsbudget des öffentlichen Chats bleiben beim Betreiber (Klasse (b)).
+- [entschieden 20.11.2026, Fabian: ja] Alarm-Empfänger und Monatsbudget des öffentlichen Chats bleiben beim Betreiber (Klasse (b)).
   Empfehlung: ja (Personendaten, Kostenhoheit).
+- [entschieden 20.11.2026, Fabian: Option (a)] Rollenzuweisung des Dienstkontos: Requirement 5.2 verlangt `manage-users`, das die FGAP-Prüfung
+  umgeht (Spike 19.1). Optionen: (a) `manage-users` behalten, der Archiv-Code ist die einzige Sperre auf die vier Archiv-Rollen
+  (Ist-Stand, Realm-Export weist FGAP nicht aus); (b) `manage-users` durch feingranulare Rechte (FGAP v2 mit `manage`-Scope
+  auf Benutzer und `map-role` auf die vier Rollen) ersetzen und Requirement 5.2 anpassen. Empfehlung: (a), solange (b) nicht
+  gegen Keycloak 26.8.2 nachgewiesen ist.
 - Aufgabe 19.1 klärt gegen Keycloak 26.8.2: feingranulare Admin-Rechte (`map-roles`) für das Dienstkonto, interne Adresse und
   Aussteller des Tokens, Rotation des Client-Secrets mit Überlappung, `auth_time` im Access-Token, Verhalten von
   `prompt=login` mit dem Cookie-Zweig des Browser-Flows, Aufruf `execute-actions-email` ohne vorhandenes Passwort.
 - Grenzwerte (Katalog, Raten, Gültigkeiten) sind Vorschläge; sie gelten mit dem Merge dieses PR und sind Klasse (b), also ohne
   Codeänderung, nur per Konfiguration und Deploy anpassbar (`archiv.verwaltung.*`).
+
+## Umsetzung 19.1 — Spike Keycloak 26.8.2
+
+Der Dev-Service-Test bestätigt, dass der Issuer aus der Discovery-Antwort mit dem `iss`-Claim des Dienstkonto-Tokens
+übereinstimmt. `GET /users?q=mandant:urinet` liefert nur Testbenutzer mit diesem Attribut; `GET /roles/inhaber/users`
+liefert dagegen Inhaber aus beiden Testmandanten. Der Adapter muss daher weiterhin jede Antwort nach `mandant` filtern.
+Das Dienstkonto erhält ein Token mit den direkt zugewiesenen Rollen `query-users`, `view-users` und `manage-users` sowie
+der erwarteten `realm-management`-Audience. Im Test-Realm ist `view-users` zusammengesetzt und bringt zusätzlich
+`query-groups` in den effektiven Token-Rollen mit.
+
+Ein Aufruf der Admin-REST-API mit diesem Token (`GET /users?max=1`) antwortete zunächst mit HTTP 401, auch mit zusätzlich
+zugewiesenem `realm-admin`. Ursache (Keycloak-Log, Test `KeycloakVerwaltungSpikeTest`): Keycloak 26.8 prüft die Audience der
+Admin-API («Failed to verify identity token: Expected audience not available in the token»). Das Token braucht den Client-Scope
+`kc-admin-api`, der die Audience `<Basis>/admin/realms/<Realm>` einträgt und den Scope `kc-admin-api` setzt. Der Scope ist im
+Realm vorhanden, aber nicht Standard-Scope eines neuen Clients. Der Test weist beides nach: Ohne den Scope als Standard-Scope des
+Dienstkontos antwortet die Admin-API mit 401, mit ihm mit 200. Die Vermutung eines Issuer-Fehlers ist damit widerlegt (der Issuer
+stimmt). Folge für Aufgabe 19.2: Der Client `archiv-verwaltung` im Realm-Export muss `kc-admin-api` als Standard-Scope tragen
+(`defaultClientScopes`), sonst scheitert jeder Aufruf des Adapters. Die Wirkung von FGAP ist weiterhin nur aus der Dokumentation
+belegt, nicht durch einen Test.
+
+Keycloaks [Dokumentation zu FGAP v2 für Version 26.8.2](https://github.com/keycloak/keycloak/blob/26.8.2/docs/documentation/server_admin/topics/admin-console-permissions/fine-grain-v2.adoc)
+beschreibt `map-role` als Scope der Rollen-Ressource. Dieselbe Dokumentation hält fest, dass administrative RBAC-Rollen wie
+`manage-users` die FGAP-Prüfung umgehen. Damit kann FGAP die Zuweisung auf die vier Archiv-Rollen nicht begrenzen, solange
+Requirement 5.2 zugleich `manage-users` verlangt. Diese Rechtevorgaben widersprechen sich; bis zum Entscheid darf der
+Realm-Export FGAP nicht als Begrenzung der Rollenzuweisung ausweisen.
+
+Nicht nachgewiesen wurden die interne Compose-Adresse samt Backchannel-Issuer, überlappende Secret-Rotation, `auth_time`
+in einem interaktiven Benutzertoken, `prompt=login` gegen den Cookie-Zweig und `execute-actions-email` ohne Passwort mit
+`VERIFY_EMAIL`, `UPDATE_PASSWORD` und `CONFIGURE_TOTP`. Der Test-Realm führt keinen Browser-Flow- und SMTP-Nachweis aus;
+diese Punkte bleiben vor der Realm-Änderung offen.
+
+Stand Aufgabe 19.1: Nachgewiesen sind Mandantensuche, Rollenmitglieder, Issuer, Token-Rollen, die Ursache des 401 und der
+erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Secret-Rotation, `auth_time`, `prompt=login` und
+`execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
+Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.
+
+## Umsetzung 19.2 — Realm-Export und Tests
+
+Der Export enthält das Dienstkonto mit `kc-admin-api` und den drei vorgesehenen Rollen; der Test-Realm ergänzt SMTP
+an Mailpit. Der importierte Export und der reguläre Dev Service senden eine Einladung ohne vorhandenes Passwort mit den
+drei erforderlichen Aktionen. Der interaktive PWA-Test weist `auth_time` beim ersten Login und unverändert bei SSO nach;
+`prompt=login` verlangt Passwort und TOTP und liefert danach eine neuere Authentifizierungszeit. Für die erneute Anmeldung
+wartet der Test auf ein neues TOTP-Zeitfenster, weil Keycloak die Wiederverwendung desselben Codes ablehnt.
+Ein synthetischer Test weist die Secret-Überlappung und den Widerruf sowie den internen Backchannel mit korrektem
+Issuer nach; die konkrete Betriebsverdrahtung und die automatische Ablaufzeit bleiben als nachgelagerte
+Betriebsnachweise für 19.3 offen (Entscheid Fabian 21.11.2026).
+
+Redirect, Web-Origin und Logout-Redirect des PWA-Clients verwenden im Realm-Export `${ARCHIV_BASIS_URL}`. Keycloak
+liest den nicht geheimen Wert beim Import aus der Umgebung; Compose reicht ihn aus der externen Bundle-Konfiguration
+weiter. Der Start bricht bei fehlender oder ungültiger HTTPS-Basisadresse ab. `schreibe-env.sh` schreibt den Wert aus
+`HOST_ARCHIV` in die `.env` des Bundles (Nachbesserung Review PR #385); der Workflow bleibt unverändert. Der Export
+enthält kein Dienstkonto-Secret; Keycloak erzeugt beim Erstimport eines. Der Test weist nach, dass damit ein Token
+bezogen werden kann. Das tatsächlich verwendete Secret wird erst in 19.3 ausserhalb des Imports gesetzt; `start.sh`
+liest oder übergibt es nicht. Ein bereits importierter Realm wird durch den Startimport nicht aktualisiert;
+die einmalige Aktualisierung ist in 19.3 nachgelagert (Entscheid Fabian 21.11.2026).
+
+## Umsetzung 19.4 — Keycloak-Adapter
+
+`KeycloakAdminAdapter` ist nur im Profil `prod` aktiv; Dev und Tests verwenden den speicherbasierten Stub. Der Adapter
+nutzt den JDK-HTTP-Client, eine feste Positivliste aus Methode und Pfad sowie Antworten bis 1 MiB. Er cached das
+Client-Credentials-Token bis 30 Sekunden vor Ablauf, begrenzt Verbindung und Anfrage gemäss Konfiguration und erlaubt
+höchstens zwei gleichzeitige Aufrufe. Schreibaufrufe werden nicht wiederholt; Leseaufrufe nach Transportfehler oder 5xx
+höchstens einmal nach 200 ms. Drei Fehler innerhalb 30 Sekunden öffnen den Schutzschalter für 30 Sekunden.
+
+Die Admin-Basisadresse kommt im Profil `prod` aus `ARCHIV_KEYCLOAK_ADMIN_URL`; ohne URL oder Dienstkonto-Secret meldet
+der Adapter den Dienst als nicht erreichbar, ohne einen Ersatz-Endpunkt zu verwenden. Das Dienstkonto-Secret wird nur
+aus `keycloak_verwaltung_secret` gelesen und von `SecretPruefung` für `api` und `kommando` verlangt, sobald
+`archiv.verwaltung.keycloak.basis-url` gesetzt ist (Hotfix 21.11.2026, Deploy-Lauf 44922011116: ohne Secret im Bundle
+startete die API in Stufe A in Schleife; Secret und Adresse kommen erst mit 19.3 ins Deploy). Ohne Adresse startet die
+API, die Benutzerverwaltung meldet bis 19.3 `IDENTITAETSDIENST_NICHT_ERREICHBAR`. Eine eigene
+`@HealthGroup("detail")` prüft, ob ein Token geholt werden kann; sie gehört weder zur Liveness noch zur Readiness.
+WireMock-Tests decken Mandantenfilter, Zeitüberschreitung, 5xx-Wiederholung, 401, Schreibaufruf ohne Wiederholung und
+Schutzschalter ab.

@@ -1,0 +1,172 @@
+package ch.urinet.archiv.wissen.application;
+
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
+import ch.urinet.archiv.ki.application.KiPort;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.verarbeitung.application.AuftragService;
+import ch.urinet.archiv.wissen.domain.Quelleneintrag;
+import ch.urinet.archiv.wissen.domain.WissensMarkdown;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.IntSupplier;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class FreigabeAnnahme {
+    private final FreigabeSperre sperre;
+    private final FreigabeRepository repository;
+    private final FreigabeKontext kontext;
+    private final WissenIngestPort daten;
+    private final WissenHuelleDienst huelle;
+    private final WissenIngestSpeichern ingest;
+    private final WissenKonfiguration konfiguration;
+    private final FreigabeProtokoll protokoll;
+    private final AuftragService auftraege;
+    private final WissenImport importieren;
+
+    public FreigabeAnnahme(FreigabeSperre sperre, FreigabeRepository repository, FreigabeKontext kontext,
+                           WissenIngestPort daten, WissenHuelleDienst huelle, WissenIngestSpeichern ingest,
+                           WissenKonfiguration konfiguration, FreigabeProtokoll protokoll, AuftragService auftraege,
+                           WissenImport importieren) {
+        this.sperre = sperre;
+        this.repository = repository;
+        this.kontext = kontext;
+        this.daten = daten;
+        this.huelle = huelle;
+        this.ingest = ingest;
+        this.konfiguration = konfiguration;
+        this.protokoll = protokoll;
+        this.auftraege = auftraege;
+        this.importieren = importieren;
+    }
+
+    @Transactional(Transactional.TxType.MANDATORY)
+    public boolean ausfuehren(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch,
+                              Bearbeitung bearbeitung, String gewuenschteStufe, String grund, String realIp) {
+        FreigabeRepository.Aenderung aenderung = sperre.laden(benutzer, entwurfId, nummer, ifMatch);
+        if (!sperre.basisAktuell(aenderung)) {
+            return false;
+        }
+        if (grund != null && grund.length() > 1000) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        FreigabeRepository.Vorschlag vorschlag = repository.vorschlagLaden(aenderung);
+        if ("ANALYSE".equals(aenderung.anlass()) && bearbeitung == null) {
+            throw new FachFehler(Fehlercode.ENTWURF_BEFUND);
+        }
+        Wissensseite entwurf = vorschlag.fassung();
+        Set<String> entfernt = vorschlag.entfernteAussagen();
+        String importErzeugt = null;
+        if ("IMPORT".equals(aenderung.anlass())) {
+            var basis = aenderung.seiteId() == null ? null : daten.seiteLaden(aenderung.seiteId()).orElseThrow();
+            var aufgeloest = importieren.fuerAnnahme(benutzer, entwurfId, nummer, basis, bearbeitung);
+            if (!aufgeloest.befunde().isEmpty()) {
+                throw new EntwurfBefunde(aufgeloest.befunde().stream().map(b -> b.code().name()).toList());
+            }
+            entwurf = aufgeloest.fassung();
+            importErzeugt = entwurf.erzeugtVon();
+            vorschlag = new FreigabeRepository.Vorschlag(entwurf, entfernt,
+                    ch.urinet.archiv.wissen.domain.WissensStufe.valueOf(vorschlag.kontextstufe())
+                            .hoechste(aufgeloest.stufe()).name(),
+                    null, null, vorschlag.erstelltVon());
+        }
+        if (bearbeitung != null) {
+            if (ManuellerWissensentwurf.enthaeltNull(bearbeitung.tags())
+                    || ManuellerWissensentwurf.enthaeltNull(bearbeitung.quellen())) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            entfernt = bearbeitung.entfernteAussagen() == null ? Set.of()
+                    : bearbeitung.entfernteAussagen().stream()
+                    .filter(a -> a != null && a.schluessel() != null
+                            && a.begruendung() != null && !a.begruendung().isBlank())
+                    .map(KiPort.EntfernteAussage::schluessel).collect(Collectors.toUnmodifiableSet());
+            entwurf = new Wissensseite(entwurf.id(), entwurf.pfad(), entwurf.typ(), bearbeitung.titel(),
+                    bearbeitung.beschreibung(), bearbeitung.tags(), entwurf.status(), bearbeitung.veraltetAb(),
+                    "IMPORT".equals(aenderung.anlass()) ? entwurf.quellen() : bearbeitung.quellen(),
+                    entwurf.vertraulichkeit(), bearbeitung.inhalt(), entwurf.version(),
+                    null, null, null, null, false, false, entwurf.wissensquelleId());
+        }
+        String basisInhalt = aenderung.seiteId() == null ? ""
+                : daten.seiteLaden(aenderung.seiteId()).orElseThrow().inhalt();
+        var aufgeloesteWidersprueche = WissensMarkdown.entfernteWidersprueche(basisInhalt, entwurf.inhalt());
+        if (!aufgeloesteWidersprueche.isEmpty()) {
+            if (grund == null || grund.isBlank()) {
+                throw new FachFehler(Fehlercode.PFLICHTFELD_FEHLT);
+            }
+            entfernt = new HashSet<>(entfernt);
+            // Nur Schlüssel entschuldigen, die die Basis ausserhalb von Widerspruchsblöcken nicht nutzt;
+            // geteilte Schlüssel decken sonst die Entfernung einer normalen Aussage mit ab.
+            Set<String> ausserhalbBloecken = new HashSet<>();
+            for (var aussage : WissensMarkdown.analysieren(basisInhalt, WissensMarkdown.MAX_EINGABE_ZEICHEN)
+                    .aussagen()) {
+                ausserhalbBloecken.addAll(aussage.fussnoten());
+            }
+            for (var block : aufgeloesteWidersprueche) {
+                for (String schluessel : block.fussnoten()) {
+                    if (!ausserhalbBloecken.contains(schluessel)) {
+                        entfernt.add(schluessel);
+                    }
+                }
+            }
+        }
+        var gepruefterVorschlag = new FreigabeRepository.Vorschlag(entwurf, entfernt, vorschlag.kontextstufe(),
+                vorschlag.wissensquelleId(), vorschlag.modell(), vorschlag.erstelltVon());
+        var ergebnis = kontext.pruefen(benutzer, entwurfId, aenderung, gepruefterVorschlag, entwurf, gewuenschteStufe);
+        if (!ergebnis.pruefung().befunde().isEmpty()) {
+            throw new EntwurfBefunde(ergebnis.pruefung().befunde().stream().map(b -> b.code().name()).toList());
+        }
+        UUID seiteId = aenderung.seiteId() == null ? UUID.randomUUID() : aenderung.seiteId();
+        int version = aenderung.basisVersion() == null ? 1 : aenderung.basisVersion() + 1;
+        Wissensseite.Status status = "VERALTEN".equals(aenderung.aktion()) ? Wissensseite.Status.VERALTET
+                : aenderung.seiteId() == null ? Wissensseite.Status.AKTIV
+                : Wissensseite.Status.valueOf(daten.seiteLaden(seiteId).orElseThrow().metadaten().status());
+        Wissensseite fassung = new Wissensseite(seiteId, entwurf.pfad(), entwurf.typ(), entwurf.titel(),
+                entwurf.beschreibung(), entwurf.tags(), status, entwurf.veraltetAb(), entwurf.quellen(),
+                Wissensseite.Vertraulichkeit.valueOf(ergebnis.wirksameStufe().name()), entwurf.inhalt(), version,
+                null, null, null, null, false,
+                !WissensMarkdown.analysieren(entwurf.inhalt(), konfiguration.ingest().seiteMaxZeichen())
+                        .widersprueche().isEmpty(), entwurf.wissensquelleId());
+        String erzeugt;
+        if (bearbeitung != null) {
+            erzeugt = "human:" + benutzer.id();
+        } else if ("IMPORT".equals(aenderung.anlass())) {
+            erzeugt = java.util.Objects.requireNonNull(importErzeugt);
+        } else if ("INGEST".equals(aenderung.anlass())
+                || ("MANUELL".equals(aenderung.anlass()) && vorschlag.modell() != null)) {
+            if (vorschlag.modell() == null || vorschlag.modell().isBlank()) {
+                throw new IllegalStateException("Modell des Ingest-Entwurfs fehlt");
+            }
+            erzeugt = "infomaniak/" + vorschlag.modell();
+        } else {
+            erzeugt = "human:" + vorschlag.erstelltVon();
+        }
+        Set<String> links = WissensMarkdown.analysieren(fassung.inhalt(),
+                konfiguration.ingest().seiteMaxZeichen()).links();
+        repository.fassungSpeichern(entwurfId, aenderung, fassung, ergebnis.mindeststufe(), ergebnis.wirksameStufe(),
+                erzeugt, benutzer.id(), grund, links, !aufgeloesteWidersprueche.isEmpty());
+        huelle.versionFreigeben(seiteId, version);
+        protokoll.angenommen(benutzer, entwurfId, nummer, seiteId, aenderung.basisVersion(), version, realIp);
+        auftraege.wissensEmbeddingEinreihen(seiteId, version);
+        if (repository.entwurfAbschliessen(entwurfId)) {
+            repository.abschlussProtokollieren(entwurfId);
+            if ("INGEST".equals(aenderung.anlass())) {
+                ingest.wartendenIngestStarten();
+            }
+        }
+        return true;
+    }
+
+    public record Bearbeitung(String titel, String beschreibung, List<String> tags, LocalDate veraltetAb,
+                              List<Quelleneintrag> quellen, String inhalt,
+                              List<KiPort.EntfernteAussage> entfernteAussagen) {
+    }
+}

@@ -1,0 +1,956 @@
+<title>UriNet Archiv</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: schwebende Glas-Navigation links, Arbeitsfläche rechts mit Kopfzeile; Karten nur für Kennzahlen, Diagramme und Arbeitsobjekte */
+:root{
+  --bg:#f2efe7; --glow:rgba(238,177,17,.22); --glow2:rgba(5,7,12,.05);
+  --surface:#fffdf8; --surface-2:#f7f3e8; --glass:rgba(255,253,248,.72);
+  --line:#e7e0cd; --line-strong:#d6cdb4;
+  --fg:#05070c; --fg-2:#3a3d45; --muted:#6f6a5a;
+  --accent:#eeb111; --accent-ink:#7a5900; --accent-soft:#fbefc8; --on-accent:#05070c;
+  --chart:#a87a00; --chart-fill:rgba(238,177,17,.30);
+  --ok:#21734a; --ok-soft:#e1f2e7; --warn:#9a5b00; --warn-soft:#fdf0d8; --crit:#b3261e; --crit-soft:#fbe4e1; --info:#2f5f96; --info-soft:#e3ecf7;
+  --shadow:0 1px 2px rgba(40,30,0,.05),0 8px 24px -12px rgba(40,30,0,.18);
+  --f-display:"Inter Tight","Inter",system-ui,sans-serif; --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --r:16px; --r-s:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#05070c; --glow:rgba(238,177,17,.10); --glow2:rgba(242,239,231,.03);
+  --surface:#0d1017; --surface-2:#131722; --glass:rgba(13,16,23,.78);
+  --line:#1f2431; --line-strong:#2c3242;
+  --fg:#f2efe7; --fg-2:#cfccc3; --muted:#8d909a;
+  --accent:#eeb111; --accent-ink:#f2c13a; --accent-soft:rgba(238,177,17,.14); --on-accent:#05070c;
+  --chart:#eeb111; --chart-fill:rgba(238,177,17,.22);
+  --ok:#5cc488; --ok-soft:rgba(92,196,136,.13); --warn:#f0a940; --warn-soft:rgba(240,169,64,.13); --crit:#ff7a6e; --crit-soft:rgba(255,122,110,.13); --info:#7fb0ea; --info-soft:rgba(127,176,234,.13);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 28px -14px rgba(0,0,0,.7); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#05070c; --glow:rgba(238,177,17,.10); --glow2:rgba(242,239,231,.03);
+  --surface:#0d1017; --surface-2:#131722; --glass:rgba(13,16,23,.78);
+  --line:#1f2431; --line-strong:#2c3242;
+  --fg:#f2efe7; --fg-2:#cfccc3; --muted:#8d909a;
+  --accent:#eeb111; --accent-ink:#f2c13a; --accent-soft:rgba(238,177,17,.14); --on-accent:#05070c;
+  --chart:#eeb111; --chart-fill:rgba(238,177,17,.22);
+  --ok:#5cc488; --ok-soft:rgba(92,196,136,.13); --warn:#f0a940; --warn-soft:rgba(240,169,64,.13); --crit:#ff7a6e; --crit-soft:rgba(255,122,110,.13); --info:#7fb0ea; --info-soft:rgba(127,176,234,.13);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 28px -14px rgba(0,0,0,.7); color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(900px 520px at 88% -8%,var(--glow),transparent 70%),radial-gradient(700px 600px at -10% 110%,var(--glow2),transparent 70%);background-attachment:fixed}
+button,input,select,textarea{font:inherit;color:inherit}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:25;background:var(--bg)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--f-mono);font-size:.86em;letter-spacing:-.01em}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* Rahmen */
+.app{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100%;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.side{position:sticky;top:12px;height:calc(100vh - 24px);margin-block:12px;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:20px;display:flex;flex-direction:column;padding:18px 12px;overflow:auto;z-index:30}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 18px;font:700 17px/1 var(--f-display);letter-spacing:-.02em;text-decoration:none}
+.brand small{display:block;font:500 11px/1.4 var(--f-body);color:var(--muted);letter-spacing:0}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--accent);display:grid;place-items:center;flex:none}
+.logo svg{width:20px;height:20px;stroke:#05070c;fill:none;stroke-width:2;stroke-linecap:round}
+.nav-group{font:600 10.5px/1 var(--f-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted);padding:16px 10px 6px}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;text-decoration:none;color:var(--fg-2);font-weight:500}
+.nav a:hover{background:var(--surface-2);color:var(--fg)}
+.nav a[aria-current="page"]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow);border:1px solid var(--line)}
+.nav a[aria-current="page"] svg{color:var(--accent-ink)}
+.nav a .cnt{margin-left:auto;background:var(--accent);color:var(--on-accent);font:600 11px/1 var(--f-body);padding:4px 7px;border-radius:99px}
+.side-foot{margin-top:auto;padding:14px 10px 2px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:grid;gap:6px}
+.side-foot b{color:var(--fg);font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle}
+
+.main{min-width:0;padding:12px 0 40px 20px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;gap:12px;padding:8px 0 14px;background:linear-gradient(var(--bg) 70%,transparent)}
+.ibtn.burger{display:none}
+.search{flex:1;max-width:520px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:0 12px;height:42px;color:var(--muted)}
+.search input{flex:1;min-width:0;border:0;background:transparent;outline:0;color:var(--fg);height:100%}
+.search kbd{font:500 11px var(--f-mono);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+.spacer{flex:1}
+.ibtn{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer;position:relative;color:var(--fg-2)}
+.ibtn:hover{color:var(--fg);border-color:var(--line-strong)}
+.ibtn .badge{position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;background:var(--crit);border:2px solid var(--surface)}
+.user{display:flex;align-items:center;gap:10px;padding:4px 10px 4px 4px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer;position:relative;height:42px}
+.avatar{width:32px;height:32px;border-radius:9px;background:#05070c;color:#eeb111;display:grid;place-items:center;font:700 12px var(--f-display);flex:none}
+.user .who{font-weight:600;line-height:1.15;font-size:13px;text-align:left}
+.user .who small{display:block;font-weight:500;color:var(--muted);font-size:11.5px}
+.menu{position:absolute;right:0;top:50px;width:290px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px;cursor:default;text-align:left}
+.menu h4{margin:4px 6px 8px;font:600 11px var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.menu label{display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:10px;cursor:pointer}
+.menu label:hover{background:var(--surface-2)}
+.menu label small{display:block;color:var(--muted);font-size:12px}
+.menu input{margin-top:3px;accent-color:var(--accent)}
+
+/* Seitenkopf */
+.ph{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:6px 0 20px}
+.ph h1{font:700 clamp(22px,2.6vw,28px)/1.15 var(--f-display);letter-spacing:-.025em;margin:0;text-wrap:balance}
+.ph p{margin:4px 0 0;color:var(--muted)}
+.eyebrow{font:600 11px var(--f-body);text-transform:uppercase;letter-spacing:.09em;color:var(--accent-ink);margin-bottom:6px}
+
+/* Bausteine */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);min-width:0}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px 0;flex-wrap:wrap}
+.card-h h2,.card-h h3{font:600 15px/1.3 var(--f-display);letter-spacing:-.01em;margin:0}
+.card-b{padding:14px 18px 18px}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g-dash{grid-template-columns:minmax(0,1.65fr) minmax(0,1fr)}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap;text-decoration:none}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.pri:hover{filter:brightness(.96)}
+.btn.dark{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.danger{color:var(--crit)}
+.btn.sm{height:30px;padding:0 10px;font-size:12.5px;border-radius:8px}
+.btn svg.i{width:16px;height:16px}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;padding:5px 11px;border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.pill{display:inline-flex;align-items:center;gap:5px;font:600 11.5px/1 var(--f-body);padding:5px 8px;border-radius:99px;white-space:nowrap;background:var(--surface-2);color:var(--fg-2);border:1px solid var(--line)}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.pill.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.pill.crit{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+.pill.info{background:var(--info-soft);color:var(--info);border-color:transparent}
+.pill.acc{background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
+.pill svg.i{width:13px;height:13px}
+.trend{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted)}
+.trend b{color:var(--ok);font-weight:600}
+.trend b.down{color:var(--crit)}
+.field{display:grid;gap:5px}
+.field label,.lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.inp{height:38px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);padding:0 11px;width:100%;min-width:0}
+textarea.inp{height:auto;padding:9px 11px;resize:vertical}
+.inp:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+.inp.unsicher{border-color:var(--warn);background:var(--warn-soft)}
+.tbl-wrap{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr.click{cursor:pointer}
+.tbl tr.click:hover td{background:var(--surface-2)}
+.r{text-align:right}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.platzhalter{font-style:italic;color:var(--muted)}
+.platzhalter::before{content:"Datei: ";font-style:normal;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+
+/* Kennzahlen */
+.kpi{padding:16px 18px;display:grid;gap:10px;text-decoration:none}
+.kpi .k-h{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--fg-2)}
+.kpi .k-h span.ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--line)}
+.kpi .v{font:700 30px/1 var(--f-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+a.kpi:hover{border-color:var(--line-strong)}
+.kpi.hl{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.kpi.hl .k-h{color:var(--bg)}
+.kpi.hl .k-h span.ic{background:var(--accent);border-color:var(--accent);color:#05070c}
+.kpi.hl .trend{color:color-mix(in srgb,var(--bg) 65%,transparent)}
+
+/* Lebenszyklus */
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:4px}
+.flow div{padding:10px 12px;background:var(--surface-2);border-radius:10px;position:relative;min-width:0}
+.flow div b{display:block;font:700 18px/1.2 var(--f-display);font-variant-numeric:tabular-nums}
+.flow div span{font:500 10.5px var(--f-mono);color:var(--muted);letter-spacing:.02em}
+.flow div.now{background:var(--accent-soft)}
+.flow div.now span{color:var(--accent-ink)}
+
+/* Diagramme */
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .ax{fill:var(--muted);font:11px var(--f-body)}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:10px;padding:8px 11px;font-size:12px;white-space:nowrap;transform:translate(-50%,-110%)}
+.tip b{display:block;font:700 18px/1.1 var(--f-display)}
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:130px minmax(0,1fr) 46px;align-items:center;gap:10px;font-size:12.5px;padding:2px 4px;border-radius:6px}
+.bar:hover{background:var(--surface-2)}
+.bar .t{height:14px;border-radius:0 4px 4px 0;background:var(--chart);min-width:3px}
+.bar .n{text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-2)}
+.bar .l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--fg-2)}
+
+.list{display:grid}
+.li{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
+.li:last-child{border-bottom:0}
+.li .ic{width:32px;height:32px;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;flex:none;color:var(--fg-2)}
+.li .tx{min-width:0;flex:1}
+.li .tx b{font-weight:600;display:block}
+.li .tx small{color:var(--muted)}
+
+/* Eingangskorb */
+.korb{display:grid;gap:14px}
+.kk{display:grid;grid-template-columns:120px minmax(0,1fr);gap:18px;padding:16px}
+.kk.fehler{border-color:color-mix(in srgb,var(--crit) 45%,var(--line))}
+.thumb{aspect-ratio:3/4;max-width:100%;border-radius:8px;background:#fff;border:1px solid var(--line);padding:10px 9px;display:grid;align-content:start;gap:5px;position:relative;overflow:hidden}
+.thumb i{display:block;height:4px;border-radius:2px;background:#e3dfd4}
+.thumb i.h{height:8px;width:55%;background:#05070c}
+.thumb i.s{width:40%}
+.thumb i.m{width:75%}
+.thumb i.y{background:#eeb111;width:30%;margin-top:6px}
+.thumb.err::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;font:700 34px var(--f-display);color:#b3261e;background:rgba(251,228,225,.75)}
+.kk-h{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.kk-h h3{margin:0;font:600 16px/1.3 var(--f-display);letter-spacing:-.01em}
+.kk-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.vorschlag{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:14px 0}
+.vf{border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.vf.u{border-color:var(--warn);background:var(--warn-soft)}
+.vf .lbl{display:flex;justify-content:space-between;gap:6px}
+.vf .val{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.konf{font:500 10.5px var(--f-mono)}
+.hint{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;font-size:13px;margin:10px 0}
+.hint.warn{background:var(--warn-soft);color:var(--warn)}
+.hint.crit{background:var(--crit-soft);color:var(--crit)}
+.hint.info{background:var(--info-soft);color:var(--info)}
+.hint .tx{color:var(--fg-2)}
+.hint b{color:inherit}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* Suche */
+.s-lay{display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;align-items:start}
+.facet{padding:14px 16px;border-bottom:1px solid var(--line)}
+.facet:last-child{border-bottom:0}
+.facet h4{margin:0 0 8px;font:600 12px var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.facet label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13px}
+.facet label span.c{margin-left:auto;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.facet input[type=checkbox]{accent-color:var(--accent)}
+.hit{padding:16px 18px;border-bottom:1px solid var(--line);cursor:pointer;display:grid;gap:6px}
+.hit:last-child{border-bottom:0}
+.hit:hover{background:var(--surface-2)}
+.hit h3{margin:0;font:600 15px/1.35 var(--f-display)}
+.hit p{margin:0;color:var(--fg-2);font-size:13px}
+mark{background:var(--accent-soft);color:inherit;padding:0 2px;border-radius:3px;box-shadow:inset 0 -2px 0 var(--accent)}
+.big-search{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.big-search .search{max-width:none;height:48px;font-size:15px}
+
+/* Dokument */
+.doc-lay{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:18px;align-items:start}
+.paper{background:#fff;color:#1b1d22;border-radius:6px;padding:34px 34px 40px;box-shadow:0 2px 6px rgba(0,0,0,.08),0 20px 40px -20px rgba(0,0,0,.35);font-size:12px;aspect-ratio:1/1.414;max-width:100%;overflow:hidden;display:flex;flex-direction:column;gap:14px}
+.paper .p-h{display:flex;justify-content:space-between;align-items:flex-start}
+.paper .p-logo{font:700 15px var(--f-display);display:flex;align-items:center;gap:6px}
+.paper .p-logo i{width:14px;height:14px;background:#eeb111;border-radius:3px;display:inline-block}
+.paper h4{font:700 17px var(--f-display);margin:8px 0 0}
+.paper table{width:100%;border-collapse:collapse;font-size:11px}
+.paper td{padding:5px 0;border-bottom:1px solid #eee}
+.paper .tot{font-weight:700;border-top:2px solid #1b1d22}
+.paper .qr{margin-top:auto;display:flex;gap:12px;align-items:center;border-top:1px dashed #bbb;padding-top:12px;font-size:10px;color:#666}
+.paper .qr i{width:56px;height:56px;background:repeating-conic-gradient(#1b1d22 0 25%,#fff 0 50%) 0 0/8px 8px;border:3px solid #1b1d22;flex:none}
+.kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:9px 14px;font-size:13.5px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:0 18px;overflow-x:auto}
+.tabs button{border:0;background:transparent;padding:12px 10px;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--fg);border-color:var(--accent)}
+.tl{display:grid;gap:0}
+.tl .e{display:grid;grid-template-columns:14px minmax(0,1fr);gap:12px;padding-bottom:16px;position:relative}
+.tl .e::before{content:"";position:absolute;left:6px;top:14px;bottom:0;width:2px;background:var(--line)}
+.tl .e:last-child::before{display:none}
+.tl .e i{width:14px;height:14px;border-radius:50%;border:3px solid var(--accent);background:var(--surface);margin-top:3px}
+.integ{display:grid;gap:8px;background:var(--surface-2);border-radius:12px;padding:12px 14px;font-size:12.5px}
+.integ div{display:flex;gap:8px;align-items:center;min-width:0}
+.integ .mono{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Chat */
+.chat-lay{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;height:calc(100vh - 150px);min-height:520px}
+.conv{overflow:auto;padding:8px}
+.conv button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 10px;border-radius:9px;cursor:pointer;font-size:13px}
+.conv button small{display:block;color:var(--muted);font-size:11.5px}
+.conv button[aria-current="true"]{background:var(--surface-2);font-weight:600}
+.thread{display:flex;flex-direction:column;min-height:0}
+.msgs{flex:1;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:18px}
+.msg{max-width:720px;display:grid;gap:8px}
+.msg.me{align-self:flex-end;background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:14px 14px 4px 14px}
+.msg.ai{align-self:flex-start}
+.msg.ai .body{background:var(--surface-2);padding:12px 15px;border-radius:14px 14px 14px 4px;line-height:1.6}
+.tool{display:inline-flex;align-items:center;gap:7px;font:500 12px var(--f-mono);color:var(--muted)}
+.tool .spin{width:12px;height:12px;border:2px solid var(--line-strong);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;text-decoration:none}
+.chip:hover{border-color:var(--line-strong)}
+.chip.wiki{border-style:dashed}
+.chip svg.i{width:14px;height:14px}
+.composer{border-top:1px solid var(--line);padding:12px;display:grid;gap:10px}
+.composer form{display:flex;gap:8px}
+.composer .inp{height:44px}
+.beispiele{display:flex;gap:6px;flex-wrap:wrap}
+.beispiele button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 11px;font-size:12px;cursor:pointer;color:var(--fg-2)}
+.beispiele button:hover{border-color:var(--accent)}
+
+/* Erfassen */
+.drop{border:2px dashed var(--line-strong);border-radius:var(--r);padding:34px 20px;text-align:center;display:grid;gap:10px;justify-items:center;background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+.drop .big{width:52px;height:52px;border-radius:14px;background:var(--accent);display:grid;place-items:center;color:#05070c}
+.drop .big svg{width:26px;height:26px}
+.prog{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .4s}
+
+/* Wissen */
+.diff{font:12.5px/1.65 var(--f-mono);border:1px solid var(--line);border-radius:10px;overflow:auto}
+.diff div{padding:1px 12px;white-space:pre-wrap}
+.diff .add{background:var(--ok-soft)}
+.diff .add::before{content:"+ ";color:var(--ok)}
+.diff .del{background:var(--crit-soft);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--crit) 50%,transparent)}
+.diff .del::before{content:"− ";color:var(--crit)}
+.diff .ctx::before{content:"  "}
+
+/* Rechtematrix */
+.mx td,.mx th{text-align:center}
+.mx td:first-child,.mx th:first-child,.mx td:nth-child(2),.mx th:nth-child(2){text-align:left}
+.yes{color:var(--ok);font-weight:700}
+.no{color:var(--muted)}
+.part{color:var(--warn);font-weight:600;font-size:12px}
+
+/* Dialog, Toast, Drawer */
+dialog{border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--fg);padding:0;width:min(480px,calc(100vw - 32px));box-shadow:0 30px 80px -20px rgba(0,0,0,.45)}
+dialog::backdrop{background:rgba(5,7,12,.45);backdrop-filter:blur(2px)}
+dialog .d-b{padding:22px;display:grid;gap:12px}
+dialog h3{margin:0;font:700 18px var(--f-display)}
+dialog .d-f{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--line)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:11px 16px;border-radius:12px;font-weight:600;font-size:13px;display:flex;gap:8px;align-items:center;z-index:100;box-shadow:var(--shadow)}
+.toast svg.i{color:var(--accent)}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--surface);border-left:1px solid var(--line);z-index:60;box-shadow:-20px 0 60px -20px rgba(0,0,0,.35);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer .dh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+.drawer .db{overflow:auto;padding:20px;display:grid;gap:18px;align-content:start}
+.scrim{position:fixed;inset:0;background:rgba(5,7,12,.4);z-index:50}
+.role-note{display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:var(--info-soft);color:var(--info);font-size:13px;margin-bottom:16px}
+.role-note b{color:var(--fg)}
+.nur-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+@media (max-width:1180px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g-dash{grid-template-columns:minmax(0,1fr)}.doc-lay{grid-template-columns:minmax(0,1fr)}.paper{max-width:520px}}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .side{position:fixed;left:0;top:0;bottom:0;height:auto;margin:0;border-radius:0 20px 20px 0;width:270px;transform:translateX(-105%);transition:transform .2s;padding-top:calc(18px + env(safe-area-inset-top,0px));padding-left:max(12px,env(safe-area-inset-left,0px));background:var(--surface)}
+  .side.open{transform:none;box-shadow:var(--shadow)}
+  .main{padding-left:0}
+  .ibtn.burger{display:grid}
+  .s-lay,.chat-lay,.g2{grid-template-columns:minmax(0,1fr)}
+  .chat-lay{height:auto}
+  .conv{display:flex;overflow-x:auto;gap:4px}
+  .conv button{flex:none;width:auto;max-width:220px}
+  .msgs{max-height:60vh}
+  .user .who,.search kbd{display:none}
+}
+@media (max-width:560px){
+  .g4{gap:10px}.kpi{padding:14px}.kpi .v{font-size:24px}
+  .kk{grid-template-columns:minmax(0,1fr)}.kk .thumb{display:none}
+  .flow{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .bar{grid-template-columns:96px minmax(0,1fr) 38px}
+  .kv{grid-template-columns:minmax(0,1fr)}.kv dt{margin-top:6px}
+  .ibtn.opt{display:none}
+  .paper{padding:20px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* Seite Hilfe (Spec 07, Aufgabe 22.2) */
+.g-hilfe{align-items:start}
+.hilfe-toc ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.hilfe-toc ol ol{padding-left:12px;margin-top:2px}
+.hilfe-toc a{display:block;padding:6px 10px;border-radius:10px;color:var(--fg-2);text-decoration:none;font-size:14px}
+.hilfe-toc a:hover{background:var(--surface-2);color:var(--fg)}
+.hilfe-text h3{font:600 15px/1.3 var(--f-display);margin:18px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+.hilfe-text p,.hilfe-text ol{max-width:70ch;color:var(--fg-2)}
+@media (min-width:1100px){.g-hilfe{grid-template-columns:15rem minmax(0,1fr)}.hilfe-toc{position:sticky;top:76px}}
+</style>
+
+<div class="app">
+  <aside class="side" id="side" aria-label="Hauptnavigation">
+    <a class="brand" href="#uebersicht"><span class="logo"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span><span>UriNet Archiv<small>Mandant urinet</small></span></a>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div><span class="dot"></span><b>Manifest 19.11.2026</b></div>
+      <div>1'284 Prüfsummen · Prüflauf 01.11. ohne Abweichung</div>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <button class="ibtn burger" id="burger" aria-label="Menü öffnen" aria-controls="side" aria-expanded="false"></button>
+      <form class="search" id="topsearch" role="search">
+        <span data-i="search"></span>
+        <input id="topq" placeholder="Dokumente, Belegnummern, Partner suchen …" aria-label="Suche im Archiv">
+        <kbd>/</kbd>
+      </form>
+      <span class="spacer"></span>
+      <button class="ibtn opt" id="theme" aria-label="Hell oder dunkel umschalten"></button>
+      <button class="ibtn opt" id="bell" aria-label="Meldungen"><span data-i="bell"></span><span class="badge"></span></button>
+      <div class="user" id="user" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
+        <span class="avatar" id="av">FA</span>
+        <span class="who" id="who"></span>
+        <span data-i="chev"></span>
+      </div>
+    </header>
+    <main id="view" tabindex="-1"></main>
+  </div>
+</div>
+<div id="layer"></div>
+<dialog id="dlg"></dialog>
+
+<script>
+"use strict";
+/* ---------- Icons ---------- */
+const P={
+ grid:'<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+ inbox:'<path d="M3 13h5l1.5 2.5h5L16 13h5"/><path d="M5.5 5h13L21 13v6H3v-6z"/>',
+ upload:'<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v5h16v-5"/>',
+ search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+ chat:'<path d="M4 5.5h16v11H10l-5 3.5v-3.5H4z"/><path d="M8 10h8M8 13h5"/>',
+ users:'<circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20c.8-3.5 3.3-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 5.2a3.3 3.3 0 0 1 0 6.6M18 14.8c1.8.7 3 2.4 3.5 5.2"/>',
+ book:'<path d="M12 6.5C10 5 7 4.5 3.5 5v13.5c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5zM12 6.5V20"/>',
+ imp:'<path d="M12 3v11M7.5 9.5 12 14l4.5-4.5"/><path d="M4 16v4h16v-4"/>',
+ box:'<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10.5h14V9M10 13h4"/>',
+ doc:'<path d="M6 3h8l4.5 4.5V21H6z"/><path d="M14 3v4.5h4.5M9 13h6M9 16.5h6"/>',
+ types:'<path d="M4 6h7M4 12h7M4 18h7"/><rect x="14" y="4" width="6" height="4" rx="1"/><rect x="14" y="10" width="6" height="4" rx="1"/><rect x="14" y="16" width="6" height="4" rx="1"/>',
+ shield:'<path d="M12 3 19.5 6v5.5c0 4.8-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.7-7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/>',
+ key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l2.5 2.5M14.5 8.5l2 2"/>',
+ sliders:'<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+ bell:'<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>',
+ moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+ check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+ x:'<path d="M6 6l12 12M18 6 6 18"/>',
+ refresh:'<path d="M20 11a8 8 0 0 0-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16M20 20v-4h-4"/>',
+ alert:'<path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.2v.3"/>',
+ spark:'<path d="M12 3c.6 4.5 2.5 6.4 7 7-4.5.6-6.4 2.5-7 7-.6-4.5-2.5-6.4-7-7 4.5-.6 6.4-2.5 7-7z"/><path d="M19 15.5c.2 1.6.9 2.3 2.5 2.5-1.6.2-2.3.9-2.5 2.5-.2-1.6-.9-2.3-2.5-2.5 1.6-.2 2.3-.9 2.5-2.5z"/>',
+ lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+ chev:'<path d="m7 10 5 5 5-5"/>',
+ menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+ camera:'<path d="M4 8h3.5L9 5.5h6L16.5 8H20v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+ mail:'<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>',
+ clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+ eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+ dl:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/>',
+ edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+ merge:'<circle cx="6" cy="5.5" r="2"/><circle cx="6" cy="18.5" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7.5v9M6 9c0 3 3 3 6 3h4"/>',
+ copy:'<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V5.5a1 1 0 0 0-1-1h-9a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3"/>',
+ send:'<path d="M4 12 20 4l-6 16-2.5-6.5z"/><path d="M11.5 13.5 20 4"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ trend:'<path d="m3.5 16.5 6-6 4 4 7-7"/><path d="M15 7.5h5.5V13"/>',
+ trenddown:'<path d="m3.5 7.5 6 6 4-4 7 7"/><path d="M15 16.5h5.5V11"/>',
+ link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+ filter:'<path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/>',
+};
+const ic=(n,c='')=>`<svg class="i ${c}" viewBox="0 0 24 24" aria-hidden="true">${P[n]||''}</svg>`;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const chf=n=>n==null?'–':'CHF '+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,"'");
+const tsd=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,"'");
+const $=s=>document.querySelector(s);
+
+/* ---------- Beispieldaten (fiktiv) ---------- */
+const ARTEN=[
+ {code:'AUSGANGSRECHNUNG',name:'Ausgangsrechnung',gr:'finanz',pf:'Belegnummer, Partner, Betrag',vt:'NORMAL',jahre:10,ab:'Geschäftsjahr',gp:true,selbst:true,muster:'^\\d{4}-\\d{3}$',n:214},
+ {code:'OFFERTE',name:'Offerte',gr:'finanz',pf:'Belegnummer, Partner, gültig bis',vt:'NORMAL',jahre:10,ab:'Geschäftsjahr',gp:false,selbst:true,muster:'^O-\\d{4}-\\d{3}$',n:96},
+ {code:'LIEFERANTENBELEG',name:'Lieferantenbeleg',gr:'finanz',pf:'Partner, Betrag, Belegdatum',vt:'NORMAL',jahre:10,ab:'Geschäftsjahr',gp:true,selbst:false,muster:'',n:388},
+ {code:'QUITTUNG',name:'Quittung / Spesen',gr:'finanz',pf:'Betrag, Belegdatum',vt:'NORMAL',jahre:10,ab:'Geschäftsjahr',gp:true,selbst:false,muster:'',n:241},
+ {code:'LOHNABRECHNUNG',name:'Lohnabrechnung',gr:'finanz',pf:'Person, Monat, Betrag',vt:'PERSONAL',jahre:10,ab:'Geschäftsjahr',gp:true,selbst:true,muster:'',n:44},
+ {code:'VERTRAG',name:'Vertrag',gr:'vertrag',pf:'Partner, gültig ab',vt:'INTERN',jahre:10,ab:'gültig bis',gp:true,selbst:false,muster:'',n:31},
+ {code:'VERSICHERUNG',name:'Versicherung',gr:'vertrag',pf:'Partner, Policennummer',vt:'INTERN',jahre:10,ab:'Geschäftsjahr',gp:false,selbst:false,muster:'',n:27},
+ {code:'BEHOERDE',name:'Behörde',gr:'frei',pf:'Partner, Belegdatum',vt:'INTERN',jahre:10,ab:'Geschäftsjahr',gp:false,selbst:false,muster:'',n:53},
+ {code:'BANK',name:'Bank',gr:'finanz',pf:'Partner, Belegdatum',vt:'INTERN',jahre:10,ab:'Geschäftsjahr',gp:true,selbst:false,muster:'',n:72},
+ {code:'PROJEKTDOKUMENT',name:'Projektdokument',gr:'frei',pf:'Titel, Partner',vt:'NORMAL',jahre:null,ab:'unbefristet',gp:false,selbst:false,muster:'',n:79},
+ {code:'KORRESPONDENZ',name:'Korrespondenz',gr:'frei',pf:'Partner, Belegdatum',vt:'NORMAL',jahre:10,ab:'Geschäftsjahr',gp:false,selbst:false,muster:'',n:39},
+ {code:'WISSENSQUELLE',name:'Wissensquelle',gr:'frei',pf:'Titel',vt:'NORMAL',jahre:null,ab:'unbefristet',gp:false,selbst:false,muster:'',n:5},
+];
+const DOCS=[
+ {id:2611,titel:'Rechnung Webauftritt Vereinsseite',art:'Ausgangsrechnung',partner:'FC Schattdorf',datum:'14.11.2026',betrag:1850,ri:'Ausgang',nr:'2026-041',st:'ARCHIVIERT',vt:'NORMAL',gj:2026,tags:['Webauftritt','Verein'],dn:'Rechnung_2026-041.pdf',bis:'31.12.2036',text:'Webauftritt Vereinsseite, Pflege und Hosting 2027. Zahlbar innert 30 Tagen.',erf:'Generator'},
+ {id:2598,titel:'Offerte Sponsoring-Plattform',art:'Offerte',partner:'SC Buochs',datum:'03.11.2026',betrag:4200,ri:'Ausgang',nr:'O-2026-012',st:'ARCHIVIERT',vt:'NORMAL',gj:2026,tags:['Offerte','Sponsoring'],dn:'Offerte_O-2026-012.pdf',bis:'31.12.2036',text:'Sponsoring-Plattform mit Sponsorenliste und Live-Stand. Die Offerte ist gültig bis 03.12.2026.',erf:'Generator',gueltig:'03.12.2026'},
+ {id:2590,titel:'Webhosting Paket Business 2027',art:'Lieferantenbeleg',partner:'Hostpoint AG',datum:'02.11.2026',betrag:287.40,ri:'Eingang',nr:'F0412',st:'ARCHIVIERT',vt:'NORMAL',gj:2026,tags:['Hosting'],dn:'hostpoint_rechnung_nov.pdf',bis:'31.12.2036',text:'Webhosting Paket Business, Laufzeit 12 Monate, Domain urinet.ch inklusive.',erf:'E-Mail-Eingang'},
+ {id:2587,titel:'Material Messestand',art:'Quittung / Spesen',partner:'Migros Altdorf',datum:'31.10.2026',betrag:46.85,ri:'Eingang',nr:'',st:'ARCHIVIERT',vt:'NORMAL',gj:2026,tags:['Spesen'],dn:'IMG_4471.jpg',bis:'31.12.2036',text:'Klebeband, Schreibwaren, Getränke für den Messestand.',erf:'Handy'},
+ {id:2580,titel:'Lohnabrechnung Oktober 2026',art:'Lohnabrechnung',partner:'Joel Aschwanden',datum:'25.10.2026',betrag:1240,ri:'Ausgang',nr:'L-2026-10',st:'ARCHIVIERT',vt:'PERSONAL',gj:2026,tags:['Lohn'],dn:'Lohn_2026-10_JA.pdf',bis:'31.12.2036',text:'Lohnabrechnung Oktober, AHV/IV/EO, ALV, UVG Nichtberufsunfall.',erf:'Generator'},
+ {id:2511,titel:'Arbeitsvertrag Teilzeit',art:'Vertrag',partner:'Joel Aschwanden',datum:'01.08.2026',betrag:null,ri:'–',nr:'',st:'ARCHIVIERT',vt:'PERSONAL',gj:2026,tags:['Personal'],dn:'Arbeitsvertrag_JA.pdf',bis:'unbefristet',text:'Arbeitsvertrag Teilzeit 20 %, Beginn 01.08.2026, unbefristet.',erf:'Upload'},
+ {id:2490,titel:'Police Unfallversicherung UVG 2026',art:'Versicherung',partner:'Suva',datum:'12.01.2026',betrag:318.60,ri:'Eingang',nr:'',st:'ARCHIVIERT',vt:'INTERN',gj:2026,tags:['UVG','Versicherung'],dn:'uvg_police_2026.pdf',bis:'31.12.2036',text:'Prämie UVG 2026, Lohndeklaration fällig bis 31.01.2027.',erf:'Upload'},
+ {id:2476,titel:'Akontorechnung Beiträge 2026',art:'Behörde',partner:'Ausgleichskasse Uri',datum:'10.01.2026',betrag:612.00,ri:'Eingang',nr:'',st:'ARCHIVIERT',vt:'INTERN',gj:2026,tags:['AHV'],dn:'akonto_ahv.pdf',bis:'31.12.2036',text:'Akontobeiträge AHV/IV/EO 2026, quartalsweise.',erf:'E-Mail-Eingang'},
+ {id:2601,titel:'Kontoauszug Oktober 2026',art:'Bank',partner:'Urner Kantonalbank',datum:'01.11.2026',betrag:null,ri:'–',nr:'',st:'ARCHIVIERT',vt:'INTERN',gj:2026,tags:['Konto'],dn:'kontoauszug_2026-10.pdf',bis:'31.12.2036',text:'Kontoauszug Geschäftskonto Oktober 2026.',erf:'E-Mail-Eingang'},
+ {id:2566,titel:'Konzept Publikationsplattform VHF/GSK',art:'Projektdokument',partner:'VHF / GSK',datum:'20.10.2026',betrag:null,ri:'–',nr:'',st:'ARCHIVIERT',vt:'NORMAL',gj:2026,tags:['Konzept','WordPress'],dn:'Konzept_VHF-GSK.pdf',bis:'unbefristet',text:'Konzept Publikationsplattform mit Suche und Chatbot aus dem UriNet Archiv.',erf:'Upload'},
+ {id:2544,titel:'Rechnung Mobile Abo Oktober',art:'Lieferantenbeleg',partner:'Swisscom (Schweiz) AG',datum:'05.10.2026',betrag:59.90,ri:'Eingang',nr:'8812-3301',st:'ARCHIVIERT',vt:'NORMAL',gj:2026,tags:['Telefon'],dn:'swisscom_10.pdf',bis:'31.12.2036',text:'Mobile Abo inOne, Oktober 2026.',erf:'E-Mail-Eingang'},
+ {id:2399,titel:'Rechnung Webauftritt 2025',art:'Ausgangsrechnung',partner:'FC Schattdorf',datum:'18.11.2025',betrag:1650,ri:'Ausgang',nr:'2025-038',st:'ARCHIVIERT',vt:'NORMAL',gj:2025,tags:['Webauftritt','Verein'],dn:'Rechnung_2025-038.pdf',bis:'31.12.2035',text:'Webauftritt Vereinsseite, Pflege und Hosting 2026.',erf:'Generator'},
+ {id:2620,titel:'',art:'Lieferantenbeleg',partner:'',datum:'',betrag:null,ri:'Eingang',nr:'',st:'VERARBEITUNG',vt:'PERSONAL',gj:2026,tags:[],dn:'Scan_2026-11-20_0812.pdf',bis:'',text:'',erf:'Handy'},
+];
+let KORB=[
+ {id:2617,dn:'infomaniak_rechnung_2026-11.pdf',titel:'VPS Lite November 2026',erf:'E-Mail-Eingang · heute 07:42',st:'EINGANGSKORB',
+  f:[['Art','Lieferantenbeleg',.97],['Partner','Infomaniak Network SA',.95],['Belegdatum','18.11.2026',.98],['Betrag','CHF 14.40',.99],['Belegnummer','INV-26-118734',.93],['Geschäftsjahr','2026',.99]]},
+ {id:2616,dn:'IMG_4502.jpg',titel:'Schrauben und Dübel Messestand',erf:'Handy · Joel Aschwanden · gestern 17:05',st:'EINGANGSKORB',
+  f:[['Art','Quittung / Spesen',.91],['Partner','Coop Bau+Hobby Altdorf',.58],['Belegdatum','19.11.2026',.88],['Betrag','CHF 23.70',.61],['Geschäftsjahr','2026',.95]]},
+ {id:2615,dn:'swisscom_11.pdf',titel:'Rechnung Mobile Abo November',erf:'E-Mail-Eingang · gestern 09:12',st:'EINGANGSKORB',dup:2544,
+  f:[['Art','Lieferantenbeleg',.96],['Partner','Swisscom (Schweiz) AG',.97],['Belegdatum','05.11.2026',.94],['Betrag','CHF 59.90',.98],['Belegnummer','8812-3301',.81],['Geschäftsjahr','2026',.99]]},
+ {id:2614,dn:'Scan_2026-11-18_0937.pdf',titel:'',erf:'Handy · 18.11.2026 09:37',st:'FEHLER',fehler:'Die Texterkennung ist auf Seite 2 gescheitert: Die Seite ist unscharf. Erneut verarbeiten oder die Seite neu fotografieren.'},
+ {id:2610,dn:'quittung_altbestand_2014.pdf',titel:'Druckerpatrone',erf:'Import Google Drive · 16.11.2026',st:'EINGANGSKORB',abgelaufen:'31.12.2024',
+  f:[['Art','Quittung / Spesen',.9],['Partner','Interdiscount',.87],['Belegdatum','12.03.2014',.92],['Betrag','CHF 39.90',.95],['Geschäftsjahr','2014',.92]]},
+ {id:2605,dn:'Mietvertrag_Buero.pdf',titel:'Mietvertrag Büro Seedorf',erf:'Upload · 12.11.2026',st:'ARCHIVIERUNG_FEHLER',fehler:'Die Kopie im Archivspeicher konnte nicht gesperrt werden (Zeitüberschreitung). Das Dokument ist bestätigt, die Archivierung lässt sich gefahrlos wiederholen.'},
+];
+const KONTAKTE=[
+ {id:1,name:'FC Schattdorf',typ:'Organisation',ort:'6467 Schattdorf',str:'Sportplatz Grund 1',mail:'vorstand@fc-schattdorf.example',tel:'041 870 00 00',crm:'CRM-1042',herk:'Import',aktiv:true,docs:14},
+ {id:2,name:'SC Buochs',typ:'Organisation',ort:'6374 Buochs',str:'Seefeldstrasse 3',mail:'info@sc-buochs.example',tel:'041 620 00 00',crm:'CRM-1107',herk:'Import',aktiv:true,docs:6},
+ {id:3,name:'Hostpoint AG',typ:'Lieferant',ort:'8640 Rapperswil-Jona',str:'Neue Jonastrasse 60',mail:'rechnung@hostpoint.example',tel:'',crm:'',herk:'manuell',aktiv:true,docs:48},
+ {id:4,name:'Brand Automobile AG',typ:'Organisation',ort:'6460 Altdorf',str:'Gotthardstrasse 12',mail:'info@brand-auto.example',tel:'041 870 11 11',crm:'CRM-1210',herk:'Import',aktiv:true,docs:3},
+ {id:5,name:'Skiclub Attinghausen',typ:'Organisation',ort:'6468 Attinghausen',str:'Dorfplatz 2',mail:'ok@sca.example',tel:'',crm:'CRM-1188',herk:'Import',aktiv:true,docs:9,fehlt:true},
+ {id:6,name:'FC Schattdorf (alt)',typ:'Organisation',ort:'6467 Schattdorf',str:'Postfach',mail:'',tel:'',crm:'CRM-0871',herk:'Import',aktiv:false,merged:'FC Schattdorf',docs:0},
+ {id:7,name:'Joel Aschwanden',typ:'Person',ort:'6462 Seedorf',str:'—',mail:'joel@urinet.example',tel:'',crm:'',herk:'manuell',aktiv:true,docs:5},
+ {id:8,name:'Infomaniak Network SA',typ:'Lieferant',ort:'1227 Carouge',str:'Rue Eugène-Marziano 25',mail:'',tel:'',crm:'',herk:'manuell',aktiv:true,docs:11},
+];
+const WISSEN=[
+ {p:'ueberblick',t:'Überblick UriNet',typ:'Synthese',q:5,d:'18.11.2026'},
+ {p:'konzepte/spesenregelung',t:'Spesenregelung',typ:'Konzept',q:2,d:'14.11.2026'},
+ {p:'konzepte/offerten-gueltigkeit',t:'Gültigkeit von Offerten',typ:'Konzept',q:3,d:'17.11.2026'},
+ {p:'akteure/suva',t:'Suva (UVG)',typ:'Akteur',q:2,d:'12.11.2026'},
+ {p:'projekte/vhf-gsk',t:'Publikationsplattform VHF/GSK',typ:'Projekt',q:4,d:'19.11.2026'},
+ {p:'quellen/handbuch-lohn-2026',t:'Handbuch Lohn 2026',typ:'Quelle',q:1,d:'10.11.2026'},
+ {p:'analysen/umsatz-vereine',t:'Umsatz mit Vereinen 2024–2026',typ:'Analyse',q:6,d:'16.11.2026'},
+];
+const PROTO=[
+ ['20.11.2026 08:14','Fabian Aschwanden','ANZEIGEN','D-2598','10.0.4.12'],
+ ['20.11.2026 08:02','Treuhand Muster AG','EXPORT','Geschäftsjahr 2025','10.0.7.33'],
+ ['19.11.2026 17:21','Fabian Aschwanden','BESTAETIGEN','D-2612','10.0.4.12'],
+ ['19.11.2026 17:20','Fabian Aschwanden','AENDERN','D-2612','10.0.4.12'],
+ ['19.11.2026 16:05','Joel Aschwanden','ERFASSEN','D-2616','10.0.5.80'],
+ ['19.11.2026 11:47','Fabian Aschwanden','HERUNTERLADEN','D-2580','10.0.4.12'],
+ ['18.11.2026 21:03','System','MANIFEST','manifest-2026-11-18','–'],
+ ['18.11.2026 10:15','Joel Aschwanden','ZUGRIFF_VERWEIGERT','D-2511','10.0.5.80'],
+];
+
+/* ---------- Rollen (Rechtematrix Spec 01, 2.6) ---------- */
+const ROLLEN={
+ inhaber:{name:'Fabian Aschwanden',kurz:'FA',label:'Inhaber',r:['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','A12','A13','A14','EXPORT','A15','A17']},
+ mitarbeiter:{name:'Joel Aschwanden',kurz:'JA',label:'Mitarbeiter',r:['A1','A2','A4e','A5e','A15']},
+ treuhaender:{name:'Treuhand Muster AG',kurz:'TM',label:'Treuhänder',r:['A2','A3','A4','EXPORT','A15']},
+};
+const S={rolle:'inhaber',docId:2598,chatId:0,q:'',modus:'hybrid',f:{art:new Set(),ri:new Set(),gj:new Set(),vt:new Set()},kf:'aktiv',kq:'',wTyp:'',year:2026,tab:'meta',menu:false};
+const darf=r=>ROLLEN[S.rolle].r.includes(r);
+const sichtbar=d=>d.vt==='NORMAL'||(d.vt==='INTERN'&&darf('A3'))||(d.vt==='PERSONAL'&&(darf('A4')||(darf('A4e')&&d.partner==='Joel Aschwanden')));
+
+const NAV=[
+ {g:'Archiv'},
+ {h:'uebersicht',t:'Übersicht',i:'grid'},
+ {h:'eingangskorb',t:'Eingangskorb',i:'inbox',need:()=>darf('A5')||darf('A5e'),cnt:true},
+ {h:'erfassen',t:'Erfassen',i:'upload',need:()=>darf('A1')},
+ {h:'suche',t:'Suche',i:'search'},
+ {h:'chat',t:'Chat',i:'chat'},
+ {g:'Bestand'},
+ {h:'kontakte',t:'Kontakte',i:'users',need:()=>darf('A6')},
+ {h:'wissen',t:'Wissen',i:'book',need:()=>darf('A15')},
+ {h:'importe',t:'Importe',i:'imp',need:()=>darf('A12')},
+ {h:'export',t:'Jahresexport',i:'box',need:()=>darf('EXPORT')},
+ {g:'Verwaltung',need:()=>darf('A11')},
+ {h:'dokumentarten',t:'Dokumentarten',i:'types',need:()=>darf('A11')},
+ {h:'benutzer',t:'Benutzer und Rollen',i:'users',need:()=>darf('A11')},
+ {h:'einstellungen',t:'Einstellungen',i:'sliders',need:()=>darf('A11')},
+ {h:'protokoll',t:'Zugriffsprotokoll',i:'shield',need:()=>darf('A13')},
+ {h:'api-tokens',t:'API-Tokens',i:'key',need:()=>darf('A14')},
+];
+const korbSichtbar=()=>KORB.filter(k=>darf('A5')||(darf('A5e')&&/Joel/.test(k.erf)));
+
+/* ---------- Hilfsbausteine ---------- */
+const stPill=s=>({ARCHIVIERT:`<span class="pill ok">${ic('lock')}Archiviert</span>`,EINGANGSKORB:'<span class="pill acc">Eingangskorb</span>',VERARBEITUNG:'<span class="pill info">Verarbeitung</span>',FEHLER:`<span class="pill crit">${ic('alert')}Fehler</span>`,ARCHIVIERUNG_FEHLER:`<span class="pill crit">${ic('alert')}Archivierung fehlgeschlagen</span>`,NEU:'<span class="pill info">Neu</span>'}[s]||s);
+const vtPill=v=>v==='NORMAL'?'<span class="pill">Normal</span>':v==='INTERN'?'<span class="pill info">Intern</span>':`<span class="pill warn">${ic('lock')}Personal</span>`;
+const titelOder=(t,dn)=>t?esc(t):dn?`<span class="platzhalter">${esc(dn)}</span>`:'<span class="platzhalter">Ohne Titel</span>';
+const ph=(eyebrow,h,p,right='')=>`<div class="ph"><div><div class="eyebrow">${eyebrow}</div><h1>${h}</h1>${p?`<p>${p}</p>`:''}</div>${right?`<div class="actions">${right}</div>`:''}</div>`;
+function toast(t){const el=document.createElement('div');el.className='toast';el.setAttribute('role','status');el.innerHTML=ic('check')+esc(t);document.body.append(el);setTimeout(()=>el.remove(),2600)}
+function dialog(html,onOk){const d=$('#dlg');d.innerHTML=html;d.showModal();d.querySelector('[data-cancel]')?.addEventListener('click',()=>d.close());const f=d.querySelector('form');f?.addEventListener('submit',e=>{e.preventDefault();if(onOk(new FormData(f))!==false)d.close()})}
+function drawer(title,body){$('#layer').innerHTML=`<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="dh"><h3 style="margin:0;font:700 17px var(--f-display)">${esc(title)}</h3><button class="ibtn" data-close aria-label="Schliessen">${ic('x')}</button></div><div class="db">${body}</div></aside>`;$('#layer').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$('#layer').innerHTML='')}
+
+/* ---------- Ansichten ---------- */
+const V={};
+
+V.uebersicht=()=>{
+ const korb=korbSichtbar().length, fehler=KORB.filter(k=>/FEHLER/.test(k.st)).length;
+ const kpis=[
+  {t:'Im Eingangskorb',v:korb,i:'inbox',h:'eingangskorb',tr:'2 davon mit unsicheren Feldern',hl:true,need:darf('A5')||darf('A5e')},
+  {t:'Erfasst diese Woche',v:23,i:'upload',tr:'<b>+18 %</b> ggü. Vorwoche',up:true},
+  {t:'Archiviert 2026',v:"1'284",i:'lock',h:'suche',tr:'<b>+96</b> im November'},
+  {t:'Braucht Aufmerksamkeit',v:fehler,i:'alert',h:'eingangskorb',tr:'Verarbeitung oder Archivierung',need:darf('A5')},
+ ].filter(k=>k.need!==false);
+ const M=S.year===2026?[62,71,148,96,88,104,77,69,121,133,118]:[41,55,97,63,70,66,52,48,88,92,81,104];
+ return ph('Mittwoch, 20. November 2026','Guten Morgen, '+ROLLEN[S.rolle].name.split(' ')[0],'Was seit gestern ins Archiv gekommen ist und was noch auf dich wartet.',
+   (darf('A1')?`<a class="btn" href="#erfassen">${ic('camera')}Erfassen</a>`:'')+`<a class="btn dark" href="#chat">${ic('spark')}Archiv fragen</a>`)+
+ `<div class="grid g4" style="grid-template-columns:repeat(${Math.min(4,kpis.length)},minmax(0,1fr))">${kpis.map(k=>`<${k.h?`a href="#${k.h}"`:'div'} class="card kpi${k.hl?' hl':''}"><div class="k-h"><span class="ic">${ic(k.i)}</span>${k.t}</div><div class="v">${k.v}</div><div class="trend">${k.up?ic('trend'):''}${k.tr}</div></${k.h?'a':'div'}>`).join('')}</div>
+ <div class="card" style="margin-top:16px"><div class="card-h"><h3>Lebenszyklus der Dokumente</h3><span class="muted" style="font-size:12px">Stand heute 08:15</span></div><div class="card-b"><div class="flow">
+  ${[['NEU',1],['VERARBEITUNG',2],['EINGANGSKORB',korb,1],['ARCHIVIERUNG',1],['ARCHIVIERT',"1'284"]].map(([s,n,now])=>`<div class="${now?'now':''}"><b>${n}</b><span>${s}</span></div>`).join('')}
+ </div></div></div>
+ <div class="grid g-dash" style="margin-top:16px">
+  <div class="card"><div class="card-h"><h3>Erfasste Dokumente</h3><div class="seg" role="group" aria-label="Jahr">${[2026,2025].map(y=>`<button data-year="${y}" aria-pressed="${S.year===y}">${y}</button>`).join('')}</div></div>
+   <div class="card-b"><div class="chart" id="area">${area(M)}</div></div></div>
+  <div class="card"><div class="card-h"><h3>Bestand nach Dokumentart</h3><span class="muted" style="font-size:12px">Dokumente</span></div>
+   <div class="card-b"><div class="bars">${ARTEN.slice(0,11).sort((a,b)=>b.n-a.n).map(a=>`<div class="bar" title="${a.name}: ${a.n} Dokumente"><span class="l">${a.name}</span><span><span class="t" style="display:block;width:${a.n/388*100}%"></span></span><span class="n">${a.n}</span></div>`).join('')}</div></div></div>
+ </div>
+ <div class="grid g2" style="margin-top:16px">
+  <div class="card"><div class="card-h"><h3>Fristen und Fälligkeiten</h3><a class="btn sm ghost" href="#chat">Im Chat fragen</a></div><div class="card-b list">
+   ${[['clock','Offerte SC Buochs läuft ab','O-2026-012 · gültig bis 03.12.2026','in 13 Tagen','warn'],['doc','Lohndeklaration UVG einreichen','Suva · fällig bis 31.01.2027','in 72 Tagen',''],['box','Jahresexport 2026 für den Treuhänder','Geschäftsjahr endet am 31.12.2026','ab 01.01.2027',''],['lock','Erste Aufbewahrungsfrist läuft ab','Belege 2025 · aufbewahren bis 31.12.2035','2035','']].map(([i,t,s,w,c])=>`<div class="li"><span class="ic">${ic(i)}</span><span class="tx"><b>${t}</b><small>${s}</small></span><span class="pill ${c}">${w}</span></div>`).join('')}
+  </div></div>
+  <div class="card"><div class="card-h"><h3>Zuletzt archiviert</h3><a class="btn sm ghost" href="#suche">Alle anzeigen</a></div><div class="card-b list">
+   ${DOCS.filter(d=>d.st==='ARCHIVIERT'&&sichtbar(d)).slice(0,5).map(d=>`<a class="li" style="text-decoration:none" href="#dokument" data-doc="${d.id}"><span class="ic">${ic('doc')}</span><span class="tx"><b>${esc(d.titel)}</b><small>${d.art} · ${esc(d.partner)} · ${d.datum}</small></span><span class="num" style="font-weight:600;white-space:nowrap">${d.betrag!=null?chf(d.betrag):''}</span></a>`).join('')}
+  </div></div>
+ </div>`;
+};
+function area(M){
+ const W=600,H=220,L=36,B=26,T=10,mx=160,n=12,x=i=>L+i*(W-L-8)/(n-1),y=v=>T+(H-T-B)*(1-v/mx);
+ const mon=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+ const pts=M.map((v,i)=>[x(i),y(v)]);
+ const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+ const last=pts[pts.length-1];
+ return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Erfasste Dokumente pro Monat ${S.year}, höchster Wert ${Math.max(...M)} im ${mon[M.indexOf(Math.max(...M))]}">
+  <defs><linearGradient id="ag" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".38"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+  ${[0,40,80,120,160].map(v=>`<line class="gl" x1="${L}" x2="${W-4}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L-8}" y="${y(v)+4}" text-anchor="end">${v}</text>`).join('')}
+  ${mon.map((m,i)=>`<text class="ax" x="${x(i)}" y="${H-6}" text-anchor="middle">${m}</text>`).join('')}
+  <path d="${line} L${last[0]} ${y(0)} L${L} ${y(0)} Z" fill="url(#ag)"/>
+  <path d="${line}" fill="none" stroke="var(--chart)" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="${last[0]}" cy="${last[1]}" r="5" fill="var(--chart)" stroke="var(--surface)" stroke-width="2"/>
+  <g id="hov" style="display:none"><line id="hl" y1="${T}" y2="${y(0)}" stroke="var(--muted)" stroke-dasharray="3 3"/><circle id="hc" r="5" fill="var(--surface)" stroke="var(--chart)" stroke-width="2"/></g>
+  <rect id="hit" x="${L}" y="0" width="${W-L}" height="${H-B}" fill="transparent"/>
+ </svg><div class="tip" id="tip" hidden></div>`;
+}
+function bindArea(){
+ const host=$('#area');if(!host)return;const svg=host.querySelector('svg'),hit=host.querySelector('#hit'),tip=host.querySelector('#tip');
+ const M=S.year===2026?[62,71,148,96,88,104,77,69,121,133,118]:[41,55,97,63,70,66,52,48,88,92,81,104];
+ const mon=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+ const W=600,H=220,L=36,B=26,T=10,x=i=>L+i*(W-L-8)/11,y=v=>T+(H-T-B)*(1-v/160);
+ const show=e=>{const r=svg.getBoundingClientRect(),vx=(e.clientX-r.left)/r.width*W;let i=Math.round((vx-L)/((W-L-8)/11));i=Math.max(0,Math.min(M.length-1,i));
+  svg.querySelector('#hov').style.display='';svg.querySelector('#hl').setAttribute('x1',x(i));svg.querySelector('#hl').setAttribute('x2',x(i));const c=svg.querySelector('#hc');c.setAttribute('cx',x(i));c.setAttribute('cy',y(M[i]));
+  tip.hidden=false;tip.style.left=(x(i)/W*r.width)+'px';tip.style.top=(y(M[i])/H*r.height-8)+'px';tip.innerHTML=`${mon[i]} ${S.year}${S.year===2026&&i===10?' (bis 20.11.)':''}<b>${M[i]}</b>Dokumente erfasst`};
+ hit.addEventListener('pointermove',show);hit.addEventListener('pointerleave',()=>{tip.hidden=true;svg.querySelector('#hov').style.display='none'});
+}
+
+V.eingangskorb=()=>{
+ const k=korbSichtbar();
+ const note=!darf('A5')?`<div class="role-note">${ic('eye')}<span>Als <b>Mitarbeiter</b> siehst du nur selbst erfasste Dokumente. Bestätigen und Verwerfen ist dem Inhaber vorbehalten.</span></div>`:'';
+ return ph('Prüfen und bestätigen','Eingangskorb',`${k.length} Dokumente warten · neueste zuerst · unsichere Vorschläge sind gelb markiert`,`<a class="btn" href="#erfassen">${ic('plus')}Dokument erfassen</a>`)+note+
+ (k.length?`<div class="korb">${k.map(korbKarte).join('')}</div>`:`<div class="card empty">${ic('check')}<p>Der Eingangskorb ist leer. Neue Dokumente erscheinen hier, sobald sie verarbeitet sind.</p></div>`);
+};
+function korbKarte(k){
+ const kann=darf('A7');
+ const titel=titelOder(k.titel,k.dn);
+ let body='';
+ if(k.st==='FEHLER') body=`<div class="hint crit">${ic('alert')}<span class="tx"><b>Verarbeitung fehlgeschlagen.</b> ${esc(k.fehler)}</span></div><div class="actions">${kann?`<button class="btn pri" data-act="wiederholen" data-id="${k.id}">${ic('refresh')}Erneut verarbeiten</button><button class="btn danger" data-act="verwerfen" data-id="${k.id}">Verwerfen</button>`:''}</div>`;
+ else if(k.st==='ARCHIVIERUNG_FEHLER') body=`<div class="hint crit">${ic('alert')}<span class="tx"><b>Archivierung fehlgeschlagen.</b> ${esc(k.fehler)}</span></div><div class="actions">${kann?`<button class="btn pri" data-act="archwdh" data-id="${k.id}">${ic('refresh')}Archivierung wiederholen</button>`:''}</div>`;
+ else{
+  const uns=k.f.filter(f=>f[2]<.8).length;
+  body=`<div class="vorschlag">${k.f.map(([l,v,c])=>`<div class="vf${c<.8?' u':''}"><div class="lbl"><span>${l}</span><span class="konf" title="Sicherheit des KI-Vorschlags">${Math.round(c*100)} %</span></div><div class="val">${esc(v)}</div></div>`).join('')}</div>
+  ${k.dup?`<div class="hint warn">${ic('alert')}<span class="tx"><b>Mögliche Doppelerfassung.</b> Ein Dokument mit gleicher Belegnummer, gleichem Partner und gleicher Art liegt schon im Archiv: <a href="#dokument" data-doc="${k.dup}">D-${k.dup}</a>. Du kannst trotzdem bestätigen.</span></div>`:''}
+  ${k.abgelaufen?`<div class="hint warn">${ic('clock')}<span class="tx"><b>Frist abgelaufen.</b> Aufbewahren bis ${k.abgelaufen} liegt schon zurück (Altbestand). Entscheide, ob das Dokument trotzdem archiviert oder verworfen wird.</span></div>`:''}
+  <div class="actions">${kann?`<button class="btn pri" data-act="bestaetigen" data-id="${k.id}">${ic('check')}Bestätigen</button><button class="btn" data-act="pruefen" data-id="${k.id}">${ic('edit')}Prüfen und ändern</button><button class="btn ghost danger" data-act="verwerfen" data-id="${k.id}">Verwerfen</button>`:'<span class="muted">Wartet auf Bestätigung durch den Inhaber.</span>'}
+   ${uns?`<span class="pill warn" style="margin-left:auto">${uns} unsichere${uns>1?'':'s'} Feld${uns>1?'er':''}</span>`:`<span class="pill ok" style="margin-left:auto">${ic('spark')}Vorschlag vollständig</span>`}</div>`;
+ }
+ return `<article class="card kk${/FEHLER/.test(k.st)?' fehler':''}"><div class="thumb${k.st==='FEHLER'?' err':''}" aria-hidden="true"><i class="h"></i><i class="s"></i><i></i><i class="m"></i><i></i><i class="m"></i><i class="s"></i><i></i><i class="y"></i></div>
+ <div style="min-width:0"><div class="kk-h"><div><h3>${titel}</h3><div class="kk-meta">${stPill(k.st)}<span class="pill">${ic('clock')}${esc(k.erf)}</span><span class="pill mono">D-${k.id}</span></div></div></div>${body}</div></article>`;
+}
+
+V.erfassen=()=>ph('Papier und digitale Belege','Erfassen','Jedes Dokument wird einmal erfasst, in PDF/A umgewandelt, per Texterkennung gelesen und landet mit KI-Vorschlag im Eingangskorb.')+
+ `<div class="grid g-dash"><div style="display:grid;gap:16px;min-width:0">
+  <label class="drop" id="drop" for="file"><span class="big">${ic('upload')}</span><b style="font-size:16px">Dateien hierher ziehen oder auswählen</b><span class="muted">PDF, JPG, PNG, HEIC, DOCX · bis 50 MB je Datei · mehrere Seiten werden zu einem Dokument</span><input type="file" id="file" multiple hidden></label>
+  <div class="card"><div class="card-h"><h3>Warteschlange</h3><span class="muted" style="font-size:12px">wird auch offline gehalten</span></div><div class="card-b list" id="queue">
+   ${[['IMG_4510.jpg','Handy · vor 3 Min.',100,'Im Eingangskorb'],['Scan_2026-11-20_0812.pdf','Handy · vor 9 Min.',70,'Texterkennung läuft']].map(q=>queueRow(...q)).join('')}
+  </div></div></div>
+  <div style="display:grid;gap:16px;align-content:start;min-width:0">
+   <div class="card"><div class="card-b" style="display:grid;gap:10px"><div class="k-h" style="display:flex;gap:10px;align-items:center;font-weight:600">${ic('camera')}Mit dem Handy fotografieren</div><p class="muted" style="margin:0">Die Web-App lässt sich auf iPhone und Android installieren. Post und Quittungen direkt fotografieren, Ränder werden automatisch zugeschnitten.</p><div class="actions"><button class="btn pri" data-act="kamera">${ic('camera')}Kamera öffnen</button></div></div></div>
+   <div class="card"><div class="card-b" style="display:grid;gap:10px"><div style="display:flex;gap:10px;align-items:center;font-weight:600">${ic('mail')}Per E-Mail weiterleiten</div><p class="muted" style="margin:0">Rechnungen als Anhang an diese Adresse senden. Absender müssen freigeschaltet sein.</p><div class="actions"><code class="mono" style="padding:8px 10px;background:var(--surface-2);border-radius:8px;user-select:all">archiv@urinet.ch</code><button class="btn sm" id="copymail">${ic('copy')}Kopieren</button></div></div></div>
+   <div class="card"><div class="card-b" style="display:grid;gap:8px"><div style="display:flex;gap:10px;align-items:center;font-weight:600">${ic('key')}Generatoren</div><p class="muted" style="margin:0">Rechnungen, Offerten und Lohnabrechnungen aus den eigenen Generatoren kommen per API-Token mit fertigen Metadaten.</p></div></div>
+  </div></div>`;
+function queueRow(n,s,p,t){return `<div class="li"><span class="ic">${ic('doc')}</span><span class="tx"><b>${esc(n)}</b><small>${esc(s)} · ${esc(t)}</small><div class="prog" style="margin-top:6px"><i style="width:${p}%"></i></div></span>${p>=100?`<span class="pill ok">${ic('check')}Fertig</span>`:'<span class="pill info">läuft</span>'}</div>`}
+
+V.suche=()=>{
+ const q=S.q.trim().toLowerCase();
+ const base=DOCS.filter(d=>sichtbar(d)&&d.st!=='VERWORFEN');
+ const match=d=>!q||[d.titel,d.partner,d.nr,d.art,d.text,d.dn,...d.tags].join(' ').toLowerCase().includes(q);
+ const pass=(d,skip)=>['art','ri','gj','vt'].every(k=>k===skip||!S.f[k].size||S.f[k].has(String(d[k])));
+ const hits=base.filter(d=>match(d)&&pass(d));
+ const facet=(k,label,vals)=>`<div class="facet"><h4>${label}</h4>${vals.map(v=>{const c=base.filter(d=>match(d)&&pass(d,k)&&String(d[k])===String(v)).length;return `<label><input type="checkbox" data-f="${k}" value="${esc(v)}" ${S.f[k].has(String(v))?'checked':''}>${esc(v==='NORMAL'?'Normal':v==='INTERN'?'Intern':v==='PERSONAL'?'Personal':v)}<span class="c">${c}</span></label>`}).join('')}</div>`;
+ const arten=[...new Set(base.map(d=>d.art))];
+ return ph('Volltext, Metadaten und Bedeutung','Suche',S.modus==='hybrid'?'Hybridsuche: die 30 besten Treffer nach Bedeutung, ohne Gesamtzahl.':'Volltextsuche: alle Treffer mit Gesamtzahl, sortiert nach Relevanz oder Datum.')+
+ `<div class="big-search" style="margin-bottom:18px"><form class="search" id="bigsearch" role="search">${ic('search')}<input id="q" value="${esc(S.q)}" placeholder="z. B. Hostpoint, 2026-041, Offerte SC Buochs" aria-label="Suchbegriff"></form>
+  <div class="seg" role="group" aria-label="Suchmodus"><button data-modus="hybrid" aria-pressed="${S.modus==='hybrid'}">${''}Hybrid</button><button data-modus="volltext" aria-pressed="${S.modus==='volltext'}">Volltext</button></div></div>
+ <div class="s-lay"><div class="card">${facet('art','Dokumentart',arten)}${facet('ri','Richtung',['Eingang','Ausgang'])}${facet('gj','Geschäftsjahr',[2026,2025])}${facet('vt','Vertraulichkeit',['NORMAL','INTERN','PERSONAL'].filter(v=>base.some(d=>d.vt===v)))}
+   <div class="facet"><h4>Betrag (CHF)</h4><div style="display:flex;gap:8px"><input class="inp" placeholder="von" aria-label="Betrag von" inputmode="decimal"><input class="inp" placeholder="bis" aria-label="Betrag bis" inputmode="decimal"></div></div></div>
+  <div class="card" style="min-width:0"><div class="card-h" style="padding-bottom:12px;border-bottom:1px solid var(--line)"><span class="muted" style="font-size:13px">${S.modus==='volltext'?`<b style="color:var(--fg)">${hits.length}</b> Treffer`:'Beste Treffer'}${q?` für «${esc(S.q)}»`:''}</span>${S.modus==='volltext'?'<div class="seg"><button aria-pressed="true">Relevanz</button><button aria-pressed="false">Datum</button></div>':''}</div>
+  ${hits.length?hits.map(d=>`<div class="hit" data-doc="${d.id}" tabindex="0" role="link"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><h3>${d.titel?hl(d.titel,q):titelOder('',d.dn)}</h3><span class="num" style="font-weight:600">${d.betrag!=null?chf(d.betrag):''}</span></div>
+   <div class="kk-meta" style="margin:0"><span class="pill">${d.art}</span><span class="pill">${hl(d.partner||'Partner offen',q)}</span>${d.nr?`<span class="pill mono">${hl(d.nr,q)}</span>`:''}<span class="pill">${d.datum||'–'}</span>${vtPill(d.vt)}${d.st!=='ARCHIVIERT'?stPill(d.st):''}</div>
+   ${d.text?`<p>… ${hl(d.text,q)} …</p>`:''}</div>`).join(''):`<div class="empty">Keine Treffer. Prüfe die Schreibweise oder entferne einen Filter.</div>`}
+  </div></div>`;
+};
+function hl(t,q){const s=esc(t);if(!q)return s;const i=s.toLowerCase().indexOf(esc(q));return i<0?s:s.slice(0,i)+'<mark>'+s.slice(i,i+esc(q).length)+'</mark>'+s.slice(i+esc(q).length)}
+
+V.dokument=()=>{
+ const d=DOCS.find(x=>x.id===S.docId)||DOCS[1];
+ if(!sichtbar(d))return ph('Dokument','Nicht gefunden','Dieses Dokument gibt es nicht oder du darfst es nicht sehen.',`<a class="btn" href="#suche">Zur Suche</a>`);
+ const sha='9f2c4e81b07a3d55e6c1a9b4f0d27e8c3b5a6d9e1f4c7b2a8e0d3c6f9a1b4e7d';
+ const tabs={meta:'Metadaten',versionen:'Versionen',protokoll:'Zugriffe'};
+ let tb='';
+ if(S.tab==='meta')tb=`<dl class="kv"><dt>Dokumentart</dt><dd>${d.art}</dd><dt>Partner</dt><dd>${esc(d.partner)}</dd><dt>Belegdatum</dt><dd>${d.datum}</dd>${d.nr?`<dt>Belegnummer</dt><dd class="mono">${d.nr}</dd>`:''}<dt>Richtung</dt><dd>${d.ri}</dd><dt>Betrag</dt><dd class="num">${chf(d.betrag)}</dd>${d.gueltig?`<dt>Gültig bis</dt><dd>${d.gueltig} <span class="pill warn">in 13 Tagen</span></dd>`:''}<dt>Geschäftsjahr</dt><dd>${d.gj}</dd><dt>Vertraulichkeit</dt><dd>${vtPill(d.vt)}</dd><dt>Tags</dt><dd class="chips">${d.tags.map(t=>`<span class="pill">${esc(t)}</span>`).join('')}</dd><dt>Dateiname</dt><dd class="mono">${esc(d.dn)}</dd><dt>Erfasst über</dt><dd>${d.erf}</dd></dl>`;
+ if(S.tab==='versionen')tb=`<div class="tl">${[['Version 3','19.11.2026 17:20 · Fabian Aschwanden','Tags ergänzt: «Sponsoring»'],['Version 2','03.11.2026 14:02 · Fabian Aschwanden','Bestätigt · aufbewahren bis 31.12.2036 berechnet'],['Version 1','03.11.2026 14:01 · Generator','Erfasst mit Metadaten aus dem Offerten-Generator']].map(([a,b,c])=>`<div class="e"><i></i><div><b>${a}</b> <span class="muted">· ${b}</span><div>${c}</div></div></div>`).join('')}</div>`;
+ if(S.tab==='protokoll')tb=`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Zeit</th><th>Benutzer</th><th>Aktion</th></tr></thead><tbody>${[['20.11.2026 08:14','Fabian Aschwanden','ANZEIGEN'],['19.11.2026 17:20','Fabian Aschwanden','AENDERN'],['04.11.2026 09:31','Treuhand Muster AG','HERUNTERLADEN'],['03.11.2026 14:02','Fabian Aschwanden','BESTAETIGEN']].map(r=>`<tr><td class="num">${r[0]}</td><td>${r[1]}</td><td class="mono">${r[2]}</td></tr>`).join('')}</tbody></table></div>`;
+ return ph(`<a href="#suche" style="text-decoration:none">← Suche</a> · D-${d.id}`,esc(d.titel)||titelOder('',d.dn),`${d.art} · ${esc(d.partner)}`,`${stPill(d.st)}<button class="btn" id="dlbtn">${ic('dl')}PDF/A herunterladen</button>${darf('A6')?`<button class="btn pri" id="editbtn">${ic('edit')}Metadaten ändern</button>`:''}`)+
+ `<div class="doc-lay"><div class="paper" aria-label="Vorschau der PDF/A-Fassung"><div class="p-h"><span class="p-logo"><i></i>UriNet</span><span style="text-align:right;color:#666;font-size:10px">Urinet Aschwanden<br>6462 Seedorf UR</span></div>
+   <div><div style="color:#666;font-size:10px">${esc(d.partner)}</div><h4>${esc(d.art)} ${esc(d.nr)}</h4><div style="color:#666">${d.datum}</div></div>
+   <p style="margin:0;line-height:1.6">${esc(d.text)}</p>
+   ${d.betrag!=null?`<table><tr><td>Leistung gemäss Beschrieb</td><td style="text-align:right">${chf(d.betrag)}</td></tr><tr><td>MWST</td><td style="text-align:right">nicht MWST-pflichtig</td></tr><tr><td class="tot">Total</td><td class="tot" style="text-align:right">${chf(d.betrag)}</td></tr></table>`:''}
+   <div class="qr"><i></i><span>Seite 1 von 1 · PDF/A-2b · Text erkannt</span></div></div>
+  <div style="display:grid;gap:16px;min-width:0">
+   <div class="card"><div class="tabs" role="tablist">${Object.entries(tabs).map(([k,t])=>`<button role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${t}</button>`).join('')}</div><div class="card-b">${tb}</div></div>
+   <div class="card"><div class="card-h"><h3>Unveränderbare Ablage</h3><span class="pill ok">${ic('shield')}GeBüV</span></div><div class="card-b"><div class="integ">
+    <div>${ic('lock')}<span>Gesperrt bis <b>${d.bis}</b> (Object Lock, Compliance)</span></div>
+    <div>${ic('clock')}<span>Aufbewahren bis <b>${d.bis}</b> · Regel: 10 Jahre ab Ende Geschäftsjahr</span></div>
+    <div>${ic('check')}<span class="muted">SHA-256</span><span class="mono" title="${sha}">${sha}</span></div>
+    <div>${ic('doc')}<span>Im Manifest vom 03.11.2026 enthalten</span></div></div></div></div>
+   ${d.id===2598?`<div class="card"><div class="card-h"><h3>In der Wissensbasis verwendet</h3></div><div class="card-b chips"><a class="chip wiki" href="#wissen">${ic('book')}konzepte/offerten-gueltigkeit</a><a class="chip wiki" href="#wissen">${ic('book')}analysen/umsatz-vereine</a></div></div>`:''}
+  </div></div>`;
+};
+
+const CHATS=[
+ {t:'Offerte SC Buochs',d:'heute 08:10',m:[
+  {me:'Was haben wir dem SC Buochs offeriert, und gilt die Offerte noch?'},
+  {tool:'suche Offerten für «SC Buochs» …'},
+  {ai:'Am <b>03.11.2026</b> hast du dem SC Buochs eine Sponsoring-Plattform mit Sponsorenliste und Live-Stand offeriert, für <b>CHF 4\'200.00</b> (Offerte O-2026-012). Die Offerte ist <b>gültig bis 03.12.2026</b>, also noch 13 Tage. Eine Auftragsbestätigung oder Rechnung dazu habe ich nicht gefunden.',q:[['doc','O-2026-012 · Offerte Sponsoring-Plattform',2598],['wiki','konzepte/offerten-gueltigkeit']]}]},
+ {t:'Letzte Rechnung FC Schattdorf',d:'gestern',m:[{me:'Zeig mir die letzte Rechnung an den FC Schattdorf.'},{tool:'suche Rechnungen an «FC Schattdorf» …'},{ai:'Die letzte Rechnung an den FC Schattdorf ist <b>2026-041</b> vom <b>14.11.2026</b> über <b>CHF 1\'850.00</b> für Webauftritt, Pflege und Hosting 2027. Ob sie bezahlt ist, weiss das Archiv nicht; der Zahlstatus wird in AbaNinja geführt.',q:[['doc','2026-041 · Rechnung Webauftritt Vereinsseite',2611],['doc','2025-038 · Rechnung Webauftritt 2025',2399]]}]},
+ {t:'UVG-Prämie und Lohndeklaration',d:'18.11.2026',m:[]},
+ {t:'Arbeitsvertrag Joel',d:'15.11.2026',m:[]},
+ {t:'Fehlende Belege Abschluss 2026',d:'12.11.2026',m:[]},
+ {t:'Einnahmen pro Kunde 2024–2026',d:'10.11.2026',m:[]},
+];
+const BEISPIELE=['Welche Belege fehlen noch für den Abschluss 2026?','Wie hoch ist die UVG-Prämie und wann ist die Lohndeklaration fällig?','Wie viel habe ich in den letzten drei Jahren eingenommen – pro Jahr und pro Kunde?'];
+V.chat=()=>{
+ const c=CHATS[S.chatId];
+ return `<div class="chat-lay"><div class="card conv" aria-label="Letzte Gespräche"><button class="btn sm pri" id="newchat" style="width:100%;justify-content:center;margin-bottom:8px;display:flex">${ic('plus')}Neues Gespräch</button>
+  ${CHATS.map((x,i)=>`<button data-chat="${i}" aria-current="${i===S.chatId}">${esc(x.t)}<small>${x.d}</small></button>`).join('')}</div>
+  <div class="card thread"><div class="card-h" style="padding-bottom:14px;border-bottom:1px solid var(--line)"><h3>${esc(c.t)}</h3><span class="muted" style="font-size:12px">${ic('lock')} Nur lesende Werkzeuge · Antworten immer mit Quelle</span></div>
+  <div class="msgs" id="msgs" aria-live="polite">${c.m.length?c.m.map(msgHtml).join(''):`<div class="empty">${ic('spark')}<p>Frag das Archiv in eigenen Worten. Jede Antwort nennt die Dokumente oder Wissensseiten, auf die sie sich stützt.</p></div>`}</div>
+  <div class="composer"><div class="beispiele">${BEISPIELE.map(b=>`<button data-ask="${esc(b)}">${esc(b)}</button>`).join('')}</div>
+  <form id="chatform"><input class="inp" id="chatq" placeholder="Frage an das Archiv …" aria-label="Frage an das Archiv" autocomplete="off"><button class="btn pri" style="height:44px">${ic('send')}Senden</button></form></div></div></div>`;
+};
+function msgHtml(m){
+ if(m.me)return `<div class="msg me">${esc(m.me)}</div>`;
+ if(m.tool)return `<div class="tool">${m.busy?'<span class="spin"></span>':ic('check')}${esc(m.tool)}</div>`;
+ return `<div class="msg ai"><div class="body">${m.ai}</div>${m.q?`<div class="chips"><span class="muted" style="font-size:12px;align-self:center">Quellen</span>${m.q.map(([t,l,id])=>t==='doc'?`<a class="chip" href="#dokument" data-doc="${id}">${ic('doc')}${esc(l)}</a>`:`<a class="chip wiki" href="#wissen">${ic('book')}${esc(l)}</a>`).join('')}</div>`:''}${darf('A17')&&m.q?'<div><button class="btn sm ghost" data-act="analyse">'+ic('book')+'Als Analyse vorschlagen</button></div>':''}</div>`;
+}
+const ANTWORTEN={
+ 'Welche Belege fehlen noch für den Abschluss 2026?':{tool:'prüfe Vollständigkeit Geschäftsjahr 2026 …',ai:'Für 2026 fehlen nach den wiederkehrenden Belegen noch: <b>Kontoauszug November</b> (Urner Kantonalbank, erwartet Anfang Dezember), <b>Lohnabrechnung November</b> und die <b>Infomaniak-Rechnung November</b>, die noch im Eingangskorb liegt. Alle anderen Monate sind vollständig.',q:[['doc','Kontoauszug Oktober 2026',2601],['doc','Lohnabrechnung Oktober 2026',2580]]},
+ 'Wie hoch ist die UVG-Prämie und wann ist die Lohndeklaration fällig?':{tool:'suche Versicherung «UVG» …',ai:'Die UVG-Prämie 2026 beträgt <b>CHF 318.60</b>. Die Lohndeklaration ist <b>bis 31.01.2027</b> bei der Suva einzureichen.',q:[['doc','Police Unfallversicherung UVG 2026',2490],['wiki','akteure/suva']]},
+ 'Wie viel habe ich in den letzten drei Jahren eingenommen – pro Jahr und pro Kunde?':{tool:'berechne Kennzahl Einnahmen 2024–2026 …',ai:'Aus den archivierten Ausgangsrechnungen (Beispieldaten): <b>2024</b> CHF 38\'420.00, <b>2025</b> CHF 46\'915.00, <b>2026</b> bisher CHF 52\'180.00. Grösster Kunde über alle drei Jahre ist der FC Schattdorf. Ob die Rechnungen bezahlt sind, weiss das Archiv nicht.',q:[['doc','2026-041 · Rechnung Webauftritt Vereinsseite',2611],['wiki','analysen/umsatz-vereine']]},
+};
+function ask(q){
+ if(!q.trim())return;const c=CHATS[S.chatId];
+ if(!c.m.length)c.t=q.length>34?q.slice(0,32)+' …':q;
+ const a=ANTWORTEN[q]||{tool:'suche im Archiv nach «'+q.slice(0,40)+'» …',ai:'Dazu habe ich im Archiv nichts Sicheres gefunden. Ich antworte nur mit Belegen als Quelle, deshalb lasse ich die Frage offen. Versuch es mit einem Partner, einer Belegnummer oder einem Zeitraum.'};
+ c.m.push({me:q});const t={tool:a.tool,busy:true};c.m.push(t);render();
+ setTimeout(()=>{t.busy=false;const msg={ai:'',q:null};c.m.push(msg);let i=0;const words=a.ai.split(' ');
+  const tick=setInterval(()=>{i+=3;msg.ai=words.slice(0,i).join(' ');if(i>=words.length){clearInterval(tick);msg.ai=a.ai;msg.q=a.q}const box=$('#msgs');if(box&&S.view==='chat'&&CHATS[S.chatId]===c){box.innerHTML=c.m.map(msgHtml).join('');box.scrollTop=box.scrollHeight}},45)},900);
+}
+
+V.kontakte=()=>{
+ const q=S.kq.toLowerCase();
+ const list=KONTAKTE.filter(k=>(S.kf==='alle'||(S.kf==='aktiv')===k.aktiv)&&(!q||[k.name,k.ort,k.mail,k.crm].join(' ').toLowerCase().includes(q)));
+ return ph('Aus 21.CRM und manuell erfasst','Kontakte',`${list.length} Kontakte · inaktive erscheinen nicht in der Partnerauswahl`,darf('A12')?`<a class="btn" href="#importe">${ic('imp')}CSV importieren</a>`:'')+
+ `<div class="card"><div class="card-h" style="padding-bottom:14px"><form class="search" id="kform" style="max-width:360px" role="search">${ic('search')}<input id="kq" value="${esc(S.kq)}" placeholder="Name, Ort, E-Mail, CRM-ID" aria-label="Kontakte durchsuchen"></form>
+  <div class="seg" role="group" aria-label="Status">${['aktiv','inaktiv','alle'].map(f=>`<button data-kf="${f}" aria-pressed="${S.kf===f}">${f[0].toUpperCase()+f.slice(1)}</button>`).join('')}</div></div>
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Typ</th><th>Ort</th><th>CRM-ID</th><th>Herkunft</th><th class="r">Dokumente</th><th></th></tr></thead><tbody>
+  ${list.map(k=>`<tr class="click" data-kontakt="${k.id}" tabindex="0"><td><b>${esc(k.name)}</b></td><td>${k.typ}</td><td>${esc(k.ort)}</td><td class="mono">${k.crm||'–'}</td><td>${k.herk}</td><td class="r num">${k.docs}</td><td>${!k.aktiv?`<span class="pill">${k.merged?'zusammengeführt':'inaktiv'}</span>`:k.fehlt?'<span class="pill warn">nicht mehr im CRM-Export</span>':''}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Kein Kontakt gefunden.</td></tr>'}
+  </tbody></table></div></div>`;
+};
+function kontaktDetail(id){
+ const k=KONTAKTE.find(x=>x.id===id);
+ const docs=DOCS.filter(d=>d.partner===k.name&&sichtbar(d));
+ drawer(k.name,`<dl class="kv"><dt>Typ</dt><dd>${k.typ}</dd><dt>Adresse</dt><dd>${esc(k.str)}, ${esc(k.ort)}</dd><dt>E-Mail</dt><dd>${esc(k.mail||'–')}</dd><dt>Telefon</dt><dd>${esc(k.tel||'–')}</dd><dt>Kontakt-ID 21.CRM</dt><dd class="mono">${k.crm||'–'}</dd><dt>Herkunft</dt><dd>${k.herk}</dd><dt>Status</dt><dd>${k.aktiv?'<span class="pill ok">aktiv</span>':`<span class="pill">inaktiv${k.merged?' · zusammengeführt in '+esc(k.merged):''}</span>`}</dd></dl>
+ ${darf('A12')&&k.aktiv?`<div class="actions"><button class="btn" data-act="kmerge" data-id="${k.id}">${ic('merge')}Zusammenführen</button><button class="btn ghost danger" data-act="kinaktiv" data-id="${k.id}">Als inaktiv markieren</button></div>`:''}
+ <div><div class="lbl" style="margin-bottom:6px">Dokumente (${docs.length} sichtbar)</div><div class="list">${docs.map(d=>`<a class="li" style="text-decoration:none" href="#dokument" data-doc="${d.id}"><span class="ic">${ic('doc')}</span><span class="tx"><b>${esc(d.titel)}</b><small>${d.art} · ${d.datum}</small></span><span class="num">${d.betrag!=null?chf(d.betrag):''}</span></a>`).join('')||'<p class="muted">Keine Dokumente, die du sehen darfst.</p>'}</div></div>`);
+}
+
+V.wissen=()=>{
+ const pages=WISSEN.filter(w=>!S.wTyp||w.typ===S.wTyp);
+ return ph('Kuratiertes Wissen aus Wissensquellen','Wissen','Seiten nach dem LLM-Wiki-Muster: jede Aussage mit Fussnote auf ein Quelldokument. Änderungen werden erst nach Freigabe wirksam.',darf('A17')?`<button class="btn" data-act="lint">${ic('shield')}Lint starten</button>`:'')+
+ `<div class="grid g-dash">
+  <div style="display:grid;gap:16px;min-width:0">
+  ${darf('A17')?`<div class="card"><div class="card-h"><h3>Entwurf zur Freigabe</h3><span class="pill acc">Ingest · Handbuch Lohn 2026</span></div><div class="card-b" style="display:grid;gap:12px">
+   <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>konzepte/spesenregelung</b><span class="muted" style="font-size:12px">Änderung 1 von 3</span></div>
+   <div class="diff"><div class="ctx">## Pauschalen</div><div class="del">Verpflegung auswärts: CHF 25.00 pro Tag.[^1]</div><div class="add">Verpflegung auswärts: CHF 30.00 pro Tag, ab 01.01.2027.[^2]</div><div class="ctx">Kilometer mit Privatauto: CHF 0.70.[^1]</div><div class="add">&gt; ⚠️ Widerspruch: Das Spesenreglement 2024 nennt CHF 25.00.[^1] Das Handbuch Lohn 2026 nennt CHF 30.00.[^2]</div></div>
+   <div class="actions"><button class="btn pri" data-act="wannehmen">${ic('check')}Annehmen</button><button class="btn">${ic('edit')}Ändern</button><button class="btn ghost danger" data-act="wverwerfen">Verwerfen</button></div></div></div>`:''}
+  <div class="card"><div class="card-h" style="padding-bottom:12px"><h3>Seiten</h3><select class="inp" id="wtyp" style="width:auto;height:34px" aria-label="Seitentyp"><option value="">Alle Seitentypen</option>${['Synthese','Konzept','Akteur','Projekt','Quelle','Analyse'].map(t=>`<option ${S.wTyp===t?'selected':''}>${t}</option>`).join('')}</select></div>
+   <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Seite</th><th>Typ</th><th class="r">Quellen</th><th>Stand</th></tr></thead><tbody>${pages.map(w=>`<tr class="click"><td><b>${w.t}</b><div class="mono muted">${w.p}</div></td><td><span class="pill">${w.typ}</span></td><td class="r num">${w.q}</td><td class="num">${w.d}</td></tr>`).join('')}</tbody></table></div></div>
+  </div>
+  <div class="card" style="align-self:start"><div class="card-h"><h3>Änderungslog</h3></div><div class="card-b list">
+   ${[['INGEST','Handbuch Lohn 2026','3 Änderungen als Entwurf','heute 07:30'],['FREIGABE','projekte/vhf-gsk','Version 4 · Fabian Aschwanden','19.11.2026'],['LINT','Wissensbasis','2 Widersprüche · 1 veraltete Seite · 0 Waisen','16.11.2026'],['ABFRAGE','analysen/umsatz-vereine','aus dem Chat als Analyse übernommen','16.11.2026'],['INGEST','Reglement Spesen 2024','erledigt · 2 Seiten','14.11.2026']].map(([a,t,s,d])=>`<div class="li"><span class="pill mono acc" style="min-width:76px;justify-content:center">${a}</span><span class="tx"><b>${t}</b><small>${s} · ${d}</small></span></div>`).join('')}
+  </div></div></div>`;
+};
+
+/* Seite /hilfe (Spec 07, Aufgabe 22.2): ganze Anleitung der Rolle mit Inhaltsverzeichnis und Sprungmarken. Erreichbar
+   über #hilfe; den Knopf «Hilfe» in der Kopfzeile bringt Aufgabe 22.3. Alle Texte sind erfundene Beispiele. */
+const HILFE=[
+ {a:'erste-schritte',t:'Erste Schritte'},
+ {a:'erfassen',t:'Erfassen',need:()=>darf('A1'),u:[{a:'erfassen-offline',t:'Ohne Netz erfassen'}]},
+ {a:'eingangskorb',t:'Eingangskorb',need:()=>darf('A5')||darf('A5e')},
+ {a:'suche',t:'Suche'},
+ {a:'jahresexport',t:'Jahresexport',need:()=>darf('EXPORT')},
+ {a:'probleme',t:'Wenn etwas nicht klappt'},
+];
+V.hilfe=()=>{
+ const h=HILFE.filter(x=>!x.need||x.need());
+ const link=x=>`<a href="#hilfe" data-sprung="${x.a}">${esc(x.t)}</a>`;
+ return ph('UriNet Archiv','Hilfe','So bedienen Sie das Archiv, Bereich für Bereich.')+
+ `<div class="hint info" style="max-width:70ch;margin:0 0 16px">${ic('book')}<span class="tx">Sie sind als ‹${esc(ROLLEN[S.rolle].label)}› angemeldet. Diese Anleitung zeigt die Bereiche, die Ihre Rolle nutzen darf.</span></div>
+ <div class="grid g-hilfe">
+  <nav class="card hilfe-toc" aria-labelledby="hilfe-inhalt"><div class="card-h"><h2 id="hilfe-inhalt">Inhalt der Anleitung</h2></div><div class="card-b"><ol>${h.map(x=>`<li>${link(x)}${x.u?`<ol>${x.u.map(u=>`<li>${link(u)}</li>`).join('')}</ol>`:''}</li>`).join('')}</ol></div></nav>
+  <div style="display:grid;gap:16px;min-width:0">${h.map(x=>`<section class="card" aria-labelledby="h-${x.a}"><div class="card-h"><h2 id="h-${x.a}" tabindex="-1">${esc(x.t)}</h2></div><div class="card-b hilfe-text">
+   <p><span class="pill">Beispiel</span> Erfundener Text zum Bereich «${esc(x.t)}»: wozu er dient und was Sie dort tun.</p>
+   <ol><li>Wählen Sie im Menü «${esc(x.t)}».</li><li>Folgen Sie den Knöpfen der Seite.</li></ol>
+   ${(x.u||[]).map(u=>`<h3 id="h-${u.a}" tabindex="-1">${esc(u.t)}</h3><p><span class="pill">Beispiel</span> Erfundener Text zum Unterabschnitt «${esc(u.t)}».</p>`).join('')}
+  </div></section>`).join('')}</div>
+ </div>`;
+};
+
+V.importe=()=>ph('Kontakte aus 21.CRM','Importe','CSV mit Semikolon oder Komma, UTF-8 oder Windows-1252. Trennzeichen und Zeichensatz werden erkannt.',`<label class="btn pri" for="csv">${ic('imp')}CSV hochladen<input type="file" id="csv" accept=".csv" hidden></label>`)+
+ `<div class="card"><div class="card-h"><h3>Vorschau Import vom 20.11.2026</h3><span class="pill acc">wartet auf Übernahme</span></div><div class="card-b" style="display:grid;gap:16px">
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">${[['neu',12,''],['geändert',40,''],['unverändert',310,''],['mögliche Dublette',3,'warn'],['inaktiv',1,''],['fehlerhaft',0,'']].map(([l,n,c])=>`<div class="vf${c?' u':''}"><div class="lbl">${l}</div><div class="val num" style="font:700 22px var(--f-display)">${n}</div></div>`).join('')}</div>
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Zeile</th><th>Kontakt in der Datei</th><th>Mögliche Dublette</th><th>Entscheid</th></tr></thead><tbody>
+   ${[[17,'Skiclub Attinghausen, 6468 Attinghausen','Skiclub Attinghausen (CRM-1188)'],[88,'FC Schattdorf Junioren, 6467 Schattdorf','FC Schattdorf (CRM-1042)'],[203,'Brand Automobile, 6460 Altdorf','Brand Automobile AG (CRM-1210)']].map(([z,a,b])=>`<tr><td class="num">${z}</td><td>${a}</td><td>${b}</td><td><select class="inp" style="height:32px;width:auto" aria-label="Entscheid Zeile ${z}"><option>Mit bestehendem abgleichen</option><option>Als neuen Kontakt anlegen</option><option>Auslassen</option></select></td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="actions"><button class="btn pri" data-act="importok">${ic('check')}362 Zeilen übernehmen</button><button class="btn ghost">Verwerfen</button></div></div></div>
+  <div class="card" style="margin-top:16px"><div class="card-h"><h3>Frühere Läufe</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Datum</th><th>Datei</th><th class="r">Übernommen</th><th>Status</th></tr></thead><tbody>
+  <tr><td>14.11.2026</td><td class="mono">21crm_export_2026-11-14.csv</td><td class="r num">358</td><td><span class="pill ok">abgeschlossen</span></td></tr><tr><td>10.11.2026</td><td class="mono">21crm_test.csv</td><td class="r num">0</td><td><span class="pill">verworfen</span></td></tr></tbody></table></div></div>`;
+
+V.export=()=>ph('Abschluss für den Treuhänder','Jahresexport','Alle archivierten Belege eines Geschäftsjahres als ZIP: PDF/A-Fassungen, Belegliste, Prüfsummen und Manifeste.')+
+ `<div class="grid g-dash"><div class="card"><div class="card-b" style="display:grid;gap:16px">
+  <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap"><div class="field"><label for="gj">Geschäftsjahr</label><select class="inp" id="gj" style="width:160px"><option>2026 (läuft)</option><option selected>2025</option><option>2024</option></select></div><button class="btn pri" id="expbtn">${ic('box')}Export anfordern</button></div>
+  <div id="expstate"></div>
+  <div><div class="lbl" style="margin-bottom:8px">Inhalt des ZIP</div><div class="list">
+   ${[['doc','1\'161 PDF/A-Dateien','<span class="mono">2025-11-18_AUSGANGSRECHNUNG_2025-038_FC-Schattdorf.pdf</span>'],['types','belegliste.csv','ID, Art, Datum, Partner, Belegnummer, Richtung, Betrag, Währung, SHA-256, Dateiname'],['shield','pruefsummen.sha256','eine Zeile je Datei'],['lock','manifeste/','365 tägliche Manifeste des Jahres']].map(([i,t,s])=>`<div class="li"><span class="ic">${ic(i)}</span><span class="tx"><b>${t}</b><small>${s}</small></span></div>`).join('')}
+  </div></div></div></div>
+  <div class="card" style="align-self:start"><div class="card-h"><h3>Bisherige Exporte</h3></div><div class="card-b list">
+   <div class="li"><span class="ic">${ic('box')}</span><span class="tx"><b>Geschäftsjahr 2025</b><small>Treuhand Muster AG · 20.11.2026 08:02 · 1.4 GB</small><div class="mono muted" style="font-size:11px;margin-top:2px">sha256 4be1…c09a</div></span><span class="pill ok">Link 24 h gültig</span></div>
+   <div class="li"><span class="ic">${ic('box')}</span><span class="tx"><b>Geschäftsjahr 2024</b><small>Fabian Aschwanden · 28.02.2026 · 1.1 GB</small></span><span class="pill">abgelaufen</span></div>
+  </div></div></div>`;
+
+V.dokumentarten=()=>ph('Verwaltung','Dokumentarten','Arten, Zusatzfelder und Aufbewahrungsregeln des Mandanten urinet. Eine Art mit Dokumenten lässt sich nur noch deaktivieren.',`<button class="btn pri">${ic('plus')}Neue Dokumentart</button>`)+
+ `<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Code</th><th>Felder</th><th>Pflichtfelder</th><th>Standard</th><th>Aufbewahrung</th><th>Belegnummer</th><th class="r">Dokumente</th></tr></thead><tbody>
+ ${ARTEN.map(a=>`<tr class="click"><td><b>${a.name}</b>${a.selbst?' <span class="pill acc">selbst ausgestellt</span>':''}</td><td class="mono">${a.code}</td><td>${a.gr}</td><td class="muted">${a.pf}</td><td>${vtPill(a.vt)}</td><td>${a.jahre?`${a.jahre} Jahre ab ${a.ab}`:'unbefristet'}${a.gp?' <span class="pill info" title="gesetzliche Pflicht">GeBüV</span>':''}</td><td class="mono">${esc(a.muster)||'–'}</td><td class="r num">${a.n}</td></tr>`).join('')}
+ </tbody></table></div></div>`;
+
+V.benutzer=()=>{
+ const M=[['A1','Dokumente erfassen','✓','✓','–'],['A2','NORMAL lesen, suchen','✓','✓','✓'],['A3','INTERN lesen','✓','–','✓'],['A4','PERSONAL lesen','✓','nur eigene','nur lesend'],['A5','Eingangskorb einsehen','✓','selbst erfasste','–'],['A6','Metadaten ändern','✓','–','–'],['A7','Bestätigen','✓','–','–'],['A8','Vertraulichkeit setzen','✓','–','–'],['A9','Verwerfen','✓','–','–'],['A10','Verarbeitung wiederholen','✓','–','–'],['A11','Dokumentarten verwalten','✓','–','–'],['A12','Kontakte ändern, CSV-Import','✓','–','–'],['A13','Zugriffsprotokoll','✓','–','–'],['A14','API-Tokens','✓','–','–'],['–','Jahresexport','✓','–','✓']];
+ const cell=v=>v==='✓'?'<span class="yes" aria-label="erlaubt">✓</span>':v==='–'?'<span class="no" aria-label="nicht erlaubt">–</span>':`<span class="part">${v}</span>`;
+ return ph('Verwaltung','Benutzer und Rollen','Rechte werden nur über eine der vier Rollen vergeben, nie einzeln. Anmeldung mit Zwei-Faktor über Keycloak oder Google.',`<button class="btn pri" data-act="einladen">${ic('mail')}Benutzer einladen</button>`)+
+ `<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Benutzer</th><th>Rolle</th><th>Anmeldung</th><th>Zuletzt aktiv</th><th>Status</th><th></th></tr></thead><tbody>
+  ${[['Fabian Aschwanden','fabian@urinet.example','Inhaber','Google + TOTP','heute 08:14','aktiv'],['Joel Aschwanden','joel@urinet.example','Mitarbeiter','Passwort + TOTP','gestern 17:05','aktiv'],['Treuhand Muster AG','abschluss@treuhand.example','Treuhänder','Passwort + TOTP','heute 08:02','aktiv'],['Aushilfe Sommer','aushilfe@urinet.example','Mitarbeiter','–','31.08.2026','deaktiviert']].map(u=>`<tr><td><b>${u[0]}</b><div class="muted" style="font-size:12px">${u[1]}</div></td><td><span class="pill ${u[2]==='Inhaber'?'acc':''}">${u[2]}</span></td><td>${u[3]}</td><td class="num">${u[4]}</td><td>${u[5]==='aktiv'?'<span class="pill ok">aktiv</span>':'<span class="pill">deaktiviert</span>'}</td><td class="r"><button class="btn sm ghost">Bearbeiten</button></td></tr>`).join('')}
+ </tbody></table></div></div>
+ <div class="card" style="margin-top:16px"><div class="card-h"><h3>Was jede Rolle darf</h3><span class="muted" style="font-size:12px">Rechtematrix, Spec 01 · 2.6</span></div><div class="tbl-wrap" style="margin-top:8px"><table class="tbl mx"><thead><tr><th>Nr.</th><th>Aktion</th><th>Inhaber</th><th>Mitarbeiter</th><th>Treuhänder</th></tr></thead><tbody>${M.map(r=>`<tr><td class="mono">${r[0]}</td><td>${r[1]}</td>${r.slice(2).map(cell).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+};
+
+V.einstellungen=()=>{
+ const row=(n,b,v,cls,hint)=>`<div class="li"><span class="tx"><b>${n}</b><small>${b}</small></span>${cls==='a'?`<input class="inp num" style="width:150px;text-align:right" value="${v}" aria-label="${n}">`:cls==='b'?`<span class="pill">${ic('lock')}${v}</span>`:`<span class="pill">${ic('key')}als Secret-Datei hinterlegt</span>`}</div>`;
+ return ph('Verwaltung','Einstellungen','Jede Änderung wird geprüft, versioniert und protokolliert. Werte, die Sicherheit oder Kosten der Instanz betreffen, bleiben dem Betrieb vorbehalten.',`<button class="btn pri" data-act="speichern">${ic('check')}Speichern</button>`)+
+ `<div class="grid g2"><div class="card"><div class="card-h"><h3>In der App änderbar</h3><span class="pill ok">Mandant urinet</span></div><div class="card-b list">
+  ${row('Geschäftsjahresende','Grundlage für Aufbewahrungsfristen und Jahresexport','31.12.','a')}${row('Aufbewahrung Standard','Jahre ab Ende Geschäftsjahr, wenn die Art nichts anderes sagt','10','a')}${row('Chat-Fragen pro Stunde','je Benutzer, danach wird abgelehnt','100','a')}${row('Budget Ingest','Tokens je Wissensquelle','100\'000','a')}${row('Erlaubte E-Mail-Absender','für archiv@urinet.ch','3 Adressen','a')}
+ </div></div><div style="display:grid;gap:16px;align-content:start"><div class="card"><div class="card-h"><h3>Nur über das Deployment</h3></div><div class="card-b list">
+  ${row('KI-Modell','Infomaniak AI Services','Mistral · Schweiz','b')}${row('Max. Dateigrösse','Upload und E-Mail','50 MB','b')}${row('Object Lock','Modus des Archivspeichers','Compliance','b')}
+ </div></div><div class="card"><div class="card-h"><h3>Geheimnisse</h3></div><div class="card-b list">${row('Infomaniak AI Token','Zugang Sprachmodell','','c')}${row('Google OAuth','Anmeldung mit Google','','c')}</div></div></div></div>`;
+};
+
+V.protokoll=()=>ph('Verwaltung','Zugriffsprotokoll','Jedes Anzeigen, Herunterladen, Ändern, Bestätigen, Verwerfen und Exportieren, mit Zeit, Benutzer, Dokument und IP.',`<button class="btn">${ic('filter')}Filtern</button>`)+
+ `<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Zeit</th><th>Benutzer</th><th>Aktion</th><th>Objekt</th><th>IP</th></tr></thead><tbody>
+ ${PROTO.map(r=>`<tr><td class="num">${r[0]}</td><td>${r[1]}</td><td><span class="pill mono ${r[2]==='ZUGRIFF_VERWEIGERT'?'crit':r[2]==='EXPORT'?'acc':''}">${r[2]}</span></td><td class="mono">${r[3]}</td><td class="mono muted">${r[4]}</td></tr>`).join('')}
+ </tbody></table></div></div>`;
+
+V['api-tokens']=()=>ph('Verwaltung','API-Tokens','Für Generatoren, Importe und Webseiten. Gespeichert wird nur ein Hash, der Klartext erscheint einmal beim Anlegen.',`<button class="btn pri" data-act="token">${ic('plus')}Token anlegen</button>`)+
+ `<div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Scope</th><th>Angelegt</th><th>Gültig bis</th><th>Zuletzt verwendet</th><th></th></tr></thead><tbody>
+ ${[['Rechnungs-Generator','generator','10.11.2026','10.11.2028','heute 06:00'],['Offerten-Generator','generator','10.11.2026','unbefristet','03.11.2026'],['Google-Drive-Import','import','12.11.2026','31.12.2026','16.11.2026']].map(t=>`<tr><td><b>${t[0]}</b></td><td><span class="pill mono">${t[1]}</span></td><td class="num">${t[2]}</td><td class="num">${t[3]}</td><td class="num">${t[4]}</td><td class="r"><button class="btn sm ghost danger" data-act="widerrufen">Widerrufen</button></td></tr>`).join('')}
+ </tbody></table></div></div>`;
+
+/* ---------- Rahmen rendern ---------- */
+function renderNav(){
+ const korb=korbSichtbar().length;let html='',skipGroup=false;
+ for(const n of NAV){
+  if(n.g){skipGroup=n.need&&!n.need();if(!skipGroup)html+=`<div class="nav-group">${n.g}</div>`;continue}
+  if(skipGroup||(n.need&&!n.need()))continue;
+  const cur=S.view===n.h||(S.view==='dokument'&&n.h==='suche');
+  html+=`<a href="#${n.h}" ${cur?'aria-current="page"':''}>${ic(n.i)}<span>${n.t}</span>${n.cnt&&korb?`<span class="cnt" aria-label="${korb} Dokumente">${korb}</span>`:''}</a>`;
+ }
+ $('#nav').innerHTML=html;
+ const r=ROLLEN[S.rolle];$('#av').textContent=r.kurz;$('#who').innerHTML=`${r.name}<small>${r.label} · urinet</small>`;
+}
+function allowed(v){const n=NAV.find(x=>x.h===v);return v==='dokument'||v==='hilfe'||(n&&(!n.need||n.need()))}
+function render(){
+ if(!V[S.view]||!allowed(S.view))S.view='uebersicht';
+ renderNav();$('#view').innerHTML=V[S.view]();
+ if(S.view==='uebersicht')bindArea();
+ if(S.view==='chat'){const b=$('#msgs');if(b)b.scrollTop=b.scrollHeight}
+}
+function route(){S.view=(location.hash||'#uebersicht').slice(1);$('#side').classList.remove('open');$('#layer').innerHTML='';render();window.scrollTo(0,0)}
+addEventListener('hashchange',route);
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener('click',e=>{
+ const sp=e.target.closest('[data-sprung]');if(sp){e.preventDefault();const z=document.getElementById('h-'+sp.dataset.sprung);z?.scrollIntoView({block:'start'});z?.focus({preventScroll:true});return}
+ const t=e.target.closest('[data-doc],[data-act],[data-year],[data-modus],[data-tab],[data-chat],[data-ask],[data-kf],[data-kontakt]');
+ if(!t)return;
+ if(t.dataset.doc){S.docId=+t.dataset.doc;S.tab='meta';if(location.hash!=='#dokument'){location.hash='dokument'}else route();if(t.tagName!=='A')e.preventDefault();return}
+ if(t.dataset.year){S.year=+t.dataset.year;render();return}
+ if(t.dataset.modus){S.modus=t.dataset.modus;render();return}
+ if(t.dataset.tab){S.tab=t.dataset.tab;render();return}
+ if(t.dataset.chat){S.chatId=+t.dataset.chat;render();return}
+ if(t.dataset.ask){ask(t.dataset.ask);return}
+ if(t.dataset.kf){S.kf=t.dataset.kf;render();return}
+ if(t.dataset.kontakt){kontaktDetail(+t.dataset.kontakt);return}
+ const a=t.dataset.act,id=+t.dataset.id;
+ if(a==='bestaetigen'){$('#layer').innerHTML='';const k=KORB.find(x=>x.id===id);KORB=KORB.filter(x=>x.id!==id);render();toast(`Bestätigt · D-${id} wird archiviert`);DOCS.unshift({id,titel:k.titel,art:k.f[0][1],partner:k.f[1][1],datum:k.f[2][1],betrag:parseFloat(k.f[3][1].replace(/[^\d.]/g,'')),ri:'Eingang',nr:'',st:'ARCHIVIERT',vt:'NORMAL',gj:2026,tags:[],dn:k.dn,bis:'31.12.2036',text:'',erf:k.erf.split(' ·')[0]})}
+ if(a==='verwerfen')dialog(`<form><div class="d-b"><h3>Dokument D-${id} verwerfen?</h3><p class="muted" style="margin:0">Das Dokument verschwindet aus Eingangskorb und Suche. Die Originaldatei bleibt im Archivspeicher, der Vorgang wird protokolliert.</p><div class="field"><label for="grund">Grund</label><textarea class="inp" id="grund" name="grund" rows="3" required placeholder="z. B. Doppelt erfasst, privater Beleg"></textarea></div></div><div class="d-f"><button type="button" class="btn ghost" data-cancel>Abbrechen</button><button class="btn pri" style="background:var(--crit);border-color:var(--crit);color:#fff">Verwerfen</button></div></form>`,()=>{KORB=KORB.filter(x=>x.id!==id);render();toast(`D-${id} verworfen`)});
+ if(a==='wiederholen'){const k=KORB.find(x=>x.id===id);k.st='EINGANGSKORB';k.titel='Beleg Bürobedarf';k.f=[['Art','Quittung / Spesen',.86],['Partner','Papeterie Gisler Altdorf',.74],['Belegdatum','17.11.2026',.9],['Betrag','CHF 18.50',.93],['Geschäftsjahr','2026',.97]];render();toast('Erneut verarbeitet · Vorschlag bereit')}
+ if(a==='archwdh'){KORB=KORB.filter(x=>x.id!==id);render();toast('Archivierung wiederholt · Kopie gesperrt')}
+ if(a==='pruefen'){const k=KORB.find(x=>x.id===id);drawer('Prüfen und ändern',`<div class="thumb" style="max-width:180px;justify-self:center" aria-hidden="true"><i class="h"></i><i class="s"></i><i></i><i class="m"></i><i></i><i class="y"></i></div><form id="pf" style="display:grid;gap:12px">${k.f.map(([l,v,c],i)=>`<div class="field"><label for="pf${i}">${l}${c<.8?' · <span style="color:var(--warn)">unsicher ('+Math.round(c*100)+' %)</span>':''}</label>${l==='Art'?`<select class="inp" id="pf${i}">${ARTEN.map(a=>`<option ${a.name===v?'selected':''}>${a.name}</option>`).join('')}</select>`:`<input class="inp${c<.8?' unsicher':''}" id="pf${i}" value="${esc(v)}">`}</div>`).join('')}<div class="field"><label for="pfv">Vertraulichkeit</label><select class="inp" id="pfv"><option>Normal</option><option>Intern</option><option>Personal</option></select></div><div class="field"><label for="pft">Titel</label><input class="inp" id="pft" value="${esc(k.titel)}"></div><div class="actions"><button class="btn pri" type="button" data-act="bestaetigen" data-id="${k.id}">${ic('check')}Speichern und bestätigen</button></div></form>`)}
+ if(a==='kinaktiv'||a==='kmerge'){const k=KONTAKTE.find(x=>x.id===id);
+  if(a==='kmerge')dialog(`<form><div class="d-b"><h3>${esc(k.name)} zusammenführen</h3><div class="field"><label for="ziel">In diesen Kontakt (Ziel)</label><select class="inp" id="ziel" name="ziel">${KONTAKTE.filter(x=>x.aktiv&&x.id!==id).map(x=>`<option>${esc(x.name)}</option>`).join('')}</select></div><div class="hint warn">${ic('alert')}<span class="tx">${k.docs} Dokumente und 2 Verkaufschancen werden auf das Ziel umgehängt. Das lässt sich nicht rückgängig machen.</span></div><div class="field"><label for="mg">Grund</label><input class="inp" id="mg" name="g" required placeholder="z. B. Doppelt importiert"></div></div><div class="d-f"><button type="button" class="btn ghost" data-cancel>Abbrechen</button><button class="btn pri">Zusammenführen</button></div></form>`,fd=>{k.aktiv=false;k.merged=fd.get('ziel');$('#layer').innerHTML='';render();toast('Zusammengeführt')});
+  else dialog(`<form><div class="d-b"><h3>${esc(k.name)} als inaktiv markieren?</h3><p class="muted" style="margin:0">Stammdaten und bestehende Zuordnungen bleiben. Der Kontakt erscheint nicht mehr in der Partnerauswahl.</p></div><div class="d-f"><button type="button" class="btn ghost" data-cancel>Abbrechen</button><button class="btn pri">Als inaktiv markieren</button></div></form>`,()=>{k.aktiv=false;$('#layer').innerHTML='';render();toast('Als inaktiv markiert')});}
+ const msgs={wannehmen:'Änderung angenommen · neue Seitenversion',wverwerfen:'Änderung verworfen',lint:'Lint gestartet · Befunde erscheinen als Entwurf',importok:'362 Zeilen übernommen',speichern:'Einstellungen gespeichert · Version 7',widerrufen:'Token widerrufen',analyse:'Als Analyse vorgeschlagen · wartet auf Freigabe',kamera:'In der installierten Web-App öffnet sich hier die Kamera'};
+ if(msgs[a])toast(msgs[a]);
+ if(a==='einladen')dialog(`<form><div class="d-b"><h3>Benutzer einladen</h3><div class="field"><label for="im">E-Mail</label><input class="inp" id="im" type="email" required placeholder="name@firma.ch"></div><div class="field"><label for="ir">Rolle</label><select class="inp" id="ir"><option>Mitarbeiter</option><option>Treuhänder</option><option>Inhaber</option></select></div><p class="muted" style="margin:0;font-size:12.5px">Die Einladung kommt von Keycloak. Zwei-Faktor wird bei der ersten Anmeldung eingerichtet.</p></div><div class="d-f"><button type="button" class="btn ghost" data-cancel>Abbrechen</button><button class="btn pri">Einladung senden</button></div></form>`,()=>toast('Einladung vorbereitet'));
+ if(a==='token')dialog(`<form><div class="d-b"><h3>API-Token anlegen</h3><div class="field"><label for="tn">Name</label><input class="inp" id="tn" required placeholder="z. B. Lohn-Generator"></div><div class="field"><label for="ts">Scope</label><select class="inp" id="ts"><option>generator</option><option>import</option></select></div><div class="field"><label for="tg">Gültig bis</label><input class="inp" id="tg" type="date"></div></div><div class="d-f"><button type="button" class="btn ghost" data-cancel>Abbrechen</button><button class="btn pri">Anlegen</button></div></form>`,()=>toast('Token angelegt · Klartext einmal angezeigt'));
+});
+document.addEventListener('keydown',e=>{
+ if(e.key==='Enter'&&e.target.matches('[data-doc],[data-kontakt]'))e.target.click();
+ if(e.key==='/'&&!e.target.matches('input,textarea,select')){e.preventDefault();$('#topq').focus()}
+ if(e.key==='Escape'){$('#layer').innerHTML='';closeMenu()}
+});
+document.addEventListener('change',e=>{
+ const t=e.target;
+ if(t.dataset.f){const s=S.f[t.dataset.f];t.checked?s.add(t.value):s.delete(t.value);render()}
+ if(t.id==='wtyp'){S.wTyp=t.value;render()}
+ if(t.id==='file'&&t.files.length)addFiles(t.files);
+ if(t.id==='csv'&&t.files.length)toast(`«${t.files[0].name}» gelesen · Vorschau wird erstellt`);
+});
+document.addEventListener('submit',e=>{
+ if(e.target.closest('dialog'))return;e.preventDefault();
+ if(e.target.id==='topsearch'){S.q=$('#topq').value;location.hash==='#suche'?render():location.hash='suche'}
+ if(e.target.id==='bigsearch'){S.q=$('#q').value;$('#topq').value=S.q;render()}
+ if(e.target.id==='kform'){S.kq=$('#kq').value;render()}
+ if(e.target.id==='chatform'){const q=$('#chatq').value;ask(q)}
+});
+document.addEventListener('dragover',e=>{const d=e.target.closest?.('#drop');if(d){e.preventDefault();d.classList.add('over')}});
+document.addEventListener('dragleave',e=>{const d=e.target.closest?.('#drop');d&&d.classList.remove('over')});
+document.addEventListener('drop',e=>{const d=e.target.closest?.('#drop');if(d){e.preventDefault();d.classList.remove('over');addFiles(e.dataTransfer.files)}});
+function addFiles(files){
+ const q=$('#queue');[...files].forEach((f,n)=>{const row=document.createElement('div');row.innerHTML=queueRow(f.name,'Upload · gerade eben',10,'wird hochgeladen');const el=row.firstElementChild;q.prepend(el);
+  const steps=[[35,'PDF/A wird erstellt'],[65,'Texterkennung läuft'],[90,'KI-Vorschlag'],[100,'Im Eingangskorb']];
+  steps.forEach(([p,s],i)=>setTimeout(()=>{el.querySelector('i').style.width=p+'%';el.querySelector('small').textContent='Upload · gerade eben · '+s;if(p===100){el.lastElementChild.outerHTML=`<span class="pill ok">${ic('check')}Fertig</span>`;
+   KORB.unshift({id:2630+n+Math.floor(Math.random()*50),dn:f.name,titel:'',erf:'Upload · gerade eben',st:'EINGANGSKORB',f:[['Art','Lieferantenbeleg',.72],['Partner','—',.3],['Belegdatum','20.11.2026',.8],['Betrag','CHF 0.00',.2]]});renderNav()}},700*(i+1)+n*300));
+ });
+}
+document.addEventListener('click',e=>{if(e.target.closest('#copymail')){navigator.clipboard?.writeText('archiv@urinet.ch').then(()=>toast('Adresse kopiert'),()=>toast('Adresse markieren und kopieren'))}});
+document.addEventListener('click',e=>{if(e.target.closest('#dlbtn'))toast('Download-Link erstellt · 5 Minuten gültig · protokolliert');if(e.target.closest('#editbtn'))toast('Änderungen erzeugen eine neue Version');
+ if(e.target.closest('#expbtn')){const st=$('#expstate');st.innerHTML=`<div class="hint info">${ic('clock')}<span class="tx">Export 2025 wird erstellt …<div class="prog" style="margin-top:8px"><i style="width:15%"></i></div></span></div>`;let p=15;const iv=setInterval(()=>{p+=17;const b=st.querySelector('.prog i');if(b)b.style.width=Math.min(p,100)+'%';if(p>=100){clearInterval(iv);st.innerHTML=`<div class="hint info" style="background:var(--ok-soft);color:var(--ok)">${ic('check')}<span class="tx"><b>Fertig.</b> Download-Link ist 24 Stunden gültig. Eine E-Mail mit Link und Export-ID ist unterwegs. <button class="btn sm" style="margin-left:6px">${ic('dl')}ZIP herunterladen</button></span></div>`}},450)}
+ if(e.target.closest('#newchat')){CHATS.unshift({t:'Neues Gespräch',d:'jetzt',m:[]});S.chatId=0;render();$('#chatq')?.focus()}
+});
+
+/* Kopfzeile */
+$('#burger').innerHTML=ic('menu');
+$('#burger').onclick=()=>{const o=$('#side').classList.toggle('open');$('#burger').setAttribute('aria-expanded',o)};
+document.querySelectorAll('[data-i]').forEach(s=>s.outerHTML=ic(s.dataset.i));
+function themeIcon(){const dark=document.documentElement.dataset.theme?document.documentElement.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;$('#theme').innerHTML=ic(dark?'sun':'moon')}
+$('#theme').onclick=()=>{const dark=document.documentElement.dataset.theme?document.documentElement.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.dataset.theme=dark?'light':'dark';themeIcon()};
+themeIcon();
+$('#bell').onclick=()=>toast('2 Dokumente brauchen Aufmerksamkeit im Eingangskorb');
+function closeMenu(){$('#user .menu')?.remove();$('#user').setAttribute('aria-expanded','false')}
+$('#user').onclick=e=>{
+ if(e.target.closest('.menu')){const r=e.target.closest('input[name=rolle]');if(r){S.rolle=r.value;closeMenu();route();toast('Angemeldet als '+ROLLEN[S.rolle].label)}return}
+ if($('#user .menu')){closeMenu();return}
+ const m=document.createElement('div');m.className='menu';m.innerHTML=`<h4>Rolle ansehen (Demo)</h4>${Object.entries(ROLLEN).map(([k,r])=>`<label><input type="radio" name="rolle" value="${k}" ${S.rolle===k?'checked':''}><span><b>${r.label}</b><small>${r.name}</small></span></label>`).join('')}<h4 style="margin-top:10px">Mandant</h4><div style="padding:0 8px 6px;font-size:13px">urinet · Urinet Aschwanden, Seedorf UR</div>`;
+ $('#user').append(m);$('#user').setAttribute('aria-expanded','true');
+};
+$('#user').onkeydown=e=>{if(e.key==='Enter'&&!e.target.closest('.menu'))$('#user').click()};
+document.addEventListener('click',e=>{if(!e.target.closest('#user'))closeMenu()});
+route();
+</script>

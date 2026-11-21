@@ -27,9 +27,16 @@ export const ProtokollAktion = {
     WissenVerwerfen: 'WISSEN_VERWERFEN',
     WissenIngest: 'WISSEN_INGEST',
     WissenLint: 'WISSEN_LINT',
+    WissenImport: 'WISSEN_IMPORT',
     KontaktZusammenfuehren: 'KONTAKT_ZUSAMMENFUEHREN',
     KontaktInaktiv: 'KONTAKT_INAKTIV',
     KontaktAktiv: 'KONTAKT_AKTIV',
+    BenutzerAnlegen: 'BENUTZER_ANLEGEN',
+    BenutzerAendern: 'BENUTZER_AENDERN',
+    BenutzerLoeschen: 'BENUTZER_LOESCHEN',
+    RolleZuweisen: 'ROLLE_ZUWEISEN',
+    BenutzerAntrag: 'BENUTZER_ANTRAG',
+    BenutzerAbweichung: 'BENUTZER_ABWEICHUNG',
 } as const;
 export type ProtokollAktion = typeof ProtokollAktion[keyof typeof ProtokollAktion];
 

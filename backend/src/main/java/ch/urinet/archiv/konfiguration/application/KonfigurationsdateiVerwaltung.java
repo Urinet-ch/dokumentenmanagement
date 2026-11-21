@@ -116,7 +116,8 @@ public class KonfigurationsdateiVerwaltung {
             return new Ergebnis(aktuell.version(), analyse.aenderungen());
         }
         speichern(analyse.ziel());
-        int version = konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.DATEI, aktuell);
+        int version = konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.DATEI, aktuell,
+                analyse.ziel().einstellungen());
         return new Ergebnis(version, analyse.aenderungen());
     }
 
@@ -148,8 +149,10 @@ public class KonfigurationsdateiVerwaltung {
         if (konfiguration.versionen().stream().anyMatch(v -> v.quelle() == KonfigurationQuelle.SEED)) {
             return konfiguration.aktuelleVersion();
         }
+        Konfiguration vorher = konfiguration.aktuell();
         speichern(seed);
-        return konfiguration.aenderungSpeichern("system:seed", null, KonfigurationQuelle.SEED);
+        return konfiguration.aenderungSpeichern("system:seed", null, KonfigurationQuelle.SEED, vorher,
+                seed.einstellungen());
     }
 
     public KiTexte kiTexte() {
@@ -178,6 +181,32 @@ public class KonfigurationsdateiVerwaltung {
         KiTexte alt = vorher.kiTexte();
         kiTexte.speichern(new KiTexte(rolle, feldregeln, alt.kiFreigegeben()));
         return konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.APP, vorher);
+    }
+
+    public int kiFreigeben(String wer, String abnahme) {
+        List<KonfigurationUngueltig.Befund> befunde = new ArrayList<>();
+        if (wer == null || wer.isBlank() || codepunkte(wer) > 80 || steuerzeichen(wer)) {
+            befunde.add(new KonfigurationUngueltig.Befund("wer", "WER_UNGUELTIG",
+                    "Der Betreibername fehlt oder ist ungültig."));
+        }
+        if (abnahme == null || abnahme.isBlank() || codepunkte(abnahme) > 1000 || steuerzeichen(abnahme)) {
+            befunde.add(new KonfigurationUngueltig.Befund("abnahme", "ABNAHME_UNGUELTIG",
+                    "Der Verweis auf die Abnahme fehlt oder ist ungültig."));
+        }
+        if (!befunde.isEmpty()) {
+            throw new KonfigurationUngueltig(befunde);
+        }
+        konfiguration.aenderungStarten(konfiguration.aktuelleVersion());
+        KiTexte texte = kiTexte.lesen();
+        if (texte.kiFreigegeben()) {
+            return konfiguration.aktuelleVersion();
+        }
+        kiTexte.speichern(new KiTexte(texte.rolle(), texte.feldregeln(), true));
+        return konfiguration.aenderungSpeichern(wer, abnahme, KonfigurationQuelle.APP);
+    }
+
+    private static boolean steuerzeichen(String text) {
+        return text.codePoints().anyMatch(Character::isISOControl);
     }
 
     private Analyse analysieren(Konfiguration aktuell, KonfigurationsdateiCodec.Datei datei) {

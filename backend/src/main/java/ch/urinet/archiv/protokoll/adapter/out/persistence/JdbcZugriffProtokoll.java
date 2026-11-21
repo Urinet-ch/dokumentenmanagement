@@ -100,7 +100,7 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         }
     }
 
-    private static String json(ProtokollDetails details) {
+    static String json(ProtokollDetails details) {
         if (details.leer()) {
             return null;
         }
@@ -119,6 +119,33 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         }
         if (details.tokenId() != null) {
             knoten.put("tokenId", details.tokenId());
+        }
+        if (details.wissensImportSeiten() != null) {
+            knoten.put("seiten", details.wissensImportSeiten());
+        }
+        if (details.verwaltung() != null) {
+            ProtokollDetails.Verwaltung verwaltung = details.verwaltung();
+            uuid(knoten, "vorgangId", verwaltung.vorgangId());
+            knoten.put("phase", verwaltung.phase().name());
+            uuid(knoten, "ziel", verwaltung.ziel());
+            if (verwaltung.vorgang() != null) {
+                knoten.put("vorgang", verwaltung.vorgang().name());
+            }
+            if (verwaltung.rolleAlt() != null) {
+                knoten.put("rolleAlt", verwaltung.rolleAlt().name().toLowerCase(java.util.Locale.ROOT));
+            }
+            if (verwaltung.rolleNeu() != null) {
+                knoten.put("rolleNeu", verwaltung.rolleNeu().name().toLowerCase(java.util.Locale.ROOT));
+            }
+            if (verwaltung.grund() != null) {
+                knoten.put("grund", verwaltung.grund().name());
+            }
+            if (!verwaltung.felder().isEmpty()) {
+                ObjectNode felder = knoten.putObject("felder");
+                for (ProtokollDetails.Verwaltungsfeld feld : verwaltung.felder()) {
+                    felder.put(feld.name().toLowerCase(java.util.Locale.ROOT), "geändert");
+                }
+            }
         }
         if (details.regelAenderung() != null) {
             knoten.put("dokumentart", details.regelAenderung().dokumentart());
@@ -139,6 +166,14 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             zahl(knoten, "dokumente", kontakte.dokumente());
             zahl(knoten, "verkaufschancen", kontakte.verkaufschancen());
             zahl(knoten, "korrekturbeispiele", kontakte.korrekturbeispiele());
+        }
+        ProtokollDetails.WissensEntscheid entscheid = details.wissensEntscheid();
+        if (entscheid != null) {
+            ObjectNode wissen = knoten.putObject("wissen");
+            wissen.put("aenderungNr", entscheid.aenderungNr());
+            uuid(wissen, "seiteId", entscheid.seiteId());
+            zahl(wissen, "basisVersion", entscheid.basisVersion());
+            zahl(wissen, "neueVersion", entscheid.neueVersion());
         }
         ProtokollDetails.Konfiguration konfiguration = details.konfiguration();
         if (konfiguration != null) {

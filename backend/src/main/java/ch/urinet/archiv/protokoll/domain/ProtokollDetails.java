@@ -3,6 +3,7 @@ package ch.urinet.archiv.protokoll.domain;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -12,6 +13,7 @@ import java.util.regex.Pattern;
  * Aktionen {@code KONTAKT_*} die Kontakt-IDs und Zahlen ({@link Kontakte}), bei {@code KONFIGURATION_AENDERN} Version
  * und Quelle ({@link Konfiguration}) und der Kanal eines Auslösers ohne
  * eigenen Endpunkt ({@code kanal}, z. B. {@value #KANAL_CHAT} für das Chat-Werkzeug {@code dokument_zeigen},
+ * und bei Wissensentscheiden Seiten-ID und Versionsnummern ({@link WissensEntscheid}),
  * Spec 02, Aufgabe 7.1a), bei Änderungen an einem API-Token dessen ID ({@code tokenId}, Req 2.20), nie Dokument-,
  * Kontakt- oder Konfigurationsinhalte ausser den geänderten Konfigurationselementen mit alt und neu, bei UID und
  * IBANs ohne Werte (Req 9.7, 9.10,
@@ -20,7 +22,8 @@ import java.util.regex.Pattern;
  */
 public record ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
                                FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
-                               String kanal, String tokenId) {
+                               String kanal, String tokenId, WissensEntscheid wissensEntscheid,
+                               Integer wissensImportSeiten, Verwaltung verwaltung) {
 
     public static final ProtokollDetails KEINE = new ProtokollDetails(null, null, null);
     private static final Pattern TOKEN_ID = Pattern.compile("^[a-z0-9]{12}$");
@@ -32,6 +35,14 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
     private static final Pattern CODE = Pattern.compile("^[A-Z][A-Z0-9_]*$");
 
     public ProtokollDetails {
+        if (verwaltung != null && (grund != null || sha256 != null || fehlercode != null || regelAenderung != null
+                || fristKonflikt != null || kontakte != null || konfiguration != null || tokenId != null
+                || wissensEntscheid != null || wissensImportSeiten != null)) {
+            throw new IllegalArgumentException("Verwaltungsdetails dürfen nicht mit anderen Details vermischt werden");
+        }
+        if (wissensImportSeiten != null && (wissensImportSeiten < 0 || wissensImportSeiten > 200)) {
+            throw new IllegalArgumentException("Ungültige Seitenzahl des Wissensimports");
+        }
         if (sha256 != null) {
             sha256 = sha256.toLowerCase(Locale.ROOT);
             if (!SHA256.matcher(sha256).matches()) {
@@ -50,6 +61,27 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         if (tokenId != null && !TOKEN_ID.matcher(tokenId).matches()) {
             throw new IllegalArgumentException("tokenId ist keine Token-ID");
         }
+    }
+
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                            FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
+                            String kanal, String tokenId, WissensEntscheid wissensEntscheid,
+                            Integer wissensImportSeiten) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration, kanal, tokenId,
+                wissensEntscheid, wissensImportSeiten, null);
+    }
+
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                           FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
+                           String kanal, String tokenId, WissensEntscheid wissensEntscheid) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration, kanal, tokenId,
+                wissensEntscheid, null);
+    }
+
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                            FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
+                            String kanal, String tokenId) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration, kanal, tokenId, null);
     }
 
     /** Kompatibel zur Form vor {@code tokenId}. */
@@ -99,16 +131,29 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         return new ProtokollDetails(grund, null, null, null, null, null, konfiguration, null, null);
     }
 
+    public static ProtokollDetails wissensEntscheid(String grund, WissensEntscheid entscheid) {
+        return new ProtokollDetails(grund, null, null, null, null, null, null, null, null, entscheid);
+    }
+
+    public static ProtokollDetails wissensImport(String sha256, int seiten) {
+        return new ProtokollDetails(null, sha256, null, null, null, null, null, null, null, null, seiten);
+    }
+
+    public static ProtokollDetails verwaltung(Verwaltung verwaltung) {
+        return new ProtokollDetails(null, null, null, null, null, null, null, null, null, null, null,
+                Objects.requireNonNull(verwaltung));
+    }
+
     public boolean leer() {
         return grund == null && sha256 == null && fehlercode == null && regelAenderung == null
                 && fristKonflikt == null && kontakte == null && konfiguration == null && kanal == null
-                && tokenId == null;
+                && tokenId == null && wissensEntscheid == null && wissensImportSeiten == null && verwaltung == null;
     }
 
     /** Dieselben Details mit dem Kanal {@code kanal}. */
     public ProtokollDetails mitKanal(String kanal) {
         return new ProtokollDetails(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration,
-                kanal, tokenId);
+                kanal, tokenId, wissensEntscheid, wissensImportSeiten, verwaltung);
     }
 
     /** Details eines Eintrags zu einem API-Token: dessen ID (kein Geheimnis). */
@@ -171,6 +216,49 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
 
         public static Kontakte markieren(UUID kontakt) {
             return new Kontakte(null, null, kontakt, null, null, null);
+        }
+    }
+
+    public record WissensEntscheid(int aenderungNr, UUID seiteId, Integer basisVersion, Integer neueVersion) {
+    }
+
+    public enum Verwaltungsphase {
+        ANGEFRAGT, ABGESCHLOSSEN, FEHLGESCHLAGEN, UNKLAR
+    }
+
+    public enum Verwaltungsvorgang {
+        ANLEGEN, SPERREN, ENTSPERREN, DEAKTIVIEREN, REAKTIVIEREN, ZUGANG_ZURUECKSETZEN,
+        EINLADUNG_ERNEUT, EMAIL_AENDERN, GOOGLE_LOESEN, LOESCHEN, ROLLE_ZUWEISEN, ANTRAG, ABWEICHUNG
+    }
+
+    public enum Verwaltungsrolle {
+        INHABER, MITARBEITER, TREUHAENDER, GESCHAEFTSSTELLE
+    }
+
+    public enum Verwaltungsfeld {
+        EMAIL, VORNAME, NACHNAME
+    }
+
+    public enum Verwaltungsgrund {
+        SICHERHEIT, AUSTRITT, RECHTEAENDERUNG, KORREKTUR, SONSTIGES
+    }
+
+    public record Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
+                             Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder,
+                             Verwaltungsgrund grund) {
+        public Verwaltung {
+            Objects.requireNonNull(vorgangId);
+            Objects.requireNonNull(phase);
+            felder = felder == null ? List.of() : List.copyOf(felder);
+        }
+
+        public Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
+                          Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder) {
+            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, null);
+        }
+
+        public Verwaltung(UUID vorgangId, Verwaltungsphase phase) {
+            this(vorgangId, phase, null, null, null, null, List.of(), null);
         }
     }
 

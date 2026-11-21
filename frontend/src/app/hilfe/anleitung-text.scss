@@ -1,0 +1,54 @@
+// Fliesstext der Anleitung wie die Wissensseite (wissen-seite.scss, «.text»); Hinweis ist der globale Baustein
+:host {
+  display: block;
+}
+
+.text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-2);
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  :is(p, ul, ol) {
+    max-width: 70ch;
+    margin-block: 0 0.875rem;
+  }
+
+  :is(h2, h3, h4, h5, h6) {
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.3;
+    margin: 1.25rem 0 0.5rem;
+  }
+
+  :is(ul, ol) {
+    padding-inline-start: 1.25rem;
+  }
+
+  li + li {
+    margin-top: 0.25rem;
+  }
+
+  code {
+    font-family: var(--schrift-mono);
+    font-size: 0.88em;
+  }
+
+  > .hinweis {
+    max-width: 70ch;
+    margin-block: 0 0.875rem;
+  }
+}
+
+.fehler {
+  display: grid;
+  gap: 0.625rem;
+  justify-items: start;
+}

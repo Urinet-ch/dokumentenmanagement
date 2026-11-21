@@ -23,35 +23,54 @@ auf Server oder Secrets aus der Sitzung.
     Tokens (`KC_HOSTNAME_BACKCHANNEL_DYNAMIC`); Rotation des Client-Secrets mit Überlappung; `auth_time` im Access-Token;
     `prompt=login` gegen den Cookie-Zweig von `browser-totp-pflicht`; `execute-actions-email` für einen Benutzer ohne Passwort
     mit den drei Aktionen; Suche `q=mandant:<m>`; Rollenmitglieder (`/roles/{rolle}/users`).
+  - Stand: nachgewiesen sind Suche `q=mandant:<m>`, Rollenmitglieder, Issuer, Token-Rollen und der Dienstkonto-Aufruf (401 ohne
+    Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»); `auth_time`, `prompt=login`,
+    `execute-actions-email`, interne Adresse und Secret-Rotation sind mit 19.2 nachgewiesen (design.md «Umsetzung 19.2»).
+    Der Entscheid zu FGAP und `manage-users` ist in design.md «Open Points» festgehalten. Betriebsnachweise folgen in 19.3.
+    Checkbox offen: Der vollständige Nachweis von 7.2 (Step-up-Endpunkt) folgt mit 19.10.
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
 - [ ] 19.2 Realm-Export und Realm-Tests [Infra]
-  - Client `archiv-verwaltung` mit Platzhalter für das Secret und den drei Rollen des Dienstkontos (Härtung nach 19.1);
+  - Client `archiv-verwaltung` ohne Secret im Export und mit den drei Rollen des Dienstkontos und dem Standard-Scope `kc-admin-api` (Härtung nach 19.1);
     Passwort-Richtlinie; Access-Token-Lebensdauer 300 s; Lebensdauer der Aktions-Links; Ereignisse und Admin-Ereignisse mit
     400 Tagen; `auth_time`-Mapper; Test-Realm mit Dienstkonto und SMTP an Mailpit; `RealmExportTest` und `ExportKeycloak`
     erweitert (nur diese Rollen, kein Secret, kein Realm-Admin, Benutzerprofil unverändert).
+  - Stand: Export, Test-Realm und Tests umgesetzt (PR #385); `adminEventsExpiration` gesetzt. Keycloak erzeugt beim
+    Erstimport das Dienstkonto-Secret selbst; `start.sh` übergibt keines. `ARCHIV_BASIS_URL` schreibt `schreibe-env.sh`
+    aus `HOST_ARCHIV`. Das tatsächlich verwendete Secret und seine Pflichtprüfung folgen in 19.3.
+    Checkbox offen: Vollständige Szenarien zu 4.9 und 7.4 folgen mit 19.7 bis 19.9.
+  - Nachgelagert [Fabian] (Entscheid 21.11.2026): Betriebsnachweis der internen Compose-Verbindung mit korrektem
+    Issuer und der automatischen Ablaufzeit der Secret-Überlappung in 19.3.
   - _Anforderungen: 3.17, 4.9, 5.2, 5.3, 6.9, 7.4_
   - _Abhängig von: 19.1_
 
 - [ ] 19.3 Stufe A: Dienstkonto, SMTP, Secrets, Deploy [Fabian]
+  - [Fabian] (neu 21.11.2026) Secret-Datei `namenssperre_salz` (zufällig, 32 Bytes) als GitHub-Secret hinterlegen und ins Deploy-Bundle aufnehmen; Pflichtprüfung wie beim Dienstkonto-Secret (erst mit 19.7).
   - Realm-Änderungen einmalig per `kcadm.sh` im Wegwerf-Container (der Import wirkt nur beim ersten Start); GitHub-Secrets
     `KEYCLOAK_VERWALTUNG_SECRET` und `KEYCLOAK_SMTP_PASSWORT`, Secret-Dateien im Deploy-Bundle und Pflichtprüfung im Workflow;
     Compose: Secret für `api`; Admin-Konsole bleibt nicht öffentlich; Probe: Token des Dienstkontos holbar; Notfallunterlagen
     um das neue Secret ergänzt.
+  - Hinweis (Hotfix 21.11.2026): `SecretPruefung` verlangt `keycloak_verwaltung_secret` erst, wenn
+    `ARCHIV_KEYCLOAK_ADMIN_URL` gesetzt ist; Secret und Adresse in Compose darum im selben Schritt setzen.
+    Umgesetzt: Anforderung 5.3 Kriterium 4, `design.md`, `SecretPruefung`, `SecretPruefungTest` (api und kommando ohne Adresse).
+  - Nachgelagert [Fabian] (Entscheid 21.11.2026): bestehenden Realm einmalig aktualisieren und die Betriebsnachweise
+    für interne Verbindung mit korrektem Issuer und automatische Ablaufzeit der Secret-Überlappung führen.
   - _Anforderungen: 5.2, 5.3, 5.4, 6.9, 7.4_
   - _Abhängig von: 19.2_
 
-- [ ] 19.4 Port `IdentitaetsDienst` und Adapter Keycloak [Backend]
+- [x] 19.4 Port `IdentitaetsDienst` und Adapter Keycloak [Backend]
   - Port, Dev-Stub, `KeycloakAdminAdapter` (JDK-HTTP-Client, Positivliste der Aufrufe, Token-Cache, Zeitgrenzen, zwei gleichzeitige
     Aufrufe, Schutzschalter, Fehlerabbildung auf 502 und 503, Filter auf `mandant`), Detail-Health; `SecretPruefung` verlangt
     `keycloak_verwaltung_secret` für `api` und Kommando; Konfiguration `archiv.verwaltung.keycloak.*`; WireMock-Tests
     (Zeitüberschreitung, 5xx, 401 des Dienstkontos, Schutzschalter, kein Wiederholungssturm).
   - Codes `IDENTITAETSDIENST_FEHLER`, `IDENTITAETSDIENST_NICHT_ERREICHBAR` in Spec 01 und Enum.
+  - Folgt später: Alarm bei 502 (Req 5.6) mit 19.13, Belegung von `ARCHIV_KEYCLOAK_ADMIN_URL` in prod (Req 5.3) mit 19.3,
+    Abbildung `KonfliktException` auf 409 `BENUTZER_EXISTIERT` mit 19.7.
   - _Anforderungen: 3.3, 5.1, 5.4, 5.5, 5.6, 5.8, 5.9, 5.10_
   - _Abhängig von: 19.1_
 
-- [ ] 19.5 Domain-Regeln und Rechtematrix A20 bis A23 [Backend]
+- [x] 19.5 Domain-Regeln und Rechtematrix A20 bis A23 [Backend]
   - `Vergaberegeln` (Eskalationsschutz, Satz der Rollen, letzter Inhaber, Rollen ausserhalb der vier), `Benutzerstatus` und
     Statusautomat, `Aktion` A20 bis A23 mit Zeilen der Matrix, `RechteUebersicht`; `RechtematrixSpecTest` liest die Tabelle aus
     Spec 06; Absatz unter der Tabelle in Spec 01 requirements.md 2.6; Changeset `public.mandant.verwaltung_rollen`.
@@ -63,10 +82,17 @@ auf Server oder Secrets aus der Sitzung.
     Absicht und Abschluss mit `vorgangId`, Vorgangssperre (`verwaltung_vorgang`), `benutzer_status`, `verwaltung_antrag`,
     Raten aus dem Protokoll (`archiv.verwaltung.grenzen.*`), `VerwaltungProtokollTest` (kein Klartext), `KeinLoeschpfadTest`
     erweitert; Code `ZU_VIELE_ANFRAGEN` mit `grund = VERWALTUNG`.
+  - Offen, bewusst nicht abgehakt: Cucumber-Szenarien `@req-4.7`, `6.1`–`6.4`, `6.6` brauchen einen Endpunkt und kommen mit 19.7;
+    ebenso die Anbindung der Einstellungsgrenze (`Art.EINSTELLUNG`, `einstellungen-je-mandant`) und der Grund-Eingabe.
+    Ebenfalls offen (Req 6.3): das Schreiben der Verzeichniszeilen `ANLAGE`, `UEBERNAHME` und `AUSTRITT` in der Abschlusstransaktion
+    kommt mit 19.7 bis 19.9; hier sind nur Enum-Wert, Check-Constraint und Vertrag umgesetzt.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 
 - [ ] 19.7 REST Benutzer lesen, anlegen und einladen [Backend]
+  - Namenssperre nach Mandantenabbau (Entscheid Fabian 21.11.2026, Weg A; Req 3.4, design.md «Mandantenabbau»): Tabelle `benutzername_sperre` im Schema `public`
+    (Changeset aus dem public-Bereich, Nummer gegen `origin/main` prüfen), HMAC-Hash mit Salz `archiv.verwaltung.namenssperre-salz`, Eintrag in der Anlage-Transaktion,
+    Bestandsnamen per Changeset; Szenario: Name nach vollständigem Mandantenabbau bleibt gesperrt (409 `BENUTZER_EXISTIERT`). Spec 03, 8.3 nennt die Ausnahme.
   - `GET /rollen`, `GET /benutzer`, `GET /benutzer/{id}`, `POST /benutzer` (Formregeln, Höchstzahl, `BENUTZER_EXISTIERT`,
     Namenssperre über das Verzeichnis, Kompensation), `POST /benutzer/{id}/einladung`; Sicherheits-Header und
     `Cache-Control: no-store`, nur `application/json`; `EndpunktWaechterTest` erweitert.
@@ -78,6 +104,11 @@ auf Server oder Secrets aus der Sitzung.
   - `sperren`, `entsperren` (inkl. Sperre durch Fehlversuche), `deaktivieren` (Zeile `AUSTRITT`), `reaktivieren`,
     `zugang-zuruecksetzen` (TOTP entfernen), `PATCH` für E-Mail mit `VERIFY_EMAIL` und Mitteilung an die alte Adresse,
     `DELETE …/google-verknuepfung` (WO O.8), `If-Match` und `ETag` des Benutzers.
+  - Text der Mitteilung an die alte Adresse aus `deploy/infomaniak/keycloak/README.md` (Aufgabe 20.8) übernehmen, als
+    Ressource des Archivs ablegen und mit einem Test sichern (keine Namen Dritter, Req 7.8; Abhängigkeit von 20.8).
+  - Selbstaktionen (sperren, deaktivieren, löschen, Zugang zurücksetzen auf sich selbst) prüft
+    `Vergaberegeln.pruefeSelbstzugriff` (403 `ESKALATION_VERBOTEN`, Req 4.6); HTTP-Nachweis je Rolle und Zeile A20 bis A23
+    mit `VERWEIGERT` über `Berechtigung` kommt mit 19.7 bis 19.9 (Req 4.2).
   - _Anforderungen: 3.8, 3.9, 3.10, 3.13, 3.14, 3.15, 3.17, 3.18_
   - _Abhängig von: 19.7_
 
@@ -116,18 +147,20 @@ auf Server oder Secrets aus der Sitzung.
   - _Abhängig von: 19.6, 19.11_
 
 ## Welle 20 — Einstellungen und Oberfläche
-- [ ] 20.1 Einstellungskatalog und Abbild [Backend]
+- [x] 20.1 Einstellungskatalog und Abbild [Backend]
   - `Einstellungskatalog` (Domain), Abschnitt `einstellungen` im Abbild und in `konfiguration.schema.json` (Test
     `EinstellungskatalogSchemaTest`), Prüfung in `Konfiguration.pruefen`, Standardwerte, `EinstellungsInventarTest`,
     `EinstellungskatalogTest` (nur Klasse (a)), Konfigurationsdatei und Export mit dem erweiterten Abschnitt.
   - _Anforderungen: 1.1, 1.2, 1.3, 1.4, 1.6, 2.3, 2.4_
+  - Teilweise: 1.4 nur als Katalogfunktion (Verdrahtung in 20.4); 2.3/2.4 in 20.1 über Datei und Domäne, `befunde[]` und
+    Anfragekörper höchstens 16 KiB (HTTP 413) in 20.2.
   - _Abhängig von: Spec 05: 17.7_
 
 - [ ] 20.2 REST Einstellungen [Backend]
   - `GET` mit Katalog und Block `betrieb`, `PATCH` als Merge Patch mit `If-Match`, `bestaetigt`, Step-up, Vorschau und
     `Auswirkung`, Zurücksetzen (Gruppe, Version), Datei und Kommando mit Bestätigung; Rechte je Gruppe (A20, A19, A11); Code
     `BESTAETIGUNG_NOETIG`.
-  - _Anforderungen: 1.8, 2.1, 2.2, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.14_
+  - _Anforderungen: 1.8, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.14_
   - _Abhängig von: 20.1, 19.10_
 
 - [ ] 20.3 Einstellungen der Wissensbasis in die Mechanik [Backend]
@@ -140,7 +173,7 @@ auf Server oder Secrets aus der Sitzung.
   - Branding, Aufbewahrung der Chat-Fragen (intern und öffentlich) und die Budgets lesen über `MandantEinstellungen`; die
     Eigenschaften bleiben Standard; Migration der heute wirksamen Werte (Version, Quelle `MIGRATION`); «wirksam ab» wie im
     Katalog.
-  - _Anforderungen: 1.5, 2.12_
+  - _Anforderungen: 1.4, 1.5, 2.12_
   - _Abhängig von: 20.2_
 
 - [ ] 20.5 Oberfläche Einstellungen [Frontend]
@@ -162,11 +195,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 8.4, 8.5, 8.6_
   - _Abhängig von: 19.12, 20.6_
 
-- [ ] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
+- [x] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
   - Deutsche Texte der Einladung (Einmal-Link, Gültigkeit, Hinweis, was zu tun ist) und der Mitteilung an die alte Adresse, Theme
     `urinet-archiv` (Logo-Textmarke, Farben wie `vhf-gsk`-Muster aus Spec 03, 2.3); keine Namen Dritter in Betreffzeilen.
   - _Anforderungen: 7.4, 7.8, 8.6_
   - _Abhängig von: 19.2_
+  - Einladung und Theme mit importiertem Realm, Wegwerf-Keycloak und Mailpit geprüft. Die Mitteilung an die bisherige
+    Adresse ist als Text in der Keycloak-Betriebsdokumentation vorbereitet; der Versand durch das Archiv folgt mit 19.8.
+    Umstellung eines bestehenden Realms und Prüfung mit echtem Postfach bleiben Betriebsnachweise.
 
 ## Welle 21 — Admin-Kommando, Migration, Tests und Abnahme
 - [ ] 21.1 Admin-Kommando [Backend]
@@ -207,3 +243,21 @@ auf Server oder Secrets aus der Sitzung.
     Google-Verknüpfung (WO O.8).
   - _Anforderungen: 5.10, 8.2, 9.4, 9.7_
   - _Abhängig von: 21.2, 21.3, 21.4, 21.5_
+
+## Welle 24 — Passkey als Anmeldeweg (Entscheid Fabian 21.11.2026, Requirement 10)
+- [ ] 24.1 Spike und Realm-Flow Passkey [Infra] [Backend]
+  - Spike gegen Keycloak 26.8.2: Flow mit Passkey und Rückfall `browser-totp-pflicht`, `auth_time` bei Passkey, Einrichtung in der
+    Kontoverwaltung, Direct Grant unverändert; Ergebnis in design.md «Passkey» (Marker `[offen: …]` auflösen). Realm-Export mit
+    Platzhalter für die Relying-Party-ID; Realm-Tests mit virtuellem Authenticator (Einrichten, Anmelden, Step-up, Entfernen).
+  - _Anforderungen: 10.1, 10.2, 10.3, 10.4, 10.8, 10.9, 10.10, 10.11_
+  - _Abhängig von: 19.2, 19.10_
+- [ ] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
+  - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
+    Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
+  - _Anforderungen: 10.5, 10.6, 10.7_
+  - _Abhängig von: 24.1, 19.8, 20.7_
+- [ ] 24.3 Anleitung und Inbetriebnahme [Fabian]
+  - Anleitung (Spec 07, `frontend/public/anleitung/`) um «Mit Passkey anmelden» ergänzen; auf Stufe A Realm einmalig aktualisieren, Relying-Party-ID
+    setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
+  - _Anforderungen: 10.1, 10.2, 10.8_
+  - _Abhängig von: 24.1, 24.2_

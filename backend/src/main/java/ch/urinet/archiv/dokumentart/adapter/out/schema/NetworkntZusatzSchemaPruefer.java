@@ -283,6 +283,28 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         });
     }
 
+    @Override
+    public Map<String, String> feldBeschreibungen(String schemaJson) {
+        return mitFrist(zeitgrenzeNanos, () -> {
+            try {
+                geprueft(schemaJson);
+                JsonNode schema = StrengesJson.lesen(schemaJson);
+                JsonNode properties = schema.path("properties");
+                Map<String, String> beschreibungen = new LinkedHashMap<>();
+                properties.fields().forEachRemaining(eintrag -> {
+                    JsonNode definition = definition(schema, eintrag.getValue());
+                    String beschreibung = definition.path("description").asText();
+                    if (!beschreibung.isBlank()) {
+                        beschreibungen.put(eintrag.getKey(), beschreibung);
+                    }
+                });
+                return Collections.unmodifiableMap(beschreibungen);
+            } catch (JsonProcessingException e) {
+                throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            }
+        });
+    }
+
     private static JsonNode definition(JsonNode schema, JsonNode definition) {
         Set<String> gesehen = new LinkedHashSet<>();
         JsonNode aktuelle = definition;
@@ -311,7 +333,16 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
 
     @Override
     public List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson) {
-        return mitFrist(zeitgrenzeNanos, () -> {
+        return konfigurationPruefen(zeitgrenzeNanos, schemaJson, dateiJson);
+    }
+
+    @Override
+    public List<Verletzung> seedKonfigurationPruefen(String schemaJson, String dateiJson) {
+        return konfigurationPruefen(seedZeitgrenzeNanos, schemaJson, dateiJson);
+    }
+
+    private List<Verletzung> konfigurationPruefen(long fristNanos, String schemaJson, String dateiJson) {
+        return mitFrist(fristNanos, () -> {
             JsonNode datei = lesen(dateiJson, MAX_KONFIGURATION_BYTES, true);
             if (!datei.isObject() || tiefe(datei) > MAX_TIEFE) {
                 throw ungueltig();

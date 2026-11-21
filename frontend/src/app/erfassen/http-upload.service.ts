@@ -17,11 +17,22 @@ export class HttpUploadService extends UploadPort {
 
   hochladen(dateien: readonly File[], zusammenfassen: boolean): Observable<UploadEreignis> {
     return this.dokumente
-      .apiV1DokumentePost([...dateien], undefined, zusammenfassen ? true : undefined, undefined, 'events', true)
+      .apiV1DokumentePost(
+        [...dateien],
+        undefined,
+        zusammenfassen ? true : undefined,
+        undefined,
+        undefined,
+        undefined,
+        'events',
+        true,
+      )
       .pipe(
         map((ereignis): UploadEreignis | null => {
           if (ereignis.type === HttpEventType.UploadProgress) {
-            const prozent = ereignis.total ? Math.round((100 * ereignis.loaded) / ereignis.total) : 0;
+            const prozent = ereignis.total
+              ? Math.round((100 * ereignis.loaded) / ereignis.total)
+              : 0;
             return { typ: 'fortschritt', prozent };
           }
           if (ereignis.type === HttpEventType.Response) {

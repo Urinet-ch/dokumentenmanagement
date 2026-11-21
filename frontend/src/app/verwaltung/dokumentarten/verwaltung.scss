@@ -1,3 +1,4 @@
+// Gestaltung nach Prototyp (docs/oberflaeche/prototyp.html, V.dokumentarten): Bereiche als Karten, Pillen, Knöpfe
 :host {
   display: block;
   max-width: 72rem;
@@ -10,7 +11,6 @@
   min-width: 0;
 }
 
-h1,
 h2,
 h3,
 h4,
@@ -18,16 +18,17 @@ h5 {
   margin: 0;
 }
 
-h1 {
-  font: var(--mat-sys-headline-small);
+h2,
+h3 {
+  font-weight: 600;
 }
 
 h2 {
-  font: var(--mat-sys-title-large);
+  font-size: 17px;
 }
 
 h3 {
-  font: var(--mat-sys-title-medium);
+  font-size: 15px;
 }
 
 p {
@@ -35,15 +36,11 @@ p {
   overflow-wrap: anywhere;
 }
 
-section {
-  display: grid;
-  gap: 0.75rem;
-  min-width: 0;
-}
-
 .sprungmarken,
 .datei-aktionen,
-.bestaetigung {
+.bestaetigung,
+.zuordnungsliste li,
+.werteliste li {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -54,9 +51,19 @@ section {
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;
-  padding: 0.35rem 0.6rem;
-  color: var(--urinet-gelb);
-  text-underline-offset: 0.2em;
+  padding: 0 0.85rem;
+  border: 1px solid var(--linie);
+  border-radius: 99px;
+  background: var(--karte);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    border-color: var(--linie-stark);
+    color: var(--text);
+  }
 }
 
 .zweispaltig {
@@ -74,17 +81,24 @@ aside,
 .bestaetigung,
 .feld-editor {
   min-width: 0;
-  padding: 0.75rem;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 0.5rem;
+  padding: 0.875rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
 }
 
+.bestaetigung {
+  border-color: transparent;
+  background: var(--akzent-weich);
+}
+
+section,
 aside,
 .formular,
-.wert-formular,
-.zuordnungen {
+.wert-formular {
   display: grid;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .auswahlliste,
@@ -98,22 +112,53 @@ aside,
   min-width: 0;
 }
 
+// Auswahl in der Liste: Karte, die gewählte gelb markiert
 .auswahl {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.5rem;
   width: 100%;
   min-height: 2.75rem;
-  padding: 0.5rem;
+  padding: 0.6rem 0.75rem;
   text-align: start;
+  border-color: var(--linie);
+  background: var(--karte);
+  color: var(--text);
+  font-weight: 400;
+
+  &:not(:disabled):hover {
+    filter: none;
+    border-color: var(--linie-stark);
+  }
+
+  &[aria-current='true'] {
+    border-color: var(--urinet-gelb);
+    background: var(--akzent-weich);
+    box-shadow: inset 3px 0 0 var(--urinet-gelb);
+  }
+
+  .name {
+    font-weight: 600;
+  }
+
+  span:first-child,
+  code {
+    overflow-wrap: anywhere;
+  }
+
+  code {
+    color: var(--text-gedaempft);
+  }
+
+  .status {
+    grid-column: 1 / -1;
+  }
 }
 
-.auswahl span:first-child,
-.auswahl code {
-  overflow-wrap: anywhere;
-}
-
-.auswahl .status {
-  grid-column: 1 / -1;
+.pillen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
 }
 
 .formular label,
@@ -123,6 +168,8 @@ aside,
   display: grid;
   gap: 0.3rem;
   min-width: 0;
+  color: var(--text-2);
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -133,12 +180,13 @@ textarea {
   width: 100%;
   min-width: 0;
   min-height: 2.75rem;
-  padding: 0.5rem;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 0.25rem;
-  background: var(--urinet-karte);
-  color: var(--urinet-hell);
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+  background: var(--karte);
+  color: var(--text);
   font: inherit;
+  font-weight: 400;
 }
 
 textarea {
@@ -167,45 +215,56 @@ fieldset {
   min-width: 0;
   margin: 0;
   padding: 0.75rem;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 0.35rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
 }
 
 legend {
   padding: 0 0.25rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
-.feld-editor {
-  display: grid;
-  gap: 0.65rem;
-}
-
-.option-zeile {
+.option-zeile,
+.vergleich-formular {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
   gap: 0.5rem;
   align-items: end;
 }
 
+// Knöpfe wie im Prototyp (.btn): Hauptaktion gelb, sonst neutral; Löschen dezent in Gefahrfarbe
 button {
   min-height: 2.75rem;
   max-width: 100%;
-  padding: 0.45rem 0.8rem;
+  padding: 0.45rem 0.875rem;
   border: 1px solid var(--urinet-gelb);
-  border-radius: 0.3rem;
+  border-radius: var(--radius-klein);
   background: var(--urinet-gelb);
-  color: var(--urinet-dunkel);
+  color: var(--urinet-schwarz);
   font: inherit;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   overflow-wrap: anywhere;
   cursor: pointer;
 }
 
+button:not(:disabled):hover {
+  filter: brightness(0.96);
+}
+
 button.sekundaer {
-  border-color: var(--urinet-linie);
-  background: transparent;
-  color: var(--urinet-hell);
+  border-color: var(--linie-stark);
+  background: var(--karte);
+  color: var(--text);
+
+  &:not(:disabled):hover {
+    filter: none;
+    background: var(--karte-2);
+  }
+}
+
+button.gefahr {
+  color: var(--gefahr);
 }
 
 button:disabled {
@@ -213,54 +272,25 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid var(--urinet-gelb);
-  outline-offset: 2px;
-}
-
-.hinweis,
+.nebentext,
 .status {
-  color: var(--urinet-gedaempft);
+  color: var(--text-gedaempft);
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
 
-.meldung {
-  padding: 0.65rem;
-  border-inline-start: 0.25rem solid currentColor;
-  overflow-wrap: anywhere;
-}
+// Versionen und Vergleiche (.tabelle): Zellen oben bündig, Köpfe und lange Pfade umbrechen
+.tabelle-rahmen {
+  th,
+  td {
+    min-width: 6rem;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
 
-.fehler {
-  color: var(--urinet-fehler);
-}
-
-.erfolg {
-  color: var(--urinet-erfolg);
-}
-
-.tabellen-rahmen {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  min-width: 6rem;
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--urinet-linie);
-  text-align: start;
-  vertical-align: top;
-  overflow-wrap: anywhere;
+  th {
+    white-space: normal;
+  }
 }
 
 td code {
@@ -268,19 +298,13 @@ td code {
 }
 
 .vergleich-formular {
-  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 0.75rem;
-  align-items: end;
   min-width: 0;
 }
 
 .zuordnungsliste li,
 .werteliste li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
   min-width: 0;
 }
 

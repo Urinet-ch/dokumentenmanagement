@@ -96,7 +96,8 @@ class DeployBenachrichtigungTest {
         Path env = ordner.resolve(".env");
 
         assertThat(schreibeEnv(wert, env)).isZero();
-        assertThat(Files.readAllLines(env, StandardCharsets.UTF_8)).containsExactly(VARIABLE + "=" + wert);
+        assertThat(Files.readAllLines(env, StandardCharsets.UTF_8)).containsExactly(VARIABLE + "=" + wert,
+                "ARCHIV_BASIS_URL=https://archiv.example.invalid");
     }
 
     /** Injektionsschutz: keine weitere Zeile, keine Interpolation, keine zweite Adresse; ohne .env kein Deploy. */
@@ -112,10 +113,25 @@ class DeployBenachrichtigungTest {
         assertThat(env).doesNotExist();
     }
 
+    /** Ohne gültigen Hostnamen schreibt das Skript keine .env; sonst startet Keycloak nach dem Deploy nicht. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", "archiv", "archiv.example.invalid/pfad", "archiv.example.invalid:8443", "a b.example.invalid"})
+    void ungueltigerHostBrichtAb(String host, @TempDir Path ordner) throws Exception {
+        Path env = ordner.resolve(".env");
+
+        assertThat(schreibeEnv("", host, env)).isEqualTo(1);
+        assertThat(env).doesNotExist();
+    }
+
     private static int schreibeEnv(String wert, Path env) throws Exception {
+        return schreibeEnv(wert, "archiv.example.invalid", env);
+    }
+
+    private static int schreibeEnv(String wert, String host, Path env) throws Exception {
         ProcessBuilder pb = new ProcessBuilder("bash", SCHREIBE_ENV.toString(), env.toString())
                 .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
         pb.environment().put(VARIABLE, wert);
+        pb.environment().put("HOST_ARCHIV", host);
         Process p = pb.start();
         assertThat(p.waitFor(30, TimeUnit.SECONDS)).isTrue();
         return p.exitValue();

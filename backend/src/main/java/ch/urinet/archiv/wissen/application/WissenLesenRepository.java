@@ -17,6 +17,8 @@ public interface WissenLesenRepository {
 
     IndexErgebnis index(Sichtregel sichtregel, IndexAnfrage anfrage);
 
+    List<SeiteVerweis> seitenFuerDokument(Sichtregel sichtregel, UUID dokumentId);
+
     Optional<Wissensseite> seite(UUID id, Sichtregel sichtregel);
 
     Optional<Wissensseite> seite(String pfad, Sichtregel sichtregel);
@@ -41,7 +43,11 @@ public interface WissenLesenRepository {
     }
 
     record IndexZeile(UUID id, Seitentyp typ, String pfad, String titel, String beschreibung, String status,
-                      boolean quellePruefen) {
+                      boolean quellePruefen, Wissensseite.Vertraulichkeit vertraulichkeit) {
+        public IndexZeile(UUID id, Seitentyp typ, String pfad, String titel, String beschreibung, String status,
+                          boolean quellePruefen) {
+            this(id, typ, pfad, titel, beschreibung, status, quellePruefen, null);
+        }
     }
 
     record IndexErgebnis(List<IndexZeile> seiten, long gesamt) {
@@ -64,14 +70,19 @@ public interface WissenLesenRepository {
         }
     }
 
-    record DokumentKopf(String titel, String dateiname) {
+    record DokumentKopf(String titel, String dateiname, java.time.LocalDate datum) {
     }
 
     record SeiteVerweis(UUID id, String pfad, String titel) {
     }
 
     record LogEintrag(long id, Instant zeit, String aktion, String akteur, List<SeiteVerweis> seiten,
-                      UUID dokumentId, UUID entwurfId) {
+                      UUID dokumentId, UUID entwurfId, boolean widerspruchAufgeloest) {
+        public LogEintrag(long id, Instant zeit, String aktion, String akteur, List<SeiteVerweis> seiten,
+                          UUID dokumentId, UUID entwurfId) {
+            this(id, zeit, aktion, akteur, seiten, dokumentId, entwurfId, false);
+        }
+
         public LogEintrag {
             seiten = List.copyOf(seiten);
         }
