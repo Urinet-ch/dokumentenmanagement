@@ -119,6 +119,21 @@ public class AnmeldungSchritte {
         assertThat(pflicht).isTrue();
     }
 
+    @Dann("beträgt die Access-Token-Lebensdauer des Realm-Exports {int} Sekunden")
+    public void accessTokenLebensdauer(int sekunden) throws IOException {
+        assertThat(export().path("accessTokenLifespan").asInt()).isEqualTo(sekunden);
+    }
+
+    @Dann("verlangt der Realm-Export Passwörter mit mindestens 12 Zeichen ohne Benutzername oder E-Mail")
+    public void passwortRichtlinie() throws IOException {
+        assertThat(export().path("passwordPolicy").asText()).isEqualTo("length(12) and notUsername and notEmail");
+    }
+
+    @Und("sendet Keycloak eine Einladung ohne Passwort und mit TOTP-Einrichtung an Mailpit")
+    public void einladungAnMailpit() {
+        EinladungsProbe.pruefen();
+    }
+
     @Dann("ist Google im Realm-Export als deaktivierter, nicht vertrauender Provider vorbereitet")
     public void googleProviderVorbereitet() throws IOException {
         JsonNode google = export().path("identityProviders").path(0);

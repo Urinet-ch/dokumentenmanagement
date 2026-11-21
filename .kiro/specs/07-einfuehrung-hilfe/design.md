@@ -95,6 +95,31 @@ Alle Punkte sind vorgeschlagen am 21.11.2026 und gelten als entschieden mit dem 
   Schreibzugriff, erfasst aber weder «übersprungen» noch Benutzer aus der Übernahme.
 Empfehlung: Browser jetzt; (a) erst prüfen, wenn Spec 06 umgesetzt ist und Fabian das Wiedererscheinen als störend meldet.
 
+**Umsetzung (Aufgabe 23.1):**
+- Zwei Dateien unter `frontend/src/app/hilfe/`: `einfuehrung-vermerk-speicher.ts` (Format, Kennung, Lesen, Ablegen,
+  Datum; ohne Angular und ohne Importe, damit die Browser-Szenarien das Modul unverändert in Chromium laden können) und
+  `einfuehrung-vermerk.ts` (Dienst `EinfuehrungVermerk`, root, liest Benutzer und Mandant aus `AnmeldungService.benutzer`).
+- Schnittstelle für die Aufgaben 23.2 und 23.3: `bekannt: Signal<boolean | null>` – `false` heisst neuer Benutzer
+  (Einführung zeigen), `true` Vermerk besteht, `null` kein angemeldeter Benutzer mit Mandant, `sub` und Rolle oder die
+  Kennung ist noch nicht berechnet (`crypto.subtle.digest` ist asynchron; dann nichts zeigen, damit die Karte nicht
+  aufblitzt). `ablegen(art: 'ABGESCHLOSSEN' | 'UEBERSPRUNGEN'): Promise<void>` setzt `bekannt` sofort auf `true`, ersetzt
+  einen bestehenden Vermerk (Req 3.5) und tut ohne Benutzer mit Mandant und Rolle nichts. Ob `/?einfuehrung` die
+  Einführung trotz Vermerk zeigt, entscheidet die Startseite (23.3), nicht der Dienst.
+- Benutzerwechsel und Abmeldung: `bekannt` folgt dem Signal des angemeldeten Benutzers; nach der Abmeldung ist es `null`,
+  der Vermerk bleibt im Browser. Ein Ergebnis für einen inzwischen abgemeldeten oder gewechselten Benutzer wird verworfen.
+- Format: Ein Wert mit anderem `v` als 1, ohne Liste oder ohne gültiges JSON gilt als unlesbar (leer) und wird beim
+  nächsten Schreiben ersetzt; einzelne unlesbare Einträge (Kennung nicht 64 Zeichen hex, Version keine ganze Zahl ≥ 1,
+  unbekannte Art, Datum nicht `JJJJ-MM-TT`) fallen weg, zusätzliche Felder werden nicht übernommen. Jede Version ≥ 1 gilt
+  als Vermerk. «Ältester» ist der vorderste Eintrag der Liste (Reihenfolge des Schreibens, nicht `am`, das nur den Tag
+  kennt); ein ersetzter Vermerk rückt als neuester ans Ende. `am` ist das Kalenderdatum in Europe/Zurich.
+- Arbeitsspeicher: Der Dienst merkt sich jeden Vermerk dieser Sitzung unter `<mandant>:<sub>` (nur im Arbeitsspeicher,
+  nie gespeichert), nicht nur bei einem Fehler des Speichers. Ohne `crypto.subtle` liest und schreibt er den
+  `localStorage` nicht.
+- Nachweis: Vitest `einfuehrung-vermerk.spec.ts` (Hash, 20 Einträge, Ersetzen, Benutzerwechsel, Abmeldung, gesperrter,
+  voller und beschädigter Speicher, ohne `crypto.subtle`, keine Anfrage); Browser-Szenarien
+  `features/hilfe/einfuehrung-vermerk.feature` (Req 1.3–1.5) prüfen das Modul im echten Browser auf dem Ursprung der App.
+  Abschliessen und Überspringen über die Karte belegen die Szenarien zu Req 3.3 und 3.4 (Aufgabe 23.3).
+
 ## Schritte der Einführung (Requirement 2)
 Texte in `texte.de-CH.ts` (`einfuehrung.schritte`); `{name}` = Name aus dem Branding, `{rolle}` = Bezeichnung der Rolle
 aus `texte.kopf.rollen`. Jeder Schritt höchstens drei Sätze und ein Link «In der Anleitung lesen», der die Hilfe-Leiste
