@@ -87,7 +87,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Abhängig von: 22.1_
 
 ## Welle 23 — Einführung und Abschluss
-- [ ] 23.1 Einführungsvermerk [Frontend]
+- [x] 23.1 Einführungsvermerk [Frontend]
   - Dienst `EinfuehrungVermerk`: Schlüssel `archiv.einfuehrung`, Kennung SHA-256 von `<mandant>:<sub>`, Version, Art,
     Datum, höchstens 20 Einträge, Arbeitsspeicher als Rückfall (gesperrter Speicher, beschädigter Eintrag, ohne
     `crypto.subtle`), nie an den Server; Vitest `einfuehrung-vermerk.spec.ts`.
