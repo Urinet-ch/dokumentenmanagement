@@ -1,5 +1,7 @@
 export * from './api-tokens.service';
 import { APITokensService } from './api-tokens.service';
+export * from './benutzerverwaltung.service';
+import { BenutzerverwaltungService } from './benutzerverwaltung.service';
 export * from './berichte.service';
 import { BerichteService } from './berichte.service';
 export * from './branding.service';
@@ -26,4 +28,4 @@ export * from './wissen-lint-resource.service';
 import { WissenLintResourceService } from './wissen-lint-resource.service';
 export * from './wissensbasis.service';
 import { WissensbasisService } from './wissensbasis.service';
-export const APIS = [APITokensService, BerichteService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KonfigurationService, KontakteService, ProtokollService, WissenIngestResourceService, WissenLintResourceService, WissensbasisService];
+export const APIS = [APITokensService, BenutzerverwaltungService, BerichteService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KonfigurationService, KontakteService, ProtokollService, WissenIngestResourceService, WissenLintResourceService, WissensbasisService];

@@ -91,38 +91,6 @@ components:
       - A21
       - A22
       - A23
-    Ansicht:
-      type: object
-      properties:
-        id:
-          type: string
-        benutzername:
-          type: string
-        vorname:
-          type: string
-        nachname:
-          type: string
-        email:
-          type: string
-        rollen:
-          type: array
-          uniqueItems: true
-          items:
-            $ref: "#/components/schemas/Rolle"
-        rollenkonflikt:
-          type: boolean
-        status:
-          $ref: "#/components/schemas/BenutzerStatus"
-        totp:
-          type: boolean
-        google:
-          type: boolean
-        einladungOffenSeit:
-          $ref: "#/components/schemas/Instant"
-        letzteAktion:
-          $ref: "#/components/schemas/LetzteAktion"
-        etag:
-          type: string
     Antwort:
       type: object
       properties:
@@ -350,6 +318,58 @@ components:
         code:
           type: string
         meldung:
+          type: string
+    BenutzerAnlage:
+      type: object
+      properties:
+        benutzername:
+          type: string
+        email:
+          type: string
+        vorname:
+          type: string
+        nachname:
+          type: string
+        rolle:
+          type: string
+    BenutzerAnlageErgebnis:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        antragId:
+          $ref: "#/components/schemas/UUID"
+    BenutzerAnsicht:
+      type: object
+      properties:
+        id:
+          type: string
+        benutzername:
+          type: string
+        vorname:
+          type: string
+        nachname:
+          type: string
+        email:
+          type: string
+        rollen:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Rolle"
+        rollenkonflikt:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/BenutzerStatus"
+        totp:
+          type: boolean
+        google:
+          type: boolean
+        einladungOffenSeit:
+          $ref: "#/components/schemas/Instant"
+        letzteAktion:
+          $ref: "#/components/schemas/LetzteAktion"
+        etag:
           type: string
     BenutzerStatus:
       type: string
@@ -3719,7 +3739,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Ansicht"
+                  $ref: "#/components/schemas/BenutzerAnsicht"
         "401":
           description: Not Authorized
         "403":
@@ -3740,19 +3760,21 @@ paths:
         content:
           application/json:
             schema:
-              type: string
-              format: binary
+              $ref: "#/components/schemas/BenutzerAnlage"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Benutzer angelegt
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: "#/components/schemas/BenutzerAnlageErgebnis"
         "401":
           description: Not Authorized
         "403":
           description: Not Allowed
+        "400":
+          description: Bad Request
       security:
       - SecurityScheme:
         - inhaber
@@ -3769,10 +3791,11 @@ paths:
           type: string
       responses:
         "200":
-          description: OK
+          description: Benutzer des Mandanten
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: "#/components/schemas/BenutzerAnsicht"
         "401":
           description: Not Authorized
         "403":
@@ -3799,19 +3822,17 @@ paths:
         content:
           application/json:
             schema:
-              type: string
-              format: binary
+              type: object
         required: true
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: {}
+        "204":
+          description: Einladung gesendet
         "401":
           description: Not Authorized
         "403":
           description: Not Allowed
+        "400":
+          description: Bad Request
       security:
       - SecurityScheme:
         - inhaber

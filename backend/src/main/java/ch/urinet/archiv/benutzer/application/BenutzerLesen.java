@@ -28,7 +28,7 @@ public class BenutzerLesen {
         this.mandant = mandant;
     }
 
-    public record Ansicht(String id, String benutzername, String vorname, String nachname, String email,
+    public record BenutzerAnsicht(String id, String benutzername, String vorname, String nachname, String email,
                           Set<Rolle> rollen, boolean rollenkonflikt, BenutzerStatus status,
                           boolean totp, boolean google, Instant einladungOffenSeit,
                           BenutzerAktivitaet.LetzteAktion letzteAktion, String etag) {
@@ -38,7 +38,7 @@ public class BenutzerLesen {
         }
     }
 
-    public List<Ansicht> suchen(String suche, int seite, int groesse) {
+    public List<BenutzerAnsicht> suchen(String suche, int seite, int groesse) {
         try {
             IdentitaetsDienst.seitenanfang(suche, seite, groesse);
         } catch (IllegalArgumentException e) {
@@ -48,7 +48,7 @@ public class BenutzerLesen {
         return identitaet.benutzerSuchen(code, suche, seite, groesse).stream().map(this::darstellen).toList();
     }
 
-    public Ansicht lesen(String id) {
+    public BenutzerAnsicht lesen(String id) {
         String code = mandant.pruefen().wert();
         if (id == null || !KENNUNG.matcher(id).matches()) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
@@ -56,12 +56,12 @@ public class BenutzerLesen {
         return darstellen(identitaet.benutzerLesen(code, id));
     }
 
-    private Ansicht darstellen(IdentitaetsDienst.Benutzer benutzer) {
+    private BenutzerAnsicht darstellen(IdentitaetsDienst.Benutzer benutzer) {
         BenutzerStatus zustand = status.lesen(benutzer.id()).map(BenutzerStatusSpeicher.Eintrag::status)
                 .orElseGet(() -> !benutzer.aktiv() ? BenutzerStatus.GESPERRT
                         : benutzer.aktionen().isEmpty() ? BenutzerStatus.AKTIV : BenutzerStatus.EINGELADEN);
         BenutzerAktivitaet.Angaben angaben = aktivitaet.lesen(benutzer.id());
-        return new Ansicht(benutzer.id(), benutzer.benutzername(), benutzer.vorname(), benutzer.nachname(),
+        return new BenutzerAnsicht(benutzer.id(), benutzer.benutzername(), benutzer.vorname(), benutzer.nachname(),
                 benutzer.email(), benutzer.rollen(), benutzer.rollen().size() != 1, zustand, benutzer.totp(),
                 benutzer.google(), zustand == BenutzerStatus.EINGELADEN ? angaben.einladungSeit() : null,
                 angaben.letzteAktion(), BenutzerEtag.berechnen(benutzer, zustand));

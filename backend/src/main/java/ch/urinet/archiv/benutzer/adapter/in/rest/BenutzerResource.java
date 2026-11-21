@@ -31,6 +31,11 @@ import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.io.IOException;
@@ -68,7 +73,7 @@ public class BenutzerResource {
     @ErfordertAktion(Aktion.A21)
     @RolesAllowed("inhaber")
     @Operation(summary = "Benutzer des Mandanten auflisten")
-    public List<BenutzerLesen.Ansicht> suchen(@QueryParam("q") String suche,
+    public List<BenutzerLesen.BenutzerAnsicht> suchen(@QueryParam("q") String suche,
                                               @QueryParam("seite") @DefaultValue("0") int seite,
                                               @QueryParam("groesse") @DefaultValue("50") int groesse) {
         return lesen.suchen(suche, seite, groesse);
@@ -79,8 +84,11 @@ public class BenutzerResource {
     @ErfordertAktion(Aktion.A21)
     @RolesAllowed("inhaber")
     @Operation(summary = "Benutzer des Mandanten anzeigen")
+    @APIResponse(responseCode = "200", description = "Benutzer des Mandanten",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = BenutzerLesen.BenutzerAnsicht.class)))
     public Response lesen(@PathParam("benutzerId") String benutzerId) {
-        BenutzerLesen.Ansicht ansicht = lesen.lesen(benutzerId);
+        BenutzerLesen.BenutzerAnsicht ansicht = lesen.lesen(benutzerId);
         return Response.ok(ansicht).tag(ansicht.etag()).build();
     }
 
@@ -89,6 +97,11 @@ public class BenutzerResource {
     @ErfordertAktion(Aktion.A22)
     @RolesAllowed("inhaber")
     @Operation(summary = "Benutzer anlegen und einladen")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = BenutzerAnlegen.BenutzerAnlage.class)))
+    @APIResponse(responseCode = "201", description = "Benutzer angelegt",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = BenutzerAnlegen.BenutzerAnlageErgebnis.class)))
     public Response anlegen(@HeaderParam("X-Real-Ip") String ip,
                             @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
         var code = mandant.pruefen();
@@ -97,9 +110,9 @@ public class BenutzerResource {
         stepUp.pruefen();
         jsonPruefen(contentType);
         byte[] eingabe = begrenztLesen(body);
-        BenutzerAnlegen.Eingabe neu;
+        BenutzerAnlegen.BenutzerAnlage neu;
         try {
-            neu = json.forType(BenutzerAnlegen.Eingabe.class).readValue(eingabe);
+            neu = json.forType(BenutzerAnlegen.BenutzerAnlage.class).readValue(eingabe);
         } catch (JsonProcessingException e) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -113,6 +126,8 @@ public class BenutzerResource {
     @ErfordertAktion(Aktion.A22)
     @RolesAllowed("inhaber")
     @Operation(summary = "Einladung erneut senden")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Einladung gesendet")
     public Response einladung(@PathParam("benutzerId") String benutzerId, @HeaderParam("X-Real-Ip") String ip,
                               @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
         jsonPruefen(contentType);

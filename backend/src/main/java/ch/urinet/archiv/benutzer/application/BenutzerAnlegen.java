@@ -75,17 +75,18 @@ public class BenutzerAnlegen {
         this.antrag = antrag;
     }
 
-    public record Eingabe(String benutzername, String email, String vorname, String nachname, String rolle) {
+    public record BenutzerAnlage(String benutzername, String email, String vorname, String nachname, String rolle) {
         @Override
         public String toString() {
             return "Eingabe[geschützt]";
         }
     }
 
-    public record Ergebnis(UUID id, UUID antragId) {
+    public record BenutzerAnlageErgebnis(UUID id, UUID antragId) {
     }
 
-    public Ergebnis anlegen(MandantCode mandant, Benutzer akteur, Eingabe eingabe, Optional<IpAdresse> ip) {
+    public BenutzerAnlageErgebnis anlegen(MandantCode mandant, Benutzer akteur, BenutzerAnlage eingabe,
+                                         Optional<IpAdresse> ip) {
         berechtigung.aktion(akteur, Aktion.A22);
         berechtigung.aktion(akteur, Aktion.A23);
         stepUp.pruefen();
@@ -104,62 +105,81 @@ public class BenutzerAnlegen {
         ZugriffEintrag absicht = eintrag(akteur, ip, vorgangId, null, rolleNeu,
                 ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
         AtomicBoolean vierAugen = new AtomicBoolean();
+        AtomicBoolean arbeitAbgeschlossen = new AtomicBoolean();
         AtomicReference<String> angelegt = new AtomicReference<>();
-        return vorgang.ausfuehren(mandant, absicht, () -> {
-            if (identitaet.benutzerZaehlen(mandant.wert()) >= maximum) {
-                throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
-            }
-            if (namen.vergeben(eingabe.benutzername())) {
-                throw new FachFehler(Fehlercode.BENUTZER_EXISTIERT);
-            }
-            vierAugen.set(rolle == Rolle.INHABER && identitaet.inhaberZaehlen(mandant.wert()) >= 2);
-        }, () -> {
-            var neu = new IdentitaetsDienst.Neuanlage(eingabe.benutzername(), eingabe.email(),
-                    eingabe.vorname(), eingabe.nachname());
-            String id = vierAugen.get() ? identitaet.anlegenOhneRolle(mandant.wert(), neu)
-                    : identitaet.anlegen(mandant.wert(), neu, rolle);
-            angelegt.set(id);
-            UUID ziel;
-            try {
-                ziel = UUID.fromString(id);
-                if (!ziel.toString().equalsIgnoreCase(id)) {
-                    throw new IllegalArgumentException("Ungültige Zielkennung");
+        try {
+            return vorgang.ausfuehren(mandant, absicht, () -> {
+                if (identitaet.benutzerZaehlen(mandant.wert()) >= maximum) {
+                    throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
                 }
-            } catch (IllegalArgumentException e) {
-                throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
-            }
-            try {
-                identitaet.einladen(mandant.wert(), id, AKTIONEN, einladung);
-            } catch (RuntimeException fehler) {
-                throw new VerwaltungVorgang.ArbeitFehler(ziel, fehler);
-            }
-            return new Ergebnis(ziel, vierAugen.get() ? UUID.randomUUID() : null);
-        }, fehler -> {
-            if (fehler instanceof IdentitaetsDienst.KonfliktException) {
-                return VerwaltungVorgang.Kompensation.GEKLAERT;
-            }
-            if (angelegt.get() != null) {
-                identitaet.loeschen(mandant.wert(), angelegt.get());
-            }
-            return VerwaltungVorgang.Kompensation.UNKLAR;
-        }, ergebnis -> {
-            verzeichnis.einfuegen(Optional.empty(), new BenutzerVerzeichnis.Neu(ergebnis.id().toString(),
-                    Optional.of(eingabe.benutzername()), vierAugen.get() ? Optional.empty() : Optional.of(rolle.name()),
-                    Optional.empty(), false, VerzeichnisEintrag.Anlass.ANLAGE, Optional.of(akteur.id())));
-            if (ergebnis.antragId() != null) {
-                Instant jetzt = Instant.now();
-                antraege.anlegen(new VerwaltungAntragSpeicher.Antrag(ergebnis.antragId(),
-                        VerwaltungAntragSpeicher.Art.INHABER_ROLLE, ergebnis.id().toString(), Rolle.INHABER,
-                        null, akteur.id(), jetzt, jetzt.plus(antrag), VerwaltungAntragSpeicher.Status.OFFEN,
-                        null, null));
-                var details = new ProtokollDetails.Verwaltung(ergebnis.antragId(),
-                        ProtokollDetails.Verwaltungsphase.ANGEFRAGT, ergebnis.id(),
-                        ProtokollDetails.Verwaltungsvorgang.ANTRAG, null, rolleNeu, List.of());
-                protokoll.schreiben(new ZugriffEintrag(Optional.of(akteur.id()), Optional.of(akteur.rolle().name()),
-                        ProtokollAktion.BENUTZER_ANTRAG, Optional.empty(), ip, ProtokollDetails.verwaltung(details)));
-            }
-        }, ergebnis -> eintrag(akteur, ip, vorgangId, ergebnis.id(), rolleNeu,
-                ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
+                if (namen.vergeben(eingabe.benutzername())) {
+                    throw new FachFehler(Fehlercode.BENUTZER_EXISTIERT);
+                }
+                vierAugen.set(rolle == Rolle.INHABER && identitaet.inhaberZaehlen(mandant.wert()) >= 2);
+            }, () -> {
+                var neu = new IdentitaetsDienst.Neuanlage(eingabe.benutzername(), eingabe.email(),
+                        eingabe.vorname(), eingabe.nachname());
+                String id = vierAugen.get() ? identitaet.anlegenOhneRolle(mandant.wert(), neu)
+                        : identitaet.anlegen(mandant.wert(), neu, rolle);
+                angelegt.set(id);
+                UUID ziel;
+                try {
+                    ziel = UUID.fromString(id);
+                    if (!ziel.toString().equalsIgnoreCase(id)) {
+                        throw new IllegalArgumentException("Ungültige Zielkennung");
+                    }
+                } catch (IllegalArgumentException e) {
+                    throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                }
+                try {
+                    identitaet.einladen(mandant.wert(), id, AKTIONEN, einladung);
+                } catch (RuntimeException fehler) {
+                    throw new VerwaltungVorgang.ArbeitFehler(ziel, fehler);
+                }
+                arbeitAbgeschlossen.set(true);
+                return new BenutzerAnlageErgebnis(ziel, vierAugen.get() ? UUID.randomUUID() : null);
+            }, fehler -> {
+                if (fehler instanceof IdentitaetsDienst.KonfliktException) {
+                    return VerwaltungVorgang.Kompensation.GEKLAERT;
+                }
+                if (fehler instanceof IdentitaetsDienst.AnlageException anlageFehler) {
+                    return anlageFehler.entfernt() && sicherAbgewiesen(anlageFehler.getCause())
+                            ? VerwaltungVorgang.Kompensation.GEKLAERT : VerwaltungVorgang.Kompensation.UNKLAR;
+                }
+                if (angelegt.get() != null) {
+                    identitaet.anlageRueckgaengig(mandant.wert(), angelegt.get());
+                    if (arbeitAbgeschlossen.get() || fehler instanceof VerwaltungVorgang.ArbeitFehler arbeitFehler
+                            && sicherAbgewiesen(arbeitFehler.getCause())) {
+                        return VerwaltungVorgang.Kompensation.GEKLAERT;
+                    }
+                }
+                return VerwaltungVorgang.Kompensation.UNKLAR;
+            }, ergebnis -> {
+                verzeichnis.einfuegen(Optional.empty(), new BenutzerVerzeichnis.Neu(ergebnis.id().toString(),
+                        Optional.of(eingabe.benutzername()), vierAugen.get() ? Optional.empty() : Optional.of(rolle.name()),
+                        Optional.empty(), false, VerzeichnisEintrag.Anlass.ANLAGE, Optional.of(akteur.id())));
+                if (ergebnis.antragId() != null) {
+                    Instant jetzt = Instant.now();
+                    antraege.anlegen(new VerwaltungAntragSpeicher.Antrag(ergebnis.antragId(),
+                            VerwaltungAntragSpeicher.Art.INHABER_ROLLE, ergebnis.id().toString(), Rolle.INHABER,
+                            null, akteur.id(), jetzt, jetzt.plus(antrag), VerwaltungAntragSpeicher.Status.OFFEN,
+                            null, null));
+                    var details = new ProtokollDetails.Verwaltung(ergebnis.antragId(),
+                            ProtokollDetails.Verwaltungsphase.ANGEFRAGT, ergebnis.id(),
+                            ProtokollDetails.Verwaltungsvorgang.ANTRAG, null, rolleNeu, List.of());
+                    protokoll.schreiben(new ZugriffEintrag(Optional.of(akteur.id()), Optional.of(akteur.rolle().name()),
+                            ProtokollAktion.BENUTZER_ANTRAG, Optional.empty(), ip, ProtokollDetails.verwaltung(details)));
+                }
+            }, ergebnis -> eintrag(akteur, ip, vorgangId, ergebnis.id(), rolleNeu,
+                    ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
+        } catch (VerwaltungVorgang.ArbeitFehler | IdentitaetsDienst.AnlageException fehler) {
+            throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+    }
+
+    private static boolean sicherAbgewiesen(Throwable fehler) {
+        return fehler instanceof FachFehler fachfehler && (fachfehler.code() == Fehlercode.IDENTITAETSDIENST_FEHLER
+                || fachfehler.code() == Fehlercode.UEBERLASTET || fachfehler.code() == Fehlercode.NICHT_GEFUNDEN);
     }
 
     private static ZugriffEintrag eintrag(Benutzer akteur, Optional<IpAdresse> ip, UUID vorgangId, UUID ziel,

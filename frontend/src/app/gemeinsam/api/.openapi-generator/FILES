@@ -2,6 +2,7 @@ api.base.service.ts
 api.module.ts
 api/api-tokens.service.ts
 api/api.ts
+api/benutzerverwaltung.service.ts
 api/berichte.service.ts
 api/branding.service.ts
 api/chat.service.ts
@@ -19,6 +20,7 @@ configuration.ts
 encoder.ts
 index.ts
 model/aenderung.ts
+model/aktion.ts
 model/antwort.ts
 model/antwort1.ts
 model/anzahl.ts
@@ -33,6 +35,10 @@ model/aussage.ts
 model/auszug-teil.ts
 model/bearbeitung.ts
 model/befund.ts
+model/benutzer-anlage-ergebnis.ts
+model/benutzer-anlage.ts
+model/benutzer-ansicht.ts
+model/benutzer-status.ts
 model/bestaetigung.ts
 model/branding-dto.ts
 model/chat-frage.ts
@@ -57,6 +63,7 @@ model/eingabe.ts
 model/eingangskorb-seite.ts
 model/entfernte-aussage.ts
 model/entscheidung.ts
+model/ergebnis.ts
 model/export-anfrage.ts
 model/export.ts
 model/fundstelle.ts
@@ -98,6 +105,7 @@ model/kontakt-zusammenfuehren.ts
 model/kontakt-zusammengefuehrt.ts
 model/kontakt.ts
 model/kopf.ts
+model/letzte-aktion.ts
 model/mandantenfunktionen.ts
 model/models.ts
 model/paket-kopf.ts
@@ -110,11 +118,15 @@ model/regel-anlegen.ts
 model/regel.ts
 model/regel1.ts
 model/reihe.ts
+model/rolle.ts
 model/status-ansicht.ts
 model/suchergebnis.ts
 model/suchtreffer.ts
 model/upload-ergebnis.ts
 model/upload-fehler.ts
+model/verwaltung-rechte-fussnote.ts
+model/verwaltung-rolle.ts
+model/verwaltung-rollenrecht.ts
 model/verwerfen.ts
 model/verzeichnis-eintrag.ts
 model/vollansicht.ts

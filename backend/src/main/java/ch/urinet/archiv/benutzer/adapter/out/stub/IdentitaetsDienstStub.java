@@ -141,6 +141,11 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
     }
 
     @Override
+    public synchronized void anlageRueckgaengig(String mandant, String id) {
+        loeschen(mandant, id);
+    }
+
+    @Override
     public synchronized long benutzerZaehlen(String mandant) {
         Objects.requireNonNull(mandant);
         return benutzer.values().stream().filter(e -> e.mandant.equals(mandant)).count();

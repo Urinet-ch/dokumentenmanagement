@@ -133,6 +133,9 @@ public interface IdentitaetsDienst {
 
     void loeschen(String mandant, String id);
 
+    /** Entfernt einen gerade angelegten Benutzer auch bei offenem Schutzschalter. */
+    void anlageRueckgaengig(String mandant, String id);
+
     /** Alle nicht gelöschten Benutzer des Mandanten, auch deaktivierte und eingeladene. */
     long benutzerZaehlen(String mandant);
 

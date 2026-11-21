@@ -3,6 +3,7 @@ package ch.urinet.archiv.benutzer.adapter.out.keycloak;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.AnlageException;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Neuanlage;
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.ErforderlicheAktion;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -703,6 +705,7 @@ class KeycloakAdminAdapterTest {
 
         for (Runnable aufruf : new Runnable[] {
                 () -> adapter.loeschen("urinet", "fremd-1"),
+                () -> adapter.anlageRueckgaengig("urinet", "fremd-1"),
                 () -> adapter.aktivieren("urinet", "fremd-1", false),
                 () -> adapter.rolleSetzen("urinet", "fremd-1", Rolle.INHABER),
                 () -> adapter.otpEntfernen("urinet", "fremd-1"),
@@ -775,6 +778,39 @@ class KeycloakAdminAdapterTest {
                 });
 
         server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/neu-1")));
+    }
+
+    @Test
+    void kompensationNachEinladungsfehlerUmgehtOffenenSchutzschalter() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/stoerung")).willReturn(aResponse().withStatus(503)));
+        benutzerStub("neu-1", "urinet");
+        server.stubFor(delete(urlPathEqualTo(USERS + "/neu-1")).willReturn(aResponse().withStatus(204)));
+        KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+        for (int i = 0; i < 3; i++) {
+            assertThatThrownBy(() -> adapter.benutzerLesen("urinet", "stoerung")).isInstanceOf(FachFehler.class);
+        }
+
+        adapter.anlageRueckgaengig("urinet", "neu-1");
+
+        server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/neu-1")));
+    }
+
+    @Test
+    void angenommenerVersandOderLoeschungIstKeinBestaetigterAbschluss() {
+        tokenAntwort();
+        benutzerStub("neu-1", "urinet");
+        server.stubFor(put(urlPathEqualTo(USERS + "/neu-1/execute-actions-email"))
+                .willReturn(aResponse().withStatus(202)));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/neu-1")).willReturn(aResponse().withStatus(202)));
+        KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+        assertThatThrownBy(() -> adapter.einladen("urinet", "neu-1",
+                Set.of(ErforderlicheAktion.VERIFY_EMAIL), Duration.ofHours(1)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+        assertThatThrownBy(() -> adapter.anlageRueckgaengig("urinet", "neu-1"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
     }
 
     @Test

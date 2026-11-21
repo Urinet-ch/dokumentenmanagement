@@ -1,6 +1,11 @@
 package ch.urinet.archiv.benutzer.adapter.in.rest;
 
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
+import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
+import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
@@ -8,6 +13,7 @@ import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusMock;
 import io.restassured.common.mapper.TypeRef;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,11 +23,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -172,6 +181,196 @@ class VerwaltungCacheHttpTest {
             identitaet.loeschen("urinet", eigeneId);
             identitaet.loeschen("vhf-gsk", fremdeId);
         }
+    }
+
+    @Test
+    void anlegenVerlangtStepUp() {
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                .body(anlage("test." + UUID.randomUUID().toString().substring(0, 8), "mitarbeiter"))
+                .when().post("/api/v1/benutzer").then()
+                .statusCode(401).body("fehlercode", is("STEP_UP_NOETIG"));
+    }
+
+    @Test
+    void anlegenPrueftRollenNamenssperreUndVierAugen() throws SQLException {
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String name = "test." + suffix;
+        String inhaberName = "owner." + suffix;
+        String erster = null;
+        String zweiter = null;
+        String neu = null;
+        String antragZiel = null;
+        String[] bisher = rollenDesVerbands();
+        try {
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .body(anlage("test", "geschaeftsstelle")).when().post("/api/v1/benutzer").then()
+                    .statusCode(403).body("fehlercode", is("ESKALATION_VERBOTEN"));
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .body(anlage("x", "mitarbeiter")).when().post("/api/v1/benutzer").then()
+                    .statusCode(422).body("fehlercode", is("KONFIGURATION_UNGUELTIG"));
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .body("{\"mandant\":\"vhf-gsk\"}").when().post("/api/v1/benutzer").then().statusCode(400);
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .body(" ".repeat(8193)).when().post("/api/v1/benutzer").then().statusCode(413);
+            neu = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .body(anlage(name, "mitarbeiter")).when().post("/api/v1/benutzer").then()
+                    .statusCode(201).body("antragId", is((String) null)).extract().path("id");
+            var angelegt = identitaet.benutzerLesen("urinet", neu);
+            assertThat(angelegt.rollen()).containsExactly(Rolle.MITARBEITER);
+            assertThat(angelegt.aktionen()).containsExactlyInAnyOrder(
+                    IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
+                    IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                    IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+            identitaet.loeschen("urinet", neu);
+            neu = null;
+            rollenDesVerbandsSetzen(new String[]{"mitarbeiter"});
+            given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).contentType("application/json")
+                    .body(anlage(name, "mitarbeiter")).when().post("/api/v1/benutzer").then()
+                    .statusCode(409).body("fehlercode", is("BENUTZER_EXISTIERT"));
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .body(anlage(name, "mitarbeiter")).when().post("/api/v1/benutzer").then()
+                    .statusCode(409).body("fehlercode", is("BENUTZER_EXISTIERT"));
+
+            erster = identitaet.anlegen("urinet", person("a." + suffix), Rolle.INHABER);
+            zweiter = identitaet.anlegen("urinet", person("b." + suffix), Rolle.INHABER);
+            identitaet.einladen("urinet", erster, Set.of(), Duration.ofHours(1));
+            identitaet.einladen("urinet", zweiter, Set.of(), Duration.ofHours(1));
+            var antwort = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .contentType("application/json").body(anlage(inhaberName, "inhaber"))
+                    .when().post("/api/v1/benutzer").then().statusCode(201).extract();
+            antragZiel = antwort.path("id");
+            assertThat(antwort.<String>path("antragId")).isNotBlank();
+            assertThat(identitaet.benutzerLesen("urinet", antragZiel).rollen()).isEmpty();
+        } finally {
+            rollenDesVerbandsSetzen(bisher);
+            if (neu != null) identitaet.loeschen("urinet", neu);
+            if (antragZiel != null) identitaet.loeschen("urinet", antragZiel);
+            if (erster != null) identitaet.loeschen("urinet", erster);
+            if (zweiter != null) identitaet.loeschen("urinet", zweiter);
+        }
+    }
+
+    @Test
+    void hoechstzahlZaehltAuchDeaktivierteBenutzer() {
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub();
+        for (int i = 0; i < 25; i++) {
+            String id = dienst.anlegen("urinet", person("limit." + i), Rolle.MITARBEITER);
+            dienst.aktivieren("urinet", id, false);
+        }
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                .body(anlage("test.limit", "mitarbeiter")).when().post("/api/v1/benutzer").then()
+                .statusCode(409).body("fehlercode", is("STATUS_KONFLIKT"));
+    }
+
+    @Test
+    void fehlerBeimVersandEntferntBenutzerUndHaeltUnklareSperre() throws SQLException {
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        var fehlerdienst = new IdentitaetsDienstStub() {
+            String ziel;
+
+            @Override
+            public void einladen(String mandant, String id, Set<ErforderlicheAktion> aktionen, Duration gueltigkeit) {
+                ziel = id;
+                throw new FachFehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
+            }
+        };
+        QuarkusMock.installMockForType(fehlerdienst, IdentitaetsDienst.class);
+        String[] bisher = rollenDesVerbands();
+        UUID sperre = null;
+        try {
+            rollenDesVerbandsSetzen(new String[]{"mitarbeiter"});
+            String name = "test." + UUID.randomUUID().toString().substring(0, 8);
+            given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).contentType("application/json")
+                    .body(anlage(name, "mitarbeiter")).when().post("/api/v1/benutzer").then()
+                    .statusCode(502).body("fehlercode", is("IDENTITAETSDIENST_FEHLER"));
+            assertThat(fehlerdienst.ziel).isNotBlank();
+            assertThatThrownBy(() -> fehlerdienst.benutzerLesen("vhf-gsk", fehlerdienst.ziel))
+                    .isInstanceOf(FachFehler.class);
+            try (Connection verbindung = datenbank.getConnection();
+                 PreparedStatement abfrage = verbindung.prepareStatement(
+                         "select vorgang_id, phase from public.verwaltung_vorgang where mandant = ?")) {
+                abfrage.setString(1, "vhf-gsk");
+                try (ResultSet zeile = abfrage.executeQuery()) {
+                    assertThat(zeile.next()).isTrue();
+                    sperre = zeile.getObject(1, UUID.class);
+                    assertThat(zeile.getString(2)).isEqualTo("UNKLAR");
+                }
+            }
+        } finally {
+            rollenDesVerbandsSetzen(bisher);
+            if (sperre != null) {
+                try (Connection verbindung = datenbank.getConnection();
+                     PreparedStatement loeschen = verbindung.prepareStatement(
+                             "delete from public.verwaltung_vorgang where mandant = ? and vorgang_id = ?")) {
+                    loeschen.setString(1, "vhf-gsk");
+                    loeschen.setObject(2, sperre);
+                    loeschen.executeUpdate();
+                }
+            }
+        }
+    }
+
+    @Test
+    void eindeutigAbgewiesenerVersandGibtSperreNachKompensationFrei() throws SQLException {
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        var fehlerdienst = new IdentitaetsDienstStub() {
+            String ziel;
+
+            @Override
+            public void einladen(String mandant, String id, Set<ErforderlicheAktion> aktionen, Duration gueltigkeit) {
+                ziel = id;
+                throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+        };
+        QuarkusMock.installMockForType(fehlerdienst, IdentitaetsDienst.class);
+        String name = "test." + UUID.randomUUID().toString().substring(0, 8);
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                .body(anlage(name, "mitarbeiter")).when().post("/api/v1/benutzer").then()
+                .statusCode(502).body("fehlercode", is("IDENTITAETSDIENST_FEHLER"));
+        assertThatThrownBy(() -> fehlerdienst.benutzerLesen("urinet", fehlerdienst.ziel))
+                .isInstanceOf(FachFehler.class);
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details->>'phase' from m_urinet.zugriff_protokoll "
+                             + "where details->>'ziel' = ? and details->>'vorgang' = 'ANLEGEN'")) {
+            abfrage.setString(1, fehlerdienst.ziel);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).isEqualTo("FEHLGESCHLAGEN");
+            }
+            try (PreparedStatement sperre = verbindung.prepareStatement(
+                    "select exists (select 1 from public.verwaltung_vorgang where mandant = ?)")) {
+                sperre.setString(1, "urinet");
+                try (ResultSet zeile = sperre.executeQuery()) {
+                    assertThat(zeile.next()).isTrue();
+                    assertThat(zeile.getBoolean(1)).isFalse();
+                }
+            }
+        }
+    }
+
+    private static IdentitaetsDienst.Neuanlage person(String name) {
+        return new IdentitaetsDienst.Neuanlage(name, name + "@example.invalid", "Test", "Person");
+    }
+
+    private static java.util.Map<String, String> anlage(String name, String rolle) {
+        return java.util.Map.of("benutzername", name, "email", name + "@example.invalid",
+                "vorname", "Test", "nachname", "Person", "rolle", rolle);
     }
 
     private void rechtePruefen(List<RollenResource.RolleDto> rollen) {

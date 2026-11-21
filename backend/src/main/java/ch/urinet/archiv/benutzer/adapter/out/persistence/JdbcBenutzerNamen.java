@@ -29,17 +29,32 @@ public class JdbcBenutzerNamen implements BenutzerNamen {
         if (!SCHEMA.matcher(schema).matches()) {
             throw new IllegalStateException("Namensprüfung ohne Mandanten-Schema");
         }
-        String sql = "select exists (select 1 from " + schema
-                + ".benutzer_verzeichnis where lower(name) = lower(?))";
         try (Connection verbindung = datenquelle.get().getConnection();
-             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
-            abfrage.setString(1, benutzername);
-            try (ResultSet zeile = abfrage.executeQuery()) {
-                if (!zeile.next()) {
-                    throw new IllegalStateException("Namensprüfung fehlgeschlagen");
+             PreparedStatement mandanten = verbindung.prepareStatement(
+                     "select schema_name from public.mandant where aktiv or "
+                             + "(deaktiviert_am is not null and exists "
+                             + "(select 1 from pg_namespace where nspname = schema_name))");
+             ResultSet schemata = mandanten.executeQuery()) {
+            while (schemata.next()) {
+                String zielSchema = schemata.getString(1);
+                if (zielSchema == null || !SCHEMA.matcher(zielSchema).matches()) {
+                    throw new IllegalStateException("Ungültiges Schema bei Namensprüfung");
                 }
-                return zeile.getBoolean(1);
+                String sql = "select exists (select 1 from " + zielSchema
+                        + ".benutzer_verzeichnis where lower(name) = lower(?))";
+                try (PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+                    abfrage.setString(1, benutzername);
+                    try (ResultSet zeile = abfrage.executeQuery()) {
+                        if (!zeile.next()) {
+                            throw new IllegalStateException("Namensprüfung fehlgeschlagen");
+                        }
+                        if (zeile.getBoolean(1)) {
+                            return true;
+                        }
+                    }
+                }
             }
+            return false;
         } catch (SQLException e) {
             throw new IllegalStateException("Namensprüfung fehlgeschlagen", e);
         }

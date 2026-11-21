@@ -266,12 +266,12 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             }
         }
         if (!zielVorhanden) {
-            request("POST", user(id) + "/role-mappings/realm", null, json.createArrayNode().add(ziel),
-                    false, Set.of(204));
+            nur204(request("POST", user(id) + "/role-mappings/realm", null, json.createArrayNode().add(ziel),
+                    false, Set.of(204)));
         }
         if (!uebrige.isEmpty()) {
-            request("DELETE", user(id) + "/role-mappings/realm", null, json.valueToTree(uebrige),
-                    false, Set.of(204));
+            nur204(request("DELETE", user(id) + "/role-mappings/realm", null, json.valueToTree(uebrige),
+                    false, Set.of(204)));
         }
     }
 
@@ -290,8 +290,8 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         if (!einladungsRedirectUri.isBlank()) {
             query += "&redirect_uri=" + query(einladungsRedirectUri);
         }
-        request("PUT", user(id) + "/execute-actions-email", query,
-                json.valueToTree(aktionen.stream().map(Enum::name).toList()), false, Set.of(204));
+        nur204(request("PUT", user(id) + "/execute-actions-email", query,
+                json.valueToTree(aktionen.stream().map(Enum::name).toList()), false, Set.of(204)));
     }
 
     @Override
@@ -332,6 +332,21 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     public void loeschen(String mandant, String id) {
         benutzerAbrufen(mandant, id);
         request("DELETE", user(id), null, null, false, Set.of(204));
+    }
+
+    @Override
+    public void anlageRueckgaengig(String mandant, String id) {
+        JsonNode benutzer = json(request("GET", user(id), null, null, true, Set.of(404), true));
+        if (benutzer == null || !mandantPasst(benutzer, mandant)) {
+            throw fehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        nur204(request("DELETE", user(id), null, null, false, Set.of(204), true));
+    }
+
+    private static void nur204(Antwort antwort) {
+        if (antwort.status() != 204) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
+        }
     }
 
     @Override
