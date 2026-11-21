@@ -52,6 +52,7 @@ public class WissenLesenSchritte {
     private final UUID wissensquelle = UUID.randomUUID();
     private final UUID entwurf = UUID.randomUUID();
     private final UUID interneEntwurf = UUID.randomUUID();
+    private final UUID fremdEntwurf = UUID.randomUUID();
     private final UUID normaleSeite = UUID.randomUUID();
     private final UUID zweiteNormaleSeite = UUID.randomUUID();
     private final UUID interneSeite = UUID.randomUUID();
@@ -152,10 +153,23 @@ public class WissenLesenSchritte {
                     .get("/api/v1/wissensbasis/log").then().statusCode(200).extract().asString();
             assertThat(logText).doesNotContain(verband ? "human:probe-a-" + kennung : "human:fremd-" + kennung);
             if (!verband) assertThat(logText).contains("human:probe-a-" + kennung);
+            else assertThat(logText).contains("human:fremd-" + kennung);
             if (!internSichtbar) assertThat(logText).doesNotContain("human:probe-c-" + kennung);
             int entwurfStatus = verband ? 404 : rolle == Rolle.INHABER ? 200 : 403;
             given().auth().oauth2(token).get("/api/v1/wissensentwuerfe/" + entwurf)
                     .then().statusCode(entwurfStatus);
+
+            var entwurfListe = given().auth().oauth2(token).get("/api/v1/wissensentwuerfe").andReturn();
+            if (rolle == Rolle.INHABER || rolle == Rolle.GESCHAEFTSSTELLE) {
+                String liste = entwurfListe.then().statusCode(200).extract().asString();
+                assertThat(liste).contains((verband ? fremdEntwurf : entwurf).toString())
+                        .doesNotContain((verband ? entwurf : fremdEntwurf).toString())
+                        .doesNotContain((verband ? interneEntwurf : fremdEntwurf).toString());
+            } else {
+                assertThat(entwurfListe.statusCode()).isEqualTo(rolle == Rolle.MITARBEITER ? 200 : 403);
+                assertThat(entwurfListe.asString()).doesNotContain(entwurf.toString(), fremdEntwurf.toString(),
+                        interneEntwurf.toString());
+            }
 
             String lauf = UUID.randomUUID().toString();
             chatKontexte.festhalten(lauf, WerkzeugKontext.fuer(new MandantCode(mandant),
@@ -346,6 +360,7 @@ public class WissenLesenSchritte {
             huelle(verbindung, SCHEMA, verweisendeSeite, wissensquelle);
             entwurf(verbindung, SCHEMA, entwurf, normaleQuelle);
             entwurf(verbindung, SCHEMA, interneEntwurf, interneQuelle);
+            entwurf(verbindung, ANDERER_SCHEMA, fremdEntwurf, interneQuelle);
             String normal = "{\"vertraulichkeit_mindest\":\"NORMAL\"}";
             version(verbindung, normaleSeite, 1, normal, null, "Synthetischer Inhalt");
             version(verbindung, normaleSeite, 2, normal, entwurf, "Kopf\nAlte Aussage\nFuss");

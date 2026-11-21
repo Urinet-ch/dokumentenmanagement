@@ -210,6 +210,7 @@ abstract class MandantenIsolationIT {
         UUID vhfSeite = UUID.randomUUID();
         UUID urinetDokument = null;
         UUID vhfDokument = null;
+        Throwable testFehler = null;
         try {
             urinetDokument = Testdokumente.anlegen(datenbank.get(),
                     new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
@@ -226,19 +227,41 @@ abstract class MandantenIsolationIT {
                 given().auth().oauth2(token).get("/api/v1/wissensseiten/" + (verband ? urinetSeite : vhfSeite))
                         .then().statusCode(404);
             }
+        } catch (Throwable t) {
+            testFehler = t;
+            throw t;
         } finally {
-            try (Connection verbindung = datenbank.get().getConnection()) {
-                for (String schema : List.of("m_urinet", "m_vhf_gsk")) {
-                    try (PreparedStatement loeschen = verbindung.prepareStatement(
-                            "delete from " + schema + ".wissensseite where id = ?")) {
-                        loeschen.setObject(1, schema.equals("m_urinet") ? urinetSeite : vhfSeite);
-                        loeschen.executeUpdate();
-                    }
+            Throwable fehler = null;
+            for (String schema : List.of("m_urinet", "m_vhf_gsk")) {
+                try (Connection verbindung = datenbank.get().getConnection();
+                     PreparedStatement loeschen = verbindung.prepareStatement(
+                             "delete from " + schema + ".wissensseite where id = ?")) {
+                    loeschen.setObject(1, schema.equals("m_urinet") ? urinetSeite : vhfSeite);
+                    loeschen.executeUpdate();
+                } catch (Exception e) {
+                    fehler = merken(fehler, e);
                 }
             }
-            if (urinetDokument != null) Testdokumente.loeschen(datenbank.get(), "urinet", List.of(urinetDokument));
-            if (vhfDokument != null) Testdokumente.loeschen(datenbank.get(), "vhf-gsk", List.of(vhfDokument));
+            for (var eintrag : java.util.Map.of("urinet", java.util.Optional.ofNullable(urinetDokument),
+                    "vhf-gsk", java.util.Optional.ofNullable(vhfDokument)).entrySet()) {
+                if (eintrag.getValue().isEmpty()) continue;
+                try {
+                    Testdokumente.loeschen(datenbank.get(), eintrag.getKey(), List.of(eintrag.getValue().get()));
+                } catch (Exception e) {
+                    fehler = merken(fehler, e);
+                }
+            }
+            if (fehler != null) {
+                if (testFehler != null) testFehler.addSuppressed(fehler);
+                else throw new IllegalStateException("Aufräumen fehlgeschlagen", fehler);
+            }
         }
+    }
+
+    private static Throwable merken(Throwable erster, Throwable weiterer) {
+        if (erster == null) return weiterer;
+        erster.addSuppressed(weiterer);
+        return erster;
     }
 
     private void wissensseiteAnlegen(String schema, UUID seite, UUID dokument) throws SQLException {

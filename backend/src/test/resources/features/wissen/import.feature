@@ -92,3 +92,8 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
   Szenario: Anweisungen im Wissenspaket bleiben ein ungeprüfter Entwurf
     Wenn der Inhaber ein Paket mit synthetischen Anweisungen und verbotenen Freigabefeldern importiert
     Dann ändern die Anweisungen weder Freigabe noch Rechte oder KI-Verbrauch
+
+  @req-11.6 @req-19.21
+  Szenario: Anweisungen allein ohne Rohhtml bleiben ein ungeprüfter Entwurf
+    Wenn der Inhaber ein sonst gültiges Paket ohne HTML mit synthetischen Anweisungen und verbotenen Freigabefeldern importiert
+    Dann bleibt der Entwurf der Anweisungen ohne Befund offen, ohne Seite, Freigabe und KI-Verbrauch

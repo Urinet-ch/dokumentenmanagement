@@ -27,9 +27,11 @@ Funktionalität: Export der Wissensbasis
   Szenario: Ein Export ist für andere Rollen und Mandanten nicht abrufbar
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Und eine synthetische freigegebene Wissensseite ist vorhanden
+    Und der Mandant «vhf-gsk» hat eine freigegebene und eine interne Wissensseite
     Wenn der Inhaber einen Wissensexport anfordert und ausführen lässt
     Dann ist der Export nur für den Inhaber seines Mandanten abrufbar
     Und enthält das ZIP die Seite mit OKF-Frontmatter sowie Index und Log
+    Und enthält das ZIP keine Seite und keinen Inhalt des Mandanten «vhf-gsk»
 
   @req-17.5
   Szenario: Der Vollexport enthält die Wissensbasis des Mandanten

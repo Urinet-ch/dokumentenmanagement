@@ -69,6 +69,8 @@ public class WissenExportSchritte {
     private UUID seitenId;
     private String seitenPfad;
     private UUID referenzId;
+    private final List<UUID> fremdeSeiten = new java.util.ArrayList<>();
+    private final List<String> fremdePfade = new java.util.ArrayList<>();
     private String referenzPfad;
     private UUID dokumentId;
     private Response antwort;
@@ -88,6 +90,27 @@ public class WissenExportSchritte {
             sql.setObject(1, seitenId);
             sql.setString(2, seitenPfad);
             sql.executeUpdate();
+        }
+    }
+
+    @Angenommen("der Mandant «vhf-gsk» hat eine freigegebene und eine interne Wissensseite")
+    public void fremdeSeitenAnlegen() throws Exception {
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement sql = c.prepareStatement("""
+                     insert into m_vhf_gsk.wissensseite
+                     (id,pfad,typ,titel,beschreibung,vertraulichkeit,inhalt,version,erzeugt_von,erzeugt_am,
+                      freigegeben_von,freigegeben_am)
+                     values (?,?,'Konzept','Fremdprobe','Beschreibung',?,'Fremdtext',1,'probe',now(),'probe',now())
+                     """)) {
+            for (String stufe : List.of("NORMAL", "INTERN")) {
+                UUID id = UUID.randomUUID();
+                fremdeSeiten.add(id);
+                fremdePfade.add("konzepte/fremd-" + stufe.toLowerCase() + "-" + id);
+                sql.setObject(1, id);
+                sql.setString(2, fremdePfade.get(fremdePfade.size() - 1));
+                sql.setString(3, stufe);
+                sql.executeUpdate();
+            }
         }
     }
 
@@ -169,6 +192,18 @@ public class WissenExportSchritte {
         }
         given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk"))
                 .get("/api/v1/wissensbasis/exporte/" + exportId).then().statusCode(404);
+    }
+
+    @Dann("enthält das ZIP keine Seite und keinen Inhalt des Mandanten «vhf-gsk»")
+    public void exportOhneFremdseitenPruefen() throws Exception {
+        assertThat(fremdePfade).hasSize(2);
+        Map<String, String> dateien = dateien();
+        assertThat(dateien).containsKey(seitenPfad + ".md");
+        for (String pfad : fremdePfade) {
+            assertThat(dateien).doesNotContainKey(pfad + ".md");
+            assertThat(dateien.values()).noneMatch(inhalt -> inhalt.contains(pfad));
+        }
+        assertThat(dateien.values()).noneMatch(inhalt -> inhalt.contains("Fremdprobe") || inhalt.contains("Fremdtext"));
     }
 
     @Dann("enthält das ZIP die Seite mit OKF-Frontmatter sowie Index und Log")
@@ -323,9 +358,24 @@ public class WissenExportSchritte {
                     }
                 }
             } finally {
-                if (dokumentId != null) {
-                    Testdokumente.loeschen(datenbank.get(), "urinet", List.of(dokumentId));
+                try {
+                    fremdeSeitenLoeschen();
+                } finally {
+                    if (dokumentId != null) {
+                        Testdokumente.loeschen(datenbank.get(), "urinet", List.of(dokumentId));
+                    }
                 }
+            }
+        }
+    }
+
+    private void fremdeSeitenLoeschen() throws Exception {
+        if (fremdeSeiten.isEmpty()) return;
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement sql = c.prepareStatement("delete from m_vhf_gsk.wissensseite where id = ?")) {
+            for (UUID id : fremdeSeiten) {
+                sql.setObject(1, id);
+                sql.executeUpdate();
             }
         }
     }
