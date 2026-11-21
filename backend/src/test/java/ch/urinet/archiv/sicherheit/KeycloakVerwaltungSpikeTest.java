@@ -141,6 +141,7 @@ class KeycloakVerwaltungSpikeTest {
             assertThat(adapter.benutzerSuchen("vhf-gsk", "inhaber", 0, 1))
                     .extracting(benutzer -> benutzer.benutzername())
                     .containsExactly("inhaber-vhf-gsk");
+            assertThat(adapter.inhaberZaehlen("vhf-gsk")).isEqualTo(1);
         } finally {
             // Kein Assert im finally: ein Fehler beim Aufräumen darf den ursprünglichen Testfehler nicht überdecken.
             try {

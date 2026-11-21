@@ -319,11 +319,17 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
             for (JsonNode eintrag : treffer) {
-                // Fehlt das Attributfeld (Kurzdarstellung), wird der Benutzer einzeln gelesen statt als 0 gezählt.
-                JsonNode user = eintrag.has("attributes") ? eintrag
+                // Unvollständige Darstellungen einzeln lesen, damit kein eingeladener Inhaber als aktiv zählt.
+                JsonNode user = eintrag.has("attributes") && eintrag.has("enabled")
+                        && eintrag.has("requiredActions") ? eintrag
                         : benutzerDirekt(segment(eintrag.path("id").asText()));
-                if (mandantPasst(user, mandant) && user.path("enabled").asBoolean()) {
-                    anzahl++;
+                if (mandantPasst(user, mandant)) {
+                    if (!user.path("enabled").isBoolean()) {
+                        throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                    }
+                    if (user.path("enabled").asBoolean() && erforderlicheAktionen(user).isEmpty()) {
+                        anzahl++;
+                    }
                 }
             }
             if (treffer.size() < SEITENGROESSE) {
@@ -397,20 +403,28 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 }
             }
         }
-        Set<ErforderlicheAktion> aktionen = EnumSet.noneOf(ErforderlicheAktion.class);
-        JsonNode required = user.path("requiredActions");
-        if (required.isArray()) {
-            for (JsonNode action : required) {
-                try {
-                    aktionen.add(ErforderlicheAktion.valueOf(action.asText()));
-                } catch (IllegalArgumentException ignored) {
-                    // Unbekannte Keycloak-Aktionen gehören nicht zum Archiv-Port.
-                }
-            }
-        }
         return new Benutzer(id, user.path("username").asText(), text(user, "email"),
                 text(user, "firstName"), text(user, "lastName"), user.path("enabled").asBoolean(), rollen,
-                aktionen, hatOtp(id), hatGoogle(id));
+                erforderlicheAktionen(user), hatOtp(id), hatGoogle(id));
+    }
+
+    private Set<ErforderlicheAktion> erforderlicheAktionen(JsonNode user) {
+        JsonNode required = user.path("requiredActions");
+        if (!required.isArray()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        Set<ErforderlicheAktion> aktionen = EnumSet.noneOf(ErforderlicheAktion.class);
+        for (JsonNode action : required) {
+            if (!action.isTextual()) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            try {
+                aktionen.add(ErforderlicheAktion.valueOf(action.textValue()));
+            } catch (IllegalArgumentException e) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+        }
+        return aktionen;
     }
 
     private boolean hatOtp(String id) {

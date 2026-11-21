@@ -407,16 +407,61 @@ class KeycloakAdminAdapterTest {
                 .withQueryParam("briefRepresentation", equalTo("false"))
                 .willReturn(okJson("""
                         [{"id":"inhaber-1","username":"eins","enabled":true},
-                         {"id":"inhaber-2","username":"zwei","enabled":true,"attributes":{"mandant":["urinet"]}},
-                         {"id":"inhaber-3","username":"drei","enabled":false,"attributes":{"mandant":["urinet"]}},
-                         {"id":"inhaber-4","username":"vier","enabled":true,"attributes":{"mandant":["vhf-gsk"]}}]
+                         {"id":"inhaber-2","username":"zwei","enabled":true,"attributes":{"mandant":["urinet"]},"requiredActions":[]},
+                         {"id":"inhaber-3","username":"drei","enabled":false,"attributes":{"mandant":["urinet"]},"requiredActions":[]},
+                         {"id":"inhaber-4","username":"vier","enabled":true,"attributes":{"mandant":["vhf-gsk"]},"requiredActions":[]},
+                         {"id":"inhaber-5","username":"fuenf","enabled":true,"attributes":{"mandant":["urinet"]},"requiredActions":["VERIFY_EMAIL"]},
+                         {"id":"inhaber-6","username":"sechs","enabled":true,"attributes":{"mandant":["urinet"]}}]
                         """)));
         benutzerStub("inhaber-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/inhaber-6")).willReturn(okJson("""
+                {"id":"inhaber-6","username":"sechs","enabled":true,"attributes":{"mandant":["urinet"]},
+                 "requiredActions":["CONFIGURE_TOTP"]}
+                """)));
 
         long anzahl = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).inhaberZaehlen("urinet");
 
         assertThat(anzahl).isEqualTo(2);
         server.verify(1, getRequestedFor(urlPathEqualTo(USERS + "/inhaber-1")));
+        server.verify(1, getRequestedFor(urlPathEqualTo(USERS + "/inhaber-6")));
+    }
+
+    @Test
+    void inhaberZaehlenBrichtBeiUnvollstaendigenOderUnbekanntenAktionenAb() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/inhaber/users"))
+                .willReturn(okJson("""
+                        [{"id":"inhaber-1","enabled":true,"attributes":{"mandant":["urinet"]}}]
+                        """)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/inhaber-1")).willReturn(okJson("""
+                {"id":"inhaber-1","enabled":true,"attributes":{"mandant":["urinet"]}}
+                """)));
+        KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+        assertThatThrownBy(() -> adapter.inhaberZaehlen("urinet"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+
+        server.stubFor(get(urlPathEqualTo(USERS + "/inhaber-1")).willReturn(okJson("""
+                {"id":"inhaber-1","enabled":true,"attributes":{"mandant":["urinet"]},
+                 "requiredActions":["SYNTHETISCHE_AKTION"]}
+                """)));
+        assertThatThrownBy(() -> adapter.inhaberZaehlen("urinet"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+    }
+
+    @Test
+    void benutzerLesenVerwirftUnbekannteErforderlicheAktionenNicht() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(okJson("""
+                {"id":"benutzer-1","enabled":true,"attributes":{"mandant":["urinet"]},
+                 "requiredActions":["SYNTHETISCHE_AKTION"]}
+                """)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm")).willReturn(okJson("[]")));
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .benutzerLesen("urinet", "benutzer-1"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
     }
 
     @Test
