@@ -76,6 +76,18 @@ public final class ChatJson {
                     wert.put("datenstand", s.datenstand().zeitpunkt().toString());
                     wert.put("belege", s.datenstand().belege());
                 }
+                case Quelle.Wissen w -> {
+                    wert.put("wissen", Map.of("titel", w.titel(), "link", w.link(), "stand", w.stand().toString()));
+                    wert.put("dokumente", w.dokumente().stream().map(d -> {
+                        Map<String, Object> dokument = new LinkedHashMap<>();
+                        dokument.put("titel", d.titel());
+                        dokument.put("link", d.link());
+                        if (d.seite() != null) {
+                            dokument.put("seiten", d.seite());
+                        }
+                        return dokument;
+                    }).toList());
+                }
             }
             werte.add(wert);
         }
@@ -89,7 +101,25 @@ public final class ChatJson {
         }
         List<Quelle> quellen = new ArrayList<>();
         for (JsonNode wert : baum(json)) {
-            if (wert.hasNonNull("link")) {
+            if (wert.hasNonNull("wissen")) {
+                JsonNode wissen = wert.path("wissen");
+                String link = wissen.path("link").asText();
+                if (!link.startsWith("/wissen/")) {
+                    throw new IllegalStateException("Chat-Wissensquelle enthält einen ungültigen Link");
+                }
+                List<Quelle.Dokument> dokumente = new ArrayList<>();
+                for (JsonNode dokument : wert.path("dokumente")) {
+                    String dokumentLink = dokument.path("link").asText();
+                    if (!dokumentLink.startsWith("/dokument/")) {
+                        throw new IllegalStateException("Chat-Wissensquelle enthält einen ungültigen Dokumentlink");
+                    }
+                    dokumente.add(new Quelle.Dokument(UUID.fromString(dokumentLink.substring("/dokument/".length())),
+                            dokument.path("titel").asText(), dokument.hasNonNull("seiten")
+                                    ? dokument.path("seiten").asText() : null));
+                }
+                quellen.add(new Quelle.Wissen(link.substring("/wissen/".length()), wissen.path("titel").asText(),
+                        Instant.parse(wissen.path("stand").asText()), dokumente));
+            } else if (wert.hasNonNull("link")) {
                 quellen.add(new Quelle.Dokument(UUID.fromString(wert.path("id").asText()), wert.path("titel").asText()));
             } else {
                 quellen.add(new Quelle.Stand(wert.path("werkzeug").asText(), new ChatEreignis.Datenstand(

@@ -61,6 +61,7 @@ final class AgentWerkzeug implements ToolExecutor {
         } catch (RuntimeException e) {
             LOG.warnf("Ergebnis von %s nicht abgebildet: %s", name, e.getClass().getSimpleName());
         }
-        return DokumentTexte.kennzeichnen(json, roh);
+        return DokumentTexte.kennzeichnen(json, roh,
+                "wissen_index".equals(name) || "wissen_seite_zeigen".equals(name));
     }
 }

@@ -22,4 +22,16 @@ public class SchreibenderZugriffGegenprobe {
             eintrag.hashCode();
         }
     }
+
+    public static class WissensRepositoryZugriff {
+        void benutzen(ch.urinet.archiv.wissen.application.WissenLesenRepository repository) {
+            repository.index(null, null);
+        }
+    }
+
+    public static class WissensKonfigurationZugriff {
+        void benutzen(ch.urinet.archiv.wissen.application.WissenKonfiguration konfiguration) {
+            konfiguration.modell();
+        }
+    }
 }

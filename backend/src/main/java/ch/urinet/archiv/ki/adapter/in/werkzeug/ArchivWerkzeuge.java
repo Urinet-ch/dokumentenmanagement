@@ -10,6 +10,7 @@ import ch.urinet.archiv.ki.application.chat.VollstaendigkeitAbfrage;
 import ch.urinet.archiv.ki.application.chat.WerkzeugAuswahl;
 import ch.urinet.archiv.ki.application.chat.WerkzeugFehler;
 import ch.urinet.archiv.ki.application.chat.Werkzeuglauf;
+import ch.urinet.archiv.ki.application.chat.WissenWerkzeuge;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -44,11 +45,12 @@ public class ArchivWerkzeuge {
     private final KennzahlAbfrage kennzahl;
     private final OffenePostenAbfrage offenePosten;
     private final VollstaendigkeitAbfrage vollstaendigkeit;
+    private final WissenWerkzeuge wissen;
     private final ObjectMapper json;
 
     public ArchivWerkzeuge(Werkzeuglauf lauf, DokumenteSuchen suchen, DokumentZeigen zeigen, FristenAbfrage fristen,
                            KennzahlAbfrage kennzahl, OffenePostenAbfrage offenePosten,
-                           VollstaendigkeitAbfrage vollstaendigkeit, ObjectMapper json) {
+                           VollstaendigkeitAbfrage vollstaendigkeit, WissenWerkzeuge wissen, ObjectMapper json) {
         this.lauf = lauf;
         this.suchen = suchen;
         this.zeigen = zeigen;
@@ -56,6 +58,7 @@ public class ArchivWerkzeuge {
         this.kennzahl = kennzahl;
         this.offenePosten = offenePosten;
         this.vollstaendigkeit = vollstaendigkeit;
+        this.wissen = wissen;
         this.json = json.copy().setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
@@ -186,6 +189,25 @@ public class ArchivWerkzeuge {
             @P("Geschäftsjahr, vierstellig, z. B. 2026") Integer geschaeftsjahr) {
         return antworten(WerkzeugAuswahl.VOLLSTAENDIGKEIT, () -> lauf.ausfuehren(laufId,
                 WerkzeugAuswahl.VOLLSTAENDIGKEIT, k -> vollstaendigkeit.vollstaendigkeit(k, geschaeftsjahr)));
+    }
+
+    @Tool(name = WerkzeugAuswahl.WISSEN_INDEX, value = "Sucht sichtbare freigegebene Wissensseiten oder zeigt den Index.")
+    public String wissenIndex(@ToolMemoryId Object laufId,
+                              @P(value = "Suchfrage, ohne Angabe vollständiger Index", required = false) String frage,
+                              @P(value = "Seitentyp", required = false) String typ,
+                              @P(value = "Höchstens 50 Treffer, nur mit Suchfrage", required = false) Integer anzahl) {
+        return antworten(WerkzeugAuswahl.WISSEN_INDEX, () -> lauf.ausfuehren(laufId,
+                WerkzeugAuswahl.WISSEN_INDEX, k -> wissen.index(k, frage, typ, anzahl)));
+    }
+
+    @Tool(name = WerkzeugAuswahl.WISSEN_SEITE_ZEIGEN, value = "Zeigt die aktuelle freigegebene Wissensseite mit Quellen und Hinweisen.")
+    public String wissenSeiteZeigen(@ToolMemoryId Object laufId, @P("Pfad der Wissensseite aus wissen_index") String pfad) {
+        return antworten(WerkzeugAuswahl.WISSEN_SEITE_ZEIGEN, () -> {
+            var seite = lauf.ausfuehren(laufId, WerkzeugAuswahl.WISSEN_SEITE_ZEIGEN, k -> wissen.zeigen(k, pfad));
+            merken(laufId, seite.quellen().stream().map(WissenWerkzeuge.Quelle::dokumentId)
+                    .filter(java.util.Objects::nonNull).map(java.util.UUID::toString));
+            return seite;
+        });
     }
 
     /** Hält die IDs eines Werkzeugergebnisses als gesehen fest (nur gültige UUIDs; {@link GeseheneIds}). */

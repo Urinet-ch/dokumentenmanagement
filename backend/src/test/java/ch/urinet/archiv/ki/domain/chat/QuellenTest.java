@@ -35,6 +35,19 @@ class QuellenTest {
     }
 
     @Test
+    void gezeigteWissensseiteHatIhreDirektenDokumenteAlsQuelle() {
+        Instant stand = Instant.parse("2026-11-14T08:00:00Z");
+        ChatEreignis.QuellWissen wissen = new ChatEreignis.QuellWissen("konzepte/arbeit", "Arbeitsregel", stand,
+                List.of(new ChatEreignis.QuellDokument(new UUID(0, 1), "Dokument 1", "2-3")));
+        var ergebnis = new ChatEreignis.WerkzeugErgebnis("wissen_seite_zeigen", Map.of(), List.of(),
+                Optional.empty(), Optional.of(wissen));
+
+        assertThat(Quellen.aus(List.of(ergebnis, ergebnis))).containsExactly(
+                new Quelle.Wissen("konzepte/arbeit", "Arbeitsregel", stand,
+                        List.of(new Quelle.Dokument(new UUID(0, 1), "Dokument 1", "2-3"))));
+    }
+
+    @Test
     void dokumentZeigenImmerUndSuchtrefferDannNicht() {
         List<Quelle> quellen = Quellen.aus(List.of(
                 ergebnis("dokumente_suchen", List.of(dok(1), dok(2)), Optional.empty()),

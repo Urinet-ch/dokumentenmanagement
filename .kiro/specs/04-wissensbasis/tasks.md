@@ -18,12 +18,12 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - ADR-013 per Merge freigeben; die Folgeänderungen nach design.md, Abschnitt «Folgeänderungen in anderen Dokumenten» (Spec 01/02/03, `product.md`, `structure.md`, `tech.md`, `umsetzungsplan.md`, `docs/adr/README.md`, Nachträge zu ADR-006, ADR-009 und ADR-011) nach dem Merge von PR #15 als eigenen PR veranlassen (PR #16 ist gemergt); darin auch die neuen Fehlercodes in die abschliessende Code-Liste von Spec 01
   - _Anforderungen: 2.3, 5.7, 12.1, 13.4, 13.6, 18.1_
 
-- [ ] 13.2 Dokumentart Wissensquelle [Backend]
-  - Seed-Teil `seed/_alle/dokumentarten-wissen.json` nach design.md, beim Anlegen jedes Mandanten eingelesen, nur anlegen, wenn der Code fehlt; für `vhf-gsk` mit `zugriff` und `veroeffentlicht` (Spec 03, Aufgabe 10.2); `WissensquelleSeedTest`; `DokumentartSeedTest` aus Spec 01 unverändert
+- [x] 13.2 Dokumentart Wissensquelle [Backend]
+  - Seed-Teil `seed/_alle/dokumentarten-wissen.json` nach design.md, beim Anlegen jedes Mandanten eingelesen, nur anlegen, wenn der Code fehlt; für `vhf-gsk` mit `zugriff` und `veroeffentlicht` (Spec 03, Aufgabe 10.2); `KonfigurationWissensquelleSeedTest`; `DokumentartSeedTest` aus Spec 01 unverändert
   - Art nicht in der Artenliste des KI-Vorschlags (Test: Prompt aus Spec 01 unverändert); Szenarien: Art im Eingangskorb von Hand gewählt, Upload bis `ARCHIVIERT` ohne Sperre, Datei im Manifest, Titel aus `dokument.titel`, Jahresexport ohne Wissensquelle
   - Satz zu GeBüV in der Verfahrensbeschreibung (Nachweis Dokument, zusammen mit der Folgeänderung zu Spec 01, 16.6)
   - Spec 05 ergänzt: Die Ergänzung für `vhf-gsk` (`zugriff`, `veroeffentlicht`) kommt aus der Konfiguration von `vhf-gsk`, nicht aus dem Seed-Teil; `WISSENSQUELLE` trägt fest `ki_vorschlag = nein` (Spec 05, Req 2.6; Aufgabe 17.3)
-  - Teil erledigt (PR #297): Seed-Teil, Art in `seed/vhf-gsk/dokumentarten.json` mit `zugriff` und `veroeffentlicht`, Prüfung der festen Eigenschaften beim Anlegen, Changeset `044-wissensquelle-bestand` für bestehende Mandanten, Archivierung ohne Sperre, Manifest, Jahresexport ohne Wissensquelle, Verfahrensbeschreibung (Req 1.1–1.3, 1.5, 1.6; design.md, «Umsetzung 13.2»). Nachprüfung 20.11.2026: Ingest und Freigabe sind gemergt, Req 1.4 bleibt bis zum Unveränderbarkeitsnachweis des Lints (15.4) offen.
+  - Erledigt (PR #297): Seed-Teil, Art in `seed/vhf-gsk/dokumentarten.json` mit `zugriff` und `veroeffentlicht`, Prüfung der festen Eigenschaften beim Anlegen, Changeset `044-wissensquelle-bestand` für bestehende Mandanten, Archivierung ohne Sperre, Manifest, Jahresexport ohne Wissensquelle, Verfahrensbeschreibung (Req 1.1–1.3, 1.5, 1.6; design.md, «Umsetzung 13.2»). Nachprüfung 20.11.2026: Ingest und Freigabe sind gemergt. Req 1.4 (Quelle bleibt unverändert) ist für alle drei Wege belegt: Lint (PR #376, `lint.feature`, vergleicht Dokumentmetadaten, Volltext, Dateizeilen sowie S3-Versionen und Bytes von Original, Arbeitsfassung und PDF/A), Ingest (`ingest.feature`, «Alle vier Ingest-Teilaufträge erstellen einen Entwurf», vergleicht Dokumentzeile und Dateizeilen vorher/nachher; PERSONAL-Fall: Hinweis und Version) und Freigabe (`quelldokumente.feature`, «Die Freigabe einer Seitenänderung verändert das Quelldokument nicht», vergleicht Dokumentzeile und Dateizeilen). Die Szenarien von Ingest und Freigabe prüfen die Datenbankzeilen (inkl. S3-Schlüssel und Versionskennungen), nicht die Bytes in S3.
   - _Anforderungen: 1.1–1.6_
   - _Abhängig von: Spec 01: Feld `dokument.titel` (vorhanden, Requirement 7.2)_
 
@@ -128,9 +128,10 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 9.1–9.6, 13.2_
   - _Abhängig von: 14.2, Spec 02: 6.3, 6.4_
 
-- [ ] 15.2 Chat-Werkzeuge und Quellen [Backend]
+- [x] 15.2 Chat-Werkzeuge und Quellen [Backend]
   - `wissen_index` und `wissen_seite_zeigen` in `ArchivWerkzeuge` (nur lesend, Mandant/Benutzer aus Kontext, Kürzung nach `werkzeug-max-zeichen` mit `GEKUERZT`), Systemprompt-Ergänzung, SSE-Quellenform `{wissen, dokumente}`, Hinweise in der Antwort
   - Szenarien mit simulierten Tool-Calls: nur freigegebene Fassungen, `mitarbeiter` erhält keine Seite mit unsichtbarer Hülle; `OeffentlicheWerkzeuge` (Spec 03) ohne Wissenswerkzeuge
+  - Nachweis-Vermerke ohne eigenes `@req`-Szenario: 8.7 gilt über die Prompt-Regel (`ChatSystemPromptTest`, Szenario `@req-8.7`); das Modellverhalten ist nicht deterministisch prüfbar; Hinweise `ABGELAUFEN`, `WIDERSPRUCH`, `VERALTET` (8.3) → `WissenWerkzeugeTest`; unbekannter oder unsichtbarer Pfad → `NICHT_GEFUNDEN` (`WissenWerkzeugeTest`); 8.2 Obergrenze 200 ohne Suchbegriff (mit Kürzungshinweis) und Suchzweig (Typfilter, Kappung auf 30, `degradiert`) → `WissenWerkzeugeTest`; 8.7 nennt auch `GEKUERZT` in der Prompt-Regel
   - _Anforderungen: 8.1–8.7, 8.9, 11.4_
   - _Abhängig von: 15.1, Spec 02: 7.1–7.3_
 
@@ -165,6 +166,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - `tools/wissen_paket` (Java 25, picocli, Shade-Jar, SpotBugs wie `tools/drive_import`), Kommandos `validate` und `bauen`, Option `--quellen`; bindet den Quelltext von `wissen/domain` und `gemeinsam/domain/Seitentext*` per `build-helper-maven-plugin` ein (design.md, «Prüfwerkzeug»); `OfflineKontext`; Bericht nur mit Befund-Codes und Pfaden (`--json`), Rückgabewert 0/1; reproduzierbares ZIP; kein Netz, keine Zugangsdaten
   - CI: eigener Schritt für `tools/wissen_paket` und Pfadfilter für Änderungen an `wissen/domain`; `README.md` des Werkzeugs
   - `PaketRegelnGleichheitTest` (JUnit, Nachweis für 19.27): dieselben Beispielpakete wie 15.6 ergeben dieselben Befund-Listen; Test, dass das Werkzeug keine Netzverbindung aufbaut und keine Datei ausser dem Ausgabe-ZIP schreibt
+  - Teil erledigt: Offline-Werkzeug und Tests; `PaketRegelnGleichheitTest` vergleicht die offline prüfbaren Codes und Pfade von Werkzeug und tatsächlicher REST-Antwort für 18 Beispielpakete. CI-Schritt und Pfadfilter bleiben offen, da Änderungen unter `.github/workflows` in diesem Auftrag ausgeschlossen sind. Übergabe an die CI-Koordination; Aufgabe bleibt offen. Abweichung von design.md: Der Bericht enthält Befund-Codes und Pfade, aber keine Zähler (Requirement 19.27 verlangt nur Codes und Pfade). Der Netz-Test ist eine statische Bytecode-Suche in den eigenen Klassen des Werkzeugs und kein Laufzeitnachweis; die Paketgrenze sichert die ArchUnit-Regel im Backend.
   - Abgrenzung: nur das Paketformat und die Domain-Regeln aus 13.4/15.6 werden gebraucht, nicht der Endpunkt; Aufgabe 15.6 und 15.7 dürfen parallel laufen, sobald `WissensPaketLeser` steht (Klasse aus 15.6, zuerst mergen)
   - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.25, 19.27_
   - _Abhängig von: 13.4 (`WissensPruefung`), Paketformat aus 15.6 (`WissensPaketLeser`)_

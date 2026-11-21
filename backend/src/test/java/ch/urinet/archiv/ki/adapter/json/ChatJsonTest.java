@@ -54,6 +54,18 @@ class ChatJsonTest {
     }
 
     @Test
+    void wissensquelleMitDirektenBelegenBleibtInStreamUndVerlaufErhalten() {
+        Quelle.Wissen wissen = new Quelle.Wissen("konzepte/arbeit", "Arbeitsregel",
+                Instant.parse("2026-11-14T08:00:00Z"), List.of(new Quelle.Dokument(ID, "Vertrag", "2-3")));
+        String json = ChatJson.quellen(List.of(wissen));
+
+        assertThat(json).contains("\"wissen\":", "\"link\":\"/wissen/konzepte/arbeit\"",
+                "\"dokumente\":", "\"seiten\":\"2-3\"");
+        assertThat(ChatJson.quellenLesen(json)).containsExactly(wissen);
+        assertThat(ChatJson.daten(new ChatAusgabe.Quellen(List.of(wissen)))).isEqualTo(json);
+    }
+
+    @Test
     void werkzeugeNurMitIdsUndParametern() {
         Map<String, Object> parameter = new LinkedHashMap<>();
         parameter.put("messgroesse", "EINNAHMEN");
