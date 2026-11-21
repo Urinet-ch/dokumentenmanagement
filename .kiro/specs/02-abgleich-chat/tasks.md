@@ -121,7 +121,7 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
 ## Welle 10 — Bewertung von Chat-Antworten (Entscheid Fabian 21.11.2026, Requirement 15)
 - [ ] 10.1 Bewertung speichern und Rechtematrix A20 [Backend]
   - Changeset `chat_bewertung`, REST `PUT/DELETE/GET /chat/nachrichten/{id}/bewertung`, Grenze, Textbereinigung, Mandantentrennung, Recht A20 in der Rechtematrix; Szenarien `@req-15.2` bis `@req-15.4`.
-  - _Anforderungen: 15.2, 15.3, 15.4, 15.5 (Recht)_
+  - _Anforderungen: 15.2, 15.3, 15.4, 15.5_
   - _Abhängig von: 7.3_
 - [ ] 10.2 Oberfläche Sterne und Hinweis [Frontend]
   - Sterne, Grundauswahl, Freitext, Datenschutzhinweis; Anleitung `chat.md` und Hilfe-Katalog nachziehen; Browser-Szenario, axe, `npm run pruefe:gestaltung`.
