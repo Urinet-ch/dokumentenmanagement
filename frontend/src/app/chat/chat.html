@@ -2,6 +2,9 @@
   <p class="vorzeile">{{ texte.vorzeile }}</p>
   <h1>{{ texte.titel }}</h1>
   <p>{{ texte.einleitung }}</p>
+  @if (anmeldung.darf('A18')) {
+    <a routerLink="/wissen/entwuerfe/meine">{{ texte.analysen }}</a>
+  }
 </div>
 
 <div class="layout" [class.mobil]="mobil()">
@@ -106,6 +109,15 @@
               </ul>
             </div>
           }
+          @if (anmeldung.darf('A18') && n.id && n.analyseMoeglich) {
+            @if (n.entwurfId) {
+              <a [routerLink]="['/wissen/entwuerfe/meine', n.entwurfId]">{{ texte.analyseVorgeschlagen }}</a>
+            } @else {
+              <button mat-stroked-button type="button" (click)="vorschlagen(n)" [disabled]="analyseSendet() !== null">
+                {{ texte.analyseVorschlagen }}
+              </button>
+            }
+          }
           @if (n.status === 'ABGEBROCHEN') {
             <p class="gedaempft">{{ texte.abgebrochen }}</p>
           } @else if (n.fehler) {
@@ -127,6 +139,9 @@
 
     @if (fehler()) {
       <p class="fehler" role="alert">{{ fehler() }}</p>
+    }
+    @if (analyseFehler()) {
+      <p class="fehler" role="alert">{{ analyseFehler() }}</p>
     }
     @if (neuBeginnen()) {
       <p class="gedaempft" data-test="neu-beginnen">{{ texte.neuBeginnen }}</p>

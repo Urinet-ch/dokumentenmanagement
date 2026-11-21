@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Chat } from './chat';
 import { fehlerText } from './chat-logik';
 import {
@@ -23,6 +24,7 @@ class ChatAttrappe extends ChatPort {
   listeAbrufe = 0;
   listeFehler = false;
   verlauf = new Map<string, GespeicherteNachricht[]>();
+  vorgeschlagen: string[] = [];
 
   fragen(frage: string, gespraechId: string | null): Observable<ChatEreignis> {
     const strom = new Subject<ChatEreignis>();
@@ -44,12 +46,17 @@ class ChatAttrappe extends ChatPort {
     const n = this.verlauf.get(id);
     return n ? of(n) : throwError(() => new ChatFehler('NICHT_GEFUNDEN'));
   }
+  analyseVorschlagen(id: string): Observable<string> {
+    this.vorgeschlagen.push(id);
+    return of('00000000-0000-0000-0000-000000000001');
+  }
 }
 
 describe('Chat (Req 6.1–6.3)', () => {
   let fixture: ComponentFixture<Chat>;
   let port: ChatAttrappe;
   let element: HTMLElement;
+  let darfAnalyse: boolean;
   const t = TEXTE.chat;
 
   async function oeffnen() {
@@ -60,13 +67,15 @@ describe('Chat (Req 6.1–6.3)', () => {
 
   beforeEach(async () => {
     port = new ChatAttrappe();
+    darfAnalyse = true;
     port.liste = [
       { id: 'g1', titel: 'Offene Rechnungen im November', geaendert: '2026-11-13T23:30:00Z' },
       { id: 'g2', titel: 'Fristen 2027', geaendert: '2026-11-01T08:00:00Z' },
     ];
     TestBed.configureTestingModule({
       imports: [Chat],
-      providers: [provideRouter([]), { provide: ChatPort, useValue: port }],
+      providers: [provideRouter([]), { provide: ChatPort, useValue: port },
+        { provide: AnmeldungService, useValue: { darf: () => darfAnalyse } }],
     });
     await oeffnen();
   });
@@ -378,6 +387,26 @@ describe('Chat (Req 6.1–6.3)', () => {
     await fixture.whenStable();
     expect(antworten()).toEqual([]);
     expect((await senden('Neu')).gespraechId).toBeNull();
+  });
+
+  it('bietet die Analyse nur für berechtigte und geeignete Antworten an', async () => {
+    port.verlauf.set('g1', [
+      { id: '1', rolle: 'ASSISTENT', inhalt: 'Geeignet', quellen: [], status: 'OK', zeit: '', analyseMoeglich: true },
+      { id: '2', rolle: 'ASSISTENT', inhalt: 'Nicht geeignet', quellen: [], status: 'OK', zeit: '', analyseMoeglich: false },
+    ]);
+    (element.querySelector('[data-test=gespraech]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(element.querySelectorAll('button').length).toBeGreaterThan(0);
+    expect([...element.querySelectorAll('button')].filter((b) => b.textContent?.trim() === t.analyseVorschlagen))
+      .toHaveLength(1);
+    knopf(t.analyseVorschlagen)!.click();
+    await fixture.whenStable();
+    expect(port.vorgeschlagen).toEqual(['1']);
+    expect(element.querySelector('a[href="/wissen/entwuerfe/meine/00000000-0000-0000-0000-000000000001"]'))
+      .not.toBeNull();
+    darfAnalyse = false;
+    fixture.detectChanges();
+    expect(knopf(t.analyseVorschlagen)).toBeUndefined();
   });
 
   it('meldet ein Gespräch, das es nicht mehr gibt', async () => {

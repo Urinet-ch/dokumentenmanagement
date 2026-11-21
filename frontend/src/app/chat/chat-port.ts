@@ -41,6 +41,7 @@ export type NachrichtStatus = 'OK' | 'FEHLER' | 'ABGEBROCHEN';
 
 export interface GespeicherteNachricht {
   id?: string;
+  analyseMoeglich?: boolean;
   rolle: Rolle;
   inhalt: string;
   quellen: Quelle[];
@@ -53,7 +54,8 @@ export interface GespeicherteNachricht {
  * (429 mit `Retry-After` in Sekunden), Frage ungültig (400), keine Verbindung, unlesbare oder abgebrochene Antwort.
  */
 export type ChatFehlerArt =
-  'SITZUNG' | 'NICHT_GEFUNDEN' | 'ZU_VIELE' | 'UNGUELTIG' | 'VERBINDUNG' | 'ANTWORT' | 'ALLGEMEIN';
+  'SITZUNG' | 'NICHT_GEFUNDEN' | 'ZU_VIELE' | 'UNGUELTIG' | 'VERBINDUNG' | 'ANTWORT' | 'ALLGEMEIN'
+  | 'ANALYSE_NICHT_MOEGLICH' | 'NICHT_ERLAUBT';
 
 /** Grund eines 429 aus dem Feld `grund` der Problem Details, sofern das Backend ihn mitschickt. */
 export type ZuVieleGrund = 'STUNDENLIMIT' | 'LAEUFT';
@@ -77,4 +79,5 @@ export abstract class ChatPort {
   /** Die letzten 20 eigenen Gespräche, neueste zuerst. */
   abstract gespraeche(): Observable<GespraechKopf[]>;
   abstract gespraech(id: string): Observable<GespeicherteNachricht[]>;
+  abstract analyseVorschlagen(nachrichtId: string): Observable<string>;
 }

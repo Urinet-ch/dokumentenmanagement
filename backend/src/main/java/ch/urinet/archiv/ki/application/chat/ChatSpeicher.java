@@ -49,6 +49,9 @@ public interface ChatSpeicher {
     /** Das Gespräch mit Nachrichten, nur wenn es dem Benutzer gehört. */
     Optional<Gespraech> gespraech(UUID id, String benutzer);
 
+    /** Sperrt das eigene Gespräch und liest den Kontext bis zur Antwort in der laufenden Transaktion. */
+    Optional<ChatAnalyseDaten> analyseDaten(long nachrichtId, String benutzer);
+
     /** Löscht Nachrichten mit {@code zeit} vor {@code grenze}, danach Gespräche ohne Nachrichten (Requirement 5.4). */
     Aufgeraeumt aufraeumen(Instant grenze);
 }

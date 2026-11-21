@@ -575,7 +575,7 @@
       },
       "ChatNachricht" : {
         "type" : "object",
-        "required" : [ "id", "rolle", "inhalt", "quellen", "zeit" ],
+        "required" : [ "id", "rolle", "inhalt", "quellen", "zeit", "analyseMoeglich" ],
         "properties" : {
           "id" : {
             "type" : "string",
@@ -602,6 +602,9 @@
           "zeit" : {
             "type" : "string",
             "$ref" : "#/components/schemas/Instant"
+          },
+          "analyseMoeglich" : {
+            "type" : "boolean"
           }
         }
       },
@@ -3322,6 +3325,14 @@
           "meldung" : {
             "type" : [ "string", "null" ],
             "description" : "Meldung der Dokumentregel"
+          }
+        }
+      },
+      "WissenAnalyse" : {
+        "type" : "object",
+        "properties" : {
+          "nachrichtId" : {
+            "type" : "string"
           }
         }
       },
@@ -7701,6 +7712,45 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensentwuerfe/analyse" : {
+      "post" : {
+        "summary" : "Eigene Chat-Antwort als Analyse vorschlagen",
+        "tags" : [ "Wissensbasis" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenAnalyse"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Analyseentwurf angelegt"
+          },
+          "400" : {
+            "description" : "Nachrichten-ID ungültig"
+          },
+          "403" : {
+            "description" : "Rolle darf keine Analyse vorschlagen"
+          },
+          "404" : {
+            "description" : "Antwort oder Quelle nicht sichtbar"
+          },
+          "422" : {
+            "description" : "Analyse aus diesem Gespräch nicht möglich"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "geschaeftsstelle" ]
         } ]
       }
     },

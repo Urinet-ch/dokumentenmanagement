@@ -23,6 +23,7 @@ export interface ChatNachricht {
      */
     status?: ChatNachricht.StatusEnum | null;
     zeit: string;
+    analyseMoeglich: boolean;
 }
 export namespace ChatNachricht {
     export const RolleEnum = {

@@ -42,6 +42,8 @@ export function chatFehlerAus(fehler: unknown): ChatFehler {
       return new ChatFehler('UNGUELTIG');
     case 401:
       return new ChatFehler('SITZUNG');
+    case 403:
+      return new ChatFehler('NICHT_ERLAUBT');
     case 404:
       return new ChatFehler('NICHT_GEFUNDEN');
     case 429:
@@ -50,6 +52,8 @@ export function chatFehlerAus(fehler: unknown): ChatFehler {
         retryAfterSekunden((fehler as HttpErrorResponse).headers.get('Retry-After')),
         grundAus((fehler as HttpErrorResponse).error),
       );
+    case 422:
+      return new ChatFehler('ANALYSE_NICHT_MOEGLICH');
     default:
       return new ChatFehler('ALLGEMEIN');
   }
@@ -132,6 +136,18 @@ export class HttpChatService extends ChatPort {
       catchError((fehler: unknown) => throwError(() => chatFehlerAus(fehler))),
     );
   }
+
+  analyseVorschlagen(nachrichtId: string): Observable<string> {
+    return this.http.post<{ id: string }>('/api/v1/wissensentwuerfe/analyse', { nachrichtId }).pipe(
+      map((antwort) => {
+        if (typeof antwort.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(antwort.id)) {
+          throw new ChatFehler('ANTWORT');
+        }
+        return antwort.id;
+      }),
+      catchError((fehler: unknown) => throwError(() => chatFehlerAus(fehler))),
+    );
+  }
 }
 
 /** Nachrichten als Liste oder als `{nachrichten: [...]}`; Quellen nur in lesbarer Form. */
@@ -151,6 +167,7 @@ export function nachrichtenAus(wert: unknown): GespeicherteNachricht[] {
     const id = nachrichtIdAus(x['id']);
     return {
       ...(id ? { id } : {}),
+      ...(typeof x['analyseMoeglich'] === 'boolean' ? { analyseMoeglich: x['analyseMoeglich'] } : {}),
       rolle: x['rolle'] === 'BENUTZER' ? 'BENUTZER' : 'ASSISTENT',
       inhalt: typeof x['inhalt'] === 'string' ? x['inhalt'] : '',
       quellen: quellenAus(x['quellen']),

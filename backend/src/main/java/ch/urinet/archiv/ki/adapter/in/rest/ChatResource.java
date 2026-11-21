@@ -120,7 +120,8 @@ public class ChatResource {
             @Schema(required = true) List<QuelleDto> quellen,
             @Schema(nullable = true, enumeration = {"OK", "FEHLER", "ABGEBROCHEN"},
                     description = "nur bei Antworten") String status,
-            @Schema(required = true) Instant zeit) {
+            @Schema(required = true) Instant zeit,
+            @Schema(required = true) boolean analyseMoeglich) {
     }
 
     @Schema(name = "ChatVerlauf")
@@ -237,7 +238,7 @@ public class ChatResource {
 
     private static NachrichtDto dto(ChatNachricht n) {
         return new NachrichtDto(Long.toString(n.id()), n.rolle().name(), n.inhalt(), n.quellen().stream().map(ChatResource::dto).toList(),
-                n.status().map(Enum::name).orElse(null), n.zeit());
+                n.status().map(Enum::name).orElse(null), n.zeit(), n.analyseMoeglich());
     }
 
     private static QuelleDto dto(Quelle quelle) {

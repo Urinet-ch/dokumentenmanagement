@@ -4,6 +4,7 @@ import ch.urinet.archiv.ki.domain.chat.ChatAusgabe;
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
 import ch.urinet.archiv.ki.domain.chat.Quelle;
 import ch.urinet.archiv.ki.domain.chat.WerkzeugAufruf;
+import ch.urinet.archiv.ki.application.chat.ChatAnalyseDaten;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -147,6 +148,26 @@ public final class ChatJson {
             werte.add(wert);
         }
         return text(werte);
+    }
+
+    public static List<ChatAnalyseDaten.Werkzeug> analyseWerkzeugeLesen(String json) {
+        if (json == null) {
+            throw new IllegalStateException("Chat-Werkzeugdaten nicht lesbar");
+        }
+        JsonNode wurzel = baum(json);
+        if (wurzel == null || !wurzel.isArray()) {
+            throw new IllegalStateException("Chat-Werkzeugdaten nicht lesbar");
+        }
+        List<ChatAnalyseDaten.Werkzeug> aufrufe = new ArrayList<>();
+        for (JsonNode wert : wurzel) {
+            if (!wert.path("name").isTextual()) {
+                throw new IllegalStateException("Chat-Werkzeugname nicht lesbar");
+            }
+            JsonNode stufe = wert.get("kontextstufe");
+            aufrufe.add(new ChatAnalyseDaten.Werkzeug(wert.path("name").asText(),
+                    stufe != null && stufe.isTextual() ? stufe.asText() : null));
+        }
+        return List.copyOf(aufrufe);
     }
 
     private static JsonNode baum(String json) {
