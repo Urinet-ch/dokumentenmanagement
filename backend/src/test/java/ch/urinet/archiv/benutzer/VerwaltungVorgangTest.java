@@ -176,20 +176,20 @@ class VerwaltungVorgangTest {
     @Test
     void anlageMitGescheitertemAbschlussTraegtZielImUnklarEintrag() throws Exception {
         mandantenVorbereiten();
-        MandantCode mandant = new MandantCode("urinet");
+        MandantCode mandant = new MandantCode("vhf-gsk");
         UUID id = UUID.randomUUID();
         String akteur = UUID.randomUUID().toString();
         String sub = UUID.randomUUID().toString();
         var absicht = anlage(id, null, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
         try (var thread = Executors.newSingleThreadExecutor()) {
-            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+            assertThatThrownBy(() -> in(thread, "vhf-gsk", () -> vorgang.ausfuehren(mandant, absicht,
                     () -> { }, () -> sub, fehler -> Kompensation.UNKLAR,
                     wert -> { throw new IllegalStateException("synthetischer Abschluss"); },
                     wert -> anlage(id, UUID.fromString(wert), akteur,
                             ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN))))
                     .hasRootCauseInstanceOf(IllegalStateException.class);
-            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
-            assertThat(zielDerPhase(id, "UNKLAR")).isEqualTo(sub);
+            assertThat(phasen("m_vhf_gsk", id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(zielDerPhase("m_vhf_gsk", id, "UNKLAR")).isEqualTo(sub);
         } finally {
             testsperreEntfernen(mandant, id);
         }
@@ -203,10 +203,10 @@ class VerwaltungVorgangTest {
                 Optional.empty(), Optional.empty(), ProtokollDetails.verwaltung(details));
     }
 
-    private String zielDerPhase(UUID id, String phase) {
+    private String zielDerPhase(String schema, UUID id, String phase) {
         try (Connection verbindung = datenquelle.getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
-                     "select details->>'ziel' from m_urinet.zugriff_protokoll "
+                     "select details->>'ziel' from " + schema + ".zugriff_protokoll "
                              + "where details->>'vorgangId' = ? and details->>'phase' = ?")) {
             abfrage.setString(1, id.toString());
             abfrage.setString(2, phase);
@@ -356,9 +356,13 @@ class VerwaltungVorgangTest {
     }
 
     private List<String> phasen(UUID id) {
+        return phasen("m_urinet", id);
+    }
+
+    private List<String> phasen(String schema, UUID id) {
         try (Connection verbindung = datenquelle.getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
-                     "select details->>'phase' from m_urinet.zugriff_protokoll "
+                     "select details->>'phase' from " + schema + ".zugriff_protokoll "
                              + "where details->>'vorgangId' = ? order by id")) {
             abfrage.setString(1, id.toString());
             try (ResultSet zeilen = abfrage.executeQuery()) {
