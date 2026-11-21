@@ -120,7 +120,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 7.5_
   - _Abhängig von: 17.7; Spec 01: 3.6, 4.6_
 
-- [ ] 18.5 Isolation und Abnahme [QA]
+- [x] 18.5 Isolation und Abnahme [QA]
   - `MandantenIsolationIT` anlegen oder erweitern, Beispiel-Mandant `probe-verband` durchgängig.
   - _Anforderungen: 9.3, 9.4_
   - _Abhängig von: 18.1, 18.2, 18.3, 18.4_
