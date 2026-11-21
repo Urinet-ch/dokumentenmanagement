@@ -792,7 +792,8 @@ public class WerkzeugSchritte {
     public void werkzeugeAngeboten(String benutzer, String namen) {
         String id = kontext(benutzer);
         WerkzeugKontext kontext = register.finden(id).orElseThrow();
-        assertThat(imFremdenThread(() -> String.join(",", auswahl.angeboten(kontext)))).isEqualTo(namen);
+        assertThat(imFremdenThread(() -> String.join(",", auswahl.angeboten(kontext))))
+                .isEqualTo(namen + ",wissen_index,wissen_seite_zeigen");
     }
 
     @Dann("antwortet kennzahl und offene_posten für «{word}» mit «{}»")

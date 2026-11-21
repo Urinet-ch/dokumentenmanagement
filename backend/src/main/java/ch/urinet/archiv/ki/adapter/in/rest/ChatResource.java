@@ -86,15 +86,25 @@ public class ChatResource {
             @Schema(nullable = true, description = "Gespräch fortsetzen; ohne beginnt ein neues") UUID gespraechId) {
     }
 
-    @Schema(name = "ChatQuelle", description = "Dokument (id, titel, link) oder Datenstand eines Zahlenwerkzeugs "
-            + "(werkzeug, datenstand, belege)")
+    @Schema(name = "ChatQuelle", description = "Dokument (id, titel, link), Datenstand eines Zahlenwerkzeugs "
+            + "(werkzeug, datenstand, belege) oder Wissensseite mit direkten Quelldokumenten (wissen, dokumente)")
     public record QuelleDto(
             @Schema(nullable = true) UUID id,
             @Schema(nullable = true) String titel,
             @Schema(nullable = true, description = "relativer PWA-Pfad /dokument/<id>") String link,
             @Schema(nullable = true) String werkzeug,
             @Schema(nullable = true) Instant datenstand,
-            @Schema(nullable = true) Integer belege) {
+            @Schema(nullable = true) Integer belege,
+            @Schema(nullable = true) WissensquelleDto wissen,
+            @Schema(nullable = true) List<QuelldokumentDto> dokumente) {
+    }
+
+    @Schema(name = "ChatWissensquelle")
+    public record WissensquelleDto(String titel, String link, Instant stand) {
+    }
+
+    @Schema(name = "ChatQuelldokument")
+    public record QuelldokumentDto(String titel, String link, String seiten) {
     }
 
     @Schema(name = "ChatGespraech")
@@ -127,7 +137,8 @@ public class ChatResource {
     @Operation(summary = "Frage an den Chat",
             description = "Antwort als Server-Sent Events mit benannten Ereignissen, JSON in data: «werkzeug» {name} "
                     + "je Werkzeugaufruf, «text» {delta}, genau ein «quellen» [{id, titel, link} | {werkzeug, "
-                    + "datenstand, belege}] vor «fertig» {gespraechId, tokens: {ein, aus}}; «fehler» {meldung, "
+                    + "datenstand, belege} | {wissen: {titel, link, stand}, dokumente: [{titel, link, seiten}]}] "
+                    + "vor «fertig» {gespraechId, tokens: {ein, aus}}; «fehler» {meldung, "
                     + "gespraechId} beendet den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 "
                     + "NICHT_GEFUNDEN (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After "
                     + "und dem Feld grund der Problem Details (STUNDENLIMIT: mehr als 100 Fragen in 60 Minuten; "
@@ -230,9 +241,12 @@ public class ChatResource {
 
     private static QuelleDto dto(Quelle quelle) {
         return switch (quelle) {
-            case Quelle.Dokument d -> new QuelleDto(d.id(), d.titel(), d.link(), null, null, null);
+            case Quelle.Dokument d -> new QuelleDto(d.id(), d.titel(), d.link(), null, null, null, null, null);
             case Quelle.Stand s -> new QuelleDto(null, null, null, s.werkzeug(), s.datenstand().zeitpunkt(),
-                    s.datenstand().belege());
+                    s.datenstand().belege(), null, null);
+            case Quelle.Wissen w -> new QuelleDto(null, null, null, null, null, null,
+                    new WissensquelleDto(w.titel(), w.link(), w.stand()),
+                    w.dokumente().stream().map(d -> new QuelldokumentDto(d.titel(), d.link(), d.seite())).toList());
         };
     }
 

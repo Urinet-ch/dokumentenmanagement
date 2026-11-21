@@ -12,6 +12,7 @@ public class WerkzeugFehler extends RuntimeException {
     public static final String KEIN_KONTEXT = "kein Kontext";
     public static final String NICHT_VERFUEGBAR = "Werkzeug nicht verfügbar";
     public static final String NICHT_GEFUNDEN = "nicht gefunden: ID unbekannt, zuerst dokumente_suchen verwenden";
+    public static final String SEITE_NICHT_GEFUNDEN = "nicht gefunden: Pfad unbekannt, zuerst wissen_index verwenden";
     public static final String UNBEKANNTE_ART = "unbekannte Art";
 
     private final transient List<String> arten;

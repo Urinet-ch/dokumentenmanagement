@@ -32,12 +32,18 @@ public sealed interface ChatEreignis {
      *                   {@code vollstaendigkeit})
      */
     record WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
-                            Optional<Datenstand> datenstand) implements ChatEreignis {
+                            Optional<Datenstand> datenstand, Optional<QuellWissen> wissen) implements ChatEreignis {
         public WerkzeugErgebnis {
             Objects.requireNonNull(name, "name");
             parameter = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(parameter, "parameter")));
             dokumente = List.copyOf(dokumente);
             Objects.requireNonNull(datenstand, "datenstand");
+            Objects.requireNonNull(wissen, "wissen");
+        }
+
+        public WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
+                                Optional<Datenstand> datenstand) {
+            this(name, parameter, dokumente, datenstand, Optional.empty());
         }
     }
 
@@ -77,6 +83,15 @@ public sealed interface ChatEreignis {
 
         public QuellDokument(UUID id, String titel) {
             this(id, titel, null);
+        }
+    }
+
+    record QuellWissen(String pfad, String titel, Instant stand, List<QuellDokument> dokumente) {
+        public QuellWissen {
+            Objects.requireNonNull(pfad, "pfad");
+            Objects.requireNonNull(titel, "titel");
+            Objects.requireNonNull(stand, "stand");
+            dokumente = List.copyOf(dokumente);
         }
     }
 
