@@ -63,7 +63,7 @@ button app-symbol {
   margin-right: 0.375rem;
 }
 
-.hinweis {
+.nebentext {
   color: var(--text-gedaempft);
 }
 
@@ -75,106 +75,29 @@ mat-progress-bar {
   width: 100%;
 }
 
-// Tabelle der Läufe (Prototyp `.tbl`), breit in eigenem Scrollbereich
-.tabelle {
-  overflow-x: auto;
-  margin: 0.5rem -1.125rem 0;
-  border-radius: 0;
+// Tabelle der Läufe (Baustein .tabelle), breit in eigenem Scrollbereich bis an den Kartenrand
+.laeufe .tabelle-rahmen {
+  margin-top: 0.5rem;
 }
 
-table {
-  width: 100%;
+.laeufe .tabelle {
   min-width: 36rem;
-  border-collapse: collapse;
-  font-size: 0.8125rem;
 }
 
-th,
-td {
-  text-align: left;
-  padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid var(--linie);
-  vertical-align: middle;
-
-  &:first-child {
-    padding-left: 1.125rem;
-  }
-  &:last-child {
-    padding-right: 1.125rem;
-  }
+.laeufe .pille:not(.marke) {
+  margin-left: 0.25rem;
 }
 
-th {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-gedaempft);
-  white-space: nowrap;
-}
-
-tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-tbody tr:hover td {
-  background: var(--karte-2);
-}
-
-.r {
-  text-align: right;
-}
-
-.zahl {
+.zeit {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .datei-name a {
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-family: var(--schrift-mono);
   font-size: 0.8125rem;
   font-weight: 500;
   white-space: nowrap;
-}
-
-// Status-Pille (Prototyp `.pill`)
-.marke,
-.pille {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1;
-  padding: 0.3rem 0.5rem;
-  border-radius: 99px;
-  white-space: nowrap;
-  background: var(--karte-2);
-  color: var(--text-2);
-  border: 1px solid var(--linie);
-}
-
-.pille {
-  margin-left: 0.25rem;
-}
-
-.marke {
-  &[data-status='ZUORDNUNG_NOETIG'],
-  &[data-status='VORSCHAU'],
-  &[data-status='VORSCHAU_AUSSTEHEND'] {
-    background: var(--akzent-weich);
-    color: var(--akzent-text);
-    border-color: transparent;
-  }
-  &[data-status='UEBERNOMMEN'] {
-    background: var(--ok-weich);
-    color: var(--ok);
-    border-color: transparent;
-  }
-  &[data-status='ABGEBROCHEN'] {
-    background: var(--gefahr-weich);
-    color: var(--gefahr);
-    border-color: transparent;
-  }
 }
 
 .blaettern {

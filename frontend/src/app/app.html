@@ -20,7 +20,7 @@
     [mode]="mobil() ? 'over' : 'side'"
     [opened]="menue().length > 0 && !mobil()"
     [disableClose]="!mobil()"
-    [class.leer]="menue().length === 0"
+    [class.ohne-menue]="menue().length === 0"
   >
     @if (menue().length > 0) {
       <div class="seitenleiste">
@@ -75,7 +75,7 @@
           }
           @if (wissensentwurfZaehler.fehler()) {
             <div class="nav-fehler">
-              <p role="alert">{{ texte.wissen.entwuerfe.zaehlerFehler }}</p>
+              <p class="hinweis gefahr" role="alert">{{ texte.wissen.entwuerfe.zaehlerFehler }}</p>
               <button type="button" class="knopf breit" (click)="wissensentwurfZaehler.auffrischen()">
                 <app-symbol name="wiederholen" />{{ texte.wissen.erneut }}
               </button>

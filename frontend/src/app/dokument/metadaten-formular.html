@@ -29,7 +29,7 @@
         }
       </select>
       @if (vorbelegt(); as name) {
-        <p class="hinweis" data-test="art-vorbelegt">{{ texte.artVorbelegt(name) }}</p>
+        <p class="nebentext" data-test="art-vorbelegt">{{ texte.artVorbelegt(name) }}</p>
       }
     </div>
     <div class="feld">
@@ -107,11 +107,11 @@
           [attr.aria-invalid]="ungueltig('partnerId') || null"
           (input)="partnerSuchen(wert($event))"
         />
-        <p class="hinweis" id="bearbeiten-partner-hinweis">{{ korb.partnerSuchenHinweis }}</p>
+        <p class="nebentext" id="bearbeiten-partner-hinweis">{{ korb.partnerSuchenHinweis }}</p>
         @if (treffer(); as liste) {
           <div aria-live="polite">
             @if (liste.length === 0) {
-              <p class="hinweis">{{ korb.partnerKeine }}</p>
+              <p class="nebentext">{{ korb.partnerKeine }}</p>
             } @else {
               <ul class="treffer" data-test="partner-treffer">
                 @for (kontakt of liste; track kontakt.id) {
@@ -152,7 +152,7 @@
         [value]="f.tags"
         (input)="setze('tags', wert($event))"
       />
-      <p class="hinweis" id="bearbeiten-tags-hinweis">{{ texte.tagsHinweis }}</p>
+      <p class="nebentext" id="bearbeiten-tags-hinweis">{{ texte.tagsHinweis }}</p>
     </div>
     @if (darfVertraulichkeit()) {
       <div class="feld">
@@ -280,9 +280,9 @@
   }
 
   @if (klassifikationen.status === 'laedt') {
-    <p class="hinweis" role="status">{{ korb.klassifikationenLaedt }}</p>
+    <p class="nebentext" role="status">{{ korb.klassifikationenLaedt }}</p>
   } @else if (klassifikationen.status === 'fehler') {
-    <p class="fehler" role="alert">{{ korb.klassifikationenFehler }}</p>
+    <p class="hinweis gefahr" role="alert">{{ korb.klassifikationenFehler }}</p>
   } @else {
     @if (klassifikationen.daten.art.length > 0) {
       <app-klassifikationen-formular
@@ -318,7 +318,7 @@
       [value]="f.grund"
       (input)="setze('grund', wert($event))"
     ></textarea>
-    <p class="hinweis" id="bearbeiten-grund-hinweis">
+    <p class="nebentext" id="bearbeiten-grund-hinweis">
       {{ archiviert() ? texte.grundPflicht : texte.grundFrei }}
     </p>
   </div>
