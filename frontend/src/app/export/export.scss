@@ -72,7 +72,7 @@ button app-symbol {
   margin-right: 0.375rem;
 }
 
-.hinweis,
+.nebentext,
 .angaben,
 small {
   color: var(--text-gedaempft);
@@ -82,22 +82,9 @@ small {
   color: var(--gefahr);
 }
 
-.laufend {
-  display: flex;
-  gap: 0.625rem;
-  align-items: flex-start;
-  padding: 0.625rem 0.75rem;
-  border-radius: var(--radius-klein);
-  background: var(--akzent-weich);
-  color: var(--akzent-text);
-
-  .tx {
-    flex: 1;
-    min-width: 0;
-    display: grid;
-    gap: 0.5rem;
-    color: var(--text);
-  }
+.laufend .tx {
+  display: grid;
+  gap: 0.5rem;
 }
 
 // Liste mit Symbol links (Prototyp `.list`/`.li`)
@@ -167,35 +154,4 @@ small {
 
 .eintrag button {
   margin-top: 0.25rem;
-}
-
-// Status-Pille (Prototyp `.pill`)
-.marke {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1;
-  padding: 0.3rem 0.5rem;
-  border-radius: 99px;
-  white-space: nowrap;
-  background: var(--karte-2);
-  color: var(--text-2);
-  border: 1px solid var(--linie);
-
-  &[data-status='OFFEN'] {
-    background: var(--akzent-weich);
-    color: var(--akzent-text);
-    border-color: transparent;
-  }
-  &[data-status='FERTIG'] {
-    background: var(--ok-weich);
-    color: var(--ok);
-    border-color: transparent;
-  }
-  &[data-status='FEHLER'] {
-    background: var(--gefahr-weich);
-    color: var(--gefahr);
-    border-color: transparent;
-  }
 }

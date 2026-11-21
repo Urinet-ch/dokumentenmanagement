@@ -6,13 +6,13 @@
   </div>
 
   @if (fehler()) {
-    <p class="meldung fehler" role="alert">{{ fehlerMeldung() }}</p>
+    <p class="hinweis gefahr" role="alert">{{ fehlerMeldung() }}</p>
     @if (neuLadenNoetig()) {
       <button type="button" class="sekundaer" (click)="neuLaden()">{{ texte.erneutLaden }}</button>
     }
   }
   @if (meldung()) {
-    <p class="meldung erfolg" role="status" aria-live="polite">{{ meldung() }}</p>
+    <p class="hinweis ok" role="status" aria-live="polite">{{ meldung() }}</p>
   }
 
   <nav [attr.aria-label]="texte.navigation" class="sprungmarken">
@@ -43,7 +43,7 @@
                   (click)="artWaehlen(art)"
                 >
                   <span class="name">{{ art.name }}</span>
-                  <code>{{ art.code }}</code>
+                  <code class="mono">{{ art.code }}</code>
                   <span class="status pillen">
                     <span class="pille" [class.ok]="art.aktiv">{{ art.aktiv ? texte.aktiv : texte.inaktiv }}</span>
                     <span class="pille">{{ texte.dokumentarten.vertraulichkeiten[art.vertraulichkeit] }}</span>
@@ -51,7 +51,7 @@
                       <span class="pille akzent">{{ texte.dokumentarten.selbstAusgestellt }}</span>
                     }
                     @if (art.gesetzlichePflicht) {
-                      <span class="pille info" [attr.title]="texte.dokumentarten.gesetzlichePflicht">{{ texte.gebuev }}</span>
+                      <span class="pille warnung" [attr.title]="texte.dokumentarten.gesetzlichePflicht">{{ texte.gebuev }}</span>
                     }
                   </span>
                 </button>
@@ -90,13 +90,13 @@
                 {{ texte.dokumentarten.gruppe[gruppe] }}
               </label>
             }
-            <p class="hinweis">{{ texte.dokumentarten.gruppeFreiHinweis }}</p>
+            <p class="nebentext">{{ texte.dokumentarten.gruppeFreiHinweis }}</p>
           </fieldset>
 
           <label>
             {{ texte.dokumentarten.pflichtfelder }}
             <textarea [(ngModel)]="artForm.pflichtfelder" rows="3"></textarea>
-            <span class="hinweis">{{
+            <span class="nebentext">{{
               artForm.schema.modus === 'json'
                 ? texte.dokumentarten.pflichtfelderHinweisJson
                 : texte.dokumentarten.pflichtfelderHinweis
@@ -106,7 +106,7 @@
           <fieldset>
             <legend>{{ texte.dokumentarten.zusatzSchema }}</legend>
             @if (artForm.schema.modus === 'json') {
-              <p class="hinweis">{{ texte.dokumentarten.schemaJsonHinweis }}</p>
+              <p class="nebentext">{{ texte.dokumentarten.schemaJsonHinweis }}</p>
               <label>
                 {{ texte.dokumentarten.schemaJson }}
                 <textarea
@@ -201,7 +201,7 @@
                 </fieldset>
               }
               @if (feldEditorFehler()) {
-                <p class="meldung fehler" role="alert">{{ feldEditorFehler() }}</p>
+                <p class="hinweis gefahr" role="alert">{{ feldEditorFehler() }}</p>
               }
               <button type="button" class="sekundaer" (click)="feldHinzufuegen()">
                 {{ texte.dokumentarten.feldHinzufuegen }}
@@ -254,7 +254,7 @@
           <label>
             {{ texte.dokumentarten.belegnummerMuster }}
             <textarea [(ngModel)]="artForm.belegnummerMuster" rows="3"></textarea>
-            <span class="hinweis">{{ texte.dokumentarten.belegnummerMusterHinweis }}</span>
+            <span class="nebentext">{{ texte.dokumentarten.belegnummerMusterHinweis }}</span>
           </label>
           <label>
             {{ texte.dokumentarten.fremdbelegArt }}
@@ -285,7 +285,7 @@
           <label>
             {{ texte.dokumentarten.kiFelder }}
             <textarea [(ngModel)]="artForm.kiFelder" rows="3"></textarea>
-            <span class="hinweis">{{ texte.dokumentarten.kiFelderHinweis }}</span>
+            <span class="nebentext">{{ texte.dokumentarten.kiFelderHinweis }}</span>
           </label>
           <label>
             {{ texte.dokumentarten.kiHinweise }}
@@ -305,7 +305,7 @@
           </label>
 
           @if (!artNeu()) {
-            <p class="hinweis">{{ texte.wirkungWarnung }}</p>
+            <p class="nebentext">{{ texte.wirkungWarnung }}</p>
           }
           @if (speichernFrage() === 'art') {
             <div class="bestaetigung" role="group" aria-labelledby="art-speichern-frage">
@@ -442,7 +442,7 @@
                   (click)="klassifikationWaehlen(klassifikation)"
                 >
                   <span class="name">{{ klassifikation.name }}</span>
-                  <code>{{ klassifikation.code }}</code>
+                  <code class="mono">{{ klassifikation.code }}</code>
                   <span class="status pillen">
                     <span class="pille" [class.ok]="klassifikation.aktiv">{{
                       klassifikation.aktiv ? texte.aktiv : texte.inaktiv
@@ -506,7 +506,7 @@
             {{ texte.aenderungsgrund }}
             <input [(ngModel)]="klassifikationForm.grund" maxlength="1000" />
           </label>
-          <p class="hinweis">{{ texte.wirkungWarnung }}</p>
+          <p class="nebentext">{{ texte.wirkungWarnung }}</p>
           <button type="button" [disabled]="beschaeftigt()" (click)="klassifikationSpeichern()">
             {{ texte.speichern }}
           </button>
@@ -701,7 +701,7 @@
           <label>
             {{ texte.regeln.parameter }}
             <textarea [(ngModel)]="regelForm.parameter" rows="8" spellcheck="false"></textarea>
-            <span class="hinweis">{{ texte.regeln.parameterHinweis }}</span>
+            <span class="nebentext">{{ texte.regeln.parameterHinweis }}</span>
           </label>
           <label>
             {{ texte.regeln.schwere }}
@@ -724,7 +724,7 @@
             <input [(ngModel)]="regelForm.grund" maxlength="1000" />
           </label>
           @if (!regelNeu()) {
-            <p class="hinweis">{{ texte.regeln.warnungBetroffene }}</p>
+            <p class="nebentext">{{ texte.regeln.warnungBetroffene }}</p>
           }
           <button type="button" [disabled]="beschaeftigt()" (click)="regelSpeichern()">
             {{ texte.speichern }}
@@ -742,11 +742,11 @@
     } @else if (versionen().length === 0) {
       <p>{{ texte.versionen.keineVersionen }}</p>
     } @else {
-      <div class="tabellen-rahmen">
-        <table>
+      <div class="tabelle-rahmen">
+        <table class="tabelle">
           <thead>
             <tr>
-              <th scope="col">{{ texte.versionen.version }}</th>
+              <th scope="col" class="zahl">{{ texte.versionen.version }}</th>
               <th scope="col">{{ texte.versionen.zeit }}</th>
               <th scope="col">{{ texte.versionen.wer }}</th>
               <th scope="col">{{ texte.versionen.grund }}</th>
@@ -757,13 +757,13 @@
           <tbody>
             @for (version of versionen(); track version.version) {
               <tr>
-                <td>{{ version.version }}</td>
+                <td class="zahl">{{ version.version }}</td>
                 <td>{{ zeitpunkt(version.zeit) }}</td>
                 <td>{{ version.wer }}</td>
                 <td>{{ version.grund ?? '—' }}</td>
                 <td>{{ version.quelle }}</td>
                 <td>
-                  <code>{{ version.sha256 }}</code>
+                  <code class="mono">{{ version.sha256 }}</code>
                 </td>
               </tr>
             }
@@ -798,8 +798,8 @@
       @if (diff().length === 0) {
         <p>{{ texte.versionen.keineAenderungen }}</p>
       } @else {
-        <div class="tabellen-rahmen">
-          <table>
+        <div class="tabelle-rahmen">
+          <table class="tabelle">
             <thead>
               <tr>
                 <th scope="col">{{ texte.versionen.aenderungspfad }}</th>
@@ -876,14 +876,14 @@
         @if (aenderungen(vergleich).length === 0) {
           <p>{{ texte.datei.keineAenderungen }}</p>
         } @else {
-          <div class="tabellen-rahmen">
-            <table>
+          <div class="tabelle-rahmen">
+            <table class="tabelle">
               <thead>
                 <tr>
                   <th scope="col">{{ texte.versionen.aenderungspfad }}</th>
                   <th scope="col">{{ texte.versionen.alt }}</th>
                   <th scope="col">{{ texte.versionen.neu }}</th>
-                  <th scope="col">{{ texte.datei.betroffene }}</th>
+                  <th scope="col" class="zahl">{{ texte.datei.betroffene }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -896,7 +896,7 @@
                     <td>
                       {{ aenderung.werteVerdeckt ? texte.versionen.werteVerdeckt : aenderung.neu }}
                     </td>
-                    <td>
+                    <td class="zahl">
                       @if (vergleich.aenderungen?.[index]; as eintrag) {
                         {{ eintrag.betroffeneDokumente ?? 0 }}
                       }

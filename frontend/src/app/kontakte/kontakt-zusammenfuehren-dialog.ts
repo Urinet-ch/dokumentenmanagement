@@ -92,7 +92,7 @@ export interface Zusammengefuehrt {
                   </button>
                 </li>
               } @empty {
-                <li class="hinweis" data-test="ziel-keine">{{ texte.zielKeine }}</li>
+                <li class="nebentext" data-test="ziel-keine">{{ texte.zielKeine }}</li>
               }
             </ul>
           }
@@ -109,9 +109,9 @@ export interface Zusammengefuehrt {
           ></textarea>
           <small id="grund-hinweis">{{ texte.grundHinweis }}</small>
         </label>
-        <p class="fehler" role="alert" data-test="auswahl-fehler">{{ auswahlFehler() }}</p>
+        <p class="hinweis gefahr" role="alert" data-test="auswahl-fehler">{{ auswahlFehler() }}</p>
         @if (fehler(); as text) {
-          <p class="fehler" role="alert" data-test="aktion-fehler">{{ text }}</p>
+          <p class="hinweis gefahr" role="alert" data-test="aktion-fehler">{{ text }}</p>
         }
         <div class="knoepfe">
           <button
@@ -152,7 +152,7 @@ export interface Zusammengefuehrt {
         <p class="text" data-test="rueckfrage-grund">{{ texte.rueckfrageGrund(grund().trim()) }}</p>
         <p class="fehler" data-test="nicht-umkehrbar">{{ texte.nichtUmkehrbar }}</p>
         @if (fehler(); as text) {
-          <p class="fehler" role="alert" data-test="aktion-fehler">{{ text }}</p>
+          <p class="hinweis gefahr" role="alert" data-test="aktion-fehler">{{ text }}</p>
         }
         <div class="knoepfe">
           <button

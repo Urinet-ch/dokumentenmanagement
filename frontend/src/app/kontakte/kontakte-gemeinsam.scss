@@ -55,7 +55,7 @@ textarea {
   resize: vertical;
 }
 
-.hinweis {
+.nebentext {
   color: var(--text-gedaempft);
   margin: 0;
 }
@@ -64,16 +64,20 @@ textarea {
   color: var(--gefahr);
 }
 
-div.fehler,
-p.fehler[role='alert']:not(:empty) {
-  background: var(--gefahr-weich);
-  border-radius: var(--radius-klein);
-  padding: 0.625rem 0.875rem;
+// Fehler als .hinweis gefahr; eine leere Live-Region zeigt keine Fläche
+:host .hinweis {
+  row-gap: 0.5rem;
   margin: 0.5rem 0;
 
-  p {
-    margin: 0 0 0.5rem;
+  > button {
+    justify-self: start;
   }
+}
+
+p[role='alert'].hinweis:empty {
+  margin: 1em 0;
+  padding: 0;
+  background: none;
 }
 
 .erfolg {
@@ -102,7 +106,7 @@ button app-symbol {
   min-width: 0;
 }
 
-// Pillen wie im Prototyp: neutral, «nicht mehr im CRM-Export» als Warnung
+// Kennzeichen als Pillen: neutral, Herkunft zurückhaltend, «nicht mehr im CRM-Export» als Warnung
 .marken {
   display: flex;
   flex-wrap: wrap;
@@ -111,29 +115,9 @@ button app-symbol {
   margin: 0;
   padding: 0;
 
-  li {
-    display: inline-flex;
-    align-items: center;
-    font-size: 11.5px;
-    font-weight: 600;
-    line-height: 1.1;
-    padding: 4px 8px;
-    border-radius: 99px;
-    border: 1px solid var(--linie);
-    background: var(--karte-2);
-    color: var(--text-2);
-    overflow-wrap: anywhere;
-  }
-
   [data-art='herkunft'] {
     background: transparent;
     color: var(--text-gedaempft);
-  }
-
-  [data-art='export'] {
-    background: var(--warnung-weich);
-    color: var(--warnung);
-    border-color: transparent;
   }
 }
 
@@ -167,7 +151,7 @@ button app-symbol {
     border-top: 1px solid var(--linie);
   }
 
-  .hinweis {
+  .nebentext {
     padding: 0.625rem 0.75rem;
   }
 }

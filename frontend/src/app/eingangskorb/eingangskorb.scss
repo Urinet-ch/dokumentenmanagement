@@ -20,32 +20,17 @@
   }
 }
 
-.fehler {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.25rem 0.625rem;
-  align-items: start;
+// Fehler als .hinweis (styles.scss), Knopf unter dem Text
+:host > .hinweis {
   margin: 0 0 0.875rem;
-  padding: 0.625rem 0.875rem;
-  border-radius: var(--radius-klein);
-  background: var(--gefahr-weich);
-  color: var(--text);
-
-  app-symbol {
-    color: var(--gefahr);
-  }
-
-  p {
-    margin: 0;
-  }
 
   button {
-    grid-column: 2;
     justify-self: start;
   }
 }
 
-.leer {
+// Leer: alles erledigt (Karte mit Symbol und Satz)
+.erledigt {
   display: flex;
   align-items: center;
   gap: 0.75rem;

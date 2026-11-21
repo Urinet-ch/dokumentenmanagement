@@ -33,13 +33,13 @@
         {{ texte.anfordern }}
       </button>
     </div>
-    <p id="jahr-hinweis" class="hinweis">{{ texte.jahrHinweis }}</p>
+    <p id="jahr-hinweis" class="nebentext">{{ texte.jahrHinweis }}</p>
     <p class="status" role="status" aria-live="polite">{{ meldung() }}</p>
     @if (fehler()) {
       <p class="fehler" role="alert">{{ fehler() }}</p>
     }
     @if (offen(); as eintrag) {
-      <div class="laufend">
+      <div class="hinweis info laufend">
         <app-symbol name="uhr" />
         <div class="tx">
           <span>{{ texte.inArbeit(eintrag.geschaeftsjahr) }}</span>
@@ -74,10 +74,10 @@
     }
     @if (liste() === null) {
       @if (!listeFehler()) {
-        <p class="hinweis">{{ texte.laden }}</p>
+        <p class="nebentext">{{ texte.laden }}</p>
       }
     } @else if (liste()!.length === 0) {
-      <p class="hinweis">{{ texte.keine }}</p>
+      <p class="nebentext">{{ texte.keine }}</p>
     } @else {
       <ul class="liste exporte">
         @for (eintrag of liste(); track eintrag.id) {
@@ -86,7 +86,7 @@
             <span class="tx">
               <span class="kopf">
                 <b>{{ texte.zeile(eintrag.geschaeftsjahr, zeit(eintrag.erstellt)) }}</b>
-                <span class="marke" [attr.data-status]="eintrag.status">{{
+                <span class="pille marke" [class]="ton[eintrag.status] ?? ''" [attr.data-status]="eintrag.status">{{
                   texte.status[eintrag.status]
                 }}</span>
               </span>

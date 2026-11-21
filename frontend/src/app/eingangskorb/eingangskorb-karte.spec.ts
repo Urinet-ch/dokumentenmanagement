@@ -315,7 +315,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     await zeigen(MIT_VORSCHLAG);
     const pille = element.querySelector('[data-test=unsichere-felder]');
     expect(pille?.textContent?.trim()).toBe(T.unsichereFelder(1));
-    expect(element.querySelector('[data-feld=betrag]')?.classList).toContain('unsicher');
+    expect(element.querySelector('[data-feld=betrag]')?.classList).toContain('warnung');
     expect(element.querySelector('[data-test=vorschlag-vollstaendig]')).toBeNull();
     expect(knoepfe()).toEqual([T.bestaetigen, T.aendern, T.verwerfen]);
   });
