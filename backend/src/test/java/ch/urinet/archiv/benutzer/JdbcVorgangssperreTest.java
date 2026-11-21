@@ -3,6 +3,7 @@ package ch.urinet.archiv.benutzer;
 import ch.urinet.archiv.benutzer.application.Vorgangssperre;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import java.sql.SQLException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @QuarkusTest
 class JdbcVorgangssperreTest {
@@ -54,6 +56,7 @@ class JdbcVorgangssperreTest {
                     ablaufen.executeUpdate();
                 }
                 assertThat(sperre.gueltig(a, alt)).isFalse();
+                assertThat(QuarkusTransaction.requiringNew().call(() -> sperre.anfragen(a, alt))).isFalse();
                 assertThat(sperre.belegen(a, neu)).isTrue();
                 assertThat(sperre.freigeben(a, alt)).isFalse();
                 assertThat(sperre.gueltig(a, neu)).isTrue();
@@ -71,6 +74,46 @@ class JdbcVorgangssperreTest {
                 }
                 assertThat(sperre.belegen(a, alt)).isTrue();
                 assertThat(sperre.freigeben(a, alt)).isTrue();
+
+                assertThat(sperre.belegen(a, alt)).isTrue();
+                assertThatThrownBy(() -> sperre.anfragen(a, alt)).isInstanceOf(IllegalStateException.class);
+                assertThatThrownBy(() -> QuarkusTransaction.requiringNew().run(() -> {
+                    assertThat(sperre.anfragen(a, alt)).isTrue();
+                    throw new IllegalStateException("synthetischer Fehler");
+                })).isInstanceOf(IllegalStateException.class);
+                assertThat(sperre.freigeben(a, alt)).isTrue();
+
+                assertThat(sperre.belegen(a, alt)).isTrue();
+                assertThat(QuarkusTransaction.requiringNew().call(() -> sperre.anfragen(a, alt))).isTrue();
+                try (PreparedStatement ablaufen = verbindung.prepareStatement(
+                        "update public.verwaltung_vorgang set bis = clock_timestamp() - interval '1 second' "
+                                + "where mandant = ?")) {
+                    ablaufen.setString(1, a.wert());
+                    ablaufen.executeUpdate();
+                }
+                assertThat(sperre.belegen(a, neu)).isFalse();
+                assertThat(sperre.freigeben(a, alt)).isFalse();
+                assertThatThrownBy(() -> QuarkusTransaction.requiringNew().run(() -> {
+                    assertThat(sperre.abschliessen(a, alt, Vorgangssperre.Abschluss.ABGESCHLOSSEN)).isTrue();
+                    throw new IllegalStateException("synthetischer Fehler");
+                })).isInstanceOf(IllegalStateException.class);
+                assertThat(sperre.belegen(a, neu)).isFalse();
+                assertThat(QuarkusTransaction.requiringNew().call(() ->
+                        sperre.abschliessen(a, neu, Vorgangssperre.Abschluss.ABGESCHLOSSEN))).isFalse();
+                assertThat(QuarkusTransaction.requiringNew().call(() ->
+                        sperre.abschliessen(a, alt, Vorgangssperre.Abschluss.ABGESCHLOSSEN))).isTrue();
+                assertThat(sperre.belegen(a, neu)).isTrue();
+                assertThat(QuarkusTransaction.requiringNew().call(() -> sperre.anfragen(a, neu))).isTrue();
+                assertThat(QuarkusTransaction.requiringNew().call(() ->
+                        sperre.abschliessen(a, neu, Vorgangssperre.Abschluss.UNKLAR))).isTrue();
+                try (PreparedStatement ablaufen = verbindung.prepareStatement(
+                        "update public.verwaltung_vorgang set bis = clock_timestamp() - interval '1 second' "
+                                + "where mandant = ?")) {
+                    ablaufen.setString(1, a.wert());
+                    ablaufen.executeUpdate();
+                }
+                assertThat(sperre.freigeben(a, neu)).isFalse();
+                assertThat(sperre.belegen(a, alt)).isFalse();
             } finally {
                 try (PreparedStatement loeschen = verbindung.prepareStatement(
                         "delete from public.verwaltung_vorgang where mandant in (?, ?)")) {
