@@ -9,7 +9,9 @@
  */
 
 
-export interface EmailAenderung { 
+export interface BenutzerAenderung { 
     email?: string;
+    vorname?: string;
+    nachname?: string;
 }
 

@@ -364,7 +364,7 @@ class VerwaltungCacheHttpTest {
     void emailAendernPrueftVersionMandantUndSendetBeideMitteilungen() {
         String pfad = "/api/v1/benutzer/";
         String token = Testanmeldung.token("inhaber-urinet");
-        given().auth().oauth2(token).contentType("application/json").body("{}")
+        given().auth().oauth2(token).contentType("application/json").body("{\"email\":\"neu@example.invalid\"}")
                 .patch(pfad + UUID.randomUUID()).then().statusCode(401).body("fehlercode", is("STEP_UP_NOETIG"));
 
         QuarkusMock.installMockForType(new StepUpAusstehend() {
@@ -395,8 +395,10 @@ class VerwaltungCacheHttpTest {
         given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
                 .body("{\"email\":\"" + neu + "\"}").patch(pfad + fremd).then().statusCode(404);
         given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
-                .body("{\"email\":\"" + neu + "\"}").patch(pfad + ziel).then().statusCode(204);
+                .body("{\"email\":\"" + neu + "\",\"vorname\":\"Neu" + suffix + "\"}")
+                .patch(pfad + ziel).then().statusCode(204);
         assertThat(dienst.benutzerLesen("urinet", ziel).email()).isEqualTo(neu);
+        assertThat(dienst.benutzerLesen("urinet", ziel).vorname()).isEqualTo("Neu" + suffix);
         assertThat(dienst.benutzerLesen("urinet", ziel).aktionen()).containsExactlyInAnyOrder(
                 IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
                 IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
@@ -404,6 +406,45 @@ class VerwaltungCacheHttpTest {
         assertThat(mitteilungen).containsExactly("email." + suffix + "@example.invalid");
         given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
                 .body("{\"email\":\"" + neu + "\"}").patch(pfad + ziel).then().statusCode(412);
+    }
+
+    @Test
+    void namenAendernVerlangtVersionAberKeinStepUpUndProtokolliertKeineNamen() throws SQLException {
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub();
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String ziel = dienst.anlegen("urinet", person("name." + suffix), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/benutzer/" + ziel;
+        String etag = given().auth().oauth2(token).get(pfad).then().statusCode(200).extract().header("ETag");
+        String namen = "{\"vorname\":\"Neu" + suffix + "\",\"nachname\":\"Person" + suffix + "\"}";
+
+        given().auth().oauth2(token).contentType("application/json").body(namen)
+                .patch(pfad).then().statusCode(428);
+        given().auth().oauth2(token).contentType("application/json")
+                .header("If-Match", "\"" + "0".repeat(64) + "\"").body(namen)
+                .patch(pfad).then().statusCode(412);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"vorname\":\"\"}").patch(pfad).then().statusCode(422);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body(namen).patch(pfad).then().statusCode(204);
+        assertThat(dienst.benutzerLesen("urinet", ziel).vorname()).isEqualTo("Neu" + suffix);
+        assertThat(dienst.benutzerLesen("urinet", ziel).nachname()).isEqualTo("Person" + suffix);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body(namen).patch(pfad).then().statusCode(412);
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details::text, details->'felder'->>'vorname', details->'felder'->>'nachname' "
+                             + "from m_urinet.zugriff_protokoll where details->>'ziel' = ? "
+                             + "and details->>'vorgang' = 'NAME_AENDERN' and details->>'phase' = 'ABGESCHLOSSEN'")) {
+            abfrage.setString(1, ziel);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).doesNotContain("Neu" + suffix, "Person" + suffix);
+                assertThat(zeile.getString(2)).isEqualTo("geändert");
+                assertThat(zeile.getString(3)).isEqualTo("geändert");
+            }
+        }
     }
 
     @Test

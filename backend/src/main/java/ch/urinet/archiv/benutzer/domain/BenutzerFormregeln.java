@@ -33,6 +33,19 @@ public final class BenutzerFormregeln {
         }
     }
 
+    public static void pruefeNamen(String vorname, String nachname) {
+        List<Befund> befunde = new ArrayList<>();
+        if (vorname != null) {
+            pruefeName(befunde, "vorname", vorname);
+        }
+        if (nachname != null) {
+            pruefeName(befunde, "nachname", nachname);
+        }
+        if (!befunde.isEmpty()) {
+            throw new KonfigurationUngueltig(befunde);
+        }
+    }
+
     private static void pruefeEmail(List<Befund> befunde, String email) {
         if (!laengeUndSteuerzeichen(email, 1, 254)
                 || email.indexOf('@') < 0 || email.indexOf('@') != email.lastIndexOf('@')) {

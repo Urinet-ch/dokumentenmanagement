@@ -17,13 +17,13 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
+import { BenutzerAenderung } from '../model/benutzer-aenderung';
+// @ts-ignore
 import { BenutzerAnlage } from '../model/benutzer-anlage';
 // @ts-ignore
 import { BenutzerAnlageErgebnis } from '../model/benutzer-anlage-ergebnis';
 // @ts-ignore
 import { BenutzerAnsicht } from '../model/benutzer-ansicht';
-// @ts-ignore
-import { EmailAenderung } from '../model/email-aenderung';
 // @ts-ignore
 import { Grund } from '../model/grund';
 // @ts-ignore
@@ -409,25 +409,25 @@ export class BenutzerverwaltungService extends BaseService {
     }
 
     /**
-     * E-Mail-Adresse ändern
+     * E-Mail-Adresse oder Namen ändern
      * @endpoint patch /api/v1/benutzer/{benutzerId}
      * @param benutzerId 
-     * @param emailAenderung 
+     * @param benutzerAenderung 
      * @param ifMatch 
      * @param xRealIp 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1BenutzerBenutzerIdPatch(benutzerId: string, emailAenderung: EmailAenderung, ifMatch?: string, xRealIp?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1BenutzerBenutzerIdPatch(benutzerId: string, emailAenderung: EmailAenderung, ifMatch?: string, xRealIp?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1BenutzerBenutzerIdPatch(benutzerId: string, emailAenderung: EmailAenderung, ifMatch?: string, xRealIp?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1BenutzerBenutzerIdPatch(benutzerId: string, emailAenderung: EmailAenderung, ifMatch?: string, xRealIp?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1BenutzerBenutzerIdPatch(benutzerId: string, benutzerAenderung: BenutzerAenderung, ifMatch?: string, xRealIp?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1BenutzerBenutzerIdPatch(benutzerId: string, benutzerAenderung: BenutzerAenderung, ifMatch?: string, xRealIp?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1BenutzerBenutzerIdPatch(benutzerId: string, benutzerAenderung: BenutzerAenderung, ifMatch?: string, xRealIp?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1BenutzerBenutzerIdPatch(benutzerId: string, benutzerAenderung: BenutzerAenderung, ifMatch?: string, xRealIp?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (benutzerId === null || benutzerId === undefined) {
             throw new Error('Required parameter benutzerId was null or undefined when calling apiV1BenutzerBenutzerIdPatch.');
         }
-        if (emailAenderung === null || emailAenderung === undefined) {
-            throw new Error('Required parameter emailAenderung was null or undefined when calling apiV1BenutzerBenutzerIdPatch.');
+        if (benutzerAenderung === null || benutzerAenderung === undefined) {
+            throw new Error('Required parameter benutzerAenderung was null or undefined when calling apiV1BenutzerBenutzerIdPatch.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -477,7 +477,7 @@ export class BenutzerverwaltungService extends BaseService {
         return this.httpClient.request<any>('patch', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: emailAenderung,
+                body: benutzerAenderung,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

@@ -240,7 +240,7 @@ public class VerwaltungVorgang {
             case BENUTZER_AENDERN -> switch (vorgang) {
                 case EINLADUNG_ERNEUT, ZUGANG_ZURUECKSETZEN, REAKTIVIEREN -> VerwaltungGrenzen.Art.EMAIL;
                 case EMAIL_AENDERN -> VerwaltungGrenzen.Art.EMAIL_AENDERUNG;
-                case SPERREN, ENTSPERREN, DEAKTIVIEREN, GOOGLE_LOESEN ->
+                case SPERREN, ENTSPERREN, DEAKTIVIEREN, NAME_AENDERN, GOOGLE_LOESEN ->
                         VerwaltungGrenzen.Art.BENUTZER;
                 default -> throw new IllegalArgumentException("Ungültiger Änderungsvorgang");
             };

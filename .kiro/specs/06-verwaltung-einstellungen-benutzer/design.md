@@ -217,6 +217,8 @@ geschützte Aktionen; Tests ersetzen sie ausdrücklich. Eine bestätigte Entfern
 genügt nicht für `GEKLAERT`; HTTP 202 gilt nicht als bestätigter Abschluss.
 Bei einer E-Mail-Änderung werden für die Bestätigung an die neue und die Mitteilung an die bisherige Adresse zwei der
 drei Mailplätze je Ziel reserviert. Auch angefragte Änderungen mit unklarem Ausgang zählen vorsorglich.
+Eine reine Namensänderung trägt den technischen Vorgang `NAME_AENDERN`; bei einer gemeinsamen Änderung mit E-Mail
+steht `EMAIL_AENDERN`. Das Protokoll nennt ausschliesslich die betroffenen Felder, nie deren Werte.
 
 ### Statusautomat
 | Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |

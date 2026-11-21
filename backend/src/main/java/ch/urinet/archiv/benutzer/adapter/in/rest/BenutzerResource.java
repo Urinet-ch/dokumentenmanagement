@@ -5,7 +5,7 @@ import ch.urinet.archiv.benutzer.application.BenutzerEinladen;
 import ch.urinet.archiv.benutzer.application.BenutzerAnlegen;
 import ch.urinet.archiv.benutzer.application.BenutzerZugangZuruecksetzen;
 import ch.urinet.archiv.benutzer.application.BenutzerGoogleLoesen;
-import ch.urinet.archiv.benutzer.application.BenutzerEmailAendern;
+import ch.urinet.archiv.benutzer.application.BenutzerAendern;
 import ch.urinet.archiv.benutzer.application.BenutzerStatusAendern;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -57,7 +57,7 @@ public class BenutzerResource {
     private final BenutzerAnlegen anlegen;
     private final BenutzerZugangZuruecksetzen zugang;
     private final BenutzerGoogleLoesen google;
-    private final BenutzerEmailAendern email;
+    private final BenutzerAendern aendern;
     private final BenutzerStatusAendern status;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
@@ -66,7 +66,7 @@ public class BenutzerResource {
     private final StepUp stepUp;
 
     public BenutzerResource(BenutzerLesen lesen, BenutzerEinladen einladen, BenutzerAnlegen anlegen,
-                            BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google, BenutzerEmailAendern email,
+                            BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google, BenutzerAendern aendern,
                             BenutzerStatusAendern status,
                             MandantAufloesung mandant, SecurityIdentity identitaet, ObjectMapper json,
                             Berechtigung berechtigung, StepUp stepUp) {
@@ -75,7 +75,7 @@ public class BenutzerResource {
         this.anlegen = anlegen;
         this.zugang = zugang;
         this.google = google;
-        this.email = email;
+        this.aendern = aendern;
         this.status = status;
         this.mandant = mandant;
         this.identitaet = identitaet;
@@ -206,10 +206,10 @@ public class BenutzerResource {
         return Response.noContent().build();
     }
 
-    public record EmailAenderung(String email) {
+    public record BenutzerAenderung(String email, String vorname, String nachname) {
         @Override
         public String toString() {
-            return "EmailAenderung[geschützt]";
+            return "BenutzerAenderung[geschützt]";
         }
     }
 
@@ -218,29 +218,32 @@ public class BenutzerResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @ErfordertAktion(Aktion.A22)
     @RolesAllowed("inhaber")
-    @Operation(summary = "E-Mail-Adresse ändern")
+    @Operation(summary = "E-Mail-Adresse oder Namen ändern")
     @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
-            schema = @Schema(implementation = EmailAenderung.class)))
-    @APIResponse(responseCode = "204", description = "E-Mail-Adresse geändert")
-    public Response emailAendern(@PathParam("benutzerId") String benutzerId, @HeaderParam("If-Match") String ifMatch,
+            schema = @Schema(implementation = BenutzerAenderung.class)))
+    @APIResponse(responseCode = "204", description = "Benutzerdaten geändert")
+    public Response benutzerAendern(@PathParam("benutzerId") String benutzerId, @HeaderParam("If-Match") String ifMatch,
                                  @HeaderParam("X-Real-Ip") String ip,
                                  @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
         var code = mandant.pruefen();
         Benutzer akteur = akteur();
         berechtigung.aktion(akteur, Aktion.A22);
-        stepUp.pruefen();
-        BenutzerEmailAendern.ifMatchPruefen(ifMatch);
         jsonPruefen(contentType);
-        EmailAenderung aenderung;
+        BenutzerAenderung eingabe;
         try {
-            aenderung = json.forType(EmailAenderung.class).readValue(begrenztLesen(body));
+            eingabe = json.forType(BenutzerAenderung.class).readValue(begrenztLesen(body));
         } catch (JsonProcessingException e) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
-        if (aenderung == null) {
+        if (eingabe == null) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
-        email.ausfuehren(code, akteur, benutzerId, ifMatch, aenderung.email(), IpAdresse.aus(ip));
+        if (eingabe.email() != null) {
+            stepUp.pruefen();
+        }
+        BenutzerAendern.ifMatchPruefen(ifMatch);
+        aendern.ausfuehren(code, akteur, benutzerId, ifMatch, eingabe.email(), eingabe.vorname(),
+                eingabe.nachname(), IpAdresse.aus(ip));
         return Response.noContent().build();
     }
 

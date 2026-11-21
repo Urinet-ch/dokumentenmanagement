@@ -15,6 +15,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.EnumSet;
 import java.util.Optional;
@@ -24,7 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
-public class BenutzerEmailAendern {
+public class BenutzerAendern {
     private final IdentitaetsDienst identitaet;
     private final BenutzerStatusSpeicher status;
     private final BenutzerMitteilung mitteilung;
@@ -33,7 +34,7 @@ public class BenutzerEmailAendern {
     private final StepUp stepUp;
     private final Duration gueltigkeit;
 
-    public BenutzerEmailAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
+    public BenutzerAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
                                BenutzerMitteilung mitteilung, VerwaltungVorgang vorgang, Berechtigung berechtigung,
                                StepUp stepUp, @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit",
                                        defaultValue = "PT24H") Duration gueltigkeit) {
@@ -50,10 +51,15 @@ public class BenutzerEmailAendern {
     }
 
     public void ausfuehren(MandantCode mandant, Benutzer akteur, String id, String ifMatch, String email,
-                          Optional<IpAdresse> ip) {
+                          String vorname, String nachname, Optional<IpAdresse> ip) {
         berechtigung.aktion(akteur, Aktion.A22);
-        stepUp.pruefen();
+        if (email != null) {
+            stepUp.pruefen();
+        }
         ifMatchPruefen(ifMatch);
+        if (email == null && vorname == null && nachname == null) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
         UUID ziel;
         try {
             ziel = UUID.fromString(id);
@@ -66,33 +72,53 @@ public class BenutzerEmailAendern {
         UUID vorgangId = UUID.randomUUID();
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
         AtomicBoolean emailGeaendert = new AtomicBoolean();
+        var felder = new ArrayList<ProtokollDetails.Verwaltungsfeld>();
+        if (email != null) {
+            felder.add(ProtokollDetails.Verwaltungsfeld.EMAIL);
+        }
+        if (vorname != null) {
+            felder.add(ProtokollDetails.Verwaltungsfeld.VORNAME);
+        }
+        if (nachname != null) {
+            felder.add(ProtokollDetails.Verwaltungsfeld.NACHNAME);
+        }
+        var art = email == null ? ProtokollDetails.Verwaltungsvorgang.NAME_AENDERN
+                : ProtokollDetails.Verwaltungsvorgang.EMAIL_AENDERN;
         try {
-            vorgang.ausfuehren(mandant, eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
+            vorgang.ausfuehren(mandant, eintrag(akteur, ip, vorgangId, ziel, art, felder,
+                            ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
                 () -> {
                     var benutzer = identitaet.benutzerLesen(mandant.wert(), id);
                     String etag = BenutzerEtag.berechnen(benutzer, BenutzerLesen.status(benutzer, status));
                     if (!ifMatch.equals("\"" + etag + "\"")) {
                         throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
                     }
-                    BenutzerFormregeln.pruefeEmail(email);
-                    if (benutzer.email() == null || benutzer.email().isBlank() || email.equals(benutzer.email())) {
-                        throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+                    BenutzerFormregeln.pruefeNamen(vorname, nachname);
+                    if (email != null) {
+                        BenutzerFormregeln.pruefeEmail(email);
+                        if (benutzer.email() == null || benutzer.email().isBlank() || email.equals(benutzer.email())) {
+                            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+                        }
                     }
                     gefunden.set(benutzer);
                 }, () -> {
-                    var aktionen = EnumSet.noneOf(IdentitaetsDienst.ErforderlicheAktion.class);
-                    aktionen.addAll(gefunden.get().aktionen());
-                    aktionen.add(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL);
-                    identitaet.aktualisieren(mandant.wert(), id, new IdentitaetsDienst.Aenderung(email, null, null));
-                    emailGeaendert.set(true);
-                    identitaet.aktionenHinzufuegen(mandant.wert(), id, Set.of(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL));
-                    identitaet.einladen(mandant.wert(), id, aktionen, gueltigkeit);
-                    mitteilung.emailGeaendert(gefunden.get().email());
+                    identitaet.aktualisieren(mandant.wert(), id, new IdentitaetsDienst.Aenderung(email, vorname, nachname));
+                    if (email != null) {
+                        emailGeaendert.set(true);
+                        var aktionen = EnumSet.noneOf(IdentitaetsDienst.ErforderlicheAktion.class);
+                        aktionen.addAll(gefunden.get().aktionen());
+                        aktionen.add(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL);
+                        identitaet.aktionenHinzufuegen(mandant.wert(), id,
+                                Set.of(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL));
+                        identitaet.einladen(mandant.wert(), id, aktionen, gueltigkeit);
+                        mitteilung.emailGeaendert(gefunden.get().email());
+                    }
                     return ziel;
                 }, fehler -> fehler instanceof IdentitaetsDienst.KonfliktException && !emailGeaendert.get()
                         ? VerwaltungVorgang.Kompensation.GEKLAERT : VerwaltungVorgang.Kompensation.UNKLAR,
                 ignoriert -> { },
-                ignoriert -> eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
+                ignoriert -> eintrag(akteur, ip, vorgangId, ziel, art, felder,
+                        ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
         } catch (IdentitaetsDienst.KonfliktException e) {
             throw new FachFehler(emailGeaendert.get()
                     ? Fehlercode.IDENTITAETSDIENST_FEHLER : Fehlercode.BENUTZER_EXISTIERT);
@@ -109,10 +135,11 @@ public class BenutzerEmailAendern {
     }
 
     private static ZugriffEintrag eintrag(Benutzer akteur, Optional<IpAdresse> ip, UUID vorgangId, UUID ziel,
+                                          ProtokollDetails.Verwaltungsvorgang art,
+                                          List<ProtokollDetails.Verwaltungsfeld> felder,
                                           ProtokollDetails.Verwaltungsphase phase) {
         var details = new ProtokollDetails.Verwaltung(vorgangId, phase, ziel,
-                ProtokollDetails.Verwaltungsvorgang.EMAIL_AENDERN, null, null,
-                List.of(ProtokollDetails.Verwaltungsfeld.EMAIL));
+                art, null, null, felder);
         return new ZugriffEintrag(Optional.of(akteur.id()), Optional.of(akteur.rolle().name()),
                 ProtokollAktion.BENUTZER_AENDERN, Optional.empty(), ip, ProtokollDetails.verwaltung(details));
     }

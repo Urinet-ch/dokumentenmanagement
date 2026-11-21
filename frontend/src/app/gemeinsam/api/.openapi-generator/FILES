@@ -35,6 +35,7 @@ model/aussage.ts
 model/auszug-teil.ts
 model/bearbeitung.ts
 model/befund.ts
+model/benutzer-aenderung.ts
 model/benutzer-anlage-ergebnis.ts
 model/benutzer-anlage.ts
 model/benutzer-ansicht.ts
@@ -61,7 +62,6 @@ model/dokumentart.ts
 model/download-adresse.ts
 model/eingabe.ts
 model/eingangskorb-seite.ts
-model/email-aenderung.ts
 model/entfernte-aussage.ts
 model/entscheidung.ts
 model/ergebnis.ts

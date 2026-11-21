@@ -319,6 +319,15 @@ components:
           type: string
         meldung:
           type: string
+    BenutzerAenderung:
+      type: object
+      properties:
+        email:
+          type: string
+        vorname:
+          type: string
+        nachname:
+          type: string
     BenutzerAnlage:
       type: object
       properties:
@@ -1414,11 +1423,6 @@ components:
         groesse:
           type: integer
           format: int32
-    EmailAenderung:
-      type: object
-      properties:
-        email:
-          type: string
     EntfernteAussage:
       type: object
       properties:
@@ -3816,7 +3820,7 @@ paths:
       - SecurityScheme:
         - inhaber
     patch:
-      summary: E-Mail-Adresse ändern
+      summary: E-Mail-Adresse oder Namen ändern
       tags:
       - Benutzerverwaltung
       parameters:
@@ -3837,11 +3841,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EmailAenderung"
+              $ref: "#/components/schemas/BenutzerAenderung"
         required: true
       responses:
         "204":
-          description: E-Mail-Adresse geändert
+          description: Benutzerdaten geändert
         "401":
           description: Not Authorized
         "403":

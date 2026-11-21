@@ -42,6 +42,12 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber die E-Mail-Adresse des Mitarbeiters mit der aktuellen Version ändert
     Dann muss die neue Adresse bestätigt werden und die bisherige Adresse wird benachrichtigt
 
+  @req-3.18 @req-6.2
+  Szenario: Eine Namensänderung verlangt die aktuelle Version und protokolliert nur die Feldnamen
+    Angenommen ein synthetischer Mitarbeiter ist eingeladen
+    Wenn der Inhaber den Namen des Mitarbeiters mit der aktuellen Version ändert
+    Dann ist der neue Name gespeichert und nicht im Verwaltungsprotokoll enthalten
+
   @req-3.8
   Szenario: Ein aktiver Benutzer wird gesperrt und wieder entsperrt
     Angenommen die frische Anmeldung ist für den Test bestätigt

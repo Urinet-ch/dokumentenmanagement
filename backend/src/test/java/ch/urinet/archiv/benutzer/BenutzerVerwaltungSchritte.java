@@ -350,6 +350,34 @@ public class BenutzerVerwaltungSchritte {
                 .body("{\"email\":\"neu." + name + "@example.invalid\"}").patch(PFAD + "/" + eigeneId));
     }
 
+    @Wenn("der Inhaber den Namen des Mitarbeiters mit der aktuellen Version ändert")
+    public void namenAendern() {
+        String etag = anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).extract().header("ETag");
+        antworten.add(anfrage().contentType("application/json").header("If-Match", etag)
+                .body("{\"vorname\":\"Neu" + name + "\",\"nachname\":\"Person" + name + "\"}")
+                .patch(PFAD + "/" + eigeneId));
+    }
+
+    @Dann("ist der neue Name gespeichert und nicht im Verwaltungsprotokoll enthalten")
+    public void namenGeaendert() throws SQLException {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).vorname()).isEqualTo("Neu" + name);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).nachname()).isEqualTo("Person" + name);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details::text, details->'felder'->>'vorname', details->'felder'->>'nachname' "
+                             + "from m_" + SCHEMA + ".zugriff_protokoll where details->>'ziel' = ? "
+                             + "and details->>'vorgang' = 'NAME_AENDERN' and details->>'phase' = 'ABGESCHLOSSEN'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).doesNotContain("Neu" + name, "Person" + name);
+                assertThat(zeile.getString(2)).isEqualTo("geändert");
+                assertThat(zeile.getString(3)).isEqualTo("geändert");
+            }
+        }
+    }
+
     @Dann("muss die neue Adresse bestätigt werden und die bisherige Adresse wird benachrichtigt")
     public void emailGeaendert() throws SQLException {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);
