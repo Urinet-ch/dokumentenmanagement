@@ -54,7 +54,9 @@ class WerkzeugeNurLesendTest {
             // E4: das Zugriffsprotokoll ist der einzige schreibende Port (Anzeige und Verweigerung mit Kanal Chat)
             Map.entry("ch.urinet.archiv.protokoll.application.ZugriffProtokoll", Set.of("schreiben")));
 
+    // Daten- und Fehlertypen ohne Zugriff auf andere Fachbereiche.
     static final Set<String> LESENDE_WERTETYPEN = Set.of(
+            "ch.urinet.archiv.sicherheit.application.Verweigerung",
             "ch.urinet.archiv.wissen.application.WissenLesenRepository$IndexZeile");
 
     private static final Pattern FACHBEREICH = Pattern.compile("^ch\\.urinet\\.archiv\\.([a-z]+)\\.(application|adapter)\\..*$");
@@ -70,7 +72,7 @@ class WerkzeugeNurLesendTest {
         return m.matches() && !m.group(1).equals("ki") && !m.group(1).equals("gemeinsam");
     }
 
-    /** Nur die Ports der Liste sind erreichbar; Typen der {@code domain} anderer Fachbereiche sind Wertetypen. */
+    /** Nur die Ports und einzelnen Daten- und Fehlertypen der Listen sowie Domain-Typen sind erreichbar. */
     @ArchTest
     static final ArchRule nurLesendePortsAnderer = classes().that().resideInAnyPackage(PAKETE)
             .should(new ArchCondition<>("andere Fachbereiche nur über lesende Ports erreichen") {
