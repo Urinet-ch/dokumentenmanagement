@@ -117,6 +117,12 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Und verlangt der Systemprompt der ersten Anfrage «wissen_index | wissen_seite_zeigen | VERALTET | WIDERSPRUCH»
 
   @req-8.9 @wissen-chat-probe
+  Szenario: Die öffentliche Schnittstelle bietet keinen Wissensseiten-Endpunkt
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Wenn «webseite» GET «/public/v1/wissensseiten» aufruft
+    Dann antwortet die Webseiten-Schnittstelle mit Status 404
+
+  @req-8.9 @wissen-chat-probe
   Szenario: Der öffentliche Chatbot erhält auch bei erzwungenen Aufrufen keine Wissensseiten
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Und synthetische Wissensleseproben sind angelegt
