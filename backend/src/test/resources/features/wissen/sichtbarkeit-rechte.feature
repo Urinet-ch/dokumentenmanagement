@@ -97,3 +97,21 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Angenommen synthetische Wissensleseproben sind angelegt
     Wenn die Wissensseiten nach einem Quelldokument gefiltert werden
     Dann zeigt der Index nur sichtbare Seiten des eigenen Mandanten und deren Prüfhinweis
+
+  @req-8.2 @req-8.3 @req-8.6 @req-11.4 @wissen-chat-probe
+  Szenario: Chat-Werkzeuge liefern nur freigegebene sichtbare Wissensseiten
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und synthetische Wissensleseproben sind angelegt
+    Wenn der Mitarbeiter die Wissenswerkzeuge mit den Leseproben aufruft
+    Dann liefern die Wissenswerkzeuge nur sichtbare freigegebene Seiten und verdecken unsichtbare Links
+
+  @req-8.1 @req-8.4 @req-8.5 @req-8.7 @wissen-chat-probe
+  Szenario: Wissensquellen gelangen über den Agenten in Stream und Verlauf
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und synthetische Wissensleseproben sind angelegt
+    Und der Chat nutzt den Agenten mit dem simulierten Sprachmodell
+    Und das simulierte Sprachmodell ruft Index und sichtbare Wissensseite der Leseprobe auf
+    Wenn «mitarbeiter-urinet» dem Agenten die Frage «Welche Regel gilt?» stellt
+    Dann zeigt der Stream des Agenten 2 Werkzeugaufrufe
+    Und enthalten Stream und Verlauf die Wissensseite mit ihrem direkten Quelldokument
+    Und verlangt der Systemprompt der ersten Anfrage «wissen_index | wissen_seite_zeigen | VERALTET | WIDERSPRUCH»

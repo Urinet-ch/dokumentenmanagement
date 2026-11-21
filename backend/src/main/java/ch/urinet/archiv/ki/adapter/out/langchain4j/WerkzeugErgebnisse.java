@@ -12,6 +12,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,8 +52,33 @@ final class WerkzeugErgebnisse {
             datenstand = Optional.of(new ChatEreignis.Datenstand(zeitpunkt(stand.path("zeitpunkt").asText(""), jetzt),
                     (int) Math.max(0, Math.min(Integer.MAX_VALUE, stand.path("anzahl").asLong(0)))));
         }
+        Optional<ChatEreignis.QuellWissen> wissen = "wissen_seite_zeigen".equals(name)
+                ? wissen(wurzel) : Optional.empty();
         return new ChatEreignis.WerkzeugErgebnis(name, parameter(json, argumente), List.copyOf(dokumente.values()),
-                datenstand);
+                datenstand, wissen);
+    }
+
+    private record WissensDokument(ChatEreignis.QuellDokument dokument, int anzahl) { }
+
+    private static Optional<ChatEreignis.QuellWissen> wissen(JsonNode wurzel) {
+        if (!wurzel.hasNonNull("pfad") || !wurzel.hasNonNull("titel") || !wurzel.hasNonNull("stand")) {
+            return Optional.empty();
+        }
+        Map<UUID, WissensDokument> dokumente = new LinkedHashMap<>();
+        for (JsonNode quelle : wurzel.path("quellen")) {
+            if (!quelle.hasNonNull("dokumentId")) continue;
+            UUID id = UUID.fromString(quelle.path("dokumentId").asText());
+            var dokument = new ChatEreignis.QuellDokument(id, quelle.path("titel").asText(),
+                    seite(quelle.path("seiten")));
+            int anzahl = quelle.path("anzahl").asInt();
+            dokumente.merge(id, new WissensDokument(dokument, anzahl),
+                    (alt, neu) -> new WissensDokument(alt.dokument(), alt.anzahl() + neu.anzahl()));
+        }
+        var geordnet = new ArrayList<>(dokumente.values());
+        geordnet.sort(Comparator.comparingInt(WissensDokument::anzahl).reversed());
+        return Optional.of(new ChatEreignis.QuellWissen(wurzel.path("pfad").asText(), wurzel.path("titel").asText(),
+                Instant.parse(wurzel.path("stand").asText()),
+                geordnet.stream().limit(5).map(WissensDokument::dokument).toList()));
     }
 
     private static void dokument(JsonNode knoten, Map<String, ChatEreignis.QuellDokument> ziel) {

@@ -93,9 +93,10 @@ class ChatSystemPromptTest {
     }
 
     @Test
-    void platzDerWissensregelBleibtLeerUndWirdBeiBedarfGefuellt() {
-        String ohne = ChatSystemPrompt.system("X", MITTAG);
-        assertThat(ohne).doesNotContain("{wissen}").doesNotContain("9. ");
+    void platzDerWissensregelWirdGefuellt() {
+        String standard = ChatSystemPrompt.system("X", MITTAG);
+        assertThat(standard).doesNotContain("{wissen}").contains("wissen_index", "wissen_seite_zeigen",
+                "VERALTET", "ABGELAUFEN", "WIDERSPRUCH", "QUELLE_PRUEFEN");
         String mit = ChatSystemPrompt.system("X", MITTAG, "Fragen nach Wissen: zuerst wissen_index.");
         assertThat(mit).contains("9. Fragen nach Wissen: zuerst wissen_index.").doesNotContain("{wissen}");
         assertThat(mit.indexOf("9. Fragen")).isLessThan(mit.indexOf("Sprache und Form"));

@@ -128,7 +128,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 9.1–9.6, 13.2_
   - _Abhängig von: 14.2, Spec 02: 6.3, 6.4_
 
-- [ ] 15.2 Chat-Werkzeuge und Quellen [Backend]
+- [x] 15.2 Chat-Werkzeuge und Quellen [Backend]
   - `wissen_index` und `wissen_seite_zeigen` in `ArchivWerkzeuge` (nur lesend, Mandant/Benutzer aus Kontext, Kürzung nach `werkzeug-max-zeichen` mit `GEKUERZT`), Systemprompt-Ergänzung, SSE-Quellenform `{wissen, dokumente}`, Hinweise in der Antwort
   - Szenarien mit simulierten Tool-Calls: nur freigegebene Fassungen, `mitarbeiter` erhält keine Seite mit unsichtbarer Hülle; `OeffentlicheWerkzeuge` (Spec 03) ohne Wissenswerkzeuge
   - _Anforderungen: 8.1–8.7, 8.9, 11.4_
