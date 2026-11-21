@@ -12,8 +12,8 @@ diff --git a/.github/workflows/infomaniak-deploy.yml b/.github/workflows/infoman
            exit 1
 -
 +
-+      # Voraussetzung: Das gebundene Deploy-Gate unterstützt «diagnose archiv» und gibt ausschliesslich
-+      # die letzten 80 API-Logzeilen und OOMKilled, ExitCode und RestartCount der API aus.
++      # Voraussetzung: «diagnose archiv» gibt nur OOMKilled, ExitCode, RestartCount und gezählte Fehlercodes aus,
++      # nie Rohzeilen der API-Logs (CI-Logs nur mit IDs, wie beim Schritt «Container gesund»).
 +      - name: Diagnose bei fehlgeschlagener Container-Prüfung
 +        if: failure() && steps.container_gesund.outcome == 'failure'
 +        env:
