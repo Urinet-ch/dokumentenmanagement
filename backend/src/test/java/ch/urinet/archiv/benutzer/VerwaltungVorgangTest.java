@@ -174,6 +174,51 @@ class VerwaltungVorgangTest {
     }
 
     @Test
+    void anlageMitGescheitertemAbschlussTraegtZielImUnklarEintrag() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        String akteur = UUID.randomUUID().toString();
+        String sub = UUID.randomUUID().toString();
+        var absicht = anlage(id, null, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> sub, fehler -> Kompensation.UNKLAR,
+                    wert -> { throw new IllegalStateException("synthetischer Abschluss"); },
+                    wert -> anlage(id, UUID.fromString(wert), akteur,
+                            ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN))))
+                    .hasRootCauseInstanceOf(IllegalStateException.class);
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(zielDerPhase(id, "UNKLAR")).isEqualTo(sub);
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    private static ZugriffEintrag anlage(UUID id, UUID ziel, String akteur,
+                                         ProtokollDetails.Verwaltungsphase phase) {
+        var details = new ProtokollDetails.Verwaltung(id, phase, ziel, ProtokollDetails.Verwaltungsvorgang.ANLEGEN,
+                null, null, List.of());
+        return new ZugriffEintrag(Optional.of(akteur), Optional.of("INHABER"), ProtokollAktion.BENUTZER_ANLEGEN,
+                Optional.empty(), Optional.empty(), ProtokollDetails.verwaltung(details));
+    }
+
+    private String zielDerPhase(UUID id, String phase) {
+        try (Connection verbindung = datenquelle.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details->>'ziel' from m_urinet.zugriff_protokoll "
+                             + "where details->>'vorgangId' = ? and details->>'phase' = ?")) {
+            abfrage.setString(1, id.toString());
+            abfrage.setString(2, phase);
+            try (ResultSet zeilen = abfrage.executeQuery()) {
+                return zeilen.next() ? zeilen.getString(1) : null;
+            }
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException("Testprotokoll nicht lesbar", e);
+        }
+    }
+
+    @Test
     void abschlussNachFristBleibtUngeklaert() throws Exception {
         mandantenVorbereiten();
         MandantCode mandant = new MandantCode("urinet");

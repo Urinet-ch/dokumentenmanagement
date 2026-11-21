@@ -94,8 +94,10 @@ public class VerwaltungVorgang {
             throw fehler;
         }
 
+        final java.util.concurrent.atomic.AtomicReference<T> geliefert = new java.util.concurrent.atomic.AtomicReference<>();
         try {
             T ergebnis = arbeit.get();
+            geliefert.set(ergebnis);
             transaktionen.neu(() -> {
                 speichern.accept(ergebnis);
                 ZugriffEintrag eintrag = abschluss.apply(ergebnis);
@@ -117,6 +119,7 @@ public class VerwaltungVorgang {
             return ergebnis;
         } catch (RuntimeException fehler) {
             Kompensation ergebnis = Kompensation.UNKLAR;
+            UUID ziel = zielAusArbeit(geliefert.get(), abschluss);
             try {
                 ergebnis = Objects.requireNonNull(kompensieren.apply(fehler), "Ergebnis der Kompensation fehlt");
             } catch (RuntimeException kompensationsFehler) {
@@ -126,7 +129,7 @@ public class VerwaltungVorgang {
                 boolean abgeschlossen = false;
                 try {
                     transaktionen.neu(() -> {
-                        protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.FEHLGESCHLAGEN));
+                        protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.FEHLGESCHLAGEN, ziel));
                         if (!sperre.abschliessen(mandant, id, Vorgangssperre.Abschluss.FEHLGESCHLAGEN)) {
                             throw new IllegalStateException("Vorgangssperre nicht abgeschlossen");
                         }
@@ -141,7 +144,7 @@ public class VerwaltungVorgang {
             }
             try {
                 transaktionen.neu(() -> {
-                    protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.UNKLAR));
+                    protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.UNKLAR, ziel));
                     if (!sperre.abschliessen(mandant, id, Vorgangssperre.Abschluss.UNKLAR)) {
                         throw new IllegalStateException("Vorgangssperre nicht abgeschlossen");
                     }
@@ -197,9 +200,24 @@ public class VerwaltungVorgang {
         };
     }
 
-    private static ZugriffEintrag mitPhase(ZugriffEintrag eintrag, ProtokollDetails.Verwaltungsphase phase) {
+    /** Ziel (Keycloak-sub) aus dem Ergebnis der Arbeit; null, wenn die Arbeit nichts lieferte. */
+    private static <T> UUID zielAusArbeit(T ergebnis, Function<T, ZugriffEintrag> abschluss) {
+        if (ergebnis == null) {
+            return null;
+        }
+        try {
+            ProtokollDetails.Verwaltung v = abschluss.apply(ergebnis).details().verwaltung();
+            return v == null ? null : v.ziel();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static ZugriffEintrag mitPhase(ZugriffEintrag eintrag, ProtokollDetails.Verwaltungsphase phase,
+                                           UUID ziel) {
         ProtokollDetails.Verwaltung bisher = eintrag.details().verwaltung();
-        var details = new ProtokollDetails.Verwaltung(bisher.vorgangId(), phase, bisher.ziel(), bisher.vorgang(),
+        var details = new ProtokollDetails.Verwaltung(bisher.vorgangId(), phase,
+                bisher.ziel() != null ? bisher.ziel() : ziel, bisher.vorgang(),
                 bisher.rolleAlt(), bisher.rolleNeu(), bisher.felder(), bisher.grund());
         return new ZugriffEintrag(eintrag.benutzer(), eintrag.rolle(), eintrag.aktion(), eintrag.dokumentId(),
                 eintrag.ip(), ProtokollDetails.verwaltung(details), eintrag.bearbeiter());

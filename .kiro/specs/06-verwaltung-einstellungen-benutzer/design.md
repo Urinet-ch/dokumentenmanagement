@@ -181,7 +181,8 @@ Ein Vorgang mit Wirkung in Keycloak lässt sich nicht in der Datenbank-Transakti
    aufgerufen (Spec 01, 10.8).
 4. Aufrufe an Keycloak (mit Zeitgrenze); bei Fehler Kompensation (z. B. neu angelegten Benutzer entfernen).
 5. Transaktion 2: Protokolleintrag `phase=ABGESCHLOSSEN` oder `FEHLGESCHLAGEN` (bzw. `UNKLAR`, wenn die Kompensation
-   scheitert), Benutzerverzeichnis (`ANLAGE`, `AUSTRITT`), `benutzer_status`, Antrag, Token-Widerruf.
+   scheitert, ungewiss ist oder fehlt; `FEHLGESCHLAGEN` und `UNKLAR` tragen das `ziel` aus dem Ergebnis der Arbeit, bei
+   der Anlage also den neuen Keycloak-`sub`), Benutzerverzeichnis (`ANLAGE`, `AUSTRITT`), `benutzer_status`, Antrag, Token-Widerruf.
    Die Kompensation meldet `GEKLAERT` nur, wenn der Ausgangszustand wiederhergestellt ist und keine verspätete externe
    Wirkung mehr eintreffen kann. Nur dann wird `FEHLGESCHLAGEN` mit Freigabe der Sperre transaktional geschrieben;
    bei Ungewissheit, Fehler oder Fristablauf bleibt der Vorgang `UNKLAR` gesperrt.
@@ -373,7 +374,8 @@ Realm-Import wirkt nur beim ersten Start); der Export bleibt die Quelle für Stu
 `db/public` (neue Changesets, bestehende unverändert):
 ```
 mandant:                + verwaltung_rollen text[] not null default '{inhaber,mitarbeiter,treuhaender}'
-verwaltung_vorgang(mandant text pk, vorgang_id uuid, bis timestamptz)           -- Vorgangssperre (Lease)
+verwaltung_vorgang(mandant text pk, vorgang_id uuid, bis timestamptz,
+                   phase text)  -- Vorgangssperre (Lease); phase VORBEREITET -> ANGEFRAGT -> gelöscht oder UNKLAR (Changeset 042)
 token_widerruf(benutzer text pk, ab timestamptz)                                -- Zeile mit Upsert; Aufräumen nach 1 Tag
 ```
 `db/mandant` je Mandant:

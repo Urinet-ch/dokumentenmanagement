@@ -3008,6 +3008,8 @@ components:
           - AKTION
           - AUSTRITT
           - WIDERRUF
+          - ANLAGE
+          - UEBERNAHME
         erfasstVon:
           type:
           - string

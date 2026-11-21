@@ -3269,7 +3269,7 @@
           },
           "anlass" : {
             "type" : "string",
-            "enum" : [ "AKTION", "AUSTRITT", "WIDERRUF" ]
+            "enum" : [ "AKTION", "AUSTRITT", "WIDERRUF", "ANLAGE", "UEBERNAHME" ]
           },
           "erfasstVon" : {
             "type" : [ "string", "null" ],
