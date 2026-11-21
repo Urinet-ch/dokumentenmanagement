@@ -1,121 +1,205 @@
-<a routerLink="/wissen">{{ wissen.zurueck }}</a>
-<h1>{{ texte.titel }}</h1>
-@if (laedt()) { <p role="status">{{ wissen.laedt }}</p> }
+<a class="zurueck" routerLink="/wissen"><span aria-hidden="true">←&nbsp;</span>{{ wissen.zurueck }}</a>
+<div class="kopf">
+  <div class="seitenkopf">
+    <p class="vorzeile">{{ wissen.titel }}</p>
+    <h1>{{ texte.titel }}</h1>
+    <p>{{ texte.einleitung }}</p>
+  </div>
+  @if (id()) {
+    <a mat-stroked-button routerLink="/wissen/entwuerfe">{{ texte.zurListe }}</a>
+  }
+</div>
+@if (laedt()) { <p class="status" role="status">{{ wissen.laedt }}</p> }
 @if (fehler(); as meldung) {
-  <p role="alert">{{ meldung }}</p>
-  <button type="button" (click)="laden()">{{ wissen.erneut }}</button>
+  <p class="fehler" role="alert">{{ meldung }}</p>
+  <div class="knoepfe"><button mat-button type="button" (click)="laden(true)">{{ wissen.erneut }}</button></div>
 }
 @if (!id()) {
-  <form (ngSubmit)="laden()">
-    <label for="entwurf-status">{{ texte.status }}</label>
-    <select id="entwurf-status" name="status" [(ngModel)]="status">
-      @for (wert of texte.statuswerte; track wert.code) { <option [value]="wert.code">{{ wert.text }}</option> }
-    </select>
-    <button type="submit">{{ texte.filtern }}</button>
+  <div class="knoepfe"><a mat-stroked-button routerLink="/wissen/entwuerfe/import">{{ importe.titel }}</a></div>
+  <form class="karte felder" (ngSubmit)="laden()">
+    <div class="feld">
+      <label for="entwurf-status">{{ texte.status }}</label>
+      <select id="entwurf-status" name="status" [(ngModel)]="status">
+        @for (wert of texte.statuswerte; track wert.code) { <option [value]="wert.code">{{ wert.text }}</option> }
+      </select>
+    </div>
+    <div class="knoepfe"><button mat-stroked-button type="submit">{{ texte.filtern }}</button></div>
   </form>
-  @if (!laedt() && !fehler() && !liste().length) { <p>{{ texte.keine }}</p> }
-  <ul>
-    @for (eintrag of liste(); track eintrag.entwurf.id) {
-      <li><a [routerLink]="['/wissen/entwuerfe', eintrag.entwurf.id]">
-        {{ eintrag.entwurf.anlass }} · {{ zeitpunkt(eintrag.entwurf.erstellt) }}
-      </a> · {{ eintrag.entwurf.status }}</li>
-    }
-  </ul>
+  @if (!laedt() && !fehler() && !liste().length) { <p class="karte gedaempft">{{ texte.keine }}</p> }
+  @if (liste().length) {
+    <ul class="karte liste">
+      @for (eintrag of liste(); track eintrag.entwurf.id) {
+        <li>
+          <a [routerLink]="['/wissen/entwuerfe', eintrag.entwurf.id]">
+            {{ eintrag.entwurf.anlass }} · {{ zeitpunkt(eintrag.entwurf.erstellt) }}
+          </a>
+          <span class="pille" [class]="ton(eintrag.entwurf.status)">{{ eintrag.entwurf.status }}</span>
+        </li>
+      }
+    </ul>
+  }
 }
 @if (entwurf(); as ansicht) {
-  <a routerLink="/wissen/entwuerfe">{{ texte.zurListe }}</a>
-  <p>{{ ansicht.entwurf.anlass }} · {{ ansicht.entwurf.status }} · {{ zeitpunkt(ansicht.entwurf.erstellt) }}</p>
-  @if (ansicht.entwurf.unvollstaendig) { <p>{{ texte.unvollstaendig }}</p> }
-  @if (ansicht.entwurf.hinweis) { <p>{{ ansicht.entwurf.hinweis }}</p> }
+  <div class="karte">
+    <div class="pillen">
+      <p class="pille akzent">{{ ansicht.entwurf.anlass }} · {{ ansicht.entwurf.status }} · {{ zeitpunkt(ansicht.entwurf.erstellt) }}</p>
+      @if (ansicht.entwurf.unvollstaendig) { <p class="pille warnung"><app-symbol name="warnung" />{{ texte.unvollstaendig }}</p> }
+    </div>
+    @if (ansicht.entwurf.hinweis) { <p>{{ ansicht.entwurf.hinweis }}</p> }
+  </div>
+  @if (ansicht.entwurf.anlass === 'IMPORT') {
+    <section class="karte importherkunft">
+      <h2>{{ importe.herkunft }}</h2>
+      @if (ansicht.entwurf.herkunft; as herkunft) {
+        <dl>
+          <dt>{{ importe.erzeugtVon }}</dt><dd>{{ herkunft.kopf.erzeugtVon }}</dd>
+          <dt>{{ importe.erzeugtMit }}</dt><dd>{{ herkunft.kopf.erzeugtMit }}</dd>
+          <dt>{{ importe.kontextStufe }}</dt><dd>{{ herkunft.kopf.kontextStufe }}</dd>
+          <dt>{{ importe.erzeugtAm }}</dt><dd>{{ zeitpunkt(herkunft.kopf.erzeugtAm) }}</dd>
+          <dt>{{ importe.importiertVon }}</dt><dd>{{ ansicht.entwurf.erstelltVon }}</dd>
+          <dt>{{ importe.importiertAm }}</dt><dd>{{ zeitpunkt(ansicht.entwurf.erstellt) }}</dd>
+          <dt>{{ importe.sha256 }}</dt><dd><code>{{ herkunft.paketSha256 }}</code></dd>
+        </dl>
+      } @else { <p role="alert">{{ importe.herkunftFehlt }}</p> }
+      <p>{{ importe.cloudHinweis }}</p>
+      @if (ansicht.entwurf.status === 'OFFEN') {
+        <button mat-stroked-button type="button" [disabled]="sendet()" (click)="neuPruefen()">{{ importe.neuPruefen }}</button>
+      }
+      @if (prueft()) { <p role="status">{{ importe.prueft }}</p> }
+      @if (pruefFehler(); as meldung) { <p role="alert">{{ meldung }}</p> }
+      @if (bearbeitet !== undefined) { <p>{{ importe.bearbeitungBehalten }}</p> }
+    </section>
+  }
   @if (ansicht.kernaussagen?.length) {
-    <section>
+    <section class="karte">
       <h2>{{ texte.kernaussagen }}</h2>
-      <ul>
+      <ul class="eintraege">
         @for (aussage of ansicht.kernaussagen; track aussage.schluessel) {
           <li>
-            {{ aussage.text }} · {{ texte.pdfSeiten }} {{ aussage.seiten.join(', ') }}
+            <p>{{ aussage.text }} <span class="gedaempft">· {{ texte.pdfSeiten }} {{ aussage.seiten.join(', ') }}</span></p>
             <blockquote>{{ aussage.auszug }}</blockquote>
-            <p>{{ aussage.belegt ? texte.belegt : texte.nichtBelegt }}</p>
-            @if (!aussage.zugeordnet) { <strong>{{ texte.nichtZugeordnet }}</strong> }
+            <div class="pillen">
+              <p class="pille" [class]="aussage.belegt ? 'ok' : 'gefahr'">{{ aussage.belegt ? texte.belegt : texte.nichtBelegt }}</p>
+              @if (!aussage.zugeordnet) { <strong class="pille warnung">{{ texte.nichtZugeordnet }}</strong> }
+            </div>
           </li>
         }
       </ul>
     </section>
   }
-  @for (aenderung of ansicht.aenderungen; track aenderung.nr) {
-    <section class="aenderung">
-      <h2>{{ aenderung.pfad }}</h2>
-      <p>{{ aenderung.aktion }} · {{ aenderung.status }}</p>
-      <p>{{ texte.basis }}: {{ aenderung.basisVersion ?? 0 }}</p>
-      <p>{{ texte.kontext }}: {{ aenderung.vertraulichkeitKontext }}</p>
-      <h3>{{ texte.begruendung }}</h3><p>{{ aenderung.begruendung }}</p>
+  @for (aenderung of ansicht.aenderungen; track aenderung.nr; let nr = $index, anzahl = $count) {
+    <section class="karte aenderung">
+      <div class="aenderung-kopf">
+        <h2>{{ aenderung.pfad }}</h2>
+        <span class="gedaempft">{{ texte.position(nr + 1, anzahl) }}</span>
+      </div>
+      <div class="pillen">
+        @if (aenderung.aktion) { <span class="pille">{{ aenderung.aktion }}</span> }
+        <span class="pille" [class]="ton(aenderung.status)">{{ aenderung.status }}</span>
+        <span class="pille">{{ texte.basis }}: {{ aenderung.basisVersion ?? 0 }}</span>
+        <span class="pille"><app-symbol name="schloss" />{{ texte.kontext }}: {{ aenderung.vertraulichkeitKontext }}</span>
+      </div>
+      @if (ansicht.entwurf.anlass === 'IMPORT') {
+        <h3>{{ importe.quellenPruefung }}</h3>
+        @if (aenderung.daten.quellenPruefung; as pruefungen) {
+          @if (!pruefungen.length) { <p>{{ importe.keineDokumentquellen }}</p> }
+          <ul>
+            @for (quelle of pruefungen; track quelle.schluessel) {
+              <li>{{ quelle.schluessel }} · {{ importe.zuordnung }}: {{ zuordnungText(quelle.zuordnung) }}
+                · {{ importe.auszug }}: {{ auszugText(quelle.auszug) }}</li>
+            }
+          </ul>
+        } @else { <p role="alert">{{ importe.quellenPruefungFehlt }}</p> }
+      }
+      <h3>{{ texte.begruendung }}</h3><p>{{ aenderung.begruendung || texte.leer }}</p>
       <h3>{{ texte.diff }}</h3>
       @for (name of diffFelder; track name) {
         @if (aenderung.diff[name]; as wert) {
           <h4>{{ texte.feldnamen[name] }}</h4>
           <div class="diff">
-            <pre class="alt">− {{ feld(wert.alt) }}</pre><pre class="neu">+ {{ feld(wert.neu) }}</pre>
+            <div class="alt"><p class="spalte">{{ texte.bisher }}</p><del><span class="zeichen">−</span> {{ feld(wert.alt) }}</del></div>
+            <div class="neu"><p class="spalte">{{ texte.neu }}</p><ins><span class="zeichen">+</span> {{ feld(wert.neu) }}</ins></div>
           </div>
         }
       }
       @for (block of aenderung.diff.zeilen; track $index) {
         <div class="diff">
-          <pre class="alt">@for (zeile of block.alt; track $index) {<span>− {{ zeile }}<br></span>}</pre>
-          <pre class="neu">@for (zeile of block.neu; track $index) {<span>+ {{ zeile }}<br></span>}</pre>
+          <div class="alt"><p class="spalte">{{ texte.bisher }}</p>@for (zeile of block.alt; track $index) {<del><span class="zeichen">−</span> {{ zeile }}</del>}</div>
+          <div class="neu"><p class="spalte">{{ texte.neu }}</p>@for (zeile of block.neu; track $index) {<ins><span class="zeichen">+</span> {{ zeile }}</ins>}</div>
         </div>
       }
       <details><summary>{{ texte.fassung }}</summary><pre>{{ aenderung.inhalt }}</pre></details>
       <h3>{{ texte.befunde }}</h3>
-      @for (befund of aenderung.befunde; track $index) { <p>{{ befund.code }} · {{ befund.meldung ?? befund.text }}</p> }
+      @for (befund of aenderung.befunde; track $index) {
+        <p class="befund"><span class="pille gefahr mono">{{ befund.code }}</span> {{ befund.meldung ?? befund.text }}</p>
+      } @empty { <p class="gedaempft">{{ texte.leer }}</p> }
       <h3>{{ texte.hinweise }}</h3>
-      @for (hinweis of aenderung.hinweise; track $index) { <p>{{ hinweis.code }} · {{ hinweis.meldung ?? hinweis.text }}</p> }
+      @for (hinweis of aenderung.hinweise; track $index) {
+        <p class="befund"><span class="pille warnung mono">{{ hinweis.code }}</span> {{ hinweis.meldung ?? hinweis.text }}</p>
+      } @empty { <p class="gedaempft">{{ texte.leer }}</p> }
       <h3>{{ texte.widersprueche }}</h3>
       @if (aenderung.diff.widersprueche; as bloecke) {
-        @for (block of bloecke.alt; track $index) { <pre>− {{ block.text }} · {{ block.fussnoten.join(', ') }}</pre> }
-        @for (block of bloecke.neu; track $index) { <pre>+ {{ block.text }} · {{ block.fussnoten.join(', ') }}</pre> }
+        <div class="diff einspaltig">
+          @for (block of bloecke.alt; track $index) { <del><span class="zeichen">−</span> {{ block.text }} · {{ block.fussnoten.join(', ') }}</del> }
+          @for (block of bloecke.neu; track $index) { <ins><span class="zeichen">+</span> {{ block.text }} · {{ block.fussnoten.join(', ') }}</ins> }
+        </div>
       } @else {
-        @for (block of aenderung.widersprueche; track $index) { <pre>{{ feld(block) }}</pre> }
+        @for (block of aenderung.widersprueche; track $index) { <div class="diff einspaltig"><span class="ctx">{{ feld(block) }}</span></div> }
       }
       @for (block of aenderung.diff.entfernteWidersprueche; track $index) {
-        <p>{{ texte.aufloesung }}</p><pre>− {{ block.text }} · {{ block.fussnoten.join(', ') }}</pre>
+        <p class="pille ok"><app-symbol name="haken" />{{ texte.aufloesung }}</p>
+        <div class="diff einspaltig"><del><span class="zeichen">−</span> {{ block.text }} · {{ block.fussnoten.join(', ') }}</del></div>
       }
       <h3>{{ texte.entfernteAussagen }}</h3>
       @for (aussage of aenderung.entfernteAussagen; track $index) {
-        <p>{{ aussage.schluessel }} · {{ aussage.begruendung }}</p>
-      }
+        <p class="befund"><span class="mono">{{ aussage.schluessel }}</span> · {{ aussage.begruendung }}</p>
+      } @empty { <p class="gedaempft">{{ texte.leer }}</p> }
       @if (aenderung.grund) { <p>{{ texte.grund }}: {{ aenderung.grund }}</p> }
       @if (ansicht.entwurf.status === 'OFFEN' && (aenderung.status === 'OFFEN' || aenderung.status === 'VERALTET')) {
-        <button type="button" [disabled]="sendet()" (click)="stufeWaehlen(aenderung)">{{ texte.entscheiden }}</button>
-        @if (auswahl === aenderung.nr) {
-          @if (aenderung.status === 'OFFEN') {
-            <button type="button" [disabled]="sendet()" (click)="bearbeiten(aenderung)">{{ texte.bearbeiten }}</button>
-          }
-          @if (bearbeitet === aenderung.nr && fassung) {
-            <label>{{ texte.feldnamen.titel }}<input [(ngModel)]="fassung.titel" [disabled]="sendet()"></label>
-            <label>{{ texte.feldnamen.beschreibung }}<textarea [(ngModel)]="fassung.beschreibung" [disabled]="sendet()"></textarea></label>
-            <label>{{ texte.feldnamen.tags }}<input [(ngModel)]="tagsText" [disabled]="sendet()"></label>
-            <label>{{ texte.veraltetAb }}<input type="date" [(ngModel)]="fassung.veraltetAb" [disabled]="sendet()"></label>
-            <label>{{ texte.markdown }}<textarea class="markdown" [(ngModel)]="fassung.inhalt" [disabled]="sendet()"></textarea></label>
-            <label>{{ texte.quellenJson }}<textarea [(ngModel)]="quellenText" [disabled]="sendet()"></textarea></label>
-            <label>{{ texte.entfernteJson }}<textarea [(ngModel)]="entfernteText" [disabled]="sendet()"></textarea></label>
-          }
-          <label>{{ texte.grund }}<textarea [(ngModel)]="grund" maxlength="1000" [disabled]="sendet()"></textarea></label>
-          <label>{{ texte.stufe }}<select [(ngModel)]="stufe" [disabled]="sendet()">
-            <option value="">{{ texte.berechnet }}</option>
-            <option value="NORMAL" [disabled]="aenderung.vertraulichkeitKontext === 'INTERN'">NORMAL</option>
-            <option value="INTERN">INTERN</option>
-          </select></label>
-          @if (aktionsFehler(); as meldung) { <p role="alert">{{ meldung }}</p><button type="button" (click)="laden()">{{ wissen.erneut }}</button> }
-          @for (code of aktionsBefunde(); track code) { <p>{{ code }}</p> }
-          <div class="aktionen">
-            @if (aenderung.status === 'OFFEN') {
-              <button type="button" [disabled]="sendet() || (!!aenderung.befunde?.length && bearbeitet !== aenderung.nr)"
-                (click)="bestaetigen(aenderung, 'annehmen')">{{ bearbeitet === aenderung.nr ? texte.geaendertAnnehmen : texte.annehmen }}</button>
+        @if (auswahl !== aenderung.nr) {
+          <div class="knoepfe">
+            <button mat-flat-button type="button" [disabled]="sendet()" (click)="stufeWaehlen(aenderung)">{{ texte.entscheiden }}</button>
+          </div>
+        } @else {
+          <div class="entscheid">
+            <div class="knoepfe">
+              <button mat-stroked-button type="button" [disabled]="sendet()" (click)="stufeWaehlen(aenderung)">{{ texte.entscheiden }}</button>
+              @if (aenderung.status === 'OFFEN') {
+                <button mat-stroked-button type="button" [disabled]="sendet()" (click)="bearbeiten(aenderung)"><app-symbol name="bearbeiten" />{{ texte.bearbeiten }}</button>
+              }
+            </div>
+            @if (bearbeitet === aenderung.nr && fassung) {
+              <label class="feld">{{ texte.feldnamen.titel }}<input [(ngModel)]="fassung.titel" [disabled]="sendet()"></label>
+              <label class="feld">{{ texte.feldnamen.beschreibung }}<textarea [(ngModel)]="fassung.beschreibung" [disabled]="sendet()"></textarea></label>
+              <label class="feld">{{ texte.feldnamen.tags }}<input [(ngModel)]="tagsText" [disabled]="sendet()"></label>
+              <label class="feld">{{ texte.veraltetAb }}<input type="date" [(ngModel)]="fassung.veraltetAb" [disabled]="sendet()"></label>
+              <label class="feld">{{ texte.markdown }}<textarea class="markdown mono" [(ngModel)]="fassung.inhalt" [disabled]="sendet()"></textarea></label>
+              <label class="feld">{{ texte.quellenJson }}<textarea class="mono" [(ngModel)]="quellenText" [disabled]="sendet()"></textarea></label>
+              <label class="feld">{{ texte.entfernteJson }}<textarea class="mono" [(ngModel)]="entfernteText" [disabled]="sendet()"></textarea></label>
             }
-            <button type="button" [disabled]="sendet()" (click)="bestaetigen(aenderung, 'verwerfen')">{{ texte.verwerfen }}</button>
-            @if (aenderung.status === 'VERALTET' && (ansicht.entwurf.anlass === 'INGEST' || ansicht.entwurf.anlass === 'MANUELL')) {
-              <button type="button" [disabled]="sendet()" (click)="bestaetigen(aenderung, 'neu-erzeugen')">{{ texte.neuErzeugen }}</button>
+            <label class="feld">{{ texte.grund }}<textarea [(ngModel)]="grund" maxlength="1000" [disabled]="sendet()"></textarea></label>
+            <label class="feld">{{ texte.stufe }}<select [(ngModel)]="stufe" [disabled]="sendet()">
+              <option value="">{{ texte.berechnet }}</option>
+              <option value="NORMAL" [disabled]="aenderung.vertraulichkeitKontext === 'INTERN'">NORMAL</option>
+              <option value="INTERN">INTERN</option>
+            </select></label>
+            @if (aktionsFehler(); as meldung) {
+              <p class="fehler" role="alert">{{ meldung }}</p>
+              <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ wissen.erneut }}</button></div>
             }
+            @if (aktionsBefunde().length) {
+              <div class="pillen">@for (code of aktionsBefunde(); track code) { <p class="pille gefahr mono">{{ code }}</p> }</div>
+            }
+            <div class="knoepfe">
+              @if (aenderung.status === 'OFFEN') {
+                <button mat-flat-button type="button" [disabled]="sendet() || (!!aenderung.befunde?.length && bearbeitet !== aenderung.nr)"
+                  (click)="bestaetigen(aenderung, 'annehmen')"><app-symbol name="haken" />{{ bearbeitet === aenderung.nr ? texte.geaendertAnnehmen : texte.annehmen }}</button>
+              }
+              @if (aenderung.status === 'VERALTET' && (ansicht.entwurf.anlass === 'INGEST' || ansicht.entwurf.anlass === 'MANUELL')) {
+                <button mat-stroked-button type="button" [disabled]="sendet()" (click)="bestaetigen(aenderung, 'neu-erzeugen')"><app-symbol name="wiederholen" />{{ texte.neuErzeugen }}</button>
+              }
+              <button mat-button class="verwerfen-knopf" type="button" [disabled]="sendet()" (click)="bestaetigen(aenderung, 'verwerfen')">{{ texte.verwerfen }}</button>
+            </div>
           </div>
         }
       }

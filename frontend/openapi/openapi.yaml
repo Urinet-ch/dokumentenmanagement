@@ -1982,6 +1982,37 @@ components:
           format: int32
         aktiv:
           type: boolean
+    Klassifikationsfacette:
+      type: object
+      required:
+      - code
+      - name
+      - werte
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        werte:
+          type: array
+          items:
+            $ref: "#/components/schemas/KlassifikationswertFacette"
+    KlassifikationswertFacette:
+      type: object
+      required:
+      - code
+      - name
+      - anzahl
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        anzahl:
+          type: integer
+          format: int64
+          description: Anzahl sichtbarer Dokumente; im Modus hybrid nur unter den
+            gelieferten Treffern
     KonfigurationKiTexte:
       type: object
       properties:
@@ -2428,6 +2459,15 @@ components:
       format: date
       examples:
       - 2022-03-10
+    Mandantenfunktionen:
+      type: object
+      required:
+      - finanzVerfuegbar
+      properties:
+        finanzVerfuegbar:
+          type: boolean
+          description: "Mindestens eine aktive Dokumentart hat die Gruppe «finanz»\
+            \ (Spec 05, Req 8.8)"
     PaketKopf:
       type: object
       properties:
@@ -2689,6 +2729,7 @@ components:
       type: object
       required:
       - treffer
+      - facetten
       - gesamt
       - seite
       - groesse
@@ -2697,6 +2738,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Suchtreffer"
+        facetten:
+          type: array
+          items:
+            $ref: "#/components/schemas/Klassifikationsfacette"
         gesamt:
           type: integer
           format: int64
@@ -3077,11 +3122,24 @@ components:
           - "null"
           format: int32
           minimum: 1
+    WissenLintAuftrag:
+      type: object
+      properties:
+        lintId:
+          $ref: "#/components/schemas/UUID"
     WissenVerwerfen:
       type: object
       properties:
         grund:
           type: string
+    WissensEmbeddingAuftrag:
+      type: object
+      required:
+      - auftragId
+      properties:
+        auftragId:
+          type: integer
+          format: int64
     WissensIndex:
       type: object
       properties:
@@ -3164,6 +3222,18 @@ components:
           type: string
         titel:
           type: string
+    WissensSuchergebnis:
+      type: object
+      required:
+      - treffer
+      - degradiert
+      properties:
+        treffer:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensIndexZeile"
+        degradiert:
+          type: boolean
     Wissensdiff:
       type: object
       properties:
@@ -3885,8 +3955,10 @@ paths:
     post:
       summary: Dateien hochladen
       description: "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei\
-        \ ein Ergebnis (Req 3). Sind alle Dateien abgelehnt, folgt Problem Details\
-        \ mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse»."
+        \ ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen»\
+        \ als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprü\
+        ft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der\
+        \ ersten Ablehnung und der Erweiterung «ergebnisse»."
       tags:
       - Dokumente
       requestBody:
@@ -3908,6 +3980,10 @@ paths:
                 zusammenfassen:
                   type: boolean
                 hinweis:
+                  type: string
+                art:
+                  type: string
+                klassifikationen:
                   type: string
         required: true
       responses:
@@ -3953,8 +4029,9 @@ paths:
         \ gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid\
         \ Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht,\
         \ ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blä\
-        ttern, degradiert bei Rückfall auf den Volltext. Ungültige Parameter → 400\
-        \ ANFRAGE_UNGUELTIG."
+        ttern, degradiert bei Rückfall auf den Volltext. Klassifikationsfilter als\
+        \ wiederholbare Parameter klassifikation.<code>=<wert>; Antwort enthält sichtbarkeitsgeprü\
+        fte Facetten. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG."
       tags:
       - Dokumente
       parameters:
@@ -5763,6 +5840,28 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/mandant/funktionen:
+    get:
+      summary: Verfügbare Funktionen des Mandanten
+      tags:
+      - Konfiguration
+      responses:
+        "200":
+          description: Funktionen des aktuellen Mandanten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mandantenfunktionen"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/protokoll:
     get:
       summary: Zugriffsprotokoll durchsuchen
@@ -6076,6 +6175,29 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/wissensbasis/embeddings:
+    post:
+      summary: Seiten-Embeddings neu berechnen
+      description: "Auftrag im verifizierten Mandanten, A17."
+      tags:
+      - Wissensbasis
+      responses:
+        "202":
+          description: Nachberechnung eingereiht oder schon laufend
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissensEmbeddingAuftrag"
+        "403":
+          description: Kein Freigaberecht
+        "429":
+          description: Monatsbudget der Wissensbasis erschöpft
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
   /api/v1/wissensbasis/exporte:
     post:
       summary: OKF-Export anfordern
@@ -6124,6 +6246,30 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/wissensbasis/lint:
+    post:
+      summary: Lint der Wissensbasis starten
+      responses:
+        "202":
+          description: Lint eingereiht
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenLintAuftrag"
+        "403":
+          description: Rolle darf keinen Lint starten
+        "409":
+          description: Ein Lint läuft bereits
+        "429":
+          description: Monatsbudget der Wissensbasis erschöpft
+        "401":
+          description: Not Authorized
+      tags:
+      - Wissen Lint Resource
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
   /api/v1/wissensbasis/log:
     get:
       summary: Wissensbasis-Log
@@ -6468,8 +6614,11 @@ paths:
   /api/v1/wissensseiten:
     get:
       summary: Wissensseiten-Index
-      description: Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur
-        sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.
+      description: "Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur\
+        \ sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.\
+        \ modus=hybrid oder volltext liefert höchstens 30 rangierte Treffer ohne Gesamtzahl/Paging,\
+        \ hybrid mit Volltext-Rückfall und degradiert. Ohne modus bleibt der Index\
+        \ unverändert."
       tags:
       - Wissensbasis
       parameters:
@@ -6482,6 +6631,10 @@ paths:
           default: 50
         name: groesse
         in: query
+      - name: modus
+        in: query
+        schema:
+          type: string
       - schema:
           type: integer
           default: 0
@@ -6505,10 +6658,14 @@ paths:
           type: string
       responses:
         "200":
-          description: Index oder Seite
+          description: "Index, Seite oder rangiertes Suchergebnis"
           content:
             application/json:
-              schema: {}
+              schema:
+                oneOf:
+                - $ref: "#/components/schemas/WissensIndex"
+                - $ref: "#/components/schemas/Wissensseite"
+                - $ref: "#/components/schemas/WissensSuchergebnis"
         "400":
           description: Ungültiger Filter oder Pagingwert
         "404":

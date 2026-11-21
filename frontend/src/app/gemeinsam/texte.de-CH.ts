@@ -69,6 +69,44 @@ export const TEXTE = {
     wissen: 'Wissen',
   },
   wissen: {
+    import: {
+      titel: 'Wissenspaket importieren', zurListe: 'Zur Entwurfsliste',
+      einleitung: 'ZIP mit paket.yaml und OKF-Markdown wählen. Das Archiv prüft das Paket ohne KI; '
+        + 'jede Änderung wird erst nach einer Einzelannahme wirksam.',
+      cloudHinweis: 'Cloud-Modelle dürfen nur Quellen der Stufe NORMAL ohne Personendaten sehen, '
+        + 'auf Verantwortung des Inhabers. INTERN, PERSONAL und daraus abgeleitete Inhalte nie an Cloud-Modelle geben. '
+        + 'Die Angaben im Paket sind Selbstauskünfte und belegen die Einhaltung nicht.',
+      datei: 'Wissenspaket (ZIP)', importieren: 'Als Entwurf importieren',
+      laedt: 'Paket wird hochgeladen und geprüft …',
+      dateiFehlt: 'Bitte zuerst ein Wissenspaket auswählen.',
+      nichtErlaubt: 'Sie dürfen keine Wissenspakete importieren. Bitte mit einem berechtigten Benutzer anmelden.',
+      berichtFehlt: 'Die Antwort enthält keinen vollständigen Prüfbericht. Bitte die Entwurfsliste prüfen, '
+        + 'bevor Sie das Paket erneut importieren.',
+      bericht: 'Prüfbericht', nurEntwurf: 'Nur ein Entwurf wurde angelegt. Keine Seite wurde freigegeben.',
+      neu: 'Neu', aendern: 'Ändern', unveraendert: 'Unverändert', ignoriert: 'Ignorierte Dateien',
+      sha256: 'SHA-256 des ZIP', befunde: 'Sperrende Befunde je Seite', hinweise: 'Hinweise',
+      keineBefunde: 'Keine sperrenden Befunde im Importbericht.',
+      entwurfOeffnen: 'Entwurf prüfen', vorhandenenOeffnen: 'Vorhandenen Entwurf öffnen',
+      herkunft: 'Importherkunft', erzeugtVon: 'Erzeugt von', erzeugtMit: 'Erzeugt mit',
+      kontextStufe: 'Kontextstufe im Paket (Selbstauskunft)', erzeugtAm: 'Paket erzeugt am',
+      importiertVon: 'Importiert von', importiertAm: 'Importiert am',
+      herkunftFehlt: 'Die Importherkunft fehlt. Bitte die Ansicht erneut laden.',
+      quellenPruefung: 'Zuordnung und Auszugsprüfung', zuordnung: 'Quellenzuordnung', auszug: 'Auszugsprüfung',
+      keineDokumentquellen: 'Keine Dokumentquellen zu prüfen.',
+      quellenPruefungFehlt: 'Die Quellenprüfung fehlt. Bitte die Prüfung wiederholen.',
+      auszugNichtGeprueft: 'Nicht geprüft: Quelle zuerst zuordnen',
+      neuPruefen: 'Prüfung wiederholen', prueft: 'Quellen und Befunde werden ohne KI neu geprüft …',
+      pruefungNichtErlaubt: 'Nur ein offener Importentwurf darf neu geprüft werden. Bitte die Ansicht erneut laden.',
+      bearbeitungBehalten: 'Nicht gespeicherte Bearbeitungen bleiben erhalten. Prüfen Sie ihre Quellen '
+        + 'vor der Einzelannahme gegen den erneuerten Bericht.',
+      auszugsErgebnisse: {
+        GEFUNDEN: 'Gefunden', NICHT_GEFUNDEN: 'Nicht gefunden', NICHT_PRUEFBAR: 'Nicht prüfbar',
+        SEITE_FEHLT: 'PDF-Seite fehlt', QUELLE_UNGUELTIG: 'Quelle ungültig', FEHLT: 'Auszug fehlt',
+      } as Record<string, string>,
+      zuordnungen: {
+        ZUGEORDNET: 'Zugeordnet', QUELLE_UNBEKANNT: 'Quelle unbekannt', QUELLE_PERSONAL: 'Personaldokument',
+      } as Record<string, string>,
+    },
     entwuerfe: {
       titel: 'Wissensentwürfe', zurListe: 'Zur Entwurfsliste', keine: 'Keine Entwürfe vorhanden.',
       status: 'Entwurfsstatus', filtern: 'Filtern', unvollstaendig: 'Entwurf unvollständig',
@@ -94,6 +132,9 @@ export const TEXTE = {
       feldnamen: { titel: 'Titel', beschreibung: 'Beschreibung', tags: 'Schlagwörter (mit Komma getrennt)', quellen: 'Quelleneinträge' },
       anzahl: (anzahl: number) => `${anzahl} offene Wissensentwürfe`,
       zaehlerFehler: 'Die Zahl offener Wissensentwürfe konnte nicht geladen werden.',
+      einleitung: 'Jede vorgeschlagene Änderung einzeln prüfen: annehmen, ändern oder verwerfen.',
+      position: (nr: number, anzahl: number) => `Änderung ${nr} von ${anzahl}`,
+      bisher: 'Bisher', neu: 'Neu', leer: 'Keine',
     },
     titel: 'Wissen',
     log: 'Änderungslog',
@@ -549,6 +590,11 @@ export const TEXTE = {
       string
     >,
     treffer: 'Treffer',
+    wissen: 'Wissen',
+    wissenLaeuft: 'Wissensseiten werden gesucht …',
+    wissenHinweis: 'Die besten Wissensseiten. Dokumentfilter gelten nur für die Dokumenttreffer.',
+    keinWissen: 'Keine passenden Wissensseiten gefunden.',
+    wissenFehler: 'Wissensseiten konnten nicht gesucht werden.',
     volltext: 'Volltext',
     volltextHinweis:
       'Aus: die besten Treffer nach Wortlaut und Bedeutung. Ein: alle Treffer im Volltext, mit Gesamtzahl und Blättern.',

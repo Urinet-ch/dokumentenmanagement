@@ -181,7 +181,7 @@ damit ich Wissen auch ohne Chat nachschlagen kann.
 2. WENN eine Fassung freigegeben wird, DANN SOLL das Archiv ihren Inhalt in Abschnitte teilen und Embeddings speichern wie Spec 02, 2.1, in einer eigenen Tabelle; die Suche SOLL Volltext und Vektor wie Spec 02, 2.2 zusammenführen und bei Ausfall nach Spec 02, 2.3 auf Volltext zurückfallen.
 3. Die Suche SOLL die Sichtbarkeit nach Requirement 11 vor der Verdichtung und vor dem Reranker anwenden.
 4. Spec 04 ergänzt die Suchseite (Spec 01, Requirement 14): Die App SOLL passende Wissensseiten in einem eigenen Abschnitt über den Dokumenttreffern zeigen, mit Titel, Typ und Beschreibung.
-5. Die Suche SOLL bei 2'000 Seiten pro Mandant innert 1 Sekunde antworten (p95, Messpunkt Server; Messbedingungen wie Spec 01, Requirement 3.2).
+5. Die Suche SOLL bei 2'000 Seiten pro Mandant innert 1 Sekunde antworten (p95, Messpunkt Server; Messbedingungen wie Spec 01, Requirement 3.2). Nachweis: JUnit (`WissenssucheLeistungIT`, ausschliesslich manuell gestartet, nie in der CI; lokaler Messlauf mit synthetischen Daten gemäss Auftrag Runde 9, Entscheid Claude 20.11.2026). Der lokale Nachweis ersetzt nicht die Messung auf der VPS nach Spec 01, Requirement 3.2.
 6. Das Archiv SOLL eine Nachberechnung aller Seiten-Embeddings als Auftrag `WISSEN_EMBEDDING_ALLE` anbieten.
 
 ### Requirement 10: Lint der Wissensbasis (ohne Konzept-ID)

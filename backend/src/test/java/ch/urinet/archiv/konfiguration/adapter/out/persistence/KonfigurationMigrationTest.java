@@ -30,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @QuarkusTest
 class KonfigurationMigrationTest {
 
-    private static final List<String> SCHEMAS = List.of("m_probe_konf037_a", "m_probe_konf037_b");
+    private static final List<String> SCHEMAS = List.of(
+            "m_probe_konf037_a", "m_probe_konf037_b", "m_probe_volltext055_a", "m_probe_volltext055_b");
     private static final PanacheKonfigurationVersionsRepository LESER =
             new PanacheKonfigurationVersionsRepository(new ObjectMapper());
 
@@ -111,7 +112,78 @@ class KonfigurationMigrationTest {
         }
     }
 
+    @Test
+    void changeset055StelltBeimRollbackBestandUndBeideSuchindizesWiederHer() throws Exception {
+        Map<String, String> bestand = new LinkedHashMap<>();
+        Map<String, String> vektoren = new LinkedHashMap<>();
+        for (String schema : SCHEMAS.subList(2, 4)) {
+            try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("create schema " + schema);
+                befehl.execute("set search_path to " + schema);
+                migrieren(verbindung, schema, 51);
+                assertThat(wert(befehl, "select id from databasechangelog order by orderexecuted desc limit 1"))
+                        .isEqualTo("054-ki-texte-aus-seed");
+                befehl.execute("""
+                        insert into dokumentart (code, name, gruppen, pflichtfelder, zusatz_schema,
+                            vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv)
+                        values ('ALT', 'Probe', '{frei}', '{titel}', '{"type":"object"}',
+                            'NORMAL', 10, 'GESCHAEFTSJAHR', true, true)
+                        """);
+                befehl.execute("insert into dokument (id, art, titel, quelle, erstellt_von, status, volltext, "
+                        + "dateiname, tags) values ('" + UUID.randomUUID()
+                        + "', 'ALT', 'Bestand Probe', 'UPLOAD', 'probe', 'ARCHIVIERT', "
+                        + "'Police Versicherung', 'Zebrafink.pdf', '{bestand}')");
+                befehl.execute("""
+                        insert into klassifikation (code, name, mehrfach, ki_vorschlag, suchfilter, oeffentlich_filter)
+                        values ('fach', 'Fach', false, false, true, false);
+                        insert into klassifikation_wert (klassifikation, code, name)
+                        values ('fach', 'bau', 'Elektrotechnik');
+                        insert into dokument_klassifikation (dokument_id, klassifikation, wert)
+                        select id, 'fach', 'bau' from dokument
+                        """);
+                bestand.put(schema, wert(befehl, "select (to_jsonb(d) - 'volltext_tsv')::text from dokument d"));
+                vektoren.put(schema, wert(befehl, "select volltext_tsv::text from dokument"));
+                verbindung.commit();
+                migrieren(verbindung, schema, 1);
+                verbindung.commit();
+                assertThat(wert(befehl, "select (volltext_tsv @@ plainto_tsquery('german', 'Elektrotechnik'))::text "
+                        + "from dokument")).isEqualTo("true");
+            }
+        }
+        for (String schema : SCHEMAS.subList(2, 4)) {
+            String anderes = SCHEMAS.get(schema.endsWith("_a") ? 3 : 2);
+            try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("set search_path to " + schema);
+                String andererStand = wert(befehl, "select to_jsonb(d)::text from " + anderes + ".dokument d");
+                aendern(verbindung, schema, "rollbackCount", 1);
+                verbindung.commit();
+                assertThat(wert(befehl, "select (to_jsonb(d) - 'volltext_tsv')::text from dokument d"))
+                        .isEqualTo(bestand.get(schema));
+                assertThat(wert(befehl, "select volltext_tsv::text from dokument")).isEqualTo(vektoren.get(schema));
+                assertThat(wert(befehl, "select attgenerated from pg_attribute "
+                        + "where attrelid = 'dokument'::regclass and attname = 'volltext_tsv'")).isEqualTo("s");
+                assertThat(wert(befehl, "select count(*)::text from pg_index where indrelid = 'dokument'::regclass "
+                        + "and indisvalid and indexrelid in ('dokument_volltext_ix'::regclass, "
+                        + "'dokument_volltext_ohne_dateiname_ix'::regclass)")).isEqualTo("2");
+                assertThat(wert(befehl, "select to_jsonb(d)::text from " + anderes + ".dokument d"))
+                        .isEqualTo(andererStand);
+                befehl.execute("update dokument set titel = 'Neuer Titel'");
+                assertThat(wert(befehl, "select (volltext_tsv @@ plainto_tsquery('german', 'Neuer'))::text "
+                        + "from dokument")).isEqualTo("true");
+                verbindung.commit();
+                migrieren(verbindung, schema, 1);
+                verbindung.commit();
+                assertThat(wert(befehl, "select (volltext_tsv @@ plainto_tsquery('german', 'Elektrotechnik'))::text "
+                        + "from dokument")).isEqualTo("true");
+            }
+        }
+    }
+
     private static void migrieren(Connection verbindung, String schema, int anzahl) throws Exception {
+        aendern(verbindung, schema, "updateCount", anzahl);
+    }
+
+    private static void aendern(Connection verbindung, String schema, String kommando, int anzahl) throws Exception {
         var datenbank = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
         datenbank.setDefaultSchemaName(schema);
         datenbank.setLiquibaseSchemaName(schema);
@@ -119,7 +191,7 @@ class KonfigurationMigrationTest {
                 Scope.Attr.resourceAccessor.name(), new ClassLoaderResourceAccessor(
                         KonfigurationMigrationTest.class.getClassLoader()),
                 Scope.Attr.ui.name(), new LoggerUIService()), () ->
-                new CommandScope("updateCount")
+                new CommandScope(kommando)
                         .addArgumentValue("count", anzahl)
                         .addArgumentValue(DbUrlConnectionArgumentsCommandStep.DATABASE_ARG, datenbank)
                         .addArgumentValue(UpdateCommandStep.CHANGELOG_FILE_ARG, "db/mandant/changelog.xml")

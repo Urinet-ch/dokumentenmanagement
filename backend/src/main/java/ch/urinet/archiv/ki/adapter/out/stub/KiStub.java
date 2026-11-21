@@ -44,6 +44,7 @@ public class KiStub implements KiPort {
             case SEITE -> new Seite("Vorschlag des Dev-Stubs", "Ein Stub-Vorschlag.", List.of(), "", List.of(),
                     List.of(), "Dev-Stub");
             case QUELLE -> new Quelle("Vorschlag des Dev-Stubs", "Ein Stub-Vorschlag.", List.of(), List.of());
+            case LINT_PAAR -> new LintPaar(List.of(), List.of(), List.of());
         };
         return new WissensGueltig(inhalt, new Verbrauch(MODELL, 0, 0));
     }

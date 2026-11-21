@@ -16,9 +16,13 @@ import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.narayana.jta.runtime.TransactionConfiguration;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
@@ -44,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -58,15 +63,20 @@ import java.util.UUID;
 public class DokumentUploadResource {
 
     private static final Logger LOG = Logger.getLogger(DokumentUploadResource.class);
+    private static final TypeReference<Map<String, List<String>>> KLASSIFIKATIONEN = new TypeReference<>() {
+    };
 
     static final String QUELLE_HANDY = DokumentErfassen.QUELLE_SCAN;
 
     private final DokumentErfassen erfassen;
     private final SecurityIdentity identitaet;
+    private final ObjectMapper json;
 
-    public DokumentUploadResource(DokumentErfassen erfassen, SecurityIdentity identitaet) {
+    @Inject
+    public DokumentUploadResource(DokumentErfassen erfassen, SecurityIdentity identitaet, ObjectMapper json) {
         this.erfassen = erfassen;
         this.identitaet = identitaet;
+        this.json = json;
     }
 
     @Schema(name = "UploadFehler", description = "Fehler einer einzelnen Datei als Auszug aus Problem Details")
@@ -98,6 +108,8 @@ public class DokumentUploadResource {
     @TransactionConfiguration(timeoutFromConfigProperty = "archiv.upload.transaktion-zeitgrenze")
     @Operation(summary = "Dateien hochladen",
             description = "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). "
+                    + "Für unbestätigte Importe können «art» und «klassifikationen» als JSON-Objekt mit Codes "
+                    + "übergeben werden; Werte werden nach Req 3.5 geprüft. "
                     + "Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und "
                     + "der Erweiterung «ergebnisse».")
     @APIResponse(responseCode = "202", description = "Mindestens eine Datei angenommen oder als Dublette erkannt",
@@ -115,9 +127,11 @@ public class DokumentUploadResource {
                               @RestForm("arbeitsfassungen") List<FileUpload> arbeitsfassungen,
                               @RestForm("zusammenfassen") boolean zusammenfassen,
                               @RestForm("hinweis") String hinweis,
+                              @RestForm("art") String art,
+                              @RestForm("klassifikationen") String klassifikationen,
                               @Parameter(hidden = true) MultipartFormDataInput formular) {
         List<UploadErgebnis> ergebnisse = new ArrayList<>(erfassen(dateien, arbeitsfassungen, zusammenfassen,
-                hinweis, formular));
+                hinweis, art, klassifikationen, formular));
         List<UploadErgebnisDto> antwort = ergebnisse.stream().map(DokumentUploadResource::dto).toList();
         if (ergebnisse.stream().allMatch(UploadErgebnis.Abgelehnt.class::isInstance)) {
             Fehlercode erster = ((UploadErgebnis.Abgelehnt) ergebnisse.getFirst()).fehler();
@@ -134,7 +148,8 @@ public class DokumentUploadResource {
      * Reihenfolge der Teile liest der Endpunkt über die öffentliche {@link MultipartFormDataInput}.
      */
     private List<UploadErgebnis> erfassen(List<FileUpload> dateien, List<FileUpload> arbeitsfassungen,
-                                          boolean zusammenfassen, String hinweis, MultipartFormDataInput formular) {
+                                          boolean zusammenfassen, String hinweis, String art, String klassifikationen,
+                                          MultipartFormDataInput formular) {
         List<FileUpload> originale = dateien == null ? List.of() : dateien;
         List<FileUpload> arbeit = arbeitsfassungen == null ? List.of() : arbeitsfassungen;
         List<Boolean> teile = dateiTeile(formular, "dateien", originale.size());
@@ -144,6 +159,11 @@ public class DokumentUploadResource {
         }
         List<UploadErgebnis> ergebnisse = List.of();
         if (!originale.isEmpty() || !teile.contains(false)) {
+            Map<String, List<String>> werte = klassifikationen(klassifikationen);
+            String artCode = art == null || art.isBlank() ? null : art.strip();
+            if ((artCode == null) != werte.isEmpty()) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
             List<UploadAnfrage.Seite> seiten = new ArrayList<>();
             for (int i = 0; i < originale.size(); i++) {
                 FileUpload original = originale.get(i);
@@ -152,7 +172,7 @@ public class DokumentUploadResource {
                 seiten.add(new UploadAnfrage.Seite(original.uploadedFile(), original.fileName(), fassung));
             }
             ergebnisse = erfassen.erfassen(new UploadAnfrage(seiten, zusammenfassen, Optional.ofNullable(hinweis),
-                    erfasser(!arbeit.isEmpty())));
+                    erfasser(!arbeit.isEmpty()), artCode, werte));
         }
         if (!teile.contains(false)) {
             return ergebnisse;
@@ -166,6 +186,17 @@ public class DokumentUploadResource {
                     : new UploadErgebnis.Abgelehnt(DateiName.ERSATZ, Fehlercode.DATEITYP_UNBEKANNT));
         }
         return alle;
+    }
+
+    private Map<String, List<String>> klassifikationen(String text) {
+        if (text == null || text.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return DokumentResource.klassifikationen(json.readValue(text, KLASSIFIKATIONEN));
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
     }
 
     /**

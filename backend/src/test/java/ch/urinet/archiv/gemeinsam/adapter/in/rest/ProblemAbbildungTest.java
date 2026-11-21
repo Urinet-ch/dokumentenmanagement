@@ -43,6 +43,24 @@ class ProblemAbbildungTest {
     }
 
     @Test
+    void identitaetsdienstFehlerWerdenMitRetryAfterAbgebildet() {
+        try (Response nichtErreichbar = abbildung.fachFehler(
+                new ch.urinet.archiv.gemeinsam.domain.FachFehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+             Response ueberlastet = abbildung.fachFehler(
+                     new ch.urinet.archiv.gemeinsam.domain.FachFehler(Fehlercode.UEBERLASTET))) {
+            assertThat(nichtErreichbar.getStatus()).isEqualTo(503);
+            assertThat(nichtErreichbar.getHeaderString("Retry-After")).isEqualTo("1");
+            assertThat(ueberlastet.getStatus()).isEqualTo(503);
+            assertThat(ueberlastet.getHeaderString("Retry-After")).isEqualTo("1");
+        }
+        try (Response fehler = abbildung.fachFehler(
+                new ch.urinet.archiv.gemeinsam.domain.FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER))) {
+            assertThat(fehler.getStatus()).isEqualTo(502);
+            assertThat(fehler.getHeaderString("Retry-After")).isNull();
+        }
+    }
+
+    @Test
     void regelverletzungEnthaeltNurDieRegelcodesUndMeldungen() {
         var fehler = new RegelVerletzt(java.util.List.of(
                 new RegelVerletzt.Befund("datum_pflicht", "Belegdatum fehlt.")));

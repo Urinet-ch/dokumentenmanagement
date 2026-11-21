@@ -276,6 +276,14 @@ public class GeneratorSchritte {
         }
     }
 
+    @Dann("hat das Generator-Dokument «{word}» die Klassifikation «{word}» mit dem Wert «{word}»")
+    public void klassifikation(String name, String code, String wert) throws SQLException {
+        Ort ort = ort(name);
+        assertThat(abfragen("select wert from " + schema(ort.mandant())
+                + ".dokument_klassifikation where dokument_id = ? and klassifikation = ?",
+                ort.id(), code)).containsExactly(wert);
+    }
+
     /**
      * Req 10.2: {@code ERFASSEN} einmal je Anfrage, mit dem Principal des Tokens; ohne Dokument-ID, weil der Eintrag vor
      * der Aktion entsteht (design.md «Protokoll und Manifest»), ohne Rolle wie jeder Token-Eintrag (Check 002).

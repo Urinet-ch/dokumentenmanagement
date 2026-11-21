@@ -308,7 +308,7 @@ und nur im Mandanten des Inhabers anfasst, damit ein Fehler oder ein Einbruch in
 #### Acceptance Criteria
 1. Das Archiv SOLL Keycloak als einzige Quelle für Benutzer, Zugangsdaten, Rollen und das Attribut `mandant` behalten
    und über Spec 01, 10.10 hinaus keine Kopie von Personendaten führen (keine E-Mail, keine Vor- und Nachnamen in
-   Tabellen des Archivs).
+   Tabellen des Archivs). Nachweis: JUnit (`KeycloakAdminAdapterTest`).
 2. Das Archiv SOLL die Admin-REST-API von Keycloak nur über das Dienstkonto `archiv-verwaltung` im Realm
    `urinet-archiv` aufrufen (Client-Credentials, nur Dienstkonto, kein Browser-Fluss, kein Direct Grant). Das Dienstkonto
    SOLL nur die Rechte `query-users`, `view-users` und `manage-users` des Clients `realm-management` tragen, keines
@@ -327,11 +327,13 @@ und nur im Mandanten des Inhabers anfasst, damit ein Fehler oder ein Einbruch in
    (Wartezeit 200 Millisekunden, danach HTTP 503 `UEBERLASTET` mit `Retry-After: 1`), schreibende Aufrufe nie
    automatisch wiederholen, lesende höchstens einmal, und nach 3 Fehlern in Folge innerhalb von 30 Sekunden für 30
    Sekunden ohne Aufruf mit HTTP 503 `IDENTITAETSDIENST_NICHT_ERREICHBAR` antworten (Schutzschalter, kein Wiederholungssturm).
+   Nachweis: JUnit (`KeycloakAdminAdapterTest`, `ProblemAbbildungTest`).
 6. FALLS Keycloak nicht erreichbar ist, die Zeit überschreitet oder mit 5xx antwortet, DANN SOLL das Archiv mit HTTP
    503 `IDENTITAETSDIENST_NICHT_ERREICHBAR` und `Retry-After` antworten; FALLS Keycloak mit einem unerwarteten 4xx
    (insbesondere 401 oder 403 für das Dienstkonto) antwortet, DANN SOLL es mit HTTP 502 `IDENTITAETSDIENST_FEHLER`
    antworten und einen Alarm auslösen (6.7). Antworten und Logs SOLLEN keine Meldungen, Namen oder Werte von
-   Keycloak enthalten, nur Fehler-ID, Klasse und Status.
+   Keycloak enthalten, nur Fehler-ID, Klasse und Status. Nachweis: JUnit (`KeycloakAdminAdapterTest`,
+   `ProblemAbbildungTest`).
 7. Das Archiv SOLL mehrstufige Vorgänge (Anlegen, Rolle setzen, Einladung senden) so ausführen, dass entweder alles
    gelingt oder der Zustand vor dem Vorgang wiederhergestellt wird (Kompensation, z. B. den eben angelegten Benutzer
    entfernen); gelingt die Kompensation nicht, SOLL der Vorgang als `UNKLAR` gelten und der Abgleich (6.5) ihn melden.
@@ -339,9 +341,10 @@ und nur im Mandanten des Inhabers anfasst, damit ein Fehler oder ein Einbruch in
 8. SOLANGE Keycloak für die Verwaltung nicht erreichbar ist, SOLL das Archiv Anmeldung, Dokumente, Einstellungen und alle
    übrigen Endpunkte unverändert bedienen; nur die Endpunkte der Benutzer und Rollen antworten nach 5.5 und 5.6. Die
    Readiness der API ändert sich nicht (Spec 01, Plattform und Betrieb); der Zustand des Dienstkontos erscheint im
-   internen Detail-Health.
+   internen Detail-Health. Nachweis: JUnit (`IdentitaetsdienstHealthCheckTest`).
 9. Das Archiv SOLL bei jeder Keycloak-Antwort mit Benutzern nur solche weiterverarbeiten, deren Attribut `mandant` genau
    ein Wert ist und dem Mandanten des Akteurs entspricht (Prüfung im Archiv, nicht nur über die Suchanfrage).
+   Nachweis: JUnit (`KeycloakAdminAdapterTest`).
 10. Das Archiv SOLL das Speicherbudget der Stufe A einhalten: Die Anbindung nutzt den JDK-HTTP-Client und Jackson ohne
     Keycloak-Admin-Bibliothek, Antworten sind auf höchstens 50 Benutzer je Aufruf und 1 MiB begrenzt, der Heap der
     API wächst dadurch um höchstens 4 MiB. Nachweis: manuell [Fabian] (Messung wie Spec 01, Aufgabe 1.10, mit

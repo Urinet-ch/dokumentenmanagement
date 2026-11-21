@@ -6,6 +6,7 @@ import ch.urinet.archiv.export.domain.Export;
 import ch.urinet.archiv.export.domain.Geschaeftsjahr;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.Funktionen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
@@ -40,20 +41,22 @@ public class ExportVerwaltung {
     private final AblagePort ablage;
     private final Berechtigung berechtigung;
     private final Clock uhr;
+    private final Funktionen funktionen;
 
     @Inject
     public ExportVerwaltung(ExportRepository repository, ExportProtokoll protokoll, AuftragService auftraege,
-                            AblagePort ablage, Berechtigung berechtigung) {
-        this(repository, protokoll, auftraege, ablage, berechtigung, Clock.systemUTC());
+                            AblagePort ablage, Berechtigung berechtigung, Funktionen funktionen) {
+        this(repository, protokoll, auftraege, ablage, berechtigung, funktionen, Clock.systemUTC());
     }
 
     ExportVerwaltung(ExportRepository repository, ExportProtokoll protokoll, AuftragService auftraege,
-                     AblagePort ablage, Berechtigung berechtigung, Clock uhr) {
+                     AblagePort ablage, Berechtigung berechtigung, Funktionen funktionen, Clock uhr) {
         this.repository = repository;
         this.protokoll = protokoll;
         this.auftraege = auftraege;
         this.ablage = ablage;
         this.berechtigung = berechtigung;
+        this.funktionen = funktionen;
         this.uhr = uhr;
     }
 
@@ -107,6 +110,9 @@ public class ExportVerwaltung {
     public void pruefen(Benutzer benutzer) {
         if (!Exportrecht.erlaubt(benutzer.rolle())) {
             berechtigung.ohneZugang(Optional.of(benutzer.id()), Optional.of(benutzer.rolle()), Optional.empty());
+        }
+        if (!funktionen.finanzVerfuegbar()) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
     }
 }

@@ -13,6 +13,7 @@ api/konfiguration.service.ts
 api/kontakte.service.ts
 api/protokoll.service.ts
 api/wissen-ingest-resource.service.ts
+api/wissen-lint-resource.service.ts
 api/wissensbasis.service.ts
 configuration.ts
 encoder.ts
@@ -26,6 +27,7 @@ model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts
 model/api-v1-wissensentwuerfe-id-get200-response.ts
+model/api-v1-wissensseiten-get200-response.ts
 model/art-klassifikation.ts
 model/aussage.ts
 model/auszug-teil.ts
@@ -76,6 +78,8 @@ model/import-zuordnung.ts
 model/kategorie.ts
 model/klassifikation-wert.ts
 model/klassifikation.ts
+model/klassifikationsfacette.ts
+model/klassifikationswert-facette.ts
 model/konfiguration-ki-texte.ts
 model/konfigurations-version-detail.ts
 model/konfigurations-version.ts
@@ -92,6 +96,7 @@ model/kontakt-zusammenfuehren.ts
 model/kontakt-zusammengefuehrt.ts
 model/kontakt.ts
 model/kopf.ts
+model/mandantenfunktionen.ts
 model/models.ts
 model/paket-kopf.ts
 model/protokoll-aktion.ts
@@ -117,13 +122,16 @@ model/wissen-einstellungen.ts
 model/wissen-export.ts
 model/wissen-ingest-auftrag.ts
 model/wissen-ingest-start.ts
+model/wissen-lint-auftrag.ts
 model/wissen-verwerfen.ts
+model/wissens-embedding-auftrag.ts
 model/wissens-index-gruppe.ts
 model/wissens-index-zeile.ts
 model/wissens-index.ts
 model/wissens-log-seite.ts
 model/wissens-log-verweis.ts
 model/wissens-log.ts
+model/wissens-suchergebnis.ts
 model/wissensdiff.ts
 model/wissensquelleneintrag.ts
 model/wissensseite.ts

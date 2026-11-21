@@ -450,6 +450,36 @@ flowchart LR
   `RerankerClient`; Sichtbarkeitsfilter vor Verdichtung und Reranker; Rückfall `degradiert=true` wie Spec 02.
 - REST `GET /api/v1/wissensseiten?q=…` und Abschnitt «Wissen» auf der Suchseite (`GET /api/v1/dokumente?q=` bleibt
   unverändert; die Suchseite ruft beide auf).
+- Umsetzung 15.1 (20.11.2026): `modus=hybrid` bzw. `modus=volltext` liefert `{treffer,degradiert}` mit
+  höchstens 30 Seiten, ohne Gesamtzahl und Paging. Ohne `modus` bleibt der bestehende Indexvertrag unverändert.
+  Nur Suchbegriff und Modus werden mit der Dokumentensuche geteilt; ihre Dokumentfilter gelten nicht für Seiten.
+  Fehler, Abbruch und Wiederholung der beiden Anfragen sind unabhängig.
+- `POST /api/v1/wissensbasis/embeddings` verlangt A17 und liefert den Nachberechnungsauftrag (202).
+  Die Antwort ist das typisierte `{auftragId}`; ein erschöpftes Monatsbudget wird vor dem manuellen Start
+  mit 429 abgewiesen. In `lokal` umgehen die Embedding-/Reranker-Stubs die Budgetabfrage.
+  Die Nachberechnung reiht Teilaufträge für höchstens 500 Seiten ein; Nutzlasten enthalten nur IDs und Versionen.
+  Schreiben sperrt die Seite, prüft ihre Version und sichert den Auftragsanspruch in derselben Transaktion.
+  Ein Stub überschreibt keine vorhandenen Vektoren derselben Version.
+- Modellaufrufe laufen ausserhalb von Datenbanktransaktionen. Wissenssuche und Seiten-Embeddings buchen
+  `WISSEN_EMBEDDING`; vor jeder Frage, jedem Reranker-Aufruf und jedem Embedding-Batch wird das
+  mandantenspezifische Monatsbudget geprüft. Fehler bei diesen Verbrauchsbuchungen bleiben Fehler.
+- `WissenIngestIndex` nutzt dieselbe Rangierung bei überschrittenem Zeichenbudget. Seine erlaubten IDs werden
+  aus dem aktuellen Ingest-/Hüllenkontext vor jeder Abfrage und nach der Rangierung neu berechnet, nicht aus
+  einer erfundenen Benutzerrolle. `PERSONAL` und der Überblick bei `INTERN` bleiben ausgeschlossen;
+  bei `NORMAL` wird der sichtbare Überblick vor den begrenzten Treffern ergänzt.
+- Nachweise 15.1: JDBC prüft den echten Handler mit WireMock-Vektor und `WISSEN_EMBEDDING`-Buchung sowie
+  Rollback bei verlorenem Auftragsanspruch, Versions-/Mandantentrennung und Stubschutz. Szenarien prüfen
+  Volltextgewichtung, Hybrid-/Stub-Rückfall und A17-Nachberechnung; der Browser prüft den Wissensabschnitt,
+  Seitenlink und Barrierefreiheit bei 375 px. Der ausdrücklich freigegebene einmalige lokale Messlauf
+  (20.11.2026) nutzt `tools/last/wissenssuche.sh --freigabe` unter der Docker-Sperre:
+  eigene leere PostgreSQL-Datenbank, 2'000 tatsächlich gespeicherte synthetische Seiten (davon 200 `INTERN`),
+  20 Aufwärmanfragen und 200 HTTP-Hybridsuchen als Mitarbeiter über zehn Suchbegriffe. Die echte Pipeline
+  umfasst SQL-Sichtfilter, Volltext, Vektor, RRF und Reranker; WireMock liefert lediglich Embeddings und
+  Rerankerantworten (je 220 geprüfte Aufrufe). Alle Antworten sind nicht degradiert, haben 30 Treffer und
+  enthalten keine interne Seite. PostgreSQL ist auf 512 MiB und zwei CPU begrenzt.
+  HTTP einschliesslich Client als konservative Obergrenze der Serverzeit: p50 63.365 ms, p95 69.613 ms,
+  Maximum 77.146 ms (9.5: p95 ≤ 1 s). Der Messlauf ist nicht Teil der CI; Container und benanntes Volume
+  werden auch bei Fehlern entfernt. Die lokale Messung ersetzt den Nachweis auf der VPS durch Fabian nicht.
 
 ### Lint (`wissen/application`)
 - `WISSEN_LINT` (Scheduler mit `archiv.wissen.lint-zeitplan`, nur Rolle `worker`; manuell A17), je KI-Aufruf ein
@@ -461,14 +491,26 @@ flowchart LR
 - Kandidaten «veraltet» ohne KI (Requirement 10.3): Aussagen einer Seite, deren Quelldokument ein älteres
   Dokumentdatum hat als eine Wissensquelle, deren Quelle-Seite auf die Seite verlinkt oder mit ihr eine Quelle teilt.
 - Mit KI (Requirement 10.3, 10.4): Paare, die einander verlinken, eine Quelle teilen oder ≥ 2 Schlagwörter teilen,
-  ohne Seiten mit `PERSONAL`-Dokument in der Hülle, Paare mit `QUERVERWEIS_FEHLT` oder Kandidaten «veraltet» zuerst,
-  sonst nach `lint_geprueft_am`, höchstens `lint-paare`. Antwort `{widersprueche:[{seite, schluessel, gegenseite,
+  ohne Seiten mit `PERSONAL`-Dokument in der Hülle, nach letztem Prüfzeitpunkt und bei Gleichstand Paare mit
+  `QUERVERWEIS_FEHLT` oder Kandidaten «veraltet» zuerst, höchstens `lint-paare`. Antwort `{widersprueche:[{seite, schluessel, gegenseite,
   gegenschluessel, text}], veraltet:[{seite, schluessel, neuere_quelle, text}], links:[{seite, ziel, text}]}`. Für
   jede betroffene Seite folgt ein Teilauftrag `SEITE` (gleiches Schema wie beim Ingest) mit dem Befund als Auftrag;
   bei Paaren verschiedener Vertraulichkeit nur für die höher eingestufte Seite, die andere erhält nur einen Befund
   (IDs). Kontextstufe = höchste Stufe des Paars.
 - Erschöpftes Monatsbudget: kein KI-Teil, Logeintrag `LINT` mit Befund «Budget erschöpft» (Requirement 13.6).
 - Ergebnis in `wissens_lint` (Befunde nur als IDs und Codes) und ggf. Entwurf `anlass = LINT`; Logeintrag `LINT`.
+- Umsetzung 15.4: Vorrang haben nach Requirement 10.3 die am längsten nicht geprüften Paare; Kandidaten sind bei
+  gleichem Prüfzeitpunkt das zweite Sortierkriterium. Der Fortschritt und die Paarhistorie liegen im
+  `ingest_daten` des LINT-Entwurfs. Der Entwurf dient auch als Budgetanker und bleibt ohne Änderungen mit Status
+  `ERLEDIGT` bestehen. Vor jedem KI-Aufruf wird die aktuelle Hülle erneut geprüft; vor dem Seitenauftrag müssen
+  Version und Quellenrevision aller beteiligten Seiten noch zum Paarauftrag passen. Änderungen verwenden die
+  bestehende Freigabeprüfung und werden nicht unmittelbar angewendet. Bricht der Lauf wegen Budget oder fehlendem
+  KI-Zugang ab, bei endgültigem KI-Fehler (Fehlerpfad) oder wird ein Seitenauftrag übersprungen (Seite geändert oder
+  nicht mehr freigegeben, Quellenschlüssel uneindeutig, KI-Antwort nach Nachfrage ungültig), gelten Paare, deren
+  Seitenaufträge nicht ausgeführt wurden, nicht als geprüft (Review PR #376); sie behalten ihren Vorrang im nächsten
+  Lauf. Der Nachweis für 10.1 (Zeitplan reiht je Mandant einen Auftrag ein, derselbe Termin startet nicht doppelt) ist
+  das Szenario `@req-10.1` in `lint.feature`. Die Nachweise für 10.2 (Befundarten ohne KI inkl. Formfehler) liegen als
+  Szenario `@req-10.2` in `lint.feature`.
 
 ### OKF-Export (`wissen/adapter/out`)
 - `WISSEN_EXPORT` schreibt ein ZIP stromweise nach S3 `exporte/wissen-<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage
@@ -601,6 +643,17 @@ die Importherkunft und je Quellenschlüssel die Zuordnung und das Ergebnis aus
 `WissensPruefung.auszugPruefen`; dieselbe Auszugsprüfung wird beim Annehmen erneut ausgeführt.
 Leere und vollständig unveränderte Pakete bleiben gemäss 19.18 `OFFEN`; es wird keine zusätzliche Abschlussaktion
 oder automatische Freigabe eingeführt. Der offene Punkt 19-a bleibt unverändert offen.
+
+**Oberfläche (Aufgabe 15.8):** Die A17-Route `/wissen/entwuerfe/import` steht vor der dynamischen
+Entwurfsroute. Sie sendet genau den Multipart-Teil `paket`, prüft den vollständigen Antwortbericht und
+zeigt Zähler, Seitenpfade und Befundcodes. 409 verlinkt den vorhandenen Entwurf; 422 zeigt die
+Paketbefunde ohne automatischen Wiederholungsversuch. Herkunft und Quellenprüfungen stammen aus
+`entwurf.herkunft` und `aenderung.daten.quellenPruefung`, nicht aus einer Client-Paketanalyse.
+«Prüfung wiederholen» lädt nach 204 die aktuellen Änderungs-ETags neu und bewahrt ungespeicherte
+Bearbeitungen; diese sind nicht Bestandteil des neu geprüften Serverberichts. Bei Benutzer-, Rollen-
+oder Mandantenwechsel werden laufende Anfragen und Bestätigungen abgebrochen und alte Inhalte
+einschliesslich Dateiauswahl entfernt. Eine Tokenaktualisierung im gleichen Benutzerkontext löscht
+keine Eingaben. Keine KI-Neuerzeugung für Import und kein gesammeltes Annehmen.
 
 Der gemeinsame synthetische Korpus unter `backend/src/test/resources/wissen-pakete/` beschreibt Pakete textuell;
 `WissensPaketBeispiele` erzeugt die ZIP-Bytes einschliesslich gezielter Metadatenangriffe nur für Tests.
@@ -890,6 +943,11 @@ bei 375, 1023, 1024 und 1280 px und prüft Überlauf, WCAG 2.1 AA mit axe, Einze
 Der integrierte Widerspruchsschutz (14.3, PR #351) liefert `diff.widersprueche` und
 `diff.entfernteWidersprueche`. Die Auflösungsmarkierung verwendet den echten Vertrag auch ohne KI-Blockliste;
 der REST-Nachweis prüft Text und Fussnotenschlüssel, Frontend- und Browsernachweise prüfen die Hervorhebung.
+Vor 14.3 gespeicherte Diffs erhalten fehlende Widerspruchsmarker beim Lesen aus der unveränderbaren
+historischen Basisversion und der gespeicherten Fassung, nie aus dem aktuellen Seiteninhalt.
+Gespeicherter Diff, Status und ETag bleiben unverändert; eine fehlende Änderungsbasis ist ein Fehler.
+Das Altdaten-Szenario liest Basisversion 2 nach einer weiteren Freigabe auf Version 3 und prüft zusätzlich
+die Mandantentrennung.
 
 ### Konfiguration und Aufträge
 | Schlüssel | Startwert |
@@ -1042,12 +1100,12 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Deploy und Rollback gleich, und `wiederverwenden` (Spec 01, Req 15.6) bricht nicht ab. Die Quellenbezüge
   (`wissensseite_version_dokument`) stehen nicht im Manifest, weil Req 4.6 nur Versionen und Log nennt; sie sind
   INSERT-only, aber nicht gehasht (Review PR #295, K7).
-- Req 4.7 ist offen: In der Sicherung ist die Wissensbasis ohne eigenen Schritt, weil `taeglich.sh` die ganze
-  Archiv-Datenbank mit `pg_dump` sichert. Die Restore-Probe im Repo stellt aber nur Bucket-Objekte wieder her
-  (`archiv sicherung wiederherstellen` und `sperren-pruefen`); `pg_dump` in eine leere Datenbank einspielen und mit der Quelle
-  vergleichen kommt erst mit Spec 01, Aufgabe 5.12. Der Vergleich von Anzahl Seiten und Versionen folgt mit dieser
-  Kette; bis dahin bleibt 13.3 offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein
-  Nachweis (Review PR #295, M1).
+- Req 4.7 ist offen: Die Sicherung erfasst die ganze Archiv-Datenbank mit `pg_dump`. Seit PR #357 stellt
+  `restore-uebung-lokal.sh` den Datenbankdump tatsächlich mit `pg_restore` in einer eigenen Ziel-Datenbank
+  wieder her (Spec 01, Aufgabe 5.12). Noch fehlt der Nachweis, dass dabei ein nichtleerer Wissensseiten- und
+  Versionsbestand vor und nach dem Restore verglichen wird (Nachprüfung 20.11.2026). Deshalb bleibt 13.3
+  offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis
+  (Review PR #295, M1).
 
 ### Umsetzung 13.5 (PR #300)
 - `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe

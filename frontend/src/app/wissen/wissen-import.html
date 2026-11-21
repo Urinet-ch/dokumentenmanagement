@@ -1,0 +1,40 @@
+<a routerLink="/wissen/entwuerfe">{{ texte.zurListe }}</a>
+<h1>{{ texte.titel }}</h1>
+<p>{{ texte.einleitung }}</p>
+<p>{{ texte.cloudHinweis }}</p>
+<form (ngSubmit)="importieren()" [attr.aria-busy]="sendet()">
+  <label for="wissenspaket">{{ texte.datei }}</label>
+  <input #paket id="wissenspaket" type="file" accept=".zip,application/zip"
+    [disabled]="sendet() || !anmeldung.darf('A17')" (change)="waehlen(paket.files?.item(0) ?? null)">
+  @if (datei(); as gewaehlt) { <p>{{ gewaehlt.name }}</p> }
+  <button mat-flat-button type="submit" [disabled]="sendet() || !datei() || !anmeldung.darf('A17')">
+    {{ texte.importieren }}
+  </button>
+</form>
+@if (sendet()) { <p role="status">{{ texte.laedt }}</p> }
+@if (fehler(); as meldung) {
+  <p role="alert">{{ meldung }}</p>
+  <ul>@for (befund of fehlerBefunde(); track $index) { <li>{{ befund.pfad }} · {{ befund.code }}</li> }</ul>
+}
+@if (vorhandenerEntwurf(); as id) {
+  <a [routerLink]="['/wissen/entwuerfe', id]">{{ texte.vorhandenenOeffnen }}</a>
+}
+@if (bericht(); as ergebnis) {
+  <section aria-labelledby="importbericht">
+    <h2 id="importbericht">{{ texte.bericht }}</h2>
+    <p role="status">{{ texte.nurEntwurf }}</p>
+    <dl class="anzahlen">
+      <div><dt>{{ texte.neu }}</dt><dd>{{ ergebnis.anzahl.neu }}</dd></div>
+      <div><dt>{{ texte.aendern }}</dt><dd>{{ ergebnis.anzahl.aendern }}</dd></div>
+      <div><dt>{{ texte.unveraendert }}</dt><dd>{{ ergebnis.anzahl.unveraendert }}</dd></div>
+      <div><dt>{{ texte.ignoriert }}</dt><dd>{{ ergebnis.anzahl.ignoriert }}</dd></div>
+    </dl>
+    <p>{{ texte.sha256 }}: <code>{{ ergebnis.paketSha256 }}</code></p>
+    <h3>{{ texte.befunde }}</h3>
+    @if (!ergebnis.befunde.length) { <p>{{ texte.keineBefunde }}</p> }
+    <ul>@for (befund of ergebnis.befunde; track $index) { <li>{{ befund.pfad }} · {{ befund.code }}</li> }</ul>
+    <h3>{{ texte.hinweise }}</h3>
+    <ul>@for (hinweis of ergebnis.hinweise; track $index) { <li>{{ hinweis.pfad }} · {{ hinweis.code }}</li> }</ul>
+    <a [routerLink]="['/wissen/entwuerfe', ergebnis.entwurfId]">{{ texte.entwurfOeffnen }}</a>
+  </section>
+}
