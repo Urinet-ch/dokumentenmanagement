@@ -214,7 +214,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 17.1 Markierung, Ingest-Auslöser und Migration [Backend]
   - Tabelle `wissensquelle_markierung`, `WissensquelleMarkieren`/`-Entfernen`, REST `POST/DELETE /dokumente/{id}/wissensquelle` und
     `GET /wissen/quellen`; `WissenIngestStarten`/`-Verarbeiten` und Repository auf die Markierung umstellen; Migration: Dokumente der Art
-    `WISSENSQUELLE` markieren, Art `aktiv = false`, Seed für neue Mandanten ohne die Art; Spec 05: `SeedPruefung`/`Konfiguration`
+    `WISSENSQUELLE` auf `PROJEKTDOKUMENT` umstellen und markieren, die Art löschen (Fremdschlüssel vorher prüfen), Seed für neue Mandanten ohne die Art; Spec 05: `SeedPruefung`/`Konfiguration`
     tolerieren die fehlende Art; Szenarien `@req-20.1` bis `@req-20.9`, Isolation und Negativfälle.
   - _Anforderungen: 20.1–20.9, 20.11_
   - _Abhängig von: 15.x (Ingest und Entwürfe auf main)_

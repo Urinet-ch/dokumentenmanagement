@@ -379,17 +379,20 @@ bis 1.6 und 5.1: Wo dort «Dokument der Art `WISSENSQUELLE`» steht, gilt «mark
    sich das Dokument ändert.
 6. Das Archiv SOLL Aufbewahrung, Object-Lock-Sperre, Jahresexport, Vertraulichkeit und Fristen eines markierten Dokuments allein nach
    seiner Dokumentart bestimmen (Spec 01, 6.12; Spec 02, 7.1): Die Ausnahme aus Requirement 1.3 und 1.6 gilt nur noch für Dokumente
-   der auslaufenden Art nach Kriterium 8.
+   der Art `WISSENSQUELLE`, die nach Kriterium 8 nicht mehr existiert (die Ausnahme entfällt ersatzlos).
 7. Das Archiv SOLL der KI nur Inhalte markierter Dokumente zeigen, deren Vertraulichkeit die Regeln aus Requirement 5.5 und 5.11 erfüllt
    (nie eine Seite mit niedrigerer Vertraulichkeit als ihre Quelle).
-8. Das Archiv SOLL die Art `WISSENSQUELLE` nicht mehr als wählbare Art anbieten (Seed `_alle/dokumentarten-wissen.json` entfällt, die
-   Art wird im Bestand `aktiv = false` gesetzt und nicht gelöscht); jedes bestehende Dokument dieser Art SOLL bei der Migration
-   zusätzlich markiert werden (Zeitpunkt der Migration, Benutzer «System»), behält seine Art (und damit seine Eigenschaften) und
-   bleibt in der Wissensbasis Quelle; neue Dokumente dieser Art SOLLEN nicht mehr entstehen. Der Wechsel auf eine andere Art bleibt
-   dem Benutzer über «Dokument ändern» überlassen (Spec 01, Artwechsel); die Markierung bleibt dabei bestehen.
-9. Die Konfiguration (Spec 05) SOLL die Art `WISSENSQUELLE` nur noch als inaktive Bestandsart kennen: Die Prüfung der festen
-   Eigenschaften (Spec 05, Befund `WISSENSQUELLE_UNGUELTIG`) entfällt für neue Mandanten; im Bestand bleibt die Art unverändert
-   inaktiv.
+8. Das Archiv SOLL die Dokumentart `WISSENSQUELLE` **vollständig entfernen** (Entscheid Fabian 21.11.2026: erst 2 Dokumente betroffen): Der Seed
+   `_alle/dokumentarten-wissen.json` entfällt, neue Mandanten bekommen die Art nicht mehr. Die Migration SOLL jedes bestehende Dokument dieser
+   Art zuerst auf die Art `PROJEKTDOKUMENT` umstellen (Entscheid Fabian 21.11.2026; ein fehlendes Pflichtfeld der neuen Art, zum Beispiel
+   `projekt`, blockiert nicht, Spec 01, «Artwechsel»; die vorherige Fassung wird als `dokument_version` mit dem Grund
+   «Migration Wissensquelle» festgehalten) und es zugleich markieren (Zeitpunkt der Migration, Benutzer «System»); danach SOLL sie die Art
+   `WISSENSQUELLE` aus `dokumentart` und aus der Konfigurationsversion löschen. Bleibt ein Verweis auf die Art bestehen (Fremdschlüssel),
+   SOLL die Migration mit einer klaren Meldung abbrechen statt Daten zu verändern. Der Benutzer kann die Art eines migrierten Dokuments
+   später über «Dokument ändern» korrigieren; die Markierung bleibt dabei bestehen.
+9. Die Konfiguration (Spec 05) SOLL die Art `WISSENSQUELLE` nicht mehr kennen: Die Prüfung der festen Eigenschaften (Spec 05, Befund
+   `WISSENSQUELLE_UNGUELTIG`) und die Seed-Prüfung für diese Art entfallen; eine Konfigurationsdatei, die die Art noch enthält, SOLL mit
+   einem klaren Befund abgelehnt werden (der Export ohne die Art ist die Quelle).
 10. Das Archiv SOLL jede Markierung und jede Entfernung in der Wissensbasis-Oberfläche sichtbar machen: die Liste «Wissensquellen»
     zeigt Titel, Art, Datum der Markierung und Stand des letzten Ingest; die Dokumentansicht zeigt «Wissensquelle» als Kennzeichen.
 11. Das Archiv SOLL für jedes Kriterium 1 bis 10 ein Cucumber-Szenario `@req-20.x` (`@spec-04`) enthalten, darunter Mandantentrennung
