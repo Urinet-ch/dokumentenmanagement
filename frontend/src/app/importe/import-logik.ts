@@ -122,6 +122,21 @@ export function entscheideZaehlen(entscheide: ReadonlyMap<number, Entscheid>): {
   return { neu, zusammen, ueberspringen };
 }
 
+/** Farbvariante der Pille (styles.scss) je Laufstatus und Zeilenergebnis; ohne Eintrag neutral. */
+export const STATUS_TON: Readonly<Partial<Record<string, string>>> = {
+  ZUORDNUNG_NOETIG: 'akzent',
+  VORSCHAU: 'akzent',
+  VORSCHAU_AUSSTEHEND: 'akzent',
+  UEBERNOMMEN: 'ok',
+  ABGEBROCHEN: 'gefahr',
+};
+export const ERGEBNIS_TON: Readonly<Partial<Record<string, string>>> = {
+  NEU: 'ok',
+  GEAENDERT: 'ok',
+  DUBLETTE: 'warnung',
+  FEHLER: 'gefahr',
+};
+
 /** Ganze Zahlen mit Apostroph als Tausendertrennzeichen (`1'234`). */
 export function zahl(wert: number | null | undefined): string {
   return String(wert ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, "'");

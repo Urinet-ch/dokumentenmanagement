@@ -29,7 +29,7 @@
   }
 }
 
-.gefahr {
+.knopf-gefahr {
   --mat-button-text-label-text-color: var(--gefahr);
 }
 
@@ -110,11 +110,6 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
-}
-
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12.5px;
 }
 
 .verweise {

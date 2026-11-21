@@ -29,7 +29,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
             <ul class="kacheln">
               @for (punkt of abschnitt.punkte; track punkt.pfad) {
                 <li>
-                  <a class="karte kachel" [class.hervor]="punkt.eingangskorbZaehler && (anzahl() ?? 0) > 0" [routerLink]="punkt.pfad">
+                  <a class="karte funktion" [class.hervor]="punkt.eingangskorbZaehler && (anzahl() ?? 0) > 0" [routerLink]="punkt.pfad">
                     <span class="symbol"><app-symbol [name]="punkt.symbol" /></span>
                     <span class="text">
                       <b>{{ punkt.text }}</b>
@@ -89,7 +89,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
       grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
       gap: 14px;
     }
-    .kachel {
+    .funktion {
       display: flex;
       align-items: flex-start;
       gap: 12px;
@@ -102,7 +102,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
         border-color: var(--linie-stark);
       }
     }
-    .kachel.hervor {
+    .funktion.hervor {
       background: var(--text);
       color: var(--flaeche);
       border-color: var(--text);

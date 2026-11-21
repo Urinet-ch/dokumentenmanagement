@@ -47,23 +47,11 @@ button {
   gap: 0.5rem;
 }
 
-// Nicht angemeldet oder Sitzung abgelaufen (Prototyp `.hint`)
-.hinweis {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.5rem 0.625rem;
-  align-items: start;
+// Nicht angemeldet oder Sitzung abgelaufen: .hinweis (styles.scss), Knopf unter dem Text
+:host > .hinweis {
   margin: 0 0 1rem;
-  padding: 0.75rem 0.875rem;
-  border-radius: var(--radius-klein);
-  background: var(--akzent-weich);
-
-  app-symbol {
-    color: var(--akzent-text);
-  }
 
   button {
-    grid-column: 2;
     justify-self: start;
   }
 }

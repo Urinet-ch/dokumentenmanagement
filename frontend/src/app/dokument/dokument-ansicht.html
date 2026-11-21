@@ -66,10 +66,12 @@
         </div>
       </div>
       @if (d.fristAbgelaufen) {
-        <p class="hinweis">{{ texte.fristAbgelaufen }}</p>
+        <p class="hinweis warnung"><app-symbol name="uhr" /><span>{{ texte.fristAbgelaufen }}</span></p>
       }
       @for (warnung of regelWarnungen(); track $index) {
-        <p class="warnung" data-test="regelwarnung">{{ warnung.meldung || warnung.code }}</p>
+        <p class="hinweis warnung" data-test="regelwarnung">
+          <app-symbol name="warnung" /><span>{{ warnung.meldung || warnung.code }}</span>
+        </p>
       }
       <div class="spalten">
         <section class="karte vorschau" aria-labelledby="vorschau-titel">

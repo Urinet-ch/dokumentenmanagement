@@ -27,7 +27,7 @@
               <span>{{ wert.name }}</span>
             </label>
           }
-          <p class="hinweis" [id]="kennung() + '-' + feld.code + '-hinweis'">
+          <p class="nebentext" [id]="kennung() + '-' + feld.code + '-hinweis'">
             @if (feld.pflicht) {
               {{ texte.klassifikationPflicht }}
             } @else if (!feld.aktiv) {

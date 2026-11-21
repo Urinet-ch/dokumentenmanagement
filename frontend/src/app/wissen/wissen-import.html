@@ -4,7 +4,7 @@
   <h1>{{ texte.titel }}</h1>
   <p>{{ texte.einleitung }}</p>
 </div>
-<p class="box"><app-symbol name="warnung" />{{ texte.cloudHinweis }}</p>
+<p class="hinweis warnung"><app-symbol name="warnung" />{{ texte.cloudHinweis }}</p>
 <form class="karte" (ngSubmit)="importieren()" [attr.aria-busy]="sendet()">
   <div class="feld">
     <label for="wissenspaket">{{ texte.datei }}</label>
@@ -20,7 +20,7 @@
 </form>
 @if (sendet()) { <p class="status" role="status">{{ texte.laedt }}</p> }
 @if (fehler(); as meldung) {
-  <p class="fehler" role="alert">{{ meldung }}</p>
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
   @if (fehlerBefunde().length) {
     <ul class="karte befunde">@for (befund of fehlerBefunde(); track $index) { <li><span class="mono">{{ befund.pfad }}</span> · <span class="pille gefahr mono">{{ befund.code }}</span></li> }</ul>
   }

@@ -13,7 +13,7 @@
 </div>
 @if (laedt()) { <p class="status" role="status">{{ wissen.laedt }}</p> }
 @if (fehler(); as meldung) {
-  <p class="fehler" role="alert">{{ meldung }}</p>
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
   <div class="knoepfe"><button mat-button type="button" (click)="laden(true)">{{ wissen.erneut }}</button></div>
 }
 @if (!id()) {
@@ -61,15 +61,15 @@
           <dt>{{ importe.importiertAm }}</dt><dd>{{ zeitpunkt(ansicht.entwurf.erstellt) }}</dd>
           <dt>{{ importe.sha256 }}</dt><dd><code>{{ herkunft.paketSha256 }}</code></dd>
         </dl>
-      } @else { <p class="fehler" role="alert">{{ importe.herkunftFehlt }}</p> }
-      <p class="box"><app-symbol name="warnung" />{{ importe.cloudHinweis }}</p>
+      } @else { <p class="hinweis gefahr" role="alert">{{ importe.herkunftFehlt }}</p> }
+      <p class="hinweis warnung"><app-symbol name="warnung" />{{ importe.cloudHinweis }}</p>
       @if (ansicht.entwurf.status === 'OFFEN') {
         <div class="knoepfe">
           <button mat-stroked-button type="button" [disabled]="sendet()" (click)="neuPruefen()"><app-symbol name="wiederholen" />{{ importe.neuPruefen }}</button>
         </div>
       }
       @if (prueft()) { <p class="status" role="status">{{ importe.prueft }}</p> }
-      @if (pruefFehler(); as meldung) { <p class="fehler" role="alert">{{ meldung }}</p> }
+      @if (pruefFehler(); as meldung) { <p class="hinweis gefahr" role="alert">{{ meldung }}</p> }
       @if (bearbeitet !== undefined) { <p class="gedaempft">{{ importe.bearbeitungBehalten }}</p> }
     </section>
   }
@@ -114,7 +114,7 @@
                 [class.warnung]="quelle.auszug !== 'GEFUNDEN'">{{ importe.auszug }}: {{ auszugText(quelle.auszug) }}</span></li>
             }
           </ul>
-        } @else { <p class="fehler" role="alert">{{ importe.quellenPruefungFehlt }}</p> }
+        } @else { <p class="hinweis gefahr" role="alert">{{ importe.quellenPruefungFehlt }}</p> }
       }
       <h3>{{ texte.begruendung }}</h3><p>{{ aenderung.begruendung || texte.leer }}</p>
       <h3>{{ texte.diff }}</h3>
@@ -189,7 +189,7 @@
               <option value="INTERN">INTERN</option>
             </select></label>
             @if (aktionsFehler(); as meldung) {
-              <p class="fehler" role="alert">{{ meldung }}</p>
+              <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
               <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ wissen.erneut }}</button></div>
             }
             @if (aktionsBefunde().length) {

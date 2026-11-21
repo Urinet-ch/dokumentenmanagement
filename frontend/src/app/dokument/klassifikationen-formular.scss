@@ -69,12 +69,12 @@ select {
   }
 }
 
-.hinweis,
+.nebentext,
 .fehler {
   margin: 0;
 }
 
-.hinweis {
+.nebentext {
   color: var(--text-gedaempft);
   font: var(--mat-sys-body-small);
 }

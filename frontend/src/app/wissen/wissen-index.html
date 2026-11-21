@@ -35,7 +35,7 @@
 
 @if (laedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
 @if (fehler(); as meldung) {
-  <p class="fehler" role="alert">{{ meldung }}</p>
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
   <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button></div>
 }
 @if (ergebnis(); as ergebnis) {
@@ -46,35 +46,37 @@
         <h2 [id]="'wissen-gruppe-' + $index">{{ texte.seitentypen[gruppe.typ ?? ''] ?? texte.unbekannterTyp }}</h2>
         <span class="gedaempft">{{ texte.anzahl(gruppe.seiten?.length ?? 0) }}</span>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">{{ texte.spalteSeite }}</th>
-            <th scope="col">{{ texte.spalteStatus }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (seite of gruppe.seiten; track seite.id) {
+      <div class="tabelle-rahmen randbuendig">
+        <table class="tabelle">
+          <thead>
             <tr>
-              <td>
-                <a class="titel" [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a>
-                <span class="mono gedaempft">{{ seite.pfad }}</span>
-                @if (seite.beschreibung) { <p class="beschreibung">{{ seite.beschreibung }}</p> }
-              </td>
-              <td>
-                <span class="pillen">
-                  @if (seite.status === 'VERALTET') {
-                    <span class="pille warnung">{{ texte.veraltet }}</span>
-                  } @else if (seite.status === 'AKTIV') {
-                    <span class="pille ok">{{ texte.aktiv }}</span>
-                  }
-                  @if (seite.quellePruefen) { <span class="pille warnung">{{ texte.quellePruefen }}</span> }
-                </span>
-              </td>
+              <th scope="col">{{ texte.spalteSeite }}</th>
+              <th scope="col">{{ texte.spalteStatus }}</th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (seite of gruppe.seiten; track seite.id) {
+              <tr>
+                <td>
+                  <a class="titel" [routerLink]="'/wissen/' + seite.pfad">{{ seite.titel }}</a>
+                  <span class="mono gedaempft">{{ seite.pfad }}</span>
+                  @if (seite.beschreibung) { <p class="beschreibung">{{ seite.beschreibung }}</p> }
+                </td>
+                <td>
+                  <span class="pillen">
+                    @if (seite.status === 'VERALTET') {
+                      <span class="pille warnung">{{ texte.veraltet }}</span>
+                    } @else if (seite.status === 'AKTIV') {
+                      <span class="pille ok">{{ texte.aktiv }}</span>
+                    }
+                    @if (seite.quellePruefen) { <span class="pille warnung">{{ texte.quellePruefen }}</span> }
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
   }
   @if (offset > 0 || offset + 50 < (ergebnis.gesamt || 0)) {
