@@ -34,6 +34,7 @@ public class Ueberwachung {
     private final DokumentUeberwachung dokumente;
     private final ManifestUeberwachung manifeste;
     private final SicherungUeberwachung sicherung;
+    private final VorgangUeberwachung vorgaenge;
     private final AlarmSpeicher alarme;
     private final InhaberBenachrichtigung benachrichtigung;
     private final Duration grenze;
@@ -45,7 +46,7 @@ public class Ueberwachung {
     }
 
     public Ueberwachung(MandantRegister register, DokumentUeberwachung dokumente, ManifestUeberwachung manifeste,
-                        SicherungUeberwachung sicherung, AlarmSpeicher alarme,
+                        SicherungUeberwachung sicherung, VorgangUeberwachung vorgaenge, AlarmSpeicher alarme,
                         InhaberBenachrichtigung benachrichtigung,
                         @ConfigProperty(name = "archiv.ueberwachung.grenze") Duration grenze,
                         @ConfigProperty(name = "archiv.ueberwachung.betrieb-mandant") String betrieb) {
@@ -54,6 +55,7 @@ public class Ueberwachung {
         this.dokumente = dokumente;
         this.manifeste = manifeste;
         this.sicherung = sicherung;
+        this.vorgaenge = vorgaenge;
         this.alarme = alarme;
         this.benachrichtigung = benachrichtigung;
         this.grenze = grenze;
@@ -105,6 +107,7 @@ public class Ueberwachung {
             gemeldet += quelle(mandant, Befund.Quelle.DOKUMENT, () -> Optional.of(dokumente.laengerAls(mandant,
                     grenze)));
             gemeldet += quelle(mandant, Befund.Quelle.MANIFEST, () -> manifeste.befunde(mandant));
+            gemeldet += quelle(mandant, Befund.Quelle.VERWALTUNG, () -> Optional.of(vorgaenge.ungeklaert(mandant)));
         }
         if (mandanten.contains(betrieb)) {
             gemeldet += quelle(betrieb, Befund.Quelle.SICHERUNG, sicherung::befunde);
