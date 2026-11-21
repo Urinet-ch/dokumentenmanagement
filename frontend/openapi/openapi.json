@@ -92,6 +92,10 @@
           }
         }
       },
+      "Aktion" : {
+        "type" : "string",
+        "enum" : [ "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15", "A16", "A17", "A18", "A19", "A20", "A21", "A22", "A23" ]
+      },
       "Antwort" : {
         "type" : "object",
         "properties" : {
@@ -1427,6 +1431,10 @@
             "type" : "string"
           }
         }
+      },
+      "Ergebnis" : {
+        "type" : "string",
+        "enum" : [ "ERLAUBT", "VERBOTEN", "NICHT_SICHTBAR", "NUR_EIGENE", "NUR_LESEND", "NUR_SELBST_ERFASSTE" ]
       },
       "Export" : {
         "description" : "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link (24 Stunden ab Fertigstellung) gilt nicht mehr",
@@ -3180,6 +3188,57 @@
           }
         }
       },
+      "VerwaltungRechteFussnote" : {
+        "type" : "object",
+        "required" : [ "zeichen", "text" ],
+        "properties" : {
+          "zeichen" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          }
+        }
+      },
+      "VerwaltungRolle" : {
+        "type" : "object",
+        "required" : [ "code", "beschreibung", "rechte" ],
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "rechte" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/VerwaltungRollenrecht"
+            }
+          }
+        }
+      },
+      "VerwaltungRollenrecht" : {
+        "type" : "object",
+        "required" : [ "aktion", "bezeichnung", "ergebnis", "fussnoten" ],
+        "properties" : {
+          "aktion" : {
+            "$ref" : "#/components/schemas/Aktion"
+          },
+          "bezeichnung" : {
+            "type" : "string"
+          },
+          "ergebnis" : {
+            "$ref" : "#/components/schemas/Ergebnis"
+          },
+          "fussnoten" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/VerwaltungRechteFussnote"
+            }
+          }
+        }
+      },
       "Verwerfen" : {
         "description" : "Grund des Verwerfens (Req 6.6)",
         "type" : "object",
@@ -3771,6 +3830,8 @@
   "openapi" : "3.1.0",
   "tags" : [ {
     "name" : "API-Tokens"
+  }, {
+    "name" : "Benutzerverwaltung"
   }, {
     "name" : "Berichte"
   }, {
@@ -7337,6 +7398,36 @@
           },
           "428" : {
             "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/rollen" : {
+      "get" : {
+        "summary" : "Rollen und Rechte des Mandanten auflisten",
+        "tags" : [ "Benutzerverwaltung" ],
+        "responses" : {
+          "200" : {
+            "description" : "Rollen des aktuellen Mandanten",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/VerwaltungRolle"
+                  }
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "NICHT_ERLAUBT"
           },
           "401" : {
             "description" : "Not Authorized"
