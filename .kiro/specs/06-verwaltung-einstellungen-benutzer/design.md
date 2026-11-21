@@ -209,6 +209,12 @@ Für den Protokollgrund sind ausschliesslich die festen Kategorien `SICHERHEIT`,
 append-only Protokoll gelangen. Die Kategorie muss beim Vorgang explizit gewählt werden; Freitext wird nicht
 automatisch umgedeutet. Die Anbindung der Eingaben und Pflichtprüfung folgt mit den Verwaltungsendpunkten.
 
+Bei der Anlage eines weiteren Inhabers mit mindestens zwei aktiven Inhabern entsteht zunächst ein Konto ohne
+Archiv-Rolle und ein offener Antrag; die Bestätigung und Rollenvergabe folgen in 19.11. Auch dieses Konto kann seine
+Einladung erneut erhalten, solange es im Status `EINGELADEN` ist. Bis 19.10 verweigert die Step-up-Schnittstelle
+geschützte Aktionen; Tests ersetzen sie ausdrücklich. Eine bestätigte Entfernung nach einer unklaren Keycloak-Wirkung
+genügt nicht für `GEKLAERT`; HTTP 202 gilt nicht als bestätigter Abschluss.
+
 ### Statusautomat
 | Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |
 | --- | --- | --- | --- | --- | --- | --- | --- |

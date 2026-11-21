@@ -14,9 +14,12 @@ import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusMock;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import io.restassured.common.mapper.TypeRef;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -25,6 +28,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,7 +41,18 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 
 @QuarkusTest
+@Tag("start-4")
+@TestProfile(VerwaltungCacheHttpTest.Isoliert.class)
 class VerwaltungCacheHttpTest {
+
+    public static class Isoliert implements QuarkusTestProfile {
+        private static final String SUFFIX = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of("quarkus.datasource.devservices.db-name", "archiv_verwaltung_" + SUFFIX);
+        }
+    }
 
     @Inject
     AgroalDataSource datenbank;

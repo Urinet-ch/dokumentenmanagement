@@ -4,11 +4,18 @@ import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
+import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
+import ch.urinet.archiv.mandant.application.KonfigurationSeed;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.WissensquelleSeed;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
@@ -19,8 +26,11 @@ import io.cucumber.java.de.Wenn;
 import io.quarkus.arc.ClientProxy;
 import io.quarkus.test.junit.QuarkusMock;
 import io.restassured.response.Response;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.ConfigProvider;
 
+import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -38,9 +48,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class BenutzerVerwaltungSchritte {
     private static final String PFAD = "/api/v1/benutzer";
+    private static final String MANDANT = "b19-" + UUID.randomUUID().toString().substring(0, 8);
+    private static final String SCHEMA = MANDANT.replace('-', '_');
 
-    @Inject AgroalDataSource datenbank;
+    @Inject Instance<AgroalDataSource> datenbank;
     @Inject MandantProvisionierung provisionierung;
+    @Inject KonfigurationSeed seed;
+    @Inject KonfigurationsdateiCodec codec;
+    @Inject WissensquelleSeed wissensquelle;
+    @Inject ZusatzSchemaPruefer zusatzSchema;
     @Inject IdentitaetsDienst identitaet;
     @Inject StepUp stepUp;
 
@@ -53,22 +69,72 @@ public class BenutzerVerwaltungSchritte {
     private String name;
     private String eigeneId;
     private String fremdeId;
+    private String admin;
+    private String adminPfad;
+    private String akteurId;
+    private String akteurName;
 
     @Before("@benutzer-verwaltung")
     public void mandantenVorbereiten() throws SQLException {
-        for (String code : List.of("urinet", "vhf-gsk")) {
-            try (Connection verbindung = datenbank.getConnection();
+        for (String code : List.of(MANDANT, "vhf-gsk")) {
+            try (Connection verbindung = datenbank.get().getConnection();
                  PreparedStatement abfrage = verbindung.prepareStatement(
                          "select 1 from public.mandant where code = ? and aktiv")) {
                 abfrage.setString(1, code);
                 try (ResultSet zeile = abfrage.executeQuery()) {
                     if (!zeile.next()) {
-                        provisionierung.anlegen(code, null, null);
+                        if (code.equals(MANDANT)) {
+                            KonfigurationSeed original = ClientProxy.unwrap(seed);
+                            QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec, wissensquelle,
+                                    zusatzSchema) {
+                                @Override
+                                public Konfiguration lesen(MandantCode ignoriert) {
+                                    return original.lesen(new MandantCode("urinet"));
+                                }
+                            }, KonfigurationSeed.class);
+                            try {
+                                provisionierung.anlegen(code, null, null);
+                            } finally {
+                                QuarkusMock.installMockForType(original, KonfigurationSeed.class);
+                            }
+                        } else {
+                            provisionierung.anlegen(code, null, null);
+                        }
                     }
                 }
             }
         }
         name = "probe." + UUID.randomUUID().toString().substring(0, 8);
+        String realmUrl = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
+        URI realm = URI.create(realmUrl);
+        if (!"http".equals(realm.getScheme()) || !List.of("localhost", "127.0.0.1").contains(realm.getHost())) {
+            throw new IllegalStateException("Benutzerszenarien benötigen einen lokalen Keycloak-Dev-Service");
+        }
+        String basis = realmUrl.substring(0, realmUrl.indexOf("/realms/"));
+        adminPfad = basis + "/admin/realms/urinet-archiv";
+        admin = given().formParam("grant_type", "password").formParam("client_id", "admin-cli")
+                .formParam("username", "admin").formParam("password", "admin")
+                .post(basis + "/realms/master/protocol/openid-connect/token")
+                .then().statusCode(200).extract().path("access_token");
+        akteurName = "probe-19-7-" + UUID.randomUUID();
+        Map<String, Object> passwort = Map.of("type", "password", "value", Testanmeldung.PASSWORT, "temporary", false);
+        Map<String, Object> otp = Map.of("type", "otp", "userLabel", "Probe",
+                "secretData", "{\"value\":\"" + Testanmeldung.OTP_SECRET + "\"}",
+                "credentialData", "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,"
+                        + "\"algorithm\":\"HmacSHA1\"}");
+        Map<String, Object> nutzer = Map.of("username", akteurName, "enabled", true,
+                "email", akteurName + "@example.invalid", "emailVerified", true, "firstName", "Probe",
+                "lastName", "Person", "attributes", Map.of("mandant", List.of(MANDANT)),
+                "requiredActions", List.of(), "credentials", List.of(passwort, otp));
+        given().auth().oauth2(admin).contentType("application/json")
+                .body(Map.of("ifResourceExists", "FAIL", "users", List.of(nutzer)))
+                .post(adminPfad + "/partialImport").then().statusCode(200);
+        akteurId = given().auth().oauth2(admin).queryParam("username", akteurName).queryParam("exact", true)
+                .get(adminPfad + "/users").then().statusCode(200).extract().path("[0].id");
+        Map<String, Object> rolle = given().auth().oauth2(admin).get(adminPfad + "/roles/inhaber")
+                .then().statusCode(200).extract().jsonPath().getMap("$");
+        given().auth().oauth2(admin).contentType("application/json").body(List.of(rolle))
+                .post(adminPfad + "/users/" + akteurId + "/role-mappings/realm").then().statusCode(204);
     }
 
     @After("@benutzer-verwaltung")
@@ -85,11 +151,14 @@ public class BenutzerVerwaltungSchritte {
         for (var eintrag : benutzer) {
             identitaet.loeschen(eintrag.getKey(), eintrag.getValue());
         }
+        if (akteurId != null) {
+            given().auth().oauth2(admin).delete(adminPfad + "/users/" + akteurId).then().statusCode(204);
+        }
     }
 
     @Angenommen("in zwei Mandanten gibt es je einen synthetischen Benutzer")
     public void benutzerInZweiMandanten() {
-        eigeneId = anlegen("urinet", name);
+        eigeneId = anlegen(MANDANT, name);
         fremdeId = anlegen("vhf-gsk", "fremd." + name);
     }
 
@@ -137,22 +206,22 @@ public class BenutzerVerwaltungSchritte {
         antworten.add(antwort);
         if (antwort.statusCode() == 201) {
             eigeneId = antwort.path("id");
-            benutzer.add(Map.entry("urinet", eigeneId));
+            benutzer.add(Map.entry(MANDANT, eigeneId));
         }
     }
 
     @Dann("ist der Mitarbeiter mit Einrichtungspflichten im Mandanten angelegt und protokolliert")
     public void angelegtUndProtokolliert() throws SQLException {
         assertThat(antworten.getFirst().statusCode()).isEqualTo(201);
-        var ziel = identitaet.benutzerLesen("urinet", eigeneId);
+        var ziel = identitaet.benutzerLesen(MANDANT, eigeneId);
         assertThat(ziel.rollen()).containsExactly(Rolle.MITARBEITER);
         assertThat(ziel.aktionen()).containsExactlyInAnyOrder(
                 IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
                 IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
                 IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
-        try (Connection verbindung = datenbank.getConnection();
+        try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
-                     "select details::text from m_urinet.zugriff_protokoll "
+                     "select details::text from m_" + SCHEMA + ".zugriff_protokoll "
                              + "where details->>'ziel' = ? and details->>'phase' = 'ABGESCHLOSSEN' "
                              + "and details->>'vorgang' = 'ANLEGEN'")) {
             abfrage.setString(1, eigeneId);
@@ -161,7 +230,7 @@ public class BenutzerVerwaltungSchritte {
                 assertThat(zeile.getString(1)).doesNotContain(name, "@example.invalid");
             }
             try (PreparedStatement verzeichnis = verbindung.prepareStatement(
-                    "select name, rolle, anlass from m_urinet.benutzer_verzeichnis where benutzer = ?")) {
+                    "select name, rolle, anlass from m_" + SCHEMA + ".benutzer_verzeichnis where benutzer = ?")) {
                 verzeichnis.setString(1, eigeneId);
                 try (ResultSet zeile = verzeichnis.executeQuery()) {
                     assertThat(zeile.next()).isTrue();
@@ -175,7 +244,7 @@ public class BenutzerVerwaltungSchritte {
 
     @Angenommen("ein synthetischer Mitarbeiter ist eingeladen")
     public void eingeladenerMitarbeiter() {
-        eigeneId = anlegen("urinet", name);
+        eigeneId = anlegen(MANDANT, name);
     }
 
     @Wenn("der Inhaber die Einladung viermal erneut sendet")
@@ -213,15 +282,17 @@ public class BenutzerVerwaltungSchritte {
     @Angenommen("der Mandant hat {int} deaktivierte synthetische Benutzer")
     public void deaktivierteBenutzer(int anzahl) {
         for (int i = 0; i < anzahl; i++) {
-            String id = anlegen("urinet", name + "." + i);
-            identitaet.aktivieren("urinet", id, false);
+            String id = anlegen(MANDANT, name + "." + i);
+            identitaet.aktivieren(MANDANT, id, false);
         }
     }
 
-    @Dann("wird die Anlage wegen der Höchstzahl abgewiesen")
+    @Dann("wird die Anlage wegen der Höchstzahl und eine übergrosse Anfrage abgewiesen")
     public void hoechstzahl() {
         assertThat(antworten.getFirst().statusCode()).isEqualTo(409);
         assertThat(antworten.getFirst().jsonPath().<String>get("fehlercode")).isEqualTo("STATUS_KONFLIKT");
+        anfrage().contentType("application/json").body(" ".repeat(8193)).post(PFAD)
+                .then().statusCode(413);
     }
 
     @Angenommen("der Identitätsdienst weist den Einladungsversand eindeutig ab")
@@ -241,10 +312,10 @@ public class BenutzerVerwaltungSchritte {
     public void kompensation() throws SQLException {
         assertThat(antworten.getFirst().statusCode()).isEqualTo(502);
         assertThat(eigeneId).isNotBlank();
-        assertThatThrownBy(() -> fehlerdienst.benutzerLesen("urinet", eigeneId)).isInstanceOf(FachFehler.class);
-        try (Connection verbindung = datenbank.getConnection();
+        assertThatThrownBy(() -> fehlerdienst.benutzerLesen(MANDANT, eigeneId)).isInstanceOf(FachFehler.class);
+        try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
-                     "select details->>'phase' from m_urinet.zugriff_protokoll "
+                     "select details->>'phase' from m_" + SCHEMA + ".zugriff_protokoll "
                              + "where details->>'ziel' = ? and details->>'vorgang' = 'ANLEGEN'")) {
             abfrage.setString(1, eigeneId);
             try (ResultSet zeile = abfrage.executeQuery()) {
@@ -284,10 +355,10 @@ public class BenutzerVerwaltungSchritte {
     public void zweiAktiveInhaber() {
         for (int i = 0; i < 2; i++) {
             String inhaberName = name + "." + i;
-            String id = identitaet.anlegen("urinet", new IdentitaetsDienst.Neuanlage(inhaberName,
+            String id = identitaet.anlegen(MANDANT, new IdentitaetsDienst.Neuanlage(inhaberName,
                     inhaberName + "@example.invalid", "Test", "Person"), Rolle.INHABER);
-            benutzer.add(Map.entry("urinet", id));
-            identitaet.einladen("urinet", id, Set.of(), Duration.ofHours(1));
+            benutzer.add(Map.entry(MANDANT, id));
+            identitaet.einladen(MANDANT, id, Set.of(), Duration.ofHours(1));
         }
     }
 
@@ -299,12 +370,12 @@ public class BenutzerVerwaltungSchritte {
     @Dann("ist die Inhaber-Rolle nicht vergeben und ein offener Antrag erfasst")
     public void antragStattRolle() throws SQLException {
         assertThat(antworten.getFirst().statusCode()).isEqualTo(201);
-        assertThat(identitaet.benutzerLesen("urinet", eigeneId).rollen()).isEmpty();
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).rollen()).isEmpty();
         String antragId = antworten.getFirst().path("antragId");
         assertThat(antragId).isNotBlank();
-        try (Connection verbindung = datenbank.getConnection();
+        try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
-                     "select art, rolle, status, ziel from m_urinet.verwaltung_antrag where id = ?")) {
+                     "select art, rolle, status, ziel from m_" + SCHEMA + ".verwaltung_antrag where id = ?")) {
             abfrage.setObject(1, UUID.fromString(antragId));
             try (ResultSet zeile = abfrage.executeQuery()) {
                 assertThat(zeile.next()).isTrue();
@@ -316,6 +387,17 @@ public class BenutzerVerwaltungSchritte {
         }
     }
 
+    @Wenn("der Inhaber die Einladung des neuen Inhabers erneut sendet")
+    public void inhaberErneutEinladen() {
+        antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/einladung"));
+    }
+
+    @Dann("wird die Einladung ohne Rollenvergabe erneut gesendet")
+    public void erneutEingeladenOhneRolle() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).rollen()).isEmpty();
+    }
+
     private String anlegen(String mandant, String benutzername) {
         String id = identitaet.anlegen(mandant, new IdentitaetsDienst.Neuanlage(benutzername,
                 benutzername + "@example.invalid", "Test", "Person"), Rolle.MITARBEITER);
@@ -323,7 +405,7 @@ public class BenutzerVerwaltungSchritte {
         return id;
     }
 
-    private static io.restassured.specification.RequestSpecification anfrage() {
-        return given().auth().oauth2(Testanmeldung.token("inhaber-urinet"));
+    private io.restassured.specification.RequestSpecification anfrage() {
+        return given().auth().oauth2(Testanmeldung.token(akteurName));
     }
 }

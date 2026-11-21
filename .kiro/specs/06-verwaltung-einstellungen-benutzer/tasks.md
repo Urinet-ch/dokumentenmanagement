@@ -88,11 +88,13 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 
-- [ ] 19.7 REST Benutzer lesen, anlegen und einladen [Backend]
+- [x] 19.7 REST Benutzer lesen, anlegen und einladen [Backend]
   - `GET /rollen`, `GET /benutzer`, `GET /benutzer/{id}`, `POST /benutzer` (Formregeln, Höchstzahl, `BENUTZER_EXISTIERT`,
     Namenssperre über das Verzeichnis, Kompensation), `POST /benutzer/{id}/einladung`; Sicherheits-Header und
     `Cache-Control: no-store`, nur `application/json`; `EndpunktWaechterTest` erweitert.
   - Codes `BENUTZER_EXISTIERT` und `STATUS_KONFLIKT` für die Höchstzahl.
+  - Step-up verweigert geschützte Aktionen bis zur Implementierung in 19.10; Antragsentscheidung und Alarm folgen in 19.11
+    bzw. 19.13.
   - _Anforderungen: 3.1, 3.2, 3.4, 3.5, 3.6, 3.7, 4.8, 5.7, 5.9, 7.5, 7.6, 7.7, 7.8_
   - _Abhängig von: 19.4, 19.6_
 

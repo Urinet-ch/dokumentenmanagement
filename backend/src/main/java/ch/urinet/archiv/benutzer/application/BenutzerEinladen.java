@@ -51,7 +51,7 @@ public class BenutzerEinladen {
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
         vorgang.ausfuehren(mandant, absicht, () -> {
             IdentitaetsDienst.Benutzer benutzer = identitaet.benutzerLesen(mandant.wert(), id);
-            if (!benutzer.aktiv() || benutzer.aktionen().isEmpty() || benutzer.rollen().size() != 1
+            if (!benutzer.aktiv() || benutzer.aktionen().isEmpty() || benutzer.rollen().size() > 1
                     || status.lesen(id).isPresent()) {
                 throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
             }

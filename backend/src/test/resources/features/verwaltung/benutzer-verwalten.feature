@@ -32,7 +32,7 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Angenommen die frische Anmeldung ist für den Test bestätigt
     Und der Mandant hat 25 deaktivierte synthetische Benutzer
     Wenn der Inhaber einen synthetischen Mitarbeiter anlegt
-    Dann wird die Anlage wegen der Höchstzahl abgewiesen
+    Dann wird die Anlage wegen der Höchstzahl und eine übergrosse Anfrage abgewiesen
 
   @req-3.7 @req-5.7
   Szenario: Eine eindeutig abgewiesene Einladung wird kompensiert
@@ -60,3 +60,5 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Und im Mandanten gibt es zwei aktive synthetische Inhaber
     Wenn der Inhaber einen weiteren Inhaber anlegt
     Dann ist die Inhaber-Rolle nicht vergeben und ein offener Antrag erfasst
+    Wenn der Inhaber die Einladung des neuen Inhabers erneut sendet
+    Dann wird die Einladung ohne Rollenvergabe erneut gesendet
