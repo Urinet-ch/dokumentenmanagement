@@ -16,23 +16,33 @@ dieselben Dateien ändert (`CLAUDE.md`, «Keine Überschneidung»). Die Texte de
 was auf `main` umgesetzt ist (Requirement 6.4).
 
 ## Welle 22 — Benutzeranleitung und Hilfe
-- [ ] 22.1 Hilfe-Katalog, Markdown-Teilmenge und Inhaltsprüfung [Frontend]
+- [x] 22.1 Hilfe-Katalog, Markdown-Teilmenge und Inhaltsprüfung [Frontend]
   - Ordner `frontend/src/app/hilfe/` mit `hilfe-katalog.ts` (Einträge `erste-schritte` und `probleme`; die übrigen
     bringen 22.5 bis 22.7 mit ihren Dateien), `anleitung-markdown.ts` (Teilmenge nach design.md, Ergebnis `Textteil`),
     `anleitung-text.ts` (Darstellung nach dem Muster von `wissen-seite.html`, nur Interpolation), `AnleitungLader` mit
     Fehlerfall und «Erneut versuchen»; Dateien `frontend/public/anleitung/erste-schritte.md` und `probleme.md`.
   - Vitest `hilfe-katalog.spec.ts`, `anleitung-markdown.spec.ts`, `anleitung-inhalt.spec.ts` (Sprache, Links, Muster von
     Personendaten, Summe der Grössen); Texte der Oberfläche in `texte.de-CH.ts` (`hilfe`).
-  - _Anforderungen: 7.1, 7.2, 7.3, 7.4, 7.6, 9.3, 9.5, 9.7_
+  - Erledigt (PR #411; design.md «Umsetzung (Aufgabe 22.1, 21.11.2026)»): Katalog mit `erste-schritte` und `probleme`,
+    `anleitung-markdown.ts`, `anleitung-text.ts` (Eingaben `versatz`, `leiste`, Ausgaben `abschnitt`, `navigiert`),
+    `anleitung-lader.ts`, `app-pfade.ts`, Symbol `info`; Szenario `@req-7.1` in `features/hilfe/anleitung-pwa.feature`,
+    7.2 bis 7.4, 9.3, 9.5 und 9.7 per Vitest. Lader, Hinweis und «Erneut versuchen» nach 7.6 sind umgesetzt und mit
+    `anleitung-text.spec.ts` geprüft; weil erst 22.2 die Anleitung auf einer Seite zeigt, ist 7.6 mit seinem
+    Browser-Szenario zu 22.2 verschoben.
+  - _Anforderungen: 7.1, 7.2, 7.3, 7.4, 9.3, 9.5, 9.7_
 
-- [ ] 22.2 Seite `/hilfe` mit Inhaltsverzeichnis und Sprungmarken [Frontend]
+- [x] 22.2 Seite `/hilfe` mit Inhaltsverzeichnis und Sprungmarken [Frontend]
   - Route `hilfe` (`loadComponent`, ohne Rechte-Wächter, Titel wie die übrigen Routen), Seitenkopf mit Name aus dem
     Branding, Inhaltsverzeichnis als `nav`, Filter nach Rolle und abgemeldet, Hinweis nach 6.3, Satz zur eigenen Rolle,
     Sprung zum Anker im Scroll-Bereich `mat-sidenav-content` mit Fokus, unbekannter Anker ohne Meldung; einspaltig bis
     etwa 1100 px, darüber mit Inhaltsverzeichnis links; Platz für den Knopf «Einführung erneut zeigen» (Funktion mit 23.3).
   - Prototyp `docs/oberflaeche/prototyp.html` um die Seite ergänzt, mit erfundenen und gekennzeichneten Beispieldaten.
-  - Szenarien je Rolle (Inhaltsverzeichnis, verborgene Abschnitte, Sprungmarke, Zurück-Knopf).
-  - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 6.2, 6.3, 6.5_
+  - Szenarien je Rolle (Inhaltsverzeichnis, verborgene Abschnitte, Sprungmarke, Zurück-Knopf); Szenario zu 7.6 (eine
+    Datei nicht ladbar: Hinweis mit «Erneut versuchen» beim Abschnitt, die übrigen bleiben; Teile aus 22.1).
+  - Erledigt (design.md «Umsetzung (Aufgabe 22.2, 21.11.2026)»): `hilfe-seite.*`, Filter `hilfe-sichtbar.ts`, Route
+    `hilfe`, Prototyp-Ansicht `#hilfe`; Szenarien in `features/hilfe/hilfe-seite-pwa.feature`, Vitest
+    `hilfe-sichtbar.spec.ts` und `hilfe-seite.spec.ts`.
+  - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 6.2, 6.3, 6.5, 7.6_
   - _Abhängig von: 22.1_
 
 - [ ] 22.3 Knopf «Hilfe» und Hilfe-Leiste [Frontend]
@@ -52,31 +62,43 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 8.1, 8.2, 8.3_
   - _Abhängig von: 22.3_
 
-- [ ] 22.5 Texte: Erste Schritte, Erfassen, Eingangskorb, Dokumentansicht [Frontend]
+- [x] 22.5 Texte: Erste Schritte, Erfassen, Eingangskorb, Dokumentansicht [Frontend]
   - Dateien und Katalogeinträge `erste-schritte` (fertig), `erfassen` mit `erfassen-handy`, `erfassen-dateien`,
     `erfassen-offline` (Hauptfall, ausführlich), `eingangskorb` mit `eingangskorb-bestaetigen` und `eingangskorb-eigene`,
     `dokument` mit `dokument-aendern`; Namen der Menüpunkte und Knöpfe aus `texte.de-CH.ts`; Review durch Fabian.
+  - Erledigt (design.md «Umsetzung (Aufgabe 22.5, 21.11.2026)»): neun Dateien und Katalogeinträge, `erste-schritte.md`
+    überarbeitet; Szenario `@req-6.1` in `features/hilfe/anleitung-abschnitte.feature`, Vitest
+    `anleitung-abschnitte.spec.ts` (Reihenfolge und Felder nach design.md, Verweise nur auf sichtbare Abschnitte, Namen
+    aus `texte.de-CH.ts`); 6.4, 6.6 und 6.7 als Dokument im PR.
   - _Anforderungen: 6.1, 6.4, 6.6, 6.7_
   - _Abhängig von: 22.1_
 
-- [ ] 22.6 Texte: Suche, Chat, Kontakte, Wissen [Frontend]
+- [x] 22.6 Texte: Suche, Chat, Kontakte, Wissen [Frontend]
   - Dateien und Katalogeinträge `suche`, `chat` (ohne die Beispielfragen der Chat-Abnahme), `kontakte`, `wissen` mit
     `wissen-entwuerfe`; nur umgesetzte Funktionen.
+  - Erledigt (design.md «Umsetzung (Aufgabe 22.6, 21.11.2026)»): fünf Dateien und Einträge, `wissen` zusätzlich mit den
+    Pfaden `/wissen/entwuerfe/meine` und `/wissensbasis`; Nachweis per Vitest (`hilfe-katalog.spec.ts`,
+    `anleitung-inhalt.spec.ts`) und `anleitung-suche-wissen.feature` (`@req-6.1`).
   - _Anforderungen: 6.1, 6.4, 6.6_
   - _Abhängig von: 22.1_
 
-- [ ] 22.7 Texte: Importe, Jahresexport, Verwaltung, Probleme; Anleitungen unter `docs/` [Frontend]
+- [x] 22.7 Texte: Importe, Jahresexport, Verwaltung, Probleme; Anleitungen unter `docs/` [Frontend]
   - Dateien und Katalogeinträge `importe`, `jahresexport`, `verwaltung` mit `verwaltung-dokumentarten`,
     `verwaltung-protokoll`, `verwaltung-api-tokens`; `probleme` vervollständigt (neutrale Ansprechperson).
   - `docs/anleitung-geschaeftsstelle.md` auf Betreiber-Wege, Kontaktstelle und Verweis auf `/hilfe` gekürzt; Verweis in
     `docs/anleitung-verwaltung.md` auf die App (der Inhalt folgt mit Spec 06: 21.5).
   - Prüfen, dass die Pflegeregel in `tech.md` (Definition of Done) für alle Abschnitte greift; Katalog vollständig nach
     Requirement 6.1.
+  - Erledigt (design.md «Umsetzung (Aufgabe 22.7, 21.11.2026)»): Dateien und Katalogeinträge `importe`, `jahresexport`,
+    `verwaltung` mit drei Unterabschnitten, `probleme` ergänzt; `docs/anleitung-geschaeftsstelle.md` gekürzt (Regeln zur
+    Webseite bleiben bis zum Entscheid zu 2.4), Verweis in `docs/anleitung-verwaltung.md`; Szenario `@req-6.1` in
+    `features/hilfe/anleitung-bestand-verwaltung.feature`, Reihenfolge per `hilfe-katalog.spec.ts`. Vollständig nach 6.1
+    ist der Katalog mit 22.5 und 22.6.
   - _Anforderungen: 6.1, 6.4, 6.6, 7.5, 7.7_
   - _Abhängig von: 22.1_
 
 ## Welle 23 — Einführung und Abschluss
-- [ ] 23.1 Einführungsvermerk [Frontend]
+- [x] 23.1 Einführungsvermerk [Frontend]
   - Dienst `EinfuehrungVermerk`: Schlüssel `archiv.einfuehrung`, Kennung SHA-256 von `<mandant>:<sub>`, Version, Art,
     Datum, höchstens 20 Einträge, Arbeitsspeicher als Rückfall (gesperrter Speicher, beschädigter Eintrag, ohne
     `crypto.subtle`), nie an den Server; Vitest `einfuehrung-vermerk.spec.ts`.

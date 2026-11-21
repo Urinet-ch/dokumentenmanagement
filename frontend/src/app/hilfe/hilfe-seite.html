@@ -1,0 +1,65 @@
+<div class="seitenkopf">
+  <p class="vorzeile">{{ branding.branding().name }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.untertitel }}</p>
+  <!-- Platz für den Knopf «Einführung erneut zeigen» (Req 5.5, Aufgabe 23.3): Aktionen rechts im Seitenkopf -->
+</div>
+
+@if (rolle(); as rolle) {
+  <div class="hinweis info einstieg" data-test="hilfe-rolle">
+    <app-symbol name="info" />
+    <p>{{ texte.rolle(rollen[rolle]) }}</p>
+  </div>
+} @else {
+  <div class="hinweis info einstieg" data-test="hilfe-abgemeldet">
+    <app-symbol name="info" />
+    <p>{{ texte.abgemeldet }}</p>
+  </div>
+}
+
+<div class="raster">
+  <nav class="karte inhalt" aria-labelledby="hilfe-inhalt">
+    <h2 id="hilfe-inhalt">{{ texte.inhalt }}</h2>
+    <ol>
+      @for (abschnitt of abschnitte(); track abschnitt.eintrag.anker) {
+        <li>
+          <a
+            routerLink="/hilfe"
+            [fragment]="abschnitt.eintrag.anker"
+            [attr.aria-current]="aktuell() === abschnitt.eintrag.anker ? 'location' : null"
+            (click)="gewaehlt(abschnitt.eintrag.anker)"
+          >{{ abschnitt.eintrag.titel }}</a>
+          @if (abschnitt.unter.length > 0) {
+            <ol>
+              @for (unter of abschnitt.unter; track unter.anker) {
+                <li>
+                  <a
+                    routerLink="/hilfe"
+                    [fragment]="unter.anker"
+                    [attr.aria-current]="aktuell() === unter.anker ? 'location' : null"
+                    (click)="gewaehlt(unter.anker)"
+                  >{{ unter.titel }}</a>
+                </li>
+              }
+            </ol>
+          }
+        </li>
+      }
+    </ol>
+  </nav>
+
+  <div class="abschnitte">
+    @for (abschnitt of abschnitte(); track abschnitt.eintrag.anker) {
+      <section class="karte abschnitt" [attr.aria-labelledby]="abschnitt.eintrag.anker" [attr.data-anker]="abschnitt.eintrag.anker">
+        <h2 [id]="abschnitt.eintrag.anker" tabindex="-1">{{ abschnitt.eintrag.titel }}</h2>
+        <app-anleitung-text [eintrag]="abschnitt.eintrag" [versatz]="1" (abschnitt)="gewaehlt($event)" />
+        @for (unter of abschnitt.unter; track unter.anker) {
+          <div class="unter" [attr.data-anker]="unter.anker">
+            <h3 [id]="unter.anker" tabindex="-1">{{ unter.titel }}</h3>
+            <app-anleitung-text [eintrag]="unter" [versatz]="2" (abschnitt)="gewaehlt($event)" />
+          </div>
+        }
+      </section>
+    }
+  </div>
+</div>

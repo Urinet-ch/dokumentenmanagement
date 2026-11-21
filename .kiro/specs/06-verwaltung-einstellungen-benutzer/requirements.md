@@ -48,6 +48,7 @@ eine Aufgabe.
 - **Benutzerstatus** – `EINGELADEN` (angelegt, Einladung offen), `AKTIV`, `GESPERRT` (vorübergehend, umkehrbar),
   `DEAKTIVIERT` (Austritt, umkehrbar bis zum Löschen), `GELOESCHT` (nur noch im Protokoll und im Benutzerverzeichnis).
 - **Step-up** – erneute Anmeldung mit Passwort und TOTP kurz vor einer kritischen Aktion (Requirement 7.2).
+- **Passkey** – Anmeldedaten nach WebAuthn (Gerät wie iPhone, Mac/Schlüsselbund oder Sicherheitsschlüssel); das Gerät prüft die Person (Fingerabdruck, Gesicht, PIN), das Archiv speichert nur den öffentlichen Schlüssel in Keycloak (Requirement 10).
 - **Token-Widerruf** – Zeitpunkt je Benutzer, vor dem ausgestellte Access-Tokens das Archiv nicht mehr annimmt
   (Requirement 4.9); er schliesst die Lücke zwischen Sperren in Keycloak und Ablauf des JWT.
 - **Vorgang** – eine Verwaltungsaktion mit Wirkung in Keycloak; sie wird als Absicht und Abschluss protokolliert
@@ -168,8 +169,8 @@ dass ein Passwort durch meine Hände oder durch das Archiv geht, damit ich Zugä
    nie einen Einladungslink kennen. Nachweis: JUnit (der Adapter ruft weder `reset-password` noch einen Endpunkt
    auf, der einen Link zurückgibt; ArchUnit auf die erlaubten Aufrufe).
 4. FALLS Benutzername, E-Mail, Vorname, Nachname oder Grund die Formregeln verletzen (Benutzername 3 bis 40 Zeichen aus
-   `a–z`, `0–9`, `.`, `_`, `-`; E-Mail höchstens 254 Zeichen und genau ein `@`; Namen 1 bis 60 Zeichen; Grund 10 bis
-   500 Zeichen; keine Steuerzeichen), DANN SOLL das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` und `befunde[]`
+   `a–z`, `0–9`, `.`, `_`, `-`; E-Mail höchstens 254 Zeichen und genau ein `@`; Namen 1 bis 60 Zeichen; Grund eine der festen Kategorien
+   `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`, `KORREKTUR`, `SONSTIGES`; keine Steuerzeichen), DANN SOLL das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` und `befunde[]`
    antworten. FALLS Benutzername oder E-Mail im Realm schon vergeben sind oder der Benutzername je im
    Benutzerverzeichnis einer anderen Kennung gehörte, DANN SOLL das Archiv mit HTTP 409 `BENUTZER_EXISTIERT`
    antworten, ohne zu nennen, welches Feld oder welcher Mandant betroffen ist.
@@ -271,8 +272,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
    403 `ESKALATION_VERBOTEN` antworten, nichts ändern und `VERWEIGERT` mit dem Fehlercode protokollieren.
 7. FALLS ein Vorgang den Mandanten ohne aktiven Inhaber (Status `AKTIV` mit Rolle `inhaber`) liesse (Rolle ändern,
    sperren, deaktivieren, löschen), DANN SOLL das Archiv mit HTTP 409 `LETZTER_INHABER` antworten und nichts ändern. Das
-   Archiv SOLL gleichzeitige Verwaltungsvorgänge eines Mandanten nacheinander ausführen (eine Vorgangssperre mit Ablauf
-   nach höchstens 15 Sekunden; ein zweiter Vorgang erhält HTTP 409 `STATUS_KONFLIKT`), damit zwei Inhaber sich nicht
+   Archiv SOLL gleichzeitige Verwaltungsvorgänge eines Mandanten nacheinander ausführen (eine Vorgangssperre; eine vor externer Wirkung
+   vorbereitete Sperre läuft nach höchstens 15 Sekunden ab, ein Vorgang `ANGEFRAGT` oder `UNKLAR` bleibt bis zum Abgleich
+   oder zur Klärung gesperrt, weil eine externe Wirkung noch eintreffen kann (Entscheid Fabian 21.11.2026); ein zweiter Vorgang erhält HTTP 409 `STATUS_KONFLIKT`), damit zwei Inhaber sich nicht
    gleichzeitig entfernen. Nachweis: Szenario mit gleichzeitigen Aufrufen und JUnit (`LetzterInhaberTest`).
 8. Das Archiv SOLL den Mandanten nie aus Pfad, Query, Header oder Body übernehmen: Der Mandant stammt aus dem
    verifizierten Token; jeder Zielbenutzer SOLL vor jeder Aktion (nicht nur in Listen) auf genau diesen Wert des
@@ -363,7 +365,7 @@ auffälliger Häufung gewarnt werden, damit ein Missbrauch auffällt.
    Die Aktionen und Fehlercodes kommen mit der jeweiligen Aufgabe in Spec 01 und in die Enums (`FehlercodeSpecTest`).
 2. Das Archiv SOLL je Eintrag den Akteur (`benutzer` = Keycloak-`sub`, Rolle), die Zeit, die IP und im Feld `details`
    die `vorgangId`, das Ziel nur als Keycloak-`sub` (`ziel`), den Vorgang, bei Rollenwechsel die Rollennamen alt und neu,
-   bei E-Mail, Vorname und Nachname nur Feldname und «geändert» und den Grund (höchstens 500 Zeichen) enthalten, nie
+   bei E-Mail, Vorname und Nachname nur Feldname und «geändert» und den Grund (feste Kategorie, Entscheid Fabian 21.11.2026) enthalten, nie
    E-Mail-Adressen, Vor- und Nachnamen, Passwörter, Links, Codes oder Tokens; `dokument_id` bleibt leer. Nachweis: Szenarien
    und JUnit (`VerwaltungProtokollTest` sucht in `details` nach E-Mail-Mustern, Namen aus dem Test und Link-Mustern).
 3. WENN das Archiv einen Benutzer anlegt oder bei der Übernahme (9.4) erfasst, DANN SOLL es in derselben Transaktion eine
@@ -514,6 +516,41 @@ einen ersten Inhaber ohne Passwort im Terminal erhalten, damit Betrieb und Abnah
 
 ---
 
+### Requirement 10: Passkey als zusätzlicher Anmeldeweg (ohne Konzept-ID)
+**User Story:** Als Benutzer möchte ich mich mit einem Passkey auf meinem iPhone oder Mac anmelden können, damit ich ohne Passwort und
+Einmalcode sicher und schnell ins Archiv komme, ohne dass der Schutz sinkt.
+
+Entscheid Fabian 21.11.2026: Der Passkey ist ein **zusätzlicher Weg**, der Passwort und TOTP ersetzt (er deckt beide Faktoren ab:
+Besitz des Geräts und Prüfung der Person); Passwort plus TOTP bleibt für alle ohne Passkey. Verlorene Passkeys setzt ein Admin zurück
+(wie TOTP). Der Passkey genügt als Step-up (7.2). Die Google-Anmeldung bleibt unverändert (verknüpftes Konto plus TOTP).
+
+#### Acceptance Criteria
+1. WENN ein Benutzer angemeldet ist, DANN SOLL er in der Kontoverwaltung von Keycloak einen oder mehrere Passkeys einrichten und
+   wieder entfernen können (iPhone, Mac/Schlüsselbund, Sicherheitsschlüssel); die Einrichtung ist freiwillig, kein Benutzer wird dazu
+   gezwungen.
+2. Der Realm SOLL auf der Anmeldeseite die Anmeldung mit Passkey ohne Passwort und ohne TOTP erlauben; das Gerät MUSS die Person prüfen
+   (Benutzerverifikation «required», auffindbarer Schlüssel «required», Attestation «none»). Die Anmeldung mit Passkey zählt als zwei
+   Faktoren und setzt `auth_time` wie die Anmeldung mit Passwort und TOTP.
+3. Das Archiv SOLL einem Benutzer ohne Passkey die Anmeldung weiter nur mit Passwort und TOTP erlauben; ein eingerichteter Passkey
+   schaltet TOTP nicht ab (Rückfall bei Geräteverlust). Der Zugang ohne zweiten Faktor bleibt ausgeschlossen (Spec 01, 2.1).
+4. WENN eine Aktion der Liste «Step-up» eintrifft, DANN SOLL eine erneute Anmeldung mit Passkey (`max_age=0`, `prompt=login`) den
+   Step-up erfüllen wie Passwort und TOTP (7.2). Nachweis gegen echtes Keycloak.
+5. WENN ein Admin «Zugang zurücksetzen» für einen Benutzer ausführt, DANN SOLL das Archiv wahlweise dessen Passkeys löschen können
+   (gleiche Rollen, gleiche Step-up- und Vier-Augen-Regeln, gleiches Protokoll wie TOTP zurücksetzen, 3.x); der Benutzer richtet beim
+   nächsten Anmelden mit Passwort und TOTP einen neuen Passkey ein.
+6. Das Archiv SOLL im Benutzerdetail «Passkey eingerichtet: ja/nein» und die Anzahl zeigen, **nicht** Gerätenamen, Schlüsselkennungen
+   oder andere Gerätedaten; die Liste der Benutzer SOLL danach filtern können.
+7. Das Archiv SOLL die Ereignisse Passkey eingerichtet, entfernt und zurückgesetzt im Verwaltungsprotokoll ohne Gerätedaten führen
+   (Spec 06, 6.x); Keycloak-Ereignisse nach den bestehenden Regeln aufbewahren.
+8. Die Relying-Party-ID (Domain der App) SOLL eine Betriebsangabe sein: im Realm-Export ein Platzhalter, der Wert kommt beim Einspielen
+   (Betrieb, nicht im Repo). Ein Domainwechsel macht Passkeys ungültig; die Dokumentation SOLL das nennen, der Rückfall ist Passwort
+   plus TOTP.
+9. Die Google-Anmeldung SOLL unverändert bleiben (verknüpftes Konto, TOTP-Pflicht, Admin-only-Verknüpfung).
+10. Das Archiv SOLL keine biometrischen Daten erhalten oder speichern; sie bleiben auf dem Gerät.
+11. Das Archiv SOLL den Passkey-Weg mit einem **virtuellen Authenticator** (Browser-Automatisierung, WebAuthn-CDP) gegen ein
+    Wegwerf-Keycloak prüfen: Einrichten, Anmelden, Step-up, Entfernen, Zurücksetzen durch den Admin. Nachweis auf echten Geräten
+    (iPhone, Mac) ist Aufgabe von Fabian bei der Inbetriebnahme.
+
 ## Rückverfolgung Auftrag → Spec
 | Auftrag Fabian (18.11.2026) | Requirement |
 | --- | --- |
@@ -523,3 +560,4 @@ einen ersten Inhaber ohne Passwort im Terminal erhalten, damit Betrieb und Abnah
 | Protokoll, Fehlerfälle, Grenzen, Alarm | 5, 6 |
 | Sicherheit und Bedrohungsmodell | 5, 7 (design.md «Bedrohungsmodell») |
 | Inbetriebnahme, Migration, Tests, Abnahme, Mandantenabbau | 9 |
+| Passkey als Anmeldeweg (iPhone, Mac), Entscheid 21.11.2026 | 10 |
