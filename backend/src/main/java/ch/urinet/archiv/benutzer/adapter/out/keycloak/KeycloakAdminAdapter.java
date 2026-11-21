@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -48,7 +49,7 @@ import java.util.regex.Pattern;
 @Typed(IdentitaetsDienst.class)
 public class KeycloakAdminAdapter implements IdentitaetsDienst {
     static final int MAX_ANTWORT = 1024 * 1024;
-    static final int SEITENGROESSE = 50;
+    static final int SEITENGROESSE = MAX_SEITENGROESSE;
     static final Duration WARTEZEIT_PARALLEL = Duration.ofMillis(200);
     static final Duration WIEDERHOLUNGSABSTAND = Duration.ofMillis(200);
     static final Duration FEHLERFENSTER = Duration.ofSeconds(30);
@@ -126,17 +127,15 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     }
 
     @Override
-    public List<Benutzer> benutzerSuchen(String mandant, String suche, int seite) {
-        if (seite < 0 || (long) seite * SEITENGROESSE > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("Ungültige Seite");
-        }
-        String query = "q=" + query("mandant:" + mandant) + "&max=" + SEITENGROESSE
-                + "&first=" + ((long) seite * SEITENGROESSE);
+    public List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse) {
+        Objects.requireNonNull(mandant);
+        int start = IdentitaetsDienst.seitenanfang(suche, seite, groesse);
+        String query = "q=" + query("mandant:" + mandant) + "&max=" + groesse + "&first=" + start;
         if (suche != null && !suche.isBlank()) {
             query += "&search=" + query(suche);
         }
         JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
-        if (!treffer.isArray() || treffer.size() > SEITENGROESSE) {
+        if (!treffer.isArray() || treffer.size() > groesse) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
         List<Benutzer> ergebnis = new ArrayList<>();

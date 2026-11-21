@@ -35,5 +35,20 @@ class IdentitaetsDienstStubTest {
         assertThat(dienst.benutzerSuchen("a", "", 0)).hasSize(50);
         assertThat(dienst.benutzerSuchen("a", "", 1)).hasSize(1);
         assertThat(dienst.benutzerSuchen("a", "", 2)).isEmpty();
+        var erste = dienst.benutzerSuchen("a", "", 0, 7);
+        var zweite = dienst.benutzerSuchen("a", "", 1, 7);
+        assertThat(erste).hasSize(7).doesNotContainAnyElementsOf(zweite);
+        assertThat(zweite).hasSize(7);
+        assertThat(dienst.benutzerSuchen("a", "", 7, 7)).hasSize(2);
+        assertThatThrownBy(() -> dienst.benutzerSuchen("a", "", 0, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> dienst.benutzerSuchen("a", "", 0, 51))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> dienst.benutzerSuchen("a", "", -1, 7))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> dienst.benutzerSuchen("a", "", Integer.MAX_VALUE, 2))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> dienst.benutzerSuchen("a", "x".repeat(41), 0, 7))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

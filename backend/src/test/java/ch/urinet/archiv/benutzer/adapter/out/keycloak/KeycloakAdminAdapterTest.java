@@ -274,6 +274,35 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void benutzerSucheVerwendetDieAngeforderteSeitengroesse() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS)).willReturn(okJson("[]")));
+        KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+
+        assertThat(adapter.benutzerSuchen("urinet", "probe", 2, 7)).isEmpty();
+        server.verify(1, getRequestedFor(urlPathEqualTo(USERS))
+                .withQueryParam("q", equalTo("mandant:urinet"))
+                .withQueryParam("search", equalTo("probe"))
+                .withQueryParam("first", equalTo("14"))
+                .withQueryParam("max", equalTo("7")));
+        assertThatThrownBy(() -> adapter.benutzerSuchen("urinet", "", 0, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> adapter.benutzerSuchen("urinet", "", 0, 51))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> adapter.benutzerSuchen("urinet", "", Integer.MAX_VALUE, 2))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> adapter.benutzerSuchen("urinet", "x".repeat(41), 0, 7))
+                .isInstanceOf(IllegalArgumentException.class);
+        server.verify(1, getRequestedFor(urlPathEqualTo(USERS)));
+
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("max", equalTo("1"))
+                .willReturn(okJson("[{},{}]")));
+        assertThatThrownBy(() -> adapter.benutzerSuchen("urinet", "", 0, 1))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+    }
+
+    @Test
     void positivlisteLehntNichtFreigegebeneAufrufeAb() {
         KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
 

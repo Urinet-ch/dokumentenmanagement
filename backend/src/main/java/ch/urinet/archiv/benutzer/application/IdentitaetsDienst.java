@@ -12,6 +12,8 @@ import java.util.Set;
  */
 public interface IdentitaetsDienst {
 
+    int MAX_SEITENGROESSE = 50;
+
     /**
      * Der Identitätsdienst meldet einen fachlichen Konflikt (HTTP 409, z. B. Benutzername oder E-Mail vergeben).
      * Der Konflikt ist kein Ausfall des Dienstes und zählt nicht für den Schutzschalter. Die Abbildung auf den
@@ -56,7 +58,20 @@ public interface IdentitaetsDienst {
         }
     }
 
-    List<Benutzer> benutzerSuchen(String mandant, String suche, int seite);
+    default List<Benutzer> benutzerSuchen(String mandant, String suche, int seite) {
+        return benutzerSuchen(mandant, suche, seite, MAX_SEITENGROESSE);
+    }
+
+    List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse);
+
+    static int seitenanfang(String suche, int seite, int groesse) {
+        long start = (long) seite * groesse;
+        if (seite < 0 || groesse < 1 || groesse > MAX_SEITENGROESSE || start > Integer.MAX_VALUE
+                || (suche != null && suche.length() > 40)) {
+            throw new IllegalArgumentException("Ungültige Suchanfrage");
+        }
+        return (int) start;
+    }
 
     Benutzer benutzerLesen(String mandant, String id);
 

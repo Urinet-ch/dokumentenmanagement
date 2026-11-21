@@ -23,15 +23,12 @@ import java.util.UUID;
 @UnlessBuildProfile("prod")
 @Typed(IdentitaetsDienst.class)
 public class IdentitaetsDienstStub implements IdentitaetsDienst {
-    private static final int SEITENGROESSE = 50;
     private final Map<String, Eintrag> benutzer = new HashMap<>();
 
     @Override
-    public synchronized java.util.List<Benutzer> benutzerSuchen(String mandant, String suche, int seite) {
+    public synchronized java.util.List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse) {
         Objects.requireNonNull(mandant);
-        if (seite < 0 || (suche != null && suche.length() > 40)) {
-            throw new IllegalArgumentException("Ungültige Suchanfrage");
-        }
+        int start = IdentitaetsDienst.seitenanfang(suche, seite, groesse);
         String filter = suche == null ? "" : suche.toLowerCase(Locale.ROOT);
         var treffer = new ArrayList<Benutzer>();
         benutzer.values().stream().filter(e -> e.mandant.equals(mandant))
@@ -39,11 +36,10 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
                 .filter(b -> b.benutzername().toLowerCase(Locale.ROOT).contains(filter))
                 .sorted(Comparator.comparing(Benutzer::benutzername))
                 .forEach(treffer::add);
-        long start = (long) seite * SEITENGROESSE;
         if (start >= treffer.size()) {
             return java.util.List.of();
         }
-        return java.util.List.copyOf(treffer.subList((int) start, Math.min((int) start + SEITENGROESSE, treffer.size())));
+        return java.util.List.copyOf(treffer.subList(start, (int) Math.min((long) start + groesse, treffer.size())));
     }
 
     @Override
