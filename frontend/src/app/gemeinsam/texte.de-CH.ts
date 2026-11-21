@@ -1641,11 +1641,28 @@ export const TEXTE = {
   hilfe: {
     abschnitte: {
       'erste-schritte': 'Erste Schritte',
+      // Aufgabe 22.5
+      erfassen: 'Erfassen',
+      'erfassen-handy': 'Mit dem Handy fotografieren',
+      'erfassen-dateien': 'Dateien hochladen',
+      'erfassen-offline': 'Ohne Netz erfassen',
+      eingangskorb: 'Eingangskorb',
+      'eingangskorb-bestaetigen': 'Prüfen, korrigieren und bestätigen',
+      'eingangskorb-eigene': 'Ihre erfassten Dokumente verfolgen',
       suche: 'Suche',
       chat: 'Chat',
+      dokument: 'Dokumentansicht',
+      'dokument-aendern': 'Angaben ändern',
       kontakte: 'Kontakte',
       wissen: 'Wissen',
       'wissen-entwuerfe': 'Wissensentwürfe',
+      // Bestand und Verwaltung (Aufgabe 22.7)
+      importe: 'Importe',
+      jahresexport: 'Jahresexport',
+      verwaltung: 'Verwaltung',
+      'verwaltung-dokumentarten': 'Dokumentarten',
+      'verwaltung-protokoll': 'Zugriffsprotokoll',
+      'verwaltung-api-tokens': 'API-Tokens',
       probleme: 'Wenn etwas nicht klappt',
     } as Record<string, string>,
     laedt: 'Die Anleitung wird geladen …',

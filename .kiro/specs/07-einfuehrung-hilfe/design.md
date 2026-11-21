@@ -371,6 +371,33 @@ Stand von PR #411; Schnittstellen für die Aufgaben 22.2 bis 22.7.
   gefunden, kein Mandant oder keine Rolle, neue Version) als erste Fassung nur mit dem, was auf `main` umgesetzt ist;
   22.5 bzw. 22.7 vervollständigen sie (z. B. Knopf «Hilfe» und Verweise auf `#erfassen-offline`, sobald es sie gibt).
 
+## Umsetzung (Aufgabe 22.5, 21.11.2026)
+Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben ist nur, was auf `main` umgesetzt ist
+(Requirement 6.4), mit dem Wortlaut der Knöpfe und Meldungen aus `texte.de-CH.ts`.
+- **Katalog:** Einträge `erfassen`, `erfassen-handy`, `erfassen-dateien`, `erfassen-offline` (`abgemeldet`),
+  `eingangskorb`, `eingangskorb-bestaetigen` (A7), `eingangskorb-eigene` (A5 ohne A7), `dokument`, `dokument-aendern`
+  (A6) wie in der Tabelle «Hilfe-Katalog», in zwei Blöcken: Erfassen und Eingangskorb nach `erste-schritte`,
+  Dokumentansicht zwischen `chat` und `kontakte` aus 22.6 (nach dem Merge von #423 eingeordnet). Titel in `TEXTE.hilfe.abschnitte`.
+- **Prüfung** (`anleitung-abschnitte.spec.ts`): (1) Der Katalog folgt der Tabelle «Hilfe-Katalog» (Reihenfolge, Titel,
+  Abschnitt, Bedingung, Pfade, `abgemeldet`); die Tabelle steht im Test, damit auch 22.6 und 22.7 gegen sie laufen.
+  (2) Ein Link auf einen Abschnitt (`#anker`) zeigt nur auf Einträge, die jede Rolle und der Besucher ohne Anmeldung
+  sieht, wenn sie den verweisenden Eintrag sehen (Requirement 6.2, 6.3; Unterabschnitt nur mit seinem Abschnitt).
+  Darum verweisen `eingangskorb.md` nicht auf seine beiden Unterabschnitte, `dokument.md` nicht auf `dokument-aendern`
+  und `erste-schritte.md` sowie `erfassen-offline.md` nur auf allgemeine Abschnitte. (3) Jeder Name in Guillemets in
+  den Dateien der Aufgabe steht wörtlich in `texte.de-CH.ts` (Requirement 6.6, 9.3); Ausnahme sind die Menüs der
+  Browser für «Startbildschirm» in `erfassen-handy.md`.
+- **Befunde aus dem Code**, die die Texte bestimmen: Die Kamera öffnet erst mit «Kamera öffnen» (Requirement 4.2 sagt
+  «beim Wählen von Erfassen»; die Anleitung beschreibt den Knopf). Neue Aufnahmen kommen immer ans Ende, Seiten lassen
+  sich nicht umsortieren. Hochgeladen wird nur bei offener App (kein Background Sync). Aufnahmen ohne Anmeldung übernimmt
+  die nächste Anmeldung mit A1 auf dem Gerät (`WarteschlangeService.zuordnen`). Der Entwurf im Eingangskorb entsteht nur,
+  wenn die Sitzung beim Bestätigen abläuft (`sessionStorage`). «Metadaten bearbeiten» gibt es in den Zuständen
+  `EINGANGSKORB`, `FEHLER` und `ARCHIVIERT`. Die Anmeldeseite bietet kein Zurücksetzen des Passworts
+  (`resetPasswordAllowed: false`).
+- **Für 22.7:** Die Umsetzung von 22.1 nennt Verweise auf `#erfassen-offline` in `erste-schritte.md` und
+  `probleme.md`. Nach (2) geht das nicht: Ohne Anmeldung sehen alle drei Einträge, angemeldet sieht der Treuhänder aber
+  `erste-schritte` und `probleme`, nicht `erfassen-offline` (A1). `erste-schritte.md` nennt darum nur den Link «Ohne
+  Verbindung erfassen» der Startseite; den Weg zu `#erfassen-offline` bringen die Links «So funktioniert es»
+  (Requirement 4.6, Aufgabe 23.4). `probleme.md` bleibt bei 22.7.
 ## Umsetzung (Aufgabe 22.2, 21.11.2026)
 Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
 - **Filter** (`hilfe/hilfe-sichtbar.ts`): `sichtbareAbschnitte(katalog, rolle)` ergibt die Abschnitte mit ihren
@@ -433,6 +460,39 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   und Spec 04, 12.1; Zuordnung der Wissenspfade), `anleitung-inhalt.spec.ts` für die neuen Dateien und
   `features/hilfe/anleitung-suche-wissen.feature` (`@req-6.1`: jede Datei kommt mit dem Prod-Build, wie 22.5); 6.4 und
   6.6 per Review (Nachweis: Dokument).
+
+## Umsetzung (Aufgabe 22.7, 21.11.2026)
+- **Katalog:** Block «Bestand und Verwaltung» vor `probleme`: `importe` (A12, `/importe`, deckt auch `/importe/:id`),
+  `jahresexport` (`EXPORT`, `/export`), `verwaltung` (A11, A13 oder A14, ohne Pfad, kurze Einleitung) mit
+  `verwaltung-dokumentarten` (A11), `verwaltung-protokoll` (A13), `verwaltung-api-tokens` (A14), Bedingungen und Pfade wie
+  in `MENUE`; Titel in `TEXTE.hilfe.abschnitte`. `hilfe-katalog.spec.ts` prüft zusätzlich die Reihenfolge der vorhandenen
+  Abschnitte nach Requirement 6.1 (Teilfolge, weil 22.5 und 22.6 ihre Abschnitte selbst bringen), dass ein Unterabschnitt
+  direkt im Block seines Abschnitts steht und `<eltern>-` im Anker trägt, sowie die Einträge dieses Blocks. Vollständig
+  nach 6.1 ist der Katalog, wenn 22.5, 22.6 und 22.7 auf `main` liegen; wer zuletzt merged, kann die Teilfolge zur
+  Gleichheit verschärfen.
+- **Texte nach dem Code, nicht nach dem Prototyp:** Die Abschnitte nennen Menüpunkte, Knöpfe und Meldungen aus
+  `texte.de-CH.ts` und beschreiben nur, was die Seiten tun. Befunde dabei: Die Seite «API-Tokens» stellt keine Tokens aus
+  (nur Ablaufdatum und Widerruf); die Anleitung verweist für neue Tokens auf die Unterlagen des Betriebs (README,
+  «API-Token für Skripte»). Der Jahresexport meldet sich per E-Mail an den Empfänger der Benachrichtigungen des Mandanten
+  (`archiv.benachrichtigung.empfaenger.<mandant>`), nicht an die anfordernde Person, und die Liste zeigt die 20 neuesten
+  Exporte des Mandanten; die Anleitung sagt das so, obwohl die Seite nach dem Anfordern «Sie erhalten eine E-Mail …»
+  meldet. Verweise innerhalb der Anleitung gehen auf Seiten der App (`/kontakte`, `/verwaltung/protokoll`,
+  `/verwaltung/api-tokens`), nicht auf Anker anderer Aufgaben, damit die Dateien ohne 22.5 und 22.6 gültig sind.
+- **`probleme`:** ergänzt um Meldungen, die mehrere Bereiche teilen (`httpFehler`: keine Verbindung, nicht erreichbar,
+  fehlendes Recht, Daten inzwischen geändert, zu viele Anfragen) und den Hinweis zur nicht ladbaren Anleitung (7.6);
+  Ansprechperson neutral. Knopf «Hilfe» (22.3) und Verweise auf `#erfassen-offline` (22.5) fehlen weiter, weil beides noch
+  nicht auf `main` liegt (6.4); die Aufgabe, die zuletzt merged, ergänzt sie.
+- **`docs/` nach E10:** `docs/anleitung-geschaeftsstelle.md` behält Zugang und Kontaktstelle, die Angaben der
+  Dokumentarten des Mandanten `vhf-gsk` und die Regeln für die Webseite (Zugriffsstufe, Veröffentlichen, Zurückziehen),
+  weil die App-Texte für alle Mandanten gleich sind und ein Satz zur Webseite nach dem offenen Punkt 2.4 nicht in die App
+  kommt; die Bedienung (Anmelden, Erfassen, Eingangskorb, Suche, allgemeine Meldungen) verweist auf `/hilfe#…`.
+  `docs/anleitung-verwaltung.md` bleibt Entwurf von Spec 06 mit einem Verweis auf `/hilfe#verwaltung`.
+  Betreiber-Anleitungen (`docs/wiederherstellung.md`, `docs/notfall/`, `docs/verfahren/`, README) bleiben unverändert.
+- **Pflegeregel (7.5):** `tech.md` (Definition of Done) nennt die Regel seit dem Merge von Spec 07 «für jeden Bereich,
+  sobald sein Abschnitt auf `main` liegt, nach Spec 07, Aufgabe 22.7 für alle»; mit dieser Aufgabe greift sie für
+  Importe, Jahresexport und Verwaltung, für die übrigen Bereiche mit 22.5 und 22.6.
+- **Nachweis:** 6.1 mit `features/hilfe/anleitung-bestand-verwaltung.feature` (`@req-6.1`, `@req-7.1`, Dateien aus dem
+  Prod-Build) und `hilfe-katalog.spec.ts` (Reihenfolge); 6.4, 6.6, 7.5 und 7.7 Nachweis: Dokument (Review des PR).
 
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,
