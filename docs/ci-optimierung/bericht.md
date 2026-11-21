@@ -214,9 +214,8 @@ beiden Klassen zusammen 99,31 s und 107,88 s. In den zwei Versuchen des Laufs
 44903693361 dauerte die gebündelte Klasse 101,4 s und 68,32 s; alle vier
 Testmethoden waren grün. Die Mittelwerte sind 103,60 s und 84,86 s, bei
 deutlicher Streuung. Gruppe 4 meldete vorher in beiden Läufen 12 und nachher
-in beiden Versuchen 11 Compose-Netzerstellungen. Der erste vollständige
-Nachher-Lauf war grün; der zweite Gruppenjob war grün, der restliche zweite
-Lauf noch nicht abgeschlossen.
+in beiden Versuchen 11 Compose-Netzerstellungen. Beide vollständigen
+Nachher-Versuche waren grün.
 
 Ein lokaler Vergleich der vollständigen Startgruppe 4 erzeugte im Standardlauf
 12 Compose-Netze und mit einem eigens gewählten, zufälligen Projektnamen sowie
@@ -224,14 +223,19 @@ Ein lokaler Vergleich der vollständigen Startgruppe 4 erzeugte im Standardlauf
 hatten 38 grüne Tests; das eigene Netz war 20 Sekunden nach Ende des
 Wiederverwendungslaufs entfernt. Der Standardlauf zeigte 4 Netze vorher, 16
 unmittelbar nachher und 4 nach 20 Sekunden auf dem gemeinsam genutzten Host.
-Das sind lokale Einzelmessungen, keine CI-Nachweise.
+Ein weiterer Wiederverwendungslauf der Gruppe 1 mit 779 Tests einschliesslich
+766 Cucumber-Szenarien war grün, erzeugte ein Compose-Netz und hatte es
+15 Sekunden nach Laufende entfernt. Das sind lokale Einzelmessungen, keine
+CI-Nachweise. Bei einer separaten kontrollierten Abbruchprobe mit aktiviertem
+Ryuk waren das eigene Netz und fünf vorher anhand ihrer IDs identifizierte
+Container nach sieben Sekunden entfernt; die Probe belegt nicht jede mögliche
+Abbruchart.
 
 **Nicht umgesetzt:** Ein eindeutiger Projektname vermeidet die Wiederverwendung
 fremder Projekte, aber MinIO und Mailpit behalten damit Daten zwischen
-verschiedenen Quarkus-Profilen. Die grüne Gruppe 4 allein belegt nicht die
-Isolation aller Tests oder die Bereinigung bei einem Prozessabbruch. Die Option
-wird deshalb nicht generell aktiviert; ein isolierter Lebenszyklus für
-Testdaten und Ressourcen bleibt zu klären.
+verschiedenen Quarkus-Profilen. Die grünen Gruppen 1 und 4 belegen nicht die
+Isolation aller Tests. Die Option wird deshalb nicht generell aktiviert; ein
+isolierter Lebenszyklus für Testdaten bleibt zu klären.
 
 Die erfolgreichen Startmeldungen im Lauf 44899529866 ergeben je Gruppe
 6 / 8 / 7 / 12 Meldungen. Deren gemeldete Zeiten in Sekunden sind:
