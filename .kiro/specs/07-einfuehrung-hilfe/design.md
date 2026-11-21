@@ -398,6 +398,40 @@ Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben
   `erste-schritte` und `probleme`, nicht `erfassen-offline` (A1). `erste-schritte.md` nennt darum nur den Link «Ohne
   Verbindung erfassen» der Startseite; den Weg zu `#erfassen-offline` bringen die Links «So funktioniert es»
   (Requirement 4.6, Aufgabe 23.4). `probleme.md` bleibt bei 22.7.
+## Umsetzung (Aufgabe 22.2, 21.11.2026)
+Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
+- **Filter** (`hilfe/hilfe-sichtbar.ts`): `sichtbareAbschnitte(katalog, rolle)` ergibt die Abschnitte mit ihren
+  Unterabschnitten in Katalogreihenfolge, `sichtbareAnker(abschnitte)` alle Anker daraus. `rolle` ist nur gesetzt, wenn
+  jemand mit Mandant und Rolle angemeldet ist (wie `AnmeldungService.darf`); sonst zählt nur `abgemeldet`. Mit Rolle
+  erscheint ein Unterabschnitt nur mit seinem Abschnitt. Ohne Rolle steht ein Unterabschnitt mit `abgemeldet`, dessen
+  Abschnitt verborgen ist (`erfassen-offline` ohne `erfassen`), als eigener Abschnitt an seiner Stelle: als `h2` mit
+  eigener Karte und auf oberster Ebene im Inhaltsverzeichnis. Das Token `HILFE_EINTRAEGE` (Standard `HILFE_KATALOG`)
+  macht den Katalog in Tests ersetzbar; 22.3 sollte Kontext und Sichtbarkeit über dieselben Funktionen bestimmen
+  (Req 4.3: «nicht sichtbar» heisst nicht in `sichtbareAnker`).
+- **Seite** (`hilfe/hilfe-seite.*`, Route `hilfe` mit `loadComponent`, ohne Wächter, Titel `titel(TEXTE.hilfe.titel)`):
+  Seitenkopf (Vorzeile Name aus dem Branding, «Hilfe», fester Untertitel), darunter ein `.hinweis info` mit dem Satz
+  zur Rolle (6.5) bzw. dem Hinweis nach 6.3, dann das Raster aus Inhaltsverzeichnis (`nav` mit sichtbarer Überschrift
+  «Inhalt der Anleitung» über `aria-labelledby`) und Abschnitten als `.karte` (`section`, `h2` mit id = Anker,
+  Unterabschnitte als `h3` in der Karte, alle Titel mit `tabindex="-1"`). Ab 1100 px zwei Spalten, das
+  Inhaltsverzeichnis klebt (`position: sticky`, `top: 5rem` unter der Kopfzeile). Der Platz für «Einführung erneut
+  zeigen» (23.3) ist rechts im Seitenkopf (Kommentar im Template), noch ohne Knopf.
+- **Sprung:** Die Seite hört auf `ActivatedRoute.fragment` und springt erst, wenn keine Datei der sichtbaren Abschnitte
+  mehr lädt (sonst verschöbe nachgeladener Text das Ziel); ein Fehler nach 7.6 zählt als fertig. Sprung mit
+  `scrollIntoView({ block: 'start' })` und `focus({ preventScroll: true })`, `scroll-margin-top` hält die Überschrift
+  unter der klebenden Kopfzeile frei. Unbekannter oder verborgener Anker: `mat-sidenav-content` nach oben, keine
+  Meldung, kein `aria-current`. Ein Klick auf den Anker, der schon in der Adresse steht, navigiert im Router nicht; die
+  Seite springt dann selbst. `aria-current="location"` markiert den zuletzt angesprungenen Eintrag.
+- **Ids:** Überschriften der Dateien tragen `<anker>-<titel>`; ein Titel wie «Offline» in `erfassen.md` ergäbe die id
+  des Unterabschnitts `erfassen-offline`. `hilfe-seite.spec.ts` prüft darum alle Dateien gegen die Anker des Katalogs.
+- **Browser-Szenarien** (`features/hilfe/hilfe-seite-pwa.feature`, Schritte `e2e/schritte/hilfe-seite.mjs`): Weil die
+  Anmeldung nur im Arbeitsspeicher liegt, öffnet der Schritt «ich in der App «…» aufrufe» eine Adresse mit
+  `history.pushState` und `popstate` wie ein Link der App (auch für 22.3 und 23.4 nutzbar). Die Szenarien je Rolle
+  prüfen Anfang und Ende des Inhaltsverzeichnisses und die Anker, die die Rolle nach der Tabelle «Hilfe-Katalog» nie
+  sieht; sie bleiben gültig, während 22.5 bis 22.7 den Katalog füllen. Den Filter über den ganzen Katalog prüft
+  `hilfe-sichtbar.spec.ts` gegen dieselbe Tabelle.
+- **Prototyp:** Ansicht `#hilfe` in `docs/oberflaeche/prototyp.html` mit erfundenen, als «Beispiel» gekennzeichneten
+  Texten; erreichbar nur über die Adresse, bis 22.3 den Knopf in der Kopfzeile bringt.
+
 ## Umsetzung (Aufgabe 22.6, 21.11.2026)
 Abschnitte `suche`, `chat`, `kontakte`, `wissen` und `wissen-entwuerfe` mit Dateien unter `frontend/public/anleitung/`,
 Einträgen im Katalog (Bedingungen wie im Menü: A2, A2, A6, A15, A17) und Titeln in `TEXTE.hilfe.abschnitte`. Beschrieben

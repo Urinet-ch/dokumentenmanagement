@@ -325,3 +325,34 @@ zuletzt verwendeten Schritten hat keine prozessübergreifende Sperre. Ausserdem
 teilen sich Szenarien Testdaten und Backend. Shards erfordern daher erst
 nachgewiesene Daten- und Anmeldeisolation; sie werden nicht als sichere
 Beschleunigung ausgegeben.
+
+## Stand der Massnahmen (21.11.2026)
+
+- **Quarkus-Starts: teilweise erledigt.** #409 bündelt zwei Kommando-Testklassen
+  ohne Verlust von Testmethoden. Die mittlere Klassenzeit der je zwei oben
+  genannten CI-Versuche sank von 103,60 s auf 84,86 s; die Streuung ist gross.
+  Weitere Startprofile sind nicht pauschal zusammengelegt.
+- **Docker-Netzwerke: teilweise erledigt.** #409 senkt die in Gruppe 4
+  protokollierten Compose-Netzerstellungen in beiden Nachher-Versuchen von
+  12 auf 11. Die lokale Wiederverwendung eines eindeutigen Projekts senkte sie
+  für Gruppe 4 von 12 auf 1; sie ist wegen der ungeklärten Datenisolation
+  zwischen Profilen nicht aktiviert. Ryuk entfernte die eigenen Ressourcen in
+  der oben beschriebenen Abbruchprobe; das belegt keine allgemeine Aufräumung.
+- **Browserprozess: erledigt.** #407 verwendet Browserprozesse wieder, behält
+  aber getrennte Kontexte. Die mittlere Jobdauer der je zwei oben genannten
+  CI-Versuche sank von 5 min 45 s auf 5 min 3,5 s.
+- **Browser-Shards: offen.** #408 schlägt zwei getrennte Runner und Backends
+  vor; ein paralleler CI-Lauf und eine Einsparung sind noch nicht nachgewiesen.
+  Jeder Shard und jeder Lauf muss ein eigenes Compose-Projekt verwenden; eine
+  gemeinsame Nutzung zwischen parallelen Runnern oder lokalen Läufen ist nicht
+  zulässig. Das löst nicht die offene Isolation zwischen Profilen innerhalb
+  eines wiederverwendeten Projekts.
+- **Teststabilität: in Arbeit.** #418 synchronisiert den Chat-Test auf den
+  Sendezustand; seine CI 44908290740 scheiterte in einem anderen Szenario.
+  #419 synchronisiert dort die Offline-Wiederholung. Zwei vollständige
+  CI-Versuche des Laufs 44916286340 auf demselben Stand waren grün, mit je
+  170 Szenarien und 3016 Schritten: Die Browserjobs dauerten 6 min 9 s und
+  5 min 36 s, Cucumber 212,492 s und 173,470 s. Ein lokaler Lauf hatte
+  170 grüne Szenarien in 2 min 44,6 s. Das sind Stabilitätsnachweise, kein
+  Nachweis einer Zeitersparnis; der Testumfang ist gegenüber den Ausgangsläufen
+  gewachsen. Beide Korrekturen sind noch nicht gemergt.
