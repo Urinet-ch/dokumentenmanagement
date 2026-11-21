@@ -71,7 +71,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
     `wissen-entwuerfe`; nur umgesetzte Funktionen.
   - Erledigt (design.md «Umsetzung (Aufgabe 22.6, 21.11.2026)»): fünf Dateien und Einträge, `wissen` zusätzlich mit den
     Pfaden `/wissen/entwuerfe/meine` und `/wissensbasis`; Nachweis per Vitest (`hilfe-katalog.spec.ts`,
-    `anleitung-inhalt.spec.ts`) und `anleitung-pwa.feature`.
+    `anleitung-inhalt.spec.ts`) und `anleitung-suche-wissen.feature` (`@req-6.1`).
   - _Anforderungen: 6.1, 6.4, 6.6_
   - _Abhängig von: 22.1_
 

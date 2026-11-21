@@ -396,8 +396,9 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - **Befund:** Die Meldung `TEXTE.chat.zuViele` duzt («Du hast in dieser Stunde …»), die übrige App siezt
   (Requirement 9.3). Die Anleitung umschreibt die Meldung, statt sie zu zitieren; die Meldung selbst ändert 22.6 nicht.
 - **Nachweis:** `hilfe-katalog.spec.ts` (Reihenfolge, Bedingungen und Eltern; Sichtbarkeit je Rolle nach Requirement 2.2
-  und Spec 04, 12.1; Zuordnung der Wissenspfade), `anleitung-inhalt.spec.ts` für die neuen Dateien und die neuen Zeilen
-  in `features/hilfe/anleitung-pwa.feature` (`@req-7.1`); 6.4 und 6.6 per Review (Nachweis: Dokument).
+  und Spec 04, 12.1; Zuordnung der Wissenspfade), `anleitung-inhalt.spec.ts` für die neuen Dateien und
+  `features/hilfe/anleitung-suche-wissen.feature` (`@req-6.1`: jede Datei kommt mit dem Prod-Build, wie 22.5); 6.4 und
+  6.6 per Review (Nachweis: Dokument).
 
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,

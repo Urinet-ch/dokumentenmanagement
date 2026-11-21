@@ -10,11 +10,6 @@ Funktionalität: Benutzeranleitung als Markdown mit der App
     Dann liefert das Archiv die Anleitung «<anker>» als Markdown aus dem Build aus
 
     Beispiele:
-      | anker            |
-      | erste-schritte   |
-      | suche            |
-      | chat             |
-      | kontakte         |
-      | wissen           |
-      | wissen-entwuerfe |
-      | probleme         |
+      | anker          |
+      | erste-schritte |
+      | probleme       |
