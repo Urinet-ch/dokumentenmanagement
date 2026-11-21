@@ -190,6 +190,14 @@ wiederverwenden; auf dem gemeinsam genutzten Rechner wäre Testisolation damit
 nicht belegt. Ein JVM-eigenes Projekt mit sicherer Lebensdauer und Aufräumung
 ist noch zu untersuchen. Keine Netzwerke anderer Läufe wurden entfernt.
 
+Ein späterer lokaler `mvn verify` protokollierte bis zum Abbruch 25 verschiedene
+Ryuk-Container. Ein zum Lauf gehörender Keycloak-Container endete mit Exit 137;
+Docker meldete `OOMKilled=true`. Danach scheiterten Szenarien an nicht
+erreichbaren Testdiensten. Der Lauf wurde abgebrochen, nicht als Messung eines
+vollständigen Laufs gewertet. Nach dem Abbruch waren die drei anhand ihrer IDs
+geprüften Testcontainer entfernt. Ob die vielen Ryuk-Container den
+Speicherabbruch verursachten, ist nicht nachgewiesen.
+
 Die erfolgreichen Startmeldungen im Lauf 44899529866 ergeben je Gruppe
 6 / 8 / 7 / 12 Meldungen. Deren gemeldete Zeiten in Sekunden sind:
 
