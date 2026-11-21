@@ -28,6 +28,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.delete;
 import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.put;
 import static com.github.tomakehurst.wiremock.client.WireMock.putRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
@@ -686,6 +687,29 @@ class KeycloakAdminAdapterTest {
         server.verify(1, putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath("$.enabled",
                         equalTo("false"))));
+    }
+
+    @Test
+    void anlegenSetztErforderlicheAktionenSchonBeimErstellen() {
+        tokenAntwort();
+        server.stubFor(post(urlPathEqualTo(USERS)).willReturn(aResponse().withStatus(201)
+                .withHeader("Location", server.baseUrl() + USERS + "/neu-1")));
+        benutzerStub("neu-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/neu-1/role-mappings/realm")).willReturn(okJson("[]")));
+        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/mitarbeiter"))
+                .willReturn(okJson("{\"id\":\"r1\",\"name\":\"mitarbeiter\"}")));
+        server.stubFor(post(urlPathEqualTo(USERS + "/neu-1/role-mappings/realm"))
+                .willReturn(aResponse().withStatus(204)));
+
+        assertThat(adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).anlegen("urinet",
+                new Neuanlage("synthetic-user", "user@example.invalid", "Ada", "Muster"), Rolle.MITARBEITER))
+                .isEqualTo("neu-1");
+
+        server.verify(1, postRequestedFor(urlPathEqualTo(USERS)).withRequestBody(equalToJson("""
+                {"username":"synthetic-user","email":"user@example.invalid","firstName":"Ada","lastName":"Muster",
+                 "enabled":true,"attributes":{"mandant":["urinet"]},
+                 "requiredActions":["VERIFY_EMAIL","UPDATE_PASSWORD","CONFIGURE_TOTP"]}
+                """)));
     }
 
     @Test

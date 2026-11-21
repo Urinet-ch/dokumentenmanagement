@@ -29,13 +29,6 @@ public final class BenutzerFormregeln {
         }
     }
 
-    public static void pruefeGrund(String grund) {
-        if (!laengeUndSteuerzeichen(grund, 10, 500)) {
-            throw new KonfigurationUngueltig(List.of(new Befund("grund", "GRUND_UNGUELTIG",
-                    "Der Grund muss 10 bis 500 Zeichen ohne Steuerzeichen enthalten.")));
-        }
-    }
-
     private static void pruefeName(List<Befund> befunde, String feld, String name) {
         if (!laengeUndSteuerzeichen(name, 1, 60)) {
             befunde.add(new Befund(feld, "NAME_UNGUELTIG",

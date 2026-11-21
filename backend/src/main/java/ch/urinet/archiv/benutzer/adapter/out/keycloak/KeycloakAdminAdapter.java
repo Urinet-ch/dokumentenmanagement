@@ -176,6 +176,10 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 .put("lastName", neu.nachname())
                 .put("enabled", true);
         neuJson.set("attributes", json.valueToTree(Map.of("mandant", List.of(mandant))));
+        neuJson.set("requiredActions", json.valueToTree(List.of(
+                ErforderlicheAktion.VERIFY_EMAIL.name(),
+                ErforderlicheAktion.UPDATE_PASSWORD.name(),
+                ErforderlicheAktion.CONFIGURE_TOTP.name())));
         Antwort angelegt = request("POST", admin("/users"), null, neuJson, false, Set.of());
         if (angelegt.status() != 201) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);

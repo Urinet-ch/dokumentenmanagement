@@ -14,8 +14,6 @@ class BenutzerFormregelnTest {
                 "ä".repeat(60), "𐐀".repeat(60))).doesNotThrowAnyException();
         assertThatCode(() -> BenutzerFormregeln.pruefeAnlage("a".repeat(40), "a@b", "A", "B"))
                 .doesNotThrowAnyException();
-        assertThatCode(() -> BenutzerFormregeln.pruefeGrund("x".repeat(10))).doesNotThrowAnyException();
-        assertThatCode(() -> BenutzerFormregeln.pruefeGrund("x".repeat(500))).doesNotThrowAnyException();
     }
 
     @Test
@@ -30,12 +28,6 @@ class BenutzerFormregelnTest {
         assertThatCode(() -> BenutzerFormregeln.pruefeAnlage("a".repeat(41), "a@b", "A", "B"))
                 .isInstanceOf(KonfigurationUngueltig.class);
         assertThatCode(() -> BenutzerFormregeln.pruefeAnlage("abc", "x".repeat(254) + "@", "A", "B"))
-                .isInstanceOf(KonfigurationUngueltig.class);
-        assertThatCode(() -> BenutzerFormregeln.pruefeGrund("x".repeat(9)))
-                .isInstanceOf(KonfigurationUngueltig.class);
-        assertThatCode(() -> BenutzerFormregeln.pruefeGrund("x".repeat(501)))
-                .isInstanceOf(KonfigurationUngueltig.class);
-        assertThatCode(() -> BenutzerFormregeln.pruefeGrund("012345678\n"))
                 .isInstanceOf(KonfigurationUngueltig.class);
     }
 }
