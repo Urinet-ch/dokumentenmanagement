@@ -43,7 +43,11 @@ public interface WissenLesenRepository {
     }
 
     record IndexZeile(UUID id, Seitentyp typ, String pfad, String titel, String beschreibung, String status,
-                      boolean quellePruefen) {
+                      boolean quellePruefen, Wissensseite.Vertraulichkeit vertraulichkeit) {
+        public IndexZeile(UUID id, Seitentyp typ, String pfad, String titel, String beschreibung, String status,
+                          boolean quellePruefen) {
+            this(id, typ, pfad, titel, beschreibung, status, quellePruefen, null);
+        }
     }
 
     record IndexErgebnis(List<IndexZeile> seiten, long gesamt) {

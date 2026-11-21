@@ -21,6 +21,7 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.wissen.application.WissensSuchePort;
+import ch.urinet.archiv.wissen.application.WissenLesenRepository;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.application.AuftragService.AnspruchVerloren;
@@ -110,6 +111,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     PanacheWissensSuche wissensSuche;
+
+    @Inject
+    WissenLesenRepository wissenLesen;
 
     @Inject
     JdbcWissensEmbedding wissensEmbedding;
@@ -205,6 +209,7 @@ class JdbcWissenIngestTest {
         ausfuehren("update " + URINET.schema() + ".wissensseite set beschreibung = ? where id = ?", q, beschreibung);
         UUID dokument = quelle(URINET);
         ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'INTERN' where id = ?", dokument);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set vertraulichkeit = 'INTERN' where id = ?", geheim);
         ausfuehren("insert into " + URINET.schema()
                 + ".wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)",
                 geheim, dokument);
@@ -217,6 +222,16 @@ class JdbcWissenIngestTest {
         assertThat(im(ZWEITER, () -> wissensSuche.volltext(q, filter, 3)))
                 .extracting(t -> t.seite().id()).containsExactly(fremd);
         assertThat(im(URINET, () -> wissensSuche.sichtbar(List.of(geheim, fremd), filter))).isEmpty();
+        var inhaber = Sichtregel.fuer(new Benutzer("inhaber", Rolle.INHABER));
+        var inhaberFilter = new WissensSuchePort.Filter(inhaber, null, null, null);
+        assertThat(im(URINET, () -> wissensSuche.sichtbar(List.of(geheim), inhaberFilter)))
+                .singleElement().satisfies(t -> assertThat(t.seite().vertraulichkeit())
+                        .isEqualTo(ch.urinet.archiv.wissen.domain.Wissensseite.Vertraulichkeit.INTERN));
+        var anfrage = new WissenLesenRepository.IndexAnfrage(null, null, q, null, 0, 50);
+        assertThat(im(URINET, () -> wissenLesen.index(inhaber, anfrage)).seiten())
+                .filteredOn(s -> s.id().equals(geheim)).singleElement()
+                .satisfies(s -> assertThat(s.vertraulichkeit())
+                        .isEqualTo(ch.urinet.archiv.wissen.domain.Wissensseite.Vertraulichkeit.INTERN));
         given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
                 .queryParam("q", q).queryParam("modus", "volltext")
                 .when().get("/api/v1/wissensseiten").then().statusCode(200)

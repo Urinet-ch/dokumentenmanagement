@@ -82,6 +82,13 @@ class ChatJsonTest {
                 + "{\"name\":\"dokumente_suchen\",\"parameter\":{},\"dokumentIds\":[]}]");
     }
 
+    @Test
+    void kontextstufeWirdFuerSpaetereAnalyseGespeichert() {
+        var aufruf = new WerkzeugAufruf("dokumente_suchen", Map.of(), List.of(ID), Optional.empty(),
+                Optional.of(ChatEreignis.Kontextstufe.INTERN));
+        assertThat(ChatJson.werkzeuge(List.of(aufruf))).contains("\"kontextstufe\":\"INTERN\"");
+    }
+
     private static String name(ChatAusgabe ausgabe) {
         return ausgabe.name() + " " + ChatJson.daten(ausgabe);
     }

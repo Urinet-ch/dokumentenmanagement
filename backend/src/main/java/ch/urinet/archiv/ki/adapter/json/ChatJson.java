@@ -21,7 +21,7 @@ import java.util.UUID;
  * <ul>
  *   <li>Quelle Dokument {@code {"id", "titel", "link": "/dokument/<id>"}}, Quelle Datenstand
  *       {@code {"werkzeug", "datenstand": "<ISO-8601 UTC>", "belege": n}}</li>
- *   <li>Werkzeugaufruf {@code {"name", "parameter": {…}, "dokumentIds": […], "datenstand"?: {"zeitpunkt", "belege"}}}</li>
+ *   <li>Werkzeugaufruf {@code {"name", "parameter": {…}, "dokumentIds": […], "kontextstufe"?, "datenstand"?}}</li>
  *   <li>SSE: {@code werkzeug {"name"}}, {@code text {"delta"}}, {@code quellen […]},
  *       {@code fertig {"gespraechId", "nachrichtId", "tokens": {"ein", "aus"}}}, {@code fehler {"meldung", "gespraechId"}}</li>
  * </ul>
@@ -137,6 +137,7 @@ public final class ChatJson {
             wert.put("name", aufruf.name());
             wert.put("parameter", aufruf.parameter());
             wert.put("dokumentIds", aufruf.dokumentIds().stream().map(UUID::toString).toList());
+            aufruf.kontextstufe().ifPresent(s -> wert.put("kontextstufe", s.name()));
             aufruf.datenstand().ifPresent(s -> {
                 Map<String, Object> stand = new LinkedHashMap<>();
                 stand.put("zeitpunkt", s.zeitpunkt().toString());

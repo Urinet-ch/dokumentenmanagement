@@ -32,18 +32,33 @@ public sealed interface ChatEreignis {
      *                   {@code vollstaendigkeit})
      */
     record WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
-                            Optional<Datenstand> datenstand, Optional<QuellWissen> wissen) implements ChatEreignis {
+                            Optional<Datenstand> datenstand, Optional<QuellWissen> wissen,
+                            Optional<Kontextstufe> kontextstufe) implements ChatEreignis {
         public WerkzeugErgebnis {
             Objects.requireNonNull(name, "name");
             parameter = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(parameter, "parameter")));
             dokumente = List.copyOf(dokumente);
             Objects.requireNonNull(datenstand, "datenstand");
             Objects.requireNonNull(wissen, "wissen");
+            Objects.requireNonNull(kontextstufe, "kontextstufe");
+        }
+
+        public WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
+                                Optional<Datenstand> datenstand, Optional<QuellWissen> wissen) {
+            this(name, parameter, dokumente, datenstand, wissen, Optional.empty());
         }
 
         public WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
                                 Optional<Datenstand> datenstand) {
-            this(name, parameter, dokumente, datenstand, Optional.empty());
+            this(name, parameter, dokumente, datenstand, Optional.empty(), Optional.empty());
+        }
+    }
+
+    enum Kontextstufe {
+        NORMAL, INTERN, PERSONAL;
+
+        public Kontextstufe hoechste(Kontextstufe andere) {
+            return ordinal() >= andere.ordinal() ? this : andere;
         }
     }
 

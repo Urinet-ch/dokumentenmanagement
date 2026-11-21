@@ -10,16 +10,23 @@ import java.util.UUID;
 
 /**
  * Gespeicherter Werkzeugaufruf ({@code chat_nachricht.werkzeuge}, je Aufruf {@code {name, parameter, dokumentIds,
- * datenstand?}}; design.md «Vertrag Welle 7», Speicherung): nur IDs, nie Titel oder Dokumentinhalte.
+ * datenstand?, kontextstufe?}}; design.md «Vertrag Welle 7», Speicherung): nur IDs, nie Titel oder Dokumentinhalte.
  */
 public record WerkzeugAufruf(String name, Map<String, Object> parameter, List<UUID> dokumentIds,
-                             Optional<ChatEreignis.Datenstand> datenstand) {
+                             Optional<ChatEreignis.Datenstand> datenstand,
+                             Optional<ChatEreignis.Kontextstufe> kontextstufe) {
 
     public WerkzeugAufruf {
         Objects.requireNonNull(name, "name");
         parameter = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(parameter, "parameter")));
         dokumentIds = List.copyOf(dokumentIds);
         Objects.requireNonNull(datenstand, "datenstand");
+        Objects.requireNonNull(kontextstufe, "kontextstufe");
+    }
+
+    public WerkzeugAufruf(String name, Map<String, Object> parameter, List<UUID> dokumentIds,
+                          Optional<ChatEreignis.Datenstand> datenstand) {
+        this(name, parameter, dokumentIds, datenstand, Optional.empty());
     }
 
     public static WerkzeugAufruf aus(ChatEreignis.WerkzeugErgebnis ergebnis) {
@@ -27,6 +34,6 @@ public record WerkzeugAufruf(String name, Map<String, Object> parameter, List<UU
                 ergebnis.dokumente().stream().map(ChatEreignis.QuellDokument::id),
                 ergebnis.wissen().stream().flatMap(w -> w.alleDokumentIds().stream())).distinct().toList();
         return new WerkzeugAufruf(ergebnis.name(), ergebnis.parameter(),
-                dokumentIds, ergebnis.datenstand());
+                dokumentIds, ergebnis.datenstand(), ergebnis.kontextstufe());
     }
 }
