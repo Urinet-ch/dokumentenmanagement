@@ -79,6 +79,29 @@ class JsonKonfigurationsdateiCodecTest {
     }
 
     @Test
+    void erweiterteEinstellungenBleibenBeimRundlaufErhalten() {
+        KonfigurationsdateiCodec codec = codec();
+        KonfigurationsdateiCodec.Datei datei = codec.lesen("""
+                {
+                  "format": 1, "basisVersion": 4,
+                  "einstellungen": {
+                    "geschaeftsjahrEnde": "12-31", "kennungen": { "uid": null, "ibans": [] },
+                    "branding": { "name": "Archiv", "primaerfarbe": "#eeb111" },
+                    "chat": { "aufbewahrungMonate": 6 },
+                    "webseitenChat": { "aufbewahrungTage": 30 },
+                    "wissen": { "budgetTokens": 10000, "lintBudgetTokens": 10000,
+                      "monatsbudgetTokens": 100000, "lintZeitplan": { "wochentag": "SUNDAY", "stunde": 4 } }
+                  },
+                  "kiTexte": { "rolle": "", "feldregeln": "", "kiFreigegeben": false },
+                  "klassifikationen": [], "regeln": [], "arten": []
+                }
+                """);
+
+        assertThat(codec.lesen(codec.schreiben(datei.inhalt())).inhalt().einstellungen())
+                .isEqualTo(datei.inhalt().einstellungen());
+    }
+
+    @Test
     void weistDateienUeberEinMiBAb() {
         KonfigurationsdateiCodec codec = codec();
 

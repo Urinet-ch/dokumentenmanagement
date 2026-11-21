@@ -7,6 +7,8 @@
   </div>
   @if (id()) {
     <a mat-stroked-button routerLink="/wissen/entwuerfe">{{ texte.zurListe }}</a>
+  } @else {
+    <a mat-stroked-button routerLink="/wissen/entwuerfe/import"><app-symbol name="importe" />{{ importe.titel }}</a>
   }
 </div>
 @if (laedt()) { <p class="status" role="status">{{ wissen.laedt }}</p> }
@@ -15,7 +17,6 @@
   <div class="knoepfe"><button mat-button type="button" (click)="laden(true)">{{ wissen.erneut }}</button></div>
 }
 @if (!id()) {
-  <div class="knoepfe"><a mat-stroked-button routerLink="/wissen/entwuerfe/import">{{ importe.titel }}</a></div>
   <form class="karte felder" (ngSubmit)="laden()">
     <div class="feld">
       <label for="entwurf-status">{{ texte.status }}</label>
@@ -60,14 +61,16 @@
           <dt>{{ importe.importiertAm }}</dt><dd>{{ zeitpunkt(ansicht.entwurf.erstellt) }}</dd>
           <dt>{{ importe.sha256 }}</dt><dd><code>{{ herkunft.paketSha256 }}</code></dd>
         </dl>
-      } @else { <p role="alert">{{ importe.herkunftFehlt }}</p> }
-      <p>{{ importe.cloudHinweis }}</p>
+      } @else { <p class="fehler" role="alert">{{ importe.herkunftFehlt }}</p> }
+      <p class="box"><app-symbol name="warnung" />{{ importe.cloudHinweis }}</p>
       @if (ansicht.entwurf.status === 'OFFEN') {
-        <button mat-stroked-button type="button" [disabled]="sendet()" (click)="neuPruefen()">{{ importe.neuPruefen }}</button>
+        <div class="knoepfe">
+          <button mat-stroked-button type="button" [disabled]="sendet()" (click)="neuPruefen()"><app-symbol name="wiederholen" />{{ importe.neuPruefen }}</button>
+        </div>
       }
-      @if (prueft()) { <p role="status">{{ importe.prueft }}</p> }
-      @if (pruefFehler(); as meldung) { <p role="alert">{{ meldung }}</p> }
-      @if (bearbeitet !== undefined) { <p>{{ importe.bearbeitungBehalten }}</p> }
+      @if (prueft()) { <p class="status" role="status">{{ importe.prueft }}</p> }
+      @if (pruefFehler(); as meldung) { <p class="fehler" role="alert">{{ meldung }}</p> }
+      @if (bearbeitet !== undefined) { <p class="gedaempft">{{ importe.bearbeitungBehalten }}</p> }
     </section>
   }
   @if (ansicht.kernaussagen?.length) {
@@ -102,14 +105,16 @@
       @if (ansicht.entwurf.anlass === 'IMPORT') {
         <h3>{{ importe.quellenPruefung }}</h3>
         @if (aenderung.daten.quellenPruefung; as pruefungen) {
-          @if (!pruefungen.length) { <p>{{ importe.keineDokumentquellen }}</p> }
-          <ul>
+          @if (!pruefungen.length) { <p class="gedaempft">{{ importe.keineDokumentquellen }}</p> }
+          <ul class="quellen">
             @for (quelle of pruefungen; track quelle.schluessel) {
-              <li>{{ quelle.schluessel }} · {{ importe.zuordnung }}: {{ zuordnungText(quelle.zuordnung) }}
-                · {{ importe.auszug }}: {{ auszugText(quelle.auszug) }}</li>
+              <li><span class="mono">{{ quelle.schluessel }}</span> · <span class="pille" [class.ok]="quelle.zuordnung === 'ZUGEORDNET'"
+                [class.warnung]="quelle.zuordnung !== 'ZUGEORDNET'">{{ importe.zuordnung }}: {{ zuordnungText(quelle.zuordnung) }}</span>
+                · <span class="pille" [class.ok]="quelle.auszug === 'GEFUNDEN'"
+                [class.warnung]="quelle.auszug !== 'GEFUNDEN'">{{ importe.auszug }}: {{ auszugText(quelle.auszug) }}</span></li>
             }
           </ul>
-        } @else { <p role="alert">{{ importe.quellenPruefungFehlt }}</p> }
+        } @else { <p class="fehler" role="alert">{{ importe.quellenPruefungFehlt }}</p> }
       }
       <h3>{{ texte.begruendung }}</h3><p>{{ aenderung.begruendung || texte.leer }}</p>
       <h3>{{ texte.diff }}</h3>

@@ -26,6 +26,11 @@ class ReqAbdeckungTest {
     }
 
     @Test
+    void einstellungsinventarDecktKonfigurationsschluesselAb() throws IOException {
+        assertThat(EinstellungsInventar.luecken()).isEmpty();
+    }
+
+    @Test
     void bereicheWerdenAufgeloest() {
         assertThat(ReqAbdeckung.kriterien("1.7, 16.20–16.22, 9.1 – 9.2, 4.3–4"))
                 .containsExactly("1.7", "16.20", "16.21", "16.22", "9.1", "9.2", "4.3", "4.4");
