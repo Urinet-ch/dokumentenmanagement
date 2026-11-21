@@ -10,7 +10,9 @@ import io.smallrye.config.SmallRyeConfigBuilder;
 import org.testcontainers.Testcontainers;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
@@ -19,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -113,6 +116,71 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
             throw new UncheckedIOException(e);
         }
     }
+
+    static BackchannelMessung backchannelPruefen(boolean dynamisch) throws IOException, InterruptedException {
+        String intern = "http://keycloak-probe:8080";
+        String issuer = "http://issuer.test/realms/urinet-archiv";
+        Path export = Path.of(System.getProperty("archiv.realm-export", "../deploy/keycloak/realm-export.json"));
+        try (Network testnetz = Network.newNetwork();
+             GenericContainer<?> server = new GenericContainer<>(image())
+                     .withNetwork(testnetz).withNetworkAliases("keycloak-probe")
+                     .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN)
+                     .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
+                     .withEnv("KEYCLOAK_VERWALTUNG_SECRET", VERWALTUNG_TESTWERT)
+                     .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
+                     .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
+                     .withEnv("KC_HOSTNAME", "http://issuer.test")
+                     .withEnv("KC_HOSTNAME_BACKCHANNEL_DYNAMIC", Boolean.toString(dynamisch))
+                     .withCopyFileToContainer(MountableFile.forHostPath(export.toAbsolutePath()),
+                             "/opt/keycloak/data/import/realm-export.json")
+                     .withCommand("start-dev", "--import-realm")
+                     .withExposedPorts(8080)
+                     .waitingFor(Wait.forHttp("/realms/urinet-archiv").forPort(8080)
+                             .withStartupTimeout(Duration.ofMinutes(3)));
+             GenericContainer<?> client = new GenericContainer<>(
+                     "curlimages/curl:8.23.0@sha256:a134550be58ab783810e613ae96fd253c38f7bdd16d9bf9be350700c7a29ac06")
+                     .withNetwork(testnetz)
+                     .withCreateContainerCmdModifier(cmd -> cmd.withEntrypoint("sleep"))
+                     .withCommand("300")) {
+            server.start();
+            client.start();
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode discovery = mapper.readTree(curl(client, "-fsS",
+                    intern + "/realms/urinet-archiv/.well-known/openid-configuration"));
+            client.copyFileToContainer(Transferable.of(
+                    "grant_type=client_credentials&client_id=archiv-verwaltung&client_secret=" + VERWALTUNG_TESTWERT),
+                    "/tmp/token-form");
+            JsonNode token = mapper.readTree(curl(client, "-fsS", "-X", "POST",
+                    "--data", "@/tmp/token-form",
+                    intern + "/realms/urinet-archiv/protocol/openid-connect/token"));
+            String accessToken = token.path("access_token").asText();
+            String[] teile = accessToken.split("\\.");
+            if (teile.length != 3) {
+                throw new IllegalStateException("Dienstkonto lieferte kein JWT");
+            }
+            JsonNode claims = mapper.readTree(Base64.getUrlDecoder().decode(teile[1]));
+            client.copyFileToContainer(Transferable.of("Authorization: Bearer " + accessToken),
+                    "/tmp/auth-header");
+            String status = curl(client, "-sS", "-o", "/dev/null", "-w", "%{http_code}",
+                    "-H", "@/tmp/auth-header", intern + "/admin/realms/urinet-archiv/users?max=1");
+            return new BackchannelMessung(issuer, discovery.path("issuer").asText(),
+                    discovery.path("token_endpoint").asText(), intern, claims.path("iss").asText(), status);
+        }
+    }
+
+    private static String curl(GenericContainer<?> client, String... argumente) throws IOException, InterruptedException {
+        String[] befehl = new String[argumente.length + 1];
+        befehl[0] = "curl";
+        System.arraycopy(argumente, 0, befehl, 1, argumente.length);
+        ExecResult ergebnis = client.execInContainer(befehl);
+        if (ergebnis.getExitCode() != 0) {
+            throw new IllegalStateException("Backchannel-Testanfrage fehlgeschlagen: " + ergebnis.getExitCode());
+        }
+        return ergebnis.getStdout();
+    }
+
+    record BackchannelMessung(String erwartetIssuer, String discoveryIssuer, String tokenEndpunkt,
+                              String interneBasis, String tokenIssuer, String adminStatus) { }
 
     private Path exportMitOidcTestIdp(Path quelle) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
