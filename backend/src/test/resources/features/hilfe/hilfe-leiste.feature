@@ -1,6 +1,6 @@
 # language: de
 # Hilfe-Leiste im App-Rahmen (Spec 07, Aufgabe 22.3). Erfassungsbilder und Chatantworten stammen aus synthetischen Attrappen.
-@spec-07 @browser
+@spec-07 @browser @attrappe
 Funktionalität: Hilfe-Leiste ohne Verlassen der aktuellen Seite
 
   @req-4.1
@@ -31,7 +31,7 @@ Funktionalität: Hilfe-Leiste ohne Verlassen der aktuellen Seite
     Dann sehe ich 1 Seite
     Und bin ich auf der Seite «/erfassen»
 
-  @req-4.2 @attrappe
+  @req-4.2
   Szenario: Der Chatverlauf bleibt beim Öffnen und Schliessen der Hilfe-Leiste erhalten
     Angenommen die Chat-Schnittstelle ist eine Attrappe
     Und Keycloak kennt mich als «inhaber» im Mandanten «urinet»
