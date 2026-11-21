@@ -265,7 +265,7 @@ Funktionalität: Klassifikationen je Mandant
     Dann antwortet die Klassifikationsverwaltung mit Status 200
     Und steht im letzten Konfigurationseintrag von «urinet» die Änderung «arten.PROJEKTDOKUMENT.klassifikationen.fachgebiet.standardWert» von «bau» auf «elektro»
 
-  @req-1.2
+  @req-1.2 @req-9.3
   Szenario: Klassifikationen, Zuordnungen und Dokumentwerte bleiben im eigenen Mandanten
     Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
       """
