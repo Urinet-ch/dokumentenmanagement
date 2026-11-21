@@ -3,11 +3,11 @@
 # .github/workflows/infomaniak-deploy.yml; das Bundle bringt archiv:<sha>, archiv:db-<version> und archiv:kc-<version>
 # mit, deploy-app.sh setzt daraus archiv:current, archiv:db-current und archiv:kc-current.
 # Secrets nur als Dateien unter /run/secrets (tech.md Regel 7), je Dienst nur die eigenen.
-# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 1200 MiB (geändert 21.11.2026, Entscheid Fabian: API 700m für
-# gut 200 MiB Luft über dem gemessenen Bedarf; davor 1000 MiB, geändert 13.11.2026, Entscheid Fabian;
+# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 1150 MiB (geändert 21.11.2026, Entscheid Fabian: Keycloak 550m für
+# gut 200 MiB Luft über dem gemessenen Bedarf, API bleibt 500m mit rund 200 MiB Luft; davor 1000 MiB, geändert 13.11.2026, Entscheid Fabian;
 # bisher 900, davor 700 MiB), cpus höchstens 0.75 (Richtwert, Messung 1.10). Erste Messung (Spitzen unter Last: api 309,
 # db 66, kc 358 MiB); seit 3.2 belegt die API schon im Leerlauf rund 300 MiB, mit 320m beendete der cgroup-OOM sie bei
-# der ersten Verarbeitung (13.11.2026). Darum api 500m, zusammen 1000 MiB; seit 21.11.2026 api 700m, zusammen 1200 MiB. Der Deploy-Workflow bricht vor
+# der ersten Verarbeitung (13.11.2026). Darum api 500m, zusammen 1000 MiB; seit 21.11.2026 kc 550m, zusammen 1150 MiB. Der Deploy-Workflow bricht vor
 # dem Bundle ab, sobald die Summe über dem Budget liegt (Req 16.18).
 name: archiv
 
@@ -28,7 +28,7 @@ services:
         target: /var/lib/archiv/arbeit
     cap_drop: [ALL]
     security_opt: [no-new-privileges]
-    mem_limit: 700m
+    mem_limit: 500m
     cpus: 0.3
     init: true
     environment:
@@ -237,7 +237,8 @@ services:
       - /opt/keycloak/data/tmp:size=32m,uid=1000,gid=1000,mode=0700
     cap_drop: [ALL]
     security_opt: [no-new-privileges]
-    mem_limit: 400m
+    # Keycloak: gemessen 332 von 400 MiB (21.11.2026), nur 68 MiB Luft; 550m für gut 200 MiB Puffer (Entscheid Fabian)
+    mem_limit: 550m
     cpus: 0.3
     environment:
       KC_DB_URL: jdbc:postgresql://db:5432/keycloak
