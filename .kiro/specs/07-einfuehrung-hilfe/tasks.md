@@ -55,7 +55,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _Abhängig von: 22.2_
 
-- [ ] 22.4 Anleitung offline [Frontend]
+- [x] 22.4 Anleitung offline [Frontend]
   - Asset-Gruppe `anleitung` (`prefetch`) in `ngsw-config.json`; Prüfung, dass Quinoa `/anleitung/*.md` ausliefert und die
     SPA-Weiterleitung sie nicht abfängt; Szenarien mit Service Worker und `setOffline` (Leiste und Seite vollständig,
     abgemeldet nur die allgemeinen Abschnitte und `erfassen-offline`); neue Version tauscht App und Anleitung zusammen.
