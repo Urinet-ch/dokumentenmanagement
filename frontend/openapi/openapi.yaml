@@ -2546,6 +2546,12 @@ components:
       - KONTAKT_ZUSAMMENFUEHREN
       - KONTAKT_INAKTIV
       - KONTAKT_AKTIV
+      - BENUTZER_ANLEGEN
+      - BENUTZER_AENDERN
+      - BENUTZER_LOESCHEN
+      - ROLLE_ZUWEISEN
+      - BENUTZER_ANTRAG
+      - BENUTZER_ABWEICHUNG
     ProtokollEintrag:
       description: Eintrag des Zugriffsprotokolls; Name und Rolle aus dem Benutzerverzeichnis
         zur Zeit des Eintrags (Req 10.10)
@@ -3009,6 +3015,8 @@ components:
           - AKTION
           - AUSTRITT
           - WIDERRUF
+          - ANLAGE
+          - UEBERNAHME
         erfasstVon:
           type:
           - string

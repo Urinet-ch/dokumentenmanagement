@@ -168,8 +168,8 @@ dass ein Passwort durch meine Hände oder durch das Archiv geht, damit ich Zugä
    nie einen Einladungslink kennen. Nachweis: JUnit (der Adapter ruft weder `reset-password` noch einen Endpunkt
    auf, der einen Link zurückgibt; ArchUnit auf die erlaubten Aufrufe).
 4. FALLS Benutzername, E-Mail, Vorname, Nachname oder Grund die Formregeln verletzen (Benutzername 3 bis 40 Zeichen aus
-   `a–z`, `0–9`, `.`, `_`, `-`; E-Mail höchstens 254 Zeichen und genau ein `@`; Namen 1 bis 60 Zeichen; Grund 10 bis
-   500 Zeichen; keine Steuerzeichen), DANN SOLL das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` und `befunde[]`
+   `a–z`, `0–9`, `.`, `_`, `-`; E-Mail höchstens 254 Zeichen und genau ein `@`; Namen 1 bis 60 Zeichen; Grund eine der festen Kategorien
+   `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`, `KORREKTUR`, `SONSTIGES`; keine Steuerzeichen), DANN SOLL das Archiv mit HTTP 422 `KONFIGURATION_UNGUELTIG` und `befunde[]`
    antworten. FALLS Benutzername oder E-Mail im Realm schon vergeben sind oder der Benutzername je im
    Benutzerverzeichnis einer anderen Kennung gehörte, DANN SOLL das Archiv mit HTTP 409 `BENUTZER_EXISTIERT`
    antworten, ohne zu nennen, welches Feld oder welcher Mandant betroffen ist.
@@ -271,8 +271,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
    403 `ESKALATION_VERBOTEN` antworten, nichts ändern und `VERWEIGERT` mit dem Fehlercode protokollieren.
 7. FALLS ein Vorgang den Mandanten ohne aktiven Inhaber (Status `AKTIV` mit Rolle `inhaber`) liesse (Rolle ändern,
    sperren, deaktivieren, löschen), DANN SOLL das Archiv mit HTTP 409 `LETZTER_INHABER` antworten und nichts ändern. Das
-   Archiv SOLL gleichzeitige Verwaltungsvorgänge eines Mandanten nacheinander ausführen (eine Vorgangssperre mit Ablauf
-   nach höchstens 15 Sekunden; ein zweiter Vorgang erhält HTTP 409 `STATUS_KONFLIKT`), damit zwei Inhaber sich nicht
+   Archiv SOLL gleichzeitige Verwaltungsvorgänge eines Mandanten nacheinander ausführen (eine Vorgangssperre; eine vor externer Wirkung
+   vorbereitete Sperre läuft nach höchstens 15 Sekunden ab, ein Vorgang `ANGEFRAGT` oder `UNKLAR` bleibt bis zum Abgleich
+   oder zur Klärung gesperrt, weil eine externe Wirkung noch eintreffen kann (Entscheid Fabian 21.11.2026); ein zweiter Vorgang erhält HTTP 409 `STATUS_KONFLIKT`), damit zwei Inhaber sich nicht
    gleichzeitig entfernen. Nachweis: Szenario mit gleichzeitigen Aufrufen und JUnit (`LetzterInhaberTest`).
 8. Das Archiv SOLL den Mandanten nie aus Pfad, Query, Header oder Body übernehmen: Der Mandant stammt aus dem
    verifizierten Token; jeder Zielbenutzer SOLL vor jeder Aktion (nicht nur in Listen) auf genau diesen Wert des
@@ -363,7 +364,7 @@ auffälliger Häufung gewarnt werden, damit ein Missbrauch auffällt.
    Die Aktionen und Fehlercodes kommen mit der jeweiligen Aufgabe in Spec 01 und in die Enums (`FehlercodeSpecTest`).
 2. Das Archiv SOLL je Eintrag den Akteur (`benutzer` = Keycloak-`sub`, Rolle), die Zeit, die IP und im Feld `details`
    die `vorgangId`, das Ziel nur als Keycloak-`sub` (`ziel`), den Vorgang, bei Rollenwechsel die Rollennamen alt und neu,
-   bei E-Mail, Vorname und Nachname nur Feldname und «geändert» und den Grund (höchstens 500 Zeichen) enthalten, nie
+   bei E-Mail, Vorname und Nachname nur Feldname und «geändert» und den Grund (feste Kategorie, Entscheid Fabian 21.11.2026) enthalten, nie
    E-Mail-Adressen, Vor- und Nachnamen, Passwörter, Links, Codes oder Tokens; `dokument_id` bleibt leer. Nachweis: Szenarien
    und JUnit (`VerwaltungProtokollTest` sucht in `details` nach E-Mail-Mustern, Namen aus dem Test und Link-Mustern).
 3. WENN das Archiv einen Benutzer anlegt oder bei der Übernahme (9.4) erfasst, DANN SOLL es in derselben Transaktion eine
