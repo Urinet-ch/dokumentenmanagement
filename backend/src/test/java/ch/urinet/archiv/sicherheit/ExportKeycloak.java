@@ -71,6 +71,9 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
                 .withEnv("ARCHIV_BASIS_URL", PWA_TEST_URL)
                 .withCopyFileToContainer(MountableFile.forHostPath(exportTemporaer.toAbsolutePath()),
                         "/opt/keycloak/data/import/realm-export.json")
+                .withCopyFileToContainer(MountableFile.forHostPath(
+                                Path.of("../deploy/infomaniak/keycloak/themes/urinet-archiv").toAbsolutePath()),
+                        "/opt/keycloak/themes/urinet-archiv")
                 .withCommand("start-dev", "--import-realm")
                 .withExposedPorts(8080)
                 .waitingFor(Wait.forHttp("/realms/urinet-archiv").forPort(8080)

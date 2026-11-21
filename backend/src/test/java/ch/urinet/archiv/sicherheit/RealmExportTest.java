@@ -186,7 +186,10 @@ class RealmExportTest {
                 identityProviders.remove(i);
             }
         }
-        assertThat(test).isEqualTo(JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile()));
+        ObjectNode export = (ObjectNode) JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile());
+        assertThat(export.remove("loginTheme").asText()).isEqualTo("urinet-archiv");
+        assertThat(export.remove("emailTheme").asText()).isEqualTo("urinet-archiv");
+        assertThat(test).isEqualTo(export);
     }
 
     @Test

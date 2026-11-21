@@ -32,6 +32,8 @@
   "permanentLockout": false,
   "failureFactor": 5,
   "internationalizationEnabled": true,
+  "loginTheme": "urinet-archiv",
+  "emailTheme": "urinet-archiv",
   "supportedLocales": [
     "de"
   ],

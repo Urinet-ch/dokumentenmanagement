@@ -9,6 +9,7 @@ COPY --from=build /opt/keycloak/ /opt/keycloak/
 COPY --chown=1000:0 keycloak/realm-export.json /opt/keycloak/data/import/realm-export.json
 # Login-Theme des Mandanten VHF/GSK (Aufgabe 10.3); gewählt wird es am Client im Realm (Admin-Konsole, Hinweis in design.md)
 COPY --chown=1000:0 infomaniak/keycloak/themes/vhf-gsk /opt/keycloak/themes/vhf-gsk
+COPY --chown=1000:0 infomaniak/keycloak/themes/urinet-archiv /opt/keycloak/themes/urinet-archiv
 COPY infomaniak/keycloak/start.sh /opt/keycloak/bin/archiv-start.sh
 USER 1000
 ENTRYPOINT ["/opt/keycloak/bin/archiv-start.sh"]
