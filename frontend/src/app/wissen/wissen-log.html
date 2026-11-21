@@ -6,7 +6,7 @@
 </div>
 @if (laedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
 @if (fehler(); as meldung) {
-  <p class="fehler" role="alert">{{ meldung }}</p>
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
   <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button></div>
 }
 @if (seite(); as seite) {

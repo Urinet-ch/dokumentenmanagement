@@ -1,7 +1,7 @@
 <a class="zurueck" routerLink="/wissen"><span aria-hidden="true">←&nbsp;</span>{{ texte.zurueck }}</a>
 <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
 @if (fehler(); as meldung) {
-  <p class="fehler" role="alert">{{ meldung }}</p>
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
   @if (!werte()) {
     <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button></div>
   }
@@ -40,7 +40,7 @@
       (click)="exportStarten()">{{ texte.exportStart }}</button>
   </div>
   @if (exportFehler(); as meldung) {
-    <p class="fehler" role="alert">{{ meldung }}</p>
+    <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
     @if (export()?.status === 'OFFEN' || export()?.status === 'IN_ARBEIT') {
       <div class="knoepfe"><button mat-button type="button" (click)="exportAbrufen()">{{ texte.erneut }}</button></div>
     }

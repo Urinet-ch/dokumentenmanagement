@@ -160,16 +160,20 @@ jobs:
           .github/scripts/pruefe-liquibase-test.sh
           .github/scripts/pruefe-liquibase.sh "$BASIS"
 
+      - name: Webseiten-Vertrag nur additiv
+        env:
+          EREIGNIS: ${{ github.event_name }}
+          BASIS: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$EREIGNIS" = workflow_dispatch ]; then
+            BASIS="$(git rev-parse HEAD^)"
+          fi
+          .github/scripts/pruefe-vertrag-test.sh
+          .github/scripts/pruefe-vertrag.sh "$BASIS"
+
       - name: Frontend-Abhängigkeiten
         working-directory: frontend
         run: npm ci
-      # Das JAR des OpenAPI-Generators lädt die CLI sonst bei jedem Lauf von Maven Central, weil npm ci node_modules
-      # leert; HTTP 429 liess den Build scheitern (20.11.2026). Version aus openapitools.json, Wiederherstellen nach npm ci
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: frontend/node_modules/@openapitools/openapi-generator-cli/versions
-          key: openapi-generator-${{ hashFiles('frontend/openapitools.json') }}
-
       - name: Build über Quinoa (ohne Tests, die laufen in den Backend-Jobs)
         run: mvn -B -ntp -f backend/pom.xml package -Dmaven.test.skip=true
 
@@ -178,6 +182,14 @@ jobs:
           name: quarkus-app
           path: backend/target/quarkus-app/
           retention-days: 3
+
+      # Das JAR des OpenAPI-Generators lädt die CLI sonst bei jedem Lauf von Maven Central (HTTP 429 liess den Build
+      # scheitern, 20.11.2026). Erst nach dem Quinoa-Build wiederherstellen: Quinoa führt selbst «npm ci» aus und leert
+      # node_modules, ein früher wiederhergestelltes JAR war danach weg (21.11.2026, Lauf 44897598278)
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: frontend/node_modules/@openapitools/openapi-generator-cli/versions
+          key: openapi-generator-${{ hashFiles('frontend/openapitools.json') }}
 
       - name: OpenAPI und generierter Client aktuell
         working-directory: frontend

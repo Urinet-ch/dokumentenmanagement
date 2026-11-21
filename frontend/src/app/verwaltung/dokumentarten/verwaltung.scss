@@ -11,7 +11,6 @@
   min-width: 0;
 }
 
-h1,
 h2,
 h3,
 h4,
@@ -19,14 +18,17 @@ h5 {
   margin: 0;
 }
 
+h2,
+h3 {
+  font-weight: 600;
+}
+
 h2 {
   font-size: 17px;
-  font-weight: 600;
 }
 
 h3 {
   font-size: 15px;
-  font-weight: 600;
 }
 
 p {
@@ -34,15 +36,11 @@ p {
   overflow-wrap: anywhere;
 }
 
-section {
-  display: grid;
-  gap: 0.75rem;
-  min-width: 0;
-}
-
 .sprungmarken,
 .datei-aktionen,
-.bestaetigung {
+.bestaetigung,
+.zuordnungsliste li,
+.werteliste li {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -94,12 +92,13 @@ aside,
   background: var(--akzent-weich);
 }
 
+section,
 aside,
 .formular,
-.wert-formular,
-.zuordnungen {
+.wert-formular {
   display: grid;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .auswahlliste,
@@ -142,58 +141,24 @@ aside,
     font-weight: 600;
   }
 
+  span:first-child,
+  code {
+    overflow-wrap: anywhere;
+  }
+
   code {
     color: var(--text-gedaempft);
   }
-}
 
-.auswahl span:first-child,
-.auswahl code {
-  overflow-wrap: anywhere;
-}
-
-.auswahl .status {
-  grid-column: 1 / -1;
+  .status {
+    grid-column: 1 / -1;
+  }
 }
 
 .pillen {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
-}
-
-.pille {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border: 1px solid var(--linie);
-  border-radius: 99px;
-  background: var(--karte-2);
-  color: var(--text-2);
-  font-size: 11.5px;
-  font-weight: 600;
-  line-height: 1.1;
-
-  &.ok,
-  &.akzent,
-  &.info {
-    border-color: transparent;
-  }
-
-  &.ok {
-    background: var(--ok-weich);
-    color: var(--ok);
-  }
-
-  &.akzent {
-    background: var(--akzent-weich);
-    color: var(--akzent-text);
-  }
-
-  &.info {
-    background: var(--warnung-weich);
-    color: var(--warnung);
-  }
 }
 
 .formular label,
@@ -259,12 +224,8 @@ legend {
   font-weight: 600;
 }
 
-.feld-editor {
-  display: grid;
-  gap: 0.65rem;
-}
-
-.option-zeile {
+.option-zeile,
+.vergleich-formular {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
   gap: 0.5rem;
@@ -311,80 +272,25 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid var(--urinet-gelb);
-  outline-offset: 2px;
-}
-
-.hinweis,
+.nebentext,
 .status {
   color: var(--text-gedaempft);
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
 
-.meldung {
-  padding: 0.65rem 0.8rem;
-  border-radius: var(--radius-klein);
-  overflow-wrap: anywhere;
-}
+// Versionen und Vergleiche (.tabelle): Zellen oben bündig, Köpfe und lange Pfade umbrechen
+.tabelle-rahmen {
+  th,
+  td {
+    min-width: 6rem;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
 
-.fehler {
-  color: var(--gefahr);
-}
-
-.meldung.fehler {
-  background: var(--gefahr-weich);
-}
-
-.erfolg {
-  color: var(--ok);
-}
-
-.meldung.erfolg {
-  background: var(--ok-weich);
-}
-
-.tabellen-rahmen {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-th,
-td {
-  min-width: 6rem;
-  padding: 0.625rem 0.75rem;
-  border-bottom: 1px solid var(--linie);
-  text-align: start;
-  vertical-align: top;
-  overflow-wrap: anywhere;
-}
-
-th {
-  color: var(--text-gedaempft);
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-tr:last-child td {
-  border-bottom: 0;
-}
-
-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.86em;
+  th {
+    white-space: normal;
+  }
 }
 
 td code {
@@ -392,19 +298,13 @@ td code {
 }
 
 .vergleich-formular {
-  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 0.75rem;
-  align-items: end;
   min-width: 0;
 }
 
 .zuordnungsliste li,
 .werteliste li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
   min-width: 0;
 }
 

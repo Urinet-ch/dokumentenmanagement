@@ -130,7 +130,7 @@ describe('Import-Lauf (Aufgabe 4.4)', () => {
   describe('Vorschau und Übernahme (Req 13.3, 13.5–13.7)', () => {
     it('zeigt die Zähler und filtert die Zeilen je Ergebnis', async () => {
       await oeffnen(VORSCHAU);
-      const chips = [...element.querySelectorAll<HTMLButtonElement>('.chip')];
+      const chips = [...element.querySelectorAll<HTMLButtonElement>('.kachel')];
       expect(chips.map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
         '4 Alle',
         '1 neu',
@@ -163,7 +163,7 @@ describe('Import-Lauf (Aufgabe 4.4)', () => {
 
     it('filtert die Zeilen auf «inaktiv» (Req 13.3)', async () => {
       await oeffnen(VORSCHAU);
-      const chip = [...element.querySelectorAll<HTMLButtonElement>('.chip')].find((c) => c.dataset['ergebnis'] === 'INAKTIV')!;
+      const chip = [...element.querySelectorAll<HTMLButtonElement>('.kachel')].find((c) => c.dataset['ergebnis'] === 'INAKTIV')!;
       chip.click();
       await fixture.whenStable();
       expect(service.apiV1ImporteIdGet).toHaveBeenLastCalledWith('l1', 'INAKTIV', 50, 0);
@@ -202,7 +202,7 @@ describe('Import-Lauf (Aufgabe 4.4)', () => {
       const auswahl = () => [...element.querySelectorAll<HTMLSelectElement>('[data-test=entscheid]')];
       await waehlen(auswahl()[0], `ZUSAMMENFUEHREN:${K1}`);
       await waehlen(auswahl()[1], 'NEU');
-      const chips = () => [...element.querySelectorAll<HTMLButtonElement>('.chip')];
+      const chips = () => [...element.querySelectorAll<HTMLButtonElement>('.kachel')];
       chips()[1].click();
       await fixture.whenStable();
       chips()[0].click();
