@@ -166,6 +166,53 @@ damit ich Dokumente auch in einer unterstützten KI-Anwendung finden und prüfen
 10. WENN ein MCP-Token widerrufen wird, DANN SOLL der nächste Aufruf mit diesem Token abgelehnt werden. Das Tokengeheimnis SOLL nur einmal ausgegeben, gehasht gespeichert und weder protokolliert noch in einer URL übertragen werden.
 11. Der MCP-Server SOLL selbst keine Archivdaten an ein Sprachmodell senden. Produktiv dürfen Antworten nur mit einem gemäss `tech.md` zugelassenen Modell verarbeitet werden; eine Weitergabe an einen fremden Modellanbieter ist ausgeschlossen. Dieses Kriterium ist eine Betriebsbedingung, die der Server bei einem externen MCP-Client nicht durchsetzen kann; sie setzt Entscheid 1 voraus (bei «nein» entfällt Requirement 14 wie die AbaNinja-Anforderungen). In Stufe A darf MCP nur mit Testdaten nach `tech.md` geprüft werden (anonymisierte Echtdaten nur mit Nachweis der Anonymisierung durch Fabian); der Produktiveinsatz ist frühestens auf Stufe B nach manueller Freigabe zulässig (Nachweis: manuell [Fabian]).
 
+### Requirement 15: Bewertung von Chat-Antworten und Auswertung für die Suche (ohne Konzept-ID, Entscheid Fabian 21.11.2026)
+**User Story:** Als Inhaber möchte ich jede Chat-Antwort bewerten können (war sie gut, wurde die Frage richtig beantwortet) und die
+Bewertungen samt Frage, Antwort und Quellen als Datei exportieren, damit ich sie auswerten und die Suche und den Chat gezielt
+verbessern kann.
+
+Entscheide Fabian 21.11.2026: **Fünf Sterne** je Antwort; gespeichert werden **Frage, Antwort, Quellen und Bewertung**; **alle
+Chat-Nutzer bewerten**, nur der **Inhaber exportiert**; der Export hat einen Schalter **«Personendaten schwärzen»** (Standard an).
+Die Bewertung ändert Suche und Chat **nicht selbst**; Verbesserungen entstehen durch Menschen auf Grundlage der Auswertung.
+
+#### Acceptance Criteria
+1. Die Chat-Seite SOLL unter jeder abgeschlossenen Antwort (Status `OK`) fünf Sterne zeigen (1 bis 5). WENN die Bewertung höchstens 3
+   beträgt, DANN SOLL die App einen Grund zur Auswahl anbieten («Frage nicht beantwortet», «Antwort falsch», «Antwort unvollständig»,
+   «falsche oder fehlende Quelle», «zu langsam», «anderes») und ein Freitextfeld mit höchstens 500 Zeichen; bei 4 und 5 sind beide
+   freiwillig. Die Sterne sind mit Tastatur und Screenreader bedienbar (Name «Antwort bewerten, n von 5 Sternen»).
+2. Das Archiv SOLL je Antwort und Benutzer höchstens eine Bewertung speichern, die der Benutzer jederzeit ändern oder entfernen kann
+   (die letzte gilt); nur die Antworten **eigener** Gespräche SOLLEN bewertbar sein (andere: HTTP 404, wie unbekannt); mandantengetrennt.
+3. Das Archiv SOLL mit der Bewertung (Sterne, Grund, Freitext, Zeitpunkt, Benutzer) auf die gespeicherte Nachricht verweisen und aus dem
+   Gesprächsprotokoll (Requirement 5.4) Frage, Antwort, Werkzeugaufrufe, Quellen, Tokens und Modellkennung für den Export
+   verwenden; es SOLL keine zusätzliche Kopie von Frage und Antwort anlegen. Die Bewertung SOLL mit der Nachricht nach 12 Monaten
+   gelöscht werden (Requirement 5.4) und bei Löschung der Nachricht oder des Gesprächs mitgelöscht werden.
+4. Das Archiv SOLL die Zahl der Bewertungen begrenzen (höchstens 200 je Benutzer und Stunde, HTTP 429) und den Freitext als Text speichern
+   und anzeigen (kein Markup, keine Ausführung), Steuerzeichen entfernen.
+5. Das Archiv SOLL für Benutzer mit dem neuen Recht **A20** (Rolle Inhaber; Geschäftsstelle 403; API-Tokens und Webseiten-Schlüssel 403,
+   ergänzt die Rechtematrix, Spec 01, 2.6) die Seite «Chat-Auswertung» zeigen: Anzahl Bewertungen und Durchschnitt im gewählten
+   Zeitraum, Verteilung der Sterne, Häufigkeit der Gründe und die Liste der Antworten mit höchstens 2 Sternen (Datum, Sterne, Grund,
+   erste 120 Zeichen der Frage), nur für den eigenen Mandanten.
+6. WENN ein Benutzer mit Recht A20 «Auswertung exportieren» wählt, DANN SOLL das Archiv eine Datei erzeugen: ZIP mit `bewertungen.jsonl`
+   (eine Zeile je bewertete Antwort), `schema.json` und `README.txt` (Format `chat-bewertungen/v1`), Zeitraum und Mindest-/Höchstzahl
+   der Sterne wählbar, höchstens 5'000 Zeilen je Export (Hinweis bei Überschreitung), deterministisch sortiert (Zeit, Nachrichtennummer).
+   Je Zeile: Tag (ohne Uhrzeit), Sterne, Grund, Freitext, Frage, Antwort, Werkzeuge (Name, Parameter, Anzahl Treffer), Treffer
+   (Typ Dokument oder Wissensseite, Kennung als Hash, Rang, Ähnlichkeit), Suchweg (hybrid, Volltext, Wissensseiten), Zeit bis zum ersten
+   Text, Tokens, Modellkennung und Version des Systemprompts. Keine Benutzerkennung, keine Mandantenkennung, keine Dateinamen.
+7. Der Export SOLL den Schalter «Personendaten schwärzen» haben, **standardmässig an**: Das Archiv SOLL E-Mail-Adressen, Telefonnummern, IBAN,
+   UID, AHV-Nummer, Geldbeträge, Datumsangaben von Personen und die Namen der Partner und Kontakte des Mandanten in Frage, Antwort und
+   Freitext durch Platzhalter ersetzen (`[E-MAIL]`, `[IBAN]`, `[PARTNER-3]` …, gleiche Person gleicher Platzhalter innerhalb der Datei);
+   die App SOLL darauf hinweisen, dass freie Namen und Zusammenhänge nicht vollständig erkannt werden und die Datei vor dem Weitergeben
+   geprüft werden muss. Der Export im Klartext SOLL eine ausdrückliche Bestätigung verlangen.
+8. Der Export SOLL ein Step-up verlangen (Spec 06, 7.2) und im Verwaltungsprotokoll als `CHAT_BEWERTUNG_EXPORT` ohne Inhalte stehen
+   (Zeitraum, Anzahl, Modus geschwärzt/Klartext, Benutzer); die Datei SOLL nur als Download an den anfragenden Benutzer gehen, nicht im
+   Archiv abgelegt, nicht per E-Mail versendet und nicht an Dritte übermittelt werden; der Inhaber verantwortet die Weitergabe (revDSG).
+9. Die Chat-Seite SOLL den Hinweis zeigen, dass Bewertungen mit Frage und Antwort 12 Monate gespeichert werden und der Inhaber sie
+   auswertet (Datenschutzhinweis, kurzer Text unter den Sternen oder auf der Hilfeseite «Chat»).
+10. Das Archiv SOLL die Bewertung nie automatisch in Suche, Systemprompt, Rangierung oder Prüfliste einfliessen lassen.
+11. Das Archiv SOLL für jedes Kriterium 1 bis 10 ein Cucumber-Szenario `@req-15.x` (`@spec-02`) enthalten, darunter Mandantentrennung,
+    fremdes Gespräch (404), Rechte (A20, Geschäftsstelle 403, API-Token 403), Schwärzung (synthetische Daten mit allen genannten
+    Mustern), Grenze von 5'000 Zeilen und Löschung nach 12 Monaten; Nachweis des Formats mit einem Schematest gegen `schema.json`.
+
 ## Optionen (nicht Teil des Plans, Aufgaben mit `*`)
 - I4: eigene Rechnungen als PDF nach AbaNinja importieren (ersetzt Nacherfassung).
 - I5: Bankbewegungen aus AbaNinja für «bezahlt am». Entfällt mit AbaNinja (Entscheid 15.11.2026, bestätigt 16.11.2026).
@@ -182,3 +229,4 @@ damit ich Dokumente auch in einer unterstützten KI-Anwendung finden und prüfen
 | I3 | 8–12 |
 | Gate Phase 2 | 13 |
 | C3 | 14 |
+| Entscheid Fabian 21.11.2026 (Chat-Bewertung) | 15 |

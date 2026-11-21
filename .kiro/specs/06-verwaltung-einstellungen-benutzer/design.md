@@ -481,7 +481,12 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 5. Mandantenabbau (Spec 03, 8.3): Der Betreiber-Schritt «Mandant deaktivieren» deaktiviert zusätzlich alle Keycloak-Benutzer
    des Mandanten und beendet ihre Sitzungen (`archiv mandant benutzer-sperren <code>`); `MandantVerweigert` (403) wirkt ohnehin
    sofort. Nach der Frist von 30 Tagen löscht der Abbau die Keycloak-Benutzer des Mandanten; Protokoll und Benutzerverzeichnis
-   bleiben mit dem Schema (Aufbewahrung, Spec 01, 10.9). Der Abgleich meldet Benutzer eines inaktiven Mandanten, die noch aktiv sind.
+   bleiben mit dem Schema (Aufbewahrung, Spec 01, 10.9). Die Namenssperre überlebt den Abbau (Req 3.4, Entscheid 21.11.2026, Weg A): Tabelle `benutzername_sperre(hash bytea primary key,
+   erstellt timestamptz not null)` im Schema `public`; `hash` = HMAC-SHA-256 über den kleingeschriebenen Benutzernamen mit dem Salz
+   `archiv.verwaltung.namenssperre-salz` (Secret-Datei, nie im Repo). Die Anlage schreibt den Eintrag in derselben Transaktion wie `ANLAGE`;
+   die Prüfung liest zuerst die Sperrliste, dann Realm und Benutzerverzeichnis; der Mandantenabbau löscht die Tabelle nicht. Bestandsnamen
+   werden mit einem Changeset aus dem Benutzerverzeichnis aller Mandanten eingetragen. Die Antwort 409 `BENUTZER_EXISTIERT` bleibt
+   unverändert (kein Hinweis auf Quelle oder Mandant). Der Abgleich meldet Benutzer eines inaktiven Mandanten, die noch aktiv sind.
 6. Rückfall: Die Verwaltung lässt sich abschalten (`archiv.verwaltung.aktiv=false`, Klasse (b)); Endpunkte antworten 404, Betrieb wie bisher
    per `kcadm.sh`.
 
