@@ -1,0 +1,21 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -152,6 +152,17 @@ jobs:
+           .github/scripts/pruefe-liquibase-test.sh
+           .github/scripts/pruefe-liquibase.sh "$BASIS"
+ 
++      - name: Webseiten-Vertrag nur additiv
++        env:
++          EREIGNIS: ${{ github.event_name }}
++          BASIS: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
++        run: |
++          if [ "$EREIGNIS" = workflow_dispatch ]; then
++            BASIS="$(git rev-parse HEAD^)"
++          fi
++          .github/scripts/pruefe-vertrag-test.sh
++          .github/scripts/pruefe-vertrag.sh "$BASIS"
++
+       - name: Frontend-Abhängigkeiten
+         working-directory: frontend
+         run: npm ci
