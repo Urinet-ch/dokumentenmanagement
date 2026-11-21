@@ -48,6 +48,7 @@ eine Aufgabe.
 - **Benutzerstatus** – `EINGELADEN` (angelegt, Einladung offen), `AKTIV`, `GESPERRT` (vorübergehend, umkehrbar),
   `DEAKTIVIERT` (Austritt, umkehrbar bis zum Löschen), `GELOESCHT` (nur noch im Protokoll und im Benutzerverzeichnis).
 - **Step-up** – erneute Anmeldung mit Passwort und TOTP kurz vor einer kritischen Aktion (Requirement 7.2).
+- **Passkey** – Anmeldedaten nach WebAuthn (Gerät wie iPhone, Mac/Schlüsselbund oder Sicherheitsschlüssel); das Gerät prüft die Person (Fingerabdruck, Gesicht, PIN), das Archiv speichert nur den öffentlichen Schlüssel in Keycloak (Requirement 10).
 - **Token-Widerruf** – Zeitpunkt je Benutzer, vor dem ausgestellte Access-Tokens das Archiv nicht mehr annimmt
   (Requirement 4.9); er schliesst die Lücke zwischen Sperren in Keycloak und Ablauf des JWT.
 - **Vorgang** – eine Verwaltungsaktion mit Wirkung in Keycloak; sie wird als Absicht und Abschluss protokolliert
@@ -515,6 +516,41 @@ einen ersten Inhaber ohne Passwort im Terminal erhalten, damit Betrieb und Abnah
 
 ---
 
+### Requirement 10: Passkey als zusätzlicher Anmeldeweg (ohne Konzept-ID)
+**User Story:** Als Benutzer möchte ich mich mit einem Passkey auf meinem iPhone oder Mac anmelden können, damit ich ohne Passwort und
+Einmalcode sicher und schnell ins Archiv komme, ohne dass der Schutz sinkt.
+
+Entscheid Fabian 21.11.2026: Der Passkey ist ein **zusätzlicher Weg**, der Passwort und TOTP ersetzt (er deckt beide Faktoren ab:
+Besitz des Geräts und Prüfung der Person); Passwort plus TOTP bleibt für alle ohne Passkey. Verlorene Passkeys setzt ein Admin zurück
+(wie TOTP). Der Passkey genügt als Step-up (7.2). Die Google-Anmeldung bleibt unverändert (verknüpftes Konto plus TOTP).
+
+#### Acceptance Criteria
+1. WENN ein Benutzer angemeldet ist, DANN SOLL er in der Kontoverwaltung von Keycloak einen oder mehrere Passkeys einrichten und
+   wieder entfernen können (iPhone, Mac/Schlüsselbund, Sicherheitsschlüssel); die Einrichtung ist freiwillig, kein Benutzer wird dazu
+   gezwungen.
+2. Der Realm SOLL auf der Anmeldeseite die Anmeldung mit Passkey ohne Passwort und ohne TOTP erlauben; das Gerät MUSS die Person prüfen
+   (Benutzerverifikation «required», auffindbarer Schlüssel «required», Attestation «none»). Die Anmeldung mit Passkey zählt als zwei
+   Faktoren und setzt `auth_time` wie die Anmeldung mit Passwort und TOTP.
+3. Das Archiv SOLL einem Benutzer ohne Passkey die Anmeldung weiter nur mit Passwort und TOTP erlauben; ein eingerichteter Passkey
+   schaltet TOTP nicht ab (Rückfall bei Geräteverlust). Der Zugang ohne zweiten Faktor bleibt ausgeschlossen (Spec 01, 2.1).
+4. WENN eine Aktion der Liste «Step-up» eintrifft, DANN SOLL eine erneute Anmeldung mit Passkey (`max_age=0`, `prompt=login`) den
+   Step-up erfüllen wie Passwort und TOTP (7.2). Nachweis gegen echtes Keycloak.
+5. WENN ein Admin «Zugang zurücksetzen» für einen Benutzer ausführt, DANN SOLL das Archiv wahlweise dessen Passkeys löschen können
+   (gleiche Rollen, gleiche Step-up- und Vier-Augen-Regeln, gleiches Protokoll wie TOTP zurücksetzen, 3.x); der Benutzer richtet beim
+   nächsten Anmelden mit Passwort und TOTP einen neuen Passkey ein.
+6. Das Archiv SOLL im Benutzerdetail «Passkey eingerichtet: ja/nein» und die Anzahl zeigen, **nicht** Gerätenamen, Schlüsselkennungen
+   oder andere Gerätedaten; die Liste der Benutzer SOLL danach filtern können.
+7. Das Archiv SOLL die Ereignisse Passkey eingerichtet, entfernt und zurückgesetzt im Verwaltungsprotokoll ohne Gerätedaten führen
+   (Spec 06, 6.x); Keycloak-Ereignisse nach den bestehenden Regeln aufbewahren.
+8. Die Relying-Party-ID (Domain der App) SOLL eine Betriebsangabe sein: im Realm-Export ein Platzhalter, der Wert kommt beim Einspielen
+   (Betrieb, nicht im Repo). Ein Domainwechsel macht Passkeys ungültig; die Dokumentation SOLL das nennen, der Rückfall ist Passwort
+   plus TOTP.
+9. Die Google-Anmeldung SOLL unverändert bleiben (verknüpftes Konto, TOTP-Pflicht, Admin-only-Verknüpfung).
+10. Das Archiv SOLL keine biometrischen Daten erhalten oder speichern; sie bleiben auf dem Gerät.
+11. Das Archiv SOLL den Passkey-Weg mit einem **virtuellen Authenticator** (Browser-Automatisierung, WebAuthn-CDP) gegen ein
+    Wegwerf-Keycloak prüfen: Einrichten, Anmelden, Step-up, Entfernen, Zurücksetzen durch den Admin. Nachweis auf echten Geräten
+    (iPhone, Mac) ist Aufgabe von Fabian bei der Inbetriebnahme.
+
 ## Rückverfolgung Auftrag → Spec
 | Auftrag Fabian (18.11.2026) | Requirement |
 | --- | --- |
@@ -524,3 +560,4 @@ einen ersten Inhaber ohne Passwort im Terminal erhalten, damit Betrieb und Abnah
 | Protokoll, Fehlerfälle, Grenzen, Alarm | 5, 6 |
 | Sicherheit und Bedrohungsmodell | 5, 7 (design.md «Bedrohungsmodell») |
 | Inbetriebnahme, Migration, Tests, Abnahme, Mandantenabbau | 9 |
+| Passkey als Anmeldeweg (iPhone, Mac), Entscheid 21.11.2026 | 10 |
