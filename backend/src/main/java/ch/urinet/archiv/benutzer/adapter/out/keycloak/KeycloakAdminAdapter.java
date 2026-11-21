@@ -196,14 +196,21 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             rolleSetzen(mandant, id, rolle);
             return id;
         } catch (RuntimeException fehler) {
+            boolean entfernt = false;
+            RuntimeException kompensationsFehler = null;
             try {
                 // Kompensation umgeht den Schutzschalter: Sie ist gerade dann nötig, wenn der Dienst ausfällt.
                 request("DELETE", user(id), null, null, false, Set.of(204, 404), true);
+                entfernt = true;
             } catch (RuntimeException kompensation) {
                 LOG.error("Kompensation nach Benutzeranlage fehlgeschlagen; Benutzerzustand ist unklar.");
-                fehler.addSuppressed(kompensation);
+                kompensationsFehler = kompensation;
             }
-            throw fehler;
+            AnlageException anlageFehler = new AnlageException(id, entfernt, fehler);
+            if (kompensationsFehler != null) {
+                anlageFehler.addSuppressed(kompensationsFehler);
+            }
+            throw anlageFehler;
         }
     }
 

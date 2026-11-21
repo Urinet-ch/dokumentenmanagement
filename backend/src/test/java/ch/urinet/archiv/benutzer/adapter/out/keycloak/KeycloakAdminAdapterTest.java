@@ -1,5 +1,6 @@
 package ch.urinet.archiv.benutzer.adapter.out.keycloak;
 
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.AnlageException;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Neuanlage;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -725,9 +726,33 @@ class KeycloakAdminAdapterTest {
 
         assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).anlegen("urinet",
                 new Neuanlage("synthetic-user", "user@example.invalid", "Ada", "Muster"), Rolle.MITARBEITER))
-                .isInstanceOfSatisfying(FachFehler.class,
-                        fehler -> assertThat(fehler.code())
-                                .isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+                .isInstanceOfSatisfying(AnlageException.class, fehler -> {
+                    assertThat(fehler.ziel()).isEqualTo("neu-1");
+                    assertThat(fehler.entfernt()).isTrue();
+                    assertThat(fehler.getCause()).isInstanceOfSatisfying(FachFehler.class,
+                            ursache -> assertThat(ursache.code())
+                                    .isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+                });
+
+        server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/neu-1")));
+    }
+
+    @Test
+    void anlegenMeldetZielUndUnklareKompensation() {
+        tokenAntwort();
+        server.stubFor(post(urlPathEqualTo(USERS)).willReturn(aResponse().withStatus(201)
+                .withHeader("Location", server.baseUrl() + USERS + "/neu-1")));
+        benutzerStub("neu-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/neu-1/role-mappings/realm")).willReturn(aResponse().withStatus(503)));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/neu-1")).willReturn(aResponse().withStatus(503)));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).anlegen("urinet",
+                new Neuanlage("synthetic-user", "user@example.invalid", "Ada", "Muster"), Rolle.MITARBEITER))
+                .isInstanceOfSatisfying(AnlageException.class, fehler -> {
+                    assertThat(fehler.ziel()).isEqualTo("neu-1");
+                    assertThat(fehler.entfernt()).isFalse();
+                    assertThat(fehler.getSuppressed()).hasSize(1);
+                });
 
         server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/neu-1")));
     }

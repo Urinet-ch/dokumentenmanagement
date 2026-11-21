@@ -28,6 +28,26 @@ public interface IdentitaetsDienst {
         }
     }
 
+    /** Fehler nach erfolgreicher Anlage; das Ziel wird für den Abschluss des Verwaltungsvorgangs benötigt. */
+    final class AnlageException extends RuntimeException {
+        private final String ziel;
+        private final boolean entfernt;
+
+        public AnlageException(String ziel, boolean entfernt, RuntimeException ursache) {
+            super("Benutzeranlage nach Erstellung fehlgeschlagen", ursache);
+            this.ziel = Objects.requireNonNull(ziel);
+            this.entfernt = entfernt;
+        }
+
+        public String ziel() {
+            return ziel;
+        }
+
+        public boolean entfernt() {
+            return entfernt;
+        }
+    }
+
     enum ErforderlicheAktion {
         VERIFY_EMAIL, UPDATE_PASSWORD, CONFIGURE_TOTP
     }

@@ -164,7 +164,9 @@ backend/src/main/java/ch/urinet/archiv/
   Dienstkontos; andere 4xx (400, 404, 405) zählen nicht. 409 wird als `IdentitaetsDienst.KonfliktException` weitergereicht
   (Abbildung auf `BENUTZER_EXISTIERT` mit 19.7). Bei 401 wird der gecachte Token verworfen, ein lesender Aufruf wird genau
   einmal mit neuem Token wiederholt. Die Kompensation in `anlegen()` umgeht den Schutzschalter (Wartezeit 2 s auf einen
-  Platz); scheitert sie, hängt der Adapter den Fehler als Suppressed an die Ausnahme. `rolleSetzen` holt die Zielrolle zuerst,
+  Platz); bei einem Fehler nach der Anlage meldet der Adapter die Zielkennung und ob die Entfernung bestätigt wurde in
+  `AnlageException`; scheitert die Kompensation, hängt er ihren Fehler als Suppressed an diese Ausnahme.
+  `rolleSetzen` holt die Zielrolle zuerst,
   fügt sie hinzu und entfernt erst danach die übrigen Archiv-Rollen. `verbindungPruefen` erzwingt einen echten Tokenabruf.
   Pfadwerte `.` und `..` (und `%2e`) werden abgelehnt. Offen (Kann): `aktualisieren`/`aktivieren` lesen und schreiben die
   volle Darstellung (Lost Update); die Vorgangssperre (19.6) serialisiert die Aufrufer.
