@@ -15,6 +15,8 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -63,7 +65,7 @@ public class JdbcVerwaltungAntrag implements VerwaltungAntragSpeicher {
     @Override
     public Optional<Antrag> lesen(UUID id) {
         Objects.requireNonNull(id);
-        String sql = "select art, ziel, rolle, grund, beantragt_von, beantragt_am, gueltig_bis, "
+        String sql = "select id, art, ziel, rolle, grund, beantragt_von, beantragt_am, gueltig_bis, "
                 + "status, entschieden_von, entschieden_am from " + schema() + ".verwaltung_antrag where id = ?";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
@@ -72,18 +74,44 @@ public class JdbcVerwaltungAntrag implements VerwaltungAntragSpeicher {
                 if (!zeile.next()) {
                     return Optional.empty();
                 }
-                String rolle = zeile.getString("rolle");
-                OffsetDateTime entschiedenAm = zeile.getObject("entschieden_am", OffsetDateTime.class);
-                return Optional.of(new Antrag(id, Art.valueOf(zeile.getString("art")), zeile.getString("ziel"),
-                        rolle == null ? null : Rolle.valueOf(rolle.toUpperCase(Locale.ROOT)), zeile.getString("grund"),
-                        zeile.getString("beantragt_von"), zeile.getObject("beantragt_am", OffsetDateTime.class).toInstant(),
-                        zeile.getObject("gueltig_bis", OffsetDateTime.class).toInstant(),
-                        Status.valueOf(zeile.getString("status")), zeile.getString("entschieden_von"),
-                        entschiedenAm == null ? null : entschiedenAm.toInstant()));
+                return Optional.of(antrag(zeile));
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Antrag nicht lesbar", e);
         }
+    }
+
+    @Override
+    public List<Antrag> offene(Instant zeit) {
+        Objects.requireNonNull(zeit);
+        String sql = "select id, art, ziel, rolle, grund, beantragt_von, beantragt_am, gueltig_bis, "
+                + "status, entschieden_von, entschieden_am from " + schema()
+                + ".verwaltung_antrag where status = 'OFFEN' and gueltig_bis > ? order by beantragt_am, id";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setObject(1, zeit.atOffset(ZoneOffset.UTC));
+            try (ResultSet zeilen = abfrage.executeQuery()) {
+                List<Antrag> antraege = new ArrayList<>();
+                while (zeilen.next()) {
+                    antraege.add(antrag(zeilen));
+                }
+                return List.copyOf(antraege);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Offene Anträge nicht lesbar", e);
+        }
+    }
+
+    private static Antrag antrag(ResultSet zeile) throws SQLException {
+        String rolle = zeile.getString("rolle");
+        OffsetDateTime entschiedenAm = zeile.getObject("entschieden_am", OffsetDateTime.class);
+        return new Antrag(zeile.getObject("id", UUID.class), Art.valueOf(zeile.getString("art")),
+                zeile.getString("ziel"), rolle == null ? null : Rolle.valueOf(rolle.toUpperCase(Locale.ROOT)),
+                zeile.getString("grund"), zeile.getString("beantragt_von"),
+                zeile.getObject("beantragt_am", OffsetDateTime.class).toInstant(),
+                zeile.getObject("gueltig_bis", OffsetDateTime.class).toInstant(),
+                Status.valueOf(zeile.getString("status")), zeile.getString("entschieden_von"),
+                entschiedenAm == null ? null : entschiedenAm.toInstant());
     }
 
     @Override

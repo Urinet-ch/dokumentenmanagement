@@ -3,6 +3,7 @@ package ch.urinet.archiv.benutzer.application;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +45,8 @@ public interface VerwaltungAntragSpeicher {
     void anlegen(Antrag antrag);
 
     Optional<Antrag> lesen(UUID id);
+
+    List<Antrag> offene(Instant zeit);
 
     boolean entscheiden(UUID id, Status status, String akteur, Instant zeit);
 }

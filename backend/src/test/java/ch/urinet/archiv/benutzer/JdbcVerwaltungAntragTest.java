@@ -61,6 +61,9 @@ class JdbcVerwaltungAntragTest {
             });
             assertThat(in(thread, "urinet", () -> speicher.lesen(antrag.id()))).contains(antrag);
             assertThat(in(thread, "vhf-gsk", () -> speicher.lesen(antrag.id()))).isEmpty();
+            assertThat(in(thread, "urinet", () -> speicher.offene(zeit))).contains(antrag);
+            assertThat(in(thread, "vhf-gsk", () -> speicher.offene(zeit))).doesNotContain(antrag);
+            assertThat(in(thread, "urinet", () -> speicher.offene(zeit.plusSeconds(60)))).doesNotContain(antrag);
             assertThat(in(thread, "urinet", () ->
                     speicher.entscheiden(antrag.id(), Status.BESTAETIGT, "antragsteller", zeit))).isFalse();
             assertThat(in(thread, "urinet", () ->
@@ -74,6 +77,7 @@ class JdbcVerwaltungAntragTest {
             assertThat(in(thread, "urinet", () -> speicher.lesen(antrag.id()))).contains(antrag);
             assertThat(in(thread, "urinet", () ->
                     speicher.entscheiden(antrag.id(), Status.ABGELAUFEN, null, zeit.plusSeconds(60)))).isTrue();
+            assertThat(in(thread, "urinet", () -> speicher.offene(zeit))).doesNotContain(antrag);
             assertThat(in(thread, "urinet", () ->
                     speicher.entscheiden(antrag.id(), Status.BESTAETIGT, "anderer", zeit))).isFalse();
         }
