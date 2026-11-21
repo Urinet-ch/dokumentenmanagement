@@ -1,44 +1,22 @@
+// Suche nach Prototyp (V.suche): grosses Suchfeld, Modus, Filter links in einer Karte, Treffer rechts als Zeilen.
+// Am Handy untereinander, Filter einklappbar; ab 960 px zweispaltig. Farben nur über Tokens.
 :host {
   display: block;
-  max-width: 60rem;
-}
-
-h1 {
-  font: var(--mat-sys-headline-small);
-  margin-top: 0;
+  max-width: 72rem;
+  overflow-wrap: anywhere;
 }
 
 h2 {
-  font: var(--mat-sys-title-medium);
-}
-
-.suchzeile {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
 
-  .begriff {
-    flex: 1 1 14rem;
-  }
-
-  button {
-    margin-bottom: 1.4rem;
-  }
-}
-
-.feld {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 0;
-
-  > span {
-    font: var(--mat-sys-label-large);
-  }
-
-  small {
-    color: var(--urinet-gedaempft);
+  app-symbol {
+    color: var(--akzent-text);
   }
 }
 
@@ -46,172 +24,362 @@ input,
 select {
   box-sizing: border-box;
   width: 100%;
-  min-height: 44px;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--urinet-linie);
-  border-radius: 8px;
-  background-color: var(--urinet-dunkel);
-  color: var(--urinet-hell);
+  min-height: 2.75rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+  background: var(--karte);
+  color: var(--text);
   font: inherit;
 }
 
-.filter-schalter {
-  margin: 0.5rem 0;
-}
-
-.filterleiste {
+.feld {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
-  gap: 0.75rem 1rem;
-  margin: 0 0 1rem;
+  gap: 0.3rem;
+  min-width: 0;
 
-  &[hidden] {
-    display: none;
+  > span:first-child {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
   }
 }
 
-.partner {
-  .gewaehlt {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    overflow-wrap: anywhere;
-  }
+.feld > span:first-child,
+small,
+.anzahl,
+.hinweis,
+.leer {
+  color: var(--text-gedaempft);
 }
 
-.vorschlaege {
-  list-style: none;
+small,
+.anzahl,
+.hinweis,
+.leer {
   margin: 0;
-  padding: 0;
-
-  .leer {
-    color: var(--urinet-gedaempft);
-  }
+  font-size: 12.5px;
+  font-weight: 400;
 }
 
-.filter-aktionen {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.fehler {
-  color: var(--urinet-fehler);
-}
-
-.anzahl {
-  color: var(--urinet-gedaempft);
-  font: var(--mat-sys-body-medium);
-}
-
-.liste {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.eintrag {
-  padding: 0.75rem 1rem;
-  overflow-wrap: anywhere;
-}
-
-.titel {
-  font: var(--mat-sys-title-medium);
-}
-
-.angaben {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-  margin: 0.25rem 0;
-  color: var(--urinet-gedaempft);
-}
-
-.betrag {
-  color: var(--urinet-hell);
-  font-variant-numeric: tabular-nums;
-}
-
-.status {
-  color: var(--akzent-text);
-}
-
-.auszug {
-  margin: 0.25rem 0;
-
-  mark {
-    background-color: var(--urinet-gelb);
-    color: var(--urinet-schwarz);
-    border-radius: 2px;
-    padding: 0 0.1em;
-  }
-}
-
-.tags {
-  list-style: none;
-  padding: 0;
-  margin: 0.25rem 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-
-  li {
-    border: 1px solid var(--urinet-linie);
-    border-radius: 1rem;
-    padding: 0 0.5rem;
-  }
-}
-
+.suchzeile,
+.modus,
+.filter-aktionen,
+.zeile-kopf,
+.zeile-fuss,
+.angaben,
+.tags,
+.rueckfall,
 .blaettern {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
-  margin: 1rem 0;
 }
 
-.modus {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin: 0.25rem 0 0.5rem;
+.suchzeile {
+  align-items: flex-start;
 
-  label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 44px;
-    font: var(--mat-sys-label-large);
+  .begriff {
+    flex: 1 1 12rem;
+    max-width: 40rem;
+  }
+
+  > button {
+    min-height: 3rem;
+  }
+}
+
+.suchfeld {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--linie-stark);
+  border-radius: 12px;
+  background: var(--karte);
+  color: var(--text-gedaempft);
+  box-shadow: var(--schatten);
+
+  &:focus-within {
+    outline: 3px solid var(--urinet-gelb);
+    outline-offset: 2px;
   }
 
   input {
-    width: 1.5rem;
-    min-height: 1.5rem;
-    height: 1.5rem;
+    min-height: 3rem;
+    border: 0;
     padding: 0;
-    margin: 0;
+    background: transparent;
+    outline: 0;
+    font-size: 15px;
   }
+}
+
+.modus {
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
 
   small {
-    color: var(--urinet-gedaempft);
+    flex: 1 1 16rem;
+  }
+}
+
+// Schalter «Volltext» im Stil des Segments; der Zustand zeigt sich am Haken und an der hervorgehobenen Fläche
+.umschalter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
+  color: var(--text-gedaempft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:has(:checked) {
+    border-color: var(--linie-stark);
+    background: var(--karte);
+    color: var(--text);
+    box-shadow: var(--schatten);
+  }
+
+  input {
+    width: 1.125rem;
+    min-height: 1.125rem;
+    margin: 0;
+    accent-color: var(--urinet-gelb);
+  }
+}
+
+.spalten {
+  display: grid;
+  gap: 1rem 1.125rem;
+  align-items: start;
+  margin-top: 1.125rem;
+
+  @media (min-width: 960px) {
+    grid-template-columns: 16rem minmax(0, 1fr);
+  }
+}
+
+.filter.karte {
+  padding: 0;
+  gap: 0;
+}
+
+.filter-schalter {
+  justify-self: start;
+  margin: 0.625rem;
+}
+
+.filterleiste {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--linie);
+
+  &[hidden] {
+    display: none;
+  }
+
+  > :not(legend) {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--linie);
+  }
+
+  > :last-child {
+    border-bottom: 0;
+  }
+}
+
+.paar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.vorschlaege,
+.liste,
+.tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ergebnisse,
+.karte {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.karte,
+.treffer-zeile {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+// Leere Meldungsfläche bleibt als Live-Region im Baum, ohne Abstand zu erzeugen
+.meldungen:empty {
+  margin-bottom: -1rem;
+}
+
+.fehler {
+  margin: 0 0 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-klein);
+  background: var(--gefahr-weich);
+  color: var(--gefahr);
+}
+
+.kopf {
+  display: grid;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--linie);
+}
+
+.leer {
+  padding: 1.5rem 0.5rem;
+  text-align: center;
+}
+
+.treffer-zeile {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--linie);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  h3 a {
+    color: var(--text);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 13px;
+  }
+}
+
+.zeile-kopf,
+.zeile-fuss {
+  justify-content: space-between;
+}
+
+.zeile-kopf {
+  align-items: baseline;
+
+  h3 {
+    min-width: 0;
+  }
+}
+
+.betrag {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.angaben {
+  gap: 0.375rem;
+}
+
+.pille {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid var(--linie);
+  border-radius: 99px;
+  background: var(--karte-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.1;
+  --symbol-groesse: 13px;
+
+  &.akzent {
+    border-color: transparent;
+    background: var(--akzent-weich);
+    color: var(--akzent-text);
+  }
+
+  &.warnung {
+    border-color: transparent;
+    background: var(--warnung-weich);
+    color: var(--warnung);
+  }
+
+  &.gefahr {
+    border-color: transparent;
+    background: var(--gefahr-weich);
+    color: var(--gefahr);
+  }
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+// Treffer nicht nur über Farbe: Unterstrich und fette Schrift (WCAG 1.4.1)
+mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--akzent-weich);
+  color: inherit;
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--urinet-gelb);
+}
+
+.tags {
+  gap: 0.25rem;
+  font-size: 12px;
+  color: var(--text-gedaempft);
+
+  li {
+    padding: 0.125rem 0.5rem;
+    border: 1px dashed var(--linie-stark);
+    border-radius: 99px;
   }
 }
 
 .rueckfall {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 1rem;
-  padding: 0.5rem 1rem;
-  margin: 0.5rem 0;
-  overflow-wrap: anywhere;
+  gap: 0.5rem 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-klein);
+  background: var(--warnung-weich);
+
+  app-symbol {
+    color: var(--warnung);
+  }
 
   p {
+    flex: 1 1 12rem;
     margin: 0;
-    flex: 1 1 14rem;
+    color: var(--text-2);
   }
+}
+
+.blaettern {
+  justify-content: center;
+  padding-top: 0.75rem;
 }
