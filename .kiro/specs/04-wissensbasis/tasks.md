@@ -184,12 +184,24 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
 ## Welle 16 — Abnahme Phase 4
 
-- [ ] 16.1 Sicherheits- und Isolationstests [QA]
+- [x] 16.1 Sicherheits- und Isolationstests [QA]
   - Szenario `@req-18.5` mit zwei Mandanten und allen Rollen über Index, Seiten, Suche, Log, Entwürfe, Chat-Werkzeuge und Export; `MandantenIsolationIT` (Spec 03) um die Wissensbasis erweitern
   - Prompt-Injection-Prüfung aus 14.1 über alle Wege wiederholen, auch über Pakete (Import, 15.6); Befunde beheben
   - Import in die Isolation einbeziehen (`@req-19.29`): zwei Mandanten, alle Rollen und API-Token; Paket mit der SHA-256 eines Dokuments des anderen Mandanten, Zip-Slip, Symlink, Zip-Bombe, YAML mit Tag und Alias, Rohhtml, externer Link und `cloud` mit `INTERN` je abgelehnt bzw. mit Befund (Beispielpakete aus 15.6)
   - _Anforderungen: 11.5, 11.6, 18.5, 19.29_
   - _Abhängig von: 15.1–15.8_
+  - Isolation und Angriffswege mit synthetischen Daten automatisiert geprüft; der Lauf gegen den echten Bestand auf Stufe B
+    und das Gate bleiben Aufgabe 16.2 [Fabian].
+  - Prompt-Injection je Weg (Weg → Szenario): Ingest `ingest.feature` (aus 14.1); Chat-Lesewerkzeuge `sichtbarkeit-rechte.feature`
+    (@req-11.6); Analysevorschlag `chat-analyse.feature` (Anweisung in der Chatantwort, ohne KI-Aufruf); Lint `lint.feature`;
+    Import `import.feature` (Anweisung mit und ohne Rohhtml). Der manuelle Entwurf ruft keine KI auf; sein Text stammt vom
+    Inhaber selbst und ist kein Injektionsweg. Es wurden keine Befunde gefunden, die Produktcode ändern.
+  - Auslegung Import (@req-19.29): Die Angriffspakete laufen über die gemeinsamen Beispielpakete (`WissensPaketBeispiele`) und
+    prüfen Paketleser und REST-Import auf gleiche Ergebnisse; der Mandant stammt immer aus der Anmeldung, die Regelgleichheit ist
+    rollenunabhängig. Die Rollen- und Mandantenprüfung läuft mit einem gültigen Paket (`rechte()`); die Fremd-SHA wird in
+    Richtung urinet geprüft. Offen und bewusst nicht getestet: Fremd-SHA und Angriffspakete aus Sicht von `inhaber-vhf-gsk`.
+  - Entwurfsliste (`GET /wissensentwuerfe`) mit Mandant und Rolle geprüft: Inhaber und Geschäftsstelle (A17) sehen nur die Entwürfe
+    des eigenen Mandanten, der Mitarbeiter (A18) nur eigene Analysevorschläge, der Treuhänder erhält 403.
 
 - [ ] 16.2 Prüfliste und Gate [Fabian] [QA]
   - `wissen-pruefliste.yaml` (Wissensquellen, Fussnoten-Stichprobe, Fragen mit erwarteten Seiten und Quelldokumenten) nur unter `ARCHIV_GOLDEN_DIR`; im Repo nur Schema und Test `WissenPrueflisteIT`

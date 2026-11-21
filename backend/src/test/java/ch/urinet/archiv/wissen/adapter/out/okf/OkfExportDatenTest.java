@@ -89,9 +89,12 @@ class OkfExportDatenTest {
         }
         UUID seitenId = UUID.randomUUID();
         String pfad = "konzepte/export-" + seitenId;
+        UUID fremdeSeitenId = UUID.randomUUID();
+        String fremderPfad = "konzepte/export-" + fremdeSeitenId;
         UUID exportId = null;
         try {
             seite(code, seitenId, pfad);
+            seite(fremder, fremdeSeitenId, fremderPfad);
             String token = Testanmeldung.token("inhaber-urinet");
             var angefordert = given().auth().oauth2(token).when().post("/api/v1/wissensbasis/exporte")
                     .then().statusCode(202).extract().jsonPath();
@@ -129,6 +132,7 @@ class OkfExportDatenTest {
             byte[] zip = TestAblage.lesen(code.wert(), key, version);
             assertThat(antwort.getString("sha256")).isEqualTo(Pruefsumme.von(zip));
             assertThat(dateinamen(zip)).contains(pfad + ".md", "index.md", "log.md", "paket.yaml");
+            assertThat(dateinamen(zip)).doesNotContain(fremderPfad + ".md");
             try (HttpClient http = HttpClient.newHttpClient()) {
                 HttpResponse<byte[]> download = http.send(
                         HttpRequest.newBuilder(URI.create(antwort.getString("url"))).GET().build(),
@@ -179,7 +183,11 @@ class OkfExportDatenTest {
                     }
                 }
             } finally {
-                loeschen(code, seitenId);
+                try {
+                    loeschen(code, seitenId);
+                } finally {
+                    loeschen(fremder, fremdeSeitenId);
+                }
             }
         }
     }
