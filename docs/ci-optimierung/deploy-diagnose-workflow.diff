@@ -1,0 +1,28 @@
+diff --git a/.github/workflows/infomaniak-deploy.yml b/.github/workflows/infomaniak-deploy.yml
+--- a/.github/workflows/infomaniak-deploy.yml
++++ b/.github/workflows/infomaniak-deploy.yml
+@@ -223,4 +223,5 @@ jobs:
+       - name: Container gesund
++        id: container_gesund
+         env:
+           HOST: ${{ vars.INFOMANIAK_HOST }}
+         run: |
+@@ -257,5 +258,17 @@ jobs:
+           echo "::error::api, db und kc sind nach 10 Minuten nicht alle healthy."
+           exit 1
+-
++
++      # Voraussetzung: «diagnose archiv» gibt nur OOMKilled, ExitCode, RestartCount und gezählte Fehlercodes aus,
++      # nie Rohzeilen der API-Logs (CI-Logs nur mit IDs, wie beim Schritt «Container gesund»).
++      - name: Diagnose bei fehlgeschlagener Container-Prüfung
++        if: failure() && steps.container_gesund.outcome == 'failure'
++        env:
++          HOST: ${{ vars.INFOMANIAK_HOST }}
++        run: |
++          umask 077
++          if ! ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "deploy@$HOST" "diagnose $APP"; then
++            echo "::warning::Die Container-Diagnose ist fehlgeschlagen; Deploy-Gate und API-Container prüfen."
++          fi
++
+       - name: Öffentliche Prüfung
+         run: |
