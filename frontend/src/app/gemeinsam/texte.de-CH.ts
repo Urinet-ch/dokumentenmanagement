@@ -1672,6 +1672,9 @@ export const TEXTE = {
     // Seite /hilfe (Spec 07, Aufgabe 22.2, Req 5.1, 6.3, 6.5)
     titel: 'Hilfe',
     untertitel: 'So bedienen Sie das Archiv, Bereich für Bereich.',
+    ganzeAnleitung: 'Ganze Anleitung öffnen',
+    schliessen: 'Schliessen',
+    kontextInhalt: 'Abschnitt der Anleitung',
     inhalt: 'Inhalt der Anleitung',
     rolle: (rolle: string) =>
       `Sie sind als ‹${rolle}› angemeldet. Diese Anleitung zeigt die Bereiche, die Ihre Rolle nutzen darf.`,

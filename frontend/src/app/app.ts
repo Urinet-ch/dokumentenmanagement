@@ -28,6 +28,11 @@ import { Symbol } from './gemeinsam/symbol';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
 import { WissenEntwurfZaehler } from './wissen/wissen-entwurf-zaehler';
+import { HILFE_EINTRAEGE } from './hilfe/hilfe-sichtbar';
+import { HilfeLeisteAnsicht } from './hilfe/hilfe-leiste';
+import { HilfeLeiste } from './hilfe/hilfe-leiste.service';
+import { hilfeKontext } from './hilfe/hilfe-kontext';
+import { Rolle } from './gemeinsam/anmeldung/rechte';
 
 export const SEITE_NEU_LADEN = new InjectionToken<() => void>('SEITE_NEU_LADEN', {
   providedIn: 'root',
@@ -43,7 +48,7 @@ export const SEITE_NEU_LADEN = new InjectionToken<() => void>('SEITE_NEU_LADEN',
 });
 
 @Component({
-  imports: [MatButtonModule, MatSidenavModule, RouterLink, RouterLinkActive, RouterOutlet, Symbol],
+  imports: [HilfeLeisteAnsicht, MatButtonModule, MatSidenavModule, RouterLink, RouterLinkActive, RouterOutlet, Symbol],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',
@@ -55,6 +60,7 @@ export class App {
   protected readonly branding = inject(BrandingService);
   protected readonly zaehler = inject(EingangskorbZaehler);
   protected readonly wissensentwurfZaehler = inject(WissenEntwurfZaehler);
+  protected readonly hilfe = inject(HilfeLeiste);
   private readonly entwurfSpeicher = inject(EingangskorbEntwurfSpeicher);
   protected readonly online = inject(ONLINE);
   protected readonly updateBereit = signal(false);
@@ -62,6 +68,7 @@ export class App {
   private readonly router = inject(Router);
   private readonly swUpdate = inject(SwUpdate);
   private readonly seiteNeuLaden = inject(SEITE_NEU_LADEN);
+  private readonly hilfeKatalog = inject(HILFE_EINTRAEGE);
 
   protected readonly mobil = toSignal(
     inject(BreakpointObserver)
@@ -81,6 +88,11 @@ export class App {
   protected readonly aktiverPfad = computed(() => aktiverPfad(this.url(), this.menue().map((punkt) => punkt.pfad)));
   protected readonly abschnitte = computed(() => abschnitte(this.menue()));
   protected readonly darfSuchen = computed(() => this.menue().length > 0 && this.anmeldung.darf('A2'));
+  private readonly hilfeRolle = computed<Rolle | null>(() => {
+    const benutzer = this.anmeldung.benutzer();
+    return this.anmeldung.angemeldet() && benutzer?.mandant && benutzer.rolle ? benutzer.rolle : null;
+  });
+  private readonly hilfeAnker = computed(() => hilfeKontext(this.url(), this.hilfeRolle(), this.hilfeKatalog));
   protected readonly farbschema = inject(FarbschemaService);
 
   constructor() {
@@ -102,6 +114,15 @@ export class App {
           this.updateBereit.set(true);
         });
     }
+
+    this.router.events
+      .pipe(
+        filter((ereignis) => ereignis instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        if (this.hilfe.offen()) this.hilfe.schliessen();
+      });
 
     // Die Warteschlange der Handy-Erfassung lädt ab dem Start der App hoch, nicht erst auf «Erfassen» (Req 4.5);
     // nachgeladen, damit IndexedDB und Upload nicht im ersten Bundle liegen
@@ -138,6 +159,14 @@ export class App {
 
   protected zumInhalt(inhalt: HTMLElement): void {
     inhalt.focus();
+  }
+
+  protected hilfeUmschalten(ausloeser: HTMLElement): void {
+    if (this.hilfe.offen()) {
+      this.hilfe.schliessen();
+    } else {
+      this.hilfe.oeffnen(this.hilfeAnker(), ausloeser);
+    }
   }
 
   protected abmelden(): void {

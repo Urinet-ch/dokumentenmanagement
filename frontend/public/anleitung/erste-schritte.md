@@ -25,6 +25,10 @@ Auf breiten Bildschirmen stehen oben rechts Ihr Name, Ihre Rolle und der Mandant
 
 Die App folgt dem hellen oder dunklen Farbschema Ihres Geräts. Mit dem Knopf mit Sonne oder Mond oben rechts wechseln Sie das Farbschema. Diese Wahl merkt sich nur der Browser, in dem Sie sie treffen.
 
+## Hilfe
+
+Wählen Sie oben neben dem Farbschema «Hilfe». Die Hilfe-Leiste zeigt den Abschnitt zur aktuellen Seite, ohne sie zu verlassen. Über «Ganze Anleitung öffnen» lesen Sie alle für Ihre Rolle sichtbaren Bereiche; dort können Sie auch einen Abschnitt direkt öffnen.
+
 ## Abmelden
 
 1. Wählen Sie oben rechts «Abmelden». Auf dem Handy zeigt der Knopf nur das Symbol.
