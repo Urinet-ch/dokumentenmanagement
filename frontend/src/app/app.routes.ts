@@ -24,6 +24,12 @@ export const routes: Routes = [
     title: TEXTE.seiteNichtGefunden.titel,
   },
   { path: 'anmeldung', component: Rueckruf, title: TEXTE.appTitel },
+  // Benutzeranleitung (Spec 07, Req 5.1): ohne Rechte-Wächter, die Seite blendet nach Rolle aus (Req 6.2, 6.3)
+  {
+    path: 'hilfe',
+    loadComponent: () => import('./hilfe/hilfe-seite').then((m) => m.HilfeSeite),
+    title: titel(TEXTE.hilfe.titel),
+  },
   {
     path: 'erfassen',
     loadComponent: () => import('./erfassen/handy/handy-erfassung').then((m) => m.HandyErfassung),

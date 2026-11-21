@@ -31,7 +31,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
     Browser-Szenario zu 22.2 verschoben.
   - _Anforderungen: 7.1, 7.2, 7.3, 7.4, 9.3, 9.5, 9.7_
 
-- [ ] 22.2 Seite `/hilfe` mit Inhaltsverzeichnis und Sprungmarken [Frontend]
+- [x] 22.2 Seite `/hilfe` mit Inhaltsverzeichnis und Sprungmarken [Frontend]
   - Route `hilfe` (`loadComponent`, ohne Rechte-Wächter, Titel wie die übrigen Routen), Seitenkopf mit Name aus dem
     Branding, Inhaltsverzeichnis als `nav`, Filter nach Rolle und abgemeldet, Hinweis nach 6.3, Satz zur eigenen Rolle,
     Sprung zum Anker im Scroll-Bereich `mat-sidenav-content` mit Fokus, unbekannter Anker ohne Meldung; einspaltig bis
@@ -39,6 +39,9 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - Prototyp `docs/oberflaeche/prototyp.html` um die Seite ergänzt, mit erfundenen und gekennzeichneten Beispieldaten.
   - Szenarien je Rolle (Inhaltsverzeichnis, verborgene Abschnitte, Sprungmarke, Zurück-Knopf); Szenario zu 7.6 (eine
     Datei nicht ladbar: Hinweis mit «Erneut versuchen» beim Abschnitt, die übrigen bleiben; Teile aus 22.1).
+  - Erledigt (design.md «Umsetzung (Aufgabe 22.2, 21.11.2026)»): `hilfe-seite.*`, Filter `hilfe-sichtbar.ts`, Route
+    `hilfe`, Prototyp-Ansicht `#hilfe`; Szenarien in `features/hilfe/hilfe-seite-pwa.feature`, Vitest
+    `hilfe-sichtbar.spec.ts` und `hilfe-seite.spec.ts`.
   - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 6.2, 6.3, 6.5, 7.6_
   - _Abhängig von: 22.1_
 
