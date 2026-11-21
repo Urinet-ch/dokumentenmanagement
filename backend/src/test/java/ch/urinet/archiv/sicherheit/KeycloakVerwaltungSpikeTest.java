@@ -58,7 +58,9 @@ class KeycloakVerwaltungSpikeTest {
         String serverVersion = given().auth().oauth2(adminToken).get(basisUrl + "/admin/serverinfo")
                 .then().statusCode(200).extract().path("systemInfo.version");
         assertThat(serverVersion).isEqualTo("26.8.2");
-        assertThat(imageTag).endsWith(":" + serverVersion);
+        // Sicherheits-Neubauten wie 26.8.2-3 hängen die Build-Revision an den Image-Tag an.
+        String imageTagVersion = imageTag.substring(imageTag.lastIndexOf(':') + 1).replaceFirst("-\\d+$", "");
+        assertThat(imageTagVersion).isEqualTo(serverVersion);
 
         List<Map<String, Object>> urinetBenutzer = OBJECT_MAPPER.readValue(
                 adminGet(adminUrl + "/users?q=mandant:urinet&max=50", adminToken).asByteArray(),

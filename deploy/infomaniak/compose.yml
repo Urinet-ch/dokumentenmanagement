@@ -65,16 +65,10 @@ services:
       # Metaspace 192m (15.11.2026, Messung im PR fix/metaspace-messung): schon im Leerlauf 111 MiB committed, nach dem
       # ersten Jahresexport samt Mailversand 118 MiB (Plateau, danach rund 25 KiB je Export); mit 112m beendet sich die
       # JVM beim ersten Export mit OutOfMemoryError: Metaspace, 128m liess nur 10 MiB Luft für alles, was in Betrieb dazukommt
-      # -XX:UseAVX=2 (18.11.2026, CVE-2026-114938, Speicherfehler im Base64-Decoder der Java-Laufzeit): sperrt den
-      # AVX-512-Codepfad, den der Fehler braucht (betroffen: x86-64 mit AVX-512 VBMI). Die heutige VPS (AMD EPYC Zen 2) hat
-      # kein AVX-512; die Option schützt auch, falls Stufe B auf eine CPU mit AVX-512 zieht. Nur hier, nicht im Dockerfile:
-      # auf ARM (lokale Entwicklung) ist die Option unbekannt. Entfernen erst mit einem Basis-Image, das das Update vom
-      # 17.11.2026 enthält (Temurin ab dem Update nach 25.0.5+8, Keycloak-Image mit neuerem OpenJDK als 21.0.13).
       JAVA_OPTS_APPEND: >-
         -Djava.util.logging.manager=org.jboss.logmanager.LogManager
         -Xmx112m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=32m
         -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
-        -XX:UseAVX=2
     secrets:
       - archiv_db_app
       - archiv_db_owner
@@ -256,7 +250,6 @@ services:
         -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:ReservedCodeCacheSize=32m
         -XX:MaxDirectMemorySize=32m -Xss512k
         -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/urandom
-        -XX:UseAVX=2
         -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.err.encoding=UTF-8
         -Djdk.tls.rejectClientInitiatedRenegotiation=true
     secrets:
