@@ -40,8 +40,8 @@ public interface ChatSpeicher {
     /** Speichert die Frage und setzt {@code geaendert}. */
     void frageSpeichern(UUID gespraech, String frage, Instant zeit);
 
-    /** Speichert die Antwort und setzt {@code geaendert}, in einer eigenen Transaktion. */
-    void antwortSpeichern(UUID gespraech, ChatAntwort antwort, Instant zeit);
+    /** Speichert die Antwort und liefert ihre ID, in einer eigenen Transaktion. */
+    long antwortSpeichern(UUID gespraech, ChatAntwort antwort, Instant zeit);
 
     /** Die neuesten {@code anzahl} Gespräche des Benutzers nach {@code geaendert}. */
     List<GespraechKopf> gespraeche(String benutzer, int anzahl);

@@ -100,6 +100,10 @@ export function quellenAus(wert: unknown): Quelle[] {
   return Array.isArray(wert) ? wert.map(quelle).filter((q): q is Quelle => q !== null) : [];
 }
 
+export function nachrichtIdAus(wert: unknown): string | undefined {
+  return typeof wert === 'string' && /^[1-9]\d*$/.test(wert) ? wert : undefined;
+}
+
 const BEKANNT = new Set(['werkzeug', 'text', 'quellen', 'fertig', 'fehler']);
 
 /**
@@ -132,10 +136,13 @@ export function chatEreignis(sse: SseEreignis): ChatEreignis | null {
         return text('name') === null ? null : { typ: 'werkzeug', name: text('name')! };
       case 'text':
         return text('delta') === null ? null : { typ: 'text', delta: text('delta')! };
-      case 'fertig':
+      case 'fertig': {
+        const nachrichtId = nachrichtIdAus(wert['nachrichtId']);
         return text('gespraechId') === null
           ? null
-          : { typ: 'fertig', gespraechId: text('gespraechId')! };
+          : { typ: 'fertig', gespraechId: text('gespraechId')!,
+              ...(nachrichtId ? { nachrichtId } : {}) };
+      }
       default:
         return text('meldung') === null
           ? null

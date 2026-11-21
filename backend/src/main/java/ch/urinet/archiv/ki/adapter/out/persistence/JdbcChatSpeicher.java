@@ -115,15 +115,17 @@ public class JdbcChatSpeicher implements ChatSpeicher {
 
     @Override
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public void antwortSpeichern(UUID gespraech, ChatAntwort antwort, Instant zeit) {
+    public long antwortSpeichern(UUID gespraech, ChatAntwort antwort, Instant zeit) {
         String s = schema();
-        aendern("insert into " + s + ".chat_nachricht (gespraech_id, rolle, inhalt, werkzeuge, quellen, tokens_ein, "
-                        + "tokens_aus, status, zeit) values (?, 'ASSISTENT', ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?)",
+        long id = abfragen("insert into " + s + ".chat_nachricht (gespraech_id, rolle, inhalt, werkzeuge, quellen, tokens_ein, "
+                        + "tokens_aus, status, zeit) values (?, 'ASSISTENT', ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?) returning id",
+                z -> z.getLong(1),
                 gespraech, antwort.inhalt(), ChatJson.werkzeuge(antwort.werkzeuge()), ChatJson.quellen(antwort.quellen()),
                 antwort.tokens().map(t -> (Object) t.tokensEin()).orElse(Leer.INT),
                 antwort.tokens().map(t -> (Object) t.tokensAus()).orElse(Leer.INT), antwort.status().name(),
-                Timestamp.from(zeit));
+                Timestamp.from(zeit)).getFirst();
         geaendert(s, gespraech, zeit);
+        return id;
     }
 
     @Override
@@ -141,11 +143,11 @@ public class JdbcChatSpeicher implements ChatSpeicher {
                         + "where id = ? and benutzer = ?",
                 z -> new GespraechKopf(z.getObject(1, UUID.class), z.getString(2), z.getTimestamp(3).toInstant()),
                 id, benutzer).stream().findFirst();
-        return kopf.map(k -> new Gespraech(k, abfragen("select rolle, inhalt, quellen::text, status, zeit from " + s
+        return kopf.map(k -> new Gespraech(k, abfragen("select id, rolle, inhalt, quellen::text, status, zeit from " + s
                         + ".chat_nachricht where gespraech_id = ? order by id",
-                z -> new ChatNachricht(ChatRolle.valueOf(z.getString(1)), z.getString(2),
-                        ChatJson.quellenLesen(z.getString(3)),
-                        Optional.ofNullable(z.getString(4)).map(ChatStatus::valueOf), z.getTimestamp(5).toInstant()),
+                z -> new ChatNachricht(z.getLong(1), ChatRolle.valueOf(z.getString(2)), z.getString(3),
+                        ChatJson.quellenLesen(z.getString(4)),
+                        Optional.ofNullable(z.getString(5)).map(ChatStatus::valueOf), z.getTimestamp(6).toInstant()),
                 id)));
     }
 

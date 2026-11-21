@@ -36,6 +36,7 @@ import {
 
 /** Eine Nachricht im Verlauf; `fehler` ist die Meldung zu einer Antwort, die nicht fertig wurde. */
 export interface Nachricht {
+  id?: string;
   rolle: 'BENUTZER' | 'ASSISTENT';
   inhalt: string;
   quellen: Quelle[];
@@ -222,6 +223,7 @@ export class Chat {
         this.neuBeginnen.set(false);
         this.nachrichten.set(
           liste.map((n) => ({
+            id: n.id,
             rolle: n.rolle,
             inhalt: n.inhalt,
             quellen: n.quellen,
@@ -261,7 +263,7 @@ export class Chat {
         break;
       case 'fertig':
         this.gespraechId.set(ereignis.gespraechId);
-        this.antwortAendern((n) => ({ ...n, status: 'OK' }));
+        this.antwortAendern((n) => ({ ...n, id: ereignis.nachrichtId, status: 'OK' }));
         break;
       case 'fehler':
         if (ereignis.gespraechId) {

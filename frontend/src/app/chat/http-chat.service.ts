@@ -10,7 +10,7 @@ import {
   GespraechKopf,
   ZuVieleGrund,
 } from './chat-port';
-import { SSE_START, SseZustand, chatEreignis, quellenAus, sseLesen } from './sse-leser';
+import { SSE_START, SseZustand, chatEreignis, nachrichtIdAus, quellenAus, sseLesen } from './sse-leser';
 
 const PFAD = '/api/v1/chat';
 
@@ -148,7 +148,9 @@ export function nachrichtenAus(wert: unknown): GespeicherteNachricht[] {
   }
   return liste.map((n) => {
     const x = (n ?? {}) as Record<string, unknown>;
+    const id = nachrichtIdAus(x['id']);
     return {
+      ...(id ? { id } : {}),
       rolle: x['rolle'] === 'BENUTZER' ? 'BENUTZER' : 'ASSISTENT',
       inhalt: typeof x['inhalt'] === 'string' ? x['inhalt'] : '',
       quellen: quellenAus(x['quellen']),

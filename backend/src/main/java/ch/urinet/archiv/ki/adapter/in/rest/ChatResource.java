@@ -114,6 +114,7 @@ public class ChatResource {
 
     @Schema(name = "ChatNachricht")
     public record NachrichtDto(
+            @Schema(required = true, description = "Nachrichten-ID als Dezimalzahl") String id,
             @Schema(required = true, enumeration = {"BENUTZER", "ASSISTENT"}) String rolle,
             @Schema(required = true) String inhalt,
             @Schema(required = true) List<QuelleDto> quellen,
@@ -138,7 +139,7 @@ public class ChatResource {
             description = "Antwort als Server-Sent Events mit benannten Ereignissen, JSON in data: «werkzeug» {name} "
                     + "je Werkzeugaufruf, «text» {delta}, genau ein «quellen» [{id, titel, link} | {werkzeug, "
                     + "datenstand, belege} | {wissen: {titel, link, stand}, dokumente: [{titel, link, seiten}]}] "
-                    + "vor «fertig» {gespraechId, tokens: {ein, aus}}; «fehler» {meldung, "
+                    + "vor «fertig» {gespraechId, nachrichtId, tokens: {ein, aus}}; «fehler» {meldung, "
                     + "gespraechId} beendet den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 "
                     + "NICHT_GEFUNDEN (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After "
                     + "und dem Feld grund der Problem Details (STUNDENLIMIT: mehr als 100 Fragen in 60 Minuten; "
@@ -235,7 +236,7 @@ public class ChatResource {
     }
 
     private static NachrichtDto dto(ChatNachricht n) {
-        return new NachrichtDto(n.rolle().name(), n.inhalt(), n.quellen().stream().map(ChatResource::dto).toList(),
+        return new NachrichtDto(Long.toString(n.id()), n.rolle().name(), n.inhalt(), n.quellen().stream().map(ChatResource::dto).toList(),
                 n.status().map(Enum::name).orElse(null), n.zeit());
     }
 

@@ -23,7 +23,7 @@ import java.util.UUID;
  *       {@code {"werkzeug", "datenstand": "<ISO-8601 UTC>", "belege": n}}</li>
  *   <li>Werkzeugaufruf {@code {"name", "parameter": {…}, "dokumentIds": […], "datenstand"?: {"zeitpunkt", "belege"}}}</li>
  *   <li>SSE: {@code werkzeug {"name"}}, {@code text {"delta"}}, {@code quellen […]},
- *       {@code fertig {"gespraechId", "tokens": {"ein", "aus"}}}, {@code fehler {"meldung", "gespraechId"}}</li>
+ *       {@code fertig {"gespraechId", "nachrichtId", "tokens": {"ein", "aus"}}}, {@code fehler {"meldung", "gespraechId"}}</li>
  * </ul>
  */
 public final class ChatJson {
@@ -42,6 +42,7 @@ public final class ChatJson {
             case ChatAusgabe.Fertig f -> {
                 Map<String, Object> werte = new LinkedHashMap<>();
                 werte.put("gespraechId", f.gespraechId().toString());
+                werte.put("nachrichtId", Long.toString(f.nachrichtId()));
                 Map<String, Object> tokens = new LinkedHashMap<>();
                 tokens.put("ein", f.tokens().tokensEin());
                 tokens.put("aus", f.tokens().tokensAus());

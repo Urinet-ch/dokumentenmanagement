@@ -86,6 +86,24 @@ class JdbcChatSpeicherWerkzeugDokumenteTest {
     }
 
     @Test
+    void gespeicherteAntwortHatImVerlaufDieselbeIdUndIstNurDemEigentuemerSichtbar() throws SQLException {
+        for (MandantCode code : List.of(URINET, ZWEITER)) {
+            if (!vorhanden(code)) {
+                provisionierung.anlegen(code.wert(), null, null);
+            }
+        }
+        UUID gespraech = gespraech(URINET, "benutzer-a", urinetGespraeche);
+        ChatAntwort antwort = new ChatAntwort("Antwort", List.of(), List.of(), Optional.empty(), ChatStatus.OK);
+        long id = im(URINET, () -> speicher.antwortSpeichern(gespraech, antwort, Instant.now()));
+
+        assertThat(id).isPositive();
+        assertThat(im(URINET, () -> speicher.gespraech(gespraech, "benutzer-a")).orElseThrow().nachrichten())
+                .singleElement().satisfies(n -> assertThat(n.id()).isEqualTo(id));
+        assertThat(im(URINET, () -> speicher.gespraech(gespraech, "benutzer-b"))).isEmpty();
+        assertThat(im(ZWEITER, () -> speicher.gespraech(gespraech, "benutzer-a"))).isEmpty();
+    }
+
+    @Test
     void werkzeugDokumenteLiefernNurDieTrefferDesGespraechs() throws SQLException {
         for (MandantCode code : List.of(URINET, ZWEITER)) {
             if (!vorhanden(code)) {

@@ -11,6 +11,10 @@ import { ChatQuelle } from './chat-quelle';
 
 
 export interface ChatNachricht { 
+    /**
+     * Nachrichten-ID als Dezimalzahl
+     */
+    id: string;
     rolle: ChatNachricht.RolleEnum;
     inhalt: string;
     quellen: Array<ChatQuelle>;

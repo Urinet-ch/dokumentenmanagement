@@ -27,7 +27,7 @@ export type ChatEreignis =
   | { typ: 'werkzeug'; name: string }
   | { typ: 'text'; delta: string }
   | { typ: 'quellen'; quellen: Quelle[] }
-  | { typ: 'fertig'; gespraechId: string }
+  | { typ: 'fertig'; gespraechId: string; nachrichtId?: string }
   | { typ: 'fehler'; meldung: string; gespraechId?: string };
 
 export interface GespraechKopf {
@@ -40,6 +40,7 @@ export type Rolle = 'BENUTZER' | 'ASSISTENT';
 export type NachrichtStatus = 'OK' | 'FEHLER' | 'ABGEBROCHEN';
 
 export interface GespeicherteNachricht {
+  id?: string;
   rolle: Rolle;
   inhalt: string;
   quellen: Quelle[];

@@ -6,7 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Nachricht eines Gesprächs für den Verlauf (design.md «Vertrag Welle 7», Verlauf). */
-public record ChatNachricht(ChatRolle rolle, String inhalt, List<Quelle> quellen, Optional<ChatStatus> status,
+public record ChatNachricht(long id, ChatRolle rolle, String inhalt, List<Quelle> quellen, Optional<ChatStatus> status,
                             Instant zeit) {
 
     public ChatNachricht {

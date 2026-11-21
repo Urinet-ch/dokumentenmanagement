@@ -46,7 +46,7 @@ public sealed interface ChatAusgabe {
         }
     }
 
-    record Fertig(UUID gespraechId, ChatEreignis.Ende tokens) implements ChatAusgabe {
+    record Fertig(UUID gespraechId, long nachrichtId, ChatEreignis.Ende tokens) implements ChatAusgabe {
         public Fertig {
             Objects.requireNonNull(gespraechId, "gespraechId");
             Objects.requireNonNull(tokens, "tokens");

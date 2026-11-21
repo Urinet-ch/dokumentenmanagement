@@ -85,6 +85,10 @@ describe('SSE-Leser (Spec 02, Aufgabe 7.4)', () => {
       typ: 'fertig',
       gespraechId: 'g1',
     });
+    expect(chatEreignis({ name: 'fertig', daten: '{"gespraechId":"g1","nachrichtId":"9223372036854775807"}' }))
+      .toEqual({ typ: 'fertig', gespraechId: 'g1', nachrichtId: '9223372036854775807' });
+    expect(chatEreignis({ name: 'fertig', daten: '{"gespraechId":"g1","nachrichtId":12}' }))
+      .toEqual({ typ: 'fertig', gespraechId: 'g1' });
     expect(
       chatEreignis({ name: 'fehler', daten: '{"meldung":"Nicht verfügbar","gespraechId":"g2"}' }),
     ).toEqual({
