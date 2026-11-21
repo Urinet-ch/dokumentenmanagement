@@ -18,7 +18,7 @@ Zahlen wie Summen und Anzahlen rechnet das Archiv mit festen Auswertungen aus de
 
 ## Quellen prüfen
 Unter jeder Antwort stehen die «Quellen»:
-- Ein Dokument mit Titel öffnen Sie mit einem Tipp in der Dokumentansicht.
+- Ein Dokument mit Titel öffnen Sie mit einem Tipp in der [Dokumentansicht](#dokument).
 - Eine Seite der Wissensbasis ist mit dem Symbol für Wissen gekennzeichnet und öffnet die Wissensseite.
 - «Datenstand: …» nennt Zeitpunkt und Zahl der Belege, auf denen eine Zahl beruht.
 

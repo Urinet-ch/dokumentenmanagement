@@ -4,7 +4,7 @@ Mit der Suche finden Sie Dokumente über Wörter aus dem Text, den Titel, den Pa
 1. Wählen Sie in der Seitenleiste «Suche» oder geben Sie den Begriff direkt in das Suchfeld der Kopfzeile ein.
 2. Geben Sie einen oder mehrere Suchbegriffe ein, zum Beispiel einen Partner, ein Stichwort oder eine Belegnummer.
 3. Wählen Sie «Suchen» oder drücken Sie die Eingabetaste.
-4. Wählen Sie den Titel eines Treffers. Die App öffnet das Dokument in der Dokumentansicht.
+4. Wählen Sie den Titel eines Treffers. Die App öffnet das Dokument in der [Dokumentansicht](#dokument).
 
 Kehren Sie aus der Dokumentansicht zurück, zeigt die Suche Ihre letzten Treffer wieder. Nach dem Neuladen der Seite beginnt sie leer.
 
