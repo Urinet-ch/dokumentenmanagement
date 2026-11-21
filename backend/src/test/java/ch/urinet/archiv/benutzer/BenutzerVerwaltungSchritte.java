@@ -255,6 +255,33 @@ public class BenutzerVerwaltungSchritte {
         eigeneId = anlegen(MANDANT, name);
     }
 
+    @Wenn("der Inhaber den Zugang des Mitarbeiters zurücksetzt")
+    public void zugangZuruecksetzen() {
+        identitaet.einladen(MANDANT, eigeneId, Set.of(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL),
+                Duration.ofHours(1));
+        antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/zugang-zuruecksetzen"));
+    }
+
+    @Dann("sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert")
+    public void zugangZurueckgesetzt() throws SQLException {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktionen()).containsExactlyInAnyOrder(
+                IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
+                IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details::text from m_" + SCHEMA + ".zugriff_protokoll "
+                             + "where details->>'ziel' = ? and details->>'phase' = 'ABGESCHLOSSEN' "
+                             + "and details->>'vorgang' = 'ZUGANG_ZURUECKSETZEN'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).doesNotContain(name, "@example.invalid");
+            }
+        }
+    }
+
     @Wenn("der Inhaber die Einladung viermal erneut sendet")
     public void einladungenSenden() {
         for (int i = 0; i < 4; i++) {

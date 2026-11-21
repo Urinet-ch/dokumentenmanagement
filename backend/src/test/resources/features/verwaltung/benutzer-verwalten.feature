@@ -20,6 +20,13 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber die Einladung viermal erneut sendet
     Dann sind drei Einladungen erlaubt und die vierte wird begrenzt
 
+  @req-3.13
+  Szenario: Ein Zugang wird mit neuer Passwort- und TOTP-Einrichtung zurückgesetzt
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer Mitarbeiter ist eingeladen
+    Wenn der Inhaber den Zugang des Mitarbeiters zurücksetzt
+    Dann sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert
+
   @req-3.4 @req-5.9
   Szenario: Ungültige Angaben und Realm-Konflikte werden ohne Personendaten abgewiesen
     Angenommen die frische Anmeldung ist für den Test bestätigt

@@ -3,6 +3,7 @@ package ch.urinet.archiv.benutzer.adapter.in.rest;
 import ch.urinet.archiv.benutzer.application.BenutzerLesen;
 import ch.urinet.archiv.benutzer.application.BenutzerEinladen;
 import ch.urinet.archiv.benutzer.application.BenutzerAnlegen;
+import ch.urinet.archiv.benutzer.application.BenutzerZugangZuruecksetzen;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -49,6 +50,7 @@ public class BenutzerResource {
     private final BenutzerLesen lesen;
     private final BenutzerEinladen einladen;
     private final BenutzerAnlegen anlegen;
+    private final BenutzerZugangZuruecksetzen zugang;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
     private final ObjectReader json;
@@ -56,11 +58,13 @@ public class BenutzerResource {
     private final StepUp stepUp;
 
     public BenutzerResource(BenutzerLesen lesen, BenutzerEinladen einladen, BenutzerAnlegen anlegen,
+                            BenutzerZugangZuruecksetzen zugang,
                             MandantAufloesung mandant, SecurityIdentity identitaet, ObjectMapper json,
                             Berechtigung berechtigung, StepUp stepUp) {
         this.lesen = lesen;
         this.einladen = einladen;
         this.anlegen = anlegen;
+        this.zugang = zugang;
         this.mandant = mandant;
         this.identitaet = identitaet;
         this.json = json.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
@@ -130,6 +134,12 @@ public class BenutzerResource {
     @APIResponse(responseCode = "204", description = "Einladung gesendet")
     public Response einladung(@PathParam("benutzerId") String benutzerId, @HeaderParam("X-Real-Ip") String ip,
                               @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        leerenKoerperPruefen(contentType, body);
+        einladen.erneut(mandant.pruefen(), akteur(), benutzerId, IpAdresse.aus(ip));
+        return Response.noContent().build();
+    }
+
+    private void leerenKoerperPruefen(String contentType, InputStream body) throws IOException {
         jsonPruefen(contentType);
         byte[] eingabe = begrenztLesen(body);
         if (eingabe.length > 0) {
@@ -142,7 +152,26 @@ public class BenutzerResource {
                 throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
             }
         }
-        einladen.erneut(mandant.pruefen(), akteur(), benutzerId, IpAdresse.aus(ip));
+    }
+
+    @POST
+    @Path("/{benutzerId}/zugang-zuruecksetzen")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Zugang zurücksetzen")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Zugang zurückgesetzt und Einladung gesendet")
+    public Response zugangZuruecksetzen(@PathParam("benutzerId") String benutzerId,
+                                       @HeaderParam("X-Real-Ip") String ip,
+                                       @HeaderParam("Content-Type") String contentType, InputStream body)
+            throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        stepUp.pruefen();
+        leerenKoerperPruefen(contentType, body);
+        zugang.ausfuehren(code, akteur, benutzerId, IpAdresse.aus(ip));
         return Response.noContent().build();
     }
 

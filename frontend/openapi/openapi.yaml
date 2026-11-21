@@ -3836,6 +3836,39 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/benutzer/{benutzerId}/zugang-zuruecksetzen:
+    post:
+      summary: Zugang zurücksetzen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+      responses:
+        "204":
+          description: Zugang zurückgesetzt und Einladung gesendet
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
   /api/v1/berichte/luecken:
     get:
       summary: Lückenbericht für ein Geschäftsjahr

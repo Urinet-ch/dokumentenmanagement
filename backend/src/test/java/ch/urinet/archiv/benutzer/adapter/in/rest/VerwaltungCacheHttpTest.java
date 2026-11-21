@@ -279,6 +279,60 @@ class VerwaltungCacheHttpTest {
     }
 
     @Test
+    void zugangZuruecksetzenPrueftStepUpMandantUndBewirktAlleSchritte() {
+        String pfad = "/api/v1/benutzer/";
+        String token = Testanmeldung.token("inhaber-urinet");
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + UUID.randomUUID() + "/zugang-zuruecksetzen")
+                .then().statusCode(401).body("fehlercode", is("STEP_UP_NOETIG"));
+
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        List<String> aufrufe = new java.util.ArrayList<>();
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub() {
+            @Override
+            public synchronized void aktionenHinzufuegen(String mandant, String id, Set<ErforderlicheAktion> aktionen) {
+                aufrufe.add("aktionen");
+                super.aktionenHinzufuegen(mandant, id, aktionen);
+            }
+
+            @Override
+            public synchronized void otpEntfernen(String mandant, String id) {
+                aufrufe.add("otp");
+                super.otpEntfernen(mandant, id);
+            }
+
+            @Override
+            public synchronized void sitzungenBeenden(String mandant, String id) {
+                aufrufe.add("sitzungen");
+                super.sitzungenBeenden(mandant, id);
+            }
+
+            @Override
+            public synchronized void einladen(String mandant, String id, Set<ErforderlicheAktion> aktionen,
+                                               Duration gueltigkeit) {
+                aufrufe.add("einladung");
+                super.einladen(mandant, id, aktionen, gueltigkeit);
+            }
+        };
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String ziel = dienst.anlegen("urinet", person("reset." + suffix), Rolle.MITARBEITER);
+        String fremd = dienst.anlegen("vhf-gsk", person("fremd." + suffix), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + fremd + "/zugang-zuruecksetzen").then().statusCode(404);
+        given().auth().oauth2(token).contentType("application/json").body("{\"unerwartet\":true}")
+                .post(pfad + ziel + "/zugang-zuruecksetzen").then().statusCode(400);
+        assertThat(aufrufe).isEmpty();
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + ziel + "/zugang-zuruecksetzen").then().statusCode(204);
+        assertThat(aufrufe).containsExactly("aktionen", "otp", "sitzungen", "einladung");
+    }
+
+    @Test
     void anlegenPrueftRollenNamenssperreUndVierAugen() throws SQLException {
         QuarkusMock.installMockForType(new StepUpAusstehend() {
             @Override
