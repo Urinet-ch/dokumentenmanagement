@@ -18,7 +18,10 @@ const MOTIV_DATEI = { 'blatt.png': 'ein Blatt', 'leer.png': 'eine leere Fläche'
 
 /** Startet den Browser neu als Handy (390 × 844, Touch); mit Motiv filmt die Rückkamera dieses Bild. */
 async function handy(welt, { motiv, serviceWorker = false, zeitzone = 'Europe/Zurich' }) {
-  await welt.browser?.close();
+  await welt.kontext?.close();
+  if (welt.browser !== welt.standardBrowser) {
+    await welt.browser?.close();
+  }
   const args = [];
   welt.kennung = randomInt(2 ** 32);
   if (motiv) {
