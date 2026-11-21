@@ -1008,7 +1008,7 @@ Konfiguration). Mandanten, die vor 13.2 angelegt wurden, erhalten die Art über 
 `044-wissensquelle-bestand` mit denselben Werten wie aus dem Seed (in `m_vhf_gsk` mit den Feldern oben) und eine neue
 Version der Konfiguration (`MIGRATION`); ein neues Schema hat beim Migrieren noch keine Arten und übergeht es
 (`MARK_RAN`). Der Jahresexport schliesst nur `WISSENSQUELLE` aus (`art is distinct from`), Dokumente ohne Art bleiben
-wie bisher drin. Req 1.4 weisen erst Ingest, Freigabe und Lint nach (14.x).
+wie bisher drin. Req 1.4 weisen Ingest (`ingest.feature`), Freigabe (`quelldokumente.feature`) und Lint (`lint.feature`, PR #376) mit Szenarien `@req-1.4` nach.
 
 | Code | Name | Gruppen | Pflichtfelder | Zusatz | Vertraulichkeit | Aufbewahrung | `gesetzliche_pflicht` |
 | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -493,7 +493,7 @@ public class WissenImportSchritte {
         antwort = post(paket("lokal", "NORMAL", seite(pfad, sha, "Seite 1", 0L, "Aussage.")));
     }
 
-    public void regelgleichheit(WissensPaketBeispiele.Beispiel beispiel) {
+    public Response regelgleichheit(WissensPaketBeispiele.Beispiel beispiel) {
         String code = null;
         List<Map<String, String>> erwarteteHinweise = List.of();
         try {
@@ -520,6 +520,7 @@ public class WissenImportSchritte {
                 assertThat(ergebnis.jsonPath().getList("befunde.code", String.class)).contains(code);
             }
         }
+        return ergebnis;
     }
 
     @Dann("der Paketleser und der REST-Import beurteilen die gemeinsamen Beispielpakete gleich")

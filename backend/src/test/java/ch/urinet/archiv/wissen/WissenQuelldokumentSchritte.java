@@ -38,6 +38,7 @@ public class WissenQuelldokumentSchritte {
     private UUID dokument;
     private UUID seite;
     private UUID entwurf;
+    private String zustandVorher;
 
     @Angenommen("eine normale Wissensseite verweist auf ein normales Quelldokument")
     public void normaleQuelle() throws Exception {
@@ -141,12 +142,43 @@ public class WissenQuelldokumentSchritte {
                 .when().patch(pfad).then().statusCode(200);
     }
 
-    @Wenn("der Inhaber eine Änderung dieser Wissensseite freigibt")
-    public void seitenAenderungFreigeben() throws Exception {
+    @Angenommen("das Quelldokument hat Volltext und eine PDF-A-Fassung")
+    public void volltextUndPdfa() throws Exception {
         try (Connection verbindung = datenbank.get().getConnection()) {
             ausfuehren(verbindung, "update m_urinet.dokument set volltext = 'Seite 1' || chr(12), seiten = 1, "
                     + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false where id = ?", dokument);
         }
+    }
+
+    @Angenommen("der Zustand des Quelldokuments mit Dokumentzeile und Dateizeilen ist festgehalten")
+    public void zustandFesthalten() throws Exception {
+        zustandVorher = zustand();
+    }
+
+    @Dann("sind Dokumentzeile und Dateizeilen des Quelldokuments unverändert")
+    public void zustandUnveraendert() throws Exception {
+        assertThat(zustand()).isEqualTo(zustandVorher);
+    }
+
+    private String zustand() throws Exception {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement("""
+                     select (select row_to_json(d)::text from m_urinet.dokument d where d.id = ?)
+                         || '|' || coalesce((select string_agg(row_to_json(f)::text, '|' order by f.rolle)
+                         from m_urinet.dokument_datei f where f.dokument_id = ?), '')
+                     """)) {
+            befehl.setObject(1, dokument);
+            befehl.setObject(2, dokument);
+            try (var ergebnis = befehl.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                return ergebnis.getString(1);
+            }
+        }
+    }
+
+    @Wenn("der Inhaber eine Änderung dieser Wissensseite freigibt")
+    public void seitenAenderungFreigeben() throws Exception {
+        volltextUndPdfa();
         String inhaber = Testanmeldung.token("inhaber-urinet");
         Map<String, Object> daten = Map.of("seiteId", seite, "pfad", "konzepte/quelle-" + seite,
                 "typ", "Konzept", "titel", "Probe", "beschreibung", "Ein Satz.", "inhalt", "Aussage.[^q1]",

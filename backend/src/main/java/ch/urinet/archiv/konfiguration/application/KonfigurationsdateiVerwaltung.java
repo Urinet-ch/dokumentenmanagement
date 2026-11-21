@@ -116,7 +116,8 @@ public class KonfigurationsdateiVerwaltung {
             return new Ergebnis(aktuell.version(), analyse.aenderungen());
         }
         speichern(analyse.ziel());
-        int version = konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.DATEI, aktuell);
+        int version = konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.DATEI, aktuell,
+                analyse.ziel().einstellungen());
         return new Ergebnis(version, analyse.aenderungen());
     }
 
@@ -148,8 +149,10 @@ public class KonfigurationsdateiVerwaltung {
         if (konfiguration.versionen().stream().anyMatch(v -> v.quelle() == KonfigurationQuelle.SEED)) {
             return konfiguration.aktuelleVersion();
         }
+        Konfiguration vorher = konfiguration.aktuell();
         speichern(seed);
-        return konfiguration.aenderungSpeichern("system:seed", null, KonfigurationQuelle.SEED);
+        return konfiguration.aenderungSpeichern("system:seed", null, KonfigurationQuelle.SEED, vorher,
+                seed.einstellungen());
     }
 
     public KiTexte kiTexte() {

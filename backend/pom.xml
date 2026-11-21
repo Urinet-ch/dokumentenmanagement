@@ -353,7 +353,7 @@
                 </executions>
             </plugin>
             <plugin>
-                <!-- Drive-Import (Aufgabe 4.8): die Cucumber-Szenarien @req-12.x rufen das Werkzeug direkt auf -->
+                <!-- Werkzeugquellen nur für Tests: Drive-Import und Gleichheit von Wissenspaket und REST-Import. -->
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
                 <version>${build-helper-plugin.version}</version>
@@ -367,6 +367,7 @@
                         <configuration>
                             <sources>
                                 <source>${project.basedir}/../tools/drive_import/src/main/java</source>
+                                <source>${project.basedir}/../tools/wissen_paket/src/main/java</source>
                             </sources>
                         </configuration>
                     </execution>
