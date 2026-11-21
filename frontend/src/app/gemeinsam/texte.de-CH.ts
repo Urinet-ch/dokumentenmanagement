@@ -1641,6 +1641,11 @@ export const TEXTE = {
   hilfe: {
     abschnitte: {
       'erste-schritte': 'Erste Schritte',
+      suche: 'Suche',
+      chat: 'Chat',
+      kontakte: 'Kontakte',
+      wissen: 'Wissen',
+      'wissen-entwuerfe': 'Wissensentwürfe',
       probleme: 'Wenn etwas nicht klappt',
     } as Record<string, string>,
     laedt: 'Die Anleitung wird geladen …',
