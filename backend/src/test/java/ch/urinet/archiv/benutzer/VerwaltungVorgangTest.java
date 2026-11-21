@@ -179,21 +179,20 @@ class VerwaltungVorgangTest {
 
     @Test
     void anlageMitGescheitertemAbschlussTraegtZielImUnklarEintrag() throws Exception {
-        mandantenVorbereiten();
-        MandantCode mandant = new MandantCode("vhf-gsk");
+        MandantCode mandant = mandantFuerAnlage();
         UUID id = UUID.randomUUID();
         String akteur = UUID.randomUUID().toString();
         String sub = UUID.randomUUID().toString();
         var absicht = anlage(id, null, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
         try (var thread = Executors.newSingleThreadExecutor()) {
-            assertThatThrownBy(() -> in(thread, "vhf-gsk", () -> vorgang.ausfuehren(mandant, absicht,
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
                     () -> { }, () -> sub, fehler -> Kompensation.UNKLAR,
                     wert -> { throw new IllegalStateException("synthetischer Abschluss"); },
                     wert -> anlage(id, UUID.fromString(wert), akteur,
                             ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN))))
                     .hasRootCauseInstanceOf(IllegalStateException.class);
-            assertThat(phasen("m_vhf_gsk", id)).containsExactly("ANGEFRAGT", "UNKLAR");
-            assertThat(zielDerPhase("m_vhf_gsk", id, "UNKLAR")).isEqualTo(sub);
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(zielDerPhase(mandant.schema(), id, "UNKLAR")).isEqualTo(sub);
         } finally {
             testsperreEntfernen(mandant, id);
         }
@@ -201,8 +200,7 @@ class VerwaltungVorgangTest {
 
     @Test
     void abgelehnterOderFehlenderAnlageabschlussUebernimmtKeinUngeprueftesZiel() throws Exception {
-        mandantenVorbereiten();
-        MandantCode mandant = new MandantCode("vhf-gsk");
+        MandantCode mandant = mandantFuerAnlage();
         try (var thread = Executors.newSingleThreadExecutor()) {
             for (int fall = 0; fall < 3; fall++) {
                 UUID id = UUID.randomUUID();
@@ -222,15 +220,15 @@ class VerwaltungVorgangTest {
                             ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
                 };
                 try {
-                    assertThatThrownBy(() -> in(thread, "vhf-gsk", () -> vorgang.ausfuehren(mandant, absicht,
+                    assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
                             () -> { }, () -> ziel, fehler -> Kompensation.GEKLAERT,
                             wert -> gespeichert.set(true), abschluss)))
                             .hasRootCauseInstanceOf(fehlerart == 2
                                     ? IllegalStateException.class : IllegalArgumentException.class);
                     assertThat(abschlussAufrufe).hasValue(1);
                     assertThat(gespeichert).isFalse();
-                    assertThat(phasen("m_vhf_gsk", id)).containsExactly("ANGEFRAGT", "UNKLAR");
-                    assertThat(zielDerPhase("m_vhf_gsk", id, "UNKLAR")).isNull();
+                    assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+                    assertThat(zielDerPhase(mandant.schema(), id, "UNKLAR")).isNull();
                     assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
                 } finally {
                     testsperreEntfernen(mandant, id);
@@ -434,6 +432,21 @@ class VerwaltungVorgangTest {
                 }
             }
         }
+    }
+
+    private MandantCode mandantFuerAnlage() throws Exception {
+        MandantCode mandant = new MandantCode("probe-verwaltungsvorgang");
+        try (Connection verbindung = datenquelle.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select 1 from public.mandant where code = ?")) {
+            abfrage.setString(1, mandant.wert());
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                if (!zeile.next()) {
+                    provisionierung.anlegen(mandant.wert(), null, null);
+                }
+            }
+        }
+        return mandant;
     }
 
     private <T> T in(java.util.concurrent.ExecutorService thread, String code, Supplier<T> arbeit) throws Exception {
