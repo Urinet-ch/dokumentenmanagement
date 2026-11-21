@@ -1,5 +1,7 @@
 Hier finden Sie häufige Meldungen und was Sie tun können. Meldungen, die nur einen Bereich betreffen, stehen im Abschnitt dieses Bereichs. Hilft nichts davon weiter, wenden Sie sich an die Person, die Ihren Zugang eingerichtet hat.
 
+Wählen Sie oben «Hilfe», um die Anleitung zur aktuellen Seite zu öffnen. «Ganze Anleitung öffnen» führt zur Übersicht aller für Ihre Rolle sichtbaren Abschnitte.
+
 ## Die Sitzung ist abgelaufen
 Die Startseite oder eine Meldung zeigt «Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.»
 

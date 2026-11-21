@@ -210,6 +210,8 @@ class RealmExportKeycloakTest {
     @Test
     @Order(2)
     void einladungOhnePasswortErreichtMailpit() {
+        assertThat(adminGet(REALM).jsonPath().getString("emailTheme")).isEqualTo("urinet-archiv");
+        assertThat(adminGet(REALM).jsonPath().getString("loginTheme")).isEqualTo("urinet-archiv");
         String name = "einladung-test";
         Map<String, Object> benutzer = Map.of("username", name, "enabled", true,
                 "email", "einladung@example.invalid", "firstName", "Probe", "lastName", "Einladung",
@@ -223,8 +225,30 @@ class RealmExportKeycloakTest {
                     .queryParam("lifespan", 86400)
                     .put(ExportKeycloak.basisUrl + REALM + "/users/{id}/execute-actions-email", id)
                     .then().statusCode(204);
-            given().queryParam("query", "to:einladung@example.invalid").get(ExportKeycloak.mailpitUrl + "/api/v1/search")
-                    .then().statusCode(200).body("total", org.hamcrest.Matchers.greaterThanOrEqualTo(1));
+            List<String> ids = given().queryParam("query", "to:einladung@example.invalid")
+                    .get(ExportKeycloak.mailpitUrl + "/api/v1/search")
+                    .then().statusCode(200).extract().jsonPath().getList("messages.ID");
+            assertThat(ids).hasSize(1);
+            Response mail = given().get(ExportKeycloak.mailpitUrl + "/api/v1/message/" + ids.getFirst())
+                    .then().statusCode(200).extract().response();
+            assertThat(mail.jsonPath().getString("Subject"))
+                    .isEqualTo("UriNet Archiv: Zugang einrichten oder aktualisieren");
+            assertThat(mail.jsonPath().getString("Text"))
+                    .contains("Einmal-Link", "1 Tag", "angezeigten Schritte", "wenden Sie sich an die Verwaltung");
+            assertThat(mail.jsonPath().getString("HTML")).contains("Zugang einrichten oder aktualisieren", "1 Tag");
+            given().auth().oauth2(admin).contentType(ContentType.JSON)
+                    .body(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD", "CONFIGURE_TOTP"))
+                    .queryParam("lifespan", 5400)
+                    .put(ExportKeycloak.basisUrl + REALM + "/users/{id}/execute-actions-email", id)
+                    .then().statusCode(204);
+            List<String> beideIds = given().queryParam("query", "to:einladung@example.invalid")
+                    .get(ExportKeycloak.mailpitUrl + "/api/v1/search")
+                    .then().statusCode(200).extract().jsonPath().getList("messages.ID");
+            assertThat(beideIds).hasSize(2);
+            assertThat(beideIds.stream().map(mailId -> given()
+                    .get(ExportKeycloak.mailpitUrl + "/api/v1/message/" + mailId)
+                    .then().statusCode(200).extract().jsonPath().getString("Text")).toList())
+                    .anySatisfy(text -> assertThat(text).contains("90 Minuten"));
         } finally {
             loeschen("/users/" + id);
         }
@@ -277,6 +301,12 @@ class RealmExportKeycloakTest {
             HttpResponse<String> antwort = senden(HttpRequest.newBuilder(URI.create(url)).GET());
             if (interaktiv) {
                 assertThat(antwort.statusCode()).isEqualTo(200);
+                Matcher css = Pattern.compile("href=\"([^\"]*css/urinet-archiv\\.css)\"").matcher(antwort.body());
+                assertThat(css.find()).isTrue();
+                HttpResponse<String> branding = senden(HttpRequest.newBuilder(
+                        antwort.uri().resolve(css.group(1).replace("&amp;", "&"))).GET());
+                assertThat(branding.statusCode()).isEqualTo(200);
+                assertThat(branding.body()).contains("UriNet Archiv", "#eeb111");
                 assertThat(antwort.body().contains("name=\"password\"")).as("Passwortformular vorhanden").isTrue();
                 antwort = absenden(antwort, "password", Map.of("username", "step-up", "password", PASSWORT));
                 assertThat(antwort.statusCode()).as("Passwort-Anmeldung: Sitzungsfehler=%s, Zugangsdatenfehler=%s",

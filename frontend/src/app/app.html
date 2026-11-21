@@ -130,6 +130,18 @@
       >
         <app-symbol [name]="farbschema.dunkel() ? 'sonne' : 'mond'" />
       </button>
+      <button
+        #hilfeKnopf
+        type="button"
+        class="knopf"
+        [attr.aria-label]="texte.hilfe.titel"
+        [attr.aria-expanded]="hilfe.offen()"
+        aria-controls="hilfe-leiste"
+        (click)="hilfeUmschalten(hilfeKnopf)"
+      >
+        <app-symbol name="hilfe" />
+        <span class="nur-breit">{{ texte.hilfe.titel }}</span>
+      </button>
       @if (anmeldung.angemeldet()) {
         @if (anmeldung.benutzer(); as benutzer) {
           <span class="benutzer" data-test="benutzer">
@@ -159,4 +171,18 @@
       <router-outlet />
     </main>
   </mat-sidenav-content>
+  <mat-sidenav
+    id="hilfe-leiste"
+    position="end"
+    mode="over"
+    autoFocus="first-heading"
+    [style.width]="mobil() ? '100%' : 'min(420px, 100vw)'"
+    [opened]="hilfe.offen()"
+    (openedChange)="hilfe.geaendert($event)"
+    (closed)="hilfe.geschlossen()"
+  >
+    @defer (when hilfe.offen()) {
+      <app-hilfe-leiste (navigiert)="hilfe.schliessen()" />
+    } @placeholder {}
+  </mat-sidenav>
 </mat-sidenav-container>

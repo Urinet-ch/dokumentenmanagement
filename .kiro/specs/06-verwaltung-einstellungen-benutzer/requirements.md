@@ -420,8 +420,9 @@ oder Missbrauch wird, damit der Schutz der Dokumente nicht an einer Verwaltungsf
 4. Das Archiv SOLL die Einladung ohne Passwort ausstellen, den Link nur an die in Keycloak hinterlegte Adresse senden
    lassen, nach Ablauf (3.2) den Status `EINGELADEN` mit Kennzeichen «abgelaufen» zeigen und die erforderliche Einrichtung
    von TOTP im selben Ablauf erzwingen (ein Benutzer ohne TOTP kann sich nie anmelden, Spec 01, 2.1). Der Realm SOLL für
-   Passwörter eine Richtlinie führen (mindestens 12 Zeichen, nicht Benutzername und nicht E-Mail-Adresse). Nachweis:
-   JUnit (`RealmExportTest`) und Szenario gegen Keycloak mit Mailpit.
+   Passwörter eine Richtlinie führen (mindestens 12 Zeichen, nicht Benutzername und nicht E-Mail-Adresse).
+   Nachweis: JUnit (`RealmExportTest`; `RealmExportKeycloakTest.einladungOhnePasswortErreichtMailpit` gegen Keycloak mit
+   Mailpit: Theme `urinet-archiv`, Einmal-Link, Gültigkeit und Betreff ohne Namen) und Szenario gegen Keycloak mit Mailpit.
 5. Das Archiv SOLL beim Lesen und Ändern von Benutzern nicht verraten, ob eine Kennung in einem anderen Mandanten
    existiert: Fremde oder unbekannte IDs ergeben denselben Status 404; die Suche (`q`, höchstens 40 Zeichen) sucht nur im
    Mandanten; die Meldung bei `BENUTZER_EXISTIERT` nennt weder Feld noch Mandant (Restrisiko: ein Inhaber kann durch
@@ -463,7 +464,9 @@ folgenreichen Schritt gewarnt werden, damit ich nichts versehentlich auslöse.
    503 `IDENTITAETSDIENST_NICHT_ERREICHBAR` mit «Später erneut versuchen»; Netzwerkfehler wie 5xx. Verwaltungsaktionen
    werden nie in die Offline-Warteschlange gestellt.
 6. Die App SOLL nie ein Passwort, einen Einladungslink oder ein Geheimnis anzeigen; nach dem Einladen steht, dass die
-   Person eine E-Mail erhält, und der Status zeigt «Einladung offen seit …».
+   Person eine E-Mail erhält, und der Status zeigt «Einladung offen seit …». Nachweis: JUnit
+   (`RealmExportKeycloakTest.einladungOhnePasswortErreichtMailpit`: Text der Einladung nennt Einmal-Link und nächste
+   Schritte; Betriebsdokumentation `deploy/infomaniak/keycloak/README.md`) und Szenarien der Oberfläche.
 7. Die Seite der Einstellungen SOLL die Gruppen des Katalogs, je Einstellung Grenzen, Standard, «wirksam ab» und
    «auf Standard», eine Vorschau vor dem Speichern und den Verlauf der Versionen mit Vergleich (nur die Pfade unter
    `einstellungen.*`, Kennungen ohne Werte) zeigen; die Seite der Benutzer SOLL die Rechte-Übersicht je Benutzer und je

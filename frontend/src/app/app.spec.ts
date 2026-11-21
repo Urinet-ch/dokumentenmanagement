@@ -133,6 +133,14 @@ describe('App (Req 2.6, 8.6)', () => {
     expect(element.textContent).not.toContain(TEXTE.anmeldung.abmelden);
   });
 
+  it('bietet «Hilfe» auch ohne Anmeldung an', async () => {
+    const element = await zeigen();
+    const knopf = element.querySelector<HTMLButtonElement>('[aria-controls="hilfe-leiste"]');
+    expect(knopf?.getAttribute('aria-label')).toBe(TEXTE.hilfe.titel);
+    expect(knopf?.getAttribute('aria-expanded')).toBe('false');
+    expect(knopf?.querySelector('app-symbol')?.getAttribute('name')).toBe('hilfe');
+  });
+
   it.each<[Rolle, string[]]>([
     [
       'inhaber',

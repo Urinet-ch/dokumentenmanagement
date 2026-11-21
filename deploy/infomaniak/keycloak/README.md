@@ -1,4 +1,22 @@
-# Google-IdP
+# Keycloak
+
+## Theme und Benachrichtigung
+
+Der Realm-Export wählt das Login- und E-Mail-Theme `urinet-archiv`; der Client für VHF/GSK kann sein eigenes
+Login-Theme weiter wählen. Ein bestehender Realm wird beim Import nicht aktualisiert: Die Umstellung seiner
+Theme-Einstellungen und der Versand an ein echtes Postfach sind Betriebsnachweise.
+Der Test-Realm der Dev Services verwendet weiterhin das eingebaute Theme, da das Dev-Services-Image keine
+Projekt-Themes enthält; `RealmExportKeycloakTest` prüft das ausgelieferte Theme mit einem eigenen Keycloak.
+
+Die Mitteilung an die bisherige Adresse versendet das Archiv, nicht Keycloak (Spec 06, 3.14). Vorgesehener Text
+für die noch ausstehende Anbindung:
+
+> **UriNet Archiv: E-Mail-Adresse geändert**
+>
+> Die E-Mail-Adresse für Ihren Zugang zum UriNet Archiv wurde geändert. Falls Sie diese Änderung nicht erwartet
+> haben, wenden Sie sich umgehend an die Verwaltung.
+
+## Google-IdP
 
 Der Realm-Export enthält den deaktivierten Provider `google`, beide Anmeldeflows und die Ereignistypen. `start.sh` kann
 `google_client_id` und `google_client_secret` aus `/run/secrets/` lesen und die Werte beim erstmaligen Import als
