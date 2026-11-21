@@ -1,8 +1,10 @@
 package ch.urinet.archiv.wissen;
 
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
+import io.cucumber.java.Before;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Und;
@@ -28,10 +30,27 @@ public class ChatAnalyseSchritte {
     @Inject
     Instance<AgroalDataSource> datenbank;
 
+    @Inject
+    MandantProvisionierung provisionierung;
+
     private UUID gespraech;
     private UUID entwurf;
     private long nachricht;
     private Response antwort;
+
+    @Before("@wissen-analyse")
+    public void mandantAnlegen() throws SQLException {
+        boolean vorhanden;
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select 1 from public.mandant where code = 'urinet'");
+             ResultSet zeile = abfrage.executeQuery()) {
+            vorhanden = zeile.next();
+        }
+        if (!vorhanden) {
+            provisionierung.anlegen("urinet", null, null);
+        }
+    }
 
     @After("@wissen-analyse")
     public void aufraeumen() throws SQLException {

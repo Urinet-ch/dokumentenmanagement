@@ -16,6 +16,12 @@ import ch.urinet.archiv.ki.application.ChunkPort;
 import ch.urinet.archiv.ki.domain.Chunk;
 import ch.urinet.archiv.ki.application.EmbeddingPort;
 import ch.urinet.archiv.ki.TestEmbeddingPort;
+import ch.urinet.archiv.ki.application.chat.ChatSpeicher;
+import ch.urinet.archiv.ki.domain.chat.ChatAntwort;
+import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
+import ch.urinet.archiv.ki.domain.chat.ChatStatus;
+import ch.urinet.archiv.ki.domain.chat.Quelle;
+import ch.urinet.archiv.ki.domain.chat.WerkzeugAufruf;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -70,6 +76,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -108,6 +115,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     JdbcWissenIngest ingest;
+
+    @Inject
+    ChatSpeicher chatSpeicher;
 
     @Inject
     PanacheWissensSuche wissensSuche;
@@ -648,6 +658,55 @@ class JdbcWissenIngestTest {
                 ausfuehren("delete from " + code.schema() + ".wissens_einstellung where id = 1");
             }
             Testdokumente.loeschen(datenbank.get(), code.wert(), dokumente.get(code));
+        }
+    }
+
+    @Test
+    void analyseWirdErstNachBelegterBearbeitungFreigegebenUndProtokolliert() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID gespraech = UUID.randomUUID();
+        String benutzer = Testanmeldung.sub("mitarbeiter-urinet");
+        im(URINET, () -> {
+            chatSpeicher.gespraechAnlegen(gespraech, benutzer, "Probe", Instant.now());
+            return null;
+        });
+        long nachricht = im(URINET, () -> chatSpeicher.antwortSpeichern(gespraech,
+                new ChatAntwort("Ein synthetischer Satz.",
+                        List.of(new WerkzeugAufruf("dokument_zeigen", Map.of(), List.of(dokument), Optional.empty(),
+                                Optional.of(ChatEreignis.Kontextstufe.INTERN))),
+                        List.of(new Quelle.Dokument(dokument, "Probe")), Optional.empty(), ChatStatus.OK, true),
+                Instant.now()));
+        UUID entwurf = null;
+        try {
+            entwurf = UUID.fromString(given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                    .contentType("application/json").body(Map.of("nachrichtId", Long.toString(nachricht)))
+                    .when().post("/api/v1/wissensentwuerfe/analyse").then().statusCode(201).extract().path("id"));
+            entwuerfe.get(URINET).add(entwurf);
+            String inhaber = Testanmeldung.token("inhaber-urinet");
+            String schluessel = given().auth().oauth2(inhaber).when().get("/api/v1/wissensentwuerfe/" + entwurf)
+                    .then().statusCode(200).extract().path("aenderungen[0].daten.quellen[0].schluessel");
+            String url = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen";
+            Map<String, Object> fassung = Map.of("titel", "Analyse", "beschreibung", "Ein Satz.", "tags", List.of(),
+                    "quellen", List.of(Map.of("schluessel", schluessel, "dokumentId", dokument)),
+                    "inhalt", "Ein synthetischer Satz.[^" + schluessel + "]");
+            given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json")
+                    .body(Map.of("fassung", fassung)).when().post(url).then().statusCode(422)
+                    .body("befunde", hasItem("SEITE_FEHLT"));
+            fassung = Map.of("titel", "Analyse", "beschreibung", "Ein Satz.", "tags", List.of(),
+                    "quellen", List.of(Map.of("schluessel", schluessel, "dokumentId", dokument, "seiteVon", 1,
+                            "seiteBis", 1)), "inhalt", "Ein synthetischer Satz.[^" + schluessel + "]");
+            given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json")
+                    .body(Map.of("fassung", fassung)).when().post(url).then().statusCode(204);
+            assertThat(anzahl("select count(*) from m_urinet.wissens_log where entwurf_id = ? "
+                    + "and aktion = 'ANALYSE' and angaben->>'vorschlagender' = ?", entwurf, benutzer)).isEqualTo(1);
+            assertThat(anzahl("select count(*) from m_urinet.wissensseite s "
+                    + "join m_urinet.wissens_aenderung a on a.seite_id = s.id "
+                    + "where a.entwurf_id = ? and s.vertraulichkeit_mindest = 'INTERN'", entwurf)).isEqualTo(1);
+        } finally {
+            if (entwurf != null) {
+                annahmeBereinigen(entwurf);
+            }
+            ausfuehren("delete from m_urinet.chat_gespraech where id = ?", gespraech);
         }
     }
 

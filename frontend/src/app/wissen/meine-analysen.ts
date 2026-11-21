@@ -1,10 +1,12 @@
 import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
 interface Eintrag { id: string; status: string }
@@ -15,33 +17,44 @@ interface Statusansicht extends Eintrag { entscheidungen: Entscheidung[] }
 
 @Component({
   selector: 'app-meine-analysen',
-  imports: [RouterLink, MatButtonModule],
+  imports: [RouterLink, MatButtonModule, MatProgressBarModule, Symbol],
   template: `
     <a routerLink="/chat">{{ texte.titel }}</a>
-    <div class="seitenkopf"><h1>{{ texte.analysen }}</h1></div>
+    <div class="seitenkopf">
+      <p class="vorzeile">{{ wissen.titel }}</p>
+      <h1>{{ texte.analysen }}</h1>
+      <p>{{ texte.analyseEinleitung }}</p>
+    </div>
     @if (id()) { <a routerLink="/wissen/entwuerfe/meine">{{ texte.analyseZurListe }}</a> }
-    @if (laedt()) { <p role="status">{{ wissen.laedt }}</p> }
+    @if (laedt()) {
+      <p role="status">{{ wissen.laedt }}</p>
+      <mat-progress-bar mode="indeterminate" />
+    }
     @if (fehler(); as meldung) {
       <p role="alert">{{ meldung }}</p>
       <button mat-button type="button" (click)="laden()">{{ wissen.erneut }}</button>
     }
-    @if (!id() && !laedt() && !fehler()) {
-      @if (liste().length === 0) { <p>{{ texte.analyseLeer }}</p> }
-      <ul>
-        @for (eintrag of liste(); track eintrag.id) {
-          <li><a [routerLink]="['/wissen/entwuerfe/meine', eintrag.id]">{{ eintrag.id }}</a> · {{ eintrag.status }}</li>
+    @if (!laedt() && !fehler()) {
+      <section class="karte">
+        @if (!id()) {
+          @if (liste().length === 0) { <p><app-symbol name="wissen" /> {{ texte.analyseLeer }}</p> }
+          <ul>
+            @for (eintrag of liste(); track eintrag.id) {
+              <li><a class="mono" [routerLink]="['/wissen/entwuerfe/meine', eintrag.id]">{{ eintrag.id }}</a> · {{ eintrag.status }}</li>
+            }
+          </ul>
         }
-      </ul>
-    }
-    @if (ansicht(); as daten) {
-      <p>{{ wissen.entwuerfe.status }}: {{ daten.status }}</p>
-      <ul>
-        @for (entscheid of daten.entscheidungen; track entscheid.nr) {
-          <li>{{ texte.analyseEntscheid }} {{ entscheid.nr }}: {{ entscheid.status }}
-            @if (entscheid.grund) { <p>{{ texte.analyseGrund }}: {{ entscheid.grund }}</p> }
-          </li>
+        @if (ansicht(); as daten) {
+          <p>{{ wissen.entwuerfe.status }}: {{ daten.status }}</p>
+          <ul>
+            @for (entscheid of daten.entscheidungen; track entscheid.nr) {
+              <li>{{ texte.analyseEntscheid }} {{ entscheid.nr }}: {{ entscheid.status }}
+                @if (entscheid.grund) { <p>{{ texte.analyseGrund }}: {{ entscheid.grund }}</p> }
+              </li>
+            }
+          </ul>
         }
-      </ul>
+      </section>
     }
   `,
   styleUrl: './wissen.scss',

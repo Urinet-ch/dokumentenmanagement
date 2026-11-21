@@ -1484,12 +1484,12 @@ export const TEXTE = {
     datenstand: (zeitpunkt: string, anzahl: string) =>
       `Datenstand: ${zeitpunkt}, ${anzahl} ${anzahl === '1' ? 'Beleg' : 'Belege'}`,
     wissensquelle: (titel: string) => `Wissensseite: ${titel}`,
-    dokumentquelle: (titel: string) => `Dokument: ${titel}`,
     dokumentMitSeiten: (titel: string, seiten: string) => `${titel}, Seite ${seiten}`,
     analyseVorschlagen: 'Als Analyse vorschlagen',
     analyseVorgeschlagen: 'Analyse vorgeschlagen. Status anzeigen',
     analysen: 'Meine Analysevorschläge',
     analyseLeer: 'Noch keine Analysevorschläge.',
+    analyseEinleitung: 'Hier sehen Sie den Status und die Entscheide Ihrer Analysevorschläge.',
     analyseEntscheid: 'Entscheid',
     analyseGrund: 'Grund',
     analyseZurListe: 'Zur Liste der Analysevorschläge',

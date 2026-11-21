@@ -926,6 +926,16 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
   Aktion «Als Analyse vorschlagen» nur bei zulässigen Gesprächen (Requirement 12.4, 16.6); Parameter `seite` in der
   Dokumentansicht (Requirement 16.2). Texte nur in `texte.de-CH.ts`.
 
+#### Umsetzung 15.3 (PR #399)
+
+Chatantworten erhalten eine ID als Dezimaltext. Für Analysevorschläge prüft das Archiv Eigentum, erlaubte Werkzeuge,
+aktuelle Quellensichtbarkeit und die höchste gespeicherte Kontextstufe bis zur Antwort. Fehlende Nachweise und
+`PERSONAL` schliessen einen Vorschlag aus. Alte Gespräche und Gespräche mit gelöschten Nachrichten gelten als
+unvollständig; ein Datenbanktrigger bewahrt diese Regel auch beim Aufräumen durch die Vorgängerversion. Der Entwurf
+übernimmt nur Dokument- und Seitenquellen, ohne PDF-Seite, und kann nur mit bearbeiteter Fassung angenommen werden.
+Die Oberfläche unterscheidet Quellen-Chips, bietet die Aktion nur bei nachweislich geeigneten Antworten an und zeigt
+den Status eigener Vorschläge. Der Vorschlag selbst löst keinen KI-Aufruf aus.
+
 #### Umsetzung 14.6 (PR #352)
 
 Die beiden Entwurfsrouten und der Navigationszähler verlangen A17; Mitarbeiter und Treuhänder erhalten

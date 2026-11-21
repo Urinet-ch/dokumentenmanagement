@@ -232,7 +232,7 @@ describe('Chat (Req 6.1–6.3)', () => {
     expect(quellen[0].getAttribute('href')).toBe('/wissen/konzepte/test');
     expect(quellen[0].getAttribute('aria-label')).toBe('Wissensseite: Konzept');
     expect(quellen[1].getAttribute('href')).toBe('/dokument/d1');
-    expect(quellen[1].getAttribute('aria-label')).toBe('Dokument: Beleg, Seite 1–2');
+    expect(quellen[1].getAttribute('aria-label')).toBeNull();
   });
 
   it('zeigt die Meldung aus fehler und übernimmt die gespraechId', async () => {

@@ -71,7 +71,7 @@ Given('ein Chatgespräch enthält eine Wissensquelle und einen Analysevorschlag'
 Then('sind Wissensseite und Quelldokument im Chat unterscheidbar', async function () {
   const antwort = antworten(this.seite).first();
   await antwort.getByRole('link', { name: 'Wissensseite: Synthetische Wissensseite' }).waitFor();
-  await antwort.getByRole('link', { name: `Dokument: ${SEEDORF.titel}, Seite 2` }).waitFor();
+  await antwort.getByRole('link', { name: `${SEEDORF.titel}, Seite 2` }).waitFor();
 });
 
 When('ich im Chat die Wissensquelle öffne', async function () {
