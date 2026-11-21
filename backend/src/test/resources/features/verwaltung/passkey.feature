@@ -4,7 +4,7 @@ Funktionalität: Passkey im Keycloak-Realm
   Der virtuelle Authenticator prüft den Realm; der Backend-Step-up folgt nach 19.10,
   der Admin-Reset nach 24.2 und der Nachweis auf echten Geräten nach 24.3.
 
-  @req-10.1
+  @req-10.1 @req-10.11
   Szenario: Passkey freiwillig in der Kontoverwaltung einrichten und entfernen
     Angenommen ein Testbenutzer ist mit Passwort und TOTP angemeldet
     Wenn er in der Kontoverwaltung einen Passkey einrichtet
@@ -48,7 +48,5 @@ Funktionalität: Passkey im Keycloak-Realm
     Angenommen ein Testbenutzer hat einen Passkey eingerichtet
     Wenn er sich mit dem Passkey anmeldet
     Dann erhält er ein Access-Token mit auth_time
-    Und er kann diesen Passkey in der Kontoverwaltung entfernen
-    Wenn er in der Kontoverwaltung einen Passkey einrichtet
-    Und ein Keycloak-Admin diesen Passkey zurücksetzt
+    Wenn ein Keycloak-Admin diesen Passkey zurücksetzt
     Dann verlangt die Passwortanmeldung dieses Benutzers weiterhin TOTP

@@ -319,10 +319,6 @@ Then('kann er diesen Passkey in der Kontoverwaltung entfernen', async function (
   await entfernen(this);
 });
 
-Then('er kann diesen Passkey in der Kontoverwaltung entfernen', async function () {
-  await entfernen(this);
-});
-
 When('ein Keycloak-Admin diesen Passkey zurücksetzt', async function () {
   const { adminUrl, id, header } = this.passkey;
   const url = `${adminUrl}/users/${id}/credentials`;
