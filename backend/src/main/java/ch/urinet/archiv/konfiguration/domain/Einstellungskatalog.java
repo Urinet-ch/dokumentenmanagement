@@ -141,6 +141,6 @@ public final class Einstellungskatalog {
 
     public static boolean ibansGueltig(List<String> ibans) {
         return ibans.size() <= IBAN_ANZAHL_MAX && ibans.stream()
-                .allMatch(wert -> !wert.isBlank() && wert.length() <= IBAN_LAENGE_MAX && wert.codePoints().noneMatch(Character::isISOControl));
+                .allMatch(wert -> !wert.isBlank() && wert.codePointCount(0, wert.length()) <= IBAN_LAENGE_MAX && wert.codePoints().noneMatch(Character::isISOControl));
     }
 }

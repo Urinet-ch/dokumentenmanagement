@@ -412,6 +412,22 @@ public class KonfigurationsVersionSchritte {
         ((ObjectNode) datei.path("einstellungen").path("chat")).put("aufbewahrungMonate", monate);
     }
 
+    @Wenn("in der Datei die Einstellung {string} in der Gruppe {string} auf den JSON-Wert {string} gesetzt wird")
+    public void einstellungRohSetzen(String schluessel, String gruppe, String jsonWert) throws Exception {
+        ObjectNode einstellungen = (ObjectNode) datei.path("einstellungen");
+        ObjectNode block = einstellungen.has(gruppe) ? (ObjectNode) einstellungen.get(gruppe) : einstellungen.putObject(gruppe);
+        block.set(schluessel, JSON.readTree(jsonWert));
+    }
+
+    @Wenn("in der Datei die IBAN-Liste mit {int} Einträgen gesetzt wird")
+    public void ibanListeSetzen(int anzahl) {
+        var liste = JSON.createArrayNode();
+        for (int i = 0; i < anzahl; i++) {
+            liste.add("CH00 SYNTH " + i);
+        }
+        ((ObjectNode) datei.path("einstellungen").path("kennungen")).set("ibans", liste);
+    }
+
     @Dann("enthält der Export die erweiterten Testwerte")
     public void exportEnthaeltErweiterteTestwerte() {
         JsonNode einstellungen = datei.path("einstellungen");

@@ -27,9 +27,27 @@ Funktionalität: Erweitertes Konfigurationsabbild
     Dann enthält der Export die erweiterten Testwerte
 
   @req-2.3 @req-2.4
-  Szenario: Eine Einstellung ausserhalb der Grenzen wird abgelehnt
+  Szenariogrundriss: Eine Einstellung ausserhalb der Grenzen wird abgelehnt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
-    Und in der Datei die Chat-Aufbewahrung auf 0 Monate gesetzt wird
+    Und in der Datei die Einstellung "<schluessel>" in der Gruppe "<gruppe>" auf den JSON-Wert '<wert>' gesetzt wird
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
+    Und ist die Konfigurationsversion unverändert
+
+    Beispiele:
+      | gruppe    | schluessel         | wert                    |
+      | branding  | name               | "<b>Archiv</b>"         |
+      | branding  | name               | "Arc\u0007hiv"          |
+      | branding  | primaerfarbe       | "#ffffff"               |
+      | kennungen | uid                | "CHE-123"               |
+      | kennungen | ibans              | "kein-array"            |
+      | chat      | aufbewahrungMonate | 0                       |
+      | chat      | unbekannterSchluessel | 1                    |
+
+  @req-2.4
+  Szenario: Eine IBAN-Liste mit mehr als 20 Einträgen wird abgelehnt
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Und in der Datei die IBAN-Liste mit 21 Einträgen gesetzt wird
     Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
     Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
     Und ist die Konfigurationsversion unverändert
