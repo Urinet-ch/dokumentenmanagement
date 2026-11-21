@@ -34,7 +34,8 @@ class WerkzeugAuswahlTest {
             assertThat(auswahl.angeboten(kontext)).as(rolle.name()).startsWith("dokumente_suchen", "dokument_zeigen",
                     "fristen");
             assertThat(auswahl.erlaubt(kontext, "vollstaendigkeit")).as(rolle.name()).isEqualTo(a3A4);
-            assertThat(auswahl.angeboten(kontext)).as(rolle.name()).hasSize(a3A4 ? 4 : 3);
+            assertThat(auswahl.angeboten(kontext)).as(rolle.name()).hasSize(a3A4 ? 6 : 5)
+                    .contains("wissen_index", "wissen_seite_zeigen");
             assertThat(auswahl.erlaubt(kontext, "kennzahl")).as(rolle.name()).isFalse();
         }
     }
@@ -60,7 +61,8 @@ class WerkzeugAuswahlTest {
             throw new IllegalStateException("Datenbank weg");
         });
         assertThat(auswahl.angeboten(WerkzeugKontext.fuer(URINET, new Benutzer("b", Rolle.INHABER), null)))
-                .containsExactly("dokumente_suchen", "dokument_zeigen", "fristen", "vollstaendigkeit");
+                .containsExactly("dokumente_suchen", "dokument_zeigen", "fristen", "vollstaendigkeit",
+                        "wissen_index", "wissen_seite_zeigen");
     }
 
     /** Spec 05, Req 5.4: nur Rollen, die A3 und A4 uneingeschränkt sehen. */

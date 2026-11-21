@@ -1,5 +1,7 @@
 package ch.urinet.archiv.ki.domain.chat;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -27,6 +29,20 @@ public sealed interface Quelle {
         public Stand {
             Objects.requireNonNull(werkzeug, "werkzeug");
             Objects.requireNonNull(datenstand, "datenstand");
+        }
+
+    }
+
+    record Wissen(String pfad, String titel, Instant stand, List<Dokument> dokumente) implements Quelle {
+        public Wissen {
+            Objects.requireNonNull(pfad, "pfad");
+            Objects.requireNonNull(titel, "titel");
+            Objects.requireNonNull(stand, "stand");
+            dokumente = List.copyOf(dokumente);
+        }
+
+        public String link() {
+            return "/wissen/" + pfad;
         }
     }
 }

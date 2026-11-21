@@ -135,7 +135,7 @@ button {
   display: block;
   width: 100%;
   max-height: 60vh;
-  background: #000;
+  background: #000; // gestaltung-ausnahme: Kamerabild, in beiden Farbschemata schwarz
   border-radius: var(--radius-klein);
 }
 

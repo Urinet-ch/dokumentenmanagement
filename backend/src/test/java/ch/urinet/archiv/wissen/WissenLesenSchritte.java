@@ -2,6 +2,13 @@ package ch.urinet.archiv.wissen;
 
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.ki.TestEmbeddingPort;
+import ch.urinet.archiv.ki.KiWireMock;
+import ch.urinet.archiv.ki.adapter.in.werkzeug.ArchivWerkzeuge;
+import ch.urinet.archiv.ki.application.chat.WerkzeugKontext;
+import ch.urinet.archiv.ki.application.chat.WerkzeugKontextRegister;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
@@ -33,6 +40,12 @@ public class WissenLesenSchritte {
 
     @Inject
     TestEmbeddingPort embeddingModell;
+
+    @Inject
+    ArchivWerkzeuge chatWerkzeuge;
+
+    @Inject
+    WerkzeugKontextRegister chatKontexte;
 
     private final UUID normaleQuelle = UUID.randomUUID();
     private final UUID interneQuelle = UUID.randomUUID();
@@ -74,6 +87,51 @@ public class WissenLesenSchritte {
     private Response suchergebnis;
     private long auftragsStand;
     private long nachberechnungId;
+    private String chatIndex;
+    private String chatSeite;
+    private String chatInterneSeite;
+
+    @Wenn("der Mitarbeiter die Wissenswerkzeuge mit den Leseproben aufruft")
+    public void wissenswerkzeugeAufrufen() throws Exception {
+        String lauf = UUID.randomUUID().toString();
+        chatKontexte.festhalten(lauf, WerkzeugKontext.fuer(new MandantCode("urinet"),
+                new Benutzer(MITARBEITER, Rolle.MITARBEITER), null));
+        try (var thread = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            chatIndex = thread.submit(() -> chatWerkzeuge.wissenIndex(lauf, null, null, null)).get();
+            chatSeite = thread.submit(() -> chatWerkzeuge.wissenSeiteZeigen(lauf, normaleSeitePfad)).get();
+            chatInterneSeite = thread.submit(
+                    () -> chatWerkzeuge.wissenSeiteZeigen(lauf, "konzepte/leseprobe-intern-" + kennung)).get();
+        } finally {
+            chatKontexte.entfernen(lauf);
+        }
+    }
+
+    @Dann("liefern die Wissenswerkzeuge nur sichtbare freigegebene Seiten und verdecken unsichtbare Links")
+    public void wissenswerkzeugePruefen() {
+        assertThat(chatIndex).contains(normaleSeitePfad).doesNotContain(interneSeiteTitel, "Fremdmandant " + kennung);
+        assertThat(chatSeite).contains("Aussage", normaleQuelle.toString(), "QUELLE_PRUEFEN")
+                .doesNotContain("leseprobe-intern-" + kennung, "leseprobe-fehlt-" + kennung);
+        assertThat(chatInterneSeite).contains("\"fehler\"").doesNotContain(interneSeiteTitel, interneQuelle.toString());
+    }
+
+    @Angenommen("das simulierte Sprachmodell ruft Index und sichtbare Wissensseite der Leseprobe auf")
+    public void wissenschatVorbereiten() {
+        KiWireMock.chatFolge(List.of(
+                KiWireMock.ChatAntwort.werkzeuge(10, 2, new KiWireMock.ChatAufruf("wissen_index", "{}")),
+                KiWireMock.ChatAntwort.werkzeuge(10, 2, new KiWireMock.ChatAufruf("wissen_seite_zeigen",
+                        "{\"pfad\":\"" + normaleSeitePfad + "\"}")),
+                KiWireMock.ChatAntwort.text("Die Wissensseite nennt eine Aussage.", 10, 2)));
+    }
+
+    @Angenommen("das öffentliche Sprachmodell versucht die Wissenswerkzeuge mit der Leseprobe aufzurufen")
+    public void oeffentlichenWissenschatVorbereiten() {
+        KiWireMock.chatFolge(List.of(
+                KiWireMock.ChatAntwort.werkzeuge(10, 2,
+                        new KiWireMock.ChatAufruf("wissen_index", "{}"),
+                        new KiWireMock.ChatAufruf("wissen_seite_zeigen",
+                                "{\"pfad\":\"" + normaleSeitePfad + "\"}")),
+                KiWireMock.ChatAntwort.text("Keine Publikation gefunden.", 10, 2)));
+    }
 
     @Wenn("der Inhaber die Nachberechnung der Wissensembeddings zweimal startet")
     public void nachberechnungStarten() throws Exception {

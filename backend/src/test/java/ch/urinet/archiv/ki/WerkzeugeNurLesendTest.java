@@ -36,19 +36,28 @@ class WerkzeugeNurLesendTest {
     static final String[] PAKETE = {"ch.urinet.archiv.ki.adapter.in.werkzeug..", "ch.urinet.archiv.ki.application.chat.."};
 
     /** Lesende Ports anderer Fachbereiche und die Methoden, die die Werkzeuge aufrufen dürfen. */
-    static final Map<String, Set<String>> LESENDE_PORTS = Map.of(
-            "ch.urinet.archiv.dokument.application.DokumentRepository", Set.of("finden"),
-            "ch.urinet.archiv.suche.application.SuchePort", Set.of("suchen"),
+    static final Map<String, Set<String>> LESENDE_PORTS = Map.ofEntries(
+            Map.entry("ch.urinet.archiv.dokument.application.DokumentRepository", Set.of("finden")),
+            Map.entry("ch.urinet.archiv.suche.application.SuchePort", Set.of("suchen")),
             // Hybridsuche der Wortsuche vorgeschaltet (7.1d); liest nur
-            "ch.urinet.archiv.suche.application.HybridSuche", Set.of("suchen"),
-            "ch.urinet.archiv.kontakt.application.KontaktRegister", Set.of("aehnlichste", "mitWortanfaengen", "finden"),
-            "ch.urinet.archiv.dokumentart.application.DokumentartRepository", Set.of("alle"),
-            "ch.urinet.archiv.mandant.application.MandantKontext", Set.of("mit", "aktuell"),
-            "ch.urinet.archiv.mandant.application.MandantEinstellungen", Set.of("lesen"),
+            Map.entry("ch.urinet.archiv.suche.application.HybridSuche", Set.of("suchen")),
+            Map.entry("ch.urinet.archiv.kontakt.application.KontaktRegister", Set.of("aehnlichste", "mitWortanfaengen", "finden")),
+            Map.entry("ch.urinet.archiv.dokumentart.application.DokumentartRepository", Set.of("alle")),
+            Map.entry("ch.urinet.archiv.mandant.application.MandantKontext", Set.of("mit", "aktuell")),
+            Map.entry("ch.urinet.archiv.mandant.application.MandantEinstellungen", Set.of("lesen")),
             // Angebot von kennzahl und offene_posten (7.1b, Spec 05, Req 8.8)
-            "ch.urinet.archiv.konfiguration.application.Funktionen", Set.of("finanzVerfuegbar"),
+            Map.entry("ch.urinet.archiv.konfiguration.application.Funktionen", Set.of("finanzVerfuegbar")),
+            Map.entry("ch.urinet.archiv.wissen.application.WissenLesen",
+                    Set.of("index", "seite", "quellenAnzeige", "inhaltDarstellen")),
+            Map.entry("ch.urinet.archiv.wissen.application.WissensSuche", Set.of("suchen")),
+            Map.entry("ch.urinet.archiv.wissen.application.WissenKonfiguration", Set.of("ingest")),
             // E4: das Zugriffsprotokoll ist der einzige schreibende Port (Anzeige und Verweigerung mit Kanal Chat)
-            "ch.urinet.archiv.protokoll.application.ZugriffProtokoll", Set.of("schreiben"));
+            Map.entry("ch.urinet.archiv.protokoll.application.ZugriffProtokoll", Set.of("schreiben")));
+
+    // Daten- und Fehlertypen ohne Zugriff auf andere Fachbereiche.
+    static final Set<String> LESENDE_WERTETYPEN = Set.of(
+            "ch.urinet.archiv.sicherheit.application.Verweigerung",
+            "ch.urinet.archiv.wissen.application.WissenLesenRepository$IndexZeile");
 
     private static final Pattern FACHBEREICH = Pattern.compile("^ch\\.urinet\\.archiv\\.([a-z]+)\\.(application|adapter)\\..*$");
 
@@ -63,7 +72,7 @@ class WerkzeugeNurLesendTest {
         return m.matches() && !m.group(1).equals("ki") && !m.group(1).equals("gemeinsam");
     }
 
-    /** Nur die Ports der Liste sind erreichbar; Typen der {@code domain} anderer Fachbereiche sind Wertetypen. */
+    /** Nur die Ports und einzelnen Daten- und Fehlertypen der Listen sowie Domain-Typen sind erreichbar. */
     @ArchTest
     static final ArchRule nurLesendePortsAnderer = classes().that().resideInAnyPackage(PAKETE)
             .should(new ArchCondition<>("andere Fachbereiche nur über lesende Ports erreichen") {
@@ -71,7 +80,8 @@ class WerkzeugeNurLesendTest {
                 public void check(JavaClass klasse, ConditionEvents ereignisse) {
                     klasse.getDirectDependenciesFromSelf().forEach(d -> {
                         JavaClass ziel = d.getTargetClass();
-                        if (fremd(ziel) && !LESENDE_PORTS.containsKey(aussen(ziel.getName()))) {
+                        if (fremd(ziel) && !LESENDE_PORTS.containsKey(aussen(ziel.getName()))
+                                && !LESENDE_WERTETYPEN.contains(ziel.getName())) {
                             ereignisse.add(SimpleConditionEvent.violated(d, d.getDescription()));
                         }
                     });
@@ -123,6 +133,24 @@ class WerkzeugeNurLesendTest {
 
         assertThat(nurLesendePortsAnderer.evaluate(klassen).getFailureReport().getDetails())
                 .anyMatch(zeile -> zeile.contains("DokumentVersionEintrag"));
+    }
+
+    @Test
+    void direkterZugriffAufWissensRepositoryVerstoesst() {
+        JavaClasses klassen = new ClassFileImporter()
+                .importClasses(SchreibenderZugriffGegenprobe.WissensRepositoryZugriff.class);
+
+        assertThat(nurLesendePortsAnderer.evaluate(klassen).getFailureReport().getDetails())
+                .anyMatch(zeile -> zeile.contains("WissenLesenRepository"));
+    }
+
+    @Test
+    void nichtFreigegebeneWissensmethodeVerstoesst() {
+        JavaClasses klassen = new ClassFileImporter()
+                .importClasses(SchreibenderZugriffGegenprobe.WissensKonfigurationZugriff.class);
+
+        assertThat(nurLesendeMethoden.evaluate(klassen).getFailureReport().getDetails())
+                .anyMatch(zeile -> zeile.contains("modell"));
     }
 
     @Test

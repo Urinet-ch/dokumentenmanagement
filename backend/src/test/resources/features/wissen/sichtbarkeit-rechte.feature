@@ -97,3 +97,39 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Angenommen synthetische Wissensleseproben sind angelegt
     Wenn die Wissensseiten nach einem Quelldokument gefiltert werden
     Dann zeigt der Index nur sichtbare Seiten des eigenen Mandanten und deren Prüfhinweis
+
+  @req-8.2 @req-8.3 @req-8.6 @req-11.4 @wissen-chat-probe
+  Szenario: Chat-Werkzeuge liefern nur freigegebene sichtbare Wissensseiten
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und synthetische Wissensleseproben sind angelegt
+    Wenn der Mitarbeiter die Wissenswerkzeuge mit den Leseproben aufruft
+    Dann liefern die Wissenswerkzeuge nur sichtbare freigegebene Seiten und verdecken unsichtbare Links
+
+  @req-8.1 @req-8.4 @req-8.5 @req-8.7 @wissen-chat-probe
+  Szenario: Wissensquellen gelangen über den Agenten in Stream und Verlauf
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und synthetische Wissensleseproben sind angelegt
+    Und der Chat nutzt den Agenten mit dem simulierten Sprachmodell
+    Und das simulierte Sprachmodell ruft Index und sichtbare Wissensseite der Leseprobe auf
+    Wenn «mitarbeiter-urinet» dem Agenten die Frage «Welche Regel gilt?» stellt
+    Dann zeigt der Stream des Agenten 2 Werkzeugaufrufe
+    Und enthalten Stream und Verlauf die Wissensseite mit ihrem direkten Quelldokument
+    Und verlangt der Systemprompt der ersten Anfrage «wissen_index | wissen_seite_zeigen | VERALTET | WIDERSPRUCH»
+
+  @req-8.9 @wissen-chat-probe
+  Szenario: Die öffentliche Schnittstelle bietet keinen Wissensseiten-Endpunkt
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Wenn «webseite» GET «/public/v1/wissensseiten» aufruft
+    Dann antwortet die Webseiten-Schnittstelle mit Status 404
+
+  @req-8.9 @wissen-chat-probe
+  Szenario: Der öffentliche Chatbot erhält auch bei erzwungenen Aufrufen keine Wissensseiten
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und synthetische Wissensleseproben sind angelegt
+    Und der Chatbot-Schlüssel «vorstand» der Webseite «probe-chat» im Mandanten «urinet» hat die höchste Stufe «vorstand»
+    Und das öffentliche Sprachmodell versucht die Wissenswerkzeuge mit der Leseprobe aufzurufen
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Welche Regel gilt?»
+    Dann bietet die erste Anfrage dem Sprachmodell genau die Werkzeuge «dokumente_suchen, dokument_zeigen»
+    Und enthält ein Werkzeugergebnis der Anfrage 2 «unbekanntes Werkzeug»
+    Und enthält kein Werkzeugergebnis der Anfrage 2 «Normale Leseprobe|Synthetische Beschreibung|Aussage.»
+    Und sind die Quellen des Chatbots leer

@@ -71,7 +71,7 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
       | application/json;q=0, */*                                             | leitet das Archiv auf eine höchstens 5 Minuten gültige Adresse um, die nicht zwischengespeichert wird   |
       | application/json;q=0.5                                                | liefert das Archiv die höchstens 5 Minuten gültige Adresse als JSON, die nicht zwischengespeichert wird |
 
-  @req-14.6 @req-14.5
+  @req-14.6 @req-14.5 @req-1.4 @req-9.1
   Szenario: Unsichtbare, fremde, verworfene und fehlende Dateien ergeben 404, falsche Angaben 400
     Dann antwortet der Download so:
       | benutzer                 | dokument    | anfrage                   | status | fehlercode        | grund                          |

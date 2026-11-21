@@ -30,6 +30,8 @@ public class WerkzeugAuswahl {
     public static final String VOLLSTAENDIGKEIT = "vollstaendigkeit";
     public static final String KENNZAHL = "kennzahl";
     public static final String OFFENE_POSTEN = "offene_posten";
+    public static final String WISSEN_INDEX = "wissen_index";
+    public static final String WISSEN_SEITE_ZEIGEN = "wissen_seite_zeigen";
 
     private static final Logger LOG = Logger.getLogger(WerkzeugAuswahl.class);
 
@@ -59,6 +61,8 @@ public class WerkzeugAuswahl {
         if (vollstaendigkeitErlaubt(kontext.sicht())) {
             namen.add(VOLLSTAENDIGKEIT);
         }
+        namen.add(WISSEN_INDEX);
+        namen.add(WISSEN_SEITE_ZEIGEN);
         return List.copyOf(namen);
     }
 

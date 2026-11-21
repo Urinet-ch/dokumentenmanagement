@@ -17,25 +17,30 @@ import java.util.List;
 final class DokumentTexte {
 
     static final List<String> FELDER = List.of("inhalt", "auszug");
+    static final List<String> WISSEN_FELDER = List.of("titel", "beschreibung");
     static final String NICHT_VERFUEGBAR = "{\"fehler\":\"Werkzeug nicht verfügbar\"}";
 
     private DokumentTexte() {
     }
 
     static String kennzeichnen(ObjectMapper json, String antwort) {
+        return kennzeichnen(json, antwort, false);
+    }
+
+    static String kennzeichnen(ObjectMapper json, String antwort, boolean wissen) {
         try {
             JsonNode wurzel = json.readTree(antwort);
             if (wurzel == null || !wurzel.isContainerNode()) {
                 return NICHT_VERFUEGBAR;
             }
-            kennzeichnen(wurzel);
+            kennzeichnen(wurzel, wissen);
             return json.writeValueAsString(wurzel);
         } catch (JsonProcessingException e) {
             return NICHT_VERFUEGBAR;
         }
     }
 
-    private static void kennzeichnen(JsonNode knoten) {
+    private static void kennzeichnen(JsonNode knoten, boolean wissen) {
         if (knoten instanceof ObjectNode objekt) {
             for (String feld : FELDER) {
                 JsonNode wert = objekt.get(feld);
@@ -43,13 +48,21 @@ final class DokumentTexte {
                     objekt.put(feld, DokumentDaten.kennzeichnen(wert.asText()));
                 }
             }
+            if (wissen) {
+                for (String feld : WISSEN_FELDER) {
+                    JsonNode wert = objekt.get(feld);
+                    if (wert != null && wert.isTextual()) {
+                        objekt.put(feld, DokumentDaten.kennzeichnen(wert.asText()));
+                    }
+                }
+            }
             objekt.forEach(k -> {
                 if (k.isContainerNode()) {
-                    kennzeichnen(k);
+                    kennzeichnen(k, wissen);
                 }
             });
         } else {
-            knoten.forEach(DokumentTexte::kennzeichnen);
+            knoten.forEach(k -> kennzeichnen(k, wissen));
         }
     }
 }
