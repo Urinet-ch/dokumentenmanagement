@@ -42,6 +42,20 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber die E-Mail-Adresse des Mitarbeiters mit der aktuellen Version ändert
     Dann muss die neue Adresse bestätigt werden und die bisherige Adresse wird benachrichtigt
 
+  @req-3.8
+  Szenario: Ein aktiver Benutzer wird gesperrt und wieder entsperrt
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter besteht
+    Wenn der Inhaber den Mitarbeiter sperrt und wieder entsperrt
+    Dann ist der Mitarbeiter wieder aktiv
+
+  @req-3.9 @req-3.10
+  Szenario: Ein Austritt wird erfasst und der Zugang später neu eingerichtet
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter besteht
+    Wenn der Inhaber den Mitarbeiter deaktiviert und reaktiviert
+    Dann ist der Austritt verzeichnet und eine neue Zugangseinrichtung verlangt
+
   @req-3.4 @req-5.9
   Szenario: Ungültige Angaben und Realm-Konflikte werden ohne Personendaten abgewiesen
     Angenommen die frische Anmeldung ist für den Test bestätigt

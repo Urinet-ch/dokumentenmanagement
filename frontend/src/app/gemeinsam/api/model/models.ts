@@ -52,6 +52,7 @@ export * from './generator-finanz';
 export * from './generator-metadaten';
 export * from './generator-partner';
 export * from './generator-vertrag';
+export * from './grund';
 export * from './import-herkunft';
 export * from './import-hochgeladen';
 export * from './import-kontakt';

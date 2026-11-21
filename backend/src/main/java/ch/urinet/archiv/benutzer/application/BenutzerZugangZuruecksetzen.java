@@ -67,11 +67,11 @@ public class BenutzerZugangZuruecksetzen {
         vorgang.ausfuehren(mandant, eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
                 () -> {
                     var benutzer = identitaet.benutzerLesen(mandant.wert(), id);
-                    if (benutzer.rollen().size() != 1) {
+                    if (benutzer.rollen().size() > 1) {
                         throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
                     }
-                    Rolle rolle = benutzer.rollen().iterator().next();
-                    if (Vergaberegeln.pruefeSelbstzugriff(akteur, new Benutzer(id, rolle),
+                    Rolle rolle = benutzer.rollen().stream().findFirst().orElse(null);
+                    if (Vergaberegeln.pruefeSelbstzugriff(akteur, id,
                             Vergaberegeln.Selbstaktion.ZUGANG_ZURUECKSETZEN)
                             != Vergaberegeln.Pruefung.ERLAUBT) {
                         berechtigung.eskalationVerweigern(akteur, Aktion.A22);

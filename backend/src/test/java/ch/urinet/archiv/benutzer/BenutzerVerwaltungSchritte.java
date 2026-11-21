@@ -370,6 +370,57 @@ public class BenutzerVerwaltungSchritte {
         }
     }
 
+    @Angenommen("ein synthetischer aktiver Mitarbeiter besteht")
+    public void aktiverMitarbeiter() {
+        eingeladenerMitarbeiter();
+        identitaet.einladen(MANDANT, eigeneId, Set.of(), Duration.ofHours(1));
+    }
+
+    @Wenn("der Inhaber den Mitarbeiter sperrt und wieder entsperrt")
+    public void sperrenUndEntsperren() {
+        antworten.add(anfrage().contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
+                .post(PFAD + "/" + eigeneId + "/sperren"));
+        antworten.add(anfrage().get(PFAD + "/" + eigeneId));
+        antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/entsperren"));
+    }
+
+    @Dann("ist der Mitarbeiter wieder aktiv")
+    public void wiederAktiv() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
+        assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("GESPERRT");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktiv()).isTrue();
+        anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).body("status", org.hamcrest.Matchers.is("AKTIV"));
+    }
+
+    @Wenn("der Inhaber den Mitarbeiter deaktiviert und reaktiviert")
+    public void deaktivierenUndReaktivieren() {
+        antworten.add(anfrage().contentType("application/json").body("{\"grund\":\"AUSTRITT\"}")
+                .post(PFAD + "/" + eigeneId + "/deaktivieren"));
+        antworten.add(anfrage().get(PFAD + "/" + eigeneId));
+        antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/reaktivieren"));
+    }
+
+    @Dann("ist der Austritt verzeichnet und eine neue Zugangseinrichtung verlangt")
+    public void austrittUndNeuerZugang() throws SQLException {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
+        assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("DEAKTIVIERT");
+        var benutzer = identitaet.benutzerLesen(MANDANT, eigeneId);
+        assertThat(benutzer.aktiv()).isTrue();
+        assertThat(benutzer.rollen()).containsExactly(Rolle.MITARBEITER);
+        assertThat(benutzer.aktionen()).contains(IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from m_" + SCHEMA
+                             + ".benutzer_verzeichnis where benutzer = ? and anlass = 'AUSTRITT'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getInt(1)).isEqualTo(1);
+            }
+        }
+    }
+
     @Wenn("der Inhaber die Einladung viermal erneut sendet")
     public void einladungenSenden() {
         for (int i = 0; i < 4; i++) {

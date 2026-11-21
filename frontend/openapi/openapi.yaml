@@ -365,6 +365,8 @@ components:
           type: boolean
         google:
           type: boolean
+        voruebergehendGesperrt:
+          type: boolean
         einladungOffenSeit:
           $ref: "#/components/schemas/Instant"
         letzteAktion:
@@ -1676,6 +1678,11 @@ components:
           type: string
         naechsteFrist:
           $ref: "#/components/schemas/LocalDate"
+    Grund:
+      type: object
+      properties:
+        grund:
+          type: string
     ImportHerkunft:
       type: object
       properties:
@@ -3842,6 +3849,39 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/benutzer/{benutzerId}/deaktivieren:
+    post:
+      summary: Benutzer deaktivieren
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Grund"
+        required: true
+      responses:
+        "204":
+          description: Benutzer deaktiviert
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
   /api/v1/benutzer/{benutzerId}/einladung:
     post:
       summary: Einladung erneut senden
@@ -3866,6 +3906,39 @@ paths:
       responses:
         "204":
           description: Einladung gesendet
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/{benutzerId}/entsperren:
+    post:
+      summary: Benutzer entsperren
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+      responses:
+        "204":
+          description: Benutzer entsperrt
         "401":
           description: Not Authorized
         "403":
@@ -3903,6 +3976,72 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/{benutzerId}/reaktivieren:
+    post:
+      summary: Benutzer reaktivieren
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+      responses:
+        "204":
+          description: Benutzer reaktiviert
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/{benutzerId}/sperren:
+    post:
+      summary: Benutzer sperren
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Grund"
+        required: true
+      responses:
+        "204":
+          description: Benutzer gesperrt
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
       security:
       - SecurityScheme:
         - inhaber

@@ -153,7 +153,8 @@ backend/src/main/java/ch/urinet/archiv/
   `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
   `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
   `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET …/users/{id}/federated-identity` (Liste, Filter auf `identityProvider = google`; unter `…/federated-identity/google` kennt Keycloak nur POST und DELETE), `DELETE …/users/{id}/federated-identity/google`,
-  `DELETE …/attack-detection/brute-force/users/{id}`. Interne Adresse und Aussteller des Tokens sind in Aufgabe 19.1 zu
+  `GET/DELETE …/attack-detection/brute-force/users/{id}` (GET für die Anzeige und die Prüfung vor dem Entsperren;
+  aus der Antwort wird nur `disabled` verwendet, keine IP protokolliert). Interne Adresse und Aussteller des Tokens sind in Aufgabe 19.1 zu
   prüfen (`KC_HOSTNAME` zeigt auf die öffentliche Adresse; für den internen Weg nötigenfalls
   `KC_HOSTNAME_BACKCHANNEL_DYNAMIC`).
 - **Zeitgrenzen** (`archiv.verwaltung.keycloak.*`, Klasse (b)): Verbindung 2 s, Anfrage 5 s; zwei gleichzeitige Aufrufe

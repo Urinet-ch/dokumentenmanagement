@@ -108,6 +108,24 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void anmeldesperreWirdMandantengeprueftUndOhneIpVerarbeitet() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1"))
+                .willReturn(okJson("{\"id\":\"benutzer-1\",\"attributes\":{\"mandant\":[\"urinet\"]}}")));
+        String sperre = "/admin/realms/urinet-archiv/attack-detection/brute-force/users/benutzer-1";
+        server.stubFor(get(urlPathEqualTo(sperre))
+                .willReturn(okJson("{\"disabled\":true,\"lastIPFailure\":\"synthetische-ip\"}")));
+        var adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+
+        assertThat(adapter.anmeldungGesperrt("urinet", "benutzer-1")).isTrue();
+        assertThatThrownBy(() -> adapter.anmeldungGesperrt("vhf-gsk", "benutzer-1"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN));
+        server.verify(1, getRequestedFor(urlPathEqualTo(sperre)));
+        assertThat(log.volltext()).doesNotContain("synthetische-ip");
+    }
+
+    @Test
     void abgelehntesDienstkontoWirdAls502Abgebildet() {
         server.stubFor(post(urlPathEqualTo(TOKEN)).willReturn(aResponse().withStatus(401)
                 .withBody("{\"error\":\"synthetic private detail\"}")));

@@ -6,6 +6,7 @@ import ch.urinet.archiv.benutzer.application.BenutzerAnlegen;
 import ch.urinet.archiv.benutzer.application.BenutzerZugangZuruecksetzen;
 import ch.urinet.archiv.benutzer.application.BenutzerGoogleLoesen;
 import ch.urinet.archiv.benutzer.application.BenutzerEmailAendern;
+import ch.urinet.archiv.benutzer.application.BenutzerStatusAendern;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -57,6 +58,7 @@ public class BenutzerResource {
     private final BenutzerZugangZuruecksetzen zugang;
     private final BenutzerGoogleLoesen google;
     private final BenutzerEmailAendern email;
+    private final BenutzerStatusAendern status;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
     private final ObjectReader json;
@@ -65,6 +67,7 @@ public class BenutzerResource {
 
     public BenutzerResource(BenutzerLesen lesen, BenutzerEinladen einladen, BenutzerAnlegen anlegen,
                             BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google, BenutzerEmailAendern email,
+                            BenutzerStatusAendern status,
                             MandantAufloesung mandant, SecurityIdentity identitaet, ObjectMapper json,
                             Berechtigung berechtigung, StepUp stepUp) {
         this.lesen = lesen;
@@ -73,6 +76,7 @@ public class BenutzerResource {
         this.zugang = zugang;
         this.google = google;
         this.email = email;
+        this.status = status;
         this.mandant = mandant;
         this.identitaet = identitaet;
         this.json = json.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
@@ -237,6 +241,92 @@ public class BenutzerResource {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         email.ausfuehren(code, akteur, benutzerId, ifMatch, aenderung.email(), IpAdresse.aus(ip));
+        return Response.noContent().build();
+    }
+
+    public record Grund(String grund) {
+    }
+
+    @POST
+    @Path("/{benutzerId}/sperren")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Benutzer sperren")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = Grund.class)))
+    @APIResponse(responseCode = "204", description = "Benutzer gesperrt")
+    public Response sperren(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                            @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        return statusAendern(id, ip, contentType, body, BenutzerStatusAendern.Vorgang.SPERREN);
+    }
+
+    @POST
+    @Path("/{benutzerId}/entsperren")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Benutzer entsperren")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Benutzer entsperrt")
+    public Response entsperren(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                               @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        return statusAendern(id, ip, contentType, body, BenutzerStatusAendern.Vorgang.ENTSPERREN);
+    }
+
+    @POST
+    @Path("/{benutzerId}/deaktivieren")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Benutzer deaktivieren")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = Grund.class)))
+    @APIResponse(responseCode = "204", description = "Benutzer deaktiviert")
+    public Response deaktivieren(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        return statusAendern(id, ip, contentType, body, BenutzerStatusAendern.Vorgang.DEAKTIVIEREN);
+    }
+
+    @POST
+    @Path("/{benutzerId}/reaktivieren")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Benutzer reaktivieren")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Benutzer reaktiviert")
+    public Response reaktivieren(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        return statusAendern(id, ip, contentType, body, BenutzerStatusAendern.Vorgang.REAKTIVIEREN);
+    }
+
+    private Response statusAendern(String id, String ip, String contentType, InputStream body,
+                                  BenutzerStatusAendern.Vorgang vorgang) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        boolean mitGrund = vorgang == BenutzerStatusAendern.Vorgang.SPERREN
+                || vorgang == BenutzerStatusAendern.Vorgang.DEAKTIVIEREN;
+        if (!mitGrund) {
+            stepUp.pruefen();
+        }
+        String grund = null;
+        if (mitGrund) {
+            jsonPruefen(contentType);
+            byte[] eingabe = begrenztLesen(body);
+            if (eingabe.length != 0) {
+                try {
+                    Grund wert = json.forType(Grund.class).readValue(eingabe);
+                    grund = wert == null ? null : wert.grund();
+                } catch (JsonProcessingException e) {
+                    throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+                }
+            }
+        } else {
+            leerenKoerperPruefen(contentType, body);
+        }
+        status.ausfuehren(code, akteur, id, vorgang, grund, IpAdresse.aus(ip));
         return Response.noContent().build();
     }
 

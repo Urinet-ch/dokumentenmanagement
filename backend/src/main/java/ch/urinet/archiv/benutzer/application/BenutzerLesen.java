@@ -30,7 +30,7 @@ public class BenutzerLesen {
 
     public record BenutzerAnsicht(String id, String benutzername, String vorname, String nachname, String email,
                           Set<Rolle> rollen, boolean rollenkonflikt, BenutzerStatus status,
-                          boolean totp, boolean google, Instant einladungOffenSeit,
+                          boolean totp, boolean google, boolean voruebergehendGesperrt, Instant einladungOffenSeit,
                           BenutzerAktivitaet.LetzteAktion letzteAktion, String etag) {
         @Override
         public String toString() {
@@ -45,7 +45,8 @@ public class BenutzerLesen {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         String code = mandant.pruefen().wert();
-        return identitaet.benutzerSuchen(code, suche, seite, groesse).stream().map(this::darstellen).toList();
+        return identitaet.benutzerSuchen(code, suche, seite, groesse).stream()
+                .map(benutzer -> darstellen(code, benutzer)).toList();
     }
 
     public BenutzerAnsicht lesen(String id) {
@@ -53,15 +54,16 @@ public class BenutzerLesen {
         if (id == null || !KENNUNG.matcher(id).matches()) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
-        return darstellen(identitaet.benutzerLesen(code, id));
+        return darstellen(code, identitaet.benutzerLesen(code, id));
     }
 
-    private BenutzerAnsicht darstellen(IdentitaetsDienst.Benutzer benutzer) {
+    private BenutzerAnsicht darstellen(String code, IdentitaetsDienst.Benutzer benutzer) {
         BenutzerStatus zustand = status(benutzer, status);
         BenutzerAktivitaet.Angaben angaben = aktivitaet.lesen(benutzer.id());
         return new BenutzerAnsicht(benutzer.id(), benutzer.benutzername(), benutzer.vorname(), benutzer.nachname(),
                 benutzer.email(), benutzer.rollen(), benutzer.rollen().size() != 1, zustand, benutzer.totp(),
-                benutzer.google(), zustand == BenutzerStatus.EINGELADEN ? angaben.einladungSeit() : null,
+                benutzer.google(), identitaet.anmeldungGesperrt(code, benutzer.id()),
+                zustand == BenutzerStatus.EINGELADEN ? angaben.einladungSeit() : null,
                 angaben.letzteAktion(), BenutzerEtag.berechnen(benutzer, zustand));
     }
 

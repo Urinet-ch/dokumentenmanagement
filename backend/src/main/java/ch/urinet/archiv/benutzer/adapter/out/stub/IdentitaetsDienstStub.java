@@ -137,6 +137,12 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
     }
 
     @Override
+    public synchronized boolean anmeldungGesperrt(String mandant, String id) {
+        finden(mandant, id);
+        return false;
+    }
+
+    @Override
     public synchronized void googleLoesen(String mandant, String id) {
         Eintrag e = finden(mandant, id);
         Benutzer b = e.wert;

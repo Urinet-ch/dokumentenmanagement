@@ -131,6 +131,8 @@ public interface IdentitaetsDienst {
 
     void sperreAufheben(String mandant, String id);
 
+    boolean anmeldungGesperrt(String mandant, String id);
+
     void googleLoesen(String mandant, String id);
 
     void loeschen(String mandant, String id);

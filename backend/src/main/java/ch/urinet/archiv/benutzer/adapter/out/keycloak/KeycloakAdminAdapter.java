@@ -347,6 +347,17 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     }
 
     @Override
+    public boolean anmeldungGesperrt(String mandant, String id) {
+        benutzerAbrufen(mandant, id);
+        JsonNode antwort = json(request("GET", admin("/attack-detection/brute-force/users/" + segment(id)),
+                null, null, true, Set.of()));
+        if (antwort == null || !antwort.path("disabled").isBoolean()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        return antwort.path("disabled").booleanValue();
+    }
+
+    @Override
     public void googleLoesen(String mandant, String id) {
         benutzerAbrufen(mandant, id);
         Antwort antwort = request("DELETE", user(id) + "/federated-identity/google", null, null, false, Set.of(204, 404));
@@ -819,7 +830,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 || path.matches(usersMuster + "/" + id + "/federated-identity/google")
                 && method.equals("DELETE")
                 || path.matches(rootMuster + "/attack-detection/brute-force/users/" + id)
-                && method.equals("DELETE")
+                && Set.of("GET", "DELETE").contains(method)
                 || path.matches(rootMuster + "/roles/" + id) && method.equals("GET");
         if (!erlaubt) {
             throw new IllegalArgumentException("Nicht freigegebener Keycloak-Aufruf");

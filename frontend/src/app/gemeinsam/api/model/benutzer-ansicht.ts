@@ -23,6 +23,7 @@ export interface BenutzerAnsicht {
     status?: BenutzerStatus;
     totp?: boolean;
     google?: boolean;
+    voruebergehendGesperrt?: boolean;
     einladungOffenSeit?: string;
     letzteAktion?: LetzteAktion;
     etag?: string;

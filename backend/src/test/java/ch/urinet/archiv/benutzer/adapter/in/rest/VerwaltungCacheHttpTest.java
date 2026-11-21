@@ -444,6 +444,101 @@ class VerwaltungCacheHttpTest {
     }
 
     @Test
+    void statusAktionenSchuetzenSelbstzugriffLetztenInhaberUndMandant() {
+        String akteurId = Testanmeldung.sub("inhaber-urinet");
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub() {
+            @Override
+            public synchronized Benutzer benutzerLesen(String mandant, String id) {
+                if (id.equals(akteurId) && mandant.equals("urinet")) {
+                    return new Benutzer(id, "akteur", "akteur@example.invalid", "Test", "Person", true,
+                            Set.of(Rolle.INHABER), Set.of(), true, false);
+                }
+                return super.benutzerLesen(mandant, id);
+            }
+
+            @Override
+            public synchronized long inhaberZaehlen(String mandant) {
+                return 1;
+            }
+        };
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String inhaber = dienst.anlegen("urinet", person("inhaber." + suffix), Rolle.INHABER);
+        dienst.einladen("urinet", inhaber, Set.of(), Duration.ofHours(1));
+        String fremd = dienst.anlegen("vhf-gsk", person("fremd." + suffix), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/benutzer/";
+        for (String aktion : List.of("sperren", "deaktivieren")) {
+            given().auth().oauth2(token).contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
+                    .post(pfad + akteurId + "/" + aktion).then().statusCode(403)
+                    .body("fehlercode", is("ESKALATION_VERBOTEN"));
+            given().auth().oauth2(token).contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
+                    .post(pfad + inhaber + "/" + aktion).then().statusCode(409)
+                    .body("fehlercode", is("LETZTER_INHABER"));
+            given().auth().oauth2(token).contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
+                    .post(pfad + fremd + "/" + aktion).then().statusCode(404);
+        }
+        given().auth().oauth2(token).contentType("application/json").body("{\"grund\":\"freitext\"}")
+                .post(pfad + inhaber + "/sperren").then().statusCode(422);
+    }
+
+    @Test
+    void fehlversuchssperreIstSichtbarUndKannAufgehobenWerden() {
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub() {
+            private boolean gesperrt = true;
+
+            @Override
+            public synchronized boolean anmeldungGesperrt(String mandant, String id) {
+                super.anmeldungGesperrt(mandant, id);
+                return gesperrt;
+            }
+
+            @Override
+            public synchronized void sperreAufheben(String mandant, String id) {
+                super.sperreAufheben(mandant, id);
+                gesperrt = false;
+            }
+        };
+        String ziel = dienst.anlegen("urinet", person("probe." + UUID.randomUUID().toString().substring(0, 8)),
+                Rolle.MITARBEITER);
+        dienst.einladen("urinet", ziel, Set.of(), Duration.ofHours(1));
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/benutzer/" + ziel;
+        given().auth().oauth2(token).get(pfad).then().statusCode(200).body("voruebergehendGesperrt", is(true));
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + "/entsperren").then().statusCode(204);
+        given().auth().oauth2(token).get(pfad).then().statusCode(200).body("voruebergehendGesperrt", is(false));
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + "/entsperren").then().statusCode(409);
+    }
+
+    @Test
+    void kontoOhneRolleKannDeaktiviertUndZurueckgesetztWerden() {
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub();
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String deaktivieren = dienst.anlegenOhneRolle("urinet", person("offen." + suffix));
+        String zuruecksetzen = dienst.anlegenOhneRolle("urinet", person("reset." + suffix));
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/benutzer/";
+        given().auth().oauth2(token).contentType("application/json").body("{\"grund\":\"KORREKTUR\"}")
+                .post(pfad + deaktivieren + "/deaktivieren").then().statusCode(204);
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + zuruecksetzen + "/zugang-zuruecksetzen").then().statusCode(204);
+        assertThat(dienst.benutzerLesen("urinet", deaktivieren).rollen()).isEmpty();
+        assertThat(dienst.benutzerLesen("urinet", zuruecksetzen).rollen()).isEmpty();
+    }
+
+    @Test
     void anlegenPrueftRollenNamenssperreUndVierAugen() throws SQLException {
         QuarkusMock.installMockForType(new StepUpAusstehend() {
             @Override
