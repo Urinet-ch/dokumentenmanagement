@@ -38,7 +38,7 @@ Funktionalität: Erweitertes Konfigurationsabbild
       | gruppe    | schluessel         | wert                    |
       | branding  | name               | "<b>Archiv</b>"         |
       | branding  | name               | "Arc\u0007hiv"          |
-      | branding  | primaerfarbe       | "#ffffff"               |
+      | branding  | primaerfarbe       | "#fff"                  |
       | kennungen | uid                | "CHE-123"               |
       | kennungen | ibans              | "kein-array"            |
       | chat      | aufbewahrungMonate | 0                       |
