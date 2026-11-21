@@ -17,6 +17,8 @@ import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -66,7 +68,6 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
                 .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
                 .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
                 .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
-                .withEnv("KEYCLOAK_VERWALTUNG_SECRET", VERWALTUNG_TESTWERT)
                 .withEnv("ARCHIV_BASIS_URL", PWA_TEST_URL)
                 .withCopyFileToContainer(MountableFile.forHostPath(exportTemporaer.toAbsolutePath()),
                         "/opt/keycloak/data/import/realm-export.json")
@@ -128,7 +129,6 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
                      .withNetwork(testnetz).withNetworkAliases("keycloak-probe")
                      .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN)
                      .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
-                     .withEnv("KEYCLOAK_VERWALTUNG_SECRET", VERWALTUNG_TESTWERT)
                      .withEnv("ARCHIV_BASIS_URL", PWA_TEST_URL)
                      .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
                      .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
@@ -151,7 +151,27 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
             JsonNode discovery = mapper.readTree(curl(client, "-fsS",
                     intern + "/realms/urinet-archiv/.well-known/openid-configuration"));
             client.copyFileToContainer(Transferable.of(
-                    "grant_type=client_credentials&client_id=archiv-verwaltung&client_secret=" + VERWALTUNG_TESTWERT),
+                    "grant_type=password&client_id=admin-cli&username=" + ADMIN + "&password=" + ADMIN_PASSWORT),
+                    "/tmp/admin-form");
+            JsonNode adminToken = mapper.readTree(curl(client, "-fsS", "-X", "POST", "--data", "@/tmp/admin-form",
+                    intern + "/realms/master/protocol/openid-connect/token"));
+            client.copyFileToContainer(Transferable.of("Authorization: Bearer " + adminToken.path("access_token").asText()),
+                    "/tmp/admin-header");
+            JsonNode clients = mapper.readTree(curl(client, "-fsS", "-H", "@/tmp/admin-header",
+                    intern + "/admin/realms/urinet-archiv/clients?clientId=archiv-verwaltung"));
+            if (!clients.isArray() || clients.size() != 1 || clients.get(0).path("id").asText().isBlank()) {
+                throw new IllegalStateException("Dienstkonto im Test-Realm nicht eindeutig");
+            }
+            String id = clients.get(0).path("id").asText();
+            JsonNode credential = mapper.readTree(curl(client, "-fsS", "-H", "@/tmp/admin-header",
+                    intern + "/admin/realms/urinet-archiv/clients/" + id + "/client-secret"));
+            String testSecret = credential.path("value").asText();
+            if (testSecret.isBlank() || testSecret.contains("${")) {
+                throw new IllegalStateException("Dienstkonto im Test-Realm ohne erzeugtes Secret");
+            }
+            client.copyFileToContainer(Transferable.of(
+                    "grant_type=client_credentials&client_id=archiv-verwaltung&client_secret="
+                            + URLEncoder.encode(testSecret, StandardCharsets.UTF_8)),
                     "/tmp/token-form");
             JsonNode token = mapper.readTree(curl(client, "-fsS", "-X", "POST",
                     "--data", "@/tmp/token-form",

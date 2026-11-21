@@ -41,18 +41,6 @@ else
   GOOGLE_CLIENT_ID=
   GOOGLE_CLIENT_SECRET=
 fi
-# Client-Secret des Dienstkontos archiv-verwaltung für den Realm-Import (Platzhalter im Export). Fehlt die Datei (bis 19.3
-# liefert sie der Deploy nicht), gilt ein zufälliger, nirgends bekannter Wert: der Platzhalter bleibt nie als Klartext
-# stehen. Rotation und das echte Secret setzt 19.3 per kcadm.
-if [[ -s "$secrets/keycloak_verwaltung_secret" ]]; then
-  KEYCLOAK_VERWALTUNG_SECRET=$(lesen keycloak_verwaltung_secret)
-else
-  KEYCLOAK_VERWALTUNG_SECRET=$(LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 48 || true)
-  if (( ${#KEYCLOAK_VERWALTUNG_SECRET} < 32 )); then
-    echo "Zufallswert für keycloak_verwaltung_secret nicht erzeugbar." >&2
-    exit 1
-  fi
-fi
-export KEYCLOAK_VERWALTUNG_SECRET
+unset KEYCLOAK_VERWALTUNG_SECRET
 export KC_DB_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
 exec "${KEYCLOAK_BIN:-/opt/keycloak/bin/kc.sh}" start --optimized --import-realm "$@"

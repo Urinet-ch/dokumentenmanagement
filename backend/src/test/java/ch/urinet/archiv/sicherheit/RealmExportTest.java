@@ -16,7 +16,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der Realm-Export enthält nur das Dienstkonto und festgelegte Secret-Platzhalter; der Test-Realm ist der Export
+ * Der Realm-Export enthält nur das Dienstkonto und keine Dienstkonto-Secrets; der Test-Realm ist der Export
  * plus Testanteile (Benutzer, Clients {@code archiv-test*}, localhost für {@code archiv-pwa}).
  */
 class RealmExportTest {
@@ -53,7 +53,7 @@ class RealmExportTest {
         assertThat(pwa.path("webOrigins")).extracting(JsonNode::asText).containsExactly("${ARCHIV_BASIS_URL}");
         assertThat(pwa.path("attributes").path("post.logout.redirect.uris").asText())
                 .isEqualTo("${ARCHIV_BASIS_URL}/*");
-        assertThat(verwaltung.path("secret").asText()).isEqualTo("${KEYCLOAK_VERWALTUNG_SECRET}");
+        assertThat(verwaltung.has("secret")).isFalse();
         assertThat(verwaltung.path("publicClient").asBoolean(true)).isFalse();
         assertThat(verwaltung.path("bearerOnly").asBoolean(true)).isFalse();
         assertThat(verwaltung.path("serviceAccountsEnabled").asBoolean()).isTrue();
@@ -71,7 +71,6 @@ class RealmExportTest {
         assertThat(dienstkonto.has("realmRoles")).isFalse();
         ObjectNode bereinigt = export.deepCopy();
         bereinigt.remove("identityProviders");
-        ((ObjectNode) client(bereinigt, "archiv-verwaltung")).remove("secret");
         ((ObjectNode) bereinigt.path("users").get(0)).remove("clientRoles");
         ArrayNode konten = (ArrayNode) bereinigt.remove("users");
         assertThat(heikleFelder(konten)).isEmpty();
@@ -154,7 +153,7 @@ class RealmExportTest {
         test.remove("smtpServer");
         ObjectNode verwaltung = (ObjectNode) client(test, "archiv-verwaltung");
         assertThat(verwaltung.path("secret").asText()).isEqualTo(ExportKeycloak.VERWALTUNG_TESTWERT);
-        verwaltung.put("secret", "${KEYCLOAK_VERWALTUNG_SECRET}");
+        verwaltung.remove("secret");
         ArrayNode benutzer = (ArrayNode) test.path("users");
         for (int i = benutzer.size() - 1; i >= 0; i--) {
             if (!"archiv-verwaltung".equals(benutzer.get(i).path("serviceAccountClientId").asText())) {

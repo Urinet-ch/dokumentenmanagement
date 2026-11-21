@@ -587,7 +587,6 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "secret": "${KEYCLOAK_VERWALTUNG_SECRET}",
       "defaultClientScopes": [
         "kc-admin-api",
         "roles"

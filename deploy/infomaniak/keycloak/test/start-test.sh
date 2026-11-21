@@ -21,7 +21,11 @@ set -euo pipefail
 printf '%s\n' "${GOOGLE_CLIENT_ID:-}" > "$START_TEST_AUSGABE/id"
 printf '%s\n' "${GOOGLE_CLIENT_SECRET:-}" > "$START_TEST_AUSGABE/secret"
 printf '%s\n' "$*" > "$START_TEST_AUSGABE/args"
-printf '%s\n' "${KEYCLOAK_VERWALTUNG_SECRET:-}" > "$START_TEST_AUSGABE/verwaltung"
+if [[ ${KEYCLOAK_VERWALTUNG_SECRET+x} == x ]]; then
+  echo vorhanden > "$START_TEST_AUSGABE/verwaltung"
+else
+  echo fehlt > "$START_TEST_AUSGABE/verwaltung"
+fi
 STUB
 chmod +x "$temp/bin/keycloak-stub"
 mkdir "$temp/out"
@@ -39,6 +43,7 @@ pruefen() {
   ARCHIV_SECRETS_DIR="$temp/secrets" \
   ARCHIV_BASIS_URL="https://pwa.example.invalid" \
   KEYCLOAK_BIN="$temp/bin/keycloak-stub" \
+  KEYCLOAK_VERWALTUNG_SECRET="synthetischer-testwert" \
   START_TEST_AUSGABE="$temp/out" \
     bash "$start" >/dev/null
   [[ $(<"$temp/out/id") == "$erwartet_id" ]]
@@ -72,15 +77,10 @@ for basis in "" "http://pwa.example.invalid" "https://pwa.example.invalid/path" 
 done
 # Positivfall mit Port
 basis_pruefen "https://pwa.example.invalid:8443" >/dev/null
-# Dienstkonto-Secret: ohne Datei zufälliger Wert (nie der Platzhalter), mit Datei dessen Inhalt
-pruefen "synthetische-id\n" "synthetisches-secret\n" "synthetische-id" "synthetisches-secret"
-zufall=$(<"$temp/out/verwaltung")
-[[ ${#zufall} -ge 32 && "$zufall" != *'$'* ]]
-pruefen "synthetische-id\n" "synthetisches-secret\n" "synthetische-id" "synthetisches-secret"
-[[ $(<"$temp/out/verwaltung") != "$zufall" ]]
+# Dienstkonto-Secret wird weder aus der Datei gelesen noch aus der Umgebung weitergereicht.
 printf 'verwaltung-testwert\n' > "$temp/secrets/keycloak_verwaltung_secret"
 pruefen "synthetische-id\n" "synthetisches-secret\n" "synthetische-id" "synthetisches-secret"
-[[ $(<"$temp/out/verwaltung") == "verwaltung-testwert" ]]
+[[ $(<"$temp/out/verwaltung") == "fehlt" ]]
 jq -e '.identityProviders[] | select(.alias == "google" and .enabled == false)' \
   "$repo/deploy/keycloak/realm-export.json" >/dev/null
 echo "Keycloak-Start übergibt leere Werte für Google bei leerer, fehlender oder nur aus Leerraum bestehender ID oder Secret."

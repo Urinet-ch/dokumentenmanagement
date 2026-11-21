@@ -191,9 +191,11 @@ class RealmExportKeycloakTest {
         assertThat(adminGet(REALM + "/users/{user}/role-mappings/realm", konto).jsonPath().<String>getList("name"))
                 .doesNotContain("realm-admin");
 
+        String testSecret = adminGet(REALM + "/clients/{id}/client-secret", client).path("value");
+        assertThat(testSecret != null && !testSecret.isBlank() && !testSecret.contains("${")).isTrue();
         String token = given().formParam("grant_type", "client_credentials")
                 .formParam("client_id", "archiv-verwaltung")
-                .formParam("client_secret", ExportKeycloak.VERWALTUNG_TESTWERT)
+                .formParam("client_secret", testSecret)
                 .post(realmUrl() + "/protocol/openid-connect/token")
                 .then().statusCode(200).extract().path("access_token");
         JsonNode claims = new ObjectMapper().readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
