@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer;
 
 import ch.urinet.archiv.benutzer.application.BenutzerStatusSpeicher;
+import ch.urinet.archiv.protokoll.domain.ProtokollDetails.Verwaltungsgrund;
 import ch.urinet.archiv.benutzer.domain.BenutzerStatus;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
@@ -48,9 +49,9 @@ class JdbcBenutzerStatusTest {
         }
         String benutzer = UUID.randomUUID().toString();
         var gesperrt = new BenutzerStatusSpeicher.Eintrag(BenutzerStatus.GESPERRT,
-                Instant.parse("2026-01-01T10:00:00Z"), "Synthetischer Grund", "akteur");
+                Instant.parse("2026-01-01T10:00:00Z"), Verwaltungsgrund.KORREKTUR, "akteur");
         var deaktiviert = new BenutzerStatusSpeicher.Eintrag(BenutzerStatus.DEAKTIVIERT,
-                Instant.parse("2026-01-02T10:00:00Z"), "Synthetischer Grund", "akteur");
+                Instant.parse("2026-01-02T10:00:00Z"), Verwaltungsgrund.SONSTIGES, "akteur");
         try (var thread = Executors.newSingleThreadExecutor()) {
             try {
                 thread.submit(() -> {
@@ -80,9 +81,13 @@ class JdbcBenutzerStatusTest {
                 }
             }
         }
-        assertThat(gesperrt.toString()).doesNotContain("Synthetischer Grund", "akteur");
+        assertThat(gesperrt.toString()).doesNotContain("KORREKTUR", "akteur");
         assertThatThrownBy(() -> new BenutzerStatusSpeicher.Eintrag(BenutzerStatus.AKTIV,
-                Instant.now(), "Synthetischer Grund", "akteur")).isInstanceOf(IllegalArgumentException.class);
+                Instant.now(), Verwaltungsgrund.SONSTIGES, "akteur")).isInstanceOf(IllegalArgumentException.class);
+        for (Verwaltungsgrund grund : Verwaltungsgrund.values()) {
+            assertThat(new BenutzerStatusSpeicher.Eintrag(BenutzerStatus.GESPERRT, Instant.now(), grund, "akteur")
+                    .grund()).isEqualTo(grund);
+        }
     }
 
     private <T> T in(java.util.concurrent.ExecutorService thread, String code, Callable<T> arbeit) throws Exception {

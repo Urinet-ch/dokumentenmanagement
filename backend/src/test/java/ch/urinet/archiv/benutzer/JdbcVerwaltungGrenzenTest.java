@@ -86,6 +86,17 @@ class JdbcVerwaltungGrenzenTest {
                     return null;
                 });
             }
+            UUID verwaist = UUID.randomUUID();
+            in(thread, "urinet", () -> {
+                protokoll("urinet", anderer, "BENUTZER_ANLEGEN", "UNKLAR", "ANLEGEN", verwaist, 0);
+                protokoll("urinet", anderer, "BENUTZER_ANLEGEN", "FEHLGESCHLAGEN", "ANLEGEN", verwaist, 0);
+                protokoll("urinet", anderer, "BENUTZER_ANLEGEN", "ABGESCHLOSSEN", "ANLEGEN", verwaist, 0);
+                return null;
+            });
+            assertThatThrownBy(() -> in(thread, "urinet", () -> {
+                grenzen.pruefen(anderer, Art.EMAIL, verwaist);
+                return null;
+            })).hasRootCauseInstanceOf(ZuVieleAnfragen.class);
             in(thread, "urinet", () -> {
                 for (int i = 0; i < 60; i++) {
                     protokoll("urinet", UUID.randomUUID().toString(), "KONFIGURATION_AENDERN",

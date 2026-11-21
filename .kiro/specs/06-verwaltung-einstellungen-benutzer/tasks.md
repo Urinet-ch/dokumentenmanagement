@@ -70,6 +70,8 @@ auf Server oder Secrets aus der Sitzung.
     erweitert; Code `ZU_VIELE_ANFRAGEN` mit `grund = VERWALTUNG`.
   - Offen, bewusst nicht abgehakt: Cucumber-Szenarien `@req-4.7`, `6.1`–`6.4`, `6.6` brauchen einen Endpunkt und kommen mit 19.7;
     ebenso die Anbindung der Einstellungsgrenze (`Art.EINSTELLUNG`, `einstellungen-je-mandant`) und der Grund-Eingabe.
+    Ebenfalls offen (Req 6.3): das Schreiben der Verzeichniszeilen `ANLAGE`, `UEBERNAHME` und `AUSTRITT` in der Abschlusstransaktion
+    kommt mit 19.7 bis 19.9; hier sind nur Enum-Wert, Check-Constraint und Vertrag umgesetzt.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 

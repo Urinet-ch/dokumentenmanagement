@@ -32,7 +32,7 @@ public class JdbcVerwaltungGrenzen implements VerwaltungGrenzen {
             + "or aktion = 'BENUTZER_ANTRAG' and coalesce(details->>'phase', 'ANGEFRAGT') = 'ANGEFRAGT' "
             + "or aktion = 'KONFIGURATION_AENDERN')";
     private static final String EMAILS = "details->>'ziel' = ? and "
-            + "(aktion = 'BENUTZER_ANLEGEN' and details->>'phase' = 'ABGESCHLOSSEN' "
+            + "(aktion = 'BENUTZER_ANLEGEN' and details->>'phase' in ('ABGESCHLOSSEN', 'UNKLAR', 'FEHLGESCHLAGEN') "
             + "or aktion = 'BENUTZER_AENDERN' and details->>'phase' = 'ANGEFRAGT' "
             + "and details->>'vorgang' in ('EINLADUNG_ERNEUT', 'ZUGANG_ZURUECKSETZEN', 'REAKTIVIEREN'))";
 

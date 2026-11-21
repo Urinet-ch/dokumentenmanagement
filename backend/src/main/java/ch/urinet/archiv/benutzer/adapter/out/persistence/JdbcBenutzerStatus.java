@@ -3,6 +3,7 @@ package ch.urinet.archiv.benutzer.adapter.out.persistence;
 import ch.urinet.archiv.benutzer.application.BenutzerStatusSpeicher;
 import ch.urinet.archiv.benutzer.domain.BenutzerStatus;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
+import ch.urinet.archiv.protokoll.domain.ProtokollDetails.Verwaltungsgrund;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -40,7 +41,7 @@ public class JdbcBenutzerStatus implements BenutzerStatusSpeicher {
             try (ResultSet zeile = abfrage.executeQuery()) {
                 return zeile.next() ? Optional.of(new Eintrag(BenutzerStatus.valueOf(zeile.getString("art")),
                         zeile.getObject("seit", OffsetDateTime.class).toInstant(),
-                        zeile.getString("grund"), zeile.getString("von"))) : Optional.empty();
+                        Verwaltungsgrund.valueOf(zeile.getString("grund")), zeile.getString("von"))) : Optional.empty();
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Benutzerstatus nicht lesbar", e);
@@ -60,7 +61,7 @@ public class JdbcBenutzerStatus implements BenutzerStatusSpeicher {
             befehl.setString(1, benutzer);
             befehl.setString(2, eintrag.status().name());
             befehl.setObject(3, eintrag.seit().atOffset(ZoneOffset.UTC));
-            befehl.setString(4, eintrag.grund());
+            befehl.setString(4, eintrag.grund().name());
             befehl.setString(5, eintrag.von());
             befehl.executeUpdate();
         } catch (SQLException e) {

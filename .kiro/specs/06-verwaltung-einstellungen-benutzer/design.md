@@ -381,7 +381,7 @@ token_widerruf(benutzer text pk, ab timestamptz)                                
 `db/mandant` je Mandant:
 ```
 benutzer_status(benutzer text pk, art text check (art in ('GESPERRT','DEAKTIVIERT')), seit timestamptz,
-                grund text, von text)                      -- Zeile entfällt beim Entsperren und Reaktivieren; Verlauf steht im Protokoll
+                grund text check (Kategorie nach 4.4), von text)  -- Zeile entfällt beim Entsperren und Reaktivieren; Verlauf steht im Protokoll
 verwaltung_antrag(id uuid pk, art text check (art in ('INHABER_ROLLE','LOESCHEN')), ziel text, rolle text null,
                   grund text, beantragt_von text, beantragt_am timestamptz, gueltig_bis timestamptz,
                   status text check (status in ('OFFEN','BESTAETIGT','ABGELEHNT','ABGELAUFEN','ZURUECKGEZOGEN')),
@@ -391,7 +391,7 @@ zugriff_protokoll:      aktion erhält die Werte BENUTZER_ANLEGEN, BENUTZER_AEND
                         BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG (Check-Constraint per neuem Changeset, falls vorhanden)
 ```
 Es gibt keine Tabelle mit E-Mail, Namen oder Zugangsdaten. `benutzer_status` und `verwaltung_antrag` enthalten nur
-Kennungen (`sub`) und Texte der Inhaber (Grund). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
+Kennungen (`sub`) und Texte der Inhaber (Grund; in `benutzer_status` nur die feste Kategorie nach 4.4). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
 
 ## Error Handling (neue Codes)
 Die Aufgabe, die einen Code einführt, trägt ihn im selben PR in die Tabelle in Spec 01 design.md («Error Handling») und ins

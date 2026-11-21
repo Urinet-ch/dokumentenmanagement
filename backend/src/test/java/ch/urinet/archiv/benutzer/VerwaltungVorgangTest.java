@@ -237,6 +237,58 @@ class VerwaltungVorgangTest {
         }
     }
 
+    @Test
+    void fehlerDerArbeitMitZielTraegtDasZielInsUnklarProtokoll() throws Exception {
+        MandantCode mandant = mandantFuerAnlage();
+        UUID id = UUID.randomUUID();
+        UUID sub = UUID.randomUUID();
+        String akteur = UUID.randomUUID().toString();
+        var absicht = anlage(id, null, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.<UUID>ausfuehren(mandant, absicht,
+                    () -> { }, () -> { throw new VerwaltungVorgang.ArbeitFehler(sub, new IllegalStateException()); },
+                    fehler -> Kompensation.UNKLAR, wert -> { },
+                    wert -> anlage(id, wert, akteur, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN))))
+                    .hasRootCauseInstanceOf(IllegalStateException.class);
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(zielDerPhase(mandant.schema(), id, "UNKLAR")).isEqualTo(sub.toString());
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void abschlussMitAndererRolleAlsAngefragtWirdAbgelehnt() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        UUID ziel = UUID.randomUUID();
+        String akteur = UUID.randomUUID().toString();
+        AtomicBoolean gespeichert = new AtomicBoolean();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant,
+                    rollenvorgang(id, ziel, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT,
+                            ProtokollDetails.Verwaltungsrolle.MITARBEITER),
+                    () -> { }, () -> "ok", fehler -> Kompensation.UNKLAR, wert -> gespeichert.set(true),
+                    wert -> rollenvorgang(id, ziel, akteur, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN,
+                            ProtokollDetails.Verwaltungsrolle.INHABER))))
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(gespeichert).isFalse();
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    private static ZugriffEintrag rollenvorgang(UUID id, UUID ziel, String akteur,
+                                                ProtokollDetails.Verwaltungsphase phase,
+                                                ProtokollDetails.Verwaltungsrolle rolleNeu) {
+        var details = new ProtokollDetails.Verwaltung(id, phase, ziel,
+                ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN, null, rolleNeu, List.of());
+        return new ZugriffEintrag(Optional.of(akteur), Optional.of("INHABER"), ProtokollAktion.ROLLE_ZUWEISEN,
+                Optional.empty(), Optional.empty(), ProtokollDetails.verwaltung(details));
+    }
+
     private static ZugriffEintrag anlage(UUID id, UUID ziel, String akteur,
                                          ProtokollDetails.Verwaltungsphase phase) {
         var details = new ProtokollDetails.Verwaltung(id, phase, ziel, ProtokollDetails.Verwaltungsvorgang.ANLEGEN,

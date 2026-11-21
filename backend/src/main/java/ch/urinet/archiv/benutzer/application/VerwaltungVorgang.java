@@ -23,6 +23,23 @@ public class VerwaltungVorgang {
 
     public enum Kompensation { GEKLAERT, UNKLAR }
 
+    /**
+     * Fehler der {@code arbeit}, nachdem sie im Realm schon einen Benutzer angelegt hat. Er trägt dessen {@code sub},
+     * damit das Protokoll {@code UNKLAR} oder {@code FEHLGESCHLAGEN} das Ziel nennt (Spur zum verwaisten Benutzer).
+     */
+    public static final class ArbeitFehler extends RuntimeException {
+        private final transient UUID ziel;
+
+        public ArbeitFehler(UUID ziel, Throwable ursache) {
+            super("Verwaltungsarbeit fehlgeschlagen", ursache);
+            this.ziel = Objects.requireNonNull(ziel);
+        }
+
+        UUID ziel() {
+            return ziel;
+        }
+    }
+
     private static final Set<ProtokollAktion> AKTIONEN = Set.of(ProtokollAktion.BENUTZER_ANLEGEN,
             ProtokollAktion.BENUTZER_AENDERN, ProtokollAktion.BENUTZER_LOESCHEN, ProtokollAktion.ROLLE_ZUWEISEN);
 
@@ -108,6 +125,9 @@ public class VerwaltungVorgang {
                     || !absicht.rolle().equals(eintrag.rolle())
                     || details.vorgang() != ende.vorgang()
                     || details.grund() != ende.grund()
+                    || (details.rolleAlt() != null && details.rolleAlt() != ende.rolleAlt())
+                    || (details.rolleNeu() != null && details.rolleNeu() != ende.rolleNeu())
+                    || (!details.felder().isEmpty() && !details.felder().equals(ende.felder()))
                     || (details.ziel() != null && !details.ziel().equals(ende.ziel()))
                     || (art == VerwaltungGrenzen.Art.ANLEGEN && ende.ziel() == null)) {
                 throw new IllegalArgumentException("Abschluss gehört nicht zum Vorgang");
@@ -125,6 +145,10 @@ public class VerwaltungVorgang {
         } catch (RuntimeException fehler) {
             Kompensation ergebnis = Kompensation.UNKLAR;
             UUID geprueftesZiel = ziel;
+            if (!arbeitGeliefert && geprueftesZiel == null && fehler instanceof ArbeitFehler mitZiel) {
+                geprueftesZiel = mitZiel.ziel();
+            }
+            UUID fehlerZiel = geprueftesZiel;
             try {
                 ergebnis = Objects.requireNonNull(kompensieren.apply(fehler), "Ergebnis der Kompensation fehlt");
             } catch (RuntimeException kompensationsFehler) {
@@ -134,7 +158,7 @@ public class VerwaltungVorgang {
                 boolean abgeschlossen = false;
                 try {
                     transaktionen.neu(() -> {
-                        protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.FEHLGESCHLAGEN, geprueftesZiel));
+                        protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.FEHLGESCHLAGEN, fehlerZiel));
                         if (!sperre.abschliessen(mandant, id, Vorgangssperre.Abschluss.FEHLGESCHLAGEN)) {
                             throw new IllegalStateException("Vorgangssperre nicht abgeschlossen");
                         }
@@ -149,7 +173,7 @@ public class VerwaltungVorgang {
             }
             try {
                 transaktionen.neu(() -> {
-                    protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.UNKLAR, geprueftesZiel));
+                    protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.UNKLAR, fehlerZiel));
                     if (!sperre.abschliessen(mandant, id, Vorgangssperre.Abschluss.UNKLAR)) {
                         throw new IllegalStateException("Vorgangssperre nicht abgeschlossen");
                     }

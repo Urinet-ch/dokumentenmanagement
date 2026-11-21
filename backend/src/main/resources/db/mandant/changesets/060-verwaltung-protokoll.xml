@@ -20,7 +20,7 @@
                 benutzer text primary key,
                 art text not null check (art in ('GESPERRT', 'DEAKTIVIERT')),
                 seit timestamptz not null,
-                grund text not null,
+                grund text not null check (grund in ('SICHERHEIT', 'AUSTRITT', 'RECHTEAENDERUNG', 'KORREKTUR', 'SONSTIGES')),
                 von text not null
             );
             create table verwaltung_antrag (
