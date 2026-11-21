@@ -98,6 +98,18 @@ class SecretPruefungTest {
     }
 
     @Test
+    void keycloakSecretErstMitAdminAdresse() throws IOException {
+        dateien("archiv_db_app");
+        Map<String, String> ohneAdresse = Map.of(SecretPruefung.PFLICHT, "archiv_db_app",
+                SecretPruefung.MIGRIEREN, "false", SecretPruefung.ADMIN_URL, "");
+
+        assertThatCode(() -> config("api", ohneAdresse).getValue(DB_APP, String.class))
+                .doesNotThrowAnyException();
+        assertThat(config("api", ohneAdresse)
+                .getOptionalValue("archiv.verwaltung.keycloak.client-secret", String.class)).isEmpty();
+    }
+
+    @Test
     void ohnePflichtlisteKeinePruefung() {
         SmallRyeConfig config = builder("api", Map.of()).withProfile("dev").build();
         assertThatCode(() -> config.getOptionalValue(DB_APP, String.class)).doesNotThrowAnyException();
@@ -145,6 +157,7 @@ class SecretPruefungTest {
                 "archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis,infomaniak_ai_token,archiv_manifest_key");
         werte.put("%prod." + SecretPruefung.PFLICHT_MIGRATION, "archiv_db_owner");
         werte.put(SecretPruefung.MIGRIEREN, "true");
+        werte.put("%prod." + SecretPruefung.ADMIN_URL, "http://kc:8080");
         werte.put("%prod.smallrye.config.source.file.locations", verzeichnis.toString());
         SecretPruefung.ZIELE.forEach((ziel, datei) -> werte.put("%prod." + ziel,
                 "${" + datei + (datei.equals("keycloak_verwaltung_secret") ? ":" : "") + "}"));

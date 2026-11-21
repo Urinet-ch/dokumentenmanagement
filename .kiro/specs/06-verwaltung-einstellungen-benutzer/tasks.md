@@ -50,6 +50,8 @@ auf Server oder Secrets aus der Sitzung.
     `KEYCLOAK_VERWALTUNG_SECRET` und `KEYCLOAK_SMTP_PASSWORT`, Secret-Dateien im Deploy-Bundle und Pflichtprüfung im Workflow;
     Compose: Secret für `api`; Admin-Konsole bleibt nicht öffentlich; Probe: Token des Dienstkontos holbar; Notfallunterlagen
     um das neue Secret ergänzt.
+  - Hinweis (Hotfix 21.11.2026): `SecretPruefung` verlangt `keycloak_verwaltung_secret` erst, wenn
+    `ARCHIV_KEYCLOAK_ADMIN_URL` gesetzt ist; Secret und Adresse in Compose darum im selben Schritt setzen.
   - Nachgelagert [Fabian] (Entscheid 21.11.2026): bestehenden Realm einmalig aktualisieren und die Betriebsnachweise
     für interne Verbindung mit korrektem Issuer und automatische Ablaufzeit der Secret-Überlappung führen.
   - _Anforderungen: 5.2, 5.3, 5.4, 6.9, 7.4_

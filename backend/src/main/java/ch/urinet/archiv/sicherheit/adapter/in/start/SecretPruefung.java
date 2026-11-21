@@ -30,6 +30,7 @@ public class SecretPruefung implements ConfigSourceInterceptor {
     static final String PFLICHT = "archiv.secrets.pflicht";
     static final String PFLICHT_MIGRATION = "archiv.secrets.pflicht-migration";
     static final String MIGRIEREN = "quarkus.liquibase.migrate-at-start";
+    static final String ADMIN_URL = "archiv.verwaltung.keycloak.basis-url";
     /** Zugang → Secret-Datei, aus der er in {@code prod} kommen muss. */
     static final Map<String, String> ZIELE = Map.of(
             "quarkus.datasource.password", "archiv_db_app",
@@ -70,7 +71,8 @@ public class SecretPruefung implements ConfigSourceInterceptor {
         if (migrieren != null && Boolean.parseBoolean(migrieren.getValue())) {
             pflicht.addAll(werte(lesen, PFLICHT_MIGRATION));
         }
-        if (!pflicht.isEmpty()
+        // Pflicht erst, wenn die Admin-Adresse gesetzt ist (Spec 06, 19.3); ohne sie meldet der Adapter «nicht erreichbar».
+        if (!pflicht.isEmpty() && !werte(lesen, ADMIN_URL).isEmpty()
                 && werte(lesen, "archiv.rolle").stream()
                 .anyMatch(rolle -> rolle.equals("api") || rolle.equals("kommando"))) {
             pflicht.add("keycloak_verwaltung_secret");
