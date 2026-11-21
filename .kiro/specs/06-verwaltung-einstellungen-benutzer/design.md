@@ -338,8 +338,8 @@ ein neuer Benutzer nie als früherer erscheint.
 
 ## Realm-Änderungen (Keycloak, Betreiber)
 Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anmeldung und Benutzer bleiben unverändert:
-1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, Secret `${KEYCLOAK_VERWALTUNG_SECRET}`
-   (Platzhalter, wie bei Google); Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
+1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, im Export kein Secret;
+   Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
    `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1. Ergebnis des Spikes: FGAP wirkt nicht, solange `manage-users` gehalten wird (siehe «Umsetzung 19.1»; entschieden 20.11.2026: `manage-users` bleibt, Option (a)).
 2. SMTP des Realms (Host, Port, Absender `archiv@urinet.ch`, Anzeigename «UriNet Archiv», Zugang als Secret
    `keycloak_smtp_passwort`); ohne SMTP kann Keycloak keine Einladung senden.
@@ -552,6 +552,26 @@ Stand Aufgabe 19.1: Nachgewiesen sind Mandantensuche, Rollenmitglieder, Issuer, 
 erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Secret-Rotation, `auth_time`, `prompt=login` und
 `execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
 Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.
+
+## Umsetzung 19.2 — Realm-Export und Tests
+
+Der Export enthält das Dienstkonto mit `kc-admin-api` und den drei vorgesehenen Rollen; der Test-Realm ergänzt SMTP
+an Mailpit. Der importierte Export und der reguläre Dev Service senden eine Einladung ohne vorhandenes Passwort mit den
+drei erforderlichen Aktionen. Der interaktive PWA-Test weist `auth_time` beim ersten Login und unverändert bei SSO nach;
+`prompt=login` verlangt Passwort und TOTP und liefert danach eine neuere Authentifizierungszeit. Für die erneute Anmeldung
+wartet der Test auf ein neues TOTP-Zeitfenster, weil Keycloak die Wiederverwendung desselben Codes ablehnt.
+Ein synthetischer Test weist die Secret-Überlappung und den Widerruf sowie den internen Backchannel mit korrektem
+Issuer nach; die konkrete Betriebsverdrahtung und die automatische Ablaufzeit bleiben als nachgelagerte
+Betriebsnachweise für 19.3 offen (Entscheid Fabian 21.11.2026).
+
+Redirect, Web-Origin und Logout-Redirect des PWA-Clients verwenden im Realm-Export `${ARCHIV_BASIS_URL}`. Keycloak
+liest den nicht geheimen Wert beim Import aus der Umgebung; Compose reicht ihn aus der externen Bundle-Konfiguration
+weiter. Der Start bricht bei fehlender oder ungültiger HTTPS-Basisadresse ab. `schreibe-env.sh` schreibt den Wert aus
+`HOST_ARCHIV` in die `.env` des Bundles (Nachbesserung Review PR #385); der Workflow bleibt unverändert. Der Export
+enthält kein Dienstkonto-Secret; Keycloak erzeugt beim Erstimport eines. Der Test weist nach, dass damit ein Token
+bezogen werden kann. Das tatsächlich verwendete Secret wird erst in 19.3 ausserhalb des Imports gesetzt; `start.sh`
+liest oder übergibt es nicht. Ein bereits importierter Realm wird durch den Startimport nicht aktualisiert;
+die einmalige Aktualisierung ist in 19.3 nachgelagert (Entscheid Fabian 21.11.2026).
 
 ## Umsetzung 19.4 — Keycloak-Adapter
 

@@ -4,7 +4,23 @@
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
+  "accessTokenLifespan": 300,
+  "actionTokenGeneratedByAdminLifespan": 86400,
+  "passwordPolicy": "length(12) and notUsername and notEmail",
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "archiv@example.invalid",
+    "fromDisplayName": "UriNet Archiv",
+    "auth": "false",
+    "ssl": "false",
+    "starttls": "false"
+  },
   "eventsEnabled": true,
+  "eventsExpiration": 34560000,
+  "attributes": {
+    "adminEventsExpiration": "34560000"
+  },
   "eventsListeners": [],
   "enabledEventTypes": [
     "LOGIN_ERROR",
@@ -570,6 +586,23 @@
   ],
   "clients": [
     {
+      "clientId": "archiv-verwaltung",
+      "name": "UriNet Archiv (Verwaltung)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "verwaltung-nur-testwert",
+      "defaultClientScopes": [
+        "kc-admin-api",
+        "roles"
+      ]
+    },
+    {
       "clientId": "archiv-pwa",
       "name": "UriNet Archiv (PWA)",
       "enabled": true,
@@ -581,18 +614,30 @@
       "serviceAccountsEnabled": false,
       "frontchannelLogout": true,
       "redirectUris": [
-        "https://archiv.apps.urinet.ch/*",
+        "https://pwa.example.invalid/*",
         "http://localhost:8080/*"
       ],
       "webOrigins": [
-        "https://archiv.apps.urinet.ch",
+        "https://pwa.example.invalid",
         "http://localhost:8080"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "https://archiv.apps.urinet.ch/*##http://localhost:8080/*"
+        "post.logout.redirect.uris": "https://pwa.example.invalid/*##http://localhost:8080/*"
       },
       "protocolMappers": [
+        {
+          "name": "auth_time",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "AUTH_TIME",
+            "claim.name": "auth_time",
+            "jsonType.label": "long",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "mandant",
           "protocol": "openid-connect",
@@ -1059,6 +1104,18 @@
   "directGrantFlow": "direct-grant-totp-pflicht",
   "resetCredentialsFlow": "reset-credentials-totp-pflicht",
   "users": [
+    {
+      "username": "service-account-archiv-verwaltung",
+      "enabled": true,
+      "serviceAccountClientId": "archiv-verwaltung",
+      "clientRoles": {
+        "realm-management": [
+          "query-users",
+          "view-users",
+          "manage-users"
+        ]
+      }
+    },
     {
       "username": "inhaber-urinet",
       "enabled": true,
