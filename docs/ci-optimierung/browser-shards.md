@@ -6,18 +6,20 @@ PostgreSQL und MinIO. So teilen sich die Shards weder die TOTP-Schritte noch
 die Testdaten. Die Jobnamen ändern sich; wer den Diff anwendet, prüft auch
 externe Auswertungen und erforderliche Checks auf die neuen Namen.
 
-Mit dem Cucumber-Dry-Run auf `main` wurden 154 Szenarien einschliesslich
-Outline-Beispielen über URI, Szenario-ID und Zeile verglichen: 77 je Shard,
-keine Überschneidung, keines fehlt. Lokal liefen beide Shards nacheinander
-mit jeweils frisch gestartetem, eigenem Testbackend: Shard 1 mit 77 Szenarien
-und 1404 Schritten in 1 min 19 s, Shard 2 mit 77 Szenarien und 1402 Schritten
-in 1 min 23 s; alle waren grün. Beide Backends wurden regulär beendet.
-Das belegt nicht den parallelen CI-Lauf oder eine Zeitersparnis. Nach Anwendung
-muss der Diff in mindestens zwei vollständigen CI-Läufen geprüft werden;
-`fail-fast: false` verhindert, dass ein fehlerhafter Shard den anderen abbricht.
-Kein Szenario wird ausgelassen.
+Mit dem Cucumber-Dry-Run auf `main` bei `c8aba344` wurden 158 Szenarien
+einschliesslich Outline-Beispielen über URI, Szenario-ID und Zeile verglichen:
+79 je Shard, keine Überschneidung, keines fehlt. Lokal liefen beide Shards
+nacheinander mit jeweils frisch gestartetem, eigenem Testbackend. Shard 2 war
+mit 79 Szenarien und 1440 Schritten grün; in Shard 1 waren 78 Szenarien grün,
+eines scheiterte beim erneuten Senden nach einem Chat-Streamfehler. Der
+Testfehler und seine Synchronisation werden in #418 bearbeitet. Beide Backends
+wurden regulär beendet. Nach dessen Merge müssen beide Shards erneut geprüft
+werden; der parallele CI-Lauf und eine Zeitersparnis sind noch nicht belegt.
+Nach Anwendung muss der Diff in mindestens zwei vollständigen CI-Läufen
+geprüft werden; `fail-fast: false` verhindert, dass ein fehlerhafter Shard den
+anderen abbricht. Kein Szenario wird ausgelassen.
 
-Grundlage des folgenden Diffs: Stand `457d32cb` von `main`:
+Grundlage des folgenden Diffs: Stand `c8aba344` von `main`:
 
 ```diff
 diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
