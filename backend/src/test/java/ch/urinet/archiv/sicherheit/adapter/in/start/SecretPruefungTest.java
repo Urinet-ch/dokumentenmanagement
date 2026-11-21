@@ -105,6 +105,8 @@ class SecretPruefungTest {
 
         assertThatCode(() -> config("api", ohneAdresse).getValue(DB_APP, String.class))
                 .doesNotThrowAnyException();
+        assertThatCode(() -> config("kommando", ohneAdresse).getValue(DB_APP, String.class))
+                .doesNotThrowAnyException();
         assertThat(config("api", ohneAdresse)
                 .getOptionalValue("archiv.verwaltung.keycloak.client-secret", String.class)).isEmpty();
     }
