@@ -5,7 +5,7 @@ import io.quarkus.dev.console.QuarkusConsole;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainLauncher;
 import io.quarkus.test.junit.main.QuarkusMainTest;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -16,14 +16,13 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * {@code archiv mail einrichten} über denselben Einstieg wie der Dienst ({@code ArchivMain.main}). Befund Stufe A
- * (13.11.2026): Las das Kommando die Standardeingabe erst nach dem Start der Anwendung, kam im Wegwerf-Container nichts
- * mehr an («Passwort fehlt»). Die {@link Tastatur} dieses Tests liefert das Passwort darum nur, solange der Leser noch
- * vor {@code Quarkus.run} steht, und sonst eine leere Zeile; das Kommando gelingt also nur, wenn es vor dem Start liest.
+ * Prüft die Kommandos «alte-links» und «mail» über denselben Einstieg wie der Dienst ({@code ArchivMain.main}).
+ * Die Tastatur liefert das Mail-Passwort nur, solange der Leser noch vor {@code Quarkus.run} steht: Im
+ * Wegwerf-Container kam die Standardeingabe nach dem Start nicht mehr an (Befund Stufe A vom 13.11.2026).
  */
 @Tag("start-4")
 @QuarkusMainTest
-class MailKommandoStartTest {
+class IntegrationKommandoStartTest {
 
     private static final String[] AUFRUF = {"mail", "einrichten", "urinet", "imap.example.invalid", "993",
             "archiv@example.invalid", "a@example.invalid"};
@@ -82,9 +81,27 @@ class MailKommandoStartTest {
         }
     }
 
-    @AfterAll
-    static void kommandoEinstellungenEntfernen() {
+    @AfterEach
+    void kommandoEinstellungenEntfernen() {
         ArchivMain.KOMMANDO.keySet().forEach(System::clearProperty);
+        ArchivMain.OHNE_DATENBANK.keySet().forEach(System::clearProperty);
+    }
+
+    @Test
+    void falscherAufrufEndetMitCode2UndAufrufhinweis(QuarkusMainLauncher starter) {
+        LaunchResult ergebnis = starter.launch("alte-links", "importieren");
+
+        assertThat(ergebnis.exitCode()).isEqualTo(2);
+        assertThat(ergebnis.getErrorOutput()).contains("archiv alte-links importieren");
+    }
+
+    @Test
+    void gueltigerAufrufErreichtDasKommando(QuarkusMainLauncher starter) {
+        LaunchResult ergebnis = starter.launch("alte-links", "importieren", "/nicht/vorhanden.csv",
+                "--mandant", "urinet", "--dry-run");
+
+        assertThat(ergebnis.exitCode()).isNotEqualTo(2);
+        assertThat(ergebnis.getErrorOutput()).doesNotContain("Aufruf: archiv alte-links");
     }
 
     @Test
