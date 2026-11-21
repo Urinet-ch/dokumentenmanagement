@@ -3,6 +3,11 @@
 > **Entwurf, nicht umgesetzt.** Beschreibt, wie die Verwaltung nach Spec 06 (`.kiro/specs/06-verwaltung-einstellungen-benutzer/`)
 > funktionieren soll. Die Seiten gibt es erst nach Welle 20; bis dahin gilt der Weg im README («Benutzer in Keycloak anlegen»).
 > Wird mit Aufgabe 21.5 zur gültigen Anleitung.
+>
+> **Bedienung in der App:** Die Seiten, die es heute schon gibt («Dokumentarten», «Zugriffsprotokoll», «API-Tokens»),
+> beschreibt die Anleitung in der App unter «Hilfe», Abschnitt «Verwaltung» (`/hilfe#verwaltung`). Nach Spec 07,
+> Requirement 7.7 kommt mit Aufgabe 21.5 auch die Bedienung von Benutzern und Einstellungen dorthin; diese Datei behält
+> dann nur, was nicht in die App gehört (Wege des Betreibers, Notweg nach Spec 06, Requirement 9.3, Kontaktstellen).
 
 Die Verwaltung finden Sie nur als **Inhaber** unter «Verwaltung». Alle Änderungen gelten nur für Ihren Mandanten und stehen im
 Zugriffsprotokoll (`/verwaltung/protokoll`), ohne E-Mail-Adressen und Namen.
