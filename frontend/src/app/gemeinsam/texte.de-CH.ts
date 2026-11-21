@@ -590,6 +590,11 @@ export const TEXTE = {
       string
     >,
     treffer: 'Treffer',
+    wissen: 'Wissen',
+    wissenLaeuft: 'Wissensseiten werden gesucht …',
+    wissenHinweis: 'Die besten Wissensseiten. Dokumentfilter gelten nur für die Dokumenttreffer.',
+    keinWissen: 'Keine passenden Wissensseiten gefunden.',
+    wissenFehler: 'Wissensseiten konnten nicht gesucht werden.',
     volltext: 'Volltext',
     volltextHinweis:
       'Aus: die besten Treffer nach Wortlaut und Bedeutung. Ein: alle Treffer im Volltext, mit Gesamtzahl und Blättern.',
@@ -618,6 +623,9 @@ export const TEXTE = {
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und suchen Sie erneut.',
     fehlerAllgemein: 'Die Suche ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
     wiederholen: 'Erneut suchen',
+    vorzeile: 'Volltext, Metadaten und Bedeutung',
+    vertraulichkeit: 'Vertraulichkeit',
+    vertraulichkeiten: { NORMAL: 'Normal', INTERN: 'Intern', PERSONAL: 'Personal' } as Record<string, string>,
   },
   dokument: {
     titel: 'Dokument',

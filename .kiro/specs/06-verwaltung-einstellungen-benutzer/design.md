@@ -67,7 +67,7 @@ Stand: `application.properties` (Präfixe `archiv.*`), Umgebung und Compose, Kon
 `wissens_einstellung` (Spec 04), `public.mandant` und `public.mandant_budget` (Spec 01 und 03). Klassen: **(a)** im
 Betrieb in der App änderbar, je Mandant, mit Versionen, Prüfung und Protokoll; **(b)** nur über Deployment oder
 Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 1.1) prüft die Präfixe dieser Tabelle gegen
-`application.properties`.
+`application.properties`. Einzelne Schlüssel in Klasse (a) gehen einem allgemeineren Präfix in Klasse (b) vor.
 
 ### Klasse (a): in der App änderbar (Einstellungskatalog)
 | Einstellung | Heute | Grenzen und Standard | riskant | Recht | Begründung der Klasse |
@@ -97,9 +97,11 @@ Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 
 | `archiv.chat.*` (Raten je Benutzer, Gleichzeitigkeit, Aufräumzeit) | Konfiguration | Schutz der Instanz |
 | `archiv.mail.*` (Postfach, Intervall, Ordner, Grössen) | Konfiguration | ein Postfach und ein Abrufer je Instanz (Spec 02) |
 | `archiv.ueberwachung.*`, `archiv.oidc.waechter.*`, `archiv.kennzahlen.*`, `archiv.mandant.bericht.*` | Konfiguration | Betrieb und Alarmschwellen der Instanz |
+| `archiv.adresse`, `archiv.integration.*` | Konfiguration | Instanzweite Adresse und Integrationsadapter; keine Mandanten-Einstellung |
+| `archiv.wissen.*` | Konfiguration | Instanzweite Modelle und technische Grenzen; die oben einzeln genannten Startwerte der Klasse (a) sind ausgenommen |
 | `archiv.benachrichtigung.empfaenger.<code>` | Umgebung `ARCHIV_ALARM_EMPFAENGER_<CODE>` | E-Mail-Adressen sind Personendaten und gehören nicht in unveränderliche Konfigurationsversionen; Umleiten der Alarme wäre ein Missbrauchsweg (Entscheid Fabian offen, Open Points) |
 | `archiv.branding.mandanten.<code>.domain`, `…logo-url` | Konfiguration, Traefik | Domain ist DNS und Router; eine fremde Logo-URL wäre ein Tracking- und Phishing-Weg |
-| `archiv.mandant.<code>.fristen.*`, `….kennzahl.*` | Konfiguration | fachliche Werte von `urinet`; Kandidaten für Spec 05, nicht für diese Spec |
+| `archiv.mandant.<code>.fristen.*`, `archiv.mandant.<code>.kennzahl.*`, `archiv.mandant.<code>.chat-hinweis` | Konfiguration | fachliche Werte und Hinweise; nicht Bestandteil des Einstellungskatalogs dieser Spec |
 | `public.mandant.name`, `public.mandant.verwaltung_rollen`, `public.mandant_budget` (Monatsbudget öffentlicher Chat) | Datenbank, Admin-Kommando | Name geht in den Prompt (Gate 0); Rollensatz und Kostenhoheit gehören dem Betreiber; die Oberfläche zeigt Budget und Verbrauch nur lesend |
 | `ki_freigegeben` | Admin-Kommando (Spec 05, 8.4) | gebunden an die Abnahme; nie über die Oberfläche |
 | Rollen und Rechtematrix | Code (`Rechtematrix`) | Quelle der Wahrheit; Änderung ist ein Release mit Test |
@@ -148,9 +150,9 @@ backend/src/main/java/ch/urinet/archiv/
   `/components`, `/partial-import`, Rollen-Definitionen und `client-secret`.
 - **Aufrufe an Keycloak** (Realm `urinet-archiv`): `POST /protocol/openid-connect/token` (Client-Credentials, Token bis
   30 Sekunden vor Ablauf wiederverwendet, ein Abruf gleichzeitig); `GET /admin/realms/…/users?q=mandant:<m>&max=50`,
-  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users`,
+  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
   `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
-  `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET/DELETE …/users/{id}/federated-identity/google`,
+  `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET …/users/{id}/federated-identity` (Liste, Filter auf `identityProvider = google`; unter `…/federated-identity/google` kennt Keycloak nur POST und DELETE), `DELETE …/users/{id}/federated-identity/google`,
   `DELETE …/attack-detection/brute-force/users/{id}`. Interne Adresse und Aussteller des Tokens sind in Aufgabe 19.1 zu
   prüfen (`KC_HOSTNAME` zeigt auf die öffentliche Adresse; für den internen Weg nötigenfalls
   `KC_HOSTNAME_BACKCHANNEL_DYNAMIC`).
@@ -158,6 +160,14 @@ backend/src/main/java/ch/urinet/archiv/
   (`Semaphore`, Wartezeit 200 ms, sonst 503 `UEBERLASTET`); Schreibaufrufe nie wiederholt; Leseaufrufe höchstens einmal nach
   200 ms; Schutzschalter nach 3 Fehlern in Folge innerhalb 30 s für 30 s (ohne Bibliothek, ein Zähler und ein Zeitstempel).
   Keine Ausnahme der Keycloak-Meldungen in Antworten oder Logs (Requirement 5.6).
+  Nachbesserung Review PR 348: Für den Schutzschalter zählen nur Transportfehler, Zeitüberschreitungen, 5xx und 401/403 des
+  Dienstkontos; andere 4xx (400, 404, 405) zählen nicht. 409 wird als `IdentitaetsDienst.KonfliktException` weitergereicht
+  (Abbildung auf `BENUTZER_EXISTIERT` mit 19.7). Bei 401 wird der gecachte Token verworfen, ein lesender Aufruf wird genau
+  einmal mit neuem Token wiederholt. Die Kompensation in `anlegen()` umgeht den Schutzschalter (Wartezeit 2 s auf einen
+  Platz); scheitert sie, hängt der Adapter den Fehler als Suppressed an die Ausnahme. `rolleSetzen` holt die Zielrolle zuerst,
+  fügt sie hinzu und entfernt erst danach die übrigen Archiv-Rollen. `verbindungPruefen` erzwingt einen echten Tokenabruf.
+  Pfadwerte `.` und `..` (und `%2e`) werden abgelehnt. Offen (Kann): `aktualisieren`/`aktivieren` lesen und schreiben die
+  volle Darstellung (Lost Update); die Vorgangssperre (19.6) serialisiert die Aufrufer.
 - **Detail-Health:** Prüfung `identitaetsdienst` (Token holbar, Dienstkonto gültig); sie beeinflusst die Readiness der API
   nicht (Requirement 5.8).
 
@@ -233,6 +243,14 @@ Teil `einstellungen` von `konfiguration.schema.json` (`EinstellungskatalogSchema
 die Prüfung in `Konfiguration.pruefen` (Pfad, Code, Meldung, wie Spec 05), die Vorschau (`Auswirkung`) und die Oberfläche.
 Konfigurationsdatei, Export, Vergleich, Versionen, `If-Match`, Rundlauf und Protokoll `KONFIGURATION_AENDERN` gelten
 unverändert; neu ist nur die Bestätigung riskanter Änderungen und die erweiterte Prüfung.
+
+**Umsetzung 20.1:** Der erweiterte Abschnitt ist rückwärtskompatibel optional; fehlende Gruppen werden mit leeren
+Werten gelesen. Das Abbild übernimmt die neuen Werte aus der zuletzt gespeicherten Konfiguration, auch wenn eine andere
+Änderung eine Version erzeugt. Dateiimport und Seed übergeben die neuen Werte ausdrücklich. Wochentage im Abbild sind
+ISO-Namen (`MONDAY` bis `SUNDAY`). Der Anzeigename folgt der bestehenden Zeichen-Positivliste des Brandings mit höchstens
+60 Zeichen. Der Katalog stellt für Zahlen die Auflösung eigener Wert → bisheriger Startwert → Katalogstandard bereit.
+Die Umstellung der Verbraucher und die Übernahme bisheriger Werte gehören zu 20.4; die offene Entscheidung zu
+`wissens_einstellung` wird dadurch nicht vorweggenommen.
 
 **Schnittstelle** (Erweiterung von `GET/PATCH /mandant/einstellungen`, Spec 01 und 05; die Form der bestehenden Felder
 bleibt, neue Felder kommen flach dazu; die genaue Form legt Aufgabe 20.2 gegen den Stand von Spec 05, 17.3 fest):
@@ -534,3 +552,18 @@ Stand Aufgabe 19.1: Nachgewiesen sind Mandantensuche, Rollenmitglieder, Issuer, 
 erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Secret-Rotation, `auth_time`, `prompt=login` und
 `execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
 Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.
+
+## Umsetzung 19.4 — Keycloak-Adapter
+
+`KeycloakAdminAdapter` ist nur im Profil `prod` aktiv; Dev und Tests verwenden den speicherbasierten Stub. Der Adapter
+nutzt den JDK-HTTP-Client, eine feste Positivliste aus Methode und Pfad sowie Antworten bis 1 MiB. Er cached das
+Client-Credentials-Token bis 30 Sekunden vor Ablauf, begrenzt Verbindung und Anfrage gemäss Konfiguration und erlaubt
+höchstens zwei gleichzeitige Aufrufe. Schreibaufrufe werden nicht wiederholt; Leseaufrufe nach Transportfehler oder 5xx
+höchstens einmal nach 200 ms. Drei Fehler innerhalb 30 Sekunden öffnen den Schutzschalter für 30 Sekunden.
+
+Die Admin-Basisadresse kommt im Profil `prod` aus `ARCHIV_KEYCLOAK_ADMIN_URL`; ohne URL oder Dienstkonto-Secret meldet
+der Adapter den Dienst als nicht erreichbar, ohne einen Ersatz-Endpunkt zu verwenden. Das Dienstkonto-Secret wird nur
+aus `keycloak_verwaltung_secret` gelesen und von `SecretPruefung` für `api` und `kommando` verlangt. Eine eigene
+`@HealthGroup("detail")` prüft, ob ein Token geholt werden kann; sie gehört weder zur Liveness noch zur Readiness.
+WireMock-Tests decken Mandantenfilter, Zeitüberschreitung, 5xx-Wiederholung, 401, Schreibaufruf ohne Wiederholung und
+Schutzschalter ab.

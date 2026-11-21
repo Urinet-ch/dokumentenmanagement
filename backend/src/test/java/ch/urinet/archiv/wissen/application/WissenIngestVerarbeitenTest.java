@@ -566,7 +566,7 @@ class WissenIngestVerarbeitenTest {
         WissenKonfiguration konfiguration = new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
                 20_000, 12_000, 300_000, 1_000_000);
         return new WissenIngestVerarbeiten(speichern, konfiguration, ki, verbrauch,
-                new DiffDienst(new JavaWissenZeilendiff()));
+                new DiffDienst(new JavaWissenZeilendiff()), new WissenIngestIndex(speichern, null, konfiguration));
     }
 
     private static Stand stand(Lauf lauf, long monatsverbrauch) {
@@ -650,11 +650,6 @@ class WissenIngestVerarbeitenTest {
         public long hoechsteQuellenNummer(UUID dokumentId) {
             geprueftesDokument = dokumentId;
             return hoechsteNummer;
-        }
-
-        @Override
-        public List<SeitenMetadaten> indexLaden(UUID entwurfId, String suchtext) {
-            return List.of();
         }
 
         @Override

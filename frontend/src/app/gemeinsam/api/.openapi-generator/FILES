@@ -27,6 +27,7 @@ model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts
 model/api-v1-wissensentwuerfe-id-get200-response.ts
+model/api-v1-wissensseiten-get200-response.ts
 model/art-klassifikation.ts
 model/aussage.ts
 model/auszug-teil.ts
@@ -123,12 +124,14 @@ model/wissen-ingest-auftrag.ts
 model/wissen-ingest-start.ts
 model/wissen-lint-auftrag.ts
 model/wissen-verwerfen.ts
+model/wissens-embedding-auftrag.ts
 model/wissens-index-gruppe.ts
 model/wissens-index-zeile.ts
 model/wissens-index.ts
 model/wissens-log-seite.ts
 model/wissens-log-verweis.ts
 model/wissens-log.ts
+model/wissens-suchergebnis.ts
 model/wissensdiff.ts
 model/wissensquelleneintrag.ts
 model/wissensseite.ts

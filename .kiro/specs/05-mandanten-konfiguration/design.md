@@ -519,6 +519,16 @@ Ebenso trägt die Aufgabe, die das Recht A11 erweitert, das in Spec 01, 2.6 und 
   `src/test/resources/seed/` prüft `KonfigurationSeedTest` gegen Schema und Prüfungen, aber nicht gegen eine
   Stammdaten-Tabelle.
 - Isolation: `MandantenIsolationIT` mit den Wegen nach Req 9.3.
+- Umsetzung 18.5: `MandantenIsolationIT` in `MandantenIsolationTest` prüft Abbild, Versionsinhalt,
+  Admin-Export, API, Suchfilter, KI-Anfragen und Lückenbericht mit getrennten Mandanten. Die Browser-Szenarien
+  `mandantenisolation-pwa.feature` prüfen die sichtbaren Verwaltungslisten gegen die echte Test-API.
+  `mandantenisolation.feature` ergänzt vollständige API-Abbilder und KI-Texte sowie den Ablauf des
+  synthetischen `probe-verband` mit Klassifikation, EINDEUTIG-Regel, Archivierung und Fristbezug `FELD`.
+  Der Multipart-Import prüft zusätzlich unbekannte und inaktive Arten, fremde Klassifikationen und
+  mehrere Werte einer einfachen Klassifikation: Dokumente, Dateien, Aufträge und Ablage bleiben
+  nach der Ablehnung in beiden Mandanten unverändert.
+  Die Testfixture bezieht Datenquelle und OIDC-URL erst bei der Szenarioausführung; sie erzwingt
+  keine Datenbank oder Anmeldung beim Start anderer Testprofile oder Kommando-Tests.
 - Migration: Test mit einem Schema im Stand vor Spec 05 (Arten von `urinet` und ein Dokument mit Sperre) → nach der
   Migration gleiche Arten, Frist und Sperre, Version 1 (Req 9.1, 9.2).
 

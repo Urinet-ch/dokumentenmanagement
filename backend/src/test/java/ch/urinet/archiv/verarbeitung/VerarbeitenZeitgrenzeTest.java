@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * nächste Versuch verarbeitet das Dokument genau einmal. Die Zeitgrenze ist kurz, das erste Dokument lang genug, dass
  * OCRmyPDF sie sicher überschreitet; ein Beobachter hält fest, dass dabei ein Container mit {@code ocrmypdf} lief.
  */
-@Tag("start-4")
+@Tag("start-2")
 @QuarkusTest
 @TestProfile(VerarbeitenZeitgrenzeTest.KurzeZeitgrenze.class)
 class VerarbeitenZeitgrenzeTest {

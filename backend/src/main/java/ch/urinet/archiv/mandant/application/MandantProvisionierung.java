@@ -87,7 +87,9 @@ public class MandantProvisionierung {
                     "Mandant " + code + " ist in Provisionierung mit anderen Angaben (Name oder Geschäftsjahresende)");
         }
         Konfiguration konfigurationFuerMandant = new Konfiguration(seedKonfiguration.version(),
-                new Konfiguration.Einstellungen(ende.wert(), seedKonfiguration.einstellungen().kennungen()),
+                new Konfiguration.Einstellungen(ende.wert(), seedKonfiguration.einstellungen().kennungen(),
+                        seedKonfiguration.einstellungen().branding(), seedKonfiguration.einstellungen().chat(),
+                        seedKonfiguration.einstellungen().webseitenChat(), seedKonfiguration.einstellungen().wissen()),
                 seedKonfiguration.arten(), seedKonfiguration.klassifikationen(), seedKonfiguration.regeln(),
                 seedKonfiguration.kiTexte());
         datenbank.schemaAnlegen(mandantCode.schema());

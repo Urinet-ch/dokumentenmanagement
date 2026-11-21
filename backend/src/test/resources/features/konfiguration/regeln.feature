@@ -278,7 +278,7 @@ Funktionalität: Regeln je Mandant
       | treuhaender-urinet       | urinet  | TREUHAENDER      | ausgangsrechnung_folge |
       | geschaeftsstelle-vhf-gsk | vhf-gsk | GESCHAEFTSSTELLE | probe_ohne_recht       |
 
-  @req-1.2
+  @req-1.2 @req-9.3
   Szenario: Eine Regel des einen Mandanten ist im anderen weder sichtbar noch änderbar
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Wenn «inhaber-vhf-gsk» die Regeln liest
