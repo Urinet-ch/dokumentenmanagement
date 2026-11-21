@@ -348,6 +348,53 @@ Entschieden von Fabian am 18.11.2026 (verbindlich): (1) Ein lokales Modell darf 
 28. Die App SOLL Benutzern mit Recht A17 unter `/wissen/entwuerfe/import` einen Upload für das ZIP bieten, nach dem Import den Prüfbericht (Zahl der Seiten `NEU`, `AENDERN`, unverändert, ignoriert, Befunde je Seite mit Code und Pfad) und einen Link zum Entwurf zeigen. Die Entwurfsansicht SOLL bei Anlass `IMPORT` zusätzlich Herkunft (`erzeugt_von`, `erzeugt_mit`, `kontext_stufe`, Prüfsumme des ZIP, Zeit, Importierender) und je Quelle das Ergebnis der Zuordnung und der Auszugsprüfung zeigen, die Regel zu Cloud-Modellen (19.25) als Hinweis tragen und die Aktion «Prüfung wiederholen» bieten. Die Anforderungen aus 16.3, 16.4 und 16.7 gelten unverändert.
 29. Abnahme: Die Tests SOLLEN nachweisen: ein gültiges Paket ergibt einen Entwurf `IMPORT` mit richtigen Aktionen `NEU`, `AENDERN` und «unverändert»; Paket zweimal → HTTP 409 mit der ID des Entwurfs; unbekannte `sha256` → `QUELLE_UNBEKANNT`, nach Hochladen der Quelle und «Prüfung wiederholen» ohne Befund; Quelle `PERSONAL` → `QUELLE_PERSONAL`; erfundener Auszug → `AUSZUG_NICHT_GEFUNDEN`; fehlender Auszug → `AUSZUG_FEHLT`; Prüfsumme eines Dokuments eines anderen Mandanten → `QUELLE_UNBEKANNT`; Paket mit tieferer Stufe als die Quelle → Stufe der Quelle; Zip-Slip, Symlink, Zip-Bombe, doppelte Namen, Entpackgrösse, unbekannte Dateitypen, YAML mit Tag, Anker und Alias, Rohhtml und externer Link → abgelehnt bzw. Befund; `mitarbeiter` und `treuhaender` → 403; API-Token → 403; `erzeugt_mit: cloud` mit `kontext_stufe: INTERN` → abgelehnt; ein Export einer Instanz mit Profil `lokal` ist importierbar; das Prüfwerkzeug und der Import kommen auf allen Beispielpaketen zum selben Ergebnis (Gleichheitstest); die Logs enthalten keine Inhalte. Zusätzlich SOLL der Isolationstest (11.5) den Import umfassen.
 
+### Requirement 20: Wissensquelle als Markierung statt als Dokumentart (ohne Konzept-ID, Entscheid Fabian 21.11.2026)
+**User Story:** Als Inhaber möchte ich ein bereits archiviertes Dokument mit einem Knopf als Wissensquelle verwenden können,
+ohne seine Dokumentart zu ändern, damit eine Rechnung, ein Vertrag oder eine Fachunterlage Quelle der Wissensbasis sein kann und
+ihre Aufbewahrung, ihr Export und ihre Sperren unverändert bleiben.
+
+Entscheide Fabian 21.11.2026: (1) Das Dokument bekommt eine **eigene Markierung**; die Dokumentart bleibt. (2) Das Recht **A16**
+(wie beim erneuten Ingest) genügt. (3) **Jede Dokumentart** ist zulässig, aber nicht die Vertraulichkeit `PERSONAL`. (4) Die
+Dokumentart `WISSENSQUELLE` **entfällt** als wählbare Art; die Markierung ersetzt sie. Dieses Requirement ändert Requirement 1.1
+bis 1.6 und 5.1: Wo dort «Dokument der Art `WISSENSQUELLE`» steht, gilt «markiertes Dokument».
+
+#### Acceptance Criteria
+1. Das Archiv SOLL in der Dokumentansicht für Benutzer mit Recht A16 einen Knopf «Als Wissensquelle verwenden» zeigen, wenn das
+   Dokument den Status `ARCHIVIERT` hat und nicht markiert ist, und «Wissensquelle entfernen», wenn es markiert ist. Die
+   Dokumentart wird dabei nicht geändert.
+2. WENN ein Benutzer mit Recht A16 «Als Wissensquelle verwenden» wählt, DANN SOLL das Archiv die Markierung mandantengetrennt
+   speichern (Dokument, Benutzer, Zeitpunkt; höchstens eine aktive Markierung je Dokument; Protokoll `WISSENSQUELLE_MARKIERT`
+   ohne Titel und Inhalte) und einen Auftrag `WISSEN_INGEST` für das Dokument einreihen (Requirement 5 gilt unverändert,
+   einschliesslich Entwurf und Freigabe; es entsteht nie eine freigegebene Seite ohne Annahme).
+3. Das Archiv SOLL die Markierung verweigern mit HTTP 422 und einem Grund, den die Oberfläche zeigt, WENN das Dokument nicht
+   `ARCHIVIERT` ist, die Vertraulichkeit `PERSONAL` hat, keinen Volltext oder keine PDF/A-Fassung hat (Vermerk `pdfa_fehlt`,
+   Spec 01, 5.9) oder der Benutzer das Recht A16 oder den Zugriff auf das Dokument (Mandant, Vertraulichkeit) nicht hat; ein
+   Dokument eines anderen Mandanten SOLL wie ein unbekanntes antworten (404).
+4. WENN die Markierung gesetzt ist, DANN SOLL das Archiv das Dokument für Requirement 5 bis 15 wie bisher ein Dokument der Art
+   `WISSENSQUELLE` behandeln (erneuter Ingest nach A16, Auszugsprüfung, Quelle prüfen bei Änderung, Quelleneintrag), die Original-,
+   Arbeits- und PDF/A-Dateien und die Prüfsummen jedoch nicht verändern (Requirement 1.4 gilt weiter).
+5. WENN ein Benutzer mit Recht A16 «Wissensquelle entfernen» wählt, DANN SOLL das Archiv die Markierung beenden (Zeitpunkt, Benutzer;
+   Protokoll `WISSENSQUELLE_ENTFERNT`), keinen neuen Ingest einreihen und **keine bestehende Wissensseite löschen oder ändern**;
+   Quelleneinträge auf das Dokument bleiben, die Seite zeigt weiterhin den Hinweis nach Requirement 15 («Quelle prüfen»), wenn
+   sich das Dokument ändert.
+6. Das Archiv SOLL Aufbewahrung, Object-Lock-Sperre, Jahresexport, Vertraulichkeit und Fristen eines markierten Dokuments allein nach
+   seiner Dokumentart bestimmen (Spec 01, 6.12; Spec 02, 7.1): Die Ausnahme aus Requirement 1.3 und 1.6 gilt nur noch für Dokumente
+   der auslaufenden Art nach Kriterium 8.
+7. Das Archiv SOLL der KI nur Inhalte markierter Dokumente zeigen, deren Vertraulichkeit die Regeln aus Requirement 5.5 und 5.11 erfüllt
+   (nie eine Seite mit niedrigerer Vertraulichkeit als ihre Quelle).
+8. Das Archiv SOLL die Art `WISSENSQUELLE` nicht mehr als wählbare Art anbieten (Seed `_alle/dokumentarten-wissen.json` entfällt, die
+   Art wird im Bestand `aktiv = false` gesetzt und nicht gelöscht); jedes bestehende Dokument dieser Art SOLL bei der Migration
+   zusätzlich markiert werden (Zeitpunkt der Migration, Benutzer «System»), behält seine Art (und damit seine Eigenschaften) und
+   bleibt in der Wissensbasis Quelle; neue Dokumente dieser Art SOLLEN nicht mehr entstehen. Der Wechsel auf eine andere Art bleibt
+   dem Benutzer über «Dokument ändern» überlassen (Spec 01, Artwechsel); die Markierung bleibt dabei bestehen.
+9. Die Konfiguration (Spec 05) SOLL die Art `WISSENSQUELLE` nur noch als inaktive Bestandsart kennen: Die Prüfung der festen
+   Eigenschaften (Spec 05, Befund `WISSENSQUELLE_UNGUELTIG`) entfällt für neue Mandanten; im Bestand bleibt die Art unverändert
+   inaktiv.
+10. Das Archiv SOLL jede Markierung und jede Entfernung in der Wissensbasis-Oberfläche sichtbar machen: die Liste «Wissensquellen»
+    zeigt Titel, Art, Datum der Markierung und Stand des letzten Ingest; die Dokumentansicht zeigt «Wissensquelle» als Kennzeichen.
+11. Das Archiv SOLL für jedes Kriterium 1 bis 10 ein Cucumber-Szenario `@req-20.x` (`@spec-04`) enthalten, darunter Mandantentrennung
+    (Markierung und Ingest eines Dokuments in Mandant A bleiben für Mandant B unsichtbar) und der Negativfall `PERSONAL`.
+
 ## Optionen (nicht Teil des Plans, Aufgaben mit `*`)
 - Wissensseiten für Verbandsmitglieder von VHF/GSK über die öffentliche Schnittstelle und den Chatbot (ändert Spec 03, 6.1).
 - ~~Import eines bestehenden OKF-Bundles (z. B. eines LLM-Wikis) als Entwurf mit Freigabe.~~ **Übernommen in den Plan als Requirement 19** (entschieden von Fabian am 18.11.2026; Aufgaben 15.6 bis 15.8, tasks.md, Option O.5). Zugelassen sind Pakete im OKF-Format mit Quellen über SHA-256 (19.3); Quellen ohne zuordenbares Archivdokument sind Befund `QUELLE_UNBEKANNT` (19.14).
