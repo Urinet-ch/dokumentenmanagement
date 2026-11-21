@@ -129,6 +129,11 @@ public class AnmeldungSchritte {
         assertThat(export().path("passwordPolicy").asText()).isEqualTo("length(12) and notUsername and notEmail");
     }
 
+    @Und("sendet Keycloak eine Einladung ohne Passwort und mit TOTP-Einrichtung an Mailpit")
+    public void einladungAnMailpit() {
+        EinladungsProbe.pruefen();
+    }
+
     @Dann("ist Google im Realm-Export als deaktivierter, nicht vertrauender Provider vorbereitet")
     public void googleProviderVorbereitet() throws IOException {
         JsonNode google = export().path("identityProviders").path(0);
