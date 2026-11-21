@@ -11,7 +11,7 @@
   @if (vorschauUrl(); as url) {
     <img class="vorschau" [src]="url" [alt]="texte.vorschau(titel())" data-test="vorschau" />
   } @else {
-    <div class="vorschau leer" aria-hidden="true">{{ texte.ohneVorschau }}</div>
+    <div class="vorschau ohne-bild" aria-hidden="true">{{ texte.ohneVorschau }}</div>
   }
   <div class="kopf">
     <h2 [id]="'titel-' + d.id" class="titel">
@@ -36,12 +36,12 @@
       <dl class="vorschlag">
         @for (zeile of angaben(); track zeile.feld) {
           <div
-            class="zeile"
-            [class.unsicher]="bittePruefen(zeile.feld)"
+            class="zeile kachel"
+            [class.warnung]="bittePruefen(zeile.feld)"
             [attr.data-feld]="zeile.feld"
           >
-            <dt>{{ feldText(zeile.feld) }}</dt>
-            <dd>
+            <dt class="beschriftung">{{ feldText(zeile.feld) }}</dt>
+            <dd class="wert">
               {{ zeile.wert }}
               @if (bittePruefen(zeile.feld)) {
                 <span class="pruefen" data-test="bitte-pruefen">{{ texte.bittePruefen }}</span>
@@ -52,16 +52,16 @@
       </dl>
     }
     @if (erkannterPartner(); as name) {
-      <p class="hinweis" data-test="partner-vorschlag">{{ texte.partnerVorschlag(name) }}</p>
+      <p class="nebentext" data-test="partner-vorschlag">{{ texte.partnerVorschlag(name) }}</p>
     }
 
     @if (d.fehler && !imKorb()) {
-      <p class="box gefahr" data-test="fehlertext">
+      <p class="hinweis gefahr" data-test="fehlertext">
         <app-symbol name="warnung" /><span>{{ d.fehler }}</span>
       </p>
     }
     @if (entwurfWiederhergestellt()) {
-      <div class="box info" role="status" data-test="entwurf-wiederhergestellt">
+      <div class="hinweis info" role="status" data-test="entwurf-wiederhergestellt">
         <span>{{ texte.entwurfWiederhergestellt }}</span>
         <button mat-button type="button" data-test="entwurf-verwerfen" (click)="entwurfVerwerfen()">
           {{ texte.entwurfVerwerfen }}
@@ -69,17 +69,17 @@
       </div>
     }
     @if (d.pdfaFehlt) {
-      <p class="box warnung" data-test="hinweis-pdfa">
+      <p class="hinweis warnung" data-test="hinweis-pdfa">
         <app-symbol name="warnung" /><span>{{ texte.hinweisPdfa }}</span>
       </p>
     }
     @if (d.fristAbgelaufen) {
-      <p class="box warnung" data-test="hinweis-frist">
+      <p class="hinweis warnung" data-test="hinweis-frist">
         <app-symbol name="uhr" /><span>{{ texte.hinweisFrist }}</span>
       </p>
     }
     @if (darfBestaetigen() && zusatzFehlt().length > 0) {
-      <p class="box warnung" data-test="hinweis-zusatz">
+      <p class="hinweis warnung" data-test="hinweis-zusatz">
         <app-symbol name="warnung" />
         <span>
           {{ texte.hinweisZusatz(zusatzNamen()) }}
@@ -111,7 +111,7 @@
       </p>
     }
     @for (warnung of belegnummerWarnungen(); track $index) {
-      <p class="box warnung" data-test="warnung-belegnummer">
+      <p class="hinweis warnung" data-test="warnung-belegnummer">
         <app-symbol name="warnung" />
         <span>
           {{ texte.warnungBelegnummer }}
@@ -122,13 +122,13 @@
       </p>
     }
     @for (warnung of regelWarnungen(); track $index) {
-      <p class="box warnung" data-test="regelwarnung">
+      <p class="hinweis warnung" data-test="regelwarnung">
         <app-symbol name="warnung" /><span>{{ warnung.meldung || warnung.code }}</span>
       </p>
     }
 
     @if (fehler()) {
-      <div class="box gefahr" role="alert" tabindex="-1" data-test="fehler">
+      <div class="hinweis gefahr" role="alert" tabindex="-1" data-test="fehler">
         <app-symbol name="warnung" />
         <p>{{ fehler() }}</p>
         @if (konfliktNeuLaden()) {
@@ -212,7 +212,7 @@
             [value]="grund()"
             (input)="grund.set(wert($event))"
           ></textarea>
-          <p class="hinweis" [id]="d.id + '-grund-hinweis'">{{ texte.grundHinweis }}</p>
+          <p class="nebentext" [id]="d.id + '-grund-hinweis'">{{ texte.grundHinweis }}</p>
           <div class="knoepfe">
             <button mat-flat-button class="gefahr" type="submit" [disabled]="laeuft()">
               {{ texte.verwerfenJa }}
@@ -311,7 +311,7 @@
                 [attr.aria-describedby]="d.id + '-partner-hinweis'"
                 (input)="partnerSuchen(wert($event))"
               />
-              <p class="hinweis" [id]="d.id + '-partner-hinweis'">
+              <p class="nebentext" [id]="d.id + '-partner-hinweis'">
                 @if (erkannterPartner(); as name) {
                   {{ texte.partnerVorschlag(name) }}.
                 }
@@ -320,7 +320,7 @@
               @if (treffer(); as liste) {
                 <div aria-live="polite">
                   @if (liste.length === 0) {
-                    <p class="hinweis">{{ texte.partnerKeine }}</p>
+                    <p class="nebentext">{{ texte.partnerKeine }}</p>
                   } @else {
                     <ul class="treffer" data-test="partner-treffer">
                       @for (kontakt of liste; track kontakt.id) {
@@ -474,9 +474,9 @@
             </p>
           }
           @if (k.status === 'laedt') {
-            <p class="hinweis" role="status">{{ texte.klassifikationenLaedt }}</p>
+            <p class="nebentext" role="status">{{ texte.klassifikationenLaedt }}</p>
           } @else if (k.status === 'fehler') {
-            <p class="fehler" role="alert">{{ texte.klassifikationenFehler }}</p>
+            <p class="hinweis gefahr" role="alert">{{ texte.klassifikationenFehler }}</p>
           } @else {
             @if (k.daten.art.length > 0) {
               <app-klassifikationen-formular
@@ -572,7 +572,7 @@
             </button>
           }
           @if (ohneAktion()) {
-            <p class="hinweis">{{ texte.keineAktion }}</p>
+            <p class="nebentext">{{ texte.keineAktion }}</p>
           }
           @if (imKorb()) {
             @if (unsichereFelder() > 0) {

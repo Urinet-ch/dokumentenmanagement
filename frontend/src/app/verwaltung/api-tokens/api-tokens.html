@@ -5,7 +5,7 @@
 </div>
 <p class="meldung" role="status" aria-live="polite">{{ meldung() }}</p>
 @if (fehler()) {
-  <p class="fehler" role="alert">{{ fehler() }}</p>
+  <p class="hinweis gefahr" role="alert">{{ fehler() }}</p>
 }
 @if (tokens() === null) {
   @if (!fehler()) {
@@ -18,9 +18,9 @@
 } @else if (tokens()!.length === 0) {
   <p role="status">{{ texte.keine }}</p>
 } @else {
-  <div class="karte tabelle">
-    <div class="tabellen-rahmen">
-      <table aria-label="API-Tokens">
+  <div class="karte tabellen-karte">
+    <div class="tabelle-rahmen">
+      <table class="tabelle" aria-label="API-Tokens">
         <thead>
           <tr>
             <th scope="col">{{ texte.name }}</th>
@@ -37,10 +37,10 @@
             <tr>
               <td><bdi class="wert name">{{ token.name }}</bdi></td>
               <td><code class="pille mono">{{ scopeText(token.scope) }}</code></td>
-              <td class="zahl">
+              <td class="zeit">
                 <time [attr.datetime]="token.erstellt ?? null">{{ zeitpunkt(token.erstellt) }}</time>
               </td>
-              <td class="zahl">
+              <td class="zeit">
                 @if (token.zuletzt) {
                   <time [attr.datetime]="token.zuletzt">{{ zeitpunkt(token.zuletzt) }}</time>
                 } @else {
@@ -55,7 +55,12 @@
                 }
               </td>
               <td>
-                <span class="pille" [attr.data-status]="tokenStatus(token)">{{ statusText(token) }}</span>
+                <span
+                  class="pille"
+                  [class.ok]="tokenStatus(token) === 'aktiv'"
+                  [class.gefahr]="tokenStatus(token) === 'abgelaufen'"
+                  [attr.data-status]="tokenStatus(token)"
+                >{{ statusText(token) }}</span>
               </td>
               <td class="rechts">
                 @if (token.aktiv === true && bestaetigung() !== token.id) {
@@ -81,10 +86,10 @@
                 <td colspan="7">
                   <div class="zusatz-inhalt">
                     @if (token.aktiv === true && !token.gueltigBis && langeUngenutzt(token)) {
-                      <p class="hinweis">{{ texte.hinweisOhneAblauf }}</p>
+                      <p class="gefahrtext">{{ texte.hinweisOhneAblauf }}</p>
                     }
                     @if (tokenStatus(token) === 'abgelaufen') {
-                      <p class="hinweis">{{ texte.hinweisAbgelaufen }}</p>
+                      <p class="gefahrtext">{{ texte.hinweisAbgelaufen }}</p>
                     }
                     @if (ablaufBearbeitbar(token)) {
                       <div class="ablauf">

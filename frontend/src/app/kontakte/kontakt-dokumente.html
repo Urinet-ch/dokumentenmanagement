@@ -11,7 +11,7 @@
     <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.dokumenteLaedt" />
   }
   @if (fehler()) {
-    <div role="alert" class="fehler" data-test="dokumente-fehler">
+    <div role="alert" class="hinweis gefahr" data-test="dokumente-fehler">
       <p>{{ texte.dokumenteFehler }}</p>
       <button mat-stroked-button type="button" (click)="neuLaden()">
         {{ texte.erneutVersuchen }}
@@ -19,7 +19,7 @@
     </div>
   } @else if (ergebnis(); as e) {
     @if (e.treffer.length === 0) {
-      <p class="leer" data-test="dokumente-keine">{{ texte.dokumenteKeine }}</p>
+      <p class="nebentext" data-test="dokumente-keine">{{ texte.dokumenteKeine }}</p>
     } @else {
       <ol class="dokumente" [attr.aria-label]="texte.dokumenteBeschreibung">
         @for (t of e.treffer; track t.id) {

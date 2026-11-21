@@ -7,7 +7,7 @@
 <p class="meldung" role="status" data-test="meldung">{{ meldung() }}</p>
 
 @if (fehlerLaden()) {
-  <div class="fehler" role="alert">
+  <div class="hinweis gefahr" role="alert">
     <app-symbol name="warnung" />
     <p>{{ fehlerLaden() }}</p>
     <button mat-stroked-button type="button" (click)="laden(fehlerWeitere())">
@@ -16,7 +16,7 @@
   </div>
 }
 @if (fehlerArten(); as fehler) {
-  <div class="fehler" role="alert" data-test="fehler-arten">
+  <div class="hinweis gefahr" role="alert" data-test="fehler-arten">
     <app-symbol name="warnung" />
     <p>{{ fehler }}</p>
     <button mat-stroked-button type="button" (click)="ladenArten()">{{ texte.neuLaden }}</button>
@@ -26,7 +26,7 @@
 @if (laedt() && eintraege().length === 0) {
   <p aria-busy="true">{{ texte.laedt }}</p>
 } @else if (!fehlerLaden() && eintraege().length === 0) {
-  <div class="karte leer">
+  <div class="karte erledigt">
     <app-symbol name="haken" />
     <p data-test="leer">{{ texte.leer }}</p>
   </div>

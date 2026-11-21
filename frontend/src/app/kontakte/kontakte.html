@@ -26,7 +26,9 @@
         <small id="such-hinweis">{{ texte.suchHinweis }}</small>
       </label>
       @if (!suchbegriffOk()) {
-        <p class="fehler" role="alert" data-test="such-ungueltig">{{ texte.suchUngueltig }}</p>
+        <p class="hinweis gefahr" role="alert" data-test="such-ungueltig">
+          {{ texte.suchUngueltig }}
+        </p>
       }
     </form>
 
@@ -100,7 +102,7 @@
     <p class="nur-screenreader" aria-live="polite">{{ laedt() ? texte.laedt : '' }}</p>
 
     @if (fehler(); as text) {
-      <div role="alert" class="fehler" data-test="fehler">
+      <div role="alert" class="hinweis gefahr" data-test="fehler">
         <p>{{ text }}</p>
         @if (wiederholbar()) {
           <button mat-stroked-button type="button" data-test="erneut" (click)="neuLaden()">
@@ -121,25 +123,25 @@
                 [attr.aria-label]="texte.oeffnen(name(k))"
                 >{{ name(k) }}</a
               >
-              <p class="hinweis">
+              <p class="nebentext">
                 {{ texte.typen[k.typ ?? ''] }}
                 @if (ort(k)) {
                   · {{ ort(k) }}
                 }
               </p>
               @if (k.email) {
-                <p class="hinweis" data-test="email">{{ k.email }}</p>
+                <p class="nebentext" data-test="email">{{ k.email }}</p>
               }
               <ul class="marken">
                 @for (m of marken(k); track m.text) {
-                  <li [attr.data-art]="m.art">{{ m.text }}</li>
+                  <li [class]="pille(m.art)" [attr.data-art]="m.art">{{ m.text }}</li>
                 }
               </ul>
             </li>
           }
         </ol>
       } @else {
-        <div class="tabellen-rahmen">
+        <div class="tabelle-rahmen randbuendig">
           <table class="tabelle" [attr.aria-label]="texte.listeBeschreibung">
             <thead>
               <tr>
@@ -169,7 +171,7 @@
                   <td>
                     <ul class="marken">
                       @for (m of marken(k); track m.text) {
-                        <li [attr.data-art]="m.art">{{ m.text }}</li>
+                        <li [class]="pille(m.art)" [attr.data-art]="m.art">{{ m.text }}</li>
                       }
                     </ul>
                   </td>
