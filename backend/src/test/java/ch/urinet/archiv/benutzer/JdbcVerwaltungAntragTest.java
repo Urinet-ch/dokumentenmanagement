@@ -4,6 +4,7 @@ import ch.urinet.archiv.benutzer.application.VerwaltungAntragSpeicher;
 import ch.urinet.archiv.benutzer.application.VerwaltungAntragSpeicher.Antrag;
 import ch.urinet.archiv.benutzer.application.VerwaltungAntragSpeicher.Art;
 import ch.urinet.archiv.benutzer.application.VerwaltungAntragSpeicher.Status;
+import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -80,6 +81,41 @@ class JdbcVerwaltungAntragTest {
             assertThat(in(thread, "urinet", () -> speicher.offene(zeit))).doesNotContain(antrag);
             assertThat(in(thread, "urinet", () ->
                     speicher.entscheiden(antrag.id(), Status.BESTAETIGT, "anderer", zeit))).isFalse();
+            for (String code : List.of("urinet", "vhf-gsk")) {
+                var ungueltig = new Antrag(UUID.randomUUID(), Art.INHABER_ROLLE, "ziel", Rolle.INHABER,
+                        "synthetischer Freitext", "antragsteller", zeit, zeit.plusSeconds(60), Status.OFFEN, null, null);
+                assertThatThrownBy(() -> in(thread, code, () -> {
+                    speicher.anlegen(ungueltig);
+                    return null;
+                })).hasRootCauseInstanceOf(KonfigurationUngueltig.class);
+                assertThat(in(thread, code, () -> speicher.lesen(ungueltig.id()))).isEmpty();
+                var gueltig = new Antrag(UUID.randomUUID(), Art.INHABER_ROLLE, "ziel", Rolle.INHABER,
+                        "SICHERHEIT", "antragsteller", zeit, zeit.plusSeconds(60), Status.OFFEN, null, null);
+                in(thread, code, () -> {
+                    speicher.anlegen(gueltig);
+                    return null;
+                });
+                assertThat(in(thread, code, () -> speicher.lesen(gueltig.id()))).contains(gueltig);
+            }
+            var alt = new Antrag(UUID.randomUUID(), Art.INHABER_ROLLE, "ziel", Rolle.INHABER,
+                    "synthetischer Alttext", "antragsteller", zeit, zeit.plusSeconds(60), Status.OFFEN, null, null);
+            try (Connection verbindung = datenquelle.getConnection();
+                 PreparedStatement einfuegen = verbindung.prepareStatement(
+                         "insert into m_urinet.verwaltung_antrag "
+                                 + "(id, art, ziel, rolle, grund, beantragt_von, beantragt_am, gueltig_bis, status) "
+                                 + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                einfuegen.setObject(1, alt.id());
+                einfuegen.setString(2, alt.art().name());
+                einfuegen.setString(3, alt.ziel());
+                einfuegen.setString(4, alt.rolle().code());
+                einfuegen.setString(5, alt.grund());
+                einfuegen.setString(6, alt.beantragtVon());
+                einfuegen.setObject(7, alt.beantragtAm().atOffset(java.time.ZoneOffset.UTC));
+                einfuegen.setObject(8, alt.gueltigBis().atOffset(java.time.ZoneOffset.UTC));
+                einfuegen.setString(9, alt.status().name());
+                einfuegen.executeUpdate();
+            }
+            assertThat(in(thread, "urinet", () -> speicher.lesen(alt.id()))).contains(alt);
         }
     }
 

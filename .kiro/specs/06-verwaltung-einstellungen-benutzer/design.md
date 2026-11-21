@@ -416,7 +416,9 @@ zugriff_protokoll:      aktion erhält die Werte BENUTZER_ANLEGEN, BENUTZER_AEND
                         BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG (Check-Constraint per neuem Changeset, falls vorhanden)
 ```
 Es gibt keine Tabelle mit E-Mail, Namen oder Zugangsdaten. `benutzer_status` und `verwaltung_antrag` enthalten nur
-Kennungen (`sub`) und Texte der Inhaber (Grund; in `benutzer_status` nur die feste Kategorie nach 4.4). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
+Kennungen (`sub`) und Gründe. Für neue Anträge und in `benutzer_status` sind nur die festen Kategorien zulässig;
+vorhandene Anträge bleiben lesbar. Ein Verwaltungsendpunkt darf alte Freitexte nicht unmaskiert ausgeben.
+Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
 
 ## Error Handling (neue Codes)
 Die Aufgabe, die einen Code einführt, trägt ihn im selben PR in die Tabelle in Spec 01 design.md («Error Handling») und ins
