@@ -6,6 +6,7 @@ import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
@@ -38,6 +39,7 @@ class VerwaltungVorgangTest {
     @Inject MandantKontext kontext;
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenquelle;
+    @Inject ZugriffProtokoll protokoll;
 
     @Test
     void absichtIstVorWirkungFestgeschriebenUndFehlerBleibenGesperrt() throws Exception {
@@ -110,6 +112,32 @@ class VerwaltungVorgangTest {
             } finally {
                 testsperreEntfernen(mandant, fehlerId);
             }
+        }
+    }
+
+    @Test
+    void fehlerBeimAbschlussRolltDatenbankZurueckUndHaeltDieSperre() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        var absicht = eintrag(id, UUID.randomUUID(), UUID.randomUUID().toString(), "INHABER",
+                ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> "ok",
+                    fehler -> { throw new IllegalArgumentException("synthetische Kompensation"); },
+                    wert -> {
+                        protokoll.schreiben(absicht);
+                        throw new IllegalStateException("synthetischer Abschluss");
+                    }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(IllegalStateException.class)
+                    .satisfies(fehler -> assertThat(fehler.getCause().getSuppressed())
+                            .hasSize(1).satisfies(unterdrueckt ->
+                                    assertThat(unterdrueckt[0]).isInstanceOf(IllegalArgumentException.class)));
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+        } finally {
+            testsperreEntfernen(mandant, id);
         }
     }
 
