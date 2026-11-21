@@ -611,16 +611,16 @@
       "serviceAccountsEnabled": false,
       "frontchannelLogout": true,
       "redirectUris": [
-        "https://archiv.apps.urinet.ch/*",
+        "https://pwa.example.invalid/*",
         "http://localhost:8080/*"
       ],
       "webOrigins": [
-        "https://archiv.apps.urinet.ch",
+        "https://pwa.example.invalid",
         "http://localhost:8080"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "https://archiv.apps.urinet.ch/*##http://localhost:8080/*"
+        "post.logout.redirect.uris": "https://pwa.example.invalid/*##http://localhost:8080/*"
       },
       "protocolMappers": [
         {

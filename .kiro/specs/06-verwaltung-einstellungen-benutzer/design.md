@@ -561,6 +561,15 @@ drei erforderlichen Aktionen. Der interaktive PWA-Test weist `auth_time` beim er
 `prompt=login` verlangt Passwort und TOTP und liefert danach eine neuere Authentifizierungszeit. Für die erneute Anmeldung
 wartet der Test auf ein neues TOTP-Zeitfenster, weil Keycloak die Wiederverwendung desselben Codes ablehnt.
 Interne Compose-Adresse mit Backchannel und überlappende Secret-Rotation bleiben als Betriebsnachweise offen.
+Ein synthetischer Test weist die Secret-Überlappung und den Widerruf sowie den internen Backchannel mit korrektem
+Issuer nach; die konkrete Betriebsverdrahtung und die automatische Ablaufzeit bleiben offen. Deshalb bleibt 19.1
+offen.
+
+Redirect, Web-Origin und Logout-Redirect des PWA-Clients verwenden im Realm-Export `${ARCHIV_BASIS_URL}`. Keycloak
+liest den nicht geheimen Wert beim Import aus der Umgebung; Compose reicht ihn aus der externen Bundle-Konfiguration
+weiter. Der Start bricht bei fehlender oder ungültiger HTTPS-Basisadresse ab. Die Bereitstellung des Werts im
+Deploy-Bundle gehört zu 19.3 [Fabian] und muss vor dem Deploy erfolgen; ohne diese Verdrahtung startet Keycloak nicht.
+Ein bereits importierter Realm wird durch den Startimport nicht aktualisiert.
 
 ## Umsetzung 19.4 — Keycloak-Adapter
 

@@ -3,6 +3,19 @@
 # Der Realm urinet-archiv wird nur importiert, solange es ihn in der Datenbank noch nicht gibt.
 set -euo pipefail
 
+if [[ ! "${ARCHIV_BASIS_URL:-}" =~ ^https://[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:[0-9]{1,5})?$ ]]; then
+  echo "ARCHIV_BASIS_URL fehlt oder ist keine HTTPS-Basisadresse; Deploy-Konfiguration prüfen." >&2
+  exit 1
+fi
+host_port=${ARCHIV_BASIS_URL#https://}
+if [[ "$host_port" == *:* ]]; then
+  port=${host_port##*:}
+  if (( 10#$port < 1 || 10#$port > 65535 )); then
+    echo "ARCHIV_BASIS_URL enthält keinen gültigen Port; Deploy-Konfiguration prüfen." >&2
+    exit 1
+  fi
+fi
+
 lesen() {
   local datei="${ARCHIV_SECRETS_DIR:-/run/secrets}/$1"
   if [[ ! -s "$datei" ]]; then

@@ -4,7 +4,13 @@ set -euo pipefail
 repo=$(cd "$(dirname "$0")/../../../.." && pwd)
 start="$repo/deploy/infomaniak/keycloak/start.sh"
 temp=$(mktemp -d)
-trap 'rm -rf -- "$temp"' EXIT
+aufraeumen() {
+  rm -f -- "$temp/secrets/keycloak_db" "$temp/secrets/keycloak_admin" \
+    "$temp/secrets/google_client_id" "$temp/secrets/google_client_secret" \
+    "$temp/bin/keycloak-stub" "$temp/out/id" "$temp/out/secret" "$temp/out/args"
+  rmdir -- "$temp/secrets" "$temp/bin" "$temp/out" "$temp"
+}
+trap aufraeumen EXIT
 mkdir -p "$temp/secrets" "$temp/bin"
 printf 'db-testwert\n' > "$temp/secrets/keycloak_db"
 printf 'admin-testwert\n' > "$temp/secrets/keycloak_admin"
@@ -30,6 +36,7 @@ pruefen() {
     printf "$secret" > "$temp/secrets/google_client_secret"
   fi
   ARCHIV_SECRETS_DIR="$temp/secrets" \
+  ARCHIV_BASIS_URL="https://pwa.example.invalid" \
   KEYCLOAK_BIN="$temp/bin/keycloak-stub" \
   START_TEST_AUSGABE="$temp/out" \
     bash "$start" >/dev/null
@@ -46,6 +53,13 @@ pruefen "synthetische-id\n" "\n" "" ""
 pruefen "   \n" "synthetisches-secret\n" "" ""
 pruefen "synthetische-id\n" " \r\n" "" ""
 pruefen "synthetische-id\n" "synthetisches-secret\n" "synthetische-id" "synthetisches-secret"
+for basis in "" "http://pwa.example.invalid" "https://pwa.example.invalid/path" \
+  'https://pwa.example.invalid/*' "https://." "https://pwa.example.invalid:99999"; do
+  if ARCHIV_BASIS_URL="$basis" bash "$start" >/dev/null 2>&1; then
+    echo "Ungültige Basisadresse wurde angenommen." >&2
+    exit 1
+  fi
+done
 jq -e '.identityProviders[] | select(.alias == "google" and .enabled == false)' \
   "$repo/deploy/keycloak/realm-export.json" >/dev/null
 echo "Keycloak-Start übergibt leere Werte für Google bei leerer, fehlender oder nur aus Leerraum bestehender ID oder Secret."

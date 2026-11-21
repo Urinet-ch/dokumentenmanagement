@@ -34,6 +34,7 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
     static final String ADMIN = "admin";
     static final String ADMIN_PASSWORT = "admin-nur-test";
     static final String VERWALTUNG_TESTWERT = "verwaltung-nur-testwert";
+    static final String PWA_TEST_URL = "https://pwa.example.invalid";
     static String basisUrl;
     static String mailpitUrl;
     static OidcTestIdp oidcTestIdp;
@@ -66,6 +67,7 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
                 .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
                 .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
                 .withEnv("KEYCLOAK_VERWALTUNG_SECRET", VERWALTUNG_TESTWERT)
+                .withEnv("ARCHIV_BASIS_URL", PWA_TEST_URL)
                 .withCopyFileToContainer(MountableFile.forHostPath(exportTemporaer.toAbsolutePath()),
                         "/opt/keycloak/data/import/realm-export.json")
                 .withCommand("start-dev", "--import-realm")
@@ -127,6 +129,7 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
                      .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN)
                      .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
                      .withEnv("KEYCLOAK_VERWALTUNG_SECRET", VERWALTUNG_TESTWERT)
+                     .withEnv("ARCHIV_BASIS_URL", PWA_TEST_URL)
                      .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
                      .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
                      .withEnv("KC_HOSTNAME", "http://issuer.test")

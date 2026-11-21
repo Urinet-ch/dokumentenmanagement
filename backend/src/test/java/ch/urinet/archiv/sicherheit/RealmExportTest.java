@@ -48,6 +48,11 @@ class RealmExportTest {
         assertThat(google.path("mappers").isMissingNode()).isTrue();
 
         JsonNode verwaltung = client(export, "archiv-verwaltung");
+        JsonNode pwa = client(export, "archiv-pwa");
+        assertThat(pwa.path("redirectUris")).extracting(JsonNode::asText).containsExactly("${ARCHIV_BASIS_URL}/*");
+        assertThat(pwa.path("webOrigins")).extracting(JsonNode::asText).containsExactly("${ARCHIV_BASIS_URL}");
+        assertThat(pwa.path("attributes").path("post.logout.redirect.uris").asText())
+                .isEqualTo("${ARCHIV_BASIS_URL}/*");
         assertThat(verwaltung.path("secret").asText()).isEqualTo("${KEYCLOAK_VERWALTUNG_SECRET}");
         assertThat(verwaltung.path("publicClient").asBoolean(true)).isFalse();
         assertThat(verwaltung.path("bearerOnly").asBoolean(true)).isFalse();
@@ -163,9 +168,16 @@ class RealmExportTest {
             } else if ("archiv-pwa".equals(client.path("clientId").asText())) {
                 ohneLokal((ArrayNode) client.path("redirectUris"));
                 ohneLokal((ArrayNode) client.path("webOrigins"));
+                assertThat(client.path("redirectUris")).extracting(JsonNode::asText)
+                        .containsExactly(ExportKeycloak.PWA_TEST_URL + "/*");
+                assertThat(client.path("webOrigins")).extracting(JsonNode::asText)
+                        .containsExactly(ExportKeycloak.PWA_TEST_URL);
+                ((ArrayNode) client.path("redirectUris")).set(0, JSON.getNodeFactory().textNode("${ARCHIV_BASIS_URL}/*"));
+                ((ArrayNode) client.path("webOrigins")).set(0, JSON.getNodeFactory().textNode("${ARCHIV_BASIS_URL}"));
                 ObjectNode attribute = (ObjectNode) client.path("attributes");
-                attribute.put("post.logout.redirect.uris",
-                        attribute.path("post.logout.redirect.uris").asText().replace("##" + LOKAL + "/*", ""));
+                assertThat(attribute.path("post.logout.redirect.uris").asText())
+                        .isEqualTo(ExportKeycloak.PWA_TEST_URL + "/*##" + LOKAL + "/*");
+                attribute.put("post.logout.redirect.uris", "${ARCHIV_BASIS_URL}/*");
             }
         }
         ArrayNode identityProviders = (ArrayNode) test.path("identityProviders");

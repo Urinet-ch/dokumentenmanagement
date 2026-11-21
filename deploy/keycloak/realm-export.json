@@ -602,14 +602,14 @@
       "serviceAccountsEnabled": false,
       "frontchannelLogout": true,
       "redirectUris": [
-        "https://archiv.apps.urinet.ch/*"
+        "${ARCHIV_BASIS_URL}/*"
       ],
       "webOrigins": [
-        "https://archiv.apps.urinet.ch"
+        "${ARCHIV_BASIS_URL}"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "https://archiv.apps.urinet.ch/*"
+        "post.logout.redirect.uris": "${ARCHIV_BASIS_URL}/*"
       },
       "protocolMappers": [
         {

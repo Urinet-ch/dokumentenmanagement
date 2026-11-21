@@ -146,6 +146,18 @@ class RealmExportKeycloakTest {
 
     @Test
     @Order(2)
+    void pwaAdressenWerdenAusDerKonfigurationImportiert() {
+        Response pwa = adminGet(REALM + "/clients/{id}", clientId("archiv-pwa"));
+        assertThat(pwa.jsonPath().<String>getList("redirectUris"))
+                .containsExactly(ExportKeycloak.PWA_TEST_URL + "/*");
+        assertThat(pwa.jsonPath().<String>getList("webOrigins"))
+                .containsExactly(ExportKeycloak.PWA_TEST_URL);
+        assertThat(pwa.jsonPath().getString("attributes.'post.logout.redirect.uris'"))
+                .isEqualTo(ExportKeycloak.PWA_TEST_URL + "/*");
+    }
+
+    @Test
+    @Order(2)
     void verknuepfungIstNichtTeilDerBenutzerrolleUndEreignisseSindAktiv() {
         List<Map<String, Object>> composites = adminGet(
                 REALM + "/clients/{id}/roles/manage-account/composites", clientId("account"))
