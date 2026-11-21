@@ -24,9 +24,9 @@ env:
   APP: archiv
   HOST_ARCHIV: archiv.apps.urinet.ch
   HOST_AUTH: archiv-auth.apps.urinet.ch
-  # Speicherbudget Stufe A aus tech.md (1000 MiB, geändert 13.11.2026, Entscheid Fabian; bisher 900 MiB); liegt compose.yml darüber,
+  # Speicherbudget Stufe A aus tech.md (1150 MiB, geändert 21.11.2026, Entscheid Fabian: Keycloak 550m; davor 1000 MiB seit 13.11.2026, 900 MiB); liegt compose.yml darüber,
   # gilt Req 16.18 (kein Deploy auf Stufe A)
-  BUDGET_MEM_MIB: '1000'
+  BUDGET_MEM_MIB: '1150'
   BUDGET_CPUS: '0.75'
   # Eingeführt, als Push auf main ohne CI lief (Entscheid Fabian 11.11.2026, PR #50; seit PR #58 läuft ci.yml wieder auf
   # Push nach main, und Regel 3 des Nachweises braucht diesen Lauf): Bis zum Vortag dieses Datums gilt auch die grüne
