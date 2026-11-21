@@ -1637,5 +1637,12 @@ export const TEXTE = {
     nichtVerfuegbar:
       'Dieser Teil der Anleitung ist gerade nicht verfügbar. Bitte versuchen Sie es später erneut.',
     erneut: 'Erneut versuchen',
+    // Seite /hilfe (Spec 07, Aufgabe 22.2, Req 5.1, 6.3, 6.5)
+    titel: 'Hilfe',
+    untertitel: 'So bedienen Sie das Archiv, Bereich für Bereich.',
+    inhalt: 'Inhalt der Anleitung',
+    rolle: (rolle: string) =>
+      `Sie sind als ‹${rolle}› angemeldet. Diese Anleitung zeigt die Bereiche, die Ihre Rolle nutzen darf.`,
+    abgemeldet: 'Nach der Anmeldung sehen Sie die Anleitung für alle Bereiche Ihrer Rolle.',
   },
 } as const;

@@ -344,6 +344,15 @@ dialog .d-f{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;bord
   .paper{padding:20px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* Seite Hilfe (Spec 07, Aufgabe 22.2) */
+.g-hilfe{align-items:start}
+.hilfe-toc ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.hilfe-toc ol ol{padding-left:12px;margin-top:2px}
+.hilfe-toc a{display:block;padding:6px 10px;border-radius:10px;color:var(--fg-2);text-decoration:none;font-size:14px}
+.hilfe-toc a:hover{background:var(--surface-2);color:var(--fg)}
+.hilfe-text h3{font:600 15px/1.3 var(--f-display);margin:18px 0 8px;padding-top:14px;border-top:1px solid var(--line)}
+.hilfe-text p,.hilfe-text ol{max-width:70ch;color:var(--fg-2)}
+@media (min-width:1100px){.g-hilfe{grid-template-columns:15rem minmax(0,1fr)}.hilfe-toc{position:sticky;top:76px}}
 </style>
 
 <div class="app">
@@ -760,6 +769,31 @@ V.wissen=()=>{
   </div></div></div>`;
 };
 
+/* Seite /hilfe (Spec 07, Aufgabe 22.2): ganze Anleitung der Rolle mit Inhaltsverzeichnis und Sprungmarken. Erreichbar
+   über #hilfe; den Knopf «Hilfe» in der Kopfzeile bringt Aufgabe 22.3. Alle Texte sind erfundene Beispiele. */
+const HILFE=[
+ {a:'erste-schritte',t:'Erste Schritte'},
+ {a:'erfassen',t:'Erfassen',need:()=>darf('A1'),u:[{a:'erfassen-offline',t:'Ohne Netz erfassen'}]},
+ {a:'eingangskorb',t:'Eingangskorb',need:()=>darf('A5')||darf('A5e')},
+ {a:'suche',t:'Suche'},
+ {a:'jahresexport',t:'Jahresexport',need:()=>darf('EXPORT')},
+ {a:'probleme',t:'Wenn etwas nicht klappt'},
+];
+V.hilfe=()=>{
+ const h=HILFE.filter(x=>!x.need||x.need());
+ const link=x=>`<a href="#hilfe" data-sprung="${x.a}">${esc(x.t)}</a>`;
+ return ph('UriNet Archiv','Hilfe','So bedienen Sie das Archiv, Bereich für Bereich.')+
+ `<div class="hint info" style="max-width:70ch;margin:0 0 16px">${ic('book')}<span class="tx">Sie sind als ‹${esc(ROLLEN[S.rolle].label)}› angemeldet. Diese Anleitung zeigt die Bereiche, die Ihre Rolle nutzen darf.</span></div>
+ <div class="grid g-hilfe">
+  <nav class="card hilfe-toc" aria-labelledby="hilfe-inhalt"><div class="card-h"><h2 id="hilfe-inhalt">Inhalt der Anleitung</h2></div><div class="card-b"><ol>${h.map(x=>`<li>${link(x)}${x.u?`<ol>${x.u.map(u=>`<li>${link(u)}</li>`).join('')}</ol>`:''}</li>`).join('')}</ol></div></nav>
+  <div style="display:grid;gap:16px;min-width:0">${h.map(x=>`<section class="card" aria-labelledby="h-${x.a}"><div class="card-h"><h2 id="h-${x.a}" tabindex="-1">${esc(x.t)}</h2></div><div class="card-b hilfe-text">
+   <p><span class="pill">Beispiel</span> Erfundener Text zum Bereich «${esc(x.t)}»: wozu er dient und was Sie dort tun.</p>
+   <ol><li>Wählen Sie im Menü «${esc(x.t)}».</li><li>Folgen Sie den Knöpfen der Seite.</li></ol>
+   ${(x.u||[]).map(u=>`<h3 id="h-${u.a}" tabindex="-1">${esc(u.t)}</h3><p><span class="pill">Beispiel</span> Erfundener Text zum Unterabschnitt «${esc(u.t)}».</p>`).join('')}
+  </div></section>`).join('')}</div>
+ </div>`;
+};
+
 V.importe=()=>ph('Kontakte aus 21.CRM','Importe','CSV mit Semikolon oder Komma, UTF-8 oder Windows-1252. Trennzeichen und Zeichensatz werden erkannt.',`<label class="btn pri" for="csv">${ic('imp')}CSV hochladen<input type="file" id="csv" accept=".csv" hidden></label>`)+
  `<div class="card"><div class="card-h"><h3>Vorschau Import vom 20.11.2026</h3><span class="pill acc">wartet auf Übernahme</span></div><div class="card-b" style="display:grid;gap:16px">
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">${[['neu',12,''],['geändert',40,''],['unverändert',310,''],['mögliche Dublette',3,'warn'],['inaktiv',1,''],['fehlerhaft',0,'']].map(([l,n,c])=>`<div class="vf${c?' u':''}"><div class="lbl">${l}</div><div class="val num" style="font:700 22px var(--f-display)">${n}</div></div>`).join('')}</div>
@@ -829,7 +863,7 @@ function renderNav(){
  $('#nav').innerHTML=html;
  const r=ROLLEN[S.rolle];$('#av').textContent=r.kurz;$('#who').innerHTML=`${r.name}<small>${r.label} · urinet</small>`;
 }
-function allowed(v){const n=NAV.find(x=>x.h===v);return v==='dokument'||(n&&(!n.need||n.need()))}
+function allowed(v){const n=NAV.find(x=>x.h===v);return v==='dokument'||v==='hilfe'||(n&&(!n.need||n.need()))}
 function render(){
  if(!V[S.view]||!allowed(S.view))S.view='uebersicht';
  renderNav();$('#view').innerHTML=V[S.view]();
@@ -841,6 +875,7 @@ addEventListener('hashchange',route);
 
 /* ---------- Ereignisse ---------- */
 document.addEventListener('click',e=>{
+ const sp=e.target.closest('[data-sprung]');if(sp){e.preventDefault();const z=document.getElementById('h-'+sp.dataset.sprung);z?.scrollIntoView({block:'start'});z?.focus({preventScroll:true});return}
  const t=e.target.closest('[data-doc],[data-act],[data-year],[data-modus],[data-tab],[data-chat],[data-ask],[data-kf],[data-kontakt]');
  if(!t)return;
  if(t.dataset.doc){S.docId=+t.dataset.doc;S.tab='meta';if(location.hash!=='#dokument'){location.hash='dokument'}else route();if(t.tagName!=='A')e.preventDefault();return}
