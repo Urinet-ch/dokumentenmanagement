@@ -42,7 +42,10 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
             if (stream == null) {
                 throw new IllegalStateException("Konfigurationsschema fehlt");
             }
-            this.schema = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            ObjectNode geladen = (ObjectNode) json.readTree(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+            ObjectNode definitionen = (ObjectNode) geladen.path("$defs");
+            EinstellungskatalogSchema.erzeugen(json).forEach(definitionen::set);
+            this.schema = json.writeValueAsString(geladen);
         } catch (IOException e) {
             throw new IllegalStateException("Konfigurationsschema nicht lesbar", e);
         }

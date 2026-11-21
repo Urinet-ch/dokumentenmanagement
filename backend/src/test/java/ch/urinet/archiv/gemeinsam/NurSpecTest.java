@@ -196,6 +196,7 @@ class NurSpecTest {
 
     /** Hilfsklassen, die Specs lesen: Nutzer ohne Eintrag in SPEC_TESTS nur mit Grund. */
     private static final java.util.Map<String, String> NUTZER_AUSSERHALB = java.util.Map.of(
+            "EinstellungsInventarTest", "ReqAbdeckungTest",
             // Cucumber-Schritt und KonfigurationSeedTest nutzen die Tabelle; der alte Name bleibt als CI-Kompatibilität
             // in SPEC_TESTS und erbt die Prüfungen aus KonfigurationSeedTest.
             "DokumentartSchritte", "DokumentartSeedTest",
