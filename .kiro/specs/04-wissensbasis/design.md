@@ -1107,10 +1107,16 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   INSERT-only, aber nicht gehasht (Review PR #295, K7).
 - Req 4.7 ist offen: Die Sicherung erfasst die ganze Archiv-Datenbank mit `pg_dump`. Seit PR #357 stellt
   `restore-uebung-lokal.sh` den Datenbankdump tatsächlich mit `pg_restore` in einer eigenen Ziel-Datenbank
-  wieder her (Spec 01, Aufgabe 5.12). Noch fehlt der Nachweis, dass dabei ein nichtleerer Wissensseiten- und
-  Versionsbestand vor und nach dem Restore verglichen wird (Nachprüfung 20.11.2026). Deshalb bleibt 13.3
-  offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis
-  (Review PR #295, M1).
+  wieder her (Spec 01, Aufgabe 5.12). Seit PR #397 vergleicht der lokale Rundlauf
+  (`SicherungPaketRoundtripTest`, Nachprüfung 21.11.2026) je Mandant zwei Wissensseiten und drei Versionen
+  (nichtleerer Bestand) vor und nach dem Datenbank-Restore. Offen bleibt nur der Zählvergleich in der
+  wiederkehrenden betrieblichen Restore-Probe (4.7); deshalb bleibt 13.3 offen. Ein Szenario, das nach einem
+  Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis (Review PR #295, M1).
+- Das Secret `keycloak_verwaltung_secret` steht seit PR #397 in der Secret-Liste von `restore-uebung-lokal.sh` und im
+  Restore-Compose-Stack: `application.properties` (`%prod`, Spec 06, ADR-015) verlangt es, der Stack startet sonst
+  nicht. Es hat mit dem Wissensvergleich nichts zu tun.
+- Der Rundlauftest läuft nur mit `-Darchiv.restore.e2e=true` (sonst übersprungen); der Beleg ist der Lauf von
+  `restore-uebung-lokal.sh`.
 
 ### Umsetzung 13.5 (PR #300)
 - `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe

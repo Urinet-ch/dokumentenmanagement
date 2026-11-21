@@ -350,7 +350,6 @@ class SicherungPaketRoundtripTest {
                 p.setString(4, Pruefsumme.von(PDFA));
                 p.executeUpdate();
             }
-
             try (PreparedStatement p = connection.prepareStatement("insert into " + schema
                     + ".dokument_datei (dokument_id, nr, rolle, sha256, s3_schluessel, s3_version) "
                     + "values (?, 1, 'ORIGINAL', ?, ?, ?)")) {
