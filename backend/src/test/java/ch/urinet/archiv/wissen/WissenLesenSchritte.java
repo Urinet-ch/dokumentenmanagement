@@ -123,6 +123,16 @@ public class WissenLesenSchritte {
                 KiWireMock.ChatAntwort.text("Die Wissensseite nennt eine Aussage.", 10, 2)));
     }
 
+    @Angenommen("das öffentliche Sprachmodell versucht die Wissenswerkzeuge mit der Leseprobe aufzurufen")
+    public void oeffentlichenWissenschatVorbereiten() {
+        KiWireMock.chatFolge(List.of(
+                KiWireMock.ChatAntwort.werkzeuge(10, 2,
+                        new KiWireMock.ChatAufruf("wissen_index", "{}"),
+                        new KiWireMock.ChatAufruf("wissen_seite_zeigen",
+                                "{\"pfad\":\"" + normaleSeitePfad + "\"}")),
+                KiWireMock.ChatAntwort.text("Keine Publikation gefunden.", 10, 2)));
+    }
+
     @Wenn("der Inhaber die Nachberechnung der Wissensembeddings zweimal startet")
     public void nachberechnungStarten() throws Exception {
         try (var verbindung = datenbank.get().getConnection();
