@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -401,35 +402,44 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
-    void inhaberZaehlenFordertVollformAnUndLiestBenutzerOhneAttributeEinzeln() {
+    void inhaberZaehlenPrueftMandantRolleUndErforderlicheAktionen() {
         tokenAntwort();
-        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/inhaber/users"))
-                .withQueryParam("briefRepresentation", equalTo("false"))
+        server.stubFor(get(urlPathEqualTo(USERS))
+                .withQueryParam("q", equalTo("mandant:urinet"))
+                .withQueryParam("max", equalTo("50"))
                 .willReturn(okJson("""
                         [{"id":"inhaber-1","username":"eins","enabled":true},
                          {"id":"inhaber-2","username":"zwei","enabled":true,"attributes":{"mandant":["urinet"]},"requiredActions":[]},
                          {"id":"inhaber-3","username":"drei","enabled":false,"attributes":{"mandant":["urinet"]},"requiredActions":[]},
                          {"id":"inhaber-4","username":"vier","enabled":true,"attributes":{"mandant":["vhf-gsk"]},"requiredActions":[]},
                          {"id":"inhaber-5","username":"fuenf","enabled":true,"attributes":{"mandant":["urinet"]},"requiredActions":["VERIFY_EMAIL"]},
-                         {"id":"inhaber-6","username":"sechs","enabled":true,"attributes":{"mandant":["urinet"]}}]
+                         {"id":"inhaber-6","username":"sechs","enabled":true,"attributes":{"mandant":["urinet"]}},
+                         {"id":"mitarbeiter-1","enabled":true,"attributes":{"mandant":["urinet"]},"requiredActions":[]}]
                         """)));
         benutzerStub("inhaber-1", "urinet");
         server.stubFor(get(urlPathEqualTo(USERS + "/inhaber-6")).willReturn(okJson("""
                 {"id":"inhaber-6","username":"sechs","enabled":true,"attributes":{"mandant":["urinet"]},
                  "requiredActions":["CONFIGURE_TOTP"]}
                 """)));
+        for (String id : List.of("inhaber-1", "inhaber-2", "inhaber-5", "inhaber-6")) {
+            server.stubFor(get(urlPathEqualTo(USERS + "/" + id + "/role-mappings/realm"))
+                    .willReturn(okJson("[{\"name\":\"inhaber\"}]")));
+        }
+        server.stubFor(get(urlPathEqualTo(USERS + "/mitarbeiter-1/role-mappings/realm"))
+                .willReturn(okJson("[{\"name\":\"mitarbeiter\"}]")));
 
         long anzahl = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).inhaberZaehlen("urinet");
 
         assertThat(anzahl).isEqualTo(2);
         server.verify(1, getRequestedFor(urlPathEqualTo(USERS + "/inhaber-1")));
         server.verify(1, getRequestedFor(urlPathEqualTo(USERS + "/inhaber-6")));
+        server.verify(0, getRequestedFor(urlPathEqualTo(USERS + "/inhaber-4/role-mappings/realm")));
     }
 
     @Test
     void inhaberZaehlenBrichtBeiUnvollstaendigenOderUnbekanntenAktionenAb() {
         tokenAntwort();
-        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/inhaber/users"))
+        server.stubFor(get(urlPathEqualTo(USERS))
                 .willReturn(okJson("""
                         [{"id":"inhaber-1","enabled":true,"attributes":{"mandant":["urinet"]}}]
                         """)));
@@ -445,9 +455,29 @@ class KeycloakAdminAdapterTest {
                 {"id":"inhaber-1","enabled":true,"attributes":{"mandant":["urinet"]},
                  "requiredActions":["SYNTHETISCHE_AKTION"]}
                 """)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/inhaber-1/role-mappings/realm"))
+                .willReturn(okJson("[{\"name\":\"inhaber\"}]")));
         assertThatThrownBy(() -> adapter.inhaberZaehlen("urinet"))
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+    }
+
+    @Test
+    void inhaberZaehlenPrueftAuchDieNaechsteMandantenseite() {
+        tokenAntwort();
+        String inaktiv = "{\"id\":\"inaktiv\",\"enabled\":false,\"attributes\":{\"mandant\":[\"urinet\"]},"
+                + "\"requiredActions\":[]}";
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("first", equalTo("0"))
+                .willReturn(okJson("[" + String.join(",", java.util.Collections.nCopies(50, inaktiv)) + "]")));
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("first", equalTo("50"))
+                .willReturn(okJson("""
+                        [{"id":"inhaber-1","enabled":true,"attributes":{"mandant":["urinet"]},"requiredActions":[]}]
+                        """)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/inhaber-1/role-mappings/realm"))
+                .willReturn(okJson("[{\"name\":\"inhaber\"}]")));
+
+        assertThat(adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).inhaberZaehlen("urinet")).isEqualTo(1);
+        server.verify(1, getRequestedFor(urlPathEqualTo(USERS)).withQueryParam("first", equalTo("50")));
     }
 
     @Test
@@ -467,7 +497,7 @@ class KeycloakAdminAdapterTest {
     @Test
     void inhaberZaehlenMeldetFehlerStattNullWennBenutzerNichtLesbarIst() {
         tokenAntwort();
-        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/inhaber/users"))
+        server.stubFor(get(urlPathEqualTo(USERS))
                 .willReturn(okJson("[{\"id\":\"inhaber-1\",\"enabled\":true}]")));
         server.stubFor(get(urlPathEqualTo(USERS + "/inhaber-1")).willReturn(aResponse().withStatus(404)));
 

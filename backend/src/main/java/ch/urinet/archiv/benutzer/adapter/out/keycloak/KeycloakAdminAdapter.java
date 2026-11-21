@@ -49,7 +49,6 @@ import java.util.regex.Pattern;
 @Typed(IdentitaetsDienst.class)
 public class KeycloakAdminAdapter implements IdentitaetsDienst {
     static final int MAX_ANTWORT = 1024 * 1024;
-    static final int SEITENGROESSE = MAX_SEITENGROESSE;
     static final Duration WARTEZEIT_PARALLEL = Duration.ofMillis(200);
     static final Duration WIEDERHOLUNGSABSTAND = Duration.ofMillis(200);
     static final Duration FEHLERFENSTER = Duration.ofSeconds(30);
@@ -312,28 +311,39 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public long inhaberZaehlen(String mandant) {
         long anzahl = 0;
-        for (int first = 0; ; first += SEITENGROESSE) {
-            JsonNode treffer = json(request("GET", admin("/roles/inhaber/users"),
-                    "briefRepresentation=false&max=" + SEITENGROESSE + "&first=" + first, null, true, Set.of()));
-            if (!treffer.isArray() || treffer.size() > SEITENGROESSE) {
+        long offset = 0;
+        while (true) {
+            String query = "q=" + query("mandant:" + mandant) + "&max=" + MAX_SEITENGROESSE + "&first=" + offset;
+            JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
+            if (!treffer.isArray() || treffer.size() > MAX_SEITENGROESSE) {
                 throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
             for (JsonNode eintrag : treffer) {
-                // Unvollständige Darstellungen einzeln lesen, damit kein eingeladener Inhaber als aktiv zählt.
+                String id;
+                try {
+                    id = segment(eintrag.path("id").asText());
+                } catch (IllegalArgumentException e) {
+                    throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                }
                 JsonNode user = eintrag.has("attributes") && eintrag.has("enabled")
                         && eintrag.has("requiredActions") ? eintrag
-                        : benutzerDirekt(segment(eintrag.path("id").asText()));
+                        : benutzerDirekt(id);
                 if (mandantPasst(user, mandant)) {
                     if (!user.path("enabled").isBoolean()) {
                         throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
                     }
-                    if (user.path("enabled").asBoolean() && erforderlicheAktionen(user).isEmpty()) {
+                    if (user.path("enabled").asBoolean() && rollen(id).contains(Rolle.INHABER)
+                            && erforderlicheAktionen(user).isEmpty()) {
                         anzahl++;
                     }
                 }
             }
-            if (treffer.size() < SEITENGROESSE) {
+            if (treffer.size() < MAX_SEITENGROESSE) {
                 return anzahl;
+            }
+            offset += treffer.size();
+            if (offset > Integer.MAX_VALUE) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
         }
     }
@@ -391,6 +401,12 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         } catch (IllegalArgumentException e) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
+        return new Benutzer(id, user.path("username").asText(), text(user, "email"),
+                text(user, "firstName"), text(user, "lastName"), user.path("enabled").asBoolean(), rollen(id),
+                erforderlicheAktionen(user), hatOtp(id), hatGoogle(id));
+    }
+
+    private Set<Rolle> rollen(String id) {
         Set<Rolle> rollen = EnumSet.noneOf(Rolle.class);
         JsonNode mappings = json(request("GET", user(id) + "/role-mappings/realm", null, null, true, Set.of()));
         if (!mappings.isArray()) {
@@ -403,9 +419,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 }
             }
         }
-        return new Benutzer(id, user.path("username").asText(), text(user, "email"),
-                text(user, "firstName"), text(user, "lastName"), user.path("enabled").asBoolean(), rollen,
-                erforderlicheAktionen(user), hatOtp(id), hatGoogle(id));
+        return rollen;
     }
 
     private Set<ErforderlicheAktion> erforderlicheAktionen(JsonNode user) {

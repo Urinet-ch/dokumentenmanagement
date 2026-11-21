@@ -135,6 +135,19 @@ class KeycloakVerwaltungSpikeTest {
             assertThat(serviceClaims.path("aud").toString()).contains("realm-management").contains(adminUrl);
             // Mit dem Scope funktioniert der Aufruf der Admin-API mit dem Dienstkonto-Token (Requirement 5.2).
             given().auth().oauth2(serviceToken).get(adminUrl + "/users?max=1").then().statusCode(200);
+            String inhaberId = adminGet(adminUrl + "/users?exact=true&username=inhaber-vhf-gsk", adminToken)
+                    .path("[0].id");
+            Map<String, Integer> status = Map.of(
+                    "mandantensuche", given().auth().oauth2(serviceToken)
+                            .get(adminUrl + "/users?q=mandant:vhf-gsk&max=50").statusCode(),
+                    "rollenmitglieder", given().auth().oauth2(serviceToken)
+                            .get(adminUrl + "/roles/inhaber/users?briefRepresentation=false&max=50").statusCode(),
+                    "benutzer", given().auth().oauth2(serviceToken)
+                            .get(adminUrl + "/users/{id}", inhaberId).statusCode(),
+                    "rollen", given().auth().oauth2(serviceToken)
+                            .get(adminUrl + "/users/{id}/role-mappings/realm", inhaberId).statusCode());
+            assertThat(status).containsExactlyInAnyOrderEntriesOf(Map.of(
+                    "mandantensuche", 200, "rollenmitglieder", 403, "benutzer", 200, "rollen", 200));
             var adapter = new KeycloakAdminAdapter(OBJECT_MAPPER, Optional.of(basisUrl), REALM,
                     clientIdName, Optional.of(clientSecret), "archiv-pwa", Optional.empty(),
                     Duration.ofSeconds(2), Duration.ofSeconds(5));
@@ -142,6 +155,16 @@ class KeycloakVerwaltungSpikeTest {
                     .extracting(benutzer -> benutzer.benutzername())
                     .containsExactly("inhaber-vhf-gsk");
             assertThat(adapter.inhaberZaehlen("vhf-gsk")).isEqualTo(1);
+            try {
+                given().auth().oauth2(adminToken).contentType("application/json")
+                        .body(Map.of("requiredActions", List.of("CONFIGURE_TOTP")))
+                        .put(adminUrl + "/users/{id}", inhaberId).then().statusCode(204);
+                assertThat(adapter.inhaberZaehlen("vhf-gsk")).isZero();
+            } finally {
+                given().auth().oauth2(adminToken).contentType("application/json")
+                        .body(Map.of("requiredActions", List.of()))
+                        .put(adminUrl + "/users/{id}", inhaberId).then().statusCode(204);
+            }
         } finally {
             // Kein Assert im finally: ein Fehler beim Aufräumen darf den ursprünglichen Testfehler nicht überdecken.
             try {
