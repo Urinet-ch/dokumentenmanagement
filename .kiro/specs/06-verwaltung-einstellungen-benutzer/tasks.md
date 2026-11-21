@@ -50,6 +50,9 @@ auf Server oder Secrets aus der Sitzung.
     `KEYCLOAK_VERWALTUNG_SECRET` und `KEYCLOAK_SMTP_PASSWORT`, Secret-Dateien im Deploy-Bundle und Pflichtprüfung im Workflow;
     Compose: Secret für `api`; Admin-Konsole bleibt nicht öffentlich; Probe: Token des Dienstkontos holbar; Notfallunterlagen
     um das neue Secret ergänzt.
+  - Hinweis (Hotfix 21.11.2026): `SecretPruefung` verlangt `keycloak_verwaltung_secret` erst, wenn
+    `ARCHIV_KEYCLOAK_ADMIN_URL` gesetzt ist; Secret und Adresse in Compose darum im selben Schritt setzen.
+    Umgesetzt: Anforderung 5.3 Kriterium 4, `design.md`, `SecretPruefung`, `SecretPruefungTest` (api und kommando ohne Adresse).
   - Nachgelagert [Fabian] (Entscheid 21.11.2026): bestehenden Realm einmalig aktualisieren und die Betriebsnachweise
     für interne Verbindung mit korrektem Issuer und automatische Ablaufzeit der Secret-Überlappung führen.
   - _Anforderungen: 5.2, 5.3, 5.4, 6.9, 7.4_
@@ -231,3 +234,21 @@ auf Server oder Secrets aus der Sitzung.
     Google-Verknüpfung (WO O.8).
   - _Anforderungen: 5.10, 8.2, 9.4, 9.7_
   - _Abhängig von: 21.2, 21.3, 21.4, 21.5_
+
+## Welle 24 — Passkey als Anmeldeweg (Entscheid Fabian 21.11.2026, Requirement 10)
+- [ ] 24.1 Spike und Realm-Flow Passkey [Infra] [Backend]
+  - Spike gegen Keycloak 26.8.2: Flow mit Passkey und Rückfall `browser-totp-pflicht`, `auth_time` bei Passkey, Einrichtung in der
+    Kontoverwaltung, Direct Grant unverändert; Ergebnis in design.md «Passkey» (Marker `[offen: …]` auflösen). Realm-Export mit
+    Platzhalter für die Relying-Party-ID; Realm-Tests mit virtuellem Authenticator (Einrichten, Anmelden, Step-up, Entfernen).
+  - _Anforderungen: 10.1, 10.2, 10.3, 10.4, 10.8, 10.9, 10.10, 10.11_
+  - _Abhängig von: 19.2, 19.10_
+- [ ] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
+  - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
+    Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
+  - _Anforderungen: 10.5, 10.6, 10.7_
+  - _Abhängig von: 24.1, 19.8, 20.7_
+- [ ] 24.3 Anleitung und Inbetriebnahme [Fabian]
+  - Anleitung (Spec 07, `frontend/public/anleitung/`) um «Mit Passkey anmelden» ergänzen; auf Stufe A Realm einmalig aktualisieren, Relying-Party-ID
+    setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
+  - _Anforderungen: 10.1, 10.2, 10.8_
+  - _Abhängig von: 24.1, 24.2_
