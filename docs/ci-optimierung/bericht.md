@@ -349,6 +349,10 @@ Beschleunigung ausgegeben.
   eines wiederverwendeten Projekts.
 - **Teststabilität: in Arbeit.** #418 synchronisiert den Chat-Test auf den
   Sendezustand; seine CI 44908290740 scheiterte in einem anderen Szenario.
-  #419 untersucht die dortige Offline-Wiederholung. Ein lokaler Lauf mit dem
-  Testfix hatte 170 grüne Szenarien in 2 min 44,6 s; das ist weder eine
-  CI-Messung noch ein Nachweis einer Zeitersparnis.
+  #419 synchronisiert dort die Offline-Wiederholung. Zwei vollständige
+  CI-Versuche des Laufs 44916286340 auf demselben Stand waren grün, mit je
+  170 Szenarien und 3016 Schritten: Die Browserjobs dauerten 6 min 9 s und
+  5 min 36 s, Cucumber 212,492 s und 173,470 s. Ein lokaler Lauf hatte
+  170 grüne Szenarien in 2 min 44,6 s. Das sind Stabilitätsnachweise, kein
+  Nachweis einer Zeitersparnis; der Testumfang ist gegenüber den Ausgangsläufen
+  gewachsen. Beide Korrekturen sind noch nicht gemergt.
