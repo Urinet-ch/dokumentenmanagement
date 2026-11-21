@@ -135,8 +135,9 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 8.1–8.7, 8.9, 11.4_
   - _Abhängig von: 15.1, Spec 02: 7.1–7.3_
 
-- [ ] 15.3 Chat-Oberfläche und Analyse-Vorschlag [Frontend] [Backend]
+- [x] 15.3 Chat-Oberfläche und Analyse-Vorschlag [Frontend] [Backend]
   - Quellen-Chips für Seiten (öffnen die Seite mit Protokoll), Aktion «Als Analyse vorschlagen» für A18 nur bei zulässigen Gesprächen; `POST /wissensentwuerfe/analyse` ohne KI-Aufruf (422 `ANALYSE_NICHT_MOEGLICH` nach Aufruf von `kennzahl` u. a., Quellen ohne Seite, Kontextstufe aus allen Werkzeugergebnissen des Gesprächs), Status eigener Vorschläge ohne Fassung und Diff; Logeintrag `ANALYSE`
+  - Nachweis: Backend-Szenarien `@req-12.3`, `@req-16.6`, Persistenz- und Freigabetests; Browser-Szenarien `@req-8.8`, `@req-12.4`, `@req-16.6` sowie Chat- und Status-Unit-Tests.
   - _Anforderungen: 6.10, 8.8, 12.3, 12.4, 16.6_
   - _Abhängig von: 15.2, 14.2, Spec 02: 7.4_
 
