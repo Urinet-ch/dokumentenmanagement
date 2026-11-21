@@ -2,7 +2,7 @@
 @if (laedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
 @if (fehler(); as meldung) {
   <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
-  <p class="fehler" role="alert">{{ meldung }}</p>
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
   <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button></div>
 }
 @if (inhalt(); as inhalt) {
@@ -58,7 +58,7 @@
           }
         </ol>
         @if (versionLaedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
-        @if (versionsFehler(); as meldung) { <p class="fehler" role="alert">{{ meldung }}</p> }
+        @if (versionsFehler(); as meldung) { <p class="hinweis gefahr" role="alert">{{ meldung }}</p> }
         @if (versionsText(); as version) {
           <div class="fruehere">
             <div class="knoepfe zwischenkopf">

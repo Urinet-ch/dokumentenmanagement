@@ -56,7 +56,7 @@
       >
         {{ texte.profil }}
       </mat-checkbox>
-      <p id="profil-hinweis" class="hinweis">{{ texte.profilHinweis }}</p>
+      <p id="profil-hinweis" class="nebentext">{{ texte.profilHinweis }}</p>
     }
     <ol class="spalten">
       @for (spalte of spalten(); track spalte.position) {
@@ -72,12 +72,12 @@
             </select>
           </label>
           @if (beispiel(position)) {
-            <span class="hinweis">{{ texte.beispiel(beispiel(position)) }}</span>
+            <span class="nebentext">{{ texte.beispiel(beispiel(position)) }}</span>
           }
         </li>
       }
     </ol>
-    <p class="hinweis">{{ texte.zugeordnet(anzahlZugeordnet()) }}</p>
+    <p class="nebentext">{{ texte.zugeordnet(anzahlZugeordnet()) }}</p>
     @if (!pflichtOk()) {
       <p class="fehler" data-test="pflicht">
         {{ art() === 'kontakt' ? texte.pflichtKontakt : texte.pflichtVerkaufschance }}
@@ -97,7 +97,7 @@
         <li>{{ zahl(posten.anzahl) }} {{ texte.bilanz[posten.schluessel] }}</li>
       }
     </ul>
-    <p class="hinweis">{{ texte.uebernommenAm(zeit(l.uebernommen)) }}</p>
+    <p class="nebentext">{{ texte.uebernommenAm(zeit(l.uebernommen)) }}</p>
   </section>
 }
 
@@ -106,7 +106,7 @@
 }
 
 @if ((status() === 'VORSCHAU' || status() === 'UEBERNOMMEN') && l) {
-  <section aria-labelledby="vorschau-titel">
+  <section class="vorschau" aria-labelledby="vorschau-titel">
     <h2 id="vorschau-titel">{{ texte.vorschauTitel }}</h2>
     @if (entscheidbar()) {
       <p>{{ texte.vorschauEinleitung }}</p>
@@ -115,19 +115,20 @@
       @for (z of zaehler(); track z.ergebnis) {
         <button
           type="button"
-          class="chip"
-          [class.auffaellig]="(z.ergebnis === 'DUBLETTE' || z.ergebnis === 'FEHLER') && z.anzahl > 0"
+          class="kachel"
+          [class.warnung]="z.ergebnis === 'DUBLETTE' && z.anzahl > 0"
+          [class.gefahr]="z.ergebnis === 'FEHLER' && z.anzahl > 0"
           [attr.data-ergebnis]="z.ergebnis ?? 'ALLE'"
           [attr.aria-pressed]="filter() === z.ergebnis"
           (click)="filtern(z.ergebnis)"
         >
-          <span class="anzahl">{{ zahl(z.anzahl) }}</span> {{ texte.zaehler[z.ergebnis ?? 'alle'] }}
+          <span class="kennzahl">{{ zahl(z.anzahl) }}</span> {{ texte.zaehler[z.ergebnis ?? 'alle'] }}
         </button>
       }
     </div>
 
     @if (entscheidbar() && (l.dubletten ?? 0) > 0) {
-      <p class="hinweis" data-test="dubletten-hinweis">
+      <p class="nebentext" data-test="dubletten-hinweis">
         @if (art() === 'kontakt') {
           {{ texte.dublettenHinweis }}
           {{ texte.entschieden(zahl(entscheide().size), zahl(l.dubletten)) }}
@@ -141,8 +142,8 @@
       <p>{{ texte.keineZeilen }}</p>
     } @else {
       @let mitEntscheid = art() === 'kontakt' && entscheidbar() && hatDubletten();
-      <div class="tabelle" tabindex="0" role="region" aria-labelledby="vorschau-titel">
-        <table>
+      <div class="tabelle-rahmen" tabindex="0" role="region" aria-labelledby="vorschau-titel">
+        <table class="tabelle">
           <thead>
             <tr>
               <th scope="col">{{ texte.spalteZeile }}</th>
@@ -158,7 +159,7 @@
               <tr class="zeile" [attr.data-ergebnis]="zeile.ergebnis" data-test="zeile">
                 <th scope="row">
                   <span class="nr">{{ texte.zeile(zeile.nr ?? 0) }}</span>
-                  <span class="marke" [attr.data-ergebnis]="zeile.ergebnis">{{ texte.zaehler[zeile.ergebnis ?? ''] }}</span>
+                  <span class="pille marke" [class]="ton[zeile.ergebnis ?? ''] ?? ''" [attr.data-ergebnis]="zeile.ergebnis">{{ texte.zaehler[zeile.ergebnis ?? ''] }}</span>
                 </th>
                 <td class="werte-zelle">
                   @if (zeile.meldung) {
@@ -175,21 +176,21 @@
                       }
                     </dl>
                   } @else if (zeile.werte?.length) {
-                    <p class="werte"><span class="hinweis">{{ texte.rohwerte }}:</span> {{ zeile.werte!.join(' · ') }}</p>
+                    <p class="werte"><span class="nebentext">{{ texte.rohwerte }}:</span> {{ zeile.werte!.join(' · ') }}</p>
                   } @else if (!zeile.werte) {
-                    <p class="hinweis" data-test="werte-verworfen">{{ texte.werteVerworfen }}</p>
+                    <p class="nebentext" data-test="werte-verworfen">{{ texte.werteVerworfen }}</p>
                   }
                 </td>
                 <td class="kontakt-zelle">
                   @if (zeile.kontaktId) {
                     <p class="kontakt">
-                      <span class="hinweis">{{ texte.trifft }}:</span>
+                      <span class="nebentext">{{ texte.trifft }}:</span>
                       <a [routerLink]="['/kontakte', zeile.kontaktId]" data-test="kontakt-link">{{ kontaktText(zeile.kontaktId) }}</a>
                     </p>
                   }
                   @if (zeile.kandidaten?.length) {
                     <div class="kandidaten">
-                      <span class="hinweis">{{ texte.kandidaten }}:</span>
+                      <span class="nebentext">{{ texte.kandidaten }}:</span>
                       <ul>
                         @for (kandidat of zeile.kandidaten; track kandidat) {
                           <li><a [routerLink]="['/kontakte', kandidat]" data-test="kandidat-link">{{ kontaktText(kandidat) }}</a></li>

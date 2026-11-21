@@ -30,7 +30,7 @@
         <option [value]="zeile.benutzer">{{ zeile.name || zeile.benutzer }}</option>
       }
     </datalist>
-    <span id="kennung-hinweis" class="hinweis">{{ texte.benutzerHinweis }}</span>
+    <span id="kennung-hinweis" class="nebentext">{{ texte.benutzerHinweis }}</span>
   </label>
   <label class="feld">
     <span>{{ texte.dokument }}</span>
@@ -60,7 +60,7 @@
 <section aria-labelledby="eintraege-titel">
   <h2 id="eintraege-titel">{{ texte.eintraege }}</h2>
   @if (fehler()) {
-    <p class="fehler" role="alert">{{ fehler() }}</p>
+    <p class="hinweis gefahr" role="alert">{{ fehler() }}</p>
   }
   @if (eintraege() === null) {
     @if (!fehler()) {
@@ -69,9 +69,9 @@
   } @else if (eintraege()!.length === 0) {
     <p role="status">{{ texte.keineEintraege }}</p>
   } @else {
-    <div class="karte tabelle">
-      <div class="tabellen-rahmen">
-        <table>
+    <div class="karte tabellen-karte">
+      <div class="tabelle-rahmen">
+        <table class="tabelle">
           <thead>
             <tr>
               <th scope="col">{{ texte.spalteZeit }}</th>
@@ -85,7 +85,7 @@
           <tbody>
             @for (eintrag of eintraege(); track eintrag.id) {
               <tr data-test="eintrag">
-                <td class="zahl">
+                <td class="zeit">
                   <time [attr.datetime]="eintrag.zeit">{{ zeitpunkt(eintrag.zeit) }}</time>
                 </td>
                 <td>
@@ -95,7 +95,12 @@
                   }
                 </td>
                 <td>
-                  <span class="pille" [attr.data-aktion]="eintrag.aktion">{{ aktionText(eintrag.aktion) }}</span>
+                  <span
+                    class="pille"
+                    [class.gefahr]="eintrag.aktion === 'VERWEIGERT' || eintrag.aktion === 'SPERRE_KONFLIKT'"
+                    [class.akzent]="eintrag.aktion === 'EXPORTIEREN'"
+                    [attr.data-aktion]="eintrag.aktion"
+                  >{{ aktionText(eintrag.aktion) }}</span>
                 </td>
                 <td>
                   @if (eintrag.dokumentId) {
@@ -129,7 +134,7 @@
   <p>{{ texte.verzeichnisEinleitung }}</p>
   <p class="status" role="status" aria-live="polite">{{ meldung() }}</p>
   @if (verzeichnisFehler()) {
-    <p class="fehler" role="alert">{{ verzeichnisFehler() }}</p>
+    <p class="hinweis gefahr" role="alert">{{ verzeichnisFehler() }}</p>
   }
   @if (verzeichnis() === null) {
     @if (!verzeichnisFehler()) {
@@ -138,9 +143,9 @@
   } @else if (verzeichnis()!.length === 0) {
     <p>{{ texte.keinVerzeichnis }}</p>
   } @else {
-    <div class="karte tabelle">
-      <div class="tabellen-rahmen">
-        <table>
+    <div class="karte tabellen-karte">
+      <div class="tabelle-rahmen">
+        <table class="tabelle">
           <thead>
             <tr>
               <th scope="col">{{ texte.spaltePerson }}</th>
