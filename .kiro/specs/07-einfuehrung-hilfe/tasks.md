@@ -16,14 +16,20 @@ dieselben Dateien ändert (`CLAUDE.md`, «Keine Überschneidung»). Die Texte de
 was auf `main` umgesetzt ist (Requirement 6.4).
 
 ## Welle 22 — Benutzeranleitung und Hilfe
-- [ ] 22.1 Hilfe-Katalog, Markdown-Teilmenge und Inhaltsprüfung [Frontend]
+- [x] 22.1 Hilfe-Katalog, Markdown-Teilmenge und Inhaltsprüfung [Frontend]
   - Ordner `frontend/src/app/hilfe/` mit `hilfe-katalog.ts` (Einträge `erste-schritte` und `probleme`; die übrigen
     bringen 22.5 bis 22.7 mit ihren Dateien), `anleitung-markdown.ts` (Teilmenge nach design.md, Ergebnis `Textteil`),
     `anleitung-text.ts` (Darstellung nach dem Muster von `wissen-seite.html`, nur Interpolation), `AnleitungLader` mit
     Fehlerfall und «Erneut versuchen»; Dateien `frontend/public/anleitung/erste-schritte.md` und `probleme.md`.
   - Vitest `hilfe-katalog.spec.ts`, `anleitung-markdown.spec.ts`, `anleitung-inhalt.spec.ts` (Sprache, Links, Muster von
     Personendaten, Summe der Grössen); Texte der Oberfläche in `texte.de-CH.ts` (`hilfe`).
-  - _Anforderungen: 7.1, 7.2, 7.3, 7.4, 7.6, 9.3, 9.5, 9.7_
+  - Erledigt (PR #411; design.md «Umsetzung (Aufgabe 22.1, 21.11.2026)»): Katalog mit `erste-schritte` und `probleme`,
+    `anleitung-markdown.ts`, `anleitung-text.ts` (Eingaben `versatz`, `leiste`, Ausgaben `abschnitt`, `navigiert`),
+    `anleitung-lader.ts`, `app-pfade.ts`, Symbol `info`; Szenario `@req-7.1` in `features/hilfe/anleitung-pwa.feature`,
+    7.2 bis 7.4, 9.3, 9.5 und 9.7 per Vitest. Lader, Hinweis und «Erneut versuchen» nach 7.6 sind umgesetzt und mit
+    `anleitung-text.spec.ts` geprüft; weil erst 22.2 die Anleitung auf einer Seite zeigt, ist 7.6 mit seinem
+    Browser-Szenario zu 22.2 verschoben.
+  - _Anforderungen: 7.1, 7.2, 7.3, 7.4, 9.3, 9.5, 9.7_
 
 - [ ] 22.2 Seite `/hilfe` mit Inhaltsverzeichnis und Sprungmarken [Frontend]
   - Route `hilfe` (`loadComponent`, ohne Rechte-Wächter, Titel wie die übrigen Routen), Seitenkopf mit Name aus dem
@@ -31,8 +37,9 @@ was auf `main` umgesetzt ist (Requirement 6.4).
     Sprung zum Anker im Scroll-Bereich `mat-sidenav-content` mit Fokus, unbekannter Anker ohne Meldung; einspaltig bis
     etwa 1100 px, darüber mit Inhaltsverzeichnis links; Platz für den Knopf «Einführung erneut zeigen» (Funktion mit 23.3).
   - Prototyp `docs/oberflaeche/prototyp.html` um die Seite ergänzt, mit erfundenen und gekennzeichneten Beispieldaten.
-  - Szenarien je Rolle (Inhaltsverzeichnis, verborgene Abschnitte, Sprungmarke, Zurück-Knopf).
-  - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 6.2, 6.3, 6.5_
+  - Szenarien je Rolle (Inhaltsverzeichnis, verborgene Abschnitte, Sprungmarke, Zurück-Knopf); Szenario zu 7.6 (eine
+    Datei nicht ladbar: Hinweis mit «Erneut versuchen» beim Abschnitt, die übrigen bleiben; Teile aus 22.1).
+  - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 6.2, 6.3, 6.5, 7.6_
   - _Abhängig von: 22.1_
 
 - [ ] 22.3 Knopf «Hilfe» und Hilfe-Leiste [Frontend]
