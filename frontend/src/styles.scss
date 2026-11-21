@@ -34,6 +34,7 @@
     0 8px 24px -12px light-dark(rgb(40 30 0 / 18%), rgb(0 0 0 / 70%));
   --radius: 16px;
   --radius-klein: 10px;
+  --schrift-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   // Frühere Namen, jetzt je Farbschema (von den Seiten verwendet)
   --urinet-dunkel: var(--flaeche);
@@ -167,6 +168,292 @@ a {
     color: var(--text-gedaempft);
     margin: 0.25rem 0 0;
   }
+}
+
+// Bausteine des Leitfadens (docs/oberflaeche/README.md, «Bausteine»): Seiten verwenden diese Klassen, statt sie
+// lokal nachzubauen (npm run pruefe:gestaltung). Werte nach Prototyp (.pill, .hint, .tbl, .seg, .vf, .empty, .mono).
+
+// Mono für Belegnummern, IDs, Pfade, Prüfsummen, Scopes und Aktionscodes
+.mono {
+  font-family: var(--schrift-mono);
+  font-size: 0.86em;
+  letter-spacing: -0.01em;
+}
+
+// Pille: kleines Etikett; Text oder Symbol ist Pflicht, die Farbe allein sagt nichts (WCAG 1.4.1)
+.pille {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid var(--linie);
+  border-radius: 99px;
+  background: var(--karte-2);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  --symbol-groesse: 13px;
+
+  &.ok,
+  &.warnung,
+  &.gefahr,
+  &.info,
+  &.akzent {
+    border-color: transparent;
+    background: var(--grund);
+    color: var(--schrift);
+  }
+
+  &.ok {
+    --grund: var(--ok-weich);
+    --schrift: var(--ok);
+  }
+
+  &.warnung {
+    --grund: var(--warnung-weich);
+    --schrift: var(--warnung);
+  }
+
+  &.gefahr {
+    --grund: var(--gefahr-weich);
+    --schrift: var(--gefahr);
+  }
+
+  // Info und Akzent teilen die Akzentflächen (kein eigenes Info-Token)
+  &.info,
+  &.akzent {
+    --grund: var(--akzent-weich);
+    --schrift: var(--akzent-text);
+  }
+
+  &.mono {
+    font-family: var(--schrift-mono);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+}
+
+// Hinweis: Box mit Symbol links und Text rechts; Fehler mit role="alert" (setzt die Seite). Ohne Symbol trägt der
+// Text die Zustandsfarbe, damit der Zustand nicht nur an der Fläche hängt.
+// Der Chat hat noch eine eigene Klasse «hinweis» (Statuszeile) und ist ausgenommen, bis Umstellung nach #399.
+.hinweis:not(app-chat *) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.25rem 0.625rem;
+  align-items: start;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-klein);
+  background: var(--grund, var(--karte-2));
+  color: var(--text-2);
+  font-size: 13px;
+  --symbol-groesse: 16px;
+
+  > app-symbol {
+    color: var(--schrift, var(--text-gedaempft));
+    margin-top: 1px;
+  }
+
+  > :not(app-symbol) {
+    grid-column: 2;
+    margin: 0;
+  }
+
+  &:not(:has(> app-symbol)) {
+    grid-template-columns: minmax(0, 1fr);
+    color: var(--schrift, var(--text-2));
+
+    > * {
+      grid-column: 1;
+    }
+  }
+
+  &.warnung {
+    --grund: var(--warnung-weich);
+    --schrift: var(--warnung);
+  }
+
+  &.gefahr {
+    --grund: var(--gefahr-weich);
+    --schrift: var(--gefahr);
+  }
+
+  &.info {
+    --grund: var(--akzent-weich);
+    --schrift: var(--akzent-text);
+  }
+
+  &.ok {
+    --grund: var(--ok-weich);
+    --schrift: var(--ok);
+  }
+}
+
+// Tabelle: <div class="tabelle-rahmen"><table class="tabelle">; der Rahmen scrollt selbst, damit die Seite bei
+// 375 px nicht seitlich scrollt. `.randbuendig` zieht den Rahmen in einer Karte bis an deren Rand.
+.tabelle-rahmen {
+  overflow-x: auto;
+  container-type: inline-size;
+  min-width: 0;
+
+  &.randbuendig {
+    margin-inline: -1.125rem;
+
+    .tabelle :is(th, td):first-child {
+      padding-inline-start: 1.125rem;
+    }
+
+    .tabelle :is(th, td):last-child {
+      padding-inline-end: 1.125rem;
+    }
+  }
+}
+
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th,
+  td {
+    padding: 0.6875rem 0.75rem;
+    border-bottom: 1px solid var(--linie);
+    text-align: start;
+    vertical-align: middle;
+  }
+
+  thead th {
+    padding-block: 0.625rem;
+    color: var(--text-gedaempft);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  tbody:last-child tr:last-child > * {
+    border-bottom: 0;
+  }
+
+  tbody tr:hover > * {
+    background: var(--karte-2);
+  }
+
+  .zahl {
+    text-align: end;
+  }
+}
+
+.zahl {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+// Kachel: Kennzahl oder Feld mit Beschriftung oben; auffällige Werte mit Rahmen in Zustandsfarbe und Text
+.kachel {
+  display: grid;
+  gap: 0.125rem;
+  align-content: start;
+  min-width: 0;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte);
+  color: var(--text);
+
+  .beschriftung {
+    color: var(--text-gedaempft);
+    font-size: 12px;
+  }
+
+  .wert {
+    margin: 0;
+    font-weight: 600;
+    overflow-wrap: break-word;
+  }
+
+  .kennzahl {
+    display: block;
+    color: var(--text);
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.warnung {
+    border-color: var(--warnung);
+    background: var(--warnung-weich);
+  }
+
+  &.gefahr {
+    border-color: var(--gefahr);
+    background: var(--gefahr-weich);
+  }
+}
+
+// Kachel als Filterknopf (aria-pressed)
+button.kachel {
+  min-height: 2.75rem;
+  color: var(--text-gedaempft);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+
+  &.warnung {
+    color: var(--warnung);
+  }
+
+  &.gefahr {
+    color: var(--gefahr);
+  }
+
+  &[aria-pressed='true'] {
+    border-color: var(--akzent-text);
+    box-shadow: inset 0 0 0 1px var(--akzent-text);
+  }
+}
+
+// Segment: Umschalter-Gruppe aus Knöpfen mit aria-pressed
+.segment {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
+
+  button {
+    min-height: 2.375rem;
+    padding: 0 0.75rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-gedaempft);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      background: var(--karte);
+      color: var(--text);
+      box-shadow: var(--schatten);
+    }
+  }
+}
+
+// Leerzustand: ein Satz, was hier erscheint
+.leer {
+  margin: 0;
+  padding: 1.5rem 0.5rem;
+  color: var(--text-gedaempft);
+  text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
