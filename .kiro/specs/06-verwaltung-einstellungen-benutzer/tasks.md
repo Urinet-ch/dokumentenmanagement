@@ -100,6 +100,8 @@ auf Server oder Secrets aus der Sitzung.
   - `sperren`, `entsperren` (inkl. Sperre durch Fehlversuche), `deaktivieren` (Zeile `AUSTRITT`), `reaktivieren`,
     `zugang-zuruecksetzen` (TOTP entfernen), `PATCH` für E-Mail mit `VERIFY_EMAIL` und Mitteilung an die alte Adresse,
     `DELETE …/google-verknuepfung` (WO O.8), `If-Match` und `ETag` des Benutzers.
+  - Text der Mitteilung an die alte Adresse aus `deploy/infomaniak/keycloak/README.md` (Aufgabe 20.8) übernehmen, als
+    Ressource des Archivs ablegen und mit einem Test sichern (keine Namen Dritter, Req 7.8; Abhängigkeit von 20.8).
   - Selbstaktionen (sperren, deaktivieren, löschen, Zugang zurücksetzen auf sich selbst) prüft
     `Vergaberegeln.pruefeSelbstzugriff` (403 `ESKALATION_VERBOTEN`, Req 4.6); HTTP-Nachweis je Rolle und Zeile A20 bis A23
     mit `VERWEIGERT` über `Berechtigung` kommt mit 19.7 bis 19.9 (Req 4.2).
@@ -189,11 +191,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 8.4, 8.5, 8.6_
   - _Abhängig von: 19.12, 20.6_
 
-- [ ] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
+- [x] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
   - Deutsche Texte der Einladung (Einmal-Link, Gültigkeit, Hinweis, was zu tun ist) und der Mitteilung an die alte Adresse, Theme
     `urinet-archiv` (Logo-Textmarke, Farben wie `vhf-gsk`-Muster aus Spec 03, 2.3); keine Namen Dritter in Betreffzeilen.
   - _Anforderungen: 7.4, 7.8, 8.6_
   - _Abhängig von: 19.2_
+  - Einladung und Theme mit importiertem Realm, Wegwerf-Keycloak und Mailpit geprüft. Die Mitteilung an die bisherige
+    Adresse ist als Text in der Keycloak-Betriebsdokumentation vorbereitet; der Versand durch das Archiv folgt mit 19.8.
+    Umstellung eines bestehenden Realms und Prüfung mit echtem Postfach bleiben Betriebsnachweise.
 
 ## Welle 21 — Admin-Kommando, Migration, Tests und Abnahme
 - [ ] 21.1 Admin-Kommando [Backend]
