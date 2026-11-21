@@ -1,5 +1,6 @@
 package ch.urinet.archiv.mandant;
 
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -117,6 +118,9 @@ class WissensquelleBestandTest {
     private JsonNode normalisieren(String inhalt) throws SQLException {
         try {
             ObjectNode konfiguration = (ObjectNode) json.readTree(inhalt);
+            Konfiguration.Einstellungen einstellungen = json.treeToValue(konfiguration.path("einstellungen"),
+                    Konfiguration.Einstellungen.class);
+            konfiguration.set("einstellungen", json.valueToTree(einstellungen));
             if (konfiguration.path("klassifikationen").isMissingNode()) {
                 konfiguration.putArray("klassifikationen");
             }
