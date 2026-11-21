@@ -243,7 +243,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         if (aenderung.nachname() != null) {
             benutzer.put("lastName", aenderung.nachname());
         }
-        request("PUT", user(id), null, benutzer, false, Set.of(204));
+        nur204(request("PUT", user(id), null, benutzer, false, Set.of(204)));
     }
 
     @Override
@@ -281,7 +281,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     public void aktivieren(String mandant, String id, boolean aktiv) {
         ObjectNode benutzer = (ObjectNode) benutzerAbrufen(mandant, id);
         benutzer.put("enabled", aktiv);
-        request("PUT", user(id), null, benutzer, false, Set.of(204));
+        nur204(request("PUT", user(id), null, benutzer, false, Set.of(204)));
     }
 
     @Override
@@ -318,7 +318,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public void sitzungenBeenden(String mandant, String id) {
         benutzerAbrufen(mandant, id);
-        request("POST", user(id) + "/logout", null, null, false, Set.of(204));
+        nur204(request("POST", user(id) + "/logout", null, null, false, Set.of(204)));
     }
 
     @Override
@@ -330,8 +330,8 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         }
         for (JsonNode credential : credentials) {
             if ("otp".equals(credential.path("type").asText())) {
-                request("DELETE", user(id) + "/credentials/" + segment(credential.path("id").asText()),
-                        null, null, false, Set.of(204));
+                nur204(request("DELETE", user(id) + "/credentials/" + segment(credential.path("id").asText()),
+                        null, null, false, Set.of(204)));
             }
         }
     }
@@ -339,14 +339,17 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public void sperreAufheben(String mandant, String id) {
         benutzerAbrufen(mandant, id);
-        request("DELETE", admin("/attack-detection/brute-force/users/" + segment(id)),
-                null, null, false, Set.of(204));
+        nur204(request("DELETE", admin("/attack-detection/brute-force/users/" + segment(id)),
+                null, null, false, Set.of(204)));
     }
 
     @Override
     public void googleLoesen(String mandant, String id) {
         benutzerAbrufen(mandant, id);
-        request("DELETE", user(id) + "/federated-identity/google", null, null, false, Set.of(204, 404));
+        Antwort antwort = request("DELETE", user(id) + "/federated-identity/google", null, null, false, Set.of(204, 404));
+        if (antwort.status() != 404) {
+            nur204(antwort);
+        }
     }
 
     @Override

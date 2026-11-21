@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer.adapter.out.keycloak;
 
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.AnlageException;
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Aenderung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Neuanlage;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.ErforderlicheAktion;
@@ -851,6 +852,34 @@ class KeycloakAdminAdapterTest {
         assertThatThrownBy(() -> adapter.anlageRueckgaengig("urinet", "neu-1"))
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+    }
+
+    @Test
+    void angenommeneZugangsaenderungenSindKeinBestaetigterAbschluss() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(put(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(aResponse().withStatus(202)));
+        server.stubFor(post(urlPathEqualTo(USERS + "/benutzer-1/logout")).willReturn(aResponse().withStatus(202)));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/federated-identity/google"))
+                .willReturn(aResponse().withStatus(202)));
+        server.stubFor(delete(urlPathEqualTo("/admin/realms/urinet-archiv/attack-detection/brute-force/users/benutzer-1"))
+                .willReturn(aResponse().withStatus(202)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials"))
+                .willReturn(okJson("[{\"id\":\"otp-1\",\"type\":\"otp\"}]")));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/credentials/otp-1"))
+                .willReturn(aResponse().withStatus(202)));
+        KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+
+        for (Runnable aktion : List.<Runnable>of(
+                () -> adapter.aktualisieren("urinet", "benutzer-1", new Aenderung(null, "Neu", null)),
+                () -> adapter.aktivieren("urinet", "benutzer-1", false),
+                () -> adapter.sitzungenBeenden("urinet", "benutzer-1"),
+                () -> adapter.googleLoesen("urinet", "benutzer-1"),
+                () -> adapter.sperreAufheben("urinet", "benutzer-1"),
+                () -> adapter.otpEntfernen("urinet", "benutzer-1"))) {
+            assertThatThrownBy(aktion::run).isInstanceOfSatisfying(FachFehler.class,
+                    fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+        }
     }
 
     @Test
