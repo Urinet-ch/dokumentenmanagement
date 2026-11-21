@@ -20,7 +20,7 @@
         <span>{{ anzeige(option) }}</span>
       </label>
     }
-    <p class="hinweis" [id]="kennung() + '-hinweis'">{{ hinweis() }}</p>
+    <p class="nebentext" [id]="kennung() + '-hinweis'">{{ hinweis() }}</p>
   </fieldset>
 } @else {
   <div class="gruppe" role="group" [attr.aria-labelledby]="kennung() + '-label'" data-test="listenfeld">
@@ -42,7 +42,7 @@
         }
       </ul>
     } @else {
-      <p class="hinweis">{{ texte.leer }}</p>
+      <p class="nebentext">{{ texte.leer }}</p>
     }
     <div class="neu">
       <input
@@ -58,7 +58,7 @@
       />
       <button mat-stroked-button type="button" (click)="hinzufuegen(neu)">{{ texte.hinzufuegen }}</button>
     </div>
-    <p class="hinweis" [id]="kennung() + '-hinweis'">{{ hinweis() }}</p>
+    <p class="nebentext" [id]="kennung() + '-hinweis'">{{ hinweis() }}</p>
     @if (doppelt()) {
       <p class="fehler" role="alert">{{ texte.schonVorhanden }}</p>
     }

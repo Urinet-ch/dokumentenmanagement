@@ -16,7 +16,7 @@
       <a mat-stroked-button routerLink="/kontakte">{{ texte.titel }}</a>
     </section>
   } @else {
-    <div role="alert" class="fehler" data-test="fehler">
+    <div role="alert" class="hinweis gefahr" data-test="fehler">
       <p>{{ f.text }}</p>
       @if (f.art === 'verbindung' || f.art === 'sonst') {
         <button mat-stroked-button type="button" data-test="erneut" (click)="laden(true)">
@@ -34,15 +34,15 @@
       <h1 tabindex="-1" #ueberschrift data-test="kontakt-name">{{ name() }}</h1>
       <ul class="marken" data-test="kennzeichen">
         @if (k.aktiv === false) {
-          <li data-art="inaktiv">
+          <li class="pille" data-art="inaktiv">
             {{ texte.inaktivSeit(k.inaktivSeit ? zeitpunkt(k.inaktivSeit) : '') }}
           </li>
         }
-        <li data-art="herkunft">
+        <li class="pille" data-art="herkunft">
           {{ k.quelle === 'CSV_IMPORT' ? texte.herkunftImport : texte.herkunftManuell }}
         </li>
         @if (k.nichtImExport) {
-          <li data-art="export">{{ texte.nichtImExport }}</li>
+          <li class="pille warnung" data-art="export">{{ texte.nichtImExport }}</li>
         }
       </ul>
     </div>
@@ -75,7 +75,7 @@
           <button
             mat-button
             type="button"
-            class="gefahr"
+            class="knopf-gefahr"
             data-test="inaktiv"
             (click)="dialogOeffnen('inaktiv')"
           >
@@ -111,7 +111,7 @@
     }
   </div>
   @if (aktionFehler(); as text) {
-    <p class="fehler" role="alert" data-test="aktion-fehler">{{ text }}</p>
+    <p class="hinweis gefahr" role="alert" data-test="aktion-fehler">{{ text }}</p>
   }
 
   @if (k.aktiv === false) {

@@ -26,8 +26,7 @@ button {
 }
 
 .gedaempft,
-.fehlercode,
-.hinweis {
+.fehlercode {
   color: var(--text-gedaempft);
 }
 
@@ -170,18 +169,4 @@ button {
 // Leer ohne Fläche und ohne Abstand im Raster, bleibt aber im Baum (Live-Region)
 .status:empty {
   position: absolute;
-}
-
-.gesamtfehler {
-  display: flex;
-  gap: 0.625rem;
-  align-items: flex-start;
-  padding: 0.625rem 0.875rem;
-  border-radius: var(--radius-klein);
-  background: var(--gefahr-weich);
-  color: var(--text);
-
-  app-symbol {
-    color: var(--gefahr);
-  }
 }

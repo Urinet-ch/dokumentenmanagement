@@ -111,7 +111,7 @@
       >
         {{ texte.alsEinDokument }}
       </mat-checkbox>
-      <p id="zusammenfassen-hinweis" class="hinweis">{{ texte.alsEinDokumentHinweis }}</p>
+      <p id="zusammenfassen-hinweis" class="gedaempft">{{ texte.alsEinDokumentHinweis }}</p>
       <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || dateien().length === 0">
         {{ gesamtFehler() ? texte.erneutHochladen : texte.hochladen }}
       </button>
@@ -129,6 +129,6 @@
     }
   </p>
   @if (gesamtFehler()) {
-    <p class="gesamtfehler" role="alert"><app-symbol name="warnung" />{{ gesamtFehler() }}</p>
+    <p class="hinweis gefahr" role="alert"><app-symbol name="warnung" /><span>{{ gesamtFehler() }}</span></p>
   }
 </section>

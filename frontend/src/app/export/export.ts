@@ -17,6 +17,7 @@ import {
   ABFRAGE_MS,
   JAHR_MAX,
   JAHR_MIN,
+  STATUS_TON,
   fehlerArtText,
   fehlerText,
   inArbeit,
@@ -44,6 +45,7 @@ export class Export implements OnInit {
   protected readonly texte = TEXTE.export;
   protected readonly zahl = zahl;
   protected readonly zeit = zeit;
+  protected readonly ton = STATUS_TON;
   protected readonly fehlerArtText = fehlerArtText;
   protected readonly groesse = groesse;
   protected readonly min = JAHR_MIN;

@@ -8,7 +8,7 @@ import { Subscription } from 'rxjs';
 import { ImportLauf, ImporteService } from '../gemeinsam/api';
 import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
-import { ImportArt, MAX_GROESSE, fehlerText, groesse, zahl, zeit } from './import-logik';
+import { ImportArt, MAX_GROESSE, STATUS_TON, fehlerText, groesse, zahl, zeit } from './import-logik';
 
 const SEITE = 20;
 
@@ -28,6 +28,7 @@ export class Importe implements OnInit {
   protected readonly texte = TEXTE.importe;
   protected readonly zahl = zahl;
   protected readonly zeit = zeit;
+  protected readonly ton = STATUS_TON;
 
   protected readonly art = signal<ImportArt>('kontakt');
   protected readonly vollexport = signal(false);

@@ -33,6 +33,7 @@ import {
   kontaktText,
   pflichtErfuellt,
   profilGilt,
+  ERGEBNIS_TON,
   voruebergehend,
   zahl,
   zeit,
@@ -85,6 +86,7 @@ export class ImportLaufSeite {
   protected readonly texte = TEXTE.importe;
   protected readonly zahl = zahl;
   protected readonly zeit = zeit;
+  protected readonly ton = ERGEBNIS_TON;
 
   protected readonly antwort = signal<ImportLaufMitZeilen | null>(null);
   protected readonly fehler = signal<string | null>(null);
