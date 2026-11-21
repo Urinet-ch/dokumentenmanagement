@@ -4,6 +4,7 @@ import ch.urinet.archiv.ki.domain.chat.ChatAusgabe;
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
 import ch.urinet.archiv.ki.domain.chat.Quelle;
 import ch.urinet.archiv.ki.domain.chat.WerkzeugAufruf;
+import ch.urinet.archiv.ki.application.chat.ChatAnalyseDaten;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,9 +22,9 @@ import java.util.UUID;
  * <ul>
  *   <li>Quelle Dokument {@code {"id", "titel", "link": "/dokument/<id>"}}, Quelle Datenstand
  *       {@code {"werkzeug", "datenstand": "<ISO-8601 UTC>", "belege": n}}</li>
- *   <li>Werkzeugaufruf {@code {"name", "parameter": {…}, "dokumentIds": […], "datenstand"?: {"zeitpunkt", "belege"}}}</li>
+ *   <li>Werkzeugaufruf {@code {"name", "parameter": {…}, "dokumentIds": […], "kontextstufe"?, "datenstand"?}}</li>
  *   <li>SSE: {@code werkzeug {"name"}}, {@code text {"delta"}}, {@code quellen […]},
- *       {@code fertig {"gespraechId", "tokens": {"ein", "aus"}}}, {@code fehler {"meldung", "gespraechId"}}</li>
+ *       {@code fertig {"gespraechId", "nachrichtId", "tokens": {"ein", "aus"}}}, {@code fehler {"meldung", "gespraechId"}}</li>
  * </ul>
  */
 public final class ChatJson {
@@ -42,6 +43,7 @@ public final class ChatJson {
             case ChatAusgabe.Fertig f -> {
                 Map<String, Object> werte = new LinkedHashMap<>();
                 werte.put("gespraechId", f.gespraechId().toString());
+                werte.put("nachrichtId", Long.toString(f.nachrichtId()));
                 Map<String, Object> tokens = new LinkedHashMap<>();
                 tokens.put("ein", f.tokens().tokensEin());
                 tokens.put("aus", f.tokens().tokensAus());
@@ -136,6 +138,7 @@ public final class ChatJson {
             wert.put("name", aufruf.name());
             wert.put("parameter", aufruf.parameter());
             wert.put("dokumentIds", aufruf.dokumentIds().stream().map(UUID::toString).toList());
+            aufruf.kontextstufe().ifPresent(s -> wert.put("kontextstufe", s.name()));
             aufruf.datenstand().ifPresent(s -> {
                 Map<String, Object> stand = new LinkedHashMap<>();
                 stand.put("zeitpunkt", s.zeitpunkt().toString());
@@ -145,6 +148,26 @@ public final class ChatJson {
             werte.add(wert);
         }
         return text(werte);
+    }
+
+    public static List<ChatAnalyseDaten.Werkzeug> analyseWerkzeugeLesen(String json) {
+        if (json == null) {
+            throw new IllegalStateException("Chat-Werkzeugdaten nicht lesbar");
+        }
+        JsonNode wurzel = baum(json);
+        if (wurzel == null || !wurzel.isArray()) {
+            throw new IllegalStateException("Chat-Werkzeugdaten nicht lesbar");
+        }
+        List<ChatAnalyseDaten.Werkzeug> aufrufe = new ArrayList<>();
+        for (JsonNode wert : wurzel) {
+            if (!wert.path("name").isTextual()) {
+                throw new IllegalStateException("Chat-Werkzeugname nicht lesbar");
+            }
+            JsonNode stufe = wert.get("kontextstufe");
+            aufrufe.add(new ChatAnalyseDaten.Werkzeug(wert.path("name").asText(),
+                    stufe != null && stufe.isTextual() ? stufe.asText() : null));
+        }
+        return List.copyOf(aufrufe);
     }
 
     private static JsonNode baum(String json) {

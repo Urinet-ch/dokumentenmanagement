@@ -32,6 +32,7 @@ class ChatDurchgangTest {
         assertThat(weiter).containsExactly(new ChatEreignis.WerkzeugStart("dokument_zeigen"),
                 new ChatEreignis.Text("Hallo "), new ChatEreignis.Text("Welt"));
         assertThat(a.status()).isEqualTo(ChatStatus.OK);
+        assertThat(a.kontextVollstaendig()).isTrue();
         assertThat(a.inhalt()).isEqualTo("Hallo Welt");
         assertThat(a.tokens()).contains(new ChatEreignis.Ende(10, 2));
         assertThat(a.werkzeuge()).singleElement().satisfies(w -> {
@@ -41,6 +42,14 @@ class ChatDurchgangTest {
         });
         assertThat(a.quellen()).containsExactly(new Quelle.Dokument(DOK, "Rechnung"));
         assertThat(d.ausfallgrund()).isEmpty();
+    }
+
+    @Test
+    void fehlendesWerkzeugergebnisMachtDenKontextnachweisUnvollstaendig() {
+        ChatDurchgang d = new ChatDurchgang();
+        d.aufnehmen(new ChatEreignis.WerkzeugStart("dokument_zeigen"), e -> { });
+        d.aufnehmen(new ChatEreignis.Ende(1, 1), e -> { });
+        assertThat(d.antwort(false).kontextVollstaendig()).isFalse();
     }
 
     @Test

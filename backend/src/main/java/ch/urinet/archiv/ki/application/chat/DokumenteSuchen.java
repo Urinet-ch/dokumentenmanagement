@@ -68,15 +68,17 @@ public class DokumenteSuchen {
      * (Spec 03, Req 5.7).
      */
     public record Treffer(String id, String titel, String art, String datum, String partner, String betrag,
-                          String auszug, boolean bestaetigt, String link, String seiten, Integer nummer) {
+                          String auszug, boolean bestaetigt, String link, String seiten, Integer nummer,
+                          String vertraulichkeit) {
 
         public Treffer(String id, String titel, String art, String datum, String partner, String betrag,
                        String auszug, boolean bestaetigt, String link, String seiten) {
-            this(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, null);
+            this(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, null, null);
         }
 
         public Treffer mitNummer(int nummer) {
-            return new Treffer(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, nummer);
+            return new Treffer(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, nummer,
+                    vertraulichkeit);
         }
     }
 
@@ -270,7 +272,8 @@ public class DokumenteSuchen {
         String auszug = t.auszug().stream().map(AuszugTeil::text).collect(Collectors.joining());
         return new Treffer(t.id().toString(), t.titel(), t.art(), Werteformat.datum(t.datum()), t.partnerName(),
                 Werteformat.betrag(t.betrag(), t.waehrung()), auszug.isEmpty() ? null : auszug, bestaetigt,
-                link(t.id()), fundstelle == null ? null : fundstelle.seitenText(dokumentSeiten));
+                link(t.id()), fundstelle == null ? null : fundstelle.seitenText(dokumentSeiten), null,
+                t.vertraulichkeit());
     }
 
     static String link(UUID id) {

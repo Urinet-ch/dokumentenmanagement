@@ -138,6 +138,136 @@ Given(
   },
 );
 
+Given('eine synthetische Wissensseite ist freigegeben', async function () {
+  const kennung = randomUUID();
+  const pfad = `konzepte/chat-${kennung}`;
+  const titel = `Wissensprobe ${kennung}`;
+  const headers = {
+    authorization: `Bearer ${await echtesToken('inhaber', 'urinet')}`,
+    'content-type': 'application/json',
+  };
+  const entwurf = await fetch(`${backend().api}/api/v1/wissensentwuerfe`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      pfad,
+      typ: 'Konzept',
+      titel,
+      beschreibung: 'Synthetische Wissensprobe.',
+      tags: [],
+      quellen: [],
+      inhalt: '',
+    }),
+  });
+  assert.equal(entwurf.status, 201, 'manueller Wissensentwurf');
+  const { id } = await entwurf.json();
+  const annahme = await fetch(
+    `${backend().api}/api/v1/wissensentwuerfe/${id}/aenderungen/1/annehmen`,
+    {
+      method: 'POST',
+      headers: { ...headers, 'if-match': '"0"' },
+      body: '{}',
+    },
+  );
+  assert.equal(annahme.status, 204, 'Freigabe der Wissensprobe');
+  const antwort = await fetch(
+    `${backend().api}/api/v1/wissensseiten?pfad=${encodeURIComponent(pfad)}`,
+    { headers },
+  );
+  assert.equal(antwort.status, 200, 'freigegebene Wissensprobe');
+  this.wissensprobe = { pfad, titel, id: (await antwort.json()).id };
+});
+
+async function wissensmodell(welt, id) {
+  const { wissensprobe } = welt;
+  assert.ok(wissensprobe);
+  await admin('POST', '/scenarios/reset');
+  welt.modellAbbildungen = [];
+  welt.modellText = 'Die synthetische Wissensprobe ist verfügbar.';
+  const aufrufe = [
+    { name: 'wissen_seite_zeigen', argumente: JSON.stringify({ pfad: wissensprobe.pfad }) },
+  ];
+  if (id) aufrufe.push({ name: 'dokument_zeigen', argumente: JSON.stringify({ id }) });
+  for (const [antwort, vorher, nachher] of [
+    [{ aufrufe }, 'Started', 'nach-werkzeug'],
+    [{ text: welt.modellText }, 'nach-werkzeug', undefined],
+  ]) {
+    const angelegt = await admin('POST', '/mappings', abbildung(antwort, vorher, nachher));
+    welt.modellAbbildungen.push(angelegt.id);
+  }
+}
+
+Given(
+  /^das simulierte Sprachmodell nutzt die Wissensseite und das Dokument «(.+)»$/,
+  async function (name) {
+    const id = echteDokumente(this).get(name);
+    assert.ok(id, `kein Dokument «${name}» angelegt`);
+    await wissensmodell(this, id);
+  },
+);
+
+Given('das simulierte Sprachmodell nutzt nur die Wissensseite', async function () {
+  assert.ok(this.wissensprobe);
+  await wissensmodell(this);
+});
+
+Then('zeigt der echte Chat unterscheidbare Quellen', async function () {
+  const antwort = this.seite.locator('[data-test=antwort]').last();
+  await antwort
+    .getByRole('link', { name: `Wissensseite: ${this.wissensprobe.titel}` })
+    .waitFor({ timeout: 8_000 });
+  await antwort
+    .getByRole('link', { name: 'Rechnung Testverein Chatdorf' })
+    .waitFor({ timeout: 8_000 });
+});
+
+When('ich die echte Antwort als Analyse vorschlage', async function () {
+  await this.seite
+    .locator('[data-test=antwort]')
+    .last()
+    .getByRole('button', { name: 'Als Analyse vorschlagen', exact: true })
+    .click({ timeout: 8_000 });
+});
+
+Then('zeigt der echte Chat den Status des Analysevorschlags', async function () {
+  await this.seite
+    .locator('[data-test=antwort]')
+    .last()
+    .getByRole('link', { name: 'Analyse vorgeschlagen. Status anzeigen' })
+    .waitFor({ timeout: 8_000 });
+});
+
+When('ich die echte Wissensquelle im Chat öffne', async function () {
+  this.wissensabrufAb = Date.now();
+  await this.seite
+    .locator('[data-test=antwort]')
+    .last()
+    .getByRole('link', { name: `Wissensseite: ${this.wissensprobe.titel}` })
+    .click();
+});
+
+Then('ist die echte Wissensseite geöffnet und ihr Abruf protokolliert', async function () {
+  await this.seite.getByRole('heading', { name: this.wissensprobe.titel }).waitFor();
+  const headers = { authorization: `Bearer ${await echtesToken('inhaber', 'urinet')}` };
+  for (const ende = Date.now() + 15_000; Date.now() < ende;) {
+    const antwort = await fetch(
+      `${backend().api}/api/v1/protokoll?aktion=WISSEN_ANZEIGEN&groesse=100`,
+      { headers },
+    );
+    assert.equal(antwort.status, 200, 'Zugriffsprotokoll');
+    const eintraege = (await antwort.json()).eintraege;
+    if (
+      eintraege.some(
+        (e) =>
+          e.dokumentId === this.wissensprobe.id && Date.parse(e.zeit) >= this.wissensabrufAb - 1000,
+      )
+    )
+      return;
+    await new Promise((weiter) => setTimeout(weiter, 300));
+  }
+  assert.fail('WISSEN_ANZEIGEN für den Seitenabruf fehlt');
+});
+
 Given('verschiedene Benutzer haben eigene echte Chat-Gespräche', async function () {
   await admin('POST', '/scenarios/reset');
   this.modellAbbildungen = [];

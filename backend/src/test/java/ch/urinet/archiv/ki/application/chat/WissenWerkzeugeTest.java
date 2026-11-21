@@ -64,6 +64,7 @@ class WissenWerkzeugeTest {
     @Test
     void kuerztUnicodeOhneQuellenZuVerlierenUndProtokolliert() {
         var antwort = werkzeuge.zeigen(KONTEXT, "konzepte/test");
+        assertThat(antwort.vertraulichkeit()).isEqualTo(Wissensseite.Vertraulichkeit.NORMAL);
         assertThat(antwort.inhalt()).isEqualTo("😀aa");
         assertThat(antwort.hinweise()).containsExactly("VERALTET", "ABGELAUFEN", "WIDERSPRUCH",
                 "QUELLE_PRUEFEN", "GEKUERZT");
@@ -87,7 +88,7 @@ class WissenWerkzeugeTest {
 
     private static WissenLesenRepository.IndexZeile zeile(int nr, Seitentyp typ) {
         return new WissenLesenRepository.IndexZeile(UUID.randomUUID(), typ, "konzepte/s" + nr, "S" + nr, "b",
-                "VERALTET", true);
+                "VERALTET", true, Wissensseite.Vertraulichkeit.INTERN);
     }
 
     private WissenWerkzeuge mitIndex(WissenLesen.IndexErgebnis index, WissensSuche suche, List<Object> aufrufe) {
@@ -114,6 +115,7 @@ class WissenWerkzeugeTest {
         assertThat(antwort.treffer()).hasSize(200);
         assertThat(antwort.hinweis()).contains("200").contains("eingrenzen");
         assertThat(antwort.treffer().get(0).hinweise()).containsExactly("VERALTET", "QUELLE_PRUEFEN");
+        assertThat(antwort.treffer().get(0).vertraulichkeit()).isEqualTo(Wissensseite.Vertraulichkeit.INTERN);
 
         var vollstaendig = mitIndex(new WissenLesen.IndexErgebnis(
                 List.of(new WissenLesen.IndexGruppe(Seitentyp.KONZEPT, zeilen)), 200, 0, 200), null, aufrufe);

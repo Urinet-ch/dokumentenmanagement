@@ -40,14 +40,17 @@ public interface ChatSpeicher {
     /** Speichert die Frage und setzt {@code geaendert}. */
     void frageSpeichern(UUID gespraech, String frage, Instant zeit);
 
-    /** Speichert die Antwort und setzt {@code geaendert}, in einer eigenen Transaktion. */
-    void antwortSpeichern(UUID gespraech, ChatAntwort antwort, Instant zeit);
+    /** Speichert die Antwort und liefert ihre ID, in einer eigenen Transaktion. */
+    long antwortSpeichern(UUID gespraech, ChatAntwort antwort, Instant zeit);
 
     /** Die neuesten {@code anzahl} Gespräche des Benutzers nach {@code geaendert}. */
     List<GespraechKopf> gespraeche(String benutzer, int anzahl);
 
     /** Das Gespräch mit Nachrichten, nur wenn es dem Benutzer gehört. */
     Optional<Gespraech> gespraech(UUID id, String benutzer);
+
+    /** Sperrt das eigene Gespräch und liest den Kontext bis zur Antwort in der laufenden Transaktion. */
+    Optional<ChatAnalyseDaten> analyseDaten(long nachrichtId, String benutzer);
 
     /** Löscht Nachrichten mit {@code zeit} vor {@code grenze}, danach Gespräche ohne Nachrichten (Requirement 5.4). */
     Aufgeraeumt aufraeumen(Instant grenze);

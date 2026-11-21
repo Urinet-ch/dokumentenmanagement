@@ -114,7 +114,7 @@ geheimnis_erzeugen() {
   openssl rand -hex 32 > "$temp/secrets/$1"
 }
 
-for geheimnis in postgres_password archiv_db_owner archiv_db_app keycloak_db keycloak_admin restore_oidc_client_secret; do
+for geheimnis in postgres_password archiv_db_owner archiv_db_app keycloak_db keycloak_admin keycloak_verwaltung_secret restore_oidc_client_secret; do
   geheimnis_erzeugen "$geheimnis"
 done
 jq -n --arg client "$oidc_client" --rawfile secret "$temp/secrets/restore_oidc_client_secret" '{

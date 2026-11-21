@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ki.adapter.out.langchain4j;
 
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
+import ch.urinet.archiv.ki.domain.chat.WerkzeugAufruf;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +35,41 @@ class WerkzeugErgebnisseTest {
         assertThat(e.dokumente()).extracting(ChatEreignis.QuellDokument::seite).containsExactly("7-8", null);
         assertThat(e.datenstand()).isEmpty();
         assertThat(e.toString()).doesNotContain("GEHEIMER TEXT");
+    }
+
+    @Test
+    void kontextstufeVerwendetAlleGeliefertenDokumenteUndSeiten() {
+        var suche = abbilden("dokumente_suchen", "{}", """
+                {"treffer":[{"id":"00000000-0000-0000-0000-000000000001","titel":"A","vertraulichkeit":"NORMAL"},
+                {"id":"00000000-0000-0000-0000-000000000002","titel":"B","vertraulichkeit":"INTERN"}]}
+                """);
+        assertThat(WerkzeugAufruf.aus(suche).kontextstufe()).contains(ChatEreignis.Kontextstufe.INTERN);
+        assertThat(abbilden("wissen_index", "{}", """
+                {"treffer":[{"vertraulichkeit":"NORMAL"},{"vertraulichkeit":"INTERN"}]}
+                """).kontextstufe()).contains(ChatEreignis.Kontextstufe.INTERN);
+        assertThat(abbilden("wissen_seite_zeigen", "{}", """
+                {"pfad":"konzepte/a","titel":"A","stand":"2026-11-14T10:00:00Z","quellen":[],"vertraulichkeit":"INTERN"}
+                """).kontextstufe()).contains(ChatEreignis.Kontextstufe.INTERN);
+        assertThat(abbilden("dokument_zeigen", "{}", """
+                {"id":"00000000-0000-0000-0000-000000000001","titel":"A","vertraulichkeit":"PERSONAL"}
+                """).kontextstufe()).contains(ChatEreignis.Kontextstufe.PERSONAL);
+    }
+
+    @Test
+    void fehlendeOderUnbekannteStufeIstKeinVollstaendigerKontextnachweis() {
+        assertThat(abbilden("dokumente_suchen", "{}", "{\"treffer\":[{\"id\":\"" + A + "\"}]}")
+                .kontextstufe()).isEmpty();
+        assertThat(abbilden("wissen_index", "{}", "{\"treffer\":[{\"vertraulichkeit\":\"UNBEKANNT\"}]}")
+                .kontextstufe()).isEmpty();
+        assertThat(abbilden("dokument_zeigen", "{}", "kein json").kontextstufe()).isEmpty();
+        assertThat(abbilden("dokument_zeigen", "{}", "{\"fehler\":\"nicht gefunden\"}").kontextstufe())
+                .contains(ChatEreignis.Kontextstufe.NORMAL);
+        assertThat(abbilden("dokument_zeigen", "{}", "{\"fehler\":\"x\",\"inhalt\":\"Text\"}").kontextstufe())
+                .isEmpty();
+        assertThat(abbilden("wissen_seite_zeigen", "{}", "{\"vertraulichkeit\":\"NORMAL\"}").kontextstufe())
+                .isEmpty();
+        assertThat(abbilden("wissen_index", "{}", "{\"treffer\":[]}").kontextstufe())
+                .contains(ChatEreignis.Kontextstufe.NORMAL);
     }
 
     @Test
@@ -78,6 +114,9 @@ class WerkzeugErgebnisseTest {
                     .containsExactly("Quelle 1", "Quelle 6", "Quelle 5", "Quelle 4", "Quelle 3");
             assertThat(w.dokumente()).allSatisfy(d -> assertThat(d.seite()).isEqualTo("2-3"));
         });
+        assertThat(WerkzeugAufruf.aus(e).dokumentIds()).containsExactly(
+                new UUID(0, 1), new UUID(0, 2), new UUID(0, 3),
+                new UUID(0, 4), new UUID(0, 5), new UUID(0, 6));
         assertThat(e.toString()).doesNotContain("GEHEIMER TEXT");
     }
 
