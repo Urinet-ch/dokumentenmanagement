@@ -85,6 +85,7 @@ Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was
 ## Tests und Qualität
 - Jedes Akzeptanzkriterium hat mindestens ein Cucumber-Szenario mit dem Tag `@req-<x.y>` (z. B. `@req-3.4` für Requirement 3, Kriterium 4). EARS-Kriterien werden direkt als Szenario geschrieben. Feature-Dateien unter `backend/src/test/resources/features/<fachbereich>/`, per Tag an Java-Runner (REST-assured) oder Cucumber.js + Playwright geroutet.
 - Jede Feature-Datei trägt auf Feature-Ebene genau einen Spec-Tag (`@spec-01` bis `@spec-06`). Die Abdeckungsprüfung (Req 16.14) vergleicht `@req`-Tags nur innerhalb derselben Spec; fehlt der Spec-Tag oder stehen mehrere, bricht sie ab.
+- Tag `@teilnachweis-<x.y>` kennzeichnet ein Szenario, das ein Kriterium nur teilweise belegt; er zählt in der Abdeckungsprüfung nicht als `@req`. Das Kriterium bleibt offen, bis ein `@req`-Szenario oder ein genannter JUnit-Test (z. B. `RealmExportTest`, `ExportKeycloak`) den Rest belegt; die Feature-Datei nennt in ihrer Beschreibung, was fehlt.
 - Domain-Logik zusätzlich mit JUnit-Unit-Tests (Jupiter 6, über die Quarkus-BOM), ohne Quarkus.
 - Mandantentrennung wird in jedem Repository-Test mit zwei Mandanten geprüft.
 - KI-Aufrufe in Unit- und Integrationstests mit WireMock.

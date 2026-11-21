@@ -567,8 +567,10 @@ offen.
 
 Redirect, Web-Origin und Logout-Redirect des PWA-Clients verwenden im Realm-Export `${ARCHIV_BASIS_URL}`. Keycloak
 liest den nicht geheimen Wert beim Import aus der Umgebung; Compose reicht ihn aus der externen Bundle-Konfiguration
-weiter. Der Start bricht bei fehlender oder ungültiger HTTPS-Basisadresse ab. Die Bereitstellung des Werts im
-Deploy-Bundle gehört zu 19.3 [Fabian] und muss vor dem Deploy erfolgen; ohne diese Verdrahtung startet Keycloak nicht.
+weiter. Der Start bricht bei fehlender oder ungültiger HTTPS-Basisadresse ab. `schreibe-env.sh` schreibt den Wert aus
+`HOST_ARCHIV` in die `.env` des Bundles (Nachbesserung Review PR #385); der Workflow bleibt unverändert. Das Client-Secret
+von `archiv-verwaltung` liest `start.sh` aus `keycloak_verwaltung_secret`; fehlt die Datei (bis 19.3), setzt der Start einen
+zufälligen Wert, damit der Platzhalter nie als Klartext-Secret im Realm steht.
 Ein bereits importierter Realm wird durch den Startimport nicht aktualisiert.
 
 ## Umsetzung 19.4 — Keycloak-Adapter

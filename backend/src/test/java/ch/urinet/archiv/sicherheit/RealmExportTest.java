@@ -86,6 +86,7 @@ class RealmExportTest {
         assertThat(export.path("adminEventsEnabled").asBoolean()).isTrue();
         assertThat(export.path("adminEventsDetailsEnabled").asBoolean()).isFalse();
         assertThat(export.path("eventsExpiration").asInt()).isEqualTo(400 * 24 * 60 * 60);
+        assertThat(export.path("attributes").path("adminEventsExpiration").asText()).isEqualTo("34560000");
         assertThat(export.path("accessTokenLifespan").asInt()).isEqualTo(300);
         assertThat(export.path("actionTokenGeneratedByAdminLifespan").asInt()).isEqualTo(86400);
         assertThat(export.path("passwordPolicy").asText()).isEqualTo("length(12) and notUsername and notEmail");

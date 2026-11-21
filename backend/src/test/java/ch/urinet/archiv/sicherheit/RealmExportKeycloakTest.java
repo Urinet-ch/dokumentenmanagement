@@ -169,6 +169,7 @@ class RealmExportKeycloakTest {
         assertThat(realm.get("adminEventsEnabled")).isEqualTo(true);
         assertThat(realm.get("adminEventsDetailsEnabled")).isEqualTo(false);
         assertThat(realm.get("eventsExpiration")).isEqualTo(34560000);
+        assertThat(((Map<String, Object>) realm.get("attributes")).get("adminEventsExpiration")).isEqualTo("34560000");
         assertThat(realm.get("accessTokenLifespan")).isEqualTo(300);
         assertThat(realm.get("actionTokenGeneratedByAdminLifespan")).isEqualTo(86400);
         assertThat(realm.get("passwordPolicy")).isEqualTo("length(12) and notUsername and notEmail");

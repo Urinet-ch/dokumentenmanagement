@@ -24,8 +24,9 @@ auf Server oder Secrets aus der Sitzung.
     `prompt=login` gegen den Cookie-Zweig von `browser-totp-pflicht`; `execute-actions-email` für einen Benutzer ohne Passwort
     mit den drei Aktionen; Suche `q=mandant:<m>`; Rollenmitglieder (`/roles/{rolle}/users`).
   - Stand: nachgewiesen sind Suche `q=mandant:<m>`, Rollenmitglieder, Issuer, Token-Rollen und der Dienstkonto-Aufruf (401 ohne
-    Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»). Offen: interne Adresse, Secret-Rotation,
-    `auth_time`, `prompt=login`, `execute-actions-email`; Entscheid FGAP gegen `manage-users` (design.md, Open Points).
+    Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»); `auth_time`, `prompt=login`,
+    `execute-actions-email`, interne Adresse und Secret-Rotation sind mit 19.2 nachgewiesen (design.md «Umsetzung 19.2»).
+    Offen: Betriebsverdrahtung des Backchannels und automatische Ablaufzeit der Rotation (19.3); Entscheid FGAP gegen `manage-users` (design.md, Open Points).
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
@@ -34,6 +35,10 @@ auf Server oder Secrets aus der Sitzung.
     Passwort-Richtlinie; Access-Token-Lebensdauer 300 s; Lebensdauer der Aktions-Links; Ereignisse und Admin-Ereignisse mit
     400 Tagen; `auth_time`-Mapper; Test-Realm mit Dienstkonto und SMTP an Mailpit; `RealmExportTest` und `ExportKeycloak`
     erweitert (nur diese Rollen, kein Secret, kein Realm-Admin, Benutzerprofil unverändert).
+  - Stand: Export, Test-Realm und Tests umgesetzt (PR #385); `adminEventsExpiration` gesetzt. `start.sh` liest
+    `keycloak_verwaltung_secret` und setzt ohne Datei einen Zufallswert; `ARCHIV_BASIS_URL` schreibt `schreibe-env.sh` aus
+    `HOST_ARCHIV`. Offen für 19.3: echtes Secret per Datei und kcadm, Pflichtprüfung im Workflow. Die Checkbox bleibt offen,
+    bis der PR gemergt ist.
   - _Anforderungen: 3.17, 4.9, 5.2, 5.3, 6.9, 7.4_
   - _Abhängig von: 19.1_
 

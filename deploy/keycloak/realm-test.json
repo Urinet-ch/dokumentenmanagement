@@ -18,6 +18,9 @@
   },
   "eventsEnabled": true,
   "eventsExpiration": 34560000,
+  "attributes": {
+    "adminEventsExpiration": "34560000"
+  },
   "eventsListeners": [],
   "enabledEventTypes": [
     "LOGIN_ERROR",
