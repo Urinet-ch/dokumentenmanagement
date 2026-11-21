@@ -257,6 +257,52 @@ Then('enthält das neue Access-Token eine neuere auth_time', function () {
   assert.ok(this.passkey.claims.acr || this.passkey.claims.amr);
 });
 
+Then('enthält das Access-Token keine WebAuthn- oder biometrischen Daten', function () {
+  const erlaubteClaims = new Set([
+    'exp',
+    'iat',
+    'nbf',
+    'auth_time',
+    'jti',
+    'iss',
+    'aud',
+    'sub',
+    'typ',
+    'azp',
+    'sid',
+    'session_state',
+    'acr',
+    'amr',
+    'nonce',
+    'allowed-origins',
+    'realm_access',
+    'resource_access',
+    'scope',
+    'email_verified',
+    'name',
+    'preferred_username',
+    'given_name',
+    'family_name',
+    'email',
+    'mandant',
+  ]);
+  assert.deepEqual(
+    Object.keys(this.passkey.claims).filter((claim) => !erlaubteClaims.has(claim)),
+    [],
+  );
+  const rollen = (wert) =>
+    wert &&
+    Object.keys(wert).length === 1 &&
+    Array.isArray(wert.roles) &&
+    wert.roles.every((rolle) => typeof rolle === 'string');
+  if (this.passkey.claims.realm_access) {
+    assert.ok(rollen(this.passkey.claims.realm_access));
+  }
+  if (this.passkey.claims.resource_access) {
+    assert.ok(Object.values(this.passkey.claims.resource_access).every(rollen));
+  }
+});
+
 Then(
   'liefert das Archiv die konfigurierte Keycloak-Origin unter dem WebAuthn-Pfad',
   async function () {
@@ -275,6 +321,29 @@ Then('kann er diesen Passkey in der Kontoverwaltung entfernen', async function (
 
 Then('er kann diesen Passkey in der Kontoverwaltung entfernen', async function () {
   await entfernen(this);
+});
+
+When('ein Keycloak-Admin diesen Passkey zurücksetzt', async function () {
+  const { adminUrl, id, header } = this.passkey;
+  const url = `${adminUrl}/users/${id}/credentials`;
+  const antwort = await fetch(url, { headers: header });
+  await pruefeAntwort(antwort, 200, 'Zugangsdaten lesen');
+  const credentials = await antwort.json();
+  const passkeys = credentials.filter((credential) => credential.type === 'webauthn-passwordless');
+  assert.equal(passkeys.length, 1);
+  const geloescht = await fetch(`${url}/${encodeURIComponent(passkeys[0].id)}`, {
+    method: 'DELETE',
+    headers: header,
+  });
+  await pruefeAntwort(geloescht, 204, 'Passkey zurücksetzen');
+  const erneut = await fetch(url, { headers: header });
+  await pruefeAntwort(erneut, 200, 'Zugangsdaten erneut lesen');
+  const verbleibend = await erneut.json();
+  assert.equal(
+    verbleibend.some((credential) => credential.type === 'webauthn-passwordless'),
+    false,
+  );
+  assert.ok(verbleibend.some((credential) => credential.type === 'otp'));
 });
 
 Then(
