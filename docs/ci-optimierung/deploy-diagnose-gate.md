@@ -7,10 +7,14 @@ prüft ihn dort vor der Anwendung des Workflow-Diffs.
 ## Vertrag
 
 Der bestehende appgebundene Forced Command `bin/deploy-app.sh` erhält den
-Unterbefehl `diagnose archiv`. Die vorhandene Prüfung der Schlüsselbindung und
-der Argumentzahl gilt unverändert; zusätzlich ist `diagnose` ausschliesslich
-für die gebundene App `archiv` zulässig. Keine weiteren Argumente, kein
-Shell-Ausdruck und keine vom Aufrufer gewählten Container oder Filter.
+Unterbefehl `diagnose archiv`. Die vorhandenen Prüfungen der Schlüsselbindung
+und der Argumentzahl bleiben wirksam; zusätzlich ist `diagnose`
+ausschliesslich für die gebundene App `archiv` zulässig. Keine weiteren
+Argumente, kein Shell-Ausdruck und keine vom Aufrufer gewählten Container oder
+Filter. Für diesen Unterbefehl müssen auch die Fehlermeldungen der gemeinsamen
+Argument- und Bindungsprüfung abgefangen oder angepasst werden: Das heutige
+Gate gibt dabei teilweise den gelieferten App-Namen aus. Alle anderen
+Unterbefehle behalten ihr bisheriges Verhalten.
 
 Bei Erfolg gibt der Befehl ausschliesslich diese Zeilen aus, in dieser
 Reihenfolge und mit tatsächlich ermittelten Werten:
