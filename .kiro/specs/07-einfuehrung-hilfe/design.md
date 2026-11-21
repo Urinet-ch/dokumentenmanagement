@@ -95,6 +95,31 @@ Alle Punkte sind vorgeschlagen am 21.11.2026 und gelten als entschieden mit dem 
   Schreibzugriff, erfasst aber weder «übersprungen» noch Benutzer aus der Übernahme.
 Empfehlung: Browser jetzt; (a) erst prüfen, wenn Spec 06 umgesetzt ist und Fabian das Wiedererscheinen als störend meldet.
 
+**Umsetzung (Aufgabe 23.1):**
+- Zwei Dateien unter `frontend/src/app/hilfe/`: `einfuehrung-vermerk-speicher.ts` (Format, Kennung, Lesen, Ablegen,
+  Datum; ohne Angular und ohne Importe, damit die Browser-Szenarien das Modul unverändert in Chromium laden können) und
+  `einfuehrung-vermerk.ts` (Dienst `EinfuehrungVermerk`, root, liest Benutzer und Mandant aus `AnmeldungService.benutzer`).
+- Schnittstelle für die Aufgaben 23.2 und 23.3: `bekannt: Signal<boolean | null>` – `false` heisst neuer Benutzer
+  (Einführung zeigen), `true` Vermerk besteht, `null` kein angemeldeter Benutzer mit Mandant, `sub` und Rolle oder die
+  Kennung ist noch nicht berechnet (`crypto.subtle.digest` ist asynchron; dann nichts zeigen, damit die Karte nicht
+  aufblitzt). `ablegen(art: 'ABGESCHLOSSEN' | 'UEBERSPRUNGEN'): Promise<void>` setzt `bekannt` sofort auf `true`, ersetzt
+  einen bestehenden Vermerk (Req 3.5) und tut ohne Benutzer mit Mandant und Rolle nichts. Ob `/?einfuehrung` die
+  Einführung trotz Vermerk zeigt, entscheidet die Startseite (23.3), nicht der Dienst.
+- Benutzerwechsel und Abmeldung: `bekannt` folgt dem Signal des angemeldeten Benutzers; nach der Abmeldung ist es `null`,
+  der Vermerk bleibt im Browser. Ein Ergebnis für einen inzwischen abgemeldeten oder gewechselten Benutzer wird verworfen.
+- Format: Ein Wert mit anderem `v` als 1, ohne Liste oder ohne gültiges JSON gilt als unlesbar (leer) und wird beim
+  nächsten Schreiben ersetzt; einzelne unlesbare Einträge (Kennung nicht 64 Zeichen hex, Version keine ganze Zahl ≥ 1,
+  unbekannte Art, Datum nicht `JJJJ-MM-TT`) fallen weg, zusätzliche Felder werden nicht übernommen. Jede Version ≥ 1 gilt
+  als Vermerk. «Ältester» ist der vorderste Eintrag der Liste (Reihenfolge des Schreibens, nicht `am`, das nur den Tag
+  kennt); ein ersetzter Vermerk rückt als neuester ans Ende. `am` ist das Kalenderdatum in Europe/Zurich.
+- Arbeitsspeicher: Der Dienst merkt sich jeden Vermerk dieser Sitzung unter `<mandant>:<sub>` (nur im Arbeitsspeicher,
+  nie gespeichert), nicht nur bei einem Fehler des Speichers. Ohne `crypto.subtle` liest und schreibt er den
+  `localStorage` nicht.
+- Nachweis: Vitest `einfuehrung-vermerk.spec.ts` (Hash, 20 Einträge, Ersetzen, Benutzerwechsel, Abmeldung, gesperrter,
+  voller und beschädigter Speicher, ohne `crypto.subtle`, keine Anfrage); Browser-Szenarien
+  `features/hilfe/einfuehrung-vermerk.feature` (Req 1.3–1.5) prüfen das Modul im echten Browser auf dem Ursprung der App.
+  Abschliessen und Überspringen über die Karte belegen die Szenarien zu Req 3.3 und 3.4 (Aufgabe 23.3).
+
 ## Schritte der Einführung (Requirement 2)
 Texte in `texte.de-CH.ts` (`einfuehrung.schritte`); `{name}` = Name aus dem Branding, `{rolle}` = Bezeichnung der Rolle
 aus `texte.kopf.rollen`. Jeder Schritt höchstens drei Sätze und ein Link «In der Anleitung lesen», der die Hilfe-Leiste
@@ -302,6 +327,49 @@ Neue Fehlercodes der API gibt es nicht.
 - **Antworten der KI auf Bedienfragen:** nicht Teil der Spec; später möglich als Wissensquelle der Anleitung, dann mit
   eigener Spec.
 - **Menüpunkt in der Seitenleiste:** siehe E3; abgelehnt.
+
+## Umsetzung (Aufgabe 22.1, 21.11.2026)
+Stand von PR #411; Schnittstellen für die Aufgaben 22.2 bis 22.7.
+- **Katalog** (`hilfe/hilfe-katalog.ts`): `HILFE_KATALOG` mit `erste-schritte` und `probleme` (beide allgemein,
+  `abgemeldet`), Typen `HilfeEintrag` und `Bedingung`, `bedingungErfuellt(bedingung, rolle)` (über `darf`, ohne
+  Bedingung immer erfüllt; den Filter nach Rolle, Eltern und abgemeldet baut 22.2) und `hilfeEintrag(anker)`. Titel
+  stehen in `TEXTE.hilfe.abschnitte` je Anker. `rechte.ts` exportiert dazu `AKTIONEN` (bekannte Aktionen für den Test).
+- **Pfade** (`hilfe/app-pfade.ts`): `istAppPfad(pfad, routes)` verlangt genau eine Route (Ziel eines Links),
+  `istAppPfadPraefix(pfad, routes)` eine Route oder ihren Anfang (`pfade` im Katalog, z. B. `/dokument`). `**` zählt nicht,
+  Parameter passen auf jedes Segment, Segmente nur aus Kleinbuchstaben, Ziffern und Bindestrich: `//host`, `/a?b`,
+  `/a#b` und `/a/` sind keine Pfade. Zur Laufzeit gilt `Router.config`, in den Tests `routes` aus `app.routes.ts`.
+- **Teilmenge** (`hilfe/anleitung-markdown.ts`): `anleitungMarkdown(quelle, { istAppPfad, praefix? })` ergibt
+  `{ teile, befunde }`. `Anleitungsteil` erweitert `Textteil` aus `wissen/wissen-text.ts` (nicht verschoben) um
+  `anker` (Ziel von `abschnitt`, id einer Überschrift), `variante` (`info`, `warnung`) und `platzhalter`. Abweichend
+  von der Tabelle oben werden `{name}` und `{rolle}` zu `platzhalter` statt `text`: Ersetzt wird erst beim Darstellen,
+  damit ein Name aus dem Branding nie als Markdown gelesen wird. `befunde` nennt je Konstrukt ausserhalb der Teilmenge
+  Zeile und Art (z. B. «Zeile 3: fremdes Ziel»); die Darstellung zeigt es trotzdem als Text, der Inhaltstest verlangt
+  eine leere Liste. Überschriften erhalten mit `praefix` die id `<anker>-<titel>` (Umlaute als ae, oe, ue; Zähler bei
+  Doppelten). Die Suche nach Schlusszeichen merkt sich ihr Ergebnis, die Arbeit bleibt linear (Test mit 32 KiB offener
+  Klammern). Über 32 KiB (UTF-8) wirft der Parser `AnleitungZuGross`.
+- **Lader** (`hilfe/anleitung-lader.ts`, root): `zustand(eintrag)` liefert ein Signal `laedt` | `fertig` | `fehler` und
+  lädt jede Datei einmal je Sitzung über `HttpClient` (der Anmelde-Interceptor hängt nur an `/api/` ein Token an);
+  `erneut(eintrag)` lädt nach einem Fehler neu. Fehler sind HTTP-Fehler, kein Netz ohne Cache, mehr als 32 KiB und eine
+  Antwort mit `Content-Type: text/html` (Rückfallseite der SPA statt der Datei).
+- **Darstellung** (`hilfe/anleitung-text.ts`, `app-anleitung-text`): Eingaben `eintrag`, `versatz` (Stufen, um die
+  Überschriften der Datei tiefer stehen; auf `/hilfe` z. B. 1 unter dem `h2` des Abschnitts, 2 im Unterabschnitt) und
+  `leiste` (Links auf Abschnitte navigieren nicht, `href` bleibt `/hilfe#<anker>`); Ausgaben `abschnitt` (Anker) und
+  `navigiert` (Link auf eine Seite der App gewählt, die Leiste schliesst). Den Titel setzt die Seite bzw. die Leiste.
+  Laden mit `mat-progress-bar`, Fehler als `.hinweis gefahr` mit `role="alert"` (`data-test="anleitung-fehler"`) und
+  dem Knopf «Erneut versuchen». Der Hinweis-Block nutzt das neue Symbol `info` (am Ende von `SYMBOLE`, vor `hilfe` aus
+  22.3). Zeigen Leiste und Seite denselben Abschnitt zugleich, entstehen doppelte ids der Überschriften; 22.3 sollte in
+  der Leiste ohne `praefix` laden oder die Leiste auf `/hilfe` schliessen.
+- **Inhaltsprüfung** (`anleitung-inhalt.spec.ts`): zusätzlich zur Tabelle der Teststrategie verbietet sie `http:`,
+  `https:`, `mailto:`, `javascript:`, `data:` und `www.` auch als blossen Text sowie `{rolle}` in Abschnitten mit
+  `abgemeldet` (ohne Anmeldung gibt es keine Rolle). Die Vitests lesen die Dateien ohne `@types/node` über
+  `process.getBuiltinModule('node:fs')`, Arbeitsverzeichnis `frontend/`.
+- **Nachweis:** 7.1 mit `features/hilfe/anleitung-pwa.feature` (Datei aus dem Prod-Build, nicht die Rückfallseite);
+  7.6 ist umgesetzt und per Vitest geprüft (`anleitung-text.spec.ts`), sein Browser-Szenario braucht eine Seite und
+  kommt mit 22.2 (tasks.md: 7.6 von 22.1 zu 22.2 verschoben).
+- **Texte:** `erste-schritte.md` (Anmelden mit Code der Authenticator-App, Seitenleiste und Menü, Rolle in der
+  Kopfzeile, Farbschema, Abmelden) und `probleme.md` (Sitzung abgelaufen, offline, Upload nicht hochgeladen, Seite nicht
+  gefunden, kein Mandant oder keine Rolle, neue Version) als erste Fassung nur mit dem, was auf `main` umgesetzt ist;
+  22.5 bzw. 22.7 vervollständigen sie (z. B. Knopf «Hilfe» und Verweise auf `#erfassen-offline`, sobald es sie gibt).
 
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,

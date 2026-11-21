@@ -1120,8 +1120,8 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   wieder her (Spec 01, Aufgabe 5.12). Seit PR #397 vergleicht der lokale Rundlauf
   (`SicherungPaketRoundtripTest`, Nachprüfung 21.11.2026) je Mandant zwei Wissensseiten und drei Versionen
   (nichtleerer Bestand) vor und nach dem Datenbank-Restore. Offen bleibt nur der Zählvergleich in der
-  wiederkehrenden betrieblichen Restore-Probe (4.7); deshalb bleibt 13.3 offen. Ein Szenario, das nach einem
-  Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis (Review PR #295, M1).
+  wiederkehrenden betrieblichen Restore-Probe (4.7); dieser Teil ist nachgelagert als Aufgabe 13.7 offen.
+  Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis (Review PR #295, M1).
 - Das Secret `keycloak_verwaltung_secret` steht seit PR #397 in der Secret-Liste von `restore-uebung-lokal.sh` und im
   Restore-Compose-Stack: `application.properties` (`%prod`, Spec 06, ADR-015) verlangt es, der Stack startet sonst
   nicht. Es hat mit dem Wissensvergleich nichts zu tun.

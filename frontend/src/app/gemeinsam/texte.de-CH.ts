@@ -1637,4 +1637,15 @@ export const TEXTE = {
     spalteGueltigkeit: 'Anlass und Gültigkeit',
     spalteAktionen: 'Aktionen',
   },
+  // Benutzeranleitung und Hilfe (Spec 07, Aufgabe 22.1); Titel der Abschnitte je Anker des Hilfe-Katalogs
+  hilfe: {
+    abschnitte: {
+      'erste-schritte': 'Erste Schritte',
+      probleme: 'Wenn etwas nicht klappt',
+    } as Record<string, string>,
+    laedt: 'Die Anleitung wird geladen …',
+    nichtVerfuegbar:
+      'Dieser Teil der Anleitung ist gerade nicht verfügbar. Bitte versuchen Sie es später erneut.',
+    erneut: 'Erneut versuchen',
+  },
 } as const;
