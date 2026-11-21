@@ -198,6 +198,45 @@ vollständigen Laufs gewertet. Nach dem Abbruch waren die drei anhand ihrer IDs
 geprüften Testcontainer entfernt. Ob die vielen Ryuk-Container den
 Speicherabbruch verursachten, ist nicht nachgewiesen.
 
+### Weitere Messungen
+
+Browserprozess-Wiederverwendung (#407): Die Browserjobs der beiden
+Ausgangsläufe dauerten 5 min 37 s und 5 min 53 s. Im grünen Lauf 44903211310
+dauerten Versuch 1 und 2 nach der Änderung 4 min 45 s und 5 min 22 s. Die
+Mittelwerte der je zwei Stichproben sind 5 min 45 s und 5 min 3,5 s; die
+Differenz beträgt 41,5 s. Cucumber benötigte vorher 186,5 s und 200,7 s,
+nachher 166,652 s und 172,126 s. In beiden Nachher-Versuchen waren alle
+154 Szenarien und 2806 Schritte grün. Die kleinen Stichproben belegen keine
+Langzeitstreuung.
+
+Kommando-Starttests (#409): In denselben beiden `main`-Läufen dauerten die
+beiden Klassen zusammen 99,31 s und 107,88 s. In den zwei Versuchen des Laufs
+44903693361 dauerte die gebündelte Klasse 101,4 s und 68,32 s; alle vier
+Testmethoden waren grün. Die Mittelwerte sind 103,60 s und 84,86 s, bei
+deutlicher Streuung. Gruppe 4 meldete vorher in beiden Läufen 12 und nachher
+in beiden Versuchen 11 Compose-Netzerstellungen. Beide vollständigen
+Nachher-Versuche waren grün.
+
+Ein lokaler Vergleich der vollständigen Startgruppe 4 erzeugte im Standardlauf
+12 Compose-Netze und mit einem eigens gewählten, zufälligen Projektnamen sowie
+`quarkus.compose.devservices.reuse-project-for-tests=true` eines. Beide Läufe
+hatten 38 grüne Tests; das eigene Netz war 20 Sekunden nach Ende des
+Wiederverwendungslaufs entfernt. Der Standardlauf zeigte 4 Netze vorher, 16
+unmittelbar nachher und 4 nach 20 Sekunden auf dem gemeinsam genutzten Host.
+Ein weiterer Wiederverwendungslauf der Gruppe 1 mit 779 Tests einschliesslich
+766 Cucumber-Szenarien war grün, erzeugte ein Compose-Netz und hatte es
+15 Sekunden nach Laufende entfernt. Das sind lokale Einzelmessungen, keine
+CI-Nachweise. Bei einer separaten kontrollierten Abbruchprobe mit aktiviertem
+Ryuk waren das eigene Netz und fünf vorher anhand ihrer IDs identifizierte
+Container nach sieben Sekunden entfernt; die Probe belegt nicht jede mögliche
+Abbruchart.
+
+**Nicht umgesetzt:** Ein eindeutiger Projektname vermeidet die Wiederverwendung
+fremder Projekte, aber MinIO und Mailpit behalten damit Daten zwischen
+verschiedenen Quarkus-Profilen. Die grünen Gruppen 1 und 4 belegen nicht die
+Isolation aller Tests. Die Option wird deshalb nicht generell aktiviert; ein
+isolierter Lebenszyklus für Testdaten bleibt zu klären.
+
 Die erfolgreichen Startmeldungen im Lauf 44899529866 ergeben je Gruppe
 6 / 8 / 7 / 12 Meldungen. Deren gemeldete Zeiten in Sekunden sind:
 
@@ -241,8 +280,8 @@ getaggte Klasse wird im Surefire-Lauf tatsächlich ausgeführt:
 Die Profile unterscheiden sich vielfach bewusst, etwa bei der Prüfung
 ungültiger Grenzwerte und Startkonfigurationen. Unterschiedliche Werte dürfen
 nicht zu einem einzigen Start zusammengefasst werden, weil dann nicht mehr
-nachgewiesen wäre, welcher Wert den Abbruch verursacht. Eine sichere
-Zusammenlegung mit gemessener Zeitersparnis ist noch nicht nachgewiesen.
+nachgewiesen wäre, welcher Wert den Abbruch verursacht. Die in #409 gebündelten
+Kommando-Starttests bilden eine Ausnahme; ihre Messwerte stehen oben.
 
 ## Zwanzig langsamste Klassen im Ausgangslauf
 
@@ -277,11 +316,43 @@ Die Szenario-Runner umfassen viele Szenarien, nicht nur einen Testfall.
 
 Läufe 44899529866 und 44898942261 führten je 154 Browser-Szenarien in
 186,5 bzw. 200,7 s aus; die Browser-Jobs insgesamt dauerten 5 min 37 s bzw.
-5 min 53 s. Die Anwendung wird dabei nicht je
-Szenario neu gestartet, wohl aber der Browser. Ein unbedachter paralleler
+5 min 53 s. In diesen Ausgangsläufen wurde die Anwendung nicht je
+Szenario neu gestartet, wohl aber der Browser; die spätere Wiederverwendung
+steht oben bei #407. Ein unbedachter paralleler
 Aufruf ist nicht isoliert: Der echte Test-Realm akzeptiert denselben TOTP je
 Benutzer nur einmal; der Token-Cache ist pro Prozess und die Datei mit den
 zuletzt verwendeten Schritten hat keine prozessübergreifende Sperre. Ausserdem
 teilen sich Szenarien Testdaten und Backend. Shards erfordern daher erst
 nachgewiesene Daten- und Anmeldeisolation; sie werden nicht als sichere
 Beschleunigung ausgegeben.
+
+## Stand der Massnahmen (21.11.2026)
+
+- **Quarkus-Starts: teilweise erledigt.** #409 bündelt zwei Kommando-Testklassen
+  ohne Verlust von Testmethoden. Die mittlere Klassenzeit der je zwei oben
+  genannten CI-Versuche sank von 103,60 s auf 84,86 s; die Streuung ist gross.
+  Weitere Startprofile sind nicht pauschal zusammengelegt.
+- **Docker-Netzwerke: teilweise erledigt.** #409 senkt die in Gruppe 4
+  protokollierten Compose-Netzerstellungen in beiden Nachher-Versuchen von
+  12 auf 11. Die lokale Wiederverwendung eines eindeutigen Projekts senkte sie
+  für Gruppe 4 von 12 auf 1; sie ist wegen der ungeklärten Datenisolation
+  zwischen Profilen nicht aktiviert. Ryuk entfernte die eigenen Ressourcen in
+  der oben beschriebenen Abbruchprobe; das belegt keine allgemeine Aufräumung.
+- **Browserprozess: erledigt.** #407 verwendet Browserprozesse wieder, behält
+  aber getrennte Kontexte. Die mittlere Jobdauer der je zwei oben genannten
+  CI-Versuche sank von 5 min 45 s auf 5 min 3,5 s.
+- **Browser-Shards: offen.** #408 schlägt zwei getrennte Runner und Backends
+  vor; ein paralleler CI-Lauf und eine Einsparung sind noch nicht nachgewiesen.
+  Jeder Shard und jeder Lauf muss ein eigenes Compose-Projekt verwenden; eine
+  gemeinsame Nutzung zwischen parallelen Runnern oder lokalen Läufen ist nicht
+  zulässig. Das löst nicht die offene Isolation zwischen Profilen innerhalb
+  eines wiederverwendeten Projekts.
+- **Teststabilität: in Arbeit.** #418 synchronisiert den Chat-Test auf den
+  Sendezustand; seine CI 44908290740 scheiterte in einem anderen Szenario.
+  #419 synchronisiert dort die Offline-Wiederholung. Zwei vollständige
+  CI-Versuche des Laufs 44916286340 auf demselben Stand waren grün, mit je
+  170 Szenarien und 3016 Schritten: Die Browserjobs dauerten 6 min 9 s und
+  5 min 36 s, Cucumber 212,492 s und 173,470 s. Ein lokaler Lauf hatte
+  170 grüne Szenarien in 2 min 44,6 s. Das sind Stabilitätsnachweise, kein
+  Nachweis einer Zeitersparnis; der Testumfang ist gegenüber den Ausgangsläufen
+  gewachsen. Beide Korrekturen sind noch nicht gemergt.

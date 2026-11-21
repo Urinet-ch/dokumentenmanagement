@@ -222,6 +222,7 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
             case MANIFEST -> "UriNet Archiv: Manifest " + befund.gegenstand() + " für " + mandant.wert() + " "
                     + befund.status();
             case SICHERUNG -> "UriNet Archiv: Sicherung " + befund.gegenstand() + " " + befund.status();
+            case VERWALTUNG -> "UriNet Archiv: Verwaltungsvorgang " + befund.gegenstand() + " ungeklärt";
         };
     }
 
@@ -236,6 +237,8 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
                     + "suchen und den Auftrag MANIFEST prüfen. Der nächste tägliche Lauf holt fehlende Tage nach.";
             case SICHERUNG -> "Die Sicherung " + befund.gegenstand() + " hat den Befund " + befund.status()
                     + ".\n\nDen Sicherungs-Export auf dem Server und den Sicherungs-Workflow prüfen.";
+            case VERWALTUNG -> "Der Verwaltungsvorgang " + befund.gegenstand() + " ist ungeklärt. Weitere "
+                    + "Verwaltungsvorgänge sind gesperrt.\n\nDen Betreiber zur Klärung benachrichtigen.";
         };
         return "Mandant: " + mandant.wert() + "\n" + was + "\n\nZu diesem Befund kommt keine weitere Mail, bis er "
                 + "behoben ist.\n";

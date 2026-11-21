@@ -66,6 +66,18 @@ Funktionalität: Lint der Wissensbasis starten
     Und die Originale, Arbeitsfassung, PDF-A, Volltext und Metadaten bleiben unverändert
     Und Bericht und Protokolle enthalten keine Seiten- oder Dokumentinhalte
 
+  @req-11.6
+  Szenario: Eine Anweisung im Seiteninhalt kann den Lint nicht freigeben
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und zwei verknüpfbare Lint-Seiten mit Stufen NORMAL und INTERN und eine PERSONAL-Hülle bestehen
+    Und eine Lint-Seite enthält eine synthetische Anweisung zur Freigabe und Rechteänderung
+    Und WireMock erkennt den Lint-Widerspruch und liefert Seitenänderungen
+    Wenn der Inhaber den Lint für das Seitenpaar startet
+    Dann der Lint verarbeitet die Teilaufträge mit höchstens einem KI-Aufruf je Auftrag
+    Und nur die interne Seite erhält einen Lint-Entwurf und PERSONAL erreicht die KI nicht
+    Und die Anweisung bleibt Seitentext und gibt den Lint nicht frei
+
   @req-10.2
   Szenario: Der Lint zählt die Befundarten ohne KI (Links, veraltet ab, Quelle prüfen, Querverweise, Quellseiten, Formfehler)
     Angenommen Lint-Seiten mit fehlendem Link, abgelaufenem «veraltet ab», «Quelle prüfen», fehlendem Querverweis, einer Quellseite ohne berührte Seiten und einer Aussage ohne Beleg bestehen

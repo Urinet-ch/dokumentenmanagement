@@ -1091,6 +1091,7 @@ Drive-Import (Req 12):
 | `REGEL_AENDERN` | `PATCH /dokumentarten/{code}`, wenn sich Jahre oder «ab» (Req 9.10, entschieden von Fabian am 10.11.2026) oder `gesetzliche_pflicht` (entschieden von Fabian am 11.11.2026) ändern, auch beim Senken einer pflichtigen Art; ohne Dokument-ID, mit Code der Art und alter und neuer Regel |
 | `KONFIGURATION_AENDERN` | jede Änderung der Konfiguration eines Mandanten (Spec 05 ergänzt, Spec 05, Req 1.3; design.md «Data Models»), mit `{version, aenderungen: [{pfad, alt, neu}]}`, bei den Kennungen `uid` und `ibans` nur `{pfad, aenderung: "geändert"}` ohne Werte (Spec 05, Req 1.3, geändert 18.11.2026); **zusätzlich** zu `REGEL_AENDERN`, das bei Jahren, «ab» oder `gesetzliche_pflicht` einer Art weiter geschrieben wird, mit Verweis auf die Version (umgesetzt in Spec 05, Aufgabe 17.2) |
 | `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN`, `WISSEN_INGEST`, `WISSEN_LINT` | Endpunkte der Wissensbasis (Spec 04, design.md, «Zugriffsprotokoll»); `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN` mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, `WISSEN_INGEST` mit Dokument-ID |
+| `BENUTZER_ANLEGEN`, `BENUTZER_AENDERN`, `BENUTZER_LOESCHEN`, `ROLLE_ZUWEISEN`, `BENUTZER_ANTRAG`, `BENUTZER_ABWEICHUNG` | Benutzer- und Rollenverwaltung sowie Abgleich (Spec 06, Req 6.1–6.4); ohne Dokument-ID, mit Vorgangs-ID und bei Wirkung in Keycloak mit Phase. Details und Schutz vor Personen- und Zugangsdaten nach Spec 06, Req 6.2 |
 
 Chat (Req 10.2, 10.7; entschieden von Fabian am 14.11.2026, folgt mit Spec 02, 7.1a, dem ersten Teil von Aufgabe 7.1): Das Chat-Werkzeug `dokument_zeigen` ist ein Auslöser ohne eigenen Endpunkt und schreibt je gezeigtem Dokument `ANZEIGEN` mit Benutzer, Rolle, Dokument-ID und `details` `{"kanal": "CHAT"}`; eine unsichtbare oder unbekannte ID schreibt wie an `GET /dokumente/{id}` `VERWEIGERT` (Spec 02 design.md, «Vertrag Welle 7»). `POST /chat` selbst wird nicht einzeln protokolliert (wie Listen und Suche).
 
@@ -1783,7 +1784,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
 | 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
 | 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6); bei Dokumentarten mit der Konfigurationsversion |
-| 429 | `ZU_VIELE_ANFRAGEN` | Grenze überschritten, mit `Retry-After` in Sekunden: neue API-Token-Prüfungen je Quelladresse mit `grund=SCHLUESSELPRUEFUNG` (Spec 03, F2; vor den Grenzen je Schlüssel, für alle API-Token-Pfade); Chat mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage (Spec 02, Req 5.5; seit Aufgabe 7.3); Spec 03 nutzt denselben Code für die Grenzen der Webseiten-Schnittstelle (Spec 03, design.md «Error Handling») |
+| 429 | `ZU_VIELE_ANFRAGEN` | Grenze überschritten, mit `Retry-After` in Sekunden: neue API-Token-Prüfungen je Quelladresse mit `grund=SCHLUESSELPRUEFUNG` (Spec 03, F2; vor den Grenzen je Schlüssel, für alle API-Token-Pfade); Chat mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage (Spec 02, Req 5.5; seit Aufgabe 7.3); Spec 03 nutzt denselben Code für die Grenzen der Webseiten-Schnittstelle (Spec 03, design.md «Error Handling»); Verwaltungsgrenzen mit `grund=VERWALTUNG` (Spec 06, Req 6.6) |
 | 429 | `BUDGET` | Token-Budget des öffentlichen Chatbots für den Mandanten im laufenden Monat erschöpft, ohne `Retry-After` (Spec 03, Req 6.4; seit Aufgabe 11.3); Monatsbudget der Wissensbasis beim manuellen Ingest (Spec 04, Req 13.6; seit Spec 04, Aufgabe 14.1a) |
 | 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort nur mit Fehler-ID, Log mit Fehler-ID und den Klassen der Ursachen-Kette (bei `SQLException` mit SQLState), ohne Meldungen |
 | 502 | `IDENTITAETSDIENST_FEHLER` | unerwartete 4xx-Antwort des Keycloak-Dienstkontos, insbesondere 401 oder 403 (Spec 06, Req 5.6); Antwort und Log enthalten keine Meldung von Keycloak |
@@ -1837,11 +1838,13 @@ decken Kriterien von `[Frontend]`-Aufgaben ab, für Kriterien abgehakter `[Backe
 (Review PR #44).
 
 Entwicklungsumgebung (Aufgabe 1.2): In `dev` und in Tests starten PostgreSQL 17 mit pgvector
-(`pgvector/pgvector:0.8.7-pg17-trixie`) und Keycloak (`quay.io/keycloak/keycloak:26.8.2`, Realm aus
+(`pgvector/pgvector:0.8.7-pg17-trixie`) und Keycloak (`quay.io/keycloak/keycloak:26.8.2-3`, Realm aus
 `deploy/keycloak/realm-test.json`) als Dev Services der Extensions, MinIO und Mailpit als Compose Dev Services aus
 `backend/compose-devservices.yml` (statt Testcontainers, weil Compose dev und Tests mit einer Datei abdeckt; entschieden
-von Fabian am 09.11.2026). MinIO veröffentlicht keine Images mehr auf Docker Hub (Upstream seit 24.04.2026 archiviert); verwendet wird
-`cgr.dev/chainguard/minio` (aus dem Fork `chainguard-forks/minio`) mit festem Digest, Ausweiche `docker.io/pgsty/silo`.
+von Fabian am 09.11.2026). Das Keycloak-Deploy-Image übernimmt diese Distribution, baut und startet sie aber wie das
+API-Image mit Temurin 25.0.5.1+2 (JDK und JRE, behoben für CVE-2026-114938). MinIO veröffentlicht keine Images mehr
+auf Docker Hub (Upstream seit 24.04.2026 archiviert); verwendet wird `cgr.dev/chainguard/minio` (aus dem Fork
+`chainguard-forks/minio`) mit festem Digest, Ausweiche `docker.io/pgsty/silo`.
 MinIO verdeckt Eigenheiten von Ceph RGW (Fehlercodes, Deny-Policy gilt nicht für den Root-Zugang, Versions-ID bei
 `CopyObject`); die prüft gegen Infomaniak nur `InfomaniakAblageSmokeIT` von Hand. Zusätzlich laufen `S3AblageTest`, die
 Ablage-Szenarien und `InfomaniakAblageSmokeIT` nicht blockierend gegen einen Einzelcontainer mit Ceph RGW (Workflow

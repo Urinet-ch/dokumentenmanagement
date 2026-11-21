@@ -78,6 +78,10 @@ class KeinLoeschpfadTest {
                 entities)).hasSize(1);
         assertThat(funde("Probe.java", "befehl.execute(\"update \" + s + \".benutzer_verzeichnis set name = ?\");",
                 entities)).hasSize(1);
+        assertThat(funde("Probe.java", "\"delete from zugriff_protokoll where aktion = 'BENUTZER_ANLEGEN'\"",
+                entities)).hasSize(1);
+        assertThat(funde("Probe.java", "\"update zugriff_protokoll set details = null "
+                + "where aktion = 'ROLLE_ZUWEISEN'\"", entities)).hasSize(1);
         assertThat(funde("probe.xml", "<sql>truncate dokument_version;</sql>", entities)).hasSize(1);
         assertThat(funde("probe.xml", "create trigger t before update or delete on zugriff_protokoll for each row",
                 entities)).isEmpty();

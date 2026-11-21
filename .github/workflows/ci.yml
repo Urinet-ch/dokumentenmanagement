@@ -204,6 +204,9 @@ jobs:
       - name: Drive-Import-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
         run: mvn -B -ntp -f tools/drive_import/pom.xml verify
 
+      - name: strace bereitstellen (Netzlaufzeitnachweis Wissenspaket)
+        run: command -v strace >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq strace)
+
       - name: Wissenspaket-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
         run: mvn -B -ntp -f tools/wissen_paket/pom.xml verify
 
@@ -449,7 +452,7 @@ jobs:
         run: touch backend/target/browser-backend.stop
 
   docker:
-    name: Docker-Image (nur bauen)
+    name: Docker-Images (nur bauen)
     if: needs.art.outputs.nur-spec != 'true'
     needs: [art, build]
     runs-on: ubuntu-24.04
@@ -461,4 +464,7 @@ jobs:
         with:
           name: quarkus-app
           path: backend/target/quarkus-app/
-      - run: docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv:ci backend
+      - name: API-Image
+        run: docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv:ci backend
+      - name: Keycloak-Image
+        run: docker build -f deploy/infomaniak/keycloak/Dockerfile -t urinet-archiv:ci-kc deploy

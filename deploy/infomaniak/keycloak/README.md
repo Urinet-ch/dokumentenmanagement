@@ -1,4 +1,22 @@
-# Google-IdP
+# Keycloak
+
+## Theme und Benachrichtigung
+
+Der Realm-Export wählt das Login- und E-Mail-Theme `urinet-archiv`; der Client für VHF/GSK kann sein eigenes
+Login-Theme weiter wählen. Ein bestehender Realm wird beim Import nicht aktualisiert: Die Umstellung seiner
+Theme-Einstellungen und der Versand an ein echtes Postfach sind Betriebsnachweise.
+Der Test-Realm der Dev Services verwendet weiterhin das eingebaute Theme, da das Dev-Services-Image keine
+Projekt-Themes enthält; `RealmExportKeycloakTest` prüft das ausgelieferte Theme mit einem eigenen Keycloak.
+
+Die Mitteilung an die bisherige Adresse versendet das Archiv, nicht Keycloak (Spec 06, 3.14). Vorgesehener Text
+für die noch ausstehende Anbindung:
+
+> **UriNet Archiv: E-Mail-Adresse geändert**
+>
+> Die E-Mail-Adresse für Ihren Zugang zum UriNet Archiv wurde geändert. Falls Sie diese Änderung nicht erwartet
+> haben, wenden Sie sich umgehend an die Verwaltung.
+
+## Google-IdP
 
 Der Realm-Export enthält den deaktivierten Provider `google`, beide Anmeldeflows und die Ereignistypen. `start.sh` kann
 `google_client_id` und `google_client_secret` aus `/run/secrets/` lesen und die Werte beim erstmaligen Import als
@@ -49,8 +67,8 @@ bash deploy/infomaniak/keycloak/test/start-test.sh
 - Ein dedizierter Cucumber-Runner prüft unbekannte Konten, eine nicht automatisch verknüpfte gleiche E-Mail-Adresse,
   TOTP nach einer bestehenden Verknüpfung sowie Admin-Ereignisse und Sitzungsende nach dem Lösen gegen einen lokalen
   `oidc`-Test-IdP.
-- `eventsListeners` ist in Realm-Export und Vorlage gleich (`[]`, Ereignisse nur in der Datenbank); `eventsExpiration` ist
-  bewusst nicht gesetzt (unbegrenzte Aufbewahrung, Zugriffsprotokoll nach Req 2.27).
+- `eventsListeners` ist in Realm-Export und Vorlage gleich (`[]`, Ereignisse nur in der Datenbank); `eventsExpiration` und das
+  Realm-Attribut `adminEventsExpiration` stehen in Export und Vorlage auf 400 Tage (34'560'000 s, Spec 06 Req 9).
 - `start.sh` setzt fehlende `google_client_id` und `google_client_secret` auf leer; das gilt nur bei deaktiviertem Provider.
   Mit der Freigabe werden die Dateien Pflicht (offen für Fabian, Workflow-Prüfung). Der Start-Stub-Test prüft beide leeren
   Fälle und beide synthetischen Werte; er läuft nicht in der CI (Workflow-Änderung liegt bei Fabian).

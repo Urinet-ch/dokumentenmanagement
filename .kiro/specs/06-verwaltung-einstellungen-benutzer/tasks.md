@@ -24,16 +24,24 @@ auf Server oder Secrets aus der Sitzung.
     `prompt=login` gegen den Cookie-Zweig von `browser-totp-pflicht`; `execute-actions-email` für einen Benutzer ohne Passwort
     mit den drei Aktionen; Suche `q=mandant:<m>`; Rollenmitglieder (`/roles/{rolle}/users`).
   - Stand: nachgewiesen sind Suche `q=mandant:<m>`, Rollenmitglieder, Issuer, Token-Rollen und der Dienstkonto-Aufruf (401 ohne
-    Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»). Offen: interne Adresse, Secret-Rotation,
-    `auth_time`, `prompt=login`, `execute-actions-email`; Entscheid FGAP gegen `manage-users` (design.md, Open Points).
+    Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»); `auth_time`, `prompt=login`,
+    `execute-actions-email`, interne Adresse und Secret-Rotation sind mit 19.2 nachgewiesen (design.md «Umsetzung 19.2»).
+    Der Entscheid zu FGAP und `manage-users` ist in design.md «Open Points» festgehalten. Betriebsnachweise folgen in 19.3.
+    Checkbox offen: Der vollständige Nachweis von 7.2 (Step-up-Endpunkt) folgt mit 19.10.
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
 - [ ] 19.2 Realm-Export und Realm-Tests [Infra]
-  - Client `archiv-verwaltung` mit Platzhalter für das Secret und den drei Rollen des Dienstkontos und dem Standard-Scope `kc-admin-api` (Härtung nach 19.1);
+  - Client `archiv-verwaltung` ohne Secret im Export und mit den drei Rollen des Dienstkontos und dem Standard-Scope `kc-admin-api` (Härtung nach 19.1);
     Passwort-Richtlinie; Access-Token-Lebensdauer 300 s; Lebensdauer der Aktions-Links; Ereignisse und Admin-Ereignisse mit
     400 Tagen; `auth_time`-Mapper; Test-Realm mit Dienstkonto und SMTP an Mailpit; `RealmExportTest` und `ExportKeycloak`
     erweitert (nur diese Rollen, kein Secret, kein Realm-Admin, Benutzerprofil unverändert).
+  - Stand: Export, Test-Realm und Tests umgesetzt (PR #385); `adminEventsExpiration` gesetzt. Keycloak erzeugt beim
+    Erstimport das Dienstkonto-Secret selbst; `start.sh` übergibt keines. `ARCHIV_BASIS_URL` schreibt `schreibe-env.sh`
+    aus `HOST_ARCHIV`. Das tatsächlich verwendete Secret und seine Pflichtprüfung folgen in 19.3.
+    Checkbox offen: Vollständige Szenarien zu 4.9 und 7.4 folgen mit 19.7 bis 19.9.
+  - Nachgelagert [Fabian] (Entscheid 21.11.2026): Betriebsnachweis der internen Compose-Verbindung mit korrektem
+    Issuer und der automatischen Ablaufzeit der Secret-Überlappung in 19.3.
   - _Anforderungen: 3.17, 4.9, 5.2, 5.3, 6.9, 7.4_
   - _Abhängig von: 19.1_
 
@@ -42,6 +50,11 @@ auf Server oder Secrets aus der Sitzung.
     `KEYCLOAK_VERWALTUNG_SECRET` und `KEYCLOAK_SMTP_PASSWORT`, Secret-Dateien im Deploy-Bundle und Pflichtprüfung im Workflow;
     Compose: Secret für `api`; Admin-Konsole bleibt nicht öffentlich; Probe: Token des Dienstkontos holbar; Notfallunterlagen
     um das neue Secret ergänzt.
+  - Hinweis (Hotfix 21.11.2026): `SecretPruefung` verlangt `keycloak_verwaltung_secret` erst, wenn
+    `ARCHIV_KEYCLOAK_ADMIN_URL` gesetzt ist; Secret und Adresse in Compose darum im selben Schritt setzen.
+    Umgesetzt: Anforderung 5.3 Kriterium 4, `design.md`, `SecretPruefung`, `SecretPruefungTest` (api und kommando ohne Adresse).
+  - Nachgelagert [Fabian] (Entscheid 21.11.2026): bestehenden Realm einmalig aktualisieren und die Betriebsnachweise
+    für interne Verbindung mit korrektem Issuer und automatische Ablaufzeit der Secret-Überlappung führen.
   - _Anforderungen: 5.2, 5.3, 5.4, 6.9, 7.4_
   - _Abhängig von: 19.2_
 
@@ -68,6 +81,10 @@ auf Server oder Secrets aus der Sitzung.
     Absicht und Abschluss mit `vorgangId`, Vorgangssperre (`verwaltung_vorgang`), `benutzer_status`, `verwaltung_antrag`,
     Raten aus dem Protokoll (`archiv.verwaltung.grenzen.*`), `VerwaltungProtokollTest` (kein Klartext), `KeinLoeschpfadTest`
     erweitert; Code `ZU_VIELE_ANFRAGEN` mit `grund = VERWALTUNG`.
+  - Offen, bewusst nicht abgehakt: Cucumber-Szenarien `@req-4.7`, `6.1`–`6.4`, `6.6` brauchen einen Endpunkt und kommen mit 19.7;
+    ebenso die Anbindung der Einstellungsgrenze (`Art.EINSTELLUNG`, `einstellungen-je-mandant`) und der Grund-Eingabe.
+    Ebenfalls offen (Req 6.3): das Schreiben der Verzeichniszeilen `ANLAGE`, `UEBERNAHME` und `AUSTRITT` in der Abschlusstransaktion
+    kommt mit 19.7 bis 19.9; hier sind nur Enum-Wert, Check-Constraint und Vertrag umgesetzt.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 
@@ -83,6 +100,8 @@ auf Server oder Secrets aus der Sitzung.
   - `sperren`, `entsperren` (inkl. Sperre durch Fehlversuche), `deaktivieren` (Zeile `AUSTRITT`), `reaktivieren`,
     `zugang-zuruecksetzen` (TOTP entfernen), `PATCH` für E-Mail mit `VERIFY_EMAIL` und Mitteilung an die alte Adresse,
     `DELETE …/google-verknuepfung` (WO O.8), `If-Match` und `ETag` des Benutzers.
+  - Text der Mitteilung an die alte Adresse aus `deploy/infomaniak/keycloak/README.md` (Aufgabe 20.8) übernehmen, als
+    Ressource des Archivs ablegen und mit einem Test sichern (keine Namen Dritter, Req 7.8; Abhängigkeit von 20.8).
   - Selbstaktionen (sperren, deaktivieren, löschen, Zugang zurücksetzen auf sich selbst) prüft
     `Vergaberegeln.pruefeSelbstzugriff` (403 `ESKALATION_VERBOTEN`, Req 4.6); HTTP-Nachweis je Rolle und Zeile A20 bis A23
     mit `VERWEIGERT` über `Berechtigung` kommt mit 19.7 bis 19.9 (Req 4.2).
@@ -172,11 +191,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 8.4, 8.5, 8.6_
   - _Abhängig von: 19.12, 20.6_
 
-- [ ] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
+- [x] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
   - Deutsche Texte der Einladung (Einmal-Link, Gültigkeit, Hinweis, was zu tun ist) und der Mitteilung an die alte Adresse, Theme
     `urinet-archiv` (Logo-Textmarke, Farben wie `vhf-gsk`-Muster aus Spec 03, 2.3); keine Namen Dritter in Betreffzeilen.
   - _Anforderungen: 7.4, 7.8, 8.6_
   - _Abhängig von: 19.2_
+  - Einladung und Theme mit importiertem Realm, Wegwerf-Keycloak und Mailpit geprüft. Die Mitteilung an die bisherige
+    Adresse ist als Text in der Keycloak-Betriebsdokumentation vorbereitet; der Versand durch das Archiv folgt mit 19.8.
+    Umstellung eines bestehenden Realms und Prüfung mit echtem Postfach bleiben Betriebsnachweise.
 
 ## Welle 21 — Admin-Kommando, Migration, Tests und Abnahme
 - [ ] 21.1 Admin-Kommando [Backend]
@@ -217,3 +239,21 @@ auf Server oder Secrets aus der Sitzung.
     Google-Verknüpfung (WO O.8).
   - _Anforderungen: 5.10, 8.2, 9.4, 9.7_
   - _Abhängig von: 21.2, 21.3, 21.4, 21.5_
+
+## Welle 24 — Passkey als Anmeldeweg (Entscheid Fabian 21.11.2026, Requirement 10)
+- [ ] 24.1 Spike und Realm-Flow Passkey [Infra] [Backend]
+  - Spike gegen Keycloak 26.8.2: Flow mit Passkey und Rückfall `browser-totp-pflicht`, `auth_time` bei Passkey, Einrichtung in der
+    Kontoverwaltung, Direct Grant unverändert; Ergebnis in design.md «Passkey» (Marker `[offen: …]` auflösen). Realm-Export mit
+    Platzhalter für die Relying-Party-ID; Realm-Tests mit virtuellem Authenticator (Einrichten, Anmelden, Step-up, Entfernen).
+  - _Anforderungen: 10.1, 10.2, 10.3, 10.4, 10.8, 10.9, 10.10, 10.11_
+  - _Abhängig von: 19.2, 19.10_
+- [ ] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
+  - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
+    Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
+  - _Anforderungen: 10.5, 10.6, 10.7_
+  - _Abhängig von: 24.1, 19.8, 20.7_
+- [ ] 24.3 Anleitung und Inbetriebnahme [Fabian]
+  - Anleitung (Spec 07, `frontend/public/anleitung/`) um «Mit Passkey anmelden» ergänzen; auf Stufe A Realm einmalig aktualisieren, Relying-Party-ID
+    setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
+  - _Anforderungen: 10.1, 10.2, 10.8_
+  - _Abhängig von: 24.1, 24.2_

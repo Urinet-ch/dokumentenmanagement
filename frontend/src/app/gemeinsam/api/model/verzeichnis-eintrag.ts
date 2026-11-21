@@ -34,6 +34,8 @@ export namespace VerzeichnisEintrag {
         Aktion: 'AKTION',
         Austritt: 'AUSTRITT',
         Widerruf: 'WIDERRUF',
+        Anlage: 'ANLAGE',
+        Uebernahme: 'UEBERNAHME',
     } as const;
     export type AnlassEnum = typeof AnlassEnum[keyof typeof AnlassEnum];
 }

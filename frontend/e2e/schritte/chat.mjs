@@ -105,6 +105,7 @@ Then('sehe ich den Entscheid und Grund meines Analysevorschlags', async function
 When(/^ich die Frage «(.+)» sende$/, async function (frage) {
   const feld = this.seite.getByRole('textbox', { name: 'Frage', exact: true });
   await feld.fill(frage);
+  await this.seite.locator('form.eingabe button[type="submit"]:enabled').waitFor();
   await feld.press('Enter');
 });
 

@@ -95,6 +95,31 @@ Alle Punkte sind vorgeschlagen am 21.11.2026 und gelten als entschieden mit dem 
   Schreibzugriff, erfasst aber weder «übersprungen» noch Benutzer aus der Übernahme.
 Empfehlung: Browser jetzt; (a) erst prüfen, wenn Spec 06 umgesetzt ist und Fabian das Wiedererscheinen als störend meldet.
 
+**Umsetzung (Aufgabe 23.1):**
+- Zwei Dateien unter `frontend/src/app/hilfe/`: `einfuehrung-vermerk-speicher.ts` (Format, Kennung, Lesen, Ablegen,
+  Datum; ohne Angular und ohne Importe, damit die Browser-Szenarien das Modul unverändert in Chromium laden können) und
+  `einfuehrung-vermerk.ts` (Dienst `EinfuehrungVermerk`, root, liest Benutzer und Mandant aus `AnmeldungService.benutzer`).
+- Schnittstelle für die Aufgaben 23.2 und 23.3: `bekannt: Signal<boolean | null>` – `false` heisst neuer Benutzer
+  (Einführung zeigen), `true` Vermerk besteht, `null` kein angemeldeter Benutzer mit Mandant, `sub` und Rolle oder die
+  Kennung ist noch nicht berechnet (`crypto.subtle.digest` ist asynchron; dann nichts zeigen, damit die Karte nicht
+  aufblitzt). `ablegen(art: 'ABGESCHLOSSEN' | 'UEBERSPRUNGEN'): Promise<void>` setzt `bekannt` sofort auf `true`, ersetzt
+  einen bestehenden Vermerk (Req 3.5) und tut ohne Benutzer mit Mandant und Rolle nichts. Ob `/?einfuehrung` die
+  Einführung trotz Vermerk zeigt, entscheidet die Startseite (23.3), nicht der Dienst.
+- Benutzerwechsel und Abmeldung: `bekannt` folgt dem Signal des angemeldeten Benutzers; nach der Abmeldung ist es `null`,
+  der Vermerk bleibt im Browser. Ein Ergebnis für einen inzwischen abgemeldeten oder gewechselten Benutzer wird verworfen.
+- Format: Ein Wert mit anderem `v` als 1, ohne Liste oder ohne gültiges JSON gilt als unlesbar (leer) und wird beim
+  nächsten Schreiben ersetzt; einzelne unlesbare Einträge (Kennung nicht 64 Zeichen hex, Version keine ganze Zahl ≥ 1,
+  unbekannte Art, Datum nicht `JJJJ-MM-TT`) fallen weg, zusätzliche Felder werden nicht übernommen. Jede Version ≥ 1 gilt
+  als Vermerk. «Ältester» ist der vorderste Eintrag der Liste (Reihenfolge des Schreibens, nicht `am`, das nur den Tag
+  kennt); ein ersetzter Vermerk rückt als neuester ans Ende. `am` ist das Kalenderdatum in Europe/Zurich.
+- Arbeitsspeicher: Der Dienst merkt sich jeden Vermerk dieser Sitzung unter `<mandant>:<sub>` (nur im Arbeitsspeicher,
+  nie gespeichert), nicht nur bei einem Fehler des Speichers. Ohne `crypto.subtle` liest und schreibt er den
+  `localStorage` nicht.
+- Nachweis: Vitest `einfuehrung-vermerk.spec.ts` (Hash, 20 Einträge, Ersetzen, Benutzerwechsel, Abmeldung, gesperrter,
+  voller und beschädigter Speicher, ohne `crypto.subtle`, keine Anfrage); Browser-Szenarien
+  `features/hilfe/einfuehrung-vermerk.feature` (Req 1.3–1.5) prüfen das Modul im echten Browser auf dem Ursprung der App.
+  Abschliessen und Überspringen über die Karte belegen die Szenarien zu Req 3.3 und 3.4 (Aufgabe 23.3).
+
 ## Schritte der Einführung (Requirement 2)
 Texte in `texte.de-CH.ts` (`einfuehrung.schritte`); `{name}` = Name aus dem Branding, `{rolle}` = Bezeichnung der Rolle
 aus `texte.kopf.rollen`. Jeder Schritt höchstens drei Sätze und ein Link «In der Anleitung lesen», der die Hilfe-Leiste
@@ -186,10 +211,10 @@ eine Datei auf 32 KiB; darüber gilt der Fehlerfall 7.6.
 ## Hilfe-Leiste und Seite `/hilfe` (Requirements 4, 5)
 - **Leiste:** zweiter `mat-sidenav` mit `position="end"` und `mode="over"` im bestehenden `mat-sidenav-container` von
   `app.html` (Fokusfalle, Escape und Abdunklung bringt Angular Material mit), `role="dialog"`, Name «Hilfe». Inhalt in
-  `@defer (when hilfeOffen())`. Dienst `HilfeLeiste` (root) mit `oeffnen(anker?)`, `schliessen()`, `anker` als Signal; der
+  `@defer (when hilfeOffen())`. Dienst `HilfeLeiste` (root) mit `oeffnen(anker, ausloeser)`, `schliessen()`, `anker` als Signal; der
   Knopf in der Kopfzeile ruft `oeffnen()` mit dem Kontext, die Links «So funktioniert es» (Requirement 4.6) und «In der
   Anleitung lesen» (Einführung) mit festem Anker.
-- **Kontext:** `kontext(url, rolle)` nimmt aus dem Katalog die Einträge mit `pfade`, wählt mit `aktiverPfad` den längsten
+- **Kontext:** `hilfeKontext(url, rolle, katalog)` nimmt aus dem Katalog die Einträge mit `pfade`, wählt mit `aktiverPfad` den längsten
   passenden Pfad und gibt den Anker nur zurück, wenn der Eintrag für die Rolle sichtbar ist (Requirement 4.3).
 - **Seite:** Route `hilfe` mit `loadComponent`, ohne `canActivate`, Titel über `titel(TEXTE.hilfe.titel)` wie die anderen
   Routen. Inhaltsverzeichnis als `nav` mit Links `routerLink="/hilfe" [fragment]="anker"`. Weil der Inhalt in
@@ -302,6 +327,195 @@ Neue Fehlercodes der API gibt es nicht.
 - **Antworten der KI auf Bedienfragen:** nicht Teil der Spec; später möglich als Wissensquelle der Anleitung, dann mit
   eigener Spec.
 - **Menüpunkt in der Seitenleiste:** siehe E3; abgelehnt.
+
+## Umsetzung (Aufgabe 22.1, 21.11.2026)
+Stand von PR #411; Schnittstellen für die Aufgaben 22.2 bis 22.7.
+- **Katalog** (`hilfe/hilfe-katalog.ts`): `HILFE_KATALOG` mit `erste-schritte` und `probleme` (beide allgemein,
+  `abgemeldet`), Typen `HilfeEintrag` und `Bedingung`, `bedingungErfuellt(bedingung, rolle)` (über `darf`, ohne
+  Bedingung immer erfüllt; den Filter nach Rolle, Eltern und abgemeldet baut 22.2) und `hilfeEintrag(anker)`. Titel
+  stehen in `TEXTE.hilfe.abschnitte` je Anker. `rechte.ts` exportiert dazu `AKTIONEN` (bekannte Aktionen für den Test).
+- **Pfade** (`hilfe/app-pfade.ts`): `istAppPfad(pfad, routes)` verlangt genau eine Route (Ziel eines Links),
+  `istAppPfadPraefix(pfad, routes)` eine Route oder ihren Anfang (`pfade` im Katalog, z. B. `/dokument`). `**` zählt nicht,
+  Parameter passen auf jedes Segment, Segmente nur aus Kleinbuchstaben, Ziffern und Bindestrich: `//host`, `/a?b`,
+  `/a#b` und `/a/` sind keine Pfade. Zur Laufzeit gilt `Router.config`, in den Tests `routes` aus `app.routes.ts`.
+- **Teilmenge** (`hilfe/anleitung-markdown.ts`): `anleitungMarkdown(quelle, { istAppPfad, praefix? })` ergibt
+  `{ teile, befunde }`. `Anleitungsteil` erweitert `Textteil` aus `wissen/wissen-text.ts` (nicht verschoben) um
+  `anker` (Ziel von `abschnitt`, id einer Überschrift), `variante` (`info`, `warnung`) und `platzhalter`. Abweichend
+  von der Tabelle oben werden `{name}` und `{rolle}` zu `platzhalter` statt `text`: Ersetzt wird erst beim Darstellen,
+  damit ein Name aus dem Branding nie als Markdown gelesen wird. `befunde` nennt je Konstrukt ausserhalb der Teilmenge
+  Zeile und Art (z. B. «Zeile 3: fremdes Ziel»); die Darstellung zeigt es trotzdem als Text, der Inhaltstest verlangt
+  eine leere Liste. Überschriften erhalten mit `praefix` die id `<anker>-<titel>` (Umlaute als ae, oe, ue; Zähler bei
+  Doppelten). Die Suche nach Schlusszeichen merkt sich ihr Ergebnis, die Arbeit bleibt linear (Test mit 32 KiB offener
+  Klammern). Über 32 KiB (UTF-8) wirft der Parser `AnleitungZuGross`.
+- **Lader** (`hilfe/anleitung-lader.ts`, root): `zustand(eintrag)` liefert ein Signal `laedt` | `fertig` | `fehler` und
+  lädt jede Datei einmal je Sitzung über `HttpClient` (der Anmelde-Interceptor hängt nur an `/api/` ein Token an);
+  `erneut(eintrag)` lädt nach einem Fehler neu. Fehler sind HTTP-Fehler, kein Netz ohne Cache, mehr als 32 KiB und eine
+  Antwort mit `Content-Type: text/html` (Rückfallseite der SPA statt der Datei).
+- **Darstellung** (`hilfe/anleitung-text.ts`, `app-anleitung-text`): Eingaben `eintrag`, `versatz` (Stufen, um die
+  Überschriften der Datei tiefer stehen; auf `/hilfe` z. B. 1 unter dem `h2` des Abschnitts, 2 im Unterabschnitt) und
+  `leiste` (Links auf Abschnitte navigieren nicht, `href` bleibt `/hilfe#<anker>`); Ausgaben `abschnitt` (Anker) und
+  `navigiert` (Link auf eine Seite der App gewählt, die Leiste schliesst). Den Titel setzt die Seite bzw. die Leiste.
+  Laden mit `mat-progress-bar`, Fehler als `.hinweis gefahr` mit `role="alert"` (`data-test="anleitung-fehler"`) und
+  dem Knopf «Erneut versuchen». Der Hinweis-Block nutzt das neue Symbol `info` (am Ende von `SYMBOLE`, vor `hilfe` aus
+  22.3). Zeigen Leiste und Seite denselben Abschnitt zugleich, entstehen doppelte ids der Überschriften; 22.3 sollte in
+  der Leiste ohne `praefix` laden oder die Leiste auf `/hilfe` schliessen.
+- **Inhaltsprüfung** (`anleitung-inhalt.spec.ts`): zusätzlich zur Tabelle der Teststrategie verbietet sie `http:`,
+  `https:`, `mailto:`, `javascript:`, `data:` und `www.` auch als blossen Text sowie `{rolle}` in Abschnitten mit
+  `abgemeldet` (ohne Anmeldung gibt es keine Rolle). Die Vitests lesen die Dateien ohne `@types/node` über
+  `process.getBuiltinModule('node:fs')`, Arbeitsverzeichnis `frontend/`.
+- **Nachweis:** 7.1 mit `features/hilfe/anleitung-pwa.feature` (Datei aus dem Prod-Build, nicht die Rückfallseite);
+  7.6 ist umgesetzt und per Vitest geprüft (`anleitung-text.spec.ts`), sein Browser-Szenario braucht eine Seite und
+  kommt mit 22.2 (tasks.md: 7.6 von 22.1 zu 22.2 verschoben).
+- **Texte:** `erste-schritte.md` (Anmelden mit Code der Authenticator-App, Seitenleiste und Menü, Rolle in der
+  Kopfzeile, Farbschema, Abmelden) und `probleme.md` (Sitzung abgelaufen, offline, Upload nicht hochgeladen, Seite nicht
+  gefunden, kein Mandant oder keine Rolle, neue Version) als erste Fassung nur mit dem, was auf `main` umgesetzt ist;
+  22.5 bzw. 22.7 vervollständigen sie (z. B. Knopf «Hilfe» und Verweise auf `#erfassen-offline`, sobald es sie gibt).
+
+## Umsetzung (Aufgabe 22.5, 21.11.2026)
+Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben ist nur, was auf `main` umgesetzt ist
+(Requirement 6.4), mit dem Wortlaut der Knöpfe und Meldungen aus `texte.de-CH.ts`.
+- **Katalog:** Einträge `erfassen`, `erfassen-handy`, `erfassen-dateien`, `erfassen-offline` (`abgemeldet`),
+  `eingangskorb`, `eingangskorb-bestaetigen` (A7), `eingangskorb-eigene` (A5 ohne A7), `dokument`, `dokument-aendern`
+  (A6) wie in der Tabelle «Hilfe-Katalog», in zwei Blöcken: Erfassen und Eingangskorb nach `erste-schritte`,
+  Dokumentansicht zwischen `chat` und `kontakte` aus 22.6 (nach dem Merge von #423 eingeordnet). Titel in `TEXTE.hilfe.abschnitte`.
+- **Prüfung** (`anleitung-abschnitte.spec.ts`): (1) Der Katalog folgt der Tabelle «Hilfe-Katalog» (Reihenfolge, Titel,
+  Abschnitt, Bedingung, Pfade, `abgemeldet`); die Tabelle steht im Test, damit auch 22.6 und 22.7 gegen sie laufen.
+  (2) Ein Link auf einen Abschnitt (`#anker`) zeigt nur auf Einträge, die jede Rolle und der Besucher ohne Anmeldung
+  sieht, wenn sie den verweisenden Eintrag sehen (Requirement 6.2, 6.3; Unterabschnitt nur mit seinem Abschnitt).
+  Darum verweisen `eingangskorb.md` nicht auf seine beiden Unterabschnitte, `dokument.md` nicht auf `dokument-aendern`
+  und `erste-schritte.md` sowie `erfassen-offline.md` nur auf allgemeine Abschnitte. (3) Jeder Name in Guillemets in
+  den Dateien der Aufgabe steht wörtlich in `texte.de-CH.ts` (Requirement 6.6, 9.3); Ausnahme sind die Menüs der
+  Browser für «Startbildschirm» in `erfassen-handy.md`.
+- **Befunde aus dem Code**, die die Texte bestimmen: Die Kamera öffnet erst mit «Kamera öffnen» (Requirement 4.2 sagt
+  «beim Wählen von Erfassen»; die Anleitung beschreibt den Knopf). Neue Aufnahmen kommen immer ans Ende, Seiten lassen
+  sich nicht umsortieren. Hochgeladen wird nur bei offener App (kein Background Sync). Aufnahmen ohne Anmeldung übernimmt
+  die nächste Anmeldung mit A1 auf dem Gerät (`WarteschlangeService.zuordnen`). Der Entwurf im Eingangskorb entsteht nur,
+  wenn die Sitzung beim Bestätigen abläuft (`sessionStorage`). «Metadaten bearbeiten» gibt es in den Zuständen
+  `EINGANGSKORB`, `FEHLER` und `ARCHIVIERT`. Die Anmeldeseite bietet kein Zurücksetzen des Passworts
+  (`resetPasswordAllowed: false`).
+- **Für 22.7:** Die Umsetzung von 22.1 nennt Verweise auf `#erfassen-offline` in `erste-schritte.md` und
+  `probleme.md`. Nach (2) geht das nicht: Ohne Anmeldung sehen alle drei Einträge, angemeldet sieht der Treuhänder aber
+  `erste-schritte` und `probleme`, nicht `erfassen-offline` (A1). `erste-schritte.md` nennt darum nur den Link «Ohne
+  Verbindung erfassen» der Startseite; den Weg zu `#erfassen-offline` bringen die Links «So funktioniert es»
+  (Requirement 4.6, Aufgabe 23.4). `probleme.md` bleibt bei 22.7.
+## Umsetzung (Aufgabe 22.2, 21.11.2026)
+Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
+- **Filter** (`hilfe/hilfe-sichtbar.ts`): `sichtbareAbschnitte(katalog, rolle)` ergibt die Abschnitte mit ihren
+  Unterabschnitten in Katalogreihenfolge, `sichtbareAnker(abschnitte)` alle Anker daraus. `rolle` ist nur gesetzt, wenn
+  jemand mit Mandant und Rolle angemeldet ist (wie `AnmeldungService.darf`); sonst zählt nur `abgemeldet`. Mit Rolle
+  erscheint ein Unterabschnitt nur mit seinem Abschnitt. Ohne Rolle steht ein Unterabschnitt mit `abgemeldet`, dessen
+  Abschnitt verborgen ist (`erfassen-offline` ohne `erfassen`), als eigener Abschnitt an seiner Stelle: als `h2` mit
+  eigener Karte und auf oberster Ebene im Inhaltsverzeichnis. Das Token `HILFE_EINTRAEGE` (Standard `HILFE_KATALOG`)
+  macht den Katalog in Tests ersetzbar; 22.3 sollte Kontext und Sichtbarkeit über dieselben Funktionen bestimmen
+  (Req 4.3: «nicht sichtbar» heisst nicht in `sichtbareAnker`).
+- **Seite** (`hilfe/hilfe-seite.*`, Route `hilfe` mit `loadComponent`, ohne Wächter, Titel `titel(TEXTE.hilfe.titel)`):
+  Seitenkopf (Vorzeile Name aus dem Branding, «Hilfe», fester Untertitel), darunter ein `.hinweis info` mit dem Satz
+  zur Rolle (6.5) bzw. dem Hinweis nach 6.3, dann das Raster aus Inhaltsverzeichnis (`nav` mit sichtbarer Überschrift
+  «Inhalt der Anleitung» über `aria-labelledby`) und Abschnitten als `.karte` (`section`, `h2` mit id = Anker,
+  Unterabschnitte als `h3` in der Karte, alle Titel mit `tabindex="-1"`). Ab 1100 px zwei Spalten, das
+  Inhaltsverzeichnis klebt (`position: sticky`, `top: 5rem` unter der Kopfzeile). Der Platz für «Einführung erneut
+  zeigen» (23.3) ist rechts im Seitenkopf (Kommentar im Template), noch ohne Knopf.
+- **Sprung:** Die Seite hört auf `ActivatedRoute.fragment` und springt erst, wenn keine Datei der sichtbaren Abschnitte
+  mehr lädt (sonst verschöbe nachgeladener Text das Ziel); ein Fehler nach 7.6 zählt als fertig. Sprung mit
+  `scrollIntoView({ block: 'start' })` und `focus({ preventScroll: true })`, `scroll-margin-top` hält die Überschrift
+  unter der klebenden Kopfzeile frei. Unbekannter oder verborgener Anker: `mat-sidenav-content` nach oben, keine
+  Meldung, kein `aria-current`. Ein Klick auf den Anker, der schon in der Adresse steht, navigiert im Router nicht; die
+  Seite springt dann selbst. `aria-current="location"` markiert den zuletzt angesprungenen Eintrag.
+- **Ids:** Überschriften der Dateien tragen `<anker>-<titel>`; ein Titel wie «Offline» in `erfassen.md` ergäbe die id
+  des Unterabschnitts `erfassen-offline`. `hilfe-seite.spec.ts` prüft darum alle Dateien gegen die Anker des Katalogs.
+- **Browser-Szenarien** (`features/hilfe/hilfe-seite-pwa.feature`, Schritte `e2e/schritte/hilfe-seite.mjs`): Weil die
+  Anmeldung nur im Arbeitsspeicher liegt, öffnet der Schritt «ich in der App «…» aufrufe» eine Adresse mit
+  `history.pushState` und `popstate` wie ein Link der App (auch für 22.3 und 23.4 nutzbar). Die Szenarien je Rolle
+  prüfen Anfang und Ende des Inhaltsverzeichnisses und die Anker, die die Rolle nach der Tabelle «Hilfe-Katalog» nie
+  sieht; sie bleiben gültig, während 22.5 bis 22.7 den Katalog füllen. Den Filter über den ganzen Katalog prüft
+  `hilfe-sichtbar.spec.ts` gegen dieselbe Tabelle.
+- **Prototyp:** Ansicht `#hilfe` in `docs/oberflaeche/prototyp.html` mit erfundenen, als «Beispiel» gekennzeichneten
+  Texten; erreichbar nur über die Adresse, bis 22.3 den Knopf in der Kopfzeile bringt.
+
+## Umsetzung (Aufgabe 22.3, 21.11.2026)
+- **Kopfzeile:** «Hilfe» steht neben dem Farbschema-Knopf, für alle Besucher und mit zugänglichem Namen. Unter 600 px
+  bleibt nur das Symbol sichtbar. Das neue Symbol `hilfe` wurde am Ende von `SYMBOLE` ergänzt.
+- **Leiste:** zweiter `mat-sidenav` am Ende des bestehenden Rahmens, als Overlay mit maximal 420 px Breite ab 960 px und
+  voller Breite auf schmalen Geräten. Inhalt wird erst beim ersten Öffnen mit `@defer` geladen. Der Dialog erhält Fokus
+  auf der Überschrift, Escape und die Material-Fokusfalle bleiben aktiv; beim Schliessen kehrt der Fokus zum Auslöser
+  zurück. Jede App-Navigation schliesst die Leiste.
+- **Kontext und Sichtbarkeit:** `hilfeKontext` nutzt `aktiverPfad`, wählt den längsten zugeordneten Pfad und gibt einen
+  Anker nur zurück, wenn er in `sichtbareAnker(sichtbareAbschnitte(...))` liegt. Ohne passenden oder sichtbaren Kontext
+  zeigt die Leiste das gefilterte Inhaltsverzeichnis. Rollen werden nur bei angemeldetem Benutzer mit Mandant und Rolle
+  gesetzt. Im `/hilfe`-Kontext gibt es absichtlich keinen zugeordneten Pfad; beim Anzeigen von Anleitungstext in der
+  Leiste entfallen dessen Überschriften-IDs, damit keine doppelten IDs mit der ganzen Anleitung entstehen.
+- **Navigation:** Abschnittslinks in der Leiste wechseln den Inhalt ohne Navigation. Links zu App-Seiten schliessen die
+  Leiste; «Ganze Anleitung öffnen» führt zu `/hilfe#<anker>`. Die Seite darunter wird nicht neu erzeugt und ihre
+  ungespeicherten Eingaben bleiben erhalten.
+- **Abweichungen vom Entwurf:** Der Dienst heisst `HilfeLeiste` mit `oeffnen(anker, ausloeser)` (der Auslöser gibt den
+  Fokus beim Schliessen zurück), `offen()` statt `hilfeOffen()` und der gemeinsamen `rolle()` für Kontext und
+  Inhaltsverzeichnis. Der Kontext heisst `hilfeKontext(url, rolle, katalog)`. Der Knopf trägt den festen zugänglichen
+  Namen «Hilfe» (nicht «Hilfe zu <Abschnitt>»); der Abschnitt zeigt sich in der geöffneten Leiste.
+- **Pflege und Nachweis:** `erste-schritte.md` und `probleme.md` beschreiben den Kopfzeilenknopf. `hilfe-kontext.spec.ts`
+  prüft längste Pfade und verborgene Abschnitte, `hilfe-leiste.spec.ts` den Dienst (Fokusrückgabe, Rolle); Browser-Szenarien zu 4.1–4.5 (inkl. Leistenbreite und angemeldet ohne Rolle) liegen in
+  `features/hilfe/hilfe-leiste.feature`.
+
+## Umsetzung (Aufgabe 22.6, 21.11.2026)
+Abschnitte `suche`, `chat`, `kontakte`, `wissen` und `wissen-entwuerfe` mit Dateien unter `frontend/public/anleitung/`,
+Einträgen im Katalog (Bedingungen wie im Menü: A2, A2, A6, A15, A17) und Titeln in `TEXTE.hilfe.abschnitte`. Beschrieben
+ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `texte.de-CH.ts`.
+- **Reihenfolge:** Die Einträge stehen vor `probleme` in der Reihenfolge von Requirement 6.1; `dokument` (Aufgabe 22.5)
+  gehört zwischen `chat` und `kontakte`.
+- **Pfade, abweichend von der Tabelle «Hilfe-Katalog»:** `wissen` trägt zusätzlich `/wissen/entwuerfe/meine` und
+  `/wissensbasis`. Sonst ordnete die Hilfe-Leiste «Meine Analysevorschläge» (A18) dem Unterabschnitt `wissen-entwuerfe`
+  (A17) zu, und `mitarbeiter` sähe nur das Inhaltsverzeichnis (Requirement 4.3); «Einstellungen und Export» (A19) hätte
+  keinen Kontext. Beide Seiten beschreibt `wissen.md`. Den Gleichlauf mit `MENUE` berührt das nicht, weil das Menü diese
+  Pfade nicht kennt; `hilfe-katalog.spec.ts` prüft die Zuordnung.
+- **Rechte innerhalb eines Abschnitts:** Für A12 (Kontakte pflegen), A18 und A19 gibt es keinen Unterabschnitt. Die Texte
+  nennen solche Teile bedingt («Steht unter einer Antwort der Knopf …», «Sehen Sie den Knopf …») oder, bei den Kontakten,
+  wie die Einleitung der Seite («kann nur der Inhaber»), ohne eigene Liste der Rechte (Requirement 6.5, 6.6).
+- **Chat:** keine Beispielfragen aus `product.md` (Requirement 9.5), sondern erfundene mit «Muster AG». Weil
+  `kennzahl` und `offene_posten` von den Finanzfunktionen des Mandanten und `vollstaendigkeit` von der Rolle abhängen
+  (Spec 02, 3.1, 4.2), nennt der Text diese Auswertungen mit «je nach Ihrer Rolle und den Funktionen Ihres Archivs»; die
+  Texte bleiben für alle Mandanten gleich (Requirement 2.4).
+- **Nicht beschrieben, weil die Oberfläche es nicht anbietet:** Ingest erneut starten (A16), Seite von Hand anlegen
+  (Spec 04, 6.9), Lint starten und «Quelle prüfen» bestätigen (Spec 04, 15.2), Löschen der Gespräche nach 12 Monaten.
+- **Verweise** nur auf Anker, die der Katalog auf `main` schon kennt (`#suche`, `#chat`, `#wissen`); einen Verweis auf
+  `#dokument` kann 22.5 oder ein späterer PR ergänzen.
+- **Befund:** Die Meldung `TEXTE.chat.zuViele` duzt («Du hast in dieser Stunde …»), die übrige App siezt
+  (Requirement 9.3). Die Anleitung umschreibt die Meldung, statt sie zu zitieren; die Meldung selbst ändert 22.6 nicht.
+- **Nachweis:** `hilfe-katalog.spec.ts` (Reihenfolge, Bedingungen und Eltern; Sichtbarkeit je Rolle nach Requirement 2.2
+  und Spec 04, 12.1; Zuordnung der Wissenspfade), `anleitung-inhalt.spec.ts` für die neuen Dateien und
+  `features/hilfe/anleitung-suche-wissen.feature` (`@req-6.1`: jede Datei kommt mit dem Prod-Build, wie 22.5); 6.4 und
+  6.6 per Review (Nachweis: Dokument).
+
+## Umsetzung (Aufgabe 22.7, 21.11.2026)
+- **Katalog:** Block «Bestand und Verwaltung» vor `probleme`: `importe` (A12, `/importe`, deckt auch `/importe/:id`),
+  `jahresexport` (`EXPORT`, `/export`), `verwaltung` (A11, A13 oder A14, ohne Pfad, kurze Einleitung) mit
+  `verwaltung-dokumentarten` (A11), `verwaltung-protokoll` (A13), `verwaltung-api-tokens` (A14), Bedingungen und Pfade wie
+  in `MENUE`; Titel in `TEXTE.hilfe.abschnitte`. `hilfe-katalog.spec.ts` prüft zusätzlich die Reihenfolge der vorhandenen
+  Abschnitte nach Requirement 6.1 (Teilfolge, weil 22.5 und 22.6 ihre Abschnitte selbst bringen), dass ein Unterabschnitt
+  direkt im Block seines Abschnitts steht und `<eltern>-` im Anker trägt, sowie die Einträge dieses Blocks. Vollständig
+  nach 6.1 ist der Katalog, wenn 22.5, 22.6 und 22.7 auf `main` liegen; wer zuletzt merged, kann die Teilfolge zur
+  Gleichheit verschärfen.
+- **Texte nach dem Code, nicht nach dem Prototyp:** Die Abschnitte nennen Menüpunkte, Knöpfe und Meldungen aus
+  `texte.de-CH.ts` und beschreiben nur, was die Seiten tun. Befunde dabei: Die Seite «API-Tokens» stellt keine Tokens aus
+  (nur Ablaufdatum und Widerruf); die Anleitung verweist für neue Tokens auf die Unterlagen des Betriebs (README,
+  «API-Token für Skripte»). Der Jahresexport meldet sich per E-Mail an den Empfänger der Benachrichtigungen des Mandanten
+  (`archiv.benachrichtigung.empfaenger.<mandant>`), nicht an die anfordernde Person, und die Liste zeigt die 20 neuesten
+  Exporte des Mandanten; die Anleitung sagt das so, obwohl die Seite nach dem Anfordern «Sie erhalten eine E-Mail …»
+  meldet. Verweise innerhalb der Anleitung gehen auf Seiten der App (`/kontakte`, `/verwaltung/protokoll`,
+  `/verwaltung/api-tokens`), nicht auf Anker anderer Aufgaben, damit die Dateien ohne 22.5 und 22.6 gültig sind.
+- **`probleme`:** ergänzt um Meldungen, die mehrere Bereiche teilen (`httpFehler`: keine Verbindung, nicht erreichbar,
+  fehlendes Recht, Daten inzwischen geändert, zu viele Anfragen) und den Hinweis zur nicht ladbaren Anleitung (7.6);
+  Ansprechperson neutral. Knopf «Hilfe» (22.3) und Verweise auf `#erfassen-offline` (22.5) fehlen weiter, weil beides noch
+  nicht auf `main` liegt (6.4); die Aufgabe, die zuletzt merged, ergänzt sie.
+- **`docs/` nach E10:** `docs/anleitung-geschaeftsstelle.md` behält Zugang und Kontaktstelle, die Angaben der
+  Dokumentarten des Mandanten `vhf-gsk` und die Regeln für die Webseite (Zugriffsstufe, Veröffentlichen, Zurückziehen),
+  weil die App-Texte für alle Mandanten gleich sind und ein Satz zur Webseite nach dem offenen Punkt 2.4 nicht in die App
+  kommt; die Bedienung (Anmelden, Erfassen, Eingangskorb, Suche, allgemeine Meldungen) verweist auf `/hilfe#…`.
+  `docs/anleitung-verwaltung.md` bleibt Entwurf von Spec 06 mit einem Verweis auf `/hilfe#verwaltung`.
+  Betreiber-Anleitungen (`docs/wiederherstellung.md`, `docs/notfall/`, `docs/verfahren/`, README) bleiben unverändert.
+- **Pflegeregel (7.5):** `tech.md` (Definition of Done) nennt die Regel seit dem Merge von Spec 07 «für jeden Bereich,
+  sobald sein Abschnitt auf `main` liegt, nach Spec 07, Aufgabe 22.7 für alle»; mit dieser Aufgabe greift sie für
+  Importe, Jahresexport und Verwaltung, für die übrigen Bereiche mit 22.5 und 22.6.
+- **Nachweis:** 6.1 mit `features/hilfe/anleitung-bestand-verwaltung.feature` (`@req-6.1`, `@req-7.1`, Dateien aus dem
+  Prod-Build) und `hilfe-katalog.spec.ts` (Reihenfolge); 6.4, 6.6, 7.5 und 7.7 Nachweis: Dokument (Review des PR).
 
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,

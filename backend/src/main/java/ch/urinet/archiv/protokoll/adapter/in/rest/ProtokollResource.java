@@ -88,7 +88,7 @@ public class ProtokollResource {
             @Schema(nullable = true) String rolle,
             @Schema(required = true) Instant gueltigVon,
             @Schema(nullable = true) Instant gueltigBis,
-            @Schema(required = true, enumeration = {"AKTION", "AUSTRITT", "WIDERRUF"}) String anlass,
+            @Schema(required = true, enumeration = {"AKTION", "AUSTRITT", "WIDERRUF", "ANLAGE", "UEBERNAHME"}) String anlass,
             @Schema(nullable = true, description = "Kennung, die Austritt oder Widerruf erfasst hat") String erfasstVon) {
     }
 

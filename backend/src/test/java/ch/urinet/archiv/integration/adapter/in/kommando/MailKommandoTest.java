@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Aufruf von {@code archiv mail …} (Spec 02, Aufgabe 6.2): Passwort nur über stdin, nie in Ausgabe oder Fehlertext. Den
- * Weg über {@code ArchivMain.main} (Lesen vor dem Start) prüft {@code MailKommandoStartTest}.
+ * Weg über {@code ArchivMain.main} (Lesen vor dem Start) prüft {@code IntegrationKommandoStartTest}.
  */
 class MailKommandoTest {
 

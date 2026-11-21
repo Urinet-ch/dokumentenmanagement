@@ -167,11 +167,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 19.1–19.23, 19.26, 14.3, 17.2_
   - _Abhängig von: 14.2 (Entwurf, Diff, Freigabe, manueller Entwurf), 15.5 (OKF-Export, Paketformat)_
 
-- [ ] 15.7 Prüfwerkzeug `wissen_paket` [Backend]
+- [x] 15.7 Prüfwerkzeug `wissen_paket` [Backend]
   - `tools/wissen_paket` (Java 25, picocli, Shade-Jar, SpotBugs wie `tools/drive_import`), Kommandos `validate` und `bauen`, Option `--quellen`; bindet den Quelltext von `wissen/domain` und `gemeinsam/domain/Seitentext*` per `build-helper-maven-plugin` ein (design.md, «Prüfwerkzeug»); `OfflineKontext`; Bericht nur mit Befund-Codes und Pfaden (`--json`), Rückgabewert 0/1; reproduzierbares ZIP; kein Netz, keine Zugangsdaten
   - CI: eigener Schritt für `tools/wissen_paket` und Pfadfilter für Änderungen an `wissen/domain`; `README.md` des Werkzeugs
   - `PaketRegelnGleichheitTest` (JUnit, Nachweis für 19.27): dieselben Beispielpakete wie 15.6 ergeben dieselben Befund-Listen; Test, dass das Werkzeug keine Netzverbindung aufbaut und keine Datei ausser dem Ausgabe-ZIP schreibt
-  - Teil erledigt (PR #379, #395, #396): Offline-Werkzeug und Tests; `PaketRegelnGleichheitTest` vergleicht die offline prüfbaren Codes und Pfade von Werkzeug und tatsächlicher REST-Antwort für 18 Beispielpakete. Der CI-Schritt läuft bei jeder Nicht-Spec-Änderung und damit auch bei Änderungen an `wissen/domain`. Abweichung von design.md: Der Bericht enthält Befund-Codes und Pfade, aber keine Zähler (Requirement 19.27 verlangt nur Codes und Pfade). Offen bleibt der Laufzeitnachweis, dass das Werkzeug keine Netzverbindung aufbaut: Der vorhandene Netz-Test durchsucht nur die eigenen Klassen statisch nach Bytecode; die Paketgrenze sichert die ArchUnit-Regel im Backend.
+  - Erledigt (PR #379, #395, #396, #413): Offline-Werkzeug und Tests; `PaketRegelnGleichheitTest` vergleicht die offline prüfbaren Codes und Pfade von Werkzeug und tatsächlicher REST-Antwort für 18 Beispielpakete. Der CI-Schritt läuft bei jeder Nicht-Spec-Änderung und damit auch bei Änderungen an `wissen/domain`. Abweichung von design.md: Der Bericht enthält Befund-Codes und Pfade, aber keine Zähler (Requirement 19.27 verlangt nur Codes und Pfade). `WissenPaketNetzTest` prüft unter Linux mit `strace` zur Laufzeit `bauen` und `validate` samt Quellenprüfung und Kindprozessen; eine Loopback-Gegenprobe belegt die Erkennung. Der Test hängt von `strace` und ptrace; der CI-Schritt «strace bereitstellen» installiert es bei Bedarf, fehlt es trotzdem, schlägt der Test fehl (kein stilles Überspringen). Ein Marker der Attrappe `pdftotext` belegt, dass die Quellenprüfung wirklich lief. Zusätzlich durchsucht der bisherige Netz-Test die eigenen Klassen statisch nach Bytecode; die Paketgrenze sichert die ArchUnit-Regel im Backend.
   - Abgrenzung: nur das Paketformat und die Domain-Regeln aus 13.4/15.6 werden gebraucht, nicht der Endpunkt; Aufgabe 15.6 und 15.7 dürfen parallel laufen, sobald `WissensPaketLeser` steht (Klasse aus 15.6, zuerst mergen)
   - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.25, 19.27_
   - _Abhängig von: 13.4 (`WissensPruefung`), Paketformat aus 15.6 (`WissensPaketLeser`)_
@@ -184,12 +184,24 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
 ## Welle 16 — Abnahme Phase 4
 
-- [ ] 16.1 Sicherheits- und Isolationstests [QA]
+- [x] 16.1 Sicherheits- und Isolationstests [QA]
   - Szenario `@req-18.5` mit zwei Mandanten und allen Rollen über Index, Seiten, Suche, Log, Entwürfe, Chat-Werkzeuge und Export; `MandantenIsolationIT` (Spec 03) um die Wissensbasis erweitern
   - Prompt-Injection-Prüfung aus 14.1 über alle Wege wiederholen, auch über Pakete (Import, 15.6); Befunde beheben
   - Import in die Isolation einbeziehen (`@req-19.29`): zwei Mandanten, alle Rollen und API-Token; Paket mit der SHA-256 eines Dokuments des anderen Mandanten, Zip-Slip, Symlink, Zip-Bombe, YAML mit Tag und Alias, Rohhtml, externer Link und `cloud` mit `INTERN` je abgelehnt bzw. mit Befund (Beispielpakete aus 15.6)
   - _Anforderungen: 11.5, 11.6, 18.5, 19.29_
   - _Abhängig von: 15.1–15.8_
+  - Isolation und Angriffswege mit synthetischen Daten automatisiert geprüft; der Lauf gegen den echten Bestand auf Stufe B
+    und das Gate bleiben Aufgabe 16.2 [Fabian].
+  - Prompt-Injection je Weg (Weg → Szenario): Ingest `ingest.feature` (aus 14.1); Chat-Lesewerkzeuge `sichtbarkeit-rechte.feature`
+    (@req-11.6); Analysevorschlag `chat-analyse.feature` (Anweisung in der Chatantwort, ohne KI-Aufruf); Lint `lint.feature`;
+    Import `import.feature` (Anweisung mit und ohne Rohhtml). Der manuelle Entwurf ruft keine KI auf; sein Text stammt vom
+    Inhaber selbst und ist kein Injektionsweg. Es wurden keine Befunde gefunden, die Produktcode ändern.
+  - Auslegung Import (@req-19.29): Die Angriffspakete laufen über die gemeinsamen Beispielpakete (`WissensPaketBeispiele`) und
+    prüfen Paketleser und REST-Import auf gleiche Ergebnisse; der Mandant stammt immer aus der Anmeldung, die Regelgleichheit ist
+    rollenunabhängig. Die Rollen- und Mandantenprüfung läuft mit einem gültigen Paket (`rechte()`); die Fremd-SHA wird in
+    Richtung urinet geprüft. Offen und bewusst nicht getestet: Fremd-SHA und Angriffspakete aus Sicht von `inhaber-vhf-gsk`.
+  - Entwurfsliste (`GET /wissensentwuerfe`) mit Mandant und Rolle geprüft: Inhaber und Geschäftsstelle (A17) sehen nur die Entwürfe
+    des eigenen Mandanten, der Mitarbeiter (A18) nur eigene Analysevorschläge, der Treuhänder erhält 403.
 
 - [ ] 16.2 Prüfliste und Gate [Fabian] [QA]
   - `wissen-pruefliste.yaml` (Wissensquellen, Fussnoten-Stichprobe, Fragen mit erwarteten Seiten und Quelldokumenten) nur unter `ARCHIV_GOLDEN_DIR`; im Repo nur Schema und Test `WissenPrueflisteIT`
