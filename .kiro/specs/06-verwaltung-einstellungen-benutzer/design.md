@@ -617,7 +617,10 @@ höchstens einmal nach 200 ms. Drei Fehler innerhalb 30 Sekunden öffnen den Sch
 
 Die Admin-Basisadresse kommt im Profil `prod` aus `ARCHIV_KEYCLOAK_ADMIN_URL`; ohne URL oder Dienstkonto-Secret meldet
 der Adapter den Dienst als nicht erreichbar, ohne einen Ersatz-Endpunkt zu verwenden. Das Dienstkonto-Secret wird nur
-aus `keycloak_verwaltung_secret` gelesen und von `SecretPruefung` für `api` und `kommando` verlangt. Eine eigene
+aus `keycloak_verwaltung_secret` gelesen und von `SecretPruefung` für `api` und `kommando` verlangt, sobald
+`archiv.verwaltung.keycloak.basis-url` gesetzt ist (Hotfix 21.11.2026, Deploy-Lauf 44922011116: ohne Secret im Bundle
+startete die API in Stufe A in Schleife; Secret und Adresse kommen erst mit 19.3 ins Deploy). Ohne Adresse startet die
+API, die Benutzerverwaltung meldet bis 19.3 `IDENTITAETSDIENST_NICHT_ERREICHBAR`. Eine eigene
 `@HealthGroup("detail")` prüft, ob ein Token geholt werden kann; sie gehört weder zur Liveness noch zur Readiness.
 WireMock-Tests decken Mandantenfilter, Zeitüberschreitung, 5xx-Wiederholung, 401, Schreibaufruf ohne Wiederholung und
 Schutzschalter ab.

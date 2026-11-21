@@ -322,7 +322,8 @@ und nur im Mandanten des Inhabers anfasst, damit ein Fehler oder ein Einbruch in
    (Spec 01, Plattform und Betrieb). Nachweis: JUnit (`ComposeRoutenTest`-Muster aus Spec 01, Aufgabe 1.9).
 4. Das Archiv SOLL das Geheimnis des Dienstkontos nur als Secret-Datei `keycloak_verwaltung_secret` führen (GitHub-Secret
    `KEYCLOAK_VERWALTUNG_SECRET`; nie im Realm-Export, im Repository, in Umgebungsvariablen, Logs oder Antworten); die
-   Startprüfung `SecretPruefung` SOLL die Datei in `prod` für die Laufart `api` und das Admin-Kommando verlangen.
+   Startprüfung `SecretPruefung` SOLL die Datei in `prod` für die Laufart `api` und das Admin-Kommando verlangen, sobald die
+   Admin-Adresse (`archiv.verwaltung.keycloak.basis-url`) gesetzt ist.
    Nachweis: JUnit (`SecretPruefungTest` erweitert, `RealmExportTest`).
 5. Das Archiv SOLL Verbindungsaufbau und Anfrage zu Keycloak begrenzen (Standard 2 und 5 Sekunden,
    `archiv.verwaltung.keycloak.verbindungs-zeitgrenze` und `….zeitgrenze`), höchstens 2 Aufrufe gleichzeitig zulassen
