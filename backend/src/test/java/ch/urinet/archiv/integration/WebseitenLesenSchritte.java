@@ -48,6 +48,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -594,10 +597,9 @@ public class WebseitenLesenSchritte {
         }
         Instant bis = Instant.parse(antwort.path("gueltigBis"));
         long restMillis = Duration.between(Instant.now(), bis).toMillis();
-        assertThat(("http".equals(url.getScheme()) || "https".equals(url.getScheme()))
-                && restMillis > 0 && restMillis <= Duration.ofSeconds(300).toMillis())
-                .as("Die Datei-Adresse muss per HTTP(S) erreichbar sein und höchstens 300 Sekunden gelten")
-                .isTrue();
+        assertThat(url.getScheme()).as("Schema der Datei-Adresse").isIn("http", "https");
+        assertThat(restMillis).as("Restlaufzeit gemäss gueltigBis in ms").isPositive()
+                .isLessThanOrEqualTo(Duration.ofSeconds(300).toMillis());
 
         String query = url.getRawQuery();
         if (query == null || query.isBlank()) {
@@ -612,34 +614,35 @@ public class WebseitenLesenSchritte {
         }
         Set<String> sigV4Parameter = Set.of("X-Amz-Algorithm", "X-Amz-Credential", "X-Amz-Date",
                 "X-Amz-Expires", "X-Amz-SignedHeaders", "X-Amz-Signature");
-        assertThat(parameter.keySet().containsAll(sigV4Parameter))
-                .as("Die Datei-Adresse muss die SigV4-Signaturparameter enthalten").isTrue();
-        assertThat("AWS4-HMAC-SHA256".equals(parameter.get("X-Amz-Algorithm"))
-                && !parameter.get("X-Amz-Credential").isBlank()
-                && parameter.get("X-Amz-Date").matches("\\d{8}T\\d{6}Z")
-                && parameter.get("X-Amz-SignedHeaders").contains("host")
-                && parameter.get("X-Amz-Signature").matches("[0-9a-f]{64}"))
-                .as("Die Datei-Adresse muss eine vollständige SigV4-Signatur enthalten").isTrue();
+        assertThat(parameter.keySet()).as("SigV4-Signaturparameter").containsAll(sigV4Parameter);
+        assertThat(parameter.get("X-Amz-Algorithm")).isEqualTo("AWS4-HMAC-SHA256");
+        assertThat(parameter.get("X-Amz-Credential")).isNotBlank();
+        assertThat(parameter.get("X-Amz-Date")).matches("\\d{8}T\\d{6}Z");
+        assertThat(parameter.get("X-Amz-SignedHeaders")).contains("host");
+        assertThat(parameter.get("X-Amz-Signature")).matches("[0-9a-f]{64}");
         String ablauf = parameter.get("X-Amz-Expires");
         if (!ablauf.matches("\\d+")) {
             throw new AssertionError("Die SigV4-Ablaufzeit ist ungültig");
         }
         int sekunden = Integer.parseInt(ablauf);
-        assertThat(sekunden > 0 && sekunden <= 300)
-                .as("Die SigV4-Ablaufzeit darf höchstens 300 Sekunden betragen").isTrue();
+        assertThat(sekunden).as("X-Amz-Expires in Sekunden").isPositive().isLessThanOrEqualTo(300);
+        Instant signiertBis = LocalDateTime.parse(parameter.get("X-Amz-Date"),
+                DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")).toInstant(ZoneOffset.UTC).plusSeconds(sekunden);
+        assertThat(Duration.between(signiertBis, bis).abs().toSeconds())
+                .as("Abweichung zwischen gueltigBis und X-Amz-Date + X-Amz-Expires in Sekunden")
+                .isLessThanOrEqualTo(5);
 
         HttpResponse<byte[]> dateiAntwort = anonymAbrufen(url);
-        assertThat(dateiAntwort.statusCode() == 200).as("Die signierte S3-Adresse muss anonym abrufbar sein").isTrue();
-        assertThat(sha256Hex(dateiAntwort.body()).equals(sha256Hex(dateiInhalt(dokument))))
-                .as("Die signierte S3-Adresse muss auf die erwartete Datei zeigen").isTrue();
+        assertThat(dateiAntwort.statusCode()).as("Status der anonymen Abfrage der signierten Adresse").isEqualTo(200);
+        assertThat(sha256Hex(dateiAntwort.body())).as("SHA-256 der gelieferten Datei")
+                .isEqualTo(sha256Hex(dateiInhalt(dokument)));
         Map<String, Object> antwortfelder = antwort.path("$");
-        assertThat(antwortfelder.keySet().equals(Set.of("url", "gueltigBis")))
-                .as("Die Antwort darf nur Adresse und Ablaufzeit enthalten").isTrue();
+        assertThat(antwortfelder.keySet()).as("Felder der Antwort").containsExactlyInAnyOrder("url", "gueltigBis");
     }
 
     private static HttpResponse<byte[]> anonymAbrufen(URI url) {
-        try (HttpClient http = HttpClient.newHttpClient()) {
-            return http.send(HttpRequest.newBuilder(url).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        try (HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
+            return http.send(HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(10)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (IOException e) {
             throw new AssertionError("Die signierte S3-Adresse konnte nicht anonym abgerufen werden ("
                     + e.getClass().getSimpleName() + ")");
