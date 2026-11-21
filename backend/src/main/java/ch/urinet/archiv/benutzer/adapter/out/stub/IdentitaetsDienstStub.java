@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -23,27 +22,22 @@ import java.util.UUID;
 @UnlessBuildProfile("prod")
 @Typed(IdentitaetsDienst.class)
 public class IdentitaetsDienstStub implements IdentitaetsDienst {
-    private static final int SEITENGROESSE = 50;
     private final Map<String, Eintrag> benutzer = new HashMap<>();
 
     @Override
-    public synchronized java.util.List<Benutzer> benutzerSuchen(String mandant, String suche, int seite) {
+    public synchronized java.util.List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse) {
         Objects.requireNonNull(mandant);
-        if (seite < 0 || (suche != null && suche.length() > 40)) {
-            throw new IllegalArgumentException("Ungültige Suchanfrage");
-        }
-        String filter = suche == null ? "" : suche.toLowerCase(Locale.ROOT);
+        int start = IdentitaetsDienst.seitenanfang(suche, seite, groesse);
         var treffer = new ArrayList<Benutzer>();
         benutzer.values().stream().filter(e -> e.mandant.equals(mandant))
                 .map(e -> e.wert)
-                .filter(b -> b.benutzername().toLowerCase(Locale.ROOT).contains(filter))
+                .filter(b -> IdentitaetsDienst.passtSuche(suche, b.benutzername(), b.email(), b.vorname(), b.nachname()))
                 .sorted(Comparator.comparing(Benutzer::benutzername))
                 .forEach(treffer::add);
-        long start = (long) seite * SEITENGROESSE;
         if (start >= treffer.size()) {
             return java.util.List.of();
         }
-        return java.util.List.copyOf(treffer.subList((int) start, Math.min((int) start + SEITENGROESSE, treffer.size())));
+        return java.util.List.copyOf(treffer.subList(start, (int) Math.min((long) start + groesse, treffer.size())));
     }
 
     @Override
@@ -60,7 +54,7 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
                 .anyMatch(b -> b.benutzername().equalsIgnoreCase(neu.benutzername())
                         || b.email().equalsIgnoreCase(neu.email()));
         if (vorhanden) {
-            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+            throw new KonfliktException();
         }
         String id = UUID.randomUUID().toString();
         Benutzer wert = new Benutzer(id, neu.benutzername(), neu.email(), neu.vorname(), neu.nachname(), true,

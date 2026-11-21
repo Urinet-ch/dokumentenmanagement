@@ -3,7 +3,10 @@ package ch.urinet.archiv.benutzer.application;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -11,6 +14,8 @@ import java.util.Set;
  * jede Operation mit einer Benutzerkennung prüft die Zugehörigkeit erneut.
  */
 public interface IdentitaetsDienst {
+
+    int MAX_SEITENGROESSE = 50;
 
     /**
      * Der Identitätsdienst meldet einen fachlichen Konflikt (HTTP 409, z. B. Benutzername oder E-Mail vergeben).
@@ -56,7 +61,29 @@ public interface IdentitaetsDienst {
         }
     }
 
-    List<Benutzer> benutzerSuchen(String mandant, String suche, int seite);
+    default List<Benutzer> benutzerSuchen(String mandant, String suche, int seite) {
+        return benutzerSuchen(mandant, suche, seite, MAX_SEITENGROESSE);
+    }
+
+    List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse);
+
+    static int seitenanfang(String suche, int seite, int groesse) {
+        long start = (long) seite * groesse;
+        if (seite < 0 || groesse < 1 || groesse > MAX_SEITENGROESSE || start > Integer.MAX_VALUE
+                || (suche != null && suche.length() > 40)) {
+            throw new IllegalArgumentException("Ungültige Suchanfrage");
+        }
+        return (int) start;
+    }
+
+    static boolean passtSuche(String suche, String... felder) {
+        if (suche == null || suche.isBlank()) {
+            return true;
+        }
+        String filter = suche.toLowerCase(Locale.ROOT);
+        return Arrays.stream(felder).filter(Objects::nonNull)
+                .anyMatch(wert -> wert.toLowerCase(Locale.ROOT).contains(filter));
+    }
 
     Benutzer benutzerLesen(String mandant, String id);
 

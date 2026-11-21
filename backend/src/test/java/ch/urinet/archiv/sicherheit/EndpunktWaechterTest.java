@@ -21,14 +21,20 @@ import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.ws.rs.CookieParam;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HEAD;
+import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.MatrixParam;
 import jakarta.ws.rs.OPTIONS;
 import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
 import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Annotation;
@@ -65,6 +71,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code POST /dokumente/generator} ({@code generator}), beide mit A1; {@code @RolesAllowed} nennt dort zusätzlich die
  * Scope-Rolle, sonst nirgends.
  * <p>
+ * Spec 06, Req 4.8: Die Verwaltung deklariert keine direkten Request-Parameter {@code mandant} oder {@code X-Mandant}
+ * und kein {@code {mandant}} im Pfad; der Mandant kommt aus der Anmeldung.
+ * <p>
  * Geprüft werden alle konkreten Klassen (main und test), in deren Hierarchie (Oberklassen, Interfaces) ein
  * {@code @Path} steht. Das HTTP-Verb und {@code @Path} der Methode dürfen aus Interface oder Oberklasse stammen, die
  * Sicherheitsannotationen werden an der Implementierung gelesen (dort liest sie der Filter). Eine Methode mit
@@ -78,6 +87,10 @@ class EndpunktWaechterTest {
     // Attrappen mit @Path in der Hierarchie registrierte Quarkus sonst als echte Ressourcen; die Eigenschaft ist nie gesetzt
     static final String ATTRAPPE = "archiv.test.waechter-attrappe";
     private static final Pattern PARAMETER = Pattern.compile("\\{");
+    private static final Pattern MANDANT_IM_PFAD =
+            Pattern.compile("\\{\\s*mandant\\s*(?::[^}]*)?}", Pattern.CASE_INSENSITIVE);
+    private static final List<String> VERWALTUNG = List.of("/rollen", "/benutzer", "/mandant/einstellungen",
+            "/wissensbasis/einstellungen", "/konfiguration/versionen");
     // {id} mit optionalem Regex, der selbst Klammern enthalten darf, z. B. {id:[0-9a-f-]{36}}
     private static final String ID = "\\{\\s*id\\s*(:([^{}]|\\{[^{}]*})*)?}";
     private static final Pattern DOKUMENT_ID = Pattern.compile(ID);
@@ -130,6 +143,14 @@ class EndpunktWaechterTest {
         assertThat(verstoesse(KorrektNichtDokumentbezogen.class)).isEmpty();
         assertThat(verstoesse(KorrektMitScope.class)).isEmpty();
         assertThat(verstoesse(KorrektUeberInterface.class)).isEmpty();
+        assertThat(verstoesse(VerwaltungMitMandant.class)).singleElement().asString()
+                .contains("kein Mandant aus Parametern");
+        assertThat(verstoesse(VerwaltungMitMandantenHeader.class)).singleElement().asString()
+                .contains("kein Mandant aus Parametern");
+        assertThat(verstoesse(VerwaltungMitMandantImPfad.class)).singleElement().asString()
+                .contains("kein Mandant aus Parametern");
+        assertThat(verstoesse(EinstellungenMitMandant.class)).singleElement().asString()
+                .contains("kein Mandant aus Parametern");
         assertThat(verstoesse(WebseiteOhneWebseitenZugang.class)).singleElement().asString()
                 .contains("jede Methode unter /public/ verlangt @WebseitenZugang");
         assertThat(verstoesse(WebseitenZugangAusserhalbPublic.class)).singleElement().asString()
@@ -171,6 +192,13 @@ class EndpunktWaechterTest {
             }
             String pfad = klassenPfad + "/" + deklarationen.stream().map(m -> m.getAnnotation(Path.class))
                     .filter(Objects::nonNull).map(Path::value).findFirst().orElse("");
+            String normalerPfad = normalisiert(pfad);
+            if (VERWALTUNG.stream().anyMatch(p -> normalerPfad.equals(p) || normalerPfad.startsWith(p + "/"))
+                    && (MANDANT_IM_PFAD.matcher(pfad).find()
+                    || deklarationen.stream().flatMap(m -> Arrays.stream(m.getParameterAnnotations()))
+                            .flatMap(Arrays::stream).anyMatch(EndpunktWaechterTest::mandantParameter))) {
+                verstoesse.add(name + ": kein Mandant aus Parametern der Verwaltung");
+            }
             boolean unterPublic = normalisiert(klassenPfad).equals("/public")
                     || normalisiert(klassenPfad).startsWith("/public/");
             WebseitenZugang webseitenZugang = methode.getAnnotation(WebseitenZugang.class);
@@ -178,6 +206,7 @@ class EndpunktWaechterTest {
                 if (!unterPublic) {
                     verstoesse.add(name + ": @WebseitenZugang nur unter /public/");
                 }
+
                 WebseitenErfassungAktion webseitenAktion = methode.getAnnotation(WebseitenErfassungAktion.class);
                 if (webseitenZugang.value() == WebseitenZugang.Art.ERFASSUNG) {
                     if (webseitenAktion == null) {
@@ -263,6 +292,19 @@ class EndpunktWaechterTest {
     }
 
     /** Pfad ohne doppelte und abschliessende Schrägstriche. */
+    private static boolean mandantParameter(Annotation annotation) {
+        String parameter = switch (annotation) {
+            case QueryParam p -> p.value();
+            case PathParam p -> p.value();
+            case HeaderParam p -> p.value();
+            case CookieParam p -> p.value();
+            case FormParam p -> p.value();
+            case MatrixParam p -> p.value();
+            default -> "";
+        };
+        return parameter.equalsIgnoreCase("mandant") || parameter.equalsIgnoreCase("x-mandant");
+    }
+
     private static String normalisiert(String pfad) {
         String ohneDoppelte = pfad.replaceAll("/{2,}", "/");
         return ohneDoppelte.length() > 1 && ohneDoppelte.endsWith("/")
@@ -523,6 +565,42 @@ class EndpunktWaechterTest {
         }
 
         public void keinEndpunkt() {
+        }
+    }
+
+    static class VerwaltungMitMandant {
+        @GET
+        @Path("/rollen")
+        @ErfordertAktion(Aktion.A21)
+        @RolesAllowed("inhaber")
+        public void lesen(@QueryParam("mandant") String mandant) {
+        }
+    }
+
+    static class VerwaltungMitMandantImPfad {
+        @GET
+        @Path("/benutzer/{mandant}")
+        @ErfordertAktion(Aktion.A21)
+        @RolesAllowed("inhaber")
+        public void lesen() {
+        }
+    }
+
+    static class VerwaltungMitMandantenHeader {
+        @GET
+        @Path("/benutzer")
+        @ErfordertAktion(Aktion.A21)
+        @RolesAllowed("inhaber")
+        public void lesen(@HeaderParam("X-Mandant") String mandant) {
+        }
+    }
+
+    static class EinstellungenMitMandant {
+        @GET
+        @Path("/mandant/einstellungen")
+        @ErfordertAktion(Aktion.A20)
+        @RolesAllowed("inhaber")
+        public void lesen(@QueryParam("mandant") String mandant) {
         }
     }
 
