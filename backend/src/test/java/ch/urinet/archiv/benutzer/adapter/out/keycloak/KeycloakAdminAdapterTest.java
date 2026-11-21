@@ -757,6 +757,46 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void erforderlicheAktionenErgaenzenErhaeltBestehendeUndPrueftDenMandanten() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(okJson("""
+                {"id":"benutzer-1","attributes":{"mandant":["urinet"]},
+                 "requiredActions":["SYNTHETISCHE_AKTION","VERIFY_EMAIL"]}
+                """)));
+        server.stubFor(put(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(aResponse().withStatus(204)));
+        KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> adapter.aktionenHinzufuegen("vhf-gsk", "benutzer-1",
+                Set.of(ErforderlicheAktion.UPDATE_PASSWORD)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN));
+        server.verify(0, putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1")));
+
+        adapter.aktionenHinzufuegen("urinet", "benutzer-1",
+                Set.of(ErforderlicheAktion.VERIFY_EMAIL, ErforderlicheAktion.UPDATE_PASSWORD));
+
+        server.verify(1, putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1"))
+                .withRequestBody(equalToJson("""
+                        {"id":"benutzer-1","attributes":{"mandant":["urinet"]},
+                         "requiredActions":["SYNTHETISCHE_AKTION","VERIFY_EMAIL","UPDATE_PASSWORD"]}
+                        """)));
+    }
+
+    @Test
+    void ungueltigeErforderlicheAktionenWerdenNichtUeberschrieben() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(okJson("""
+                {"id":"benutzer-1","attributes":{"mandant":["urinet"]},"requiredActions":"ungueltig"}
+                """)));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .aktionenHinzufuegen("urinet", "benutzer-1", Set.of(ErforderlicheAktion.CONFIGURE_TOTP)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+        server.verify(0, putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1")));
+    }
+
+    @Test
     void anlegenLoeschtBenutzerBeiFehlerEvenBeiOffenemSchutzschalter() {
         tokenAntwort();
         server.stubFor(post(urlPathEqualTo(USERS)).willReturn(aResponse().withStatus(201)

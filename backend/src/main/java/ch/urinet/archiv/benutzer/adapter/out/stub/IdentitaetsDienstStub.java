@@ -100,6 +100,15 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
     }
 
     @Override
+    public synchronized void aktionenHinzufuegen(String mandant, String id, Set<ErforderlicheAktion> aktionen) {
+        Eintrag e = finden(mandant, id);
+        Benutzer b = e.wert;
+        var alle = new java.util.HashSet<>(b.aktionen());
+        alle.addAll(Objects.requireNonNull(aktionen));
+        e.wert = kopie(b, b.aktiv(), b.rollen(), alle, b.totp(), b.google());
+    }
+
+    @Override
     public synchronized void einladen(String mandant, String id, Set<ErforderlicheAktion> aktionen, Duration gueltigkeit) {
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
             throw new IllegalArgumentException("Ungültige Gültigkeit");

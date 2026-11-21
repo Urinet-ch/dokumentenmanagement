@@ -121,6 +121,8 @@ public interface IdentitaetsDienst {
 
     void aktivieren(String mandant, String id, boolean aktiv);
 
+    void aktionenHinzufuegen(String mandant, String id, Set<ErforderlicheAktion> aktionen);
+
     void einladen(String mandant, String id, Set<ErforderlicheAktion> aktionen, Duration gueltigkeit);
 
     void sitzungenBeenden(String mandant, String id);

@@ -8,6 +8,7 @@ import ch.urinet.archiv.sicherheit.domain.Rolle;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -41,6 +42,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 
 /**
  * Beschränkt den Zugriff des Dienstkontos auf die ausdrücklich freigegebene Keycloak-Admin-API (Spec 06, Req 5).
@@ -280,6 +282,25 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         ObjectNode benutzer = (ObjectNode) benutzerAbrufen(mandant, id);
         benutzer.put("enabled", aktiv);
         request("PUT", user(id), null, benutzer, false, Set.of(204));
+    }
+
+    @Override
+    public void aktionenHinzufuegen(String mandant, String id, Set<ErforderlicheAktion> aktionen) {
+        Objects.requireNonNull(aktionen);
+        ObjectNode benutzer = (ObjectNode) benutzerAbrufen(mandant, id);
+        JsonNode bisher = benutzer.get("requiredActions");
+        if (bisher != null && !bisher.isArray()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        ArrayNode alle = bisher == null ? json.createArrayNode() : (ArrayNode) bisher;
+        for (ErforderlicheAktion aktion : aktionen) {
+            if (StreamSupport.stream(alle.spliterator(), false)
+                    .noneMatch(wert -> wert.isTextual() && aktion.name().equals(wert.textValue()))) {
+                alle.add(aktion.name());
+            }
+        }
+        benutzer.set("requiredActions", alle);
+        nur204(request("PUT", user(id), null, benutzer, false, Set.of(204)));
     }
 
     @Override
