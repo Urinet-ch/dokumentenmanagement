@@ -174,6 +174,11 @@ dass ein Passwort durch meine Hände oder durch das Archiv geht, damit ich Zugä
    antworten. FALLS Benutzername oder E-Mail im Realm schon vergeben sind oder der Benutzername je im
    Benutzerverzeichnis einer anderen Kennung gehörte, DANN SOLL das Archiv mit HTTP 409 `BENUTZER_EXISTIERT`
    antworten, ohne zu nennen, welches Feld oder welcher Mandant betroffen ist.
+   Die Sperre eines je vergebenen Benutzernamens SOLL auch den Abbau eines Mandanten überdauern: Das Archiv SOLL für jeden vergebenen
+   Benutzernamen einen Eintrag in einer gemeinsamen Sperrliste im Schema `public` führen, der nur einen gesalzenen Hash des
+   normalisierten Namens (HMAC-SHA-256 mit Salz aus der Konfiguration), keinen Klarnamen, keine E-Mail, keinen Mandanten und keine
+   Kennung enthält; der Abbau eines Mandanten (Spec 03, 8.3) SOLL diesen Eintrag nicht löschen (Entscheid Fabian 21.11.2026, Weg A;
+   Spec 06 und Spec 03 waren widersprüchlich).
 5. FALLS ein Mandant die Höchstzahl der Benutzer erreicht hat (`archiv.verwaltung.max-benutzer`, Standard 25, nicht
    gelöschte), DANN SOLL das Archiv das Anlegen mit HTTP 409 `STATUS_KONFLIKT` ablehnen.
 6. WENN ein Benutzer mit Recht A22 die Einladung eines Benutzers im Status `EINGELADEN` erneut sendet, DANN SOLL das
