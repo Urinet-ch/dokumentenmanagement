@@ -7,6 +7,9 @@ import dev.langchain4j.service.tool.ToolExecutor;
 import org.jboss.logging.Logger;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Hülle um den Aufruf eines Werkzeugs im Durchgang (Spec 02, Aufgabe 7.2): meldet {@link ChatEreignis.WerkzeugStart}
@@ -52,15 +55,25 @@ final class AgentWerkzeug implements ToolExecutor {
             throw new Abgebrochen();
         }
         if (lauf.runde() > runden) {
+            lauf.melden(WerkzeugErgebnisse.abbilden(json, name, anfrage.arguments(), GRENZE, Instant::now));
             return GRENZE;
         }
         lauf.melden(new ChatEreignis.WerkzeugStart(name));
-        String roh = echt.execute(anfrage, memoryId);
+        String roh;
         try {
-            lauf.melden(WerkzeugErgebnisse.abbilden(json, name, anfrage.arguments(), roh, Instant::now));
+            roh = echt.execute(anfrage, memoryId);
+        } catch (RuntimeException e) {
+            lauf.melden(new ChatEreignis.WerkzeugErgebnis(name, Map.of(), List.of(), Optional.empty()));
+            throw e;
+        }
+        ChatEreignis.WerkzeugErgebnis ergebnis;
+        try {
+            ergebnis = WerkzeugErgebnisse.abbilden(json, name, anfrage.arguments(), roh, Instant::now);
         } catch (RuntimeException e) {
             LOG.warnf("Ergebnis von %s nicht abgebildet: %s", name, e.getClass().getSimpleName());
+            ergebnis = new ChatEreignis.WerkzeugErgebnis(name, Map.of(), List.of(), Optional.empty());
         }
+        lauf.melden(ergebnis);
         return DokumentTexte.kennzeichnen(json, roh,
                 "wissen_index".equals(name) || "wissen_seite_zeigen".equals(name));
     }

@@ -65,7 +65,7 @@ class DokumenteSuchenRueckfallTest {
     @Test
     void fehlerImHybridPfadLiefertVolltexttrefferMitHinweisUndDegradiert() {
         UUID id = UUID.randomUUID();
-        Suchtreffer treffer = new Suchtreffer(id, "VERSICHERUNG", "Police", null, null, "ARCHIVIERT", "NORMAL", List.of(),
+        Suchtreffer treffer = new Suchtreffer(id, "VERSICHERUNG", "Police", null, null, "ARCHIVIERT", "PERSONAL", List.of(),
                 null, null, null, null, null, null, null, List.of(), null);
         SuchePort volltext = (anfrage, regel, mitDateiname) -> {
             assertThat(mitDateiname).isFalse();
@@ -116,6 +116,10 @@ class DokumenteSuchenRueckfallTest {
 
         assertThat(hybrid.aufrufe).isEqualTo(1);
         assertThat(antwort.treffer()).extracting(DokumenteSuchen.Treffer::titel).containsExactly("Police");
+        assertThat(antwort.treffer()).singleElement().satisfies(t -> {
+            assertThat(t.vertraulichkeit()).isEqualTo("PERSONAL");
+            assertThat(t.mitNummer(1).vertraulichkeit()).isEqualTo("PERSONAL");
+        });
         assertThat(antwort.hinweis()).isEqualTo("nur Volltext");
         assertThat(antwort.degradiert()).isTrue();
         assertThat(antwort.gesamt()).isEqualTo(1);

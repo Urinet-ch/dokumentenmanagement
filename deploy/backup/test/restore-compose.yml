@@ -89,6 +89,7 @@ services:
       - archiv_manifest_key
       - keycloak_db
       - keycloak_admin
+      - keycloak_verwaltung_secret
     depends_on:
       db:
         condition: service_healthy
@@ -142,6 +143,8 @@ secrets:
     file: ${ARCHIV_RESTORE_TMP:?}/secrets/keycloak_db
   keycloak_admin:
     file: ${ARCHIV_RESTORE_TMP:?}/secrets/keycloak_admin
+  keycloak_verwaltung_secret:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/keycloak_verwaltung_secret
   restore_oidc_client_secret:
     file: ${ARCHIV_RESTORE_TMP:?}/secrets/restore_oidc_client_secret
   restore_oidc_client:

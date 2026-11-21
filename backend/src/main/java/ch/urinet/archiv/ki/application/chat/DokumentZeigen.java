@@ -71,7 +71,7 @@ public class DokumentZeigen {
     public record Ansicht(String metadaten, String inhalt, Boolean inhaltGekuerzt, Integer inhaltZeichen,
                           String inhaltHinweis, String id, String titel, String art, String datum,
                           String partner, String belegnummer, String betrag, String faelligkeit, Vertrag vertrag,
-                          boolean bestaetigt, String link) {
+                          boolean bestaetigt, String link, String vertraulichkeit) {
     }
 
     private final DokumentRepository dokumente;
@@ -125,7 +125,7 @@ public class DokumentZeigen {
                 inhalt.gekuerzt() ? HINWEIS_GEKUERZT.formatted(INHALT_MAX) : null, id.toString(), d.titel(), d.art(), datum, partner, belegnummer, betrag, faelligkeit,
                 v == null ? null : new Vertrag(Werteformat.datum(v.gueltigAb()), Werteformat.datum(v.gueltigBis()),
                         v.kuendigungsfrist(), Werteformat.datum(v.naechsteFrist())),
-                d.bestaetigtesDokument(), DokumenteSuchen.link(id)));
+                d.bestaetigtesDokument(), DokumenteSuchen.link(id), d.wirksameVertraulichkeit()));
     }
 
     static String metadaten(boolean bestaetigt, String belegnummer, String betrag, String datum, String faelligkeit,

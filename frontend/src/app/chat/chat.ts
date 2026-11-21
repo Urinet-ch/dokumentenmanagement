@@ -14,6 +14,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { Subscription, map } from 'rxjs';
 import { Symbol } from '../gemeinsam/symbol';
+import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import {
   ChatEreignis,
@@ -31,10 +32,14 @@ import {
   istDatenstand,
   tag,
   werkzeugHinweis,
+  wissenLink,
 } from './chat-logik';
 
 /** Eine Nachricht im Verlauf; `fehler` ist die Meldung zu einer Antwort, die nicht fertig wurde. */
 export interface Nachricht {
+  id?: string;
+  analyseMoeglich?: boolean;
+  entwurfId?: string;
   rolle: 'BENUTZER' | 'ASSISTENT';
   inhalt: string;
   quellen: Quelle[];
@@ -46,6 +51,7 @@ export interface Nachricht {
 interface Chip {
   text: string;
   link: string | null;
+  art: 'dokument' | 'wissen' | 'datenstand';
 }
 
 /**
@@ -61,6 +67,7 @@ interface Chip {
 })
 export class Chat {
   private readonly port = inject(ChatPort);
+  protected readonly anmeldung = inject(AnmeldungService);
 
   protected readonly texte = TEXTE.chat;
   protected readonly neuLadenText = TEXTE.eingangskorb.neuLaden;
@@ -85,6 +92,8 @@ export class Chat {
   protected readonly hinweis = signal<string | null>(null);
   protected readonly eingabe = signal('');
   protected readonly fehler = signal<string | null>(null);
+  protected readonly analyseFehler = signal<string | null>(null);
+  protected readonly analyseSendet = signal<string | null>(null);
   /**
    * Die Ansicht zeigt Nachrichten, zu denen die Seite keine `gespraechId` kennt (erste Frage ohne `fertig` oder `fehler`
    * beendet, 404): Die nächste Frage beginnt beim Archiv ein neues Gespräch, darum leert die Seite dann die Ansicht.
@@ -105,6 +114,8 @@ export class Chat {
   private frage?: Subscription;
   private laden?: Subscription;
   private liste?: Subscription;
+  private analyse?: Subscription;
+  private analyseStatus?: Subscription;
 
   constructor() {
     // Seite verlassen bricht eine laufende Frage ab (die Anfrage wird beendet)
@@ -112,16 +123,27 @@ export class Chat {
       this.frage?.unsubscribe();
       this.laden?.unsubscribe();
       this.liste?.unsubscribe();
+      this.analyse?.unsubscribe();
+      this.analyseStatus?.unsubscribe();
     });
     this.listeLaden();
   }
 
   protected chips(quellen: readonly Quelle[]): Chip[] {
-    return quellen.map((q) =>
-      istDatenstand(q)
-        ? { text: datenstandText(q), link: null }
-        : { text: q.titel, link: dokumentLink(q.link) },
-    );
+    return quellen.flatMap((q): Chip[] => {
+      if (istDatenstand(q)) return [{ text: datenstandText(q), link: null, art: 'datenstand' }];
+      if ('wissen' in q) {
+        return [
+          { text: q.wissen.titel, link: wissenLink(q.wissen.link), art: 'wissen' },
+          ...q.dokumente.map((d): Chip => ({
+            text: d.seiten ? this.texte.dokumentMitSeiten(d.titel, d.seiten) : d.titel,
+            link: dokumentLink(d.link),
+            art: 'dokument',
+          })),
+        ];
+      }
+      return [{ text: q.titel, link: dokumentLink(q.link), art: 'dokument' }];
+    });
   }
 
   protected listeUmschalten(): void {
@@ -194,6 +216,7 @@ export class Chat {
     this.nachrichten.set([]);
     this.neuBeginnen.set(false);
     this.fehler.set(null);
+    this.analyseFehler.set(null);
     this.mobilSchliessen();
   }
 
@@ -211,6 +234,8 @@ export class Chat {
         this.neuBeginnen.set(false);
         this.nachrichten.set(
           liste.map((n) => ({
+            id: n.id,
+            analyseMoeglich: n.analyseMoeglich,
             rolle: n.rolle,
             inhalt: n.inhalt,
             quellen: n.quellen,
@@ -250,7 +275,10 @@ export class Chat {
         break;
       case 'fertig':
         this.gespraechId.set(ereignis.gespraechId);
-        this.antwortAendern((n) => ({ ...n, status: 'OK' }));
+        this.antwortAendern((n) => ({ ...n, id: ereignis.nachrichtId, status: 'OK' }));
+        if (ereignis.nachrichtId && this.anmeldung.darf('A18')) {
+          this.analyseStatusLaden(ereignis.gespraechId);
+        }
         break;
       case 'fehler':
         if (ereignis.gespraechId) {
@@ -291,6 +319,36 @@ export class Chat {
       this.laeuft.set(false);
       this.listeLaden();
     }
+  }
+
+  protected vorschlagen(nachricht: Nachricht): void {
+    if (!nachricht.id || !nachricht.analyseMoeglich || this.analyseSendet()) return;
+    const id = nachricht.id;
+    this.analyseFehler.set(null);
+    this.analyseSendet.set(id);
+    this.analyse = this.port.analyseVorschlagen(id).subscribe({
+      next: (entwurfId) => {
+        this.nachrichten.update((liste) => liste.map((n) => n.id === id ? { ...n, entwurfId } : n));
+        this.analyseSendet.set(null);
+      },
+      error: (fehler: unknown) => {
+        this.analyseSendet.set(null);
+        this.analyseFehler.set(fehlerText(fehler instanceof ChatFehler ? fehler : new ChatFehler('ALLGEMEIN'), new Date()));
+      },
+    });
+  }
+
+  private analyseStatusLaden(gespraechId: string): void {
+    this.analyseStatus?.unsubscribe();
+    this.analyseStatus = this.port.gespraech(gespraechId).subscribe({
+      next: (gespeichert) => {
+        if (this.gespraechId() !== gespraechId) return;
+        const status = new Map(gespeichert.map((n) => [n.id, n.analyseMoeglich === true]));
+        this.nachrichten.update((liste) => liste.map((n) =>
+          n.id && status.has(n.id) ? { ...n, analyseMoeglich: status.get(n.id) } : n));
+      },
+      error: () => this.analyseFehler.set(this.texte.analyseStatusFehler),
+    });
   }
 
   private antwortAendern(aendern: (n: Nachricht) => Nachricht): void {
