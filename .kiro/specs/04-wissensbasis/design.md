@@ -1420,6 +1420,29 @@ Vorgeschlagen (Freigabe per eigenem Merge mit Spec 04)». PR #16 ist gemergt und
 Nach dem Merge von Spec 04: Projektseite des UriNet-Archivs um Spec 04, ADR-013 und die Entscheide vom 09.11.2026
 ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachführen»).
 
+## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
+Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:
+- **Datenmodell (Mandantenschema `m_<code>`):** Tabelle `wissensquelle_markierung(dokument_id bigint, markiert_von text, markiert_am timestamptz,
+  beendet_am timestamptz null, beendet_von text null)`; Fremdschlüssel auf `dokument`, höchstens eine aktive Markierung je Dokument
+  (partieller eindeutiger Index auf `dokument_id` wo `beendet_am is null`); Rollback und Check-Constraints nach Changeset-Konvention.
+- **Anwendungsschicht:** `WissensquelleMarkieren` (Recht A16, Vorprüfung nach Requirement 20.3, Markierung schreiben, `WissenIngestStarten`
+  aufrufen, Protokoll `WISSENSQUELLE_MARKIERT`), `WissensquelleEntfernen`; `WissenIngestStarten` und `WissenIngestVerarbeiten` prüfen
+  statt `d.art = 'WISSENSQUELLE'` die aktive Markierung (`PanacheDokumentRepository`, `JdbcWissenIngest`).
+- **REST:** `POST /dokumente/{id}/wissensquelle` und `DELETE /dokumente/{id}/wissensquelle` (A16, Mandantenfilter, 404 für fremde
+  Dokumente, 422 mit Grundcode `KEINE_WISSENSQUELLE`/Vorbedingung); `GET /wissen/quellen` (Liste für die Oberfläche).
+- **Migration (Changeset, Mandant, ein Changeset):** (1) Für jedes Dokument der Art `WISSENSQUELLE`: vorherige Fassung nach `dokument_version`
+  (Grund «Migration Wissensquelle»), Art auf `PROJEKTDOKUMENT` setzen (fehlende Pflichtfelder blockieren nicht), Markierung anlegen (Benutzer «System»);
+  (2) die Art `WISSENSQUELLE` aus `dokumentart` löschen und aus der aktiven Konfigurationsversion entfernen (neue Version mit Quelle
+  `MIGRATION`); (3) Vorbedingung: `PROJEKTDOKUMENT` existiert, sonst abbrechen mit Meldung. Seed-Teil `_alle/dokumentarten-wissen.json`
+  und Changeset 044 (Bestand legt die Art an) entfallen für neue Mandanten; `SeedPruefung` und `Konfiguration` kennen die Art nicht mehr
+  (Spec 05: Folgeänderung zu Requirement 1.6 von Spec 05). `[offen: Fremdschlüssel auf dokumentart.code aus dokument_version und weiteren Tabellen
+  (belegnummer_eigen u. a.) vor dem Löschen prüfen; Aufgabe 17.1 klärt das im Spike und ergänzt hier]`
+- **Oberfläche:** Knopf in der Dokumentansicht (Spec 07: Anleitung `wissen.md` und `dokument.md` nachziehen), Liste «Wissensquellen» in
+  der Wissen-Seite.
+- **Bedrohungsmodell:** Markieren löst KI-Kosten aus (Tokenbudget, Requirement 12 bleibt: höchstens ein Ingest je Mandant); nur A16;
+  Protokoll ohne Titel; kein Weg, die Vertraulichkeit einer Quelle zu umgehen (`PERSONAL` und höhere Stufen nach 5.5 und 5.11).
+- `[offen: Marker für das Kennzeichen «Wissensquelle» im Export (OKF) und im Jahresexport: Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6); Auswirkung auf den OKF-Export der Quelleneinträge prüft Aufgabe 17.1]`
+
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
 1. Lage zu Spec 03: Spec 04 wird nach Spec 03 umgesetzt, Wellen 13–16 (tasks.md). Der Nachtrag in
