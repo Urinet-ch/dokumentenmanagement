@@ -50,8 +50,9 @@ class WissenPaketNetzTest {
                 # Beispiel
                 """.formatted(hash));
         Path bin = Files.createDirectory(arbeit.resolve("bin"));
+        Path marker = arbeit.resolve("pdftotext.aufgerufen");
         Path extraktor = bin.resolve("pdftotext");
-        Files.writeString(extraktor, "#!/bin/sh\nprintf 'Wortlaut\\f'\n");
+        Files.writeString(extraktor, "#!/bin/sh\ntouch \"" + marker + "\"\nprintf 'Wortlaut\\f'\n");
         assertThat(extraktor.toFile().setExecutable(true)).isTrue();
 
         assertThat(netz(aufzeichnen("kontrolle", NetzGegenprobe.class.getName()))).isTrue();
@@ -62,8 +63,11 @@ class WissenPaketNetzTest {
                 "--kontext-stufe", "NORMAL", "--quellen", quellen.toString());
         assertThat(netz(bauTrace)).as(bauTrace).isFalse();
         assertThat(Files.isRegularFile(zip)).isTrue();
+        assertThat(marker).as("Quellenprüfung muss die Attrappe pdftotext aufrufen").exists();
+        Files.delete(marker);
         assertThat(netz(aufzeichnen("validate", WissenPaketCli.class.getName(),
                 "validate", zip.toString(), "--quellen", quellen.toString(), "--json"))).isFalse();
+        assertThat(marker).as("validate mit --quellen muss pdftotext aufrufen").exists();
     }
 
     @Test
