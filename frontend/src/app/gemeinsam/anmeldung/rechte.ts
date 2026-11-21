@@ -28,6 +28,9 @@ const ERLAUBT: Record<Aktion, readonly Rolle[]> = {
   EXPORT: ['inhaber', 'treuhaender'],
 };
 
+/** Alle Aktionen, die die Oberfläche kennt (Prüfung der Bedingungen im Hilfe-Katalog, Spec 07, Req 7.2). */
+export const AKTIONEN = Object.keys(ERLAUBT) as readonly Aktion[];
+
 export function rolleAusRealmRollen(rollen: readonly unknown[] | undefined): Rolle | null {
   if (!Array.isArray(rollen)) {
     return null;
