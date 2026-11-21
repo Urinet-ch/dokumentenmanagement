@@ -124,18 +124,20 @@ auf Server oder Secrets aus der Sitzung.
   - _Abhängig von: 19.6, 19.11_
 
 ## Welle 20 — Einstellungen und Oberfläche
-- [ ] 20.1 Einstellungskatalog und Abbild [Backend]
+- [x] 20.1 Einstellungskatalog und Abbild [Backend]
   - `Einstellungskatalog` (Domain), Abschnitt `einstellungen` im Abbild und in `konfiguration.schema.json` (Test
     `EinstellungskatalogSchemaTest`), Prüfung in `Konfiguration.pruefen`, Standardwerte, `EinstellungsInventarTest`,
     `EinstellungskatalogTest` (nur Klasse (a)), Konfigurationsdatei und Export mit dem erweiterten Abschnitt.
   - _Anforderungen: 1.1, 1.2, 1.3, 1.4, 1.6, 2.3, 2.4_
+  - Teilweise: 1.4 nur als Katalogfunktion (Verdrahtung in 20.4); 2.3/2.4 in 20.1 über Datei und Domäne, `befunde[]` und
+    Anfragekörper höchstens 16 KiB (HTTP 413) in 20.2.
   - _Abhängig von: Spec 05: 17.7_
 
 - [ ] 20.2 REST Einstellungen [Backend]
   - `GET` mit Katalog und Block `betrieb`, `PATCH` als Merge Patch mit `If-Match`, `bestaetigt`, Step-up, Vorschau und
     `Auswirkung`, Zurücksetzen (Gruppe, Version), Datei und Kommando mit Bestätigung; Rechte je Gruppe (A20, A19, A11); Code
     `BESTAETIGUNG_NOETIG`.
-  - _Anforderungen: 1.8, 2.1, 2.2, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.14_
+  - _Anforderungen: 1.8, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.14_
   - _Abhängig von: 20.1, 19.10_
 
 - [ ] 20.3 Einstellungen der Wissensbasis in die Mechanik [Backend]
@@ -148,7 +150,7 @@ auf Server oder Secrets aus der Sitzung.
   - Branding, Aufbewahrung der Chat-Fragen (intern und öffentlich) und die Budgets lesen über `MandantEinstellungen`; die
     Eigenschaften bleiben Standard; Migration der heute wirksamen Werte (Version, Quelle `MIGRATION`); «wirksam ab» wie im
     Katalog.
-  - _Anforderungen: 1.5, 2.12_
+  - _Anforderungen: 1.4, 1.5, 2.12_
   - _Abhängig von: 20.2_
 
 - [ ] 20.5 Oberfläche Einstellungen [Frontend]

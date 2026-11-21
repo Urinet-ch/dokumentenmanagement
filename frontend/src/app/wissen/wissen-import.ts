@@ -8,6 +8,7 @@ import { Subscription } from 'rxjs';
 import { Anzahl, Antwort1, WissensbasisService } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { WissenEntwurfZaehler } from './wissen-entwurf-zaehler';
 
@@ -36,7 +37,7 @@ function istBericht(wert: Antwort1): wert is ImportBericht {
 
 @Component({
   selector: 'app-wissen-import',
-  imports: [RouterLink, FormsModule, MatButtonModule],
+  imports: [RouterLink, FormsModule, MatButtonModule, Symbol],
   templateUrl: './wissen-import.html',
   styleUrls: ['./wissen.scss', './wissen-import.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,6 +48,7 @@ export class WissenImport {
   private readonly zaehler = inject(WissenEntwurfZaehler);
   protected readonly anmeldung = inject(AnmeldungService);
   protected readonly texte = TEXTE.wissen.import;
+  protected readonly entwuerfe = TEXTE.wissen.entwuerfe;
   protected readonly datei = signal<File | null>(null);
   protected readonly sendet = signal(false);
   protected readonly bericht = signal<ImportBericht | null>(null);

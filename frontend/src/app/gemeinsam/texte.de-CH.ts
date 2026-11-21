@@ -623,6 +623,9 @@ export const TEXTE = {
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und suchen Sie erneut.',
     fehlerAllgemein: 'Die Suche ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
     wiederholen: 'Erneut suchen',
+    vorzeile: 'Volltext, Metadaten und Bedeutung',
+    vertraulichkeit: 'Vertraulichkeit',
+    vertraulichkeiten: { NORMAL: 'Normal', INTERN: 'Intern', PERSONAL: 'Personal' } as Record<string, string>,
   },
   dokument: {
     titel: 'Dokument',

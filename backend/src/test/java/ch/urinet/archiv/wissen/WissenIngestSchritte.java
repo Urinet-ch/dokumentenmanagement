@@ -56,6 +56,7 @@ public class WissenIngestSchritte {
     private final Map<String, UUID> entwuerfe = new HashMap<>();
     private final Map<String, List<UUID>> wissensseiten = new HashMap<>();
     private final Map<String, Object[]> vorher = new HashMap<>();
+    private final Map<String, List<Object>> zustaende = new HashMap<>();
     private final Map<String, Einstellung> einstellungen = new HashMap<>();
     private final List<Long> verbrauch = new ArrayList<>();
     private final Map<UUID, Integer> ersteQuellenNummer = new HashMap<>();
@@ -108,6 +109,7 @@ public class WissenIngestSchritte {
         entwuerfe.clear();
         wissensseiten.clear();
         vorher.clear();
+        zustaende.clear();
         einstellungen.clear();
         verbrauch.clear();
         entwurfId = null;
@@ -790,6 +792,24 @@ public class WissenIngestSchritte {
         assertThat(jetzt.get("hinweis")).isEqualTo(alt[0]);
         assertThat(jetzt.get("version")).isEqualTo(alt[1]);
         assertThat(jetzt.get("versionen")).isEqualTo(alt[2]);
+    }
+
+    @Angenommen("der Zustand von «{word}» mit Dokumentzeile und Dateizeilen ist festgehalten")
+    public void zustandFesthalten(String name) throws SQLException {
+        zustaende.put(name, zustand(ort(name)));
+    }
+
+    @Dann("sind Dokumentzeile und Dateizeilen von «{word}» unverändert")
+    public void zustandUnveraendert(String name) throws SQLException {
+        assertThat(zustand(ort(name))).isEqualTo(zustaende.get(name));
+    }
+
+    private List<Object> zustand(Ort ort) throws SQLException {
+        String s = schema(ort.mandant());
+        return List.of(
+                zeile("select row_to_json(d)::text as j from " + s + ".dokument d where id = ?", ort.id()).get("j"),
+                zeile("select coalesce(string_agg(row_to_json(f)::text, '|' order by f.rolle), '') as j from " + s
+                        + ".dokument_datei f where dokument_id = ?", ort.id()).get("j"));
     }
 
     private void ingestStarten(String benutzer, String name, Map<String, Object> angaben) throws SQLException {

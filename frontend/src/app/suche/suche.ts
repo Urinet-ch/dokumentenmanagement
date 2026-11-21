@@ -29,6 +29,7 @@ import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { AnzeigeTitel, TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { betrag, datum } from '../gemeinsam/format';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { SucheZustand } from './suche-zustand';
 import { Suchanfrage, SuchePort } from './suche-port';
@@ -51,7 +52,7 @@ const STATI = [
  */
 @Component({
   selector: 'app-suche',
-  imports: [MatButtonModule, MatProgressBarModule, RouterLink, TitelAnzeige],
+  imports: [MatButtonModule, MatProgressBarModule, RouterLink, Symbol, TitelAnzeige],
   templateUrl: './suche.html',
   styleUrl: './suche.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
