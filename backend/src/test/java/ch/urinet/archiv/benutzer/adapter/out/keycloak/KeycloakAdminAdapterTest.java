@@ -86,6 +86,28 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void emailAenderungSetztBestaetigungZurueckOhneMandantZuAendern() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1"))
+                .willReturn(okJson("""
+                        {"id":"benutzer-1","email":"alt@example.invalid","emailVerified":true,
+                         "attributes":{"mandant":["urinet"]}}
+                        """)));
+        server.stubFor(put(urlPathEqualTo(USERS + "/benutzer-1"))
+                .willReturn(aResponse().withStatus(204)));
+
+        adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .aktualisieren("urinet", "benutzer-1", new Aenderung("neu@example.invalid", null, null));
+
+        server.verify(putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1"))
+                .withRequestBody(equalToJson("""
+                        {"id":"benutzer-1","email":"neu@example.invalid","emailVerified":false,
+                         "attributes":{"mandant":["urinet"]}}
+                        """)));
+        assertThat(log.volltext()).doesNotContain("alt@example.invalid", "neu@example.invalid");
+    }
+
+    @Test
     void abgelehntesDienstkontoWirdAls502Abgebildet() {
         server.stubFor(post(urlPathEqualTo(TOKEN)).willReturn(aResponse().withStatus(401)
                 .withBody("{\"error\":\"synthetic private detail\"}")));

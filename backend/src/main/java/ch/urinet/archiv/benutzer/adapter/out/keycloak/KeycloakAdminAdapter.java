@@ -235,6 +235,9 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     public void aktualisieren(String mandant, String id, Aenderung aenderung) {
         ObjectNode benutzer = (ObjectNode) benutzerAbrufen(mandant, id);
         if (aenderung.email() != null) {
+            if (!aenderung.email().equals(benutzer.path("email").asText(null))) {
+                benutzer.put("emailVerified", false);
+            }
             benutzer.put("email", aenderung.email());
         }
         if (aenderung.vorname() != null) {
