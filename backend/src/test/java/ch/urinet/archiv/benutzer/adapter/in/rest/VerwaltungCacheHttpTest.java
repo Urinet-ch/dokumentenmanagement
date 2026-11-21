@@ -1,9 +1,12 @@
 package ch.urinet.archiv.benutzer.adapter.in.rest;
 
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
+import ch.urinet.archiv.benutzer.application.BenutzerNamen;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
+import ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreBestandMigration;
+import ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreHash;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
@@ -16,8 +19,11 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.restassured.common.mapper.TypeRef;
 import jakarta.inject.Inject;
+import liquibase.database.DatabaseFactory;
+import liquibase.database.jvm.JdbcConnection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -63,6 +69,9 @@ class VerwaltungCacheHttpTest {
     @Inject
     IdentitaetsDienst identitaet;
 
+    @Inject
+    BenutzerNamen namen;
+
     @BeforeEach
     void mandantAnlegen() throws SQLException {
         for (String code : List.of("urinet", "vhf-gsk")) {
@@ -74,7 +83,70 @@ class VerwaltungCacheHttpTest {
                     if (!ergebnis.next()) {
                         provisionierung.anlegen(code, null, null);
                     }
+
                 }
+            }
+        }
+    }
+
+    @Test
+    void bestandsmigrationUebernimmtBeideMandantenOhneKlarnamen() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String erster = "probe." + suffix;
+        String zweiter = "fremd." + suffix;
+        try (Connection verbindung = datenbank.getConnection()) {
+            for (var eintrag : Map.of("m_urinet", erster, "m_vhf_gsk", zweiter).entrySet()) {
+                try (PreparedStatement einfuegen = verbindung.prepareStatement(
+                        "insert into " + eintrag.getKey() + ".benutzer_verzeichnis "
+                                + "(benutzer, name, gueltig_von, anlass) values (?, ?, clock_timestamp(), 'AKTION')")) {
+                    einfuegen.setString(1, UUID.randomUUID().toString());
+                    einfuegen.setString(2, eintrag.getValue().toUpperCase(java.util.Locale.ROOT));
+                    einfuegen.executeUpdate();
+                }
+            }
+            var database = DatabaseFactory.getInstance()
+                    .findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
+            var migration = new NamenssperreBestandMigration();
+            migration.execute(database);
+            migration.execute(database);
+            var hash = NamenssperreHash.ausKonfiguration().orElseThrow();
+            try (PreparedStatement suchen = verbindung.prepareStatement(
+                    "select count(*) from public.benutzername_sperre where hash in (?, ?)")) {
+                suchen.setBytes(1, hash.hash(erster));
+                suchen.setBytes(2, hash.hash(zweiter));
+                try (ResultSet zeile = suchen.executeQuery()) {
+                    assertThat(zeile.next()).isTrue();
+                    assertThat(zeile.getInt(1)).isEqualTo(2);
+                }
+            }
+            try (PreparedStatement spalten = verbindung.prepareStatement(
+                    "select column_name from information_schema.columns "
+                            + "where table_schema = 'public' and table_name = 'benutzername_sperre' "
+                            + "order by ordinal_position");
+                 ResultSet zeilen = spalten.executeQuery()) {
+                assertThat(zeilen.next()).isTrue();
+                assertThat(zeilen.getString(1)).isEqualTo("hash");
+                assertThat(zeilen.next()).isTrue();
+                assertThat(zeilen.getString(1)).isEqualTo("erstellt");
+                assertThat(zeilen.next()).isFalse();
+            }
+        }
+    }
+
+    @Test
+    void namenssperreWirdMitDerTransaktionZurueckgerollt() throws SQLException {
+        String name = "probe." + UUID.randomUUID().toString().substring(0, 8);
+        assertThatThrownBy(() -> QuarkusTransaction.requiringNew().run(() -> {
+            namen.sperren(name);
+            throw new IllegalStateException("synthetischer Fehler");
+        })).isInstanceOf(IllegalStateException.class);
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from public.benutzername_sperre where hash = ?")) {
+            abfrage.setBytes(1, NamenssperreHash.ausKonfiguration().orElseThrow().hash(name));
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getInt(1)).isZero();
             }
         }
     }

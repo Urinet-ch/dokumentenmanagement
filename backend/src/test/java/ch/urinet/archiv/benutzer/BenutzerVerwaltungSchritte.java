@@ -14,6 +14,7 @@ import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
 import ch.urinet.archiv.mandant.application.KonfigurationSeed;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantAbbau;
 import ch.urinet.archiv.mandant.application.WissensquelleSeed;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -53,6 +54,7 @@ public class BenutzerVerwaltungSchritte {
 
     @Inject Instance<AgroalDataSource> datenbank;
     @Inject MandantProvisionierung provisionierung;
+    @Inject MandantAbbau abbau;
     @Inject KonfigurationSeed seed;
     @Inject KonfigurationsdateiCodec codec;
     @Inject WissensquelleSeed wissensquelle;
@@ -67,6 +69,7 @@ public class BenutzerVerwaltungSchritte {
     private IdentitaetsDienstStub fehlerdienst;
     private LogMitschnitt log;
     private String name;
+    private String spaetererBestandsname;
     private String eigeneId;
     private String fremdeId;
     private String admin;
@@ -117,24 +120,29 @@ public class BenutzerVerwaltungSchritte {
                 .post(basis + "/realms/master/protocol/openid-connect/token")
                 .then().statusCode(200).extract().path("access_token");
         akteurName = "probe-19-7-" + UUID.randomUUID();
+        akteurId = akteurAnlegen(MANDANT, akteurName);
+    }
+
+    private String akteurAnlegen(String mandant, String benutzername) {
         Map<String, Object> passwort = Map.of("type", "password", "value", Testanmeldung.PASSWORT, "temporary", false);
         Map<String, Object> otp = Map.of("type", "otp", "userLabel", "Probe",
                 "secretData", "{\"value\":\"" + Testanmeldung.OTP_SECRET + "\"}",
                 "credentialData", "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,"
                         + "\"algorithm\":\"HmacSHA1\"}");
-        Map<String, Object> nutzer = Map.of("username", akteurName, "enabled", true,
-                "email", akteurName + "@example.invalid", "emailVerified", true, "firstName", "Probe",
-                "lastName", "Person", "attributes", Map.of("mandant", List.of(MANDANT)),
+        Map<String, Object> nutzer = Map.of("username", benutzername, "enabled", true,
+                "email", benutzername + "@example.invalid", "emailVerified", true, "firstName", "Probe",
+                "lastName", "Person", "attributes", Map.of("mandant", List.of(mandant)),
                 "requiredActions", List.of(), "credentials", List.of(passwort, otp));
         given().auth().oauth2(admin).contentType("application/json")
                 .body(Map.of("ifResourceExists", "FAIL", "users", List.of(nutzer)))
                 .post(adminPfad + "/partialImport").then().statusCode(200);
-        akteurId = given().auth().oauth2(admin).queryParam("username", akteurName).queryParam("exact", true)
+        String id = given().auth().oauth2(admin).queryParam("username", benutzername).queryParam("exact", true)
                 .get(adminPfad + "/users").then().statusCode(200).extract().path("[0].id");
         Map<String, Object> rolle = given().auth().oauth2(admin).get(adminPfad + "/roles/inhaber")
                 .then().statusCode(200).extract().jsonPath().getMap("$");
         given().auth().oauth2(admin).contentType("application/json").body(List.of(rolle))
-                .post(adminPfad + "/users/" + akteurId + "/role-mappings/realm").then().statusCode(204);
+                .post(adminPfad + "/users/" + id + "/role-mappings/realm").then().statusCode(204);
+        return id;
     }
 
     @After("@benutzer-verwaltung")
@@ -277,6 +285,73 @@ public class BenutzerVerwaltungSchritte {
         assertThat(antworten.get(1).statusCode()).isEqualTo(409);
         assertThat(antworten.get(1).jsonPath().<String>get("fehlercode")).isEqualTo("BENUTZER_EXISTIERT");
         assertThat(antworten.get(1).asString()).doesNotContain("fremd." + name, "vhf-gsk");
+    }
+
+    @Angenommen("ein Benutzername wurde in einem vollständig abgebauten Testmandanten vergeben")
+    public void nameAusAbgebautemMandanten() throws SQLException {
+        String quelle = "b19-" + UUID.randomUUID().toString().substring(0, 8);
+        KonfigurationSeed original = ClientProxy.unwrap(seed);
+        QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec, wissensquelle, zusatzSchema) {
+            @Override
+            public Konfiguration lesen(MandantCode ignoriert) {
+                return original.lesen(new MandantCode("urinet"));
+            }
+        }, KonfigurationSeed.class);
+        try {
+            provisionierung.anlegen(quelle, null, null);
+        } finally {
+            QuarkusMock.installMockForType(original, KonfigurationSeed.class);
+        }
+        String bisherigerAkteur = akteurName;
+        String quellAkteur = "probe-19-7-" + UUID.randomUUID();
+        String quellAkteurId = akteurAnlegen(quelle, quellAkteur);
+        try {
+            akteurName = quellAkteur;
+            Response angelegt = anfrage().contentType("application/json").body(Map.of(
+                    "benutzername", name, "email", name + "@example.invalid",
+                    "vorname", "Test", "nachname", "Person", "rolle", "mitarbeiter")).post(PFAD);
+            assertThat(angelegt.statusCode()).isEqualTo(201);
+            identitaet.loeschen(quelle, angelegt.path("id"));
+        } finally {
+            akteurName = bisherigerAkteur;
+            given().auth().oauth2(admin).delete(adminPfad + "/users/" + quellAkteurId).then().statusCode(204);
+        }
+        spaetererBestandsname = "alt." + name;
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement(
+                     "insert into " + new MandantCode(quelle).schema() + ".benutzer_verzeichnis "
+                             + "(benutzer, name, gueltig_von, anlass) values (?, ?, clock_timestamp(), 'AKTION')")) {
+            einfuegen.setString(1, UUID.randomUUID().toString());
+            einfuegen.setString(2, spaetererBestandsname);
+            einfuegen.executeUpdate();
+        }
+        UUID export = UUID.randomUUID();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement deaktivieren = verbindung.prepareStatement(
+                     "update public.mandant set aktiv = false, deaktiviert_am = clock_timestamp() - interval '31 days', "
+                             + "vollexport_bestaetigt = ?, abbau_wer = 'test', abbau_grund = 'test' where code = ?")) {
+            deaktivieren.setObject(1, export);
+            deaktivieren.setString(2, quelle);
+            assertThat(deaktivieren.executeUpdate()).isEqualTo(1);
+        }
+        var bericht = abbau.ausfuehren(new MandantCode(quelle), export, true, false,
+                new MandantAbbau.Anlass("test", "test"));
+        assertThat(bericht.zustand()).isEqualTo(MandantAbbau.Zustand.ABGESCHLOSSEN);
+        assertThat(bericht.schemaEntfernt()).isTrue();
+        assertThat(bericht.bucketEntfernt()).isTrue();
+    }
+
+    @Dann("wird die Wiedervergabe ohne Angabe des früheren Mandanten abgewiesen")
+    public void wiedervergabeAbgewiesen() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(409);
+        assertThat(antworten.getLast().jsonPath().<String>get("fehlercode")).isEqualTo("BENUTZER_EXISTIERT");
+        assertThat(antworten.getLast().asString()).doesNotContain(name, "@example.invalid", "b19-");
+        Response bestand = anfrage().contentType("application/json").body(Map.of(
+                "benutzername", spaetererBestandsname, "email", spaetererBestandsname + "@example.invalid",
+                "vorname", "Test", "nachname", "Person", "rolle", "mitarbeiter")).post(PFAD);
+        assertThat(bestand.statusCode()).isEqualTo(409);
+        assertThat(bestand.jsonPath().<String>get("fehlercode")).isEqualTo("BENUTZER_EXISTIERT");
+        assertThat(bestand.asString()).doesNotContain(spaetererBestandsname);
     }
 
     @Angenommen("der Mandant hat {int} deaktivierte synthetische Benutzer")

@@ -46,7 +46,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Abhängig von: 19.1_
 
 - [ ] 19.3 Stufe A: Dienstkonto, SMTP, Secrets, Deploy [Fabian]
-  - [Fabian] (neu 21.11.2026) Secret-Datei `namenssperre_salz` (zufällig, 32 Bytes) als GitHub-Secret hinterlegen und ins Deploy-Bundle aufnehmen; Pflichtprüfung wie beim Dienstkonto-Secret (erst mit 19.7).
+  - [Fabian] (neu 21.11.2026) Secret-Datei `namenssperre_salz` (32 zufällige Bytes, Base64-kodiert) als GitHub-Secret hinterlegen und ins Deploy-Bundle aufnehmen; dauerhaft sichern, Pflichtprüfung wie beim Dienstkonto-Secret (erst mit 19.7).
   - Realm-Änderungen einmalig per `kcadm.sh` im Wegwerf-Container (der Import wirkt nur beim ersten Start); GitHub-Secrets
     `KEYCLOAK_VERWALTUNG_SECRET` und `KEYCLOAK_SMTP_PASSWORT`, Secret-Dateien im Deploy-Bundle und Pflichtprüfung im Workflow;
     Compose: Secret für `api`; Admin-Konsole bleibt nicht öffentlich; Probe: Token des Dienstkontos holbar; Notfallunterlagen
@@ -89,7 +89,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 
-- [ ] 19.7 REST Benutzer lesen, anlegen und einladen [Backend]
+- [x] 19.7 REST Benutzer lesen, anlegen und einladen [Backend]
   - Namenssperre nach Mandantenabbau (Entscheid Fabian 21.11.2026, Weg A; Req 3.4, design.md «Mandantenabbau»): Tabelle `benutzername_sperre` im Schema `public`
     (Changeset aus dem public-Bereich, Nummer gegen `origin/main` prüfen), HMAC-Hash mit Salz `archiv.verwaltung.namenssperre-salz`, Eintrag in der Anlage-Transaktion,
     Bestandsnamen per Changeset; Szenario: Name nach vollständigem Mandantenabbau bleibt gesperrt (409 `BENUTZER_EXISTIERT`). Spec 03, 8.3 nennt die Ausnahme.

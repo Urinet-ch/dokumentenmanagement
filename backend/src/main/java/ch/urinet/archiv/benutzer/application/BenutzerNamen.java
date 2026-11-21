@@ -1,6 +1,10 @@
 package ch.urinet.archiv.benutzer.application;
 
-/** Namenssperre des Benutzerverzeichnisses des aktuellen Mandanten. */
+/** Mandantenübergreifende Namenssperre. */
 public interface BenutzerNamen {
     boolean vergeben(String benutzername);
+
+    void sperren(String benutzername);
+
+    void vorMandantenabbauSichern(String schema);
 }

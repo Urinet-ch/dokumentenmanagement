@@ -27,6 +27,13 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber ungültige und bereits vergebene Angaben zur Anlage sendet
     Dann werden Formfehler und Konflikt ohne die fremden Angaben gemeldet
 
+  @req-3.4
+  Szenario: Ein Benutzername bleibt nach vollständigem Mandantenabbau gesperrt
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein Benutzername wurde in einem vollständig abgebauten Testmandanten vergeben
+    Wenn der Inhaber einen synthetischen Mitarbeiter anlegt
+    Dann wird die Wiedervergabe ohne Angabe des früheren Mandanten abgewiesen
+
   @req-3.5 @req-7.6
   Szenario: Deaktivierte Benutzer zählen zur Höchstzahl
     Angenommen die frische Anmeldung ist für den Test bestätigt
