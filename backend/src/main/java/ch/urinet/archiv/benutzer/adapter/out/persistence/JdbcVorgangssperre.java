@@ -41,6 +41,22 @@ public class JdbcVorgangssperre implements Vorgangssperre {
                     return false;
                 }
             }
+            // Ein übersprungener gesperrter Datensatz darf nicht als fehlend gelten und das INSERT blockieren.
+            try (PreparedStatement zeile = verbindung.prepareStatement(
+                    "select exists (select 1 from public.verwaltung_vorgang where mandant = ?), "
+                            + "exists (select 1 from public.verwaltung_vorgang where mandant = ? "
+                            + "for update skip locked)")) {
+                zeile.setString(1, mandant.wert());
+                zeile.setString(2, mandant.wert());
+                try (ResultSet ergebnis = zeile.executeQuery()) {
+                    if (!ergebnis.next()) {
+                        throw new IllegalStateException("Vorgangszeile nicht geprüft");
+                    }
+                    if (ergebnis.getBoolean(1) && !ergebnis.getBoolean(2)) {
+                        return false;
+                    }
+                }
+            }
             try (PreparedStatement befehl = verbindung.prepareStatement(
                     "insert into public.verwaltung_vorgang (mandant, vorgang_id, bis) "
                             + "values (?, ?, clock_timestamp() + interval '15 seconds') "

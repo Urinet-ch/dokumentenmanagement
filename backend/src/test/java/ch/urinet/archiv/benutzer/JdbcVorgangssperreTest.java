@@ -12,6 +12,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,6 +26,52 @@ class JdbcVorgangssperreTest {
 
     @Inject
     Vorgangssperre sperre;
+
+    @Test
+    void belegungWartetNichtAufGesperrteVorgangszeile() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+        var mandant = new MandantCode("sperre-c-" + suffix);
+        UUID alt = UUID.randomUUID();
+        UUID neu = UUID.randomUUID();
+        try (Connection verbindung = datenquelle.getConnection()) {
+            try (PreparedStatement anlegen = verbindung.prepareStatement(
+                    "insert into public.mandant (code, name, schema_name, bucket) values (?, ?, ?, ?)")) {
+                anlegen.setString(1, mandant.wert());
+                anlegen.setString(2, mandant.wert());
+                anlegen.setString(3, mandant.schema());
+                anlegen.setString(4, mandant.wert());
+                anlegen.executeUpdate();
+            }
+            try {
+                assertThat(sperre.belegen(mandant, alt)).isTrue();
+                try (var thread = Executors.newSingleThreadExecutor()) {
+                    verbindung.setAutoCommit(false);
+                    try (PreparedStatement sperren = verbindung.prepareStatement(
+                            "select 1 from public.verwaltung_vorgang where mandant = ? for update")) {
+                        sperren.setString(1, mandant.wert());
+                        sperren.executeQuery().close();
+                        var versuch = thread.submit(() -> sperre.belegen(mandant, neu));
+                        assertThat(versuch.get(1, TimeUnit.SECONDS)).isFalse();
+                    } finally {
+                        verbindung.rollback();
+                        verbindung.setAutoCommit(true);
+                    }
+                }
+                assertThat(sperre.freigeben(mandant, alt)).isTrue();
+            } finally {
+                try (PreparedStatement loeschen = verbindung.prepareStatement(
+                        "delete from public.verwaltung_vorgang where mandant = ?")) {
+                    loeschen.setString(1, mandant.wert());
+                    loeschen.executeUpdate();
+                }
+                try (PreparedStatement loeschen = verbindung.prepareStatement(
+                        "delete from public.mandant where code = ?")) {
+                    loeschen.setString(1, mandant.wert());
+                    loeschen.executeUpdate();
+                }
+            }
+        }
+    }
 
     @Test
     void leaseIstMandantenbezogenUndAlterInhaberKannNachAblaufNichtFreigeben() throws SQLException {
