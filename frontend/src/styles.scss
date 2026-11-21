@@ -428,7 +428,8 @@ button.kachel {
   border-radius: var(--radius-klein);
   background: var(--karte-2);
 
-  button {
+  // [aria-pressed] hebt die Spezifität über lokale `button { min-height }` der Seiten
+  > button[aria-pressed] {
     min-height: 2.375rem;
     padding: 0 0.75rem;
     border: 0;
