@@ -17,6 +17,8 @@ import java.nio.file.StandardOpenOption;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Sendet eine Datei an {@code POST /api/v1/dokumente} (Req 12.1, 12.8): eine Datei je Anfrage, Multipart mit den
@@ -66,6 +68,11 @@ final class ArchivClient {
     }
 
     Ergebnis senden(Path datei, String dateiname, String hinweis) throws InterruptedException {
+        return senden(datei, dateiname, hinweis, null, Map.of());
+    }
+
+    Ergebnis senden(Path datei, String dateiname, String hinweis, String art,
+                    Map<String, List<String>> klassifikationen) throws InterruptedException {
         if (dateiname.codePoints().anyMatch(c -> Character.getType(c) == Character.CONTROL)) {
             return abgelehnt("Dateiname enthält Steuerzeichen, bitte umbenennen");
         }
@@ -76,7 +83,7 @@ final class ArchivClient {
         for (int versuch = 1; versuch <= MAX_VERSUCHE; versuch++) {
             HttpResponse<String> antwort;
             try {
-                antwort = http.send(anfrage(datei, dateiname, hinweis),
+                antwort = http.send(anfrage(datei, dateiname, hinweis, art, klassifikationen),
                         HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             } catch (FileNotFoundException e) {
                 return abgelehnt(NICHT_LESBAR);
@@ -112,13 +119,24 @@ final class ArchivClient {
         }
     }
 
-    private HttpRequest anfrage(Path datei, String dateiname, String hinweis) throws FileNotFoundException {
+    private HttpRequest anfrage(Path datei, String dateiname, String hinweis, String art,
+                                Map<String, List<String>> klassifikationen) throws FileNotFoundException {
         String grenze = "----drive-import-" + HexFormat.of().formatHex(zufall());
         String kopf = "--" + grenze + "\r\n"
                 + "Content-Disposition: form-data; name=\"hinweis\"\r\n"
                 + "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
-                + hinweis + "\r\n"
-                + "--" + grenze + "\r\n"
+                + hinweis + "\r\n";
+        if (art != null) {
+            kopf += "--" + grenze + "\r\n"
+                    + "Content-Disposition: form-data; name=\"art\"\r\n"
+                    + "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
+                    + art + "\r\n"
+                    + "--" + grenze + "\r\n"
+                    + "Content-Disposition: form-data; name=\"klassifikationen\"\r\n"
+                    + "Content-Type: application/json; charset=UTF-8\r\n\r\n"
+                    + json(klassifikationen) + "\r\n";
+        }
+        kopf += "--" + grenze + "\r\n"
                 + "Content-Disposition: form-data; name=\"dateien\"; filename=\"" + dateiname.replace("\"", "%22")
                 + "\"\r\n"
                 + "Content-Type: application/octet-stream\r\n\r\n";
@@ -134,6 +152,14 @@ final class ArchivClient {
                 .header("Content-Type", "multipart/form-data; boundary=" + grenze)
                 .POST(inhalt)
                 .build();
+    }
+
+    private static String json(Map<String, List<String>> klassifikationen) {
+        try {
+            return JSON.writeValueAsString(klassifikationen);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Klassifikationen konnten nicht serialisiert werden", e);
+        }
     }
 
     private static byte[] zufall() {

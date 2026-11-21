@@ -1778,6 +1778,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 422 | `CSV_UNGUELTIG`, `CSV_LEER` | Req 13.10, 13.11 |
 | 422 | `KEINE_WISSENSQUELLE` | Ingest für ein Dokument einer anderen Art als `WISSENSQUELLE` (Spec 04, Req 5.7) |
 | 422 | `ENTWURF_BEFUND` | Änderung der Wissensbasis mit Befund, mit Liste der Befund-Codes (Spec 04, Req 6.3) |
+| 422 | `PAKET_UNGUELTIG` | Wissenspaket mit Format-, Grenz-, Mandanten- oder Zeitfehler; Codes und Pfade ohne Inhalte (Spec 04, Req 19.7) |
 | 422 | `VERTRAULICHKEIT_ZU_TIEF` | Vertraulichkeit einer Wissensseite unter der berechneten Stufe (Spec 04, Req 6.8) |
 | 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
 | 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
@@ -1785,6 +1786,8 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 429 | `ZU_VIELE_ANFRAGEN` | Grenze überschritten, mit `Retry-After` in Sekunden: neue API-Token-Prüfungen je Quelladresse mit `grund=SCHLUESSELPRUEFUNG` (Spec 03, F2; vor den Grenzen je Schlüssel, für alle API-Token-Pfade); Chat mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage (Spec 02, Req 5.5; seit Aufgabe 7.3); Spec 03 nutzt denselben Code für die Grenzen der Webseiten-Schnittstelle (Spec 03, design.md «Error Handling») |
 | 429 | `BUDGET` | Token-Budget des öffentlichen Chatbots für den Mandanten im laufenden Monat erschöpft, ohne `Retry-After` (Spec 03, Req 6.4; seit Aufgabe 11.3); Monatsbudget der Wissensbasis beim manuellen Ingest (Spec 04, Req 13.6; seit Spec 04, Aufgabe 14.1a) |
 | 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort nur mit Fehler-ID, Log mit Fehler-ID und den Klassen der Ursachen-Kette (bei `SQLException` mit SQLState), ohne Meldungen |
+| 502 | `IDENTITAETSDIENST_FEHLER` | unerwartete 4xx-Antwort des Keycloak-Dienstkontos, insbesondere 401 oder 403 (Spec 06, Req 5.6); Antwort und Log enthalten keine Meldung von Keycloak |
+| 503 | `IDENTITAETSDIENST_NICHT_ERREICHBAR` | Keycloak nicht erreichbar, Zeitgrenze überschritten, 5xx oder Schutzschalter offen (Spec 06, Req 5.5, 5.6); mit `Retry-After: 1` |
 | 503 | `UEBERLASTET` | zu viele gleichzeitige Argon2-Rechnungen für API-Tokens (Prüfen und Anlegen, seit 2.1), mit `Retry-After: 1` (Aufgabe 1.5); kein Platz nach `archiv.api-token.wartezeit`, bei `0` ohne Warten |
 | 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload oder beim Öffnen einer Datei für den Stream der Webseiten-Schnittstelle (Spec 03, Req 13) nicht erreichbar, mit `Retry-After` |
 
@@ -1868,7 +1871,7 @@ Start migriert bzw. geprüft sind (`SchemaBereitschaftCheck`, ergänzt 13.11.202
 | Speicherbudget Stufe A | Messung in Aufgabe 1.10 mit synthetischen Belegen | Spitzenverbrauch je Dienst gegen das Budget aus `tech.md`, Health und Speicher der anderen Apps (Req 16.18) |
 | KI-Qualität | `GoldenDatensatzIT`, nur manuell gestartet, Daten aus `ARCHIV_GOLDEN_DIR` ausserhalb des Repos, echter AI-Aufruf | Bericht je Feld, getrennt nach Abstimmungs- (30) und Prüfteil (20); Gate ≥ 18/20 und Req 0.9 (Nachweis manuell) |
 | Frontend | Vitest, Playwright (mobile Viewport 375 px) | Erfassen mit Testbild mit und ohne Kanten, Offline-Warteschlange (Dublette, 4xx, 5xx, offline), Eingangskorb bestätigen in ≤ 2 Tipps |
-| Betrieb | Restore-Probe, monatlich und nach Änderungen, auf der Stufe-B-VPS mit `archiv.stufe=P`; in Stufe A nur als Funktionstest (Req 16.19) | Datenbanken und Dateien wiederherstellen, Anzahl Objekte = Einträge, Sperren (Ist aus dem Inventar ≥ Soll aus der DB, Modus gleich, aktive Sperre, Löschen ohne Bypass scheitert), Anmeldung, Dokument öffnen, Prüflauf grün (Req 16.3, 16.23, 16.27); JUnit: Stufenregel und Konfiguration der Stufe P, `DeployStufeTest` weist P in `deploy/infomaniak/` ab (Req 16.24), Wiederherstellungswerkzeug kappt nur beim Präfix `urinet-archiv-p-` (Req 16.27) |
+| Betrieb | Restore-Probe, monatlich und nach Änderungen, auf der Stufe-B-VPS mit `archiv.stufe=P`; in Stufe A nur als Funktionstest (Req 16.19) | Datenbanken und Dateien wiederherstellen, Anzahl Objekte = Einträge, Sperren (Ist aus dem Inventar ≥ Soll aus der DB, Modus gleich, aktive Sperre, Löschen ohne Bypass scheitert), Anmeldung, Dokument öffnen, Prüflauf grün (Req 16.3, 16.23, 16.27); der lokale Sicherungs-Roundtrip prüft zusätzlich die OIDC-Anmeldung am wiederhergestellten Realm und einen geschützten API-Aufruf; JUnit: Stufenregel und Konfiguration der Stufe P, `DeployStufeTest` weist P in `deploy/infomaniak/` ab (Req 16.24), Wiederherstellungswerkzeug kappt nur beim Präfix `urinet-archiv-p-` (Req 16.27) |
 
 Umsetzung der Architekturregeln (Aufgabe 1.6, `ArchitekturTest`, Req 16.13):
 - `domain` hängt nur vom JDK und von Domain-Typen ab. `application` hängt zusätzlich nur von `application`, CDI,

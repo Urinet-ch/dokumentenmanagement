@@ -12,6 +12,10 @@ import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenLesen;
 import ch.urinet.archiv.wissen.application.WissenLesenRepository;
 import ch.urinet.archiv.wissen.application.QuellenPruefung;
+import ch.urinet.archiv.wissen.application.WissensSuche;
+import ch.urinet.archiv.wissen.application.WissensEmbeddingSpeichern;
+import ch.urinet.archiv.wissen.application.WissenModellBudget;
+import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
@@ -32,6 +36,7 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -63,20 +68,37 @@ public class WissensseiteResource {
     private final WissensseiteAbrufProtokoll abrufProtokoll;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
+    private final WissensSuche suche;
+    private final WissensEmbeddingSpeichern embeddings;
+    private final Berechtigung rechte;
+    private final WissenModellBudget budget;
 
     public WissensseiteResource(WissenLesen lesen, QuellenPruefung quellenPruefung,
                                 WissensseiteAbrufProtokoll abrufProtokoll,
-                                MandantAufloesung aufloesung, SecurityIdentity identitaet) {
+                                MandantAufloesung aufloesung, SecurityIdentity identitaet,
+                                WissensSuche suche, WissensEmbeddingSpeichern embeddings, Berechtigung rechte,
+                                WissenModellBudget budget) {
         this.lesen = lesen;
         this.quellenPruefung = quellenPruefung;
         this.abrufProtokoll = abrufProtokoll;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
+        this.suche = suche;
+        this.embeddings = embeddings;
+        this.rechte = rechte;
+        this.budget = budget;
     }
 
     @Schema(name = "WissensIndex")
     public record IndexDto(List<IndexGruppeDto> gruppen, long gesamt, int offset, int groesse) {
     }
+
+    @Schema(name = "WissensSuchergebnis")
+    public record SuchDto(@Schema(required = true) List<IndexZeileDto> treffer,
+                          @Schema(required = true) boolean degradiert) { }
+
+    @Schema(name = "WissensEmbeddingAuftrag")
+    public record EmbeddingAuftragDto(@Schema(required = true) long auftragId) { }
 
     @Schema(name = "WissensIndexGruppe")
     public record IndexGruppeDto(String typ, List<IndexZeileDto> seiten) {
@@ -98,7 +120,7 @@ public class WissensseiteResource {
     @Schema(name = "Wissensquelleneintrag")
     public record QuelleDto(String schluessel, UUID dokumentId, Integer seiteVon, Integer seiteBis, String auszug,
                             UUID quellSeiteId, String dokumentTitel, String dokumentDateiname, String quellSeitePfad,
-                            String quellSeiteTitel) {
+                            String quellSeiteTitel, java.time.LocalDate dokumentDatum) {
     }
 
     @Schema(name = "Wissensversion")
@@ -136,11 +158,13 @@ public class WissensseiteResource {
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "Wissensseiten-Index",
             description = "Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. "
-                    + "Mit pfad wird stattdessen eine einzelne Seite abgerufen.")
-    @APIResponse(responseCode = "200", description = "Index oder Seite")
+                    + "Mit pfad wird stattdessen eine einzelne Seite abgerufen. "
+                    + "modus=hybrid oder volltext liefert höchstens 30 rangierte Treffer ohne Gesamtzahl/Paging, "
+                    + "hybrid mit Volltext-Rückfall und degradiert. Ohne modus bleibt der Index unverändert.")
+    @APIResponse(responseCode = "200", description = "Index, Seite oder rangiertes Suchergebnis",
+            content = @Content(schema = @Schema(oneOf = {IndexDto.class, WissensseiteDto.class, SuchDto.class})))
     @APIResponse(responseCode = "400", description = "Ungültiger Filter oder Pagingwert")
     @APIResponse(responseCode = "404", description = "Seite zum Pfad nicht vorhanden")
-    @Transactional
     public Response index(
             @QueryParam("typ") String typ,
             @QueryParam("tag") String tag,
@@ -150,7 +174,8 @@ public class WissensseiteResource {
             @QueryParam("offset") @Parameter(schema = @Schema(type = SchemaType.INTEGER, defaultValue = "0"))
             String offset,
             @QueryParam("groesse") @Parameter(schema = @Schema(type = SchemaType.INTEGER, defaultValue = "50"))
-            String groesse) {
+            String groesse,
+            @QueryParam("modus") String modus) {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer();
         if (pfad != null) {
@@ -167,6 +192,14 @@ public class WissensseiteResource {
         int start = zahl(offset, 0, MAX_OFFSET);
         int anzahl = zahl(groesse, INDEX_STANDARD, INDEX_MAX);
         UUID dokument = dokumentFilter(dokumentId);
+        if (modus != null) {
+            if (!"hybrid".equals(modus) && !"volltext".equals(modus)) throw ungueltigeAnfrage();
+            if (suchbegriff == null || start != 0) throw ungueltigeAnfrage();
+            var ergebnis = suche.suchen(benutzer, suchbegriff, seitentyp, schlagwort, dokument, Math.min(anzahl, 30),
+                    "hybrid".equals(modus));
+            return privateAntwort(new SuchDto(ergebnis.treffer().stream().map(WissensseiteResource::dto).toList(),
+                    ergebnis.degradiert())).build();
+        }
         WissenLesen.IndexErgebnis ergebnis = lesen.index(benutzer, seitentyp, schlagwort, suchbegriff, dokument,
                 start, anzahl);
         List<IndexGruppeDto> gruppen = ergebnis.gruppen().stream()
@@ -174,6 +207,22 @@ public class WissensseiteResource {
                         .map(WissensseiteResource::dto).toList()))
                 .toList();
         return privateAntwort(new IndexDto(gruppen, ergebnis.gesamt(), ergebnis.offset(), ergebnis.groesse())).build();
+    }
+
+    @POST
+    @Path("/wissensbasis/embeddings")
+    @ErfordertAktion(Aktion.A17)
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
+    @Operation(summary = "Seiten-Embeddings neu berechnen", description = "Auftrag im verifizierten Mandanten, A17.")
+    @APIResponse(responseCode = "202", description = "Nachberechnung eingereiht oder schon laufend",
+            content = @Content(schema = @Schema(implementation = EmbeddingAuftragDto.class)))
+    @APIResponse(responseCode = "403", description = "Kein Freigaberecht")
+    @APIResponse(responseCode = "429", description = "Monatsbudget der Wissensbasis erschöpft")
+    public Response embeddings() {
+        aufloesung.pruefen();
+        rechte.wissensseitenAktion(benutzer(), Aktion.A17, true);
+        budget.embeddingPruefen();
+        return privateAntwort(new EmbeddingAuftragDto(embeddings.starten())).status(202).build();
     }
 
     @GET
@@ -328,7 +377,8 @@ public class WissensseiteResource {
         return new QuelleDto(quelle.schluessel(), quelle.dokumentId(), quelle.seiteVon(), quelle.seiteBis(),
                 quelle.auszug(), quelle.quellSeiteId(),
                 anzeige == null ? null : anzeige.dokumentTitel(), anzeige == null ? null : anzeige.dokumentDateiname(),
-                anzeige == null ? null : anzeige.seitePfad(), anzeige == null ? null : anzeige.seiteTitel());
+                anzeige == null ? null : anzeige.seitePfad(), anzeige == null ? null : anzeige.seiteTitel(),
+                anzeige == null ? null : anzeige.dokumentDatum());
     }
 
     private static IndexZeileDto dto(WissenLesenRepository.IndexZeile seite) {
@@ -365,6 +415,9 @@ public class WissensseiteResource {
             case "ANALYSE" -> "Analyse übernommen";
             default -> throw new IllegalStateException("Unbekannte Wissensbasis-Logaktion");
         };
+        if (eintrag.widerspruchAufgeloest()) {
+            text += " – Widerspruch aufgelöst";
+        }
         if (!seiten.isBlank()) {
             text += ": " + seiten;
         }

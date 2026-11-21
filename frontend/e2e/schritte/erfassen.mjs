@@ -111,7 +111,14 @@ function mitschreiben() {
   };
 }
 
+/**
+ * Beantwortet bzw. leitet die Uploads weiter; jeder Versuch steht in welt.handy.anfragen. Status und Antwort kommen
+ * zusammen, erst wenn der Körper gelesen ist: Das Ereignis «response» kommt mit den Headern, der Körper später, und ein
+ * Schritt, der auf den Status wartet, darf keinen Eintrag ohne Antwort sehen. Zugeordnet wird über die Anfrage, nicht
+ * über den letzten Eintrag.
+ */
 async function uploadsBeantworten(welt) {
+  const weitergeleitet = new Map();
   await welt.seite.route(`${basisUrl}/api/v1/dokumente`, async (route) => {
     const anfrage = route.request();
     if (anfrage.method() !== 'POST') {
@@ -134,6 +141,7 @@ async function uploadsBeantworten(welt) {
           body: JSON.stringify(vorgabe.body),
         });
       }
+      weitergeleitet.set(anfrage, eintrag);
       await anfrageWeiterleiten(route, welt.keycloak.benutzer);
     } catch (fehler) {
       welt.handy.fehler = fehler;
@@ -141,16 +149,14 @@ async function uploadsBeantworten(welt) {
     }
   });
   welt.seite.on('response', async (antwort) => {
-    if (
-      antwort.request().method() === 'POST' &&
-      new URL(antwort.url()).pathname === '/api/v1/dokumente'
-    ) {
-      const eintrag = welt.handy.anfragen.at(-1);
-      if (eintrag && eintrag.status === null) {
-        eintrag.status = antwort.status();
-        eintrag.antwort = await antwort.json().catch(() => null);
-      }
+    const eintrag = weitergeleitet.get(antwort.request());
+    if (!eintrag) {
+      return;
     }
+    weitergeleitet.delete(antwort.request());
+    const status = antwort.status();
+    const koerper = await antwort.json().catch((fehler) => ({ unlesbar: String(fehler) }));
+    Object.assign(eintrag, { status, antwort: koerper });
   });
 }
 

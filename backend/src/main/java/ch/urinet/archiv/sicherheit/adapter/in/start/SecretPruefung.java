@@ -7,7 +7,6 @@ import io.smallrye.config.ConfigValue;
 import io.smallrye.config.Priorities;
 import jakarta.annotation.Priority;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,7 +36,8 @@ public class SecretPruefung implements ConfigSourceInterceptor {
             "quarkus.liquibase.password", "archiv_db_owner",
             "quarkus.s3.aws.credentials.static-provider.access-key-id", "s3_app_zugang_id",
             "quarkus.s3.aws.credentials.static-provider.secret-access-key", "s3_app_zugang_geheimnis",
-            "archiv.manifest.schluessel", "archiv_manifest_key");
+            "archiv.manifest.schluessel", "archiv_manifest_key",
+            "archiv.verwaltung.keycloak.client-secret", "keycloak_verwaltung_secret");
     private static final String DATEI_QUELLE = "FileSystemConfigSource[";
 
     private final BooleanSupplier aktiv;
@@ -65,10 +65,15 @@ public class SecretPruefung implements ConfigSourceInterceptor {
     }
 
     static void pruefen(Function<String, ConfigValue> lesen) {
-        List<String> pflicht = new ArrayList<>(werte(lesen, PFLICHT));
+        Set<String> pflicht = new LinkedHashSet<>(werte(lesen, PFLICHT));
         ConfigValue migrieren = lesen.apply(MIGRIEREN);
         if (migrieren != null && Boolean.parseBoolean(migrieren.getValue())) {
             pflicht.addAll(werte(lesen, PFLICHT_MIGRATION));
+        }
+        if (!pflicht.isEmpty()
+                && werte(lesen, "archiv.rolle").stream()
+                .anyMatch(rolle -> rolle.equals("api") || rolle.equals("kommando"))) {
+            pflicht.add("keycloak_verwaltung_secret");
         }
         if (pflicht.isEmpty()) {
             return;
@@ -108,6 +113,9 @@ public class SecretPruefung implements ConfigSourceInterceptor {
             return false;
         }
         String roh = ziel.getRawValue() != null ? ziel.getRawValue() : ziel.getValue();
-        return ausDatei(ziel) || ("${" + datei + "}").equals(roh == null ? null : roh.trim());
+        String referenz = roh == null ? null : roh.trim();
+        return ausDatei(ziel) || ("${" + datei + "}").equals(referenz)
+                || (datei.equals("keycloak_verwaltung_secret")
+                && ("${" + datei + ":}").equals(referenz));
     }
 }

@@ -2,12 +2,14 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { forkJoin, of, switchMap } from 'rxjs';
 import { WissensIndexZeile, Wissensseite, Wissensversion, Wissensversionen } from '../gemeinsam/api';
 import { anzeigeTitel } from '../gemeinsam/anzeige-titel';
-import { zeitpunkt } from '../gemeinsam/format';
+import { datum, zeitpunkt } from '../gemeinsam/format';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { Textteil, wissenText } from './wissen-text';
 
@@ -17,12 +19,17 @@ function heuteIso(): string {
   return `${jetzt.getFullYear()}-${zweistellig(jetzt.getMonth() + 1)}-${zweistellig(jetzt.getDate())}`;
 }
 
+function klartext(teil: Textteil): string {
+  return teil.text ?? (teil.kinder ?? []).map(klartext).join('');
+}
+
 interface Quelle {
   schluessel: string;
   titel: string;
   dokumentId?: string;
   seite?: number;
   pfad?: string;
+  datum?: string;
 }
 
 interface Inhalt {
@@ -36,9 +43,9 @@ interface Inhalt {
 
 @Component({
   selector: 'app-wissen-seite',
-  imports: [RouterLink, NgTemplateOutlet],
+  imports: [RouterLink, NgTemplateOutlet, MatButtonModule, Symbol],
   templateUrl: './wissen-seite.html',
-  styleUrl: './wissen.scss',
+  styleUrls: ['./wissen.scss', './wissen-seite.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WissenSeite {
@@ -49,6 +56,7 @@ export class WissenSeite {
   readonly name = input<string>();
   protected readonly texte = TEXTE.wissen;
   protected readonly zeitpunkt = zeitpunkt;
+  protected readonly datum = datum;
   protected readonly inhalt = signal<Inhalt | null>(null);
   protected readonly fehler = signal<string | null>(null);
   protected readonly laedt = signal(false);
@@ -67,6 +75,11 @@ export class WissenSeite {
         this.laden();
       });
     });
+  }
+
+  /** Widerspruchsblock `> ⚠️ Widerspruch: …` (Glossar Spec 04) erscheint als Warn-Hinweis. */
+  protected widerspruch(teil: Textteil): boolean {
+    return /^\s*⚠\uFE0F?\s*Widerspruch:/.test(klartext(teil));
   }
 
   /** Hinweis ABGELAUFEN (8.3): «veraltet ab» erreicht, Status aber noch nicht VERALTET. */
@@ -96,6 +109,7 @@ export class WissenSeite {
               titel: bekannt ? anzeigeTitel(quelle.dokumentTitel, null, quelle.dokumentDateiname).text : schluessel,
               dokumentId: quelle.dokumentId,
               seite: quelle.seiteVon,
+              datum: quelle.dokumentDatum,
             };
           }
           return { schluessel, titel: quelle.quellSeiteTitel || schluessel, pfad: quelle.quellSeitePfad };

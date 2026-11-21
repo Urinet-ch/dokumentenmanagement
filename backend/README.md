@@ -382,3 +382,21 @@ Im Ordner `backend/` kann der Lauf nur ausdrücklich und gezielt gestartet werde
 mvn -ntp test -Dtest=OeffentlicherChatPrueflisteIT -Dsurefire.failIfNoSpecifiedTests=false \
   -Darchiv.oeffentlicher-chat-prueflauf=true
 ```
+
+## Lokale Leistungsmessung der Wissenssuche
+
+Nur nach ausdrücklicher Freigabe und nie in CI aus der Repository-Wurzel:
+
+```sh
+bash tools/last/wissenssuche.sh --freigabe
+```
+
+`WissenssucheLeistungIT` braucht zusätzlich die vom Skript gesetzte Property
+`archiv.wissen-leistung=true`. Der Lauf legt in einem eigenen PostgreSQL-Container mit eigenem benanntem Volume
+2'000 synthetische Seiten mit je einem Vektorabschnitt und zwei gemeinsamen Quelldokumenten an; 200 Seiten sind
+intern. Nach 20 Aufwärmungen folgen 200 sequenzielle HTTP-Anfragen als Mitarbeiter. Die echte Hybridsuche mit
+Sichtfiltern, Volltext, Vektor, RRF und Reranking wird ausgeführt; Embedding und Reranker antworten über WireMock,
+ohne echte Modelle. Der Test prüft erfolgreiche, nicht degradierte Antworten, Sichtbarkeit sowie beide Modellaufrufe
+und gibt p50, p95 und Maximum aus. Die gemessene Loopback-HTTP-Zeit einschliesslich Client ist eine konservative
+Obergrenze der Serverlaufzeit. Container und Volume werden anhand ihrer beim Start erfassten IDs gezielt entfernt.
+Ein lokaler Lauf ohne OCR und mit Attrappen ersetzt den Nachweis auf der VPS (Fabian-Aufgabe) nicht.

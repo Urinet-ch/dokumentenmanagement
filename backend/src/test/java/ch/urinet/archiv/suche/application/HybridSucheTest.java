@@ -172,6 +172,19 @@ class HybridSucheTest {
     }
 
     @Test
+    void volltextZweigErhaeltKlassifikationJahrUndVeroeffentlicht() {
+        embedding.antwort = new EmbeddingPort.OhneZugang();
+        Suchanfrage anfrage = new Suchanfrage("Projekt", null, null, null, null, null, null, null, List.of(), null,
+                null, null, null, 0, Suchanfrage.GROESSE_STANDARD, 2025, true, Map.of("fachgebiet", List.of("bau")));
+
+        suche.suchen(anfrage, REGEL, true, 30);
+
+        assertThat(volltext.anfrage.klassifikationen()).isEqualTo(Map.of("fachgebiet", List.of("bau")));
+        assertThat(volltext.anfrage.jahr()).isEqualTo(2025);
+        assertThat(volltext.anfrage.veroeffentlicht()).isTrue();
+    }
+
+    @Test
     void ohneKandidatenKeinAufrufDesRerankers() {
         Hybridergebnis ergebnis = suche.suchen(anfrage("nichts"), REGEL, true, 30);
 

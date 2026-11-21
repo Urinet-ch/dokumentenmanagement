@@ -161,7 +161,11 @@ public interface WissenIngestPort {
     }
 
     record SeitenFassung(SeitenMetadaten metadaten, String inhalt, UUID wissensquelleId,
-                         List<Quelleneintrag> quellen) {
+                         List<Quelleneintrag> quellen, LocalDate veraltetAb) {
+        public SeitenFassung(SeitenMetadaten metadaten, String inhalt, UUID wissensquelleId,
+                             List<Quelleneintrag> quellen) {
+            this(metadaten, inhalt, wissensquelleId, quellen, null);
+        }
         public SeitenFassung {
             quellen = quellen == null ? List.of() : List.copyOf(quellen);
         }

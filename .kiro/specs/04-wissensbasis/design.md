@@ -405,6 +405,26 @@ flowchart LR
   - `vertraulichkeit_kontext` = höchste Stufe aller Dokumente, die Werkzeuge im Gespräch bis zu dieser Nachricht
     geliefert haben; Quellen müssen für den Vorschlagenden sichtbar sein.
 
+#### Umsetzung 14.3
+- Derselbe CommonMark-Baum erkennt Widerspruchsblöcke für Belegprüfung, Diff und Freigabe. Der Diff enthält
+  beide Fassungen der Blöcke und die entfernten Blöcke mit ihren Quellenschlüsseln. Auch eine Änderung am Text
+  oder den Schlüsseln gilt vorsorglich als Auflösung; identische mehrfach vorhandene Blöcke werden einzeln gezählt.
+- Bei jeder Annahme wird gegen die gesperrte aktuelle Basis geprüft: Eine Auflösung braucht einen nicht leeren
+  Grund, auch wenn die Schlüssel anderswo weiter vorkommen. Der Grund entschuldigt nur die Schlüssel der
+  aufgelösten Blöcke, die die Basis nicht auch ausserhalb von Widerspruchsblöcken nutzt (geteilte Schlüssel
+  decken keine Entfernung normaler Aussagen). Version und Änderung speichern den Grund; das Log hält
+  das strukturierte Kennzeichen `widerspruchAufgeloest` und erzeugt daraus «Widerspruch aufgelöst».
+- `widerspruch_offen` entsteht aus dem geprüften Inhalt, nie aus KI-Feldern, und wird mit der aktuellen Seite und
+  der vollständigen Version gespeichert. Die bestehende Seitenansicht zeigt den Hinweis. Quellendatum und
+  Freigabezeit werden getrennt geliefert und dargestellt; das Alter einer Quelle ändert keine Seitenfassung.
+- Altdaten: `Diff` füllt fehlende Widerspruchsfelder aus gespeichertem JSON (Ingest-Fortschritt, Vorschläge)
+  null-sicher mit leeren Werten; `DiffDienstTest` belegt das.
+- Offen: Die sichtbare Hervorhebung im Diff (Req 7.3) liefert hier nur das Backend; die Oberfläche folgt mit
+  14.6 (PR #352).
+- Nachweis: `widerspruch.feature` (Req 7.1–7.5), `WissensMarkdownTest`, `DiffDienstTest`, vorhandene
+  Freigabe-/Quellendokument-Szenarien und `JdbcWissenIngestTest`. Die Chat-Werkzeuge bleiben Aufgabe 15.2;
+  sie übernehmen das gelieferte Kennzeichen nach dem bestehenden Vertrag.
+
 ### Chat-Werkzeuge (Ergänzung zu `ArchivWerkzeuge`, Spec 02)
 | Werkzeug | Parameter | Rückgabe |
 | --- | --- | --- |
@@ -430,6 +450,36 @@ flowchart LR
   `RerankerClient`; Sichtbarkeitsfilter vor Verdichtung und Reranker; Rückfall `degradiert=true` wie Spec 02.
 - REST `GET /api/v1/wissensseiten?q=…` und Abschnitt «Wissen» auf der Suchseite (`GET /api/v1/dokumente?q=` bleibt
   unverändert; die Suchseite ruft beide auf).
+- Umsetzung 15.1 (20.11.2026): `modus=hybrid` bzw. `modus=volltext` liefert `{treffer,degradiert}` mit
+  höchstens 30 Seiten, ohne Gesamtzahl und Paging. Ohne `modus` bleibt der bestehende Indexvertrag unverändert.
+  Nur Suchbegriff und Modus werden mit der Dokumentensuche geteilt; ihre Dokumentfilter gelten nicht für Seiten.
+  Fehler, Abbruch und Wiederholung der beiden Anfragen sind unabhängig.
+- `POST /api/v1/wissensbasis/embeddings` verlangt A17 und liefert den Nachberechnungsauftrag (202).
+  Die Antwort ist das typisierte `{auftragId}`; ein erschöpftes Monatsbudget wird vor dem manuellen Start
+  mit 429 abgewiesen. In `lokal` umgehen die Embedding-/Reranker-Stubs die Budgetabfrage.
+  Die Nachberechnung reiht Teilaufträge für höchstens 500 Seiten ein; Nutzlasten enthalten nur IDs und Versionen.
+  Schreiben sperrt die Seite, prüft ihre Version und sichert den Auftragsanspruch in derselben Transaktion.
+  Ein Stub überschreibt keine vorhandenen Vektoren derselben Version.
+- Modellaufrufe laufen ausserhalb von Datenbanktransaktionen. Wissenssuche und Seiten-Embeddings buchen
+  `WISSEN_EMBEDDING`; vor jeder Frage, jedem Reranker-Aufruf und jedem Embedding-Batch wird das
+  mandantenspezifische Monatsbudget geprüft. Fehler bei diesen Verbrauchsbuchungen bleiben Fehler.
+- `WissenIngestIndex` nutzt dieselbe Rangierung bei überschrittenem Zeichenbudget. Seine erlaubten IDs werden
+  aus dem aktuellen Ingest-/Hüllenkontext vor jeder Abfrage und nach der Rangierung neu berechnet, nicht aus
+  einer erfundenen Benutzerrolle. `PERSONAL` und der Überblick bei `INTERN` bleiben ausgeschlossen;
+  bei `NORMAL` wird der sichtbare Überblick vor den begrenzten Treffern ergänzt.
+- Nachweise 15.1: JDBC prüft den echten Handler mit WireMock-Vektor und `WISSEN_EMBEDDING`-Buchung sowie
+  Rollback bei verlorenem Auftragsanspruch, Versions-/Mandantentrennung und Stubschutz. Szenarien prüfen
+  Volltextgewichtung, Hybrid-/Stub-Rückfall und A17-Nachberechnung; der Browser prüft den Wissensabschnitt,
+  Seitenlink und Barrierefreiheit bei 375 px. Der ausdrücklich freigegebene einmalige lokale Messlauf
+  (20.11.2026) nutzt `tools/last/wissenssuche.sh --freigabe` unter der Docker-Sperre:
+  eigene leere PostgreSQL-Datenbank, 2'000 tatsächlich gespeicherte synthetische Seiten (davon 200 `INTERN`),
+  20 Aufwärmanfragen und 200 HTTP-Hybridsuchen als Mitarbeiter über zehn Suchbegriffe. Die echte Pipeline
+  umfasst SQL-Sichtfilter, Volltext, Vektor, RRF und Reranker; WireMock liefert lediglich Embeddings und
+  Rerankerantworten (je 220 geprüfte Aufrufe). Alle Antworten sind nicht degradiert, haben 30 Treffer und
+  enthalten keine interne Seite. PostgreSQL ist auf 512 MiB und zwei CPU begrenzt.
+  HTTP einschliesslich Client als konservative Obergrenze der Serverzeit: p50 63.365 ms, p95 69.613 ms,
+  Maximum 77.146 ms (9.5: p95 ≤ 1 s). Der Messlauf ist nicht Teil der CI; Container und benanntes Volume
+  werden auch bei Fehlern entfernt. Die lokale Messung ersetzt den Nachweis auf der VPS durch Fabian nicht.
 
 ### Lint (`wissen/application`)
 - `WISSEN_LINT` (Scheduler mit `archiv.wissen.lint-zeitplan`, nur Rolle `worker`; manuell A17), je KI-Aufruf ein
@@ -441,14 +491,26 @@ flowchart LR
 - Kandidaten «veraltet» ohne KI (Requirement 10.3): Aussagen einer Seite, deren Quelldokument ein älteres
   Dokumentdatum hat als eine Wissensquelle, deren Quelle-Seite auf die Seite verlinkt oder mit ihr eine Quelle teilt.
 - Mit KI (Requirement 10.3, 10.4): Paare, die einander verlinken, eine Quelle teilen oder ≥ 2 Schlagwörter teilen,
-  ohne Seiten mit `PERSONAL`-Dokument in der Hülle, Paare mit `QUERVERWEIS_FEHLT` oder Kandidaten «veraltet» zuerst,
-  sonst nach `lint_geprueft_am`, höchstens `lint-paare`. Antwort `{widersprueche:[{seite, schluessel, gegenseite,
+  ohne Seiten mit `PERSONAL`-Dokument in der Hülle, nach letztem Prüfzeitpunkt und bei Gleichstand Paare mit
+  `QUERVERWEIS_FEHLT` oder Kandidaten «veraltet» zuerst, höchstens `lint-paare`. Antwort `{widersprueche:[{seite, schluessel, gegenseite,
   gegenschluessel, text}], veraltet:[{seite, schluessel, neuere_quelle, text}], links:[{seite, ziel, text}]}`. Für
   jede betroffene Seite folgt ein Teilauftrag `SEITE` (gleiches Schema wie beim Ingest) mit dem Befund als Auftrag;
   bei Paaren verschiedener Vertraulichkeit nur für die höher eingestufte Seite, die andere erhält nur einen Befund
   (IDs). Kontextstufe = höchste Stufe des Paars.
 - Erschöpftes Monatsbudget: kein KI-Teil, Logeintrag `LINT` mit Befund «Budget erschöpft» (Requirement 13.6).
 - Ergebnis in `wissens_lint` (Befunde nur als IDs und Codes) und ggf. Entwurf `anlass = LINT`; Logeintrag `LINT`.
+- Umsetzung 15.4: Vorrang haben nach Requirement 10.3 die am längsten nicht geprüften Paare; Kandidaten sind bei
+  gleichem Prüfzeitpunkt das zweite Sortierkriterium. Der Fortschritt und die Paarhistorie liegen im
+  `ingest_daten` des LINT-Entwurfs. Der Entwurf dient auch als Budgetanker und bleibt ohne Änderungen mit Status
+  `ERLEDIGT` bestehen. Vor jedem KI-Aufruf wird die aktuelle Hülle erneut geprüft; vor dem Seitenauftrag müssen
+  Version und Quellenrevision aller beteiligten Seiten noch zum Paarauftrag passen. Änderungen verwenden die
+  bestehende Freigabeprüfung und werden nicht unmittelbar angewendet. Bricht der Lauf wegen Budget oder fehlendem
+  KI-Zugang ab, bei endgültigem KI-Fehler (Fehlerpfad) oder wird ein Seitenauftrag übersprungen (Seite geändert oder
+  nicht mehr freigegeben, Quellenschlüssel uneindeutig, KI-Antwort nach Nachfrage ungültig), gelten Paare, deren
+  Seitenaufträge nicht ausgeführt wurden, nicht als geprüft (Review PR #376); sie behalten ihren Vorrang im nächsten
+  Lauf. Der Nachweis für 10.1 (Zeitplan reiht je Mandant einen Auftrag ein, derselbe Termin startet nicht doppelt) ist
+  das Szenario `@req-10.1` in `lint.feature`. Die Nachweise für 10.2 (Befundarten ohne KI inkl. Formfehler) liegen als
+  Szenario `@req-10.2` in `lint.feature`.
 
 ### OKF-Export (`wissen/adapter/out`)
 - `WISSEN_EXPORT` schreibt ein ZIP stromweise nach S3 `exporte/wissen-<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage
@@ -555,6 +617,49 @@ Spesen sind innert 30 Tagen mit Beleg einzureichen.[^q-ab12-1] Die Unterlage ist
   Angaben aus `paket.yaml` übernommen. `verified`, `generated` und `status` verwirft der Import (Requirement 7.6, 19.4).
 
 #### Import-Dienst (`WissensImport`, `wissen/application`)
+**Umsetzung (Aufgabe 15.6):** Die Anwendungsklasse heisst entsprechend den bestehenden `Wissen…`-Diensten
+`WissenImport`. `WissenImportResource` liest den genau einmal vorhandenen Multipart-Teil begrenzt in den Speicher;
+`TransaktionalerWissenPaketImport` berechnet seine SHA-256 mit `Pruefsumme` und umschliesst Lesen, Zuordnung,
+Änderungen und Zugriffsprotokoll mit einer JTA-Transaktion. Eine monotone Deadline reicht vom Beginn der
+Ressourcenmethode bis zur letzten Prüfung vor der Antwort. Ein mandantenspezifisches Advisory Lock serialisiert
+Idempotenz und die Quote; der Hüllen-Lock hält Quellen und Seiten während der Prüfung konsistent.
+PostgreSQL 17 erhält zusätzlich ein transaktionslokales `transaction_timeout` aus der verbleibenden Zeit;
+dadurch können interne Änderungen von `statement_timeout` die gesamte Transaktionsfrist nicht verlängern.
+SQLSTATE `25P04` und `57014` werden nach dem Rollback als `PAKET_UNGUELTIG` mit Grund `ZEIT` gemeldet.
+`neu-pruefen` bewahrt bereits erreichte Kontextstufen und erhöht die Änderungs-ETags.
+**Gemeinsame Auslegung 19.9/19.10/19.23 (Aufgabe 15.6):** Bei `NEU` ist die Zielbasis fehlend (entspricht 0).
+Eine positive Archivversion aus einer ausdrücklich anderen Herkunftsinstanz ist keine Zielbasis:
+Sie bleibt im ursprünglichen Paket gespeichert, wird wie bei `AENDERN` aus fremder Herkunft nicht als
+Zielversion übernommen und erzeugt `BASIS_UNBEKANNT`. So bleibt der lokale Export in ein anderes Archiv
+auch für unbekannte Zielpfade importierbar. Negative Werte, Werte ausserhalb der Archiv-Versionsspanne und
+positive NEU-Basisversionen ohne fremde Herkunft brechen weiterhin mit `FORMAT` ohne Entwurf ab, sofern der Pfad im
+Mandanten nicht existiert. Existiert der Pfad, ist die Seite für den Benutzer aber unsichtbar (höhere Stufe), wird die
+Basisversion nicht ausgewertet: Die Änderung entsteht als `NEU` mit `PFAD_UNGUELTIG` und `HOEHERE_STUFE_VORHANDEN` (19.9).
+Herkunft ist nur Metadatum, kein Recht und kein Quellen- oder Mandantenselektor; die Zielbasis wird nicht
+aus ihr gelesen. Der REST-Rundlauf exportiert aus einer anderen Instanz mit fremder Dokument-ID und
+übernimmt eine dort erzeugte Seite im Ziel neu, ausschliesslich mit SHA-Zuordnung.
+Die A17-Leseansicht liefert
+die Importherkunft und je Quellenschlüssel die Zuordnung und das Ergebnis aus
+`WissensPruefung.auszugPruefen`; dieselbe Auszugsprüfung wird beim Annehmen erneut ausgeführt.
+Leere und vollständig unveränderte Pakete bleiben gemäss 19.18 `OFFEN`; es wird keine zusätzliche Abschlussaktion
+oder automatische Freigabe eingeführt. Der offene Punkt 19-a bleibt unverändert offen.
+
+**Oberfläche (Aufgabe 15.8):** Die A17-Route `/wissen/entwuerfe/import` steht vor der dynamischen
+Entwurfsroute. Sie sendet genau den Multipart-Teil `paket`, prüft den vollständigen Antwortbericht und
+zeigt Zähler, Seitenpfade und Befundcodes. 409 verlinkt den vorhandenen Entwurf; 422 zeigt die
+Paketbefunde ohne automatischen Wiederholungsversuch. Herkunft und Quellenprüfungen stammen aus
+`entwurf.herkunft` und `aenderung.daten.quellenPruefung`, nicht aus einer Client-Paketanalyse.
+«Prüfung wiederholen» lädt nach 204 die aktuellen Änderungs-ETags neu und bewahrt ungespeicherte
+Bearbeitungen; diese sind nicht Bestandteil des neu geprüften Serverberichts. Bei Benutzer-, Rollen-
+oder Mandantenwechsel werden laufende Anfragen und Bestätigungen abgebrochen und alte Inhalte
+einschliesslich Dateiauswahl entfernt. Eine Tokenaktualisierung im gleichen Benutzerkontext löscht
+keine Eingaben. Keine KI-Neuerzeugung für Import und kein gesammeltes Annehmen.
+
+Der gemeinsame synthetische Korpus unter `backend/src/test/resources/wissen-pakete/` beschreibt Pakete textuell;
+`WissensPaketBeispiele` erzeugt die ZIP-Bytes einschliesslich gezielter Metadatenangriffe nur für Tests.
+`PaketRegelnGleichheitTest` vergleicht den Leser und den REST-Import; Aufgabe 15.7 erweitert diesen Nachweis um das
+Prüfwerkzeug. Die Beispielpakete enthalten keine echten Belege oder Zugangsdaten.
+
 `WissensImport.importieren(benutzer, zipStrom)` in einer Transaktion; der Endpunkt reicht den Strom nur bis zur Grenze
 `archiv.wissen.import.max-zip-bytes` weiter und rechnet währenddessen die SHA-256 des ZIP:
 1. **Rechte und Kontext:** A17, nur OIDC (kein API-Token), Mandant und Benutzer aus dem Anfragekontext; keine Daten
@@ -816,6 +921,34 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
   Aktion «Als Analyse vorschlagen» nur bei zulässigen Gesprächen (Requirement 12.4, 16.6); Parameter `seite` in der
   Dokumentansicht (Requirement 16.2). Texte nur in `texte.de-CH.ts`.
 
+#### Umsetzung 14.6 (PR #352)
+
+Die beiden Entwurfsrouten und der Navigationszähler verlangen A17; Mitarbeiter und Treuhänder erhalten
+keinen Entwurfsmenüpunkt. Der Zähler liest nur offene Entwürfe, erneuert sich bei Entscheidungen und
+gedrosselt bei Navigation; Benutzer- und Mandantenwechsel brechen alte Anfragen ab. Ein Ausfall erscheint
+mit Wiederholungsmöglichkeit, nicht als scheinbar leere Liste.
+
+Jede Änderung wird einzeln ausgewählt und in einem Dialog bestätigt. Der POST verwendet genau den
+angezeigten ETag; während Dialog und Anfrage sind weitere Entscheidungen gesperrt. Bei 412 oder 422
+bleiben Eingaben erhalten, neue fachliche Befunde sind sichtbar; kein automatischer zweiter POST.
+Veraltete Änderungen lassen sich verwerfen, bei MANUELL und INGEST auch neu erzeugen, nicht bei IMPORT.
+Eine leere Stufenauswahl überlässt die Mindeststufenberechnung dem Backend.
+
+Titel, Beschreibung, Tags, Datum und Markdown haben eigene Eingaben. Quellen und begründete entfernte
+Aussagen werden als JSON-Listen bearbeitet; Syntax und Listenform prüft die Oberfläche, die vollständige
+Fassung prüft erneut der Freigabedienst. Die API verwendet versiegelte Leseansichten ohne konkret
+generierte Angular-Modelle; dafür enthält die Oberfläche lokale, typisierte Vertragsansichten.
+Der Diff steht ab 1024 px nebeneinander, darunter untereinander. Cucumber.js/Playwright misst Positionen
+bei 375, 1023, 1024 und 1280 px und prüft Überlauf, WCAG 2.1 AA mit axe, Einzelbestätigung und Zähler.
+Der integrierte Widerspruchsschutz (14.3, PR #351) liefert `diff.widersprueche` und
+`diff.entfernteWidersprueche`. Die Auflösungsmarkierung verwendet den echten Vertrag auch ohne KI-Blockliste;
+der REST-Nachweis prüft Text und Fussnotenschlüssel, Frontend- und Browsernachweise prüfen die Hervorhebung.
+Vor 14.3 gespeicherte Diffs erhalten fehlende Widerspruchsmarker beim Lesen aus der unveränderbaren
+historischen Basisversion und der gespeicherten Fassung, nie aus dem aktuellen Seiteninhalt.
+Gespeicherter Diff, Status und ETag bleiben unverändert; eine fehlende Änderungsbasis ist ein Fehler.
+Das Altdaten-Szenario liest Basisversion 2 nach einer weiteren Freigabe auf Version 3 und prüft zusätzlich
+die Mandantentrennung.
+
 ### Konfiguration und Aufträge
 | Schlüssel | Startwert |
 | --- | --- |
@@ -967,12 +1100,12 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Deploy und Rollback gleich, und `wiederverwenden` (Spec 01, Req 15.6) bricht nicht ab. Die Quellenbezüge
   (`wissensseite_version_dokument`) stehen nicht im Manifest, weil Req 4.6 nur Versionen und Log nennt; sie sind
   INSERT-only, aber nicht gehasht (Review PR #295, K7).
-- Req 4.7 ist offen: In der Sicherung ist die Wissensbasis ohne eigenen Schritt, weil `taeglich.sh` die ganze
-  Archiv-Datenbank mit `pg_dump` sichert. Die Restore-Probe im Repo stellt aber nur Bucket-Objekte wieder her
-  (`archiv sicherung wiederherstellen` und `sperren-pruefen`); `pg_dump` in eine leere Datenbank einspielen und mit der Quelle
-  vergleichen kommt erst mit Spec 01, Aufgabe 5.12. Der Vergleich von Anzahl Seiten und Versionen folgt mit dieser
-  Kette; bis dahin bleibt 13.3 offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein
-  Nachweis (Review PR #295, M1).
+- Req 4.7 ist offen: Die Sicherung erfasst die ganze Archiv-Datenbank mit `pg_dump`. Seit PR #357 stellt
+  `restore-uebung-lokal.sh` den Datenbankdump tatsächlich mit `pg_restore` in einer eigenen Ziel-Datenbank
+  wieder her (Spec 01, Aufgabe 5.12). Noch fehlt der Nachweis, dass dabei ein nichtleerer Wissensseiten- und
+  Versionsbestand vor und nach dem Restore verglichen wird (Nachprüfung 20.11.2026). Deshalb bleibt 13.3
+  offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis
+  (Review PR #295, M1).
 
 ### Umsetzung 13.5 (PR #300)
 - `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe

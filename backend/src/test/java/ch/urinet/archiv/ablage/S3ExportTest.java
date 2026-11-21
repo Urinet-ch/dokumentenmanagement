@@ -113,6 +113,21 @@ class S3ExportTest {
         assertThat(verwaltung.listMultipartUploads(b -> b.bucket(bucket)).uploads()).isEmpty();
     }
 
+    @Test
+    void wissensexportHatEigenenSchluesselUndPruefsumme() throws Exception {
+        UUID id = UUID.randomUUID();
+        byte[] daten = "Wissenspaket".getBytes(StandardCharsets.UTF_8);
+        AbgelegteDatei zip;
+        try (Exportziel ziel = ablage.wissensExportSchreiben(mandant, id)) {
+            ziel.strom().write(daten);
+            zip = ziel.abschliessen();
+        }
+        assertThat(zip.schluessel()).isEqualTo("exporte/wissen-" + id + ".zip");
+        assertThat(zip.sha256()).isEqualTo(Pruefsumme.von(daten));
+        assertThat(verwaltung.getObjectAsBytes(b -> b.bucket(bucket).key(zip.schluessel())
+                .versionId(zip.versionId())).asByteArray()).isEqualTo(daten);
+    }
+
     /** Zeitgrenze oder Herunterfahren: Der Abbruch läuft trotz gesetztem Interrupt-Flag, das danach bleibt. */
     @Test
     void nachUnterbrechungWirdDerUploadAbgebrochen() throws Exception {

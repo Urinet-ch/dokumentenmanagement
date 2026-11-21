@@ -39,6 +39,15 @@ public interface ZusatzSchemaPruefer {
      */
     List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson);
 
+    /**
+     * Wie {@link #konfigurationPruefen}, aber für den Seed eines Mandanten (Quelle im Repo) mit der grösseren Frist
+     * {@code archiv.dokumentart.seed-zeitgrenze}: Die ganze Seed-Datei mit allen Arten braucht mit kalter JVM mehr als
+     * die Frist einer einzelnen Anfrage (instabile CI, «Seed ungültig für Mandant urinet», 20.11.2026).
+     */
+    default List<Verletzung> seedKonfigurationPruefen(String schemaJson, String dateiJson) {
+        return konfigurationPruefen(schemaJson, dateiJson);
+    }
+
     int MAX_VERLETZUNGEN = 100;
 
     /**

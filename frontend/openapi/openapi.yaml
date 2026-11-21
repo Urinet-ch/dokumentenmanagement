@@ -1,6 +1,70 @@
 ---
 components:
   schemas:
+    Aenderung:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nr:
+          type: integer
+          format: int32
+        aktion:
+          type: string
+        seiteId:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        basisVersion:
+          type: integer
+          format: int32
+        daten:
+          type: object
+          additionalProperties: {}
+        inhalt:
+          type: string
+        diff:
+          type: object
+          additionalProperties: {}
+        begruendung:
+          type: string
+        widersprueche:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        entfernteAussagen:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        befunde:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        hinweise:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        vertraulichkeitKontext:
+          type: string
+        status:
+          type: string
+        entschiedenVon:
+          type: string
+        entschiedenAm:
+          $ref: "#/components/schemas/Instant"
+        grund:
+          type: string
+        ergebnisVersion:
+          type: integer
+          format: int32
+        etag:
+          type: integer
+          format: int32
     Antwort:
       type: object
       properties:
@@ -19,6 +83,44 @@ components:
           $ref: "#/components/schemas/Datenstand"
         hinweis:
           type: string
+    Antwort1:
+      type: object
+      properties:
+        entwurfId:
+          $ref: "#/components/schemas/UUID"
+        status:
+          type: string
+        anzahl:
+          $ref: "#/components/schemas/Anzahl"
+        paketSha256:
+          type: string
+        befunde:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+        hinweise:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+    Anzahl:
+      type: object
+      properties:
+        neu:
+          type: integer
+          format: int32
+        aendern:
+          type: integer
+          format: int32
+        unveraendert:
+          type: integer
+          format: int32
+        ignoriert:
+          type: integer
+          format: int32
     ApiToken:
       type: object
       properties:
@@ -126,6 +228,27 @@ components:
           type: boolean
         standardWert:
           type: string
+    Aussage:
+      type: object
+      properties:
+        nr:
+          type: integer
+          format: int32
+        schluessel:
+          type: string
+        text:
+          type: string
+        seiten:
+          type: array
+          items:
+            type: integer
+            format: int32
+        auszug:
+          type: string
+        belegt:
+          type: boolean
+        zugeordnet:
+          type: boolean
     AuszugTeil:
       description: Stück der Textstelle; treffer = hervorgehobener Suchbegriff (Req
         14.4)
@@ -1174,6 +1297,16 @@ components:
           type: string
         begruendung:
           type: string
+    Entscheidung:
+      type: object
+      properties:
+        nr:
+          type: integer
+          format: int32
+        status:
+          type: string
+        grund:
+          type: string
     Export:
       description: "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link\
         \ (24 Stunden ab Fertigstellung) gilt nicht mehr"
@@ -1407,6 +1540,19 @@ components:
           type: string
         naechsteFrist:
           $ref: "#/components/schemas/LocalDate"
+    ImportHerkunft:
+      type: object
+      properties:
+        paketSha256:
+          type: string
+        kopf:
+          $ref: "#/components/schemas/PaketKopf"
+        unveraendert:
+          type: integer
+          format: int32
+        ignoriert:
+          type: integer
+          format: int32
     ImportHochgeladen:
       type: object
       properties:
@@ -1836,6 +1982,37 @@ components:
           format: int32
         aktiv:
           type: boolean
+    Klassifikationsfacette:
+      type: object
+      required:
+      - code
+      - name
+      - werte
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        werte:
+          type: array
+          items:
+            $ref: "#/components/schemas/KlassifikationswertFacette"
+    KlassifikationswertFacette:
+      type: object
+      required:
+      - code
+      - name
+      - anzahl
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        anzahl:
+          type: integer
+          format: int64
+          description: Anzahl sichtbarer Dokumente; im Modus hybrid nur unter den
+            gelieferten Treffern
     KonfigurationKiTexte:
       type: object
       properties:
@@ -2256,11 +2433,59 @@ components:
         korrekturbeispiele:
           type: integer
           format: int32
+    Kopf:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        anlass:
+          type: string
+        status:
+          type: string
+        erstelltVon:
+          type: string
+        erstellt:
+          $ref: "#/components/schemas/Instant"
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+        unvollstaendig:
+          type: boolean
+        hinweis:
+          type: string
+        herkunft:
+          $ref: "#/components/schemas/ImportHerkunft"
     LocalDate:
       type: string
       format: date
       examples:
       - 2022-03-10
+    Mandantenfunktionen:
+      type: object
+      required:
+      - finanzVerfuegbar
+      properties:
+        finanzVerfuegbar:
+          type: boolean
+          description: "Mindestens eine aktive Dokumentart hat die Gruppe «finanz»\
+            \ (Spec 05, Req 8.8)"
+    PaketKopf:
+      type: object
+      properties:
+        paketFormat:
+          type: integer
+          format: int32
+        mandant:
+          type: string
+        erzeugtVon:
+          type: string
+        erzeugtMit:
+          type: string
+        kontextStufe:
+          type: string
+        erzeugtAm:
+          $ref: "#/components/schemas/Instant"
+        instanz:
+          type: string
     ProtokollAktion:
       type: string
       enum:
@@ -2281,6 +2506,7 @@ components:
       - WISSEN_VERWERFEN
       - WISSEN_INGEST
       - WISSEN_LINT
+      - WISSEN_IMPORT
       - KONTAKT_ZUSAMMENFUEHREN
       - KONTAKT_INAKTIV
       - KONTAKT_AKTIV
@@ -2367,6 +2593,8 @@ components:
           type: string
         quellSeiteId:
           $ref: "#/components/schemas/UUID"
+        sha256:
+          type: string
     Regel:
       type: object
       properties:
@@ -2486,10 +2714,22 @@ components:
           type: array
           items:
             type: string
+    StatusAnsicht:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        status:
+          type: string
+        entscheidungen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entscheidung"
     Suchergebnis:
       type: object
       required:
       - treffer
+      - facetten
       - gesamt
       - seite
       - groesse
@@ -2498,6 +2738,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Suchtreffer"
+        facetten:
+          type: array
+          items:
+            $ref: "#/components/schemas/Klassifikationsfacette"
         gesamt:
           type: integer
           format: int64
@@ -2734,6 +2978,19 @@ components:
           - string
           - "null"
           description: "Kennung, die Austritt oder Widerruf erfasst hat"
+    Vollansicht:
+      type: object
+      properties:
+        entwurf:
+          $ref: "#/components/schemas/Kopf"
+        kernaussagen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Aussage"
+        aenderungen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Aenderung"
     Warnung:
       type: object
       description: "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)"
@@ -2765,6 +3022,71 @@ components:
           type: string
         grund:
           type: string
+    WissenEinstellungen:
+      type: object
+      properties:
+        budgetTokens:
+          type:
+          - integer
+          - "null"
+          format: int32
+          minimum: 1
+        lintBudgetTokens:
+          type:
+          - integer
+          - "null"
+          format: int32
+          minimum: 1
+        lintZeitplan:
+          type:
+          - string
+          - "null"
+        monatsbudgetTokens:
+          type:
+          - integer
+          - "null"
+          format: int32
+          minimum: 1
+    WissenExport:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        status:
+          type: string
+        erstellt:
+          $ref: "#/components/schemas/Instant"
+        fertig:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        gueltigBis:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        groesse:
+          type:
+          - integer
+          - "null"
+          format: int64
+        sha256:
+          type:
+          - string
+          - "null"
+        url:
+          type:
+          - string
+          - "null"
+        fehlerId:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
     WissenIngestAuftrag:
       description: Eingereihter Ingest-Entwurf.
       type: object
@@ -2800,11 +3122,24 @@ components:
           - "null"
           format: int32
           minimum: 1
+    WissenLintAuftrag:
+      type: object
+      properties:
+        lintId:
+          $ref: "#/components/schemas/UUID"
     WissenVerwerfen:
       type: object
       properties:
         grund:
           type: string
+    WissensEmbeddingAuftrag:
+      type: object
+      required:
+      - auftragId
+      properties:
+        auftragId:
+          type: integer
+          format: int64
     WissensIndex:
       type: object
       properties:
@@ -2887,6 +3222,18 @@ components:
           type: string
         titel:
           type: string
+    WissensSuchergebnis:
+      type: object
+      required:
+      - treffer
+      - degradiert
+      properties:
+        treffer:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensIndexZeile"
+        degradiert:
+          type: boolean
     Wissensdiff:
       type: object
       properties:
@@ -2937,6 +3284,8 @@ components:
           type: string
         quellSeiteTitel:
           type: string
+        dokumentDatum:
+          $ref: "#/components/schemas/LocalDate"
     Wissensseite:
       type: object
       properties:
@@ -3606,8 +3955,10 @@ paths:
     post:
       summary: Dateien hochladen
       description: "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei\
-        \ ein Ergebnis (Req 3). Sind alle Dateien abgelehnt, folgt Problem Details\
-        \ mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse»."
+        \ ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen»\
+        \ als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprü\
+        ft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der\
+        \ ersten Ablehnung und der Erweiterung «ergebnisse»."
       tags:
       - Dokumente
       requestBody:
@@ -3629,6 +3980,10 @@ paths:
                 zusammenfassen:
                   type: boolean
                 hinweis:
+                  type: string
+                art:
+                  type: string
+                klassifikationen:
                   type: string
         required: true
       responses:
@@ -3674,8 +4029,9 @@ paths:
         \ gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid\
         \ Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht,\
         \ ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blä\
-        ttern, degradiert bei Rückfall auf den Volltext. Ungültige Parameter → 400\
-        \ ANFRAGE_UNGUELTIG."
+        ttern, degradiert bei Rückfall auf den Volltext. Klassifikationsfilter als\
+        \ wiederholbare Parameter klassifikation.<code>=<wert>; Antwort enthält sichtbarkeitsgeprü\
+        fte Facetten. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG."
       tags:
       - Dokumente
       parameters:
@@ -5484,6 +5840,28 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/mandant/funktionen:
+    get:
+      summary: Verfügbare Funktionen des Mandanten
+      tags:
+      - Konfiguration
+      responses:
+        "200":
+          description: Funktionen des aktuellen Mandanten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mandantenfunktionen"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/protokoll:
     get:
       summary: Zugriffsprotokoll durchsuchen
@@ -5748,6 +6126,150 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/wissensbasis/einstellungen:
+    put:
+      summary: Wissenseinstellungen ersetzen
+      description: Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.
+      tags:
+      - Wissensbasis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WissenEinstellungen"
+        required: true
+      responses:
+        "200":
+          description: Einstellungen gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenEinstellungen"
+        "422":
+          description: Budget oder Zeitplan ungültig
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+    get:
+      summary: Wissenseinstellungen lesen
+      description: Nur Inhaber (A19); null bedeutet den konfigurierten Startwert.
+      tags:
+      - Wissensbasis
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenEinstellungen"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/wissensbasis/embeddings:
+    post:
+      summary: Seiten-Embeddings neu berechnen
+      description: "Auftrag im verifizierten Mandanten, A17."
+      tags:
+      - Wissensbasis
+      responses:
+        "202":
+          description: Nachberechnung eingereiht oder schon laufend
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissensEmbeddingAuftrag"
+        "403":
+          description: Kein Freigaberecht
+        "429":
+          description: Monatsbudget der Wissensbasis erschöpft
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
+  /api/v1/wissensbasis/exporte:
+    post:
+      summary: OKF-Export anfordern
+      description: Nur Inhaber (A19); reiht WISSEN_EXPORT ein.
+      tags:
+      - Wissensbasis
+      responses:
+        "202":
+          description: Export angelegt und eingereiht
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenExport"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/wissensbasis/exporte/{id}:
+    get:
+      summary: OKF-Export abrufen
+      description: Nur Inhaber (A19); Download ab Abschluss für 24 Stunden.
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Exportstatus und gegebenenfalls Download-Adresse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenExport"
+        "404":
+          description: Export nicht gefunden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/wissensbasis/lint:
+    post:
+      summary: Lint der Wissensbasis starten
+      responses:
+        "202":
+          description: Lint eingereiht
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenLintAuftrag"
+        "403":
+          description: Rolle darf keinen Lint starten
+        "409":
+          description: Ein Lint läuft bereits
+        "429":
+          description: Monatsbudget der Wissensbasis erschöpft
+        "401":
+          description: Not Authorized
+      tags:
+      - Wissen Lint Resource
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
   /api/v1/wissensbasis/log:
     get:
       summary: Wissensbasis-Log
@@ -5829,6 +6351,48 @@ paths:
           description: Rolle darf keine Entwürfe anlegen
         "404":
           description: Seite nicht vorhanden oder nicht sichtbar
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
+  /api/v1/wissensentwuerfe/import:
+    post:
+      summary: Wissenspaket synchron als Entwurf importieren
+      description: "A17, nur OIDC. Keine KI, keine Freigabe. Höchstens 10 MiB ZIP\
+        \ und 60 Sekunden."
+      tags:
+      - Wissensbasis
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                paket:
+                  type: string
+                  format: binary
+        required: true
+      responses:
+        "201":
+          description: Importentwurf angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Antwort1"
+        "400":
+          description: Teil paket fehlt oder ist mehrfach vorhanden
+        "403":
+          description: Import nicht erlaubt
+        "409":
+          description: Paket bereits importiert oder zu viele offene Importe
+        "413":
+          description: Paket zu gross
+        "415":
+          description: Kein ZIP oder falscher Medientyp
+        "422":
+          description: Paket ungültig; Codes und Pfade ohne Inhalte
         "401":
           description: Not Authorized
       security:
@@ -5999,10 +6563,13 @@ paths:
           $ref: "#/components/schemas/UUID"
       responses:
         "200":
-          description: Entwurf
+          description: Entwurf mit Importherkunft für A17; nur Status für A18
           content:
             application/json:
-              schema: {}
+              schema:
+                oneOf:
+                - $ref: "#/components/schemas/Vollansicht"
+                - $ref: "#/components/schemas/StatusAnsicht"
         "403":
           description: Rolle darf den Entwurf nicht lesen
         "404":
@@ -6015,11 +6582,43 @@ paths:
         - mitarbeiter
         - treuhaender
         - geschaeftsstelle
+  /api/v1/wissensentwuerfe/{id}/neu-pruefen:
+    post:
+      summary: Quellen und Befunde eines Importentwurfs ohne KI neu prüfen
+      tags:
+      - Wissensbasis
+      parameters:
+      - description: ID des Importentwurfs
+        name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "204":
+          description: Prüfung erneuert; Änderungs-ETags erhöht
+        "403":
+          description: Prüfung nicht erlaubt
+        "404":
+          description: Importentwurf nicht gefunden
+        "409":
+          description: Entwurf ist kein offener Import
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/wissensseiten:
     get:
       summary: Wissensseiten-Index
-      description: Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur
-        sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.
+      description: "Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur\
+        \ sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.\
+        \ modus=hybrid oder volltext liefert höchstens 30 rangierte Treffer ohne Gesamtzahl/Paging,\
+        \ hybrid mit Volltext-Rückfall und degradiert. Ohne modus bleibt der Index\
+        \ unverändert."
       tags:
       - Wissensbasis
       parameters:
@@ -6032,6 +6631,10 @@ paths:
           default: 50
         name: groesse
         in: query
+      - name: modus
+        in: query
+        schema:
+          type: string
       - schema:
           type: integer
           default: 0
@@ -6055,10 +6658,14 @@ paths:
           type: string
       responses:
         "200":
-          description: Index oder Seite
+          description: "Index, Seite oder rangiertes Suchergebnis"
           content:
             application/json:
-              schema: {}
+              schema:
+                oneOf:
+                - $ref: "#/components/schemas/WissensIndex"
+                - $ref: "#/components/schemas/Wissensseite"
+                - $ref: "#/components/schemas/WissensSuchergebnis"
         "400":
           description: Ungültiger Filter oder Pagingwert
         "404":

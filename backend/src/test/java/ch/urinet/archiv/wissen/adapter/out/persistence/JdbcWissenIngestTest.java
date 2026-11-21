@@ -12,10 +12,20 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.ki.application.KiPort;
 import ch.urinet.archiv.ki.application.KiVerbrauchPort;
+import ch.urinet.archiv.ki.application.ChunkPort;
+import ch.urinet.archiv.ki.domain.Chunk;
+import ch.urinet.archiv.ki.application.EmbeddingPort;
+import ch.urinet.archiv.ki.TestEmbeddingPort;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import ch.urinet.archiv.wissen.application.WissensSuchePort;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
+import ch.urinet.archiv.verarbeitung.application.AuftragService;
+import ch.urinet.archiv.verarbeitung.application.AuftragService.AnspruchVerloren;
+import ch.urinet.archiv.wissen.application.WissensEmbeddingSpeichern;
+import ch.urinet.archiv.wissen.application.WissensEmbeddingHandler;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
@@ -33,6 +43,7 @@ import ch.urinet.archiv.wissen.domain.Wissensseite;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import ch.urinet.archiv.wissen.application.WissenIngestSpeichern;
+import ch.urinet.archiv.wissen.application.WissenIngestIndex;
 import ch.urinet.archiv.wissen.application.WissenIngestVerarbeiten;
 import ch.urinet.archiv.wissen.application.WissenKonfiguration;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
@@ -76,6 +87,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.hasKey;
+import static org.hamcrest.Matchers.not;
 
 /**
  * Lesen und Anlegen für den Ingest-Start (Spec 04, Aufgabe 14.1a) je Mandant: Jeder Mandant sieht nur Dokumente,
@@ -92,6 +107,24 @@ class JdbcWissenIngestTest {
 
     @Inject
     JdbcWissenIngest ingest;
+
+    @Inject
+    PanacheWissensSuche wissensSuche;
+
+    @Inject
+    JdbcWissensEmbedding wissensEmbedding;
+
+    @Inject
+    WissensEmbeddingSpeichern embeddingSpeichern;
+
+    @Inject
+    WissensEmbeddingHandler seitenEmbeddingHandler;
+
+    @Inject
+    TestEmbeddingPort embeddingModell;
+
+    @Inject
+    AuftragService auftraege;
 
     @Inject
     PanacheWissenHuelleRepository huellen;
@@ -116,6 +149,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     WissenIngestSpeichern ingestSpeichern;
+
+    @Inject
+    WissenIngestIndex ingestIndex;
 
     @Inject
     ManuellerWissensentwurf manuellerEntwurfDienst;
@@ -156,6 +192,167 @@ class JdbcWissenIngestTest {
     private final Map<MandantCode, List<Long>> verbrauch = new HashMap<>();
     private final Map<MandantCode, Monatsbudget> monatsbudgets = new HashMap<>();
     private final Map<MandantCode, List<UUID>> seiten = new HashMap<>();
+
+    @Test
+    void wissensVolltextGewichtetTitelVorBeschreibungVorInhaltUndTrenntMandanten() throws SQLException {
+        String q = "Wissenssuchprobe Vertrag";
+        UUID titel = seite(URINET, "konzepte/suche-titel", "anderer Inhalt", null);
+        UUID beschreibung = seite(URINET, "konzepte/suche-beschreibung", "anderer Inhalt", null);
+        UUID inhalt = seite(URINET, "konzepte/suche-inhalt", "Wissenssuchprobe Verträge", null);
+        UUID geheim = seite(URINET, "konzepte/suche-geheim", q, null);
+        UUID fremd = seite(ZWEITER, "konzepte/suche-fremd", q, null);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set titel = ? where id = ?", q, titel);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set beschreibung = ? where id = ?", q, beschreibung);
+        UUID dokument = quelle(URINET);
+        ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'INTERN' where id = ?", dokument);
+        ausfuehren("insert into " + URINET.schema()
+                + ".wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)",
+                geheim, dokument);
+        ausfuehren("insert into " + URINET.schema()
+                + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)", geheim, dokument);
+        var filter = new WissensSuchePort.Filter(Sichtregel.fuer(new Benutzer("mitarbeiter", Rolle.MITARBEITER)),
+                null, null, null);
+        var treffer = im(URINET, () -> wissensSuche.volltext(q, filter, 3));
+        assertThat(treffer).extracting(t -> t.seite().id()).containsExactly(titel, beschreibung, inhalt);
+        assertThat(im(ZWEITER, () -> wissensSuche.volltext(q, filter, 3)))
+                .extracting(t -> t.seite().id()).containsExactly(fremd);
+        assertThat(im(URINET, () -> wissensSuche.sichtbar(List.of(geheim, fremd), filter))).isEmpty();
+        given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                .queryParam("q", q).queryParam("modus", "volltext")
+                .when().get("/api/v1/wissensseiten").then().statusCode(200)
+                .body("treffer.id", contains(titel.toString(), beschreibung.toString(), inhalt.toString()))
+                .body("degradiert", is(false)).body("$", not(hasKey("gesamt")));
+        embeddingModell.setzen(TestEmbeddingPort.Ersatz.STUB);
+        try {
+            given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                    .queryParam("q", q).queryParam("modus", "hybrid")
+                    .when().get("/api/v1/wissensseiten").then().statusCode(200)
+                    .body("treffer.id", contains(titel.toString(), beschreibung.toString(), inhalt.toString()))
+                    .body("degradiert", is(true)).body("$", not(hasKey("gesamt")));
+        } finally {
+            embeddingModell.setzen(null);
+        }
+    }
+
+    @Test
+    void wissensChunksSindVersionsgebundenStubSicherUndMandantengetrennt() throws Exception {
+        UUID id = seite(URINET, "konzepte/embedding", "Text", null);
+        UUID fremd = seite(ZWEITER, "konzepte/embedding", "Fremd", null);
+        var eigeneSeiten = Map.of(URINET, id, ZWEITER, fremd);
+        long verbrauchVorher = anzahl("select coalesce(max(id), 0) from " + URINET.schema() + ".ki_verbrauch");
+        long embeddingAuftrag = 0;
+        try {
+            for (var eintrag : eigeneSeiten.entrySet()) {
+                ausfuehren("insert into " + eintrag.getKey().schema()
+                        + ".wissensseite_version (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit) "
+                        + "values (?, 1, '{}'::jsonb, 'Text', 'probe', 'probe', now())", eintrag.getValue());
+            }
+            var nutzlast = new Nutzlast(Map.of("seiteId", id, "version", 1));
+            embeddingAuftrag = im(URINET, () -> auftraege.einreihen(WissensEmbeddingSpeichern.EINZELN, nutzlast));
+            ausfuehren("update public.auftrag set status = 'LAEUFT', versuche = 1 where id = ?", embeddingAuftrag);
+            var wirklicherAuftrag = new Auftrag(embeddingAuftrag, URINET, WissensEmbeddingSpeichern.EINZELN,
+                    nutzlast, 1);
+            CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
+                try {
+                    seitenEmbeddingHandler.ausfuehren(wirklicherAuftrag);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_chunk where seite_id = ? and version = 1 and embedding is not null", id))
+                    .isEqualTo(1);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".ki_verbrauch where id > ? and zweck = 'WISSEN_EMBEDDING'", verbrauchVorher)).isEqualTo(1);
+            float[] vektor = new float[EmbeddingPort.DIMENSION];
+            vektor[0] = 1;
+            var eingebettet = List.of(new ChunkPort.Eingebettet(new Chunk(1, "Text", null, null), vektor));
+            assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isTrue();
+            assertThat(im(ZWEITER, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isFalse();
+            assertThat(im(ZWEITER, () -> wissensEmbedding.ersetzen(fremd, 1, eingebettet))).isTrue();
+            var ohneAnspruch = new Auftrag(Long.MAX_VALUE, URINET, WissensEmbeddingSpeichern.EINZELN,
+                    new Nutzlast(Map.of("seiteId", id, "version", 1)), 0);
+            assertThatThrownBy(() -> im(URINET, () -> embeddingSpeichern
+                    .ersetzen(ohneAnspruch, id, 1,
+                            List.of(new ChunkPort.Eingebettet(new Chunk(1, "Nicht speichern", null, null), vektor)))))
+                    .isInstanceOf(AnspruchVerloren.class);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite_chunk where seite_id = ? and text = 'Text'", id)).isEqualTo(1);
+            assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1,
+                    List.of(new ChunkPort.Eingebettet(new Chunk(1, "Stub", null, null), null))))).isFalse();
+            var filter = new WissensSuchePort.Filter(Sichtregel.fuer(new Benutzer("inhaber", Rolle.INHABER)),
+                    null, null, null);
+            assertThat(im(URINET, () -> wissensSuche.vektor(vektor, filter, 50)))
+                    .extracting(t -> t.seite().id()).containsExactly(id);
+            assertThat(im(ZWEITER, () -> wissensSuche.vektor(vektor, filter, 50)))
+                    .extracting(t -> t.seite().id()).containsExactly(fremd);
+            ausfuehren("update " + URINET.schema() + ".wissensseite set version = 2 where id = ?", id);
+            assertThat(im(URINET, () -> wissensEmbedding.ersetzen(id, 1, eingebettet))).isFalse();
+            assertThat(im(URINET, () -> wissensSuche.vektor(vektor, filter, 50))).isEmpty();
+        } finally {
+            if (embeddingAuftrag > 0) ausfuehren("delete from public.auftrag where id = ?", embeddingAuftrag);
+            try (var verbindung = datenbank.get().getConnection();
+                 var query = verbindung.prepareStatement("select id from " + URINET.schema()
+                         + ".ki_verbrauch where id > ? and zweck = 'WISSEN_EMBEDDING'")) {
+                query.setLong(1, verbrauchVorher);
+                try (var ergebnis = query.executeQuery()) {
+                    while (ergebnis.next()) verbrauch.get(URINET).add(ergebnis.getLong(1));
+                }
+            }
+            for (var eintrag : eigeneSeiten.entrySet()) {
+                ausfuehren("delete from " + eintrag.getKey().schema() + ".wissensseite_chunk where seite_id = ?",
+                        eintrag.getValue());
+                try (var verbindung = datenbank.get().getConnection()) {
+                    verbindung.setAutoCommit(false);
+                    try (var befehl = verbindung.createStatement()) {
+                        befehl.execute("set local session_replication_role = replica");
+                    }
+                    try (var befehl = verbindung.prepareStatement("delete from " + eintrag.getKey().schema()
+                            + ".wissensseite_version where seite_id = ?")) {
+                        befehl.setObject(1, eintrag.getValue());
+                        befehl.executeUpdate();
+                    }
+                    verbindung.commit();
+                }
+            }
+        }
+    }
+
+    @Test
+    void embeddingNachberechnungIstEinWiederverwendeterAuftragMitA17() throws SQLException {
+        long vorher;
+        try (var verbindung = datenbank.get().getConnection();
+             var query = verbindung.createStatement();
+             var ergebnis = query.executeQuery("select coalesce(max(id), 0) from public.auftrag")) {
+            ergebnis.next();
+            vorher = ergebnis.getLong(1);
+        }
+        long auftragId = 0;
+        try {
+            given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(403);
+            given().auth().oauth2(Testanmeldung.token("treuhaender-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(403);
+            auftragId = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(202)
+                    .extract().jsonPath().getLong("auftragId");
+            long wiederverwendet = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(202)
+                    .extract().jsonPath().getLong("auftragId");
+            assertThat(wiederverwendet).isEqualTo(auftragId);
+            assertThat(auftragId).isPositive();
+            ausfuehren("insert into " + URINET.schema()
+                    + ".wissens_einstellung (id, monatsbudget_tokens) values (1, 1) "
+                    + "on conflict (id) do update set monatsbudget_tokens = 1");
+            verbrauch(URINET, KiVerbrauchPort.WISSEN_EMBEDDING, 1, Instant.now());
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().post("/api/v1/wissensbasis/embeddings").then().statusCode(429)
+                    .body("fehlercode", is("BUDGET"));
+        } finally {
+            if (auftragId > vorher) ausfuehren("delete from public.auftrag where id = ?", auftragId);
+        }
+    }
 
     @Test
     void quellenAenderungBleibtTransaktionalUndImMandanten() throws SQLException {
@@ -776,7 +973,7 @@ class JdbcWissenIngestTest {
         try {
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
                 try {
-                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst)
+                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst, ingestIndex)
                             .ausfuehren(auftrag, entwurf);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -812,7 +1009,7 @@ class JdbcWissenIngestTest {
                     new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
                 try {
-                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst)
+                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst, ingestIndex)
                             .ausfuehren(zweiter, entwurf);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -893,7 +1090,7 @@ class JdbcWissenIngestTest {
         };
         try {
             var verarbeiten = new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, testKi, kiVerbrauch,
-                    diffDienst);
+                    diffDienst, ingestIndex);
             var manuell = new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration);
             var handler = new WissenIngestHandler(verarbeiten, ingestSpeichern, manuell, manuellSpeichern);
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
@@ -993,7 +1190,7 @@ class JdbcWissenIngestTest {
             }
         };
         var verarbeiten = new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, testKi, kiVerbrauch,
-                diffDienst);
+                diffDienst, ingestIndex);
         var handler = new WissenIngestHandler(verarbeiten, ingestSpeichern,
                 new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration), manuellSpeichern);
         try {
@@ -1262,7 +1459,7 @@ class JdbcWissenIngestTest {
         assertThatThrownBy(() -> im(URINET, () -> {
             var aenderung = freigabeRepository.sperren(entwurf, 1).orElseThrow();
             freigabeRepository.fassungSpeichern(entwurf, aenderung, fassung, WissensStufe.INTERN,
-                    WissensStufe.INTERN, "human:probe", "inhaber", null, Set.of("konzepte/andere"));
+                    WissensStufe.INTERN, "human:probe", "inhaber", null, Set.of("konzepte/andere"), false);
             EntityManager em = entityManager.get();
             assertThat(((Number) em.createNativeQuery("select count(*) from wissensseite_version where seite_id = :id")
                     .setParameter("id", seite).getSingleResult()).intValue()).isEqualTo(1);
@@ -1298,7 +1495,7 @@ class JdbcWissenIngestTest {
         assertThatThrownBy(() -> im(URINET, () -> {
             var aenderung = freigabeRepository.sperren(entwurf, 1).orElseThrow();
             freigabeRepository.fassungSpeichern(entwurf, aenderung, fassung, WissensStufe.NORMAL,
-                    WissensStufe.NORMAL, "human:probe", "inhaber", null, Set.of());
+                    WissensStufe.NORMAL, "human:probe", "inhaber", null, Set.of(), false);
             assertThat(entityManager.get().createNativeQuery("select quelle_pruefen from wissensseite where id = :id")
                     .setParameter("id", seite).getSingleResult()).isEqualTo(false);
             throw new IllegalStateException("rollback");
@@ -1852,6 +2049,19 @@ class JdbcWissenIngestTest {
                 .isEmpty();
         assertThat(JdbcWissenIngest.oderSuche("Am 1. April: UVG-Prämie, uvg!")).isEqualTo("april or uvg or prämie");
         assertThat(JdbcWissenIngest.oderSuche("ab 12 zu")).isEmpty();
+    }
+
+    @Test
+    void ingestKontextDerWissensSucheVerbindetKernaussagenMitOder() throws SQLException {
+        UUID lohn = seite(URINET, "probe/ws-lohn", "Die Lohndeklaration ist bis Ende Januar fällig.", null);
+        UUID uvg = seite(URINET, "probe/ws-uvg", "Die Unfallversicherung wird jährlich abgerechnet.", null);
+        UUID fremd = seite(URINET, "probe/ws-fremd", "Ein Text über Fussballvereine.", null);
+        String suchtext = "Die Lohndeklaration ist fällig.\nDie Unfallversicherung wird abgerechnet.";
+        var ingestFilter = new WissensSuchePort.Filter(null, null, null, null, java.util.Set.of(lohn, uvg, fremd));
+
+        assertThat(im(URINET, () -> wissensSuche.volltext(suchtext, ingestFilter, 10)))
+                .extracting(t -> t.seite().id()).containsExactlyInAnyOrder(lohn, uvg);
+        assertThat(im(URINET, () -> wissensSuche.volltext("ab 12 zu", ingestFilter, 10))).isEmpty();
     }
 
     @Test

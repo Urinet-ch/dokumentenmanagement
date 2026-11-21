@@ -52,6 +52,15 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
     }
 
     public Datei lesen(String text) {
+        return lesen(text, false);
+    }
+
+    @Override
+    public Datei seedLesen(String text) {
+        return lesen(text, true);
+    }
+
+    private Datei lesen(String text, boolean seed) {
         if (text == null) {
             throw ungueltig();
         }
@@ -59,7 +68,9 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
             throw new FachFehler(Fehlercode.DATEI_ZU_GROSS);
         }
         try {
-            List<ZusatzSchemaPruefer.Verletzung> verletzungen = schemaPruefer.konfigurationPruefen(schema, text);
+            List<ZusatzSchemaPruefer.Verletzung> verletzungen = seed
+                    ? schemaPruefer.seedKonfigurationPruefen(schema, text)
+                    : schemaPruefer.konfigurationPruefen(schema, text);
             if (!verletzungen.isEmpty()) {
                 throw new KonfigurationUngueltig(verletzungen.stream().map(verletzung ->
                         new KonfigurationUngueltig.Befund(verletzung.pfad(), verletzung.schluesselwort(),

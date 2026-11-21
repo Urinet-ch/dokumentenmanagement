@@ -16,6 +16,7 @@ import { Subscription, map } from 'rxjs';
 import { KontaktDetail } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { zeitpunkt } from '../gemeinsam/format';
+import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { KontaktBearbeiten } from './kontakt-bearbeiten';
 import { KontaktDokumente } from './kontakt-dokumente';
@@ -52,6 +53,7 @@ interface Erfolg {
     KontaktDokumente,
     KontaktInaktivDialog,
     KontaktZusammenfuehrenDialog,
+    Symbol,
   ],
   templateUrl: './kontakt-detail.html',
   styleUrls: ['./kontakte-gemeinsam.scss', './kontakt-detail.scss'],

@@ -39,6 +39,7 @@
         <zxing.version>3.5.4</zxing.version>
         <wiremock.version>3.13.2</wiremock.version>
         <greenmail.version>2.1.15</greenmail.version>
+        <snakeyaml-engine.version>3.0.1</snakeyaml-engine.version>
     </properties>
 
     <dependencyManagement>
@@ -87,6 +88,11 @@
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>org.snakeyaml</groupId>
+            <artifactId>snakeyaml-engine</artifactId>
+            <version>${snakeyaml-engine.version}</version>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-rest-jackson</artifactId>
@@ -178,6 +184,11 @@
             <groupId>org.commonmark</groupId>
             <artifactId>commonmark-ext-footnotes</artifactId>
             <version>${commonmark.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.6</version>
         </dependency>
         <dependency>
             <groupId>io.github.java-diff-utils</groupId>

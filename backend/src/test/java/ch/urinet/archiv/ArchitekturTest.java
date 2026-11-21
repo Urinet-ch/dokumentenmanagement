@@ -40,6 +40,7 @@ class ArchitekturTest {
     static final String WURZEL = "ch.urinet.archiv";
     static final String GEMEINSAM = "gemeinsam";
     private static final String WISSENSMARKDOWN = "^ch\\.urinet\\.archiv\\.wissen\\.domain\\.WissensMarkdown(\\$.*)?$";
+    private static final String PAKETLESER = "^ch\\.urinet\\.archiv\\.wissen\\.domain\\.paket\\.WissensPaketLeser(\\$.*)?$";
     private static final Pattern PAKET = Pattern.compile("^ch\\.urinet\\.archiv\\.([a-z]+)\\.(domain|application|adapter)(\\..*)?$");
     private static final Map<String, Set<String>> ERLAUBT_EIGENER_BEREICH = Map.of(
             "domain", Set.of("domain"),
@@ -70,7 +71,8 @@ class ArchitekturTest {
     @ArchTest
     static final ArchRule domainOhneFramework = classes().that().resideInAPackage("ch.urinet.archiv..domain..")
             .and(DescribedPredicate.describe("nicht WissensMarkdown oder dessen innere Typen",
-                    klasse -> !klasse.getName().matches(WISSENSMARKDOWN)))
+                    klasse -> !klasse.getName().matches(WISSENSMARKDOWN)
+                            && !klasse.getName().matches(PAKETLESER)))
             .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "ch.urinet.archiv..domain..")
             .because("die Domain ist framework-frei (tech.md Regel 12, structure.md)");
 
@@ -82,6 +84,20 @@ class ArchitekturTest {
             .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "ch.urinet.archiv..domain..",
                     "org.commonmark..")
             .because("CommonMark ist nur die Parser-Bibliothek von WissensMarkdown, kein Framework");
+
+    @ArchTest
+    static final ArchRule paketLeserNurSnakeYaml = classes()
+            .that().resideInAPackage("ch.urinet.archiv.wissen.domain.paket..")
+            .and(DescribedPredicate.describe("WissensPaketLeser oder dessen innere Typen",
+                    klasse -> klasse.getName().matches(PAKETLESER)))
+            .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "ch.urinet.archiv.wissen.domain..",
+                    "ch.urinet.archiv.gemeinsam.domain..", "org.snakeyaml.engine..");
+
+    @ArchTest
+    static final ArchRule wissenDomainOhneFramework = classes()
+            .that().resideInAPackage("ch.urinet.archiv.wissen.domain..")
+            .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "ch.urinet.archiv.wissen.domain..",
+                    "ch.urinet.archiv.gemeinsam.domain..", "org.commonmark..", "org.snakeyaml.engine..");
 
     /**
      * {@code application} hängt nur von {@code domain} (und Ports anderer {@code application}) ab; zulässig sind die

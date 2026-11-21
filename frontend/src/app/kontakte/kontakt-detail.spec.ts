@@ -408,6 +408,7 @@ describe('Kontakte: Detail (Req 17.3, 17.4, 17.6)', () => {
     });
     const ergebnis = (gesamt: number, ...t: ReturnType<typeof treffer>[]): Suchergebnis => ({
       treffer: t,
+      facetten: [],
       gesamt,
       seite: 0,
       groesse: 20,

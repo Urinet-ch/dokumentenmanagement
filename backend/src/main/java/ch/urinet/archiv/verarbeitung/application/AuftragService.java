@@ -41,7 +41,6 @@ public class AuftragService {
         return schlange.einfuegen(mandant(), typ, nutzlast);
     }
 
-    /** Der Handler folgt in Aufgabe 15.1; bis dahin holt kein Worker diesen Auftragstyp. */
     public long wissensEmbeddingEinreihen(UUID seiteId, int version) {
         return schlange.einfuegen(mandant(), new AuftragTyp("WISSEN_EMBEDDING"),
                 new Nutzlast(Map.of("seiteId", seiteId, "version", version)));

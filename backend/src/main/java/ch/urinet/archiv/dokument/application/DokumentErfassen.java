@@ -12,6 +12,7 @@ import ch.urinet.archiv.dokument.domain.Dateityp;
 import ch.urinet.archiv.dokument.domain.UploadErgebnis;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
@@ -95,17 +96,37 @@ public class DokumentErfassen {
     private final TransactionSynchronizationRegistry transaktion;
     private final UploadGrenzen grenzen;
     private final Clock uhr;
+    private final KlassifikationVerwaltung klassifikationVerwaltung;
+    private final DokumentKlassifikationenPort dokumentKlassifikationen;
 
     @Inject
     public DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
                             AuftragService auftraege, MandantAufloesung aufloesung,
+                            TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen,
+                            KlassifikationVerwaltung klassifikationVerwaltung,
+                            DokumentKlassifikationenPort dokumentKlassifikationen) {
+        this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, Clock.systemUTC(),
+                klassifikationVerwaltung, dokumentKlassifikationen);
+    }
+
+    public DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
+                            AuftragService auftraege, MandantAufloesung aufloesung,
                             TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen) {
-        this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, Clock.systemUTC());
+        this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, Clock.systemUTC(), null,
+                null);
     }
 
     DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
                      AuftragService auftraege, MandantAufloesung aufloesung,
                      TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen, Clock uhr) {
+        this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, uhr, null, null);
+    }
+
+    private DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
+                             AuftragService auftraege, MandantAufloesung aufloesung,
+                             TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen, Clock uhr,
+                             KlassifikationVerwaltung klassifikationVerwaltung,
+                             DokumentKlassifikationenPort dokumentKlassifikationen) {
         this.repository = repository;
         this.typerkennung = typerkennung;
         this.ablage = ablage;
@@ -114,6 +135,8 @@ public class DokumentErfassen {
         this.transaktion = transaktion;
         this.grenzen = grenzen;
         this.uhr = uhr;
+        this.klassifikationVerwaltung = klassifikationVerwaltung;
+        this.dokumentKlassifikationen = dokumentKlassifikationen;
     }
 
     /** Ein Ergebnis je Seite in der gesendeten Reihenfolge; Fehler der ganzen Anfrage als {@link FachFehler}. */
@@ -151,6 +174,12 @@ public class DokumentErfassen {
         if (empfangen.isEmpty() || anfrage.hinweis().map(DokumentErfassen::hinweisUngueltig).orElse(false)) {
             LOG.infof("Upload abgelehnt: mandant=%s dateien=%d fehlercode=%s", mandant.wert(), empfangen.size(),
                     Fehlercode.ANFRAGE_UNGUELTIG);
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        if (!anfrage.klassifikationen().isEmpty()
+                && (anfrage.art() == null || klassifikationVerwaltung == null || dokumentKlassifikationen == null
+                || !klassifikationVerwaltung.markierteDokumentKlassifikationen(anfrage.art(),
+                anfrage.klassifikationen(), false).isEmpty())) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         Instant eingang = uhr.instant();
@@ -310,6 +339,15 @@ public class DokumentErfassen {
         repository.anlegen(new NeuesDokument(id, eingang, anfrage.erfasser().quelle(), anfrage.erfasser().id(),
                 anfrage.hinweis().filter(h -> !h.isBlank()), dateiname));
         transaktion.registerInterposedSynchronization(new EingangAufraeumen(mandant, jahr, id));
+        if (!anfrage.klassifikationen().isEmpty()) {
+            if (!repository.artVorbelegen(id, anfrage.art())) {
+                // Art inaktiv, unbekannt oder zwischenzeitlich deaktiviert: Eingabefehler, kein 500
+                LOG.infof("Upload abgelehnt: mandant=%s fehlercode=%s (Art nicht aktiv)", mandant.wert(),
+                        Fehlercode.ANFRAGE_UNGUELTIG);
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            dokumentKlassifikationen.ersetzen(id, anfrage.klassifikationen());
+        }
         return id;
     }
 

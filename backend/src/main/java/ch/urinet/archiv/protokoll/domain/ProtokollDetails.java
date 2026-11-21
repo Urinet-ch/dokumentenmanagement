@@ -21,7 +21,8 @@ import java.util.regex.Pattern;
  */
 public record ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
                                FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
-                               String kanal, String tokenId, WissensEntscheid wissensEntscheid) {
+                               String kanal, String tokenId, WissensEntscheid wissensEntscheid,
+                               Integer wissensImportSeiten) {
 
     public static final ProtokollDetails KEINE = new ProtokollDetails(null, null, null);
     private static final Pattern TOKEN_ID = Pattern.compile("^[a-z0-9]{12}$");
@@ -33,6 +34,9 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
     private static final Pattern CODE = Pattern.compile("^[A-Z][A-Z0-9_]*$");
 
     public ProtokollDetails {
+        if (wissensImportSeiten != null && (wissensImportSeiten < 0 || wissensImportSeiten > 200)) {
+            throw new IllegalArgumentException("Ungültige Seitenzahl des Wissensimports");
+        }
         if (sha256 != null) {
             sha256 = sha256.toLowerCase(Locale.ROOT);
             if (!SHA256.matcher(sha256).matches()) {
@@ -51,6 +55,13 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         if (tokenId != null && !TOKEN_ID.matcher(tokenId).matches()) {
             throw new IllegalArgumentException("tokenId ist keine Token-ID");
         }
+    }
+
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                           FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
+                           String kanal, String tokenId, WissensEntscheid wissensEntscheid) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration, kanal, tokenId,
+                wissensEntscheid, null);
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
@@ -110,16 +121,20 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         return new ProtokollDetails(grund, null, null, null, null, null, null, null, null, entscheid);
     }
 
+    public static ProtokollDetails wissensImport(String sha256, int seiten) {
+        return new ProtokollDetails(null, sha256, null, null, null, null, null, null, null, null, seiten);
+    }
+
     public boolean leer() {
         return grund == null && sha256 == null && fehlercode == null && regelAenderung == null
                 && fristKonflikt == null && kontakte == null && konfiguration == null && kanal == null
-                && tokenId == null && wissensEntscheid == null;
+                && tokenId == null && wissensEntscheid == null && wissensImportSeiten == null;
     }
 
     /** Dieselben Details mit dem Kanal {@code kanal}. */
     public ProtokollDetails mitKanal(String kanal) {
         return new ProtokollDetails(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration,
-                kanal, tokenId, wissensEntscheid);
+                kanal, tokenId, wissensEntscheid, wissensImportSeiten);
     }
 
     /** Details eines Eintrags zu einem API-Token: dessen ID (kein Geheimnis). */

@@ -292,7 +292,8 @@ class MandantVollexportHandlerTest {
                         }
                         default -> throw new UnsupportedOperationException(methode.getName());
                     });
-            return new MandantVollexportHandler(speichern, new Repository(export), daten, ablage, temp);
+            return new MandantVollexportHandler(speichern, new Repository(export), daten, ablage,
+                    (mandant, strom) -> {}, temp);
         }
     }
 }

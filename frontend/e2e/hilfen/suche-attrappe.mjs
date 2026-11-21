@@ -225,8 +225,8 @@ export async function sucheAttrappe(welt) {
     if (anfrage.method() !== 'GET' && !aendern) {
       return route.fallback();
     }
-    if (pfad === '/api/v1/branding') {
-      // Öffentlicher Endpunkt ohne Token: gehört nicht zur Such-API und zählt nicht als abgelehnt.
+    if (pfad === '/api/v1/branding' || pfad === '/api/v1/wissensentwuerfe') {
+      // Diese Endpunkte gehören nicht zur Such-API; die jeweils zuständige Attrappe beantwortet sie.
       return route.fallback();
     }
     if ((await anfrage.headerValue('authorization')) !== `Bearer ${welt.keycloak?.accessToken}`) {
@@ -247,6 +247,9 @@ export async function sucheAttrappe(welt) {
     }
     if (pfad === '/api/v1/kontakte') {
       return json(route, 200, []);
+    }
+    if (pfad === '/api/v1/wissensseiten') {
+      return json(route, 200, { treffer: [], degradiert: false });
     }
     if (pfad === '/api/v1/dokumente') {
       zustand.anfragen.push(url.searchParams);

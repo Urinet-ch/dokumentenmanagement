@@ -58,7 +58,7 @@ public class SucheSchritte {
     private Response antwort;
     private LogMitschnitt log;
 
-    @After
+    @After(order = 1)
     public void aufraeumen() throws SQLException {
         if (log != null) {
             log.close();
@@ -116,6 +116,22 @@ public class SucheSchritte {
             befehl.setString(15, z.get("text"));
             befehl.setString(16, z.get("dateiname"));
             befehl.executeUpdate();
+        }
+        String klassifikationen = z.get("klassifikationen");
+        if (klassifikationen != null && !klassifikationen.isBlank()) {
+            for (String eintrag : klassifikationen.split(",")) {
+                String[] teile = eintrag.split("=", 2);
+                if (teile.length != 2) {
+                    throw new IllegalArgumentException("Ungültige Testklassifikation");
+                }
+                try (PreparedStatement befehl = verbindung.prepareStatement("insert into " + schema
+                        + ".dokument_klassifikation (dokument_id, klassifikation, wert) values (?, ?, ?)")) {
+                    befehl.setObject(1, id);
+                    befehl.setString(2, teile[0]);
+                    befehl.setString(3, teile[1]);
+                    befehl.executeUpdate();
+                }
+            }
         }
     }
 
@@ -188,6 +204,27 @@ public class SucheSchritte {
         }
     }
 
+    @Dann("zeigt die Suche diese Klassifikationsfacetten:")
+    public void klassifikationsfacetten(DataTable tabelle) {
+        klassifikationsfacetten(antwort, tabelle);
+    }
+
+    static void klassifikationsfacetten(Response antwort, DataTable tabelle) {
+        assertThat(antwort.statusCode()).isEqualTo(200);
+        List<Map<String, Object>> facetten = antwort.jsonPath().getList("facetten");
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Map<String, Object> klassifikation = facetten.stream()
+                    .filter(f -> zeile.get("klassifikation").equals(f.get("code"))).findFirst().orElseThrow();
+            assertThat(klassifikation.get("name")).isEqualTo(zeile.get("name"));
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> werte = (List<Map<String, Object>>) klassifikation.get("werte");
+            Map<String, Object> wert = werte.stream()
+                    .filter(w -> zeile.get("wert").equals(w.get("code"))).findFirst().orElseThrow();
+            assertThat(wert.get("name")).isEqualTo(zeile.get("wertName"));
+            assertThat(((Number) wert.get("anzahl")).longValue()).isEqualTo(Long.parseLong(zeile.get("anzahl")));
+        }
+    }
+
     @Dann("antwortet die Suche für «{word}» so:")
     public void eingaben(String benutzer, DataTable tabelle) {
         for (Map<String, String> zeile : tabelle.asMaps()) {
@@ -230,6 +267,11 @@ public class SucheSchritte {
     @Dann("antwortet die Suche ohne Anmeldung mit {int}")
     public void ohneAnmeldung(int status) {
         given().queryParam("q", "Rechnung").when().get("/api/v1/dokumente").then().statusCode(status);
+    }
+
+    @Dann("antwortet die Suche mit Status {int} und Fehlercode «{word}»")
+    public void statusUndFehlercode(int status, String fehlercode) {
+        assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(fehlercode);
     }
 
     @Dann("ist die Gesamtzahl {int}")

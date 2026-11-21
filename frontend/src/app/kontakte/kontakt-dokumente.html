@@ -13,24 +13,29 @@
   @if (fehler()) {
     <div role="alert" class="fehler" data-test="dokumente-fehler">
       <p>{{ texte.dokumenteFehler }}</p>
-      <button mat-button type="button" (click)="neuLaden()">{{ texte.erneutVersuchen }}</button>
+      <button mat-stroked-button type="button" (click)="neuLaden()">
+        {{ texte.erneutVersuchen }}
+      </button>
     </div>
   } @else if (ergebnis(); as e) {
     @if (e.treffer.length === 0) {
-      <p data-test="dokumente-keine">{{ texte.dokumenteKeine }}</p>
+      <p class="leer" data-test="dokumente-keine">{{ texte.dokumenteKeine }}</p>
     } @else {
       <ol class="dokumente" [attr.aria-label]="texte.dokumenteBeschreibung">
         @for (t of e.treffer; track t.id) {
-          <li class="karte eintrag" data-test="dokument">
-            <a class="titel" [routerLink]="['/dokument', t.id]"
-              ><app-titel-anzeige [anzeige]="titel(t)"
-            /></a>
-            <p class="angaben">
-              <span>{{ artName(t.art) }}</span>
-              @if (t.datum) {
-                <span>{{ datum(t.datum) }}</span>
-              }
-            </p>
+          <li class="eintrag" data-test="dokument">
+            <span class="symbol"><app-symbol name="dokument" /></span>
+            <div class="text">
+              <a class="titel" [routerLink]="['/dokument', t.id]"
+                ><app-titel-anzeige [anzeige]="titel(t)"
+              /></a>
+              <p class="angaben">
+                <span>{{ artName(t.art) }}</span>
+                @if (t.datum) {
+                  <span>{{ datum(t.datum) }}</span>
+                }
+              </p>
+            </div>
           </li>
         }
       </ol>
