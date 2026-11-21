@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Vorab-Lesen des Passworts für {@code mail einrichten} in {@code ArchivMain.main}, ohne Start der Anwendung: Exit-Codes
- * und Meldungen auf stderr. Den Weg über den echten Einstieg prüft {@code MailKommandoStartTest}.
+ * und Meldungen auf stderr. Den Weg über den echten Einstieg prüft {@code IntegrationKommandoStartTest}.
  */
 class ArchivMainMailPasswortTest {
 
