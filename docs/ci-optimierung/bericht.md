@@ -267,8 +267,9 @@ Die Szenario-Runner umfassen viele Szenarien, nicht nur einen Testfall.
 
 ## Browser-Parallelisierung
 
-Lauf 44899529866 führte 154 Browser-Szenarien in 186,5 s aus;
-der Browser-Job insgesamt dauerte 5 min 37 s. Die Anwendung wird dabei nicht je
+Läufe 44899529866 und 44898942261 führten je 154 Browser-Szenarien in
+186,5 bzw. 200,7 s aus; die Browser-Jobs insgesamt dauerten 5 min 37 s bzw.
+5 min 53 s. Die Anwendung wird dabei nicht je
 Szenario neu gestartet, wohl aber der Browser. Ein unbedachter paralleler
 Aufruf ist nicht isoliert: Der echte Test-Realm akzeptiert denselben TOTP je
 Benutzer nur einmal; der Token-Cache ist pro Prozess und die Datei mit den
