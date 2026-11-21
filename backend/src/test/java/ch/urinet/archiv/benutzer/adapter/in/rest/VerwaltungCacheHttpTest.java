@@ -483,6 +483,37 @@ class VerwaltungCacheHttpTest {
     }
 
     @Test
+    void lesendeUndSchreibendeVerwaltungVerweigertAndereRollenMitProtokoll() throws SQLException {
+        for (String[] fall : List.of(
+                new String[]{"mitarbeiter-urinet", "m_urinet", "MITARBEITER"},
+                new String[]{"treuhaender-urinet", "m_urinet", "TREUHAENDER"},
+                new String[]{"geschaeftsstelle-vhf-gsk", "m_vhf_gsk", "GESCHAEFTSSTELLE"})) {
+            long lesenVorher = verweigerungen(fall[1], fall[2], "A21");
+            long schreibenVorher = verweigerungen(fall[1], fall[2], "A22");
+            String token = Testanmeldung.token(fall[0]);
+            given().auth().oauth2(token).get("/api/v1/benutzer").then().statusCode(403);
+            given().auth().oauth2(token).contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
+                    .post("/api/v1/benutzer/" + UUID.randomUUID() + "/sperren").then().statusCode(403);
+            assertThat(verweigerungen(fall[1], fall[2], "A21")).isEqualTo(lesenVorher + 1);
+            assertThat(verweigerungen(fall[1], fall[2], "A22")).isEqualTo(schreibenVorher + 1);
+        }
+    }
+
+    private long verweigerungen(String schema, String rolle, String recht) throws SQLException {
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from " + schema + ".zugriff_protokoll "
+                             + "where aktion = 'VERWEIGERT' and rolle = ? and details->>'grund' = ?")) {
+            abfrage.setString(1, rolle);
+            abfrage.setString(2, recht);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                return zeile.getLong(1);
+            }
+        }
+    }
+
+    @Test
     void fehlversuchssperreIstSichtbarUndKannAufgehobenWerden() {
         QuarkusMock.installMockForType(new StepUpAusstehend() {
             @Override
