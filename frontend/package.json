@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "api:generieren": "node scripts/api-leeren.mjs && openapi-generator-cli generate -i openapi/openapi.yaml -g typescript-angular -o src/app/gemeinsam/api --additional-properties=ngVersion=22.2.6,fileNaming=kebab-case",
-    "e2e": "cucumber-js"
+    "e2e": "cucumber-js",
+    "pruefe:gestaltung": "node --test scripts/pruefe-gestaltung.test.mjs && node scripts/pruefe-gestaltung.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.8",

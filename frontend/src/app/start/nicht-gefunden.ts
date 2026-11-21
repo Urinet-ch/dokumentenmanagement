@@ -5,7 +5,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
   selector: 'app-nicht-gefunden',
   standalone: true,
   template: `
-    <div>
+    <div class="seitenkopf">
       <h1>{{ texte.seiteNichtGefunden.titel }}</h1>
       <p>{{ texte.seiteNichtGefunden.beschreibung }}</p>
     </div>
