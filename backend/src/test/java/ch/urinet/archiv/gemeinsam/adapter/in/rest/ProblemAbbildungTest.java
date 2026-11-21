@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
 import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
+import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
 import jakarta.persistence.PersistenceException;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,16 @@ class ProblemAbbildungTest {
                 new ch.urinet.archiv.gemeinsam.domain.FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER))) {
             assertThat(fehler.getStatus()).isEqualTo(502);
             assertThat(fehler.getHeaderString("Retry-After")).isNull();
+        }
+    }
+
+    @Test
+    void stepUpFordertErneuteAnmeldungMitDerZulaessigenDauer() {
+        try (Response antwort = abbildung.fachFehler(new StepUpNoetig(450))) {
+            assertThat(antwort.getStatus()).isEqualTo(401);
+            assertThat(antwort.getHeaderString("WWW-Authenticate"))
+                    .contains("insufficient_user_authentication", "max_age=\"450\"");
+            assertThat(antwort.getEntity()).asString().contains("\"fehlercode\":\"STEP_UP_NOETIG\"");
         }
     }
 

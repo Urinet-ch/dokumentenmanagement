@@ -10,6 +10,8 @@ public enum Fehlercode {
             "Die Anfrage ist unvollständig oder hat ein falsches Format. Bitte prüfen Sie die Angaben und senden Sie sie erneut."),
     NICHT_ANGEMELDET(401, "Nicht angemeldet",
             "Für diese Anfrage ist eine gültige Anmeldung nötig. Bitte melden Sie sich neu an."),
+    STEP_UP_NOETIG(401, "Erneute Anmeldung nötig",
+            "Für diese Aktion ist eine erneute Anmeldung nötig. Bitte melden Sie sich neu an."),
     MANDANT_FEHLT(403, "Kein gültiger Mandant",
             "Ihre Anmeldung gehört zu keinem gültigen, aktiven Mandanten. Bitte wenden Sie sich an den Inhaber."),
     NICHT_ERLAUBT(403, "Nicht erlaubt",

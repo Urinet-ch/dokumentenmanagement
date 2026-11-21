@@ -234,6 +234,9 @@ Richtung): Lesen, sperren, deaktivieren, Einladung erneut senden. `StepUp` liest
 (Muster RFC 9470). Die App leitet mit `max_age=0` und `prompt=login` zu Keycloak; der Browser-Flow
 `browser-totp-pflicht` verlangt dann Passwort und TOTP (der Cookie-Zweig greift bei `prompt=login` nicht; Nachweis im
 Test gegen echtes Keycloak).
+Bis zur Umsetzung 19.10 verweigert der Standardadapter `StepUpAusstehend` jede geschützte Aktion mit
+`STEP_UP_NOETIG` und dem Standardwert 300 Sekunden; er gewährt nie eine Anmeldung. 19.10 ersetzt ihn durch die
+Claim-Prüfung mit konfigurierter Gültigkeit.
 
 ### Passkey (Requirement 10)
 Entscheid Fabian 21.11.2026: zusätzlicher Anmeldeweg, ersetzt Passwort und TOTP; Passwort plus TOTP bleibt; Admin setzt zurück;
