@@ -20,10 +20,24 @@ Rollen auf. Ein frisches Backend für Shard 2 (Projekt `urinet-archiv-dev-jooofl
 wurde wegen gleichzeitig gestarteter fremder schwerer Container wieder beendet,
 bevor Browser-Szenarien liefen. Beide Backends wurden regulär beendet.
 
-Zwei grüne lokale Läufe je Shard, der parallele CI-Lauf und eine Zeitersparnis
-sind noch nicht belegt. Nach Anwendung muss der Diff in mindestens zwei
-vollständigen CI-Läufen geprüft werden; `fail-fast: false` verhindert, dass ein
-fehlerhafter Shard den anderen abbricht. Kein Szenario wird ausgelassen.
+Nach dem Merge von #440 wurden beide Shards je zweimal lokal gegen das
+PWA-Produktionsartefakt und jeweils ein frisches Testbackend ausgeführt. Die
+Compose-Projekte waren je Shard und Lauf verschieden:
+
+| Lauf | Shard 1 (108 Szenarien) | Projekt | Shard 2 (107 Szenarien) | Projekt | Summe |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 108 grün, 78,76 s | `urinet-archiv-dev-ugdonv` | 107 grün, 82,19 s | `urinet-archiv-dev-apkbdi` | 160,95 s |
+| 2 | 108 grün, 76,75 s | `urinet-archiv-dev-zomsom` | 107 grün, 82,64 s | `urinet-archiv-dev-fhhxqk` | 159,39 s |
+
+Die Zeiten messen den jeweiligen Cucumber-Befehl inklusive Prozessstart, nicht
+den Backend-Start. Die Summe ist die Addition der nacheinander gemessenen Shards,
+keine gemessene parallele Laufzeit. Der erneute Dry-Run bestätigte 215
+Szenarien, vollständig und disjunkt.
+
+Der parallele CI-Lauf und eine Zeitersparnis sind noch nicht belegt. Nach
+Anwendung muss der Diff in mindestens zwei vollständigen CI-Läufen geprüft
+werden; `fail-fast: false` verhindert, dass ein fehlerhafter Shard den anderen
+abbricht. Kein Szenario wird ausgelassen.
 
 Grundlage des folgenden Diffs: Stand `c8aba344` von `main`:
 
@@ -55,5 +69,5 @@ diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
 Die Baselines der Browser-Jobs in den Läufen 44899529866 und 44898942261
 betragen 5 min 37 s und 5 min 53 s; die Cucumber-Schritte dauern 186,5 s und
 200,7 s für je 154 Szenarien. Wegen des gewachsenen Umfangs sind sie mit dem
-aktuellen lokalen Lauf nicht direkt vergleichbar. Eine erfolgreiche
-Nachher-Messung und damit eine belastbare Einsparung fehlen.
+aktuellen lokalen Läufen nicht direkt vergleichbar. Eine CI-Nachher-Messung
+und damit eine belastbare Einsparung fehlen.
