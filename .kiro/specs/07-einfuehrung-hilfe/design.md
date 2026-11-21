@@ -517,6 +517,15 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - **Nachweis:** 6.1 mit `features/hilfe/anleitung-bestand-verwaltung.feature` (`@req-6.1`, `@req-7.1`, Dateien aus dem
   Prod-Build) und `hilfe-katalog.spec.ts` (Reihenfolge); 6.4, 6.6, 7.5 und 7.7 Nachweis: Dokument (Review des PR).
 
+## Umsetzung (Aufgabe 23.2, 21.11.2026)
+- `EinfuehrungVermerk.bekannt` steuert die Karte; solange die Kennung berechnet wird oder Rolle und Mandant fehlen,
+  erscheint sie nicht. Die Kacheln bleiben darunter bedienbar. Name und optionales Logo kommen aus dem Branding.
+- `einfuehrungSchritte` erstellt die Schritte aus denselben Rechten wie das Menü; der fünfte Schritt verwendet die
+  Beschreibungen der vorhandenen Kacheln. Vitest prüft Reihenfolge und erlaubte Bereiche aller vier Rollen.
+- Die Karte zeigt vorerst den ersten Schritt. Wechsel, Abschluss, Überspringen und erneuter Aufruf folgen in Aufgabe
+  23.3. `einfuehrung-start.feature` prüft die Karte im Prod-Build und die unveränderte Schrittberechnung im Browser
+  für alle Rollen; die Bedienung und Anzeige der weiteren Schritte prüft 23.3.
+
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,
   welche bestätigten Dokumente auf der WordPress-Seite erscheinen und ab wann (Spec 03); Wortlaut von Fabian mit der

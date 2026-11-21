@@ -104,7 +104,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
     `crypto.subtle`), nie an den Server; Vitest `einfuehrung-vermerk.spec.ts`.
   - _Anforderungen: 1.3, 1.4, 1.5, 1.6_
 
-- [ ] 23.2 Einführung auf der Startseite: Anzeige und Schritte nach Rechten [Frontend]
+- [x] 23.2 Einführung auf der Startseite: Anzeige und Schritte nach Rechten [Frontend]
   - Karte zwischen Seitenkopf und Kacheln in `start.ts` für neue Benutzer, Schritte nach der Tabelle in Requirement 2.1
     mit `darf`, Texte in `texte.de-CH.ts` (Entwürfe aus design.md), Name und Logo aus dem Branding, Schritt 5 mit den
     Beschreibungen aus `texte.start.beschreibung`; bekannte Benutzer und Benutzer ohne Rolle wie bisher; keine Anfrage an
