@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -185,6 +185,9 @@ jobs:
+       - name: Drive-Import-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
+         run: mvn -B -ntp -f tools/drive_import/pom.xml verify
+ 
++      - name: Wissenspaket-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
++        run: mvn -B -ntp -f tools/wissen_paket/pom.xml verify
++
+   backend:
+     name: Backend-Tests (JUnit, ArchUnit, SpotBugs)
+     if: needs.art.outputs.nur-spec != 'true'
