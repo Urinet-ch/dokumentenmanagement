@@ -79,7 +79,7 @@ final class WerkzeugErgebnisse {
         geordnet.sort(Comparator.comparingInt(WissensDokument::anzahl).reversed());
         return Optional.of(new ChatEreignis.QuellWissen(wurzel.path("pfad").asText(), wurzel.path("titel").asText(),
                 Instant.parse(wurzel.path("stand").asText()),
-                geordnet.stream().limit(5).map(WissensDokument::dokument).toList()));
+                geordnet.stream().limit(5).map(WissensDokument::dokument).toList(), List.copyOf(dokumente.keySet())));
     }
 
     private static void dokument(JsonNode knoten, Map<String, ChatEreignis.QuellDokument> ziel) {

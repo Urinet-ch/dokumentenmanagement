@@ -86,12 +86,18 @@ public sealed interface ChatEreignis {
         }
     }
 
-    record QuellWissen(String pfad, String titel, Instant stand, List<QuellDokument> dokumente) {
+    record QuellWissen(String pfad, String titel, Instant stand, List<QuellDokument> dokumente,
+                       List<UUID> alleDokumentIds) {
         public QuellWissen {
             Objects.requireNonNull(pfad, "pfad");
             Objects.requireNonNull(titel, "titel");
             Objects.requireNonNull(stand, "stand");
             dokumente = List.copyOf(dokumente);
+            alleDokumentIds = List.copyOf(alleDokumentIds);
+        }
+
+        public QuellWissen(String pfad, String titel, Instant stand, List<QuellDokument> dokumente) {
+            this(pfad, titel, stand, dokumente, dokumente.stream().map(QuellDokument::id).toList());
         }
     }
 

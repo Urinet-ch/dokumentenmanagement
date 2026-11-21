@@ -23,7 +23,10 @@ public record WerkzeugAufruf(String name, Map<String, Object> parameter, List<UU
     }
 
     public static WerkzeugAufruf aus(ChatEreignis.WerkzeugErgebnis ergebnis) {
+        var dokumentIds = java.util.stream.Stream.concat(
+                ergebnis.dokumente().stream().map(ChatEreignis.QuellDokument::id),
+                ergebnis.wissen().stream().flatMap(w -> w.alleDokumentIds().stream())).distinct().toList();
         return new WerkzeugAufruf(ergebnis.name(), ergebnis.parameter(),
-                ergebnis.dokumente().stream().map(ChatEreignis.QuellDokument::id).toList(), ergebnis.datenstand());
+                dokumentIds, ergebnis.datenstand());
     }
 }

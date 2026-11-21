@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ki.adapter.out.langchain4j;
 
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
+import ch.urinet.archiv.ki.domain.chat.WerkzeugAufruf;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -78,6 +79,9 @@ class WerkzeugErgebnisseTest {
                     .containsExactly("Quelle 1", "Quelle 6", "Quelle 5", "Quelle 4", "Quelle 3");
             assertThat(w.dokumente()).allSatisfy(d -> assertThat(d.seite()).isEqualTo("2-3"));
         });
+        assertThat(WerkzeugAufruf.aus(e).dokumentIds()).containsExactly(
+                new UUID(0, 1), new UUID(0, 2), new UUID(0, 3),
+                new UUID(0, 4), new UUID(0, 5), new UUID(0, 6));
         assertThat(e.toString()).doesNotContain("GEHEIMER TEXT");
     }
 
