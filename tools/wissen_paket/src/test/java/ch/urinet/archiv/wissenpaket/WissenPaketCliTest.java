@@ -162,6 +162,42 @@ class WissenPaketCliTest {
         assertThat(text.toString()).doesNotContain("Synthetisches Beispiel");
     }
 
+    @Test void unterschiedlicheIgnorierteFelderBehaltenIhreHinweise() throws Exception {
+        Path seite = eingabe.resolve("konzepte/test.md");
+        Files.writeString(seite, Files.readString(seite).replace("sources: []", """
+                status: stable
+                generated: {by: test}
+                verified: []
+                sources: []"""));
+
+        assertThat(aufruf("validate", eingabe.toString(), "--json")).isZero();
+        assertThat(text.toString()).contains("FELD_IGNORIERT", "konzepte/test.md");
+        assertThat(text.toString().split("FELD_IGNORIERT", -1)).hasSize(4);
+        assertThat(aufruf("validate", eingabe.toString(), "--quellen", quellen.toString(), "--json")).isZero();
+        assertThat(text.toString().split("FELD_IGNORIERT", -1)).hasSize(4);
+    }
+
+    @Test void lokaleQuellenpruefungErsetztPauschaleQuellenhinweise() throws Exception {
+        byte[] original = "synthetisches original".getBytes(StandardCharsets.UTF_8);
+        String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(original));
+        Path seite = eingabe.resolve("konzepte/test.md");
+        Files.writeString(seite, Files.readString(seite).replace("sources: []", """
+                sources:
+                  - id: a
+                    sha256: '%s'
+                  - id: b
+                    sha256: '%s'
+                """.formatted(hash, hash)));
+
+        assertThat(aufruf("validate", eingabe.toString(), "--quellen", quellen.toString(), "--json"))
+                .isEqualTo(1);
+        assertThat(text.toString().split("QUELLE_NICHT_GEPRUEFT", -1)).hasSize(2);
+        assertThat(text.toString()).contains("AUSZUG_FEHLT", "SEITE_FEHLT");
+        Files.write(quellen.resolve("original.pdf"), original);
+        assertThat(aufruf("validate", eingabe.toString(), "--quellen", quellen.toString(), "--json")).isEqualTo(1);
+        assertThat(text.toString()).contains("AUSZUG_FEHLT", "SEITE_FEHLT").doesNotContain("QUELLE_NICHT_GEPRUEFT");
+    }
+
     @Test void quellenHashUndLokalBestimmbarerAuszugSindNurVorpruefung() throws Exception {
         byte[] original = "synthetisches original".getBytes(StandardCharsets.UTF_8);
         Files.write(quellen.resolve("original.pdf"), original);

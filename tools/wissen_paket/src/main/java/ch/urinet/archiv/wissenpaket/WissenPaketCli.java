@@ -61,8 +61,10 @@ public final class WissenPaketCli implements Callable<Integer> {
                 }
                 hinweise.addAll(weitereHinweise());
                 if (quellen != null) {
-                    hinweise.addAll(LokaleQuellen.pruefen(paket, quellen));
-                    hinweise = new ArrayList<>(new java.util.LinkedHashSet<>(hinweise));
+                    Set<OfflinePruefung.Meldung> fehlendeQuellen = new HashSet<>();
+                    hinweise.addAll(LokaleQuellen.pruefen(paket, quellen).stream()
+                            .filter(h -> !h.code().equals("QUELLE_NICHT_GEPRUEFT") || fehlendeQuellen.add(h))
+                            .toList());
                 }
                 if (bericht.gueltig()) schreiben(zip);
                 ausgeben(spec.commandLine().getOut(), json, bericht.befunde(), hinweise);
