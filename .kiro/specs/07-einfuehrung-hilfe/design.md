@@ -346,6 +346,34 @@ Stand von PR #411; Schnittstellen für die Aufgaben 22.2 bis 22.7.
   gefunden, kein Mandant oder keine Rolle, neue Version) als erste Fassung nur mit dem, was auf `main` umgesetzt ist;
   22.5 bzw. 22.7 vervollständigen sie (z. B. Knopf «Hilfe» und Verweise auf `#erfassen-offline`, sobald es sie gibt).
 
+## Umsetzung (Aufgabe 22.6, 21.11.2026)
+Abschnitte `suche`, `chat`, `kontakte`, `wissen` und `wissen-entwuerfe` mit Dateien unter `frontend/public/anleitung/`,
+Einträgen im Katalog (Bedingungen wie im Menü: A2, A2, A6, A15, A17) und Titeln in `TEXTE.hilfe.abschnitte`. Beschrieben
+ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `texte.de-CH.ts`.
+- **Reihenfolge:** Die Einträge stehen vor `probleme` in der Reihenfolge von Requirement 6.1; `dokument` (Aufgabe 22.5)
+  gehört zwischen `chat` und `kontakte`.
+- **Pfade, abweichend von der Tabelle «Hilfe-Katalog»:** `wissen` trägt zusätzlich `/wissen/entwuerfe/meine` und
+  `/wissensbasis`. Sonst ordnete die Hilfe-Leiste «Meine Analysevorschläge» (A18) dem Unterabschnitt `wissen-entwuerfe`
+  (A17) zu, und `mitarbeiter` sähe nur das Inhaltsverzeichnis (Requirement 4.3); «Einstellungen und Export» (A19) hätte
+  keinen Kontext. Beide Seiten beschreibt `wissen.md`. Den Gleichlauf mit `MENUE` berührt das nicht, weil das Menü diese
+  Pfade nicht kennt; `hilfe-katalog.spec.ts` prüft die Zuordnung.
+- **Rechte innerhalb eines Abschnitts:** Für A12 (Kontakte pflegen), A18 und A19 gibt es keinen Unterabschnitt. Die Texte
+  nennen solche Teile bedingt («Steht unter einer Antwort der Knopf …», «Sehen Sie den Knopf …») oder, bei den Kontakten,
+  wie die Einleitung der Seite («kann nur der Inhaber»), ohne eigene Liste der Rechte (Requirement 6.5, 6.6).
+- **Chat:** keine Beispielfragen aus `product.md` (Requirement 9.5), sondern erfundene mit «Muster AG». Weil
+  `kennzahl` und `offene_posten` von den Finanzfunktionen des Mandanten und `vollstaendigkeit` von der Rolle abhängen
+  (Spec 02, 3.1, 4.2), nennt der Text diese Auswertungen mit «je nach Ihrer Rolle und den Funktionen Ihres Archivs»; die
+  Texte bleiben für alle Mandanten gleich (Requirement 2.4).
+- **Nicht beschrieben, weil die Oberfläche es nicht anbietet:** Ingest erneut starten (A16), Seite von Hand anlegen
+  (Spec 04, 6.9), Lint starten und «Quelle prüfen» bestätigen (Spec 04, 15.2), Löschen der Gespräche nach 12 Monaten.
+- **Verweise** nur auf Anker, die der Katalog auf `main` schon kennt (`#suche`, `#chat`, `#wissen`); einen Verweis auf
+  `#dokument` kann 22.5 oder ein späterer PR ergänzen.
+- **Befund:** Die Meldung `TEXTE.chat.zuViele` duzt («Du hast in dieser Stunde …»), die übrige App siezt
+  (Requirement 9.3). Die Anleitung umschreibt die Meldung, statt sie zu zitieren; die Meldung selbst ändert 22.6 nicht.
+- **Nachweis:** `hilfe-katalog.spec.ts` (Reihenfolge, Bedingungen und Eltern; Sichtbarkeit je Rolle nach Requirement 2.2
+  und Spec 04, 12.1; Zuordnung der Wissenspfade), `anleitung-inhalt.spec.ts` für die neuen Dateien und die neuen Zeilen
+  in `features/hilfe/anleitung-pwa.feature` (`@req-7.1`); 6.4 und 6.6 per Review (Nachweis: Dokument).
+
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,
   welche bestätigten Dokumente auf der WordPress-Seite erscheinen und ab wann (Spec 03); Wortlaut von Fabian mit der
