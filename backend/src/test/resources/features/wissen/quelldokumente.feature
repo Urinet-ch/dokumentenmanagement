@@ -32,6 +32,15 @@ Funktionalität: Änderungen an Quelldokumenten
     Wenn der Inhaber eine Änderung dieser Wissensseite freigibt
     Dann ist der Quellenhinweis durch die Freigabe entfernt
 
+  @req-1.4
+  Szenario: Die Freigabe einer Seitenänderung verändert das Quelldokument nicht
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine normale Wissensseite verweist auf ein normales Quelldokument
+    Und das Quelldokument hat Volltext und eine PDF-A-Fassung
+    Und der Zustand des Quelldokuments mit Dokumentzeile und Dateizeilen ist festgehalten
+    Wenn der Inhaber eine Änderung dieser Wissensseite freigibt
+    Dann sind Dokumentzeile und Dateizeilen des Quelldokuments unverändert
+
   @req-15.3
   Szenario: Quelleneinträge zeigen den aktuellen Dokumenttitel
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
