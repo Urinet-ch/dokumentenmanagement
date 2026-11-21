@@ -198,6 +198,41 @@ vollständigen Laufs gewertet. Nach dem Abbruch waren die drei anhand ihrer IDs
 geprüften Testcontainer entfernt. Ob die vielen Ryuk-Container den
 Speicherabbruch verursachten, ist nicht nachgewiesen.
 
+### Weitere Messungen
+
+Browserprozess-Wiederverwendung (#407): Die Browserjobs der beiden
+Ausgangsläufe dauerten 5 min 37 s und 5 min 53 s. Im grünen Lauf 44903211310
+dauerten Versuch 1 und 2 nach der Änderung 4 min 45 s und 5 min 22 s. Die
+Mittelwerte der je zwei Stichproben sind 5 min 45 s und 5 min 3,5 s; die
+Differenz beträgt 41,5 s. Cucumber benötigte vorher 186,5 s und 200,7 s,
+nachher 166,652 s und 172,126 s. In beiden Nachher-Versuchen waren alle
+154 Szenarien und 2806 Schritte grün. Die kleinen Stichproben belegen keine
+Langzeitstreuung.
+
+Kommando-Starttests (#409): In denselben beiden `main`-Läufen dauerten die
+beiden Klassen zusammen 99,31 s und 107,88 s. In den zwei Versuchen des Laufs
+44903693361 dauerte die gebündelte Klasse 101,4 s und 68,32 s; alle vier
+Testmethoden waren grün. Die Mittelwerte sind 103,60 s und 84,86 s, bei
+deutlicher Streuung. Gruppe 4 meldete vorher in beiden Läufen 12 und nachher
+in beiden Versuchen 11 Compose-Netzerstellungen. Der erste vollständige
+Nachher-Lauf war grün; der zweite Gruppenjob war grün, der restliche zweite
+Lauf noch nicht abgeschlossen.
+
+Ein lokaler Vergleich der vollständigen Startgruppe 4 erzeugte im Standardlauf
+12 Compose-Netze und mit einem eigens gewählten, zufälligen Projektnamen sowie
+`quarkus.compose.devservices.reuse-project-for-tests=true` eines. Beide Läufe
+hatten 38 grüne Tests; das eigene Netz war 20 Sekunden nach Ende des
+Wiederverwendungslaufs entfernt. Der Standardlauf zeigte 4 Netze vorher, 16
+unmittelbar nachher und 4 nach 20 Sekunden auf dem gemeinsam genutzten Host.
+Das sind lokale Einzelmessungen, keine CI-Nachweise.
+
+**Nicht umgesetzt:** Ein eindeutiger Projektname vermeidet die Wiederverwendung
+fremder Projekte, aber MinIO und Mailpit behalten damit Daten zwischen
+verschiedenen Quarkus-Profilen. Die grüne Gruppe 4 allein belegt nicht die
+Isolation aller Tests oder die Bereinigung bei einem Prozessabbruch. Die Option
+wird deshalb nicht generell aktiviert; ein isolierter Lebenszyklus für
+Testdaten und Ressourcen bleibt zu klären.
+
 Die erfolgreichen Startmeldungen im Lauf 44899529866 ergeben je Gruppe
 6 / 8 / 7 / 12 Meldungen. Deren gemeldete Zeiten in Sekunden sind:
 
