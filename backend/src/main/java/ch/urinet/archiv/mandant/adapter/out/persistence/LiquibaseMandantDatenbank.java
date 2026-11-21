@@ -294,7 +294,8 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                 return;
             }
             befehl.execute("grant usage on schema public to " + appRolle);
-            befehl.execute("grant select, insert, update, delete on public.mandant, public.auftrag, public.api_client to "
+            befehl.execute("grant select, insert, update, delete on public.mandant, public.auftrag, public.api_client, "
+                    + "public.verwaltung_vorgang to "
                     + appRolle);
             befehl.execute("grant usage, select on all sequences in schema public to " + appRolle);
         } catch (SQLException e) {

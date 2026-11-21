@@ -70,6 +70,15 @@ describe('Zugriffsprotokoll: Logik (Aufgabe 5.1)', () => {
     expect(fehlerText(fehler(500))).toBe(TEXTE.protokoll.fehlerAllgemein);
   });
 
+  it('beschriftet jede Aktion des Aktionsfilters und jeden Anlass', () => {
+    for (const a of AKTIONEN) {
+      expect(TEXTE.protokoll.aktionen[a]).toBeTruthy();
+    }
+    for (const a of Object.values(VerzeichnisEintrag.AnlassEnum)) {
+      expect(TEXTE.protokoll.anlaesse[a]).toBeTruthy();
+    }
+  });
+
   it('führt die Kontakt-Aktionen im Aktionsfilter, mit Beschriftung', () => {
     for (const a of ['KONTAKT_ZUSAMMENFUEHREN', 'KONTAKT_INAKTIV', 'KONTAKT_AKTIV'] as const) {
       expect(AKTIONEN).toContain(a);

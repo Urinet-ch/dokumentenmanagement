@@ -25,7 +25,7 @@ interface Soll {
   abgemeldet?: boolean;
 }
 
-/** Die Tabelle aus design.md «Hilfe-Katalog» in Lesereihenfolge (Abschnitte nach Req 6.1). */
+/** Die Tabelle aus design.md «Hilfe-Katalog» in Lesereihenfolge (Abschnitte nach Req 6.1), mit den dort nachgetragenen Abweichungen. */
 const SOLL: readonly Soll[] = [
   { anker: 'erste-schritte', titel: 'Erste Schritte', pfade: ['/'], abgemeldet: true },
   { anker: 'erfassen', titel: 'Erfassen', eine: ['A1'], pfade: ['/erfassen'] },
@@ -40,7 +40,8 @@ const SOLL: readonly Soll[] = [
   { anker: 'dokument', titel: 'Dokumentansicht', eine: ['A2'], pfade: ['/dokument'] },
   { anker: 'dokument-aendern', titel: 'Angaben ändern', eltern: 'dokument', eine: ['A6'] },
   { anker: 'kontakte', titel: 'Kontakte', eine: ['A6'], pfade: ['/kontakte'] },
-  { anker: 'wissen', titel: 'Wissen', eine: ['A15'], pfade: ['/wissen'] },
+  // Pfade abweichend von der Tabelle, design.md «Umsetzung (Aufgabe 22.6)»
+  { anker: 'wissen', titel: 'Wissen', eine: ['A15'], pfade: ['/wissen', '/wissen/entwuerfe/meine', '/wissensbasis'] },
   { anker: 'wissen-entwuerfe', titel: 'Wissensentwürfe', eltern: 'wissen', eine: ['A17'], pfade: ['/wissen/entwuerfe'] },
   { anker: 'importe', titel: 'Importe', eine: ['A12'], pfade: ['/importe'] },
   { anker: 'jahresexport', titel: 'Jahresexport', eine: ['EXPORT'], pfade: ['/export'] },

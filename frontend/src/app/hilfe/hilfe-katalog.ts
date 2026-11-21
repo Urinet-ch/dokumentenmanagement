@@ -86,7 +86,21 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     eltern: 'eingangskorb',
     bedingung: { eine: ['A5'], ohne: ['A7'] },
   },
-  // Dokumentansicht (Aufgabe 22.5); davor kommen «suche» und «chat» (Aufgabe 22.6)
+  {
+    anker: 'suche',
+    titel: TEXTE.hilfe.abschnitte['suche'],
+    datei: '/anleitung/suche.md',
+    bedingung: { eine: ['A2'] },
+    pfade: ['/suche'],
+  },
+  {
+    anker: 'chat',
+    titel: TEXTE.hilfe.abschnitte['chat'],
+    datei: '/anleitung/chat.md',
+    bedingung: { eine: ['A2'] },
+    pfade: ['/chat'],
+  },
+  // Dokumentansicht (Aufgabe 22.5), zwischen «chat» und «kontakte»
   {
     anker: 'dokument',
     titel: TEXTE.hilfe.abschnitte['dokument'],
@@ -100,6 +114,29 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     datei: '/anleitung/dokument-aendern.md',
     eltern: 'dokument',
     bedingung: { eine: ['A6'] },
+  },
+  {
+    anker: 'kontakte',
+    titel: TEXTE.hilfe.abschnitte['kontakte'],
+    datei: '/anleitung/kontakte.md',
+    bedingung: { eine: ['A6'] },
+    pfade: ['/kontakte'],
+  },
+  {
+    anker: 'wissen',
+    titel: TEXTE.hilfe.abschnitte['wissen'],
+    datei: '/anleitung/wissen.md',
+    bedingung: { eine: ['A15'] },
+    // «Meine Analysevorschläge» (A18) und die Einstellungen (A19) beschreibt der Abschnitt selbst (Aufgabe 22.6).
+    pfade: ['/wissen', '/wissen/entwuerfe/meine', '/wissensbasis'],
+  },
+  {
+    anker: 'wissen-entwuerfe',
+    titel: TEXTE.hilfe.abschnitte['wissen-entwuerfe'],
+    datei: '/anleitung/wissen-entwuerfe.md',
+    eltern: 'wissen',
+    bedingung: { eine: ['A17'] },
+    pfade: ['/wissen/entwuerfe'],
   },
   {
     anker: 'probleme',

@@ -377,7 +377,7 @@ Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben
 - **Katalog:** Einträge `erfassen`, `erfassen-handy`, `erfassen-dateien`, `erfassen-offline` (`abgemeldet`),
   `eingangskorb`, `eingangskorb-bestaetigen` (A7), `eingangskorb-eigene` (A5 ohne A7), `dokument`, `dokument-aendern`
   (A6) wie in der Tabelle «Hilfe-Katalog», in zwei Blöcken: Erfassen und Eingangskorb nach `erste-schritte`,
-  Dokumentansicht davor, wo 22.6 `suche` und `chat` einfügt. Titel in `TEXTE.hilfe.abschnitte`.
+  Dokumentansicht zwischen `chat` und `kontakte` aus 22.6 (nach dem Merge von #423 eingeordnet). Titel in `TEXTE.hilfe.abschnitte`.
 - **Prüfung** (`anleitung-abschnitte.spec.ts`): (1) Der Katalog folgt der Tabelle «Hilfe-Katalog» (Reihenfolge, Titel,
   Abschnitt, Bedingung, Pfade, `abgemeldet`); die Tabelle steht im Test, damit auch 22.6 und 22.7 gegen sie laufen.
   (2) Ein Link auf einen Abschnitt (`#anker`) zeigt nur auf Einträge, die jede Rolle und der Besucher ohne Anmeldung
@@ -398,6 +398,34 @@ Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben
   `erste-schritte` und `probleme`, nicht `erfassen-offline` (A1). `erste-schritte.md` nennt darum nur den Link «Ohne
   Verbindung erfassen» der Startseite; den Weg zu `#erfassen-offline` bringen die Links «So funktioniert es»
   (Requirement 4.6, Aufgabe 23.4). `probleme.md` bleibt bei 22.7.
+## Umsetzung (Aufgabe 22.6, 21.11.2026)
+Abschnitte `suche`, `chat`, `kontakte`, `wissen` und `wissen-entwuerfe` mit Dateien unter `frontend/public/anleitung/`,
+Einträgen im Katalog (Bedingungen wie im Menü: A2, A2, A6, A15, A17) und Titeln in `TEXTE.hilfe.abschnitte`. Beschrieben
+ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `texte.de-CH.ts`.
+- **Reihenfolge:** Die Einträge stehen vor `probleme` in der Reihenfolge von Requirement 6.1; `dokument` (Aufgabe 22.5)
+  gehört zwischen `chat` und `kontakte`.
+- **Pfade, abweichend von der Tabelle «Hilfe-Katalog»:** `wissen` trägt zusätzlich `/wissen/entwuerfe/meine` und
+  `/wissensbasis`. Sonst ordnete die Hilfe-Leiste «Meine Analysevorschläge» (A18) dem Unterabschnitt `wissen-entwuerfe`
+  (A17) zu, und `mitarbeiter` sähe nur das Inhaltsverzeichnis (Requirement 4.3); «Einstellungen und Export» (A19) hätte
+  keinen Kontext. Beide Seiten beschreibt `wissen.md`. Den Gleichlauf mit `MENUE` berührt das nicht, weil das Menü diese
+  Pfade nicht kennt; `hilfe-katalog.spec.ts` prüft die Zuordnung.
+- **Rechte innerhalb eines Abschnitts:** Für A12 (Kontakte pflegen), A18 und A19 gibt es keinen Unterabschnitt. Die Texte
+  nennen solche Teile bedingt («Steht unter einer Antwort der Knopf …», «Sehen Sie den Knopf …») oder, bei den Kontakten,
+  wie die Einleitung der Seite («kann nur der Inhaber»), ohne eigene Liste der Rechte (Requirement 6.5, 6.6).
+- **Chat:** keine Beispielfragen aus `product.md` (Requirement 9.5), sondern erfundene mit «Muster AG». Weil
+  `kennzahl` und `offene_posten` von den Finanzfunktionen des Mandanten und `vollstaendigkeit` von der Rolle abhängen
+  (Spec 02, 3.1, 4.2), nennt der Text diese Auswertungen mit «je nach Ihrer Rolle und den Funktionen Ihres Archivs»; die
+  Texte bleiben für alle Mandanten gleich (Requirement 2.4).
+- **Nicht beschrieben, weil die Oberfläche es nicht anbietet:** Ingest erneut starten (A16), Seite von Hand anlegen
+  (Spec 04, 6.9), Lint starten und «Quelle prüfen» bestätigen (Spec 04, 15.2), Löschen der Gespräche nach 12 Monaten.
+- **Verweise** nur auf Anker, die der Katalog auf `main` schon kennt (`#suche`, `#chat`, `#wissen`); einen Verweis auf
+  `#dokument` kann 22.5 oder ein späterer PR ergänzen.
+- **Befund:** Die Meldung `TEXTE.chat.zuViele` duzt («Du hast in dieser Stunde …»), die übrige App siezt
+  (Requirement 9.3). Die Anleitung umschreibt die Meldung, statt sie zu zitieren; die Meldung selbst ändert 22.6 nicht.
+- **Nachweis:** `hilfe-katalog.spec.ts` (Reihenfolge, Bedingungen und Eltern; Sichtbarkeit je Rolle nach Requirement 2.2
+  und Spec 04, 12.1; Zuordnung der Wissenspfade), `anleitung-inhalt.spec.ts` für die neuen Dateien und
+  `features/hilfe/anleitung-suche-wissen.feature` (`@req-6.1`: jede Datei kommt mit dem Prod-Build, wie 22.5); 6.4 und
+  6.6 per Review (Nachweis: Dokument).
 
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,
