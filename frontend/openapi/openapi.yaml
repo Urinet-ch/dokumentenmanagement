@@ -65,6 +65,32 @@ components:
         etag:
           type: integer
           format: int32
+    Aktion:
+      type: string
+      enum:
+      - A1
+      - A2
+      - A3
+      - A4
+      - A5
+      - A6
+      - A7
+      - A8
+      - A9
+      - A10
+      - A11
+      - A12
+      - A13
+      - A14
+      - A15
+      - A16
+      - A17
+      - A18
+      - A19
+      - A20
+      - A21
+      - A22
+      - A23
     Antwort:
       type: object
       properties:
@@ -293,6 +319,66 @@ components:
           type: string
         meldung:
           type: string
+    BenutzerAnlage:
+      type: object
+      properties:
+        benutzername:
+          type: string
+        email:
+          type: string
+        vorname:
+          type: string
+        nachname:
+          type: string
+        rolle:
+          type: string
+    BenutzerAnlageErgebnis:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        antragId:
+          $ref: "#/components/schemas/UUID"
+    BenutzerAnsicht:
+      type: object
+      properties:
+        id:
+          type: string
+        benutzername:
+          type: string
+        vorname:
+          type: string
+        nachname:
+          type: string
+        email:
+          type: string
+        rollen:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Rolle"
+        rollenkonflikt:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/BenutzerStatus"
+        totp:
+          type: boolean
+        google:
+          type: boolean
+        einladungOffenSeit:
+          $ref: "#/components/schemas/Instant"
+        letzteAktion:
+          $ref: "#/components/schemas/LetzteAktion"
+        etag:
+          type: string
+    BenutzerStatus:
+      type: string
+      enum:
+      - EINGELADEN
+      - AKTIV
+      - GESPERRT
+      - DEAKTIVIERT
+      - GELOESCHT
     Bestaetigung:
       description: "Bestätigte Metadaten (A7, Req 8.2–8.5, 8.8, 8.9). Ersetzt die\
         \ Grundfelder sowie die Felder der Gruppen finanz und vertrag vollständig;\
@@ -1343,6 +1429,15 @@ components:
           type: string
         grund:
           type: string
+    Ergebnis:
+      type: string
+      enum:
+      - ERLAUBT
+      - VERBOTEN
+      - NICHT_SICHTBAR
+      - NUR_EIGENE
+      - NUR_LESEND
+      - NUR_SELBST_ERFASSTE
     Export:
       description: "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link\
         \ (24 Stunden ab Fertigstellung) gilt nicht mehr"
@@ -2490,6 +2585,13 @@ components:
           type: string
         herkunft:
           $ref: "#/components/schemas/ImportHerkunft"
+    LetzteAktion:
+      type: object
+      properties:
+        zeit:
+          $ref: "#/components/schemas/Instant"
+        aktion:
+          type: string
     LocalDate:
       type: string
       format: date
@@ -2756,6 +2858,13 @@ components:
           type: array
           items:
             type: string
+    Rolle:
+      type: string
+      enum:
+      - INHABER
+      - MITARBEITER
+      - TREUHAENDER
+      - GESCHAEFTSSTELLE
     StatusAnsicht:
       type: object
       properties:
@@ -2962,6 +3071,49 @@ components:
           type: string
         detail:
           type: string
+    VerwaltungRechteFussnote:
+      type: object
+      required:
+      - zeichen
+      - text
+      properties:
+        zeichen:
+          type: string
+        text:
+          type: string
+    VerwaltungRolle:
+      type: object
+      required:
+      - code
+      - beschreibung
+      - rechte
+      properties:
+        code:
+          type: string
+        beschreibung:
+          type: string
+        rechte:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerwaltungRollenrecht"
+    VerwaltungRollenrecht:
+      type: object
+      required:
+      - aktion
+      - bezeichnung
+      - ergebnis
+      - fussnoten
+      properties:
+        aktion:
+          $ref: "#/components/schemas/Aktion"
+        bezeichnung:
+          type: string
+        ergebnis:
+          $ref: "#/components/schemas/Ergebnis"
+        fussnoten:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerwaltungRechteFussnote"
     Verwerfen:
       description: Grund des Verwerfens (Req 6.6)
       type: object
@@ -3421,6 +3573,7 @@ components:
 openapi: 3.1.0
 tags:
 - name: API-Tokens
+- name: Benutzerverwaltung
 - name: Berichte
 - name: Branding
 - name: Chat
@@ -3553,6 +3706,133 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer:
+    get:
+      summary: Benutzer des Mandanten auflisten
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: groesse
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: seite
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BenutzerAnsicht"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+    post:
+      summary: Benutzer anlegen und einladen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BenutzerAnlage"
+        required: true
+      responses:
+        "201":
+          description: Benutzer angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BenutzerAnlageErgebnis"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/{benutzerId}:
+    get:
+      summary: Benutzer des Mandanten anzeigen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Benutzer des Mandanten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BenutzerAnsicht"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/{benutzerId}/einladung:
+    post:
+      summary: Einladung erneut senden
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+      responses:
+        "204":
+          description: Einladung gesendet
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
       security:
       - SecurityScheme:
         - inhaber
@@ -6172,6 +6452,27 @@ paths:
           description: KONFIGURATION_UNGUELTIG
         "428":
           description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/rollen:
+    get:
+      summary: Rollen und Rechte des Mandanten auflisten
+      tags:
+      - Benutzerverwaltung
+      responses:
+        "200":
+          description: Rollen des aktuellen Mandanten
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VerwaltungRolle"
+        "403":
+          description: NICHT_ERLAUBT
         "401":
           description: Not Authorized
       security:

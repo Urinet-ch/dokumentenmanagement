@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer.adapter.out.persistence;
 
 import ch.urinet.archiv.benutzer.application.VerwaltungAntragSpeicher;
+import ch.urinet.archiv.benutzer.application.VerwaltungsgrundPruefung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
@@ -40,6 +41,9 @@ public class JdbcVerwaltungAntrag implements VerwaltungAntragSpeicher {
         Objects.requireNonNull(antrag);
         if (antrag.status() != Status.OFFEN) {
             throw new IllegalArgumentException("Neuer Antrag muss offen sein");
+        }
+        if (antrag.grund() != null) {
+            VerwaltungsgrundPruefung.pruefen(antrag.grund());
         }
         transaktionPruefen();
         String sql = "insert into " + schema() + ".verwaltung_antrag "

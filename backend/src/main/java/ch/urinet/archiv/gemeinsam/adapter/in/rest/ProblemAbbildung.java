@@ -11,6 +11,7 @@ import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
+import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import io.quarkus.oidc.OIDCException;
@@ -64,7 +65,12 @@ public class ProblemAbbildung {
                     .header(HttpHeaders.RETRY_AFTER, Long.toString(zuViele.wartezeitSekunden())).build();
         }
         Response.ResponseBuilder antwort = builder(ProblemAntwort.fuer(fehler.code()));
-        if (fehler.code() == Fehlercode.UEBERLASTET
+        if (fehler instanceof StepUpNoetig stepUp) {
+            antwort.header(HttpHeaders.WWW_AUTHENTICATE,
+                    "Bearer error=\"insufficient_user_authentication\", "
+                            + "error_description=\"Erneute Anmeldung erforderlich\", max_age=\""
+                            + stepUp.maxAlterSekunden() + "\"");
+        } else if (fehler.code() == Fehlercode.UEBERLASTET
                 || fehler.code() == Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR) {
             antwort.header(HttpHeaders.RETRY_AFTER, DIENST_NOCHMALS_NACH_SEKUNDEN);
         } else if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {

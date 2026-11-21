@@ -9,7 +9,7 @@ Funktionalität: Schema nur über versionierte Migrationen
 
   Szenario: Liquibase legt die Tabellen an, Hibernate prüft nur und erzeugt nichts
     Dann hat Liquibase im Schema «public» die Changesets «001-mandant», «002-auftrag» und «003-api-client» ausgeführt
-    Und das Schema «public» enthält nur die Tabellen «api_client», «auftrag», «databasechangelog», «databasechangeloglock», «mandant», «mandant_budget», «sicherung_export» und «verwaltung_vorgang»
+    Und das Schema «public» enthält nur die Tabellen «api_client», «auftrag», «benutzername_sperre», «benutzername_sperre_status», «databasechangelog», «databasechangeloglock», «mandant», «mandant_budget», «sicherung_export» und «verwaltung_vorgang»
     Und das Schema «public» enthält keine Sequenz ausser «auftrag_id_seq»
     Und Hibernate bildet die Entität «MandantEintrag» auf die Tabelle «mandant» ab
 

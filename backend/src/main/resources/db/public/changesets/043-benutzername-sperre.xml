@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="043-benutzername-sperre" author="copilot">
+        <sql>
+            create table if not exists public.benutzername_sperre (
+                hash bytea primary key,
+                erstellt timestamptz not null default clock_timestamp()
+            );
+            create table if not exists public.benutzername_sperre_status (
+                id integer primary key check (id = 1),
+                pruefwert bytea not null
+            );
+        </sql>
+        <sql splitStatements="false">
+            do $$
+            begin
+                if exists (select 1 from pg_roles where rolname = 'archiv_app') then
+                    execute 'revoke all on public.benutzername_sperre from archiv_app';
+                    execute 'grant select, insert on public.benutzername_sperre to archiv_app';
+                    execute 'revoke all on public.benutzername_sperre_status from archiv_app';
+                    execute 'grant select on public.benutzername_sperre_status to archiv_app';
+                end if;
+            end
+            $$
+        </sql>
+        <rollback><sql>select 1</sql></rollback>
+    </changeSet>
+    <changeSet id="043-benutzername-sperre-bestand" author="copilot">
+        <preConditions onFail="CONTINUE">
+            <customPrecondition className="ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreMigrationBereit"/>
+        </preConditions>
+        <customChange class="ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreBestandMigration"/>
+        <rollback><sql>select 1</sql></rollback>
+    </changeSet>
+</databaseChangeLog>

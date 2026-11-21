@@ -49,6 +49,10 @@ public class Berechtigung {
         }
     }
 
+    public void eskalationVerweigern(Benutzer benutzer, Aktion aktion) {
+        verweigern(benutzer, aktion, Optional.empty(), Verweigerung.Grund.ESKALATION_VERBOTEN);
+    }
+
     /** Wissensseitenaktion: Sichtbarkeit wird vor dem Recht geprüft, ohne Seiteninhalte ins Zugriffsprotokoll zu schreiben. */
     public void wissensseitenAktion(Benutzer benutzer, Aktion aktion, boolean sichtbar) {
         if (!WISSEN_AKTIONEN.contains(aktion)) {

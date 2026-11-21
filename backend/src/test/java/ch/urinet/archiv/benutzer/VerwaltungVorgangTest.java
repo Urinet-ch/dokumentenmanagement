@@ -4,6 +4,9 @@ import ch.urinet.archiv.benutzer.application.VerwaltungVorgang;
 import ch.urinet.archiv.benutzer.application.VerwaltungVorgang.Kompensation;
 import ch.urinet.archiv.benutzer.application.Vorgangssperre;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
+import ch.urinet.archiv.gemeinsam.LogMitschnitt;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
@@ -172,6 +175,118 @@ class VerwaltungVorgangTest {
                                     assertThat(unterdrueckt[0]).isInstanceOf(NullPointerException.class)));
             assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
             assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void kompensationsfehlerBeiFachfehlerWirdOhneInhalteGemeldet() throws Exception {
+        MandantCode mandant = mandantFuerAnlage();
+        UUID id = UUID.randomUUID();
+        String akteur = UUID.randomUUID().toString();
+        var absicht = anlage(id, null, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor(); var log = LogMitschnitt.starten()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER); },
+                    fehler -> { throw new IllegalStateException("geheimer synthetischer Inhalt"); },
+                    wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(FachFehler.class);
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+            assertThat(log.volltext()).contains(id.toString(), "Kompensation fehlgeschlagen", "IllegalStateException")
+                    .doesNotContain("geheimer synthetischer Inhalt");
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void anlagefehlerUebernimmtZielUndHaeltUnklareEntfernungGesperrt() throws Exception {
+        MandantCode mandant = mandantFuerAnlage();
+        UUID ziel = UUID.randomUUID();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            for (boolean entfernt : List.of(true, false)) {
+                UUID id = UUID.randomUUID();
+                var absicht = anlage(id, null, UUID.randomUUID().toString(),
+                        ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+                try {
+                    assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                            () -> { }, () -> {
+                                throw new IdentitaetsDienst.AnlageException(ziel.toString(), entfernt,
+                                        new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER));
+                            }, fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                            .hasRootCauseInstanceOf(FachFehler.class);
+                    String phase = entfernt ? "FEHLGESCHLAGEN" : "UNKLAR";
+                    assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", phase);
+                    assertThat(zielDerPhase(mandant.schema(), id, phase)).isEqualTo(ziel.toString());
+                    UUID neuerVorgang = UUID.randomUUID();
+                    assertThat(sperre.belegen(mandant, neuerVorgang)).isEqualTo(entfernt);
+                    if (entfernt) {
+                        assertThat(sperre.freigeben(mandant, neuerVorgang)).isTrue();
+                    }
+                } finally {
+                    testsperreEntfernen(mandant, id);
+                }
+            }
+        }
+    }
+
+    @Test
+    void konfliktBeiAnlageErgibtNeutralenFehlerUndGibtSperreFrei() throws Exception {
+        MandantCode mandant = mandantFuerAnlage("vhf-gsk");
+        UUID id = UUID.randomUUID();
+        var absicht = anlage(id, null, UUID.randomUUID().toString(), ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { throw new IdentitaetsDienst.KonfliktException(); },
+                    fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(FachFehler.class)
+                    .satisfies(fehler -> assertThat(((FachFehler) fehler.getCause()).code())
+                            .isEqualTo(Fehlercode.BENUTZER_EXISTIERT));
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "FEHLGESCHLAGEN");
+            UUID neuerVorgang = UUID.randomUUID();
+            assertThat(sperre.belegen(mandant, neuerVorgang)).isTrue();
+            assertThat(sperre.freigeben(mandant, neuerVorgang)).isTrue();
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void ungeklaerterAnlagekonfliktBleibtGesperrtUndWirdNichtAlsGeklaertAbgebildet() throws Exception {
+        MandantCode mandant = mandantFuerAnlage("vhf-gsk");
+        UUID id = UUID.randomUUID();
+        var absicht = anlage(id, null, UUID.randomUUID().toString(), ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { throw new IdentitaetsDienst.KonfliktException(); },
+                    fehler -> Kompensation.UNKLAR, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(IdentitaetsDienst.KonfliktException.class);
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void ungueltigeAnlagekennungBleibtUnklarOhneDenWertZuLoggen() throws Exception {
+        MandantCode mandant = mandantFuerAnlage();
+        UUID id = UUID.randomUUID();
+        var absicht = anlage(id, null, UUID.randomUUID().toString(), ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor(); var log = LogMitschnitt.starten()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> {
+                        throw new IdentitaetsDienst.AnlageException("geheimer-synthetischer-wert", true,
+                                new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER));
+                    }, fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(FachFehler.class);
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(zielDerPhase(mandant.schema(), id, "UNKLAR")).isNull();
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+            assertThat(log.volltext()).contains(id.toString(), "Zielkennung der Anlage ungültig")
+                    .doesNotContain("geheimer-synthetischer-wert");
         } finally {
             testsperreEntfernen(mandant, id);
         }
@@ -487,7 +602,11 @@ class VerwaltungVorgangTest {
     }
 
     private MandantCode mandantFuerAnlage() throws Exception {
-        MandantCode mandant = new MandantCode("probe-verwaltungsvorgang");
+        return mandantFuerAnlage("probe-verwaltungsvorgang");
+    }
+
+    private MandantCode mandantFuerAnlage(String code) throws Exception {
+        MandantCode mandant = new MandantCode(code);
         try (Connection verbindung = datenquelle.getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
                      "select 1 from public.mandant where code = ?")) {
