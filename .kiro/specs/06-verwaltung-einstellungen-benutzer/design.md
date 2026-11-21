@@ -233,6 +233,22 @@ Richtung): Lesen, sperren, deaktivieren, Einladung erneut senden. `StepUp` liest
 `browser-totp-pflicht` verlangt dann Passwort und TOTP (der Cookie-Zweig greift bei `prompt=login` nicht; Nachweis im
 Test gegen echtes Keycloak).
 
+### Passkey (Requirement 10)
+Entscheid Fabian 21.11.2026: zusätzlicher Anmeldeweg, ersetzt Passwort und TOTP; Passwort plus TOTP bleibt; Admin setzt zurück;
+Step-up per Passkey; Google unverändert. Der Browser-Flow des Realms bietet zusätzlich die Anmeldung mit Passkey (WebAuthn
+passwordless, auffindbarer Schlüssel, Benutzerverifikation «required», Attestation «none», Unterstützung der Anmeldung per
+Vorschlag im Feld Benutzername) und fällt auf `browser-totp-pflicht` (Passwort plus TOTP) zurück. `auth_time` und `amr` des Tokens
+bleiben die Quelle für den Step-up; `StepUp` prüft weiter nur `auth_time` (kein Wissen über die Methode). Die Einrichtung geschieht in
+der Kontoverwaltung von Keycloak (Theme 20.8: deutsche Texte); das Archiv bekommt dafür keine eigene Oberfläche, nur Anzeige
+(«Passkey eingerichtet», Anzahl) und die Admin-Aktion «Passkeys zurücksetzen» als Teil von «Zugang zurücksetzen» (REST,
+Step-up, Protokoll ohne Gerätedaten). Der Adapter liest die Zahl über die Admin-API (Credentials des Benutzers, Typ
+`webauthn-passwordless`) und löscht sie auf Anforderung; er gibt keine Schlüsselkennungen weiter. Die Relying-Party-ID ist die
+Domain der App und eine Betriebsangabe (Platzhalter im Export). Tests: virtueller Authenticator gegen ein Wegwerf-Keycloak
+(Einrichten, Anmelden, Step-up, Entfernen, Zurücksetzen); echte Geräte bei der Inbetriebnahme (Fabian).
+`[offen: genaue Flow-Konstruktion in Keycloak 26.8.2 (Passkey-Authenticator mit bedingter Anzeige gegen eigener Teilfluss),
+Setzen von auth_time bei Passkey, Auswirkung auf Direct-Grant und die Wegwerf-Tests (Direct Grant bleibt TOTP-Pflicht) — Spike
+in Aufgabe 24.1 klärt das und ergänzt diesen Abschnitt]`
+
 ### Abgleich
 `Abgleich` liest die Benutzer des Mandanten (Seiten zu 50), gleicht mit `benutzer_status`, dem Benutzerverzeichnis und dem
 Protokoll ab und meldet die Abweichungen nach Requirement 6.5 als `BENUTZER_ABWEICHUNG` (Code: `ROLLE_OHNE_VORGANG`,
@@ -367,6 +383,7 @@ Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anm
 6. Anzeige: E-Mail-Texte und Theme auf Deutsch (Aufgabe 20.8); Benutzerprofil unverändert (E-Mail, Benutzername und
    `mandant` nur Admin).
 7. `auth_time` im Access-Token von `archiv-pwa` (Mapper, falls nicht schon vorhanden).
+8. Passkey-Anmeldeweg (Aufgabe 24.1, Requirement 10): Relying-Party-ID als Platzhalter im Export; Wert beim Einspielen (Betrieb).
 Auf bestehenden Instanzen (Stufe A) legt Aufgabe 19.3 diese Änderungen einmalig per `kcadm.sh` im Wegwerf-Container an (der
 Realm-Import wirkt nur beim ersten Start); der Export bleibt die Quelle für Stufe B.
 
