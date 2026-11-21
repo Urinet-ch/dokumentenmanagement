@@ -1,17 +1,17 @@
 diff --git a/.github/workflows/infomaniak-deploy.yml b/.github/workflows/infomaniak-deploy.yml
 --- a/.github/workflows/infomaniak-deploy.yml
 +++ b/.github/workflows/infomaniak-deploy.yml
-@@ -223,5 +223,6 @@ jobs:
- 
+@@ -223,4 +223,5 @@ jobs:
        - name: Container gesund
 +        id: container_gesund
          env:
            HOST: ${{ vars.INFOMANIAK_HOST }}
          run: |
-@@ -261,6 +262,18 @@ jobs:
+@@ -257,5 +258,17 @@ jobs:
            echo "::error::api, db und kc sind nach 10 Minuten nicht alle healthy."
            exit 1
- 
+-
++
 +      # Voraussetzung: Das gebundene Deploy-Gate unterstützt «diagnose archiv» und gibt ausschliesslich
 +      # die letzten 80 API-Logzeilen und OOMKilled, ExitCode und RestartCount der API aus.
 +      - name: Diagnose bei fehlgeschlagener Container-Prüfung
@@ -26,4 +26,3 @@ diff --git a/.github/workflows/infomaniak-deploy.yml b/.github/workflows/infoman
 +
        - name: Öffentliche Prüfung
          run: |
-           code() { curl -s -o /dev/null --max-time 15 -w '%{http_code}' "$1"; }
