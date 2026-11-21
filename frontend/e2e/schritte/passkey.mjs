@@ -257,6 +257,18 @@ Then('enthält das neue Access-Token eine neuere auth_time', function () {
   assert.ok(this.passkey.claims.acr || this.passkey.claims.amr);
 });
 
+Then(
+  'liefert das Archiv die konfigurierte Keycloak-Origin unter dem WebAuthn-Pfad',
+  async function () {
+    const antwort = await fetch(new URL('/.well-known/webauthn', backend().api), {
+      redirect: 'manual',
+    });
+    await pruefeAntwort(antwort, 200, 'Related Origins');
+    assert.match(antwort.headers.get('content-type'), /^application\/json\b/);
+    assert.deepEqual(await antwort.json(), { origins: [new URL(backend().keycloak).origin] });
+  },
+);
+
 Then('kann er diesen Passkey in der Kontoverwaltung entfernen', async function () {
   await entfernen(this);
 });

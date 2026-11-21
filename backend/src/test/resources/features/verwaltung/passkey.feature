@@ -33,6 +33,10 @@ Funktionalität: Passkey im Keycloak-Realm
     Wenn er sich für den Step-up mit dem Passkey erneut anmeldet
     Dann enthält das neue Access-Token eine neuere auth_time
 
+  @req-10.8
+  Szenario: Das Archiv liefert die Keycloak-Origin für Related Origins
+    Dann liefert das Archiv die konfigurierte Keycloak-Origin unter dem WebAuthn-Pfad
+
   @teilnachweis-10.11
   Szenario: Virtueller Authenticator gegen Keycloak
     Angenommen ein Testbenutzer hat einen Passkey eingerichtet
