@@ -192,6 +192,9 @@ jobs:
       - name: Drive-Import-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
         run: mvn -B -ntp -f tools/drive_import/pom.xml verify
 
+      - name: Wissenspaket-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
+        run: mvn -B -ntp -f tools/wissen_paket/pom.xml verify
+
   backend:
     name: Backend-Tests (JUnit, ArchUnit, SpotBugs)
     if: needs.art.outputs.nur-spec != 'true'
@@ -329,6 +332,10 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - working-directory: frontend
         run: npx ng test --watch=false
+      # Gestaltungsregeln (docs/oberflaeche/README.md): keine festen Farben, keine früheren Farbnamen, Seitenkopf
+      - name: Gestaltungsregeln
+        working-directory: frontend
+        run: npm run pruefe:gestaltung
       - name: Generator-Client (tools/archiv_client.py, unittest)
         run: python3 -m unittest tools/test_archiv_client.py
       - name: Lastskripte (tools/last, unittest)
