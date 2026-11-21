@@ -3,7 +3,10 @@ package ch.urinet.archiv.benutzer.application;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -71,6 +74,15 @@ public interface IdentitaetsDienst {
             throw new IllegalArgumentException("Ungültige Suchanfrage");
         }
         return (int) start;
+    }
+
+    static boolean passtSuche(String suche, String... felder) {
+        if (suche == null || suche.isBlank()) {
+            return true;
+        }
+        String filter = suche.toLowerCase(Locale.ROOT);
+        return Arrays.stream(felder).filter(Objects::nonNull)
+                .anyMatch(wert -> wert.toLowerCase(Locale.ROOT).contains(filter));
     }
 
     Benutzer benutzerLesen(String mandant, String id);

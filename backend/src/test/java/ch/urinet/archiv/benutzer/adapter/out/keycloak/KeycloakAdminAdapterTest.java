@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.absent;
 import static com.github.tomakehurst.wiremock.client.WireMock.delete;
 import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
@@ -274,7 +275,7 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
-    void benutzerSucheVerwendetDieAngeforderteSeitengroesse() {
+    void benutzerSuchePrueftGrenzenUndFiltertVorDerPaginierung() throws Exception {
         tokenAntwort();
         server.stubFor(get(urlPathEqualTo(USERS)).willReturn(okJson("[]")));
         KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
@@ -282,9 +283,9 @@ class KeycloakAdminAdapterTest {
         assertThat(adapter.benutzerSuchen("urinet", "probe", 2, 7)).isEmpty();
         server.verify(1, getRequestedFor(urlPathEqualTo(USERS))
                 .withQueryParam("q", equalTo("mandant:urinet"))
-                .withQueryParam("search", equalTo("probe"))
-                .withQueryParam("first", equalTo("14"))
-                .withQueryParam("max", equalTo("7")));
+                .withQueryParam("search", absent())
+                .withQueryParam("first", equalTo("0"))
+                .withQueryParam("max", equalTo("50")));
         assertThatThrownBy(() -> adapter.benutzerSuchen("urinet", "", 0, 0))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> adapter.benutzerSuchen("urinet", "", 0, 51))
@@ -295,11 +296,60 @@ class KeycloakAdminAdapterTest {
                 .isInstanceOf(IllegalArgumentException.class);
         server.verify(1, getRequestedFor(urlPathEqualTo(USERS)));
 
-        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("max", equalTo("1"))
-                .willReturn(okJson("[{},{}]")));
+        var zuGross = new ObjectMapper().createArrayNode();
+        for (int i = 0; i < 51; i++) {
+            zuGross.addObject();
+        }
+        server.stubFor(get(urlPathEqualTo(USERS)).willReturn(okJson(zuGross.toString())));
         assertThatThrownBy(() -> adapter.benutzerSuchen("urinet", "", 0, 1))
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+    }
+
+    @Test
+    void suchergebnisseWerdenMandantengefiltertUndSeitenuebergreifendPaginiert() {
+        tokenAntwort();
+        var json = new ObjectMapper();
+        var erste = json.createArrayNode();
+        for (int i = 0; i < 50; i++) {
+            var user = erste.addObject();
+            user.put("id", "benutzer-" + i);
+            user.put("username", "synthetisch-" + i);
+            user.put("enabled", true);
+            user.putArray("requiredActions");
+            user.putObject("attributes").putArray("mandant").add(i == 1 ? "fremd" : "urinet");
+            if (i < 3) {
+                user.put("firstName", "Sonne");
+            }
+        }
+        var zweite = json.createArrayNode();
+        for (int i = 50; i < 53; i++) {
+            var user = zweite.addObject();
+            user.put("id", "benutzer-" + i);
+            user.put("username", "synthetisch-" + i);
+            user.put("email", "sonne" + i + "@example.test");
+            user.put("enabled", true);
+            user.putArray("requiredActions");
+            user.putObject("attributes").putArray("mandant").add("urinet");
+        }
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("q", equalTo("mandant:urinet"))
+                .withQueryParam("search", absent()).withQueryParam("first", equalTo("0"))
+                .withQueryParam("max", equalTo("50")).willReturn(okJson(erste.toString())));
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("q", equalTo("mandant:urinet"))
+                .withQueryParam("search", absent()).withQueryParam("first", equalTo("50"))
+                .withQueryParam("max", equalTo("50")).willReturn(okJson(zweite.toString())));
+        server.stubFor(get(urlPathMatching(USERS + "/benutzer-[0-9]+/role-mappings/realm"))
+                .willReturn(okJson("[]")));
+        server.stubFor(get(urlPathMatching(USERS + "/benutzer-[0-9]+/credentials"))
+                .willReturn(okJson("[]")));
+        server.stubFor(get(urlPathMatching(USERS + "/benutzer-[0-9]+/federated-identity"))
+                .willReturn(okJson("[]")));
+
+        var ergebnis = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .benutzerSuchen("urinet", "SONNE", 1, 2);
+        assertThat(ergebnis).extracting(b -> b.id()).containsExactly("benutzer-50", "benutzer-51");
+        server.verify(0, getRequestedFor(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm")));
+        server.verify(2, getRequestedFor(urlPathEqualTo(USERS)).withQueryParam("search", absent()));
     }
 
     @Test

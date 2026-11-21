@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -29,11 +28,10 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
     public synchronized java.util.List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse) {
         Objects.requireNonNull(mandant);
         int start = IdentitaetsDienst.seitenanfang(suche, seite, groesse);
-        String filter = suche == null ? "" : suche.toLowerCase(Locale.ROOT);
         var treffer = new ArrayList<Benutzer>();
         benutzer.values().stream().filter(e -> e.mandant.equals(mandant))
                 .map(e -> e.wert)
-                .filter(b -> b.benutzername().toLowerCase(Locale.ROOT).contains(filter))
+                .filter(b -> IdentitaetsDienst.passtSuche(suche, b.benutzername(), b.email(), b.vorname(), b.nachname()))
                 .sorted(Comparator.comparing(Benutzer::benutzername))
                 .forEach(treffer::add);
         if (start >= treffer.size()) {

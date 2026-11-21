@@ -130,21 +130,36 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     public List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse) {
         Objects.requireNonNull(mandant);
         int start = IdentitaetsDienst.seitenanfang(suche, seite, groesse);
-        String query = "q=" + query("mandant:" + mandant) + "&max=" + groesse + "&first=" + start;
-        if (suche != null && !suche.isBlank()) {
-            query += "&search=" + query(suche);
-        }
-        JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
-        if (!treffer.isArray() || treffer.size() > groesse) {
-            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
-        }
         List<Benutzer> ergebnis = new ArrayList<>();
-        for (JsonNode eintrag : treffer) {
-            if (mandantPasst(eintrag, mandant)) {
-                ergebnis.add(benutzer(eintrag, mandant));
+        long offset = 0;
+        long passende = 0;
+        while (true) {
+            // Keycloak ignoriert «q», wenn zugleich «search» gesetzt ist; erst Mandant, dann Suche und Paginierung.
+            String query = "q=" + query("mandant:" + mandant) + "&max=" + MAX_SEITENGROESSE + "&first=" + offset;
+            JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
+            if (!treffer.isArray() || treffer.size() > MAX_SEITENGROESSE) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            for (JsonNode eintrag : treffer) {
+                if (mandantPasst(eintrag, mandant) && IdentitaetsDienst.passtSuche(suche,
+                        text(eintrag, "username"), text(eintrag, "email"),
+                        text(eintrag, "firstName"), text(eintrag, "lastName"))) {
+                    if (passende++ >= start) {
+                        ergebnis.add(benutzer(eintrag, mandant));
+                        if (ergebnis.size() == groesse) {
+                            return List.copyOf(ergebnis);
+                        }
+                    }
+                }
+            }
+            if (treffer.size() < MAX_SEITENGROESSE) {
+                return List.copyOf(ergebnis);
+            }
+            offset += treffer.size();
+            if (offset > Integer.MAX_VALUE) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
         }
-        return List.copyOf(ergebnis);
     }
 
     @Override

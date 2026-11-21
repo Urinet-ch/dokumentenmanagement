@@ -55,6 +55,8 @@ class IdentitaetsDienstStubTest {
         assertThat(erste).hasSize(7).doesNotContainAnyElementsOf(zweite);
         assertThat(zweite).hasSize(7);
         assertThat(dienst.benutzerSuchen("a", "", 7, 7)).hasSize(2);
+        assertThat(dienst.benutzerSuchen("a", "PERSON", 1, 7)).hasSize(7);
+        assertThat(dienst.benutzerSuchen("a", "@EXAMPLE.TEST", 0, 7)).hasSize(7);
         assertThatThrownBy(() -> dienst.benutzerSuchen("a", "", 0, 0))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> dienst.benutzerSuchen("a", "", 0, 51))

@@ -1,5 +1,6 @@
 package ch.urinet.archiv.sicherheit;
 
+import ch.urinet.archiv.benutzer.adapter.out.keycloak.KeycloakAdminAdapter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
@@ -11,10 +12,12 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
@@ -132,6 +135,12 @@ class KeycloakVerwaltungSpikeTest {
             assertThat(serviceClaims.path("aud").toString()).contains("realm-management").contains(adminUrl);
             // Mit dem Scope funktioniert der Aufruf der Admin-API mit dem Dienstkonto-Token (Requirement 5.2).
             given().auth().oauth2(serviceToken).get(adminUrl + "/users?max=1").then().statusCode(200);
+            var adapter = new KeycloakAdminAdapter(OBJECT_MAPPER, Optional.of(basisUrl), REALM,
+                    clientIdName, Optional.of(clientSecret), "archiv-pwa", Optional.empty(),
+                    Duration.ofSeconds(2), Duration.ofSeconds(5));
+            assertThat(adapter.benutzerSuchen("vhf-gsk", "inhaber", 0, 1))
+                    .extracting(benutzer -> benutzer.benutzername())
+                    .containsExactly("inhaber-vhf-gsk");
         } finally {
             // Kein Assert im finally: ein Fehler beim Aufräumen darf den ursprünglichen Testfehler nicht überdecken.
             try {
