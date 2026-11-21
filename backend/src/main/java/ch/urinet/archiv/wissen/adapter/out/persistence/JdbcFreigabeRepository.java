@@ -41,6 +41,14 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
     }
 
     @Override
+    public void analyseEntwurfAnlegen(UUID entwurfId, String benutzer) {
+        em.get().createNativeQuery("""
+                insert into wissens_entwurf (id, anlass, status, erstellt_von, erstellt)
+                values (:id, 'ANALYSE', 'OFFEN', :benutzer, now())
+                """).setParameter("id", entwurfId).setParameter("benutzer", benutzer).executeUpdate();
+    }
+
+    @Override
     public Optional<Aenderung> sperren(UUID entwurfId, int nummer) {
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = em.get().createNativeQuery("""

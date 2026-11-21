@@ -60,6 +60,9 @@ public class FreigabeAnnahme {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         FreigabeRepository.Vorschlag vorschlag = repository.vorschlagLaden(aenderung);
+        if ("ANALYSE".equals(aenderung.anlass()) && bearbeitung == null) {
+            throw new FachFehler(Fehlercode.ENTWURF_BEFUND);
+        }
         Wissensseite entwurf = vorschlag.fassung();
         Set<String> entfernt = vorschlag.entfernteAussagen();
         String importErzeugt = null;

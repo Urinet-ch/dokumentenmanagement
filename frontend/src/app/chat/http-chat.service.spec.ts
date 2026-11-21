@@ -220,6 +220,7 @@ describe('HttpChatService (Spec 02, Aufgabe 7.4)', () => {
       nachrichten: [
         { rolle: 'BENUTZER', inhalt: 'Frage', quellen: [], zeit: '2026-11-14T08:00:00Z' },
         {
+          id: '9223372036854775807',
           rolle: 'ASSISTENT',
           inhalt: 'Antwort',
           quellen: [{ titel: 'R', link: '/dokument/d1' }, { unbekannt: true }],
@@ -237,6 +238,7 @@ describe('HttpChatService (Spec 02, Aufgabe 7.4)', () => {
         zeit: '2026-11-14T08:00:00Z',
       },
       {
+        id: '9223372036854775807',
         rolle: 'ASSISTENT',
         inhalt: 'Antwort',
         quellen: [{ titel: 'R', link: '/dokument/d1' }],

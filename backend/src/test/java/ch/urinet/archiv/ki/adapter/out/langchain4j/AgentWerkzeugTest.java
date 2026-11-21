@@ -81,7 +81,38 @@ class AgentWerkzeugTest {
         assertThat(werkzeug.execute(anfrage(), lauf.id())).isEqualTo(AgentWerkzeug.GRENZE)
                 .isEqualTo("{\"fehler\":\"Grenze der Werkzeugaufrufe erreicht, antworte mit dem Bisherigen\"}");
         assertThat(aufrufe).hasSize(5);
-        assertThat(ereignisse).hasSize(ereignisseVorGrenze);
+        assertThat(ereignisse).hasSize(ereignisseVorGrenze + 1);
+        assertThat(ereignisse.getLast()).isInstanceOfSatisfying(ChatEreignis.WerkzeugErgebnis.class, e -> {
+            assertThat(e.name()).isEqualTo("dokumente_suchen");
+            assertThat(e.kontextstufe()).contains(ChatEreignis.Kontextstufe.NORMAL);
+        });
+    }
+
+    @Test
+    void nichtAbbildbaresWerkzeugergebnisBleibtOhneKontextnachweisErhalten() {
+        AgentLauf lauf = lauf();
+        lauf.rundeBeginnt();
+        ToolExecutor kaputt = (a, m) -> """
+                {"pfad":"konzepte/a","titel":"A","stand":"ungueltig","quellen":[],"vertraulichkeit":"INTERN"}
+                """;
+        new AgentWerkzeug("wissen_seite_zeigen", kaputt, lauf, JSON, 5).execute(anfrage(), lauf.id());
+        assertThat(ereignisse.getLast()).isInstanceOfSatisfying(ChatEreignis.WerkzeugErgebnis.class, e -> {
+            assertThat(e.name()).isEqualTo("wissen_seite_zeigen");
+            assertThat(e.kontextstufe()).isEmpty();
+        });
+    }
+
+    @Test
+    void scheiternderWerkzeugaufrufBleibtOhneKontextnachweisErhalten() {
+        AgentLauf lauf = lauf();
+        lauf.rundeBeginnt();
+        ToolExecutor kaputt = (a, m) -> { throw new IllegalStateException(); };
+        assertThatThrownBy(() -> new AgentWerkzeug("kennzahl", kaputt, lauf, JSON, 5)
+                .execute(anfrage(), lauf.id())).isInstanceOf(IllegalStateException.class);
+        assertThat(ereignisse.getLast()).isInstanceOfSatisfying(ChatEreignis.WerkzeugErgebnis.class, e -> {
+            assertThat(e.name()).isEqualTo("kennzahl");
+            assertThat(e.kontextstufe()).isEmpty();
+        });
     }
 
     @Test
