@@ -211,10 +211,10 @@ eine Datei auf 32 KiB; darüber gilt der Fehlerfall 7.6.
 ## Hilfe-Leiste und Seite `/hilfe` (Requirements 4, 5)
 - **Leiste:** zweiter `mat-sidenav` mit `position="end"` und `mode="over"` im bestehenden `mat-sidenav-container` von
   `app.html` (Fokusfalle, Escape und Abdunklung bringt Angular Material mit), `role="dialog"`, Name «Hilfe». Inhalt in
-  `@defer (when hilfeOffen())`. Dienst `HilfeLeiste` (root) mit `oeffnen(anker?)`, `schliessen()`, `anker` als Signal; der
+  `@defer (when hilfeOffen())`. Dienst `HilfeLeiste` (root) mit `oeffnen(anker, ausloeser)`, `schliessen()`, `anker` als Signal; der
   Knopf in der Kopfzeile ruft `oeffnen()` mit dem Kontext, die Links «So funktioniert es» (Requirement 4.6) und «In der
   Anleitung lesen» (Einführung) mit festem Anker.
-- **Kontext:** `kontext(url, rolle)` nimmt aus dem Katalog die Einträge mit `pfade`, wählt mit `aktiverPfad` den längsten
+- **Kontext:** `hilfeKontext(url, rolle, katalog)` nimmt aus dem Katalog die Einträge mit `pfade`, wählt mit `aktiverPfad` den längsten
   passenden Pfad und gibt den Anker nur zurück, wenn der Eintrag für die Rolle sichtbar ist (Requirement 4.3).
 - **Seite:** Route `hilfe` mit `loadComponent`, ohne `canActivate`, Titel über `titel(TEXTE.hilfe.titel)` wie die anderen
   Routen. Inhaltsverzeichnis als `nav` mit Links `routerLink="/hilfe" [fragment]="anker"`. Weil der Inhalt in
@@ -447,8 +447,12 @@ Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
 - **Navigation:** Abschnittslinks in der Leiste wechseln den Inhalt ohne Navigation. Links zu App-Seiten schliessen die
   Leiste; «Ganze Anleitung öffnen» führt zu `/hilfe#<anker>`. Die Seite darunter wird nicht neu erzeugt und ihre
   ungespeicherten Eingaben bleiben erhalten.
+- **Abweichungen vom Entwurf:** Der Dienst heisst `HilfeLeiste` mit `oeffnen(anker, ausloeser)` (der Auslöser gibt den
+  Fokus beim Schliessen zurück), `offen()` statt `hilfeOffen()` und der gemeinsamen `rolle()` für Kontext und
+  Inhaltsverzeichnis. Der Kontext heisst `hilfeKontext(url, rolle, katalog)`. Der Knopf trägt den festen zugänglichen
+  Namen «Hilfe» (nicht «Hilfe zu <Abschnitt>»); der Abschnitt zeigt sich in der geöffneten Leiste.
 - **Pflege und Nachweis:** `erste-schritte.md` und `probleme.md` beschreiben den Kopfzeilenknopf. `hilfe-kontext.spec.ts`
-  prüft längste Pfade und verborgene Abschnitte; Browser-Szenarien zu 4.1–4.5 liegen in
+  prüft längste Pfade und verborgene Abschnitte, `hilfe-leiste.spec.ts` den Dienst (Fokusrückgabe, Rolle); Browser-Szenarien zu 4.1–4.5 (inkl. Leistenbreite und angemeldet ohne Rolle) liegen in
   `features/hilfe/hilfe-leiste.feature`.
 
 ## Umsetzung (Aufgabe 22.6, 21.11.2026)

@@ -32,7 +32,6 @@ import { HILFE_EINTRAEGE } from './hilfe/hilfe-sichtbar';
 import { HilfeLeisteAnsicht } from './hilfe/hilfe-leiste';
 import { HilfeLeiste } from './hilfe/hilfe-leiste.service';
 import { hilfeKontext } from './hilfe/hilfe-kontext';
-import { Rolle } from './gemeinsam/anmeldung/rechte';
 
 export const SEITE_NEU_LADEN = new InjectionToken<() => void>('SEITE_NEU_LADEN', {
   providedIn: 'root',
@@ -88,11 +87,7 @@ export class App {
   protected readonly aktiverPfad = computed(() => aktiverPfad(this.url(), this.menue().map((punkt) => punkt.pfad)));
   protected readonly abschnitte = computed(() => abschnitte(this.menue()));
   protected readonly darfSuchen = computed(() => this.menue().length > 0 && this.anmeldung.darf('A2'));
-  private readonly hilfeRolle = computed<Rolle | null>(() => {
-    const benutzer = this.anmeldung.benutzer();
-    return this.anmeldung.angemeldet() && benutzer?.mandant && benutzer.rolle ? benutzer.rolle : null;
-  });
-  private readonly hilfeAnker = computed(() => hilfeKontext(this.url(), this.hilfeRolle(), this.hilfeKatalog));
+  private readonly hilfeAnker = computed(() => hilfeKontext(this.url(), this.hilfe.rolle(), this.hilfeKatalog));
   protected readonly farbschema = inject(FarbschemaService);
 
   constructor() {

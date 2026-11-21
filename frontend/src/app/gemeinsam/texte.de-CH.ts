@@ -1674,7 +1674,6 @@ export const TEXTE = {
     untertitel: 'So bedienen Sie das Archiv, Bereich für Bereich.',
     ganzeAnleitung: 'Ganze Anleitung öffnen',
     schliessen: 'Schliessen',
-    kontextInhalt: 'Abschnitt der Anleitung',
     inhalt: 'Inhalt der Anleitung',
     rolle: (rolle: string) =>
       `Sie sind als ‹${rolle}› angemeldet. Diese Anleitung zeigt die Bereiche, die Ihre Rolle nutzen darf.`,

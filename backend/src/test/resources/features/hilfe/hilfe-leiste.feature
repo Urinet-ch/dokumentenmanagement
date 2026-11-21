@@ -19,6 +19,30 @@ Funktionalität: Hilfe-Leiste ohne Verlassen der aktuellen Seite
     Und zeigt der Knopf das Symbol «hilfe»
     Und ist der Hilfetext sichtbar
 
+  @req-4.1
+  Szenario: Der Knopf «Hilfe» ist für Angemeldete ohne Rolle da und die Leiste zeigt nur die Abschnitte für Besucher
+    Angenommen ein Bildschirm mit 1280 Pixel Breite
+    Und ich bin als «ohne-rolle» im Mandanten «urinet» angemeldet
+    Dann ist der Knopf «Hilfe» mit seinem zugänglichen Namen sichtbar
+    Wenn ich die Hilfe-Leiste öffne
+    Dann zeigt die Hilfe-Leiste ihr Inhaltsverzeichnis «Inhalt der Anleitung»
+    Und zeigt die Hilfe-Leiste den Abschnitt «Erste Schritte»
+    Und enthält das Inhaltsverzeichnis der Hilfe-Leiste den Abschnitt «Erfassen» nicht
+
+  @req-4.5
+  Szenario: Die Leiste ist auf dem Handy so breit wie der Bildschirm
+    Angenommen ein Bildschirm mit 375 Pixel Breite
+    Wenn ich die Seite «/» öffne
+    Und ich die Hilfe-Leiste öffne
+    Dann ist die Hilfe-Leiste 375 Pixel breit
+
+  @req-4.5
+  Szenario: Die Leiste ist am breiten Bildschirm höchstens 420 Pixel breit
+    Angenommen ein Bildschirm mit 1280 Pixel Breite
+    Wenn ich die Seite «/» öffne
+    Und ich die Hilfe-Leiste öffne
+    Dann ist die Hilfe-Leiste höchstens 420 Pixel breit
+
   @req-4.2
   Szenario: Eine Aufnahme bleibt beim Öffnen und Schliessen der Hilfe-Leiste erhalten
     Angenommen ein Handy, dessen Rückkamera «ein Blatt» filmt

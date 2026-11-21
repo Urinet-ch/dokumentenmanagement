@@ -93,3 +93,28 @@ Then(/^ist der Knopf «(.+)» wieder fokussiert$/, async function (name) {
 Then('ist die Hilfe-Leiste geschlossen', async function () {
   await dialog(this.seite).waitFor({ state: 'detached' });
 });
+
+const leistenBreite = (seite) => dialog(seite).evaluate((element) => element.closest('mat-sidenav').getBoundingClientRect().width);
+
+Then(/^ist die Hilfe-Leiste (\d+) Pixel breit$/, async function (breite) {
+  await this.seite.waitForFunction(
+    (soll) => Math.round(document.querySelector('#hilfe-leiste').getBoundingClientRect().width) === soll,
+    Number(breite),
+  );
+  assert.equal(Math.round(await leistenBreite(this.seite)), Number(breite));
+});
+
+Then(/^ist die Hilfe-Leiste höchstens (\d+) Pixel breit$/, async function (breite) {
+  await this.seite.waitForFunction(
+    (soll) => {
+      const b = document.querySelector('#hilfe-leiste').getBoundingClientRect().width;
+      return b > 0 && b <= soll;
+    },
+    Number(breite),
+  );
+});
+
+Then(/^enthält das Inhaltsverzeichnis der Hilfe-Leiste den Abschnitt «(.+)» nicht$/, async function (titel) {
+  const verzeichnis = dialog(this.seite).getByRole('navigation', { name: 'Inhalt der Anleitung' });
+  assert.equal(await verzeichnis.getByRole('link', { name: titel, exact: true }).count(), 0);
+});

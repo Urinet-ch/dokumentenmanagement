@@ -9,8 +9,6 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
-import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
-import { Rolle } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { AnleitungText } from './anleitung-text';
 import { HILFE_EINTRAEGE, sichtbareAbschnitte } from './hilfe-sichtbar';
@@ -25,19 +23,13 @@ import { HilfeLeiste } from './hilfe-leiste.service';
 })
 export class HilfeLeisteAnsicht {
   protected readonly hilfe = inject(HilfeLeiste);
-  private readonly anmeldung = inject(AnmeldungService);
   private readonly katalog = inject(HILFE_EINTRAEGE);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly texte = TEXTE.hilfe;
   readonly navigiert = output<void>();
 
-  private readonly rolle = computed<Rolle | null>(() => {
-    const benutzer = this.anmeldung.benutzer();
-    return this.anmeldung.angemeldet() && benutzer?.mandant && benutzer.rolle ? benutzer.rolle : null;
-  });
-
   protected readonly eintraege = computed(() =>
-    sichtbareAbschnitte(this.katalog, this.rolle()).flatMap(({ eintrag, unter }) => [eintrag, ...unter]),
+    sichtbareAbschnitte(this.katalog, this.hilfe.rolle()).flatMap(({ eintrag, unter }) => [eintrag, ...unter]),
   );
 
   protected readonly ausgewaehlt = computed(
