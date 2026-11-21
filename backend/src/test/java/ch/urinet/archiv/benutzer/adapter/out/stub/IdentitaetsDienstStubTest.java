@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer.adapter.out.stub;
 
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Neuanlage;
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -10,6 +11,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class IdentitaetsDienstStubTest {
+
+    @Test
+    void doppelteNamenOderAdressenMeldenEinenNeutralenRealmweitenKonflikt() {
+        var dienst = new IdentitaetsDienstStub();
+        dienst.anlegen("a", new Neuanlage("beispiel", "a@example.test", "Test", "Person"), Rolle.MITARBEITER);
+
+        assertThatThrownBy(() -> dienst.anlegen("b",
+                new Neuanlage("BEISPIEL", "b@example.test", "Test", "Person"), Rolle.MITARBEITER))
+                .isInstanceOf(KonfliktException.class).hasMessage("Konflikt im Identitätsdienst");
+        assertThatThrownBy(() -> dienst.anlegen("b",
+                new Neuanlage("anderer", "A@example.test", "Test", "Person"), Rolle.MITARBEITER))
+                .isInstanceOf(KonfliktException.class).hasMessage("Konflikt im Identitätsdienst");
+        assertThat(dienst.benutzerSuchen("b", "", 0)).isEmpty();
+    }
 
     @Test
     void fremderBenutzerIstNichtLesbarOderAenderbar() {

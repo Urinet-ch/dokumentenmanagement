@@ -56,7 +56,7 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
                 .anyMatch(b -> b.benutzername().equalsIgnoreCase(neu.benutzername())
                         || b.email().equalsIgnoreCase(neu.email()));
         if (vorhanden) {
-            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+            throw new KonfliktException();
         }
         String id = UUID.randomUUID().toString();
         Benutzer wert = new Benutzer(id, neu.benutzername(), neu.email(), neu.vorname(), neu.nachname(), true,
