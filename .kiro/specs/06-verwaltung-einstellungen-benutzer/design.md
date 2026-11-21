@@ -245,6 +245,7 @@ Step-up, Protokoll ohne Gerätedaten). Der Adapter liest die Zahl über die Admi
 `webauthn-passwordless`) und löscht sie auf Anforderung; er gibt keine Schlüsselkennungen weiter. Die Relying-Party-ID ist die
 Domain der App und eine Betriebsangabe (Platzhalter im Export). Tests: virtueller Authenticator gegen ein Wegwerf-Keycloak
 (Einrichten, Anmelden, Step-up, Entfernen, Zurücksetzen); echte Geräte bei der Inbetriebnahme (Fabian).
+Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach Aufgabe 19.10; Aufgabe 24.1 prüft die Token-Ebene.
 `[offen: genaue Flow-Konstruktion in Keycloak 26.8.2 (Passkey-Authenticator mit bedingter Anzeige gegen eigener Teilfluss),
 Setzen von auth_time bei Passkey, Auswirkung auf Direct-Grant und die Wegwerf-Tests (Direct Grant bleibt TOTP-Pflicht) — Spike
 in Aufgabe 24.1 klärt das und ergänzt diesen Abschnitt]`
