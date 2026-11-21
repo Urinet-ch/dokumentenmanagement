@@ -287,7 +287,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Und der Stand des Zugriffsprotokolls von «urinet» ist für die Webseite gemerkt
     Wenn der Webseiten-Lesezugang «oeffentlich» die Datei des Dokuments «b1» mit der Stufe «oeffentlich» und der Adresse «192.0.2.77» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 200
-    Und nennt die Antwort eine Adresse der Datei, die höchstens 5 Minuten gilt
+    Und ist die Antwort eine gültige signierte S3-Adresse der Datei «b1» mit höchstens 300 Sekunden Gültigkeit
     Und steht im Zugriffsprotokoll von «urinet» genau ein neuer Eintrag HERUNTERLADEN für «b1» von der Adresse «192.0.2.0» ohne weitere Angaben
 
   @req-5.4 @req-13.1

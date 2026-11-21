@@ -99,6 +99,28 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Und belegt die API noch 0 Plätze für Streams
 
+  @req-1.4 @req-9.1
+  Szenario: Ein fremder Mandant erhält keinen S3-Link für eine öffentliche Datei
+    Angenommen im Mandanten «vhf-gsk» sind diese Reihen angelegt:
+      | code        | name                  | aktiv |
+      | WEBTEST_VHF | Fremdmandanten-Reihe  | true  |
+    Und im Mandanten «vhf-gsk» liegen diese Webseiten-Dokumente:
+      | name | art         | zugriff     | text          |
+      | x    | WEBTEST_VHF | oeffentlich | Fremdmandant  |
+    Und im Mandanten «urinet» liegen diese Webseiten-Dokumente:
+      | name | art         | zugriff     | text          |
+      | y    | WEBTEST_BUL | oeffentlich | Eigenmandant  |
+    Und das Dokument «x» hat eine Datei
+    Und das Dokument «y» hat eine Datei
+    Wenn der Webseiten-Lesezugang «oeffentlich» die Datei des Dokuments «y» mit der Stufe «oeffentlich» und der Adresse «192.0.2.77» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 200
+    Und ist die Antwort eine gültige signierte S3-Adresse der Datei «y» mit höchstens 300 Sekunden Gültigkeit
+    Und der Stand des Zugriffsprotokolls von «urinet» ist für die Webseite gemerkt
+    Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «x» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und steht im Zugriffsprotokoll von «urinet» kein neuer Eintrag
+    Und belegt die API noch 0 Plätze für Streams
+
   @req-13.2
   Szenario: Ein Dokument ohne Datei oder ohne Sicht ist 404 und ein unbekanntes ebenso
     Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «b3» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
