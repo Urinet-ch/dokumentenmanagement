@@ -135,6 +135,9 @@ Die Workflow-Vorschläge samt Diff stehen in
 [workflow-vorschlaege.md](./workflow-vorschlaege.md). Es wurden keine
 Workflowdateien geändert.
 
+Die CI-Schritte für das Wissenspaket-Werkzeug und den additiven Webseiten-Vertrag
+wurden inzwischen in #395 beziehungsweise #405 angewendet.
+
 ## Zeitabschätzung
 
 Gemessener Ausgangswert: **18,0 min Median**, **25,6 min P90**. Die
