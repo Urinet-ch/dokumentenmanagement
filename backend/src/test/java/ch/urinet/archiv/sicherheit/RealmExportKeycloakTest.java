@@ -232,7 +232,8 @@ class RealmExportKeycloakTest {
         JsonNode sso = browser.anmelden(false, false);
         assertThat(sso.path("auth_time").asLong()).isEqualTo(ersteZeit);
 
-        Thread.sleep(1100);
+        // Keycloak lässt denselben TOTP-Code nicht zweimal zu.
+        Thread.sleep((31 - (System.currentTimeMillis() / 1000) % 30) * 1000);
         JsonNode erneut = browser.anmelden(true, true);
         assertThat(erneut.path("auth_time").isIntegralNumber()).isTrue();
         assertThat(erneut.path("auth_time").asLong()).isGreaterThan(ersteZeit);
