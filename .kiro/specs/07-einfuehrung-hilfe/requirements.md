@@ -46,8 +46,8 @@ entschieden mit dem Merge dieses PR»; die Liste steht in design.md, «Entscheid
 - **Benutzeranleitung** (kurz **Anleitung**) – alle Texte, die die Hilfe-Leiste und die Seite `/hilfe` zeigen.
 - **Abschnitt** – Teil der Anleitung zu einem Bereich der App, mit fester Sprungmarke; ein **Unterabschnitt** gehört zu
   einem Abschnitt und kann eine eigene Bedingung haben.
-- **Bedingung** – Liste von Aktionen der Rechtematrix; erfüllt, wenn die Rolle mindestens eine davon darf. Ohne
-  Bedingung ist ein Abschnitt **allgemein**.
+- **Bedingung** – Liste von Aktionen der Rechtematrix; erfüllt, wenn die Rolle mindestens eine davon darf und, falls
+  angegeben, keine der ausgeschlossenen Aktionen. Ohne Bedingung ist ein Abschnitt **allgemein**.
 - **Hilfe-Katalog** – die eine Liste im Code mit allen Abschnitten: Anker, Titel, Datei, übergeordneter Abschnitt,
   Bedingung, zugeordnete Pfade der App (design.md, «Hilfe-Katalog»).
 - **Sprungmarke** – Anker eines Abschnitts in der Adresse, `/hilfe#<anker>`.
