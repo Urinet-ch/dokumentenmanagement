@@ -94,7 +94,17 @@ public class ChatResource {
             @Schema(nullable = true, description = "relativer PWA-Pfad /dokument/<id>") String link,
             @Schema(nullable = true) String werkzeug,
             @Schema(nullable = true) Instant datenstand,
-            @Schema(nullable = true) Integer belege) {
+            @Schema(nullable = true) Integer belege,
+            @Schema(nullable = true) WissensquelleDto wissen,
+            @Schema(nullable = true) List<QuelldokumentDto> dokumente) {
+    }
+
+    @Schema(name = "ChatWissensquelle")
+    public record WissensquelleDto(String titel, String link, Instant stand) {
+    }
+
+    @Schema(name = "ChatQuelldokument")
+    public record QuelldokumentDto(String titel, String link, String seiten) {
     }
 
     @Schema(name = "ChatGespraech")
@@ -230,9 +240,12 @@ public class ChatResource {
 
     private static QuelleDto dto(Quelle quelle) {
         return switch (quelle) {
-            case Quelle.Dokument d -> new QuelleDto(d.id(), d.titel(), d.link(), null, null, null);
+            case Quelle.Dokument d -> new QuelleDto(d.id(), d.titel(), d.link(), null, null, null, null, null);
             case Quelle.Stand s -> new QuelleDto(null, null, null, s.werkzeug(), s.datenstand().zeitpunkt(),
-                    s.datenstand().belege());
+                    s.datenstand().belege(), null, null);
+            case Quelle.Wissen w -> new QuelleDto(null, null, null, null, null, null,
+                    new WissensquelleDto(w.titel(), w.link(), w.stand()),
+                    w.dokumente().stream().map(d -> new QuelldokumentDto(d.titel(), d.link(), d.seite())).toList());
         };
     }
 
