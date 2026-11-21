@@ -83,6 +83,11 @@ class DeployStufeTest {
         umgebung.put("QUARKUS_DATASOURCE_PASSWORD", "synthetisch");
         assertThatThrownBy(() -> secretsPruefen(compose, "api", umgebung))
                 .hasMessageContaining("archiv_db_app").hasMessageNotContaining("synthetisch");
+
+        umgebung.remove("QUARKUS_DATASOURCE_PASSWORD");
+        umgebung.put("ARCHIV_SECRETS_PFLICHT", "archiv_db_app");
+        assertThatThrownBy(() -> secretsPruefen(compose, "api", umgebung))
+                .hasMessageContaining("archiv.secrets.pflicht");
     }
 
     @Test
@@ -148,8 +153,6 @@ class DeployStufeTest {
                                 Map<String, String> umgebung) throws IOException {
         Map<String, Object> dienst = composeDienste(compose).get(dienstName);
         assertThat(dienst).as("Dienst %s in %s", dienstName, COMPOSE).doesNotContainKey("env_file");
-        assertThat(umgebung).as("Pflichtlisten von Dienst %s", dienstName)
-                .doesNotContainKeys("ARCHIV_SECRETS_PFLICHT", "ARCHIV_SECRETS_PFLICHT_MIGRATION");
         Path dateien = Files.createTempDirectory(temporaer, dienstName);
         Map<?, ?> deklarierteSecrets = (Map<?, ?>) compose.get("secrets");
         Object secrets = dienst.getOrDefault("secrets", List.of());
@@ -195,8 +198,12 @@ class DeployStufeTest {
         SmallRyeConfig config = SecretPruefungTestzugang.config(umgebung, dateien);
         assertThat(config.getValue("smallrye.config.source.file.locations", String.class))
                 .as("Secret-Verzeichnis von Dienst %s", dienstName).isEqualTo("/run/secrets");
-        assertThat(config.getOptionalValue("archiv.secrets.pflicht", String.class))
-                .as("Pflichtliste für Dienst %s", dienstName).isPresent();
+        SmallRyeConfig standard = prodConfig(Map.of());
+        for (String schluessel : List.of("archiv.secrets.pflicht", "archiv.secrets.pflicht-migration")) {
+            assertThat(config.getOptionalValues(schluessel, String.class).orElse(List.of()))
+                    .as("%s für Dienst %s", schluessel, dienstName)
+                    .containsAll(standard.getValues(schluessel, String.class));
+        }
         config.getOptionalValue("quarkus.datasource.password", String.class);
     }
 
@@ -459,8 +466,10 @@ class DeployStufeTest {
     @SuppressWarnings("unchecked")
     private static Map<String, String> strings(Object environment) {
         Map<String, String> ergebnis = new HashMap<>();
-        ((Map<String, Object>) environment).forEach((schluessel, wert) -> ergebnis.put(schluessel,
-                String.valueOf(wert)));
+        ((Map<String, Object>) environment).forEach((schluessel, wert) -> {
+            assertThat(wert).as("Compose-Umgebungswert %s ohne Standard", schluessel).isNotNull();
+            ergebnis.put(schluessel, String.valueOf(wert));
+        });
         return ergebnis;
     }
 }
