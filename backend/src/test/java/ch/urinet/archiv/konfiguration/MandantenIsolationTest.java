@@ -1,6 +1,7 @@
 package ch.urinet.archiv.konfiguration;
 
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.ki.KiWireMock;
 import ch.urinet.archiv.ki.application.MetadatenExtraktion;
 import ch.urinet.archiv.ki.application.chat.Lueckenbericht;
@@ -201,6 +202,63 @@ abstract class MandantenIsolationIT {
                 .when().get("/api/v1/dokumente").then().statusCode(400);
         given().auth().oauth2(vhf).queryParam("klassifikation.sitzungsthema", "projekte")
                 .when().get("/api/v1/dokumente").then().statusCode(400);
+    }
+
+    @Test
+    void wissensseitenBleibenBeimMandantenAusDerAnmeldung() throws Exception {
+        UUID urinetSeite = UUID.randomUUID();
+        UUID vhfSeite = UUID.randomUUID();
+        UUID urinetDokument = null;
+        UUID vhfDokument = null;
+        try {
+            urinetDokument = Testdokumente.anlegen(datenbank.get(),
+                    new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+            vhfDokument = Testdokumente.anlegen(datenbank.get(),
+                    new Testdokumente.Angaben("vhf-gsk", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+            wissensseiteAnlegen("m_urinet", urinetSeite, urinetDokument);
+            wissensseiteAnlegen("m_vhf_gsk", vhfSeite, vhfDokument);
+            for (String benutzer : List.of("inhaber-urinet", "mitarbeiter-urinet", "treuhaender-urinet",
+                    "inhaber-vhf-gsk", "geschaeftsstelle-vhf-gsk")) {
+                boolean verband = benutzer.endsWith("vhf-gsk");
+                String token = Testanmeldung.token(benutzer);
+                given().auth().oauth2(token).get("/api/v1/wissensseiten/" + (verband ? vhfSeite : urinetSeite))
+                        .then().statusCode(200);
+                given().auth().oauth2(token).get("/api/v1/wissensseiten/" + (verband ? urinetSeite : vhfSeite))
+                        .then().statusCode(404);
+            }
+        } finally {
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                for (String schema : List.of("m_urinet", "m_vhf_gsk")) {
+                    try (PreparedStatement loeschen = verbindung.prepareStatement(
+                            "delete from " + schema + ".wissensseite where id = ?")) {
+                        loeschen.setObject(1, schema.equals("m_urinet") ? urinetSeite : vhfSeite);
+                        loeschen.executeUpdate();
+                    }
+                }
+            }
+            if (urinetDokument != null) Testdokumente.loeschen(datenbank.get(), "urinet", List.of(urinetDokument));
+            if (vhfDokument != null) Testdokumente.loeschen(datenbank.get(), "vhf-gsk", List.of(vhfDokument));
+        }
+    }
+
+    private void wissensseiteAnlegen(String schema, UUID seite, UUID dokument) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement("""
+                     insert into %s.wissensseite
+                         (id, pfad, typ, titel, beschreibung, tags, vertraulichkeit, vertraulichkeit_mindest, inhalt,
+                          version, erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am)
+                     values (?, ?, 'Konzept', 'Isolationsprobe', 'Synthetisch', array['isolation'],
+                             'NORMAL', 'NORMAL', 'Aussage', 1, 'probe', now(), 'probe', now())
+                     """.formatted(schema));
+             PreparedStatement huelle = verbindung.prepareStatement(
+                     "insert into " + schema + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)")) {
+            einfuegen.setObject(1, seite);
+            einfuegen.setString(2, "konzepte/isolation-" + seite);
+            einfuegen.executeUpdate();
+            huelle.setObject(1, seite);
+            huelle.setObject(2, dokument);
+            huelle.executeUpdate();
+        }
     }
 
     @Test

@@ -23,6 +23,14 @@ Funktionalität: Export der Wissensbasis
     Wenn der Inhaber einen Wissensexport anfordert und ausführen lässt
     Dann ist der Download 24 Stunden ab Fertigstellung gültig und seine Prüfsumme protokolliert
 
+  @req-18.5
+  Szenario: Ein Export ist für andere Rollen und Mandanten nicht abrufbar
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und eine synthetische freigegebene Wissensseite ist vorhanden
+    Wenn der Inhaber einen Wissensexport anfordert und ausführen lässt
+    Dann ist der Export nur für den Inhaber seines Mandanten abrufbar
+    Und enthält das ZIP die Seite mit OKF-Frontmatter sowie Index und Log
+
   @req-17.5
   Szenario: Der Vollexport enthält die Wissensbasis des Mandanten
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt

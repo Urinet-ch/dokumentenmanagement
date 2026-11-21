@@ -161,6 +161,16 @@ public class WissenExportSchritte {
         assertThat((String) antwort.path("status")).isEqualTo("FERTIG");
     }
 
+    @Dann("ist der Export nur für den Inhaber seines Mandanten abrufbar")
+    public void exportIsolationPruefen() {
+        for (String benutzer : List.of("mitarbeiter-urinet", "treuhaender-urinet", "geschaeftsstelle-vhf-gsk")) {
+            given().auth().oauth2(Testanmeldung.token(benutzer))
+                    .get("/api/v1/wissensbasis/exporte/" + exportId).then().statusCode(403);
+        }
+        given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk"))
+                .get("/api/v1/wissensbasis/exporte/" + exportId).then().statusCode(404);
+    }
+
     @Dann("enthält das ZIP die Seite mit OKF-Frontmatter sowie Index und Log")
     public void paketPruefen() throws Exception {
         Map<String, String> dateien = dateien();

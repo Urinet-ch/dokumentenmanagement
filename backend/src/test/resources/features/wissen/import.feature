@@ -29,7 +29,7 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
     Wenn der Inhaber eine neue Wissensseite mit Basisversion 0 importiert
     Dann liegt ausschliesslich ein offener Importentwurf mit SHA-Protokoll vor
 
-  @req-19.12 @req-19.13 @req-19.14 @req-19.15
+  @req-19.12 @req-19.13 @req-19.14 @req-19.15 @req-19.29
   Szenariogrundriss: Wissenspaket mit unzulässiger oder unbelegter Quelle
     Wenn das Wissenspaket die Quellenabweichung "<Fall>" enthält
     Dann blockiert der Befund "<Code>" die Freigabe des Importentwurfs
@@ -43,7 +43,7 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
       | Auszug falsch     | AUSZUG_NICHT_GEFUNDEN   |
       | Seitentext fehlt  | AUSZUG_NICHT_PRUEFBAR    |
 
-  @req-19.16 @req-19.26
+  @req-19.16 @req-19.26 @req-19.29
   Szenario: Wissenspaket aus lokalem und Cloud-Kontext mit internen Quellen
     Dann erzwingt der Import die Quellenstufe und verwirft unzulässige Cloud-Kontexte
 
@@ -60,7 +60,7 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
   Szenario: Wissenspaketquelle ändert sich vor dem Annehmen
     Dann wird eine inzwischen geänderte Quelle beim Annehmen erneut geprüft
 
-  @req-19.5
+  @req-19.5 @req-19.29
   Szenario: Wissenspaketimport ist A17 und OIDC vorbehalten
     Dann rollenfremde Benutzer und API-Tokens können kein Wissenspaket importieren
 
@@ -84,6 +84,11 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
   Szenario: Lokaler OKF-Export durchläuft denselben Paketleser und Import mit SHA-Quellen
     Dann ein OKF-Export mit lokaler Herkunft ist ohne ID-Zuordnung als Wissenspaket importierbar
 
-  @req-19.2 @req-19.3 @req-19.4 @req-19.6 @req-19.7 @req-19.8 @req-19.21
+  @req-19.2 @req-19.3 @req-19.4 @req-19.6 @req-19.7 @req-19.8 @req-19.21 @req-19.29
   Szenario: Wissenspaketangriffe und Markdown werden durch gemeinsame Regeln geprüft
     Dann der Paketleser und der REST-Import beurteilen die gemeinsamen Beispielpakete gleich
+
+  @req-11.6 @req-19.21
+  Szenario: Anweisungen im Wissenspaket bleiben ein ungeprüfter Entwurf
+    Wenn der Inhaber ein Paket mit synthetischen Anweisungen und verbotenen Freigabefeldern importiert
+    Dann ändern die Anweisungen weder Freigabe noch Rechte oder KI-Verbrauch
