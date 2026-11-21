@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer;
 
 import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
+import ch.urinet.archiv.benutzer.application.BenutzerAktivitaet;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
@@ -30,9 +31,37 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class JdbcVerwaltungGrenzenTest {
 
     @Inject VerwaltungGrenzen grenzen;
+    @Inject BenutzerAktivitaet aktivitaet;
     @Inject MandantKontext kontext;
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenquelle;
+
+    @Test
+    void benutzeraktivitaetLiestNurAbgeschlosseneEinladungenDesMandanten() throws Exception {
+        mandantenVorbereiten();
+        UUID ziel = UUID.randomUUID();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            in(thread, "urinet", () -> {
+                protokoll("urinet", UUID.randomUUID().toString(), "BENUTZER_ANLEGEN",
+                        "ABGESCHLOSSEN", "ANLEGEN", ziel, 3600);
+                protokoll("urinet", UUID.randomUUID().toString(), "BENUTZER_AENDERN",
+                        "FEHLGESCHLAGEN", "REAKTIVIEREN", ziel, 0);
+                protokoll("urinet", ziel.toString(), "BENUTZER_AENDERN",
+                        "ANGEFRAGT", "SPERREN", UUID.randomUUID(), 0);
+                var angaben = aktivitaet.lesen(ziel.toString());
+                assertThat(angaben.einladungSeit()).isNotNull();
+                assertThat(angaben.letzteAktion().aktion()).isEqualTo("BENUTZER_AENDERN");
+                assertThat(angaben.letzteAktion().zeit()).isAfter(angaben.einladungSeit());
+                return null;
+            });
+            in(thread, "vhf-gsk", () -> {
+                var angaben = aktivitaet.lesen(ziel.toString());
+                assertThat(angaben.einladungSeit()).isNull();
+                assertThat(angaben.letzteAktion()).isNull();
+                return null;
+            });
+        }
+    }
 
     @Test
     void grenzenZaehlenAbsichtenUndTrennenMandanten() throws Exception {

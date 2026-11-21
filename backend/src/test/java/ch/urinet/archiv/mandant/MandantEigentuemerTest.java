@@ -64,6 +64,10 @@ class MandantEigentuemerTest {
                     assertThat(wahr(befehl, "has_table_privilege('public." + tabelle + "', '" + recht + "')"))
                             .as("public." + tabelle + " " + recht).isTrue();
                 }
+                assertThat(wahr(befehl, "has_table_privilege('public.benutzername_sperre', '" + recht + "')"))
+                        .as("public.benutzername_sperre " + recht).isEqualTo(List.of("SELECT", "INSERT").contains(recht));
+                assertThat(wahr(befehl, "has_table_privilege('public.benutzername_sperre_status', '" + recht + "')"))
+                        .as("public.benutzername_sperre_status " + recht).isEqualTo(recht.equals("SELECT"));
             }
             assertThat(wahr(befehl, "has_sequence_privilege('public.auftrag_id_seq', 'USAGE')")).isTrue();
             assertThat(wahr(befehl, "has_schema_privilege('public', 'CREATE')")).isFalse();

@@ -1750,6 +1750,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | --- | --- | --- |
 | 400 | `ANFRAGE_UNGUELTIG` | Anfrage formal ungültig (Pfad, Parameter, JSON), auch andere 4xx des Frameworks mit ihrem Status (z. B. 405, 406) |
 | 401 | `NICHT_ANGEMELDET` | Token fehlt, ungültig oder abgelaufen, mit `WWW-Authenticate: Bearer` |
+| 401 | `STEP_UP_NOETIG` | frische Anmeldung für geschützte Verwaltungsaktion fehlt, mit `WWW-Authenticate` und `max_age` (Spec 06, Req 7.2) |
 | 403 | `MANDANT_FEHLT` | kein gültiger oder inaktiver Mandant (Req 1.3) |
 | 403 | `NICHT_ERLAUBT` | Rolle oder Token-Scope ohne Recht (Req 2.4–2.20) |
 | 403 | `ESKALATION_VERBOTEN` | Benutzerverwaltung würde die Rolle des Akteurs überschreiten oder die festgelegten Vergaberegeln verletzen (Spec 06, Req 4.6) |
@@ -1757,6 +1758,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 409 | `API_TOKEN_ABGELAUFEN` | Ablauf eines abgelaufenen API-Tokens setzen oder entfernen; ein neues Token muss ausgestellt werden (Req 2.5, Review PR #248) |
 | 409 | `STATUS_KONFLIKT` | Aktion im falschen Status (Req 6.7, 6.13, 8.8) |
 | 409 | `LETZTER_INHABER` | Vorgang liesse den Mandanten ohne aktiven Inhaber (Spec 06, Req 4.7) |
+| 409 | `BENUTZER_EXISTIERT` | Benutzername oder E-Mail vergeben oder Benutzername früher einer anderen Kennung zugeordnet; ohne Angabe von Feld oder Mandant (Spec 06, Req 3.4) |
 | 409 | `REFERENZ_VERGEBEN` | dieselbe Webseiten-Referenz ist bereits an eine andere Datei gebunden (Spec 03, Req 10.3) |
 | 409 | `BELEGNUMMER_VERGEBEN` | eigene Art, Belegnummer reserviert (Req 8.9, 11.3) |
 | 409 | `FRIST_ABGELAUFEN` | Bestätigung mit Frist in der Vergangenheit (Req 9.8) |

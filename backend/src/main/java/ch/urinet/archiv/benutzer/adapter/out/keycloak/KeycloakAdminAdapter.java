@@ -32,12 +32,14 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
 
 /**
@@ -48,7 +50,6 @@ import java.util.regex.Pattern;
 @Typed(IdentitaetsDienst.class)
 public class KeycloakAdminAdapter implements IdentitaetsDienst {
     static final int MAX_ANTWORT = 1024 * 1024;
-    static final int SEITENGROESSE = 50;
     static final Duration WARTEZEIT_PARALLEL = Duration.ofMillis(200);
     static final Duration WIEDERHOLUNGSABSTAND = Duration.ofMillis(200);
     static final Duration FEHLERFENSTER = Duration.ofSeconds(30);
@@ -126,26 +127,39 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     }
 
     @Override
-    public List<Benutzer> benutzerSuchen(String mandant, String suche, int seite) {
-        if (seite < 0 || (long) seite * SEITENGROESSE > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("Ungültige Seite");
-        }
-        String query = "q=" + query("mandant:" + mandant) + "&max=" + SEITENGROESSE
-                + "&first=" + ((long) seite * SEITENGROESSE);
-        if (suche != null && !suche.isBlank()) {
-            query += "&search=" + query(suche);
-        }
-        JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
-        if (!treffer.isArray() || treffer.size() > SEITENGROESSE) {
-            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
-        }
+    public List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse) {
+        Objects.requireNonNull(mandant);
+        int start = IdentitaetsDienst.seitenanfang(suche, seite, groesse);
         List<Benutzer> ergebnis = new ArrayList<>();
-        for (JsonNode eintrag : treffer) {
-            if (mandantPasst(eintrag, mandant)) {
-                ergebnis.add(benutzer(eintrag, mandant));
+        long offset = 0;
+        long passende = 0;
+        while (true) {
+            // Keycloak ignoriert «q», wenn zugleich «search» gesetzt ist; erst Mandant, dann Suche und Paginierung.
+            String query = "q=" + query("mandant:" + mandant) + "&max=" + MAX_SEITENGROESSE + "&first=" + offset;
+            JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
+            if (!treffer.isArray() || treffer.size() > MAX_SEITENGROESSE) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            for (JsonNode eintrag : treffer) {
+                if (mandantPasst(eintrag, mandant) && IdentitaetsDienst.passtSuche(suche,
+                        text(eintrag, "username"), text(eintrag, "email"),
+                        text(eintrag, "firstName"), text(eintrag, "lastName"))) {
+                    if (passende++ >= start) {
+                        ergebnis.add(benutzer(eintrag, mandant));
+                        if (ergebnis.size() == groesse) {
+                            return List.copyOf(ergebnis);
+                        }
+                    }
+                }
+            }
+            if (treffer.size() < MAX_SEITENGROESSE) {
+                return List.copyOf(ergebnis);
+            }
+            offset += treffer.size();
+            if (offset > Integer.MAX_VALUE) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
         }
-        return List.copyOf(ergebnis);
     }
 
     @Override
@@ -156,6 +170,15 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public String anlegen(String mandant, Neuanlage neu, Rolle rolle) {
         pruefeRolle(rolle);
+        return anlegenIntern(mandant, neu, rolle);
+    }
+
+    @Override
+    public String anlegenOhneRolle(String mandant, Neuanlage neu) {
+        return anlegenIntern(mandant, neu, null);
+    }
+
+    private String anlegenIntern(String mandant, Neuanlage neu, Rolle rolle) {
         ObjectNode neuJson = json.createObjectNode()
                 .put("username", neu.benutzername())
                 .put("email", neu.email())
@@ -163,6 +186,10 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 .put("lastName", neu.nachname())
                 .put("enabled", true);
         neuJson.set("attributes", json.valueToTree(Map.of("mandant", List.of(mandant))));
+        neuJson.set("requiredActions", json.valueToTree(List.of(
+                ErforderlicheAktion.VERIFY_EMAIL.name(),
+                ErforderlicheAktion.UPDATE_PASSWORD.name(),
+                ErforderlicheAktion.CONFIGURE_TOTP.name())));
         Antwort angelegt = request("POST", admin("/users"), null, neuJson, false, Set.of());
         if (angelegt.status() != 201) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
@@ -176,17 +203,29 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
         try {
-            rolleSetzen(mandant, id, rolle);
+            if (rolle != null) {
+                rolleSetzen(mandant, id, rolle);
+            }
             return id;
         } catch (RuntimeException fehler) {
+            boolean entfernt = false;
+            RuntimeException kompensationsFehler = null;
             try {
                 // Kompensation umgeht den Schutzschalter: Sie ist gerade dann nötig, wenn der Dienst ausfällt.
-                request("DELETE", user(id), null, null, false, Set.of(204, 404), true);
+                Antwort loeschung = request("DELETE", user(id), null, null, false, Set.of(204, 404), true);
+                if (loeschung.status() != 204 && loeschung.status() != 404) {
+                    throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                }
+                entfernt = true;
             } catch (RuntimeException kompensation) {
                 LOG.error("Kompensation nach Benutzeranlage fehlgeschlagen; Benutzerzustand ist unklar.");
-                fehler.addSuppressed(kompensation);
+                kompensationsFehler = kompensation;
             }
-            throw fehler;
+            AnlageException anlageFehler = new AnlageException(id, entfernt, fehler);
+            if (kompensationsFehler != null) {
+                anlageFehler.addSuppressed(kompensationsFehler);
+            }
+            throw anlageFehler;
         }
     }
 
@@ -227,12 +266,12 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             }
         }
         if (!zielVorhanden) {
-            request("POST", user(id) + "/role-mappings/realm", null, json.createArrayNode().add(ziel),
-                    false, Set.of(204));
+            nur204(request("POST", user(id) + "/role-mappings/realm", null, json.createArrayNode().add(ziel),
+                    false, Set.of(204)));
         }
         if (!uebrige.isEmpty()) {
-            request("DELETE", user(id) + "/role-mappings/realm", null, json.valueToTree(uebrige),
-                    false, Set.of(204));
+            nur204(request("DELETE", user(id) + "/role-mappings/realm", null, json.valueToTree(uebrige),
+                    false, Set.of(204)));
         }
     }
 
@@ -251,8 +290,8 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         if (!einladungsRedirectUri.isBlank()) {
             query += "&redirect_uri=" + query(einladungsRedirectUri);
         }
-        request("PUT", user(id) + "/execute-actions-email", query,
-                json.valueToTree(aktionen.stream().map(Enum::name).toList()), false, Set.of(204));
+        nur204(request("PUT", user(id) + "/execute-actions-email", query,
+                json.valueToTree(aktionen.stream().map(Enum::name).toList()), false, Set.of(204)));
     }
 
     @Override
@@ -296,24 +335,75 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     }
 
     @Override
+    public void anlageRueckgaengig(String mandant, String id) {
+        JsonNode benutzer = json(request("GET", user(id), null, null, true, Set.of(404), true));
+        if (benutzer == null || !mandantPasst(benutzer, mandant)) {
+            throw fehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        nur204(request("DELETE", user(id), null, null, false, Set.of(204), true));
+    }
+
+    private static void nur204(Antwort antwort) {
+        if (antwort.status() != 204) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
+        }
+    }
+
+    @Override
+    public long benutzerZaehlen(String mandant) {
+        return zaehlen(mandant, (id, eintrag) -> {
+            JsonNode user = eintrag.path("attributes").has("mandant") ? eintrag : benutzerDirekt(id);
+            JsonNode werte = user.path("attributes").path("mandant");
+            if (!werte.isMissingNode() && (!werte.isArray() || werte.size() != 1 || !werte.get(0).isTextual())) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            return mandantPasst(user, mandant);
+        });
+    }
+
+    @Override
     public long inhaberZaehlen(String mandant) {
+        return zaehlen(mandant, (id, eintrag) -> {
+            JsonNode user = eintrag.has("attributes") && eintrag.has("enabled")
+                    && eintrag.has("requiredActions") ? eintrag : benutzerDirekt(id);
+            if (!mandantPasst(user, mandant)) {
+                return false;
+            }
+            if (!user.path("enabled").isBoolean()) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            return user.path("enabled").asBoolean() && rollen(id).contains(Rolle.INHABER)
+                    && erforderlicheAktionen(user).isEmpty();
+        });
+    }
+
+    private long zaehlen(String mandant, BiPredicate<String, JsonNode> zaehlt) {
+        Objects.requireNonNull(mandant);
         long anzahl = 0;
-        for (int first = 0; ; first += SEITENGROESSE) {
-            JsonNode treffer = json(request("GET", admin("/roles/inhaber/users"),
-                    "briefRepresentation=false&max=" + SEITENGROESSE + "&first=" + first, null, true, Set.of()));
-            if (!treffer.isArray() || treffer.size() > SEITENGROESSE) {
+        long offset = 0;
+        while (true) {
+            String query = "q=" + query("mandant:" + mandant) + "&max=" + MAX_SEITENGROESSE + "&first=" + offset;
+            JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
+            if (!treffer.isArray() || treffer.size() > MAX_SEITENGROESSE) {
                 throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
             for (JsonNode eintrag : treffer) {
-                // Fehlt das Attributfeld (Kurzdarstellung), wird der Benutzer einzeln gelesen statt als 0 gezählt.
-                JsonNode user = eintrag.has("attributes") ? eintrag
-                        : benutzerDirekt(segment(eintrag.path("id").asText()));
-                if (mandantPasst(user, mandant) && user.path("enabled").asBoolean()) {
+                String id;
+                try {
+                    id = segment(eintrag.path("id").asText());
+                } catch (IllegalArgumentException e) {
+                    throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                }
+                if (zaehlt.test(id, eintrag)) {
                     anzahl++;
                 }
             }
-            if (treffer.size() < SEITENGROESSE) {
+            if (treffer.size() < MAX_SEITENGROESSE) {
                 return anzahl;
+            }
+            offset += treffer.size();
+            if (offset > Integer.MAX_VALUE) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
         }
     }
@@ -371,6 +461,12 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         } catch (IllegalArgumentException e) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
+        return new Benutzer(id, user.path("username").asText(), text(user, "email"),
+                text(user, "firstName"), text(user, "lastName"), user.path("enabled").asBoolean(), rollen(id),
+                erforderlicheAktionen(user), hatOtp(id), hatGoogle(id));
+    }
+
+    private Set<Rolle> rollen(String id) {
         Set<Rolle> rollen = EnumSet.noneOf(Rolle.class);
         JsonNode mappings = json(request("GET", user(id) + "/role-mappings/realm", null, null, true, Set.of()));
         if (!mappings.isArray()) {
@@ -383,20 +479,26 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 }
             }
         }
-        Set<ErforderlicheAktion> aktionen = EnumSet.noneOf(ErforderlicheAktion.class);
+        return rollen;
+    }
+
+    private Set<ErforderlicheAktion> erforderlicheAktionen(JsonNode user) {
         JsonNode required = user.path("requiredActions");
-        if (required.isArray()) {
-            for (JsonNode action : required) {
-                try {
-                    aktionen.add(ErforderlicheAktion.valueOf(action.asText()));
-                } catch (IllegalArgumentException ignored) {
-                    // Unbekannte Keycloak-Aktionen gehören nicht zum Archiv-Port.
-                }
+        if (!required.isArray()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        Set<ErforderlicheAktion> aktionen = EnumSet.noneOf(ErforderlicheAktion.class);
+        for (JsonNode action : required) {
+            if (!action.isTextual()) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            try {
+                aktionen.add(ErforderlicheAktion.valueOf(action.textValue()));
+            } catch (IllegalArgumentException e) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
             }
         }
-        return new Benutzer(id, user.path("username").asText(), text(user, "email"),
-                text(user, "firstName"), text(user, "lastName"), user.path("enabled").asBoolean(), rollen,
-                aktionen, hatOtp(id), hatGoogle(id));
+        return aktionen;
     }
 
     private boolean hatOtp(String id) {

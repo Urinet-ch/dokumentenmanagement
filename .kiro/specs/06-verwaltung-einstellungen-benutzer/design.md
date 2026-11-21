@@ -161,10 +161,17 @@ backend/src/main/java/ch/urinet/archiv/
   200 ms; Schutzschalter nach 3 Fehlern in Folge innerhalb 30 s für 30 s (ohne Bibliothek, ein Zähler und ein Zeitstempel).
   Keine Ausnahme der Keycloak-Meldungen in Antworten oder Logs (Requirement 5.6).
   Nachbesserung Review PR 348: Für den Schutzschalter zählen nur Transportfehler, Zeitüberschreitungen, 5xx und 401/403 des
-  Dienstkontos; andere 4xx (400, 404, 405) zählen nicht. 409 wird als `IdentitaetsDienst.KonfliktException` weitergereicht
-  (Abbildung auf `BENUTZER_EXISTIERT` mit 19.7). Bei 401 wird der gecachte Token verworfen, ein lesender Aufruf wird genau
+  Dienstkontos; andere 4xx (400, 404, 405) zählen nicht. 409 wird als `IdentitaetsDienst.KonfliktException` weitergereicht;
+  der Anlagevorgang bildet ihn nach geklärtem Fehlerabschluss neutral auf `BENUTZER_EXISTIERT` ab. Bei 401 wird der gecachte Token verworfen, ein lesender Aufruf wird genau
   einmal mit neuem Token wiederholt. Die Kompensation in `anlegen()` umgeht den Schutzschalter (Wartezeit 2 s auf einen
-  Platz); scheitert sie, hängt der Adapter den Fehler als Suppressed an die Ausnahme. `rolleSetzen` holt die Zielrolle zuerst,
+  Platz); bei einem Fehler nach der Anlage meldet der Adapter die Zielkennung und ob die Entfernung bestätigt wurde in
+  `AnlageException`; scheitert die Kompensation, hängt er ihren Fehler als Suppressed an diese Ausnahme.
+  `VerwaltungVorgang` übernimmt die gültige Zielkennung in den Fehlerabschluss; eine nicht bestätigte Entfernung oder
+  ungültige Kennung bleibt `UNKLAR`, auch wenn der Aufrufer die Kompensation als geklärt meldet. Eine bestätigte
+  Entfernung allein beweist noch nicht, dass keine verspätete externe Wirkung eintrifft.
+  `benutzerZaehlen` zählt alle nicht gelöschten Benutzer des Mandanten, auch deaktivierte, und prüft das
+  Mandantenattribut nach jeder Keycloak-Antwort; bei fehlenden Attributen liest es die Einzelangabe nach.
+  `rolleSetzen` holt die Zielrolle zuerst,
   fügt sie hinzu und entfernt erst danach die übrigen Archiv-Rollen. `verbindungPruefen` erzwingt einen echten Tokenabruf.
   Pfadwerte `.` und `..` (und `%2e`) werden abgelehnt. Offen (Kann): `aktualisieren`/`aktivieren` lesen und schreiben die
   volle Darstellung (Lost Update); die Vorgangssperre (19.6) serialisiert die Aufrufer.
@@ -202,6 +209,12 @@ Für den Protokollgrund sind ausschliesslich die festen Kategorien `SICHERHEIT`,
 append-only Protokoll gelangen. Die Kategorie muss beim Vorgang explizit gewählt werden; Freitext wird nicht
 automatisch umgedeutet. Die Anbindung der Eingaben und Pflichtprüfung folgt mit den Verwaltungsendpunkten.
 
+Bei der Anlage eines weiteren Inhabers mit mindestens zwei aktiven Inhabern entsteht zunächst ein Konto ohne
+Archiv-Rolle und ein offener Antrag; die Bestätigung und Rollenvergabe folgen in 19.11. Auch dieses Konto kann seine
+Einladung erneut erhalten, solange es im Status `EINGELADEN` ist. Bis 19.10 verweigert die Step-up-Schnittstelle
+geschützte Aktionen; Tests ersetzen sie ausdrücklich. Eine bestätigte Entfernung nach einer unklaren Keycloak-Wirkung
+genügt nicht für `GEKLAERT`; HTTP 202 gilt nicht als bestätigter Abschluss.
+
 ### Statusautomat
 | Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -232,6 +245,9 @@ Richtung): Lesen, sperren, deaktivieren, Einladung erneut senden. `StepUp` liest
 (Muster RFC 9470). Die App leitet mit `max_age=0` und `prompt=login` zu Keycloak; der Browser-Flow
 `browser-totp-pflicht` verlangt dann Passwort und TOTP (der Cookie-Zweig greift bei `prompt=login` nicht; Nachweis im
 Test gegen echtes Keycloak).
+Bis zur Umsetzung 19.10 verweigert der Standardadapter `StepUpAusstehend` jede geschützte Aktion mit
+`STEP_UP_NOETIG` und dem Standardwert 300 Sekunden; er gewährt nie eine Anmeldung. 19.10 ersetzt ihn durch die
+Claim-Prüfung mit konfigurierter Gültigkeit.
 
 ### Passkey (Requirement 10)
 Entscheid Fabian 21.11.2026: zusätzlicher Anmeldeweg, ersetzt Passwort und TOTP; Passwort plus TOTP bleibt; Admin setzt zurück;
@@ -408,7 +424,9 @@ zugriff_protokoll:      aktion erhält die Werte BENUTZER_ANLEGEN, BENUTZER_AEND
                         BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG (Check-Constraint per neuem Changeset, falls vorhanden)
 ```
 Es gibt keine Tabelle mit E-Mail, Namen oder Zugangsdaten. `benutzer_status` und `verwaltung_antrag` enthalten nur
-Kennungen (`sub`) und Texte der Inhaber (Grund; in `benutzer_status` nur die feste Kategorie nach 4.4). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
+Kennungen (`sub`) und Gründe. Für neue Anträge und in `benutzer_status` sind nur die festen Kategorien zulässig;
+vorhandene Anträge bleiben lesbar. Ein Verwaltungsendpunkt darf alte Freitexte nicht unmaskiert ausgeben.
+Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
 
 ## Error Handling (neue Codes)
 Die Aufgabe, die einen Code einführt, trägt ihn im selben PR in die Tabelle in Spec 01 design.md («Error Handling») und ins
@@ -480,7 +498,19 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 5. Mandantenabbau (Spec 03, 8.3): Der Betreiber-Schritt «Mandant deaktivieren» deaktiviert zusätzlich alle Keycloak-Benutzer
    des Mandanten und beendet ihre Sitzungen (`archiv mandant benutzer-sperren <code>`); `MandantVerweigert` (403) wirkt ohnehin
    sofort. Nach der Frist von 30 Tagen löscht der Abbau die Keycloak-Benutzer des Mandanten; Protokoll und Benutzerverzeichnis
-   bleiben mit dem Schema (Aufbewahrung, Spec 01, 10.9). Der Abgleich meldet Benutzer eines inaktiven Mandanten, die noch aktiv sind.
+   werden zusammen mit dem Schema nach Spec 03, 8.3 und Spec 01, 10.9 behandelt. Die Namenssperre überlebt den Abbau (Req 3.4, Entscheid 21.11.2026, Weg A): Tabelle `benutzername_sperre(hash bytea primary key,
+   erstellt timestamptz not null)` im Schema `public`; `hash` = HMAC-SHA-256 über den kleingeschriebenen Benutzernamen mit dem Salz
+   `archiv.verwaltung.namenssperre-salz` (Secret-Datei, nie im Repo). Die Anlage schreibt den Eintrag in derselben Transaktion wie `ANLAGE`;
+   die Prüfung liest zuerst die Sperrliste, dann Realm und Benutzerverzeichnis; der Mandantenabbau löscht die Tabelle nicht. Bestandsnamen
+   werden mit einem Changeset aus dem Benutzerverzeichnis aller Mandanten eingetragen. Die Antwort 409 `BENUTZER_EXISTIERT` bleibt
+   unverändert (kein Hinweis auf Quelle oder Mandant). Der Abgleich meldet Benutzer eines inaktiven Mandanten, die noch aktiv sind.
+   - Umsetzung 19.7: Das Salz sind 32 zufällige Bytes, Base64-kodiert in der Secret-Datei `namenssperre_salz`. Die
+     Datei muss dauerhaft erhalten bleiben; ein Austausch macht bestehende Sperren unprüfbar. `public.benutzername_sperre_status`
+     enthält nur einen HMAC-Prüfwert des Schlüssels und markiert die abgeschlossene Bestandsmigration. Fehlt das Salz,
+     bleibt das Changeset für den nächsten Start ausstehend; Anlegen und Mandantenabbau sind bis zur Migration gesperrt,
+     der übrige Dienst startet weiter. Vor dem Löschen sichert der Abbau zusätzlich seither ins Verzeichnis aufgenommene
+     Namen. Der Rollback belässt Sperrliste und Prüfwert, damit keine dauerhafte Sperre verloren geht. Die Pflichtprüfung
+     im Deploy folgt mit der Bereitstellung der Datei in 19.3.
 6. Rückfall: Die Verwaltung lässt sich abschalten (`archiv.verwaltung.aktiv=false`, Klasse (b)); Endpunkte antworten 404, Betrieb wie bisher
    per `kcadm.sh`.
 

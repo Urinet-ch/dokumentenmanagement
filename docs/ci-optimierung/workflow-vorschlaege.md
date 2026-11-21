@@ -3,6 +3,11 @@
 `ci.yml` bleibt unverändert. Die folgenden Änderungen sind nur Vorschläge und
 werden erst nach eigenem Entscheid in `.github/workflows/` übernommen.
 
+Der CI-Schritt für das Wissenspaket-Werkzeug wurde in #395 angewendet, der
+Vergleich des Webseiten-Vertrags in #405. Der
+[Deploy-Diagnose-Vorschlag](./deploy-diagnose-workflow.diff) ist noch nicht
+angewendet und wartet auf das Gate «diagnose archiv» im Infra-Repo.
+
 ## 1. Veraltete `main`-Läufe abbrechen
 
 Ein `main`-Push kann einen älteren `main`-Lauf ersetzen: der neue Kopf enthält

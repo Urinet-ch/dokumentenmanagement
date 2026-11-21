@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -23,27 +22,22 @@ import java.util.UUID;
 @UnlessBuildProfile("prod")
 @Typed(IdentitaetsDienst.class)
 public class IdentitaetsDienstStub implements IdentitaetsDienst {
-    private static final int SEITENGROESSE = 50;
     private final Map<String, Eintrag> benutzer = new HashMap<>();
 
     @Override
-    public synchronized java.util.List<Benutzer> benutzerSuchen(String mandant, String suche, int seite) {
+    public synchronized java.util.List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse) {
         Objects.requireNonNull(mandant);
-        if (seite < 0 || (suche != null && suche.length() > 40)) {
-            throw new IllegalArgumentException("Ungültige Suchanfrage");
-        }
-        String filter = suche == null ? "" : suche.toLowerCase(Locale.ROOT);
+        int start = IdentitaetsDienst.seitenanfang(suche, seite, groesse);
         var treffer = new ArrayList<Benutzer>();
         benutzer.values().stream().filter(e -> e.mandant.equals(mandant))
                 .map(e -> e.wert)
-                .filter(b -> b.benutzername().toLowerCase(Locale.ROOT).contains(filter))
+                .filter(b -> IdentitaetsDienst.passtSuche(suche, b.benutzername(), b.email(), b.vorname(), b.nachname()))
                 .sorted(Comparator.comparing(Benutzer::benutzername))
                 .forEach(treffer::add);
-        long start = (long) seite * SEITENGROESSE;
         if (start >= treffer.size()) {
             return java.util.List.of();
         }
-        return java.util.List.copyOf(treffer.subList((int) start, Math.min((int) start + SEITENGROESSE, treffer.size())));
+        return java.util.List.copyOf(treffer.subList(start, (int) Math.min((long) start + groesse, treffer.size())));
     }
 
     @Override
@@ -56,15 +50,26 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
         Objects.requireNonNull(mandant);
         Objects.requireNonNull(neu);
         Objects.requireNonNull(rolle);
+        return anlegenIntern(mandant, neu, Set.of(rolle));
+    }
+
+    @Override
+    public synchronized String anlegenOhneRolle(String mandant, Neuanlage neu) {
+        Objects.requireNonNull(mandant);
+        Objects.requireNonNull(neu);
+        return anlegenIntern(mandant, neu, Set.of());
+    }
+
+    private String anlegenIntern(String mandant, Neuanlage neu, Set<Rolle> rollen) {
         boolean vorhanden = benutzer.values().stream().map(e -> e.wert)
                 .anyMatch(b -> b.benutzername().equalsIgnoreCase(neu.benutzername())
                         || b.email().equalsIgnoreCase(neu.email()));
         if (vorhanden) {
-            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+            throw new KonfliktException();
         }
         String id = UUID.randomUUID().toString();
         Benutzer wert = new Benutzer(id, neu.benutzername(), neu.email(), neu.vorname(), neu.nachname(), true,
-                Set.of(rolle), Set.of(ErforderlicheAktion.VERIFY_EMAIL, ErforderlicheAktion.UPDATE_PASSWORD,
+                rollen, Set.of(ErforderlicheAktion.VERIFY_EMAIL, ErforderlicheAktion.UPDATE_PASSWORD,
                 ErforderlicheAktion.CONFIGURE_TOTP), false, false);
         benutzer.put(id, new Eintrag(mandant, wert));
         return id;
@@ -133,6 +138,17 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
     public synchronized void loeschen(String mandant, String id) {
         finden(mandant, id);
         benutzer.remove(id);
+    }
+
+    @Override
+    public synchronized void anlageRueckgaengig(String mandant, String id) {
+        loeschen(mandant, id);
+    }
+
+    @Override
+    public synchronized long benutzerZaehlen(String mandant) {
+        Objects.requireNonNull(mandant);
+        return benutzer.values().stream().filter(e -> e.mandant.equals(mandant)).count();
     }
 
     @Override
