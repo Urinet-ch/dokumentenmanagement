@@ -16,7 +16,7 @@ Funktionalität: Konfigurationsversionen
     Dann antwortet die Konfigurationsverwaltung mit Status 200
     Und enthält die Antwort ein vollständiges Konfigurationsabbild
 
-  @req-1.2
+  @req-1.2 @req-9.3
   Szenario: Konfigurationsversionen eines Mandanten bleiben von Änderungen anderer Mandanten getrennt
     Wenn «inhaber-urinet» eine Dokumentart mit der aktuellen Version anlegt:
       """

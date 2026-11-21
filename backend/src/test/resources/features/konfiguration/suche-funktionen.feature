@@ -213,3 +213,40 @@ Funktionalität: Klassifikationen in Suche und Funktionen des Mandanten
     Dann endet der Drive-Import mit Exit-Code 0
     Und steht jedes importierte Dokument im Status «NEU» als «PERSONAL», unbestätigt und nicht archiviert
     Und hat jedes importierte Dokument die Klassifikation «fachgebiet» mit dem Wert «bau»
+
+  @req-8.7 @req-9.3
+  Szenariogrundriss: Ungültige Multipart-Vorbelegung hinterlässt in keinem Mandanten Importdaten
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"importphase","name":"Importphase","werte":[{"code":"planung","name":"Planung"},{"code":"ausfuehrung","name":"Ausführung"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» ordnet die Klassifikation «importphase» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «planung» zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» ordnet die Klassifikation «importphase» der Dokumentart «KORRESPONDENZ» mit dem Standardwert «planung» zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» die Dokumentart «KORRESPONDENZ» ändert:
+      """
+      {"aktiv":false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 200
+    Wenn «inhaber-vhf-gsk» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fremdfach","name":"Fremdes Fachgebiet","werte":[{"code":"bau","name":"Bau"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn ein Import-Token von «urinet» eine PDF mit Art «<art>» und diesen Klassifikationen hochlädt:
+      """
+      <klassifikationen>
+      """
+    Dann antwortet der Upload mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und hat sich in keinem der beiden Mandanten der Importbestand geändert
+
+    Beispiele:
+      | art              | klassifikationen                              |
+      | NICHT_VORHANDEN   | {"importphase":["planung"]}                    |
+      | KORRESPONDENZ     | {"importphase":["planung"]}                    |
+      | PROJEKTDOKUMENT   | {"fremdfach":["bau"]}                          |
+      | PROJEKTDOKUMENT   | {"importphase":["planung","ausfuehrung"]}      |

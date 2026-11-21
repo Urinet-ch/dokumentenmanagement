@@ -1,0 +1,73 @@
+{
+  "format": 1,
+  "einstellungen": {
+    "geschaeftsjahrEnde": "12-31",
+    "kennungen": { "uid": null, "ibans": [] }
+  },
+  "kiTexte": {
+    "rolle": "Archivassistent für den synthetischen Probeverband",
+    "feldregeln": "Ordne Sitzungsunterlagen nach ihrem Thema.",
+    "kiFreigegeben": false
+  },
+  "klassifikationen": [
+    {
+      "code": "sitzungsthema",
+      "name": "Sitzungsthema",
+      "mehrfach": false,
+      "kiVorschlag": true,
+      "suchfilter": true,
+      "oeffentlichFilter": false,
+      "werte": [
+        { "code": "projekte", "name": "Projekte" },
+        { "code": "betrieb", "name": "Betrieb" }
+      ]
+    }
+  ],
+  "arten": [
+    {
+      "code": "VERBANDSSITZUNG",
+      "name": "Sitzungsunterlage",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel", "zusatz.sitzung"],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": { "jahre": 10, "ab": "FELD", "feld": "sitzung" },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "kiVorschlag": true,
+      "kiFelder": ["sitzung", "nummer"],
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "sitzung": { "type": "string", "format": "date" },
+          "nummer": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      },
+      "klassifikationen": [
+        { "code": "sitzungsthema", "pflicht": true }
+      ]
+    }
+  ],
+  "regeln": [
+    {
+      "code": "sitzung_nummer_eindeutig",
+      "art": "VERBANDSSITZUNG",
+      "typ": "EINDEUTIG",
+      "parameter": { "felder": ["zusatz.nummer"] },
+      "schwere": "FEHLER",
+      "meldung": "Diese Sitzungsnummer ist bereits vergeben.",
+      "aktiv": true
+    },
+    {
+      "code": "sitzung_nummer_folge",
+      "art": "VERBANDSSITZUNG",
+      "typ": "FOLGE",
+      "parameter": { "feld": "zusatz.nummer", "zeitraum": "GESAMT" },
+      "schwere": "WARNUNG",
+      "meldung": "Eine Sitzungsnummer fehlt.",
+      "aktiv": true
+    }
+  ],
+  "_zweck": "Synthetischer Beispielmandant für Spec 05, Aufgabe 18.5"
+}

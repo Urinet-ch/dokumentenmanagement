@@ -113,6 +113,7 @@ public class UploadSchritte {
     private List<Datei> gesendet = List.of();
     private String mandant;
     private Stand vorher;
+    private final Map<String, Stand> importStaende = new LinkedHashMap<>();
     private Set<Path> tempVorher = Set.of();
     private Set<Path> arbeitVorher = Set.of();
     private List<Response> parallel = List.of();
@@ -199,6 +200,30 @@ public class UploadSchritte {
         gesendet = dateien;
         antwort = multipart(given().header("Authorization", "Bearer " + token), dateien, false, null).when().post(PFAD);
         merken(mandantCode);
+    }
+
+    @Wenn("ein Import-Token von «{word}» eine PDF mit Art «{word}» und diesen Klassifikationen hochlädt:")
+    public void importMitVorbelegung(String mandantCode, String art, String klassifikationen) throws SQLException {
+        String token = tokens.erstellen(mandantCode, "Probe Import-Vorbelegung", "import").token().text();
+        tokenIds.add(ApiToken.lesen(token).orElseThrow().id());
+        List<Datei> dateien = List.of(new Datei("vorbelegung.pdf", Testdateien.pdf(), null));
+        stand(mandantCode, dateien);
+        for (String code : List.of("urinet", "vhf-gsk")) {
+            importStaende.put(code, zaehlen(code, dateien));
+        }
+        gesendet = dateien;
+        antwort = multipart(given().auth().oauth2(token), dateien, false, null)
+                .multiPart("art", art).multiPart("klassifikationen", klassifikationen)
+                .when().post(PFAD);
+        merken(mandantCode);
+    }
+
+    @Dann("hat sich in keinem der beiden Mandanten der Importbestand geändert")
+    public void importBestandUnveraendert() throws SQLException {
+        assertThat(importStaende).hasSize(2);
+        for (Map.Entry<String, Stand> stand : importStaende.entrySet()) {
+            nichtsGespeichert(stand.getKey(), stand.getValue());
+        }
     }
 
     /**
@@ -317,6 +342,10 @@ public class UploadSchritte {
 
     @Dann("ist im Mandanten «{word}» nichts gespeichert")
     public void nichtsGespeichert(String mandantCode) throws SQLException {
+        nichtsGespeichert(mandantCode, vorher);
+    }
+
+    private void nichtsGespeichert(String mandantCode, Stand vorher) throws SQLException {
         Stand nachher = zaehlen(mandantCode, gesendet);
         assertThat(nachher.dokumente()).as("Dokumente").isEqualTo(vorher.dokumente());
         assertThat(nachher.dateien()).as("Dateien").isEqualTo(vorher.dateien());
