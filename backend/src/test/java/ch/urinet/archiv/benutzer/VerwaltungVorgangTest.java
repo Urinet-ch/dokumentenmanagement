@@ -3,6 +3,7 @@ package ch.urinet.archiv.benutzer;
 import ch.urinet.archiv.benutzer.application.VerwaltungVorgang;
 import ch.urinet.archiv.benutzer.application.Vorgangssperre;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
+import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -177,6 +178,52 @@ class VerwaltungVorgangTest {
         }
     }
 
+    @Test
+    void ratengrenzenVerhindernExterneWirkungUndGebenVorbereiteteSperreFrei() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        String akteur = UUID.randomUUID().toString();
+        UUID ziel = UUID.randomUUID();
+        alteAbsichten(akteur, ziel, "SPERREN", 30);
+        UUID anderesZiel = UUID.randomUUID();
+        alteAbsichten(UUID.randomUUID().toString(), anderesZiel, "EINLADUNG_ERNEUT", 3);
+
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            for (var fall : List.of(
+                    eintrag(UUID.randomUUID(), ziel, akteur, "INHABER",
+                            ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
+                    eintrag(UUID.randomUUID(), anderesZiel, UUID.randomUUID().toString(), "INHABER",
+                            ProtokollDetails.Verwaltungsphase.ANGEFRAGT,
+                            ProtokollDetails.Verwaltungsvorgang.EINLADUNG_ERNEUT))) {
+                AtomicBoolean ausgefuehrt = new AtomicBoolean();
+                UUID vorgangId = fall.details().verwaltung().vorgangId();
+                assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, fall,
+                        () -> { }, () -> { ausgefuehrt.set(true); return "ok"; },
+                        fehler -> { }, wert -> { }, wert -> fall)))
+                        .hasRootCauseInstanceOf(ZuVieleAnfragen.class);
+                assertThat(ausgefuehrt).isFalse();
+                assertThat(phasen(vorgangId)).isEmpty();
+                assertThat(sperre.belegen(mandant, vorgangId)).isTrue();
+                assertThat(sperre.freigeben(mandant, vorgangId)).isTrue();
+            }
+        }
+    }
+
+    private void alteAbsichten(String akteur, UUID ziel, String vorgang, int anzahl) throws Exception {
+        try (Connection verbindung = datenquelle.getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement(
+                     "insert into m_urinet.zugriff_protokoll (zeit, benutzer, aktion, details) "
+                             + "values (clock_timestamp(), ?, 'BENUTZER_AENDERN', "
+                             + "jsonb_build_object('phase', 'ANGEFRAGT', 'vorgang', ?, 'ziel', ?))")) {
+            einfuegen.setString(1, akteur);
+            einfuegen.setString(2, vorgang);
+            einfuegen.setString(3, ziel.toString());
+            for (int i = 0; i < anzahl; i++) {
+                einfuegen.executeUpdate();
+            }
+        }
+    }
+
     private void testsperreEntfernen(MandantCode mandant, UUID id) throws Exception {
         try (Connection verbindung = datenquelle.getConnection();
              PreparedStatement entfernen = verbindung.prepareStatement(
@@ -189,8 +236,13 @@ class VerwaltungVorgangTest {
 
     private static ZugriffEintrag eintrag(UUID id, UUID ziel, String akteur, String rolle,
                                           ProtokollDetails.Verwaltungsphase phase) {
-        var details = new ProtokollDetails.Verwaltung(id, phase, ziel,
-                ProtokollDetails.Verwaltungsvorgang.SPERREN, null, null, List.of());
+        return eintrag(id, ziel, akteur, rolle, phase, ProtokollDetails.Verwaltungsvorgang.SPERREN);
+    }
+
+    private static ZugriffEintrag eintrag(UUID id, UUID ziel, String akteur, String rolle,
+                                          ProtokollDetails.Verwaltungsphase phase,
+                                          ProtokollDetails.Verwaltungsvorgang vorgang) {
+        var details = new ProtokollDetails.Verwaltung(id, phase, ziel, vorgang, null, null, List.of());
         return new ZugriffEintrag(Optional.of(akteur), Optional.of(rolle), ProtokollAktion.BENUTZER_AENDERN,
                 Optional.empty(), Optional.empty(), ProtokollDetails.verwaltung(details));
     }
