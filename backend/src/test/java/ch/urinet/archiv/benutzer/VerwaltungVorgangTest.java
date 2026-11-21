@@ -202,6 +202,59 @@ class VerwaltungVorgangTest {
     }
 
     @Test
+    void anlagefehlerUebernimmtZielUndHaeltUnklareEntfernungGesperrt() throws Exception {
+        MandantCode mandant = mandantFuerAnlage();
+        UUID ziel = UUID.randomUUID();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            for (boolean entfernt : List.of(true, false)) {
+                UUID id = UUID.randomUUID();
+                var absicht = anlage(id, null, UUID.randomUUID().toString(),
+                        ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+                try {
+                    assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                            () -> { }, () -> {
+                                throw new IdentitaetsDienst.AnlageException(ziel.toString(), entfernt,
+                                        new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER));
+                            }, fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                            .hasRootCauseInstanceOf(FachFehler.class);
+                    String phase = entfernt ? "FEHLGESCHLAGEN" : "UNKLAR";
+                    assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", phase);
+                    assertThat(zielDerPhase(mandant.schema(), id, phase)).isEqualTo(ziel.toString());
+                    UUID neuerVorgang = UUID.randomUUID();
+                    assertThat(sperre.belegen(mandant, neuerVorgang)).isEqualTo(entfernt);
+                    if (entfernt) {
+                        assertThat(sperre.freigeben(mandant, neuerVorgang)).isTrue();
+                    }
+                } finally {
+                    testsperreEntfernen(mandant, id);
+                }
+            }
+        }
+    }
+
+    @Test
+    void ungueltigeAnlagekennungBleibtUnklarOhneDenWertZuLoggen() throws Exception {
+        MandantCode mandant = mandantFuerAnlage();
+        UUID id = UUID.randomUUID();
+        var absicht = anlage(id, null, UUID.randomUUID().toString(), ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor(); var log = LogMitschnitt.starten()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> {
+                        throw new IdentitaetsDienst.AnlageException("geheimer-synthetischer-wert", true,
+                                new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER));
+                    }, fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(FachFehler.class);
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(zielDerPhase(mandant.schema(), id, "UNKLAR")).isNull();
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+            assertThat(log.volltext()).contains(id.toString(), "Zielkennung der Anlage ungültig")
+                    .doesNotContain("geheimer-synthetischer-wert");
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
     void anlageMitGescheitertemAbschlussTraegtZielImUnklarEintrag() throws Exception {
         MandantCode mandant = mandantFuerAnlage();
         UUID id = UUID.randomUUID();

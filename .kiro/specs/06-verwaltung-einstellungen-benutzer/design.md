@@ -166,6 +166,9 @@ backend/src/main/java/ch/urinet/archiv/
   einmal mit neuem Token wiederholt. Die Kompensation in `anlegen()` umgeht den Schutzschalter (Wartezeit 2 s auf einen
   Platz); bei einem Fehler nach der Anlage meldet der Adapter die Zielkennung und ob die Entfernung bestätigt wurde in
   `AnlageException`; scheitert die Kompensation, hängt er ihren Fehler als Suppressed an diese Ausnahme.
+  `VerwaltungVorgang` übernimmt die gültige Zielkennung in den Fehlerabschluss; eine nicht bestätigte Entfernung oder
+  ungültige Kennung bleibt `UNKLAR`, auch wenn der Aufrufer die Kompensation als geklärt meldet. Eine bestätigte
+  Entfernung allein beweist noch nicht, dass keine verspätete externe Wirkung eintrifft.
   `rolleSetzen` holt die Zielrolle zuerst,
   fügt sie hinzu und entfernt erst danach die übrigen Archiv-Rollen. `verbindungPruefen` erzwingt einen echten Tokenabruf.
   Pfadwerte `.` und `..` (und `%2e`) werden abgelehnt. Offen (Kann): `aktualisieren`/`aktivieren` lesen und schreiben die

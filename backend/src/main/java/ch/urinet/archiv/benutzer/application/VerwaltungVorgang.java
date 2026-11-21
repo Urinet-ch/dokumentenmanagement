@@ -150,8 +150,22 @@ public class VerwaltungVorgang {
         } catch (RuntimeException fehler) {
             Kompensation ergebnis = Kompensation.UNKLAR;
             UUID geprueftesZiel = ziel;
+            boolean anlageUnklar = false;
             if (!arbeitGeliefert && geprueftesZiel == null && fehler instanceof ArbeitFehler mitZiel) {
                 geprueftesZiel = mitZiel.ziel();
+            } else if (!arbeitGeliefert && art == VerwaltungGrenzen.Art.ANLEGEN
+                    && fehler instanceof IdentitaetsDienst.AnlageException anlageFehler) {
+                anlageUnklar = !anlageFehler.entfernt();
+                try {
+                    UUID gelesen = UUID.fromString(anlageFehler.ziel());
+                    if (!gelesen.toString().equalsIgnoreCase(anlageFehler.ziel())) {
+                        throw new IllegalArgumentException("Ungültiges UUID-Format");
+                    }
+                    geprueftesZiel = gelesen;
+                } catch (IllegalArgumentException ungueltig) {
+                    LOG.errorf("Vorgang %s: Zielkennung der Anlage ungültig.", id);
+                    anlageUnklar = true;
+                }
             }
             UUID fehlerZiel = geprueftesZiel;
             try {
@@ -161,7 +175,7 @@ public class VerwaltungVorgang {
                         kompensationsFehler.getClass().getSimpleName());
                 fehler.addSuppressed(kompensationsFehler);
             }
-            if (ergebnis == Kompensation.GEKLAERT && (!arbeitGeliefert || abschlussGeprueft)) {
+            if (ergebnis == Kompensation.GEKLAERT && !anlageUnklar && (!arbeitGeliefert || abschlussGeprueft)) {
                 boolean abgeschlossen = false;
                 try {
                     transaktionen.neu(() -> {

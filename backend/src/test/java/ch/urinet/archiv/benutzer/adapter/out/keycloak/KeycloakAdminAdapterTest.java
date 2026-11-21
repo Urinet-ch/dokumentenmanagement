@@ -37,6 +37,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -800,19 +801,15 @@ class KeycloakAdminAdapterTest {
         server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/mitarbeiter"))
                 .willReturn(okJson("{\"id\":\"r1\",\"name\":\"mitarbeiter\"}")));
         server.stubFor(post(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm"))
+                .inScenario("rollenfolge").whenScenarioStateIs(STARTED).willSetStateTo("zugewiesen")
                 .willReturn(aResponse().withStatus(204)));
         server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm"))
+                .inScenario("rollenfolge").whenScenarioStateIs("zugewiesen")
                 .willReturn(aResponse().withStatus(204)));
 
         adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).rolleSetzen("urinet", "benutzer-1", Rolle.MITARBEITER);
 
-        var ereignisse = server.getAllServeEvents().stream()
-                .filter(e -> e.getRequest().getUrl().endsWith("/role-mappings/realm")
-                        && !e.getRequest().getMethod().getName().equals("GET"))
-                .sorted(java.util.Comparator.comparing(e -> e.getRequest().getLoggedDate()))
-                .toList();
-        assertThat(ereignisse).extracting(e -> e.getRequest().getMethod().getName())
-                .containsExactly("POST", "DELETE");
+        server.verify(1, postRequestedFor(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm")));
         server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.containing("inhaber"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notMatching(".*offline_access.*")));
