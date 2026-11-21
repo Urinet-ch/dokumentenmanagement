@@ -15,6 +15,7 @@ import ch.urinet.archiv.wissen.application.WissenEntwurfLesen;
 import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
 import ch.urinet.archiv.wissen.application.ManuellerWissensentwurf;
+import ch.urinet.archiv.wissen.application.ChatWissensentwurf;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.GET;
@@ -44,14 +45,16 @@ public class WissenEntwurfResource {
     private final WissenEntwurfLesen lesen;
     private final FreigabeDienst freigabe;
     private final ManuellerWissensentwurf manuell;
+    private final ChatWissensentwurf analyse;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
 
     public WissenEntwurfResource(WissenEntwurfLesen lesen, FreigabeDienst freigabe, ManuellerWissensentwurf manuell,
-                                 MandantAufloesung mandant, SecurityIdentity identitaet) {
+                                 ChatWissensentwurf analyse, MandantAufloesung mandant, SecurityIdentity identitaet) {
         this.lesen = lesen;
         this.freigabe = freigabe;
         this.manuell = manuell;
+        this.analyse = analyse;
         this.mandant = mandant;
         this.identitaet = identitaet;
     }
@@ -91,6 +94,27 @@ public class WissenEntwurfResource {
 
     @Schema(name = "WissenAnnehmen")
     public record AnnehmenDto(FreigabeAnnahme.Bearbeitung fassung, String vertraulichkeit, String grund) {
+    }
+
+    @Schema(name = "WissenAnalyse")
+    public record AnalyseDto(String nachrichtId) {
+    }
+
+    @POST
+    @Path("/analyse")
+    @ErfordertAktion(Aktion.A18)
+    @RolesAllowed({"inhaber", "mitarbeiter", "geschaeftsstelle"})
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Eigene Chat-Antwort als Analyse vorschlagen")
+    @APIResponse(responseCode = "201", description = "Analyseentwurf angelegt")
+    @APIResponse(responseCode = "400", description = "Nachrichten-ID ungültig")
+    @APIResponse(responseCode = "403", description = "Rolle darf keine Analyse vorschlagen")
+    @APIResponse(responseCode = "404", description = "Antwort oder Quelle nicht sichtbar")
+    @APIResponse(responseCode = "422", description = "Analyse aus diesem Gespräch nicht möglich")
+    public Response analyse(AnalyseDto eingabe) {
+        mandant.pruefen();
+        UUID id = analyse.anlegen(benutzer(), eingabe == null ? null : eingabe.nachrichtId());
+        return Response.status(Response.Status.CREATED).entity(java.util.Map.of("id", id)).build();
     }
 
     @POST

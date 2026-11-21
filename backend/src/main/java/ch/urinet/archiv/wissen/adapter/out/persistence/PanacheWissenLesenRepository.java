@@ -89,7 +89,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                     limit :groesse offset :offset
                 )
                 select anzahl.gesamt, seite.id, seite.typ, seite.pfad, seite.titel, seite.beschreibung, seite.status,
-                       seite.quelle_pruefen
+                       seite.quelle_pruefen, seite.vertraulichkeit
                 from anzahl left join seite on true
                 order by %s, seite.titel, seite.pfad
                 """.formatted(SEITENFELDER, filter, typSortierung("gefiltert"), typSortierung("seite")));
@@ -99,7 +99,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         long gesamt = rows.isEmpty() ? 0 : ((Number) rows.getFirst()[0]).longValue();
         List<IndexZeile> seiten = rows.stream().filter(row -> row[1] != null)
                 .map(row -> new IndexZeile(uuid(row[1]), seitentyp(text(row[2])), text(row[3]), text(row[4]),
-                        text(row[5]), text(row[6]), bool(row[7])))
+                        text(row[5]), text(row[6]), bool(row[7]),
+                        Wissensseite.Vertraulichkeit.valueOf(text(row[8]))))
                 .toList();
         return new IndexErgebnis(seiten, gesamt);
     }
@@ -292,7 +293,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         WissenSichtbarkeitSql.Ausdruck zielSicht = WissenSichtbarkeitSql.aktuell("z", sichtregel);
         WissenSichtbarkeitSql.Ausdruck quelleSicht = WissenSichtbarkeitSql.aktuell("s", sichtregel);
         Query query = em.get().createNativeQuery("""
-                select s.id, s.typ, s.pfad, s.titel, s.beschreibung, s.status, s.quelle_pruefen
+                select s.id, s.typ, s.pfad, s.titel, s.beschreibung, s.status, s.quelle_pruefen, s.vertraulichkeit
                 from wissensseite z
                 join wissensseite s on s.id <> z.id
                 where z.id = :seiteId and %s and %s
@@ -309,7 +310,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();
         return rows.stream().map(row -> new IndexZeile(uuid(row[0]), seitentyp(text(row[1])), text(row[2]),
-                text(row[3]), text(row[4]), text(row[5]), bool(row[6]))).toList();
+                text(row[3]), text(row[4]), text(row[5]), bool(row[6]),
+                Wissensseite.Vertraulichkeit.valueOf(text(row[7])))).toList();
     }
 
     @Override

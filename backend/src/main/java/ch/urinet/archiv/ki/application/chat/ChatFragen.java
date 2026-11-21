@@ -202,8 +202,9 @@ public class ChatFragen {
         if (antwort.status() == ChatStatus.FEHLER) {
             LOG.warnf("Chat-Agent für Gespräch %s ausgefallen, grund=%s", id, durchgang.ausfallgrund().orElse("-"));
         }
+        long nachrichtId;
         try {
-            speicher.antwortSpeichern(id, antwort, uhr.instant());
+            nachrichtId = speicher.antwortSpeichern(id, antwort, uhr.instant());
         } catch (RuntimeException e) {
             LOG.errorf("Antwort für Gespräch %s nicht gespeichert, ursache=%s", id, Ursachen.kette(e));
             annahme.platz().freigeben();
@@ -217,7 +218,7 @@ public class ChatFragen {
             switch (antwort.status()) {
                 case OK -> {
                     strom.accept(new ChatAusgabe.Quellen(antwort.quellen()));
-                    strom.accept(new ChatAusgabe.Fertig(id, antwort.tokens().orElseThrow()));
+                    strom.accept(new ChatAusgabe.Fertig(id, nachrichtId, antwort.tokens().orElseThrow()));
                 }
                 case FEHLER -> strom.accept(new ChatAusgabe.Fehler(NICHT_VERFUEGBAR, id));
                 case ABGEBROCHEN -> LOG.infof("Chat-Gespräch %s: Frage vom Client abgebrochen", id);

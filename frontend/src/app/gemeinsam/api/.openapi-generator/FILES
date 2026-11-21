@@ -119,6 +119,7 @@ model/verwerfen.ts
 model/verzeichnis-eintrag.ts
 model/vollansicht.ts
 model/warnung.ts
+model/wissen-analyse.ts
 model/wissen-annehmen.ts
 model/wissen-einstellungen.ts
 model/wissen-export.ts
