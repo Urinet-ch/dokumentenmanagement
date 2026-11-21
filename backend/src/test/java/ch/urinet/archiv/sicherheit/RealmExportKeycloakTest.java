@@ -9,6 +9,7 @@ import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -382,6 +383,63 @@ class RealmExportKeycloakTest {
         assertThat(eigen).isNotNull();
         given().auth().oauth2(fremd).get(PROBE_PFAD).then().statusCode(401);
         given().auth().oauth2(eigen).get(PROBE_PFAD).then().statusCode(404);
+    }
+
+    @Test
+    @Order(4)
+    @Disabled("Entwurf: Client-Anmeldung schlägt vor der Rotation mit HTTP 401 fehl")
+    void clientSecretRotationErlaubtUeberlappungUndWiderruf() {
+        String vorherigeProfile = adminGet(REALM + "/client-policies/profiles").asString();
+        String vorherigeRegeln = adminGet(REALM + "/client-policies/policies").asString();
+        String clientName = "rotation-probe";
+        importieren(Map.of("ifResourceExists", "SKIP", "clients", List.of(Map.of(
+                "clientId", clientName, "enabled", true, "publicClient", false,
+                "serviceAccountsEnabled", true, "standardFlowEnabled", false))));
+        String client = clientId(clientName);
+        try {
+            Response initial = given().auth().oauth2(admin)
+                    .post(ExportKeycloak.basisUrl + REALM + "/clients/{id}/client-secret", client);
+            assertThat(initial.statusCode()).isEqualTo(200);
+            String alterTestwert = initial.path("value");
+            assertThat(alterTestwert).isNotNull();
+            adminPut("/client-policies/profiles", Map.of("profiles", List.of(Map.of(
+                    "name", "rotation-probe",
+                    "executors", List.of(Map.of("executor", "secret-rotation", "configuration", Map.of(
+                            "expiration-period", 3600, "rotated-expiration-period", 600,
+                            "remaining-rotation-period", 0)))))));
+            adminPut("/client-policies/policies", Map.of("policies", List.of(Map.of(
+                    "name", "rotation-probe", "enabled", true, "profiles", List.of("rotation-probe"),
+                    "conditions", List.of(Map.of("condition", "client-access-type",
+                            "configuration", Map.of("type", List.of("confidential"))))))));
+            assertThat(clientTokenStatus(clientName, alterTestwert)).isEqualTo(200);
+            Response rotation = given().auth().oauth2(admin)
+                    .post(ExportKeycloak.basisUrl + REALM + "/clients/{id}/client-secret", client);
+            assertThat(rotation.statusCode()).isEqualTo(200);
+            String neuerTestwert = rotation.path("value");
+            assertThat(neuerTestwert != null && !neuerTestwert.equals(alterTestwert)).isTrue();
+            assertThat(clientTokenStatus(clientName, alterTestwert)).isEqualTo(200);
+            assertThat(clientTokenStatus(clientName, neuerTestwert)).isEqualTo(200);
+            given().auth().oauth2(admin)
+                    .delete(ExportKeycloak.basisUrl + REALM + "/clients/{id}/client-secret/rotated", client)
+                    .then().statusCode(204);
+            assertThat(clientTokenStatus(clientName, alterTestwert)).isEqualTo(401);
+            assertThat(clientTokenStatus(clientName, neuerTestwert)).isEqualTo(200);
+        } finally {
+            loeschen("/clients/" + client);
+            adminPut("/client-policies/policies", vorherigeRegeln);
+            adminPut("/client-policies/profiles", vorherigeProfile);
+        }
+    }
+
+    private void adminPut(String pfad, Object inhalt) {
+        given().auth().oauth2(admin).contentType(ContentType.JSON).body(inhalt)
+                .put(ExportKeycloak.basisUrl + REALM + pfad).then().statusCode(204);
+    }
+
+    private int clientTokenStatus(String client, String testwert) {
+        return given().formParam("grant_type", "client_credentials").formParam("client_id", client)
+                .formParam("client_secret", testwert)
+                .post(realmUrl() + "/protocol/openid-connect/token").statusCode();
     }
 
     /** Clients, deren eigene Flow-Bindung keinen OTP-Schritt ohne Bedingung verlangt. */
