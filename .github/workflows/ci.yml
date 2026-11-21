@@ -452,7 +452,7 @@ jobs:
         run: touch backend/target/browser-backend.stop
 
   docker:
-    name: Docker-Image (nur bauen)
+    name: Docker-Images (nur bauen)
     if: needs.art.outputs.nur-spec != 'true'
     needs: [art, build]
     runs-on: ubuntu-24.04
@@ -464,4 +464,7 @@ jobs:
         with:
           name: quarkus-app
           path: backend/target/quarkus-app/
-      - run: docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv:ci backend
+      - name: API-Image
+        run: docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv:ci backend
+      - name: Keycloak-Image
+        run: docker build -f deploy/infomaniak/keycloak/Dockerfile -t urinet-archiv:ci-kc deploy
