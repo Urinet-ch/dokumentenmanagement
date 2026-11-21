@@ -1579,6 +1579,14 @@ export const TEXTE = {
       KONTAKT_ZUSAMMENFUEHREN: 'Kontakte zusammengeführt',
       KONTAKT_INAKTIV: 'Kontakt als inaktiv markiert',
       KONTAKT_AKTIV: 'Kontakt wieder aktiviert',
+      KONFIGURATION_AENDERN: 'Einstellung geändert',
+      WISSEN_IMPORT: 'Wissensquelle importiert',
+      BENUTZER_ANLEGEN: 'Benutzer angelegt',
+      BENUTZER_AENDERN: 'Benutzer geändert',
+      BENUTZER_LOESCHEN: 'Benutzer gelöscht',
+      ROLLE_ZUWEISEN: 'Rolle zugewiesen',
+      BENUTZER_ANTRAG: 'Benutzerantrag',
+      BENUTZER_ABWEICHUNG: 'Benutzerabweichung',
     } as Record<string, string>,
     rollen: {
       INHABER: 'Inhaber',
@@ -1599,6 +1607,8 @@ export const TEXTE = {
       AKTION: 'Aktion',
       AUSTRITT: 'Austritt',
       WIDERRUF: 'Token widerrufen',
+      ANLAGE: 'Benutzer angelegt',
+      UEBERNAHME: 'Benutzer übernommen',
     } as Record<string, string>,
     erfasstVon: (kennung: string) => `erfasst von ${kennung}`,
     austritt: 'Austritt erfassen',
@@ -1626,5 +1636,21 @@ export const TEXTE = {
     spaltePerson: 'Person',
     spalteGueltigkeit: 'Anlass und Gültigkeit',
     spalteAktionen: 'Aktionen',
+  },
+  // Benutzeranleitung und Hilfe (Spec 07, Aufgabe 22.1); Titel der Abschnitte je Anker des Hilfe-Katalogs
+  hilfe: {
+    abschnitte: {
+      'erste-schritte': 'Erste Schritte',
+      suche: 'Suche',
+      chat: 'Chat',
+      kontakte: 'Kontakte',
+      wissen: 'Wissen',
+      'wissen-entwuerfe': 'Wissensentwürfe',
+      probleme: 'Wenn etwas nicht klappt',
+    } as Record<string, string>,
+    laedt: 'Die Anleitung wird geladen …',
+    nichtVerfuegbar:
+      'Dieser Teil der Anleitung ist gerade nicht verfügbar. Bitte versuchen Sie es später erneut.',
+    erneut: 'Erneut versuchen',
   },
 } as const;

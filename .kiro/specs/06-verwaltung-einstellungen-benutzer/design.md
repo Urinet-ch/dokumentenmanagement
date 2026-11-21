@@ -181,10 +181,26 @@ Ein Vorgang mit Wirkung in Keycloak lässt sich nicht in der Datenbank-Transakti
    aufgerufen (Spec 01, 10.8).
 4. Aufrufe an Keycloak (mit Zeitgrenze); bei Fehler Kompensation (z. B. neu angelegten Benutzer entfernen).
 5. Transaktion 2: Protokolleintrag `phase=ABGESCHLOSSEN` oder `FEHLGESCHLAGEN` (bzw. `UNKLAR`, wenn die Kompensation
-   scheitert), Benutzerverzeichnis (`ANLAGE`, `AUSTRITT`), `benutzer_status`, Antrag, Token-Widerruf.
-6. Vorgangssperre freigeben (auch bei Fehler; sonst läuft sie nach 15 s ab).
+   scheitert, ungewiss ist oder fehlt; `FEHLGESCHLAGEN` und `UNKLAR` tragen das `ziel` aus dem Ergebnis der Arbeit, bei
+   der Anlage also den neuen Keycloak-`sub`), Benutzerverzeichnis (`ANLAGE`, `AUSTRITT`), `benutzer_status`, Antrag, Token-Widerruf.
+   Die Kompensation meldet `GEKLAERT` nur, wenn der Ausgangszustand wiederhergestellt ist und keine verspätete externe
+   Wirkung mehr eintreffen kann. Nur dann wird `FEHLGESCHLAGEN` mit Freigabe der Sperre transaktional geschrieben;
+   bei Ungewissheit, Fehler oder Fristablauf bleibt der Vorgang `UNKLAR` gesperrt.
+6. Die Sperre nach eindeutigem Abschluss freigeben; eine vor externer Wirkung vorbereitete Sperre läuft nach 15 s ab.
+   Entscheid Fabian 21.11.2026: Ein ungeklärter Vorgang (`UNKLAR`) hält die Sperre bis zum Abgleich (19.13) oder bis
+   ein Admin ihn klärt; bei `UNKLAR` wird alarmiert. Das weicht von der pauschalen 15-Sekunden-Grenze in Req 4.7 ab.
+   Auch ein `ANGEFRAGT` ohne Abschluss bleibt gesperrt: Eine verspätete externe Wirkung kann noch eintreffen.
+   Trifft ein erfolgreicher Abschluss nach Ablauf der Frist ein, wird er nicht als eindeutig abgeschlossen
+   übernommen; die Datenbanktransaktion wird zurückgerollt und der Vorgang als ungeklärt behandelt.
+   Die bestehende Überwachung meldet `UNKLAR` und abgelaufene `ANGEFRAGT`-Vorgänge je Mandant mit der Vorgangs-ID;
+   bei gescheitertem Mailversand versucht sie es beim nächsten Takt erneut.
 Der Abgleich (täglich, beim Start des Workers) findet Einträge `ANGEFRAGT` ohne Abschluss nach 5 Minuten, liest den
 Zustand in Keycloak und schreibt den Abschluss `UNKLAR` mit Alarm; er ändert nie etwas in Keycloak.
+
+Für den Protokollgrund sind ausschliesslich die festen Kategorien `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`,
+`KORREKTUR` und `SONSTIGES` zulässig. So können Namen, E-Mail-Adressen und Geheimnisse nicht durch Freitext ins
+append-only Protokoll gelangen. Die Kategorie muss beim Vorgang explizit gewählt werden; Freitext wird nicht
+automatisch umgedeutet. Die Anbindung der Eingaben und Pflichtprüfung folgt mit den Verwaltungsendpunkten.
 
 ### Statusautomat
 | Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |
@@ -338,8 +354,8 @@ ein neuer Benutzer nie als früherer erscheint.
 
 ## Realm-Änderungen (Keycloak, Betreiber)
 Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anmeldung und Benutzer bleiben unverändert:
-1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, Secret `${KEYCLOAK_VERWALTUNG_SECRET}`
-   (Platzhalter, wie bei Google); Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
+1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, im Export kein Secret;
+   Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
    `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1. Ergebnis des Spikes: FGAP wirkt nicht, solange `manage-users` gehalten wird (siehe «Umsetzung 19.1»; entschieden 20.11.2026: `manage-users` bleibt, Option (a)).
 2. SMTP des Realms (Host, Port, Absender `archiv@urinet.ch`, Anzeigename «UriNet Archiv», Zugang als Secret
    `keycloak_smtp_passwort`); ohne SMTP kann Keycloak keine Einladung senden.
@@ -358,13 +374,14 @@ Realm-Import wirkt nur beim ersten Start); der Export bleibt die Quelle für Stu
 `db/public` (neue Changesets, bestehende unverändert):
 ```
 mandant:                + verwaltung_rollen text[] not null default '{inhaber,mitarbeiter,treuhaender}'
-verwaltung_vorgang(mandant text pk, vorgang_id uuid, bis timestamptz)           -- Vorgangssperre (Lease)
+verwaltung_vorgang(mandant text pk, vorgang_id uuid, bis timestamptz,
+                   phase text)  -- Vorgangssperre (Lease); phase VORBEREITET -> ANGEFRAGT -> gelöscht oder UNKLAR (Changeset 042)
 token_widerruf(benutzer text pk, ab timestamptz)                                -- Zeile mit Upsert; Aufräumen nach 1 Tag
 ```
 `db/mandant` je Mandant:
 ```
 benutzer_status(benutzer text pk, art text check (art in ('GESPERRT','DEAKTIVIERT')), seit timestamptz,
-                grund text, von text)                      -- Zeile entfällt beim Entsperren und Reaktivieren; Verlauf steht im Protokoll
+                grund text check (Kategorie nach 4.4), von text)  -- Zeile entfällt beim Entsperren und Reaktivieren; Verlauf steht im Protokoll
 verwaltung_antrag(id uuid pk, art text check (art in ('INHABER_ROLLE','LOESCHEN')), ziel text, rolle text null,
                   grund text, beantragt_von text, beantragt_am timestamptz, gueltig_bis timestamptz,
                   status text check (status in ('OFFEN','BESTAETIGT','ABGELEHNT','ABGELAUFEN','ZURUECKGEZOGEN')),
@@ -374,7 +391,7 @@ zugriff_protokoll:      aktion erhält die Werte BENUTZER_ANLEGEN, BENUTZER_AEND
                         BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG (Check-Constraint per neuem Changeset, falls vorhanden)
 ```
 Es gibt keine Tabelle mit E-Mail, Namen oder Zugangsdaten. `benutzer_status` und `verwaltung_antrag` enthalten nur
-Kennungen (`sub`) und Texte der Inhaber (Grund). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
+Kennungen (`sub`) und Texte der Inhaber (Grund; in `benutzer_status` nur die feste Kategorie nach 4.4). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
 
 ## Error Handling (neue Codes)
 Die Aufgabe, die einen Code einführt, trägt ihn im selben PR in die Tabelle in Spec 01 design.md («Error Handling») und ins
@@ -552,6 +569,26 @@ Stand Aufgabe 19.1: Nachgewiesen sind Mandantensuche, Rollenmitglieder, Issuer, 
 erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Secret-Rotation, `auth_time`, `prompt=login` und
 `execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
 Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.
+
+## Umsetzung 19.2 — Realm-Export und Tests
+
+Der Export enthält das Dienstkonto mit `kc-admin-api` und den drei vorgesehenen Rollen; der Test-Realm ergänzt SMTP
+an Mailpit. Der importierte Export und der reguläre Dev Service senden eine Einladung ohne vorhandenes Passwort mit den
+drei erforderlichen Aktionen. Der interaktive PWA-Test weist `auth_time` beim ersten Login und unverändert bei SSO nach;
+`prompt=login` verlangt Passwort und TOTP und liefert danach eine neuere Authentifizierungszeit. Für die erneute Anmeldung
+wartet der Test auf ein neues TOTP-Zeitfenster, weil Keycloak die Wiederverwendung desselben Codes ablehnt.
+Ein synthetischer Test weist die Secret-Überlappung und den Widerruf sowie den internen Backchannel mit korrektem
+Issuer nach; die konkrete Betriebsverdrahtung und die automatische Ablaufzeit bleiben als nachgelagerte
+Betriebsnachweise für 19.3 offen (Entscheid Fabian 21.11.2026).
+
+Redirect, Web-Origin und Logout-Redirect des PWA-Clients verwenden im Realm-Export `${ARCHIV_BASIS_URL}`. Keycloak
+liest den nicht geheimen Wert beim Import aus der Umgebung; Compose reicht ihn aus der externen Bundle-Konfiguration
+weiter. Der Start bricht bei fehlender oder ungültiger HTTPS-Basisadresse ab. `schreibe-env.sh` schreibt den Wert aus
+`HOST_ARCHIV` in die `.env` des Bundles (Nachbesserung Review PR #385); der Workflow bleibt unverändert. Der Export
+enthält kein Dienstkonto-Secret; Keycloak erzeugt beim Erstimport eines. Der Test weist nach, dass damit ein Token
+bezogen werden kann. Das tatsächlich verwendete Secret wird erst in 19.3 ausserhalb des Imports gesetzt; `start.sh`
+liest oder übergibt es nicht. Ein bereits importierter Realm wird durch den Startimport nicht aktualisiert;
+die einmalige Aktualisierung ist in 19.3 nachgelagert (Entscheid Fabian 21.11.2026).
 
 ## Umsetzung 19.4 — Keycloak-Adapter
 

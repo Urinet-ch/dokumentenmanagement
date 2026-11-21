@@ -1,0 +1,54 @@
+@let z = zustand();
+@if (z.art === 'laedt') {
+  <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laedt" />
+} @else if (z.art === 'fehler') {
+  <div class="fehler">
+    <div class="hinweis gefahr" role="alert" data-test="anleitung-fehler">
+      <app-symbol name="warnung" />
+      <p>{{ texte.nichtVerfuegbar }}</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="erneut()"><app-symbol name="wiederholen" />{{ texte.erneut }}</button>
+  </div>
+} @else {
+  <div class="text">
+    <ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: z.anleitung.teile }" />
+  </div>
+}
+<ng-template #baum let-teile>
+  @for (teil of teile; track $index) {
+    @switch (teil.art) {
+      @case ('text') {<ng-container>{{ teil.text }}</ng-container>}
+      @case ('platzhalter') {<ng-container>{{ platzhalter(teil) }}</ng-container>}
+      @case ('code') {<code>{{ teil.text }}</code>}
+      @case ('link') {<a [routerLink]="teil.pfad" (click)="navigiert.emit()">{{ teil.text }}</a>}
+      @case ('abschnitt') {
+        @if (leiste()) {
+          <a [href]="'/hilfe#' + teil.anker" (click)="abschnittGewaehlt($event, teil.anker)">{{ teil.text }}</a>
+        } @else {
+          <a routerLink="/hilfe" [fragment]="teil.anker" (click)="abschnittGewaehlt($event, teil.anker)">{{ teil.text }}</a>
+        }
+      }
+      @case ('strong') { <strong><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></strong> }
+      @case ('em') { <em><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></em> }
+      @case ('p') { <p><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></p> }
+      @case ('ul') { <ul><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></ul> }
+      @case ('ol') { <ol><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></ol> }
+      @case ('li') { <li><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></li> }
+      @case ('hinweis') {
+        <div class="hinweis" [class.info]="teil.variante === 'info'" [class.warnung]="teil.variante === 'warnung'">
+          <app-symbol [name]="teil.variante === 'warnung' ? 'warnung' : 'info'" />
+          <p><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></p>
+        </div>
+      }
+      @default {
+        @switch (ebene(teil)) {
+          @case (2) { <h2 [id]="teil.anker"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h2> }
+          @case (3) { <h3 [id]="teil.anker"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h3> }
+          @case (4) { <h4 [id]="teil.anker"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h4> }
+          @case (5) { <h5 [id]="teil.anker"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h5> }
+          @case (6) { <h6 [id]="teil.anker"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h6> }
+        }
+      }
+    }
+  }
+</ng-template>
