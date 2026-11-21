@@ -28,7 +28,10 @@ public interface IdentitaetsDienst {
         }
     }
 
-    /** Fehler nach erfolgreicher Anlage; das Ziel wird für den Abschluss des Verwaltungsvorgangs benötigt. */
+    /**
+     * Fehler nach erfolgreicher Anlage; das Ziel wird für den Abschluss des Verwaltungsvorgangs benötigt.
+     * Eine bestätigte Entfernung allein beweist nicht, dass keine verspätete externe Wirkung mehr eintritt.
+     */
     final class AnlageException extends RuntimeException {
         private final String ziel;
         private final boolean entfernt;

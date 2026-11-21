@@ -758,6 +758,24 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void anlegenWertetAngenommeneAberNichtAbgeschlosseneLoeschungAlsUnklar() {
+        tokenAntwort();
+        server.stubFor(post(urlPathEqualTo(USERS)).willReturn(aResponse().withStatus(201)
+                .withHeader("Location", server.baseUrl() + USERS + "/neu-1")));
+        benutzerStub("neu-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/neu-1/role-mappings/realm")).willReturn(aResponse().withStatus(503)));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/neu-1")).willReturn(aResponse().withStatus(202)));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).anlegen("urinet",
+                new Neuanlage("synthetic-user", "user@example.invalid", "Ada", "Muster"), Rolle.MITARBEITER))
+                .isInstanceOfSatisfying(AnlageException.class, fehler -> {
+                    assertThat(fehler.ziel()).isEqualTo("neu-1");
+                    assertThat(fehler.entfernt()).isFalse();
+                    assertThat(fehler.getSuppressed()).hasSize(1);
+                });
+    }
+
+    @Test
     void rolleSetzenBehaeltBeiFehlerDerZielrolleDieBisherigeRolle() {
         tokenAntwort();
         benutzerStub("benutzer-1", "urinet");

@@ -200,7 +200,10 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             RuntimeException kompensationsFehler = null;
             try {
                 // Kompensation umgeht den Schutzschalter: Sie ist gerade dann nötig, wenn der Dienst ausfällt.
-                request("DELETE", user(id), null, null, false, Set.of(204, 404), true);
+                Antwort loeschung = request("DELETE", user(id), null, null, false, Set.of(204, 404), true);
+                if (loeschung.status() != 204 && loeschung.status() != 404) {
+                    throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                }
                 entfernt = true;
             } catch (RuntimeException kompensation) {
                 LOG.error("Kompensation nach Benutzeranlage fehlgeschlagen; Benutzerzustand ist unklar.");
