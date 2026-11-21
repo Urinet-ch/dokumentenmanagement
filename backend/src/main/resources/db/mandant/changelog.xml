@@ -57,5 +57,6 @@
     <include file="changesets/055-klassifikation-volltext.xml" relativeToChangelogFile="true"/>
     <include file="changesets/056-wissens-export.xml" relativeToChangelogFile="true"/>
     <include file="changesets/057-wissens-import.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/080-chat-kontextnachweis.xml" relativeToChangelogFile="true"/>
     <include file="changesets/060-verwaltung-protokoll.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

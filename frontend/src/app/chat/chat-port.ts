@@ -7,6 +7,7 @@ import { Observable } from 'rxjs';
 export interface DokumentQuelle {
   titel: string;
   link: string;
+  seiten?: string;
 }
 
 /** Quelle «Datenstand: <Zeitpunkt>, <n> Belege» der zählenden Werkzeuge (Req 4.1). */
@@ -14,14 +15,19 @@ export interface DatenstandQuelle {
   datenstand: { zeitpunkt: string; anzahl: number };
 }
 
-export type Quelle = DokumentQuelle | DatenstandQuelle;
+export interface WissenQuelle {
+  wissen: { titel: string; link: string };
+  dokumente: DokumentQuelle[];
+}
+
+export type Quelle = DokumentQuelle | DatenstandQuelle | WissenQuelle;
 
 /** Ereignisse des Stroms (`event:`-Name und JSON aus `data:`); unbekannte Ereignisse lässt der Leser weg. */
 export type ChatEreignis =
   | { typ: 'werkzeug'; name: string }
   | { typ: 'text'; delta: string }
   | { typ: 'quellen'; quellen: Quelle[] }
-  | { typ: 'fertig'; gespraechId: string }
+  | { typ: 'fertig'; gespraechId: string; nachrichtId?: string }
   | { typ: 'fehler'; meldung: string; gespraechId?: string };
 
 export interface GespraechKopf {
@@ -34,6 +40,8 @@ export type Rolle = 'BENUTZER' | 'ASSISTENT';
 export type NachrichtStatus = 'OK' | 'FEHLER' | 'ABGEBROCHEN';
 
 export interface GespeicherteNachricht {
+  id?: string;
+  analyseMoeglich?: boolean;
   rolle: Rolle;
   inhalt: string;
   quellen: Quelle[];
@@ -46,7 +54,8 @@ export interface GespeicherteNachricht {
  * (429 mit `Retry-After` in Sekunden), Frage ungültig (400), keine Verbindung, unlesbare oder abgebrochene Antwort.
  */
 export type ChatFehlerArt =
-  'SITZUNG' | 'NICHT_GEFUNDEN' | 'ZU_VIELE' | 'UNGUELTIG' | 'VERBINDUNG' | 'ANTWORT' | 'ALLGEMEIN';
+  'SITZUNG' | 'NICHT_GEFUNDEN' | 'ZU_VIELE' | 'UNGUELTIG' | 'VERBINDUNG' | 'ANTWORT' | 'ALLGEMEIN'
+  | 'ANALYSE_NICHT_MOEGLICH' | 'NICHT_ERLAUBT';
 
 /** Grund eines 429 aus dem Feld `grund` der Problem Details, sofern das Backend ihn mitschickt. */
 export type ZuVieleGrund = 'STUNDENLIMIT' | 'LAEUFT';
@@ -70,4 +79,5 @@ export abstract class ChatPort {
   /** Die letzten 20 eigenen Gespräche, neueste zuerst. */
   abstract gespraeche(): Observable<GespraechKopf[]>;
   abstract gespraech(id: string): Observable<GespeicherteNachricht[]>;
+  abstract analyseVorschlagen(nachrichtId: string): Observable<string>;
 }

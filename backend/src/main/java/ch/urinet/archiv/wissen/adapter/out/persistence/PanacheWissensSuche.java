@@ -5,6 +5,7 @@ import ch.urinet.archiv.suche.application.HybridSuche;
 import ch.urinet.archiv.wissen.application.WissenLesenRepository;
 import ch.urinet.archiv.wissen.application.WissensSuchePort;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.EntityManager;
@@ -16,7 +17,7 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class PanacheWissensSuche implements WissensSuchePort {
-    private static final String FELDER = "s.id, s.typ, s.pfad, s.titel, s.beschreibung, s.status, s.quelle_pruefen, s.version";
+    private static final String FELDER = "s.id, s.typ, s.pfad, s.titel, s.beschreibung, s.status, s.quelle_pruefen, s.version, s.vertraulichkeit";
     private static final String TEXT = "left(s.titel || ' – ' || s.typ || chr(10) || s.inhalt, :zeichen)";
     private final Instance<EntityManager> em;
 
@@ -90,7 +91,8 @@ public class PanacheWissensSuche implements WissensSuchePort {
         return rows.stream().map(row -> new Treffer(new WissenLesenRepository.IndexZeile((UUID) row[0],
                 Seitentyp.vonDatenbankwert((String) row[1])
                         .orElseThrow(() -> new IllegalStateException("Ungültiger Typ der Wissensseite")),
-                (String) row[2], (String) row[3], (String) row[4], (String) row[5], (Boolean) row[6]),
-                ((Number) row[7]).intValue(), (String) row[8])).toList();
+                (String) row[2], (String) row[3], (String) row[4], (String) row[5], (Boolean) row[6],
+                Wissensseite.Vertraulichkeit.valueOf((String) row[8])),
+                ((Number) row[7]).intValue(), (String) row[9])).toList();
     }
 }

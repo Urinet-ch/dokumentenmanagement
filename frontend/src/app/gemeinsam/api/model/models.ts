@@ -98,6 +98,7 @@ export * from './verwerfen';
 export * from './verzeichnis-eintrag';
 export * from './vollansicht';
 export * from './warnung';
+export * from './wissen-analyse';
 export * from './wissen-annehmen';
 export * from './wissen-einstellungen';
 export * from './wissen-export';
