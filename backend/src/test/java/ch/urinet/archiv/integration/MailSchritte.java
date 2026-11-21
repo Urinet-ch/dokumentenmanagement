@@ -1,7 +1,9 @@
 package ch.urinet.archiv.integration;
 
 import ch.urinet.archiv.dokument.Testdateien;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.ablage.S3Stoerung;
+import ch.urinet.archiv.ablage.TestAblage;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.SchedulerTakt;
 import ch.urinet.archiv.integration.adapter.in.job.MailTakt;
@@ -46,9 +48,11 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -95,16 +99,66 @@ public class MailSchritte {
     private final List<String> nachrichten = new ArrayList<>();
     /** Anzahl Dokumente mit Quelle EMAIL je Mandant vor dem Szenario. */
     private final Map<String, Long> vorher = new HashMap<>();
+    private final Map<String, Set<UUID>> vorhandeneDokumente = new HashMap<>();
     private byte[] letztesPdf;
     private byte[] logo;
     private MimeMessage letzteNachricht;
     private LogMitschnitt log;
 
     @After("@spec-02")
-    public void aufraeumen() {
+    public void aufraeumen() throws SQLException {
         S3Stoerung.aus();
         if (log != null) {
             log.close();
+            log = null;
+        }
+        for (Map.Entry<String, Set<UUID>> eintrag : vorhandeneDokumente.entrySet()) {
+            String mandant = eintrag.getKey();
+            Set<UUID> neueDokumente = emailDokumentIds(mandant);
+            neueDokumente.removeAll(eintrag.getValue());
+            try (Connection verbindung = datenbank.get().getConnection();
+                 PreparedStatement auftraege = verbindung.prepareStatement(
+                         "delete from public.auftrag where mandant = ? and nutzlast->>'dokumentId' = any (?)")) {
+                auftraege.setString(1, mandant);
+                auftraege.setArray(2, verbindung.createArrayOf("text",
+                        neueDokumente.stream().map(UUID::toString).toArray()));
+                auftraege.executeUpdate();
+            }
+            Testdokumente.loeschen(datenbank.get(), mandant, neueDokumente);
+            if (!neueDokumente.isEmpty()) {
+                for (String praefix : List.of("eingang/", "vorschau/")) {
+                    TestAblage.loeschen(mandant, praefix, schluessel -> neueDokumente.stream()
+                            .anyMatch(id -> schluessel.contains("/" + id + "/")));
+                }
+            }
+        }
+        vorhandeneDokumente.clear();
+    }
+
+    @Dann("räumt die Mail-Testhilfe nur neue E-Mail-Dokumente auf")
+    public void testIsolation() throws SQLException {
+        UUID neu = dokument("urinet");
+        UUID vorhanden = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(
+                "urinet", null, "PERSONAL", false, "mail-test", null, "EINGANGSKORB"));
+        try {
+            try (Connection verbindung = datenbank.get().getConnection();
+                 PreparedStatement setzen = verbindung.prepareStatement(
+                         "update " + schema("urinet") + ".dokument set quelle = 'EMAIL' where id = ?")) {
+                setzen.setObject(1, vorhanden);
+                setzen.executeUpdate();
+            }
+            // Der Hintergrund hat den Ausgangsstand bereits erfasst.
+            vorhandeneDokumente.get("urinet").add(vorhanden);
+            Set<UUID> erwartet = Set.copyOf(vorhandeneDokumente.get("urinet"));
+            aufraeumen();
+            assertThat(emailDokumentIds("urinet")).containsExactlyInAnyOrderElementsOf(erwartet)
+                    .doesNotContain(neu);
+            assertThat(wert("select count(*) from public.auftrag where mandant = ? "
+                    + "and nutzlast->>'dokumentId' = ?", "urinet", neu.toString())).isZero();
+            assertThat(TestAblage.versionen("urinet", "eingang/"))
+                    .noneMatch(schluessel -> schluessel.contains("/" + neu + "/"));
+        } finally {
+            Testdokumente.loeschen(datenbank.get(), "urinet", List.of(vorhanden));
         }
     }
 
@@ -116,6 +170,7 @@ public class MailSchritte {
 
     @Angenommen("für «{word}» ist kein Postfach eingerichtet")
     public void keinPostfach(String mandant) throws SQLException {
+        dokumenteMerken(mandant);
         ausfuehren("delete from " + schema(mandant) + ".integration_mail");
         vorher.put(mandant, emailDokumente(mandant));
     }
@@ -612,6 +667,7 @@ public class MailSchritte {
     }
 
     private void postfachEinrichten(String mandant, boolean mitOrdnern) throws Exception {
+        dokumenteMerken(mandant);
         TestPostfach postfach = TestPostfach.neu();
         if (mitOrdnern) {
             postfach.ordnerAnlegen("Archiviert");
@@ -719,6 +775,25 @@ public class MailSchritte {
 
     private long emailDokumente(String mandant) throws SQLException {
         return wert("select count(*) from " + schema(mandant) + ".dokument where quelle = 'EMAIL'");
+    }
+
+    private void dokumenteMerken(String mandant) throws SQLException {
+        if (!vorhandeneDokumente.containsKey(mandant)) {
+            vorhandeneDokumente.put(mandant, emailDokumentIds(mandant));
+        }
+    }
+
+    private Set<UUID> emailDokumentIds(String mandant) throws SQLException {
+        Set<UUID> ids = new HashSet<>();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select id from " + schema(mandant) + ".dokument where quelle = 'EMAIL'");
+             ResultSet zeilen = abfrage.executeQuery()) {
+            while (zeilen.next()) {
+                ids.add(zeilen.getObject(1, UUID.class));
+            }
+        }
+        return ids;
     }
 
     private long wert(String sql, Object... parameter) throws SQLException {
