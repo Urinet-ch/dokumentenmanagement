@@ -226,6 +226,11 @@ export class Kontakte {
     ];
   }
 
+  /** Kennzeichen als Pille; «nicht mehr im CRM-Export» als Warnung. */
+  protected pille(art: 'inaktiv' | 'herkunft' | 'export'): string {
+    return art === 'export' ? 'pille warnung' : 'pille';
+  }
+
   private navigieren(filter: ListenFilter, ersetzen: boolean): void {
     void this.router.navigate([], {
       relativeTo: this.route,

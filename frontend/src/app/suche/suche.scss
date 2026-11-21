@@ -49,14 +49,13 @@ select {
 .feld > span:first-child,
 small,
 .anzahl,
-.hinweis,
-.leer {
+.nebentext {
   color: var(--text-gedaempft);
 }
 
 small,
 .anzahl,
-.hinweis,
+.nebentext,
 .leer {
   margin: 0;
   font-size: 12.5px;
@@ -70,7 +69,6 @@ small,
 .zeile-fuss,
 .angaben,
 .tags,
-.rueckfall,
 .blaettern {
   display: flex;
   flex-wrap: wrap;
@@ -219,8 +217,7 @@ small,
   min-width: 0;
 }
 
-.karte,
-.treffer-zeile {
+.karte {
   grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
 }
@@ -230,12 +227,9 @@ small,
   margin-bottom: -1rem;
 }
 
-.fehler {
-  margin: 0 0 0.5rem;
-  padding: 0.625rem 0.875rem;
-  border-radius: var(--radius-klein);
-  background: var(--gefahr-weich);
-  color: var(--gefahr);
+.meldungen .hinweis,
+.wissen > .hinweis {
+  margin-bottom: 0.5rem;
 }
 
 .kopf {
@@ -244,13 +238,9 @@ small,
   border-bottom: 1px solid var(--linie);
 }
 
-.leer {
-  padding: 1.5rem 0.5rem;
-  text-align: center;
-}
-
 .treffer-zeile {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.375rem;
   padding: 0.875rem 0;
   border-bottom: 1px solid var(--linie);
@@ -296,48 +286,15 @@ small,
 
 .betrag {
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .angaben {
   gap: 0.375rem;
 }
 
-.pille {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3125rem;
-  padding: 0.3125rem 0.5rem;
-  border: 1px solid var(--linie);
-  border-radius: 99px;
-  background: var(--karte-2);
-  font-size: 11.5px;
-  font-weight: 600;
-  line-height: 1.1;
-  --symbol-groesse: 13px;
-
-  &.akzent {
-    border-color: transparent;
-    background: var(--akzent-weich);
-    color: var(--akzent-text);
-  }
-
-  &.warnung {
-    border-color: transparent;
-    background: var(--warnung-weich);
-    color: var(--warnung);
-  }
-
-  &.gefahr {
-    border-color: transparent;
-    background: var(--gefahr-weich);
-    color: var(--gefahr);
-  }
-}
-
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+// Lange Partnernamen brechen um, damit die Zeile bei 375 px nicht seitlich scrollt
+.angaben .pille {
+  white-space: normal;
 }
 
 // Treffer nicht nur über Farbe: Unterstrich und fette Schrift (WCAG 1.4.1)
@@ -362,21 +319,8 @@ mark {
   }
 }
 
-.rueckfall {
-  gap: 0.5rem 0.75rem;
-  padding: 0.625rem 0.75rem;
-  border-radius: var(--radius-klein);
-  background: var(--warnung-weich);
-
-  app-symbol {
-    color: var(--warnung);
-  }
-
-  p {
-    flex: 1 1 12rem;
-    margin: 0;
-    color: var(--text-2);
-  }
+.treffer > .hinweis > button {
+  justify-self: start;
 }
 
 .blaettern {

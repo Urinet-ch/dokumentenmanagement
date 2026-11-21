@@ -23,7 +23,7 @@ p {
 }
 
 .angaben,
-.hinweis {
+.nebentext {
   color: var(--text-gedaempft);
 }
 
@@ -100,7 +100,7 @@ select {
   }
 }
 
-// Kennzahlen als Kacheln, zugleich Filter (Prototyp `.vf`)
+// Kennzahlen als Kacheln (Baustein button.kachel), zugleich Filter
 .zaehler {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
@@ -108,93 +108,34 @@ select {
   margin: 0.5rem 0 1rem;
 }
 
-.chip {
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-align: left;
-  color: var(--text-gedaempft);
-  background: var(--karte);
-  border: 1px solid var(--linie);
-  border-radius: var(--radius-klein);
-  min-height: 2.75rem;
-  padding: 0.5rem 0.625rem;
-  cursor: pointer;
-
-  .anzahl {
-    display: block;
-    font-size: 1.375rem;
-    font-weight: 700;
-    line-height: 1.2;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-
-  &.auffaellig[data-ergebnis='DUBLETTE'] {
-    border-color: var(--warnung);
-    background: var(--warnung-weich);
-    color: var(--warnung);
-  }
-
-  &.auffaellig[data-ergebnis='FEHLER'] {
-    border-color: var(--gefahr);
-    background: var(--gefahr-weich);
-    color: var(--gefahr);
-  }
-
-  &[aria-pressed='true'] {
-    border-color: var(--akzent-text);
-    box-shadow: inset 0 0 0 1px var(--akzent-text);
-  }
-}
-
-// Tabelle der Zeilen (Prototyp `.tbl`), breit in eigenem Scrollbereich
-.tabelle {
-  overflow-x: auto;
-  margin-bottom: 0.75rem;
-  background: var(--karte);
-  border: 1px solid var(--linie);
-  border-radius: var(--radius);
-  box-shadow: var(--schatten);
-}
-
-table {
-  width: 100%;
+// Tabelle der Zeilen (Baustein .tabelle) in eigenem kartenartigem Rahmen, breit in eigenem Scrollbereich
+.vorschau .tabelle {
   min-width: 44rem;
-  border-collapse: collapse;
-  font-size: 0.8125rem;
-}
 
-th,
-td {
-  text-align: left;
-  padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid var(--linie);
-  vertical-align: top;
-}
-
-thead th {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-gedaempft);
-  white-space: nowrap;
-}
-
-tbody tr:last-child > * {
-  border-bottom: 0;
-}
-
-tbody th {
-  font-weight: 400;
-  white-space: nowrap;
-
-  .nr {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
+  :is(th, td) {
+    vertical-align: top;
   }
+}
+
+.vorschau {
+  .tabelle-rahmen {
+    margin-bottom: 0.75rem;
+    background: var(--karte);
+    border: 1px solid var(--linie);
+    border-radius: var(--radius);
+    box-shadow: var(--schatten);
+  }
+
+  tbody th {
+    font-weight: 400;
+    white-space: nowrap;
+  }
+}
+
+.nr {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
 }
 
 .zeile[data-ergebnis='DUBLETTE'] > * {
@@ -216,38 +157,6 @@ tbody th {
 
 .entscheid-zelle select {
   min-width: 13rem;
-}
-
-// Status-Pille (Prototyp `.pill`)
-.marke {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1;
-  padding: 0.3rem 0.5rem;
-  border-radius: 99px;
-  white-space: nowrap;
-  background: var(--karte-2);
-  color: var(--text-2);
-  border: 1px solid var(--linie);
-
-  &[data-ergebnis='NEU'],
-  &[data-ergebnis='GEAENDERT'] {
-    background: var(--ok-weich);
-    color: var(--ok);
-    border-color: transparent;
-  }
-  &[data-ergebnis='DUBLETTE'] {
-    background: var(--warnung-weich);
-    color: var(--warnung);
-    border-color: transparent;
-  }
-  &[data-ergebnis='FEHLER'] {
-    background: var(--gefahr-weich);
-    color: var(--gefahr);
-    border-color: transparent;
-  }
 }
 
 .felder {

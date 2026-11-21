@@ -49,34 +49,6 @@
   gap: 0.5rem;
 }
 
-.segment {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--linie);
-  border-radius: var(--radius-klein);
-  background: var(--karte-2);
-
-  button {
-    min-height: 2.375rem;
-    padding: 0 0.75rem;
-    border: 0;
-    border-radius: 7px;
-    background: transparent;
-    color: var(--text-gedaempft);
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-
-    &[aria-pressed='true'] {
-      background: var(--karte);
-      color: var(--text);
-      box-shadow: var(--schatten);
-    }
-  }
-}
-
 .filterleiste {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
@@ -116,13 +88,6 @@ section {
   min-width: 0;
 }
 
-.leer {
-  padding: 1.5rem 0.5rem;
-  text-align: center;
-  color: var(--text-gedaempft);
-  margin: 0;
-}
-
 .name {
   font-weight: 600;
   color: var(--text);
@@ -158,49 +123,5 @@ section {
   p {
     margin: 0;
     font-size: 13px;
-  }
-}
-
-// Breit: Tabelle in eigener Bildlaufleiste
-.tabellen-rahmen {
-  overflow-x: auto;
-  margin: 0 -1.125rem;
-}
-
-.tabelle {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-
-  th,
-  td {
-    text-align: start;
-    padding: 0.6875rem 0.75rem;
-    border-bottom: 1px solid var(--linie);
-    vertical-align: middle;
-    overflow-wrap: break-word;
-  }
-
-  th:first-child,
-  td:first-child {
-    padding-inline-start: 1.125rem;
-  }
-
-  th {
-    font-size: 11.5px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-gedaempft);
-    white-space: nowrap;
-    padding-block: 0.625rem;
-  }
-
-  tbody tr:last-child td {
-    border-bottom: 0;
-  }
-
-  tbody tr:hover td {
-    background: var(--karte-2);
   }
 }

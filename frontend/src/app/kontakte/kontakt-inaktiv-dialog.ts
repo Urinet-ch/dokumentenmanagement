@@ -36,13 +36,13 @@ import { KontaktePort } from './kontakte-port';
           aria-describedby="inaktiv-grund-fehler"
         ></textarea>
       </label>
-      <p id="inaktiv-grund-fehler" class="fehler" role="alert" data-test="grund-fehler">
+      <p id="inaktiv-grund-fehler" class="hinweis gefahr" role="alert" data-test="grund-fehler">
         @if (grundZuLang()) {
           {{ texte.grundZuLang }}
         }
       </p>
       @if (fehler(); as text) {
-        <p class="fehler" role="alert" data-test="aktion-fehler">{{ text }}</p>
+        <p class="hinweis gefahr" role="alert" data-test="aktion-fehler">{{ text }}</p>
       }
       <div class="knoepfe">
         <button
