@@ -142,6 +142,10 @@ public class MailSchritte {
     @Dann("räumt die Mail-Testhilfe nur neue E-Mail-Dokumente auf")
     public void testIsolation() throws SQLException {
         UUID neu = dokument("urinet");
+        assertThat(wert("select count(*) from public.auftrag where mandant = ? "
+                + "and nutzlast->>'dokumentId' = ?", "urinet", neu.toString())).isPositive();
+        assertThat(TestAblage.versionen("urinet", "eingang/"))
+                .anyMatch(schluessel -> schluessel.contains("/" + neu + "/"));
         UUID vorhanden = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(
                 "urinet", null, "PERSONAL", false, "mail-test", null, "EINGANGSKORB"));
         try {
