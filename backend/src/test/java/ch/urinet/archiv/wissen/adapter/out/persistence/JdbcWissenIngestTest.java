@@ -15,6 +15,7 @@ import ch.urinet.archiv.ki.application.KiVerbrauchPort;
 import ch.urinet.archiv.ki.application.ChunkPort;
 import ch.urinet.archiv.ki.domain.Chunk;
 import ch.urinet.archiv.ki.application.EmbeddingPort;
+import ch.urinet.archiv.ki.application.RerankerPort;
 import ch.urinet.archiv.ki.TestEmbeddingPort;
 import ch.urinet.archiv.ki.application.chat.ChatSpeicher;
 import ch.urinet.archiv.ki.domain.chat.ChatAntwort;
@@ -27,6 +28,10 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.wissen.application.WissensSuchePort;
+import ch.urinet.archiv.wissen.application.WissensSuche;
+import ch.urinet.archiv.wissen.application.WissensSucheTransaktion;
+import ch.urinet.archiv.wissen.application.WissenModellBudget;
+import ch.urinet.archiv.suche.application.HybridSuche;
 import ch.urinet.archiv.wissen.application.WissenLesenRepository;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
@@ -63,6 +68,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -87,6 +93,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -121,6 +128,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     PanacheWissensSuche wissensSuche;
+
+    @Inject
+    WissensSucheTransaktion wissensSucheTransaktion;
 
     @Inject
     WissenLesenRepository wissenLesen;
@@ -2136,6 +2146,58 @@ class JdbcWissenIngestTest {
         assertThat(im(URINET, () -> wissensSuche.volltext(suchtext, ingestFilter, 10)))
                 .extracting(t -> t.seite().id()).containsExactlyInAnyOrder(lohn, uvg);
         assertThat(im(URINET, () -> wissensSuche.volltext("ab 12 zu", ingestFilter, 10))).isEmpty();
+    }
+
+    @Test
+    @Tag("req-5.4")
+    void ingestIndexFindetBeiModellausfallMehrworttrefferJeMandant() throws Exception {
+        Map<MandantCode, UUID> entwurfIds = new HashMap<>();
+        Map<MandantCode, List<UUID>> erwarteteSeiten = new HashMap<>();
+        for (MandantCode code : List.of(URINET, ZWEITER)) {
+            entwurfIds.put(code, entwurf(code, quelle(code), "WARTEND"));
+            UUID lohn = seite(code, "probe/lohn", "Die Lohndeklaration ist fällig.", null);
+            UUID uvg = seite(code, "probe/uvg", "Die Unfallversicherung wird abgerechnet.", null);
+            seite(code, "probe/anders", "Ein Text über Fussballvereine.", null);
+            UUID intern = seite(code, "probe/intern", "Lohndeklaration Unfallversicherung", null);
+            ausfuehren("update " + code.schema() + ".wissensseite set vertraulichkeit = 'INTERN', "
+                    + "vertraulichkeit_mindest = 'INTERN' where id = ?", intern);
+            erwarteteSeiten.put(code, List.of(lohn, uvg));
+        }
+
+        for (boolean embeddingAusfall : List.of(true, false)) {
+            AtomicInteger rerankerAufrufe = new AtomicInteger();
+            var verbrauch = new KiPort.Verbrauch("test", 0, 0);
+            EmbeddingPort embedding = new EmbeddingPort() {
+                @Override public Antwort einbetten(List<String> texte) {
+                    throw new AssertionError("Nur die Frage darf eingebettet werden");
+                }
+                @Override public Antwort einbettenFrage(String frage) {
+                    if (embeddingAusfall) return new Ausfall("Testausfall", verbrauch);
+                    float[] vektor = new float[DIMENSION];
+                    vektor[0] = 1;
+                    return new Vektoren(List.of(vektor), verbrauch);
+                }
+            };
+            RerankerPort reranker = (frage, texte, topN) -> {
+                rerankerAufrufe.incrementAndGet();
+                return new RerankerPort.Ausfall("Testausfall", verbrauch);
+            };
+            var modelle = new HybridSuche(null, null, embedding, reranker, (zweck, eintrag) -> { }, null);
+            var suche = new WissensSuche(wissensSuche, modelle, wissensSucheTransaktion, null,
+                    new WissenModellBudget(null, null, true, true));
+            var grenzen = new WissenKonfiguration("test-modell", 30_000, 15, 100,
+                    20_000, 12_000, 300_000, 1_000_000);
+            var index = new WissenIngestIndex(ingestSpeichern, suche, grenzen);
+
+            for (MandantCode code : List.of(URINET, ZWEITER)) {
+                var treffer = CompletableFuture.supplyAsync(() -> kontext.mit(code,
+                        () -> index.laden(entwurfIds.get(code), "Lohndeklaration Unfallversicherung")), worker)
+                        .get(1, TimeUnit.MINUTES);
+                assertThat(treffer).extracting(WissenIngestPort.SeitenMetadaten::id)
+                        .containsExactlyInAnyOrderElementsOf(erwarteteSeiten.get(code));
+            }
+            assertThat(rerankerAufrufe).hasValue(embeddingAusfall ? 0 : 2);
+        }
     }
 
     @Test
