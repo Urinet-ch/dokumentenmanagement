@@ -96,6 +96,54 @@
         "type" : "string",
         "enum" : [ "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15", "A16", "A17", "A18", "A19", "A20", "A21", "A22", "A23" ]
       },
+      "Ansicht" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "benutzername" : {
+            "type" : "string"
+          },
+          "vorname" : {
+            "type" : "string"
+          },
+          "nachname" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "rollen" : {
+            "type" : "array",
+            "uniqueItems" : true,
+            "items" : {
+              "$ref" : "#/components/schemas/Rolle"
+            }
+          },
+          "rollenkonflikt" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "$ref" : "#/components/schemas/BenutzerStatus"
+          },
+          "totp" : {
+            "type" : "boolean"
+          },
+          "google" : {
+            "type" : "boolean"
+          },
+          "einladungOffenSeit" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "letzteAktion" : {
+            "$ref" : "#/components/schemas/LetzteAktion"
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        }
+      },
       "Antwort" : {
         "type" : "object",
         "properties" : {
@@ -396,6 +444,10 @@
             "type" : "string"
           }
         }
+      },
+      "BenutzerStatus" : {
+        "type" : "string",
+        "enum" : [ "EINGELADEN", "AKTIV", "GESPERRT", "DEAKTIVIERT", "GELOESCHT" ]
       },
       "Bestaetigung" : {
         "description" : "Bestätigte Metadaten (A7, Req 8.2–8.5, 8.8, 8.9). Ersetzt die Grundfelder sowie die Felder der Gruppen finanz und vertrag vollständig; fehlende Felder sind leer. Zusatzfelder kommen aus dem gespeicherten Dokument.",
@@ -2761,6 +2813,17 @@
           }
         }
       },
+      "LetzteAktion" : {
+        "type" : "object",
+        "properties" : {
+          "zeit" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "aktion" : {
+            "type" : "string"
+          }
+        }
+      },
       "LocalDate" : {
         "type" : "string",
         "format" : "date",
@@ -3031,6 +3094,10 @@
             }
           }
         }
+      },
+      "Rolle" : {
+        "type" : "string",
+        "enum" : [ "INHABER", "MITARBEITER", "TREUHAENDER", "GESCHAEFTSSTELLE" ]
       },
       "StatusAnsicht" : {
         "type" : "object",
@@ -4068,6 +4135,131 @@
         "responses" : {
           "204" : {
             "description" : "Ablaufdatum entfernt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer" : {
+      "get" : {
+        "summary" : "Benutzer des Mandanten auflisten",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "groesse",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50
+          }
+        }, {
+          "name" : "q",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "seite",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Ansicht"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/{benutzerId}" : {
+      "get" : {
+        "summary" : "Benutzer des Mandanten anzeigen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/{benutzerId}/einladung" : {
+      "post" : {
+        "summary" : "Einladung erneut senden",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
           },
           "401" : {
             "description" : "Not Authorized"
