@@ -71,7 +71,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code POST /dokumente/generator} ({@code generator}), beide mit A1; {@code @RolesAllowed} nennt dort zusätzlich die
  * Scope-Rolle, sonst nirgends.
  * <p>
- * Spec 06: Die Benutzerverwaltung deklariert keine direkten Request-Parameter {@code mandant} oder {@code X-Mandant}
+ * Spec 06, Req 4.8: Die Verwaltung deklariert keine direkten Request-Parameter {@code mandant} oder {@code X-Mandant}
  * und kein {@code {mandant}} im Pfad; der Mandant kommt aus der Anmeldung.
  * <p>
  * Geprüft werden alle konkreten Klassen (main und test), in deren Hierarchie (Oberklassen, Interfaces) ein
@@ -89,6 +89,8 @@ class EndpunktWaechterTest {
     private static final Pattern PARAMETER = Pattern.compile("\\{");
     private static final Pattern MANDANT_IM_PFAD =
             Pattern.compile("\\{\\s*mandant\\s*(?::[^}]*)?}", Pattern.CASE_INSENSITIVE);
+    private static final List<String> VERWALTUNG = List.of("/rollen", "/benutzer", "/mandant/einstellungen",
+            "/wissensbasis/einstellungen", "/konfiguration/versionen");
     // {id} mit optionalem Regex, der selbst Klammern enthalten darf, z. B. {id:[0-9a-f-]{36}}
     private static final String ID = "\\{\\s*id\\s*(:([^{}]|\\{[^{}]*})*)?}";
     private static final Pattern DOKUMENT_ID = Pattern.compile(ID);
@@ -147,6 +149,8 @@ class EndpunktWaechterTest {
                 .contains("kein Mandant aus Parametern");
         assertThat(verstoesse(VerwaltungMitMandantImPfad.class)).singleElement().asString()
                 .contains("kein Mandant aus Parametern");
+        assertThat(verstoesse(EinstellungenMitMandant.class)).singleElement().asString()
+                .contains("kein Mandant aus Parametern");
         assertThat(verstoesse(WebseiteOhneWebseitenZugang.class)).singleElement().asString()
                 .contains("jede Methode unter /public/ verlangt @WebseitenZugang");
         assertThat(verstoesse(WebseitenZugangAusserhalbPublic.class)).singleElement().asString()
@@ -189,12 +193,11 @@ class EndpunktWaechterTest {
             String pfad = klassenPfad + "/" + deklarationen.stream().map(m -> m.getAnnotation(Path.class))
                     .filter(Objects::nonNull).map(Path::value).findFirst().orElse("");
             String normalerPfad = normalisiert(pfad);
-            if ((normalerPfad.equals("/rollen") || normalerPfad.startsWith("/rollen/")
-                    || normalerPfad.equals("/benutzer") || normalerPfad.startsWith("/benutzer/"))
+            if (VERWALTUNG.stream().anyMatch(p -> normalerPfad.equals(p) || normalerPfad.startsWith(p + "/"))
                     && (MANDANT_IM_PFAD.matcher(pfad).find()
                     || deklarationen.stream().flatMap(m -> Arrays.stream(m.getParameterAnnotations()))
                             .flatMap(Arrays::stream).anyMatch(EndpunktWaechterTest::mandantParameter))) {
-                verstoesse.add(name + ": kein Mandant aus Parametern der Benutzerverwaltung");
+                verstoesse.add(name + ": kein Mandant aus Parametern der Verwaltung");
             }
             boolean unterPublic = normalisiert(klassenPfad).equals("/public")
                     || normalisiert(klassenPfad).startsWith("/public/");
@@ -589,6 +592,15 @@ class EndpunktWaechterTest {
         @ErfordertAktion(Aktion.A21)
         @RolesAllowed("inhaber")
         public void lesen(@HeaderParam("X-Mandant") String mandant) {
+        }
+    }
+
+    static class EinstellungenMitMandant {
+        @GET
+        @Path("/mandant/einstellungen")
+        @ErfordertAktion(Aktion.A20)
+        @RolesAllowed("inhaber")
+        public void lesen(@QueryParam("mandant") String mandant) {
         }
     }
 
