@@ -20,6 +20,9 @@ public class ChatAnalyseLesen {
     @Transactional(Transactional.TxType.MANDATORY)
     public Ergebnis lesen(String nachrichtId, String benutzer) {
         long id;
+        if (nachrichtId == null || !nachrichtId.matches("[1-9][0-9]{0,18}")) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
         try {
             id = Long.parseLong(nachrichtId);
         } catch (NumberFormatException e) {

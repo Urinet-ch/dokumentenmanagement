@@ -27,9 +27,20 @@ describe('Meine Analysevorschläge', () => {
       id: 'e1', status: 'ERLEDIGT', entscheidungen: [{ nr: 1, status: 'VERWORFEN', grund: 'Unklar' }],
     });
     await fixture.whenStable();
-    expect(fixture.nativeElement.textContent).toContain('ERLEDIGT');
-    expect(fixture.nativeElement.textContent).toContain('VERWORFEN');
+    expect(fixture.nativeElement.textContent).toContain('Erledigt');
+    expect(fixture.nativeElement.textContent).toContain('Verworfen');
+    expect(fixture.nativeElement.textContent).not.toContain('ERLEDIGT');
+    expect(fixture.nativeElement.textContent).not.toContain('VERWORFEN');
     expect(fixture.nativeElement.textContent).toContain('Unklar');
+  });
+
+  it('fällt bei unbekannten Codes auf den Code zurück', async () => {
+    const fixture = TestBed.createComponent(MeineAnalysen);
+    fixture.componentRef.setInput('id', 'e2');
+    fixture.detectChanges();
+    http.expectOne('/api/v1/wissensentwuerfe/e2').flush({ id: 'e2', status: 'NEU_X', entscheidungen: [] });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('NEU_X');
   });
 
   it('filtert die Vollansicht eines A17-Benutzers auf eigene Analysen', async () => {

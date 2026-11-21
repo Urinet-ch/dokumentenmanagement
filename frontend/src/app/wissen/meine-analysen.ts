@@ -9,6 +9,10 @@ import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
+/**
+ * Reine JSON-Seite über rohen HttpClient mit lokalen Typen: Die Ansicht mischt Status- und Vollansicht (A18/A17),
+ * die der generierte Service als eine Antwort ohne diese Unterscheidung modelliert.
+ */
 interface Eintrag { id: string; status: string }
 interface Entscheidung { nr: number; status: string; grund?: string | null }
 interface VollerEintrag { entwurf: Eintrag & { anlass: string; erstelltVon: string } }
@@ -40,15 +44,15 @@ interface Statusansicht extends Eintrag { entscheidungen: Entscheidung[] }
           @if (liste().length === 0) { <p><app-symbol name="wissen" /> {{ texte.analyseLeer }}</p> }
           <ul>
             @for (eintrag of liste(); track eintrag.id) {
-              <li><a class="mono" [routerLink]="['/wissen/entwuerfe/meine', eintrag.id]">{{ eintrag.id }}</a> · {{ eintrag.status }}</li>
+              <li><a class="mono" [routerLink]="['/wissen/entwuerfe/meine', eintrag.id]">{{ eintrag.id }}</a> · {{ statusText(eintrag.status) }}</li>
             }
           </ul>
         }
         @if (ansicht(); as daten) {
-          <p>{{ wissen.entwuerfe.status }}: {{ daten.status }}</p>
+          <p>{{ wissen.entwuerfe.status }}: {{ statusText(daten.status) }}</p>
           <ul>
             @for (entscheid of daten.entscheidungen; track entscheid.nr) {
-              <li>{{ texte.analyseEntscheid }} {{ entscheid.nr }}: {{ entscheid.status }}
+              <li>{{ texte.analyseEntscheid }} {{ entscheid.nr }}: {{ statusText(entscheid.status) }}
                 @if (entscheid.grund) { <p>{{ texte.analyseGrund }}: {{ entscheid.grund }}</p> }
               </li>
             }
@@ -79,6 +83,10 @@ export class MeineAnalysen {
       this.anmeldung.benutzer();
       untracked(() => this.laden());
     });
+  }
+
+  protected statusText(code: string): string {
+    return this.texte.analyseStatus[code] ?? code;
   }
 
   protected laden(): void {

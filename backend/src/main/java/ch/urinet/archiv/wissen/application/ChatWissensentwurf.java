@@ -48,20 +48,34 @@ public class ChatWissensentwurf {
     public UUID anlegen(Benutzer benutzer, String nachrichtId) {
         berechtigung.aktion(benutzer, Aktion.A18);
         huelle.sperren();
-        ChatAnalyseLesen.Ergebnis antwort = chat.lesen(nachrichtId, benutzer.id());
+        ChatAnalyseLesen.Ergebnis antwort;
+        try {
+            antwort = chat.lesen(nachrichtId, benutzer.id());
+        } catch (FachFehler e) {
+            if (e.code() == Fehlercode.NICHT_GEFUNDEN) {
+                nichtGefunden(benutzer);
+            }
+            throw e;
+        }
         Sichtregel regel = Sichtregel.fuer(benutzer);
         Set<ChatAnalyseDaten.Quelle> quellen = new LinkedHashSet<>(antwort.quellen());
         Set<UUID> dokumente = new LinkedHashSet<>();
         quellen.stream().map(ChatAnalyseDaten.Quelle::dokumentId).filter(java.util.Objects::nonNull)
                 .forEach(dokumente::add);
         if (lesen.dokumentKoepfe(regel, dokumente).size() != dokumente.size()) {
-            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+            nichtGefunden(benutzer);
         }
         UUID id = UUID.randomUUID();
         List<Quelleneintrag> eintraege = new ArrayList<>();
         for (ChatAnalyseDaten.Quelle quelle : quellen) {
-            UUID seiteId = quelle.seitenPfad() == null ? null : lesen.seite(quelle.seitenPfad(), regel)
-                    .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN)).id();
+            UUID seiteId = null;
+            if (quelle.seitenPfad() != null) {
+                var seite = lesen.seite(quelle.seitenPfad(), regel);
+                if (seite.isEmpty()) {
+                    nichtGefunden(benutzer);
+                }
+                seiteId = seite.get().id();
+            }
             eintraege.add(new Quelleneintrag("q-chat-" + id + "-" + (eintraege.size() + 1), quelle.dokumentId(),
                     null, null, null, seiteId));
         }
@@ -79,5 +93,10 @@ public class ChatWissensentwurf {
                 fassung, null, List.of(), List.of(), ergebnis.pruefung().befunde(), ergebnis.pruefung().hinweise(),
                 diff.vergleichen(null, fassung), antwort.kontextstufe()));
         return id;
+    }
+
+    /** Meldet eine unsichtbare Quelle als VERWEIGERT (404) ins Zugriffsprotokoll, ohne Inhalte oder Titel. */
+    private void nichtGefunden(Benutzer benutzer) {
+        berechtigung.wissensseitenAktion(benutzer, Aktion.A18, false);
     }
 }

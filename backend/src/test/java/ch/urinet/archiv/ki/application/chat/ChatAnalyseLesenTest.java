@@ -32,6 +32,16 @@ class ChatAnalyseLesenTest {
         }
     }
 
+    @Test
+    void nachrichtIdMussStrengDezimalSeinOhneVorzeichenOderNichtAsciiZiffern() {
+        var lesen = new ChatAnalyseLesen(null);
+        for (String id : new String[] {"+12", "-1", "0", "012", "\u0661\u0662", "", " 5", null, "99999999999999999999"}) {
+            assertThatThrownBy(() -> lesen.lesen(id, "u1"))
+                    .isInstanceOf(FachFehler.class)
+                    .satisfies(e -> assertThat(((FachFehler) e).code()).isEqualTo(Fehlercode.ANFRAGE_UNGUELTIG));
+        }
+    }
+
     private static ChatAnalyseDaten daten(boolean vollstaendig, String status, ChatAnalyseDaten.Werkzeug... werkzeuge) {
         return new ChatAnalyseDaten("Antwort", status, vollstaendig, List.of(werkzeuge), List.of());
     }

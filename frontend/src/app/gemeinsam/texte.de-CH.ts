@@ -1493,6 +1493,10 @@ export const TEXTE = {
     analyseEntscheid: 'Entscheid',
     analyseGrund: 'Grund',
     analyseZurListe: 'Zur Liste der Analysevorschläge',
+    analyseStatus: {
+      OFFEN: 'Offen', ERLEDIGT: 'Erledigt', IN_ARBEIT: 'In Arbeit', WARTEND: 'Wartend', ABGELEHNT: 'Abgelehnt',
+      FEHLER: 'Fehler', ANGENOMMEN: 'Angenommen', VERWORFEN: 'Verworfen', VERALTET: 'Veraltet',
+    } as Readonly<Record<string, string>>,
     analyseStatusFehler: 'Die Eignung für einen Analysevorschlag konnte nicht geprüft werden. Bitte laden Sie das Gespräch neu.',
     /** Hinweis während eines Werkzeugaufrufs (Req 6.2), fest je Werkzeug. */
     werkzeuge: {
