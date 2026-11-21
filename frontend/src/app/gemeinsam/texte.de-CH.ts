@@ -1631,6 +1631,16 @@ export const TEXTE = {
   hilfe: {
     abschnitte: {
       'erste-schritte': 'Erste Schritte',
+      // Aufgabe 22.5
+      erfassen: 'Erfassen',
+      'erfassen-handy': 'Mit dem Handy fotografieren',
+      'erfassen-dateien': 'Dateien hochladen',
+      'erfassen-offline': 'Ohne Netz erfassen',
+      eingangskorb: 'Eingangskorb',
+      'eingangskorb-bestaetigen': 'Prüfen, korrigieren und bestätigen',
+      'eingangskorb-eigene': 'Ihre erfassten Dokumente verfolgen',
+      dokument: 'Dokumentansicht',
+      'dokument-aendern': 'Angaben ändern',
       probleme: 'Wenn etwas nicht klappt',
     } as Record<string, string>,
     laedt: 'Die Anleitung wird geladen …',

@@ -346,6 +346,34 @@ Stand von PR #411; Schnittstellen für die Aufgaben 22.2 bis 22.7.
   gefunden, kein Mandant oder keine Rolle, neue Version) als erste Fassung nur mit dem, was auf `main` umgesetzt ist;
   22.5 bzw. 22.7 vervollständigen sie (z. B. Knopf «Hilfe» und Verweise auf `#erfassen-offline`, sobald es sie gibt).
 
+## Umsetzung (Aufgabe 22.5, 21.11.2026)
+Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben ist nur, was auf `main` umgesetzt ist
+(Requirement 6.4), mit dem Wortlaut der Knöpfe und Meldungen aus `texte.de-CH.ts`.
+- **Katalog:** Einträge `erfassen`, `erfassen-handy`, `erfassen-dateien`, `erfassen-offline` (`abgemeldet`),
+  `eingangskorb`, `eingangskorb-bestaetigen` (A7), `eingangskorb-eigene` (A5 ohne A7), `dokument`, `dokument-aendern`
+  (A6) wie in der Tabelle «Hilfe-Katalog», in zwei Blöcken: Erfassen und Eingangskorb nach `erste-schritte`,
+  Dokumentansicht davor, wo 22.6 `suche` und `chat` einfügt. Titel in `TEXTE.hilfe.abschnitte`.
+- **Prüfung** (`anleitung-abschnitte.spec.ts`): (1) Der Katalog folgt der Tabelle «Hilfe-Katalog» (Reihenfolge, Titel,
+  Abschnitt, Bedingung, Pfade, `abgemeldet`); die Tabelle steht im Test, damit auch 22.6 und 22.7 gegen sie laufen.
+  (2) Ein Link auf einen Abschnitt (`#anker`) zeigt nur auf Einträge, die jede Rolle und der Besucher ohne Anmeldung
+  sieht, wenn sie den verweisenden Eintrag sehen (Requirement 6.2, 6.3; Unterabschnitt nur mit seinem Abschnitt).
+  Darum verweisen `eingangskorb.md` nicht auf seine beiden Unterabschnitte, `dokument.md` nicht auf `dokument-aendern`
+  und `erste-schritte.md` sowie `erfassen-offline.md` nur auf allgemeine Abschnitte. (3) Jeder Name in Guillemets in
+  den Dateien der Aufgabe steht wörtlich in `texte.de-CH.ts` (Requirement 6.6, 9.3); Ausnahme sind die Menüs der
+  Browser für «Startbildschirm» in `erfassen-handy.md`.
+- **Befunde aus dem Code**, die die Texte bestimmen: Die Kamera öffnet erst mit «Kamera öffnen» (Requirement 4.2 sagt
+  «beim Wählen von Erfassen»; die Anleitung beschreibt den Knopf). Neue Aufnahmen kommen immer ans Ende, Seiten lassen
+  sich nicht umsortieren. Hochgeladen wird nur bei offener App (kein Background Sync). Aufnahmen ohne Anmeldung übernimmt
+  die nächste Anmeldung mit A1 auf dem Gerät (`WarteschlangeService.zuordnen`). Der Entwurf im Eingangskorb entsteht nur,
+  wenn die Sitzung beim Bestätigen abläuft (`sessionStorage`). «Metadaten bearbeiten» gibt es in den Zuständen
+  `EINGANGSKORB`, `FEHLER` und `ARCHIVIERT`. Die Anmeldeseite bietet kein Zurücksetzen des Passworts
+  (`resetPasswordAllowed: false`).
+- **Für 22.7:** Die Umsetzung von 22.1 nennt Verweise auf `#erfassen-offline` in `erste-schritte.md` und
+  `probleme.md`. Nach (2) geht das nicht: Ohne Anmeldung sehen alle drei Einträge, angemeldet sieht der Treuhänder aber
+  `erste-schritte` und `probleme`, nicht `erfassen-offline` (A1). `erste-schritte.md` nennt darum nur den Link «Ohne
+  Verbindung erfassen» der Startseite; den Weg zu `#erfassen-offline` bringen die Links «So funktioniert es»
+  (Requirement 4.6, Aufgabe 23.4). `probleme.md` bleibt bei 22.7.
+
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,
   welche bestätigten Dokumente auf der WordPress-Seite erscheinen und ab wann (Spec 03); Wortlaut von Fabian mit der
