@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer;
 
 import ch.urinet.archiv.benutzer.application.VerwaltungVorgang;
+import ch.urinet.archiv.benutzer.application.VerwaltungVorgang.Kompensation;
 import ch.urinet.archiv.benutzer.application.Vorgangssperre;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
@@ -58,20 +59,20 @@ class VerwaltungVorgangTest {
             assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, falsch, () -> { }, () -> {
                 ausgefuehrt.set(true);
                 return "ok";
-            }, fehler -> { }, wert -> { }, wert -> abschluss)))
+            }, fehler -> Kompensation.UNKLAR, wert -> { }, wert -> abschluss)))
                     .hasRootCauseInstanceOf(org.postgresql.util.PSQLException.class);
             assertThat(ausgefuehrt).isFalse();
             assertThat(sperre.belegen(mandant, falsch.details().verwaltung().vorgangId())).isTrue();
             assertThat(sperre.freigeben(mandant, falsch.details().verwaltung().vorgangId())).isTrue();
 
             assertThatThrownBy(() -> in(thread, "vhf-gsk", () -> vorgang.ausfuehren(mandant, absicht,
-                    () -> { }, () -> "ok", fehler -> { }, wert -> { }, wert -> abschluss)))
+                    () -> { }, () -> "ok", fehler -> Kompensation.UNKLAR, wert -> { }, wert -> abschluss)))
                     .hasRootCauseInstanceOf(IllegalStateException.class);
             assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
                     () -> { throw new IllegalStateException("synthetische Prüfung"); }, () -> {
                         ausgefuehrt.set(true);
                         return "ok";
-                    }, fehler -> { }, wert -> { }, wert -> abschluss)))
+                    }, fehler -> Kompensation.UNKLAR, wert -> { }, wert -> abschluss)))
                     .hasRootCauseInstanceOf(IllegalStateException.class);
             assertThat(ausgefuehrt).isFalse();
             assertThat(phasen(id)).isEmpty();
@@ -79,7 +80,7 @@ class VerwaltungVorgangTest {
                 assertThat(QuarkusTransaction.isActive()).isFalse();
                 assertThat(phasen(id)).containsExactly("ANGEFRAGT");
                 return "ok";
-            }, fehler -> { }, wert -> assertThat(QuarkusTransaction.isActive()).isTrue(),
+            }, fehler -> Kompensation.UNKLAR, wert -> assertThat(QuarkusTransaction.isActive()).isTrue(),
                     wert -> abschluss))).isEqualTo("ok");
             assertThat(phasen(id)).containsExactly("ANGEFRAGT", "ABGESCHLOSSEN");
             UUID konfliktId = UUID.randomUUID();
@@ -89,11 +90,16 @@ class VerwaltungVorgangTest {
             try {
                 assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, konflikt, () -> { },
                         () -> { throw new IdentitaetsDienst.KonfliktException(); },
-                        fehler -> konfliktKompensiert.set(true), wert -> { }, wert -> abschluss)))
+                        fehler -> {
+                            konfliktKompensiert.set(true);
+                            return Kompensation.GEKLAERT;
+                        }, wert -> { }, wert -> abschluss)))
                         .hasRootCauseInstanceOf(IdentitaetsDienst.KonfliktException.class);
                 assertThat(konfliktKompensiert).isTrue();
-                assertThat(phasen(konfliktId)).containsExactly("ANGEFRAGT", "UNKLAR");
-                assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+                assertThat(phasen(konfliktId)).containsExactly("ANGEFRAGT", "FEHLGESCHLAGEN");
+                UUID neuerVorgang = UUID.randomUUID();
+                assertThat(sperre.belegen(mandant, neuerVorgang)).isTrue();
+                assertThat(sperre.freigeben(mandant, neuerVorgang)).isTrue();
             } finally {
                 testsperreEntfernen(mandant, konfliktId);
             }
@@ -105,7 +111,10 @@ class VerwaltungVorgangTest {
             try {
                 assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, fehlerAbsicht, () -> { },
                         () -> { throw new IllegalStateException("synthetischer Fehler"); },
-                        fehler -> kompensiert.set(true), wert -> { }, wert -> abschluss)))
+                        fehler -> {
+                            kompensiert.set(true);
+                            return Kompensation.UNKLAR;
+                        }, wert -> { }, wert -> abschluss)))
                         .hasRootCauseInstanceOf(IllegalStateException.class);
                 assertThat(kompensiert).isTrue();
                 assertThat(phasen(fehlerId)).containsExactly("ANGEFRAGT", "UNKLAR");
@@ -143,6 +152,28 @@ class VerwaltungVorgangTest {
     }
 
     @Test
+    void fehlendesKompensationsergebnisBleibtUngeklaert() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        var absicht = eintrag(id, UUID.randomUUID(), UUID.randomUUID().toString(), "INHABER",
+                ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { throw new IllegalStateException("synthetischer Fehler"); },
+                    fehler -> null, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(IllegalStateException.class)
+                    .satisfies(fehler -> assertThat(fehler.getCause().getSuppressed())
+                            .hasSize(1).satisfies(unterdrueckt ->
+                                    assertThat(unterdrueckt[0]).isInstanceOf(NullPointerException.class)));
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
     void abschlussNachFristBleibtUngeklaert() throws Exception {
         mandantenVorbereiten();
         MandantCode mandant = new MandantCode("urinet");
@@ -165,7 +196,7 @@ class VerwaltungVorgangTest {
                             throw new IllegalStateException(e);
                         }
                         return "ok";
-                    }, fehler -> { }, wert -> protokoll.schreiben(absicht), wert -> abschluss)))
+                    }, fehler -> Kompensation.GEKLAERT, wert -> protokoll.schreiben(absicht), wert -> abschluss)))
                     .hasRootCauseInstanceOf(IllegalStateException.class);
             assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
             assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
@@ -191,18 +222,18 @@ class VerwaltungVorgangTest {
         try (var thread = Executors.newSingleThreadExecutor()) {
             assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, ohneZiel,
                     () -> { }, () -> { ausgefuehrt.set(true); return "ok"; },
-                    fehler -> { }, wert -> { }, wert -> falscheRolle)))
+                    fehler -> Kompensation.UNKLAR, wert -> { }, wert -> falscheRolle)))
                     .hasRootCauseInstanceOf(IllegalArgumentException.class);
             assertThat(ausgefuehrt).isFalse();
             assertThat(phasen(id)).isEmpty();
             assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, ohneRolle,
                     () -> { }, () -> { ausgefuehrt.set(true); return "ok"; },
-                    fehler -> { }, wert -> { }, wert -> falscheRolle)))
+                    fehler -> Kompensation.UNKLAR, wert -> { }, wert -> falscheRolle)))
                     .hasRootCauseInstanceOf(IllegalArgumentException.class);
             assertThat(ausgefuehrt).isFalse();
             assertThat(phasen(id)).isEmpty();
             assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
-                    () -> { }, () -> "ok", fehler -> { }, wert -> { }, wert -> falscheRolle)))
+                    () -> { }, () -> "ok", fehler -> Kompensation.UNKLAR, wert -> { }, wert -> falscheRolle)))
                     .hasRootCauseInstanceOf(IllegalArgumentException.class);
             assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
         } finally {
@@ -231,7 +262,7 @@ class VerwaltungVorgangTest {
                 UUID vorgangId = fall.details().verwaltung().vorgangId();
                 assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, fall,
                         () -> { }, () -> { ausgefuehrt.set(true); return "ok"; },
-                        fehler -> { }, wert -> { }, wert -> fall)))
+                        fehler -> Kompensation.UNKLAR, wert -> { }, wert -> fall)))
                         .hasRootCauseInstanceOf(ZuVieleAnfragen.class);
                 assertThat(ausgefuehrt).isFalse();
                 assertThat(phasen(vorgangId)).isEmpty();

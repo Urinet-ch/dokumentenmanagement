@@ -21,6 +21,8 @@ import java.util.function.Supplier;
 @ApplicationScoped
 public class VerwaltungVorgang {
 
+    public enum Kompensation { GEKLAERT, UNKLAR }
+
     private static final Set<ProtokollAktion> AKTIONEN = Set.of(ProtokollAktion.BENUTZER_ANLEGEN,
             ProtokollAktion.BENUTZER_AENDERN, ProtokollAktion.BENUTZER_LOESCHEN, ProtokollAktion.ROLLE_ZUWEISEN);
 
@@ -46,10 +48,12 @@ public class VerwaltungVorgang {
      * Die erneute Prüfung unter der Vorgangssperre darf Keycloak nur lesen; sie prüft insbesondere den letzten Inhaber.
      * Die externe Arbeit und ihre Kompensation laufen ausserhalb der Datenbanktransaktion; die Arbeit darf Fehler
      * schreibender Aufrufe nicht unterdrücken.
+     * Die Kompensation darf {@code GEKLAERT} nur melden, wenn der Ausgangszustand wiederhergestellt ist und keine
+     * verspätete externe Wirkung mehr eintreffen kann.
      * {@code speichern} darf ausschliesslich Datenbankänderungen ausführen.
      */
     public <T> T ausfuehren(MandantCode mandant, ZugriffEintrag absicht, Runnable pruefen,
-                            Supplier<T> arbeit, Consumer<RuntimeException> kompensieren,
+                            Supplier<T> arbeit, Function<RuntimeException, Kompensation> kompensieren,
                             Consumer<T> speichern, Function<T, ZugriffEintrag> abschluss) {
         if (transaktionen.aktiv()) {
             throw new IllegalStateException("Verwaltungsvorgang darf nicht in einer Transaktion beginnen");
@@ -112,10 +116,28 @@ public class VerwaltungVorgang {
             });
             return ergebnis;
         } catch (RuntimeException fehler) {
+            Kompensation ergebnis = Kompensation.UNKLAR;
             try {
-                kompensieren.accept(fehler);
+                ergebnis = Objects.requireNonNull(kompensieren.apply(fehler), "Ergebnis der Kompensation fehlt");
             } catch (RuntimeException kompensationsFehler) {
                 fehler.addSuppressed(kompensationsFehler);
+            }
+            if (ergebnis == Kompensation.GEKLAERT) {
+                boolean abgeschlossen = false;
+                try {
+                    transaktionen.neu(() -> {
+                        protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.FEHLGESCHLAGEN));
+                        if (!sperre.abschliessen(mandant, id, Vorgangssperre.Abschluss.FEHLGESCHLAGEN)) {
+                            throw new IllegalStateException("Vorgangssperre nicht abgeschlossen");
+                        }
+                    });
+                    abgeschlossen = true;
+                } catch (RuntimeException abschlussFehler) {
+                    fehler.addSuppressed(abschlussFehler);
+                }
+                if (abgeschlossen) {
+                    throw fehler;
+                }
             }
             try {
                 transaktionen.neu(() -> {
