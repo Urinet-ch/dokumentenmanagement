@@ -24,6 +24,8 @@ public enum Fehlercode {
             "Das Dokument steht in einem Status, in dem diese Aktion nicht möglich ist. Bitte laden Sie es neu."),
     LETZTER_INHABER(409, "Letzter Inhaber",
             "Diese Änderung kann den letzten aktiven Inhaber entfernen. Bitte behalten Sie mindestens einen aktiven Inhaber."),
+    BENUTZER_EXISTIERT(409, "Benutzer existiert",
+            "Die Angaben sind bereits vergeben. Bitte prüfen Sie die Angaben und versuchen Sie es erneut."),
     REFERENZ_VERGEBEN(409, "Referenz vergeben",
             "Diese Referenz gehört bereits zu einer anderen Datei. Bitte verwenden Sie eine neue Referenz."),
     BELEGNUMMER_VERGEBEN(409, "Belegnummer vergeben",
