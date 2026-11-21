@@ -98,6 +98,7 @@ public class VerwaltungVorgang {
                 ProtokollDetails.Verwaltung ende = details(eintrag, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
                 if (!id.equals(ende.vorgangId()) || !absicht.aktion().equals(eintrag.aktion())
                         || !absicht.benutzer().equals(eintrag.benutzer())
+                        || !absicht.rolle().equals(eintrag.rolle())
                         || details.vorgang() != ende.vorgang()
                         || (details.ziel() != null && !details.ziel().equals(ende.ziel()))
                         || (art == VerwaltungGrenzen.Art.ANLEGEN && ende.ziel() == null)) {
@@ -134,7 +135,8 @@ public class VerwaltungVorgang {
         Objects.requireNonNull(eintrag);
         ProtokollDetails.Verwaltung details = eintrag.details().verwaltung();
         if (!AKTIONEN.contains(eintrag.aktion()) || eintrag.dokumentId().isPresent()
-                || details == null || details.phase() != phase) {
+                || eintrag.rolle().isEmpty() || details == null || details.phase() != phase
+                || (eintrag.aktion() != ProtokollAktion.BENUTZER_ANLEGEN && details.ziel() == null)) {
             throw new IllegalArgumentException("Ungültiges Verwaltungsprotokoll");
         }
         return details;

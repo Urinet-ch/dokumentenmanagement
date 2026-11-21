@@ -141,6 +141,42 @@ class VerwaltungVorgangTest {
         }
     }
 
+    @Test
+    void protokollVerlangtZielUndGleicheAkteurrolle() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        UUID ziel = UUID.randomUUID();
+        String akteur = UUID.randomUUID().toString();
+        var ohneZiel = eintrag(id, null, akteur, "INHABER", ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        var absicht = eintrag(id, ziel, akteur, "INHABER", ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        var ohneRolle = new ZugriffEintrag(absicht.benutzer(), Optional.empty(), absicht.aktion(),
+                absicht.dokumentId(), absicht.ip(), absicht.details());
+        var falscheRolle = eintrag(id, ziel, akteur, "MITARBEITER",
+                ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+        AtomicBoolean ausgefuehrt = new AtomicBoolean();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, ohneZiel,
+                    () -> { }, () -> { ausgefuehrt.set(true); return "ok"; },
+                    fehler -> { }, wert -> { }, wert -> falscheRolle)))
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(ausgefuehrt).isFalse();
+            assertThat(phasen(id)).isEmpty();
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, ohneRolle,
+                    () -> { }, () -> { ausgefuehrt.set(true); return "ok"; },
+                    fehler -> { }, wert -> { }, wert -> falscheRolle)))
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(ausgefuehrt).isFalse();
+            assertThat(phasen(id)).isEmpty();
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> "ok", fehler -> { }, wert -> { }, wert -> falscheRolle)))
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
     private void testsperreEntfernen(MandantCode mandant, UUID id) throws Exception {
         try (Connection verbindung = datenquelle.getConnection();
              PreparedStatement entfernen = verbindung.prepareStatement(
