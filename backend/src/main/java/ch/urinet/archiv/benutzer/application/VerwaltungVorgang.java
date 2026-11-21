@@ -10,6 +10,7 @@ import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.logging.Logger;
 
 import java.util.Objects;
 import java.util.Set;
@@ -20,6 +21,8 @@ import java.util.function.Supplier;
 
 @ApplicationScoped
 public class VerwaltungVorgang {
+
+    private static final Logger LOG = Logger.getLogger(VerwaltungVorgang.class);
 
     public enum Kompensation { GEKLAERT, UNKLAR }
 
@@ -107,6 +110,8 @@ public class VerwaltungVorgang {
             try {
                 sperre.freigeben(mandant, id);
             } catch (RuntimeException freigabeFehler) {
+                LOG.errorf("Vorgang %s: Freigabe fehlgeschlagen (%s).", id,
+                        freigabeFehler.getClass().getSimpleName());
                 fehler.addSuppressed(freigabeFehler);
             }
             throw fehler;
@@ -145,16 +150,32 @@ public class VerwaltungVorgang {
         } catch (RuntimeException fehler) {
             Kompensation ergebnis = Kompensation.UNKLAR;
             UUID geprueftesZiel = ziel;
+            boolean anlageUnklar = false;
             if (!arbeitGeliefert && geprueftesZiel == null && fehler instanceof ArbeitFehler mitZiel) {
                 geprueftesZiel = mitZiel.ziel();
+            } else if (!arbeitGeliefert && art == VerwaltungGrenzen.Art.ANLEGEN
+                    && fehler instanceof IdentitaetsDienst.AnlageException anlageFehler) {
+                anlageUnklar = !anlageFehler.entfernt();
+                try {
+                    UUID gelesen = UUID.fromString(anlageFehler.ziel());
+                    if (!gelesen.toString().equalsIgnoreCase(anlageFehler.ziel())) {
+                        throw new IllegalArgumentException("Ungültiges UUID-Format");
+                    }
+                    geprueftesZiel = gelesen;
+                } catch (IllegalArgumentException ungueltig) {
+                    LOG.errorf("Vorgang %s: Zielkennung der Anlage ungültig.", id);
+                    anlageUnklar = true;
+                }
             }
             UUID fehlerZiel = geprueftesZiel;
             try {
                 ergebnis = Objects.requireNonNull(kompensieren.apply(fehler), "Ergebnis der Kompensation fehlt");
             } catch (RuntimeException kompensationsFehler) {
+                LOG.errorf("Vorgang %s: Kompensation fehlgeschlagen (%s).", id,
+                        kompensationsFehler.getClass().getSimpleName());
                 fehler.addSuppressed(kompensationsFehler);
             }
-            if (ergebnis == Kompensation.GEKLAERT && (!arbeitGeliefert || abschlussGeprueft)) {
+            if (ergebnis == Kompensation.GEKLAERT && !anlageUnklar && (!arbeitGeliefert || abschlussGeprueft)) {
                 boolean abgeschlossen = false;
                 try {
                     transaktionen.neu(() -> {
@@ -165,10 +186,12 @@ public class VerwaltungVorgang {
                     });
                     abgeschlossen = true;
                 } catch (RuntimeException abschlussFehler) {
+                    LOG.errorf("Vorgang %s: Fehlerabschluss fehlgeschlagen (%s).", id,
+                            abschlussFehler.getClass().getSimpleName());
                     fehler.addSuppressed(abschlussFehler);
                 }
                 if (abgeschlossen) {
-                    throw fehler;
+                    throw anlageKonfliktAbbilden(art, fehler);
                 }
             }
             try {
@@ -179,10 +202,17 @@ public class VerwaltungVorgang {
                     }
                 });
             } catch (RuntimeException protokollFehler) {
+                LOG.errorf("Vorgang %s: Protokollierung des unklaren Zustands fehlgeschlagen (%s).", id,
+                        protokollFehler.getClass().getSimpleName());
                 fehler.addSuppressed(protokollFehler);
             }
             throw fehler;
         }
+    }
+
+    private static RuntimeException anlageKonfliktAbbilden(VerwaltungGrenzen.Art art, RuntimeException fehler) {
+        return art == VerwaltungGrenzen.Art.ANLEGEN && fehler instanceof IdentitaetsDienst.KonfliktException
+                ? new FachFehler(Fehlercode.BENUTZER_EXISTIERT) : fehler;
     }
 
     private static ProtokollDetails.Verwaltung details(ZugriffEintrag eintrag,
