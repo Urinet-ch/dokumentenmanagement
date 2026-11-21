@@ -4359,6 +4359,50 @@
         } ]
       }
     },
+    "/api/v1/benutzer/{benutzerId}/google-verknuepfung" : {
+      "delete" : {
+        "summary" : "Google-Verknüpfung lösen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Google-Verknüpfung gelöst"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
     "/api/v1/benutzer/{benutzerId}/zugang-zuruecksetzen" : {
       "post" : {
         "summary" : "Zugang zurücksetzen",

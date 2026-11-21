@@ -333,6 +333,32 @@ class VerwaltungCacheHttpTest {
     }
 
     @Test
+    void googleLoesenPrueftStepUpMandantUndBestehendeVerknuepfung() {
+        String pfad = "/api/v1/benutzer/";
+        String token = Testanmeldung.token("inhaber-urinet");
+        given().auth().oauth2(token).contentType("application/json")
+                .delete(pfad + UUID.randomUUID() + "/google-verknuepfung")
+                .then().statusCode(401).body("fehlercode", is("STEP_UP_NOETIG"));
+
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub();
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String ziel = dienst.anlegen("urinet", person("google." + suffix), Rolle.MITARBEITER);
+        String fremd = dienst.anlegen("vhf-gsk", person("fremd." + suffix), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+
+        given().auth().oauth2(token).contentType("application/json")
+                .delete(pfad + fremd + "/google-verknuepfung").then().statusCode(404);
+        given().auth().oauth2(token).contentType("application/json").body("{\"googleId\":\"verboten\"}")
+                .delete(pfad + ziel + "/google-verknuepfung").then().statusCode(400);
+        given().auth().oauth2(token).contentType("application/json").delete(pfad + ziel + "/google-verknuepfung")
+                .then().statusCode(409).body("fehlercode", is("STATUS_KONFLIKT"));
+    }
+
+    @Test
     void anlegenPrueftRollenNamenssperreUndVierAugen() throws SQLException {
         QuarkusMock.installMockForType(new StepUpAusstehend() {
             @Override

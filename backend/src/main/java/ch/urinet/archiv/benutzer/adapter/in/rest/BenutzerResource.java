@@ -4,6 +4,7 @@ import ch.urinet.archiv.benutzer.application.BenutzerLesen;
 import ch.urinet.archiv.benutzer.application.BenutzerEinladen;
 import ch.urinet.archiv.benutzer.application.BenutzerAnlegen;
 import ch.urinet.archiv.benutzer.application.BenutzerZugangZuruecksetzen;
+import ch.urinet.archiv.benutzer.application.BenutzerGoogleLoesen;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -23,6 +24,7 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.POST;
@@ -51,6 +53,7 @@ public class BenutzerResource {
     private final BenutzerEinladen einladen;
     private final BenutzerAnlegen anlegen;
     private final BenutzerZugangZuruecksetzen zugang;
+    private final BenutzerGoogleLoesen google;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
     private final ObjectReader json;
@@ -58,13 +61,14 @@ public class BenutzerResource {
     private final StepUp stepUp;
 
     public BenutzerResource(BenutzerLesen lesen, BenutzerEinladen einladen, BenutzerAnlegen anlegen,
-                            BenutzerZugangZuruecksetzen zugang,
+                            BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google,
                             MandantAufloesung mandant, SecurityIdentity identitaet, ObjectMapper json,
                             Berechtigung berechtigung, StepUp stepUp) {
         this.lesen = lesen;
         this.einladen = einladen;
         this.anlegen = anlegen;
         this.zugang = zugang;
+        this.google = google;
         this.mandant = mandant;
         this.identitaet = identitaet;
         this.json = json.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
@@ -172,6 +176,25 @@ public class BenutzerResource {
         stepUp.pruefen();
         leerenKoerperPruefen(contentType, body);
         zugang.ausfuehren(code, akteur, benutzerId, IpAdresse.aus(ip));
+        return Response.noContent().build();
+    }
+
+    @DELETE
+    @Path("/{benutzerId}/google-verknuepfung")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Google-Verknüpfung lösen")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Google-Verknüpfung gelöst")
+    public Response googleLoesen(@PathParam("benutzerId") String benutzerId, @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        stepUp.pruefen();
+        leerenKoerperPruefen(contentType, body);
+        google.ausfuehren(code, akteur, benutzerId, IpAdresse.aus(ip));
         return Response.noContent().build();
     }
 

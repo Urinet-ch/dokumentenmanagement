@@ -27,6 +27,13 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber den Zugang des Mitarbeiters zurücksetzt
     Dann sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert
 
+  @req-3.15
+  Szenario: Eine Google-Verknüpfung wird gelöst und Sitzungen beendet
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer Benutzer hat eine Google-Verknüpfung
+    Wenn der Inhaber die Google-Verknüpfung löst
+    Dann ist die Verknüpfung entfernt und die Sitzungen sind beendet
+
   @req-3.4 @req-5.9
   Szenario: Ungültige Angaben und Realm-Konflikte werden ohne Personendaten abgewiesen
     Angenommen die frische Anmeldung ist für den Test bestätigt

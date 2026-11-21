@@ -67,6 +67,8 @@ public class BenutzerVerwaltungSchritte {
     private StepUp urspruenglichesStepUp;
     private IdentitaetsDienst urspruenglicheIdentitaet;
     private IdentitaetsDienstStub fehlerdienst;
+    private boolean googleVerknuepft;
+    private boolean googleSitzungenBeendet;
     private LogMitschnitt log;
     private String name;
     private String spaetererBestandsname;
@@ -280,6 +282,47 @@ public class BenutzerVerwaltungSchritte {
                 assertThat(zeile.getString(1)).doesNotContain(name, "@example.invalid");
             }
         }
+    }
+
+    @Angenommen("ein synthetischer Benutzer hat eine Google-Verknüpfung")
+    public void googleVerknuepft() {
+        urspruenglicheIdentitaet = ClientProxy.unwrap(identitaet);
+        googleVerknuepft = true;
+        fehlerdienst = new IdentitaetsDienstStub() {
+            @Override
+            public synchronized Benutzer benutzerLesen(String mandant, String id) {
+                Benutzer b = super.benutzerLesen(mandant, id);
+                return new Benutzer(b.id(), b.benutzername(), b.email(), b.vorname(), b.nachname(), b.aktiv(),
+                        b.rollen(), b.aktionen(), b.totp(), googleVerknuepft);
+            }
+
+            @Override
+            public synchronized void googleLoesen(String mandant, String id) {
+                super.googleLoesen(mandant, id);
+                googleVerknuepft = false;
+            }
+
+            @Override
+            public synchronized void sitzungenBeenden(String mandant, String id) {
+                super.sitzungenBeenden(mandant, id);
+                googleSitzungenBeendet = true;
+            }
+        };
+        eigeneId = fehlerdienst.anlegen(MANDANT, new IdentitaetsDienst.Neuanlage(name,
+                name + "@example.invalid", "Test", "Person"), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(fehlerdienst, IdentitaetsDienst.class);
+    }
+
+    @Wenn("der Inhaber die Google-Verknüpfung löst")
+    public void googleLoesen() {
+        antworten.add(anfrage().contentType("application/json").delete(PFAD + "/" + eigeneId + "/google-verknuepfung"));
+    }
+
+    @Dann("ist die Verknüpfung entfernt und die Sitzungen sind beendet")
+    public void googleGeloest() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(googleVerknuepft).isFalse();
+        assertThat(googleSitzungenBeendet).isTrue();
     }
 
     @Wenn("der Inhaber die Einladung viermal erneut sendet")
