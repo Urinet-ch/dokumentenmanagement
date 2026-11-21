@@ -32,6 +32,11 @@ class KeycloakVerwaltungSpikeTest {
     }
 
     @Test
+    void testRealmSendetEinladungAnMailpit() {
+        EinladungsProbe.pruefen();
+    }
+
+    @Test
     void devServiceZeigtMandantensucheRollenmitgliederUndDienstkontoToken() throws IOException {
         String oidcUrl = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
         String imageTag = ConfigProvider.getConfig().getValue("quarkus.keycloak.devservices.image-name", String.class);
