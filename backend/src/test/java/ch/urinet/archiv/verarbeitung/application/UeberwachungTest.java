@@ -78,7 +78,21 @@ class UeberwachungTest {
 
         ueberwachung.pruefen();
 
-        assertThat(speicher.abgeglichen).containsOnly(Befund.Quelle.DOKUMENT);
+        assertThat(speicher.abgeglichen).containsOnly(Befund.Quelle.DOKUMENT, Befund.Quelle.VERWALTUNG);
+    }
+
+    @Test
+    void ungeklärterVerwaltungsvorgangWirdNachVersandfehlerErneutGemeldet() {
+        var unklar = new Befund(Befund.Quelle.VERWALTUNG, UUID.randomUUID().toString(), "UNKLAR");
+        Ueberwachung ueberwachung = ueberwachung(List.of(URINET), Optional.empty(),
+                mandant -> List.of(unklar));
+        post.zustellen = false;
+        ueberwachung.pruefen();
+        post.zustellen = true;
+        ueberwachung.pruefen();
+        ueberwachung.pruefen();
+        assertThat(post.versuche).filteredOn(unklar::equals).containsExactly(unklar, unklar);
+        assertThat(post.zugestellt).containsEntry(unklar, URINET);
     }
 
     @Test
@@ -96,14 +110,14 @@ class UeberwachungTest {
             public Map<String, Long> anzahlJeStatus(MandantCode mandant) {
                 return Map.of();
             }
-        }, m -> Optional.empty(), Optional::empty, speicher, post, Duration.ofHours(1), "urinet");
+        }, m -> Optional.empty(), Optional::empty, m -> List.of(), speicher, post, Duration.ofHours(1), "urinet");
 
         assertThat(ueberwachung.pruefen()).isEqualTo(1);
     }
 
     @Test
     void grenzeMussPositivSein() {
-        assertThatThrownBy(() -> new Ueberwachung(register(List.of()), null, null, null, speicher, post,
+        assertThatThrownBy(() -> new Ueberwachung(register(List.of()), null, null, null, null, speicher, post,
                 Duration.ZERO, "urinet")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Ueberwachung.pruefeEinstellungen(Duration.ofSeconds(-1), "urinet"))
                 .hasMessageContaining("archiv.ueberwachung.grenze");
@@ -128,6 +142,11 @@ class UeberwachungTest {
     }
 
     private Ueberwachung ueberwachung(List<MandantCode> mandanten, Optional<List<Befund>> sicherung) {
+        return ueberwachung(mandanten, sicherung, m -> List.of());
+    }
+
+    private Ueberwachung ueberwachung(List<MandantCode> mandanten, Optional<List<Befund>> sicherung,
+                                       VorgangUeberwachung vorgaenge) {
         DokumentUeberwachung dokumente = new DokumentUeberwachung() {
             @Override
             public List<Befund> laengerAls(MandantCode mandant, Duration grenze) {
@@ -139,7 +158,8 @@ class UeberwachungTest {
                 return Map.of();
             }
         };
-        return new Ueberwachung(register(mandanten), dokumente, m -> Optional.empty(), () -> sicherung, speicher, post,
+        return new Ueberwachung(register(mandanten), dokumente, m -> Optional.empty(), () -> sicherung,
+                vorgaenge, speicher, post,
                 Duration.ofHours(1), "urinet");
     }
 

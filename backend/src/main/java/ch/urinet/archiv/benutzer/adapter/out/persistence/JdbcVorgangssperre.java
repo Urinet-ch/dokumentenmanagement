@@ -100,6 +100,9 @@ public class JdbcVorgangssperre implements Vorgangssperre {
                 ? "update public.verwaltung_vorgang set phase = 'UNKLAR' "
                 : "delete from public.verwaltung_vorgang ";
         sql += "where mandant = ? and vorgang_id = ? and phase = 'ANGEFRAGT'";
+        if (abschluss != Abschluss.UNKLAR) {
+            sql += " and bis > clock_timestamp()";
+        }
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement befehl = verbindung.prepareStatement(sql)) {
             befehl.setString(1, mandant.wert());

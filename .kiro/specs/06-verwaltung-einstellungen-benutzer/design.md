@@ -182,9 +182,21 @@ Ein Vorgang mit Wirkung in Keycloak lässt sich nicht in der Datenbank-Transakti
 4. Aufrufe an Keycloak (mit Zeitgrenze); bei Fehler Kompensation (z. B. neu angelegten Benutzer entfernen).
 5. Transaktion 2: Protokolleintrag `phase=ABGESCHLOSSEN` oder `FEHLGESCHLAGEN` (bzw. `UNKLAR`, wenn die Kompensation
    scheitert), Benutzerverzeichnis (`ANLAGE`, `AUSTRITT`), `benutzer_status`, Antrag, Token-Widerruf.
-6. Vorgangssperre freigeben (auch bei Fehler; sonst läuft sie nach 15 s ab).
+6. Die Sperre nach eindeutigem Abschluss freigeben; eine vor externer Wirkung vorbereitete Sperre läuft nach 15 s ab.
+   Entscheid Fabian 21.11.2026: Ein ungeklärter Vorgang (`UNKLAR`) hält die Sperre bis zum Abgleich (19.13) oder bis
+   ein Admin ihn klärt; bei `UNKLAR` wird alarmiert. Das weicht von der pauschalen 15-Sekunden-Grenze in Req 4.7 ab.
+   Auch ein `ANGEFRAGT` ohne Abschluss bleibt gesperrt: Eine verspätete externe Wirkung kann noch eintreffen.
+   Trifft ein erfolgreicher Abschluss nach Ablauf der Frist ein, wird er nicht als eindeutig abgeschlossen
+   übernommen; die Datenbanktransaktion wird zurückgerollt und der Vorgang als ungeklärt behandelt.
+   Die bestehende Überwachung meldet `UNKLAR` und abgelaufene `ANGEFRAGT`-Vorgänge je Mandant mit der Vorgangs-ID;
+   bei gescheitertem Mailversand versucht sie es beim nächsten Takt erneut.
 Der Abgleich (täglich, beim Start des Workers) findet Einträge `ANGEFRAGT` ohne Abschluss nach 5 Minuten, liest den
 Zustand in Keycloak und schreibt den Abschluss `UNKLAR` mit Alarm; er ändert nie etwas in Keycloak.
+
+Für den Protokollgrund sind ausschliesslich die festen Kategorien `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`,
+`KORREKTUR` und `SONSTIGES` zulässig. So können Namen, E-Mail-Adressen und Geheimnisse nicht durch Freitext ins
+append-only Protokoll gelangen. Die Kategorie muss beim Vorgang explizit gewählt werden; Freitext wird nicht
+automatisch umgedeutet. Die Anbindung der Eingaben und Pflichtprüfung folgt mit den Verwaltungsendpunkten.
 
 ### Statusautomat
 | Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |

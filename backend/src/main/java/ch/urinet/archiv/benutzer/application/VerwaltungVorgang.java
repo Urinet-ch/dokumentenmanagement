@@ -100,6 +100,7 @@ public class VerwaltungVorgang {
                         || !absicht.benutzer().equals(eintrag.benutzer())
                         || !absicht.rolle().equals(eintrag.rolle())
                         || details.vorgang() != ende.vorgang()
+                        || details.grund() != ende.grund()
                         || (details.ziel() != null && !details.ziel().equals(ende.ziel()))
                         || (art == VerwaltungGrenzen.Art.ANLEGEN && ende.ziel() == null)) {
                     throw new IllegalArgumentException("Abschluss gehört nicht zum Vorgang");
@@ -177,7 +178,7 @@ public class VerwaltungVorgang {
     private static ZugriffEintrag mitPhase(ZugriffEintrag eintrag, ProtokollDetails.Verwaltungsphase phase) {
         ProtokollDetails.Verwaltung bisher = eintrag.details().verwaltung();
         var details = new ProtokollDetails.Verwaltung(bisher.vorgangId(), phase, bisher.ziel(), bisher.vorgang(),
-                bisher.rolleAlt(), bisher.rolleNeu(), bisher.felder());
+                bisher.rolleAlt(), bisher.rolleNeu(), bisher.felder(), bisher.grund());
         return new ZugriffEintrag(eintrag.benutzer(), eintrag.rolle(), eintrag.aktion(), eintrag.dokumentId(),
                 eintrag.ip(), ProtokollDetails.verwaltung(details), eintrag.bearbeiter());
     }

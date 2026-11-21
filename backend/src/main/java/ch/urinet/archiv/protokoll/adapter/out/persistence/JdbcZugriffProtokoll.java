@@ -137,6 +137,9 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             if (verwaltung.rolleNeu() != null) {
                 knoten.put("rolleNeu", verwaltung.rolleNeu().name().toLowerCase(java.util.Locale.ROOT));
             }
+            if (verwaltung.grund() != null) {
+                knoten.put("grund", verwaltung.grund().name());
+            }
             if (!verwaltung.felder().isEmpty()) {
                 ObjectNode felder = knoten.putObject("felder");
                 for (ProtokollDetails.Verwaltungsfeld feld : verwaltung.felder()) {

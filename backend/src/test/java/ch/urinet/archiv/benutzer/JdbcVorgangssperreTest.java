@@ -2,6 +2,8 @@ package ch.urinet.archiv.benutzer;
 
 import ch.urinet.archiv.benutzer.application.Vorgangssperre;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.verarbeitung.application.VorgangUeberwachung;
+import ch.urinet.archiv.verarbeitung.domain.Befund;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -26,6 +28,9 @@ class JdbcVorgangssperreTest {
 
     @Inject
     Vorgangssperre sperre;
+
+    @Inject
+    VorgangUeberwachung ueberwachung;
 
     @Test
     void belegungWartetNichtAufGesperrteVorgangszeile() throws Exception {
@@ -95,6 +100,7 @@ class JdbcVorgangssperreTest {
                 assertThat(sperre.belegen(a, alt)).isTrue();
                 assertThat(sperre.belegen(a, neu)).isFalse();
                 assertThat(sperre.belegen(b, neu)).isTrue();
+                assertThat(ueberwachung.ungeklaert(a)).isEmpty();
                 assertThat(sperre.freigeben(a, neu)).isFalse();
                 assertThat(sperre.gueltig(a, alt)).isTrue();
                 try (PreparedStatement ablaufen = verbindung.prepareStatement(
@@ -141,15 +147,27 @@ class JdbcVorgangssperreTest {
                 }
                 assertThat(sperre.belegen(a, neu)).isFalse();
                 assertThat(sperre.freigeben(a, alt)).isFalse();
+                assertThat(ueberwachung.ungeklaert(a)).containsExactly(
+                        new Befund(Befund.Quelle.VERWALTUNG, alt.toString(), "UNKLAR"));
+                assertThat(ueberwachung.ungeklaert(b)).isEmpty();
                 assertThatThrownBy(() -> QuarkusTransaction.requiringNew().run(() -> {
-                    assertThat(sperre.abschliessen(a, alt, Vorgangssperre.Abschluss.ABGESCHLOSSEN)).isTrue();
+                    assertThat(sperre.abschliessen(a, alt, Vorgangssperre.Abschluss.UNKLAR)).isTrue();
                     throw new IllegalStateException("synthetischer Fehler");
                 })).isInstanceOf(IllegalStateException.class);
                 assertThat(sperre.belegen(a, neu)).isFalse();
                 assertThat(QuarkusTransaction.requiringNew().call(() ->
                         sperre.abschliessen(a, neu, Vorgangssperre.Abschluss.ABGESCHLOSSEN))).isFalse();
                 assertThat(QuarkusTransaction.requiringNew().call(() ->
-                        sperre.abschliessen(a, alt, Vorgangssperre.Abschluss.ABGESCHLOSSEN))).isTrue();
+                        sperre.abschliessen(a, alt, Vorgangssperre.Abschluss.ABGESCHLOSSEN))).isFalse();
+                assertThat(QuarkusTransaction.requiringNew().call(() ->
+                        sperre.abschliessen(a, alt, Vorgangssperre.Abschluss.UNKLAR))).isTrue();
+                assertThat(sperre.belegen(a, neu)).isFalse();
+                try (PreparedStatement entfernen = verbindung.prepareStatement(
+                        "delete from public.verwaltung_vorgang where mandant = ? and vorgang_id = ?")) {
+                    entfernen.setString(1, a.wert());
+                    entfernen.setObject(2, alt);
+                    entfernen.executeUpdate();
+                }
                 assertThat(sperre.belegen(a, neu)).isTrue();
                 assertThat(QuarkusTransaction.requiringNew().call(() -> sperre.anfragen(a, neu))).isTrue();
                 assertThat(QuarkusTransaction.requiringNew().call(() ->

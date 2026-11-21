@@ -143,6 +143,38 @@ class VerwaltungVorgangTest {
     }
 
     @Test
+    void abschlussNachFristBleibtUngeklaert() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        UUID ziel = UUID.randomUUID();
+        String akteur = UUID.randomUUID().toString();
+        var absicht = eintrag(id, ziel, akteur, "INHABER", ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        var abschluss = eintrag(id, ziel, akteur, "INHABER", ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> {
+                        try (Connection verbindung = datenquelle.getConnection();
+                             PreparedStatement ablaufen = verbindung.prepareStatement(
+                                     "update public.verwaltung_vorgang set bis = clock_timestamp() "
+                                             + "- interval '1 second' where mandant = ? and vorgang_id = ?")) {
+                            ablaufen.setString(1, mandant.wert());
+                            ablaufen.setObject(2, id);
+                            assertThat(ablaufen.executeUpdate()).isEqualTo(1);
+                        } catch (java.sql.SQLException e) {
+                            throw new IllegalStateException(e);
+                        }
+                        return "ok";
+                    }, fehler -> { }, wert -> protokoll.schreiben(absicht), wert -> abschluss)))
+                    .hasRootCauseInstanceOf(IllegalStateException.class);
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
     void protokollVerlangtZielUndGleicheAkteurrolle() throws Exception {
         mandantenVorbereiten();
         MandantCode mandant = new MandantCode("urinet");

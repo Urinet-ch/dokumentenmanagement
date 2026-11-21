@@ -239,16 +239,26 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         EMAIL, VORNAME, NACHNAME
     }
 
+    public enum Verwaltungsgrund {
+        SICHERHEIT, AUSTRITT, RECHTEAENDERUNG, KORREKTUR, SONSTIGES
+    }
+
     public record Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
-                             Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder) {
+                             Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder,
+                             Verwaltungsgrund grund) {
         public Verwaltung {
             Objects.requireNonNull(vorgangId);
             Objects.requireNonNull(phase);
             felder = felder == null ? List.of() : List.copyOf(felder);
         }
 
+        public Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
+                          Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder) {
+            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, null);
+        }
+
         public Verwaltung(UUID vorgangId, Verwaltungsphase phase) {
-            this(vorgangId, phase, null, null, null, null, List.of());
+            this(vorgangId, phase, null, null, null, null, List.of(), null);
         }
     }
 
