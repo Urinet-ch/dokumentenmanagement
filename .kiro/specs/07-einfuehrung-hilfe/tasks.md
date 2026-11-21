@@ -62,10 +62,14 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 8.1, 8.2, 8.3_
   - _Abhängig von: 22.3_
 
-- [ ] 22.5 Texte: Erste Schritte, Erfassen, Eingangskorb, Dokumentansicht [Frontend]
+- [x] 22.5 Texte: Erste Schritte, Erfassen, Eingangskorb, Dokumentansicht [Frontend]
   - Dateien und Katalogeinträge `erste-schritte` (fertig), `erfassen` mit `erfassen-handy`, `erfassen-dateien`,
     `erfassen-offline` (Hauptfall, ausführlich), `eingangskorb` mit `eingangskorb-bestaetigen` und `eingangskorb-eigene`,
     `dokument` mit `dokument-aendern`; Namen der Menüpunkte und Knöpfe aus `texte.de-CH.ts`; Review durch Fabian.
+  - Erledigt (design.md «Umsetzung (Aufgabe 22.5, 21.11.2026)»): neun Dateien und Katalogeinträge, `erste-schritte.md`
+    überarbeitet; Szenario `@req-6.1` in `features/hilfe/anleitung-abschnitte.feature`, Vitest
+    `anleitung-abschnitte.spec.ts` (Reihenfolge und Felder nach design.md, Verweise nur auf sichtbare Abschnitte, Namen
+    aus `texte.de-CH.ts`); 6.4, 6.6 und 6.7 als Dokument im PR.
   - _Anforderungen: 6.1, 6.4, 6.6, 6.7_
   - _Abhängig von: 22.1_
 
