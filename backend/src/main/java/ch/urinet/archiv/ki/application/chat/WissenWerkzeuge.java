@@ -34,6 +34,8 @@ public class WissenWerkzeuge {
     public record Seite(String pfad, String titel, String typ, String inhalt, List<Quelle> quellen, String stand,
                         String freigegebenVon, List<String> hinweise, String link) { }
 
+    static final int INDEX_MAX = 200;
+
     private final WissenLesen lesen;
     private final WissensSuche suche;
     private final WissenKonfiguration konfiguration;
@@ -57,9 +59,11 @@ public class WissenWerkzeuge {
             if (anzahl != null) {
                 throw WerkzeugFehler.ungueltig("anzahl");
             }
-            var index = lesen.index(kontext.benutzer(), filter, null, null, null, 0, 200);
-            return new Index(index.gruppen().stream().flatMap(g -> g.seiten().stream())
-                    .map(WissenWerkzeuge::zeile).toList(), false, null);
+            var index = lesen.index(kontext.benutzer(), filter, null, null, null, 0, INDEX_MAX);
+            List<IndexZeile> zeilen = index.gruppen().stream().flatMap(g -> g.seiten().stream())
+                    .map(WissenWerkzeuge::zeile).toList();
+            return new Index(zeilen, false, index.gesamt() > zeilen.size()
+                    ? "Der Index ist auf " + INDEX_MAX + " Seiten gekürzt, mit frage oder typ eingrenzen." : null);
         }
         int max = Werkzeugparameter.zahl("anzahl", anzahl, 1, 50, 5);
         var ergebnis = suche.suchen(kontext.benutzer(), text, filter, null, null,

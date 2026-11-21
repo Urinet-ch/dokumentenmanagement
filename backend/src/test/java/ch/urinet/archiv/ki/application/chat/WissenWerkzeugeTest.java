@@ -8,6 +8,8 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenKonfiguration;
 import ch.urinet.archiv.wissen.application.WissenLesen;
+import ch.urinet.archiv.wissen.application.WissenLesenRepository;
+import ch.urinet.archiv.wissen.application.WissensSuche;
 import ch.urinet.archiv.wissen.domain.Quelleneintrag;
 import ch.urinet.archiv.wissen.domain.Seitentyp;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
@@ -81,6 +83,64 @@ class WissenWerkzeugeTest {
     void anzahlOhneFrageWirdAbgelehnt() {
         assertThatThrownBy(() -> werkzeuge.index(KONTEXT, null, null, 2))
                 .isInstanceOf(WerkzeugFehler.class).hasMessageContaining("anzahl");
+    }
+
+    private static WissenLesenRepository.IndexZeile zeile(int nr, Seitentyp typ) {
+        return new WissenLesenRepository.IndexZeile(UUID.randomUUID(), typ, "konzepte/s" + nr, "S" + nr, "b",
+                "VERALTET", true);
+    }
+
+    private WissenWerkzeuge mitIndex(WissenLesen.IndexErgebnis index, WissensSuche suche, List<Object> aufrufe) {
+        var l = new WissenLesen(null, null, null) {
+            @Override
+            public IndexErgebnis index(Benutzer b, Seitentyp typ, String tag, String q, UUID d, int offset,
+                                       int groesse) {
+                aufrufe.add(typ);
+                aufrufe.add(groesse);
+                return index;
+            }
+        };
+        return new WissenWerkzeuge(l, suche, null, eintraege::add, new WerkzeugTransaktion());
+    }
+
+    @Test
+    void indexOhneFrageIstAuf200GedeckeltUndMeldetKuerzung() {
+        List<Object> aufrufe = new ArrayList<>();
+        var zeilen = java.util.stream.IntStream.range(0, 200).mapToObj(i -> zeile(i, Seitentyp.KONZEPT)).toList();
+        var gekuerzt = mitIndex(new WissenLesen.IndexErgebnis(
+                List.of(new WissenLesen.IndexGruppe(Seitentyp.KONZEPT, zeilen)), 250, 0, 200), null, aufrufe);
+        var antwort = gekuerzt.index(KONTEXT, null, "konzept", null);
+        assertThat(aufrufe).containsExactly(Seitentyp.KONZEPT, 200);
+        assertThat(antwort.treffer()).hasSize(200);
+        assertThat(antwort.hinweis()).contains("200").contains("eingrenzen");
+        assertThat(antwort.treffer().get(0).hinweise()).containsExactly("VERALTET", "QUELLE_PRUEFEN");
+
+        var vollstaendig = mitIndex(new WissenLesen.IndexErgebnis(
+                List.of(new WissenLesen.IndexGruppe(Seitentyp.KONZEPT, zeilen)), 200, 0, 200), null, aufrufe);
+        assertThat(vollstaendig.index(KONTEXT, null, null, null).hinweis()).isNull();
+    }
+
+    @Test
+    void indexMitFrageNutztSucheMitTypfilterKappungUndDegradiert() {
+        List<Object> aufrufe = new ArrayList<>();
+        var suche = new WissensSuche(null, null, null, null, null) {
+            @Override
+            public Ergebnis suchen(Benutzer b, String frage, Seitentyp typ, String tag, UUID d, int k,
+                                   boolean hybrid) {
+                aufrufe.addAll(List.of(frage, String.valueOf(typ), k, hybrid));
+                return new Ergebnis(List.of(zeile(1, Seitentyp.KONZEPT)), true);
+            }
+        };
+        var w = mitIndex(null, suche, aufrufe);
+        var antwort = w.index(KONTEXT, "Frist", "konzept", 50);
+        assertThat(aufrufe).containsExactly("Frist", "KONZEPT", 30, true);
+        assertThat(antwort.degradiert()).isTrue();
+        assertThat(antwort.treffer()).singleElement().satisfies(z -> assertThat(z.pfad()).isEqualTo("konzepte/s1"));
+        assertThat(antwort.hinweis()).contains("30");
+
+        aufrufe.clear();
+        assertThat(w.index(KONTEXT, "Frist", null, null).hinweis()).isNull();
+        assertThat(aufrufe).containsExactly("Frist", "null", 5, true);
     }
 
     @Test
