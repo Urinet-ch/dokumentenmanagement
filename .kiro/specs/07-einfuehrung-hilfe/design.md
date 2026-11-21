@@ -461,6 +461,39 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   `features/hilfe/anleitung-suche-wissen.feature` (`@req-6.1`: jede Datei kommt mit dem Prod-Build, wie 22.5); 6.4 und
   6.6 per Review (Nachweis: Dokument).
 
+## Umsetzung (Aufgabe 22.7, 21.11.2026)
+- **Katalog:** Block «Bestand und Verwaltung» vor `probleme`: `importe` (A12, `/importe`, deckt auch `/importe/:id`),
+  `jahresexport` (`EXPORT`, `/export`), `verwaltung` (A11, A13 oder A14, ohne Pfad, kurze Einleitung) mit
+  `verwaltung-dokumentarten` (A11), `verwaltung-protokoll` (A13), `verwaltung-api-tokens` (A14), Bedingungen und Pfade wie
+  in `MENUE`; Titel in `TEXTE.hilfe.abschnitte`. `hilfe-katalog.spec.ts` prüft zusätzlich die Reihenfolge der vorhandenen
+  Abschnitte nach Requirement 6.1 (Teilfolge, weil 22.5 und 22.6 ihre Abschnitte selbst bringen), dass ein Unterabschnitt
+  direkt im Block seines Abschnitts steht und `<eltern>-` im Anker trägt, sowie die Einträge dieses Blocks. Vollständig
+  nach 6.1 ist der Katalog, wenn 22.5, 22.6 und 22.7 auf `main` liegen; wer zuletzt merged, kann die Teilfolge zur
+  Gleichheit verschärfen.
+- **Texte nach dem Code, nicht nach dem Prototyp:** Die Abschnitte nennen Menüpunkte, Knöpfe und Meldungen aus
+  `texte.de-CH.ts` und beschreiben nur, was die Seiten tun. Befunde dabei: Die Seite «API-Tokens» stellt keine Tokens aus
+  (nur Ablaufdatum und Widerruf); die Anleitung verweist für neue Tokens auf die Unterlagen des Betriebs (README,
+  «API-Token für Skripte»). Der Jahresexport meldet sich per E-Mail an den Empfänger der Benachrichtigungen des Mandanten
+  (`archiv.benachrichtigung.empfaenger.<mandant>`), nicht an die anfordernde Person, und die Liste zeigt die 20 neuesten
+  Exporte des Mandanten; die Anleitung sagt das so, obwohl die Seite nach dem Anfordern «Sie erhalten eine E-Mail …»
+  meldet. Verweise innerhalb der Anleitung gehen auf Seiten der App (`/kontakte`, `/verwaltung/protokoll`,
+  `/verwaltung/api-tokens`), nicht auf Anker anderer Aufgaben, damit die Dateien ohne 22.5 und 22.6 gültig sind.
+- **`probleme`:** ergänzt um Meldungen, die mehrere Bereiche teilen (`httpFehler`: keine Verbindung, nicht erreichbar,
+  fehlendes Recht, Daten inzwischen geändert, zu viele Anfragen) und den Hinweis zur nicht ladbaren Anleitung (7.6);
+  Ansprechperson neutral. Knopf «Hilfe» (22.3) und Verweise auf `#erfassen-offline` (22.5) fehlen weiter, weil beides noch
+  nicht auf `main` liegt (6.4); die Aufgabe, die zuletzt merged, ergänzt sie.
+- **`docs/` nach E10:** `docs/anleitung-geschaeftsstelle.md` behält Zugang und Kontaktstelle, die Angaben der
+  Dokumentarten des Mandanten `vhf-gsk` und die Regeln für die Webseite (Zugriffsstufe, Veröffentlichen, Zurückziehen),
+  weil die App-Texte für alle Mandanten gleich sind und ein Satz zur Webseite nach dem offenen Punkt 2.4 nicht in die App
+  kommt; die Bedienung (Anmelden, Erfassen, Eingangskorb, Suche, allgemeine Meldungen) verweist auf `/hilfe#…`.
+  `docs/anleitung-verwaltung.md` bleibt Entwurf von Spec 06 mit einem Verweis auf `/hilfe#verwaltung`.
+  Betreiber-Anleitungen (`docs/wiederherstellung.md`, `docs/notfall/`, `docs/verfahren/`, README) bleiben unverändert.
+- **Pflegeregel (7.5):** `tech.md` (Definition of Done) nennt die Regel seit dem Merge von Spec 07 «für jeden Bereich,
+  sobald sein Abschnitt auf `main` liegt, nach Spec 07, Aufgabe 22.7 für alle»; mit dieser Aufgabe greift sie für
+  Importe, Jahresexport und Verwaltung, für die übrigen Bereiche mit 22.5 und 22.6.
+- **Nachweis:** 6.1 mit `features/hilfe/anleitung-bestand-verwaltung.feature` (`@req-6.1`, `@req-7.1`, Dateien aus dem
+  Prod-Build) und `hilfe-katalog.spec.ts` (Reihenfolge); 6.4, 6.6, 7.5 und 7.7 Nachweis: Dokument (Review des PR).
+
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,
   welche bestätigten Dokumente auf der WordPress-Seite erscheinen und ab wann (Spec 03); Wortlaut von Fabian mit der

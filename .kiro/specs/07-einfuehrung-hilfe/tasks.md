@@ -82,13 +82,18 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 6.1, 6.4, 6.6_
   - _Abhängig von: 22.1_
 
-- [ ] 22.7 Texte: Importe, Jahresexport, Verwaltung, Probleme; Anleitungen unter `docs/` [Frontend]
+- [x] 22.7 Texte: Importe, Jahresexport, Verwaltung, Probleme; Anleitungen unter `docs/` [Frontend]
   - Dateien und Katalogeinträge `importe`, `jahresexport`, `verwaltung` mit `verwaltung-dokumentarten`,
     `verwaltung-protokoll`, `verwaltung-api-tokens`; `probleme` vervollständigt (neutrale Ansprechperson).
   - `docs/anleitung-geschaeftsstelle.md` auf Betreiber-Wege, Kontaktstelle und Verweis auf `/hilfe` gekürzt; Verweis in
     `docs/anleitung-verwaltung.md` auf die App (der Inhalt folgt mit Spec 06: 21.5).
   - Prüfen, dass die Pflegeregel in `tech.md` (Definition of Done) für alle Abschnitte greift; Katalog vollständig nach
     Requirement 6.1.
+  - Erledigt (design.md «Umsetzung (Aufgabe 22.7, 21.11.2026)»): Dateien und Katalogeinträge `importe`, `jahresexport`,
+    `verwaltung` mit drei Unterabschnitten, `probleme` ergänzt; `docs/anleitung-geschaeftsstelle.md` gekürzt (Regeln zur
+    Webseite bleiben bis zum Entscheid zu 2.4), Verweis in `docs/anleitung-verwaltung.md`; Szenario `@req-6.1` in
+    `features/hilfe/anleitung-bestand-verwaltung.feature`, Reihenfolge per `hilfe-katalog.spec.ts`. Vollständig nach 6.1
+    ist der Katalog mit 22.5 und 22.6.
   - _Anforderungen: 6.1, 6.4, 6.6, 7.5, 7.7_
   - _Abhängig von: 22.1_
 

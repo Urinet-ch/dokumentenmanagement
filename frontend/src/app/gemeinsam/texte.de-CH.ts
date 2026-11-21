@@ -1656,6 +1656,13 @@ export const TEXTE = {
       kontakte: 'Kontakte',
       wissen: 'Wissen',
       'wissen-entwuerfe': 'Wissensentwürfe',
+      // Bestand und Verwaltung (Aufgabe 22.7)
+      importe: 'Importe',
+      jahresexport: 'Jahresexport',
+      verwaltung: 'Verwaltung',
+      'verwaltung-dokumentarten': 'Dokumentarten',
+      'verwaltung-protokoll': 'Zugriffsprotokoll',
+      'verwaltung-api-tokens': 'API-Tokens',
       probleme: 'Wenn etwas nicht klappt',
     } as Record<string, string>,
     laedt: 'Die Anleitung wird geladen …',
