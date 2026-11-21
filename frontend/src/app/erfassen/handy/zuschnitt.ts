@@ -50,19 +50,19 @@ const ECKEN: Ecke[] = ['obenLinks', 'obenRechts', 'untenRechts', 'untenLinks'];
       width: 100%;
       max-height: 70vh;
       touch-action: none;
-      background: var(--urinet-karte, #0d1017);
+      background: var(--karte);
     }
     polygon {
-      fill: rgb(238 177 17 / 15%);
-      stroke: var(--urinet-gelb, #eeb111);
+      fill: color-mix(in srgb, var(--urinet-gelb) 15%, transparent);
+      stroke: var(--urinet-gelb);
     }
     circle {
-      fill: rgb(238 177 17 / 40%);
-      stroke: var(--urinet-gelb, #eeb111);
+      fill: color-mix(in srgb, var(--urinet-gelb) 40%, transparent);
+      stroke: var(--urinet-gelb);
       cursor: grab;
       &:focus-visible {
         outline: none;
-        fill: var(--urinet-gelb, #eeb111);
+        fill: var(--urinet-gelb);
       }
     }
     .aktionen {
