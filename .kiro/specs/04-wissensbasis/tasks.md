@@ -27,15 +27,13 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 1.1–1.6_
   - _Abhängig von: Spec 01: Feld `dokument.titel` (vorhanden, Requirement 7.2)_
 
-- [ ] 13.3 Fachbereich `wissen` und Datenmodell [Backend]
+- [x] 13.3 Fachbereich `wissen` und Datenmodell [Backend]
   - Paket `wissen` mit `domain`, `application`, `adapter`; ArchUnit-Regeln wie ADR-011 (kein Zugriff auf `public` ausser `auftrag`)
   - Liquibase-Changesets (`db/mandant`) für alle Tabellen aus design.md; Trigger INSERT-only auf `wissensseite_version` und `wissens_log`, `archiv_app` dort nur `INSERT`/`SELECT`
-  - Manifest um Zeilen von `wissensseite_version` und `wissens_log` erweitern; Restore-Probe vergleicht Anzahl Seiten und Versionen
+  - Manifest um Zeilen von `wissensseite_version` und `wissens_log` erweitern; lokaler Restore-Rundlauf vergleicht Anzahl Seiten und Versionen
   - Logs nur mit IDs (Test über Log-Ausgabe)
-  - Teil erledigt (PR #295): Paket, Changeset `043-wissen-datenmodell`, Rechte und INSERT-only, Manifest (Req 4.1–4.3, 4.6); `public` nur über `auftrag` prüft die allgemeine ArchUnit-Regel `publicNurUeberAuftrag`. Offen: Req 4.7, der Vergleich von Anzahl Seiten und Versionen in der Restore-Probe; er braucht die Restore-Kette mit Datenbank-Restore aus Spec 01, Aufgabe 5.12 (design.md, «Umsetzung 13.3»). 13.9 weisen die Ingest- und Freigabepfade nach (14.x)
-  - Nachprüfung 20.11.2026: PR #357 liefert den echten lokalen Datenbank-Restore (`restore-uebung-lokal.sh`); der Vergleich nichtleerer Wissensseiten- und Versionsbestände vor und nach diesem Restore ist noch nicht belegt. Deshalb bleibt 13.3 offen; ein Bucket-Restore mit Zählen derselben Datenbank reicht weiterhin nicht.
-  - Nachprüfung 21.11.2026: Der lokale Rundlauf vergleicht je zwei synthetische Seiten und drei Versionen pro Mandant vor und nach dem Datenbank-Restore. Der Zählvergleich in der wiederkehrenden betrieblichen Restore-Probe ist damit noch nicht nachgewiesen; 13.3 bleibt offen.
-  - _Anforderungen: 4.1–4.3, 4.6, 4.7, 13.9_
+  - Erledigt (PR #295, #357, #397): Paket, Changeset `043-wissen-datenmodell`, Rechte und INSERT-only, Manifest sowie lokaler Datenbank-Restore mit je zwei synthetischen Seiten und drei Versionen pro Mandant vor und nach dem Restore. `public` nur über `auftrag` prüft die allgemeine ArchUnit-Regel `publicNurUeberAuftrag`. 13.9 weisen die Ingest- und Freigabepfade nach (14.x).
+  - _Anforderungen: 4.1–4.3, 4.6, 13.9_
 
 - [x] 13.4 Seitenmodell, Markdown und Prüfung [Backend]
   - `Wissensseite`, `Quelleneintrag`, `Seitentyp`; `WissensMarkdown` (commonmark-java, Footnotes, ohne HTML); `Seitentext` aus `\f`-getrenntem Volltext (besteht seit Spec 02, Aufgabe 6.3, als `gemeinsam/domain/Seitentext`; wiederverwenden, nicht neu bauen)
@@ -59,6 +57,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Szenario `@req-12.2` über einen Endpunkt: `treuhaender` erhält 403, Datenbank und Log bleiben unverändert (Review PR #300, S4) → verschoben auf 14.2 (`POST /wissensentwuerfe`, Vermerk bei 13.5; Review PR #311, M2)
   - _Anforderungen: 3.1–3.4, 3.6, 3.8, 4.4, 4.5, 14.2, 14.4–14.6_
   - _Abhängig von: 13.4, 13.5_
+
+- [ ] 13.7 Zählvergleich in der betrieblichen Restore-Probe [Infra] [nachgelagert]
+  - Der lokale Rundlauf aus #397 weist den Vergleich in der wiederkehrenden betrieblichen Restore-Probe nicht nach. Den Vergleich der Seiten- und Versionszahl dort ergänzen und bei der Restore-Probe auf Stufe B nachweisen; ein Bucket-Restore mit Zählen derselben Datenbank reicht nicht.
+  - _Anforderungen: 4.7_
+  - _Abhängig von: 13.3, Spec 01: 5.11_
 
 ## Welle 14 — Ingest und Freigabe
 
