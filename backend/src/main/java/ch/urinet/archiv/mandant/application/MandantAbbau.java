@@ -2,6 +2,7 @@ package ch.urinet.archiv.mandant.application;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
+import ch.urinet.archiv.benutzer.application.BenutzerNamen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -61,19 +62,20 @@ public class MandantAbbau {
     private final MandantDatenbank datenbank;
     private final MandantBucket bucket;
     private final AblagePort ablage;
+    private final BenutzerNamen benutzerNamen;
     private final Clock uhr;
     private final String bucketPraefix;
 
     @Inject
     public MandantAbbau(MandantAbbauRegister register, MandantVollexportRepository exporte, MandantKontext kontext,
-                        MandantDatenbank datenbank, MandantBucket bucket, AblagePort ablage,
+                        MandantDatenbank datenbank, MandantBucket bucket, AblagePort ablage, BenutzerNamen benutzerNamen,
                         @ConfigProperty(name = "archiv.ablage.bucket-praefix") String bucketPraefix) {
-        this(register, exporte, kontext, datenbank, bucket, ablage, bucketPraefix, Clock.systemUTC());
+        this(register, exporte, kontext, datenbank, bucket, ablage, benutzerNamen, bucketPraefix, Clock.systemUTC());
     }
 
     MandantAbbau(MandantAbbauRegister register, MandantVollexportRepository exporte, MandantKontext kontext,
-                 MandantDatenbank datenbank, MandantBucket bucket, AblagePort ablage, String bucketPraefix,
-                 Clock uhr) {
+                 MandantDatenbank datenbank, MandantBucket bucket, AblagePort ablage, BenutzerNamen benutzerNamen,
+                 String bucketPraefix, Clock uhr) {
         this.bucketPraefix = Objects.requireNonNull(bucketPraefix, "bucketPraefix");
         this.register = Objects.requireNonNull(register, "register");
         this.exporte = Objects.requireNonNull(exporte, "exporte");
@@ -81,6 +83,7 @@ public class MandantAbbau {
         this.datenbank = Objects.requireNonNull(datenbank, "datenbank");
         this.bucket = Objects.requireNonNull(bucket, "bucket");
         this.ablage = Objects.requireNonNull(ablage, "ablage");
+        this.benutzerNamen = Objects.requireNonNull(benutzerNamen, "benutzerNamen");
         this.uhr = Objects.requireNonNull(uhr, "uhr");
     }
 
@@ -127,6 +130,9 @@ public class MandantAbbau {
                     new MandantAblageAbbau(0, List.of()));
         }
 
+        if (datenbank.schemaVorhanden(status.mandant().schema())) {
+            benutzerNamen.vorMandantenabbauSichern(status.mandant().schema());
+        }
         MandantAblageAbbau bereinigung = ablage.mandantAbbauen(code, jetzt);
         if (datenbank.schemaVorhanden(status.mandant().schema())) {
             datenbank.schemaEntfernen(status.mandant().schema());

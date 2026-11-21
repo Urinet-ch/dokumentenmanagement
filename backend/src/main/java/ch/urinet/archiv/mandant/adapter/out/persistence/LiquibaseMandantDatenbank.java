@@ -81,7 +81,15 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
     @Override
     public void schemaEntfernen(String schema) {
         pruefen(schema);
-        try (Connection verbindung = eigentuemer.oeffnen(); Statement befehl = verbindung.createStatement()) {
+        try (Connection verbindung = eigentuemer.oeffnen();
+             PreparedStatement kontrolle = verbindung.prepareStatement(
+                     "select exists (select 1 from public.databasechangelog "
+                             + "where id = '043-benutzername-sperre-bestand' and exectype = 'EXECUTED')");
+             ResultSet status = kontrolle.executeQuery();
+             Statement befehl = verbindung.createStatement()) {
+            if (!status.next() || !status.getBoolean(1)) {
+                throw new IllegalStateException("Mandantenabbau gesperrt: Namenssperre-Bestandsmigration ausstehend");
+            }
             befehl.execute("drop schema if exists " + schema + " cascade");
         } catch (SQLException e) {
             throw new IllegalStateException("Mandanten-Schema " + schema + " nicht entfernt", e);

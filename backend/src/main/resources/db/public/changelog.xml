@@ -24,4 +24,5 @@
     <include file="changesets/040-mandant-verwaltung-rollen.xml" relativeToChangelogFile="true"/>
     <include file="changesets/041-verwaltung-vorgang.xml" relativeToChangelogFile="true"/>
     <include file="changesets/042-verwaltung-vorgang-phase.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/043-benutzername-sperre.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

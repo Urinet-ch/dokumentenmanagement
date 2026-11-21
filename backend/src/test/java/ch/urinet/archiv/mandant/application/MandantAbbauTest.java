@@ -72,6 +72,19 @@ class MandantAbbauTest {
     }
 
     @Test
+    void fehlendeNamenssicherungVerhindertAlleLoeschschritte() {
+        Testaufbau t = new Testaufbau(START.plusSeconds(30L * 24 * 60 * 60));
+        t.register.deaktivieren(CODE, EXPORT_ID, START, "tester", "Kundenende");
+        t.namenssicherungFehlt = true;
+
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(t.ablageAufrufe.get()).isZero();
+        assertThat(t.datenbank.schemaEntfernt).isFalse();
+        assertThat(t.bucketEntferntAufrufe.get()).isZero();
+    }
+
+    @Test
     void gesperrteObjekteBleibenUndWiederholungKannAbschliessen() {
         Testaufbau t = new Testaufbau(START.plusSeconds(30L * 24 * 60 * 60));
         t.register.deaktivieren(CODE, EXPORT_ID, START, "tester", "Kundenende");
@@ -313,6 +326,7 @@ class MandantAbbauTest {
         MandantVollexportRepository.Status exportStatus = MandantVollexportRepository.Status.FERTIG;
         List<MandantAblageAbbau.GesperrtesObjekt> gesperrteObjekte = List.of();
         boolean bucketEntfernbar = true;
+        boolean namenssicherungFehlt;
         int anzahl = 3;
         int bestandAnzahl = 3;
         Optional<Instant> letzteAenderung = Optional.of(START.minusSeconds(60));
@@ -387,7 +401,21 @@ class MandantAbbauTest {
                     return bucketEntfernbar;
                 }
             };
-            return new MandantAbbau(register, exporte, kontext, datenbank, bucket, ablage, "bucket-", uhr);
+            var namen = new ch.urinet.archiv.benutzer.application.BenutzerNamen() {
+                @Override
+                public boolean vergeben(String name) { return false; }
+
+                @Override
+                public void sperren(String name) { }
+
+                @Override
+                public void vorMandantenabbauSichern(String schema) {
+                    if (namenssicherungFehlt) {
+                        throw new IllegalStateException("Namenssicherung fehlt");
+                    }
+                }
+            };
+            return new MandantAbbau(register, exporte, kontext, datenbank, bucket, ablage, namen, "bucket-", uhr);
         }
     }
 
