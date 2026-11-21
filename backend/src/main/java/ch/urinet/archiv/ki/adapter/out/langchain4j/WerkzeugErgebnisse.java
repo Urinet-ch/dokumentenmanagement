@@ -55,7 +55,63 @@ final class WerkzeugErgebnisse {
         Optional<ChatEreignis.QuellWissen> wissen = "wissen_seite_zeigen".equals(name)
                 ? wissen(wurzel) : Optional.empty();
         return new ChatEreignis.WerkzeugErgebnis(name, parameter(json, argumente), List.copyOf(dokumente.values()),
-                datenstand, wissen);
+                datenstand, wissen, kontextstufe(name, wurzel));
+    }
+
+    private static Optional<ChatEreignis.Kontextstufe> kontextstufe(String name, JsonNode wurzel) {
+        if (!wurzel.isObject()) return Optional.empty();
+        if (wurzel.path("fehler").isTextual()) {
+            var felder = wurzel.fieldNames();
+            while (felder.hasNext()) {
+                if (!List.of("fehler", "arten").contains(felder.next())) return Optional.empty();
+            }
+            return Optional.of(ChatEreignis.Kontextstufe.NORMAL);
+        }
+        JsonNode treffer = switch (name) {
+            case "dokumente_suchen", "wissen_index" -> wurzel.path("treffer");
+            case "dokument_zeigen", "wissen_seite_zeigen" -> null;
+            default -> { yield null; }
+        };
+        if ("dokument_zeigen".equals(name)) {
+            if (!gueltigeId(wurzel.path("id"))) return Optional.empty();
+            return stufe(wurzel);
+        }
+        if ("wissen_seite_zeigen".equals(name)) {
+            if (!wurzel.path("pfad").isTextual() || !wurzel.path("titel").isTextual()
+                    || !wurzel.path("stand").isTextual() || !wurzel.path("quellen").isArray()) {
+                return Optional.empty();
+            }
+            return stufe(wurzel);
+        }
+        if (treffer == null || !treffer.isArray()) return Optional.empty();
+        ChatEreignis.Kontextstufe hoechste = ChatEreignis.Kontextstufe.NORMAL;
+        for (JsonNode eintrag : treffer) {
+            if ("dokumente_suchen".equals(name) && !gueltigeId(eintrag.path("id"))) return Optional.empty();
+            Optional<ChatEreignis.Kontextstufe> stufe = stufe(eintrag);
+            if (stufe.isEmpty()) return Optional.empty();
+            hoechste = hoechste.hoechste(stufe.orElseThrow());
+        }
+        return Optional.of(hoechste);
+    }
+
+    private static boolean gueltigeId(JsonNode wert) {
+        if (!wert.isTextual()) return false;
+        try {
+            UUID.fromString(wert.textValue());
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private static Optional<ChatEreignis.Kontextstufe> stufe(JsonNode knoten) {
+        JsonNode wert = knoten.path("vertraulichkeit");
+        if (!wert.isTextual()) return Optional.empty();
+        try {
+            return Optional.of(ChatEreignis.Kontextstufe.valueOf(wert.textValue()));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
     }
 
     private record WissensDokument(ChatEreignis.QuellDokument dokument, int anzahl) { }
@@ -79,7 +135,7 @@ final class WerkzeugErgebnisse {
         geordnet.sort(Comparator.comparingInt(WissensDokument::anzahl).reversed());
         return Optional.of(new ChatEreignis.QuellWissen(wurzel.path("pfad").asText(), wurzel.path("titel").asText(),
                 Instant.parse(wurzel.path("stand").asText()),
-                geordnet.stream().limit(5).map(WissensDokument::dokument).toList()));
+                geordnet.stream().limit(5).map(WissensDokument::dokument).toList(), List.copyOf(dokumente.keySet())));
     }
 
     private static void dokument(JsonNode knoten, Map<String, ChatEreignis.QuellDokument> ziel) {

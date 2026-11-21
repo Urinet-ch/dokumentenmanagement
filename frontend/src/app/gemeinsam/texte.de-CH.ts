@@ -1483,6 +1483,21 @@ export const TEXTE = {
     quellen: 'Quellen',
     datenstand: (zeitpunkt: string, anzahl: string) =>
       `Datenstand: ${zeitpunkt}, ${anzahl} ${anzahl === '1' ? 'Beleg' : 'Belege'}`,
+    wissensquelle: (titel: string) => `Wissensseite: ${titel}`,
+    dokumentMitSeiten: (titel: string, seiten: string) => `${titel}, Seite ${seiten}`,
+    analyseVorschlagen: 'Als Analyse vorschlagen',
+    analyseVorgeschlagen: 'Analyse vorgeschlagen. Status anzeigen',
+    analysen: 'Meine Analysevorschläge',
+    analyseLeer: 'Noch keine Analysevorschläge.',
+    analyseEinleitung: 'Hier sehen Sie den Status und die Entscheide Ihrer Analysevorschläge.',
+    analyseEntscheid: 'Entscheid',
+    analyseGrund: 'Grund',
+    analyseZurListe: 'Zur Liste der Analysevorschläge',
+    analyseStatus: {
+      OFFEN: 'Offen', ERLEDIGT: 'Erledigt', IN_ARBEIT: 'In Arbeit', WARTEND: 'Wartend', ABGELEHNT: 'Abgelehnt',
+      FEHLER: 'Fehler', ANGENOMMEN: 'Angenommen', VERWORFEN: 'Verworfen', VERALTET: 'Veraltet',
+    } as Readonly<Record<string, string>>,
+    analyseStatusFehler: 'Die Eignung für einen Analysevorschlag konnte nicht geprüft werden. Bitte laden Sie das Gespräch neu.',
     /** Hinweis während eines Werkzeugaufrufs (Req 6.2), fest je Werkzeug. */
     werkzeuge: {
       dokumente_suchen: 'suche Dokumente …',
@@ -1507,6 +1522,8 @@ export const TEXTE = {
       VERBINDUNG:
         'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
       ANTWORT: 'Die Antwort ist unvollständig angekommen. Bitte stellen Sie die Frage erneut.',
+      ANALYSE_NICHT_MOEGLICH: 'Aus diesem Gespräch kann kein Analysevorschlag entstehen.',
+      NICHT_ERLAUBT: 'Sie dürfen keinen Analysevorschlag erstellen.',
       ALLGEMEIN: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
     } as Record<string, string>,
     fehlerListe: 'Die letzten Gespräche konnten nicht geladen werden.',

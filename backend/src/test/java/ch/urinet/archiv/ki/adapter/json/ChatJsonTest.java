@@ -31,15 +31,16 @@ class ChatJsonTest {
                 new Quelle.Stand("kennzahl", STAND))))).isEqualTo("quellen [{\"id\":\"" + ID
                 + "\",\"titel\":\"Rechnung 2025-007\",\"link\":\"/dokument/" + ID + "\"},"
                 + "{\"werkzeug\":\"kennzahl\",\"datenstand\":\"2026-11-14T08:00:00Z\",\"belege\":3}]");
-        assertThat(name(new ChatAusgabe.Fertig(GESPRAECH, new ChatEreignis.Ende(120, 30))))
-                .isEqualTo("fertig {\"gespraechId\":\"" + GESPRAECH + "\",\"tokens\":{\"ein\":120,\"aus\":30}}");
+        assertThat(name(new ChatAusgabe.Fertig(GESPRAECH, Long.MAX_VALUE, new ChatEreignis.Ende(120, 30))))
+                .isEqualTo("fertig {\"gespraechId\":\"" + GESPRAECH
+                        + "\",\"nachrichtId\":\"9223372036854775807\",\"tokens\":{\"ein\":120,\"aus\":30}}");
         assertThat(name(new ChatAusgabe.Fehler("nicht verfügbar", GESPRAECH)))
                 .isEqualTo("fehler {\"meldung\":\"nicht verfügbar\",\"gespraechId\":\"" + GESPRAECH + "\"}");
     }
 
     @Test
     void nurFertigUndFehlerBeendenDenStream() {
-        assertThat(new ChatAusgabe.Fertig(GESPRAECH, new ChatEreignis.Ende(0, 0)).letzte()).isTrue();
+        assertThat(new ChatAusgabe.Fertig(GESPRAECH, 1, new ChatEreignis.Ende(0, 0)).letzte()).isTrue();
         assertThat(new ChatAusgabe.Fehler("x", GESPRAECH).letzte()).isTrue();
         assertThat(new ChatAusgabe.Quellen(List.of()).letzte()).isFalse();
         assertThat(new ChatAusgabe.Text("x").letzte()).isFalse();
@@ -79,6 +80,13 @@ class ChatJsonTest {
                 + "\"von\":\"2025-01-01\",\"anzahl\":5,\"partner\":null},\"dokumentIds\":[\"" + ID + "\"],"
                 + "\"datenstand\":{\"zeitpunkt\":\"2026-11-14T08:00:00Z\",\"belege\":3}},"
                 + "{\"name\":\"dokumente_suchen\",\"parameter\":{},\"dokumentIds\":[]}]");
+    }
+
+    @Test
+    void kontextstufeWirdFuerSpaetereAnalyseGespeichert() {
+        var aufruf = new WerkzeugAufruf("dokumente_suchen", Map.of(), List.of(ID), Optional.empty(),
+                Optional.of(ChatEreignis.Kontextstufe.INTERN));
+        assertThat(ChatJson.werkzeuge(List.of(aufruf))).contains("\"kontextstufe\":\"INTERN\"");
     }
 
     private static String name(ChatAusgabe ausgabe) {

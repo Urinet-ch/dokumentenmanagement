@@ -85,6 +85,10 @@ describe('SSE-Leser (Spec 02, Aufgabe 7.4)', () => {
       typ: 'fertig',
       gespraechId: 'g1',
     });
+    expect(chatEreignis({ name: 'fertig', daten: '{"gespraechId":"g1","nachrichtId":"9223372036854775807"}' }))
+      .toEqual({ typ: 'fertig', gespraechId: 'g1', nachrichtId: '9223372036854775807' });
+    expect(chatEreignis({ name: 'fertig', daten: '{"gespraechId":"g1","nachrichtId":12}' }))
+      .toEqual({ typ: 'fertig', gespraechId: 'g1' });
     expect(
       chatEreignis({ name: 'fehler', daten: '{"meldung":"Nicht verfügbar","gespraechId":"g2"}' }),
     ).toEqual({
@@ -129,7 +133,8 @@ describe('SSE-Leser (Spec 02, Aufgabe 7.4)', () => {
       quellenAus([
         { id: 'd1', titel: 'Rechnung 2026-004', link: '/dokument/d1' },
         { werkzeug: 'kennzahl', datenstand: '2026-11-14T08:00:00Z', belege: 3 },
-        { wissen: { titel: 'Seite', link: '/wissen/x', stand: '2026-11-01' }, dokumente: [] },
+        { wissen: { titel: 'Seite', link: '/wissen/konzepte/test', stand: '2026-11-01' },
+          dokumente: [{ titel: 'Quelle', link: '/dokument/d1', seiten: '1–2' }] },
         { datenstand: { zeitpunkt: '2026-11-14T08:00:00Z', anzahl: 3 } },
         { datenstand: '2026-11-14T08:00:00Z', anzahl: 3 },
         'Text',
@@ -138,6 +143,8 @@ describe('SSE-Leser (Spec 02, Aufgabe 7.4)', () => {
     ).toEqual([
       { titel: 'Rechnung 2026-004', link: '/dokument/d1' },
       { datenstand: { zeitpunkt: '2026-11-14T08:00:00Z', anzahl: 3 } },
+      { wissen: { titel: 'Seite', link: '/wissen/konzepte/test' },
+        dokumente: [{ titel: 'Quelle', link: '/dokument/d1', seiten: '1–2' }] },
     ]);
     expect(quellenAus('kein Array')).toEqual([]);
   });

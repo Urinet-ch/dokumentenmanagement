@@ -926,6 +926,16 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
   Aktion «Als Analyse vorschlagen» nur bei zulässigen Gesprächen (Requirement 12.4, 16.6); Parameter `seite` in der
   Dokumentansicht (Requirement 16.2). Texte nur in `texte.de-CH.ts`.
 
+#### Umsetzung 15.3 (PR #399)
+
+Chatantworten erhalten eine ID als Dezimaltext. Für Analysevorschläge prüft das Archiv Eigentum, erlaubte Werkzeuge,
+aktuelle Quellensichtbarkeit und die höchste gespeicherte Kontextstufe bis zur Antwort. Fehlende Nachweise und
+`PERSONAL` schliessen einen Vorschlag aus. Alte Gespräche und Gespräche mit gelöschten Nachrichten gelten als
+unvollständig; ein Datenbanktrigger bewahrt diese Regel auch beim Aufräumen durch die Vorgängerversion. Der Entwurf
+übernimmt nur Dokument- und Seitenquellen, ohne PDF-Seite, und kann nur mit bearbeiteter Fassung angenommen werden.
+Die Oberfläche unterscheidet Quellen-Chips, bietet die Aktion nur bei nachweislich geeigneten Antworten an und zeigt
+den Status eigener Vorschläge. Der Vorschlag selbst löst keinen KI-Aufruf aus.
+
 #### Umsetzung 14.6 (PR #352)
 
 Die beiden Entwurfsrouten und der Navigationszähler verlangen A17; Mitarbeiter und Treuhänder erhalten
@@ -1107,10 +1117,16 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   INSERT-only, aber nicht gehasht (Review PR #295, K7).
 - Req 4.7 ist offen: Die Sicherung erfasst die ganze Archiv-Datenbank mit `pg_dump`. Seit PR #357 stellt
   `restore-uebung-lokal.sh` den Datenbankdump tatsächlich mit `pg_restore` in einer eigenen Ziel-Datenbank
-  wieder her (Spec 01, Aufgabe 5.12). Noch fehlt der Nachweis, dass dabei ein nichtleerer Wissensseiten- und
-  Versionsbestand vor und nach dem Restore verglichen wird (Nachprüfung 20.11.2026). Deshalb bleibt 13.3
-  offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis
-  (Review PR #295, M1).
+  wieder her (Spec 01, Aufgabe 5.12). Seit PR #397 vergleicht der lokale Rundlauf
+  (`SicherungPaketRoundtripTest`, Nachprüfung 21.11.2026) je Mandant zwei Wissensseiten und drei Versionen
+  (nichtleerer Bestand) vor und nach dem Datenbank-Restore. Offen bleibt nur der Zählvergleich in der
+  wiederkehrenden betrieblichen Restore-Probe (4.7); deshalb bleibt 13.3 offen. Ein Szenario, das nach einem
+  Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis (Review PR #295, M1).
+- Das Secret `keycloak_verwaltung_secret` steht seit PR #397 in der Secret-Liste von `restore-uebung-lokal.sh` und im
+  Restore-Compose-Stack: `application.properties` (`%prod`, Spec 06, ADR-015) verlangt es, der Stack startet sonst
+  nicht. Es hat mit dem Wissensvergleich nichts zu tun.
+- Der Rundlauftest läuft nur mit `-Darchiv.restore.e2e=true` (sonst übersprungen); der Beleg ist der Lauf von
+  `restore-uebung-lokal.sh`.
 
 ### Umsetzung 13.5 (PR #300)
 - `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe

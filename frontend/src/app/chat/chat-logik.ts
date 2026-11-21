@@ -56,6 +56,11 @@ export function dokumentLink(link: string): string | null {
   return /^\/dokument\/[A-Za-z0-9-]+$/.test(link) ? link : null;
 }
 
+export function wissenLink(link: string): string | null {
+  return /^\/wissen\/(?:ueberblick|(?:quellen|konzepte|akteure|projekte|analysen)\/[a-z0-9]+(?:-[a-z0-9]+)*)$/.test(link)
+    ? link : null;
+}
+
 export function istDatenstand(quelle: Quelle): quelle is DatenstandQuelle {
   return 'datenstand' in quelle;
 }
