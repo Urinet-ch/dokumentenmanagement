@@ -186,7 +186,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 8.4, 8.5, 8.6_
   - _Abhängig von: 19.12, 20.6_
 
-- [x] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
+- [ ] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
   - Deutsche Texte der Einladung (Einmal-Link, Gültigkeit, Hinweis, was zu tun ist) und der Mitteilung an die alte Adresse, Theme
     `urinet-archiv` (Logo-Textmarke, Farben wie `vhf-gsk`-Muster aus Spec 03, 2.3); keine Namen Dritter in Betreffzeilen.
   - _Anforderungen: 7.4, 7.8, 8.6_
@@ -194,6 +194,7 @@ auf Server oder Secrets aus der Sitzung.
   - Einladung und Theme mit importiertem Realm, Wegwerf-Keycloak und Mailpit geprüft. Die Mitteilung an die bisherige
     Adresse ist als Text in der Keycloak-Betriebsdokumentation vorbereitet; der Versand durch das Archiv folgt mit 19.8.
     Umstellung eines bestehenden Realms und Prüfung mit echtem Postfach bleiben Betriebsnachweise.
+    Checkbox offen: Vollständige Szenarien zu 7.4 und 8.6 folgen mit 19.7 bis 19.9 und 20.7.
 
 ## Welle 21 — Admin-Kommando, Migration, Tests und Abnahme
 - [ ] 21.1 Admin-Kommando [Backend]
