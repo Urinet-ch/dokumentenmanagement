@@ -4,6 +4,7 @@ import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
+import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.suche.application.HybridSuche;
 import ch.urinet.archiv.wissen.application.WissenKonfiguration;
 import ch.urinet.archiv.wissen.application.WissenLesen;
@@ -69,6 +70,15 @@ public class WissenWerkzeuge {
 
     public Seite zeigen(WerkzeugKontext kontext, String pfad) {
         String wert = Werkzeugparameter.text("pfad", pfad, 200, true);
+        try {
+            return zeigenInTransaktion(kontext, wert);
+        } catch (Verweigerung e) {
+            // unbekannt, unsichtbar oder nicht erlaubt: für das Modell dasselbe; VERWEIGERT ist bereits protokolliert
+            throw new WerkzeugFehler(WerkzeugFehler.SEITE_NICHT_GEFUNDEN);
+        }
+    }
+
+    private Seite zeigenInTransaktion(WerkzeugKontext kontext, String wert) {
         return transaktion.neu(() -> {
             Wissensseite seite = lesen.seite(kontext.benutzer(), wert);
             Map<String, WissenLesen.QuellenAnzeige> anzeigen = lesen.quellenAnzeige(kontext.benutzer(), seite);

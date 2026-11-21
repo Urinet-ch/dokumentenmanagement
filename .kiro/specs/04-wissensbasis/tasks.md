@@ -131,6 +131,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 - [x] 15.2 Chat-Werkzeuge und Quellen [Backend]
   - `wissen_index` und `wissen_seite_zeigen` in `ArchivWerkzeuge` (nur lesend, Mandant/Benutzer aus Kontext, Kürzung nach `werkzeug-max-zeichen` mit `GEKUERZT`), Systemprompt-Ergänzung, SSE-Quellenform `{wissen, dokumente}`, Hinweise in der Antwort
   - Szenarien mit simulierten Tool-Calls: nur freigegebene Fassungen, `mitarbeiter` erhält keine Seite mit unsichtbarer Hülle; `OeffentlicheWerkzeuge` (Spec 03) ohne Wissenswerkzeuge
+  - Nachweis-Vermerke ohne eigenes `@req`-Szenario: 8.7 gilt über die Prompt-Regel (`ChatSystemPromptTest`, Szenario `@req-8.7`); das Modellverhalten ist nicht deterministisch prüfbar; Hinweise `ABGELAUFEN`, `WIDERSPRUCH`, `VERALTET` (8.3) → `WissenWerkzeugeTest`; unbekannter oder unsichtbarer Pfad → `NICHT_GEFUNDEN` (`WissenWerkzeugeTest`)
   - _Anforderungen: 8.1–8.7, 8.9, 11.4_
   - _Abhängig von: 15.1, Spec 02: 7.1–7.3_
 

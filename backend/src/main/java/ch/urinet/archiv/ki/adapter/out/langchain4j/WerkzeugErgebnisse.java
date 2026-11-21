@@ -72,7 +72,8 @@ final class WerkzeugErgebnisse {
                     seite(quelle.path("seiten")));
             int anzahl = quelle.path("anzahl").asInt();
             dokumente.merge(id, new WissensDokument(dokument, anzahl),
-                    (alt, neu) -> new WissensDokument(alt.dokument(), alt.anzahl() + neu.anzahl()));
+                    (alt, neu) -> new WissensDokument((neu.anzahl() > alt.anzahl() ? neu : alt).dokument(),
+                            alt.anzahl() + neu.anzahl()));
         }
         var geordnet = new ArrayList<>(dokumente.values());
         geordnet.sort(Comparator.comparingInt(WissensDokument::anzahl).reversed());

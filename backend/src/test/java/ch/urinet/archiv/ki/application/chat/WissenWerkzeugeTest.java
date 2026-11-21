@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.application.chat;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
+import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenKonfiguration;
@@ -37,6 +38,9 @@ class WissenWerkzeugeTest {
         @Override
         public Wissensseite seite(Benutzer benutzer, String pfad) {
             assertThat(benutzer).isEqualTo(KONTEXT.benutzer());
+            if (pfad.startsWith("regeln/")) {
+                throw new Verweigerung(Verweigerung.Grund.NICHT_GEFUNDEN);
+            }
             assertThat(pfad).isEqualTo("konzepte/test");
             return seite;
         }
@@ -77,5 +81,12 @@ class WissenWerkzeugeTest {
     void anzahlOhneFrageWirdAbgelehnt() {
         assertThatThrownBy(() -> werkzeuge.index(KONTEXT, null, null, 2))
                 .isInstanceOf(WerkzeugFehler.class).hasMessageContaining("anzahl");
+    }
+
+    @Test
+    void unbekannterOderUnsichtbarerPfadIstNichtGefunden() {
+        assertThatThrownBy(() -> werkzeuge.zeigen(KONTEXT, "regeln/gibts-nicht"))
+                .isInstanceOf(WerkzeugFehler.class).hasMessage(WerkzeugFehler.SEITE_NICHT_GEFUNDEN);
+        assertThat(eintraege).isEmpty();
     }
 }
