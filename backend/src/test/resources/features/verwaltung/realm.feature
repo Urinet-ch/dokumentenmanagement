@@ -4,11 +4,11 @@ Funktionalität: Realm-Konfiguration für die Benutzerverwaltung
   Teilprüfungen zu 4.9 und 7.4: Die Szenarien weisen weder den Token-Widerruf noch den vollständigen Einladungsablauf nach.
   Die weiteren Wirkungen der Benutzerverwaltung folgen in den Aufgaben 19.7 bis 19.10.
 
-  @req-4.9
+  @teilnachweis-4.9
   Szenario: Der Realm begrenzt die Lebensdauer von Access-Tokens auf fünf Minuten
     Dann beträgt die Access-Token-Lebensdauer des Realm-Exports 300 Sekunden
 
-  @req-7.4
+  @teilnachweis-7.4
   Szenario: Der Realm schützt Passwörter und versendet Einladungen mit TOTP-Einrichtung
     Dann verlangt der Realm-Export Passwörter mit mindestens 12 Zeichen ohne Benutzername oder E-Mail
     Und jeder neue Benutzer muss TOTP einrichten

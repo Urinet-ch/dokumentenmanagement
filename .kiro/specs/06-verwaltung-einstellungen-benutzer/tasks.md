@@ -29,7 +29,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
-- [x] 19.2 Realm-Export und Realm-Tests [Infra]
+- [ ] 19.2 Realm-Export und Realm-Tests [Infra]
   - Client `archiv-verwaltung` mit Platzhalter für das Secret und den drei Rollen des Dienstkontos und dem Standard-Scope `kc-admin-api` (Härtung nach 19.1);
     Passwort-Richtlinie; Access-Token-Lebensdauer 300 s; Lebensdauer der Aktions-Links; Ereignisse und Admin-Ereignisse mit
     400 Tagen; `auth_time`-Mapper; Test-Realm mit Dienstkonto und SMTP an Mailpit; `RealmExportTest` und `ExportKeycloak`

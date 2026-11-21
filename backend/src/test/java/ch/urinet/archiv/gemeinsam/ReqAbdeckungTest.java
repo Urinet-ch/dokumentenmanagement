@@ -125,7 +125,8 @@ class ReqAbdeckungTest {
                 "### Requirement 1: M\n7. Schema.\n### Requirement 16: B\n1. Läuft. Nachweis: manuell\n14. Abdeckung.\n");
         Path features = Files.createDirectories(repo.resolve("backend/src/test/resources/features/x"));
         Files.writeString(features.resolve("a.feature"),
-                "@spec-01 @req-1.7\nFeature: a\n  # @req-16.14 im Kommentar zählt nicht\n");
+                "@spec-01 @req-1.7\nFeature: a\n  # @req-16.14 im Kommentar zählt nicht\n"
+                        + "  @teilnachweis-16.14\n  Scenario: Teilnachweis\n");
         assertThat(ReqAbdeckung.luecken(repo)).containsExactly("01-test: 16.14");
     }
 
