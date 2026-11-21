@@ -11,6 +11,13 @@ export const ABFRAGE_MS = 5000;
 export const JAHR_MIN = 1900;
 export const JAHR_MAX = 2999;
 
+/** Farbvariante der Status-Pille (styles.scss); ohne Eintrag neutral. */
+export const STATUS_TON: Readonly<Partial<Record<string, string>>> = {
+  OFFEN: 'akzent',
+  FERTIG: 'ok',
+  FEHLER: 'gefahr',
+};
+
 /** Vorschlag: das zuletzt abgeschlossene Kalenderjahr (Geschäftsjahresende 31.12. bei Urinet). */
 export function standardJahr(heute: Date): number {
   return heute.getFullYear() - 1;

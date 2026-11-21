@@ -24,7 +24,7 @@
       >
         {{ texte.vollexport }}
       </mat-checkbox>
-      <p id="vollexport-hinweis" class="hinweis">{{ texte.vollexportHinweis }}</p>
+      <p id="vollexport-hinweis" class="nebentext">{{ texte.vollexportHinweis }}</p>
     </div>
   }
   <div class="datei">
@@ -42,7 +42,7 @@
     />
     <span class="dateiname" data-test="dateiname">{{ datei()?.name ?? texte.keineDatei }}</span>
   </div>
-  <p class="hinweis">{{ texte.grenze }}</p>
+  <p class="nebentext">{{ texte.grenze }}</p>
   <div>
     <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || !datei()">
       <app-symbol name="importe" />
@@ -67,17 +67,17 @@
   @if (listeFehler()) {
     <p class="fehler" role="alert">{{ listeFehler() }}</p>
   } @else if (laeufe() === null) {
-    <p class="hinweis">{{ texte.laden }}</p>
+    <p class="nebentext">{{ texte.laden }}</p>
   } @else if (laeufe()!.length === 0) {
-    <p class="hinweis">{{ texte.keineLaeufe }}</p>
+    <p class="nebentext">{{ texte.keineLaeufe }}</p>
   } @else {
-    <div class="tabelle" tabindex="0" role="region" aria-labelledby="laeufe-titel">
-      <table>
+    <div class="tabelle-rahmen randbuendig" tabindex="0" role="region" aria-labelledby="laeufe-titel">
+      <table class="tabelle">
         <thead>
           <tr>
             <th scope="col">{{ texte.spalteDatei }}</th>
             <th scope="col">{{ texte.art }}</th>
-            <th scope="col" class="r">{{ texte.spalteZeilen }}</th>
+            <th scope="col" class="zahl">{{ texte.spalteZeilen }}</th>
             <th scope="col">{{ texte.spalteHochgeladen }}</th>
             <th scope="col">{{ texte.spalteStatus }}</th>
           </tr>
@@ -94,10 +94,10 @@
                   <span class="pille">{{ texte.vollexportMarke }}</span>
                 }
               </td>
-              <td class="r zahl">{{ zahl(lauf.zeilen) }}</td>
-              <td class="zahl">{{ zeit(lauf.erstellt) }}</td>
+              <td class="zahl">{{ zahl(lauf.zeilen) }}</td>
+              <td class="zeit">{{ zeit(lauf.erstellt) }}</td>
               <td>
-                <span class="marke" [attr.data-status]="lauf.status">{{ texte.status[lauf.status ?? ''] }}</span>
+                <span class="pille marke" [class]="ton[lauf.status ?? ''] ?? ''" [attr.data-status]="lauf.status">{{ texte.status[lauf.status ?? ''] }}</span>
               </td>
             </tr>
           }

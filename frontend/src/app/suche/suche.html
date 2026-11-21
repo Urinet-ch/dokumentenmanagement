@@ -223,10 +223,10 @@
   <div class="ergebnisse">
     <div role="alert" class="meldungen">
       @for (p of pruefFehler(); track p) {
-        <p class="fehler" data-test="pruefung">{{ texte.pruefung[p] }}</p>
+        <p class="hinweis gefahr" data-test="pruefung">{{ texte.pruefung[p] }}</p>
       }
       @if (fehler(); as text) {
-        <p class="fehler" data-test="fehler">{{ text }}</p>
+        <p class="hinweis gefahr" data-test="fehler">{{ text }}</p>
         @if (wiederholbar()) {
           <button mat-stroked-button type="button" data-test="wiederholen" (click)="wiederholen()">{{ texte.wiederholen }}</button>
         }
@@ -237,18 +237,18 @@
       <section class="karte wissen" aria-labelledby="wissen-titel" [attr.aria-busy]="wissenLaeuft()" data-test="wissen">
         <div class="kopf">
           <h2 id="wissen-titel"><app-symbol name="wissen" />{{ texte.wissen }}</h2>
-          <p class="hinweis">{{ texte.wissenHinweis }}</p>
+          <p class="nebentext">{{ texte.wissenHinweis }}</p>
         </div>
         @if (wissenLaeuft()) {
           <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.wissenLaeuft" />
         } @else if (wissenFehler(); as fehler) {
-          <p class="fehler" role="alert">{{ texte.wissenFehler }} {{ fehler }}</p>
+          <p class="hinweis gefahr" role="alert">{{ texte.wissenFehler }} {{ fehler }}</p>
           @if (wissenWiederholbar()) {
             <button mat-stroked-button type="button" (click)="wissenWiederholen()">{{ texte.wiederholen }}</button>
           }
         } @else {
           @if (wissenDegradiert()) {
-            <p class="hinweis" role="status">{{ texte.nurVolltext }}</p>
+            <p class="nebentext" role="status">{{ texte.nurVolltext }}</p>
           }
           @for (seite of wissenTreffer(); track seite.id) {
             <article class="treffer-zeile" data-test="wissens-treffer">
@@ -286,7 +286,7 @@
       </p>
 
       @if (hybrid() && ergebnis()?.degradiert) {
-        <div class="rueckfall" role="status" data-test="nur-volltext">
+        <div class="hinweis warnung" role="status" data-test="nur-volltext">
           <app-symbol name="warnung" />
           <p>{{ texte.nurVolltext }}</p>
           <button mat-stroked-button type="button" [disabled]="laeuft()" (click)="volltextSetzen(true, true)">{{ texte.alleImVolltext }}</button>
@@ -303,7 +303,7 @@
                 <div class="zeile-kopf">
                   <h3><a class="titel" [routerLink]="['/dokument', t.id]"><app-titel-anzeige [anzeige]="titel(t)" /></a></h3>
                   @if (t.betrag !== null && t.betrag !== undefined) {
-                    <span class="betrag">{{ betrag(t.betrag, t.waehrung) }}</span>
+                    <span class="betrag zahl">{{ betrag(t.betrag, t.waehrung) }}</span>
                   }
                 </div>
                 <p class="angaben">

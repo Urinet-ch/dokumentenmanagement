@@ -5,7 +5,7 @@
 </div>
 
 @if (!anmeldung.angemeldet()) {
-  <div class="hinweis">
+  <div class="hinweis info">
     <app-symbol name="schloss" />
     <p role="alert">
       {{ anmeldung.zustand() === 'abgelaufen' ? anmeldeTexte.abgelaufen : texte.ohneAnmeldung }}
