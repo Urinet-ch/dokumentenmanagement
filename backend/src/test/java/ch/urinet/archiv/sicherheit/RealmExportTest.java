@@ -71,6 +71,10 @@ class RealmExportTest {
         assertThat(dienstkonto.has("realmRoles")).isFalse();
         ObjectNode bereinigt = export.deepCopy();
         bereinigt.remove("identityProviders");
+        JsonNode passkeyConfig = bereinigt.path("authenticatorConfig").get(0);
+        assertThat(passkeyConfig.path("alias").asText()).isEqualTo("otp-nur-ohne-passkey");
+        assertThat(passkeyConfig.path("config").path("credentials").asText()).isEqualTo("webauthn-passwordless");
+        ((ObjectNode) passkeyConfig.path("config")).remove("credentials");
         ((ObjectNode) bereinigt.path("users").get(0)).remove("clientRoles");
         ArrayNode konten = (ArrayNode) bereinigt.remove("users");
         assertThat(heikleFelder(konten)).isEmpty();
@@ -145,6 +149,33 @@ class RealmExportTest {
     }
 
     @Test
+    void passkeyIstFreiwilligUndVerlangtPersonenpruefung() throws IOException {
+        JsonNode export = JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile());
+        assertThat(export.path("webAuthnPolicyPasswordlessRpId").asText()).isEqualTo("${ARCHIV_PASSKEY_RP_ID}");
+        assertThat(export.path("webAuthnPolicyPasswordlessAttestationConveyancePreference").asText()).isEqualTo("none");
+        assertThat(export.path("webAuthnPolicyPasswordlessResidentKey").asText()).isEqualTo("required");
+        assertThat(export.path("webAuthnPolicyPasswordlessUserVerificationRequirement").asText()).isEqualTo("required");
+        assertThat(export.path("webAuthnPolicyPasswordlessPasskeysEnabled").asBoolean()).isTrue();
+        assertThat(export.path("webAuthnPolicyPasswordlessMediation").asText()).isEqualTo("conditional");
+        for (String alias : List.of("webauthn-register-passwordless", "delete_credential")) {
+            List<JsonNode> aktionen = new ArrayList<>();
+            export.path("requiredActions").forEach(a -> {
+                if (alias.equals(a.path("alias").asText())) {
+                    aktionen.add(a);
+                }
+            });
+            assertThat(aktionen).hasSize(1);
+            assertThat(aktionen.getFirst().path("providerId").asText()).isEqualTo(alias);
+            assertThat(aktionen.getFirst().path("enabled").asBoolean()).isTrue();
+            assertThat(aktionen.getFirst().path("defaultAction").asBoolean()).isFalse();
+        }
+        JsonNode scope = export.path("clientScopeMappings").path("account").path(0);
+        assertThat(scope.path("client").asText()).isEqualTo("account-console");
+        assertThat(scope.path("roles")).extracting(JsonNode::asText)
+                .containsExactlyInAnyOrder("manage-account", "view-profile");
+    }
+
+    @Test
     void testRealmIstExportPlusTestanteile() throws IOException {
         ObjectNode test = (ObjectNode) JSON.readTree(KEYCLOAK.resolve("realm-test.json").toFile());
         assertThat(test.path("users")).isNotEmpty();
@@ -187,6 +218,9 @@ class RealmExportTest {
             }
         }
         ObjectNode export = (ObjectNode) JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile());
+        assertThat(test.path("webAuthnPolicyPasswordlessRpId").asText()).isEqualTo("localhost");
+        assertThat(export.path("webAuthnPolicyPasswordlessRpId").asText()).isEqualTo("${ARCHIV_PASSKEY_RP_ID}");
+        test.put("webAuthnPolicyPasswordlessRpId", "${ARCHIV_PASSKEY_RP_ID}");
         assertThat(export.remove("loginTheme").asText()).isEqualTo("urinet-archiv");
         assertThat(export.remove("emailTheme").asText()).isEqualTo("urinet-archiv");
         assertThat(test).isEqualTo(export);
@@ -251,7 +285,8 @@ class RealmExportTest {
 
     private static void ohneLokal(ArrayNode werte) {
         for (int i = werte.size() - 1; i >= 0; i--) {
-            if (werte.get(i).asText().startsWith(LOKAL)) {
+            if (werte.get(i).asText().startsWith(LOKAL)
+                    || "http://127.0.0.1/passkey-test-callback".equals(werte.get(i).asText())) {
                 werte.remove(i);
             }
         }

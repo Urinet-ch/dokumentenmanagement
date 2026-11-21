@@ -8,6 +8,8 @@ if [[ ! "${ARCHIV_BASIS_URL:-}" =~ ^https://[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9]
   exit 1
 fi
 host_port=${ARCHIV_BASIS_URL#https://}
+ARCHIV_PASSKEY_RP_ID=${host_port%%:*}
+export ARCHIV_PASSKEY_RP_ID
 if [[ "$host_port" == *:* ]]; then
   port=${host_port##*:}
   if (( 10#$port < 1 || 10#$port > 65535 )); then
