@@ -32,6 +32,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -44,6 +48,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -56,8 +63,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
@@ -75,7 +80,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class WebseitenLesenSchritte {
 
     private static final int JAHR = 2026;
-    private static final Pattern GUELTIG = Pattern.compile("[?&]X-Amz-Expires=(\\d+)");
 
     @Inject
     WebseitenSchluesselVerwaltung verwaltung;
@@ -239,7 +243,7 @@ public class WebseitenLesenSchritte {
     @Angenommen("das Dokument «{word}» hat eine Datei")
     public void datei(String name) throws SQLException {
         Dok d = dokumente.get(name);
-        byte[] inhalt = ("PDF/A " + name).getBytes(StandardCharsets.UTF_8);
+        byte[] inhalt = dateiInhalt(name);
         AbgelegteDatei datei = ablage.ablegenEingang(new MandantCode(d.mandant()), DateiSchluessel.pdfa(JAHR, d.id()),
                 new ByteArrayInputStream(inhalt), inhalt.length);
         ausfuehren("update " + new MandantCode(d.mandant()).schema() + ".dokument set s3_pdfa = ?, s3_version_pdfa = ?, "
@@ -579,17 +583,81 @@ public class WebseitenLesenSchritte {
         assertThat(antwort.headers().hasHeaderWithName(name)).as(antwort.headers().toString()).isFalse();
     }
 
-    @Dann("nennt die Antwort eine Adresse der Datei, die höchstens 5 Minuten gilt")
-    public void adresse() {
-        String url = antwort.path("url");
-        Instant bis = Instant.parse(antwort.path("gueltigBis"));
-        assertThat(url).startsWith("http");
-        assertThat(bis).isAfter(Instant.now()).isBefore(Instant.now().plus(Duration.ofMinutes(5)).plusSeconds(5));
-        Matcher m = GUELTIG.matcher(url);
-        if (m.find()) {
-            assertThat(Integer.parseInt(m.group(1))).isLessThanOrEqualTo(300);
+    @Dann("ist die Antwort eine gültige signierte S3-Adresse der Datei «{word}» mit höchstens 300 Sekunden Gültigkeit")
+    public void adresse(String dokument) {
+        String text = antwort.path("url");
+        if (text == null || text.isBlank()) {
+            throw new AssertionError("Die Antwort enthält keine Datei-Adresse");
         }
-        assertThat(antwort.<Map<String, Object>>path("$")).containsOnlyKeys("url", "gueltigBis");
+        URI url;
+        try {
+            url = URI.create(text);
+        } catch (IllegalArgumentException e) {
+            throw new AssertionError("Die Antwort enthält keine gültige Datei-Adresse");
+        }
+        Instant bis = Instant.parse(antwort.path("gueltigBis"));
+        long restMillis = Duration.between(Instant.now(), bis).toMillis();
+        assertThat(url.getScheme()).as("Schema der Datei-Adresse").isIn("http", "https");
+        assertThat(restMillis).as("Restlaufzeit gemäss gueltigBis in ms").isPositive()
+                .isLessThanOrEqualTo(Duration.ofSeconds(300).toMillis());
+
+        String query = url.getRawQuery();
+        if (query == null || query.isBlank()) {
+            throw new AssertionError("Die Datei-Adresse enthält keine SigV4-Parameter");
+        }
+        Map<String, String> parameter = new HashMap<>();
+        for (String teil : query.split("&")) {
+            int trenner = teil.indexOf('=');
+            if (trenner <= 0 || parameter.putIfAbsent(teil.substring(0, trenner), teil.substring(trenner + 1)) != null) {
+                throw new AssertionError("Die Datei-Adresse enthält ungültige oder doppelte Abfrageparameter");
+            }
+        }
+        Set<String> sigV4Parameter = Set.of("X-Amz-Algorithm", "X-Amz-Credential", "X-Amz-Date",
+                "X-Amz-Expires", "X-Amz-SignedHeaders", "X-Amz-Signature");
+        assertThat(parameter.keySet()).as("SigV4-Signaturparameter").containsAll(sigV4Parameter);
+        assertThat(parameter.get("X-Amz-Algorithm")).isEqualTo("AWS4-HMAC-SHA256");
+        assertThat(parameter.get("X-Amz-Credential")).isNotBlank();
+        assertThat(parameter.get("X-Amz-Date")).matches("\\d{8}T\\d{6}Z");
+        assertThat(parameter.get("X-Amz-SignedHeaders")).contains("host");
+        assertThat(parameter.get("X-Amz-Signature")).matches("[0-9a-f]{64}");
+        String ablauf = parameter.get("X-Amz-Expires");
+        if (!ablauf.matches("\\d+")) {
+            throw new AssertionError("Die SigV4-Ablaufzeit ist ungültig");
+        }
+        int sekunden = Integer.parseInt(ablauf);
+        assertThat(sekunden).as("X-Amz-Expires in Sekunden").isPositive().isLessThanOrEqualTo(300);
+        Instant signiertBis = LocalDateTime.parse(parameter.get("X-Amz-Date"),
+                DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")).toInstant(ZoneOffset.UTC).plusSeconds(sekunden);
+        assertThat(Duration.between(signiertBis, bis).abs().toSeconds())
+                .as("Abweichung zwischen gueltigBis und X-Amz-Date + X-Amz-Expires in Sekunden")
+                .isLessThanOrEqualTo(5);
+
+        HttpResponse<byte[]> dateiAntwort = anonymAbrufen(url);
+        assertThat(dateiAntwort.statusCode()).as("Status der anonymen Abfrage der signierten Adresse").isEqualTo(200);
+        assertThat(sha256Hex(dateiAntwort.body())).as("SHA-256 der gelieferten Datei")
+                .isEqualTo(sha256Hex(dateiInhalt(dokument)));
+        Map<String, Object> antwortfelder = antwort.path("$");
+        assertThat(antwortfelder.keySet()).as("Felder der Antwort").containsExactlyInAnyOrder("url", "gueltigBis");
+    }
+
+    private static HttpResponse<byte[]> anonymAbrufen(URI url) {
+        try (HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
+            return http.send(HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(10)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        } catch (IOException e) {
+            throw new AssertionError("Die signierte S3-Adresse konnte nicht anonym abgerufen werden ("
+                    + e.getClass().getSimpleName() + ")");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Der anonyme Abruf der signierten S3-Adresse wurde unterbrochen");
+        }
+    }
+
+    private static byte[] dateiInhalt(String name) {
+        return ("PDF/A " + name).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static String sha256Hex(byte[] inhalt) {
+        return HexFormat.of().formatHex(digest().digest(inhalt));
     }
 
     @Dann("steht im Zugriffsprotokoll von «{word}» genau ein neuer Eintrag HERUNTERLADEN für «{word}» von der Adresse «{}» ohne weitere Angaben")

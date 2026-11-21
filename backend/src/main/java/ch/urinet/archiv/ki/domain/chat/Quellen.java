@@ -50,6 +50,9 @@ public final class Quellen {
                 }
             } else if (ZAHLENWERKZEUGE.contains(ergebnis.name())) {
                 ergebnis.datenstand().ifPresent(s -> quellen.add(new Quelle.Stand(ergebnis.name(), s)));
+            } else if ("wissen_seite_zeigen".equals(ergebnis.name())) {
+                ergebnis.wissen().ifPresent(w -> quellen.add(new Quelle.Wissen(w.pfad(), w.titel(), w.stand(),
+                        w.dokumente().stream().map(d -> new Quelle.Dokument(d.id(), d.titel(), d.seite())).toList())));
             }
         }
         return List.copyOf(quellen);

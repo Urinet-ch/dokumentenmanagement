@@ -293,6 +293,23 @@ public class AgentSchritte {
         assertThat(ereignis("quellen")).isEmpty();
     }
 
+    @Dann("enthalten Stream und Verlauf die Wissensseite mit ihrem direkten Quelldokument")
+    public void wissensquellenInStreamUndVerlauf() {
+        JsonNode quellen = ereignis("quellen");
+        assertThat(quellen).hasSize(1);
+        JsonNode quelle = quellen.get(0);
+        assertThat(quelle.path("wissen").path("titel").asText()).startsWith("Normale Leseprobe ");
+        assertThat(quelle.path("wissen").path("link").asText()).startsWith("/wissen/konzepte/leseprobe-");
+        assertThat(quelle.path("wissen").path("stand").asText()).isNotBlank();
+        assertThat(quelle.path("dokumente")).hasSize(1);
+        assertThat(quelle.path("dokumente").get(0).path("link").asText()).startsWith("/dokument/");
+        String verlauf = RestAssured.given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                .when().get("/api/v1/chat/gespraeche/" + gespraech).then().statusCode(200).extract().asString();
+        assertThat(verlauf).contains(quelle.path("wissen").path("titel").asText(),
+                quelle.path("wissen").path("link").asText(),
+                quelle.path("dokumente").get(0).path("link").asText());
+    }
+
     @Dann("nennen die Quellen im Stream genau die Dokumente «{}»")
     public void quellenDokumente(String titel) {
         List<String> erwartet = Arrays.stream(titel.split("\\|")).map(String::strip).toList();

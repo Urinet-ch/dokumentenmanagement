@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>ch.urinet.archiv</groupId>
+  <artifactId>wissen-paket</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <properties>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <quarkus.platform.version>3.40.1.2</quarkus.platform.version>
+  </properties>
+  <dependencyManagement><dependencies>
+    <dependency><groupId>io.quarkus.platform</groupId><artifactId>quarkus-bom</artifactId><version>${quarkus.platform.version}</version><type>pom</type><scope>import</scope></dependency>
+  </dependencies></dependencyManagement>
+  <dependencies>
+    <dependency><groupId>info.picocli</groupId><artifactId>picocli</artifactId></dependency>
+    <dependency><groupId>org.commonmark</groupId><artifactId>commonmark</artifactId><version>0.32.0</version></dependency>
+    <dependency><groupId>org.commonmark</groupId><artifactId>commonmark-ext-footnotes</artifactId><version>0.32.0</version></dependency>
+    <dependency><groupId>org.snakeyaml</groupId><artifactId>snakeyaml-engine</artifactId><version>3.0.1</version></dependency>
+    <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.assertj</groupId><artifactId>assertj-core</artifactId><version>3.27.7</version><scope>test</scope></dependency>
+  </dependencies>
+  <build>
+    <testResources><testResource><directory>../../backend/src/test/resources</directory><includes><include>wissen-pakete/**</include></includes></testResource></testResources>
+    <plugins>
+      <plugin><groupId>org.codehaus.mojo</groupId><artifactId>build-helper-maven-plugin</artifactId><version>3.8.0</version><executions>
+        <execution><id>domain</id><phase>generate-sources</phase><goals><goal>add-source</goal></goals><configuration><sources><source>../../backend/src/main/java</source></sources></configuration></execution>
+        <execution><id>korpus</id><phase>generate-test-sources</phase><goals><goal>add-test-source</goal></goals><configuration><sources><source>../../backend/src/test/java/ch/urinet/archiv/wissen/domain/paket</source></sources></configuration></execution>
+      </executions></plugin>
+      <plugin><artifactId>maven-compiler-plugin</artifactId><version>3.16.0</version><configuration>
+        <includes><include>ch/urinet/archiv/wissenpaket/**</include><include>ch/urinet/archiv/wissen/domain/**</include><include>ch/urinet/archiv/gemeinsam/domain/Seitentext*.java</include></includes>
+        <testIncludes><testInclude>**/*Test.java</testInclude><testInclude>**/WissensPaketBeispiele.java</testInclude></testIncludes>
+      </configuration></plugin>
+      <plugin><artifactId>maven-surefire-plugin</artifactId><version>3.6.1</version></plugin>
+      <plugin><artifactId>maven-shade-plugin</artifactId><version>3.6.2</version><executions><execution><phase>package</phase><goals><goal>shade</goal></goals><configuration>
+        <createDependencyReducedPom>false</createDependencyReducedPom>
+        <transformers><transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"><mainClass>ch.urinet.archiv.wissenpaket.WissenPaketCli</mainClass></transformer><transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/></transformers>
+        <filters><filter><artifact>*:*</artifact><excludes><exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude><exclude>module-info.class</exclude><exclude>META-INF/versions/*/module-info.class</exclude></excludes></filter></filters>
+      </configuration></execution></executions></plugin>
+      <plugin><groupId>com.github.spotbugs</groupId><artifactId>spotbugs-maven-plugin</artifactId><version>4.10.5.0</version><configuration><threshold>High</threshold><failOnError>true</failOnError></configuration><executions><execution><goals><goal>check</goal></goals></execution></executions></plugin>
+    </plugins>
+  </build>
+</project>

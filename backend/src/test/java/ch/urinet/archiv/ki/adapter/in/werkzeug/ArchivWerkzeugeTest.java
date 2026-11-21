@@ -50,7 +50,7 @@ class ArchivWerkzeugeTest {
                 .filter(m -> m.isAnnotationPresent(Tool.class)).toList();
         assertThat(werkzeuge).extracting(m -> m.getAnnotation(Tool.class).name())
                 .containsExactlyInAnyOrder("dokumente_suchen", "dokument_zeigen", "fristen", "kennzahl", "offene_posten",
-                        "vollstaendigkeit");
+                        "vollstaendigkeit", "wissen_index", "wissen_seite_zeigen");
         for (Method methode : werkzeuge) {
             int memoryIds = 0;
             for (Parameter parameter : methode.getParameters()) {
@@ -303,6 +303,6 @@ class ArchivWerkzeugeTest {
         };
         Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(m -> true), mandanten);
         return new ArchivWerkzeuge(lauf, suchen, zeigen, fristen, kennzahl, offenePosten,
-                new VollstaendigkeitAbfrage(null, null, null), new ObjectMapper());
+                new VollstaendigkeitAbfrage(null, null, null), null, new ObjectMapper());
     }
 }

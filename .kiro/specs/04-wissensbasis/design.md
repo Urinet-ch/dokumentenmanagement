@@ -439,6 +439,11 @@ flowchart LR
 - SSE `quellen` (Spec 02, design.md) erhält die Form `{wissen:{titel, link, stand}, dokumente:[{titel, link, seiten}]}`
   für jede mit `wissen_seite_zeigen` geladene Seite; die Dokumente sind die direkten Quellen der Seite nach Anzahl
   Fussnoten, höchstens 5 (Requirement 8.5). Gespeichert in `chat_nachricht.quellen` wie bisher.
+- Umsetzung 15.2: Die Ausgabe des Seiteninhalts nutzt dieselbe sichtgefilterte Darstellung wie die Einzelansicht;
+  unsichtbare Linkziele und ihre Beschriftungen gelangen nicht ins Modell. Die Kürzung erfolgt danach, die Quellenliste
+  bleibt vollständig. Beim Quellenranking werden Fussnoten desselben Quelldokuments zusammengezählt. Eine Suchanfrage
+  mit `anzahl` über 30 ist gültig, liefert aber gemäss Suchverfahren höchstens die 30 rerangierten Treffer und nennt
+  diese Grenze ausdrücklich.
 
 ### Suche und Embeddings (`wissen`, nutzt `suche` und `ki` aus Spec 02)
 - `wissensseite.inhalt_tsv`: `setweight(titel,'A') || setweight(beschreibung,'B') || setweight(tags,'B') ||
@@ -1003,7 +1008,7 @@ Konfiguration). Mandanten, die vor 13.2 angelegt wurden, erhalten die Art über 
 `044-wissensquelle-bestand` mit denselben Werten wie aus dem Seed (in `m_vhf_gsk` mit den Feldern oben) und eine neue
 Version der Konfiguration (`MIGRATION`); ein neues Schema hat beim Migrieren noch keine Arten und übergeht es
 (`MARK_RAN`). Der Jahresexport schliesst nur `WISSENSQUELLE` aus (`art is distinct from`), Dokumente ohne Art bleiben
-wie bisher drin. Req 1.4 weisen erst Ingest, Freigabe und Lint nach (14.x).
+wie bisher drin. Req 1.4 weisen Ingest (`ingest.feature`), Freigabe (`quelldokumente.feature`) und Lint (`lint.feature`, PR #376) mit Szenarien `@req-1.4` nach.
 
 | Code | Name | Gruppen | Pflichtfelder | Zusatz | Vertraulichkeit | Aufbewahrung | `gesetzliche_pflicht` |
 | --- | --- | --- | --- | --- | --- | --- | --- |

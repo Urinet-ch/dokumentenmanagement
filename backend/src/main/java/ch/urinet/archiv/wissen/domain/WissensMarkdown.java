@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -120,7 +121,8 @@ public final class WissensMarkdown {
         merkmale.eigeneDefinitionen.forEach(Node::unlink);
         return new Analyse(rendern(dokument, sichtbarePfade), links, fussnoten, abschnitte, aussagen, merkmale.html,
                 merkmale.bild, merkmale.ungueltigerLink, merkmale.wikilink,
-                !merkmale.eigeneDefinitionen.isEmpty(), false, false, merkmale.widersprueche);
+                !merkmale.eigeneDefinitionen.isEmpty(), false, false, merkmale.widersprueche,
+                merkmale.fussnotenHaeufigkeit);
     }
 
     public static String darstellen(String markdown) {
@@ -329,6 +331,9 @@ public final class WissensMarkdown {
             }
             if (node instanceof FootnoteReference reference) {
                 fussnoten.add(reference.getLabel());
+                if (!fussnotenDefinition) {
+                    merkmale.fussnotenHaeufigkeit.merge(reference.getLabel(), 1, Integer::sum);
+                }
             }
             if (node instanceof FootnoteDefinition definition) {
                 if (ergaenzt(definition, laenge)) {
@@ -629,18 +634,19 @@ public final class WissensMarkdown {
     public record Analyse(String html, Set<String> links, Set<String> fussnoten, Set<String> abschnitte,
                           List<Aussage> aussagen, boolean htmlVorhanden, boolean bildVorhanden,
                           boolean ungueltigerLink, boolean wikilink, boolean fussnotenDefinition, boolean zuGross,
-                          boolean zuTief, List<Aussage> widersprueche) {
+                          boolean zuTief, List<Aussage> widersprueche, Map<String, Integer> fussnotenHaeufigkeit) {
         public Analyse {
             links = Collections.unmodifiableSet(new LinkedHashSet<>(links));
             fussnoten = Collections.unmodifiableSet(new LinkedHashSet<>(fussnoten));
             abschnitte = Collections.unmodifiableSet(new LinkedHashSet<>(abschnitte));
             aussagen = List.copyOf(aussagen);
             widersprueche = List.copyOf(widersprueche);
+            fussnotenHaeufigkeit = Map.copyOf(fussnotenHaeufigkeit);
         }
 
         private static Analyse abgelehnt(boolean zuGross, boolean zuTief) {
             return new Analyse("", Set.of(), Set.of(), Set.of(), List.of(), false, false, false, false, false,
-                    zuGross, zuTief, List.of());
+                    zuGross, zuTief, List.of(), Map.of());
         }
     }
 
@@ -656,5 +662,6 @@ public final class WissensMarkdown {
         private boolean zuTief;
         private final List<Node> eigeneDefinitionen = new ArrayList<>();
         private final List<Aussage> widersprueche = new ArrayList<>();
+        private final Map<String, Integer> fussnotenHaeufigkeit = new java.util.HashMap<>();
     }
 }
