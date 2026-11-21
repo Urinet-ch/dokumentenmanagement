@@ -21,6 +21,7 @@ die nächste Phase beginnt erst, wenn es erfüllt ist.**
 | `.kiro/specs/04-wissensbasis/` | Phase 4: 19 Requirements, Design, Aufgaben (Wissensbasis nach LLM-Wiki-Muster, ADR-013) | 13–16 | noch nicht geschätzt |
 | `.kiro/specs/05-mandanten-konfiguration/` | Konfiguration je Mandant: 9 Requirements, Design, Aufgaben (Dokumentarten, Klassifikationen, Fristen, Regeln) | 17–18, umgesetzt nach Gate Phase 1 und spätestens vor Welle 10 (Entscheid Fabian 11.11.2026) | noch nicht geschätzt |
 | `.kiro/specs/06-verwaltung-einstellungen-benutzer/` | Einstellungen, Benutzer und Rollen in der App verwalten: 9 Requirements, Design, Aufgaben (Keycloak-Dienstkonto, Benutzer, Rollen, Einstellungen; ADR-015) | 19–21, Welle 19 nach Gate Phase 1 und parallel zu 17–18, Welle 20 nach Spec 05, 17.7 | noch nicht geschätzt (27 Aufgaben bis je 3 Stunden) |
+| `.kiro/specs/07-einfuehrung-hilfe/` | Einführung für neue Benutzer auf der Startseite und Benutzeranleitung «Hilfe» (Hilfe-Leiste, Seite `/hilfe`, offline): 10 Requirements, Design, Aufgaben; nur Frontend, keine Änderung an Rechten | 22–23, nach dem Merge parallel zu den übrigen Wellen (hängt nur vom bestehenden Frontend ab; vorgeschlagen 21.11.2026, entschieden mit dem Merge von Spec 07); Welle 22 Anleitung und Hilfe, Welle 23 Einführung und Abnahme (nach 22.3) | noch nicht geschätzt (13 Aufgaben bis je 3 Stunden) |
 
 Jede Spec folgt dem Kiro-Muster: `requirements.md` (User Stories + Akzeptanzkriterien in EARS),
 `design.md` (Architektur, Schnittstellen, Datenmodell, Fehler, Tests), `tasks.md` (Aufgaben mit

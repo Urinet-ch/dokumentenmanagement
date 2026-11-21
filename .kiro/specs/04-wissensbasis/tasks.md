@@ -27,14 +27,13 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 1.1–1.6_
   - _Abhängig von: Spec 01: Feld `dokument.titel` (vorhanden, Requirement 7.2)_
 
-- [ ] 13.3 Fachbereich `wissen` und Datenmodell [Backend]
+- [x] 13.3 Fachbereich `wissen` und Datenmodell [Backend]
   - Paket `wissen` mit `domain`, `application`, `adapter`; ArchUnit-Regeln wie ADR-011 (kein Zugriff auf `public` ausser `auftrag`)
   - Liquibase-Changesets (`db/mandant`) für alle Tabellen aus design.md; Trigger INSERT-only auf `wissensseite_version` und `wissens_log`, `archiv_app` dort nur `INSERT`/`SELECT`
-  - Manifest um Zeilen von `wissensseite_version` und `wissens_log` erweitern; Restore-Probe vergleicht Anzahl Seiten und Versionen
+  - Manifest um Zeilen von `wissensseite_version` und `wissens_log` erweitern; lokaler Restore-Rundlauf vergleicht Anzahl Seiten und Versionen
   - Logs nur mit IDs (Test über Log-Ausgabe)
-  - Teil erledigt (PR #295): Paket, Changeset `043-wissen-datenmodell`, Rechte und INSERT-only, Manifest (Req 4.1–4.3, 4.6); `public` nur über `auftrag` prüft die allgemeine ArchUnit-Regel `publicNurUeberAuftrag`. Offen: Req 4.7, der Vergleich von Anzahl Seiten und Versionen in der Restore-Probe; er braucht die Restore-Kette mit Datenbank-Restore aus Spec 01, Aufgabe 5.12 (design.md, «Umsetzung 13.3»). 13.9 weisen die Ingest- und Freigabepfade nach (14.x)
-  - Nachprüfung 20.11.2026: PR #357 liefert den echten lokalen Datenbank-Restore (`restore-uebung-lokal.sh`); der Vergleich nichtleerer Wissensseiten- und Versionsbestände vor und nach diesem Restore ist noch nicht belegt. Deshalb bleibt 13.3 offen; ein Bucket-Restore mit Zählen derselben Datenbank reicht weiterhin nicht.
-  - _Anforderungen: 4.1–4.3, 4.6, 4.7, 13.9_
+  - Erledigt (PR #295, #357, #397): Paket, Changeset `043-wissen-datenmodell`, Rechte und INSERT-only, Manifest sowie lokaler Datenbank-Restore mit je zwei synthetischen Seiten und drei Versionen pro Mandant vor und nach dem Restore. `public` nur über `auftrag` prüft die allgemeine ArchUnit-Regel `publicNurUeberAuftrag`. 13.9 weisen die Ingest- und Freigabepfade nach (14.x).
+  - _Anforderungen: 4.1–4.3, 4.6, 13.9_
 
 - [x] 13.4 Seitenmodell, Markdown und Prüfung [Backend]
   - `Wissensseite`, `Quelleneintrag`, `Seitentyp`; `WissensMarkdown` (commonmark-java, Footnotes, ohne HTML); `Seitentext` aus `\f`-getrenntem Volltext (besteht seit Spec 02, Aufgabe 6.3, als `gemeinsam/domain/Seitentext`; wiederverwenden, nicht neu bauen)
@@ -58,6 +57,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Szenario `@req-12.2` über einen Endpunkt: `treuhaender` erhält 403, Datenbank und Log bleiben unverändert (Review PR #300, S4) → verschoben auf 14.2 (`POST /wissensentwuerfe`, Vermerk bei 13.5; Review PR #311, M2)
   - _Anforderungen: 3.1–3.4, 3.6, 3.8, 4.4, 4.5, 14.2, 14.4–14.6_
   - _Abhängig von: 13.4, 13.5_
+
+- [ ] 13.7 Zählvergleich in der betrieblichen Restore-Probe [Infra] [nachgelagert]
+  - Der lokale Rundlauf aus #397 weist den Vergleich in der wiederkehrenden betrieblichen Restore-Probe nicht nach. Den Vergleich der Seiten- und Versionszahl dort ergänzen und bei der Restore-Probe auf Stufe B nachweisen; ein Bucket-Restore mit Zählen derselben Datenbank reicht nicht.
+  - _Anforderungen: 4.7_
+  - _Abhängig von: 13.3, Spec 01: 5.11_
 
 ## Welle 14 — Ingest und Freigabe
 
@@ -135,8 +139,9 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 8.1–8.7, 8.9, 11.4_
   - _Abhängig von: 15.1, Spec 02: 7.1–7.3_
 
-- [ ] 15.3 Chat-Oberfläche und Analyse-Vorschlag [Frontend] [Backend]
+- [x] 15.3 Chat-Oberfläche und Analyse-Vorschlag [Frontend] [Backend]
   - Quellen-Chips für Seiten (öffnen die Seite mit Protokoll), Aktion «Als Analyse vorschlagen» für A18 nur bei zulässigen Gesprächen; `POST /wissensentwuerfe/analyse` ohne KI-Aufruf (422 `ANALYSE_NICHT_MOEGLICH` nach Aufruf von `kennzahl` u. a., Quellen ohne Seite, Kontextstufe aus allen Werkzeugergebnissen des Gesprächs), Status eigener Vorschläge ohne Fassung und Diff; Logeintrag `ANALYSE`
+  - Nachweis: Backend-Szenarien, Persistenz- und Freigabetests sowie Chat- und Status-Unit-Tests. Echte Browser-Szenarien prüfen den Seitenabruf samt Protokoll und den Analysevorschlag (`@req-8.8`, `@req-16.6`); das Browser-Szenario `@req-12.4` läuft gegen eine Attrappe.
   - _Anforderungen: 6.10, 8.8, 12.3, 12.4, 16.6_
   - _Abhängig von: 15.2, 14.2, Spec 02: 7.4_
 
@@ -166,7 +171,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - `tools/wissen_paket` (Java 25, picocli, Shade-Jar, SpotBugs wie `tools/drive_import`), Kommandos `validate` und `bauen`, Option `--quellen`; bindet den Quelltext von `wissen/domain` und `gemeinsam/domain/Seitentext*` per `build-helper-maven-plugin` ein (design.md, «Prüfwerkzeug»); `OfflineKontext`; Bericht nur mit Befund-Codes und Pfaden (`--json`), Rückgabewert 0/1; reproduzierbares ZIP; kein Netz, keine Zugangsdaten
   - CI: eigener Schritt für `tools/wissen_paket` und Pfadfilter für Änderungen an `wissen/domain`; `README.md` des Werkzeugs
   - `PaketRegelnGleichheitTest` (JUnit, Nachweis für 19.27): dieselben Beispielpakete wie 15.6 ergeben dieselben Befund-Listen; Test, dass das Werkzeug keine Netzverbindung aufbaut und keine Datei ausser dem Ausgabe-ZIP schreibt
-  - Teil erledigt: Offline-Werkzeug und Tests; `PaketRegelnGleichheitTest` vergleicht die offline prüfbaren Codes und Pfade von Werkzeug und tatsächlicher REST-Antwort für 18 Beispielpakete. CI-Schritt und Pfadfilter bleiben offen, da Änderungen unter `.github/workflows` in diesem Auftrag ausgeschlossen sind. Übergabe an die CI-Koordination; Aufgabe bleibt offen. Abweichung von design.md: Der Bericht enthält Befund-Codes und Pfade, aber keine Zähler (Requirement 19.27 verlangt nur Codes und Pfade). Der Netz-Test ist eine statische Bytecode-Suche in den eigenen Klassen des Werkzeugs und kein Laufzeitnachweis; die Paketgrenze sichert die ArchUnit-Regel im Backend.
+  - Teil erledigt (PR #379, #395, #396): Offline-Werkzeug und Tests; `PaketRegelnGleichheitTest` vergleicht die offline prüfbaren Codes und Pfade von Werkzeug und tatsächlicher REST-Antwort für 18 Beispielpakete. Der CI-Schritt läuft bei jeder Nicht-Spec-Änderung und damit auch bei Änderungen an `wissen/domain`. Abweichung von design.md: Der Bericht enthält Befund-Codes und Pfade, aber keine Zähler (Requirement 19.27 verlangt nur Codes und Pfade). Offen bleibt der Laufzeitnachweis, dass das Werkzeug keine Netzverbindung aufbaut: Der vorhandene Netz-Test durchsucht nur die eigenen Klassen statisch nach Bytecode; die Paketgrenze sichert die ArchUnit-Regel im Backend.
   - Abgrenzung: nur das Paketformat und die Domain-Regeln aus 13.4/15.6 werden gebraucht, nicht der Endpunkt; Aufgabe 15.6 und 15.7 dürfen parallel laufen, sobald `WissensPaketLeser` steht (Klasse aus 15.6, zuerst mergen)
   - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.25, 19.27_
   - _Abhängig von: 13.4 (`WissensPruefung`), Paketformat aus 15.6 (`WissensPaketLeser`)_

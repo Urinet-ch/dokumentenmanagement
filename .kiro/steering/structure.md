@@ -16,7 +16,9 @@ dokumentenmanagement/
 │       ├── 02-abgleich-chat/
 │       ├── 03-zweiter-mandant/
 │       ├── 04-wissensbasis/
-│       └── 05-mandanten-konfiguration/
+│       ├── 05-mandanten-konfiguration/
+│       ├── 06-verwaltung-einstellungen-benutzer/
+│       └── 07-einfuehrung-hilfe/   Einführung für neue Benutzer, Benutzeranleitung «Hilfe»
 ├── backend/                 Quarkus (API + Worker), liefert die PWA über Quinoa aus
 │   ├── compose-devservices.yml   MinIO und Mailpit als Compose Dev Services (dev und Tests)
 │   └── src/main/java/ch/urinet/archiv/
@@ -41,10 +43,11 @@ dokumentenmanagement/
 │       ├── db/mandant/      Liquibase: Schema je Mandant
 │       ├── seed/<code>/konfiguration.json   Konfiguration je Mandant, einschliesslich Dokumentarten (Spec 05)
 │       └── seed/_alle/dokumentarten-wissen.json   Art WISSENSQUELLE für jeden Mandanten (Spec 04)
-│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>, je Datei genau ein @spec-NN); Spec 04 unter features/wissen/, Spec 05 unter features/konfiguration/
+│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>, je Datei genau ein @spec-NN); Spec 04 unter features/wissen/, Spec 05 unter features/konfiguration/, Spec 06 unter features/verwaltung/, Spec 07 unter features/hilfe/
 ├── frontend/                Angular PWA (Build über Quinoa)
+│   ├── public/anleitung/    Benutzeranleitung als Markdown, eine Datei je Abschnitt (Spec 07)
 │   └── src/app/
-│       ├── erfassen/  eingangskorb/  suche/  dokument/  importe/  chat/  verwaltung/  wissen/ (Spec 04)
+│       ├── erfassen/  eingangskorb/  suche/  dokument/  importe/  chat/  verwaltung/  wissen/ (Spec 04)  hilfe/ (Spec 07)
 │       └── gemeinsam/       Auth, API-Client (aus OpenAPI generiert), Offline-Warteschlange
 ├── tools/
 │   ├── archiv_client.py     Client für rechnung_gen.py und urinet_pdf.py

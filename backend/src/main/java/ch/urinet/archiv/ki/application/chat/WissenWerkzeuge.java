@@ -27,12 +27,13 @@ import java.util.UUID;
 @ApplicationScoped
 public class WissenWerkzeuge {
     public record IndexZeile(String pfad, String titel, String typ, String beschreibung, List<String> hinweise,
-                             String link) { }
+                             String link, Wissensseite.Vertraulichkeit vertraulichkeit) { }
     public record Index(List<IndexZeile> treffer, boolean degradiert, String hinweis) { }
     public record Quelle(String schluessel, UUID dokumentId, String titel, String seiten, String seite, String link,
                          int anzahl) { }
     public record Seite(String pfad, String titel, String typ, String inhalt, List<Quelle> quellen, String stand,
-                        String freigegebenVon, List<String> hinweise, String link) { }
+                        String freigegebenVon, List<String> hinweise, String link,
+                        Wissensseite.Vertraulichkeit vertraulichkeit) { }
 
     static final int INDEX_MAX = 200;
 
@@ -105,7 +106,8 @@ public class WissenWerkzeuge {
                     Optional.of(kontext.rolle().name()), ProtokollAktion.WISSEN_ANZEIGEN, Optional.of(seite.id()),
                     kontext.ip(), ProtokollDetails.KEINE.mitKanal(ProtokollDetails.KANAL_CHAT)));
             return new Seite(seite.pfad(), seite.titel(), seite.typ().datenbankwert(), inhalt, quellen,
-                    seite.freigegebenAm().toString(), seite.freigegebenVon(), List.copyOf(hinweise), link(seite.pfad()));
+                    seite.freigegebenAm().toString(), seite.freigegebenVon(), List.copyOf(hinweise),
+                    link(seite.pfad()), seite.vertraulichkeit());
         });
     }
 
@@ -131,7 +133,7 @@ public class WissenWerkzeuge {
         if ("VERALTET".equalsIgnoreCase(seite.status())) hinweise.add("VERALTET");
         if (seite.quellePruefen()) hinweise.add("QUELLE_PRUEFEN");
         return new IndexZeile(seite.pfad(), seite.titel(), seite.typ().datenbankwert(), seite.beschreibung(),
-                List.copyOf(hinweise), link(seite.pfad()));
+                List.copyOf(hinweise), link(seite.pfad()), seite.vertraulichkeit());
     }
 
     private static List<String> hinweise(Wissensseite seite) {
