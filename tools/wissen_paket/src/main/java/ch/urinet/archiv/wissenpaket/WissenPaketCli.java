@@ -54,9 +54,14 @@ public final class WissenPaketCli implements Callable<Integer> {
                 byte[] zip = daten();
                 WissensPaket paket = new WissensPaketLeser().lesen(zip);
                 OfflinePruefung.Bericht bericht = OfflinePruefung.pruefen(paket);
-                List<OfflinePruefung.Meldung> hinweise = new ArrayList<>(bericht.hinweise());
+                List<OfflinePruefung.Meldung> hinweise = new ArrayList<>();
+                // Mit --quellen entscheidet LokaleQuellen je Quelle; der pauschale Offline-Hinweis entfällt.
+                for (var h : bericht.hinweise()) {
+                    if (quellen == null || !h.code().equals("QUELLE_NICHT_GEPRUEFT")) hinweise.add(h);
+                }
                 hinweise.addAll(weitereHinweise());
                 if (quellen != null) hinweise.addAll(LokaleQuellen.pruefen(paket, quellen));
+                hinweise = new ArrayList<>(new java.util.LinkedHashSet<>(hinweise));
                 if (bericht.gueltig()) schreiben(zip);
                 ausgeben(spec.commandLine().getOut(), json, bericht.befunde(), hinweise);
                 return bericht.gueltig() ? 0 : 1;

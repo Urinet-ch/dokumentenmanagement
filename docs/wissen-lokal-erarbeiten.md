@@ -1,7 +1,7 @@
 # Wissen lokal erarbeiten und ins Archiv übertragen
 
-> Der Import-Endpunkt und das Offline-Werkzeug sind umgesetzt. Die Oberfläche zum Hochladen (Aufgabe 15.8)
-> und der OKF-Export (Aufgabe 15.5) folgen noch. Platzhalter stehen in `<spitzen Klammern>`.
+> Import-Endpunkt, Oberfläche zum Hochladen (Aufgabe 15.8), OKF-Export (Aufgabe 15.5) und Offline-Werkzeug sind
+> umgesetzt. Offen ist nur der CI-Schritt von Aufgabe 15.7. Platzhalter stehen in `<spitzen Klammern>`.
 
 Das Archiv nimmt Wissen von aussen nur als **Entwurf** an. Wirksam wird jede Änderung erst, wenn du sie im Archiv
 einzeln ansiehst und annimmst. Das Archiv ruft dabei keine KI auf.
