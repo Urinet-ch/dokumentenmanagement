@@ -4,6 +4,9 @@ import ch.urinet.archiv.benutzer.application.VerwaltungVorgang;
 import ch.urinet.archiv.benutzer.application.VerwaltungVorgang.Kompensation;
 import ch.urinet.archiv.benutzer.application.Vorgangssperre;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
+import ch.urinet.archiv.gemeinsam.LogMitschnitt;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
@@ -172,6 +175,27 @@ class VerwaltungVorgangTest {
                                     assertThat(unterdrueckt[0]).isInstanceOf(NullPointerException.class)));
             assertThat(phasen(id)).containsExactly("ANGEFRAGT", "UNKLAR");
             assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void kompensationsfehlerBeiFachfehlerWirdOhneInhalteGemeldet() throws Exception {
+        MandantCode mandant = mandantFuerAnlage();
+        UUID id = UUID.randomUUID();
+        String akteur = UUID.randomUUID().toString();
+        var absicht = anlage(id, null, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor(); var log = LogMitschnitt.starten()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER); },
+                    fehler -> { throw new IllegalStateException("geheimer synthetischer Inhalt"); },
+                    wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(FachFehler.class);
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+            assertThat(log.volltext()).contains(id.toString(), "Kompensation fehlgeschlagen", "IllegalStateException")
+                    .doesNotContain("geheimer synthetischer Inhalt");
         } finally {
             testsperreEntfernen(mandant, id);
         }

@@ -10,6 +10,7 @@ import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.logging.Logger;
 
 import java.util.Objects;
 import java.util.Set;
@@ -20,6 +21,8 @@ import java.util.function.Supplier;
 
 @ApplicationScoped
 public class VerwaltungVorgang {
+
+    private static final Logger LOG = Logger.getLogger(VerwaltungVorgang.class);
 
     public enum Kompensation { GEKLAERT, UNKLAR }
 
@@ -107,6 +110,8 @@ public class VerwaltungVorgang {
             try {
                 sperre.freigeben(mandant, id);
             } catch (RuntimeException freigabeFehler) {
+                LOG.errorf("Vorgang %s: Freigabe fehlgeschlagen (%s).", id,
+                        freigabeFehler.getClass().getSimpleName());
                 fehler.addSuppressed(freigabeFehler);
             }
             throw fehler;
@@ -152,6 +157,8 @@ public class VerwaltungVorgang {
             try {
                 ergebnis = Objects.requireNonNull(kompensieren.apply(fehler), "Ergebnis der Kompensation fehlt");
             } catch (RuntimeException kompensationsFehler) {
+                LOG.errorf("Vorgang %s: Kompensation fehlgeschlagen (%s).", id,
+                        kompensationsFehler.getClass().getSimpleName());
                 fehler.addSuppressed(kompensationsFehler);
             }
             if (ergebnis == Kompensation.GEKLAERT && (!arbeitGeliefert || abschlussGeprueft)) {
@@ -165,6 +172,8 @@ public class VerwaltungVorgang {
                     });
                     abgeschlossen = true;
                 } catch (RuntimeException abschlussFehler) {
+                    LOG.errorf("Vorgang %s: Fehlerabschluss fehlgeschlagen (%s).", id,
+                            abschlussFehler.getClass().getSimpleName());
                     fehler.addSuppressed(abschlussFehler);
                 }
                 if (abgeschlossen) {
@@ -179,6 +188,8 @@ public class VerwaltungVorgang {
                     }
                 });
             } catch (RuntimeException protokollFehler) {
+                LOG.errorf("Vorgang %s: Protokollierung des unklaren Zustands fehlgeschlagen (%s).", id,
+                        protokollFehler.getClass().getSimpleName());
                 fehler.addSuppressed(protokollFehler);
             }
             throw fehler;
