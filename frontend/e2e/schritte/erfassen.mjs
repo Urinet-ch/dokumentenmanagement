@@ -236,6 +236,18 @@ Given('ein Handy ohne Kamera', { timeout: 60_000 }, async function () {
 
 Given('die Uhr des Handys lässt sich vorstellen', async function () {
   await this.kontext.clock.install();
+  await this.seite.evaluate(() => {
+    window.__uploadWartezeiten = [];
+    const original = window.setTimeout;
+    window.setTimeout = function (callback, verzug, ...argumente) {
+      const id = original(callback, verzug, ...argumente);
+      // Nur den Timer der Warteschlange erfassen, nicht etwa die Token-Erneuerung.
+      if (typeof callback === 'function' && /this\s*\.\s*verarbeiten\s*\(/.test(callback.toString())) {
+        window.__uploadWartezeiten.push(verzug);
+      }
+      return id;
+    };
+  });
 });
 
 Given(
@@ -368,6 +380,12 @@ When(
   { timeout: 60_000 },
   async function () {
     const vorher = this.handy.anfragen.length;
+    await warten(
+      this,
+      () => this.seite.evaluate((verzug) => window.__uploadWartezeiten.includes(verzug), vorher * 30_000),
+      `Wiederholungstimer nach Versuch ${vorher}`,
+      50_000,
+    );
     await this.kontext.clock.fastForward('03:00');
     await warten(this, () => this.handy.anfragen.length > vorher, 'neuer Upload-Versuch');
   },
