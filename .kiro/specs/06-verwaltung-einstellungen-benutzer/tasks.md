@@ -88,7 +88,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 
-- [x] 19.7 REST Benutzer lesen, anlegen und einladen [Backend]
+- [ ] 19.7 REST Benutzer lesen, anlegen und einladen [Backend]
   - `GET /rollen`, `GET /benutzer`, `GET /benutzer/{id}`, `POST /benutzer` (Formregeln, Höchstzahl, `BENUTZER_EXISTIERT`,
     Namenssperre über das Verzeichnis, Kompensation), `POST /benutzer/{id}/einladung`; Sicherheits-Header und
     `Cache-Control: no-store`, nur `application/json`; `EndpunktWaechterTest` erweitert.
