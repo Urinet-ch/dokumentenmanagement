@@ -118,11 +118,15 @@ public class MailSchritte {
             neueDokumente.removeAll(eintrag.getValue());
             try (Connection verbindung = datenbank.get().getConnection();
                  PreparedStatement auftraege = verbindung.prepareStatement(
-                         "delete from public.auftrag where mandant = ? and nutzlast->>'dokumentId' = any (?)")) {
+                         "delete from public.auftrag where mandant = ? and nutzlast->>'dokumentId' = any (?)");
+                 PreparedStatement maileingang = verbindung.prepareStatement(
+                         "delete from " + schema(mandant) + ".mail_eingang where dokument_ids && ?")) {
                 auftraege.setString(1, mandant);
                 auftraege.setArray(2, verbindung.createArrayOf("text",
                         neueDokumente.stream().map(UUID::toString).toArray()));
                 auftraege.executeUpdate();
+                maileingang.setArray(1, verbindung.createArrayOf("uuid", neueDokumente.toArray()));
+                maileingang.executeUpdate();
             }
             Testdokumente.loeschen(datenbank.get(), mandant, neueDokumente);
             if (!neueDokumente.isEmpty()) {
@@ -155,6 +159,8 @@ public class MailSchritte {
                     .doesNotContain(neu);
             assertThat(wert("select count(*) from public.auftrag where mandant = ? "
                     + "and nutzlast->>'dokumentId' = ?", "urinet", neu.toString())).isZero();
+            assertThat(wert("select count(*) from " + schema("urinet")
+                    + ".mail_eingang where message_id = ?", gespeichert(nachrichten.getLast()))).isZero();
             assertThat(TestAblage.versionen("urinet", "eingang/"))
                     .noneMatch(schluessel -> schluessel.contains("/" + neu + "/"));
         } finally {
