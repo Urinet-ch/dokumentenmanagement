@@ -1537,6 +1537,14 @@
           }
         }
       },
+      "EmailAenderung" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          }
+        }
+      },
       "EntfernteAussage" : {
         "type" : "object",
         "properties" : {
@@ -4299,6 +4307,54 @@
                 }
               }
             }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "patch" : {
+        "summary" : "E-Mail-Adresse ändern",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EmailAenderung"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "E-Mail-Adresse geändert"
           },
           "401" : {
             "description" : "Not Authorized"

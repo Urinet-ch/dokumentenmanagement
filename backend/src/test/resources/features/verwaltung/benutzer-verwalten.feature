@@ -34,6 +34,14 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber die Google-Verknüpfung löst
     Dann ist die Verknüpfung entfernt und die Sitzungen sind beendet
 
+  @req-3.14 @req-3.18
+  Szenario: Eine E-Mail-Änderung verlangt die aktuelle Version und benachrichtigt beide Adressen
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer Mitarbeiter ist eingeladen
+    Und die Mitteilung an die bisherige Adresse wird aufgezeichnet
+    Wenn der Inhaber die E-Mail-Adresse des Mitarbeiters mit der aktuellen Version ändert
+    Dann muss die neue Adresse bestätigt werden und die bisherige Adresse wird benachrichtigt
+
   @req-3.4 @req-5.9
   Szenario: Ungültige Angaben und Realm-Konflikte werden ohne Personendaten abgewiesen
     Angenommen die frische Anmeldung ist für den Test bestätigt

@@ -214,6 +214,8 @@ Archiv-Rolle und ein offener Antrag; die Bestätigung und Rollenvergabe folgen i
 Einladung erneut erhalten, solange es im Status `EINGELADEN` ist. Bis 19.10 verweigert die Step-up-Schnittstelle
 geschützte Aktionen; Tests ersetzen sie ausdrücklich. Eine bestätigte Entfernung nach einer unklaren Keycloak-Wirkung
 genügt nicht für `GEKLAERT`; HTTP 202 gilt nicht als bestätigter Abschluss.
+Bei einer E-Mail-Änderung werden für die Bestätigung an die neue und die Mitteilung an die bisherige Adresse zwei der
+drei Mailplätze je Ziel reserviert. Auch angefragte Änderungen mit unklarem Ausgang zählen vorsorglich.
 
 ### Statusautomat
 | Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |

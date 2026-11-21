@@ -5,6 +5,7 @@ import ch.urinet.archiv.benutzer.application.BenutzerEinladen;
 import ch.urinet.archiv.benutzer.application.BenutzerAnlegen;
 import ch.urinet.archiv.benutzer.application.BenutzerZugangZuruecksetzen;
 import ch.urinet.archiv.benutzer.application.BenutzerGoogleLoesen;
+import ch.urinet.archiv.benutzer.application.BenutzerEmailAendern;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -28,6 +29,7 @@ import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.HeaderParam;
@@ -54,6 +56,7 @@ public class BenutzerResource {
     private final BenutzerAnlegen anlegen;
     private final BenutzerZugangZuruecksetzen zugang;
     private final BenutzerGoogleLoesen google;
+    private final BenutzerEmailAendern email;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
     private final ObjectReader json;
@@ -61,7 +64,7 @@ public class BenutzerResource {
     private final StepUp stepUp;
 
     public BenutzerResource(BenutzerLesen lesen, BenutzerEinladen einladen, BenutzerAnlegen anlegen,
-                            BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google,
+                            BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google, BenutzerEmailAendern email,
                             MandantAufloesung mandant, SecurityIdentity identitaet, ObjectMapper json,
                             Berechtigung berechtigung, StepUp stepUp) {
         this.lesen = lesen;
@@ -69,6 +72,7 @@ public class BenutzerResource {
         this.anlegen = anlegen;
         this.zugang = zugang;
         this.google = google;
+        this.email = email;
         this.mandant = mandant;
         this.identitaet = identitaet;
         this.json = json.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
@@ -195,6 +199,44 @@ public class BenutzerResource {
         stepUp.pruefen();
         leerenKoerperPruefen(contentType, body);
         google.ausfuehren(code, akteur, benutzerId, IpAdresse.aus(ip));
+        return Response.noContent().build();
+    }
+
+    public record EmailAenderung(String email) {
+        @Override
+        public String toString() {
+            return "EmailAenderung[geschützt]";
+        }
+    }
+
+    @PATCH
+    @Path("/{benutzerId}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "E-Mail-Adresse ändern")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = EmailAenderung.class)))
+    @APIResponse(responseCode = "204", description = "E-Mail-Adresse geändert")
+    public Response emailAendern(@PathParam("benutzerId") String benutzerId, @HeaderParam("If-Match") String ifMatch,
+                                 @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        stepUp.pruefen();
+        BenutzerEmailAendern.ifMatchPruefen(ifMatch);
+        jsonPruefen(contentType);
+        EmailAenderung aenderung;
+        try {
+            aenderung = json.forType(EmailAenderung.class).readValue(begrenztLesen(body));
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        if (aenderung == null) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        email.ausfuehren(code, akteur, benutzerId, ifMatch, aenderung.email(), IpAdresse.aus(ip));
         return Response.noContent().build();
     }
 

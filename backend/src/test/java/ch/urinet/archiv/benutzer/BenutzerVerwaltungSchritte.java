@@ -2,7 +2,9 @@ package ch.urinet.archiv.benutzer;
 
 import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
+import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
+import ch.urinet.archiv.benutzer.application.BenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
@@ -60,12 +62,15 @@ public class BenutzerVerwaltungSchritte {
     @Inject WissensquelleSeed wissensquelle;
     @Inject ZusatzSchemaPruefer zusatzSchema;
     @Inject IdentitaetsDienst identitaet;
+    @Inject BenutzerMitteilung mitteilung;
     @Inject StepUp stepUp;
 
     private final List<Map.Entry<String, String>> benutzer = new ArrayList<>();
     private final List<Response> antworten = new ArrayList<>();
     private StepUp urspruenglichesStepUp;
     private IdentitaetsDienst urspruenglicheIdentitaet;
+    private BenutzerMitteilung urspruenglicheMitteilung;
+    private final List<String> emailMitteilungen = new ArrayList<>();
     private IdentitaetsDienstStub fehlerdienst;
     private boolean googleVerknuepft;
     private boolean googleSitzungenBeendet;
@@ -157,6 +162,9 @@ public class BenutzerVerwaltungSchritte {
         }
         if (urspruenglicheIdentitaet != null) {
             QuarkusMock.installMockForType(urspruenglicheIdentitaet, IdentitaetsDienst.class);
+        }
+        if (urspruenglicheMitteilung != null) {
+            QuarkusMock.installMockForType(urspruenglicheMitteilung, BenutzerMitteilung.class);
         }
         for (var eintrag : benutzer) {
             identitaet.loeschen(eintrag.getKey(), eintrag.getValue());
@@ -323,6 +331,43 @@ public class BenutzerVerwaltungSchritte {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);
         assertThat(googleVerknuepft).isFalse();
         assertThat(googleSitzungenBeendet).isTrue();
+    }
+
+    @Angenommen("die Mitteilung an die bisherige Adresse wird aufgezeichnet")
+    public void emailMitteilungAufzeichnen() {
+        urspruenglicheMitteilung = ClientProxy.unwrap(mitteilung);
+        QuarkusMock.installMockForType(new MailBenutzerMitteilung(mails -> {
+            for (var mail : mails) {
+                emailMitteilungen.addAll(mail.getTo());
+            }
+        }), BenutzerMitteilung.class);
+    }
+
+    @Wenn("der Inhaber die E-Mail-Adresse des Mitarbeiters mit der aktuellen Version ändert")
+    public void emailAendern() {
+        String etag = anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).extract().header("ETag");
+        antworten.add(anfrage().contentType("application/json").header("If-Match", etag)
+                .body("{\"email\":\"neu." + name + "@example.invalid\"}").patch(PFAD + "/" + eigeneId));
+    }
+
+    @Dann("muss die neue Adresse bestätigt werden und die bisherige Adresse wird benachrichtigt")
+    public void emailGeaendert() throws SQLException {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).email()).isEqualTo("neu." + name + "@example.invalid");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktionen())
+                .contains(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL);
+        assertThat(emailMitteilungen).containsExactly(name + "@example.invalid");
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details::text from m_" + SCHEMA + ".zugriff_protokoll "
+                             + "where details->>'ziel' = ? and details->>'phase' = 'ABGESCHLOSSEN' "
+                             + "and details->>'vorgang' = 'EMAIL_AENDERN'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).doesNotContain(name, "@example.invalid");
+            }
+        }
     }
 
     @Wenn("der Inhaber die Einladung viermal erneut sendet")

@@ -61,6 +61,7 @@ model/dokumentart.ts
 model/download-adresse.ts
 model/eingabe.ts
 model/eingangskorb-seite.ts
+model/email-aenderung.ts
 model/entfernte-aussage.ts
 model/entscheidung.ts
 model/ergebnis.ts

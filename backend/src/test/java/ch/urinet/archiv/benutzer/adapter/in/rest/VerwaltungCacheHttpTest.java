@@ -2,9 +2,11 @@ package ch.urinet.archiv.benutzer.adapter.in.rest;
 
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.BenutzerNamen;
+import ch.urinet.archiv.benutzer.application.BenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
+import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreBestandMigration;
 import ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreHash;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -356,6 +358,89 @@ class VerwaltungCacheHttpTest {
                 .delete(pfad + ziel + "/google-verknuepfung").then().statusCode(400);
         given().auth().oauth2(token).contentType("application/json").delete(pfad + ziel + "/google-verknuepfung")
                 .then().statusCode(409).body("fehlercode", is("STATUS_KONFLIKT"));
+    }
+
+    @Test
+    void emailAendernPrueftVersionMandantUndSendetBeideMitteilungen() {
+        String pfad = "/api/v1/benutzer/";
+        String token = Testanmeldung.token("inhaber-urinet");
+        given().auth().oauth2(token).contentType("application/json").body("{}")
+                .patch(pfad + UUID.randomUUID()).then().statusCode(401).body("fehlercode", is("STEP_UP_NOETIG"));
+
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub();
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String ziel = dienst.anlegen("urinet", person("email." + suffix), Rolle.MITARBEITER);
+        String fremd = dienst.anlegen("vhf-gsk", person("fremd." + suffix), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        List<String> mitteilungen = new java.util.ArrayList<>();
+        QuarkusMock.installMockForType(new MailBenutzerMitteilung(mails -> {
+            for (var mail : mails) {
+                mitteilungen.addAll(mail.getTo());
+            }
+        }), BenutzerMitteilung.class);
+        String etag = given().auth().oauth2(token).get(pfad + ziel).then().statusCode(200).extract().header("ETag");
+        String neu = "neu." + suffix + "@example.invalid";
+
+        given().auth().oauth2(token).contentType("application/json").body("{}")
+                .patch(pfad + ziel).then().statusCode(428).body("fehlercode", is("VERSION_FEHLT"));
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", "\"" + "0".repeat(64) + "\"")
+                .body("{\"email\":\"ungültig\"}").patch(pfad + ziel)
+                .then().statusCode(412).body("fehlercode", is("VERSION_KONFLIKT"));
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"email\":\"ungültig\"}").patch(pfad + ziel).then().statusCode(422);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"email\":\"" + neu + "\"}").patch(pfad + fremd).then().statusCode(404);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"email\":\"" + neu + "\"}").patch(pfad + ziel).then().statusCode(204);
+        assertThat(dienst.benutzerLesen("urinet", ziel).email()).isEqualTo(neu);
+        assertThat(dienst.benutzerLesen("urinet", ziel).aktionen()).containsExactlyInAnyOrder(
+                IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
+                IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+        assertThat(mitteilungen).containsExactly("email." + suffix + "@example.invalid");
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"email\":\"" + neu + "\"}").patch(pfad + ziel).then().statusCode(412);
+    }
+
+    @Test
+    void vergebeneEmailBleibtNeutralUndGibtDieVorgangssperreFrei() {
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub() {
+            private boolean konfligiert = true;
+
+            @Override
+            public synchronized void aktualisieren(String mandant, String id, Aenderung aenderung) {
+                if (konfligiert) {
+                    konfligiert = false;
+                    throw new KonfliktException();
+                }
+                super.aktualisieren(mandant, id, aenderung);
+            }
+        };
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String ziel = dienst.anlegen("urinet", person("email." + suffix), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        QuarkusMock.installMockForType(new MailBenutzerMitteilung(mails -> { }), BenutzerMitteilung.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/benutzer/" + ziel;
+        String etag = given().auth().oauth2(token).get(pfad).then().statusCode(200).extract().header("ETag");
+        String eingabe = "{\"email\":\"neu." + suffix + "@example.invalid\"}";
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag).body(eingabe)
+                .patch(pfad).then().statusCode(409).body("fehlercode", is("BENUTZER_EXISTIERT"))
+                .body(not(containsString(suffix)));
+        String zweitesZiel = dienst.anlegen("urinet", person("zweite." + suffix), Rolle.MITARBEITER);
+        String zweiterPfad = "/api/v1/benutzer/" + zweitesZiel;
+        String zweiterEtag = given().auth().oauth2(token).get(zweiterPfad)
+                .then().statusCode(200).extract().header("ETag");
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", zweiterEtag).body(eingabe)
+                .patch(zweiterPfad).then().statusCode(204);
     }
 
     @Test

@@ -40,6 +40,7 @@ export * from './dokumentart-aenderung';
 export * from './download-adresse';
 export * from './eingabe';
 export * from './eingangskorb-seite';
+export * from './email-aenderung';
 export * from './entfernte-aussage';
 export * from './entscheidung';
 export * from './ergebnis';

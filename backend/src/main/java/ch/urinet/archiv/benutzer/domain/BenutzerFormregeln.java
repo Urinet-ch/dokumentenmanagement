@@ -17,15 +17,27 @@ public final class BenutzerFormregeln {
             befunde.add(new Befund("benutzername", "BENUTZERNAME_UNGUELTIG",
                     "Der Benutzername muss 3 bis 40 Zeichen aus a–z, 0–9, Punkt, Unterstrich oder Bindestrich enthalten."));
         }
-        if (!laengeUndSteuerzeichen(email, 1, 254)
-                || email.indexOf('@') < 0 || email.indexOf('@') != email.lastIndexOf('@')) {
-            befunde.add(new Befund("email", "EMAIL_UNGUELTIG",
-                    "Die E-Mail-Adresse darf höchstens 254 Zeichen und muss genau ein @ enthalten."));
-        }
+        pruefeEmail(befunde, email);
         pruefeName(befunde, "vorname", vorname);
         pruefeName(befunde, "nachname", nachname);
         if (!befunde.isEmpty()) {
             throw new KonfigurationUngueltig(befunde);
+        }
+    }
+
+    public static void pruefeEmail(String email) {
+        List<Befund> befunde = new ArrayList<>();
+        pruefeEmail(befunde, email);
+        if (!befunde.isEmpty()) {
+            throw new KonfigurationUngueltig(befunde);
+        }
+    }
+
+    private static void pruefeEmail(List<Befund> befunde, String email) {
+        if (!laengeUndSteuerzeichen(email, 1, 254)
+                || email.indexOf('@') < 0 || email.indexOf('@') != email.lastIndexOf('@')) {
+            befunde.add(new Befund("email", "EMAIL_UNGUELTIG",
+                    "Die E-Mail-Adresse darf höchstens 254 Zeichen und muss genau ein @ enthalten."));
         }
     }
 

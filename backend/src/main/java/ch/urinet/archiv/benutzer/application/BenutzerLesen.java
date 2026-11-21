@@ -57,13 +57,17 @@ public class BenutzerLesen {
     }
 
     private BenutzerAnsicht darstellen(IdentitaetsDienst.Benutzer benutzer) {
-        BenutzerStatus zustand = status.lesen(benutzer.id()).map(BenutzerStatusSpeicher.Eintrag::status)
-                .orElseGet(() -> !benutzer.aktiv() ? BenutzerStatus.GESPERRT
-                        : benutzer.aktionen().isEmpty() ? BenutzerStatus.AKTIV : BenutzerStatus.EINGELADEN);
+        BenutzerStatus zustand = status(benutzer, status);
         BenutzerAktivitaet.Angaben angaben = aktivitaet.lesen(benutzer.id());
         return new BenutzerAnsicht(benutzer.id(), benutzer.benutzername(), benutzer.vorname(), benutzer.nachname(),
                 benutzer.email(), benutzer.rollen(), benutzer.rollen().size() != 1, zustand, benutzer.totp(),
                 benutzer.google(), zustand == BenutzerStatus.EINGELADEN ? angaben.einladungSeit() : null,
                 angaben.letzteAktion(), BenutzerEtag.berechnen(benutzer, zustand));
+    }
+
+    static BenutzerStatus status(IdentitaetsDienst.Benutzer benutzer, BenutzerStatusSpeicher speicher) {
+        return speicher.lesen(benutzer.id()).map(BenutzerStatusSpeicher.Eintrag::status)
+                .orElseGet(() -> !benutzer.aktiv() ? BenutzerStatus.GESPERRT
+                        : benutzer.aktionen().isEmpty() ? BenutzerStatus.AKTIV : BenutzerStatus.EINGELADEN);
     }
 }

@@ -34,7 +34,7 @@ public class JdbcVerwaltungGrenzen implements VerwaltungGrenzen {
     private static final String EMAILS = "details->>'ziel' = ? and "
             + "(aktion = 'BENUTZER_ANLEGEN' and details->>'phase' in ('ABGESCHLOSSEN', 'UNKLAR', 'FEHLGESCHLAGEN') "
             + "or aktion = 'BENUTZER_AENDERN' and details->>'phase' = 'ANGEFRAGT' "
-            + "and details->>'vorgang' in ('EINLADUNG_ERNEUT', 'ZUGANG_ZURUECKSETZEN', 'REAKTIVIEREN'))";
+            + "and details->>'vorgang' in ('EINLADUNG_ERNEUT', 'ZUGANG_ZURUECKSETZEN', 'REAKTIVIEREN', 'EMAIL_AENDERN'))";
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -69,7 +69,7 @@ public class JdbcVerwaltungGrenzen implements VerwaltungGrenzen {
             throw new IllegalArgumentException("Akteur ist Pflicht");
         }
         Objects.requireNonNull(art);
-        if (art == Art.EMAIL && ziel == null) {
+        if ((art == Art.EMAIL || art == Art.EMAIL_AENDERUNG) && ziel == null) {
             throw new IllegalArgumentException("Ziel einer E-Mail ist Pflicht");
         }
         String schema = aufloesung.schema();
@@ -97,13 +97,39 @@ public class JdbcVerwaltungGrenzen implements VerwaltungGrenzen {
                 case ANLEGEN -> pruefen(verbindung, schema,
                         "aktion = 'BENUTZER_ANLEGEN' and details->>'phase' = 'ANGEFRAGT'",
                         null, anlagen, STUNDE, jetzt);
-                case EMAIL -> pruefen(verbindung, schema, EMAILS, ziel.toString(), emails, TAG, jetzt);
+                case EMAIL, EMAIL_AENDERUNG -> pruefenEmails(verbindung, schema, ziel.toString(), emails,
+                        art == Art.EMAIL_AENDERUNG ? 2 : 1, jetzt);
                 case EINSTELLUNG -> pruefen(verbindung, schema, "aktion = 'KONFIGURATION_AENDERN'",
                         null, einstellungen, STUNDE, jetzt);
                 case BENUTZER -> { }
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Verwaltungsgrenzen nicht geprüft", e);
+        }
+    }
+
+    private static void pruefenEmails(Connection verbindung, String schema, String ziel, int grenze,
+                                      int benoetigt, Instant jetzt) throws SQLException {
+        int frei = grenze - benoetigt;
+        if (frei < 0) {
+            throw new ZuVieleAnfragen(ZuVieleAnfragen.Grund.VERWALTUNG, TAG.toSeconds());
+        }
+        String sql = "select zeit from " + schema + ".zugriff_protokoll "
+                + "cross join lateral generate_series(1, case when details->>'vorgang' = 'EMAIL_AENDERN' "
+                + "then 2 else 1 end) as email_nr where zeit > ? and " + EMAILS
+                + " order by zeit desc limit 1 offset ?";
+        try (PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setObject(1, jetzt.minus(TAG).atOffset(ZoneOffset.UTC));
+            abfrage.setString(2, ziel);
+            abfrage.setInt(3, frei);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                if (zeile.next()) {
+                    Instant freiAb = zeile.getObject(1, OffsetDateTime.class).toInstant().plus(TAG);
+                    Duration wartezeit = Duration.between(jetzt, freiAb);
+                    long sekunden = wartezeit.getSeconds() + (wartezeit.getNano() == 0 ? 0 : 1);
+                    throw new ZuVieleAnfragen(ZuVieleAnfragen.Grund.VERWALTUNG, Math.max(1, sekunden));
+                }
+            }
         }
     }
 
