@@ -3,11 +3,13 @@ package ch.urinet.archiv.gemeinsam;
 import ch.urinet.archiv.ablage.domain.Sperrmodus;
 import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.ablage.domain.Stufenregel;
+import ch.urinet.archiv.sicherheit.adapter.in.start.SecretPruefungTestzugang;
 import io.smallrye.config.EnvConfigSource;
 import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfig;
 import io.smallrye.config.SmallRyeConfigBuilder;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -22,10 +24,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Stufe des Deploys (Req 6.11; erster Deploy 12.11.2026, fehlendes {@code ARCHIV_STUFE}, PR #73): Die Umgebung der API
@@ -39,6 +47,178 @@ class DeployStufeTest {
 
     private static final Path COMPOSE = GemeinsamSchritte.REPO.resolve("deploy/infomaniak/compose.yml");
     private static final Path PROBE = GemeinsamSchritte.REPO.resolve("deploy/probe/compose.yml");
+    private static final Pattern INTERPOLATION = Pattern.compile("\\$\\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*?))?}");
+
+    @TempDir
+    Path temporaer;
+
+    @Test
+    void composeDecktDiePflichtGeheimnisse() throws IOException {
+        Map<String, Object> compose = compose(COMPOSE);
+        for (var dienst : archivDienste().entrySet()) {
+            for (Map<String, String> umgebung : composeVarianten(dienst.getValue())) {
+                if (dienst.getKey().equals("api")) {
+                    assertThat(prodConfig(umgebung).getValues("archiv.rolle", String.class))
+                            .as("Rolle von Dienst api in %s", COMPOSE).contains("api");
+                }
+                assertThatCode(() -> secretsPruefen(compose, dienst.getKey(), umgebung))
+                        .as("Pflicht-Geheimnisse: %s / Dienst %s", COMPOSE, dienst.getKey())
+                        .doesNotThrowAnyException();
+            }
+        }
+    }
+
+    @Test
+    void fehlendeDateiUndUebersteuerterZugangWerdenErkannt() throws IOException {
+        Map<String, Object> compose = compose(COMPOSE);
+        Map<String, Object> api = composeDienste(compose).get("api");
+        @SuppressWarnings("unchecked")
+        List<Object> secrets = (List<Object>) api.get("secrets");
+        assertThat(secrets.remove("archiv_db_app")).isTrue();
+        assertThatThrownBy(() -> secretsPruefen(compose, "api", apiUmgebung()))
+                .hasMessageContaining("archiv_db_app");
+
+        secrets.add("archiv_db_app");
+        Map<String, String> umgebung = apiUmgebung();
+        umgebung.put("QUARKUS_DATASOURCE_PASSWORD", "synthetisch");
+        assertThatThrownBy(() -> secretsPruefen(compose, "api", umgebung))
+                .hasMessageContaining("archiv_db_app").hasMessageNotContaining("synthetisch");
+    }
+
+    @Test
+    void adminAdresseAktiviertDieBedingteSecretPruefung() throws IOException {
+        Map<String, Object> compose = compose(COMPOSE);
+        @SuppressWarnings("unchecked")
+        List<Object> secrets = (List<Object>) composeDienste(compose).get("api").get("secrets");
+        secrets.removeIf(eintrag -> "keycloak_verwaltung_secret".equals(eintrag)
+                || eintrag instanceof Map<?, ?> lang
+                && ("keycloak_verwaltung_secret".equals(lang.get("target"))
+                || !lang.containsKey("target") && "keycloak_verwaltung_secret".equals(lang.get("source"))));
+        Map<String, String> umgebung = apiUmgebung();
+        umgebung.put("ARCHIV_KEYCLOAK_ADMIN_URL", "https://keycloak.invalid");
+        for (String rolle : List.of("api", "kommando")) {
+            umgebung.put("ARCHIV_ROLLE", rolle);
+            assertThatThrownBy(() -> secretsPruefen(compose, "api", umgebung))
+                    .as("Rolle %s", rolle).hasMessageContaining("keycloak_verwaltung_secret");
+        }
+        umgebung.put("ARCHIV_ROLLE", "worker");
+        assertThatCode(() -> secretsPruefen(compose, "api", umgebung)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void migrationsSecretIstNurBeiAktiverMigrationPflicht() throws IOException {
+        Map<String, Object> compose = compose(COMPOSE);
+        @SuppressWarnings("unchecked")
+        List<Object> secrets = (List<Object>) composeDienste(compose).get("api").get("secrets");
+        assertThat(secrets.remove("archiv_db_owner")).isTrue();
+        Map<String, String> umgebung = apiUmgebung();
+        umgebung.put("ARCHIV_ROLLE", "worker");
+        umgebung.put("QUARKUS_LIQUIBASE_MIGRATE_AT_START", "false");
+        assertThatCode(() -> secretsPruefen(compose, "api", umgebung)).doesNotThrowAnyException();
+        umgebung.put("ARCHIV_ROLLE", "api");
+        umgebung.put("QUARKUS_LIQUIBASE_MIGRATE_AT_START", "true");
+        assertThatThrownBy(() -> secretsPruefen(compose, "api", umgebung))
+                .hasMessageContaining("archiv_db_owner");
+    }
+
+    private void secretsPruefen(Map<String, Object> compose, String dienstName,
+                                Map<String, String> umgebung) throws IOException {
+        Map<String, Object> dienst = composeDienste(compose).get(dienstName);
+        assertThat(dienst).as("Dienst %s in %s", dienstName, COMPOSE).doesNotContainKey("env_file");
+        assertThat(umgebung).as("Pflichtlisten von Dienst %s", dienstName)
+                .doesNotContainKeys("ARCHIV_SECRETS_PFLICHT", "ARCHIV_SECRETS_PFLICHT_MIGRATION");
+        Path dateien = Files.createTempDirectory(temporaer, dienstName);
+        Map<?, ?> deklarierteSecrets = (Map<?, ?>) compose.get("secrets");
+        Object secrets = dienst.getOrDefault("secrets", List.of());
+        assertThat(secrets).as("secrets von Dienst %s", dienstName).isInstanceOf(List.class);
+        for (Object eintrag : (List<?>) secrets) {
+            String quelle;
+            String ziel;
+            if (eintrag instanceof String name) {
+                quelle = name;
+                ziel = name;
+            } else if (eintrag instanceof Map<?, ?> lang) {
+                quelle = String.valueOf(lang.get("source"));
+                ziel = String.valueOf(lang.containsKey("target") ? lang.get("target") : quelle);
+            } else {
+                throw new IllegalArgumentException("Unbekannter Secret-Eintrag in Dienst " + dienstName);
+            }
+            assertThat(deklarierteSecrets.containsKey(quelle)).as("Secret-Quelle %s von Dienst %s",
+                    quelle, dienstName).isTrue();
+            if (!ziel.startsWith("/") || ziel.startsWith("/run/secrets/")) {
+                synthetischeDatei(dateien, ziel);
+            }
+        }
+        Object volumes = dienst.getOrDefault("volumes", List.of());
+        assertThat(volumes).as("volumes von Dienst %s", dienstName).isInstanceOf(List.class);
+        for (Object eintrag : (List<?>) volumes) {
+            String ziel;
+            if (eintrag instanceof String kurz) {
+                String[] teile = kurz.split(":", -1);
+                ziel = teile.length > 1 ? teile[1] : teile[0];
+            } else if (eintrag instanceof Map<?, ?> lang) {
+                ziel = String.valueOf(lang.get("target"));
+            } else {
+                throw new IllegalArgumentException("Unbekannter Volume-Eintrag in Dienst " + dienstName);
+            }
+            if (ziel.equals("/run/secrets") || ziel.equals("/run/secrets/")) {
+                throw new IllegalArgumentException("Secret-Verzeichnis als Volume in Dienst " + dienstName
+                        + " kann nicht aus Compose bestimmt werden");
+            }
+            if (ziel.startsWith("/run/secrets/")) {
+                synthetischeDatei(dateien, ziel);
+            }
+        }
+        SmallRyeConfig config = SecretPruefungTestzugang.config(umgebung, dateien);
+        assertThat(config.getValue("smallrye.config.source.file.locations", String.class))
+                .as("Secret-Verzeichnis von Dienst %s", dienstName).isEqualTo("/run/secrets");
+        assertThat(config.getOptionalValue("archiv.secrets.pflicht", String.class))
+                .as("Pflichtliste für Dienst %s", dienstName).isPresent();
+        config.getOptionalValue("quarkus.datasource.password", String.class);
+    }
+
+    private static List<Map<String, String>> composeVarianten(Map<String, String> umgebung) {
+        Set<String> variablen = new TreeSet<>();
+        umgebung.values().forEach(wert -> {
+            Matcher treffer = INTERPOLATION.matcher(wert);
+            while (treffer.find()) {
+                variablen.add(treffer.group(1));
+            }
+        });
+        List<Map<String, String>> eingaben = new ArrayList<>();
+        eingaben.add(Map.of());
+        variablen.forEach(name -> eingaben.add(Map.of(name, "https://beispiel.invalid")));
+        Map<String, String> alle = new HashMap<>();
+        variablen.forEach(name -> alle.put(name, "https://beispiel.invalid"));
+        eingaben.add(alle);
+        return eingaben.stream().map(eingabe -> {
+            Map<String, String> ergebnis = new HashMap<>();
+            umgebung.forEach((name, wert) -> ergebnis.put(name, composeWert(wert, eingabe)));
+            return ergebnis;
+        }).toList();
+    }
+
+    private static String composeWert(String wert, Map<String, String> eingabe) {
+        Matcher treffer = INTERPOLATION.matcher(wert);
+        StringBuffer ergebnis = new StringBuffer();
+        while (treffer.find()) {
+            String standard = treffer.group(2) == null ? "" : treffer.group(2);
+            treffer.appendReplacement(ergebnis, Matcher.quoteReplacement(eingabe.getOrDefault(treffer.group(1), standard)));
+        }
+        treffer.appendTail(ergebnis);
+        if (ergebnis.indexOf("${") >= 0) {
+            throw new IllegalArgumentException("Compose-Interpolation kann nicht geprüft werden: " + wert);
+        }
+        return ergebnis.toString();
+    }
+
+    private static void synthetischeDatei(Path verzeichnis, String ziel) throws IOException {
+        String name = ziel.startsWith("/run/secrets/") ? ziel.substring("/run/secrets/".length()) : ziel;
+        if (name.contains("/") || name.isBlank() || name.equals(".") || name.equals("..")) {
+            throw new IllegalArgumentException("Ungültiges Secret-Ziel: " + ziel);
+        }
+        Files.writeString(verzeichnis.resolve(name), "synthetischer-platzhalter");
+    }
 
     /** Alle Dienste des Archivs (siehe {@link #archivDienste()}), damit ein eigener Worker-Dienst nicht durchrutscht. */
     @Test
