@@ -77,7 +77,8 @@ Funktionalität: Hilfe-Leiste ohne Verlassen der aktuellen Seite
 
   @req-4.3
   Szenariogrundriss: Der Kontext der Suche ist für «<rolle>» sichtbar
-    Angenommen ich bin als «<rolle>» im Mandanten «urinet» angemeldet
+    Angenommen das Archiv liefert synthetische Suchtreffer
+    Und ich bin als «<rolle>» im Mandanten «urinet» angemeldet
     Wenn ich im Menü «Suche» wähle
     Und ich die Hilfe-Leiste öffne
     Dann zeigt die Hilfe-Leiste den Abschnitt «Suche»
