@@ -112,6 +112,9 @@ public interface IdentitaetsDienst {
 
     String anlegen(String mandant, Neuanlage benutzer, Rolle rolle);
 
+    /** Für einen Vier-Augen-Antrag: Ein Benutzer ohne Archiv-Rolle erhält keinen Zugang zum Archiv. */
+    String anlegenOhneRolle(String mandant, Neuanlage benutzer);
+
     void aktualisieren(String mandant, String id, Aenderung aenderung);
 
     void rolleSetzen(String mandant, String id, Rolle rolle);

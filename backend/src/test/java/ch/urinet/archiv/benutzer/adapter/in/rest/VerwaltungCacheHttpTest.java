@@ -126,10 +126,22 @@ class VerwaltungCacheHttpTest {
             given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
                     .queryParam("groesse", 51).when().get(pfad).then().statusCode(400);
             given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                    .contentType("application/json")
                     .when().post(pfad + "/" + eigeneId + "/einladung").then().statusCode(403);
             given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .contentType("application/json")
                     .when().post(pfad + "/" + fremdeId + "/einladung").then().statusCode(404);
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("text/plain")
+                    .when().post(pfad + "/" + eigeneId + "/einladung").then().statusCode(415)
+                    .body("fehlercode", is("MEDIENTYP_FALSCH"));
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .body("{\"mandant\":\"vhf-gsk\"}").when().post(pfad + "/" + eigeneId + "/einladung").then()
+                    .statusCode(400);
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .body(" ".repeat(8193)).when().post(pfad + "/" + eigeneId + "/einladung").then()
+                    .statusCode(413);
             given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .contentType("application/json")
                     .when().post(pfad + "/" + eigeneId + "/einladung").then().statusCode(204)
                     .header("Cache-Control", containsString("no-store"));
             try (Connection verbindung = datenbank.getConnection();
@@ -148,6 +160,14 @@ class VerwaltungCacheHttpTest {
                             .allMatch(d -> !d.contains(name) && !d.contains("@example.invalid"));
                 }
             }
+            for (int i = 0; i < 2; i++) {
+                given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                        .when().post(pfad + "/" + eigeneId + "/einladung").then().statusCode(204);
+            }
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                    .when().post(pfad + "/" + eigeneId + "/einladung").then().statusCode(429);
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("text/plain")
+                    .body("x").when().post(pfad + "/" + eigeneId + "/einladung").then().statusCode(415);
         } finally {
             identitaet.loeschen("urinet", eigeneId);
             identitaet.loeschen("vhf-gsk", fremdeId);

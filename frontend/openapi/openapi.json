@@ -4199,6 +4199,47 @@
         "security" : [ {
           "SecurityScheme" : [ "inhaber" ]
         } ]
+      },
+      "post" : {
+        "summary" : "Benutzer anlegen und einladen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
       }
     },
     "/api/v1/benutzer/{benutzerId}" : {
@@ -4252,6 +4293,17 @@
             "type" : "string"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
         "responses" : {
           "200" : {
             "description" : "OK",

@@ -170,6 +170,15 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public String anlegen(String mandant, Neuanlage neu, Rolle rolle) {
         pruefeRolle(rolle);
+        return anlegenIntern(mandant, neu, rolle);
+    }
+
+    @Override
+    public String anlegenOhneRolle(String mandant, Neuanlage neu) {
+        return anlegenIntern(mandant, neu, null);
+    }
+
+    private String anlegenIntern(String mandant, Neuanlage neu, Rolle rolle) {
         ObjectNode neuJson = json.createObjectNode()
                 .put("username", neu.benutzername())
                 .put("email", neu.email())
@@ -194,7 +203,9 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
         try {
-            rolleSetzen(mandant, id, rolle);
+            if (rolle != null) {
+                rolleSetzen(mandant, id, rolle);
+            }
             return id;
         } catch (RuntimeException fehler) {
             boolean entfernt = false;

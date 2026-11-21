@@ -50,6 +50,17 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
         Objects.requireNonNull(mandant);
         Objects.requireNonNull(neu);
         Objects.requireNonNull(rolle);
+        return anlegenIntern(mandant, neu, Set.of(rolle));
+    }
+
+    @Override
+    public synchronized String anlegenOhneRolle(String mandant, Neuanlage neu) {
+        Objects.requireNonNull(mandant);
+        Objects.requireNonNull(neu);
+        return anlegenIntern(mandant, neu, Set.of());
+    }
+
+    private String anlegenIntern(String mandant, Neuanlage neu, Set<Rolle> rollen) {
         boolean vorhanden = benutzer.values().stream().map(e -> e.wert)
                 .anyMatch(b -> b.benutzername().equalsIgnoreCase(neu.benutzername())
                         || b.email().equalsIgnoreCase(neu.email()));
@@ -58,7 +69,7 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
         }
         String id = UUID.randomUUID().toString();
         Benutzer wert = new Benutzer(id, neu.benutzername(), neu.email(), neu.vorname(), neu.nachname(), true,
-                Set.of(rolle), Set.of(ErforderlicheAktion.VERIFY_EMAIL, ErforderlicheAktion.UPDATE_PASSWORD,
+                rollen, Set.of(ErforderlicheAktion.VERIFY_EMAIL, ErforderlicheAktion.UPDATE_PASSWORD,
                 ErforderlicheAktion.CONFIGURE_TOTP), false, false);
         benutzer.put(id, new Eintrag(mandant, wert));
         return id;

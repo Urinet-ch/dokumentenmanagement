@@ -11,6 +11,7 @@ public class Verweigerung extends FachFehler {
         NICHT_GEFUNDEN(Fehlercode.NICHT_GEFUNDEN),
         /** HTTP 403: Recht der Aktion fehlt oder keine Archiv-Rolle (Req 2.2, 2.6) */
         NICHT_ERLAUBT(Fehlercode.NICHT_ERLAUBT),
+        ESKALATION_VERBOTEN(Fehlercode.ESKALATION_VERBOTEN),
         /** HTTP 403: kein gültiger, aktiver Mandant (Req 1.3); ohne Mandanten-Schema nicht protokolliert */
         MANDANT_FEHLT(Fehlercode.MANDANT_FEHLT);
 
