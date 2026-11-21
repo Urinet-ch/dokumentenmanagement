@@ -1,6 +1,6 @@
 import { routes } from '../app.routes';
 import { AKTIONEN, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
-import { MENUE } from '../gemeinsam/navigation';
+import { MENUE, aktiverPfad } from '../gemeinsam/navigation';
 import { istAppPfad, istAppPfadPraefix } from './app-pfade';
 import { HILFE_KATALOG, bedingungErfuellt } from './hilfe-katalog';
 
@@ -118,6 +118,49 @@ describe('Hilfe-Katalog (Spec 07, Req 7.2)', () => {
     }
     expect(HILFE_KATALOG[0].anker).toBe('erste-schritte');
     expect(HILFE_KATALOG.at(-1)?.anker).toBe('probleme');
+  });
+
+  it('Suche, Chat, Kontakte und Wissen mit Bedingung, Eltern und Reihenfolge nach Req 6.1 und design.md (Aufgabe 22.6)', () => {
+    const erwartet = [
+      { anker: 'suche', eine: ['A2'], eltern: undefined },
+      { anker: 'chat', eine: ['A2'], eltern: undefined },
+      { anker: 'kontakte', eine: ['A6'], eltern: undefined },
+      { anker: 'wissen', eine: ['A15'], eltern: undefined },
+      { anker: 'wissen-entwuerfe', eine: ['A17'], eltern: 'wissen' },
+    ];
+    const positionen = erwartet.map(({ anker }) => HILFE_KATALOG.findIndex((e) => e.anker === anker));
+    expect(positionen.every((p) => p >= 0), erwartet.map((e) => e.anker).join(', ')).toBe(true);
+    expect([...positionen].sort((a, b) => a - b)).toEqual(positionen);
+    erwartet.forEach(({ anker, eine, eltern }, i) => {
+      const eintrag = HILFE_KATALOG[positionen[i]];
+      expect(eintrag.bedingung, anker).toEqual({ eine });
+      expect(eintrag.eltern, anker).toBe(eltern);
+      expect(eintrag.abgemeldet, anker).toBeUndefined();
+    });
+  });
+
+  it('zeigt die Abschnitte aus Aufgabe 22.6 genau den Rollen nach Requirement 2.2 und Spec 04, 12.1', () => {
+    const sichtbar = (rolle: Rolle) =>
+      ['suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe'].filter((anker) =>
+        bedingungErfuellt(HILFE_KATALOG.find((e) => e.anker === anker)?.bedingung, rolle),
+      );
+    expect(sichtbar('inhaber')).toEqual(['suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe']);
+    expect(sichtbar('geschaeftsstelle')).toEqual(['suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe']);
+    expect(sichtbar('mitarbeiter')).toEqual(['suche', 'chat', 'wissen']);
+    expect(sichtbar('treuhaender')).toEqual(['suche', 'chat', 'wissen']);
+  });
+
+  it('ordnet die Seiten der Wissensbasis wie das Menü dem längsten Pfad zu (Aufgabe 22.6)', () => {
+    const pfade = HILFE_KATALOG.flatMap((e) => e.pfade ?? []);
+    const anker = (url: string) => HILFE_KATALOG.find((e) => e.pfade?.includes(aktiverPfad(url, pfade) ?? ''))?.anker;
+    expect(anker('/wissen')).toBe('wissen');
+    expect(anker('/wissen/konzepte/beispiel')).toBe('wissen');
+    expect(anker('/wissen/entwuerfe')).toBe('wissen-entwuerfe');
+    expect(anker('/wissen/entwuerfe/import')).toBe('wissen-entwuerfe');
+    expect(anker('/wissen/entwuerfe/meine/abc')).toBe('wissen');
+    expect(anker('/wissensbasis/einstellungen')).toBe('wissen');
+    expect(anker('/suche?q=x')).toBe('suche');
+    expect(anker('/kontakte/abc')).toBe('kontakte');
   });
 });
 

@@ -35,6 +35,43 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     pfade: ['/'],
     abgemeldet: true,
   },
+  {
+    anker: 'suche',
+    titel: TEXTE.hilfe.abschnitte['suche'],
+    datei: '/anleitung/suche.md',
+    bedingung: { eine: ['A2'] },
+    pfade: ['/suche'],
+  },
+  {
+    anker: 'chat',
+    titel: TEXTE.hilfe.abschnitte['chat'],
+    datei: '/anleitung/chat.md',
+    bedingung: { eine: ['A2'] },
+    pfade: ['/chat'],
+  },
+  {
+    anker: 'kontakte',
+    titel: TEXTE.hilfe.abschnitte['kontakte'],
+    datei: '/anleitung/kontakte.md',
+    bedingung: { eine: ['A6'] },
+    pfade: ['/kontakte'],
+  },
+  {
+    anker: 'wissen',
+    titel: TEXTE.hilfe.abschnitte['wissen'],
+    datei: '/anleitung/wissen.md',
+    bedingung: { eine: ['A15'] },
+    // «Meine Analysevorschläge» (A18) und die Einstellungen (A19) beschreibt der Abschnitt selbst (Aufgabe 22.6).
+    pfade: ['/wissen', '/wissen/entwuerfe/meine', '/wissensbasis'],
+  },
+  {
+    anker: 'wissen-entwuerfe',
+    titel: TEXTE.hilfe.abschnitte['wissen-entwuerfe'],
+    datei: '/anleitung/wissen-entwuerfe.md',
+    eltern: 'wissen',
+    bedingung: { eine: ['A17'] },
+    pfade: ['/wissen/entwuerfe'],
+  },
   // Bestand und Verwaltung (Spec 07, Aufgabe 22.7)
   {
     anker: 'importe',

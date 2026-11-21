@@ -24,5 +24,6 @@ public enum ProtokollAktion {
      */
     KONTAKT_ZUSAMMENFUEHREN,
     /** Kontakt als inaktiv markiert bzw. wieder aktiviert (Req 17.11, 17.15), ohne Dokument */
-    KONTAKT_INAKTIV, KONTAKT_AKTIV
+    KONTAKT_INAKTIV, KONTAKT_AKTIV,
+    BENUTZER_ANLEGEN, BENUTZER_AENDERN, BENUTZER_LOESCHEN, ROLLE_ZUWEISEN, BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG
 }
