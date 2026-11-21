@@ -9,7 +9,6 @@ import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -387,21 +386,13 @@ class RealmExportKeycloakTest {
 
     @Test
     @Order(4)
-    @Disabled("Entwurf: Client-Anmeldung schlägt vor der Rotation mit HTTP 401 fehl")
     void clientSecretRotationErlaubtUeberlappungUndWiderruf() {
         String vorherigeProfile = adminGet(REALM + "/client-policies/profiles").asString();
         String vorherigeRegeln = adminGet(REALM + "/client-policies/policies").asString();
         String clientName = "rotation-probe";
-        importieren(Map.of("ifResourceExists", "SKIP", "clients", List.of(Map.of(
-                "clientId", clientName, "enabled", true, "publicClient", false,
-                "serviceAccountsEnabled", true, "standardFlowEnabled", false))));
-        String client = clientId(clientName);
+        String alterTestwert = UUID.randomUUID().toString();
+        String client = null;
         try {
-            Response initial = given().auth().oauth2(admin)
-                    .post(ExportKeycloak.basisUrl + REALM + "/clients/{id}/client-secret", client);
-            assertThat(initial.statusCode()).isEqualTo(200);
-            String alterTestwert = initial.path("value");
-            assertThat(alterTestwert).isNotNull();
             adminPut("/client-policies/profiles", Map.of("profiles", List.of(Map.of(
                     "name", "rotation-probe",
                     "executors", List.of(Map.of("executor", "secret-rotation", "configuration", Map.of(
@@ -411,6 +402,12 @@ class RealmExportKeycloakTest {
                     "name", "rotation-probe", "enabled", true, "profiles", List.of("rotation-probe"),
                     "conditions", List.of(Map.of("condition", "client-access-type",
                             "configuration", Map.of("type", List.of("confidential"))))))));
+            given().auth().oauth2(admin).contentType(ContentType.JSON).body(Map.of(
+                    "clientId", clientName, "enabled", true, "protocol", "openid-connect",
+                    "publicClient", false, "serviceAccountsEnabled", true, "standardFlowEnabled", false,
+                    "directAccessGrantsEnabled", false, "secret", alterTestwert))
+                    .post(ExportKeycloak.basisUrl + REALM + "/clients").then().statusCode(201);
+            client = clientId(clientName);
             assertThat(clientTokenStatus(clientName, alterTestwert)).isEqualTo(200);
             Response rotation = given().auth().oauth2(admin)
                     .post(ExportKeycloak.basisUrl + REALM + "/clients/{id}/client-secret", client);
@@ -425,9 +422,17 @@ class RealmExportKeycloakTest {
             assertThat(clientTokenStatus(clientName, alterTestwert)).isEqualTo(401);
             assertThat(clientTokenStatus(clientName, neuerTestwert)).isEqualTo(200);
         } finally {
-            loeschen("/clients/" + client);
-            adminPut("/client-policies/policies", vorherigeRegeln);
-            adminPut("/client-policies/profiles", vorherigeProfile);
+            try {
+                if (client != null) {
+                    loeschen("/clients/" + client);
+                }
+            } finally {
+                try {
+                    adminPut("/client-policies/policies", vorherigeRegeln);
+                } finally {
+                    adminPut("/client-policies/profiles", vorherigeProfile);
+                }
+            }
         }
     }
 
