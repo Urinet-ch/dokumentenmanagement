@@ -107,7 +107,7 @@ class MandantEigentuemerTest {
             befehl.execute("insert into public.verwaltung_vorgang values "
                     + "('probe-praefix', '00000000-0000-4000-8000-000000000001', now() + interval '15 seconds')");
             befehl.execute("insert into m_probe_praefix.benutzer_status values "
-                    + "('kennung-a', 'GESPERRT', now(), 'synthetischer Grund', 'akteur-a')");
+                    + "('kennung-a', 'GESPERRT', now(), 'KORREKTUR', 'akteur-a')");
             assertThat(wert(befehl, "select count(*) from m_probe_kommando.benutzer_status")).isEqualTo("0");
             befehl.execute("insert into m_probe_kommando.benutzer_verzeichnis "
                     + "(benutzer, rolle, gueltig_von, anlass) values "
@@ -119,7 +119,7 @@ class MandantEigentuemerTest {
             verweigert(befehl, "update m_probe_kommando.zugriff_protokoll set benutzer = 'x'");
             verweigert(befehl, "delete from m_probe_kommando.benutzer_verzeichnis");
             assertThatThrownBy(() -> befehl.execute("insert into m_probe_praefix.benutzer_status values "
-                    + "('kennung-b', 'UNGUELTIG', now(), 'Grund', 'akteur-a')"))
+                    + "('kennung-b', 'UNGUELTIG', now(), 'KORREKTUR', 'akteur-a')"))
                     .isInstanceOf(SQLException.class).hasMessageContaining("check constraint");
         }
     }
