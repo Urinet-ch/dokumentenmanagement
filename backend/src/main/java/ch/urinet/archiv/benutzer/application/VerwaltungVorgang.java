@@ -191,7 +191,7 @@ public class VerwaltungVorgang {
                     fehler.addSuppressed(abschlussFehler);
                 }
                 if (abgeschlossen) {
-                    throw fehler;
+                    throw anlageKonfliktAbbilden(art, fehler);
                 }
             }
             try {
@@ -208,6 +208,11 @@ public class VerwaltungVorgang {
             }
             throw fehler;
         }
+    }
+
+    private static RuntimeException anlageKonfliktAbbilden(VerwaltungGrenzen.Art art, RuntimeException fehler) {
+        return art == VerwaltungGrenzen.Art.ANLEGEN && fehler instanceof IdentitaetsDienst.KonfliktException
+                ? new FachFehler(Fehlercode.BENUTZER_EXISTIERT) : fehler;
     }
 
     private static ProtokollDetails.Verwaltung details(ZugriffEintrag eintrag,

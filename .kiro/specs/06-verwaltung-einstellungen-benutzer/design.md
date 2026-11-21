@@ -161,8 +161,8 @@ backend/src/main/java/ch/urinet/archiv/
   200 ms; Schutzschalter nach 3 Fehlern in Folge innerhalb 30 s für 30 s (ohne Bibliothek, ein Zähler und ein Zeitstempel).
   Keine Ausnahme der Keycloak-Meldungen in Antworten oder Logs (Requirement 5.6).
   Nachbesserung Review PR 348: Für den Schutzschalter zählen nur Transportfehler, Zeitüberschreitungen, 5xx und 401/403 des
-  Dienstkontos; andere 4xx (400, 404, 405) zählen nicht. 409 wird als `IdentitaetsDienst.KonfliktException` weitergereicht
-  (Abbildung auf `BENUTZER_EXISTIERT` mit 19.7). Bei 401 wird der gecachte Token verworfen, ein lesender Aufruf wird genau
+  Dienstkontos; andere 4xx (400, 404, 405) zählen nicht. 409 wird als `IdentitaetsDienst.KonfliktException` weitergereicht;
+  der Anlagevorgang bildet ihn nach geklärtem Fehlerabschluss neutral auf `BENUTZER_EXISTIERT` ab. Bei 401 wird der gecachte Token verworfen, ein lesender Aufruf wird genau
   einmal mit neuem Token wiederholt. Die Kompensation in `anlegen()` umgeht den Schutzschalter (Wartezeit 2 s auf einen
   Platz); bei einem Fehler nach der Anlage meldet der Adapter die Zielkennung und ob die Entfernung bestätigt wurde in
   `AnlageException`; scheitert die Kompensation, hängt er ihren Fehler als Suppressed an diese Ausnahme.

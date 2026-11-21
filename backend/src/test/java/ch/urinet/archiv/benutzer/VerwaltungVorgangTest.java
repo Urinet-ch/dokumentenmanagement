@@ -233,6 +233,44 @@ class VerwaltungVorgangTest {
     }
 
     @Test
+    void konfliktBeiAnlageErgibtNeutralenFehlerUndGibtSperreFrei() throws Exception {
+        MandantCode mandant = mandantFuerAnlage("vhf-gsk");
+        UUID id = UUID.randomUUID();
+        var absicht = anlage(id, null, UUID.randomUUID().toString(), ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { throw new IdentitaetsDienst.KonfliktException(); },
+                    fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(FachFehler.class)
+                    .satisfies(fehler -> assertThat(((FachFehler) fehler.getCause()).code())
+                            .isEqualTo(Fehlercode.BENUTZER_EXISTIERT));
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "FEHLGESCHLAGEN");
+            UUID neuerVorgang = UUID.randomUUID();
+            assertThat(sperre.belegen(mandant, neuerVorgang)).isTrue();
+            assertThat(sperre.freigeben(mandant, neuerVorgang)).isTrue();
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void ungeklaerterAnlagekonfliktBleibtGesperrtUndWirdNichtAlsGeklaertAbgebildet() throws Exception {
+        MandantCode mandant = mandantFuerAnlage("vhf-gsk");
+        UUID id = UUID.randomUUID();
+        var absicht = anlage(id, null, UUID.randomUUID().toString(), ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, mandant.wert(), () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { throw new IdentitaetsDienst.KonfliktException(); },
+                    fehler -> Kompensation.UNKLAR, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(IdentitaetsDienst.KonfliktException.class);
+            assertThat(phasen(mandant.schema(), id)).containsExactly("ANGEFRAGT", "UNKLAR");
+            assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+        } finally {
+            testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
     void ungueltigeAnlagekennungBleibtUnklarOhneDenWertZuLoggen() throws Exception {
         MandantCode mandant = mandantFuerAnlage();
         UUID id = UUID.randomUUID();
@@ -564,7 +602,11 @@ class VerwaltungVorgangTest {
     }
 
     private MandantCode mandantFuerAnlage() throws Exception {
-        MandantCode mandant = new MandantCode("probe-verwaltungsvorgang");
+        return mandantFuerAnlage("probe-verwaltungsvorgang");
+    }
+
+    private MandantCode mandantFuerAnlage(String code) throws Exception {
+        MandantCode mandant = new MandantCode(code);
         try (Connection verbindung = datenquelle.getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
                      "select 1 from public.mandant where code = ?")) {
