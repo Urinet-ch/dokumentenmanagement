@@ -139,6 +139,9 @@ class SicherungPaketRoundtripTest {
             String originalVersion = ablegen(mandant.bucket(), originalKey, ORIGINAL);
             String pdfaVersion = ablegen(mandant.bucket(), pdfaKey, PDFA);
             dokumentAnlegen(mandant.schema(), id, pdfaKey, pdfaVersion, originalKey, originalVersion);
+            wissenAnlegen(mandant.schema());
+            long[] wissen = wissenZaehlen(mandant.schema());
+            assertThat(wissen).containsExactly(2, 3);
 
             KeyPair schluessel = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
             ManifestTestdaten manifest = manifestErzeugen(schluessel, code);
@@ -148,6 +151,8 @@ class SicherungPaketRoundtripTest {
             }
             manifestFesthalten(mandant.schema(), manifest, versionen);
             String prefix = code + ".";
+            zustand.setProperty(prefix + "wissen.seiten", Long.toString(wissen[0]));
+            zustand.setProperty(prefix + "wissen.versionen", Long.toString(wissen[1]));
             zustand.setProperty(prefix + "dokument.id", id.toString());
             zustand.setProperty(prefix + "dokument.original.schluessel", originalKey);
             zustand.setProperty(prefix + "dokument.original.sha256", Pruefsumme.von(ORIGINAL));
@@ -241,6 +246,9 @@ class SicherungPaketRoundtripTest {
 
         Properties erwartet = zustandLaden();
         String prefix = code + ".";
+        assertThat(wissenZaehlen(schema)).containsExactly(
+                Long.parseLong(erwartet.getProperty(prefix + "wissen.seiten")),
+                Long.parseLong(erwartet.getProperty(prefix + "wissen.versionen")));
         UUID id = UUID.fromString(erwartet.getProperty(prefix + "dokument.id"));
         try (Connection connection = datenquelle.getConnection()) {
             try (PreparedStatement p = connection.prepareStatement("select count(*) from " + schema + ".dokument");
@@ -343,6 +351,7 @@ class SicherungPaketRoundtripTest {
                 p.setString(4, Pruefsumme.von(PDFA));
                 p.executeUpdate();
             }
+
             try (PreparedStatement p = connection.prepareStatement("insert into " + schema
                     + ".dokument_datei (dokument_id, nr, rolle, sha256, s3_schluessel, s3_version) "
                     + "values (?, 1, 'ORIGINAL', ?, ?, ?)")) {
@@ -352,6 +361,44 @@ class SicherungPaketRoundtripTest {
                 p.setString(4, originalVersion);
                 p.executeUpdate();
             }
+        }
+    }
+
+    private void wissenAnlegen(String schema) throws Exception {
+        try (Connection connection = datenquelle.getConnection()) {
+            for (int nr = 1; nr <= 2; nr++) {
+                UUID seite = UUID.randomUUID();
+                try (PreparedStatement p = connection.prepareStatement("insert into " + schema
+                        + ".wissensseite (id, pfad, typ, titel, beschreibung, vertraulichkeit, inhalt, version, "
+                        + "erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am) "
+                        + "values (?, ?, 'Konzept', 'Synthetische Probe', 'Probe', 'NORMAL', 'Testinhalt', ?, "
+                        + "'human:probe', '2030-01-01T00:00:00Z', 'human:probe', '2030-01-01T00:00:00Z')")) {
+                    p.setObject(1, seite);
+                    p.setString(2, "restore/" + seite);
+                    p.setInt(3, nr);
+                    p.executeUpdate();
+                }
+                for (int version = 1; version <= nr; version++) {
+                    try (PreparedStatement p = connection.prepareStatement("insert into " + schema
+                            + ".wissensseite_version (seite_id, version, daten, inhalt, erzeugt_von, "
+                            + "freigegeben_von, zeit) values (?, ?, '{}', 'Testinhalt', 'human:probe', "
+                            + "'human:probe', '2030-01-01T00:00:00Z')")) {
+                        p.setObject(1, seite);
+                        p.setInt(2, version);
+                        p.executeUpdate();
+                    }
+                }
+            }
+        }
+    }
+
+    private long[] wissenZaehlen(String schema) throws Exception {
+        try (Connection connection = datenquelle.getConnection();
+             PreparedStatement p = connection.prepareStatement("select (select count(*) from " + schema
+                     + ".wissensseite), (select count(*) from " + schema + ".wissensseite_version)");
+             ResultSet r = p.executeQuery()) {
+            assertThat(r.next()).isTrue();
+            return new long[] {r.getLong(1), r.getLong(2)};
         }
     }
 
