@@ -121,6 +121,29 @@ class DeployStufeTest {
                 .hasMessageContaining("archiv_db_owner");
     }
 
+    @Test
+    void umbenannteSecretDateiUndVolumeWerdenAlsZieleGeprueft() throws IOException {
+        Map<String, Object> compose = compose(COMPOSE);
+        Map<String, Object> api = composeDienste(compose).get("api");
+        @SuppressWarnings("unchecked")
+        List<Object> secrets = (List<Object>) api.get("secrets");
+        @SuppressWarnings("unchecked")
+        List<Object> volumes = (List<Object>) api.get("volumes");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> deklariert = (Map<String, Object>) compose.get("secrets");
+        assertThat(secrets.remove("archiv_db_app")).isTrue();
+        deklariert.put("andere_quelle", Map.of("file", "./secrets/andere_quelle"));
+        secrets.add(Map.of("source", "andere_quelle", "target", "archiv_db_app"));
+        assertThat(secrets.remove("s3_app_zugang_id")).isTrue();
+        volumes.add("./synthetisch:/run/secrets/s3_app_zugang_id:ro");
+        Map<String, String> umgebung = apiUmgebung();
+        umgebung.put("ARCHIV_ROLLE", "worker");
+        assertThatCode(() -> secretsPruefen(compose, "api", umgebung)).doesNotThrowAnyException();
+        volumes.removeLast();
+        assertThatThrownBy(() -> secretsPruefen(compose, "api", umgebung))
+                .hasMessageContaining("s3_app_zugang_id");
+    }
+
     private void secretsPruefen(Map<String, Object> compose, String dienstName,
                                 Map<String, String> umgebung) throws IOException {
         Map<String, Object> dienst = composeDienste(compose).get(dienstName);
