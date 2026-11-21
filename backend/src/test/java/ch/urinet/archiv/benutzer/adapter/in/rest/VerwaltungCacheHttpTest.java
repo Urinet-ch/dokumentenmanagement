@@ -41,7 +41,7 @@ class VerwaltungCacheHttpTest {
 
     @Test
     void auchAnmeldungUndRechtefehlerTragenNoStore() {
-        String pfad = "/api/v1/verwaltung/cache-probe";
+        String pfad = "/api/v1/benutzer/cache-probe";
         given().when().get(pfad).then().statusCode(401).header("Cache-Control", containsString("no-store"));
         given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet")).when().get(pfad).then()
                 .statusCode(403).header("Cache-Control", containsString("no-store"));

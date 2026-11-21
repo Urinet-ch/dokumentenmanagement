@@ -9,11 +9,12 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.Config;
 
 import java.util.Arrays;
+import java.util.List;
 
 @ApplicationScoped
 public class VerwaltungCacheRoute {
 
-    private final String verwaltung;
+    private final List<String> verwaltung;
 
     @Inject
     public VerwaltungCacheRoute(Config config) {
@@ -22,7 +23,8 @@ public class VerwaltungCacheRoute {
 
     VerwaltungCacheRoute(String restPfad) {
         String basis = restPfad.endsWith("/") ? restPfad.substring(0, restPfad.length() - 1) : restPfad;
-        verwaltung = basis + "/verwaltung";
+        verwaltung = List.of(basis + "/rollen", basis + "/benutzer", basis + "/mandant/einstellungen",
+                basis + "/wissensbasis/einstellungen", basis + "/konfiguration/versionen");
     }
 
     void einrichten(@Observes Router router) {
@@ -32,7 +34,7 @@ public class VerwaltungCacheRoute {
 
     void behandeln(RoutingContext kontext) {
         String pfad = kontext.normalizedPath().replaceAll(";[^/]*", "").replaceAll("/{2,}", "/");
-        if (pfad.equals(verwaltung) || pfad.startsWith(verwaltung + "/")) {
+        if (verwaltung.stream().anyMatch(p -> pfad.equals(p) || pfad.startsWith(p + "/"))) {
             kontext.addHeadersEndHandler(ignoriert -> {
                 boolean vorhanden = kontext.response().headers().getAll(HttpHeaders.CACHE_CONTROL).stream()
                         .flatMap(wert -> Arrays.stream(wert.split(",")))

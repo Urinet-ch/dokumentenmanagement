@@ -54,21 +54,22 @@ class VerwaltungCacheRouteTest {
         int port = vertx.createHttpServer().requestHandler(router).listen(0, "127.0.0.1")
                 .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS).actualPort();
 
-        for (String pfad : List.of("/api/v1/verwaltung/rollen", "/api/v1/verwaltung/nicht-angemeldet",
-                "/api/v1/verwaltung/verboten", "/api/v1/verwaltung/cors", "/api/v1/%76erwaltung/rollen",
-                "/api/v1//verwaltung;test/rollen",
-                "/api/v1;x/verwaltung/rollen")) {
+        for (String pfad : List.of("/api/v1/rollen", "/api/v1/benutzer/nicht-angemeldet",
+                "/api/v1/benutzer/verboten", "/api/v1/benutzer/cors", "/api/v1/%62enutzer",
+                "/api/v1//benutzer;test/rollen", "/api/v1;x/benutzer/rollen",
+                "/api/v1/mandant/einstellungen/vorschau", "/api/v1/wissensbasis/einstellungen",
+                "/api/v1/konfiguration/versionen/1")) {
             assertThat(abrufen(port, pfad).headers().allValues("cache-control")).as(pfad).containsExactly("no-store");
         }
-        assertThat(abrufen(port, "/api/v1/verwaltungx").headers().allValues("cache-control"))
+        assertThat(abrufen(port, "/api/v1/benutzerx").headers().allValues("cache-control"))
                 .isEmpty();
-        assertThat(abrufen(port, "/api/v1/verwaltung/streng").headers().allValues("cache-control"))
+        assertThat(abrufen(port, "/api/v1/benutzer/streng").headers().allValues("cache-control"))
                 .containsExactly("private, no-store");
-        assertThat(abrufen(port, "/api/v1/verwaltung/lax").headers().allValues("cache-control"))
+        assertThat(abrufen(port, "/api/v1/benutzer/lax").headers().allValues("cache-control"))
                 .containsExactly("no-transform, max-age=60", "no-store");
-        assertThat(abrufen(port, "/api/v1/verwaltung/nicht-angemeldet").statusCode()).isEqualTo(401);
-        assertThat(abrufen(port, "/api/v1/verwaltung/verboten").statusCode()).isEqualTo(403);
-        assertThat(abrufen(port, "/api/v1/verwaltung/cors").statusCode()).isEqualTo(204);
+        assertThat(abrufen(port, "/api/v1/benutzer/nicht-angemeldet").statusCode()).isEqualTo(401);
+        assertThat(abrufen(port, "/api/v1/benutzer/verboten").statusCode()).isEqualTo(403);
+        assertThat(abrufen(port, "/api/v1/benutzer/cors").statusCode()).isEqualTo(204);
     }
 
     private HttpResponse<String> abrufen(int port, String pfad) throws Exception {
