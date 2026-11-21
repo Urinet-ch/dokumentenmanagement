@@ -28,6 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -132,6 +134,8 @@ class VerwaltungVorgangTest {
         UUID id = UUID.randomUUID();
         var absicht = eintrag(id, UUID.randomUUID(), UUID.randomUUID().toString(), "INHABER",
                 ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        var abschluss = eintrag(id, absicht.details().verwaltung().ziel(), absicht.benutzer().orElseThrow(), "INHABER",
+                ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
         try (var thread = Executors.newSingleThreadExecutor()) {
             assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
                     () -> { }, () -> "ok",
@@ -139,7 +143,7 @@ class VerwaltungVorgangTest {
                     wert -> {
                         protokoll.schreiben(absicht);
                         throw new IllegalStateException("synthetischer Abschluss");
-                    }, wert -> absicht)))
+                    }, wert -> abschluss)))
                     .hasRootCauseInstanceOf(IllegalStateException.class)
                     .satisfies(fehler -> assertThat(fehler.getCause().getSuppressed())
                             .hasSize(1).satisfies(unterdrueckt ->
@@ -192,6 +196,46 @@ class VerwaltungVorgangTest {
             assertThat(zielDerPhase("m_vhf_gsk", id, "UNKLAR")).isEqualTo(sub);
         } finally {
             testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void abgelehnterOderFehlenderAnlageabschlussUebernimmtKeinUngeprueftesZiel() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("vhf-gsk");
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            for (int fall = 0; fall < 3; fall++) {
+                UUID id = UUID.randomUUID();
+                UUID ziel = UUID.randomUUID();
+                String akteur = UUID.randomUUID().toString();
+                var absicht = anlage(id, null, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+                AtomicInteger abschlussAufrufe = new AtomicInteger();
+                AtomicBoolean gespeichert = new AtomicBoolean();
+                int fehlerart = fall;
+                Function<UUID, ZugriffEintrag> abschluss = wert -> {
+                    abschlussAufrufe.incrementAndGet();
+                    if (fehlerart == 2) {
+                        throw new IllegalStateException("synthetische Zielermittlung");
+                    }
+                    return anlage(fehlerart == 0 ? UUID.randomUUID() : id, wert,
+                            fehlerart == 1 ? UUID.randomUUID().toString() : akteur,
+                            ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+                };
+                try {
+                    assertThatThrownBy(() -> in(thread, "vhf-gsk", () -> vorgang.ausfuehren(mandant, absicht,
+                            () -> { }, () -> ziel, fehler -> Kompensation.GEKLAERT,
+                            wert -> gespeichert.set(true), abschluss)))
+                            .hasRootCauseInstanceOf(fehlerart == 2
+                                    ? IllegalStateException.class : IllegalArgumentException.class);
+                    assertThat(abschlussAufrufe).hasValue(1);
+                    assertThat(gespeichert).isFalse();
+                    assertThat(phasen("m_vhf_gsk", id)).containsExactly("ANGEFRAGT", "UNKLAR");
+                    assertThat(zielDerPhase("m_vhf_gsk", id, "UNKLAR")).isNull();
+                    assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
+                } finally {
+                    testsperreEntfernen(mandant, id);
+                }
+            }
         }
     }
 

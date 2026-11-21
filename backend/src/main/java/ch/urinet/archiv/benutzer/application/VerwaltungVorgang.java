@@ -51,6 +51,7 @@ public class VerwaltungVorgang {
      * Die Kompensation darf {@code GEKLAERT} nur melden, wenn der Ausgangszustand wiederhergestellt ist und keine
      * verspätete externe Wirkung mehr eintreffen kann.
      * {@code speichern} darf ausschliesslich Datenbankänderungen ausführen.
+     * {@code abschluss} erstellt den Protokolleintrag aus dem Arbeitsergebnis ohne Datenbankänderung.
      */
     public <T> T ausfuehren(MandantCode mandant, ZugriffEintrag absicht, Runnable pruefen,
                             Supplier<T> arbeit, Function<RuntimeException, Kompensation> kompensieren,
@@ -94,23 +95,27 @@ public class VerwaltungVorgang {
             throw fehler;
         }
 
-        final java.util.concurrent.atomic.AtomicReference<T> geliefert = new java.util.concurrent.atomic.AtomicReference<>();
+        boolean arbeitGeliefert = false;
+        boolean abschlussGeprueft = false;
+        UUID ziel = null;
         try {
             T ergebnis = arbeit.get();
-            geliefert.set(ergebnis);
+            arbeitGeliefert = true;
+            ZugriffEintrag eintrag = abschluss.apply(ergebnis);
+            ProtokollDetails.Verwaltung ende = details(eintrag, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+            if (!id.equals(ende.vorgangId()) || !absicht.aktion().equals(eintrag.aktion())
+                    || !absicht.benutzer().equals(eintrag.benutzer())
+                    || !absicht.rolle().equals(eintrag.rolle())
+                    || details.vorgang() != ende.vorgang()
+                    || details.grund() != ende.grund()
+                    || (details.ziel() != null && !details.ziel().equals(ende.ziel()))
+                    || (art == VerwaltungGrenzen.Art.ANLEGEN && ende.ziel() == null)) {
+                throw new IllegalArgumentException("Abschluss gehört nicht zum Vorgang");
+            }
+            ziel = ende.ziel();
+            abschlussGeprueft = true;
             transaktionen.neu(() -> {
                 speichern.accept(ergebnis);
-                ZugriffEintrag eintrag = abschluss.apply(ergebnis);
-                ProtokollDetails.Verwaltung ende = details(eintrag, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
-                if (!id.equals(ende.vorgangId()) || !absicht.aktion().equals(eintrag.aktion())
-                        || !absicht.benutzer().equals(eintrag.benutzer())
-                        || !absicht.rolle().equals(eintrag.rolle())
-                        || details.vorgang() != ende.vorgang()
-                        || details.grund() != ende.grund()
-                        || (details.ziel() != null && !details.ziel().equals(ende.ziel()))
-                        || (art == VerwaltungGrenzen.Art.ANLEGEN && ende.ziel() == null)) {
-                    throw new IllegalArgumentException("Abschluss gehört nicht zum Vorgang");
-                }
                 protokoll.schreiben(eintrag);
                 if (!sperre.abschliessen(mandant, id, Vorgangssperre.Abschluss.ABGESCHLOSSEN)) {
                     throw new IllegalStateException("Vorgangssperre nicht abgeschlossen");
@@ -119,17 +124,17 @@ public class VerwaltungVorgang {
             return ergebnis;
         } catch (RuntimeException fehler) {
             Kompensation ergebnis = Kompensation.UNKLAR;
-            UUID ziel = zielAusArbeit(geliefert.get(), abschluss);
+            UUID geprueftesZiel = ziel;
             try {
                 ergebnis = Objects.requireNonNull(kompensieren.apply(fehler), "Ergebnis der Kompensation fehlt");
             } catch (RuntimeException kompensationsFehler) {
                 fehler.addSuppressed(kompensationsFehler);
             }
-            if (ergebnis == Kompensation.GEKLAERT) {
+            if (ergebnis == Kompensation.GEKLAERT && (!arbeitGeliefert || abschlussGeprueft)) {
                 boolean abgeschlossen = false;
                 try {
                     transaktionen.neu(() -> {
-                        protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.FEHLGESCHLAGEN, ziel));
+                        protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.FEHLGESCHLAGEN, geprueftesZiel));
                         if (!sperre.abschliessen(mandant, id, Vorgangssperre.Abschluss.FEHLGESCHLAGEN)) {
                             throw new IllegalStateException("Vorgangssperre nicht abgeschlossen");
                         }
@@ -144,7 +149,7 @@ public class VerwaltungVorgang {
             }
             try {
                 transaktionen.neu(() -> {
-                    protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.UNKLAR, ziel));
+                    protokoll.schreiben(mitPhase(absicht, ProtokollDetails.Verwaltungsphase.UNKLAR, geprueftesZiel));
                     if (!sperre.abschliessen(mandant, id, Vorgangssperre.Abschluss.UNKLAR)) {
                         throw new IllegalStateException("Vorgangssperre nicht abgeschlossen");
                     }
@@ -198,19 +203,6 @@ public class VerwaltungVorgang {
             }
             default -> throw new IllegalArgumentException("Ungültige Verwaltungsaktion");
         };
-    }
-
-    /** Ziel (Keycloak-sub) aus dem Ergebnis der Arbeit; null, wenn die Arbeit nichts lieferte. */
-    private static <T> UUID zielAusArbeit(T ergebnis, Function<T, ZugriffEintrag> abschluss) {
-        if (ergebnis == null) {
-            return null;
-        }
-        try {
-            ProtokollDetails.Verwaltung v = abschluss.apply(ergebnis).details().verwaltung();
-            return v == null ? null : v.ziel();
-        } catch (RuntimeException e) {
-            return null;
-        }
     }
 
     private static ZugriffEintrag mitPhase(ZugriffEintrag eintrag, ProtokollDetails.Verwaltungsphase phase,
