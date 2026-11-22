@@ -2,6 +2,7 @@ package ch.urinet.archiv.mandant;
 
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantVollexportDaten;
@@ -74,6 +75,9 @@ class MandantVollexportDbTest {
 
     @Inject
     ObjectMapper json;
+
+    @Inject
+    KonfigurationsdateiVerwaltung dateiVerwaltung;
 
     @AfterAll
     static void beenden() {
@@ -160,8 +164,12 @@ class MandantVollexportDbTest {
             assertThat(aktuell.path("arten").findValuesAsText("description"))
                     .hasSize(40).containsOnly("x".repeat(4000));
             assertThat(aktuell.toString().getBytes(StandardCharsets.UTF_8).length).isGreaterThan(131_072);
-            String erwartet = THREADS.submit(() -> kontext.mit(A, () -> konfiguration.aktuell().json())).get();
-            assertThat(aktuell).isEqualTo(json.readTree(erwartet));
+            String erwartet = THREADS.submit(() -> kontext.mit(A, () -> dateiVerwaltung.exportieren().datei())).get();
+            JsonNode erwarteterStand = json.readTree(erwartet);
+            for (String feld : List.of("format", "basisVersion", "einstellungen", "kiTexte",
+                    "klassifikationen", "arten", "regeln")) {
+                assertThat(aktuell.path(feld).equals(erwarteterStand.path(feld))).as(feld).isTrue();
+            }
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             try (DigestInputStream inhalt = new DigestInputStream(
                     a.getInputStream(a.getEntry("konfiguration/versionen.json")), digest)) {

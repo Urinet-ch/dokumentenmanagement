@@ -172,7 +172,7 @@ class MandantVollexportKnapperHeapTest {
                 return "m_test";
             }
         };
-        var leser = new JdbcMandantVollexportKonfiguration(quelle, aufloesung, null);
+        var leser = new JdbcMandantVollexportKonfiguration(quelle, aufloesung);
         long[] bytes = {0};
         int[] versionenGelesen = {0};
         OutputStream zaehler = new OutputStream() {
