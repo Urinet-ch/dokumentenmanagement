@@ -215,7 +215,18 @@ class VerwaltungCacheHttpTest {
             given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
                     .when().get(pfad + "/" + eigeneId).then().statusCode(200)
                     .header("ETag", containsString("\"")).body("vorname", is("Test"))
-                    .body("nachname", is("Person"));
+                    .body("nachname", is("Person"))
+                    .body("apiTokenVerwaltungspfad", is("/verwaltung/api-tokens"))
+                    .body("apiTokenHinweis", containsString("bleiben beim Sperren oder Deaktivieren gültig"));
+            RollenResource.RolleDto rechte = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().get(pfad + "/" + eigeneId + "/rechte").then().statusCode(200)
+                    .header("Cache-Control", containsString("no-store")).extract().as(RollenResource.RolleDto.class);
+            assertThat(rechte.code()).isEqualTo("mitarbeiter");
+            rechtePruefen(List.of(rechte));
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().get(pfad + "/" + fremdeId + "/rechte").then().statusCode(404);
+            given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                    .when().get(pfad + "/" + eigeneId + "/rechte").then().statusCode(403);
             given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
                     .when().get(pfad + "/" + fremdeId).then().statusCode(404)
                     .body(not(containsString(fremd)));
@@ -750,6 +761,176 @@ class VerwaltungCacheHttpTest {
                 .post(pfad + zuruecksetzen + "/zugang-zuruecksetzen").then().statusCode(204);
         assertThat(dienst.benutzerLesen("urinet", deaktivieren).rollen()).isEmpty();
         assertThat(dienst.benutzerLesen("urinet", zuruecksetzen).rollen()).isEmpty();
+    }
+
+    @Test
+    void rollenwechselPrueftVersionMandantUndVierAugen() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub();
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String ziel = dienst.anlegen("urinet", person("rolle." + suffix), Rolle.MITARBEITER);
+        String fremd = dienst.anlegen("vhf-gsk", person("fremd." + suffix), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/benutzer/" + ziel;
+        String etag = given().auth().oauth2(token).get(pfad).then().statusCode(200).extract().header("ETag");
+        given().auth().oauth2(token).contentType("application/json").body("{\"rolle\":\"treuhaender\"}")
+                .put(pfad + "/rolle").then().statusCode(428);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", "\"" + "0".repeat(64) + "\"")
+                .body("{\"rolle\":\"treuhaender\"}").put(pfad + "/rolle").then().statusCode(412);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"rolle\":\"treuhaender\"}").put("/api/v1/benutzer/" + fremd + "/rolle")
+                .then().statusCode(404);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"rolle\":\"treuhaender\"}").put(pfad + "/rolle").then().statusCode(204);
+        assertThat(dienst.benutzerLesen("urinet", ziel).rollen()).containsExactly(Rolle.TREUHAENDER);
+
+        for (int i = 0; i < 2; i++) {
+            String inhaber = dienst.anlegen("urinet", person("inhaber" + i + "." + suffix), Rolle.INHABER);
+            dienst.einladen("urinet", inhaber, Set.of(), Duration.ofHours(1));
+        }
+        etag = given().auth().oauth2(token).get(pfad).then().statusCode(200).extract().header("ETag");
+        String antragId = given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"rolle\":\"inhaber\"}").put(pfad + "/rolle").then().statusCode(202)
+                .extract().path("antragId");
+        assertThat(UUID.fromString(antragId)).isNotNull();
+        assertThat(dienst.benutzerLesen("urinet", ziel).rollen()).containsExactly(Rolle.TREUHAENDER);
+    }
+
+    @Test
+    void inhaberAntragErfordertZweitenAktivenInhaberUndVerfaellt() throws SQLException {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        String akteurId = Testanmeldung.sub("inhaber-urinet");
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub() {
+            @Override
+            public synchronized Benutzer benutzerLesen(String mandant, String id) {
+                if (mandant.equals("urinet") && id.equals(akteurId)) {
+                    return new Benutzer(id, "akteur", "akteur@example.invalid", "Test", "Person", true,
+                            Set.of(Rolle.INHABER), Set.of(), true, false);
+                }
+                return super.benutzerLesen(mandant, id);
+            }
+        };
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String ziel = dienst.anlegen("urinet", person("antrag." + suffix), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        UUID eigener = antragAnlegen(ziel, akteurId, false);
+        UUID abgelaufen = antragAnlegen(ziel, UUID.randomUUID().toString(), true);
+        UUID fremder = antragAnlegen(ziel, UUID.randomUUID().toString(), false);
+        String pfad = "/api/v1/benutzer/antraege/";
+
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement aenderung = verbindung.prepareStatement(
+                     "update m_urinet.verwaltung_antrag set grund = ? where id = ?")) {
+            aenderung.setString(1, "private-probe@example.invalid");
+            aenderung.setObject(2, eigener);
+            assertThat(aenderung.executeUpdate()).isEqualTo(1);
+        }
+        given().auth().oauth2(token).get("/api/v1/benutzer/antraege").then().statusCode(200)
+                .body(containsString("NICHT_ANZEIGBAR")).body(not(containsString("private-probe@example.invalid")));
+        given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                .get("/api/v1/benutzer/antraege").then().statusCode(403);
+        given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).contentType("application/json")
+                .post(pfad + fremder + "/bestaetigen").then().statusCode(404);
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + fremder + "/zurueckziehen").then().statusCode(403);
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + eigener + "/bestaetigen").then().statusCode(403);
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + abgelaufen + "/bestaetigen").then().statusCode(409);
+        assertThat(dienst.benutzerLesen("urinet", ziel).rollen()).containsExactly(Rolle.MITARBEITER);
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + fremder + "/bestaetigen").then().statusCode(204);
+        assertThat(dienst.benutzerLesen("urinet", ziel).rollen()).containsExactly(Rolle.INHABER);
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + fremder + "/bestaetigen").then().statusCode(409);
+        given().auth().oauth2(token).contentType("application/json")
+                .post(pfad + eigener + "/zurueckziehen").then().statusCode(204);
+    }
+
+    @Test
+    void rollenkonfliktLaesstNurRollenwechselZu() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub() {
+            private boolean konflikt = true;
+
+            @Override
+            public synchronized Benutzer benutzerLesen(String mandant, String id) {
+                Benutzer benutzer = super.benutzerLesen(mandant, id);
+                return konflikt ? new Benutzer(benutzer.id(), benutzer.benutzername(), benutzer.email(),
+                        benutzer.vorname(), benutzer.nachname(), benutzer.aktiv(),
+                        Set.of(Rolle.MITARBEITER, Rolle.TREUHAENDER), benutzer.aktionen(), benutzer.totp(), true)
+                        : benutzer;
+            }
+
+            @Override
+            public synchronized void rolleSetzen(String mandant, String id, Rolle rolle) {
+                super.rolleSetzen(mandant, id, rolle);
+                konflikt = false;
+            }
+        };
+        String ziel = dienst.anlegen("urinet", person("konflikt." + UUID.randomUUID().toString().substring(0, 8)),
+                Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/benutzer/" + ziel;
+        String etag = given().auth().oauth2(token).get(pfad).then().statusCode(200)
+                .body("rollenkonflikt", is(true)).extract().header("ETag");
+        given().auth().oauth2(token).get(pfad + "/rechte").then().statusCode(409);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"vorname\":\"Neu\"}").patch(pfad).then().statusCode(409);
+        given().auth().oauth2(token).contentType("application/json")
+                .delete(pfad + "/google-verknuepfung").then().statusCode(409);
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"rolle\":\"mitarbeiter\"}").put(pfad + "/rolle").then().statusCode(204);
+        given().auth().oauth2(token).get(pfad).then().statusCode(200).body("rollenkonflikt", is(false));
+    }
+
+    @Test
+    void letzterAktiverInhaberKannSeineRolleNichtVerlieren() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new IdentitaetsDienstStub();
+        String ziel = dienst.anlegen("urinet", person("letzter." + UUID.randomUUID().toString().substring(0, 8)),
+                Rolle.INHABER);
+        dienst.einladen("urinet", ziel, Set.of(), Duration.ofHours(1));
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String pfad = "/api/v1/benutzer/" + ziel;
+        String etag = given().auth().oauth2(token).get(pfad).then().statusCode(200).extract().header("ETag");
+        given().auth().oauth2(token).contentType("application/json").header("If-Match", etag)
+                .body("{\"rolle\":\"mitarbeiter\"}").put(pfad + "/rolle").then().statusCode(409)
+                .body("fehlercode", is("LETZTER_INHABER"));
+        assertThat(dienst.benutzerLesen("urinet", ziel).rollen()).containsExactly(Rolle.INHABER);
+    }
+
+    private UUID antragAnlegen(String ziel, String akteur, boolean abgelaufen) throws SQLException {
+        UUID id = UUID.randomUUID();
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement(
+                     "insert into m_urinet.verwaltung_antrag "
+                             + "(id, art, ziel, rolle, beantragt_von, beantragt_am, gueltig_bis, status) "
+                             + "values (?, 'INHABER_ROLLE', ?, 'inhaber', ?, now() - interval '2 hours', "
+                             + (abgelaufen ? "now() - interval '1 hour'" : "now() + interval '1 hour'")
+                             + ", 'OFFEN')")) {
+            einfuegen.setObject(1, id);
+            einfuegen.setString(2, ziel);
+            einfuegen.setString(3, akteur);
+            einfuegen.executeUpdate();
+        }
+        return id;
     }
 
     @Test

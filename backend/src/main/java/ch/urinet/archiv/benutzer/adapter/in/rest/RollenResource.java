@@ -59,7 +59,7 @@ public class RollenResource {
         return rollen.lesen().stream().sorted().map(RollenResource::darstellen).toList();
     }
 
-    private static RolleDto darstellen(Rolle rolle) {
+    static RolleDto darstellen(Rolle rolle) {
         List<RechtDto> rechte = Arrays.stream(Aktion.values()).map(aktion ->
                 new RechtDto(aktion, aktion.bezeichnung(), Rechtematrix.ergebnis(rolle, aktion),
                         Rechtematrix.fussnoten(rolle, aktion).stream().map(RollenResource::darstellen).toList()))
