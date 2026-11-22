@@ -141,9 +141,13 @@ async function passwortAnmelden(welt, seite, negativprobe = false) {
   await seite.locator('#kc-login').click();
   await seite.locator('#otp').waitFor();
   if (negativprobe) {
-    await seite.locator('#kc-login').click();
-    await seite.locator('#otp').waitFor();
+    await Promise.all([
+      seite.waitForEvent('framenavigated', { predicate: (frame) => frame === seite.mainFrame() }),
+      seite.locator('#kc-login').click(),
+    ]);
+    await seite.waitForLoadState('networkidle');
     assert.equal(amCallback(welt.passkey)(new URL(seite.url())), false);
+    await seite.locator('#otp').waitFor();
   }
   await otpEingeben(welt, seite);
 }
@@ -344,14 +348,14 @@ When('ein Keycloak-Admin diesen Passkey zurücksetzt', async function () {
 
 Then(
   'verlangt die Passwortanmeldung dieses Benutzers weiterhin TOTP',
-  { timeout: 45_000 },
+  { timeout: 90_000 },
   async function () {
-    await this.kontext.clearCookies();
-    const seite = await this.kontext.newPage();
+    const kontext = await this.browser.newContext({ locale: 'de-CH' });
     try {
+      const seite = await kontext.newPage();
       await passwortAnmelden(this, seite, true);
     } finally {
-      await seite.close();
+      await kontext.close();
     }
   },
 );

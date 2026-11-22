@@ -279,7 +279,8 @@ Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach Aufgabe 19.10; 
   `docs/passkey-related-origins.md`. Ein synthetischer Chromium-Spike bestätigte die Related-Origin-Konfiguration;
   echte Geräte und Betrieb bleiben Aufgabe 24.3.
 - Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach 19.10, der Admin-Reset nach 24.2. Browser- und
-  Keycloak-Integrationstests prüfen den exportierten Realm.
+  Keycloak-Integrationstests prüfen den exportierten Realm. Die Browser-Szenarien prüfen die Rücksetzung direkt über die
+  Keycloak-Admin-API; für den Passwort-Rückfall nutzen sie einen isolierten Browser-Kontext ohne aktive Passkey-Sitzung.
 
 ### Abgleich
 `Abgleich` liest die Benutzer des Mandanten (Seiten zu 50), gleicht mit `benutzer_status`, dem Benutzerverzeichnis und dem
