@@ -11,9 +11,10 @@ Deploy-/Sicherungsprozess.
 2. Prüfen, dass `m_urinet` und `m_vhf_gsk` in der Archivdatenbank vorhanden
    sind. `taeglich.sh` bricht bei einem Schema ab, das nicht in dieser Liste
    steht.
-3. Für Sicherungs- und Probe-Schlüssel zwei verschiedene öffentliche
-   `age`-Empfänger als Secret-Dateien im vorgesehenen Betriebsprozess
-   hinterlegen. Private Schlüssel gehören nur in die Notfallunterlagen
+3. Die öffentlichen `age`-Empfänger über
+   `ARCHIV_AGE_EMPFAENGER_SICHERUNG` und `ARCHIV_AGE_EMPFAENGER_PROBE`
+   bereitstellen. Es sind zwei verschiedene öffentliche Schlüssel, keine
+   Secret-Dateien. Private Schlüssel gehören nur in die Notfallunterlagen
    beziehungsweise auf die Restore-Probe.
 4. Den ersten Lauf mit `ARCHIV_VOLLEXPORT=1` planen. Danach wird der
    verschlüsselte Bucket-Zuwachs je Mandant anhand des Vorinventars erzeugt.
@@ -29,7 +30,10 @@ Zu prüfen sind insbesondere:
 
 - ein Inventar und ein Bucket-Strom für `urinet` **und** `vhf-gsk`;
 - `SHA256SUMS` und das Register der Prüfsummen;
-- ein erfolgreicher Lauf ohne Klartextartefakte;
+- die zur Abholung freigegebenen Laufartefakte in `laeufe/` enthalten keine
+  unverschlüsselten Nutzdaten; das Vorinventar `.zustand/` ausserhalb von
+  `laeufe/` bleibt absichtlich unverschlüsselt und wird vom Infra-Repository
+  nicht abgeholt;
 - die unveränderte Verfügbarkeit der vorherigen erfolgreichen Sicherung bei
   einem Fehler;
 - der vollständige Export nach einem Wechsel des Probe-Empfängers.
