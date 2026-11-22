@@ -559,7 +559,7 @@ class VerwaltungCacheHttpTest {
         String id = Testanmeldung.sub("mitarbeiter-urinet");
         String token = Testanmeldung.token("mitarbeiter-urinet");
         List<String> aufrufe = new java.util.ArrayList<>();
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -589,7 +589,7 @@ class VerwaltungCacheHttpTest {
         String id = Testanmeldung.sub("mitarbeiter-urinet");
         String token = Testanmeldung.token("mitarbeiter-urinet");
         List<String> aufrufe = new java.util.ArrayList<>();
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
