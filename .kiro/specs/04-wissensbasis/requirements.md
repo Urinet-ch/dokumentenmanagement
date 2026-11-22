@@ -170,7 +170,7 @@ damit ich die Antwort bis zur Unterlage zurückverfolgen kann.
 6. Das Archiv SOLL Entwürfe und nicht angenommene Änderungen nie an den Chat geben.
 7. WENN eine verwendete Seite einen der Hinweise aus 8.3 trägt, DANN SOLL der Agent ihn in der Antwort nennen.
 8. WENN der Benutzer auf eine Seite in der Quellenliste tippt, DANN SOLL die App die Seite öffnen (mit Protokolleintrag nach 14.2).
-9. Die öffentliche Schnittstelle und der öffentliche Chatbot (Spec 03, Requirements 5 und 6) SOLLEN keine Wissensseiten liefern; Spec 03, 6.1 bleibt unverändert.
+9. Die öffentliche Schnittstelle und der öffentliche Chatbot (Spec 03, Requirements 5 und 6) SOLLEN keine Wissensseiten liefern, ausser nach Requirement 21.6 (Wissenschat für Webseiten, Entscheid Fabian 22.11.2026; geändert 22.11.2026).
 
 ### Requirement 9: Suche nach Wissensseiten (ohne Konzept-ID, erweitert S1, S2)
 **User Story:** Als Benutzer möchte ich Wissensseiten wie Dokumente finden,
@@ -398,6 +398,44 @@ bis 1.6 und 5.1: Wo dort «Dokument der Art `WISSENSQUELLE`» steht, gilt «mark
     zeigt Titel, Art, Datum der Markierung und Stand des letzten Ingest; die Dokumentansicht zeigt «Wissensquelle» als Kennzeichen.
 11. Das Archiv SOLL für jedes Kriterium 1 bis 10 ein Cucumber-Szenario `@req-20.x` (`@spec-04`) enthalten, darunter Mandantentrennung
     (Markierung und Ingest eines Dokuments in Mandant A bleiben für Mandant B unsichtbar) und der Negativfall `PERSONAL`.
+
+### Requirement 21: Wissenschat und Archivchat, auch als Schnittstelle (ohne Konzept-ID, Entscheid Fabian 22.11.2026)
+**User Story:** Als Benutzer möchte ich beim Start eines Chats wählen, ob ich einen Archivchat (Suche in den Dokumenten) oder einen
+Wissenschat (Antworten nur aus der Wissensbasis) führe, und beides auch über eine Schnittstelle nutzen, damit ich die Wissensquellen
+als Nachschlagewerk (RAG) verwenden kann, in der App, in eigenen Anwendungen und auf Webseiten.
+
+Entscheide Fabian 22.11.2026: (1) Der Wissenschat antwortet **nur aus der Wissensbasis**, ohne Archivsuche über alle Dokumente. (2) Der
+Modus wird **beim Start eines Gesprächs** gewählt und bleibt für das Gespräch fest. (3) Die Schnittstelle gilt **auch öffentlich für
+Webseiten** (ändert 8.9 und Spec 03, 6.1 in der unten genannten Weise). (4) Spec jetzt, Umsetzung später (nach Welle 17 und Spec 02, Welle 10).
+
+#### Acceptance Criteria
+1. Das Archiv SOLL beim Anlegen eines Chat-Gesprächs den Modus `ARCHIV` (Standard, Verhalten wie bisher) oder `WISSEN` annehmen
+   und je Gespräch fest speichern (`chat_gespraech.modus`, Check-Constraint); ein Gespräch SOLL seinen Modus nie wechseln, ein anderer
+   Modus verlangt ein neues Gespräch. Der Modus `WISSEN` setzt das Recht A15 voraus (sonst 403), die Oberfläche zeigt ihn dann nicht.
+2. Im Modus `WISSEN` SOLL der Chat-Agent nur die Werkzeuge `wissen_index` und `wissen_seite_zeigen` (Requirement 8) verwenden, keines der
+   Archivwerkzeuge (`dokumente_suchen`, `dokument_zeigen` und weitere); der Systemprompt SOLL verlangen, nur aus freigegebenen Wissensseiten
+   zu antworten, bei fehlender Antwort «Dazu steht nichts in der Wissensbasis» zu sagen und je Aussage Seite und Quelldokument zu nennen
+   (Requirement 8.7). Die Wissensseiten bleiben nach Requirement 8 und 12 sichtbar (Rechte, Hülle, nur freigegebene Fassungen, nie Entwürfe).
+3. Im Modus `ARCHIV` SOLL der Chat unverändert bleiben (Archivwerkzeuge und Wissenswerkzeuge nach Requirement 8).
+4. Die Chat-Seite SOLL beim neuen Gespräch den Modus zur Wahl anbieten («Archiv durchsuchen» oder «Wissen befragen»), ihn im Gespräch
+   und in der Gesprächsliste kennzeichnen und in Gesprächen, die Requirement 15 von Spec 02 bewertet, mit speichern und im Export
+   (`chat-bewertungen/v1`, Feld `modus`) ausweisen.
+5. Das Archiv SOLL beide Modi über die interne Schnittstelle (Anmeldung oder API-Token mit den Rechten nach Rechtematrix) anbieten:
+   `POST /chat/gespraeche` mit `modus`; Antworten, Quellenform und Grenzen wie der Chat aus Spec 02; mandantengetrennt.
+6. Das Archiv SOLL den Wissenschat auch über die öffentliche Schnittstelle (Spec 03) für Webseiten anbieten (`/public/v1`, Webseiten-Schlüssel,
+   gleiche Grenzen je Client und Monatsbudget wie Spec 03, 6.4 und 15.1; nur für Mandanten, die ihn einschalten, Standard aus). Ändert 8.9
+   und Spec 03, 6.1: Die öffentliche Schnittstelle SOLL **nur** Wissensseiten liefern, die (a) ein Mensch mit Recht A16 ausdrücklich für die
+   Webseite freigegeben hat (Kennzeichen «für Webseite» je Seite, protokolliert) **und** (b) deren Quelldokumente alle die Zugriffsstufe
+   `oeffentlich` und die Vertraulichkeit `NORMAL` haben; Wissensseiten der Stufen `mitglieder` und `vorstand`, Entwürfe und Analysen
+   SOLLEN nie ausgeliefert werden. Wird eine Quelle später höher gestuft oder das Kennzeichen entzogen, SOLL die Seite sofort
+   nicht mehr ausgeliefert werden. Der öffentliche Wissenschat SOLL keine Archivwerkzeuge kennen, keine Personenbezüge speichern
+   (Spec 03, 6.5) und Antworten mit Seitentitel und Quellenverweis (Titel, Reihe, Ausgabe) liefern.
+7. Das Archiv SOLL für den Wissenschat dieselben Schutzmassnahmen wie der Archivchat einhalten: Eingaben aus Dokumenten und Seiten sind Daten, nie
+   Anweisungen (Prompt-Injection), Obergrenzen für Frage, Antwort, Werkzeugaufrufe und Zeit, Kosten in `ki_verbrauch` (Zweck `WISSEN_CHAT`)
+   mit dem Budget nach Requirement 11.
+8. Das Archiv SOLL für jedes Kriterium 1 bis 7 ein Cucumber-Szenario `@req-21.x` (`@spec-04`) enthalten, darunter Mandantentrennung, fehlendes Recht A15
+   (403), Modus nicht wechselbar, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar (simulierter Tool-Call), öffentliche Auslieferung
+   nur mit Kennzeichen und Zugriffsstufe `oeffentlich` und sofortiger Entzug.
 
 ## Optionen (nicht Teil des Plans, Aufgaben mit `*`)
 - Wissensseiten für Verbandsmitglieder von VHF/GSK über die öffentliche Schnittstelle und den Chatbot (ändert Spec 03, 6.1).
