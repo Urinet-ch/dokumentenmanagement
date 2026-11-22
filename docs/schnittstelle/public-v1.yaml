@@ -114,10 +114,14 @@ paths:
   "/public/v1/dokumente":
     get:
       summary: Veröffentlichte Dokumente auflisten
-      description: Dokumente, die der feste Filter bis zur Stufe der Anfrage liefert
-        (archiviert, veröffentlicht, Vertraulichkeit NORMAL, Zugriffsstufe bis zur gemeldeten
-        Stufe). Filter nach reihe (Code), jahr und ausgabe; sortierung datum_ab (Standard),
-        datum_auf oder titel. Unbekannte Parameter werden ignoriert.
+      description: |
+        Dokumente, die der feste Filter bis zur Stufe der Anfrage liefert (archiviert, veröffentlicht, Vertraulichkeit
+        NORMAL, Zugriffsstufe bis zur gemeldeten Stufe). Filter nach reihe (Code), jahr und ausgabe; zusätzlich ist je
+        aktiver öffentlich filterbarer Klassifikation ihr Code ein optionaler Query-Parameter (z. B.
+        `?fachgebiet=bad`). Wiederholte Werte einer Klassifikation gelten als ODER, verschiedene Klassifikationen als
+        UND. Unbekannte Parameter und Klassifikations-Codes, die nicht öffentlich filterbar sind, werden ignoriert.
+        Die Dokumentantworten enthalten nur öffentlich filterbare Klassifikationen. Sortierung datum_ab (Standard),
+        datum_auf oder titel.
       parameters:
       - description: Ausgabe innerhalb der Reihe
         name: ausgabe
@@ -267,9 +271,10 @@ paths:
   "/public/v1/filter":
     get:
       summary: Werte für die Filter
-      description: Reihen (Code und Name der aktiven Dokumentarten), zu denen der feste
-        Filter bis zur Stufe der Anfrage mindestens ein Dokument liefert; eine Reihe
-        oder ein Wert einer höheren Stufe wird nie genannt.
+      description: |
+        Reihen (Code und Name der aktiven Dokumentarten) und öffentlich filterbare Klassifikationen samt aktiven Werten,
+        zu denen der feste Filter bis zur Stufe der Anfrage mindestens ein Dokument liefert; eine Reihe oder ein Wert
+        einer höheren Stufe wird nie genannt.
       parameters:
       - "$ref": "#/components/parameters/ClientHeader"
       - "$ref": "#/components/parameters/ZugriffHeader"
@@ -1342,6 +1347,7 @@ components:
       required:
       - id
       - zugriff
+      - klassifikationen
       properties:
         id:
           type: string
@@ -1383,12 +1389,18 @@ components:
           - 'null'
           format: int32
           description: Zahl der Seiten, wenn bekannt
+        klassifikationen:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteKlassifikation"
+          description: Nur öffentlich filterbare Klassifikationen des Dokuments
     WebseiteDokumentDetails:
       description: Dokument mit Auszug
       type: object
       required:
       - id
       - zugriff
+      - klassifikationen
       properties:
         id:
           type: string
@@ -1431,6 +1443,11 @@ components:
           - string
           - 'null'
           description: Anfang des Textes, höchstens 300 Zeichen; fehlt ohne Text
+        klassifikationen:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteKlassifikation"
+          description: Nur öffentlich filterbare Klassifikationen des Dokuments
     WebseiteDokumentListe:
       description: Seite der Liste veröffentlichter Dokumente
       type: object
@@ -1460,12 +1477,44 @@ components:
       type: object
       required:
       - reihen
+      - klassifikationen
       properties:
         reihen:
           type: array
           items:
             "$ref": "#/components/schemas/WebseiteReihe"
           description: Reihen mit mindestens einem sichtbaren Dokument
+        klassifikationen:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteKlassifikation"
+          description: Öffentlich filterbare Klassifikationen und Werte mit mindestens einem sichtbaren Dokument
+    WebseiteKlassifikation:
+      type: object
+      description: Öffentlich filterbare Klassifikation und sichtbare Werte
+      required:
+      - code
+      - name
+      - werte
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        werte:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteKlassifikationWert"
+    WebseiteKlassifikationWert:
+      type: object
+      required:
+      - code
+      - name
+      properties:
+        code:
+          type: string
+        name:
+          type: string
     WebseiteFundstelle:
       description: Stelle des besten Treffers im Dokument
       type: object
@@ -1509,6 +1558,7 @@ components:
       required:
       - id
       - zugriff
+      - klassifikationen
       - rang
       properties:
         id:
@@ -1547,6 +1597,11 @@ components:
           - integer
           - 'null'
           format: int32
+        klassifikationen:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteKlassifikation"
+          description: Nur öffentlich filterbare Klassifikationen des Dokuments
         auszug:
           type:
           - string
