@@ -48,16 +48,15 @@ final class Urinet_Archiv_Client {
 			return;
 		}
 		$lock = 'ua_download_' . self::client_hash();
-		if ( get_transient( $lock ) ) {
+		if ( ! wp_cache_add( $lock, 1, 'urinet-downloads', 120 ) ) {
 			status_header( 429 );
 			echo 'Zu viele Downloads gleichzeitig. Bitte versuchen Sie es später erneut.'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Feste Fehlermeldung.
 			return;
 		}
-		set_transient( $lock, 1, 120 );
 		$werte = Urinet_Archiv_Einstellungen::werte();
 		$curl  = curl_init( $werte['url'] . '/public/v1/dokumente/' . rawurlencode( $id ) . '/datei' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		if ( false === $curl ) {
-			delete_transient( $lock );
+			wp_cache_delete( $lock, 'urinet-downloads' );
 			status_header( 404 );
 			return;
 		}
@@ -69,7 +68,7 @@ final class Urinet_Archiv_Client {
 			array(
 				CURLOPT_HTTPHEADER     => array( 'Authorization: Bearer ' . $token, 'X-Archiv-Zugriff: ' . Urinet_Archiv_Einstellungen::stufe() ),
 				CURLOPT_FOLLOWLOCATION => false,
-				CURLOPT_TIMEOUT        => 30,
+				CURLOPT_TIMEOUT        => 900,
 				CURLOPT_HEADERFUNCTION => static function ( $handle, string $header ) use ( &$typ ): int {
 					if ( preg_match( '/^Content-Type:\s*(.+)$/i', $header, $treffer ) ) {
 						$typ = trim( $treffer[1] );
@@ -99,27 +98,29 @@ final class Urinet_Archiv_Client {
 		$status = (int) curl_getinfo( $curl, CURLINFO_RESPONSE_CODE ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_getinfo -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		$error  = curl_error( $curl ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_error -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		if ( false === $ok || '' !== $error ) {
-			delete_transient( $lock );
-			status_header( 404 );
+			wp_cache_delete( $lock, 'urinet-downloads' );
+			if ( ! $stream ) {
+				status_header( 404 );
+			}
 			return;
 		}
 		if ( 429 === $status ) {
 			status_header( 429 );
 			header( 'Content-Type: text/plain; charset=utf-8' );
 			echo 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Feste Fehlermeldung.
-			delete_transient( $lock );
+			wp_cache_delete( $lock, 'urinet-downloads' );
 			return;
 		}
 		if ( 200 === $status ) {
 			$json = json_decode( $inhalt, true );
 			if ( is_array( $json ) && isset( $json['url'] ) && is_string( $json['url'] ) && '' !== esc_url_raw( $json['url'] ) ) {
-				wp_safe_redirect( esc_url_raw( $json['url'] ), 302 );
-				delete_transient( $lock );
+				wp_redirect( esc_url_raw( $json['url'] ), 302 ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- Die API liefert eine vorsignierte Object-Storage-URL.
+				wp_cache_delete( $lock, 'urinet-downloads' );
 				return;
 			}
 		}
 		if ( in_array( $status, array( 301, 302 ), true ) ) {
-			delete_transient( $lock );
+			wp_cache_delete( $lock, 'urinet-downloads' );
 			status_header( 404 );
 			return;
 		}
@@ -129,13 +130,13 @@ final class Urinet_Archiv_Client {
 			header( 'Content-Type: ' . $typ );
 			echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
 		}
-		delete_transient( $lock );
+		wp_cache_delete( $lock, 'urinet-downloads' );
 	}
 
 	private static function client_hash(): string {
 		$benutzer = wp_get_current_user();
 		// The cookie is only hashed into an opaque client identifier and never used as a value.
-		$kennung = $benutzer instanceof WP_User && $benutzer->exists() ? (string) $benutzer->ID : (string) ( $_COOKIE[ LOGGED_IN_COOKIE ] ?? 'anonym' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+		$kennung = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ) : 'anonym'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		return hash_hmac( 'sha256', $kennung, wp_salt( 'auth' ) . gmdate( 'Y-m-d' ) );
 	}
 

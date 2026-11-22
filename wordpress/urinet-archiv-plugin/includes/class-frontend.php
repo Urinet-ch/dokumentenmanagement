@@ -54,7 +54,10 @@ final class Urinet_Archiv_Frontend {
 			wp_localize_script(
 				'urinet-archiv-chatbot',
 				'urinetArchivChatbot',
-				array( 'url' => esc_url_raw( rest_url( 'urinet-archiv/v1/chat' ) ) )
+				array(
+					'url'         => esc_url_raw( rest_url( 'urinet-archiv/v1/chat' ) ),
+					'dokumentUrl' => esc_url_raw( home_url( '/urinet-archiv/dokument/' ) ),
+				)
 			);
 		}
 	}

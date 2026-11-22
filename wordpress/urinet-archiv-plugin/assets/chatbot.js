@@ -19,29 +19,34 @@
 				return response.text();
 			}).then(function (stream) {
 				var quellen = [];
-				var text = stream.split('\n').filter(function (line) {
-					return line.indexOf('data:') === 0;
-				}).map(function (line) {
-					try {
-						var data = JSON.parse(line.slice(5).trim());
-						if (data.typ === 'quellen' || data.quellen) {
-							quellen = quellen.concat(data.quellen || []);
-							return '';
-						}
-						if (data.typ === 'fehler' || data.fehler) {
-							throw new Error(data.meldung || (data.fehler && data.fehler.meldung) || 'chat');
-						}
-						return data.delta || data.text || data.hinweis || '';
-					} catch (error) {
-						return '';
+				var text = '';
+				var ereignis = '';
+				var daten = [];
+				function verarbeiten() {
+					if (!daten.length) return;
+					var data = JSON.parse(daten.join('\n'));
+					if ('text' === ereignis) text += data.delta || '';
+					if ('quellen' === ereignis) quellen = data;
+					if ('fehler' === ereignis) throw new Error(data.meldung || 'chat');
+					if ('fertig' === ereignis && data.hinweis) text += '\n' + data.hinweis;
+					daten = [];
+				}
+				stream.split('\n').forEach(function (line) {
+					if (line.indexOf('event:') === 0) {
+						ereignis = line.slice(6).trim();
+					} else if (line.indexOf('data:') === 0) {
+						daten.push(line.slice(5).trim());
+					} else if (!line.trim()) {
+						try { verarbeiten(); } catch (error) { throw error; }
 					}
-				}).join('');
+				});
+				verarbeiten();
 				ausgabe.textContent = text || 'Es wurde keine Antwort gefunden.';
 				quellen.forEach(function (quelle) {
-					if (quelle.url) {
+					if (quelle.dokumentId) {
 						var link = document.createElement('a');
-						link.href = quelle.url;
-						link.textContent = 'Quelle: ' + (quelle.titel || quelle.id || 'Dokument');
+						link.href = window.urinetArchivChatbot.dokumentUrl + encodeURIComponent(quelle.dokumentId);
+						link.textContent = 'Quelle: ' + (quelle.titel || quelle.dokumentId);
 						ausgabe.appendChild(document.createElement('br'));
 						ausgabe.appendChild(link);
 					}
