@@ -453,6 +453,9 @@ abaninja_beleg(abaninja_uuid text pk, art text, belegnummer text, kontakt_id uui
   oder nicht bewertbare Nachrichten ergeben 404. Der REST-Endpunkt bleibt für dieselben Chat-Rollen wie der Chat zugänglich; A24 ist ausschliesslich
   die Berechtigung für Auswertung und Export. Szenarien `chat-bewertungen.feature` decken Ändern, Löschen, Mandantentrennung, Aufbewahrung,
   Textbereinigung, Rate-Limit und die A24-Zuordnung ab.
+  Für `PUT` begrenzt ein früher HTTP-Bodyhandler den empfangenen Body auf 8'191 Bytes, auch ohne `Content-Length`; darüber folgt 413 als Problem-JSON
+  und die Verbindung wird geschlossen. Der REST-Eingabestrom wird zusätzlich begrenzt. Ein Socket-Test prüft die Ablehnung vor dem Ende einer
+  Chunked-Anfrage, einschliesslich kodierter und mit Schrägstrich abgeschlossener Pfade, sowie die Annahme knapp unter der Grenze.
 - **Format:** `chat-bewertungen/v1` mit `schema.json` (JSON Schema) im ZIP und in `docs/` zum Schematest; Felder nach Requirement 15.6; die Kennung der Treffer ist
   ein SHA-256 über Dokument-ID und ein Salz je Export (nicht zurückrechenbar, innerhalb der Datei stabil). Keine Benutzer- und Mandantenkennung.
 - **Oberfläche:** Sterne unter jeder Antwort (`data-test`, ARIA-Name «Antwort bewerten»), Grundauswahl und Freitext ab 3 Sternen; Seite «Chat-Auswertung» (A24) mit

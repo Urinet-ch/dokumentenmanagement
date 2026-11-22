@@ -13,10 +13,17 @@ import io.cucumber.java.Before;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.Socket;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -139,6 +146,55 @@ public class ChatBewertungSchritte {
     @Wenn("«{word}» löscht die Bewertung von «{word}»")
     public void loeschen(String benutzer, String antwort) {
         letzteAntwort = anfrage(benutzer, antworten.get(antwort).id(), "DELETE", null);
+    }
+
+    @Dann("wird eine unvollständige Chunked-Bewertung von «{word}» für «{word}» vor ihrem Ende mit 413 abgelehnt")
+    public void chunkedZuGross(String benutzer, String antwort) throws Exception {
+        String basis = BEWERTUNGS_PFAD + antworten.get(antwort).id() + "/";
+        chunkedPfadPruefen(benutzer, basis + "bewertung");
+        chunkedPfadPruefen(benutzer, basis + "%62ewertung");
+        chunkedPfadPruefen(benutzer, basis + "bewertung/");
+    }
+
+    private void chunkedPfadPruefen(String benutzer, String pfad) throws Exception {
+        try (Socket socket = new Socket("127.0.0.1", RestAssured.port)) {
+            socket.setSoTimeout(10_000);
+            String kopf = "PUT " + pfad + " HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Authorization: Bearer " + Testanmeldung.token(benutzer) + "\r\n"
+                    + "Content-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+            var aus = socket.getOutputStream();
+            aus.write(kopf.getBytes(StandardCharsets.US_ASCII));
+            aus.write("2000\r\n".getBytes(StandardCharsets.US_ASCII));
+            aus.write(" ".repeat(8192).getBytes(StandardCharsets.US_ASCII));
+            aus.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+            aus.flush();
+            BufferedReader leser = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            assertThat(leser.readLine()).contains(" 413 ");
+            StringBuilder antwortstext = new StringBuilder();
+            for (String zeile; (zeile = leser.readLine()) != null; ) {
+                antwortstext.append(zeile);
+            }
+            assertThat(antwortstext.toString()).contains("application/problem+json", "DATEI_ZU_GROSS");
+        }
+    }
+
+    @Wenn("«{word}» sendet eine Chunked-Bewertung für «{word}» knapp unter der Grenze")
+    public void chunkedKnappDarunter(String benutzer, String antwort) throws Exception {
+        String pfad = BEWERTUNGS_PFAD + antworten.get(antwort).id() + "/bewertung";
+        HttpURLConnection verbindung = (HttpURLConnection) URI.create("http://127.0.0.1:" + RestAssured.port + pfad)
+                .toURL().openConnection();
+        verbindung.setRequestMethod("PUT");
+        verbindung.setDoOutput(true);
+        verbindung.setChunkedStreamingMode(1024);
+        verbindung.setRequestProperty("Authorization", "Bearer " + Testanmeldung.token(benutzer));
+        verbindung.setRequestProperty("Content-Type", "application/json");
+        String body = "{\"sterne\":5}" + " ".repeat(8191 - "{\"sterne\":5}".length());
+        try (var aus = verbindung.getOutputStream()) {
+            aus.write(body.getBytes(StandardCharsets.UTF_8));
+        }
+        assertThat(verbindung.getResponseCode()).isEqualTo(200);
+        verbindung.disconnect();
+        letzteAntwort = anfrage(benutzer, antworten.get(antwort).id(), "GET", null);
     }
 
     @Wenn("«{word}» bewertet «{word}» in einem anderen Mandanten")

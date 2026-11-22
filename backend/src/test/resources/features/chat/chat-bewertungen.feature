@@ -24,10 +24,30 @@ Funktionalität: Chat-Bewertungen speichern
   @req-15.2
   Szenario: Bewertungen fremder Benutzer und Mandanten sind nicht zugänglich
     Angenommen für «mitarbeiter-urinet» existiert im Mandanten «urinet» die Chat-Antwort «FREMD»
+    Wenn «mitarbeiter-urinet» bewertet «FREMD» mit dem Körper «{"sterne":2,"freitext":"Eigene Bewertung"}»
+    Dann ist die Bewertungsanfrage mit Status 200 beantwortet
     Wenn «inhaber-urinet» ruft die Bewertung von «FREMD» ab
+    Dann ist die Bewertungsanfrage mit Status 404 beantwortet
+    Wenn «inhaber-urinet» bewertet «FREMD» mit dem Körper «{"sterne":5,"freitext":"Fremde Änderung"}»
+    Dann ist die Bewertungsanfrage mit Status 404 beantwortet
+    Wenn «inhaber-urinet» löscht die Bewertung von «FREMD»
     Dann ist die Bewertungsanfrage mit Status 404 beantwortet
     Wenn «inhaber-vhf-gsk» ruft die Bewertung von «FREMD» ab
     Dann ist die Bewertungsanfrage mit Status 404 beantwortet
+    Wenn «inhaber-vhf-gsk» bewertet «FREMD» mit dem Körper «{"sterne":5,"freitext":"Fremde Änderung"}»
+    Dann ist die Bewertungsanfrage mit Status 404 beantwortet
+    Wenn «inhaber-vhf-gsk» löscht die Bewertung von «FREMD»
+    Dann ist die Bewertungsanfrage mit Status 404 beantwortet
+    Wenn «mitarbeiter-urinet» ruft die Bewertung von «FREMD» ab
+    Dann ist die Bewertungsanfrage mit Status 200 beantwortet
+    Und enthält die Antwort die Bewertung mit 2 Sternen und dem Freitext «Eigene Bewertung»
+
+  @req-15.4
+  Szenario: Eine übergrosse Chunked-Bewertung wird während des Empfangs abgelehnt
+    Angenommen für «inhaber-urinet» existiert im Mandanten «urinet» die Chat-Antwort «GRENZE»
+    Dann wird eine unvollständige Chunked-Bewertung von «inhaber-urinet» für «GRENZE» vor ihrem Ende mit 413 abgelehnt
+    Wenn «inhaber-urinet» sendet eine Chunked-Bewertung für «GRENZE» knapp unter der Grenze
+    Dann ist die Bewertungsanfrage mit Status 200 beantwortet
 
   @req-15.3
   Szenario: Eine Bewertung wird mit der Antwort nach 12 Monaten gelöscht

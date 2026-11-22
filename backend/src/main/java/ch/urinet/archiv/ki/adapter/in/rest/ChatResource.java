@@ -50,6 +50,9 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -68,6 +71,7 @@ public class ChatResource {
 
     private static final String REAL_IP = "X-Real-Ip";
     private static final ObjectMapper JSON = new ObjectMapper();
+    static final int BEWERTUNG_KOERPER_GRENZE = 8192;
 
     private final ChatFragen fragen;
     private final ChatVerlauf verlauf;
@@ -235,17 +239,29 @@ public class ChatResource {
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "Eigene Chat-Antwort bewerten",
             description = "Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit Status OK. Fremde, unbekannte "
-                    + "und nicht bewertbare Antworten ergeben 404; nach mehr als 200 Speicherungen je Stunde 429.")
+                    + "und nicht bewertbare Antworten ergeben 404; nach mehr als 200 Speicherungen je Stunde 429. "
+                    + "Der Anfragekörper muss kleiner als 8 KiB sein.")
+    @RequestBody(required = true, description = "Bewertung der Antwort",
+            content = @Content(schema = @Schema(implementation = BewertungEingabeDto.class)))
     @APIResponse(responseCode = "200", description = "Bewertung gespeichert")
     @APIResponse(responseCode = "400", description = "Bewertung ungültig")
     @APIResponse(responseCode = "404", description = "Antwort nicht gefunden")
+    @APIResponse(responseCode = "413", description = "Bewertung zu gross")
     @APIResponse(responseCode = "429", description = "Bewertungslimit erreicht",
             headers = @Header(name = "Retry-After", description = "Sekunden bis zum nächsten Versuch"))
-    public BewertungDto bewerten(@PathParam("id") String id, String body) {
+    public BewertungDto bewerten(@PathParam("id") String id, InputStream body) throws IOException {
         aufloesung.pruefen();
-        BewertungEingabe eingabe = bewertungEingabe(body);
+        BewertungEingabe eingabe = bewertungEingabe(bewertungKoerper(body));
         return dto(bewertungen.speichern(bewertungId(id), benutzer().id(), eingabe.sterne(),
                 eingabe.grund(), eingabe.freitext()));
+    }
+
+    static String bewertungKoerper(InputStream body) throws IOException {
+        byte[] eingabe = body.readNBytes(BEWERTUNG_KOERPER_GRENZE);
+        if (eingabe.length == BEWERTUNG_KOERPER_GRENZE) {
+            throw new FachFehler(Fehlercode.DATEI_ZU_GROSS);
+        }
+        return new String(eingabe, StandardCharsets.UTF_8);
     }
 
     @GET

@@ -19,6 +19,8 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { ChatBewertung } from '../model/chat-bewertung';
 // @ts-ignore
+import { ChatBewertungEingabe } from '../model/chat-bewertung-eingabe';
+// @ts-ignore
 import { ChatFrage } from '../model/chat-frage';
 // @ts-ignore
 import { ChatGespraech } from '../model/chat-gespraech';
@@ -278,23 +280,23 @@ export class ChatService extends BaseService {
 
     /**
      * Eigene Chat-Antwort bewerten
-     * Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit Status OK. Fremde, unbekannte und nicht bewertbare Antworten ergeben 404; nach mehr als 200 Speicherungen je Stunde 429.
+     * Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit Status OK. Fremde, unbekannte und nicht bewertbare Antworten ergeben 404; nach mehr als 200 Speicherungen je Stunde 429. Der Anfragekörper muss kleiner als 8 KiB sein.
      * @endpoint put /api/v1/chat/nachrichten/{id}/bewertung
      * @param id 
-     * @param body 
+     * @param chatBewertungEingabe Bewertung der Antwort
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1ChatNachrichtenIdBewertungPut(id: string, body: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ChatBewertung>;
-    public apiV1ChatNachrichtenIdBewertungPut(id: string, body: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ChatBewertung>>;
-    public apiV1ChatNachrichtenIdBewertungPut(id: string, body: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ChatBewertung>>;
-    public apiV1ChatNachrichtenIdBewertungPut(id: string, body: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1ChatNachrichtenIdBewertungPut(id: string, chatBewertungEingabe: ChatBewertungEingabe, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ChatBewertung>;
+    public apiV1ChatNachrichtenIdBewertungPut(id: string, chatBewertungEingabe: ChatBewertungEingabe, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ChatBewertung>>;
+    public apiV1ChatNachrichtenIdBewertungPut(id: string, chatBewertungEingabe: ChatBewertungEingabe, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ChatBewertung>>;
+    public apiV1ChatNachrichtenIdBewertungPut(id: string, chatBewertungEingabe: ChatBewertungEingabe, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiV1ChatNachrichtenIdBewertungPut.');
         }
-        if (body === null || body === undefined) {
-            throw new Error('Required parameter body was null or undefined when calling apiV1ChatNachrichtenIdBewertungPut.');
+        if (chatBewertungEingabe === null || chatBewertungEingabe === undefined) {
+            throw new Error('Required parameter chatBewertungEingabe was null or undefined when calling apiV1ChatNachrichtenIdBewertungPut.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -339,7 +341,7 @@ export class ChatService extends BaseService {
         return this.httpClient.request<ChatBewertung>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: body,
+                body: chatBewertungEingabe,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

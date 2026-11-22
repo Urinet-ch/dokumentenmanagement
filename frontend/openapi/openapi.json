@@ -5017,7 +5017,7 @@
       },
       "put" : {
         "summary" : "Eigene Chat-Antwort bewerten",
-        "description" : "Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit Status OK. Fremde, unbekannte und nicht bewertbare Antworten ergeben 404; nach mehr als 200 Speicherungen je Stunde 429.",
+        "description" : "Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit Status OK. Fremde, unbekannte und nicht bewertbare Antworten ergeben 404; nach mehr als 200 Speicherungen je Stunde 429. Der Anfragekörper muss kleiner als 8 KiB sein.",
         "tags" : [ "Chat" ],
         "parameters" : [ {
           "name" : "id",
@@ -5028,10 +5028,11 @@
           }
         } ],
         "requestBody" : {
+          "description" : "Bewertung der Antwort",
           "content" : {
             "application/json" : {
               "schema" : {
-                "type" : "string"
+                "$ref" : "#/components/schemas/ChatBewertungEingabe"
               }
             }
           },
@@ -5053,6 +5054,9 @@
           },
           "404" : {
             "description" : "Antwort nicht gefunden"
+          },
+          "413" : {
+            "description" : "Bewertung zu gross"
           },
           "429" : {
             "description" : "Bewertungslimit erreicht",

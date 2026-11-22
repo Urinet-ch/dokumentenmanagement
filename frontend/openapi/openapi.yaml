@@ -4358,7 +4358,8 @@ paths:
       summary: Eigene Chat-Antwort bewerten
       description: "Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit\
         \ Status OK. Fremde, unbekannte und nicht bewertbare Antworten ergeben 404;\
-        \ nach mehr als 200 Speicherungen je Stunde 429."
+        \ nach mehr als 200 Speicherungen je Stunde 429. Der Anfragekörper muss kleiner\
+        \ als 8 KiB sein."
       tags:
       - Chat
       parameters:
@@ -4368,10 +4369,11 @@ paths:
         schema:
           type: string
       requestBody:
+        description: Bewertung der Antwort
         content:
           application/json:
             schema:
-              type: string
+              $ref: "#/components/schemas/ChatBewertungEingabe"
         required: true
       responses:
         "200":
@@ -4384,6 +4386,8 @@ paths:
           description: Bewertung ungültig
         "404":
           description: Antwort nicht gefunden
+        "413":
+          description: Bewertung zu gross
         "429":
           description: Bewertungslimit erreicht
           headers:
