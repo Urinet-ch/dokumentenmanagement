@@ -27,6 +27,12 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber den Zugang des Mitarbeiters zurücksetzt
     Dann sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert
 
+  @req-4.9
+  Szenario: Ein altes Benutzertoken wird nach dem Widerruf abgewiesen
+    Angenommen ein synthetischer Verwaltungszugang hat ein altes Token
+    Wenn das Token des Inhabers widerrufen wird
+    Dann wird dieses Token innerhalb der Frist mit 401 abgewiesen
+
   @req-3.15
   Szenario: Eine Google-Verknüpfung wird gelöst und Sitzungen beendet
     Angenommen die frische Anmeldung ist für den Test bestätigt
@@ -48,7 +54,7 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber den Namen des Mitarbeiters mit der aktuellen Version ändert
     Dann ist der neue Name gespeichert und nicht im Verwaltungsprotokoll enthalten
 
-  @req-3.8
+  @req-3.8 @req-4.9
   Szenario: Ein aktiver Benutzer wird gesperrt und wieder entsperrt
     Angenommen die frische Anmeldung ist für den Test bestätigt
     Und ein synthetischer aktiver Mitarbeiter besteht
