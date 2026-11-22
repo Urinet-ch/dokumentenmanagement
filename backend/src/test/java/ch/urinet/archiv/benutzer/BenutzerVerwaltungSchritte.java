@@ -6,6 +6,7 @@ import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.BenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
@@ -103,6 +104,7 @@ public class BenutzerVerwaltungSchritte {
     private String akteurName;
     private String zweiterAkteurId;
     private String zweiterAkteurName;
+    private UUID loeschDokument;
     private String altesToken;
     private final Map<String, Rolle> gleichzeitigeRollen = new ConcurrentHashMap<>();
 
@@ -191,6 +193,9 @@ public class BenutzerVerwaltungSchritte {
         for (var eintrag : benutzer) {
             identitaet.loeschen(eintrag.getKey(), eintrag.getValue());
             tokenWiderrufZeileLoeschen(eintrag.getValue());
+        }
+        if (loeschDokument != null) {
+            Testdokumente.loeschen(datenbank.get(), MANDANT, List.of(loeschDokument));
         }
         if (eigeneId != null) {
             tokenWiderrufZeileLoeschen(eigeneId);
@@ -686,6 +691,99 @@ public class BenutzerVerwaltungSchritte {
                 .post(PFAD + "/" + eigeneId + "/deaktivieren"));
         antworten.add(anfrage().get(PFAD + "/" + eigeneId));
         antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/reaktivieren"));
+    }
+
+    @Angenommen("der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert")
+    public void mitarbeiterDeaktivierenUndVerknuepfen() throws SQLException {
+        loeschDokument = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(
+                MANDANT, null, "PERSONAL", false, eigeneId, eigeneId, "EINGANGSKORB"));
+        anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/deaktivieren").then().statusCode(204);
+    }
+
+    @Wenn("der Inhaber Vorschau und Löschung vor und nach der Frist ausführt")
+    public void loeschungNachFrist() throws SQLException {
+        String pfad = PFAD + "/" + eigeneId;
+        Response vorschau = anfrage().get(pfad + "/loeschvorschau");
+        assertThat(vorschau.statusCode()).isEqualTo(200);
+        assertThat(vorschau.jsonPath().getLong("dokumente")).isEqualTo(1);
+        assertThat(vorschau.jsonPath().getLong("protokolleintraege")).isGreaterThanOrEqualTo(2);
+        antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(pfad + "/loeschen"));
+        loeschfristAbgelaufen();
+        antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(pfad + "/loeschen"));
+        if (antworten.getLast().statusCode() == 204) {
+            benutzer.remove(Map.entry(MANDANT, eigeneId));
+        }
+    }
+
+    @Dann("wird nur nach der Frist gelöscht und die Archivverweise bleiben bestehen")
+    public void loeschungNachFristGeprueft() throws SQLException {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(409, 204);
+        assertThat(anfrage().get(PFAD + "/" + eigeneId).statusCode()).isEqualTo(404);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select erstellt_von, person_benutzer from m_" + SCHEMA + ".dokument where id = ?")) {
+            abfrage.setObject(1, loeschDokument);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).isEqualTo(eigeneId);
+                assertThat(zeile.getString(2)).isEqualTo(eigeneId);
+            }
+        }
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from m_" + SCHEMA + ".benutzer_verzeichnis where benutzer = ?")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getLong(1)).isGreaterThan(0);
+            }
+        }
+    }
+
+    @Wenn("zwei Inhaber einen Löschantrag nach der Frist entscheiden")
+    public void loeschantragEntscheiden() throws SQLException {
+        loeschfristAbgelaufen();
+        assertThat(Testanmeldung.sub(akteurName)).isEqualTo(akteurId);
+        assertThat(Testanmeldung.sub(zweiterAkteurName)).isEqualTo(zweiterAkteurId);
+        assertThat(identitaet.benutzerLesen(MANDANT, akteurId).rollen()).contains(Rolle.INHABER);
+        assertThat(identitaet.benutzerLesen(MANDANT, zweiterAkteurId).rollen()).contains(Rolle.INHABER);
+        Response antrag = anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/loeschen");
+        antworten.add(antrag);
+        String id = antrag.then().statusCode(202).extract().path("antragId");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId)).isNotNull();
+        String pfad = PFAD + "/antraege/" + id + "/bestaetigen";
+        Response selbst = anfrage().contentType("application/json").post(pfad);
+        assertThat(selbst.statusCode()).as(selbst.asString()).isEqualTo(403);
+        antworten.add(selbst);
+        Response zweiter = given().auth().oauth2(Testanmeldung.token(zweiterAkteurName))
+                .contentType("application/json").post(pfad);
+        assertThat(zweiter.statusCode()).as(zweiter.asString()).isEqualTo(204);
+        antworten.add(zweiter);
+        if (antworten.getLast().statusCode() == 204) {
+            benutzer.remove(Map.entry(MANDANT, eigeneId));
+        }
+    }
+
+    @Dann("löscht nur die Bestätigung des zweiten Inhabers den Benutzer")
+    public void loeschantragGeprueft() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(202, 403, 204);
+        assertThat(anfrage().get(PFAD + "/" + eigeneId).statusCode()).isEqualTo(404);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
+    }
+
+    private void loeschfristAbgelaufen() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement(
+                     "update m_" + SCHEMA + ".benutzer_status set seit = clock_timestamp() - interval '31 days' "
+                             + "where benutzer = ? and art = 'DEAKTIVIERT'")) {
+            befehl.setString(1, eigeneId);
+            assertThat(befehl.executeUpdate()).isEqualTo(1);
+        }
     }
 
     @Dann("ist der Austritt verzeichnet und eine neue Zugangseinrichtung verlangt")

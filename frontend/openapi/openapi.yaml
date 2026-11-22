@@ -137,7 +137,7 @@ components:
         status:
           type: string
         anzahl:
-          $ref: "#/components/schemas/Anzahl"
+          $ref: "#/components/schemas/Anzahl1"
         paketSha256:
           type: string
         befunde:
@@ -153,6 +153,15 @@ components:
             additionalProperties:
               type: string
     Anzahl:
+      type: object
+      properties:
+        protokolleintraege:
+          type: integer
+          format: int64
+        dokumente:
+          type: integer
+          format: int64
+    Anzahl1:
       type: object
       properties:
         neu:
@@ -1535,6 +1544,11 @@ components:
       - NUR_LESEND
       - NUR_SELBST_ERFASSTE
     Ergebnis1:
+      type: object
+      properties:
+        antragId:
+          $ref: "#/components/schemas/UUID"
+    Ergebnis2:
       type: object
       properties:
         antragId:
@@ -4197,6 +4211,70 @@ paths:
       responses:
         "204":
           description: Google-Verknüpfung gelöst
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/{benutzerId}/loeschen:
+    post:
+      summary: Deaktivierten Benutzer nach Ablauf der Frist löschen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Grund"
+        required: true
+      responses:
+        "204":
+          description: Benutzer gelöscht
+        "202":
+          description: Vier-Augen-Antrag angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ergebnis2"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/{benutzerId}/loeschvorschau:
+    get:
+      summary: Verweise vor dem Löschen anzeigen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Anzahl Protokolleinträge und Dokumente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Anzahl"
         "401":
           description: Not Authorized
         "403":

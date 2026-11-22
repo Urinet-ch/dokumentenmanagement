@@ -9,6 +9,8 @@ import ch.urinet.archiv.benutzer.application.BenutzerAendern;
 import ch.urinet.archiv.benutzer.application.BenutzerStatusAendern;
 import ch.urinet.archiv.benutzer.application.BenutzerRolleAendern;
 import ch.urinet.archiv.benutzer.application.BenutzerAntraege;
+import ch.urinet.archiv.benutzer.application.BenutzerLoeschen;
+import ch.urinet.archiv.benutzer.application.BenutzerVerweise;
 import ch.urinet.archiv.benutzer.application.VerwaltungAntragSpeicher;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -66,6 +68,7 @@ public class BenutzerResource {
     private final BenutzerStatusAendern status;
     private final BenutzerRolleAendern rolle;
     private final BenutzerAntraege antraege;
+    private final BenutzerLoeschen loeschen;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
     private final ObjectReader json;
@@ -75,6 +78,7 @@ public class BenutzerResource {
     public BenutzerResource(BenutzerLesen lesen, BenutzerEinladen einladen, BenutzerAnlegen anlegen,
                             BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google, BenutzerAendern aendern,
                             BenutzerStatusAendern status, BenutzerRolleAendern rolle, BenutzerAntraege antraege,
+                            BenutzerLoeschen loeschen,
                             MandantAufloesung mandant, SecurityIdentity identitaet, ObjectMapper json,
                             Berechtigung berechtigung, StepUp stepUp) {
         this.lesen = lesen;
@@ -86,6 +90,7 @@ public class BenutzerResource {
         this.status = status;
         this.rolle = rolle;
         this.antraege = antraege;
+        this.loeschen = loeschen;
         this.mandant = mandant;
         this.identitaet = identitaet;
         this.json = json.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
@@ -377,6 +382,46 @@ public class BenutzerResource {
     }
 
     public record Grund(String grund) {
+    }
+
+    @GET
+    @Path("/{benutzerId}/loeschvorschau")
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Verweise vor dem Löschen anzeigen")
+    @APIResponse(responseCode = "200", description = "Anzahl Protokolleinträge und Dokumente",
+            content = @Content(schema = @Schema(implementation = BenutzerVerweise.Anzahl.class)))
+    public BenutzerVerweise.Anzahl loeschvorschau(@PathParam("benutzerId") String id) {
+        return loeschen.vorschau(mandant.pruefen(), akteur(), id);
+    }
+
+    @POST
+    @Path("/{benutzerId}/loeschen")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Deaktivierten Benutzer nach Ablauf der Frist löschen")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = Grund.class)))
+    @APIResponse(responseCode = "204", description = "Benutzer gelöscht")
+    @APIResponse(responseCode = "202", description = "Vier-Augen-Antrag angelegt",
+            content = @Content(schema = @Schema(implementation = BenutzerLoeschen.Ergebnis.class)))
+    public Response loeschen(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                             @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        stepUp.pruefen();
+        jsonPruefen(contentType);
+        Grund eingabe;
+        try {
+            eingabe = json.forType(Grund.class).readValue(begrenztLesen(body));
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        var ergebnis = loeschen.loeschen(code, akteur, id, eingabe == null ? null : eingabe.grund(), IpAdresse.aus(ip));
+        return ergebnis.antragId() == null ? Response.noContent().build()
+                : Response.status(Response.Status.ACCEPTED).entity(ergebnis).build();
     }
 
     @POST

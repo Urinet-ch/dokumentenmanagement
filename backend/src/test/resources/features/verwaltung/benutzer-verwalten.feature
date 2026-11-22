@@ -95,6 +95,22 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber den Mitarbeiter deaktiviert und reaktiviert
     Dann ist der Austritt verzeichnet und eine neue Zugangseinrichtung verlangt
 
+  @req-3.11 @req-3.12 @req-4.8
+  Szenario: Ein Austritt darf erst nach der Frist gelöscht werden
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter besteht
+    Und der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert
+    Wenn der Inhaber Vorschau und Löschung vor und nach der Frist ausführt
+    Dann wird nur nach der Frist gelöscht und die Archivverweise bleiben bestehen
+
+  @req-3.11 @req-4.11
+  Szenario: Ein Löschantrag braucht die Bestätigung eines zweiten Inhabers
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter und zwei aktive Inhaber bestehen
+    Und der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert
+    Wenn zwei Inhaber einen Löschantrag nach der Frist entscheiden
+    Dann löscht nur die Bestätigung des zweiten Inhabers den Benutzer
+
   @req-3.4 @req-5.9
   Szenario: Ungültige Angaben und Realm-Konflikte werden ohne Personendaten abgewiesen
     Angenommen die frische Anmeldung ist für den Test bestätigt
