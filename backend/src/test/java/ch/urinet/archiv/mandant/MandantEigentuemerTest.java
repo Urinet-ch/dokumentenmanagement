@@ -104,6 +104,35 @@ class MandantEigentuemerTest {
     }
 
     @Test
+    void mandantenschemaAbbauErhaeltGemeinsameNamenssperre() throws SQLException {
+        datenbank.schemaAnlegen("m_probe_namenssperre");
+        byte[] gesperrterName = new byte[32];
+        gesperrterName[0] = 42;
+        try (Connection app = verbinden("archiv_app", "app-nur-test");
+             var einfuegen = app.prepareStatement(
+                     "insert into public.benutzername_sperre (hash) values (?)");
+             var pruefen = app.prepareStatement(
+                     "select count(*) from public.benutzername_sperre where hash = ?")) {
+            einfuegen.setBytes(1, gesperrterName);
+            einfuegen.executeUpdate();
+
+            datenbank.schemaEntfernen("m_probe_namenssperre");
+
+            pruefen.setBytes(1, gesperrterName);
+            try (ResultSet ergebnis = pruefen.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getInt(1)).isEqualTo(1);
+            }
+        }
+        try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
+             Statement befehl = eigentuemer.createStatement()) {
+            assertThat(wert(befehl, "select to_regclass('m_probe_namenssperre.dokumentart')")).isNull();
+            assertThat(wert(befehl, "select to_regclass('public.benutzername_sperre')"))
+                    .isEqualTo("benutzername_sperre");
+        }
+    }
+
+    @Test
     void verwaltungsschemaIstJeMandantGetrenntUndProtokollBleibtNurAnfuegend() throws SQLException {
         provisionierung.anlegen("probe-praefix", null, null);
         provisionierung.anlegen("probe-kommando", null, null);
