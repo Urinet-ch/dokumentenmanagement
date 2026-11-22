@@ -2,6 +2,7 @@ package ch.urinet.archiv.mandant.adapter.out.persistence;
 
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantVollexportKonfiguration;
+import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -22,10 +23,19 @@ public class JdbcMandantVollexportKonfiguration implements MandantVollexportKonf
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
+    private final KonfigurationsdateiVerwaltung dateiVerwaltung;
 
-    public JdbcMandantVollexportKonfiguration(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung) {
+    public JdbcMandantVollexportKonfiguration(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung,
+                                              KonfigurationsdateiVerwaltung dateiVerwaltung) {
         this.datenquelle = datenquelle;
         this.aufloesung = aufloesung;
+        this.dateiVerwaltung = dateiVerwaltung;
+    }
+
+    @Override
+    public Version aktuell() {
+        KonfigurationsdateiVerwaltung.Export export = dateiVerwaltung.exportieren();
+        return new Version(export.version(), export.datei());
     }
 
     @Override

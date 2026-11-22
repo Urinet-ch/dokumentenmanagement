@@ -9,4 +9,9 @@ public interface MandantVollexportKonfiguration {
     }
 
     List<Version> versionen();
+
+    default Version aktuell() {
+        List<Version> versionen = versionen();
+        return versionen.isEmpty() ? null : versionen.getLast();
+    }
 }

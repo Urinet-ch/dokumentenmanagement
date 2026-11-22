@@ -91,13 +91,11 @@ public class MandantVollexportSchreiber {
     }
 
     private void schreibeKonfiguration(ZipOutputStream zip, BufferedWriter pruefsummen) throws IOException {
-            List<MandantVollexportKonfiguration.Version> versionen = konfiguration.versionen();
-            if (versionen.isEmpty()) {
-                return;
+            MandantVollexportKonfiguration.Version aktuell = konfiguration.aktuell();
+            if (aktuell != null) {
+                schreibeText(zip, pruefsummen, "konfiguration.json", aktuell.json());
             }
-            MandantVollexportKonfiguration.Version aktuell = versionen.getLast();
-            schreibeText(zip, pruefsummen, "konfiguration.json", aktuell.json());
-            for (MandantVollexportKonfiguration.Version version : versionen) {
+            for (MandantVollexportKonfiguration.Version version : konfiguration.versionen()) {
                 schreibeText(zip, pruefsummen, "konfiguration/versionen/" + version.nummer() + ".json", version.json());
             }
         }
