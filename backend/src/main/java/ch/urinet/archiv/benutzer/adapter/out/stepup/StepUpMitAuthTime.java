@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
 import io.quarkus.arc.DefaultBean;
+import io.quarkus.runtime.Startup;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
@@ -21,6 +22,7 @@ import java.util.OptionalLong;
 
 @ApplicationScoped
 @DefaultBean
+@Startup
 @Typed(StepUp.class)
 public class StepUpMitAuthTime implements StepUp {
     private static final Duration MAX_GUELTIGKEIT = Duration.ofMinutes(15);
@@ -71,7 +73,8 @@ public class StepUpMitAuthTime implements StepUp {
     private static long maxAlterSekunden(Duration gueltigkeit) {
         if (gueltigkeit == null || gueltigkeit.isNegative() || gueltigkeit.isZero()
                 || gueltigkeit.getNano() != 0 || gueltigkeit.compareTo(MAX_GUELTIGKEIT) > 0) {
-            throw new IllegalArgumentException("Ungültige Step-up-Gültigkeit");
+            throw new IllegalArgumentException("archiv.verwaltung.step-up-gueltigkeit muss eine positive ganze "
+                    + "Sekundenzahl und höchstens 15 Minuten sein");
         }
         return gueltigkeit.getSeconds();
     }
