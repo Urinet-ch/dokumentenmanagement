@@ -4,7 +4,6 @@ import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -16,7 +15,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
-@Tag("start-3")
 class JdbcTokenWiderrufTest {
 
     @Inject TokenWiderruf tokenWiderruf;
