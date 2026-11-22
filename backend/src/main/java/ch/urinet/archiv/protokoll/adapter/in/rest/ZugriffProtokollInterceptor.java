@@ -57,6 +57,9 @@ public class ZugriffProtokollInterceptor {
     @AroundInvoke
     Object protokollieren(InvocationContext aufruf) throws Exception {
         Protokolliert erklaerung = aufruf.getInterceptorBinding(Protokolliert.class);
+        if (erklaerung.manuell()) {
+            return aufruf.proceed();
+        }
         ZugriffEintrag eintrag = new ZugriffEintrag(benutzer(), rolle(), erklaerung.aktion(),
                 id(aufruf, erklaerung),
                 ip(), tokenDetails(), bearbeiter());
