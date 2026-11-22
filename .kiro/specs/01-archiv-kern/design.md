@@ -1784,6 +1784,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 409 | `DOKUMENTART_IN_GEBRAUCH` | Löschen einer benutzten Art (Req 9.4) |
 | 409 | `KONFIGURATION_IN_GEBRAUCH` | Löschen einer Klassifikation oder eines Werts, der noch an einem Dokument hängt (Spec 05, Req 3.3) |
 | 409 | `KONFIGURATION_VERALTET` | Konfigurationsdatei basiert auf einer älteren Basisversion (Spec 05, Req 6.4) |
+| 409 | `BESTAETIGUNG_NOETIG` | Riskante Einstellungsänderung ohne Bestätigung, mit Auswirkung (Spec 06, Req 2.6, 2.10) |
 | 409 | `DOKUMENTART_EXISTIERT` | Anlegen einer Art mit einem Code, den es im Mandanten schon gibt (Req 9.1; Review PR #40) |
 | 410 | `CURSOR_ABGELAUFEN` | Cursor des Änderungs-Feeds älter als die Aufbewahrung des Feeds (90 Tage); die Webseite lädt ihren Bestand neu und beginnt ohne Cursor (Spec 03, Req 14.4; seit Aufgabe 11.9) |
 | 412 | `VERSION_KONFLIKT` | `If-Match` passt nicht (Req 10.4); bei Dokumenten oder Dokumentarten die jeweilige aktuelle Version |
