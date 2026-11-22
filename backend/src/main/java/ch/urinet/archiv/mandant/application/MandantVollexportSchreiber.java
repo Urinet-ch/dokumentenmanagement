@@ -67,14 +67,17 @@ public class MandantVollexportSchreiber {
 
     private int schreibenMitPruefsummen(MandantCode mandant, UUID exportId, Path pruefsummenDatei,
                                         OutputStream ziel) throws IOException, InterruptedException {
+        MandantVollexportKonfiguration.Version aktuell = konfiguration.aktuell();
         ZipOutputStream zip = new ZipOutputStream(new NichtSchliessend(ziel), StandardCharsets.UTF_8);
         zip.setLevel(Deflater.BEST_SPEED);
         try (BufferedWriter pruefsummen = Files.newBufferedWriter(pruefsummenDatei, StandardCharsets.UTF_8)) {
+            schreibeAktuelleKonfiguration(zip, pruefsummen, aktuell);
+            aktuell = null;
+            schreibeKonfigurationsversionen(zip, pruefsummen);
             schreibeMetadatenJson(zip, pruefsummen);
             schreibeMetadatenCsv(zip, pruefsummen);
             int dokumente = schreibeDateien(mandant, zip, pruefsummen);
             schreibeManifeste(mandant, zip, pruefsummen);
-            schreibeKonfiguration(zip, pruefsummen);
             zip.putNextEntry(new ZipEntry(WISSENSBASIS));
             MessageDigest wissenDigest = sha256();
             wissen.schreiben(mandant, new DigestOutputStream(zip, wissenDigest));
@@ -90,11 +93,15 @@ public class MandantVollexportSchreiber {
         }
     }
 
-    private void schreibeKonfiguration(ZipOutputStream zip, BufferedWriter pruefsummen) throws IOException {
-        MandantVollexportKonfiguration.Version aktuell = konfiguration.aktuell();
+    private static void schreibeAktuelleKonfiguration(ZipOutputStream zip, BufferedWriter pruefsummen,
+                                                       MandantVollexportKonfiguration.Version aktuell)
+            throws IOException {
         if (aktuell != null) {
             schreibeInhalt(zip, pruefsummen, "konfiguration.json", ziel -> schreiben(ziel, aktuell.json()));
         }
+    }
+
+    private void schreibeKonfigurationsversionen(ZipOutputStream zip, BufferedWriter pruefsummen) throws IOException {
         schreibeInhalt(zip, pruefsummen, "konfiguration/versionen.json", ziel -> {
             schreiben(ziel, "[");
             boolean[] erstes = {true};

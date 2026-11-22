@@ -6,6 +6,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
@@ -103,6 +104,29 @@ class MandantVollexportSchreiberTest {
 
         assertThatThrownBy(() -> schreiben(temp, daten(List.of(dokument), List.of()), ablage(inhalt)))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("Prüfsumme weicht ab");
+    }
+
+    @Test
+    void fehlerDerAktuellenKonfigurationSchreibtKeinTeilZip(@TempDir Path temp) {
+        MandantVollexportKonfiguration konfiguration = new MandantVollexportKonfiguration() {
+            @Override
+            public Version aktuell() {
+                throw new IllegalStateException("Konfiguration nicht exportierbar");
+            }
+
+            @Override
+            public void versionen(Versionsausgabe ausgabe) {
+                throw new AssertionError("Historie darf nicht gelesen werden");
+            }
+        };
+        ByteArrayOutputStream ziel = new ByteArrayOutputStream();
+        MandantVollexportSchreiber schreiber = new MandantVollexportSchreiber(daten(List.of(), List.of()),
+                ablage(Map.of()), (mandant, strom) -> { throw new AssertionError("Wissen darf nicht gelesen werden"); },
+                konfiguration);
+
+        assertThatThrownBy(() -> schreiber.schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(), temp, ziel))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Konfiguration nicht exportierbar");
+        assertThat(ziel.size()).isZero();
     }
 
     @Test
