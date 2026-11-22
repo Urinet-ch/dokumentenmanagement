@@ -33,8 +33,9 @@ class EinstellungenVerwaltungTest {
     private int stepUps;
     private int grenzen;
     private final EinstellungenVerwaltung verwaltung = new EinstellungenVerwaltung(konfiguration,
-            einstellungen -> schreibvorgaenge++, new StartwerteProbe(), new EinstellungsAuswirkungBerechnen(new Daten()),
-            () -> stepUps++, (akteur, art, ziel) -> grenzen++, aufloesung, kontext);
+            einstellungen -> schreibvorgaenge++, new EinstellungsAenderungsPruefung(new StartwerteProbe(),
+                    new EinstellungsAuswirkungBerechnen(new Daten()), () -> stepUps++, aufloesung, kontext),
+            (akteur, art, ziel) -> grenzen++);
 
     @Test
     void versionWirdVorInhaltUndRisikoGeprueft() {

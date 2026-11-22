@@ -6230,6 +6230,10 @@ paths:
       tags:
       - Konfiguration
       parameters:
+      - name: bestaetigt
+        in: query
+        schema:
+          type: string
       - name: X-Aenderungsgrund
         in: header
         schema:

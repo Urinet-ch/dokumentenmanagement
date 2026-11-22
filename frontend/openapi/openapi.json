@@ -7423,6 +7423,12 @@
         "description" : "Massgeblich ist die basisVersion in der Datei; weicht sie vom aktuellen Stand ab, kommt 409. Ein If-Match wird nicht ausgewertet.",
         "tags" : [ "Konfiguration" ],
         "parameters" : [ {
+          "name" : "bestaetigt",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
           "name" : "X-Aenderungsgrund",
           "in" : "header",
           "schema" : {
