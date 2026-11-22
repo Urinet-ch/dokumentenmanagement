@@ -157,6 +157,51 @@ Then('zeigt die PWA weiterhin die alte App und die alte Anleitung', async functi
   await pruefeVersion(this.seite, false);
 });
 
+async function updateKnopfImZugänglichkeitsbaum(seite) {
+  const sitzung = await seite.context().newCDPSession(seite);
+  try {
+    const { root } = await sitzung.send('DOM.getDocument');
+    const { nodeId } = await sitzung.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: '[data-test=update-hinweis] button',
+    });
+    const { nodes } = await sitzung.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
+    return !nodes[0].ignored;
+  } finally {
+    await sitzung.detach();
+  }
+}
+
+Then('ist der Updateknopf durch die Hilfe abgeschirmt', async function () {
+  const hinweis = this.seite.locator('[data-test=update-hinweis]');
+  const knopf = hinweis.locator('button');
+  await knopf.evaluate((element) => {
+    window.updateTestKlicks = 0;
+    element.addEventListener('click', (ereignis) => {
+      window.updateTestKlicks++;
+      ereignis.stopImmediatePropagation();
+    }, { capture: true });
+  });
+  assert.equal(await hinweis.evaluate((element) => element.inert), true);
+  assert.equal(await updateKnopfImZugänglichkeitsbaum(this.seite), false);
+  assert.equal(await knopf.evaluate((element) => {
+    element.focus();
+    return document.activeElement === element;
+  }), false);
+  const box = await knopf.boundingBox();
+  assert.ok(box);
+  await this.seite.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  assert.equal(await this.seite.evaluate(() => window.updateTestKlicks), 0);
+});
+
+Then('ist der Updateknopf wieder bedienbar', async function () {
+  const hinweis = this.seite.locator('[data-test=update-hinweis]');
+  assert.equal(await hinweis.evaluate((element) => element.inert), false);
+  assert.equal(await updateKnopfImZugänglichkeitsbaum(this.seite), true);
+  await hinweis.locator('button').click();
+  assert.equal(await this.seite.evaluate(() => window.updateTestKlicks), 1);
+});
+
 When('ich die neue App-Version aktiviere', async function () {
   await this.seite.locator('[data-test=update-hinweis] button').click();
   await this.seite.waitForLoadState();

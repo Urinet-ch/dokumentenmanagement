@@ -594,3 +594,6 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   `npm run pruefe:gestaltung` und die 20 Spec-Abdeckungs-/Shard-Tests sind grün. Alle 100 Spec-07-Browserszenarien
   sowie das Zehn-Zyklen-Szenario dreimal nacheinander sind grün. Der Build meldet weiterhin das bestehende
   Initial-Bundle-Budget (691.47 KiB statt 500 KiB).
+- Nachtrag Zweitreview (22.11.2026): Auch der Updatehinweis ausserhalb des Drawer-Containers erhält bei geöffneter Hilfe
+  `inert`. Das Browser-Szenario löst mit zwei synthetischen PWA-Versionen einen echten Updatezustand aus und prüft
+  Maus, Fokus und Zugänglichkeitsbaum vor und nach dem Schliessen.
