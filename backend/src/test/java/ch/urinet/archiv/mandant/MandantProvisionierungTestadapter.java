@@ -8,6 +8,7 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.application.MandantSchemaPruefung;
+import ch.urinet.archiv.mandant.application.MandantVerwaltungsrollenSeed;
 import ch.urinet.archiv.mandant.application.SeedPruefung;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import jakarta.annotation.Priority;
@@ -37,8 +38,10 @@ public class MandantProvisionierungTestadapter extends MandantProvisionierung {
                                              MandantBucket bucket, KonfigurationSeed seed,
                                              KonfigurationsdateiVerwaltung konfiguration, MandantKontext kontext,
                                              MandantSchemaPruefung schemaPruefung, SeedPruefung seedPruefung,
+                                             MandantVerwaltungsrollenSeed verwaltungsrollenSeed,
                                              @ConfigProperty(name = "archiv.ablage.bucket-praefix") String bucketPraefix) {
-        super(register, datenbank, bucket, seed, konfiguration, kontext, schemaPruefung, seedPruefung, bucketPraefix);
+        super(register, datenbank, bucket, seed, konfiguration, kontext, schemaPruefung, seedPruefung,
+                verwaltungsrollenSeed, bucketPraefix);
     }
 
     @Override

@@ -8,10 +8,12 @@ import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,13 +24,15 @@ public class BenutzerGoogleLoesen {
     private final VerwaltungVorgang vorgang;
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
+    private final TokenWiderruf tokenWiderruf;
 
     public BenutzerGoogleLoesen(IdentitaetsDienst identitaet, VerwaltungVorgang vorgang,
-                                Berechtigung berechtigung, StepUp stepUp) {
+                                Berechtigung berechtigung, StepUp stepUp, TokenWiderruf tokenWiderruf) {
         this.identitaet = identitaet;
         this.vorgang = vorgang;
         this.berechtigung = berechtigung;
         this.stepUp = stepUp;
+        this.tokenWiderruf = tokenWiderruf;
     }
 
     public void ausfuehren(MandantCode mandant, Benutzer akteur, String id, Optional<IpAdresse> ip) {
@@ -52,8 +56,12 @@ public class BenutzerGoogleLoesen {
                 }, () -> {
                     identitaet.googleLoesen(mandant.wert(), id);
                     identitaet.sitzungenBeenden(mandant.wert(), id);
+                    tokenWiderruf.setzen(id, Instant.now());
                     return ziel;
-                }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR, ignoriert -> { },
+                }, fehler -> {
+                    tokenWiderruf.setzen(id, Instant.now());
+                    return VerwaltungVorgang.Kompensation.UNKLAR;
+                }, ignoriert -> { },
                 ignoriert -> eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
     }
 

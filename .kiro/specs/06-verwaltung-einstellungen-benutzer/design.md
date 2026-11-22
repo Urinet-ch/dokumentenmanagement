@@ -102,6 +102,7 @@ Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 
 | `archiv.benachrichtigung.empfaenger.<code>` | Umgebung `ARCHIV_ALARM_EMPFAENGER_<CODE>` | E-Mail-Adressen sind Personendaten und gehören nicht in unveränderliche Konfigurationsversionen; Umleiten der Alarme wäre ein Missbrauchsweg (Entscheid Fabian offen, Open Points) |
 | `archiv.branding.mandanten.<code>.domain`, `…logo-url` | Konfiguration, Traefik | Domain ist DNS und Router; eine fremde Logo-URL wäre ein Tracking- und Phishing-Weg |
 | `archiv.mandant.<code>.fristen.*`, `archiv.mandant.<code>.kennzahl.*`, `archiv.mandant.<code>.chat-hinweis` | Konfiguration | fachliche Werte und Hinweise; nicht Bestandteil des Einstellungskatalogs dieser Spec |
+| `archiv.provisionierung.mandanten.<code>.verwaltungs-rollen` | Konfiguration | Rollensatz für einen neu angelegten Mandanten; wird vor der Provisionierung validiert und nicht über die Oberfläche geändert |
 | `public.mandant.name`, `public.mandant.verwaltung_rollen`, `public.mandant_budget` (Monatsbudget öffentlicher Chat) | Datenbank, Admin-Kommando | Name geht in den Prompt (Gate 0); Rollensatz und Kostenhoheit gehören dem Betreiber; die Oberfläche zeigt Budget und Verbrauch nur lesend |
 | `ki_freigegeben` | Admin-Kommando (Spec 05, 8.4) | gebunden an die Abnahme; nie über die Oberfläche |
 | Rollen und Rechtematrix | Code (`Rechtematrix`) | Quelle der Wahrheit; Änderung ist ein Release mit Test |
@@ -676,3 +677,20 @@ API, die Benutzerverwaltung meldet bis 19.3 `IDENTITAETSDIENST_NICHT_ERREICHBAR`
 `@HealthGroup("detail")` prüft, ob ein Token geholt werden kann; sie gehört weder zur Liveness noch zur Readiness.
 WireMock-Tests decken Mandantenfilter, Zeitüberschreitung, 5xx-Wiederholung, 401, Schreibaufruf ohne Wiederholung und
 Schutzschalter ab.
+
+## Umsetzung 19.9 — Token-Widerruf (22.11.2026)
+
+Das Changeset `044-token-widerruf` ergänzt `public.token_widerruf(benutzer, ab)`. `JdbcTokenWiderruf` liest und setzt
+den Zeitpunkt monoton; der Worker entfernt Einträge, die älter als einen Tag sind. Der `ZugangFilter` prüft
+Benutzer-JWTs nach der Rollenprüfung anhand von `iat` und lehnt widerrufene Tokens mit 401 `NICHT_ANGEMELDET` ab.
+API-Tokens und Webseiten-Schlüssel verwenden weiterhin ihre bisherigen Prüfpfade. Der lokale Cache ist standardmässig
+drei Sekunden gültig und auf höchstens fünf Sekunden begrenzt.
+
+Nach erfolgreicher Sperre, Deaktivierung, Zugangsrücksetzung und Aufhebung einer Google-Verknüpfung wird der Widerruf
+gesetzt. Das synthetische Szenario prüft ein altes Token am REST-Filter; weitere Tests decken Cache-Ablauf,
+monotones Upsert, Aufräumen und die Wirkung vor der Aktionsberechtigung ab.
+Das Changeset legt die absichtlich beim Rollback erhaltene Tabelle mit `IF NOT EXISTS` an; ein Integrationstest prüft
+Update → Rollback → Update sowie den Erhalt der Widerrufe und Constraints.
+
+Die Anbindung nach Rollenwechsel und Löschen folgt mit 19.11 beziehungsweise 19.12, wenn diese Endpunkte umgesetzt
+werden. Die Checkbox für 19.9 bleibt bis zu diesen Anbindungen offen.

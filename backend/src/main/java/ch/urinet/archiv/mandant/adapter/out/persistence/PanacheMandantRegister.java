@@ -5,6 +5,7 @@ import ch.urinet.archiv.mandant.application.MandantAbbauRegister;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.mandant.domain.MandantVerwaltungsrollen;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.transaction.Transactional;
@@ -35,6 +36,7 @@ public class PanacheMandantRegister implements MandantRegister, MandantAbbauRegi
         eintrag.schemaName = mandant.schema();
         eintrag.bucket = mandant.bucket();
         eintrag.geschaeftsjahrEnde = mandant.geschaeftsjahresende().wert();
+        eintrag.verwaltungRollen = mandant.verwaltungsrollen().alsArray();
         eintrag.aktiv = mandant.aktiv();
         eintrag.persist();
     }
@@ -44,7 +46,8 @@ public class PanacheMandantRegister implements MandantRegister, MandantAbbauRegi
     public List<Mandant> aktive() {
         return MandantEintrag.<MandantEintrag>list("aktiv = true order by code").stream()
                 .map(e -> new Mandant(new MandantCode(e.code), e.name, e.schemaName, e.bucket,
-                        new Geschaeftsjahresende(e.geschaeftsjahrEnde), e.aktiv))
+                        new Geschaeftsjahresende(e.geschaeftsjahrEnde), e.aktiv,
+                        new MandantVerwaltungsrollen(List.of(e.verwaltungRollen))))
                 .toList();
     }
 
@@ -56,7 +59,8 @@ public class PanacheMandantRegister implements MandantRegister, MandantAbbauRegi
             return Optional.empty();
         }
         return Optional.of(new Mandant(code, eintrag.name, eintrag.schemaName, eintrag.bucket,
-                new Geschaeftsjahresende(eintrag.geschaeftsjahrEnde), false));
+                new Geschaeftsjahresende(eintrag.geschaeftsjahrEnde), false,
+                new MandantVerwaltungsrollen(List.of(eintrag.verwaltungRollen))));
     }
 
     @Override
@@ -89,7 +93,8 @@ public class PanacheMandantRegister implements MandantRegister, MandantAbbauRegi
             return Optional.empty();
         }
         Mandant mandant = new Mandant(code, eintrag.name, eintrag.schemaName, eintrag.bucket,
-                new Geschaeftsjahresende(eintrag.geschaeftsjahrEnde), eintrag.aktiv);
+                new Geschaeftsjahresende(eintrag.geschaeftsjahrEnde), eintrag.aktiv,
+                new MandantVerwaltungsrollen(List.of(eintrag.verwaltungRollen)));
         return Optional.of(new MandantAbbauRegister.Status(mandant,
                 Optional.ofNullable(eintrag.deaktiviertAm).map(OffsetDateTime::toInstant),
                 Optional.ofNullable(eintrag.vollexportBestaetigt), eintrag.abbauAbgeschlossen));
