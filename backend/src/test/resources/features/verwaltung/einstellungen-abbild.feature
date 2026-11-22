@@ -15,9 +15,10 @@ Funktionalität: Erweitertes Konfigurationsabbild
 
   @req-1.3
   Szenario: Erweiterte Einstellungen überleben Datei-Rundlauf und spätere Änderungen
+    Angenommen für die Konfigurationsdatei ist eine frische Anmeldung bestätigt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Und in der Datei die erweiterten Einstellungen mit Testwerten gesetzt werden
-    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei mit Bestätigung "webseitenChat.aufbewahrungTage" einspielt
     Dann antwortet die Konfigurationsverwaltung mit Status 200
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Dann enthält der Export die erweiterten Testwerte

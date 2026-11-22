@@ -1,6 +1,8 @@
 package ch.urinet.archiv.konfiguration;
 
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.networknt.schema.InputFormat;
@@ -16,6 +18,8 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.quarkus.arc.ClientProxy;
+import io.quarkus.test.junit.QuarkusMock;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
@@ -24,6 +28,7 @@ import jakarta.inject.Inject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -49,6 +54,8 @@ public class KonfigurationsVersionSchritte {
     @Inject
     Instance<AgroalDataSource> datenbank;
 
+    @Inject StepUp stepUp;
+    private StepUp urspruenglichesStepUp;
     private Response antwort;
     private int versionVorher;
     private int letzteVersion;
@@ -458,6 +465,25 @@ public class KonfigurationsVersionSchritte {
         }
     }
 
+    @Angenommen("für die Konfigurationsdatei ist eine frische Anmeldung bestätigt")
+    public void frischeAnmeldung() {
+        urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+    }
+
+    @Wenn("«{word}» die geänderte Konfigurationsdatei mit Bestätigung {string} einspielt")
+    public void geaenderteDateiBestaetigtEinspielen(String benutzer, String bestaetigt) throws IOException {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("bestaetigt", bestaetigt)
+                .contentType(ContentType.JSON).body(JSON.writeValueAsString(datei)).when().put(KONFIGURATION);
+        if (antwort.statusCode() == 200) {
+            dateiWiederherstellen = true;
+            etagLesen();
+        }
+    }
+
     @Wenn("«{word}» die geänderte Konfigurationsdatei prüft")
     public void geaenderteDateiPruefen(String benutzer) throws IOException {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
@@ -671,6 +697,8 @@ public class KonfigurationsVersionSchritte {
             ObjectNode zurueck = ausgangsdatei.deepCopy();
             zurueck.put("basisVersion", stand.jsonPath().getInt("basisVersion"));
             Response einspielen = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .queryParam("bestaetigt",
+                            "geschaeftsjahrEnde,chat.aufbewahrungMonate,webseitenChat.aufbewahrungTage,wissen.monatsbudgetTokens")
                     .header("X-Aenderungsgrund", "Testwerte wiederherstellen").contentType(ContentType.JSON)
                     .body(JSON.writeValueAsString(zurueck)).when().put(KONFIGURATION);
             assertThat(einspielen.statusCode()).as(einspielen.asString()).isEqualTo(200);
@@ -798,6 +826,14 @@ public class KonfigurationsVersionSchritte {
             assertThat(loeschen.statusCode()).as(loeschen.asString()).isIn(204, 404);
         }
         eigeneArten.clear();
+    }
+
+    @After(order = -100)
+    public void stepUpWiederherstellen() {
+        if (urspruenglichesStepUp != null) {
+            QuarkusMock.installMockForType(urspruenglichesStepUp, StepUp.class);
+            urspruenglichesStepUp = null;
+        }
     }
 
     private int aktuelleNummer(String benutzer) {
