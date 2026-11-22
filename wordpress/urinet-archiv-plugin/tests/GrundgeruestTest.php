@@ -613,8 +613,9 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 
 		$write_methode = new ReflectionMethod( Urinet_Archiv_Client::class, 'download_write_callback' );
 		$write_methode->setAccessible( true );
-		$argumente = array( &$stream );
-		$write     = $write_methode->invokeArgs( null, $argumente );
+		$argumente       = array( &$stream );
+		$write           = $write_methode->invokeArgs( null, $argumente );
+		$stream['start'] = true;
 		ob_start();
 		try {
 			$this->assertSame( 1048576, $write( null, str_repeat( 'x', 1048576 ) ) );
