@@ -676,3 +676,18 @@ API, die Benutzerverwaltung meldet bis 19.3 `IDENTITAETSDIENST_NICHT_ERREICHBAR`
 `@HealthGroup("detail")` prüft, ob ein Token geholt werden kann; sie gehört weder zur Liveness noch zur Readiness.
 WireMock-Tests decken Mandantenfilter, Zeitüberschreitung, 5xx-Wiederholung, 401, Schreibaufruf ohne Wiederholung und
 Schutzschalter ab.
+
+## Umsetzung 19.9 — Token-Widerruf (22.11.2026)
+
+Das Changeset `044-token-widerruf` ergänzt `public.token_widerruf(benutzer, ab)`. `JdbcTokenWiderruf` liest und setzt
+den Zeitpunkt monoton; der Worker entfernt Einträge, die älter als einen Tag sind. Der `ZugangFilter` prüft
+Benutzer-JWTs nach der Rollenprüfung anhand von `iat` und lehnt widerrufene Tokens mit 401 `NICHT_ANGEMELDET` ab.
+API-Tokens und Webseiten-Schlüssel verwenden weiterhin ihre bisherigen Prüfpfade. Der lokale Cache ist standardmässig
+drei Sekunden gültig und auf höchstens fünf Sekunden begrenzt.
+
+Nach erfolgreicher Sperre, Deaktivierung, Zugangsrücksetzung und Aufhebung einer Google-Verknüpfung wird der Widerruf
+gesetzt. Das synthetische Szenario prüft ein altes Token am REST-Filter; weitere Tests decken Cache-Ablauf,
+monotones Upsert, Aufräumen und die Wirkung vor der Aktionsberechtigung ab.
+
+Die Anbindung nach Rollenwechsel und Löschen folgt mit 19.11 beziehungsweise 19.12, wenn diese Endpunkte umgesetzt
+werden. Die Checkbox für 19.9 bleibt bis zu diesen Anbindungen offen.

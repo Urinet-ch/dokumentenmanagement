@@ -12,6 +12,7 @@ import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.VerzeichnisEintrag;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -38,11 +39,12 @@ public class BenutzerStatusAendern {
     private final VerwaltungVorgang verwaltung;
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
+    private final TokenWiderruf tokenWiderruf;
     private final Duration gueltigkeit;
 
     public BenutzerStatusAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
                                 BenutzerVerzeichnis verzeichnis, VerwaltungVorgang verwaltung,
-                                Berechtigung berechtigung, StepUp stepUp,
+                                Berechtigung berechtigung, StepUp stepUp, TokenWiderruf tokenWiderruf,
                                 @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit",
                                         defaultValue = "PT24H") Duration gueltigkeit) {
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
@@ -54,6 +56,7 @@ public class BenutzerStatusAendern {
         this.verwaltung = verwaltung;
         this.berechtigung = berechtigung;
         this.stepUp = stepUp;
+        this.tokenWiderruf = tokenWiderruf;
         this.gueltigkeit = gueltigkeit;
     }
 
@@ -134,6 +137,7 @@ public class BenutzerStatusAendern {
                     return ziel;
                 }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR, ignoriert -> {
                     if (vorgang == Vorgang.SPERREN || vorgang == Vorgang.DEAKTIVIEREN) {
+                        tokenWiderruf.setzen(id, Instant.now());
                         BenutzerStatus neu = vorgang == Vorgang.SPERREN
                                 ? BenutzerStatus.GESPERRT : BenutzerStatus.DEAKTIVIERT;
                         status.setzen(id, new BenutzerStatusSpeicher.Eintrag(neu, Instant.now(), kategorie, akteur.id()));

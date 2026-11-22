@@ -8,6 +8,7 @@ import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -16,6 +17,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
@@ -33,10 +35,12 @@ public class BenutzerZugangZuruecksetzen {
     private final VerwaltungVorgang vorgang;
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
+    private final TokenWiderruf tokenWiderruf;
     private final Duration gueltigkeit;
 
     public BenutzerZugangZuruecksetzen(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
                                       VerwaltungVorgang vorgang, Berechtigung berechtigung, StepUp stepUp,
+                                      TokenWiderruf tokenWiderruf,
                                       @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit",
                                               defaultValue = "PT24H") Duration gueltigkeit) {
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
@@ -47,6 +51,7 @@ public class BenutzerZugangZuruecksetzen {
         this.vorgang = vorgang;
         this.berechtigung = berechtigung;
         this.stepUp = stepUp;
+        this.tokenWiderruf = tokenWiderruf;
         this.gueltigkeit = gueltigkeit;
     }
 
@@ -92,6 +97,7 @@ public class BenutzerZugangZuruecksetzen {
                     identitaet.otpEntfernen(mandant.wert(), id);
                     identitaet.sitzungenBeenden(mandant.wert(), id);
                     identitaet.einladen(mandant.wert(), id, aktionen, gueltigkeit);
+                    tokenWiderruf.setzen(id, Instant.now());
                     return ziel;
                 }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR, ignoriert -> { },
                 ignoriert -> eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
