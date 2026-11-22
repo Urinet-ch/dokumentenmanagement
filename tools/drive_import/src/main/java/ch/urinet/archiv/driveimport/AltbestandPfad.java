@@ -26,7 +26,7 @@ record AltbestandPfad(String reihe, String art, int jahr, Integer ausgabe) {
         if (relativ.getNameCount() < 2) {
             return new Erkennung(null, "Reihenordner fehlt");
         }
-        String reihe = relativ.getName(0).toString().strip();
+        String reihe = relativ.getName(0).toString();
         String art = switch (reihe.toLowerCase(Locale.ROOT)) {
             case "bulletin" -> "BULLETIN";
             case "merkblatt" -> "MERKBLATT";

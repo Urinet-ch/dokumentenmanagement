@@ -36,6 +36,8 @@ class AltbestandPfadTest {
 
         assertThat(AltbestandPfad.erkennen(wurzel, wurzel.resolve("Unbekannt/2026/1.pdf")).grund())
                 .contains("Reihe nicht erkannt");
+        assertThat(AltbestandPfad.erkennen(wurzel, wurzel.resolve(" Bulletin/2026/1.pdf")).grund())
+                .contains("Reihe nicht erkannt");
         assertThat(AltbestandPfad.erkennen(wurzel, wurzel.resolve("Bulletin/2025/2026/1.pdf")).grund())
                 .contains("Jahr mehrdeutig");
     }
