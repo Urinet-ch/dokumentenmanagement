@@ -14,6 +14,6 @@ public final class BestaetigungNoetig extends FachFehler {
         return auswirkung;
     }
 
-    public record Auswirkung(String schluessel, String text, long betroffeneDatensaetze) {
+    public record Auswirkung(String schluessel, String text, Long betroffeneDatensaetze) {
     }
 }

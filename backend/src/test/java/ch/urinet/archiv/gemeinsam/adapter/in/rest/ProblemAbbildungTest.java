@@ -111,7 +111,7 @@ class ProblemAbbildungTest {
     @Test
     void fehlendeBestaetigungNenntAuswirkungen() {
         var fehler = new BestaetigungNoetig(java.util.List.of(
-                new BestaetigungNoetig.Auswirkung("chat.aufbewahrungMonate", "Beim nächsten Lauf.", 3)));
+                new BestaetigungNoetig.Auswirkung("chat.aufbewahrungMonate", "Beim nächsten Lauf.", 3L)));
         try (Response antwort = abbildung.fachFehler(fehler)) {
             assertThat(antwort.getStatus()).isEqualTo(409);
             assertThat(antwort.getEntity()).asString()
