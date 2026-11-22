@@ -96,6 +96,35 @@
         "type" : "string",
         "enum" : [ "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15", "A16", "A17", "A18", "A19", "A20", "A21", "A22", "A23", "A24" ]
       },
+      "Ansicht" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "art" : {
+            "$ref" : "#/components/schemas/Art"
+          },
+          "ziel" : {
+            "type" : "string"
+          },
+          "rolle" : {
+            "$ref" : "#/components/schemas/Rolle"
+          },
+          "grund" : {
+            "type" : "string"
+          },
+          "beantragtVon" : {
+            "type" : "string"
+          },
+          "beantragtAm" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "gueltigBis" : {
+            "$ref" : "#/components/schemas/Instant"
+          }
+        }
+      },
       "Antwort" : {
         "type" : "object",
         "properties" : {
@@ -289,6 +318,10 @@
             } ]
           }
         }
+      },
+      "Art" : {
+        "type" : "string",
+        "enum" : [ "INHABER_ROLLE", "LOESCHEN" ]
       },
       "ArtKlassifikation" : {
         "type" : "object",
@@ -489,6 +522,12 @@
             "$ref" : "#/components/schemas/LetzteAktion"
           },
           "etag" : {
+            "type" : "string"
+          },
+          "apiTokenVerwaltungspfad" : {
+            "type" : "string"
+          },
+          "apiTokenHinweis" : {
             "type" : "string"
           }
         }
@@ -1633,6 +1672,14 @@
       "Ergebnis" : {
         "type" : "string",
         "enum" : [ "ERLAUBT", "VERBOTEN", "NICHT_SICHTBAR", "NUR_EIGENE", "NUR_LESEND", "NUR_SELBST_ERFASSTE" ]
+      },
+      "Ergebnis1" : {
+        "type" : "object",
+        "properties" : {
+          "antragId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
       },
       "Export" : {
         "description" : "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link (24 Stunden ab Fertigstellung) gilt nicht mehr",
@@ -3205,6 +3252,14 @@
         "type" : "string",
         "enum" : [ "INHABER", "MITARBEITER", "TREUHAENDER", "GESCHAEFTSSTELLE" ]
       },
+      "RollenAenderung" : {
+        "type" : "object",
+        "properties" : {
+          "rolle" : {
+            "type" : "string"
+          }
+        }
+      },
       "StatusAnsicht" : {
         "type" : "object",
         "properties" : {
@@ -4352,6 +4407,186 @@
         } ]
       }
     },
+    "/api/v1/benutzer/antraege" : {
+      "get" : {
+        "summary" : "Offene Verwaltungsanträge anzeigen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Ansicht"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/antraege/{antragId}/ablehnen" : {
+      "post" : {
+        "summary" : "Verwaltungsantrag ablehnen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "antragId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/antraege/{antragId}/bestaetigen" : {
+      "post" : {
+        "summary" : "Verwaltungsantrag bestätigen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "antragId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/antraege/{antragId}/zurueckziehen" : {
+      "post" : {
+        "summary" : "Eigenen Verwaltungsantrag zurückziehen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "antragId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
     "/api/v1/benutzer/{benutzerId}" : {
       "get" : {
         "summary" : "Benutzer des Mandanten anzeigen",
@@ -4695,6 +4930,69 @@
           },
           "403" : {
             "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/{benutzerId}/rolle" : {
+      "put" : {
+        "summary" : "Rolle eines Benutzers ändern",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RollenAenderung"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Rolle geändert"
+          },
+          "202" : {
+            "description" : "Vier-Augen-Antrag angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Ergebnis1"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
           }
         },
         "security" : [ {
