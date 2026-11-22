@@ -129,7 +129,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 7.2, 7.3, 7.9_
   - _Abhängig von: 19.2, 19.7_
 
-- [ ] 19.11 REST Rolle, Rechte-Übersicht und Anträge [Backend]
+- [x] 19.11 REST Rolle, Rechte-Übersicht und Anträge [Backend]
   - `PUT /benutzer/{id}/rolle`, `GET /benutzer/{id}/rechte`, Anträge (Vier-Augen: `inhaber` vergeben und Löschen, ab zwei aktiven
     Inhabern; Verfall nach 72 Stunden), Alarm-Hook für `inhaber`, Abweisung des Rollenkonflikts, Hinweis auf API-Tokens in der
     Antwort; Codes `ESKALATION_VERBOTEN`, `LETZTER_INHABER`.

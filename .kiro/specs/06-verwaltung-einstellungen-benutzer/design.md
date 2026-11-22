@@ -704,3 +704,16 @@ Update → Rollback → Update sowie den Erhalt der Widerrufe und Constraints.
 
 Die Anbindung nach Rollenwechsel und Löschen folgt mit 19.11 beziehungsweise 19.12, wenn diese Endpunkte umgesetzt
 werden. Die Checkbox für 19.9 bleibt bis zu diesen Anbindungen offen.
+
+## Umsetzung (Aufgabe 19.11, 22.11.2026)
+
+Die Rechte-Übersicht liest die bestehende Rechtematrix. Bei keiner oder mehreren Archiv-Rollen meldet sie
+`STATUS_KONFLIKT`; ein Rollenkonflikt lässt nur die Zuweisung einer eindeutigen Rolle zu. Der Rollenwechsel prüft
+`If-Match`, Step-up, Eskalationsschutz und den letzten aktiven Inhaber unter der Vorgangssperre. Bei einer
+Inhabervergabe ab zwei aktiven Inhabern entsteht stattdessen ein befristeter Antrag; nur ein anderer aktiver Inhaber
+bestätigt ihn mit Step-up. Rollenzuweisungen widerrufen bestehende Tokens. Unsichere externe Teilwirkungen bleiben
+`UNKLAR` und halten die Sperre. Alte Freitextgründe werden in Antragsantworten nicht ausgegeben.
+
+Ein internes Ereignis kennzeichnet erfolgreiche Inhabervergaben; die Alarmzustellung folgt in 19.13. Die
+Löschwirkung und die Bestätigung von Löschanträgen folgen in 19.12. Die Benutzeransicht liefert den Verweis und
+Hinweis zu API-Tokens; die Anzeige in der Oberfläche folgt in 20.6/20.7.

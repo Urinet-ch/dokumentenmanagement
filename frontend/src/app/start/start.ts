@@ -88,6 +88,9 @@ import { VermerkArt } from '../hilfe/einfuehrung-vermerk-speicher';
         }
       } @else {
         <p role="alert">{{ texte.anmeldung.ohneZugang }}</p>
+        <a #zugangHilfe href="/hilfe#probleme" (click)="$event.preventDefault(); hilfe.oeffnen('probleme', zugangHilfe)">
+          {{ texte.hilfe.soFunktioniertEs }}
+        </a>
       }
     } @else {
       <div class="karte willkommen">
@@ -104,6 +107,9 @@ import { VermerkArt } from '../hilfe/einfuehrung-vermerk-speicher';
         <button mat-flat-button type="button" (click)="anmelden()">{{ texte.anmeldung.anmelden }}</button>
         @if (!online()) {
           <p><a routerLink="/erfassen">{{ texte.handy.offlineErfassen }}</a></p>
+          <a #offlineHilfe href="/hilfe#erfassen-offline" (click)="$event.preventDefault(); hilfe.oeffnen('erfassen-offline', offlineHilfe)">
+            {{ texte.hilfe.soFunktioniertEs }}
+          </a>
         }
       </div>
     }

@@ -21,6 +21,7 @@ encoder.ts
 index.ts
 model/aenderung.ts
 model/aktion.ts
+model/ansicht.ts
 model/antwort.ts
 model/antwort1.ts
 model/anzahl.ts
@@ -31,6 +32,7 @@ model/api-token.ts
 model/api-v1-wissensentwuerfe-id-get200-response.ts
 model/api-v1-wissensseiten-get200-response.ts
 model/art-klassifikation.ts
+model/art.ts
 model/aussage.ts
 model/auszug-teil.ts
 model/bearbeitung.ts
@@ -69,6 +71,7 @@ model/eingangskorb-seite.ts
 model/entfernte-aussage.ts
 model/entscheidung.ts
 model/ergebnis.ts
+model/ergebnis1.ts
 model/export-anfrage.ts
 model/export.ts
 model/fundstelle.ts
@@ -126,6 +129,7 @@ model/regel.ts
 model/regel1.ts
 model/reihe.ts
 model/rolle.ts
+model/rollen-aenderung.ts
 model/schlechte-antwort-dto.ts
 model/status-ansicht.ts
 model/sterne-dto.ts

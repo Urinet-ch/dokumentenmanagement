@@ -121,7 +121,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 5.5_
   - _Abhängig von: 23.2_
 
-- [ ] 23.4 Links «So funktioniert es» an Orten mit Rückfragen [Frontend]
+- [x] 23.4 Links «So funktioniert es» an Orten mit Rückfragen [Frontend]
   - Erfassen (Warteschlange, fehlerhafter Upload), Anmeldekarte der Startseite ohne Netz und Meldung ohne Mandant oder
     Rolle öffnen die Hilfe-Leiste mit dem Unterabschnitt; Verhalten und `data-test` der Seiten sonst unverändert.
   - _Anforderungen: 4.6_

@@ -89,6 +89,9 @@ public class BenutzerAendern {
                             ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
                 () -> {
                     var benutzer = identitaet.benutzerLesen(mandant.wert(), id);
+                    if (benutzer.rollen().size() > 1) {
+                        throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+                    }
                     String etag = BenutzerEtag.berechnen(benutzer, BenutzerLesen.status(benutzer, status));
                     if (!ifMatch.equals("\"" + etag + "\"")) {
                         throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
