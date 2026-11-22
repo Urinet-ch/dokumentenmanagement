@@ -1483,6 +1483,10 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     werden dafür nicht zusätzlich persistiert. Werte sind konservative Implementierungsgrenzen: 12 MP entspricht der
     Verarbeitungsvorgabe aus Req 5.5, 20 Seiten der Grenze für gerenderte KI-Seiten, 10 MiB liegt unter dem Upload, der
     auf Stufe A den OOM-Abbruch ausgelöst hat. Anleitung und Grenzmeldungen nennen alle drei Grenzen.
+  - Nachtrag Zweitreview PR #472 (22.11.2026): Zusätzlich liest der Worker JPEG-SOF-, PNG-IHDR-, WebP- und HEIC-`ispe`-
+    Abmessungen aus höchstens 1 MiB des Dateikopfs, bevor OpenCV und `createImageBitmap` geladen bzw. aufgerufen werden;
+    die Prüfung nach dem Decodieren bleibt als zweite Kontrolle. Dieselbe Kopfprüfung läuft für Originale alter
+    Warteschlangeneinträge unmittelbar vor dem Upload; ungültige oder übergrosse Einträge werden fehlerhaft erhalten.
 - Suche und Dokumentansicht (Aufgabe 4.6, 11.11.2026; Rest 13.11.2026):
   - Download-Adresse als JSON: Ein Browser folgt dem 302 von `GET /dokumente/{id}/datei` bei `fetch`/XHR selbst und
     schickt dabei den `Authorization`-Header nicht mit, die Antwort der Ablage wäre zudem eine Cross-Origin-Antwort.

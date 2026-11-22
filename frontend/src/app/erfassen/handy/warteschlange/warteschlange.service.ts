@@ -4,6 +4,7 @@ import { ONLINE } from '../../../gemeinsam/online';
 import { httpFehlerText } from '../../../gemeinsam/http-fehler';
 import { TEXTE } from '../../../gemeinsam/texte.de-CH';
 import { AufnahmeGrenzeFehler, aufnahmeGrenzeMeldung, pruefeAufnahme } from '../aufnahme-grenzen';
+import { leseBildAbmessungen } from '../bild-abmessungen';
 import { Eintrag, Meldungen, Seite, bewerten } from './eintrag';
 import { WarteschlangeSpeicher } from './speicher';
 import { WarteschlangeUpload } from './warteschlange-upload';
@@ -233,6 +234,9 @@ export class WarteschlangeService {
       }
       try {
         pruefeAufnahme(eintrag.seiten);
+        for (const seite of eintrag.seiten) {
+          await leseBildAbmessungen(seite.original);
+        }
       } catch (fehler) {
         if (!(fehler instanceof AufnahmeGrenzeFehler)) {
           throw fehler;

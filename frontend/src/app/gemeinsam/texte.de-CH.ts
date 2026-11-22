@@ -387,6 +387,8 @@ export const TEXTE = {
       'Jedes Dokument wird einmal erfasst, in PDF/A umgewandelt, per Texterkennung gelesen und landet mit KI-Vorschlag im Eingangskorb.',
     warteschlange: 'Warteschlange',
     warteschlangeHinweis: 'wird auch offline gehalten',
+    aufnahmeBildNichtPruefbar:
+      'Die Bildabmessungen konnten nicht geprüft werden. Bitte wählen Sie ein JPEG, PNG, WebP oder HEIC.',
   },
   eingangskorb: {
     titel: 'Eingangskorb',

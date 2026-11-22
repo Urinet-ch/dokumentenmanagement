@@ -5,6 +5,7 @@ import { Ecken, skalieren } from './ecken';
 import { Cv, eckenFinden, entzerren, openCvLaden } from './kanten';
 import { ScannerAntwort, ScannerAuftrag } from './scanner-nachricht';
 import { AufnahmeGrenzeFehler, MAX_AUFNAHME_BYTES, pruefeBildPixel } from '../aufnahme-grenzen';
+import { leseBildAbmessungen } from '../bild-abmessungen';
 
 /** Die Kanten werden auf einer Verkleinerung gesucht; das spart Zeit und dämpft Rauschen. */
 const ERKENNUNG_KANTE = 1000;
@@ -34,6 +35,7 @@ async function aufbereiten(auftrag: ScannerAuftrag) {
   if (auftrag.bild.size > MAX_AUFNAHME_BYTES) {
     throw new AufnahmeGrenzeFehler('groesse');
   }
+  await leseBildAbmessungen(auftrag.bild);
   const { cv } = await (opencv ??= openCvLaden());
   const bild = await createImageBitmap(auftrag.bild);
   const { width: breite, height: hoehe } = bild;

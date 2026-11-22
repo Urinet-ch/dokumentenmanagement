@@ -4,7 +4,7 @@ export const MAX_AUFNAHME_SEITEN = 20;
 export const MAX_AUFNAHME_BYTES = 10 * 1024 * 1024;
 export const MAX_BILD_PIXEL = 12_000_000;
 
-export type AufnahmeGrenze = 'seiten' | 'groesse' | 'pixel';
+export type AufnahmeGrenze = 'seiten' | 'groesse' | 'pixel' | 'bild';
 
 export class AufnahmeGrenzeFehler extends Error {
   constructor(readonly grenze: AufnahmeGrenze) {
@@ -20,11 +20,13 @@ export function aufnahmeGrenzeMeldung(fehler: AufnahmeGrenzeFehler): string {
       return TEXTE.handy.aufnahmeZuGross;
     case 'pixel':
       return TEXTE.handy.aufnahmeZuVielePixel;
+    case 'bild':
+      return TEXTE.handy.aufnahmeBildNichtPruefbar;
   }
 }
 
 export function istAufnahmeGrenze(wert: string): wert is AufnahmeGrenze {
-  return wert === 'seiten' || wert === 'groesse' || wert === 'pixel';
+  return wert === 'seiten' || wert === 'groesse' || wert === 'pixel' || wert === 'bild';
 }
 
 export function pruefeAufnahme(

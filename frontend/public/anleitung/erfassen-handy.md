@@ -56,4 +56,5 @@ Diese Bezeichnungen stammen vom Browser und können je nach Version leicht abwei
 - «Ein Dokument darf höchstens 20 Seiten haben. Bitte schliessen Sie die Erfassung ab oder verwerfen Sie eine Seite.»
 - «Die Erfassung ist grösser als 10 MiB. Bitte teilen Sie das Dokument auf oder wählen Sie kleinere Bilder.»
 - «Das Bild hat mehr als 12 Megapixel. Bitte wählen Sie ein kleineres Kamerabild.»
+- «Die Bildabmessungen konnten nicht geprüft werden. Bitte wählen Sie ein JPEG, PNG, WebP oder HEIC.» Verwenden Sie ein lesbares Bild in einem unterstützten Format.
 - «Die Erfassung konnte auf diesem Gerät nicht gespeichert werden (z. B. im privaten Modus). Bitte erneut versuchen.» Ein privates Fenster oder ein voller Speicher verhindert das Speichern. Öffnen Sie das Archiv in einem normalen Fenster und schaffen Sie bei Bedarf Platz auf dem Gerät.
