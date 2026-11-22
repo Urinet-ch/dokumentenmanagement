@@ -184,10 +184,11 @@ final class Urinet_Archiv_Client {
 
 	private static function download_header_callback( array &$stream ): Closure {
 		return static function ( $handle, string $header ) use ( &$stream ): int {
-			if ( preg_match( '/^Content-Type:\s*(.+)$/i', $header, $treffer ) ) {
+			$zeile = trim( $header );
+			if ( preg_match( '/^Content-Type:\s*(.+)$/i', $zeile, $treffer ) ) {
 				$stream['typ'] = trim( $treffer[1] );
 			}
-			if ( preg_match( '/^Content-Length:\s*(\d+)$/i', $header, $treffer ) ) {
+			if ( preg_match( '/^Content-Length:\s*(\d+)$/i', $zeile, $treffer ) ) {
 				$stream['laenge'] = $treffer[1];
 			}
 			return strlen( $header );
