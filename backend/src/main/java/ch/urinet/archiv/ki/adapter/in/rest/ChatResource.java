@@ -4,8 +4,10 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.ki.adapter.json.ChatJson;
 import ch.urinet.archiv.ki.application.chat.ChatAbbruch;
+import ch.urinet.archiv.ki.application.chat.ChatBewertungen;
 import ch.urinet.archiv.ki.application.chat.ChatFragen;
 import ch.urinet.archiv.ki.application.chat.ChatVerlauf;
+import ch.urinet.archiv.ki.domain.chat.ChatBewertung;
 import ch.urinet.archiv.ki.domain.chat.ChatNachricht;
 import ch.urinet.archiv.ki.domain.chat.Gespraech;
 import ch.urinet.archiv.ki.domain.chat.GespraechKopf;
@@ -27,13 +29,16 @@ import io.vertx.core.http.HttpServerRequest;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.inject.Instance;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.sse.OutboundSseEvent;
 import jakarta.ws.rs.sse.Sse;
 import org.eclipse.microprofile.openapi.annotations.Operation;
@@ -45,6 +50,9 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -63,17 +71,21 @@ public class ChatResource {
 
     private static final String REAL_IP = "X-Real-Ip";
     private static final ObjectMapper JSON = new ObjectMapper();
+    static final int BEWERTUNG_KOERPER_GRENZE = 8192;
 
     private final ChatFragen fragen;
     private final ChatVerlauf verlauf;
+    private final ChatBewertungen bewertungen;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
     private final Instance<HttpServerRequest> anfrage;
 
-    public ChatResource(ChatFragen fragen, ChatVerlauf verlauf, MandantAufloesung aufloesung,
-                        SecurityIdentity identitaet, Instance<HttpServerRequest> anfrage) {
+    public ChatResource(ChatFragen fragen, ChatVerlauf verlauf, ChatBewertungen bewertungen,
+                        MandantAufloesung aufloesung, SecurityIdentity identitaet,
+                        Instance<HttpServerRequest> anfrage) {
         this.fragen = fragen;
         this.verlauf = verlauf;
+        this.bewertungen = bewertungen;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
         this.anfrage = anfrage;
@@ -128,6 +140,22 @@ public class ChatResource {
     public record VerlaufDto(@Schema(required = true) UUID id, @Schema(required = true) String titel,
                              @Schema(required = true) Instant geaendert,
                              @Schema(required = true) List<NachrichtDto> nachrichten) {
+    }
+
+    @Schema(name = "ChatBewertung")
+    public record BewertungDto(@Schema(required = true) String nachrichtId,
+                               @Schema(required = true, minimum = "1", maximum = "5") int sterne,
+                               @Schema(nullable = true, enumeration = {"NICHT_BEANTWORTET", "FALSCH",
+                                       "UNVOLLSTAENDIG", "QUELLE", "ZU_LANGSAM", "ANDERES"}) String grund,
+                               @Schema(nullable = true, maxLength = ChatBewertung.MAX_FREITEXT) String freitext,
+                               @Schema(required = true) Instant erstellt,
+                               @Schema(required = true) Instant geaendert) {
+    }
+
+    @Schema(name = "ChatBewertungEingabe")
+    public record BewertungEingabeDto(@Schema(required = true, minimum = "1", maximum = "5") Integer sterne,
+                                      @Schema(nullable = true) String grund,
+                                      @Schema(nullable = true, maxLength = ChatBewertung.MAX_FREITEXT) String freitext) {
     }
 
     @POST
@@ -202,7 +230,74 @@ public class ChatResource {
                 gespraech.nachrichten().stream().map(ChatResource::dto).toList());
     }
 
+    @PUT
+    @Path("/nachrichten/{id}/bewertung")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Blocking
+    @AlleArchivRollen
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Operation(summary = "Eigene Chat-Antwort bewerten",
+            description = "Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit Status OK. Fremde, unbekannte "
+                    + "und nicht bewertbare Antworten ergeben 404; nach mehr als 200 Speicherungen je Stunde 429. "
+                    + "Der Anfragekörper muss kleiner als 8 KiB sein.")
+    @RequestBody(required = true, description = "Bewertung der Antwort",
+            content = @Content(schema = @Schema(implementation = BewertungEingabeDto.class)))
+    @APIResponse(responseCode = "200", description = "Bewertung gespeichert")
+    @APIResponse(responseCode = "400", description = "Bewertung ungültig")
+    @APIResponse(responseCode = "404", description = "Antwort nicht gefunden")
+    @APIResponse(responseCode = "413", description = "Bewertung zu gross")
+    @APIResponse(responseCode = "429", description = "Bewertungslimit erreicht",
+            headers = @Header(name = "Retry-After", description = "Sekunden bis zum nächsten Versuch"))
+    public BewertungDto bewerten(@PathParam("id") String id, InputStream body) throws IOException {
+        aufloesung.pruefen();
+        BewertungEingabe eingabe = bewertungEingabe(bewertungKoerper(body));
+        return dto(bewertungen.speichern(bewertungId(id), benutzer().id(), eingabe.sterne(),
+                eingabe.grund(), eingabe.freitext()));
+    }
+
+    static String bewertungKoerper(InputStream body) throws IOException {
+        byte[] eingabe = body.readNBytes(BEWERTUNG_KOERPER_GRENZE);
+        if (eingabe.length == BEWERTUNG_KOERPER_GRENZE) {
+            throw new FachFehler(Fehlercode.DATEI_ZU_GROSS);
+        }
+        return new String(eingabe, StandardCharsets.UTF_8);
+    }
+
+    @GET
+    @Path("/nachrichten/{id}/bewertung")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Blocking
+    @AlleArchivRollen
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Operation(summary = "Eigene Chat-Bewertung abrufen",
+            description = "Fremde, unbekannte oder nicht bewertbare Antworten sowie Antworten ohne Bewertung ergeben 404.")
+    @APIResponse(responseCode = "200", description = "Eigene Bewertung")
+    @APIResponse(responseCode = "404", description = "Bewertung nicht gefunden")
+    public BewertungDto bewertung(@PathParam("id") String id) {
+        aufloesung.pruefen();
+        return dto(bewertungen.lesen(bewertungId(id), benutzer().id()));
+    }
+
+    @DELETE
+    @Path("/nachrichten/{id}/bewertung")
+    @Blocking
+    @AlleArchivRollen
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Operation(summary = "Eigene Chat-Bewertung entfernen",
+            description = "Fremde, unbekannte und nicht bewertbare Antworten sowie Antworten ohne Bewertung ergeben 404.")
+    @APIResponse(responseCode = "204", description = "Bewertung entfernt")
+    @APIResponse(responseCode = "404", description = "Bewertung nicht gefunden")
+    public Response bewertungLoeschen(@PathParam("id") String id) {
+        aufloesung.pruefen();
+        bewertungen.loeschen(bewertungId(id), benutzer().id());
+        return Response.noContent().build();
+    }
+
     record Eingabe(String frage, Optional<UUID> gespraechId) {
+    }
+
+    private record BewertungEingabe(int sterne, ChatBewertung.Grund grund, String freitext) {
     }
 
     /**
@@ -230,6 +325,47 @@ public class ChatResource {
         } catch (JsonProcessingException | IllegalArgumentException e) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
+    }
+
+    private static BewertungEingabe bewertungEingabe(String body) {
+        try {
+            if (body == null || body.isBlank()) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            JsonNode wurzel = JSON.readTree(body);
+            JsonNode sterne = wurzel.isObject() ? wurzel.get("sterne") : null;
+            JsonNode grund = wurzel.isObject() ? wurzel.get("grund") : null;
+            JsonNode freitext = wurzel.isObject() ? wurzel.get("freitext") : null;
+            if (sterne == null || !sterne.isIntegralNumber() || !sterne.canConvertToInt()
+                    || grund != null && !grund.isNull() && !grund.isTextual()
+                    || freitext != null && !freitext.isNull() && !freitext.isTextual()) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            ChatBewertung.Grund grundWert = grund == null || grund.isNull() ? null
+                    : ChatBewertung.Grund.valueOf(grund.asText());
+            return new BewertungEingabe(sterne.asInt(), grundWert,
+                    freitext == null || freitext.isNull() ? null : freitext.asText());
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+    }
+
+    private static long bewertungId(String id) {
+        try {
+            long wert = Long.parseLong(id);
+            if (wert < 1) {
+                throw new IllegalArgumentException("ungültige Nachrichten-ID");
+            }
+            return wert;
+        } catch (IllegalArgumentException e) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+    }
+
+    private static BewertungDto dto(ChatBewertung bewertung) {
+        return new BewertungDto(Long.toString(bewertung.nachrichtId()), bewertung.sterne(),
+                bewertung.grund() == null ? null : bewertung.grund().name(), bewertung.freitext(),
+                bewertung.erstellt(), bewertung.geaendert());
     }
 
     private static GespraechDto dto(GespraechKopf kopf) {

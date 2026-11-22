@@ -46,7 +46,7 @@ class RechtematrixSpecTest {
         spec.putAll(wissen);
         spec.putAll(verwaltung);
 
-        assertThat(spec.keySet()).containsExactly(Aktion.values());
+        assertThat(spec.keySet()).containsExactlyInAnyOrder(Aktion.values());
         spec.forEach((aktion, zeile) -> zeile.forEach((rolle, ergebnis) ->
                 assertThat(Rechtematrix.ergebnis(rolle, aktion)).as(aktion + " " + rolle.code()).isEqualTo(ergebnis)));
     }

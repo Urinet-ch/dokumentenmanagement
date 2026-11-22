@@ -11,8 +11,10 @@ import io.quarkus.security.UnauthorizedException;
 import io.quarkus.runtime.configuration.MemorySize;
 import io.quarkus.vertx.http.runtime.RouteConstants;
 import io.vertx.core.http.HttpHeaders;
+import io.vertx.core.http.HttpClosedException;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.BodyHandler;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -44,6 +46,8 @@ public class ProblemFehlerRoute {
     static final String NOCHMALS_NACH_SEKUNDEN = "1";
 
     static final String MULTIPART = "multipart/form-data";
+    static final int BEWERTUNG_MAX_BYTES = 8191;
+    private static final String BEWERTUNG_PFAD = "^/api/v1/chat/nachrichten/[^/]+/bewertung/?$";
 
     private final Optional<MemorySize> grenze;
     private final MemorySize grenzeOhneUpload;
@@ -55,9 +59,28 @@ public class ProblemFehlerRoute {
     }
 
     void einrichten(@Observes Router router) {
+        router.putWithRegex(BEWERTUNG_PFAD).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
+                .handler(BodyHandler.create(false).setBodyLimit(BEWERTUNG_MAX_BYTES))
+                .failureHandler(this::bewertungZuGross);
         router.route(API).order(RouteConstants.ROUTE_ORDER_UPLOAD_LIMIT - 1).handler(this::grenzePruefen);
         router.route().order(-2).failureHandler(this::ueberlastet);
         router.route(API).order(-1).failureHandler(this::behandeln);
+    }
+
+    void bewertungZuGross(RoutingContext kontext) {
+        if (kontext.statusCode() != 413 || kontext.response().headWritten()) {
+            kontext.next();
+            return;
+        }
+        kontext.request().pause();
+        kontext.request().exceptionHandler(fehler -> {
+            if (!(fehler instanceof HttpClosedException && kontext.response().ended())) {
+                kontext.fail(fehler);
+            }
+        });
+        kontext.response().putHeader(HttpHeaders.CONNECTION, "close")
+                .endHandler(ende -> kontext.request().connection().close());
+        senden(kontext, ProblemAntwort.fuer(Fehlercode.DATEI_ZU_GROSS), false);
     }
 
     void ueberlastet(RoutingContext kontext) {

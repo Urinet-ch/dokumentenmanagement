@@ -33,6 +33,7 @@ export const Aktion = {
     A21: 'A21',
     A22: 'A22',
     A23: 'A23',
+    A24: 'A24',
 } as const;
 export type Aktion = typeof Aktion[keyof typeof Aktion];
 

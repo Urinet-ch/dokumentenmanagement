@@ -326,7 +326,7 @@ class EndpunktWaechterTest {
             case A7 -> ProtokollAktion.BESTAETIGEN;
             case A9 -> ProtokollAktion.VERWERFEN;
             case A10 -> ProtokollAktion.WIEDERHOLEN;
-            case A5, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23 -> null;
+            case A5, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23, A24 -> null;
         });
     }
 
