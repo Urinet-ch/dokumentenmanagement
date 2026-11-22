@@ -5,7 +5,7 @@ Funktionalität: Archivierte Dokumente als Wissensquellen markieren
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
 
-  @req-20.2 @req-20.4
+  @req-20.1 @req-20.2 @req-20.4
   Szenario: Eine Quittung wird markiert und unverändert zum Ingest eingereiht
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «BELEG» der Art «QUITTUNG»
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens

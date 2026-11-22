@@ -4,6 +4,7 @@ import ch.urinet.archiv.sicherheit.application.SichtregelSql;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.wissen.application.WissensquelleMarkierungPort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 
@@ -16,21 +17,21 @@ import java.util.UUID;
 @ApplicationScoped
 @Transactional(Transactional.TxType.MANDATORY)
 public class JdbcWissensquelleMarkierung implements WissensquelleMarkierungPort {
-    private final EntityManager em;
+    private final Instance<EntityManager> em;
 
-    public JdbcWissensquelleMarkierung(EntityManager em) {
+    public JdbcWissensquelleMarkierung(Instance<EntityManager> em) {
         this.em = em;
     }
 
     @Override
     public boolean dokumentSperren(UUID dokumentId) {
-        return !em.createNativeQuery("select id from dokument where id = :id for update")
+        return !em.get().createNativeQuery("select id from dokument where id = :id for update")
                 .setParameter("id", dokumentId).getResultList().isEmpty();
     }
 
     @Override
     public boolean aktiv(UUID dokumentId) {
-        return Boolean.TRUE.equals(em.createNativeQuery("""
+        return Boolean.TRUE.equals(em.get().createNativeQuery("""
                 select exists (select 1 from wissensquelle_markierung
                     where dokument_id = :id and beendet_am is null)""")
                 .setParameter("id", dokumentId).getSingleResult());
@@ -38,7 +39,7 @@ public class JdbcWissensquelleMarkierung implements WissensquelleMarkierungPort 
 
     @Override
     public void markieren(UUID dokumentId, String benutzer) {
-        em.createNativeQuery("""
+        em.get().createNativeQuery("""
                 insert into wissensquelle_markierung (dokument_id, markiert_von, markiert_am)
                 values (:id, :benutzer, clock_timestamp())""")
                 .setParameter("id", dokumentId).setParameter("benutzer", benutzer).executeUpdate();
@@ -46,7 +47,7 @@ public class JdbcWissensquelleMarkierung implements WissensquelleMarkierungPort 
 
     @Override
     public boolean entfernen(UUID dokumentId, String benutzer) {
-        return em.createNativeQuery("""
+        return em.get().createNativeQuery("""
                 update wissensquelle_markierung set beendet_am = clock_timestamp(), beendet_von = :benutzer
                 where dokument_id = :id and beendet_am is null""")
                 .setParameter("id", dokumentId).setParameter("benutzer", benutzer).executeUpdate() == 1;
@@ -55,7 +56,7 @@ public class JdbcWissensquelleMarkierung implements WissensquelleMarkierungPort 
     @Override
     public List<Quelle> quellen(Sichtregel sicht) {
         SichtregelSql.Ausdruck filter = SichtregelSql.dokument(sicht, "d");
-        var abfrage = em.createNativeQuery("""
+        var abfrage = em.get().createNativeQuery("""
                 select d.id, d.titel, d.art, m.markiert_am,
                     (select e.status from wissens_entwurf e
                      where e.dokument_id = d.id and e.anlass = 'INGEST'
