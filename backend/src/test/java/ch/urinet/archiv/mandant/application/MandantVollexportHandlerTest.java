@@ -6,6 +6,7 @@ import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Proxy;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -66,6 +69,30 @@ class MandantVollexportHandlerTest {
         assertThat(t.zielAbgeschlossen).isFalse();
         assertThat(t.zielGeschlossen).isTrue();
         assertThat(t.fertigeAnzahl).isEmpty();
+    }
+
+    @Test
+    void zuGrosseKonfigurationWirdOhneTeilZipAlsFachlicherFehlerGespeichert(@TempDir Path temp) throws Exception {
+        Testaufbau t = new Testaufbau(Repository.offen());
+        t.konfiguration = new MandantVollexportKonfiguration() {
+            @Override
+            public Version aktuell() {
+                throw new ZuGross();
+            }
+
+            @Override
+            public void versionen(Versionsausgabe ausgabe) {
+                throw new AssertionError("Historie darf nicht gelesen werden");
+            }
+        };
+
+        t.handler(temp).ausfuehren(auftrag(ID));
+
+        assertThat(t.zipBytes.size()).isZero();
+        assertThat(t.zielGeschlossen).isTrue();
+        assertThat(t.zielAbgeschlossen).isFalse();
+        assertThat(t.fertigeAnzahl).isEmpty();
+        assertThat(t.fehlerarten).containsExactly(MandantVollexportRepository.Fehlerart.KONFIGURATION_ZU_GROSS);
     }
 
     @Test
@@ -168,13 +195,37 @@ class MandantVollexportHandlerTest {
                 .herunterladen(MANDANT, ID)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> new MandantVollexport(new Repository(Optional.empty()), null, ablage)
                 .herunterladen(MANDANT, ID)).isInstanceOf(IllegalArgumentException.class);
+        var zuGross = new MandantVollexportRepository.Vollexport(ID, MandantVollexportRepository.Status.FEHLER,
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Instant.now(), Optional.empty(), Optional.of(MandantVollexportRepository.Fehlerart.KONFIGURATION_ZU_GROSS));
+        assertThatThrownBy(() -> new MandantVollexport(new Repository(Optional.of(zuGross)), null, ablage)
+                .herunterladen(MANDANT, ID)).isInstanceOf(MandantFehler.class)
+                .hasMessageContaining("1 MiB").hasMessageContaining("erneut starten")
+                .satisfies(e -> assertThat(((MandantFehler) e).grund())
+                        .isEqualTo(MandantFehler.Grund.KONFIGURATION_ZU_GROSS));
+        MandantKontext kontext = new MandantKontext(null, null, null) {
+            @Override
+            public <T> T mit(MandantCode code, java.util.function.Supplier<T> arbeit) {
+                return arbeit.get();
+            }
+        };
+        var meldungen = new ByteArrayOutputStream();
+        try (PrintStream aus = new PrintStream(OutputStream.nullOutputStream());
+             PrintStream fehler = new PrintStream(meldungen, true, StandardCharsets.UTF_8)) {
+            int exit = new MandantKommando(null, kontext,
+                    new MandantVollexport(new Repository(Optional.of(zuGross)), null, ablage), null)
+                    .ausfuehren(List.of("export", "vhf-gsk", "--download", ID.toString()), aus, fehler);
+            assertThat(exit).isEqualTo(1);
+        }
+        assertThat(meldungen.toString(StandardCharsets.UTF_8))
+                .contains("KONFIGURATION_ZU_GROSS", "1 MiB", "erneut starten");
     }
 
     private static Auftrag auftrag(UUID exportId) {
         return new Auftrag(5, MANDANT, MandantVollexport.TYP, new Nutzlast(Map.of(MandantVollexport.EXPORT_ID, exportId)), 0);
     }
 
-    private static class Repository implements MandantVollexportRepository {
+    static class Repository implements MandantVollexportRepository {
         private final Optional<Vollexport> export;
 
         Repository(Optional<Vollexport> export) {
@@ -214,6 +265,11 @@ class MandantVollexportHandlerTest {
         public boolean fehler(UUID id, UUID fehlerId) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public boolean fehler(UUID id, UUID fehlerId, Fehlerart art) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class TestDaten implements MandantVollexportDaten {
@@ -231,22 +287,24 @@ class MandantVollexportHandlerTest {
         }
     }
 
-    private static final class Testaufbau {
+    static final class Testaufbau {
         private final Optional<MandantVollexportRepository.Vollexport> export;
         private final TestDaten daten = new TestDaten();
         private final List<Integer> fertigeAnzahl = new ArrayList<>();
         private final List<Map.Entry<UUID, UUID>> fehler = new ArrayList<>();
-        private final ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
+        final List<MandantVollexportRepository.Fehlerart> fehlerarten = new ArrayList<>();
+        final ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
+        MandantVollexportKonfiguration konfiguration = MandantVollexportKonfiguration.leer();
         private boolean lebenszyklus;
-        private boolean zielAbgeschlossen;
-        private boolean zielGeschlossen;
+        boolean zielAbgeschlossen;
+        boolean zielGeschlossen;
         private boolean sicherungsKopieFehler;
 
-        private Testaufbau(Optional<MandantVollexportRepository.Vollexport> export) {
+        Testaufbau(Optional<MandantVollexportRepository.Vollexport> export) {
             this.export = export;
         }
 
-        private MandantVollexportHandler handler(Path temp) {
+        MandantVollexportHandler handler(Path temp) {
             MandantVollexport speichern = new MandantVollexport(new Repository(export), null, null) {
                 @Override
                 public boolean fertig(Auftrag auftrag, UUID id, AbgelegteDatei zip, int anzahlDokumente) {
@@ -257,6 +315,13 @@ class MandantVollexportHandlerTest {
                 @Override
                 public boolean fehler(UUID id, UUID fehlerId) {
                     fehler.add(Map.entry(id, fehlerId));
+                    return true;
+                }
+
+                @Override
+                public boolean fehler(Auftrag auftrag, UUID id, UUID fehlerId,
+                                      MandantVollexportRepository.Fehlerart art) {
+                    fehlerarten.add(art);
                     return true;
                 }
             };
@@ -293,7 +358,7 @@ class MandantVollexportHandlerTest {
                         default -> throw new UnsupportedOperationException(methode.getName());
                     });
             return new MandantVollexportHandler(speichern, new Repository(export), daten, ablage,
-                    (mandant, strom) -> {}, temp);
+                    (mandant, strom) -> {}, konfiguration, temp);
         }
     }
 }

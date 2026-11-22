@@ -6,6 +6,12 @@ import java.io.OutputStream;
 /** Konfigurationsabbilder des aktuellen Mandanten für den Vollexport. */
 public interface MandantVollexportKonfiguration {
 
+    final class ZuGross extends RuntimeException {
+        public ZuGross() {
+            super("Die aktuelle Konfigurationsdatei überschreitet 1 MiB.", null, false, false);
+        }
+    }
+
     record Version(int nummer, String json) {
     }
 
