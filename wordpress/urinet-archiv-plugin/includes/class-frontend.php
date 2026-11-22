@@ -135,7 +135,7 @@ final class Urinet_Archiv_Frontend {
 
 	public static function chat( WP_REST_Request $request ) {
 		$frage = $request->get_param( 'frage' );
-		if ( ! is_string( $frage ) || '' === trim( $frage ) || strlen( $frage ) > 4000 ) {
+		if ( ! is_string( $frage ) || '' === trim( $frage ) || strlen( $frage ) > 500 ) {
 			return new WP_Error( 'anfrage_ungueltig', 'Die Frage ist ungültig.', array( 'status' => 400 ) );
 		}
 		$antwort = Urinet_Archiv_Client::chat( trim( $frage ) );

@@ -5,8 +5,8 @@
 		var ausgabe = box.querySelector('[data-urinet-chat-ausgabe]');
 		box.querySelector('[data-urinet-chat-senden]').addEventListener('click', function () {
 			var text = frage.value.trim();
-			if (!text || text.length > 4000) {
-				ausgabe.textContent = 'Bitte geben Sie eine Frage mit höchstens 4’000 Zeichen ein.';
+			if (!text || text.length > 500) {
+				ausgabe.textContent = 'Bitte geben Sie eine Frage mit höchstens 500 Zeichen ein.';
 				return;
 			}
 			ausgabe.textContent = 'Die Antwort wird gesucht …';
@@ -46,7 +46,10 @@
 					if (quelle.dokumentId) {
 						var link = document.createElement('a');
 						link.href = window.urinetArchivChatbot.dokumentUrl + encodeURIComponent(quelle.dokumentId);
-						link.textContent = 'Quelle: ' + (quelle.titel || quelle.dokumentId);
+						var reihe = quelle.reihe && (quelle.reihe.name || quelle.reihe.code);
+						var ausgabe = quelle.ausgabe ? ', ' + quelle.ausgabe : '';
+						link.textContent = 'Quelle: ' + (quelle.titel || quelle.dokumentId)
+							+ (reihe ? ' (' + reihe + ausgabe + ')' : ausgabe);
 						ausgabe.appendChild(document.createElement('br'));
 						ausgabe.appendChild(link);
 					}

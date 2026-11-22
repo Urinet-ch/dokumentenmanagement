@@ -47,8 +47,15 @@ final class Urinet_Archiv_Client {
 			status_header( 404 );
 			return;
 		}
-		$lock = 'ua_download_' . self::client_hash();
-		if ( ! wp_cache_add( $lock, 1, 'urinet-downloads', 120 ) ) {
+		$lock = '';
+		foreach ( array( 1, 2 ) as $slot ) {
+			$kandidat = 'ua_download_' . self::client_hash() . '_' . $slot;
+			if ( add_option( $kandidat, time(), '', 'no' ) ) {
+				$lock = $kandidat;
+				break;
+			}
+		}
+		if ( '' === $lock ) {
 			status_header( 429 );
 			echo 'Zu viele Downloads gleichzeitig. Bitte versuchen Sie es später erneut.'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Feste Fehlermeldung.
 			return;
@@ -56,22 +63,26 @@ final class Urinet_Archiv_Client {
 		$werte = Urinet_Archiv_Einstellungen::werte();
 		$curl  = curl_init( $werte['url'] . '/public/v1/dokumente/' . rawurlencode( $id ) . '/datei' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		if ( false === $curl ) {
-			wp_cache_delete( $lock, 'urinet-downloads' );
+			delete_option( $lock );
 			status_header( 404 );
 			return;
 		}
 		$inhalt = '';
 		$stream = false;
 		$typ    = 'application/octet-stream';
+		$laenge = '';
 		curl_setopt_array( // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt_array -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 			$curl,
 			array(
 				CURLOPT_HTTPHEADER     => array( 'Authorization: Bearer ' . $token, 'X-Archiv-Zugriff: ' . Urinet_Archiv_Einstellungen::stufe() ),
 				CURLOPT_FOLLOWLOCATION => false,
 				CURLOPT_TIMEOUT        => 900,
-				CURLOPT_HEADERFUNCTION => static function ( $handle, string $header ) use ( &$typ ): int {
+				CURLOPT_HEADERFUNCTION => static function ( $handle, string $header ) use ( &$typ, &$laenge ): int {
 					if ( preg_match( '/^Content-Type:\s*(.+)$/i', $header, $treffer ) ) {
 						$typ = trim( $treffer[1] );
+					}
+					if ( preg_match( '/^Content-Length:\s*(\d+)$/i', $header, $treffer ) ) {
+						$laenge = $treffer[1];
 					}
 					return strlen( $header );
 				},
@@ -84,6 +95,9 @@ final class Urinet_Archiv_Client {
 						status_header( 200 );
 						header( 'Cache-Control: private, no-store' );
 						header( 'Content-Type: ' . $typ );
+						if ( '' !== $laenge ) {
+							header( 'Content-Length: ' . $laenge );
+						}
 						echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
 						$inhalt = '';
 						$stream = true;
@@ -98,7 +112,7 @@ final class Urinet_Archiv_Client {
 		$status = (int) curl_getinfo( $curl, CURLINFO_RESPONSE_CODE ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_getinfo -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		$error  = curl_error( $curl ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_error -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		if ( false === $ok || '' !== $error ) {
-			wp_cache_delete( $lock, 'urinet-downloads' );
+			delete_option( $lock );
 			if ( ! $stream ) {
 				status_header( 404 );
 			}
@@ -108,19 +122,19 @@ final class Urinet_Archiv_Client {
 			status_header( 429 );
 			header( 'Content-Type: text/plain; charset=utf-8' );
 			echo 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Feste Fehlermeldung.
-			wp_cache_delete( $lock, 'urinet-downloads' );
+			delete_option( $lock );
 			return;
 		}
 		if ( 200 === $status ) {
 			$json = json_decode( $inhalt, true );
 			if ( is_array( $json ) && isset( $json['url'] ) && is_string( $json['url'] ) && '' !== esc_url_raw( $json['url'] ) ) {
 				wp_redirect( esc_url_raw( $json['url'] ), 302 ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- Die API liefert eine vorsignierte Object-Storage-URL.
-				wp_cache_delete( $lock, 'urinet-downloads' );
+				delete_option( $lock );
 				return;
 			}
 		}
 		if ( in_array( $status, array( 301, 302 ), true ) ) {
-			wp_cache_delete( $lock, 'urinet-downloads' );
+			delete_option( $lock );
 			status_header( 404 );
 			return;
 		}
@@ -130,7 +144,7 @@ final class Urinet_Archiv_Client {
 			header( 'Content-Type: ' . $typ );
 			echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
 		}
-		wp_cache_delete( $lock, 'urinet-downloads' );
+		delete_option( $lock );
 	}
 
 	private static function client_hash(): string {
@@ -182,12 +196,12 @@ final class Urinet_Archiv_Client {
 		$pflicht = array(
 			'dokumente' => array( 'eintraege', 'seite', 'proSeite', 'gesamt' ),
 			'suche'     => array( 'treffer', 'degradiert' ),
-			'filter'    => array( 'reihen' ),
+			'filter'    => array( 'reihen', 'klassifikationen' ),
 		);
 		if ( array_diff( $pflicht[ $pfad ], array_keys( $daten ) )
 			|| ( 'dokumente' === $pfad && ( ! is_array( $daten['eintraege'] ) || ! is_int( $daten['seite'] ) || ! is_int( $daten['proSeite'] ) || ! is_int( $daten['gesamt'] ) ) )
 			|| ( 'suche' === $pfad && ( ! is_array( $daten['treffer'] ) || ! is_bool( $daten['degradiert'] ) ) )
-			|| ( 'filter' === $pfad && ! is_array( $daten['reihen'] ) )
+			|| ( 'filter' === $pfad && ( ! is_array( $daten['reihen'] ) || ! is_array( $daten['klassifikationen'] ) ) )
 		) {
 			return new WP_Error( 'archiv_antwort', 'Das Archiv hat eine ungültige Antwort geliefert. Bitte versuchen Sie es später erneut.' );
 		}
