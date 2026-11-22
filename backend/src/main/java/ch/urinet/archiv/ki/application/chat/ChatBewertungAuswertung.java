@@ -67,7 +67,8 @@ public class ChatBewertungAuswertung {
                             + ";modus=" + (schwaerzen ? "GESCHWAERZT" : "KLARTEXT"), null, null),
                     Optional.empty()));
 
-            Schwaerzung redaktion = schwaerzen ? new Schwaerzung(snapshot.kontaktUndPartnerNamen()) : null;
+            Schwaerzung redaktion = schwaerzen
+                    ? new Schwaerzung(snapshot.kontaktUndPartnerNamensgruppen()) : null;
             byte[] salz = new byte[32];
             RANDOM.nextBytes(salz);
             return new Export(snapshot, redaktion, salz, zipPort);

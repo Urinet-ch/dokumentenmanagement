@@ -42,7 +42,7 @@ class ChatBewertungAuswertungTest {
     @Test
     void exportIstVollstaendigGeschwaerztUndSchemaKonform() throws Exception {
         FakeSpeicher speicher = new FakeSpeicher();
-        speicher.namen = List.of("Ada Muster");
+        speicher.namen = List.of(List.of("Ada Muster"));
         speicher.zeilen.add(new ChatAuswertungSpeicher.ExportZeile(Instant.parse("2026-11-22T11:00:00Z"),
                 17L, 2, "FALSCH", "Kontakt Ada Muster", "E-Mail ada@example.test, Betrag CHF 42.50 am 22.11.2026",
                 "Telefon +41 79 123 45 67; Ada Muster", """
@@ -119,7 +119,7 @@ class ChatBewertungAuswertungTest {
 
     private static final class FakeSpeicher implements ChatAuswertungSpeicher {
         private final List<ExportZeile> zeilen = new ArrayList<>();
-        private List<String> namen = List.of();
+        private List<List<String>> namen = List.of();
         private long anzahl = -1;
         private boolean snapshotEingerichtet;
         private int zeilenExportiert;
@@ -134,7 +134,7 @@ class ChatBewertungAuswertungTest {
                 }
 
                 @Override
-                public List<String> kontaktUndPartnerNamen() {
+                public List<List<String>> kontaktUndPartnerNamensgruppen() {
                     return namen;
                 }
 

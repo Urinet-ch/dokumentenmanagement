@@ -60,6 +60,14 @@ Funktionalität: Chat-Bewertungen auswerten und exportieren
     Dann ist der Chat-Auswertungs-Export mit Status 200 beantwortet
     Und enthält der Chat-Auswertungs-Export die Platzhalter für die synthetischen Personendaten
 
+  @req-15.7
+  Szenario: Kontakt- und dokumentierte Partnernamen teilen einen Platzhalter
+    Angenommen im Mandanten «urinet» sind synthetische Kontakt- und Partnernamen für den Export erfasst
+    Und im Mandanten «urinet» gibt es eine synthetische Chat-Bewertung mit 2 Sternen
+    Wenn «inhaber-urinet» exportiert die Chat-Auswertung für die letzten 30 Tage
+    Dann ist der Chat-Auswertungs-Export mit Status 200 beantwortet
+    Und schwärzt der Export die bekannten Kontakt- und Partnernamen mit demselben Platzhalter
+
   @req-15.10
   Szenario: Eine Bewertung fliesst nicht in den nächsten Chat-Aufruf ein
     Angenommen der Chat nutzt den Agenten mit dem simulierten Sprachmodell

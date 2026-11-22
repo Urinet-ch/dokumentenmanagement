@@ -1,10 +1,12 @@
 package ch.urinet.archiv.ki.domain.chat;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,30 +31,48 @@ public final class Schwaerzung {
                     + "|(?<![\\p{L}\\p{N}])[-+]?\\d(?:[\\d'’., ]*\\d)?\\s*(?:CHF|EUR|USD|GBP|CAD|AUD|JPY|Fr\\.?)"
                     + "|(?<![\\p{L}\\p{N}])[€$£]\\s*[-+]?\\d(?:[\\d'’., ]*\\d)?");
     private static final Pattern DATUM = Pattern.compile(
-            "(?<!\\d)(?:\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2})(?!\\d)");
+            "(?iu)(?<![\\p{L}\\p{N}])(?:\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2}"
+                    + "|\\d{1,2}\\.?\\s+(?:jan(?:uar)?|feb(?:ruar)?|mär(?:z)?|maerz|apr(?:il)?|mai|jun(?:i)?"
+                    + "|jul(?:i)?|aug(?:ust)?|sep(?:tember|t)?|okt(?:ober)?|nov(?:ember)?|dez(?:ember)?)\\.?\\s+"
+                    + "\\d{4})(?![\\p{L}\\p{N}])");
     private static final Pattern LEERZEICHEN = Pattern.compile("[\\s-]");
 
-    private final Map<String, String> partnerPlatzhalter;
     private final List<NameMuster> partnerMuster;
 
-    private record NameMuster(Pattern muster, String platzhalter) {
+    private record NameMuster(String name, Pattern muster, String platzhalter) {
     }
 
-    public Schwaerzung(List<String> kontaktUndPartnerNamen) {
-        Map<String, String> platzhalter = new LinkedHashMap<>();
-        List<String> namen = kontaktUndPartnerNamen == null ? List.of()
-                : kontaktUndPartnerNamen.stream().filter(name -> name != null && !name.isBlank())
-                .map(String::strip).distinct()
-                .sorted(Comparator.comparingInt(String::length).reversed().thenComparing(String::compareToIgnoreCase))
+    public Schwaerzung(List<List<String>> kontaktUndPartnerNamensgruppen) {
+        List<List<String>> gruppen = kontaktUndPartnerNamensgruppen == null ? List.of()
+                : kontaktUndPartnerNamensgruppen.stream().filter(gruppe -> gruppe != null)
+                .map(gruppe -> gruppe.stream().filter(name -> name != null && !name.isBlank())
+                        .map(String::strip).distinct()
+                        .sorted(Comparator.comparingInt(String::length).reversed()
+                                .thenComparing(String::compareToIgnoreCase))
+                        .toList())
+                .filter(gruppe -> !gruppe.isEmpty())
+                .sorted(Comparator.comparingInt(Schwaerzung::laengsterName).reversed()
+                        .thenComparing(Schwaerzung::sortierName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
-        for (String name : namen) {
-            platzhalter.computeIfAbsent(normalisieren(name), ignored -> "[PARTNER-" + (platzhalter.size() + 1) + "]");
+        Map<String, String> platzhalter = new LinkedHashMap<>();
+        List<NameMuster> muster = new ArrayList<>();
+        int naechsterPlatzhalter = 1;
+        for (List<String> gruppe : gruppen) {
+            String platzhalterDerGruppe = gruppe.stream().map(Schwaerzung::normalisieren)
+                    .map(platzhalter::get).filter(Objects::nonNull).findFirst().orElse(null);
+            if (platzhalterDerGruppe == null) {
+                platzhalterDerGruppe = "[PARTNER-" + naechsterPlatzhalter++ + "]";
+            }
+            String gruppenPlatzhalter = platzhalterDerGruppe;
+            for (String name : gruppe) {
+                String platzhalterDesNamens = platzhalter.computeIfAbsent(normalisieren(name),
+                        ignored -> gruppenPlatzhalter);
+                muster.add(new NameMuster(name, Pattern.compile("(?iu)(?<![\\p{L}\\p{N}])" + Pattern.quote(name)
+                        + "(?![\\p{L}\\p{N}])"), platzhalterDesNamens));
+            }
         }
-        partnerPlatzhalter = Map.copyOf(platzhalter);
-        partnerMuster = namen.stream()
-                .map(name -> new NameMuster(Pattern.compile("(?iu)(?<![\\p{L}\\p{N}])" + Pattern.quote(name)
-                                + "(?![\\p{L}\\p{N}])"),
-                        partnerPlatzhalter.get(normalisieren(name))))
+        partnerMuster = muster.stream()
+                .sorted(Comparator.comparingInt((NameMuster name) -> name.name().length()).reversed())
                 .toList();
     }
 
@@ -112,5 +132,13 @@ public final class Schwaerzung {
 
     private static String normalisieren(String name) {
         return name.strip().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+    }
+
+    private static int laengsterName(List<String> gruppe) {
+        return gruppe.stream().mapToInt(String::length).max().orElse(0);
+    }
+
+    private static String sortierName(List<String> gruppe) {
+        return gruppe.stream().min(String.CASE_INSENSITIVE_ORDER).orElse("");
     }
 }

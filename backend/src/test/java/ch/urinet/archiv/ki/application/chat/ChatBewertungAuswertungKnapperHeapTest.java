@@ -42,7 +42,7 @@ class ChatBewertungAuswertungKnapperHeapTest {
                     }
 
                     @Override
-                    public List<String> kontaktUndPartnerNamen() {
+                    public List<List<String>> kontaktUndPartnerNamensgruppen() {
                         return List.of();
                     }
 

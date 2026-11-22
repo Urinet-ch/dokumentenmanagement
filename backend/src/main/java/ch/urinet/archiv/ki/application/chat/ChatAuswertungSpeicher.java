@@ -38,7 +38,7 @@ public interface ChatAuswertungSpeicher {
     interface ExportSnapshot extends AutoCloseable {
         long anzahl();
 
-        List<String> kontaktUndPartnerNamen();
+        List<List<String>> kontaktUndPartnerNamensgruppen();
 
         void exportZeilen(Consumer<ExportZeile> verarbeiten);
 

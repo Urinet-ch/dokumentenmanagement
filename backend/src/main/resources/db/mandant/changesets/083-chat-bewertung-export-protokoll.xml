@@ -24,7 +24,7 @@
                         'WISSEN_VERWERFEN', 'WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_IMPORT',
                         'KONTAKT_ZUSAMMENFUEHREN', 'KONTAKT_INAKTIV', 'KONTAKT_AKTIV',
                         'BENUTZER_ANLEGEN', 'BENUTZER_AENDERN', 'BENUTZER_LOESCHEN',
-                        'ROLLE_ZUWEISEN', 'BENUTZER_ANTRAG', 'BENUTZER_ABWEICHUNG'));
+                        'ROLLE_ZUWEISEN', 'BENUTZER_ANTRAG', 'BENUTZER_ABWEICHUNG', 'CHAT_BEWERTUNG_EXPORT'));
             </sql>
         </rollback>
     </changeSet>

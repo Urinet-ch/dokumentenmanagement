@@ -15,7 +15,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -109,7 +115,7 @@ public class JdbcChatAuswertungSpeicher implements ChatAuswertungSpeicher {
         private final String schema;
         private final Filter filter;
         private final long anzahl;
-        private final List<String> namen;
+        private final List<List<String>> namensgruppen;
         private boolean abgeschlossen;
 
         private JdbcExportSnapshot(Connection verbindung, String schema, Filter filter) throws SQLException {
@@ -118,7 +124,7 @@ public class JdbcChatAuswertungSpeicher implements ChatAuswertungSpeicher {
             this.filter = filter;
             try {
                 anzahl = zaehlen();
-                namen = namenLesen();
+                namensgruppen = namenLesen();
             } catch (SQLException | RuntimeException e) {
                 try {
                     verbindung.rollback();
@@ -140,8 +146,8 @@ public class JdbcChatAuswertungSpeicher implements ChatAuswertungSpeicher {
         }
 
         @Override
-        public List<String> kontaktUndPartnerNamen() {
-            return namen;
+        public List<List<String>> kontaktUndPartnerNamensgruppen() {
+            return namensgruppen;
         }
 
         @Override
@@ -213,18 +219,55 @@ public class JdbcChatAuswertungSpeicher implements ChatAuswertungSpeicher {
             }
         }
 
-        private List<String> namenLesen() throws SQLException {
-            try (PreparedStatement sql = verbindung.prepareStatement("select distinct name_normalisiert from "
-                    + schema + ".kontakt where name_normalisiert is not null order by name_normalisiert")) {
+        private List<List<String>> namenLesen() throws SQLException {
+            Map<UUID, Set<String>> gruppen = new LinkedHashMap<>();
+            try (PreparedStatement sql = verbindung.prepareStatement("select id, name, vorname, name_normalisiert "
+                    + "from " + schema + ".kontakt order by id")) {
                 sql.setFetchSize(100);
                 sql.setQueryTimeout(ZEITGRENZE_S);
                 try (ResultSet rs = sql.executeQuery()) {
-                    List<String> werte = new ArrayList<>();
                     while (rs.next()) {
-                        werte.add(rs.getString(1));
+                        Set<String> namen = gruppen.computeIfAbsent(rs.getObject(1, UUID.class),
+                                ignored -> new LinkedHashSet<>());
+                        String name = rs.getString(2);
+                        String vorname = rs.getString(3);
+                        nameHinzufuegen(namen, name);
+                        nameHinzufuegen(namen, vorname);
+                        nameHinzufuegen(namen, rs.getString(4));
+                        if (vorname != null && !vorname.isBlank() && name != null && !name.isBlank()) {
+                            nameHinzufuegen(namen, vorname + " " + name);
+                        }
                     }
-                    return List.copyOf(werte);
                 }
+            }
+            Map<String, Set<String>> unverbundenePartner = new LinkedHashMap<>();
+            try (PreparedStatement sql = verbindung.prepareStatement("select distinct partner_id, partner_name from "
+                    + schema + ".dokument where partner_name is not null order by partner_id, partner_name")) {
+                sql.setFetchSize(100);
+                sql.setQueryTimeout(ZEITGRENZE_S);
+                try (ResultSet rs = sql.executeQuery()) {
+                    while (rs.next()) {
+                        UUID partnerId = rs.getObject(1, UUID.class);
+                        String partnerName = rs.getString(2);
+                        if (partnerId == null) {
+                            String schluessel = partnerName.strip().toLowerCase(Locale.ROOT);
+                            unverbundenePartner.computeIfAbsent(schluessel, ignored -> new LinkedHashSet<>())
+                                    .add(partnerName);
+                        } else {
+                            gruppen.computeIfAbsent(partnerId, ignored -> new LinkedHashSet<>()).add(partnerName);
+                        }
+                    }
+                }
+            }
+            List<List<String>> werte = new ArrayList<>();
+            gruppen.values().forEach(namen -> werte.add(List.copyOf(namen)));
+            unverbundenePartner.values().forEach(namen -> werte.add(List.copyOf(namen)));
+            return List.copyOf(werte);
+        }
+
+        private static void nameHinzufuegen(Set<String> namen, String name) {
+            if (name != null && !name.isBlank()) {
+                namen.add(name.strip());
             }
         }
     }

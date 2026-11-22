@@ -19,8 +19,16 @@ class SchwaerzungTest {
     }
 
     @Test
+    void schwaerztAuchAusgeschriebeneDeutschePersonendaten() {
+        Schwaerzung schwaerzung = new Schwaerzung(List.of());
+
+        assertThat(schwaerzung.anwenden("Geboren am 10. Januar 1990 und am 3. Mär. 1987"))
+                .isEqualTo("Geboren am [DATUM] und am [DATUM]");
+    }
+
+    @Test
     void verwendetFuerBekanntePartnerInnerhalbDerDateiStabilePlatzhalter() {
-        Schwaerzung schwaerzung = new Schwaerzung(List.of("Muster AG", "Anna Beispiel"));
+        Schwaerzung schwaerzung = new Schwaerzung(List.of(List.of("Muster AG"), List.of("Anna Beispiel")));
 
         assertThat(schwaerzung.anwenden("Muster AG fragt. Anna Beispiel antwortet Muster AG."))
                 .isEqualTo("[PARTNER-2] fragt. [PARTNER-1] antwortet [PARTNER-2].");
@@ -28,7 +36,7 @@ class SchwaerzungTest {
 
     @Test
     void freieNamenAusserhalbDerMandantenkontakteSindNichtZuverlaessigErkennbar() {
-        Schwaerzung schwaerzung = new Schwaerzung(List.of("Muster AG"));
+        Schwaerzung schwaerzung = new Schwaerzung(List.of(List.of("Muster AG")));
 
         assertThat(schwaerzung.anwenden("Fabian Aschwanden spricht mit einer unbekannten Person."))
                 .isEqualTo("Fabian Aschwanden spricht mit einer unbekannten Person.");
@@ -40,5 +48,13 @@ class SchwaerzungTest {
 
         assertThat(schwaerzung.anwenden("Konto AB12 3456 7890 1234 5678"))
                 .isEqualTo("Konto AB12 3456 7890 1234 5678");
+    }
+
+    @Test
+    void verwendetFuerNamensvariantenDerselbenKontaktgruppeEinenPlatzhalter() {
+        Schwaerzung schwaerzung = new Schwaerzung(List.of(List.of("Müller AG", "mueller", "Müller GmbH")));
+
+        assertThat(schwaerzung.anwenden("Müller AG, Müller GmbH, mueller"))
+                .isEqualTo("[PARTNER-1], [PARTNER-1], [PARTNER-1]");
     }
 }

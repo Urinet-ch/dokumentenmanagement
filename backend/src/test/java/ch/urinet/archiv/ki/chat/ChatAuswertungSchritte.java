@@ -59,9 +59,12 @@ public class ChatAuswertungSchritte {
     WebseitenSchluesselVerwaltung webseitenSchluessel;
 
     private final Map<String, List<UUID>> gespraeche = new HashMap<>();
+    private final Map<String, List<UUID>> exportKontakte = new HashMap<>();
+    private final Map<String, List<UUID>> exportDokumente = new HashMap<>();
     private final List<String> apiClientIds = new ArrayList<>();
     private Response letzteAntwort;
     private Map<String, String> zipDateien = Map.of();
+    private String frageZusatz = "";
     private String apiToken;
     private String webseitenToken;
     private StepUp urspruenglichesStepUp;
@@ -70,9 +73,12 @@ public class ChatAuswertungSchritte {
     @Before
     public void vorbereiten() {
         gespraeche.clear();
+        exportKontakte.clear();
+        exportDokumente.clear();
         apiClientIds.clear();
         letzteAntwort = null;
         zipDateien = Map.of();
+        frageZusatz = "";
         apiToken = null;
         webseitenToken = null;
         stepUpGeprueft = false;
@@ -101,7 +107,50 @@ public class ChatAuswertungSchritte {
                     }
                 }
             }
+            for (Map.Entry<String, List<UUID>> eintrag : exportDokumente.entrySet()) {
+                for (UUID dokument : eintrag.getValue()) {
+                    try (PreparedStatement befehl = verbindung.prepareStatement(
+                            "delete from " + schema(eintrag.getKey()) + ".dokument where id = ?")) {
+                        befehl.setObject(1, dokument);
+                        befehl.executeUpdate();
+                    }
+                }
+            }
+            for (Map.Entry<String, List<UUID>> eintrag : exportKontakte.entrySet()) {
+                for (UUID kontakt : eintrag.getValue()) {
+                    try (PreparedStatement befehl = verbindung.prepareStatement(
+                            "delete from " + schema(eintrag.getKey()) + ".kontakt where id = ?")) {
+                        befehl.setObject(1, kontakt);
+                        befehl.executeUpdate();
+                    }
+                }
+            }
         }
+    }
+
+    @Angenommen("im Mandanten «{word}» sind synthetische Kontakt- und Partnernamen für den Export erfasst")
+    public void bekannteExportNamenAnlegen(String mandant) throws SQLException {
+        String s = schema(mandant);
+        UUID kontakt = UUID.randomUUID();
+        UUID dokument = UUID.randomUUID();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement("insert into " + s
+                     + ".kontakt (id, typ, name, name_normalisiert, quelle) values (?, 'ORGANISATION', "
+                     + "'Müller AG', 'mueller', 'MANUELL')")) {
+            einfuegen.setObject(1, kontakt);
+            einfuegen.executeUpdate();
+        }
+        exportKontakte.computeIfAbsent(mandant, ignored -> new ArrayList<>()).add(kontakt);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement("insert into " + s
+                     + ".dokument (id, quelle, erstellt_von, status, partner_id, partner_name) "
+                     + "values (?, 'UPLOAD', 'probe', 'NEU', ?, 'Müller GmbH')")) {
+            einfuegen.setObject(1, dokument);
+            einfuegen.setObject(2, kontakt);
+            einfuegen.executeUpdate();
+        }
+        exportDokumente.computeIfAbsent(mandant, ignored -> new ArrayList<>()).add(dokument);
+        frageZusatz = ", Müller AG, Müller GmbH, mueller";
     }
 
     @Angenommen("im Mandanten «{word}» gibt es eine synthetische Chat-Bewertung mit {int} Sternen")
@@ -125,7 +174,7 @@ public class ChatAuswertungSchritte {
              PreparedStatement frage = verbindung.prepareStatement("insert into " + s
                      + ".chat_nachricht (gespraech_id, rolle, inhalt, zeit) values (?, 'BENUTZER', ?, ?)")) {
             frage.setObject(1, gespraech);
-            frage.setString(2, FRAGE);
+            frage.setString(2, FRAGE + frageZusatz);
             frage.setTimestamp(3, Timestamp.from(jetzt));
             frage.executeUpdate();
         }
@@ -320,6 +369,13 @@ public class ChatAuswertungSchritte {
         assertThat(inhalt).contains("[E-MAIL]", "[TELEFON]", "[IBAN]", "[UID]", "[AHV-NUMMER]",
                 "[BETRAG]", "[DATUM]")
                 .doesNotContain("ada@example.test", "123 45 67", "CHE-123", "756.1234", "1'234.50", "08.11.2026");
+    }
+
+    @Dann("schwärzt der Export die bekannten Kontakt- und Partnernamen mit demselben Platzhalter")
+    public void exportSchwaerztKontaktPartner() {
+        String inhalt = zipDateien.get("bewertungen.jsonl");
+        assertThat(inhalt).contains("[PARTNER-1], [PARTNER-1], [PARTNER-1]")
+                .doesNotContain("Müller AG", "Müller GmbH", "mueller", "[PARTNER-2]");
     }
 
     private static Map<String, String> entpacken(byte[] bytes) throws IOException {
