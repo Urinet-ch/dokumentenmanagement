@@ -198,7 +198,9 @@ public class ChatFragen {
             durchgang.ausfallen(e.getClass().getSimpleName());
             LOG.warnf("Chat-Agent für Gespräch %s mit Ausnahme beendet, ursache=%s", id, Ursachen.kette(e));
         }
-        ChatAntwort antwort = durchgang.antwort(abbruch.gesetzt());
+        ChatAntwort antwort = durchgang.antwort(abbruch.gesetzt()).mitExportdaten(
+                durchgang.zeitBisErstemTextMs(), agent.modellkennung().orElse(null),
+                agent.systempromptVersion().orElse(null));
         if (antwort.status() == ChatStatus.FEHLER) {
             LOG.warnf("Chat-Agent für Gespräch %s ausgefallen, grund=%s", id, durchgang.ausfallgrund().orElse("-"));
         }

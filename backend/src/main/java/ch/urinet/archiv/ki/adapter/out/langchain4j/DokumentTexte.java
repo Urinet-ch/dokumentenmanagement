@@ -11,8 +11,9 @@ import java.util.List;
 /**
  * Kennzeichnet Dokumenttexte in Werkzeugantworten als Daten (Spec 02, Req 5.3): die Felder {@code inhalt}
  * ({@code dokument_zeigen}) und {@code auszug} ({@code dokumente_suchen}), überall in der JSON-Antwort, gehen in den Block
- * von {@link DokumentDaten}. Alle anderen Felder bleiben unverändert. Eine Antwort, die kein JSON ist, geht nie
- * unverändert an das Modell, sondern als {@code {"fehler":"Werkzeug nicht verfügbar"}}.
+ * von {@link DokumentDaten}; der interne Rerankerwert {@code aehnlichkeit} wird nicht an das Modell weitergegeben.
+ * Eine Antwort, die kein JSON ist, geht nie unverändert an das Modell, sondern als
+ * {@code {"fehler":"Werkzeug nicht verfügbar"}}.
  */
 final class DokumentTexte {
 
@@ -42,6 +43,7 @@ final class DokumentTexte {
 
     private static void kennzeichnen(JsonNode knoten, boolean wissen) {
         if (knoten instanceof ObjectNode objekt) {
+            objekt.remove("aehnlichkeit");
             for (String feld : FELDER) {
                 JsonNode wert = objekt.get(feld);
                 if (wert != null && wert.isTextual()) {
