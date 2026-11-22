@@ -59,6 +59,24 @@ class EinstellungsAuswirkungBerechnenTest {
                 assertThat(auswirkung.text()).contains("CHF 1.51", "Preisstand 08.11.2026", "ohne MWST"));
     }
 
+    @Test
+    void zuruecksetzenZaehltAnDerTatsaechlichenStartperiode() {
+        var startwerte = new EinstellungsRisiko.Startwerte(java.time.Period.ofDays(30), null, null);
+        var auswirkungen = berechnung.berechnen(einstellungen(1, 90, null),
+                einstellungen(null, 90, null), startwerte, "urinet", JETZT);
+        assertThat(auswirkungen).hasSize(1);
+        assertThat(daten.chatGrenze).isEqualTo(Instant.parse("2026-10-23T12:00:00Z"));
+    }
+
+    @Test
+    void kostenrichtwertNutztDenBisherigenMonatsbudgetStartwert() {
+        var startwerte = new EinstellungsRisiko.Startwerte(null, null, 30_000_000L);
+        var auswirkungen = berechnung.berechnen(einstellungen(12, 90, 3_000_000),
+                einstellungen(12, 90, null), startwerte, "urinet", JETZT);
+        assertThat(auswirkungen).singleElement().satisfies(auswirkung ->
+                assertThat(auswirkung.text()).contains("CHF 22.50"));
+    }
+
     private static Konfiguration.Einstellungen einstellungen(Integer chat, Integer web, Integer budget) {
         return new Konfiguration.Einstellungen("12-31", null, null, new Konfiguration.ChatEinstellungen(chat),
                 new Konfiguration.WebseitenChatEinstellungen(web),

@@ -66,7 +66,7 @@ class EinstellungskatalogTest {
 
     @Test
     void risikoBeimZuruecksetzenVergleichtMitBisherigemStartwert() {
-        var startwerte = new EinstellungsRisiko.Startwerte(6, 40, 1_000_000);
+        var startwerte = new EinstellungsRisiko.Startwerte(java.time.Period.ofMonths(6), 40, 1_000_000L);
         var vorher = einstellungen("12-31", 12, 30, null);
         var nachher = einstellungen("12-31", null, null, null);
 
@@ -78,6 +78,17 @@ class EinstellungskatalogTest {
     }
 
     @Test
+    void risikoBeimZuruecksetzenBeachtetStartperiodeMitTagen() {
+        var startwerte = new EinstellungsRisiko.Startwerte(java.time.Period.ofDays(30), null, null);
+        var vorher = einstellungen("12-31", 1, null, null);
+        var nachher = einstellungen("12-31", null, null, null);
+        var jetzt = java.time.Instant.parse("2026-11-22T12:00:00Z");
+        assertThat(EinstellungsRisiko.geaendert(vorher, nachher, startwerte, "urinet", jetzt))
+                .containsExactly("chat.aufbewahrungMonate");
+        assertThat(EinstellungsRisiko.geaendert(nachher, vorher, startwerte, "urinet", jetzt)).isEmpty();
+    }
+
+    @Test
     void monatsbudgetIstErstOberhalbDesDoppeltenStandardsRiskant() {
         var startwerte = new EinstellungsRisiko.Startwerte(null, null, null);
         var vorher = einstellungen("12-31", null, null, 1_000_000);
@@ -86,6 +97,14 @@ class EinstellungskatalogTest {
                 einstellungen("12-31", null, null, 2_000_000), startwerte, "urinet")).isEmpty();
         assertThat(EinstellungsRisiko.geaendert(vorher,
                 einstellungen("12-31", null, null, 2_000_001), startwerte, "urinet"))
+                .containsExactly("wissen.monatsbudgetTokens");
+    }
+
+    @Test
+    void risikoBeachtetAuchBisherigeStartwerteUeberDerKataloggrenze() {
+        var startwerte = new EinstellungsRisiko.Startwerte(null, null, 30_000_000L);
+        assertThat(EinstellungsRisiko.geaendert(einstellungen("12-31", null, null, null),
+                einstellungen("12-31", null, null, 3_000_000), startwerte, "urinet"))
                 .containsExactly("wissen.monatsbudgetTokens");
     }
 
