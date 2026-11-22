@@ -54,24 +54,55 @@ final class Urinet_Archiv_Client {
 			return;
 		}
 		set_transient( $lock, 1, 120 );
-		$werte   = Urinet_Archiv_Einstellungen::werte();
-		$antwort = wp_safe_remote_get(
-			$werte['url'] . '/public/v1/dokumente/' . rawurlencode( $id ) . '/datei',
-			array(
-				'headers' => array(
-					'Authorization'    => 'Bearer ' . $token,
-					'X-Archiv-Zugriff' => Urinet_Archiv_Einstellungen::stufe(),
-				),
-				'timeout' => 30,
-			)
-		);
-		if ( is_wp_error( $antwort ) ) {
+		$werte = Urinet_Archiv_Einstellungen::werte();
+		$curl  = curl_init( $werte['url'] . '/public/v1/dokumente/' . rawurlencode( $id ) . '/datei' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
+		if ( false === $curl ) {
 			delete_transient( $lock );
 			status_header( 404 );
 			return;
 		}
-		$status = wp_remote_retrieve_response_code( $antwort );
-		$inhalt = wp_remote_retrieve_body( $antwort );
+		$inhalt = '';
+		$stream = false;
+		$typ    = 'application/octet-stream';
+		curl_setopt_array( // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt_array -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
+			$curl,
+			array(
+				CURLOPT_HTTPHEADER     => array( 'Authorization: Bearer ' . $token, 'X-Archiv-Zugriff: ' . Urinet_Archiv_Einstellungen::stufe() ),
+				CURLOPT_FOLLOWLOCATION => false,
+				CURLOPT_TIMEOUT        => 30,
+				CURLOPT_HEADERFUNCTION => static function ( $handle, string $header ) use ( &$typ ): int {
+					if ( preg_match( '/^Content-Type:\s*(.+)$/i', $header, $treffer ) ) {
+						$typ = trim( $treffer[1] );
+					}
+					return strlen( $header );
+				},
+				CURLOPT_WRITEFUNCTION  => static function ( $handle, string $chunk ) use ( &$inhalt, &$stream, &$typ ): int {
+					if ( ! $stream ) {
+						$inhalt .= $chunk;
+						if ( strlen( $inhalt ) < 1048576 ) {
+							return strlen( $chunk );
+						}
+						status_header( 200 );
+						header( 'Cache-Control: private, no-store' );
+						header( 'Content-Type: ' . $typ );
+						echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+						$inhalt = '';
+						$stream = true;
+					} else {
+						echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+					}
+					return strlen( $chunk );
+				},
+			)
+		);
+		$ok     = curl_exec( $curl ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_exec -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
+		$status = (int) curl_getinfo( $curl, CURLINFO_RESPONSE_CODE ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_getinfo -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
+		$error  = curl_error( $curl ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_error -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
+		if ( false === $ok || '' !== $error ) {
+			delete_transient( $lock );
+			status_header( 404 );
+			return;
+		}
 		if ( 429 === $status ) {
 			status_header( 429 );
 			header( 'Content-Type: text/plain; charset=utf-8' );
@@ -88,18 +119,16 @@ final class Urinet_Archiv_Client {
 			}
 		}
 		if ( in_array( $status, array( 301, 302 ), true ) ) {
-			$ziel = wp_remote_retrieve_header( $antwort, 'location' );
-			if ( $ziel ) {
-				delete_transient( $lock );
-				wp_safe_redirect( $ziel, $status );
-				return;
-			}
+			delete_transient( $lock );
+			status_header( 404 );
+			return;
 		}
-		status_header( $status );
-		header( 'Cache-Control: private, no-store' );
-		$content_type = wp_remote_retrieve_header( $antwort, 'content-type' );
-		header( 'Content-Type: ' . ( $content_type ? $content_type : 'application/octet-stream' ) );
-		echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+		if ( ! $stream ) {
+			status_header( $status );
+			header( 'Cache-Control: private, no-store' );
+			header( 'Content-Type: ' . $typ );
+			echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+		}
 		delete_transient( $lock );
 	}
 
