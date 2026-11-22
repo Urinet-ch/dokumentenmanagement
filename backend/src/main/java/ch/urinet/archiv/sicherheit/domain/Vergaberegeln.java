@@ -57,11 +57,16 @@ public final class Vergaberegeln {
 
     /** Sperren, Deaktivieren, Löschen und Zugang zurücksetzen gegen sich selbst ist verboten (Req 4.6). */
     public static Pruefung pruefeSelbstzugriff(Benutzer akteur, Benutzer ziel, Selbstaktion aktion) {
+        return pruefeSelbstzugriff(akteur, ziel.id(), aktion);
+    }
+
+    public static Pruefung pruefeSelbstzugriff(Benutzer akteur, String zielId, Selbstaktion aktion) {
         Objects.requireNonNull(aktion, "aktion");
+        Objects.requireNonNull(zielId, "zielId");
         if (!Rechtematrix.ergebnis(akteur.rolle(), Aktion.A22).zugaenglich()) {
             return Pruefung.NICHT_ERLAUBT;
         }
-        return akteur.id().equals(ziel.id()) ? Pruefung.ESKALATION_VERBOTEN : Pruefung.ERLAUBT;
+        return akteur.id().equals(zielId) ? Pruefung.ESKALATION_VERBOTEN : Pruefung.ERLAUBT;
     }
 
     public static boolean entferntLetztenAktivenInhaber(Rolle zielRolle, boolean zielAktiv,

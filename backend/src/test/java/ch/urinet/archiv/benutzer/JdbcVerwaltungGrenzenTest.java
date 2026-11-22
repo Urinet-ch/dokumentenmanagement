@@ -141,6 +141,33 @@ class JdbcVerwaltungGrenzenTest {
     }
 
     @Test
+    void emailAenderungBelegtZweiPlaetzeImMailLimit() throws Exception {
+        mandantenVorbereiten();
+        String akteur = UUID.randomUUID().toString();
+        UUID ziel = UUID.randomUUID();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            in(thread, "urinet", () -> {
+                grenzen.pruefen(akteur, Art.EMAIL_AENDERUNG, ziel);
+                protokoll("urinet", akteur, "BENUTZER_AENDERN", "ANGEFRAGT", "EMAIL_AENDERN", ziel, 0);
+                grenzen.pruefen(akteur, Art.EMAIL, ziel);
+                return null;
+            });
+            assertThatThrownBy(() -> in(thread, "urinet", () -> {
+                grenzen.pruefen(akteur, Art.EMAIL_AENDERUNG, ziel);
+                return null;
+            })).hasRootCauseInstanceOf(ZuVieleAnfragen.class);
+            in(thread, "urinet", () -> {
+                protokoll("urinet", akteur, "BENUTZER_AENDERN", "ANGEFRAGT", "EINLADUNG_ERNEUT", ziel, 0);
+                return null;
+            });
+            assertThatThrownBy(() -> in(thread, "urinet", () -> {
+                grenzen.pruefen(akteur, Art.EMAIL, ziel);
+                return null;
+            })).hasRootCauseInstanceOf(ZuVieleAnfragen.class);
+        }
+    }
+
+    @Test
     void gleichzeitigePruefungenKoennenDieGrenzeNichtUeberschreiten() throws Exception {
         mandantenVorbereiten();
         String akteur = UUID.randomUUID().toString();
