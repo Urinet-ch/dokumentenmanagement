@@ -27,6 +27,18 @@ Funktionalität: WordPress-Grundgerüst
     Wenn das Archiv nicht erreichbar ist
     Dann liefert das Plugin eine freundliche Meldung ohne technische Einzelheiten
 
+  @req-7.9
+  Szenario: Der Änderungs-Feed invalidiert alte Dokumente sofort
+    Angenommen ein WordPress mit dem Archiv-Plugin
+    Wenn ein Dokument im Lese-Feed zurückgezogen wird oder der Feed ausfällt
+    Dann gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab
+
+  @req-7.10
+  Szenario: Das Erfassungsformular folgt dem Art-Schema
+    Angenommen ein WordPress mit dem Archiv-Plugin
+    Wenn die Geschäftsstelle die Erfassungsseite öffnet
+    Dann zeigt das Plugin Schema-Felder und sperrt die öffentliche Zugriffsstufe
+
   @req-7.7
   Szenario: Das Plugin funktioniert mit unterstütztem WordPress und PHP
     Angenommen ein WordPress mit dem Archiv-Plugin
