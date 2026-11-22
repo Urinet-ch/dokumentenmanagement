@@ -42,6 +42,7 @@ Es erscheint «Zu viele Anfragen.» Das Archiv begrenzt, wie oft eine Aktion in 
 
 ## Kein Mandant oder keine Rolle
 Die Startseite zeigt «Ihrem Benutzer ist kein Mandant oder keine Rolle im Archiv zugeordnet. Bitte wenden Sie sich an den Inhaber.» Ihr Zugang ist dann noch nicht fertig eingerichtet. Gemeint ist die Person, die Ihren Zugang eingerichtet hat; wenden Sie sich an sie.
+Der Link «So funktioniert es» bei der Meldung öffnet diese Hilfe, ohne die Startseite zu verlassen.
 
 ## Eine neue Version ist verfügbar
 Oben erscheint «Eine neue Version ist verfügbar.»

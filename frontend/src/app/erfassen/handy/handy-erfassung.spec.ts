@@ -6,6 +6,7 @@ import { AnmeldungService, Benutzer, Sitzungszustand } from '../../gemeinsam/anm
 import { Aktion, Rolle, darf } from '../../gemeinsam/anmeldung/rechte';
 import { ONLINE } from '../../gemeinsam/online';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { HilfeLeiste } from '../../hilfe/hilfe-leiste.service';
 import { UploadPort } from '../upload-port';
 import { MAX_AUFNAHME_BYTES, MAX_AUFNAHME_SEITEN } from './aufnahme-grenzen';
 import { HandyErfassung } from './handy-erfassung';
@@ -121,6 +122,16 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
     expect(element.textContent).toContain(TEXTE.handy.keineKamera);
     expect(hinweise()).toEqual(['kantenErkannt', 'kantenErkannt']);
     expect(scanner.auftraege).toEqual([undefined, undefined]);
+  });
+
+  it('öffnet die Warteschlangenhilfe ohne die begonnene Aufnahme zu verlieren', async () => {
+    await zeigen();
+    await fotoWaehlen();
+    const link = element.querySelector<HTMLAnchorElement>('.schlange > a[href="/hilfe#erfassen-offline"]')!;
+    link.click();
+    expect(TestBed.inject(HilfeLeiste).anker()).toBe('erfassen-offline');
+    expect(TestBed.inject(HilfeLeiste).offen()).toBe(true);
+    expect(hinweise()).toEqual(['kantenErkannt']);
   });
 
   it('weist eine zusätzliche Seite ab, bevor sie in den Scanner gelangt', async () => {
@@ -424,6 +435,16 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
       expect([...speicher.inhalt.keys()]).toEqual(['b']);
       expect(element.querySelectorAll('[data-test=fehlerhaft]')).toHaveLength(1);
       expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toContain(TEXTE.handy.geloescht);
+    });
+
+    it('öffnet die Hilfe direkt beim fehlerhaften Upload', async () => {
+      speicher.inhalt.set('a', eintrag('a', 'u1', 'fehlerhaft'));
+      anmeldung.als('mitarbeiter', 'u1');
+      await zeigen();
+      element.querySelector<HTMLAnchorElement>('[data-test=fehlerhaft] a[href="/hilfe#erfassen-offline"]')!.click();
+      expect(TestBed.inject(HilfeLeiste).anker()).toBe('erfassen-offline');
+      expect(TestBed.inject(HilfeLeiste).offen()).toBe(true);
+      expect(speicher.inhalt.has('a')).toBe(true);
     });
   });
 });
