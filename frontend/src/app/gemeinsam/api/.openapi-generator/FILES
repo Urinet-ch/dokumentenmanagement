@@ -42,6 +42,8 @@ model/benutzer-ansicht.ts
 model/benutzer-status.ts
 model/bestaetigung.ts
 model/branding-dto.ts
+model/chat-bewertung-eingabe.ts
+model/chat-bewertung.ts
 model/chat-frage.ts
 model/chat-gespraech.ts
 model/chat-nachricht.ts

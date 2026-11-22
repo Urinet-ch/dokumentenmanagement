@@ -21,6 +21,8 @@ export * from './benutzer-ansicht';
 export * from './benutzer-status';
 export * from './bestaetigung';
 export * from './branding-dto';
+export * from './chat-bewertung';
+export * from './chat-bewertung-eingabe';
 export * from './chat-frage';
 export * from './chat-gespraech';
 export * from './chat-nachricht';

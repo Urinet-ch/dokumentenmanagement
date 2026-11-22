@@ -2,6 +2,7 @@ package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.ki.domain.chat.Aufgeraeumt;
 import ch.urinet.archiv.ki.domain.chat.ChatAntwort;
+import ch.urinet.archiv.ki.domain.chat.ChatBewertung;
 import ch.urinet.archiv.ki.domain.chat.Gespraech;
 import ch.urinet.archiv.ki.domain.chat.GespraechKopf;
 import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
@@ -9,6 +10,7 @@ import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.UUID;
 
 /**
@@ -51,6 +53,21 @@ public interface ChatSpeicher {
 
     /** Sperrt das eigene Gespräch und liest den Kontext bis zur Antwort in der laufenden Transaktion. */
     Optional<ChatAnalyseDaten> analyseDaten(long nachrichtId, String benutzer);
+
+    /** Sperrt die Antwort nur, wenn sie im eigenen Gespräch liegt und den Status {@code OK} hat. */
+    boolean bewertbareAntwortSperren(long nachrichtId, String benutzer);
+
+    /** Bewertung einer eigenen, bewertbaren Antwort. */
+    Optional<ChatBewertung> bewertung(long nachrichtId, String benutzer);
+
+    /** Registriert einen Bewertungsversuch; leer bedeutet Erfolg, andernfalls die verbleibende Wartezeit in Sekunden. */
+    OptionalLong bewertungVersuchRegistrieren(String benutzer, Instant jetzt, int grenze, Instant seit);
+
+    /** Legt eine Bewertung an oder aktualisiert die bestehende, ohne {@code erstellt} zu ändern. */
+    void bewertungSpeichern(ChatBewertung bewertung, String benutzer);
+
+    /** Entfernt die Bewertung der eigenen Antwort. */
+    boolean bewertungLoeschen(long nachrichtId, String benutzer);
 
     /** Löscht Nachrichten mit {@code zeit} vor {@code grenze}, danach Gespräche ohne Nachrichten (Requirement 5.4). */
     Aufgeraeumt aufraeumen(Instant grenze);
