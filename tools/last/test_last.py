@@ -131,6 +131,9 @@ class Server(BaseHTTPRequestHandler):
         koerper = self.rfile.read(int(self.headers["Content-Length"]))
         with self.sperre:
             self.anfragen.append(("POST", self.path, koerper))
+        if b'name="dateien"; filename=' not in koerper:
+            self.antworten(400, {"detail": "Formularfeld dateien fehlt"})
+            return
         self.antworten(202, [{"id": "00000000-0000-0000-0000-000000000001"}])
 
 

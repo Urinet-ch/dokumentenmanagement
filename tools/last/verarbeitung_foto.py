@@ -102,7 +102,7 @@ def anfrage(url: str, token: str, daten: bytes | None = None, medientyp: str | N
 
 def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float) -> float:
     endung, typ = fototyp(foto)
-    koerper, medientyp = multipart("dateien[]", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
+    koerper, medientyp = multipart("dateien", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
     start = time.monotonic()
     if status != 202 or not isinstance(ergebnis, list) or not ergebnis or "id" not in ergebnis[0]:
