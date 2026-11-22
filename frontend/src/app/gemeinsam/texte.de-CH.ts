@@ -326,6 +326,10 @@ export const TEXTE = {
     ganzesBild: 'Ganzes Bild verwendet.',
     aufbereitenFehler:
       'Die Seite konnte nicht zugeschnitten werden. Bitte verwerfen und neu aufnehmen.',
+    aufnahmeZuVieleSeiten: (max: number) =>
+      `Ein Dokument darf höchstens ${max} Seiten haben. Bitte schliessen Sie die Erfassung ab oder verwerfen Sie eine Seite.`,
+    aufnahmeZuGross: 'Die Erfassung ist grösser als 10 MiB. Bitte teilen Sie das Dokument auf oder wählen Sie kleinere Bilder.',
+    aufnahmeZuVielePixel: 'Das Bild hat mehr als 12 Megapixel. Bitte wählen Sie ein kleineres Kamerabild.',
     anpassenFehler: 'Der Zuschnitt konnte nicht angepasst werden. Der bisherige Zuschnitt bleibt.',
     anpassen: (nr: number) => `Zuschnitt Seite ${nr} anpassen`,
     verwerfen: (nr: number) => `Seite ${nr} verwerfen`,

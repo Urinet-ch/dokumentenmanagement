@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { AufnahmeGrenzeFehler, istAufnahmeGrenze, MAX_AUFNAHME_BYTES } from '../aufnahme-grenzen';
 import { Ecken } from './ecken';
 import { ScannerAntwort } from './scanner-nachricht';
 
@@ -24,6 +25,7 @@ export abstract class ScannerPort {
 export class WorkerScanner extends ScannerPort {
   private worker?: Worker;
   private nr = 0;
+  private reihe: Promise<void> = Promise.resolve();
   private readonly offen = new Map<number, (antwort: ScannerAntwort) => void>();
 
   vorbereiten(): void {
@@ -31,13 +33,25 @@ export class WorkerScanner extends ScannerPort {
   }
 
   aufbereiten(bild: Blob, ecken?: Ecken | null): Promise<Aufbereitet> {
+    const lauf = this.reihe.then(() => this.einzelnesAufbereiten(bild, ecken));
+    this.reihe = lauf.then(
+      () => undefined,
+      () => undefined,
+    );
+    return lauf;
+  }
+
+  private einzelnesAufbereiten(bild: Blob, ecken?: Ecken | null): Promise<Aufbereitet> {
+    if (bild.size > MAX_AUFNAHME_BYTES) {
+      return Promise.reject(new AufnahmeGrenzeFehler('groesse'));
+    }
     const worker = (this.worker ??= this.starten());
     const nr = ++this.nr;
     return new Promise((erledigt, abgelehnt) => {
       this.offen.set(nr, (antwort) =>
         antwort.ok
           ? erledigt({ ecken: antwort.ecken, breite: antwort.breite, hoehe: antwort.hoehe, arbeitsfassung: antwort.arbeitsfassung })
-          : abgelehnt(new Error(antwort.fehler)),
+          : abgelehnt(istAufnahmeGrenze(antwort.fehler) ? new AufnahmeGrenzeFehler(antwort.fehler) : new Error(antwort.fehler)),
       );
       worker.postMessage(ecken === undefined ? { nr, bild } : { nr, bild, ecken });
     });

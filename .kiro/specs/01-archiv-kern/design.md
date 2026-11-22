@@ -1472,6 +1472,17 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     Service Worker, «installiert» heisst: alle Dateien der Gruppe «app» aus `ngsw.json` liegen im Cache. Req 4.9 prüft
     ein Szenario in der Zeitzone Asia/Tokyo mit fester Uhr (23:59 in Zürich) und Upload nach Mitternacht; den
     gespeicherten Dateinamen liest es über die API. Req 4.1 (Installation, echte Geräte) weist Fabian manuell nach.
+  - Umsetzung (Aufgabe 3.7, Eingabegrenzen, 22.11.2026): Eine Erfassung ist auf 20 Seiten und 10 MiB für Originale plus
+    Arbeitsfassungen begrenzt; jede Bildseite auf 12 Megapixel. Dateigrösse und Seitenzahl werden beim Eingang, vor dem
+    Speichern in IndexedDB und vor jedem Upload geprüft (auch bei bereits gespeicherten Einträgen). Die Kamera prüft
+    die Pixelzahl vor dem Canvas; der Worker prüft sie nach
+    dem Erzeugen des `ImageBitmap`, aber vor den OpenCV-Rastern. Der Scanner bearbeitet immer nur eine Seite gleichzeitig,
+    damit Mehrseiten-Aufnahmen nicht mehrere decodierte Raster parallel halten. Aufnahmen bleiben bis zum Abschliessen
+    im Komponenten-Arbeitsspeicher; die fertig begrenzte Erfassung folgt danach der vorgeschriebenen IndexedDB-Warteschlange.
+    Die Hilfe-Leiste bleibt im App-Rahmen und navigiert beim Öffnen nicht von `/erfassen` weg; Kameraseiten und Chatverlauf
+    werden dafür nicht zusätzlich persistiert. Werte sind konservative Implementierungsgrenzen: 12 MP entspricht der
+    Verarbeitungsvorgabe aus Req 5.5, 20 Seiten der Grenze für gerenderte KI-Seiten, 10 MiB liegt unter dem Upload, der
+    auf Stufe A den OOM-Abbruch ausgelöst hat. Anleitung und Grenzmeldungen nennen alle drei Grenzen.
 - Suche und Dokumentansicht (Aufgabe 4.6, 11.11.2026; Rest 13.11.2026):
   - Download-Adresse als JSON: Ein Browser folgt dem 302 von `GET /dokumente/{id}/datei` bei `fetch`/XHR selbst und
     schickt dabei den `Authorization`-Header nicht mit, die Antwort der Ablage wäre zudem eine Cross-Origin-Antwort.
