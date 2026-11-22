@@ -1420,6 +1420,17 @@ Vorgeschlagen (Freigabe per eigenem Merge mit Spec 04)». PR #16 ist gemergt und
 Nach dem Merge von Spec 04: Projektseite des UriNet-Archivs um Spec 04, ADR-013 und die Entscheide vom 09.11.2026
 ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachführen»).
 
+## Wissenschat und Archivchat (Requirement 21, Entscheid Fabian 22.11.2026)
+- **Datenmodell:** `chat_gespraech.modus text not null default 'ARCHIV' check (modus in ('ARCHIV','WISSEN'))` (Mandantenschema, Rollback); je Wissensseite das Kennzeichen
+  `fuer_webseite boolean not null default false` mit `fuer_webseite_von`, `fuer_webseite_am` (Protokoll `WISSEN_WEBSEITE_FREIGEGEBEN` und `…_ENTZOGEN`, ohne Inhalte).
+- **Anwendung:** `ChatAgent` wählt die Werkzeugliste nach `modus` (`ARCHIV`: wie bisher; `WISSEN`: nur `wissen_index`, `wissen_seite_zeigen`) und den Systemprompt
+  `wissen-chat` (nur Wissensseiten, Fehlanzeige «Dazu steht nichts in der Wissensbasis», Quelle je Aussage). Kein Umschalten im Gespräch.
+- **REST (intern):** `POST /chat/gespraeche {modus}`; `GET /chat/gespraeche` liefert `modus`; Recht A15 für `WISSEN`.
+- **Öffentlich (Spec 03):** `POST /public/v1/wissen/chat` (Webseiten-Schlüssel, `OeffentlicheWissenWerkzeuge`: `wissen_index_oeffentlich`, `wissen_seite_zeigen_oeffentlich`, Sicht nur auf
+  Seiten mit `fuer_webseite` und Quellen der Stufe `oeffentlich` und Vertraulichkeit `NORMAL`, Prüfung bei jeder Anfrage, nicht aus einem Cache), eigene Grenzen je Client und Budget je Mandant,
+  Schalter `archiv.oeffentlich.wissenschat` (Standard aus, je Mandant).
+- **Offen für die Umsetzung (Welle 18):** `[offen: Form der Freigabe «für Webseite» in der Oberfläche der Wissensseite (Schalter in der Seitenansicht, Recht A16) und Anzeige der Quellen-Zugriffsstufen; Aufgabe 18.3 klärt es und ergänzt hier]`
+
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:
 - **Datenmodell (Mandantenschema `m_<code>`):** Tabelle `wissensquelle_markierung(dokument_id uuid, markiert_von text, markiert_am timestamptz,
