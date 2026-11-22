@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:urinet:chat-bewertungen:v1",
+  "title": "Chat-Bewertung",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "datum",
+    "sterne",
+    "grund",
+    "freitext",
+    "frage",
+    "antwort",
+    "werkzeuge",
+    "treffer",
+    "suchweg",
+    "zeitBisErstemTextMs",
+    "tokens",
+    "modellkennung",
+    "systempromptVersion"
+  ],
+  "properties": {
+    "datum": {
+      "type": "string",
+      "format": "date"
+    },
+    "sterne": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "grund": {
+      "type": ["string", "null"],
+      "enum": ["NICHT_BEANTWORTET", "FALSCH", "UNVOLLSTAENDIG", "QUELLE", "ZU_LANGSAM", "ANDERES", null]
+    },
+    "freitext": {
+      "type": ["string", "null"]
+    },
+    "frage": {
+      "type": ["string", "null"]
+    },
+    "antwort": {
+      "type": ["string", "null"]
+    },
+    "werkzeuge": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "parameter", "anzahlTreffer"],
+        "properties": {
+          "name": {"type": "string"},
+          "parameter": {"type": "object"},
+          "anzahlTreffer": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "treffer": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["typ", "kennung", "rang", "aehnlichkeit"],
+        "properties": {
+          "typ": {"enum": ["DOKUMENT", "WISSENSSEITE"]},
+          "kennung": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "rang": {"type": "integer", "minimum": 1},
+          "aehnlichkeit": {"type": ["number", "null"]}
+        }
+      }
+    },
+    "suchweg": {
+      "type": "array",
+      "items": {"enum": ["HYBRID", "VOLLTEXT", "WISSENSSEITEN"]},
+      "description": "Leeres Array, wenn für historische Daten kein Suchweg gespeichert ist."
+    },
+    "zeitBisErstemTextMs": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ein", "aus"],
+      "properties": {
+        "ein": {"type": ["integer", "null"], "minimum": 0},
+        "aus": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "modellkennung": {
+      "type": ["string", "null"]
+    },
+    "systempromptVersion": {
+      "type": ["string", "null"]
+    }
+  }
+}

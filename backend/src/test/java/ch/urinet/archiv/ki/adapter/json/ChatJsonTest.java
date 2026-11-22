@@ -89,6 +89,14 @@ class ChatJsonTest {
         assertThat(ChatJson.werkzeuge(List.of(aufruf))).contains("\"kontextstufe\":\"INTERN\"");
     }
 
+    @Test
+    void suchwegWirdMitWerkzeugaufrufGespeichert() {
+        var aufruf = new WerkzeugAufruf("dokumente_suchen", Map.of(), List.of(ID), Optional.empty(),
+                Optional.empty(), "VOLLTEXT", Map.of(ID, 0.87));
+        assertThat(ChatJson.werkzeuge(List.of(aufruf)))
+                .contains("\"suchweg\":\"VOLLTEXT\"", "\"aehnlichkeiten\":{\"" + ID + "\":0.87}");
+    }
+
     private static String name(ChatAusgabe ausgabe) {
         return ausgabe.name() + " " + ChatJson.daten(ausgabe);
     }
