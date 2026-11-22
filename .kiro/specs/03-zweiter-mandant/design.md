@@ -492,6 +492,14 @@ Umsetzung (Aufgabe 11.11; Stand: Baustein, Lese-Endpunkte und echter Upload umge
   Wechsel von `X-Archiv-Client` und `X-Archiv-Zugriff` umgeht nichts, `Retry-After`, Suche strenger, Uploads, Chat zählt mit
   und behält seine Grenzen, interne Endpunkte unberührt, Kennzahl nur mit `grund`).
 
+## Umsetzung (Aufgabe 11.11, 22.11.2026)
+- Die Repository-Teile der Schlüsselgrenzen sind vollständig belegt: Stunden-Bucket für Uploads, `Retry-After` und `grund`
+  im einheitlichen 429-Problem-Detail, der Fehlercode `ZU_VIELE_ANFRAGEN` in der Fehlercodetabelle von Spec 01 sowie
+  Unit- und Cucumber-Nachweise für Lesen, Suche, Erfassung, Uploads und den gemeinsamen Chat-Bucket.
+- Lokal wurden die Startwerte durch den Testlauf mit den kleinen Testprofilwerten und die Produktionswerte durch die
+  Konfigurationsprüfung nachvollzogen. Die tatsächliche Kalibrierung am Livegang bleibt ein manueller Nachweis über
+  `archiv_webseite_grenze_abgelehnt_total` und die 429-Einträge im Zugriffsprotokoll; sie ist nicht lokal ersetzbar.
+
 ### WordPress-Plugin `wordpress/urinet-archiv-plugin`
 Nutzer des Vertrags `public-v1` (geändert 13.11.2026, E-B): Das Plugin nutzt nur, was in `docs/schnittstelle/public-v1.yaml`
 steht, und ignoriert unbekannte Felder (Requirement 11.6).
