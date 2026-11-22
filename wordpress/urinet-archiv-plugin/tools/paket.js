@@ -6,8 +6,11 @@ const dateien = [
   'urinet-archiv.php',
   'includes/class-client.php',
   'includes/class-einstellungen.php',
+  'includes/class-feed.php',
+  'includes/class-erfassung.php',
   'includes/class-frontend.php',
   'assets/einstellungen.js',
+  'assets/erfassung.js',
   'assets/chatbot.js',
 ];
 mkdirSync('dist', { recursive: true });
