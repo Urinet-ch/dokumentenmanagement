@@ -322,6 +322,9 @@ class RealmExportKeycloakTest {
         assertThat(zuerst.claims().path("realm_access").path("roles").toString()).contains("inhaber");
         long ersteZeit = zuerst.claims().path("auth_time").asLong();
         assertThat(ersteZeit).isPositive();
+        Response frischeEinstellung = riskanteEinstellung(zuerst.accessToken());
+        assertThat(frischeEinstellung.statusCode()).as(frischeEinstellung.asString()).isEqualTo(422);
+        assertThat(frischeEinstellung.jsonPath().getString("fehlercode")).isEqualTo("KONFIGURATION_UNGUELTIG");
 
         PwaBrowser.Anmeldung sso = browser.anmelden(false, false);
         assertThat(sso.claims().path("auth_time").asLong()).isEqualTo(ersteZeit);
@@ -331,6 +334,9 @@ class RealmExportKeycloakTest {
         assertThat(zuAlt.statusCode()).as(zuAlt.asString()).isEqualTo(401);
         assertThat(zuAlt.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
         assertThat(zuAlt.header("WWW-Authenticate")).contains("insufficient_user_authentication", "max_age=\"60\"");
+        Response alteEinstellung = riskanteEinstellung(zuerst.accessToken());
+        assertThat(alteEinstellung.statusCode()).as(alteEinstellung.asString()).isEqualTo(401);
+        assertThat(alteEinstellung.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
         Response cookieAllein = stepUpAnfrage(sso.accessToken());
         assertThat(cookieAllein.statusCode()).isEqualTo(401);
         assertThat(cookieAllein.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
@@ -347,6 +353,16 @@ class RealmExportKeycloakTest {
 
     private Response stepUpAnfrage(String token) {
         return given().auth().oauth2(token).contentType(ContentType.JSON).body("{").post("/api/v1/benutzer");
+    }
+
+    private Response riskanteEinstellung(String token) {
+        String pfad = "/api/v1/mandant/einstellungen";
+        Response stand = given().auth().oauth2(token).get(pfad);
+        assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+        return given().auth().oauth2(token).header("If-Match", stand.header("ETag"))
+                .queryParam("bestaetigt", "chat.aufbewahrungMonate")
+                .contentType("application/merge-patch+json").body("{\"chat\":{\"aufbewahrungMonate\":0}}")
+                .patch(pfad);
     }
 
     private static final class PwaBrowser {

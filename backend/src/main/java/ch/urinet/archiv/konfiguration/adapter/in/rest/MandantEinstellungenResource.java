@@ -1,6 +1,8 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
+import ch.urinet.archiv.gemeinsam.adapter.in.rest.ProblemAbbildung;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.gemeinsam.domain.BestaetigungNoetig.Auswirkung;
 import ch.urinet.archiv.konfiguration.adapter.EinstellungenPatch;
@@ -38,6 +40,7 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -183,6 +186,17 @@ public class MandantEinstellungenResource {
         var ergebnis = verwaltung.aendern(Versionskopf.version(ifMatch), eingabe,
                 BestaetigteEinstellungen.lesen(bestaetigt), wer());
         return Response.ok(ergebnis).tag(tag(ergebnis.version())).build();
+    }
+
+    @ServerExceptionMapper
+    public Response fachFehler(FachFehler fehler) {
+        Response antwort = new ProblemAbbildung().fachFehler(fehler);
+        return switch (fehler.code()) {
+            case VERSION_FEHLT, VERSION_KONFLIKT, BESTAETIGUNG_NOETIG, STEP_UP_NOETIG,
+                    KONFIGURATION_UNGUELTIG, ZU_VIELE_ANFRAGEN ->
+                    Response.fromResponse(antwort).tag(tag(konfiguration.aktuelleVersion())).build();
+            default -> antwort;
+        };
     }
 
     private EinstellungenVerwaltung.Eingabe patch(Einstellungen vorher, JsonNode eingabe) {

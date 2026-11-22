@@ -65,22 +65,32 @@ class MandantEinstellungenResourceTest {
         String etag = export.getHeader("ETag");
         String ungültigUndRiskant = "{\"chat\":{\"aufbewahrungMonate\":0}}";
 
-        assertThat(given().contentType("application/merge-patch+json").body(ungültigUndRiskant)
-                .patch(PFAD).statusCode()).isEqualTo(401);
-        assertThat(given().auth().oauth2(mitarbeiter).contentType("application/merge-patch+json")
-                .body(ungültigUndRiskant).patch(PFAD).statusCode()).isEqualTo(403);
-        assertThat(patch(inhaber, null, "{").statusCode()).isEqualTo(428);
-        assertThat(patch(inhaber, "\"0\"", ungültigUndRiskant).statusCode()).isEqualTo(412);
+        Response anonym = given().contentType("application/merge-patch+json").body(ungültigUndRiskant).patch(PFAD);
+        assertThat(anonym.statusCode()).isEqualTo(401);
+        assertThat(anonym.getHeader("ETag")).isNull();
+        Response verboten = given().auth().oauth2(mitarbeiter).contentType("application/merge-patch+json")
+                .body(ungültigUndRiskant).patch(PFAD);
+        assertThat(verboten.statusCode()).isEqualTo(403);
+        assertThat(verboten.getHeader("ETag")).isNull();
+        Response fehlendeVersion = patch(inhaber, null, "{");
+        assertThat(fehlendeVersion.statusCode()).isEqualTo(428);
+        assertThat(fehlendeVersion.getHeader("ETag")).isEqualTo(etag);
+        Response veralteteVersion = patch(inhaber, "\"0\"", ungültigUndRiskant);
+        assertThat(veralteteVersion.statusCode()).isEqualTo(412);
+        assertThat(veralteteVersion.getHeader("ETag")).isEqualTo(etag);
         Response riskant = patch(inhaber, etag, ungültigUndRiskant);
         assertThat(riskant.statusCode()).as(riskant.asString()).isEqualTo(409);
         assertThat(riskant.path("fehlercode").toString()).isEqualTo("BESTAETIGUNG_NOETIG");
+        assertThat(riskant.getHeader("ETag")).isEqualTo(etag);
         Response bestaetigt = given().auth().oauth2(inhaber).header("If-Match", etag)
                 .queryParam("bestaetigt", "chat.aufbewahrungMonate").contentType("application/merge-patch+json")
                 .body(ungültigUndRiskant).patch(PFAD);
         assertThat(bestaetigt.statusCode()).as(bestaetigt.asString()).isEqualTo(401);
         assertThat(bestaetigt.path("fehlercode").toString()).isEqualTo("STEP_UP_NOETIG");
+        assertThat(bestaetigt.getHeader("ETag")).isEqualTo(etag);
         Response ungueltigerName = patch(inhaber, etag, "{\"branding\":{\"name\":42}}");
         assertThat(ungueltigerName.statusCode()).as(ungueltigerName.asString()).isEqualTo(422);
+        assertThat(ungueltigerName.getHeader("ETag")).isEqualTo(etag);
         assertThat(given().auth().oauth2(inhaber).get("/api/v1/konfiguration").getHeader("ETag"))
                 .isEqualTo(etag);
     }
