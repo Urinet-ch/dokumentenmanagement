@@ -18,6 +18,7 @@ Ohne Verbindung ist keine Anmeldung möglich. Mit der Kamera erfassen können Si
 4. Sobald wieder eine Verbindung besteht, wählen Sie «Anmelden». Seiten, die noch nicht abgeschlossen sind, legt die App vorher in die Warteschlange. Nach der Anmeldung werden die Aufnahmen hochgeladen.
 
 Ohne Anmeldung gibt es nur die Kamera, nicht das Hochladen von Dateien.
+Der Knopf «Hilfe» öffnet auf dieser Seite auch ohne Anmeldung diesen Abschnitt, ohne Ihre Aufnahme zu verlassen.
 
 > **Achtung:** Aufnahmen ohne Anmeldung gehören noch niemandem. Hochgeladen werden sie mit der nächsten Anmeldung auf diesem Gerät, die Dokumente erfassen darf. Melden Sie sich darum selbst an, bevor jemand anderes das Gerät benutzt.
 
