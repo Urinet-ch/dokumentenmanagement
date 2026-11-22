@@ -4,6 +4,7 @@ Neue Tokens stellen Sie nicht auf dieser Seite aus. Wie ein neues Token entsteht
 
 ## Webseiten-Schlüssel
 Für eine Webseite gibt es getrennte Schlüssel zum Lesen und zur Erfassung. Die Person, die WordPress verwaltet, trägt sie in den Plugin-Einstellungen ein; angezeigt werden sie dort später nicht mehr. Leere Schlüsselfelder behalten den bisherigen Wert.
+Zum Speichern der Plugin-Einstellungen muss JavaScript im Browser aktiviert sein.
 
 Das Plugin darf erst eingesetzt werden, wenn der Änderungs-Feed zur sofortigen Aktualisierung zurückgezogener Dokumente eingerichtet und geprüft ist. Wenden Sie sich dafür an den Betrieb.
 

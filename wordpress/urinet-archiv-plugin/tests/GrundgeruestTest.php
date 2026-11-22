@@ -33,17 +33,66 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 	public function test_erste_speicherung_verschluesselt_den_schluessel_einmal(): void {
 		delete_option( Urinet_Archiv_Einstellungen::OPTION );
 		Urinet_Archiv_Einstellungen::registrieren();
-		update_option(
-			Urinet_Archiv_Einstellungen::OPTION,
+		$neu = Urinet_Archiv_Einstellungen::validieren(
 			array(
 				'url'             => 'https://example.invalid',
 				'cache_minuten'   => '10',
 				'lese_schluessel' => $this->token,
 			)
 		);
+		update_option( Urinet_Archiv_Einstellungen::OPTION, $neu );
 		$werte = Urinet_Archiv_Einstellungen::werte();
 		$this->assertSame( $this->token, Urinet_Archiv_Einstellungen::entschluesseln( $werte['lese_schluessel'] ) );
+		$this->assertArrayNotHasKey( Urinet_Archiv_Einstellungen::OPTION, get_registered_settings() );
 	}
+
+	// phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fopen,WordPress.WP.AlternativeFunctions.file_system_operations_fwrite,WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Simulierte Eingabeströme im Speicher.
+	public function test_json_eingang_ohne_content_length_ist_begrenzt(): void {
+		$strom = fopen( 'php://temp', 'w+' );
+		$json  = '{"_wpnonce":"test","url":"https://example.invalid","cache_minuten":"10"}';
+		fwrite( $strom, $json );
+		rewind( $strom );
+		$eingabe = Urinet_Archiv_Einstellungen::eingang_lesen( $strom, null, 'application/json' );
+		$this->assertIsArray( $eingabe );
+		$this->assertSame( '10', $eingabe['cache_minuten'] );
+		fclose( $strom );
+
+		$strom = fopen( 'php://temp', 'w+' );
+		fwrite( $strom, str_repeat( 'x', Urinet_Archiv_Einstellungen::MAX_EINGANG + 100 ) );
+		rewind( $strom );
+		$fehler = Urinet_Archiv_Einstellungen::eingang_lesen( $strom, null, 'application/json' );
+		$this->assertWPError( $fehler );
+		$this->assertSame( 413, $fehler->get_error_data()['status'] );
+		$this->assertSame( Urinet_Archiv_Einstellungen::MAX_EINGANG + 1, ftell( $strom ) );
+		fclose( $strom );
+
+		$prefix = '{"_wpnonce":"test","cache_minuten":"10","url":"';
+		$suffix = '"}';
+		$strom  = fopen( 'php://temp', 'w+' );
+		fwrite( $strom, $prefix . str_repeat( 'x', Urinet_Archiv_Einstellungen::MAX_EINGANG - strlen( $prefix . $suffix ) ) . $suffix );
+		rewind( $strom );
+		$this->assertIsArray( Urinet_Archiv_Einstellungen::eingang_lesen( $strom, null, 'application/json' ) );
+		fclose( $strom );
+	}
+
+	public function test_json_eingang_prueft_laenge_und_festes_schema(): void {
+		foreach ( array(
+			array( '{"_wpnonce":"test","url":"x","cache_minuten":"10","extra":"x"}', null, 'application/json', 400 ),
+			array( '{"_wpnonce":"test","url":"x","cache_minuten":[]}', null, 'application/json', 400 ),
+			array( '{}', '8193', 'application/json', 413 ),
+			array( '{}', '2', 'application/x-www-form-urlencoded', 415 ),
+			array( str_repeat( 'x', 8193 ), '1', 'application/json', 413 ),
+		) as $fall ) {
+			$strom = fopen( 'php://temp', 'w+' );
+			fwrite( $strom, $fall[0] );
+			rewind( $strom );
+			$fehler = Urinet_Archiv_Einstellungen::eingang_lesen( $strom, $fall[1], $fall[2] );
+			$this->assertWPError( $fehler );
+			$this->assertSame( $fall[3], $fehler->get_error_data()['status'] );
+			fclose( $strom );
+		}
+	}
+	// phpcs:enable WordPress.WP.AlternativeFunctions.file_system_operations_fopen,WordPress.WP.AlternativeFunctions.file_system_operations_fwrite,WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
 	public function test_erfassungsschluessel_und_geschaeftsstellenrolle(): void {
 		$erfassung = 'synthetisch-erfassung-' . bin2hex( random_bytes( 8 ) );

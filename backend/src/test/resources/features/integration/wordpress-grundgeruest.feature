@@ -9,6 +9,12 @@ Funktionalität: WordPress-Grundgerüst
     Wenn die Webseiten-Schlüssel und die Rolle der Geschäftsstelle eingestellt werden
     Dann sind die Schlüssel verschlüsselt gespeichert und auf der Einstellungsseite nicht sichtbar
 
+  @req-7.1
+  Szenario: Die Einstellungsanfrage ohne Content-Length bleibt begrenzt
+    Angenommen ein WordPress mit dem Archiv-Plugin
+    Wenn die Einstellungsdaten ohne Längenangabe als Eingabestrom eintreffen
+    Dann prüft das Plugin die Grösse und das feste Schema der Anfrage
+
   @req-7.3 @req-7.4
   Szenario: Die höchste WordPress-Rolle bestimmt den getrennten Cache
     Angenommen ein WordPress mit dem Archiv-Plugin

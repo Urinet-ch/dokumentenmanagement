@@ -5,7 +5,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Urinet_Archiv_Einstellungen {
-	const OPTION = 'urinet_archiv_einstellungen';
+	const OPTION      = 'urinet_archiv_einstellungen';
+	const MAX_EINGANG = 8192;
 
 	public static function werte(): array {
 		$werte = get_option( self::OPTION, array() );
@@ -65,7 +66,83 @@ final class Urinet_Archiv_Einstellungen {
 
 	public static function registrieren(): void {
 		add_option( self::OPTION, array(), '', false );
-		register_setting( 'urinet_archiv', self::OPTION, array( 'sanitize_callback' => array( self::class, 'validieren' ) ) );
+	}
+
+	public static function eingang_lesen( $stream, ?string $laenge, string $typ ) {
+		if ( null !== $laenge && ( ! ctype_digit( $laenge ) || (float) $laenge > self::MAX_EINGANG ) ) {
+			return new WP_Error( 'eingang_zu_gross', 'Die Anfrage ist zu gross oder ungültig.', array( 'status' => 413 ) );
+		}
+		if ( ! preg_match( '~^application/json(?:\s*;\s*charset=utf-8)?$~i', $typ ) ) {
+			return new WP_Error( 'eingang_typ', 'Das Anfrageformat ist ungültig.', array( 'status' => 415 ) );
+		}
+		$inhalt = stream_get_contents( $stream, self::MAX_EINGANG + 1 );
+		if ( false === $inhalt ) {
+			return new WP_Error( 'eingang_lesen', 'Die Anfrage konnte nicht gelesen werden.', array( 'status' => 400 ) );
+		}
+		if ( strlen( $inhalt ) > self::MAX_EINGANG ) {
+			return new WP_Error( 'eingang_zu_gross', 'Die Anfrage ist zu gross.', array( 'status' => 413 ) );
+		}
+		$eingabe = json_decode( $inhalt, true, 8 );
+		$felder  = array( '_wpnonce', 'url', 'cache_minuten', 'rolle_mitglieder', 'rolle_vorstand', 'rolle_geschaeftsstelle', 'lese_schluessel', 'erfassung_schluessel', 'erfassung_entfernen' );
+		if ( ! is_array( $eingabe ) || array_is_list( $eingabe ) || array_diff( array_keys( $eingabe ), $felder )
+			|| ! isset( $eingabe['_wpnonce'], $eingabe['url'], $eingabe['cache_minuten'] )
+		) {
+			return new WP_Error( 'eingang_schema', 'Die Einstellungen sind ungültig.', array( 'status' => 400 ) );
+		}
+		foreach ( $eingabe as $wert ) {
+			if ( ! is_string( $wert ) ) {
+				return new WP_Error( 'eingang_schema', 'Die Einstellungen sind ungültig.', array( 'status' => 400 ) );
+			}
+		}
+		if ( isset( $eingabe['erfassung_entfernen'] ) && '1' !== $eingabe['erfassung_entfernen'] ) {
+			return new WP_Error( 'eingang_schema', 'Die Einstellungen sind ungültig.', array( 'status' => 400 ) );
+		}
+		return $eingabe;
+	}
+
+	public static function speichern(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Sie dürfen diese Einstellungen nicht ändern.' ), 403 );
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Der JSON-Nonce wird nach begrenztem Lesen geprüft.
+		$methode = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Vor dem Lesen streng als Zahl validiert.
+		$laenge = isset( $_SERVER['CONTENT_LENGTH'] ) ? wp_unslash( $_SERVER['CONTENT_LENGTH'] ) : null;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Vor dem Lesen streng gegen den Medientyp geprüft.
+		$typ = wp_unslash( $_SERVER['CONTENT_TYPE'] ?? '' );
+		if ( 'POST' !== $methode ) {
+			wp_send_json_error( array( 'message' => 'Die Anfrage ist ungültig.' ), 405 );
+		}
+		$stream = fopen( 'php://input', 'rb' );
+		if ( false === $stream ) {
+			wp_send_json_error( array( 'message' => 'Die Anfrage konnte nicht gelesen werden.' ), 400 );
+		}
+		$eingabe = self::eingang_lesen( $stream, $laenge, $typ );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- PHP-Eingabestrom, keine Datei.
+		fclose( $stream );
+		if ( is_wp_error( $eingabe ) ) {
+			wp_send_json_error( array( 'message' => $eingabe->get_error_message() ), $eingabe->get_error_data()['status'] );
+		}
+		if ( ! wp_verify_nonce( $eingabe['_wpnonce'], 'urinet_archiv_speichern' ) ) {
+			wp_send_json_error( array( 'message' => 'Die Sitzung ist abgelaufen. Bitte laden Sie die Seite neu.' ), 403 );
+		}
+		unset( $eingabe['_wpnonce'] );
+		$alt    = self::werte();
+		$neu    = self::validieren( $eingabe );
+		$fehler = get_settings_errors( self::OPTION );
+		if ( $fehler ) {
+			wp_send_json_error( array( 'message' => $fehler[0]['message'] ), 400 );
+		}
+		if ( $neu !== $alt && ! update_option( self::OPTION, $neu ) ) {
+			wp_send_json_error( array( 'message' => 'Die Einstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut.' ), 500 );
+		}
+		wp_send_json_success();
+	}
+
+	public static function skript( string $seite ): void {
+		if ( 'settings_page_urinet-archiv' === $seite ) {
+			wp_enqueue_script( 'urinet-archiv-einstellungen', plugins_url( 'assets/einstellungen.js', dirname( __DIR__ ) . '/urinet-archiv.php' ), array(), '0.1.0', true );
+		}
 	}
 
 	public static function validieren( $eingabe ): array {
@@ -146,8 +223,9 @@ final class Urinet_Archiv_Einstellungen {
 			wp_die( esc_html__( 'Sie dürfen diese Einstellungen nicht ändern.', 'urinet-archiv' ) );
 		}
 		$werte = self::werte();
-		echo '<div class="wrap"><h1>UriNet Archiv</h1><form action="options.php" method="post">';
-		settings_fields( 'urinet_archiv' );
+		echo '<div class="wrap"><h1>UriNet Archiv</h1><div id="urinet-archiv-meldung" role="status" aria-live="polite"></div><noscript>Zum Speichern der Einstellungen ist JavaScript erforderlich.</noscript>';
+		echo '<form id="urinet-archiv-formular" action="' . esc_url( admin_url( 'admin-post.php?action=urinet_archiv_speichern' ) ) . '" method="post">';
+		wp_nonce_field( 'urinet_archiv_speichern' );
 		echo '<table class="form-table" role="presentation"><tbody>';
 		foreach ( array(
 			'url'           => 'Archiv-URL',

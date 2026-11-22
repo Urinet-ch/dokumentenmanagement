@@ -16,6 +16,10 @@ When('Gäste, Mitglieder und Personen mit beiden Rollen Dokumente abrufen', func
   this.test = 'test_stufen_und_cache_sind_getrennt';
 });
 
+When('die Einstellungsdaten ohne Längenangabe als Eingabestrom eintreffen', function () {
+  this.test = 'test_json_eingang_(ohne_content_length_ist_begrenzt|prueft_laenge_und_festes_schema)';
+});
+
 When('das Archiv nicht erreichbar ist', function () {
   this.test = 'test_nicht_erreichbares_archiv_liefert_freundlichen_fehler';
 });
@@ -25,7 +29,7 @@ When('das Plugin mit der unterstützten PHP-Version und WordPress geprüft wird'
   this.codingStandards = true;
 });
 
-Then(/^(?:sind die Schlüssel verschlüsselt gespeichert und auf der Einstellungsseite nicht sichtbar|meldet das Plugin die jeweilige höchste Stufe und trennt die Cache-Einträge|liefert das Plugin eine freundliche Meldung ohne technische Einzelheiten|bestehen die Plugin-Tests und die WordPress-Coding-Standards-Prüfung)$/, function () {
+Then(/^(?:sind die Schlüssel verschlüsselt gespeichert und auf der Einstellungsseite nicht sichtbar|prüft das Plugin die Grösse und das feste Schema der Anfrage|meldet das Plugin die jeweilige höchste Stufe und trennt die Cache-Einträge|liefert das Plugin eine freundliche Meldung ohne technische Einzelheiten|bestehen die Plugin-Tests und die WordPress-Coding-Standards-Prüfung)$/, function () {
   assert.ok(this.test, 'Kein WordPress-Test ausgewählt');
   const lokal = Boolean(process.env.WP_TESTS_DIR);
   const command = lokal ? (process.env.WORDPRESS_PHP || 'php') : 'npm';

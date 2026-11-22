@@ -40,3 +40,10 @@ diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
    # Reine Spec-Anpassungen ohne vollständigen Lauf (entschieden von Fabian am 13.11.2026): «art» bestimmt mit
    # .github/scripts/nur-spec.py, ob jede geänderte Datei eine .md-Datei unter .kiro/ oder docs/ ist (strenge
    # Positivliste; PR: alle Dateien zwischen Basis und Kopf, Push auf main: gegenüber «before», neuer Branch oder
+@@ -310,5 +344,5 @@
+   testzahl:
+     name: Backend-Tests vollständig (jede Klasse genau einmal)
+     if: needs.art.outputs.nur-spec != 'true'
+-    needs: [art, backend, gruppen]
++    needs: [art, backend, gruppen, wordpress]
+     runs-on: ubuntu-24.04

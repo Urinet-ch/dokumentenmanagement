@@ -6,6 +6,7 @@ const dateien = [
   'urinet-archiv.php',
   'includes/class-client.php',
   'includes/class-einstellungen.php',
+  'assets/einstellungen.js',
 ];
 mkdirSync('dist', { recursive: true });
 const temporaer = mkdtempSync(join('dist', '.paket-'));
@@ -31,6 +32,7 @@ try {
     if (existsSync(ziel)) unlinkSync(ziel);
   }
   if (existsSync(join(ordner, 'includes'))) rmdirSync(join(ordner, 'includes'));
+  if (existsSync(join(ordner, 'assets'))) rmdirSync(join(ordner, 'assets'));
   if (existsSync(ordner)) rmdirSync(ordner);
   rmdirSync(temporaer);
 }
