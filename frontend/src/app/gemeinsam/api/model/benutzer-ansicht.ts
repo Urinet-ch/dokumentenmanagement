@@ -27,6 +27,8 @@ export interface BenutzerAnsicht {
     einladungOffenSeit?: string;
     letzteAktion?: LetzteAktion;
     etag?: string;
+    apiTokenVerwaltungspfad?: string;
+    apiTokenHinweis?: string;
 }
 export namespace BenutzerAnsicht {
 }

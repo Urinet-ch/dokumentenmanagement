@@ -80,6 +80,8 @@ services:
       - archiv_data_key
       # Aufgabe 5.6: Passwort des Postfachs archiv@urinet.ch für den Versand; leer, solange ARCHIV_SMTP_PASSWORT fehlt
       - archiv_smtp_passwort
+      # Spec 06, 19.7 (Namenssperre, Weg A): 32 Zufallsbytes in Base64, dauerhaft; ein Austausch macht Sperren unprüfbar
+      - namenssperre_salz
     networks:
       intern: {}
       web: {}
@@ -322,6 +324,8 @@ secrets:
     file: ./secrets/archiv_data_key
   archiv_smtp_passwort:
     file: ./secrets/archiv_smtp_passwort
+  namenssperre_salz:
+    file: ./secrets/namenssperre_salz
   archiv_db_postgres:
     file: ./secrets/archiv_db_postgres
   archiv_db_owner_scram:

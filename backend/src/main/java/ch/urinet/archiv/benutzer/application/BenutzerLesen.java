@@ -31,7 +31,8 @@ public class BenutzerLesen {
     public record BenutzerAnsicht(String id, String benutzername, String vorname, String nachname, String email,
                           Set<Rolle> rollen, boolean rollenkonflikt, BenutzerStatus status,
                           boolean totp, boolean google, boolean voruebergehendGesperrt, Instant einladungOffenSeit,
-                          BenutzerAktivitaet.LetzteAktion letzteAktion, String etag) {
+                          BenutzerAktivitaet.LetzteAktion letzteAktion, String etag,
+                          String apiTokenVerwaltungspfad, String apiTokenHinweis) {
         @Override
         public String toString() {
             return "Ansicht[geschützt]";
@@ -64,7 +65,8 @@ public class BenutzerLesen {
                 benutzer.email(), benutzer.rollen(), benutzer.rollen().size() != 1, zustand, benutzer.totp(),
                 benutzer.google(), identitaet.anmeldungGesperrt(code, benutzer.id()),
                 zustand == BenutzerStatus.EINGELADEN ? angaben.einladungSeit() : null,
-                angaben.letzteAktion(), BenutzerEtag.berechnen(benutzer, zustand));
+                angaben.letzteAktion(), BenutzerEtag.berechnen(benutzer, zustand), "/verwaltung/api-tokens",
+                "API-Tokens und Webseiten-Schlüssel bleiben beim Sperren oder Deaktivieren gültig.");
     }
 
     static BenutzerStatus status(IdentitaetsDienst.Benutzer benutzer, BenutzerStatusSpeicher speicher) {

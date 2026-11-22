@@ -2,11 +2,38 @@
 @spec-06 @benutzer-verwaltung
 Funktionalität: Benutzer des eigenen Mandanten verwalten
 
-  @req-3.1 @req-4.8 @req-7.5
+  @req-3.1 @req-4.8 @req-4.13 @req-7.5
   Szenario: Liste und Detail zeigen nur Benutzer des eigenen Mandanten
     Angenommen in zwei Mandanten gibt es je einen synthetischen Benutzer
     Wenn der Inhaber die Benutzerliste und beide Details abruft
     Dann sieht er nur den eigenen Benutzer und fremde Kennungen ergeben 404
+
+  @req-4.12 @req-4.8
+  Szenario: Rechte-Übersicht zeigt die Matrix nur für Benutzer des eigenen Mandanten
+    Angenommen in zwei Mandanten gibt es je einen synthetischen Benutzer
+    Wenn der Inhaber die Rechte beider Benutzer abruft
+    Dann sieht er die Rechte aus der Matrix nur für den eigenen Benutzer
+
+  @req-3.18 @req-4.5 @req-4.9
+  Szenario: Rollenwechsel verlangt die aktuelle Version und widerruft alte Tokens
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter besteht
+    Wenn der Inhaber die Rolle mit fehlender, veralteter und aktueller Version ändert
+    Dann ist nur die aktuelle Rollenänderung wirksam und das alte Token widerrufen
+
+  @req-4.11
+  Szenario: Eine Inhabervergabe benötigt die Bestätigung eines zweiten Inhabers
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter und zwei aktive Inhaber bestehen
+    Wenn der Inhaber die Inhaberrolle beantragt und beide Inhaber darüber entscheiden
+    Dann kann nur der zweite Inhaber die Vergabe bestätigen
+
+  @req-4.7
+  Szenario: Gleichzeitige Rollenwechsel lassen einen aktiven Inhaber zurück
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und zwei aktive Inhaber bestehen
+    Wenn beide Inhaber gleichzeitig die Rolle des anderen ändern
+    Dann wird ein Vorgang gesperrt und mindestens ein Inhaber bleibt aktiv
 
   @req-3.2 @req-6.1 @req-6.2 @req-6.3 @req-6.4
   Szenario: Ein neuer Benutzer wird eingeladen und die Anlage protokolliert

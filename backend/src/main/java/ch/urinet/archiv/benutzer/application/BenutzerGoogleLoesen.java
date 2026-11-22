@@ -50,7 +50,8 @@ public class BenutzerGoogleLoesen {
         UUID vorgangId = UUID.randomUUID();
         vorgang.ausfuehren(mandant, eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
                 () -> {
-                    if (!identitaet.benutzerLesen(mandant.wert(), id).google()) {
+                    var benutzer = identitaet.benutzerLesen(mandant.wert(), id);
+                    if (benutzer.rollen().size() > 1 || !benutzer.google()) {
                         throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
                     }
                 }, () -> {
