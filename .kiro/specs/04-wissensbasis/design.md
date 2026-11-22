@@ -1422,21 +1422,19 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
 
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:
-- **Datenmodell (Mandantenschema `m_<code>`):** Tabelle `wissensquelle_markierung(dokument_id bigint, markiert_von text, markiert_am timestamptz,
-  beendet_am timestamptz null, beendet_von text null)`; Fremdschlüssel auf `dokument`, höchstens eine aktive Markierung je Dokument
+- **Datenmodell (Mandantenschema `m_<code>`):** Tabelle `wissensquelle_markierung(dokument_id uuid, markiert_von text, markiert_am timestamptz,
+  beendet_am timestamptz null, beendet_von text null)`; Fremdschlüssel auf `dokument(id)` (gleicher Typ `uuid`), höchstens eine aktive Markierung je Dokument
   (partieller eindeutiger Index auf `dokument_id` wo `beendet_am is null`); Rollback und Check-Constraints nach Changeset-Konvention.
 - **Anwendungsschicht:** `WissensquelleMarkieren` (Recht A16, Vorprüfung nach Requirement 20.3, Markierung schreiben, `WissenIngestStarten`
   aufrufen, Protokoll `WISSENSQUELLE_MARKIERT`), `WissensquelleEntfernen`; `WissenIngestStarten` und `WissenIngestVerarbeiten` prüfen
   statt `d.art = 'WISSENSQUELLE'` die aktive Markierung (`PanacheDokumentRepository`, `JdbcWissenIngest`).
 - **REST:** `POST /dokumente/{id}/wissensquelle` und `DELETE /dokumente/{id}/wissensquelle` (A16, Mandantenfilter, 404 für fremde
-  Dokumente, 422 mit Grundcode `KEINE_WISSENSQUELLE`/Vorbedingung); `GET /wissen/quellen` (Liste für die Oberfläche).
+  Dokumente, 404 für unsichtbare Dokumente (Mandant, Vertraulichkeit), 403 für sichtbare Dokumente ohne A16, 422 mit Grundcode `KEINE_WISSENSQUELLE`/Vorbedingung nur für fachliche Vorbedingungen nach Requirement 20.3); `GET /wissen/quellen` (Liste für die Oberfläche).
 - **Migration (Changeset, Mandant, ein Changeset):** (1) Für jedes Dokument der Art `WISSENSQUELLE`: vorherige Fassung nach `dokument_version`
   (Grund «Migration Wissensquelle»), Art auf `PROJEKTDOKUMENT` setzen (fehlende Pflichtfelder blockieren nicht), Markierung anlegen (Benutzer «System»);
   (2) die Art `WISSENSQUELLE` aus `dokumentart` löschen und aus der aktiven Konfigurationsversion entfernen (neue Version mit Quelle
-  `MIGRATION`); (3) Vorbedingung: `PROJEKTDOKUMENT` existiert, sonst abbrechen mit Meldung. Seed-Teil `_alle/dokumentarten-wissen.json`
-  und Changeset 044 (Bestand legt die Art an) entfallen für neue Mandanten; `SeedPruefung` und `Konfiguration` kennen die Art nicht mehr
-  (Spec 05: Folgeänderung zu Requirement 1.6 von Spec 05). `[offen: Fremdschlüssel auf dokumentart.code aus dokument_version und weiteren Tabellen
-  (belegnummer_eigen u. a.) vor dem Löschen prüfen; Aufgabe 17.1 klärt das im Spike und ergänzt hier]`
+  `MIGRATION`); (3) Vorbedingung: `PROJEKTDOKUMENT` existiert, sonst abbrechen mit Meldung. Der Seed-Teil `_alle/dokumentarten-wissen.json` entfällt; das bestehende Changeset `044-wissensquelle-bestand` bleibt **unverändert** (angewendete Changesets werden nie geändert oder entfernt, sonst scheitert die Prüfsumme bestehender Mandanten): Ein neuer Mandant durchläuft 044 und danach das neue Migrations-Changeset, das die Art ohne Dokumente wieder löscht (Reihenfolge der Changesets garantiert das). Die Seed-Logik und `SeedPruefung` legen die Art nicht mehr an; `SeedPruefung` und `Konfiguration` kennen die Art nicht mehr
+  (Spec 05: Folgeänderung zu Requirement 1.6 von Spec 05). Spike 22.11.2026 (Zweitreview Mac 2, Prüfung der Changesets, nicht des Produktivbestands): Fremdschlüssel auf `dokumentart.code` bestehen in `dokument.art`, `belegnummer_eigen.art`, `dokumentart.fremdbeleg_art`, `dokumentart.ohne_zahlungsdaten_art`, `dokumentart_klassifikation.art` (**`ON DELETE CASCADE`**: vor dem Löschen ausdrücklich prüfen, damit die Migration bei einem bleibenden Verweis abbricht, statt Zuordnungen still zu entfernen) und `regel.art` (`ON DELETE RESTRICT`). `dokument_version` hat keinen Art-Fremdschlüssel; die historische Art steht im JSON-Feld `daten`. `konfiguration_version.inhalt` ist JSON; `dokument` und `dokument_version` verweisen auf Konfigurationsversionen. Beide Versionstabellen sind append-only: Historische Abbilder bleiben, für die aktive Konfiguration entsteht eine neue Version. Aufgabe 17.1 setzt das um.
 - **Oberfläche:** Knopf in der Dokumentansicht (Spec 07: Anleitung `wissen.md` und `dokument.md` nachziehen), Liste «Wissensquellen» in
   der Wissen-Seite.
 - **Bedrohungsmodell:** Markieren löst KI-Kosten aus (Tokenbudget, Requirement 12 bleibt: höchstens ein Ingest je Mandant); nur A16;
