@@ -1,4 +1,4 @@
-<button type="button" class="sprunglink" (click)="zumInhalt(inhalt)">{{ texte.zumInhalt }}</button>
+<button type="button" class="sprunglink" [attr.inert]="hilfe.offen() ? '' : null" (click)="zumInhalt(inhalt)">{{ texte.zumInhalt }}</button>
 @if (!online()) {
   <p class="pwa-hinweis" role="status" aria-live="polite" data-test="offline-hinweis">
     {{ texte.offlineHinweis }}
@@ -21,9 +21,10 @@
     [opened]="menue().length > 0 && !mobil()"
     [disableClose]="!mobil()"
     [class.ohne-menue]="menue().length === 0"
+    [attr.inert]="hilfe.offen() ? '' : null"
   >
     @if (menue().length > 0) {
-      <div class="seitenleiste">
+      <aside class="seitenleiste">
         <a class="marke" routerLink="/" (click)="mobil() && nav.close()">
           @if (branding.branding().logoUrl; as logoUrl) {
             <img class="logo" [src]="logoUrl" alt="" />
@@ -82,10 +83,10 @@
             </div>
           }
         </nav>
-      </div>
+      </aside>
     }
   </mat-sidenav>
-  <mat-sidenav-content>
+  <mat-sidenav-content [attr.inert]="hilfe.offen() ? '' : null">
     <header class="kopf">
       @if (menue().length > 0 && mobil()) {
         <button

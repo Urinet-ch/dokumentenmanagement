@@ -567,3 +567,20 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - Nachweise: `hilfe-kontextlinks.feature` (`@req-4.6`) für alle vier Stellen sowie fehlenden Mandanten und fehlende
   Rolle, einschliesslich Fokusrückgabe und erhaltener Aufnahme beziehungsweise Dateiauswahl; Angular-Tests für die
   Zustände der Komponenten.
+
+## Umsetzung (Aufgabe 23.5, 22.11.2026)
+- `hilfe-qualitaet.feature` prüft Einführungsschritte, ganze Anleitung und jeden sichtbaren Abschnitt der Hilfe-Leiste
+  mit axe auf dem ganzen Dokument, für alle vier Rollen und ohne Anmeldung, bei 375 und 1280 px in hell und dunkel.
+  Sie prüft auch den waagrechten Bildlauf und zeichnet nach der Anmeldung beziehungsweise dem Laden der Startseite
+  zusätzliche Anfragen auf: keine an einen anderen Ursprung und keine an `/api/`. Die Anmeldung selbst ist nicht Teil
+  dieser Messung. Fremde Anfragen werden im Test blockiert. Der tatsächlich abgelegte Einführungsvermerk wird auf seine
+  vier Felder und die gehashte Kennung geprüft.
+- Die Hilfe-Kopfzeile ist kein zweites `banner` mehr. Bei geöffnetem Dialog sind Navigation, Seiteninhalt und
+  Sprunglink mit `inert` für Tastatur und Screenreader gesperrt; nach dem Schliessen sind sie wieder erreichbar. So
+  stehen die beiden Inhaltsverzeichnisse nicht gleichzeitig als aktive Landmarks zur Verfügung. Die Seitenleiste ist
+  ein `aside`, damit die Marke auch auf breiten Bildschirmen innerhalb einer Landmark liegt.
+- Überschriften ohne IDs verwenden `[attr.id]`: Die vorherige Property-Bindung schrieb bei `null` die Zeichenfolge
+  `null` als ID. `anleitung-text.spec.ts` prüft, dass die Attribute in der Leiste tatsächlich fehlen.
+- Nachweis 10.1 und 10.2: `ReqAbdeckungTest` und `SzenarienShardTest` prüfen das Repository; für 9.6 enthält der
+  PR unter `backend/` ausschliesslich eine Feature-Datei. Oberfläche und Bedienung der Anleitung ändern sich nicht,
+  darum brauchen Anleitung und Katalog keine Textänderung.
