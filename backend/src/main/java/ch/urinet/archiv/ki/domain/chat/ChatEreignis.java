@@ -33,7 +33,7 @@ public sealed interface ChatEreignis {
      */
     record WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
                             Optional<Datenstand> datenstand, Optional<QuellWissen> wissen,
-                            Optional<Kontextstufe> kontextstufe) implements ChatEreignis {
+                            Optional<Kontextstufe> kontextstufe, String suchweg) implements ChatEreignis {
         public WerkzeugErgebnis {
             Objects.requireNonNull(name, "name");
             parameter = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(parameter, "parameter")));
@@ -45,12 +45,18 @@ public sealed interface ChatEreignis {
 
         public WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
                                 Optional<Datenstand> datenstand, Optional<QuellWissen> wissen) {
-            this(name, parameter, dokumente, datenstand, wissen, Optional.empty());
+            this(name, parameter, dokumente, datenstand, wissen, Optional.empty(), null);
+        }
+
+        public WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
+                                Optional<Datenstand> datenstand, Optional<QuellWissen> wissen,
+                                Optional<Kontextstufe> kontextstufe) {
+            this(name, parameter, dokumente, datenstand, wissen, kontextstufe, null);
         }
 
         public WerkzeugErgebnis(String name, Map<String, Object> parameter, List<QuellDokument> dokumente,
                                 Optional<Datenstand> datenstand) {
-            this(name, parameter, dokumente, datenstand, Optional.empty(), Optional.empty());
+            this(name, parameter, dokumente, datenstand, Optional.empty(), Optional.empty(), null);
         }
     }
 
@@ -90,14 +96,18 @@ public sealed interface ChatEreignis {
     }
 
     /** Dokument in einem Werkzeugergebnis. */
-    record QuellDokument(UUID id, String titel, String seite) {
+    record QuellDokument(UUID id, String titel, String seite, Double aehnlichkeit) {
         public QuellDokument {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(titel, "titel");
         }
 
         public QuellDokument(UUID id, String titel) {
-            this(id, titel, null);
+            this(id, titel, null, null);
+        }
+
+        public QuellDokument(UUID id, String titel, String seite) {
+            this(id, titel, seite, null);
         }
     }
 
