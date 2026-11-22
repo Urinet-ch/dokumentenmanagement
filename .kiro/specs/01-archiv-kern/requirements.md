@@ -140,6 +140,7 @@ damit Lohn- und Vertragsdaten geschützt sind.
 | A12 | Kontakte ändern, CSV-Import | erlaubt | 403 | 403 | 403 |
 | A13 | Zugriffsprotokoll einsehen | erlaubt | 403 | 403 | 403 |
 | A14 | API-Tokens verwalten | erlaubt | 403 | 403 | 403 |
+| A24 | Chat-Auswertung ansehen und exportieren | erlaubt | 403 | 403 | 403 |
 
 A11 umfasst das Anlegen, Ändern, Deaktivieren und Löschen von Dokumentarten. Das Lesen der Dokumentarten ist kein
 A11-Verwaltungsrecht (alle Rollen). Das Lesen früherer Konfigurationsversionen gehört dagegen zu A11 (Spec 05,
@@ -153,6 +154,10 @@ Chat (Spec 02, entschieden von Fabian am 14.11.2026; ohne eigene Zeile der Matri
 Die Zeilen A15 bis A19 (Wissensbasis) ergänzt Spec 04, Requirement 12.1; sie gehören zu dieser Matrix, mit derselben Bedeutung von «erlaubt», «403» und «404» und demselben Vorrang 404 vor 403. Massgeblich für ihren Wortlaut ist Spec 04, Requirement 12.1.
 
 Die Zeilen A20 bis A23 (Einstellungen, Benutzer, Benutzerverwaltung, Rollen zuweisen) ergänzt Spec 06, Requirement 4.1, mit derselben Bedeutung von «erlaubt», «403» und «404». Sie stehen nicht in dieser Tabelle; `Aktion` und `RechtematrixSpecTest` übernehmen sie mit Spec 06, Aufgabe 19.5. Die Bezeichnungen der Zeilen A1 bis A19 bleiben unverändert.
+
+A24 ergänzt Spec 02, Requirement 15.5 (Entscheid und Korrektur von Fabian am 22.11.2026): Nur der `inhaber` darf die
+Chat-Auswertung ansehen und exportieren. Die Aktion gilt nicht für API-Tokens oder Webseiten-Schlüssel; für `geschaeftsstelle`
+und die übrigen Rollen gilt 403.
 
 Präzisierung zu A6 und A12 (entschieden von Fabian am 14.11.2026, Requirement 17): Zu A6 gehört auch das Ansehen der Kontakte (Partnerauswahl, Liste und Detailansicht, 17.1–17.5), zu A12 «Kontakte ändern» auch Zusammenführen, als inaktiv markieren und wieder aktivieren (17.6–17.16; Wiederaktivieren vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR). Der Wortlaut der Zeilen A6 und A12 bleibt, weil `RechtematrixSpecTest` ihn gegen `Aktion.bezeichnung()` prüft.
 

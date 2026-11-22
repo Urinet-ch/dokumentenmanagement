@@ -7,6 +7,7 @@ import ch.urinet.archiv.ki.application.chat.ChatAnalyseLesen;
 import ch.urinet.archiv.ki.application.chat.ChatWerkzeugDokument;
 import ch.urinet.archiv.ki.domain.chat.Aufgeraeumt;
 import ch.urinet.archiv.ki.domain.chat.ChatAntwort;
+import ch.urinet.archiv.ki.domain.chat.ChatBewertung;
 import ch.urinet.archiv.ki.domain.chat.ChatNachricht;
 import ch.urinet.archiv.ki.domain.chat.ChatRolle;
 import ch.urinet.archiv.ki.domain.chat.ChatStatus;
@@ -26,11 +27,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -216,6 +219,72 @@ public class JdbcChatSpeicher implements ChatSpeicher {
                 werkzeuge, quellen));
     }
 
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public boolean bewertbareAntwortSperren(long nachrichtId, String benutzer) {
+        return !abfragen("select 1 from " + schema() + ".chat_nachricht n join " + schema()
+                        + ".chat_gespraech g on g.id = n.gespraech_id where n.id = ? and n.rolle = 'ASSISTENT' "
+                        + "and n.status = 'OK' and g.benutzer = ? for update of n, g",
+                z -> 1, nachrichtId, benutzer).isEmpty();
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public Optional<ChatBewertung> bewertung(long nachrichtId, String benutzer) {
+        String s = schema();
+        return abfragen("select b.nachricht_id, b.sterne, b.grund, b.freitext, b.erstellt, b.geaendert from " + s
+                        + ".chat_bewertung b join " + s + ".chat_nachricht n on n.id = b.nachricht_id join " + s
+                        + ".chat_gespraech g on g.id = n.gespraech_id where b.nachricht_id = ? and b.benutzer = ? "
+                        + "and n.rolle = 'ASSISTENT' and n.status = 'OK' and g.benutzer = ?",
+                z -> new ChatBewertung(z.getLong(1), z.getInt(2), grund(z.getString(3)), z.getString(4),
+                        z.getTimestamp(5).toInstant(), z.getTimestamp(6).toInstant()),
+                nachrichtId, benutzer, benutzer).stream().findFirst();
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public OptionalLong bewertungVersuchRegistrieren(String benutzer, Instant jetzt, int grenze, Instant seit) {
+        String s = schema();
+        abfragen("select pg_advisory_xact_lock(hashtextextended(?, 0))", z -> null,
+                "chat-bewertung:" + s + ":" + benutzer);
+        aendern("delete from " + s + ".chat_bewertung_versuch where zeit <= ?", Timestamp.from(seit));
+        record Zaehler(long anzahl, Instant aelteste) { }
+        Zaehler zaehler = abfragen("select count(*), min(zeit) from " + s
+                        + ".chat_bewertung_versuch where benutzer = ? and zeit > ?",
+                z -> new Zaehler(z.getLong(1), z.getTimestamp(2) == null ? null : z.getTimestamp(2).toInstant()),
+                benutzer, Timestamp.from(seit)).getFirst();
+        if (zaehler.anzahl() >= grenze) {
+            long sekunden = Duration.between(jetzt, zaehler.aelteste().plus(Duration.ofHours(1))).toSeconds();
+            return OptionalLong.of(Math.max(1, sekunden + 1));
+        }
+        aendern("insert into " + s + ".chat_bewertung_versuch (benutzer, zeit) values (?, ?)",
+                benutzer, Timestamp.from(jetzt));
+        return OptionalLong.empty();
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public void bewertungSpeichern(ChatBewertung bewertung, String benutzer) {
+        aendern("insert into " + schema() + ".chat_bewertung "
+                        + "(nachricht_id, benutzer, sterne, grund, freitext, erstellt, geaendert) "
+                        + "values (?, ?, ?, ?, ?, ?, ?) on conflict (nachricht_id, benutzer) do update set "
+                        + "sterne = excluded.sterne, grund = excluded.grund, freitext = excluded.freitext, "
+                        + "geaendert = excluded.geaendert",
+                bewertung.nachrichtId(), benutzer, bewertung.sterne(),
+                bewertung.grund() == null ? null : bewertung.grund().name(), bewertung.freitext(),
+                Timestamp.from(bewertung.erstellt()), Timestamp.from(bewertung.geaendert()));
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public boolean bewertungLoeschen(long nachrichtId, String benutzer) {
+        return aendern("delete from " + schema() + ".chat_bewertung b using " + schema()
+                        + ".chat_nachricht n join " + schema() + ".chat_gespraech g on g.id = n.gespraech_id "
+                        + "where b.nachricht_id = n.id and n.id = ? and b.benutzer = ? and n.rolle = 'ASSISTENT' "
+                        + "and n.status = 'OK' and g.benutzer = ?",
+                nachrichtId, benutzer, benutzer) == 1;
+    }
+
     /**
      * In einer Transaktion: Nachrichten vor der Grenze, danach Gespräche ohne Nachrichten, deren letzte Änderung vor der
      * Grenze liegt. Die Bedingung auf {@code geaendert} schützt ein Gespräch, in das gerade eine neue Frage kommt
@@ -245,6 +314,10 @@ public class JdbcChatSpeicher implements ChatSpeicher {
             throw new IllegalStateException("Chat ohne Mandanten-Schema");
         }
         return schema;
+    }
+
+    private static ChatBewertung.Grund grund(String grund) {
+        return grund == null ? null : ChatBewertung.Grund.valueOf(grund);
     }
 
     /** SQL-NULL für eine Ganzzahl-Spalte. */

@@ -21,7 +21,9 @@ public class ZuVieleAnfragen extends FachFehler {
         /** Neue oder nicht im Prüf-Cache enthaltene API-Token-Prüfungen je vertrauenswürdiger Quelladresse. */
         SCHLUESSELPRUEFUNG,
         /** Grenze für Verwaltungsaktionen (Spec 06, 6.6). */
-        VERWALTUNG
+        VERWALTUNG,
+        /** Grenze für Chat-Bewertungen (Spec 02, 15.4). */
+        CHAT_BEWERTUNGEN
     }
 
     private final Grund grund;

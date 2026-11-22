@@ -8,6 +8,8 @@ import { MENUE, abschnitte } from '../gemeinsam/navigation';
 import { Symbol } from '../gemeinsam/symbol';
 import { ONLINE } from '../gemeinsam/online';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { einfuehrungSchritte } from '../hilfe/einfuehrung-schritte';
+import { EinfuehrungVermerk } from '../hilfe/einfuehrung-vermerk';
 
 @Component({
   selector: 'app-start',
@@ -21,6 +23,15 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
           <p>{{ texte.start.untertitel }}</p>
         }
       </div>
+      @if (vermerk.bekannt() === false && schritte()[0]; as schritt) {
+        <section class="karte einfuehrung" aria-labelledby="einfuehrung-titel">
+          @if (branding.branding().logoUrl; as logoUrl) {
+            <img class="einfuehrung-logo" [src]="logoUrl" alt="" />
+          }
+          <h2 id="einfuehrung-titel">{{ schritt.titel }}</h2>
+          <p>{{ schritt.text }}</p>
+        </section>
+      }
       @if (abschnitte().length > 0) {
         <h2 class="nur-screenreader">{{ texte.anmeldung.funktionen }}</h2>
         @for (abschnitt of abschnitte(); track abschnitt.gruppe) {
@@ -70,6 +81,14 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
     }
   `,
   styles: `
+    .einfuehrung {
+      margin-bottom: 1.5rem;
+    }
+    .einfuehrung-logo {
+      max-width: 120px;
+      max-height: 60px;
+      object-fit: contain;
+    }
     .abschnitt {
       margin-bottom: 1.5rem;
     }
@@ -172,6 +191,7 @@ export class Start {
   protected readonly anmeldung = inject(AnmeldungService);
   protected readonly texte = TEXTE;
   protected readonly branding = inject(BrandingService);
+  protected readonly vermerk = inject(EinfuehrungVermerk);
   /** Ohne Verbindung ist keine Anmeldung möglich; «Erfassen» nimmt dann Aufnahmen in die Warteschlange (Req 4.4). */
   protected readonly online = inject(ONLINE);
   /** Ziel nach der Anmeldung (vom Guard gesetzt). */
@@ -181,6 +201,10 @@ export class Start {
   /** Anzahl im Eingangskorb, wo vorhanden (Req 8.6); fehlt sie, zeigt die Kachel ihre Beschreibung. */
   protected readonly anzahl = computed(() => this.zaehler?.anzahl() ?? null);
   protected readonly vorname = computed(() => this.anmeldung.benutzer()?.name.trim().split(/\s+/)[0] ?? '');
+  protected readonly schritte = computed(() => {
+    const rolle = this.anmeldung.benutzer()?.rolle;
+    return rolle ? einfuehrungSchritte((aktion) => this.anmeldung.darf(aktion), this.branding.branding().name, this.texte.kopf.rollen[rolle]) : [];
+  });
   private readonly zaehler = inject(EingangskorbZaehler, { optional: true });
 
   protected anmelden(): void {
