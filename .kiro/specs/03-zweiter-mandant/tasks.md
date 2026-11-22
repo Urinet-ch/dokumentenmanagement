@@ -39,7 +39,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 10.3 Branding pro Mandant [Frontend] [Infra]
   - `GET /api/v1/branding?domain=`, Web-App lädt Name/Logo/Farbe; Keycloak-Theme `vhf-gsk` auf `archiv-auth.apps.urinet.ch`; Traefik-Router (Labels in `deploy/infomaniak/compose.yml`) für die Verbands-Domain, ausgerollt nur über den Deploy-Workflow
   - Umsetzung (PR #228): öffentlicher Branding-Endpunkt und Web-App mit neutralem Fallback; Domains bleiben ausserhalb des Repos konfigurierbar, da die Domain-Entscheidung offen ist. Offen: Keycloak-Theme und Traefik-Router (Deploy). Nachbesserung Review: Quelle ist `archiv.branding.mandanten.*` statt `mandant.branding` (Entscheid in design.md); Domain `archiv.apps.urinet.ch` ist Standard für UriNet, `ARCHIV_BRANDING_VHF_GSK_DOMAIN` muss im Deploy gesetzt werden, sobald die Domain feststeht; Seitentitel und Startseite zeigen den Mandantennamen; Primärfarben ohne WCAG-AA-Kontrast (4,5:1) fallen auf die Standardfarbe zurück; Logos nur auf eigener Origin.
-  - Vorschlag aus PR #242: Keycloak-Theme `vhf-gsk` und Traefik-Router sind vorbereitet; Einzelheiten in design.md. Deploy und Prüfung sind weiterhin nicht belegt, deshalb bleibt der Haken offen.
+  - Vorschlag aus PR #242: Keycloak-Theme `vhf-gsk` ist vorbereitet; die Betriebs- und Entscheidungsgrenzen stehen in `docs/betrieb/branding-mandant2.md` und design.md. Der Traefik-Router bleibt bis zum Entscheid von Fabian bewusst entfernt; Deploy und Prüfung sind weiterhin nicht belegt, deshalb bleibt der Haken offen.
   - PR #299: Traefik-Router für den Host von VHF/GSK wieder entfernt (Compose-Policy der VPS; ein Host nach ihrer Namensregel wäre mit dem Deploy sofort öffentlich, Abweichung von tech.md «Erreichbarkeit»); er kommt mit einem Entscheid von Fabian in einem eigenen PR, Einzelheiten in design.md.
   - _Anforderungen: 2.1–2.3_
 
@@ -168,10 +168,13 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 15.1, 6.4_
   - _Abhängig von: 11.7_
 
-- [ ] 11.12 Plugin: Änderungs-Feed und Erfassung [Frontend]
+- [x] 11.12 Plugin: Änderungs-Feed und Erfassung [Frontend]
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 13.11.2026 (E-A); Feed vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR
   - `class-feed.php` (WP-Cron, Transients ab `stufe` aufwärts verwerfen, 410 → alles verwerfen; Hintergrund nur Feed und Statusabruf über die Referenz); `class-erfassung.php` (WP-Admin für die Rolle der Geschäftsstelle, Liste, Formular aus `/erfassung/dokumentarten`, Angaben je Referenz als Post-Meta und Vorbelegung beim Bestätigen, Datei ansehen, Datei nicht in der Mediathek, Referenz und Bearbeiter mit Meldung über `PUT /erfassung/bearbeiter/{kennung}`, `If-Match`, 412 → neu laden, Veröffentlichen erst nach `ARCHIVIERT`, Wiederholen, «Entfernen» = Zurückziehen)
   - Browser-Szenarien mit Cucumber.js + Playwright gegen wp-env
+  - Umsetzung 23.11.2026: Der 5-Minuten-Feed invalidiert den betroffenen Zugriff und höhere Stufen; abgelaufene Cursor laden den Bestand neu. Ein Feed-Ausfall entfernt die Gültigkeitsmarke und blockiert die Ausgabe zwischengespeicherter Treffer. Der Erfassungsbereich nutzt ausschliesslich den separaten Erfassungs-Schlüssel, speichert Referenz, Status, Version und Formularentwurf lokal und streamt Dateien ohne Ablage in der Mediathek. Änderungen arbeiten mit `If-Match`; bei 412 wird der Entwurf verworfen und zum Neuladen aufgefordert. Datei- und Metadatenannahme sind begrenzt; die vorgeschaltete Empfangsgrenze bleibt zwingend.
+  - Nachweis: `npm test` (15 Tests, 64 Assertions), `npm run test:cucumber` (7 Szenarien, 28 Schritte; Erfassungsformular im Browser via Playwright gegen wp-env), PHPCS, PHP-/JavaScript-Syntax, `npm run build`, `composer audit` und `npm audit --omit=dev --audit-level=high` grün. Vollständiges `npm audit --audit-level=high` meldet 7 moderate Befunde in Entwicklungsabhängigkeiten, keinen hohen Befund; die vorgeschlagene erzwungene Abwertung von `@wordpress/env` wäre ein Breaking Change und wurde nicht vorgenommen.
+  - Offen für Fabian: Nachweis der äussersten Hosting-Empfangsgrenzen für Chunked-Anfragen und Test auf einer echten WordPress-Seite; bis dahin bleibt der Einsatz gesperrt (README).
   - _Anforderungen: 7.9, 7.10_
   - _Abhängig von: 11.9, 11.10_
 
