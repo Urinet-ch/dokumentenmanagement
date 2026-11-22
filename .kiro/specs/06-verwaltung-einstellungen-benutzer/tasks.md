@@ -159,7 +159,7 @@ auf Server oder Secrets aus der Sitzung.
     Anfragekörper höchstens 16 KiB (HTTP 413) in 20.2.
   - _Abhängig von: Spec 05: 17.7_
 
-- [x] 20.2 REST Einstellungen [Backend]
+- [ ] 20.2 REST Einstellungen [Backend]
   - `GET` mit Katalog und Block `betrieb`, `PATCH` als Merge Patch mit `If-Match`, `bestaetigt`, Step-up, Vorschau und
     `Auswirkung`, Zurücksetzen (Gruppe, Version), Datei und Kommando mit Bestätigung; Rechte je Gruppe (A20, A19, A11); Code
     `BESTAETIGUNG_NOETIG`.

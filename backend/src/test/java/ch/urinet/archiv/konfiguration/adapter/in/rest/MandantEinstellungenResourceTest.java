@@ -1,12 +1,18 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
+import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
+import ch.urinet.archiv.benutzer.adapter.out.persistence.JdbcVerwaltungGrenzen;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.arc.ClientProxy;
+import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -18,6 +24,7 @@ import java.net.HttpURLConnection;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +35,22 @@ class MandantEinstellungenResourceTest {
 
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenbank;
+    @Inject VerwaltungGrenzen grenzen;
+    private VerwaltungGrenzen urspruenglicheGrenzen;
+
+    @BeforeEach
+    void grenzenIsolieren() {
+        urspruenglicheGrenzen = ClientProxy.unwrap(grenzen);
+        QuarkusMock.installMockForType(new JdbcVerwaltungGrenzen(null, null, 1, 1, 1, 1) {
+            @Override
+            public void pruefen(String akteur, Art art, UUID ziel) { }
+        }, VerwaltungGrenzen.class);
+    }
+
+    @AfterEach
+    void grenzenWiederherstellen() {
+        QuarkusMock.installMockForType(urspruenglicheGrenzen, VerwaltungGrenzen.class);
+    }
 
     @Test
     void katalogUndBetriebsbudgetSindMandantenbezogenUndNurFuerBerechtigteLesbar() throws Exception {

@@ -51,7 +51,6 @@ import java.util.function.Function;
 @Path("/mandant/einstellungen")
 @Tag(name = "Einstellungen")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed("inhaber")
 public class MandantEinstellungenResource {
     @Schema(name = "EinstellungenZuruecksetzen")
     public record ZuruecksetzenDto(String gruppe, Integer version) {
@@ -108,6 +107,7 @@ public class MandantEinstellungenResource {
 
     @GET
     @ErfordertAktion(Aktion.A20)
+    @RolesAllowed("inhaber")
     @Operation(summary = "Einstellungskatalog und Betriebsbudget lesen")
     @APIResponse(responseCode = "200", description = "Katalog und aktueller Budgetstand",
             content = @Content(schema = @Schema(implementation = KatalogAntwortDto.class)))
@@ -118,6 +118,7 @@ public class MandantEinstellungenResource {
 
     @PATCH
     @ErfordertAktion(Aktion.A20)
+    @RolesAllowed("inhaber")
     @Consumes({"application/merge-patch+json", MediaType.APPLICATION_JSON})
     @Operation(summary = "Einstellungen ändern")
     @RequestBody(required = true, content = {
@@ -143,6 +144,7 @@ public class MandantEinstellungenResource {
     @POST
     @Path("/vorschau")
     @ErfordertAktion(Aktion.A20)
+    @RolesAllowed("inhaber")
     @Consumes({"application/merge-patch+json", MediaType.APPLICATION_JSON})
     @Operation(summary = "Änderung der Einstellungen vorschauen")
     @RequestBody(required = true, content = {
@@ -161,6 +163,7 @@ public class MandantEinstellungenResource {
     @POST
     @Path("/zuruecksetzen")
     @ErfordertAktion(Aktion.A20)
+    @RolesAllowed("inhaber")
     @Consumes(MediaType.APPLICATION_JSON)
     @Operation(summary = "Einstellungen einer Gruppe oder Version zurücksetzen")
     @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,

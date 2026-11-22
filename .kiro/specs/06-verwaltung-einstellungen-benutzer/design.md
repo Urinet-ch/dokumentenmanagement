@@ -352,7 +352,9 @@ bei einer Rücksetzung auf eine historische Version vorsorglich ebenfalls. Vorsc
 Risikoprüfung; die Vorschau verlangt keine Bestätigung und schreibt weder Version noch Protokoll. Die Bestätigung
 `bestaetigt` nennt die riskanten Schlüssel kommasepariert; beim Dateiimport gelten dieselben Prüfung und Step-up,
 beim Betreiberkommando dieselbe Bestätigung ohne Benutzer-Step-up. Schemafehler verdecken weder eine lesbare veraltete
-Datei-Basisversion noch eine erkennbare unbestätigte riskante Einstellung.
+Datei-Basisversion noch eine erkennbare unbestätigte riskante Einstellung. Für die Verwaltungsraten zählen
+`KONFIGURATION_AENDERN`-Einträge nur, wenn mindestens ein Änderungspfad zu `einstellungen.*` gehört; Änderungen anderer
+Konfigurationsbereiche verbrauchen keine Einstellungsrate.
 
 Die 16-KiB-Grenze wird beim HTTP-Empfang auch ohne Inhaltslänge durchgesetzt. Fachliche Fehler nach erfolgreicher
 Anmeldung und Mandantenprüfung tragen den aktuellen ETag; vor der Anmeldung oder Rechteprüfung sowie bei der frühen

@@ -9,6 +9,7 @@ import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.io.BufferedReader;
@@ -30,7 +31,7 @@ public class MandantEinstellungenSchritte {
     private static final String DATEI = "/api/v1/konfiguration";
     private static final String SCHEMA = new MandantCode("urinet").schema();
 
-    @Inject AgroalDataSource datenbank;
+    @Inject Instance<AgroalDataSource> datenbank;
 
     private Response antwort;
     private Response ausgang;
@@ -204,7 +205,7 @@ public class MandantEinstellungenSchritte {
     @Dann("enthält das Änderungsprotokoll nur den Pfad und nicht die UID-Werte")
     public void uidNichtImProtokoll() throws SQLException {
         assertThat(antwort.jsonPath().getBoolean("geaendert")).isTrue();
-        try (Connection verbindung = datenbank.getConnection(); Statement befehl = verbindung.createStatement();
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement();
              ResultSet zeile = befehl.executeQuery("select details::text from " + SCHEMA
                      + ".zugriff_protokoll where aktion = 'KONFIGURATION_AENDERN' order by id desc limit 1")) {
             assertThat(zeile.next()).isTrue();
@@ -273,7 +274,7 @@ public class MandantEinstellungenSchritte {
         assertThat(antwort.jsonPath().getBoolean("geaendert")).isTrue();
         assertThat(antwort.jsonPath().getInt("version")).isGreaterThan(ausgangsVersion);
         assertThat(protokollAnzahl()).isEqualTo(protokollAnzahl + 1);
-        try (Connection verbindung = datenbank.getConnection(); Statement befehl = verbindung.createStatement();
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement();
              ResultSet zeile = befehl.executeQuery("select quelle from " + SCHEMA
                      + ".konfiguration_version order by version desc limit 1")) {
             assertThat(zeile.next()).isTrue();
@@ -319,7 +320,7 @@ public class MandantEinstellungenSchritte {
     }
 
     private long protokollAnzahl() throws SQLException {
-        try (Connection verbindung = datenbank.getConnection(); Statement befehl = verbindung.createStatement();
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement();
              ResultSet zeile = befehl.executeQuery("select count(*) from " + SCHEMA
                      + ".zugriff_protokoll where aktion = 'KONFIGURATION_AENDERN'")) {
             assertThat(zeile.next()).isTrue();

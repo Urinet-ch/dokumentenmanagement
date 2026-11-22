@@ -2,6 +2,8 @@ package ch.urinet.archiv.konfiguration;
 
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
+import ch.urinet.archiv.benutzer.adapter.out.persistence.JdbcVerwaltungGrenzen;
 import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -15,6 +17,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
+import io.cucumber.java.Before;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
@@ -56,6 +59,8 @@ public class KonfigurationsVersionSchritte {
 
     @Inject StepUp stepUp;
     private StepUp urspruenglichesStepUp;
+    @Inject VerwaltungGrenzen grenzen;
+    private VerwaltungGrenzen urspruenglicheGrenzen;
     private Response antwort;
     private int versionVorher;
     private int letzteVersion;
@@ -479,6 +484,15 @@ public class KonfigurationsVersionSchritte {
         }, StepUp.class);
     }
 
+    @Before("@20-1-abbild or @20-2-rest")
+    public void grenzenFuerEinstellungsszenarienIsolieren() {
+        urspruenglicheGrenzen = ClientProxy.unwrap(grenzen);
+        QuarkusMock.installMockForType(new JdbcVerwaltungGrenzen(null, null, 1, 1, 1, 1) {
+            @Override
+            public void pruefen(String akteur, Art art, UUID ziel) { }
+        }, VerwaltungGrenzen.class);
+    }
+
     @Wenn("«{word}» die geänderte Konfigurationsdatei mit Bestätigung {string} einspielt")
     public void geaenderteDateiBestaetigtEinspielen(String benutzer, String bestaetigt) throws IOException {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("bestaetigt", bestaetigt)
@@ -838,6 +852,14 @@ public class KonfigurationsVersionSchritte {
         if (urspruenglichesStepUp != null) {
             QuarkusMock.installMockForType(urspruenglichesStepUp, StepUp.class);
             urspruenglichesStepUp = null;
+        }
+    }
+
+    @After(order = -200)
+    public void grenzenWiederherstellen() {
+        if (urspruenglicheGrenzen != null) {
+            QuarkusMock.installMockForType(urspruenglicheGrenzen, VerwaltungGrenzen.class);
+            urspruenglicheGrenzen = null;
         }
     }
 
