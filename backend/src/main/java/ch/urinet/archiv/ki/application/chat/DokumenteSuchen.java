@@ -69,16 +69,22 @@ public class DokumenteSuchen {
      */
     public record Treffer(String id, String titel, String art, String datum, String partner, String betrag,
                           String auszug, boolean bestaetigt, String link, String seiten, Integer nummer,
-                          String vertraulichkeit) {
+                          String vertraulichkeit, Double aehnlichkeit) {
 
         public Treffer(String id, String titel, String art, String datum, String partner, String betrag,
                        String auszug, boolean bestaetigt, String link, String seiten) {
-            this(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, null, null);
+            this(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, null, null, null);
+        }
+
+        public Treffer(String id, String titel, String art, String datum, String partner, String betrag,
+                       String auszug, boolean bestaetigt, String link, String seiten, Integer nummer,
+                       String vertraulichkeit) {
+            this(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, nummer, vertraulichkeit, null);
         }
 
         public Treffer mitNummer(int nummer) {
             return new Treffer(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, nummer,
-                    vertraulichkeit);
+                    vertraulichkeit, aehnlichkeit);
         }
     }
 
@@ -246,7 +252,7 @@ public class DokumenteSuchen {
         Map<UUID, Integer> seiten = daten.seiten(ergebnis.treffer().stream().map(h -> h.treffer().id()).toList());
         List<Treffer> treffer = ergebnis.treffer().stream()
                 .map(h -> treffer(h.treffer(), bestaetigt.contains(h.treffer().id()), h.fundstelle(),
-                        seiten.get(h.treffer().id()))).toList();
+                        seiten.get(h.treffer().id()), h.relevanz())).toList();
         return new Antwort(treffer, treffer.size(), ergebnis.degradiert() ? NUR_VOLLTEXT : null,
                 ergebnis.degradiert() ? Boolean.TRUE : null);
     }
@@ -254,7 +260,8 @@ public class DokumenteSuchen {
     private Antwort volltext(Suchanfrage anfrage, Sichtregel sicht, boolean rueckfall) {
         Suchergebnis ergebnis = suche.suchen(anfrage, sicht, false);
         Set<UUID> bestaetigt = daten.bestaetigte(ergebnis.treffer().stream().map(Suchtreffer::id).toList());
-        return new Antwort(ergebnis.treffer().stream().map(t -> treffer(t, bestaetigt.contains(t.id()), null, null)).toList(),
+        return new Antwort(ergebnis.treffer().stream()
+                .map(t -> treffer(t, bestaetigt.contains(t.id()), null, null, null)).toList(),
                 ergebnis.gesamt(), rueckfall ? NUR_VOLLTEXT : null, rueckfall ? Boolean.TRUE : null);
     }
 
@@ -268,12 +275,13 @@ public class DokumenteSuchen {
         return code;
     }
 
-    private static Treffer treffer(Suchtreffer t, boolean bestaetigt, Fundstelle fundstelle, Integer dokumentSeiten) {
+    private static Treffer treffer(Suchtreffer t, boolean bestaetigt, Fundstelle fundstelle, Integer dokumentSeiten,
+                                   Double aehnlichkeit) {
         String auszug = t.auszug().stream().map(AuszugTeil::text).collect(Collectors.joining());
         return new Treffer(t.id().toString(), t.titel(), t.art(), Werteformat.datum(t.datum()), t.partnerName(),
                 Werteformat.betrag(t.betrag(), t.waehrung()), auszug.isEmpty() ? null : auszug, bestaetigt,
                 link(t.id()), fundstelle == null ? null : fundstelle.seitenText(dokumentSeiten), null,
-                t.vertraulichkeit());
+                t.vertraulichkeit(), aehnlichkeit);
     }
 
     static String link(UUID id) {
