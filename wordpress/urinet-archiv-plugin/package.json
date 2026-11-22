@@ -1,0 +1,11 @@
+{
+  "name": "urinet-archiv-plugin",
+  "private": true,
+  "scripts": {
+    "wp-env": "wp-env",
+    "test": "ruby tests/vertrag.rb && wp-env run tests-cli --env-cwd=wp-content/plugins/urinet-archiv-plugin phpunit"
+  },
+  "devDependencies": {
+    "@wordpress/env": "12.2.0"
+  }
+}
