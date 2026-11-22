@@ -52,6 +52,60 @@ class EinstellungskatalogTest {
     }
 
     @Test
+    void risikoBeruecksichtigtWirksameStandardsUndKuerzereAufbewahrung() {
+        var vorher = einstellungen("12-31", null, null, null);
+        var nachher = einstellungen("06-30", 11, 29, null);
+        var startwerte = new EinstellungsRisiko.Startwerte(null, null, null);
+
+        assertThat(EinstellungsRisiko.geaendert(vorher, nachher, startwerte, "vhf-gsk"))
+                .containsExactlyInAnyOrder("geschaeftsjahrEnde", "chat.aufbewahrungMonate",
+                        "webseitenChat.aufbewahrungTage");
+        assertThat(EinstellungsRisiko.geaendert(nachher, vorher, startwerte, "vhf-gsk"))
+                .containsExactly("geschaeftsjahrEnde");
+    }
+
+    @Test
+    void risikoBeimZuruecksetzenVergleichtMitBisherigemStartwert() {
+        var startwerte = new EinstellungsRisiko.Startwerte(6, 40, 1_000_000);
+        var vorher = einstellungen("12-31", 12, 30, null);
+        var nachher = einstellungen("12-31", null, null, null);
+
+        assertThat(EinstellungsRisiko.geaendert(vorher, nachher, startwerte, "urinet"))
+                .containsExactly("chat.aufbewahrungMonate");
+        assertThat(EinstellungsRisiko.geaendert(nachher, nachher, startwerte, "urinet")).isEmpty();
+        assertThat(EinstellungsRisiko.geaendert(einstellungen("12-31", null, null, null),
+                einstellungen(null, null, null, null), startwerte, "urinet")).isEmpty();
+    }
+
+    @Test
+    void monatsbudgetIstErstOberhalbDesDoppeltenStandardsRiskant() {
+        var startwerte = new EinstellungsRisiko.Startwerte(null, null, null);
+        var vorher = einstellungen("12-31", null, null, 1_000_000);
+
+        assertThat(EinstellungsRisiko.geaendert(vorher,
+                einstellungen("12-31", null, null, 2_000_000), startwerte, "urinet")).isEmpty();
+        assertThat(EinstellungsRisiko.geaendert(vorher,
+                einstellungen("12-31", null, null, 2_000_001), startwerte, "urinet"))
+                .containsExactly("wissen.monatsbudgetTokens");
+    }
+
+    @Test
+    void risikoWirdAuchVorDerValidierungUngueltigerZahlenErkannt() {
+        var startwerte = new EinstellungsRisiko.Startwerte(null, null, null);
+        assertThat(EinstellungsRisiko.geaendert(einstellungen("12-31", null, null, null),
+                einstellungen("12-31", 0, null, 20_000_001), startwerte, "urinet"))
+                .containsExactlyInAnyOrder("chat.aufbewahrungMonate", "wissen.monatsbudgetTokens");
+    }
+
+    private static Konfiguration.Einstellungen einstellungen(String geschaeftsjahrEnde, Integer chat,
+                                                              Integer webseitenChat, Integer monatsbudget) {
+        return new Konfiguration.Einstellungen(geschaeftsjahrEnde, null, null,
+                new Konfiguration.ChatEinstellungen(chat),
+                new Konfiguration.WebseitenChatEinstellungen(webseitenChat),
+                new Konfiguration.WissenEinstellungen(null, null, monatsbudget, null));
+    }
+
+    @Test
     void grenzenUndStandardsEntsprechenDemInventar() {
         Map<Einstellungskatalog.Zahl, int[]> erwartet = Map.of(
                 Einstellungskatalog.Zahl.CHAT_AUFBEWAHRUNG, new int[] {1, 60, 12},

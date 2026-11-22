@@ -15,6 +15,7 @@ public final class Einstellungskatalog {
     private static final Pattern BRANDING_NAME =
             Pattern.compile("^[\\p{L}\\p{N}][\\p{L}\\p{N} &'’().,/-]{0,59}$");
     public static final String UID_MUSTER = "(?i)^CHE[-. ]?\\d{3}[. ]?\\d{3}[. ]?\\d{3}(?: *(?:MWST|TVA|IVA))?$";
+    public static final String GESCHAEFTSJAHR_STANDARD = "12-31";
     public static final int IBAN_ANZAHL_MAX = 20;
     /** Längste IBAN-Schreibweise (34 Zeichen); je Eintrag begrenzt, damit kein Freitext in Konfiguration und Export gelangt. */
     public static final int IBAN_LAENGE_MAX = 34;
@@ -34,7 +35,7 @@ public final class Einstellungskatalog {
     }
 
     private static final List<Einstellung> EINSTELLUNGEN = List.of(
-            new Einstellung("geschaeftsjahrEnde", Gruppe.GESCHAEFTSJAHR, Typ.DATUM, "12-31", Risiko.IMMER,
+            new Einstellung("geschaeftsjahrEnde", Gruppe.GESCHAEFTSJAHR, Typ.DATUM, GESCHAEFTSJAHR_STANDARD, Risiko.IMMER,
                     Recht.A20, null),
             new Einstellung("kennungen.uid", Gruppe.KENNUNGEN, Typ.UID, null, Risiko.KEINES, Recht.A20, null),
             new Einstellung("kennungen.ibans", Gruppe.KENNUNGEN, Typ.IBANS, List.of(), Risiko.KEINES, Recht.A20, null),
