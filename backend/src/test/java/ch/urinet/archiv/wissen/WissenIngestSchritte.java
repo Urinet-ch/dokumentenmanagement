@@ -491,6 +491,51 @@ public class WissenIngestSchritte {
                 .when().delete("/api/v1/dokumente/" + ort(name).id() + "/wissensquelle");
     }
 
+    @Wenn("«{word}» die Wissensquellen abruft")
+    public void wissensquellenAbrufen(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get("/api/v1/wissen/quellen");
+    }
+
+    @Dann("enthält die Wissensquellenliste «{word}» {word}")
+    public void wissensquellenliste(String name, String erwartet) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        List<String> ids = antwort.jsonPath().getList("dokumentId", String.class);
+        if ("nicht".equals(erwartet)) {
+            assertThat(ids).doesNotContain(ort(name).id().toString());
+        } else {
+            assertThat(erwartet).isEqualTo("sichtbar");
+            assertThat(ids).contains(ort(name).id().toString());
+            int position = ids.indexOf(ort(name).id().toString());
+            assertThat(antwort.<String>path("[" + position + "].art")).isNotBlank();
+            assertThat(antwort.<String>path("[" + position + "].titel")).isNotBlank();
+            assertThat(antwort.<String>path("[" + position + "].markiertAm")).isNotBlank();
+            assertThat(antwort.<String>path("[" + position + "].ingestStatus")).isNotBlank();
+        }
+    }
+
+    @Angenommen("zu «{word}» besteht die Wissensseite «{word}» mit Quelleneintrag")
+    public void seiteMitQuelle(String name, String pfad) throws SQLException {
+        Ort ort = ort(name);
+        seiteAnlegen(ort.mandant(), pfad, "NORMAL", "UNVERAENDERT", "Test");
+        UUID seite = wissensseiten.get(ort.mandant()).getLast();
+        ausfuehren("insert into " + schema(ort.mandant()) + ".wissensseite_quelle "
+                        + "(seite_id, schluessel, dokument_id, seite_von, seite_bis, auszug) "
+                        + "values (?, 'q-probe', ?, 1, 1, 'Synthetische Seite 1')", seite, ort.id());
+    }
+
+    @Dann("bleibt die Wissensseite «{word}» mit Quelleneintrag für «{word}» unverändert")
+    public void seiteUnveraendert(String pfad, String name) throws SQLException {
+        Ort ort = ort(name);
+        Map<String, Object> seite = zeile("select s.titel, s.inhalt, s.version, "
+                + "(select count(*) from " + schema(ort.mandant())
+                + ".wissensseite_quelle q where q.seite_id = s.id and q.dokument_id = ?) as quellen "
+                + "from " + schema(ort.mandant()) + ".wissensseite s where s.pfad = ?", ort.id(), pfad);
+        assertThat(seite.get("titel")).isEqualTo("UNVERAENDERT");
+        assertThat(seite.get("inhalt")).isEqualTo("Abgabefrist UNVERAENDERT");
+        assertThat(((Number) seite.get("version")).intValue()).isEqualTo(1);
+        assertThat(((Number) seite.get("quellen")).intValue()).isEqualTo(1);
+    }
+
     @Dann("antwortet die Markierung mit Status {int} und Grund «{word}»")
     public void markierungGrund(int status, String grund) {
         assertThat(ProblemDetails.pruefen(antwort, status, "grund")).isEqualTo("KEINE_WISSENSQUELLE");

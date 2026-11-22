@@ -309,9 +309,10 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Und im Mandanten «urinet» liegt das Dokument «W» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Und im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Wenn «inhaber-urinet» das Dokument «W» so bestätigt:
-      | art   | PROJEKTDOKUMENT     |
-      | titel | Probe-Merkblatt    |
-      | datum | 2026-03-10         |
+      | art     | PROJEKTDOKUMENT  |
+      | titel   | Probe-Merkblatt  |
+      | datum   | 2026-03-10       |
+      | projekt | Probeprojekt     |
     Dann meldet das Archiv Status 202
     Wenn «inhaber-urinet» das Dokument «Q» so bestätigt:
       | art      | QUITTUNG       |

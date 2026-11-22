@@ -61,7 +61,9 @@ public class JdbcWissensquelleMarkierung implements WissensquelleMarkierungPort 
                      where e.dokument_id = d.id and e.anlass = 'INGEST'
                      order by e.erstellt desc, e.id desc limit 1)
                 from wissensquelle_markierung m join dokument d on d.id = m.dokument_id
-                where m.beendet_am is null and """ + filter.bedingung() + " order by m.markiert_am desc, d.id");
+                where m.beendet_am is null and %s
+                order by m.markiert_am desc, d.id
+                """.formatted(filter.bedingung()));
         filter.parameter().forEach(abfrage::setParameter);
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = abfrage.getResultList();

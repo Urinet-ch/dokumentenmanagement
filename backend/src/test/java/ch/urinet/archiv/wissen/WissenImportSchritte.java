@@ -160,7 +160,8 @@ public class WissenImportSchritte {
             case "fremd" -> importSha = fremdeSha;
             case "PERSONAL" -> ausfuehren("update m_urinet.dokument set vertraulichkeit = 'PERSONAL' where id = ?",
                     dokumente.get("urinet").getFirst());
-            case "falsche Art" -> ausfuehren("update m_urinet.dokument set art = 'AUSGANGSRECHNUNG' where id = ?",
+            case "nicht markiert" -> ausfuehren("update m_urinet.wissensquelle_markierung "
+                            + "set beendet_am = clock_timestamp(), beendet_von = 'probe' where dokument_id = ?",
                     dokumente.get("urinet").getFirst());
             case "Auszug fehlt" -> auszug = null;
             case "Auszug falsch" -> auszug = "Nicht belegter Text";

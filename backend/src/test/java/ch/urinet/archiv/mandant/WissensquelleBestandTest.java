@@ -50,20 +50,54 @@ class WissensquelleBestandTest {
         ausfuehren("drop table " + s + ".wissensquelle_markierung");
         ausfuehren("delete from " + s + ".databasechangelog where id = '070-wissensquelle-markierung'");
         String alteVersion = wert("select max(version)::text from " + s + ".konfiguration_version");
-        ausfuehren("update " + s + ".dokumentart set fremdbeleg_art = 'WISSENSQUELLE' where code = 'PROBE_BELEG'");
-
+        ausfuehren("delete from " + s + ".dokumentart where code = 'PROJEKTDOKUMENT'");
         assertThatThrownBy(() -> mandantDatenbank.schemaMigrieren(s))
-                .hasStackTraceContaining("Ein Verweis auf die Dokumentart WISSENSQUELLE besteht weiterhin");
-        assertThat(wert("select count(*) from " + s + ".dokument where art = 'WISSENSQUELLE'")).isEqualTo("2");
-        assertThat(wert("select count(*) from " + s + ".dokument_version where grund = 'Migration Wissensquelle'"))
-                .isEqualTo("0");
-        assertThat(wert("select max(version)::text from " + s + ".konfiguration_version")).isEqualTo(alteVersion);
-        assertThat(wert("select to_regclass('" + s + ".wissensquelle_markierung') is null")).isEqualTo("t");
-
-        ausfuehren("update " + s + ".dokumentart set fremdbeleg_art = null where code = 'PROBE_BELEG'");
+                .hasStackTraceContaining("Dokumentart PROJEKTDOKUMENT fehlt");
+        ausfuehren("insert into " + s + ".dokumentart (code, name, vertraulichkeit, gesetzliche_pflicht) "
+                + "values ('PROJEKTDOKUMENT', 'Projektdokument', 'NORMAL', false)");
+        ausfuehren("insert into " + s + ".klassifikation "
+                + "(code, name, mehrfach, ki_vorschlag, suchfilter, oeffentlich_filter, aktiv) "
+                + "values ('migrationstest', 'Migrationstest', false, false, false, false, true)");
+        record Verweis(String anlegen, String pruefen, String entfernen) { }
+        List<Verweis> verweise = List.of(
+                new Verweis("update " + s + ".dokumentart set fremdbeleg_art = 'WISSENSQUELLE' where code = 'PROBE_BELEG'",
+                        "select count(*) from " + s + ".dokumentart where fremdbeleg_art = 'WISSENSQUELLE'",
+                        "update " + s + ".dokumentart set fremdbeleg_art = null where code = 'PROBE_BELEG'"),
+                new Verweis("update " + s + ".dokumentart set ohne_zahlungsdaten_art = 'WISSENSQUELLE' where code = 'PROBE_BELEG'",
+                        "select count(*) from " + s + ".dokumentart where ohne_zahlungsdaten_art = 'WISSENSQUELLE'",
+                        "update " + s + ".dokumentart set ohne_zahlungsdaten_art = null where code = 'PROBE_BELEG'"),
+                new Verweis("insert into " + s + ".belegnummer_eigen (art, belegnummer, dokument_id) values "
+                        + "('WISSENSQUELLE', 'probe', '" + erstes + "')",
+                        "select count(*) from " + s + ".belegnummer_eigen where art = 'WISSENSQUELLE'",
+                        "delete from " + s + ".belegnummer_eigen where art = 'WISSENSQUELLE'"),
+                new Verweis("insert into " + s + ".dokumentart_klassifikation (art, klassifikation, pflicht) "
+                        + "values ('WISSENSQUELLE', 'migrationstest', false)",
+                        "select count(*) from " + s + ".dokumentart_klassifikation where art = 'WISSENSQUELLE'",
+                        "delete from " + s + ".dokumentart_klassifikation where art = 'WISSENSQUELLE'"),
+                new Verweis("insert into " + s + ".regel (code, art, typ, parameter, schwere, meldung, aktiv) "
+                        + "values ('migrationstest', 'WISSENSQUELLE', 'FOLGE', "
+                        + "'{\"feld\":\"geschaeftsjahr\",\"zeitraum\":\"GESAMT\"}', 'WARNUNG', 'Probe', true)",
+                        "select count(*) from " + s + ".regel where art = 'WISSENSQUELLE'",
+                        "delete from " + s + ".regel where code = 'migrationstest'"));
+        for (Verweis verweis : verweise) {
+            ausfuehren(verweis.anlegen());
+            assertThatThrownBy(() -> mandantDatenbank.schemaMigrieren(s))
+                    .hasStackTraceContaining("Ein Verweis auf die Dokumentart WISSENSQUELLE besteht weiterhin");
+            assertThat(wert(verweis.pruefen())).isEqualTo("1");
+            assertThat(wert("select count(*) from " + s + ".dokument where art = 'WISSENSQUELLE'")).isEqualTo("2");
+            assertThat(wert("select count(*) from " + s + ".dokument_version where grund = 'Migration Wissensquelle'"))
+                    .isEqualTo("0");
+            assertThat(wert("select max(version)::text from " + s + ".konfiguration_version")).isEqualTo(alteVersion);
+            assertThat(wert("select to_regclass('" + s + ".wissensquelle_markierung') is null")).isEqualTo("t");
+            ausfuehren(verweis.entfernen());
+        }
+        ausfuehren("delete from " + s + ".klassifikation where code = 'migrationstest'");
         mandantDatenbank.schemaMigrieren(s);
         assertThat(wert("select count(*) from " + s
                 + ".dokument where art = 'PROJEKTDOKUMENT' and version = 1")).isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".dokument where art = 'PROJEKTDOKUMENT' "
+                + "and konfiguration_version = (select max(version) from " + s + ".konfiguration_version)"))
+                .isEqualTo("2");
         assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung "
                 + "where markiert_von = 'System' and beendet_am is null")).isEqualTo("2");
         assertThat(wert("select count(*) from " + s + ".dokument_version "
@@ -75,6 +109,13 @@ class WissensquelleBestandTest {
         assertThat(wert("select count(*) from " + s + ".konfiguration_version k, "
                 + "jsonb_array_elements(k.inhalt->'arten') a where k.version = (select max(version) from " + s
                 + ".konfiguration_version) and a->>'code' = 'WISSENSQUELLE'")).isEqualTo("0");
+        String neueVersion = wert("select max(version)::text from " + s + ".konfiguration_version");
+        ausfuehren("delete from " + s + ".databasechangelog where id = '070-wissensquelle-markierung'");
+        mandantDatenbank.schemaMigrieren(s);
+        assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung")).isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".dokument_version where grund = 'Migration Wissensquelle'"))
+                .isEqualTo("2");
+        assertThat(wert("select max(version)::text from " + s + ".konfiguration_version")).isEqualTo(neueVersion);
         Testdokumente.loeschen(datenbank.get(), MANDANT.wert(), List.of(erstes, zweites));
     }
 

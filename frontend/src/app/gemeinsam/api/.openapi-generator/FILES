@@ -114,6 +114,7 @@ model/paket-kopf.ts
 model/protokoll-aktion.ts
 model/protokoll-eintrag.ts
 model/protokoll-seite.ts
+model/quelle.ts
 model/quelleneintrag.ts
 model/regel-aenderung.ts
 model/regel-anlegen.ts

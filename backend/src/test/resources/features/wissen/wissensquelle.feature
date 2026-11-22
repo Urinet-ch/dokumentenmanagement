@@ -2,7 +2,7 @@
 @spec-04
 Funktionalität: Wissensquelle als Markierung
 
-  @req-1.1 @req-1.3
+  @req-1.1 @req-1.3 @req-20.8
   Szenario: Ein neuer Mandant erhält keine Wissensquellenart und das Manifest enthält markierte Dateien
     Angenommen der Mandant «mf-wissensquelle» ist am «10.01.2026» angelegt
     Dann hat der Mandant «mf-wissensquelle» keine Dokumentart WISSENSQUELLE
@@ -15,17 +15,27 @@ Funktionalität: Wissensquelle als Markierung
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Dann hat der Mandant «vhf-gsk» keine Dokumentart WISSENSQUELLE
 
+  @req-20.9
+  Szenario: Eine alte Konfiguration mit Wissensquellenart wird abgelehnt
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Und «inhaber-urinet» die Konfigurationsdatei mit ungültiger WISSENSQUELLE einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
+    Und nennt die Antwort den Befund "arten.WISSENSQUELLE" mit dem Code «DOKUMENTART_ENTFALLEN»
+    Und ist die Konfigurationsversion unverändert
+
   @req-1.2 @req-1.5
   Szenario: Der Inhaber archiviert eine Fachunterlage nach ihrer eigentlichen Art
     Angenommen die Archivierung ist bereit
     Und im Mandanten «urinet» liegt das Dokument «WQ_HAND» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Wenn «inhaber-urinet» das Dokument «WQ_HAND» so bestätigt:
-      | art   | KORRESPONDENZ       |
-      | titel | Probe Wissensquelle |
-      | datum | 2026-03-10          |
+      | art     | PROJEKTDOKUMENT     |
+      | titel   | Probe Wissensquelle |
+      | datum   | 2026-03-10          |
+      | projekt | Probeprojekt        |
     Dann meldet das Archiv Status 202
     Und hat das Dokument «WQ_HAND» diese Werte:
-      | art             | KORRESPONDENZ       |
+      | art             | PROJEKTDOKUMENT     |
       | titel           | Probe Wissensquelle |
       | aufbewahren_bis | null                |
     Wenn der Worker die Archivierung ausführt

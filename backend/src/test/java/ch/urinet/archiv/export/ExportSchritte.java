@@ -156,11 +156,6 @@ public class ExportSchritte {
                         id, sha, schluessel, version, (long) inhalt.length);
             }
 
-            @Angenommen("der Beleg «{word}» ist als Wissensquelle markiert")
-            public void belegMarkieren(String name) throws SQLException {
-                Beleg beleg = belege.get(name);
-                Testdokumente.alsWissensquelleMarkieren(datenbank.get(), beleg.mandant(), beleg.id());
-            }
             if (z.get("betrag") != null) {
                 ausfuehren("insert into " + s + ".dokument_finanz (dokument_id, belegnummer, richtung, betrag) "
                         + "values (?, ?, ?, ?)", id, z.get("belegnummer"), z.get("richtung"),
@@ -168,6 +163,12 @@ public class ExportSchritte {
             }
             belege.put(name, new Beleg(mandant, id, jahr, schluessel, sha));
         }
+    }
+
+    @Angenommen("der Beleg «{word}» ist als Wissensquelle markiert")
+    public void belegMarkieren(String name) throws SQLException {
+        Beleg beleg = belege.get(name);
+        Testdokumente.alsWissensquelleMarkieren(datenbank.get(), beleg.mandant(), beleg.id());
     }
 
     @Angenommen("im Mandanten «{word}» liegen die Manifeste vom {word} und vom {word} mit Zeitstempel «{word}»")

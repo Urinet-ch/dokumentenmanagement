@@ -5206,7 +5206,8 @@ paths:
       tags:
       - Wissensbasis
       parameters:
-      - name: id
+      - description: ID des Dokuments
+        name: id
         in: path
         required: true
         schema:
@@ -5214,6 +5215,10 @@ paths:
       responses:
         "202":
           description: Markierung gespeichert und Ingest angestossen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenIngestAuftrag"
         "403":
           description: Recht A16 fehlt
         "404":
@@ -5235,7 +5240,8 @@ paths:
       tags:
       - Wissensbasis
       parameters:
-      - name: id
+      - description: ID des Dokuments
+        name: id
         in: path
         required: true
         schema:

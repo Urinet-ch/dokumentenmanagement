@@ -6099,6 +6099,7 @@
         "summary" : "Dokument als Wissensquelle verwenden",
         "tags" : [ "Wissensbasis" ],
         "parameters" : [ {
+          "description" : "ID des Dokuments",
           "name" : "id",
           "in" : "path",
           "required" : true,
@@ -6108,7 +6109,14 @@
         } ],
         "responses" : {
           "202" : {
-            "description" : "Markierung gespeichert und Ingest angestossen"
+            "description" : "Markierung gespeichert und Ingest angestossen",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenIngestAuftrag"
+                }
+              }
+            }
           },
           "403" : {
             "description" : "Recht A16 fehlt"
@@ -6134,6 +6142,7 @@
         "summary" : "Markierung als Wissensquelle entfernen",
         "tags" : [ "Wissensbasis" ],
         "parameters" : [ {
+          "description" : "ID des Dokuments",
           "name" : "id",
           "in" : "path",
           "required" : true,

@@ -4,7 +4,7 @@
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
     <changeSet id="070-wissensquelle-markierung" author="archiv">
         <sql splitStatements="false"><![CDATA[
-            create table wissensquelle_markierung (
+            create table if not exists wissensquelle_markierung (
                 dokument_id uuid not null references dokument (id),
                 markiert_von text not null check (length(trim(markiert_von)) > 0),
                 markiert_am timestamptz not null,
@@ -15,7 +15,7 @@
                     or (beendet_am is not null and beendet_von is not null
                         and length(trim(beendet_von)) > 0 and beendet_am >= markiert_am))
             );
-            create unique index wissensquelle_markierung_aktiv_ux on wissensquelle_markierung (dokument_id)
+            create unique index if not exists wissensquelle_markierung_aktiv_ux on wissensquelle_markierung (dokument_id)
                 where beendet_am is null;
 
             alter table zugriff_protokoll drop constraint zugriff_protokoll_aktion_ck;
@@ -56,13 +56,6 @@
                 ) k), '{}'::jsonb)), 'System', 'Migration Wissensquelle'
             from dokument d where d.art = 'WISSENSQUELLE';
 
-            insert into wissensquelle_markierung (dokument_id, markiert_von, markiert_am)
-            select id, 'System', clock_timestamp() from dokument where art = 'WISSENSQUELLE';
-
-            update dokument set art = 'PROJEKTDOKUMENT', version = version + 1, geaendert = clock_timestamp()
-            where art = 'WISSENSQUELLE';
-            delete from dokumentart where code = 'WISSENSQUELLE';
-
             with aktuell as (
                 select version, inhalt from konfiguration_version order by version desc limit 1
             ), abbild as (
@@ -80,6 +73,15 @@
             select version, 'System', 'Migration Wissensquelle', 'MIGRATION', inhalt,
                 encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
             from abbild;
+
+            insert into wissensquelle_markierung (dokument_id, markiert_von, markiert_am)
+            select id, 'System', clock_timestamp() from dokument where art = 'WISSENSQUELLE';
+
+            update dokument set art = 'PROJEKTDOKUMENT', version = version + 1,
+                konfiguration_version = (select max(version) from konfiguration_version),
+                geaendert = clock_timestamp()
+            where art = 'WISSENSQUELLE';
+            delete from dokumentart where code = 'WISSENSQUELLE';
         ]]></sql>
         <rollback>
             <sql>-- Markierungen und Versionen bleiben beim Rollback zum Schutz der Daten bestehen.</sql>

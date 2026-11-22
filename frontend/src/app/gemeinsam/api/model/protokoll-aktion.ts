@@ -28,6 +28,8 @@ export const ProtokollAktion = {
     WissenIngest: 'WISSEN_INGEST',
     WissenLint: 'WISSEN_LINT',
     WissenImport: 'WISSEN_IMPORT',
+    WissensquelleMarkiert: 'WISSENSQUELLE_MARKIERT',
+    WissensquelleEntfernt: 'WISSENSQUELLE_ENTFERNT',
     KontaktZusammenfuehren: 'KONTAKT_ZUSAMMENFUEHREN',
     KontaktInaktiv: 'KONTAKT_INAKTIV',
     KontaktAktiv: 'KONTAKT_AKTIV',

@@ -16,6 +16,10 @@ Funktionalität: Archivierte Dokumente als Wissensquellen markieren
     Und ist für «BELEG» ein Auftrag «WISSEN_INGEST» eingereiht
     Und sind Dokumentzeile und Dateizeilen von «BELEG» unverändert
     Und protokolliert das Archiv «WISSENSQUELLE_MARKIERT» für «BELEG» ohne Titel
+    Wenn «inhaber-vhf-gsk» die Wissensquellen abruft
+    Dann enthält die Wissensquellenliste «BELEG» nicht
+    Wenn «inhaber-urinet» die Wissensquellen abruft
+    Dann enthält die Wissensquellenliste «BELEG» sichtbar
 
   @req-20.3
   Szenario: Ein nicht archiviertes Dokument kann nicht markiert werden
@@ -57,6 +61,14 @@ Funktionalität: Archivierte Dokumente als Wissensquellen markieren
     Und ist «BELEG» als Wissensquelle unmarkiert
 
   @req-20.3
+  Szenario: Ein unsichtbares Dokument bleibt auch ohne Recht A16 unbekannt
+    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «BELEG» der Art «QUITTUNG»
+    Und das Dokument «BELEG» hat Vertraulichkeit «PERSONAL»
+    Wenn «mitarbeiter-urinet» markiert «BELEG» als Wissensquelle
+    Dann antwortet die Markierung mit Status 404
+    Und ist «BELEG» als Wissensquelle unmarkiert
+
+  @req-20.3
   Szenario: Ein Dokument eines anderen Mandanten bleibt unbekannt
     Angenommen im Mandanten «vhf-gsk» liegt ein archiviertes Dokument «BELEG» der Art «PROBE_VHF_BULLETIN»
     Wenn «inhaber-urinet» markiert «BELEG» als Wissensquelle
@@ -66,7 +78,17 @@ Funktionalität: Archivierte Dokumente als Wissensquellen markieren
   @req-20.5
   Szenario: Eine Markierung wird mit Protokoll beendet
     Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «BELEG» mit Vertraulichkeit «NORMAL» und 2 Seiten
+    Und zu «BELEG» besteht die Wissensseite «konzepte/markierung-probe» mit Quelleneintrag
     Wenn «inhaber-urinet» entfernt die Wissensquellenmarkierung von «BELEG»
     Dann antwortet die Markierung mit Status 204
     Und ist «BELEG» als Wissensquelle unmarkiert
     Und protokolliert das Archiv «WISSENSQUELLE_ENTFERNT» für «BELEG» ohne Titel
+    Und ist für «BELEG» kein Auftrag «WISSEN_INGEST» eingereiht
+    Und bleibt die Wissensseite «konzepte/markierung-probe» mit Quelleneintrag für «BELEG» unverändert
+
+  @req-20.2
+  Szenario: Eine aktive Markierung kann nicht doppelt gesetzt werden
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «BELEG» mit Vertraulichkeit «NORMAL» und 2 Seiten
+    Wenn «inhaber-urinet» markiert «BELEG» als Wissensquelle
+    Dann antwortet die Markierung mit Status 409
+    Und ist «BELEG» als Wissensquelle markiert
