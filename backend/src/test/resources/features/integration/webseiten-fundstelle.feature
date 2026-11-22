@@ -31,7 +31,7 @@ Funktionalität: Fundstelle in Suchtreffern der Webseiten-Schnittstelle (Aufgabe
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/suche?q=Kirschkuchen» mit der Stufe «oeffentlich» aufruft
     Dann trägt der Treffer «f1» die Fundstelle mit Seite 7
     Und nennt die Antwort den Text der Abschnitte nicht
-    Und haben alle Einträge nur die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,auszug,fundstelle,rang»
+    Und haben alle Einträge nur die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,klassifikationen,auszug,fundstelle,rang»
     Und steht in der Lese-Antwort weder «http» noch «seiteBis»
 
   @req-5.7
