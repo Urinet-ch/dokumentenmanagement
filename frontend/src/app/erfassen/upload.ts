@@ -18,6 +18,7 @@ import { Subscription } from 'rxjs';
 import { httpFehlerText } from '../gemeinsam/http-fehler';
 import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { HilfeLeiste } from '../hilfe/hilfe-leiste.service';
 import { UploadErgebnis, UploadFehler, UploadPort } from './upload-port';
 import { uploadProblem } from './upload-problem';
 
@@ -48,9 +49,11 @@ export interface Zeile {
 export class Upload {
   private readonly upload = inject(UploadPort);
   private readonly injector = inject(Injector);
+  protected readonly hilfe = inject(HilfeLeiste);
   private laufend?: Subscription;
 
   protected readonly texte = TEXTE.upload;
+  protected readonly hilfeTexte = TEXTE.hilfe;
   protected readonly erlaubteTypen = ERLAUBTE_TYPEN;
 
   protected readonly dateien = signal<readonly File[]>([]);
@@ -71,6 +74,7 @@ export class Upload {
     const dateien = this.dateien();
     return dateien.map((datei, index) => ({ datei, ...auswerten(zuordnen(ergebnisse, dateien, index), !!ergebnisse) }));
   });
+  protected readonly hatAbgelehntenUpload = computed(() => this.zeilen().some((zeile) => zeile.ausgang === 'abgelehnt'));
 
   private readonly dateiwahl = viewChild.required<ElementRef<HTMLInputElement>>('dateiwahl');
   private readonly ergebnisUeberschrift = viewChild<ElementRef<HTMLElement>>('ergebnisUeberschrift');

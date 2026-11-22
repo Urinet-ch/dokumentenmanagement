@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject } from 'rxjs';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { HilfeLeiste } from '../hilfe/hilfe-leiste.service';
 import { Upload } from './upload';
 import { UploadEreignis, UploadPort } from './upload-port';
 
@@ -163,6 +164,27 @@ describe('Upload (Req 3.1, 3.3–3.8)', () => {
     port.antwort = new Subject();
     await senden({ typ: 'fehler', fehler: { status: 0 } });
     expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.httpFehler.verbindung);
+  });
+
+  it('öffnet bei einem Uploadfehler die Hilfe und behält die Auswahl', async () => {
+    await waehlen(pdf('a.pdf'));
+    await senden({ typ: 'fehler', fehler: { status: 0 } });
+    element.querySelector<HTMLAnchorElement>('a[href="/hilfe#erfassen-offline"]')!.click();
+    expect(TestBed.inject(HilfeLeiste).anker()).toBe('erfassen-offline');
+    expect(TestBed.inject(HilfeLeiste).offen()).toBe(true);
+    expect(namen()).toEqual(['a.pdf']);
+  });
+
+  it('bietet die Hilfe auch bei einem abgelehnten Einzelergebnis an', async () => {
+    await waehlen(pdf('a.pdf'));
+    await senden({
+      typ: 'fertig',
+      ergebnisse: [{ datei: 'a.pdf', status: 'ABGELEHNT', fehler: { status: 422 } }],
+    });
+    const link = element.querySelector<HTMLAnchorElement>('a[href="/hilfe#erfassen-offline"]')!;
+    link.click();
+    expect(TestBed.inject(HilfeLeiste).anker()).toBe('erfassen-offline');
+    expect(namen()).toEqual(['a.pdf']);
   });
 
   it.each([

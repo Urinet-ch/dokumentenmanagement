@@ -556,3 +556,14 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   eine sichtbare Statusmeldung meldet das Ergebnis. Die Karte verwendet keine Übergangsanimation.
 - Nachweise: `einfuehrung-start.feature` für 3.2–3.7 und 5.5, `einfuehrung-vermerk.spec.ts` für den flüchtigen
   Schrittstand und die Trennung nach Benutzer, `hilfe-seite.spec.ts` für den rollenabhängigen Wiederaufruf.
+
+## Umsetzung (Aufgabe 23.4, 22.11.2026)
+- Die Links bei Warteschlange, fehlgeschlagenen Uploads und auf der Offline-Anmeldekarte öffnen `erfassen-offline`,
+  der Link bei fehlendem Mandant oder fehlender Rolle öffnet `probleme`. Die vorhandenen Katalogeinträge bleiben
+  unverändert: Beide sind bereits für die jeweiligen Besucher sichtbar. Die Hilfe-Leiste erhält den auslösenden Link
+  für die Fokusrückgabe; der normale Klick navigiert nicht.
+- Fehler bei Datei-Uploads umfassen sowohl die ganze Anfrage als auch abgelehnte Einzelergebnisse. Die Anleitung
+  unterscheidet diese Fälle vom automatischen Wiederholen der Warteschlange.
+- Nachweise: `hilfe-kontextlinks.feature` (`@req-4.6`) für alle vier Stellen sowie fehlenden Mandanten und fehlende
+  Rolle, einschliesslich Fokusrückgabe und erhaltener Aufnahme beziehungsweise Dateiauswahl; Angular-Tests für die
+  Zustände der Komponenten.

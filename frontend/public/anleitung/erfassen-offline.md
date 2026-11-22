@@ -3,6 +3,7 @@ Am Handy fehlt oft gerade das Netz. Erfassen geht trotzdem: Ihre Aufnahmen bleib
 ## Die Warteschlange
 
 Im Teil «Warteschlange» der Seite «Erfassen» steht «Wartet auf Upload» mit der Zahl der Erfassungen, die noch auf diesem Gerät liegen. Sie bleiben dort auch, wenn Sie die App schliessen oder das Handy neu starten.
+Der Link «So funktioniert es» bei der Warteschlange und bei fehlgeschlagenen Uploads öffnet diese Hilfe, ohne die Seite zu verlassen.
 
 Hochgeladen wird von selbst, sobald das Gerät online ist und Sie angemeldet sind: beim Start der App, wenn die Verbindung zurückkommt, nach der Anmeldung und gleich nach dem Erfassen. Erfolgreich hochgeladene Erfassungen verschwinden aus der Warteschlange. Ist ein Dokument schon im Archiv, gilt die Erfassung ebenfalls als hochgeladen.
 
@@ -13,6 +14,7 @@ Hochgeladen wird von selbst, sobald das Gerät online ist und Sie angemeldet sin
 Ohne Verbindung ist keine Anmeldung möglich. Mit der Kamera erfassen können Sie trotzdem:
 
 1. Wählen Sie auf der Startseite «Ohne Verbindung erfassen». Der Link erscheint nur, solange keine Verbindung besteht.
+   «So funktioniert es» auf der Anmeldekarte öffnet vorher diese Hilfe.
 2. Die Seite «Erfassen» zeigt «Sie sind nicht angemeldet. Aufnahmen bleiben auf diesem Gerät und werden nach der Anmeldung hochgeladen.»
 3. Nehmen Sie die Seiten auf und wählen Sie «Erfassung abschliessen».
 4. Sobald wieder eine Verbindung besteht, wählen Sie «Anmelden». Seiten, die noch nicht abgeschlossen sind, legt die App vorher in die Warteschlange. Nach der Anmeldung werden die Aufnahmen hochgeladen.
@@ -24,8 +26,9 @@ Der Knopf «Hilfe» öffnet auf dieser Seite auch ohne Anmeldung diesen Abschnit
 
 ## Wenn ein Upload nicht klappt
 
-Klappt ein Upload nicht, versucht es die App nach einer Weile von selbst noch einmal. Erfassungen, die nicht hochgeladen werden konnten, stehen unter «Nicht hochgeladen», jeweils mit Zeitpunkt, Zahl der Seiten und Meldung.
+Klappt der Upload einer Aufnahme aus der Warteschlange nicht, versucht es die App nach einer Weile von selbst noch einmal. Erfassungen, die nicht hochgeladen werden konnten, stehen unter «Nicht hochgeladen», jeweils mit Zeitpunkt, Zahl der Seiten und Meldung.
 
+- Beim Hochladen von Dateien zeigt die Seite Fehler für die Anfrage oder für einzelne Dateien. Prüfen Sie die Meldung. Bei einem Anfragefehler bleiben die Dateien ausgewählt; wählen Sie «Erneut hochladen». Für abgelehnte Dateien beginnen Sie eine neue Erfassung.
 - Scheitert der Upload dreimal an der Verbindung oder am Archiv, lautet die Meldung «Der Upload ist dreimal fehlgeschlagen (Verbindung oder Archiv). Bitte später erneut versuchen.» Versuche ohne Netz zählen dabei nicht.
 - Lehnt das Archiv die Erfassung ab, steht seine Meldung sofort dort.
 - Ist Ihre Sitzung abgelaufen, bleibt die Erfassung in der Warteschlange. Melden Sie sich neu an, dann geht es weiter.
