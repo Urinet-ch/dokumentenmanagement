@@ -6,7 +6,7 @@ Funktionalität: Einstellungen über die REST-Schnittstelle verwalten
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Und die Ausgangsstände der Einstellungen sind gemerkt
 
-  @req-2.1 @req-2.2 @req-2.11
+  @req-1.8 @req-2.1 @req-2.2 @req-2.11
   Szenario: Nur Berechtigte sehen den Katalog und den eigenen Betriebsstand
     Wenn «inhaber-urinet» den Einstellungskatalog liest
     Dann enthält der REST-Katalog Werte und Metadaten sowie den Betriebsstand
@@ -25,6 +25,24 @@ Funktionalität: Einstellungen über die REST-Schnittstelle verwalten
     Dann antwortet die Einstellungsverwaltung mit Status 409 und ETag des Ausgangsstands
     Und die REST-Antwort nennt die Auswirkung und «BESTAETIGUNG_NOETIG»
     Und sind Version und Änderungsprotokoll unverändert
+
+  @req-2.3
+  Szenario: Ein ungültiger Feldtyp meldet Befunde und ändert nichts
+    Wenn ein ungültiger Archivname über REST gesendet wird
+    Dann antwortet die Einstellungsverwaltung mit Status 422 und ETag des Ausgangsstands
+    Und enthält die REST-Antwort einen Befund zum Archivnamen
+    Und sind Version und Änderungsprotokoll unverändert
+
+  @req-2.4
+  Szenario: Eine übergrosse Chunked-Anfrage wird schon beim Empfang abgewiesen
+    Wenn eine übergrosse REST-Anfrage ohne Inhaltslänge gesendet wird
+    Dann wird die REST-Anfrage mit Status 413 abgewiesen
+    Und sind Version und Änderungsprotokoll unverändert
+
+  @req-2.9
+  Szenario: Das Änderungsprotokoll nennt bei Kennungen keine Werte
+    Wenn eine UID über REST geändert wird
+    Dann enthält das Änderungsprotokoll nur den Pfad und nicht die UID-Werte
 
   @req-2.5 @req-2.7 @req-2.9 @req-2.11
   Szenario: Vorschau, Änderung und Rücksetzung bleiben auf den eigenen Mandanten beschränkt

@@ -7,9 +7,15 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import jakarta.inject.Inject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -31,6 +37,9 @@ public class MandantEinstellungenSchritte {
     private Response andererMandant;
     private String etag;
     private String neuerName;
+    private String uidVorher;
+    private String uidNeu;
+    private String statuszeile;
     private int ausgangsVersion;
     private long protokollAnzahl;
     private boolean geaendert;
@@ -45,6 +54,7 @@ public class MandantEinstellungenSchritte {
         ausgangsVersion = ausgang.jsonPath().getInt("basisVersion");
         String bisher = ausgang.jsonPath().getString("einstellungen.branding.name");
         neuerName = "Testarchiv".equals(bisher) ? "Probe Archiv" : "Testarchiv";
+        uidVorher = ausgang.jsonPath().getString("einstellungen.kennungen.uid");
         protokollAnzahl = protokollAnzahl();
         geaendert = false;
     }
@@ -112,7 +122,67 @@ public class MandantEinstellungenSchritte {
     @Dann("die REST-Antwort nennt die Auswirkung und «{word}»")
     public void auswirkung(String code) {
         assertThat(antwort.jsonPath().getString("fehlercode")).isEqualTo(code);
-        assertThat(antwort.jsonPath().getList("auswirkung")).isNotEmpty();
+        assertThat(antwort.jsonPath().<Map<String, Object>>getList("auswirkung")).isNotEmpty()
+                .allSatisfy(wirkung -> assertThat(wirkung).containsKeys("schluessel", "text", "betroffeneDatensaetze"));
+    }
+
+    @Wenn("ein ungültiger Archivname über REST gesendet wird")
+    public void ungueltigerName() {
+        antwort = given().auth().oauth2(token()).header("If-Match", etag)
+                .contentType("application/merge-patch+json").body("{\"branding\":{\"name\":42}}").patch(PFAD);
+    }
+
+    @Dann("enthält die REST-Antwort einen Befund zum Archivnamen")
+    public void befund() {
+        assertThat(antwort.jsonPath().getString("fehlercode")).isEqualTo("KONFIGURATION_UNGUELTIG");
+        assertThat(antwort.jsonPath().<Map<String, Object>>getList("befunde")).anySatisfy(eintrag -> {
+            assertThat(eintrag.get("pfad")).isEqualTo("einstellungen.branding.name");
+            assertThat(eintrag.get("meldung")).isNotNull();
+        });
+    }
+
+    @Wenn("eine übergrosse REST-Anfrage ohne Inhaltslänge gesendet wird")
+    public void chunkedZuGross() throws IOException {
+        try (Socket socket = new Socket("127.0.0.1", RestAssured.port)) {
+            socket.setSoTimeout(10_000);
+            String kopf = "PATCH " + PFAD + " HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Authorization: Bearer " + token() + "\r\n"
+                    + "Content-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+            var aus = socket.getOutputStream();
+            aus.write(kopf.getBytes(StandardCharsets.US_ASCII));
+            aus.write("4001\r\n".getBytes(StandardCharsets.US_ASCII));
+            aus.write(" ".repeat(16 * 1024 + 1).getBytes(StandardCharsets.US_ASCII));
+            aus.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+            aus.flush();
+            statuszeile = new BufferedReader(
+                    new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8)).readLine();
+        }
+    }
+
+    @Dann("wird die REST-Anfrage mit Status {int} abgewiesen")
+    public void chunkedStatus(int status) {
+        assertThat(statuszeile).contains(" " + status + " ");
+    }
+
+    @Wenn("eine UID über REST geändert wird")
+    public void uidAendern() {
+        uidNeu = "CHE-123.456.789".equals(uidVorher) ? "CHE-987.654.321" : "CHE-123.456.789";
+        patch("{\"kennungen\":{\"uid\":\"" + uidNeu + "\"}}");
+    }
+
+    @Dann("enthält das Änderungsprotokoll nur den Pfad und nicht die UID-Werte")
+    public void uidNichtImProtokoll() throws SQLException {
+        assertThat(antwort.jsonPath().getBoolean("geaendert")).isTrue();
+        try (Connection verbindung = datenbank.getConnection(); Statement befehl = verbindung.createStatement();
+             ResultSet zeile = befehl.executeQuery("select details::text from " + SCHEMA
+                     + ".zugriff_protokoll where aktion = 'KONFIGURATION_AENDERN' order by id desc limit 1")) {
+            assertThat(zeile.next()).isTrue();
+            String details = zeile.getString(1);
+            assertThat(details).contains("einstellungen.kennungen.uid", "geändert").doesNotContain(uidNeu);
+            if (uidVorher != null) {
+                assertThat(details).doesNotContain(uidVorher);
+            }
+        }
     }
 
     @Dann("sind Version und Änderungsprotokoll unverändert")
