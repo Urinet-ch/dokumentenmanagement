@@ -577,12 +577,20 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   vier Felder und die gehashte Kennung geprüft.
 - Die Hilfe-Kopfzeile ist kein zweites `banner` mehr. Bei geöffnetem Dialog sind Navigation, Seiteninhalt und
   Sprunglink mit `inert` für Tastatur und Screenreader gesperrt; nach dem Schliessen sind sie wieder erreichbar. So
-  stehen die beiden Inhaltsverzeichnisse nicht gleichzeitig als aktive Landmarks zur Verfügung. Bei Escape ist die
-  Fokusrückgabe beim wiederholten schnellen Schliessen noch nicht zuverlässig; das neue Szenario ist zweimal
-  fehlgeschlagen und Aufgabe 23.5 bleibt offen. Die Seitenleiste ist
-  ein `aside`, damit die Marke auch auf breiten Bildschirmen innerhalb einer Landmark liegt.
+  stehen die beiden Inhaltsverzeichnisse nicht gleichzeitig als aktive Landmarks zur Verfügung. Angular Material erhält
+  `autoFocus="dialog"`, damit sein automatisches Wiederherstellen des Fokus nicht mit `inert` kollidiert. `closedStart`
+  schliesst den Zustand idempotent; nach dem nächsten Render fokussiert der Service den gemerkten Auslöser, sofern er noch
+  verbunden und nicht `inert` ist, andernfalls die Seitenüberschrift. Eine Generationsnummer verwirft veraltete
+  Fokusrückgaben, falls währenddessen erneut geöffnet wird. Der Unit-Test prüft die Reihenfolge «inert entfernt, dann
+  Fokus» und den Fallback bei entferntem Auslöser. Das Zehn-Zyklen-Browserszenario wartet nach Escape per Polling auf
+  Auslöserfokus und vollständiges Ende der Schliessanimation; der Lauf und drei direkte Wiederholungen sind grün. Die
+  Seitenleiste ist ein `aside`, damit die Marke auch auf breiten Bildschirmen innerhalb einer Landmark liegt.
 - Überschriften ohne IDs verwenden `[attr.id]`: Die vorherige Property-Bindung schrieb bei `null` die Zeichenfolge
   `null` als ID. `anleitung-text.spec.ts` prüft, dass die Attribute in der Leiste tatsächlich fehlen.
 - Nachweis 10.1 und 10.2: `ReqAbdeckungTest` und `SzenarienShardTest` prüfen das Repository; für 9.6 enthält der
   PR unter `backend/` ausschliesslich eine Feature-Datei. Oberfläche und Bedienung der Anleitung ändern sich nicht,
   darum brauchen Anleitung und Katalog keine Textänderung.
+- Abschluss Aufgabe 23.5 (22.11.2026): `npx ng test --watch=false` (84 Dateien, 1'058 Tests), `npx ng build`,
+  `npm run pruefe:gestaltung` und die 20 Spec-Abdeckungs-/Shard-Tests sind grün. Alle 100 Spec-07-Browserszenarien
+  sowie das Zehn-Zyklen-Szenario dreimal nacheinander sind grün. Der Build meldet weiterhin das bestehende
+  Initial-Bundle-Budget (691.47 KiB statt 500 KiB).

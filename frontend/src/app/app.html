@@ -176,12 +176,10 @@
     id="hilfe-leiste"
     position="end"
     mode="over"
-    autoFocus="first-heading"
+    autoFocus="dialog"
     [style.width]="mobil() ? '100%' : 'min(420px, 100vw)'"
     [opened]="hilfe.offen()"
-    (closedStart)="hilfe.geaendert(false)"
-    (openedChange)="hilfe.geaendert($event)"
-    (closed)="hilfe.geschlossen()"
+    (closedStart)="hilfe.drawerGeschlossen()"
   >
     @defer (when hilfe.offen()) {
       <app-hilfe-leiste (navigiert)="hilfe.schliessen()" />

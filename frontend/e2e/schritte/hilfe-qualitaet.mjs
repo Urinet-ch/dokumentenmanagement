@@ -115,11 +115,21 @@ When('ich die Hilfe wiederholt sofort mit Escape schliesse', async function () {
     await knopf.click();
     await this.seite.getByRole('dialog', { name: 'Hilfe', exact: true }).waitFor();
     await this.seite.waitForFunction(() => document.activeElement?.id === 'hilfe-leiste-titel');
+    await this.seite.waitForFunction(() => !document.querySelector('#hilfe-leiste').classList.contains('mat-drawer-animating'));
     await this.seite.keyboard.press('Escape');
     await this.seite.waitForFunction(() =>
       !document.querySelector('mat-sidenav-content').inert &&
       document.activeElement?.matches('button[aria-label="Hilfe"]'),
     );
+    await this.seite.waitForFunction(() => {
+      const drawer = document.querySelector('#hilfe-leiste');
+      return (
+        !drawer.classList.contains('mat-drawer-opened') &&
+        !drawer.classList.contains('mat-drawer-animating') &&
+        !drawer.parentElement.classList.contains('mat-drawer-container-has-open') &&
+        drawer.getBoundingClientRect().left >= document.documentElement.clientWidth
+      );
+    });
   }
 });
 
