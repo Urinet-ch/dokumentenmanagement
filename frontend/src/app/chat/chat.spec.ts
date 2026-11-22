@@ -3,6 +3,8 @@ import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { ChatService } from '../gemeinsam/api/api/chat.service';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Chat } from './chat';
 import { fehlerText } from './chat-logik';
 import {
@@ -75,6 +77,8 @@ describe('Chat (Req 6.1–6.3)', () => {
     TestBed.configureTestingModule({
       imports: [Chat],
       providers: [provideRouter([]), { provide: ChatPort, useValue: port },
+        { provide: ChatService, useValue: { apiV1ChatNachrichtenIdBewertungGet: () =>
+          throwError(() => new HttpErrorResponse({ status: 404 })) } },
         { provide: AnmeldungService, useValue: { darf: () => darfAnalyse } }],
     });
     await oeffnen();
@@ -154,6 +158,17 @@ describe('Chat (Req 6.1–6.3)', () => {
     // die nächste Frage setzt das Gespräch fort
     const zweite = await senden('Und im Oktober?');
     expect(zweite.gespraechId).toBe('g9');
+  });
+
+  it('bietet Sterne erst nach einer abgeschlossenen Antwort mit Nachrichten-ID an', async () => {
+    darfAnalyse = false;
+    await senden('Frage');
+    await ereignis({ typ: 'text', delta: 'Antwort' });
+    expect(element.querySelector('[data-test=bewertung]')).toBeNull();
+    await ereignis({ typ: 'fertig', gespraechId: 'g1', nachrichtId: '42' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(element.querySelectorAll('[data-test=stern]')).toHaveLength(5);
   });
 
   it('sendet mit Enter und beginnt mit Umschalt+Enter keine neue Frage', async () => {

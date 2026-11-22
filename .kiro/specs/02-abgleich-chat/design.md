@@ -460,6 +460,8 @@ abaninja_beleg(abaninja_uuid text pk, art text, belegnummer text, kontakt_id uui
   ein SHA-256 über Dokument-ID und ein Salz je Export (nicht zurückrechenbar, innerhalb der Datei stabil). Keine Benutzer- und Mandantenkennung.
 - **Oberfläche:** Sterne unter jeder Antwort (`data-test`, ARIA-Name «Antwort bewerten»), Grundauswahl und Freitext ab 3 Sternen; Seite «Chat-Auswertung» (A24) mit
   Kennzahlen, Liste schlecht bewerteter Antworten und Export-Dialog (Zeitraum, Sterne, Schalter «Personendaten schwärzen», Bestätigung für Klartext); Anleitung `chat.md` nachziehen.
+  Umsetzung 10.2: Fünf einzeln beschriftete Tastaturknöpfe, Grund und Freitext für alle Sterne freiwillig; gespeicherte Bewertungen werden beim Öffnen geladen,
+  können geändert oder entfernt werden. Datenschutzhinweis direkt bei der Bewertung und eigener Abschnitt im Hilfe-Katalog.
 - **Bedrohungsmodell:** Export enthält Geschäftsdaten (Frage und Antwort): Schutz durch A24, Step-up, Schwärzung als Standard, Protokoll ohne Inhalte und Verzicht auf Ablage;
   Freitext und Antworten als Text (XSS); Enumeration fremder Nachrichten (404); Kosten und Überlast (Grenze, 5'000 Zeilen, Strom).
   `[offen: Reichweite der Schwärzung für freie Personennamen ausserhalb der Mandantentabellen; Aufgabe 10.3 prüft mit synthetischen Mustern und dokumentiert die Grenzen]`

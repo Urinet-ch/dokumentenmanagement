@@ -155,6 +155,7 @@ Verhalten (z. B. «bestätigen») müssen der umgesetzten App entsprechen (Requi
 | `eingangskorb-eigene` | Ihre erfassten Dokumente verfolgen | `eingangskorb` | A5 ohne A7 | – | – |
 | `suche` | Suche | – | A2 | `/suche` | – |
 | `chat` | Chat | – | A2 | `/chat` | – |
+| `chat-bewerten` | Antworten bewerten | `chat` | A2 | – | – |
 | `dokument` | Dokumentansicht | – | A2 | `/dokument` | – |
 | `dokument-aendern` | Angaben ändern | `dokument` | A6 | – | – |
 | `kontakte` | Kontakte | – | A6 | `/kontakte` | – |

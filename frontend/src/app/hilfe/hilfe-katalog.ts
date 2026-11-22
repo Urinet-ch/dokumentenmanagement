@@ -100,6 +100,13 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     bedingung: { eine: ['A2'] },
     pfade: ['/chat'],
   },
+  {
+    anker: 'chat-bewerten',
+    titel: TEXTE.hilfe.abschnitte['chat-bewerten'],
+    datei: '/anleitung/chat-bewerten.md',
+    eltern: 'chat',
+    bedingung: { eine: ['A2'] },
+  },
   // Dokumentansicht (Aufgabe 22.5), zwischen «chat» und «kontakte»
   {
     anker: 'dokument',
