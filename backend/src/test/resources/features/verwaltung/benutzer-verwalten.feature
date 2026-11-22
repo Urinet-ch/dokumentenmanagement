@@ -8,6 +8,12 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber die Benutzerliste und beide Details abruft
     Dann sieht er nur den eigenen Benutzer und fremde Kennungen ergeben 404
 
+  @req-4.12 @req-4.8
+  Szenario: Rechte-Übersicht zeigt die Matrix nur für Benutzer des eigenen Mandanten
+    Angenommen in zwei Mandanten gibt es je einen synthetischen Benutzer
+    Wenn der Inhaber die Rechte beider Benutzer abruft
+    Dann sieht er die Rechte aus der Matrix nur für den eigenen Benutzer
+
   @req-3.2 @req-6.1 @req-6.2 @req-6.3 @req-6.4
   Szenario: Ein neuer Benutzer wird eingeladen und die Anlage protokolliert
     Angenommen die frische Anmeldung ist für den Test bestätigt

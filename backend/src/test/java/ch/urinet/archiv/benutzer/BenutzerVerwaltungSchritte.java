@@ -24,7 +24,9 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
+import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
@@ -231,6 +233,26 @@ public class BenutzerVerwaltungSchritte {
         assertThat(antworten.get(3).statusCode()).isEqualTo(404);
         assertThat(antworten.get(4).statusCode()).isEqualTo(404);
         assertThat(antworten.get(3).asString()).doesNotContain("fremd." + name);
+    }
+
+    @Wenn("der Inhaber die Rechte beider Benutzer abruft")
+    public void benutzerrechteAbrufen() {
+        antworten.add(anfrage().get(PFAD + "/" + eigeneId + "/rechte"));
+        antworten.add(anfrage().get(PFAD + "/" + fremdeId + "/rechte"));
+    }
+
+    @Dann("sieht er die Rechte aus der Matrix nur für den eigenen Benutzer")
+    public void benutzerrechtePruefen() {
+        Response eigene = antworten.get(0);
+        assertThat(eigene.statusCode()).isEqualTo(200);
+        assertThat(eigene.jsonPath().<String>get("code")).isEqualTo("mitarbeiter");
+        var rechte = eigene.jsonPath().<Map<String, Object>>getList("rechte");
+        assertThat(rechte).hasSize(Aktion.values().length);
+        for (Aktion aktion : Aktion.values()) {
+            var recht = rechte.stream().filter(r -> aktion.name().equals(r.get("aktion"))).findFirst().orElseThrow();
+            assertThat(recht.get("ergebnis")).isEqualTo(Rechtematrix.ergebnis(Rolle.MITARBEITER, aktion).name());
+        }
+        assertThat(antworten.get(1).statusCode()).isEqualTo(404);
     }
 
     @Angenommen("die frische Anmeldung ist für den Test bestätigt")

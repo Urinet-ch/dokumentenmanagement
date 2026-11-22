@@ -4667,6 +4667,41 @@
         } ]
       }
     },
+    "/api/v1/benutzer/{benutzerId}/rechte" : {
+      "get" : {
+        "summary" : "Rechte eines Benutzers anzeigen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Rolle und Rechte des Benutzers",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VerwaltungRolle"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
     "/api/v1/benutzer/{benutzerId}/sperren" : {
       "post" : {
         "summary" : "Benutzer sperren",

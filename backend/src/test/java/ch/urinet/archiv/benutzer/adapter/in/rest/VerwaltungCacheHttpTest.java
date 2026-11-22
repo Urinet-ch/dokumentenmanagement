@@ -216,6 +216,15 @@ class VerwaltungCacheHttpTest {
                     .when().get(pfad + "/" + eigeneId).then().statusCode(200)
                     .header("ETag", containsString("\"")).body("vorname", is("Test"))
                     .body("nachname", is("Person"));
+            RollenResource.RolleDto rechte = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().get(pfad + "/" + eigeneId + "/rechte").then().statusCode(200)
+                    .header("Cache-Control", containsString("no-store")).extract().as(RollenResource.RolleDto.class);
+            assertThat(rechte.code()).isEqualTo("mitarbeiter");
+            rechtePruefen(List.of(rechte));
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .when().get(pfad + "/" + fremdeId + "/rechte").then().statusCode(404);
+            given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet"))
+                    .when().get(pfad + "/" + eigeneId + "/rechte").then().statusCode(403);
             given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
                     .when().get(pfad + "/" + fremdeId).then().statusCode(404)
                     .body(not(containsString(fremd)));

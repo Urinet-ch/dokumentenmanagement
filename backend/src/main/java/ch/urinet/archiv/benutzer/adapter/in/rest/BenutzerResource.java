@@ -108,6 +108,20 @@ public class BenutzerResource {
         return Response.ok(ansicht).tag(ansicht.etag()).build();
     }
 
+    @GET
+    @Path("/{benutzerId}/rechte")
+    @ErfordertAktion(Aktion.A21)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Rechte eines Benutzers anzeigen")
+    @APIResponse(responseCode = "200", description = "Rolle und Rechte des Benutzers")
+    public RollenResource.RolleDto rechte(@PathParam("benutzerId") String benutzerId) {
+        var rollen = lesen.lesen(benutzerId).rollen();
+        if (rollen.size() != 1) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        return RollenResource.darstellen(rollen.iterator().next());
+    }
+
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @ErfordertAktion(Aktion.A22)
