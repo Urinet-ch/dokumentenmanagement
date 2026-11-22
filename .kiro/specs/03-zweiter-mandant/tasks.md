@@ -199,12 +199,12 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Auslegungen (Review entscheidet): «Speicher» zählt alle Objektversionen (`listObjectVersions`), nicht nur die aktuellen Objekte; Speicher und Dokumente je Status sind der Stand bei der Erhebung (nicht zum Monatsende), nur KI-Tokens und Chat-Fragen sind auf das Fenster begrenzt; Mail ist mindestens-einmal; ohne Empfänger bleibt der Bericht gespeichert und die Planung reiht täglich neu ein (WARN als Betreibersignal)
   - _Anforderungen: 8.1_
 
-- [x] 12.2 Vollexport und Abbau [Backend]
+- [ ] 12.2 Vollexport und Abbau [Backend]
   - `MANDANT_EXPORT` (alle Jahre, Original + Arbeitsfassung + PDF/A, Metadaten JSON/CSV, Manifeste); Kommando `mandant abbauen` mit 30-Tage-Frist, Liste gesperrter Objekte und Ablaufdatum der Sicherungsstände
   - Teilstand PR #239: Vollexport und wiederholbarer Abbau mit Trockenlauf, Bestätigung, Sperrprüfung und Bericht umgesetzt. Req 8.3 angepasst (Entscheid Fabian 17.11.2026): gemeinsame Realm-Clients bleiben bestehen, der Abbau entfernt den Mandantenzugang, ein Client-Lifecycle-Port entfällt; siehe design.md «Mandantenverwaltung». Bericht an Req 8.3 angeglichen: Zustand `ABGESCHLOSSEN` ohne Zusatz, Bericht nennt Mandantenzugang und den Handschritt (Client, Benutzer); `MandantAbbauTest` belegt, dass der abgebaute Mandant nicht mehr auflösbar ist.
   - Restnachweis 22.11.2026: `MandantEigentuemerTest.mandantenschemaAbbauErhaeltGemeinsameNamenssperre` löscht ein echtes Mandantenschema und prüft anschliessend, dass `public.benutzername_sperre` und der gesperrte Hash erhalten bleiben; das Mandantenschema ist entfernt.
-  - Umsetzung Rest (22.11.2026): Der Vollexport enthält `wissensbasis.zip`, je Dokument `konfigurationVersion` und `klassifikationen` mit Code, Name und Werten sowie `konfiguration.json` und alle Konfigurationsversionen unter `konfiguration/versionen/`. Die Abbildungen sind auf 200 Versionen und 128 KiB je JSON begrenzt; der Export bleibt ein Ausgabestrom.
-  - Nachweis: `mvn -o -f backend/pom.xml test -Dquarkus.http.test-port=0 -Dtest=MandantVollexportSchreiberTest,MandantVollexportDbTest,MandantVollexportKnapperHeapTest` (ZIP-Inhalte und Prüfsummen, streamender Export, echte PostgreSQL-Mandantentrennung über alle Seiten, Speichergrenzen)
+  - Teilstand Review (22.11.2026): Historische Konfigurationsversionen werden ohne Mengen- oder Grössenlimit blockweise als JSON-Array in `konfiguration/versionen.json` geschrieben. Die aktuelle Konfigurationsdatei wird weiterhin vollständig im Speicher erzeugt; für den geforderten speicherunabhängigen Export muss dieser Pfad noch angepasst und nachgewiesen werden.
+  - Nachweis Teilstand: `MandantVollexportDbTest` prüft 201 Versionen, ein Abbild über 128 KiB und zwei Mandanten; `MandantVollexportKnapperHeapTest` prüft den ZIP-Schreiber mit 201 Versionen und einem synthetischen 128-MiB-Abbild bei 64 MiB Heap. Der Heap-Test simuliert die Datenquelle und belegt nicht den Speicherbedarf der aktuellen Konfigurationsdatei.
   - _Anforderungen: 8.2, 8.3, 8.5_
 
 - [ ] 12.3 Isolations- und Sicherheitstests [QA]

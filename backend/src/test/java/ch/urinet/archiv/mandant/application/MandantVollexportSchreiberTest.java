@@ -51,8 +51,7 @@ class MandantVollexportSchreiberTest {
                 "manifest/m", "versions-id-der-quelle", sha(inhalt.get("manifest/m")));
 
         Path zipPfad = schreiben(temp, daten(List.of(dokument), List.of(manifest)), ablage(inhalt),
-                () -> List.of(new MandantVollexportKonfiguration.Version(1, "{\"version\":1}"),
-                        new MandantVollexportKonfiguration.Version(2, "{\"version\":2}")));
+                konfiguration());
 
         assertThat(manifestKopien).containsExactly("manifest/m");
         try (ZipFile zip = new ZipFile(zipPfad.toFile())) {
@@ -65,7 +64,9 @@ class MandantVollexportSchreiberTest {
             assertThat(text(zip, "manifeste.csv")).contains("manifest/m");
             assertThat(text(zip, "wissensbasis.zip")).isEqualTo("Wissenspaket");
             assertThat(text(zip, "konfiguration.json")).isEqualTo("{\"version\":2}");
-            assertThat(text(zip, "konfiguration/versionen/1.json")).isEqualTo("{\"version\":1}");
+            assertThat(text(zip, "konfiguration/versionen.json"))
+                    .isEqualTo("[{\"version\":1,\"inhalt\":{\"version\":1}},"
+                            + "{\"version\":2,\"inhalt\":{\"version\":2}}]");
             assertThat(text(zip, "pruefsummen.sha256"))
                     .contains(sha(inhalt.get("archiv/o")) + "  dateien/" + id + "/ORIGINAL-1.bin")
                     .contains(sha(inhalt.get("archiv/p")) + "  dateien/" + id + "/pdfa.pdf")
@@ -121,7 +122,25 @@ class MandantVollexportSchreiberTest {
     }
 
     private static Path schreiben(Path temp, MandantVollexportDaten daten, AblagePort ablage) throws Exception {
-        return schreiben(temp, daten, ablage, () -> List.of());
+        return schreiben(temp, daten, ablage, MandantVollexportKonfiguration.leer());
+    }
+
+    private static MandantVollexportKonfiguration konfiguration() {
+        return new MandantVollexportKonfiguration() {
+            @Override
+            public Version aktuell() {
+                return new Version(2, "{\"version\":2}");
+            }
+
+            @Override
+            public void versionen(Versionsausgabe ausgabe) throws java.io.IOException {
+                for (int nummer = 1; nummer <= 2; nummer++) {
+                    int version = nummer;
+                    ausgabe.schreiben(version, ziel -> ziel.write(
+                            ("{\"version\":" + version + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                }
+            }
+        };
     }
 
     private static Path schreiben(Path temp, MandantVollexportDaten daten, AblagePort ablage,

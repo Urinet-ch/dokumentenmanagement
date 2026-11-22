@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantVollexportDaten;
+import ch.urinet.archiv.mandant.application.MandantVollexportKonfiguration;
 import ch.urinet.archiv.mandant.application.MandantVollexportRepository;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
@@ -12,7 +13,12 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -25,6 +31,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -55,6 +64,9 @@ class MandantVollexportDbTest {
     @Inject
     MandantVollexportRepository repository;
 
+    @Inject
+    MandantVollexportKonfiguration konfiguration;
+
     @AfterAll
     static void beenden() {
         THREADS.shutdownNow();
@@ -80,6 +92,62 @@ class MandantVollexportDbTest {
         assertThat(gelesenA).doesNotHaveDuplicates().containsAll(idsA).doesNotContainAnyElementsOf(idsB);
         assertThat(gelesenB).doesNotHaveDuplicates().containsAll(idsB).doesNotContainAnyElementsOf(idsA);
         assertThat(gelesenA.size()).isGreaterThanOrEqualTo(205);
+    }
+
+    @Test
+    void konfigurationsversionenWerdenVollstaendigUndMandantengetrenntGestreamt(@TempDir Path temp) throws Exception {
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement a = verbindung.prepareStatement("""
+                     insert into m_urinet.konfiguration_version (version, wer, quelle, inhalt, sha256)
+                     select n, 'test', 'APP', case when n = 10001
+                         then jsonb_set(basis.inhalt, '{kiTexte,rolle}', to_jsonb(repeat('ä🙂', 70000)))
+                         else basis.inhalt end, repeat('a', 64)
+                     from generate_series(10001, 10201) n
+                     cross join (select inhalt from m_urinet.konfiguration_version order by version desc limit 1) basis
+                     """);
+             PreparedStatement b = verbindung.prepareStatement("""
+                     insert into m_vhf_gsk.konfiguration_version (version, wer, quelle, inhalt, sha256)
+                     select 20001, 'test', 'APP',
+                       jsonb_set(inhalt, '{kiTexte,rolle}', to_jsonb('mandant-b'::text)), repeat('b', 64)
+                     from m_vhf_gsk.konfiguration_version order by version desc limit 1
+                     """)) {
+            a.executeUpdate();
+            b.executeUpdate();
+        }
+
+        Path zipA = temp.resolve("a.zip");
+        Path zipB = temp.resolve("b.zip");
+        versionenInsZip(A, zipA);
+        versionenInsZip(B, zipB);
+
+        try (ZipFile a = new ZipFile(zipA.toFile()); ZipFile b = new ZipFile(zipB.toFile())) {
+            for (int version = 10001; version <= 10201; version++) {
+                assertThat(a.getEntry(version + ".json")).isNotNull();
+                assertThat(b.getEntry(version + ".json")).isNull();
+            }
+            assertThat(a.getEntry("20001.json")).isNull();
+            assertThat(b.getEntry("20001.json")).isNotNull();
+            String gross = new String(a.getInputStream(a.getEntry("10001.json")).readAllBytes(),
+                    StandardCharsets.UTF_8);
+            assertThat(gross).contains("ä🙂".repeat(70000)).doesNotContain("mandant-b");
+            assertThat(gross.getBytes(StandardCharsets.UTF_8).length).isGreaterThan(131_072);
+        }
+    }
+
+    private void versionenInsZip(MandantCode code, Path pfad) throws Exception {
+        THREADS.submit(() -> kontext.mit(code, () -> {
+            try (OutputStream datei = Files.newOutputStream(pfad);
+                 ZipOutputStream zip = new ZipOutputStream(datei, StandardCharsets.UTF_8)) {
+                konfiguration.versionen((nummer, inhalt) -> {
+                    zip.putNextEntry(new ZipEntry(nummer + ".json"));
+                    inhalt.schreiben(zip);
+                    zip.closeEntry();
+                });
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            return null;
+        })).get();
     }
 
     @Test

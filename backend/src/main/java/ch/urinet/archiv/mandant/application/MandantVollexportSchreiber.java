@@ -43,7 +43,7 @@ public class MandantVollexportSchreiber {
     private final MandantVollexportKonfiguration konfiguration;
 
     public MandantVollexportSchreiber(MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen) {
-        this(daten, ablage, wissen, () -> List.of());
+        this(daten, ablage, wissen, MandantVollexportKonfiguration.leer());
     }
 
     public MandantVollexportSchreiber(MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen,
@@ -91,21 +91,32 @@ public class MandantVollexportSchreiber {
     }
 
     private void schreibeKonfiguration(ZipOutputStream zip, BufferedWriter pruefsummen) throws IOException {
-            MandantVollexportKonfiguration.Version aktuell = konfiguration.aktuell();
-            if (aktuell != null) {
-                schreibeText(zip, pruefsummen, "konfiguration.json", aktuell.json());
-            }
-            for (MandantVollexportKonfiguration.Version version : konfiguration.versionen()) {
-                schreibeText(zip, pruefsummen, "konfiguration/versionen/" + version.nummer() + ".json", version.json());
-            }
+        MandantVollexportKonfiguration.Version aktuell = konfiguration.aktuell();
+        if (aktuell != null) {
+            schreibeInhalt(zip, pruefsummen, "konfiguration.json", ziel -> schreiben(ziel, aktuell.json()));
         }
+        schreibeInhalt(zip, pruefsummen, "konfiguration/versionen.json", ziel -> {
+            schreiben(ziel, "[");
+            boolean[] erstes = {true};
+            konfiguration.versionen((nummer, inhalt) -> {
+                if (!erstes[0]) {
+                    schreiben(ziel, ",");
+                }
+                schreiben(ziel, "{\"version\":" + nummer + ",\"inhalt\":");
+                inhalt.schreiben(ziel);
+                schreiben(ziel, "}");
+                erstes[0] = false;
+            });
+            schreiben(ziel, "]");
+        });
+    }
 
-    private static void schreibeText(ZipOutputStream zip, BufferedWriter pruefsummen, String pfad, String text)
-            throws IOException {
+    private static void schreibeInhalt(ZipOutputStream zip, BufferedWriter pruefsummen, String pfad,
+                                       MandantVollexportKonfiguration.Inhalt inhalt) throws IOException {
         zip.putNextEntry(new ZipEntry(pfad));
         MessageDigest digest = sha256();
         OutputStream ausgabe = new DigestOutputStream(zip, digest);
-        schreiben(ausgabe, text);
+        inhalt.schreiben(ausgabe);
         zip.closeEntry();
         pruefsumme(pruefsummen, digest.digest(), pfad);
     }

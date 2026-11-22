@@ -71,6 +71,70 @@ class MandantVollexportKnapperHeapTest {
         }
     }
 
+    @Test
+    void grosseKonfigurationsversionUndMehrAlsZweihundertVersionenWerdenGestreamt(@TempDir Path temp) throws Exception {
+        Assumptions.assumeTrue(Boolean.getBoolean("archiv.speicher-test"), "nur in der Ausführung «speicher»");
+        long groesse = 128L * 1024 * 1024;
+        assertThat(Runtime.getRuntime().maxMemory()).isLessThan(groesse);
+        MandantVollexportKonfiguration konfiguration = new MandantVollexportKonfiguration() {
+            @Override
+            public Version aktuell() {
+                return new Version(201, "{}");
+            }
+
+            @Override
+            public void versionen(Versionsausgabe ausgabe) throws java.io.IOException {
+                for (int version = 1; version <= 201; version++) {
+                    if (version == 1) {
+                        ausgabe.schreiben(version, ziel -> {
+                            byte[] block = new byte[BLOCK];
+                            java.util.Arrays.fill(block, (byte) 'x');
+                            byte[] anfang = "{\"text\":\"".getBytes(StandardCharsets.UTF_8);
+                            byte[] ende = "\"}".getBytes(StandardCharsets.UTF_8);
+                            ziel.write(anfang);
+                            long textlaenge = groesse - anfang.length - ende.length;
+                            for (long position = 0; position < textlaenge; position += block.length) {
+                                ziel.write(block, 0, (int) Math.min(block.length, textlaenge - position));
+                            }
+                            ziel.write(ende);
+                        });
+                    } else {
+                        ausgabe.schreiben(version, ziel -> ziel.write("{}".getBytes(StandardCharsets.UTF_8)));
+                    }
+                }
+            }
+        };
+        MandantVollexportDaten daten = new MandantVollexportDaten() {
+            @Override
+            public List<Dokument> seite(Optional<UUID> nach, int anzahl) {
+                return List.of();
+            }
+
+            @Override
+            public List<Manifestdatei> manifeste() {
+                return List.of();
+            }
+        };
+        AblagePort ablage = (AblagePort) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{AblagePort.class},
+                (proxy, methode, argumente) -> { throw new AssertionError(methode.getName()); });
+        Path datei = temp.resolve("konfiguration.zip");
+        try (OutputStream ziel = Files.newOutputStream(datei)) {
+            new MandantVollexportSchreiber(daten, ablage, (mandant, strom) -> {}, konfiguration)
+                    .schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(), temp, ziel);
+        }
+        try (ZipFile zip = new ZipFile(datei.toFile())) {
+            var eintrag = zip.getEntry("konfiguration/versionen.json");
+            assertThat(eintrag).isNotNull();
+            assertThat(eintrag.getSize()).isGreaterThan(groesse);
+            try (var strom = zip.getInputStream(eintrag)) {
+                strom.skipNBytes(eintrag.getSize() - 128);
+                assertThat(new String(strom.readAllBytes(), StandardCharsets.UTF_8))
+                        .contains("{\"version\":201,\"inhalt\":{}}]");
+            }
+        }
+    }
+
     /** Gegenprobe: Der Heap ist wirklich zu klein für die Datei, ein Puffern der ganzen Datei schlüge fehl. */
     @Test
     void heapIstKleinerAlsDieDatei() {

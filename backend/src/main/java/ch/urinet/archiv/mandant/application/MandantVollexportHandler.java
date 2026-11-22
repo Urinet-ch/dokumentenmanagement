@@ -49,7 +49,7 @@ public class MandantVollexportHandler implements AuftragHandler {
     public MandantVollexportHandler(MandantVollexport speichern, MandantVollexportRepository repository,
                                     MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen,
                                     Path arbeitsverzeichnis) {
-        this(speichern, repository, daten, ablage, wissen, () -> java.util.List.of(), arbeitsverzeichnis);
+        this(speichern, repository, daten, ablage, wissen, MandantVollexportKonfiguration.leer(), arbeitsverzeichnis);
     }
 
     @Override
