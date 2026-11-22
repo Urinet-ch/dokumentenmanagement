@@ -135,7 +135,10 @@ public class BenutzerStatusAendern {
                         }
                     }
                     return ziel;
-                }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR, ignoriert -> {
+                }, fehler -> {
+                    tokenWiderruf.setzen(id, Instant.now());
+                    return VerwaltungVorgang.Kompensation.UNKLAR;
+                }, ignoriert -> {
                     if (vorgang == Vorgang.SPERREN || vorgang == Vorgang.DEAKTIVIEREN) {
                         tokenWiderruf.setzen(id, Instant.now());
                         BenutzerStatus neu = vorgang == Vorgang.SPERREN

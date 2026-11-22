@@ -58,7 +58,10 @@ public class BenutzerGoogleLoesen {
                     identitaet.sitzungenBeenden(mandant.wert(), id);
                     tokenWiderruf.setzen(id, Instant.now());
                     return ziel;
-                }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR, ignoriert -> { },
+                }, fehler -> {
+                    tokenWiderruf.setzen(id, Instant.now());
+                    return VerwaltungVorgang.Kompensation.UNKLAR;
+                }, ignoriert -> { },
                 ignoriert -> eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
     }
 
