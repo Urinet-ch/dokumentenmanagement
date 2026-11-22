@@ -172,7 +172,7 @@ export class HandyErfassung {
   /** Nimmt das volle Kamerabild als Original (Rohaufnahme, Req 4.7) und startet den Zuschnitt. */
   protected async aufnehmen(): Promise<void> {
     if (this.seiten().length >= MAX_AUFNAHME_SEITEN) {
-      this.meldung.set(this.texte.aufnahmeZuVieleSeiten(MAX_AUFNAHME_SEITEN));
+      this.meldung.set(this.texte.aufnahmeZuVieleSeiten);
       return;
     }
     const video = this.video()!.nativeElement;

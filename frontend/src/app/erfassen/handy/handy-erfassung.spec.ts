@@ -129,7 +129,7 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
     expect(hinweise()).toHaveLength(MAX_AUFNAHME_SEITEN);
     expect(scanner.auftraege).toHaveLength(MAX_AUFNAHME_SEITEN);
     expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toBe(
-      TEXTE.handy.aufnahmeZuVieleSeiten(MAX_AUFNAHME_SEITEN),
+      TEXTE.handy.aufnahmeZuVieleSeiten,
     );
   });
 

@@ -15,7 +15,7 @@ export class AufnahmeGrenzeFehler extends Error {
 export function aufnahmeGrenzeMeldung(fehler: AufnahmeGrenzeFehler): string {
   switch (fehler.grenze) {
     case 'seiten':
-      return TEXTE.handy.aufnahmeZuVieleSeiten(MAX_AUFNAHME_SEITEN);
+      return TEXTE.handy.aufnahmeZuVieleSeiten;
     case 'groesse':
       return TEXTE.handy.aufnahmeZuGross;
     case 'pixel':

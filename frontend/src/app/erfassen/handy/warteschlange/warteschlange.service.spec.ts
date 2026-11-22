@@ -117,7 +117,7 @@ describe('WarteschlangeService (Req 4.4–4.6, 4.8)', () => {
 
     expect(upload.gesendet).toHaveLength(1);
     expect(schlange.fehlerhaft()).toMatchObject([
-      { id: 'zu-gross', zustand: 'fehlerhaft', meldung: TEXTE.handy.aufnahmeZuVieleSeiten(MAX_AUFNAHME_SEITEN) },
+      { id: 'zu-gross', zustand: 'fehlerhaft', meldung: TEXTE.handy.aufnahmeZuVieleSeiten },
     ]);
   });
 
