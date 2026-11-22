@@ -541,3 +541,15 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   Geschäftsstelle. Bis zum Entscheid sind die Texte für alle Mandanten gleich; ein Zusatz käme über die Konfiguration des
   Mandanten (Spec 05), nie über eine Abfrage der Kennung im Code.]
 - Alle übrigen Punkte sind Vorschläge (Abschnitt «Entscheide») und gelten mit dem Merge dieses PR.
+
+## Umsetzung (Aufgabe 23.3, 22.11.2026)
+- Die Karte zeigt Fortschritt und Schritte, einschliesslich der für die Rolle erlaubten Bereiche. Der aktuelle Schritt
+  und ein erzwungener Wiederaufruf bleiben im Dienst nur im Arbeitsspeicher und sind an Mandant und Benutzer gebunden;
+  ein Neuladen setzt den Schritt zurück. Abschluss und Überspringen ersetzen den lokalen Vermerk.
+- «In der Anleitung lesen» öffnet die Hilfe-Leiste am Anker des Schritts, ohne Navigation. Auf `/hilfe` führt
+  «Einführung erneut zeigen» für angemeldete Benutzer mit Rolle und Mandant zu `/?einfuehrung=`; der Router behandelt
+  den leeren Parameter wie `/?einfuehrung`. Die Karte bleibt auch für Benutzer mit bestehendem Vermerk sichtbar.
+- Die Schrittüberschrift erhält beim Wechsel den Fokus, nach Abschluss oder Überspringen die Seitenüberschrift;
+  eine sichtbare Statusmeldung meldet das Ergebnis. Die Karte verwendet keine Übergangsanimation.
+- Nachweise: `einfuehrung-start.feature` für 3.2–3.7 und 5.5, `einfuehrung-vermerk.spec.ts` für den flüchtigen
+  Schrittstand und die Trennung nach Benutzer, `hilfe-seite.spec.ts` für den rollenabhängigen Wiederaufruf.

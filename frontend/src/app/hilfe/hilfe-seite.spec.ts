@@ -95,6 +95,7 @@ describe('Seite /hilfe (Spec 07, Req 5.1 bis 5.4, 6.2, 6.3, 6.5, 7.6)', () => {
     const seite = await oeffnen('/hilfe');
     expect(seite.querySelector('.seitenkopf .vorzeile')?.textContent?.trim()).toBe('Muster Archiv');
     expect(seite.querySelector('.seitenkopf h1')?.textContent?.trim()).toBe('Hilfe');
+    expect(seite.querySelector<HTMLAnchorElement>('.seitenkopf a')?.getAttribute('href')).toBe('/?einfuehrung=');
     const nav = seite.querySelector('nav')!;
     expect(seite.querySelector(`#${nav.getAttribute('aria-labelledby')}`)?.textContent?.trim()).toBe('Inhalt der Anleitung');
     expect(inhalt(seite)).toEqual([
@@ -143,6 +144,7 @@ describe('Seite /hilfe (Spec 07, Req 5.1 bis 5.4, 6.2, 6.3, 6.5, 7.6)', () => {
       expect(seite.querySelector('h2#erfassen-offline')).not.toBeNull();
       expect(seite.querySelector('[data-test="hilfe-abgemeldet"]')?.textContent?.trim()).toBe(TEXTE.hilfe.abgemeldet);
       expect(seite.querySelector('[data-test="hilfe-rolle"]')).toBeNull();
+      expect(seite.querySelector('.seitenkopf a')).toBeNull();
     });
   }
 

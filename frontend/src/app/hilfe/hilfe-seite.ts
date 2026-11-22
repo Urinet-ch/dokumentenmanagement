@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle } from '../gemeinsam/anmeldung/rechte';
@@ -26,7 +27,7 @@ import { HILFE_EINTRAEGE, sichtbareAbschnitte, sichtbareAnker } from './hilfe-si
  */
 @Component({
   selector: 'app-hilfe-seite',
-  imports: [RouterLink, Symbol, AnleitungText],
+  imports: [RouterLink, Symbol, AnleitungText, MatButtonModule],
   templateUrl: './hilfe-seite.html',
   styleUrl: './hilfe-seite.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,6 +39,7 @@ export class HilfeSeite {
   private readonly katalog = inject(HILFE_EINTRAEGE);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly texte = TEXTE.hilfe;
+  protected readonly texteEinfuehrung = TEXTE.einfuehrung;
   protected readonly rollen = TEXTE.kopf.rollen;
 
   /** Nur mit Mandant und Rolle; sonst zeigt die Anleitung die Abschnitte für Abgemeldete (Req 6.3). */
