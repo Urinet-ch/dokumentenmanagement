@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="081-chat-bewertung" author="copilot">
+        <sql>
+            create table chat_bewertung (
+                nachricht_id bigint not null constraint chat_bewertung_nachricht_fk
+                    references chat_nachricht (id) on delete cascade,
+                benutzer text not null,
+                sterne smallint not null constraint chat_bewertung_sterne_ck check (sterne between 1 and 5),
+                grund text constraint chat_bewertung_grund_ck
+                    check (grund in ('NICHT_BEANTWORTET', 'FALSCH', 'UNVOLLSTAENDIG', 'QUELLE', 'ZU_LANGSAM', 'ANDERES')),
+                freitext text constraint chat_bewertung_freitext_ck check (char_length(freitext) &lt;= 500),
+                erstellt timestamptz not null,
+                geaendert timestamptz not null,
+                constraint chat_bewertung_pk primary key (nachricht_id, benutzer)
+            );
+            create index chat_bewertung_erstellt_ix on chat_bewertung (erstellt);
+            create table chat_bewertung_versuch (
+                id bigserial constraint chat_bewertung_versuch_pk primary key,
+                benutzer text not null,
+                zeit timestamptz not null
+            );
+            create index chat_bewertung_versuch_benutzer_zeit_ix
+                on chat_bewertung_versuch (benutzer, zeit);
+            create index chat_bewertung_versuch_zeit_ix on chat_bewertung_versuch (zeit);
+        </sql>
+        <rollback>
+            <sql>
+                drop table chat_bewertung_versuch;
+                drop table chat_bewertung;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

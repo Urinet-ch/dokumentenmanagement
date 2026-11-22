@@ -91,6 +91,7 @@ components:
       - A21
       - A22
       - A23
+      - A24
     Antwort:
       type: object
       properties:
@@ -536,6 +537,62 @@ components:
           type: string
         sprache:
           type: string
+    ChatBewertung:
+      type: object
+      required:
+      - nachrichtId
+      - sterne
+      - erstellt
+      - geaendert
+      properties:
+        nachrichtId:
+          type: string
+        sterne:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+        grund:
+          type:
+          - string
+          - "null"
+          enum:
+          - NICHT_BEANTWORTET
+          - FALSCH
+          - UNVOLLSTAENDIG
+          - QUELLE
+          - ZU_LANGSAM
+          - ANDERES
+        freitext:
+          type:
+          - string
+          - "null"
+          maxLength: 500
+        erstellt:
+          type: string
+          $ref: "#/components/schemas/Instant"
+        geaendert:
+          type: string
+          $ref: "#/components/schemas/Instant"
+    ChatBewertungEingabe:
+      type: object
+      required:
+      - sterne
+      properties:
+        sterne:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+        grund:
+          type:
+          - string
+          - "null"
+        freitext:
+          type:
+          - string
+          - "null"
+          maxLength: 500
     ChatFrage:
       type: object
       required:
@@ -4228,6 +4285,110 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatVerlauf"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/chat/nachrichten/{id}/bewertung:
+    delete:
+      summary: Eigene Chat-Bewertung entfernen
+      description: "Fremde, unbekannte und nicht bewertbare Antworten sowie Antworten\
+        \ ohne Bewertung ergeben 404."
+      tags:
+      - Chat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Bewertung entfernt
+        "404":
+          description: Bewertung nicht gefunden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+    get:
+      summary: Eigene Chat-Bewertung abrufen
+      description: "Fremde, unbekannte oder nicht bewertbare Antworten sowie Antworten\
+        \ ohne Bewertung ergeben 404."
+      tags:
+      - Chat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Eigene Bewertung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatBewertung"
+        "404":
+          description: Bewertung nicht gefunden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+    put:
+      summary: Eigene Chat-Antwort bewerten
+      description: "Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit\
+        \ Status OK. Fremde, unbekannte und nicht bewertbare Antworten ergeben 404;\
+        \ nach mehr als 200 Speicherungen je Stunde 429."
+      tags:
+      - Chat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        "200":
+          description: Bewertung gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatBewertung"
+        "400":
+          description: Bewertung ungültig
+        "404":
+          description: Antwort nicht gefunden
+        "429":
+          description: Bewertungslimit erreicht
+          headers:
+            Retry-After:
+              description: Sekunden bis zum nächsten Versuch
         "401":
           description: Not Authorized
         "403":

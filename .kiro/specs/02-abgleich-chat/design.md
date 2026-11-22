@@ -448,6 +448,11 @@ abaninja_beleg(abaninja_uuid text pk, art text, belegnummer text, kontakt_id uui
 - **Anwendung:** `ChatBewertungSpeichern` (Grenze 200/h je Benutzer, Textbereinigung), `ChatAuswertung` (nur Lesen, begrenzte Abfragen), `ChatBewertungExport`
   (Strom, höchstens 5'000 Zeilen, deterministische Sortierung) mit dem Domain-Dienst `Schwaerzung` (framework-frei: Regeln für E-Mail, Telefon, IBAN, UID, AHV-Nummer,
   Beträge, Personendaten; Namen der Partner und Kontakte aus den Mandantentabellen als Wortliste; stabile Platzhalter je Datei).
+- **Umsetzung (Aufgabe 10.1, 22.11.2026):** Changeset 081 ergänzt `chat_bewertung` mit Fremdschlüssel-Löschung und eine mandantenlokale
+  Versuchstabelle für das rollierende Limit. `PUT`, `GET` und `DELETE` prüfen die eigene gespeicherte Antwort mit Status `OK`; nicht eigene
+  oder nicht bewertbare Nachrichten ergeben 404. Der REST-Endpunkt bleibt für dieselben Chat-Rollen wie der Chat zugänglich; A24 ist ausschliesslich
+  die Berechtigung für Auswertung und Export. Szenarien `chat-bewertungen.feature` decken Ändern, Löschen, Mandantentrennung, Aufbewahrung,
+  Textbereinigung, Rate-Limit und die A24-Zuordnung ab.
 - **Format:** `chat-bewertungen/v1` mit `schema.json` (JSON Schema) im ZIP und in `docs/` zum Schematest; Felder nach Requirement 15.6; die Kennung der Treffer ist
   ein SHA-256 über Dokument-ID und ein Salz je Export (nicht zurückrechenbar, innerhalb der Datei stabil). Keine Benutzer- und Mandantenkennung.
 - **Oberfläche:** Sterne unter jeder Antwort (`data-test`, ARIA-Name «Antwort bewerten»), Grundauswahl und Freitext ab 3 Sternen; Seite «Chat-Auswertung» (A24) mit

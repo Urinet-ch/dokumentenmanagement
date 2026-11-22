@@ -119,7 +119,7 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
 
 
 ## Welle 10 — Bewertung von Chat-Antworten (Entscheid Fabian 21.11.2026, Requirement 15)
-- [ ] 10.1 Bewertung speichern und Rechtematrix A24 [Backend]
+- [x] 10.1 Bewertung speichern und Rechtematrix A24 [Backend]
   - Changeset `chat_bewertung`, REST `PUT/DELETE/GET /chat/nachrichten/{id}/bewertung`, Grenze, Textbereinigung, Mandantentrennung, Recht A24 in der Rechtematrix; Szenarien `@req-15.2` bis `@req-15.4`.
   - _Anforderungen: 15.2, 15.3, 15.4, 15.5_
   - _Abhängig von: 7.3_
