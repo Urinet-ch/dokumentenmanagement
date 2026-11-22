@@ -157,12 +157,12 @@ def main() -> int:
         "sichtbare_dokumente": sichtbar,
         "beantwortet": len(zeiten),
         "fehler": {str(status): zahl for status, zahl in sorted(fehler.items())},
-        "p50_s": round(statistics.median(zeiten), 3) if zeiten else None,
-        "p95_s": round(perzentil(zeiten, 95), 3) if zeiten else None,
-        "max_s": round(max(zeiten), 3) if zeiten else None,
+        "p50_s": statistics.median(zeiten) if zeiten else None,
+        "p95_s": perzentil(zeiten, 95) if zeiten else None,
+        "max_s": max(zeiten) if zeiten else None,
         "grenze_s": grenze,
     }
-    bericht["bestanden"] = not fehler and bericht["p95_s"] is not None and bericht["p95_s"] <= grenze
+    bericht["bestanden"] = not fehler and bool(zeiten) and perzentil(zeiten, 95) <= grenze
     if args.json:
         print(json.dumps(bericht, ensure_ascii=False))
     else:
@@ -172,7 +172,7 @@ def main() -> int:
             # Status 0: keine Antwort (Verbindung abgebrochen oder Zeitüberschreitung)
             print("Fehler nach Status: " + ", ".join(f"{s}: {z}" for s, z in sorted(fehler.items())))
         if zeiten:
-            print(f"p50 {bericht['p50_s']} s, p95 {bericht['p95_s']} s, max {bericht['max_s']} s "
+            print(f"p50 {bericht['p50_s']:.3f} s, p95 {bericht['p95_s']:.3f} s, max {bericht['max_s']:.3f} s "
                   f"(Grenze p95 {grenze} s)")
         print("bestanden" if bericht["bestanden"] else "nicht bestanden")
     return 0 if bericht["bestanden"] else 1

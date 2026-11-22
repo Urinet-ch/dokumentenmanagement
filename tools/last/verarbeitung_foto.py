@@ -22,6 +22,7 @@ import json
 import math
 import os
 import stat
+import statistics
 import struct
 import sys
 import time
@@ -133,6 +134,7 @@ def main() -> int:
     parser.add_argument("--aufwaermen", type=int, default=20, help="Läufe vorweg, die nicht zählen")
     parser.add_argument("--intervall", type=float, default=0.5, help="Abfrageintervall in Sekunden")
     parser.add_argument("--grenze", type=float, default=600.0, help="Abbruch je Lauf in Sekunden")
+    parser.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
     args = parser.parse_args()
 
     if args.anzahl < 1 or args.aufwaermen < 0:
@@ -143,14 +145,27 @@ def main() -> int:
     basis = args.basis_url.rstrip("/")
     for nr in range(1, args.aufwaermen + 1):
         dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
-        print(f"Aufwärmen {nr:3d}: {dauer:6.1f} s (zählt nicht)")
+        if not args.json:
+            print(f"Aufwärmen {nr:3d}: {dauer:6.1f} s (zählt nicht)")
     zeiten = []
     for nr in range(1, args.anzahl + 1):
         dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
         zeiten.append(dauer)
-        print(f"Lauf {nr:3d}: {dauer:6.1f} s")
+        if not args.json:
+            print(f"Lauf {nr:3d}: {dauer:6.1f} s")
     wert = p95(zeiten)
-    print(f"p95 über {len(zeiten)} Läufe: {wert:.1f} s (Ziel <= {ZIEL_P95_SEKUNDEN:.0f} s)")
+    if args.json:
+        print(json.dumps({
+            "anzahl": len(zeiten),
+            "aufwaermen": args.aufwaermen,
+            "p50_s": statistics.median(zeiten),
+            "p95_s": wert,
+            "max_s": max(zeiten),
+            "grenze_s": ZIEL_P95_SEKUNDEN,
+            "bestanden": wert <= ZIEL_P95_SEKUNDEN,
+        }))
+    else:
+        print(f"p95 über {len(zeiten)} Läufe: {wert:.1f} s (Ziel <= {ZIEL_P95_SEKUNDEN:.0f} s)")
     return 0 if wert <= ZIEL_P95_SEKUNDEN else 1
 
 

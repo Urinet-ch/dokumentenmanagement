@@ -11,14 +11,18 @@ import sys
 import tempfile
 import threading
 import unittest
+from contextlib import redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 HIER = Path(__file__).resolve().parent
 sys.path.insert(0, str(HIER))
 
 import verarbeitung_foto  # noqa: E402
+import suche  # noqa: E402
+import upload  # noqa: E402
 
 
 def box(typ: bytes, inhalt: bytes) -> bytes:
@@ -76,6 +80,28 @@ class FototypTest(unittest.TestCase):
         endung, _ = verarbeitung_foto.fototyp(original)
         bild = Image.open(io.BytesIO(verarbeitung_foto.eindeutig(original, endung)))
         self.assertEqual(bild.size, (64, 48))
+
+
+class Grenztest(unittest.TestCase):
+    def test_upload_vergleicht_ungerundete_zeit(self):
+        argv = ["upload.py", "--url", "http://localhost", "--anzahl", "1", "--parallel", "1",
+                "--groesse", "200", "--grenze", "2", "--json"]
+        with patch.object(sys, "argv", argv), patch.object(upload, "token_lesen", return_value="probe"), \
+                patch.object(upload, "hochladen", return_value=(202, 2.0004)), redirect_stdout(io.StringIO()) as ausgabe:
+            self.assertEqual(upload.main(), 1)
+        bericht = json.loads(ausgabe.getvalue())
+        self.assertFalse(bericht["bestanden"])
+        self.assertGreater(bericht["p95_s"], bericht["grenze_s"])
+
+    def test_suche_vergleicht_ungerundete_zeit(self):
+        argv = ["suche.py", "--url", "http://localhost", "--anzahl", "1", "--parallel", "1", "--json"]
+        with patch.object(sys, "argv", argv), patch.object(suche, "token_lesen", return_value="probe"), \
+                patch.object(suche, "suchen", return_value=(200, 1.0004, 50000)), \
+                redirect_stdout(io.StringIO()) as ausgabe:
+            self.assertEqual(suche.main(), 1)
+        bericht = json.loads(ausgabe.getvalue())
+        self.assertFalse(bericht["bestanden"])
+        self.assertGreater(bericht["p95_s"], bericht["grenze_s"])
 
 
 class Server(BaseHTTPRequestHandler):
@@ -182,6 +208,20 @@ class SkriptTest(unittest.TestCase):
         self.assertIn("p95 über 50 Läufe", lauf.stdout)
         self.assertEqual(lauf.stdout.count("zählt nicht"), 20)
         self.assertEqual(len([a for a in Server.anfragen if a[0] == "POST"]), 70)
+
+    def test_foto_json_enthaelt_messwerte_ohne_aufwaermen(self):
+        foto = Path(self.ordner.name) / "foto.jpg"
+        foto.write_bytes(JPEG)
+        lauf = self.starten("verarbeitung_foto.py", "--basis-url", self.url, "--foto", str(foto), "--anzahl", "3",
+                            "--aufwaermen", "2", "--intervall", "0.01", "--json")
+        self.assertEqual(lauf.returncode, 0, lauf.stderr)
+        bericht = json.loads(lauf.stdout)
+        self.assertEqual((bericht["anzahl"], bericht["aufwaermen"], bericht["grenze_s"]), (3, 2, 30.0))
+        self.assertTrue(bericht["bestanden"])
+        self.assertLessEqual(0, bericht["p50_s"])
+        self.assertLessEqual(bericht["p50_s"], bericht["p95_s"])
+        self.assertLessEqual(bericht["p95_s"], bericht["max_s"])
+        self.assertEqual(len([a for a in Server.anfragen if a[0] == "POST"]), 5)
 
 
 if __name__ == "__main__":
