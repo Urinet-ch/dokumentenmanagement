@@ -7,3 +7,10 @@ target/
 # Deploy: Secrets und lokale Umgebung nie ins Repository (tech.md Regel 7)
 deploy/infomaniak/secrets/
 deploy/infomaniak/.env
+.copilot-specs-cache/
+
+# tokenade — per-project cache / scaffold flag / dedup refs
+.tokenade/
+
+# tokenade — legacy per-project embedding model cache (now global)
+.fastembed_cache/

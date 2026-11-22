@@ -61,9 +61,24 @@ public class MandantVollexport {
         return repository.fehler(id, fehlerId);
     }
 
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public boolean fehler(Auftrag auftrag, UUID id, UUID fehlerId, MandantVollexportRepository.Fehlerart art) {
+        auftraege.anspruchSichern(auftrag);
+        return repository.fehler(id, fehlerId, art);
+    }
+
     public VorsignierteUrl herunterladen(MandantCode mandant, UUID id) {
         MandantVollexportRepository.Vollexport export = repository.laden(id)
                 .orElseThrow(() -> new IllegalArgumentException("Vollexport nicht gefunden"));
+        if (export.status() == MandantVollexportRepository.Status.FEHLER) {
+            if (export.fehlerart().orElse(null)
+                    == MandantVollexportRepository.Fehlerart.KONFIGURATION_ZU_GROSS) {
+                throw new MandantFehler(MandantFehler.Grund.KONFIGURATION_ZU_GROSS,
+                        "Die aktuelle Konfigurationsdatei überschreitet 1 MiB. "
+                                + "Bitte die Konfiguration verkleinern und den Vollexport erneut starten.");
+            }
+            throw new IllegalStateException("Vollexport fehlgeschlagen; bitte einen neuen Export starten.");
+        }
         if (export.status() != MandantVollexportRepository.Status.FERTIG) {
             throw new IllegalStateException("Vollexport ist noch nicht fertig");
         }

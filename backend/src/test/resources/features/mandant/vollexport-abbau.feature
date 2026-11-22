@@ -19,6 +19,11 @@ Funktionalität: Vollexport und Abbau
     Wenn für zwei Mandanten je ein Vollexport geschrieben wird
     Dann enthält jedes ZIP nur die Dateien des eigenen Mandanten
 
+  @req-8.2
+  Szenario: Eine zu grosse aktuelle Konfiguration verhindert den gesamten Vollexport
+    Wenn die Grössenprüfung der aktuellen Konfiguration den Vollexport ablehnt
+    Dann wird kein Teil-ZIP abgeschlossen und der Grenzfehler festgehalten
+
   @req-8.3
   Szenario: Ein veralteter Vollexport verhindert die Deaktivierung
     Wenn nach dem Vollexport ein weiteres Dokument entstanden ist
