@@ -155,6 +155,12 @@ public class ExportSchritte {
                         + "s3_version, mime, groesse) values (?, 1, 'ORIGINAL', ?, ?, ?, 'application/pdf', ?)",
                         id, sha, schluessel, version, (long) inhalt.length);
             }
+
+            @Angenommen("der Beleg «{word}» ist als Wissensquelle markiert")
+            public void belegMarkieren(String name) throws SQLException {
+                Beleg beleg = belege.get(name);
+                Testdokumente.alsWissensquelleMarkieren(datenbank.get(), beleg.mandant(), beleg.id());
+            }
             if (z.get("betrag") != null) {
                 ausfuehren("insert into " + s + ".dokument_finanz (dokument_id, belegnummer, richtung, betrag) "
                         + "values (?, ?, ?, ?)", id, z.get("belegnummer"), z.get("richtung"),

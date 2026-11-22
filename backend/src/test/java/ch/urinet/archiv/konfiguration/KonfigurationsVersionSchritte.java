@@ -193,12 +193,10 @@ public class KonfigurationsVersionSchritte {
     public void ungueltigeWissensquelleEinspielen(String benutzer) throws Exception {
         ObjectNode datei = (ObjectNode) JSON.readTree(konfigurationsdatei);
         ArrayNode arten = (ArrayNode) datei.path("arten");
-        for (JsonNode knoten : arten) {
-            if (knoten instanceof ObjectNode art && "WISSENSQUELLE".equals(art.path("code").asText())) {
-                art.put("kiVorschlag", true);
-                break;
-            }
-        }
+        ObjectNode art = ((ObjectNode) arten.get(0)).deepCopy();
+        art.put("code", "WISSENSQUELLE");
+        art.put("name", "Wissensquelle");
+        arten.add(art);
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
                 .contentType(ContentType.JSON).body(JSON.writeValueAsString(datei)).when().put(KONFIGURATION);
     }

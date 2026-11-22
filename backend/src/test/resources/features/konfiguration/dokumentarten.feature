@@ -43,7 +43,7 @@ Funktionalität: Mandantenspezifische Dokumentart-Attribute
   @req-2.6
   Szenario: Die Art WISSENSQUELLE behält ihre festen Eigenschaften
     Wenn eine Test-Konfiguration die Art «WISSENSQUELLE» mit geänderten festen Eigenschaften prüft
-    Dann enthält die Test-Konfiguration den Befund «WISSENSQUELLE_UNGUELTIG»
+    Dann enthält die Test-Konfiguration den Befund «DOKUMENTART_ENTFALLEN»
 
   @req-2.2
   Szenario: Nur selbst ausgestellte Arten verhindern doppelte Belegnummern

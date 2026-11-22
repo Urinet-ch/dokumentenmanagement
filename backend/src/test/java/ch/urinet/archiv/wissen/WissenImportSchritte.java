@@ -679,9 +679,11 @@ public class WissenImportSchritte {
     }
 
     private void quelle(String code, String hash) throws SQLException {
-        UUID id = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(code, "WISSENSQUELLE",
+        UUID id = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(code,
+                code.equals("vhf-gsk") ? "PROBE_VHF_BULLETIN" : "PROJEKTDOKUMENT",
                 "NORMAL", true, "probe", null, "ARCHIVIERT"));
         dokumente.get(code).add(id);
+        Testdokumente.alsWissensquelleMarkieren(datenbank.get(), code, id);
         String schema = new MandantCode(code).schema();
         ausfuehren("update " + schema + ".dokument set volltext = 'Seite 1\f', seiten = 1, "
                 + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false where id = ?", id);

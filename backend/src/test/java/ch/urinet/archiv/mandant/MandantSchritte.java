@@ -1,6 +1,5 @@
 package ch.urinet.archiv.mandant;
 
-import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadWissensquelleSeed;
 import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantFehler;
 import ch.urinet.archiv.mandant.application.MandantVerzeichnis;
@@ -209,10 +208,6 @@ public class MandantSchritte {
             json.readTree(inhalt).path("arten").forEach(a -> erwartet.add(a.path("code").asText()));
         }
         assertThat(erwartet).hasSize(11);
-        String wissensquelle = new KlassenpfadWissensquelleSeed(json).lesen().code();
-        if (!erwartet.contains(wissensquelle)) {
-            erwartet.add(wissensquelle);
-        }
         assertThat(werte("select code from " + schema + ".dokumentart")).containsExactlyInAnyOrderElementsOf(erwartet);
         assertThat(werte("select vertraulichkeit || '/' || gesetzliche_pflicht from " + schema
                 + ".dokumentart where code = 'PROJEKTDOKUMENT'")).containsExactly("NORMAL/false");
@@ -235,7 +230,6 @@ public class MandantSchritte {
             json.readTree(inhalt).path("arten").forEach(a -> erwartet.add(a.path("code").asText()));
         }
         assertThat(erwartet).isNotEmpty();
-        erwartet.add(new KlassenpfadWissensquelleSeed(json).lesen().code());
         List<String> imAbbild = new ArrayList<>();
         seedAbbild.path("arten").forEach(a -> imAbbild.add(a.path("code").asText()));
         assertThat(imAbbild).containsExactlyInAnyOrderElementsOf(erwartet);

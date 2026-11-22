@@ -32,7 +32,7 @@ public class WissensquelleMarkieren {
     public WissenIngestStarten.Ergebnis markieren(UUID id, String benutzer) {
         auftraege.offen(WissenIngestStarten.TYP, Optional.empty(), true);
         sperren(id);
-        if (markierungen.aktiv(id)) {
+        if (markierungen.aktiv(id) || quellen.entwurfFuerDokumentLaufend(id)) {
             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }
         WissenIngestPort.Quelle quelle = quellen.quelleLaden(id)

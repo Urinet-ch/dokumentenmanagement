@@ -12,6 +12,7 @@ import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.wissen.application.WissensquelleMarkieren;
 import ch.urinet.archiv.wissen.application.WissensquelleMarkierungPort;
+import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.DELETE;
@@ -23,6 +24,8 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -50,14 +53,18 @@ public class WissensquelleResource {
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Protokolliert(aktion = ProtokollAktion.WISSENSQUELLE_MARKIERT)
     @Operation(summary = "Dokument als Wissensquelle verwenden")
-    @APIResponse(responseCode = "202", description = "Markierung gespeichert und Ingest angestossen")
+    @APIResponse(responseCode = "202", description = "Markierung gespeichert und Ingest angestossen",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = WissenIngestResource.AuftragDto.class)))
     @APIResponse(responseCode = "403", description = "Recht A16 fehlt")
     @APIResponse(responseCode = "404", description = "Dokument unbekannt oder nicht sichtbar")
     @APIResponse(responseCode = "409", description = "Dokument bereits markiert oder Ingest läuft")
     @APIResponse(responseCode = "422", description = "Fachliche Voraussetzung fehlt")
     public Response markieren(@PathParam("id") UUID id) {
         mandant.pruefen();
-        return Response.accepted(markieren.markieren(id, benutzer().id())).build();
+        WissenIngestStarten.Ergebnis ergebnis = markieren.markieren(id, benutzer().id());
+        return Response.accepted(new WissenIngestResource.AuftragDto(ergebnis.entwurfId(), ergebnis.status(),
+                ergebnis.geschaetzteTokens(), ergebnis.hinweis())).build();
     }
 
     @DELETE

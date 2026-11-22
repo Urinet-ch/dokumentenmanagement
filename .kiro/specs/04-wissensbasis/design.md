@@ -1439,7 +1439,11 @@ Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und 
   der Wissen-Seite.
 - **Bedrohungsmodell:** Markieren löst KI-Kosten aus (Tokenbudget, Requirement 12 bleibt: höchstens ein Ingest je Mandant); nur A16;
   Protokoll ohne Titel; kein Weg, die Vertraulichkeit einer Quelle zu umgehen (`PERSONAL` und höhere Stufen nach 5.5 und 5.11).
-- `[offen: Marker für das Kennzeichen «Wissensquelle» im Export (OKF) und im Jahresexport: Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6); Auswirkung auf den OKF-Export der Quelleneinträge prüft Aufgabe 17.1]`
+- **Exporte:** Die Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6). Im OKF-Export kennzeichnet
+  `sources[].wissensquelle` weiterhin die Hauptquelle einer Quelle-Seite, nicht den aktuellen Markierungszustand des
+  Dokuments. Auch nach dem Entfernen der Markierung bleiben die bestehenden Seiten und ihre Quellen im Export erhalten.
+  Beim erneuten Import muss die Dokumentquelle dagegen aktiv markiert sein; andernfalls ergibt die Quellenauflösung
+  `QUELLE_UNBEKANNT` (Requirement 20.9).
 
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
