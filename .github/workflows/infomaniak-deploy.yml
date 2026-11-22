@@ -83,6 +83,7 @@ jobs:
           S3_APP_ZUGANG_GEHEIMNIS: ${{ secrets.S3_APP_ZUGANG_GEHEIMNIS }}
           INFOMANIAK_AI_TOKEN: ${{ secrets.INFOMANIAK_AI_TOKEN }}
           ARCHIV_MANIFEST_KEY: ${{ secrets.ARCHIV_MANIFEST_KEY }}
+          NAMENSSPERRE_SALZ: ${{ secrets.NAMENSSPERRE_SALZ }}
         run: |
           fehlt=0
           pruefe() { if [ -z "$2" ]; then echo "::error::$1 fehlt (Secret bzw. Variable im Repo setzen)"; fehlt=1; fi; }
@@ -98,6 +99,7 @@ jobs:
           pruefe S3_APP_ZUGANG_GEHEIMNIS "$S3_APP_ZUGANG_GEHEIMNIS"
           pruefe INFOMANIAK_AI_TOKEN "$INFOMANIAK_AI_TOKEN"
           pruefe ARCHIV_MANIFEST_KEY "$ARCHIV_MANIFEST_KEY"
+          pruefe NAMENSSPERRE_SALZ "$NAMENSSPERRE_SALZ"
           exit "$fehlt"
 
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
@@ -147,6 +149,8 @@ jobs:
           # Passwort des Postfachs archiv@urinet.ch für Benachrichtigungen (Aufgabe 5.6, Entscheid Fabian 14.11.2026);
           # optional: ohne es ist die Datei leer, das Archiv startet, und jede Benachrichtigung bleibt beim Log
           ARCHIV_SMTP_PASSWORT: ${{ secrets.ARCHIV_SMTP_PASSWORT }}
+          # Salz der Namenssperre (Spec 06, 19.7, Weg A): 32 Zufallsbytes in Base64, Pflicht, dauerhaft (nie austauschen)
+          NAMENSSPERRE_SALZ: ${{ secrets.NAMENSSPERRE_SALZ }}
           # Anmeldung mit Google (O.8): Client-ID und -Secret; optional: ohne sie sind die Dateien leer, Keycloak
           # startet, und der Google-Provider bleibt deaktiviert
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
@@ -173,6 +177,7 @@ jobs:
           schreibe archiv_manifest_key "$ARCHIV_MANIFEST_KEY"
           schreibe archiv_data_key "$ARCHIV_DATA_KEY"
           schreibe archiv_smtp_passwort "$ARCHIV_SMTP_PASSWORT"
+          schreibe namenssperre_salz "$NAMENSSPERRE_SALZ"
           schreibe google_client_id "$GOOGLE_CLIENT_ID"
           schreibe google_client_secret "$GOOGLE_CLIENT_SECRET"
           # .env für die Interpolation in compose.yml (deploy-app.sh übernimmt sie): nur eine einzelne Adresse, sonst
