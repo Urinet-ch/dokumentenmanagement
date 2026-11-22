@@ -25,6 +25,8 @@ import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.export.application.ExportBelege;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -441,6 +443,57 @@ class S3AblageTest {
         assertThat(nachher).isAfter(vorher);
         assertThat(kuerzer.getFirst().ergebnis()).isEqualTo(SperrAenderung.Ergebnis.KONFLIKT);
         assertThat(retention(kopie.schluessel(), kopie.versionId()).orElseThrow().retainUntilDate()).isEqualTo(nachher);
+    }
+
+    @Test
+    void ablageVerwendetMandantenbucketBeiLesenUndArchivieren() throws Exception {
+        S3Ablage ablage = ablage();
+        MandantCode anderer = TestBucket.neu(verwaltung, true);
+        try {
+            assertThat(TestBucket.bucket(mandant)).isNotEqualTo(TestBucket.bucket(anderer));
+            DateiSchluessel schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+            byte[] eigeneDaten = inhalt("eigener Bucket");
+            byte[] fremdeDaten = inhalt("fremder Bucket");
+            ZuArchivieren eigeneDatei = eingang(ablage, schluessel, eigeneDaten);
+            String fremdeVersion = verwaltung.putObject(r -> r.bucket(TestBucket.bucket(anderer))
+                    .key(schluessel.pfad(Ablageort.EINGANG)), RequestBody.fromBytes(fremdeDaten)).versionId();
+            ZuArchivieren fremdeDatei = new ZuArchivieren(schluessel, fremdeVersion, Pruefsumme.von(fremdeDaten));
+
+            try (var strom = ablage.oeffnen(mandant, Ablageort.EINGANG, schluessel, eigeneDatei.eingangVersionId())) {
+                assertThat(strom.inhalt().readAllBytes()).isEqualTo(eigeneDaten);
+            }
+            try (var strom = ablage.oeffnen(anderer, Ablageort.EINGANG, schluessel, fremdeVersion)) {
+                assertThat(strom.inhalt().readAllBytes()).isEqualTo(fremdeDaten);
+            }
+            assertThatThrownBy(() -> ablage.oeffnen(mandant, Ablageort.EINGANG, schluessel, fremdeVersion))
+                    .isInstanceOfSatisfying(FachFehler.class,
+                            e -> assertThat(e.code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN));
+
+            var service = new AblageService(ablage);
+            var festgehalten = new ArrayList<ArchiviertesDokument>();
+            service.archivieren(anderer, List.of(fremdeDatei), Sperrvorgabe.ohnePflicht(), festgehalten::add);
+            assertThat(festgehalten).hasSize(1);
+            var fremdeArchivVersion = festgehalten.getFirst().dateien().getFirst().versionId();
+            assertThat(verwaltung.getObject(r -> r.bucket(TestBucket.bucket(anderer))
+                    .key(schluessel.pfad(Ablageort.ARCHIV)).versionId(fremdeArchivVersion))
+                    .readAllBytes()).isEqualTo(fremdeDaten);
+            assertThat(verwaltung.listObjectVersions(r -> r.bucket(bucket)
+                    .prefix(schluessel.pfad(Ablageort.EINGANG))).versions()).hasSize(1);
+
+            festgehalten.clear();
+            service.archivieren(mandant, List.of(eigeneDatei), Sperrvorgabe.ohnePflicht(), festgehalten::add);
+            assertThat(festgehalten).hasSize(1);
+            var eigeneArchivVersion = festgehalten.getFirst().dateien().getFirst().versionId();
+            assertThat(verwaltung.getObject(r -> r.bucket(bucket)
+                    .key(schluessel.pfad(Ablageort.ARCHIV)).versionId(eigeneArchivVersion))
+                    .readAllBytes()).isEqualTo(eigeneDaten);
+            assertThat(verwaltung.listObjectVersions(r -> r.bucket(bucket)
+                    .prefix(schluessel.pfad(Ablageort.ARCHIV))).versions()).hasSize(1);
+            assertThat(verwaltung.listObjectVersions(r -> r.bucket(TestBucket.bucket(anderer))
+                    .prefix(schluessel.pfad(Ablageort.ARCHIV))).versions()).hasSize(1);
+        } finally {
+            TestBucket.aufraeumen(verwaltung, anderer);
+        }
     }
 
     @Test
