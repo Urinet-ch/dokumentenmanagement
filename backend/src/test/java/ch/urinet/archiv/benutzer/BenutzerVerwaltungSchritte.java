@@ -1,6 +1,6 @@
 package ch.urinet.archiv.benutzer;
 
-import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
@@ -12,6 +12,7 @@ import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
@@ -20,7 +21,10 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantAbbau;
 import ch.urinet.archiv.mandant.application.WissensquelleSeed;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
+import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
+import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
@@ -45,6 +49,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -67,10 +72,13 @@ public class BenutzerVerwaltungSchritte {
     @Inject IdentitaetsDienst identitaet;
     @Inject BenutzerMitteilung mitteilung;
     @Inject StepUp stepUp;
+    @Inject ApiTokenVerwaltung apiTokens;
+    @Inject WebseitenSchluesselVerwaltung webseitenSchluessel;
     @Inject TokenWiderruf tokenWiderruf;
 
     private final List<Map.Entry<String, String>> benutzer = new ArrayList<>();
     private final List<Response> antworten = new ArrayList<>();
+    private final List<ApiToken> verwaltungsSchluessel = new ArrayList<>();
     private StepUp urspruenglichesStepUp;
     private IdentitaetsDienst urspruenglicheIdentitaet;
     private BenutzerMitteilung urspruenglicheMitteilung;
@@ -178,6 +186,9 @@ public class BenutzerVerwaltungSchritte {
         if (eigeneId != null) {
             tokenWiderrufZeileLoeschen(eigeneId);
         }
+        for (ApiToken token : verwaltungsSchluessel) {
+            apiTokens.widerrufen(new MandantCode("urinet"), token.id(), Optional.empty());
+        }
         if (akteurId != null) {
             tokenWiderrufZeileLoeschen(akteurId);
             given().auth().oauth2(admin).delete(adminPfad + "/users/" + akteurId).then().statusCode(204);
@@ -225,9 +236,20 @@ public class BenutzerVerwaltungSchritte {
     @Angenommen("die frische Anmeldung ist für den Test bestätigt")
     public void stepUpBestaetigen() {
         urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
+        }, StepUp.class);
+    }
+
+    @Angenommen("die Anmeldung für eine kritische Aktion ist nicht frisch")
+    public void stepUpNichtBestaetigen() {
+        urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() {
+                throw new StepUpNoetig(300);
+            }
         }, StepUp.class);
     }
 
@@ -252,6 +274,18 @@ public class BenutzerVerwaltungSchritte {
     @Wenn("der Inhaber einen synthetischen Mitarbeiter anlegt")
     public void mitarbeiterAnlegen() {
         anlegenUeberApi("mitarbeiter");
+    }
+
+    @Dann("wird die kritische Aktion abgewiesen und kein Benutzer angelegt")
+    public void stepUpNoetig() {
+        Response antwort = antworten.getFirst();
+        assertThat(antwort.statusCode()).isEqualTo(401);
+        assertThat(antwort.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
+        assertThat(antwort.header("WWW-Authenticate"))
+                .contains("insufficient_user_authentication", "max_age=\"300\"");
+        Response liste = anfrage().queryParam("q", name).get(PFAD);
+        assertThat(liste.statusCode()).isEqualTo(200);
+        assertThat(liste.jsonPath().<String>getList("id")).isEmpty();
     }
 
     private void anlegenUeberApi(String rolle) {
@@ -706,6 +740,30 @@ public class BenutzerVerwaltungSchritte {
     public void erneutEingeladenOhneRolle() {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);
         assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).rollen()).isEmpty();
+    }
+
+    @Angenommen("ein Mitarbeiterkonto, ein API-Token und ein Webseiten-Schlüssel bestehen")
+    public void verwaltungszugaengeAnlegen() {
+        verwaltungsSchluessel.add(apiTokens.erstellen("urinet", "Probe Verwaltung", "generator").token());
+        verwaltungsSchluessel.add(webseitenSchluessel.erstellen("urinet", "probe", "lesen", "oeffentlich", false)
+                .token());
+    }
+
+    @Wenn("alle drei Zugänge die Benutzerliste abrufen")
+    public void verwaltungszugaengeAbrufen() {
+        antworten.clear();
+        antworten.add(given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet")).get(PFAD));
+        antworten.add(given().auth().oauth2(verwaltungsSchluessel.get(0).text()).get(PFAD));
+        antworten.add(given().auth().oauth2(verwaltungsSchluessel.get(1).text()).get(PFAD));
+    }
+
+    @Dann("werden alle drei mit «NICHT_ERLAUBT» abgewiesen")
+    public void verwaltungszugaengeAbgewiesen() {
+        assertThat(antworten).hasSize(3);
+        for (Response antwort : antworten) {
+            assertThat(antwort.statusCode()).isEqualTo(403);
+            assertThat(antwort.path("fehlercode").toString()).isEqualTo("NICHT_ERLAUBT");
+        }
     }
 
     private String anlegen(String mandant, String benutzername) {

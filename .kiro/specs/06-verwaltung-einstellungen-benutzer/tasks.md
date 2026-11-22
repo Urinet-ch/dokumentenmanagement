@@ -121,10 +121,11 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.9_
   - _Abhängig von: 19.8_
 
-- [ ] 19.10 Step-up [Backend]
+- [x] 19.10 Step-up [Backend]
   - `StepUp` mit `auth_time`, Code `STEP_UP_NOETIG` mit `WWW-Authenticate`, Liste der Aktionen nach design.md, Konfiguration
     `archiv.verwaltung.step-up-gueltigkeit`, API-Tokens und Webseiten-Schlüssel scheitern an der Verwaltung mit 403; Test
-    gegen echtes Keycloak (`prompt=login` verlangt Passwort und TOTP).
+    gegen echtes Keycloak (`prompt=login` verlangt Passwort und TOTP). Unit- und Cucumber-Tests prüfen Ablauf, Claim-Grenzen,
+    Antwortheader sowie Benutzer-, API-Token- und Webseiten-Zugänge.
   - _Anforderungen: 7.2, 7.3, 7.9_
   - _Abhängig von: 19.2, 19.7_
 
