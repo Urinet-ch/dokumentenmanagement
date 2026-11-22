@@ -59,4 +59,5 @@
     <include file="changesets/057-wissens-import.xml" relativeToChangelogFile="true"/>
     <include file="changesets/080-chat-kontextnachweis.xml" relativeToChangelogFile="true"/>
     <include file="changesets/060-verwaltung-protokoll.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/070-wissensquelle-markierung.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -130,7 +130,10 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 befunde.add(new Befund("arten." + art.code() + ".aufbewahrung.feld", "FRISTFELD_UNGUELTIG",
                         "Der Fristbezug FELD benötigt ein pflichtiges Zusatzfeld."));
             }
-            wissensquellePruefen(befunde, art);
+            if ("WISSENSQUELLE".equals(art.code())) {
+                befunde.add(new Befund("arten.WISSENSQUELLE", "DOKUMENTART_ENTFALLEN",
+                        "Die Dokumentart WISSENSQUELLE ist entfallen. Bitte exportieren Sie die aktuelle Konfiguration."));
+            }
         }
         Map<String, Klassifikation> klassifikationenNachCode = new TreeMap<>();
         if (klassifikationen.size() > 50) {
@@ -453,18 +456,6 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             case "PERSONAL" -> 2;
             default -> -1;
         };
-    }
-
-    private static void wissensquellePruefen(List<Befund> befunde, Art art) {
-        if (!"WISSENSQUELLE".equals(art.code())) {
-            return;
-        }
-        if (!art.gruppen().equals(List.of("frei")) || !art.pflichtfelder().containsAll(List.of("titel", "datum"))
-                || art.aufbewahrung().jahre() != null || art.aufbewahrung().ab() != null
-                || art.gesetzlichePflicht() || art.kiVorschlag()) {
-            befunde.add(new Befund("arten.WISSENSQUELLE", "WISSENSQUELLE_UNGUELTIG",
-                    "Die festen Eigenschaften der Art WISSENSQUELLE dürfen nicht geändert werden."));
-        }
     }
 
     public boolean gleicherInhalt(Konfiguration andere) {

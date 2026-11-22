@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="070-wissensquelle-markierung" author="archiv">
+        <sql splitStatements="false"><![CDATA[
+            create table wissensquelle_markierung (
+                dokument_id uuid not null references dokument (id),
+                markiert_von text not null check (length(trim(markiert_von)) > 0),
+                markiert_am timestamptz not null,
+                beendet_am timestamptz,
+                beendet_von text,
+                constraint wissensquelle_markierung_ende_ck check (
+                    (beendet_am is null and beendet_von is null)
+                    or (beendet_am is not null and beendet_von is not null
+                        and length(trim(beendet_von)) > 0 and beendet_am >= markiert_am))
+            );
+            create unique index wissensquelle_markierung_aktiv_ux on wissensquelle_markierung (dokument_id)
+                where beendet_am is null;
+
+            alter table zugriff_protokoll drop constraint zugriff_protokoll_aktion_ck;
+            alter table zugriff_protokoll add constraint zugriff_protokoll_aktion_ck
+                check (aktion in ('ERFASSEN', 'ANZEIGEN', 'HERUNTERLADEN', 'AENDERN', 'BESTAETIGEN',
+                    'VERWERFEN', 'WIEDERHOLEN', 'EXPORTIEREN', 'VERWEIGERT', 'SPERRE_KONFLIKT',
+                    'REGEL_AENDERN', 'KONFIGURATION_AENDERN', 'WISSEN_ANZEIGEN', 'WISSEN_ANNEHMEN',
+                    'WISSEN_VERWERFEN', 'WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_IMPORT',
+                    'WISSENSQUELLE_MARKIERT', 'WISSENSQUELLE_ENTFERNT',
+                    'KONTAKT_ZUSAMMENFUEHREN', 'KONTAKT_INAKTIV', 'KONTAKT_AKTIV',
+                    'BENUTZER_ANLEGEN', 'BENUTZER_AENDERN', 'BENUTZER_LOESCHEN',
+                    'ROLLE_ZUWEISEN', 'BENUTZER_ANTRAG', 'BENUTZER_ABWEICHUNG'));
+
+            do $$
+            begin
+                if exists (select 1 from dokument where art = 'WISSENSQUELLE')
+                    and not exists (select 1 from dokumentart where code = 'PROJEKTDOKUMENT') then
+                    raise exception 'Migration Wissensquelle: Dokumentart PROJEKTDOKUMENT fehlt';
+                end if;
+                if exists (select 1 from belegnummer_eigen where art = 'WISSENSQUELLE')
+                    or exists (select 1 from dokumentart where fremdbeleg_art = 'WISSENSQUELLE'
+                        or ohne_zahlungsdaten_art = 'WISSENSQUELLE')
+                    or exists (select 1 from dokumentart_klassifikation where art = 'WISSENSQUELLE')
+                    or exists (select 1 from regel where art = 'WISSENSQUELLE') then
+                    raise exception 'Migration Wissensquelle: Ein Verweis auf die Dokumentart WISSENSQUELLE besteht weiterhin';
+                end if;
+            end
+            $$;
+
+            insert into dokument_version (dokument_id, version, konfiguration_version, daten, geaendert_von, grund)
+            select d.id, d.version, d.konfiguration_version, jsonb_build_object(
+                'dokument', to_jsonb(d) - 'volltext' - 'volltext_tsv',
+                'finanz', (select to_jsonb(f) - 'dokument_id' from dokument_finanz f where f.dokument_id = d.id),
+                'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id),
+                'klassifikationen', coalesce((select jsonb_object_agg(k.klassifikation, k.werte) from (
+                    select klassifikation, jsonb_agg(wert order by wert) as werte from dokument_klassifikation
+                    where dokument_id = d.id group by klassifikation
+                ) k), '{}'::jsonb)), 'System', 'Migration Wissensquelle'
+            from dokument d where d.art = 'WISSENSQUELLE';
+
+            insert into wissensquelle_markierung (dokument_id, markiert_von, markiert_am)
+            select id, 'System', clock_timestamp() from dokument where art = 'WISSENSQUELLE';
+
+            update dokument set art = 'PROJEKTDOKUMENT', version = version + 1, geaendert = clock_timestamp()
+            where art = 'WISSENSQUELLE';
+            delete from dokumentart where code = 'WISSENSQUELLE';
+
+            with aktuell as (
+                select version, inhalt from konfiguration_version order by version desc limit 1
+            ), abbild as (
+                select version + 1 as version,
+                    jsonb_set(
+                        jsonb_set(inhalt, '{version}', to_jsonb(version + 1)),
+                        '{arten}', coalesce((select jsonb_agg(a.element order by a.position)
+                            from jsonb_array_elements(inhalt -> 'arten') with ordinality as a(element, position)
+                            where a.element ->> 'code' <> 'WISSENSQUELLE'), '[]'::jsonb)) as inhalt
+                from aktuell
+                where exists (select 1 from jsonb_array_elements(inhalt -> 'arten') a
+                    where a ->> 'code' = 'WISSENSQUELLE')
+            )
+            insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+            select version, 'System', 'Migration Wissensquelle', 'MIGRATION', inhalt,
+                encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+            from abbild;
+        ]]></sql>
+        <rollback>
+            <sql>-- Markierungen und Versionen bleiben beim Rollback zum Schutz der Daten bestehen.</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

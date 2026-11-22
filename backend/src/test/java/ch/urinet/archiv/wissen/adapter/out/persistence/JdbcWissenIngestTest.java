@@ -726,7 +726,7 @@ class JdbcWissenIngestTest {
 
         assertThat(im(URINET, () -> ingest.quelleLaden(id))).isEmpty();
         WissenIngestPort.Quelle quelle = im(ZWEITER, () -> ingest.quelleLaden(id)).orElseThrow();
-        assertThat(quelle.art()).isEqualTo("WISSENSQUELLE");
+        assertThat(quelle.markiert()).isTrue();
         assertThat(quelle.status()).isEqualTo("ARCHIVIERT");
         assertThat(quelle.seiten()).isEqualTo(2);
         assertThat(quelle.pdfaVorhanden()).isTrue();
