@@ -52,6 +52,8 @@ public enum Fehlercode {
             "Jemand hat den Stand inzwischen geändert. Bitte laden Sie ihn neu und wiederholen Sie die Änderung."),
     DATEI_ZU_GROSS(413, "Datei zu gross",
             "Die Datei oder die Anfrage ist zu gross. Bitte teilen Sie die Datei auf oder verkleinern Sie sie."),
+    BEWERTUNG_EXPORT_ZU_GROSS(413, "Auswertung zu gross",
+            "Der Export enthält mehr als 5'000 Bewertungen. Bitte verkleinern Sie den Zeitraum oder schränken Sie den Sternebereich ein."),
     DATEITYP_UNBEKANNT(415, "Dateityp nicht unterstützt",
             "Dieser Dateityp wird nicht unterstützt. Bitte senden Sie ein PDF oder ein Bild (JPEG, PNG, HEIC, TIFF)."),
     MEDIENTYP_FALSCH(415, "Format der Anfrage nicht unterstützt",

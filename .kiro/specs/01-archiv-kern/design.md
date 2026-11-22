@@ -1789,6 +1789,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 410 | `CURSOR_ABGELAUFEN` | Cursor des Änderungs-Feeds älter als die Aufbewahrung des Feeds (90 Tage); die Webseite lädt ihren Bestand neu und beginnt ohne Cursor (Spec 03, Req 14.4; seit Aufgabe 11.9) |
 | 412 | `VERSION_KONFLIKT` | `If-Match` passt nicht (Req 10.4); bei Dokumenten oder Dokumentarten die jeweilige aktuelle Version |
 | 413 | `DATEI_ZU_GROSS` | Datei über 50 MB oder Anfrage über der Gesamtgrenze (Req 3.6); CSV-Import über `archiv.import.max-groesse` (5 MiB, entschieden von Fabian am 11.11.2026) |
+| 413 | `BEWERTUNG_EXPORT_ZU_GROSS` | Chat-Auswertung enthält im gewählten Zeitraum mehr als 5'000 Bewertungen; Export wird vor dem Download abgelehnt (Spec 02, Req 15.6) |
 | 415 | `DATEITYP_UNBEKANNT` | Inhalt kein unterstützter Typ (Req 3.3) |
 | 415 | `MEDIENTYP_FALSCH` | `Content-Type` der Anfrage passt nicht zum Endpunkt (Framework, z. B. Text statt JSON); nicht für den Dateityp eines Uploads |
 | 422 | `DATEI_UNGUELTIG` | leere oder beschädigte Datei (Req 3.7) |
