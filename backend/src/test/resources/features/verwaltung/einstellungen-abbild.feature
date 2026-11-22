@@ -27,6 +27,21 @@ Funktionalität: Erweitertes Konfigurationsabbild
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Dann enthält der Export die erweiterten Testwerte
 
+  @req-2.10 @req-2.14
+  Szenario: Ein Schemafehler verdeckt weder eine riskante Einstellung noch eine veraltete Basisversion
+    Angenommen für die Konfigurationsdatei ist eine frische Anmeldung bestätigt
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Und in der Datei die Einstellung "aufbewahrungMonate" in der Gruppe "chat" auf den JSON-Wert '0' gesetzt wird
+    Und in der Datei das Feld «unbekannt» mit dem Wert «falsch» steht
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 409 und Fehlercode «BESTAETIGUNG_NOETIG»
+    Wenn «inhaber-urinet» die geänderte Konfigurationsdatei mit Bestätigung "chat.aufbewahrungMonate" einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
+    Wenn in der Datei die Basisversion veraltet ist
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 409 und Fehlercode «KONFIGURATION_VERALTET»
+    Und ist die Konfigurationsversion unverändert
+
   @req-2.3 @req-2.4
   Szenariogrundriss: Eine Einstellung ausserhalb der Grenzen wird abgelehnt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
@@ -42,7 +57,6 @@ Funktionalität: Erweitertes Konfigurationsabbild
       | branding  | primaerfarbe       | "#fff"                  |
       | kennungen | uid                | "CHE-123"               |
       | kennungen | ibans              | "kein-array"            |
-      | chat      | aufbewahrungMonate | 0                       |
       | chat      | unbekannterSchluessel | 1                    |
 
   @req-2.4

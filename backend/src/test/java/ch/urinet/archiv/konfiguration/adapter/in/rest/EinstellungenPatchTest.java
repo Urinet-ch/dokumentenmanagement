@@ -1,5 +1,6 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
+import ch.urinet.archiv.konfiguration.adapter.EinstellungenPatch;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;

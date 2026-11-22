@@ -403,6 +403,11 @@ public class KonfigurationsVersionSchritte {
         ((ObjectNode) datei.path("einstellungen")).put("geschaeftsjahrEnde", datum);
     }
 
+    @Wenn("in der Datei die Basisversion veraltet ist")
+    public void basisversionVeraltet() {
+        datei.put("basisVersion", versionVorher + 1);
+    }
+
     @Wenn("in der Datei die erweiterten Einstellungen mit Testwerten gesetzt werden")
     public void erweiterteEinstellungenSetzen() {
         ObjectNode einstellungen = (ObjectNode) datei.path("einstellungen");

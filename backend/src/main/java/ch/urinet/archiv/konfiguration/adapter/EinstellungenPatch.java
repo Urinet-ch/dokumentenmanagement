@@ -1,4 +1,4 @@
-package ch.urinet.archiv.konfiguration.adapter.in.rest;
+package ch.urinet.archiv.konfiguration.adapter;
 
 import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -24,13 +24,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-final class EinstellungenPatch {
+public final class EinstellungenPatch {
     private static final int MAX_BYTES = 16 * 1024;
     private static final Map<String, Einstellungskatalog.Einstellung> KATALOG = Einstellungskatalog.alle().stream()
             .collect(Collectors.toUnmodifiableMap(Einstellungskatalog.Einstellung::schluessel, einstellung -> einstellung));
 
-    record Ergebnis(Einstellungen ziel, List<KonfigurationUngueltig.Befund> befunde) {
-        Ergebnis {
+    public record Ergebnis(Einstellungen ziel, List<KonfigurationUngueltig.Befund> befunde) {
+        public Ergebnis {
             befunde = List.copyOf(befunde);
         }
     }
@@ -38,7 +38,7 @@ final class EinstellungenPatch {
     private EinstellungenPatch() {
     }
 
-    static JsonNode lesen(InputStream eingabe) throws IOException {
+    public static JsonNode lesen(InputStream eingabe) throws IOException {
         byte[] bytes = eingabe.readNBytes(MAX_BYTES + 1);
         if (bytes.length > MAX_BYTES) {
             throw new FachFehler(Fehlercode.DATEI_ZU_GROSS);
@@ -55,7 +55,7 @@ final class EinstellungenPatch {
         }
     }
 
-    static Ergebnis anwenden(ObjectMapper json, Einstellungen bisher, JsonNode patch) {
+    public static Ergebnis anwenden(ObjectMapper json, Einstellungen bisher, JsonNode patch) {
         if (!(patch instanceof ObjectNode objekt)) {
             throw ungueltig();
         }

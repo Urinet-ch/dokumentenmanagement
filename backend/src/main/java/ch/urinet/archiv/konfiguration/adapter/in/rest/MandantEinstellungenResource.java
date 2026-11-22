@@ -3,6 +3,7 @@ package ch.urinet.archiv.konfiguration.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.gemeinsam.domain.BestaetigungNoetig.Auswirkung;
+import ch.urinet.archiv.konfiguration.adapter.EinstellungenPatch;
 import ch.urinet.archiv.konfiguration.application.BestaetigteEinstellungen;
 import ch.urinet.archiv.konfiguration.application.EinstellungenVerwaltung;
 import ch.urinet.archiv.konfiguration.application.EinstellungskatalogLesen;

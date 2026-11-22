@@ -107,7 +107,22 @@ public class KonfigurationsdateiVerwaltung {
      */
     public Ergebnis einspielen(String text, String wer, String grund, String bestaetigt,
                               EinstellungsAenderungsPruefung.Ursprung ursprung) {
-        KonfigurationsdateiCodec.Datei datei = codec.lesen(text);
+        KonfigurationsdateiCodec.Datei datei;
+        try {
+            datei = codec.lesen(text);
+        } catch (KonfigurationUngueltig schemafehler) {
+            var vorpruefung = codec.vorpruefen(text);
+            if (vorpruefung.basisVersion() != null) {
+                konfiguration.dateiAenderungStarten(vorpruefung.basisVersion());
+                if (vorpruefung.einstellungen() != null) {
+                    var folgen = einstellungsPruefung.folgen(
+                            aktuellMitLiveKiTexte().einstellungen(), vorpruefung.einstellungen());
+                    var gelesen = BestaetigteEinstellungen.lesen(bestaetigt);
+                    einstellungsPruefung.bestaetigt(folgen, gelesen.schluessel(), ursprung);
+                }
+            }
+            throw schemafehler;
+        }
         if (datei.basisVersion() == null) {
             throw new KonfigurationUngueltig(List.of(new KonfigurationUngueltig.Befund("/basisVersion",
                     "BASISVERSION_FEHLT", "Die Datei nennt keine basisVersion; bitte zuerst exportieren.")));
