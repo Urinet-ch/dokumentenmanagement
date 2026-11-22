@@ -219,6 +219,12 @@ Given(
       undefined,
       { timeout: 110_000, polling: 500 },
     );
+    // Nach dem ersten Laden kann die Seite noch nicht vom aktiven Service Worker kontrolliert sein.
+    await this.seite.reload();
+    await this.seite.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, {
+      timeout: 110_000,
+      polling: 500,
+    });
   },
 );
 
