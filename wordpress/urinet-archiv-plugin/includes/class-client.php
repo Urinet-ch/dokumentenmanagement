@@ -201,8 +201,10 @@ final class Urinet_Archiv_Client {
 				if ( strlen( $stream['inhalt'] ) < 1048576 ) {
 					return strlen( $chunk );
 				}
-				status_header( 200 );
-				self::download_sende_header( $stream );
+				if ( ! headers_sent() ) {
+					status_header( 200 );
+					self::download_sende_header( $stream );
+				}
 				echo $stream['inhalt']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
 				$stream['inhalt'] = '';
 				$stream['start']  = true;
