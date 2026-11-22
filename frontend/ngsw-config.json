@@ -18,6 +18,14 @@
       }
     },
     {
+      "name": "anleitung",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": ["/anleitung/**"]
+      }
+    },
+    {
       "name": "assets",
       "installMode": "lazy",
       "updateMode": "prefetch",

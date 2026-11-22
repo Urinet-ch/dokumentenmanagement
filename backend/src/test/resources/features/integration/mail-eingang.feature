@@ -20,6 +20,11 @@ Funktionalität: E-Mail-Eingang
     Und das Passwort steht in «integration_mail» von «urinet» nur verschlüsselt
     Und enthält das Log weder Benutzer noch Passwort des Postfachs
 
+  Szenario: Die Mail-Testhilfe räumt neue Dokumente auf und erhält bestehende
+    Angenommen im Postfach liegt eine Mail von «inhaber@example.invalid» mit dem Betreff «Isolation» und einem PDF «isolation.pdf»
+    Wenn der Mail-Eingang das Postfach von «urinet» abruft
+    Dann räumt die Mail-Testhilfe nur neue E-Mail-Dokumente auf
+
   @req-1.1
   Szenario: Ein falsches Passwort zählt als gescheiterter Abruf, das Log nennt nur die Ursachen-Klassen
     Angenommen das Log des Mail-Eingangs wird mitgeschnitten
