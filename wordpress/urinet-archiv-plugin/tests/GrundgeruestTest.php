@@ -140,6 +140,7 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 
 	public function test_stufen_und_cache_sind_getrennt(): void {
 		$aufrufe = array();
+		update_option( Urinet_Archiv_Feed::LESE_OK, time() );
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Lokal erzeugte Testdaten.
 		$fixtures = json_decode( file_get_contents( __DIR__ . '/vertrag.json' ), true, 512, JSON_THROW_ON_ERROR );
 		$mock     = static function ( $preempt, $args ) use ( &$aufrufe, $fixtures ) {
@@ -230,5 +231,227 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 		$this->assertWPError( $antwort );
 		$this->assertStringContainsString( 'diesen Monat ausgelastet', $antwort->get_error_message() );
 		$this->assertStringNotContainsString( 'intern', $antwort->get_error_message() );
+	}
+
+	public function test_feed_invalidiert_cache_vor_der_ausgabe_geaenderter_dokumente(): void {
+		$versionen = array(
+			'oeffentlich' => 0,
+			'mitglieder'  => 0,
+			'vorstand'    => 0,
+		);
+		update_option( Urinet_Archiv_Feed::CACHE_VERSION, $versionen );
+		update_option( Urinet_Archiv_Feed::LESE_CURSOR, 'cursor-alt' );
+		update_option( Urinet_Archiv_Feed::LESE_OK, time() - 600 );
+		delete_transient( 'urinet_archiv_feed_wartezeit' );
+		$cache = 'ua_' . hash( 'sha256', wp_json_encode( array( 'https://example.invalid', hash( 'sha256', $this->token ), 'dokumente', array(), 'oeffentlich', array( 0 ) ) ) );
+		set_transient( $cache, array( 'eintraege' => array( array( 'id' => 'veraltet' ) ) ), 10 * MINUTE_IN_SECONDS );
+		$mock = static function ( $preempt, $args, $url ) {
+			if ( str_ends_with( (string) wp_parse_url( $url, PHP_URL_PATH ), '/aenderungen' ) ) {
+				$body = array(
+					'eintraege' => array(
+						array(
+							'dokumentId' => '00000000-0000-4000-8000-000000000001',
+							'art'        => 'NICHT_SICHTBAR',
+							'stufe'      => 'oeffentlich',
+						),
+					),
+					'cursor'    => 'cursor-neu',
+				);
+			} else {
+				$body = array(
+					'eintraege' => array( array( 'id' => 'aktuell' ) ),
+					'seite'     => 0,
+					'proSeite'  => 20,
+					'gesamt'    => 1,
+				);
+			}
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( $body ),
+				'headers'  => array(),
+			);
+		};
+		add_filter( 'pre_http_request', $mock, 10, 3 );
+		try {
+			$antwort = Urinet_Archiv_Client::lesen( 'dokumente' );
+		} finally {
+			remove_filter( 'pre_http_request', $mock, 10 );
+		}
+		$this->assertSame( 'aktuell', $antwort['eintraege'][0]['id'] );
+		$this->assertSame(
+			array(
+				'oeffentlich' => 1,
+				'mitglieder'  => 1,
+				'vorstand'    => 1,
+			),
+			get_option( Urinet_Archiv_Feed::CACHE_VERSION )
+		);
+	}
+
+	public function test_feed_ausfall_gibt_keinen_veralteten_cache_zurueck(): void {
+		update_option(
+			Urinet_Archiv_Feed::CACHE_VERSION,
+			array(
+				'oeffentlich' => 0,
+				'mitglieder'  => 0,
+				'vorstand'    => 0,
+			)
+		);
+		update_option( Urinet_Archiv_Feed::LESE_CURSOR, 'cursor-alt' );
+		update_option( Urinet_Archiv_Feed::LESE_OK, time() - 600 );
+		delete_transient( 'urinet_archiv_feed_wartezeit' );
+		$cache = 'ua_' . hash( 'sha256', wp_json_encode( array( 'https://example.invalid', hash( 'sha256', $this->token ), 'dokumente', array(), 'oeffentlich', array( 0 ) ) ) );
+		set_transient( $cache, array( 'eintraege' => array( array( 'id' => 'veraltet' ) ) ), 10 * MINUTE_IN_SECONDS );
+		$mock = static function () {
+			return new WP_Error( 'http_request_failed', 'synthetischer Ausfall' );
+		};
+		add_filter( 'pre_http_request', $mock, 10, 3 );
+		try {
+			$antwort = Urinet_Archiv_Client::lesen( 'dokumente' );
+		} finally {
+			remove_filter( 'pre_http_request', $mock, 10 );
+		}
+		$this->assertWPError( $antwort );
+		$this->assertStringNotContainsString( 'veraltet', wp_json_encode( $antwort ) );
+	}
+
+	public function test_erfassungsformular_nutzt_dokumentart_schema_und_sperrt_oeffentlich(): void {
+		$werte                           = Urinet_Archiv_Einstellungen::werte();
+		$werte['erfassung_schluessel']   = Urinet_Archiv_Einstellungen::verschluesseln( 'synthetisch-erfassung' );
+		$werte['rolle_geschaeftsstelle'] = 'editor';
+		update_option( Urinet_Archiv_Einstellungen::OPTION, $werte );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+		$mock = static function ( $preempt, $args, $url ) {
+			$daten = str_ends_with( (string) wp_parse_url( $url, PHP_URL_PATH ), '/dokumentarten' )
+				? array(
+					array(
+						'code'          => 'merkblatt',
+						'name'          => 'Merkblatt',
+						'pflichtfelder' => array( 'ausgabe', 'jahr' ),
+						'zusatzSchema'  => array(
+							'type'       => 'object',
+							'required'   => array( 'ausgabe', 'jahr', 'zugriff' ),
+							'properties' => array(
+								'ausgabe'         => array(
+									'type'  => 'string',
+									'title' => 'Ausgabe',
+								),
+								'jahr'            => array(
+									'type'  => 'integer',
+									'title' => 'Jahr',
+								),
+								'zugriff'         => array( 'type' => 'string' ),
+								'veroeffentlicht' => array( 'type' => 'boolean' ),
+							),
+						),
+					),
+				)
+				: array(
+					'eintraege' => array(),
+					'seite'     => 0,
+					'proSeite'  => 50,
+					'gesamt'    => 0,
+				);
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( $daten ),
+				'headers'  => array(),
+			);
+		};
+		add_filter( 'pre_http_request', $mock, 10, 3 );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nur der globale Zustand für den direkten Seitentest wird gesichert.
+		$vorher = $_GET;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Direkter Seitentest, keine eingehende Formübermittlung.
+		$_GET['page'] = Urinet_Archiv_Erfassung::SEITE;
+		try {
+			ob_start();
+			Urinet_Archiv_Erfassung::seite();
+			$html = ob_get_clean();
+		} finally {
+			$_GET = $vorher;
+			remove_filter( 'pre_http_request', $mock, 10 );
+		}
+		$this->assertStringContainsString( 'urinet_zusatz[merkblatt][ausgabe]', $html );
+		$this->assertStringContainsString( 'urinet_zusatz[merkblatt][jahr]', $html );
+		$this->assertStringNotContainsString( 'value="oeffentlich"', $html );
+		$this->assertStringNotContainsString( 'urinet_zusatz[merkblatt][veroeffentlicht]', $html );
+		$this->assertTrue( Urinet_Archiv_Erfassung::hat_zugriff() );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$this->assertFalse( Urinet_Archiv_Erfassung::hat_zugriff() );
+		$werte['erfassung_schluessel'] = '';
+		update_option( Urinet_Archiv_Einstellungen::OPTION, $werte );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+		$this->assertFalse( Urinet_Archiv_Erfassung::hat_zugriff() );
+	}
+
+	public function test_erfassungsdaten_normalisiert_das_art_schema_und_verbietet_oeffentlich(): void {
+		$werte                         = Urinet_Archiv_Einstellungen::werte();
+		$werte['erfassung_schluessel'] = Urinet_Archiv_Einstellungen::verschluesseln( 'synthetisch-erfassung' );
+		update_option( Urinet_Archiv_Einstellungen::OPTION, $werte );
+		$mock = static function () {
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode(
+					array(
+						array(
+							'code'          => 'merkblatt',
+							'name'          => 'Merkblatt',
+							'pflichtfelder' => array( 'ausgabe', 'jahr' ),
+							'zusatzSchema'  => array(
+								'type'       => 'object',
+								'required'   => array( 'ausgabe', 'jahr', 'zugriff' ),
+								'properties' => array(
+									'ausgabe'         => array( 'type' => 'string' ),
+									'jahr'            => array( 'type' => 'integer' ),
+									'zugriff'         => array( 'type' => 'string' ),
+									'veroeffentlicht' => array( 'type' => 'boolean' ),
+								),
+							),
+						),
+					)
+				),
+				'headers'  => array(),
+			);
+		};
+		add_filter( 'pre_http_request', $mock, 10, 3 );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Die private Parsermethode wird direkt im Unit-Test ausgeführt.
+		$vorher  = $_POST;
+		$eingabe = array(
+			'urinet_daten'   => array(
+				'art'             => 'merkblatt',
+				'titel'           => 'Synthetisches Merkblatt',
+				'datum'           => '2026-01-02',
+				'vertraulichkeit' => 'NORMAL',
+			),
+			'urinet_tags'    => 'Bauen, Energie',
+			'urinet_zusatz'  => array(
+				'merkblatt' => array(
+					'ausgabe' => 'Frühjahr',
+					'jahr'    => '2026',
+				),
+			),
+			'urinet_zugriff' => 'oeffentlich',
+		);
+		$method  = new ReflectionMethod( Urinet_Archiv_Erfassung::class, 'form_daten' );
+		$method->setAccessible( true );
+		try {
+			$_POST  = $eingabe;
+			$fehler = $method->invoke( null );
+			$this->assertWPError( $fehler );
+			$_POST['urinet_zugriff'] = 'mitglieder';
+			$daten                   = $method->invoke( null );
+		} finally {
+			$_POST = $vorher;
+			remove_filter( 'pre_http_request', $mock, 10 );
+		}
+		$this->assertSame( array( 'Bauen', 'Energie' ), $daten['tags'] );
+		$this->assertSame(
+			array(
+				'ausgabe' => 'Frühjahr',
+				'jahr'    => 2026,
+				'zugriff' => 'mitglieder',
+			),
+			$daten['zusatz']
+		);
 	}
 }
