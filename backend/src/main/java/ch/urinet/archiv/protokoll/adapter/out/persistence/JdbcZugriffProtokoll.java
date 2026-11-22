@@ -140,6 +140,9 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             if (verwaltung.grund() != null) {
                 knoten.put("grund", verwaltung.grund().name());
             }
+            if (verwaltung.abweichung() != null) {
+                knoten.put("abweichung", verwaltung.abweichung().name());
+            }
             if (!verwaltung.felder().isEmpty()) {
                 ObjectNode felder = knoten.putObject("felder");
                 for (ProtokollDetails.Verwaltungsfeld feld : verwaltung.felder()) {

@@ -5,6 +5,7 @@ import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Aenderung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Neuanlage;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.ErforderlicheAktion;
+import ch.urinet.archiv.benutzer.application.AbgleichIdentitaet.RealmBenutzer;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
@@ -21,6 +22,7 @@ import java.time.ZoneOffset;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -135,6 +137,49 @@ class KeycloakAdminAdapterTest {
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
         assertThat(log.volltext()).doesNotContain("synthetic private detail");
         server.verify(1, postRequestedFor(urlPathEqualTo(TOKEN)));
+    }
+
+    @Test
+    void abgleichLiestAuchFehlendeUndMehrwertigeMandantenOhnePersonenangaben() {
+        String ersteId = "9a735b70-5648-42db-8391-1abe070391cb";
+        String zweiteId = "2db61293-0570-4410-93dd-5d6e611a0049";
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("first", equalTo("50"))
+                .withQueryParam("max", equalTo("50"))
+                .willReturn(okJson("""
+                        [{"id":"%s","username":"synthetisch-privat"},
+                         {"id":"%s","email":"privat@example.invalid",
+                          "attributes":{"mandant":["urinet","vhf-gsk"]}}]
+                        """.formatted(ersteId, zweiteId))));
+        server.stubFor(get(urlPathEqualTo(USERS + "/" + ersteId + "/role-mappings/realm"))
+                .willReturn(okJson("[{\"name\":\"inhaber\"}]")));
+        server.stubFor(get(urlPathEqualTo(USERS + "/" + zweiteId + "/role-mappings/realm"))
+                .willReturn(okJson("[{\"name\":\"mitarbeiter\"},{\"name\":\"treuhaender\"}]")));
+
+        var seite = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).seite(1);
+
+        assertThat(seite).containsExactly(
+                new RealmBenutzer(UUID.fromString(ersteId), List.of(), Set.of(Rolle.INHABER)),
+                new RealmBenutzer(UUID.fromString(zweiteId), List.of("urinet", "vhf-gsk"),
+                        Set.of(Rolle.MITARBEITER, Rolle.TREUHAENDER)));
+        assertThat(seite.toString()).doesNotContain("synthetisch-privat", "privat@example.invalid", "vhf-gsk");
+        assertThat(log.volltext()).doesNotContain("synthetisch-privat", "privat@example.invalid");
+        server.verify(1, getRequestedFor(urlPathEqualTo(USERS)).withQueryParam("first", equalTo("50"))
+                .withQueryParam("max", equalTo("50")));
+    }
+
+    @Test
+    void abgleichWeistUngueltigeRealmAntwortZurueck() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS)).willReturn(okJson("""
+                [{"id":"9a735b70-5648-42db-8391-1abe070391cb","attributes":{"mandant":"urinet"}}]
+                """)));
+        var adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> adapter.seite(0)).isInstanceOfSatisfying(FachFehler.class,
+                fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+        assertThatThrownBy(() -> adapter.seite(-1)).isInstanceOf(IllegalArgumentException.class);
+        server.verify(0, getRequestedFor(urlPathMatching(USERS + "/.*/role-mappings/realm")));
     }
 
     @Test

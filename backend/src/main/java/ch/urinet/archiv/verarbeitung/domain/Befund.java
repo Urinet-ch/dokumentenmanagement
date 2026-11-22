@@ -1,5 +1,6 @@
 package ch.urinet.archiv.verarbeitung.domain;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -9,13 +10,13 @@ import java.util.regex.Pattern;
  * Status. Der Schlüssel besteht nur aus diesen drei Teilen und enthält damit nur IDs und Status (Req 16.7); je Schlüssel
  * geht genau eine Mail. Wechselt ein Dokument den Status und steht wieder zu lange, ist das ein neuer Befund.
  */
-public record Befund(Quelle quelle, String gegenstand, String status) {
+public record Befund(Quelle quelle, String gegenstand, String status, Instant erstmals) {
 
     private static final Pattern GEGENSTAND = Pattern.compile("[A-Za-z0-9-]{1,64}");
     private static final Pattern STATUS = Pattern.compile("[A-Z_]{1,40}");
 
     public enum Quelle {
-        DOKUMENT, MANIFEST, SICHERUNG, VERWALTUNG;
+        DOKUMENT, MANIFEST, SICHERUNG, VERWALTUNG, ABGLEICH;
 
         /** Präfix der Schlüssel dieser Quelle in der Tabelle {@code alarm}. */
         public String praefix() {
@@ -31,6 +32,10 @@ public record Befund(Quelle quelle, String gegenstand, String status) {
         if (status == null || !STATUS.matcher(status).matches()) {
             throw new IllegalArgumentException("Status eines Befunds nur aus Grossbuchstaben und «_»");
         }
+    }
+
+    public Befund(Quelle quelle, String gegenstand, String status) {
+        this(quelle, gegenstand, status, null);
     }
 
     public String schluessel() {

@@ -1,5 +1,6 @@
 package ch.urinet.archiv.benutzer.adapter.out.keycloak;
 
+import ch.urinet.archiv.benutzer.application.AbgleichIdentitaet;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -36,6 +37,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.Semaphore;
@@ -49,8 +51,8 @@ import java.util.stream.StreamSupport;
  */
 @IfBuildProfile("prod")
 @ApplicationScoped
-@Typed(IdentitaetsDienst.class)
-public class KeycloakAdminAdapter implements IdentitaetsDienst {
+@Typed({IdentitaetsDienst.class, AbgleichIdentitaet.class})
+public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentitaet {
     static final int MAX_ANTWORT = 1024 * 1024;
     static final Duration WARTEZEIT_PARALLEL = Duration.ofMillis(200);
     static final Duration WIEDERHOLUNGSABSTAND = Duration.ofMillis(200);
@@ -167,6 +169,44 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public Benutzer benutzerLesen(String mandant, String id) {
         return benutzer(benutzerAbrufen(mandant, id), mandant);
+    }
+
+    @Override
+    public List<RealmBenutzer> seite(int seite) {
+        int start = IdentitaetsDienst.seitenanfang(null, seite, MAX_SEITENGROESSE);
+        String query = "max=" + MAX_SEITENGROESSE + "&first=" + start;
+        JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
+        if (treffer == null || !treffer.isArray() || treffer.size() > MAX_SEITENGROESSE) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        List<RealmBenutzer> ergebnis = new ArrayList<>();
+        for (JsonNode eintrag : treffer) {
+            UUID id;
+            try {
+                String text = eintrag.path("id").asText();
+                id = UUID.fromString(text);
+                if (!id.toString().equalsIgnoreCase(text)) {
+                    throw new IllegalArgumentException("Ungültige Kennung");
+                }
+            } catch (IllegalArgumentException e) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            JsonNode attribut = eintrag.path("attributes").path("mandant");
+            List<String> mandanten = new ArrayList<>();
+            if (!attribut.isMissingNode() && !attribut.isNull()) {
+                if (!attribut.isArray()) {
+                    throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                }
+                for (JsonNode wert : attribut) {
+                    if (!wert.isTextual()) {
+                        throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                    }
+                    mandanten.add(wert.textValue());
+                }
+            }
+            ergebnis.add(new RealmBenutzer(id, mandanten, rollen(id.toString())));
+        }
+        return List.copyOf(ergebnis);
     }
 
     @Override
