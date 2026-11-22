@@ -8,6 +8,39 @@ describe('Bildabmessungen aus dem Dateikopf', () => {
     await expect(leseBildAbmessungen(bild)).rejects.toThrow(new AufnahmeGrenzeFehler('pixel'));
   });
 
+  it('überspringt JPEG-Metadaten über 1 MiB und prüft auch danach die Pixelgrenze', async () => {
+    const app = new Uint8Array(65_537);
+    app.set([0xff, 0xe1, 0xff, 0xff]);
+    const metadata = Array.from({ length: 17 }, () => app);
+    const bild = jpeg(1024, 1024);
+    const gross = jpeg(4001, 3000);
+    const mitMetadaten = async (original: Blob) =>
+      new Blob([original.slice(0, 2), ...metadata, original.slice(2)], { type: 'image/jpeg' });
+    const klein = await mitMetadaten(bild);
+    expect(klein.size).toBeGreaterThan(1024 * 1024);
+    await expect(leseBildAbmessungen(klein)).resolves.toEqual({ breite: 1024, hoehe: 1024 });
+    await expect(leseBildAbmessungen(await mitMetadaten(gross))).rejects.toThrow(
+      new AufnahmeGrenzeFehler('pixel'),
+    );
+  });
+
+  it('liest VP8- und VP8L-Kopf unabhängig von der Länge des Bild-Chunks', async () => {
+    for (const bild of [webpVp8(1024, 1024, 2 * 1024 * 1024), webpVp8l(1024, 1024, 3 * 1024 * 1024)]) {
+      expect(bild.size).toBeGreaterThan(1024 * 1024);
+      await expect(leseBildAbmessungen(bild)).resolves.toEqual({ breite: 1024, hoehe: 1024 });
+    }
+    await expect(leseBildAbmessungen(webpVp8l(4001, 3000, 2 * 1024 * 1024))).rejects.toThrow(
+      new AufnahmeGrenzeFehler('pixel'),
+    );
+  });
+
+  it('weist einen abgeschnittenen WebP-Chunk ab', async () => {
+    const bild = webpVp8l(1024, 1024, 1024);
+    await expect(leseBildAbmessungen(bild.slice(0, bild.size - 1))).rejects.toThrow(
+      new AufnahmeGrenzeFehler('bild'),
+    );
+  });
+
   it('liest PNG-, WebP- und HEIC-Abmessungen ohne Bilddecodierung', async () => {
     await expect(leseBildAbmessungen(png(4000, 3000))).resolves.toEqual({
       breite: 4000,
@@ -90,7 +123,7 @@ function webp(breite: number, hoehe: number): Blob {
   ]);
 }
 
-function webpVp8l(breite: number, hoehe: number): Blob {
+function webpVp8l(breite: number, hoehe: number, fuellung = 0): Blob {
   const w = breite - 1;
   const h = hoehe - 1;
   return webpChunk('VP8L', [
@@ -99,10 +132,10 @@ function webpVp8l(breite: number, hoehe: number): Blob {
     ((w >> 8) & 0x3f) | ((h & 0x03) << 6),
     (h >> 2) & 0xff,
     (h >> 10) & 0x0f,
-  ]);
+  ], fuellung);
 }
 
-function webpVp8(breite: number, hoehe: number): Blob {
+function webpVp8(breite: number, hoehe: number, fuellung = 0): Blob {
   return webpChunk('VP8 ', [
     0,
     0,
@@ -114,11 +147,11 @@ function webpVp8(breite: number, hoehe: number): Blob {
     (breite >> 8) & 0x3f,
     hoehe & 0xff,
     (hoehe >> 8) & 0x3f,
-  ]);
+  ], fuellung);
 }
 
-function webpChunk(art: string, inhalt: number[]): Blob {
-  const laenge = inhalt.length;
+function webpChunk(art: string, inhalt: number[], fuellung = 0): Blob {
+  const laenge = inhalt.length + fuellung;
   const bytes = new Uint8Array(20 + laenge + (laenge % 2));
   bytes.set([0x52, 0x49, 0x46, 0x46]);
   new DataView(bytes.buffer).setUint32(4, bytes.length - 8, true);

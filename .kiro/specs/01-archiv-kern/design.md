@@ -1487,6 +1487,10 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     Abmessungen aus höchstens 1 MiB des Dateikopfs, bevor OpenCV und `createImageBitmap` geladen bzw. aufgerufen werden;
     die Prüfung nach dem Decodieren bleibt als zweite Kontrolle. Dieselbe Kopfprüfung läuft für Originale alter
     Warteschlangeneinträge unmittelbar vor dem Upload; ungültige oder übergrosse Einträge werden fehlerhaft erhalten.
+  - Nachtrag Review PR #472: JPEG-Segmente und WebP-Chunks werden mit kleinen `Blob.slice`-Lesezugriffen übersprungen;
+    ihre Köpfe werden bis höchstens 16 MiB Dateiposition und 4'096 Segmenten gelesen, ohne Metadaten oder Bilddaten zu
+    puffern. PNG und HEIC bleiben bei der bisherigen Kopfprüfung. So sind auch JPEG mit über 1 MiB Metadaten und grosse
+    WebP-Bild-Chunks prüfbar, ohne die Pixel- und Gesamtgrössengrenzen aufzuweichen.
 - Suche und Dokumentansicht (Aufgabe 4.6, 11.11.2026; Rest 13.11.2026):
   - Download-Adresse als JSON: Ein Browser folgt dem 302 von `GET /dokumente/{id}/datei` bei `fetch`/XHR selbst und
     schickt dabei den `Authorization`-Header nicht mit, die Antwort der Ablage wäre zudem eine Cross-Origin-Antwort.
