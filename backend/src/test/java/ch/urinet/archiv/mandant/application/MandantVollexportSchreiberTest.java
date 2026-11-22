@@ -50,7 +50,9 @@ class MandantVollexportSchreiberTest {
         var manifest = new MandantVollexportDaten.Manifestdatei(java.time.LocalDate.of(2026, 1, 2), "json",
                 "manifest/m", "versions-id-der-quelle", sha(inhalt.get("manifest/m")));
 
-        Path zipPfad = schreiben(temp, daten(List.of(dokument), List.of(manifest)), ablage(inhalt));
+        Path zipPfad = schreiben(temp, daten(List.of(dokument), List.of(manifest)), ablage(inhalt),
+                () -> List.of(new MandantVollexportKonfiguration.Version(1, "{\"version\":1}"),
+                        new MandantVollexportKonfiguration.Version(2, "{\"version\":2}")));
 
         assertThat(manifestKopien).containsExactly("manifest/m");
         try (ZipFile zip = new ZipFile(zipPfad.toFile())) {
@@ -62,6 +64,8 @@ class MandantVollexportSchreiberTest {
             assertThat(text(zip, "metadaten.csv")).contains(id.toString(), "ARCHIVIERT");
             assertThat(text(zip, "manifeste.csv")).contains("manifest/m");
             assertThat(text(zip, "wissensbasis.zip")).isEqualTo("Wissenspaket");
+            assertThat(text(zip, "konfiguration.json")).isEqualTo("{\"version\":2}");
+            assertThat(text(zip, "konfiguration/versionen/1.json")).isEqualTo("{\"version\":1}");
             assertThat(text(zip, "pruefsummen.sha256"))
                     .contains(sha(inhalt.get("archiv/o")) + "  dateien/" + id + "/ORIGINAL-1.bin")
                     .contains(sha(inhalt.get("archiv/p")) + "  dateien/" + id + "/pdfa.pdf")
@@ -117,12 +121,17 @@ class MandantVollexportSchreiberTest {
     }
 
     private static Path schreiben(Path temp, MandantVollexportDaten daten, AblagePort ablage) throws Exception {
+        return schreiben(temp, daten, ablage, () -> List.of());
+    }
+
+    private static Path schreiben(Path temp, MandantVollexportDaten daten, AblagePort ablage,
+                                  MandantVollexportKonfiguration konfiguration) throws Exception {
         Path zipPfad = temp.resolve("export-" + UUID.randomUUID() + ".zip");
         try (OutputStream ziel = Files.newOutputStream(zipPfad)) {
             new MandantVollexportSchreiber(daten, ablage, (mandant, strom) -> {
                 assertThat(mandant).isEqualTo(new MandantCode("vhf-gsk"));
                 strom.write("Wissenspaket".getBytes());
-            }).schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(), temp, ziel);
+            }, konfiguration).schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(), temp, ziel);
         }
         return zipPfad;
     }

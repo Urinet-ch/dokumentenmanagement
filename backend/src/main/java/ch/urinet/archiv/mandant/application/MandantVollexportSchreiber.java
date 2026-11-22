@@ -40,11 +40,18 @@ public class MandantVollexportSchreiber {
     private final MandantVollexportDaten daten;
     private final AblagePort ablage;
     private final WissenOkfExportPort wissen;
+    private final MandantVollexportKonfiguration konfiguration;
 
     public MandantVollexportSchreiber(MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen) {
+        this(daten, ablage, wissen, () -> List.of());
+    }
+
+    public MandantVollexportSchreiber(MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen,
+                                      MandantVollexportKonfiguration konfiguration) {
         this.daten = Objects.requireNonNull(daten, "daten");
         this.ablage = Objects.requireNonNull(ablage, "ablage");
         this.wissen = Objects.requireNonNull(wissen, "wissen");
+        this.konfiguration = Objects.requireNonNull(konfiguration, "konfiguration");
     }
 
     public int schreiben(MandantCode mandant, UUID exportId, Path arbeitsverzeichnis, OutputStream ziel)
@@ -67,6 +74,7 @@ public class MandantVollexportSchreiber {
             schreibeMetadatenCsv(zip, pruefsummen);
             int dokumente = schreibeDateien(mandant, zip, pruefsummen);
             schreibeManifeste(mandant, zip, pruefsummen);
+            schreibeKonfiguration(zip, pruefsummen);
             zip.putNextEntry(new ZipEntry(WISSENSBASIS));
             MessageDigest wissenDigest = sha256();
             wissen.schreiben(mandant, new DigestOutputStream(zip, wissenDigest));
@@ -80,6 +88,28 @@ public class MandantVollexportSchreiber {
             zip.flush();
             return dokumente;
         }
+    }
+
+    private void schreibeKonfiguration(ZipOutputStream zip, BufferedWriter pruefsummen) throws IOException {
+            List<MandantVollexportKonfiguration.Version> versionen = konfiguration.versionen();
+            if (versionen.isEmpty()) {
+                return;
+            }
+            MandantVollexportKonfiguration.Version aktuell = versionen.getLast();
+            schreibeText(zip, pruefsummen, "konfiguration.json", aktuell.json());
+            for (MandantVollexportKonfiguration.Version version : versionen) {
+                schreibeText(zip, pruefsummen, "konfiguration/versionen/" + version.nummer() + ".json", version.json());
+            }
+        }
+
+    private static void schreibeText(ZipOutputStream zip, BufferedWriter pruefsummen, String pfad, String text)
+            throws IOException {
+        zip.putNextEntry(new ZipEntry(pfad));
+        MessageDigest digest = sha256();
+        OutputStream ausgabe = new DigestOutputStream(zip, digest);
+        schreiben(ausgabe, text);
+        zip.closeEntry();
+        pruefsumme(pruefsummen, digest.digest(), pfad);
     }
 
     private void schreibeMetadatenJson(ZipOutputStream zip, BufferedWriter pruefsummen)

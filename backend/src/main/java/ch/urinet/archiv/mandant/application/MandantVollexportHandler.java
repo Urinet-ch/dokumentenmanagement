@@ -10,6 +10,7 @@ import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.wissen.application.WissenOkfExportPort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -28,17 +29,27 @@ public class MandantVollexportHandler implements AuftragHandler {
     private final MandantVollexportDaten daten;
     private final AblagePort ablage;
     private final WissenOkfExportPort wissen;
+    private final MandantVollexportKonfiguration konfiguration;
     private final Path arbeitsverzeichnis;
 
+    @Inject
     public MandantVollexportHandler(MandantVollexport speichern, MandantVollexportRepository repository,
                                     MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen,
+                                    MandantVollexportKonfiguration konfiguration,
                                     @ConfigProperty(name = "archiv.arbeit.verzeichnis") Path arbeitsverzeichnis) {
         this.speichern = speichern;
         this.repository = repository;
         this.daten = daten;
         this.ablage = ablage;
         this.wissen = wissen;
+        this.konfiguration = konfiguration;
         this.arbeitsverzeichnis = arbeitsverzeichnis;
+    }
+
+    public MandantVollexportHandler(MandantVollexport speichern, MandantVollexportRepository repository,
+                                    MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen,
+                                    Path arbeitsverzeichnis) {
+        this(speichern, repository, daten, ablage, wissen, () -> java.util.List.of(), arbeitsverzeichnis);
     }
 
     @Override
@@ -59,7 +70,7 @@ public class MandantVollexportHandler implements AuftragHandler {
 
         MandantCode mandant = auftrag.mandant();
         ablage.exportLebenszyklusSichern(mandant);
-        MandantVollexportSchreiber schreiber = new MandantVollexportSchreiber(daten, ablage, wissen);
+        MandantVollexportSchreiber schreiber = new MandantVollexportSchreiber(daten, ablage, wissen, konfiguration);
         AbgelegteDatei zip;
         int anzahl;
         try (Exportziel ziel = ablage.exportSchreiben(mandant, id)) {
