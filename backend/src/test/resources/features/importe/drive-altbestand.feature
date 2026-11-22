@@ -8,6 +8,7 @@ Funktionalität: Altbestand von VHF/GSK übernehmen
 
   @req-4.1
   Szenario: Reihe und Jahr aus einem synthetischen Altbestand übernehmen
+    Angenommen die synthetische Dokumentart «BULLETIN» ist im Mandanten «vhf-gsk» vorbereitet
     Wenn «inhaber-vhf-gsk» legt die Klassifikation mit dem aktuellen Stand an:
       """
       {"code":"fachgebiet","name":"Fachgebiet","werte":[{"code":"bau","name":"Bau"}],

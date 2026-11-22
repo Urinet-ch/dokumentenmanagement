@@ -4,15 +4,22 @@ import ch.urinet.archiv.ablage.TestAblage;
 import ch.urinet.archiv.dokument.Testdateien;
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.driveimport.DriveImport;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
@@ -43,15 +50,19 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Schritte zum Drive-Import (Spec 01, Requirement 12; Aufgabe 4.8). Das Werkzeug aus {@code tools/drive_import} läuft
- * in-process gegen das Archiv der Testinstanz; Ordner, Dateien und Tokens sind synthetisch und werden aufgeräumt.
+ * Schritte zum Drive-Import (Spec 01, Requirement 12; Aufgabe 4.8 und Spec 03, Requirement 4.1; Aufgabe 10.5).
+ * Das Werkzeug aus {@code tools/drive_import} läuft in-process gegen das Archiv der Testinstanz; Ordner, Dateien und
+ * Tokens sind synthetisch und werden aufgeräumt.
  */
 public class DriveImportSchritte {
 
     private static final long UEBER_50_MB = 50L * 1024 * 1024 + 1;
+    private static final String KONFIGURATION = "/api/v1/konfiguration";
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @Inject
     Instance<AgroalDataSource> datenbank;
@@ -71,6 +82,9 @@ public class DriveImportSchritte {
     private String ausgabe = "";
     private String fehlerausgabe = "";
     private int exitCode = -1;
+    private String konfigurationVorher;
+    private String konfigurationMandant;
+    private boolean konfigurationWiederherstellenNoetig;
 
     @After
     public void aufraeumen() throws SQLException, IOException {
@@ -84,12 +98,44 @@ public class DriveImportSchritte {
             TestAblage.loeschen(mandant, "eingang/", s -> ordner.stream().anyMatch(s::contains));
             TestAblage.loeschen(mandant, "vorschau/", s -> ordner.stream().anyMatch(o -> s.startsWith("vorschau" + o)));
         }
+        if (konfigurationWiederherstellenNoetig) {
+            konfigurationWiederherstellen();
+        }
         for (String id : tokenIds) {
             ausfuehren("delete from public.api_client where id = ?", id);
         }
         if (verzeichnis != null) {
             loeschen(verzeichnis);
         }
+    }
+
+    @Angenommen("die synthetische Dokumentart «{word}» ist im Mandanten «{word}» vorbereitet")
+    public void dokumentartVorbereiten(String artCode, String mandantCode) throws IOException {
+        String benutzer = "inhaber-" + mandantCode;
+        Response export = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(KONFIGURATION);
+        assertThat(export.statusCode()).as(export.asString()).isEqualTo(200);
+        konfigurationVorher = export.asString();
+        konfigurationMandant = mandantCode;
+
+        ObjectNode konfiguration = (ObjectNode) JSON.readTree(konfigurationVorher);
+        ArrayNode arten = (ArrayNode) konfiguration.path("arten");
+        assertThat(arten).noneSatisfy(art -> assertThat(art.path("code").asText()).isEqualTo(artCode));
+        ObjectNode vorlage = null;
+        for (JsonNode art : arten) {
+            if ("PROBE_VHF_BULLETIN".equals(art.path("code").asText())) {
+                vorlage = (ObjectNode) art.deepCopy();
+                break;
+            }
+        }
+        assertThat(vorlage).as("Testvorlage PROBE_VHF_BULLETIN").isNotNull();
+        vorlage.put("code", artCode).put("name", "Synthetische Altbestand-Probe");
+        vorlage.put("reihenfolge", arten.size());
+        arten.add(vorlage);
+
+        Response gespeichert = given().auth().oauth2(Testanmeldung.token(benutzer))
+                .contentType(ContentType.JSON).body(JSON.writeValueAsString(konfiguration)).when().put(KONFIGURATION);
+        assertThat(gespeichert.statusCode()).as(gespeichert.asString()).isEqualTo(200);
+        konfigurationWiederherstellenNoetig = true;
     }
 
     @Angenommen("ein Ordner «{word}» mit diesen synthetischen Dateien:")
@@ -453,6 +499,21 @@ public class DriveImportSchritte {
             }
             befehl.executeUpdate();
         }
+    }
+
+    private void konfigurationWiederherstellen() throws IOException {
+        String benutzer = "inhaber-" + konfigurationMandant;
+        Response export = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(KONFIGURATION);
+        assertThat(export.statusCode()).as(export.asString()).isEqualTo(200);
+        ObjectNode aktuell = (ObjectNode) JSON.readTree(export.asString());
+        assertThat(aktuell.path("basisVersion").isInt()).isTrue();
+
+        ObjectNode wiederhergestellt = (ObjectNode) JSON.readTree(konfigurationVorher);
+        wiederhergestellt.put("basisVersion", aktuell.path("basisVersion").intValue());
+        Response antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(JSON.writeValueAsString(wiederhergestellt)).when().put(KONFIGURATION);
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        konfigurationWiederherstellenNoetig = false;
     }
 
     private List<Map<String, String>> abfragen(String sql, String... werte) throws SQLException {
