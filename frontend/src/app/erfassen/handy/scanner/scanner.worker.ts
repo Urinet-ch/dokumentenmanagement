@@ -4,6 +4,8 @@
 import { Ecken, skalieren } from './ecken';
 import { Cv, eckenFinden, entzerren, openCvLaden } from './kanten';
 import { ScannerAntwort, ScannerAuftrag } from './scanner-nachricht';
+import { AufnahmeGrenzeFehler, MAX_AUFNAHME_BYTES, pruefeBildPixel } from '../aufnahme-grenzen';
+import { leseBildAbmessungen } from '../bild-abmessungen';
 
 /** Die Kanten werden auf einer Verkleinerung gesucht; das spart Zeit und dämpft Rauschen. */
 const ERKENNUNG_KANTE = 1000;
@@ -11,21 +13,34 @@ const JPEG_QUALITAET = 0.85;
 
 let opencv: Promise<{ cv: Cv }> | undefined;
 
-addEventListener('message', async ({ data }: MessageEvent<ScannerAuftrag>) => {
+addEventListener('message', ({ data }: MessageEvent<ScannerAuftrag>) => {
+  void verarbeiten(data);
+});
+
+async function verarbeiten(data: ScannerAuftrag): Promise<void> {
   let antwort: ScannerAntwort;
   try {
     antwort = { nr: data.nr, ok: true, ...(await aufbereiten(data)) };
   } catch (fehler) {
-    antwort = { nr: data.nr, ok: false, fehler: fehler instanceof Error ? fehler.message : String(fehler) };
+    antwort = {
+      nr: data.nr,
+      ok: false,
+      fehler: fehler instanceof AufnahmeGrenzeFehler ? fehler.grenze : fehler instanceof Error ? fehler.message : String(fehler),
+    };
   }
   postMessage(antwort);
-});
+}
 
 async function aufbereiten(auftrag: ScannerAuftrag) {
+  if (auftrag.bild.size > MAX_AUFNAHME_BYTES) {
+    throw new AufnahmeGrenzeFehler('groesse');
+  }
+  await leseBildAbmessungen(auftrag.bild);
   const { cv } = await (opencv ??= openCvLaden());
   const bild = await createImageBitmap(auftrag.bild);
   const { width: breite, height: hoehe } = bild;
   try {
+    pruefeBildPixel(breite, hoehe);
     let ecken: Ecken | null | undefined = auftrag.ecken;
     if (ecken === undefined) {
       const faktor = Math.min(1, ERKENNUNG_KANTE / Math.max(breite, hoehe));

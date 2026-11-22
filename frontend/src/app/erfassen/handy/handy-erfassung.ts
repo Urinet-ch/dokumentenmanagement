@@ -18,6 +18,13 @@ import { aufnahmeName, aufnahmeZeit } from '../../gemeinsam/aufnahme-name';
 import { Symbol } from '../../gemeinsam/symbol';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { Upload } from '../upload';
+import {
+  AufnahmeGrenzeFehler,
+  MAX_AUFNAHME_SEITEN,
+  MAX_BILD_PIXEL,
+  aufnahmeGrenzeMeldung,
+  pruefeAufnahme,
+} from './aufnahme-grenzen';
 import { Ecken } from './scanner/ecken';
 import { ScannerPort } from './scanner/scanner.service';
 import { WarteschlangeService } from './warteschlange/warteschlange.service';
@@ -164,7 +171,15 @@ export class HandyErfassung {
 
   /** Nimmt das volle Kamerabild als Original (Rohaufnahme, Req 4.7) und startet den Zuschnitt. */
   protected async aufnehmen(): Promise<void> {
+    if (this.seiten().length >= MAX_AUFNAHME_SEITEN) {
+      this.meldung.set(this.texte.aufnahmeZuVieleSeiten);
+      return;
+    }
     const video = this.video()!.nativeElement;
+    if (video.videoWidth * video.videoHeight > MAX_BILD_PIXEL) {
+      this.meldung.set(this.texte.aufnahmeZuVielePixel);
+      return;
+    }
     const leinwand = this.dokument.createElement('canvas');
     leinwand.width = video.videoWidth;
     leinwand.height = video.videoHeight;
@@ -177,8 +192,15 @@ export class HandyErfassung {
 
   protected dateienGewaehlt(ereignis: Event): void {
     const eingabe = ereignis.target as HTMLInputElement;
+    this.meldung.set(null);
+    let abgewiesen: string | null = null;
     for (const datei of Array.from(eingabe.files ?? [])) {
-      this.seiteHinzufuegen(datei);
+      if (!this.seiteHinzufuegen(datei)) {
+        abgewiesen ??= this.meldung();
+      }
+    }
+    if (abgewiesen) {
+      this.meldung.set(abgewiesen);
     }
     eingabe.value = '';
   }
@@ -253,8 +275,8 @@ export class HandyErfassung {
         seiten.map((s) => ({ original: s.original, arbeitsfassung: s.arbeitsfassung! })),
         seiten[0].aufgenommen,
       );
-    } catch {
-      this.meldung.set(this.texte.speichernFehler);
+    } catch (fehler) {
+      this.meldung.set(this.grenzeText(fehler) ?? this.texte.speichernFehler);
       return false;
     }
     const gespeichert = new Set(seiten.map((s) => s.nr));
@@ -264,7 +286,13 @@ export class HandyErfassung {
     return true;
   }
 
-  private seiteHinzufuegen(original: Blob): void {
+  private seiteHinzufuegen(original: Blob): boolean {
+    try {
+      pruefeAufnahme([...this.seiten(), { original }]);
+    } catch (fehler) {
+      this.meldung.set(this.grenzeText(fehler) ?? this.texte.speichernFehler);
+      return false;
+    }
     this.meldung.set(null);
     const nr = ++this.naechsteNr;
     this.seiten.update((seiten) => [
@@ -281,6 +309,7 @@ export class HandyErfassung {
       },
     ]);
     this.aufbereiten(nr);
+    return true;
   }
 
   /** `ecken` fehlt: Kanten erkennen; `null`: ganzes Bild; sonst die angepassten Ecken (Req 4.3). */
@@ -297,6 +326,18 @@ export class HandyErfassung {
         if (!aktuell) {
           return;
         }
+        try {
+          pruefeAufnahme(
+            this.seiten().map((s) => ({
+              original: s.original,
+              arbeitsfassung: s.nr === nr ? ergebnis.arbeitsfassung : s.arbeitsfassung,
+            })),
+          );
+        } catch (fehler) {
+          this.aendern(nr, { hinweis: aktuell.arbeitsfassung ? 'anpassenFehler' : 'fehler' });
+          this.meldung.set(this.grenzeText(fehler) ?? this.texte.speichernFehler);
+          return;
+        }
         if (aktuell.vorschauUrl) {
           URL.revokeObjectURL(aktuell.vorschauUrl);
         }
@@ -311,10 +352,14 @@ export class HandyErfassung {
           hinweis,
         });
       })
-      .catch(() => {
+      .catch((fehler: unknown) => {
         // Scheitert das Anpassen, bleibt die zuvor gültige Arbeitsfassung samt Vorschau erhalten.
         const aktuell = this.seiten().find((s) => s.nr === nr);
         this.aendern(nr, { hinweis: aktuell?.arbeitsfassung ? 'anpassenFehler' : 'fehler' });
+        const grenze = this.grenzeText(fehler);
+        if (grenze) {
+          this.meldung.set(grenze);
+        }
       })
       .finally(() => this.laufend.delete(lauf));
     this.laufend.add(lauf);
@@ -334,5 +379,9 @@ export class HandyErfassung {
   private kameraStoppen(): void {
     this.strom?.getTracks().forEach((spur) => spur.stop());
     this.strom = null;
+  }
+
+  private grenzeText(fehler: unknown): string | null {
+    return fehler instanceof AufnahmeGrenzeFehler ? aufnahmeGrenzeMeldung(fehler) : null;
   }
 }
