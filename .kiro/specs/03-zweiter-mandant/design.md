@@ -401,9 +401,13 @@ Neu 13.11.2026 (Requirement 11; entschieden von Fabian am 13.11.2026, E-B).
     HTTP-Datum (RFC 8594), `Deprecation` = Sunset minus 6 Monate als `@<Unix-Sekunden>` (RFC 9745; Wahl dieser Aufgabe,
     die Spec nennt keinen Zeitpunkt), `Link: </public/v<n+1>>; rel="successor-version"`. Nach dem Sunset liefert das
     Archiv weiter aus (Abschalten ist ein Betriebsentscheid).
-  - Offen: CI-Schritt «Vertrag nur additiv» im Build-Job (`.github/workflows/` nicht in dieser Aufgabe), Router für
-    `/public/` mit eigener Drosselung in Traefik (`deploy/infomaniak/compose.yml`, Wert betrieblich); bis dahin läuft
-    `/public/` über den Router der App.
+  - Offen: Router für `/public/` mit eigener Drosselung in Traefik (`deploy/infomaniak/compose.yml`, Wert betrieblich);
+    bis dahin läuft `/public/` über den Router der App.
+  - Stand 22.11.2026: Der CI-Schritt «Webseiten-Vertrag nur additiv» ist auf `main` vorhanden (PR #405). Er lädt
+    die vollständige Historie, führt den Selbsttest aus und vergleicht den PR-Kopf mit der Basis; deshalb ist in dieser
+    Aufgabe keine Änderung unter `.github/workflows/` nötig. Der Repo-Nachweis für die Versions- und Additivitätsregel
+    besteht aus `PublicVertragTest`, `VertragPruefungTest`, dem Ruby-Vergleicher und dessen Selbsttest. Der Nachweis
+    der Traefik-Drosselung und des Deploys bleibt ein manueller Betriebsnachweis.
   - Vorschlag Traefik-Drosselung (17.11.2026, Aufgabe 11.6; wartet auf Prüfung von Fabian, nichts ausgerollt): Router
     `archiv-public` (`PathPrefix(/public/)` ohne die Suche) und `archiv-public-suche` (`Path(/public/v1/suche)`, auch
     mit Schrägstrich am Ende), Labels in `deploy/infomaniak/compose.yml`; der PWA-Router schliesst `/public/` aus.
