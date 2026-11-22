@@ -1672,6 +1672,7 @@ export const TEXTE = {
   },
   // Benutzeranleitung und Hilfe (Spec 07, Aufgabe 22.1); Titel der Abschnitte je Anker des Hilfe-Katalogs
   hilfe: {
+    soFunktioniertEs: 'So funktioniert es',
     abschnitte: {
       'erste-schritte': 'Erste Schritte',
       // Aufgabe 22.5
