@@ -55,6 +55,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -103,6 +104,7 @@ public class BenutzerVerwaltungSchritte {
     private String zweiterAkteurId;
     private String zweiterAkteurName;
     private String altesToken;
+    private final Map<String, Rolle> gleichzeitigeRollen = new ConcurrentHashMap<>();
 
     @Before("@benutzer-verwaltung")
     public void mandantenVorbereiten() throws SQLException {
@@ -595,22 +597,31 @@ public class BenutzerVerwaltungSchritte {
         String zweitesToken = Testanmeldung.token(zweiterAkteurName);
         String ersterPfad = PFAD + "/" + zweiterAkteurId;
         String zweiterPfad = PFAD + "/" + akteurId;
-        String erstesEtag = given().auth().oauth2(erstesToken).get(ersterPfad).then()
-                .statusCode(200).extract().header("ETag");
-        String zweitesEtag = given().auth().oauth2(zweitesToken).get(zweiterPfad).then()
-                .statusCode(200).extract().header("ETag");
+        gleichzeitigeRollen.put(akteurId, Rolle.INHABER);
+        gleichzeitigeRollen.put(zweiterAkteurId, Rolle.INHABER);
         urspruenglicheIdentitaet = ClientProxy.unwrap(identitaet);
         CountDownLatch begonnen = new CountDownLatch(1);
         CountDownLatch fortsetzen = new CountDownLatch(1);
         QuarkusMock.installMockForType(new IdentitaetsDienstStub() {
             @Override
             public Benutzer benutzerLesen(String mandant, String id) {
-                return urspruenglicheIdentitaet.benutzerLesen(mandant, id);
+                Rolle rolle = gleichzeitigeRollen.get(id);
+                if (!MANDANT.equals(mandant) || rolle == null) {
+                    throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+                }
+                return new Benutzer(id, "probe", "probe@example.invalid", "Test", "Person", true,
+                        Set.of(rolle), Set.of(), true, false);
+            }
+
+            @Override
+            public boolean anmeldungGesperrt(String mandant, String id) {
+                benutzerLesen(mandant, id);
+                return false;
             }
 
             @Override
             public long inhaberZaehlen(String mandant) {
-                return urspruenglicheIdentitaet.inhaberZaehlen(mandant);
+                return gleichzeitigeRollen.values().stream().filter(rolle -> rolle == Rolle.INHABER).count();
             }
 
             @Override
@@ -624,9 +635,14 @@ public class BenutzerVerwaltungSchritte {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("Test unterbrochen", e);
                 }
-                urspruenglicheIdentitaet.rolleSetzen(mandant, id, rolle);
+                benutzerLesen(mandant, id);
+                gleichzeitigeRollen.put(id, rolle);
             }
         }, IdentitaetsDienst.class);
+        String erstesEtag = given().auth().oauth2(erstesToken).get(ersterPfad).then()
+                .statusCode(200).extract().header("ETag");
+        String zweitesEtag = given().auth().oauth2(zweitesToken).get(zweiterPfad).then()
+                .statusCode(200).extract().header("ETag");
         CompletableFuture<Response> erster = CompletableFuture.supplyAsync(() -> given().auth().oauth2(erstesToken)
                 .contentType("application/json").header("If-Match", erstesEtag)
                 .body(Map.of("rolle", "mitarbeiter")).put(ersterPfad + "/rolle"));
@@ -644,7 +660,7 @@ public class BenutzerVerwaltungSchritte {
     @Dann("wird ein Vorgang gesperrt und mindestens ein Inhaber bleibt aktiv")
     public void einInhaberBleibt() {
         assertThat(antworten).extracting(Response::statusCode).containsExactly(409, 204);
-        assertThat(urspruenglicheIdentitaet.inhaberZaehlen(MANDANT)).isGreaterThanOrEqualTo(1);
+        assertThat(gleichzeitigeRollen.values().stream().filter(rolle -> rolle == Rolle.INHABER)).hasSize(1);
     }
 
     @Wenn("der Inhaber den Mitarbeiter sperrt und wieder entsperrt")
