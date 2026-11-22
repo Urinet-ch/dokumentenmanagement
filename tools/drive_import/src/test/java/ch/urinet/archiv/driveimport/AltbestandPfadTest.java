@@ -31,6 +31,14 @@ class AltbestandPfadTest {
     }
 
     @Test
+    void dateistammMitDemJahrIstKeineAusgabenummer() {
+        Path wurzel = tmp.resolve("Altbestand");
+
+        assertThat(AltbestandPfad.erkennen(wurzel, wurzel.resolve("Bulletin/2026/2026.pdf")).pfad())
+                .isEqualTo(new AltbestandPfad("Bulletin", "BULLETIN", 2026, null));
+    }
+
+    @Test
     void lehntUnbekannteReihenUndMehrdeutigeJahreAb() {
         Path wurzel = tmp.resolve("Altbestand");
 

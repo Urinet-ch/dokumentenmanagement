@@ -164,6 +164,23 @@ class DriveImportTest {
     }
 
     @Test
+    void altbestandsberichtZaehltAuchDateienNachTokenabbruch() throws IOException {
+        datei("Bulletin/2026/1.pdf", "%PDF-a");
+        datei("Bulletin/2026/3.pdf", "%PDF-b");
+        datei("Bulletin/2026/5.pdf", "%PDF-c");
+        antworten.add(neu());
+        antworten.add(new Antwort(401, "application/problem+json",
+                "{\"status\":401,\"fehlercode\":\"NICHT_ANGEMELDET\"}", null));
+
+        assertThat(lauf("--altbestand", "--klassifikation", "fachgebiet=bau")).isEqualTo(DriveImport.ABGEBROCHEN);
+
+        assertThat(anfragen).hasSize(2);
+        assertThat(aus.toString()).contains(
+                "BULLETIN / 2026: 3 Dateien; Ausgabe-Nr. erkannt: [1, 3, 5]; nicht erkannt: 0",
+                "Kontrolle: 3 = 1 + 0 + 1 + 1 (geht auf)");
+    }
+
+    @Test
     void altbestandTrockenlaufErkenntDateienOhneKlassifikationZuLesen() throws IOException {
         datei("Merkblatt/2025/12-2025.pdf", "%PDF-a");
         tokenDatei = tmp.resolve("fehlt");

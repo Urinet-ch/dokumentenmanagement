@@ -153,6 +153,20 @@ public final class DriveImport implements Callable<Integer> {
         }
         List<Fund> funde = durchsuchen(wurzel);
         Bericht bericht = new Bericht(trockenlauf, altbestand, funde.size());
+        Map<Path, AltbestandPfad.Erkennung> altbestandErkennungen = new LinkedHashMap<>();
+        if (altbestand) {
+            for (Fund fund : funde) {
+                if (fund.problem() != null
+                        || Einordnung.von(fund.pfad().getFileName().toString()).weg() != Einordnung.Weg.SENDEN) {
+                    continue;
+                }
+                AltbestandPfad.Erkennung erkennung = AltbestandPfad.erkennen(wurzel, fund.pfad());
+                altbestandErkennungen.put(fund.pfad(), erkennung);
+                if (erkennung.pfad() != null) {
+                    bericht.altbestand(erkennung.pfad());
+                }
+            }
+        }
         aus.println((trockenlauf ? "Trockenlauf" : "Import nach " + ziel) + ": " + funde.size() + " Dateien in "
                 + anzeige(wurzel, wurzel));
         String abbruch = null;
@@ -186,14 +200,16 @@ public final class DriveImport implements Callable<Integer> {
                 case SENDEN -> {
                     AltbestandPfad altbestandPfad = null;
                     if (altbestand) {
-                        AltbestandPfad.Erkennung erkennung = AltbestandPfad.erkennen(wurzel, fund.pfad());
+                        AltbestandPfad.Erkennung erkennung = altbestandErkennungen.get(fund.pfad());
+                        if (erkennung == null) {
+                            throw new IllegalStateException("Altbestandsdatei wurde nicht vorgeprüft");
+                        }
                         if (erkennung.pfad() == null) {
                             bericht.uebersprungen(pfad, erkennung.grund());
                             aus.println("übersprungen:     " + pfad + " – " + erkennung.grund());
                             continue;
                         }
                         altbestandPfad = erkennung.pfad();
-                        bericht.altbestand(altbestandPfad);
                     }
                     String hinweis = OrdnerHinweis.von(wurzel, fund.pfad(), altbestandPfad);
                     String artFuerDatei = altbestandPfad == null ? art : altbestandPfad.art();

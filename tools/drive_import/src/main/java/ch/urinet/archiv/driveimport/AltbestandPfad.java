@@ -52,13 +52,16 @@ record AltbestandPfad(String reihe, String art, int jahr, Integer ausgabe) {
             return new Erkennung(null, "Jahr mehrdeutig; im Pfad und Dateinamen darf nur ein Jahr stehen");
         }
 
-        Integer ausgabe = ausgabe(datei.getFileName().toString());
+        Integer ausgabe = ausgabe(datei.getFileName().toString(), jahre.iterator().next());
         return new Erkennung(new AltbestandPfad(reihe, art, jahre.iterator().next(), ausgabe), null);
     }
 
-    private static Integer ausgabe(String dateiname) {
+    private static Integer ausgabe(String dateiname, int jahr) {
         int punkt = dateiname.lastIndexOf('.');
         String stamm = (punkt > 0 ? dateiname.substring(0, punkt) : dateiname).strip();
+        if (JAHR.matcher(stamm).matches() && Integer.parseInt(stamm) == jahr) {
+            return null;
+        }
         Matcher jahrAusgabe = JAHR_AUSGABE.matcher(stamm);
         if (jahrAusgabe.matches()) {
             return nummer(jahrAusgabe.group(2));
