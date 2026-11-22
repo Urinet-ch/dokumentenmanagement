@@ -389,6 +389,12 @@
                     </excludes>
                 </configuration>
                 <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <configuration>
+                            <argLine>-XX:CompressedClassSpaceSize=2g</argLine>
+                        </configuration>
+                    </execution>
                     <!-- Aufgabe 3.2 (Review PR #93, M3): Seitenbilder und Swiss QR Code mit knappem Heap; Stufe A hat
                          -Xmx112m, davon braucht die übrige API den grösseren Teil -->
                     <execution>
