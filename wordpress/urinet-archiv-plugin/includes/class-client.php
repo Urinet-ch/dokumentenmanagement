@@ -61,7 +61,15 @@ final class Urinet_Archiv_Client {
 			status_header( 404 );
 			return;
 		}
-		status_header( wp_remote_retrieve_response_code( $antwort ) );
+		$status = wp_remote_retrieve_response_code( $antwort );
+		if ( in_array( $status, array( 301, 302 ), true ) ) {
+			$ziel = wp_remote_retrieve_header( $antwort, 'location' );
+			if ( $ziel ) {
+				wp_safe_redirect( $ziel, $status );
+				return;
+			}
+		}
+		status_header( $status );
 		header( 'Cache-Control: private, no-store' );
 		$content_type = wp_remote_retrieve_header( $antwort, 'content-type' );
 		header( 'Content-Type: ' . ( $content_type ? $content_type : 'application/octet-stream' ) );
