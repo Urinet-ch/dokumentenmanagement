@@ -114,7 +114,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 1.1, 1.2, 1.7, 2.1, 2.2, 2.3, 2.4, 3.1, 3.8_
   - _Abhängig von: 23.1, 22.3_
 
-- [ ] 23.3 Einführung: Bedienung und erneuter Aufruf [Frontend]
+- [x] 23.3 Einführung: Bedienung und erneuter Aufruf [Frontend]
   - «Schritt n von m», «Zurück», «Weiter», «Fertig», «Überspringen», Statusmeldungen, Fokus auf die Überschrift des
     Schritts und nach dem Schliessen auf den Seitenkopf, Schritt bleibt bis zum Neuladen, `prefers-reduced-motion`;
     «In der Anleitung lesen» öffnet die Hilfe-Leiste; «Einführung erneut zeigen» auf `/hilfe` öffnet `/?einfuehrung`.
