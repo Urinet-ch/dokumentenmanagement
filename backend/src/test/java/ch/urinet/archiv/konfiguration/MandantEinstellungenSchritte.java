@@ -37,6 +37,7 @@ public class MandantEinstellungenSchritte {
     private Response andererMandant;
     private String etag;
     private String neuerName;
+    private String neuesGeschaeftsjahr;
     private String uidVorher;
     private String uidNeu;
     private String statuszeile;
@@ -54,6 +55,8 @@ public class MandantEinstellungenSchritte {
         ausgangsVersion = ausgang.jsonPath().getInt("basisVersion");
         String bisher = ausgang.jsonPath().getString("einstellungen.branding.name");
         neuerName = "Testarchiv".equals(bisher) ? "Probe Archiv" : "Testarchiv";
+        neuesGeschaeftsjahr = "06-30".equals(ausgang.jsonPath().getString("einstellungen.geschaeftsjahrEnde"))
+                ? "09-30" : "06-30";
         uidVorher = ausgang.jsonPath().getString("einstellungen.kennungen.uid");
         protokollAnzahl = protokollAnzahl();
         geaendert = false;
@@ -124,6 +127,34 @@ public class MandantEinstellungenSchritte {
         assertThat(antwort.jsonPath().getString("fehlercode")).isEqualTo(code);
         assertThat(antwort.jsonPath().<Map<String, Object>>getList("auswirkung")).isNotEmpty()
                 .allSatisfy(wirkung -> assertThat(wirkung).containsKeys("schluessel", "text", "betroffeneDatensaetze"));
+    }
+
+    @Wenn("die Änderung des Geschäftsjahresendes als REST-Vorschau gesendet wird")
+    public void geschaeftsjahrVorschau() {
+        antwort = given().auth().oauth2(token()).header("If-Match", etag)
+                .contentType("application/merge-patch+json").body(geschaeftsjahr()).post(PFAD + "/vorschau");
+    }
+
+    @Dann("enthält die REST-Vorschau die Auswirkung zum Geschäftsjahresende")
+    public void geschaeftsjahrAuswirkung() {
+        assertThat(antwort.jsonPath().<Map<String, Object>>getList("auswirkungen")).anySatisfy(wirkung -> {
+            assertThat(wirkung.get("schluessel")).isEqualTo("geschaeftsjahrEnde");
+            assertThat(wirkung.get("text")).isNotNull();
+        });
+    }
+
+    @Wenn("die Änderung des Geschäftsjahresendes ohne Bestätigung gesendet wird")
+    public void geschaeftsjahrUnbestaetigt() {
+        antwort = given().auth().oauth2(token()).header("If-Match", etag)
+                .contentType("application/merge-patch+json").body(geschaeftsjahr()).patch(PFAD);
+    }
+
+    @Wenn("die Änderung des Geschäftsjahresendes mit Bestätigung gespeichert wird")
+    public void geschaeftsjahrBestaetigt() {
+        antwort = given().auth().oauth2(token()).header("If-Match", etag)
+                .queryParam("bestaetigt", "geschaeftsjahrEnde")
+                .contentType("application/merge-patch+json").body(geschaeftsjahr()).patch(PFAD);
+        aenderungMerken();
     }
 
     @Wenn("ein ungültiger Archivname über REST gesendet wird")
@@ -225,6 +256,8 @@ public class MandantEinstellungenSchritte {
 
     private void zuruecksetzen(String body) {
         antwort = given().auth().oauth2(token()).header("If-Match", etag)
+                .queryParam("bestaetigt", "geschaeftsjahrEnde,chat.aufbewahrungMonate,"
+                        + "webseitenChat.aufbewahrungTage,wissen.monatsbudgetTokens")
                 .contentType("application/json").body(body).post(PFAD + "/zuruecksetzen");
         aenderungMerken();
     }
@@ -304,5 +337,9 @@ public class MandantEinstellungenSchritte {
 
     private static String branding(String name) {
         return "{\"branding\":{\"name\":\"" + name + "\"}}";
+    }
+
+    private String geschaeftsjahr() {
+        return "{\"geschaeftsjahrEnde\":\"" + neuesGeschaeftsjahr + "\"}";
     }
 }

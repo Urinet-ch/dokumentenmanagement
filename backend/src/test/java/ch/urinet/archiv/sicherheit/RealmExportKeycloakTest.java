@@ -325,6 +325,7 @@ class RealmExportKeycloakTest {
         Response frischeEinstellung = riskanteEinstellung(zuerst.accessToken());
         assertThat(frischeEinstellung.statusCode()).as(frischeEinstellung.asString()).isEqualTo(422);
         assertThat(frischeEinstellung.jsonPath().getString("fehlercode")).isEqualTo("KONFIGURATION_UNGUELTIG");
+        gueltigeRiskanteEinstellung(zuerst.accessToken());
 
         PwaBrowser.Anmeldung sso = browser.anmelden(false, false);
         assertThat(sso.claims().path("auth_time").asLong()).isEqualTo(ersteZeit);
@@ -363,6 +364,30 @@ class RealmExportKeycloakTest {
                 .queryParam("bestaetigt", "chat.aufbewahrungMonate")
                 .contentType("application/merge-patch+json").body("{\"chat\":{\"aufbewahrungMonate\":0}}")
                 .patch(pfad);
+    }
+
+    private void gueltigeRiskanteEinstellung(String token) {
+        String pfad = "/api/v1/mandant/einstellungen";
+        Response ausgang = given().auth().oauth2(token).get("/api/v1/konfiguration");
+        assertThat(ausgang.statusCode()).as(ausgang.asString()).isEqualTo(200);
+        String bisher = ausgang.jsonPath().getString("einstellungen.geschaeftsjahrEnde");
+        String neu = "06-30".equals(bisher) ? "09-30" : "06-30";
+        Response geaendert = given().auth().oauth2(token).header("If-Match", ausgang.header("ETag"))
+                .queryParam("bestaetigt", "geschaeftsjahrEnde")
+                .contentType("application/merge-patch+json").body("{\"geschaeftsjahrEnde\":\"" + neu + "\"}")
+                .patch(pfad);
+        try {
+            assertThat(geaendert.statusCode()).as(geaendert.asString()).isEqualTo(200);
+            assertThat(geaendert.jsonPath().getBoolean("geaendert")).isTrue();
+        } finally {
+            if (geaendert.statusCode() == 200) {
+                Response wiederhergestellt = given().auth().oauth2(token).header("If-Match", geaendert.header("ETag"))
+                        .queryParam("bestaetigt", "geschaeftsjahrEnde").contentType(ContentType.JSON)
+                        .body("{\"version\":" + ausgang.jsonPath().getInt("basisVersion") + "}")
+                        .post(pfad + "/zuruecksetzen");
+                assertThat(wiederhergestellt.statusCode()).as(wiederhergestellt.asString()).isEqualTo(200);
+            }
+        }
     }
 
     private static final class PwaBrowser {

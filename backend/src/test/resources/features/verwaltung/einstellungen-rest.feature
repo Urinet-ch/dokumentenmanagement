@@ -26,6 +26,21 @@ Funktionalität: Einstellungen über die REST-Schnittstelle verwalten
     Und die REST-Antwort nennt die Auswirkung und «BESTAETIGUNG_NOETIG»
     Und sind Version und Änderungsprotokoll unverändert
 
+  @req-2.6 @req-2.7
+  Szenario: Eine riskante Änderung braucht Bestätigung und frische Anmeldung
+    Angenommen für die Konfigurationsdatei ist eine frische Anmeldung bestätigt
+    Wenn die Änderung des Geschäftsjahresendes als REST-Vorschau gesendet wird
+    Dann antwortet die Einstellungsverwaltung mit Status 200
+    Und enthält die REST-Vorschau die Auswirkung zum Geschäftsjahresende
+    Und sind Version und Änderungsprotokoll unverändert
+    Wenn die Änderung des Geschäftsjahresendes ohne Bestätigung gesendet wird
+    Dann antwortet die Einstellungsverwaltung mit Status 409 und ETag des Ausgangsstands
+    Und die REST-Antwort nennt die Auswirkung und «BESTAETIGUNG_NOETIG»
+    Wenn die Änderung des Geschäftsjahresendes mit Bestätigung gespeichert wird
+    Dann ist eine neue APP-Version mit Änderungsprotokoll entstanden
+    Wenn die ursprüngliche Einstellungsversion über REST wiederhergestellt wird
+    Dann entsprechen die Einstellungen wieder dem Ausgangsstand
+
   @req-2.3
   Szenario: Ein ungültiger Feldtyp meldet Befunde und ändert nichts
     Wenn ein ungültiger Archivname über REST gesendet wird
