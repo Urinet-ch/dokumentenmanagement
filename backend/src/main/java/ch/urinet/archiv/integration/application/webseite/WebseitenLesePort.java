@@ -3,12 +3,14 @@ package ch.urinet.archiv.integration.application.webseite;
 import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteDokument;
+import ch.urinet.archiv.integration.domain.webseite.WebseiteKlassifikation;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteReihe;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -33,6 +35,12 @@ public interface WebseitenLesePort {
 
     /** Aktive Reihen, zu denen der feste Filter mindestens ein Dokument liefert, nach Name. */
     List<WebseiteReihe> reihen(Lesezugriff zugriff);
+
+    /** Öffentlich filterbare Klassifikationen und Werte, zu denen der feste Filter mindestens ein Dokument liefert. */
+    List<WebseiteKlassifikation> klassifikationen(Lesezugriff zugriff);
+
+    /** Aktive Codes der öffentlich filterbaren Klassifikationen im Mandantenschema. */
+    Set<String> oeffentlicheKlassifikationsCodes();
 
     /** Dokument-ID zu einer alten URL (normalisiert), nur wenn das Dokument sichtbar ist. */
     Optional<UUID> umleitung(Lesezugriff zugriff, String alteUrl);
