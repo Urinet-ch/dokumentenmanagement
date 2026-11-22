@@ -54,6 +54,25 @@ export const TEXTE = {
     imEingangskorb: (anzahl: number) =>
       anzahl === 1 ? '1 Dokument wartet' : `${anzahl} Dokumente warten`,
   },
+  einfuehrung: {
+    willkommen: (name: string) => `Willkommen im ${name}`,
+    rolle: (rolle: string) =>
+      `Hier legen Sie Dokumente einmal ab und finden sie danach in Sekunden wieder, immer mit Quelle. Sie sind als «${rolle}» angemeldet; die App zeigt Ihnen nur die Bereiche, die Ihre Rolle nutzen darf.`,
+    erfassen: 'Unter «Erfassen» fotografieren Sie Papier mit dem Handy oder laden Dateien hoch. Ohne Netz wartet die Aufnahme auf dem Gerät und wird nach der Anmeldung hochgeladen, sobald wieder eine Verbindung besteht.',
+    pruefen: 'Neue Dokumente kommen in den «Eingangskorb». Das Archiv schlägt Art und Angaben vor; Sie prüfen den Vorschlag, korrigieren ihn wo nötig und bestätigen.',
+    eigene: 'Im «Eingangskorb» sehen Sie die Dokumente, die Sie erfasst haben, mit dem Vorschlag des Archivs. Bestätigt werden sie von einer Person mit diesem Recht.',
+    finden: 'Mit der «Suche» finden Sie Dokumente über Wörter, Belegnummern oder Partner und öffnen ihre Dokumentansicht. Im «Chat» fragen Sie in eigenen Worten; jede Antwort nennt ihre Quelle.',
+    wissen: 'Unter «Wissen» finden Sie geprüftes Wissen aus Ihren Unterlagen.',
+    hilfe: 'Über «Hilfe» oben rechts öffnen Sie jederzeit die Anleitung zur Seite, auf der Sie gerade sind. Dort können Sie auch diese Einführung erneut ansehen.',
+    titel: {
+      erfassen: 'Dokumente erfassen',
+      pruefen: 'Prüfen und bestätigen',
+      eigene: 'Ihre erfassten Dokumente',
+      finden: 'Finden',
+      bestand: 'Bestand und Abschluss',
+      hilfe: 'Hilfe finden',
+    },
+  },
   menue: {
     uebersicht: 'Übersicht',
     erfassen: 'Erfassen',
