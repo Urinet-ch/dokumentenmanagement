@@ -8,6 +8,10 @@ Given('ein WordPress mit dem Archiv-Plugin', function () {
   this.test = null;
 });
 
+When('alle Archiv-Shortcodes und Gutenberg-Blöcke eingerichtet sind', function () {
+  this.test = 'test_shortcodes_und_bloecke_sind_registriert';
+});
+
 When('die Webseiten-Schlüssel und die Rolle der Geschäftsstelle eingestellt werden', function () {
   this.test = 'test_(verschluesselung_und_keine_ausgabe_des_schluessels|erfassungsschluessel_und_geschaeftsstellenrolle)';
 });
@@ -84,6 +88,18 @@ Then('zeigt das Plugin dynamische Filter, Seitennavigation und lesbare Chatquell
   await quelle.waitFor();
   assert.match(await this.page.locator('[data-urinet-chat-ausgabe]').innerText(), /Synthetische Antwort/);
   assert.match(await quelle.getAttribute('href'), /00000000-0000-4000-8000-000000000001$/);
+});
+
+Then('übernimmt die Plugin-Ausgabe die Theme-Schrift und besteht WCAG 2.1 AA', async function () {
+  const schriftarten = await this.page.evaluate(() => {
+    const body = getComputedStyle(document.body).fontFamily;
+    const liste = getComputedStyle(document.querySelector('.urinet-archiv-liste-bereich')).fontFamily;
+    const chatbot = getComputedStyle(document.querySelector('.urinet-archiv-chatbot')).fontFamily;
+    return [body, liste, chatbot];
+  });
+  assert.ok(schriftarten[0]);
+  assert.equal(schriftarten[1], schriftarten[0]);
+  assert.equal(schriftarten[2], schriftarten[0]);
 
   await this.page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
   const pruefung = await this.page.evaluate(async () => {
@@ -107,7 +123,7 @@ When('das Plugin mit der unterstützten PHP-Version und WordPress geprüft wird'
   this.codingStandards = true;
 });
 
-Then(/^(?:sind die Schlüssel verschlüsselt gespeichert und auf der Einstellungsseite nicht sichtbar|prüft das Plugin die Grösse und das feste Schema der Anfrage|meldet das Plugin die jeweilige höchste Stufe und trennt die Cache-Einträge|liefert das Plugin eine freundliche Meldung ohne technische Einzelheiten|gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab|prüft das Plugin ablaufende Sperren und die Länge eines Teil-Streams|zeigt das Plugin Schema-Felder und sperrt die öffentliche Zugriffsstufe|bestehen die Plugin-Tests und die WordPress-Coding-Standards-Prüfung)$/, async function () {
+Then(/^(?:sind alle Archiv-Shortcodes und Gutenberg-Blöcke registriert|sind die Schlüssel verschlüsselt gespeichert und auf der Einstellungsseite nicht sichtbar|prüft das Plugin die Grösse und das feste Schema der Anfrage|meldet das Plugin die jeweilige höchste Stufe und trennt die Cache-Einträge|liefert das Plugin eine freundliche Meldung ohne technische Einzelheiten|gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab|prüft das Plugin ablaufende Sperren und die Länge eines Teil-Streams|zeigt das Plugin Schema-Felder und sperrt die öffentliche Zugriffsstufe|bestehen die Plugin-Tests und die WordPress-Coding-Standards-Prüfung)$/, async function () {
   if (this.browserTest) {
     const art = this.page.locator('[data-urinet-art]');
     const merkblatt = this.page.locator('fieldset[data-urinet-zusatz-art="merkblatt"]');

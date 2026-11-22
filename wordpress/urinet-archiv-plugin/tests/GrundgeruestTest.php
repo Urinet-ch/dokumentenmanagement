@@ -18,6 +18,17 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_shortcodes_und_bloecke_sind_registriert(): void {
+		foreach ( array( 'urinet_archiv_liste', 'urinet_archiv_suche', 'urinet_chatbot' ) as $shortcode ) {
+			$this->assertTrue( shortcode_exists( $shortcode ), $shortcode );
+		}
+
+		$bloecke = WP_Block_Type_Registry::get_instance();
+		foreach ( array( 'liste', 'suche', 'chatbot' ) as $block ) {
+			$this->assertTrue( $bloecke->is_registered( 'urinet-archiv/' . $block ), $block );
+		}
+	}
+
 	public function test_verschluesselung_und_keine_ausgabe_des_schluessels(): void {
 		$werte = Urinet_Archiv_Einstellungen::werte();
 		$this->assertStringNotContainsString( $this->token, $werte['lese_schluessel'] );
