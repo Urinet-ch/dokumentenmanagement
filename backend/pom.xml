@@ -24,6 +24,7 @@
         <verapdf.version>1.30.4</verapdf.version>
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
+        <argLine></argLine>
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
         <build-helper-plugin.version>3.8.0</build-helper-plugin.version>
         <!-- 3.x braucht Jackson 3 (tools.jackson) neben dem Jackson 2 von Quarkus; nur der Schema-Prüfer nutzt es (Jackson3Baum).
@@ -392,7 +393,7 @@
                     <execution>
                         <id>default-test</id>
                         <configuration>
-                            <argLine>-XX:CompressedClassSpaceSize=2g</argLine>
+                            <argLine>@{argLine} -XX:CompressedClassSpaceSize=2g</argLine>
                         </configuration>
                     </execution>
                     <!-- Aufgabe 3.2 (Review PR #93, M3): Seitenbilder und Swiss QR Code mit knappem Heap; Stufe A hat
