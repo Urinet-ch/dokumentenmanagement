@@ -57,6 +57,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +107,7 @@ public class WebseitenLesenSchritte {
     private final List<String> tokenIds = new ArrayList<>();
     private final Map<String, Dok> dokumente = new LinkedHashMap<>();
     private final Set<String> mandantenMitReihen = new TreeSet<>();
+    private final Set<String> mandantenMitKlassifikationen = new TreeSet<>();
     private long protokollStand;
     private final List<RohClient> offeneStreams = new ArrayList<>();
     private final Map<String, String> sha256 = new HashMap<>();
@@ -154,6 +156,10 @@ public class WebseitenLesenSchritte {
             ausfuehren("delete from " + new MandantCode(mandant).schema()
                     + ".dokumentart where code like 'WEBTEST\\_%'");
         }
+        for (String mandant : mandantenMitKlassifikationen) {
+            ausfuehren("delete from " + new MandantCode(mandant).schema()
+                    + ".klassifikation where code like 'webtest\\_%'");
+        }
         if (embeddingGesetzt) {
             embeddingGesetzt = false;
             KiWireMock.zuruecksetzen();
@@ -163,6 +169,7 @@ public class WebseitenLesenSchritte {
         schluessel.clear();
         cursor.clear();
         mandantenMitReihen.clear();
+        mandantenMitKlassifikationen.clear();
     }
 
     @Angenommen("der Webseiten-Lesezugang «{word}» der Webseite «{word}» im Mandanten «{word}» hat die höchste Stufe «{word}»")
@@ -187,6 +194,33 @@ public class WebseitenLesenSchritte {
                     + "gesetzliche_pflicht, aktiv) values (?, ?, 'NORMAL', false, ?::boolean)", zeile.get("code"),
                     zeile.get("name"), zeile.get("aktiv"));
         }
+    }
+
+    @Angenommen("im Mandanten «{word}» sind diese Webseiten-Klassifikationen angelegt:")
+    public void klassifikationen(String mandant, DataTable tabelle) throws SQLException {
+        mandantenMitKlassifikationen.add(mandant);
+        Set<String> angelegt = new HashSet<>();
+        String schema = new MandantCode(mandant).schema();
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            String code = zeile.get("code");
+            if (angelegt.add(code)) {
+                ausfuehren("insert into " + schema + ".klassifikation "
+                        + "(code, name, mehrfach, ki_vorschlag, suchfilter, oeffentlich_filter, aktiv) "
+                        + "values (?, ?, false, false, false, ?::boolean, true)",
+                        code, zeile.get("name"), zeile.get("oeffentlich"));
+            }
+            ausfuehren("insert into " + schema + ".klassifikation_wert "
+                            + "(klassifikation, code, name, reihenfolge, aktiv) values (?, ?, ?, 0, true)",
+                    code, zeile.get("wert"), zeile.get("wert_name"));
+        }
+    }
+
+    @Angenommen("das Dokument «{word}» trägt die Webseiten-Klassifikation «{word}» mit dem Wert «{word}»")
+    public void dokumentKlassifikation(String dokument, String klassifikation, String wert) throws SQLException {
+        Dok d = dokumente.get(dokument);
+        ausfuehren("insert into " + new MandantCode(d.mandant()).schema()
+                + ".dokument_klassifikation (dokument_id, klassifikation, wert) values (?, ?, ?)",
+                d.id(), klassifikation, wert);
     }
 
     /**
@@ -502,6 +536,34 @@ public class WebseitenLesenSchritte {
         List<Map<String, String>> reihen = antwort.path("reihen");
         reihen.forEach(r -> ist.add(r.get("code") + ":" + r.get("name")));
         assertThat(ist).containsExactlyElementsOf(Arrays.asList(paare.split(",")));
+    }
+
+    @Dann("nennt der Filter die öffentliche Klassifikation «{word}» mit den Werten «{}»")
+    public void filterKlassifikation(String code, String werte) {
+        List<Map<String, Object>> klassifikationen = antwort.path("klassifikationen");
+        Map<String, Object> klassifikation = klassifikationen.stream()
+                .filter(k -> code.equals(k.get("code"))).findFirst().orElseThrow();
+        List<String> codes = ((List<Map<String, String>>) klassifikation.get("werte")).stream()
+                .map(w -> w.get("code")).toList();
+        assertThat(codes).containsExactlyElementsOf(werte.isEmpty() ? List.of() : Arrays.asList(werte.split(",")));
+    }
+
+    @Dann("nennt der Filter keine öffentliche Klassifikation «{word}»")
+    public void filterKlassifikationFehlt(String code) {
+        List<Map<String, Object>> klassifikationen = antwort.path("klassifikationen");
+        assertThat(klassifikationen).extracting(k -> k.get("code")).doesNotContain(code);
+    }
+
+    @Dann("hat die Antwort für «{word}» die öffentliche Klassifikation «{word}» mit dem Wert «{word}»")
+    public void antwortKlassifikation(String dokument, String code, String wert) {
+        List<Map<String, Object>> eintraege = antwort.path("eintraege");
+        Map<String, Object> eintrag = eintraege.stream()
+                .filter(e -> ("webtest-" + dokument).equals(e.get("titel"))).findFirst().orElseThrow();
+        List<Map<String, Object>> klassifikationen = (List<Map<String, Object>>) eintrag.get("klassifikationen");
+        Map<String, Object> klassifikation = klassifikationen.stream()
+                .filter(k -> code.equals(k.get("code"))).findFirst().orElseThrow();
+        assertThat((List<Map<String, String>>) klassifikation.get("werte"))
+                .extracting(w -> w.get("code")).containsExactly(wert);
     }
 
     @Dann("nennt die Antwort die Dokument-ID von «{word}»")

@@ -10,14 +10,21 @@ import java.util.UUID;
  * aus dem Dokument ohne Dateinamen, nur bei Suche und Details gesetzt.
  */
 public record WebseiteDokument(UUID id, String titel, WebseiteReihe reihe, String ausgabe, Integer jahr,
-                               LocalDate datum, String zugriff, Integer seiten, String auszug) {
+                               LocalDate datum, String zugriff, Integer seiten, String auszug,
+                               java.util.List<WebseiteKlassifikation> klassifikationen) {
 
     /** Längster Auszug in Zeichen. */
     public static final int AUSZUG_MAX = 300;
 
+    public WebseiteDokument(UUID id, String titel, WebseiteReihe reihe, String ausgabe, Integer jahr,
+                            LocalDate datum, String zugriff, Integer seiten, String auszug) {
+        this(id, titel, reihe, ausgabe, jahr, datum, zugriff, seiten, auszug, java.util.List.of());
+    }
+
     public WebseiteDokument {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(zugriff, "zugriff");
+        klassifikationen = java.util.List.copyOf(klassifikationen);
         if (auszug != null) {
             String eng = auszug.replaceAll("\\s+", " ").strip();
             auszug = eng.isEmpty() ? null : kuerzen(eng);
