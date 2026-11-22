@@ -1,8 +1,8 @@
 <section class="hilfe-leiste" role="dialog" aria-modal="true" aria-labelledby="hilfe-leiste-titel">
-  <header class="hilfe-kopf">
+  <div class="hilfe-kopf">
     <h2 id="hilfe-leiste-titel" tabindex="-1">{{ texte.titel }}</h2>
     <button mat-button type="button" (click)="hilfe.schliessen()">{{ texte.schliessen }}</button>
-  </header>
+  </div>
 
   <nav class="hilfe-inhalt" [attr.aria-label]="texte.inhalt">
     @for (eintrag of eintraege(); track eintrag.anker) {
