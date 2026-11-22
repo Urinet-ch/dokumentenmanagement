@@ -104,12 +104,19 @@ public class MandantVollexportAbbauSchritte {
     @Und("die Prüfsummenliste stimmt mit dem Inhalt des ZIP überein")
     public void pruefsummenStimmen() throws Exception {
         try (ZipFile z = new ZipFile(zip.toFile())) {
-            for (String zeile : pruefsummen.split("\n")) {
+            Map<String, String> summen = new java.util.HashMap<>();
+            for (String zeile : pruefsummen.lines().toList()) {
                 String[] teile = zeile.split("  ", 2);
+                assertThat(teile).hasSize(2);
+                assertThat(teile[0]).matches("[0-9a-f]{64}");
+                assertThat(summen.put(teile[1], teile[0])).as("Doppelter Eintrag: " + teile[1]).isNull();
+                assertThat(z.getEntry(teile[1])).as(teile[1]).isNotNull();
                 byte[] inhalt = z.getInputStream(z.getEntry(teile[1])).readAllBytes();
                 assertThat(sha(inhalt)).as(teile[1]).isEqualTo(teile[0]);
             }
-            assertThat(pruefsummen.split("\n")).hasSize(8);
+            assertThat(summen.keySet()).containsExactlyInAnyOrderElementsOf(
+                    java.util.Collections.list(z.entries()).stream().map(java.util.zip.ZipEntry::getName)
+                            .filter(name -> !name.equals("pruefsummen.sha256")).toList());
         }
     }
 

@@ -1,13 +1,16 @@
 package ch.urinet.archiv.sicherheit;
 
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -23,6 +26,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -51,7 +58,8 @@ class RealmExportKeycloakTest {
     public static class MitExport implements QuarkusTestProfile {
         @Override
         public Map<String, String> getConfigOverrides() {
-            return Map.of("quarkus.keycloak.devservices.enabled", "false");
+            return Map.of("quarkus.keycloak.devservices.enabled", "false",
+                    "archiv.verwaltung.step-up-gueltigkeit", "PT1M");
         }
 
         @Override
@@ -67,16 +75,35 @@ class RealmExportKeycloakTest {
 
     private String admin;
 
+    @Inject
+    AgroalDataSource datenbank;
+
+    @Inject
+    MandantProvisionierung provisionierung;
+
     @BeforeAll
-    void vorbereiten() {
+    void vorbereiten() throws SQLException {
         admin = given().formParam("grant_type", "password").formParam("client_id", "admin-cli")
                 .formParam("username", ExportKeycloak.ADMIN).formParam("password", ExportKeycloak.ADMIN_PASSWORT)
                 .post(ExportKeycloak.basisUrl + "/realms/master/protocol/openid-connect/token").path("access_token");
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select 1 from public.mandant where code = 'urinet' and aktiv");
+             ResultSet zeile = abfrage.executeQuery()) {
+            if (!zeile.next()) {
+                provisionierung.anlegen("urinet", null, null);
+            }
+        }
         // Benutzer und Probe-Clients entstehen erst nach dem Import, wie es ein Administrator täte
         importieren(Map.of("ifResourceExists", "SKIP",
                 "users", List.of(benutzer("ohne-totp", false), benutzer("mit-totp-1", true),
                         benutzer("mit-totp-2", true), benutzer("step-up", true)),
                 "clients", List.of(probeClient("probe-fremd", false), probeClient("probe-mit-audience", true))));
+        String stepUpBenutzer = adminGet(REALM + "/users?exact=true&username=step-up").path("[0].id");
+        Map<String, Object> inhaberRolle = adminGet(REALM + "/roles/inhaber").as(Map.class);
+        given().auth().oauth2(admin).contentType(ContentType.JSON).body(List.of(inhaberRolle))
+                .post(ExportKeycloak.basisUrl + REALM + "/users/" + stepUpBenutzer + "/role-mappings/realm")
+                .then().statusCode(204);
         // Ohne offene Pflichtaktion: geprüft wird die Flow-Bindung, nicht CONFIGURE_TOTP als Standardaktion
         String id = adminGet(REALM + "/users?exact=true&username=ohne-totp").path("[0].id");
         given().auth().oauth2(admin).contentType(ContentType.JSON).body(Map.of("requiredActions", List.of()))
@@ -281,27 +308,45 @@ class RealmExportKeycloakTest {
     }
 
     @Test
-    @Order(2)
-    void pwaBrowserAnmeldungUndErneuteAnmeldungLiefernAuthTime() throws Exception {
+    @Order(5)
+    void stepUpVerlangtFrischeAuthentifizierungUndPromptLoginErneuertAuthTime() throws Exception {
         String client = clientId("archiv-pwa");
         String erlaubteUmleitung = adminGet(REALM + "/clients/{id}", client)
                 .jsonPath().<String>getList("redirectUris").getFirst();
         String rueckruf = erlaubteUmleitung.replace("*", "test-callback");
         var browser = new PwaBrowser(rueckruf);
 
-        JsonNode zuerst = browser.anmelden(false, true);
-        assertThat(zuerst.path("auth_time").isIntegralNumber()).isTrue();
-        long ersteZeit = zuerst.path("auth_time").asLong();
+        PwaBrowser.Anmeldung zuerst = browser.anmelden(false, true);
+        assertThat(zuerst.claims().path("auth_time").isIntegralNumber()).isTrue();
+        assertThat(zuerst.claims().path("mandant").asText()).isEqualTo("urinet");
+        assertThat(zuerst.claims().path("realm_access").path("roles").toString()).contains("inhaber");
+        long ersteZeit = zuerst.claims().path("auth_time").asLong();
         assertThat(ersteZeit).isPositive();
 
-        JsonNode sso = browser.anmelden(false, false);
-        assertThat(sso.path("auth_time").asLong()).isEqualTo(ersteZeit);
+        PwaBrowser.Anmeldung sso = browser.anmelden(false, false);
+        assertThat(sso.claims().path("auth_time").asLong()).isEqualTo(ersteZeit);
+
+        Thread.sleep(61_000);
+        Response zuAlt = stepUpAnfrage(zuerst.accessToken());
+        assertThat(zuAlt.statusCode()).as(zuAlt.asString()).isEqualTo(401);
+        assertThat(zuAlt.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
+        assertThat(zuAlt.header("WWW-Authenticate")).contains("insufficient_user_authentication", "max_age=\"60\"");
+        Response cookieAllein = stepUpAnfrage(sso.accessToken());
+        assertThat(cookieAllein.statusCode()).isEqualTo(401);
+        assertThat(cookieAllein.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
 
         // Keycloak lässt denselben TOTP-Code nicht zweimal zu.
         Thread.sleep((31 - (System.currentTimeMillis() / 1000) % 30) * 1000);
-        JsonNode erneut = browser.anmelden(true, true);
-        assertThat(erneut.path("auth_time").isIntegralNumber()).isTrue();
-        assertThat(erneut.path("auth_time").asLong()).isGreaterThan(ersteZeit);
+        PwaBrowser.Anmeldung erneut = browser.anmelden(true, true);
+        assertThat(erneut.claims().path("auth_time").isIntegralNumber()).isTrue();
+        assertThat(erneut.claims().path("auth_time").asLong()).isGreaterThan(ersteZeit);
+        Response frisch = stepUpAnfrage(erneut.accessToken());
+        assertThat(frisch.statusCode()).isEqualTo(400);
+        assertThat(frisch.jsonPath().getString("fehlercode")).isEqualTo("ANFRAGE_UNGUELTIG");
+    }
+
+    private Response stepUpAnfrage(String token) {
+        return given().auth().oauth2(token).contentType(ContentType.JSON).body("{").post("/api/v1/benutzer");
     }
 
     private static final class PwaBrowser {
@@ -316,7 +361,10 @@ class RealmExportKeycloakTest {
             this.rueckruf = rueckruf;
         }
 
-        private JsonNode anmelden(boolean prompt, boolean interaktiv) throws Exception {
+        private record Anmeldung(JsonNode claims, String accessToken) {
+        }
+
+        private Anmeldung anmelden(boolean prompt, boolean interaktiv) throws Exception {
             String challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(
                     MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII)));
             String url = realmUrl() + "/protocol/openid-connect/auth?client_id=archiv-pwa&response_type=code"
@@ -354,7 +402,8 @@ class RealmExportKeycloakTest {
                             .formParam("code", java.net.URLDecoder.decode(code, StandardCharsets.UTF_8))
                             .post(realmUrl() + "/protocol/openid-connect/token")
                             .then().statusCode(200).extract().path("access_token");
-                    return new ObjectMapper().readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
+                    JsonNode claims = new ObjectMapper().readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
+                    return new Anmeldung(claims, token);
                 }
                 antwort = senden(HttpRequest.newBuilder(ziel).GET());
             }
