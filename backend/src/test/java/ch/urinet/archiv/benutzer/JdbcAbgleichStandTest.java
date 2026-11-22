@@ -75,9 +75,10 @@ class JdbcAbgleichStandTest {
         try {
             assertThat(abgleich.unklar(new MandantCode("vhf-gsk"), vorgang)).isFalse();
             assertThat(abgleich.unklar(new MandantCode("urinet"), vorgang)).isTrue();
-            assertThat(abgleich.unklar(new MandantCode("urinet"), vorgang)).isFalse();
+            protokoll("BENUTZER_ABWEICHUNG", vorgang, ziel, "ABGESCHLOSSEN", null, 0);
+            assertThat(abgleich.unklar(new MandantCode("urinet"), vorgang)).isTrue();
             assertThat(abgleich.lesen(new MandantCode("urinet")).offeneVorgaenge().stream()
-                    .map(AbgleichStand.OffenerVorgang::id)).doesNotContain(vorgang);
+                    .map(AbgleichStand.OffenerVorgang::id)).contains(vorgang);
             try (Connection verbindung = datenquelle.getConnection();
                  PreparedStatement pruefen = verbindung.prepareStatement(
                          "select phase, (select count(*) from m_urinet.zugriff_protokoll p "
@@ -99,6 +100,8 @@ class JdbcAbgleichStandTest {
                 entfernen.executeUpdate();
             }
         }
+        assertThat(abgleich.lesen(new MandantCode("urinet")).offeneVorgaenge().stream()
+                .map(AbgleichStand.OffenerVorgang::id)).doesNotContain(vorgang);
     }
 
     private void vorbereiten(String code) throws Exception {

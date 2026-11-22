@@ -47,7 +47,15 @@ public class JdbcAbgleichStand implements AbgleichStand {
             sperre.setString(1, mandant.wert());
             sperre.setObject(2, vorgang);
             if (sperre.executeUpdate() == 0) {
-                return false;
+                try (PreparedStatement pruefen = verbindung.prepareStatement(
+                        "select phase from public.verwaltung_vorgang "
+                                + "where mandant = ? and vorgang_id = ? for update")) {
+                    pruefen.setString(1, mandant.wert());
+                    pruefen.setObject(2, vorgang);
+                    try (ResultSet zeile = pruefen.executeQuery()) {
+                        return zeile.next() && "UNKLAR".equals(zeile.getString(1));
+                    }
+                }
             }
             String sql = "insert into " + schema + ".zugriff_protokoll "
                     + "(benutzer, rolle, aktion, dokument_id, ip, details, bearbeiter) "
@@ -58,6 +66,7 @@ public class JdbcAbgleichStand implements AbgleichStand {
                     + "and p.zeit <= clock_timestamp() - interval '5 minutes' "
                     + "and not exists (select 1 from " + schema + ".zugriff_protokoll ende "
                     + "where ende.details->>'vorgangId' = p.details->>'vorgangId' "
+                    + "and ende.aktion = p.aktion "
                     + "and ende.details->>'phase' in ('ABGESCHLOSSEN', 'FEHLGESCHLAGEN', 'UNKLAR'))";
             try (PreparedStatement protokoll = verbindung.prepareStatement(sql)) {
                 protokoll.setString(1, vorgang.toString());
@@ -114,10 +123,16 @@ public class JdbcAbgleichStand implements AbgleichStand {
                 + "where v.mandant = ? and v.vorgang_id::text = p.details->>'vorgangId')) "
                 + "and not exists (select 1 from " + schema + ".zugriff_protokoll ende "
                 + "where ende.details->>'vorgangId' = p.details->>'vorgangId' "
-                + "and ende.details->>'phase' in ('ABGESCHLOSSEN', 'FEHLGESCHLAGEN', 'UNKLAR'))";
+                + "and ende.aktion = p.aktion and ende.details->>'phase' in ('ABGESCHLOSSEN', 'FEHLGESCHLAGEN')) "
+                + "and (not exists (select 1 from " + schema + ".zugriff_protokoll ende "
+                + "where ende.details->>'vorgangId' = p.details->>'vorgangId' and ende.aktion = p.aktion "
+                + "and ende.details->>'phase' = 'UNKLAR') or exists "
+                + "(select 1 from public.verwaltung_vorgang v where v.mandant = ? "
+                + "and v.vorgang_id::text = p.details->>'vorgangId' and v.phase = 'UNKLAR'))";
         Set<OffenerVorgang> ergebnis = new HashSet<>();
         try (PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setString(1, mandant.wert());
+            abfrage.setString(2, mandant.wert());
             try (ResultSet zeilen = abfrage.executeQuery()) {
                 while (zeilen.next()) {
                     String ziel = zeilen.getString(2);

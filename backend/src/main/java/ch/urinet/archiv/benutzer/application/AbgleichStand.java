@@ -27,8 +27,8 @@ public interface AbgleichStand {
     Stand lesen(MandantCode mandant);
 
     /**
-     * Markiert einen weiterhin offenen Vorgang atomar als ungeklärt und hält seine Sperre. {@code false} bedeutet,
-     * dass die zugehörige angefragte Sperre nicht mehr vorliegt; der Aufrufer muss den Stand dann erneut prüfen.
+     * Markiert einen weiterhin offenen Vorgang atomar als ungeklärt und hält seine Sperre. Eine bereits ungeklärte
+     * Sperre gilt ebenfalls als offen. Bei {@code false} muss der Aufrufer den Stand erneut prüfen.
      */
     boolean unklar(MandantCode mandant, UUID vorgang);
 }
