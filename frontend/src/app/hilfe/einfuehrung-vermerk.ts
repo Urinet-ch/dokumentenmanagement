@@ -29,6 +29,7 @@ export class EinfuehrungVermerk {
   private readonly sitzung = new Set<string>();
   private readonly gelesen = signal<{ person: string; bekannt: boolean } | null>(null);
   private readonly fortschritt = signal<{ person: string; schritt: number; erneut: boolean } | null>(null);
+  private readonly parameterAusgewertet = new Set<string>();
 
   private readonly person = computed<Person | null>(
     () => {
@@ -69,7 +70,15 @@ export class EinfuehrungVermerk {
 
   neuBeginnen(): void {
     const person = this.person();
-    if (person) this.fortschritt.set({ person: schluessel(person), schritt: 0, erneut: true });
+    if (person) {
+      this.parameterAusgewertet.add(schluessel(person));
+      this.fortschritt.set({ person: schluessel(person), schritt: 0, erneut: true });
+    }
+  }
+
+  wiederaufrufAuswerten(): void {
+    const person = this.person();
+    if (person && !this.parameterAusgewertet.has(schluessel(person))) this.neuBeginnen();
   }
 
   constructor() {

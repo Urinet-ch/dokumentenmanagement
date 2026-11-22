@@ -69,6 +69,16 @@ Funktionalität: Einführung auf der Startseite
     Wenn ich die Seite neu lade und mich erneut anmelde
     Dann zeigt die Einführung «Schritt 1 von 5» ohne Zurück
 
+  @req-3.5 @req-3.6
+  Szenario: Wiederaufgerufene Einführung behält ihren Schritt beim Zurückkehren
+    Angenommen ein bekannter Benutzer «mitarbeiter» im Mandanten «urinet» ist angemeldet
+    Wenn ich die Einführung über die Anleitung erneut öffne
+    Und ich in der Einführung mit der Tastatur «Weiter» wähle
+    Und ich die Startseite vorübergehend verlasse und zurückkehre
+    Dann zeigt die Einführung «Schritt 2 von 5»
+    Wenn ich die Seite neu lade und mich erneut anmelde
+    Dann zeigt die Einführung «Schritt 1 von 5» ohne Zurück
+
   @req-3.2
   Szenario: Anleitung zum Schritt öffnet sich ohne Seitenwechsel
     Angenommen ich bin als «mitarbeiter» im Mandanten «urinet» angemeldet

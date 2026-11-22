@@ -549,6 +549,8 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - «In der Anleitung lesen» öffnet die Hilfe-Leiste am Anker des Schritts, ohne Navigation. Auf `/hilfe` führt
   «Einführung erneut zeigen» für angemeldete Benutzer mit Rolle und Mandant zu `/?einfuehrung=`; der Router behandelt
   den leeren Parameter wie `/?einfuehrung`. Die Karte bleibt auch für Benutzer mit bestehendem Vermerk sichtbar.
+- Der Wiederaufruf-Parameter wird je Benutzer nur einmal pro Seitenladung ausgewertet; ein neuer Klick in der Anleitung
+  startet ausdrücklich erneut. Dadurch setzt die Rückkehr über den Browserverlauf den Schritt nicht zurück.
 - Die Schrittüberschrift erhält beim Wechsel den Fokus, nach Abschluss oder Überspringen die Seitenüberschrift;
   eine sichtbare Statusmeldung meldet das Ergebnis. Die Karte verwendet keine Übergangsanimation.
 - Nachweise: `einfuehrung-start.feature` für 3.2–3.7 und 5.5, `einfuehrung-vermerk.spec.ts` für den flüchtigen

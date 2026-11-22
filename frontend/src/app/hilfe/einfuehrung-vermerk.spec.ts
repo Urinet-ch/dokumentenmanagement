@@ -128,6 +128,22 @@ describe('Einführungsvermerk (Spec 07, Req 1.3–1.6)', () => {
     expect(dienst().schritt()).toBe(0);
   });
 
+  it('wertet den Parameter je Sitzung einmal aus, ein neuer Aufruf startet erneut (Req 3.5, 3.6)', async () => {
+    const vermerk = dienst();
+    await bekannt(vermerk);
+    vermerk.wiederaufrufAuswerten();
+    vermerk.schrittSetzen(1);
+    vermerk.wiederaufrufAuswerten();
+    expect(vermerk.schritt()).toBe(1);
+    vermerk.neuBeginnen();
+    expect(vermerk.schritt()).toBe(0);
+    vermerk.schrittSetzen(1);
+    const neugeladen = dienst();
+    neugeladen.wiederaufrufAuswerten();
+    expect(neugeladen.schritt()).toBe(0);
+    expect(neugeladen.erneut()).toBe(true);
+  });
+
   it('trennt Benutzer und Mandanten und lässt die Vermerke anderer unverändert (Req 1.4)', async () => {
     const vermerk = dienst();
     await bekannt(vermerk);

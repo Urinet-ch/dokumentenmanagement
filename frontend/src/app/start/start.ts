@@ -253,7 +253,7 @@ export class Start {
     effect(() => {
       const benutzer = this.anmeldung.benutzer();
       if (this.wiederaufruf() && this.anmeldung.angemeldet() && benutzer?.id && benutzer.mandant && benutzer.rolle) {
-        untracked(() => this.vermerk.neuBeginnen());
+        untracked(() => this.vermerk.wiederaufrufAuswerten());
         this.wiederaufruf.set(false);
       }
     });

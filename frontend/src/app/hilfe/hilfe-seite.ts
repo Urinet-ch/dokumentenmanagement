@@ -18,6 +18,7 @@ import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { AnleitungLader } from './anleitung-lader';
 import { AnleitungText } from './anleitung-text';
+import { EinfuehrungVermerk } from './einfuehrung-vermerk';
 import { HILFE_EINTRAEGE, sichtbareAbschnitte, sichtbareAnker } from './hilfe-sichtbar';
 
 /**
@@ -34,6 +35,7 @@ import { HILFE_EINTRAEGE, sichtbareAbschnitte, sichtbareAnker } from './hilfe-si
 })
 export class HilfeSeite {
   protected readonly branding = inject(BrandingService);
+  protected readonly vermerk = inject(EinfuehrungVermerk);
   private readonly anmeldung = inject(AnmeldungService);
   private readonly lader = inject(AnleitungLader);
   private readonly katalog = inject(HILFE_EINTRAEGE);
