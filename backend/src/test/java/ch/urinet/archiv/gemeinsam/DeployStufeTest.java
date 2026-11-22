@@ -12,7 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.Tag;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -459,7 +462,17 @@ class DeployStufeTest {
     }
 
     private static Map<String, Object> compose(Path datei) throws IOException {
-        return new Yaml(new SafeConstructor(new LoaderOptions()))
+        SafeConstructor constructor = new SafeConstructor(new LoaderOptions()) {
+            {
+                yamlConstructors.put(new Tag("!reset"), new AbstractConstruct() {
+                    @Override
+                    public Object construct(Node node) {
+                        return "";
+                    }
+                });
+            }
+        };
+        return new Yaml(constructor)
                 .load(Files.readString(datei, StandardCharsets.UTF_8));
     }
 

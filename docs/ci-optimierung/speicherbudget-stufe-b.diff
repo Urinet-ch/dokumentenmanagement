@@ -1,0 +1,104 @@
+--- a/.github/scripts/pruefe-speicherbudget.py
++++ b/.github/scripts/pruefe-speicherbudget.py
+@@ -1,32 +1,85 @@
+ #!/usr/bin/env python3
+-"""Speicherbudget des Zielhosts vor dem Deploy prüfen (Req 16.18, tech.md «Plattform und Betrieb»).
++"""Speicher- und CPU-Budget der Zielplattform vor dem Deploy prüfen (Req 16.18, 16.26).
+ 
+-Liest `docker compose config --format json` auf stdin. Jeder Dienst braucht mem_limit und cpus; liegt die Summe
+-über dem Budget, bricht der Deploy ab, bevor ein Bundle gebaut wird. Aufruf:
+-  docker compose -f deploy/infomaniak/compose.yml config --format json | pruefe-speicherbudget.py <MiB> <cpus>
++Liest `docker compose config --format json` auf stdin. `--zielhost A|B` wählt das
++Budget der Plattform, unabhängig von archiv.stufe. Mit `--probe-datei` wird
++zusätzlich die gerenderte Compose-Konfiguration der Restore-Probe geprüft.
++Der bisherige Aufruf mit zwei Zahlen bleibt für bestehende Aufrufer erhalten.
+ """
++import argparse
+ import json
+ import sys
+ from decimal import Decimal
+ 
++BUDGET = {"A": (Decimal(1150), Decimal("0.75")), "B": (Decimal(3200), Decimal("4.5"))}
++SICHERUNG_B = (Decimal(256), Decimal("0.25"))
+ 
+-def main() -> int:
+-    budget_mib, budget_cpus = Decimal(sys.argv[1]), Decimal(sys.argv[2])
+-    dienste = json.load(sys.stdin)["services"]
+-    summe_mib, summe_cpus, fehler = Decimal(0), Decimal(0), []
++
++def summen(dienste: dict, fehler: list[str], prefix: str = "") -> tuple[Decimal, Decimal]:
++    mib, cpus = Decimal(0), Decimal(0)
++    if not dienste:
++        fehler.append(f"{prefix}keine Dienste")
+     for name, dienst in sorted(dienste.items()):
+         if "mem_limit" not in dienst or "cpus" not in dienst:
+-            fehler.append(f"Dienst {name} ohne mem_limit oder cpus")
++            fehler.append(f"{prefix}{name}: mem_limit oder cpus fehlt")
+             continue
+-        mib = Decimal(int(dienst["mem_limit"])) / (1024 * 1024)
+-        cpus = Decimal(str(dienst["cpus"]))
+-        summe_mib += mib
+-        summe_cpus += cpus
+-        print(f"{name}: {mib:.0f} MiB, {cpus} CPU")
++        speicher = Decimal(int(dienst["mem_limit"])) / (1024 * 1024)
++        cpu = Decimal(str(dienst["cpus"]))
++        if speicher <= 0 or cpu <= 0:
++            fehler.append(f"{prefix}{name}: mem_limit und cpus müssen positiv sein")
++        mib += speicher
++        cpus += cpu
++        print(f"{prefix}{name}: {speicher:.0f} MiB, {cpu} CPU")
++    return mib, cpus
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("budget_mib", nargs="?", type=Decimal)
++    parser.add_argument("budget_cpus", nargs="?", type=Decimal)
++    parser.add_argument("--zielhost", choices=("A", "B"))
++    parser.add_argument("--probe-datei", help="gerenderte Compose-Konfiguration der Restore-Probe als JSON")
++    args = parser.parse_args()
++    if args.zielhost:
++        if args.budget_mib is not None or args.budget_cpus is not None:
++            parser.error("--zielhost nicht mit numerischen Budgets kombinieren")
++        budget_mib, budget_cpus = BUDGET[args.zielhost]
++    else:
++        if args.budget_mib is None or args.budget_cpus is None:
++            parser.error("--zielhost oder beide numerischen Budgets angeben")
++        budget_mib, budget_cpus = args.budget_mib, args.budget_cpus
++    if budget_mib <= 0 or budget_cpus <= 0:
++        parser.error("Budgets müssen positiv sein")
++    if args.probe_datei and args.zielhost != "B":
++        parser.error("--probe-datei verlangt --zielhost B")
++
++    dienste = json.load(sys.stdin)["services"]
++    fehler: list[str] = []
++    summe_mib, summe_cpus = summen(dienste, fehler)
++    if args.zielhost == "B":
++        summe_mib += SICHERUNG_B[0]
++        summe_cpus += SICHERUNG_B[1]
++        print(f"Reserve Sicherung: {SICHERUNG_B[0]} MiB, {SICHERUNG_B[1]} CPU")
+     print(f"Summe: {summe_mib:.0f} MiB (Budget {budget_mib}), {summe_cpus} CPU (Budget {budget_cpus})")
+     if summe_mib > budget_mib or summe_cpus > budget_cpus:
+-        fehler.append("Summe über dem Speicherbudget des Zielhosts: Req 16.18 tritt ein. Deploy abbrechen und Budget "
+-                      "anpassen.")
++        fehler.append("Summe über dem Speicherbudget des Zielhosts: Deploy abbrechen und Budget anpassen.")
++
++    if args.probe_datei:
++        with open(args.probe_datei, encoding="utf-8") as datei:
++            probe = json.load(datei)["services"]
++        probe_mib, probe_cpus = summen(probe, fehler, "Probe/")
++        worker = dienste.get("worker")
++        if not worker or "mem_limit" not in worker or "cpus" not in worker:
++            fehler.append("Worker-Limits für die Restore-Probe fehlen")
++        else:
++            worker_mib = Decimal(int(worker["mem_limit"])) / (1024 * 1024)
++            worker_cpus = Decimal(str(worker["cpus"]))
++            if probe_mib > worker_mib:
++                fehler.append("Restore-Probe überschreitet den Speicheranteil des gestoppten Workers")
++            if summe_mib - worker_mib + probe_mib > budget_mib:
++                fehler.append("Restore-Probe und übrige Dienste überschreiten das Speicherbudget des Zielhosts")
++            if summe_cpus - worker_cpus + probe_cpus > budget_cpus:
++                fehler.append("Restore-Probe und übrige Dienste überschreiten das CPU-Budget des Zielhosts")
+     for f in fehler:
+         print(f"::error::{f}")
+     return 1 if fehler else 0

@@ -3,6 +3,7 @@
 # Startwerte für Stufe B; die Messung in 5.11 muss die Reserve nachweisen.
 services:
   api:
+    image: archiv:current
     mem_limit: 640m
     cpus: 1.0
     environment:
