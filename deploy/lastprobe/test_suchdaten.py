@@ -60,7 +60,7 @@ class SuchdatenTest(unittest.TestCase):
             input=sql, capture_output=True, text=True, check=check, timeout=180,
         )
 
-    def test_fuellt_50_000_und_verweigert_erneutes_oder_falsches_ziel(self):
+    def test_fuellt_50_000_und_verweigert_unsichere_ziele(self):
         sql = (HIER / "suchdaten.sql").read_text(encoding="utf-8")
         falsch = self.psql("postgres", sql, check=False)
         self.assertNotEqual(falsch.returncode, 0)
@@ -82,6 +82,11 @@ class SuchdatenTest(unittest.TestCase):
         erneut = self.psql("archiv_lastprobe", sql, check=False)
         self.assertNotEqual(erneut.returncode, 0)
         self.assertIn("muss für die Füllung leer sein", erneut.stderr)
+        self.psql("archiv_lastprobe", "INSERT INTO public.mandant VALUES ('anderer');")
+        anderer_mandant = self.psql("archiv_lastprobe", sql, check=False)
+        self.assertNotEqual(anderer_mandant.returncode, 0)
+        self.assertIn("ausschliesslich den Mess-Mandanten", anderer_mandant.stderr)
+        self.assertEqual(self.psql("archiv_lastprobe", "SELECT count(*) FROM m_last.dokument;").stdout, "50000\n")
 
 
 if __name__ == "__main__":
