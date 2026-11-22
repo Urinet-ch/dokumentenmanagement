@@ -6,8 +6,8 @@ import java.util.Map;
 
 /**
  * Prüft einen Keycloak-Ablauf (flache Liste aus {@code /authentication/flows/{alias}/executions}): Jeder Weg zum Token
- * verlangt einen OTP-Schritt, ohne Bedingung. Keycloak-Regel: Gibt es in einem Ablauf REQUIRED- oder CONDITIONAL-Schritte,
- * zählen die ALTERNATIVE-Schritte nicht; sonst genügt eine Alternative.
+ * verlangt einen OTP-Schritt ohne Bedingung oder den exakt geprüften Browser-Ablauf mit Passkey. Keycloak-Regel: Gibt es
+ * in einem Ablauf REQUIRED- oder CONDITIONAL-Schritte, zählen die ALTERNATIVE-Schritte nicht; sonst genügt eine Alternative.
  */
 final class OtpPruefung {
 
@@ -30,6 +30,26 @@ final class OtpPruefung {
 
     static boolean otpOhneBedingung(List<Map<String, Object>> schritte) {
         return verlangtOtp(baum(schritte));
+    }
+
+    static boolean passkeyOderOtp(List<Map<String, Object>> schritte, Map<String, String> bedingung) {
+        return schritte.size() == 6
+                && schritt(schritte.get(0), 0, "auth-cookie", "ALTERNATIVE", false)
+                && schritt(schritte.get(1), 0, null, "ALTERNATIVE", true)
+                && schritt(schritte.get(2), 1, "auth-username-password-form", "REQUIRED", false)
+                && schritt(schritte.get(3), 1, null, "CONDITIONAL", true)
+                && schritt(schritte.get(4), 2, "conditional-credential", "REQUIRED", false)
+                && schritte.get(4).get("authenticationConfig") instanceof String
+                && schritt(schritte.get(5), 2, "auth-otp-form", "REQUIRED", false)
+                && bedingung.equals(Map.of("credentials", "webauthn-passwordless", "included", "false"));
+    }
+
+    private static boolean schritt(Map<String, Object> schritt, int ebene, String provider, String anforderung,
+                                   boolean ablauf) {
+        return schritt.get("level") instanceof Number level && level.intValue() == ebene
+                && java.util.Objects.equals(provider, schritt.get("providerId"))
+                && anforderung.equals(schritt.get("requirement"))
+                && ablauf == Boolean.TRUE.equals(schritt.get("authenticationFlow"));
     }
 
     private static boolean verlangtOtp(List<Knoten> kinder) {

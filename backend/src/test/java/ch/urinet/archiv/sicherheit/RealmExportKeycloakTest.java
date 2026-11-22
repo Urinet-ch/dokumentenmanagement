@@ -37,8 +37,8 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Req 2.1 gegen den in Keycloak importierten Realm-Export (Stufe A und B): ohne TOTP kein Token über irgendeinen
- * Client oder Ablauf, und die API nimmt nur Tokens mit Audience {@code archiv-api} an. Gegenprobe:
+ * Req 2.1 gegen den in Keycloak importierten Realm-Export (Stufe A und B): ohne Passkey oder TOTP kein Token über
+ * irgendeinen Client oder Ablauf, und die API nimmt nur Tokens mit Audience {@code archiv-api} an. Gegenprobe:
  * {@code mvn verify -Dtest=RealmExportKeycloakTest -Darchiv.realm-export=<alter Export>} muss rot werden.
  */
 @Tag("start-3")
@@ -108,11 +108,37 @@ class RealmExportKeycloakTest {
 
     @Test
     @Order(2)
-    void jedeFlowBindungVerlangtTotpOhneBedingung() {
+    void jedeFlowBindungVerlangtTotpOderPasskey() {
         Map<String, Object> realm = adminGet(REALM).as(Map.class);
-        for (String bindung : List.of("browserFlow", "directGrantFlow", "resetCredentialsFlow")) {
+        List<Map<String, Object>> browser = schritte((String) realm.get("browserFlow"));
+        assertThat(browser).hasSize(6);
+        assertThat(browser.get(4).get("authenticationConfig")).isInstanceOf(String.class);
+        String configId = (String) browser.get(4).get("authenticationConfig");
+        Map<String, String> bedingung = adminGet(REALM + "/authentication/config/{id}", configId).path("config");
+        assertThat(OtpPruefung.passkeyOderOtp(browser, bedingung)).isTrue();
+        for (String bindung : List.of("directGrantFlow", "resetCredentialsFlow")) {
             String alias = (String) realm.get(bindung);
             assertThat(OtpPruefung.otpOhneBedingung(schritte(alias))).as(bindung + " = " + alias).isTrue();
+        }
+    }
+
+    @Test
+    @Order(2)
+    void passkeyEinstellungenUndKontoScopeWerdenImportiert() {
+        Map<String, Object> realm = adminGet(REALM).as(Map.class);
+        assertThat(realm).containsEntry("webAuthnPolicyPasswordlessRpId", "localhost")
+                .containsEntry("webAuthnPolicyPasswordlessAttestationConveyancePreference", "none")
+                .containsEntry("webAuthnPolicyPasswordlessResidentKey", "required")
+                .containsEntry("webAuthnPolicyPasswordlessUserVerificationRequirement", "required")
+                .containsEntry("webAuthnPolicyPasswordlessPasskeysEnabled", true)
+                .containsEntry("webAuthnPolicyPasswordlessMediation", "conditional");
+        List<String> kontoRollen = adminGet(REALM + "/clients/{id}/scope-mappings/clients/{account}",
+                clientId("account-console"), clientId("account")).jsonPath().getList("name");
+        assertThat(kontoRollen).containsExactlyInAnyOrder("manage-account", "view-profile");
+        for (String alias : List.of("webauthn-register-passwordless", "delete_credential")) {
+            Response aktion = adminGet(REALM + "/authentication/required-actions/{alias}", alias);
+            assertThat(aktion.jsonPath().getBoolean("enabled")).isTrue();
+            assertThat(aktion.jsonPath().getBoolean("defaultAction")).isFalse();
         }
     }
 
