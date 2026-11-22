@@ -27,6 +27,10 @@ def messung(pfad: Path) -> dict:
         raise ValueError(f"{pfad}: bestanden fehlt")
     if daten["bestanden"] and daten["p95_s"] > daten["grenze_s"]:
         raise ValueError(f"{pfad}: bestanden widerspricht der Grenze")
+    for feld in ("anzahl", "parallel", "aufwaermen", "groesse", "sichtbare_dokumente"):
+        wert = daten.get(feld)
+        if feld in daten and (isinstance(wert, bool) or not isinstance(wert, int) or wert < 0):
+            raise ValueError(f"{pfad}: {feld} ist keine gültige Anzahl")
     return daten
 
 
@@ -103,13 +107,21 @@ def main() -> int:
             "",
             "## Laufzeiten",
             "",
-            "| Test | p50 (s) | p95 (s) | Maximum (s) | Grenze p95 (s) | Ergebnis |",
-            "| --- | ---: | ---: | ---: | ---: | --- |",
+            "| Test | Anzahl | Parallel | Aufwärmen | Grösse (Bytes) | p50 (s) | p95 (s) | Maximum (s) | Grenze p95 (s) | Ergebnis |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
         ]
         for name, daten in messungen:
             ergebnis = "bestanden" if daten["bestanden"] else "nicht bestanden"
-            zeilen.append(f"| {name} | {daten['p50_s']} | {daten['p95_s']} | "
+            anzahl = daten.get("anzahl", "–")
+            parallel = daten.get("parallel", "–")
+            aufwaermen = daten.get("aufwaermen", "–")
+            groesse_bytes = daten.get("groesse", "–")
+            zeilen.append(f"| {name} | {anzahl} | {parallel} | {aufwaermen} | {groesse_bytes} | "
+                          f"{daten['p50_s']} | {daten['p95_s']} | "
                           f"{daten['max_s']} | {daten['grenze_s']} | {ergebnis} |")
+            if "sichtbare_dokumente" in daten:
+                zeilen.append(f"| {name}: sichtbare Dokumente | {daten['sichtbare_dokumente']} | – | – | "
+                              "– | – | – | – | – | – |")
         zeilen.extend(["", "## Spitzen je Container", "", "| Container | Speicher (MiB) | CPU (%) |",
                        "| --- | ---: | ---: |"])
         for name in args.dienst:

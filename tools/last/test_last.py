@@ -134,6 +134,14 @@ class Grenztest(unittest.TestCase):
                 suche.main()
         self.assertEqual(suchen.call_count, 2)
 
+    def test_suche_bricht_ohne_sichtbare_dokumentzahl_ab(self):
+        argv = ["suche.py", "--url", "http://localhost", "--anzahl", "1", "--parallel", "1"]
+        with patch.object(sys, "argv", argv), patch.object(suche, "token_lesen", return_value="probe"), \
+                patch.object(suche, "suchen", return_value=(200, 0.1, None)) as suchen:
+            with self.assertRaisesRegex(SystemExit, "keine gültige Dokumentzahl"):
+                suche.main()
+        self.assertEqual(suchen.call_count, 1)
+
 
 class Server(BaseHTTPRequestHandler):
     anfragen: list[tuple[str, str, bytes]] = []

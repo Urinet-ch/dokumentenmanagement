@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import sammler
+import bericht
 
 PROJEKT = "archiv-lastprobe-a1b2c3d4e5f6"
 
@@ -28,6 +29,12 @@ class SammlerTest(unittest.TestCase):
         befehl = run.call_args_list[0].args[0]
         self.assertEqual(befehl[:5], ["docker", "stats", "--no-stream", "--format", "{{json .}}"])
         self.assertEqual(befehl[5:], [f"{PROJEKT}-{d}-1" for d in sammler.DIENSTE])
+        with tempfile.TemporaryDirectory() as ordner:
+            pfad = Path(ordner)
+            (pfad / "stats").write_text(docker, encoding="utf-8")
+            (pfad / "host").write_text(host, encoding="utf-8")
+            self.assertEqual(len(bericht.docker_spitzen(pfad / "stats", befehl[5:])), len(sammler.DIENSTE))
+            self.assertEqual(bericht.host_spitzen(pfad / "host"), (4000, 1000, 2500))
 
     def test_lehnt_fremden_oder_fehlenden_container_ab(self):
         stats = json.dumps({"Name": "fremd-api-1"})

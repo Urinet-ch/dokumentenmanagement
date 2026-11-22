@@ -16,6 +16,7 @@ class BerichtTest(unittest.TestCase):
         self.addCleanup(self.ordner.cleanup)
         self.pfad = Path(self.ordner.name)
         self.schreiben("upload.json", json.dumps({
+            "anzahl": 200, "parallel": 4, "aufwaermen": 20, "groesse": 200000,
             "p50_s": 0.3, "p95_s": 2.0004, "max_s": 3.2, "grenze_s": 2, "bestanden": False,
         }))
         self.schreiben("stats.jsonl", "\n".join(json.dumps(d) for d in [
@@ -42,7 +43,7 @@ class BerichtTest(unittest.TestCase):
         lauf = self.starten()
         self.assertEqual(lauf.returncode, 0, lauf.stderr)
         text = (self.pfad / "messbericht.md").read_text(encoding="utf-8")
-        self.assertIn("| Upload | 0.3 | 2.0004 | 3.2 | 2 | nicht bestanden |", text)
+        self.assertIn("| Upload | 200 | 4 | 20 | 200000 | 0.3 | 2.0004 | 3.2 | 2 | nicht bestanden |", text)
         self.assertIn("| probe-api-1 | 125.00 | 20.25 |", text)
         self.assertIn("| probe-worker-1 | 953.67 | 110.50 |", text)
         self.assertIn("Gesamt: 4000 MiB", text)

@@ -134,6 +134,8 @@ def main() -> int:
     status, _, sichtbar = suchen(args.url, token, {"modus": "volltext", "groesse": "1"})
     if status != 200:
         sys.exit(f"Die Suche antwortet mit Status {status}. Bitte URL und Token (Recht A2) prüfen.")
+    if isinstance(sichtbar, bool) or not isinstance(sichtbar, int) or sichtbar < 0:
+        sys.exit("Die Suche liefert keine gültige Dokumentzahl. Bitte den Endpunkt prüfen; Messung abgebrochen.")
     grenze = args.grenze if args.grenze is not None else (2.0 if args.modus == "hybrid" else 1.0)
     zufall = random.Random(args.seed)
     # Gemessene Anfragen hängen nur vom Seed ab, nicht von der Zahl der Aufwärm-Anfragen
