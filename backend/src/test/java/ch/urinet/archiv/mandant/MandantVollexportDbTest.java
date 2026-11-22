@@ -1,12 +1,16 @@
 package ch.urinet.archiv.mandant;
 
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
+import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantVollexportDaten;
 import ch.urinet.archiv.mandant.application.MandantVollexportKonfiguration;
 import ch.urinet.archiv.mandant.application.MandantVollexportRepository;
+import ch.urinet.archiv.mandant.application.MandantVollexportSchreiber;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -19,21 +23,22 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,6 +71,9 @@ class MandantVollexportDbTest {
 
     @Inject
     MandantVollexportKonfiguration konfiguration;
+
+    @Inject
+    ObjectMapper json;
 
     @AfterAll
     static void beenden() {
@@ -101,6 +109,12 @@ class MandantVollexportDbTest {
                      insert into m_urinet.konfiguration_version (version, wer, quelle, inhalt, sha256)
                      select n, 'test', 'APP', case when n = 10001
                          then jsonb_set(basis.inhalt, '{kiTexte,rolle}', to_jsonb(repeat('ä🙂', 70000)))
+                         when n = 10201 then jsonb_set(basis.inhalt, '{arten}',
+                             (select jsonb_agg(jsonb_set(jsonb_set(basis.inhalt->'arten'->0, '{code}',
+                                 to_jsonb('SYNTH' || g)), '{zusatzSchema}',
+                                 to_jsonb(('{"type":"object","properties":{},"description":"'
+                                     || repeat('x', 4000) || '"}')::text)))
+                              from generate_series(1, 40) g))
                          else basis.inhalt end, repeat('a', 64)
                      from generate_series(10001, 10201) n
                      cross join (select inhalt from m_urinet.konfiguration_version order by version desc limit 1) basis
@@ -117,34 +131,73 @@ class MandantVollexportDbTest {
 
         Path zipA = temp.resolve("a.zip");
         Path zipB = temp.resolve("b.zip");
-        versionenInsZip(A, zipA);
-        versionenInsZip(B, zipB);
+        versionenInsZip(A, zipA, temp);
+        versionenInsZip(B, zipB, temp);
 
         try (ZipFile a = new ZipFile(zipA.toFile()); ZipFile b = new ZipFile(zipB.toFile())) {
+            JsonNode versionenA = json.readTree(a.getInputStream(a.getEntry("konfiguration/versionen.json")));
+            JsonNode versionenB = json.readTree(b.getInputStream(b.getEntry("konfiguration/versionen.json")));
+            Set<Integer> nummernA = new HashSet<>();
+            Set<Integer> nummernB = new HashSet<>();
+            versionenA.forEach(version -> assertThat(nummernA.add(version.path("version").asInt())).isTrue());
+            versionenB.forEach(version -> assertThat(nummernB.add(version.path("version").asInt())).isTrue());
             for (int version = 10001; version <= 10201; version++) {
-                assertThat(a.getEntry(version + ".json")).isNotNull();
-                assertThat(b.getEntry(version + ".json")).isNull();
+                assertThat(nummernA).contains(version);
+                assertThat(nummernB).doesNotContain(version);
             }
-            assertThat(a.getEntry("20001.json")).isNull();
-            assertThat(b.getEntry("20001.json")).isNotNull();
-            String gross = new String(a.getInputStream(a.getEntry("10001.json")).readAllBytes(),
+            assertThat(nummernA).doesNotContain(20001);
+            assertThat(nummernB).contains(20001);
+            JsonNode gross = null;
+            for (JsonNode version : versionenA) {
+                if (version.path("version").asInt() == 10001) {
+                    gross = version.path("inhalt");
+                }
+            }
+            assertThat(gross).isNotNull();
+            assertThat(gross.path("kiTexte").path("rolle").asText()).isEqualTo("ä🙂".repeat(70000));
+            assertThat(gross.toString().getBytes(StandardCharsets.UTF_8).length).isGreaterThan(131_072);
+            JsonNode aktuell = json.readTree(a.getInputStream(a.getEntry("konfiguration.json")));
+            assertThat(aktuell.path("arten").findValuesAsText("description"))
+                    .hasSize(40).containsOnly("x".repeat(4000));
+            assertThat(aktuell.toString().getBytes(StandardCharsets.UTF_8).length).isGreaterThan(131_072);
+            String erwartet = THREADS.submit(() -> kontext.mit(A, () -> konfiguration.aktuell().json())).get();
+            assertThat(aktuell).isEqualTo(json.readTree(erwartet));
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (DigestInputStream inhalt = new DigestInputStream(
+                    a.getInputStream(a.getEntry("konfiguration/versionen.json")), digest)) {
+                inhalt.transferTo(OutputStream.nullOutputStream());
+            }
+            String pruefsummen = new String(a.getInputStream(a.getEntry("pruefsummen.sha256")).readAllBytes(),
                     StandardCharsets.UTF_8);
-            assertThat(gross).contains("ä🙂".repeat(70000)).doesNotContain("mandant-b");
-            assertThat(gross.getBytes(StandardCharsets.UTF_8).length).isGreaterThan(131_072);
+            assertThat(pruefsummen).contains(HexFormat.of().formatHex(digest.digest())
+                    + "  konfiguration/versionen.json");
         }
     }
 
-    private void versionenInsZip(MandantCode code, Path pfad) throws Exception {
+    private void versionenInsZip(MandantCode code, Path pfad, Path temp) throws Exception {
         THREADS.submit(() -> kontext.mit(code, () -> {
-            try (OutputStream datei = Files.newOutputStream(pfad);
-                 ZipOutputStream zip = new ZipOutputStream(datei, StandardCharsets.UTF_8)) {
-                konfiguration.versionen((nummer, inhalt) -> {
-                    zip.putNextEntry(new ZipEntry(nummer + ".json"));
-                    inhalt.schreiben(zip);
-                    zip.closeEntry();
-                });
+            MandantVollexportDaten leer = new MandantVollexportDaten() {
+                @Override
+                public List<Dokument> seite(Optional<UUID> nach, int anzahl) {
+                    return List.of();
+                }
+
+                @Override
+                public List<Manifestdatei> manifeste() {
+                    return List.of();
+                }
+            };
+            try (OutputStream datei = Files.newOutputStream(pfad)) {
+                new MandantVollexportSchreiber(leer, (AblagePort)
+                        java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+                                new Class<?>[]{AblagePort.class},
+                                (proxy, methode, argumente) -> { throw new AssertionError(methode.getName()); }),
+                        (mandant, strom) -> {}, konfiguration).schreiben(code, UUID.randomUUID(), temp, datei);
             } catch (java.io.IOException e) {
                 throw new java.io.UncheckedIOException(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Vollexport unterbrochen", e);
             }
             return null;
         })).get();
