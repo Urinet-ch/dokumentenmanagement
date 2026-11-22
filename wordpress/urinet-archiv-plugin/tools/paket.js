@@ -6,7 +6,9 @@ const dateien = [
   'urinet-archiv.php',
   'includes/class-client.php',
   'includes/class-einstellungen.php',
+  'includes/class-frontend.php',
   'assets/einstellungen.js',
+  'assets/chatbot.js',
 ];
 mkdirSync('dist', { recursive: true });
 const temporaer = mkdtempSync(join('dist', '.paket-'));

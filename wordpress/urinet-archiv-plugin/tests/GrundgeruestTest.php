@@ -231,4 +231,46 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'diesen Monat ausgelastet', $antwort->get_error_message() );
 		$this->assertStringNotContainsString( 'intern', $antwort->get_error_message() );
 	}
+
+	public function test_liste_escaped_titel_und_dokumentseite(): void {
+		$mock = static function () {
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode(
+					array(
+						'eintraege' => array(
+							array(
+								'id'    => '11111111-1111-4111-8111-111111111111',
+								'titel' => '<Synthetisch>',
+							),
+						),
+						'seite'     => 1,
+						'proSeite'  => 20,
+						'gesamt'    => 1,
+					)
+				),
+				'headers'  => array(),
+			);
+		};
+		add_filter( 'pre_http_request', $mock, 10, 3 );
+		$html = Urinet_Archiv_Frontend::liste();
+		remove_filter( 'pre_http_request', $mock, 10 );
+		$this->assertStringContainsString( '&lt;Synthetisch&gt;', $html );
+		$this->assertStringContainsString( '/urinet-archiv/dokument/11111111-1111-4111-8111-111111111111', $html );
+	}
+
+	public function test_chatbot_markup_enthaelt_keine_eingabe(): void {
+		$html = Urinet_Archiv_Frontend::chatbot();
+		$this->assertStringContainsString( 'data-urinet-chatbot', $html );
+		$this->assertStringContainsString( 'data-urinet-chat-senden', $html );
+		$this->assertStringNotContainsString( 'urinetArchivChatbot.url', $html );
+	}
+
+	public function test_chat_frage_begrenzt_eingabe(): void {
+		$request = new WP_REST_Request( 'POST', '/urinet-archiv/v1/chat' );
+		$request->set_param( 'frage', str_repeat( 'x', 4001 ) );
+		$antwort = Urinet_Archiv_Frontend::chat( $request );
+		$this->assertWPError( $antwort );
+		$this->assertSame( 400, $antwort->get_error_data()['status'] );
+	}
 }
