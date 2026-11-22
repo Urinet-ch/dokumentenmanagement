@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.konfiguration.domain.EinstellungsRisiko;
+import ch.urinet.archiv.konfiguration.domain.Einstellungskatalog.Gruppe;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -87,6 +88,21 @@ class EinstellungenPatchTest {
                 .isInstanceOf(KonfigurationUngueltig.class);
         assertThatThrownBy(() -> EinstellungenPatch.lesen(new ByteArrayInputStream(new byte[] {(byte) 0xff})))
                 .isInstanceOf(KonfigurationUngueltig.class);
+    }
+
+    @Test
+    void zuruecksetzenNachGruppeOderVersionIstEindeutig() throws Exception {
+        var auftrag = EinstellungenZuruecksetzen.lesen(lesen("{\"gruppe\":\"CHAT\"}"));
+        assertThat(auftrag.gruppe()).isEqualTo(Gruppe.CHAT);
+        assertThat(EinstellungenPatch.anwenden(json, bisher,
+                EinstellungenZuruecksetzen.gruppenPatch(json, auftrag.gruppe())).ziel().chat().aufbewahrungMonate())
+                .isNull();
+        assertThat(EinstellungenZuruecksetzen.lesen(lesen("{\"version\":3}")).version()).isEqualTo(3);
+        for (String ungueltig : List.of("{}", "{\"gruppe\":\"NICHTS\"}", "{\"version\":0}",
+                "{\"gruppe\":\"CHAT\",\"version\":3}", "{\"version\":3,\"mandant\":\"fremd\"}")) {
+            assertThatThrownBy(() -> EinstellungenZuruecksetzen.lesen(lesen(ungueltig)))
+                    .isInstanceOf(KonfigurationUngueltig.class);
+        }
     }
 
     private EinstellungenPatch.Ergebnis anwenden(String patch) throws Exception {
