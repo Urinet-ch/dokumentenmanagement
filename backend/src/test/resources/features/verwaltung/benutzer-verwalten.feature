@@ -109,6 +109,12 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn alle drei Zugänge die Benutzerliste abrufen
     Dann werden alle drei mit «NICHT_ERLAUBT» abgewiesen
 
+  @req-7.2
+  Szenario: Eine kritische Benutzeranlage verlangt eine frische Anmeldung
+    Angenommen die Anmeldung für eine kritische Aktion ist nicht frisch
+    Wenn der Inhaber einen synthetischen Mitarbeiter anlegt
+    Dann wird die kritische Aktion abgewiesen und kein Benutzer angelegt
+
   @req-4.11
   Szenario: Ein neuer Inhaber bleibt bis zur Zustimmung des zweiten Inhabers ohne Archiv-Rolle
     Angenommen die frische Anmeldung ist für den Test bestätigt

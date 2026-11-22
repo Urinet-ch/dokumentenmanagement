@@ -59,7 +59,7 @@ class RealmExportKeycloakTest {
         @Override
         public Map<String, String> getConfigOverrides() {
             return Map.of("quarkus.keycloak.devservices.enabled", "false",
-                    "archiv.verwaltung.step-up-gueltigkeit", "PT10S");
+                    "archiv.verwaltung.step-up-gueltigkeit", "PT1M");
         }
 
         @Override
@@ -308,7 +308,7 @@ class RealmExportKeycloakTest {
     }
 
     @Test
-    @Order(2)
+    @Order(5)
     void stepUpVerlangtFrischeAuthentifizierungUndPromptLoginErneuertAuthTime() throws Exception {
         String client = clientId("archiv-pwa");
         String erlaubteUmleitung = adminGet(REALM + "/clients/{id}", client)
@@ -326,11 +326,11 @@ class RealmExportKeycloakTest {
         PwaBrowser.Anmeldung sso = browser.anmelden(false, false);
         assertThat(sso.claims().path("auth_time").asLong()).isEqualTo(ersteZeit);
 
-        Thread.sleep(11_000);
+        Thread.sleep(61_000);
         Response zuAlt = stepUpAnfrage(zuerst.accessToken());
         assertThat(zuAlt.statusCode()).as(zuAlt.asString()).isEqualTo(401);
         assertThat(zuAlt.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
-        assertThat(zuAlt.header("WWW-Authenticate")).contains("insufficient_user_authentication", "max_age=\"10\"");
+        assertThat(zuAlt.header("WWW-Authenticate")).contains("insufficient_user_authentication", "max_age=\"60\"");
         Response cookieAllein = stepUpAnfrage(sso.accessToken());
         assertThat(cookieAllein.statusCode()).isEqualTo(401);
         assertThat(cookieAllein.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");

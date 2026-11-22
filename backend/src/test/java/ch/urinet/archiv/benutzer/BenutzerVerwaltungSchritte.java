@@ -11,6 +11,7 @@ import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
@@ -222,9 +223,32 @@ public class BenutzerVerwaltungSchritte {
         }, StepUp.class);
     }
 
+    @Angenommen("die Anmeldung für eine kritische Aktion ist nicht frisch")
+    public void stepUpNichtBestaetigen() {
+        urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() {
+                throw new StepUpNoetig(300);
+            }
+        }, StepUp.class);
+    }
+
     @Wenn("der Inhaber einen synthetischen Mitarbeiter anlegt")
     public void mitarbeiterAnlegen() {
         anlegenUeberApi("mitarbeiter");
+    }
+
+    @Dann("wird die kritische Aktion abgewiesen und kein Benutzer angelegt")
+    public void stepUpNoetig() {
+        Response antwort = antworten.getFirst();
+        assertThat(antwort.statusCode()).isEqualTo(401);
+        assertThat(antwort.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
+        assertThat(antwort.header("WWW-Authenticate"))
+                .contains("insufficient_user_authentication", "max_age=\"300\"");
+        Response liste = anfrage().queryParam("q", name).get(PFAD);
+        assertThat(liste.statusCode()).isEqualTo(200);
+        assertThat(liste.jsonPath().<String>getList("id")).isEmpty();
     }
 
     private void anlegenUeberApi(String rolle) {
