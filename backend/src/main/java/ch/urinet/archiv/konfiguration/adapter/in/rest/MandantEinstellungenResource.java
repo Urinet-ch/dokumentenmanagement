@@ -2,11 +2,13 @@ package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
+import ch.urinet.archiv.gemeinsam.domain.BestaetigungNoetig.Auswirkung;
 import ch.urinet.archiv.konfiguration.application.BestaetigteEinstellungen;
 import ch.urinet.archiv.konfiguration.application.EinstellungenVerwaltung;
 import ch.urinet.archiv.konfiguration.application.EinstellungskatalogLesen;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration.Einstellungen;
+import ch.urinet.archiv.konfiguration.domain.Einstellungskatalog;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
@@ -38,6 +40,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.function.Function;
 
@@ -48,6 +51,34 @@ import java.util.function.Function;
 public class MandantEinstellungenResource {
     @Schema(name = "EinstellungenZuruecksetzen")
     public record ZuruecksetzenDto(String gruppe, Integer version) {
+    }
+
+    @Schema(name = "EinstellungskatalogEintrag")
+    public record KatalogEintragDto(String schluessel, Einstellungskatalog.Gruppe gruppe, String name,
+                                    String beschreibung, Einstellungskatalog.Typ typ, String einheit,
+                                    Integer minimum, Integer maximum, String formregel, Object standard,
+                                    Object aktuellerWert, boolean eigenerWert, boolean riskant,
+                                    String wirksamAb, String hinweis) {
+    }
+
+    @Schema(name = "OeffentlichesChatBudget")
+    public record ChatBudgetDto(LocalDate monat, long budgetTokens, long verbrauchteTokens) {
+    }
+
+    @Schema(name = "EinstellungenBetrieb")
+    public record BetriebDto(ChatBudgetDto oeffentlicherChat, long wissenMonatsbudgetTokens) {
+    }
+
+    @Schema(name = "EinstellungskatalogAntwort")
+    public record KatalogAntwortDto(int version, List<KatalogEintragDto> katalog, BetriebDto betrieb) {
+    }
+
+    @Schema(name = "EinstellungenVorschau")
+    public record VorschauDto(int version, List<Auswirkung> auswirkungen) {
+    }
+
+    @Schema(name = "EinstellungenErgebnis")
+    public record ErgebnisDto(int version, boolean geaendert, List<Auswirkung> auswirkungen) {
     }
 
     private final EinstellungenVerwaltung verwaltung;
@@ -75,7 +106,7 @@ public class MandantEinstellungenResource {
     @ErfordertAktion(Aktion.A20)
     @Operation(summary = "Einstellungskatalog und Betriebsbudget lesen")
     @APIResponse(responseCode = "200", description = "Katalog und aktueller Budgetstand",
-            content = @Content(schema = @Schema(implementation = EinstellungskatalogLesen.Ergebnis.class)))
+            content = @Content(schema = @Schema(implementation = KatalogAntwortDto.class)))
     public Response lesen() {
         var ergebnis = katalog.lesen(benutzer().rolle());
         return Response.ok(ergebnis).tag(tag(ergebnis.version())).build();
@@ -89,7 +120,7 @@ public class MandantEinstellungenResource {
             @Content(mediaType = "application/merge-patch+json", schema = @Schema(implementation = Einstellungen.class)),
             @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = Einstellungen.class))})
     @APIResponse(responseCode = "200", description = "Änderung oder unveränderter Stand",
-            content = @Content(schema = @Schema(implementation = EinstellungenVerwaltung.Ergebnis.class)))
+            content = @Content(schema = @Schema(implementation = ErgebnisDto.class)))
     @APIResponse(responseCode = "409", description = "BESTAETIGUNG_NOETIG")
     @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
     @APIResponse(responseCode = "413", description = "DATEI_ZU_GROSS")
@@ -114,7 +145,7 @@ public class MandantEinstellungenResource {
             @Content(mediaType = "application/merge-patch+json", schema = @Schema(implementation = Einstellungen.class)),
             @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = Einstellungen.class))})
     @APIResponse(responseCode = "200", description = "Auswirkungen ohne Änderung",
-            content = @Content(schema = @Schema(implementation = EinstellungenVerwaltung.Vorschau.class)))
+            content = @Content(schema = @Schema(implementation = VorschauDto.class)))
     public Response vorschau(@HeaderParam(HttpHeaders.IF_MATCH) String ifMatch, InputStream body) throws IOException {
         aufloesung.pruefen();
         Anfrage anfrage = lesen(body);
@@ -131,7 +162,7 @@ public class MandantEinstellungenResource {
     @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(implementation = ZuruecksetzenDto.class)))
     @APIResponse(responseCode = "200", description = "Zurückgesetzt oder unveränderter Stand",
-            content = @Content(schema = @Schema(implementation = EinstellungenVerwaltung.Ergebnis.class)))
+            content = @Content(schema = @Schema(implementation = ErgebnisDto.class)))
     public Response zuruecksetzen(@HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
                                   @QueryParam("bestaetigt") String bestaetigt, InputStream body) throws IOException {
         aufloesung.pruefen();

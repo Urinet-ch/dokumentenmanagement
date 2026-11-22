@@ -17,7 +17,6 @@ import ch.urinet.archiv.wissen.application.WissenLintStarten;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.time.DayOfWeek;
 import java.time.Period;
@@ -30,18 +29,15 @@ import java.util.regex.Pattern;
 public class EinstellungskatalogLesen {
     private static final Pattern WOCHENPLAN = Pattern.compile("^0 0 (\\d{1,2}) \\? \\* (MON|TUE|WED|THU|FRI|SAT|SUN)$");
 
-    @Schema(name = "EinstellungskatalogEintrag")
     public record Eintrag(String schluessel, Einstellungskatalog.Gruppe gruppe, String name, String beschreibung,
                           Einstellungskatalog.Typ typ, String einheit, Integer minimum, Integer maximum,
                           String formregel, Object standard, Object aktuellerWert, boolean eigenerWert,
                           boolean riskant, String wirksamAb, String hinweis) {
     }
 
-    @Schema(name = "EinstellungenBetrieb")
     public record Betrieb(MandantBudget.Stand oeffentlicherChat, long wissenMonatsbudgetTokens) {
     }
 
-    @Schema(name = "EinstellungskatalogAntwort")
     public record Ergebnis(int version, List<Eintrag> katalog, Betrieb betrieb) {
         public Ergebnis {
             katalog = List.copyOf(katalog);

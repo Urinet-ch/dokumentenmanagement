@@ -1,7 +1,6 @@
 package ch.urinet.archiv.ki.application.oeffentlich;
 
 import ch.urinet.archiv.mandant.domain.MandantCode;
-import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.time.LocalDate;
 
@@ -23,7 +22,6 @@ public interface MandantBudget {
     record Reservierung(ReservierungsStatus status, LocalDate monat) {
     }
 
-    @Schema(name = "OeffentlichesChatBudget")
     record Stand(LocalDate monat, long budgetTokens, long verbrauchteTokens) {
     }
 
