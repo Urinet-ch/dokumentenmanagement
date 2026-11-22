@@ -2,11 +2,38 @@
 @spec-06 @benutzer-verwaltung
 Funktionalität: Benutzer des eigenen Mandanten verwalten
 
-  @req-3.1 @req-4.8 @req-7.5
+  @req-3.1 @req-4.8 @req-4.13 @req-7.5
   Szenario: Liste und Detail zeigen nur Benutzer des eigenen Mandanten
     Angenommen in zwei Mandanten gibt es je einen synthetischen Benutzer
     Wenn der Inhaber die Benutzerliste und beide Details abruft
     Dann sieht er nur den eigenen Benutzer und fremde Kennungen ergeben 404
+
+  @req-4.12 @req-4.8
+  Szenario: Rechte-Übersicht zeigt die Matrix nur für Benutzer des eigenen Mandanten
+    Angenommen in zwei Mandanten gibt es je einen synthetischen Benutzer
+    Wenn der Inhaber die Rechte beider Benutzer abruft
+    Dann sieht er die Rechte aus der Matrix nur für den eigenen Benutzer
+
+  @req-3.18 @req-4.5 @req-4.9
+  Szenario: Rollenwechsel verlangt die aktuelle Version und widerruft alte Tokens
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter besteht
+    Wenn der Inhaber die Rolle mit fehlender, veralteter und aktueller Version ändert
+    Dann ist nur die aktuelle Rollenänderung wirksam und das alte Token widerrufen
+
+  @req-4.11
+  Szenario: Eine Inhabervergabe benötigt die Bestätigung eines zweiten Inhabers
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter und zwei aktive Inhaber bestehen
+    Wenn der Inhaber die Inhaberrolle beantragt und beide Inhaber darüber entscheiden
+    Dann kann nur der zweite Inhaber die Vergabe bestätigen
+
+  @req-4.7
+  Szenario: Gleichzeitige Rollenwechsel lassen einen aktiven Inhaber zurück
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und zwei aktive Inhaber bestehen
+    Wenn beide Inhaber gleichzeitig die Rolle des anderen ändern
+    Dann wird ein Vorgang gesperrt und mindestens ein Inhaber bleibt aktiv
 
   @req-3.2 @req-6.1 @req-6.2 @req-6.3 @req-6.4
   Szenario: Ein neuer Benutzer wird eingeladen und die Anlage protokolliert
@@ -26,6 +53,12 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Und ein synthetischer Mitarbeiter ist eingeladen
     Wenn der Inhaber den Zugang des Mitarbeiters zurücksetzt
     Dann sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert
+
+  @req-4.9
+  Szenario: Ein altes Benutzertoken wird nach dem Widerruf abgewiesen
+    Angenommen ein synthetischer Verwaltungszugang hat ein altes Token
+    Wenn das Token des Inhabers widerrufen wird
+    Dann wird dieses Token innerhalb der Frist mit 401 abgewiesen
 
   @req-3.15
   Szenario: Eine Google-Verknüpfung wird gelöst und Sitzungen beendet
@@ -48,7 +81,7 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber den Namen des Mitarbeiters mit der aktuellen Version ändert
     Dann ist der neue Name gespeichert und nicht im Verwaltungsprotokoll enthalten
 
-  @req-3.8
+  @req-3.8 @req-4.9
   Szenario: Ein aktiver Benutzer wird gesperrt und wieder entsperrt
     Angenommen die frische Anmeldung ist für den Test bestätigt
     Und ein synthetischer aktiver Mitarbeiter besteht
@@ -102,6 +135,18 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Und die synthetischen Verwaltungslogs werden aufgezeichnet
     Wenn der Inhaber einen synthetischen Mitarbeiter anlegt
     Dann enthält das Log weder den Namen noch die E-Mail-Adresse
+
+  @req-7.3 @req-7.9
+  Szenario: Verwaltungsrechte werden für jeden Aufruf aus dem Zugang bestimmt
+    Angenommen ein Mitarbeiterkonto, ein API-Token und ein Webseiten-Schlüssel bestehen
+    Wenn alle drei Zugänge die Benutzerliste abrufen
+    Dann werden alle drei mit «NICHT_ERLAUBT» abgewiesen
+
+  @req-7.2
+  Szenario: Eine kritische Benutzeranlage verlangt eine frische Anmeldung
+    Angenommen die Anmeldung für eine kritische Aktion ist nicht frisch
+    Wenn der Inhaber einen synthetischen Mitarbeiter anlegt
+    Dann wird die kritische Aktion abgewiesen und kein Benutzer angelegt
 
   @req-4.11
   Szenario: Ein neuer Inhaber bleibt bis zur Zustimmung des zweiten Inhabers ohne Archiv-Rolle

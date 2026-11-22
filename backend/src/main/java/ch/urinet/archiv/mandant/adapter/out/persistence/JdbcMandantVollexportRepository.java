@@ -23,7 +23,8 @@ public class JdbcMandantVollexportRepository implements MandantVollexportReposit
 
     private static final int ZEITGRENZE_S = 30;
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
-    private static final String SPALTEN = "id, status, s3_schluessel, s3_version, sha256, groesse, anzahl, erstellt, fertig";
+    private static final String SPALTEN =
+            "id, status, s3_schluessel, s3_version, sha256, groesse, anzahl, erstellt, fertig, fehler_art";
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -61,7 +62,8 @@ public class JdbcMandantVollexportRepository implements MandantVollexportReposit
                         Optional.ofNullable(zeile.getString("s3_version")),
                         Optional.ofNullable(zeile.getString("sha256")), mitGroesse, mitAnzahl,
                         zeile.getTimestamp("erstellt").toInstant(),
-                        Optional.ofNullable(fertig).map(Timestamp::toInstant)));
+                        Optional.ofNullable(fertig).map(Timestamp::toInstant),
+                        Optional.ofNullable(zeile.getString("fehler_art")).map(Fehlerart::valueOf)));
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Mandanten-Vollexport nicht gelesen", e);
@@ -104,6 +106,12 @@ public class JdbcMandantVollexportRepository implements MandantVollexportReposit
     public boolean fehler(UUID id, UUID fehlerId) {
         return aendern("update " + schema() + ".mandant_vollexport set status = 'FEHLER', fehler_id = ? "
                 + "where id = ? and status = 'OFFEN'", fehlerId, id) == 1;
+    }
+
+    @Override
+    public boolean fehler(UUID id, UUID fehlerId, Fehlerart art) {
+        return aendern("update " + schema() + ".mandant_vollexport set status = 'FEHLER', fehler_id = ?, "
+                + "fehler_art = ? where id = ? and status = 'OFFEN'", fehlerId, art.name(), id) == 1;
     }
 
     private String schema() {

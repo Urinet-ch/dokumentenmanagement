@@ -5,7 +5,7 @@ public class MandantFehler extends RuntimeException {
 
     public enum Grund {
         UNGUELTIG, MANDANT_EXISTIERT, SEED_FEHLT, SEED_UNGUELTIG, SCHEMA_FEHLT, SCHEMA_ABWEICHUNG,
-        ABBAU_UNGUELTIG
+        ABBAU_UNGUELTIG, KONFIGURATION_ZU_GROSS
     }
 
     private final Grund grund;

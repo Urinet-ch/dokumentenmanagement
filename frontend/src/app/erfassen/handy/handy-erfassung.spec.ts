@@ -6,7 +6,9 @@ import { AnmeldungService, Benutzer, Sitzungszustand } from '../../gemeinsam/anm
 import { Aktion, Rolle, darf } from '../../gemeinsam/anmeldung/rechte';
 import { ONLINE } from '../../gemeinsam/online';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { HilfeLeiste } from '../../hilfe/hilfe-leiste.service';
 import { UploadPort } from '../upload-port';
+import { MAX_AUFNAHME_BYTES, MAX_AUFNAHME_SEITEN } from './aufnahme-grenzen';
 import { HandyErfassung } from './handy-erfassung';
 import { Eintrag } from './warteschlange/eintrag';
 import { Ecken } from './scanner/ecken';
@@ -120,6 +122,58 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
     expect(element.textContent).toContain(TEXTE.handy.keineKamera);
     expect(hinweise()).toEqual(['kantenErkannt', 'kantenErkannt']);
     expect(scanner.auftraege).toEqual([undefined, undefined]);
+  });
+
+  it('öffnet die Warteschlangenhilfe ohne die begonnene Aufnahme zu verlieren', async () => {
+    await zeigen();
+    await fotoWaehlen();
+    const link = element.querySelector<HTMLAnchorElement>('.schlange > a[href="/hilfe#erfassen-offline"]')!;
+    link.click();
+    expect(TestBed.inject(HilfeLeiste).anker()).toBe('erfassen-offline');
+    expect(TestBed.inject(HilfeLeiste).offen()).toBe(true);
+    expect(hinweise()).toEqual(['kantenErkannt']);
+  });
+
+  it('weist eine zusätzliche Seite ab, bevor sie in den Scanner gelangt', async () => {
+    await zeigen();
+    await fotoWaehlen(MAX_AUFNAHME_SEITEN + 1);
+    expect(hinweise()).toHaveLength(MAX_AUFNAHME_SEITEN);
+    expect(scanner.auftraege).toHaveLength(MAX_AUFNAHME_SEITEN);
+    expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toBe(
+      TEXTE.handy.aufnahmeZuVieleSeiten,
+    );
+  });
+
+  it('weist eine zu grosse Datei ab, bevor sie decodiert wird', async () => {
+    await zeigen();
+    knopf(TEXTE.handy.kameraOeffnen)?.click();
+    await fixture.whenStable();
+    const eingabe = element.querySelector<HTMLInputElement>('input[type=file][capture=environment]')!;
+    Object.defineProperty(eingabe, 'files', {
+      value: [new File([new Uint8Array(MAX_AUFNAHME_BYTES + 1)], 'gross.jpg', { type: 'image/jpeg' })],
+    });
+    eingabe.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(hinweise()).toEqual([]);
+    expect(scanner.auftraege).toEqual([]);
+    expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toBe(TEXTE.handy.aufnahmeZuGross);
+  });
+
+  it('behält eine Grenzmeldung, wenn weitere Bilder derselben Auswahl angenommen werden', async () => {
+    await zeigen();
+    knopf(TEXTE.handy.kameraOeffnen)?.click();
+    await fixture.whenStable();
+    const eingabe = element.querySelector<HTMLInputElement>('input[type=file][capture=environment]')!;
+    Object.defineProperty(eingabe, 'files', {
+      value: [
+        new File([new Uint8Array(MAX_AUFNAHME_BYTES + 1)], 'gross.jpg', { type: 'image/jpeg' }),
+        new File(['klein'], 'klein.jpg', { type: 'image/jpeg' }),
+      ],
+    });
+    eingabe.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(hinweise()).toHaveLength(1);
+    expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toBe(TEXTE.handy.aufnahmeZuGross);
   });
 
   it('verwendet ohne erkannte Kanten das ganze Bild', async () => {
@@ -381,6 +435,16 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
       expect([...speicher.inhalt.keys()]).toEqual(['b']);
       expect(element.querySelectorAll('[data-test=fehlerhaft]')).toHaveLength(1);
       expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toContain(TEXTE.handy.geloescht);
+    });
+
+    it('öffnet die Hilfe direkt beim fehlerhaften Upload', async () => {
+      speicher.inhalt.set('a', eintrag('a', 'u1', 'fehlerhaft'));
+      anmeldung.als('mitarbeiter', 'u1');
+      await zeigen();
+      element.querySelector<HTMLAnchorElement>('[data-test=fehlerhaft] a[href="/hilfe#erfassen-offline"]')!.click();
+      expect(TestBed.inject(HilfeLeiste).anker()).toBe('erfassen-offline');
+      expect(TestBed.inject(HilfeLeiste).offen()).toBe(true);
+      expect(speicher.inhalt.has('a')).toBe(true);
     });
   });
 });

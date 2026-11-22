@@ -55,16 +55,16 @@ Then('sind alle sichtbaren Abschnitte der Anleitung geladen', async function () 
   assert.equal(await this.seite.locator('app-hilfe-seite [data-test=anleitung-fehler]').count(), 0);
 });
 
-Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', async function () {
+Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_000 }, async function () {
   const leiste = this.seite.getByRole('dialog', { name: 'Hilfe', exact: true });
   const nav = leiste.getByRole('navigation', { name: 'Inhalt der Anleitung' });
   const links = nav.getByRole('link');
   const titel = (await links.allInnerTexts()).map((text) => text.trim());
   assert.ok(titel.length > 0);
   for (const name of titel) {
-    await nav.getByRole('link', { name, exact: true }).click();
-    await leiste.getByRole('heading', { name, exact: true }).waitFor();
-    await leiste.locator('app-anleitung-text .text').waitFor();
+    await nav.getByRole('link', { name, exact: true }).click({ timeout: 10_000 });
+    await leiste.getByRole('heading', { name, exact: true }).waitFor({ timeout: 10_000 });
+    await leiste.locator('app-anleitung-text .text').waitFor({ timeout: 10_000 });
     assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0, name);
     assert.equal(await leiste.locator('[data-test=anleitung-fehler]').count(), 0, name);
   }

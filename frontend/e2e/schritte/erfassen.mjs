@@ -219,6 +219,12 @@ Given(
       undefined,
       { timeout: 110_000, polling: 500 },
     );
+    // Nach dem ersten Laden kann die Seite noch nicht vom aktiven Service Worker kontrolliert sein.
+    await this.seite.reload();
+    await this.seite.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, {
+      timeout: 110_000,
+      polling: 500,
+    });
   },
 );
 
@@ -353,6 +359,70 @@ When(/^ich das Foto «(.+)» wähle$/, async function (name) {
   await this.seite
     .locator('input[type=file][capture=environment]')
     .setInputFiles({ name, mimeType: 'image/png', buffer: png(motiv, this.kennung) });
+});
+
+When('ich ein JPEG mit grossen Metadaten und ein grosses WebP wähle', { timeout: 60_000 }, async function () {
+  const groessen = await this.seite.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1024;
+    const kontext = canvas.getContext('2d');
+    const raster = kontext.createImageData(1024, 1024);
+    for (let i = 0; i < raster.data.length; i += 65_536) {
+      crypto.getRandomValues(raster.data.subarray(i, i + 65_536));
+    }
+    for (let i = 0; i < raster.data.length; i += 4) {
+      raster.data[i + 3] = 255;
+    }
+    kontext.putImageData(raster, 0, 0);
+    const erzeugen = (typ, qualitaet) =>
+      new Promise((resolve) => canvas.toBlob(resolve, typ, qualitaet));
+    const jpeg = await erzeugen('image/jpeg', 0.6);
+    const app = new Uint8Array(65_537);
+    app.set([0xff, 0xe1, 0xff, 0xff]);
+    const jpegMitMetadaten = new Blob(
+      [jpeg.slice(0, 2), ...Array.from({ length: 17 }, () => app), jpeg.slice(2)],
+      { type: 'image/jpeg' },
+    );
+    const webp = new Uint8Array(await (await erzeugen('image/webp', 1)).arrayBuffer());
+    const ansicht = new DataView(webp.buffer);
+    let chunk;
+    for (let offset = 12; offset + 8 <= webp.length;) {
+      const laenge = ansicht.getUint32(offset + 4, true);
+      if (String.fromCharCode(...webp.subarray(offset, offset + 4)) === 'VP8L') {
+        chunk = webp.slice(offset, offset + 8 + laenge + laenge % 2);
+        break;
+      }
+      offset += 8 + laenge + laenge % 2;
+    }
+    if (!chunk || chunk.length <= 1024 * 1024) {
+      throw new Error('Das synthetische WebP enthält keinen grossen VP8L-Chunk');
+    }
+    const riff = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
+    new DataView(riff.buffer).setUint32(4, 4 + chunk.length, true);
+    const webpOhneVp8x = new Blob([riff, chunk], { type: 'image/webp' });
+    const dateien = [jpegMitMetadaten, webpOhneVp8x];
+    for (const datei of dateien) {
+      const bild = await createImageBitmap(datei);
+      if (bild.width !== 1024 || bild.height !== 1024) {
+        throw new Error('Synthetisches Bild hat unerwartete Abmessungen');
+      }
+      bild.close();
+    }
+    const auswahl = new DataTransfer();
+    dateien.forEach((datei, i) => auswahl.items.add(new File([datei], i ? 'gross.webp' : 'metadaten.jpg', { type: datei.type })));
+    const eingabe = document.querySelector('input[type=file][capture=environment]');
+    eingabe.files = auswahl.files;
+    eingabe.dispatchEvent(new Event('change', { bubbles: true }));
+    return dateien.map((datei) => datei.size);
+  });
+  assert.ok(groessen.every((groesse) => groesse > 1024 * 1024));
+  assert.ok(groessen.reduce((summe, groesse) => summe + groesse, 0) < 10 * 1024 * 1024);
+});
+
+Then('die beiden gewählten Bilder zugeschnitten sind', { timeout: 60_000 }, async function () {
+  for (const nr of [1, 2]) {
+    await seiten(this).nth(nr - 1).getByRole('img', { name: `Vorschau Seite ${nr}` }).waitFor({ timeout: 55_000 });
+  }
 });
 
 When(/^ich die Ecke oben links von Seite (\d+) nach rechts schiebe$/, async function (nr) {

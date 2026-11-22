@@ -5,6 +5,7 @@ import ch.urinet.archiv.integration.application.webseite.WebseitenLesePort;
 import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteDokument;
+import ch.urinet.archiv.integration.domain.webseite.WebseiteKlassifikation;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteReihe;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
@@ -24,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -86,7 +88,7 @@ public class SqlWebseitenLese implements WebseitenLesePort {
         Query q = abfrage("select " + FELDER + ", cast(null as text)" + VON + "where " + bedingung + " order by "
                 + ordnung + " limit :proSeite offset :start", parameter);
         q.setParameter("proSeite", proSeite).setParameter("start", (long) (seite - 1) * proSeite);
-        return new WebseiteSeite(dokumente(q), seite, proSeite, gesamt);
+        return new WebseiteSeite(mitKlassifikationen(dokumente(q)), seite, proSeite, gesamt);
     }
 
     @Override
@@ -99,8 +101,8 @@ public class SqlWebseitenLese implements WebseitenLesePort {
         parameter.put("begriff", begriff);
         parameter.put(FesterFilter.PARAMETER, FesterFilter.stufen(zugriff));
         vorbereiten();
-        List<WebseiteDokument> geladen = dokumente(abfrage("select " + FELDER + ", " + AUSZUG_SUCHE + VON
-                + "where d.id = any(:ids) and " + FEST, parameter));
+        List<WebseiteDokument> geladen = mitKlassifikationen(dokumente(abfrage("select " + FELDER + ", "
+                + AUSZUG_SUCHE + VON + "where d.id = any(:ids) and " + FEST, parameter)));
         Map<UUID, WebseiteDokument> nachId = new LinkedHashMap<>();
         geladen.forEach(d -> nachId.put(d.id(), d));
         List<WebseiteDokument> geordnet = new ArrayList<>();
@@ -119,8 +121,8 @@ public class SqlWebseitenLese implements WebseitenLesePort {
         parameter.put("id", id);
         parameter.put(FesterFilter.PARAMETER, FesterFilter.stufen(zugriff));
         vorbereiten();
-        return dokumente(abfrage("select " + FELDER + ", " + AUSZUG_ANFANG + VON + "where d.id = :id and "
-                + FEST, parameter)).stream().findFirst();
+        return mitKlassifikationen(dokumente(abfrage("select " + FELDER + ", " + AUSZUG_ANFANG + VON
+                + "where d.id = :id and " + FEST, parameter))).stream().findFirst();
     }
 
     @Override
@@ -133,6 +135,48 @@ public class SqlWebseitenLese implements WebseitenLesePort {
                 + "(select 1 from dokument d where d.art = a.code and " + FEST
                 + ") order by lower(a.name), a.code", parameter).getResultList();
         return zeilen.stream().map(z -> new WebseiteReihe((String) z[0], (String) z[1])).toList();
+    }
+
+    @Override
+    public List<WebseiteKlassifikation> klassifikationen(Lesezugriff zugriff) {
+        Map<String, Object> parameter = new HashMap<>();
+        parameter.put(FesterFilter.PARAMETER, FesterFilter.stufen(zugriff));
+        vorbereiten();
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = abfrage("""
+                select k.code, k.name, w.code, w.name
+                from klassifikation k
+                join klassifikation_wert w on w.klassifikation = k.code
+                where k.aktiv and k.oeffentlich_filter and w.aktiv
+                  and exists (
+                    select 1
+                    from dokument_klassifikation dk
+                    join dokument d on d.id = dk.dokument_id
+                    where dk.klassifikation = k.code and dk.wert = w.code and %s
+                  )
+                order by k.code, w.reihenfolge, w.code
+                """.formatted(FEST), parameter).getResultList();
+        Map<String, List<WebseiteKlassifikation.Wert>> werte = new LinkedHashMap<>();
+        Map<String, String> namen = new LinkedHashMap<>();
+        for (Object[] zeile : zeilen) {
+            String code = (String) zeile[0];
+            namen.put(code, (String) zeile[1]);
+            werte.computeIfAbsent(code, ignored -> new ArrayList<>())
+                    .add(new WebseiteKlassifikation.Wert((String) zeile[2], (String) zeile[3]));
+        }
+        return werte.entrySet().stream()
+                .map(e -> new WebseiteKlassifikation(e.getKey(), namen.get(e.getKey()), e.getValue()))
+                .toList();
+    }
+
+    @Override
+    public Set<String> oeffentlicheKlassifikationsCodes() {
+        vorbereiten();
+        @SuppressWarnings("unchecked")
+        List<String> codes = em.get().createNativeQuery("""
+                select code from klassifikation where aktiv and oeffentlich_filter order by code
+                """).getResultList();
+        return Set.copyOf(codes);
     }
 
     @Override
@@ -162,6 +206,27 @@ public class SqlWebseitenLese implements WebseitenLesePort {
             bedingung.append(" and d.zusatz ->> 'ausgabe' = :ausgabe");
             parameter.put("ausgabe", filter.ausgabe());
         }
+        int index = 0;
+        for (Map.Entry<String, List<String>> eintrag : filter.klassifikationen().entrySet()) {
+            String code = "oeffentlicheKlasse" + index;
+            List<String> parameterWerte = new ArrayList<>();
+            for (int i = 0; i < eintrag.getValue().size(); i++) {
+                String parameterWert = code + "Wert" + i;
+                parameter.put(parameterWert, eintrag.getValue().get(i));
+                parameterWerte.add(":" + parameterWert);
+            }
+            bedingung.append("""
+                     and exists (
+                        select 1 from dokument_klassifikation dk
+                        join klassifikation k on k.code = dk.klassifikation
+                        join klassifikation_wert kw on kw.klassifikation = dk.klassifikation and kw.code = dk.wert
+                        where dk.dokument_id = d.id and k.code = :%s and k.aktiv and k.oeffentlich_filter
+                          and kw.aktiv and dk.wert in (%s)
+                     )
+                    """.formatted(code, String.join(", ", parameterWerte)));
+            parameter.put(code, eintrag.getKey());
+            index++;
+        }
         return bedingung.toString();
     }
 
@@ -189,6 +254,38 @@ public class SqlWebseitenLese implements WebseitenLesePort {
                     (String) z[7], z[8] == null ? null : ((Number) z[8]).intValue(), (String) z[9]));
         }
         return ergebnis;
+    }
+
+    private List<WebseiteDokument> mitKlassifikationen(List<WebseiteDokument> dokumente) {
+        if (dokumente.isEmpty()) {
+            return dokumente;
+        }
+        List<UUID> ids = dokumente.stream().map(WebseiteDokument::id).toList();
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = abfrage("""
+                select dk.dokument_id, k.code, k.name, w.code, w.name
+                from dokument_klassifikation dk
+                join klassifikation k on k.code = dk.klassifikation
+                join klassifikation_wert w on w.klassifikation = dk.klassifikation and w.code = dk.wert
+                where dk.dokument_id = any(:ids) and k.aktiv and k.oeffentlich_filter and w.aktiv
+                order by dk.dokument_id, k.code, w.reihenfolge, w.code
+                """, Map.of("ids", ids.toArray(UUID[]::new))).getResultList();
+        Map<UUID, Map<String, List<WebseiteKlassifikation.Wert>>> klassifikationen = new LinkedHashMap<>();
+        Map<String, String> namen = new HashMap<>();
+        for (Object[] zeile : zeilen) {
+            UUID id = (UUID) zeile[0];
+            String code = (String) zeile[1];
+            namen.put(code, (String) zeile[2]);
+            klassifikationen.computeIfAbsent(id, ignored -> new LinkedHashMap<>())
+                    .computeIfAbsent(code, ignored -> new ArrayList<>())
+                    .add(new WebseiteKlassifikation.Wert((String) zeile[3], (String) zeile[4]));
+        }
+        return dokumente.stream().map(d -> {
+            List<WebseiteKlassifikation> werte = klassifikationen.getOrDefault(d.id(), Map.of()).entrySet().stream()
+                    .map(e -> new WebseiteKlassifikation(e.getKey(), namen.get(e.getKey()), e.getValue())).toList();
+            return new WebseiteDokument(d.id(), d.titel(), d.reihe(), d.ausgabe(), d.jahr(), d.datum(), d.zugriff(),
+                    d.seiten(), d.auszug(), werte);
+        }).toList();
     }
 
     private static LocalDate datum(Object wert) {

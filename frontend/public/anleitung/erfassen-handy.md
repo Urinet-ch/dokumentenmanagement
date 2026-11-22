@@ -12,6 +12,8 @@ Für das nächste Dokument nehmen Sie danach einfach die nächsten Seiten auf. W
 
 > **Achtung:** Erst mit «Erfassung abschliessen» liegen die Seiten sicher auf dem Gerät. Schliessen Sie die Seite nicht vorher.
 
+> **Hinweis:** Ein Dokument kann höchstens 20 Seiten und zusammen höchstens 10 MiB für Originale und Zuschnitte enthalten. Ein einzelnes Bild darf höchstens 12 Megapixel haben. Grössere Erfassungen teilen Sie bitte auf mehrere Dokumente auf.
+
 ## Zuschnitt
 
 Nach jeder Aufnahme sucht die App auf dem Gerät die Kanten des Blatts, schneidet die Seite zu und entzerrt sie. Solange das läuft, steht bei der Seite «Wird zugeschnitten …». Danach steht dort eine dieser Meldungen:
@@ -51,4 +53,8 @@ Diese Bezeichnungen stammen vom Browser und können je nach Version leicht abwei
 - «Die Seite konnte nicht zugeschnitten werden. Bitte verwerfen und neu aufnehmen.» Wählen Sie bei der Seite «Verwerfen» und nehmen Sie sie neu auf.
 - «Bitte zuerst die markierten Seiten verwerfen oder neu aufnehmen.» Eine Seite ist nicht zugeschnitten; vorher lässt sich die Erfassung nicht abschliessen.
 - «Der Zuschnitt konnte nicht angepasst werden. Der bisherige Zuschnitt bleibt.» Versuchen Sie es noch einmal oder verwenden Sie das ganze Bild.
+- «Ein Dokument darf höchstens 20 Seiten haben. Bitte schliessen Sie die Erfassung ab oder verwerfen Sie eine Seite.»
+- «Die Erfassung ist grösser als 10 MiB. Bitte teilen Sie das Dokument auf oder wählen Sie kleinere Bilder.»
+- «Das Bild hat mehr als 12 Megapixel. Bitte wählen Sie ein kleineres Kamerabild.»
+- «Die Bildabmessungen konnten nicht geprüft werden. Bitte wählen Sie ein JPEG, PNG, WebP oder HEIC.» Verwenden Sie ein lesbares Bild in einem unterstützten Format.
 - «Die Erfassung konnte auf diesem Gerät nicht gespeichert werden (z. B. im privaten Modus). Bitte erneut versuchen.» Ein privates Fenster oder ein voller Speicher verhindert das Speichern. Öffnen Sie das Archiv in einem normalen Fenster und schaffen Sie bei Bedarf Platz auf dem Gerät.

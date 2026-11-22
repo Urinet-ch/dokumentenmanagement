@@ -10,10 +10,11 @@ public final class SzenarienShards {
 
     /**
      * Was nie in den Backend-Szenarien läuft: Browser-Szenarien, Sicherung (eigener Lauf), Mandantenbericht und
-     * Sichtbarkeit der Wissensbasis und Google-Broker-Anmeldungen (je eigene Klasse).
+     * Sichtbarkeit der Wissensbasis und Google-Broker-Anmeldungen (je eigene Klasse), WordPress (eigener Runner).
      */
     public static final String AUSGENOMMEN =
-            "not @browser and not @sicherung and not @mandant-bericht and not @wissen-sichtbarkeit and not @google-oidc";
+            "not @browser and not @sicherung and not @mandant-bericht and not @wissen-sichtbarkeit"
+                    + " and not @google-oidc and not @wordpress";
 
     /** Tag-Ausdruck, der Shard 1 von Shard 2 trennt. */
     public static final String ABGRENZUNG = "@spec-01";

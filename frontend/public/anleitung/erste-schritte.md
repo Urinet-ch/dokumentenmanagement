@@ -7,6 +7,11 @@ Im {name} legen Sie Dokumente einmal ab und finden sie danach wieder, immer mit 
 3. Geben Sie den sechsstelligen Code aus Ihrer Authenticator-App ein. Bei der ersten Anmeldung richten Sie die App zuerst ein; die Anmeldeseite führt Sie durch die Schritte.
 4. Danach zeigt die Startseite Ihren Gruss und je Bereich, den Ihre Rolle nutzen darf, eine Kachel mit einer kurzen Beschreibung.
 
+Wenn Sie diesen Browser erstmals mit Ihrem Zugang nutzen, erscheint auf der Startseite zusätzlich die Einführung.
+Mit «Weiter» und «Zurück» gehen Sie durch die Schritte; «In der Anleitung lesen» öffnet die Hilfe zum aktuellen Schritt,
+ohne die Startseite zu verlassen. Mit «Fertig» schliessen Sie die Einführung ab, mit «Überspringen» schliessen Sie sie
+vorzeitig. Unter «Hilfe» und «Ganze Anleitung öffnen» können Sie sie mit «Einführung erneut zeigen» wieder aufrufen.
+
 Ein Zurücksetzen des Passworts auf der Anmeldeseite gibt es nicht. Haben Sie Ihr Passwort vergessen oder das Gerät mit der Authenticator-App verloren, wenden Sie sich an die Person, die Ihren Zugang eingerichtet hat.
 
 > **Hinweis:** Ohne Verbindung ist keine Anmeldung möglich. Die Startseite zeigt dann den Link «Ohne Verbindung erfassen». Damit nehmen Sie Papier mit der Kamera auch ohne Anmeldung auf; hochgeladen wird es nach der Anmeldung.

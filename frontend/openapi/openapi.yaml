@@ -91,6 +91,26 @@ components:
       - A21
       - A22
       - A23
+      - A24
+    Ansicht:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        art:
+          $ref: "#/components/schemas/Art"
+        ziel:
+          type: string
+        rolle:
+          $ref: "#/components/schemas/Rolle"
+        grund:
+          type: string
+        beantragtVon:
+          type: string
+        beantragtAm:
+          $ref: "#/components/schemas/Instant"
+        gueltigBis:
+          $ref: "#/components/schemas/Instant"
     Antwort:
       type: object
       properties:
@@ -245,6 +265,11 @@ components:
           anyOf:
           - $ref: "#/components/schemas/LocalDate"
           - type: "null"
+    Art:
+      type: string
+      enum:
+      - INHABER_ROLLE
+      - LOESCHEN
     ArtKlassifikation:
       type: object
       properties:
@@ -381,6 +406,10 @@ components:
         letzteAktion:
           $ref: "#/components/schemas/LetzteAktion"
         etag:
+          type: string
+        apiTokenVerwaltungspfad:
+          type: string
+        apiTokenHinweis:
           type: string
     BenutzerStatus:
       type: string
@@ -536,6 +565,62 @@ components:
           type: string
         sprache:
           type: string
+    ChatBewertung:
+      type: object
+      required:
+      - nachrichtId
+      - sterne
+      - erstellt
+      - geaendert
+      properties:
+        nachrichtId:
+          type: string
+        sterne:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+        grund:
+          type:
+          - string
+          - "null"
+          enum:
+          - NICHT_BEANTWORTET
+          - FALSCH
+          - UNVOLLSTAENDIG
+          - QUELLE
+          - ZU_LANGSAM
+          - ANDERES
+        freitext:
+          type:
+          - string
+          - "null"
+          maxLength: 500
+        erstellt:
+          type: string
+          $ref: "#/components/schemas/Instant"
+        geaendert:
+          type: string
+          $ref: "#/components/schemas/Instant"
+    ChatBewertungEingabe:
+      type: object
+      required:
+      - sterne
+      properties:
+        sterne:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+        grund:
+          type:
+          - string
+          - "null"
+        freitext:
+          type:
+          - string
+          - "null"
+          maxLength: 500
     ChatFrage:
       type: object
       required:
@@ -1449,6 +1534,11 @@ components:
       - NUR_EIGENE
       - NUR_LESEND
       - NUR_SELBST_ERFASSTE
+    Ergebnis1:
+      type: object
+      properties:
+        antragId:
+          $ref: "#/components/schemas/UUID"
     Export:
       description: "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link\
         \ (24 Stunden ab Fertigstellung) gilt nicht mehr"
@@ -2896,6 +2986,11 @@ components:
       - MITARBEITER
       - TREUHAENDER
       - GESCHAEFTSSTELLE
+    RollenAenderung:
+      type: object
+      properties:
+        rolle:
+          type: string
     StatusAnsicht:
       type: object
       properties:
@@ -3809,6 +3904,132 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/benutzer/antraege:
+    get:
+      summary: Offene Verwaltungsanträge anzeigen
+      tags:
+      - Benutzerverwaltung
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ansicht"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/antraege/{antragId}/ablehnen:
+    post:
+      summary: Verwaltungsantrag ablehnen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: antragId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/antraege/{antragId}/bestaetigen:
+    post:
+      summary: Verwaltungsantrag bestätigen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: antragId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/antraege/{antragId}/zurueckziehen:
+    post:
+      summary: Eigenen Verwaltungsantrag zurückziehen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: antragId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: binary
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
   /api/v1/benutzer/{benutzerId}:
     get:
       summary: Benutzer des Mandanten anzeigen
@@ -4031,6 +4252,74 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/benutzer/{benutzerId}/rechte:
+    get:
+      summary: Rechte eines Benutzers anzeigen
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Rolle und Rechte des Benutzers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerwaltungRolle"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/benutzer/{benutzerId}/rolle:
+    put:
+      summary: Rolle eines Benutzers ändern
+      tags:
+      - Benutzerverwaltung
+      parameters:
+      - name: benutzerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        schema:
+          type: string
+      - name: X-Real-Ip
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RollenAenderung"
+        required: true
+      responses:
+        "204":
+          description: Rolle geändert
+        "202":
+          description: Vier-Augen-Antrag angelegt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ergebnis1"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
   /api/v1/benutzer/{benutzerId}/sperren:
     post:
       summary: Benutzer sperren
@@ -4243,6 +4532,114 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatVerlauf"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/chat/nachrichten/{id}/bewertung:
+    delete:
+      summary: Eigene Chat-Bewertung entfernen
+      description: "Fremde, unbekannte und nicht bewertbare Antworten sowie Antworten\
+        \ ohne Bewertung ergeben 404."
+      tags:
+      - Chat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Bewertung entfernt
+        "404":
+          description: Bewertung nicht gefunden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+    get:
+      summary: Eigene Chat-Bewertung abrufen
+      description: "Fremde, unbekannte oder nicht bewertbare Antworten sowie Antworten\
+        \ ohne Bewertung ergeben 404."
+      tags:
+      - Chat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Eigene Bewertung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatBewertung"
+        "404":
+          description: Bewertung nicht gefunden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+    put:
+      summary: Eigene Chat-Antwort bewerten
+      description: "Erstellt oder ersetzt die Bewertung einer eigenen Antwort mit\
+        \ Status OK. Fremde, unbekannte und nicht bewertbare Antworten ergeben 404;\
+        \ nach mehr als 200 Speicherungen je Stunde 429. Der Anfragekörper muss kleiner\
+        \ als 8 KiB sein."
+      tags:
+      - Chat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: Bewertung der Antwort
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatBewertungEingabe"
+        required: true
+      responses:
+        "200":
+          description: Bewertung gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatBewertung"
+        "400":
+          description: Bewertung ungültig
+        "404":
+          description: Antwort nicht gefunden
+        "413":
+          description: Bewertung zu gross
+        "429":
+          description: Bewertungslimit erreicht
+          headers:
+            Retry-After:
+              description: Sekunden bis zum nächsten Versuch
         "401":
           description: Not Authorized
         "403":

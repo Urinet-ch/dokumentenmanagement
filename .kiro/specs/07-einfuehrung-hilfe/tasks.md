@@ -104,7 +104,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
     `crypto.subtle`), nie an den Server; Vitest `einfuehrung-vermerk.spec.ts`.
   - _Anforderungen: 1.3, 1.4, 1.5, 1.6_
 
-- [ ] 23.2 Einführung auf der Startseite: Anzeige und Schritte nach Rechten [Frontend]
+- [x] 23.2 Einführung auf der Startseite: Anzeige und Schritte nach Rechten [Frontend]
   - Karte zwischen Seitenkopf und Kacheln in `start.ts` für neue Benutzer, Schritte nach der Tabelle in Requirement 2.1
     mit `darf`, Texte in `texte.de-CH.ts` (Entwürfe aus design.md), Name und Logo aus dem Branding, Schritt 5 mit den
     Beschreibungen aus `texte.start.beschreibung`; bekannte Benutzer und Benutzer ohne Rolle wie bisher; keine Anfrage an
@@ -114,14 +114,14 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 1.1, 1.2, 1.7, 2.1, 2.2, 2.3, 2.4, 3.1, 3.8_
   - _Abhängig von: 23.1, 22.3_
 
-- [ ] 23.3 Einführung: Bedienung und erneuter Aufruf [Frontend]
+- [x] 23.3 Einführung: Bedienung und erneuter Aufruf [Frontend]
   - «Schritt n von m», «Zurück», «Weiter», «Fertig», «Überspringen», Statusmeldungen, Fokus auf die Überschrift des
     Schritts und nach dem Schliessen auf den Seitenkopf, Schritt bleibt bis zum Neuladen, `prefers-reduced-motion`;
     «In der Anleitung lesen» öffnet die Hilfe-Leiste; «Einführung erneut zeigen» auf `/hilfe` öffnet `/?einfuehrung`.
   - _Anforderungen: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 5.5_
   - _Abhängig von: 23.2_
 
-- [ ] 23.4 Links «So funktioniert es» an Orten mit Rückfragen [Frontend]
+- [x] 23.4 Links «So funktioniert es» an Orten mit Rückfragen [Frontend]
   - Erfassen (Warteschlange, fehlerhafter Upload), Anmeldekarte der Startseite ohne Netz und Meldung ohne Mandant oder
     Rolle öffnen die Hilfe-Leiste mit dem Unterabschnitt; Verhalten und `data-test` der Seiten sonst unverändert.
   - _Anforderungen: 4.6_

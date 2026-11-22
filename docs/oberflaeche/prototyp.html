@@ -563,7 +563,8 @@ V.uebersicht=()=>{
  const M=S.year===2026?[62,71,148,96,88,104,77,69,121,133,118]:[41,55,97,63,70,66,52,48,88,92,81,104];
  return ph('Mittwoch, 20. November 2026','Guten Morgen, '+ROLLEN[S.rolle].name.split(' ')[0],'Was seit gestern ins Archiv gekommen ist und was noch auf dich wartet.',
    (darf('A1')?`<a class="btn" href="#erfassen">${ic('camera')}Erfassen</a>`:'')+`<a class="btn dark" href="#chat">${ic('spark')}Archiv fragen</a>`)+
- `<div class="grid g4" style="grid-template-columns:repeat(${Math.min(4,kpis.length)},minmax(0,1fr))">${kpis.map(k=>`<${k.h?`a href="#${k.h}"`:'div'} class="card kpi${k.hl?' hl':''}"><div class="k-h"><span class="ic">${ic(k.i)}</span>${k.t}</div><div class="v">${k.v}</div><div class="trend">${k.up?ic('trend'):''}${k.tr}</div></${k.h?'a':'div'}>`).join('')}</div>
+ `<section class="card" aria-labelledby="einfuehrung-titel" style="margin-bottom:16px"><div class="card-b"><h2 id="einfuehrung-titel">Willkommen im Archiv</h2><p>Hier legen Sie Dokumente einmal ab und finden sie danach in Sekunden wieder, immer mit Quelle.</p></div></section>
+ <div class="grid g4" style="grid-template-columns:repeat(${Math.min(4,kpis.length)},minmax(0,1fr))">${kpis.map(k=>`<${k.h?`a href="#${k.h}"`:'div'} class="card kpi${k.hl?' hl':''}"><div class="k-h"><span class="ic">${ic(k.i)}</span>${k.t}</div><div class="v">${k.v}</div><div class="trend">${k.up?ic('trend'):''}${k.tr}</div></${k.h?'a':'div'}>`).join('')}</div>
  <div class="card" style="margin-top:16px"><div class="card-h"><h3>Lebenszyklus der Dokumente</h3><span class="muted" style="font-size:12px">Stand heute 08:15</span></div><div class="card-b"><div class="flow">
   ${[['NEU',1],['VERARBEITUNG',2],['EINGANGSKORB',korb,1],['ARCHIVIERUNG',1],['ARCHIVIERT',"1'284"]].map(([s,n,now])=>`<div class="${now?'now':''}"><b>${n}</b><span>${s}</span></div>`).join('')}
  </div></div></div>

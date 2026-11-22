@@ -3,6 +3,8 @@ import { AnmeldungService } from '../../../gemeinsam/anmeldung/anmeldung.service
 import { ONLINE } from '../../../gemeinsam/online';
 import { httpFehlerText } from '../../../gemeinsam/http-fehler';
 import { TEXTE } from '../../../gemeinsam/texte.de-CH';
+import { AufnahmeGrenzeFehler, aufnahmeGrenzeMeldung, pruefeAufnahme } from '../aufnahme-grenzen';
+import { leseBildAbmessungen } from '../bild-abmessungen';
 import { Eintrag, Meldungen, Seite, bewerten } from './eintrag';
 import { WarteschlangeSpeicher } from './speicher';
 import { WarteschlangeUpload } from './warteschlange-upload';
@@ -122,6 +124,7 @@ export class WarteschlangeService {
 
   /** Legt eine Erfassung in die Warteschlange und versucht sofort den Upload. */
   async hinzufuegen(seiten: Seite[], aufgenommen: Date): Promise<void> {
+    pruefeAufnahme(seiten);
     const eintrag: Eintrag = {
       id: crypto.randomUUID(),
       aufgenommen: aufgenommen.toISOString(),
@@ -228,6 +231,19 @@ export class WarteschlangeService {
       }
       if (!this.online()) {
         return;
+      }
+      try {
+        pruefeAufnahme(eintrag.seiten);
+        for (const seite of eintrag.seiten) {
+          await leseBildAbmessungen(seite.original);
+        }
+      } catch (fehler) {
+        if (!(fehler instanceof AufnahmeGrenzeFehler)) {
+          throw fehler;
+        }
+        await this.speicher.speichern({ ...eintrag, zustand: 'fehlerhaft', meldung: aufnahmeGrenzeMeldung(fehler) });
+        await this.neuLaden();
+        continue;
       }
       // Nach einem Fehlversuch wartet die Schlange, auch wenn sie inzwischen anders angestossen wird (Req 4.6)
       const warten = (this.nichtVor.get(eintrag.id) ?? 0) - Date.now();

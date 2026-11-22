@@ -3,6 +3,14 @@
   display: block;
 }
 
+.seitenkopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .einstieg {
   max-width: 70ch;
   margin-bottom: 1rem;

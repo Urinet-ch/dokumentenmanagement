@@ -73,6 +73,7 @@ class SzenarienShardTest {
                 List.of("@spec-02", "@sicherung"),          // nie im Backend
                 List.of("@spec-03", "@mandant-bericht"),   // nie im Backend
                 List.of("@spec-04", "@wissen-sichtbarkeit"), // eigene Klasse
+                List.of("@spec-03", "@wordpress"),           // eigener Runner
                 List.of("@spec-03", "@webseiten-datei-messfall"), // eigener Runner
                 List.of("@spec-01", "@google-oidc")); // eigener Runner
 

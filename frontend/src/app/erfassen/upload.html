@@ -131,4 +131,9 @@
   @if (gesamtFehler()) {
     <p class="hinweis gefahr" role="alert"><app-symbol name="warnung" /><span>{{ gesamtFehler() }}</span></p>
   }
+  @if (gesamtFehler() || hatAbgelehntenUpload()) {
+    <a #uploadHilfe href="/hilfe#erfassen-offline" (click)="$event.preventDefault(); hilfe.oeffnen('erfassen-offline', uploadHilfe)">
+      {{ hilfeTexte.soFunktioniertEs }}
+    </a>
+  }
 </section>

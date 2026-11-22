@@ -517,6 +517,15 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - **Nachweis:** 6.1 mit `features/hilfe/anleitung-bestand-verwaltung.feature` (`@req-6.1`, `@req-7.1`, Dateien aus dem
   Prod-Build) und `hilfe-katalog.spec.ts` (Reihenfolge); 6.4, 6.6, 7.5 und 7.7 Nachweis: Dokument (Review des PR).
 
+## Umsetzung (Aufgabe 23.2, 21.11.2026)
+- `EinfuehrungVermerk.bekannt` steuert die Karte; solange die Kennung berechnet wird oder Rolle und Mandant fehlen,
+  erscheint sie nicht. Die Kacheln bleiben darunter bedienbar. Name und optionales Logo kommen aus dem Branding.
+- `einfuehrungSchritte` erstellt die Schritte aus denselben Rechten wie das Menü; der fünfte Schritt verwendet die
+  Beschreibungen der vorhandenen Kacheln. Vitest prüft Reihenfolge und erlaubte Bereiche aller vier Rollen.
+- Die Karte zeigt vorerst den ersten Schritt. Wechsel, Abschluss, Überspringen und erneuter Aufruf folgen in Aufgabe
+  23.3. `einfuehrung-start.feature` prüft die Karte im Prod-Build und die unveränderte Schrittberechnung im Browser
+  für alle Rollen; die Bedienung und Anzeige der weiteren Schritte prüft 23.3.
+
 ## Umsetzung (Aufgabe 22.4, 21.11.2026)
 - Die eigene Asset-Gruppe `anleitung` lädt alle Dateien vorab und gehört zum gehashten Manifest der App. Der bestehende
   Aktualisierungshinweis aktiviert die neue Version; der Browsertest prüft alte und neue App und Anleitung vor und nach
@@ -532,3 +541,29 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   Geschäftsstelle. Bis zum Entscheid sind die Texte für alle Mandanten gleich; ein Zusatz käme über die Konfiguration des
   Mandanten (Spec 05), nie über eine Abfrage der Kennung im Code.]
 - Alle übrigen Punkte sind Vorschläge (Abschnitt «Entscheide») und gelten mit dem Merge dieses PR.
+
+## Umsetzung (Aufgabe 23.3, 22.11.2026)
+- Die Karte zeigt Fortschritt und Schritte, einschliesslich der für die Rolle erlaubten Bereiche. Der aktuelle Schritt
+  und ein erzwungener Wiederaufruf bleiben im Dienst nur im Arbeitsspeicher und sind an Mandant und Benutzer gebunden;
+  ein Neuladen setzt den Schritt zurück. Abschluss und Überspringen ersetzen den lokalen Vermerk.
+- «In der Anleitung lesen» öffnet die Hilfe-Leiste am Anker des Schritts, ohne Navigation. Auf `/hilfe` führt
+  «Einführung erneut zeigen» für angemeldete Benutzer mit Rolle und Mandant zu `/?einfuehrung=`; der Router behandelt
+  den leeren Parameter wie `/?einfuehrung`. Die Karte bleibt auch für Benutzer mit bestehendem Vermerk sichtbar.
+- Der Wiederaufruf-Parameter wird je Benutzer nur einmal pro Seitenladung ausgewertet; ein neuer Klick in der Anleitung
+  startet ausdrücklich erneut. Dadurch setzt die Rückkehr über den Browserverlauf den Schritt nicht zurück. Nach einem
+  Neuladen und der dann erforderlichen erneuten Anmeldung bleibt der Wiederaufruf als Anmeldeziel erhalten.
+- Die Schrittüberschrift erhält beim Wechsel den Fokus, nach Abschluss oder Überspringen die Seitenüberschrift;
+  eine sichtbare Statusmeldung meldet das Ergebnis. Die Karte verwendet keine Übergangsanimation.
+- Nachweise: `einfuehrung-start.feature` für 3.2–3.7 und 5.5, `einfuehrung-vermerk.spec.ts` für den flüchtigen
+  Schrittstand und die Trennung nach Benutzer, `hilfe-seite.spec.ts` für den rollenabhängigen Wiederaufruf.
+
+## Umsetzung (Aufgabe 23.4, 22.11.2026)
+- Die Links bei Warteschlange, fehlgeschlagenen Uploads und auf der Offline-Anmeldekarte öffnen `erfassen-offline`,
+  der Link bei fehlendem Mandant oder fehlender Rolle öffnet `probleme`. Die vorhandenen Katalogeinträge bleiben
+  unverändert: Beide sind bereits für die jeweiligen Besucher sichtbar. Die Hilfe-Leiste erhält den auslösenden Link
+  für die Fokusrückgabe; der normale Klick navigiert nicht.
+- Fehler bei Datei-Uploads umfassen sowohl die ganze Anfrage als auch abgelehnte Einzelergebnisse. Die Anleitung
+  unterscheidet diese Fälle vom automatischen Wiederholen der Warteschlange.
+- Nachweise: `hilfe-kontextlinks.feature` (`@req-4.6`) für alle vier Stellen sowie fehlenden Mandanten und fehlende
+  Rolle, einschliesslich Fokusrückgabe und erhaltener Aufnahme beziehungsweise Dateiauswahl; Angular-Tests für die
+  Zustände der Komponenten.

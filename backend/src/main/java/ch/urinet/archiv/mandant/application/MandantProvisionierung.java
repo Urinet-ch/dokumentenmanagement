@@ -5,6 +5,7 @@ import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.mandant.domain.MandantVerwaltungsrollen;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -13,11 +14,12 @@ import java.util.Optional;
 
 /**
  * Legt einen Mandanten an (Req 1.1, 1.5, 9.6; ADR-002): Prüfung des Seeds ({@link SeedPruefung}, vor jeder
- * Änderung), Schema {@code m_<code>} über {@code db/mandant}, Eintrag im Register als <b>inaktiv</b>, vollständiger
- * Konfigurationsseed im Kontext {@link MandantKontext#zurProvisionierung}, Prüfung des Schemas samt Seed gegen das
- * Mapping (Req 1.7), Bucket {@code <präfix><code>} und erst zuletzt die Aktivierung. Ein abgebrochener Lauf hinterlässt
- * darum keinen aktiven Mandanten; ein erneuter Lauf mit demselben Code setzt fort (Schema, Seed und Bucket sind
- * idempotent). Weichen Name oder Geschäftsjahresende des neuen Laufs vom Eintrag ab, bricht er ab.
+ * Änderung), Schema {@code m_<code>} über {@code db/mandant}, Eintrag im Register als <b>inaktiv</b> mit den
+ * konfigurierten Verwaltungsrollen, vollständiger Konfigurationsseed im Kontext
+ * {@link MandantKontext#zurProvisionierung}, Prüfung des Schemas samt Seed gegen das Mapping (Req 1.7), Bucket
+ * {@code <präfix><code>} und erst zuletzt die Aktivierung. Ein abgebrochener Lauf hinterlässt darum keinen aktiven
+ * Mandanten; ein erneuter Lauf mit demselben Code setzt fort (Schema, Seed und Bucket sind idempotent). Weichen Name,
+ * Geschäftsjahresende oder Verwaltungsrollen des neuen Laufs vom Eintrag ab, bricht er ab.
  */
 @ApplicationScoped
 public class MandantProvisionierung {
@@ -32,6 +34,7 @@ public class MandantProvisionierung {
     private final MandantKontext kontext;
     private final MandantSchemaPruefung schemaPruefung;
     private final SeedPruefung seedPruefung;
+    private final MandantVerwaltungsrollenSeed verwaltungsrollenSeed;
     private final String bucketPraefix;
 
     public MandantProvisionierung(MandantRegister register, MandantDatenbank datenbank, MandantBucket bucket,
@@ -39,6 +42,7 @@ public class MandantProvisionierung {
                                   MandantKontext kontext,
                                   MandantSchemaPruefung schemaPruefung,
                                   SeedPruefung seedPruefung,
+                                  MandantVerwaltungsrollenSeed verwaltungsrollenSeed,
                                   @ConfigProperty(name = "archiv.ablage.bucket-praefix") String bucketPraefix) {
         this.register = register;
         this.datenbank = datenbank;
@@ -48,6 +52,7 @@ public class MandantProvisionierung {
         this.kontext = kontext;
         this.schemaPruefung = schemaPruefung;
         this.seedPruefung = seedPruefung;
+        this.verwaltungsrollenSeed = verwaltungsrollenSeed;
         this.bucketPraefix = bucketPraefix;
     }
 
@@ -81,10 +86,13 @@ public class MandantProvisionierung {
         }
         String anzeigename = name == null || name.isBlank()
                 ? fortsetzen.map(Mandant::name).orElse(code) : name;
-        Mandant mandant = new Mandant(mandantCode, anzeigename, mandantCode.schema(), bucketName, ende, false);
+        MandantVerwaltungsrollen verwaltungsrollen = verwaltungsrollenSeed.fuer(mandantCode);
+        Mandant mandant = new Mandant(mandantCode, anzeigename, mandantCode.schema(), bucketName, ende, false,
+                verwaltungsrollen);
         if (fortsetzen.isPresent() && !fortsetzen.get().equals(mandant)) {
             throw new MandantFehler(MandantFehler.Grund.MANDANT_EXISTIERT,
-                    "Mandant " + code + " ist in Provisionierung mit anderen Angaben (Name oder Geschäftsjahresende)");
+                    "Mandant " + code + " ist in Provisionierung mit anderen Angaben "
+                            + "(Name, Geschäftsjahresende oder Verwaltungsrollen)");
         }
         Konfiguration konfigurationFuerMandant = new Konfiguration(seedKonfiguration.version(),
                 new Konfiguration.Einstellungen(ende.wert(), seedKonfiguration.einstellungen().kennungen(),
@@ -102,7 +110,8 @@ public class MandantProvisionierung {
         schemaPruefung.pruefen(mandantCode.schema());
         bucket.einrichten(bucketName);
         register.aktivieren(mandantCode);
-        mandant = new Mandant(mandantCode, anzeigename, mandantCode.schema(), bucketName, ende, true);
+        mandant = new Mandant(mandantCode, anzeigename, mandantCode.schema(), bucketName, ende, true,
+                verwaltungsrollen);
         LOG.infof("Mandant %s angelegt (Schema %s, Bucket %s, %d Dokumentarten)", code, mandant.schema(), bucketName,
                 konfigurationFuerMandant.arten().size());
         return mandant;

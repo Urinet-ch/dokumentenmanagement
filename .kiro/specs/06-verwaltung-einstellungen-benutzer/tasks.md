@@ -121,14 +121,15 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.9_
   - _Abhängig von: 19.8_
 
-- [ ] 19.10 Step-up [Backend]
+- [x] 19.10 Step-up [Backend]
   - `StepUp` mit `auth_time`, Code `STEP_UP_NOETIG` mit `WWW-Authenticate`, Liste der Aktionen nach design.md, Konfiguration
     `archiv.verwaltung.step-up-gueltigkeit`, API-Tokens und Webseiten-Schlüssel scheitern an der Verwaltung mit 403; Test
-    gegen echtes Keycloak (`prompt=login` verlangt Passwort und TOTP).
+    gegen echtes Keycloak (`prompt=login` verlangt Passwort und TOTP). Unit- und Cucumber-Tests prüfen Ablauf, Claim-Grenzen,
+    Antwortheader sowie Benutzer-, API-Token- und Webseiten-Zugänge.
   - _Anforderungen: 7.2, 7.3, 7.9_
   - _Abhängig von: 19.2, 19.7_
 
-- [ ] 19.11 REST Rolle, Rechte-Übersicht und Anträge [Backend]
+- [x] 19.11 REST Rolle, Rechte-Übersicht und Anträge [Backend]
   - `PUT /benutzer/{id}/rolle`, `GET /benutzer/{id}/rechte`, Anträge (Vier-Augen: `inhaber` vergeben und Löschen, ab zwei aktiven
     Inhabern; Verfall nach 72 Stunden), Alarm-Hook für `inhaber`, Abweisung des Rollenkonflikts, Hinweis auf API-Tokens in der
     Antwort; Codes `ESKALATION_VERBOTEN`, `LETZTER_INHABER`.

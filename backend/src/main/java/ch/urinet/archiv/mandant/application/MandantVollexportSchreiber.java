@@ -40,11 +40,18 @@ public class MandantVollexportSchreiber {
     private final MandantVollexportDaten daten;
     private final AblagePort ablage;
     private final WissenOkfExportPort wissen;
+    private final MandantVollexportKonfiguration konfiguration;
 
     public MandantVollexportSchreiber(MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen) {
+        this(daten, ablage, wissen, MandantVollexportKonfiguration.leer());
+    }
+
+    public MandantVollexportSchreiber(MandantVollexportDaten daten, AblagePort ablage, WissenOkfExportPort wissen,
+                                      MandantVollexportKonfiguration konfiguration) {
         this.daten = Objects.requireNonNull(daten, "daten");
         this.ablage = Objects.requireNonNull(ablage, "ablage");
         this.wissen = Objects.requireNonNull(wissen, "wissen");
+        this.konfiguration = Objects.requireNonNull(konfiguration, "konfiguration");
     }
 
     public int schreiben(MandantCode mandant, UUID exportId, Path arbeitsverzeichnis, OutputStream ziel)
@@ -60,9 +67,13 @@ public class MandantVollexportSchreiber {
 
     private int schreibenMitPruefsummen(MandantCode mandant, UUID exportId, Path pruefsummenDatei,
                                         OutputStream ziel) throws IOException, InterruptedException {
+        MandantVollexportKonfiguration.Version aktuell = konfiguration.aktuell();
         ZipOutputStream zip = new ZipOutputStream(new NichtSchliessend(ziel), StandardCharsets.UTF_8);
         zip.setLevel(Deflater.BEST_SPEED);
         try (BufferedWriter pruefsummen = Files.newBufferedWriter(pruefsummenDatei, StandardCharsets.UTF_8)) {
+            schreibeAktuelleKonfiguration(zip, pruefsummen, aktuell);
+            aktuell = null;
+            schreibeKonfigurationsversionen(zip, pruefsummen);
             schreibeMetadatenJson(zip, pruefsummen);
             schreibeMetadatenCsv(zip, pruefsummen);
             int dokumente = schreibeDateien(mandant, zip, pruefsummen);
@@ -80,6 +91,41 @@ public class MandantVollexportSchreiber {
             zip.flush();
             return dokumente;
         }
+    }
+
+    private static void schreibeAktuelleKonfiguration(ZipOutputStream zip, BufferedWriter pruefsummen,
+                                                       MandantVollexportKonfiguration.Version aktuell)
+            throws IOException {
+        if (aktuell != null) {
+            schreibeInhalt(zip, pruefsummen, "konfiguration.json", ziel -> schreiben(ziel, aktuell.json()));
+        }
+    }
+
+    private void schreibeKonfigurationsversionen(ZipOutputStream zip, BufferedWriter pruefsummen) throws IOException {
+        schreibeInhalt(zip, pruefsummen, "konfiguration/versionen.json", ziel -> {
+            schreiben(ziel, "[");
+            boolean[] erstes = {true};
+            konfiguration.versionen((nummer, inhalt) -> {
+                if (!erstes[0]) {
+                    schreiben(ziel, ",");
+                }
+                schreiben(ziel, "{\"version\":" + nummer + ",\"inhalt\":");
+                inhalt.schreiben(ziel);
+                schreiben(ziel, "}");
+                erstes[0] = false;
+            });
+            schreiben(ziel, "]");
+        });
+    }
+
+    private static void schreibeInhalt(ZipOutputStream zip, BufferedWriter pruefsummen, String pfad,
+                                       MandantVollexportKonfiguration.Inhalt inhalt) throws IOException {
+        zip.putNextEntry(new ZipEntry(pfad));
+        MessageDigest digest = sha256();
+        OutputStream ausgabe = new DigestOutputStream(zip, digest);
+        inhalt.schreiben(ausgabe);
+        zip.closeEntry();
+        pruefsumme(pruefsummen, digest.digest(), pfad);
     }
 
     private void schreibeMetadatenJson(ZipOutputStream zip, BufferedWriter pruefsummen)

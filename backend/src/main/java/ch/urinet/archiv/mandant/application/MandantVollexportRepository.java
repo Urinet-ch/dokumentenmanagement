@@ -13,9 +13,18 @@ public interface MandantVollexportRepository {
         OFFEN, FERTIG, FEHLER
     }
 
+    enum Fehlerart {
+        KONFIGURATION_ZU_GROSS
+    }
+
     record Vollexport(UUID id, Status status, Optional<String> schluessel, Optional<String> versionId,
                       Optional<String> sha256, Optional<Long> groesse, Optional<Integer> anzahl, Instant erstellt,
-                      Optional<Instant> fertig) {
+                      Optional<Instant> fertig, Optional<Fehlerart> fehlerart) {
+        public Vollexport(UUID id, Status status, Optional<String> schluessel, Optional<String> versionId,
+                          Optional<String> sha256, Optional<Long> groesse, Optional<Integer> anzahl, Instant erstellt,
+                          Optional<Instant> fertig) {
+            this(id, status, schluessel, versionId, sha256, groesse, anzahl, erstellt, fertig, Optional.empty());
+        }
     }
 
     /** Ist-Stand der Dokumente des Mandanten: Anzahl und jüngste Änderung. */
@@ -31,4 +40,6 @@ public interface MandantVollexportRepository {
     boolean fertig(UUID id, AbgelegteDatei zip, int anzahlDokumente);
 
     boolean fehler(UUID id, UUID fehlerId);
+
+    boolean fehler(UUID id, UUID fehlerId, Fehlerart art);
 }

@@ -2,12 +2,15 @@ package ch.urinet.archiv.sicherheit.adapter.in.rest;
 
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantVerweigert;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
 import ch.urinet.archiv.sicherheit.application.NichtDokumentbezogen;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
 import ch.urinet.archiv.sicherheit.application.WebseitenErfassungAktion;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
@@ -17,9 +20,11 @@ import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ResourceInfo;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.jboss.resteasy.reactive.server.ServerRequestFilter;
 
 import java.lang.reflect.Method;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,11 +49,14 @@ public class ZugangFilter {
     private final SecurityIdentity identitaet;
     private final MandantAufloesung aufloesung;
     private final Berechtigung berechtigung;
+    private final TokenWiderruf tokenWiderruf;
 
-    public ZugangFilter(SecurityIdentity identitaet, MandantAufloesung aufloesung, Berechtigung berechtigung) {
+    public ZugangFilter(SecurityIdentity identitaet, MandantAufloesung aufloesung, Berechtigung berechtigung,
+                        TokenWiderruf tokenWiderruf) {
         this.identitaet = identitaet;
         this.aufloesung = aufloesung;
         this.berechtigung = berechtigung;
+        this.tokenWiderruf = tokenWiderruf;
     }
 
     @ServerRequestFilter
@@ -95,6 +103,11 @@ public class ZugangFilter {
         if (rolle.isEmpty() || benutzerId.isEmpty()) {
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
             return;
+        }
+        Instant ausgestellt = identitaet.getPrincipal() instanceof JsonWebToken jwt
+                ? Instant.ofEpochSecond(jwt.getIssuedAtTime()) : Instant.EPOCH;
+        if (tokenWiderruf.widerrufen(benutzerId.get(), ausgestellt)) {
+            throw new FachFehler(Fehlercode.NICHT_ANGEMELDET);
         }
         if (aktion.isPresent()) {
             aktion(new Benutzer(benutzerId.get(), rolle.get()), aktion.get(),

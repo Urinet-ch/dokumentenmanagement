@@ -20,6 +20,40 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  wordpress:
+    name: WordPress-Plugin (PHP 8.2)
+    if: needs.art.outputs.nur-spec != 'true'
+    needs: art
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: wordpress/urinet-archiv-plugin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Testabhängigkeiten
+        run: |
+          npm ci
+          composer install --no-interaction --no-progress
+      - name: Paket und Abhängigkeiten prüfen
+        run: |
+          npm run build
+          npm audit --omit=dev
+          composer audit --no-interaction
+      - name: WordPress starten
+        run: npm run wp-env -- start
+      - name: PHPUnit und Cucumber
+        run: |
+          npm test
+          npm run test:cucumber
+      - name: WordPress stoppen
+        if: always()
+        run: npm run wp-env -- stop
+
   # Reine Spec-Anpassungen ohne vollständigen Lauf (entschieden von Fabian am 13.11.2026): «art» bestimmt mit
   # .github/scripts/nur-spec.py, ob jede geänderte Datei eine .md-Datei unter .kiro/ oder docs/ ist (strenge
   # Positivliste; PR: alle Dateien zwischen Basis und Kopf, Push auf main: gegenüber «before», neuer Branch oder
@@ -310,7 +344,7 @@ jobs:
   testzahl:
     name: Backend-Tests vollständig (jede Klasse genau einmal)
     if: needs.art.outputs.nur-spec != 'true'
-    needs: [art, backend, gruppen]
+    needs: [art, backend, gruppen, wordpress]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -54,6 +54,34 @@ export const TEXTE = {
     imEingangskorb: (anzahl: number) =>
       anzahl === 1 ? '1 Dokument wartet' : `${anzahl} Dokumente warten`,
   },
+  einfuehrung: {
+    fortschritt: (schritt: number, anzahl: number) => `Schritt ${schritt} von ${anzahl}`,
+    zurueck: 'Zurück',
+    weiter: 'Weiter',
+    fertig: 'Fertig',
+    ueberspringen: 'Überspringen',
+    anleitung: 'In der Anleitung lesen',
+    erneut: 'Einführung erneut zeigen',
+    abgeschlossen: 'Einführung abgeschlossen. Sie finden sie jederzeit unter ‹Hilfe›.',
+    uebersprungen: 'Einführung übersprungen. Sie finden sie jederzeit unter ‹Hilfe›.',
+    willkommen: (name: string) => `Willkommen im ${name}`,
+    rolle: (rolle: string) =>
+      `Hier legen Sie Dokumente einmal ab und finden sie danach in Sekunden wieder, immer mit Quelle. Sie sind als «${rolle}» angemeldet; die App zeigt Ihnen nur die Bereiche, die Ihre Rolle nutzen darf.`,
+    erfassen: 'Unter «Erfassen» fotografieren Sie Papier mit dem Handy oder laden Dateien hoch. Ohne Netz wartet die Aufnahme auf dem Gerät und wird nach der Anmeldung hochgeladen, sobald wieder eine Verbindung besteht.',
+    pruefen: 'Neue Dokumente kommen in den «Eingangskorb». Das Archiv schlägt Art und Angaben vor; Sie prüfen den Vorschlag, korrigieren ihn wo nötig und bestätigen.',
+    eigene: 'Im «Eingangskorb» sehen Sie die Dokumente, die Sie erfasst haben, mit dem Vorschlag des Archivs. Bestätigt werden sie von einer Person mit diesem Recht.',
+    finden: 'Mit der «Suche» finden Sie Dokumente über Wörter, Belegnummern oder Partner und öffnen ihre Dokumentansicht. Im «Chat» fragen Sie in eigenen Worten; jede Antwort nennt ihre Quelle.',
+    wissen: 'Unter «Wissen» finden Sie geprüftes Wissen aus Ihren Unterlagen.',
+    hilfe: 'Über «Hilfe» oben rechts öffnen Sie jederzeit die Anleitung zur Seite, auf der Sie gerade sind. Dort können Sie auch diese Einführung erneut ansehen.',
+    titel: {
+      erfassen: 'Dokumente erfassen',
+      pruefen: 'Prüfen und bestätigen',
+      eigene: 'Ihre erfassten Dokumente',
+      finden: 'Finden',
+      bestand: 'Bestand und Abschluss',
+      hilfe: 'Hilfe finden',
+    },
+  },
   menue: {
     uebersicht: 'Übersicht',
     erfassen: 'Erfassen',
@@ -307,6 +335,9 @@ export const TEXTE = {
     ganzesBild: 'Ganzes Bild verwendet.',
     aufbereitenFehler:
       'Die Seite konnte nicht zugeschnitten werden. Bitte verwerfen und neu aufnehmen.',
+    aufnahmeZuVieleSeiten: 'Ein Dokument darf höchstens 20 Seiten haben. Bitte schliessen Sie die Erfassung ab oder verwerfen Sie eine Seite.',
+    aufnahmeZuGross: 'Die Erfassung ist grösser als 10 MiB. Bitte teilen Sie das Dokument auf oder wählen Sie kleinere Bilder.',
+    aufnahmeZuVielePixel: 'Das Bild hat mehr als 12 Megapixel. Bitte wählen Sie ein kleineres Kamerabild.',
     anpassenFehler: 'Der Zuschnitt konnte nicht angepasst werden. Der bisherige Zuschnitt bleibt.',
     anpassen: (nr: number) => `Zuschnitt Seite ${nr} anpassen`,
     verwerfen: (nr: number) => `Seite ${nr} verwerfen`,
@@ -365,6 +396,8 @@ export const TEXTE = {
       'Jedes Dokument wird einmal erfasst, in PDF/A umgewandelt, per Texterkennung gelesen und landet mit KI-Vorschlag im Eingangskorb.',
     warteschlange: 'Warteschlange',
     warteschlangeHinweis: 'wird auch offline gehalten',
+    aufnahmeBildNichtPruefbar:
+      'Die Bildabmessungen konnten nicht geprüft werden. Bitte wählen Sie ein JPEG, PNG, WebP oder HEIC.',
   },
   eingangskorb: {
     titel: 'Eingangskorb',
@@ -1639,6 +1672,7 @@ export const TEXTE = {
   },
   // Benutzeranleitung und Hilfe (Spec 07, Aufgabe 22.1); Titel der Abschnitte je Anker des Hilfe-Katalogs
   hilfe: {
+    soFunktioniertEs: 'So funktioniert es',
     abschnitte: {
       'erste-schritte': 'Erste Schritte',
       // Aufgabe 22.5
