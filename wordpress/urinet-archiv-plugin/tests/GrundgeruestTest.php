@@ -610,6 +610,7 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 		$header    = $header_methode->invokeArgs( null, $argumente );
 		$header( null, "Content-Type: application/pdf\r\n" );
 		$header( null, "Content-Length: 1048580\r\n" );
+		$stream['laenge'] = '1048580';
 
 		$write_methode = new ReflectionMethod( Urinet_Archiv_Client::class, 'download_write_callback' );
 		$write_methode->setAccessible( true );
