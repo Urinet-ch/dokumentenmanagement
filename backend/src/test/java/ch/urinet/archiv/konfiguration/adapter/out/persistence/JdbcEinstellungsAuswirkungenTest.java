@@ -1,6 +1,7 @@
 package ch.urinet.archiv.konfiguration.adapter.out.persistence;
 
 import ch.urinet.archiv.konfiguration.application.EinstellungsAuswirkungen;
+import ch.urinet.archiv.konfiguration.application.EinstellungsStartwerte;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -28,6 +29,7 @@ class JdbcEinstellungsAuswirkungenTest {
     private static final Instant ALT = Instant.parse("2000-01-01T00:00:00Z");
 
     @Inject EinstellungsAuswirkungen auswirkungen;
+    @Inject EinstellungsStartwerte startwerte;
     @Inject MandantKontext kontext;
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenbank;
@@ -46,6 +48,10 @@ class JdbcEinstellungsAuswirkungenTest {
             long urinetFragen = in(thread, "urinet", () -> auswirkungen.oeffentlicheFragenVor(GRENZE));
             long vhfChat = in(thread, "vhf-gsk", () -> auswirkungen.chatNachrichtenVor(GRENZE));
             long vhfFragen = in(thread, "vhf-gsk", () -> auswirkungen.oeffentlicheFragenVor(GRENZE));
+            assertThat(in(thread, "urinet", () -> startwerte.lesen().webseitenChatAufbewahrung())).isEqualTo(90);
+            assertThat(in(thread, "vhf-gsk", () -> startwerte.lesen().webseitenChatAufbewahrung())).isEqualTo(30);
+            assertThat(in(thread, "urinet", () -> startwerte.lesen().chatAufbewahrung()))
+                    .isEqualTo(java.time.Period.ofMonths(12));
             try (Connection verbindung = datenbank.getConnection()) {
                 try (PreparedStatement insert = verbindung.prepareStatement(
                         "insert into m_urinet.chat_gespraech (id, benutzer, titel, erstellt, geaendert) "
