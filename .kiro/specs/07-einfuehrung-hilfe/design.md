@@ -577,7 +577,9 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   vier Felder und die gehashte Kennung geprüft.
 - Die Hilfe-Kopfzeile ist kein zweites `banner` mehr. Bei geöffnetem Dialog sind Navigation, Seiteninhalt und
   Sprunglink mit `inert` für Tastatur und Screenreader gesperrt; nach dem Schliessen sind sie wieder erreichbar. So
-  stehen die beiden Inhaltsverzeichnisse nicht gleichzeitig als aktive Landmarks zur Verfügung. Die Seitenleiste ist
+  stehen die beiden Inhaltsverzeichnisse nicht gleichzeitig als aktive Landmarks zur Verfügung. Bei Escape ist die
+  Fokusrückgabe beim wiederholten schnellen Schliessen noch nicht zuverlässig; das neue Szenario ist zweimal
+  fehlgeschlagen und Aufgabe 23.5 bleibt offen. Die Seitenleiste ist
   ein `aside`, damit die Marke auch auf breiten Bildschirmen innerhalb einer Landmark liegt.
 - Überschriften ohne IDs verwenden `[attr.id]`: Die vorherige Property-Bindung schrieb bei `null` die Zeichenfolge
   `null` als ID. `anleitung-text.spec.ts` prüft, dass die Attribute in der Leiste tatsächlich fehlen.

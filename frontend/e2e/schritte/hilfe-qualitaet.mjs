@@ -109,6 +109,20 @@ When('ich die Hilfe ohne Anmeldung auf Barrierefreiheit und Datenschutz prüfe',
   await hilfePruefen(this.seite);
 });
 
+When('ich die Hilfe wiederholt sofort mit Escape schliesse', async function () {
+  const knopf = this.seite.getByRole('button', { name: 'Hilfe', exact: true });
+  for (let i = 0; i < 10; i++) {
+    await knopf.click();
+    await this.seite.getByRole('dialog', { name: 'Hilfe', exact: true }).waitFor();
+    await this.seite.waitForFunction(() => document.activeElement?.id === 'hilfe-leiste-titel');
+    await this.seite.keyboard.press('Escape');
+    await this.seite.waitForFunction(() =>
+      !document.querySelector('mat-sidenav-content').inert &&
+      document.activeElement?.matches('button[aria-label="Hilfe"]'),
+    );
+  }
+});
+
 Then('meldet axe keinen Befund und die Hilfe sendet keine zusätzlichen API- oder fremden Anfragen', function () {
   assert.deepEqual(this.hilfeAnfragen, []);
   assert.deepEqual(this.fremdeAnfragenBeimLaden, []);

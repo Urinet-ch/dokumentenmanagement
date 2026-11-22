@@ -179,6 +179,7 @@
     autoFocus="first-heading"
     [style.width]="mobil() ? '100%' : 'min(420px, 100vw)'"
     [opened]="hilfe.offen()"
+    (closedStart)="hilfe.geaendert(false)"
     (openedChange)="hilfe.geaendert($event)"
     (closed)="hilfe.geschlossen()"
   >
