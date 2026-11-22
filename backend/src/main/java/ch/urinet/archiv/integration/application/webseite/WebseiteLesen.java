@@ -6,6 +6,7 @@ import ch.urinet.archiv.integration.domain.webseite.AlteUrl;
 import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteDokument;
+import ch.urinet.archiv.integration.domain.webseite.WebseiteKlassifikation;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteReihe;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
@@ -13,6 +14,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -50,6 +52,14 @@ public class WebseiteLesen {
 
     public List<WebseiteReihe> reihen(Lesezugriff zugriff) {
         return port.reihen(zugriff);
+    }
+
+    public List<WebseiteKlassifikation> klassifikationen(Lesezugriff zugriff) {
+        return port.klassifikationen(zugriff);
+    }
+
+    public Set<String> oeffentlicheKlassifikationsCodes() {
+        return port.oeffentlicheKlassifikationsCodes();
     }
 
     /** Dokument-ID zur alten URL; ungültige URL 400, unbekannt oder nicht sichtbar 404. */
