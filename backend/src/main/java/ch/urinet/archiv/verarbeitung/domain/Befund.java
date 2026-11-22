@@ -16,7 +16,7 @@ public record Befund(Quelle quelle, String gegenstand, String status, Instant er
     private static final Pattern STATUS = Pattern.compile("[A-Z_]{1,40}");
 
     public enum Quelle {
-        DOKUMENT, MANIFEST, SICHERUNG, VERWALTUNG, ABGLEICH;
+        DOKUMENT, MANIFEST, SICHERUNG, VERWALTUNG, ABGLEICH, VERWALTUNGSALARM;
 
         /** Präfix der Schlüssel dieser Quelle in der Tabelle {@code alarm}. */
         public String praefix() {

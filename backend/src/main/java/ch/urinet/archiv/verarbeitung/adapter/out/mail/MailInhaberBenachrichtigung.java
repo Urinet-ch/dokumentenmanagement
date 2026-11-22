@@ -224,6 +224,7 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
             case SICHERUNG -> "UriNet Archiv: Sicherung " + befund.gegenstand() + " " + befund.status();
             case VERWALTUNG -> "UriNet Archiv: Verwaltungsvorgang " + befund.gegenstand() + " ungeklärt";
             case ABGLEICH -> "UriNet Archiv: Abweichung in der Benutzerverwaltung";
+            case VERWALTUNGSALARM -> "UriNet Archiv: Alarm der Benutzerverwaltung";
         };
     }
 
@@ -243,6 +244,14 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
             case ABGLEICH -> "Aktion: BENUTZER_ABWEICHUNG\nAnzahl: 1\nZeit: "
                     + java.util.Objects.requireNonNull(befund.erstmals(), "Zeit des Abgleichbefunds fehlt")
                     + "\nKennung: " + befund.gegenstand() + "\nAbweichung: " + befund.status()
+                    + "\n\nDen Betreiber zur Klärung benachrichtigen.";
+            case VERWALTUNGSALARM -> "Aktion: " + befund.status() + "\nAnzahl: " + switch (befund.status()) {
+                case "VERWALTUNG_AKTIONEN" -> 10;
+                case "VERWALTUNG_VERWEIGERUNGEN" -> 5;
+                default -> 1;
+            } + "\nZeit: "
+                    + java.util.Objects.requireNonNull(befund.erstmals(), "Zeit des Verwaltungsalarms fehlt")
+                    + "\nVorgang: " + befund.gegenstand()
                     + "\n\nDen Betreiber zur Klärung benachrichtigen.";
         };
         return "Mandant: " + mandant.wert() + "\n" + was + "\n\nZu diesem Befund kommt keine weitere Mail, bis er "

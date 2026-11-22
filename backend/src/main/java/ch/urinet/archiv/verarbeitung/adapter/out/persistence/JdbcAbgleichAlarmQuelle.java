@@ -25,16 +25,23 @@ public class JdbcAbgleichAlarmQuelle implements AbgleichAlarmQuelle {
 
     @Override
     public List<Befund> offene(MandantCode mandant) {
-        String sql = "select split_part(schluessel, ':', 2), split_part(schluessel, ':', 3), erstmals from "
-                + mandant.schema() + ".alarm where starts_with(schluessel, ?) and erledigt is null";
+        String sql = "select split_part(schluessel, ':', 1), split_part(schluessel, ':', 2), "
+                + "split_part(schluessel, ':', 3), erstmals from " + mandant.schema()
+                + ".alarm where (starts_with(schluessel, ?) or starts_with(schluessel, ?)) and erledigt is null";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setString(1, Befund.Quelle.ABGLEICH.praefix());
+            abfrage.setString(2, Befund.Quelle.VERWALTUNGSALARM.praefix());
             try (ResultSet zeilen = abfrage.executeQuery()) {
                 List<Befund> befunde = new ArrayList<>();
                 while (zeilen.next()) {
-                    befunde.add(new Befund(Befund.Quelle.ABGLEICH, zeilen.getString(1), zeilen.getString(2),
-                            zeilen.getObject(3, OffsetDateTime.class).toInstant()));
+                    Befund.Quelle quelle = switch (zeilen.getString(1)) {
+                        case "abgleich" -> Befund.Quelle.ABGLEICH;
+                        case "verwaltungsalarm" -> Befund.Quelle.VERWALTUNGSALARM;
+                        default -> throw new IllegalStateException("Unbekannte Quelle des Verwaltungsalarms");
+                    };
+                    befunde.add(new Befund(quelle, zeilen.getString(2), zeilen.getString(3),
+                            zeilen.getObject(4, OffsetDateTime.class).toInstant()));
                 }
                 return List.copyOf(befunde);
             }

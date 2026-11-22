@@ -115,6 +115,24 @@ class UeberwachungTest {
     }
 
     @Test
+    void inhabervergabeWirdNachVersandfehlerErneutUndDanachNurEinmalGemeldet() {
+        var befund = new Befund(Befund.Quelle.VERWALTUNGSALARM, UUID.randomUUID().toString(), "INHABER_VERGEBEN",
+                Instant.parse("2026-11-22T22:00:00Z"));
+        speicher.abgleichen(URINET, Befund.Quelle.VERWALTUNGSALARM, List.of(befund));
+        AbgleichAlarmQuelle quelle = mandant -> List.of(befund);
+        Ueberwachung ueberwachung = ueberwachung(List.of(URINET), Optional.empty(), m -> List.of(), quelle);
+
+        post.zustellen = false;
+        ueberwachung.pruefen();
+        post.zustellen = true;
+        ueberwachung.pruefen();
+        ueberwachung.pruefen();
+
+        assertThat(post.versuche).filteredOn(befund::equals).containsExactly(befund, befund);
+        assertThat(post.zugestellt).containsEntry(befund, URINET);
+    }
+
+    @Test
     void einFehlerBeiEinemMandantenHaeltDieAnderenNichtAuf() {
         Ueberwachung ueberwachung = new Ueberwachung(register(List.of(VHF, URINET)), new DokumentUeberwachung() {
             @Override

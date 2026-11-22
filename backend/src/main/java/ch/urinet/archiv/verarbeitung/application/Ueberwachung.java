@@ -142,7 +142,7 @@ public class Ueberwachung {
         try {
             return melden(mandant, abgleich.offene(mandant));
         } catch (RuntimeException e) {
-            LOG.warnf("Überwachung von ABGLEICH für Mandant %s fehlgeschlagen, ursache=%s", mandant.wert(),
+            LOG.warnf("Überwachung von Verwaltungsalarmen für Mandant %s fehlgeschlagen, ursache=%s", mandant.wert(),
                     Ursachen.kette(e));
             return 0;
         }
