@@ -39,7 +39,7 @@ Funktionalität: WordPress-Grundgerüst
     Wenn ein Dokument im Lese-Feed zurückgezogen wird oder der Feed ausfällt
     Dann gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab
 
-  @req-5.8 @req-6.2 @req-7.2 @req-7.6
+  @req-5.8 @req-6.2 @req-7.6
   Szenario: Die Liste filtert nach öffentlichen Werten und zeigt Chatquellen
     Angenommen ein WordPress mit dem Archiv-Plugin
     Wenn Besucher die Archivliste und den Chat öffnen
