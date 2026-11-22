@@ -688,6 +688,8 @@ drei Sekunden gültig und auf höchstens fünf Sekunden begrenzt.
 Nach erfolgreicher Sperre, Deaktivierung, Zugangsrücksetzung und Aufhebung einer Google-Verknüpfung wird der Widerruf
 gesetzt. Das synthetische Szenario prüft ein altes Token am REST-Filter; weitere Tests decken Cache-Ablauf,
 monotones Upsert, Aufräumen und die Wirkung vor der Aktionsberechtigung ab.
+Das Changeset legt die absichtlich beim Rollback erhaltene Tabelle mit `IF NOT EXISTS` an; ein Integrationstest prüft
+Update → Rollback → Update sowie den Erhalt der Widerrufe und Constraints.
 
 Die Anbindung nach Rollenwechsel und Löschen folgt mit 19.11 beziehungsweise 19.12, wenn diese Endpunkte umgesetzt
 werden. Die Checkbox für 19.9 bleibt bis zu diesen Anbindungen offen.

@@ -4,7 +4,7 @@
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
     <changeSet id="044-token-widerruf" author="copilot">
         <sql>
-            create table public.token_widerruf (
+            create table if not exists public.token_widerruf (
                 benutzer text primary key check (length(benutzer) between 1 and 255),
                 ab timestamptz not null
             );
