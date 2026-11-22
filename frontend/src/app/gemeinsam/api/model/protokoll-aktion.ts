@@ -37,6 +37,7 @@ export const ProtokollAktion = {
     RolleZuweisen: 'ROLLE_ZUWEISEN',
     BenutzerAntrag: 'BENUTZER_ANTRAG',
     BenutzerAbweichung: 'BENUTZER_ABWEICHUNG',
+    ChatBewertungExport: 'CHAT_BEWERTUNG_EXPORT',
 } as const;
 export type ProtokollAktion = typeof ProtokollAktion[keyof typeof ProtokollAktion];
 
