@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,12 @@ import org.junit.jupiter.api.Test;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.Socket;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,6 +100,48 @@ class MandantEinstellungenResourceTest {
         }
         assertThat(given().auth().oauth2(urinet).get("/api/v1/konfiguration")
                 .jsonPath().getString("einstellungen.branding.name")).isEqualTo(bisher);
+    }
+
+    @Test
+    void chunkedAnfragenWerdenBeimEmpfangBegrenzt() throws Exception {
+        if (!imRegister("urinet")) {
+            provisionierung.anlegen("urinet", null, null);
+        }
+        String token = Testanmeldung.token("inhaber-urinet");
+        for (String[] anfrage : new String[][] {
+                {"PATCH", PFAD}, {"PATCH", "/api/v1/mandant/%65instellungen/"},
+                {"POST", PFAD + "/vorschau"}, {"POST", PFAD + "/zuruecksetzen"}
+        }) {
+            try (Socket socket = new Socket("127.0.0.1", RestAssured.port)) {
+                socket.setSoTimeout(10_000);
+                String kopf = anfrage[0] + " " + anfrage[1] + " HTTP/1.1\r\nHost: localhost\r\n"
+                        + "Authorization: Bearer " + token + "\r\n"
+                        + "Content-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+                var aus = socket.getOutputStream();
+                aus.write(kopf.getBytes(StandardCharsets.US_ASCII));
+                aus.write("4001\r\n".getBytes(StandardCharsets.US_ASCII));
+                aus.write(" ".repeat(16 * 1024 + 1).getBytes(StandardCharsets.US_ASCII));
+                aus.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+                aus.flush();
+                BufferedReader leser = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+                assertThat(leser.readLine()).as(anfrage[1]).contains(" 413 ");
+            }
+        }
+        String etag = given().auth().oauth2(token).get("/api/v1/konfiguration").getHeader("ETag");
+        HttpURLConnection verbindung = (HttpURLConnection) URI.create("http://127.0.0.1:" + RestAssured.port
+                + PFAD + "/vorschau").toURL().openConnection();
+        verbindung.setRequestMethod("POST");
+        verbindung.setDoOutput(true);
+        verbindung.setChunkedStreamingMode(1024);
+        verbindung.setRequestProperty("Authorization", "Bearer " + token);
+        verbindung.setRequestProperty("Content-Type", "application/json");
+        verbindung.setRequestProperty("If-Match", etag);
+        try (var aus = verbindung.getOutputStream()) {
+            aus.write(("{}" + " ".repeat(16 * 1024 - 2)).getBytes(StandardCharsets.US_ASCII));
+        }
+        assertThat(verbindung.getResponseCode()).isEqualTo(200);
+        verbindung.disconnect();
     }
 
     private static Response patch(String token, String etag, String body) {
