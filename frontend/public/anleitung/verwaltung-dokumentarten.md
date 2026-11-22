@@ -55,6 +55,8 @@ Mit einer Konfigurationsdatei sichern Sie die ganze Konfiguration oder übernehm
 
 Das Archiv übernimmt alle Änderungen der Datei oder keine. Beruht die Datei auf einer älteren Version als der aktuellen, wird sie nicht eingespielt; prüfen und vergleichen Sie sie dann erneut.
 
+Beim Vollexport des ganzen Mandanten darf die aktuelle Konfigurationsdatei höchstens 1 MiB gross sein. Ist sie grösser, verkleinern Sie beispielsweise grosse Regelparameter und bitten den Betreiber, den Vollexport erneut zu starten. Ältere Konfigurationsversionen bleiben vollständig im Vollexport enthalten.
+
 ## Häufige Meldungen
 - «Die Konfiguration wurde inzwischen geändert.»: Ihre Eingabe bleibt erhalten. Wählen Sie «Neu laden», prüfen Sie den aktuellen Stand und wiederholen Sie die Änderung.
 - «Dieser Eintrag wird noch von Dokumenten verwendet …»: Deaktivieren Sie ihn, statt ihn zu löschen.

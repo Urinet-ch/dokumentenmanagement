@@ -5,6 +5,8 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.verarbeitung.application.Auftrag;
+import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Und;
 import io.cucumber.java.de.Wenn;
@@ -83,6 +85,39 @@ public class MandantVollexportAbbauSchritte {
     private MandantAbbauTest.Testaufbau aufbau;
     private MandantAbbau.Bericht bericht;
     private Throwable fehler;
+    private MandantVollexportHandlerTest.Testaufbau exportAufbau;
+
+    @Wenn("die Grössenprüfung der aktuellen Konfiguration den Vollexport ablehnt")
+    public void zuGrosseKonfiguration() throws Exception {
+        exportAufbau = new MandantVollexportHandlerTest.Testaufbau(MandantVollexportHandlerTest.Repository.offen());
+        exportAufbau.konfiguration = new MandantVollexportKonfiguration() {
+            @Override
+            public Version aktuell() {
+                throw new ZuGross();
+            }
+
+            @Override
+            public void versionen(Versionsausgabe ausgabe) {
+                throw new AssertionError("Historie darf nicht gelesen werden");
+            }
+        };
+        Path temp = Files.createTempDirectory("vollexport-grenze-");
+        try {
+            exportAufbau.handler(temp).ausfuehren(new Auftrag(5, new MandantCode("vhf-gsk"), MandantVollexport.TYP,
+                    new Nutzlast(Map.of(MandantVollexport.EXPORT_ID, EXPORT)), 0));
+        } finally {
+            Files.delete(temp);
+        }
+    }
+
+    @Dann("wird kein Teil-ZIP abgeschlossen und der Grenzfehler festgehalten")
+    public void keinTeilZipBeiGrenzfehler() {
+        assertThat(exportAufbau.zipBytes.size()).isZero();
+        assertThat(exportAufbau.zielGeschlossen).isTrue();
+        assertThat(exportAufbau.zielAbgeschlossen).isFalse();
+        assertThat(exportAufbau.fehlerarten)
+                .containsExactly(MandantVollexportRepository.Fehlerart.KONFIGURATION_ZU_GROSS);
+    }
 
     @Wenn("ein Vollexport mit einem Dokument und einem Manifest geschrieben wird")
     public void vollexportSchreiben() throws Exception {

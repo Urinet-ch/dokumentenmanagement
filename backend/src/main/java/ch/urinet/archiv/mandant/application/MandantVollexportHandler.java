@@ -76,6 +76,14 @@ public class MandantVollexportHandler implements AuftragHandler {
         try (Exportziel ziel = ablage.exportSchreiben(mandant, id)) {
             anzahl = schreiber.schreiben(mandant, id, arbeitsverzeichnis, ziel.strom());
             zip = ziel.abschliessen();
+        } catch (MandantVollexportKonfiguration.ZuGross e) {
+            UUID fehlerId = UUID.randomUUID();
+            if (speichern.fehler(auftrag, id, fehlerId,
+                    MandantVollexportRepository.Fehlerart.KONFIGURATION_ZU_GROSS)) {
+                LOG.warnf("Mandanten-Vollexport %s abgelehnt: fehler-id=%s fehlercode=KONFIGURATION_ZU_GROSS",
+                        id, fehlerId);
+            }
+            return;
         }
         if (speichern.fertig(auftrag, id, zip, anzahl)) {
             LOG.infof("Mandanten-Vollexport %s fertig: dokumente=%d groesse=%d", id, anzahl, zip.groesse());

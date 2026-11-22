@@ -18,10 +18,10 @@ describe('Start', () => {
       providers: [
         provideRouter([]),
         { provide: ONLINE, useValue: online },
-        { provide: EinfuehrungVermerk, useValue: { bekannt: signal(null) } },
+        { provide: EinfuehrungVermerk, useValue: { bekannt: signal(null), erneut: signal(false), schritt: signal(0) } },
         {
           provide: AnmeldungService,
-          useValue: { angemeldet: () => false, zustand: () => 'abgemeldet', darf: () => false },
+          useValue: { angemeldet: () => false, benutzer: () => null, zustand: () => 'abgemeldet', darf: () => false },
         },
       ],
     });
@@ -48,7 +48,7 @@ describe('Start', () => {
         providers: [
           provideRouter([]),
           { provide: ONLINE, useValue: signal(true) },
-          { provide: EinfuehrungVermerk, useValue: { bekannt } },
+          { provide: EinfuehrungVermerk, useValue: { bekannt, erneut: signal(false), schritt: signal(0) } },
           { provide: BrandingService, useValue: { branding: signal({ ...STANDARD_BRANDING, name: 'Testarchiv', logoUrl: '/logo.png' }) } },
           { provide: AnmeldungService, useValue: {
             angemeldet: () => true,

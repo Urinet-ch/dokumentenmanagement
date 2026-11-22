@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle } from '../gemeinsam/anmeldung/rechte';
@@ -17,6 +18,7 @@ import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { AnleitungLader } from './anleitung-lader';
 import { AnleitungText } from './anleitung-text';
+import { EinfuehrungVermerk } from './einfuehrung-vermerk';
 import { HILFE_EINTRAEGE, sichtbareAbschnitte, sichtbareAnker } from './hilfe-sichtbar';
 
 /**
@@ -26,18 +28,20 @@ import { HILFE_EINTRAEGE, sichtbareAbschnitte, sichtbareAnker } from './hilfe-si
  */
 @Component({
   selector: 'app-hilfe-seite',
-  imports: [RouterLink, Symbol, AnleitungText],
+  imports: [RouterLink, Symbol, AnleitungText, MatButtonModule],
   templateUrl: './hilfe-seite.html',
   styleUrl: './hilfe-seite.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HilfeSeite {
   protected readonly branding = inject(BrandingService);
+  protected readonly vermerk = inject(EinfuehrungVermerk);
   private readonly anmeldung = inject(AnmeldungService);
   private readonly lader = inject(AnleitungLader);
   private readonly katalog = inject(HILFE_EINTRAEGE);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly texte = TEXTE.hilfe;
+  protected readonly texteEinfuehrung = TEXTE.einfuehrung;
   protected readonly rollen = TEXTE.kopf.rollen;
 
   /** Nur mit Mandant und Rolle; sonst zeigt die Anleitung die Abschnitte für Abgemeldete (Req 6.3). */

@@ -1,8 +1,12 @@
 <div class="seitenkopf">
-  <p class="vorzeile">{{ branding.branding().name }}</p>
-  <h1>{{ texte.titel }}</h1>
-  <p>{{ texte.untertitel }}</p>
-  <!-- Platz für den Knopf «Einführung erneut zeigen» (Req 5.5, Aufgabe 23.3): Aktionen rechts im Seitenkopf -->
+  <div>
+    <p class="vorzeile">{{ branding.branding().name }}</p>
+    <h1>{{ texte.titel }}</h1>
+    <p>{{ texte.untertitel }}</p>
+  </div>
+  @if (rolle()) {
+    <a mat-stroked-button routerLink="/" [queryParams]="{ einfuehrung: '' }" (click)="vermerk.neuBeginnen()">{{ texteEinfuehrung.erneut }}</a>
+  }
 </div>
 
 @if (rolle(); as rolle) {
