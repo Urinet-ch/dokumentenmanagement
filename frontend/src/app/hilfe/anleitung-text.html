@@ -42,11 +42,11 @@
       }
       @default {
         @switch (ebene(teil)) {
-          @case (2) { <h2 [id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h2> }
-          @case (3) { <h3 [id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h3> }
-          @case (4) { <h4 [id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h4> }
-          @case (5) { <h5 [id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h5> }
-          @case (6) { <h6 [id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h6> }
+          @case (2) { <h2 [attr.id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h2> }
+          @case (3) { <h3 [attr.id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h3> }
+          @case (4) { <h4 [attr.id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h4> }
+          @case (5) { <h5 [attr.id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h5> }
+          @case (6) { <h6 [attr.id]="ids() ? teil.anker : null"><ng-container [ngTemplateOutlet]="baum" [ngTemplateOutletContext]="{ $implicit: teil.kinder }" /></h6> }
         }
       }
     }
