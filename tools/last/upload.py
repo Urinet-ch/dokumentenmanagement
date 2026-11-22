@@ -49,12 +49,30 @@ def token_lesen() -> str:
 
 
 def pdf(groesse: int) -> bytes:
-    """Gültiges, eindeutiges Mini-PDF, mit Kommentarzeilen auf etwa `groesse` Bytes aufgefüllt."""
+    """Einseitiges PDF mit eindeutiger Kennung und synthetischer Füllung."""
     kopf = f"%PDF-1.4\n% Lasttest {secrets.token_hex(16)}\n".encode("ascii")
-    inhalt = b"1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n"
-    fuellung = max(0, groesse - len(kopf) - len(inhalt))
-    zeilen = (b"%" + b" " * 78 + b"\n") * (fuellung // 80)
-    return kopf + zeilen + inhalt
+    objekte = (
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>",
+    )
+
+    def bauen(fuellzeilen: int) -> bytes:
+        daten = bytearray(kopf)
+        daten.extend((b"%" + b" " * 78 + b"\n") * fuellzeilen)
+        offsets = []
+        for nr, objekt in enumerate(objekte, 1):
+            offsets.append(len(daten))
+            daten.extend(f"{nr} 0 obj\n".encode("ascii") + objekt + b"\nendobj\n")
+        xref = len(daten)
+        daten.extend(b"xref\n0 4\n0000000000 65535 f \n")
+        for offset in offsets:
+            daten.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+        daten.extend(f"trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode("ascii"))
+        return bytes(daten)
+
+    basis = bauen(0)
+    return bauen(max(0, (groesse - len(basis) - 8) // 80))
 
 
 def multipart(name: str, daten: bytes) -> tuple[str, bytes]:

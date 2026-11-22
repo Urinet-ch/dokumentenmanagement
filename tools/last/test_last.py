@@ -83,6 +83,19 @@ class FototypTest(unittest.TestCase):
 
 
 class Grenztest(unittest.TestCase):
+    def test_upload_pdf_hat_seite_und_stimmende_objektoffsets(self):
+        dokument = upload.pdf(200_000)
+        self.assertGreaterEqual(len(dokument), 199_900)
+        self.assertLessEqual(len(dokument), 200_000)
+        self.assertNotEqual(dokument, upload.pdf(200_000))
+        xref = int(dokument.rsplit(b"startxref\n", 1)[1].splitlines()[0])
+        self.assertEqual(dokument[xref:xref + 5], b"xref\n")
+        zeilen = dokument[xref:].splitlines()
+        for nr, zeile in enumerate(zeilen[3:6], 1):
+            offset = int(zeile[:10])
+            self.assertTrue(dokument[offset:].startswith(f"{nr} 0 obj\n".encode()))
+        self.assertIn(b"/Type /Page /Parent 2 0 R", dokument)
+
     def test_upload_vergleicht_ungerundete_zeit(self):
         argv = ["upload.py", "--url", "http://localhost", "--anzahl", "1", "--parallel", "1",
                 "--groesse", "200", "--grenze", "2", "--json"]
