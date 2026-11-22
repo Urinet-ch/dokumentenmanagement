@@ -127,7 +127,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - [Fabian] Leitplanken-Vorlage übernehmen; `main` per pre-push-Hook gesperrt (Branch-Schutz im Free-Plan nicht verfügbar, Entscheid Fabian 09.11.2026)
   - _Anforderungen: 16.9, 16.14_
 
-- [ ] 1.9 Deploy-Workflow und Compose für die VPS [Infra]
+- [x] 1.9 Deploy-Workflow und Compose für die VPS [Infra]
   - `deploy/infomaniak/compose.yml`: API (mit PWA), Worker, PostgreSQL, Keycloak; Traefik-Labels für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Compose-Policy (Limits, `cap_drop: ALL`, `no-new-privileges`, uid ungleich 0); Secrets nur als Dateien unter `/run/secrets/`, nie `environment` oder `env_file`
   - Images von PostgreSQL und Keycloak als `<app>:…` umtaggen, Eintrag im Infra-Repo der VPS
   - `archiv_db_owner` nur dem Dienst `archiv-api` mounten; das Admin-Kommando läuft per `exec` im API-Container (geändert 12.11.2026: in einem Wegwerf-Container des Dienstes `api` mit dessen Secrets, nie per `exec`, weil eine zweite JVM das `mem_limit` sprengt; README «Admin-Kommandos auf der VPS»)
@@ -135,6 +135,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - erster Deploy des Gerüsts auf Stufe A (VPS aus 0.7) in der Form aus tech.md (API und Worker in einem Container, Limits im Speicherbudget), nur mit Testdaten (15.3, 16.15)
   - nach jedem Deploy auf Stufe A Speicherabbrüche der VPS und Health der anderen Apps prüfen; tritt 16.18 ein, gilt das Abbruchkriterium aus 1.10
   - Stand 10.11.2026 (PR #42, Copilot): `compose.yml`, abgeleitete Images, `infomaniak-deploy.yml` (nur `workflow_dispatch` und Tags `v*`), Szenarien `@req-16.7` (Allowlist) und `@req-16.11`; lokal gemessen braucht das Gerüst 820 MiB (api 320, db 100, kc 400); Fabian hat das Budget am 10.11.2026 von 700 auf 900 MiB angehoben (16.18, design.md «Stufen der Plattform»). Nachbesserung 10.11.2026: Prüfung «Commit liegt auf main», Neustart-Erkennung über die Laufzeit der Container, Rollback-Exit-Code, strengere Secret-Prüfung, Keycloak in der Readiness der API (nach Review-Befund M1 wieder entfernt: Readiness nur Datenbank), `postgres` nur über den Socket. Entscheide 11.11.2026 (Fabian, PR #42): Keycloak wieder in der Readiness, dazu Selbstheilung (OIDC-Wächter: nach 5 Minuten nicht bereit Exit-Code 75 und Neustart, P42-1); kein Environment mit Required Reviewer (P42-2); umask-Prüfung auf alle Schritte, die Dateien schreiben. Haken erst nach dem ersten Deploy durch Fabian
+  - Erster Deploy bestätigt (Fabian, 22.11.2026): Der Deploy vom 21.11. (c78a53d) scheiterte an der fehlenden Pflicht-Secret-Datei und rollte automatisch zurück (Hotfix #430, Speicherbudget #433); der Deploy vom 22.11.2026 auf grüner CI von `main` lief erfolgreich. Damit ist der Haken gesetzt.
   - _Anforderungen: 16.1, 16.9, 16.10, 16.11, 16.18_
   - _Abhängig von: 0.7, 1.1_
 
