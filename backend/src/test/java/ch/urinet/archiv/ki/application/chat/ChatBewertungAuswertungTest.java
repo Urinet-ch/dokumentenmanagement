@@ -2,6 +2,7 @@ package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.ki.adapter.out.export.ChatBewertungZipExport;
 import ch.urinet.archiv.ki.domain.chat.Schwaerzung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
@@ -51,7 +52,8 @@ class ChatBewertungAuswertungTest {
                 "[{\"id\":\"" + DOKUMENT + "\",\"titel\":\"Synthetische Quelle\",\"link\":\"/dokument/"
                         + DOKUMENT + "\"}]", 12, 9, 350L, "test-modell", "prompt-v1"));
         List<ZugriffEintrag> protokoll = new ArrayList<>();
-        ChatBewertungAuswertung anwendung = new ChatBewertungAuswertung(speicher, protokoll::add);
+        ChatBewertungAuswertung anwendung = new ChatBewertungAuswertung(
+                speicher, protokoll::add, new ChatBewertungZipExport());
         ByteArrayOutputStream ziel = new ByteArrayOutputStream();
         LocalDate heute = LocalDate.now(ZoneId.of("Europe/Zurich"));
 
@@ -85,7 +87,8 @@ class ChatBewertungAuswertungTest {
         FakeSpeicher speicher = new FakeSpeicher();
         speicher.anzahl = ChatBewertungAuswertung.MAX_EXPORT_ZEILEN + 1L;
         List<ZugriffEintrag> protokoll = new ArrayList<>();
-        ChatBewertungAuswertung anwendung = new ChatBewertungAuswertung(speicher, protokoll::add);
+        ChatBewertungAuswertung anwendung = new ChatBewertungAuswertung(
+                speicher, protokoll::add, new ChatBewertungZipExport());
         ByteArrayOutputStream ziel = new ByteArrayOutputStream();
         LocalDate heute = LocalDate.now(ZoneId.of("Europe/Zurich"));
 

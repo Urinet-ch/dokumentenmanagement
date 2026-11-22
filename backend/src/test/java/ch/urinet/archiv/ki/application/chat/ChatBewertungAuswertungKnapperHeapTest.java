@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.application.chat;
 
+import ch.urinet.archiv.ki.adapter.out.export.ChatBewertungZipExport;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
 import org.junit.jupiter.api.Assumptions;
@@ -69,7 +70,8 @@ class ChatBewertungAuswertungKnapperHeapTest {
                 return new Auswertung(0, 0, new long[5], List.of(), List.of());
             }
         };
-        ChatBewertungAuswertung auswertung = new ChatBewertungAuswertung(speicher, eintrag -> {});
+        ChatBewertungAuswertung auswertung = new ChatBewertungAuswertung(
+                speicher, eintrag -> {}, new ChatBewertungZipExport());
         LocalDate heute = LocalDate.now(ZoneId.of("Europe/Zurich"));
         Path zipPfad = temp.resolve("chat-bewertungen.zip");
         try (ChatBewertungAuswertung.Export export = auswertung.vorbereiten(heute.minusDays(1), heute, 1, 5,
