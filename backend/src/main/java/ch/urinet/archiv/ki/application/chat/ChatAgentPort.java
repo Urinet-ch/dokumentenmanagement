@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.application.chat;
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
 
 import java.util.function.Consumer;
+import java.util.Optional;
 
 /**
  * Driven Port des Chat-Agenten (Spec 02, Aufgabe 7.3; design.md «Chat-Agent»). Der Aufruf blockiert, bis die Antwort
@@ -17,4 +18,12 @@ import java.util.function.Consumer;
 public interface ChatAgentPort {
 
     void beantworten(ChatAnfrage anfrage, Consumer<ChatEreignis> ausgabe, ChatAbbruch abbruch);
+
+    default Optional<String> modellkennung() {
+        return Optional.empty();
+    }
+
+    default Optional<String> systempromptVersion() {
+        return Optional.empty();
+    }
 }

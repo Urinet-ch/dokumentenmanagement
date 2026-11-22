@@ -639,3 +639,7 @@ Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x
 - Schreibaktionen melden die Bearbeiterkennung und nutzen ETags. Ein 412 verwirft den zwischengespeicherten Entwurf und fordert zum Neuladen auf. Wiederholen ist auf Fehlerstatus beschränkt; Veröffentlichen und Zurückziehen sind nur für `ARCHIVIERT` verfügbar.
 - Die wp-env-Test-API liefert ausschliesslich synthetische Antworten. Das `@req-7.10`-Szenario prüft das Formular im Browser mit Playwright; PHPUnit deckt zusätzlich Feed-Invalidierung, Ausfallverhalten und Schema-Normalisierung ab. Chromium wird vom Cucumber-Lauf installiert. Test-API und Playwright bleiben ausserhalb des ausgelieferten Plugin-Pakets.
 - Der Einsatz bleibt bis zum Hosting-Nachweis der Empfangsgrenzen für Chunked-Anfragen und zum Test auf einer echten WordPress-Seite gesperrt; beides ist nachgelagert [Fabian].
+
+## Umsetzung (Aufgabe 10.6, 22.11.2026)
+- Die Betriebsanleitung nennt `ARCHIV_AGE_EMPFAENGER_SICHERUNG` und `ARCHIV_AGE_EMPFAENGER_PROBE` als Quelle der unterschiedlichen öffentlichen `age`-Empfänger. Die Klartextprüfung gilt für die zur Abholung freigegebenen Laufartefakte in `laeufe/`; das Vorinventar `.zustand/` ausserhalb davon bleibt absichtlich unverschlüsselt und wird vom Infra-Repository nicht abgeholt.
+- Transport, Zweitkopie, `backup-gate.sh`, VPS-Schritt und Restore-Probe bleiben ausserhalb dieses Repos und damit als Betriebsnachweis offen [Fabian].
