@@ -247,7 +247,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Abhängig von: 21.2, 21.3, 21.4, 21.5_
 
 ## Welle 24 — Passkey als Anmeldeweg (Entscheid Fabian 21.11.2026, Requirement 10)
-- [ ] 24.1 Spike und Realm-Flow Passkey [Infra] [Backend]
+- [x] 24.1 Spike und Realm-Flow Passkey [Infra] [Backend]
   - Spike gegen Keycloak 26.8.2: Flow mit Passkey und Rückfall `browser-totp-pflicht`, `auth_time` bei Passkey, Einrichtung in der
     Kontoverwaltung, Direct Grant unverändert; Ergebnis in design.md «Passkey» (Marker `[offen: …]` auflösen). Realm-Export mit
     Platzhalter für die Relying-Party-ID; Realm-Tests mit virtuellem Authenticator (Einrichten, Anmelden, Step-up, Entfernen).

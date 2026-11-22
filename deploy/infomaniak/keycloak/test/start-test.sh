@@ -7,7 +7,8 @@ temp=$(mktemp -d)
 aufraeumen() {
   rm -f -- "$temp/secrets/keycloak_db" "$temp/secrets/keycloak_admin" \
     "$temp/secrets/google_client_id" "$temp/secrets/google_client_secret" "$temp/secrets/keycloak_verwaltung_secret" \
-    "$temp/bin/keycloak-stub" "$temp/out/id" "$temp/out/secret" "$temp/out/args" "$temp/out/verwaltung"
+    "$temp/bin/keycloak-stub" "$temp/out/id" "$temp/out/secret" "$temp/out/args" "$temp/out/verwaltung" \
+    "$temp/out/rp-id"
   rmdir -- "$temp/secrets" "$temp/bin" "$temp/out" "$temp"
 }
 trap aufraeumen EXIT
@@ -21,6 +22,7 @@ set -euo pipefail
 printf '%s\n' "${GOOGLE_CLIENT_ID:-}" > "$START_TEST_AUSGABE/id"
 printf '%s\n' "${GOOGLE_CLIENT_SECRET:-}" > "$START_TEST_AUSGABE/secret"
 printf '%s\n' "$*" > "$START_TEST_AUSGABE/args"
+printf '%s\n' "${ARCHIV_PASSKEY_RP_ID:-}" > "$START_TEST_AUSGABE/rp-id"
 if [[ ${KEYCLOAK_VERWALTUNG_SECRET+x} == x ]]; then
   echo vorhanden > "$START_TEST_AUSGABE/verwaltung"
 else
@@ -49,6 +51,7 @@ pruefen() {
   [[ $(<"$temp/out/id") == "$erwartet_id" ]]
   [[ $(<"$temp/out/secret") == "$erwartet_secret" ]]
   [[ $(<"$temp/out/args") == "start --optimized --import-realm" ]]
+  [[ $(<"$temp/out/rp-id") == "pwa.example.invalid" ]]
 }
 
 # Das Skript übergibt nur Umgebungsvariablen; «enabled» bleibt im Export fest false (siehe jq unten).
@@ -77,6 +80,7 @@ for basis in "" "http://pwa.example.invalid" "https://pwa.example.invalid/path" 
 done
 # Positivfall mit Port
 basis_pruefen "https://pwa.example.invalid:8443" >/dev/null
+[[ $(<"$temp/out/rp-id") == "pwa.example.invalid" ]]
 # Dienstkonto-Secret wird weder aus der Datei gelesen noch aus der Umgebung weitergereicht.
 printf 'verwaltung-testwert\n' > "$temp/secrets/keycloak_verwaltung_secret"
 pruefen "synthetische-id\n" "synthetisches-secret\n" "synthetische-id" "synthetisches-secret"

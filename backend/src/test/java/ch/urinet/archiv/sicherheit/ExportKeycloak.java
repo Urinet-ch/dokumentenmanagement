@@ -69,6 +69,7 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
                 .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
                 .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
                 .withEnv("ARCHIV_BASIS_URL", PWA_TEST_URL)
+                .withEnv("ARCHIV_PASSKEY_RP_ID", "localhost")
                 .withCopyFileToContainer(MountableFile.forHostPath(exportTemporaer.toAbsolutePath()),
                         "/opt/keycloak/data/import/realm-export.json")
                 .withCopyFileToContainer(MountableFile.forHostPath(
@@ -133,6 +134,7 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
                      .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN)
                      .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
                      .withEnv("ARCHIV_BASIS_URL", PWA_TEST_URL)
+                     .withEnv("ARCHIV_PASSKEY_RP_ID", "localhost")
                      .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
                      .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
                      .withEnv("KC_HOSTNAME", "http://issuer.test")
