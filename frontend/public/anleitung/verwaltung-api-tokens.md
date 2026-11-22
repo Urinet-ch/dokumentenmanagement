@@ -2,6 +2,11 @@ Unter «API-Tokens» sehen Sie die Zugänge, mit denen Programme ohne Anmeldung 
 
 Neue Tokens stellen Sie nicht auf dieser Seite aus. Wie ein neues Token entsteht, steht in den Unterlagen für den Betrieb des Archivs.
 
+## Webseiten-Schlüssel
+Für eine Webseite gibt es getrennte Schlüssel zum Lesen und zur Erfassung. Die Person, die WordPress verwaltet, trägt sie in den Plugin-Einstellungen ein; angezeigt werden sie dort später nicht mehr. Leere Schlüsselfelder behalten den bisherigen Wert.
+
+Das Plugin darf erst eingesetzt werden, wenn der Änderungs-Feed zur sofortigen Aktualisierung zurückgezogener Dokumente eingerichtet und geprüft ist. Wenden Sie sich dafür an den Betrieb.
+
 ## Ablaufdatum setzen
 1. Wählen Sie beim Token unter «Gültig bis einschliesslich» ein Datum, frühestens heute und höchstens fünf Jahre in der Zukunft.
 2. Wählen Sie «Ablaufdatum speichern».

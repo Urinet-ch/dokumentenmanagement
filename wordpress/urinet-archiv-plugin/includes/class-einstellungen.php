@@ -12,12 +12,12 @@ final class Urinet_Archiv_Einstellungen {
 		return wp_parse_args(
 			is_array( $werte ) ? $werte : array(),
 			array(
-				'url'               => '',
-				'lese_schluessel'   => '',
-				'erfassung_schluessel' => '',
-				'cache_minuten'     => 10,
-				'rolle_mitglieder'  => '',
-				'rolle_vorstand'    => '',
+				'url'                    => '',
+				'lese_schluessel'        => '',
+				'erfassung_schluessel'   => '',
+				'cache_minuten'          => 10,
+				'rolle_mitglieder'       => '',
+				'rolle_vorstand'         => '',
 				'rolle_geschaeftsstelle' => '',
 			)
 		);
@@ -30,6 +30,7 @@ final class Urinet_Archiv_Einstellungen {
 		if ( ! defined( 'URINET_ARCHIV_KEY' ) || ! is_string( URINET_ARCHIV_KEY ) ) {
 			throw new RuntimeException( 'Der Verschlüsselungsschlüssel fehlt in der WordPress-Konfiguration.' );
 		}
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Schlüssel liegt als Base64 vor.
 		$key = base64_decode( URINET_ARCHIV_KEY, true );
 		if ( false === $key || SODIUM_CRYPTO_SECRETBOX_KEYBYTES !== strlen( $key ) ) {
 			throw new RuntimeException( 'Der Verschlüsselungsschlüssel in der WordPress-Konfiguration ist ungültig.' );
@@ -38,8 +39,9 @@ final class Urinet_Archiv_Einstellungen {
 	}
 
 	public static function verschluesseln( string $wert ): string {
-		$key = self::schluessel();
+		$key   = self::schluessel();
 		$nonce = random_bytes( SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Binäres Chiffrat für wp_options.
 		return base64_encode( $nonce . sodium_crypto_secretbox( $wert, $nonce, $key ) );
 	}
 
@@ -48,12 +50,13 @@ final class Urinet_Archiv_Einstellungen {
 			return '';
 		}
 		$key = self::schluessel();
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Binäres Chiffrat aus wp_options.
 		$bytes = base64_decode( $wert, true );
 		if ( false === $bytes || strlen( $bytes ) < SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + SODIUM_CRYPTO_SECRETBOX_MACBYTES ) {
 			throw new RuntimeException( 'Der gespeicherte Webseiten-Schlüssel ist ungültig.' );
 		}
 		$nonce = substr( $bytes, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
-		$klar = sodium_crypto_secretbox_open( substr( $bytes, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES ), $nonce, $key );
+		$klar  = sodium_crypto_secretbox_open( substr( $bytes, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES ), $nonce, $key );
 		if ( false === $klar ) {
 			throw new RuntimeException( 'Der Webseiten-Schlüssel kann nicht entschlüsselt werden.' );
 		}
@@ -77,7 +80,7 @@ final class Urinet_Archiv_Einstellungen {
 					throw new InvalidArgumentException( 'Die Einstellungen sind ungültig. Bitte prüfen Sie Ihre Angaben.' );
 				}
 			}
-			$url = trim( (string) ( $eingabe['url'] ?? '' ) );
+			$url   = trim( (string) ( $eingabe['url'] ?? '' ) );
 			$teile = wp_parse_url( $url );
 			if ( strlen( $url ) > 2048 || esc_url_raw( $url, array( 'https' ) ) !== $url || ! is_array( $teile ) || 'https' !== ( $teile['scheme'] ?? '' ) || empty( $teile['host'] ) || isset( $teile['user'] ) || isset( $teile['pass'] ) || isset( $teile['query'] ) || isset( $teile['fragment'] ) ) {
 				throw new InvalidArgumentException( 'Bitte geben Sie eine gültige HTTPS-Archiv-URL ohne Zugangsdaten ein.' );
@@ -86,8 +89,8 @@ final class Urinet_Archiv_Einstellungen {
 			if ( false === $minuten || $minuten < 1 || $minuten > 1440 ) {
 				throw new InvalidArgumentException( 'Die Cache-Dauer muss zwischen 1 und 1440 Minuten liegen.' );
 			}
-			$neu = $alt;
-			$neu['url'] = untrailingslashit( $url );
+			$neu                  = $alt;
+			$neu['url']           = untrailingslashit( $url );
 			$neu['cache_minuten'] = $minuten;
 			foreach ( array( 'rolle_mitglieder', 'rolle_vorstand', 'rolle_geschaeftsstelle' ) as $feld ) {
 				$rolle = (string) ( $eingabe[ $feld ] ?? '' );
@@ -106,7 +109,7 @@ final class Urinet_Archiv_Einstellungen {
 				}
 			}
 			if ( ! empty( $eingabe['erfassung_entfernen'] ) ) {
-				$neu['erfassung_schluessel'] = '';
+				$neu['erfassung_schluessel']   = '';
 				$neu['rolle_geschaeftsstelle'] = '';
 			}
 			if ( '' === $neu['erfassung_schluessel'] ) {
@@ -124,7 +127,7 @@ final class Urinet_Archiv_Einstellungen {
 
 	public static function stufe(): string {
 		$rollen = wp_get_current_user()->roles;
-		$werte = self::werte();
+		$werte  = self::werte();
 		if ( '' !== $werte['rolle_vorstand'] && in_array( $werte['rolle_vorstand'], $rollen, true ) ) {
 			return 'vorstand';
 		}
@@ -146,14 +149,23 @@ final class Urinet_Archiv_Einstellungen {
 		echo '<div class="wrap"><h1>UriNet Archiv</h1><form action="options.php" method="post">';
 		settings_fields( 'urinet_archiv' );
 		echo '<table class="form-table" role="presentation"><tbody>';
-		foreach ( array( 'url' => 'Archiv-URL', 'cache_minuten' => 'Cache-Dauer in Minuten' ) as $feld => $label ) {
+		foreach ( array(
+			'url'           => 'Archiv-URL',
+			'cache_minuten' => 'Cache-Dauer in Minuten',
+		) as $feld => $label ) {
 			printf( '<tr><th scope="row"><label for="%1$s">%2$s</label></th><td><input id="%1$s" name="%3$s[%1$s]" value="%4$s" type="%5$s" class="regular-text"></td></tr>', esc_attr( $feld ), esc_html( $label ), esc_attr( self::OPTION ), esc_attr( (string) $werte[ $feld ] ), 'url' === $feld ? 'url' : 'number' );
 		}
-		foreach ( array( 'lese_schluessel' => 'Lese-Schlüssel', 'erfassung_schluessel' => 'Erfassungs-Schlüssel (optional)' ) as $feld => $label ) {
+		foreach ( array(
+			'lese_schluessel'      => 'Lese-Schlüssel',
+			'erfassung_schluessel' => 'Erfassungs-Schlüssel (optional)',
+		) as $feld => $label ) {
 			printf( '<tr><th scope="row"><label for="%1$s">%2$s</label></th><td><input id="%1$s" name="%3$s[%1$s]" type="password" value="" autocomplete="new-password" maxlength="512"><p class="description">Leer lassen, um den bisherigen Schlüssel zu behalten.</p></td></tr>', esc_attr( $feld ), esc_html( $label ), esc_attr( self::OPTION ) );
 		}
 		echo '<tr><th scope="row">Erfassung entfernen</th><td><label><input type="checkbox" name="' . esc_attr( self::OPTION ) . '[erfassung_entfernen]" value="1"> Erfassungs-Schlüssel entfernen</label></td></tr>';
-		$rollenfelder = array( 'rolle_mitglieder' => 'Rolle Mitglieder', 'rolle_vorstand' => 'Rolle Vorstand' );
+		$rollenfelder = array(
+			'rolle_mitglieder' => 'Rolle Mitglieder',
+			'rolle_vorstand'   => 'Rolle Vorstand',
+		);
 		if ( '' !== $werte['erfassung_schluessel'] ) {
 			$rollenfelder['rolle_geschaeftsstelle'] = 'Rolle Geschäftsstelle';
 		}

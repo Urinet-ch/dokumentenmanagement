@@ -14,6 +14,10 @@ Erfassungs-Schlüssel, Cache-Dauer und Rollen eingestellt. Ein leeres Schlüssel
 bisherigen Wert. Mitglieder- und Vorstandsrolle bestimmen serverseitig die höchste Zugriffsstufe.
 Die Geschäftsstelle-Rolle wird erst mit der Erfassung verwendet (Aufgabe 11.12).
 
-Lokale Entwicklung: `npm ci`, `npm run wp-env -- start`, `npm test` und anschliessend
-`npm run wp-env -- stop`. Nur synthetische Testdaten verwenden. Installation auf einer echten
-WordPress-Seite und Gerätetests bleiben nachgelagert.
+Lokale Entwicklung: `npm ci`, `composer install`, `npm run wp-env -- start`, `npm test`,
+`npm run test:cucumber` und anschliessend `npm run wp-env -- stop`. `vendor/bin/phpcs` prüft
+die WordPress-Regeln; ausgenommen sind vorgeschriebene Dateinamen und reine Kommentarvorgaben.
+`npm run build` erstellt
+ein Paket ausschliesslich mit den freigegebenen Laufzeitdateien und prüft dessen Inhalt.
+Nur synthetische Testdaten verwenden. Installation auf einer echten WordPress-Seite und
+Gerätetests bleiben nachgelagert.

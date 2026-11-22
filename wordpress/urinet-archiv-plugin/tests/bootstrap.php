@@ -1,6 +1,8 @@
 <?php
 
+// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Synthetischer Schlüssel für Tests.
 define( 'URINET_ARCHIV_KEY', base64_encode( random_bytes( SODIUM_CRYPTO_SECRETBOX_KEYBYTES ) ) );
+define( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH', dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills' );
 
 $test_verzeichnis = getenv( 'WP_TESTS_DIR' );
 if ( ! $test_verzeichnis ) {
