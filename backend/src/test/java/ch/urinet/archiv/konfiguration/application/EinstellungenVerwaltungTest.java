@@ -11,6 +11,8 @@ import ch.urinet.archiv.konfiguration.domain.KonfigurationQuelle;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.WissenEinstellungen;
+import ch.urinet.archiv.wissen.application.WissenEinstellungenRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -33,7 +35,7 @@ class EinstellungenVerwaltungTest {
     private int grenzen;
     private final EinstellungenVerwaltung verwaltung = new EinstellungenVerwaltung(konfiguration,
             einstellungen -> schreibvorgaenge++, new EinstellungsAenderungsPruefung(new StartwerteProbe(),
-                    new EinstellungsAuswirkungBerechnen(new Daten()), () -> stepUps++, aufloesung, kontext),
+                    new EinstellungsAuswirkungBerechnen(new Daten()), () -> stepUps++, aufloesung, kontext, null),
             (akteur, art, ziel) -> grenzen++);
 
     @Test
@@ -78,6 +80,24 @@ class EinstellungenVerwaltungTest {
         assertThat(ergebnis.geaendert()).isFalse();
         assertThat(schreibvorgaenge).isZero();
         assertThat(grenzen).isZero();
+    }
+
+    @Test
+    void vollstaendigerStandMitUnwirksamenWissenswertenWirdNichtBestaetigt() {
+        var wissen = new WissenEinstellungenRepository() {
+            @Override public WissenEinstellungen.Werte lesen() {
+                return new WissenEinstellungen.Werte(null, null, null, null);
+            }
+            @Override public void speichern(WissenEinstellungen.Werte werte) {
+                throw new AssertionError("Darf nicht schreiben");
+            }
+        };
+        var pruefung = new EinstellungsAenderungsPruefung(null, null, null, null, null, wissen);
+        Einstellungen mitUnwirksamemWert = new Einstellungen("12-31", null, null, null, null,
+                new Konfiguration.WissenEinstellungen(123456, null, null, null));
+        assertThatThrownBy(() -> pruefung.wissenPruefen(mitUnwirksamemWert, mitUnwirksamemWert, false, true))
+                .isInstanceOf(KonfigurationUngueltig.class);
+        pruefung.wissenPruefen(einstellungen(12), einstellungen(12), false, true);
     }
 
     private static EinstellungenVerwaltung.Eingabe eingabe(int monate) {

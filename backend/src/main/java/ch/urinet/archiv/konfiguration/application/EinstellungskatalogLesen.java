@@ -53,13 +53,16 @@ public class EinstellungskatalogLesen {
     private final WissenKonfiguration wissenKonfiguration;
     private final WissenLintStarten lint;
     private final long lintBudget;
+    private final String lintStandardZeitplan;
 
     public EinstellungskatalogLesen(KonfigurationVerwaltung konfiguration, MandantAufloesung aufloesung,
                                     MandantBudget budget, EinstellungsStartwerte startwerte,
                                     BrandingVerzeichnis brandings, WissenEinstellungenRepository wissen,
                                     WissenKonfiguration wissenKonfiguration, WissenLintStarten lint,
                                     @ConfigProperty(name = "archiv.wissen.lint-budget-tokens", defaultValue = "100000")
-                                    long lintBudget) {
+                                    long lintBudget,
+                                    @ConfigProperty(name = "archiv.wissen.lint-zeitplan",
+                                            defaultValue = "0 0 4 ? * SUN") String lintStandardZeitplan) {
         this.konfiguration = konfiguration;
         this.aufloesung = aufloesung;
         this.budget = budget;
@@ -69,6 +72,7 @@ public class EinstellungskatalogLesen {
         this.wissenKonfiguration = wissenKonfiguration;
         this.lint = lint;
         this.lintBudget = lintBudget;
+        this.lintStandardZeitplan = lintStandardZeitplan;
     }
 
     @Transactional
@@ -93,31 +97,53 @@ public class EinstellungskatalogLesen {
                             ch.urinet.archiv.wissen.application.WissenEinstellungen.Werte wissenswerte,
                             String zeitplan) {
         String schluessel = einstellung.schluessel();
-        Object eigenerWert = eigenerWert(schluessel, werte);
+        boolean wissenEinstellung = schluessel.startsWith("wissen.");
+        Object eigenerWert = wissenEinstellung ? eigenerWissenswert(schluessel, wissenswerte)
+                : eigenerWert(schluessel, werte);
+        boolean eigenerWissenszeitplan = schluessel.startsWith("wissen.lintZeitplan.")
+                && wissenswerte.lintZeitplan() != null;
         Object standard = switch (schluessel) {
             case "branding.name" -> branding.name();
             case "branding.primaerfarbe" -> branding.primaerfarbe();
             case "chat.aufbewahrungMonate" -> monateOderPeriode(start.chatAufbewahrung());
             case "webseitenChat.aufbewahrungTage" -> start.webseitenChatAufbewahrung();
-            case "wissen.budgetTokens" -> wissenswerte.budgetTokens() == null
-                    ? wissenKonfiguration.ingest().budgetTokens() : wissenswerte.budgetTokens();
-            case "wissen.lintBudgetTokens" -> wissenswerte.lintBudgetTokens() == null
-                    ? lintBudget : wissenswerte.lintBudgetTokens();
-            case "wissen.monatsbudgetTokens" -> start.wissenMonatsbudget();
-            case "wissen.lintZeitplan.wochentag" -> tag(zeitplan);
-            case "wissen.lintZeitplan.stunde" -> stunde(zeitplan);
+            case "wissen.budgetTokens" -> wissenKonfiguration.ingest().budgetTokens();
+            case "wissen.lintBudgetTokens" -> lintBudget;
+            case "wissen.monatsbudgetTokens" -> wissenKonfiguration.ingest().monatsbudgetTokens();
+            case "wissen.lintZeitplan.wochentag" -> tag(lintStandardZeitplan);
+            case "wissen.lintZeitplan.stunde" -> stunde(lintStandardZeitplan);
             default -> einstellung.standardFuer(mandant.wert());
         };
-        String hinweis = schluessel.startsWith("wissen.lintZeitplan.") && standard == null
+        String hinweis = schluessel.startsWith("wissen.lintZeitplan.")
+                && (eigenerWissenszeitplan ? eigenerWert == null : standard == null)
                 ? "Der bisherige Zeitplan lässt sich nicht als einzelner Wochentag und Stunde darstellen: " + zeitplan
                 : schluessel.equals("chat.aufbewahrungMonate") && standard instanceof String
                 ? "Die bisherige Aufbewahrung ist eine ISO-8601-Periode und keine ganze Monatszahl." : null;
+        if (wissenEinstellung) {
+            String sperre = "Bis zur Überführung der Wissenseinstellungen ändern Sie diesen Wert über "
+                    + "/wissensbasis/einstellungen.";
+            hinweis = hinweis == null ? sperre : hinweis + " " + sperre;
+        }
         var zahl = einstellung.zahl();
         return new Eintrag(schluessel, einstellung.gruppe(), einstellung.name(), einstellung.beschreibung(),
                 einstellung.typ(), einstellung.einheit(), zahl == null ? null : zahl.minimum(),
                 zahl == null ? null : zahl.maximum(), formregel(einstellung), standard,
-                eigenerWert == null ? standard : eigenerWert, eigenerWert != null,
+                eigenerWissenszeitplan ? eigenerWert : eigenerWert == null ? standard : eigenerWert,
+                eigenerWert != null || eigenerWissenszeitplan,
                 einstellung.risiko() != Einstellungskatalog.Risiko.KEINES, einstellung.wirksamAb(), hinweis);
+    }
+
+    private static Object eigenerWissenswert(String schluessel,
+                                               ch.urinet.archiv.wissen.application.WissenEinstellungen.Werte werte) {
+        return switch (schluessel) {
+            case "wissen.budgetTokens" -> werte.budgetTokens();
+            case "wissen.lintBudgetTokens" -> werte.lintBudgetTokens();
+            case "wissen.monatsbudgetTokens" -> werte.monatsbudgetTokens();
+            case "wissen.lintZeitplan.wochentag" -> werte.lintZeitplan() == null ? null : tag(werte.lintZeitplan());
+            case "wissen.lintZeitplan.stunde" -> werte.lintZeitplan() == null ? null
+                    : stunde(werte.lintZeitplan());
+            default -> throw new IllegalStateException("Wissenseinstellung ohne Wert");
+        };
     }
 
     private static Object eigenerWert(String schluessel, Einstellungen werte) {
@@ -129,11 +155,6 @@ public class EinstellungskatalogLesen {
             case "branding.primaerfarbe" -> werte.branding().primaerfarbe();
             case "chat.aufbewahrungMonate" -> werte.chat().aufbewahrungMonate();
             case "webseitenChat.aufbewahrungTage" -> werte.webseitenChat().aufbewahrungTage();
-            case "wissen.budgetTokens" -> werte.wissen().budgetTokens();
-            case "wissen.lintBudgetTokens" -> werte.wissen().lintBudgetTokens();
-            case "wissen.monatsbudgetTokens" -> werte.wissen().monatsbudgetTokens();
-            case "wissen.lintZeitplan.wochentag" -> werte.wissen().lintZeitplan().wochentag();
-            case "wissen.lintZeitplan.stunde" -> werte.wissen().lintZeitplan().stunde();
             default -> throw new IllegalStateException("Katalogeintrag ohne Wert");
         };
     }

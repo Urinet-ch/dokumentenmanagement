@@ -45,6 +45,7 @@ public class MandantEinstellungenSchritte {
     private int ausgangsVersion;
     private long protokollAnzahl;
     private boolean geaendert;
+    private String wissenVorher;
 
     @Angenommen("die Ausgangsstände der Einstellungen sind gemerkt")
     public void ausgangsstaendeMerken() throws SQLException {
@@ -86,6 +87,39 @@ public class MandantEinstellungenSchritte {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
         assertThat(antwort.jsonPath().getString("katalog.find { it.schluessel == 'branding.name' }.standard"))
                 .isEqualTo("VHF/GSK Archiv");
+    }
+
+    @Angenommen("ein eigenes Wissensbudget ist über die bisherige Schnittstelle gesetzt")
+    public void wissensbudgetSetzen() {
+        String pfad = "/api/v1/wissensbasis/einstellungen";
+        Response bisher = given().auth().oauth2(token()).get(pfad);
+        assertThat(bisher.statusCode()).as(bisher.asString()).isEqualTo(200);
+        wissenVorher = bisher.asString();
+        Response gespeichert = given().auth().oauth2(token()).contentType("application/json")
+                .body("{\"budgetTokens\":123456,\"lintBudgetTokens\":null,\"lintZeitplan\":null,"
+                        + "\"monatsbudgetTokens\":345678}").put(pfad);
+        assertThat(gespeichert.statusCode()).as(gespeichert.asString()).isEqualTo(200);
+    }
+
+    @Dann("zeigt der Katalog das eigene Wissensbudget und den unveränderten Standard")
+    public void wissensbudgetImKatalog() {
+        String eintrag = "katalog.find { it.schluessel == 'wissen.budgetTokens' }";
+        assertThat(antwort.jsonPath().getInt(eintrag + ".standard")).isEqualTo(600000);
+        assertThat(antwort.jsonPath().getInt(eintrag + ".aktuellerWert")).isEqualTo(123456);
+        assertThat(antwort.jsonPath().getBoolean(eintrag + ".eigenerWert")).isTrue();
+        assertThat(antwort.jsonPath().getLong("betrieb.wissenMonatsbudgetTokens")).isEqualTo(345678);
+    }
+
+    @Wenn("das Wissensbudget über die neue Schnittstelle geändert wird")
+    public void wissensbudgetAendern() {
+        antwort = given().auth().oauth2(token()).header("If-Match", etag)
+                .contentType("application/merge-patch+json")
+                .body("{\"wissen\":{\"budgetTokens\":234567}}").patch(PFAD);
+    }
+
+    @Dann("nennt die Antwort die bisherige Schnittstelle für Wissenseinstellungen")
+    public void wissenssperreErklaeren() {
+        assertThat(antwort.asString()).contains("WISSEN_NOCH_NICHT_UEBERFUEHRT", "/wissensbasis/einstellungen");
     }
 
     @Wenn("die riskante ungültige REST-Änderung ohne Version gesendet wird")
@@ -312,6 +346,12 @@ public class MandantEinstellungenSchritte {
 
     @After("@20-2-rest")
     public void aufraeumen() {
+        if (wissenVorher != null) {
+            Response wiederhergestellt = given().auth().oauth2(token()).contentType("application/json")
+                    .body(wissenVorher).put("/api/v1/wissensbasis/einstellungen");
+            assertThat(wiederhergestellt.statusCode()).as(wiederhergestellt.asString()).isEqualTo(200);
+            wissenVorher = null;
+        }
         if (geaendert) {
             etag = export("inhaber-urinet").header("ETag");
             versionZuruecksetzen();

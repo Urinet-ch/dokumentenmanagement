@@ -361,7 +361,13 @@ Anmeldung und Mandantenprüfung tragen den aktuellen ETag; vor der Anmeldung ode
 413-Antwort wird keine Mandantenversion offengelegt. Bisherige Chat-Startwerte mit Tagen werden als ISO-Periode
 angezeigt; ein bisheriger Cron-Zeitplan, der nicht einem einzelnen Wochentag und einer Stunde entspricht, wird mit
 Hinweis statt eines erfundenen Katalogwerts angezeigt. Die Umstellung der Wissensschnittstelle und Verbraucher folgt in
-20.3 und 20.4; bis dahin zeigt `betrieb` das bisher wirksame Wissensbudget.
+20.3 und 20.4; bis dahin zeigt der Katalog die tatsächlich wirksamen Wissenswerte aus `wissens_einstellung`, deren
+Herkunft und die instanzweiten Standards; `betrieb` zeigt das bisher wirksame Wissensbudget. Die neue Schnittstelle
+lehnt Wissens-Patches und Rücksetzungen der Wissensgruppe mit einem erklärenden Befund ab; Änderungen bleiben über
+`/wissensbasis/einstellungen` möglich. Dateiimport und Rücksetzung auf eine historische Version werden auch abgelehnt,
+wenn sie Wissenswerte ändern würden oder bestehende eigene Wissenswerte sonst als zurückgesetzt erscheinen könnten.
+Vorschau, App, Dateiimport und Betreiberkommando quittieren damit keine noch unwirksame Wissensänderung. Aufgabe 20.3
+übernimmt die bestehenden Werte und hebt diese Übergangssperre mit der Umstellung der Verbraucher auf.
 
 **Auswirkung** (`Auswirkung`, Beispiele): kürzere Aufbewahrung: «Beim nächsten Aufräumlauf werden N Fragen gelöscht» (Zahl aus
 der Datenbank, Text deutsch); `geschaeftsjahrEnde`: «Gilt für künftig bestätigte Dokumente; bereits archivierte Fristen und

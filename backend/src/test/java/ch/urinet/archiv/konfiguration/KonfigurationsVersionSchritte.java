@@ -419,9 +419,6 @@ public class KonfigurationsVersionSchritte {
         ((ObjectNode) einstellungen.path("branding")).put("name", "Testarchiv").put("primaerfarbe", "#eeb111");
         ((ObjectNode) einstellungen.path("chat")).put("aufbewahrungMonate", 17);
         ((ObjectNode) einstellungen.path("webseitenChat")).put("aufbewahrungTage", 31);
-        ObjectNode wissen = (ObjectNode) einstellungen.path("wissen");
-        wissen.put("budgetTokens", 123456).put("lintBudgetTokens", 12345).put("monatsbudgetTokens", 1234567);
-        ((ObjectNode) wissen.path("lintZeitplan")).put("wochentag", "MONDAY").put("stunde", 7);
     }
 
     @Wenn("in der Datei die Chat-Aufbewahrung auf {int} Monate gesetzt wird")
@@ -452,11 +449,6 @@ public class KonfigurationsVersionSchritte {
         assertThat(einstellungen.path("branding").path("primaerfarbe").asText()).isEqualTo("#eeb111");
         assertThat(einstellungen.path("chat").path("aufbewahrungMonate").asInt()).isEqualTo(17);
         assertThat(einstellungen.path("webseitenChat").path("aufbewahrungTage").asInt()).isEqualTo(31);
-        assertThat(einstellungen.path("wissen").path("budgetTokens").asInt()).isEqualTo(123456);
-        assertThat(einstellungen.path("wissen").path("lintBudgetTokens").asInt()).isEqualTo(12345);
-        assertThat(einstellungen.path("wissen").path("monatsbudgetTokens").asInt()).isEqualTo(1234567);
-        assertThat(einstellungen.path("wissen").path("lintZeitplan").path("wochentag").asText()).isEqualTo("MONDAY");
-        assertThat(einstellungen.path("wissen").path("lintZeitplan").path("stunde").asInt()).isEqualTo(7);
     }
 
     @Wenn("in der Datei der KI-Rollentext geändert wird")

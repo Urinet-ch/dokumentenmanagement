@@ -139,6 +139,7 @@ public class KonfigurationsdateiVerwaltung {
                     .map(befund -> new KonfigurationUngueltig.Befund(befund.pfad(), befund.code(), befund.meldung()))
                     .toList());
         }
+        einstellungsPruefung.wissenPruefen(aktuell.einstellungen(), analyse.ziel().einstellungen(), false, true);
         if (aktuell.gleicherInhalt(analyse.ziel())) {
             return new Ergebnis(aktuell.version(), analyse.aenderungen());
         }

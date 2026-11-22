@@ -15,6 +15,17 @@ Funktionalität: Einstellungen über die REST-Schnittstelle verwalten
     Wenn «inhaber-vhf-gsk» den Einstellungskatalog liest
     Dann enthält der REST-Katalog den Branding-Standard des zweiten Mandanten
 
+  @req-2.1 @req-2.2 @req-2.11
+  Szenario: Bestehende Wissenswerte bleiben bis zur Überführung wirksam
+    Angenommen ein eigenes Wissensbudget ist über die bisherige Schnittstelle gesetzt
+    Wenn «inhaber-urinet» den Einstellungskatalog liest
+    Dann zeigt der Katalog das eigene Wissensbudget und den unveränderten Standard
+    Wenn das Wissensbudget über die neue Schnittstelle geändert wird
+    Dann antwortet die Einstellungsverwaltung mit Status 422 und ETag des Ausgangsstands
+    Und nennt die Antwort die bisherige Schnittstelle für Wissenseinstellungen
+    Und sind Version und Änderungsprotokoll unverändert
+    Und ist der zweite Einstellungsstand unverändert
+
   @req-2.3 @req-2.6 @req-2.8 @req-2.14
   Szenario: Rechte, Version, Risiko und Gültigkeit werden in dieser Reihenfolge geprüft
     Wenn die riskante ungültige REST-Änderung ohne Version gesendet wird
