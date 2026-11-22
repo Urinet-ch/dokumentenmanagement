@@ -8,6 +8,7 @@ import ch.urinet.archiv.sicherheit.domain.Rolle;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -41,6 +42,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 
 /**
  * Beschränkt den Zugriff des Dienstkontos auf die ausdrücklich freigegebene Keycloak-Admin-API (Spec 06, Req 5).
@@ -233,6 +235,9 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     public void aktualisieren(String mandant, String id, Aenderung aenderung) {
         ObjectNode benutzer = (ObjectNode) benutzerAbrufen(mandant, id);
         if (aenderung.email() != null) {
+            if (!aenderung.email().equals(benutzer.path("email").asText(null))) {
+                benutzer.put("emailVerified", false);
+            }
             benutzer.put("email", aenderung.email());
         }
         if (aenderung.vorname() != null) {
@@ -241,7 +246,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         if (aenderung.nachname() != null) {
             benutzer.put("lastName", aenderung.nachname());
         }
-        request("PUT", user(id), null, benutzer, false, Set.of(204));
+        nur204(request("PUT", user(id), null, benutzer, false, Set.of(204)));
     }
 
     @Override
@@ -279,7 +284,26 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     public void aktivieren(String mandant, String id, boolean aktiv) {
         ObjectNode benutzer = (ObjectNode) benutzerAbrufen(mandant, id);
         benutzer.put("enabled", aktiv);
-        request("PUT", user(id), null, benutzer, false, Set.of(204));
+        nur204(request("PUT", user(id), null, benutzer, false, Set.of(204)));
+    }
+
+    @Override
+    public void aktionenHinzufuegen(String mandant, String id, Set<ErforderlicheAktion> aktionen) {
+        Objects.requireNonNull(aktionen);
+        ObjectNode benutzer = (ObjectNode) benutzerAbrufen(mandant, id);
+        JsonNode bisher = benutzer.get("requiredActions");
+        if (bisher != null && !bisher.isArray()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        ArrayNode alle = bisher == null ? json.createArrayNode() : (ArrayNode) bisher;
+        for (ErforderlicheAktion aktion : aktionen) {
+            if (StreamSupport.stream(alle.spliterator(), false)
+                    .noneMatch(wert -> wert.isTextual() && aktion.name().equals(wert.textValue()))) {
+                alle.add(aktion.name());
+            }
+        }
+        benutzer.set("requiredActions", alle);
+        nur204(request("PUT", user(id), null, benutzer, false, Set.of(204)));
     }
 
     @Override
@@ -297,7 +321,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public void sitzungenBeenden(String mandant, String id) {
         benutzerAbrufen(mandant, id);
-        request("POST", user(id) + "/logout", null, null, false, Set.of(204));
+        nur204(request("POST", user(id) + "/logout", null, null, false, Set.of(204)));
     }
 
     @Override
@@ -309,8 +333,8 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         }
         for (JsonNode credential : credentials) {
             if ("otp".equals(credential.path("type").asText())) {
-                request("DELETE", user(id) + "/credentials/" + segment(credential.path("id").asText()),
-                        null, null, false, Set.of(204));
+                nur204(request("DELETE", user(id) + "/credentials/" + segment(credential.path("id").asText()),
+                        null, null, false, Set.of(204)));
             }
         }
     }
@@ -318,14 +342,28 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public void sperreAufheben(String mandant, String id) {
         benutzerAbrufen(mandant, id);
-        request("DELETE", admin("/attack-detection/brute-force/users/" + segment(id)),
-                null, null, false, Set.of(204));
+        nur204(request("DELETE", admin("/attack-detection/brute-force/users/" + segment(id)),
+                null, null, false, Set.of(204)));
+    }
+
+    @Override
+    public boolean anmeldungGesperrt(String mandant, String id) {
+        benutzerAbrufen(mandant, id);
+        JsonNode antwort = json(request("GET", admin("/attack-detection/brute-force/users/" + segment(id)),
+                null, null, true, Set.of()));
+        if (antwort == null || !antwort.path("disabled").isBoolean()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        return antwort.path("disabled").booleanValue();
     }
 
     @Override
     public void googleLoesen(String mandant, String id) {
         benutzerAbrufen(mandant, id);
-        request("DELETE", user(id) + "/federated-identity/google", null, null, false, Set.of(204, 404));
+        Antwort antwort = request("DELETE", user(id) + "/federated-identity/google", null, null, false, Set.of(204, 404));
+        if (antwort.status() != 404) {
+            nur204(antwort);
+        }
     }
 
     @Override
@@ -792,7 +830,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 || path.matches(usersMuster + "/" + id + "/federated-identity/google")
                 && method.equals("DELETE")
                 || path.matches(rootMuster + "/attack-detection/brute-force/users/" + id)
-                && method.equals("DELETE")
+                && Set.of("GET", "DELETE").contains(method)
                 || path.matches(rootMuster + "/roles/" + id) && method.equals("GET");
         if (!erlaubt) {
             throw new IllegalArgumentException("Nicht freigegebener Keycloak-Aufruf");

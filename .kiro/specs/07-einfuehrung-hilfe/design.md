@@ -235,8 +235,8 @@ Ergänzung von `frontend/ngsw-config.json` um eine Asset-Gruppe:
 - Der Service Worker führt die Dateien mit Hash im Manifest der App-Version; eine neue Version tauscht App und Anleitung
   gemeinsam (Requirement 8.2), angezeigt mit dem bestehenden Hinweis «Neue Version verfügbar» (`app.html`).
 - Die Navigationsregel `!/**/*.*` lässt `/anleitung/*.md` nicht auf `index.html` fallen; Quinoa liefert die Datei aus
-  dem Build (`quarkus.quinoa.build-dir`), die SPA-Weiterleitung greift nur für Pfade ohne Datei. Aufgabe 22.4 prüft den
-  `Content-Type` (das Frontend liest mit `response.text()`, der Typ ist dafür gleichgültig) und dass `nosniff` nicht stört.
+  dem Build (`quarkus.quinoa.build-dir`); für eine fehlende Datei kann Quinoa die SPA als HTML zurückgeben. Der Lader
+  erkennt HTML als Fehler. Aufgabe 22.4 prüft die Auslieferung der vorhandenen Dateien mit dem Service Worker.
 - Weil alle Dateien beim Installieren geladen werden, erfährt der Server nicht, welcher Abschnitt gelesen wird
   (Requirement 9.4).
 
@@ -516,6 +516,15 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   Importe, Jahresexport und Verwaltung, für die übrigen Bereiche mit 22.5 und 22.6.
 - **Nachweis:** 6.1 mit `features/hilfe/anleitung-bestand-verwaltung.feature` (`@req-6.1`, `@req-7.1`, Dateien aus dem
   Prod-Build) und `hilfe-katalog.spec.ts` (Reihenfolge); 6.4, 6.6, 7.5 und 7.7 Nachweis: Dokument (Review des PR).
+
+## Umsetzung (Aufgabe 22.4, 21.11.2026)
+- Die eigene Asset-Gruppe `anleitung` lädt alle Dateien vorab und gehört zum gehashten Manifest der App. Der bestehende
+  Aktualisierungshinweis aktiviert die neue Version; der Browsertest prüft alte und neue App und Anleitung vor und nach
+  der Aktivierung mit zwei synthetischen Versionen und einem lokalen Test-Proxy.
+- Auf `/erfassen` zeigt die Hilfe-Leiste ohne Anmeldung und ohne Netz `erfassen-offline`; sonst bleiben die bestehenden
+  Kontext- und Rechteprüfungen unverändert. Die Anleitung beschreibt den Knopf «Hilfe» an dieser Stelle.
+- Nachweise: `hilfe-kontext.spec.ts` und `hilfe-offline.feature` (`@req-8.1` bis `@req-8.3`), jeweils mit echtem
+  Service Worker und vorab geladener Anleitung; der angemeldete Offline-Test prüft alle sichtbaren Abschnittstexte.
 
 ## Open Points
 - [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,

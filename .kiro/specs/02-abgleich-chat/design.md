@@ -443,16 +443,16 @@ abaninja_beleg(abaninja_uuid text pk, art text, belegnummer text, kontakt_id uui
   freitext text null check (char_length(freitext) <= 500), erstellt timestamptz not null, geaendert timestamptz not null, primary key (nachricht_id, benutzer))`;
   Index auf `erstellt`; die Löschung der Nachricht nach 12 Monaten (Requirement 5.4) löscht die Bewertung über den Fremdschlüssel mit. Rollback: Tabelle löschen.
 - **REST:** `PUT /chat/nachrichten/{id}/bewertung` und `DELETE` (eigene Antworten, Status `OK`, sonst 404), `GET /chat/nachrichten/{id}/bewertung`;
-  `GET /chat/auswertung?von=&bis=` (A20, Kennzahlen und Liste) und `POST /chat/auswertung/export` (A20, Step-up, Antwort `application/zip` als Strom).
-  Recht A20 ergänzt die Rechtematrix (Rolle Inhaber `ERLAUBT`, Geschäftsstelle `VERBOTEN`, API-Token und Webseiten-Schlüssel erhalten A20 nicht über die Rolle).
+  `GET /chat/auswertung?von=&bis=` (A24, Kennzahlen und Liste) und `POST /chat/auswertung/export` (A24, Step-up, Antwort `application/zip` als Strom).
+  Recht A24 ergänzt die Rechtematrix (Rolle Inhaber `ERLAUBT`, Geschäftsstelle `VERBOTEN`, API-Token und Webseiten-Schlüssel erhalten A24 nicht über die Rolle).
 - **Anwendung:** `ChatBewertungSpeichern` (Grenze 200/h je Benutzer, Textbereinigung), `ChatAuswertung` (nur Lesen, begrenzte Abfragen), `ChatBewertungExport`
   (Strom, höchstens 5'000 Zeilen, deterministische Sortierung) mit dem Domain-Dienst `Schwaerzung` (framework-frei: Regeln für E-Mail, Telefon, IBAN, UID, AHV-Nummer,
   Beträge, Personendaten; Namen der Partner und Kontakte aus den Mandantentabellen als Wortliste; stabile Platzhalter je Datei).
 - **Format:** `chat-bewertungen/v1` mit `schema.json` (JSON Schema) im ZIP und in `docs/` zum Schematest; Felder nach Requirement 15.6; die Kennung der Treffer ist
   ein SHA-256 über Dokument-ID und ein Salz je Export (nicht zurückrechenbar, innerhalb der Datei stabil). Keine Benutzer- und Mandantenkennung.
-- **Oberfläche:** Sterne unter jeder Antwort (`data-test`, ARIA-Name «Antwort bewerten»), Grundauswahl und Freitext ab 3 Sternen; Seite «Chat-Auswertung» (A20) mit
+- **Oberfläche:** Sterne unter jeder Antwort (`data-test`, ARIA-Name «Antwort bewerten»), Grundauswahl und Freitext ab 3 Sternen; Seite «Chat-Auswertung» (A24) mit
   Kennzahlen, Liste schlecht bewerteter Antworten und Export-Dialog (Zeitraum, Sterne, Schalter «Personendaten schwärzen», Bestätigung für Klartext); Anleitung `chat.md` nachziehen.
-- **Bedrohungsmodell:** Export enthält Geschäftsdaten (Frage und Antwort): Schutz durch A20, Step-up, Schwärzung als Standard, Protokoll ohne Inhalte und Verzicht auf Ablage;
+- **Bedrohungsmodell:** Export enthält Geschäftsdaten (Frage und Antwort): Schutz durch A24, Step-up, Schwärzung als Standard, Protokoll ohne Inhalte und Verzicht auf Ablage;
   Freitext und Antworten als Text (XSS); Enumeration fremder Nachrichten (404); Kosten und Überlast (Grenze, 5'000 Zeilen, Strom).
   `[offen: Reichweite der Schwärzung für freie Personennamen ausserhalb der Mandantentabellen; Aufgabe 10.3 prüft mit synthetischen Mustern und dokumentiert die Grenzen]`
 

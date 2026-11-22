@@ -2,10 +2,14 @@ package ch.urinet.archiv.benutzer.adapter.out.stub;
 
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Neuanlage;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.ErforderlicheAktion;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +42,21 @@ class IdentitaetsDienstStubTest {
         assertThatThrownBy(() -> dienst.rolleSetzen("b", id, Rolle.INHABER)).isInstanceOf(FachFehler.class)
                 .extracting(e -> ((FachFehler) e).code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN);
         assertThat(dienst.benutzerLesen("a", id).rollen()).containsExactly(Rolle.MITARBEITER);
+    }
+
+    @Test
+    void erforderlicheAktionenErgaenzenOhneAndereAktionenOderMandantenZuAendern() {
+        var dienst = new IdentitaetsDienstStub();
+        String id = dienst.anlegen("a", new Neuanlage("beispiel", "a@example.test", "Test", "Person"),
+                Rolle.MITARBEITER);
+        dienst.einladen("a", id, Set.of(ErforderlicheAktion.VERIFY_EMAIL), Duration.ofHours(1));
+
+        assertThatThrownBy(() -> dienst.aktionenHinzufuegen("b", id, Set.of(ErforderlicheAktion.UPDATE_PASSWORD)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN));
+        dienst.aktionenHinzufuegen("a", id, Set.of(ErforderlicheAktion.UPDATE_PASSWORD));
+        assertThat(dienst.benutzerLesen("a", id).aktionen())
+                .containsExactlyInAnyOrder(ErforderlicheAktion.VERIFY_EMAIL, ErforderlicheAktion.UPDATE_PASSWORD);
     }
 
     @Test

@@ -4,7 +4,7 @@ import java.util.UUID;
 
 public interface VerwaltungGrenzen {
 
-    enum Art { BENUTZER, ANLEGEN, EMAIL, EINSTELLUNG }
+    enum Art { BENUTZER, ANLEGEN, EMAIL, EMAIL_AENDERUNG, EINSTELLUNG }
 
     /**
      * Prüft die Grenzen und sperrt die Prüfung für den Mandanten bis zum Transaktionsende.
