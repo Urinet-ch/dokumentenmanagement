@@ -44,7 +44,8 @@ public class VerwaltungVorgang {
     }
 
     private static final Set<ProtokollAktion> AKTIONEN = Set.of(ProtokollAktion.BENUTZER_ANLEGEN,
-            ProtokollAktion.BENUTZER_AENDERN, ProtokollAktion.BENUTZER_LOESCHEN, ProtokollAktion.ROLLE_ZUWEISEN);
+            ProtokollAktion.BENUTZER_AENDERN, ProtokollAktion.BENUTZER_LOESCHEN, ProtokollAktion.ROLLE_ZUWEISEN,
+            ProtokollAktion.BENUTZER_ANTRAG);
 
     private final Vorgangssperre sperre;
     private final VerwaltungGrenzen grenzen;
@@ -253,6 +254,12 @@ public class VerwaltungVorgang {
             case ROLLE_ZUWEISEN -> {
                 if (vorgang != ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN) {
                     throw new IllegalArgumentException("Ungültiger Rollenvorgang");
+                }
+                yield VerwaltungGrenzen.Art.BENUTZER;
+            }
+            case BENUTZER_ANTRAG -> {
+                if (vorgang != ProtokollDetails.Verwaltungsvorgang.ANTRAG) {
+                    throw new IllegalArgumentException("Ungültiger Antragsvorgang");
                 }
                 yield VerwaltungGrenzen.Art.BENUTZER;
             }
