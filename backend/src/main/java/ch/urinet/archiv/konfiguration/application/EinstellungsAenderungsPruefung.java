@@ -51,6 +51,14 @@ public class EinstellungsAenderungsPruefung {
     }
 
     public void wissenPruefen(Einstellungen vorher, Einstellungen ziel, boolean explizit, boolean vollstaendigerStand) {
+        List<KonfigurationUngueltig.Befund> befunde = wissenBefunde(vorher, ziel, explizit, vollstaendigerStand);
+        if (!befunde.isEmpty()) {
+            throw new KonfigurationUngueltig(befunde);
+        }
+    }
+
+    public List<KonfigurationUngueltig.Befund> wissenBefunde(Einstellungen vorher, Einstellungen ziel,
+                                                              boolean explizit, boolean vollstaendigerStand) {
         var bisher = vollstaendigerStand ? wissen.lesen() : null;
         boolean eigenerLiveWert = bisher != null && (bisher.budgetTokens() != null || bisher.lintBudgetTokens() != null
                 || bisher.monatsbudgetTokens() != null || bisher.lintZeitplan() != null);
@@ -59,9 +67,10 @@ public class EinstellungsAenderungsPruefung {
                 || zielWissen.lintBudgetTokens() != null || zielWissen.monatsbudgetTokens() != null
                 || zielWissen.lintZeitplan().wochentag() != null || zielWissen.lintZeitplan().stunde() != null);
         if (explizit || eigenerLiveWert || eigenerVersionswert || !vorher.wissen().equals(zielWissen)) {
-            throw new KonfigurationUngueltig(List.of(new KonfigurationUngueltig.Befund("einstellungen.wissen",
+            return List.of(new KonfigurationUngueltig.Befund("einstellungen.wissen",
                     "WISSEN_NOCH_NICHT_UEBERFUEHRT",
-                    "Ändern Sie die Wissenseinstellungen bis zur Überführung über /wissensbasis/einstellungen.")));
+                    "Ändern Sie die Wissenseinstellungen bis zur Überführung über /wissensbasis/einstellungen."));
         }
+        return List.of();
     }
 }

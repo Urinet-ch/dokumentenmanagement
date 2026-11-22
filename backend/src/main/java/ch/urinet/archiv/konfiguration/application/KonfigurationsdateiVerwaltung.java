@@ -139,7 +139,6 @@ public class KonfigurationsdateiVerwaltung {
                     .map(befund -> new KonfigurationUngueltig.Befund(befund.pfad(), befund.code(), befund.meldung()))
                     .toList());
         }
-        einstellungsPruefung.wissenPruefen(aktuell.einstellungen(), analyse.ziel().einstellungen(), false, true);
         if (aktuell.gleicherInhalt(analyse.ziel())) {
             return new Ergebnis(aktuell.version(), analyse.aenderungen());
         }
@@ -243,6 +242,9 @@ public class KonfigurationsdateiVerwaltung {
     private Analyse analysieren(Konfiguration aktuell, KonfigurationsdateiCodec.Datei datei) {
         Konfiguration ziel = fehlendesAusBestandErhalten(aktuell, datei.inhalt());
         List<Befund> befunde = new ArrayList<>(ziel.pruefen());
+        einstellungsPruefung.wissenBefunde(aktuell.einstellungen(), ziel.einstellungen(), false, true).stream()
+                .map(befund -> new Befund(befund.pfad(), befund.code(), befund.meldung()))
+                .forEach(befunde::add);
         // Massgeblich ist die Tabelle ki_texte, nicht das gespeicherte Abbild (Req 6.6, 8.4).
         if (datei.inhalt().kiTexte().kiFreigegeben() != kiTexte.lesen().kiFreigegeben()) {
             befunde.add(new Befund("kiTexte.kiFreigegeben", "KI_FREIGABE_UNGUELTIG",

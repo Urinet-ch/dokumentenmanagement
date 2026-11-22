@@ -361,13 +361,7 @@ Anmeldung und Mandantenprüfung tragen den aktuellen ETag; vor der Anmeldung ode
 413-Antwort wird keine Mandantenversion offengelegt. Bisherige Chat-Startwerte mit Tagen werden als ISO-Periode
 angezeigt; ein bisheriger Cron-Zeitplan, der nicht einem einzelnen Wochentag und einer Stunde entspricht, wird mit
 Hinweis statt eines erfundenen Katalogwerts angezeigt. Die Umstellung der Wissensschnittstelle und Verbraucher folgt in
-20.3 und 20.4; bis dahin zeigt der Katalog die tatsächlich wirksamen Wissenswerte aus `wissens_einstellung`, deren
-Herkunft und die instanzweiten Standards; `betrieb` zeigt das bisher wirksame Wissensbudget. Die neue Schnittstelle
-lehnt Wissens-Patches und Rücksetzungen der Wissensgruppe mit einem erklärenden Befund ab; Änderungen bleiben über
-`/wissensbasis/einstellungen` möglich. Dateiimport und Rücksetzung auf eine historische Version werden auch abgelehnt,
-wenn sie Wissenswerte ändern würden oder bestehende eigene Wissenswerte sonst als zurückgesetzt erscheinen könnten.
-Vorschau, App, Dateiimport und Betreiberkommando quittieren damit keine noch unwirksame Wissensänderung. Aufgabe 20.3
-übernimmt die bestehenden Werte und hebt diese Übergangssperre mit der Umstellung der Verbraucher auf.
+20.3 und 20.4; bis dahin zeigt `betrieb` das bisher wirksame Wissensbudget.
 
 **Auswirkung** (`Auswirkung`, Beispiele): kürzere Aufbewahrung: «Beim nächsten Aufräumlauf werden N Fragen gelöscht» (Zahl aus
 der Datenbank, Text deutsch); `geschaeftsjahrEnde`: «Gilt für künftig bestätigte Dokumente; bereits archivierte Fristen und
@@ -741,3 +735,14 @@ bestätigt ihn mit Step-up. Rollenzuweisungen widerrufen bestehende Tokens. Unsi
 Ein internes Ereignis kennzeichnet erfolgreiche Inhabervergaben; die Alarmzustellung folgt in 19.13. Die
 Löschwirkung und die Bestätigung von Löschanträgen folgen in 19.12. Die Benutzeransicht liefert den Verweis und
 Hinweis zu API-Tokens; die Anzeige in der Oberfläche folgt in 20.6/20.7.
+
+## Nachtrag Umsetzung (Aufgabe 20.2, 23.11.2026)
+
+Bis zur Überführung in 20.3 zeigt der Katalog die tatsächlich wirksamen Wissenswerte aus `wissens_einstellung`,
+deren Herkunft und die instanzweiten Standards; `betrieb` zeigt das bisher wirksame Wissensbudget. Die neue
+Schnittstelle lehnt Wissens-Patches und Rücksetzungen der Wissensgruppe mit einem erklärenden Befund ab; Änderungen
+bleiben über `/wissensbasis/einstellungen` möglich. Dateiimport und Rücksetzung auf eine historische Version werden
+auch abgelehnt, wenn sie Wissenswerte ändern würden oder bestehende eigene Wissenswerte sonst als zurückgesetzt
+erscheinen könnten. Vorschau, App, Dateiimport und Betreiberkommando quittieren damit keine noch unwirksame
+Wissensänderung. Aufgabe 20.3 übernimmt die bestehenden Werte und hebt diese Übergangssperre mit der Umstellung der
+Verbraucher auf.

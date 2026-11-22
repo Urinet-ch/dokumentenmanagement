@@ -211,6 +211,12 @@ class MandantEinstellungenResourceTest {
             Response export = given().auth().oauth2(urinet).get("/api/v1/konfiguration");
             ObjectNode datei = (ObjectNode) new ObjectMapper().readTree(export.asString());
             ((ObjectNode) datei.path("einstellungen").path("wissen")).put("budgetTokens", 234567);
+            for (String aktion : new String[] {"pruefen", "vergleichen"}) {
+                Response pruefung = given().auth().oauth2(urinet).contentType("application/json")
+                        .body(datei.toString()).post("/api/v1/konfiguration/" + aktion);
+                assertThat(pruefung.statusCode()).as(pruefung.asString()).isEqualTo(200);
+                assertThat(pruefung.asString()).contains("WISSEN_NOCH_NICHT_UEBERFUEHRT");
+            }
             Response importAntwort = given().auth().oauth2(urinet).contentType("application/json")
                     .body(datei.toString()).put("/api/v1/konfiguration");
             assertWissenGesperrt(importAntwort);
