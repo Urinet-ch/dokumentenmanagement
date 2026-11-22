@@ -231,6 +231,7 @@ export class Start {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly fokus = signal<{ ziel: string } | null>(null);
   private readonly wiederaufruf = signal(false);
+  private readonly route = inject(ActivatedRoute);
   /** Ohne Verbindung ist keine Anmeldung möglich; «Erfassen» nimmt dann Aufnahmen in die Warteschlange (Req 4.4). */
   protected readonly online = inject(ONLINE);
   /** Ziel nach der Anmeldung (vom Guard gesetzt). */
@@ -247,7 +248,7 @@ export class Start {
   private readonly zaehler = inject(EingangskorbZaehler, { optional: true });
 
   constructor() {
-    inject(ActivatedRoute).queryParamMap.pipe(takeUntilDestroyed()).subscribe((parameter) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((parameter) => {
       this.wiederaufruf.set(parameter.has('einfuehrung'));
     });
     effect(() => {
@@ -284,6 +285,7 @@ export class Start {
   }
 
   protected anmelden(): void {
-    void this.anmeldung.anmelden(this.ziel() ?? '/');
+    const ziel = this.route.snapshot.queryParamMap.has('einfuehrung') ? '/?einfuehrung=' : '/';
+    void this.anmeldung.anmelden(this.ziel() ?? ziel);
   }
 }
