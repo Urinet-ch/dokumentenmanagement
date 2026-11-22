@@ -200,7 +200,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Auslegungen (Review entscheidet): «Speicher» zählt alle Objektversionen (`listObjectVersions`), nicht nur die aktuellen Objekte; Speicher und Dokumente je Status sind der Stand bei der Erhebung (nicht zum Monatsende), nur KI-Tokens und Chat-Fragen sind auf das Fenster begrenzt; Mail ist mindestens-einmal; ohne Empfänger bleibt der Bericht gespeichert und die Planung reiht täglich neu ein (WARN als Betreibersignal)
   - _Anforderungen: 8.1_
 
-- [ ] 12.2 Vollexport und Abbau [Backend]
+- [x] 12.2 Vollexport und Abbau [Backend]
   - `MANDANT_EXPORT` (alle Jahre, Original + Arbeitsfassung + PDF/A, Metadaten JSON/CSV, Manifeste); Kommando `mandant abbauen` mit 30-Tage-Frist, Liste gesperrter Objekte und Ablaufdatum der Sicherungsstände
   - Teilstand PR #239: Vollexport und wiederholbarer Abbau mit Trockenlauf, Bestätigung, Sperrprüfung und Bericht umgesetzt. Req 8.3 angepasst (Entscheid Fabian 17.11.2026): gemeinsame Realm-Clients bleiben bestehen, der Abbau entfernt den Mandantenzugang, ein Client-Lifecycle-Port entfällt; siehe design.md «Mandantenverwaltung». Bericht an Req 8.3 angeglichen: Zustand `ABGESCHLOSSEN` ohne Zusatz, Bericht nennt Mandantenzugang und den Handschritt (Client, Benutzer); `MandantAbbauTest` belegt, dass der abgebaute Mandant nicht mehr auflösbar ist.
   - Restnachweis 22.11.2026: `MandantEigentuemerTest.mandantenschemaAbbauErhaeltGemeinsameNamenssperre` löscht ein echtes Mandantenschema und prüft anschliessend, dass `public.benutzername_sperre` und der gesperrte Hash erhalten bleiben; das Mandantenschema ist entfernt.
@@ -208,6 +208,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Entscheid Fabian 22.11.2026: Die aktuelle Konfigurationsdatei darf höchstens 1 MiB gross sein, sonst wird der gesamte Export mit einer eindeutigen Fehlermeldung abgelehnt; historische Versionen bleiben unbegrenzt. Die Prüfung der Dateigrösse vor der Materialisierung und der Nachweis für denselben Versionsstand sind noch offen.
   - Teilstand: Ein Fehler beim Lesen der aktuellen Konfiguration bricht vor dem ersten ZIP-Byte ab (`MandantVollexportSchreiberTest.fehlerDerAktuellenKonfigurationSchreibtKeinTeilZip`); die eigentliche Grenzprüfung und ihre Fehlermeldung fehlen noch.
   - Nachweis Teilstand: `MandantVollexportDbTest` prüft 201 Versionen, ein Abbild über 128 KiB und zwei Mandanten; `MandantVollexportKnapperHeapTest` prüft den ZIP-Schreiber mit 201 Versionen und einem synthetischen 128-MiB-Abbild bei 64 MiB Heap. Der Heap-Test simuliert die Datenquelle und belegt nicht den Speicherbedarf der aktuellen Konfigurationsdatei.
+  - Abschluss 22.11.2026: Die oben als offen bezeichnete Grenze und Fehlermeldung sind umgesetzt. `MandantVollexportDbTest` prüft unter, auf und über 1 MiB, alte Abbilder und einen Versionswechsel; eine eigene JVM mit 32 MiB Heap exportiert die Datei an der Grenze und lehnt einen 36-MiB-Regelparameter ohne Teil-ZIP ab. `MandantVollexportHandlerTest` prüft Status und Kommandoausgabe; das Szenario `@req-8.2` prüft den abgebrochenen Export.
   - _Anforderungen: 8.2, 8.3, 8.5_
 
 - [ ] 12.3 Isolations- und Sicherheitstests [QA]

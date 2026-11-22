@@ -373,6 +373,11 @@ class MandantAbbauTest {
                 public boolean fehler(UUID id, UUID fehlerId) {
                     throw new UnsupportedOperationException();
                 }
+
+                @Override
+                public boolean fehler(UUID id, UUID fehlerId, Fehlerart art) {
+                    throw new UnsupportedOperationException();
+                }
             };
             AblagePort ablage = (AblagePort) Proxy.newProxyInstance(AblagePort.class.getClassLoader(),
                     new Class<?>[]{AblagePort.class}, (proxy, methode, argumente) -> {

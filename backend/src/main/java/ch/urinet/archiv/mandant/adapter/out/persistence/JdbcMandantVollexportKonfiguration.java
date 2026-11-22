@@ -2,8 +2,6 @@ package ch.urinet.archiv.mandant.adapter.out.persistence;
 
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantVollexportKonfiguration;
-import ch.urinet.archiv.gemeinsam.domain.FachFehler;
-import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -70,12 +68,20 @@ public class JdbcMandantVollexportKonfiguration implements MandantVollexportKonf
                             select jsonb_agg(
                                 jsonb_build_object('code', k->'code', 'name', k->'name',
                                     'beschreibung', k->'beschreibung',
-                                    'werte', coalesce(nullif(k->'werte', 'null'::jsonb), '[]'::jsonb),
-                                    'mehrfach', coalesce(k->'mehrfach', 'false'::jsonb),
-                                    'kiVorschlag', coalesce(k->'kiVorschlag', 'false'::jsonb),
-                                    'suchfilter', coalesce(k->'suchfilter', 'false'::jsonb),
-                                    'oeffentlichFilter', coalesce(k->'oeffentlichFilter', 'false'::jsonb),
-                                    'aktiv', coalesce(k->'aktiv', 'false'::jsonb))
+                                    'werte', coalesce((
+                                        select jsonb_agg(jsonb_build_object('code', w->'code', 'name', w->'name',
+                                            'beschreibung', w->'beschreibung',
+                                            'reihenfolge', coalesce(nullif(w->'reihenfolge', 'null'::jsonb), '0'::jsonb),
+                                            'aktiv', coalesce(nullif(w->'aktiv', 'null'::jsonb), 'false'::jsonb))
+                                            order by ord)
+                                        from jsonb_array_elements(coalesce(nullif(k->'werte', 'null'::jsonb),
+                                            '[]'::jsonb)) with ordinality as werte(w, ord)), '[]'::jsonb),
+                                    'mehrfach', coalesce(nullif(k->'mehrfach', 'null'::jsonb), 'false'::jsonb),
+                                    'kiVorschlag', coalesce(nullif(k->'kiVorschlag', 'null'::jsonb), 'false'::jsonb),
+                                    'suchfilter', coalesce(nullif(k->'suchfilter', 'null'::jsonb), 'false'::jsonb),
+                                    'oeffentlichFilter', coalesce(nullif(k->'oeffentlichFilter', 'null'::jsonb),
+                                        'false'::jsonb),
+                                    'aktiv', coalesce(nullif(k->'aktiv', 'null'::jsonb), 'false'::jsonb))
                                 order by k->>'code' collate "C" nulls first)
                             from jsonb_array_elements(coalesce(nullif(s.inhalt->'klassifikationen', 'null'::jsonb),
                                 '[]'::jsonb)) k), '[]'::jsonb),
@@ -97,19 +103,22 @@ public class JdbcMandantVollexportKonfiguration implements MandantVollexportKonf
                                         else jsonb_build_object('jahre', a #> '{aufbewahrung,jahre}',
                                             'ab', a #> '{aufbewahrung,ab}', 'feld', a #> '{aufbewahrung,feld}')
                                         end,
-                                    'gesetzlichePflicht', coalesce(a->'gesetzlichePflicht', 'false'::jsonb),
-                                    'aktiv', coalesce(a->'aktiv', 'false'::jsonb),
-                                    'selbstAusgestellt', coalesce(a->'selbstAusgestellt', 'false'::jsonb),
+                                    'gesetzlichePflicht', coalesce(nullif(a->'gesetzlichePflicht', 'null'::jsonb),
+                                        'false'::jsonb),
+                                    'aktiv', coalesce(nullif(a->'aktiv', 'null'::jsonb), 'false'::jsonb),
+                                    'selbstAusgestellt', coalesce(nullif(a->'selbstAusgestellt', 'null'::jsonb),
+                                        'false'::jsonb),
                                     'belegnummerMuster', coalesce(nullif(a->'belegnummerMuster', 'null'::jsonb),
                                         '[]'::jsonb),
                                     'fremdbelegArt', a->'fremdbelegArt',
                                     'ohneZahlungsdatenArt', a->'ohneZahlungsdatenArt',
-                                    'kiVorschlag', coalesce(a->'kiVorschlag', 'false'::jsonb),
+                                    'kiVorschlag', coalesce(nullif(a->'kiVorschlag', 'null'::jsonb), 'false'::jsonb),
                                     'kiFelder', coalesce(nullif(a->'kiFelder', 'null'::jsonb), '[]'::jsonb),
-                                    'kiHinweise', a->'kiHinweise', 'reihenfolge', coalesce(a->'reihenfolge', '0'::jsonb),
+                                    'kiHinweise', a->'kiHinweise',
+                                    'reihenfolge', coalesce(nullif(a->'reihenfolge', 'null'::jsonb), '0'::jsonb),
                                     'klassifikationen', coalesce((
                                         select jsonb_agg(jsonb_build_object('code', z->'klassifikation',
-                                            'pflicht', coalesce(z->'pflicht', 'false'::jsonb),
+                                            'pflicht', coalesce(nullif(z->'pflicht', 'null'::jsonb), 'false'::jsonb),
                                             'standardWert', z->'standardWert') order by ord)
                                         from jsonb_array_elements(coalesce(
                                             nullif(a->'klassifikationen', 'null'::jsonb), '[]'::jsonb))
@@ -121,7 +130,7 @@ public class JdbcMandantVollexportKonfiguration implements MandantVollexportKonf
                             select jsonb_agg(jsonb_build_object(
                                 'code', r->'code', 'art', r->'art', 'typ', r->'typ', 'parameter', r->'parameter',
                                 'schwere', r->'schwere', 'meldung', r->'meldung',
-                                'aktiv', coalesce(r->'aktiv', 'false'::jsonb))
+                                'aktiv', coalesce(nullif(r->'aktiv', 'null'::jsonb), 'false'::jsonb))
                                 order by r->>'code' collate "C" nulls first)
                             from jsonb_array_elements(coalesce(nullif(s.inhalt->'regeln', 'null'::jsonb),
                                 '[]'::jsonb)) r), '[]'::jsonb)
@@ -140,7 +149,7 @@ public class JdbcMandantVollexportKonfiguration implements MandantVollexportKonf
                     throw new IllegalStateException("Aktuelle Konfiguration oder KI-Texte fehlen");
                 }
                 if (zeile.getLong(2) > MAX_KONFIGURATION_BYTES) {
-                    throw new FachFehler(Fehlercode.DATEI_ZU_GROSS);
+                    throw new ZuGross();
                 }
                 return new Version(zeile.getInt(1), zeile.getString(3));
             }
