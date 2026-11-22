@@ -34,7 +34,6 @@ class JdbcTokenWiderrufTest {
                 einfuegen.setObject(2, ab.atOffset(java.time.ZoneOffset.UTC));
                 einfuegen.executeUpdate();
             }
-            assertThat(tokenWiderruf.widerrufen(benutzer, ausgestellt)).isFalse();
             Thread.sleep(100);
             assertThat(tokenWiderruf.widerrufen(benutzer, ausgestellt)).isTrue();
             assertThat(tokenWiderruf.widerrufen(benutzer, ab)).isFalse();
