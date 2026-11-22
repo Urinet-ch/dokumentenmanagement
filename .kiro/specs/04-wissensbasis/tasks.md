@@ -229,6 +229,24 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 20.3, 20.6, 20.8, 20.11_
   - _Abhängig von: 17.1, 17.2_
 
+## Welle 18 — Wissenschat und Archivchat (Entscheid Fabian 22.11.2026, Requirement 21; Umsetzung nach Welle 17 und Spec 02, Welle 10)
+- [ ] 18.1 Modus im Chat und Werkzeuge [Backend]
+  - Changeset `chat_gespraech.modus`, `POST /chat/gespraeche {modus}`, Werkzeugliste und Systemprompt `wissen-chat`, Recht A15, `ki_verbrauch`-Zweck `WISSEN_CHAT`; Szenarien `@req-21.1` bis `@req-21.3`, `@req-21.5`, `@req-21.7`.
+  - _Anforderungen: 21.1, 21.2, 21.3, 21.5, 21.7_
+  - _Abhängig von: 15.2, 17.1_
+- [ ] 18.2 Oberfläche Modusauswahl [Frontend]
+  - Auswahl beim neuen Gespräch, Kennzeichen im Gespräch und in der Liste, Anleitung `chat.md` und `wissen.md` nachziehen; Feld `modus` im Bewertungsexport (Spec 02, 10.3).
+  - _Anforderungen: 21.4_
+  - _Abhängig von: 18.1_
+- [ ] 18.3 Öffentlicher Wissenschat [Backend] [Frontend]
+  - Kennzeichen «für Webseite» je Seite (A16, Protokoll), `/public/v1/wissen/chat`, eigene Werkzeuge, Prüfung bei jeder Anfrage, Grenzen und Budget, Schalter je Mandant; Marker `[offen: …]` im Design auflösen; Plugin (Spec 03, 11.5) nur als Hinweis.
+  - _Anforderungen: 21.6_
+  - _Abhängig von: 18.1, Spec 03: 11.2_
+- [ ] 18.4 Isolations- und Abnahmetests [QA]
+  - Mandantentrennung, A15 (403), Modus fest, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar, öffentliche Auslieferung nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug, Prompt-Injection aus Seiteninhalt.
+  - _Anforderungen: 21.8_
+  - _Abhängig von: 18.3_
+
 ## Optionen
 Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort. O.5 ist seit dem 18.11.2026 in den Plan übernommen (15.6 bis 15.8).
 
