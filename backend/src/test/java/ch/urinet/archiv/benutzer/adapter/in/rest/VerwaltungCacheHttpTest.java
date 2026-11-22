@@ -4,7 +4,7 @@ import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.BenutzerNamen;
 import ch.urinet.archiv.benutzer.application.BenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.StepUp;
-import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreBestandMigration;
@@ -288,7 +288,7 @@ class VerwaltungCacheHttpTest {
                 .post(pfad + UUID.randomUUID() + "/zugang-zuruecksetzen")
                 .then().statusCode(401).body("fehlercode", is("STEP_UP_NOETIG"));
 
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -342,7 +342,7 @@ class VerwaltungCacheHttpTest {
                 .delete(pfad + UUID.randomUUID() + "/google-verknuepfung")
                 .then().statusCode(401).body("fehlercode", is("STEP_UP_NOETIG"));
 
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -367,7 +367,7 @@ class VerwaltungCacheHttpTest {
         given().auth().oauth2(token).contentType("application/json").body("{\"email\":\"neu@example.invalid\"}")
                 .patch(pfad + UUID.randomUUID()).then().statusCode(401).body("fehlercode", is("STEP_UP_NOETIG"));
 
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -449,7 +449,7 @@ class VerwaltungCacheHttpTest {
 
     @Test
     void vergebeneEmailBleibtNeutralUndGibtDieVorgangssperreFrei() {
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -556,7 +556,7 @@ class VerwaltungCacheHttpTest {
 
     @Test
     void fehlversuchssperreIstSichtbarUndKannAufgehobenWerden() {
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -591,7 +591,7 @@ class VerwaltungCacheHttpTest {
 
     @Test
     void kontoOhneRolleKannDeaktiviertUndZurueckgesetztWerden() {
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -612,7 +612,7 @@ class VerwaltungCacheHttpTest {
 
     @Test
     void anlegenPrueftRollenNamenssperreUndVierAugen() throws SQLException {
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -675,7 +675,7 @@ class VerwaltungCacheHttpTest {
 
     @Test
     void hoechstzahlZaehltAuchDeaktivierteBenutzer() {
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -692,7 +692,7 @@ class VerwaltungCacheHttpTest {
 
     @Test
     void fehlerBeimVersandEntferntBenutzerUndHaeltUnklareSperre() throws SQLException {
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
@@ -743,7 +743,7 @@ class VerwaltungCacheHttpTest {
 
     @Test
     void eindeutigAbgewiesenerVersandGibtSperreNachKompensationFrei() throws SQLException {
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);

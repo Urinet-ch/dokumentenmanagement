@@ -250,9 +250,19 @@ Richtung): Lesen, sperren, deaktivieren, Einladung erneut senden. `StepUp` liest
 (Muster RFC 9470). Die App leitet mit `max_age=0` und `prompt=login` zu Keycloak; der Browser-Flow
 `browser-totp-pflicht` verlangt dann Passwort und TOTP (der Cookie-Zweig greift bei `prompt=login` nicht; Nachweis im
 Test gegen echtes Keycloak).
-Bis zur Umsetzung 19.10 verweigert der Standardadapter `StepUpAusstehend` jede geschützte Aktion mit
-`STEP_UP_NOETIG` und dem Standardwert 300 Sekunden; er gewährt nie eine Anmeldung. 19.10 ersetzt ihn durch die
-Claim-Prüfung mit konfigurierter Gültigkeit.
+`StepUpMitAuthTime` prüft den Claim des Benutzer-JWTs; fehlende, ungültige, zukünftige oder zu alte Werte verlangen die
+erneute Anmeldung. Die Gültigkeit muss in ganzen Sekunden positiv und höchstens 15 Minuten sein. `StepUpAusstehend`
+bleibt als einfacher Testadapter verfügbar; der produktive `StepUpMitAuthTime` ist der `@DefaultBean`.
+
+#### Umsetzung (Aufgabe 19.10, 22.11.2026)
+- `StepUpMitAuthTime` liest `auth_time` aus dem JWT in der aktuellen `SecurityIdentity` und verwendet standardmässig
+  `PT5M`; die Startkonfiguration lehnt Null, Teilsekunden und Werte über `PT15M` ab. `StepUpNoetig` liefert die bestehende
+  RFC-9470-Antwort mit der konfigurierten `max_age`. Nicht-JWT-Zugänge werden mit `NICHT_ERLAUBT` abgewiesen.
+- Der echte Keycloak-Test prüft einen abgelaufenen Token (401 samt `max_age`), einen alleinigen SSO-Cookie (weiterhin
+  401) und `prompt=login`: der Browser verlangt Passwort und TOTP, danach erreicht der frische Token die Eingabeprüfung.
+  Cucumber weist Mitarbeiter, API-Tokens und Webseiten-Schlüssel für die Benutzerverwaltung ab (Req 7.3, 7.9).
+- Entscheid Fabian 22.11.2026 (#453): Für Req 7.2 genügt das erneuerte `auth_time` nach `prompt=login&max_age=0`;
+  ein `amr`-Nachweis wird nicht verlangt.
 
 ### Passkey (Requirement 10)
 Entscheid Fabian 21.11.2026: zusätzlicher Anmeldeweg, ersetzt Passwort und TOTP; Passwort plus TOTP bleibt; Admin setzt zurück;
@@ -277,8 +287,8 @@ Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach Aufgabe 19.10; 
   `delete_credential`; die Benutzerverifikation ist verpflichtend, Attestation `none`. Die Konto-Scope-Zuordnung
   ermöglicht die erforderlichen Kontofunktionen. Der Spike prüfte Einrichtung und Entfernung.
 - Ein Access-Token nach Passkey-Anmeldung enthält `auth_time`, `acr=1`, aber keinen `amr`-Claim. Bei
-  `prompt=login&max_age=0` wurde `auth_time` erneuert. `acr=1` identifiziert die Anmeldeart nicht; ob für Requirement 7.2
-  die Prüfung von `auth_time` genügt, ist ein Entscheid für Fabian und wird nicht durch diesen Spike vorweggenommen.
+  `prompt=login&max_age=0` wurde `auth_time` erneuert. `acr=1` identifiziert die Anmeldeart nicht; gemäss Entscheid
+  Fabian 22.11.2026 (#453) genügt das erneuerte `auth_time` für Requirement 7.2, ein `amr`-Nachweis ist nicht verlangt.
 - Die RP-ID wird aus der konfigurierten App-Basisadresse abgeleitet. Weil die Keycloak-Origin eine andere Origin ist,
   liefert die App `/.well-known/webauthn` mit der konfigurierten Keycloak-Origin; die Betriebsanleitung steht in
   `docs/passkey-related-origins.md`. Ein synthetischer Chromium-Spike bestätigte die Related-Origin-Konfiguration;
