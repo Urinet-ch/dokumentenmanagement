@@ -1,4 +1,5 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { afterNextRender, inject, Injectable, Injector, computed, signal } from '@angular/core';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle } from '../gemeinsam/anmeldung/rechte';
 
@@ -8,6 +9,9 @@ export class HilfeLeiste {
   readonly offen = signal(false);
   readonly anker = signal<string | null>(null);
   private ausloeser: HTMLElement | null = null;
+  private fokusGeneration = 0;
+  private readonly dokument = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
   private readonly anmeldung = inject(AnmeldungService);
 
   /** Rolle für Kontext und Inhaltsverzeichnis (Req 4.3, 6.2): nur mit Anmeldung, Mandant und Rolle, sonst `null`. */
@@ -17,6 +21,7 @@ export class HilfeLeiste {
   });
 
   oeffnen(anker: string | null, ausloeser: HTMLElement): void {
+    this.fokusGeneration++;
     this.anker.set(anker);
     this.ausloeser = ausloeser;
     this.offen.set(true);
@@ -27,16 +32,29 @@ export class HilfeLeiste {
   }
 
   schliessen(): void {
+    if (!this.offen()) return;
+
     this.offen.set(false);
-  }
-
-  geaendert(offen: boolean): void {
-    if (!offen) this.offen.set(false);
-  }
-
-  geschlossen(): void {
+    const generation = ++this.fokusGeneration;
     const ausloeser = this.ausloeser;
-    this.ausloeser = null;
-    ausloeser?.focus();
+    afterNextRender(
+      () => {
+        if (generation !== this.fokusGeneration || this.offen()) return;
+
+        this.ausloeser = null;
+        const ziel = ausloeser?.isConnected
+          ? ausloeser
+          : this.dokument.querySelector<HTMLElement>('main .seitenkopf h1, main h1');
+        if (!ziel) return;
+
+        if (ziel !== ausloeser && !ziel.hasAttribute('tabindex')) ziel.tabIndex = -1;
+        if (!ziel.closest('[inert]')) ziel.focus({ preventScroll: true });
+      },
+      { injector: this.injector },
+    );
+  }
+
+  drawerGeschlossen(): void {
+    this.schliessen();
   }
 }

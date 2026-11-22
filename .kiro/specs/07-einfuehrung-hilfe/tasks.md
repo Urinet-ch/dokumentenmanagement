@@ -127,7 +127,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 4.6_
   - _Abhängig von: 22.3, 22.5_
 
-- [ ] 23.5 Barrierefreiheit, Datenschutz und Abdeckung [QA]
+- [x] 23.5 Barrierefreiheit, Datenschutz und Abdeckung [QA]
   - Szenarien mit axe für Einführung, Leiste und Seite bei 375 und 1280 px in hell und dunkel; Aufzeichnung der Anfragen
     (nur eigener Ursprung, keine zusätzlichen `/api/`-Aufrufe); Nachweis, dass die Spec-Prüfungen `@spec-07` erfassen
     (grüner Lauf von `ReqAbdeckungTest` und `SzenarienShardTest` mit den Feature-Dateien unter `features/hilfe/`); Liste
