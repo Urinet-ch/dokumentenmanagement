@@ -1,0 +1,91 @@
+# Arbeitsstand: nicht deployen; Budget- und Workflow-Anpassungen fehlen noch.
+# Ergänzung zu compose.yml. Nur gemeinsam mit der Basisdatei verwenden.
+# Startwerte für Stufe B; die Messung in 5.11 muss die Reserve nachweisen.
+services:
+  api:
+    mem_limit: 640m
+    cpus: 1.0
+    environment:
+      ARCHIV_ROLLE: api
+      ARCHIV_STUFE: B
+      ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-
+      ARCHIV_ABLAGE_MAX_SPERRFRIST: !reset null
+      ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST: !reset null
+      ARCHIV_ABLAGE_MANIFEST_SPERRMODUS: COMPLIANCE
+      QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "16"
+
+  worker:
+    image: archiv:current
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    volumes:
+      - type: volume
+        source: arbeit
+        target: /var/lib/archiv/arbeit
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 1024m
+    cpus: 2.0
+    init: true
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/archiv
+      QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
+      QUARKUS_LIQUIBASE_MIGRATE_AT_START: "false"
+      ARCHIV_ROLLE: worker
+      ARCHIV_STUFE: B
+      ARCHIV_WORKER_PARALLEL: "1"
+      ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-
+      ARCHIV_ABLAGE_MANIFEST_SPERRMODUS: COMPLIANCE
+      ARCHIV_TSA_DIENSTE: sgpki,freetsa
+      MALLOC_ARENA_MAX: "2"
+      JAVA_OPTS_APPEND: >-
+        -Djava.util.logging.manager=org.jboss.logmanager.LogManager
+        -Xmx256m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=32m
+        -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
+    secrets:
+      - archiv_db_app
+      - s3_app_zugang_id
+      - s3_app_zugang_geheimnis
+      - infomaniak_ai_token
+      - archiv_manifest_key
+      - archiv_data_key
+      - archiv_smtp_passwort
+    networks:
+      intern: {}
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /q/health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 && head -n1 <&3 | grep -q ' 200 '
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 120s
+
+  db:
+    mem_limit: 768m
+    cpus: 0.75
+    command:
+      - postgres
+      - -c
+      - shared_buffers=24MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=16MB
+      - -c
+      - max_connections=50
+      - -c
+      - effective_cache_size=64MB
+
+  kc:
+    mem_limit: 500m
+    cpus: 0.5
