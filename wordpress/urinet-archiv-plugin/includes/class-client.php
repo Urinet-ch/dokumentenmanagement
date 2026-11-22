@@ -19,6 +19,7 @@ final class Urinet_Archiv_Client {
 					'X-Archiv-Zugriff' => Urinet_Archiv_Einstellungen::stufe(),
 					'Content-Type'     => 'application/json',
 					'Accept'           => 'text/event-stream',
+					'X-Archiv-Client'  => self::client_hash(),
 				),
 				'timeout' => 30,
 				'body'    => wp_json_encode( array( 'frage' => $frage ) ),
@@ -46,6 +47,13 @@ final class Urinet_Archiv_Client {
 			status_header( 404 );
 			return;
 		}
+		$lock = 'ua_download_' . self::client_hash();
+		if ( get_transient( $lock ) ) {
+			status_header( 429 );
+			echo 'Zu viele Downloads gleichzeitig. Bitte versuchen Sie es später erneut.'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Feste Fehlermeldung.
+			return;
+		}
+		set_transient( $lock, 1, 120 );
 		$werte   = Urinet_Archiv_Einstellungen::werte();
 		$antwort = wp_safe_remote_get(
 			$werte['url'] . '/public/v1/dokumente/' . rawurlencode( $id ) . '/datei',
@@ -58,13 +66,31 @@ final class Urinet_Archiv_Client {
 			)
 		);
 		if ( is_wp_error( $antwort ) ) {
+			delete_transient( $lock );
 			status_header( 404 );
 			return;
 		}
 		$status = wp_remote_retrieve_response_code( $antwort );
+		$inhalt = wp_remote_retrieve_body( $antwort );
+		if ( 429 === $status ) {
+			status_header( 429 );
+			header( 'Content-Type: text/plain; charset=utf-8' );
+			echo 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Feste Fehlermeldung.
+			delete_transient( $lock );
+			return;
+		}
+		if ( 200 === $status ) {
+			$json = json_decode( $inhalt, true );
+			if ( is_array( $json ) && isset( $json['url'] ) && is_string( $json['url'] ) && '' !== esc_url_raw( $json['url'] ) ) {
+				wp_safe_redirect( esc_url_raw( $json['url'] ), 302 );
+				delete_transient( $lock );
+				return;
+			}
+		}
 		if ( in_array( $status, array( 301, 302 ), true ) ) {
 			$ziel = wp_remote_retrieve_header( $antwort, 'location' );
 			if ( $ziel ) {
+				delete_transient( $lock );
 				wp_safe_redirect( $ziel, $status );
 				return;
 			}
@@ -73,7 +99,15 @@ final class Urinet_Archiv_Client {
 		header( 'Cache-Control: private, no-store' );
 		$content_type = wp_remote_retrieve_header( $antwort, 'content-type' );
 		header( 'Content-Type: ' . ( $content_type ? $content_type : 'application/octet-stream' ) );
-		echo wp_remote_retrieve_body( $antwort ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+		echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+		delete_transient( $lock );
+	}
+
+	private static function client_hash(): string {
+		$benutzer = wp_get_current_user();
+		// The cookie is only hashed into an opaque client identifier and never used as a value.
+		$kennung = $benutzer instanceof WP_User && $benutzer->exists() ? (string) $benutzer->ID : (string) ( $_COOKIE[ LOGGED_IN_COOKIE ] ?? 'anonym' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+		return hash_hmac( 'sha256', $kennung, wp_salt( 'auth' ) . gmdate( 'Y-m-d' ) );
 	}
 
 	public static function lesen( string $pfad, array $parameter = array() ) {
@@ -160,8 +194,9 @@ final class Urinet_Archiv_Client {
 		}
 		$werte = Urinet_Archiv_Einstellungen::werte();
 		$kopf  = array(
-			'Authorization' => 'Bearer ' . $token,
-			'Accept'        => 'application/json',
+			'Authorization'   => 'Bearer ' . $token,
+			'Accept'          => 'application/json',
+			'X-Archiv-Client' => self::client_hash(),
 		);
 		if ( 'lesen' === $bereich ) {
 			$kopf['X-Archiv-Zugriff'] = Urinet_Archiv_Einstellungen::stufe();

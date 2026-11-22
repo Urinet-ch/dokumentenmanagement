@@ -9,11 +9,16 @@ final class Urinet_Archiv_Frontend {
 		add_shortcode( 'urinet_archiv_liste', array( self::class, 'liste' ) );
 		add_shortcode( 'urinet_archiv_suche', array( self::class, 'suche' ) );
 		add_shortcode( 'urinet_chatbot', array( self::class, 'chatbot' ) );
-		add_action( 'init', array( self::class, 'rewrite' ) );
+		self::rewrite();
 		add_action( 'template_redirect', array( self::class, 'route' ) );
 		add_action( 'rest_api_init', array( self::class, 'rest' ) );
 		add_filter( 'rest_pre_serve_request', array( self::class, 'serve_chat' ), 10, 4 );
 		add_action( 'wp_enqueue_scripts', array( self::class, 'skripte' ) );
+	}
+
+	public static function aktivieren(): void {
+		self::rewrite();
+		flush_rewrite_rules();
 	}
 
 	public static function bloecke(): void {
@@ -37,7 +42,8 @@ final class Urinet_Archiv_Frontend {
 	}
 
 	public static function skripte(): void {
-		if ( has_shortcode( get_post_field( 'post_content', get_queried_object_id() ), 'urinet_chatbot' ) ) {
+		$inhalt = get_post_field( 'post_content', get_queried_object_id() );
+		if ( has_shortcode( $inhalt, 'urinet_chatbot' ) || has_block( 'urinet-archiv/chatbot', get_queried_object_id() ) ) {
 			wp_enqueue_script(
 				'urinet-archiv-chatbot',
 				plugins_url( 'assets/chatbot.js', dirname( __DIR__ ) . '/urinet-archiv.php' ),
@@ -55,10 +61,10 @@ final class Urinet_Archiv_Frontend {
 
 	public static function liste( array $atts = array() ): string {
 		$parameter = array(
-			'pro_seite' => 20,
-			'seite'     => 1,
+			'pro_seite' => isset( $atts['pro_seite'] ) ? min( 100, max( 1, (int) $atts['pro_seite'] ) ) : 20,
+			'seite'     => isset( $atts['seite'] ) ? max( 1, (int) $atts['seite'] ) : 1,
 		);
-		foreach ( array( 'reihe', 'jahr', 'ausgabe', 'sortierung' ) as $feld ) {
+		foreach ( array( 'reihe', 'jahr', 'ausgabe', 'fachgebiet', 'sortierung' ) as $feld ) {
 			if ( isset( $atts[ $feld ] ) && is_scalar( $atts[ $feld ] ) ) {
 				$parameter[ $feld ] = sanitize_text_field( (string) $atts[ $feld ] );
 			}

@@ -18,19 +18,38 @@
 				if (!response.ok) throw new Error('chat');
 				return response.text();
 			}).then(function (stream) {
+				var quellen = [];
 				var text = stream.split('\n').filter(function (line) {
 					return line.indexOf('data:') === 0;
 				}).map(function (line) {
 					try {
 						var data = JSON.parse(line.slice(5).trim());
-						return data.delta || data.hinweis || '';
+						if (data.typ === 'quellen' || data.quellen) {
+							quellen = quellen.concat(data.quellen || []);
+							return '';
+						}
+						if (data.typ === 'fehler' || data.fehler) {
+							throw new Error(data.meldung || (data.fehler && data.fehler.meldung) || 'chat');
+						}
+						return data.delta || data.text || data.hinweis || '';
 					} catch (error) {
 						return '';
 					}
 				}).join('');
 				ausgabe.textContent = text || 'Es wurde keine Antwort gefunden.';
-			}).catch(function () {
-				ausgabe.textContent = 'Der Chatbot ist momentan nicht verfügbar. Bitte versuchen Sie es später erneut.';
+				quellen.forEach(function (quelle) {
+					if (quelle.url) {
+						var link = document.createElement('a');
+						link.href = quelle.url;
+						link.textContent = 'Quelle: ' + (quelle.titel || quelle.id || 'Dokument');
+						ausgabe.appendChild(document.createElement('br'));
+						ausgabe.appendChild(link);
+					}
+				});
+			}).catch(function (error) {
+				ausgabe.textContent = error.message && 'chat' !== error.message
+					? error.message
+					: 'Der Chatbot ist momentan nicht verfügbar. Bitte versuchen Sie es später erneut.';
 			});
 		});
 	});

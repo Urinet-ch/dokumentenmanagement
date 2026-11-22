@@ -29,3 +29,4 @@ add_action( 'admin_enqueue_scripts', array( 'Urinet_Archiv_Erfassung', 'skript' 
 register_deactivation_hook( __FILE__, array( 'Urinet_Archiv_Feed', 'deaktivieren' ) );
 add_action( 'init', array( 'Urinet_Archiv_Frontend', 'registrieren' ) );
 add_action( 'init', array( 'Urinet_Archiv_Frontend', 'bloecke' ) );
+register_activation_hook( __FILE__, array( 'Urinet_Archiv_Frontend', 'aktivieren' ) );
