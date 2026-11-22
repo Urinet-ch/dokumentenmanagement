@@ -148,6 +148,46 @@ class DriveImportTest {
     }
 
     @Test
+    void altbestandLeitetDokumentartJahrUndAusgabeAusPfadAb() throws IOException {
+        datei("Bulletin/2026/1.pdf", "%PDF-a");
+        datei("Bulletin/2026/3.pdf", "%PDF-b");
+
+        assertThat(lauf("--altbestand", "--klassifikation", "fachgebiet=bau")).isEqualTo(DriveImport.OK);
+
+        assertThat(anfragen).hasSize(2);
+        assertThat(anfragen.get(0)).contains("name=\"art\"", "BULLETIN",
+                "Reihe: BULLETIN; Jahr: 2026; Ausgabe: 1", "{\"fachgebiet\":[\"bau\"]}");
+        assertThat(anfragen.get(1)).contains("Reihe: BULLETIN; Jahr: 2026; Ausgabe: 3");
+        assertThat(aus.toString()).contains("Altbestand nach Reihe und Jahr (Dateien im Quellordner):",
+                "BULLETIN / 2026: 2 Dateien; Ausgabe-Nr. erkannt: [1, 3]; nicht erkannt: 0",
+                "Lücken: nicht geprüft; massgeblich ist der serverseitige Lückenbericht.");
+    }
+
+    @Test
+    void altbestandTrockenlaufErkenntDateienOhneKlassifikationZuLesen() throws IOException {
+        datei("Merkblatt/2025/12-2025.pdf", "%PDF-a");
+        tokenDatei = tmp.resolve("fehlt");
+
+        assertThat(lauf("--altbestand", "--trockenlauf")).isEqualTo(DriveImport.OK);
+
+        assertThat(anfragen).isEmpty();
+        assertThat(aus.toString()).contains("Reihe: MERKBLATT; Jahr: 2025; Ausgabe: 12",
+                "MERKBLATT / 2025: 1 Dateien; Ausgabe-Nr. erkannt: [12]; nicht erkannt: 0");
+    }
+
+    @Test
+    void altbestandLaedtUnbekannteReihenUndMehrdeutigeJahreNicht() throws IOException {
+        datei("Unbekannt/2026/1.pdf", "%PDF-a");
+        datei("Bulletin/2025/2026/2.pdf", "%PDF-b");
+
+        assertThat(lauf("--altbestand", "--klassifikation", "fachgebiet=bau")).isEqualTo(DriveImport.OK);
+
+        assertThat(anfragen).isEmpty();
+        assertThat(aus.toString()).contains("Reihe nicht erkannt", "Jahr mehrdeutig",
+                "Kontrolle: 2 = 0 + 0 + 2 + 0 (geht auf)");
+    }
+
+    @Test
     void klassifikationenOhneArtWerdenAbgelehntOhneAnfrage() throws IOException {
         datei("a.pdf", "%PDF-a");
 

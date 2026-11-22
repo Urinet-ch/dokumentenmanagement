@@ -148,6 +148,15 @@ public class DriveImportSchritte {
         ladenMitVorbelegung(ordner, null, null, null);
     }
 
+    @Wenn("der Drive-Import den Altbestand «{}» mit Klassifikation «{word}» und Wert «{word}» lädt")
+    public void altbestandLaden(String ordner, String klassifikation, String wert) throws SQLException {
+        List<String> argumente = importArgumente();
+        argumente.add("--altbestand");
+        argumente.addAll(List.of("--klassifikation", klassifikation + "=" + wert));
+        argumente.add(verzeichnis.resolve(ordner).toString());
+        starten(argumente.toArray(String[]::new));
+    }
+
     @Wenn("der Drive-Import den Ordner «{}» ins Archiv lädt und dabei Art «{word}» sowie Klassifikation «{word}» "
             + "mit Wert «{word}» vorbelegt")
     public void ladenMitKlassifikation(String ordner, String art, String klassifikation, String wert)
@@ -288,6 +297,21 @@ public class DriveImportSchritte {
         }
     }
 
+    @Dann("hat jedes importierte Dokument den Art-Vorschlag «{word}»")
+    public void artVorschlag(String art) throws SQLException {
+        assertThat(importiert).isNotEmpty();
+        for (UUID id : importiert) {
+            assertThat(abfragen("select ki_vorschlag ->> 'art' as art from " + schema(mandant)
+                    + ".dokument where id = ?::uuid", id.toString()))
+                    .as(id.toString()).containsExactly(Map.of("art", art));
+        }
+    }
+
+    @Dann("enthält der Altbestandsbericht «{}»")
+    public void altbestandBericht(String text) {
+        assertThat(ausgabe).contains(text);
+    }
+
     @Dann("ist für jedes importierte Dokument genau ein Auftrag «{word}» eingereiht")
     public void auftrag(String typ) throws SQLException {
         assertThat(importiert).isNotEmpty();
@@ -327,13 +351,17 @@ public class DriveImportSchritte {
 
     private void ladenMitVorbelegung(String ordner, String art, String klassifikation, String wert)
             throws SQLException {
-        List<String> argumente = new ArrayList<>(List.of("--archiv", "http://localhost:" + ConfigProvider.getConfig()
-                .getValue("quarkus.http.test-port", Integer.class), "--token-datei", tokenDatei.toString()));
+        List<String> argumente = importArgumente();
         if (art != null) {
             argumente.addAll(List.of("--art", art, "--klassifikation", klassifikation + "=" + wert));
         }
         argumente.add(verzeichnis.resolve(ordner).toString());
         starten(argumente.toArray(String[]::new));
+    }
+
+    private List<String> importArgumente() {
+        return new ArrayList<>(List.of("--archiv", "http://localhost:" + ConfigProvider.getConfig()
+                .getValue("quarkus.http.test-port", Integer.class), "--token-datei", tokenDatei.toString()));
     }
 
     private List<String> abschnitt(String titel) {

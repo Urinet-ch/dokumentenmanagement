@@ -54,6 +54,10 @@ public final class DriveImport implements Callable<Integer> {
     @Option(names = {"-n", "--trockenlauf"}, description = "Nur zählen und auflisten, nichts übertragen")
     boolean trockenlauf;
 
+    @Option(names = "--altbestand",
+            description = "VHF/GSK-Altbestand: Reihenordner als Dokumentart und Jahr/Ausgabe aus Pfad und Dateiname")
+    boolean altbestand;
+
     @Option(names = "--archiv", paramLabel = "URL", defaultValue = STANDARD_ARCHIV,
             description = "Adresse des Archivs (Standard: ${DEFAULT-VALUE}); http nur für localhost")
     String archiv;
@@ -64,7 +68,7 @@ public final class DriveImport implements Callable<Integer> {
     Path tokenDatei;
 
     @Option(names = "--art", paramLabel = "CODE",
-            description = "Dokumentart für die unbestätigte Vorbelegung; erforderlich mit --klassifikation")
+            description = "Dokumentart für die unbestätigte Vorbelegung; nicht mit --altbestand")
     String art;
 
     @Option(names = "--klassifikation", paramLabel = "CODE=WERT",
@@ -148,7 +152,7 @@ public final class DriveImport implements Callable<Integer> {
             }
         }
         List<Fund> funde = durchsuchen(wurzel);
-        Bericht bericht = new Bericht(trockenlauf, funde.size());
+        Bericht bericht = new Bericht(trockenlauf, altbestand, funde.size());
         aus.println((trockenlauf ? "Trockenlauf" : "Import nach " + ziel) + ": " + funde.size() + " Dateien in "
                 + anzeige(wurzel, wurzel));
         String abbruch = null;
@@ -180,13 +184,25 @@ public final class DriveImport implements Callable<Integer> {
                     aus.println("übersprungen:     " + pfad + " – " + einordnung.grund());
                 }
                 case SENDEN -> {
-                    String hinweis = OrdnerHinweis.von(wurzel, fund.pfad());
+                    AltbestandPfad altbestandPfad = null;
+                    if (altbestand) {
+                        AltbestandPfad.Erkennung erkennung = AltbestandPfad.erkennen(wurzel, fund.pfad());
+                        if (erkennung.pfad() == null) {
+                            bericht.uebersprungen(pfad, erkennung.grund());
+                            aus.println("übersprungen:     " + pfad + " – " + erkennung.grund());
+                            continue;
+                        }
+                        altbestandPfad = erkennung.pfad();
+                        bericht.altbestand(altbestandPfad);
+                    }
+                    String hinweis = OrdnerHinweis.von(wurzel, fund.pfad(), altbestandPfad);
+                    String artFuerDatei = altbestandPfad == null ? art : altbestandPfad.art();
                     if (client == null) {
                         bericht.uebertragen();
                         aus.println("würde übertragen: " + pfad + "  [" + hinweis + "]");
                     } else {
                         String name = OrdnerHinweis.sauber(fund.pfad().getFileName().toString());
-                        ArchivClient.Ergebnis ergebnis = client.senden(fund.pfad(), name, hinweis, art,
+                        ArchivClient.Ergebnis ergebnis = client.senden(fund.pfad(), name, hinweis, artFuerDatei,
                                 klassifikationen);
                         switch (ergebnis.status()) {
                             case UEBERTRAGEN -> {
@@ -220,11 +236,15 @@ public final class DriveImport implements Callable<Integer> {
     }
 
     private Map<String, List<String>> klassifikationen() {
-        if (art == null && klassifikationsangaben.isEmpty()) {
+        if (!altbestand && art == null && klassifikationsangaben.isEmpty()) {
             return Map.of();
         }
-        if (art == null || !ART_CODE.matcher(art).matches() || klassifikationsangaben.isEmpty()) {
-            fehler.println("--art und --klassifikation: bitte eine gültige Art und mindestens einen CODE=WERT angeben.");
+        if (altbestand && art != null || !altbestand && (art == null || !ART_CODE.matcher(art).matches())
+                || klassifikationsangaben.isEmpty() && (!altbestand || !trockenlauf)) {
+            fehler.println(altbestand
+                    ? "--altbestand: --art weglassen und mindestens einen CODE=WERT angeben; im Trockenlauf ist die "
+                            + "Klassifikation optional."
+                    : "--art und --klassifikation: bitte eine gültige Art und mindestens einen CODE=WERT angeben.");
             return null;
         }
         Map<String, List<String>> werte = new LinkedHashMap<>();
