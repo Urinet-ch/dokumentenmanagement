@@ -15,6 +15,12 @@ Funktionalität: WordPress-Grundgerüst
     Wenn die Einstellungsdaten ohne Längenangabe als Eingabestrom eintreffen
     Dann prüft das Plugin die Grösse und das feste Schema der Anfrage
 
+  @req-7.2
+  Szenario: Shortcodes und Gutenberg-Blöcke sind registriert
+    Angenommen ein WordPress mit dem Archiv-Plugin
+    Wenn alle Archiv-Shortcodes und Gutenberg-Blöcke eingerichtet sind
+    Dann sind alle Archiv-Shortcodes und Gutenberg-Blöcke registriert
+
   @req-7.3 @req-7.4
   Szenario: Die höchste WordPress-Rolle bestimmt den getrennten Cache
     Angenommen ein WordPress mit dem Archiv-Plugin
@@ -33,11 +39,12 @@ Funktionalität: WordPress-Grundgerüst
     Wenn ein Dokument im Lese-Feed zurückgezogen wird oder der Feed ausfällt
     Dann gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab
 
-  @req-5.8 @req-6.2
+  @req-5.8 @req-6.2 @req-7.6
   Szenario: Die Liste filtert nach öffentlichen Werten und zeigt Chatquellen
     Angenommen ein WordPress mit dem Archiv-Plugin
     Wenn Besucher die Archivliste und den Chat öffnen
     Dann zeigt das Plugin dynamische Filter, Seitennavigation und lesbare Chatquellen
+    Und übernimmt die Plugin-Ausgabe die Theme-Schrift und besteht WCAG 2.1 AA
 
   @req-7.8
   Szenario: Download-Sperren laufen ab und grosse Streams melden ihre Länge
