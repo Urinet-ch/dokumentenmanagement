@@ -9,6 +9,7 @@ import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
@@ -21,6 +22,7 @@ import ch.urinet.archiv.mandant.application.MandantAbbau;
 import ch.urinet.archiv.mandant.application.WissensquelleSeed;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -43,6 +45,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +74,7 @@ public class BenutzerVerwaltungSchritte {
     @Inject StepUp stepUp;
     @Inject ApiTokenVerwaltung apiTokens;
     @Inject WebseitenSchluesselVerwaltung webseitenSchluessel;
+    @Inject TokenWiderruf tokenWiderruf;
 
     private final List<Map.Entry<String, String>> benutzer = new ArrayList<>();
     private final List<Response> antworten = new ArrayList<>();
@@ -91,6 +95,7 @@ public class BenutzerVerwaltungSchritte {
     private String adminPfad;
     private String akteurId;
     private String akteurName;
+    private String altesToken;
 
     @Before("@benutzer-verwaltung")
     public void mandantenVorbereiten() throws SQLException {
@@ -161,7 +166,7 @@ public class BenutzerVerwaltungSchritte {
     }
 
     @After("@benutzer-verwaltung")
-    public void aufraeumen() {
+    public void aufraeumen() throws SQLException {
         if (log != null) {
             log.close();
         }
@@ -176,12 +181,26 @@ public class BenutzerVerwaltungSchritte {
         }
         for (var eintrag : benutzer) {
             identitaet.loeschen(eintrag.getKey(), eintrag.getValue());
+            tokenWiderrufZeileLoeschen(eintrag.getValue());
+        }
+        if (eigeneId != null) {
+            tokenWiderrufZeileLoeschen(eigeneId);
         }
         for (ApiToken token : verwaltungsSchluessel) {
             apiTokens.widerrufen(new MandantCode("urinet"), token.id(), Optional.empty());
         }
         if (akteurId != null) {
+            tokenWiderrufZeileLoeschen(akteurId);
             given().auth().oauth2(admin).delete(adminPfad + "/users/" + akteurId).then().statusCode(204);
+        }
+    }
+
+    private void tokenWiderrufZeileLoeschen(String id) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement loeschen = verbindung.prepareStatement(
+                     "delete from public.token_widerruf where benutzer = ?")) {
+            loeschen.setString(1, id);
+            loeschen.executeUpdate();
         }
     }
 
@@ -232,6 +251,24 @@ public class BenutzerVerwaltungSchritte {
                 throw new StepUpNoetig(300);
             }
         }, StepUp.class);
+    }
+
+    @Angenommen("ein synthetischer Verwaltungszugang hat ein altes Token")
+    public void altesToken() {
+        altesToken = Testanmeldung.token(akteurName);
+        assertThat(Testanmeldung.sub(akteurName)).isEqualTo(akteurId);
+    }
+
+    @Wenn("das Token des Inhabers widerrufen wird")
+    public void inhaberTokenWiderrufen() {
+        tokenWiderruf.setzen(Testanmeldung.sub(akteurName), Instant.now());
+        assertThat(tokenWiderruf.widerrufen(akteurId, Instant.EPOCH)).isTrue();
+    }
+
+    @Dann("wird dieses Token innerhalb der Frist mit 401 abgewiesen")
+    public void altesTokenAbgewiesen() {
+        Response antwort = given().auth().oauth2(altesToken).get(PFAD);
+        assertThat(ProblemDetails.pruefen(antwort, 401)).isEqualTo("NICHT_ANGEMELDET");
     }
 
     @Wenn("der Inhaber einen synthetischen Mitarbeiter anlegt")
@@ -309,6 +346,7 @@ public class BenutzerVerwaltungSchritte {
     @Dann("sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert")
     public void zugangZurueckgesetzt() throws SQLException {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
         assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktionen()).containsExactlyInAnyOrder(
                 IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
                 IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
@@ -365,6 +403,7 @@ public class BenutzerVerwaltungSchritte {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);
         assertThat(googleVerknuepft).isFalse();
         assertThat(googleSitzungenBeendet).isTrue();
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
     }
 
     @Angenommen("die Mitteilung an die bisherige Adresse wird aufgezeichnet")
@@ -450,6 +489,7 @@ public class BenutzerVerwaltungSchritte {
     public void wiederAktiv() {
         assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
         assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("GESPERRT");
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
         assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktiv()).isTrue();
         anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).body("status", org.hamcrest.Matchers.is("AKTIV"));
     }
@@ -467,6 +507,7 @@ public class BenutzerVerwaltungSchritte {
         assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
         assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("DEAKTIVIERT");
         var benutzer = identitaet.benutzerLesen(MANDANT, eigeneId);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
         assertThat(benutzer.aktiv()).isTrue();
         assertThat(benutzer.rollen()).containsExactly(Rolle.MITARBEITER);
         assertThat(benutzer.aktionen()).contains(IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,

@@ -71,7 +71,7 @@ das Kriterium ist erst nach diesem Entscheid umsetzbar.
 - **Benutzerverzeichnis** – nur anfügende Tabelle, die jede Kennung `benutzer` des Zugriffsprotokolls einer Person zuordnet (10.10).
 - **Notfallunterlagen** – versiegelte Zugangsdaten ausserhalb des Systems für den Notfall (Requirement 16.12).
 - **Stufe A** – Betrieb ab Welle 1 bis zum Wechsel auf der bestehenden Infomaniak-VPS, nur mit Test- und anonymisierten Daten und im Speicherbudget aus `tech.md` (Requirement 16.15).
-- **Stufe B** – Betrieb auf einer eigenen, grösseren Infomaniak-VPS (K5: VPS Lite 4 vCPU, 4 GB RAM, 80 GB, an Ort aufrüstbar, Requirement 16.1); Voraussetzung für echte Belege (Requirement 16.17).
+- **Stufe B** – Betrieb auf einer eigenen, grösseren Infomaniak-VPS (K5: VPS Lite 4 vCPU, 4 GB RAM, 80 GB, an Ort aufrüstbar, Requirement 16.1); Voraussetzung für echte Belege (Requirement 16.17). **Geändert 22.11.2026 (Entscheid Fabian):** Stufe B ist eine VPS mit 4 vCPU / 8 GB / 160 GB (CHF 18.00/Mt.); die Lastmessung auf einer Public-Cloud-Instanz vor der Bestellung entfällt; Messungen nach Req 3.2, 5.5, 14.3 und 16.26 erfolgen, falls noch nötig, auf der Stufe-B-VPS. Die übrigen Angaben dieser Zeile zu Lite 4/4/80 und der Lastmessung gelten nicht mehr.
 - **Profil `lokal`** – Quarkus-Profil nur für den Entwicklerrechner: Das Sprachmodell läuft in LM Studio an `localhost`; nicht für Gate 0, Golden-Lauf, Abnahmen, CI oder Betrieb (Requirement 16.20–16.22, ADR-012).
 
 ---
@@ -140,6 +140,7 @@ damit Lohn- und Vertragsdaten geschützt sind.
 | A12 | Kontakte ändern, CSV-Import | erlaubt | 403 | 403 | 403 |
 | A13 | Zugriffsprotokoll einsehen | erlaubt | 403 | 403 | 403 |
 | A14 | API-Tokens verwalten | erlaubt | 403 | 403 | 403 |
+| A24 | Chat-Auswertung ansehen und exportieren | erlaubt | 403 | 403 | 403 |
 
 A11 umfasst das Anlegen, Ändern, Deaktivieren und Löschen von Dokumentarten. Das Lesen der Dokumentarten ist kein
 A11-Verwaltungsrecht (alle Rollen). Das Lesen früherer Konfigurationsversionen gehört dagegen zu A11 (Spec 05,
@@ -153,6 +154,10 @@ Chat (Spec 02, entschieden von Fabian am 14.11.2026; ohne eigene Zeile der Matri
 Die Zeilen A15 bis A19 (Wissensbasis) ergänzt Spec 04, Requirement 12.1; sie gehören zu dieser Matrix, mit derselben Bedeutung von «erlaubt», «403» und «404» und demselben Vorrang 404 vor 403. Massgeblich für ihren Wortlaut ist Spec 04, Requirement 12.1.
 
 Die Zeilen A20 bis A23 (Einstellungen, Benutzer, Benutzerverwaltung, Rollen zuweisen) ergänzt Spec 06, Requirement 4.1, mit derselben Bedeutung von «erlaubt», «403» und «404». Sie stehen nicht in dieser Tabelle; `Aktion` und `RechtematrixSpecTest` übernehmen sie mit Spec 06, Aufgabe 19.5. Die Bezeichnungen der Zeilen A1 bis A19 bleiben unverändert.
+
+A24 ergänzt Spec 02, Requirement 15.5 (Entscheid und Korrektur von Fabian am 22.11.2026): Nur der `inhaber` darf die
+Chat-Auswertung ansehen und exportieren. Die Aktion gilt nicht für API-Tokens oder Webseiten-Schlüssel; für `geschaeftsstelle`
+und die übrigen Rollen gilt 403.
 
 Präzisierung zu A6 und A12 (entschieden von Fabian am 14.11.2026, Requirement 17): Zu A6 gehört auch das Ansehen der Kontakte (Partnerauswahl, Liste und Detailansicht, 17.1–17.5), zu A12 «Kontakte ändern» auch Zusammenführen, als inaktiv markieren und wieder aktivieren (17.6–17.16; Wiederaktivieren vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR). Der Wortlaut der Zeilen A6 und A12 bleibt, weil `RechtematrixSpecTest` ihn gegen `Aktion.bezeichnung()` prüft.
 

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="044-token-widerruf" author="copilot">
+        <sql>
+            create table if not exists public.token_widerruf (
+                benutzer text primary key check (length(benutzer) between 1 and 255),
+                ab timestamptz not null
+            );
+            revoke all on public.token_widerruf from public;
+        </sql>
+        <sql splitStatements="false">
+            do $$
+            begin
+                if exists (select 1 from pg_roles where rolname = 'archiv_app') then
+                    execute 'grant select, insert, update, delete on public.token_widerruf to archiv_app';
+                end if;
+            end
+            $$
+        </sql>
+        <rollback><sql>select 1</sql></rollback>
+    </changeSet>
+</databaseChangeLog>

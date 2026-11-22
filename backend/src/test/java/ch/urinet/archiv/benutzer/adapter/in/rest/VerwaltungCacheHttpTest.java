@@ -9,6 +9,7 @@ import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreBestandMigration;
 import ch.urinet.archiv.benutzer.adapter.out.persistence.NamenssperreHash;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
@@ -70,6 +71,9 @@ class VerwaltungCacheHttpTest {
 
     @Inject
     IdentitaetsDienst identitaet;
+
+    @Inject
+    TokenWiderruf tokenWiderruf;
 
     @Inject
     BenutzerNamen namen;
@@ -521,6 +525,144 @@ class VerwaltungCacheHttpTest {
         }
         given().auth().oauth2(token).contentType("application/json").body("{\"grund\":\"freitext\"}")
                 .post(pfad + inhaber + "/sperren").then().statusCode(422);
+    }
+
+    @Test
+    void deaktivierungWiderruftAltesTokenBeiUnklarerTeilwirkung() throws SQLException {
+        String id = Testanmeldung.sub("mitarbeiter-urinet");
+        String token = Testanmeldung.token("mitarbeiter-urinet");
+        List<String> aufrufe = new java.util.ArrayList<>();
+        IdentitaetsDienstStub dienst = new TestIdentitaetsDienst(id, false) {
+            @Override
+            public synchronized void aktivieren(String mandant, String benutzerId, boolean aktiv) {
+                aufrufe.add("aktivieren");
+            }
+
+            @Override
+            public synchronized void sitzungenBeenden(String mandant, String benutzerId) {
+                aufrufe.add("sitzungen");
+                throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+        };
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+
+        unklareWirkungWiderruftToken(token, "urinet", () ->
+                given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                        .body("{\"grund\":\"SICHERHEIT\"}")
+                        .post("/api/v1/benutzer/" + id + "/deaktivieren").then()
+                        .statusCode(502).body("fehlercode", is("IDENTITAETSDIENST_FEHLER")));
+        assertThat(aufrufe).containsExactly("aktivieren", "sitzungen");
+    }
+
+    @Test
+    void googleLoesenWiderruftAltesTokenBeiUnklarerTeilwirkung() throws SQLException {
+        String id = Testanmeldung.sub("mitarbeiter-urinet");
+        String token = Testanmeldung.token("mitarbeiter-urinet");
+        List<String> aufrufe = new java.util.ArrayList<>();
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new TestIdentitaetsDienst(id, true) {
+            @Override
+            public synchronized void googleLoesen(String mandant, String benutzerId) {
+                aufrufe.add("google");
+            }
+
+            @Override
+            public synchronized void sitzungenBeenden(String mandant, String benutzerId) {
+                aufrufe.add("sitzungen");
+                throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+        };
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+
+        unklareWirkungWiderruftToken(token, "urinet", () ->
+                given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                        .delete("/api/v1/benutzer/" + id + "/google-verknuepfung").then()
+                        .statusCode(502).body("fehlercode", is("IDENTITAETSDIENST_FEHLER")));
+        assertThat(aufrufe).containsExactly("google", "sitzungen");
+    }
+
+    @Test
+    void zugangZuruecksetzenWiderruftAltesTokenBeiUnklarerTeilwirkung() throws SQLException {
+        String id = Testanmeldung.sub("mitarbeiter-urinet");
+        String token = Testanmeldung.token("mitarbeiter-urinet");
+        List<String> aufrufe = new java.util.ArrayList<>();
+        QuarkusMock.installMockForType(new StepUpAusstehend() {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        IdentitaetsDienstStub dienst = new TestIdentitaetsDienst(id, false) {
+            @Override
+            public synchronized void aktionenHinzufuegen(String mandant, String benutzerId,
+                                                          Set<ErforderlicheAktion> aktionen) {
+                aufrufe.add("aktionen");
+            }
+
+            @Override
+            public synchronized void otpEntfernen(String mandant, String benutzerId) {
+                aufrufe.add("otp");
+            }
+
+            @Override
+            public synchronized void sitzungenBeenden(String mandant, String benutzerId) {
+                aufrufe.add("sitzungen");
+            }
+
+            @Override
+            public synchronized void einladen(String mandant, String benutzerId,
+                                              Set<ErforderlicheAktion> aktionen, Duration gueltigkeit) {
+                aufrufe.add("einladung");
+                throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+        };
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+
+        unklareWirkungWiderruftToken(token, "urinet", () ->
+                given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).contentType("application/json")
+                        .post("/api/v1/benutzer/" + id + "/zugang-zuruecksetzen").then()
+                        .statusCode(502).body("fehlercode", is("IDENTITAETSDIENST_FEHLER")));
+        assertThat(aufrufe).containsExactly("aktionen", "otp", "sitzungen", "einladung");
+    }
+
+    private void unklareWirkungWiderruftToken(String token, String mandant, Runnable aktion)
+            throws SQLException {
+        try {
+            given().auth().oauth2(token).get("/api/v1/mandant/funktionen").then().statusCode(200);
+            aktion.run();
+            assertThat(tokenWiderruf.widerrufen(Testanmeldung.sub("mitarbeiter-urinet"), java.time.Instant.EPOCH))
+                    .isTrue();
+            given().auth().oauth2(token).get("/api/v1/mandant/funktionen").then().statusCode(401)
+                    .body("fehlercode", is("NICHT_ANGEMELDET"));
+        } finally {
+            tokenWiderruf.aufraeumen(java.time.Instant.now().plusSeconds(1));
+            try (Connection verbindung = datenbank.getConnection();
+                 PreparedStatement loeschen = verbindung.prepareStatement(
+                         "delete from public.verwaltung_vorgang where mandant = ?")) {
+                loeschen.setString(1, mandant);
+                loeschen.executeUpdate();
+            }
+        }
+    }
+
+    private abstract static class TestIdentitaetsDienst extends IdentitaetsDienstStub {
+        private final String ziel;
+        private final boolean google;
+
+        private TestIdentitaetsDienst(String ziel, boolean google) {
+            this.ziel = ziel;
+            this.google = google;
+        }
+
+        @Override
+        public synchronized IdentitaetsDienst.Benutzer benutzerLesen(String mandant, String id) {
+            if (mandant.equals("urinet") && id.equals(ziel)) {
+                return new IdentitaetsDienst.Benutzer(id, "synthetisch", "synthetisch@example.invalid",
+                        "Test", "Person", true, Set.of(Rolle.MITARBEITER), Set.of(), true, google);
+            }
+            return super.benutzerLesen(mandant, id);
+        }
     }
 
     @Test
