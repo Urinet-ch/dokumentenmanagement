@@ -418,8 +418,8 @@ oder Missbrauch wird, damit der Schutz der Dokumente nicht an einer Verwaltungsf
 2. WENN eine Aktion der Liste «Step-up» (design.md) eintrifft und die letzte Anmeldung des Akteurs (`auth_time`)
    länger als `archiv.verwaltung.step-up-gueltigkeit` (Standard 5 Minuten, höchstens 15) zurückliegt oder `auth_time` fehlt,
    DANN SOLL das Archiv mit HTTP 401 `STEP_UP_NOETIG` und `WWW-Authenticate: Bearer error="insufficient_user_authentication"`
-   samt `max_age` antworten und nichts ändern; die erneute Anmeldung SOLL Passwort und TOTP verlangen, nicht nur den
-   Cookie der Sitzung (Nachweis gegen echtes Keycloak: `ExportKeycloak`).
+   samt `max_age` antworten und nichts ändern; die erneute Anmeldung SOLL Passwort und TOTP oder einen Passkey (10.4) verlangen, nicht nur den
+   Cookie der Sitzung (Nachweis gegen echtes Keycloak: `ExportKeycloak`). Als Nachweis genügt `auth_time` nach `prompt=login` und `max_age=0`; ein Nachweis der Anmeldeart (`amr`) ist nicht verlangt, weil Keycloak ihn beim Passkey nicht liefert (Entscheid Fabian 22.11.2026, Spike 24.1).
 3. Das Archiv SOLL Verwaltungsaktionen nur für Tokens einer Benutzeranmeldung im Realm zulassen; API-Tokens und
    Webseiten-Schlüssel SOLLEN dort mit HTTP 403 `NICHT_ERLAUBT` scheitern (Scope-Bindung, Spec 01, 2.5).
 4. Das Archiv SOLL die Einladung ohne Passwort ausstellen, den Link nur an die in Keycloak hinterlegte Adresse senden

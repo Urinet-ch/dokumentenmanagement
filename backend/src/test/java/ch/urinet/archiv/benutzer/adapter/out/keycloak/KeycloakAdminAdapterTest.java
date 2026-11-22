@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer.adapter.out.keycloak;
 
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.AnlageException;
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Aenderung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Neuanlage;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.ErforderlicheAktion;
@@ -82,6 +83,46 @@ class KeycloakAdminAdapterTest {
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
         server.verify(0, postRequestedFor(urlPathEqualTo(TOKEN)));
+    }
+
+    @Test
+    void emailAenderungSetztBestaetigungZurueckOhneMandantZuAendern() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1"))
+                .willReturn(okJson("""
+                        {"id":"benutzer-1","email":"alt@example.invalid","emailVerified":true,
+                         "attributes":{"mandant":["urinet"]}}
+                        """)));
+        server.stubFor(put(urlPathEqualTo(USERS + "/benutzer-1"))
+                .willReturn(aResponse().withStatus(204)));
+
+        adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .aktualisieren("urinet", "benutzer-1", new Aenderung("neu@example.invalid", null, null));
+
+        server.verify(putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1"))
+                .withRequestBody(equalToJson("""
+                        {"id":"benutzer-1","email":"neu@example.invalid","emailVerified":false,
+                         "attributes":{"mandant":["urinet"]}}
+                        """)));
+        assertThat(log.volltext()).doesNotContain("alt@example.invalid", "neu@example.invalid");
+    }
+
+    @Test
+    void anmeldesperreWirdMandantengeprueftUndOhneIpVerarbeitet() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1"))
+                .willReturn(okJson("{\"id\":\"benutzer-1\",\"attributes\":{\"mandant\":[\"urinet\"]}}")));
+        String sperre = "/admin/realms/urinet-archiv/attack-detection/brute-force/users/benutzer-1";
+        server.stubFor(get(urlPathEqualTo(sperre))
+                .willReturn(okJson("{\"disabled\":true,\"lastIPFailure\":\"synthetische-ip\"}")));
+        var adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+
+        assertThat(adapter.anmeldungGesperrt("urinet", "benutzer-1")).isTrue();
+        assertThatThrownBy(() -> adapter.anmeldungGesperrt("vhf-gsk", "benutzer-1"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN));
+        server.verify(1, getRequestedFor(urlPathEqualTo(sperre)));
+        assertThat(log.volltext()).doesNotContain("synthetische-ip");
     }
 
     @Test
@@ -757,6 +798,46 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void erforderlicheAktionenErgaenzenErhaeltBestehendeUndPrueftDenMandanten() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(okJson("""
+                {"id":"benutzer-1","attributes":{"mandant":["urinet"]},
+                 "requiredActions":["SYNTHETISCHE_AKTION","VERIFY_EMAIL"]}
+                """)));
+        server.stubFor(put(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(aResponse().withStatus(204)));
+        KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> adapter.aktionenHinzufuegen("vhf-gsk", "benutzer-1",
+                Set.of(ErforderlicheAktion.UPDATE_PASSWORD)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN));
+        server.verify(0, putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1")));
+
+        adapter.aktionenHinzufuegen("urinet", "benutzer-1",
+                Set.of(ErforderlicheAktion.VERIFY_EMAIL, ErforderlicheAktion.UPDATE_PASSWORD));
+
+        server.verify(1, putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1"))
+                .withRequestBody(equalToJson("""
+                        {"id":"benutzer-1","attributes":{"mandant":["urinet"]},
+                         "requiredActions":["SYNTHETISCHE_AKTION","VERIFY_EMAIL","UPDATE_PASSWORD"]}
+                        """)));
+    }
+
+    @Test
+    void ungueltigeErforderlicheAktionenWerdenNichtUeberschrieben() {
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(okJson("""
+                {"id":"benutzer-1","attributes":{"mandant":["urinet"]},"requiredActions":"ungueltig"}
+                """)));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .aktionenHinzufuegen("urinet", "benutzer-1", Set.of(ErforderlicheAktion.CONFIGURE_TOTP)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
+        server.verify(0, putRequestedFor(urlPathEqualTo(USERS + "/benutzer-1")));
+    }
+
+    @Test
     void anlegenLoeschtBenutzerBeiFehlerEvenBeiOffenemSchutzschalter() {
         tokenAntwort();
         server.stubFor(post(urlPathEqualTo(USERS)).willReturn(aResponse().withStatus(201)
@@ -811,6 +892,34 @@ class KeycloakAdminAdapterTest {
         assertThatThrownBy(() -> adapter.anlageRueckgaengig("urinet", "neu-1"))
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+    }
+
+    @Test
+    void angenommeneZugangsaenderungenSindKeinBestaetigterAbschluss() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(put(urlPathEqualTo(USERS + "/benutzer-1")).willReturn(aResponse().withStatus(202)));
+        server.stubFor(post(urlPathEqualTo(USERS + "/benutzer-1/logout")).willReturn(aResponse().withStatus(202)));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/federated-identity/google"))
+                .willReturn(aResponse().withStatus(202)));
+        server.stubFor(delete(urlPathEqualTo("/admin/realms/urinet-archiv/attack-detection/brute-force/users/benutzer-1"))
+                .willReturn(aResponse().withStatus(202)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials"))
+                .willReturn(okJson("[{\"id\":\"otp-1\",\"type\":\"otp\"}]")));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/credentials/otp-1"))
+                .willReturn(aResponse().withStatus(202)));
+        KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
+
+        for (Runnable aktion : List.<Runnable>of(
+                () -> adapter.aktualisieren("urinet", "benutzer-1", new Aenderung(null, "Neu", null)),
+                () -> adapter.aktivieren("urinet", "benutzer-1", false),
+                () -> adapter.sitzungenBeenden("urinet", "benutzer-1"),
+                () -> adapter.googleLoesen("urinet", "benutzer-1"),
+                () -> adapter.sperreAufheben("urinet", "benutzer-1"),
+                () -> adapter.otpEntfernen("urinet", "benutzer-1"))) {
+            assertThatThrownBy(aktion::run).isInstanceOfSatisfying(FachFehler.class,
+                    fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+        }
     }
 
     @Test

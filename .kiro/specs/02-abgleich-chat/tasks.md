@@ -1,6 +1,6 @@
 # Implementation Plan — 02 Abgleich und Chat
 
-Voraussetzung: Gate Phase 1 erfüllt, Spec 02 auf `main` gemergt. Ausnahme: Welle 6 (6.1, 6.3–6.6; 6.6 ergänzt 14.11.2026) wird vor Gate Phase 1 entwickelt (entschieden von Fabian am 13.11.2026, Fokus auf Funktionen für die Benutzer); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17), nicht für die Entwicklung. Welle 7 (7.1–7.4) wird ebenfalls vor Gate Phase 1 entwickelt (entschieden von Fabian am 14.11.2026, Priorität Chat-Funktionen); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17). 9.1 bleibt an Gate Phase 1 gebunden. Vertrag und Entscheide für 7.1–7.4: design.md, «Chat-Agent (`ki/chat`)», «Vertrag Welle 7». Wellen, Rollen und Gates wie in
+Voraussetzung: Gate Phase 1 erfüllt, Spec 02 auf `main` gemergt. Ausnahme: Welle 6 (6.1, 6.3–6.6; 6.6 ergänzt 14.11.2026) wird vor Gate Phase 1 entwickelt (entschieden von Fabian am 13.11.2026, Fokus auf Funktionen für die Benutzer); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17), nicht für die Entwicklung. Welle 7 (7.1–7.4) wird ebenfalls vor Gate Phase 1 entwickelt (entschieden von Fabian am 14.11.2026, Priorität Chat-Funktionen); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17). Welle 10 (10.1–10.4, Chat-Bewertung, Requirement 15) wird ebenfalls vor Gate Phase 1 entwickelt (entschieden von Fabian am 22.11.2026, wie Welle 6 und 7); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17). 9.1 bleibt an Gate Phase 1 gebunden. Vertrag und Entscheide für 7.1–7.4: design.md, «Chat-Agent (`ki/chat`)», «Vertrag Welle 7». Wellen, Rollen und Gates wie in
 `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe) nach `CLAUDE.md`.
 Welle 8 (AbaNinja) **entfällt** (Konzept-Entscheid E1 = nein, vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR); die
 Werkzeuge melden dauerhaft «Zahlstatus unbekannt». Optionale Aufgaben sind mit `*` markiert.
@@ -119,8 +119,8 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
 
 
 ## Welle 10 — Bewertung von Chat-Antworten (Entscheid Fabian 21.11.2026, Requirement 15)
-- [ ] 10.1 Bewertung speichern und Rechtematrix A20 [Backend]
-  - Changeset `chat_bewertung`, REST `PUT/DELETE/GET /chat/nachrichten/{id}/bewertung`, Grenze, Textbereinigung, Mandantentrennung, Recht A20 in der Rechtematrix; Szenarien `@req-15.2` bis `@req-15.4`.
+- [ ] 10.1 Bewertung speichern und Rechtematrix A24 [Backend]
+  - Changeset `chat_bewertung`, REST `PUT/DELETE/GET /chat/nachrichten/{id}/bewertung`, Grenze, Textbereinigung, Mandantentrennung, Recht A24 in der Rechtematrix; Szenarien `@req-15.2` bis `@req-15.4`.
   - _Anforderungen: 15.2, 15.3, 15.4, 15.5_
   - _Abhängig von: 7.3_
 - [ ] 10.2 Oberfläche Sterne und Hinweis [Frontend]
@@ -132,7 +132,7 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
   - _Anforderungen: 15.5, 15.6, 15.7, 15.8, 15.10_
   - _Abhängig von: 10.1, Spec 06: 19.10 (Step-up)_
 - [ ] 10.4 Isolations- und Abnahmetests [QA]
-  - Fremdes Gespräch (404), Rechte (A20, Geschäftsstelle, API-Token), Schwärzung mit allen Mustern, 5'000 Zeilen, Löschung nach 12 Monaten, Schematest; ergänzt Welle 9.
+  - Fremdes Gespräch (404), Rechte (A24, Geschäftsstelle, API-Token), Schwärzung mit allen Mustern, 5'000 Zeilen, Löschung nach 12 Monaten, Schematest; ergänzt Welle 9.
   - _Anforderungen: 15.11_
   - _Abhängig von: 10.3_
 

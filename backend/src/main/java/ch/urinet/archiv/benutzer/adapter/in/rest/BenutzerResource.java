@@ -3,6 +3,10 @@ package ch.urinet.archiv.benutzer.adapter.in.rest;
 import ch.urinet.archiv.benutzer.application.BenutzerLesen;
 import ch.urinet.archiv.benutzer.application.BenutzerEinladen;
 import ch.urinet.archiv.benutzer.application.BenutzerAnlegen;
+import ch.urinet.archiv.benutzer.application.BenutzerZugangZuruecksetzen;
+import ch.urinet.archiv.benutzer.application.BenutzerGoogleLoesen;
+import ch.urinet.archiv.benutzer.application.BenutzerAendern;
+import ch.urinet.archiv.benutzer.application.BenutzerStatusAendern;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -22,9 +26,11 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.HeaderParam;
@@ -49,6 +55,10 @@ public class BenutzerResource {
     private final BenutzerLesen lesen;
     private final BenutzerEinladen einladen;
     private final BenutzerAnlegen anlegen;
+    private final BenutzerZugangZuruecksetzen zugang;
+    private final BenutzerGoogleLoesen google;
+    private final BenutzerAendern aendern;
+    private final BenutzerStatusAendern status;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
     private final ObjectReader json;
@@ -56,11 +66,17 @@ public class BenutzerResource {
     private final StepUp stepUp;
 
     public BenutzerResource(BenutzerLesen lesen, BenutzerEinladen einladen, BenutzerAnlegen anlegen,
+                            BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google, BenutzerAendern aendern,
+                            BenutzerStatusAendern status,
                             MandantAufloesung mandant, SecurityIdentity identitaet, ObjectMapper json,
                             Berechtigung berechtigung, StepUp stepUp) {
         this.lesen = lesen;
         this.einladen = einladen;
         this.anlegen = anlegen;
+        this.zugang = zugang;
+        this.google = google;
+        this.aendern = aendern;
+        this.status = status;
         this.mandant = mandant;
         this.identitaet = identitaet;
         this.json = json.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
@@ -130,6 +146,12 @@ public class BenutzerResource {
     @APIResponse(responseCode = "204", description = "Einladung gesendet")
     public Response einladung(@PathParam("benutzerId") String benutzerId, @HeaderParam("X-Real-Ip") String ip,
                               @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        leerenKoerperPruefen(contentType, body);
+        einladen.erneut(mandant.pruefen(), akteur(), benutzerId, IpAdresse.aus(ip));
+        return Response.noContent().build();
+    }
+
+    private void leerenKoerperPruefen(String contentType, InputStream body) throws IOException {
         jsonPruefen(contentType);
         byte[] eingabe = begrenztLesen(body);
         if (eingabe.length > 0) {
@@ -142,7 +164,172 @@ public class BenutzerResource {
                 throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
             }
         }
-        einladen.erneut(mandant.pruefen(), akteur(), benutzerId, IpAdresse.aus(ip));
+    }
+
+    @POST
+    @Path("/{benutzerId}/zugang-zuruecksetzen")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Zugang zurücksetzen")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Zugang zurückgesetzt und Einladung gesendet")
+    public Response zugangZuruecksetzen(@PathParam("benutzerId") String benutzerId,
+                                       @HeaderParam("X-Real-Ip") String ip,
+                                       @HeaderParam("Content-Type") String contentType, InputStream body)
+            throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        stepUp.pruefen();
+        leerenKoerperPruefen(contentType, body);
+        zugang.ausfuehren(code, akteur, benutzerId, IpAdresse.aus(ip));
+        return Response.noContent().build();
+    }
+
+    @DELETE
+    @Path("/{benutzerId}/google-verknuepfung")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Google-Verknüpfung lösen")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Google-Verknüpfung gelöst")
+    public Response googleLoesen(@PathParam("benutzerId") String benutzerId, @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        stepUp.pruefen();
+        leerenKoerperPruefen(contentType, body);
+        google.ausfuehren(code, akteur, benutzerId, IpAdresse.aus(ip));
+        return Response.noContent().build();
+    }
+
+    public record BenutzerAenderung(String email, String vorname, String nachname) {
+        @Override
+        public String toString() {
+            return "BenutzerAenderung[geschützt]";
+        }
+    }
+
+    @PATCH
+    @Path("/{benutzerId}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "E-Mail-Adresse oder Namen ändern")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = BenutzerAenderung.class)))
+    @APIResponse(responseCode = "204", description = "Benutzerdaten geändert")
+    public Response benutzerAendern(@PathParam("benutzerId") String benutzerId, @HeaderParam("If-Match") String ifMatch,
+                                 @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        jsonPruefen(contentType);
+        BenutzerAenderung eingabe;
+        try {
+            eingabe = json.forType(BenutzerAenderung.class).readValue(begrenztLesen(body));
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        if (eingabe == null) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        if (eingabe.email() != null) {
+            stepUp.pruefen();
+        }
+        BenutzerAendern.ifMatchPruefen(ifMatch);
+        aendern.ausfuehren(code, akteur, benutzerId, ifMatch, eingabe.email(), eingabe.vorname(),
+                eingabe.nachname(), IpAdresse.aus(ip));
+        return Response.noContent().build();
+    }
+
+    public record Grund(String grund) {
+    }
+
+    @POST
+    @Path("/{benutzerId}/sperren")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Benutzer sperren")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = Grund.class)))
+    @APIResponse(responseCode = "204", description = "Benutzer gesperrt")
+    public Response sperren(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                            @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        return statusAendern(id, ip, contentType, body, BenutzerStatusAendern.Vorgang.SPERREN);
+    }
+
+    @POST
+    @Path("/{benutzerId}/entsperren")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Benutzer entsperren")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Benutzer entsperrt")
+    public Response entsperren(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                               @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        return statusAendern(id, ip, contentType, body, BenutzerStatusAendern.Vorgang.ENTSPERREN);
+    }
+
+    @POST
+    @Path("/{benutzerId}/deaktivieren")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Benutzer deaktivieren")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = Grund.class)))
+    @APIResponse(responseCode = "204", description = "Benutzer deaktiviert")
+    public Response deaktivieren(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        return statusAendern(id, ip, contentType, body, BenutzerStatusAendern.Vorgang.DEAKTIVIEREN);
+    }
+
+    @POST
+    @Path("/{benutzerId}/reaktivieren")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A22)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Benutzer reaktivieren")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @APIResponse(responseCode = "204", description = "Benutzer reaktiviert")
+    public Response reaktivieren(@PathParam("benutzerId") String id, @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        return statusAendern(id, ip, contentType, body, BenutzerStatusAendern.Vorgang.REAKTIVIEREN);
+    }
+
+    private Response statusAendern(String id, String ip, String contentType, InputStream body,
+                                  BenutzerStatusAendern.Vorgang vorgang) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A22);
+        boolean mitGrund = vorgang == BenutzerStatusAendern.Vorgang.SPERREN
+                || vorgang == BenutzerStatusAendern.Vorgang.DEAKTIVIEREN;
+        if (!mitGrund) {
+            stepUp.pruefen();
+        }
+        String grund = null;
+        if (mitGrund) {
+            jsonPruefen(contentType);
+            byte[] eingabe = begrenztLesen(body);
+            if (eingabe.length != 0) {
+                try {
+                    Grund wert = json.forType(Grund.class).readValue(eingabe);
+                    grund = wert == null ? null : wert.grund();
+                } catch (JsonProcessingException e) {
+                    throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+                }
+            }
+        } else {
+            leerenKoerperPruefen(contentType, body);
+        }
+        status.ausfuehren(code, akteur, id, vorgang, grund, IpAdresse.aus(ip));
         return Response.noContent().build();
     }
 
