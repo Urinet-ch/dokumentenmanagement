@@ -32,6 +32,63 @@ public final class Einstellungskatalog {
         public Object standardFuer(String mandant) {
             return zahl == null ? standard : zahl.standardFuer(mandant);
         }
+
+        public String name() {
+            return switch (schluessel) {
+                case "geschaeftsjahrEnde" -> "Geschäftsjahresende";
+                case "kennungen.uid" -> "UID";
+                case "kennungen.ibans" -> "IBANs";
+                case "branding.name" -> "Anzeigename";
+                case "branding.primaerfarbe" -> "Akzentfarbe";
+                case "chat.aufbewahrungMonate" -> "Chat-Aufbewahrung";
+                case "webseitenChat.aufbewahrungTage" -> "Webseiten-Chat-Aufbewahrung";
+                case "wissen.budgetTokens" -> "Budget je Wissens-Ingest";
+                case "wissen.lintBudgetTokens" -> "Budget je Wissensprüfung";
+                case "wissen.monatsbudgetTokens" -> "Monatsbudget der Wissensbasis";
+                case "wissen.lintZeitplan.wochentag" -> "Wochentag der Wissensprüfung";
+                case "wissen.lintZeitplan.stunde" -> "Stunde der Wissensprüfung";
+                default -> throw new IllegalStateException("Katalogeintrag ohne Namen");
+            };
+        }
+
+        public String beschreibung() {
+            return switch (schluessel) {
+                case "geschaeftsjahrEnde" -> "Ende des Geschäftsjahres im Format MM-TT.";
+                case "kennungen.uid" -> "UID des Mandanten.";
+                case "kennungen.ibans" -> "Eigene IBANs des Mandanten.";
+                case "branding.name" -> "Name des Archivs in der Oberfläche.";
+                case "branding.primaerfarbe" -> "Akzentfarbe als RGB-Wert mit ausreichendem Kontrast.";
+                case "chat.aufbewahrungMonate" -> "Aufbewahrungsdauer interner Chatnachrichten.";
+                case "webseitenChat.aufbewahrungTage" -> "Aufbewahrungsdauer öffentlicher Fragen.";
+                case "wissen.budgetTokens" -> "Höchstens verwendete Tokens je Wissens-Ingest.";
+                case "wissen.lintBudgetTokens" -> "Höchstens verwendete Tokens je Wissensprüfung.";
+                case "wissen.monatsbudgetTokens" -> "Höchstens verwendete Tokens der Wissensbasis je Monat.";
+                case "wissen.lintZeitplan.wochentag" -> "Wochentag der geplanten Wissensprüfung.";
+                case "wissen.lintZeitplan.stunde" -> "Stunde der geplanten Wissensprüfung in Zürich.";
+                default -> throw new IllegalStateException("Katalogeintrag ohne Beschreibung");
+            };
+        }
+
+        public String einheit() {
+            return switch (schluessel) {
+                case "chat.aufbewahrungMonate" -> "Monate";
+                case "webseitenChat.aufbewahrungTage" -> "Tage";
+                case "wissen.budgetTokens", "wissen.lintBudgetTokens", "wissen.monatsbudgetTokens" -> "Tokens";
+                case "wissen.lintZeitplan.stunde" -> "Stunde";
+                default -> null;
+            };
+        }
+
+        public String wirksamAb() {
+            return switch (gruppe) {
+                case GESCHAEFTSJAHR -> "Für künftig bestätigte Dokumente.";
+                case KENNUNGEN -> "Bei der nächsten Erkennung.";
+                case BRANDING -> "Nach höchstens 60 Sekunden.";
+                case CHAT, WEBSEITEN_CHAT -> "Beim nächsten Aufräumlauf.";
+                case WISSEN -> schluessel.startsWith("wissen.lintZeitplan.")
+                        ? "Beim nächsten Planungslauf nach höchstens 5 Minuten." : "Bei der nächsten Budgetprüfung.";
+            };
+        }
     }
 
     private static final List<Einstellung> EINSTELLUNGEN = List.of(

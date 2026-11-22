@@ -30,6 +30,30 @@ class MandantEinstellungenResourceTest {
     @Inject AgroalDataSource datenbank;
 
     @Test
+    void katalogUndBetriebsbudgetSindMandantenbezogenUndNurFuerBerechtigteLesbar() throws Exception {
+        for (String code : new String[] {"urinet", "vhf-gsk"}) {
+            if (!imRegister(code)) {
+                provisionierung.anlegen(code, null, null);
+            }
+        }
+        Response urinet = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).get(PFAD);
+        Response vhf = given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).get(PFAD);
+        assertThat(urinet.statusCode()).as(urinet.asString()).isEqualTo(200);
+        assertThat(vhf.statusCode()).as(vhf.asString()).isEqualTo(200);
+        assertThat(urinet.getHeader("ETag")).isEqualTo("\"" + urinet.jsonPath().getInt("version") + "\"");
+        assertThat(urinet.jsonPath().getList("katalog")).hasSize(12);
+        assertThat(urinet.jsonPath().getString("katalog.find { it.schluessel == 'branding.name' }.standard"))
+                .isEqualTo("UriNet Archiv");
+        assertThat(vhf.jsonPath().getString("katalog.find { it.schluessel == 'branding.name' }.standard"))
+                .isEqualTo("VHF/GSK Archiv");
+        assertThat(urinet.jsonPath().getLong("betrieb.oeffentlicherChat.budgetTokens")).isEqualTo(2_000_000L);
+        assertThat(urinet.jsonPath().getLong("betrieb.wissenMonatsbudgetTokens")).isEqualTo(1_000_000L);
+        assertThat(urinet.asString()).doesNotContain("alarmEmpfaenger", "secret", "passwort");
+        assertThat(given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet")).get(PFAD).statusCode())
+                .isEqualTo(403);
+    }
+
+    @Test
     void rechteVersionRisikoUndValidierungWerdenInDieserReihenfolgeGeprueft() throws Exception {
         if (!imRegister("urinet")) {
             provisionierung.anlegen("urinet", null, null);

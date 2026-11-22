@@ -8,6 +8,7 @@ api/branding.service.ts
 api/chat.service.ts
 api/dokumentarten.service.ts
 api/dokumente.service.ts
+api/einstellungen.service.ts
 api/exporte.service.ts
 api/importe.service.ts
 api/konfiguration.service.ts
@@ -34,6 +35,7 @@ model/api-v1-wissensseiten-get200-response.ts
 model/art-klassifikation.ts
 model/art.ts
 model/aussage.ts
+model/auswirkung.ts
 model/auszug-teil.ts
 model/bearbeitung.ts
 model/befund.ts
@@ -46,6 +48,7 @@ model/bestaetigung.ts
 model/branding-dto.ts
 model/chat-bewertung-eingabe.ts
 model/chat-bewertung.ts
+model/chat-einstellungen.ts
 model/chat-frage.ts
 model/chat-gespraech.ts
 model/chat-nachricht.ts
@@ -54,6 +57,7 @@ model/chat-quelle.ts
 model/chat-verlauf.ts
 model/chat-wissensquelle.ts
 model/datenstand.ts
+model/day-of-week.ts
 model/diff-eintrag.ts
 model/dokument-aenderung.ts
 model/dokument-finanz.ts
@@ -66,6 +70,14 @@ model/dokumentart.ts
 model/download-adresse.ts
 model/eingabe.ts
 model/eingangskorb-seite.ts
+model/einstellungen-betrieb.ts
+model/einstellungen-branding.ts
+model/einstellungen-ergebnis.ts
+model/einstellungen-vorschau.ts
+model/einstellungen-zuruecksetzen.ts
+model/einstellungen.ts
+model/einstellungskatalog-antwort.ts
+model/einstellungskatalog-eintrag.ts
 model/entfernte-aussage.ts
 model/entscheidung.ts
 model/ergebnis.ts
@@ -79,6 +91,7 @@ model/generator-metadaten.ts
 model/generator-partner.ts
 model/generator-vertrag.ts
 model/grund.ts
+model/gruppe.ts
 model/import-herkunft.ts
 model/import-hochgeladen.ts
 model/import-kontakt.ts
@@ -92,6 +105,7 @@ model/import-zuordnung-bestaetigen.ts
 model/import-zuordnung-gespeichert.ts
 model/import-zuordnung.ts
 model/kategorie.ts
+model/kennungen.ts
 model/klassifikation-wert.ts
 model/klassifikation.ts
 model/klassifikationsfacette.ts
@@ -113,8 +127,10 @@ model/kontakt-zusammengefuehrt.ts
 model/kontakt.ts
 model/kopf.ts
 model/letzte-aktion.ts
+model/lint-zeitplan.ts
 model/mandantenfunktionen.ts
 model/models.ts
+model/oeffentliches-chat-budget.ts
 model/paket-kopf.ts
 model/protokoll-aktion.ts
 model/protokoll-eintrag.ts
@@ -130,6 +146,7 @@ model/rollen-aenderung.ts
 model/status-ansicht.ts
 model/suchergebnis.ts
 model/suchtreffer.ts
+model/typ.ts
 model/upload-ergebnis.ts
 model/upload-fehler.ts
 model/verwaltung-rechte-fussnote.ts
@@ -139,9 +156,11 @@ model/verwerfen.ts
 model/verzeichnis-eintrag.ts
 model/vollansicht.ts
 model/warnung.ts
+model/webseiten-chat-einstellungen.ts
 model/wissen-analyse.ts
 model/wissen-annehmen.ts
 model/wissen-einstellungen.ts
+model/wissen-einstellungen1.ts
 model/wissen-export.ts
 model/wissen-ingest-auftrag.ts
 model/wissen-ingest-start.ts

@@ -1549,6 +1549,14 @@ components:
           $ref: "#/components/schemas/WebseitenChatEinstellungen"
         wissen:
           $ref: "#/components/schemas/WissenEinstellungen1"
+    EinstellungenBetrieb:
+      type: object
+      properties:
+        oeffentlicherChat:
+          $ref: "#/components/schemas/OeffentlichesChatBudget"
+        wissenMonatsbudgetTokens:
+          type: integer
+          format: int64
     EinstellungenBranding:
       type: object
       properties:
@@ -1556,6 +1564,28 @@ components:
           type: string
         primaerfarbe:
           type: string
+    EinstellungenErgebnis:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        geaendert:
+          type: boolean
+        auswirkungen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Auswirkung"
+    EinstellungenVorschau:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        auswirkungen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Auswirkung"
     EinstellungenZuruecksetzen:
       type: object
       properties:
@@ -1564,6 +1594,51 @@ components:
         version:
           type: integer
           format: int32
+    EinstellungskatalogAntwort:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        katalog:
+          type: array
+          items:
+            $ref: "#/components/schemas/EinstellungskatalogEintrag"
+        betrieb:
+          $ref: "#/components/schemas/EinstellungenBetrieb"
+    EinstellungskatalogEintrag:
+      type: object
+      properties:
+        schluessel:
+          type: string
+        gruppe:
+          $ref: "#/components/schemas/Gruppe"
+        name:
+          type: string
+        beschreibung:
+          type: string
+        typ:
+          $ref: "#/components/schemas/Typ"
+        einheit:
+          type: string
+        minimum:
+          type: integer
+          format: int32
+        maximum:
+          type: integer
+          format: int32
+        formregel:
+          type: string
+        standard: {}
+        aktuellerWert: {}
+        eigenerWert:
+          type: boolean
+        riskant:
+          type: boolean
+        wirksamAb:
+          type: string
+        hinweis:
+          type: string
     EntfernteAussage:
       type: object
       properties:
@@ -1595,18 +1670,6 @@ components:
       properties:
         antragId:
           $ref: "#/components/schemas/UUID"
-    Ergebnis2:
-      type: object
-      properties:
-        version:
-          type: integer
-          format: int32
-        geaendert:
-          type: boolean
-        auswirkungen:
-          type: array
-          items:
-            $ref: "#/components/schemas/Auswirkung"
     Export:
       description: "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link\
         \ (24 Stunden ab Fertigstellung) gilt nicht mehr"
@@ -1845,6 +1908,15 @@ components:
       properties:
         grund:
           type: string
+    Gruppe:
+      type: string
+      enum:
+      - GESCHAEFTSJAHR
+      - KENNUNGEN
+      - BRANDING
+      - CHAT
+      - WEBSEITEN_CHAT
+      - WISSEN
     ImportHerkunft:
       type: object
       properties:
@@ -2797,6 +2869,17 @@ components:
           type: boolean
           description: "Mindestens eine aktive Dokumentart hat die Gruppe «finanz»\
             \ (Spec 05, Req 8.8)"
+    OeffentlichesChatBudget:
+      type: object
+      properties:
+        monat:
+          $ref: "#/components/schemas/LocalDate"
+        budgetTokens:
+          type: integer
+          format: int64
+        verbrauchteTokens:
+          type: integer
+          format: int64
     PaketKopf:
       type: object
       properties:
@@ -3216,6 +3299,16 @@ components:
           anyOf:
           - $ref: "#/components/schemas/Fundstelle"
           - type: "null"
+    Typ:
+      type: string
+      enum:
+      - DATUM
+      - UID
+      - IBANS
+      - TEXT
+      - FARBE
+      - GANZZAHL
+      - WOCHENTAG
     UUID:
       type: string
       format: uuid
@@ -3383,16 +3476,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Aenderung"
-    Vorschau:
-      type: object
-      properties:
-        version:
-          type: integer
-          format: int32
-        auswirkungen:
-          type: array
-          items:
-            $ref: "#/components/schemas/Auswirkung"
     Warnung:
       type: object
       description: "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)"
@@ -6935,6 +7018,24 @@ paths:
       - SecurityScheme:
         - inhaber
   /api/v1/mandant/einstellungen:
+    get:
+      summary: Einstellungskatalog und Betriebsbudget lesen
+      tags:
+      - Einstellungen
+      responses:
+        "200":
+          description: Katalog und aktueller Budgetstand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EinstellungskatalogAntwort"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
     patch:
       summary: Einstellungen ändern
       tags:
@@ -6963,7 +7064,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Ergebnis2"
+                $ref: "#/components/schemas/EinstellungenErgebnis"
         "409":
           description: BESTAETIGUNG_NOETIG
         "412":
@@ -7006,7 +7107,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Vorschau"
+                $ref: "#/components/schemas/EinstellungenVorschau"
         "401":
           description: Not Authorized
         "403":
@@ -7042,7 +7143,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Ergebnis2"
+                $ref: "#/components/schemas/EinstellungenErgebnis"
         "401":
           description: Not Authorized
         "403":

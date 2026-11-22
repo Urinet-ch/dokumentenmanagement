@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.konfiguration.application.BestaetigteEinstellungen;
 import ch.urinet.archiv.konfiguration.application.EinstellungenVerwaltung;
+import ch.urinet.archiv.konfiguration.application.EinstellungskatalogLesen;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration.Einstellungen;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
@@ -49,21 +51,34 @@ public class MandantEinstellungenResource {
     }
 
     private final EinstellungenVerwaltung verwaltung;
+    private final EinstellungskatalogLesen katalog;
     private final KonfigurationVerwaltung konfiguration;
     private final MandantAufloesung aufloesung;
     private final Berechtigung rechte;
     private final SecurityIdentity identitaet;
     private final ObjectMapper json;
 
-    public MandantEinstellungenResource(EinstellungenVerwaltung verwaltung, KonfigurationVerwaltung konfiguration,
+    public MandantEinstellungenResource(EinstellungenVerwaltung verwaltung, EinstellungskatalogLesen katalog,
+                                        KonfigurationVerwaltung konfiguration,
                                         MandantAufloesung aufloesung, Berechtigung rechte,
                                         SecurityIdentity identitaet, ObjectMapper json) {
         this.verwaltung = verwaltung;
+        this.katalog = katalog;
         this.konfiguration = konfiguration;
         this.aufloesung = aufloesung;
         this.rechte = rechte;
         this.identitaet = identitaet;
         this.json = json;
+    }
+
+    @GET
+    @ErfordertAktion(Aktion.A20)
+    @Operation(summary = "Einstellungskatalog und Betriebsbudget lesen")
+    @APIResponse(responseCode = "200", description = "Katalog und aktueller Budgetstand",
+            content = @Content(schema = @Schema(implementation = EinstellungskatalogLesen.Ergebnis.class)))
+    public Response lesen() {
+        var ergebnis = katalog.lesen(benutzer().rolle());
+        return Response.ok(ergebnis).tag(tag(ergebnis.version())).build();
     }
 
     @PATCH

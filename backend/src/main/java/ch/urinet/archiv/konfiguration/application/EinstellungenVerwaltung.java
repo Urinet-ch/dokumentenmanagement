@@ -8,6 +8,7 @@ import ch.urinet.archiv.konfiguration.domain.Konfiguration.Einstellungen;
 import ch.urinet.archiv.konfiguration.domain.KonfigurationQuelle;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,12 +23,14 @@ public class EinstellungenVerwaltung {
         }
     }
 
+    @Schema(name = "EinstellungenVorschau")
     public record Vorschau(int version, List<Auswirkung> auswirkungen) {
         public Vorschau {
             auswirkungen = List.copyOf(auswirkungen);
         }
     }
 
+    @Schema(name = "EinstellungenErgebnis")
     public record Ergebnis(int version, boolean geaendert, List<Auswirkung> auswirkungen) {
         public Ergebnis {
             auswirkungen = List.copyOf(auswirkungen);
