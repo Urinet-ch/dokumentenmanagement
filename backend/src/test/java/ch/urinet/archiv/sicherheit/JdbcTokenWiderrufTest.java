@@ -10,6 +10,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,8 +24,8 @@ class JdbcTokenWiderrufTest {
     @Test
     void widerrufVergleichtAusstellungszeitUndCacheLaeuftAb() throws Exception {
         String benutzer = "token-widerruf-" + UUID.randomUUID();
-        Instant ausgestellt = Instant.now().minusSeconds(10);
-        Instant ab = Instant.now();
+        Instant ausgestellt = Instant.now().minusSeconds(10).truncatedTo(ChronoUnit.MICROS);
+        Instant ab = Instant.now().truncatedTo(ChronoUnit.MICROS);
         assertThat(tokenWiderruf.widerrufen(benutzer, ausgestellt)).isFalse();
         try {
             try (Connection verbindung = datenquelle.getConnection();
@@ -46,7 +47,7 @@ class JdbcTokenWiderrufTest {
     @Test
     void setzenUpsertetMonotonUndAufraeumenEntferntNurAlteZeilen() throws Exception {
         String benutzer = "token-widerruf-" + UUID.randomUUID();
-        Instant jetzt = Instant.now();
+        Instant jetzt = Instant.now().truncatedTo(ChronoUnit.MICROS);
         try {
             tokenWiderruf.setzen(benutzer, jetzt);
             tokenWiderruf.setzen(benutzer, jetzt.minusSeconds(30));
