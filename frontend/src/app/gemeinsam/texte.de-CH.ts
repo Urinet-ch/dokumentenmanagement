@@ -55,6 +55,15 @@ export const TEXTE = {
       anzahl === 1 ? '1 Dokument wartet' : `${anzahl} Dokumente warten`,
   },
   einfuehrung: {
+    fortschritt: (schritt: number, anzahl: number) => `Schritt ${schritt} von ${anzahl}`,
+    zurueck: 'Zurück',
+    weiter: 'Weiter',
+    fertig: 'Fertig',
+    ueberspringen: 'Überspringen',
+    anleitung: 'In der Anleitung lesen',
+    erneut: 'Einführung erneut zeigen',
+    abgeschlossen: 'Einführung abgeschlossen. Sie finden sie jederzeit unter ‹Hilfe›.',
+    uebersprungen: 'Einführung übersprungen. Sie finden sie jederzeit unter ‹Hilfe›.',
     willkommen: (name: string) => `Willkommen im ${name}`,
     rolle: (rolle: string) =>
       `Hier legen Sie Dokumente einmal ab und finden sie danach in Sekunden wieder, immer mit Quelle. Sie sind als «${rolle}» angemeldet; die App zeigt Ihnen nur die Bereiche, die Ihre Rolle nutzen darf.`,
