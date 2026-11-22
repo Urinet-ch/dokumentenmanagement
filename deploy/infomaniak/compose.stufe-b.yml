@@ -41,6 +41,7 @@ services:
       ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-
       ARCHIV_ABLAGE_MANIFEST_SPERRMODUS: COMPLIANCE
       ARCHIV_TSA_DIENSTE: sgpki,freetsa
+      ARCHIV_ALARM_EMPFAENGER_URINET: ${ARCHIV_ALARM_EMPFAENGER_URINET:-}
       MALLOC_ARENA_MAX: "2"
       JAVA_OPTS_APPEND: >-
         -Djava.util.logging.manager=org.jboss.logmanager.LogManager

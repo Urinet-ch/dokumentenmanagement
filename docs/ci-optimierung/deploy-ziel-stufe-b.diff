@@ -1,0 +1,196 @@
+--- a/.github/workflows/infomaniak-deploy.yml
++++ b/.github/workflows/infomaniak-deploy.yml
+@@ -1,4 +1,4 @@
+-# Deploy auf die Infomaniak-VPS, Stufe A (Aufgabe 1.9; Req 16.1, 16.9, 16.10, 16.11, 16.18; design.md «Betrieb auf
++# Deploy auf die Infomaniak-VPS, Stufe B (Aufgabe 5.11; Req 16.1, 16.9, 16.10, 16.11, 16.18; design.md «Betrieb auf
+ # der VPS»). Einziger Weg auf den Server: Bundle (image.tar, compose.yml, bundle/secrets/) per SSH an den Forced Command
+ # deploy-app.sh der VPS, danach Health-Prüfung; schlägt sie fehl, Rollback auf den Vorgänger-Stand.
+ # Kein Server-Zugriff aus Sitzungen, kein manuelles «docker compose up» auf dem Server (CLAUDE.md, Arbeitsweise 8).
+@@ -24,10 +24,6 @@ env:
+   APP: archiv
+   HOST_ARCHIV: archiv.apps.urinet.ch
+   HOST_AUTH: archiv-auth.apps.urinet.ch
+-  # Speicherbudget Stufe A aus tech.md (1150 MiB, geändert 21.11.2026, Entscheid Fabian: Keycloak 550m; davor 1000 MiB seit 13.11.2026, 900 MiB); liegt compose.yml darüber,
+-  # gilt Req 16.18 (kein Deploy auf Stufe A)
+-  BUDGET_MEM_MIB: '1150'
+-  BUDGET_CPUS: '0.75'
+   # Eingeführt, als Push auf main ohne CI lief (Entscheid Fabian 11.11.2026, PR #50; seit PR #58 läuft ci.yml wieder auf
+   # Push nach main, und Regel 3 des Nachweises braucht diesen Lauf): Bis zum Vortag dieses Datums gilt auch die grüne
+   # PR-CI des Squash-Merges mit gleichem Stand; ab dann nur noch ein Lauf auf dem Commit (Review PR #42, S1)
+@@ -35,7 +31,7 @@ env:
+ 
+ jobs:
+   deploy:
+-    name: Deploy Stufe A
++    name: Deploy Stufe B
+     # Nur main oder ein Release-Tag; ohne Server-Variable läuft nichts
+     if: vars.INFOMANIAK_HOST != '' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+     runs-on: ubuntu-24.04
+@@ -55,10 +51,23 @@ jobs:
+             exit 1
+           fi
+ 
+-      - name: Speicherbudget Stufe A (Req 16.18)
++      - name: Zielplattform bestätigen
++        env:
++          ZIELPLATTFORM: ${{ vars.INFOMANIAK_ZIELPLATTFORM }}
++        run: |
++          if [ "$ZIELPLATTFORM" != B ]; then
++            echo "::error::INFOMANIAK_ZIELPLATTFORM muss für diesen Workflow B sein."
++            exit 1
++          fi
++          echo "::error::Entwurf gesperrt: Worker-Netz, Ziel-Health und Rollback auf Stufe B erst nachweisen."
++          exit 1
++
++      - name: Speicherbudget Zielplattform B (Req 16.18, 16.26)
+         run: |
+-          docker compose -p "$APP" -f deploy/infomaniak/compose.yml config --format json \
+-            | python3 .github/scripts/pruefe-speicherbudget.py "$BUDGET_MEM_MIB" "$BUDGET_CPUS"
++          docker compose -f deploy/probe/compose.yml config --format json > "$RUNNER_TEMP/probe.json"
++          docker compose -p "$APP" -f deploy/infomaniak/compose.yml -f deploy/infomaniak/compose.stufe-b.yml \
++            config --format json | python3 .github/scripts/pruefe-speicherbudget.py \
++            --zielhost B --probe-datei "$RUNNER_TEMP/probe.json"
+ 
+       - name: CI für diesen Stand grün
+         env:
+@@ -73,7 +82,6 @@ jobs:
+         env:
+           SSH_KEY: ${{ secrets.INFOMANIAK_SSH_KEY }}
+           KNOWN_HOSTS: ${{ vars.INFOMANIAK_KNOWN_HOSTS }}
+-          ANDERE_APPS: ${{ vars.INFOMANIAK_ANDERE_APPS_HEALTH }}
+           ARCHIV_DB_POSTGRES: ${{ secrets.ARCHIV_DB_POSTGRES }}
+           ARCHIV_DB_OWNER: ${{ secrets.ARCHIV_DB_OWNER }}
+           ARCHIV_DB_APP: ${{ secrets.ARCHIV_DB_APP }}
+@@ -88,7 +96,6 @@ jobs:
+           pruefe() { if [ -z "$2" ]; then echo "::error::$1 fehlt (Secret bzw. Variable im Repo setzen)"; fehlt=1; fi; }
+           pruefe INFOMANIAK_SSH_KEY "$SSH_KEY"
+           pruefe INFOMANIAK_KNOWN_HOSTS "$KNOWN_HOSTS"
+-          pruefe INFOMANIAK_ANDERE_APPS_HEALTH "$ANDERE_APPS"
+           pruefe ARCHIV_DB_POSTGRES "$ARCHIV_DB_POSTGRES"
+           pruefe ARCHIV_DB_OWNER "$ARCHIV_DB_OWNER"
+           pruefe ARCHIV_DB_APP "$ARCHIV_DB_APP"
+@@ -159,7 +166,6 @@ jobs:
+           # read -a statt Wortaufteilung ohne Anführungszeichen (die Tags enthalten keine Leerzeichen)
+           read -r -a tags <<< "$TAGS"
+           docker save "${tags[@]}" -o bundle/image.tar
+-          cp deploy/infomaniak/compose.yml bundle/compose.yml
+           # Eine Datei je Secret, nur der Wert (deploy-app.sh liest bundle/secrets/<name>)
+           schreibe() { printf '%s' "$2" > "bundle/secrets/$1"; }
+           schreibe archiv_db_postgres "$ARCHIV_DB_POSTGRES"
+@@ -178,6 +184,8 @@ jobs:
+           # .env für die Interpolation in compose.yml (deploy-app.sh übernimmt sie): nur eine einzelne Adresse, sonst
+           # bricht das Skript ab (kein Deploy)
+           bash .github/scripts/schreibe-env.sh bundle/.env
++          docker compose --env-file bundle/.env -p "$APP" -f deploy/infomaniak/compose.yml \
++            -f deploy/infomaniak/compose.stufe-b.yml config --no-path-resolution > bundle/compose.yml
+           # Die Datenbank sieht nur SCRAM-Verifier, nie die Passwörter der Rollen
+           for rolle in archiv_db_owner archiv_db_app keycloak_db; do
+             python3 .github/scripts/scram-verifier.py "$rolle" < "bundle/secrets/$rolle" > "bundle/secrets/${rolle}_scram"
+@@ -194,19 +202,6 @@ jobs:
+           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy
+           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+ 
+-      - name: Andere Apps der VPS vor dem Deploy (Req 16.18)
+-        env:
+-          ANDERE_APPS: ${{ vars.INFOMANIAK_ANDERE_APPS_HEALTH }}
+-        run: |
+-          fehler=0
+-          for url in $ANDERE_APPS; do
+-            if curl -fsS -o /dev/null --max-time 15 "$url"; then echo "ok: $url"; else echo "::error::nicht gesund: $url"; fehler=1; fi
+-          done
+-          if [ "$fehler" -ne 0 ]; then
+-            echo "::error::Eine andere App ist schon vor dem Deploy nicht gesund; kein Deploy, Fabian prüft die VPS."
+-          fi
+-          exit "$fehler"
+-
+       - name: Deployen
+         id: deploy
+         env:
+@@ -254,12 +249,17 @@ jobs:
+           if [ "$sperre" -ne 0 ] || [ "$belegt" -ne 0 ]; then
+             echo "::error::Die API wartet auf die Liquibase-Sperre: Läuft eine Migration (zweite API, Admin-Kommando), abwarten; sonst die offene Sitzung der Rolle archiv_owner beenden, der nächste Start gibt die verwaiste Sperre selbst frei. Die Sperre nie von Hand löschen (Anleitung design.md «Betrieb auf der VPS»)."
+           fi
+-          echo "::error::api, db und kc sind nach 10 Minuten nicht alle healthy."
++          echo "::error::api, worker, db und kc sind nach 10 Minuten nicht alle healthy."
+           exit 1
+ 
+       - name: Öffentliche Prüfung
++        env:
++          HOST: ${{ vars.INFOMANIAK_HOST }}
+         run: |
+-          code() { curl -s -o /dev/null --max-time 15 -w '%{http_code}' "$1"; }
++          code() {
++            curl --noproxy '*' --connect-to "$HOST_ARCHIV:443:$HOST:443" \
++              --connect-to "$HOST_AUTH:443:$HOST:443" -s -o /dev/null --max-time 15 -w '%{http_code}' "$1"
++          }
+           warte() {
+             for _ in $(seq 1 30); do [ "$(code "$1")" = 200 ] && return 0; sleep 10; done
+             echo "::error::$1 liefert nach 5 Minuten nicht 200"; return 1
+@@ -290,8 +290,6 @@ jobs:
+           # PostgreSQL (ein Prozess «terminated by signal 9: Killed», der Container läuft dabei weiter) und Kernel
+           # (oom-kill); kein blosses «Killed», das auch in harmlosen Meldungen steht. Log-Inhalte erscheinen nicht in
+           # der Ausgabe, nur Zählungen.
+-          # Speicherabbrüche anderer Apps sieht der Deploy-Befehl nicht; die prüft Fabian auf der VPS (Nachweis 16.18
+-          # manuell).
+           sleep 60
+           ausgabe=$(ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null || true)
+           neustart=0
+@@ -303,29 +301,14 @@ jobs:
+             exit 1
+           fi
+ 
+-      - name: Andere Apps der VPS nach dem Deploy (Req 16.18)
+-        id: andere
+-        if: always() && steps.deploy.outcome != 'skipped'
+-        env:
+-          ANDERE_APPS: ${{ vars.INFOMANIAK_ANDERE_APPS_HEALTH }}
+-        run: |
+-          fehler=0
+-          for url in $ANDERE_APPS; do
+-            if curl -fsS -o /dev/null --max-time 15 "$url"; then echo "ok: $url"; else echo "::error::nicht gesund: $url"; fehler=1; fi
+-          done
+-          if [ "$fehler" -ne 0 ]; then
+-            echo "::error::Req 16.18 eingetreten: Abbruchkriterium 1.10. Fabian informieren; er stoppt die Archiv-Dienste auf der VPS (der Deploy-Befehl kennt kein Stoppen), K5 und Wechsel (5.11) vorziehen."
+-          fi
+-          exit "$fehler"
+-
+       - name: Rollback
+         # Nur wenn der Server den neuen Stand übernommen hat: entweder lief der Deploy durch, oder compose hat
+         # schon Container neu erstellt. Ein abgelehnter Deploy hat nichts geändert und braucht keinen Rollback.
+-        # Tritt 16.18 ein (Speicherabbruch, andere App krank), gilt das Abbruchkriterium aus 1.10 (stoppen), kein
+-        # Rollback: Der Vorgänger-Stand bräuchte denselben Speicher.
++        # Bei einem Speicherabbruch gilt das Abbruchkriterium aus 1.10 (stoppen), kein Rollback: Der Vorgänger-Stand
++        # bräuchte denselben Speicher.
+         if: >-
+           failure() && steps.deploy.outcome != 'skipped'
+-          && steps.speicher.outcome != 'failure' && steps.andere.outcome != 'failure'
++          && steps.speicher.outcome != 'failure'
+         env:
+           HOST: ${{ vars.INFOMANIAK_HOST }}
+           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+--- a/.github/scripts/pruefe-container.py
++++ b/.github/scripts/pruefe-container.py
+@@ -2,9 +2,9 @@
+ """Container des Archivs aus «deploy-app.sh status» prüfen (Aufgabe 1.9, Req 16.10, 16.18).
+ 
+   pruefe-container.py gesund <merkdatei>        < status
+-      api, db und kc laufen und sind healthy. Merkt den Zeitpunkt und die Laufzeit je Dienst in <merkdatei>.
++      api, worker, db und kc laufen und sind healthy. Merkt den Zeitpunkt und die Laufzeit je Dienst in <merkdatei>.
+   pruefe-container.py unveraendert <merkdatei>  < status
+-      Wieder alle drei healthy, und keiner lief kürzer, als seit «gesund» vergangen ist. Sonst wurde ein Container
++      Wieder alle vier healthy, und keiner lief kürzer, als seit «gesund» vergangen ist. Sonst wurde ein Container
+       neu gestartet, z. B. nach einem cgroup-OOM mit «restart: unless-stopped».
+ 
+ Ausgewertet werden nur die Zeilen von «compose ps» (Containername am Zeilenanfang), nicht die Log-Zeilen
+@@ -19,9 +19,9 @@ import re
+ import sys
+ import time
+ 
+-DIENSTE = ("api", "db", "kc")
++DIENSTE = ("api", "worker", "db", "kc")
+ TOLERANZ_S = 15
+-ZEILE = re.compile(r"^archiv-(api|db|kc)-\d+\s+([^|\s].*)$")
++ZEILE = re.compile(r"^archiv-(api|worker|db|kc)-\d+\s+([^|\s].*)$")
+ LAUFT = re.compile(r"\bUp (Less than a second|About a minute|About an hour|\d+ [a-z]+)"
+                    r"(?: \((healthy|unhealthy|health: starting)\))?(?:\s|$)")
+ EINHEIT = {"second": 1, "minute": 60, "hour": 3600, "day": 86400, "week": 7 * 86400, "month": 30 * 86400,

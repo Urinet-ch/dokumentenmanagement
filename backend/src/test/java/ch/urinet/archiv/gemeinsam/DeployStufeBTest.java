@@ -72,6 +72,8 @@ class DeployStufeBTest {
         assertThat(worker.path("environment").path("ARCHIV_WORKER_PARALLEL").asText()).isEqualTo("1");
         assertThat(worker.path("environment").path("QUARKUS_DATASOURCE_JDBC_MAX_SIZE").asText()).isEqualTo("8");
         assertThat(api.path("environment").path("QUARKUS_DATASOURCE_JDBC_MAX_SIZE").asText()).isEqualTo("16");
+        assertThat(worker.path("environment").path("ARCHIV_ALARM_EMPFAENGER_URINET"))
+                .isEqualTo(api.path("environment").path("ARCHIV_ALARM_EMPFAENGER_URINET"));
         assertThat(worker.path("networks").has("intern")).isTrue();
         assertThat(worker.path("networks").has("web")).isFalse();
         assertThat(worker.path("secrets").toString()).doesNotContain("archiv_db_owner");
