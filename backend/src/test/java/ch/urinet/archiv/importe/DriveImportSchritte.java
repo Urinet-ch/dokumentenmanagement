@@ -343,11 +343,11 @@ public class DriveImportSchritte {
         }
     }
 
-    @Dann("hat jedes importierte Dokument den Art-Vorschlag «{word}»")
-    public void artVorschlag(String art) throws SQLException {
+    @Dann("hat jedes importierte Dokument «{word}» als Art vorbelegt")
+    public void artVorbelegung(String art) throws SQLException {
         assertThat(importiert).isNotEmpty();
         for (UUID id : importiert) {
-            assertThat(abfragen("select ki_vorschlag ->> 'art' as art from " + schema(mandant)
+            assertThat(abfragen("select art from " + schema(mandant)
                     + ".dokument where id = ?::uuid", id.toString()))
                     .as(id.toString()).containsExactly(Map.of("art", art));
         }

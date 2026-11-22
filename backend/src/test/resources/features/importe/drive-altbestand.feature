@@ -29,5 +29,5 @@ Funktionalität: Altbestand von VHF/GSK übernehmen
       | Bulletin/2026/1.pdf | Drive-Import; Ordner: Altbestand/Bulletin/2026; Reihe: BULLETIN; Jahr: 2026; Ausgabe: 1 |
       | Bulletin/2026/3.pdf | Drive-Import; Ordner: Altbestand/Bulletin/2026; Reihe: BULLETIN; Jahr: 2026; Ausgabe: 3 |
     Und hat jedes importierte Dokument die Klassifikation «fachgebiet» mit dem Wert «bau»
-    Und hat jedes importierte Dokument den Art-Vorschlag «BULLETIN»
+    Und hat jedes importierte Dokument «BULLETIN» als Art vorbelegt
     Und enthält der Altbestandsbericht «BULLETIN / 2026: 2 Dateien; Ausgabe-Nr. erkannt: [1, 3]; nicht erkannt: 0»
