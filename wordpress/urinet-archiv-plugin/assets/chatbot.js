@@ -47,9 +47,9 @@
 						var link = document.createElement('a');
 						link.href = window.urinetArchivChatbot.dokumentUrl + encodeURIComponent(quelle.dokumentId);
 						var reihe = quelle.reihe && (quelle.reihe.name || quelle.reihe.code);
-						var ausgabe = quelle.ausgabe ? ', ' + quelle.ausgabe : '';
+						var ausgabeText = quelle.ausgabe ? ', ' + quelle.ausgabe : '';
 						link.textContent = 'Quelle: ' + (quelle.titel || quelle.dokumentId)
-							+ (reihe ? ' (' + reihe + ausgabe + ')' : ausgabe);
+							+ (reihe ? ' (' + reihe + ausgabeText + ')' : ausgabeText);
 						ausgabe.appendChild(document.createElement('br'));
 						ausgabe.appendChild(link);
 					}

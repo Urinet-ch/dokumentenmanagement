@@ -65,18 +65,41 @@ final class Urinet_Archiv_Frontend {
 	public static function liste( array $atts = array() ): string {
 		$parameter = array(
 			'pro_seite' => isset( $atts['pro_seite'] ) ? min( 100, max( 1, (int) $atts['pro_seite'] ) ) : 20,
-			'seite'     => isset( $atts['seite'] ) ? max( 1, (int) $atts['seite'] ) : 1,
+			'seite'     => isset( $atts['seite'] ) ? max( 1, (int) $atts['seite'] ) : ( isset( $_GET['seite'] ) ? max( 1, (int) $_GET['seite'] ) : 1 ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only pagination.
 		);
 		foreach ( array( 'reihe', 'jahr', 'ausgabe', 'fachgebiet', 'sortierung' ) as $feld ) {
 			if ( isset( $atts[ $feld ] ) && is_scalar( $atts[ $feld ] ) ) {
 				$parameter[ $feld ] = sanitize_text_field( (string) $atts[ $feld ] );
 			}
 		}
+		$filter      = Urinet_Archiv_Client::lesen( 'filter' );
+		$filter_html = '';
+		if ( ! is_wp_error( $filter ) && isset( $filter['klassifikationen'] ) && is_array( $filter['klassifikationen'] ) ) {
+			$filter_html = '<form class="urinet-archiv-filter" method="get">';
+			foreach ( $filter['klassifikationen'] as $klassifikation ) {
+				if ( ! is_array( $klassifikation ) || empty( $klassifikation['code'] ) || ! is_array( $klassifikation['werte'] ?? null ) ) {
+					continue;
+				}
+				$code         = sanitize_key( (string) $klassifikation['code'] );
+				$filter_html .= '<label>' . esc_html( (string) ( $klassifikation['name'] ?? $code ) ) . '<select name="' . esc_attr( $code ) . '"><option value="">Alle</option>';
+				foreach ( $klassifikation['werte'] as $wert ) {
+					if ( is_array( $wert ) && isset( $wert['code'], $wert['name'] ) ) {
+						$selected     = isset( $_GET[ $code ] ) && (string) wp_unslash( $_GET[ $code ] ) === (string) $wert['code'] ? ' selected' : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only filter.
+						$filter_html .= '<option value="' . esc_attr( (string) $wert['code'] ) . '"' . $selected . '>' . esc_html( (string) $wert['name'] ) . '</option>';
+						if ( '' !== $selected ) {
+							$parameter[ $code ] = sanitize_text_field( (string) $wert['code'] );
+						}
+					}
+				}
+				$filter_html .= '</select></label>';
+			}
+			$filter_html .= '<button type="submit">Filtern</button></form>';
+		}
 		$daten = Urinet_Archiv_Client::lesen( 'dokumente', $parameter );
 		if ( is_wp_error( $daten ) ) {
 			return '<p class="urinet-archiv-fehler">' . esc_html( $daten->get_error_message() ) . '</p>';
 		}
-		$html = '<ul class="urinet-archiv-liste">';
+		$html = $filter_html . '<ul class="urinet-archiv-liste">';
 		foreach ( $daten['eintraege'] as $eintrag ) {
 			if ( ! is_array( $eintrag ) || ! isset( $eintrag['id'] ) ) {
 				continue;
@@ -85,7 +108,16 @@ final class Urinet_Archiv_Frontend {
 			$titel = isset( $eintrag['titel'] ) ? (string) $eintrag['titel'] : $id;
 			$html .= '<li><a href="' . esc_url( self::dokument_url( $id ) ) . '">' . esc_html( $titel ) . '</a></li>';
 		}
-		return $html . '</ul>';
+		$html  .= '</ul>';
+		$seiten = (int) ceil( $daten['gesamt'] / max( 1, $daten['proSeite'] ) );
+		if ( $seiten > 1 ) {
+			$html .= '<nav class="urinet-archiv-seiten" aria-label="Seiten">';
+			for ( $seite = 1; $seite <= $seiten; $seite++ ) {
+				$html .= '<a href="' . esc_url( add_query_arg( 'seite', $seite ) ) . '">' . esc_html( (string) $seite ) . '</a> ';
+			}
+			$html .= '</nav>';
+		}
+		return $html;
 	}
 
 	public static function suche(): string {

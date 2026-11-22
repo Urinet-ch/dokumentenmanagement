@@ -50,6 +50,10 @@ final class Urinet_Archiv_Client {
 		$lock = '';
 		foreach ( array( 1, 2 ) as $slot ) {
 			$kandidat = 'ua_download_' . self::client_hash() . '_' . $slot;
+			$belegt   = get_option( $kandidat, 0 );
+			if ( $belegt && ( time() - (int) $belegt ) > 900 ) {
+				delete_option( $kandidat );
+			}
 			if ( add_option( $kandidat, time(), '', 'no' ) ) {
 				$lock = $kandidat;
 				break;
@@ -86,7 +90,7 @@ final class Urinet_Archiv_Client {
 					}
 					return strlen( $header );
 				},
-				CURLOPT_WRITEFUNCTION  => static function ( $handle, string $chunk ) use ( &$inhalt, &$stream, &$typ ): int {
+				CURLOPT_WRITEFUNCTION  => static function ( $handle, string $chunk ) use ( &$inhalt, &$stream, &$typ, &$laenge ): int {
 					if ( ! $stream ) {
 						$inhalt .= $chunk;
 						if ( strlen( $inhalt ) < 1048576 ) {
