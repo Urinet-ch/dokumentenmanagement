@@ -11,7 +11,6 @@ import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Function;
 
 @ApplicationScoped
@@ -58,12 +57,13 @@ public class EinstellungenVerwaltung {
     }
 
     public Ergebnis aendern(int erwarteteVersion, Function<Einstellungen, Eingabe> eingabe,
-                            Set<String> bestaetigt, String akteur) {
+                            BestaetigteEinstellungen bestaetigt, String akteur) {
         konfiguration.aenderungStarten(erwarteteVersion);
         Konfiguration vorher = konfiguration.aktuell();
         Eingabe ziel = eingabe.apply(vorher.einstellungen());
         List<Auswirkung> folgen = pruefung.folgen(vorher.einstellungen(), ziel.ziel());
-        pruefung.bestaetigt(folgen, bestaetigt, EinstellungsAenderungsPruefung.Ursprung.APP);
+        pruefung.bestaetigt(folgen, bestaetigt.schluessel(), EinstellungsAenderungsPruefung.Ursprung.APP);
+        bestaetigt.pruefen();
         gueltigkeitPruefen(vorher.version(), ziel);
         if (vorher.einstellungen().equals(ziel.ziel())) {
             return new Ergebnis(vorher.version(), false, folgen);

@@ -368,6 +368,21 @@
           }
         }
       },
+      "Auswirkung" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "betroffeneDatensaetze" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "AuszugTeil" : {
         "description" : "Stück der Textstelle; treffer = hervorgehobener Suchbegriff (Req 14.4)",
         "type" : "object",
@@ -729,6 +744,15 @@
           }
         }
       },
+      "ChatEinstellungen" : {
+        "type" : "object",
+        "properties" : {
+          "aufbewahrungMonate" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "ChatFrage" : {
         "type" : "object",
         "required" : [ "frage" ],
@@ -910,6 +934,10 @@
             "format" : "int64"
           }
         }
+      },
+      "DayOfWeek" : {
+        "type" : "string",
+        "enum" : [ "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY" ]
       },
       "DiffEintrag" : {
         "type" : "object",
@@ -1643,6 +1671,52 @@
           }
         }
       },
+      "Einstellungen" : {
+        "type" : "object",
+        "properties" : {
+          "geschaeftsjahrEnde" : {
+            "type" : "string"
+          },
+          "kennungen" : {
+            "$ref" : "#/components/schemas/Kennungen"
+          },
+          "branding" : {
+            "$ref" : "#/components/schemas/EinstellungenBranding"
+          },
+          "chat" : {
+            "$ref" : "#/components/schemas/ChatEinstellungen"
+          },
+          "webseitenChat" : {
+            "$ref" : "#/components/schemas/WebseitenChatEinstellungen"
+          },
+          "wissen" : {
+            "$ref" : "#/components/schemas/WissenEinstellungen1"
+          }
+        }
+      },
+      "EinstellungenBranding" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "primaerfarbe" : {
+            "type" : "string"
+          }
+        }
+      },
+      "EinstellungenZuruecksetzen" : {
+        "type" : "object",
+        "properties" : {
+          "gruppe" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "EntfernteAussage" : {
         "type" : "object",
         "properties" : {
@@ -1678,6 +1752,24 @@
         "properties" : {
           "antragId" : {
             "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
+      "Ergebnis2" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "geaendert" : {
+            "type" : "boolean"
+          },
+          "auswirkungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Auswirkung"
+            }
           }
         }
       },
@@ -2375,6 +2467,20 @@
           }
         }
       },
+      "Kennungen" : {
+        "type" : "object",
+        "properties" : {
+          "uid" : {
+            "type" : "string"
+          },
+          "ibans" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "Klassifikation" : {
         "type" : "object",
         "properties" : {
@@ -2974,6 +3080,18 @@
           },
           "aktion" : {
             "type" : "string"
+          }
+        }
+      },
+      "LintZeitplan" : {
+        "type" : "object",
+        "properties" : {
+          "wochentag" : {
+            "$ref" : "#/components/schemas/DayOfWeek"
+          },
+          "stunde" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -3591,6 +3709,21 @@
           }
         }
       },
+      "Vorschau" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "auswirkungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Auswirkung"
+            }
+          }
+        }
+      },
       "Warnung" : {
         "type" : "object",
         "description" : "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)",
@@ -3612,6 +3745,15 @@
           "meldung" : {
             "type" : [ "string", "null" ],
             "description" : "Meldung der Dokumentregel"
+          }
+        }
+      },
+      "WebseitenChatEinstellungen" : {
+        "type" : "object",
+        "properties" : {
+          "aufbewahrungTage" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -3657,6 +3799,26 @@
             "type" : [ "integer", "null" ],
             "format" : "int32",
             "minimum" : 1
+          }
+        }
+      },
+      "WissenEinstellungen1" : {
+        "type" : "object",
+        "properties" : {
+          "budgetTokens" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "lintBudgetTokens" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "monatsbudgetTokens" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "lintZeitplan" : {
+            "$ref" : "#/components/schemas/LintZeitplan"
           }
         }
       },
@@ -4126,6 +4288,8 @@
     "name" : "Dokumentarten"
   }, {
     "name" : "Dokumente"
+  }, {
+    "name" : "Einstellungen"
   }, {
     "name" : "Exporte"
   }, {
@@ -8218,6 +8382,181 @@
           },
           "401" : {
             "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/mandant/einstellungen" : {
+      "patch" : {
+        "summary" : "Einstellungen ändern",
+        "tags" : [ "Einstellungen" ],
+        "parameters" : [ {
+          "name" : "bestaetigt",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/merge-patch+json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Einstellungen"
+              }
+            },
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Einstellungen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Änderung oder unveränderter Stand",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Ergebnis2"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "BESTAETIGUNG_NOETIG"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "413" : {
+            "description" : "DATEI_ZU_GROSS"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/mandant/einstellungen/vorschau" : {
+      "post" : {
+        "summary" : "Änderung der Einstellungen vorschauen",
+        "tags" : [ "Einstellungen" ],
+        "parameters" : [ {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/merge-patch+json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Einstellungen"
+              }
+            },
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Einstellungen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Auswirkungen ohne Änderung",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Vorschau"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/mandant/einstellungen/zuruecksetzen" : {
+      "post" : {
+        "summary" : "Einstellungen einer Gruppe oder Version zurücksetzen",
+        "tags" : [ "Einstellungen" ],
+        "parameters" : [ {
+          "name" : "bestaetigt",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EinstellungenZuruecksetzen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Zurückgesetzt oder unveränderter Stand",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Ergebnis2"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
           }
         },
         "security" : [ {

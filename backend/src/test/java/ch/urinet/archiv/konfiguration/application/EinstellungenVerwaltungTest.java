@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,7 +38,7 @@ class EinstellungenVerwaltungTest {
 
     @Test
     void versionWirdVorInhaltUndRisikoGeprueft() {
-        assertThatThrownBy(() -> verwaltung.aendern(6, vorher -> eingabe(0), Set.of(), "test"))
+        assertThatThrownBy(() -> verwaltung.aendern(6, vorher -> eingabe(0), bestaetigt(null), "test"))
                 .isInstanceOf(FachFehler.class)
                 .satisfies(fehler -> assertThat(((FachFehler) fehler).code()).isEqualTo(Fehlercode.VERSION_KONFLIKT));
         assertThat(schreibvorgaenge).isZero();
@@ -47,12 +46,12 @@ class EinstellungenVerwaltungTest {
 
     @Test
     void fehlendeBestaetigungGehtVorUngueltigemWertUndAendertNichts() {
-        assertThatThrownBy(() -> verwaltung.aendern(7, vorher -> eingabe(0), Set.of(), "test"))
+        assertThatThrownBy(() -> verwaltung.aendern(7, vorher -> eingabe(0), bestaetigt(null), "test"))
                 .isInstanceOf(BestaetigungNoetig.class);
         assertThat(stepUps).isZero();
         assertThat(schreibvorgaenge).isZero();
         assertThatThrownBy(() -> verwaltung.aendern(7, vorher -> eingabe(0),
-                Set.of("chat.aufbewahrungMonate"), "test")).isInstanceOf(KonfigurationUngueltig.class);
+                bestaetigt("chat.aufbewahrungMonate"), "test")).isInstanceOf(KonfigurationUngueltig.class);
         assertThat(stepUps).isEqualTo(1);
         assertThat(schreibvorgaenge).isZero();
         assertThat(grenzen).isZero();
@@ -64,7 +63,7 @@ class EinstellungenVerwaltungTest {
         assertThat(vorschau.auswirkungen()).hasSize(1);
         assertThat(schreibvorgaenge).isZero();
         assertThat(stepUps).isZero();
-        var ergebnis = verwaltung.aendern(7, vorher -> eingabe(6), Set.of("chat.aufbewahrungMonate"), "test");
+        var ergebnis = verwaltung.aendern(7, vorher -> eingabe(6), bestaetigt("chat.aufbewahrungMonate"), "test");
         assertThat(ergebnis.version()).isEqualTo(8);
         assertThat(ergebnis.geaendert()).isTrue();
         assertThat(schreibvorgaenge).isEqualTo(1);
@@ -74,7 +73,7 @@ class EinstellungenVerwaltungTest {
 
     @Test
     void unveraenderterWertErzeugtKeineVersion() {
-        var ergebnis = verwaltung.aendern(7, vorher -> eingabe(12), Set.of(), "test");
+        var ergebnis = verwaltung.aendern(7, vorher -> eingabe(12), bestaetigt(null), "test");
         assertThat(ergebnis.version()).isEqualTo(7);
         assertThat(ergebnis.geaendert()).isFalse();
         assertThat(schreibvorgaenge).isZero();
@@ -83,6 +82,10 @@ class EinstellungenVerwaltungTest {
 
     private static EinstellungenVerwaltung.Eingabe eingabe(int monate) {
         return new EinstellungenVerwaltung.Eingabe(einstellungen(monate), List.of());
+    }
+
+    private static BestaetigteEinstellungen bestaetigt(String wert) {
+        return BestaetigteEinstellungen.lesen(wert);
     }
 
     private static Einstellungen einstellungen(int monate) {
