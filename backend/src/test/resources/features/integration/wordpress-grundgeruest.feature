@@ -33,6 +33,18 @@ Funktionalität: WordPress-Grundgerüst
     Wenn ein Dokument im Lese-Feed zurückgezogen wird oder der Feed ausfällt
     Dann gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab
 
+  @req-5.8 @req-6.2
+  Szenario: Die Liste filtert nach öffentlichen Werten und zeigt Chatquellen
+    Angenommen ein WordPress mit dem Archiv-Plugin
+    Wenn Besucher die Archivliste und den Chat öffnen
+    Dann zeigt das Plugin dynamische Filter, Seitennavigation und lesbare Chatquellen
+
+  @req-7.8
+  Szenario: Download-Sperren laufen ab und grosse Streams melden ihre Länge
+    Angenommen ein WordPress mit dem Archiv-Plugin
+    Wenn Download-Sperren ausfallen und ein grosser Download gestreamt wird
+    Dann prüft das Plugin ablaufende Sperren und die Länge eines Teil-Streams
+
   @req-7.10
   Szenario: Das Erfassungsformular folgt dem Art-Schema
     Angenommen ein WordPress mit dem Archiv-Plugin

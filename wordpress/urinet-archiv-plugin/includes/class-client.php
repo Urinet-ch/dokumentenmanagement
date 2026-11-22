@@ -5,6 +5,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class Urinet_Archiv_Client {
+	private const DOWNLOAD_SLOT_TTL = 1200;
+
 	public static function chat( string $frage ) {
 		$token = self::token( 'lesen' );
 		if ( is_wp_error( $token ) ) {
@@ -47,104 +49,185 @@ final class Urinet_Archiv_Client {
 			status_header( 404 );
 			return;
 		}
-		$lock = '';
-		foreach ( array( 1, 2 ) as $slot ) {
-			$kandidat = 'ua_download_' . self::client_hash() . '_' . $slot;
-			if ( add_option( $kandidat, time(), '', 'no' ) ) {
-				$lock = $kandidat;
-				break;
-			}
-		}
-		if ( '' === $lock ) {
+		$lock = self::download_slot_belegen( self::client_hash() );
+		if ( null === $lock ) {
 			status_header( 429 );
+			header( 'Retry-After: 60' );
 			echo 'Zu viele Downloads gleichzeitig. Bitte versuchen Sie es später erneut.'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Feste Fehlermeldung.
 			return;
 		}
 		$werte = Urinet_Archiv_Einstellungen::werte();
 		$curl  = curl_init( $werte['url'] . '/public/v1/dokumente/' . rawurlencode( $id ) . '/datei' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		if ( false === $curl ) {
-			delete_option( $lock );
+			self::download_slot_freigeben( $lock );
 			status_header( 404 );
 			return;
 		}
-		$inhalt = '';
-		$stream = false;
-		$typ    = 'application/octet-stream';
-		$laenge = '';
+		$stream = array(
+			'inhalt' => '',
+			'laenge' => '',
+			'start'  => false,
+			'typ'    => 'application/octet-stream',
+		);
 		curl_setopt_array( // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt_array -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 			$curl,
 			array(
 				CURLOPT_HTTPHEADER     => array( 'Authorization: Bearer ' . $token, 'X-Archiv-Zugriff: ' . Urinet_Archiv_Einstellungen::stufe() ),
 				CURLOPT_FOLLOWLOCATION => false,
 				CURLOPT_TIMEOUT        => 900,
-				CURLOPT_HEADERFUNCTION => static function ( $handle, string $header ) use ( &$typ, &$laenge ): int {
-					if ( preg_match( '/^Content-Type:\s*(.+)$/i', $header, $treffer ) ) {
-						$typ = trim( $treffer[1] );
-					}
-					if ( preg_match( '/^Content-Length:\s*(\d+)$/i', $header, $treffer ) ) {
-						$laenge = $treffer[1];
-					}
-					return strlen( $header );
-				},
-				CURLOPT_WRITEFUNCTION  => static function ( $handle, string $chunk ) use ( &$inhalt, &$stream, &$typ ): int {
-					if ( ! $stream ) {
-						$inhalt .= $chunk;
-						if ( strlen( $inhalt ) < 1048576 ) {
-							return strlen( $chunk );
-						}
-						status_header( 200 );
-						header( 'Cache-Control: private, no-store' );
-						header( 'Content-Type: ' . $typ );
-						if ( '' !== $laenge ) {
-							header( 'Content-Length: ' . $laenge );
-						}
-						echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
-						$inhalt = '';
-						$stream = true;
-					} else {
-						echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
-					}
-					return strlen( $chunk );
-				},
+				CURLOPT_HEADERFUNCTION => self::download_header_callback( $stream ),
+				CURLOPT_WRITEFUNCTION  => self::download_write_callback( $stream ),
 			)
 		);
 		$ok     = curl_exec( $curl ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_exec -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		$status = (int) curl_getinfo( $curl, CURLINFO_RESPONSE_CODE ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_getinfo -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		$error  = curl_error( $curl ); // phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_error -- Streaming ohne temporäre Datei ist für diesen Download erforderlich.
 		if ( false === $ok || '' !== $error ) {
-			delete_option( $lock );
-			if ( ! $stream ) {
+			self::download_slot_freigeben( $lock );
+			if ( ! $stream['start'] ) {
 				status_header( 404 );
 			}
 			return;
 		}
 		if ( 429 === $status ) {
 			status_header( 429 );
+			header( 'Retry-After: 60' );
 			header( 'Content-Type: text/plain; charset=utf-8' );
 			echo 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Feste Fehlermeldung.
-			delete_option( $lock );
+			self::download_slot_freigeben( $lock );
 			return;
 		}
 		if ( 200 === $status ) {
-			$json = json_decode( $inhalt, true );
+			$json = json_decode( $stream['inhalt'], true );
 			if ( is_array( $json ) && isset( $json['url'] ) && is_string( $json['url'] ) && '' !== esc_url_raw( $json['url'] ) ) {
 				wp_redirect( esc_url_raw( $json['url'] ), 302 ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- Die API liefert eine vorsignierte Object-Storage-URL.
-				delete_option( $lock );
+				self::download_slot_freigeben( $lock );
 				return;
 			}
 		}
 		if ( in_array( $status, array( 301, 302 ), true ) ) {
-			delete_option( $lock );
+			self::download_slot_freigeben( $lock );
 			status_header( 404 );
 			return;
 		}
-		if ( ! $stream ) {
+		if ( ! $stream['start'] ) {
 			status_header( $status );
-			header( 'Cache-Control: private, no-store' );
-			header( 'Content-Type: ' . $typ );
-			echo $inhalt; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+			self::download_sende_header( $stream );
+			echo $stream['inhalt']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
 		}
-		delete_option( $lock );
+		self::download_slot_freigeben( $lock );
+	}
+
+	private static function download_slot_belegen( string $client ): ?array {
+		global $wpdb;
+
+		$jetzt = time();
+		foreach ( array( 1, 2 ) as $nummer ) {
+			$name  = 'ua_download_' . $client . '_' . $nummer;
+			$lease = array(
+				'kennung' => wp_generate_uuid4(),
+				'ablauf'  => $jetzt + self::DOWNLOAD_SLOT_TTL,
+			);
+			if ( add_option( $name, $lease, '', 'no' ) ) {
+				return array(
+					'name'  => $name,
+					'lease' => $lease,
+				);
+			}
+
+			$vorhanden = get_option( $name );
+			$ablauf    = is_array( $vorhanden ) && isset( $vorhanden['ablauf'] )
+				? (int) $vorhanden['ablauf']
+				: ( is_numeric( $vorhanden ) ? (int) $vorhanden + self::DOWNLOAD_SLOT_TTL : PHP_INT_MAX );
+			if ( $ablauf > $jetzt ) {
+				continue;
+			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Compare-and-delete keeps another request's replacement lease intact.
+			$geloescht = $wpdb->delete(
+				$wpdb->options,
+				array(
+					'option_name'  => $name,
+					'option_value' => maybe_serialize( $vorhanden ),
+				),
+				array( '%s', '%s' )
+			);
+			if ( 1 !== $geloescht ) {
+				continue;
+			}
+			wp_cache_delete( $name, 'options' );
+			if ( add_option( $name, $lease, '', 'no' ) ) {
+				return array(
+					'name'  => $name,
+					'lease' => $lease,
+				);
+			}
+		}
+		return null;
+	}
+
+	private static function download_slot_freigeben( array $slot ): void {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Release only the lease owned by this request.
+		$geloescht = $wpdb->delete(
+			$wpdb->options,
+			array(
+				'option_name'  => $slot['name'],
+				'option_value' => maybe_serialize( $slot['lease'] ),
+			),
+			array( '%s', '%s' )
+		);
+		if ( 1 === $geloescht ) {
+			wp_cache_delete( $slot['name'], 'options' );
+		}
+	}
+
+	private static function download_header_callback( array &$stream ): Closure {
+		return static function ( $handle, string $header ) use ( &$stream ): int {
+			if ( preg_match( '/^Content-Type:\s*(.+)$/i', $header, $treffer ) ) {
+				$stream['typ'] = trim( $treffer[1] );
+			}
+			if ( preg_match( '/^Content-Length:\s*(\d+)$/i', $header, $treffer ) ) {
+				$stream['laenge'] = $treffer[1];
+			}
+			return strlen( $header );
+		};
+	}
+
+	private static function download_write_callback( array &$stream ): Closure {
+		return static function ( $handle, string $chunk ) use ( &$stream ): int {
+			if ( ! $stream['start'] ) {
+				$stream['inhalt'] .= $chunk;
+				if ( strlen( $stream['inhalt'] ) < 1048576 ) {
+					return strlen( $chunk );
+				}
+				status_header( 200 );
+				self::download_sende_header( $stream );
+				echo $stream['inhalt']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+				$stream['inhalt'] = '';
+				$stream['start']  = true;
+			} else {
+				echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binärdaten des Archivs.
+			}
+			return strlen( $chunk );
+		};
+	}
+
+	private static function download_response_headers( array $stream ): array {
+		$header = array(
+			'Cache-Control' => 'private, no-store',
+			'Content-Type'  => $stream['typ'],
+		);
+		if ( '' !== $stream['laenge'] ) {
+			$header['Content-Length'] = $stream['laenge'];
+		}
+		return $header;
+	}
+
+	private static function download_sende_header( array $stream ): void {
+		foreach ( self::download_response_headers( $stream ) as $name => $wert ) {
+			header( $name . ': ' . $wert );
+		}
 	}
 
 	private static function client_hash(): string {

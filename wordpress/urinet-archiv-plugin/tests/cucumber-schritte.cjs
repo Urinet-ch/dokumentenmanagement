@@ -24,8 +24,25 @@ When('das Archiv nicht erreichbar ist', function () {
   this.test = 'test_nicht_erreichbares_archiv_liefert_freundlichen_fehler';
 });
 
+When('Download-Sperren ausfallen und ein grosser Download gestreamt wird', function () {
+  this.test = 'test_download_(slots_laufen_ab_und_loeschen_keine_fremde_lease|stream_uebernimmt_content_length_und_gibt_bloecke_aus)';
+});
+
 When('ein Dokument im Lese-Feed zurückgezogen wird oder der Feed ausfällt', function () {
   this.test = 'test_feed_(invalidiert_cache_vor_der_ausgabe_geaenderter_dokumente|ausfall_gibt_keinen_veralteten_cache_zurueck)';
+});
+
+When('Besucher die Archivliste und den Chat öffnen', async function () {
+  const { chromium } = require('playwright');
+  const basis = process.env.WP_TEST_URL || 'http://localhost:8888';
+  this.browser = await chromium.launch({ headless: true });
+  this.page = await this.browser.newPage();
+  const response = await this.page.request.get(`${basis}/wp-json/wp/v2/pages?slug=urinet-archiv-testseite`);
+  assert.equal(response.status(), 200);
+  const seiten = await response.json();
+  assert.equal(seiten.length, 1, 'Die synthetische Archiv-Testseite fehlt');
+  await this.page.goto(seiten[0].link);
+  this.browserTest = 'liste-chat';
 });
 
 When('die Geschäftsstelle die Erfassungsseite öffnet', function () {
@@ -44,12 +61,49 @@ When('die Geschäftsstelle die Erfassungsseite öffnet', function () {
   })();
 });
 
+Then('zeigt das Plugin dynamische Filter, Seitennavigation und lesbare Chatquellen', async function () {
+  assert.equal(this.browserTest, 'liste-chat');
+  const liste = this.page.locator('.urinet-archiv-liste-bereich');
+  await liste.getByLabel('Fachgebiet').selectOption('bau');
+  await liste.getByRole('button', { name: 'Filtern' }).click();
+  await this.page.waitForURL(/urinet_archiv_filter_fachgebiet=bau/);
+  assert.equal(await liste.locator('select[name="urinet_archiv_filter_fachgebiet"]').inputValue(), 'bau');
+  assert.equal(await liste.getByText('Synthetisches Merkblatt 1').count(), 1);
+  const naechsteSeite = liste.getByRole('link', { name: 'Nächste Seite' });
+  const url = new URL(await naechsteSeite.getAttribute('href'));
+  assert.equal(url.searchParams.get('urinet_archiv_filter_fachgebiet'), 'bau');
+  assert.equal(url.searchParams.get('urinet_archiv_seite'), '2');
+  await naechsteSeite.click();
+  await this.page.waitForURL(/urinet_archiv_seite=2/);
+  assert.equal(await liste.getByText('Synthetisches Merkblatt 2').count(), 1);
+  assert.match(await liste.locator('.urinet-archiv-seiten').innerText(), /Seite 2 von 2/);
+
+  await this.page.locator('[data-urinet-chat-frage]').fill('synthetische Frage');
+  await this.page.getByRole('button', { name: 'Fragen' }).click();
+  const quelle = this.page.getByRole('link', { name: 'Quelle: Synthetisches Merkblatt (Merkblatt, 3/2071)' });
+  await quelle.waitFor();
+  assert.match(await this.page.locator('[data-urinet-chat-ausgabe]').innerText(), /Synthetische Antwort/);
+  assert.match(await quelle.getAttribute('href'), /00000000-0000-4000-8000-000000000001$/);
+
+  await this.page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
+  const pruefung = await this.page.evaluate(async () => {
+    const optionen = { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } };
+    const wurzeln = [
+      document.querySelector('.urinet-archiv-liste-bereich'),
+      document.querySelector('.urinet-archiv-chatbot'),
+    ];
+    const ergebnisse = await Promise.all(wurzeln.map((wurzel) => window.axe.run(wurzel, optionen)));
+    return ergebnisse.flatMap((ergebnis) => ergebnis.violations.map((verletzung) => verletzung.id));
+  });
+  assert.deepEqual(pruefung, [], `axe meldet WCAG-Verstösse: ${pruefung.join(', ')}`);
+});
+
 When('das Plugin mit der unterstützten PHP-Version und WordPress geprüft wird', function () {
   this.test = 'GrundgeruestTest';
   this.codingStandards = true;
 });
 
-Then(/^(?:sind die Schlüssel verschlüsselt gespeichert und auf der Einstellungsseite nicht sichtbar|prüft das Plugin die Grösse und das feste Schema der Anfrage|meldet das Plugin die jeweilige höchste Stufe und trennt die Cache-Einträge|liefert das Plugin eine freundliche Meldung ohne technische Einzelheiten|gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab|zeigt das Plugin Schema-Felder und sperrt die öffentliche Zugriffsstufe|bestehen die Plugin-Tests und die WordPress-Coding-Standards-Prüfung)$/, async function () {
+Then(/^(?:sind die Schlüssel verschlüsselt gespeichert und auf der Einstellungsseite nicht sichtbar|prüft das Plugin die Grösse und das feste Schema der Anfrage|meldet das Plugin die jeweilige höchste Stufe und trennt die Cache-Einträge|liefert das Plugin eine freundliche Meldung ohne technische Einzelheiten|gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab|prüft das Plugin ablaufende Sperren und die Länge eines Teil-Streams|zeigt das Plugin Schema-Felder und sperrt die öffentliche Zugriffsstufe|bestehen die Plugin-Tests und die WordPress-Coding-Standards-Prüfung)$/, async function () {
   if (this.browserTest) {
     const art = this.page.locator('[data-urinet-art]');
     const merkblatt = this.page.locator('fieldset[data-urinet-zusatz-art="merkblatt"]');
