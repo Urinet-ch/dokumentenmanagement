@@ -599,3 +599,7 @@ Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x
 - Gemeinsame Zähler für Grenzen und Prüf-Cache, falls die API je mit mehreren Instanzen läuft.
 - Stillstand des Feeds durch lang offene Transaktionen (Abschnitt «Änderungs-Feed», Grenze des Cursors): bewusst hingenommen; dann gilt die Cache-Dauer der Webseite.
 - Domain VHF/GSK (offen seit 2.2) bestimmt auch die Basis-URL im Vertrag.
+
+## Umsetzung (Aufgabe 10.2, 22.11.2026)
+- Die Verwaltungsrollen eines neu angelegten Mandanten kommen aus `archiv.provisionierung.mandanten.<code>.verwaltungs-rollen`; nicht konfigurierte Mandanten erhalten dieselben Standardrollen wie das Register. Die Werte werden vor dem Anlegen des Schemas validiert und zusammen mit dem inaktiven Registereintrag gespeichert. Für `vhf-gsk` ist nur `geschaeftsstelle` konfiguriert.
+- `MandantVerwaltungsrollen` ist der typisierte Übergabepunkt für die spätere Option `mandant anlegen --rollen` aus Spec 06, Aufgabe 21.1. Diese Aufgabe ist noch offen und von 19.7/19.13 abhängig; die Inhaber-Einladung bleibt ein separates Kommando und wird durch `mandant anlegen` nicht ausgeführt.
