@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.domain.BestaetigungNoetig;
 import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
 import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
 import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
+import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import jakarta.persistence.PersistenceException;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
@@ -55,10 +56,23 @@ class ProblemAbbildungTest {
             assertThat(ueberlastet.getStatus()).isEqualTo(503);
             assertThat(ueberlastet.getHeaderString("Retry-After")).isEqualTo("1");
         }
+
         try (Response fehler = abbildung.fachFehler(
                 new ch.urinet.archiv.gemeinsam.domain.FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER))) {
             assertThat(fehler.getStatus()).isEqualTo(502);
             assertThat(fehler.getHeaderString("Retry-After")).isNull();
+        }
+    }
+
+    @Test
+    void websseitenGrenzeLiefertRetryAfterUndGrund() {
+        try (Response antwort = abbildung.fachFehler(
+                new ZuVieleAnfragen(ZuVieleAnfragen.Grund.UPLOADS, 37))) {
+            assertThat(antwort.getStatus()).isEqualTo(429);
+            assertThat(antwort.getHeaderString("Retry-After")).isEqualTo("37");
+            assertThat(antwort.getEntity()).asString()
+                    .contains("\"fehlercode\":\"ZU_VIELE_ANFRAGEN\"")
+                    .contains("\"grund\":\"UPLOADS\"");
         }
     }
 
