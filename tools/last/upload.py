@@ -136,7 +136,10 @@ def main() -> int:
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
         # Aufwärmen mit eigenen Nummern, Ergebnis verworfen
         vorweg = range(args.anzahl, args.anzahl + args.aufwaermen)
-        list(pool.map(lambda n: hochladen(args.url, token, args.groesse, n), vorweg))
+        vorlauf = list(pool.map(lambda n: hochladen(args.url, token, args.groesse, n), vorweg))
+        fehler_vorlauf = sum(status != 202 for status, _ in vorlauf)
+        if fehler_vorlauf:
+            sys.exit(f"Aufwärmen fehlgeschlagen: {fehler_vorlauf} Uploads nicht angenommen; Messung abgebrochen.")
         ergebnisse = list(pool.map(lambda n: hochladen(args.url, token, args.groesse, n), range(args.anzahl)))
 
     zeiten = [dauer for status, dauer in ergebnisse if status == 202]

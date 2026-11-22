@@ -141,7 +141,10 @@ def main() -> int:
     zufall_vorweg = random.Random(args.seed + 1)
     aufwaermen = [parameter(n, begriffe, zufall_vorweg, args.modus) for n in range(args.aufwaermen)]
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
-        list(pool.map(lambda w: suchen(args.url, token, w), aufwaermen))
+        vorlauf = list(pool.map(lambda w: suchen(args.url, token, w), aufwaermen))
+        fehler_vorlauf = sum(status != 200 for status, _, _ in vorlauf)
+        if fehler_vorlauf:
+            sys.exit(f"Aufwärmen fehlgeschlagen: {fehler_vorlauf} Suchen nicht beantwortet; Messung abgebrochen.")
         ergebnisse = list(pool.map(lambda w: suchen(args.url, token, w), anfragen))
 
     zeiten = [dauer for status, dauer, _ in ergebnisse if status == 200]

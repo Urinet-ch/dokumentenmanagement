@@ -106,6 +106,15 @@ class Grenztest(unittest.TestCase):
         self.assertFalse(bericht["bestanden"])
         self.assertGreater(bericht["p95_s"], bericht["grenze_s"])
 
+    def test_upload_bricht_bei_fehlgeschlagenem_aufwaermen_ab(self):
+        argv = ["upload.py", "--url", "http://localhost", "--anzahl", "1", "--parallel", "1",
+                "--groesse", "200", "--aufwaermen", "1", "--json"]
+        with patch.object(sys, "argv", argv), patch.object(upload, "token_lesen", return_value="probe"), \
+                patch.object(upload, "hochladen", return_value=(503, 0.1)) as hochladen:
+            with self.assertRaisesRegex(SystemExit, "Aufwärmen fehlgeschlagen"):
+                upload.main()
+        self.assertEqual(hochladen.call_count, 1)
+
     def test_suche_vergleicht_ungerundete_zeit(self):
         argv = ["suche.py", "--url", "http://localhost", "--anzahl", "1", "--parallel", "1", "--json"]
         with patch.object(sys, "argv", argv), patch.object(suche, "token_lesen", return_value="probe"), \
@@ -115,6 +124,15 @@ class Grenztest(unittest.TestCase):
         bericht = json.loads(ausgabe.getvalue())
         self.assertFalse(bericht["bestanden"])
         self.assertGreater(bericht["p95_s"], bericht["grenze_s"])
+
+    def test_suche_bricht_bei_fehlgeschlagenem_aufwaermen_ab(self):
+        argv = ["suche.py", "--url", "http://localhost", "--anzahl", "1", "--parallel", "1",
+                "--aufwaermen", "1", "--json"]
+        with patch.object(sys, "argv", argv), patch.object(suche, "token_lesen", return_value="probe"), \
+                patch.object(suche, "suchen", side_effect=[(200, 0.1, 50000), (503, 0.1, None)]) as suchen:
+            with self.assertRaisesRegex(SystemExit, "Aufwärmen fehlgeschlagen"):
+                suche.main()
+        self.assertEqual(suchen.call_count, 2)
 
 
 class Server(BaseHTTPRequestHandler):
