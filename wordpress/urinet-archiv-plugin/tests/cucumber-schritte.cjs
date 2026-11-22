@@ -92,11 +92,12 @@ Then('zeigt das Plugin dynamische Filter, Seitennavigation und lesbare Chatquell
       document.querySelector('.urinet-archiv-liste-bereich'),
       document.querySelector('.urinet-archiv-chatbot'),
     ];
-    const ergebnisse = [];
+    const verstosse = [];
     for (const wurzel of wurzeln) {
-      ergebnisse.push(await window.axe.run(wurzel, optionen));
+      const ergebnis = await window.axe.run(wurzel, optionen);
+      verstosse.push(...ergebnis.violations.map((verletzung) => verletzung.id));
     }
-    return ergebnisse.flatMap((ergebnis) => ergebnis.violations.map((verletzung) => verletzung.id));
+    return verstosse;
   });
   assert.deepEqual(pruefung, [], `axe meldet WCAG-Verstösse: ${pruefung.join(', ')}`);
 });
