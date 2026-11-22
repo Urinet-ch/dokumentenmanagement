@@ -144,6 +144,9 @@
     <p class="zaehler" role="status" data-test="wartet">
       <span class="ic"><app-symbol name="uhr" /></span>{{ texte.wartet(warteschlange.wartend()) }}
     </p>
+    <a #schlangeHilfe href="/hilfe#erfassen-offline" (click)="$event.preventDefault(); hilfe.oeffnen('erfassen-offline', schlangeHilfe)">
+      {{ hilfeTexte.soFunktioniertEs }}
+    </a>
 
     @if (warteschlange.fehlerhaft().length > 0) {
       <h3>{{ texte.fehlerhaft }}</h3>
@@ -154,6 +157,9 @@
             <div class="tx">
               <b>{{ texte.erfassung(name(eintrag.aufgenommen), eintrag.seiten.length) }}</b>
               <p class="fehler" data-test="meldung">{{ eintrag.meldung }}</p>
+              <a #fehlerHilfe href="/hilfe#erfassen-offline" (click)="$event.preventDefault(); hilfe.oeffnen('erfassen-offline', fehlerHilfe)">
+                {{ hilfeTexte.soFunktioniertEs }}
+              </a>
               @if (loeschenFuer() === eintrag.id) {
                 <p role="alert" data-test="loeschen-frage">{{ texte.loeschenFrage }}</p>
                 <div class="aktionen">

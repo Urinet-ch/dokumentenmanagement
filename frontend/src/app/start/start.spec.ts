@@ -6,6 +6,7 @@ import { ONLINE } from '../gemeinsam/online';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { Start } from './start';
 import { EinfuehrungVermerk } from '../hilfe/einfuehrung-vermerk';
+import { HilfeLeiste } from '../hilfe/hilfe-leiste.service';
 import { BrandingService, STANDARD_BRANDING } from '../gemeinsam/branding.service';
 import { Aktion, darf } from '../gemeinsam/anmeldung/rechte';
 
@@ -36,7 +37,12 @@ describe('Start', () => {
 
   it('führt ohne Verbindung und ohne Anmeldung zu «Erfassen» (Req 4.4)', async () => {
     online.set(false);
-    expect(link(await zeigen())?.getAttribute('href')).toBe('/erfassen');
+    const element = await zeigen();
+    expect(link(element)?.getAttribute('href')).toBe('/erfassen');
+    const hilfeLink = element.querySelector<HTMLAnchorElement>('a[href="/hilfe#erfassen-offline"]')!;
+    hilfeLink.click();
+    expect(TestBed.inject(HilfeLeiste).anker()).toBe('erfassen-offline');
+    expect(TestBed.inject(HilfeLeiste).offen()).toBe(true);
   });
 
   describe('Einführung auf der Startseite', () => {
@@ -74,11 +80,16 @@ describe('Start', () => {
       await fixture.whenStable();
       expect(element.querySelector('.einfuehrung')).toBeNull();
       expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.anmeldung.ohneZugang);
+      element.querySelector<HTMLAnchorElement>('a[href="/hilfe#probleme"]')!.click();
+      expect(TestBed.inject(HilfeLeiste).anker()).toBe('probleme');
+      expect(TestBed.inject(HilfeLeiste).offen()).toBe(true);
     });
   });
 
   it('bietet den Weg online nicht an', async () => {
     online.set(true);
-    expect(link(await zeigen())).toBeUndefined();
+    const element = await zeigen();
+    expect(link(element)).toBeUndefined();
+    expect(element.querySelector('a[href="/hilfe#erfassen-offline"]')).toBeNull();
   });
 });

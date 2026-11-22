@@ -17,6 +17,7 @@ import { AnmeldungService } from '../../gemeinsam/anmeldung/anmeldung.service';
 import { aufnahmeName, aufnahmeZeit } from '../../gemeinsam/aufnahme-name';
 import { Symbol } from '../../gemeinsam/symbol';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { HilfeLeiste } from '../../hilfe/hilfe-leiste.service';
 import { Upload } from '../upload';
 import {
   AufnahmeGrenzeFehler,
@@ -66,10 +67,12 @@ const ORIGINAL_QUALITAET = 0.95;
 export class HandyErfassung {
   protected readonly anmeldung = inject(AnmeldungService);
   protected readonly warteschlange = inject(WarteschlangeService);
+  protected readonly hilfe = inject(HilfeLeiste);
   private readonly scanner = inject(ScannerPort);
   private readonly dokument = inject(DOCUMENT);
 
   protected readonly texte = TEXTE.handy;
+  protected readonly hilfeTexte = TEXTE.hilfe;
   protected readonly anmeldeTexte = TEXTE.anmeldung;
   protected readonly kamera = signal<Kamera>('aus');
   protected readonly seiten = signal<Aufnahme[]>([]);

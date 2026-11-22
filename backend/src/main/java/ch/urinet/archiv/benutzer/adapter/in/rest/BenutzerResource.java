@@ -7,6 +7,9 @@ import ch.urinet.archiv.benutzer.application.BenutzerZugangZuruecksetzen;
 import ch.urinet.archiv.benutzer.application.BenutzerGoogleLoesen;
 import ch.urinet.archiv.benutzer.application.BenutzerAendern;
 import ch.urinet.archiv.benutzer.application.BenutzerStatusAendern;
+import ch.urinet.archiv.benutzer.application.BenutzerRolleAendern;
+import ch.urinet.archiv.benutzer.application.BenutzerAntraege;
+import ch.urinet.archiv.benutzer.application.VerwaltungAntragSpeicher;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -31,6 +34,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PATCH;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.HeaderParam;
@@ -47,6 +51,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.UUID;
 
 @Path("/benutzer")
 @Tag(name = "Benutzerverwaltung")
@@ -59,6 +64,8 @@ public class BenutzerResource {
     private final BenutzerGoogleLoesen google;
     private final BenutzerAendern aendern;
     private final BenutzerStatusAendern status;
+    private final BenutzerRolleAendern rolle;
+    private final BenutzerAntraege antraege;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
     private final ObjectReader json;
@@ -67,7 +74,7 @@ public class BenutzerResource {
 
     public BenutzerResource(BenutzerLesen lesen, BenutzerEinladen einladen, BenutzerAnlegen anlegen,
                             BenutzerZugangZuruecksetzen zugang, BenutzerGoogleLoesen google, BenutzerAendern aendern,
-                            BenutzerStatusAendern status,
+                            BenutzerStatusAendern status, BenutzerRolleAendern rolle, BenutzerAntraege antraege,
                             MandantAufloesung mandant, SecurityIdentity identitaet, ObjectMapper json,
                             Berechtigung berechtigung, StepUp stepUp) {
         this.lesen = lesen;
@@ -77,6 +84,8 @@ public class BenutzerResource {
         this.google = google;
         this.aendern = aendern;
         this.status = status;
+        this.rolle = rolle;
+        this.antraege = antraege;
         this.mandant = mandant;
         this.identitaet = identitaet;
         this.json = json.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS,
@@ -106,6 +115,126 @@ public class BenutzerResource {
     public Response lesen(@PathParam("benutzerId") String benutzerId) {
         BenutzerLesen.BenutzerAnsicht ansicht = lesen.lesen(benutzerId);
         return Response.ok(ansicht).tag(ansicht.etag()).build();
+    }
+
+    @GET
+    @Path("/{benutzerId}/rechte")
+    @ErfordertAktion(Aktion.A21)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Rechte eines Benutzers anzeigen")
+    @APIResponse(responseCode = "200", description = "Rolle und Rechte des Benutzers")
+    public RollenResource.RolleDto rechte(@PathParam("benutzerId") String benutzerId) {
+        var rollen = lesen.lesen(benutzerId).rollen();
+        if (rollen.size() != 1) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        return RollenResource.darstellen(rollen.iterator().next());
+    }
+
+    public record RollenAenderung(String rolle) {
+    }
+
+    @PUT
+    @Path("/{benutzerId}/rolle")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A23)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Rolle eines Benutzers ändern")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = RollenAenderung.class)))
+    @APIResponse(responseCode = "204", description = "Rolle geändert")
+    @APIResponse(responseCode = "202", description = "Vier-Augen-Antrag angelegt",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = BenutzerRolleAendern.Ergebnis.class)))
+    public Response rolleAendern(@PathParam("benutzerId") String id, @HeaderParam("If-Match") String ifMatch,
+                                 @HeaderParam("X-Real-Ip") String ip,
+                                 @HeaderParam("Content-Type") String contentType, InputStream body) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A23);
+        stepUp.pruefen();
+        jsonPruefen(contentType);
+        RollenAenderung eingabe;
+        try {
+            eingabe = json.forType(RollenAenderung.class).readValue(begrenztLesen(body));
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        if (eingabe == null) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        BenutzerRolleAendern.Ergebnis ergebnis = rolle.aendern(code, akteur, id, ifMatch, eingabe.rolle(),
+                IpAdresse.aus(ip));
+        return ergebnis.antragId() == null ? Response.noContent().build()
+                : Response.status(Response.Status.ACCEPTED).entity(ergebnis).build();
+    }
+
+    @GET
+    @Path("/antraege")
+    @ErfordertAktion(Aktion.A21)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Offene Verwaltungsanträge anzeigen")
+    public List<BenutzerAntraege.Ansicht> antraege() {
+        mandant.pruefen();
+        return antraege.offene();
+    }
+
+    @POST
+    @Path("/antraege/{antragId}/bestaetigen")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A23)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Verwaltungsantrag bestätigen")
+    public Response antragBestaetigen(@PathParam("antragId") String id, @HeaderParam("X-Real-Ip") String ip,
+                                      @HeaderParam("Content-Type") String contentType, InputStream body)
+            throws IOException {
+        return antragEntscheiden(id, ip, contentType, body, VerwaltungAntragSpeicher.Status.BESTAETIGT);
+    }
+
+    @POST
+    @Path("/antraege/{antragId}/ablehnen")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A23)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Verwaltungsantrag ablehnen")
+    public Response antragAblehnen(@PathParam("antragId") String id, @HeaderParam("X-Real-Ip") String ip,
+                                   @HeaderParam("Content-Type") String contentType, InputStream body)
+            throws IOException {
+        return antragEntscheiden(id, ip, contentType, body, VerwaltungAntragSpeicher.Status.ABGELEHNT);
+    }
+
+    @POST
+    @Path("/antraege/{antragId}/zurueckziehen")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A23)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Eigenen Verwaltungsantrag zurückziehen")
+    public Response antragZurueckziehen(@PathParam("antragId") String id, @HeaderParam("X-Real-Ip") String ip,
+                                        @HeaderParam("Content-Type") String contentType, InputStream body)
+            throws IOException {
+        return antragEntscheiden(id, ip, contentType, body, VerwaltungAntragSpeicher.Status.ZURUECKGEZOGEN);
+    }
+
+    private Response antragEntscheiden(String id, String ip, String contentType, InputStream body,
+                                       VerwaltungAntragSpeicher.Status entscheid) throws IOException {
+        var code = mandant.pruefen();
+        Benutzer akteur = akteur();
+        berechtigung.aktion(akteur, Aktion.A23);
+        if (entscheid == VerwaltungAntragSpeicher.Status.BESTAETIGT) {
+            stepUp.pruefen();
+        }
+        leerenKoerperPruefen(contentType, body);
+        UUID antragId;
+        try {
+            antragId = UUID.fromString(id);
+            if (!antragId.toString().equalsIgnoreCase(id)) {
+                throw new IllegalArgumentException("Ungültige Kennung");
+            }
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        antraege.entscheiden(code, akteur, antragId, entscheid, IpAdresse.aus(ip));
+        return Response.noContent().build();
     }
 
     @POST
