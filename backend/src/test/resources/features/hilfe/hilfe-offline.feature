@@ -32,3 +32,12 @@ Funktionalität: Anleitung ohne Netz
     Dann zeigt die PWA weiterhin die alte App und die alte Anleitung
     Wenn ich die neue App-Version aktiviere
     Dann zeigt die PWA die neue App und die neue Anleitung
+
+  @req-9.2
+  Szenario: Der Updatehinweis ist bei geöffneter Hilfe nicht bedienbar
+    Angenommen eine PWA mit zwei synthetischen Versionen ist installiert
+    Wenn eine neue App-Version mit neuer Anleitung bereitsteht
+    Und ich die Hilfe-Leiste öffne
+    Dann ist der Updateknopf durch die Hilfe abgeschirmt
+    Wenn ich die Hilfe-Leiste über «Schliessen» schliesse
+    Dann ist der Updateknopf wieder bedienbar
