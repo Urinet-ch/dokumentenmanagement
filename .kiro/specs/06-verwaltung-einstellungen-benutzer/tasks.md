@@ -102,7 +102,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.1, 3.2, 3.4, 3.5, 3.6, 3.7, 4.8, 5.7, 5.9, 7.5, 7.6, 7.7, 7.8_
   - _Abhängig von: 19.4, 19.6_
 
-- [ ] 19.8 REST Status, Zugang und E-Mail [Backend]
+- [x] 19.8 REST Status, Zugang und E-Mail [Backend]
   - `sperren`, `entsperren` (inkl. Sperre durch Fehlversuche), `deaktivieren` (Zeile `AUSTRITT`), `reaktivieren`,
     `zugang-zuruecksetzen` (TOTP entfernen), `PATCH` für E-Mail mit `VERIFY_EMAIL` und Mitteilung an die alte Adresse,
     `DELETE …/google-verknuepfung` (WO O.8), `If-Match` und `ETag` des Benutzers.
@@ -247,7 +247,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Abhängig von: 21.2, 21.3, 21.4, 21.5_
 
 ## Welle 24 — Passkey als Anmeldeweg (Entscheid Fabian 21.11.2026, Requirement 10)
-- [ ] 24.1 Spike und Realm-Flow Passkey [Infra] [Backend]
+- [x] 24.1 Spike und Realm-Flow Passkey [Infra] [Backend]
   - Spike gegen Keycloak 26.8.2: Flow mit Passkey und Rückfall `browser-totp-pflicht`, `auth_time` bei Passkey, Einrichtung in der
     Kontoverwaltung, Direct Grant unverändert; Ergebnis in design.md «Passkey» (Marker `[offen: …]` auflösen). Realm-Export mit
     Platzhalter für die Relying-Party-ID; Realm-Tests mit virtuellem Authenticator (Einrichten, Anmelden, Step-up, Entfernen).

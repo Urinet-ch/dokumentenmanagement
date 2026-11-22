@@ -87,7 +87,9 @@ export class App {
   protected readonly aktiverPfad = computed(() => aktiverPfad(this.url(), this.menue().map((punkt) => punkt.pfad)));
   protected readonly abschnitte = computed(() => abschnitte(this.menue()));
   protected readonly darfSuchen = computed(() => this.menue().length > 0 && this.anmeldung.darf('A2'));
-  private readonly hilfeAnker = computed(() => hilfeKontext(this.url(), this.hilfe.rolle(), this.hilfeKatalog));
+  private readonly hilfeAnker = computed(() =>
+    hilfeKontext(this.url(), this.hilfe.rolle(), this.hilfeKatalog, !this.anmeldung.angemeldet() && !this.online()),
+  );
   protected readonly farbschema = inject(FarbschemaService);
 
   constructor() {

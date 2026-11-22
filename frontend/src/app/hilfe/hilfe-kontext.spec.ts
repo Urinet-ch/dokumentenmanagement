@@ -20,6 +20,12 @@ describe('hilfeKontext (Spec 07, Req 4.3)', () => {
     expect(hilfeKontext('/erfassen', null, HILFE_KATALOG)).toBeNull();
   });
 
+  it('zeigt beim Erfassen abgemeldet und offline die Offline-Anleitung', () => {
+    expect(hilfeKontext('/erfassen?test=1', null, HILFE_KATALOG, true)).toBe('erfassen-offline');
+    expect(hilfeKontext('/suche', null, HILFE_KATALOG, true)).toBeNull();
+    expect(hilfeKontext('/erfassen', null, HILFE_KATALOG)).toBeNull();
+  });
+
   it.each<Rolle>(['inhaber', 'mitarbeiter', 'treuhaender', 'geschaeftsstelle'])(
     'ordnet für %s Suche und Chat zu',
     (rolle) => {

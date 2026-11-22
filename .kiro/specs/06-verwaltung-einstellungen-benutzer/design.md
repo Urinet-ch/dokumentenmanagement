@@ -153,7 +153,8 @@ backend/src/main/java/ch/urinet/archiv/
   `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
   `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
   `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET …/users/{id}/federated-identity` (Liste, Filter auf `identityProvider = google`; unter `…/federated-identity/google` kennt Keycloak nur POST und DELETE), `DELETE …/users/{id}/federated-identity/google`,
-  `DELETE …/attack-detection/brute-force/users/{id}`. Interne Adresse und Aussteller des Tokens sind in Aufgabe 19.1 zu
+  `GET/DELETE …/attack-detection/brute-force/users/{id}` (GET für die Anzeige und die Prüfung vor dem Entsperren;
+  aus der Antwort wird nur `disabled` verwendet, keine IP protokolliert). Interne Adresse und Aussteller des Tokens sind in Aufgabe 19.1 zu
   prüfen (`KC_HOSTNAME` zeigt auf die öffentliche Adresse; für den internen Weg nötigenfalls
   `KC_HOSTNAME_BACKCHANNEL_DYNAMIC`).
 - **Zeitgrenzen** (`archiv.verwaltung.keycloak.*`, Klasse (b)): Verbindung 2 s, Anfrage 5 s; zwei gleichzeitige Aufrufe
@@ -214,6 +215,10 @@ Archiv-Rolle und ein offener Antrag; die Bestätigung und Rollenvergabe folgen i
 Einladung erneut erhalten, solange es im Status `EINGELADEN` ist. Bis 19.10 verweigert die Step-up-Schnittstelle
 geschützte Aktionen; Tests ersetzen sie ausdrücklich. Eine bestätigte Entfernung nach einer unklaren Keycloak-Wirkung
 genügt nicht für `GEKLAERT`; HTTP 202 gilt nicht als bestätigter Abschluss.
+Bei einer E-Mail-Änderung werden für die Bestätigung an die neue und die Mitteilung an die bisherige Adresse zwei der
+drei Mailplätze je Ziel reserviert. Auch angefragte Änderungen mit unklarem Ausgang zählen vorsorglich.
+Eine reine Namensänderung trägt den technischen Vorgang `NAME_AENDERN`; bei einer gemeinsamen Änderung mit E-Mail
+steht `EMAIL_AENDERN`. Das Protokoll nennt ausschliesslich die betroffenen Felder, nie deren Werte.
 
 ### Statusautomat
 | Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |
@@ -253,17 +258,34 @@ Claim-Prüfung mit konfigurierter Gültigkeit.
 Entscheid Fabian 21.11.2026: zusätzlicher Anmeldeweg, ersetzt Passwort und TOTP; Passwort plus TOTP bleibt; Admin setzt zurück;
 Step-up per Passkey; Google unverändert. Der Browser-Flow des Realms bietet zusätzlich die Anmeldung mit Passkey (WebAuthn
 passwordless, auffindbarer Schlüssel, Benutzerverifikation «required», Attestation «none», Unterstützung der Anmeldung per
-Vorschlag im Feld Benutzername) und fällt auf `browser-totp-pflicht` (Passwort plus TOTP) zurück. `auth_time` und `amr` des Tokens
-bleiben die Quelle für den Step-up; `StepUp` prüft weiter nur `auth_time` (kein Wissen über die Methode). Die Einrichtung geschieht in
+Vorschlag im Feld Benutzername) und fällt auf `browser-totp-pflicht` (Passwort plus TOTP) zurück. Der unten dokumentierte
+Spike prüft die verfügbaren Token-Claims; der Nachweis für die Anmeldeart beim Step-up bleibt offen. Die Einrichtung geschieht in
 der Kontoverwaltung von Keycloak (Theme 20.8: deutsche Texte); das Archiv bekommt dafür keine eigene Oberfläche, nur Anzeige
 («Passkey eingerichtet», Anzahl) und die Admin-Aktion «Passkeys zurücksetzen» als Teil von «Zugang zurücksetzen» (REST,
 Step-up, Protokoll ohne Gerätedaten). Der Adapter liest die Zahl über die Admin-API (Credentials des Benutzers, Typ
 `webauthn-passwordless`) und löscht sie auf Anforderung; er gibt keine Schlüsselkennungen weiter. Die Relying-Party-ID ist die
 Domain der App und eine Betriebsangabe (Platzhalter im Export). Tests: virtueller Authenticator gegen ein Wegwerf-Keycloak
 (Einrichten, Anmelden, Step-up, Entfernen, Zurücksetzen); echte Geräte bei der Inbetriebnahme (Fabian).
-`[offen: genaue Flow-Konstruktion in Keycloak 26.8.2 (Passkey-Authenticator mit bedingter Anzeige gegen eigener Teilfluss),
-Setzen von auth_time bei Passkey, Auswirkung auf Direct-Grant und die Wegwerf-Tests (Direct Grant bleibt TOTP-Pflicht) — Spike
-in Aufgabe 24.1 klärt das und ergänzt diesen Abschnitt]`
+Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach Aufgabe 19.10; Aufgabe 24.1 prüft die Token-Ebene.
+
+#### Umsetzung (Aufgabe 24.1, 21.11.2026)
+- Keycloak 26.8.2 bietet Passkeys im bestehenden `auth-username-password-form` mit bedingter UI an. Der anschliessende
+  bedingte OTP-Teilfluss verlangt TOTP, wenn `webauthn-passwordless` nicht tatsächlich verwendet wurde. Passwort bleibt
+  auch mit vorhandenem Passkey an TOTP gebunden; Direct Grant und Google-Flows bleiben unverändert. Ein synthetischer
+  Spike prüfte Passwort und TOTP, Direct Grant mit und ohne TOTP sowie die Passkey-Anmeldung.
+- Die Kontoverwaltung richtet einen auffindbaren Passkey über `webauthn-register-passwordless` ein und entfernt ihn über
+  `delete_credential`; die Benutzerverifikation ist verpflichtend, Attestation `none`. Die Konto-Scope-Zuordnung
+  ermöglicht die erforderlichen Kontofunktionen. Der Spike prüfte Einrichtung und Entfernung.
+- Ein Access-Token nach Passkey-Anmeldung enthält `auth_time`, `acr=1`, aber keinen `amr`-Claim. Bei
+  `prompt=login&max_age=0` wurde `auth_time` erneuert. `acr=1` identifiziert die Anmeldeart nicht; ob für Requirement 7.2
+  die Prüfung von `auth_time` genügt, ist ein Entscheid für Fabian und wird nicht durch diesen Spike vorweggenommen.
+- Die RP-ID wird aus der konfigurierten App-Basisadresse abgeleitet. Weil die Keycloak-Origin eine andere Origin ist,
+  liefert die App `/.well-known/webauthn` mit der konfigurierten Keycloak-Origin; die Betriebsanleitung steht in
+  `docs/passkey-related-origins.md`. Ein synthetischer Chromium-Spike bestätigte die Related-Origin-Konfiguration;
+  echte Geräte und Betrieb bleiben Aufgabe 24.3.
+- Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach 19.10, der Admin-Reset nach 24.2. Browser- und
+  Keycloak-Integrationstests prüfen den exportierten Realm. Die Browser-Szenarien prüfen die Rücksetzung direkt über die
+  Keycloak-Admin-API; für den Passwort-Rückfall nutzen sie einen isolierten Browser-Kontext ohne aktive Passkey-Sitzung.
 
 ### Abgleich
 `Abgleich` liest die Benutzer des Mandanten (Seiten zu 50), gleicht mit `benutzer_status`, dem Benutzerverzeichnis und dem

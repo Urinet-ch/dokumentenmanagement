@@ -2,7 +2,9 @@ package ch.urinet.archiv.benutzer;
 
 import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
+import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
+import ch.urinet.archiv.benutzer.application.BenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
@@ -60,13 +62,18 @@ public class BenutzerVerwaltungSchritte {
     @Inject WissensquelleSeed wissensquelle;
     @Inject ZusatzSchemaPruefer zusatzSchema;
     @Inject IdentitaetsDienst identitaet;
+    @Inject BenutzerMitteilung mitteilung;
     @Inject StepUp stepUp;
 
     private final List<Map.Entry<String, String>> benutzer = new ArrayList<>();
     private final List<Response> antworten = new ArrayList<>();
     private StepUp urspruenglichesStepUp;
     private IdentitaetsDienst urspruenglicheIdentitaet;
+    private BenutzerMitteilung urspruenglicheMitteilung;
+    private final List<String> emailMitteilungen = new ArrayList<>();
     private IdentitaetsDienstStub fehlerdienst;
+    private boolean googleVerknuepft;
+    private boolean googleSitzungenBeendet;
     private LogMitschnitt log;
     private String name;
     private String spaetererBestandsname;
@@ -155,6 +162,9 @@ public class BenutzerVerwaltungSchritte {
         }
         if (urspruenglicheIdentitaet != null) {
             QuarkusMock.installMockForType(urspruenglicheIdentitaet, IdentitaetsDienst.class);
+        }
+        if (urspruenglicheMitteilung != null) {
+            QuarkusMock.installMockForType(urspruenglicheMitteilung, BenutzerMitteilung.class);
         }
         for (var eintrag : benutzer) {
             identitaet.loeschen(eintrag.getKey(), eintrag.getValue());
@@ -253,6 +263,190 @@ public class BenutzerVerwaltungSchritte {
     @Angenommen("ein synthetischer Mitarbeiter ist eingeladen")
     public void eingeladenerMitarbeiter() {
         eigeneId = anlegen(MANDANT, name);
+    }
+
+    @Wenn("der Inhaber den Zugang des Mitarbeiters zurücksetzt")
+    public void zugangZuruecksetzen() {
+        identitaet.einladen(MANDANT, eigeneId, Set.of(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL),
+                Duration.ofHours(1));
+        antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/zugang-zuruecksetzen"));
+    }
+
+    @Dann("sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert")
+    public void zugangZurueckgesetzt() throws SQLException {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktionen()).containsExactlyInAnyOrder(
+                IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
+                IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details::text from m_" + SCHEMA + ".zugriff_protokoll "
+                             + "where details->>'ziel' = ? and details->>'phase' = 'ABGESCHLOSSEN' "
+                             + "and details->>'vorgang' = 'ZUGANG_ZURUECKSETZEN'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).doesNotContain(name, "@example.invalid");
+            }
+        }
+    }
+
+    @Angenommen("ein synthetischer Benutzer hat eine Google-Verknüpfung")
+    public void googleVerknuepft() {
+        urspruenglicheIdentitaet = ClientProxy.unwrap(identitaet);
+        googleVerknuepft = true;
+        fehlerdienst = new IdentitaetsDienstStub() {
+            @Override
+            public synchronized Benutzer benutzerLesen(String mandant, String id) {
+                Benutzer b = super.benutzerLesen(mandant, id);
+                return new Benutzer(b.id(), b.benutzername(), b.email(), b.vorname(), b.nachname(), b.aktiv(),
+                        b.rollen(), b.aktionen(), b.totp(), googleVerknuepft);
+            }
+
+            @Override
+            public synchronized void googleLoesen(String mandant, String id) {
+                super.googleLoesen(mandant, id);
+                googleVerknuepft = false;
+            }
+
+            @Override
+            public synchronized void sitzungenBeenden(String mandant, String id) {
+                super.sitzungenBeenden(mandant, id);
+                googleSitzungenBeendet = true;
+            }
+        };
+        eigeneId = fehlerdienst.anlegen(MANDANT, new IdentitaetsDienst.Neuanlage(name,
+                name + "@example.invalid", "Test", "Person"), Rolle.MITARBEITER);
+        QuarkusMock.installMockForType(fehlerdienst, IdentitaetsDienst.class);
+    }
+
+    @Wenn("der Inhaber die Google-Verknüpfung löst")
+    public void googleLoesen() {
+        antworten.add(anfrage().contentType("application/json").delete(PFAD + "/" + eigeneId + "/google-verknuepfung"));
+    }
+
+    @Dann("ist die Verknüpfung entfernt und die Sitzungen sind beendet")
+    public void googleGeloest() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(googleVerknuepft).isFalse();
+        assertThat(googleSitzungenBeendet).isTrue();
+    }
+
+    @Angenommen("die Mitteilung an die bisherige Adresse wird aufgezeichnet")
+    public void emailMitteilungAufzeichnen() {
+        urspruenglicheMitteilung = ClientProxy.unwrap(mitteilung);
+        QuarkusMock.installMockForType(new MailBenutzerMitteilung(mails -> {
+            for (var mail : mails) {
+                emailMitteilungen.addAll(mail.getTo());
+            }
+        }), BenutzerMitteilung.class);
+    }
+
+    @Wenn("der Inhaber die E-Mail-Adresse des Mitarbeiters mit der aktuellen Version ändert")
+    public void emailAendern() {
+        String etag = anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).extract().header("ETag");
+        antworten.add(anfrage().contentType("application/json").header("If-Match", etag)
+                .body("{\"email\":\"neu." + name + "@example.invalid\"}").patch(PFAD + "/" + eigeneId));
+    }
+
+    @Wenn("der Inhaber den Namen des Mitarbeiters mit der aktuellen Version ändert")
+    public void namenAendern() {
+        String etag = anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).extract().header("ETag");
+        antworten.add(anfrage().contentType("application/json").header("If-Match", etag)
+                .body("{\"vorname\":\"Neu" + name + "\",\"nachname\":\"Person" + name + "\"}")
+                .patch(PFAD + "/" + eigeneId));
+    }
+
+    @Dann("ist der neue Name gespeichert und nicht im Verwaltungsprotokoll enthalten")
+    public void namenGeaendert() throws SQLException {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).vorname()).isEqualTo("Neu" + name);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).nachname()).isEqualTo("Person" + name);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details::text, details->'felder'->>'vorname', details->'felder'->>'nachname' "
+                             + "from m_" + SCHEMA + ".zugriff_protokoll where details->>'ziel' = ? "
+                             + "and details->>'vorgang' = 'NAME_AENDERN' and details->>'phase' = 'ABGESCHLOSSEN'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).doesNotContain("Neu" + name, "Person" + name);
+                assertThat(zeile.getString(2)).isEqualTo("geändert");
+                assertThat(zeile.getString(3)).isEqualTo("geändert");
+            }
+        }
+    }
+
+    @Dann("muss die neue Adresse bestätigt werden und die bisherige Adresse wird benachrichtigt")
+    public void emailGeaendert() throws SQLException {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).email()).isEqualTo("neu." + name + "@example.invalid");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktionen())
+                .contains(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL);
+        assertThat(emailMitteilungen).containsExactly(name + "@example.invalid");
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details::text from m_" + SCHEMA + ".zugriff_protokoll "
+                             + "where details->>'ziel' = ? and details->>'phase' = 'ABGESCHLOSSEN' "
+                             + "and details->>'vorgang' = 'EMAIL_AENDERN'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).doesNotContain(name, "@example.invalid");
+            }
+        }
+    }
+
+    @Angenommen("ein synthetischer aktiver Mitarbeiter besteht")
+    public void aktiverMitarbeiter() {
+        eingeladenerMitarbeiter();
+        identitaet.einladen(MANDANT, eigeneId, Set.of(), Duration.ofHours(1));
+    }
+
+    @Wenn("der Inhaber den Mitarbeiter sperrt und wieder entsperrt")
+    public void sperrenUndEntsperren() {
+        antworten.add(anfrage().contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
+                .post(PFAD + "/" + eigeneId + "/sperren"));
+        antworten.add(anfrage().get(PFAD + "/" + eigeneId));
+        antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/entsperren"));
+    }
+
+    @Dann("ist der Mitarbeiter wieder aktiv")
+    public void wiederAktiv() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
+        assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("GESPERRT");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktiv()).isTrue();
+        anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).body("status", org.hamcrest.Matchers.is("AKTIV"));
+    }
+
+    @Wenn("der Inhaber den Mitarbeiter deaktiviert und reaktiviert")
+    public void deaktivierenUndReaktivieren() {
+        antworten.add(anfrage().contentType("application/json").body("{\"grund\":\"AUSTRITT\"}")
+                .post(PFAD + "/" + eigeneId + "/deaktivieren"));
+        antworten.add(anfrage().get(PFAD + "/" + eigeneId));
+        antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/reaktivieren"));
+    }
+
+    @Dann("ist der Austritt verzeichnet und eine neue Zugangseinrichtung verlangt")
+    public void austrittUndNeuerZugang() throws SQLException {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
+        assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("DEAKTIVIERT");
+        var benutzer = identitaet.benutzerLesen(MANDANT, eigeneId);
+        assertThat(benutzer.aktiv()).isTrue();
+        assertThat(benutzer.rollen()).containsExactly(Rolle.MITARBEITER);
+        assertThat(benutzer.aktionen()).contains(IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from m_" + SCHEMA
+                             + ".benutzer_verzeichnis where benutzer = ? and anlass = 'AUSTRITT'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getInt(1)).isEqualTo(1);
+            }
+        }
     }
 
     @Wenn("der Inhaber die Einladung viermal erneut sendet")

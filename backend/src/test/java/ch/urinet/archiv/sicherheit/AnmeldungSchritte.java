@@ -93,18 +93,23 @@ public class AnmeldungSchritte {
     @Dann("verlangt der Realm-Export im Browser Passwort und TOTP")
     public void totpImBrowser() throws IOException {
         JsonNode realm = export();
-        String flow = realm.path("browserFlow").asText();
-        List<String> verlangt = new ArrayList<>();
-        for (JsonNode f : realm.path("authenticationFlows")) {
-            if (f.path("alias").asText().startsWith(flow)) {
-                f.path("authenticationExecutions").forEach(e -> {
-                    if ("REQUIRED".equals(e.path("requirement").asText())) {
-                        verlangt.add(e.path("authenticator").asText());
-                    }
-                });
-            }
-        }
-        assertThat(verlangt).contains("auth-username-password-form", "auth-otp-form");
+        assertThat(realm.path("browserFlow").asText()).isEqualTo("browser-totp-pflicht");
+        JsonNode browser = flow(realm, "browser-totp-pflicht").path("authenticationExecutions");
+        assertThat(browser.path(1).path("flowAlias").asText()).isEqualTo("browser-totp-pflicht-formulare");
+        JsonNode formular = flow(realm, "browser-totp-pflicht-formulare").path("authenticationExecutions");
+        assertThat(formular.path(0).path("authenticator").asText()).isEqualTo("auth-username-password-form");
+        assertThat(formular.path(0).path("requirement").asText()).isEqualTo("REQUIRED");
+        assertThat(formular.path(1).path("requirement").asText()).isEqualTo("CONDITIONAL");
+        assertThat(formular.path(1).path("flowAlias").asText()).isEqualTo("browser-passkey-otp");
+        JsonNode otp = flow(realm, "browser-passkey-otp").path("authenticationExecutions");
+        assertThat(otp.path(0).path("authenticator").asText()).isEqualTo("conditional-credential");
+        assertThat(otp.path(0).path("requirement").asText()).isEqualTo("REQUIRED");
+        assertThat(otp.path(0).path("authenticatorConfig").asText()).isEqualTo("otp-nur-ohne-passkey");
+        assertThat(otp.path(1).path("authenticator").asText()).isEqualTo("auth-otp-form");
+        assertThat(otp.path(1).path("requirement").asText()).isEqualTo("REQUIRED");
+        JsonNode config = realm.path("authenticatorConfig").path(0).path("config");
+        assertThat(config.path("credentials").asText()).isEqualTo("webauthn-passwordless");
+        assertThat(config.path("included").asText()).isEqualTo("false");
         assertThat(realm.path("otpPolicyType").asText()).isEqualTo("totp");
     }
 

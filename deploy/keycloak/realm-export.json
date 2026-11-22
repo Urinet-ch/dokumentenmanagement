@@ -44,6 +44,13 @@
   "otpPolicyPeriod": 30,
   "otpPolicyLookAheadWindow": 1,
   "otpPolicyCodeReusable": false,
+  "webAuthnPolicyPasswordlessRpEntityName": "UriNet Archiv",
+  "webAuthnPolicyPasswordlessRpId": "${ARCHIV_PASSKEY_RP_ID}",
+  "webAuthnPolicyPasswordlessAttestationConveyancePreference": "none",
+  "webAuthnPolicyPasswordlessResidentKey": "required",
+  "webAuthnPolicyPasswordlessUserVerificationRequirement": "required",
+  "webAuthnPolicyPasswordlessPasskeysEnabled": true,
+  "webAuthnPolicyPasswordlessMediation": "conditional",
   "browserFlow": "browser-totp-pflicht",
   "roles": {
     "realm": [
@@ -383,6 +390,14 @@
       ]
     }
   },
+  "clientScopeMappings": {
+    "account": [
+      {
+        "client": "account-console",
+        "roles": ["manage-account", "view-profile"]
+      }
+    ]
+  },
   "requiredActions": [
     {
       "alias": "CONFIGURE_TOTP",
@@ -421,6 +436,24 @@
       "config": {}
     },
     {
+      "alias": "webauthn-register-passwordless",
+      "name": "Webauthn Register Passwordless",
+      "providerId": "webauthn-register-passwordless",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 60,
+      "config": {}
+    },
+    {
+      "alias": "delete_credential",
+      "name": "Delete Credential",
+      "providerId": "delete_credential",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 70,
+      "config": {}
+    },
+    {
       "alias": "VERIFY_PROFILE",
       "name": "Verify Profile",
       "providerId": "VERIFY_PROFILE",
@@ -428,6 +461,15 @@
       "defaultAction": false,
       "priority": 90,
       "config": {}
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "otp-nur-ohne-passkey",
+      "config": {
+        "credentials": "webauthn-passwordless",
+        "included": "false"
+      }
     }
   ],
   "authenticationFlows": [
@@ -465,7 +507,7 @@
     },
     {
       "alias": "browser-totp-pflicht",
-      "description": "Anmeldung im Browser: Cookie oder Passwort und immer TOTP (Req 2.1)",
+      "description": "Anmeldung im Browser: Cookie, Passkey oder Passwort und TOTP (Req 2.1, Spec 06 Req 10)",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -488,13 +530,37 @@
     },
     {
       "alias": "browser-totp-pflicht-formulare",
-      "description": "Passwort und TOTP, beide verlangt",
+      "description": "Passkey oder Passwort mit TOTP",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
           "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "flowAlias": "browser-passkey-otp",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "browser-passkey-otp",
+      "description": "TOTP ausser nach Anmeldung mit Passkey",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-credential",
+          "authenticatorConfig": "otp-nur-ohne-passkey",
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "priority": 10,

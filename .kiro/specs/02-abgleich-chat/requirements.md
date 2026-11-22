@@ -188,11 +188,11 @@ Die Bewertung ändert Suche und Chat **nicht selbst**; Verbesserungen entstehen 
    gelöscht werden (Requirement 5.4) und bei Löschung der Nachricht oder des Gesprächs mitgelöscht werden.
 4. Das Archiv SOLL die Zahl der Bewertungen begrenzen (höchstens 200 je Benutzer und Stunde, HTTP 429) und den Freitext als Text speichern
    und anzeigen (kein Markup, keine Ausführung), Steuerzeichen entfernen.
-5. Das Archiv SOLL für Benutzer mit dem neuen Recht **A20** (Rolle Inhaber; Geschäftsstelle 403; API-Tokens und Webseiten-Schlüssel 403,
+5. Das Archiv SOLL für Benutzer mit dem neuen Recht **A24** (A20 bis A23 sind in Spec 06 vergeben; Korrektur 22.11.2026) (Rolle Inhaber; Geschäftsstelle 403; API-Tokens und Webseiten-Schlüssel 403,
    ergänzt die Rechtematrix, Spec 01, 2.6) die Seite «Chat-Auswertung» zeigen: Anzahl Bewertungen und Durchschnitt im gewählten
    Zeitraum, Verteilung der Sterne, Häufigkeit der Gründe und die Liste der Antworten mit höchstens 2 Sternen (Datum, Sterne, Grund,
    erste 120 Zeichen der Frage), nur für den eigenen Mandanten.
-6. WENN ein Benutzer mit Recht A20 «Auswertung exportieren» wählt, DANN SOLL das Archiv eine Datei erzeugen: ZIP mit `bewertungen.jsonl`
+6. WENN ein Benutzer mit Recht A24 «Auswertung exportieren» wählt, DANN SOLL das Archiv eine Datei erzeugen: ZIP mit `bewertungen.jsonl`
    (eine Zeile je bewertete Antwort), `schema.json` und `README.txt` (Format `chat-bewertungen/v1`), Zeitraum und Mindest-/Höchstzahl
    der Sterne wählbar, höchstens 5'000 Zeilen je Export (Hinweis bei Überschreitung), deterministisch sortiert (Zeit, Nachrichtennummer).
    Je Zeile: Tag (ohne Uhrzeit), Sterne, Grund, Freitext, Frage, Antwort, Werkzeuge (Name, Parameter, Anzahl Treffer), Treffer
@@ -210,7 +210,7 @@ Die Bewertung ändert Suche und Chat **nicht selbst**; Verbesserungen entstehen 
    auswertet (Datenschutzhinweis, kurzer Text unter den Sternen oder auf der Hilfeseite «Chat»).
 10. Das Archiv SOLL die Bewertung nie automatisch in Suche, Systemprompt, Rangierung oder Prüfliste einfliessen lassen.
 11. Das Archiv SOLL für jedes Kriterium 1 bis 10 ein Cucumber-Szenario `@req-15.x` (`@spec-02`) enthalten, darunter Mandantentrennung,
-    fremdes Gespräch (404), Rechte (A20, Geschäftsstelle 403, API-Token 403), Schwärzung (synthetische Daten mit allen genannten
+    fremdes Gespräch (404), Rechte (A24, Geschäftsstelle 403, API-Token 403), Schwärzung (synthetische Daten mit allen genannten
     Mustern), Grenze von 5'000 Zeilen und Löschung nach 12 Monaten; Nachweis des Formats mit einem Schematest gegen `schema.json`.
 
 ## Optionen (nicht Teil des Plans, Aufgaben mit `*`)

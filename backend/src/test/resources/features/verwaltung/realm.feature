@@ -13,3 +13,9 @@ Funktionalität: Realm-Konfiguration für die Benutzerverwaltung
     Dann verlangt der Realm-Export Passwörter mit mindestens 12 Zeichen ohne Benutzername oder E-Mail
     Und jeder neue Benutzer muss TOTP einrichten
     Und sendet Keycloak eine Einladung ohne Passwort und mit TOTP-Einrichtung an Mailpit
+
+  @req-10.9
+  Szenario: Google bleibt auf verknüpfte Konten mit TOTP beschränkt
+    Dann verweigert der Google-Erstlogin unbekannte Konten
+    Und ist die Google-Verknüpfung nur administrativ möglich
+    Und verlangt die Google-Anmeldung weiterhin TOTP
