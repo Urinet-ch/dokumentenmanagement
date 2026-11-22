@@ -28,6 +28,8 @@ export class EinfuehrungVermerk {
   /** `<mandant>:<sub>` der Vermerke dieser Sitzung; bleibt im Arbeitsspeicher und wird nie gespeichert. */
   private readonly sitzung = new Set<string>();
   private readonly gelesen = signal<{ person: string; bekannt: boolean } | null>(null);
+  private readonly fortschritt = signal<{ person: string; schritt: number; erneut: boolean } | null>(null);
+  private readonly parameterAusgewertet = new Set<string>();
 
   private readonly person = computed<Person | null>(
     () => {
@@ -48,6 +50,36 @@ export class EinfuehrungVermerk {
     const gelesen = this.gelesen();
     return person && gelesen?.person === schluessel(person) ? gelesen.bekannt : null;
   });
+  readonly schritt = computed(() => {
+    const person = this.person();
+    const fortschritt = this.fortschritt();
+    return person && fortschritt?.person === schluessel(person) ? fortschritt.schritt : 0;
+  });
+  readonly erneut = computed(() => {
+    const person = this.person();
+    const fortschritt = this.fortschritt();
+    return !!person && fortschritt?.person === schluessel(person) && fortschritt.erneut;
+  });
+
+  schrittSetzen(schritt: number): void {
+    const person = this.person();
+    if (person) {
+      this.fortschritt.set({ person: schluessel(person), schritt, erneut: this.erneut() });
+    }
+  }
+
+  neuBeginnen(): void {
+    const person = this.person();
+    if (person) {
+      this.parameterAusgewertet.add(schluessel(person));
+      this.fortschritt.set({ person: schluessel(person), schritt: 0, erneut: true });
+    }
+  }
+
+  wiederaufrufAuswerten(): void {
+    const person = this.person();
+    if (person && !this.parameterAusgewertet.has(schluessel(person))) this.neuBeginnen();
+  }
 
   constructor() {
     effect(() => {
@@ -69,6 +101,7 @@ export class EinfuehrungVermerk {
     }
     this.sitzung.add(schluessel(person));
     this.gelesen.set({ person: schluessel(person), bekannt: true });
+    this.fortschritt.set(null);
     const k = await vermerkKennung(person.mandant, person.sub, this.subtle());
     if (k) {
       vermerkAblegen(this.speicher(), {

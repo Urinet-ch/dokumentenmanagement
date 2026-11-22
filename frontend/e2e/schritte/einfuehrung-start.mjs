@@ -1,4 +1,4 @@
-import { Given, Then } from '@cucumber/cucumber';
+import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -114,6 +114,7 @@ Then('sendet die Startseite mit Einführung dieselben API-Anfragen wie ohne Einf
         const url = new URL(anfrage.url());
         if (url.pathname.startsWith('/api/')) anfragen.push(`${anfrage.method()} ${url.pathname}`);
       });
+
       await seite.getByRole('button', { name: 'Anmelden', exact: true }).click();
       await seite.getByRole('button', { name: 'Abmelden', exact: true }).waitFor();
       if (!bekannt) await seite.locator('app-start .einfuehrung').waitFor();
@@ -124,4 +125,76 @@ Then('sendet die Startseite mit Einführung dieselben API-Anfragen wie ohne Einf
     }
   };
   assert.deepEqual(await messen(false), await messen(true));
+});
+
+Then(/^zeigt die Einführung «(Schritt \d+ von \d+)»(?: (ohne Zurück|mit Fokus auf der Schrittüberschrift))?$/, async function (fortschritt, zusatz) {
+  const karte = this.seite.locator('app-start .einfuehrung');
+  await karte.getByText(fortschritt, { exact: true }).waitFor();
+  if (zusatz === 'ohne Zurück') assert.equal(await karte.getByRole('button', { name: 'Zurück', exact: true }).count(), 0);
+  if (zusatz === 'mit Fokus auf der Schrittüberschrift') {
+    await this.seite.waitForFunction(() => document.activeElement?.id === 'einfuehrung-titel');
+  }
+});
+
+When(/^ich in der Einführung mit der Tastatur «(.+)» wähle$/, async function (name) {
+  const karte = this.seite.locator('app-start .einfuehrung');
+  const fortschritt = await karte.locator('p').first().innerText();
+  const knopf = karte.getByRole('button', { name, exact: true });
+  await knopf.focus();
+  await this.seite.keyboard.press('Enter');
+  if (name === 'Weiter' || name === 'Zurück') {
+    await this.seite.waitForFunction((alt) =>
+      document.querySelector('app-start .einfuehrung p')?.textContent?.trim() !== alt, fortschritt);
+  }
+});
+
+When('ich die Einführung bis zum letzten Schritt durchgehe', async function () {
+  const karte = this.seite.locator('app-start .einfuehrung');
+  const fortschritt = await karte.locator('p').first().innerText();
+  const [, aktuell, gesamt] = fortschritt.match(/^Schritt (\d+) von (\d+)$/);
+  for (let schritt = Number(aktuell) + 1; schritt <= Number(gesamt); schritt++) {
+    await karte.getByRole('button', { name: 'Weiter', exact: true }).click({ timeout: 5000 });
+    await karte.getByText(`Schritt ${schritt} von ${gesamt}`, { exact: true }).waitFor({ timeout: 5000 });
+  }
+  await karte.getByRole('button', { name: 'Fertig', exact: true }).waitFor();
+});
+
+Then(/^ist die Einführung mit «(ABGESCHLOSSEN|UEBERSPRUNGEN)» und der passenden Statusmeldung geschlossen$/, async function (art) {
+  await this.seite.locator('app-start .einfuehrung').waitFor({ state: 'detached' });
+  const text = art === 'ABGESCHLOSSEN' ? 'Einführung abgeschlossen.' : 'Einführung übersprungen.';
+  await this.seite.locator('app-start [role="status"]').getByText(text, { exact: false }).waitFor();
+  await this.seite.waitForFunction(() => document.activeElement?.matches('app-start .seitenkopf h1'));
+  await this.seite.waitForFunction((wert) => {
+    const daten = JSON.parse(localStorage.getItem('archiv.einfuehrung') ?? '{}');
+    return daten.eintraege?.length === 1 && daten.eintraege[0].art === wert;
+  }, art);
+});
+
+When('ich die Einführung über die Anleitung erneut öffne', async function () {
+  await this.seite.getByRole('button', { name: 'Hilfe', exact: true }).click();
+  await this.seite.getByRole('dialog', { name: 'Hilfe' }).getByRole('link', { name: 'Ganze Anleitung öffnen' }).click();
+  await this.seite.locator('app-hilfe-seite').getByRole('link', { name: 'Einführung erneut zeigen' }).click();
+  assert.equal(new URL(this.seite.url()).searchParams.has('einfuehrung'), true);
+});
+
+When('ich die Startseite vorübergehend verlasse und zurückkehre', async function () {
+  await this.seite.getByRole('button', { name: 'Hilfe', exact: true }).click();
+  await this.seite.getByRole('dialog', { name: 'Hilfe' }).getByRole('link', { name: 'Ganze Anleitung öffnen' }).click();
+  await this.seite.locator('app-hilfe-seite').waitFor();
+  await this.seite.goBack();
+});
+
+Then('ist noch kein Einführungsvermerk gespeichert', async function () {
+  assert.equal(await this.seite.evaluate(() => localStorage.getItem('archiv.einfuehrung')), null);
+});
+
+When('ich die Seite neu lade und mich erneut anmelde', async function () {
+  await this.seite.reload();
+  await this.seite.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  await this.seite.getByRole('button', { name: 'Abmelden', exact: true }).waitFor();
+});
+
+Then('bleibt die Startseite mit dem aktuellen Einführungsschritt geöffnet', async function () {
+  assert.equal(new URL(this.seite.url()).pathname, '/');
+  await this.seite.locator('app-start .einfuehrung').getByText('Schritt 2 von 5', { exact: true }).waitFor({ state: 'attached' });
 });
