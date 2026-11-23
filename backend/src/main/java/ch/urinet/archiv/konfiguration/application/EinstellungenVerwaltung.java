@@ -16,14 +16,9 @@ import java.util.function.Function;
 @ApplicationScoped
 @Transactional
 public class EinstellungenVerwaltung {
-    public record Eingabe(Einstellungen ziel, List<KonfigurationUngueltig.Befund> befunde,
-                          boolean wissenBeruehrt, boolean historischeVersion) {
+    public record Eingabe(Einstellungen ziel, List<KonfigurationUngueltig.Befund> befunde) {
         public Eingabe {
             befunde = List.copyOf(befunde);
-        }
-
-        public Eingabe(Einstellungen ziel, List<KonfigurationUngueltig.Befund> befunde) {
-            this(ziel, befunde, false, false);
         }
     }
 
@@ -58,7 +53,6 @@ public class EinstellungenVerwaltung {
         Eingabe ziel = eingabe.apply(vorher.einstellungen());
         List<Auswirkung> folgen = pruefung.folgen(vorher.einstellungen(), ziel.ziel());
         gueltigkeitPruefen(vorher.version(), ziel);
-        pruefung.wissenPruefen(vorher.einstellungen(), ziel.ziel(), ziel.wissenBeruehrt(), ziel.historischeVersion());
         return new Vorschau(vorher.version(), folgen);
     }
 
@@ -71,7 +65,6 @@ public class EinstellungenVerwaltung {
         pruefung.bestaetigt(folgen, bestaetigt.schluessel(), EinstellungsAenderungsPruefung.Ursprung.APP);
         bestaetigt.pruefen();
         gueltigkeitPruefen(vorher.version(), ziel);
-        pruefung.wissenPruefen(vorher.einstellungen(), ziel.ziel(), ziel.wissenBeruehrt(), ziel.historischeVersion());
         if (vorher.einstellungen().equals(ziel.ziel())) {
             return new Ergebnis(vorher.version(), false, folgen);
         }

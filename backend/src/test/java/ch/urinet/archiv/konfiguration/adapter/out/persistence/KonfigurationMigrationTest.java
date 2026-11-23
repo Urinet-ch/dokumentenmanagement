@@ -31,14 +31,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class KonfigurationMigrationTest {
 
     private static final List<String> SCHEMAS = List.of(
-            "m_probe_konf037_a", "m_probe_konf037_b", "m_probe_volltext055_a", "m_probe_volltext055_b");
+            "m_probe_konf037_a", "m_probe_konf037_b", "m_probe_volltext055_a", "m_probe_volltext055_b",
+            "m_probe_wissen121_a", "m_probe_wissen121_b");
     private static final PanacheKonfigurationVersionsRepository LESER =
             new PanacheKonfigurationVersionsRepository(new ObjectMapper());
 
     @AfterEach
     void aufraeumen() throws SQLException {
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
-            for (String schema : SCHEMAS) {
+            for (String schema : SCHEMAS.subList(0, 2)) {
                 befehl.execute("drop schema if exists " + schema + " cascade");
                 befehl.execute("delete from public.mandant where schema_name = '" + schema + "'");
             }
@@ -48,7 +49,7 @@ class KonfigurationMigrationTest {
     @Test
     void changeset037UebernimmtBeideMandantenAusDemEchtenVorgaengerschema() throws Exception {
         Map<String, String> abbilder = new LinkedHashMap<>();
-        for (String schema : SCHEMAS) {
+        for (String schema : SCHEMAS.subList(0, 2)) {
             String code = schema.substring(2).replace('_', '-');
             try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
                 befehl.execute("create schema " + schema);
@@ -177,6 +178,72 @@ class KonfigurationMigrationTest {
                         + "from dokument")).isEqualTo("true");
             }
         }
+    }
+
+    @Test
+    void wissenswerteWerdenMandantengetrenntMigriertUndAltwerteGesichert() throws Exception {
+        for (String schema : SCHEMAS.subList(4, 6)) {
+            try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("create schema " + schema);
+                befehl.execute("set search_path to " + schema);
+                alleMigrieren(verbindung, schema);
+                aendern(verbindung, schema, "rollbackCount", 1);
+                String werte = schema.endsWith("_a")
+                        ? "123456, 234567, '0 0 23 ? * MON', 345678"
+                        : "1, 2000000, '0 0/15 * * * ?', 2";
+                befehl.execute("insert into wissens_einstellung "
+                        + "(budget_tokens, lint_budget_tokens, lint_zeitplan, monatsbudget_tokens) values (" + werte + ")");
+                verbindung.commit();
+                migrieren(verbindung, schema, 1);
+                verbindung.commit();
+
+                String inhalt = wert(befehl, "select inhalt::text from konfiguration_version order by version desc limit 1");
+                var wissen = LESER.lesen(inhalt).einstellungen().wissen();
+                assertThat(wert(befehl, "select quelle from konfiguration_version order by version desc limit 1"))
+                        .isEqualTo("MIGRATION");
+                assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex'))"
+                        + "::text from konfiguration_version order by version desc limit 1")).isEqualTo("true");
+                assertThat(wert(befehl, "select count(*)::text from zugriff_protokoll "
+                        + "where aktion = 'KONFIGURATION_AENDERN' and benutzer = 'system:migration'")).isEqualTo("1");
+                if (schema.endsWith("_a")) {
+                    assertThat(wissen.budgetTokens()).isEqualTo(123456);
+                    assertThat(wissen.lintBudgetTokens()).isEqualTo(234567);
+                    assertThat(wissen.monatsbudgetTokens()).isEqualTo(345678);
+                    assertThat(wissen.lintZeitplan()).isEqualTo(
+                            new Konfiguration.LintZeitplan(java.time.DayOfWeek.MONDAY, 23));
+                    assertThat(wert(befehl, "select count(*)::text from wissens_einstellung_migration")).isEqualTo("0");
+                } else {
+                    assertThat(wissen.budgetTokens()).isEqualTo(600000);
+                    assertThat(wissen.lintBudgetTokens()).isEqualTo(100000);
+                    assertThat(wissen.monatsbudgetTokens()).isEqualTo(1000000);
+                    assertThat(wissen.lintZeitplan()).isEqualTo(
+                            new Konfiguration.LintZeitplan(java.time.DayOfWeek.SUNDAY, 4));
+                    assertThat(wert(befehl, "select lint_zeitplan from wissens_einstellung_migration"))
+                            .isEqualTo("0 0/15 * * * ?");
+                    assertThat(wert(befehl, "select details::text from zugriff_protokoll "
+                            + "where benutzer = 'system:migration'")).contains("wissen.lintZeitplan",
+                            "wissen.budgetTokens", "wissen.lintBudgetTokens", "wissen.monatsbudgetTokens");
+                }
+                String alt = wert(befehl, "select to_jsonb(e)::text from wissens_einstellung e");
+                aendern(verbindung, schema, "rollbackCount", 1);
+                verbindung.commit();
+                assertThat(wert(befehl, "select to_jsonb(e)::text from wissens_einstellung e")).isEqualTo(alt);
+            }
+        }
+    }
+
+    private static void alleMigrieren(Connection verbindung, String schema) throws Exception {
+        var datenbank = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
+        datenbank.setDefaultSchemaName(schema);
+        datenbank.setLiquibaseSchemaName(schema);
+        Scope.child(Map.of(
+                Scope.Attr.resourceAccessor.name(), new ClassLoaderResourceAccessor(
+                        KonfigurationMigrationTest.class.getClassLoader()),
+                Scope.Attr.ui.name(), new LoggerUIService()), () ->
+                new CommandScope("update")
+                        .addArgumentValue(DbUrlConnectionArgumentsCommandStep.DATABASE_ARG, datenbank)
+                        .addArgumentValue(UpdateCommandStep.CHANGELOG_FILE_ARG, "db/mandant/changelog.xml")
+                        .execute());
     }
 
     private static void migrieren(Connection verbindung, String schema, int anzahl) throws Exception {

@@ -89,7 +89,8 @@ public class EinstellungskatalogLesen {
                 .map(e -> eintrag(e, aktuell.einstellungen(), mandant, branding, start, wissenswerte, zeitplan))
                 .toList();
         return new Ergebnis(aktuell.version(), eintraege,
-                new Betrieb(budget.stand(mandant), start.wissenMonatsbudget()));
+                new Betrieb(budget.stand(mandant), wissenswerte.monatsbudgetTokens() == null
+                        ? start.wissenMonatsbudget() : wissenswerte.monatsbudgetTokens()));
     }
 
     private Eintrag eintrag(Einstellung einstellung, Einstellungen werte, MandantCode mandant, Branding branding,
@@ -119,11 +120,6 @@ public class EinstellungskatalogLesen {
                 ? "Der bisherige Zeitplan lässt sich nicht als einzelner Wochentag und Stunde darstellen: " + zeitplan
                 : schluessel.equals("chat.aufbewahrungMonate") && standard instanceof String
                 ? "Die bisherige Aufbewahrung ist eine ISO-8601-Periode und keine ganze Monatszahl." : null;
-        if (wissenEinstellung) {
-            String sperre = "Bis zur Überführung der Wissenseinstellungen ändern Sie diesen Wert über "
-                    + "/wissensbasis/einstellungen.";
-            hinweis = hinweis == null ? sperre : hinweis + " " + sperre;
-        }
         var zahl = einstellung.zahl();
         return new Eintrag(schluessel, einstellung.gruppe(), einstellung.name(), einstellung.beschreibung(),
                 einstellung.typ(), einstellung.einheit(), zahl == null ? null : zahl.minimum(),
