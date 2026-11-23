@@ -16,6 +16,7 @@ import { Subscription, map } from 'rxjs';
 import { Symbol } from '../gemeinsam/symbol';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { ChatBewertung } from './chat-bewertung';
 import {
   ChatEreignis,
   ChatFehler,
@@ -60,7 +61,7 @@ interface Chip {
  */
 @Component({
   selector: 'app-chat',
-  imports: [MatButtonModule, RouterLink, Symbol],
+  imports: [MatButtonModule, RouterLink, Symbol, ChatBewertung],
   templateUrl: './chat.html',
   styleUrl: './chat.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

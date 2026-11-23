@@ -1,0 +1,46 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.bewertung {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--text-gedaempft);
+  font-size: 0.875rem;
+}
+
+p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.sterne, .aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.sterne button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius-klein);
+  background: transparent;
+  color: var(--urinet-gelb);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+select, textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 0.5rem;
+  font: inherit;
+}

@@ -295,7 +295,29 @@ nav {
   }
 }
 
+// Version und Build: klein am unteren Rand der Arbeitsfläche, rechts, bleibt beim Scrollen sichtbar
+.stand {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  padding: 4px max(20px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) 20px;
+  background: linear-gradient(transparent, var(--flaeche) 60%);
+  color: var(--text-gedaempft);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+mat-sidenav-content {
+  display: flex;
+  flex-direction: column;
+}
+
 main {
+  flex: 1 0 auto;
   padding: 4px 20px 40px;
   outline: none;
 }

@@ -56,6 +56,7 @@ auf Server oder Secrets aus der Sitzung.
     Umgesetzt: Anforderung 5.3 Kriterium 4, `design.md`, `SecretPruefung`, `SecretPruefungTest` (api und kommando ohne Adresse).
   - Nachgelagert [Fabian] (Entscheid 21.11.2026): bestehenden Realm einmalig aktualisieren und die Betriebsnachweise
     für interne Verbindung mit korrektem Issuer und automatische Ablaufzeit der Secret-Überlappung führen.
+  - Stand 23.11.2026 (Betrieb, Fabian; Nachweise im PR #506 und im Deploy-Lauf 45178149286): `namenssperre_salz` (Standard-Base64, 32 Bytes; die Pflichtprüfung im Workflow prüft das Format, nachdem ein falsch formatiertes Secret vier Deploys am 22./23.11.2026 scheitern liess), `KEYCLOAK_VERWALTUNG_SECRET` und `KEYCLOAK_SMTP_PASSWORT` als GitHub-Secrets und im Bundle; Realm einmalig per `kcadm.sh` im Wegwerf-Container nachgerüstet (Client `archiv-verwaltung` mit Dienstkonto, SMTP über `asmtp.mail.hostpoint.ch` Port 587 STARTTLS, Passwort-Richtlinie); Deploy mit dem neuen Compose grün (api, db, kc gesund). Nachweise: Prüfsummen von Client-Secret in Keycloak und Datei auf der VPS gleich; Benutzerliste lädt (Token des Dienstkontos holbar); Testmail von Keycloak (`execute-actions-email`) zugestellt. **Offen:** Notfallunterlagen um die neuen Secrets ergänzen [Fabian] und der nachgelagerte Teil (interne Verbindung mit korrektem Issuer, automatische Ablaufzeit der Secret-Überlappung); die Checkbox bleibt bis dahin offen.
   - _Anforderungen: 5.2, 5.3, 5.4, 6.9, 7.4_
   - _Abhängig von: 19.2_
 
