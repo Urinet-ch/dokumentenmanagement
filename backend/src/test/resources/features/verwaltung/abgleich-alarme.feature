@@ -8,3 +8,9 @@ Funktionalität: Abgleich der Benutzerverwaltung und Alarmzustellung
     Wenn der Worker die Benutzerverwaltung abgleicht
     Dann steht jede Abweichung im Protokoll und im Alarm des eigenen Mandanten
     Und die Überwachung meldet jeden Befund einmal an den betroffenen Mandanten
+
+  @req-6.5 @req-6.7
+  Szenario: Fehlerhafte Mandanten und mehrere Rollen werden abgeglichen und gemeldet
+    Angenommen synthetische Realm-Benutzer haben fehlende oder mehrdeutige Mandanten und mehrere Rollen
+    Wenn der Worker die Benutzerverwaltung abgleicht
+    Dann stehen die Abweichungen im Protokoll und werden einmal dem zuständigen Mandanten gemeldet

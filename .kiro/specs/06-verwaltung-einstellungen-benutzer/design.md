@@ -752,6 +752,10 @@ erneut möglich. Ein Abbruch zwischen SMTP-Versand und Bestätigung kann eine zw
 Bestätigung mit der Datenbank bietet. Noch nicht zugestellte Abgleichbefunde bleiben auch bei zwischenzeitlicher
 Behebung offen. Die Eingrenzung und Betriebsfolgen stehen in `docs/alarme.md`.
 
+Die Szenarien prüfen Abweichungen und deren Zustellung für zwei Mandanten sowie fehlende und mehrdeutige
+Mandantenzuordnungen und mehrere Rollen. Im Mandanten `vhf-gsk` erzeugt ein synthetischer Inhaber zusätzlich den
+Befund `FREMDE_ROLLE`, da dort nur `geschaeftsstelle` vergeben werden darf.
+
 ## Vorbereitung (Aufgabe 19.3, 23.11.2026)
 
 Compose bindet die Secret-Datei des Verwaltungsclients in die API und die SMTP-Secret-Datei in Keycloak ein; die
