@@ -50,12 +50,18 @@ public final class AbgleichPruefung {
                     || benutzer.mandanten().size() == 1 && benutzer.mandanten().getFirst().isBlank()) {
                 if (betrieb && !benutzer.rollen().isEmpty()) {
                     befunde.add(new Abweichung(Verwaltungsabweichung.KEIN_MANDANT, benutzer.id()));
+                    if (benutzer.rollen().size() > 1) {
+                        befunde.add(new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, benutzer.id()));
+                    }
                 }
                 continue;
             }
             if (benutzer.mandanten().size() != 1) {
                 if (betrieb && !benutzer.rollen().isEmpty()) {
                     befunde.add(new Abweichung(Verwaltungsabweichung.MEHRERE_MANDANTEN, benutzer.id()));
+                    if (benutzer.rollen().size() > 1) {
+                        befunde.add(new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, benutzer.id()));
+                    }
                 }
                 continue;
             }

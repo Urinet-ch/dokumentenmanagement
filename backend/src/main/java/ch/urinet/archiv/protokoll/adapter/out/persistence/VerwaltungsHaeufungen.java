@@ -19,7 +19,7 @@ final class VerwaltungsHaeufungen {
             + "(select 1 from jsonb_array_elements(coalesce(details->'aenderungen', '[]'::jsonb)) a "
             + "where a->>'pfad' like 'einstellungen.%'))";
     private static final String VERWEIGERUNGEN = "(aktion = 'VERWEIGERT' "
-            + "and details->>'grund' in ('A20', 'A21', 'A22', 'A23'))";
+            + "and details->>'grund' in ('A13', 'A14', 'A20', 'A21', 'A22', 'A23'))";
 
     record Stand(long aktionen, long verweigerungen) {
     }

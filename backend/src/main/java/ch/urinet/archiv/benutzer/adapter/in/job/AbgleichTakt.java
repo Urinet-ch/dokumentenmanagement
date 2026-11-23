@@ -36,8 +36,8 @@ public class AbgleichTakt {
     }
 
     void start(@Observes SchemasBereit ereignis) {
-        if (beimStart) {
-            ausfuehren();
+        if (beimStart && worker && stufe != Stufe.P) {
+            Thread.ofPlatform().name("verwaltungsabgleich-start").daemon().start(this::ausfuehren);
         }
     }
 

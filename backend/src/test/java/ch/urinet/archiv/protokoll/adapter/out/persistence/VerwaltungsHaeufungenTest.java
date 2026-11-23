@@ -48,9 +48,11 @@ class VerwaltungsHaeufungenTest {
                 schreiben(verbindung, aktion);
                 assertThat(anzahl(verbindung, "VERWALTUNG_AKTIONEN")).isEqualTo(1);
 
-                for (int i = 0; i < 4; i++) {
+                for (int i = 0; i < 2; i++) {
                     schreiben(verbindung, verweigerung("A20"));
                 }
+                schreiben(verbindung, verweigerung("A13"));
+                schreiben(verbindung, verweigerung("A14"));
                 schreiben(verbindung, verweigerung("A2"));
                 assertThat(anzahl(verbindung, "VERWALTUNG_VERWEIGERUNGEN")).isZero();
                 schreiben(verbindung, verweigerung("A23"));

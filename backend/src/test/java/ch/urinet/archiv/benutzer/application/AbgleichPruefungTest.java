@@ -27,8 +27,8 @@ class AbgleichPruefungTest {
         var realm = List.of(
                 new RealmBenutzer(EINS, List.of("urinet"), Set.of(Rolle.INHABER, Rolle.GESCHAEFTSSTELLE)),
                 new RealmBenutzer(ZWEI, List.of("vhf-gsk"), Set.of(Rolle.INHABER)),
-                new RealmBenutzer(DREI, List.of(), Set.of(Rolle.MITARBEITER)),
-                new RealmBenutzer(VIER, List.of("urinet", "vhf-gsk"), Set.of(Rolle.MITARBEITER)));
+                new RealmBenutzer(DREI, List.of(), Set.of(Rolle.MITARBEITER, Rolle.INHABER)),
+                new RealmBenutzer(VIER, List.of("urinet", "vhf-gsk"), Set.of(Rolle.MITARBEITER, Rolle.INHABER)));
 
         assertThat(AbgleichPruefung.vergleichen(URINET, true, realm,
                 Set.of(Rolle.INHABER, Rolle.MITARBEITER), Set.of(EINS), Set.of(), Set.of(DREI)))
@@ -36,7 +36,9 @@ class AbgleichPruefungTest {
                         new Abweichung(Verwaltungsabweichung.FREMDE_ROLLE, EINS),
                         new Abweichung(Verwaltungsabweichung.ROLLE_OHNE_VORGANG, EINS),
                         new Abweichung(Verwaltungsabweichung.KEIN_MANDANT, DREI),
+                        new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, DREI),
                         new Abweichung(Verwaltungsabweichung.MEHRERE_MANDANTEN, VIER),
+                        new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, VIER),
                         new Abweichung(Verwaltungsabweichung.VORGANG_OFFEN, DREI));
         assertThat(AbgleichPruefung.vergleichen(VHF, false, realm,
                 Set.of(Rolle.INHABER), Set.of(ZWEI), Set.of(ZWEI), Set.of())).isEmpty();

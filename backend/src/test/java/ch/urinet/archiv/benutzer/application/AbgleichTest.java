@@ -127,6 +127,9 @@ class AbgleichTest {
             @Override public Optional<Instant> beanspruchen(MandantCode mandant, Befund befund) {
                 throw new UnsupportedOperationException();
             }
+            @Override public void bestaetigen(MandantCode mandant, Befund befund, Instant anspruch) {
+                throw new UnsupportedOperationException();
+            }
             @Override public void freigeben(MandantCode mandant, Befund befund, Instant anspruch) {
                 throw new UnsupportedOperationException();
             }

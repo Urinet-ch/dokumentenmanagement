@@ -154,6 +154,7 @@ public class Ueberwachung {
             Optional<Instant> anspruch = alarme.beanspruchen(mandant, befund);
             if (anspruch.isPresent()) {
                 if (benachrichtigung.alarm(mandant, befund)) {
+                    alarme.bestaetigen(mandant, befund, anspruch.get());
                     gemeldet++;
                 } else {
                     freigeben(new Freigabe(mandant, befund, anspruch.get()));

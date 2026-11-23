@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +56,7 @@ class KeycloakAdminAdapterTest {
 
     private WireMockServer server;
     private LogMitschnitt log;
+    private final List<Integer> dienstkontoAlarme = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void starten() {
@@ -73,10 +75,10 @@ class KeycloakAdminAdapterTest {
     void fehlendeVerbindungsdatenMeldenDienstAlsNichtErreichbar() {
         KeycloakAdminAdapter ohneAdresse = new KeycloakAdminAdapter(new ObjectMapper(), null, "urinet-archiv",
                 "archiv-verwaltung", "synthetic-client-secret", "archiv-pwa", "", Duration.ofSeconds(2),
-                Duration.ofSeconds(1), Clock.systemUTC());
+                Duration.ofSeconds(1), Clock.systemUTC(), dienstkontoAlarme::add);
         KeycloakAdminAdapter ohneSecret = new KeycloakAdminAdapter(new ObjectMapper(), server.baseUrl(),
                 "urinet-archiv", "archiv-verwaltung", "", "archiv-pwa", "", Duration.ofSeconds(2),
-                Duration.ofSeconds(1), Clock.systemUTC());
+                Duration.ofSeconds(1), Clock.systemUTC(), dienstkontoAlarme::add);
 
         assertThatThrownBy(ohneAdresse::verbindungPruefen)
                 .isInstanceOfSatisfying(FachFehler.class,
@@ -136,6 +138,7 @@ class KeycloakAdminAdapterTest {
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
         assertThat(log.volltext()).doesNotContain("synthetic private detail");
+        assertThat(dienstkontoAlarme).containsExactly(401);
         server.verify(1, postRequestedFor(urlPathEqualTo(TOKEN)));
     }
 
@@ -193,6 +196,7 @@ class KeycloakAdminAdapterTest {
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
         assertThat(log.volltext()).doesNotContain("synthetic private detail");
+        assertThat(dienstkontoAlarme).containsExactly(401);
     }
 
     @Test
@@ -684,6 +688,7 @@ class KeycloakAdminAdapterTest {
                                 .isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
 
         server.verify(3, getRequestedFor(urlPathEqualTo(USERS + "/benutzer-1")));
+        assertThat(dienstkontoAlarme).containsExactly(403, 403, 403);
     }
 
     @Test
@@ -703,6 +708,7 @@ class KeycloakAdminAdapterTest {
         var benutzer = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).benutzerLesen("urinet", "benutzer-1");
 
         assertThat(benutzer.id()).isEqualTo("benutzer-1");
+        assertThat(dienstkontoAlarme).isEmpty();
         server.verify(2, postRequestedFor(urlPathEqualTo(TOKEN)));
     }
 
@@ -1123,6 +1129,6 @@ class KeycloakAdminAdapterTest {
     private KeycloakAdminAdapter adapter(Duration verbindung, Duration anfrage, Clock uhr) {
         return new KeycloakAdminAdapter(new ObjectMapper(), server.baseUrl(), "urinet-archiv",
                 "archiv-verwaltung", "synthetic-client-secret", "archiv-pwa", "", verbindung, anfrage,
-                uhr);
+                uhr, dienstkontoAlarme::add);
     }
 }

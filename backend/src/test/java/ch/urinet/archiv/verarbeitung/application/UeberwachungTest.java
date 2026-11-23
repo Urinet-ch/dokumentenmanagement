@@ -258,6 +258,11 @@ class UeberwachungTest {
         }
 
         @Override
+        public void bestaetigen(MandantCode mandant, Befund befund, Instant anspruch) {
+            assertThat(gemeldet.get(mandant.wert() + "/" + befund.schluessel())).isEqualTo(anspruch);
+        }
+
+        @Override
         public void freigeben(MandantCode mandant, Befund befund, Instant anspruch) {
             if (freigebenScheitert > 0) {
                 freigebenScheitert--;

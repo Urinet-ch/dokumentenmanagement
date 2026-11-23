@@ -27,7 +27,8 @@ public class JdbcAbgleichAlarmQuelle implements AbgleichAlarmQuelle {
     public List<Befund> offene(MandantCode mandant) {
         String sql = "select split_part(schluessel, ':', 1), split_part(schluessel, ':', 2), "
                 + "split_part(schluessel, ':', 3), erstmals from " + mandant.schema()
-                + ".alarm where (starts_with(schluessel, ?) or starts_with(schluessel, ?)) and erledigt is null";
+                + ".alarm where (starts_with(schluessel, ?) or starts_with(schluessel, ?)) "
+                + "and erledigt is null and gemeldet is null order by erstmals, schluessel limit 200";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setString(1, Befund.Quelle.ABGLEICH.praefix());
