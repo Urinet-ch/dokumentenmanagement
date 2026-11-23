@@ -22,6 +22,12 @@ export const TEXTE = {
     bestand: 'Bestand',
     verwaltung: 'Verwaltung',
   },
+  stand: {
+    beschriftung: 'Stand der App',
+    version: (version: string) => `Version ${version}`,
+    build: (build: string) => `Build ${build}`,
+    gebaut: (zeit: string) => `gebaut am ${zeit}`,
+  },
   kopf: {
     suche: 'Im Archiv suchen',
     mandant: (mandant: string) => `Mandant ${mandant}`,
