@@ -21,6 +21,7 @@ import org.jboss.logging.Logger;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -100,6 +101,16 @@ public class LangChain4jChatAgent implements ChatAgentPort {
             register.entfernen(id);
             laeufe.entfernen(id);
         }
+    }
+
+    @Override
+    public Optional<String> modellkennung() {
+        return Optional.of(modell.modell());
+    }
+
+    @Override
+    public Optional<String> systempromptVersion() {
+        return Optional.of(ChatSystemPrompt.kennung());
     }
 
     private void starten(AgentLauf lauf, ChatAnfrage anfrage) {

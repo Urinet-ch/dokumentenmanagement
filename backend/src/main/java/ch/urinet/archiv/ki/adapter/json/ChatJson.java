@@ -22,7 +22,7 @@ import java.util.UUID;
  * <ul>
  *   <li>Quelle Dokument {@code {"id", "titel", "link": "/dokument/<id>"}}, Quelle Datenstand
  *       {@code {"werkzeug", "datenstand": "<ISO-8601 UTC>", "belege": n}}</li>
- *   <li>Werkzeugaufruf {@code {"name", "parameter": {…}, "dokumentIds": […], "kontextstufe"?, "datenstand"?}}</li>
+ *   <li>Werkzeugaufruf {@code {"name", "parameter": {…}, "dokumentIds": […], "kontextstufe"?, "datenstand"?, "suchweg"?}}</li>
  *   <li>SSE: {@code werkzeug {"name"}}, {@code text {"delta"}}, {@code quellen […]},
  *       {@code fertig {"gespraechId", "nachrichtId", "tokens": {"ein", "aus"}}}, {@code fehler {"meldung", "gespraechId"}}</li>
  * </ul>
@@ -138,6 +138,14 @@ public final class ChatJson {
             wert.put("name", aufruf.name());
             wert.put("parameter", aufruf.parameter());
             wert.put("dokumentIds", aufruf.dokumentIds().stream().map(UUID::toString).toList());
+            if (aufruf.suchweg() != null) {
+                wert.put("suchweg", aufruf.suchweg());
+            }
+            if (!aufruf.aehnlichkeiten().isEmpty()) {
+                Map<String, Double> aehnlichkeiten = new LinkedHashMap<>();
+                aufruf.aehnlichkeiten().forEach((id, score) -> aehnlichkeiten.put(id.toString(), score));
+                wert.put("aehnlichkeiten", aehnlichkeiten);
+            }
             aufruf.kontextstufe().ifPresent(s -> wert.put("kontextstufe", s.name()));
             aufruf.datenstand().ifPresent(s -> {
                 Map<String, Object> stand = new LinkedHashMap<>();

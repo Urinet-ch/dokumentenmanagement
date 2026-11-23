@@ -1620,6 +1620,7 @@ export const TEXTE = {
       ROLLE_ZUWEISEN: 'Rolle zugewiesen',
       BENUTZER_ANTRAG: 'Benutzerantrag',
       BENUTZER_ABWEICHUNG: 'Benutzerabweichung',
+      CHAT_BEWERTUNG_EXPORT: 'Chat-Bewertungen exportiert',
     } as Record<string, string>,
     rollen: {
       INHABER: 'Inhaber',
