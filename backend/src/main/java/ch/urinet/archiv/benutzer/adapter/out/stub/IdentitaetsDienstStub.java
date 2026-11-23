@@ -1,5 +1,6 @@
 package ch.urinet.archiv.benutzer.adapter.out.stub;
 
+import ch.urinet.archiv.benutzer.application.AbgleichIdentitaet;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -20,8 +21,8 @@ import java.util.UUID;
 /** Speicherbasierter Identitätsdienst für Entwicklung und Tests, ohne tatsächlichen Mailversand. */
 @ApplicationScoped
 @UnlessBuildProfile("prod")
-@Typed(IdentitaetsDienst.class)
-public class IdentitaetsDienstStub implements IdentitaetsDienst {
+@Typed({IdentitaetsDienst.class, AbgleichIdentitaet.class})
+public class IdentitaetsDienstStub implements IdentitaetsDienst, AbgleichIdentitaet {
     private final Map<String, Eintrag> benutzer = new HashMap<>();
 
     @Override
@@ -43,6 +44,21 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst {
     @Override
     public synchronized Benutzer benutzerLesen(String mandant, String id) {
         return finden(mandant, id).wert;
+    }
+
+    @Override
+    public synchronized java.util.List<RealmBenutzer> seite(int seite) {
+        int start = IdentitaetsDienst.seitenanfang(null, seite, MAX_SEITENGROESSE);
+        var treffer = benutzer.values().stream()
+                .sorted(Comparator.comparing(e -> e.wert.id()))
+                .map(e -> new RealmBenutzer(UUID.fromString(e.wert.id()),
+                        java.util.List.of(e.mandant), e.wert.rollen()))
+                .toList();
+        if (start >= treffer.size()) {
+            return java.util.List.of();
+        }
+        return java.util.List.copyOf(treffer.subList(start, (int) Math.min((long) start + MAX_SEITENGROESSE,
+                treffer.size())));
     }
 
     @Override

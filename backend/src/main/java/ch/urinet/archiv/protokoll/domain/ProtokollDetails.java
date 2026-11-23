@@ -243,22 +243,36 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         SICHERHEIT, AUSTRITT, RECHTEAENDERUNG, KORREKTUR, SONSTIGES
     }
 
+    public enum Verwaltungsabweichung {
+        ROLLE_OHNE_VORGANG, MEHRERE_ROLLEN, KEIN_MANDANT, MEHRERE_MANDANTEN, FREMDE_ROLLE, BENUTZER_FEHLT,
+        VORGANG_OFFEN
+    }
+
     public record Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
                              Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder,
-                             Verwaltungsgrund grund) {
+                             Verwaltungsgrund grund, Verwaltungsabweichung abweichung) {
         public Verwaltung {
             Objects.requireNonNull(vorgangId);
             Objects.requireNonNull(phase);
             felder = felder == null ? List.of() : List.copyOf(felder);
+            if (abweichung != null && vorgang != Verwaltungsvorgang.ABWEICHUNG) {
+                throw new IllegalArgumentException("Abweichungscode nur beim Abgleich");
+            }
+        }
+
+        public Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
+                          Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder,
+                          Verwaltungsgrund grund) {
+            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, grund, null);
         }
 
         public Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
                           Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder) {
-            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, null);
+            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, null, null);
         }
 
         public Verwaltung(UUID vorgangId, Verwaltungsphase phase) {
-            this(vorgangId, phase, null, null, null, null, List.of(), null);
+            this(vorgangId, phase, null, null, null, null, List.of(), null, null);
         }
     }
 

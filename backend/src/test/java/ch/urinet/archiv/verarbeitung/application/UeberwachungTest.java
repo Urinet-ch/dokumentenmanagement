@@ -96,6 +96,43 @@ class UeberwachungTest {
     }
 
     @Test
+    void abgleichalarmWirdNachVersandfehlerErneutGemeldetOhneDenAbgleichZuVerwerfen() {
+        var befund = new Befund(Befund.Quelle.ABGLEICH, UUID.randomUUID().toString(), "MEHRERE_ROLLEN",
+                Instant.parse("2026-11-22T22:00:00Z"));
+        speicher.abgleichen(URINET, Befund.Quelle.ABGLEICH, List.of(befund));
+        Ueberwachung ueberwachung = ueberwachung(List.of(URINET), Optional.empty(),
+                mandant -> List.of(), mandant -> List.of(befund));
+
+        post.zustellen = false;
+        ueberwachung.pruefen();
+        post.zustellen = true;
+        ueberwachung.pruefen();
+        ueberwachung.pruefen();
+
+        assertThat(post.versuche).filteredOn(befund::equals).containsExactly(befund, befund);
+        assertThat(post.zugestellt).containsEntry(befund, URINET);
+        assertThat(speicher.abgeglichen.stream().filter(Befund.Quelle.ABGLEICH::equals)).hasSize(1);
+    }
+
+    @Test
+    void inhabervergabeWirdNachVersandfehlerErneutUndDanachNurEinmalGemeldet() {
+        var befund = new Befund(Befund.Quelle.VERWALTUNGSALARM, UUID.randomUUID().toString(), "INHABER_VERGEBEN",
+                Instant.parse("2026-11-22T22:00:00Z"));
+        speicher.abgleichen(URINET, Befund.Quelle.VERWALTUNGSALARM, List.of(befund));
+        AbgleichAlarmQuelle quelle = mandant -> List.of(befund);
+        Ueberwachung ueberwachung = ueberwachung(List.of(URINET), Optional.empty(), m -> List.of(), quelle);
+
+        post.zustellen = false;
+        ueberwachung.pruefen();
+        post.zustellen = true;
+        ueberwachung.pruefen();
+        ueberwachung.pruefen();
+
+        assertThat(post.versuche).filteredOn(befund::equals).containsExactly(befund, befund);
+        assertThat(post.zugestellt).containsEntry(befund, URINET);
+    }
+
+    @Test
     void einFehlerBeiEinemMandantenHaeltDieAnderenNichtAuf() {
         Ueberwachung ueberwachung = new Ueberwachung(register(List.of(VHF, URINET)), new DokumentUeberwachung() {
             @Override
@@ -110,14 +147,15 @@ class UeberwachungTest {
             public Map<String, Long> anzahlJeStatus(MandantCode mandant) {
                 return Map.of();
             }
-        }, m -> Optional.empty(), Optional::empty, m -> List.of(), speicher, post, Duration.ofHours(1), "urinet");
+        }, m -> Optional.empty(), Optional::empty, m -> List.of(), m -> List.of(), speicher, post,
+                Duration.ofHours(1), "urinet");
 
         assertThat(ueberwachung.pruefen()).isEqualTo(1);
     }
 
     @Test
     void grenzeMussPositivSein() {
-        assertThatThrownBy(() -> new Ueberwachung(register(List.of()), null, null, null, null, speicher, post,
+        assertThatThrownBy(() -> new Ueberwachung(register(List.of()), null, null, null, null, null, speicher, post,
                 Duration.ZERO, "urinet")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Ueberwachung.pruefeEinstellungen(Duration.ofSeconds(-1), "urinet"))
                 .hasMessageContaining("archiv.ueberwachung.grenze");
@@ -147,6 +185,11 @@ class UeberwachungTest {
 
     private Ueberwachung ueberwachung(List<MandantCode> mandanten, Optional<List<Befund>> sicherung,
                                        VorgangUeberwachung vorgaenge) {
+        return ueberwachung(mandanten, sicherung, vorgaenge, m -> List.of());
+    }
+
+    private Ueberwachung ueberwachung(List<MandantCode> mandanten, Optional<List<Befund>> sicherung,
+                                       VorgangUeberwachung vorgaenge, AbgleichAlarmQuelle abgleich) {
         DokumentUeberwachung dokumente = new DokumentUeberwachung() {
             @Override
             public List<Befund> laengerAls(MandantCode mandant, Duration grenze) {
@@ -159,7 +202,7 @@ class UeberwachungTest {
             }
         };
         return new Ueberwachung(register(mandanten), dokumente, m -> Optional.empty(), () -> sicherung,
-                vorgaenge, speicher, post,
+                vorgaenge, abgleich, speicher, post,
                 Duration.ofHours(1), "urinet");
     }
 
@@ -212,6 +255,11 @@ class UeberwachungTest {
             Instant anspruch = Instant.EPOCH.plusMillis(++uhr);
             gemeldet.put(schluessel, anspruch);
             return Optional.of(anspruch);
+        }
+
+        @Override
+        public void bestaetigen(MandantCode mandant, Befund befund, Instant anspruch) {
+            assertThat(gemeldet.get(mandant.wert() + "/" + befund.schluessel())).isEqualTo(anspruch);
         }
 
         @Override

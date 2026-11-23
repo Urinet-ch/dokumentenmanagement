@@ -8,10 +8,11 @@ import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { Symbol } from '../gemeinsam/symbol';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { WissenQuellen } from './wissen-quellen';
 
 @Component({
   selector: 'app-wissen-index',
-  imports: [RouterLink, MatButtonModule, Symbol],
+  imports: [RouterLink, MatButtonModule, Symbol, WissenQuellen],
   templateUrl: './wissen-index.html',
   styleUrls: ['./wissen.scss', './wissen-index.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
