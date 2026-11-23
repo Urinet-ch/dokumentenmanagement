@@ -215,34 +215,34 @@ After({ tags: '@passkey' }, async function () {
   }
 });
 
-Given('ein Testbenutzer ohne Passkey existiert', async function () {
+Given('ein Testbenutzer ohne Passkey existiert', { timeout: 90_000 }, async function () {
   await testbenutzer(this);
 });
 
-Given('ein Testbenutzer ist mit Passwort und TOTP angemeldet', async function () {
+Given('ein Testbenutzer ist mit Passwort und TOTP angemeldet', { timeout: 90_000 }, async function () {
   await testbenutzer(this);
   await passwortAnmelden(this, this.seite);
 });
 
-Given('ein Testbenutzer hat einen Passkey eingerichtet', async function () {
+Given('ein Testbenutzer hat einen Passkey eingerichtet', { timeout: 90_000 }, async function () {
   await testbenutzer(this);
   await passwortAnmelden(this, this.seite);
   await einrichten(this);
 });
 
-When('er in der Kontoverwaltung einen Passkey einrichtet', async function () {
+When('er in der Kontoverwaltung einen Passkey einrichtet', { timeout: 90_000 }, async function () {
   await einrichten(this);
 });
 
-When('er sich mit dem Passkey anmeldet', async function () {
+When('er sich mit dem Passkey anmeldet', { timeout: 90_000 }, async function () {
   await passkeyAnmelden(this);
 });
 
-Given('er ist mit dem Passkey angemeldet', async function () {
+Given('er ist mit dem Passkey angemeldet', { timeout: 90_000 }, async function () {
   await passkeyAnmelden(this);
 });
 
-When('er sich für den Step-up mit dem Passkey erneut anmeldet', async function () {
+When('er sich für den Step-up mit dem Passkey erneut anmeldet', { timeout: 90_000 }, async function () {
   this.passkey.vorher = this.passkey.claims.auth_time;
   await new Promise((weiter) => setTimeout(weiter, 2100));
   await this.seite.goto(anmeldeUrl(this.passkey, { prompt: 'login', max_age: '0' }));

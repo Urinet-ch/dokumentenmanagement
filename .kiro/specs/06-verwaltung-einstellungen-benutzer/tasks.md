@@ -167,7 +167,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 1.8, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.14_
   - _Abhängig von: 20.1, 19.10_
 
-- [ ] 20.3 Einstellungen der Wissensbasis in die Mechanik [Backend]
+- [x] 20.3 Einstellungen der Wissensbasis in die Mechanik [Backend]
   - Nach dem Entscheid in 19.1: `/wissensbasis/einstellungen` (A19) über denselben Weg; falls die Tabelle `wissens_einstellung`
     schon Werte trägt, Migration mit Quelle `MIGRATION`; sonst Wegfall der Tabelle in einem späteren Changeset.
   - _Anforderungen: 2.13_

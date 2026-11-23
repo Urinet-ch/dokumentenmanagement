@@ -806,6 +806,20 @@ Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übe
 Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
 Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
 
+## Umsetzung (Aufgabe 20.3, 23.11.2026)
+
+Die Wissenseinstellungen werden auch bei fehlender oder vollständig leerer Tabellenzeile als Konfigurationsversion
+mit Quelle `MIGRATION` übernommen; nicht gesetzte Werte bleiben geerbt. Die bisherige Tabelle
+bleibt als Spiegel für bestehende Verbraucher und den Rückweg erhalten. Der bisherige PUT verwendet die gemeinsame
+Version, Bestätigung und Step-up; ein unverändert zurückgesendeter effektiver Zeitplan bewahrt teilweise geerbte Werte.
+Ein teilweise eigener Zeitplan übernimmt fehlende Teile aus dem instanzweiten Zeitplan, soweit dieser darstellbar ist,
+sonst aus dem Katalogstandard. Der Katalog zeigt den effektiven Wert und weist auf den nicht darstellbaren Zeitplan hin.
+Die Wissensroute begrenzt den Empfang wie die übrigen Einstellungsrouten auch ohne Inhaltslänge.
+
+Entscheid Fabian vom 23.11.2026: Nicht darstellbare bestehende Werte werden auf den Katalogstandard gesetzt,
+ihre alten Werte in `wissens_einstellung_migration` gesichert und die ersetzten Pfade ohne Werte im Zugriffsprotokoll
+vermerkt; es gibt keinen Startabbruch.
+
 ## Umsetzung (Aufgabe 19.12, 23.11.2026)
 
 Die Löschvorschau zählt Protokolleinträge und unterschiedliche Dokumente mit Bezug zum Benutzer im eigenen Mandanten.
