@@ -736,6 +736,26 @@ Ein internes Ereignis kennzeichnet erfolgreiche Inhabervergaben; die Alarmzustel
 Löschwirkung und die Bestätigung von Löschanträgen folgen in 19.12. Die Benutzeransicht liefert den Verweis und
 Hinweis zu API-Tokens; die Anzeige in der Oberfläche folgt in 20.6/20.7.
 
+## Umsetzung (Aufgabe 19.13, 23.11.2026)
+
+Der Worker liest für den Abgleich den Realm seitenweise und ohne Personenangaben, bevor er je aktivem Mandanten den
+Verwaltungsstand prüft. Er läuft beim Worker-Start und täglich um 01:20 Uhr Europe/Zurich, nicht auf Stufe P.
+Abweichungen werden protokolliert und als Befunde im betroffenen Mandanten vorgemerkt. Ein ungeklärter Vorgang bleibt
+bis zur Klärung gesperrt; ein späterer Abgleich allein schliesst ihn nicht ab.
+
+Inhabervergaben und Schwellenübergänge werden mit dem Zugriffsprotokoll in derselben Transaktion als Alarm vorgemerkt.
+Die Schwellen zählen das Protokoll im gleitenden Zehn-Minuten-Fenster unter einer mandantenbezogenen Transaktionssperre.
+Eine endgültige 401- oder 403-Antwort des Dienstkontos wird unabhängig vom aufrufenden Vorgang vorgemerkt; bei einem
+realmweiten Aufruf ohne Mandantenkontext für alle aktiven Mandanten. Der Überwachungstakt versendet die Mails.
+`120-verwaltungsalarm-anspruch` ergänzt einen befristeten Versandanspruch; nach einem Prozessabbruch ist die Zustellung
+erneut möglich. Ein Abbruch zwischen SMTP-Versand und Bestätigung kann eine zweite Mail auslösen, da SMTP keine atomare
+Bestätigung mit der Datenbank bietet. Noch nicht zugestellte Abgleichbefunde bleiben auch bei zwischenzeitlicher
+Behebung offen. Die Eingrenzung und Betriebsfolgen stehen in `docs/alarme.md`.
+
+Die Szenarien prüfen Abweichungen und deren Zustellung für zwei Mandanten sowie fehlende und mehrdeutige
+Mandantenzuordnungen und mehrere Rollen. Im Mandanten `vhf-gsk` erzeugt ein synthetischer Inhaber zusätzlich den
+Befund `FREMDE_ROLLE`, da dort nur `geschaeftsstelle` vergeben werden darf.
+
 ## Vorbereitung (Aufgabe 19.3, 23.11.2026)
 
 Compose bindet die Secret-Datei des Verwaltungsclients in die API und die SMTP-Secret-Datei in Keycloak ein; die
@@ -780,3 +800,6 @@ einen zusätzlichen Aufruf ergeben, weil der Vertrag keine Gesamtzahl liefert. F
 wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut geladen. Der Browser-Nachweis nutzt
 synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
 Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
+
+Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
+Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
