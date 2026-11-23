@@ -39,6 +39,24 @@ dd {
   margin: 0;
 }
 
+label {
+  display: block;
+  margin-top: 1rem;
+}
+
+input, textarea, select {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: .5rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--karte);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+}
+
 @media (max-width: 599px) {
   dl {
     grid-template-columns: minmax(0, 1fr);

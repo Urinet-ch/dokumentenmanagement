@@ -103,7 +103,7 @@ export const TEXTE = {
   einstellungen: {
     titel: 'Einstellungen',
     einleitung: 'Werte und Vorgaben für diesen Mandanten.',
-    nurLesen: 'Einstellungen können hier noch nicht geändert werden.',
+    nurLesen: 'Sie können Änderungen vorbereiten und prüfen. Speichern ist hier noch nicht verfügbar.',
     laden: 'Einstellungen werden geladen …',
     keine: 'Keine Einstellungen vorhanden.',
     erneut: 'Erneut versuchen',
@@ -125,6 +125,19 @@ export const TEXTE = {
     vorher: 'Vorher',
     nachher: 'Nachher',
     vergleichFehler: 'Der Vergleich konnte nicht gelesen werden. Bitte versuchen Sie es erneut.',
+    eingabe: 'Neuer Wert',
+    aufStandard: 'Auf Standard setzen',
+    standardVorgemerkt: 'Auf Standard setzen ist vorgemerkt.',
+    vorschau: 'Änderungen prüfen',
+    vorschauLaeuft: 'Änderungen werden geprüft …',
+    vorschauErgebnis: 'Auswirkungen der Änderungen',
+    keineAuswirkungen: 'Keine besonderen Auswirkungen gemeldet.',
+    eingabeUngueltig: 'Bitte geben Sie einen gültigen Wert ein.',
+    versionGeaendert: 'Die Daten haben sich geändert. Laden Sie sie neu; Ihre Eingaben bleiben erhalten.',
+    tage: {
+      MONDAY: 'Montag', TUESDAY: 'Dienstag', WEDNESDAY: 'Mittwoch', THURSDAY: 'Donnerstag',
+      FRIDAY: 'Freitag', SATURDAY: 'Samstag', SUNDAY: 'Sonntag',
+    },
     gruppen: {
       GESCHAEFTSJAHR: 'Geschäftsjahr',
       KENNUNGEN: 'Kennungen',

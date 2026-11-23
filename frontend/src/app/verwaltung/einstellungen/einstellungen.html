@@ -36,10 +36,60 @@
             @if (eintrag.hinweis) {
               <p class="hinweis">{{ eintrag.hinweis }}</p>
             }
+            <label [for]="'eingabe-' + eintrag.schluessel">{{ texte.eingabe }}</label>
+            @if (eintrag.typ === 'IBANS') {
+              <textarea #feld [id]="'eingabe-' + eintrag.schluessel" [value]="eingabe(eintrag)"
+                        [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
+                        [attr.aria-describedby]="feldfehler()[eintrag.schluessel ?? ''] ? 'fehler-' + eintrag.schluessel : null"
+                        (input)="setzen(eintrag, feld.value)"></textarea>
+            } @else if (eintrag.typ === 'WOCHENTAG') {
+              <select #feld [id]="'eingabe-' + eintrag.schluessel" [value]="eingabe(eintrag)"
+                      [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
+                      [attr.aria-describedby]="feldfehler()[eintrag.schluessel ?? ''] ? 'fehler-' + eintrag.schluessel : null"
+                      (change)="setzen(eintrag, feld.value)">
+                @for (tag of wochentage; track tag[0]) {
+                  <option [value]="tag[0]">{{ tag[1] }}</option>
+                }
+              </select>
+            } @else {
+              <input #feld [id]="'eingabe-' + eintrag.schluessel"
+                     [type]="eintrag.typ === 'GANZZAHL' ? 'number' : 'text'" [value]="eingabe(eintrag)"
+                     [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
+                     [attr.min]="eintrag.minimum ?? null" [attr.max]="eintrag.maximum ?? null"
+                     [attr.aria-describedby]="feldfehler()[eintrag.schluessel ?? ''] ? 'fehler-' + eintrag.schluessel : null"
+                     (input)="setzen(eintrag, feld.value)" />
+            }
+            @if (feldfehler()[eintrag.schluessel ?? '']; as meldung) {
+              <p [id]="'fehler-' + eintrag.schluessel" role="alert">{{ meldung }}</p>
+            }
+            <button mat-button type="button" (click)="setzen(eintrag, null)">{{ texte.aufStandard }}</button>
+            @if (eintrag.schluessel && eingaben()[eintrag.schluessel] === null) {
+              <p role="status">{{ texte.standardVorgemerkt }}</p>
+            }
           </article>
         }
       </div>
     </section>
+  }
+  @if (liste.length > 0) {
+    <button mat-flat-button type="button" [disabled]="vorschauLaeuft() || !hatEingaben()"
+            (click)="pruefen()">{{ texte.vorschau }}</button>
+    @if (vorschauLaeuft()) {
+      <p role="status">{{ texte.vorschauLaeuft }}</p>
+    } @else if (vorschau(); as auswirkungen) {
+      <section class="karte">
+        <h2>{{ texte.vorschauErgebnis }}</h2>
+        @if (auswirkungen.length === 0) {
+          <p>{{ texte.keineAuswirkungen }}</p>
+        } @else {
+          <ul>
+            @for (auswirkung of auswirkungen; track $index) {
+              <li>{{ auswirkung.text }}</li>
+            }
+          </ul>
+        }
+      </section>
+    }
   }
   <app-einstellungen-verlauf />
 } @else {
