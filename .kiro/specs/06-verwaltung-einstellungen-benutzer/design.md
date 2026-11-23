@@ -760,6 +760,13 @@ erscheinen könnten. Vorschau, App, Dateiimport und Betreiberkommando quittieren
 Wissensänderung. Aufgabe 20.3 übernimmt die bestehenden Werte und hebt diese Übergangssperre mit der Umstellung der
 Verbraucher auf.
 
+## Umsetzung (Aufgabe 20.2, 23.11.2026)
+
+Die REST-Prüfungen decken `If-Match` nun auch für Vorschau und Rücksetzung ab; eine Rücksetzung mit nicht vorhandenem
+Versionsstand oder unbekanntem Feld wird über den HTTP-Vertrag geprüft. Der Test der Einstellungsgrenze verwendet eine
+kleine Grenze und sendet echte PATCH-Anfragen. Der JDBC-Test erzeugt Konfigurationsprotokolle über denselben
+Protokolladapter wie der Schreibweg, damit Änderungen am Protokollformat die Ratenprüfung nicht unbemerkt umgehen.
+
 ## Umsetzung (Aufgabe 20.6, 23.11.2026)
 
 Die Benutzerseiten verwenden ausschliesslich die Lese-Endpunkte aus 19.7 und 19.11. Der Menüpunkt und beide Routen
