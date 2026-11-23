@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 
 import java.util.function.Consumer;
 import java.util.Optional;
@@ -25,5 +26,10 @@ public interface ChatAgentPort {
 
     default Optional<String> systempromptVersion() {
         return Optional.empty();
+    }
+
+    /** Kennung des Systemprompts für den Modus des Gesprächs (Spec 04, Requirement 21.2). */
+    default Optional<String> systempromptVersion(Chatmodus modus) {
+        return systempromptVersion();
     }
 }

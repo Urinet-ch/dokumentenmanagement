@@ -30,6 +30,12 @@ public interface KiVerbrauchPort {
      */
     String CHAT = "CHAT";
 
+    /**
+     * Sprachmodell-Aufrufe des Wissenschats (Spec 04, Requirement 21.7): eine Zeile je Aufruf wie {@link #CHAT}, zählt
+     * aber zum Monatsbudget der Wissensbasis (Requirement 13.6, Zweck {@code WISSEN_*}).
+     */
+    String WISSEN_CHAT = "WISSEN_CHAT";
+
     void erfassen(String zweck, KiPort.Verbrauch verbrauch);
 
     default void erfassen(String zweck, KiPort.Verbrauch verbrauch, UUID ingestEntwurfId) {

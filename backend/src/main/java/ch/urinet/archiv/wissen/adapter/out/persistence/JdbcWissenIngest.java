@@ -41,7 +41,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
     private static final String ZEITGRENZE = "10s";
     private static final Pattern WORT = Pattern.compile("[\\p{L}][\\p{L}\\p{N}]*");
     private static final int MAX_SUCHBEGRIFFE = 200;
-    private static final String WISSEN_ZWECKE = "'WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_EMBEDDING'";
+    private static final String WISSEN_ZWECKE = "'WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_EMBEDDING', 'WISSEN_CHAT'";
 
     private final Instance<EntityManager> entityManager;
 
