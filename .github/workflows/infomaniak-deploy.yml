@@ -261,6 +261,11 @@ jobs:
           # keine Werte), dazu die Zahl der Startversuche der API
           echo "Ausnahmeklassen im Log (Anzahl Klasse):"
           grep -oE '[A-Za-z_][A-Za-z0-9_.]*(Exception|Error)\b' status.txt | sort | uniq -c | sort -rn | head -8 || true
+          # Liquibase: nur Changeset-Kennung und SQL-State der gescheiterten Migration (ohne Meldungstext, der Werte enthalten kann)
+          echo "Gescheiterte Changesets im Log:"
+          grep -oE 'Migration failed for changeset [^ ]+' status.txt | sort | uniq -c | head -4 || true
+          grep -oE 'SQL State *: *[0-9A-Z]{5}|SQLState[ :=]+[0-9A-Z]{5}' status.txt | sort | uniq -c | head -4 || true
+          grep -oE 'Validation Failed|checksum|ValidationFailedException|Unexpected error running Liquibase' status.txt | sort | uniq -c | head -4 || true
           echo "Startversuche der API im Log: $(grep -c 'archiv-api.*started in\|Quarkus .* starting\|Installed features' status.txt || true)"
           rm -f status.txt stand.txt
           if [ "$oidc" -ne 0 ]; then
