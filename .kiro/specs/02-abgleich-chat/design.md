@@ -470,6 +470,7 @@ abaninja_beleg(abaninja_uuid text pk, art text, belegnummer text, kontakt_id uui
 - Der Export prüft die Zeilenanzahl vor dem HTTP-Download, damit ein Überschreiten als Problem-JSON mit Status 413 und ohne ZIP beantwortet wird. Die JDBC-Verbindung hält den wiederholbaren Lese-Snapshot bis zum Ende des ZIP-Stroms; der Protokolleintrag wird unabhängig davon in einer eigenen Transaktion geschrieben.
 - Die ZIP- und JSONL-Serialisierung liegt im Adapter `ChatBewertungZipExport`; der Anwendungsdienst bleibt dadurch frei von Jackson-Abhängigkeiten.
 - Für die Schwärzung kommen Original- und normalisierte Kontaktname, Vorname, bekannte Namensvarianten und die gespeicherten `dokument.partner_name` aus demselben Snapshot. Varianten mit derselben Kontakt-ID erhalten gemeinsam einen Platzhalter; bekannte ausgeschriebene deutsche Monatsdaten werden ebenfalls geschwärzt.
+- Nachprüfung (Qualitätsrunde Requirement 15, 23.11.2026): Das Kriterium 15.5 wird über die REST-Schnittstelle für Inhaber, Mitarbeiter, Treuhänder, Geschäftsstelle, API-Token und Webseiten-Schlüssel geprüft. Ein direkter Test der Rechtematrix allein ist kein Szenarionachweis für die Zugriffskontrolle.
 
 ## Error Handling
 - Chat: Werkzeugfehler werden dem Agenten als `{"fehler":"…"}` zurückgegeben; der Agent sagt, dass die Information nicht verfügbar ist. Modell nicht erreichbar → SSE `fehler` mit «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» Fehler vor dem Stream (400, 404, 429) und die Form von `fehler` nach «Vertrag Welle 7» (ergänzt 14.11.2026).
