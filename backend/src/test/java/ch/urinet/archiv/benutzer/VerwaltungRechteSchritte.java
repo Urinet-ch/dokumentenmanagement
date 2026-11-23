@@ -8,6 +8,7 @@ import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.restassured.response.Response;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.sql.Connection;
@@ -21,7 +22,7 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class VerwaltungRechteSchritte {
-    @Inject AgroalDataSource datenbank;
+    @Inject Instance<AgroalDataSource> datenbank;
     @Inject MandantProvisionierung provisionierung;
 
     private String benutzer;
@@ -33,7 +34,7 @@ public class VerwaltungRechteSchritte {
     @Before("@verwaltung-rechte-http")
     public void mandantenVorbereiten() throws SQLException {
         for (String code : List.of("urinet", "vhf-gsk")) {
-            try (Connection verbindung = datenbank.getConnection();
+            try (Connection verbindung = datenbank.get().getConnection();
                  PreparedStatement abfrage = verbindung.prepareStatement(
                          "select 1 from public.mandant where code = ? and aktiv")) {
                 abfrage.setString(1, code);
@@ -78,7 +79,7 @@ public class VerwaltungRechteSchritte {
     }
 
     private long verweigerungen() throws SQLException {
-        try (Connection verbindung = datenbank.getConnection();
+        try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
                      "select count(*) from " + schema + ".zugriff_protokoll "
                              + "where aktion = 'VERWEIGERT' and benutzer = ? and details->>'grund' = ?")) {
