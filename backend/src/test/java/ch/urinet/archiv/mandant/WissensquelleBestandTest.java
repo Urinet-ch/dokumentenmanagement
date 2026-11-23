@@ -8,6 +8,11 @@ import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import liquibase.Liquibase;
+import liquibase.database.Database;
+import liquibase.database.DatabaseFactory;
+import liquibase.database.jvm.JdbcConnection;
+import liquibase.resource.ClassLoaderResourceAccessor;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -30,13 +35,15 @@ class WissensquelleBestandTest {
     @Inject Instance<AgroalDataSource> datenbank;
 
     @Test
-    void migrationBrichtBeiVerweisAbUndUebernimmtDanachZweiDokumenteAtomar() throws SQLException {
+    void migrationBrichtBeiVerweisAbUndIstMitRollbackDatenverlustfrei() throws Exception {
         anlegenWennFehlt(MANDANT);
         String s = MANDANT.schema();
         ausfuehren("insert into " + s + ".dokumentart (code, name, vertraulichkeit, gesetzliche_pflicht) "
                 + "values ('PROJEKTDOKUMENT', 'Projektdokument', 'NORMAL', false) on conflict do nothing");
         ausfuehren("insert into " + s + ".dokumentart (code, name, vertraulichkeit, gesetzliche_pflicht) "
                 + "values ('WISSENSQUELLE', 'Wissensquelle', 'NORMAL', false)");
+        ausfuehren("insert into " + s + ".dokumentart (code, name, vertraulichkeit, gesetzliche_pflicht) "
+                + "values ('QUITTUNG', 'Quittung', 'NORMAL', false) on conflict do nothing");
         ausfuehren("insert into " + s + ".konfiguration_version (version, wer, grund, quelle, inhalt, sha256) "
                 + "select k.version + 1, 'probe', 'Altbestand', 'KOMMANDO', i.inhalt, "
                 + "encode(sha256(convert_to(i.inhalt::text, 'UTF8')), 'hex') from " + s + ".konfiguration_version k, "
@@ -47,6 +54,9 @@ class WissensquelleBestandTest {
                 new Testdokumente.Angaben(MANDANT.wert(), "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
         UUID zweites = Testdokumente.anlegen(datenbank.get(),
                 new Testdokumente.Angaben(MANDANT.wert(), "WISSENSQUELLE", "INTERN", true, "probe", null, "ARCHIVIERT"));
+        UUID quittung = Testdokumente.anlegen(datenbank.get(),
+                new Testdokumente.Angaben(MANDANT.wert(), "QUITTUNG", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+        UUID projekt;
         ausfuehren("drop table " + s + ".wissensquelle_markierung");
         ausfuehren("delete from " + s + ".databasechangelog where id = '070-wissensquelle-markierung'");
         String alteVersion = wert("select max(version)::text from " + s + ".konfiguration_version");
@@ -55,6 +65,8 @@ class WissensquelleBestandTest {
                 .hasStackTraceContaining("Dokumentart PROJEKTDOKUMENT fehlt");
         ausfuehren("insert into " + s + ".dokumentart (code, name, vertraulichkeit, gesetzliche_pflicht) "
                 + "values ('PROJEKTDOKUMENT', 'Projektdokument', 'NORMAL', false)");
+        projekt = Testdokumente.anlegen(datenbank.get(),
+                new Testdokumente.Angaben(MANDANT.wert(), "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, "ARCHIVIERT"));
         ausfuehren("insert into " + s + ".klassifikation "
                 + "(code, name, mehrfach, ki_vorschlag, suchfilter, oeffentlich_filter, aktiv) "
                 + "values ('migrationstest', 'Migrationstest', false, false, false, false, true)");
@@ -109,14 +121,55 @@ class WissensquelleBestandTest {
         assertThat(wert("select count(*) from " + s + ".konfiguration_version k, "
                 + "jsonb_array_elements(k.inhalt->'arten') a where k.version = (select max(version) from " + s
                 + ".konfiguration_version) and a->>'code' = 'WISSENSQUELLE'")).isEqualTo("0");
-        String neueVersion = wert("select max(version)::text from " + s + ".konfiguration_version");
+        assertThat(wert("select art from " + s + ".dokument where id = '" + quittung + "'")).isEqualTo("QUITTUNG");
+        assertThat(wert("select art from " + s + ".dokument where id = '" + projekt + "'")).isEqualTo("PROJEKTDOKUMENT");
+        assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung "
+                + "where dokument_id in ('" + quittung + "', '" + projekt + "')")).isEqualTo("0");
+
+        rollbackWissensquelleMarkierung(s);
+        assertThat(wert("select count(*) from " + s + ".dokument where art = 'WISSENSQUELLE' "
+                + "and id in ('" + erstes + "', '" + zweites + "')")).isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung "
+                + "where dokument_id in ('" + erstes + "', '" + zweites + "') and beendet_am is null"))
+                .isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".dokument where id = '" + quittung
+                + "' and art = 'QUITTUNG'")).isEqualTo("1");
+        assertThat(wert("select count(*) from " + s + ".dokument where id = '" + projekt
+                + "' and art = 'PROJEKTDOKUMENT'")).isEqualTo("1");
+        assertThat(wert("select name from " + s + ".dokumentart where code = 'WISSENSQUELLE'"))
+                .isEqualTo("Wissensquelle");
+        assertThat(wert("select count(*) from " + s + ".dokumentart where code = 'WISSENSQUELLE' "
+                + "and beschreibung = 'Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient.' "
+                + "and gruppen = array['frei']::text[] and pflichtfelder = array['titel', 'datum']::text[] "
+                + "and zusatz_schema = '{\"type\":\"object\",\"properties\":{\"herausgeber\":"
+                + "{\"type\":\"string\",\"minLength\":1}},\"additionalProperties\":false}'::jsonb "
+                + "and vertraulichkeit = 'NORMAL' and aufbewahrung_jahre is null and aufbewahrung_ab is null "
+                + "and not gesetzliche_pflicht and aktiv and not selbst_ausgestellt "
+                + "and belegnummer_muster = '{}'::text[] and not ki_vorschlag and ki_felder = '{}'::text[] "
+                + "and reihenfolge = 0")).isEqualTo("1");
+        assertThat(wert("select count(*) from " + s + ".konfiguration_version k, "
+                + "jsonb_array_elements(k.inhalt->'arten') a where k.version = (select max(version) from " + s
+                + ".konfiguration_version) and a->>'code' = 'WISSENSQUELLE' and a->>'name' = 'Wissensquelle'"))
+                .isEqualTo("1");
+        assertThat(wert("select count(*) from " + s + ".dokument_version where dokument_id in ('" + erstes
+                + "', '" + zweites + "') and grund = 'Rollback Wissensquelle' "
+                + "and daten->'dokument'->>'art' = 'PROJEKTDOKUMENT'")).isEqualTo("2");
+        String rollbackVersion = wert("select max(version)::text from " + s + ".konfiguration_version");
+        String rollbackDokumentVersion = wert("select version::text from " + s + ".dokument where id = '" + erstes + "'");
+        rollbackWissensquelleMarkierung(s);
+        assertThat(wert("select max(version)::text from " + s + ".konfiguration_version")).isEqualTo(rollbackVersion);
+        assertThat(wert("select version::text from " + s + ".dokument where id = '" + erstes + "'"))
+                .isEqualTo(rollbackDokumentVersion);
+        assertThat(wert("select count(*) from " + s + ".dokument_version where grund = 'Rollback Wissensquelle'"))
+                .isEqualTo("2");
+
+        Testdokumente.loeschen(datenbank.get(), MANDANT.wert(), List.of(erstes, zweites, quittung, projekt));
         ausfuehren("delete from " + s + ".databasechangelog where id = '070-wissensquelle-markierung'");
         mandantDatenbank.schemaMigrieren(s);
-        assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung")).isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung")).isEqualTo("0");
         assertThat(wert("select count(*) from " + s + ".dokument_version where grund = 'Migration Wissensquelle'"))
-                .isEqualTo("2");
-        assertThat(wert("select max(version)::text from " + s + ".konfiguration_version")).isEqualTo(neueVersion);
-        Testdokumente.loeschen(datenbank.get(), MANDANT.wert(), List.of(erstes, zweites));
+                .isEqualTo("0");
+        assertThat(wert("select count(*) from " + s + ".dokumentart where code = 'WISSENSQUELLE'")).isEqualTo("0");
     }
 
     @Test
@@ -147,6 +200,28 @@ class WissensquelleBestandTest {
              ResultSet zeile = befehl.executeQuery(sql)) {
             assertThat(zeile.next()).isTrue();
             return zeile.getString(1);
+        }
+    }
+
+    private void rollbackWissensquelleMarkierung(String schema) throws Exception {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            try (Statement befehl = verbindung.createStatement()) {
+                befehl.execute("set search_path to " + schema);
+            }
+            Database datenbankLiquibase = DatabaseFactory.getInstance()
+                    .findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
+            datenbankLiquibase.setDefaultSchemaName(schema);
+            datenbankLiquibase.setLiquibaseSchemaName(schema);
+            Liquibase liquibase = new Liquibase("db/mandant/changelog.xml",
+                    new ClassLoaderResourceAccessor(getClass().getClassLoader()), datenbankLiquibase);
+            liquibase.getDatabaseChangeLog().getChangeSets().stream()
+                    .filter(changeSet -> changeSet.getId().equals("070-wissensquelle-markierung"))
+                    .findFirst()
+                    .orElseThrow()
+                    .rollback(datenbankLiquibase);
+            try (Statement befehl = verbindung.createStatement()) {
+                befehl.execute("reset search_path");
+            }
         }
     }
 }

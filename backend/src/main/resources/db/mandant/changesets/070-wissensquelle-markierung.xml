@@ -84,7 +84,132 @@
             delete from dokumentart where code = 'WISSENSQUELLE';
         ]]></sql>
         <rollback>
-            <sql>-- Markierungen und Versionen bleiben beim Rollback zum Schutz der Daten bestehen.</sql>
+            <sql splitStatements="false"><![CDATA[
+                insert into dokumentart (code, name, beschreibung, gruppen, pflichtfelder, zusatz_schema, vertraulichkeit,
+                    aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, selbst_ausgestellt,
+                    belegnummer_muster, ki_vorschlag, ki_felder, reihenfolge)
+                values ('WISSENSQUELLE', 'Wissensquelle',
+                    'Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient.',
+                    array['frei']::text[], array['titel', 'datum']::text[],
+                    case when current_schema() = 'm_vhf_gsk' then '{
+                        "type": "object",
+                        "properties": {
+                            "herausgeber": {"type": "string", "minLength": 1},
+                            "verband": {
+                                "type": "array",
+                                "items": {"type": "string", "enum": ["vhf", "gsk"]},
+                                "x-labels": {"vhf": "VHF", "gsk": "GSK"},
+                                "minItems": 1,
+                                "uniqueItems": true
+                            },
+                            "zugriff": {
+                                "type": "string",
+                                "enum": ["oeffentlich", "mitglieder", "vorstand"],
+                                "default": "mitglieder"
+                            },
+                            "veroeffentlicht": {"type": "boolean", "default": false}
+                        },
+                        "required": ["verband", "zugriff", "veroeffentlicht"],
+                        "additionalProperties": false
+                    }'::jsonb else '{
+                        "type": "object",
+                        "properties": {"herausgeber": {"type": "string", "minLength": 1}},
+                        "additionalProperties": false
+                    }'::jsonb end,
+                    'NORMAL', null, null, false, true, false, '{}'::text[], false, '{}'::text[], 0)
+                on conflict (code) do nothing;
+
+                with aktuell as (
+                    select version, inhalt from konfiguration_version order by version desc limit 1
+                ), art as (
+                    select jsonb_build_object(
+                        'code', 'WISSENSQUELLE',
+                        'name', 'Wissensquelle',
+                        'beschreibung', 'Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient.',
+                        'gruppen', jsonb_build_array('frei'),
+                        'pflichtfelder', jsonb_build_array('titel', 'datum'),
+                        'zusatzSchema', to_jsonb(case when current_schema() = 'm_vhf_gsk' then '{
+                            "type": "object",
+                            "properties": {
+                                "herausgeber": {"type": "string", "minLength": 1},
+                                "verband": {
+                                    "type": "array",
+                                    "items": {"type": "string", "enum": ["vhf", "gsk"]},
+                                    "x-labels": {"vhf": "VHF", "gsk": "GSK"},
+                                    "minItems": 1,
+                                    "uniqueItems": true
+                                },
+                                "zugriff": {
+                                    "type": "string",
+                                    "enum": ["oeffentlich", "mitglieder", "vorstand"],
+                                    "default": "mitglieder"
+                                },
+                                "veroeffentlicht": {"type": "boolean", "default": false}
+                            },
+                            "required": ["verband", "zugriff", "veroeffentlicht"],
+                            "additionalProperties": false
+                        }' else '{
+                            "type": "object",
+                            "properties": {"herausgeber": {"type": "string", "minLength": 1}},
+                            "additionalProperties": false
+                        }' end),
+                        'vertraulichkeit', 'NORMAL',
+                        'aufbewahrung', jsonb_build_object('jahre', null, 'ab', null),
+                        'gesetzlichePflicht', false,
+                        'aktiv', true,
+                        'selbstAusgestellt', false,
+                        'belegnummerMuster', jsonb_build_array(),
+                        'fremdbelegArt', null,
+                        'ohneZahlungsdatenArt', null,
+                        'kiVorschlag', false,
+                        'kiFelder', jsonb_build_array(),
+                        'kiHinweise', null,
+                        'reihenfolge', 0) as element
+                ), abbild as (
+                    select version + 1 as version,
+                        jsonb_set(
+                            jsonb_set(inhalt, '{version}', to_jsonb(version + 1)),
+                            '{arten}', (
+                                select jsonb_agg(a.element order by (a.element ->> 'code') collate "C")
+                                from (
+                                    select jsonb_array_elements(aktuell.inhalt -> 'arten') as element
+                                    union all
+                                    select art.element
+                                ) a
+                            )) as inhalt
+                    from aktuell cross join art
+                    where not exists (
+                        select 1 from jsonb_array_elements(aktuell.inhalt -> 'arten') a
+                        where a ->> 'code' = 'WISSENSQUELLE'
+                    )
+                )
+                insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+                select version, 'System', 'Rollback Wissensquelle', 'MIGRATION', inhalt,
+                    encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+                from abbild;
+
+                insert into dokument_version (dokument_id, version, konfiguration_version, daten, geaendert_von, grund)
+                select d.id, d.version, d.konfiguration_version, jsonb_build_object(
+                    'dokument', to_jsonb(d) - 'volltext' - 'volltext_tsv',
+                    'finanz', (select to_jsonb(f) - 'dokument_id' from dokument_finanz f where f.dokument_id = d.id),
+                    'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id),
+                    'klassifikationen', coalesce((select jsonb_object_agg(k.klassifikation, k.werte) from (
+                        select klassifikation, jsonb_agg(wert order by wert) as werte from dokument_klassifikation
+                        where dokument_id = d.id group by klassifikation
+                    ) k), '{}'::jsonb)), 'System', 'Rollback Wissensquelle'
+                from dokument d
+                join wissensquelle_markierung m on m.dokument_id = d.id and m.beendet_am is null
+                where d.art <> 'WISSENSQUELLE';
+
+                update dokument d set art = 'WISSENSQUELLE', version = d.version + 1,
+                    konfiguration_version = (select max(version) from konfiguration_version),
+                    geaendert = clock_timestamp()
+                where d.art <> 'WISSENSQUELLE'
+                    and exists (
+                        select 1 from wissensquelle_markierung m
+                        where m.dokument_id = d.id and m.beendet_am is null
+                    );
+            ]]></sql>
         </rollback>
     </changeSet>
 </databaseChangeLog>
