@@ -37,9 +37,10 @@ export type Verwaltungsgrund = keyof typeof TEXTE.benutzerLoeschdialog.gruende;
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button type="button" [mat-dialog-close]="null">{{ texte.abbrechen }}</button>
-      <button mat-flat-button type="button" [disabled]="!gueltig()"
+      <button mat-button class="loeschen" type="button" [disabled]="!gueltig()"
         [mat-dialog-close]="grund()">{{ texte.loeschen }}</button>
     </mat-dialog-actions>`,
+  styles: `.loeschen:not(:disabled) { color: var(--gefahr); }`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BenutzerLoeschdialog {

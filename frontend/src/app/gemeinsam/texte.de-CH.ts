@@ -1889,4 +1889,17 @@ export const TEXTE = {
     abbrechen: 'Abbrechen',
     loeschen: 'Löschen',
   },
+  benutzerAktionsfehler: {
+    letzterInhaber: 'Der letzte aktive Inhaber darf nicht entfernt werden.',
+    benutzerExistiert: 'Der Benutzername oder die E-Mail-Adresse ist bereits vergeben.',
+    statusKonflikt: 'Die Aktion ist im aktuellen Zustand nicht möglich. Bitte laden Sie die Angaben neu.',
+    versionKonflikt: 'Die Daten haben sich geändert. Bitte laden Sie die Angaben neu; Ihre Eingaben bleiben erhalten.',
+    identitaetsdienst: 'Der Identitätsdienst ist nicht erreichbar. Bitte versuchen Sie es später erneut.',
+  },
+  benutzerLoeschen: {
+    oeffnen: 'Benutzer löschen',
+    vorschauFehler: 'Die Löschvorschau konnte nicht geladen werden. Bitte versuchen Sie es erneut.',
+    vorschauLaden: 'Löschvorschau wird geladen …',
+    wirdGeloescht: 'Die Löschung wird angefordert …',
+  },
 } as const;
