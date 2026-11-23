@@ -124,6 +124,14 @@ describe('AnmeldungService (Req 2.1)', () => {
     expect(p.get('nonce')).toBe(vorgang.nonce);
   });
 
+  it('fordert für Step-up eine erneute Anmeldung an', async () => {
+    await dienst.anmelden('/verwaltung/einstellungen', true);
+    const adresse = new URL(weiterleitung.mock.lastCall![0]);
+    expect(adresse.searchParams.get('max_age')).toBe('0');
+    expect(adresse.searchParams.get('prompt')).toBe('login');
+    expect(JSON.parse(speicher.getItem('archiv.anmeldung.vorgang')!).ziel).toBe('/verwaltung/einstellungen');
+  });
+
   it('tauscht den Code mit dem Verifier und hält die Tokens nur im Speicher', async () => {
     const adresse = await anmeldungStarten();
     const vorgang = JSON.parse(speicher.getItem('archiv.anmeldung.vorgang')!);

@@ -131,7 +131,7 @@ export class AnmeldungService {
     return this.accessToken();
   }
 
-  async anmelden(ziel = '/'): Promise<void> {
+  async anmelden(ziel = '/', erneut = false): Promise<void> {
     const vorgang: Vorgang = { state: zufall(), nonce: zufall(), verifier: zufall(48), ziel: sicheresZiel(ziel) };
     this.fenster.sessionStorage.setItem(VORGANG_SCHLUESSEL, JSON.stringify(vorgang));
     const parameter = new URLSearchParams({
@@ -144,6 +144,10 @@ export class AnmeldungService {
       code_challenge: await codeChallengeS256(vorgang.verifier),
       code_challenge_method: 'S256',
     });
+    if (erneut) {
+      parameter.set('max_age', '0');
+      parameter.set('prompt', 'login');
+    }
     this.fenster.location.assign(`${this.endpunkt('auth')}?${parameter}`);
   }
 

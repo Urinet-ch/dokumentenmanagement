@@ -103,7 +103,7 @@ export const TEXTE = {
   einstellungen: {
     titel: 'Einstellungen',
     einleitung: 'Werte und Vorgaben für diesen Mandanten.',
-    nurLesen: 'Sie können Änderungen vorbereiten und prüfen. Speichern ist hier noch nicht verfügbar.',
+    nurLesen: 'Prüfen Sie die Auswirkungen Ihrer Änderungen vor dem Speichern.',
     laden: 'Einstellungen werden geladen …',
     keine: 'Keine Einstellungen vorhanden.',
     erneut: 'Erneut versuchen',
@@ -134,6 +134,14 @@ export const TEXTE = {
     keineAuswirkungen: 'Keine besonderen Auswirkungen gemeldet.',
     eingabeUngueltig: 'Bitte geben Sie einen gültigen Wert ein.',
     versionGeaendert: 'Die Daten haben sich geändert. Laden Sie sie neu; Ihre Eingaben bleiben erhalten.',
+    speichern: 'Änderungen speichern',
+    speichernLaeuft: 'Änderungen werden gespeichert …',
+    gespeichert: 'Die Einstellungen wurden gespeichert.',
+    bestaetigenTitel: 'Änderung bestätigen',
+    bestaetigenHinweis: 'Die Änderung wird protokolliert. Bereits eingetretene Auswirkungen lassen sich möglicherweise nicht rückgängig machen.',
+    abbrechen: 'Abbrechen',
+    bestaetigen: 'Bestätigen und speichern',
+    erneuteAnmeldungFehler: 'Die Änderung konnte nach der erneuten Anmeldung nicht fortgesetzt werden. Bitte prüfen und erneut versuchen.',
     tage: {
       MONDAY: 'Montag', TUESDAY: 'Dienstag', WEDNESDAY: 'Mittwoch', THURSDAY: 'Donnerstag',
       FRIDAY: 'Freitag', SATURDAY: 'Samstag', SUNDAY: 'Sonntag',

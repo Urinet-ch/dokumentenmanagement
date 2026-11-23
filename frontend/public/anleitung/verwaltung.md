@@ -4,9 +4,10 @@ Die folgenden Teile beschreiben die Seiten der Verwaltung, die Ihre Rolle nutzen
 
 Unter «Einstellungen» sehen Sie die Einstellungen Ihres Mandanten nach Gruppen. Zu jedem Eintrag zeigt die Seite den
 aktuellen Wert, den Standard sowie vorhandene Grenzen und Hinweise zur Wirksamkeit. Sie können einen neuen Wert
-eingeben oder «Auf Standard setzen» vormerken und mit «Änderungen prüfen» die Auswirkungen ansehen. Speichern ist
-auf dieser Seite noch nicht möglich. Unter «Verlauf der Einstellungen» vergleichen Sie zwei Versionen; Kennungen
-werden dabei ohne Werte angezeigt.
+eingeben oder «Auf Standard setzen» vormerken und mit «Änderungen prüfen» die Auswirkungen ansehen. Anschliessend
+speichern Sie die Änderungen; bei Rücksetzungen und folgenreichen Änderungen verlangt das Archiv eine Bestätigung
+und gegebenenfalls eine erneute Anmeldung. Unter «Verlauf der Einstellungen» vergleichen Sie zwei Versionen;
+Kennungen werden dabei ohne Werte angezeigt.
 
 Unter «Benutzer» sehen Sie die Benutzer Ihres Mandanten als Karten. Über die Suche finden Sie einen Benutzer nach
 Name, Benutzername oder E-Mail; mit «Nächste Seite» und «Vorherige Seite» wechseln Sie die Ergebnisse. Öffnen Sie

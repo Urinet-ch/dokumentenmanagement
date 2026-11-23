@@ -5,6 +5,9 @@
 </div>
 
 <p class="hinweis info">{{ texte.nurLesen }}</p>
+@if (gespeichert()) {
+  <p class="hinweis ok" role="status">{{ texte.gespeichert }}</p>
+}
 
 @if (fehler(); as meldung) {
   <div class="hinweis gefahr" role="alert">
@@ -39,11 +42,13 @@
             <label [for]="'eingabe-' + eintrag.schluessel">{{ texte.eingabe }}</label>
             @if (eintrag.typ === 'IBANS') {
               <textarea #feld [id]="'eingabe-' + eintrag.schluessel" [value]="eingabe(eintrag)"
+                        [disabled]="speichert()"
                         [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
                         [attr.aria-describedby]="feldfehler()[eintrag.schluessel ?? ''] ? 'fehler-' + eintrag.schluessel : null"
                         (input)="setzen(eintrag, feld.value)"></textarea>
             } @else if (eintrag.typ === 'WOCHENTAG') {
               <select #feld [id]="'eingabe-' + eintrag.schluessel" [value]="eingabe(eintrag)"
+                      [disabled]="speichert()"
                       [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
                       [attr.aria-describedby]="feldfehler()[eintrag.schluessel ?? ''] ? 'fehler-' + eintrag.schluessel : null"
                       (change)="setzen(eintrag, feld.value)">
@@ -53,6 +58,7 @@
               </select>
             } @else {
               <input #feld [id]="'eingabe-' + eintrag.schluessel"
+                     [disabled]="speichert()"
                      [type]="eintrag.typ === 'GANZZAHL' ? 'number' : 'text'" [value]="eingabe(eintrag)"
                      [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
                      [attr.min]="eintrag.minimum ?? null" [attr.max]="eintrag.maximum ?? null"
@@ -62,7 +68,7 @@
             @if (feldfehler()[eintrag.schluessel ?? '']; as meldung) {
               <p [id]="'fehler-' + eintrag.schluessel" role="alert">{{ meldung }}</p>
             }
-            <button mat-button type="button" (click)="setzen(eintrag, null)">{{ texte.aufStandard }}</button>
+            <button mat-button type="button" [disabled]="speichert()" (click)="setzen(eintrag, null)">{{ texte.aufStandard }}</button>
             @if (eintrag.schluessel && eingaben()[eintrag.schluessel] === null) {
               <p role="status">{{ texte.standardVorgemerkt }}</p>
             }
@@ -72,7 +78,7 @@
     </section>
   }
   @if (liste.length > 0) {
-    <button mat-flat-button type="button" [disabled]="vorschauLaeuft() || !hatEingaben()"
+    <button mat-stroked-button type="button" [disabled]="speichert() || vorschauLaeuft() || !hatEingaben()"
             (click)="pruefen()">{{ texte.vorschau }}</button>
     @if (vorschauLaeuft()) {
       <p role="status">{{ texte.vorschauLaeuft }}</p>
@@ -88,7 +94,11 @@
             }
           </ul>
         }
+        <button mat-flat-button type="button" [disabled]="speichert()" (click)="speichern()">{{ texte.speichern }}</button>
       </section>
+    }
+    @if (speichert()) {
+      <p role="status">{{ texte.speichernLaeuft }}</p>
     }
   }
   <app-einstellungen-verlauf />

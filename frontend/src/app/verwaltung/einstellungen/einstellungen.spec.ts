@@ -1,22 +1,40 @@
 import { HttpErrorResponse, HttpHeaders, HttpResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { EinstellungenService } from '../../gemeinsam/api';
+import { AnmeldungService, FENSTER } from '../../gemeinsam/anmeldung/anmeldung.service';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { EinstellungenSeite } from './einstellungen';
 
 describe('Einstellungskatalog', () => {
   const service = { apiV1MandantEinstellungenGet: vi.fn() };
+  const anmeldung = { benutzer: () => ({ id: 'test-id', mandant: 'test-mandant' }), anmelden: vi.fn().mockResolvedValue(undefined) };
+  const dialog = { open: vi.fn().mockReturnValue({ afterClosed: () => of(true) }) };
+  const inhalt = new Map<string, string>();
+  const speicher = {
+    getItem: (name: string) => inhalt.get(name) ?? null,
+    setItem: (name: string, wert: string) => inhalt.set(name, wert),
+    removeItem: (name: string) => inhalt.delete(name),
+  };
   const antwort = (katalog: unknown[]) => new HttpResponse({ body: { katalog }, headers: new HttpHeaders({ ETag: '"3"' }) });
+
+  beforeEach(() => {
+    inhalt.clear();
+    anmeldung.anmelden.mockClear();
+    dialog.open.mockClear();
+  });
 
   function starten() {
     TestBed.configureTestingModule({
       imports: [EinstellungenSeite],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: EinstellungenService, useValue: service }],
+        { provide: EinstellungenService, useValue: service }, { provide: AnmeldungService, useValue: anmeldung },
+        { provide: FENSTER, useValue: { sessionStorage: speicher } }, { provide: MatDialog, useValue: dialog }],
     });
+    TestBed.overrideProvider(MatDialog, { useValue: dialog });
     const fixture = TestBed.createComponent(EinstellungenSeite);
     fixture.detectChanges();
     return fixture;
@@ -59,8 +77,10 @@ describe('Einstellungskatalog', () => {
     TestBed.configureTestingModule({
       imports: [EinstellungenSeite],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-        { provide: EinstellungenService, useValue: service }],
+        { provide: EinstellungenService, useValue: service }, { provide: AnmeldungService, useValue: anmeldung },
+        { provide: FENSTER, useValue: { sessionStorage: speicher } }, { provide: MatDialog, useValue: dialog }],
     });
+    TestBed.overrideProvider(MatDialog, { useValue: dialog });
     const navigieren = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     const fixture = TestBed.createComponent(EinstellungenSeite);
     fixture.detectChanges();
@@ -145,6 +165,45 @@ describe('Einstellungskatalog', () => {
     request.flush({ auswirkungen: [{ text: 'Veraltete Auswirkung' }] });
     fixture.detectChanges();
     expect(element.textContent).not.toContain('Veraltete Auswirkung');
+    http.verify();
+  });
+
+  it('bestätigt eine riskante Änderung und wiederholt sie nach Step-up genau einmal', () => {
+    service.apiV1MandantEinstellungenGet.mockReturnValue(of(antwort([
+      { gruppe: 'CHAT', schluessel: 'chat.aufbewahrungMonate', name: 'Chat', typ: 'GANZZAHL', aktuellerWert: 12 },
+    ])));
+    const fixture = starten();
+    const element = fixture.nativeElement as HTMLElement;
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/v1/konfiguration/versionen').flush([]);
+    const input = element.querySelector<HTMLInputElement>('[id="eingabe-chat.aufbewahrungMonate"]')!;
+    input.value = '6';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.einstellungen.vorschau)!.click();
+    http.expectOne('/api/v1/mandant/einstellungen/vorschau').flush({
+      auswirkungen: [{ schluessel: 'chat.aufbewahrungMonate', text: 'Nachrichten werden gelöscht.' }],
+    });
+    fixture.detectChanges();
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.einstellungen.speichern)!.click();
+    expect(dialog.open).toHaveBeenCalledOnce();
+    const erste = http.expectOne((request) => request.method === 'PATCH');
+    expect(erste.request.params.get('bestaetigt')).toBe('chat.aufbewahrungMonate');
+    erste.flush({ fehlercode: 'STEP_UP_NOETIG' }, { status: 401, statusText: 'Unauthorized' });
+    expect(anmeldung.anmelden).toHaveBeenCalledWith('/verwaltung/einstellungen', true);
+    fixture.destroy();
+
+    const erneut = TestBed.createComponent(EinstellungenSeite);
+    erneut.detectChanges();
+    const wiederholung = http.expectOne((request) => request.method === 'PATCH');
+    expect(wiederholung.request.body).toEqual({ chat: { aufbewahrungMonate: 6 } });
+    expect(wiederholung.request.headers.get('If-Match')).toBe('"3"');
+    wiederholung.flush({ fehlercode: 'STEP_UP_NOETIG' }, { status: 401, statusText: 'Unauthorized' });
+    erneut.detectChanges();
+    expect((erneut.nativeElement as HTMLElement).textContent).toContain(TEXTE.einstellungen.erneuteAnmeldungFehler);
+    expect(anmeldung.anmelden).toHaveBeenCalledOnce();
     http.verify();
   });
 });
