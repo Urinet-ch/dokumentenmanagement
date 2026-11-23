@@ -145,6 +145,18 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.importe),
   },
   {
+    path: 'verwaltung/benutzer',
+    loadComponent: () => import('./verwaltung/benutzer/benutzer-liste').then((m) => m.BenutzerListe),
+    canActivate: [rechtGuard('A21', '/nicht-gefunden')],
+    title: titel(TEXTE.menue.benutzer),
+  },
+  {
+    path: 'verwaltung/benutzer/:id',
+    loadComponent: () => import('./verwaltung/benutzer/benutzer-detail').then((m) => m.BenutzerDetail),
+    canActivate: [rechtGuard('A21', '/nicht-gefunden')],
+    title: titel(TEXTE.menue.benutzer),
+  },
+  {
     path: 'verwaltung/dokumentarten',
     loadComponent: () => import('./verwaltung/dokumentarten/verwaltung').then((m) => m.Verwaltung),
     canActivate: [verwaltungGuard],

@@ -597,3 +597,8 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - Nachtrag Zweitreview (22.11.2026): Auch der Updatehinweis ausserhalb des Drawer-Containers erhält bei geöffneter Hilfe
   `inert`. Das Browser-Szenario löst mit zwei synthetischen PWA-Versionen einen echten Updatezustand aus und prüft
   Maus, Fokus und Zugänglichkeitsbaum vor und nach dem Schliessen.
+
+## Umsetzung (Spec 06, Aufgabe 20.6, 23.11.2026)
+- Die Anleitung «Verwaltung» beschreibt neu die Benutzerübersicht. Abweichend von der Tabelle «Hilfe-Katalog»
+  ordnet der Katalog den Pfad `/verwaltung/benutzer` samt Detailseite diesem Abschnitt zu; seine bestehende
+  Sichtbarkeitsbedingung bleibt unverändert.

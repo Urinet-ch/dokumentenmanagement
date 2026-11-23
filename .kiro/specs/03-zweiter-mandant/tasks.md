@@ -56,6 +56,9 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 10.5 Altbestand übernehmen [Backend] [Fabian]
   - Drive-Import mit API-Token vom Scope `import` des Mandanten `vhf-gsk` und Pfad-Mustern (Reihe/Jahr), Bericht mit Lücken in der Nummerierung
+  - Repo-Vorstufe (PR #504): optionaler Modus `--altbestand` leitet Dokumentart, Jahr und erkannte Ausgabenummer aus synthetischen Pfaden ab; unbekannte oder mehrdeutige Angaben werden übersprungen. Der Bericht zählt nach Reihe und Jahr, behauptet aber keine Lückenfreiheit.
+  - Entscheid Fabian 23.11.2026 (Weg B): Req 4.2 wird nach dem Import mit der Archiv-Rolle über `GET /berichte/luecken` erfüllt. Das Import-Token bleibt auf `POST /dokumente` beschränkt; keine Rechteerweiterung und kein neuer Endpunkt in PR #504. Req 4.2 wird über Spec 05, Aufgaben 17.6/17.8, abgedeckt; bis dahin belegt 10.5 nur Req 4.1.
+  - Die echte Datenübernahme und die Abnahme von Aufgabe 10.5 bleiben bei Fabian; dies ist Folgearbeit, keine offene Produkt- oder Rechteentscheidung.
   - Tabelle `alte_url` und CSV-Import der alten Links (die Tabelle besteht seit Aufgabe 11.2, Changeset `031-alte-url`; der Import verwendet `AlteUrl.normalisieren` für die Form der URL)
   - CSV-Teilauftrag (PR #252) umgesetzt: Der Drive-Import und die Datenübernahme bleiben [Fabian] zugeordnet; darum bleibt der Haken offen.
   - _Anforderungen: 4.1–4.3_
@@ -100,7 +103,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 7.1, 7.3, 7.4, 7.5, 7.7, 11.1, 11.6_
   - _Abhängig von: 11.6_
 
-- [ ] 11.5 Shortcodes, Blöcke, Download, Chatbot [Frontend]
+- [x] 11.5 Shortcodes, Blöcke, Download, Chatbot [Frontend]
   - `[urinet_archiv_liste]`, `[urinet_archiv_suche]`, `[urinet_chatbot]` + Gutenberg-Blöcke; Download-Route mit 302; WP-REST-Proxy für den Chat (SSE), `assets/chatbot.js`
   - Browser-Szenarien mit Cucumber.js + Playwright gegen wp-env; Barrierefreiheit prüfen (axe), Theme-Übernahme
   - Spec 05 ergänzt: Filter der Liste nach den Klassifikationen mit `oeffentlich_filter`, nur diese werden angezeigt (Spec 05, Req 8.6)

@@ -111,6 +111,21 @@ class JsonKonfigurationsdateiCodecTest {
                 .isEqualTo(Fehlercode.DATEI_ZU_GROSS);
     }
 
+    @Test
+    void vorpruefungErkenntRiskanteWerteAuchBeiAnderenFehlern() {
+        KonfigurationsdateiCodec codec = codec();
+        var roh = codec.vorpruefen("""
+                {"basisVersion": 4, "unbekannt": true,
+                 "einstellungen": {"chat": {"aufbewahrungMonate": 0.1}}}
+                """);
+
+        assertThat(roh.basisVersion()).isEqualTo(4);
+        assertThat(roh.einstellungen().chat().aufbewahrungMonate()).isZero();
+        assertThat(codec.vorpruefen("").basisVersion()).isNull();
+        assertThat(codec.vorpruefen("{").basisVersion()).isNull();
+        assertThat(codec.vorpruefen("{\"basisVersion\":1,\"basisVersion\":2}").basisVersion()).isNull();
+    }
+
     private static KonfigurationsdateiCodec codec() {
         ZusatzSchemaPruefer pruefer = new ZusatzSchemaPruefer() {
             @Override
