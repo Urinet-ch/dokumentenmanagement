@@ -18,6 +18,17 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_shortcodes_und_bloecke_sind_registriert(): void {
+		foreach ( array( 'urinet_archiv_liste', 'urinet_archiv_suche', 'urinet_chatbot' ) as $shortcode ) {
+			$this->assertTrue( shortcode_exists( $shortcode ), $shortcode );
+		}
+
+		$bloecke = WP_Block_Type_Registry::get_instance();
+		foreach ( array( 'liste', 'suche', 'chatbot' ) as $block ) {
+			$this->assertTrue( $bloecke->is_registered( 'urinet-archiv/' . $block ), $block );
+		}
+	}
+
 	public function test_verschluesselung_und_keine_ausgabe_des_schluessels(): void {
 		$werte = Urinet_Archiv_Einstellungen::werte();
 		$this->assertStringNotContainsString( $this->token, $werte['lese_schluessel'] );
@@ -453,5 +464,187 @@ final class GrundgeruestTest extends WP_UnitTestCase {
 			),
 			$daten['zusatz']
 		);
+	}
+
+	public function test_liste_nutzt_oeffentliche_filter_und_seitennavigation(): void {
+		update_option(
+			Urinet_Archiv_Feed::CACHE_VERSION,
+			array(
+				'oeffentlich' => time(),
+				'mitglieder'  => time(),
+				'vorstand'    => time(),
+			)
+		);
+		update_option( Urinet_Archiv_Feed::LESE_OK, time() );
+		$aufrufe = array();
+		$mock    = static function ( $preempt, $args, $url ) use ( &$aufrufe ) {
+			$pfad = (string) wp_parse_url( $url, PHP_URL_PATH );
+			if ( str_ends_with( $pfad, '/filter' ) ) {
+				$daten = array(
+					'reihen'           => array(
+						array(
+							'code' => 'MERKBLATT',
+							'name' => 'Merkblätter',
+						),
+					),
+					'klassifikationen' => array(
+						array(
+							'code'  => 'fachgebiet',
+							'name'  => 'Fachgebiet',
+							'werte' => array(
+								array(
+									'code' => 'bau',
+									'name' => 'Bau',
+								),
+								array(
+									'code' => 'energie',
+									'name' => 'Energie',
+								),
+							),
+						),
+					),
+				);
+			} else {
+				parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $parameter );
+				$aufrufe[] = $parameter;
+				$seite     = isset( $parameter['seite'] ) ? (int) $parameter['seite'] : 1;
+				$daten     = array(
+					'eintraege' => array(
+						array(
+							'id'    => 'dokument-' . ( 1 + ( $seite - 1 ) * 10 ),
+							'titel' => 'Synthetisches Merkblatt',
+						),
+					),
+					'seite'     => $seite,
+					'proSeite'  => isset( $parameter['pro_seite'] ) ? (int) $parameter['pro_seite'] : 20,
+					'gesamt'    => 21,
+				);
+			}
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( $daten ),
+				'headers'  => array(),
+			);
+		};
+		add_filter( 'pre_http_request', $mock, 10, 3 );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only filter parameters for this direct render test.
+		$vorher = $_GET;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only filter parameters for this direct render test.
+		$_GET = array(
+			'urinet_archiv_filter_fachgebiet' => 'bau',
+			'urinet_archiv_jahr'              => '2026',
+			'urinet_archiv_pro_seite'         => '10',
+			'urinet_archiv_reihe'             => 'MERKBLATT',
+			'urinet_archiv_seite'             => '2',
+		);
+		try {
+			$html = Urinet_Archiv_Frontend::liste();
+		} finally {
+			$_GET = $vorher;
+			remove_filter( 'pre_http_request', $mock, 10 );
+		}
+
+		$this->assertCount( 1, $aufrufe );
+		$this->assertSame(
+			array(
+				'fachgebiet' => 'bau',
+				'jahr'       => '2026',
+				'pro_seite'  => '10',
+				'reihe'      => 'MERKBLATT',
+				'seite'      => '2',
+				'sortierung' => 'datum_ab',
+			),
+			$aufrufe[0]
+		);
+		$this->assertStringContainsString( 'name="urinet_archiv_filter_fachgebiet"', $html );
+		$this->assertStringContainsString( 'value="bau" selected=', $html );
+		$this->assertStringContainsString( 'Seite 2 von 3', $html );
+		$this->assertStringContainsString( 'rel="prev"', $html );
+		$this->assertStringContainsString( 'rel="next"', $html );
+		$html = html_entity_decode( $html, ENT_QUOTES );
+		$this->assertStringContainsString( 'urinet_archiv_filter_fachgebiet=bau', $html );
+		$this->assertStringContainsString( 'urinet_archiv_seite=3', $html );
+	}
+
+	public function test_download_slots_laufen_ab_und_loeschen_keine_fremde_lease(): void {
+		$client  = str_repeat( 'a', 64 );
+		$belegen = new ReflectionMethod( Urinet_Archiv_Client::class, 'download_slot_belegen' );
+		$belegen->setAccessible( true );
+		$freigeben = new ReflectionMethod( Urinet_Archiv_Client::class, 'download_slot_freigeben' );
+		$freigeben->setAccessible( true );
+		$erste  = null;
+		$zweite = null;
+		try {
+			$erste  = $belegen->invoke( null, $client );
+			$zweite = $belegen->invoke( null, $client );
+			$this->assertNotNull( $erste );
+			$this->assertNotNull( $zweite );
+			$this->assertGreaterThan( time(), $erste['lease']['ablauf'] );
+			$this->assertNull( $belegen->invoke( null, $client ) );
+
+			$abgelaufen = array(
+				'kennung' => 'abgelaufen',
+				'ablauf'  => time() - 1,
+			);
+			update_option( $erste['name'], $abgelaufen, false );
+			$erneuert = $belegen->invoke( null, $client );
+			$this->assertSame( $erste['name'], $erneuert['name'] );
+			$this->assertNotSame( $abgelaufen['kennung'], $erneuert['lease']['kennung'] );
+
+			$ersetzt = array(
+				'kennung' => 'anderer-request',
+				'ablauf'  => time() + 1200,
+			);
+			update_option( $zweite['name'], $ersetzt, false );
+			$freigeben->invoke( null, $zweite );
+			$this->assertSame( $ersetzt, get_option( $zweite['name'] ) );
+
+			update_option( $zweite['name'], time() - 1201, false );
+			$erneuert_alt = $belegen->invoke( null, $client );
+			$this->assertSame( $zweite['name'], $erneuert_alt['name'] );
+		} finally {
+			delete_option( 'ua_download_' . $client . '_1' );
+			delete_option( 'ua_download_' . $client . '_2' );
+		}
+	}
+
+	public function test_download_stream_uebernimmt_content_length_und_gibt_bloecke_aus(): void {
+		$stream         = array(
+			'inhalt' => '',
+			'laenge' => '',
+			'start'  => false,
+			'typ'    => 'application/octet-stream',
+		);
+		$header_methode = new ReflectionMethod( Urinet_Archiv_Client::class, 'download_header_callback' );
+		$header_methode->setAccessible( true );
+		$argumente = array( &$stream );
+		$header    = $header_methode->invokeArgs( null, $argumente );
+		$header( null, "Content-Type: application/pdf\r\n" );
+		$header( null, "Content-Length: 1048580\r\n" );
+		$this->assertSame( '1048580', $stream['laenge'] );
+		$stream['laenge'] = '1048580';
+
+		$write_methode = new ReflectionMethod( Urinet_Archiv_Client::class, 'download_write_callback' );
+		$write_methode->setAccessible( true );
+		$argumente = array( &$stream );
+		$write     = $write_methode->invokeArgs( null, $argumente );
+		ob_start();
+		try {
+			$this->assertSame( 1048576, $write( null, str_repeat( 'x', 1048576 ) ) );
+			$ausgabe = ob_get_contents();
+		} finally {
+			ob_end_clean();
+		}
+
+		$header_methode = new ReflectionMethod( Urinet_Archiv_Client::class, 'download_response_headers' );
+		$header_methode->setAccessible( true );
+		$header = $header_methode->invoke( null, $stream );
+		$this->assertSame( 'application/pdf', $stream['typ'] );
+		$this->assertSame( '1048580', $header['Content-Length'] );
+		$this->assertSame( 'private, no-store', $header['Cache-Control'] );
+		$this->assertTrue( $stream['start'] );
+		$this->assertSame( '', $stream['inhalt'] );
+		$this->assertSame( 1048576, strlen( $ausgabe ) );
+		$this->assertNotSame( (int) $header['Content-Length'], strlen( $ausgabe ) );
 	}
 }
