@@ -1453,6 +1453,11 @@ Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und 
   zusätzlich im Frontend-Rechtemodell abgebildet. Die Liste zeigt Statuswerte als Text und lässt den Tabellenrahmen auf schmalen
   Bildschirmen selbst scrollen. Die Schaltfläche verwendet den Wortlaut «Als Wissensquelle verwenden» aus Requirement 20.1.
   Requirements bleiben unverändert. Die Hilfe enthält einen A16-Unterabschnitt; die Oberfläche ändert weder Dokumentart noch Dateien.
+- **Umsetzung (Aufgabe 17.3, 23.11.2026):** `@req-20.11` verknüpft die Cucumber-Nachweise für Mandantentrennung, `PERSONAL` und
+  A16. Der Markierungsfall prüft, dass der einzelne `WISSEN_INGEST`-Auftrag dem Mandanten der Quelle zugeordnet ist und die Quelle
+  für den zweiten Mandanten nicht in der Liste erscheint. Die Oberfläche bleibt durch `@req-20.10` im Browser belegt; Migration
+  eines Altbestands mit `WISSENSQUELLE` prüft `WissensquelleBestandTest`, der unveränderte Jahresexport ist in
+  `wissensquelle.feature` belegt.
 - **Bedrohungsmodell:** Markieren löst KI-Kosten aus (Tokenbudget, Requirement 12 bleibt: höchstens ein Ingest je Mandant); nur A16;
   Protokoll ohne Titel; kein Weg, die Vertraulichkeit einer Quelle zu umgehen (`PERSONAL` und höhere Stufen nach 5.5 und 5.11).
 - **Exporte:** Die Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6). Im OKF-Export kennzeichnet
