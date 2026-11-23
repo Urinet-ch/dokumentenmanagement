@@ -32,6 +32,18 @@ class EskalationTest {
     }
 
     @Test
+    void keineRolleKannSichSelbstEineArchivRolleVergeben() {
+        for (Rolle akteurRolle : Rolle.values()) {
+            Benutzer akteur = new Benutzer("selbst", akteurRolle);
+            for (Rolle zuVergeben : Rolle.values()) {
+                assertThat(Vergaberegeln.pruefeRollenvergabe(akteur, akteur, zuVergeben.code(), ROLLEN))
+                        .as("%s vergibt sich %s", akteurRolle, zuVergeben)
+                        .isEqualTo(akteurRolle == Rolle.INHABER ? ESKALATION_VERBOTEN : NICHT_ERLAUBT);
+            }
+        }
+    }
+
+    @Test
     void ablehnungsgrundUnterscheidetFehlendesRechtVonEskalation() {
         Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
         Benutzer ziel = new Benutzer("ziel", Rolle.MITARBEITER);
