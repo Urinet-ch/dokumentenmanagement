@@ -192,7 +192,7 @@ Given(/^ein Handy, dessen Rückkamera «(.+)» filmt$/, { timeout: 60_000 }, asy
 
 Given(
   /^ein Handy mit installierter PWA, dessen Rückkamera «(.+)» filmt$/,
-  { timeout: 120_000 },
+  { timeout: 190_000 },
   async function (motiv) {
     await handy(this, { motiv, serviceWorker: true });
     // Fremde Adressen (Keycloak) sofort ablehnen: Hängende Anfragen halten die App «instabil», und der Service Worker
@@ -249,10 +249,20 @@ Given(
     }
     // Nach dem ersten Laden kann die Seite noch nicht vom aktiven Service Worker kontrolliert sein.
     await this.seite.reload();
-    await this.seite.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, {
-      timeout: 110_000,
-      polling: 500,
-    });
+    // Auf dem CI-Runner bleibt die Seite nach dem Reload gelegentlich unkontrolliert (Service Worker noch beim
+    // Aktivieren); ein weiterer Reload behebt das, statt 110 s ergebnislos zu warten.
+    let kontrolliert = false;
+    for (let versuch = 0; versuch < 5 && !kontrolliert; versuch += 1) {
+      kontrolliert = await this.seite
+        .waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 15_000, polling: 250 })
+        .then(() => true, () => false);
+      if (!kontrolliert) {
+        await this.seite.reload();
+      }
+    }
+    if (!kontrolliert) {
+      throw new Error('PWA nicht kontrolliert: Der Service Worker steuert die Seite auch nach mehreren Reloads nicht');
+    }
   },
 );
 

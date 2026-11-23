@@ -40,6 +40,8 @@ Steht im Chat unter einer Antwort der Knopf «Als Analyse vorschlagen», können
 ## Einstellungen und Export
 Sehen Sie auf der Seite «Wissen» den Knopf «Einstellungen und Export», verwalten Sie die Wissensbasis:
 - Legen Sie die Tokenbudgets der KI und den «Zeitplan für Lint» fest, die regelmässige Prüfung der Wissensbasis auf Widersprüche, Lücken und Veraltetes. Felder, die Sie leer lassen, behalten den Startwert. Wählen Sie dann «Einstellungen speichern».
+- Der Zeitplan bezeichnet einen Wochentag und eine volle Stunde, zum Beispiel `0 0 4 ? * SUN` für Sonntag um 04:00 Uhr. Für ein stark erhöhtes Monatsbudget zeigt das Archiv die Auswirkungen und verlangt Ihre Bestätigung. Falls eine erneute Anmeldung nötig ist, melden Sie sich an und geben die nicht gespeicherten Werte erneut ein.
+- Haben andere Personen die Einstellungen zwischenzeitlich geändert, laden Sie die aktuelle Version und prüfen Ihre Eingaben erneut.
 - Fordern Sie mit «OKF-Export anfordern» einen Export der ganzen Wissensbasis an. Ist er fertig, laden Sie ihn mit «OKF-Export herunterladen» herunter, solange der Download verfügbar ist.
 
 ## Häufige Meldungen

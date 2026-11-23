@@ -182,7 +182,7 @@ public class MandantEinstellungenResource {
             var auftrag = EinstellungenZuruecksetzen.lesen(anfrage.wert());
             if (auftrag.version() != null) {
                 return new EinstellungenVerwaltung.Eingabe(
-                        konfiguration.version(auftrag.version()).inhalt().einstellungen(), List.of(), false, true);
+                        konfiguration.version(auftrag.version()).inhalt().einstellungen(), List.of());
             }
             return patch(vorher, EinstellungenZuruecksetzen.gruppenPatch(json, auftrag.gruppe()));
         };
@@ -204,8 +204,7 @@ public class MandantEinstellungenResource {
 
     private EinstellungenVerwaltung.Eingabe patch(Einstellungen vorher, JsonNode eingabe) {
         var ergebnis = EinstellungenPatch.anwenden(json, vorher, eingabe);
-        return new EinstellungenVerwaltung.Eingabe(ergebnis.ziel(), ergebnis.befunde(),
-                eingabe != null && eingabe.isObject() && eingabe.has("wissen"), false);
+        return new EinstellungenVerwaltung.Eingabe(ergebnis.ziel(), ergebnis.befunde());
     }
 
     private void wissenPruefen(Anfrage anfrage) {
