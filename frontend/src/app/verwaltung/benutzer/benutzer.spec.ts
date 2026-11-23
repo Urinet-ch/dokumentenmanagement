@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
-import { BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
+import { Ansicht, BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { BenutzerDetail } from './benutzer-detail';
 import { BenutzerListe } from './benutzer-liste';
@@ -33,12 +33,13 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
   let fixture: ComponentFixture<BenutzerListe>;
   let element: HTMLElement;
 
-  async function starten(): Promise<void> {
+  async function starten(vorbereiten?: () => void): Promise<void> {
     service.apiV1BenutzerGet.mockReset().mockReturnValue(of([PERSON]));
     service.apiV1RollenGet.mockReset().mockReturnValue(of([ROLLE]));
     service.apiV1BenutzerAntraegeGet.mockReset().mockReturnValue(of([
       { id: 'antrag', art: 'INHABER_ROLLE', ziel: 'probe', beantragtVon: 'andere', gueltigBis: '2026-11-24T20:00:00Z' },
     ]));
+    vorbereiten?.();
     TestBed.configureTestingModule({
       imports: [BenutzerListe],
       providers: [provideRouter([]), { provide: BenutzerverwaltungService, useValue: service }],
@@ -62,6 +63,10 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     expect(element.textContent).toContain(TEXTE.benutzer.gruppen.bestaetigen);
     expect(element.textContent).toContain(TEXTE.benutzer.gruppen.verwalten);
     expect(element.querySelector('a[href="/verwaltung/benutzer/probe"]')).not.toBeNull();
+    expect([...element.querySelectorAll('h1, h2')]
+      .filter((heading) => heading.textContent?.trim() === TEXTE.benutzer.titel)).toHaveLength(1);
+    expect(element.querySelector('.pille.info')?.textContent).toContain('Nur eigene');
+    expect(element.querySelector('.pille.gefahr')?.textContent).toContain('Nicht erlaubt');
   });
 
   it('verwirft eine veraltete Suchantwort und setzt die Seitennummer zurück', async () => {
@@ -78,6 +83,7 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     fixture.detectChanges();
     expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, 'neue Suche', 0);
     expect(element.textContent).toContain(TEXTE.benutzer.keine);
+    expect(element.querySelector('.leer')?.textContent).toContain(TEXTE.benutzer.keine);
     expect(element.textContent).not.toContain('Alex Beispiel');
   });
 
@@ -109,6 +115,73 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     fixture.detectChanges();
     expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, 1);
     expect(element.textContent).toContain('Seite 2');
+    const vorher = [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.benutzer.vor)!;
+    const weiterNachSeite2 = [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.benutzer.weiter)!;
+    expect(vorher.disabled).toBe(false);
+    expect(weiterNachSeite2.disabled).toBe(true);
+    vorher.click();
+    fixture.detectChanges();
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, 0);
+    expect(element.textContent).toContain('Seite 1');
+  });
+
+  it('leitet bei fehlendem Listenzugriff zu «Nicht gefunden» weiter', async () => {
+    await starten();
+    const router = TestBed.inject(Router);
+    const navigieren = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    service.apiV1BenutzerGet.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 403 })),
+    );
+    element.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    fixture.detectChanges();
+    expect(navigieren).toHaveBeenCalledWith('/nicht-gefunden');
+  });
+
+  it('wiederholt das Laden der Anträge nach einem Fehler', async () => {
+    await starten(() => service.apiV1BenutzerAntraegeGet.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 503 })),
+    ));
+    const antraege = element.querySelector('section[aria-labelledby="antraege-titel"]')!;
+    expect(antraege.querySelector('[role=alert]')?.textContent).toContain(TEXTE.httpFehler.server);
+    service.apiV1BenutzerAntraegeGet.mockReturnValueOnce(of([]));
+    antraege.querySelector<HTMLButtonElement>('[role=alert] button')!.click();
+    fixture.detectChanges();
+    expect(antraege.textContent).toContain(TEXTE.benutzer.keineAntraege);
+  });
+
+  it('wiederholt das Laden der Rollen nach einem Fehler', async () => {
+    await starten(() => service.apiV1RollenGet.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 503 })),
+    ));
+    const rollen = element.querySelector('section[aria-labelledby="rollen-titel"]')!;
+    expect(rollen.querySelector('[role=alert]')?.textContent).toContain(TEXTE.httpFehler.server);
+    service.apiV1RollenGet.mockReturnValueOnce(of([ROLLE]));
+    rollen.querySelector<HTMLButtonElement>('[role=alert] button')!.click();
+    fixture.detectChanges();
+    expect(rollen.querySelector('[role=alert]')).toBeNull();
+    expect(rollen.textContent).toContain(ROLLE.beschreibung);
+  });
+
+  it('zeigt Leerzustände für Anträge und Rollen mit dem globalen Baustein', async () => {
+    await starten(() => {
+      service.apiV1BenutzerAntraegeGet.mockReturnValueOnce(of([]));
+      service.apiV1RollenGet.mockReturnValueOnce(of([]));
+    });
+    expect(element.querySelector('section[aria-labelledby="antraege-titel"] .leer')?.textContent)
+      .toContain(TEXTE.benutzer.keineAntraege);
+    expect(element.querySelector('section[aria-labelledby="rollen-titel"] .leer')?.textContent)
+      .toContain(TEXTE.benutzer.keineRollen);
+  });
+
+  it('zeigt Fortschrittsbalken, solange Liste, Anträge und Rollen laden', async () => {
+    await starten(() => {
+      service.apiV1BenutzerGet.mockReturnValueOnce(new Subject<BenutzerAnsicht[]>());
+      service.apiV1BenutzerAntraegeGet.mockReturnValueOnce(new Subject<Ansicht[]>());
+      service.apiV1RollenGet.mockReturnValueOnce(new Subject<VerwaltungRolle[]>());
+    });
+    expect(element.querySelectorAll('mat-progress-bar')).toHaveLength(3);
   });
 });
 
@@ -119,9 +192,10 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
   };
   const parameter = new BehaviorSubject(convertToParamMap({ id: 'probe' }));
 
-  async function starten(person: BenutzerAnsicht = PERSON) {
+  async function starten(person: BenutzerAnsicht = PERSON, vorbereiten?: () => void) {
     service.apiV1BenutzerBenutzerIdGet.mockReset().mockReturnValue(of(person));
     service.apiV1BenutzerBenutzerIdRechteGet.mockReset().mockReturnValue(of(ROLLE));
+    vorbereiten?.();
     parameter.next(convertToParamMap({ id: 'probe' }));
     TestBed.configureTestingModule({
       imports: [BenutzerDetail],
@@ -165,5 +239,20 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
     fixture.detectChanges();
     expect(navigieren).toHaveBeenCalledWith('/nicht-gefunden');
     expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Alex Beispiel');
+  });
+
+  it('zeigt einen Rechtefehler getrennt vom Benutzerdetail und erlaubt erneutes Laden', async () => {
+    const fixture = await starten(PERSON, () => service.apiV1BenutzerBenutzerIdRechteGet.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 503 })),
+    ));
+    const element = fixture.nativeElement as HTMLElement;
+    const warnung = element.querySelector('[role=alert]')!;
+    expect(warnung.textContent).toContain(TEXTE.httpFehler.server);
+    expect(element.textContent).toContain('Alex Beispiel');
+    service.apiV1BenutzerBenutzerIdRechteGet.mockReturnValueOnce(of(ROLLE));
+    warnung.querySelector<HTMLButtonElement>('button')!.click();
+    fixture.detectChanges();
+    expect(element.querySelector('[role=alert]')).toBeNull();
+    expect(element.textContent).toContain('Nur eigene Dokumente');
   });
 });
