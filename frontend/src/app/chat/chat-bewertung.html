@@ -1,0 +1,43 @@
+<div class="bewertung" data-test="bewertung">
+  <p>{{ texte.datenschutz }}</p>
+  @if (laedt()) {
+    <p role="status">{{ texte.laden }}</p>
+  } @else if (fehler() === texte.ladenFehler) {
+    <p role="alert">{{ fehler() }}</p>
+    <button mat-button type="button" (click)="laden()">{{ texte.erneutLaden }}</button>
+  } @else {
+    <div class="sterne" role="group" [attr.aria-label]="texte.titel">
+      @for (zahl of zahlen; track zahl) {
+        <button type="button" [attr.aria-label]="texte.stern(zahl)" [attr.aria-pressed]="sterne() === zahl"
+          [disabled]="sendet()" (click)="sterne.set(zahl)" data-test="stern">
+          <span aria-hidden="true">{{ zahl <= sterne() ? '★' : '☆' }}</span>
+        </button>
+      }
+    </div>
+    @if (sterne()) {
+      <label>
+        {{ texte.grund }}
+        <select [value]="grund()" [disabled]="sendet()" (change)="grund.set($any($event.target).value)">
+          <option value="">{{ texte.keinGrund }}</option>
+          @for (option of texte.gruende; track option.wert) {
+            <option [value]="option.wert">{{ option.text }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        {{ texte.freitext }}
+        <textarea rows="2" maxlength="500" [value]="freitext()" [disabled]="sendet()"
+          (input)="freitext.set($any($event.target).value)"></textarea>
+      </label>
+      <div class="aktionen">
+        <button mat-stroked-button type="button" [disabled]="sendet()" (click)="speichern()">{{ texte.speichern }}</button>
+        @if (gespeichert()) {
+          <button mat-button type="button" [disabled]="sendet()" (click)="entfernen()">{{ texte.entfernen }}</button>
+        }
+      </div>
+    }
+    @if (fehler()) {
+      <p role="alert">{{ fehler() }}</p>
+    }
+  }
+</div>
