@@ -830,3 +830,16 @@ Namenssperre und Dokumentverweise bleiben bestehen. Bei unklarer externer Wirkun
 Der Test der Vier-Augen-Löschung verwendet den Keycloak-Testdienst auch für die lesenden Identitätsabfragen: Der
 bisherige Identitäts-Stub kannte die im Test-Keycloak angelegten Akteure nicht. `Loeschvorschau` hat einen eindeutigen
 OpenAPI-Modellnamen, damit die Clientgenerierung das bestehende Wissensimport-Modell `Anzahl` nicht umbenennt.
+
+## Umsetzung (Aufgabe 21.3, 23.11.2026)
+
+`VerwaltungIsolationIT` prüft die Verwaltungsendpunkte mit echten Test-Realm-Tokens und einem synthetischen
+Identitätsdienst in beiden Mandantenrichtungen. Fremde Ziele und Anträge bleiben unsichtbar und unverändert;
+auch Suche, gefälschte Mandantenangaben und Protokolle bleiben auf den Tokenmandanten beschränkt. Ein eigener
+Beispielverband wird zusätzlich mit einem Test-Realm-Benutzer geprüft. Die zwölf Kombinationen aus den drei Rollen
+ohne Verwaltungsrecht und A20 bis A23 weisen HTTP 403 und einen Verweigerungseintrag nach.
+
+Ein paralleler JUnit-Test hält eine Rollenänderung an der externen Wirkung an: Ein zweiter Aufruf erhält
+`STATUS_KONFLIKT`, danach verhindert `LETZTER_INHABER` die Entfernung des letzten aktiven Inhabers. Das bestehende
+Cucumber-Szenario prüft zusätzlich konkurrierende Aufrufe zweier Inhaber. `EskalationTest` deckt auch jede
+Selbstzuweisung ab; Rollen-, Rechtematrix-, Endpunkt- und Keycloak-Ausfalltests ergänzen die Nachweise.
