@@ -10,6 +10,8 @@ import {
   Dokumentart,
   DownloadAdresse,
   Kontakt,
+  Quelle,
+  WissensbasisService,
 } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
@@ -118,10 +120,36 @@ describe('DokumentAnsicht (Req 14.6)', () => {
   let element: HTMLElement;
   const rolle = signal<Rolle>('inhaber');
   let klassifikationen: DokumentKlassifikationen;
+  let quellen: Quelle[];
+  let markierungAntwort: Observable<unknown>;
+  let wissensbasis: {
+    apiV1WissenQuellenGet: () => Observable<Quelle[]>;
+    apiV1DokumenteIdWissensquellePost: ReturnType<typeof vi.fn>;
+    apiV1DokumenteIdWissensquelleDelete: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     port = new DokumentAttrappe();
     klassifikationen = LEERE_DOKUMENT_KLASSIFIKATIONEN;
+    quellen = [];
+    markierungAntwort = of({});
+    wissensbasis = {
+      apiV1WissenQuellenGet: vi.fn(() => of(quellen)),
+      apiV1DokumenteIdWissensquellePost: vi.fn(() => {
+        quellen = [{
+          dokumentId: 'd1',
+          titel: 'Rechnung 2026-003',
+          art: 'AUSGANGSRECHNUNG',
+          markiertAm: '2026-11-23T09:00:00Z',
+          ingestStatus: 'IN_ARBEIT',
+        }];
+        return markierungAntwort;
+      }),
+      apiV1DokumenteIdWissensquelleDelete: vi.fn(() => {
+        quellen = [];
+        return of(null);
+      }),
+    };
     rolle.set('inhaber');
     TestBed.configureTestingModule({
       imports: [DokumentAnsicht],
@@ -130,6 +158,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: DokumentPort, useValue: port },
+        { provide: WissensbasisService, useValue: wissensbasis },
         {
           provide: DokumentKlassifikationenService,
           useValue: { fuerArt: () => of(klassifikationen) },
@@ -302,6 +331,60 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     await oeffnen();
     expect(element.querySelector('[data-test=partner-link]')).toBeNull();
     expect(element.querySelector('[data-test=partner]')!.textContent).toContain('Muster Garage AG');
+  });
+
+  it('zeigt Markierung, Status und Aktionen der Wissensquelle nach A16', async () => {
+    await oeffnen();
+    expect(element.querySelector('[data-test=wissensquelle-markieren]')?.textContent?.trim())
+      .toBe('Als Wissensquelle verwenden');
+    element.querySelector<HTMLButtonElement>('[data-test=wissensquelle-markieren]')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(wissensbasis.apiV1DokumenteIdWissensquellePost).toHaveBeenCalledWith('d1');
+    expect(element.querySelector('[data-test=wissensquelle-kennzeichen]')?.textContent?.trim())
+      .toBe(TEXTE.dokument.wissensquelleKennzeichen);
+    expect(element.querySelector('[data-test=wissensquelle-entfernen]')?.textContent?.trim())
+      .toBe(TEXTE.dokument.wissensquelleEntfernen);
+    expect(element.querySelector('[data-test=wissensquelle-meldung]')?.textContent?.trim())
+      .toBe(TEXTE.dokument.wissensquelleMarkiert);
+  });
+
+  it('zeigt den Grund einer abgelehnten Markierung', async () => {
+    markierungAntwort = throwError(() => new HttpErrorResponse({
+      status: 422,
+      error: { fehlercode: 'KEINE_WISSENSQUELLE', grund: 'PERSONAL' },
+    }));
+    await oeffnen();
+    element.querySelector<HTMLButtonElement>('[data-test=wissensquelle-markieren]')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(element.querySelector('[data-test=wissensquelle-fehler]')?.textContent?.trim())
+      .toBe(TEXTE.dokument.wissensquelleGruende['PERSONAL']);
+  });
+
+  it('blendet A16-Aktionen für Treuhänder aus und zeigt dennoch das Kennzeichen', async () => {
+    rolle.set('treuhaender');
+    quellen = [{
+      dokumentId: 'd1',
+      titel: 'Rechnung 2026-003',
+      art: 'AUSGANGSRECHNUNG',
+      markiertAm: '2026-11-23T09:00:00Z',
+      ingestStatus: 'IN_ARBEIT',
+    }];
+    await oeffnen();
+
+    expect(element.querySelector('[data-test=wissensquelle-kennzeichen]')).not.toBeNull();
+    expect(element.querySelector('[data-test=wissensquelle-markieren]')).toBeNull();
+    expect(element.querySelector('[data-test=wissensquelle-entfernen]')).toBeNull();
+  });
+
+  it('bietet Markieren nur bei archivierten Dokumenten an', async () => {
+    port.dokument = of({ ...DOKUMENT, status: 'VERARBEITUNG' });
+    await oeffnen();
+
+    expect(element.querySelector('[data-test=wissensquelle-markieren]')).toBeNull();
   });
 
   it('zeigt die Zeile «Dateiname» nur mit gespeichertem Namen (Req 14.10)', async () => {

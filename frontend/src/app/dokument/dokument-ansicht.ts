@@ -27,11 +27,12 @@ import {
   startWith,
   switchMap,
 } from 'rxjs';
-import { Dokument, Dokumentart, DownloadAdresse } from '../gemeinsam/api';
+import { Dokument, Dokumentart, DownloadAdresse, Quelle, WissensbasisService } from '../gemeinsam/api';
 import { anzeigeText, listeZu, zusatzFelder, zusatzGueltig } from './aenderung';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { betrag, datum, zeitpunkt } from '../gemeinsam/format';
+import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentPort, Variante } from './dokument-port';
 import { MetadatenFormular } from './metadaten-formular';
@@ -92,6 +93,7 @@ interface Zusatzfeld {
 })
 export class DokumentAnsicht {
   private readonly port = inject(DokumentPort);
+  private readonly wissensbasis = inject(WissensbasisService);
   private readonly klassifikationenService = inject(DokumentKlassifikationenService);
   private readonly anmeldung = inject(AnmeldungService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -134,6 +136,16 @@ export class DokumentAnsicht {
   /** Knopf nur mit A6 und in einem änderbaren Status; das Archiv prüft trotzdem selbst (Req 2.6). */
   /** Der Partner verlinkt auf den Kontakt nur mit A6 (Req 17.1). */
   protected readonly darfKontakt = computed(() => this.anmeldung.darf('A6'));
+  protected readonly darfWissensquelle = computed(() => this.anmeldung.darf('A16'));
+  private readonly wissensquellen = signal<Quelle[]>([]);
+  protected readonly wissensquellenLadezustand = signal<'laedt' | 'ok' | 'fehler'>('laedt');
+  protected readonly wissensquelleFehler = signal<string | null>(null);
+  protected readonly wissensquelleMeldung = signal<string | null>(null);
+  protected readonly wissensquelleAktionLaeuft = signal(false);
+  protected readonly istWissensquelle = computed(() => {
+    const id = this.dokument()?.id;
+    return !!id && this.wissensquellen().some((quelle) => quelle.dokumentId === id);
+  });
   protected readonly darfBearbeiten = computed(() => {
     const d = this.dokument();
     return !!d && AENDERBAR.has(d.status) && this.anmeldung.darf('A6');
@@ -336,6 +348,19 @@ export class DokumentAnsicht {
     this.oeffnen(this.id());
   }
 
+  protected wissensquellenNeuLaden(): void {
+    const id = this.dokument()?.id;
+    if (id) this.wissensquellenLaden(id);
+  }
+
+  protected wissensquelleMarkieren(): void {
+    this.wissensquelleAendern(true);
+  }
+
+  protected wissensquelleEntfernen(): void {
+    this.wissensquelleAendern(false);
+  }
+
   protected vorschauNeuLaden(): void {
     const dokument = this.dokument();
     if (dokument) {
@@ -397,6 +422,11 @@ export class DokumentAnsicht {
     this.meldung.set('');
     this.laden.set('laedt');
     this.dokument.set(null);
+    this.wissensquellen.set([]);
+    this.wissensquellenLadezustand.set('laedt');
+    this.wissensquelleFehler.set(null);
+    this.wissensquelleMeldung.set(null);
+    this.wissensquelleAktionLaeuft.set(false);
     this.pdfa.set(null);
     this.vorschau.set('laedt');
     this.dateiFehler.set(false);
@@ -407,10 +437,61 @@ export class DokumentAnsicht {
           this.dokument.set(dokument);
           this.laden.set('ok');
           this.vorschauLaden(id);
+          this.wissensquellenLaden(id);
         },
         error: (fehler: unknown) => this.laden.set(ladeFehler(fehler)),
       }),
     );
+  }
+
+  private wissensquellenLaden(id: string): void {
+    this.wissensquellenLadezustand.set('laedt');
+    this.wissensquelleFehler.set(null);
+    this.abos.add(this.wissensbasis.apiV1WissenQuellenGet().subscribe({
+      next: (quellen) => {
+        if (this.dokument()?.id !== id) return;
+        this.wissensquellen.set(quellen);
+        this.wissensquellenLadezustand.set('ok');
+      },
+      error: (fehler: unknown) => {
+        if (this.dokument()?.id !== id) return;
+        this.wissensquellenLadezustand.set('fehler');
+        this.wissensquelleFehler.set(httpFehlerMeldung(fehler));
+      },
+    }));
+  }
+
+  private wissensquelleAendern(markieren: boolean): void {
+    const dokument = this.dokument();
+    if (
+      !dokument ||
+      !this.darfWissensquelle() ||
+      this.wissensquellenLadezustand() !== 'ok' ||
+      this.wissensquelleAktionLaeuft() ||
+      (markieren && (dokument.status !== 'ARCHIVIERT' || this.istWissensquelle())) ||
+      (!markieren && !this.istWissensquelle())
+    ) {
+      return;
+    }
+    this.wissensquelleFehler.set(null);
+    this.wissensquelleMeldung.set(null);
+    this.wissensquelleAktionLaeuft.set(true);
+    const anfrage = markieren
+      ? this.wissensbasis.apiV1DokumenteIdWissensquellePost(dokument.id)
+      : this.wissensbasis.apiV1DokumenteIdWissensquelleDelete(dokument.id);
+    this.abos.add(anfrage.subscribe({
+      next: () => {
+        this.wissensquelleAktionLaeuft.set(false);
+        this.wissensquelleMeldung.set(
+          markieren ? this.texte.wissensquelleMarkiert : this.texte.wissensquelleEntfernt,
+        );
+        this.wissensquellenLaden(dokument.id);
+      },
+      error: (fehler: unknown) => {
+        this.wissensquelleAktionLaeuft.set(false);
+        this.wissensquelleFehler.set(wissensquelleFehlerMeldung(fehler));
+      },
+    }));
   }
 
   private vorschauLaden(id: string): void {
@@ -532,4 +613,20 @@ function ladeFehler(fehler: unknown): Laden {
     return 'fehlt';
   }
   return s === 0 ? 'verbindung' : 'fehler';
+}
+
+function wissensquelleFehlerMeldung(fehler: unknown): string {
+  if (fehler instanceof HttpErrorResponse && fehler.status === 422) {
+    const problem = objekt(fehler.error);
+    if (problem?.['fehlercode'] === 'KEINE_WISSENSQUELLE' && typeof problem['grund'] === 'string') {
+      return TEXTE.dokument.wissensquelleGruende[problem['grund']] ?? httpFehlerMeldung(fehler);
+    }
+  }
+  return httpFehlerMeldung(fehler);
+}
+
+function objekt(wert: unknown): Record<string, unknown> | null {
+  return typeof wert === 'object' && wert !== null && !Array.isArray(wert)
+    ? (wert as Record<string, unknown>)
+    : null;
 }
