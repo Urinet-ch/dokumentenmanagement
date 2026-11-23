@@ -46,8 +46,9 @@ class WorkflowSecretsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"})
-    void googleAnmeldungNurImDeployErlaubt(String name) {
+    @ValueSource(strings = {"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
+            "KEYCLOAK_VERWALTUNG_SECRET", "KEYCLOAK_SMTP_PASSWORT"})
+    void keycloakSecretsNurImDeployErlaubt(String name) {
         String workflow = "env:\n  X: ${{ secrets." + name + " }}";
         assertThat(WorkflowSecrets.funde(workflow, WorkflowSecrets.ERLAUBT.get("infomaniak-deploy.yml"))).isEmpty();
         assertThat(WorkflowSecrets.funde(workflow, WorkflowSecrets.ERLAUBT.getOrDefault("ci.yml", Set.of())))

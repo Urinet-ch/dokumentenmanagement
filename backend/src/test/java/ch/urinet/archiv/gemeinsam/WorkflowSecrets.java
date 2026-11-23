@@ -28,6 +28,8 @@ final class WorkflowSecrets {
             "ARCHIV_MANIFEST_KEY",
             // Spec 06, Aufgabe 19.7: dauerhaftes Salz der Namenssperre als Secret-Datei
             "NAMENSSPERRE_SALZ",
+            // Spec 06, Aufgabe 19.3: Dienstkonto und SMTP für Keycloak
+            "KEYCLOAK_VERWALTUNG_SECRET", "KEYCLOAK_SMTP_PASSWORT",
             // Spec 02, Aufgabe 6.1: Datenschlüssel für Zugangsdaten in der DB (Mail-Eingang), optional
             "ARCHIV_DATA_KEY",
             // Aufgabe 5.6 (Entscheid Fabian 14.11.2026): Passwort des Postfachs für Benachrichtigungen, optional
