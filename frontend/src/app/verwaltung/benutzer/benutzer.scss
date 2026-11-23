@@ -1,0 +1,100 @@
+:host {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 72rem;
+  min-width: 0;
+}
+
+section {
+  min-width: 0;
+}
+
+h2 {
+  margin: 0 0 1rem;
+}
+
+h3 {
+  margin: 0 0 .75rem;
+}
+
+.karten {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.karte {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.karte p {
+  margin: .5rem 0;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .5rem 1rem;
+  margin: 0;
+}
+
+dt {
+  color: var(--text-gedaempft);
+}
+
+dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.suche {
+  display: grid;
+  gap: .3rem;
+  margin-bottom: 1rem;
+}
+
+.knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+
+input {
+  font: inherit;
+  color: var(--text);
+  background: var(--karte);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+  min-width: 0;
+  min-height: 2.75rem;
+  max-width: 100%;
+  padding: 0 .7rem;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+details[open] summary {
+  margin-bottom: 1rem;
+}
+
+.blaettern {
+  margin-top: 1rem;
+}
+
+@media (max-width: 599px) {
+  dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  dd + dt {
+    margin-top: .5rem;
+  }
+}

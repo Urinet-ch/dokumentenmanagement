@@ -34,4 +34,19 @@ describe('rechtGuard (Req 2.6)', () => {
     expect(pruefen()).toBe(true);
     expect(anmeldung.darf).toHaveBeenCalledWith('A11');
   });
+
+  it('schickt ohne A21 auf die Seite «Nicht gefunden»', () => {
+    anmeldung.angemeldet.mockReturnValue(true);
+    anmeldung.darf.mockReturnValue(false);
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), { provide: AnmeldungService, useValue: anmeldung }],
+    });
+    const ergebnis = TestBed.runInInjectionContext(() =>
+      rechtGuard('A21', '/nicht-gefunden')(
+        {} as ActivatedRouteSnapshot,
+        { url: '/verwaltung/benutzer' } as RouterStateSnapshot,
+      ),
+    ) as UrlTree;
+    expect(TestBed.inject(Router).serializeUrl(ergebnis)).toBe('/nicht-gefunden');
+  });
 });

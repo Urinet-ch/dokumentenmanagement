@@ -1,0 +1,61 @@
+<div class="seitenkopf">
+  <p class="vorzeile">{{ gruppe }}</p>
+  <h1>{{ benutzer() ? name(benutzer()!) : texte.titel }}</h1>
+  <a routerLink="/verwaltung/benutzer">{{ texte.zurListe }}</a>
+</div>
+@if (fehler(); as meldung) {
+  <div class="hinweis gefahr" role="alert">
+    <p>{{ meldung }}</p>
+    <button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button>
+  </div>
+} @else if (benutzer(); as person) {
+  <section class="karte">
+    <h2>{{ texte.titel }}</h2>
+    <dl>
+      <dt>{{ texte.benutzername }}</dt><dd><bdi>{{ person.benutzername || texte.unbekannt }}</bdi></dd>
+      <dt>{{ texte.email }}</dt><dd><bdi>{{ person.email || texte.unbekannt }}</bdi></dd>
+      <dt>{{ texte.rolle }}</dt><dd>{{ rollen(person) }}</dd>
+      <dt>{{ texte.status }}</dt><dd>{{ texte.statusNamen[person.status ?? ''] ?? texte.unbekannt }}</dd>
+      <dt>{{ texte.totp }}</dt><dd>{{ person.totp === undefined ? texte.unbekannt : person.totp ? texte.ja : texte.nein }}</dd>
+      <dt>{{ texte.google }}</dt><dd>{{ person.google === undefined ? texte.unbekannt : person.google ? texte.ja : texte.nein }}</dd>
+      @if (person.einladungOffenSeit) {
+        <dt>{{ texte.einladungOffenSeit }}</dt><dd>{{ zeitpunkt(person.einladungOffenSeit) }}</dd>
+      }
+      <dt>{{ texte.letzteAktion }}</dt>
+      <dd>
+        @if (person.letzteAktion; as letzte) {
+          {{ zeitpunkt(letzte.zeit) }} · {{ protokollAktionen[letzte.aktion ?? ''] ?? letzte.aktion ?? texte.unbekannt }}
+        } @else {
+          {{ texte.keineAktion }}
+        }
+      </dd>
+    </dl>
+    @if (person.voruebergehendGesperrt) {
+      <p class="hinweis">{{ texte.voruebergehendGesperrt }}</p>
+    }
+  </section>
+
+  <section class="karte">
+    <h2>{{ texte.rechte }}</h2>
+    @if (person.rollenkonflikt) {
+      <p class="hinweis gefahr" role="status">{{ texte.rollenkonflikt }}</p>
+    } @else if (rechteFehler(); as meldung) {
+      <div class="hinweis gefahr" role="alert">
+        <p>{{ meldung }}</p>
+        <button mat-button type="button" (click)="rechteLaden()">{{ texte.erneut }}</button>
+      </div>
+    } @else if (rechte(); as rolle) {
+      <p>{{ rolle.beschreibung }}</p>
+      <app-benutzer-rechte [rolle]="rolle" />
+    } @else {
+      <p role="status">{{ texte.rechteLaden }}</p>
+    }
+  </section>
+
+  <aside class="karte">
+    <p>{{ texte.apiTokenHinweis }}</p>
+    <a routerLink="/verwaltung/api-tokens">{{ texte.apiTokensOeffnen }}</a>
+  </aside>
+} @else {
+  <p role="status">{{ texte.detailLaden }}</p>
+}
