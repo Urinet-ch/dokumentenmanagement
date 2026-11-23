@@ -1,5 +1,6 @@
 package ch.urinet.archiv;
 
+import ch.urinet.archiv.benutzer.adapter.in.kommando.InhaberEinladenKommando;
 import ch.urinet.archiv.integration.adapter.in.kommando.AlteLinksKommando;
 import ch.urinet.archiv.integration.adapter.in.kommando.MailKommando;
 import ch.urinet.archiv.integration.adapter.in.kommando.MailPasswortEingabe;
@@ -71,6 +72,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     MandantKommando mandant;
+
+    @Inject
+    InhaberEinladenKommando inhaberEinladen;
 
     @Inject
     KonfigurationKommando konfiguration;
@@ -172,6 +176,9 @@ public class ArchivMain implements QuarkusApplication {
             case "mandant" -> !rest.isEmpty() && rest.getFirst().equals("konfiguration")
                     ? KonfigurationKommando.gueltig(rest.subList(1, rest.size())) ? Optional.empty()
                             : Optional.of(KonfigurationKommando.AUFRUF)
+                    : !rest.isEmpty() && rest.getFirst().equals("inhaber-einladen")
+                            ? InhaberEinladenKommando.lesen(rest).isPresent() ? Optional.empty()
+                                    : Optional.of(InhaberEinladenKommando.AUFRUF)
                     : MandantKommando.gueltig(rest) ? Optional.empty() : Optional.of(MandantKommando.AUFRUF);
             case "token" -> TokenKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(TokenKommando.AUFRUF);
@@ -244,6 +251,8 @@ public class ArchivMain implements QuarkusApplication {
             case "embedding" -> embedding.ausfuehren(rest, ergebnis, System.err);
             case "mandant" -> !rest.isEmpty() && rest.getFirst().equals("konfiguration")
                     ? konfiguration.ausfuehren(rest.subList(1, rest.size()), ergebnis, System.err)
+                    : !rest.isEmpty() && rest.getFirst().equals("inhaber-einladen")
+                            ? inhaberEinladen.ausfuehren(rest, ergebnis, System.err)
                     : mandant.ausfuehren(rest, ergebnis, System.err);
             default -> mandant.ausfuehren(rest, ergebnis, System.err);
         };

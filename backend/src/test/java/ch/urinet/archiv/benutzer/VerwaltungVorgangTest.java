@@ -1,5 +1,7 @@
 package ch.urinet.archiv.benutzer;
 
+import ch.urinet.archiv.benutzer.adapter.in.kommando.InhaberEinladenKommando;
+import ch.urinet.archiv.benutzer.adapter.out.keycloak.KeycloakAdminAdapter;
 import ch.urinet.archiv.benutzer.application.VerwaltungVorgang;
 import ch.urinet.archiv.benutzer.application.VerwaltungVorgang.Kompensation;
 import ch.urinet.archiv.benutzer.application.Vorgangssperre;
@@ -10,20 +12,29 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.arc.ClientProxy;
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -47,6 +59,115 @@ class VerwaltungVorgangTest {
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenquelle;
     @Inject ZugriffProtokoll protokoll;
+    @Inject InhaberEinladenKommando inhaberEinladen;
+    @Inject IdentitaetsDienst identitaet;
+    @Inject MandantRegister register;
+
+    @Test
+    void betreiberLaedtNurDenErstenInhaberEinUndProtokolliertDieAnlage() throws Exception {
+        adminrollenMandantVorbereiten();
+        var ausgabe = new ByteArrayOutputStream();
+        var fehler = new ByteArrayOutputStream();
+        var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+        var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8);
+        String name = "probe." + UUID.randomUUID().toString().substring(0, 8);
+        List<String> aufruf = List.of("inhaber-einladen", "probe-adminrollen", "--benutzer", name,
+                "--email", name + "@example.invalid", "--vorname", "Test", "--nachname", "Person",
+                "--wer", "test-betreiber");
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThat(in(thread, "probe-adminrollen", () -> inhaberEinladen.ausfuehren(aufruf, aus, fehl)))
+                    .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+            UUID id = UUID.fromString(ausgabe.toString(StandardCharsets.UTF_8).strip());
+            assertThat(identitaet.benutzerLesen("probe-adminrollen", id.toString()).rollen())
+                    .containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+            assertThatThrownBy(() -> identitaet.benutzerLesen("vhf-gsk", id.toString()))
+                    .isInstanceOf(FachFehler.class);
+            var zweiteEinladung = new ArrayList<>(aufruf);
+            zweiteEinladung.set(3, "zweiter." + name);
+            zweiteEinladung.set(5, "zweiter." + name + "@example.invalid");
+            assertThat(in(thread, "probe-adminrollen",
+                    () -> inhaberEinladen.ausfuehren(zweiteEinladung, aus, fehl))).isEqualTo(1);
+            assertThat(fehler.toString(StandardCharsets.UTF_8)).contains("STATUS_KONFLIKT");
+            assertThat(identitaet.benutzerZaehlen("probe-adminrollen")).isEqualTo(1);
+            try (Connection verbindung = datenquelle.getConnection();
+                 PreparedStatement abfrage = verbindung.prepareStatement(
+                         "select details->>'phase', rolle from m_probe_adminrollen.zugriff_protokoll "
+                                 + "where benutzer = 'betreiber:test-betreiber' and aktion = 'BENUTZER_ANLEGEN' "
+                                 + "order by id")) {
+                try (ResultSet zeilen = abfrage.executeQuery()) {
+                    assertThat(zeilen.next()).isTrue();
+                    assertThat(zeilen.getString(1)).isEqualTo("ANGEFRAGT");
+                    assertThat(zeilen.getString(2)).isNull();
+                    assertThat(zeilen.next()).isTrue();
+                    assertThat(zeilen.getString(1)).isEqualTo("ABGESCHLOSSEN");
+                    assertThat(zeilen.getString(2)).isNull();
+                    assertThat(zeilen.next()).isFalse();
+                }
+            }
+
+        }
+    }
+
+    @Test
+    void betreibereinladungErreichtKeycloakUndMailpit() throws Exception {
+        adminrollenMandantVorbereiten();
+        String oidc = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
+        String basis = oidc.substring(0, oidc.indexOf("/realms/"));
+        String admin = given().formParam("grant_type", "password").formParam("client_id", "admin-cli")
+                .formParam("username", "admin").formParam("password", "admin")
+                .post(basis + "/realms/master/protocol/openid-connect/token")
+                .then().statusCode(200).extract().path("access_token");
+        String adminPfad = basis + "/admin/realms/urinet-archiv";
+        String clientId = given().auth().oauth2(admin).queryParam("clientId", "archiv-verwaltung")
+                .get(adminPfad + "/clients").then().statusCode(200).extract().path("[0].id");
+        String secret = given().auth().oauth2(admin).get(adminPfad + "/clients/" + clientId + "/client-secret")
+                .then().statusCode(200).extract().path("value");
+        IdentitaetsDienst original = ClientProxy.unwrap(identitaet);
+        var keycloak = new KeycloakAdminAdapter(new ObjectMapper(), Optional.of(basis), "urinet-archiv",
+                "archiv-verwaltung", Optional.of(secret), "archiv-pwa", Optional.empty(),
+                Duration.ofSeconds(2), Duration.ofSeconds(5),
+                status -> { throw new AssertionError("Unerwarteter Dienstkonto-Alarm: " + status); });
+        String name = "probe." + UUID.randomUUID().toString().substring(0, 8);
+        String email = name + "@example.invalid";
+        QuarkusMock.installMockForType(keycloak, IdentitaetsDienst.class);
+        try {
+            var ausgabe = new ByteArrayOutputStream();
+            var fehler = new ByteArrayOutputStream();
+            var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+            var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8);
+            var aufruf = List.of("inhaber-einladen", "probe-adminrollen", "--benutzer", name,
+                    "--email", email, "--vorname", "Test", "--nachname", "Person", "--wer", "probe-real");
+            try (var thread = Executors.newSingleThreadExecutor()) {
+                assertThat(in(thread, "probe-adminrollen", () -> inhaberEinladen.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+            }
+            String id = UUID.fromString(ausgabe.toString(StandardCharsets.UTF_8).strip()).toString();
+            var benutzer = keycloak.benutzerLesen("probe-adminrollen", id);
+            assertThat(benutzer.rollen()).containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+            assertThat(benutzer.aktionen()).containsExactlyInAnyOrder(
+                    IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
+                    IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                    IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+            int port = ConfigProvider.getConfig().getValue("archiv.entwicklung.mailpit-port", Integer.class);
+            int anzahl = given().baseUri("http://localhost:" + port).queryParam("query", "to:" + email)
+                    .get("/api/v1/search").then().statusCode(200).extract().path("total");
+            assertThat(anzahl).isPositive();
+            assertThat(ausgabe.toString(StandardCharsets.UTF_8)).doesNotContain(name, email, "http");
+        } finally {
+            QuarkusMock.installMockForType(original, IdentitaetsDienst.class);
+            List<String> ids = given().auth().oauth2(admin).queryParam("username", name).queryParam("exact", "true")
+                    .get(adminPfad + "/users").then().statusCode(200).extract().path("id");
+            for (String id : ids) {
+                given().auth().oauth2(admin).delete(adminPfad + "/users/{id}", id).then().statusCode(204);
+            }
+        }
+    }
+
+    private void adminrollenMandantVorbereiten() {
+        if (!register.existiert(new MandantCode("probe-adminrollen"))) {
+            provisionierung.anlegen("probe-adminrollen", null, null);
+        }
+    }
 
     @Test
     void absichtIstVorWirkungFestgeschriebenUndFehlerBleibenGesperrt() throws Exception {
