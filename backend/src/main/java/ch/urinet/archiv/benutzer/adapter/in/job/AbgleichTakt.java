@@ -37,7 +37,7 @@ public class AbgleichTakt {
 
     void start(@Observes SchemasBereit ereignis) {
         if (beimStart && worker && stufe != Stufe.P) {
-            Thread.ofPlatform().name("verwaltungsabgleich-start").daemon().start(this::ausfuehren);
+            Thread.ofPlatform().name("verwaltungsabgleich-start").daemon().start(this::geplant);
         }
     }
 
@@ -45,10 +45,6 @@ public class AbgleichTakt {
             timeZone = "Europe/Zurich", concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
             skipExecutionIf = VorMigrationUeberspringen.class)
     void geplant() {
-        ausfuehren();
-    }
-
-    private void ausfuehren() {
         if (!worker || stufe == Stufe.P || !laeuft.compareAndSet(false, true)) {
             return;
         }
