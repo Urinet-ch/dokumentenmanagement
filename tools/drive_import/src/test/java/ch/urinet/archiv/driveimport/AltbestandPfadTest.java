@@ -44,6 +44,7 @@ class AltbestandPfadTest {
 
         assertThat(pfad(wurzel, "Bulletin/2026/0.pdf").ausgabe()).isNull();
         assertThat(pfad(wurzel, "Bulletin/2026/999.pdf").ausgabe()).isEqualTo(999);
+        assertThat(pfad(wurzel, "Bulletin/2026/1000.pdf").ausgabe()).isNull();
         assertThat(pfad(wurzel, "Bulletin/2026/10000.pdf").ausgabe()).isNull();
         assertThat(pfad(wurzel, "Bulletin/2026/10001.pdf").ausgabe()).isNull();
         assertThat(pfad(wurzel, "Bulletin/2026/Ausgabe_3-2026.pdf").ausgabe()).isEqualTo(3);
