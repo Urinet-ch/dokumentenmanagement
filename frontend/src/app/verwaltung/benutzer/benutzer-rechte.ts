@@ -29,7 +29,7 @@ import { rechteGruppen } from './benutzer-logik';
     :host { display: grid; gap: 1rem; }
     h3 { margin: 0 0 .5rem; }
     ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
-    li { display: grid; gap: .2rem; overflow-wrap: anywhere; }
+    li { display: grid; justify-items: start; gap: .2rem; overflow-wrap: anywhere; }
     strong { font-size: .9rem; }
     small { color: var(--text-gedaempft); }
   `,
