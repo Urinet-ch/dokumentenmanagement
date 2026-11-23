@@ -44,7 +44,9 @@ model/benutzer-ansicht.ts
 model/benutzer-status.ts
 model/bestaetigung.ts
 model/branding-dto.ts
+model/chat-auswertung.ts
 model/chat-bewertung-eingabe.ts
+model/chat-bewertung-export-eingabe.ts
 model/chat-bewertung.ts
 model/chat-frage.ts
 model/chat-gespraech.ts
@@ -78,6 +80,7 @@ model/generator-finanz.ts
 model/generator-metadaten.ts
 model/generator-partner.ts
 model/generator-vertrag.ts
+model/grund-dto.ts
 model/grund.ts
 model/import-herkunft.ts
 model/import-hochgeladen.ts
@@ -128,7 +131,9 @@ model/regel1.ts
 model/reihe.ts
 model/rolle.ts
 model/rollen-aenderung.ts
+model/schlechte-antwort-dto.ts
 model/status-ansicht.ts
+model/sterne-dto.ts
 model/suchergebnis.ts
 model/suchtreffer.ts
 model/upload-ergebnis.ts

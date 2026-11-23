@@ -3,6 +3,7 @@
   "type": "wordpress-plugin",
   "require": {
     "php": ">=8.2",
+    "ext-curl": "*",
     "ext-sodium": "*"
   },
   "require-dev": {

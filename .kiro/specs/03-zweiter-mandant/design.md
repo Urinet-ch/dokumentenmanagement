@@ -492,6 +492,14 @@ Umsetzung (Aufgabe 11.11; Stand: Baustein, Lese-Endpunkte und echter Upload umge
   Wechsel von `X-Archiv-Client` und `X-Archiv-Zugriff` umgeht nichts, `Retry-After`, Suche strenger, Uploads, Chat zählt mit
   und behält seine Grenzen, interne Endpunkte unberührt, Kennzahl nur mit `grund`).
 
+## Umsetzung (Aufgabe 11.11, 22.11.2026)
+- Die Repository-Teile der Schlüsselgrenzen sind vollständig belegt: Stunden-Bucket für Uploads, `Retry-After` und `grund`
+  im einheitlichen 429-Problem-Detail, der Fehlercode `ZU_VIELE_ANFRAGEN` in der Fehlercodetabelle von Spec 01 sowie
+  Unit- und Cucumber-Nachweise für Lesen, Suche, Erfassung, Uploads und den gemeinsamen Chat-Bucket.
+- Lokal wurden die Startwerte durch den Testlauf mit den kleinen Testprofilwerten und die Produktionswerte durch die
+  Konfigurationsprüfung nachvollzogen. Die tatsächliche Kalibrierung am Livegang bleibt ein manueller Nachweis über
+  `archiv_webseite_grenze_abgelehnt_total` und die 429-Einträge im Zugriffsprotokoll; sie ist nicht lokal ersetzbar.
+
 ### WordPress-Plugin `wordpress/urinet-archiv-plugin`
 Nutzer des Vertrags `public-v1` (geändert 13.11.2026, E-B): Das Plugin nutzt nur, was in `docs/schnittstelle/public-v1.yaml`
 steht, und ignoriert unbekannte Felder (Requirement 11.6).
@@ -617,3 +625,25 @@ Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x
 - Nachtrag 22.11.2026: PHPUnit mit WordPress 7.1.5 und PHP 8.2 sowie Cucumber-Szenarien `@req-7.1`, `@req-7.3`, `@req-7.4`, `@req-7.5`, `@req-7.7` laufen lokal; die Szenarien verwenden die WordPress-PHPUnit-Tests und tragen `@wordpress` für ihren eigenen Runner. PHPCS prüft die WordPress-Regeln mit Ausnahmen für Spec-Dateinamen und reine Kommentarvorgaben. Der erlaubte CI-Diff liegt in `docs/ci-wordpress.patch`; bis zur Anwendung läuft dieser Runner nicht in der CI.
 - Das Plugin-Paket enthält ausschliesslich die ausdrücklich zugelassenen PHP-Laufzeitdateien; `npm run build` prüft den Paketinhalt. `isomorphic-git` wird nur für die Entwicklungsumgebung verwendet und ist auf eine Version mit behobenem Sicherheitsbefund festgelegt. Der Einsatz bleibt bis zur Feed-Invalidierung in 11.12 untersagt.
 - Nachtrag 22.11.2026 (Review): Die Einstellungen werden über einen eigenen JSON-Endpunkt mit festem Schema und höchstens 8'192 Bytes gespeichert; ein begrenzter Stream prüft auch Anfragen ohne `Content-Length`. Da PHP formkodierte Anfragen vor den WordPress-Hooks einliest, ist die vorgelagerte Webserver-Grenze auf `admin-post.php` zwingende Betriebs- und Auslieferungsvoraussetzung. Der Hosting-Nachweis für Chunked-Anfragen steht aus. Das Paket enthält zusätzlich das Einstellungen-Skript; die bisherige PHP-only-Angabe gilt nicht mehr.
+
+## Umsetzung (Aufgabe 12.3, 22.11.2026)
+- `S3AblageTest.ablageVerwendetMandantenbucketBeiLesenUndArchivieren` nutzt zwei MinIO-Buckets mit demselben Objektschlüssel und unterschiedlichen synthetischen Inhalten. Beide Mandanten lesen und archivieren nur ihre eigene Version; eine fremde Versions-ID ist im eigenen Bucket nicht lesbar. Die Gegenproben prüfen zusätzlich, dass die jeweils andere Bucket-Version unverändert bleibt.
+- Die ZAP-Baseline gegen Staging bleibt ein manueller Nachweis von Fabian; Aufgabe 12.3 bleibt bis dahin offen.
+## Umsetzung (Aufgabe 11.12, 23.11.2026)
+- `Urinet_Archiv_Feed` pollt den Lese-Feed alle fünf Minuten. Cache-Schlüssel enthalten die Stufenversion; ein Feed-Eintrag erhöht sie ab der gemeldeten Stufe, 410 invalidiert alle Stufen und startet mit einem neuen Cursor. Bei Feed-Ausfall werden Cache-Treffer nicht ausgeliefert; der nächste Versuch wartet eine Minute.
+- `Urinet_Archiv_Erfassung` stellt die Geschäftsstelle-Seite nur mit konfigurierter Rolle und separatem Erfassungs-Schlüssel bereit. Formularfelder folgen dem Schema der aktiven Dokumentart; `zugriff` und `veroeffentlicht` bleiben reserviert, die Person kann nur `mitglieder` oder `vorstand` wählen. Entwürfe bleiben je lokaler WordPress-Referenz als Post-Meta, Status und Version werden über den Erfassungs-Feed aktualisiert. Uploads sind auf 50 MiB begrenzt und werden direkt per cURL an das Archiv übergeben; Datei-Prüfströme werden blockweise und ohne temporäre Datei weitergereicht.
+- Schreibaktionen melden die Bearbeiterkennung und nutzen ETags. Ein 412 verwirft den zwischengespeicherten Entwurf und fordert zum Neuladen auf. Wiederholen ist auf Fehlerstatus beschränkt; Veröffentlichen und Zurückziehen sind nur für `ARCHIVIERT` verfügbar.
+- Die wp-env-Test-API liefert ausschliesslich synthetische Antworten. Das `@req-7.10`-Szenario prüft das Formular im Browser mit Playwright; PHPUnit deckt zusätzlich Feed-Invalidierung, Ausfallverhalten und Schema-Normalisierung ab. Chromium wird vom Cucumber-Lauf installiert. Test-API und Playwright bleiben ausserhalb des ausgelieferten Plugin-Pakets.
+- Der Einsatz bleibt bis zum Hosting-Nachweis der Empfangsgrenzen für Chunked-Anfragen und zum Test auf einer echten WordPress-Seite gesperrt; beides ist nachgelagert [Fabian].
+
+## Umsetzung (Aufgabe 10.6, 22.11.2026)
+- Die Betriebsanleitung nennt `ARCHIV_AGE_EMPFAENGER_SICHERUNG` und `ARCHIV_AGE_EMPFAENGER_PROBE` als Quelle der unterschiedlichen öffentlichen `age`-Empfänger. Die Klartextprüfung gilt für die zur Abholung freigegebenen Laufartefakte in `laeufe/`; das Vorinventar `.zustand/` ausserhalb davon bleibt absichtlich unverschlüsselt und wird vom Infra-Repository nicht abgeholt.
+- Transport, Zweitkopie, `backup-gate.sh`, VPS-Schritt und Restore-Probe bleiben ausserhalb dieses Repos und damit als Betriebsnachweis offen [Fabian].
+
+## Umsetzung (Aufgabe 11.5, 22.11.2026)
+- Die öffentliche Liste lädt Reihen und Klassifikationen aus `/public/v1/filter`, lässt nur dort gelieferte Werte zu und bietet Filter für Reihe, Jahr, Ausgabe und öffentlich filterbare Klassifikationen. Die Seitennavigation erhält die ausgewählten Filter; Seitengrössen sind auf 1 bis 100 begrenzt.
+- Download-Slots sind atomare `wp_options`-Leases mit 20 Minuten Ablaufzeit. Der Eintrag wird nur gelöscht, wenn sein gespeicherter Lease-Wert noch dem eigenen Request gehört; abgelaufene Einträge des bisherigen Zeitstempelformats werden ebenfalls bereinigt. Die Lease dauert länger als der cURL-Gesamttimeout von 15 Minuten.
+- Der cURL-Header-Callback speichert `Content-Length` im gemeinsamen Stream-Zustand und reicht die Länge vor dem ersten Byte an den Browser weiter. Ein nachträglicher Stream-Abbruch bleibt dadurch an einer kürzeren Antwort als der angekündigten Länge erkennbar.
+- Die Quellenanzeige verwendet ein eigenes Textfeld für Reihe und Ausgabe und überschreibt das DOM-Ausgabeelement nicht mehr. Die wp-env-Test-API liefert dazu eine synthetische Chatquelle; PHPUnit prüft Lease-Ablauf, Eigentümerschaft und Content-Length, Playwright prüft Filter, Navigation und Quellen. axe-core wird auf Liste und Chat-Block mit WCAG-2.1-A/AA-Regeln angewendet.
+- Die Szenarien zu 7.2 prüfen im wp-env alle drei registrierten Shortcodes und Gutenberg-Blöcke; 7.6 prüft WCAG 2.1 AA mit axe-core sowie die geerbte Theme-Schrift.
+- Der Zweitreview-Befund zur Hilfe-Leiste lag ausserhalb des Plugin-Diffs. CI und wp-env-Nachweis für die Plugin-Szenarien sind grün; die Einsatzsperre bleibt bis zum Hosting-Nachweis und dem Test auf einer echten WordPress-Seite bestehen.

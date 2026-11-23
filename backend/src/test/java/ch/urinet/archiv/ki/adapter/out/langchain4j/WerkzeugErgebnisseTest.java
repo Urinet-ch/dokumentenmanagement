@@ -26,15 +26,27 @@ class WerkzeugErgebnisseTest {
     void suchtreffer() {
         ChatEreignis.WerkzeugErgebnis e = abbilden("dokumente_suchen", "{\"frage\":\"Gondel\",\"anzahl\":5,\"neueste\":null}",
                 "{\"treffer\":[{\"id\":\"" + A + "\",\"titel\":\"Rechnung A\",\"seiten\":\"7-8\","
-                        + "\"auszug\":\"GEHEIMER TEXT\"},"
+                        + "\"aehnlichkeit\":0.87,\"auszug\":\"GEHEIMER TEXT\"},"
                         + "{\"id\":\"" + B + "\",\"titel\":\"Rechnung B\"}],\"gesamt\":2}");
         assertThat(e.name()).isEqualTo("dokumente_suchen");
         assertThat(e.parameter()).containsEntry("frage", "Gondel").containsEntry("anzahl", 5).doesNotContainKey("neueste");
         assertThat(e.dokumente()).extracting(ChatEreignis.QuellDokument::id).containsExactly(A, B);
         assertThat(e.dokumente()).extracting(ChatEreignis.QuellDokument::titel).containsExactly("Rechnung A", "Rechnung B");
         assertThat(e.dokumente()).extracting(ChatEreignis.QuellDokument::seite).containsExactly("7-8", null);
+        assertThat(WerkzeugAufruf.aus(e).aehnlichkeiten()).containsEntry(A, 0.87);
         assertThat(e.datenstand()).isEmpty();
+        assertThat(e.suchweg()).isEqualTo("HYBRID");
         assertThat(e.toString()).doesNotContain("GEHEIMER TEXT");
+    }
+
+    @Test
+    void suchwegSpiegeltVolltextRueckfallUndNeuesteSuche() {
+        assertThat(abbilden("dokumente_suchen", "{\"neueste\":true}", "{\"treffer\":[]}")
+                .suchweg()).isEqualTo("VOLLTEXT");
+        assertThat(abbilden("dokumente_suchen", "{}", "{\"treffer\":[],\"degradiert\":true}")
+                .suchweg()).isEqualTo("VOLLTEXT");
+        assertThat(abbilden("wissen_index", "{}", "{\"treffer\":[]}")
+                .suchweg()).isEqualTo("WISSENSSEITEN");
     }
 
     @Test

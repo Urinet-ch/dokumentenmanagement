@@ -26,6 +26,8 @@ final class WorkflowSecrets {
             "INFOMANIAK_AI_TOKEN",
             // Aufgabe 5.2: privater Schlüssel des Tages-Manifests als Secret-Datei
             "ARCHIV_MANIFEST_KEY",
+            // Spec 06, Aufgabe 19.7: dauerhaftes Salz der Namenssperre als Secret-Datei
+            "NAMENSSPERRE_SALZ",
             // Spec 02, Aufgabe 6.1: Datenschlüssel für Zugangsdaten in der DB (Mail-Eingang), optional
             "ARCHIV_DATA_KEY",
             // Aufgabe 5.6 (Entscheid Fabian 14.11.2026): Passwort des Postfachs für Benachrichtigungen, optional

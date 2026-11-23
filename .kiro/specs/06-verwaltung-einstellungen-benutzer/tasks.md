@@ -190,6 +190,8 @@ auf Server oder Secrets aus der Sitzung.
     Menüpunkte nach Recht, Seite «Nicht gefunden» ohne Recht.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.7_
   - _Abhängig von: 19.7, 19.11_
+  - Umsetzung und automatisierte Browser-Nachweise vorbereitet; der manuelle Nachweis zu 8.2 und 8.7 bleibt bei 21.6,
+    die zugehörigen Einstellungsseiten folgen in 20.5. Checkbox bis zum vollständigen Nachweis offen.
 
 - [ ] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
   - Einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, Rolle ändern, E-Mail ändern, löschen (mit

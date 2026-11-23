@@ -13,11 +13,13 @@ import java.util.function.Consumer;
  */
 public final class ChatDurchgang {
 
+    private final long begonnen = System.nanoTime();
     private final StringBuilder text = new StringBuilder();
     private final List<ChatEreignis.WerkzeugErgebnis> ergebnisse = new ArrayList<>();
     private final List<String> ausstehendeWerkzeuge = new ArrayList<>();
     private ChatEreignis.Ende ende;
     private ChatEreignis.Ausfall ausfall;
+    private Long zeitBisErstemTextMs;
 
     /** Nimmt das Ereignis auf und gibt es, falls für den Client bestimmt, unter derselben Sperre an {@code weiter}. */
     public synchronized void aufnehmen(ChatEreignis ereignis, Consumer<ChatEreignis> weiter) {
@@ -30,6 +32,9 @@ public final class ChatDurchgang {
                 weiter.accept(start);
             }
             case ChatEreignis.Text teil -> {
+                if (zeitBisErstemTextMs == null && !teil.delta().isEmpty()) {
+                    zeitBisErstemTextMs = Math.max(0, (System.nanoTime() - begonnen) / 1_000_000);
+                }
                 text.append(teil.delta());
                 weiter.accept(teil);
             }
@@ -59,6 +64,10 @@ public final class ChatDurchgang {
             return Optional.of(ausfall.grund());
         }
         return ende == null ? Optional.of("KeinEnde") : Optional.empty();
+    }
+
+    public synchronized Long zeitBisErstemTextMs() {
+        return zeitBisErstemTextMs;
     }
 
     /**

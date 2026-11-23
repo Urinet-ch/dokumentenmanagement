@@ -20,13 +20,14 @@ class Leer {}
   imports: [AnleitungText],
   template: `@for (eintrag of eintraege; track eintrag.anker) {
     <section [attr.data-anker]="eintrag.anker">
-      <app-anleitung-text [eintrag]="eintrag" [versatz]="1" [leiste]="leiste()" (abschnitt)="gewaehlt.set($event)" (navigiert)="navigiert.set(true)" />
+      <app-anleitung-text [eintrag]="eintrag" [versatz]="1" [leiste]="leiste()" [ids]="ids()" (abschnitt)="gewaehlt.set($event)" (navigiert)="navigiert.set(true)" />
     </section>
   }`,
 })
 class Gastgeber {
   eintraege: readonly HilfeEintrag[] = [ERSTE, PROBLEME];
   readonly leiste = signal(false);
+  readonly ids = signal(true);
   readonly gewaehlt = signal<string | null>(null);
   readonly navigiert = signal(false);
 }
@@ -95,6 +96,17 @@ describe('AnleitungText (Spec 07, Req 7.3, 7.6)', () => {
     expect(fixture.componentInstance.gewaehlt()).toBe('probleme');
     teil.querySelector<HTMLAnchorElement>('a[href="/"]')!.click();
     expect(fixture.componentInstance.navigiert()).toBe(true);
+  });
+
+  it('gibt in der Leiste ohne IDs keine ID-Attribute an Überschriften aus', async () => {
+    const fixture = await zeigen(true);
+    fixture.componentInstance.ids.set(false);
+    http.expectOne(ERSTE.datei).flush('## Eins\n\n### Zwei\n\n#### Drei', MD);
+    http.expectOne(PROBLEME.datei).flush('Text', MD);
+    await fixture.whenStable();
+    const ueberschriften = fixture.nativeElement.querySelectorAll('h3, h4, h5');
+    expect(ueberschriften).toHaveLength(3);
+    for (const ueberschrift of ueberschriften) expect(ueberschrift.hasAttribute('id')).toBe(false);
   });
 
   it('zeigt bei einem nicht ladbaren Abschnitt den Hinweis mit «Erneut versuchen», die übrigen bleiben (Req 7.6)', async () => {
