@@ -21,6 +21,7 @@ import jakarta.inject.Inject;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -280,6 +281,64 @@ public class AgentSchritte {
         if (status == 200 || status == 201) {
             vorherigesGespraech = gespraech;
             gespraech = antwortKoerper.path("id").asText();
+        }
+    }
+
+    @Wenn("«{word}» ein Gespräch mit einem Körper von {int} Zeichen anlegt")
+    public void gespraechMitLangemKoerper(String benutzer, int zeichen) throws Exception {
+        gespraechAnlegenMitKoerper(benutzer, "{\"modus\":\"" + "A".repeat(zeichen - 12) + "\"}");
+    }
+
+    @Wenn("«{word}» ein Gespräch mit Content-Length 0 anlegt")
+    public void gespraechOhneKoerperRoh(String benutzer) throws Exception {
+        benutzt = true;
+        try (Socket socket = new Socket("127.0.0.1", RestAssured.port)) {
+            socket.setSoTimeout(10_000);
+            socket.getOutputStream().write(("POST /api/v1/chat/gespraeche HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Authorization: Bearer " + Testanmeldung.token(benutzer) + "\r\n"
+                    + "Content-Type: application/json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                    .getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().flush();
+            BufferedReader leser = new BufferedReader(new InputStreamReader(socket.getInputStream(),
+                    StandardCharsets.UTF_8));
+            String statuszeile = leser.readLine();
+            status = Integer.parseInt(statuszeile.split(" ")[1]);
+            for (String zeile; (zeile = leser.readLine()) != null && !zeile.isEmpty(); ) {
+                // Kopfzeilen überspringen
+            }
+            StringBuilder rumpf = new StringBuilder();
+            for (String zeile; (zeile = leser.readLine()) != null; ) {
+                rumpf.append(zeile);
+            }
+            String json = rumpf.substring(Math.max(0, rumpf.indexOf("{")));
+            antwortKoerper = JSON.readTree(json);
+        }
+    }
+
+    @Dann("wird ein unvollständiger Chunked-Körper beim Anlegen von «{word}» vor seinem Ende mit 413 abgelehnt")
+    public void chunkedZuGross(String benutzer) throws Exception {
+        for (String pfad : List.of("/api/v1/chat/gespraeche", "/api/v1/chat/%67espraeche",
+                "/api/v1/chat/gespraeche/")) {
+            try (Socket socket = new Socket("127.0.0.1", RestAssured.port)) {
+                socket.setSoTimeout(10_000);
+                String kopf = "POST " + pfad + " HTTP/1.1\r\nHost: localhost\r\n"
+                        + "Authorization: Bearer " + Testanmeldung.token(benutzer) + "\r\n"
+                        + "Content-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+                var aus = socket.getOutputStream();
+                aus.write(kopf.getBytes(StandardCharsets.US_ASCII));
+                aus.write("2000\r\n".getBytes(StandardCharsets.US_ASCII));
+                aus.write(" ".repeat(8192).getBytes(StandardCharsets.US_ASCII));
+                aus.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+                aus.flush();
+                BufferedReader leser = new BufferedReader(new InputStreamReader(socket.getInputStream(),
+                        StandardCharsets.UTF_8));
+                assertThat(leser.readLine()).as(pfad).contains(" 413 ");
+                StringBuilder text = new StringBuilder();
+                for (String zeile; (zeile = leser.readLine()) != null; ) {
+                    text.append(zeile);
+                }
+                assertThat(text.toString()).as(pfad).contains("application/problem+json", "DATEI_ZU_GROSS");
+            }
         }
     }
 

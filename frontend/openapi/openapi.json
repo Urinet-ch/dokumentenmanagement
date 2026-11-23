@@ -5741,19 +5741,28 @@
               }
             }
           },
-          "required" : true
+          "required" : false
         },
         "responses" : {
           "200" : {
             "description" : "Noch nicht gefragtes Gespräch desselben Modus zurückgegeben",
             "content" : {
               "application/json" : {
-                "schema" : { }
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChatGespraech"
+                }
               }
             }
           },
           "201" : {
-            "description" : "Gespräch angelegt"
+            "description" : "Gespräch angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChatGespraech"
+                }
+              }
+            }
           },
           "400" : {
             "description" : "Modus ungültig"

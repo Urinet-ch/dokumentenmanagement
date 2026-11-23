@@ -6,7 +6,7 @@
          bleiben Archivchat (Standard ARCHIV). Das Rollback entfernt nur die Prüfbedingung und behält die Spalte samt
          Werten: Der Vorgänger-Release ignoriert sie, kein Gespräch geht verloren, ein wiederholtes Rollback und ein
          erneutes Vorwärts-Changeset sind wirkungsgleich. -->
-    <changeSet id="130-chat-gespraech-modus" author="claude">
+    <changeSet id="130-chat-gespraech-modus" author="copilot">
         <sql>
             alter table chat_gespraech add column if not exists modus text not null default 'ARCHIV';
             alter table chat_gespraech drop constraint if exists chat_gespraech_modus_ck;

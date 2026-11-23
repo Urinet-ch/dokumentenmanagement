@@ -323,13 +323,10 @@ export class ChatService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1ChatGespraechePost(chatGespraechAnlegen: ChatGespraechAnlegen, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1ChatGespraechePost(chatGespraechAnlegen: ChatGespraechAnlegen, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1ChatGespraechePost(chatGespraechAnlegen: ChatGespraechAnlegen, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1ChatGespraechePost(chatGespraechAnlegen: ChatGespraechAnlegen, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (chatGespraechAnlegen === null || chatGespraechAnlegen === undefined) {
-            throw new Error('Required parameter chatGespraechAnlegen was null or undefined when calling apiV1ChatGespraechePost.');
-        }
+    public apiV1ChatGespraechePost(chatGespraechAnlegen?: ChatGespraechAnlegen, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ChatGespraech>;
+    public apiV1ChatGespraechePost(chatGespraechAnlegen?: ChatGespraechAnlegen, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ChatGespraech>>;
+    public apiV1ChatGespraechePost(chatGespraechAnlegen?: ChatGespraechAnlegen, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ChatGespraech>>;
+    public apiV1ChatGespraechePost(chatGespraechAnlegen?: ChatGespraechAnlegen, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -370,7 +367,7 @@ export class ChatService extends BaseService {
 
         let localVarPath = `/api/v1/chat/gespraeche`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<ChatGespraech>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: chatGespraechAnlegen,

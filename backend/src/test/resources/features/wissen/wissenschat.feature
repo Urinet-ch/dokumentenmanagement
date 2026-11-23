@@ -34,6 +34,19 @@ Funktionalität: Wissenschat und Archivchat (Requirement 21, Aufgabe 18.1)
     Und ist das angelegte Gespräch dasselbe wie zuvor
     Und gibt es in «urinet» 1 Gespräche
 
+  @req-21.5
+  Szenario: Der Körper von «POST /chat/gespraeche» ist am Empfang auf unter 8 KiB begrenzt, auch chunked und bei kodiertem Pfad
+    Wenn «mitarbeiter-urinet» ein Gespräch mit einem Körper von 8192 Zeichen anlegt
+    Dann antwortet das Archiv mit Status 413 und dem Fehlercode «DATEI_ZU_GROSS»
+    Und wird ein unvollständiger Chunked-Körper beim Anlegen von «mitarbeiter-urinet» vor seinem Ende mit 413 abgelehnt
+    Und gibt es in «urinet» 0 Gespräche
+
+  @req-21.5
+  Szenario: Ein Körper mit Content-Length 0 legt ein Gespräch im Modus ARCHIV an
+    Wenn «mitarbeiter-urinet» ein Gespräch mit Content-Length 0 anlegt
+    Dann antwortet das Archiv auf das Anlegen mit Status 201
+    Und nennt die Antwort den Modus «ARCHIV» und den Titel «Neues Gespräch»
+
   @req-21.1
   Szenariogrundriss: Ein ungültiger Modus ergibt 400 ohne Gespräch
     Wenn «mitarbeiter-urinet» ein Gespräch mit dem Körper «<koerper>» anlegt

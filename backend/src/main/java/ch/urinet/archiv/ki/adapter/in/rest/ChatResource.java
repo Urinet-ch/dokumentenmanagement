@@ -227,9 +227,11 @@ public class ChatResource {
                     + "«Neues Gespräch». Wer wiederholt anlegt, erhält das noch nicht gefragte Gespräch desselben "
                     + "Modus zurück (200 statt 201). Das Gespräch erscheint in der Liste mit seiner ersten Frage. Der "
                     + "Anfragekörper muss kleiner als 8 KiB sein.")
-    @RequestBody(content = @Content(schema = @Schema(implementation = GespraechAnlegenDto.class)))
-    @APIResponse(responseCode = "200", description = "Noch nicht gefragtes Gespräch desselben Modus zurückgegeben")
-    @APIResponse(responseCode = "201", description = "Gespräch angelegt")
+    @RequestBody(required = false, content = @Content(schema = @Schema(implementation = GespraechAnlegenDto.class)))
+    @APIResponse(responseCode = "200", description = "Noch nicht gefragtes Gespräch desselben Modus zurückgegeben",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = GespraechDto.class)))
+    @APIResponse(responseCode = "201", description = "Gespräch angelegt",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = GespraechDto.class)))
     @APIResponse(responseCode = "400", description = "Modus ungültig")
     @APIResponse(responseCode = "403", description = "Modus WISSEN ohne Recht A15")
     @APIResponse(responseCode = "413", description = "Anfragekörper zu gross")
