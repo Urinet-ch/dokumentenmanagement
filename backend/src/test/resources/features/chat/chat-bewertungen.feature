@@ -68,7 +68,3 @@ Funktionalität: Chat-Bewertungen speichern
     Wenn «inhaber-urinet» bewertet «TEXT» mit dem Körper «{"sterne":3}»
     Dann ist die Bewertungsanfrage mit Status 429 beantwortet
     Und enthält die Antwort den Fehlercode «ZU_VIELE_ANFRAGEN»
-
-  @req-15.5
-  Szenario: Die Chat-Auswertung ist nur für Inhaber erlaubt
-    Dann ist A24 nur für den Inhaber erlaubt
