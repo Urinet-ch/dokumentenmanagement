@@ -9,6 +9,8 @@ import java.util.regex.Pattern;
 
 record AltbestandPfad(String reihe, String art, int jahr, Integer ausgabe) {
 
+    static final int MAX_AUSGABENUMMER = 999;
+
     private static final Pattern JAHR = Pattern.compile("(?<!\\d)(?:19|20)\\d{2}(?!\\d)");
     private static final Pattern AUSGABE = Pattern.compile(
             "(?i)^(?:ausgabe[ _.-]*)?([0-9]{1,5})(?:[ _.-]+((?:19|20)[0-9]{2}))?$");
@@ -76,7 +78,7 @@ record AltbestandPfad(String reihe, String art, int jahr, Integer ausgabe) {
     private static Integer nummer(String text) {
         try {
             int nummer = Integer.parseInt(text);
-            return nummer > 0 && nummer <= 10_000 ? nummer : null;
+            return nummer > 0 && nummer <= MAX_AUSGABENUMMER ? nummer : null;
         } catch (NumberFormatException e) {
             return null;
         }

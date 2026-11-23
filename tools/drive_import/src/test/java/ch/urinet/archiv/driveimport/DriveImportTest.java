@@ -164,6 +164,17 @@ class DriveImportTest {
     }
 
     @Test
+    void altbestandsberichtZaehltDoppelteAusgabenummern() throws IOException {
+        datei("Bulletin/2026/3.pdf", "%PDF-a");
+        datei("Bulletin/2026/Ausgabe-3.pdf", "%PDF-b");
+
+        assertThat(lauf("--altbestand", "--klassifikation", "fachgebiet=bau")).isEqualTo(DriveImport.OK);
+
+        assertThat(aus.toString()).contains(
+                "BULLETIN / 2026: 2 Dateien; Ausgabe-Nr. erkannt: [3]; nicht erkannt: 0; Dubletten: 1");
+    }
+
+    @Test
     void altbestandsberichtZaehltAuchDateienNachTokenabbruch() throws IOException {
         datei("Bulletin/2026/1.pdf", "%PDF-a");
         datei("Bulletin/2026/3.pdf", "%PDF-b");

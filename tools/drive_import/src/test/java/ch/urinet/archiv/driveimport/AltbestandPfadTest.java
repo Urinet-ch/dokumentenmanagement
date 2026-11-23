@@ -39,6 +39,18 @@ class AltbestandPfadTest {
     }
 
     @Test
+    void prueftGrenzenUndDateinamenvariantenDerAusgabenummer() {
+        Path wurzel = tmp.resolve("Altbestand");
+
+        assertThat(pfad(wurzel, "Bulletin/2026/0.pdf").ausgabe()).isNull();
+        assertThat(pfad(wurzel, "Bulletin/2026/999.pdf").ausgabe()).isEqualTo(999);
+        assertThat(pfad(wurzel, "Bulletin/2026/10000.pdf").ausgabe()).isNull();
+        assertThat(pfad(wurzel, "Bulletin/2026/10001.pdf").ausgabe()).isNull();
+        assertThat(pfad(wurzel, "Bulletin/2026/Ausgabe_3-2026.pdf").ausgabe()).isEqualTo(3);
+        assertThat(pfad(wurzel, "Bulletin/2026/3-2026").ausgabe()).isEqualTo(3);
+    }
+
+    @Test
     void lehntUnbekannteReihenUndMehrdeutigeJahreAb() {
         Path wurzel = tmp.resolve("Altbestand");
 
@@ -48,5 +60,11 @@ class AltbestandPfadTest {
                 .contains("Reihe nicht erkannt");
         assertThat(AltbestandPfad.erkennen(wurzel, wurzel.resolve("Bulletin/2025/2026/1.pdf")).grund())
                 .contains("Jahr mehrdeutig");
+    }
+
+    private AltbestandPfad pfad(Path wurzel, String relativ) {
+        AltbestandPfad.Erkennung erkennung = AltbestandPfad.erkennen(wurzel, wurzel.resolve(relativ));
+        assertThat(erkennung.grund()).isNull();
+        return erkennung.pfad();
     }
 }

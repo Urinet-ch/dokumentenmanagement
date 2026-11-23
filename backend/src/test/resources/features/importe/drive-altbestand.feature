@@ -32,3 +32,16 @@ Funktionalität: Altbestand von VHF/GSK übernehmen
     Und hat jedes importierte Dokument «BULLETIN» als Art vorbelegt
     Und steht jedes importierte Dokument im Status «NEU» als «PERSONAL», unbestätigt und nicht archiviert
     Und enthält der Altbestandsbericht «BULLETIN / 2026: 2 Dateien; Ausgabe-Nr. erkannt: [1, 3]; nicht erkannt: 0»
+    Und ist im Mandanten «urinet» keine Datei des Ordners gespeichert
+
+  @req-4.1
+  Szenario: Eine Datei aus unbekannter Reihe wird nicht importiert
+    Angenommen ein Ordner «Altbestand» mit diesen synthetischen Dateien:
+      | pfad                | typ |
+      | Unbekannt/2026/1.pdf | pdf |
+    Und ein Token vom Scope «import» für «vhf-gsk» liegt in einer Datei mit Rechten 600
+    Wenn der Drive-Import den Altbestand «Altbestand» mit Klassifikation «fachgebiet» und Wert «bau» lädt
+    Dann endet der Drive-Import mit Exit-Code 0
+    Und enthält der Altbestandsbericht «Reihe nicht erkannt»
+    Und ist im Mandanten «vhf-gsk» keine Datei des Ordners gespeichert
+    Und ist im Mandanten «urinet» keine Datei des Ordners gespeichert

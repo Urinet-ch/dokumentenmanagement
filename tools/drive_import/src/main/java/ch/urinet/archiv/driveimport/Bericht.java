@@ -6,7 +6,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 /**
  * Schlussbericht eines Laufs (Req 12.3, 12.5, 12.6, 12.7). Jede gefundene Datei landet in genau einem Zähler:
@@ -25,7 +24,8 @@ final class Bericht {
     private static final class AltbestandGruppe {
         private int dateien;
         private int ohneAusgabe;
-        private final TreeSet<Integer> ausgaben = new TreeSet<>();
+        private int dubletten;
+        private final Map<Integer, Integer> ausgaben = new TreeMap<>();
     }
 
     private final boolean trockenlauf;
@@ -53,7 +53,10 @@ final class Bericht {
         if (pfad.ausgabe() == null) {
             gruppe.ohneAusgabe++;
         } else {
-            gruppe.ausgaben.add(pfad.ausgabe());
+            int vorkommen = gruppe.ausgaben.merge(pfad.ausgabe(), 1, Integer::sum);
+            if (vorkommen > 1) {
+                gruppe.dubletten++;
+            }
         }
     }
 
@@ -106,7 +109,8 @@ final class Bericht {
             aus.println("Altbestand nach Reihe und Jahr (Dateien im Quellordner):");
             altbestand.forEach((schluessel, gruppe) -> aus.println("  " + schluessel.art() + " / "
                     + schluessel.jahr() + ": " + gruppe.dateien + " Dateien; Ausgabe-Nr. erkannt: "
-                    + gruppe.ausgaben + "; nicht erkannt: " + gruppe.ohneAusgabe));
+                    + gruppe.ausgaben.keySet() + "; nicht erkannt: " + gruppe.ohneAusgabe
+                    + "; Dubletten: " + gruppe.dubletten));
             aus.println("Lücken: nicht geprüft; massgeblich ist der serverseitige Lückenbericht.");
             aus.println();
         }
