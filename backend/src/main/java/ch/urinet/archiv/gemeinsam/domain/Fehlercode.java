@@ -40,6 +40,8 @@ public enum Fehlercode {
             "Die Klassifikation oder der Wert wird noch verwendet und kann nicht gelöscht werden. Sie können ihn deaktivieren."),
     KONFIGURATION_VERALTET(409, "Konfiguration veraltet",
             "Die Konfigurationsdatei basiert auf einem älteren Stand. Laden Sie die aktuelle Konfiguration und führen Sie Ihre Änderungen erneut ein."),
+    BESTAETIGUNG_NOETIG(409, "Bestätigung nötig",
+            "Die Änderung hat Auswirkungen, die Sie bestätigen müssen. Bitte prüfen Sie die Auswirkungen und bestätigen Sie die Änderung."),
     DOKUMENTART_EXISTIERT(409, "Dokumentart existiert",
             "Diesen Code hat schon eine Dokumentart. Bitte wählen Sie einen anderen Code oder ändern Sie die "
                     + "bestehende Art."),

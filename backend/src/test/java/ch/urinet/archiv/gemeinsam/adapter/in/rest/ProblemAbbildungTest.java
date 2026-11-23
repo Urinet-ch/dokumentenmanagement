@@ -1,6 +1,7 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.BestaetigungNoetig;
 import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
 import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
 import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
@@ -118,6 +119,19 @@ class ProblemAbbildungTest {
                     .contains("\"fehlercode\":\"KONFIGURATION_UNGUELTIG\"")
                     .contains("\"befunde\":[{\"pfad\":\"/arten/0\",\"code\":\"required\","
                             + "\"meldung\":\"Die Datei verletzt das Schema.\"}]");
+        }
+    }
+
+    @Test
+    void fehlendeBestaetigungNenntAuswirkungen() {
+        var fehler = new BestaetigungNoetig(java.util.List.of(
+                new BestaetigungNoetig.Auswirkung("chat.aufbewahrungMonate", "Beim nächsten Lauf.", 3L)));
+        try (Response antwort = abbildung.fachFehler(fehler)) {
+            assertThat(antwort.getStatus()).isEqualTo(409);
+            assertThat(antwort.getEntity()).asString()
+                    .contains("\"fehlercode\":\"BESTAETIGUNG_NOETIG\"")
+                    .contains("\"auswirkung\":[{\"schluessel\":\"chat.aufbewahrungMonate\","
+                            + "\"text\":\"Beim nächsten Lauf.\",\"betroffeneDatensaetze\":3}]");
         }
     }
 

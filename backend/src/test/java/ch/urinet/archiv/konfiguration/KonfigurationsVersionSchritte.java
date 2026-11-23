@@ -1,6 +1,10 @@
 package ch.urinet.archiv.konfiguration;
 
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
+import ch.urinet.archiv.benutzer.adapter.out.persistence.JdbcVerwaltungGrenzen;
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.networknt.schema.InputFormat;
@@ -13,9 +17,12 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
+import io.cucumber.java.Before;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.quarkus.arc.ClientProxy;
+import io.quarkus.test.junit.QuarkusMock;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
@@ -24,6 +31,7 @@ import jakarta.inject.Inject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -49,6 +57,10 @@ public class KonfigurationsVersionSchritte {
     @Inject
     Instance<AgroalDataSource> datenbank;
 
+    @Inject StepUp stepUp;
+    private StepUp urspruenglichesStepUp;
+    @Inject VerwaltungGrenzen grenzen;
+    private VerwaltungGrenzen urspruenglicheGrenzen;
     private Response antwort;
     private int versionVorher;
     private int letzteVersion;
@@ -394,15 +406,17 @@ public class KonfigurationsVersionSchritte {
         ((ObjectNode) datei.path("einstellungen")).put("geschaeftsjahrEnde", datum);
     }
 
+    @Wenn("in der Datei die Basisversion veraltet ist")
+    public void basisversionVeraltet() {
+        datei.put("basisVersion", versionVorher + 1);
+    }
+
     @Wenn("in der Datei die erweiterten Einstellungen mit Testwerten gesetzt werden")
     public void erweiterteEinstellungenSetzen() {
         ObjectNode einstellungen = (ObjectNode) datei.path("einstellungen");
         ((ObjectNode) einstellungen.path("branding")).put("name", "Testarchiv").put("primaerfarbe", "#eeb111");
         ((ObjectNode) einstellungen.path("chat")).put("aufbewahrungMonate", 17);
         ((ObjectNode) einstellungen.path("webseitenChat")).put("aufbewahrungTage", 31);
-        ObjectNode wissen = (ObjectNode) einstellungen.path("wissen");
-        wissen.put("budgetTokens", 123456).put("lintBudgetTokens", 12345).put("monatsbudgetTokens", 1234567);
-        ((ObjectNode) wissen.path("lintZeitplan")).put("wochentag", "MONDAY").put("stunde", 7);
     }
 
     @Wenn("in der Datei die Chat-Aufbewahrung auf {int} Monate gesetzt wird")
@@ -433,11 +447,6 @@ public class KonfigurationsVersionSchritte {
         assertThat(einstellungen.path("branding").path("primaerfarbe").asText()).isEqualTo("#eeb111");
         assertThat(einstellungen.path("chat").path("aufbewahrungMonate").asInt()).isEqualTo(17);
         assertThat(einstellungen.path("webseitenChat").path("aufbewahrungTage").asInt()).isEqualTo(31);
-        assertThat(einstellungen.path("wissen").path("budgetTokens").asInt()).isEqualTo(123456);
-        assertThat(einstellungen.path("wissen").path("lintBudgetTokens").asInt()).isEqualTo(12345);
-        assertThat(einstellungen.path("wissen").path("monatsbudgetTokens").asInt()).isEqualTo(1234567);
-        assertThat(einstellungen.path("wissen").path("lintZeitplan").path("wochentag").asText()).isEqualTo("MONDAY");
-        assertThat(einstellungen.path("wissen").path("lintZeitplan").path("stunde").asInt()).isEqualTo(7);
     }
 
     @Wenn("in der Datei der KI-Rollentext geändert wird")
@@ -450,6 +459,34 @@ public class KonfigurationsVersionSchritte {
     public void geaenderteDateiEinspielen(String benutzer) throws IOException {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
                 .body(JSON.writeValueAsString(datei)).when().put(KONFIGURATION);
+        if (antwort.statusCode() == 200) {
+            dateiWiederherstellen = true;
+            etagLesen();
+        }
+    }
+
+    @Angenommen("für die Konfigurationsdatei ist eine frische Anmeldung bestätigt")
+    public void frischeAnmeldung() {
+        urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+    }
+
+    @Before("@20-1-abbild or @20-2-rest")
+    public void grenzenFuerEinstellungsszenarienIsolieren() {
+        urspruenglicheGrenzen = ClientProxy.unwrap(grenzen);
+        QuarkusMock.installMockForType(new JdbcVerwaltungGrenzen(null, null, 1, 1, 1, 1) {
+            @Override
+            public void pruefen(String akteur, Art art, UUID ziel) { }
+        }, VerwaltungGrenzen.class);
+    }
+
+    @Wenn("«{word}» die geänderte Konfigurationsdatei mit Bestätigung {string} einspielt")
+    public void geaenderteDateiBestaetigtEinspielen(String benutzer, String bestaetigt) throws IOException {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("bestaetigt", bestaetigt)
+                .contentType(ContentType.JSON).body(JSON.writeValueAsString(datei)).when().put(KONFIGURATION);
         if (antwort.statusCode() == 200) {
             dateiWiederherstellen = true;
             etagLesen();
@@ -669,6 +706,8 @@ public class KonfigurationsVersionSchritte {
             ObjectNode zurueck = ausgangsdatei.deepCopy();
             zurueck.put("basisVersion", stand.jsonPath().getInt("basisVersion"));
             Response einspielen = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .queryParam("bestaetigt",
+                            "geschaeftsjahrEnde,chat.aufbewahrungMonate,webseitenChat.aufbewahrungTage,wissen.monatsbudgetTokens")
                     .header("X-Aenderungsgrund", "Testwerte wiederherstellen").contentType(ContentType.JSON)
                     .body(JSON.writeValueAsString(zurueck)).when().put(KONFIGURATION);
             assertThat(einspielen.statusCode()).as(einspielen.asString()).isEqualTo(200);
@@ -796,6 +835,22 @@ public class KonfigurationsVersionSchritte {
             assertThat(loeschen.statusCode()).as(loeschen.asString()).isIn(204, 404);
         }
         eigeneArten.clear();
+    }
+
+    @After(order = -100)
+    public void stepUpWiederherstellen() {
+        if (urspruenglichesStepUp != null) {
+            QuarkusMock.installMockForType(urspruenglichesStepUp, StepUp.class);
+            urspruenglichesStepUp = null;
+        }
+    }
+
+    @After(order = -200)
+    public void grenzenWiederherstellen() {
+        if (urspruenglicheGrenzen != null) {
+            QuarkusMock.installMockForType(urspruenglicheGrenzen, VerwaltungGrenzen.class);
+            urspruenglicheGrenzen = null;
+        }
     }
 
     private int aktuelleNummer(String benutzer) {

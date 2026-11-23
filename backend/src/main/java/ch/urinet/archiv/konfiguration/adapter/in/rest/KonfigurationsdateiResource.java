@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung;
+import ch.urinet.archiv.konfiguration.application.EinstellungsAenderungsPruefung;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration.Befund;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
@@ -22,6 +23,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
@@ -132,14 +134,15 @@ public class KonfigurationsdateiResource {
     @APIResponse(responseCode = "409", description = "KONFIGURATION_VERALTET")
     @APIResponse(responseCode = "413", description = "DATEI_ZU_GROSS")
     @APIResponse(responseCode = "422", description = "KONFIGURATION_UNGUELTIG")
-    public Response einspielen(@HeaderParam("X-Aenderungsgrund") String aenderungsgrund, String body) {
+    public Response einspielen(@HeaderParam("X-Aenderungsgrund") String aenderungsgrund,
+                               @QueryParam("bestaetigt") String bestaetigt, String body) {
         aufloesung.pruefen();
         String grund = aenderungsgrund == null || aenderungsgrund.isBlank() ? GRUND_DATEI : aenderungsgrund.strip();
         if (grund.codePointCount(0, grund.length()) > GRUND_MAX) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         KonfigurationsdateiVerwaltung.Ergebnis gespeichert =
-                verwaltung.einspielen(body, wer(), grund);
+                verwaltung.einspielen(body, wer(), grund, bestaetigt, EinstellungsAenderungsPruefung.Ursprung.APP);
         return Response.ok(ErgebnisDto.aus(gespeichert))
                 .tag(new EntityTag(Integer.toString(gespeichert.version()))).build();
     }

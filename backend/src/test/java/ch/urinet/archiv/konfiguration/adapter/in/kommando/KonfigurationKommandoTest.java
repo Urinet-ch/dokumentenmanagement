@@ -30,6 +30,19 @@ class KonfigurationKommandoTest {
     }
 
     @Test
+    void bestaetigungIstNurBeimEinspielenUndNurEinmalErlaubt() {
+        assertThat(KonfigurationKommando.lesen(List.of("einspielen", "urinet", "konfiguration.json",
+                "--wer", "Betreiber", "--grund", "Korrektur", "--bestaetigt", "geschaeftsjahrEnde")))
+                .isPresent().get().satisfies(aufruf ->
+                        assertThat(aufruf.bestaetigt()).isEqualTo("geschaeftsjahrEnde"));
+        assertThat(KonfigurationKommando.lesen(List.of("einspielen", "urinet", "konfiguration.json",
+                "--wer", "Betreiber", "--grund", "Korrektur", "--bestaetigt", "geschaeftsjahrEnde",
+                "--bestaetigt", "chat.aufbewahrungMonate"))).isEmpty();
+        assertThat(KonfigurationKommando.lesen(List.of("pruefen", "urinet", "konfiguration.json",
+                "--bestaetigt", "geschaeftsjahrEnde"))).isEmpty();
+    }
+
+    @Test
     void kiFreigebenVerlangtBetreiberUndAbnahmeverweis() {
         var aufruf = KonfigurationKommando.lesen(List.of("ki-freigeben", "vhf-gsk",
                 "--wer", "Fabian", "--abnahme", "auswertung-2026-11"));
