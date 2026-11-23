@@ -8,6 +8,7 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantVollexport;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.mandant.domain.MandantVerwaltungsrollen;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.io.PrintStream;
@@ -24,7 +25,7 @@ import java.util.UUID;
 public class MandantKommando {
 
     public static final String AUFRUF = """
-            Aufruf: archiv mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
+            Aufruf: archiv mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT] [--rollen <rolle,…>]
                    archiv mandant export <code>
                    archiv mandant export <code> --download <exportId>
                    archiv mandant abbauen <code> --nach-export <exportId> [--dry-run | --ausfuehren --wer <name> --grund <text>]
@@ -51,7 +52,7 @@ public class MandantKommando {
     }
 
     /** Gelesener Aufruf; {@code name} und {@code ende} sind optional. */
-    public record Aufruf(String code, String name, String ende) {
+    public record Aufruf(String code, String name, String ende, Optional<MandantVerwaltungsrollen> rollen) {
     }
 
     public record ExportAufruf(String code, Optional<UUID> id) {
@@ -73,6 +74,7 @@ public class MandantKommando {
         }
         String name = null;
         String ende = null;
+        Optional<MandantVerwaltungsrollen> rollen = Optional.empty();
         for (int i = 2; i < argumente.size(); i += 2) {
             if (i + 1 >= argumente.size()) {
                 return Optional.empty();
@@ -80,12 +82,23 @@ public class MandantKommando {
             switch (argumente.get(i)) {
                 case "--name" -> name = argumente.get(i + 1);
                 case "--geschaeftsjahr-ende" -> ende = argumente.get(i + 1);
+                case "--rollen" -> {
+                    if (rollen.isPresent() || argumente.get(i + 1).length() > 100) {
+                        return Optional.empty();
+                    }
+                    try {
+                        rollen = Optional.of(new MandantVerwaltungsrollen(
+                                List.of(argumente.get(i + 1).split(",", -1))));
+                    } catch (IllegalArgumentException e) {
+                        return Optional.empty();
+                    }
+                }
                 default -> {
                     return Optional.empty();
                 }
             }
         }
-        return Optional.of(new Aufruf(argumente.get(1), name, ende));
+        return Optional.of(new Aufruf(argumente.get(1), name, ende, rollen));
     }
 
     /** Liest den Exportauftrag oder die Abfrage eines fertigen Exports, ohne Datenbank- oder S3-Zugriff. */
@@ -250,7 +263,8 @@ public class MandantKommando {
             return 2;
         }
         try {
-            Mandant mandant = provisionierung.anlegen(aufruf.get().code(), aufruf.get().name(), aufruf.get().ende());
+            Mandant mandant = provisionierung.anlegen(aufruf.get().code(), aufruf.get().name(), aufruf.get().ende(),
+                    aufruf.get().rollen());
             aus.printf("Mandant %s angelegt: Schema %s, Bucket %s, Geschäftsjahresende %s%n", mandant.code().wert(),
                     mandant.schema(), mandant.bucket(), mandant.geschaeftsjahresende().wert());
             return 0;

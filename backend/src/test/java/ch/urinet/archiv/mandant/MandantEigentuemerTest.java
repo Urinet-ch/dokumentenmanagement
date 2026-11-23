@@ -1,5 +1,6 @@
 package ch.urinet.archiv.mandant;
 
+import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import io.quarkus.test.junit.QuarkusTest;
@@ -10,6 +11,9 @@ import org.eclipse.microprofile.config.ConfigProvider;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -48,6 +52,23 @@ class MandantEigentuemerTest {
 
     @Inject
     MandantDatenbank datenbank;
+
+    @Inject
+    MandantKommando kommando;
+
+    @Test
+    void expliziteVerwaltungsrollenWerdenImRegisterGespeichert() throws SQLException {
+        var ausgabe = new ByteArrayOutputStream();
+        var fehler = new ByteArrayOutputStream();
+        assertThat(kommando.ausfuehren(List.of("anlegen", "probe-adminrollen", "--rollen", "geschaeftsstelle,inhaber"),
+                new PrintStream(ausgabe, true, StandardCharsets.UTF_8),
+                new PrintStream(fehler, true, StandardCharsets.UTF_8)))
+                .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+        try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
+            assertThat(wert(befehl, "select array_to_string(verwaltung_rollen, ',') from public.mandant "
+                    + "where code = 'probe-adminrollen'")).isEqualTo("geschaeftsstelle,inhaber");
+        }
+    }
 
     @Test
     void appRolleNurDml() throws SQLException {

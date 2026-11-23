@@ -94,14 +94,17 @@ cd backend && mvn quarkus:dev
 
 ## Mandant anlegen
 ```bash
-java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
+java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT] [--rollen <rolle,…>]
 ```
 - Das Kommando startet keinen HTTP-Server und keine Start-Migration, braucht aber die Secret-Dateien `archiv_db_app`,
   `archiv_db_owner`, `s3_app_zugang_id`, `s3_app_zugang_geheimnis` und `infomaniak_ai_token` unter `/run/secrets/`; fehlt eine oder ist sie
   leer, bricht der Start ab. Seed: `seed/<code>/konfiguration.json`. Ohne `--geschaeftsjahr-ende` gilt das
   Geschäftsjahresende aus dem Seed (`einstellungen.geschaeftsjahrEnde`, für `urinet` und `vhf-gsk` `12-31`).
+- `--rollen` setzt die vergebbaren Verwaltungsrollen als kommagetrennte Liste aus `inhaber`, `mitarbeiter`,
+  `treuhaender` und `geschaeftsstelle`; ohne Option gelten die Rollen der Mandantenkonfiguration.
 - Der Mandant wird erst nach Seed, Schema-Prüfung und Bucket aktiv. Bricht ein Lauf ab, bleibt er inaktiv im Register;
-  derselbe Aufruf noch einmal setzt fort (mit abweichendem Namen oder Geschäftsjahresende: `MANDANT_EXISTIERT`).
+  derselbe Aufruf noch einmal setzt fort (mit abweichendem Namen, Geschäftsjahresende oder Rollensatz:
+  `MANDANT_EXISTIERT`). Ohne `--rollen` bleibt der eingetragene Rollensatz erhalten.
 - Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf (geprüft
   vor dem Start, mit Aufrufhilfe), 3 technischer Fehler, auch ein abgebrochener Start (design.md, «Mandant»).
 
