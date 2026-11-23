@@ -15,7 +15,8 @@ class UeberwachungsTaktTest {
     @Tag("req-16.24")
     void stufePUeberspringtDieUeberwachung() {
         AtomicBoolean geprueft = new AtomicBoolean();
-        Ueberwachung ueberwachung = new Ueberwachung(null, null, null, null, null, null, null, Duration.ofMinutes(1),
+        Ueberwachung ueberwachung = new Ueberwachung(null, null, null, null, null, null, null, null,
+                Duration.ofMinutes(1),
                 "urinet") {
             @Override
             public int pruefen() {

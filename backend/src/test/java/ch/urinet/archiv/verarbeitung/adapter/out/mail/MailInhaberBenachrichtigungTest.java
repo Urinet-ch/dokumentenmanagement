@@ -13,6 +13,7 @@ import io.quarkus.mailer.Mailer;
 import io.smallrye.config.SmallRyeConfigBuilder;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -163,5 +164,20 @@ class MailInhaberBenachrichtigungTest {
                 new Befund(Befund.Quelle.DOKUMENT, UUID.randomUUID().toString(), "VERARBEITUNG"));
 
         assertThat(text).doesNotContain("Standard 1 Stunde").contains("archiv.ueberwachung.grenze");
+    }
+
+    @Test
+    void abgleichalarmNenntZeitArtUndKennungOhnePersonenangaben() {
+        var befund = new Befund(Befund.Quelle.ABGLEICH, DOKUMENT.toString(), "MEHRERE_ROLLEN",
+                Instant.parse("2026-11-22T22:00:00Z"));
+        var benachrichtigung = benachrichtigung("inhaber@example.ch", mails -> gesendet.addAll(List.of(mails)));
+
+        assertThat(benachrichtigung.alarm(MANDANT, befund)).isTrue();
+        assertThat(gesendet).singleElement().satisfies(mail -> {
+            assertThat(mail.getSubject()).isEqualTo("UriNet Archiv: Abweichung in der Benutzerverwaltung");
+            assertThat(mail.getText()).contains("Aktion: BENUTZER_ABWEICHUNG", "Anzahl: 1",
+                    "Zeit: 2026-11-22T22:00:00Z", "Kennung: " + DOKUMENT, "MEHRERE_ROLLEN");
+            assertThat(mail.getText()).doesNotContain("@", "://");
+        });
     }
 }

@@ -32,6 +32,13 @@ describe('Rechte (Req 2.2, 2.6)', () => {
     }
   });
 
+  it('erlaubt die Markierung von Wissensquellen nur Inhaber und Geschäftsstelle (A16)', () => {
+    expect(darf('inhaber', 'A16')).toBe(true);
+    expect(darf('geschaeftsstelle', 'A16')).toBe(true);
+    expect(darf('mitarbeiter', 'A16')).toBe(false);
+    expect(darf('treuhaender', 'A16')).toBe(false);
+  });
+
   it('erlaubt die Benutzerübersicht nur dem Inhaber (A21)', () => {
     expect(darf('inhaber', 'A21')).toBe(true);
     for (const rolle of ['treuhaender', 'mitarbeiter', 'geschaeftsstelle'] as const) {

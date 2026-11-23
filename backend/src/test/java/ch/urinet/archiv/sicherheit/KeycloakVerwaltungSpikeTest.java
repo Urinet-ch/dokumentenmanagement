@@ -157,7 +157,8 @@ class KeycloakVerwaltungSpikeTest {
                     "mandantensuche", 200, "rollenmitglieder", 403, "benutzer", 200, "rollen", 200));
             var adapter = new KeycloakAdminAdapter(OBJECT_MAPPER, Optional.of(basisUrl), REALM,
                     clientIdName, Optional.of(clientSecret), "archiv-pwa", Optional.empty(),
-                    Duration.ofSeconds(2), Duration.ofSeconds(5));
+                    Duration.ofSeconds(2), Duration.ofSeconds(5),
+                    statusCode -> { throw new AssertionError("Unerwarteter Dienstkonto-Alarm: " + statusCode); });
             assertThat(adapter.benutzerSuchen("vhf-gsk", "inhaber", 0, 1))
                     .extracting(benutzer -> benutzer.benutzername())
                     .containsExactly("inhaber-vhf-gsk");
