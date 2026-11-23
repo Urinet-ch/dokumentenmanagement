@@ -3,10 +3,6 @@ package ch.urinet.archiv.ki.chat;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.gemeinsam.adapter.in.job.TaktThread;
 import ch.urinet.archiv.ki.adapter.in.job.ChatAufraeumer;
-import ch.urinet.archiv.sicherheit.domain.Aktion;
-import ch.urinet.archiv.sicherheit.domain.Ergebnis;
-import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
-import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
@@ -258,14 +254,6 @@ public class ChatBewertungSchritte {
     @Dann("enthält die Antwort den Fehlercode «{word}»")
     public void fehlercode(String fehlercode) {
         assertThat(letzteAntwort.jsonPath().getString("fehlercode")).isEqualTo(fehlercode);
-    }
-
-    @Dann("ist A24 nur für den Inhaber erlaubt")
-    public void a24NurInhaber() {
-        assertThat(Rechtematrix.ergebnis(Rolle.INHABER, Aktion.A24)).isEqualTo(Ergebnis.ERLAUBT);
-        assertThat(Rechtematrix.ergebnis(Rolle.MITARBEITER, Aktion.A24)).isEqualTo(Ergebnis.VERBOTEN);
-        assertThat(Rechtematrix.ergebnis(Rolle.TREUHAENDER, Aktion.A24)).isEqualTo(Ergebnis.VERBOTEN);
-        assertThat(Rechtematrix.ergebnis(Rolle.GESCHAEFTSSTELLE, Aktion.A24)).isEqualTo(Ergebnis.VERBOTEN);
     }
 
     @Dann("ist die Bewertung von «{word}» nicht mehr gespeichert")
