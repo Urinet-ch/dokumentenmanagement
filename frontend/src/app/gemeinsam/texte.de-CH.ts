@@ -1942,4 +1942,15 @@ export const TEXTE = {
     titel: 'Zugang verwalten',
     laeuft: 'Die Aktion wird ausgeführt …',
   },
+  benutzerRollendialog: {
+    titel: 'Rolle ändern',
+    hinweis: 'Die neue Rolle ersetzt die bisherigen Rollen. Bestehende Anmeldetokens werden bei einer direkten Änderung ungültig. Eine Inhaberrolle kann die Bestätigung durch eine zweite Person benötigen.',
+    auswahl: 'Neue Rolle',
+    waehlen: 'Bitte wählen',
+    bisher: 'Bisherige Rechte',
+    neu: 'Neue Rechte',
+    keine: 'Keine bisherige Archiv-Rolle.',
+    abbrechen: 'Abbrechen',
+    bestaetigen: 'Rollenänderung bestätigen',
+  },
 } as const;
