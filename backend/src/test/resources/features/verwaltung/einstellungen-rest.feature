@@ -70,6 +70,45 @@ Funktionalität: Einstellungen über die REST-Schnittstelle verwalten
     Wenn eine UID über REST geändert wird
     Dann enthält das Änderungsprotokoll nur den Pfad und nicht die UID-Werte
 
+  @req-2.8
+  Szenario: Die Vorschau verlangt eine vorhandene und aktuelle Versionsmarke
+    Wenn «inhaber-urinet» eine Vorschau der Branding-Änderung ohne Versionsmarke sendet
+    Dann antwortet die Einstellungsverwaltung mit Status 428 und ETag des Ausgangsstands
+    Wenn «inhaber-urinet» eine Vorschau der Branding-Änderung mit veralteter Versionsmarke sendet
+    Dann antwortet die Einstellungsverwaltung mit Status 412 und ETag des Ausgangsstands
+    Und sind Version und Änderungsprotokoll unverändert
+
+  @req-2.8
+  Szenario: Die Rücksetzung verlangt eine vorhandene und aktuelle Versionsmarke
+    Wenn «inhaber-urinet» eine Rücksetzung ohne Versionsmarke sendet
+    Dann antwortet die Einstellungsverwaltung mit Status 428 und ETag des Ausgangsstands
+    Wenn «inhaber-urinet» eine Rücksetzung mit veralteter Versionsmarke sendet
+    Dann antwortet die Einstellungsverwaltung mit Status 412 und ETag des Ausgangsstands
+    Und sind Version und Änderungsprotokoll unverändert
+
+  @req-2.3 @req-2.5
+  Szenario: Die Rücksetzung lehnt eine unbekannte Version und ein unbekanntes Feld ab
+    Wenn «inhaber-urinet» eine unbekannte Einstellungsversion wiederherstellt
+    Dann antwortet die Einstellungsverwaltung mit Status 404
+    Und ist der Fehlercode der Einstellungsverwaltung «NICHT_GEFUNDEN»
+    Wenn «inhaber-urinet» ein unbekanntes Feld beim Zurücksetzen sendet
+    Dann antwortet die Einstellungsverwaltung mit Status 422
+    Und ist der Fehlercode der Einstellungsverwaltung «KONFIGURATION_UNGUELTIG»
+    Und sind Version und Änderungsprotokoll unverändert
+
+  @req-2.9 @grenze-einstellungen-zwei
+  Szenario: Die Einstellungsrate zählt echte REST-Änderungen
+    Angenommen die Einstellungsrate ist auf zwei Änderungen begrenzt
+    Wenn «inhaber-urinet» den Archivnamen per REST auf "Rate Test Eins" setzt
+    Dann antwortet die Einstellungsverwaltung mit Status 200
+    Wenn «inhaber-urinet» den Archivnamen per REST auf "Rate Test Zwei" setzt
+    Dann antwortet die Einstellungsverwaltung mit Status 200
+    Wenn «inhaber-urinet» den Archivnamen per REST auf "Rate Test Drei" setzt
+    Dann antwortet die Einstellungsverwaltung mit Status 429
+    Und ist der Fehlercode der Einstellungsverwaltung «ZU_VIELE_ANFRAGEN»
+    Und bleibt die Versionsmarke der Einstellungsverwaltung unverändert
+    Und sind nach zwei angenommenen Änderungen genau zwei Protokolleinträge entstanden
+
   @req-2.5 @req-2.7 @req-2.9 @req-2.11
   Szenario: Vorschau, Änderung und Rücksetzung bleiben auf den eigenen Mandanten beschränkt
     Wenn die REST-Änderung des Archivnamens als Vorschau gesendet wird
