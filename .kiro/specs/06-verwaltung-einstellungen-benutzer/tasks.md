@@ -224,7 +224,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 9.4_
   - _Abhängig von: 21.1, 19.3_
 
-- [ ] 21.3 Isolations- und Eskalationstests [QA]
+- [x] 21.3 Isolations- und Eskalationstests [QA]
   - `VerwaltungIsolationIT` (zwei Mandanten, vier Rollen, alle Endpunkte), `EskalationTest` (Matrix), `LetzterInhaberTest` mit
     gleichzeitigen Aufrufen, `RollenGrenzeTest`, Rechtematrix-Test; Beispiel-Mandant ohne Bezug zu `urinet`.
   - _Anforderungen: 4.2, 4.3, 4.6, 4.7, 4.8, 4.10, 9.5, 9.6_

@@ -88,6 +88,8 @@ public class WissenLesenSchritte {
     private Response suchergebnis;
     private long auftragsStand;
     private long nachberechnungId;
+    private String archivAufruf;
+    private String wissensAufruf;
     private String chatIndex;
     private String chatSeite;
     private String chatInterneSeite;
@@ -198,6 +200,50 @@ public class WissenLesenSchritte {
                 KiWireMock.ChatAntwort.werkzeuge(10, 2, new KiWireMock.ChatAufruf("wissen_seite_zeigen",
                         "{\"pfad\":\"" + normaleSeitePfad + "\"}")),
                 KiWireMock.ChatAntwort.text("Die Wissensseite nennt eine Aussage.", 10, 2)));
+    }
+
+    /** Spec 04, Requirement 21.2: simulierte Aufrufe von Archivwerkzeugen im Wissenschat, danach der gültige Weg. */
+    @Angenommen("das simulierte Sprachmodell ruft im Wissenschat zuerst Archivwerkzeuge auf und liest dann die Wissensseite")
+    public void archivwerkzeugeImWissenschat() {
+        KiWireMock.chatFolge(List.of(
+                KiWireMock.ChatAntwort.werkzeuge(10, 2,
+                        new KiWireMock.ChatAufruf("dokumente_suchen", "{\"frage\":\"Leseprobe\"}"),
+                        new KiWireMock.ChatAufruf("dokument_zeigen", "{\"id\":\"" + normaleQuelle + "\"}"),
+                        new KiWireMock.ChatAufruf("kennzahl", "{\"messgroesse\":\"EINNAHMEN\"}"),
+                        new KiWireMock.ChatAufruf("wissen_index", "{}")),
+                KiWireMock.ChatAntwort.werkzeuge(10, 2, new KiWireMock.ChatAufruf("wissen_seite_zeigen",
+                        "{\"pfad\":\"" + normaleSeitePfad + "\"}")),
+                KiWireMock.ChatAntwort.text("Die Wissensseite nennt eine Aussage.", 10, 2)));
+    }
+
+    @Angenommen("das simulierte Sprachmodell antwortet im Wissenschat nacheinander mit Index, Seite und Text")
+    public void wissenschatMitTokens() {
+        KiWireMock.chatFolge(List.of(
+                KiWireMock.ChatAntwort.werkzeuge(100, 20, new KiWireMock.ChatAufruf("wissen_index", "{}")),
+                KiWireMock.ChatAntwort.werkzeuge(150, 30, new KiWireMock.ChatAufruf("wissen_seite_zeigen",
+                        "{\"pfad\":\"" + normaleSeitePfad + "\"}")),
+                KiWireMock.ChatAntwort.text("Die Wissensseite nennt eine Aussage.", 200, 40)));
+    }
+
+    @Wenn("ein Archivwerkzeug im Wissenskontext aufgerufen wird")
+    public void archivwerkzeugImWissenskontext() throws Exception {
+        String lauf = UUID.randomUUID().toString();
+        var benutzer = new Benutzer(MITARBEITER, Rolle.MITARBEITER);
+        chatKontexte.festhalten(lauf, new WerkzeugKontext(new MandantCode("urinet"), benutzer, benutzer.rolle(),
+                ch.urinet.archiv.sicherheit.domain.Sichtregel.fuer(benutzer), java.util.Optional.empty(),
+                ch.urinet.archiv.ki.domain.chat.Chatmodus.WISSEN));
+        try (var thread = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            archivAufruf = thread.submit(() -> chatWerkzeuge.dokumentZeigen(lauf, normaleQuelle.toString())).get();
+            wissensAufruf = thread.submit(() -> chatWerkzeuge.wissenIndex(lauf, null, null, null)).get();
+        } finally {
+            chatKontexte.entfernen(lauf);
+        }
+    }
+
+    @Dann("antwortet das Archivwerkzeug mit «Werkzeug nicht verfügbar» und das Wissenswerkzeug mit der Seite")
+    public void archivwerkzeugGesperrt() {
+        assertThat(archivAufruf).contains("Werkzeug nicht verfügbar").doesNotContain(normaleQuelle.toString());
+        assertThat(wissensAufruf).contains(normaleSeitePfad);
     }
 
     @Angenommen("eine Wissensleseseite enthält eine synthetische Anweisung")

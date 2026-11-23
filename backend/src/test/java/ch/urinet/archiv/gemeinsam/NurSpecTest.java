@@ -209,7 +209,8 @@ class NurSpecTest {
      * sie aus; darum brauchen sie keinen Eintrag in SPEC_TESTS (Spec 03, Aufgabe 11.6). Ihre Quelle nennt keine .md-Datei.
      */
     private static final java.util.Map<String, String> OHNE_MARKDOWN = java.util.Map.of(
-            "PublicVertragTest", "docs/schnittstelle/public-v1.yaml (Vertrag der Webseiten-Schnittstelle)");
+            "PublicVertragTest", "docs/schnittstelle/public-v1.yaml (Vertrag der Webseiten-Schnittstelle)",
+            "WorkflowSecretsTest", "docs/betrieb/secretformate-workflow.diff (Deploy-Vorschlag)");
 
     /**
      * Jede Testklasse mit einem Pfad nach .kiro/ oder docs/ steht in SPEC_TESTS; ist sie keine Testklasse (Hilfstyp wie

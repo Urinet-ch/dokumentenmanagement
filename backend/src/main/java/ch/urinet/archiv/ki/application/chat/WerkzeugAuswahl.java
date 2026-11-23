@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.application.chat;
 
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.konfiguration.application.Funktionen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -18,7 +19,8 @@ import java.util.function.Predicate;
  * {@value #FRISTEN}; dazu {@value #KENNZAHL} und {@value #OFFENE_POSTEN} nur mit
  * {@link Funktionen#finanzVerfuegbar()} des Mandanten (Aufgabe 7.1b, Spec 05, Req 8.8); {@code vollstaendigkeit} nur für Rollen, die A3 und A4
  * uneingeschränkt sehen (Aufgabe 7.1c, {@link #vollstaendigkeitErlaubt}; für andere fehlt es in der Liste, Spec 05,
- * Req 5.4). Jede
+ * Req 5.4). Im Modus {@link Chatmodus#WISSEN} nur {@value #WISSEN_INDEX} und {@value #WISSEN_SEITE_ZEIGEN}
+ * (Spec 04, Requirement 21.2). Jede
  * Werkzeugmethode prüft die Auswahl beim Aufruf nochmals, ein nicht angebotenes Werkzeug antwortet nicht (fail closed).
  */
 @ApplicationScoped
@@ -53,6 +55,10 @@ public class WerkzeugAuswahl {
 
     /** Namen der angebotenen Werkzeuge in fester Reihenfolge. */
     public List<String> angeboten(WerkzeugKontext kontext) {
+        if (kontext.modus() == Chatmodus.WISSEN) {
+            // Wissenschat (Spec 04, Requirement 21.2): nur die beiden Wissenswerkzeuge, kein Archivwerkzeug
+            return List.of(WISSEN_INDEX, WISSEN_SEITE_ZEIGEN);
+        }
         List<String> namen = new ArrayList<>(List.of(DOKUMENTE_SUCHEN, DOKUMENT_ZEIGEN, FRISTEN));
         if (finanz(kontext.mandant())) {
             namen.add(KENNZAHL);

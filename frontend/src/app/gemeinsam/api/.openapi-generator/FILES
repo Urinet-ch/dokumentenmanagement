@@ -52,6 +52,7 @@ model/chat-bewertung-export-eingabe.ts
 model/chat-bewertung.ts
 model/chat-einstellungen.ts
 model/chat-frage.ts
+model/chat-gespraech-anlegen.ts
 model/chat-gespraech.ts
 model/chat-nachricht.ts
 model/chat-quelldokument.ts

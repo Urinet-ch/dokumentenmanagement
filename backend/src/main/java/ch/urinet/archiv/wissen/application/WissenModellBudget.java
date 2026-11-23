@@ -34,6 +34,16 @@ public class WissenModellBudget {
         if (!rerankerStub) pruefen();
     }
 
+    /**
+     * Vor jeder Frage eines Wissenschats (Spec 04, Requirement 21.7, 13.6): Ist das Monatsbudget der Wissensbasis
+     * erschöpft, 429 {@code BUDGET}. Läuft in der Transaktion der Annahme; der Chat verwendet keine Stubs, die das
+     * Budget umgehen.
+     */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public void chatPruefen() {
+        pruefen();
+    }
+
     private void pruefen() {
         var einstellungen = port.budgetEinstellungenLaden();
         long grenze = einstellungen.monatsbudgetTokens() == null

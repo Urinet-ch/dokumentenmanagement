@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.application.chat;
 import ch.urinet.archiv.ki.domain.chat.Aufgeraeumt;
 import ch.urinet.archiv.ki.domain.chat.ChatAntwort;
 import ch.urinet.archiv.ki.domain.chat.ChatBewertung;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.ki.domain.chat.Gespraech;
 import ch.urinet.archiv.ki.domain.chat.GespraechKopf;
 import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
@@ -22,8 +23,11 @@ public interface ChatSpeicher {
     /** Sperrt die Fragen des Benutzers bis zum Ende der laufenden Transaktion (Zählen und Speichern ohne Wettlauf). */
     void benutzerSperren(String benutzer);
 
-    /** Gehört das Gespräch dem Benutzer? Sperrt es dann bis zum Ende der Transaktion gegen den Aufräumer. */
-    boolean gehoertSperren(UUID gespraech, String benutzer);
+    /**
+     * Modus des Gesprächs, wenn es dem Benutzer gehört (sonst leer). Sperrt es dann bis zum Ende der Transaktion gegen
+     * den Aufräumer.
+     */
+    Optional<Chatmodus> gespraechSperren(UUID gespraech, String benutzer);
 
     /**
      * Zeit der {@code grenze}-neuesten Frage des Benutzers nach {@code seit}; leer, wenn es weniger als {@code grenze}
@@ -31,7 +35,21 @@ public interface ChatSpeicher {
      */
     Optional<Instant> grenzFrage(String benutzer, Instant seit, int grenze);
 
-    void gespraechAnlegen(UUID id, String benutzer, String titel, Instant zeit);
+    void gespraechAnlegen(UUID id, String benutzer, String titel, Chatmodus modus, Instant zeit);
+
+    /** Gespräch im Modus {@link Chatmodus#ARCHIV}. */
+    default void gespraechAnlegen(UUID id, String benutzer, String titel, Instant zeit) {
+        gespraechAnlegen(id, benutzer, titel, Chatmodus.ARCHIV, zeit);
+    }
+
+    /**
+     * ID des neuesten Gesprächs des Benutzers im Modus ohne jede Nachricht (angelegt über
+     * {@code POST /chat/gespraeche}, noch nicht gefragt), sperrt es bis zum Ende der Transaktion.
+     */
+    Optional<UUID> leeresGespraechSperren(String benutzer, Chatmodus modus);
+
+    /** Setzt den Titel eines Gesprächs ohne Nachrichten; ein Gespräch mit Nachrichten behält seinen Titel. */
+    void titelSetzenWennLeer(UUID gespraech, String titel);
 
     /** Die letzten {@code anzahl} Fragen und Antworten mit Inhalt, älteste zuerst. */
     List<VerlaufEintrag> verlauf(UUID gespraech, int anzahl);
