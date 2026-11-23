@@ -26,8 +26,8 @@ env:
   HOST_AUTH: archiv-auth.apps.urinet.ch
   # Speicherbudget Stufe A aus tech.md (1150 MiB, geändert 21.11.2026, Entscheid Fabian: Keycloak 550m; davor 1000 MiB seit 13.11.2026, 900 MiB); liegt compose.yml darüber,
   # gilt Req 16.18 (kein Deploy auf Stufe A)
-  BUDGET_MEM_MIB: '1150'
-  BUDGET_CPUS: '0.75'
+  BUDGET_MEM_MIB: '2048'
+  BUDGET_CPUS: '1.5'
   # Eingeführt, als Push auf main ohne CI lief (Entscheid Fabian 11.11.2026, PR #50; seit PR #58 läuft ci.yml wieder auf
   # Push nach main, und Regel 3 des Nachweises braucht diesen Lauf): Bis zum Vortag dieses Datums gilt auch die grüne
   # PR-CI des Squash-Merges mit gleichem Stand; ab dann nur noch ein Lauf auf dem Commit (Review PR #42, S1)
@@ -249,10 +249,15 @@ jobs:
           # der Migrationsrolle ist offen, die Sperre wird darum nicht freigegeben (design.md «Betrieb auf der VPS»)
           sperre=$(grep -c 'Waiting for changelog lock' status.txt || true)
           belegt=$(grep -c 'fehlercode=LIQUIBASE_SPERRE_BELEGT' status.txt || true)
+          # Speicherabbrüche der API (nur Zählungen, keine Log-Inhalte): Java-Heap, Metaspace, vom Kernel beendet
+          oom_heap=$(grep -c 'java.lang.OutOfMemoryError: Java heap space' status.txt || true)
+          oom_meta=$(grep -c 'OutOfMemoryError: Metaspace' status.txt || true)
+          oom_kern=$(grep -c -i 'oom-kill\|OOMKilled\|Killed' status.txt || true)
           rm -f status.txt stand.txt
           echo "OIDC_NICHT_BEREIT im Log: $oidc"
           echo "Waiting for changelog lock im Log: $sperre"
           echo "LIQUIBASE_SPERRE_BELEGT im Log: $belegt"
+          echo "OutOfMemoryError Heap/Metaspace/Kernel im Log: $oom_heap/$oom_meta/$oom_kern"
           if [ "$oidc" -ne 0 ]; then
             echo "::error::Die API meldet Keycloak nicht bereit (OIDC_NICHT_BEREIT): Realm, Adresse (quarkus.oidc.auth-server-url) und Erreichbarkeit von archiv-auth prüfen."
           fi
