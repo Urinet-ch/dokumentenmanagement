@@ -717,3 +717,17 @@ bestätigt ihn mit Step-up. Rollenzuweisungen widerrufen bestehende Tokens. Unsi
 Ein internes Ereignis kennzeichnet erfolgreiche Inhabervergaben; die Alarmzustellung folgt in 19.13. Die
 Löschwirkung und die Bestätigung von Löschanträgen folgen in 19.12. Die Benutzeransicht liefert den Verweis und
 Hinweis zu API-Tokens; die Anzeige in der Oberfläche folgt in 20.6/20.7.
+
+## Umsetzung (Aufgabe 20.6, 23.11.2026)
+
+Die Benutzerseiten verwenden ausschliesslich die Lese-Endpunkte aus 19.7 und 19.11. Der Menüpunkt und beide Routen
+verlangen A21; ohne Recht zeigt der Direktaufruf «Nicht gefunden». Liste und Detail verwenden Karten, die
+Rechte-Übersicht zeigt die Ergebnisse und Fussnoten der API in vier Gruppen. Ein Rollenkonflikt verhindert das Laden
+der Rechte. Anträge sind lesend sichtbar; die Aktionen folgen in 20.7. API-Tokens und Webseiten-Schlüssel werden
+nicht über die Benutzerverwaltung ausgegeben; ein Hinweis verweist auf die separate Token-Verwaltung.
+
+Suche und Blättern nutzen die durch den REST-Vertrag begrenzte Seitengrösse 50. Ein voller letzter Abschnitt kann
+einen zusätzlichen Aufruf ergeben, weil der Vertrag keine Gesamtzahl liefert. Fehler bleiben sichtbar und sind
+wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut geladen. Der Browser-Nachweis nutzt
+synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
+Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
