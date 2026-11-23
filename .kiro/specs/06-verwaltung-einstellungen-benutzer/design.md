@@ -730,3 +730,17 @@ Die Compose- und Secret-Prüfungen sind lokal grün. Der Test gegen einen frisch
 `mktemp -d` unter macOS das eingehängte Arbeitsverzeichnis nicht verwendete. Die Vorlage nennt dieses Verzeichnis nun
 ausdrücklich; der vollständige Keycloak-Test und die Wirkung der Realm-Vorlage sind damit noch nicht nachgewiesen.
 Die Aufgabe bleibt offen und die Vorlage darf erst nach erfolgreicher Prüfung verwendet werden.
+
+## Umsetzung (Aufgabe 20.6, 23.11.2026)
+
+Die Benutzerseiten verwenden ausschliesslich die Lese-Endpunkte aus 19.7 und 19.11. Der Menüpunkt und beide Routen
+verlangen A21; ohne Recht zeigt der Direktaufruf «Nicht gefunden». Liste und Detail verwenden Karten, die
+Rechte-Übersicht zeigt die Ergebnisse und Fussnoten der API in vier Gruppen. Ein Rollenkonflikt verhindert das Laden
+der Rechte. Anträge sind lesend sichtbar; die Aktionen folgen in 20.7. API-Tokens und Webseiten-Schlüssel werden
+nicht über die Benutzerverwaltung ausgegeben; ein Hinweis verweist auf die separate Token-Verwaltung.
+
+Suche und Blättern nutzen die durch den REST-Vertrag begrenzte Seitengrösse 50. Ein voller letzter Abschnitt kann
+einen zusätzlichen Aufruf ergeben, weil der Vertrag keine Gesamtzahl liefert. Fehler bleiben sichtbar und sind
+wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut geladen. Der Browser-Nachweis nutzt
+synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
+Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
