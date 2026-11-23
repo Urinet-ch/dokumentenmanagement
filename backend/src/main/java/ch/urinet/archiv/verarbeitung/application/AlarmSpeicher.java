@@ -20,10 +20,13 @@ public interface AlarmSpeicher {
     void abgleichen(MandantCode mandant, Befund.Quelle quelle, Collection<Befund> befunde);
 
     /**
-     * Markiert einen offenen, noch nicht gemeldeten Alarm als gemeldet und liefert den Zeitpunkt des Anspruchs; leer,
-     * wenn er das schon ist.
+     * Beansprucht einen offenen, noch nicht gemeldeten Alarm; leer, wenn bereits ein Anspruch besteht. Für
+     * Verwaltungsalarme läuft ein Anspruch nach zehn Minuten ab und die Zustellung muss bestätigt werden.
      */
     Optional<Instant> beanspruchen(MandantCode mandant, Befund befund);
+
+    /** Bestätigt bei dauerhaft vorgemerkten Verwaltungsalarmen die Zustellung für den aktuellen Anspruch. */
+    void bestaetigen(MandantCode mandant, Befund befund, Instant anspruch);
 
     /**
      * Nimmt die Markierung zurück, weil die Mail nicht zugestellt wurde; der nächste Lauf versucht es wieder. Wirkt nur,

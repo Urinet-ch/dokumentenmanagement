@@ -35,4 +35,21 @@ class VerwaltungProtokollTest {
         assertThatThrownBy(() -> new ProtokollDetails("Grund", null, null, null, null, null, null, null, null,
                 null, null, details.verwaltung())).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void serialisiertAbgleichcodeMitZielkennungOhnePersoenlicheAngaben() throws Exception {
+        UUID ziel = UUID.randomUUID();
+        var details = ProtokollDetails.verwaltung(new ProtokollDetails.Verwaltung(UUID.randomUUID(),
+                ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN, ziel, ProtokollDetails.Verwaltungsvorgang.ABWEICHUNG,
+                null, null, List.of(), null, ProtokollDetails.Verwaltungsabweichung.MEHRERE_ROLLEN));
+        String text = JdbcZugriffProtokoll.json(details);
+        var json = new ObjectMapper().readTree(text);
+        assertThat(json.path("abweichung").asText()).isEqualTo("MEHRERE_ROLLEN");
+        assertThat(json.path("ziel").asText()).isEqualTo(ziel.toString());
+        assertThat(text).doesNotContain("@", "://");
+        assertThatThrownBy(() -> new ProtokollDetails.Verwaltung(UUID.randomUUID(),
+                ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN, ziel,
+                ProtokollDetails.Verwaltungsvorgang.ANLEGEN, null, null, List.of(), null,
+                ProtokollDetails.Verwaltungsabweichung.MEHRERE_ROLLEN)).isInstanceOf(IllegalArgumentException.class);
+    }
 }
