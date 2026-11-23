@@ -32,7 +32,7 @@ class KonfigurationMigrationTest {
 
     private static final List<String> SCHEMAS = List.of(
             "m_probe_konf037_a", "m_probe_konf037_b", "m_probe_volltext055_a", "m_probe_volltext055_b",
-            "m_probe_wissen121_a", "m_probe_wissen121_b");
+            "m_probe_wissen121_a", "m_probe_wissen121_b", "m_probe_wissen121_c", "m_probe_wissen121_d");
     private static final PanacheKonfigurationVersionsRepository LESER =
             new PanacheKonfigurationVersionsRepository(new ObjectMapper());
 
@@ -188,6 +188,8 @@ class KonfigurationMigrationTest {
                 befehl.execute("set search_path to " + schema);
                 alleMigrieren(verbindung, schema);
                 aendern(verbindung, schema, "rollbackCount", 1);
+                int protokolleVorher = Integer.parseInt(wert(befehl, "select count(*)::text from zugriff_protokoll "
+                        + "where aktion = 'KONFIGURATION_AENDERN' and benutzer = 'system:migration'"));
                 String werte = schema.endsWith("_a")
                         ? "123456, 234567, '0 0 23 ? * MON', 345678"
                         : "1, 2000000, '0 0/15 * * * ?', 2";
@@ -204,7 +206,8 @@ class KonfigurationMigrationTest {
                 assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex'))"
                         + "::text from konfiguration_version order by version desc limit 1")).isEqualTo("true");
                 assertThat(wert(befehl, "select count(*)::text from zugriff_protokoll "
-                        + "where aktion = 'KONFIGURATION_AENDERN' and benutzer = 'system:migration'")).isEqualTo("1");
+                        + "where aktion = 'KONFIGURATION_AENDERN' and benutzer = 'system:migration'"))
+                        .isEqualTo(Integer.toString(protokolleVorher + 1));
                 if (schema.endsWith("_a")) {
                     assertThat(wissen.budgetTokens()).isEqualTo(123456);
                     assertThat(wissen.lintBudgetTokens()).isEqualTo(234567);
@@ -221,13 +224,47 @@ class KonfigurationMigrationTest {
                     assertThat(wert(befehl, "select lint_zeitplan from wissens_einstellung_migration"))
                             .isEqualTo("0 0/15 * * * ?");
                     assertThat(wert(befehl, "select details::text from zugriff_protokoll "
-                            + "where benutzer = 'system:migration'")).contains("wissen.lintZeitplan",
+                            + "where benutzer = 'system:migration' and details->>'grund' "
+                            + "= 'Nicht darstellbare Wissenswerte auf Katalogstandard gesetzt'")).contains("wissen.lintZeitplan",
                             "wissen.budgetTokens", "wissen.lintBudgetTokens", "wissen.monatsbudgetTokens");
                 }
                 String alt = wert(befehl, "select to_jsonb(e)::text from wissens_einstellung e");
                 aendern(verbindung, schema, "rollbackCount", 1);
                 verbindung.commit();
                 assertThat(wert(befehl, "select to_jsonb(e)::text from wissens_einstellung e")).isEqualTo(alt);
+            }
+        }
+    }
+
+    @Test
+    void auchFehlendeUndLeereWissenswerteErzeugenEineVersionOhneEigeneWerte() throws Exception {
+        for (String schema : SCHEMAS.subList(6, 8)) {
+            try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("create schema " + schema);
+                befehl.execute("set search_path to " + schema);
+                alleMigrieren(verbindung, schema);
+                aendern(verbindung, schema, "rollbackCount", 1);
+                if (schema.endsWith("_d")) {
+                    befehl.execute("insert into wissens_einstellung (id) values (1)");
+                }
+                int vorher = Integer.parseInt(wert(befehl, "select max(version)::text from konfiguration_version"));
+                verbindung.commit();
+
+                migrieren(verbindung, schema, 1);
+                verbindung.commit();
+
+                assertThat(wert(befehl, "select max(version)::text from konfiguration_version"))
+                        .isEqualTo(Integer.toString(vorher + 1));
+                assertThat(wert(befehl, "select quelle from konfiguration_version order by version desc limit 1"))
+                        .isEqualTo("MIGRATION");
+                String inhalt = wert(befehl, "select inhalt::text from konfiguration_version order by version desc limit 1");
+                var wissen = LESER.lesen(inhalt).einstellungen().wissen();
+                assertThat(wissen.budgetTokens()).isNull();
+                assertThat(wissen.lintBudgetTokens()).isNull();
+                assertThat(wissen.monatsbudgetTokens()).isNull();
+                assertThat(wissen.lintZeitplan().wochentag()).isNull();
+                assertThat(wissen.lintZeitplan().stunde()).isNull();
+                assertThat(wert(befehl, "select count(*)::text from wissens_einstellung_migration")).isEqualTo("0");
             }
         }
     }

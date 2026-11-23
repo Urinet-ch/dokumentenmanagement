@@ -9427,12 +9427,14 @@
         "description" : "Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.",
         "tags" : [ "Wissensbasis" ],
         "parameters" : [ {
+          "description" : "Bestätigte riskante Einstellungen",
           "name" : "bestaetigt",
           "in" : "query",
           "schema" : {
             "type" : "string"
           }
         }, {
+          "description" : "Version der Konfiguration",
           "name" : "If-Match",
           "in" : "header",
           "schema" : {

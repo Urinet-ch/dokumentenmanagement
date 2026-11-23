@@ -290,8 +290,8 @@ export class WissensbasisService extends BaseService {
      * Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.
      * @endpoint put /api/v1/wissensbasis/einstellungen
      * @param wissenEinstellungen 
-     * @param bestaetigt 
-     * @param ifMatch 
+     * @param bestaetigt Bestätigte riskante Einstellungen
+     * @param ifMatch Version der Konfiguration
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options

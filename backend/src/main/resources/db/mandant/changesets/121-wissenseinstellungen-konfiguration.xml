@@ -29,10 +29,6 @@
                 ersetzte text[] := array[]::text[];
             begin
                 select * into alt from wissens_einstellung where id = 1;
-                if not found or (alt.budget_tokens is null and alt.lint_budget_tokens is null
-                        and alt.monatsbudget_tokens is null and alt.lint_zeitplan is null) then
-                    return;
-                end if;
                 select version, inhalt into nummer, vorher from konfiguration_version order by version desc limit 1;
                 if not found then
                     raise exception 'Wissenseinstellungen: Konfigurationsversion fehlt';

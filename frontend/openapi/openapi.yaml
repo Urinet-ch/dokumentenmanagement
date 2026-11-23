@@ -7699,11 +7699,13 @@ paths:
       tags:
       - Wissensbasis
       parameters:
-      - name: bestaetigt
+      - description: Bestätigte riskante Einstellungen
+        name: bestaetigt
         in: query
         schema:
           type: string
-      - name: If-Match
+      - description: Version der Konfiguration
+        name: If-Match
         in: header
         schema:
           type: string

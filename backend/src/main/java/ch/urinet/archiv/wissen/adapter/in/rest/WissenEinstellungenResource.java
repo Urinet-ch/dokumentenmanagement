@@ -32,6 +32,7 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -99,7 +100,9 @@ public class WissenEinstellungenResource {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = WerteDto.class)))
     @APIResponse(responseCode = "422", description = "Budget oder Zeitplan ungültig")
-    public Response speichern(@HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
+    public Response speichern(@Parameter(description = "Version der Konfiguration")
+                              @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
+                              @Parameter(description = "Bestätigte riskante Einstellungen")
                               @QueryParam("bestaetigt") String bestaetigt, InputStream body) throws IOException {
         aufloesung.pruefen();
         Anfrage anfrage = lesen(body);
