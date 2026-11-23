@@ -80,4 +80,14 @@ describe('Benutzerstatusaktionen', () => {
     expect(ergebnis).not.toHaveBeenCalled();
     expect(element.querySelector('button')!.disabled).toBe(false);
   });
+
+  it('bietet bei deaktiviertem Konto trotz temporärer Sperre kein Entsperren an', () => {
+    const { fixture, element } = starten({ id: 'ziel', benutzername: 'alex', status: 'DEAKTIVIERT' });
+    fixture.componentRef.setInput('person', {
+      id: 'ziel', benutzername: 'alex', status: 'DEAKTIVIERT', voruebergehendGesperrt: true,
+    });
+    fixture.detectChanges();
+    expect(element.textContent).not.toContain(TEXTE.benutzerStatusdialog.aktionen.entsperren.titel);
+    expect(element.textContent).toContain(TEXTE.benutzerStatusdialog.aktionen.reaktivieren.titel);
+  });
 });

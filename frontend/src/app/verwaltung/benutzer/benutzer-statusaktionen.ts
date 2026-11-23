@@ -45,11 +45,14 @@ export class BenutzerStatusaktionen {
   protected readonly laufend = signal(false);
   protected readonly aktionen = computed(() => {
     const person = this.person();
-    if (!person.id || !person.benutzername || person.rollenkonflikt) return [];
+    if (!person.id || !person.benutzername || !this.akteurId() || person.rollenkonflikt) return [];
     const selbst = person.id === this.akteurId();
     const ergebnis: BenutzerStatusAktion[] = [];
     if (!selbst && person.status === 'AKTIV') ergebnis.push('sperren');
-    if (person.status === 'GESPERRT' || person.voruebergehendGesperrt) ergebnis.push('entsperren');
+    if (person.status === 'GESPERRT'
+        || ((person.status === 'AKTIV' || person.status === 'EINGELADEN') && person.voruebergehendGesperrt)) {
+      ergebnis.push('entsperren');
+    }
     if (!selbst && (person.status === 'AKTIV' || person.status === 'GESPERRT'
         || person.status === 'EINGELADEN')) ergebnis.push('deaktivieren');
     if (person.status === 'DEAKTIVIERT') ergebnis.push('reaktivieren');
