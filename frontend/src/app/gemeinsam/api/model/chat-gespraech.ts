@@ -13,5 +13,17 @@ export interface ChatGespraech {
     id: string;
     titel: string;
     geaendert: string;
+    /**
+     * fester Modus des Gesprächs (Archivchat oder Wissenschat)
+     */
+    modus: ChatGespraech.ModusEnum;
 }
+export namespace ChatGespraech {
+    export const ModusEnum = {
+        Archiv: 'ARCHIV',
+        Wissen: 'WISSEN',
+    } as const;
+    export type ModusEnum = typeof ModusEnum[keyof typeof ModusEnum];
+}
+
 

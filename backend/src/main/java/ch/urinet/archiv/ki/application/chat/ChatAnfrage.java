@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.application.chat;
 
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
@@ -22,10 +23,12 @@ import java.util.UUID;
  *                      zuerst
  * @param geseheneDokumente IDs aus Werkzeugergebnissen dieses, dem Benutzer gehörenden Gesprächs
  * @param nummerierteTreffer IDs aus {@code dokumente_suchen}, in Reihenfolge ihres ersten Auftretens
+ * @param modus         fester Modus des Gesprächs (Spec 04, Requirement 21): bestimmt Werkzeugliste, Systemprompt und
+ *                      Verbrauchszweck
  */
 public record ChatAnfrage(MandantCode mandant, Benutzer benutzer, Sichtregel sichtregel, Optional<IpAdresse> ip,
                           String mandantenname, String frage, List<VerlaufEintrag> verlauf,
-                          List<UUID> geseheneDokumente, List<UUID> nummerierteTreffer) {
+                          List<UUID> geseheneDokumente, List<UUID> nummerierteTreffer, Chatmodus modus) {
 
     public ChatAnfrage {
         Objects.requireNonNull(mandant, "mandant");
@@ -37,6 +40,15 @@ public record ChatAnfrage(MandantCode mandant, Benutzer benutzer, Sichtregel sic
         verlauf = List.copyOf(verlauf);
         geseheneDokumente = List.copyOf(geseheneDokumente);
         nummerierteTreffer = List.copyOf(nummerierteTreffer);
+        Objects.requireNonNull(modus, "modus");
+    }
+
+    /** Frage im Modus {@link Chatmodus#ARCHIV}. */
+    public ChatAnfrage(MandantCode mandant, Benutzer benutzer, Sichtregel sichtregel, Optional<IpAdresse> ip,
+                       String mandantenname, String frage, List<VerlaufEintrag> verlauf,
+                       List<UUID> geseheneDokumente, List<UUID> nummerierteTreffer) {
+        this(mandant, benutzer, sichtregel, ip, mandantenname, frage, verlauf, geseheneDokumente, nummerierteTreffer,
+                Chatmodus.ARCHIV);
     }
 
     public ChatAnfrage(MandantCode mandant, Benutzer benutzer, Sichtregel sichtregel, Optional<IpAdresse> ip,

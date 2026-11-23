@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <!-- Spec 04, Requirement 21.1: fester Modus je Chat-Gespräch. Bestehende Gespräche und der Vorgänger-Release
+         bleiben Archivchat (Standard ARCHIV). Das Rollback entfernt nur die Prüfbedingung und behält die Spalte samt
+         Werten: Der Vorgänger-Release ignoriert sie, kein Gespräch geht verloren, ein wiederholtes Rollback und ein
+         erneutes Vorwärts-Changeset sind wirkungsgleich. -->
+    <changeSet id="130-chat-gespraech-modus" author="copilot">
+        <sql>
+            alter table chat_gespraech add column if not exists modus text not null default 'ARCHIV';
+            alter table chat_gespraech drop constraint if exists chat_gespraech_modus_ck;
+            alter table chat_gespraech add constraint chat_gespraech_modus_ck check (modus in ('ARCHIV', 'WISSEN'));
+        </sql>
+        <rollback>
+            <sql>
+                alter table chat_gespraech drop constraint if exists chat_gespraech_modus_ck;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
