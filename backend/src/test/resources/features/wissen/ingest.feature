@@ -1,7 +1,7 @@
 # language: de
 @spec-04
 Funktionalität: Start eines Ingests einer Wissensquelle
-  Der Start prüft Rechte, Status, Art, Seitenbereich, Vorprüfung (5.6) und Budget (13.4, 13.6); der Worker verarbeitet
+  Der Start prüft Rechte, Status, Markierung, Seitenbereich, Vorprüfung (5.6) und Budget (13.4, 13.6); der Worker verarbeitet
   anschliessend die vier Ingest-Teilaufträge. Nur synthetische Testdaten (Spec 01, Req 16.15).
 
   @req-5.2 @req-5.7
@@ -12,13 +12,13 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.2
   Szenario: Ein Treuhänder ohne Recht A16 kann keinen Ingest starten
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «BELEG» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «BELEG» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Wenn «treuhaender-urinet» den Ingest für «BELEG» startet
     Dann antwortet der Ingest-Endpunkt mit Status 403
 
   @req-5.3 @req-5.8 @req-13.3 @req-13.7 @req-1.4
   Szenario: Alle vier Ingest-Teilaufträge erstellen einen Entwurf
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und der Zustand von «QUELLE» mit Dokumentzeile und Dateizeilen ist festgehalten
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
@@ -31,7 +31,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
   @req-6.1
   Szenario: Nicht zugeordnete Kernaussagen bleiben im Ingest-Entwurf sichtbar
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
-    Und im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
     Und WireMock liefert eine zugeordnete und eine nicht zugeordnete Kernaussage
@@ -43,7 +43,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
   @req-7.6
   Szenario: Eine KI-Antwort setzt keine Freigabefelder oder Seitenstufe
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
-    Und im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
     Und WireMock liefert eine Seitenantwort mit manipulierten Freigabefeldern
@@ -54,7 +54,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.3 @req-5.8 @req-13.7 @req-13.8
   Szenario: Jeder Ingest-Teilauftrag fragt nach einer ungültigen Antwort einmal nach
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
     Und WireMock verlangt für alle vier Ingest-Schritte einmalig eine Korrektur
@@ -64,7 +64,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.6
   Szenario: Eine Personalunterlage erreicht die KI nicht
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «PERSONAL» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «PERSONAL» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «PERSONAL» hat Seitentext und eine PDF/A-Fassung
     Und das Dokument «PERSONAL» enthält synthetische Personendaten
     Und das Dokument «PERSONAL» hat Vertraulichkeit «PERSONAL»
@@ -75,7 +75,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.6 @req-13.6
   Szenario: Bei ausgeschöpftem Monatsbudget wird kein Ingest-Aufruf ausgeführt
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und WireMock ist zurückgesetzt
     Und das Monatsbudget der Wissensbasis ist ausgeschöpft
@@ -85,7 +85,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-13.5
   Szenario: Beim Erreichen des Ingest-Budgets bleibt ein unvollständiger Entwurf
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 600000 und das Monatsbudget 100000000 Tokens
     Und WireMock liefert eine gültige Kernaussage beim Erreichen des Ingest-Budgets
@@ -95,7 +95,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.3 @req-5.8 @req-11.6 @req-13.8
   Szenario: Eine Prompt-Injection im Dokumenttext ändert weder Regeln noch Freigabe
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
     Und das Dokument «QUELLE» enthält eine synthetische Prompt-Injection
@@ -108,7 +108,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.4
   Szenario: Ein grosser Index wird auf höchstens 40 passende Zeilen eingegrenzt
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis von «urinet» enthält mehr als 40 passende Seiten
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
@@ -118,9 +118,9 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
     Und die Planung übergibt höchstens 40 Indexzeilen
 
-  @req-5.5
+  @req-5.5 @req-20.7
   Szenario: Eine normale Quelle sieht keine Seiten höherer Vertraulichkeit
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis enthält eine Seite «konzepte/normale-probe» mit Stufe «NORMAL» und Marker «NORMAL_SEITE_MARKER»
     Und die Wissensbasis enthält eine Seite «konzepte/interne-probe» mit Stufe «INTERN» und Marker «INTERN_SEITE_MARKER»
@@ -133,7 +133,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.9 @req-13.8
   Szenario: Eine ungültige Planung nach der Nachfrage schliesst den Ingest mit Fehler ab
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
     Und WireMock liefert nach der Nachfrage eine ungültige Planung
@@ -141,7 +141,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Dann antwortet der Ingest-Endpunkt mit Status 202
     Und der Ingest endet nach einer ungültigen Planung mit «FEHLER»
 
-  @req-5.11 @req-11.7
+  @req-5.11 @req-11.7 @req-20.7
   Szenario: Eine interne Quelle liest den Überblick nicht und stuft den Entwurf intern ein
     Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «INTERN» und 2 Seiten
     Und das Dokument «QUELLE» hat ein Belegdatum
@@ -170,7 +170,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.3
   Szenario: Ein erneuter Ingest aktualisiert die bestehende Quelle-Seite
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensquelle «QUELLE» hat schon eine Quelle-Seite aus einem früheren Ingest
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
@@ -182,7 +182,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.12
   Szenario: Eine geplante Seite gibt keinen Inhalt einer unsichtbaren höheren Seite preis
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis enthält eine Seite «konzepte/interner-pfad» mit Stufe «INTERN» und Marker «GEHEIMER_SEITENINHALT»
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
@@ -195,9 +195,9 @@ Funktionalität: Start eines Ingests einer Wissensquelle
 
   @req-5.13 @req-13.7
   Szenario: Ein zweiter Ingest wartet auf den Abschluss der ersten Wissensquelle
-    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE1» der Art «WISSENSQUELLE»
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE1» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE1» hat Seitentext und eine PDF/A-Fassung
-    Und im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE2» der Art «WISSENSQUELLE»
+    Und im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE2» mit Vertraulichkeit «NORMAL» und 2 Seiten
     Und das Dokument «QUELLE2» hat Seitentext und eine PDF/A-Fassung
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
     Und WireMock liefert Antworten für zwei Wissensquellen nacheinander
@@ -304,14 +304,15 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Und hat «QUELLE» keinen neuen Ingest-Entwurf
 
   @req-5.1 @req-5.6
-  Szenario: Die Archivierung einer Wissensquelle ohne Volltext legt den Entwurf mit Hinweis an, andere Arten keinen
+  Szenario: Die Archivierung allein startet keinen Ingest
     Angenommen die Archivierung ist bereit
     Und im Mandanten «urinet» liegt das Dokument «W» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Und im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Wenn «inhaber-urinet» das Dokument «W» so bestätigt:
-      | art   | WISSENSQUELLE      |
-      | titel | Probe-Merkblatt    |
-      | datum | 2026-03-10         |
+      | art     | PROJEKTDOKUMENT  |
+      | titel   | Probe-Merkblatt  |
+      | datum   | 2026-03-10       |
+      | projekt | Probeprojekt     |
     Dann meldet das Archiv Status 202
     Wenn «inhaber-urinet» das Dokument «Q» so bestätigt:
       | art      | QUITTUNG       |
@@ -324,5 +325,5 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Wenn der Worker die Archivierung ausführt
     Dann ist das Dokument «W» im Status «ARCHIVIERT»
     Und ist das Dokument «Q» im Status «ARCHIVIERT»
-    Und hat das Dokument «W» einen Ingest-Entwurf im Status «FEHLER» mit dem Hinweis "nicht in die Wissensbasis übernommen – kein Volltext"
+    Und hat das Dokument «W» keinen Ingest-Entwurf
     Und hat das Dokument «Q» keinen Ingest-Entwurf

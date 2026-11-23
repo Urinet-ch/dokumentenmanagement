@@ -2965,6 +2965,8 @@ components:
       - WISSEN_INGEST
       - WISSEN_LINT
       - WISSEN_IMPORT
+      - WISSENSQUELLE_MARKIERT
+      - WISSENSQUELLE_ENTFERNT
       - KONTAKT_ZUSAMMENFUEHREN
       - KONTAKT_INAKTIV
       - KONTAKT_AKTIV
@@ -3041,6 +3043,19 @@ components:
         groesse:
           type: integer
           format: int32
+    Quelle:
+      type: object
+      properties:
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+        titel:
+          type: string
+        art:
+          type: string
+        markiertAm:
+          $ref: "#/components/schemas/Instant"
+        ingestStatus:
+          type: string
     Quelleneintrag:
       type: object
       properties:
@@ -5908,6 +5923,69 @@ paths:
         - mitarbeiter
         - treuhaender
         - geschaeftsstelle
+  /api/v1/dokumente/{id}/wissensquelle:
+    post:
+      summary: Dokument als Wissensquelle verwenden
+      tags:
+      - Wissensbasis
+      parameters:
+      - description: ID des Dokuments
+        name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "202":
+          description: Markierung gespeichert und Ingest angestossen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenIngestAuftrag"
+        "403":
+          description: Recht A16 fehlt
+        "404":
+          description: Dokument unbekannt oder nicht sichtbar
+        "409":
+          description: Dokument bereits markiert oder Ingest läuft
+        "422":
+          description: Fachliche Voraussetzung fehlt
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+    delete:
+      summary: Markierung als Wissensquelle entfernen
+      tags:
+      - Wissensbasis
+      parameters:
+      - description: ID des Dokuments
+        name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "204":
+          description: Markierung beendet
+        "403":
+          description: Recht A16 fehlt
+        "404":
+          description: Dokument unbekannt oder nicht sichtbar
+        "409":
+          description: Dokument ist nicht markiert
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/eingangskorb:
     get:
       summary: Eingangskorb lesen
@@ -7587,6 +7665,30 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/wissen/quellen:
+    get:
+      summary: Sichtbare Wissensquellen auflisten
+      tags:
+      - Wissensbasis
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quelle"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/wissensbasis/einstellungen:
     put:
       summary: Wissenseinstellungen ersetzen

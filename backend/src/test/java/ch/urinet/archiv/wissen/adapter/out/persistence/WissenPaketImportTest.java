@@ -39,7 +39,7 @@ class WissenPaketImportTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"fremd,QUELLE_UNBEKANNT", "falsche Art,QUELLE_UNBEKANNT", "PERSONAL,QUELLE_PERSONAL",
+    @CsvSource({"fremd,QUELLE_UNBEKANNT", "nicht markiert,QUELLE_UNBEKANNT", "PERSONAL,QUELLE_PERSONAL",
             "Auszug fehlt,AUSZUG_FEHLT", "Auszug falsch,AUSZUG_NICHT_GEFUNDEN",
             "Seitentext fehlt,AUSZUG_NICHT_PRUEFBAR"})
     void quellenabweichung(String fall, String code) throws Exception {

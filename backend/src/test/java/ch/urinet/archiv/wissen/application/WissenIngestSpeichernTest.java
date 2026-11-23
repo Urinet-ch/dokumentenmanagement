@@ -84,7 +84,7 @@ class WissenIngestSpeichernTest {
     }
 
     private static Stand stand(String vertraulichkeit, List<SeitenMetadaten> seiten) {
-        Lauf lauf = new Lauf(UUID.randomUUID(), UUID.randomUUID(), "IN_ARBEIT", "ARCHIVIERT", "WISSENSQUELLE",
+        Lauf lauf = new Lauf(UUID.randomUUID(), UUID.randomUUID(), "IN_ARBEIT", "ARCHIVIERT", true,
                 vertraulichkeit, true, "Testquelle", LocalDate.of(2026, 4, 30), "Text\f", 1, true,
                 null, null, "PLANUNG", 0, 0, "test-modell", false, 1_000_000, 1_000_000,
                 WissenIngestPort.Fortschritt.leer());
