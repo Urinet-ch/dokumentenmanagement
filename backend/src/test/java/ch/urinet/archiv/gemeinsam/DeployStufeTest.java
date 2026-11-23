@@ -111,6 +111,17 @@ class DeployStufeTest {
     }
 
     @Test
+    void keycloakSecretsNurInDenZustaendigenDiensten() throws IOException {
+        Map<String, Object> compose = compose(COMPOSE);
+        Map<String, Map<String, Object>> dienste = composeDienste(compose);
+        assertThat((List<?>) dienste.get("api").get("secrets")).extracting(Object::toString)
+                .contains("keycloak_verwaltung_secret").doesNotContain("keycloak_smtp_passwort");
+        assertThat((List<?>) dienste.get("kc").get("secrets")).extracting(Object::toString)
+                .contains("keycloak_smtp_passwort").doesNotContain("keycloak_verwaltung_secret");
+        assertThat(apiUmgebung()).containsEntry("ARCHIV_KEYCLOAK_ADMIN_URL", "http://kc:8080");
+    }
+
+    @Test
     void migrationsSecretIstNurBeiAktiverMigrationPflicht() throws IOException {
         Map<String, Object> compose = compose(COMPOSE);
         @SuppressWarnings("unchecked")
