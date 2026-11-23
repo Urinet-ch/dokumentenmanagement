@@ -1,0 +1,79 @@
+<section class="karte" aria-labelledby="wissen-quellen-titel" data-test="wissen-quellen">
+  <h2 id="wissen-quellen-titel">{{ texte.titel }}</h2>
+  <p>{{ texte.einleitung }}</p>
+
+  @if (laedt()) {
+    <p role="status">{{ texte.laedt }}</p>
+  } @else if (ladeFehler(); as meldung) {
+    <div class="hinweis gefahr" role="alert">
+      <p>{{ texte.fehler }}</p>
+      <p>{{ meldung }}</p>
+    </div>
+    <button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button>
+  } @else if (quellen(); as quellen) {
+    @if (meldung(); as status) {
+      <p role="status">{{ status }}</p>
+    }
+    @if (entfernenFehler(); as aktionFehler) {
+      <p class="hinweis gefahr" role="alert">{{ texte.entfernenFehler }} {{ aktionFehler }}</p>
+    }
+    @if (quellen.length === 0) {
+      <p class="leer">{{ texte.keine }}</p>
+    } @else {
+      <div class="tabelle-rahmen">
+        <table class="tabelle">
+          <thead>
+            <tr>
+              <th scope="col">{{ texte.dokument }}</th>
+              <th scope="col">{{ texte.art }}</th>
+              <th scope="col">{{ texte.markiertAm }}</th>
+              <th scope="col">{{ texte.ingest }}</th>
+              @if (anmeldung.darf('A16')) {
+                <th scope="col">{{ texte.aktionen }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (quelle of quellen; track quelle.dokumentId ?? $index) {
+              <tr>
+                <td>
+                  @if (quelle.dokumentId) {
+                    <a [routerLink]="['/dokument', quelle.dokumentId]">{{ titel(quelle) }}</a>
+                  } @else {
+                    {{ titel(quelle) }}
+                  }
+                </td>
+                <td class="mono">{{ quelle.art || texte.artUnbekannt }}</td>
+                <td>{{ zeitpunkt(quelle.markiertAm) || texte.datumUnbekannt }}</td>
+                <td>
+                  <span class="pille"
+                    [class.ok]="ingestStatusKlasse(quelle.ingestStatus) === 'ok'"
+                    [class.gefahr]="ingestStatusKlasse(quelle.ingestStatus) === 'gefahr'"
+                    [class.info]="ingestStatusKlasse(quelle.ingestStatus) === 'info'"
+                  >
+                    {{ ingestStatus(quelle.ingestStatus) }}
+                  </span>
+                </td>
+                @if (anmeldung.darf('A16')) {
+                  <td>
+                    @if (quelle.dokumentId) {
+                      <button
+                        mat-button
+                        type="button"
+                        [disabled]="entferntId() !== null"
+                        [attr.aria-label]="texte.entfernenLabel(titel(quelle))"
+                        (click)="entfernen(quelle)"
+                      >
+                        {{ entferntId() === quelle.dokumentId ? texte.wirdVerarbeitet : texte.entfernen }}
+                      </button>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>

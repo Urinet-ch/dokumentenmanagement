@@ -65,5 +65,6 @@
     <include file="changesets/070-wissensquelle-markierung.xml" relativeToChangelogFile="true"/>
     <include file="changesets/083-chat-bewertung-export-protokoll.xml" relativeToChangelogFile="true"/>
     <include file="changesets/084-wissensquelle-protokollaktionen.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/120-verwaltungsalarm-anspruch.xml" relativeToChangelogFile="true"/>
     <include file="changesets/121-wissenseinstellungen-konfiguration.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

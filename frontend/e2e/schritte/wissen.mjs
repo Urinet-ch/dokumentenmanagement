@@ -2,12 +2,93 @@ import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import axe from 'axe-core';
 import { DOKUMENTE, sucheAttrappe } from '../hilfen/suche-attrappe.mjs';
+import { basisUrl } from '../hilfen/keycloak-attrappe.mjs';
 
 const dokument = DOKUMENTE[0];
+const markierungsQuelle = {
+  dokumentId: dokument.id,
+  titel: dokument.titel,
+  art: dokument.art,
+  markiertAm: '2026-11-23T09:00:00Z',
+  ingestStatus: 'IN_ARBEIT',
+};
 const zeile = {
   id: 'seite-1', pfad: 'konzepte/probe', typ: 'Konzept', titel: 'Synthetische Wissensseite',
   beschreibung: 'Synthetische Beschreibung', status: 'AKTIV', quellePruefen: true,
 };
+
+Given('eine synthetische Wissensquelle für die Markierung ist verfügbar', async function () {
+  await sucheAttrappe(this);
+  this.markierungsAnfragen = [];
+  this.markierungsQuelle = null;
+  const origin = new URL(basisUrl).origin;
+  await this.seite.route((url) =>
+    url.origin === origin &&
+    (url.pathname === '/api/v1/wissen/quellen' ||
+      url.pathname === `/api/v1/dokumente/${dokument.id}/wissensquelle`), async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (!(await request.headerValue('authorization'))?.startsWith('Bearer ')) {
+      await route.fulfill({ status: 401, json: { fehlercode: 'NICHT_ANGEMELDET' } });
+      return;
+    }
+    this.markierungsAnfragen.push({ methode: request.method(), pfad: url.pathname });
+    if (url.pathname === '/api/v1/wissen/quellen') {
+      await route.fulfill({ status: 200, json: this.markierungsQuelle ? [this.markierungsQuelle] : [] });
+    } else if (request.method() === 'POST') {
+      this.markierungsQuelle = markierungsQuelle;
+      await route.fulfill({
+        status: 202,
+        json: { entwurfId: 'synthetischer-entwurf', status: 'IN_ARBEIT' },
+      });
+    } else if (request.method() === 'DELETE') {
+      this.markierungsQuelle = null;
+      await route.fulfill({ status: 204 });
+    } else {
+      await route.fulfill({ status: 405 });
+    }
+  });
+});
+
+When('ich die Wissensquelle markiere', async function () {
+  await this.seite.getByRole('button', { name: 'Als Wissensquelle verwenden', exact: true }).click();
+});
+
+Then('ist das Dokument als Wissensquelle gekennzeichnet', async function () {
+  await this.seite.locator('[data-test=wissensquelle-kennzeichen]').waitFor();
+  assert.deepEqual(this.markierungsAnfragen.filter((anfrage) => anfrage.methode === 'POST'), [
+    { methode: 'POST', pfad: `/api/v1/dokumente/${dokument.id}/wissensquelle` },
+  ]);
+  await pruefenAnsichten(this.seite, false);
+});
+
+Then('zeigt die Wissensquellenliste Titel, Art, Markierungsdatum und Ingest-Status', async function () {
+  const liste = this.seite.locator('[data-test=wissen-quellen]');
+  await liste.getByRole('heading', { name: 'Wissensquellen' }).waitFor();
+  const zeile = liste.getByRole('row').filter({ hasText: dokument.titel });
+  await zeile.getByText(dokument.art, { exact: true }).waitFor();
+  await zeile.getByText('23.11.2026 10:00', { exact: true }).waitFor();
+  await zeile.getByText('In Arbeit', { exact: true }).waitFor();
+  await liste.getByRole('button', {
+    name: `Wissensquelle entfernen: «${dokument.titel}»`,
+  }).waitFor();
+  await this.seite.addScriptTag({ content: axe.source });
+  await pruefenAnsichten(this.seite);
+});
+
+When('ich die Markierung in der Wissensquellenliste entferne', async function () {
+  await this.seite.getByRole('button', {
+    name: `Wissensquelle entfernen: «${dokument.titel}»`,
+  }).click();
+});
+
+Then('zeigt die Wissensquellenliste den Leerzustand nach der Entfernung', async function () {
+  const liste = this.seite.locator('[data-test=wissen-quellen]');
+  await liste.getByText('Noch keine Wissensquellen markiert.').waitFor();
+  assert.deepEqual(this.markierungsAnfragen.filter((anfrage) => anfrage.methode === 'DELETE'), [
+    { methode: 'DELETE', pfad: `/api/v1/dokumente/${dokument.id}/wissensquelle` },
+  ]);
+});
 
 Given('synthetische Wissensseiten sind für die Oberfläche verfügbar', async function () {
   await sucheAttrappe(this);
@@ -48,15 +129,39 @@ When('ich die Wissensoberfläche auf 375 Pixeln öffne', async function () {
 });
 
 async function pruefen(seite) {
+  await pruefenUeberlauf(seite);
+  const ergebnis = await seite.evaluate(() => window.axe.run(document, {
+    runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+  }));
+  assert.deepEqual(ergebnis.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) })), []);
+}
+
+async function pruefenUeberlauf(seite) {
   const breite = await seite.evaluate(() => ({
     inhalt: document.documentElement.scrollWidth,
     fenster: document.documentElement.clientWidth,
   }));
   assert.ok(breite.inhalt <= breite.fenster, `Horizontaler Überlauf: ${JSON.stringify(breite)}`);
-  const ergebnis = await seite.evaluate(() => window.axe.run(document, {
-    runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
-  }));
-  assert.deepEqual(ergebnis.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) })), []);
+}
+
+async function pruefenAnsichten(seite, axePruefen = true) {
+  for (const farbschema of ['light', 'dark']) {
+    for (const breite of [375, 1280]) {
+      await seite.setViewportSize({ width: breite, height: breite === 375 ? 812 : 800 });
+      await seite.emulateMedia({ colorScheme: farbschema });
+      if (breite === 375) {
+        await seite.getByRole('button', { name: 'Menü öffnen', exact: true }).waitFor();
+      } else {
+        await seite.getByRole('button', { name: 'Menü öffnen', exact: true }).waitFor({ state: 'detached' });
+      }
+      await seite.waitForTimeout(400);
+      if (axePruefen) {
+        await pruefen(seite);
+      } else {
+        await pruefenUeberlauf(seite);
+      }
+    }
+  }
 }
 
 Then('stehen Wissensseiten mit Titel, Typ und Beschreibung über den Dokumenttreffern und öffnen ihre Seite',

@@ -143,7 +143,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.11, 3.12_
   - _Abhängig von: 19.11_
 
-- [ ] 19.13 Abgleich, Alarme und Raten [Backend]
+- [x] 19.13 Abgleich, Alarme und Raten [Backend]
   - `Abgleich` (täglich im Worker, beim Start; Codes der Abweichungen), `BENUTZER_ABWEICHUNG`, Alarm-Mails (Muster
     `docs/alarme.md`: Vergabe `inhaber`, Häufung, Verweigerungen, Abweichung, Fehler des Dienstkontos), Tabelle der Alarme in
     `docs/alarme.md` ergänzt.

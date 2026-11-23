@@ -127,6 +127,7 @@ describe('Hilfe-Katalog (Spec 07, Req 7.2)', () => {
       { anker: 'kontakte', eine: ['A6'], eltern: undefined },
       { anker: 'wissen', eine: ['A15'], eltern: undefined },
       { anker: 'wissen-entwuerfe', eine: ['A17'], eltern: 'wissen' },
+      { anker: 'wissen-quellen', eine: ['A16'], eltern: 'wissen' },
     ];
     const positionen = erwartet.map(({ anker }) => HILFE_KATALOG.findIndex((e) => e.anker === anker));
     expect(positionen.every((p) => p >= 0), erwartet.map((e) => e.anker).join(', ')).toBe(true);
@@ -141,11 +142,15 @@ describe('Hilfe-Katalog (Spec 07, Req 7.2)', () => {
 
   it('zeigt die Abschnitte aus Aufgabe 22.6 genau den Rollen nach Requirement 2.2 und Spec 04, 12.1', () => {
     const sichtbar = (rolle: Rolle) =>
-      ['suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe'].filter((anker) =>
+      ['suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe', 'wissen-quellen'].filter((anker) =>
         bedingungErfuellt(HILFE_KATALOG.find((e) => e.anker === anker)?.bedingung, rolle),
       );
-    expect(sichtbar('inhaber')).toEqual(['suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe']);
-    expect(sichtbar('geschaeftsstelle')).toEqual(['suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe']);
+    expect(sichtbar('inhaber')).toEqual([
+      'suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe', 'wissen-quellen',
+    ]);
+    expect(sichtbar('geschaeftsstelle')).toEqual([
+      'suche', 'chat', 'kontakte', 'wissen', 'wissen-entwuerfe', 'wissen-quellen',
+    ]);
     expect(sichtbar('mitarbeiter')).toEqual(['suche', 'chat', 'wissen']);
     expect(sichtbar('treuhaender')).toEqual(['suche', 'chat', 'wissen']);
   });

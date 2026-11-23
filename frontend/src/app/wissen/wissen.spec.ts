@@ -3,20 +3,31 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideApi } from '../gemeinsam/api';
+import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { WissenIndex } from './wissen-index';
 import { WissenEinstellungenSeite } from './wissen-einstellungen';
 import { WissenLog } from './wissen-log';
 import { WissenSeite } from './wissen-seite';
 import { WissenVerwendung } from './wissen-verwendung';
+import { WissenQuellen } from './wissen-quellen';
 import { wissenText } from './wissen-text';
 
 describe('Wissensoberfläche', () => {
   let http: HttpTestingController;
+  const rolle = { wert: 'inhaber' as Rolle };
 
   beforeEach(() => {
+    rolle.wert = 'inhaber';
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), provideApi('')],
+      providers: [
+        provideRouter([]), provideHttpClient(), provideHttpClientTesting(), provideApi(''),
+        {
+          provide: AnmeldungService,
+          useValue: { darf: (aktion: Aktion) => darf(rolle.wert, aktion) },
+        },
+      ],
     });
     http = TestBed.inject(HttpTestingController);
   });
@@ -132,6 +143,8 @@ describe('Wissensoberfläche', () => {
 
   it('filtert den Index über die API und zeigt die sichtbaren Ergebnisse', async () => {
     const fixture = TestBed.createComponent(WissenIndex);
+    fixture.detectChanges();
+    http.expectOne('/api/v1/wissen/quellen').flush([]);
     http.expectOne((anfrage) => anfrage.url === '/api/v1/wissensseiten')
       .flush({ gesamt: 1, gruppen: [{ typ: 'Konzept', seiten: [
         { id: '1', pfad: 'konzepte/probe', titel: 'Probe', status: 'VERALTET', quellePruefen: true },
@@ -150,6 +163,52 @@ describe('Wissensoberfläche', () => {
     anfrage.flush({ gesamt: 0, gruppen: [] });
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.keineSeiten);
+  });
+
+  it('zeigt Wissensquellen mit Art, Markierungsdatum und Ingest-Status und entfernt eine Markierung', async () => {
+    const fixture = TestBed.createComponent(WissenQuellen);
+    fixture.detectChanges();
+    http.expectOne('/api/v1/wissen/quellen').flush([{
+      dokumentId: 'd1',
+      titel: 'Synthetische Quelle',
+      art: 'QUITTUNG',
+      markiertAm: '2026-11-23T09:00:00Z',
+      ingestStatus: 'IN_ARBEIT',
+    }]);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Synthetische Quelle');
+    expect(element.textContent).toContain('QUITTUNG');
+    expect(element.textContent).toContain('23.11.2026 10:00');
+    expect(element.textContent).toContain(TEXTE.wissen.quellenListe.ingestStatus['IN_ARBEIT']);
+
+    element.querySelector<HTMLButtonElement>(
+      '[aria-label="Wissensquelle entfernen: «Synthetische Quelle»"]',
+    )!.click();
+    const entfernung = http.expectOne('/api/v1/dokumente/d1/wissensquelle');
+    expect(entfernung.request.method).toBe('DELETE');
+    entfernung.flush(null, { status: 204, statusText: 'No Content' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(element.textContent).toContain(TEXTE.wissen.quellenListe.entfernt);
+    expect(element.textContent).toContain(TEXTE.wissen.quellenListe.keine);
+  });
+
+  it('zeigt die Liste ohne A16 weiter, aber ohne Entfernen-Aktion', async () => {
+    rolle.wert = 'mitarbeiter';
+    const fixture = TestBed.createComponent(WissenQuellen);
+    fixture.detectChanges();
+    http.expectOne('/api/v1/wissen/quellen').flush([{
+      dokumentId: 'd1',
+      titel: 'Synthetische Quelle',
+      art: 'QUITTUNG',
+      markiertAm: '2026-11-23T09:00:00Z',
+      ingestStatus: 'OFFEN',
+    }]);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Synthetische Quelle');
+    expect(element.querySelector('button')).toBeNull();
   });
 
   it('zeigt Fehler beim Abruf des Logs und lädt bei Wiederholung neu', async () => {

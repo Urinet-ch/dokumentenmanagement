@@ -145,6 +145,13 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     bedingung: { eine: ['A17'] },
     pfade: ['/wissen/entwuerfe'],
   },
+  {
+    anker: 'wissen-quellen',
+    titel: TEXTE.hilfe.abschnitte['wissen-quellen'],
+    datei: '/anleitung/wissen-quellen.md',
+    eltern: 'wissen',
+    bedingung: { eine: ['A16'] },
+  },
   // Bestand und Verwaltung (Spec 07, Aufgabe 22.7)
   {
     anker: 'importe',
