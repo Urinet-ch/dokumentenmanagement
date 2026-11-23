@@ -9,6 +9,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 @ApplicationScoped
@@ -55,7 +56,7 @@ public class WissenEinstellungenVerwaltung {
         return einstellungen.aendern(version, vorher -> ziel(vorher, eingabe.get()), bestaetigt, akteur);
     }
 
-    private static EinstellungenVerwaltung.Eingabe ziel(Konfiguration.Einstellungen vorher, Eingabe eingabe) {
+    private EinstellungenVerwaltung.Eingabe ziel(Konfiguration.Einstellungen vorher, Eingabe eingabe) {
         var werte = eingabe.werte();
         var befunde = new ArrayList<>(eingabe.befunde());
         Konfiguration.LintZeitplan plan = null;
@@ -67,6 +68,9 @@ public class WissenEinstellungenVerwaltung {
             } else {
                 plan = gelesen.get();
             }
+        }
+        if (Objects.equals(werte.lintZeitplan(), Wissenszeitplan.cron(vorher.wissen().lintZeitplan(), standardZeitplan))) {
+            plan = vorher.wissen().lintZeitplan();
         }
         var wissen = new Konfiguration.WissenEinstellungen(werte.budgetTokens(), werte.lintBudgetTokens(),
                 werte.monatsbudgetTokens(), plan);

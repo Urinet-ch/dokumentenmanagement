@@ -4006,12 +4006,14 @@
           "budgetTokens" : {
             "type" : [ "integer", "null" ],
             "format" : "int32",
-            "minimum" : 1
+            "maximum" : 5000000,
+            "minimum" : 10000
           },
           "lintBudgetTokens" : {
             "type" : [ "integer", "null" ],
             "format" : "int32",
-            "minimum" : 1
+            "maximum" : 1000000,
+            "minimum" : 10000
           },
           "lintZeitplan" : {
             "type" : [ "string", "null" ]
@@ -4019,7 +4021,8 @@
           "monatsbudgetTokens" : {
             "type" : [ "integer", "null" ],
             "format" : "int32",
-            "minimum" : 1
+            "maximum" : 20000000,
+            "minimum" : 100000
           }
         }
       },
@@ -9423,6 +9426,19 @@
         "summary" : "Wissenseinstellungen ersetzen",
         "description" : "Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.",
         "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "name" : "bestaetigt",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -9467,7 +9483,7 @@
         "tags" : [ "Wissensbasis" ],
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Wissenseinstellungen",
             "content" : {
               "application/json" : {
                 "schema" : {

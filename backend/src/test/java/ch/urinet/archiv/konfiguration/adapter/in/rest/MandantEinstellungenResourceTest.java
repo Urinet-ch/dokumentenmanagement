@@ -219,6 +219,34 @@ class MandantEinstellungenResourceTest {
     }
 
     @Test
+    void wissenPutBehaeltTeilweiseGeerbtenZeitplan() throws Exception {
+        if (!imRegister("urinet")) {
+            provisionierung.anlegen("urinet", null, null);
+        }
+        String token = Testanmeldung.token("inhaber-urinet");
+        Response vorher = given().auth().oauth2(token).get("/api/v1/konfiguration");
+        try {
+            Response teilplan = patch(token, vorher.getHeader("ETag"),
+                    "{\"wissen\":{\"lintZeitplan\":{\"wochentag\":\"MONDAY\",\"stunde\":null}}}");
+            assertThat(teilplan.statusCode()).as(teilplan.asString()).isEqualTo(200);
+            Response wissen = given().auth().oauth2(token).get("/api/v1/wissensbasis/einstellungen");
+            assertThat(wissen.jsonPath().getString("lintZeitplan")).isEqualTo("0 0 4 ? * MON");
+            Response gespeichert = given().auth().oauth2(token).header("If-Match", wissen.getHeader("ETag"))
+                    .contentType("application/json").body(wissen.asString()).put("/api/v1/wissensbasis/einstellungen");
+            assertThat(gespeichert.statusCode()).as(gespeichert.asString()).isEqualTo(200);
+            Response aktuell = given().auth().oauth2(token).get("/api/v1/konfiguration");
+            assertThat(aktuell.jsonPath().getString("einstellungen.wissen.lintZeitplan.wochentag")).isEqualTo("MONDAY");
+            assertThat(aktuell.jsonPath().getString("einstellungen.wissen.lintZeitplan.stunde")).isNull();
+        } finally {
+            String etag = given().auth().oauth2(token).get("/api/v1/konfiguration").getHeader("ETag");
+            Response zurueck = given().auth().oauth2(token).header("If-Match", etag).contentType("application/json")
+                    .body("{\"version\":" + vorher.jsonPath().getInt("basisVersion") + "}")
+                    .post(PFAD + "/zuruecksetzen");
+            assertThat(zurueck.statusCode()).as(zurueck.asString()).isEqualTo(200);
+        }
+    }
+
+    @Test
     void chunkedAnfragenWerdenBeimEmpfangBegrenzt() throws Exception {
         if (!imRegister("urinet")) {
             provisionierung.anlegen("urinet", null, null);

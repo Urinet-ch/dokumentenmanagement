@@ -2,14 +2,17 @@
 <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
 @if (fehler(); as meldung) {
   <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
-  @if (!werte()) {
+  @if (!werte() || neuLaden()) {
     <div class="knoepfe"><button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button></div>
+  }
+  @if (erneuteAnmeldung()) {
+    <div class="knoepfe"><button mat-button type="button" (click)="frischAnmelden()">{{ texte.frischAnmelden }}</button></div>
   }
 } @else if (!werte()) {
   <p class="status" role="status">{{ texte.laden }}</p>
 }
 @if (werte(); as werte) {
-  <form class="karte felder" #formular (submit)="$event.preventDefault(); speichern(formular)">
+  <form class="karte felder" #formular (input)="bestaetigungVerwerfen()" (submit)="$event.preventDefault(); speichern(formular)">
     <p class="gedaempft">{{ texte.standard }}</p>
     <div class="feld">
       <label for="wissen-budget">{{ texte.budget }}</label>
@@ -21,8 +24,16 @@
     </div>
     <div class="feld">
       <label for="wissen-lint-zeitplan">{{ texte.lintZeitplan }}</label>
+      <p class="gedaempft">{{ texte.zeitplanHinweis }}</p>
       <input id="wissen-lint-zeitplan" class="mono" name="lintZeitplan" [value]="werte.lintZeitplan ?? ''" />
     </div>
+    @if (bestaetigung().length) {
+      <div class="hinweis" role="alert">
+        <p>{{ texte.bestaetigungHinweis }}</p>
+        <ul>@for (auswirkung of bestaetigung(); track $index) { <li>{{ auswirkung }}</li> }</ul>
+        <button mat-stroked-button type="button" [disabled]="speichert()" (click)="bestaetigen()">{{ texte.bestaetigen }}</button>
+      </div>
+    }
     <div class="feld">
       <label for="wissen-monat">{{ texte.monat }}</label>
       <input id="wissen-monat" name="monatsbudgetTokens" type="number" min="1" step="1" [value]="werte.monatsbudgetTokens ?? ''" />

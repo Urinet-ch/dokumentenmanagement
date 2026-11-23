@@ -57,10 +57,10 @@ public class WissenEinstellungenResource {
     private static final Set<String> FELDER = Set.of("budgetTokens", "lintBudgetTokens", "lintZeitplan",
             "monatsbudgetTokens");
     @Schema(name = "WissenEinstellungen")
-    public record WerteDto(@Schema(nullable = true, minimum = "1") Integer budgetTokens,
-                           @Schema(nullable = true, minimum = "1") Integer lintBudgetTokens,
+    public record WerteDto(@Schema(nullable = true, minimum = "10000", maximum = "5000000") Integer budgetTokens,
+                           @Schema(nullable = true, minimum = "10000", maximum = "1000000") Integer lintBudgetTokens,
                            @Schema(nullable = true) String lintZeitplan,
-                           @Schema(nullable = true, minimum = "1") Integer monatsbudgetTokens) {
+                           @Schema(nullable = true, minimum = "100000", maximum = "20000000") Integer monatsbudgetTokens) {
     }
 
     private final WissenEinstellungen einstellungen;
@@ -79,6 +79,9 @@ public class WissenEinstellungenResource {
     @RolesAllowed("inhaber")
     @Operation(summary = "Wissenseinstellungen lesen",
             description = "Nur Inhaber (A19); null bedeutet den konfigurierten Startwert.")
+    @APIResponse(responseCode = "200", description = "Wissenseinstellungen",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = WerteDto.class)))
     public Response lesen() {
         aufloesung.pruefen();
         var stand = einstellungen.lesen(benutzer());

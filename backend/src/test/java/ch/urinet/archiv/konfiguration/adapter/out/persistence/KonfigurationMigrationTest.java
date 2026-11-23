@@ -39,7 +39,7 @@ class KonfigurationMigrationTest {
     @AfterEach
     void aufraeumen() throws SQLException {
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
-            for (String schema : SCHEMAS.subList(0, 2)) {
+            for (String schema : SCHEMAS) {
                 befehl.execute("drop schema if exists " + schema + " cascade");
                 befehl.execute("delete from public.mandant where schema_name = '" + schema + "'");
             }
@@ -95,7 +95,7 @@ class KonfigurationMigrationTest {
                 abbilder.put(schema, wert(befehl, "select inhalt::text from konfiguration_version"));
             }
         }
-        for (String schema : SCHEMAS) {
+        for (String schema : SCHEMAS.subList(0, 2)) {
             try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
                 String inhalt = wert(befehl, "select inhalt::text from " + schema + ".konfiguration_version");
                 assertThat(inhalt).isEqualTo(abbilder.get(schema));
