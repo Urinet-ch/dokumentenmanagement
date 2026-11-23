@@ -580,7 +580,8 @@ public class BenutzerVerwaltungSchritte {
         urspruenglicheIdentitaet = ClientProxy.unwrap(identitaet);
         IdentitaetsDienst keycloak = new KeycloakAdminAdapter(new ObjectMapper(), Optional.of(basis),
                 "urinet-archiv", "archiv-verwaltung", Optional.of(testSecret), "archiv-pwa", Optional.empty(),
-                Duration.ofSeconds(2), Duration.ofSeconds(5));
+                Duration.ofSeconds(2), Duration.ofSeconds(5),
+                status -> { throw new AssertionError("Unerwarteter Dienstkonto-Alarm: " + status); });
         QuarkusMock.installMockForType(new IdentitaetsDienstStub() {
             @Override
             public Benutzer benutzerLesen(String mandant, String id) {
