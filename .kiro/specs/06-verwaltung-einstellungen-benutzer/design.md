@@ -736,6 +736,19 @@ Ein internes Ereignis kennzeichnet erfolgreiche Inhabervergaben; die Alarmzustel
 Löschwirkung und die Bestätigung von Löschanträgen folgen in 19.12. Die Benutzeransicht liefert den Verweis und
 Hinweis zu API-Tokens; die Anzeige in der Oberfläche folgt in 20.6/20.7.
 
+## Vorbereitung (Aufgabe 19.3, 23.11.2026)
+
+Compose bindet die Secret-Datei des Verwaltungsclients in die API und die SMTP-Secret-Datei in Keycloak ein; die
+Admin-Adresse wird gleichzeitig gesetzt. Der Workflow-Diff unter `docs/betrieb/` muss vor einem Deploy auf den
+Deploy-Workflow angewendet werden, damit das Bundle beide Dateien liefert. Die Realm-Vorlage soll Client, Scope,
+Dienstkonto-Rollen, SMTP und Passwort-Richtlinie im bestehenden Realm einrichten. Nicht enthalten sind die übrigen
+Realm-Änderungen und die Betriebsnachweise von 19.3.
+
+Die Compose- und Secret-Prüfungen sind lokal grün. Der Test gegen einen frischen Keycloak scheiterte zweimal, weil
+`mktemp -d` unter macOS das eingehängte Arbeitsverzeichnis nicht verwendete. Die Vorlage nennt dieses Verzeichnis nun
+ausdrücklich; der vollständige Keycloak-Test und die Wirkung der Realm-Vorlage sind damit noch nicht nachgewiesen.
+Die Aufgabe bleibt offen und die Vorlage darf erst nach erfolgreicher Prüfung verwendet werden.
+
 ## Nachtrag Umsetzung (Aufgabe 20.2, 23.11.2026)
 
 Bis zur Überführung in 20.3 zeigt der Katalog die tatsächlich wirksamen Wissenswerte aus `wissens_einstellung`,
