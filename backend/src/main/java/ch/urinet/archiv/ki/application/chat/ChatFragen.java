@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
+import ch.urinet.archiv.ki.application.WissenschatZugang;
 import ch.urinet.archiv.ki.domain.chat.ChatAntwort;
 import ch.urinet.archiv.ki.domain.chat.ChatAusgabe;
 import ch.urinet.archiv.ki.domain.chat.ChatDurchgang;
@@ -18,10 +19,7 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
-import ch.urinet.archiv.sicherheit.application.Berechtigung;
-import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
-import ch.urinet.archiv.wissen.application.WissenModellBudget;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -76,8 +74,7 @@ public class ChatFragen {
     private final ChatGrenzen grenzen;
     private final MandantKontext kontext;
     private final MandantEinstellungen einstellungen;
-    private final Berechtigung berechtigung;
-    private final WissenModellBudget wissenBudget;
+    private final WissenschatZugang wissenschat;
     private final TransactionSynchronizationRegistry transaktionen;
     private final int fragenJeStunde;
     private final Clock uhr = Clock.systemUTC();
@@ -87,7 +84,7 @@ public class ChatFragen {
 
     @Inject
     public ChatFragen(ChatAgentPort agent, ChatSpeicher speicher, ChatGrenzen grenzen, MandantKontext kontext,
-                      MandantEinstellungen einstellungen, Berechtigung berechtigung, WissenModellBudget wissenBudget,
+                      MandantEinstellungen einstellungen, WissenschatZugang wissenschat,
                       TransactionSynchronizationRegistry transaktionen,
                       @ConfigProperty(name = "archiv.chat.fragen-je-stunde") int fragenJeStunde) {
         if (fragenJeStunde < 1) {
@@ -98,8 +95,7 @@ public class ChatFragen {
         this.grenzen = grenzen;
         this.kontext = kontext;
         this.einstellungen = einstellungen;
-        this.berechtigung = berechtigung;
-        this.wissenBudget = wissenBudget;
+        this.wissenschat = wissenschat;
         this.transaktionen = transaktionen;
         this.fragenJeStunde = fragenJeStunde;
     }
@@ -137,8 +133,8 @@ public class ChatFragen {
                     .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         }
         if (modus == Chatmodus.WISSEN) {
-            berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
-            wissenBudget.chatPruefen();
+            wissenschat.rechtPruefen(benutzer);
+            wissenschat.budgetPruefen();
         }
         Instant jetzt = uhr.instant();
         Optional<Instant> grenze = speicher.grenzFrage(benutzer.id(), jetzt.minus(Fragegrenze.FENSTER), fragenJeStunde);

@@ -4,11 +4,9 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.mandant.domain.MandantCode;
-import ch.urinet.archiv.sicherheit.application.Berechtigung;
-import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.ki.application.WissenschatZugang;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
-import ch.urinet.archiv.wissen.application.WissenModellBudget;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
@@ -40,18 +38,17 @@ class ChatFragenModusTest {
                         default -> throw new AssertionError("Speicher berührt: " + m.getName());
                     };
                 });
-        Berechtigung berechtigung = new Berechtigung(null, null) {
+        WissenschatZugang zugang = new WissenschatZugang() {
             @Override
-            public void wissensseitenAktion(Benutzer benutzer, Aktion aktion, boolean sichtbar) {
-                ereignisse.add("A15 " + aktion);
+            public void rechtPruefen(Benutzer benutzer) {
+                ereignisse.add("A15");
                 if (!a15) {
                     throw new IllegalStateException("403");
                 }
             }
-        };
-        WissenModellBudget budget = new WissenModellBudget(null, null, false, false) {
+
             @Override
-            public void chatPruefen() {
+            public void budgetPruefen() {
                 ereignisse.add("budget");
                 if (budgetErschoepft) {
                     throw new FachFehler(Fehlercode.BUDGET);
@@ -61,7 +58,7 @@ class ChatFragenModusTest {
         ChatAgentPort agent = (anfrage, ausgabe, abbruch) -> {
             throw new AssertionError("Modell darf nicht aufgerufen werden");
         };
-        return new ChatFragen(agent, speicher, null, null, null, berechtigung, budget, null, 100);
+        return new ChatFragen(agent, speicher, null, null, null, zugang, null, 100);
     }
 
     @Test
@@ -69,7 +66,7 @@ class ChatFragenModusTest {
         ChatFragen fragen = fragen(false, true);
         assertThatThrownBy(() -> fragen.annehmen(BENUTZER, new MandantCode("urinet"), Optional.empty(), "Frage?",
                 Optional.of(UUID.randomUUID()))).hasMessage("403");
-        assertThat(ereignisse).containsExactly("A15 A15");
+        assertThat(ereignisse).containsExactly("A15");
         assertThat(speicherAufrufe).containsExactly("benutzerSperren", "gespraechSperren");
     }
 
@@ -79,7 +76,7 @@ class ChatFragenModusTest {
         assertThatThrownBy(() -> fragen.annehmen(BENUTZER, new MandantCode("urinet"), Optional.empty(), "Frage?",
                 Optional.of(UUID.randomUUID())))
                 .isInstanceOfSatisfying(FachFehler.class, e -> assertThat(e.code()).isEqualTo(Fehlercode.BUDGET));
-        assertThat(ereignisse).containsExactly("A15 A15", "budget");
+        assertThat(ereignisse).containsExactly("A15", "budget");
         assertThat(speicherAufrufe).containsExactly("benutzerSperren", "gespraechSperren");
     }
 }

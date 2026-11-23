@@ -2,10 +2,9 @@ package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.ki.application.WissenschatZugang;
 import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.ki.domain.chat.GespraechKopf;
-import ch.urinet.archiv.sicherheit.application.Berechtigung;
-import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -28,12 +27,12 @@ public class ChatGespraecheAnlegen {
     public static final String TITEL_NEU = "Neues Gespräch";
 
     private final ChatSpeicher speicher;
-    private final Berechtigung berechtigung;
+    private final WissenschatZugang wissenschat;
     private final Clock uhr = Clock.systemUTC();
 
-    public ChatGespraecheAnlegen(ChatSpeicher speicher, Berechtigung berechtigung) {
+    public ChatGespraecheAnlegen(ChatSpeicher speicher, WissenschatZugang wissenschat) {
         this.speicher = speicher;
-        this.berechtigung = berechtigung;
+        this.wissenschat = wissenschat;
     }
 
     /** Der Modus aus dem Anfragekörper; fehlt er (null), gilt {@link Chatmodus#ARCHIV}. */
@@ -51,7 +50,7 @@ public class ChatGespraecheAnlegen {
     @Transactional
     public Ergebnis anlegen(Benutzer benutzer, Chatmodus modus) {
         if (modus == Chatmodus.WISSEN) {
-            berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
+            wissenschat.rechtPruefen(benutzer);
         }
         speicher.benutzerSperren(benutzer.id());
         Instant jetzt = uhr.instant();

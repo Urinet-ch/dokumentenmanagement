@@ -3,8 +3,7 @@ package ch.urinet.archiv.ki.application.chat;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.ki.domain.chat.Chatmodus;
-import ch.urinet.archiv.sicherheit.application.Berechtigung;
-import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.ki.application.WissenschatZugang;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import org.junit.jupiter.api.Test;
@@ -44,17 +43,22 @@ class ChatGespraecheAnlegenTest {
                     aufrufe.add(m.getName());
                     throw new AssertionError("Speicher darf ohne Recht nicht berührt werden: " + m.getName());
                 });
-        List<Aktion> geprueft = new ArrayList<>();
-        Berechtigung ohneRecht = new Berechtigung(null, null) {
+        List<String> geprueft = new ArrayList<>();
+        WissenschatZugang ohneRecht = new WissenschatZugang() {
             @Override
-            public void wissensseitenAktion(Benutzer benutzer, Aktion aktion, boolean sichtbar) {
-                geprueft.add(aktion);
+            public void rechtPruefen(Benutzer benutzer) {
+                geprueft.add("A15");
                 throw new IllegalStateException("403");
+            }
+
+            @Override
+            public void budgetPruefen() {
+                throw new AssertionError();
             }
         };
         ChatGespraecheAnlegen anlegen = new ChatGespraecheAnlegen(speicher, ohneRecht);
         assertThatThrownBy(() -> anlegen.anlegen(BENUTZER, Chatmodus.WISSEN)).hasMessage("403");
-        assertThat(geprueft).containsExactly(Aktion.A15);
+        assertThat(geprueft).containsExactly("A15");
         assertThat(aufrufe).isEmpty();
     }
 
@@ -66,10 +70,15 @@ class ChatGespraecheAnlegenTest {
                     aufrufe.add(m.getName());
                     throw new IllegalStateException("weiter");
                 });
-        Berechtigung verbietetAlles = new Berechtigung(null, null) {
+        WissenschatZugang verbietetAlles = new WissenschatZugang() {
             @Override
-            public void wissensseitenAktion(Benutzer benutzer, Aktion aktion, boolean sichtbar) {
+            public void rechtPruefen(Benutzer benutzer) {
                 throw new AssertionError("A15 gilt nur für WISSEN");
+            }
+
+            @Override
+            public void budgetPruefen() {
+                throw new AssertionError();
             }
         };
         assertThatThrownBy(() -> new ChatGespraecheAnlegen(speicher, verbietetAlles)
