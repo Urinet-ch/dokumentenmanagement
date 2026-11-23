@@ -44,6 +44,7 @@ const SOLL: readonly Soll[] = [
   // Pfade abweichend von der Tabelle, design.md «Umsetzung (Aufgabe 22.6)»
   { anker: 'wissen', titel: 'Wissen', eine: ['A15'], pfade: ['/wissen', '/wissen/entwuerfe/meine', '/wissensbasis'] },
   { anker: 'wissen-entwuerfe', titel: 'Wissensentwürfe', eltern: 'wissen', eine: ['A17'], pfade: ['/wissen/entwuerfe'] },
+  { anker: 'wissen-quellen', titel: 'Wissensquellen markieren und verwalten', eltern: 'wissen', eine: ['A16'] },
   { anker: 'importe', titel: 'Importe', eine: ['A12'], pfade: ['/importe'] },
   { anker: 'jahresexport', titel: 'Jahresexport', eine: ['EXPORT'], pfade: ['/export'] },
   { anker: 'verwaltung', titel: 'Verwaltung', eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer'] },
