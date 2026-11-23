@@ -4,6 +4,7 @@ import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
+import ch.urinet.archiv.konfiguration.adapter.EinstellungenPatch;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVersionsRepository;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
@@ -53,6 +54,25 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
 
     public Datei lesen(String text) {
         return lesen(text, false);
+    }
+
+    @Override
+    public Vorpruefung vorpruefen(String text) {
+        try {
+            JsonNode root = ch.urinet.archiv.gemeinsam.adapter.StrengesJson.lesenGenau(text);
+            if (root == null) {
+                return new Vorpruefung(null, null);
+            }
+            JsonNode version = root.path("basisVersion");
+            Integer basisVersion = version.isInt() ? version.intValue() : null;
+            JsonNode einstellungen = root.path("einstellungen");
+            Konfiguration.Einstellungen ziel = einstellungen.isObject()
+                    ? EinstellungenPatch.anwenden(json, new Konfiguration.Einstellungen(null, null), einstellungen).ziel()
+                    : null;
+            return new Vorpruefung(basisVersion, ziel);
+        } catch (JsonProcessingException e) {
+            return new Vorpruefung(null, null);
+        }
     }
 
     @Override

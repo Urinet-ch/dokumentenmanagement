@@ -120,6 +120,9 @@ sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/com
   von `docker compose run`. Der Name geht in den Prompt des KI-Vorschlags ein: Nur mit genau «UriNet Aschwanden» (und
   den Seed-Arten) entspricht die Prompt-Kennung der von Gate 0 (`v6-7a39224f2f5e`), sonst warnt das Log bei jedem
   Aufruf.
+- Riskante Einstellungsänderungen beim Einspielen mit `--bestaetigt <schluessel,…>` ausdrücklich bestätigen; ohne
+  Bestätigung wird nichts geändert und das Kommando endet mit einem Fehler. Das Betreiberkommando verlangt kein
+  Benutzer-Step-up.
 - Dateien der Konfiguration: Der Wegwerf-Container sieht keine Dateien des Hosts. `exportieren <code>` ohne `<datei>`
   schreibt auf die Standardausgabe (Logs gehen auf stderr), also `… <kommando> > konfiguration.json`. Für `pruefen`,
   `vergleichen` und `einspielen` die Datei nur lesend einbinden, z. B. `run … -v "$PWD/konfiguration.json:/arbeit/konfiguration.json:ro" …`

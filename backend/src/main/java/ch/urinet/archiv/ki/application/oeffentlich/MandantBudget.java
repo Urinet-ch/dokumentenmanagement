@@ -22,6 +22,12 @@ public interface MandantBudget {
     record Reservierung(ReservierungsStatus status, LocalDate monat) {
     }
 
+    record Stand(LocalDate monat, long budgetTokens, long verbrauchteTokens) {
+    }
+
+    /** Liest den Stand des laufenden Monats, ohne eine Budgetzeile anzulegen. */
+    Stand stand(MandantCode mandant);
+
     /** Reserviert atomar den einzigen laufenden Platz des aktuellen Monats und gibt den Grund einer Ablehnung zurück. */
     Reservierung reservieren(MandantCode mandant);
 

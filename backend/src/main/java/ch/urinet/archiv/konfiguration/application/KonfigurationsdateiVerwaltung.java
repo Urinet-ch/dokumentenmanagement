@@ -1,5 +1,6 @@
 package ch.urinet.archiv.konfiguration.application;
 
+import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
 import ch.urinet.archiv.dokumentart.application.DokumentartPruefung;
 import ch.urinet.archiv.dokumentart.application.DokumentartRepository;
 import ch.urinet.archiv.dokumentart.application.DokumentZaehlerPort;
@@ -46,6 +47,8 @@ public class KonfigurationsdateiVerwaltung {
     private final KiTexteRepository kiTexte;
     private final KonfigurationsEinstellungenSpeichern einstellungenSpeichern;
     private final RegelProtokollPort regelProtokoll;
+    private final EinstellungsAenderungsPruefung einstellungsPruefung;
+    private final VerwaltungGrenzen grenzen;
 
     public KonfigurationsdateiVerwaltung(KonfigurationsdateiCodec codec, KonfigurationVerwaltung konfiguration,
                                          DokumentartRepository dokumentarten,
@@ -54,7 +57,9 @@ public class KonfigurationsdateiVerwaltung {
                                          KlassifikationRepository klassifikationen, RegelRepository regeln,
                                          KiTexteRepository kiTexte,
                                          KonfigurationsEinstellungenSpeichern einstellungenSpeichern,
-                                         RegelProtokollPort regelProtokoll) {
+                                         RegelProtokollPort regelProtokoll,
+                                         EinstellungsAenderungsPruefung einstellungsPruefung,
+                                         VerwaltungGrenzen grenzen) {
         this.codec = codec;
         this.konfiguration = konfiguration;
         this.dokumentarten = dokumentarten;
@@ -65,6 +70,8 @@ public class KonfigurationsdateiVerwaltung {
         this.kiTexte = kiTexte;
         this.einstellungenSpeichern = einstellungenSpeichern;
         this.regelProtokoll = regelProtokoll;
+        this.einstellungsPruefung = einstellungsPruefung;
+        this.grenzen = grenzen;
     }
 
     /** Datei und Version stammen aus demselben Stand, damit der ETag zur {@code basisVersion} passt. */
@@ -98,8 +105,24 @@ public class KonfigurationsdateiVerwaltung {
      * Massgeblich für den Stand ist allein {@code basisVersion} der Datei (Spec 05, Req 7.6); ein {@code If-Match}
      * spielt hier keine Rolle.
      */
-    public Ergebnis einspielen(String text, String wer, String grund) {
-        KonfigurationsdateiCodec.Datei datei = codec.lesen(text);
+    public Ergebnis einspielen(String text, String wer, String grund, String bestaetigt,
+                              EinstellungsAenderungsPruefung.Ursprung ursprung) {
+        KonfigurationsdateiCodec.Datei datei;
+        try {
+            datei = codec.lesen(text);
+        } catch (KonfigurationUngueltig schemafehler) {
+            var vorpruefung = codec.vorpruefen(text);
+            if (vorpruefung.basisVersion() != null) {
+                konfiguration.dateiAenderungStarten(vorpruefung.basisVersion());
+                if (vorpruefung.einstellungen() != null) {
+                    var folgen = einstellungsPruefung.folgen(
+                            aktuellMitLiveKiTexte().einstellungen(), vorpruefung.einstellungen());
+                    var gelesen = BestaetigteEinstellungen.lesen(bestaetigt);
+                    einstellungsPruefung.bestaetigt(folgen, gelesen.schluessel(), ursprung);
+                }
+            }
+            throw schemafehler;
+        }
         if (datei.basisVersion() == null) {
             throw new KonfigurationUngueltig(List.of(new KonfigurationUngueltig.Befund("/basisVersion",
                     "BASISVERSION_FEHLT", "Die Datei nennt keine basisVersion; bitte zuerst exportieren.")));
@@ -107,6 +130,10 @@ public class KonfigurationsdateiVerwaltung {
         konfiguration.dateiAenderungStarten(datei.basisVersion());
         Konfiguration aktuell = aktuellMitLiveKiTexte();
         Analyse analyse = analysieren(aktuell, datei);
+        var folgen = einstellungsPruefung.folgen(aktuell.einstellungen(), analyse.ziel().einstellungen());
+        var gelesen = BestaetigteEinstellungen.lesen(bestaetigt);
+        einstellungsPruefung.bestaetigt(folgen, gelesen.schluessel(), ursprung);
+        gelesen.pruefen();
         if (!analyse.befunde().isEmpty()) {
             throw new KonfigurationUngueltig(analyse.befunde().stream()
                     .map(befund -> new KonfigurationUngueltig.Befund(befund.pfad(), befund.code(), befund.meldung()))
@@ -114,6 +141,9 @@ public class KonfigurationsdateiVerwaltung {
         }
         if (aktuell.gleicherInhalt(analyse.ziel())) {
             return new Ergebnis(aktuell.version(), analyse.aenderungen());
+        }
+        if (!aktuell.einstellungen().equals(analyse.ziel().einstellungen())) {
+            grenzen.pruefen(wer, VerwaltungGrenzen.Art.EINSTELLUNG, null);
         }
         speichern(analyse.ziel());
         int version = konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.DATEI, aktuell,
@@ -212,6 +242,9 @@ public class KonfigurationsdateiVerwaltung {
     private Analyse analysieren(Konfiguration aktuell, KonfigurationsdateiCodec.Datei datei) {
         Konfiguration ziel = fehlendesAusBestandErhalten(aktuell, datei.inhalt());
         List<Befund> befunde = new ArrayList<>(ziel.pruefen());
+        einstellungsPruefung.wissenBefunde(aktuell.einstellungen(), ziel.einstellungen(), false, true).stream()
+                .map(befund -> new Befund(befund.pfad(), befund.code(), befund.meldung()))
+                .forEach(befunde::add);
         // Massgeblich ist die Tabelle ki_texte, nicht das gespeicherte Abbild (Req 6.6, 8.4).
         if (datei.inhalt().kiTexte().kiFreigegeben() != kiTexte.lesen().kiFreigegeben()) {
             befunde.add(new Befund("kiTexte.kiFreigegeben", "KI_FREIGABE_UNGUELTIG",

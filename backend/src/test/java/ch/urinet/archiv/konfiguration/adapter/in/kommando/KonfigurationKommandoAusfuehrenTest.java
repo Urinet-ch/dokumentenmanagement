@@ -137,8 +137,33 @@ class KonfigurationKommandoAusfuehrenTest {
         assertThat(ausfuehren("vergleichen", MANDANT, ungueltig.toString())).isEqualTo(1);
         assertThat(ausfuehren("einspielen", MANDANT, ungueltig.toString(), "--wer", "probe", "--grund", "x",
                 "--json")).isEqualTo(1);
+        assertThat(json.readTree(ausgabe()).path("code").asText()).isEqualTo("BESTAETIGUNG_NOETIG");
+        assertThat(ausfuehren("einspielen", MANDANT, ungueltig.toString(), "--wer", "probe", "--grund", "x",
+                "--bestaetigt", "geschaeftsjahrEnde", "--json")).isEqualTo(1);
         assertThat(json.readTree(ausgabe()).path("befunde")).isNotEmpty();
         assertThat(anzahlVersionen()).isEqualTo(versionen);
+    }
+
+    @Test
+    void riskanteDateiBrauchtAusdruecklicheBestaetigungAuchImKommando() throws Exception {
+        Path datei = ordner.resolve("export.json");
+        assertThat(ausfuehren("exportieren", MANDANT, datei.toString())).isZero();
+        ObjectNode inhalt = (ObjectNode) json.readTree(datei.toFile());
+        ObjectNode einstellungen = (ObjectNode) inhalt.get("einstellungen");
+        String neu = einstellungen.path("geschaeftsjahrEnde").asText().equals("06-30") ? "12-31" : "06-30";
+        einstellungen.put("geschaeftsjahrEnde", neu);
+        Path geaendert = ordner.resolve("riskant.json");
+        Files.writeString(geaendert, json.writeValueAsString(inhalt));
+        int versionen = anzahlVersionen();
+
+        assertThat(ausfuehren("einspielen", MANDANT, geaendert.toString(), "--wer", "probe",
+                "--grund", "Test", "--json")).isEqualTo(1);
+        assertThat(json.readTree(ausgabe()).path("code").asText()).isEqualTo("BESTAETIGUNG_NOETIG");
+        assertThat(fehlerausgabe()).contains("geschaeftsjahrEnde");
+        assertThat(anzahlVersionen()).isEqualTo(versionen);
+        assertThat(ausfuehren("einspielen", MANDANT, geaendert.toString(), "--wer", "probe",
+                "--grund", "Test", "--bestaetigt", "geschaeftsjahrEnde")).isZero();
+        assertThat(anzahlVersionen()).isEqualTo(versionen + 1);
     }
 
     /** K4 (Review PR #325): Ein Seed darf die KI-Texte nicht freigeben; die Provisionierung bricht vor dem Seed ab. */
