@@ -1958,4 +1958,25 @@ export const TEXTE = {
     unvollstaendig: 'Die Rechte für den Vergleich konnten nicht vollständig geladen werden. Bitte laden Sie die Seite neu.',
     laeuft: 'Die Rollenänderung wird ausgeführt …',
   },
+  benutzerEinladen: {
+    titel: 'Benutzer einladen',
+    hinweis: 'Die Person erhält eine Einladung per E-Mail und richtet ihr Passwort und die Zwei-Faktor-Anmeldung selbst ein. Eine Inhaberrolle kann die Bestätigung durch eine zweite Person benötigen.',
+    felder: {
+      benutzername: 'Benutzername',
+      email: 'E-Mail-Adresse',
+      vorname: 'Vorname',
+      nachname: 'Nachname',
+      rolle: 'Rolle',
+    },
+    waehlen: 'Bitte wählen',
+    senden: 'Einladung senden',
+    laeuft: 'Die Einladung wird gesendet …',
+    ungueltig: {
+      benutzername: 'Bitte 3 bis 40 Zeichen aus a–z, 0–9, Punkt, Unterstrich oder Bindestrich eingeben.',
+      email: 'Bitte eine E-Mail-Adresse mit genau einem @ und höchstens 254 Zeichen eingeben.',
+      vorname: 'Bitte einen Vornamen mit 1 bis 60 Zeichen ohne Steuerzeichen eingeben.',
+      nachname: 'Bitte einen Nachnamen mit 1 bis 60 Zeichen ohne Steuerzeichen eingeben.',
+      rolle: 'Bitte eine verfügbare Rolle auswählen.',
+    },
+  },
 } as const;
