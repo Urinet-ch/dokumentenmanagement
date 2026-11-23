@@ -75,7 +75,11 @@
             from abbild;
 
             insert into wissensquelle_markierung (dokument_id, markiert_von, markiert_am)
-            select id, 'System', clock_timestamp() from dokument where art = 'WISSENSQUELLE';
+            select d.id, 'System', clock_timestamp()
+            from dokument d
+            where d.art = 'WISSENSQUELLE'
+                and not exists (select 1 from wissensquelle_markierung m
+                    where m.dokument_id = d.id and m.beendet_am is null);
 
             update dokument set art = 'PROJEKTDOKUMENT', version = version + 1,
                 konfiguration_version = (select max(version) from konfiguration_version),
@@ -84,7 +88,100 @@
             delete from dokumentart where code = 'WISSENSQUELLE';
         ]]></sql>
         <rollback>
-            <sql>-- Markierungen und Versionen bleiben beim Rollback zum Schutz der Daten bestehen.</sql>
+            <sql splitStatements="false"><![CDATA[
+                insert into dokumentart (code, name, beschreibung, gruppen, pflichtfelder, zusatz_schema, vertraulichkeit,
+                    aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, selbst_ausgestellt,
+                    belegnummer_muster, ki_vorschlag, ki_felder, reihenfolge)
+                values ('WISSENSQUELLE', 'Wissensquelle',
+                    'Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient.',
+                    array['frei']::text[], array['titel', 'datum']::text[],
+                    case when current_schema() = 'm_vhf_gsk' then '{
+                        "type": "object",
+                        "properties": {
+                            "herausgeber": {"type": "string", "minLength": 1},
+                            "verband": {
+                                "type": "array",
+                                "items": {"type": "string", "enum": ["vhf", "gsk"]},
+                                "x-labels": {"vhf": "VHF", "gsk": "GSK"},
+                                "minItems": 1,
+                                "uniqueItems": true
+                            },
+                            "zugriff": {
+                                "type": "string",
+                                "enum": ["oeffentlich", "mitglieder", "vorstand"],
+                                "default": "mitglieder"
+                            },
+                            "veroeffentlicht": {"type": "boolean", "default": false}
+                        },
+                        "required": ["verband", "zugriff", "veroeffentlicht"],
+                        "additionalProperties": false
+                    }'::jsonb else '{
+                        "type": "object",
+                        "properties": {"herausgeber": {"type": "string", "minLength": 1}},
+                        "additionalProperties": false
+                    }'::jsonb end,
+                    'NORMAL', null, null, false, true, false, '{}'::text[], false, '{}'::text[], 0)
+                on conflict (code) do nothing;
+
+                with aktuell as (
+                    select version, inhalt from konfiguration_version order by version desc limit 1
+                ), abbild as (
+                    select version + 1 as version,
+                        jsonb_set(jsonb_set(inhalt, '{version}', to_jsonb(version + 1)), '{arten}',
+                            (inhalt -> 'arten') || jsonb_build_array(jsonb_build_object(
+                                'code', a.code,
+                                'name', a.name,
+                                'beschreibung', a.beschreibung,
+                                'gruppen', to_jsonb(coalesce(a.gruppen, '{}'::text[])),
+                                'pflichtfelder', to_jsonb(coalesce(a.pflichtfelder, '{}'::text[])),
+                                'zusatzSchema', to_jsonb(coalesce(a.zusatz_schema::text,
+                                    '{"type":"object","properties":{},"additionalProperties":false}')),
+                                'vertraulichkeit', a.vertraulichkeit,
+                                'aufbewahrung', jsonb_build_object(
+                                    'jahre', a.aufbewahrung_jahre,
+                                    'ab', a.aufbewahrung_ab)
+                                    || jsonb_strip_nulls(jsonb_build_object('feld', a.aufbewahrung_feld)),
+                                'gesetzlichePflicht', a.gesetzliche_pflicht,
+                                'aktiv', a.aktiv,
+                                'selbstAusgestellt', a.selbst_ausgestellt,
+                                'belegnummerMuster', to_jsonb(coalesce(a.belegnummer_muster, '{}'::text[])),
+                                'fremdbelegArt', a.fremdbeleg_art,
+                                'ohneZahlungsdatenArt', a.ohne_zahlungsdaten_art,
+                                'kiVorschlag', a.ki_vorschlag,
+                                'kiFelder', to_jsonb(coalesce(a.ki_felder, '{}'::text[])),
+                                'kiHinweise', a.ki_hinweise,
+                                'reihenfolge', a.reihenfolge))) as inhalt
+                    from aktuell
+                    cross join dokumentart a
+                    where a.code = 'WISSENSQUELLE'
+                        and not exists (
+                            select 1 from jsonb_array_elements(aktuell.inhalt -> 'arten') vorhandene
+                            where vorhandene ->> 'code' = 'WISSENSQUELLE')
+                )
+                insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+                select version, 'System', 'Rollback Migration Wissensquelle', 'MIGRATION', inhalt,
+                    encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+                from abbild;
+
+                insert into dokument_version (dokument_id, version, konfiguration_version, daten, geaendert_von, grund)
+                select d.id, d.version, d.konfiguration_version, jsonb_build_object(
+                    'dokument', to_jsonb(d) - 'volltext' - 'volltext_tsv',
+                    'finanz', (select to_jsonb(f) - 'dokument_id' from dokument_finanz f where f.dokument_id = d.id),
+                    'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id),
+                    'klassifikationen', coalesce((select jsonb_object_agg(k.klassifikation, k.werte) from (
+                        select klassifikation, jsonb_agg(wert order by wert) as werte from dokument_klassifikation
+                        where dokument_id = d.id group by klassifikation
+                    ) k), '{}'::jsonb)), 'System', 'Rollback Migration Wissensquelle'
+                from dokument d
+                join wissensquelle_markierung m on m.dokument_id = d.id and m.beendet_am is null
+                where d.art <> 'WISSENSQUELLE';
+
+                update dokument d set art = 'WISSENSQUELLE', version = d.version + 1,
+                    konfiguration_version = (select max(version) from konfiguration_version),
+                    geaendert = clock_timestamp()
+                from wissensquelle_markierung m
+                where m.dokument_id = d.id and m.beendet_am is null and d.art <> 'WISSENSQUELLE';
+            ]]></sql>
         </rollback>
     </changeSet>
 </databaseChangeLog>

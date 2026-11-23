@@ -8,13 +8,24 @@ import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import liquibase.Scope;
+import liquibase.command.CommandScope;
+import liquibase.command.core.UpdateCommandStep;
+import liquibase.command.core.helpers.DbUrlConnectionArgumentsCommandStep;
+import liquibase.database.DatabaseFactory;
+import liquibase.database.jvm.JdbcConnection;
+import liquibase.resource.ClassLoaderResourceAccessor;
+import liquibase.ui.LoggerUIService;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +41,7 @@ class WissensquelleBestandTest {
     @Inject Instance<AgroalDataSource> datenbank;
 
     @Test
-    void migrationBrichtBeiVerweisAbUndUebernimmtDanachZweiDokumenteAtomar() throws SQLException {
+    void migrationBrichtBeiVerweisAbUndRollbackErhaeltDokumente() throws Exception {
         anlegenWennFehlt(MANDANT);
         String s = MANDANT.schema();
         ausfuehren("insert into " + s + ".dokumentart (code, name, vertraulichkeit, gesetzliche_pflicht) "
@@ -55,6 +66,9 @@ class WissensquelleBestandTest {
                 .hasStackTraceContaining("Dokumentart PROJEKTDOKUMENT fehlt");
         ausfuehren("insert into " + s + ".dokumentart (code, name, vertraulichkeit, gesetzliche_pflicht) "
                 + "values ('PROJEKTDOKUMENT', 'Projektdokument', 'NORMAL', false)");
+        UUID projektdokument = Testdokumente.anlegen(datenbank.get(),
+                new Testdokumente.Angaben(MANDANT.wert(), "PROJEKTDOKUMENT", "NORMAL", true, "probe", null,
+                        "ARCHIVIERT"));
         ausfuehren("insert into " + s + ".klassifikation "
                 + "(code, name, mehrfach, ki_vorschlag, suchfilter, oeffentlich_filter, aktiv) "
                 + "values ('migrationstest', 'Migrationstest', false, false, false, false, true)");
@@ -95,9 +109,11 @@ class WissensquelleBestandTest {
         mandantDatenbank.schemaMigrieren(s);
         assertThat(wert("select count(*) from " + s
                 + ".dokument where art = 'PROJEKTDOKUMENT' and version = 1")).isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".dokument where id = '" + projektdokument
+                + "' and art = 'PROJEKTDOKUMENT' and version = 1")).isEqualTo("1");
         assertThat(wert("select count(*) from " + s + ".dokument where art = 'PROJEKTDOKUMENT' "
                 + "and konfiguration_version = (select max(version) from " + s + ".konfiguration_version)"))
-                .isEqualTo("2");
+                .isEqualTo("3");
         assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung "
                 + "where markiert_von = 'System' and beendet_am is null")).isEqualTo("2");
         assertThat(wert("select count(*) from " + s + ".dokument_version "
@@ -116,7 +132,49 @@ class WissensquelleBestandTest {
         assertThat(wert("select count(*) from " + s + ".dokument_version where grund = 'Migration Wissensquelle'"))
                 .isEqualTo("2");
         assertThat(wert("select max(version)::text from " + s + ".konfiguration_version")).isEqualTo(neueVersion);
-        Testdokumente.loeschen(datenbank.get(), MANDANT.wert(), List.of(erstes, zweites));
+
+        rollbackWissensquelle(s);
+        assertThat(wert("select count(*) from " + s + ".dokumentart where code = 'WISSENSQUELLE' "
+                + "and name = 'Wissensquelle' and beschreibung = "
+                + "'Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient.' "
+                + "and gruppen = array['frei']::text[] "
+                + "and pflichtfelder = array['titel', 'datum']::text[] and vertraulichkeit = 'NORMAL' "
+                + "and zusatz_schema = '{\"type\":\"object\",\"properties\":{\"herausgeber\":"
+                + "{\"type\":\"string\",\"minLength\":1}},\"additionalProperties\":false}'::jsonb "
+                + "and aufbewahrung_jahre is null and aufbewahrung_ab is null "
+                + "and gesetzliche_pflicht = false and aktiv and not selbst_ausgestellt "
+                + "and belegnummer_muster = '{}'::text[] and not ki_vorschlag "
+                + "and ki_felder = '{}'::text[] and reihenfolge = 0"))
+                .isEqualTo("1");
+        assertThat(wert("select count(*) from " + s + ".dokument where art = 'WISSENSQUELLE'"))
+                .isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".konfiguration_version k, "
+                + "jsonb_array_elements(k.inhalt->'arten') a where k.version = (select max(version) from " + s
+                + ".konfiguration_version) and a->>'code' = 'WISSENSQUELLE'")).isEqualTo("1");
+        assertThat(wert("select count(*) from " + s + ".dokument where art = 'WISSENSQUELLE' "
+                + "and konfiguration_version = (select max(version) from " + s + ".konfiguration_version)"))
+                .isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".dokument d join " + s
+                + ".wissensquelle_markierung m on m.dokument_id = d.id "
+                + "where m.beendet_am is null and d.art = 'WISSENSQUELLE'")).isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".dokument where id = '" + projektdokument
+                + "' and art = 'PROJEKTDOKUMENT' and version = 1")).isEqualTo("1");
+        assertThat(wert("select count(*) from " + s
+                + ".dokument_version where grund = 'Rollback Migration Wissensquelle'")).isEqualTo("2");
+
+        mandantDatenbank.schemaMigrieren(s);
+        rollbackWissensquelle(s);
+        assertThat(wert("select count(*) from " + s + ".dokument where art = 'WISSENSQUELLE'")).isEqualTo("2");
+        assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung "
+                + "where beendet_am is null")).isEqualTo("2");
+        assertThat(wert("select count(*) from " + s
+                + ".dokument_version where grund = 'Rollback Migration Wissensquelle'")).isEqualTo("4");
+
+        mandantDatenbank.schemaMigrieren(s);
+        assertThat(wert("select count(*) from " + s + ".dokument where art = 'WISSENSQUELLE'")).isEqualTo("0");
+        assertThat(wert("select count(*) from " + s + ".wissensquelle_markierung "
+                + "where beendet_am is null")).isEqualTo("2");
+        Testdokumente.loeschen(datenbank.get(), MANDANT.wert(), List.of(erstes, zweites, projektdokument));
     }
 
     @Test
@@ -147,6 +205,30 @@ class WissensquelleBestandTest {
              ResultSet zeile = befehl.executeQuery(sql)) {
             assertThat(zeile.next()).isTrue();
             return zeile.getString(1);
+        }
+    }
+
+    private static void rollbackWissensquelle(String schema) throws Exception {
+        try (Connection verbindung = DriverManager.getConnection(
+                ConfigProvider.getConfig().getValue("quarkus.datasource.jdbc.url", String.class),
+                ConfigProvider.getConfig().getValue("quarkus.datasource.username", String.class),
+                ConfigProvider.getConfig().getValue("quarkus.datasource.password", String.class))) {
+            verbindung.setAutoCommit(false);
+            var liquibaseDb = DatabaseFactory.getInstance()
+                    .findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
+            liquibaseDb.setDefaultSchemaName(schema);
+            liquibaseDb.setLiquibaseSchemaName(schema);
+            Scope.child(Map.of(
+                    Scope.Attr.resourceAccessor.name(),
+                    new ClassLoaderResourceAccessor(WissensquelleBestandTest.class.getClassLoader()),
+                    Scope.Attr.ui.name(), new LoggerUIService()), () ->
+                    new CommandScope("rollbackCount")
+                            .addArgumentValue("count", 1)
+                            .addArgumentValue(DbUrlConnectionArgumentsCommandStep.DATABASE_ARG, liquibaseDb)
+                            .addArgumentValue(UpdateCommandStep.CHANGELOG_FILE_ARG,
+                                    "db/mandant/changesets/070-wissensquelle-markierung.xml")
+                            .execute());
+            verbindung.commit();
         }
     }
 }
