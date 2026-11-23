@@ -22,6 +22,12 @@ export const TEXTE = {
     bestand: 'Bestand',
     verwaltung: 'Verwaltung',
   },
+  stand: {
+    beschriftung: 'Stand der App',
+    version: (version: string) => `Version ${version}`,
+    build: (build: string) => `Build ${build}`,
+    gebaut: (zeit: string) => `gebaut am ${zeit}`,
+  },
   kopf: {
     suche: 'Im Archiv suchen',
     mandant: (mandant: string) => `Mandant ${mandant}`,
@@ -1502,6 +1508,29 @@ export const TEXTE = {
   },
   /** Seite «Chat» (Spec 02, Aufgabe 7.4; Req 6.1–6.3, 4.3); Menüpunkt seit Aufgabe 7.4b. */
   chat: {
+    bewertung: {
+      titel: 'Antwort bewerten',
+      stern: (n: number) => `Antwort bewerten, ${n} von 5 Sternen`,
+      datenschutz: 'Bewertungen werden mit Frage und Antwort 12 Monate gespeichert und vom Inhaber ausgewertet.',
+      laden: 'Bewertung wird geladen …',
+      ladenFehler: 'Die Bewertung konnte nicht geladen werden. Bitte versuchen Sie es erneut.',
+      erneutLaden: 'Bewertung erneut laden',
+      speichernFehler: 'Die Bewertung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.',
+      entfernenFehler: 'Die Bewertung konnte nicht entfernt werden. Bitte versuchen Sie es erneut.',
+      grund: 'Grund (freiwillig)',
+      keinGrund: 'Kein Grund',
+      freitext: 'Freitext (freiwillig, höchstens 500 Zeichen)',
+      speichern: 'Bewertung speichern',
+      entfernen: 'Bewertung entfernen',
+      gruende: [
+        { wert: 'NICHT_BEANTWORTET', text: 'Frage nicht beantwortet' },
+        { wert: 'FALSCH', text: 'Antwort falsch' },
+        { wert: 'UNVOLLSTAENDIG', text: 'Antwort unvollständig' },
+        { wert: 'QUELLE', text: 'Falsche oder fehlende Quelle' },
+        { wert: 'ZU_LANGSAM', text: 'Zu langsam' },
+        { wert: 'ANDERES', text: 'Anderes' },
+      ],
+    },
     titel: 'Chat',
     einleitung:
       'Fragen zu den Belegen im Archiv. Jede Antwort nennt ihre Quellen; sichtbar ist nur, was Sie auch in der ' +
@@ -1771,6 +1800,7 @@ export const TEXTE = {
       'eingangskorb-eigene': 'Ihre erfassten Dokumente verfolgen',
       suche: 'Suche',
       chat: 'Chat',
+      'chat-bewerten': 'Antworten bewerten',
       dokument: 'Dokumentansicht',
       'dokument-aendern': 'Angaben ändern',
       kontakte: 'Kontakte',

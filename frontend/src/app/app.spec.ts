@@ -361,4 +361,11 @@ describe('App (Req 2.6, 8.6)', () => {
     );
     expect(aktiv).toEqual(['/wissen/entwuerfe']);
   });
+
+  it('zeigt unten Version und Build der App, auch ohne Anmeldung', async () => {
+    const element = await zeigen();
+    expect(element.querySelector('[data-test=stand-version]')?.textContent).toContain('Version Entwicklung');
+    expect(element.querySelector('[data-test=stand-build]')?.textContent).toContain('Build lokal');
+    expect(element.querySelector('footer.stand')?.getAttribute('aria-label')).toBe(TEXTE.stand.beschriftung);
+  });
 });
