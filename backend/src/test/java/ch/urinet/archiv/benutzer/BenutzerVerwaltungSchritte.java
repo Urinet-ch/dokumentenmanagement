@@ -567,6 +567,10 @@ public class BenutzerVerwaltungSchritte {
 
     @Angenommen("ein synthetischer aktiver Mitarbeiter und zwei Inhaber bestehen im Test-Keycloak")
     public void loeschungMitEchtemKeycloak() {
+        loeschungMitEchtemKeycloak("mitarbeiter", true);
+    }
+
+    private void loeschungMitEchtemKeycloak(String zielRolle, boolean zweiterInhaber) {
         String realmUrl = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
         String basis = realmUrl.substring(0, realmUrl.indexOf("/realms/"));
         String clientId = given().auth().oauth2(admin).queryParam("clientId", "archiv-verwaltung")
@@ -620,9 +624,42 @@ public class BenutzerVerwaltungSchritte {
             }
         }, IdentitaetsDienst.class);
         loeschungMitKeycloak = true;
-        eigeneId = keycloakBenutzerAnlegen(MANDANT, name, "mitarbeiter");
-        zweiterAkteurName = "probe-19-12-" + UUID.randomUUID();
-        zweiterAkteurId = akteurAnlegen(MANDANT, zweiterAkteurName);
+        eigeneId = keycloakBenutzerAnlegen(MANDANT, name, zielRolle);
+        if (zweiterInhaber) {
+            zweiterAkteurName = "probe-19-12-" + UUID.randomUUID();
+            zweiterAkteurId = akteurAnlegen(MANDANT, zweiterAkteurName);
+        }
+    }
+
+    @Angenommen("ein aktiver und ein deaktivierter Inhaber bestehen im Test-Keycloak")
+    public void einAktiverUndEinDeaktivierterInhaber() {
+        inhaberFuerLoeschung(false);
+    }
+
+    @Angenommen("zwei aktive und ein deaktivierter Inhaber bestehen im Test-Keycloak")
+    public void zweiAktiveUndEinDeaktivierterInhaber() {
+        inhaberFuerLoeschung(true);
+    }
+
+    private void inhaberFuerLoeschung(boolean zweiterInhaber) {
+        loeschungMitEchtemKeycloak("inhaber", zweiterInhaber);
+        anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/deaktivieren").then().statusCode(204);
+        assertThat(identitaet.inhaberZaehlen(MANDANT)).isEqualTo(zweiterInhaber ? 2 : 1);
+    }
+
+    @Wenn("der aktive Inhaber den deaktivierten Inhaber nach der Frist löscht")
+    public void deaktiviertenInhaberLoeschen() throws SQLException {
+        loeschfristAbgelaufen();
+        antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/loeschen"));
+    }
+
+    @Dann("ist nur der deaktivierte Inhaber gelöscht")
+    public void deaktivierterInhaberGeloescht() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(anfrage().get(PFAD + "/" + eigeneId).statusCode()).isEqualTo(404);
+        assertThat(identitaet.inhaberZaehlen(MANDANT)).isEqualTo(1);
     }
 
     @Wenn("der Inhaber die Inhaberrolle beantragt und beide Inhaber darüber entscheiden")

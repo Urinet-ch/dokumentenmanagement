@@ -119,6 +119,20 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn zwei Inhaber einen Löschantrag nach der Frist entscheiden
     Dann löscht nur die Bestätigung des zweiten Inhabers den Benutzer
 
+  @req-3.11 @req-4.7 @req-4.11
+  Szenario: Ein deaktivierter Inhaber kann gelöscht werden, wenn ein aktiver Inhaber verbleibt
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein aktiver und ein deaktivierter Inhaber bestehen im Test-Keycloak
+    Wenn der aktive Inhaber den deaktivierten Inhaber nach der Frist löscht
+    Dann ist nur der deaktivierte Inhaber gelöscht
+
+  @req-3.11 @req-4.7 @req-4.11
+  Szenario: Zwei aktive Inhaber bestätigen die Löschung eines deaktivierten Inhabers
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und zwei aktive und ein deaktivierter Inhaber bestehen im Test-Keycloak
+    Wenn zwei Inhaber einen Löschantrag nach der Frist entscheiden
+    Dann löscht nur die Bestätigung des zweiten Inhabers den Benutzer
+
   @req-3.11 @req-4.6 @req-4.8
   Szenario: Eine Löschung schützt eigene, fremde, unbekannte und aktive Benutzer
     Angenommen die frische Anmeldung ist für den Test bestätigt
