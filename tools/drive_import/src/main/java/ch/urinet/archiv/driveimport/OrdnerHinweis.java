@@ -30,6 +30,10 @@ final class OrdnerHinweis {
     }
 
     static String von(Path wurzel, Path datei) {
+        return von(wurzel, datei, null);
+    }
+
+    static String von(Path wurzel, Path datei, AltbestandPfad altbestand) {
         List<String> teile = new ArrayList<>();
         Path name = wurzel.toAbsolutePath().normalize().getFileName();
         if (name != null) {
@@ -64,14 +68,26 @@ final class OrdnerHinweis {
         String kopf = "Drive-Import; Ordner: ";
         int platz = MAX_ZEICHEN - kopf.codePointCount(0, kopf.length())
                 - zusatz.codePointCount(0, zusatz.length());
+        String hinweis;
         if (platz < 1) {
-            return kuerzen(kopf + pfad + zusatz);
+            hinweis = kuerzen(kopf + pfad + zusatz);
+        } else {
+            if (pfad.codePointCount(0, pfad.length()) > platz) {
+                int weg = pfad.codePointCount(0, pfad.length()) - (platz - 1);
+                pfad = "…" + pfad.substring(pfad.offsetByCodePoints(0, weg));
+            }
+            hinweis = kopf + pfad + zusatz;
         }
-        if (pfad.codePointCount(0, pfad.length()) > platz) {
-            int weg = pfad.codePointCount(0, pfad.length()) - (platz - 1);
-            pfad = "…" + pfad.substring(pfad.offsetByCodePoints(0, weg));
+        if (altbestand == null) {
+            return hinweis;
         }
-        return kopf + pfad + zusatz;
+        String metadaten = "; Reihe: " + sauber(altbestand.art()) + "; Jahr: " + altbestand.jahr()
+                + (altbestand.ausgabe() == null ? "" : "; Ausgabe: " + altbestand.ausgabe());
+        int maxHinweis = MAX_ZEICHEN - metadaten.codePointCount(0, metadaten.length());
+        if (hinweis.codePointCount(0, hinweis.length()) > maxHinweis) {
+            hinweis = hinweis.substring(0, hinweis.offsetByCodePoints(0, maxHinweis - 1)) + "…";
+        }
+        return hinweis + metadaten;
     }
 
     /** NFC (macOS speichert Dateinamen als NFD) und Steuer- bzw. Formatzeichen durch Leerzeichen ersetzen. */

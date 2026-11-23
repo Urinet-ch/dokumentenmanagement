@@ -27,10 +27,14 @@ public class JdbcVerwaltungGrenzen implements VerwaltungGrenzen {
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final Duration STUNDE = Duration.ofHours(1);
     private static final Duration TAG = Duration.ofHours(24);
+    private static final String EINSTELLUNG = "(aktion = 'KONFIGURATION_AENDERN' and exists "
+            + "(select 1 from jsonb_array_elements(case when jsonb_typeof(details->'aenderungen') = 'array' "
+            + "then details->'aenderungen' else '[]'::jsonb end) aenderung "
+            + "where aenderung->>'pfad' like 'einstellungen.%'))";
     private static final String AKTIONEN = "(aktion in ('BENUTZER_ANLEGEN', 'BENUTZER_AENDERN', "
             + "'BENUTZER_LOESCHEN', 'ROLLE_ZUWEISEN') and details->>'phase' = 'ANGEFRAGT' "
             + "or aktion = 'BENUTZER_ANTRAG' and coalesce(details->>'phase', 'ANGEFRAGT') = 'ANGEFRAGT' "
-            + "or aktion = 'KONFIGURATION_AENDERN')";
+            + "or " + EINSTELLUNG + ")";
     private static final String EMAILS = "details->>'ziel' = ? and "
             + "(aktion = 'BENUTZER_ANLEGEN' and details->>'phase' in ('ABGESCHLOSSEN', 'UNKLAR', 'FEHLGESCHLAGEN') "
             + "or aktion = 'BENUTZER_AENDERN' and details->>'phase' = 'ANGEFRAGT' "
@@ -99,7 +103,7 @@ public class JdbcVerwaltungGrenzen implements VerwaltungGrenzen {
                         null, anlagen, STUNDE, jetzt);
                 case EMAIL, EMAIL_AENDERUNG -> pruefenEmails(verbindung, schema, ziel.toString(), emails,
                         art == Art.EMAIL_AENDERUNG ? 2 : 1, jetzt);
-                case EINSTELLUNG -> pruefen(verbindung, schema, "aktion = 'KONFIGURATION_AENDERN'",
+                case EINSTELLUNG -> pruefen(verbindung, schema, EINSTELLUNG,
                         null, einstellungen, STUNDE, jetzt);
                 case BENUTZER -> { }
             }

@@ -345,6 +345,24 @@ bleibt, neue Felder kommen flach dazu; die genaue Form legt Aufgabe 20.2 gegen d
 | GET, PUT | `/wissensbasis/einstellungen` | wie bisher (Spec 04), nach derselben Mechanik; `If-Match` mit der Konfigurationsversion | A19 |
 | GET | `/konfiguration/versionen[/{n}]` | Verlauf; die Seite der Einstellungen zeigt nur `einstellungen.*`, Kennungen ohne Werte | A11 |
 
+**Umsetzung (Aufgabe 20.2, 22.11.2026):** `GET /mandant/einstellungen` liefert `version`, `katalog[]` und `betrieb`;
+Katalogeinträge enthalten Wert, Standard, Herkunft, Grenzen und Wirkung. Dokumentarten, Klassifikationen, Regeln und
+KI-Texte bleiben bei ihren bestehenden A11-Schnittstellen. A19 wird zusätzlich beim Ändern der Wissensgruppe geprüft,
+bei einer Rücksetzung auf eine historische Version vorsorglich ebenfalls. Vorschau und Änderung verwenden dieselbe
+Risikoprüfung; die Vorschau verlangt keine Bestätigung und schreibt weder Version noch Protokoll. Die Bestätigung
+`bestaetigt` nennt die riskanten Schlüssel kommasepariert; beim Dateiimport gelten dieselben Prüfung und Step-up,
+beim Betreiberkommando dieselbe Bestätigung ohne Benutzer-Step-up. Schemafehler verdecken weder eine lesbare veraltete
+Datei-Basisversion noch eine erkennbare unbestätigte riskante Einstellung. Für die Verwaltungsraten zählen
+`KONFIGURATION_AENDERN`-Einträge nur, wenn mindestens ein Änderungspfad zu `einstellungen.*` gehört; Änderungen anderer
+Konfigurationsbereiche verbrauchen keine Einstellungsrate.
+
+Die 16-KiB-Grenze wird beim HTTP-Empfang auch ohne Inhaltslänge durchgesetzt. Fachliche Fehler nach erfolgreicher
+Anmeldung und Mandantenprüfung tragen den aktuellen ETag; vor der Anmeldung oder Rechteprüfung sowie bei der frühen
+413-Antwort wird keine Mandantenversion offengelegt. Bisherige Chat-Startwerte mit Tagen werden als ISO-Periode
+angezeigt; ein bisheriger Cron-Zeitplan, der nicht einem einzelnen Wochentag und einer Stunde entspricht, wird mit
+Hinweis statt eines erfundenen Katalogwerts angezeigt. Die Umstellung der Wissensschnittstelle und Verbraucher folgt in
+20.3 und 20.4; bis dahin zeigt `betrieb` das bisher wirksame Wissensbudget.
+
 **Auswirkung** (`Auswirkung`, Beispiele): kürzere Aufbewahrung: «Beim nächsten Aufräumlauf werden N Fragen gelöscht» (Zahl aus
 der Datenbank, Text deutsch); `geschaeftsjahrEnde`: «Gilt für künftig bestätigte Dokumente; bereits archivierte Fristen und
 Sperren bleiben»; Monatsbudget über dem Doppelten: «Mögliche Kosten bis CHF …» (Richtwert aus Spec 01, KI-Kosten). Die
@@ -730,6 +748,17 @@ Die Compose- und Secret-Prüfungen sind lokal grün. Der Test gegen einen frisch
 `mktemp -d` unter macOS das eingehängte Arbeitsverzeichnis nicht verwendete. Die Vorlage nennt dieses Verzeichnis nun
 ausdrücklich; der vollständige Keycloak-Test und die Wirkung der Realm-Vorlage sind damit noch nicht nachgewiesen.
 Die Aufgabe bleibt offen und die Vorlage darf erst nach erfolgreicher Prüfung verwendet werden.
+
+## Nachtrag Umsetzung (Aufgabe 20.2, 23.11.2026)
+
+Bis zur Überführung in 20.3 zeigt der Katalog die tatsächlich wirksamen Wissenswerte aus `wissens_einstellung`,
+deren Herkunft und die instanzweiten Standards; `betrieb` zeigt das bisher wirksame Wissensbudget. Die neue
+Schnittstelle lehnt Wissens-Patches und Rücksetzungen der Wissensgruppe mit einem erklärenden Befund ab; Änderungen
+bleiben über `/wissensbasis/einstellungen` möglich. Dateiimport und Rücksetzung auf eine historische Version werden
+auch abgelehnt, wenn sie Wissenswerte ändern würden oder bestehende eigene Wissenswerte sonst als zurückgesetzt
+erscheinen könnten. Vorschau, App, Dateiimport und Betreiberkommando quittieren damit keine noch unwirksame
+Wissensänderung. Aufgabe 20.3 übernimmt die bestehenden Werte und hebt diese Übergangssperre mit der Umstellung der
+Verbraucher auf.
 
 ## Umsetzung (Aufgabe 20.6, 23.11.2026)
 
