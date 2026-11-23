@@ -239,6 +239,36 @@ public class BenutzerVerwaltungSchritte {
         fremdeId = anlegen("vhf-gsk", "fremd." + name);
     }
 
+    @Dann("sieht ein Inhaber des Beispielverbands nur die Benutzer seines Mandanten")
+    public void beispielverbandBleibtGetrennt() throws SQLException {
+        String code = "probe-verband";
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select 1 from public.mandant where code = ? and aktiv")) {
+            abfrage.setString(1, code);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                if (!zeile.next()) {
+                    provisionierung.anlegen(code, null, null);
+                }
+            }
+        }
+        String verbandsId = anlegen(code, "verband." + name);
+        String verbandsAkteur = "probe-verband-" + UUID.randomUUID();
+        String verbandsAkteurId = akteurAnlegen(code, verbandsAkteur);
+        try {
+            String token = Testanmeldung.token(verbandsAkteur);
+            Response liste = given().auth().oauth2(token).queryParam("q", name).get(PFAD);
+            assertThat(liste.statusCode()).isEqualTo(200);
+            assertThat(liste.jsonPath().<String>getList("id")).containsExactly(verbandsId);
+            assertThat(liste.asString()).doesNotContain(eigeneId, fremdeId);
+            given().auth().oauth2(token).get(PFAD + "/" + eigeneId).then().statusCode(404);
+            given().auth().oauth2(token).get(PFAD + "/" + fremdeId).then().statusCode(404);
+            anfrage().get(PFAD + "/" + verbandsId).then().statusCode(404);
+        } finally {
+            given().auth().oauth2(admin).delete(adminPfad + "/users/" + verbandsAkteurId).then().statusCode(204);
+        }
+    }
+
     @Wenn("der Inhaber die Benutzerliste und beide Details abruft")
     public void benutzerAbrufen() {
         antworten.add(anfrage().queryParam("q", name).queryParam("groesse", 1).get(PFAD));

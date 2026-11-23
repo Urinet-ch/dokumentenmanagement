@@ -18,6 +18,27 @@ Funktionalität: Benutzerrollen und Berechtigungen
     Angenommen die Rolle «mitarbeiter» fragt Aktion «A22» an
     Dann wird die Anfrage mit HTTP-Status 403 verweigert
 
+  @req-4.2 @verwaltung-rechte-http
+  Szenariogrundriss: Jede Rolle ohne Verwaltungsrecht wird bei jeder Aktion protokolliert verweigert
+    Angenommen «<rolle>» ist im Test-Realm angemeldet
+    Wenn die Person die Verwaltungsaktion «<aktion>» über HTTP aufruft
+    Dann wird der Aufruf mit «NICHT_ERLAUBT» und einem Verweigerungseintrag beantwortet
+
+    Beispiele:
+      | rolle            | aktion |
+      | mitarbeiter      | A20    |
+      | mitarbeiter      | A21    |
+      | mitarbeiter      | A22    |
+      | mitarbeiter      | A23    |
+      | treuhaender      | A20    |
+      | treuhaender      | A21    |
+      | treuhaender      | A22    |
+      | treuhaender      | A23    |
+      | geschaeftsstelle | A20    |
+      | geschaeftsstelle | A21    |
+      | geschaeftsstelle | A22    |
+      | geschaeftsstelle | A23    |
+
   @req-4.4 @req-4.6
   Szenario: Eine bekannte Archiv-Rolle ausserhalb des Mandantensatzes wird abgewiesen
     Angenommen «inhaber» will einer anderen Person die Rolle «geschaeftsstelle» zuweisen; vergebbar sind «inhaber,mitarbeiter,treuhaender»
