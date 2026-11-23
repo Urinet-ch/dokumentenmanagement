@@ -1451,8 +1451,8 @@ Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und 
 - **Umsetzung (Aufgabe 17.2, 23.11.2026):** Die Dokumentansicht und die Liste verwenden `GET /wissen/quellen` für Kennzeichen,
   Markierungszeitpunkt und letzten Ingest-Status; Markieren und Entfernen verwenden die bestehenden Dokument-Endpunkte. A16 wird
   zusätzlich im Frontend-Rechtemodell abgebildet. Die Liste zeigt Statuswerte als Text und lässt den Tabellenrahmen auf schmalen
-  Bildschirmen selbst scrollen. Die Beschriftung «Als Wissensquelle markieren» folgt dem Umsetzungsauftrag; Requirements bleiben
-  unverändert. Die Hilfe enthält einen A16-Unterabschnitt; die Oberfläche ändert weder Dokumentart noch Dateien.
+  Bildschirmen selbst scrollen. Die Schaltfläche verwendet den Wortlaut «Als Wissensquelle verwenden» aus Requirement 20.1.
+  Requirements bleiben unverändert. Die Hilfe enthält einen A16-Unterabschnitt; die Oberfläche ändert weder Dokumentart noch Dateien.
 - **Bedrohungsmodell:** Markieren löst KI-Kosten aus (Tokenbudget, Requirement 12 bleibt: höchstens ein Ingest je Mandant); nur A16;
   Protokoll ohne Titel; kein Weg, die Vertraulichkeit einer Quelle zu umgehen (`PERSONAL` und höhere Stufen nach 5.5 und 5.11).
 - **Exporte:** Die Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6). Im OKF-Export kennzeichnet

@@ -51,7 +51,7 @@ Given('eine synthetische Wissensquelle für die Markierung ist verfügbar', asyn
 });
 
 When('ich die Wissensquelle markiere', async function () {
-  await this.seite.getByRole('button', { name: 'Als Wissensquelle markieren', exact: true }).click();
+  await this.seite.getByRole('button', { name: 'Als Wissensquelle verwenden', exact: true }).click();
 });
 
 Then('ist das Dokument als Wissensquelle gekennzeichnet', async function () {

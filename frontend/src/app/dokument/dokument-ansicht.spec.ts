@@ -336,7 +336,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
   it('zeigt Markierung, Status und Aktionen der Wissensquelle nach A16', async () => {
     await oeffnen();
     expect(element.querySelector('[data-test=wissensquelle-markieren]')?.textContent?.trim())
-      .toBe(TEXTE.dokument.alsWissensquelleMarkieren);
+      .toBe('Als Wissensquelle verwenden');
     element.querySelector<HTMLButtonElement>('[data-test=wissensquelle-markieren]')!.click();
     await fixture.whenStable();
     fixture.detectChanges();

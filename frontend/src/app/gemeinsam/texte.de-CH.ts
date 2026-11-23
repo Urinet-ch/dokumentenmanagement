@@ -808,7 +808,7 @@ export const TEXTE = {
     },
     aufbewahrung: 'Aufbewahrung',
     wissensquelleKennzeichen: 'Wissensquelle',
-    alsWissensquelleMarkieren: 'Als Wissensquelle markieren',
+    alsWissensquelleMarkieren: 'Als Wissensquelle verwenden',
     wissensquelleEntfernen: 'Wissensquelle entfernen',
     wissensquelleWirdGeladen: 'Wissensquellenstatus wird geladen …',
     wissensquelleLadenFehler: 'Der Wissensquellenstatus konnte nicht geladen werden.',
