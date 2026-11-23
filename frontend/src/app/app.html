@@ -171,6 +171,11 @@
     <main #inhalt id="inhalt" tabindex="-1">
       <router-outlet />
     </main>
+    <footer class="stand" [attr.aria-label]="texte.stand.beschriftung" data-test="stand">
+      <span data-test="stand-version">{{ texte.stand.version(stand.version) }}</span>
+      <span aria-hidden="true">·</span>
+      <span data-test="stand-build" [attr.title]="stand.gebaut ? texte.stand.gebaut(stand.gebaut) : null">{{ texte.stand.build(stand.build) }}</span>
+    </footer>
   </mat-sidenav-content>
   <mat-sidenav
     id="hilfe-leiste"
