@@ -736,6 +736,19 @@ Ein internes Ereignis kennzeichnet erfolgreiche Inhabervergaben; die Alarmzustel
 Löschwirkung und die Bestätigung von Löschanträgen folgen in 19.12. Die Benutzeransicht liefert den Verweis und
 Hinweis zu API-Tokens; die Anzeige in der Oberfläche folgt in 20.6/20.7.
 
+## Vorbereitung (Aufgabe 19.3, 23.11.2026)
+
+Compose bindet die Secret-Datei des Verwaltungsclients in die API und die SMTP-Secret-Datei in Keycloak ein; die
+Admin-Adresse wird gleichzeitig gesetzt. Der Workflow-Diff unter `docs/betrieb/` muss vor einem Deploy auf den
+Deploy-Workflow angewendet werden, damit das Bundle beide Dateien liefert. Die Realm-Vorlage soll Client, Scope,
+Dienstkonto-Rollen, SMTP und Passwort-Richtlinie im bestehenden Realm einrichten. Nicht enthalten sind die übrigen
+Realm-Änderungen und die Betriebsnachweise von 19.3.
+
+Die Compose- und Secret-Prüfungen sind lokal grün. Der Test gegen einen frischen Keycloak scheiterte zweimal, weil
+`mktemp -d` unter macOS das eingehängte Arbeitsverzeichnis nicht verwendete. Die Vorlage nennt dieses Verzeichnis nun
+ausdrücklich; der vollständige Keycloak-Test und die Wirkung der Realm-Vorlage sind damit noch nicht nachgewiesen.
+Die Aufgabe bleibt offen und die Vorlage darf erst nach erfolgreicher Prüfung verwendet werden.
+
 ## Nachtrag Umsetzung (Aufgabe 20.2, 23.11.2026)
 
 Bis zur Überführung in 20.3 zeigt der Katalog die tatsächlich wirksamen Wissenswerte aus `wissens_einstellung`,
@@ -746,6 +759,14 @@ auch abgelehnt, wenn sie Wissenswerte ändern würden oder bestehende eigene Wis
 erscheinen könnten. Vorschau, App, Dateiimport und Betreiberkommando quittieren damit keine noch unwirksame
 Wissensänderung. Aufgabe 20.3 übernimmt die bestehenden Werte und hebt diese Übergangssperre mit der Umstellung der
 Verbraucher auf.
+
+## Umsetzung (Aufgabe 20.2, 23.11.2026)
+
+Die REST-Prüfungen decken `If-Match` nun auch für Vorschau und Rücksetzung ab; eine Rücksetzung mit nicht vorhandenem
+Versionsstand oder unbekanntem Feld wird über den HTTP-Vertrag geprüft. Der Test der Einstellungsgrenze verwendet eine
+kleine Grenze und sendet echte PATCH-Anfragen. Der JDBC-Test erzeugt Konfigurationsprotokolle über denselben
+Protokolladapter wie der Schreibweg, damit Änderungen am Protokollformat die Ratenprüfung nicht unbemerkt umgehen.
+
 ## Umsetzung (Aufgabe 20.6, 23.11.2026)
 
 Die Benutzerseiten verwenden ausschliesslich die Lese-Endpunkte aus 19.7 und 19.11. Der Menüpunkt und beide Routen

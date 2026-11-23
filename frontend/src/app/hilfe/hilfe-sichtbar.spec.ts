@@ -115,7 +115,7 @@ describe('Sichtbare Abschnitte der Anleitung (Spec 07, Req 6.2, 6.3)', () => {
   // Alle Anker der Tabelle in design.md; spätere Einträge (z. B. aus Spec 06) prüft dieser Test nicht
   const TABELLE = new Set([
     'erste-schritte', 'erfassen', 'erfassen-handy', 'erfassen-dateien', 'erfassen-offline', 'eingangskorb',
-    'eingangskorb-bestaetigen', 'eingangskorb-eigene', 'suche', 'chat', 'dokument', 'dokument-aendern', 'kontakte',
+    'eingangskorb-bestaetigen', 'eingangskorb-eigene', 'suche', 'chat', 'chat-bewerten', 'dokument', 'dokument-aendern', 'kontakte',
     'wissen', 'wissen-entwuerfe', 'importe', 'jahresexport', 'verwaltung', 'verwaltung-dokumentarten',
     'verwaltung-protokoll', 'verwaltung-api-tokens', 'probleme',
   ]);

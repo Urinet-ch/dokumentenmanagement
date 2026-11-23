@@ -192,6 +192,67 @@ public class MandantEinstellungenSchritte {
         aenderungMerken();
     }
 
+    @Wenn("«{word}» eine Vorschau der Branding-Änderung ohne Versionsmarke sendet")
+    public void vorschauOhneVersion(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
+                .contentType("application/merge-patch+json").body(branding(neuerName)).post(PFAD + "/vorschau");
+    }
+
+    @Wenn("«{word}» eine Vorschau der Branding-Änderung mit veralteter Versionsmarke sendet")
+    public void vorschauVeraltet(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", "\"0\"")
+                .contentType("application/merge-patch+json").body(branding(neuerName)).post(PFAD + "/vorschau");
+    }
+
+    @Wenn("«{word}» eine Rücksetzung ohne Versionsmarke sendet")
+    public void ruecksetzungOhneVersion(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
+                .contentType("application/json").body("{\"gruppe\":\"BRANDING\"}").post(PFAD + "/zuruecksetzen");
+    }
+
+    @Wenn("«{word}» eine Rücksetzung mit veralteter Versionsmarke sendet")
+    public void ruecksetzungVeraltet(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", "\"0\"")
+                .contentType("application/json").body("{\"gruppe\":\"BRANDING\"}").post(PFAD + "/zuruecksetzen");
+    }
+
+    @Wenn("«{word}» eine unbekannte Einstellungsversion wiederherstellt")
+    public void unbekannteVersionZuruecksetzen(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag)
+                .contentType("application/json").body("{\"version\":2147483647}").post(PFAD + "/zuruecksetzen");
+    }
+
+    @Wenn("«{word}» ein unbekanntes Feld beim Zurücksetzen sendet")
+    public void unbekanntesFeldZuruecksetzen(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag)
+                .contentType("application/json").body("{\"unbekannt\":\"falsch\"}").post(PFAD + "/zuruecksetzen");
+    }
+
+    @Wenn("«{word}» den Archivnamen per REST auf {string} setzt")
+    public void archivnameAuf(String benutzer, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag)
+                .contentType("application/merge-patch+json").body(branding(name)).patch(PFAD);
+        if (antwort.statusCode() == 200) {
+            etag = antwort.header("ETag");
+            geaendert |= antwort.jsonPath().getBoolean("geaendert");
+        }
+    }
+
+    @Dann("ist der Fehlercode der Einstellungsverwaltung «{word}»")
+    public void einstellungsFehlercode(String code) {
+        assertThat(antwort.jsonPath().getString("fehlercode")).isEqualTo(code);
+    }
+
+    @Dann("bleibt die Versionsmarke der Einstellungsverwaltung unverändert")
+    public void einstellungsVersionUnveraendert() {
+        assertThat(antwort.header("ETag")).isEqualTo(etag);
+    }
+
+    @Dann("sind nach zwei angenommenen Änderungen genau zwei Protokolleinträge entstanden")
+    public void zweiAenderungenProtokolliert() throws SQLException {
+        assertThat(protokollAnzahl()).isEqualTo(protokollAnzahl + 2);
+    }
+
     @Wenn("ein ungültiger Archivname über REST gesendet wird")
     public void ungueltigerName() {
         antwort = given().auth().oauth2(token()).header("If-Match", etag)

@@ -118,6 +118,9 @@
               </button>
             }
           }
+          @if (n.rolle === 'ASSISTENT' && n.status === 'OK' && n.id) {
+            <app-chat-bewertung [nachrichtId]="n.id" />
+          }
           @if (n.status === 'ABGEBROCHEN') {
             <p class="gedaempft">{{ texte.abgebrochen }}</p>
           } @else if (n.fehler) {
