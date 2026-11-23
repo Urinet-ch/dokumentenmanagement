@@ -160,7 +160,8 @@ public class WissenImportSchritte {
             case "fremd" -> importSha = fremdeSha;
             case "PERSONAL" -> ausfuehren("update m_urinet.dokument set vertraulichkeit = 'PERSONAL' where id = ?",
                     dokumente.get("urinet").getFirst());
-            case "falsche Art" -> ausfuehren("update m_urinet.dokument set art = 'AUSGANGSRECHNUNG' where id = ?",
+            case "nicht markiert" -> ausfuehren("update m_urinet.wissensquelle_markierung "
+                            + "set beendet_am = clock_timestamp(), beendet_von = 'probe' where dokument_id = ?",
                     dokumente.get("urinet").getFirst());
             case "Auszug fehlt" -> auszug = null;
             case "Auszug falsch" -> auszug = "Nicht belegter Text";
@@ -679,9 +680,11 @@ public class WissenImportSchritte {
     }
 
     private void quelle(String code, String hash) throws SQLException {
-        UUID id = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(code, "WISSENSQUELLE",
+        UUID id = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(code,
+                code.equals("vhf-gsk") ? "PROBE_VHF_BULLETIN" : "PROJEKTDOKUMENT",
                 "NORMAL", true, "probe", null, "ARCHIVIERT"));
         dokumente.get(code).add(id);
+        Testdokumente.alsWissensquelleMarkieren(datenbank.get(), code, id);
         String schema = new MandantCode(code).schema();
         ausfuehren("update " + schema + ".dokument set volltext = 'Seite 1\f', seiten = 1, "
                 + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false where id = ?", id);

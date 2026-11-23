@@ -80,7 +80,7 @@ public enum Fehlercode {
     CSV_LEER(422, "CSV-Datei leer",
             "Die CSV-Datei enthält keine Datenzeilen. Bitte exportieren Sie sie erneut aus dem CRM."),
     KEINE_WISSENSQUELLE(422, "Keine Wissensquelle",
-            "Nur Dokumente der Art «Wissensquelle» können in die Wissensbasis übernommen werden."),
+            "Das Dokument kann nicht als Wissensquelle verwendet werden. Bitte prüfen Sie die angegebenen Voraussetzungen."),
     ENTWURF_BEFUND(422, "Entwurf mit Befund",
             "Der Entwurf hat Befunde und kann so nicht übernommen werden. Bitte beheben Sie die Befunde."),
     PAKET_UNGUELTIG(422, "Wissenspaket ungültig",

@@ -38,7 +38,7 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
       | unbekannt         | QUELLE_UNBEKANNT        |
       | fremd             | QUELLE_UNBEKANNT        |
       | PERSONAL          | QUELLE_PERSONAL         |
-      | falsche Art       | QUELLE_UNBEKANNT        |
+      | nicht markiert    | QUELLE_UNBEKANNT        |
       | Auszug fehlt      | AUSZUG_FEHLT            |
       | Auszug falsch     | AUSZUG_NICHT_GEFUNDEN   |
       | Seitentext fehlt  | AUSZUG_NICHT_PRUEFBAR    |

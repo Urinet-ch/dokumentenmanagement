@@ -1616,6 +1616,8 @@ export const TEXTE = {
       KONTAKT_AKTIV: 'Kontakt wieder aktiviert',
       KONFIGURATION_AENDERN: 'Einstellung geändert',
       WISSEN_IMPORT: 'Wissensquelle importiert',
+      WISSENSQUELLE_MARKIERT: 'Als Wissensquelle markiert',
+      WISSENSQUELLE_ENTFERNT: 'Wissensquellenmarkierung entfernt',
       BENUTZER_ANLEGEN: 'Benutzer angelegt',
       BENUTZER_AENDERN: 'Benutzer geändert',
       BENUTZER_LOESCHEN: 'Benutzer gelöscht',

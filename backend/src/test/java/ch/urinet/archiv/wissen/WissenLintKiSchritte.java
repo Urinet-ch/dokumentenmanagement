@@ -98,8 +98,9 @@ public class WissenLintKiSchritte {
 
     private UUID dokument(String stufe) throws SQLException {
         UUID id = Testdokumente.anlegen(datenbank(), new Testdokumente.Angaben(
-                "urinet", "WISSENSQUELLE", stufe, true, "probe", null, "ARCHIVIERT"));
+                "urinet", "PROJEKTDOKUMENT", stufe, true, "probe", null, "ARCHIVIERT"));
         dokumente.add(id);
+        Testdokumente.alsWissensquelleMarkieren(datenbank(), "urinet", id);
         sql("update m_urinet.dokument set seiten = 1, volltext = 'Synthetischer Volltext' where id = ?", id);
         return id;
     }

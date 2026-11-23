@@ -726,7 +726,7 @@ class JdbcWissenIngestTest {
 
         assertThat(im(URINET, () -> ingest.quelleLaden(id))).isEmpty();
         WissenIngestPort.Quelle quelle = im(ZWEITER, () -> ingest.quelleLaden(id)).orElseThrow();
-        assertThat(quelle.art()).isEqualTo("WISSENSQUELLE");
+        assertThat(quelle.markiert()).isTrue();
         assertThat(quelle.status()).isEqualTo("ARCHIVIERT");
         assertThat(quelle.seiten()).isEqualTo(2);
         assertThat(quelle.pdfaVorhanden()).isTrue();
@@ -2240,7 +2240,9 @@ class JdbcWissenIngestTest {
     @Test
     void holtHandlerFehltNichtNachWennDasDokumentKeineWissensquelleMehrIst() throws SQLException {
         UUID dokument = quelle(URINET);
-        ausfuehren("update " + URINET.schema() + ".dokument set art = 'PROJEKTDOKUMENT' where id = ?", dokument);
+        ausfuehren("update " + URINET.schema()
+                + ".wissensquelle_markierung set beendet_am = now(), beendet_von = 'probe' where dokument_id = ?",
+                dokument);
         UUID entwurf = entwurf(URINET, dokument, "FEHLER", WissenIngestStarten.HANDLER_FEHLT);
 
         im(URINET, () -> ingest.handlerFehltNachholen(WissenIngestStarten.HANDLER_FEHLT));
@@ -2261,8 +2263,10 @@ class JdbcWissenIngestTest {
 
     private UUID quelle(MandantCode code) throws SQLException {
         UUID id = Testdokumente.anlegen(datenbank.get(),
-                new Testdokumente.Angaben(code.wert(), "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+                new Testdokumente.Angaben(code.wert(), code.equals(ZWEITER) ? "PROBE_VHF_BULLETIN"
+                        : "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, "ARCHIVIERT"));
         dokumente.get(code).add(id);
+        Testdokumente.alsWissensquelleMarkieren(datenbank.get(), code.wert(), id);
         ausfuehren("update " + code.schema() + ".dokument set volltext = 'Seite 1\fSeite 2\f', seiten = 2, "
                 + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false where id = ?", id);
         return id;
