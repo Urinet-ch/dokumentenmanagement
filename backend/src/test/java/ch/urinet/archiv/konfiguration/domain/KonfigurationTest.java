@@ -92,19 +92,20 @@ class KonfigurationTest {
     }
 
     @Test
-    void prueftFesteEigenschaftenDerWissensquelle() {
+    void lehntDieEntfalleneDokumentartWissensquelleAb() {
         var art = new Konfiguration.Art("WISSENSQUELLE", "Wissensquelle", null, List.of("frei"),
                 List.of("titel", "datum"), "{\"type\":\"object\"}", "NORMAL",
                 new Konfiguration.Aufbewahrung(null, null), false, true, false, List.of(), null, null, false,
                 List.of(), null, 0);
-        assertThat(new Konfiguration(1, einstellungen(), List.of(art)).pruefen()).isEmpty();
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art)).pruefen())
+                .extracting(Konfiguration.Befund::code).containsExactly("DOKUMENTART_ENTFALLEN");
 
         var ungueltig = new Konfiguration.Art("WISSENSQUELLE", "Wissensquelle", null, List.of("frei"),
                 List.of("titel", "datum"), "{\"type\":\"object\"}", "NORMAL",
                 new Konfiguration.Aufbewahrung(null, null), false, true, false, List.of(), null, null, true,
                 List.of(), null, 0);
         assertThat(new Konfiguration(1, einstellungen(), List.of(ungueltig)).pruefen())
-                .extracting(Konfiguration.Befund::code).containsExactly("WISSENSQUELLE_UNGUELTIG");
+                .extracting(Konfiguration.Befund::code).containsExactly("DOKUMENTART_ENTFALLEN");
     }
 
     @Test

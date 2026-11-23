@@ -115,6 +115,7 @@ export * from './paket-kopf';
 export * from './protokoll-aktion';
 export * from './protokoll-eintrag';
 export * from './protokoll-seite';
+export * from './quelle';
 export * from './quelleneintrag';
 export * from './regel';
 export * from './regel1';

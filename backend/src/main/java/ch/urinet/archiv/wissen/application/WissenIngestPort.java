@@ -83,7 +83,7 @@ public interface WissenIngestPort {
 
     Optional<UUID> wartendenAktivieren(long monatsbudgetTokens, Instant von, Instant bis);
 
-    record Quelle(String art, String status, String vertraulichkeit, boolean bestaetigt, String volltext, Integer seiten,
+    record Quelle(boolean markiert, String status, String vertraulichkeit, boolean bestaetigt, String volltext, Integer seiten,
                   boolean pdfaVorhanden, Integer budgetTokens, Integer monatsbudgetTokens) {
     }
 
@@ -100,7 +100,7 @@ public interface WissenIngestPort {
     record BudgetEinstellungen(Integer budgetTokens, Integer monatsbudgetTokens) {
     }
 
-    record Lauf(UUID entwurfId, UUID dokumentId, String entwurfStatus, String dokumentStatus, String art,
+    record Lauf(UUID entwurfId, UUID dokumentId, String entwurfStatus, String dokumentStatus, boolean markiert,
                 String quelleVertraulichkeit,
                 boolean bestaetigt, String titel, LocalDate datum, String volltext, Integer seiten,
                 boolean pdfaVorhanden, Integer seiteVon, Integer seiteBis, String schritt, int tokensEin,

@@ -38,7 +38,6 @@ public class WissenIngestStarten {
             + "ist archiviert; der Ingest lässt sich wiederholen.";
     static final String NICHT_UEBERNOMMEN = "nicht in die Wissensbasis übernommen – ";
     static final String BUDGET_ERSCHOEPFT = "Budget erschöpft";
-    private static final String WISSENSQUELLE = "WISSENSQUELLE";
     private static final String ARCHIVIERT = "ARCHIVIERT";
     private static final String PERSONAL = "PERSONAL";
     private static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
@@ -58,17 +57,9 @@ public class WissenIngestStarten {
         return starten(dokumentId, seiteVon, seiteBis, akteur, true);
     }
 
-    /**
-     * Automatischer Start nach {@code ARCHIVIERT} (Req 5.1) in der Transaktion der Archivierung: Eine Ausnahme hier
-     * (z. B. Zeitgrenze der Verbrauchssumme) rollt die Archivierung zurück, der Auftrag {@code ARCHIVIEREN} wird dann
-     * wiederholt (design.md, «Ingest»).
-     */
     @Transactional
-    public void archiviert(UUID dokumentId, String art) {
-        if (!WISSENSQUELLE.equals(art)) {
-            return;
-        }
-        starten(dokumentId, null, null, AKTEUR_SYSTEM, false);
+    public Ergebnis nachMarkierung(UUID dokumentId, String akteur) {
+        return starten(dokumentId, null, null, akteur, false);
     }
 
     private Ergebnis starten(UUID dokumentId, Integer seiteVon, Integer seiteBis, String akteur, boolean manuell) {
@@ -76,7 +67,7 @@ public class WissenIngestStarten {
         // Reihenfolge nach design.md: 404, (403 im ZugangFilter), 409, 422/400
         Quelle quelle = port.quelleLaden(dokumentId)
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
-        if (!manuell && !WISSENSQUELLE.equals(quelle.art())) {
+        if (!manuell && !quelle.markiert()) {
             return null;
         }
         if (!ARCHIVIERT.equals(quelle.status())) {
@@ -88,7 +79,7 @@ public class WissenIngestStarten {
             }
             return null;
         }
-        if (!WISSENSQUELLE.equals(quelle.art())) {
+        if (!quelle.markiert()) {
             throw new FachFehler(Fehlercode.KEINE_WISSENSQUELLE);
         }
         seitenbereichPruefen(seiteVon, seiteBis, quelle.seiten());

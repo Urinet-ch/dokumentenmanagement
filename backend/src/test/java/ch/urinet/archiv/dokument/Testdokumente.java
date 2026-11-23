@@ -31,7 +31,8 @@ public final class Testdokumente {
 
     private static final List<String> TABELLEN = List.of("chunk", "dokument_version", "dokument_datei",
             "dokument_finanz", "dokument_vertrag", "belegnummer_eigen", "ki_beispiel", "alte_url",
-            "webseite_referenz", "webseite_aenderung", "dokument_klassifikation", "wissens_entwurf", "dokument");
+            "webseite_referenz", "webseite_aenderung", "dokument_klassifikation", "wissens_entwurf",
+            "wissensquelle_markierung", "dokument");
 
     /** Angaben eines Testdokuments; {@code bestaetigt = false} heisst Art unbestätigt. */
     public record Angaben(String mandant, String art, String vertraulichkeit, boolean bestaetigt, String erstelltVon,
@@ -53,6 +54,17 @@ public final class Testdokumente {
         UUID id = UUID.randomUUID();
         einfuegen(datenquelle, id, angaben, false);
         return id;
+    }
+
+    public static void alsWissensquelleMarkieren(DataSource datenquelle, String mandant, UUID id) throws SQLException {
+        String schema = new MandantCode(mandant).schema();
+        try (Connection verbindung = datenquelle.getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement(
+                     "insert into " + schema + ".wissensquelle_markierung "
+                             + "(dokument_id, markiert_von, markiert_am) values (?, 'probe', now())")) {
+            einfuegen.setObject(1, id);
+            einfuegen.executeUpdate();
+        }
     }
 
     /**
