@@ -121,14 +121,15 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.9_
   - _Abhängig von: 19.8_
 
-- [ ] 19.10 Step-up [Backend]
+- [x] 19.10 Step-up [Backend]
   - `StepUp` mit `auth_time`, Code `STEP_UP_NOETIG` mit `WWW-Authenticate`, Liste der Aktionen nach design.md, Konfiguration
     `archiv.verwaltung.step-up-gueltigkeit`, API-Tokens und Webseiten-Schlüssel scheitern an der Verwaltung mit 403; Test
-    gegen echtes Keycloak (`prompt=login` verlangt Passwort und TOTP).
+    gegen echtes Keycloak (`prompt=login` verlangt Passwort und TOTP). Unit- und Cucumber-Tests prüfen Ablauf, Claim-Grenzen,
+    Antwortheader sowie Benutzer-, API-Token- und Webseiten-Zugänge.
   - _Anforderungen: 7.2, 7.3, 7.9_
   - _Abhängig von: 19.2, 19.7_
 
-- [ ] 19.11 REST Rolle, Rechte-Übersicht und Anträge [Backend]
+- [x] 19.11 REST Rolle, Rechte-Übersicht und Anträge [Backend]
   - `PUT /benutzer/{id}/rolle`, `GET /benutzer/{id}/rechte`, Anträge (Vier-Augen: `inhaber` vergeben und Löschen, ab zwei aktiven
     Inhabern; Verfall nach 72 Stunden), Alarm-Hook für `inhaber`, Abweisung des Rollenkonflikts, Hinweis auf API-Tokens in der
     Antwort; Codes `ESKALATION_VERBOTEN`, `LETZTER_INHABER`.
@@ -158,7 +159,7 @@ auf Server oder Secrets aus der Sitzung.
     Anfragekörper höchstens 16 KiB (HTTP 413) in 20.2.
   - _Abhängig von: Spec 05: 17.7_
 
-- [ ] 20.2 REST Einstellungen [Backend]
+- [x] 20.2 REST Einstellungen [Backend]
   - `GET` mit Katalog und Block `betrieb`, `PATCH` als Merge Patch mit `If-Match`, `bestaetigt`, Step-up, Vorschau und
     `Auswirkung`, Zurücksetzen (Gruppe, Version), Datei und Kommando mit Bestätigung; Rechte je Gruppe (A20, A19, A11); Code
     `BESTAETIGUNG_NOETIG`.
@@ -189,6 +190,8 @@ auf Server oder Secrets aus der Sitzung.
     Menüpunkte nach Recht, Seite «Nicht gefunden» ohne Recht.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.7_
   - _Abhängig von: 19.7, 19.11_
+  - Umsetzung und automatisierte Browser-Nachweise vorbereitet; der manuelle Nachweis zu 8.2 und 8.7 bleibt bei 21.6,
+    die zugehörigen Einstellungsseiten folgen in 20.5. Checkbox bis zum vollständigen Nachweis offen.
 
 - [ ] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
   - Einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, Rolle ändern, E-Mail ändern, löschen (mit

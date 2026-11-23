@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { BrandingService } from '../gemeinsam/branding.service';
 import { EingangskorbZaehler } from '../gemeinsam/eingangskorb-zaehler';
@@ -10,6 +11,8 @@ import { ONLINE } from '../gemeinsam/online';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { einfuehrungSchritte } from '../hilfe/einfuehrung-schritte';
 import { EinfuehrungVermerk } from '../hilfe/einfuehrung-vermerk';
+import { HilfeLeiste } from '../hilfe/hilfe-leiste.service';
+import { VermerkArt } from '../hilfe/einfuehrung-vermerk-speicher';
 
 @Component({
   selector: 'app-start',
@@ -18,18 +21,43 @@ import { EinfuehrungVermerk } from '../hilfe/einfuehrung-vermerk';
     @if (anmeldung.angemeldet()) {
       <div class="seitenkopf">
         <p class="vorzeile">{{ branding.branding().name }}</p>
-        <h1>{{ texte.start.gruss(vorname()) }}</h1>
+        <h1 tabindex="-1">{{ texte.start.gruss(vorname()) }}</h1>
         @if (abschnitte().length > 0) {
           <p>{{ texte.start.untertitel }}</p>
         }
       </div>
-      @if (vermerk.bekannt() === false && schritte()[0]; as schritt) {
+      <div role="status">
+        @if (meldung()) {
+          <div class="hinweis ok"><p>{{ meldung() }}</p></div>
+        }
+      </div>
+      @if ((vermerk.bekannt() === false || vermerk.erneut()) && schritte()[vermerk.schritt()]; as schritt) {
         <section class="karte einfuehrung" aria-labelledby="einfuehrung-titel">
           @if (branding.branding().logoUrl; as logoUrl) {
             <img class="einfuehrung-logo" [src]="logoUrl" alt="" />
           }
-          <h2 id="einfuehrung-titel">{{ schritt.titel }}</h2>
+          <p>{{ texte.einfuehrung.fortschritt(vermerk.schritt() + 1, schritte().length) }}</p>
+          <h2 id="einfuehrung-titel" tabindex="-1">{{ schritt.titel }}</h2>
           <p>{{ schritt.text }}</p>
+          @if (schritt.bereiche; as bereiche) {
+            <ul>
+              @for (bereich of bereiche; track bereich.text) {
+                <li><b>{{ bereich.text }}</b>: {{ bereich.beschreibung }}</li>
+              }
+            </ul>
+          }
+          <button mat-button type="button" (click)="anleitungOeffnen(schritt.anker, $event)">{{ texte.einfuehrung.anleitung }}</button>
+          <div class="einfuehrung-aktionen">
+            <button mat-button type="button" (click)="beenden('UEBERSPRUNGEN')">{{ texte.einfuehrung.ueberspringen }}</button>
+            @if (vermerk.schritt() > 0) {
+              <button mat-button type="button" (click)="wechseln(-1)">{{ texte.einfuehrung.zurueck }}</button>
+            }
+            @if (vermerk.schritt() + 1 < schritte().length) {
+              <button mat-flat-button type="button" (click)="wechseln(1)">{{ texte.einfuehrung.weiter }}</button>
+            } @else {
+              <button mat-flat-button type="button" (click)="beenden('ABGESCHLOSSEN')">{{ texte.einfuehrung.fertig }}</button>
+            }
+          </div>
         </section>
       }
       @if (abschnitte().length > 0) {
@@ -60,6 +88,9 @@ import { EinfuehrungVermerk } from '../hilfe/einfuehrung-vermerk';
         }
       } @else {
         <p role="alert">{{ texte.anmeldung.ohneZugang }}</p>
+        <a #zugangHilfe href="/hilfe#probleme" (click)="$event.preventDefault(); hilfe.oeffnen('probleme', zugangHilfe)">
+          {{ texte.hilfe.soFunktioniertEs }}
+        </a>
       }
     } @else {
       <div class="karte willkommen">
@@ -76,6 +107,9 @@ import { EinfuehrungVermerk } from '../hilfe/einfuehrung-vermerk';
         <button mat-flat-button type="button" (click)="anmelden()">{{ texte.anmeldung.anmelden }}</button>
         @if (!online()) {
           <p><a routerLink="/erfassen">{{ texte.handy.offlineErfassen }}</a></p>
+          <a #offlineHilfe href="/hilfe#erfassen-offline" (click)="$event.preventDefault(); hilfe.oeffnen('erfassen-offline', offlineHilfe)">
+            {{ texte.hilfe.soFunktioniertEs }}
+          </a>
         }
       </div>
     }
@@ -88,6 +122,12 @@ import { EinfuehrungVermerk } from '../hilfe/einfuehrung-vermerk';
       max-width: 120px;
       max-height: 60px;
       object-fit: contain;
+    }
+    .einfuehrung-aktionen {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
     }
     .abschnitt {
       margin-bottom: 1.5rem;
@@ -192,6 +232,12 @@ export class Start {
   protected readonly texte = TEXTE;
   protected readonly branding = inject(BrandingService);
   protected readonly vermerk = inject(EinfuehrungVermerk);
+  protected readonly hilfe = inject(HilfeLeiste);
+  protected readonly meldung = signal('');
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly fokus = signal<{ ziel: string } | null>(null);
+  private readonly wiederaufruf = signal(false);
+  private readonly route = inject(ActivatedRoute);
   /** Ohne Verbindung ist keine Anmeldung möglich; «Erfassen» nimmt dann Aufnahmen in die Warteschlange (Req 4.4). */
   protected readonly online = inject(ONLINE);
   /** Ziel nach der Anmeldung (vom Guard gesetzt). */
@@ -207,7 +253,45 @@ export class Start {
   });
   private readonly zaehler = inject(EingangskorbZaehler, { optional: true });
 
+  constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((parameter) => {
+      this.wiederaufruf.set(parameter.has('einfuehrung'));
+    });
+    effect(() => {
+      const benutzer = this.anmeldung.benutzer();
+      if (this.wiederaufruf() && this.anmeldung.angemeldet() && benutzer?.id && benutzer.mandant && benutzer.rolle) {
+        untracked(() => this.vermerk.wiederaufrufAuswerten());
+        this.wiederaufruf.set(false);
+      }
+    });
+    afterRenderEffect(() => {
+      const fokus = this.fokus();
+      if (fokus) {
+        untracked(() => {
+          this.host.nativeElement.querySelector<HTMLElement>(fokus.ziel)?.focus();
+          this.fokus.set(null);
+        });
+      }
+    });
+  }
+
+  protected wechseln(richtung: number): void {
+    this.vermerk.schrittSetzen(this.vermerk.schritt() + richtung);
+    this.fokus.set({ ziel: '#einfuehrung-titel' });
+  }
+
+  protected anleitungOeffnen(anker: string, ereignis: MouseEvent): void {
+    if (ereignis.currentTarget instanceof HTMLElement) this.hilfe.oeffnen(anker, ereignis.currentTarget);
+  }
+
+  protected beenden(art: VermerkArt): void {
+    void this.vermerk.ablegen(art);
+    this.meldung.set(art === 'ABGESCHLOSSEN' ? this.texte.einfuehrung.abgeschlossen : this.texte.einfuehrung.uebersprungen);
+    this.fokus.set({ ziel: '.seitenkopf h1' });
+  }
+
   protected anmelden(): void {
-    void this.anmeldung.anmelden(this.ziel() ?? '/');
+    const ziel = this.route.snapshot.queryParamMap.has('einfuehrung') ? '/?einfuehrung=' : '/';
+    void this.anmeldung.anmelden(this.ziel() ?? ziel);
   }
 }

@@ -47,6 +47,21 @@ Funktionalität: Handy-Erfassung
     Dann zeigt Seite 1 «Kanten erkannt, zugeschnitten und entzerrt.»
     Und zeigt Seite 2 «Keine Kanten erkannt, das ganze Bild wird verwendet.»
 
+  @req-4.3 @req-4.5
+  Szenario: Grosse Bildköpfe und WebP-Chunks bleiben beim Erfassen und Offline-Upload lesbar
+    Angenommen ein Handy ohne Kamera
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und das Archiv meldet den nächsten Upload als Dublette
+    Wenn ich im Menü «Erfassen» wähle
+    Und das Handy offline ist
+    Und ich ein JPEG mit grossen Metadaten und ein grosses WebP wähle
+    Und die beiden gewählten Bilder zugeschnitten sind
+    Und ich die Erfassung abschliesse
+    Dann zeigt der Zähler «Wartet auf Upload: 1»
+    Wenn das Handy wieder online ist
+    Dann hat das Archiv einen Upload-Versuch erhalten
+    Und zeigt der Zähler «Wartet auf Upload: 0»
+
   @req-4.4
   Szenario: Offline und ohne Anmeldung erfassen; die Aufnahmen bleiben auf dem Gerät
     Angenommen ein Handy mit installierter PWA, dessen Rückkamera «ein Blatt» filmt

@@ -143,10 +143,10 @@ public class WissenIngestSpeichern {
 
     /**
      * Prüft bei jedem Teilauftrag erneut, ob die Quelle noch für den Ingest freigegeben ist (Req 5.6, 5.7): archiviert,
-     * bestätigt, Art WISSENSQUELLE und nicht PERSONAL.
+     * bestätigt, aktiv markiert und nicht PERSONAL.
      */
     public static boolean freigegeben(Lauf lauf) {
-        return lauf != null && "ARCHIVIERT".equals(lauf.dokumentStatus()) && "WISSENSQUELLE".equals(lauf.art())
+        return lauf != null && "ARCHIVIERT".equals(lauf.dokumentStatus()) && lauf.markiert()
                 && quellStufe(lauf) != null;
     }
 

@@ -1,6 +1,7 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.BestaetigungNoetig;
 import ch.urinet.archiv.gemeinsam.domain.EntwurfBefunde;
 import ch.urinet.archiv.gemeinsam.domain.PaketUngueltig;
 import ch.urinet.archiv.gemeinsam.domain.PaketBereitsImportiert;
@@ -12,6 +13,7 @@ import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
 import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
+import ch.urinet.archiv.gemeinsam.domain.WissensquelleUngueltig;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import io.quarkus.oidc.OIDCException;
@@ -38,6 +40,12 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper
     public Response fachFehler(FachFehler fehler) {
+        if (fehler instanceof WissensquelleUngueltig wissensquelle) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "grund", wissensquelle.grund().name())).build();
+        }
+        if (fehler instanceof BestaetigungNoetig bestaetigung) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "auswirkung", bestaetigung.auswirkung())).build();
+        }
         if (fehler instanceof PaketUngueltig paket) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "befunde", paket.befunde())).build();
         }

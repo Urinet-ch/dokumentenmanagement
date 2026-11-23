@@ -1,0 +1,5 @@
+{
+  "plugins": [".", "./tests/fixture-plugin"],
+  "phpVersion": "8.2",
+  "autoPort": true
+}

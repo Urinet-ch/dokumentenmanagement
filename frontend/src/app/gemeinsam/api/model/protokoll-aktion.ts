@@ -28,6 +28,8 @@ export const ProtokollAktion = {
     WissenIngest: 'WISSEN_INGEST',
     WissenLint: 'WISSEN_LINT',
     WissenImport: 'WISSEN_IMPORT',
+    WissensquelleMarkiert: 'WISSENSQUELLE_MARKIERT',
+    WissensquelleEntfernt: 'WISSENSQUELLE_ENTFERNT',
     KontaktZusammenfuehren: 'KONTAKT_ZUSAMMENFUEHREN',
     KontaktInaktiv: 'KONTAKT_INAKTIV',
     KontaktAktiv: 'KONTAKT_AKTIV',
@@ -37,6 +39,7 @@ export const ProtokollAktion = {
     RolleZuweisen: 'ROLLE_ZUWEISEN',
     BenutzerAntrag: 'BENUTZER_ANTRAG',
     BenutzerAbweichung: 'BENUTZER_ABWEICHUNG',
+    ChatBewertungExport: 'CHAT_BEWERTUNG_EXPORT',
 } as const;
 export type ProtokollAktion = typeof ProtokollAktion[keyof typeof ProtokollAktion];
 

@@ -55,16 +55,16 @@ Then('sind alle sichtbaren Abschnitte der Anleitung geladen', async function () 
   assert.equal(await this.seite.locator('app-hilfe-seite [data-test=anleitung-fehler]').count(), 0);
 });
 
-Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', async function () {
+Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_000 }, async function () {
   const leiste = this.seite.getByRole('dialog', { name: 'Hilfe', exact: true });
   const nav = leiste.getByRole('navigation', { name: 'Inhalt der Anleitung' });
   const links = nav.getByRole('link');
   const titel = (await links.allInnerTexts()).map((text) => text.trim());
   assert.ok(titel.length > 0);
   for (const name of titel) {
-    await nav.getByRole('link', { name, exact: true }).click();
-    await leiste.getByRole('heading', { name, exact: true }).waitFor();
-    await leiste.locator('app-anleitung-text .text').waitFor();
+    await nav.getByRole('link', { name, exact: true }).click({ timeout: 10_000 });
+    await leiste.getByRole('heading', { name, exact: true }).waitFor({ timeout: 10_000 });
+    await leiste.locator('app-anleitung-text .text').waitFor({ timeout: 10_000 });
     assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0, name);
     assert.equal(await leiste.locator('[data-test=anleitung-fehler]').count(), 0, name);
   }
@@ -155,6 +155,51 @@ async function pruefeVersion(seite, neu) {
 
 Then('zeigt die PWA weiterhin die alte App und die alte Anleitung', async function () {
   await pruefeVersion(this.seite, false);
+});
+
+async function updateKnopfImZugänglichkeitsbaum(seite) {
+  const sitzung = await seite.context().newCDPSession(seite);
+  try {
+    const { root } = await sitzung.send('DOM.getDocument');
+    const { nodeId } = await sitzung.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: '[data-test=update-hinweis] button',
+    });
+    const { nodes } = await sitzung.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
+    return !nodes[0].ignored;
+  } finally {
+    await sitzung.detach();
+  }
+}
+
+Then('ist der Updateknopf durch die Hilfe abgeschirmt', async function () {
+  const hinweis = this.seite.locator('[data-test=update-hinweis]');
+  const knopf = hinweis.locator('button');
+  await knopf.evaluate((element) => {
+    window.updateTestKlicks = 0;
+    element.addEventListener('click', (ereignis) => {
+      window.updateTestKlicks++;
+      ereignis.stopImmediatePropagation();
+    }, { capture: true });
+  });
+  assert.equal(await hinweis.evaluate((element) => element.inert), true);
+  assert.equal(await updateKnopfImZugänglichkeitsbaum(this.seite), false);
+  assert.equal(await knopf.evaluate((element) => {
+    element.focus();
+    return document.activeElement === element;
+  }), false);
+  const box = await knopf.boundingBox();
+  assert.ok(box);
+  await this.seite.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  assert.equal(await this.seite.evaluate(() => window.updateTestKlicks), 0);
+});
+
+Then('ist der Updateknopf wieder bedienbar', async function () {
+  const hinweis = this.seite.locator('[data-test=update-hinweis]');
+  assert.equal(await hinweis.evaluate((element) => element.inert), false);
+  assert.equal(await updateKnopfImZugänglichkeitsbaum(this.seite), true);
+  await hinweis.locator('button').click();
+  assert.equal(await this.seite.evaluate(() => window.updateTestKlicks), 1);
 });
 
 When('ich die neue App-Version aktiviere', async function () {

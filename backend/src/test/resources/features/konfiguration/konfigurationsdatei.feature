@@ -82,21 +82,22 @@ Funktionalität: Konfigurationsdatei
     Und nennt der letzte Eintrag «KONFIGURATION_AENDERN» im Protokoll von «urinet» den Text «kiTexte.rolle»
 
   @req-6.3
-  Szenario: Eine ungültige Konfiguration wird vor dem Schreiben abgelehnt
+  Szenario: Eine Konfiguration mit entfallener Dokumentart wird vor dem Schreiben abgelehnt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Und «inhaber-urinet» die Konfigurationsdatei mit ungültiger WISSENSQUELLE einspielt
     Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
+    Und nennt die Antwort den Befund "arten.WISSENSQUELLE" mit dem Code «DOKUMENTART_ENTFALLEN»
     Und ist die Konfigurationsversion unverändert
 
   @req-6.7
-  Szenario: Die WISSENSQUELLE bleibt beim Einspielen ohne eigene Definition erhalten
+  Szenario: Die entfallene WISSENSQUELLE wird beim Einspielen nicht ergänzt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Und «inhaber-urinet» die Konfigurationsdatei ohne WISSENSQUELLE einspielt
     Dann antwortet die Konfigurationsverwaltung mit Status 200
     Und meldet das Einspielen keine Änderung
     Und ist die Konfigurationsversion unverändert
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
-    Dann enthält der Export die Art «WISSENSQUELLE»
+    Dann enthält der Export die Art «WISSENSQUELLE» nicht
 
   @req-7.1 @req-7.2 @req-7.6
   Szenario: KI-Texte sind lesbar und Änderungen verlangen die aktuelle Version
@@ -241,9 +242,12 @@ Funktionalität: Konfigurationsdatei
 
   @req-6.3
   Szenario: Ein ungültiges Geschäftsjahresende wird abgelehnt
+    Angenommen für die Konfigurationsdatei ist eine frische Anmeldung bestätigt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Und in der Datei das Geschäftsjahresende «02-30» steht
     Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 409 und Fehlercode «BESTAETIGUNG_NOETIG»
+    Wenn «inhaber-urinet» die geänderte Konfigurationsdatei mit Bestätigung "geschaeftsjahrEnde" einspielt
     Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
     Und nennt die Antwort den Befund "einstellungen.geschaeftsjahrEnde" mit dem Code «DATUM_UNGUELTIG»
     Und ist die Konfigurationsversion unverändert

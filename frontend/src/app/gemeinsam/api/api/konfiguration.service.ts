@@ -1077,18 +1077,30 @@ export class KonfigurationService extends BaseService {
      * Massgeblich ist die basisVersion in der Datei; weicht sie vom aktuellen Stand ab, kommt 409. Ein If-Match wird nicht ausgewertet.
      * @endpoint put /api/v1/konfiguration
      * @param body 
+     * @param bestaetigt 
      * @param xAenderungsgrund 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1KonfigurationPut(body: string, xAenderungsgrund?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1KonfigurationPut(body: string, xAenderungsgrund?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1KonfigurationPut(body: string, xAenderungsgrund?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1KonfigurationPut(body: string, xAenderungsgrund?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1KonfigurationPut(body: string, bestaetigt?: string, xAenderungsgrund?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1KonfigurationPut(body: string, bestaetigt?: string, xAenderungsgrund?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1KonfigurationPut(body: string, bestaetigt?: string, xAenderungsgrund?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1KonfigurationPut(body: string, bestaetigt?: string, xAenderungsgrund?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (body === null || body === undefined) {
             throw new Error('Required parameter body was null or undefined when calling apiV1KonfigurationPut.');
         }
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'bestaetigt',
+            <any>bestaetigt,
+            QueryParamStyle.Form,
+            true,
+        );
+
 
         let localVarHeaders = this.defaultHeaders;
         if (xAenderungsgrund !== undefined && xAenderungsgrund !== null) {
@@ -1136,6 +1148,7 @@ export class KonfigurationService extends BaseService {
             {
                 context: localVarHttpContext,
                 body: body,
+                params: localVarQueryParameters.toHttpParams(),
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

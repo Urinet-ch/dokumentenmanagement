@@ -26,4 +26,11 @@ public @interface Protokolliert {
 
     @Nonbinding
     int idArgument() default -1;
+
+    /**
+     * Der Ressourcenaufruf schreibt den Eintrag selbst, wenn die Details erst nach dem Parsen des Requests bekannt
+     * sind. Der manuelle Eintrag muss synchron in derselben Transaktion erfolgen.
+     */
+    @Nonbinding
+    boolean manuell() default false;
 }

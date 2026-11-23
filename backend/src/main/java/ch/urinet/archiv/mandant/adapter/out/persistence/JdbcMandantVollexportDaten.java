@@ -34,6 +34,18 @@ public class JdbcMandantVollexportDaten implements MandantVollexportDaten {
                 'dokument', to_jsonb(d),
                 'finanz', (select to_jsonb(f) from %s.dokument_finanz f where f.dokument_id = d.id),
                 'vertrag', (select to_jsonb(v) from %s.dokument_vertrag v where v.dokument_id = d.id),
+                'konfigurationVersion', d.konfiguration_version,
+                'klassifikationen', coalesce((select jsonb_agg(jsonb_build_object(
+                    'code', k.code, 'name', k.name, 'werte', (
+                        select jsonb_agg(jsonb_build_object('code', w.code, 'name', w.name) order by w.code)
+                        from %s.dokument_klassifikation dk2
+                        join %s.klassifikation_wert w
+                          on w.klassifikation = dk2.klassifikation and w.code = dk2.wert
+                        where dk2.dokument_id = d.id and dk2.klassifikation = k.code))
+                    order by k.code)
+                    from %s.dokument_klassifikation dk
+                    join %s.klassifikation k on k.code = dk.klassifikation
+                    where dk.dokument_id = d.id), '[]'::jsonb),
                 'dateien', coalesce((select jsonb_agg(to_jsonb(x) || jsonb_build_object('zip_pfad',
                     'dateien/' || d.id || '/' || x.rolle || '-' || x.nr || '.bin') order by x.rolle, x.nr)
                     from %s.dokument_datei x where x.dokument_id = d.id), '[]'::jsonb),
@@ -59,7 +71,7 @@ public class JdbcMandantVollexportDaten implements MandantVollexportDaten {
             throw new IllegalArgumentException("Seitengrösse muss zwischen 1 und 1000 liegen");
         }
         String s = schema();
-        String metadaten = METADATEN.formatted(s, s, s, s);
+        String metadaten = METADATEN.formatted(s, s, s, s, s, s, s, s);
         String sql = "select d.id, d.status, d.art, " + metadaten + " from " + s
                 + ".dokument d where d.id > ? order by d.id limit ?";
         try (Connection verbindung = datenquelle.get().getConnection();

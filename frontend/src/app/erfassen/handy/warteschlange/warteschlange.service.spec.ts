@@ -3,6 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { AnmeldungService, Benutzer, Sitzungszustand } from '../../../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle, darf } from '../../../gemeinsam/anmeldung/rechte';
 import { ONLINE } from '../../../gemeinsam/online';
+import { TEXTE } from '../../../gemeinsam/texte.de-CH';
+import { MAX_AUFNAHME_BYTES, MAX_AUFNAHME_SEITEN, AufnahmeGrenzeFehler } from '../aufnahme-grenzen';
 import { Ausgang, Eintrag } from './eintrag';
 import { SpeicherImArbeitsspeicher, WarteschlangeSpeicher } from './speicher';
 import { WarteschlangeUpload } from './warteschlange-upload';
@@ -36,7 +38,17 @@ class UploadAttrappe {
   }
 }
 
-const seite = () => ({ original: new Blob(['o']), arbeitsfassung: new Blob(['a']) });
+const seite = () => ({ original: jpeg(100, 100), arbeitsfassung: new Blob(['a']) });
+
+function jpeg(breite: number, hoehe: number): Blob {
+  return new Blob([
+    new Uint8Array([
+      0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08,
+      (hoehe >> 8) & 0xff, hoehe & 0xff, (breite >> 8) & 0xff, breite & 0xff,
+      0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
+    ]),
+  ], { type: 'image/jpeg' });
+}
 
 describe('WarteschlangeService (Req 4.4–4.6, 4.8)', () => {
   let speicher: SpeicherImArbeitsspeicher;
@@ -77,6 +89,71 @@ describe('WarteschlangeService (Req 4.4–4.6, 4.8)', () => {
     expect(upload.gesendet).toEqual([]);
     expect(speicher.inhalt.size).toBe(2);
     expect([...speicher.inhalt.values()][0].aufgenommen).toBe('2026-11-13T07:15:00.000Z');
+  });
+
+  it('speichert keine Erfassung oberhalb der Seiten- oder Gesamtgrössengrenze', async () => {
+    await expect(
+      schlange.hinzufuegen(
+        Array.from({ length: MAX_AUFNAHME_SEITEN + 1 }, seite),
+        new Date(),
+      ),
+    ).rejects.toThrow(new AufnahmeGrenzeFehler('seiten'));
+    await expect(
+      schlange.hinzufuegen(
+        [{ original: new Blob([new Uint8Array(MAX_AUFNAHME_BYTES)]), arbeitsfassung: new Blob(['x']) }],
+        new Date(),
+      ),
+    ).rejects.toThrow(new AufnahmeGrenzeFehler('groesse'));
+    expect(speicher.inhalt.size).toBe(0);
+    expect(upload.gesendet).toEqual([]);
+  });
+
+  it('lädt alte Warteschlangeneinträge ausserhalb der Grenzen nicht hoch', async () => {
+    anmeldung.als('u1');
+    online.set(true);
+    const alt: Eintrag = {
+      id: 'zu-gross',
+      aufgenommen: new Date().toISOString(),
+      seiten: Array.from({ length: MAX_AUFNAHME_SEITEN + 1 }, seite),
+      fehlversuche: 0,
+      zustand: 'wartet',
+      benutzer: 'u1',
+      mandant: 'urinet',
+    };
+    await speicher.speichern(alt);
+
+    await schlange.hinzufuegen([seite()], new Date());
+    await schlange.verarbeiten();
+
+    expect(upload.gesendet).toHaveLength(1);
+    expect(schlange.fehlerhaft()).toMatchObject([
+      { id: 'zu-gross', zustand: 'fehlerhaft', meldung: TEXTE.handy.aufnahmeZuVieleSeiten },
+    ]);
+  });
+
+  it('behält einen alten Eintrag mit einem kleinen, aber übergrossen Original vor dem Upload', async () => {
+    anmeldung.als('u1');
+    online.set(true);
+    const alt: Eintrag = {
+      id: 'zu-viele-pixel',
+      aufgenommen: new Date().toISOString(),
+      seiten: [{ original: jpeg(4001, 3000), arbeitsfassung: new Blob(['a']) }],
+      fehlversuche: 0,
+      zustand: 'wartet',
+      benutzer: 'u1',
+      mandant: 'urinet',
+    };
+    expect(alt.seiten[0].original.size).toBeLessThan(MAX_AUFNAHME_BYTES);
+    await speicher.speichern(alt);
+
+    await schlange.hinzufuegen([seite()], new Date());
+    await schlange.verarbeiten();
+
+    expect(upload.gesendet).not.toContain('zu-viele-pixel');
+    expect(speicher.inhalt.get('zu-viele-pixel')).toMatchObject({
+      zustand: 'fehlerhaft',
+      meldung: TEXTE.handy.aufnahmeZuVielePixel,
+    });
   });
 
   it('lädt nach der Anmeldung und wieder online automatisch hoch und löscht übertragene Einträge', async () => {

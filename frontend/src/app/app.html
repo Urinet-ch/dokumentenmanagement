@@ -1,11 +1,11 @@
-<button type="button" class="sprunglink" (click)="zumInhalt(inhalt)">{{ texte.zumInhalt }}</button>
+<button type="button" class="sprunglink" [attr.inert]="hilfe.offen() ? '' : null" (click)="zumInhalt(inhalt)">{{ texte.zumInhalt }}</button>
 @if (!online()) {
   <p class="pwa-hinweis" role="status" aria-live="polite" data-test="offline-hinweis">
     {{ texte.offlineHinweis }}
   </p>
 }
 @if (updateBereit()) {
-  <div class="pwa-hinweis" role="status" aria-live="polite" data-test="update-hinweis">
+  <div class="pwa-hinweis" role="status" aria-live="polite" data-test="update-hinweis" [attr.inert]="hilfe.offen() ? '' : null">
     <span>{{ texte.updateBereit }}</span>
     <button mat-button type="button" (click)="aktualisieren()">{{ texte.updateJetzt }}</button>
   </div>
@@ -21,9 +21,10 @@
     [opened]="menue().length > 0 && !mobil()"
     [disableClose]="!mobil()"
     [class.ohne-menue]="menue().length === 0"
+    [attr.inert]="hilfe.offen() ? '' : null"
   >
     @if (menue().length > 0) {
-      <div class="seitenleiste">
+      <aside class="seitenleiste">
         <a class="marke" routerLink="/" (click)="mobil() && nav.close()">
           @if (branding.branding().logoUrl; as logoUrl) {
             <img class="logo" [src]="logoUrl" alt="" />
@@ -82,10 +83,10 @@
             </div>
           }
         </nav>
-      </div>
+      </aside>
     }
   </mat-sidenav>
-  <mat-sidenav-content>
+  <mat-sidenav-content [attr.inert]="hilfe.offen() ? '' : null">
     <header class="kopf">
       @if (menue().length > 0 && mobil()) {
         <button
@@ -175,11 +176,10 @@
     id="hilfe-leiste"
     position="end"
     mode="over"
-    autoFocus="first-heading"
+    autoFocus="dialog"
     [style.width]="mobil() ? '100%' : 'min(420px, 100vw)'"
     [opened]="hilfe.offen()"
-    (openedChange)="hilfe.geaendert($event)"
-    (closed)="hilfe.geschlossen()"
+    (closedStart)="hilfe.drawerGeschlossen()"
   >
     @defer (when hilfe.offen()) {
       <app-hilfe-leiste (navigiert)="hilfe.schliessen()" />

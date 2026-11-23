@@ -114,20 +114,20 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 1.1, 1.2, 1.7, 2.1, 2.2, 2.3, 2.4, 3.1, 3.8_
   - _Abhängig von: 23.1, 22.3_
 
-- [ ] 23.3 Einführung: Bedienung und erneuter Aufruf [Frontend]
+- [x] 23.3 Einführung: Bedienung und erneuter Aufruf [Frontend]
   - «Schritt n von m», «Zurück», «Weiter», «Fertig», «Überspringen», Statusmeldungen, Fokus auf die Überschrift des
     Schritts und nach dem Schliessen auf den Seitenkopf, Schritt bleibt bis zum Neuladen, `prefers-reduced-motion`;
     «In der Anleitung lesen» öffnet die Hilfe-Leiste; «Einführung erneut zeigen» auf `/hilfe` öffnet `/?einfuehrung`.
   - _Anforderungen: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 5.5_
   - _Abhängig von: 23.2_
 
-- [ ] 23.4 Links «So funktioniert es» an Orten mit Rückfragen [Frontend]
+- [x] 23.4 Links «So funktioniert es» an Orten mit Rückfragen [Frontend]
   - Erfassen (Warteschlange, fehlerhafter Upload), Anmeldekarte der Startseite ohne Netz und Meldung ohne Mandant oder
     Rolle öffnen die Hilfe-Leiste mit dem Unterabschnitt; Verhalten und `data-test` der Seiten sonst unverändert.
   - _Anforderungen: 4.6_
   - _Abhängig von: 22.3, 22.5_
 
-- [ ] 23.5 Barrierefreiheit, Datenschutz und Abdeckung [QA]
+- [x] 23.5 Barrierefreiheit, Datenschutz und Abdeckung [QA]
   - Szenarien mit axe für Einführung, Leiste und Seite bei 375 und 1280 px in hell und dunkel; Aufzeichnung der Anfragen
     (nur eigener Ursprung, keine zusätzlichen `/api/`-Aufrufe); Nachweis, dass die Spec-Prüfungen `@spec-07` erfassen
     (grüner Lauf von `ReqAbdeckungTest` und `SzenarienShardTest` mit den Feature-Dateien unter `features/hilfe/`); Liste

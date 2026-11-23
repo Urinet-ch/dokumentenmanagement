@@ -57,7 +57,9 @@ public class JdbcWissenIngest implements WissenIngestPort {
         zeitgrenze();
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = em().createNativeQuery("""
-                        select d.art, d.status, d.vertraulichkeit, (d.bestaetigt is not null), d.volltext, d.seiten,
+                        select exists (select 1 from wissensquelle_markierung m
+                            where m.dokument_id = d.id and m.beendet_am is null),
+                            d.status, d.vertraulichkeit, (d.bestaetigt is not null), d.volltext, d.seiten,
                             (d.s3_pdfa is not null and d.s3_version_pdfa is not null and not d.pdfa_fehlt),
                             e.budget_tokens, e.monatsbudget_tokens
                         from dokument d left join wissens_einstellung e on e.id = 1
@@ -68,7 +70,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
             return Optional.empty();
         }
         Object[] d = zeilen.getFirst();
-        return Optional.of(new Quelle((String) d[0], (String) d[1], (String) d[2], Boolean.TRUE.equals(d[3]),
+        return Optional.of(new Quelle(Boolean.TRUE.equals(d[0]), (String) d[1], (String) d[2], Boolean.TRUE.equals(d[3]),
                 (String) d[4], d[5] == null ? null : ((Number) d[5]).intValue(), Boolean.TRUE.equals(d[6]),
                 d[7] == null ? null : ((Number) d[7]).intValue(),
                 d[8] == null ? null : ((Number) d[8]).intValue()));
@@ -205,7 +207,9 @@ public class JdbcWissenIngest implements WissenIngestPort {
                             (d.s3_pdfa is not null and d.s3_version_pdfa is not null and not d.pdfa_fehlt),
                             e.seite_von, e.seite_bis, e.schritt, e.tokens_ein, e.tokens_aus,
                             e.ki_modell, e.ingest_daten, e.unvollstaendig,
-                            we.budget_tokens, we.monatsbudget_tokens, d.art
+                            we.budget_tokens, we.monatsbudget_tokens,
+                            exists (select 1 from wissensquelle_markierung m
+                                where m.dokument_id = d.id and m.beendet_am is null)
                         from wissens_entwurf e join dokument d on d.id = e.dokument_id
                         left join wissens_einstellung we on we.id = 1
                         where e.id = :id and e.anlass = 'INGEST'""")
@@ -215,7 +219,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
             return Optional.empty();
         }
         Object[] d = zeilen.getFirst();
-        return Optional.of(new Lauf(uuid(d[0]), uuid(d[1]), (String) d[2], (String) d[3], (String) d[21],
+        return Optional.of(new Lauf(uuid(d[0]), uuid(d[1]), (String) d[2], (String) d[3], Boolean.TRUE.equals(d[21]),
                 (String) d[4],
                 Boolean.TRUE.equals(d[5]), (String) d[6], datum(d[7]),
                 (String) d[8], d[9] == null ? null : ((Number) d[9]).intValue(), Boolean.TRUE.equals(d[10]),
@@ -568,8 +572,8 @@ public class JdbcWissenIngest implements WissenIngestPort {
                         where alt.anlass = 'INGEST' and alt.status = 'FEHLER' and alt.dokument_id is not null
                             and alt.hinweis = :hinweis
                             and exists (
-                                select 1 from dokument d
-                                where d.id = alt.dokument_id and d.art = 'WISSENSQUELLE'
+                                select 1 from wissensquelle_markierung m
+                                where m.dokument_id = alt.dokument_id and m.beendet_am is null
                             )
                             and not exists (
                                 select 1 from wissens_entwurf neu

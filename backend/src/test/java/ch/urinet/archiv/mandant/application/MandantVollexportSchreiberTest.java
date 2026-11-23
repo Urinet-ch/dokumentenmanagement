@@ -6,6 +6,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
@@ -50,7 +51,8 @@ class MandantVollexportSchreiberTest {
         var manifest = new MandantVollexportDaten.Manifestdatei(java.time.LocalDate.of(2026, 1, 2), "json",
                 "manifest/m", "versions-id-der-quelle", sha(inhalt.get("manifest/m")));
 
-        Path zipPfad = schreiben(temp, daten(List.of(dokument), List.of(manifest)), ablage(inhalt));
+        Path zipPfad = schreiben(temp, daten(List.of(dokument), List.of(manifest)), ablage(inhalt),
+                konfiguration());
 
         assertThat(manifestKopien).containsExactly("manifest/m");
         try (ZipFile zip = new ZipFile(zipPfad.toFile())) {
@@ -62,6 +64,10 @@ class MandantVollexportSchreiberTest {
             assertThat(text(zip, "metadaten.csv")).contains(id.toString(), "ARCHIVIERT");
             assertThat(text(zip, "manifeste.csv")).contains("manifest/m");
             assertThat(text(zip, "wissensbasis.zip")).isEqualTo("Wissenspaket");
+            assertThat(text(zip, "konfiguration.json")).isEqualTo("{\"version\":2}");
+            assertThat(text(zip, "konfiguration/versionen.json"))
+                    .isEqualTo("[{\"version\":1,\"inhalt\":{\"version\":1}},"
+                            + "{\"version\":2,\"inhalt\":{\"version\":2}}]");
             assertThat(text(zip, "pruefsummen.sha256"))
                     .contains(sha(inhalt.get("archiv/o")) + "  dateien/" + id + "/ORIGINAL-1.bin")
                     .contains(sha(inhalt.get("archiv/p")) + "  dateien/" + id + "/pdfa.pdf")
@@ -101,6 +107,29 @@ class MandantVollexportSchreiberTest {
     }
 
     @Test
+    void fehlerDerAktuellenKonfigurationSchreibtKeinTeilZip(@TempDir Path temp) {
+        MandantVollexportKonfiguration konfiguration = new MandantVollexportKonfiguration() {
+            @Override
+            public Version aktuell() {
+                throw new IllegalStateException("Konfiguration nicht exportierbar");
+            }
+
+            @Override
+            public void versionen(Versionsausgabe ausgabe) {
+                throw new AssertionError("Historie darf nicht gelesen werden");
+            }
+        };
+        ByteArrayOutputStream ziel = new ByteArrayOutputStream();
+        MandantVollexportSchreiber schreiber = new MandantVollexportSchreiber(daten(List.of(), List.of()),
+                ablage(Map.of()), (mandant, strom) -> { throw new AssertionError("Wissen darf nicht gelesen werden"); },
+                konfiguration);
+
+        assertThatThrownBy(() -> schreiber.schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(), temp, ziel))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Konfiguration nicht exportierbar");
+        assertThat(ziel.size()).isZero();
+    }
+
+    @Test
     void ungueltigeZipPfadeWerdenAbgelehnt(@TempDir Path temp) {
         for (String pfad : List.of("../aussen.bin", "/absolut.bin", "dateien\\x.bin", "dateien/a b.bin")) {
             Map<String, byte[]> inhalt = Map.of("archiv/o", "x".getBytes());
@@ -117,12 +146,35 @@ class MandantVollexportSchreiberTest {
     }
 
     private static Path schreiben(Path temp, MandantVollexportDaten daten, AblagePort ablage) throws Exception {
+        return schreiben(temp, daten, ablage, MandantVollexportKonfiguration.leer());
+    }
+
+    private static MandantVollexportKonfiguration konfiguration() {
+        return new MandantVollexportKonfiguration() {
+            @Override
+            public Version aktuell() {
+                return new Version(2, "{\"version\":2}");
+            }
+
+            @Override
+            public void versionen(Versionsausgabe ausgabe) throws java.io.IOException {
+                for (int nummer = 1; nummer <= 2; nummer++) {
+                    int version = nummer;
+                    ausgabe.schreiben(version, ziel -> ziel.write(
+                            ("{\"version\":" + version + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                }
+            }
+        };
+    }
+
+    private static Path schreiben(Path temp, MandantVollexportDaten daten, AblagePort ablage,
+                                  MandantVollexportKonfiguration konfiguration) throws Exception {
         Path zipPfad = temp.resolve("export-" + UUID.randomUUID() + ".zip");
         try (OutputStream ziel = Files.newOutputStream(zipPfad)) {
             new MandantVollexportSchreiber(daten, ablage, (mandant, strom) -> {
                 assertThat(mandant).isEqualTo(new MandantCode("vhf-gsk"));
                 strom.write("Wissenspaket".getBytes());
-            }).schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(), temp, ziel);
+            }, konfiguration).schreiben(new MandantCode("vhf-gsk"), UUID.randomUUID(), temp, ziel);
         }
         return zipPfad;
     }

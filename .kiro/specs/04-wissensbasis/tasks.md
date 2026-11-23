@@ -211,12 +211,12 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 16.1_
 
 ## Welle 17 — Wissensquelle als Markierung (Entscheid Fabian 21.11.2026, Requirement 20)
-- [ ] 17.1 Markierung, Ingest-Auslöser und Migration [Backend]
+- [x] 17.1 Markierung, Ingest-Auslöser und Migration [Backend]
   - Tabelle `wissensquelle_markierung`, `WissensquelleMarkieren`/`-Entfernen`, REST `POST/DELETE /dokumente/{id}/wissensquelle` und
     `GET /wissen/quellen`; `WissenIngestStarten`/`-Verarbeiten` und Repository auf die Markierung umstellen; Migration: Dokumente der Art
     `WISSENSQUELLE` auf `PROJEKTDOKUMENT` umstellen und markieren, die Art löschen (Fremdschlüssel vorher prüfen), Seed für neue Mandanten ohne die Art; Spec 05: `SeedPruefung`/`Konfiguration`
     tolerieren die fehlende Art; Szenarien `@req-20.1` bis `@req-20.9`, Isolation und Negativfälle.
-  - _Anforderungen: 20.1–20.9, 20.11_
+  - _Anforderungen: 20.1–20.9_
   - _Abhängig von: 15.x (Ingest und Entwürfe auf main)_
 - [ ] 17.2 Oberfläche Knopf und Liste «Wissensquellen» [Frontend]
   - Knopf «Als Wissensquelle verwenden»/«Wissensquelle entfernen» in der Dokumentansicht (Recht A16, Grund bei Ablehnung), Kennzeichen am
@@ -226,6 +226,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 17.1_
 - [ ] 17.3 Isolations- und Abnahmetests [QA]
   - Mandantentrennung, `PERSONAL`, A16, Migration (Bestand mit Art `WISSENSQUELLE`), Jahresexport unverändert; ergänzt Aufgabe 16.1.
+  - Der vollständige Szenario-Nachweis 20.11 umfasst auch die Oberfläche 20.10 und ist erst nach 17.2 möglich.
   - _Anforderungen: 20.3, 20.6, 20.8, 20.11_
   - _Abhängig von: 17.1, 17.2_
 

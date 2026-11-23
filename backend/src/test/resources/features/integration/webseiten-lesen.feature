@@ -56,6 +56,34 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
       | ausgabe=1                              | b1,b3       |
       | reihe=WEBTEST_MER&jahr=2024            |             |
 
+  @req-5.1 @req-5.8
+  Szenario: Öffentlich filterbare Klassifikationen filtern Dokumente und folgen der Zugriffsstufe
+    Angenommen im Mandanten «urinet» sind diese Webseiten-Klassifikationen angelegt:
+      | code               | name       | wert   | wert_name | oeffentlich |
+      | webtest_fachgebiet | Fachgebiet | bau    | Bau       | true        |
+      | webtest_fachgebiet | Fachgebiet | wege   | Wege      | true        |
+      | webtest_fachgebiet | Fachgebiet | verein | Verein    | true        |
+      | webtest_intern     | Intern     | intern | Intern    | false       |
+    Und das Dokument «b1» trägt die Webseiten-Klassifikation «webtest_fachgebiet» mit dem Wert «bau»
+    Und das Dokument «b2» trägt die Webseiten-Klassifikation «webtest_fachgebiet» mit dem Wert «wege»
+    Und das Dokument «b3» trägt die Webseiten-Klassifikation «webtest_fachgebiet» mit dem Wert «verein»
+    Und das Dokument «b1» trägt die Webseiten-Klassifikation «webtest_intern» mit dem Wert «intern»
+    Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?webtest_fachgebiet=bau» mit der Stufe «oeffentlich» aufruft
+    Dann nennt die Antwort genau die Dokumente «b1»
+    Und hat die Antwort für «b1» die öffentliche Klassifikation «webtest_fachgebiet» mit dem Wert «bau»
+    Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?webtest_fachgebiet=bau&webtest_fachgebiet=wege» mit der Stufe «oeffentlich» aufruft
+    Dann nennt die Antwort genau die Dokumente «b1,b2»
+    Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/filter» mit der Stufe «oeffentlich» aufruft
+    Dann nennt der Filter die öffentliche Klassifikation «webtest_fachgebiet» mit den Werten «bau,wege»
+    Und nennt der Filter keine öffentliche Klassifikation «webtest_intern»
+    Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/filter» mit der Stufe «mitglieder» aufruft
+    Dann nennt der Filter die öffentliche Klassifikation «webtest_fachgebiet» mit den Werten «bau,verein,wege»
+    Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?webtest_intern=intern» mit der Stufe «oeffentlich» aufruft
+    Dann nennt die Antwort genau die Dokumente «b1,b2,m1,a1»
+    Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?webtest_fachgebiet=BAU» mit der Stufe «oeffentlich» aufruft
+    Dann antwortet die Lese-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und steht in der Lese-Antwort weder «BAU» noch «meldung»
+
   @req-5.1
   Szenario: Die Liste blättert und sortiert, die Antwort nennt Seite, Grösse und Gesamtzahl
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?reihe=WEBTEST_BUL&pro_seite=2&seite=2&sortierung=datum_auf» mit der Stufe «vorstand» aufruft
@@ -163,7 +191,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   Szenario: Die Details nennen die Antwortfelder mit Auszug und sonst nichts
     Wenn der Webseiten-Lesezugang «oeffentlich» das Dokument «b1» mit der Stufe «oeffentlich» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 200
-    Und hat die Antwort die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,auszug» und nur diese
+    Und hat die Antwort die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,auszug,klassifikationen» und nur diese
     Und nennt die Antwort die Reihe «WEBTEST_BUL» mit dem Namen «Probe-Bulletin», die Ausgabe «1», das Jahr 2024, das Datum «2024-03-01», die Zugriffsstufe «oeffentlich» und 12 Seiten
     Und beginnt der Auszug mit «Der Zitronenkuchen»
 
@@ -171,11 +199,11 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   Szenario: Antworten tragen nur Felder des Vertrags, nie Dateiname, Vertraulichkeit, Status, Partner oder eine URL einer Seite
     Angenommen das Dokument «b1» trägt den Dateinamen «geheimer-dateiname-4711.pdf» und den Partner «Geheimpartner AG»
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/dokumente?pro_seite=100» mit der Stufe «oeffentlich» aufruft
-    Dann haben alle Einträge nur die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten»
+    Dann haben alle Einträge nur die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,klassifikationen»
     Und steht in der Lese-Antwort weder «geheimer-dateiname» noch «Geheimpartner»
     Und steht in der Lese-Antwort weder «http» noch «vertraulichkeit»
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/suche?q=Zitronenkuchen» mit der Stufe «oeffentlich» aufruft
-    Dann haben alle Einträge nur die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,auszug,fundstelle,rang»
+    Dann haben alle Einträge nur die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,klassifikationen,auszug,fundstelle,rang»
     Und steht in der Lese-Antwort weder «geheimer-dateiname» noch «Geheimpartner»
     Und steht in der Lese-Antwort weder «http» noch «status»
     Wenn der Webseiten-Lesezugang «oeffentlich» das Dokument «b1» mit der Stufe «oeffentlich» abruft

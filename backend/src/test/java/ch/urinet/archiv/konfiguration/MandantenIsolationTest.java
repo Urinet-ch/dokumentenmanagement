@@ -103,8 +103,8 @@ abstract class MandantenIsolationIT {
                 .contains("VERBANDSSITZUNG").doesNotContain("AUSGANGSRECHNUNG");
         assertThat(urinet.arten()).extracting(Konfiguration.Art::code)
                 .contains("AUSGANGSRECHNUNG").doesNotContain("VERBANDSSITZUNG");
-        assertThat(verband.arten()).extracting(Konfiguration.Art::code).contains("WISSENSQUELLE");
-        assertThat(urinet.arten()).extracting(Konfiguration.Art::code).contains("WISSENSQUELLE");
+        assertThat(verband.arten()).extracting(Konfiguration.Art::code).doesNotContain("WISSENSQUELLE");
+        assertThat(urinet.arten()).extracting(Konfiguration.Art::code).doesNotContain("WISSENSQUELLE");
         assertThat(verband.klassifikationen()).extracting(Klassifikation::code).contains("sitzungsthema");
         assertThat(urinet.klassifikationen()).extracting(Klassifikation::code).doesNotContain("sitzungsthema");
         assertThat(verband.regeln()).extracting(Regel::code)
@@ -213,9 +213,11 @@ abstract class MandantenIsolationIT {
         Throwable testFehler = null;
         try {
             urinetDokument = Testdokumente.anlegen(datenbank.get(),
-                    new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+                    new Testdokumente.Angaben("urinet", "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, "ARCHIVIERT"));
             vhfDokument = Testdokumente.anlegen(datenbank.get(),
-                    new Testdokumente.Angaben("vhf-gsk", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+                    new Testdokumente.Angaben("vhf-gsk", "PROBE_VHF_BULLETIN", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+            Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "urinet", urinetDokument);
+            Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "vhf-gsk", vhfDokument);
             wissensseiteAnlegen("m_urinet", urinetSeite, urinetDokument);
             wissensseiteAnlegen("m_vhf_gsk", vhfSeite, vhfDokument);
             for (String benutzer : List.of("inhaber-urinet", "mitarbeiter-urinet", "treuhaender-urinet",

@@ -96,6 +96,35 @@
         "type" : "string",
         "enum" : [ "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15", "A16", "A17", "A18", "A19", "A20", "A21", "A22", "A23", "A24" ]
       },
+      "Ansicht" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "art" : {
+            "$ref" : "#/components/schemas/Art"
+          },
+          "ziel" : {
+            "type" : "string"
+          },
+          "rolle" : {
+            "$ref" : "#/components/schemas/Rolle"
+          },
+          "grund" : {
+            "type" : "string"
+          },
+          "beantragtVon" : {
+            "type" : "string"
+          },
+          "beantragtAm" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "gueltigBis" : {
+            "$ref" : "#/components/schemas/Instant"
+          }
+        }
+      },
       "Antwort" : {
         "type" : "object",
         "properties" : {
@@ -290,6 +319,10 @@
           }
         }
       },
+      "Art" : {
+        "type" : "string",
+        "enum" : [ "INHABER_ROLLE", "LOESCHEN" ]
+      },
       "ArtKlassifikation" : {
         "type" : "object",
         "properties" : {
@@ -332,6 +365,21 @@
           },
           "zugeordnet" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "Auswirkung" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "betroffeneDatensaetze" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -490,6 +538,12 @@
           },
           "etag" : {
             "type" : "string"
+          },
+          "apiTokenVerwaltungspfad" : {
+            "type" : "string"
+          },
+          "apiTokenHinweis" : {
+            "type" : "string"
           }
         }
       },
@@ -640,6 +694,37 @@
           }
         }
       },
+      "ChatAuswertung" : {
+        "type" : "object",
+        "properties" : {
+          "anzahl" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "durchschnitt" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "verteilung" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SterneDto"
+            }
+          },
+          "gruende" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GrundDto"
+            }
+          },
+          "schlechteAntworten" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SchlechteAntwortDto"
+            }
+          }
+        }
+      },
       "ChatBewertung" : {
         "type" : "object",
         "required" : [ "nachrichtId", "sterne", "erstellt", "geaendert" ],
@@ -687,6 +772,40 @@
           "freitext" : {
             "type" : [ "string", "null" ],
             "maxLength" : 500
+          }
+        }
+      },
+      "ChatBewertungExportEingabe" : {
+        "type" : "object",
+        "properties" : {
+          "von" : {
+            "type" : "string"
+          },
+          "bis" : {
+            "type" : "string"
+          },
+          "minSterne" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "maxSterne" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "schwaerzen" : {
+            "type" : "boolean"
+          },
+          "klartextBestaetigt" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ChatEinstellungen" : {
+        "type" : "object",
+        "properties" : {
+          "aufbewahrungMonate" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -871,6 +990,10 @@
             "format" : "int64"
           }
         }
+      },
+      "DayOfWeek" : {
+        "type" : "string",
+        "enum" : [ "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY" ]
       },
       "DiffEintrag" : {
         "type" : "object",
@@ -1604,6 +1727,163 @@
           }
         }
       },
+      "Einstellungen" : {
+        "type" : "object",
+        "properties" : {
+          "geschaeftsjahrEnde" : {
+            "type" : "string"
+          },
+          "kennungen" : {
+            "$ref" : "#/components/schemas/Kennungen"
+          },
+          "branding" : {
+            "$ref" : "#/components/schemas/EinstellungenBranding"
+          },
+          "chat" : {
+            "$ref" : "#/components/schemas/ChatEinstellungen"
+          },
+          "webseitenChat" : {
+            "$ref" : "#/components/schemas/WebseitenChatEinstellungen"
+          },
+          "wissen" : {
+            "$ref" : "#/components/schemas/WissenEinstellungen1"
+          }
+        }
+      },
+      "EinstellungenBetrieb" : {
+        "type" : "object",
+        "properties" : {
+          "oeffentlicherChat" : {
+            "$ref" : "#/components/schemas/OeffentlichesChatBudget"
+          },
+          "wissenMonatsbudgetTokens" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "EinstellungenBranding" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "primaerfarbe" : {
+            "type" : "string"
+          }
+        }
+      },
+      "EinstellungenErgebnis" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "geaendert" : {
+            "type" : "boolean"
+          },
+          "auswirkungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Auswirkung"
+            }
+          }
+        }
+      },
+      "EinstellungenVorschau" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "auswirkungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Auswirkung"
+            }
+          }
+        }
+      },
+      "EinstellungenZuruecksetzen" : {
+        "type" : "object",
+        "properties" : {
+          "gruppe" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "EinstellungskatalogAntwort" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "katalog" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EinstellungskatalogEintrag"
+            }
+          },
+          "betrieb" : {
+            "$ref" : "#/components/schemas/EinstellungenBetrieb"
+          }
+        }
+      },
+      "EinstellungskatalogEintrag" : {
+        "type" : "object",
+        "properties" : {
+          "schluessel" : {
+            "type" : "string"
+          },
+          "gruppe" : {
+            "$ref" : "#/components/schemas/Gruppe"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "typ" : {
+            "$ref" : "#/components/schemas/Typ"
+          },
+          "einheit" : {
+            "type" : "string"
+          },
+          "minimum" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "maximum" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "formregel" : {
+            "type" : "string"
+          },
+          "standard" : { },
+          "aktuellerWert" : { },
+          "eigenerWert" : {
+            "type" : "boolean"
+          },
+          "riskant" : {
+            "type" : "boolean"
+          },
+          "wirksamAb" : {
+            "type" : "string"
+          },
+          "hinweis" : {
+            "type" : "string"
+          }
+        }
+      },
       "EntfernteAussage" : {
         "type" : "object",
         "properties" : {
@@ -1633,6 +1913,14 @@
       "Ergebnis" : {
         "type" : "string",
         "enum" : [ "ERLAUBT", "VERBOTEN", "NICHT_SICHTBAR", "NUR_EIGENE", "NUR_LESEND", "NUR_SELBST_ERFASSTE" ]
+      },
+      "Ergebnis1" : {
+        "type" : "object",
+        "properties" : {
+          "antragId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
       },
       "Export" : {
         "description" : "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link (24 Stunden ab Fertigstellung) gilt nicht mehr",
@@ -1893,6 +2181,22 @@
             "type" : "string"
           }
         }
+      },
+      "GrundDto" : {
+        "type" : "object",
+        "properties" : {
+          "grund" : {
+            "type" : "string"
+          },
+          "anzahl" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "Gruppe" : {
+        "type" : "string",
+        "enum" : [ "GESCHAEFTSJAHR", "KENNUNGEN", "BRANDING", "CHAT", "WEBSEITEN_CHAT", "WISSEN" ]
       },
       "ImportHerkunft" : {
         "type" : "object",
@@ -2324,6 +2628,20 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/Reihe"
+            }
+          }
+        }
+      },
+      "Kennungen" : {
+        "type" : "object",
+        "properties" : {
+          "uid" : {
+            "type" : "string"
+          },
+          "ibans" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
             }
           }
         }
@@ -2930,6 +3248,18 @@
           }
         }
       },
+      "LintZeitplan" : {
+        "type" : "object",
+        "properties" : {
+          "wochentag" : {
+            "$ref" : "#/components/schemas/DayOfWeek"
+          },
+          "stunde" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "LocalDate" : {
         "type" : "string",
         "format" : "date",
@@ -2942,6 +3272,22 @@
           "finanzVerfuegbar" : {
             "type" : "boolean",
             "description" : "Mindestens eine aktive Dokumentart hat die Gruppe «finanz» (Spec 05, Req 8.8)"
+          }
+        }
+      },
+      "OeffentlichesChatBudget" : {
+        "type" : "object",
+        "properties" : {
+          "monat" : {
+            "$ref" : "#/components/schemas/LocalDate"
+          },
+          "budgetTokens" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "verbrauchteTokens" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -2974,7 +3320,7 @@
       },
       "ProtokollAktion" : {
         "type" : "string",
-        "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "WISSEN_IMPORT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV", "BENUTZER_ANLEGEN", "BENUTZER_AENDERN", "BENUTZER_LOESCHEN", "ROLLE_ZUWEISEN", "BENUTZER_ANTRAG", "BENUTZER_ABWEICHUNG" ]
+        "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "WISSEN_IMPORT", "WISSENSQUELLE_MARKIERT", "WISSENSQUELLE_ENTFERNT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV", "BENUTZER_ANLEGEN", "BENUTZER_AENDERN", "BENUTZER_LOESCHEN", "ROLLE_ZUWEISEN", "BENUTZER_ANTRAG", "BENUTZER_ABWEICHUNG", "CHAT_BEWERTUNG_EXPORT" ]
       },
       "ProtokollEintrag" : {
         "description" : "Eintrag des Zugriffsprotokolls; Name und Rolle aus dem Benutzerverzeichnis zur Zeit des Eintrags (Req 10.10)",
@@ -3041,6 +3387,26 @@
           "groesse" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "Quelle" : {
+        "type" : "object",
+        "properties" : {
+          "dokumentId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "titel" : {
+            "type" : "string"
+          },
+          "art" : {
+            "type" : "string"
+          },
+          "markiertAm" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "ingestStatus" : {
+            "type" : "string"
           }
         }
       },
@@ -3205,6 +3571,32 @@
         "type" : "string",
         "enum" : [ "INHABER", "MITARBEITER", "TREUHAENDER", "GESCHAEFTSSTELLE" ]
       },
+      "RollenAenderung" : {
+        "type" : "object",
+        "properties" : {
+          "rolle" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SchlechteAntwortDto" : {
+        "type" : "object",
+        "properties" : {
+          "datum" : {
+            "$ref" : "#/components/schemas/LocalDate"
+          },
+          "sterne" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "grund" : {
+            "type" : "string"
+          },
+          "frage" : {
+            "type" : "string"
+          }
+        }
+      },
       "StatusAnsicht" : {
         "type" : "object",
         "properties" : {
@@ -3219,6 +3611,19 @@
             "items" : {
               "$ref" : "#/components/schemas/Entscheidung"
             }
+          }
+        }
+      },
+      "SterneDto" : {
+        "type" : "object",
+        "properties" : {
+          "sterne" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "anzahl" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -3352,6 +3757,10 @@
             } ]
           }
         }
+      },
+      "Typ" : {
+        "type" : "string",
+        "enum" : [ "DATUM", "UID", "IBANS", "TEXT", "FARBE", "GANZZAHL", "WOCHENTAG" ]
       },
       "UUID" : {
         "type" : "string",
@@ -3560,6 +3969,15 @@
           }
         }
       },
+      "WebseitenChatEinstellungen" : {
+        "type" : "object",
+        "properties" : {
+          "aufbewahrungTage" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "WissenAnalyse" : {
         "type" : "object",
         "properties" : {
@@ -3602,6 +4020,26 @@
             "type" : [ "integer", "null" ],
             "format" : "int32",
             "minimum" : 1
+          }
+        }
+      },
+      "WissenEinstellungen1" : {
+        "type" : "object",
+        "properties" : {
+          "budgetTokens" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "lintBudgetTokens" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "monatsbudgetTokens" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "lintZeitplan" : {
+            "$ref" : "#/components/schemas/LintZeitplan"
           }
         }
       },
@@ -4072,6 +4510,8 @@
   }, {
     "name" : "Dokumente"
   }, {
+    "name" : "Einstellungen"
+  }, {
     "name" : "Exporte"
   }, {
     "name" : "Importe"
@@ -4345,6 +4785,186 @@
           },
           "400" : {
             "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/antraege" : {
+      "get" : {
+        "summary" : "Offene Verwaltungsanträge anzeigen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Ansicht"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/antraege/{antragId}/ablehnen" : {
+      "post" : {
+        "summary" : "Verwaltungsantrag ablehnen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "antragId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/antraege/{antragId}/bestaetigen" : {
+      "post" : {
+        "summary" : "Verwaltungsantrag bestätigen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "antragId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/antraege/{antragId}/zurueckziehen" : {
+      "post" : {
+        "summary" : "Eigenen Verwaltungsantrag zurückziehen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "antragId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
           }
         },
         "security" : [ {
@@ -4667,6 +5287,104 @@
         } ]
       }
     },
+    "/api/v1/benutzer/{benutzerId}/rechte" : {
+      "get" : {
+        "summary" : "Rechte eines Benutzers anzeigen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Rolle und Rechte des Benutzers",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VerwaltungRolle"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/{benutzerId}/rolle" : {
+      "put" : {
+        "summary" : "Rolle eines Benutzers ändern",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RollenAenderung"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Rolle geändert"
+          },
+          "202" : {
+            "description" : "Vier-Augen-Antrag angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Ergebnis1"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
     "/api/v1/benutzer/{benutzerId}/sperren" : {
       "post" : {
         "summary" : "Benutzer sperren",
@@ -4877,6 +5595,87 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/chat/auswertung" : {
+      "get" : {
+        "summary" : "Chat-Bewertungen auswerten",
+        "description" : "Kennzahlen für den Zeitraum sowie höchstens 100 Antworten mit höchstens 2 Sternen. Zeitraum maximal 12 Monate, nur Inhaber (A24).",
+        "tags" : [ "Chat" ],
+        "parameters" : [ {
+          "name" : "bis",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "von",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Auswertung für den eigenen Mandanten",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChatAuswertung"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/chat/auswertung/export" : {
+      "post" : {
+        "summary" : "Chat-Bewertungen exportieren",
+        "description" : "ZIP im Format chat-bewertungen/v1; Step-up erforderlich; höchstens 5'000 Zeilen.",
+        "tags" : [ "Chat" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChatBewertungExportEingabe"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "ZIP-Download, nicht im Archiv abgelegt",
+            "content" : {
+              "application/zip" : { }
+            }
+          },
+          "401" : {
+            "description" : "Step-up erforderlich"
+          },
+          "413" : {
+            "description" : "Mehr als 5'000 Bewertungen im gewählten Zeitraum"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
         } ]
       }
     },
@@ -6255,6 +7054,84 @@
         } ]
       }
     },
+    "/api/v1/dokumente/{id}/wissensquelle" : {
+      "post" : {
+        "summary" : "Dokument als Wissensquelle verwenden",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "description" : "ID des Dokuments",
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "202" : {
+            "description" : "Markierung gespeichert und Ingest angestossen",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenIngestAuftrag"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Recht A16 fehlt"
+          },
+          "404" : {
+            "description" : "Dokument unbekannt oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Dokument bereits markiert oder Ingest läuft"
+          },
+          "422" : {
+            "description" : "Fachliche Voraussetzung fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "delete" : {
+        "summary" : "Markierung als Wissensquelle entfernen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "description" : "ID des Dokuments",
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Markierung beendet"
+          },
+          "403" : {
+            "description" : "Recht A16 fehlt"
+          },
+          "404" : {
+            "description" : "Dokument unbekannt oder nicht sichtbar"
+          },
+          "409" : {
+            "description" : "Dokument ist nicht markiert"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/eingangskorb" : {
       "get" : {
         "summary" : "Eingangskorb lesen",
@@ -7090,6 +7967,12 @@
         "description" : "Massgeblich ist die basisVersion in der Datei; weicht sie vom aktuellen Stand ab, kommt 409. Ein If-Match wird nicht ausgewertet.",
         "tags" : [ "Konfiguration" ],
         "parameters" : [ {
+          "name" : "bestaetigt",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
           "name" : "X-Aenderungsgrund",
           "in" : "header",
           "schema" : {
@@ -7886,6 +8769,206 @@
         } ]
       }
     },
+    "/api/v1/mandant/einstellungen" : {
+      "get" : {
+        "summary" : "Einstellungskatalog und Betriebsbudget lesen",
+        "tags" : [ "Einstellungen" ],
+        "responses" : {
+          "200" : {
+            "description" : "Katalog und aktueller Budgetstand",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EinstellungskatalogAntwort"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "patch" : {
+        "summary" : "Einstellungen ändern",
+        "tags" : [ "Einstellungen" ],
+        "parameters" : [ {
+          "name" : "bestaetigt",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/merge-patch+json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Einstellungen"
+              }
+            },
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Einstellungen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Änderung oder unveränderter Stand",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EinstellungenErgebnis"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "BESTAETIGUNG_NOETIG"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "413" : {
+            "description" : "DATEI_ZU_GROSS"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/mandant/einstellungen/vorschau" : {
+      "post" : {
+        "summary" : "Änderung der Einstellungen vorschauen",
+        "tags" : [ "Einstellungen" ],
+        "parameters" : [ {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/merge-patch+json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Einstellungen"
+              }
+            },
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Einstellungen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Auswirkungen ohne Änderung",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EinstellungenVorschau"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/mandant/einstellungen/zuruecksetzen" : {
+      "post" : {
+        "summary" : "Einstellungen einer Gruppe oder Version zurücksetzen",
+        "tags" : [ "Einstellungen" ],
+        "parameters" : [ {
+          "name" : "bestaetigt",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EinstellungenZuruecksetzen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Zurückgesetzt oder unveränderter Stand",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EinstellungenErgebnis"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
     "/api/v1/mandant/funktionen" : {
       "get" : {
         "summary" : "Verfügbare Funktionen des Mandanten",
@@ -8302,6 +9385,36 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/wissen/quellen" : {
+      "get" : {
+        "summary" : "Sichtbare Wissensquellen auflisten",
+        "tags" : [ "Wissensbasis" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Quelle"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
         } ]
       }
     },

@@ -36,7 +36,7 @@ public class QuellenAufloeser {
         var quelle = daten.quelleLaden(id);
         var dokument = daten.dokumentQuellenLaden(Set.of(id)).get(id);
         if (quelle.isEmpty() || dokument == null || !dokument.archiviert()
-                || !"WISSENSQUELLE".equals(quelle.get().art())) {
+                || !quelle.get().markiert()) {
             return new Aufloesung(Status.UNBEKANNT, null, null, null);
         }
         if (dokument.personal()) {

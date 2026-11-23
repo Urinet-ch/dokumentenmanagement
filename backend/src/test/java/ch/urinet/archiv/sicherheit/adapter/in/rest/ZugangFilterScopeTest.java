@@ -6,18 +6,25 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ResourceInfo;
+import jakarta.ws.rs.core.MultivaluedHashMap;
+import jakarta.ws.rs.core.UriInfo;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.security.Principal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +43,22 @@ class ZugangFilterScopeTest {
             new MandantAufloesung(null, () -> new MandantAusAnmeldung.Gueltig(new MandantCode("urinet")),
                     code -> Optional.of("m_urinet")),
             new Berechtigung((benutzer, id) -> true,
-                    (benutzerId, rolle, aktion, dokumentId, grund) -> verweigert.add(aktion)));
+                    (benutzerId, rolle, aktion, dokumentId, grund) -> verweigert.add(aktion)),
+            new TokenWiderruf() {
+                @Override
+                public boolean widerrufen(String benutzer, Instant ausgestellt) {
+                    return false;
+                }
+
+                @Override
+                public void setzen(String benutzer, Instant ab) {
+                }
+
+                @Override
+                public int aufraeumen(Instant vor) {
+                    return 0;
+                }
+            });
 
     static class Endpunkte {
         @ErfordertAktion(Aktion.A1)
@@ -71,6 +93,62 @@ class ZugangFilterScopeTest {
         assertThat(verweigert).containsExactly(Optional.of(Aktion.A1), Optional.of(Aktion.A1));
     }
 
+    @Test
+    void widerrufenesBenutzertokenErhaelt401VorDerAktion() {
+        TokenWiderruf widerruf = new TokenWiderruf() {
+            @Override
+            public boolean widerrufen(String benutzer, Instant ausgestellt) {
+                return benutzer.equals("benutzer-1") && ausgestellt.equals(Instant.ofEpochSecond(1));
+            }
+
+            @Override
+            public void setzen(String benutzer, Instant ab) {
+            }
+
+            @Override
+            public int aufraeumen(Instant vor) {
+                return 0;
+            }
+        };
+        var filter = new ZugangFilter(benutzerIdentitaet(), new MandantAufloesung(null,
+                () -> new MandantAusAnmeldung.Gueltig(new MandantCode("urinet")), code -> Optional.of("m_urinet")),
+                new Berechtigung((benutzer, id) -> true,
+                        (benutzerId, rolle, aktion, dokumentId, grund) -> verweigert.add(aktion)), widerruf);
+
+        assertThatThrownBy(() -> filter.pruefen(ressource("ohneScope"), anfrage()))
+                .isInstanceOfSatisfying(FachFehler.class, fehler ->
+                        assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_ANGEMELDET));
+        assertThat(verweigert).isEmpty();
+    }
+
+    @Test
+    void nachDemWiderrufAusgestelltesTokenBleibtGueltig() {
+        Instant ab = Instant.ofEpochSecond(2);
+        TokenWiderruf widerruf = new TokenWiderruf() {
+            @Override
+            public boolean widerrufen(String benutzer, Instant ausgestellt) {
+                return ausgestellt.isBefore(ab);
+            }
+
+            @Override
+            public void setzen(String benutzer, Instant zeit) {
+            }
+
+            @Override
+            public int aufraeumen(Instant vor) {
+                return 0;
+            }
+        };
+        var filter = new ZugangFilter(benutzerIdentitaet(3), new MandantAufloesung(null,
+                () -> new MandantAusAnmeldung.Gueltig(new MandantCode("urinet")), code -> Optional.of("m_urinet")),
+                new Berechtigung((benutzer, id) -> true,
+                        (benutzerId, rolle, aktion, dokumentId, grund) -> verweigert.add(aktion)), widerruf);
+
+        filter.pruefen(ressource("ohneScope"), anfrage());
+
+        assertThat(verweigert).isEmpty();
+    }
+
     private static ResourceInfo ressource(String name) {
         Method methode;
         try {
@@ -82,7 +160,10 @@ class ZugangFilterScopeTest {
     }
 
     private static ContainerRequestContext anfrage() {
-        return proxy(ContainerRequestContext.class, (m, args) -> null);
+        return proxy(ContainerRequestContext.class, (m, args) -> m.equals("getUriInfo")
+                ? proxy(UriInfo.class, (uriMethode, uriArgs) -> uriMethode.equals("getPathParameters")
+                        ? new MultivaluedHashMap<String, String>() : null)
+                : null);
     }
 
     private static SecurityIdentity tokenIdentitaet(ApiTokenScope scope) {
@@ -93,6 +174,25 @@ class ZugangFilterScopeTest {
             case "getAttribute" -> TokenIdentitaet.SCOPE.equals(args[0]) ? scope : null;
             case "getRoles" -> java.util.Set.of(scope == ApiTokenScope.GENERATOR
                     ? ApiTokenScope.ROLLE_GENERATOR : ApiTokenScope.ROLLE_IMPORT);
+            default -> null;
+        });
+    }
+
+    private static SecurityIdentity benutzerIdentitaet() {
+        return benutzerIdentitaet(1);
+    }
+
+    private static SecurityIdentity benutzerIdentitaet(long ausgestellt) {
+        JsonWebToken jwt = proxy(JsonWebToken.class, (m, args) -> switch (m) {
+            case "getName" -> "benutzer-1";
+            case "getIssuedAtTime" -> ausgestellt;
+            default -> null;
+        });
+        return proxy(SecurityIdentity.class, (m, args) -> switch (m) {
+            case "isAnonymous" -> false;
+            case "getPrincipal" -> jwt;
+            case "getAttribute" -> null;
+            case "getRoles" -> java.util.Set.of("inhaber");
             default -> null;
         });
     }

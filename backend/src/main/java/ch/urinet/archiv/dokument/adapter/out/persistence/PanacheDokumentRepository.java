@@ -92,7 +92,9 @@ public class PanacheDokumentRepository implements DokumentRepository {
         var abfrage = DokumentEintrag.getEntityManager().createNativeQuery("""
                 select distinct d.id from dokument d join dokument_datei f on f.dokument_id = d.id
                 where f.sha256 = :sha and f.rolle = 'ORIGINAL' and f.status = 'AKTIV'
-                  and d.status = 'ARCHIVIERT' and d.art = 'WISSENSQUELLE' and
+                  and d.status = 'ARCHIVIERT'
+                  and exists (select 1 from wissensquelle_markierung m
+                      where m.dokument_id = d.id and m.beendet_am is null) and
                 """ + sicht.bedingung(), UUID.class).setParameter("sha", sha256);
         sicht.parameter().forEach(abfrage::setParameter);
         @SuppressWarnings("unchecked")

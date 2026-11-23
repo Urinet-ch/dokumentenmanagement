@@ -8,6 +8,7 @@ import ch.urinet.archiv.integration.application.webseite.WebseiteLesen;
 import ch.urinet.archiv.integration.application.webseite.WebseiteSuche;
 import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteDokument;
+import ch.urinet.archiv.integration.domain.webseite.WebseiteKlassifikation;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteReihe;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
@@ -30,6 +31,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.core.StreamingOutput;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
@@ -40,7 +42,9 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -85,7 +89,6 @@ public class WebseitenLesenResource {
     private final LeseAnfrage anfrage;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
-
     public WebseitenLesenResource(WebseiteLesen lesen, WebseiteSuche suche, DateiAuslieferung auslieferung,
                                   LeseAnfrage anfrage,
                                   MandantAufloesung aufloesung, SecurityIdentity identitaet) {
@@ -101,6 +104,24 @@ public class WebseitenLesenResource {
     public record ReiheDto(@Schema(required = true) String code, @Schema(required = true) String name) {
     }
 
+    @Schema(name = "WebseiteKlassifikationWert")
+    public record KlassifikationWertDto(
+            @Schema(required = true) String code,
+            @Schema(required = true) String name) {
+    }
+
+    @Schema(name = "WebseiteKlassifikation")
+    public record KlassifikationDto(
+            @Schema(required = true) String code,
+            @Schema(required = true) String name,
+            @Schema(required = true) List<KlassifikationWertDto> werte) {
+        static KlassifikationDto aus(WebseiteKlassifikation klassifikation) {
+            return new KlassifikationDto(klassifikation.code(), klassifikation.name(),
+                    klassifikation.werte().stream()
+                            .map(wert -> new KlassifikationWertDto(wert.code(), wert.name())).toList());
+        }
+    }
+
     @Schema(name = "WebseiteDokument", description = "Dokument in der Liste; bezeichnet nur mit der ID, nie mit einer URL")
     public record DokumentDto(
             @Schema(required = true) UUID id,
@@ -111,7 +132,9 @@ public class WebseitenLesenResource {
             @Schema(nullable = true, description = "Erscheinungsdatum; fehlt, wenn unbekannt") LocalDate datum,
             @Schema(required = true, enumeration = {"oeffentlich", "mitglieder", "vorstand"},
                     description = "Zugriffsstufe des Dokuments") String zugriff,
-            @Schema(nullable = true, description = "Zahl der Seiten, wenn bekannt") Integer seiten) {
+            @Schema(nullable = true, description = "Zahl der Seiten, wenn bekannt") Integer seiten,
+            @Schema(required = true, description = "Nur öffentlich filterbare Klassifikationen")
+            List<KlassifikationDto> klassifikationen) {
     }
 
     @Schema(name = "WebseiteDokumentListe", description = "Seite der Liste veröffentlichter Dokumente")
@@ -133,7 +156,9 @@ public class WebseitenLesenResource {
             @Schema(required = true, enumeration = {"oeffentlich", "mitglieder", "vorstand"}) String zugriff,
             @Schema(nullable = true) Integer seiten,
             @Schema(nullable = true, description = "Anfang des Textes, höchstens 300 Zeichen; fehlt ohne Text")
-            String auszug) {
+            String auszug,
+            @Schema(required = true, description = "Nur öffentlich filterbare Klassifikationen")
+            List<KlassifikationDto> klassifikationen) {
     }
 
     @Schema(name = "WebseiteFundstelle", description = "Stelle des besten Treffers im Dokument")
@@ -151,6 +176,8 @@ public class WebseitenLesenResource {
             @Schema(nullable = true) LocalDate datum,
             @Schema(required = true, enumeration = {"oeffentlich", "mitglieder", "vorstand"}) String zugriff,
             @Schema(nullable = true) Integer seiten,
+            @Schema(required = true, description = "Nur öffentlich filterbare Klassifikationen")
+            List<KlassifikationDto> klassifikationen,
             @Schema(nullable = true, description = "Textstelle zum Suchbegriff aus dem Text, höchstens 300 Zeichen; "
                     + "ohne Dateinamen") String auszug,
             @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -181,7 +208,10 @@ public class WebseitenLesenResource {
     @Schema(name = "WebseiteFilter", description = "Auswahl für die Filter der Webseite")
     public record FilterDto(
             @Schema(required = true, description = "Reihen mit mindestens einem sichtbaren Dokument")
-            List<ReiheDto> reihen) {
+            List<ReiheDto> reihen,
+            @Schema(required = true, description = "Öffentlich filterbare Klassifikationen und Werte mit mindestens "
+                    + "einem sichtbaren Dokument")
+            List<KlassifikationDto> klassifikationen) {
     }
 
     @Schema(name = "WebseiteUmleitung", description = "Dokument zu einer alten URL")
@@ -195,8 +225,9 @@ public class WebseitenLesenResource {
     @Operation(summary = "Veröffentlichte Dokumente auflisten",
             description = "Dokumente, die der feste Filter bis zur Stufe der Anfrage liefert (archiviert, "
                     + "veröffentlicht, Vertraulichkeit NORMAL, Zugriffsstufe bis zur gemeldeten Stufe). Filter nach "
-                    + "reihe (Code), jahr und ausgabe; sortierung datum_ab (Standard), datum_auf oder titel. "
-                    + "Unbekannte Parameter werden ignoriert.")
+                    + "reihe (Code), jahr, ausgabe sowie den Codes öffentlich filterbarer Klassifikationen; "
+                    + "sortierung datum_ab (Standard), datum_auf oder titel. Mehrere Werte einer Klassifikation "
+                    + "werden mit ODER, mehrere Klassifikationen mit UND verknüpft. Unbekannte Parameter werden ignoriert.")
     @APIResponse(responseCode = "200", description = "Seite der Liste",
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ListeDto.class)))
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
@@ -205,6 +236,7 @@ public class WebseitenLesenResource {
     @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
     public ListeDto liste(@BeanParam LeseKopf kopf,
+            @Context UriInfo uriInfo,
             @QueryParam("reihe") @Parameter(description = "Code der Reihe, z. B. aus /public/v1/filter") String reihe,
             @QueryParam("jahr") @Parameter(description = "Jahr, vier Ziffern") String jahr,
             @QueryParam("ausgabe") @Parameter(description = "Ausgabe innerhalb der Reihe") String ausgabe,
@@ -216,7 +248,8 @@ public class WebseitenLesenResource {
             @QueryParam("sortierung") @Parameter(description = "Sortierung (Standard datum_ab)",
                     schema = @Schema(type = SchemaType.STRING, enumeration = {"datum_ab", "datum_auf", "titel"}))
             String sortierung) {
-        WebseiteSeite ergebnis = lesen.liste(anfrage.zugriff(), new ListenFilter(reihe, jahr, ausgabe),
+        WebseiteSeite ergebnis = lesen.liste(anfrage.zugriff(), new ListenFilter(reihe, jahr, ausgabe,
+                        klassifikationsFilter(uriInfo)),
                 sortierung(sortierung), zahl(seite, 1), zahl(proSeite, WebseiteLesen.PRO_SEITE_STANDARD));
         return new ListeDto(ergebnis.eintraege().stream().map(WebseitenLesenResource::dto).toList(), ergebnis.seite(),
                 ergebnis.proSeite(), ergebnis.gesamt());
@@ -268,7 +301,7 @@ public class WebseitenLesenResource {
     public DetailsDto details(@BeanParam LeseKopf kopf, @PathParam("id") String id) {
         WebseiteDokument d = lesen.details(anfrage.zugriff(), uuid(id));
         return new DetailsDto(d.id(), d.titel(), reihe(d), d.ausgabe(), d.jahr(), d.datum(), d.zugriff(), d.seiten(),
-                d.auszug());
+                d.auszug(), klassifikationen(d));
     }
 
     @GET
@@ -337,9 +370,9 @@ public class WebseitenLesenResource {
     @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.LESEN)
     @Operation(summary = "Werte für die Filter",
-            description = "Reihen (Code und Name der aktiven Dokumentarten), zu denen der feste Filter bis zur Stufe "
-                    + "der Anfrage mindestens ein Dokument liefert; eine Reihe oder ein Wert einer höheren Stufe "
-                    + "wird nie genannt.")
+            description = "Reihen (Code und Name der aktiven Dokumentarten) und öffentlich filterbare "
+                    + "Klassifikationen samt aktiven Werten, zu denen der feste Filter bis zur Stufe der Anfrage "
+                    + "mindestens ein Dokument liefert; eine Reihe oder ein Wert einer höheren Stufe wird nie genannt.")
     @APIResponse(responseCode = "200", description = "Filter",
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = FilterDto.class)))
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
@@ -349,7 +382,9 @@ public class WebseitenLesenResource {
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
     public FilterDto filter(@BeanParam LeseKopf kopf) {
         List<WebseiteReihe> reihen = lesen.reihen(anfrage.zugriff());
-        return new FilterDto(reihen.stream().map(r -> new ReiheDto(r.code(), r.name())).toList());
+        List<KlassifikationDto> klassifikationen = lesen.klassifikationen(anfrage.zugriff()).stream()
+                .map(KlassifikationDto::aus).toList();
+        return new FilterDto(reihen.stream().map(r -> new ReiheDto(r.code(), r.name())).toList(), klassifikationen);
     }
 
     @GET
@@ -375,13 +410,30 @@ public class WebseitenLesenResource {
     }
 
     private static DokumentDto dto(WebseiteDokument d) {
-        return new DokumentDto(d.id(), d.titel(), reihe(d), d.ausgabe(), d.jahr(), d.datum(), d.zugriff(), d.seiten());
+        return new DokumentDto(d.id(), d.titel(), reihe(d), d.ausgabe(), d.jahr(), d.datum(), d.zugriff(), d.seiten(),
+                klassifikationen(d));
     }
 
     private static TrefferDto dto(WebseiteTreffer t) {
         WebseiteDokument d = t.dokument();
         return new TrefferDto(d.id(), d.titel(), reihe(d), d.ausgabe(), d.jahr(), d.datum(), d.zugriff(), d.seiten(),
-                d.auszug(), t.fundstelleSeite() == null ? null : new FundstelleDto(t.fundstelleSeite()), t.rang());
+                klassifikationen(d), d.auszug(),
+                t.fundstelleSeite() == null ? null : new FundstelleDto(t.fundstelleSeite()), t.rang());
+    }
+
+    private static List<KlassifikationDto> klassifikationen(WebseiteDokument d) {
+        return d.klassifikationen().stream().map(KlassifikationDto::aus).toList();
+    }
+
+    private Map<String, List<String>> klassifikationsFilter(UriInfo uriInfo) {
+        Map<String, List<String>> filter = new HashMap<>();
+        for (String code : lesen.oeffentlicheKlassifikationsCodes()) {
+            List<String> werte = uriInfo.getQueryParameters().get(code);
+            if (werte != null) {
+                filter.put(code, werte);
+            }
+        }
+        return filter;
     }
 
     private static ReiheDto reihe(WebseiteDokument d) {

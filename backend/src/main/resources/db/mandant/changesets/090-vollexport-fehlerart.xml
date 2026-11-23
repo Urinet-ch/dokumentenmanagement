@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="090-vollexport-fehlerart" author="archiv">
+        <sql>
+            alter table mandant_vollexport add column fehler_art text
+                constraint mandant_vollexport_fehler_art_ck
+                    check (fehler_art in ('KONFIGURATION_ZU_GROSS'));
+        </sql>
+        <rollback>
+            <sql>alter table mandant_vollexport drop column fehler_art;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

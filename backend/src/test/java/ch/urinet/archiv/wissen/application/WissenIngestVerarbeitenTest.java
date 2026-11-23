@@ -138,10 +138,10 @@ class WissenIngestVerarbeitenTest {
     @Test
     void schliesstMitFehlerAbWennDieQuelleNichtMehrFreigegebenIst() throws InterruptedException {
         for (Lauf lauf : List.of(
-                laufMit("KERNAUSSAGEN", "ARCHIVIERT", "WISSENSQUELLE", "PERSONAL", true, Fortschritt.leer()),
-                laufMit("KERNAUSSAGEN", "ARCHIVIERT", "WISSENSQUELLE", "NORMAL", false, Fortschritt.leer()),
-                laufMit("KERNAUSSAGEN", "ARCHIVIERT", "RECHNUNG", "NORMAL", true, Fortschritt.leer()),
-                laufMit("KERNAUSSAGEN", "VERWORFEN", "WISSENSQUELLE", "NORMAL", true, Fortschritt.leer()))) {
+                laufMit("KERNAUSSAGEN", "ARCHIVIERT", true, "PERSONAL", true, Fortschritt.leer()),
+                laufMit("KERNAUSSAGEN", "ARCHIVIERT", true, "NORMAL", false, Fortschritt.leer()),
+                laufMit("KERNAUSSAGEN", "ARCHIVIERT", false, "NORMAL", true, Fortschritt.leer()),
+                laufMit("KERNAUSSAGEN", "VERWORFEN", true, "NORMAL", true, Fortschritt.leer()))) {
             Speicher speichern = new Speicher(stand(lauf, 0));
             KiAntwort ki = new KiAntwort(null);
 
@@ -154,7 +154,7 @@ class WissenIngestVerarbeitenTest {
 
     @Test
     void verwendetDasStandardbudgetWennDasBudgetNullIst() throws InterruptedException {
-        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", "WISSENSQUELLE", "NORMAL",
+        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
                 true, "Testquelle", LocalDate.of(2026, 4, 30), "Die Frist endet am 30. April.\f", 1, true,
                 null, null, "KERNAUSSAGEN", 0, 0, "test-modell", false, 0, 0, Fortschritt.leer());
         Speicher speichern = new Speicher(stand(lauf, 0));
@@ -209,7 +209,7 @@ class WissenIngestVerarbeitenTest {
 
     @Test
     void ohneBelegdatumEntfaelltNurDieQuelleSeite() throws InterruptedException {
-        Lauf ohneDatum = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", "WISSENSQUELLE", "NORMAL",
+        Lauf ohneDatum = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
                 true, "Testquelle", null, "Die Frist endet am 30. April.\f", 1, true,
                 null, null, "QUELLE", 0, 0, "test-modell", false, 300_000, 1_000_000, mitAussage());
         Speicher speichern = new Speicher(stand(ohneDatum, 0));
@@ -495,7 +495,7 @@ class WissenIngestVerarbeitenTest {
         String kurz = DOKUMENT_ID.toString().substring(0, 8);
         Fortschritt bisher = new Fortschritt(0, 0, false, List.of(new Kernaussage(1, "q-" + kurz + "-45",
                 "Frühere Aussage im selben Lauf.", List.of(1), "Frist", true)), List.of(), List.of(), List.of(), null);
-        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", "WISSENSQUELLE", "NORMAL",
+        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
                 true, "Testquelle", LocalDate.of(2026, 4, 30), "Erste Seite.\fDie Frist endet am 30. April.\f", 2,
                 true, 2, 2, "KERNAUSSAGEN", 0, 0, "test-modell", false, 300_000, 1_000_000, Fortschritt.leer());
         KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of(
@@ -513,7 +513,7 @@ class WissenIngestVerarbeitenTest {
                         org.assertj.core.groups.Tuple.tuple(2, "q-" + kurz + "-9"));
 
         Speicher imLauf = new Speicher(stand(new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT",
-                "WISSENSQUELLE", "NORMAL", true, "Testquelle", LocalDate.of(2026, 4, 30),
+                true, "NORMAL", true, "Testquelle", LocalDate.of(2026, 4, 30),
                 "Erste Seite.\fDie Frist endet am 30. April.\f", 2, true, 1, 2, "KERNAUSSAGEN", 0, 0,
                 "test-modell", false, 300_000, 1_000_000, bisher), 0));
         imLauf.hoechsteNummer = 3;
@@ -594,15 +594,15 @@ class WissenIngestVerarbeitenTest {
                 stufe);
     }
 
-    private static Lauf laufMit(String schritt, String dokumentStatus, String art, String vertraulichkeit,
+    private static Lauf laufMit(String schritt, String dokumentStatus, boolean markiert, String vertraulichkeit,
                                 boolean bestaetigt, Fortschritt fortschritt) {
-        return new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", dokumentStatus, art, vertraulichkeit,
+        return new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", dokumentStatus, markiert, vertraulichkeit,
                 bestaetigt, "Testquelle", LocalDate.of(2026, 4, 30), "Die Frist endet am 30. April.\f", 1, true,
                 null, null, schritt, 0, 0, "test-modell", false, 300_000, 1_000_000, fortschritt);
     }
 
     private static Lauf lauf(String schritt, boolean unvollstaendig, Fortschritt fortschritt) {
-        return new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", "WISSENSQUELLE", "NORMAL",
+        return new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
                 true, "Testquelle", LocalDate.of(2026, 4, 30), "Die Frist endet am 30. April.\f", 1, true,
                 null, null, schritt, 0, 0, "test-modell", unvollstaendig, 300_000, 1_000_000, fortschritt);
     }

@@ -1,24 +1,30 @@
 package ch.urinet.archiv.benutzer;
 
-import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpAusstehend;
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.BenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.StepUp;
-import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
 import ch.urinet.archiv.mandant.application.KonfigurationSeed;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantAbbau;
-import ch.urinet.archiv.mandant.application.WissensquelleSeed;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
+import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.sicherheit.domain.ApiToken;
+import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
@@ -39,11 +45,17 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,14 +71,16 @@ public class BenutzerVerwaltungSchritte {
     @Inject MandantAbbau abbau;
     @Inject KonfigurationSeed seed;
     @Inject KonfigurationsdateiCodec codec;
-    @Inject WissensquelleSeed wissensquelle;
-    @Inject ZusatzSchemaPruefer zusatzSchema;
     @Inject IdentitaetsDienst identitaet;
     @Inject BenutzerMitteilung mitteilung;
     @Inject StepUp stepUp;
+    @Inject ApiTokenVerwaltung apiTokens;
+    @Inject WebseitenSchluesselVerwaltung webseitenSchluessel;
+    @Inject TokenWiderruf tokenWiderruf;
 
     private final List<Map.Entry<String, String>> benutzer = new ArrayList<>();
     private final List<Response> antworten = new ArrayList<>();
+    private final List<ApiToken> verwaltungsSchluessel = new ArrayList<>();
     private StepUp urspruenglichesStepUp;
     private IdentitaetsDienst urspruenglicheIdentitaet;
     private BenutzerMitteilung urspruenglicheMitteilung;
@@ -83,6 +97,10 @@ public class BenutzerVerwaltungSchritte {
     private String adminPfad;
     private String akteurId;
     private String akteurName;
+    private String zweiterAkteurId;
+    private String zweiterAkteurName;
+    private String altesToken;
+    private final Map<String, Rolle> gleichzeitigeRollen = new ConcurrentHashMap<>();
 
     @Before("@benutzer-verwaltung")
     public void mandantenVorbereiten() throws SQLException {
@@ -95,8 +113,7 @@ public class BenutzerVerwaltungSchritte {
                     if (!zeile.next()) {
                         if (code.equals(MANDANT)) {
                             KonfigurationSeed original = ClientProxy.unwrap(seed);
-                            QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec, wissensquelle,
-                                    zusatzSchema) {
+                            QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec) {
                                 @Override
                                 public Konfiguration lesen(MandantCode ignoriert) {
                                     return original.lesen(new MandantCode("urinet"));
@@ -153,7 +170,7 @@ public class BenutzerVerwaltungSchritte {
     }
 
     @After("@benutzer-verwaltung")
-    public void aufraeumen() {
+    public void aufraeumen() throws SQLException {
         if (log != null) {
             log.close();
         }
@@ -168,9 +185,30 @@ public class BenutzerVerwaltungSchritte {
         }
         for (var eintrag : benutzer) {
             identitaet.loeschen(eintrag.getKey(), eintrag.getValue());
+            tokenWiderrufZeileLoeschen(eintrag.getValue());
+        }
+        if (eigeneId != null) {
+            tokenWiderrufZeileLoeschen(eigeneId);
+        }
+        for (ApiToken token : verwaltungsSchluessel) {
+            apiTokens.widerrufen(new MandantCode("urinet"), token.id(), Optional.empty());
         }
         if (akteurId != null) {
+            tokenWiderrufZeileLoeschen(akteurId);
             given().auth().oauth2(admin).delete(adminPfad + "/users/" + akteurId).then().statusCode(204);
+        }
+        if (zweiterAkteurId != null) {
+            tokenWiderrufZeileLoeschen(zweiterAkteurId);
+            given().auth().oauth2(admin).delete(adminPfad + "/users/" + zweiterAkteurId).then().statusCode(204);
+        }
+    }
+
+    private void tokenWiderrufZeileLoeschen(String id) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement loeschen = verbindung.prepareStatement(
+                     "delete from public.token_widerruf where benutzer = ?")) {
+            loeschen.setString(1, id);
+            loeschen.executeUpdate();
         }
     }
 
@@ -198,23 +236,88 @@ public class BenutzerVerwaltungSchritte {
         assertThat(antworten.get(1).jsonPath().getList("$")).isEmpty();
         assertThat(antworten.get(2).statusCode()).isEqualTo(200);
         assertThat(antworten.get(2).jsonPath().<String>get("vorname")).isEqualTo("Test");
+        assertThat(antworten.get(2).jsonPath().<String>get("apiTokenVerwaltungspfad"))
+                .isEqualTo("/verwaltung/api-tokens");
+        assertThat(antworten.get(2).jsonPath().<String>get("apiTokenHinweis"))
+                .contains("bleiben beim Sperren oder Deaktivieren gültig");
         assertThat(antworten.get(3).statusCode()).isEqualTo(404);
         assertThat(antworten.get(4).statusCode()).isEqualTo(404);
         assertThat(antworten.get(3).asString()).doesNotContain("fremd." + name);
     }
 
+    @Wenn("der Inhaber die Rechte beider Benutzer abruft")
+    public void benutzerrechteAbrufen() {
+        antworten.add(anfrage().get(PFAD + "/" + eigeneId + "/rechte"));
+        antworten.add(anfrage().get(PFAD + "/" + fremdeId + "/rechte"));
+    }
+
+    @Dann("sieht er die Rechte aus der Matrix nur für den eigenen Benutzer")
+    public void benutzerrechtePruefen() {
+        Response eigene = antworten.get(0);
+        assertThat(eigene.statusCode()).isEqualTo(200);
+        assertThat(eigene.jsonPath().<String>get("code")).isEqualTo("mitarbeiter");
+        var rechte = eigene.jsonPath().<Map<String, Object>>getList("rechte");
+        assertThat(rechte).hasSize(Aktion.values().length);
+        for (Aktion aktion : Aktion.values()) {
+            var recht = rechte.stream().filter(r -> aktion.name().equals(r.get("aktion"))).findFirst().orElseThrow();
+            assertThat(recht.get("ergebnis")).isEqualTo(Rechtematrix.ergebnis(Rolle.MITARBEITER, aktion).name());
+        }
+        assertThat(antworten.get(1).statusCode()).isEqualTo(404);
+    }
+
     @Angenommen("die frische Anmeldung ist für den Test bestätigt")
     public void stepUpBestaetigen() {
         urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
-        QuarkusMock.installMockForType(new StepUpAusstehend() {
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() { }
         }, StepUp.class);
     }
 
+    @Angenommen("die Anmeldung für eine kritische Aktion ist nicht frisch")
+    public void stepUpNichtBestaetigen() {
+        urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() {
+                throw new StepUpNoetig(300);
+            }
+        }, StepUp.class);
+    }
+
+    @Angenommen("ein synthetischer Verwaltungszugang hat ein altes Token")
+    public void altesToken() {
+        altesToken = Testanmeldung.token(akteurName);
+        assertThat(Testanmeldung.sub(akteurName)).isEqualTo(akteurId);
+    }
+
+    @Wenn("das Token des Inhabers widerrufen wird")
+    public void inhaberTokenWiderrufen() {
+        tokenWiderruf.setzen(Testanmeldung.sub(akteurName), Instant.now());
+        assertThat(tokenWiderruf.widerrufen(akteurId, Instant.EPOCH)).isTrue();
+    }
+
+    @Dann("wird dieses Token innerhalb der Frist mit 401 abgewiesen")
+    public void altesTokenAbgewiesen() {
+        Response antwort = given().auth().oauth2(altesToken).get(PFAD);
+        assertThat(ProblemDetails.pruefen(antwort, 401)).isEqualTo("NICHT_ANGEMELDET");
+    }
+
     @Wenn("der Inhaber einen synthetischen Mitarbeiter anlegt")
     public void mitarbeiterAnlegen() {
         anlegenUeberApi("mitarbeiter");
+    }
+
+    @Dann("wird die kritische Aktion abgewiesen und kein Benutzer angelegt")
+    public void stepUpNoetig() {
+        Response antwort = antworten.getFirst();
+        assertThat(antwort.statusCode()).isEqualTo(401);
+        assertThat(antwort.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
+        assertThat(antwort.header("WWW-Authenticate"))
+                .contains("insufficient_user_authentication", "max_age=\"300\"");
+        Response liste = anfrage().queryParam("q", name).get(PFAD);
+        assertThat(liste.statusCode()).isEqualTo(200);
+        assertThat(liste.jsonPath().<String>getList("id")).isEmpty();
     }
 
     private void anlegenUeberApi(String rolle) {
@@ -275,6 +378,7 @@ public class BenutzerVerwaltungSchritte {
     @Dann("sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert")
     public void zugangZurueckgesetzt() throws SQLException {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
         assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktionen()).containsExactlyInAnyOrder(
                 IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
                 IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
@@ -331,6 +435,7 @@ public class BenutzerVerwaltungSchritte {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);
         assertThat(googleVerknuepft).isFalse();
         assertThat(googleSitzungenBeendet).isTrue();
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
     }
 
     @Angenommen("die Mitteilung an die bisherige Adresse wird aufgezeichnet")
@@ -404,6 +509,155 @@ public class BenutzerVerwaltungSchritte {
         identitaet.einladen(MANDANT, eigeneId, Set.of(), Duration.ofHours(1));
     }
 
+    @Wenn("der Inhaber die Rolle mit fehlender, veralteter und aktueller Version ändert")
+    public void rolleAendern() {
+        String pfad = PFAD + "/" + eigeneId;
+        String etag = anfrage().get(pfad).then().statusCode(200).extract().header("ETag");
+        antworten.add(anfrage().contentType("application/json").body(Map.of("rolle", "treuhaender"))
+                .put(pfad + "/rolle"));
+        antworten.add(anfrage().contentType("application/json").header("If-Match", "\"" + "0".repeat(64) + "\"")
+                .body(Map.of("rolle", "treuhaender")).put(pfad + "/rolle"));
+        antworten.add(anfrage().contentType("application/json").header("If-Match", etag)
+                .body(Map.of("rolle", "treuhaender")).put(pfad + "/rolle"));
+    }
+
+    @Dann("ist nur die aktuelle Rollenänderung wirksam und das alte Token widerrufen")
+    public void rolleGeaendert() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(428, 412, 204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).rollen()).containsExactly(Rolle.TREUHAENDER);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
+    }
+
+    @Angenommen("ein synthetischer aktiver Mitarbeiter und zwei aktive Inhaber bestehen")
+    public void mitarbeiterUndInhaber() {
+        aktiverMitarbeiter();
+        for (int i = 0; i < 2; i++) {
+            String inhaberName = "inhaber." + i + "." + UUID.randomUUID().toString().substring(0, 8);
+            String id = identitaet.anlegen(MANDANT, new IdentitaetsDienst.Neuanlage(inhaberName,
+                    inhaberName + "@example.invalid", "Test", "Person"), Rolle.INHABER);
+            benutzer.add(Map.entry(MANDANT, id));
+            identitaet.einladen(MANDANT, id, Set.of(), Duration.ofHours(1));
+        }
+        zweiterAkteurName = "probe-19-11-" + UUID.randomUUID();
+        zweiterAkteurId = akteurAnlegen(MANDANT, zweiterAkteurName);
+    }
+
+    @Wenn("der Inhaber die Inhaberrolle beantragt und beide Inhaber darüber entscheiden")
+    public void inhabervergabeBeantragen() {
+        String pfad = PFAD + "/" + eigeneId;
+        String etag = anfrage().get(pfad).then().statusCode(200).extract().header("ETag");
+        Response beantragt = anfrage().contentType("application/json").header("If-Match", etag)
+                .body(Map.of("rolle", "inhaber")).put(pfad + "/rolle");
+        antworten.add(beantragt);
+        String antragId = beantragt.then().statusCode(202).extract().path("antragId");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).rollen()).containsExactly(Rolle.MITARBEITER);
+        urspruenglicheIdentitaet = ClientProxy.unwrap(identitaet);
+        QuarkusMock.installMockForType(new IdentitaetsDienstStub() {
+            @Override
+            public synchronized Benutzer benutzerLesen(String mandant, String id) {
+                if (mandant.equals(MANDANT) && (id.equals(akteurId) || id.equals(zweiterAkteurId))) {
+                    return new Benutzer(id, "probe", "probe@example.invalid", "Test", "Person", true,
+                            Set.of(Rolle.INHABER), Set.of(), true, false);
+                }
+                return urspruenglicheIdentitaet.benutzerLesen(mandant, id);
+            }
+
+            @Override
+            public synchronized void rolleSetzen(String mandant, String id, Rolle rolle) {
+                urspruenglicheIdentitaet.rolleSetzen(mandant, id, rolle);
+            }
+        }, IdentitaetsDienst.class);
+        String antragPfad = PFAD + "/antraege/" + antragId + "/bestaetigen";
+        antworten.add(anfrage().contentType("application/json").post(antragPfad));
+        antworten.add(given().auth().oauth2(Testanmeldung.token(zweiterAkteurName))
+                .contentType("application/json").post(antragPfad));
+    }
+
+    @Dann("kann nur der zweite Inhaber die Vergabe bestätigen")
+    public void inhabervergabeBestaetigt() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(202, 403, 204);
+        assertThat(urspruenglicheIdentitaet.benutzerLesen(MANDANT, eigeneId).rollen()).containsExactly(Rolle.INHABER);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
+    }
+
+    @Angenommen("zwei aktive Inhaber bestehen")
+    public void zweiInhaberFuerGleichzeitigeRollenwechsel() {
+        zweiterAkteurName = "probe-19-11-" + UUID.randomUUID();
+        zweiterAkteurId = akteurAnlegen(MANDANT, zweiterAkteurName);
+    }
+
+    @Wenn("beide Inhaber gleichzeitig die Rolle des anderen ändern")
+    public void gleichzeitigeRollenwechsel() throws Exception {
+        String erstesToken = Testanmeldung.token(akteurName);
+        String zweitesToken = Testanmeldung.token(zweiterAkteurName);
+        String ersterPfad = PFAD + "/" + zweiterAkteurId;
+        String zweiterPfad = PFAD + "/" + akteurId;
+        gleichzeitigeRollen.put(akteurId, Rolle.INHABER);
+        gleichzeitigeRollen.put(zweiterAkteurId, Rolle.INHABER);
+        urspruenglicheIdentitaet = ClientProxy.unwrap(identitaet);
+        CountDownLatch begonnen = new CountDownLatch(1);
+        CountDownLatch fortsetzen = new CountDownLatch(1);
+        QuarkusMock.installMockForType(new IdentitaetsDienstStub() {
+            @Override
+            public Benutzer benutzerLesen(String mandant, String id) {
+                Rolle rolle = gleichzeitigeRollen.get(id);
+                if (!MANDANT.equals(mandant) || rolle == null) {
+                    throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+                }
+                return new Benutzer(id, "probe", "probe@example.invalid", "Test", "Person", true,
+                        Set.of(rolle), Set.of(), true, false);
+            }
+
+            @Override
+            public boolean anmeldungGesperrt(String mandant, String id) {
+                benutzerLesen(mandant, id);
+                return false;
+            }
+
+            @Override
+            public long inhaberZaehlen(String mandant) {
+                return gleichzeitigeRollen.values().stream().filter(rolle -> rolle == Rolle.INHABER).count();
+            }
+
+            @Override
+            public void rolleSetzen(String mandant, String id, Rolle rolle) {
+                begonnen.countDown();
+                try {
+                    if (!fortsetzen.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Zweiter Aufruf ist ausgeblieben");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Test unterbrochen", e);
+                }
+                benutzerLesen(mandant, id);
+                gleichzeitigeRollen.put(id, rolle);
+            }
+        }, IdentitaetsDienst.class);
+        String erstesEtag = given().auth().oauth2(erstesToken).get(ersterPfad).then()
+                .statusCode(200).extract().header("ETag");
+        String zweitesEtag = given().auth().oauth2(zweitesToken).get(zweiterPfad).then()
+                .statusCode(200).extract().header("ETag");
+        CompletableFuture<Response> erster = CompletableFuture.supplyAsync(() -> given().auth().oauth2(erstesToken)
+                .contentType("application/json").header("If-Match", erstesEtag)
+                .body(Map.of("rolle", "mitarbeiter")).put(ersterPfad + "/rolle"));
+        try {
+            assertThat(begonnen.await(10, TimeUnit.SECONDS)).isTrue();
+            antworten.add(given().auth().oauth2(zweitesToken).contentType("application/json")
+                    .header("If-Match", zweitesEtag).body(Map.of("rolle", "mitarbeiter"))
+                    .put(zweiterPfad + "/rolle"));
+        } finally {
+            fortsetzen.countDown();
+        }
+        antworten.add(erster.get(20, TimeUnit.SECONDS));
+    }
+
+    @Dann("wird ein Vorgang gesperrt und mindestens ein Inhaber bleibt aktiv")
+    public void einInhaberBleibt() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(409, 204);
+        assertThat(gleichzeitigeRollen.values().stream().filter(rolle -> rolle == Rolle.INHABER)).hasSize(1);
+    }
+
     @Wenn("der Inhaber den Mitarbeiter sperrt und wieder entsperrt")
     public void sperrenUndEntsperren() {
         antworten.add(anfrage().contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
@@ -416,6 +670,7 @@ public class BenutzerVerwaltungSchritte {
     public void wiederAktiv() {
         assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
         assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("GESPERRT");
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
         assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktiv()).isTrue();
         anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).body("status", org.hamcrest.Matchers.is("AKTIV"));
     }
@@ -433,6 +688,7 @@ public class BenutzerVerwaltungSchritte {
         assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
         assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("DEAKTIVIERT");
         var benutzer = identitaet.benutzerLesen(MANDANT, eigeneId);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
         assertThat(benutzer.aktiv()).isTrue();
         assertThat(benutzer.rollen()).containsExactly(Rolle.MITARBEITER);
         assertThat(benutzer.aktionen()).contains(IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
@@ -485,7 +741,7 @@ public class BenutzerVerwaltungSchritte {
     public void nameAusAbgebautemMandanten() throws SQLException {
         String quelle = "b19-" + UUID.randomUUID().toString().substring(0, 8);
         KonfigurationSeed original = ClientProxy.unwrap(seed);
-        QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec, wissensquelle, zusatzSchema) {
+        QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec) {
             @Override
             public Konfiguration lesen(MandantCode ignoriert) {
                 return original.lesen(new MandantCode("urinet"));
@@ -665,6 +921,30 @@ public class BenutzerVerwaltungSchritte {
     public void erneutEingeladenOhneRolle() {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);
         assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).rollen()).isEmpty();
+    }
+
+    @Angenommen("ein Mitarbeiterkonto, ein API-Token und ein Webseiten-Schlüssel bestehen")
+    public void verwaltungszugaengeAnlegen() {
+        verwaltungsSchluessel.add(apiTokens.erstellen("urinet", "Probe Verwaltung", "generator").token());
+        verwaltungsSchluessel.add(webseitenSchluessel.erstellen("urinet", "probe", "lesen", "oeffentlich", false)
+                .token());
+    }
+
+    @Wenn("alle drei Zugänge die Benutzerliste abrufen")
+    public void verwaltungszugaengeAbrufen() {
+        antworten.clear();
+        antworten.add(given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet")).get(PFAD));
+        antworten.add(given().auth().oauth2(verwaltungsSchluessel.get(0).text()).get(PFAD));
+        antworten.add(given().auth().oauth2(verwaltungsSchluessel.get(1).text()).get(PFAD));
+    }
+
+    @Dann("werden alle drei mit «NICHT_ERLAUBT» abgewiesen")
+    public void verwaltungszugaengeAbgewiesen() {
+        assertThat(antworten).hasSize(3);
+        for (Response antwort : antworten) {
+            assertThat(antwort.statusCode()).isEqualTo(403);
+            assertThat(antwort.path("fehlercode").toString()).isEqualTo("NICHT_ERLAUBT");
+        }
     }
 
     private String anlegen(String mandant, String benutzername) {

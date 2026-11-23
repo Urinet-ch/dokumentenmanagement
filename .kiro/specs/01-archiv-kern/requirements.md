@@ -71,7 +71,7 @@ das Kriterium ist erst nach diesem Entscheid umsetzbar.
 - **Benutzerverzeichnis** – nur anfügende Tabelle, die jede Kennung `benutzer` des Zugriffsprotokolls einer Person zuordnet (10.10).
 - **Notfallunterlagen** – versiegelte Zugangsdaten ausserhalb des Systems für den Notfall (Requirement 16.12).
 - **Stufe A** – Betrieb ab Welle 1 bis zum Wechsel auf der bestehenden Infomaniak-VPS, nur mit Test- und anonymisierten Daten und im Speicherbudget aus `tech.md` (Requirement 16.15).
-- **Stufe B** – Betrieb auf einer eigenen, grösseren Infomaniak-VPS (K5: VPS Lite 4 vCPU, 4 GB RAM, 80 GB, an Ort aufrüstbar, Requirement 16.1); Voraussetzung für echte Belege (Requirement 16.17).
+- **Stufe B** – Betrieb auf einer eigenen, grösseren Infomaniak-VPS (K5: VPS Lite 4 vCPU, 4 GB RAM, 80 GB, an Ort aufrüstbar, Requirement 16.1); Voraussetzung für echte Belege (Requirement 16.17). **Geändert 22.11.2026 (Entscheid Fabian):** Stufe B ist eine VPS mit 4 vCPU / 8 GB / 160 GB (CHF 18.00/Mt.); die Lastmessung auf einer Public-Cloud-Instanz vor der Bestellung entfällt; Messungen nach Req 3.2, 5.5, 14.3 und 16.26 erfolgen, falls noch nötig, auf der Stufe-B-VPS. Die übrigen Angaben dieser Zeile zu Lite 4/4/80 und der Lastmessung gelten nicht mehr.
 - **Profil `lokal`** – Quarkus-Profil nur für den Entwicklerrechner: Das Sprachmodell läuft in LM Studio an `localhost`; nicht für Gate 0, Golden-Lauf, Abnahmen, CI oder Betrieb (Requirement 16.20–16.22, ADR-012).
 
 ---

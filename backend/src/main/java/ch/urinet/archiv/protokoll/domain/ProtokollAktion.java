@@ -18,6 +18,7 @@ public enum ProtokollAktion {
     /** Konfiguration geändert; Details enthalten Version, Quelle und die geänderten Elemente mit alten und neuen Werten. */
     KONFIGURATION_AENDERN,
     WISSEN_ANZEIGEN, WISSEN_ANNEHMEN, WISSEN_VERWERFEN, WISSEN_INGEST, WISSEN_LINT, WISSEN_IMPORT,
+    WISSENSQUELLE_MARKIERT, WISSENSQUELLE_ENTFERNT,
     /**
      * Kontakt zusammengeführt (Req 17.7, 17.8): ein Eintrag ohne Dokument mit Quelle, Ziel, Grund und Zahlen, dazu je
      * umgehängtes Dokument einer mit Dokument-ID
@@ -25,5 +26,6 @@ public enum ProtokollAktion {
     KONTAKT_ZUSAMMENFUEHREN,
     /** Kontakt als inaktiv markiert bzw. wieder aktiviert (Req 17.11, 17.15), ohne Dokument */
     KONTAKT_INAKTIV, KONTAKT_AKTIV,
-    BENUTZER_ANLEGEN, BENUTZER_AENDERN, BENUTZER_LOESCHEN, ROLLE_ZUWEISEN, BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG
+    BENUTZER_ANLEGEN, BENUTZER_AENDERN, BENUTZER_LOESCHEN, ROLLE_ZUWEISEN, BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG,
+    CHAT_BEWERTUNG_EXPORT
 }

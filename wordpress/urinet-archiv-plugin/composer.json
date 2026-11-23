@@ -1,0 +1,24 @@
+{
+  "name": "urinet/archiv-wordpress",
+  "type": "wordpress-plugin",
+  "require": {
+    "php": ">=8.2",
+    "ext-curl": "*",
+    "ext-sodium": "*"
+  },
+  "require-dev": {
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "phpunit/phpunit": "^9.6",
+    "wp-coding-standards/wpcs": "^3.0",
+    "yoast/phpunit-polyfills": "^3.0"
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    },
+    "platform": {
+      "php": "8.2.0"
+    },
+    "sort-packages": true
+  }
+}

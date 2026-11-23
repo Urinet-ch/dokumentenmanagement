@@ -1,8 +1,10 @@
 package ch.urinet.archiv.konfiguration.adapter.in.kommando;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.BestaetigungNoetig;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung;
+import ch.urinet.archiv.konfiguration.application.EinstellungsAenderungsPruefung;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung.Analyse;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung.DiffEintrag;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung.Ergebnis;
@@ -40,7 +42,7 @@ public class KonfigurationKommando {
             Aufruf: archiv mandant konfiguration exportieren <code> [<datei>] [--json]
                    archiv mandant konfiguration pruefen     <code> <datei> [--json]
                    archiv mandant konfiguration vergleichen <code> <datei> [--json]
-                   archiv mandant konfiguration einspielen  <code> <datei> --wer <name> --grund <text> [--json]
+                   archiv mandant konfiguration einspielen  <code> <datei> --wer <name> --grund <text> [--bestaetigt <schluessel,…>] [--json]
                    archiv mandant konfiguration ki-freigeben <code> --wer <name> --abnahme <verweis> [--json]""";
     private static final int DATEI_MAX = 1024 * 1024;
     private static final int TECHNISCHER_FEHLER = 3;
@@ -62,7 +64,7 @@ public class KonfigurationKommando {
     }
 
     record Aufruf(Operation operation, MandantCode mandant, Optional<Path> datei, String wer, String grund,
-                  String abnahme, boolean json) {
+                  String abnahme, String bestaetigt, boolean json) {
     }
 
     record FreigabeAusgabe(int version, boolean kiFreigegeben) {
@@ -128,6 +130,7 @@ public class KonfigurationKommando {
         String wer = null;
         String grund = null;
         String abnahme = null;
+        String bestaetigt = null;
         boolean maschinenlesbar = false;
         while (index < argumente.size()) {
             String option = argumente.get(index++);
@@ -177,6 +180,16 @@ public class KonfigurationKommando {
                     }
                     abnahme = wert;
                 }
+                case "--bestaetigt" -> {
+                    if (operation != Operation.EINSPIELEN || index >= argumente.size() || bestaetigt != null) {
+                        return Optional.empty();
+                    }
+                    String wert = argumente.get(index++);
+                    if (wert.isBlank() || wert.startsWith("--") || wert.length() > 1024) {
+                        return Optional.empty();
+                    }
+                    bestaetigt = wert;
+                }
                 default -> {
                     return Optional.empty();
                 }
@@ -188,7 +201,7 @@ public class KonfigurationKommando {
         if (operation == Operation.KI_FREIGEBEN && (wer == null || abnahme == null)) {
             return Optional.empty();
         }
-        return Optional.of(new Aufruf(operation, mandant, datei, wer, grund, abnahme, maschinenlesbar));
+        return Optional.of(new Aufruf(operation, mandant, datei, wer, grund, abnahme, bestaetigt, maschinenlesbar));
     }
 
     public static boolean gueltig(List<String> argumente) {
@@ -215,29 +228,33 @@ public class KonfigurationKommando {
             List<BefundAusgabe> befunde = e instanceof KonfigurationUngueltig ungueltig
                     ? ungueltig.befunde().stream().map(b -> new BefundAusgabe(b.pfad(), b.code(), b.meldung())).toList()
                     : List.of();
+            List<BestaetigungNoetig.Auswirkung> auswirkung = e instanceof BestaetigungNoetig bestaetigung
+                    ? bestaetigung.auswirkung() : List.of();
             befunde.forEach(befund -> fehler.printf("%s: %s: %s%n", befund.pfad(), befund.code(), befund.meldung()));
-            fehlerAlsJson(aufruf, aus, new FehlerAusgabe(e.code().name(), e.getMessage(), befunde));
+            auswirkung.forEach(folge -> fehler.printf("%s: %s%n", folge.schluessel(), folge.text()));
+            fehlerAlsJson(aufruf, aus, new FehlerAusgabe(e.code().name(), e.getMessage(), befunde, auswirkung));
             return 1;
         } catch (DateiFehler e) {
             fehler.println(e.getMessage());
-            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("DATEI", e.getMessage(), List.of()));
+            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("DATEI", e.getMessage(), List.of(), List.of()));
             return TECHNISCHER_FEHLER;
         } catch (IOException e) {
             String meldung = "Datei nicht lesbar oder nicht schreibbar (" + e.getClass().getSimpleName() + ").";
             fehler.println(meldung);
-            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("DATEI", meldung, List.of()));
+            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("DATEI", meldung, List.of(), List.of()));
             return TECHNISCHER_FEHLER;
         } catch (RuntimeException e) {
             LOG.errorf("Konfigurationskommando %s für Mandant %s: technischer Fehler %s", aufruf.operation(),
                     aufruf.mandant().wert(), e.getClass().getName());
             String meldung = "Technischer Fehler (" + e.getClass().getSimpleName() + "); nichts geändert, Details im Log.";
             fehler.println(meldung);
-            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("TECHNISCHER_FEHLER", meldung, List.of()));
+            fehlerAlsJson(aufruf, aus, new FehlerAusgabe("TECHNISCHER_FEHLER", meldung, List.of(), List.of()));
             return TECHNISCHER_FEHLER;
         }
     }
 
-    record FehlerAusgabe(String code, String meldung, List<BefundAusgabe> befunde) {
+    record FehlerAusgabe(String code, String meldung, List<BefundAusgabe> befunde,
+                         List<BestaetigungNoetig.Auswirkung> auswirkung) {
     }
 
     private void fehlerAlsJson(Aufruf aufruf, PrintStream aus, FehlerAusgabe ausgabe) {
@@ -289,7 +306,8 @@ public class KonfigurationKommando {
     private int einspielen(Aufruf aufruf, PrintStream aus) throws IOException {
         String datei = dateiLesen(aufruf.datei().orElseThrow());
         Ergebnis ergebnis = kontext.mit(aufruf.mandant(), () -> verwaltung.einspielen(datei,
-                "betreiber:" + aufruf.wer(), aufruf.grund()));
+                "betreiber:" + aufruf.wer(), aufruf.grund(), aufruf.bestaetigt(),
+                EinstellungsAenderungsPruefung.Ursprung.BETREIBERKOMMANDO));
         if (aufruf.json()) {
             aus.println(json.writeValueAsString(ergebnis));
         } else {
