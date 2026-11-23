@@ -32,7 +32,8 @@ class KonfigurationMigrationTest {
 
     private static final List<String> SCHEMAS = List.of(
             "m_probe_konf037_a", "m_probe_konf037_b", "m_probe_volltext055_a", "m_probe_volltext055_b",
-            "m_probe_wissen121_a", "m_probe_wissen121_b", "m_probe_wissen121_c", "m_probe_wissen121_d");
+            "m_probe_wissen121_a", "m_probe_wissen121_b", "m_probe_wissen121_c", "m_probe_wissen121_d",
+            "m_probe_konf129_a", "m_probe_konf129_b");
     private static final PanacheKonfigurationVersionsRepository LESER =
             new PanacheKonfigurationVersionsRepository(new ObjectMapper());
 
@@ -187,7 +188,7 @@ class KonfigurationMigrationTest {
                 befehl.execute("create schema " + schema);
                 befehl.execute("set search_path to " + schema);
                 alleMigrieren(verbindung, schema);
-                aendern(verbindung, schema, "rollbackCount", 1);
+                aendern(verbindung, schema, "rollbackCount", 2);
                 int protokolleVorher = Integer.parseInt(wert(befehl, "select count(*)::text from zugriff_protokoll "
                         + "where aktion = 'KONFIGURATION_AENDERN' and benutzer = 'system:migration'"));
                 String werte = schema.endsWith("_a")
@@ -243,7 +244,7 @@ class KonfigurationMigrationTest {
                 befehl.execute("create schema " + schema);
                 befehl.execute("set search_path to " + schema);
                 alleMigrieren(verbindung, schema);
-                aendern(verbindung, schema, "rollbackCount", 1);
+                aendern(verbindung, schema, "rollbackCount", 2);
                 if (schema.endsWith("_d")) {
                     befehl.execute("insert into wissens_einstellung (id) values (1)");
                 }
@@ -267,6 +268,95 @@ class KonfigurationMigrationTest {
                 assertThat(wert(befehl, "select count(*)::text from wissens_einstellung_migration")).isEqualTo("0");
             }
         }
+    }
+
+    @Test
+    void bisherigeEinstellungenWerdenMandantengetrenntMigriertUndBeimRollbackErhalten() throws Exception {
+        String schluesselA = "archiv.mandant.probe-konf129-a.chat-aufbewahrung-tage";
+        String schluesselB = "archiv.mandant.probe-konf129-b.chat-aufbewahrung-tage";
+        String chatSchluessel = "archiv.chat.aufbewahrung";
+        String chatVorher = System.getProperty(chatSchluessel);
+        System.setProperty(schluesselA, "19");
+        System.setProperty(schluesselB, "31");
+        try {
+            for (String schema : SCHEMAS.subList(8, 10)) {
+                System.setProperty(chatSchluessel, schema.endsWith("_a") ? "P1Y2D" : "P12M");
+                String code = schema.substring(2).replace('_', '-');
+                try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+                    befehl.execute("create schema " + schema);
+                    befehl.execute("set search_path to " + schema);
+                    alleMigrieren(verbindung, schema);
+                    aendern(verbindung, schema, "rollbackCount", 2);
+                    befehl.execute("insert into public.mandant (code, name, schema_name, bucket, "
+                            + "geschaeftsjahr_ende, aktiv) values ('" + code + "', 'Probe', '" + schema
+                            + "', '" + code + "', '12-31', true)");
+                    if (schema.endsWith("_b")) {
+                        befehl.execute("""
+                                with vorher as (select version, inhalt from konfiguration_version
+                                    order by version desc limit 1), neu as (
+                                    select version + 1 as version,
+                                        jsonb_set(jsonb_set(inhalt, '{version}', to_jsonb(version + 1)),
+                                            '{einstellungen,branding}', '{"name":"Bestand Probe"}'::jsonb) as inhalt
+                                    from vorher)
+                                insert into konfiguration_version (version, wer, quelle, inhalt, sha256)
+                                select version, 'probe', 'APP', inhalt,
+                                    encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex') from neu
+                                """);
+                        befehl.execute("insert into wissens_einstellung (id, budget_tokens) values (1, 123456)");
+                    }
+                    int vorher = Integer.parseInt(wert(befehl, "select max(version)::text from konfiguration_version"));
+                    verbindung.commit();
+                    migrieren(verbindung, schema, 2);
+                    verbindung.commit();
+
+                    assertThat(wert(befehl, "select max(version)::text from konfiguration_version"))
+                            .isEqualTo(Integer.toString(vorher + 2));
+                    assertThat(wert(befehl, "select quelle from konfiguration_version order by version desc limit 1"))
+                            .isEqualTo("MIGRATION");
+                    assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex'))"
+                            + "::text from konfiguration_version order by version desc limit 1")).isEqualTo("true");
+                    var einstellungen = LESER.lesen(wert(befehl, "select inhalt::text from konfiguration_version "
+                            + "order by version desc limit 1")).einstellungen();
+                    assertThat(einstellungen.chat().aufbewahrungMonate())
+                            .isEqualTo(schema.endsWith("_a") ? null : 12);
+                    assertThat(einstellungen.webseitenChat().aufbewahrungTage())
+                            .isEqualTo(schema.endsWith("_a") ? 19 : 31);
+                    assertThat(einstellungen.branding().name())
+                            .isEqualTo(schema.endsWith("_a") ? "Archiv" : "Bestand Probe");
+                    assertThat(einstellungen.wissen().budgetTokens()).isEqualTo(schema.endsWith("_a") ? 600000 : 123456);
+                    assertThat(einstellungen.wissen().monatsbudgetTokens()).isEqualTo(1000000);
+                    assertThat(einstellungen.wissen().lintZeitplan())
+                            .isEqualTo(new Konfiguration.LintZeitplan(java.time.DayOfWeek.SUNDAY, 4));
+                    assertThat(wert(befehl, "select budget_tokens::text from wissens_einstellung where id = 1"))
+                            .isEqualTo(schema.endsWith("_a") ? "600000" : "123456");
+                    assertThat(wert(befehl, "select lint_zeitplan from wissens_einstellung where id = 1"))
+                            .isEqualTo("0 0 4 ? * SUN");
+                    assertThat(wert(befehl, "select details::text from zugriff_protokoll "
+                            + "where benutzer = 'system:migration' order by id desc limit 1"))
+                            .contains("webseitenChat.aufbewahrungTage");
+                    String stand = wert(befehl, "select inhalt::text from konfiguration_version order by version desc limit 1");
+                    aendern(verbindung, schema, "rollbackCount", 1);
+                    verbindung.commit();
+                    assertThat(wert(befehl, "select inhalt::text from konfiguration_version order by version desc limit 1"))
+                            .isEqualTo(stand);
+                }
+            }
+        } finally {
+            System.clearProperty(schluesselA);
+            System.clearProperty(schluesselB);
+            if (chatVorher == null) {
+                System.clearProperty(chatSchluessel);
+            } else {
+                System.setProperty(chatSchluessel, chatVorher);
+            }
+        }
+    }
+
+    @Test
+    void nichtInGanzenKatalogmonatenDarstellbareFristenBleibenGeerbt() {
+        assertThat(EinstellungenBestandMigration.darstellbareMonate(java.time.Period.parse("P1Y"))).isEqualTo(12);
+        assertThat(EinstellungenBestandMigration.darstellbareMonate(java.time.Period.parse("P1M1D"))).isNull();
+        assertThat(EinstellungenBestandMigration.darstellbareMonate(java.time.Period.parse("P6Y"))).isNull();
     }
 
     private static void alleMigrieren(Connection verbindung, String schema) throws Exception {

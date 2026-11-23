@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ki.application.oeffentlich;
 
 import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -34,21 +35,25 @@ public class OeffentlicheFragenAufraeumen {
 
     private final MandantKontext kontext;
     private final OeffentlicheFragenSpeicher speicher;
+    private final MandantEinstellungen einstellungen;
     private final int standardTage;
     private final Map<String, Integer> jeMandant;
 
     @Inject
     public OeffentlicheFragenAufraeumen(MandantKontext kontext, OeffentlicheFragenSpeicher speicher,
+                                        MandantEinstellungen einstellungen,
                                         @ConfigProperty(name = "archiv.webseite.chat.aufbewahrung-tage") String standard,
                                         Config konfiguration) {
-        this(kontext, speicher, standard, konfiguration.getPropertyNames(),
+        this(kontext, speicher, einstellungen, standard, konfiguration.getPropertyNames(),
                 name -> konfiguration.getOptionalValue(name, String.class));
     }
 
-    OeffentlicheFragenAufraeumen(MandantKontext kontext, OeffentlicheFragenSpeicher speicher, String standard,
+    OeffentlicheFragenAufraeumen(MandantKontext kontext, OeffentlicheFragenSpeicher speicher,
+                                 MandantEinstellungen einstellungen, String standard,
                                  Iterable<String> namen, Function<String, Optional<String>> wert) {
         this.kontext = kontext;
         this.speicher = speicher;
+        this.einstellungen = einstellungen;
         this.standardTage = tage("archiv.webseite.chat.aufbewahrung-tage", standard);
         Map<String, Integer> eigene = new HashMap<>();
         for (String name : namen) {
@@ -85,7 +90,14 @@ public class OeffentlicheFragenAufraeumen {
 
     /** Anzahl der gelöschten Fragen des Mandanten. */
     public int aufraeumen(MandantCode mandant, Instant jetzt) {
-        Instant grenze = grenze(mandant, jetzt);
-        return kontext.mit(mandant, () -> speicher.loeschenVor(grenze));
+        return kontext.mit(mandant, () -> {
+            Integer eigeneTage = einstellungen.aufbewahrung().webseitenChatTage();
+            if (eigeneTage != null && (eigeneTage < MIN || eigeneTage > MAX)) {
+                throw new IllegalStateException("Ungültige Webseiten-Chat-Aufbewahrung in der Mandantenkonfiguration");
+            }
+            Instant grenze = eigeneTage == null ? grenze(mandant, jetzt)
+                    : jetzt.atOffset(ZoneOffset.UTC).minusDays(eigeneTage).toInstant();
+            return speicher.loeschenVor(grenze);
+        });
     }
 }
