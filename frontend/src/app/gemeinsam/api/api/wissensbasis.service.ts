@@ -290,19 +290,35 @@ export class WissensbasisService extends BaseService {
      * Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.
      * @endpoint put /api/v1/wissensbasis/einstellungen
      * @param wissenEinstellungen 
+     * @param bestaetigt Bestätigte riskante Einstellungen
+     * @param ifMatch Version der Konfiguration
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1WissensbasisEinstellungenPut(wissenEinstellungen: WissenEinstellungen, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<WissenEinstellungen>;
-    public apiV1WissensbasisEinstellungenPut(wissenEinstellungen: WissenEinstellungen, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<WissenEinstellungen>>;
-    public apiV1WissensbasisEinstellungenPut(wissenEinstellungen: WissenEinstellungen, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<WissenEinstellungen>>;
-    public apiV1WissensbasisEinstellungenPut(wissenEinstellungen: WissenEinstellungen, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1WissensbasisEinstellungenPut(wissenEinstellungen: WissenEinstellungen, bestaetigt?: string, ifMatch?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<WissenEinstellungen>;
+    public apiV1WissensbasisEinstellungenPut(wissenEinstellungen: WissenEinstellungen, bestaetigt?: string, ifMatch?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<WissenEinstellungen>>;
+    public apiV1WissensbasisEinstellungenPut(wissenEinstellungen: WissenEinstellungen, bestaetigt?: string, ifMatch?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<WissenEinstellungen>>;
+    public apiV1WissensbasisEinstellungenPut(wissenEinstellungen: WissenEinstellungen, bestaetigt?: string, ifMatch?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (wissenEinstellungen === null || wissenEinstellungen === undefined) {
             throw new Error('Required parameter wissenEinstellungen was null or undefined when calling apiV1WissensbasisEinstellungenPut.');
         }
 
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'bestaetigt',
+            <any>bestaetigt,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
         let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
 
         // authentication (SecurityScheme) required
         localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
@@ -345,6 +361,7 @@ export class WissensbasisService extends BaseService {
             {
                 context: localVarHttpContext,
                 body: wissenEinstellungen,
+                params: localVarQueryParameters.toHttpParams(),
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,
