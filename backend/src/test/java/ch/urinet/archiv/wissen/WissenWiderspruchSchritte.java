@@ -43,8 +43,9 @@ public class WissenWiderspruchSchritte {
     public void basis() throws Exception {
         for (String jahr : List.of("2000", "2026", "2005")) {
             UUID id = Testdokumente.anlegen(datenbank.get(),
-                    new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+                    new Testdokumente.Angaben("urinet", "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, "ARCHIVIERT"));
             dokumente.add(id);
+            Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "urinet", id);
             try (Connection c = datenbank.get().getConnection()) {
                 sql(c, "update m_urinet.dokument set seiten = 1, volltext = 'Synthetische Quelle' || chr(12), "
                                 + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false, "

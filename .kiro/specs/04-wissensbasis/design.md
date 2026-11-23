@@ -1450,7 +1450,19 @@ Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und 
   der Wissen-Seite.
 - **Bedrohungsmodell:** Markieren löst KI-Kosten aus (Tokenbudget, Requirement 12 bleibt: höchstens ein Ingest je Mandant); nur A16;
   Protokoll ohne Titel; kein Weg, die Vertraulichkeit einer Quelle zu umgehen (`PERSONAL` und höhere Stufen nach 5.5 und 5.11).
-- `[offen: Marker für das Kennzeichen «Wissensquelle» im Export (OKF) und im Jahresexport: Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6); Auswirkung auf den OKF-Export der Quelleneinträge prüft Aufgabe 17.1]`
+- **Exporte:** Die Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6). Im OKF-Export kennzeichnet
+  `sources[].wissensquelle` weiterhin die Hauptquelle einer Quelle-Seite, nicht den aktuellen Markierungszustand des
+  Dokuments. Auch nach dem Entfernen der Markierung bleiben die bestehenden Seiten und ihre Quellen im Export erhalten.
+  Beim erneuten Import muss die Dokumentquelle dagegen aktiv markiert sein; andernfalls ergibt die Quellenauflösung
+  `QUELLE_UNBEKANNT` (Requirement 20.9).
+
+### Umsetzung (Aufgabe 17.1, 23.11.2026)
+Das Rollback des Changesets stellt die Dokumentart mit den Werten aus Changeset 044 wieder her, einschliesslich der
+Zusatzfelder für `vhf-gsk`. Es setzt nur Dokumente mit aktiver Markierung zurück auf `WISSENSQUELLE`; unmarkierte
+`PROJEKTDOKUMENT` bleiben unverändert. Die aktive Konfigurationsversion erhält die Dokumentart ebenfalls als neue,
+append-only Version. Die Markierungstabelle und ihre Historie bleiben bestehen. Vor jeder Artänderung wird der
+aktuelle Dokumentstand append-only gesichert. `ON CONFLICT DO NOTHING` und die Artbedingung machen ein wiederholtes
+Rollback wirkungsgleich; das Vorwärts-Changeset ergänzt keine bereits aktive Markierung.
 
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):

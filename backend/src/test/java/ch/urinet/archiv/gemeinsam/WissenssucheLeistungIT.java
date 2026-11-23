@@ -117,9 +117,11 @@ class WissenssucheLeistungIT {
         }
         provisionierung.anlegen("urinet", null, null);
         UUID normal = Testdokumente.anlegen(datenbank.get(),
-                new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+                new Testdokumente.Angaben("urinet", "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, "ARCHIVIERT"));
         UUID intern = Testdokumente.anlegen(datenbank.get(),
-                new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "INTERN", true, "probe", null, "ARCHIVIERT"));
+                new Testdokumente.Angaben("urinet", "PROJEKTDOKUMENT", "INTERN", true, "probe", null, "ARCHIVIERT"));
+        Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "urinet", normal);
+        Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "urinet", intern);
         Set<String> interneSeiten = anlegen(normal, intern);
         try (Connection c = datenbank.get().getConnection(); Statement s = c.createStatement();
              var zeilen = s.executeQuery("select count(*) from m_urinet.wissensseite")) {

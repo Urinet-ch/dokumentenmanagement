@@ -76,7 +76,7 @@ class JdbcWissenLintTest {
             entityManager.get().createNativeQuery("""
                     insert into dokument (id, art, titel, quelle, vertraulichkeit, erstellt_von, status,
                                           bestaetigt, bestaetigt_von, seiten)
-                    values (:id, 'WISSENSQUELLE', 'Probe', 'UPLOAD', 'NORMAL', 'probe', 'ARCHIVIERT',
+                    values (:id, 'PROJEKTDOKUMENT', 'Probe', 'UPLOAD', 'NORMAL', 'probe', 'ARCHIVIERT',
                             now(), 'probe', 1)
                     """).setParameter("id", dokument).executeUpdate();
             entityManager.get().createNativeQuery("""

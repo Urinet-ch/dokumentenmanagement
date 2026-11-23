@@ -10,17 +10,15 @@ import java.util.UUID;
 @ApplicationScoped
 @Transactional(Transactional.TxType.MANDATORY)
 public class WissenDokumentEreignisse implements DokumentEreignisse {
-    private final WissenIngestStarten ingest;
     private final QuelldokumentBeobachter beobachter;
 
-    public WissenDokumentEreignisse(WissenIngestStarten ingest, QuelldokumentBeobachter beobachter) {
-        this.ingest = ingest;
+    public WissenDokumentEreignisse(QuelldokumentBeobachter beobachter) {
         this.beobachter = beobachter;
     }
 
     @Override
     public void archiviert(UUID dokumentId, String art) {
-        ingest.archiviert(dokumentId, art);
+        // Der Ingest beginnt erst mit der ausdrücklichen Markierung des archivierten Dokuments.
     }
 
     @Override

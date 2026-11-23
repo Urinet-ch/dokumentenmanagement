@@ -6,7 +6,6 @@ import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.BenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.StepUp;
-import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -19,7 +18,6 @@ import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
 import ch.urinet.archiv.mandant.application.KonfigurationSeed;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantAbbau;
-import ch.urinet.archiv.mandant.application.WissensquelleSeed;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
@@ -73,8 +71,6 @@ public class BenutzerVerwaltungSchritte {
     @Inject MandantAbbau abbau;
     @Inject KonfigurationSeed seed;
     @Inject KonfigurationsdateiCodec codec;
-    @Inject WissensquelleSeed wissensquelle;
-    @Inject ZusatzSchemaPruefer zusatzSchema;
     @Inject IdentitaetsDienst identitaet;
     @Inject BenutzerMitteilung mitteilung;
     @Inject StepUp stepUp;
@@ -117,8 +113,7 @@ public class BenutzerVerwaltungSchritte {
                     if (!zeile.next()) {
                         if (code.equals(MANDANT)) {
                             KonfigurationSeed original = ClientProxy.unwrap(seed);
-                            QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec, wissensquelle,
-                                    zusatzSchema) {
+                            QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec) {
                                 @Override
                                 public Konfiguration lesen(MandantCode ignoriert) {
                                     return original.lesen(new MandantCode("urinet"));
@@ -746,7 +741,7 @@ public class BenutzerVerwaltungSchritte {
     public void nameAusAbgebautemMandanten() throws SQLException {
         String quelle = "b19-" + UUID.randomUUID().toString().substring(0, 8);
         KonfigurationSeed original = ClientProxy.unwrap(seed);
-        QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec, wissensquelle, zusatzSchema) {
+        QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec) {
             @Override
             public Konfiguration lesen(MandantCode ignoriert) {
                 return original.lesen(new MandantCode("urinet"));
