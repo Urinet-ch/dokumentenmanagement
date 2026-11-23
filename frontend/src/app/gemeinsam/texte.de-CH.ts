@@ -1953,4 +1953,9 @@ export const TEXTE = {
     abbrechen: 'Abbrechen',
     bestaetigen: 'Rollenänderung bestätigen',
   },
+  benutzerRollenaktion: {
+    oeffnen: 'Rolle ändern',
+    unvollstaendig: 'Die Rechte für den Vergleich konnten nicht vollständig geladen werden. Bitte laden Sie die Seite neu.',
+    laeuft: 'Die Rollenänderung wird ausgeführt …',
+  },
 } as const;

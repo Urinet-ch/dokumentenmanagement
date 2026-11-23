@@ -69,12 +69,13 @@ export class BenutzerStatusaktionen {
   protected oeffnen(aktion: BenutzerStatusAktion): void {
     const { id, benutzername } = this.person();
     if (this.laufend() || !id || !benutzername || !this.aktionen().includes(aktion)) return;
+    const akteurId = this.akteurId();
     this.fehler.set(null);
     this.laufend.set(true);
     this.geoeffnet = this.dialog.open(BenutzerStatusdialog, { data: { aktion, benutzername } });
     this.geoeffnet.afterClosed().pipe(takeUntilDestroyed(this.zerstoert)).subscribe((ergebnis) => {
       this.geoeffnet = undefined;
-      if (!ergebnis || this.person().id !== id || this.person().benutzername !== benutzername
+      if (!ergebnis || this.akteurId() !== akteurId || this.person().id !== id || this.person().benutzername !== benutzername
           || !this.aktionen().includes(aktion)) {
         this.laufend.set(false);
         return;
