@@ -2,7 +2,11 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../../../.." && pwd)
-temp=$(mktemp -d /tmp/urinet-19.3.XXXXXX)
+# Das Arbeitsverzeichnis wird in den kcadm-Container eingehängt: Es muss für Docker erreichbar sein (unter macOS mit
+# Colima gilt das für das Home-Verzeichnis, nicht für /tmp); überschreibbar mit URINET_TEST_TMP.
+basis=${URINET_TEST_TMP:-${TMPDIR:-/tmp}}
+mkdir -p -- "$basis"
+temp=$(mktemp -d "${basis%/}/urinet-19.3.XXXXXX")
 server="urinet-19-3-server-$$"
 client="urinet-19-3-client-$$"
 image=${KEYCLOAK_TEST_IMAGE:-quay.io/keycloak/keycloak:26.8.2}
