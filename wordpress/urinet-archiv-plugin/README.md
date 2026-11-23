@@ -19,6 +19,26 @@ Das Speichern benötigt JavaScript und sendet ein JSON mit festem Feldschema an
 sendet Dateien bis 50 MiB an `wp-admin/admin.php?page=urinet-archiv-erfassung`; sie werden nicht
 in der Mediathek abgelegt.
 
+## Einbindung in Seiten
+
+Die Shortcodes `[urinet_archiv_liste]`, `[urinet_archiv_suche]` und
+`[urinet_chatbot]` liefern Liste, Suche und den Chatbot. Die gleichen Funktionen
+stehen als dynamische Gutenberg-Blöcke `urinet-archiv/liste`,
+`urinet-archiv/suche` und `urinet-archiv/chatbot` zur Verfügung. Dokumente
+verwenden die interne Seite `/urinet-archiv/dokument/{id}`; Dateien laufen über
+die serverseitige Route `/urinet-archiv-datei/{id}` und werden nie in der
+WordPress-Mediathek gespeichert. Alte Pfade können über
+`/urinet-archiv-umleitung?url=...` mit einer 301-Umleitung aufgelöst werden.
+Die Liste lädt ihre Reihen und öffentlich filterbaren Klassifikationen über
+`/public/v1/filter`. Besucher können nach Reihe, Jahr, Ausgabe und den
+freigegebenen Klassifikationen filtern, die Seitengrösse wählen und durch die
+Ergebnisse blättern; pro Seite sind höchstens 100 Einträge möglich.
+
+Der Chat wird über `/wp-json/urinet-archiv/v1/chat` als Server-Sent Events
+weitergereicht. Der Schlüssel bleibt dabei auf dem Server. Die Seite muss
+`wp_enqueue_scripts` ausführen; das Plugin lädt `assets/chatbot.js` auf Seiten
+mit dem Chatbot-Shortcode oder -Block.
+
 ## Pflicht vor dem Einsatz: Empfang begrenzen
 
 PHP liest formkodierte Anfragen bereits vor WordPress und seinen Hooks ein. Die Begrenzung des
