@@ -36,7 +36,6 @@ import java.util.Set;
 @Transactional
 public class KonfigurationsdateiVerwaltung {
 
-    private static final String WISSENSQUELLE = "WISSENSQUELLE";
     private final KonfigurationsdateiCodec codec;
     private final KonfigurationVerwaltung konfiguration;
     private final DokumentartRepository dokumentarten;
@@ -276,9 +275,8 @@ public class KonfigurationsdateiVerwaltung {
         datei.arten().forEach(art -> arten.put(art.code(), art));
         Set<String> erhalteneArten = new HashSet<>();
         for (Art alt : aktuell.arten()) {
-            if (!arten.containsKey(alt.code())
-                    && (WISSENSQUELLE.equals(alt.code()) || dokumentZaehler.anzahl(alt.code()) > 0)) {
-                arten.put(alt.code(), WISSENSQUELLE.equals(alt.code()) ? alt : mitAktivitaet(alt, false));
+            if (!arten.containsKey(alt.code()) && dokumentZaehler.anzahl(alt.code()) > 0) {
+                arten.put(alt.code(), mitAktivitaet(alt, false));
                 erhalteneArten.add(alt.code());
             }
         }

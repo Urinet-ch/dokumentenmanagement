@@ -266,7 +266,7 @@ class WissenLintAblaufTest {
         em.createNativeQuery("""
                 insert into dokument (id, art, titel, quelle, vertraulichkeit, erstellt_von, status,
                                       bestaetigt, bestaetigt_von, seiten, volltext)
-                values (:id, 'WISSENSQUELLE', 'Synthetische Quelle', 'UPLOAD', :stufe, 'probe',
+                values (:id, 'PROJEKTDOKUMENT', 'Synthetische Quelle', 'UPLOAD', :stufe, 'probe',
                         'ARCHIVIERT', now(), 'probe', 1, 'Synthetischer Volltext')
                 """).setParameter("id", id).setParameter("stufe", vertraulichkeit).executeUpdate();
         return id;

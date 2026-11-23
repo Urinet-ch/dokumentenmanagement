@@ -1,6 +1,5 @@
 package ch.urinet.archiv.mandant;
 
-import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadWissensquelleSeed;
 import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantFehler;
 import ch.urinet.archiv.mandant.application.MandantVerzeichnis;
@@ -111,13 +110,13 @@ public class MandantSchritte {
         assertThat(fehler).as("Fortsetzen ohne Fehler erwartet").isNull();
     }
 
-    /** Version 1 ({@code MIGRATION}) legt schon die Schema-Migration an; {@code WISSENSQUELLE} darf vorhanden sein. */
+    /** Version 1 ({@code MIGRATION}) legt schon die Schema-Migration an. */
     @Dann("steht «{word}» inaktiv im Register, und das Schema «{word}» hat keine Konfigurationsversion mit Quelle «{word}» und keine Art aus dem Seed")
     public void inaktivOhneVersion(String code, String schema, String quelle) throws SQLException {
         assertThat(werte("select aktiv::text from public.mandant where code = ?", code)).containsExactly("false");
         assertThat(werte("select version::text from " + schema + ".konfiguration_version where quelle = ?", quelle))
                 .isEmpty();
-        assertThat(werte("select code from " + schema + ".dokumentart")).isSubsetOf("WISSENSQUELLE");
+        assertThat(werte("select code from " + schema + ".dokumentart")).isEmpty();
     }
 
     @Und("der Mandant «{word}» ist für das Archiv nicht auflösbar")
@@ -209,10 +208,6 @@ public class MandantSchritte {
             json.readTree(inhalt).path("arten").forEach(a -> erwartet.add(a.path("code").asText()));
         }
         assertThat(erwartet).hasSize(11);
-        String wissensquelle = new KlassenpfadWissensquelleSeed(json).lesen().code();
-        if (!erwartet.contains(wissensquelle)) {
-            erwartet.add(wissensquelle);
-        }
         assertThat(werte("select code from " + schema + ".dokumentart")).containsExactlyInAnyOrderElementsOf(erwartet);
         assertThat(werte("select vertraulichkeit || '/' || gesetzliche_pflicht from " + schema
                 + ".dokumentart where code = 'PROJEKTDOKUMENT'")).containsExactly("NORMAL/false");
@@ -235,7 +230,6 @@ public class MandantSchritte {
             json.readTree(inhalt).path("arten").forEach(a -> erwartet.add(a.path("code").asText()));
         }
         assertThat(erwartet).isNotEmpty();
-        erwartet.add(new KlassenpfadWissensquelleSeed(json).lesen().code());
         List<String> imAbbild = new ArrayList<>();
         seedAbbild.path("arten").forEach(a -> imAbbild.add(a.path("code").asText()));
         assertThat(imAbbild).containsExactlyInAnyOrderElementsOf(erwartet);

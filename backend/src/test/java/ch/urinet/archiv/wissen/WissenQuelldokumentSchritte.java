@@ -48,7 +48,8 @@ public class WissenQuelldokumentSchritte {
     @Angenommen("eine normale Wissensseite verweist auf ein Quelldokument im Status «{word}»")
     public void quelleMitStatus(String status) throws Exception {
         dokument = Testdokumente.anlegen(datenbank.get(),
-                new Testdokumente.Angaben("urinet", "WISSENSQUELLE", "NORMAL", true, "probe", null, status));
+                new Testdokumente.Angaben("urinet", "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, status));
+        Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "urinet", dokument);
         seite = UUID.randomUUID();
         try (Connection verbindung = datenbank.get().getConnection()) {
             ausfuehren(verbindung, """
