@@ -4,7 +4,8 @@ Die folgenden Teile beschreiben die Seiten der Verwaltung, die Ihre Rolle nutzen
 
 Unter «Einstellungen» sehen Sie die Einstellungen Ihres Mandanten nach Gruppen. Zu jedem Eintrag zeigt die Seite den
 aktuellen Wert, den Standard sowie vorhandene Grenzen und Hinweise zur Wirksamkeit. Änderungen sind auf dieser Seite
-noch nicht möglich.
+noch nicht möglich. Unter «Verlauf der Einstellungen» vergleichen Sie zwei Versionen; Kennungen werden dabei ohne Werte
+angezeigt.
 
 Unter «Benutzer» sehen Sie die Benutzer Ihres Mandanten als Karten. Über die Suche finden Sie einen Benutzer nach
 Name, Benutzername oder E-Mail; mit «Nächste Seite» und «Vorherige Seite» wechseln Sie die Ergebnisse. Öffnen Sie

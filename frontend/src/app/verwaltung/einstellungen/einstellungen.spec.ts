@@ -1,4 +1,5 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -12,7 +13,8 @@ describe('Einstellungskatalog', () => {
   function starten() {
     TestBed.configureTestingModule({
       imports: [EinstellungenSeite],
-      providers: [provideRouter([]), { provide: EinstellungenService, useValue: service }],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: EinstellungenService, useValue: service }],
     });
     const fixture = TestBed.createComponent(EinstellungenSeite);
     fixture.detectChanges();
@@ -56,7 +58,8 @@ describe('Einstellungskatalog', () => {
     service.apiV1MandantEinstellungenGet.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
     TestBed.configureTestingModule({
       imports: [EinstellungenSeite],
-      providers: [provideRouter([]), { provide: EinstellungenService, useValue: service }],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: EinstellungenService, useValue: service }],
     });
     const navigieren = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     const fixture = TestBed.createComponent(EinstellungenSeite);

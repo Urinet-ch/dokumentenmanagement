@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { EinstellungskatalogEintrag, EinstellungenService } from '../../gemeinsam/api';
 import { httpFehlerMeldung } from '../../gemeinsam/http-fehler';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { EinstellungenVerlauf } from './einstellungen-verlauf';
 
 interface Einstellungsgruppe {
   code: string;
@@ -14,7 +15,7 @@ interface Einstellungsgruppe {
 
 @Component({
   selector: 'app-einstellungen',
-  imports: [MatButtonModule],
+  imports: [MatButtonModule, EinstellungenVerlauf],
   templateUrl: './einstellungen.html',
   styleUrl: './einstellungen.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
