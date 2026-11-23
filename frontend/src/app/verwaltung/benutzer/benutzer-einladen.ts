@@ -1,15 +1,16 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { benutzerAktionsfehler } from './benutzer-aktionsfehler';
+import {
+  BenutzerFeld, BenutzerFeldfehler, benutzerFeldbefunde, benutzernameGueltig, emailGueltig, nameGueltig,
+} from './benutzer-formregeln';
 
-type Feld = 'benutzername' | 'email' | 'vorname' | 'nachname' | 'rolle';
+type Feld = BenutzerFeld;
 type Eingabe = Record<Feld, string>;
-type Feldfehler = Partial<Record<Feld, string>>;
-const FELDER: readonly Feld[] = ['benutzername', 'email', 'vorname', 'nachname', 'rolle'];
+type Feldfehler = BenutzerFeldfehler;
 
 @Component({
   selector: 'app-benutzer-einladen',
@@ -97,7 +98,7 @@ export class BenutzerEinladen {
       },
       error: (fehler: unknown) => {
         this.laufend.set(false);
-        const felder = serverBefunde(fehler);
+        const felder = benutzerFeldbefunde(fehler);
         this.feldfehler.set(felder);
         this.fehler.set(benutzerAktionsfehler(fehler));
       },
@@ -108,29 +109,10 @@ export class BenutzerEinladen {
 function pruefen(eingabe: Eingabe, rollen: readonly VerwaltungRolle[]): Feldfehler {
   const fehler: Feldfehler = {};
   const texte = TEXTE.benutzerEinladen.ungueltig;
-  const gueltigeLaenge = (wert: string, maximum: number) => {
-    const zeichen = Array.from(wert);
-    return zeichen.length > 0 && zeichen.length <= maximum
-      && !zeichen.some((zeichen) => /[\u0000-\u001f\u007f-\u009f]/.test(zeichen));
-  };
-  if (!/^[a-z0-9._-]{3,40}$/.test(eingabe.benutzername)) fehler.benutzername = texte.benutzername;
-  if (!gueltigeLaenge(eingabe.email, 254) || eingabe.email.indexOf('@') < 0
-      || eingabe.email.indexOf('@') !== eingabe.email.lastIndexOf('@')) fehler.email = texte.email;
-  if (!gueltigeLaenge(eingabe.vorname, 60)) fehler.vorname = texte.vorname;
-  if (!gueltigeLaenge(eingabe.nachname, 60)) fehler.nachname = texte.nachname;
+  if (!benutzernameGueltig(eingabe.benutzername)) fehler.benutzername = texte.benutzername;
+  if (!emailGueltig(eingabe.email)) fehler.email = texte.email;
+  if (!nameGueltig(eingabe.vorname)) fehler.vorname = texte.vorname;
+  if (!nameGueltig(eingabe.nachname)) fehler.nachname = texte.nachname;
   if (!rollen.some((rolle) => rolle.code === eingabe.rolle)) fehler.rolle = texte.rolle;
   return fehler;
-}
-
-function serverBefunde(fehler: unknown): Feldfehler {
-  const ergebnis: Feldfehler = {};
-  if (!(fehler instanceof HttpErrorResponse) || fehler.status !== 422
-      || !Array.isArray(fehler.error?.befunde)) return ergebnis;
-  for (const befund of fehler.error.befunde as unknown[]) {
-    if (!befund || typeof befund !== 'object' || !('pfad' in befund) || !('meldung' in befund)
-        || typeof befund.pfad !== 'string' || typeof befund.meldung !== 'string') continue;
-    const feld = FELDER.find((eintrag) => eintrag === befund.pfad);
-    if (feld) ergebnis[feld] = befund.meldung;
-  }
-  return ergebnis;
 }

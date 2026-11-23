@@ -1979,4 +1979,13 @@ export const TEXTE = {
       rolle: 'Bitte eine verfügbare Rolle auswählen.',
     },
   },
+  benutzerProfil: {
+    titel: 'Benutzerangaben ändern',
+    hinweis: 'Bei einer neuen E-Mail-Adresse erhält die Person eine Bestätigung an die neue Adresse; die bisherige Adresse wird benachrichtigt.',
+    speichern: 'Änderungen speichern',
+    laden: 'Aktuellen Stand laden',
+    laeuft: 'Die Änderungen werden gespeichert …',
+    unvollstaendig: 'Die Benutzerangaben konnten nicht vollständig geladen werden. Bitte laden Sie die Seite neu.',
+    keineAenderung: 'Bitte ändern Sie mindestens eine Angabe.',
+  },
 } as const;
