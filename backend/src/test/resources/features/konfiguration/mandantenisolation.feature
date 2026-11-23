@@ -8,11 +8,11 @@ Funktionalität: Isolation der Mandantenkonfiguration
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Dann enthält der Export die Art «AUSGANGSRECHNUNG»
     Und enthält der Export die Art «PROBE_VHF_BULLETIN» nicht
-    Und enthält der Export die Art «WISSENSQUELLE»
+    Und enthält der Export die Art «WISSENSQUELLE» nicht
     Wenn «inhaber-vhf-gsk» die Konfigurationsdatei exportiert
     Dann enthält der Export die Art «PROBE_VHF_BULLETIN»
     Und enthält der Export die Art «AUSGANGSRECHNUNG» nicht
-    Und enthält der Export die Art «WISSENSQUELLE»
+    Und enthält der Export die Art «WISSENSQUELLE» nicht
 
   @req-9.4
   Szenario: Der Probeverband erfasst und archiviert eine Sitzungsunterlage
