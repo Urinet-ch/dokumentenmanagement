@@ -1448,6 +1448,11 @@ Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und 
   (Spec 05: Folgeänderung zu Requirement 1.6 von Spec 05). Spike 22.11.2026 (Zweitreview Mac 2, Prüfung der Changesets, nicht des Produktivbestands): Fremdschlüssel auf `dokumentart.code` bestehen in `dokument.art`, `belegnummer_eigen.art`, `dokumentart.fremdbeleg_art`, `dokumentart.ohne_zahlungsdaten_art`, `dokumentart_klassifikation.art` (**`ON DELETE CASCADE`**: vor dem Löschen ausdrücklich prüfen, damit die Migration bei einem bleibenden Verweis abbricht, statt Zuordnungen still zu entfernen) und `regel.art` (`ON DELETE RESTRICT`). `dokument_version` hat keinen Art-Fremdschlüssel; die historische Art steht im JSON-Feld `daten`. `konfiguration_version.inhalt` ist JSON; `dokument` und `dokument_version` verweisen auf Konfigurationsversionen. Beide Versionstabellen sind append-only: Historische Abbilder bleiben, für die aktive Konfiguration entsteht eine neue Version. Aufgabe 17.1 setzt das um.
 - **Oberfläche:** Knopf in der Dokumentansicht (Spec 07: Anleitung `wissen.md` und `dokument.md` nachziehen), Liste «Wissensquellen» in
   der Wissen-Seite.
+- **Umsetzung (Aufgabe 17.2, 23.11.2026):** Die Dokumentansicht und die Liste verwenden `GET /wissen/quellen` für Kennzeichen,
+  Markierungszeitpunkt und letzten Ingest-Status; Markieren und Entfernen verwenden die bestehenden Dokument-Endpunkte. A16 wird
+  zusätzlich im Frontend-Rechtemodell abgebildet. Die Liste zeigt Statuswerte als Text und lässt den Tabellenrahmen auf schmalen
+  Bildschirmen selbst scrollen. Die Beschriftung «Als Wissensquelle markieren» folgt dem Umsetzungsauftrag; Requirements bleiben
+  unverändert. Die Hilfe enthält einen A16-Unterabschnitt; die Oberfläche ändert weder Dokumentart noch Dateien.
 - **Bedrohungsmodell:** Markieren löst KI-Kosten aus (Tokenbudget, Requirement 12 bleibt: höchstens ein Ingest je Mandant); nur A16;
   Protokoll ohne Titel; kein Weg, die Vertraulichkeit einer Quelle zu umgehen (`PERSONAL` und höhere Stufen nach 5.5 und 5.11).
 - **Exporte:** Die Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6). Im OKF-Export kennzeichnet
