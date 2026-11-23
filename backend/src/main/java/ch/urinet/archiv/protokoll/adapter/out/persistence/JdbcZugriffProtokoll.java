@@ -84,6 +84,7 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
                 + "values (?, ?, ?, ?, cast(? as inet), cast(? as jsonb), ?)";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
+            VerwaltungsHaeufungen.Stand vorher = VerwaltungsHaeufungen.vorEintrag(verbindung, schema, eintraege);
             for (ZugriffEintrag eintrag : eintraege) {
                 einfuegen.setString(1, eintrag.benutzer().orElse(null));
                 einfuegen.setString(2, eintrag.rolle().orElse(null));
@@ -95,8 +96,35 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
                 einfuegen.addBatch();
             }
             einfuegen.executeBatch();
+            VerwaltungsHaeufungen.nachEintrag(verbindung, schema, vorher);
+            inhabervergaben(verbindung, schema, eintraege);
         } catch (SQLException e) {
             throw new IllegalStateException("Zugriffsprotokoll nicht geschrieben", e);
+        }
+    }
+
+    private static void inhabervergaben(Connection verbindung, String schema, List<ZugriffEintrag> eintraege)
+            throws SQLException {
+        String sql = "insert into " + schema + ".alarm (schluessel) select ? "
+                + "where ? or exists (select 1 from " + schema + ".benutzer_verzeichnis "
+                + "where benutzer = ? and anlass = 'ANLAGE' and rolle = 'INHABER') "
+                + "on conflict (schluessel) do nothing";
+        try (PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
+            for (ZugriffEintrag eintrag : eintraege) {
+                ProtokollDetails.Verwaltung details = eintrag.details().verwaltung();
+                if (details == null || details.phase() != ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN
+                        || details.rolleNeu() != ProtokollDetails.Verwaltungsrolle.INHABER
+                        || eintrag.aktion() != ProtokollAktion.ROLLE_ZUWEISEN
+                        && eintrag.aktion() != ProtokollAktion.BENUTZER_ANLEGEN) {
+                    continue;
+                }
+                UUID ziel = Objects.requireNonNull(details.ziel(), "Ziel der Inhabervergabe fehlt");
+                einfuegen.setString(1, "verwaltungsalarm:" + details.vorgangId() + ":INHABER_VERGEBEN");
+                einfuegen.setBoolean(2, eintrag.aktion() == ProtokollAktion.ROLLE_ZUWEISEN);
+                einfuegen.setString(3, ziel.toString());
+                einfuegen.addBatch();
+            }
+            einfuegen.executeBatch();
         }
     }
 
@@ -139,6 +167,9 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             }
             if (verwaltung.grund() != null) {
                 knoten.put("grund", verwaltung.grund().name());
+            }
+            if (verwaltung.abweichung() != null) {
+                knoten.put("abweichung", verwaltung.abweichung().name());
             }
             if (!verwaltung.felder().isEmpty()) {
                 ObjectNode felder = knoten.putObject("felder");

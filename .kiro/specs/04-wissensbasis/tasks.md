@@ -218,8 +218,8 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
     tolerieren die fehlende Art; Szenarien `@req-20.1` bis `@req-20.9`, Isolation und Negativfälle.
   - _Anforderungen: 20.1–20.9_
   - _Abhängig von: 15.x (Ingest und Entwürfe auf main)_
-- [ ] 17.2 Oberfläche Knopf und Liste «Wissensquellen» [Frontend]
-  - Knopf «Als Wissensquelle verwenden»/«Wissensquelle entfernen» in der Dokumentansicht (Recht A16, Grund bei Ablehnung), Kennzeichen am
+- [x] 17.2 Oberfläche Knopf und Liste «Wissensquellen» [Frontend]
+  - Knopf «Als Wissensquelle markieren»/«Wissensquelle entfernen» in der Dokumentansicht (Recht A16, Grund bei Ablehnung), Kennzeichen am
     Dokument, Liste «Wissensquellen» auf der Seite Wissen; Anleitung (`wissen.md`, `dokument.md`) und Hilfe-Katalog nachziehen
     (Pflegeregel); Browser-Szenario, axe und `npm run pruefe:gestaltung`.
   - _Anforderungen: 20.1, 20.3, 20.10_
