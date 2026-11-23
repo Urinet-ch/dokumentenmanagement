@@ -74,6 +74,9 @@ public class AgentSchritte {
     private boolean benutzt;
     private List<ChatAntwort> folge = List.of();
     private String gespraech;
+    private int status;
+    private JsonNode antwortKoerper;
+    private String vorherigesGespraech;
 
     @Before
     public void vorbereiten() {
@@ -85,7 +88,7 @@ public class AgentSchritte {
         if (benutzt) {
             for (String mandant : MANDANTEN) {
                 ausfuehren("delete from " + schema(mandant) + ".chat_gespraech");
-                ausfuehren("delete from " + schema(mandant) + ".ki_verbrauch where zweck = 'CHAT'");
+                ausfuehren("delete from " + schema(mandant) + ".ki_verbrauch where zweck in ('CHAT', 'WISSEN_CHAT')");
             }
         }
         KiWireMock.zuruecksetzen();
@@ -197,17 +200,25 @@ public class AgentSchritte {
 
     private List<Ereignis> lesen(String benutzer, String frage, String gespraechId,
                                  java.util.function.Predicate<Ereignis> weiter) throws Exception {
-        benutzt = true;
         Map<String, Object> koerper = new LinkedHashMap<>();
         koerper.put("frage", frage);
         if (gespraechId != null) {
             koerper.put("gespraechId", gespraechId);
         }
+        return lesenKoerper(benutzer, JSON.writeValueAsString(koerper), weiter);
+    }
+
+    private List<Ereignis> lesenKoerper(String benutzer, String koerper) throws Exception {
+        return lesenKoerper(benutzer, koerper, e -> true);
+    }
+
+    private List<Ereignis> lesenKoerper(String benutzer, String koerper, java.util.function.Predicate<Ereignis> weiter)
+            throws Exception {
+        benutzt = true;
         HttpRequest anfrage = HttpRequest.newBuilder(URI.create("http://localhost:" + RestAssured.port + "/api/v1/chat"))
                 .header("Authorization", "Bearer " + Testanmeldung.token(benutzer))
                 .header("Content-Type", "application/json").header("Accept", "text/event-stream")
-                .timeout(GEDULD).POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(koerper),
-                        StandardCharsets.UTF_8)).build();
+                .timeout(GEDULD).POST(HttpRequest.BodyPublishers.ofString(koerper, StandardCharsets.UTF_8)).build();
         HttpResponse<java.io.InputStream> r = client.send(anfrage, HttpResponse.BodyHandlers.ofInputStream());
         assertThat(r.statusCode()).isEqualTo(200);
         List<Ereignis> gelesen = new ArrayList<>();
@@ -237,6 +248,183 @@ public class AgentSchritte {
             }
         }
         return gelesen;
+    }
+
+    // ---- Modus des Gesprächs (Spec 04, Requirement 21; Aufgabe 18.1)
+
+    @Wenn("«{word}» ein Gespräch im Modus «{}» anlegt")
+    public void gespraechAnlegen(String benutzer, String modus) throws Exception {
+        gespraechAnlegenMitKoerper(benutzer, JSON.writeValueAsString(Map.of("modus", modus)));
+    }
+
+    @Wenn("«{word}» ein Gespräch ohne Modus anlegt")
+    public void gespraechOhneModus(String benutzer) throws Exception {
+        gespraechAnlegenMitKoerper(benutzer, "");
+    }
+
+    @Wenn("«{word}» ein Gespräch mit dem Körper «{}» anlegt")
+    public void gespraechMitKoerper(String benutzer, String koerper) throws Exception {
+        gespraechAnlegenMitKoerper(benutzer, koerper);
+    }
+
+    private void gespraechAnlegenMitKoerper(String benutzer, String koerper) throws Exception {
+        benutzt = true;
+        HttpResponse<String> r = client.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + RestAssured.port + "/api/v1/chat/gespraeche"))
+                .header("Authorization", "Bearer " + Testanmeldung.token(benutzer))
+                .header("Content-Type", "application/json").timeout(GEDULD)
+                .POST(HttpRequest.BodyPublishers.ofString(koerper, StandardCharsets.UTF_8)).build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        status = r.statusCode();
+        antwortKoerper = r.body().isBlank() ? null : JSON.readTree(r.body());
+        if (status == 200 || status == 201) {
+            vorherigesGespraech = gespraech;
+            gespraech = antwortKoerper.path("id").asText();
+        }
+    }
+
+    @Dann("antwortet das Archiv auf das Anlegen mit Status {int}")
+    public void anlegenStatus(int erwartet) {
+        assertThat(status).isEqualTo(erwartet);
+    }
+
+    @Dann("antwortet das Archiv mit Status {int} und dem Fehlercode «{word}»")
+    public void statusUndFehlercode(int erwartet, String code) {
+        assertThat(status).isEqualTo(erwartet);
+        assertThat(antwortKoerper.path("fehlercode").asText()).isEqualTo(code);
+    }
+
+    @Dann("nennt die Antwort den Modus «{word}» und den Titel «{}»")
+    public void antwortModusUndTitel(String modus, String titel) {
+        assertThat(antwortKoerper.path("modus").asText()).isEqualTo(modus);
+        assertThat(antwortKoerper.path("titel").asText()).isEqualTo(titel);
+    }
+
+    @Dann("ist das angelegte Gespräch dasselbe wie zuvor")
+    public void gleichesGespraech() {
+        assertThat(vorherigesGespraech).isNotNull().isEqualTo(gespraech);
+    }
+
+    @Dann("ist das angelegte Gespräch ein anderes als zuvor")
+    public void anderesGespraech() {
+        assertThat(vorherigesGespraech).isNotNull().isNotEqualTo(gespraech);
+    }
+
+    @Dann("hat das gespeicherte Gespräch in «{word}» den Modus «{word}»")
+    public void gespeicherterModus(String mandant, String modus) throws SQLException {
+        assertThat(texte("select modus from " + schema(mandant) + ".chat_gespraech where id = ?::uuid", gespraech))
+                .containsExactly(modus);
+    }
+
+    @Dann("gibt es in «{word}» {int} Gespräche")
+    public void gespraecheImMandanten(String mandant, int anzahl) throws SQLException {
+        assertThat(zahl("select count(*) from " + schema(mandant) + ".chat_gespraech")).isEqualTo(anzahl);
+    }
+
+    @Dann("zeigen Liste und Verlauf von «{word}» für das Gespräch den Modus «{word}»")
+    public void listeUndVerlaufModus(String benutzer, String modus) throws IOException {
+        String token = Testanmeldung.token(benutzer);
+        JsonNode liste = JSON.readTree(RestAssured.given().auth().oauth2(token).when().get("/api/v1/chat/gespraeche")
+                .then().statusCode(200).extract().asString());
+        List<String> modi = new ArrayList<>();
+        liste.forEach(g -> {
+            if (gespraech.equals(g.path("id").asText())) {
+                modi.add(g.path("modus").asText());
+            }
+        });
+        assertThat(modi).containsExactly(modus);
+        assertThat(RestAssured.given().auth().oauth2(token).when().get("/api/v1/chat/gespraeche/" + gespraech)
+                .then().statusCode(200).extract().path("modus").toString()).isEqualTo(modus);
+    }
+
+    @Dann("fehlt das noch nicht gefragte Gespräch in der Liste von «{word}»")
+    public void leeresGespraechNichtInDerListe(String benutzer) throws IOException {
+        JsonNode liste = JSON.readTree(RestAssured.given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                .get("/api/v1/chat/gespraeche").then().statusCode(200).extract().asString());
+        liste.forEach(g -> assertThat(g.path("id").asText()).isNotEqualTo(gespraech));
+    }
+
+    @Wenn("«{word}» im angelegten Gespräch die Frage «{}» stellt")
+    public void imAngelegtenGespraech(String benutzer, String frage) throws Exception {
+        ereignisse = lesen(benutzer, frage, gespraech, e -> true);
+    }
+
+    @Wenn("«{word}» im angelegten Gespräch die Frage «{}» mit dem Modus «{word}» im Körper stellt")
+    public void mitModusImKoerper(String benutzer, String frage, String modus) throws Exception {
+        benutzt = true;
+        Map<String, Object> koerper = new LinkedHashMap<>();
+        koerper.put("frage", frage);
+        koerper.put("gespraechId", gespraech);
+        koerper.put("modus", modus);
+        ereignisse = lesenKoerper(benutzer, JSON.writeValueAsString(koerper));
+    }
+
+    @Wenn("«{word}» im angelegten Gespräch versucht, eine Frage zu stellen")
+    public void frageVersuchen(String benutzer) throws Exception {
+        statusDerFrage(benutzer, "Welche Regel gilt?");
+    }
+
+    @Wenn("«{word}» im angelegten Gespräch eine Frage mit {int} Zeichen stellt")
+    public void langeFrage(String benutzer, int zeichen) throws Exception {
+        statusDerFrage(benutzer, "a".repeat(zeichen));
+    }
+
+    private void statusDerFrage(String benutzer, String frage) throws Exception {
+        benutzt = true;
+        Map<String, Object> koerper = new LinkedHashMap<>();
+        koerper.put("frage", frage);
+        koerper.put("gespraechId", gespraech);
+        HttpResponse<String> r = client.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + RestAssured.port + "/api/v1/chat"))
+                .header("Authorization", "Bearer " + Testanmeldung.token(benutzer))
+                .header("Content-Type", "application/json").header("Accept", "text/event-stream").timeout(GEDULD)
+                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(koerper), StandardCharsets.UTF_8))
+                .build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        status = r.statusCode();
+        String rumpf = r.body();
+        antwortKoerper = status == 200 || rumpf.isBlank() ? null : JSON.readTree(rumpf);
+    }
+
+    @Dann("hat die Antwort im Gespräch die Systemprompt-Version «{word}»")
+    public void systempromptVersion(String muster) throws SQLException {
+        List<String> versionen = new ArrayList<>();
+        for (String mandant : MANDANTEN) {
+            versionen.addAll(texte("select systemprompt_version from " + schema(mandant) + ".chat_nachricht "
+                    + "where gespraech_id = ?::uuid and rolle = 'ASSISTENT'", gespraech));
+        }
+        assertThat(versionen).hasSize(1);
+        assertThat(versionen.getFirst()).matches(muster);
+    }
+
+    @Angenommen("das Monatsbudget der Wissensbasis in «{word}» ist erschöpft")
+    public void monatsbudgetErschoepft(String mandant) throws SQLException {
+        benutzt = true;
+        ausfuehren("insert into " + schema(mandant) + ".ki_verbrauch (zweck, modell, tokens_ein, tokens_aus) "
+                + "values ('WISSEN_CHAT', 'budgetprobe', 2000000, 0)");
+    }
+
+    @Dann("sind in «{word}» {int} Einträge mit dem Zweck «WISSEN_CHAT» in ki_verbrauch, in «{word}» keiner")
+    public void wissenVerbrauchZeilen(String mandant, int anzahl, String anderer) throws SQLException {
+        assertThat(zahl("select count(*) from " + schema(mandant) + ".ki_verbrauch where zweck = 'WISSEN_CHAT'"))
+                .isEqualTo(anzahl);
+        assertThat(zahl("select count(*) from " + schema(anderer) + ".ki_verbrauch where zweck = 'WISSEN_CHAT'"))
+                .isZero();
+    }
+
+    @Dann("hat «{word}» keinen Eintrag mit dem Zweck «CHAT» in ki_verbrauch")
+    public void keinChatVerbrauch(String mandant) throws SQLException {
+        assertThat(zahl("select count(*) from " + schema(mandant) + ".ki_verbrauch where zweck = 'CHAT'")).isZero();
+    }
+
+    @Dann("haben die Einträge mit dem Zweck «WISSEN_CHAT» in «{word}» der Reihe nach diese Tokens:")
+    public void wissenVerbrauchTokens(String mandant, DataTable tabelle) throws SQLException {
+        List<String> ist = texte("select modell || ' ' || tokens_ein || '/' || tokens_aus from " + schema(mandant)
+                + ".ki_verbrauch where zweck = 'WISSEN_CHAT' order by id");
+        List<String> soll = new ArrayList<>();
+        for (Map<String, String> z : tabelle.asMaps()) {
+            soll.add(KiWireMock.CHAT_MODELL + " " + z.get("tokens"));
+        }
+        assertThat(ist).containsExactlyElementsOf(soll);
     }
 
     @Angenommen("der Stand von Dokumenten und Protokoll in «{word}» ist gemerkt")

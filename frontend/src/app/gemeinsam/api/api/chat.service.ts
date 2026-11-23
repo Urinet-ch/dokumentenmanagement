@@ -29,6 +29,8 @@ import { ChatFrage } from '../model/chat-frage';
 // @ts-ignore
 import { ChatGespraech } from '../model/chat-gespraech';
 // @ts-ignore
+import { ChatGespraechAnlegen } from '../model/chat-gespraech-anlegen';
+// @ts-ignore
 import { ChatVerlauf } from '../model/chat-verlauf';
 
 // @ts-ignore
@@ -198,7 +200,7 @@ export class ChatService extends BaseService {
 
     /**
      * Eigene Gespräche
-     * Höchstens 20 eigene Gespräche, zuletzt geänderte zuerst.
+     * Höchstens 20 eigene Gespräche mit Modus (ARCHIV oder WISSEN) und mindestens einer Frage, zuletzt geänderte zuerst.
      * @endpoint get /api/v1/chat/gespraeche
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
@@ -302,6 +304,76 @@ export class ChatService extends BaseService {
         return this.httpClient.request<ChatVerlauf>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Gespräch mit Modus anlegen
+     * Legt ein eigenes Gespräch ohne Frage an (Spec 04, Requirement 21.1 und 21.5). Modus ARCHIV (Standard, auch ohne Körper) oder WISSEN (nur aus der Wissensbasis, Recht A15, sonst 403); ein anderer Wert ergibt 400 ANFRAGE_UNGUELTIG. Der Modus bleibt für das Gespräch fest. Die Fragen folgen wie bisher mit POST /chat und der gespraechId; der Titel ist bis zur ersten Frage «Neues Gespräch». Wer wiederholt anlegt, erhält das noch nicht gefragte Gespräch desselben Modus zurück (200 statt 201). Das Gespräch erscheint in der Liste mit seiner ersten Frage. Der Anfragekörper muss kleiner als 8 KiB sein.
+     * @endpoint post /api/v1/chat/gespraeche
+     * @param chatGespraechAnlegen 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1ChatGespraechePost(chatGespraechAnlegen: ChatGespraechAnlegen, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1ChatGespraechePost(chatGespraechAnlegen: ChatGespraechAnlegen, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1ChatGespraechePost(chatGespraechAnlegen: ChatGespraechAnlegen, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1ChatGespraechePost(chatGespraechAnlegen: ChatGespraechAnlegen, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (chatGespraechAnlegen === null || chatGespraechAnlegen === undefined) {
+            throw new Error('Required parameter chatGespraechAnlegen was null or undefined when calling apiV1ChatGespraechePost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/chat/gespraeche`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: chatGespraechAnlegen,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

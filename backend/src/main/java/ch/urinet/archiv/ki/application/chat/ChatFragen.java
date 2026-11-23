@@ -9,6 +9,7 @@ import ch.urinet.archiv.ki.domain.chat.ChatAusgabe;
 import ch.urinet.archiv.ki.domain.chat.ChatDurchgang;
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
 import ch.urinet.archiv.ki.domain.chat.ChatStatus;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.ki.domain.chat.Fragegrenze;
 import ch.urinet.archiv.ki.domain.chat.Gespraechstitel;
 import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
@@ -17,7 +18,10 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.application.Berechtigung;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import ch.urinet.archiv.wissen.application.WissenModellBudget;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -72,6 +76,8 @@ public class ChatFragen {
     private final ChatGrenzen grenzen;
     private final MandantKontext kontext;
     private final MandantEinstellungen einstellungen;
+    private final Berechtigung berechtigung;
+    private final WissenModellBudget wissenBudget;
     private final TransactionSynchronizationRegistry transaktionen;
     private final int fragenJeStunde;
     private final Clock uhr = Clock.systemUTC();
@@ -81,7 +87,8 @@ public class ChatFragen {
 
     @Inject
     public ChatFragen(ChatAgentPort agent, ChatSpeicher speicher, ChatGrenzen grenzen, MandantKontext kontext,
-                      MandantEinstellungen einstellungen, TransactionSynchronizationRegistry transaktionen,
+                      MandantEinstellungen einstellungen, Berechtigung berechtigung, WissenModellBudget wissenBudget,
+                      TransactionSynchronizationRegistry transaktionen,
                       @ConfigProperty(name = "archiv.chat.fragen-je-stunde") int fragenJeStunde) {
         if (fragenJeStunde < 1) {
             throw new IllegalArgumentException("archiv.chat.fragen-je-stunde muss mindestens 1 sein");
@@ -91,6 +98,8 @@ public class ChatFragen {
         this.grenzen = grenzen;
         this.kontext = kontext;
         this.einstellungen = einstellungen;
+        this.berechtigung = berechtigung;
+        this.wissenBudget = wissenBudget;
         this.transaktionen = transaktionen;
         this.fragenJeStunde = fragenJeStunde;
     }
@@ -111,7 +120,10 @@ public class ChatFragen {
 
     /**
      * Nimmt die Frage an (Schritt a). Reihenfolge der Ablehnungen: 400, 404 (fremdes oder unbekanntes Gespräch, auch
-     * eines anderen Benutzers desselben Mandanten), 429 Rate-Limit, 429 Gleichzeitigkeit. Der Platz wird frei, wenn die
+     * eines anderen Benutzers desselben Mandanten), 403 (Gespräch im Modus {@code WISSEN} ohne Recht A15), 429 Budget
+     * der Wissensbasis erschöpft (nur Modus {@code WISSEN}, Requirement 13.6 und 21.7), 429 Rate-Limit, 429
+     * Gleichzeitigkeit. Der Modus stammt aus dem gespeicherten Gespräch, nie aus der Frage; ohne Gespräch beginnt ein
+     * Gespräch im Modus {@code ARCHIV}. Der Platz wird frei, wenn die
      * Transaktion nicht festgeschrieben wird.
      */
     @Transactional
@@ -119,8 +131,14 @@ public class ChatFragen {
                             Optional<UUID> gespraechId) {
         String text = frage(frage);
         speicher.benutzerSperren(benutzer.id());
-        if (gespraechId.isPresent() && !speicher.gehoertSperren(gespraechId.get(), benutzer.id())) {
-            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        Chatmodus modus = Chatmodus.ARCHIV;
+        if (gespraechId.isPresent()) {
+            modus = speicher.gespraechSperren(gespraechId.get(), benutzer.id())
+                    .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        }
+        if (modus == Chatmodus.WISSEN) {
+            berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
+            wissenBudget.chatPruefen();
         }
         Instant jetzt = uhr.instant();
         Optional<Instant> grenze = speicher.grenzFrage(benutzer.id(), jetzt.minus(Fragegrenze.FENSTER), fragenJeStunde);
@@ -143,7 +161,10 @@ public class ChatFragen {
         });
         UUID id = gespraechId.orElseGet(UUID::randomUUID);
         if (gespraechId.isEmpty()) {
-            speicher.gespraechAnlegen(id, benutzer.id(), Gespraechstitel.aus(text), jetzt);
+            speicher.gespraechAnlegen(id, benutzer.id(), Gespraechstitel.aus(text), modus, jetzt);
+        } else {
+            // ein über POST /chat/gespraeche angelegtes Gespräch erhält mit der ersten Frage seinen Titel
+            speicher.titelSetzenWennLeer(id, Gespraechstitel.aus(text));
         }
         List<VerlaufEintrag> verlauf = VerlaufEintrag.normalisieren(speicher.verlauf(id, VERLAUF));
         List<ChatWerkzeugDokument> werkzeugDokumente = speicher.werkzeugDokumente(id);
@@ -154,7 +175,7 @@ public class ChatFragen {
                 .map(ChatWerkzeugDokument::dokumentId).distinct().toList();
         speicher.frageSpeichern(id, text, jetzt);
         ChatAnfrage anfrage = new ChatAnfrage(mandant, benutzer, Sichtregel.fuer(benutzer), ip,
-                einstellungen.lesen(mandant).name(), text, verlauf, geseheneDokumente, nummerierteTreffer);
+                einstellungen.lesen(mandant).name(), text, verlauf, geseheneDokumente, nummerierteTreffer, modus);
         return new Annahme(id, anfrage, platz);
     }
 
@@ -200,7 +221,7 @@ public class ChatFragen {
         }
         ChatAntwort antwort = durchgang.antwort(abbruch.gesetzt()).mitExportdaten(
                 durchgang.zeitBisErstemTextMs(), agent.modellkennung().orElse(null),
-                agent.systempromptVersion().orElse(null));
+                agent.systempromptVersion(annahme.anfrage().modus()).orElse(null));
         if (antwort.status() == ChatStatus.FEHLER) {
             LOG.warnf("Chat-Agent für Gespräch %s ausgefallen, grund=%s", id, durchgang.ausfallgrund().orElse("-"));
         }

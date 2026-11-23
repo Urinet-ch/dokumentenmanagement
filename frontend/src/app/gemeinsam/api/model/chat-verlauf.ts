@@ -14,6 +14,15 @@ export interface ChatVerlauf {
     id: string;
     titel: string;
     geaendert: string;
+    modus: ChatVerlauf.ModusEnum;
     nachrichten: Array<ChatNachricht>;
 }
+export namespace ChatVerlauf {
+    export const ModusEnum = {
+        Archiv: 'ARCHIV',
+        Wissen: 'WISSEN',
+    } as const;
+    export type ModusEnum = typeof ModusEnum[keyof typeof ModusEnum];
+}
+
 

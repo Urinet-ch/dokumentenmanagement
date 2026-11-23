@@ -6,9 +6,11 @@ import ch.urinet.archiv.ki.adapter.json.ChatJson;
 import ch.urinet.archiv.ki.application.chat.ChatAbbruch;
 import ch.urinet.archiv.ki.application.chat.ChatBewertungen;
 import ch.urinet.archiv.ki.application.chat.ChatFragen;
+import ch.urinet.archiv.ki.application.chat.ChatGespraecheAnlegen;
 import ch.urinet.archiv.ki.application.chat.ChatVerlauf;
 import ch.urinet.archiv.ki.domain.chat.ChatBewertung;
 import ch.urinet.archiv.ki.domain.chat.ChatNachricht;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.ki.domain.chat.Gespraech;
 import ch.urinet.archiv.ki.domain.chat.GespraechKopf;
 import ch.urinet.archiv.ki.domain.chat.Quelle;
@@ -74,16 +76,18 @@ public class ChatResource {
     static final int BEWERTUNG_KOERPER_GRENZE = 8192;
 
     private final ChatFragen fragen;
+    private final ChatGespraecheAnlegen anlegen;
     private final ChatVerlauf verlauf;
     private final ChatBewertungen bewertungen;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
     private final Instance<HttpServerRequest> anfrage;
 
-    public ChatResource(ChatFragen fragen, ChatVerlauf verlauf, ChatBewertungen bewertungen,
+    public ChatResource(ChatFragen fragen, ChatGespraecheAnlegen anlegen, ChatVerlauf verlauf, ChatBewertungen bewertungen,
                         MandantAufloesung aufloesung, SecurityIdentity identitaet,
                         Instance<HttpServerRequest> anfrage) {
         this.fragen = fragen;
+        this.anlegen = anlegen;
         this.verlauf = verlauf;
         this.bewertungen = bewertungen;
         this.aufloesung = aufloesung;
@@ -121,7 +125,17 @@ public class ChatResource {
 
     @Schema(name = "ChatGespraech")
     public record GespraechDto(@Schema(required = true) UUID id, @Schema(required = true) String titel,
-                               @Schema(required = true) Instant geaendert) {
+                               @Schema(required = true) Instant geaendert,
+                               @Schema(required = true, enumeration = {"ARCHIV", "WISSEN"},
+                                       description = "fester Modus des Gesprächs (Archivchat oder Wissenschat)")
+                               String modus) {
+    }
+
+    @Schema(name = "ChatGespraechAnlegen")
+    public record GespraechAnlegenDto(
+            @Schema(nullable = true, enumeration = {"ARCHIV", "WISSEN"}, defaultValue = "ARCHIV",
+                    description = "Modus des neuen Gesprächs; fehlt er, gilt ARCHIV. WISSEN setzt das Recht A15 voraus")
+            String modus) {
     }
 
     @Schema(name = "ChatNachricht")
@@ -139,6 +153,7 @@ public class ChatResource {
     @Schema(name = "ChatVerlauf")
     public record VerlaufDto(@Schema(required = true) UUID id, @Schema(required = true) String titel,
                              @Schema(required = true) Instant geaendert,
+                             @Schema(required = true, enumeration = {"ARCHIV", "WISSEN"}) String modus,
                              @Schema(required = true) List<NachrichtDto> nachrichten) {
     }
 
@@ -197,12 +212,46 @@ public class ChatResource {
         return strom.onCancellation().invoke(abbruch::setzen);
     }
 
+    @POST
+    @Path("/gespraeche")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Blocking
+    @AlleArchivRollen
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Operation(summary = "Gespräch mit Modus anlegen",
+            description = "Legt ein eigenes Gespräch ohne Frage an (Spec 04, Requirement 21.1 und 21.5). Modus ARCHIV "
+                    + "(Standard, auch ohne Körper) oder WISSEN (nur aus der Wissensbasis, Recht A15, sonst 403); ein "
+                    + "anderer Wert ergibt 400 ANFRAGE_UNGUELTIG. Der Modus bleibt für das Gespräch fest. Die Fragen "
+                    + "folgen wie bisher mit POST /chat und der gespraechId; der Titel ist bis zur ersten Frage "
+                    + "«Neues Gespräch». Wer wiederholt anlegt, erhält das noch nicht gefragte Gespräch desselben "
+                    + "Modus zurück (200 statt 201). Das Gespräch erscheint in der Liste mit seiner ersten Frage. Der "
+                    + "Anfragekörper muss kleiner als 8 KiB sein.")
+    @RequestBody(content = @Content(schema = @Schema(implementation = GespraechAnlegenDto.class)))
+    @APIResponse(responseCode = "200", description = "Noch nicht gefragtes Gespräch desselben Modus zurückgegeben")
+    @APIResponse(responseCode = "201", description = "Gespräch angelegt")
+    @APIResponse(responseCode = "400", description = "Modus ungültig")
+    @APIResponse(responseCode = "403", description = "Modus WISSEN ohne Recht A15")
+    @APIResponse(responseCode = "413", description = "Anfragekörper zu gross")
+    public Response gespraechAnlegen(String body) {
+        aufloesung.pruefen();
+        // die Grösse begrenzt schon die Route (ProblemFehlerRoute, auch chunked); hier nur noch die zweite Absicherung
+        if (body != null && body.length() >= BEWERTUNG_KOERPER_GRENZE) {
+            throw new FachFehler(Fehlercode.DATEI_ZU_GROSS);
+        }
+        Chatmodus modus = ChatGespraecheAnlegen.modus(gespraechModus(body));
+        ChatGespraecheAnlegen.Ergebnis ergebnis = anlegen.anlegen(benutzer(), modus);
+        return Response.status(ergebnis.neu() ? Response.Status.CREATED : Response.Status.OK)
+                .entity(dto(ergebnis.kopf())).build();
+    }
+
     @GET
     @Path("/gespraeche")
     @Produces(MediaType.APPLICATION_JSON)
     @AlleArchivRollen
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
-    @Operation(summary = "Eigene Gespräche", description = "Höchstens 20 eigene Gespräche, zuletzt geänderte zuerst.")
+    @Operation(summary = "Eigene Gespräche", description = "Höchstens 20 eigene Gespräche mit Modus (ARCHIV oder "
+            + "WISSEN) und mindestens einer Frage, zuletzt geänderte zuerst.")
     public List<GespraechDto> gespraeche() {
         aufloesung.pruefen();
         return verlauf.gespraeche(benutzer()).stream().map(ChatResource::dto).toList();
@@ -226,7 +275,7 @@ public class ChatResource {
         }
         Gespraech gespraech = verlauf.gespraech(benutzer(), gespraechId);
         GespraechKopf kopf = gespraech.kopf();
-        return new VerlaufDto(kopf.id(), kopf.titel(), kopf.geaendert(),
+        return new VerlaufDto(kopf.id(), kopf.titel(), kopf.geaendert(), kopf.modus().name(),
                 gespraech.nachrichten().stream().map(ChatResource::dto).toList());
     }
 
@@ -327,6 +376,29 @@ public class ChatResource {
         }
     }
 
+    /** {@code {"modus"?: <Text>}}; leerer Körper und {@code null} sind kein Modus, alles andere als Text ist ungültig. */
+    static String gespraechModus(String body) {
+        try {
+            if (body == null || body.isBlank()) {
+                return null;
+            }
+            JsonNode wurzel = JSON.readTree(body);
+            if (wurzel == null || !wurzel.isObject()) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            JsonNode modus = wurzel.get("modus");
+            if (modus == null || modus.isNull()) {
+                return null;
+            }
+            if (!modus.isTextual()) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            return modus.asText();
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+    }
+
     private static BewertungEingabe bewertungEingabe(String body) {
         try {
             if (body == null || body.isBlank()) {
@@ -369,7 +441,7 @@ public class ChatResource {
     }
 
     private static GespraechDto dto(GespraechKopf kopf) {
-        return new GespraechDto(kopf.id(), kopf.titel(), kopf.geaendert());
+        return new GespraechDto(kopf.id(), kopf.titel(), kopf.geaendert(), kopf.modus().name());
     }
 
     private static NachrichtDto dto(ChatNachricht n) {

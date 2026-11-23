@@ -1431,6 +1431,33 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Schalter `archiv.oeffentlich.wissenschat` (Standard aus, je Mandant).
 - **Offen für die Umsetzung (Welle 18):** `[offen: Form der Freigabe «für Webseite» in der Oberfläche der Wissensseite (Schalter in der Seitenansicht, Recht A16) und Anzeige der Quellen-Zugriffsstufen; Aufgabe 18.3 klärt es und ergänzt hier]`
 
+### Umsetzung (Aufgabe 18.1, 23.11.2026)
+- **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`
+  (`ARCHIV`, `WISSEN`). Bestehende Gespräche und der Vorgänger-Release bleiben Archivchat. Das Rollback entfernt nur den Check-Constraint und behält die
+  Spalte samt Werten (kein Datenverlust, wiederholbar); das Vorwärts-Changeset ist wiederholbar (`add column if not exists`, Constraint neu setzen).
+- **Anlegen:** `POST /api/v1/chat/gespraeche {modus?}` (alle Rollen mit Recht A15 für `WISSEN`, sonst 403 über `Berechtigung.wissensseitenAktion`; fehlt `modus`
+  oder der Körper, gilt `ARCHIV`; anderer Wert oder kein Objekt 400 `ANFRAGE_UNGUELTIG`; Körper unter 8 KiB, auch chunked, `ProblemFehlerRoute`).
+  Antwort `{id, titel, geaendert, modus}`, 201; Titel bis zur ersten Frage «Neues Gespräch» (`ChatGespraecheAnlegen`). Je Benutzer und Modus höchstens ein
+  Gespräch ohne Nachrichten: wiederholtes Anlegen liefert es zurück (200), damit keine leeren Gespräche anwachsen. Die Fragen laufen wie bisher über
+  `POST /api/v1/chat` mit `gespraechId`; ein Feld `modus` im Körper der Frage wird ignoriert, der Modus stammt allein aus dem gespeicherten Gespräch (Requirement 21.1,
+  «bleibt fest»). Ohne `gespraechId` beginnt `POST /api/v1/chat` wie bisher ein Gespräch im Modus `ARCHIV`.
+- **Lesen:** `GET /chat/gespraeche` und `GET /chat/gespraeche/{id}` liefern `modus`; die Liste führt wie bisher nur Gespräche mit mindestens einer Nachricht.
+- **Werkzeuge:** `ChatAnfrage.modus` und `WerkzeugKontext.modus` (Standard `ARCHIV`); `WerkzeugAuswahl.angeboten` liefert im Modus `WISSEN` genau `wissen_index` und
+  `wissen_seite_zeigen`, ohne Abfrage der Finanzfunktionen. `ArchivToolProvider` bietet dem Modell nur diese an, `Werkzeuglauf` prüft sie bei jedem Aufruf nochmals
+  (fail closed): Ein Archivwerkzeug im Wissenschat ist dem Modell unbekannt («unbekanntes Werkzeug») und in der Werkzeugmethode «Werkzeug nicht verfügbar».
+- **Systemprompt** `wissen-chat` (`ChatSystemPrompt.wissenChat`, Kennung `wissen-chat-v1-<hash>`): nur Wissensseiten, Fehlanzeige «Dazu steht nichts in der Wissensbasis»,
+  Seite und Quelldokument je Aussage, Hinweise nennen, Seiteninhalte sind Daten; keine Archivwerkzeuge, keine Kennzahlen. Die Kennung steht je Antwort in
+  `chat_nachricht.systemprompt_version`.
+- **Recht und Rechte:** A15 wird beim Anlegen und bei jeder Frage in einem Gespräch im Modus `WISSEN` geprüft (403 vor dem Budget, nach 404). Die Rechtematrix
+  (`A15` bei allen vier Rollen) bleibt unverändert; ein 403 durch A15 entsteht erst, wenn eine Rolle A15 verliert (Nachweis: JUnit `ChatGespraecheAnlegenTest`).
+- **Kosten:** Zweck `WISSEN_CHAT` in `ki_verbrauch` (eine Zeile je Modellaufruf wie `CHAT`, ohne Inhalte). Die Summe der Zwecke `WISSEN_*` im Kalendermonat
+  (`JdbcWissenIngest`) enthält `WISSEN_CHAT` (Requirement 13.6: Zweck `WISSEN_*`); vor jeder Frage in einem Gespräch im Modus `WISSEN` prüft
+  `WissenModellBudget.chatPruefen` das Monatsbudget und antwortet bei Überschreitung mit 429 `BUDGET`, ohne Modellaufruf. Das Monatsbudget wird nicht reserviert; eine Frage
+  kann es um ihre eigenen Tokens überschreiten wie ein Embedding-Batch (Requirement 13.6 verlangt nur, bei erschöpftem Budget keinen Aufruf auszuführen).
+  Frage, Antwort, Rate-Limit je Stunde und Gleichzeitigkeit gelten unverändert und gemeinsam für beide Modi.
+- **Offen für Folgeaufgaben:** Feld `modus` im Bewertungsexport (`chat-bewertungen/v1`), Auswahl und Kennzeichen in der Oberfläche (18.2); öffentlicher Wissenschat und
+  `fuer_webseite` (18.3). Die Tests `@req-21.1` bis `@req-21.3`, `@req-21.5` und `@req-21.7` stehen in `features/wissen/wissenschat.feature`.
+
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:
 - **Datenmodell (Mandantenschema `m_<code>`):** Tabelle `wissensquelle_markierung(dokument_id uuid, markiert_von text, markiert_am timestamptz,

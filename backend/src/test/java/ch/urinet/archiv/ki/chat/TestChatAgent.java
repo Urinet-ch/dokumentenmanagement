@@ -80,6 +80,11 @@ public class TestChatAgent implements ChatAgentPort {
     private final List<Lauf> laeufe = new CopyOnWriteArrayList<>();
 
     @Override
+    public Optional<String> systempromptVersion(ch.urinet.archiv.ki.domain.chat.Chatmodus modus) {
+        return echt.systempromptVersion(modus);
+    }
+
+    @Override
     public void beantworten(ChatAnfrage anfrage, Consumer<ChatEreignis> ausgabe, ChatAbbruch abbruch) {
         boolean transaktion;
         try {

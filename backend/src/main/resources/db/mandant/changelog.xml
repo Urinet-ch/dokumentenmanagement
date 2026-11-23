@@ -65,4 +65,5 @@
     <include file="changesets/070-wissensquelle-markierung.xml" relativeToChangelogFile="true"/>
     <include file="changesets/083-chat-bewertung-export-protokoll.xml" relativeToChangelogFile="true"/>
     <include file="changesets/084-wissensquelle-protokollaktionen.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/130-chat-gespraech-modus.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

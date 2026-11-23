@@ -231,7 +231,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 17.1, 17.2_
 
 ## Welle 18 — Wissenschat und Archivchat (Entscheid Fabian 22.11.2026, Requirement 21; Umsetzung nach Welle 17 und Spec 02, Welle 10)
-- [ ] 18.1 Modus im Chat und Werkzeuge [Backend]
+- [x] 18.1 Modus im Chat und Werkzeuge [Backend]
   - Changeset `chat_gespraech.modus`, `POST /chat/gespraeche {modus}`, Werkzeugliste und Systemprompt `wissen-chat`, Recht A15, `ki_verbrauch`-Zweck `WISSEN_CHAT`; Szenarien `@req-21.1` bis `@req-21.3`, `@req-21.5`, `@req-21.7`.
   - _Anforderungen: 21.1, 21.2, 21.3, 21.5, 21.7_
   - _Abhängig von: 15.2, 17.1_
