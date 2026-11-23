@@ -817,3 +817,16 @@ Die Wissensroute begrenzt den Empfang wie die übrigen Einstellungsrouten auch o
 Entscheid Fabian vom 23.11.2026: Nicht darstellbare bestehende Werte werden auf den Katalogstandard gesetzt,
 ihre alten Werte in `wissens_einstellung_migration` gesichert und die ersetzten Pfade ohne Werte im Zugriffsprotokoll
 vermerkt; es gibt keinen Startabbruch.
+
+## Umsetzung (Aufgabe 19.12, 23.11.2026)
+
+Die Löschvorschau zählt Protokolleinträge und unterschiedliche Dokumente mit Bezug zum Benutzer im eigenen Mandanten.
+Die Löschung verlangt einen deaktivierten Zugang, die abgelaufene Frist, einen kategorisierten Grund und Step-up.
+Ab zwei aktiven Inhabern entsteht ein befristeter Antrag, den nur ein anderer aktiver Inhaber bestätigen kann; die
+Voraussetzungen werden unter der Vorgangssperre erneut geprüft. Keycloak beendet die Sitzungen und entfernt den
+Benutzer, das Archiv widerruft Tokens und entfernt den veränderlichen Status. Protokoll, Benutzerverzeichnis,
+Namenssperre und Dokumentverweise bleiben bestehen. Bei unklarer externer Wirkung bleibt der Vorgang gesperrt.
+
+Der Test der Vier-Augen-Löschung verwendet den Keycloak-Testdienst auch für die lesenden Identitätsabfragen: Der
+bisherige Identitäts-Stub kannte die im Test-Keycloak angelegten Akteure nicht. `Loeschvorschau` hat einen eindeutigen
+OpenAPI-Modellnamen, damit die Clientgenerierung das bestehende Wissensimport-Modell `Anzahl` nicht umbenennt.

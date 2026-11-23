@@ -143,6 +143,7 @@ public interface IdentitaetsDienst {
     /** Alle nicht gelöschten Benutzer des Mandanten, auch deaktivierte und eingeladene. */
     long benutzerZaehlen(String mandant);
 
+    /** Aktive Inhaber ohne offene erforderliche Aktionen; deaktivierte Inhaber werden nicht mitgezählt. */
     long inhaberZaehlen(String mandant);
 
     /** Prüft die Verbindung des Dienstkontos; Fehler werden nicht als Erfolg dargestellt. */

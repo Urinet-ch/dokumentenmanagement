@@ -195,30 +195,58 @@ Given(
   { timeout: 120_000 },
   async function (motiv) {
     await handy(this, { motiv, serviceWorker: true });
+    // Fremde Adressen (Keycloak) sofort ablehnen: Hängende Anfragen halten die App «instabil», und der Service Worker
+    // registriert sich dann erst nach dem Fallback von 30 s (registerWhenStable:30000), auf dem CI-Runner mit Streuung.
+    const origin = new URL(basisUrl).origin;
+    await this.kontext.route('**/*', (route) =>
+      route.request().url().startsWith(origin) ? route.continue() : route.abort('blockedbyclient'),
+    );
     await this.seite.goto(basisUrl);
     // Installiert ist die PWA, wenn der Service Worker alle Dateien der Gruppe «app» vorgeladen hat (ngsw.json), auch
     // den Scanner (Worker) und die Seite «Erfassen»; er lädt sie nacheinander.
-    await this.seite.waitForFunction(
-      async () => {
+    const zustand = () =>
+      this.seite.evaluate(async () => {
         const registrierung = await navigator.serviceWorker.getRegistration();
-        if (!registrierung?.active) {
-          return false;
-        }
         const manifest = await (await fetch('/ngsw.json')).json();
         const app = manifest.assetGroups.find((gruppe) => gruppe.name === 'app');
+        const geladen = new Set();
         for (const name of (await caches.keys()).filter((n) => n.endsWith(':assets:app:cache'))) {
-          const geladen = (await (await caches.open(name)).keys()).map(
-            (anfrage) => new URL(anfrage.url).pathname,
-          );
-          if (app.urls.every((url) => geladen.includes(url))) {
-            return true;
+          for (const anfrage of await (await caches.open(name)).keys()) {
+            geladen.add(new URL(anfrage.url).pathname);
           }
         }
-        return false;
-      },
-      undefined,
-      { timeout: 110_000, polling: 500 },
-    );
+        return {
+          aktiv: !!registrierung?.active,
+          zustand: registrierung?.active?.state ?? registrierung?.installing?.state ?? registrierung?.waiting?.state,
+          fehlend: app.urls.filter((url) => !geladen.has(url)),
+        };
+      });
+    try {
+      await this.seite.waitForFunction(
+        async () => {
+          const registrierung = await navigator.serviceWorker.getRegistration();
+          if (!registrierung?.active) {
+            return false;
+          }
+          const manifest = await (await fetch('/ngsw.json')).json();
+          const app = manifest.assetGroups.find((gruppe) => gruppe.name === 'app');
+          for (const name of (await caches.keys()).filter((n) => n.endsWith(':assets:app:cache'))) {
+            const geladen = (await (await caches.open(name)).keys()).map(
+              (anfrage) => new URL(anfrage.url).pathname,
+            );
+            if (app.urls.every((url) => geladen.includes(url))) {
+              return true;
+            }
+          }
+          return false;
+        },
+        undefined,
+        { timeout: 110_000, polling: 500 },
+      );
+    } catch (fehler) {
+      const stand = await zustand().catch((e) => ({ diagnoseFehler: String(e) }));
+      throw new Error(`PWA nicht installiert: ${JSON.stringify(stand)}; ${fehler.message}`);
+    }
     // Nach dem ersten Laden kann die Seite noch nicht vom aktiven Service Worker kontrolliert sein.
     await this.seite.reload();
     await this.seite.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, {
