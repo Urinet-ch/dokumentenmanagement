@@ -6,6 +6,7 @@ const dialog = (seite) => seite.getByRole('dialog', { name: 'Hilfe', exact: true
 When('ich die Hilfe-Leiste öffne', async function () {
   await this.seite.getByRole('button', { name: 'Hilfe', exact: true }).click();
   await dialog(this.seite).waitFor();
+  await this.seite.waitForFunction(() => document.activeElement?.id === 'hilfe-leiste-titel');
 });
 
 When(/^ich die Hilfe-Leiste über «(.+)» schliesse$/, async function (name) {
@@ -30,7 +31,26 @@ When('ich die Hilfe-Leiste mit Escape schliesse', async function () {
 });
 
 When(/^ich in der Hilfe-Leiste den Abschnitt «(.+)» wähle$/, async function (titel) {
-  await dialog(this.seite).getByRole('navigation', { name: 'Inhalt der Anleitung' }).getByRole('link', { name: titel, exact: true }).click();
+  const leiste = dialog(this.seite);
+  const link = leiste
+    .getByRole('navigation', { name: 'Inhalt der Anleitung' })
+    .getByRole('link', { name: titel, exact: true });
+  await link.click();
+  await this.seite.waitForFunction(
+    (name) =>
+      [...document.querySelectorAll('#hilfe-leiste .hilfe-inhalt a')].some(
+        (element) =>
+          element.textContent?.trim() === name &&
+          element.getAttribute('aria-current') === 'location',
+      ),
+    titel,
+  );
+  await leiste.getByRole('heading', { name: titel, level: 3, exact: true }).waitFor();
+  await this.seite.waitForFunction(() => {
+    const text = document.querySelector('#hilfe-leiste app-anleitung-text');
+    return text?.querySelector('.text') || text?.querySelector('[data-test=anleitung-fehler]');
+  });
+  assert.equal(await leiste.locator('[data-test=anleitung-fehler]').count(), 0, titel);
 });
 
 When(/^ich den Link «(.+)» in der Hilfe-Leiste wähle$/, async function (text) {
