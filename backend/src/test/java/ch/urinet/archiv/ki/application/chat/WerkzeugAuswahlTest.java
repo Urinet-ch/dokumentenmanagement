@@ -40,6 +40,26 @@ class WerkzeugAuswahlTest {
         }
     }
 
+    /** Spec 04, Requirement 21.2: Im Wissenschat gibt es nur die beiden Wissenswerkzeuge, für jede Rolle und jeden Mandanten. */
+    @Test
+    void wissensmodusBietetNurDieWissenswerkzeuge() {
+        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> true);
+        for (Rolle rolle : Rolle.values()) {
+            Benutzer benutzer = new Benutzer("b", rolle);
+            WerkzeugKontext wissen = new WerkzeugKontext(URINET, benutzer, rolle, Sichtregel.fuer(benutzer),
+                    java.util.Optional.empty(), ch.urinet.archiv.ki.domain.chat.Chatmodus.WISSEN);
+            assertThat(auswahl.angeboten(wissen)).as(rolle.name()).containsExactly("wissen_index", "wissen_seite_zeigen");
+            for (String archiv : new String[] {"dokumente_suchen", "dokument_zeigen", "fristen", "kennzahl",
+                    "offene_posten", "vollstaendigkeit"}) {
+                assertThat(auswahl.erlaubt(wissen, archiv)).as(rolle + " " + archiv).isFalse();
+            }
+            assertThat(auswahl.erlaubt(wissen, "wissen_index")).isTrue();
+            // der Archivchat bleibt unverändert
+            assertThat(auswahl.angeboten(WerkzeugKontext.fuer(URINET, benutzer, null))).contains("dokumente_suchen",
+                    "dokument_zeigen", "fristen", "wissen_index", "wissen_seite_zeigen");
+        }
+    }
+
     /** Req 3.1 und Spec 05, Req 8.8: kennzahl und offene_posten nur mit Finanzfunktionen des Mandanten. */
     @Test
     void finanzwerkzeugeNurMitFinanzfunktionen() {
