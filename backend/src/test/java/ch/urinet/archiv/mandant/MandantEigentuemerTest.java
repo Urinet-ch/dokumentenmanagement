@@ -3,6 +3,11 @@ package ch.urinet.archiv.mandant;
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantRegister;
+import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
+import ch.urinet.archiv.mandant.domain.Mandant;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.mandant.domain.MandantVerwaltungsrollen;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -56,6 +61,9 @@ class MandantEigentuemerTest {
     @Inject
     MandantKommando kommando;
 
+    @Inject
+    MandantRegister register;
+
     @Test
     void expliziteVerwaltungsrollenWerdenImRegisterGespeichert() throws SQLException {
         var ausgabe = new ByteArrayOutputStream();
@@ -67,6 +75,30 @@ class MandantEigentuemerTest {
         try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
             assertThat(wert(befehl, "select array_to_string(verwaltung_rollen, ',') from public.mandant "
                     + "where code = 'probe-adminrollen'")).isEqualTo("geschaeftsstelle,inhaber");
+        }
+    }
+
+    @Test
+    void fortsetzungErhaeltDenRollensatzUndWeistAbweichungenAb() {
+        String praefix = ConfigProvider.getConfig().getValue("archiv.ablage.bucket-praefix", String.class);
+        for (String code : List.of("probe-gj", "probe-fortsetzen")) {
+            var mandant = new MandantCode(code);
+            var rollen = new MandantVerwaltungsrollen(List.of("geschaeftsstelle", "inhaber"));
+            register.eintragen(new Mandant(mandant, code, mandant.schema(), mandant.bucket(praefix),
+                    new Geschaeftsjahresende("12-31"), false, rollen));
+            var ausgabe = new ByteArrayOutputStream();
+            var fehler = new ByteArrayOutputStream();
+            var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+            var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8);
+            assertThat(kommando.ausfuehren(List.of("anlegen", code, "--rollen", "mitarbeiter"), aus, fehl))
+                    .isEqualTo(1);
+            assertThat(fehler.toString(StandardCharsets.UTF_8)).contains("MANDANT_EXISTIERT");
+            var aufruf = code.equals("probe-gj") ? List.of("anlegen", code)
+                    : List.of("anlegen", code, "--rollen", "inhaber,geschaeftsstelle");
+            assertThat(kommando.ausfuehren(aufruf, aus, fehl))
+                    .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+            assertThat(register.aktive()).filteredOn(eintrag -> eintrag.code().equals(mandant))
+                    .singleElement().extracting(Mandant::verwaltungsrollen).isEqualTo(rollen);
         }
     }
 
