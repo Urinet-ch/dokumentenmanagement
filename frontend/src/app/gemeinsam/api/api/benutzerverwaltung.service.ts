@@ -29,7 +29,11 @@ import { BenutzerAnsicht } from '../model/benutzer-ansicht';
 // @ts-ignore
 import { Ergebnis1 } from '../model/ergebnis1';
 // @ts-ignore
+import { Ergebnis2 } from '../model/ergebnis2';
+// @ts-ignore
 import { Grund } from '../model/grund';
+// @ts-ignore
+import { Loeschvorschau } from '../model/loeschvorschau';
 // @ts-ignore
 import { RollenAenderung } from '../model/rollen-aenderung';
 // @ts-ignore
@@ -690,6 +694,142 @@ export class BenutzerverwaltungService extends BaseService {
             {
                 context: localVarHttpContext,
                 body: body,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Deaktivierten Benutzer nach Ablauf der Frist löschen
+     * @endpoint post /api/v1/benutzer/{benutzerId}/loeschen
+     * @param benutzerId 
+     * @param grund 
+     * @param xRealIp 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1BenutzerBenutzerIdLoeschenPost(benutzerId: string, grund: Grund, xRealIp?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Ergebnis2>;
+    public apiV1BenutzerBenutzerIdLoeschenPost(benutzerId: string, grund: Grund, xRealIp?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Ergebnis2>>;
+    public apiV1BenutzerBenutzerIdLoeschenPost(benutzerId: string, grund: Grund, xRealIp?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Ergebnis2>>;
+    public apiV1BenutzerBenutzerIdLoeschenPost(benutzerId: string, grund: Grund, xRealIp?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (benutzerId === null || benutzerId === undefined) {
+            throw new Error('Required parameter benutzerId was null or undefined when calling apiV1BenutzerBenutzerIdLoeschenPost.');
+        }
+        if (grund === null || grund === undefined) {
+            throw new Error('Required parameter grund was null or undefined when calling apiV1BenutzerBenutzerIdLoeschenPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (xRealIp !== undefined && xRealIp !== null) {
+            localVarHeaders = localVarHeaders.set('X-Real-Ip', String(xRealIp));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/benutzer/${this.configuration.encodeParam({name: "benutzerId", value: benutzerId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/loeschen`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Ergebnis2>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: grund,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Verweise vor dem Löschen anzeigen
+     * @endpoint get /api/v1/benutzer/{benutzerId}/loeschvorschau
+     * @param benutzerId 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1BenutzerBenutzerIdLoeschvorschauGet(benutzerId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Loeschvorschau>;
+    public apiV1BenutzerBenutzerIdLoeschvorschauGet(benutzerId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Loeschvorschau>>;
+    public apiV1BenutzerBenutzerIdLoeschvorschauGet(benutzerId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Loeschvorschau>>;
+    public apiV1BenutzerBenutzerIdLoeschvorschauGet(benutzerId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (benutzerId === null || benutzerId === undefined) {
+            throw new Error('Required parameter benutzerId was null or undefined when calling apiV1BenutzerBenutzerIdLoeschvorschauGet.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/benutzer/${this.configuration.encodeParam({name: "benutzerId", value: benutzerId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/loeschvorschau`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Loeschvorschau>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,
