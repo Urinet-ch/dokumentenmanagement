@@ -65,7 +65,7 @@ public class JdbcExportBelege implements ExportBelege {
                     + "d.partner_name, f.belegnummer, f.richtung, f.betrag, f.waehrung, d.pdfa_fehlt, d.s3_pdfa, "
                     + "d.s3_version_pdfa, d.sha256_pdfa from " + s + ".dokument d left join " + s
                     + ".dokument_finanz f on f.dokument_id = d.id where d.status = 'ARCHIVIERT' "
-                    + "and d.art is distinct from 'WISSENSQUELLE' and d.geschaeftsjahr = ? and d.id > ? order by d.id limit ?")) {
+                    + "and d.geschaeftsjahr = ? and d.id > ? order by d.id limit ?")) {
                 p.setQueryTimeout(JdbcExportRepository.ZEITGRENZE_S);
                 p.setInt(1, geschaeftsjahr);
                 p.setObject(2, nach.orElse(VOR_ALLEN), Types.OTHER);

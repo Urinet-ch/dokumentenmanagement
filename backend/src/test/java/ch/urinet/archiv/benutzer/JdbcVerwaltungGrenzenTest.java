@@ -2,7 +2,6 @@ package ch.urinet.archiv.benutzer;
 
 import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
 import ch.urinet.archiv.benutzer.application.BenutzerAktivitaet;
-import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
@@ -10,7 +9,6 @@ import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
 import ch.urinet.archiv.mandant.application.KonfigurationSeed;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
-import ch.urinet.archiv.mandant.application.WissensquelleSeed;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.arc.ClientProxy;
@@ -45,8 +43,6 @@ class JdbcVerwaltungGrenzenTest {
     @Inject AgroalDataSource datenquelle;
     @Inject KonfigurationSeed seed;
     @Inject KonfigurationsdateiCodec codec;
-    @Inject WissensquelleSeed wissensquelle;
-    @Inject ZusatzSchemaPruefer zusatzSchema;
 
     @Test
     void benutzeraktivitaetLiestNurAbgeschlosseneEinladungenDesMandanten() throws Exception {
@@ -156,7 +152,7 @@ class JdbcVerwaltungGrenzenTest {
     void nurEinstellungsAenderungenZaehlenZuDenVerwaltungsgrenzen() throws Exception {
         String mandant = "grenze-" + UUID.randomUUID().toString().substring(0, 8);
         KonfigurationSeed original = ClientProxy.unwrap(seed);
-        QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec, wissensquelle, zusatzSchema) {
+        QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec) {
             @Override
             public Konfiguration lesen(MandantCode ignoriert) {
                 return original.lesen(new MandantCode("urinet"));

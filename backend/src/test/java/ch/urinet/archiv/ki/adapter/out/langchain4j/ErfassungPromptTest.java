@@ -12,7 +12,6 @@ import ch.urinet.archiv.ki.domain.ArtEintrag;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.ki.domain.KiKlassifikation;
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
-import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadWissensquelleSeed;
 import ch.urinet.archiv.mandant.application.KonfigurationSeed;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -72,8 +71,7 @@ class ErfassungPromptTest {
             new NetworkntZusatzSchemaPruefer(Duration.ofSeconds(2), Duration.ofSeconds(2));
     private static final KonfigurationSeed SEED = new KlassenpfadKonfigurationSeed(
             new JsonKonfigurationsdateiCodec(JSON, ZUSATZ_SCHEMA,
-                    new PanacheKonfigurationVersionsRepository(JSON)),
-            new KlassenpfadWissensquelleSeed(JSON), ZUSATZ_SCHEMA);
+                    new PanacheKonfigurationVersionsRepository(JSON)));
 
     @Test
     void promptVerwendetKonfigurierteTexteFelderUndKlassifikationen() {

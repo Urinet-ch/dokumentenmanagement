@@ -451,7 +451,9 @@ public class WissenIngestSchritte {
     @Angenommen("im Mandanten «{word}» liegt die archivierte Wissensquelle «{word}» mit Vertraulichkeit «{word}» "
             + "und {int} Seiten")
     public void wissensquelle(String mandant, String name, String vertraulichkeit, int seiten) throws SQLException {
-        quelleAnlegen(mandant, name, "WISSENSQUELLE", vertraulichkeit, seiten);
+        quelleAnlegen(mandant, name, mandant.equals("vhf-gsk") ? "PROBE_VHF_BULLETIN" : "PROJEKTDOKUMENT",
+                vertraulichkeit, seiten);
+        Testdokumente.alsWissensquelleMarkieren(datenbank.get(), mandant, ort(name).id());
     }
 
     @Angenommen("die Wissensquelle «{word}» liegt im Status «{word}»")
@@ -459,6 +461,108 @@ public class WissenIngestSchritte {
         Ort ort = ort(name);
         ausfuehren("update " + schema(ort.mandant()) + ".dokument set status = ? where id = ?", status, ort.id());
         merken(name);
+    }
+
+    @Angenommen("dem Dokument «{word}» fehlt der Volltext")
+    public void ohneVolltext(String name) throws SQLException {
+        Ort ort = ort(name);
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set volltext = null where id = ?", ort.id());
+    }
+
+    @Angenommen("dem Dokument «{word}» fehlt die PDF\\/A-Fassung")
+    public void ohnePdfa(String name) throws SQLException {
+        Ort ort = ort(name);
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set pdfa_fehlt = true where id = ?", ort.id());
+    }
+
+    @Wenn("«{word}» markiert «{word}» als Wissensquelle")
+    public void markieren(String benutzer, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
+                .when().post("/api/v1/dokumente/" + ort(name).id() + "/wissensquelle");
+        if (antwort.statusCode() == 202) {
+            entwurfId = UUID.fromString(antwort.jsonPath().getString("entwurfId"));
+            entwuerfe.put(name, entwurfId);
+        }
+    }
+
+    @Wenn("«{word}» entfernt die Wissensquellenmarkierung von «{word}»")
+    public void markierungEntfernen(String benutzer, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
+                .when().delete("/api/v1/dokumente/" + ort(name).id() + "/wissensquelle");
+    }
+
+    @Wenn("«{word}» die Wissensquellen abruft")
+    public void wissensquellenAbrufen(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get("/api/v1/wissen/quellen");
+    }
+
+    @Dann("enthält die Wissensquellenliste «{word}» {word}")
+    public void wissensquellenliste(String name, String erwartet) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        List<String> ids = antwort.jsonPath().getList("dokumentId", String.class);
+        if ("nicht".equals(erwartet)) {
+            assertThat(ids).doesNotContain(ort(name).id().toString());
+        } else {
+            assertThat(erwartet).isEqualTo("sichtbar");
+            assertThat(ids).contains(ort(name).id().toString());
+            int position = ids.indexOf(ort(name).id().toString());
+            assertThat(antwort.<String>path("[" + position + "].art")).isNotBlank();
+            assertThat(antwort.<String>path("[" + position + "].titel")).isNotBlank();
+            assertThat(antwort.<String>path("[" + position + "].markiertAm")).isNotBlank();
+            assertThat(antwort.<String>path("[" + position + "].ingestStatus")).isNotBlank();
+        }
+    }
+
+    @Angenommen("zu «{word}» besteht die Wissensseite «{word}» mit Quelleneintrag")
+    public void seiteMitQuelle(String name, String pfad) throws SQLException {
+        Ort ort = ort(name);
+        seiteAnlegen(ort.mandant(), pfad, "NORMAL", "UNVERAENDERT", "Test");
+        UUID seite = wissensseiten.get(ort.mandant()).getLast();
+        ausfuehren("insert into " + schema(ort.mandant()) + ".wissensseite_quelle "
+                        + "(seite_id, schluessel, dokument_id, seite_von, seite_bis, auszug) "
+                        + "values (?, 'q-probe', ?, 1, 1, 'Synthetische Seite 1')", seite, ort.id());
+    }
+
+    @Dann("bleibt die Wissensseite «{word}» mit Quelleneintrag für «{word}» unverändert")
+    public void seiteUnveraendert(String pfad, String name) throws SQLException {
+        Ort ort = ort(name);
+        Map<String, Object> seite = zeile("select s.titel, s.inhalt, s.version, "
+                + "(select count(*) from " + schema(ort.mandant())
+                + ".wissensseite_quelle q where q.seite_id = s.id and q.dokument_id = ?) as quellen "
+                + "from " + schema(ort.mandant()) + ".wissensseite s where s.pfad = ?", ort.id(), pfad);
+        assertThat(seite.get("titel")).isEqualTo("UNVERAENDERT");
+        assertThat(seite.get("inhalt")).isEqualTo("Abgabefrist UNVERAENDERT");
+        assertThat(((Number) seite.get("version")).intValue()).isEqualTo(1);
+        assertThat(((Number) seite.get("quellen")).intValue()).isEqualTo(1);
+    }
+
+    @Dann("antwortet die Markierung mit Status {int} und Grund «{word}»")
+    public void markierungGrund(int status, String grund) {
+        assertThat(ProblemDetails.pruefen(antwort, status, "grund")).isEqualTo("KEINE_WISSENSQUELLE");
+        assertThat(antwort.<String>path("grund")).isEqualTo(grund);
+    }
+
+    @Dann("antwortet die Markierung mit Status {int}")
+    public void markierungStatus(int status) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(status);
+    }
+
+    @Dann("ist «{word}» als Wissensquelle {word}")
+    public void markierungPruefen(String name, String zustand) throws SQLException {
+        Ort ort = ort(name);
+        int anzahl = ((Number) zeile("select count(*) as anzahl from " + schema(ort.mandant())
+                + ".wissensquelle_markierung where dokument_id = ? and beendet_am is null", ort.id())
+                .get("anzahl")).intValue();
+        assertThat(anzahl).isEqualTo(zustand.equals("markiert") ? 1 : 0);
+    }
+
+    @Dann("protokolliert das Archiv «{word}» für «{word}» ohne Titel")
+    public void markierungProtokoll(String aktion, String name) throws SQLException {
+        Ort ort = ort(name);
+        assertThat(((Number) zeile("select count(*) as anzahl from " + schema(ort.mandant())
+                + ".zugriff_protokoll where aktion = ? and dokument_id = ? "
+                + "and (details is null or not details::text like '%Testdokument%')",
+                aktion, ort.id()).get("anzahl")).intValue()).isEqualTo(1);
     }
 
     @Angenommen("für «{word}» wartet bereits ein Ingest")

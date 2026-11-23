@@ -23,10 +23,10 @@ class VhfGskDokumentartSeedTest {
 
         JsonNode arten = seed.path("arten");
         JsonNode hinweise = new ObjectMapper().readTree(seed.path("_hinweise").asText());
-        assertThat(arten).hasSize(8);
+        assertThat(arten).hasSize(7);
         assertThat(arten).extracting(art -> art.path("code").asText())
                 .containsExactlyInAnyOrder("BULLETIN", "NORM_RICHTLINIE", "VORSTANDSPROTOKOLL", "MERKBLATT",
-                        "FORMULAR", "SONSTIGES", "JAHRESBERICHT", "WISSENSQUELLE");
+                        "FORMULAR", "SONSTIGES", "JAHRESBERICHT");
 
         assertThat(hinweise.path("verband").path("mehrfach").asBoolean()).isTrue();
         assertThat(hinweise.path("verband").path("suchfilter").asBoolean()).isTrue();
@@ -67,24 +67,18 @@ class VhfGskDokumentartSeedTest {
         assertThat(finde(arten, "VORSTANDSPROTOKOLL").path("vertraulichkeit").asText()).isEqualTo("INTERN");
     }
 
-    // Spec 04, Req 1.1: in vhf-gsk trägt WISSENSQUELLE zusätzlich die reservierten Felder zugriff und veroeffentlicht
     @Test
-    void wissensquelleHaeltDieFestenEigenschaftenUndGleichtDemTestSeed() throws IOException {
-        JsonNode art = finde(lesen("src/main/resources/seed/vhf-gsk/konfiguration.json").path("arten"),
-                "WISSENSQUELLE");
+    void produktionsUndTestSeedEnthaltenKeineEntfalleneWissensquelle() throws IOException {
+        for (String pfad : List.of("src/main/resources/seed/vhf-gsk/konfiguration.json",
+                "src/test/resources/seed/vhf-gsk/konfiguration.json")) {
+            assertThat(texteVonCodes(lesen(pfad).path("arten"))).doesNotContain("WISSENSQUELLE");
+        }
+    }
 
-        assertThat(texte(art.path("gruppen"))).containsExactly("frei");
-        assertThat(texte(art.path("pflichtfelder"))).contains("titel", "datum");
-        assertThat(art.path("aufbewahrung").path("jahre").isNull()).isTrue();
-        assertThat(art.path("gesetzlichePflicht").asBoolean()).isFalse();
-        assertThat(art.path("kiVorschlag").asBoolean()).isFalse();
-        assertThat(art.path("zusatzSchema").path("properties").has("herausgeber")).isTrue();
-        assertThat(art.path("zusatzSchema").path("additionalProperties").asBoolean(true)).isFalse();
-
-        // Der Test-Seed überdeckt den echten auf dem Klassenpfad; die Art muss dort gleich lauten.
-        JsonNode test = finde(lesen("src/test/resources/seed/vhf-gsk/konfiguration.json").path("arten"),
-                "WISSENSQUELLE");
-        assertThat(test).isEqualTo(art);
+    private static List<String> texteVonCodes(JsonNode arten) {
+        List<String> codes = new ArrayList<>();
+        arten.forEach(art -> codes.add(art.path("code").asText()));
+        return codes;
     }
 
     private static JsonNode lesen(String pfad) throws IOException {

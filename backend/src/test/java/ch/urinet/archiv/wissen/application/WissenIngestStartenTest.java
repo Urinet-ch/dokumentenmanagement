@@ -54,25 +54,25 @@ class WissenIngestStartenTest {
     }
 
     @Test
-    void archivierteWissensquelleStartetAutomatischMitSystemakteur() {
+    void markierteWissensquelleStartetMitDemMarkierendenBenutzer() {
         Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(true);
 
-        starten(speicher, auftraege).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
+        starten(speicher, auftraege).nachMarkierung(DOKUMENT_ID, "benutzer-id");
 
         assertThat(speicher.entwurf).satisfies(entwurf -> {
-            assertThat(entwurf.erstelltVon()).isEqualTo("process:wissen-ingest");
+            assertThat(entwurf.erstelltVon()).isEqualTo("benutzer-id");
             assertThat(entwurf.status()).isEqualTo("IN_ARBEIT");
         });
         assertThat(auftraege.eingereiht).hasSize(1);
     }
 
     @Test
-    void andereDokumentartLoestKeinenAutomatischenIngestAus() {
+    void archivierungLoestKeinenAutomatischenIngestAus() {
         Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(true);
 
-        starten(speicher, auftraege).archiviert(DOKUMENT_ID, "QUITTUNG");
+        new WissenDokumentEreignisse(null).archiviert(DOKUMENT_ID, "QUITTUNG");
 
         assertThat(speicher.geladen).isFalse();
         assertThat(speicher.entwurf).isNull();
@@ -80,11 +80,11 @@ class WissenIngestStartenTest {
     }
 
     @Test
-    void automatischerStartPrueftDieArtAusDerDatenbank() {
-        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+    void startNachMarkierungPrueftDieAktiveMarkierung() {
+        Speicher speicher = new Speicher(quelle(false, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 null, null));
 
-        starten(speicher, new Auftraege(true)).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
+        starten(speicher, new Auftraege(true)).nachMarkierung(DOKUMENT_ID, "benutzer-id");
 
         assertThat(speicher.entwurf).isNull();
     }
@@ -94,7 +94,7 @@ class WissenIngestStartenTest {
         Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(false);
 
-        starten(speicher, auftraege).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
+        starten(speicher, auftraege).nachMarkierung(DOKUMENT_ID, "benutzer-id");
 
         assertThat(speicher.entwurf.status()).isEqualTo("FEHLER");
         assertThat(speicher.entwurf.schritt()).isNull();
@@ -133,7 +133,7 @@ class WissenIngestStartenTest {
     @Test
     void seitenzahlOhnePassendeSeitentrennerVerhindertDenIngest() {
         // zwei Seiten im Volltext, drei im Dokument (Req 5.6)
-        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 3,
+        Speicher speicher = new Speicher(quelle(true, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 3,
                 true, null, null));
         Auftraege auftraege = new Auftraege(true);
 
@@ -148,7 +148,7 @@ class WissenIngestStartenTest {
 
     @Test
     void fehlendePdfaVerhindertDenIngest() {
-        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2,
+        Speicher speicher = new Speicher(quelle(true, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2,
                 false, null, null));
 
         WissenIngestStarten.Ergebnis ergebnis = starten(speicher, new Auftraege(true))
@@ -190,8 +190,8 @@ class WissenIngestStartenTest {
     }
 
     @Test
-    void statusKonfliktKommtVorFalscherArtUndUngueltigemSeitenbereich() {
-        Speicher speicher = new Speicher(quelle("QUITTUNG", "EINGANGSKORB", "NORMAL", "eins\fzwei\f", 2, true,
+    void statusKonfliktKommtVorFehlenderMarkierungUndUngueltigemSeitenbereich() {
+        Speicher speicher = new Speicher(quelle(false, "EINGANGSKORB", "NORMAL", "eins\fzwei\f", 2, true,
                 null, null));
 
         assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, 2, 1, "b"))
@@ -200,8 +200,8 @@ class WissenIngestStartenTest {
     }
 
     @Test
-    void laufenderIngestKommtVorFalscherArt() {
-        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+    void laufenderIngestKommtVorFehlenderMarkierung() {
+        Speicher speicher = new Speicher(quelle(false, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 null, null));
         speicher.laufend = true;
 
@@ -211,8 +211,8 @@ class WissenIngestStartenTest {
     }
 
     @Test
-    void falscheArtKommtVorUngueltigemSeitenbereich() {
-        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+    void fehlendeMarkierungKommtVorUngueltigemSeitenbereich() {
+        Speicher speicher = new Speicher(quelle(false, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 null, null));
 
         assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, 2, 1, "b"))
@@ -225,7 +225,7 @@ class WissenIngestStartenTest {
         Speicher speicher = new Speicher(quelle("NORMAL"));
         speicher.laufend = true;
 
-        starten(speicher, new Auftraege(true)).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
+        starten(speicher, new Auftraege(true)).nachMarkierung(DOKUMENT_ID, "benutzer-id");
 
         assertThat(speicher.entwurf).isNull();
     }
@@ -250,9 +250,9 @@ class WissenIngestStartenTest {
 
     @Test
     void budgetDerEinstellungenGehtDerKonfigurationVor() {
-        Speicher hoch = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher hoch = new Speicher(quelle(true, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 1_000_000, null));
-        Speicher tief = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher tief = new Speicher(quelle(true, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 1_000, null));
 
         WissenIngestStarten.Ergebnis durch = new WissenIngestStarten(hoch, STARTWERTE, new Auftraege(true))
@@ -288,9 +288,9 @@ class WissenIngestStartenTest {
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.BUDGET));
     }
 
-    private static Quelle quelle(String art, String status, String vertraulichkeit, String volltext, int seiten,
+    private static Quelle quelle(boolean markiert, String status, String vertraulichkeit, String volltext, int seiten,
                                  boolean pdfaVorhanden, Integer budgetTokens, Integer monatsbudgetTokens) {
-        return new Quelle(art, status, vertraulichkeit, true, volltext, seiten, pdfaVorhanden, budgetTokens,
+        return new Quelle(markiert, status, vertraulichkeit, true, volltext, seiten, pdfaVorhanden, budgetTokens,
                 monatsbudgetTokens);
     }
 
@@ -299,7 +299,7 @@ class WissenIngestStartenTest {
         for (int seite = 1; seite <= seiten; seite++) {
             volltext.append("Seite ").append(seite).append('\f');
         }
-        return new Quelle("WISSENSQUELLE", "ARCHIVIERT", vertraulichkeit, true, volltext.toString(), seiten,
+        return new Quelle(true, "ARCHIVIERT", vertraulichkeit, true, volltext.toString(), seiten,
                 true, null, null);
     }
 
@@ -309,7 +309,7 @@ class WissenIngestStartenTest {
         speicher.verbrauch = 10_000_000;
         Auftraege auftraege = new Auftraege(true);
 
-        starten(speicher, auftraege).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
+        starten(speicher, auftraege).nachMarkierung(DOKUMENT_ID, "benutzer-id");
 
         assertThat(speicher.entwurf.status()).isEqualTo("FEHLER");
         assertThat(speicher.entwurf.hinweis()).isEqualTo("Budget erschöpft");
@@ -318,7 +318,7 @@ class WissenIngestStartenTest {
 
     @Test
     void monatsbudgetDerEinstellungenGehtDerKonfigurationVor() {
-        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+        Speicher speicher = new Speicher(quelle(true, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 null, 100));
 
         assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, null, null, "b"))
