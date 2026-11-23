@@ -36,26 +36,76 @@ describe('Wissensoberfläche', () => {
 
   it('speichert Einstellungen und setzt leere Felder auf den Startwert zurück', async () => {
     const fixture = TestBed.createComponent(WissenEinstellungenSeite);
-    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({ budgetTokens: 123 });
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({ budgetTokens: 123000 }, { headers: { ETag: '"1"' } });
     await fixture.whenStable();
     const eingabe = fixture.nativeElement.querySelector('#wissen-budget') as HTMLInputElement;
-    eingabe.value = '456';
+    eingabe.value = '456000';
     fixture.nativeElement.querySelector('form').dispatchEvent(new Event('submit', { cancelable: true }));
     const anfrage = http.expectOne('/api/v1/wissensbasis/einstellungen');
     expect(anfrage.request.method).toBe('PUT');
+    expect(anfrage.request.headers.get('If-Match')).toBe('"1"');
     expect(anfrage.request.body).toEqual({
-      budgetTokens: 456, lintBudgetTokens: null, lintZeitplan: null, monatsbudgetTokens: null,
+      budgetTokens: 456000, lintBudgetTokens: null, lintZeitplan: null, monatsbudgetTokens: null,
     });
-    anfrage.flush(anfrage.request.body);
+    anfrage.flush(anfrage.request.body, { headers: { ETag: '"2"' } });
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).toContain(TEXTE.wissenEinstellungen.gespeichert);
+  });
+
+  it('verlangt eine ausdrückliche Bestätigung und zeigt die Auswirkungen', async () => {
+    const fixture = TestBed.createComponent(WissenEinstellungenSeite);
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({}, { headers: { ETag: '"1"' } });
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    element.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({
+      fehlercode: 'BESTAETIGUNG_NOETIG', auswirkung: [{ text: 'Das Budget wird erhöht.' }],
+    }, { status: 409, statusText: 'Conflict' });
+    await fixture.whenStable();
+    expect(element.textContent).toContain('Das Budget wird erhöht.');
+    [...element.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes(TEXTE.wissenEinstellungen.bestaetigen))!.click();
+    const bestaetigt = http.expectOne((anfrage) => anfrage.url === '/api/v1/wissensbasis/einstellungen');
+    expect(bestaetigt.request.params.get('bestaetigt')).toBe('true');
+    expect(bestaetigt.request.headers.get('If-Match')).toBe('"1"');
+    bestaetigt.flush({}, { headers: { ETag: '"2"' } });
+    await fixture.whenStable();
+    expect(element.textContent).toContain(TEXTE.wissenEinstellungen.gespeichert);
+  });
+
+  it('verhindert Speichern ohne Version und bietet bei Konflikt erneutes Laden an', async () => {
+    const fixture = TestBed.createComponent(WissenEinstellungenSeite);
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({}, { headers: { ETag: '"1"' } });
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    element.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({}, { status: 412, statusText: 'Precondition Failed' });
+    await fixture.whenStable();
+    element.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    http.expectNone('/api/v1/wissensbasis/einstellungen');
+    await fixture.whenStable();
+    expect(element.textContent).toContain(TEXTE.wissenEinstellungen.versionFehlt);
+  });
+
+  it('bietet bei Step-up eine erneute Anmeldung an', async () => {
+    const fixture = TestBed.createComponent(WissenEinstellungenSeite);
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({}, { headers: { ETag: '"1"' } });
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    element.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({ fehlercode: 'STEP_UP_NOETIG' },
+      { status: 401, statusText: 'Unauthorized' });
+    await fixture.whenStable();
+    expect(element.textContent).toContain(TEXTE.wissenEinstellungen.frischAnmeldenHinweis);
+    expect([...element.querySelectorAll('button')]
+      .some((button) => button.textContent?.includes(TEXTE.wissenEinstellungen.frischAnmelden))).toBe(true);
   });
 
   it('fragt den Exportstatus ab und zeigt nach Abschluss Download und Prüfsumme', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       const fixture = TestBed.createComponent(WissenEinstellungenSeite);
-      http.expectOne('/api/v1/wissensbasis/einstellungen').flush({});
+      http.expectOne('/api/v1/wissensbasis/einstellungen').flush({}, { headers: { ETag: '"1"' } });
       fixture.detectChanges();
       const element = fixture.nativeElement as HTMLElement;
       const start = [...element.querySelectorAll('button')]
@@ -80,7 +130,7 @@ describe('Wissensoberfläche', () => {
 
   it('zeigt einen unvollständigen fertigen Export nicht als Download an', async () => {
     const fixture = TestBed.createComponent(WissenEinstellungenSeite);
-    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({});
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({}, { headers: { ETag: '"1"' } });
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     [...element.querySelectorAll('button')]

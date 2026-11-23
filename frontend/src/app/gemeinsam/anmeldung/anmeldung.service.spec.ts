@@ -85,6 +85,13 @@ describe('AnmeldungService (Req 2.1)', () => {
     return new URL(weiterleitung.mock.lastCall![0]);
   }
 
+  it('fordert für Step-up eine frische Anmeldung bei Keycloak an', async () => {
+    await dienst.anmelden('/wissensbasis/einstellungen', true);
+    const adresse = new URL(weiterleitung.mock.lastCall![0]);
+    expect(adresse.searchParams.get('max_age')).toBe('0');
+    expect(adresse.searchParams.get('prompt')).toBe('login');
+  });
+
   function idToken(adresse: URL, abweichend: Record<string, unknown> = {}): string {
     return jwt({ iss: AUSSTELLER, aud: 'archiv-pwa', nonce: adresse.searchParams.get('nonce'), ...abweichend });
   }

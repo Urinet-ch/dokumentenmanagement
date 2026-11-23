@@ -52,6 +52,7 @@ public class ProblemFehlerRoute {
     private static final int EINSTELLUNGEN_MAX_BYTES = 16 * 1024;
     private static final String EINSTELLUNGEN_PATCH = "^/api/v1/mandant/einstellungen/?$";
     private static final String EINSTELLUNGEN_POST = "^/api/v1/mandant/einstellungen/(vorschau|zuruecksetzen)/?$";
+    private static final String WISSEN_EINSTELLUNGEN_PUT = "^/api/v1/wissensbasis/einstellungen/?$";
 
     private final Optional<MemorySize> grenze;
     private final MemorySize grenzeOhneUpload;
@@ -82,6 +83,9 @@ public class ProblemFehlerRoute {
                 .handler(BodyHandler.create(false).setBodyLimit(EINSTELLUNGEN_MAX_BYTES))
                 .failureHandler(this::begrenzteAnfrageZuGross);
         router.postWithRegex(EINSTELLUNGEN_POST).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
+                .handler(BodyHandler.create(false).setBodyLimit(EINSTELLUNGEN_MAX_BYTES))
+                .failureHandler(this::begrenzteAnfrageZuGross);
+        router.putWithRegex(WISSEN_EINSTELLUNGEN_PUT).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
                 .handler(BodyHandler.create(false).setBodyLimit(EINSTELLUNGEN_MAX_BYTES))
                 .failureHandler(this::begrenzteAnfrageZuGross);
         router.route(API).order(RouteConstants.ROUTE_ORDER_UPLOAD_LIMIT - 1).handler(this::grenzePruefen);

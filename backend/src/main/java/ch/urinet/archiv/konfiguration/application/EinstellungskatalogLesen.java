@@ -4,6 +4,7 @@ import ch.urinet.archiv.ki.application.oeffentlich.MandantBudget;
 import ch.urinet.archiv.konfiguration.domain.Einstellungskatalog;
 import ch.urinet.archiv.konfiguration.domain.Einstellungskatalog.Einstellung;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration.Einstellungen;
+import ch.urinet.archiv.konfiguration.domain.Wissenszeitplan;
 import ch.urinet.archiv.mandant.application.BrandingVerzeichnis;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.domain.Branding;
@@ -11,7 +12,6 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
-import ch.urinet.archiv.wissen.application.WissenEinstellungenRepository;
 import ch.urinet.archiv.wissen.application.WissenKonfiguration;
 import ch.urinet.archiv.wissen.application.WissenLintStarten;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,14 +21,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.time.DayOfWeek;
 import java.time.Period;
 import java.util.List;
-import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @ApplicationScoped
 public class EinstellungskatalogLesen {
-    private static final Pattern WOCHENPLAN = Pattern.compile("^0 0 (\\d{1,2}) \\? \\* (MON|TUE|WED|THU|FRI|SAT|SUN)$");
-
     public record Eintrag(String schluessel, Einstellungskatalog.Gruppe gruppe, String name, String beschreibung,
                           Einstellungskatalog.Typ typ, String einheit, Integer minimum, Integer maximum,
                           String formregel, Object standard, Object aktuellerWert, boolean eigenerWert,
@@ -49,7 +44,6 @@ public class EinstellungskatalogLesen {
     private final MandantBudget budget;
     private final EinstellungsStartwerte startwerte;
     private final BrandingVerzeichnis brandings;
-    private final WissenEinstellungenRepository wissen;
     private final WissenKonfiguration wissenKonfiguration;
     private final WissenLintStarten lint;
     private final long lintBudget;
@@ -57,8 +51,8 @@ public class EinstellungskatalogLesen {
 
     public EinstellungskatalogLesen(KonfigurationVerwaltung konfiguration, MandantAufloesung aufloesung,
                                     MandantBudget budget, EinstellungsStartwerte startwerte,
-                                    BrandingVerzeichnis brandings, WissenEinstellungenRepository wissen,
-                                    WissenKonfiguration wissenKonfiguration, WissenLintStarten lint,
+                                    BrandingVerzeichnis brandings, WissenKonfiguration wissenKonfiguration,
+                                    WissenLintStarten lint,
                                     @ConfigProperty(name = "archiv.wissen.lint-budget-tokens", defaultValue = "100000")
                                     long lintBudget,
                                     @ConfigProperty(name = "archiv.wissen.lint-zeitplan",
@@ -68,7 +62,6 @@ public class EinstellungskatalogLesen {
         this.budget = budget;
         this.startwerte = startwerte;
         this.brandings = brandings;
-        this.wissen = wissen;
         this.wissenKonfiguration = wissenKonfiguration;
         this.lint = lint;
         this.lintBudget = lintBudget;
@@ -80,7 +73,7 @@ public class EinstellungskatalogLesen {
         MandantCode mandant = aufloesung.pruefen();
         var aktuell = konfiguration.aktuell();
         var start = startwerte.lesen();
-        var wissenswerte = wissen.lesen();
+        var wissenswerte = aktuell.einstellungen().wissen();
         Branding branding = brandings.fuerMandant(mandant).orElse(Branding.STANDARD);
         String zeitplan = lint.zeitplan();
         List<Eintrag> eintraege = Einstellungskatalog.alle().stream()
@@ -89,19 +82,18 @@ public class EinstellungskatalogLesen {
                 .map(e -> eintrag(e, aktuell.einstellungen(), mandant, branding, start, wissenswerte, zeitplan))
                 .toList();
         return new Ergebnis(aktuell.version(), eintraege,
-                new Betrieb(budget.stand(mandant), start.wissenMonatsbudget()));
+                new Betrieb(budget.stand(mandant), wissenswerte.monatsbudgetTokens() == null
+                        ? start.wissenMonatsbudget() : wissenswerte.monatsbudgetTokens()));
     }
 
     private Eintrag eintrag(Einstellung einstellung, Einstellungen werte, MandantCode mandant, Branding branding,
                             ch.urinet.archiv.konfiguration.domain.EinstellungsRisiko.Startwerte start,
-                            ch.urinet.archiv.wissen.application.WissenEinstellungen.Werte wissenswerte,
+                            ch.urinet.archiv.konfiguration.domain.Konfiguration.WissenEinstellungen wissenswerte,
                             String zeitplan) {
         String schluessel = einstellung.schluessel();
         boolean wissenEinstellung = schluessel.startsWith("wissen.");
         Object eigenerWert = wissenEinstellung ? eigenerWissenswert(schluessel, wissenswerte)
                 : eigenerWert(schluessel, werte);
-        boolean eigenerWissenszeitplan = schluessel.startsWith("wissen.lintZeitplan.")
-                && wissenswerte.lintZeitplan() != null;
         Object standard = switch (schluessel) {
             case "branding.name" -> branding.name();
             case "branding.primaerfarbe" -> branding.primaerfarbe();
@@ -114,34 +106,37 @@ public class EinstellungskatalogLesen {
             case "wissen.lintZeitplan.stunde" -> stunde(lintStandardZeitplan);
             default -> einstellung.standardFuer(mandant.wert());
         };
-        String hinweis = schluessel.startsWith("wissen.lintZeitplan.")
-                && (eigenerWissenszeitplan ? eigenerWert == null : standard == null)
-                ? "Der bisherige Zeitplan lässt sich nicht als einzelner Wochentag und Stunde darstellen: " + zeitplan
+        boolean nichtDarstellbarerStandard = schluessel.startsWith("wissen.lintZeitplan.")
+                && eigenerWert == null && standard == null;
+        boolean teilplan = wissenswerte.lintZeitplan().wochentag() != null
+                || wissenswerte.lintZeitplan().stunde() != null;
+        String hinweis = nichtDarstellbarerStandard
+                ? teilplan
+                    ? "Der instanzweite Zeitplan ist nicht darstellbar; der fehlende Teil verwendet den Katalogstandard."
+                    : "Der bisherige Zeitplan lässt sich nicht als einzelner Wochentag und Stunde darstellen: " + zeitplan
                 : schluessel.equals("chat.aufbewahrungMonate") && standard instanceof String
                 ? "Die bisherige Aufbewahrung ist eine ISO-8601-Periode und keine ganze Monatszahl." : null;
-        if (wissenEinstellung) {
-            String sperre = "Bis zur Überführung der Wissenseinstellungen ändern Sie diesen Wert über "
-                    + "/wissensbasis/einstellungen.";
-            hinweis = hinweis == null ? sperre : hinweis + " " + sperre;
-        }
+        Object aktuellerWert = eigenerWert == null ? switch (schluessel) {
+            case "wissen.lintZeitplan.wochentag" -> tag(zeitplan);
+            case "wissen.lintZeitplan.stunde" -> stunde(zeitplan);
+            default -> standard;
+        } : eigenerWert;
         var zahl = einstellung.zahl();
         return new Eintrag(schluessel, einstellung.gruppe(), einstellung.name(), einstellung.beschreibung(),
                 einstellung.typ(), einstellung.einheit(), zahl == null ? null : zahl.minimum(),
                 zahl == null ? null : zahl.maximum(), formregel(einstellung), standard,
-                eigenerWissenszeitplan ? eigenerWert : eigenerWert == null ? standard : eigenerWert,
-                eigenerWert != null || eigenerWissenszeitplan,
+                aktuellerWert, eigenerWert != null,
                 einstellung.risiko() != Einstellungskatalog.Risiko.KEINES, einstellung.wirksamAb(), hinweis);
     }
 
     private static Object eigenerWissenswert(String schluessel,
-                                               ch.urinet.archiv.wissen.application.WissenEinstellungen.Werte werte) {
+            ch.urinet.archiv.konfiguration.domain.Konfiguration.WissenEinstellungen werte) {
         return switch (schluessel) {
             case "wissen.budgetTokens" -> werte.budgetTokens();
             case "wissen.lintBudgetTokens" -> werte.lintBudgetTokens();
             case "wissen.monatsbudgetTokens" -> werte.monatsbudgetTokens();
-            case "wissen.lintZeitplan.wochentag" -> werte.lintZeitplan() == null ? null : tag(werte.lintZeitplan());
-            case "wissen.lintZeitplan.stunde" -> werte.lintZeitplan() == null ? null
-                    : stunde(werte.lintZeitplan());
+            case "wissen.lintZeitplan.wochentag" -> werte.lintZeitplan().wochentag();
+            case "wissen.lintZeitplan.stunde" -> werte.lintZeitplan().stunde();
             default -> throw new IllegalStateException("Wissenseinstellung ohne Wert");
         };
     }
@@ -176,24 +171,12 @@ public class EinstellungskatalogLesen {
     }
 
     private static DayOfWeek tag(String zeitplan) {
-        Matcher treffer = WOCHENPLAN.matcher(zeitplan.toUpperCase(Locale.ROOT));
-        if (!treffer.matches()) {
-            return null;
-        }
-        return switch (treffer.group(2)) {
-            case "MON" -> DayOfWeek.MONDAY;
-            case "TUE" -> DayOfWeek.TUESDAY;
-            case "WED" -> DayOfWeek.WEDNESDAY;
-            case "THU" -> DayOfWeek.THURSDAY;
-            case "FRI" -> DayOfWeek.FRIDAY;
-            case "SAT" -> DayOfWeek.SATURDAY;
-            case "SUN" -> DayOfWeek.SUNDAY;
-            default -> throw new IllegalStateException("Zeitplan ohne Wochentag");
-        };
+        return Wissenszeitplan.lesen(zeitplan).map(
+                ch.urinet.archiv.konfiguration.domain.Konfiguration.LintZeitplan::wochentag).orElse(null);
     }
 
     private static Integer stunde(String zeitplan) {
-        Matcher treffer = WOCHENPLAN.matcher(zeitplan.toUpperCase(Locale.ROOT));
-        return treffer.matches() ? Integer.valueOf(treffer.group(1)) : null;
+        return Wissenszeitplan.lesen(zeitplan).map(
+                ch.urinet.archiv.konfiguration.domain.Konfiguration.LintZeitplan::stunde).orElse(null);
     }
 }
