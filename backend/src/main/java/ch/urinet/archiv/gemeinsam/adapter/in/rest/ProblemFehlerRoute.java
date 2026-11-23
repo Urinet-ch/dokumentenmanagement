@@ -48,6 +48,7 @@ public class ProblemFehlerRoute {
     static final String MULTIPART = "multipart/form-data";
     static final int BEWERTUNG_MAX_BYTES = 8191;
     private static final String BEWERTUNG_PFAD = "^/api/v1/chat/nachrichten/[^/]+/bewertung/?$";
+    private static final String GESPRAECHE_POST = "^/api/v1/chat/gespraeche/?$";
     private static final int EINSTELLUNGEN_MAX_BYTES = 16 * 1024;
     private static final String EINSTELLUNGEN_PATCH = "^/api/v1/mandant/einstellungen/?$";
     private static final String EINSTELLUNGEN_POST = "^/api/v1/mandant/einstellungen/(vorschau|zuruecksetzen)/?$";
@@ -65,6 +66,18 @@ public class ProblemFehlerRoute {
     void einrichten(@Observes Router router) {
         router.putWithRegex(BEWERTUNG_PFAD).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
                 .handler(BodyHandler.create(false).setBodyLimit(BEWERTUNG_MAX_BYTES))
+                .failureHandler(this::begrenzteAnfrageZuGross);
+        // der Körper ist hier optional: ohne Körper (Content-Length 0) gibt es nichts zu begrenzen, und der BodyHandler
+        // würde auf ein Ende warten, das schon eingetroffen ist
+        BodyHandler gespraecheKoerper = BodyHandler.create(false).setBodyLimit(BEWERTUNG_MAX_BYTES);
+        router.postWithRegex(GESPRAECHE_POST).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
+                .handler(kontext -> {
+                    if ("0".equals(kontext.request().getHeader(HttpHeaders.CONTENT_LENGTH))) {
+                        kontext.next();
+                    } else {
+                        gespraecheKoerper.handle(kontext);
+                    }
+                })
                 .failureHandler(this::begrenzteAnfrageZuGross);
         router.patchWithRegex(EINSTELLUNGEN_PATCH).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
                 .handler(BodyHandler.create(false).setBodyLimit(EINSTELLUNGEN_MAX_BYTES))
