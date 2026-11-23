@@ -3,6 +3,9 @@
   <h1>{{ benutzer() ? name(benutzer()!) : texte.titel }}</h1>
   <a routerLink="/verwaltung/benutzer">{{ texte.zurListe }}</a>
 </div>
+@if (aktionMeldung(); as meldung) {
+  <p class="hinweis ok" role="status">{{ meldung }}</p>
+}
 @if (fehler(); as meldung) {
   <div class="hinweis gefahr" role="alert">
     <p>{{ meldung }}</p>
@@ -34,6 +37,41 @@
       <p class="hinweis">{{ texte.voruebergehendGesperrt }}</p>
     }
   </section>
+
+  @if (darfVerwalten()) {
+    <app-benutzer-profil [person]="person" (abgeschlossen)="aktionAbgeschlossen()" />
+    <app-benutzer-statusaktionen
+      [person]="person"
+      [akteurId]="aktuellerBenutzerId()"
+      (abgeschlossen)="aktionAbgeschlossen()" />
+
+    @if (person.id !== aktuellerBenutzerId() && person.status === 'DEAKTIVIERT') {
+      <section class="karte">
+        <h2>{{ loeschdialogTexte.titel }}</h2>
+        <app-benutzer-loeschen [person]="person" (abgeschlossen)="loeschenAbgeschlossen($event)" />
+      </section>
+    }
+
+    @if (darfRolleAendern() && person.id !== aktuellerBenutzerId()) {
+      @if (rollenListe(); as verfuegbareRollen) {
+        <section class="karte">
+          <h2>{{ rollenaktionTexte.oeffnen }}</h2>
+          <app-benutzer-rollenaktion
+            [person]="person"
+            [akteurId]="aktuellerBenutzerId()"
+            [rollen]="verfuegbareRollen"
+            (abgeschlossen)="aktionAbgeschlossen($event.antrag)" />
+        </section>
+      } @else if (rollenFehler(); as rollenMeldung) {
+        <div class="hinweis gefahr" role="alert">
+          <p>{{ rollenMeldung }}</p>
+          <button mat-button type="button" (click)="verfuegbareRollenLaden()">{{ texte.erneut }}</button>
+        </div>
+      } @else {
+        <p role="status">{{ texte.rollenLaden }}</p>
+      }
+    }
+  }
 
   <section class="karte">
     <h2>{{ texte.rechte }}</h2>

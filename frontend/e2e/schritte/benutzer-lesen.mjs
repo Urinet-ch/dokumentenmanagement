@@ -22,12 +22,20 @@ const ROLLE = {
 
 Given('die Benutzerverwaltung liefert synthetische Daten', async function () {
   this.benutzerAnfragen = [];
+  this.benutzerEinladungen = [];
+  this.benutzerAktionen = [];
   await this.seite.route((url) => url.pathname === '/api/v1/rollen'
     || url.pathname === '/api/v1/benutzer' || url.pathname.startsWith('/api/v1/benutzer/'), async (route) => {
     const url = new URL(route.request().url());
     this.benutzerAnfragen.push(url.pathname);
     let antwort;
-    if (url.pathname === '/api/v1/benutzer') antwort = [PERSON];
+    if (url.pathname === '/api/v1/benutzer/probe/sperren' && route.request().method() === 'POST') {
+      this.benutzerAktionen.push({ aktion: 'sperren', body: route.request().postDataJSON() });
+      return route.fulfill({ status: 204 });
+    } else if (url.pathname === '/api/v1/benutzer' && route.request().method() === 'POST') {
+      this.benutzerEinladungen.push(route.request().postDataJSON());
+      antwort = { id: 'synthetische-einladung' };
+    } else if (url.pathname === '/api/v1/benutzer') antwort = [PERSON];
     else if (url.pathname === '/api/v1/benutzer/probe') antwort = PERSON;
     else if (url.pathname === '/api/v1/benutzer/probe/rechte') antwort = ROLLE;
     else if (url.pathname === '/api/v1/rollen') antwort = [ROLLE];
@@ -41,14 +49,63 @@ Given('die Benutzerverwaltung liefert synthetische Daten', async function () {
   });
 });
 
+When('ich sende eine synthetische Benutzereinladung', async function () {
+    for (const [feld, wert] of Object.entries({
+      benutzername: 'probe.einladung',
+      email: 'probe@example.invalid',
+      vorname: 'Synthetisch',
+      nachname: 'Probe',
+    })) {
+      await this.seite.getByLabel(feld === 'email' ? 'E-Mail-Adresse' : feld[0].toUpperCase() + feld.slice(1))
+        .fill(wert);
+    }
+    await this.seite.locator('#einladung-rolle').selectOption('mitarbeiter');
+    await this.seite.getByRole('button', { name: 'Einladung senden' }).click();
+});
+
+When('ich öffne den Dialog zum Sperren', async function () {
+    await this.seite.getByRole('button', { name: 'Benutzer sperren', exact: true }).click();
+});
+
+When('ich die Sperrung bestätige', async function () {
+    await this.seite.locator('#status-grund').selectOption({ index: 1 });
+    await this.seite.getByRole('dialog').getByRole('button', { name: 'Bestätigen', exact: true }).click();
+});
+
+Then('wird die Einladung bestätigt, ohne Passwort oder Link anzuzeigen', async function () {
+    await this.seite.getByText('Die Person erhält eine Einladung per E-Mail und richtet ihr Passwort und die Zwei-Faktor-Anmeldung selbst ein.', { exact: true }).waitFor();
+    assert.equal(this.benutzerEinladungen.length, 1);
+    assert.equal(this.benutzerEinladungen[0].email, 'probe@example.invalid');
+    const formular = this.seite.locator('app-benutzer-einladen');
+    assert.equal(await formular.locator('input[type="password"], a[href]').count(), 0);
+    await pruefen(this, 'einladung');
+});
+
+Then('zeigt der Sperrdialog die Auswirkung und wartet auf die Bestätigung', async function () {
+    const dialog = this.seite.getByRole('dialog');
+    await dialog.getByText('Die Anmeldung wird gesperrt und die Sitzungen werden beendet.', { exact: false }).waitFor();
+    await dialog.getByLabel('Grund').waitFor();
+    assert.equal(this.benutzerAktionen.length, 0);
+    await pruefen(this, 'sperren-dialog');
+});
+
+Then('wird die Sperrung erst nach der Bestätigung einmal gesendet', async function () {
+    await this.seite.getByRole('dialog').waitFor({ state: 'detached' });
+    assert.deepEqual(this.benutzerAktionen, [{ aktion: 'sperren', body: { grund: 'SICHERHEIT' } }]);
+});
+
 async function pruefen(welt, name) {
+  await welt.seite.waitForTimeout(250);
   await welt.seite.addScriptTag({ content: axe.source });
   const ergebnis = await welt.seite.evaluate(async () => ({
     ueberlauf: [document.documentElement, document.querySelector('mat-sidenav-content')]
       .filter(Boolean).some((element) => element.scrollWidth > element.clientWidth),
     befunde: (await window.axe.run(document, {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
-    })).violations.map(({ id, nodes }) => ({ id, targets: nodes.map((node) => node.target) })),
+    })).violations.map(({ id, nodes }) => ({
+      id,
+      targets: nodes.map((node) => ({ target: node.target, failureSummary: node.failureSummary })),
+    })),
   }));
   assert.equal(ergebnis.ueberlauf, false, `${name}: horizontaler Überlauf`);
   assert.deepEqual(ergebnis.befunde, [], `${name}: ${JSON.stringify(ergebnis.befunde)}`);

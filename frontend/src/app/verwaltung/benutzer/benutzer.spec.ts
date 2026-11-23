@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
+import { AnmeldungService } from '../../gemeinsam/anmeldung/anmeldung.service';
 import { Ansicht, BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { BenutzerDetail } from './benutzer-detail';
@@ -21,10 +22,15 @@ const ROLLE: VerwaltungRolle = {
     { aktion: 'A21', bezeichnung: 'Benutzer ansehen', ergebnis: 'VERBOTEN', fussnoten: [] },
   ],
 };
+const anmeldung = {
+  benutzer: vi.fn((): { id: string; name: string; mandant: string; rolle: 'inhaber' } | null => null),
+  darf: vi.fn().mockReturnValue(false),
+};
 
 describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
   const service = {
     apiV1BenutzerGet: vi.fn(),
+    apiV1BenutzerPost: vi.fn(),
     apiV1RollenGet: vi.fn(),
     apiV1BenutzerAntraegeGet: vi.fn(),
     apiV1BenutzerBenutzerIdGet: vi.fn(),
@@ -39,10 +45,16 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     service.apiV1BenutzerAntraegeGet.mockReset().mockReturnValue(of([
       { id: 'antrag', art: 'INHABER_ROLLE', ziel: 'probe', beantragtVon: 'andere', gueltigBis: '2026-11-24T20:00:00Z' },
     ]));
+    anmeldung.benutzer.mockReturnValue(null);
+    anmeldung.darf.mockReset().mockReturnValue(false);
     vorbereiten?.();
     TestBed.configureTestingModule({
       imports: [BenutzerListe],
-      providers: [provideRouter([]), { provide: BenutzerverwaltungService, useValue: service }],
+      providers: [
+        provideRouter([]),
+        { provide: BenutzerverwaltungService, useValue: service },
+        { provide: AnmeldungService, useValue: anmeldung },
+      ],
     });
     fixture = TestBed.createComponent(BenutzerListe);
     element = fixture.nativeElement as HTMLElement;
@@ -67,6 +79,20 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
       .filter((heading) => heading.textContent?.trim() === TEXTE.benutzer.titel)).toHaveLength(1);
     expect(element.querySelector('.pille.info')?.textContent).toContain('Nur eigene');
     expect(element.querySelector('.pille.gefahr')?.textContent).toContain('Nicht erlaubt');
+  });
+
+  it('zeigt das Einladungsformular nur bei A22 und A23', async () => {
+    await starten(() => anmeldung.darf.mockImplementation((aktion: string) => aktion === 'A22' || aktion === 'A23'));
+    expect(element.querySelector('app-benutzer-einladen')).not.toBeNull();
+  });
+
+  it('zeigt unbekannte Rechte-Ergebnisse mit dem sicheren Fallbacktext', async () => {
+    await starten(() => service.apiV1RollenGet.mockReturnValueOnce(of([JSON.parse(`{
+      "code":"inhaber", "beschreibung":"Inhaberin oder Inhaber",
+      "rechte":[{"aktion":"A21","bezeichnung":"Benutzer ansehen","ergebnis":"ZUKUENFTIG","fussnoten":[]}]
+    }`)])));
+    expect(element.textContent).toContain(TEXTE.benutzer.unbekannt);
+    expect(element.textContent).not.toContain('ZUKUENFTIG');
   });
 
   it('verwirft eine veraltete Suchantwort und setzt die Seitennummer zurück', async () => {
@@ -189,12 +215,16 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
   const service = {
     apiV1BenutzerBenutzerIdGet: vi.fn(),
     apiV1BenutzerBenutzerIdRechteGet: vi.fn(),
+    apiV1RollenGet: vi.fn(),
   };
   const parameter = new BehaviorSubject(convertToParamMap({ id: 'probe' }));
 
   async function starten(person: BenutzerAnsicht = PERSON, vorbereiten?: () => void) {
     service.apiV1BenutzerBenutzerIdGet.mockReset().mockReturnValue(of(person));
     service.apiV1BenutzerBenutzerIdRechteGet.mockReset().mockReturnValue(of(ROLLE));
+    service.apiV1RollenGet.mockReset().mockReturnValue(of([ROLLE]));
+    anmeldung.benutzer.mockReturnValue(null);
+    anmeldung.darf.mockReset().mockReturnValue(false);
     vorbereiten?.();
     parameter.next(convertToParamMap({ id: 'probe' }));
     TestBed.configureTestingModule({
@@ -202,6 +232,7 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
       providers: [
         provideRouter([]),
         { provide: BenutzerverwaltungService, useValue: service },
+        { provide: AnmeldungService, useValue: anmeldung },
         { provide: ActivatedRoute, useValue: { paramMap: parameter } },
       ],
     });
@@ -220,6 +251,18 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
     expect(element.textContent).toContain(TEXTE.benutzer.apiTokenHinweis);
     expect(element.textContent).toContain('22.11.2026');
     expect(element.querySelector('a[href="/verwaltung/api-tokens"]')).not.toBeNull();
+  });
+
+  it('bindet Profil-, Status- und Rollenaktionen nur mit den passenden Rechten ein', async () => {
+    const fixture = await starten(PERSON, () => {
+      anmeldung.benutzer.mockReturnValue({ id: 'inhaber', name: 'Inhaberin', mandant: 'urinet', rolle: 'inhaber' });
+      anmeldung.darf.mockReturnValue(true);
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('app-benutzer-profil')).not.toBeNull();
+    expect(element.querySelector('app-benutzer-statusaktionen')).not.toBeNull();
+    expect(element.querySelector('app-benutzer-rollenaktion')).not.toBeNull();
+    expect(service.apiV1RollenGet).toHaveBeenCalledOnce();
   });
 
   it('fragt bei Rollenkonflikt keine falschen Rechte ab', async () => {

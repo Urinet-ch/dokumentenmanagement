@@ -14,6 +14,10 @@
     <small id="such-hinweis">{{ texte.suchHinweis }}</small>
   </form>
 
+  @if (einladbareRollen(); as verfuegbareRollen) {
+    <app-benutzer-einladen [rollen]="verfuegbareRollen" (abgeschlossen)="laden(seite())" />
+  }
+
   @if (listenFehler(); as fehler) {
     <div class="hinweis gefahr" role="alert">
       <p>{{ fehler }}</p>

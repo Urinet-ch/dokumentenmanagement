@@ -34,11 +34,10 @@ export interface BenutzerStatusdialogErgebnis {
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button type="button" [mat-dialog-close]="null">{{ texte.abbrechen }}</button>
+      <button mat-button class="sekundaer" type="button" [mat-dialog-close]="null">{{ texte.abbrechen }}</button>
       <button mat-button type="button" [class.gefaehrlich]="brauchtGrund" [disabled]="brauchtGrund && !grund()"
         [mat-dialog-close]="ergebnis()">{{ texte.bestaetigen }}</button>
     </mat-dialog-actions>`,
-  styles: `.gefaehrlich:not(:disabled) { color: var(--gefahr); }`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BenutzerStatusdialog {

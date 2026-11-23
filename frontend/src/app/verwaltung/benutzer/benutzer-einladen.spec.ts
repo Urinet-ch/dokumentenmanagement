@@ -57,7 +57,18 @@ describe('Benutzer einladen', () => {
     });
     expect(ergebnis).toHaveBeenCalledWith({ id: 'neuer-benutzer', antrag: true });
     fixture.detectChanges();
+    expect(element.textContent).toContain(TEXTE.benutzerEinladen.antrag);
     expect(element.querySelector<HTMLInputElement>('#einladung-email')!.value).toBe('');
+  });
+
+  it('bestätigt die E-Mail-Einladung ohne Passwort oder Einladungslink anzuzeigen', () => {
+    api.apiV1BenutzerPost.mockReturnValue(of({ id: 'neuer-benutzer' }));
+    const { fixture, element } = starten();
+    ausfuellen(element);
+    element.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    fixture.detectChanges();
+    expect(element.textContent).toContain(TEXTE.benutzerEinladen.erfolg);
+    expect(element.querySelector('input[type="password"], a[href]')).toBeNull();
   });
 
   it('zeigt Befunde vom Server am Feld und erhält die Eingaben', () => {

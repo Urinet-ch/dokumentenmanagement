@@ -10,3 +10,13 @@ Rechte-Übersicht nicht verfügbar.
 Auf der Benutzerseite finden Sie auch offene Anträge und die Rechte je Rolle. Die Rechte sind in Gruppen geordnet;
 Hinweise erläutern Einschränkungen. API-Tokens und Webseiten-Schlüssel bleiben beim Sperren oder Deaktivieren eines
 Benutzers gültig. API-Tokens verwalten Sie auf der separaten Seite «API-Tokens».
+
+Als Inhaberin oder Inhaber können Sie Benutzer einladen und auf der Detailseite Angaben ändern, den Zugang verwalten,
+Rollen ändern und Benutzer löschen. Eine Einladung verschickt Keycloak per E-Mail; das Archiv zeigt weder Passwort noch
+Einladungslink. Falls Ihre Sitzung für eine Änderung nicht mehr frisch genug ist, fragt das Archiv erneut nach Ihrer
+Anmeldung und setzt den Vorgang einmal fort. Nach einer Änderung sehen Sie eine Bestätigung oder bei Vorgängen mit
+Vier-Augen-Freigabe einen offenen Antrag.
+
+Sperren, Deaktivieren und Rollenänderungen verlangen eine Bestätigung vor dem Ausführen. Beim Löschen zeigt das Archiv
+zuerst die Zahl der zugehörigen Dokumente und Protokolleinträge. Sie müssen den Benutzernamen exakt eingeben und einen
+Grund auswählen. Protokolleinträge und dokumentierte Verweise bleiben erhalten.

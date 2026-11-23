@@ -72,7 +72,10 @@ export class BenutzerStatusaktionen {
     const akteurId = this.akteurId();
     this.fehler.set(null);
     this.laufend.set(true);
-    this.geoeffnet = this.dialog.open(BenutzerStatusdialog, { data: { aktion, benutzername } });
+    this.geoeffnet = this.dialog.open(BenutzerStatusdialog, {
+      data: { aktion, benutzername },
+      panelClass: 'benutzer-status-dialog',
+    });
     this.geoeffnet.afterClosed().pipe(takeUntilDestroyed(this.zerstoert)).subscribe((ergebnis) => {
       this.geoeffnet = undefined;
       if (!ergebnis || this.akteurId() !== akteurId || this.person().id !== id || this.person().benutzername !== benutzername

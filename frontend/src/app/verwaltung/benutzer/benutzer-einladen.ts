@@ -20,6 +20,7 @@ type Feldfehler = BenutzerFeldfehler;
       <h2>{{ texte.titel }}</h2>
       <p>{{ texte.hinweis }}</p>
       @if (fehler(); as text) { <p class="hinweis gefahr" role="alert">{{ text }}</p> }
+      @if (meldung(); as text) { <p class="hinweis ok" role="status">{{ text }}</p> }
       @if (laufend()) { <p role="status">{{ texte.laeuft }}</p> }
       <form #formular novalidate (submit)="$event.preventDefault(); senden()">
         @for (feld of textfelder; track feld) {
@@ -69,17 +70,20 @@ export class BenutzerEinladen {
   protected readonly eingabe = signal<Eingabe>({ benutzername: '', email: '', vorname: '', nachname: '', rolle: '' });
   protected readonly feldfehler = signal<Feldfehler>({});
   protected readonly fehler = signal<string | null>(null);
+  protected readonly meldung = signal<string | null>(null);
   protected readonly laufend = signal(false);
 
   protected setzen(feld: Feld, event: Event): void {
     const wert = (event.target as HTMLInputElement | HTMLSelectElement).value;
     this.eingabe.update((bisher) => ({ ...bisher, [feld]: wert }));
     this.feldfehler.update((bisher) => ({ ...bisher, [feld]: undefined }));
+    this.meldung.set(null);
   }
 
   protected senden(): void {
     if (this.laufend()) return;
     this.fehler.set(null);
+    this.meldung.set(null);
     const eingabe = this.eingabe();
     const befunde = pruefen(eingabe, this.rollen());
     this.feldfehler.set(befunde);
@@ -92,6 +96,7 @@ export class BenutzerEinladen {
           this.fehler.set(TEXTE.httpFehler.allgemein);
           return;
         }
+        this.meldung.set(antwort.antragId ? this.texte.antrag : this.texte.erfolg);
         this.eingabe.set({ benutzername: '', email: '', vorname: '', nachname: '', rolle: '' });
         this.formular().nativeElement.reset();
         this.abgeschlossen.emit({ id: antwort.id, antrag: !!antwort.antragId });

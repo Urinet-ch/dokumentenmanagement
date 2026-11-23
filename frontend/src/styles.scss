@@ -106,6 +106,37 @@ body {
   height: 100%;
 }
 
+.benutzer-status-dialog .sekundaer .mdc-button__label {
+  color: var(--akzent-text);
+}
+
+.benutzer-status-dialog .mat-mdc-dialog-surface {
+  background-color: var(--karte);
+  color: var(--text);
+}
+
+.benutzer-status-dialog mat-dialog-content,
+.benutzer-status-dialog label,
+.benutzer-status-dialog select {
+  color: var(--text);
+}
+
+.benutzer-status-dialog select {
+  background-color: var(--karte);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+  min-height: 2.75rem;
+  padding: 0 .7rem;
+}
+
+.benutzer-status-dialog .gefaehrlich:not(:disabled) {
+  color: var(--gefahr);
+}
+
+.benutzer-status-dialog .gefaehrlich:not(:disabled) .mdc-button__label {
+  color: var(--gefahr);
+}
+
 h1,
 h2,
 h3 {

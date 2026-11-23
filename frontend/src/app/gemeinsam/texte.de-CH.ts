@@ -1753,6 +1753,11 @@ export const TEXTE = {
   benutzer: {
     titel: 'Benutzer',
     einleitung: 'Sehen Sie die Benutzer Ihres Mandanten und ihre Rechte.',
+    aktionen: 'Benutzer verwalten',
+    aktionErfolgreich: 'Die Benutzerangaben wurden aktualisiert.',
+    antragOffen: 'Die Aktion wartet auf die Bestätigung durch eine zweite Person.',
+    rolleAendern: 'Rolle ändern',
+    loeschen: 'Benutzer löschen',
     suchen: 'Benutzer suchen',
     suchenKnopf: 'Suchen',
     suchHinweis: 'Name, Benutzername oder E-Mail; höchstens 40 Zeichen.',
@@ -1971,6 +1976,8 @@ export const TEXTE = {
     waehlen: 'Bitte wählen',
     senden: 'Einladung senden',
     laeuft: 'Die Einladung wird gesendet …',
+    erfolg: 'Die Person erhält eine Einladung per E-Mail und richtet ihr Passwort und die Zwei-Faktor-Anmeldung selbst ein.',
+    antrag: 'Die Einladung wartet auf die Bestätigung durch eine zweite Person. Danach erhält die Person eine E-Mail.',
     ungueltig: {
       benutzername: 'Bitte 3 bis 40 Zeichen aus a–z, 0–9, Punkt, Unterstrich oder Bindestrich eingeben.',
       email: 'Bitte eine E-Mail-Adresse mit genau einem @ und höchstens 254 Zeichen eingeben.',
