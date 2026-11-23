@@ -5,6 +5,7 @@ import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.transaction.Transactional;
 
 import java.sql.Connection;
@@ -15,11 +16,12 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class JdbcDienstkontoAlarm implements DienstkontoAlarm {
-    private final AgroalDataSource datenquelle;
+    private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
     private final MandantRegister register;
 
-    public JdbcDienstkontoAlarm(AgroalDataSource datenquelle, MandantAufloesung aufloesung, MandantRegister register) {
+    public JdbcDienstkontoAlarm(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung,
+                               MandantRegister register) {
         this.datenquelle = datenquelle;
         this.aufloesung = aufloesung;
         this.register = register;
@@ -38,7 +40,7 @@ public class JdbcDienstkontoAlarm implements DienstkontoAlarm {
                 ? register.aktive().stream().map(m -> m.code().schema()).toList()
                 : List.of(schema);
         UUID id = UUID.randomUUID();
-        try (Connection verbindung = datenquelle.getConnection()) {
+        try (Connection verbindung = datenquelle.get().getConnection()) {
             for (String ziel : schemata) {
                 try (PreparedStatement einfuegen = verbindung.prepareStatement(
                         "insert into " + ziel + ".alarm (schluessel) values (?)")) {

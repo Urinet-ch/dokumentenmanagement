@@ -24,6 +24,7 @@ import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.quarkus.arc.ClientProxy;
 import io.quarkus.test.junit.QuarkusMock;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.sql.Connection;
@@ -45,7 +46,7 @@ public class VerwaltungsabgleichSchritte {
 
     @Inject MandantProvisionierung provisionierung;
     @Inject MandantRegister register;
-    @Inject AgroalDataSource datenquelle;
+    @Inject Instance<AgroalDataSource> datenquelle;
     @Inject AbgleichIdentitaet identitaet;
     @Inject Abgleich abgleich;
     @Inject AbgleichAlarmQuelle quelle;
@@ -61,7 +62,7 @@ public class VerwaltungsabgleichSchritte {
     @Before("@verwaltung-abgleich")
     public void vorbereiten() throws Exception {
         for (MandantCode code : List.of(URINET, VHF)) {
-            try (Connection verbindung = datenquelle.getConnection();
+            try (Connection verbindung = datenquelle.get().getConnection();
                  PreparedStatement abfrage = verbindung.prepareStatement(
                          "select 1 from public.mandant where code = ? and aktiv")) {
                 abfrage.setString(1, code.wert());
@@ -131,7 +132,7 @@ public class VerwaltungsabgleichSchritte {
         String erwartet = "abgleich:" + eigen + ":" + code;
         assertThat(quelle.offene(mandant)).extracting(Befund::schluessel).contains(erwartet)
                 .doesNotHaveDuplicates();
-        try (Connection verbindung = datenquelle.getConnection(); PreparedStatement abfrage =
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
                 verbindung.prepareStatement("select count(*) from " + mandant.schema()
                         + ".zugriff_protokoll where aktion = 'BENUTZER_ABWEICHUNG' "
                         + "and details->>'ziel' = ? and details->>'abweichung' = ?")) {
