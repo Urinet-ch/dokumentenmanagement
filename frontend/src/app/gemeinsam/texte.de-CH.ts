@@ -1870,4 +1870,23 @@ export const TEXTE = {
       `Sie sind als ‹${rolle}› angemeldet. Diese Anleitung zeigt die Bereiche, die Ihre Rolle nutzen darf.`,
     abgemeldet: 'Nach der Anmeldung sehen Sie die Anleitung für alle Bereiche Ihrer Rolle.',
   },
+  benutzerLoeschdialog: {
+    titel: 'Benutzer löschen',
+    folgen: 'Der Zugang und die persönlichen Angaben werden in Keycloak gelöscht. Dieser Schritt kann nicht rückgängig gemacht werden.',
+    erhalten: 'Dokumente, Protokolle und das Benutzerverzeichnis bleiben erhalten.',
+    dokumente: 'Dokumente mit Bezug zum Benutzer',
+    protokolle: 'Protokolleinträge mit Bezug zum Benutzer',
+    bestaetigung: 'Geben Sie zur Bestätigung den Benutzernamen ein.',
+    grund: 'Grund',
+    grundWaehlen: 'Bitte wählen',
+    gruende: {
+      SICHERHEIT: 'Sicherheit',
+      AUSTRITT: 'Austritt',
+      RECHTEAENDERUNG: 'Rechteänderung',
+      KORREKTUR: 'Korrektur',
+      SONSTIGES: 'Sonstiges',
+    },
+    abbrechen: 'Abbrechen',
+    loeschen: 'Löschen',
+  },
 } as const;
