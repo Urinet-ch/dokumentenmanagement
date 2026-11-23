@@ -25,6 +25,25 @@ add_action(
 	20
 );
 
+add_action(
+	'init',
+	static function (): void {
+		if ( get_page_by_path( 'urinet-archiv-testseite', OBJECT, 'page' ) ) {
+			return;
+		}
+		wp_insert_post(
+			array(
+				'post_content' => '[urinet_archiv_liste]' . "\n" . '<!-- wp:urinet-archiv/chatbot /-->',
+				'post_name'    => 'urinet-archiv-testseite',
+				'post_status'  => 'publish',
+				'post_title'   => 'Synthetische Archiv-Testseite',
+				'post_type'    => 'page',
+			)
+		);
+	},
+	20
+);
+
 add_filter(
 	'pre_http_request',
 	static function ( $antwort, array $argumente, string $url ) {
@@ -33,7 +52,52 @@ add_filter(
 		}
 
 		$pfad = (string) wp_parse_url( $url, PHP_URL_PATH );
-		if ( str_ends_with( $pfad, '/erfassung/dokumente' ) ) {
+		if ( str_ends_with( $pfad, '/chat' ) ) {
+			$body = "event: text\ndata: {\"delta\":\"Synthetische Antwort\"}\n\n"
+				. "event: quellen\ndata: [{\"dokumentId\":\"00000000-0000-4000-8000-000000000001\",\"titel\":\"Synthetisches Merkblatt\",\"reihe\":{\"code\":\"MERKBLATT\",\"name\":\"Merkblatt\"},\"ausgabe\":\"3/2071\",\"jahr\":2071,\"fundstelle\":{\"seite\":7}}]\n\n"
+				. "event: fertig\ndata: {}\n\n";
+		} elseif ( str_ends_with( $pfad, '/filter' ) ) {
+			$daten = array(
+				'reihen'           => array(
+					array(
+						'code' => 'MERKBLATT',
+						'name' => 'Merkblätter',
+					),
+				),
+				'klassifikationen' => array(
+					array(
+						'code'  => 'fachgebiet',
+						'name'  => 'Fachgebiet',
+						'werte' => array(
+							array(
+								'code' => 'bau',
+								'name' => 'Bau',
+							),
+							array(
+								'code' => 'energie',
+								'name' => 'Energie',
+							),
+						),
+					),
+				),
+			);
+		} elseif ( str_ends_with( $pfad, '/dokumente' ) ) {
+			// The output is synthetic and echoes only the pagination values requested by the test.
+			parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $parameter );
+			$seite     = isset( $parameter['seite'] ) ? max( 1, (int) $parameter['seite'] ) : 1;
+			$pro_seite = isset( $parameter['pro_seite'] ) ? max( 1, (int) $parameter['pro_seite'] ) : 20;
+			$daten     = array(
+				'eintraege' => array(
+					array(
+						'id'    => 'synthetisch-' . $seite,
+						'titel' => 'Synthetisches Merkblatt ' . $seite,
+					),
+				),
+				'seite'     => $seite,
+				'proSeite'  => $pro_seite,
+				'gesamt'    => 25,
+			);
+		} elseif ( str_ends_with( $pfad, '/erfassung/dokumente' ) ) {
 			$daten = array( 'eintraege' => array() );
 		} elseif ( str_ends_with( $pfad, '/erfassung/dokumentarten' ) ) {
 			$daten = array(
@@ -79,7 +143,7 @@ add_filter(
 
 		return array(
 			'headers'       => array( 'content-type' => 'application/json' ),
-			'body'          => wp_json_encode( $daten ),
+			'body'          => isset( $body ) ? $body : wp_json_encode( $daten ),
 			'response'      => array(
 				'code'    => 200,
 				'message' => 'OK',

@@ -1,0 +1,110 @@
+<div class="seitenkopf">
+  <p class="vorzeile">{{ gruppe }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
+
+<section aria-labelledby="benutzer-titel">
+  <h2 id="benutzer-titel">{{ texte.titel }}</h2>
+  <form role="search" class="karte suche" (submit)="$event.preventDefault(); suchen(suchfeld.value)">
+    <label for="benutzer-suche">{{ texte.suchen }}</label>
+    <div class="knoepfe">
+      <input id="benutzer-suche" #suchfeld type="search" maxlength="40" aria-describedby="such-hinweis" />
+      <button mat-stroked-button type="submit">{{ texte.suchenKnopf }}</button>
+    </div>
+    <small id="such-hinweis">{{ texte.suchHinweis }}</small>
+  </form>
+
+  @if (listenFehler(); as fehler) {
+    <div class="hinweis gefahr" role="alert">
+      <p>{{ fehler }}</p>
+      <button mat-button type="button" (click)="laden(seite())">{{ texte.erneut }}</button>
+    </div>
+  } @else if (benutzer(); as liste) {
+    @if (liste.length === 0) {
+      <p role="status">{{ texte.keine }}</p>
+    } @else {
+      <ul class="karten" data-test="benutzer-liste">
+        @for (person of liste; track person.id ?? $index) {
+          <li class="karte">
+            @if (person.id) {
+              <h3><a [routerLink]="['/verwaltung/benutzer', person.id]"><bdi>{{ name(person) }}</bdi></a></h3>
+            } @else {
+              <h3><bdi>{{ name(person) }}</bdi></h3>
+            }
+            <p><span>{{ texte.rolle }}:</span> {{ rollen(person) }}</p>
+            <p><span>{{ texte.status }}:</span> <span class="pille">{{ texte.statusNamen[person.status ?? ''] ?? texte.unbekannt }}</span></p>
+            @if (person.rollenkonflikt) {
+              <p class="hinweis gefahr">{{ texte.rollenkonflikt }}</p>
+            }
+            @if (person.voruebergehendGesperrt) {
+              <p class="hinweis">{{ texte.voruebergehendGesperrt }}</p>
+            }
+          </li>
+        }
+      </ul>
+    }
+    <nav class="knoepfe blaettern" [attr.aria-label]="texte.titel">
+      <button mat-button type="button" [disabled]="seite() === 0" (click)="laden(seite() - 1)">{{ texte.vor }}</button>
+      <span role="status">{{ texte.seite(seite() + 1) }}</span>
+      <button mat-button type="button" [disabled]="!hatWeitere()" (click)="laden(seite() + 1)">{{ texte.weiter }}</button>
+    </nav>
+  } @else {
+    <p role="status">{{ texte.laden }}</p>
+  }
+</section>
+
+<section aria-labelledby="antraege-titel">
+  <h2 id="antraege-titel">{{ texte.antraege }}</h2>
+  @if (antraegeFehler(); as fehler) {
+    <div class="hinweis gefahr" role="alert">
+      <p>{{ fehler }}</p>
+      <button mat-button type="button" (click)="antraegeLaden()">{{ texte.erneut }}</button>
+    </div>
+  } @else if (antraege(); as offene) {
+    @if (offene.length === 0) {
+      <p role="status">{{ texte.keineAntraege }}</p>
+    } @else {
+      <ul class="karten">
+        @for (antrag of offene; track antrag.id ?? $index) {
+          <li class="karte">
+            <h3>{{ texte.antragArten[antrag.art ?? ''] ?? texte.unbekannt }}</h3>
+            <dl>
+              <dt>{{ texte.antragZiel }}</dt><dd><bdi class="mono">{{ antrag.ziel }}</bdi></dd>
+              <dt>{{ texte.antragVon }}</dt><dd><bdi class="mono">{{ antrag.beantragtVon }}</bdi></dd>
+              <dt>{{ texte.antragAm }}</dt><dd>{{ zeitpunkt(antrag.beantragtAm) }}</dd>
+              <dt>{{ texte.antragBis }}</dt><dd>{{ zeitpunkt(antrag.gueltigBis) }}</dd>
+            </dl>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <p role="status">{{ texte.antraegeLaden }}</p>
+  }
+</section>
+
+<section aria-labelledby="rollen-titel">
+  <h2 id="rollen-titel">{{ texte.rollen }}</h2>
+  @if (rollenFehler(); as fehler) {
+    <div class="hinweis gefahr" role="alert">
+      <p>{{ fehler }}</p>
+      <button mat-button type="button" (click)="rollenLaden()">{{ texte.erneut }}</button>
+    </div>
+  } @else if (rollenListe(); as rollen) {
+    @if (rollen.length === 0) {
+      <p role="status">{{ texte.keineRollen }}</p>
+    } @else {
+      <div class="karten">
+        @for (rolle of rollen; track rolle.code) {
+          <details class="karte">
+            <summary>{{ rolle.beschreibung }}</summary>
+            <app-benutzer-rechte [rolle]="rolle" />
+          </details>
+        }
+      </div>
+    }
+  } @else {
+    <p role="status">{{ texte.rollenLaden }}</p>
+  }
+</section>
