@@ -1,11 +1,13 @@
 package ch.urinet.archiv.benutzer;
 
 import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
+import ch.urinet.archiv.benutzer.adapter.out.keycloak.KeycloakAdminAdapter;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.benutzer.adapter.out.mail.MailBenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.BenutzerMitteilung;
 import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -26,6 +28,7 @@ import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
@@ -99,6 +102,10 @@ public class BenutzerVerwaltungSchritte {
     private String akteurName;
     private String zweiterAkteurId;
     private String zweiterAkteurName;
+    private boolean loeschungMitKeycloak;
+    private CountDownLatch loeschungBegonnen;
+    private CountDownLatch loeschungFortsetzen;
+    private UUID loeschDokument;
     private String altesToken;
     private final Map<String, Rolle> gleichzeitigeRollen = new ConcurrentHashMap<>();
 
@@ -148,6 +155,10 @@ public class BenutzerVerwaltungSchritte {
     }
 
     private String akteurAnlegen(String mandant, String benutzername) {
+        return keycloakBenutzerAnlegen(mandant, benutzername, "inhaber");
+    }
+
+    private String keycloakBenutzerAnlegen(String mandant, String benutzername, String rollenname) {
         Map<String, Object> passwort = Map.of("type", "password", "value", Testanmeldung.PASSWORT, "temporary", false);
         Map<String, Object> otp = Map.of("type", "otp", "userLabel", "Probe",
                 "secretData", "{\"value\":\"" + Testanmeldung.OTP_SECRET + "\"}",
@@ -162,7 +173,7 @@ public class BenutzerVerwaltungSchritte {
                 .post(adminPfad + "/partialImport").then().statusCode(200);
         String id = given().auth().oauth2(admin).queryParam("username", benutzername).queryParam("exact", true)
                 .get(adminPfad + "/users").then().statusCode(200).extract().path("[0].id");
-        Map<String, Object> rolle = given().auth().oauth2(admin).get(adminPfad + "/roles/inhaber")
+        Map<String, Object> rolle = given().auth().oauth2(admin).get(adminPfad + "/roles/" + rollenname)
                 .then().statusCode(200).extract().jsonPath().getMap("$");
         given().auth().oauth2(admin).contentType("application/json").body(List.of(rolle))
                 .post(adminPfad + "/users/" + id + "/role-mappings/realm").then().statusCode(204);
@@ -177,6 +188,13 @@ public class BenutzerVerwaltungSchritte {
         if (urspruenglichesStepUp != null) {
             QuarkusMock.installMockForType(urspruenglichesStepUp, StepUp.class);
         }
+        if (loeschungMitKeycloak && eigeneId != null) {
+            int status = given().auth().oauth2(admin).delete(adminPfad + "/users/" + eigeneId).statusCode();
+            assertThat(status).isIn(204, 404);
+        }
+        if (loeschungMitKeycloak && fremdeId != null) {
+            given().auth().oauth2(admin).delete(adminPfad + "/users/" + fremdeId).then().statusCode(204);
+        }
         if (urspruenglicheIdentitaet != null) {
             QuarkusMock.installMockForType(urspruenglicheIdentitaet, IdentitaetsDienst.class);
         }
@@ -186,6 +204,9 @@ public class BenutzerVerwaltungSchritte {
         for (var eintrag : benutzer) {
             identitaet.loeschen(eintrag.getKey(), eintrag.getValue());
             tokenWiderrufZeileLoeschen(eintrag.getValue());
+        }
+        if (loeschDokument != null) {
+            Testdokumente.loeschen(datenbank.get(), MANDANT, List.of(loeschDokument));
         }
         if (eigeneId != null) {
             tokenWiderrufZeileLoeschen(eigeneId);
@@ -276,7 +297,9 @@ public class BenutzerVerwaltungSchritte {
 
     @Angenommen("die Anmeldung für eine kritische Aktion ist nicht frisch")
     public void stepUpNichtBestaetigen() {
-        urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
+        if (urspruenglichesStepUp == null) {
+            urspruenglichesStepUp = ClientProxy.unwrap(stepUp);
+        }
         QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
             @Override
             public void pruefen() {
@@ -542,6 +565,104 @@ public class BenutzerVerwaltungSchritte {
         zweiterAkteurId = akteurAnlegen(MANDANT, zweiterAkteurName);
     }
 
+    @Angenommen("ein synthetischer aktiver Mitarbeiter und zwei Inhaber bestehen im Test-Keycloak")
+    public void loeschungMitEchtemKeycloak() {
+        loeschungMitEchtemKeycloak("mitarbeiter", true);
+    }
+
+    private void loeschungMitEchtemKeycloak(String zielRolle, boolean zweiterInhaber) {
+        String realmUrl = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
+        String basis = realmUrl.substring(0, realmUrl.indexOf("/realms/"));
+        String clientId = given().auth().oauth2(admin).queryParam("clientId", "archiv-verwaltung")
+                .get(adminPfad + "/clients").then().statusCode(200).extract().path("[0].id");
+        String testSecret = given().auth().oauth2(admin).get(adminPfad + "/clients/" + clientId + "/client-secret")
+                .then().statusCode(200).extract().path("value");
+        urspruenglicheIdentitaet = ClientProxy.unwrap(identitaet);
+        IdentitaetsDienst keycloak = new KeycloakAdminAdapter(new ObjectMapper(), Optional.of(basis),
+                "urinet-archiv", "archiv-verwaltung", Optional.of(testSecret), "archiv-pwa", Optional.empty(),
+                Duration.ofSeconds(2), Duration.ofSeconds(5),
+                status -> { throw new AssertionError("Unerwarteter Dienstkonto-Alarm: " + status); });
+        QuarkusMock.installMockForType(new IdentitaetsDienstStub() {
+            @Override
+            public Benutzer benutzerLesen(String mandant, String id) {
+                return keycloak.benutzerLesen(mandant, id);
+            }
+
+            @Override
+            public long inhaberZaehlen(String mandant) {
+                return keycloak.inhaberZaehlen(mandant);
+            }
+
+            @Override
+            public void aktivieren(String mandant, String id, boolean aktiv) {
+                keycloak.aktivieren(mandant, id, aktiv);
+            }
+
+            @Override
+            public void sitzungenBeenden(String mandant, String id) {
+                keycloak.sitzungenBeenden(mandant, id);
+            }
+
+            @Override
+            public void loeschen(String mandant, String id) {
+                if (loeschungBegonnen != null) {
+                    loeschungBegonnen.countDown();
+                    try {
+                        if (!loeschungFortsetzen.await(10, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("Zweiter Löschaufruf ist ausgeblieben");
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Test unterbrochen", e);
+                    }
+                }
+                keycloak.loeschen(mandant, id);
+            }
+
+            @Override
+            public boolean anmeldungGesperrt(String mandant, String id) {
+                return keycloak.anmeldungGesperrt(mandant, id);
+            }
+        }, IdentitaetsDienst.class);
+        loeschungMitKeycloak = true;
+        eigeneId = keycloakBenutzerAnlegen(MANDANT, name, zielRolle);
+        if (zweiterInhaber) {
+            zweiterAkteurName = "probe-19-12-" + UUID.randomUUID();
+            zweiterAkteurId = akteurAnlegen(MANDANT, zweiterAkteurName);
+        }
+    }
+
+    @Angenommen("ein aktiver und ein deaktivierter Inhaber bestehen im Test-Keycloak")
+    public void einAktiverUndEinDeaktivierterInhaber() {
+        inhaberFuerLoeschung(false);
+    }
+
+    @Angenommen("zwei aktive und ein deaktivierter Inhaber bestehen im Test-Keycloak")
+    public void zweiAktiveUndEinDeaktivierterInhaber() {
+        inhaberFuerLoeschung(true);
+    }
+
+    private void inhaberFuerLoeschung(boolean zweiterInhaber) {
+        loeschungMitEchtemKeycloak("inhaber", zweiterInhaber);
+        anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/deaktivieren").then().statusCode(204);
+        assertThat(identitaet.inhaberZaehlen(MANDANT)).isEqualTo(zweiterInhaber ? 2 : 1);
+    }
+
+    @Wenn("der aktive Inhaber den deaktivierten Inhaber nach der Frist löscht")
+    public void deaktiviertenInhaberLoeschen() throws SQLException {
+        loeschfristAbgelaufen();
+        antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/loeschen"));
+    }
+
+    @Dann("ist nur der deaktivierte Inhaber gelöscht")
+    public void deaktivierterInhaberGeloescht() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(anfrage().get(PFAD + "/" + eigeneId).statusCode()).isEqualTo(404);
+        assertThat(identitaet.inhaberZaehlen(MANDANT)).isEqualTo(1);
+    }
+
     @Wenn("der Inhaber die Inhaberrolle beantragt und beide Inhaber darüber entscheiden")
     public void inhabervergabeBeantragen() {
         String pfad = PFAD + "/" + eigeneId;
@@ -681,6 +802,193 @@ public class BenutzerVerwaltungSchritte {
                 .post(PFAD + "/" + eigeneId + "/deaktivieren"));
         antworten.add(anfrage().get(PFAD + "/" + eigeneId));
         antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/reaktivieren"));
+    }
+
+    @Angenommen("der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert")
+    public void mitarbeiterDeaktivierenUndVerknuepfen() throws SQLException {
+        loeschDokument = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(
+                MANDANT, null, "PERSONAL", false, eigeneId, eigeneId, "EINGANGSKORB"));
+        anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/deaktivieren").then().statusCode(204);
+    }
+
+    @Wenn("der Inhaber Vorschau und Löschung vor und nach der Frist ausführt")
+    public void loeschungNachFrist() throws SQLException {
+        String pfad = PFAD + "/" + eigeneId;
+        Response vorschau = anfrage().get(pfad + "/loeschvorschau");
+        assertThat(vorschau.statusCode()).isEqualTo(200);
+        assertThat(vorschau.jsonPath().getLong("dokumente")).isEqualTo(1);
+        assertThat(vorschau.jsonPath().getLong("protokolleintraege")).isGreaterThanOrEqualTo(2);
+        antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(pfad + "/loeschen"));
+        loeschfristAbgelaufen();
+        antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(pfad + "/loeschen"));
+        if (antworten.getLast().statusCode() == 204) {
+            benutzer.remove(Map.entry(MANDANT, eigeneId));
+        }
+    }
+
+    @Dann("wird nur nach der Frist gelöscht und die Archivverweise bleiben bestehen")
+    public void loeschungNachFristGeprueft() throws SQLException {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(409, 204);
+        assertThat(anfrage().get(PFAD + "/" + eigeneId).statusCode()).isEqualTo(404);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select erstellt_von, person_benutzer from m_" + SCHEMA + ".dokument where id = ?")) {
+            abfrage.setObject(1, loeschDokument);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).isEqualTo(eigeneId);
+                assertThat(zeile.getString(2)).isEqualTo(eigeneId);
+            }
+        }
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select name, rolle from m_" + SCHEMA + ".benutzer_verzeichnis where benutzer = ?")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString(1)).isEqualTo(name);
+                assertThat(zeile.getString(2)).isEqualTo("MITARBEITER");
+            }
+        }
+        anlegenUeberApi("mitarbeiter");
+        assertThat(antworten.getLast().statusCode()).isEqualTo(409);
+        assertThat(antworten.getLast().jsonPath().getString("fehlercode")).isEqualTo("BENUTZER_EXISTIERT");
+    }
+
+    @Wenn("der Inhaber nach der Frist ohne frische Anmeldung löscht")
+    public void loeschenOhneStepUp() throws SQLException {
+        loeschfristAbgelaufen();
+        stepUpNichtBestaetigen();
+        antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/loeschen"));
+    }
+
+    @Dann("wird die Löschung wegen fehlendem Step-up abgewiesen")
+    public void loeschungOhneStepUpAbgewiesen() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(401);
+        assertThat(antworten.getLast().jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktiv()).isFalse();
+    }
+
+    @Wenn("zwei Inhaber einen Löschantrag nach der Frist entscheiden")
+    public void loeschantragEntscheiden() throws SQLException {
+        loeschfristAbgelaufen();
+        assertThat(Testanmeldung.sub(akteurName)).isEqualTo(akteurId);
+        assertThat(Testanmeldung.sub(zweiterAkteurName)).isEqualTo(zweiterAkteurId);
+        assertThat(identitaet.benutzerLesen(MANDANT, akteurId).rollen()).contains(Rolle.INHABER);
+        assertThat(identitaet.benutzerLesen(MANDANT, zweiterAkteurId).rollen()).contains(Rolle.INHABER);
+        Response antrag = anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/loeschen");
+        antworten.add(antrag);
+        String id = antrag.then().statusCode(202).extract().path("antragId");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId)).isNotNull();
+        String pfad = PFAD + "/antraege/" + id + "/bestaetigen";
+        Response selbst = anfrage().contentType("application/json").post(pfad);
+        assertThat(selbst.statusCode()).as(selbst.asString()).isEqualTo(403);
+        antworten.add(selbst);
+        Response zweiter = given().auth().oauth2(Testanmeldung.token(zweiterAkteurName))
+                .contentType("application/json").post(pfad);
+        assertThat(zweiter.statusCode()).as(zweiter.asString()).isEqualTo(204);
+        antworten.add(zweiter);
+        if (antworten.getLast().statusCode() == 204) {
+            benutzer.remove(Map.entry(MANDANT, eigeneId));
+        }
+    }
+
+    @Dann("löscht nur die Bestätigung des zweiten Inhabers den Benutzer")
+    public void loeschantragGeprueft() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(202, 403, 204);
+        assertThat(anfrage().get(PFAD + "/" + eigeneId).statusCode()).isEqualTo(404);
+        assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
+    }
+
+    @Wenn("der Inhaber unzulässige Löschungen beantragt")
+    public void unzulaessigeLoeschungen() {
+        fremdeId = keycloakBenutzerAnlegen("vhf-gsk", "fremd." + name, "mitarbeiter");
+        for (String id : List.of(akteurId, UUID.randomUUID().toString(), fremdeId, eigeneId)) {
+            antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                    .post(PFAD + "/" + id + "/loeschen"));
+        }
+        antworten.add(anfrage().contentType("application/json").body(Map.of("grund", "ungueltig"))
+                .post(PFAD + "/" + eigeneId + "/loeschen"));
+    }
+
+    @Dann("werden die Löschungen abgewiesen und der Mitarbeiter bleibt aktiv")
+    public void unzulaessigeLoeschungenAbgewiesen() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(403, 404, 404, 409, 422);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktiv()).isTrue();
+    }
+
+    @Wenn("Löschanträge abgelehnt, zurückgezogen und nach Ablauf bestätigt werden")
+    public void loeschantraegeOhneLoeschung() throws SQLException {
+        loeschfristAbgelaufen();
+        String zweitesToken = Testanmeldung.token(zweiterAkteurName);
+        String erster = loeschantragAnlegen();
+        antworten.add(given().auth().oauth2(zweitesToken).contentType("application/json")
+                .post(PFAD + "/antraege/" + erster + "/ablehnen"));
+        String zweiter = loeschantragAnlegen();
+        antworten.add(anfrage().contentType("application/json")
+                .post(PFAD + "/antraege/" + zweiter + "/zurueckziehen"));
+        String dritter = loeschantragAnlegen();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement(
+                     "update m_" + SCHEMA + ".verwaltung_antrag set beantragt_am = clock_timestamp() - interval '4 days', "
+                             + "gueltig_bis = clock_timestamp() - interval '1 day' where id = ?")) {
+            befehl.setObject(1, UUID.fromString(dritter));
+            assertThat(befehl.executeUpdate()).isEqualTo(1);
+        }
+        antworten.add(given().auth().oauth2(zweitesToken).contentType("application/json")
+                .post(PFAD + "/antraege/" + dritter + "/bestaetigen"));
+    }
+
+    private String loeschantragAnlegen() {
+        return anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
+                .post(PFAD + "/" + eigeneId + "/loeschen").then().statusCode(202).extract().path("antragId");
+    }
+
+    @Dann("wird kein Benutzer durch diese Anträge gelöscht")
+    public void loeschantraegeOhneWirkung() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 204, 409);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktiv()).isFalse();
+    }
+
+    @Wenn("ein Löschantrag gleichzeitig zweimal bestätigt wird")
+    public void loeschantragGleichzeitigBestaetigen() throws Exception {
+        loeschfristAbgelaufen();
+        String antrag = loeschantragAnlegen();
+        String token = Testanmeldung.token(zweiterAkteurName);
+        String pfad = PFAD + "/antraege/" + antrag + "/bestaetigen";
+        loeschungBegonnen = new CountDownLatch(1);
+        loeschungFortsetzen = new CountDownLatch(1);
+        CompletableFuture<Response> erster = CompletableFuture.supplyAsync(() -> given().auth().oauth2(token)
+                .contentType("application/json").post(pfad));
+        try {
+            assertThat(loeschungBegonnen.await(10, TimeUnit.SECONDS)).isTrue();
+            antworten.add(given().auth().oauth2(token).contentType("application/json").post(pfad));
+        } finally {
+            loeschungFortsetzen.countDown();
+        }
+        antworten.add(erster.get(20, TimeUnit.SECONDS));
+    }
+
+    @Dann("wird nur eine Bestätigung ausgeführt")
+    public void loeschungNurEinmal() {
+        assertThat(antworten).extracting(Response::statusCode).containsExactly(409, 204);
+        assertThat(anfrage().get(PFAD + "/" + eigeneId).statusCode()).isEqualTo(404);
+    }
+
+    private void loeschfristAbgelaufen() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement(
+                     "update m_" + SCHEMA + ".benutzer_status set seit = clock_timestamp() - interval '31 days' "
+                             + "where benutzer = ? and art = 'DEAKTIVIERT'")) {
+            befehl.setString(1, eigeneId);
+            assertThat(befehl.executeUpdate()).isEqualTo(1);
+        }
     }
 
     @Dann("ist der Austritt verzeichnet und eine neue Zugangseinrichtung verlangt")
