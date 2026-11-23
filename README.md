@@ -254,11 +254,37 @@ Ohne Maximum (kein `-XX:MaxMetaspaceSize`) gibt es keine Schwelle. Einstellungen
 - `archiv.ueberwachung.speicher.warn-prozent` (Standard 85) und `archiv.ueberwachung.speicher.kritisch-prozent`
   (Standard 95); es gilt `0 < warn < kritisch <= 100`, sonst bricht der Start ab.
 
-## Benutzer in Keycloak anlegen
-Benutzer des Realms `urinet-archiv` legt der Admin mit `kcadm.sh` in einem Wegwerf-Container aus dem Keycloak-Image
-an, nie per `docker exec` im laufenden `kc` (siehe «Admin-Kommandos auf der VPS»). Der Container hängt nur im internen
-Netz `archiv_intern`, erreicht Keycloak unter `http://kc:8080` (die Admin-Konsole bleibt nicht öffentlich) und liest
-das Admin-Passwort aus der Secret-Datei. Platzhalter im Kopf des Skripts ersetzen:
+## Benutzerverwaltung: normaler Weg
+Benutzer und Rollen werden im Normalfall in der Verwaltungsoberfläche gepflegt. Den ersten Inhaber eines neuen Mandanten
+lädt der Betreiber über das Admin-Kommando ein:
+```bash
+mandant inhaber-einladen <code> --benutzer <name> --email <adresse> \
+  --vorname <vorname> --nachname <nachname> --wer <betreiber>
+```
+Das Kommando legt den Inhaber ohne Passwort an und lässt Keycloak den Einmal-Link versenden; das Passwort und der Link
+erscheinen nie im Terminal.
+
+Der Abgleich ist standardmässig schreibend nur im Benutzerverzeichnis. Mit `--pruefen` wird nichts übernommen; Keycloak
+wird in beiden Fällen nie geändert:
+```bash
+benutzer abgleichen <code> [--pruefen] [--json]
+```
+Exit-Code 0 bedeutet keine Abweichung, 1 mindestens eine Abweichung, 2 falscher Aufruf und 3 technischer Fehler.
+
+Nach der Deaktivierung eines Mandanten deaktiviert dieses Kommando dessen Keycloak-Benutzer und beendet ihre Sitzungen.
+Ab 30 Tagen nach der Deaktivierung löscht ein erneuter Aufruf die Keycloak-Benutzer; Zugriffsprotokoll und
+Benutzerverzeichnis bleiben bis zum Mandantenabbau erhalten:
+```bash
+mandant benutzer-sperren <code> [--json]
+```
+
+Diese Admin-Kommandos laufen im Wegwerf-Container wie unter «Admin-Kommandos auf der VPS» beschrieben.
+
+## Notfallweg: Benutzer in Keycloak per kcadm.sh anlegen
+Nur wenn das Dienstkonto oder der Mailversand nicht bereit ist, kann der Betreiber Benutzer im Realm `urinet-archiv`
+mit `kcadm.sh` in einem Wegwerf-Container aus dem Keycloak-Image anlegen, nie per `docker exec` im laufenden `kc`.
+Der Container hängt nur im internen Netz `archiv_intern`, erreicht Keycloak unter `http://kc:8080` (die Admin-Konsole
+bleibt nicht öffentlich) und liest das Admin-Passwort aus der Secret-Datei. Platzhalter im Kopf des Skripts ersetzen:
 ```bash
 sudo docker run --rm -i --network archiv_intern -m 256m --cpus 0.5 --cap-drop ALL \
   --security-opt no-new-privileges -e KC_OPTS="-Xmx96m -XX:+UseSerialGC" \

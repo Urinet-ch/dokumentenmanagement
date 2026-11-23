@@ -211,7 +211,7 @@ auf Server oder Secrets aus der Sitzung.
     Umstellung eines bestehenden Realms und Prüfung mit echtem Postfach bleiben Betriebsnachweise.
 
 ## Welle 21 — Admin-Kommando, Migration, Tests und Abnahme
-- [ ] 21.1 Admin-Kommando [Backend]
+- [x] 21.1 Admin-Kommando [Backend]
   - `archiv mandant anlegen … --rollen`, `archiv mandant inhaber-einladen`, `archiv benutzer abgleichen [--pruefen]`,
     `archiv mandant benutzer-sperren <code>` für den Mandantenabbau (Exit-Codes, `--json`), Protokoll `betreiber:<name>`;
     README-Abschnitt «Admin-Kommandos auf der VPS» ergänzt.

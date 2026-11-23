@@ -308,23 +308,39 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
     public void rolleSetzen(String mandant, String id, Rolle rolle) {
         pruefeRolle(rolle);
         benutzerAbrufen(mandant, id);
-        // Zielrolle zuerst holen und hinzufügen, erst danach die übrigen Archiv-Rollen entfernen:
-        // Bei einem Fehler dazwischen behält der Benutzer mindestens eine gültige Rolle.
-        JsonNode ziel = json(request("GET", admin("/roles/" + segment(rolle.code())), null, null, true, Set.of()));
         JsonNode vorher = json(request("GET", user(id) + "/role-mappings/realm", null, null, true, Set.of()));
-        if (ziel == null || vorher == null || !vorher.isArray()) {
+        if (vorher == null || !vorher.isArray()) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
         List<JsonNode> uebrige = new ArrayList<>();
+        JsonNode ziel = null;
         boolean zielVorhanden = false;
         for (JsonNode role : vorher) {
             String name = role.path("name").asText();
             if (rolle.code().equals(name)) {
+                ziel = role;
                 zielVorhanden = true;
             } else if (ARCHIV_ROLLEN.contains(name)) {
                 uebrige.add(role);
             }
         }
+        if (!zielVorhanden) {
+            JsonNode verfuegbare = json(request("GET", user(id) + "/role-mappings/realm/available",
+                    null, null, true, Set.of()));
+            if (verfuegbare == null || !verfuegbare.isArray()) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            for (JsonNode role : verfuegbare) {
+                if (rolle.code().equals(role.path("name").asText())) {
+                    ziel = role;
+                    break;
+                }
+            }
+        }
+        if (ziel == null) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        // Zielrolle zuerst hinzufügen, erst danach die übrigen Archiv-Rollen entfernen.
         if (!zielVorhanden) {
             nur204(request("POST", user(id) + "/role-mappings/realm", null, json.createArrayNode().add(ziel),
                     false, Set.of(204)));
@@ -879,6 +895,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
                 || path.matches(usersMuster + "/" + id) && Set.of("GET", "PUT", "DELETE").contains(method)
                 || path.matches(usersMuster + "/" + id + "/role-mappings/realm")
                 && Set.of("GET", "POST", "DELETE").contains(method)
+                || path.matches(usersMuster + "/" + id + "/role-mappings/realm/available") && method.equals("GET")
                 || path.matches(rootMuster + "/roles/" + id + "/users") && method.equals("GET")
                 || path.matches(usersMuster + "/" + id + "/execute-actions-email") && method.equals("PUT")
                 || path.matches(usersMuster + "/" + id + "/logout") && method.equals("POST")
@@ -889,8 +906,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
                 || path.matches(usersMuster + "/" + id + "/federated-identity/google")
                 && method.equals("DELETE")
                 || path.matches(rootMuster + "/attack-detection/brute-force/users/" + id)
-                && Set.of("GET", "DELETE").contains(method)
-                || path.matches(rootMuster + "/roles/" + id) && method.equals("GET");
+                && Set.of("GET", "DELETE").contains(method);
         if (!erlaubt) {
             throw new IllegalArgumentException("Nicht freigegebener Keycloak-Aufruf");
         }
