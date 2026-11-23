@@ -153,6 +153,7 @@ export async function chatAttrappe(welt) {
       { id: randomUUID(), titel: 'Ausgaben Druckerei 2026', geaendert: '2026-10-20T16:40:00Z' },
     ],
     verlauf: new Map(),
+    bewertungen: new Map(),
     fragen: [],
     stroeme: new Map(),
     halte: [],
@@ -258,6 +259,23 @@ export async function chatAttrappe(welt) {
               title: 'Nicht gefunden',
               fehlercode: 'NICHT_GEFUNDEN',
             });
+      }
+      const bewertung = /^\/api\/v1\/chat\/nachrichten\/([^/]+)\/bewertung$/.exec(pfad);
+      if (bewertung) {
+        const id = decodeURIComponent(bewertung[1]);
+        if (anfrage.method() === 'PUT') {
+          const wert = { nachrichtId: id, ...anfrage.postDataJSON(), erstellt: '2026-11-22T00:00:00Z',
+            geaendert: '2026-11-22T00:00:00Z' };
+          chat.bewertungen.set(id, wert);
+          return json(route, 200, wert);
+        }
+        if (anfrage.method() === 'GET' && chat.bewertungen.has(id)) {
+          return json(route, 200, chat.bewertungen.get(id));
+        }
+        if (anfrage.method() === 'DELETE' && chat.bewertungen.delete(id)) {
+          return route.fulfill({ status: 204 });
+        }
+        return json(route, 404, { status: 404, fehlercode: 'NICHT_GEFUNDEN' });
       }
       if (pfad !== PFAD || anfrage.method() !== 'POST') {
         return json(route, 404, {
