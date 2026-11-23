@@ -780,3 +780,16 @@ einen zusätzlichen Aufruf ergeben, weil der Vertrag keine Gesamtzahl liefert. F
 wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut geladen. Der Browser-Nachweis nutzt
 synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
 Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
+
+## Umsetzung (Aufgabe 20.3, 23.11.2026) – Zwischenstand
+
+Die Wissenseinstellungen werden als Konfigurationsversion mit Quelle `MIGRATION` übernommen. Die bisherige Tabelle
+bleibt als Spiegel für bestehende Verbraucher und den Rückweg erhalten. Der bisherige PUT verwendet die gemeinsame
+Version, Bestätigung und Step-up; ein unverändert zurückgesendeter effektiver Zeitplan bewahrt teilweise geerbte Werte.
+Ein teilweise eigener Zeitplan übernimmt fehlende Teile aus dem instanzweiten Zeitplan, soweit dieser darstellbar ist,
+sonst aus dem Katalogstandard. Der Katalog zeigt den effektiven Wert und weist auf den nicht darstellbaren Zeitplan hin.
+Die Wissensroute begrenzt den Empfang wie die übrigen Einstellungsrouten auch ohne Inhaltslänge.
+
+Noch nicht freigegebener Vorschlag: Nicht darstellbare bestehende Werte werden auf den Katalogstandard gesetzt,
+ihre alten Werte in `wissens_einstellung_migration` gesichert und die ersetzten Pfade ohne Werte im Zugriffsprotokoll
+vermerkt. Das ändert bisheriges Verhalten und erfordert einen Entscheid von Fabian; bis dahin bleibt der PR Entwurf.

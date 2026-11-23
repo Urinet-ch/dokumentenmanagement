@@ -254,7 +254,9 @@ class MandantEinstellungenResourceTest {
         String token = Testanmeldung.token("inhaber-urinet");
         for (String[] anfrage : new String[][] {
                 {"PATCH", PFAD}, {"PATCH", "/api/v1/mandant/%65instellungen/"},
-                {"POST", PFAD + "/vorschau"}, {"POST", PFAD + "/zuruecksetzen"}
+                {"POST", PFAD + "/vorschau"}, {"POST", PFAD + "/zuruecksetzen"},
+                {"PUT", "/api/v1/wissensbasis/einstellungen"},
+                {"PUT", "/api/v1/wissensbasis/%65instellungen/"}
         }) {
             try (Socket socket = new Socket("127.0.0.1", RestAssured.port)) {
                 socket.setSoTimeout(10_000);
@@ -285,6 +287,21 @@ class MandantEinstellungenResourceTest {
             aus.write(("{}" + " ".repeat(16 * 1024 - 2)).getBytes(StandardCharsets.US_ASCII));
         }
         assertThat(verbindung.getResponseCode()).isEqualTo(200);
+        verbindung.disconnect();
+
+        verbindung = (HttpURLConnection) URI.create("http://127.0.0.1:" + RestAssured.port
+                + "/api/v1/wissensbasis/einstellungen").toURL().openConnection();
+        verbindung.setRequestMethod("PUT");
+        verbindung.setDoOutput(true);
+        verbindung.setChunkedStreamingMode(1024);
+        verbindung.setRequestProperty("Authorization", "Bearer " + token);
+        verbindung.setRequestProperty("Content-Type", "application/json");
+        verbindung.setRequestProperty("If-Match", etag);
+        String ungueltig = "{\"unbekannt\":true}";
+        try (var aus = verbindung.getOutputStream()) {
+            aus.write((ungueltig + " ".repeat(16 * 1024 - ungueltig.length())).getBytes(StandardCharsets.US_ASCII));
+        }
+        assertThat(verbindung.getResponseCode()).isEqualTo(422);
         verbindung.disconnect();
     }
 
