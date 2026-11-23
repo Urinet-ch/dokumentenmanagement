@@ -1,5 +1,6 @@
 package ch.urinet.archiv.mandant.adapter.out.konfiguration;
 
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -48,5 +49,8 @@ class KonfiguriertesBrandingVerzeichnisTest {
         var v = new KonfiguriertesBrandingVerzeichnis(konfiguration(eintrag("", "A"), eintrag("a.test.invalid", "B")));
         assertThat(v.fuerDomain("a.test.invalid")).isPresent();
         assertThat(v.fuerDomain("")).isEmpty();
+        assertThat(v.fuerMandant(new MandantCode("m0"))).get().extracting("name").isEqualTo("A");
+        assertThat(v.fuerMandant(new MandantCode("m1"))).get().extracting("name").isEqualTo("B");
+        assertThat(v.fuerMandant(new MandantCode("m2"))).isEmpty();
     }
 }

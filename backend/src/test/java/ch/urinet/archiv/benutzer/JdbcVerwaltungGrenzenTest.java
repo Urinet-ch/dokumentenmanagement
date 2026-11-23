@@ -3,11 +3,17 @@ package ch.urinet.archiv.benutzer;
 import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
 import ch.urinet.archiv.benutzer.application.BenutzerAktivitaet;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
+import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
+import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
+import ch.urinet.archiv.mandant.application.KonfigurationSeed;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.arc.ClientProxy;
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -35,6 +41,8 @@ class JdbcVerwaltungGrenzenTest {
     @Inject MandantKontext kontext;
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenquelle;
+    @Inject KonfigurationSeed seed;
+    @Inject KonfigurationsdateiCodec codec;
 
     @Test
     void benutzeraktivitaetLiestNurAbgeschlosseneEinladungenDesMandanten() throws Exception {
@@ -129,12 +137,60 @@ class JdbcVerwaltungGrenzenTest {
             in(thread, "urinet", () -> {
                 for (int i = 0; i < 60; i++) {
                     protokoll("urinet", UUID.randomUUID().toString(), "KONFIGURATION_AENDERN",
-                            null, null, null, 0);
+                            null, "einstellungen.branding.name", null, 0);
                 }
                 return null;
             });
             assertThatThrownBy(() -> in(thread, "urinet", () -> {
                 grenzen.pruefen(anderer, Art.EINSTELLUNG, null);
+                return null;
+            })).hasRootCauseInstanceOf(ZuVieleAnfragen.class);
+        }
+    }
+
+    @Test
+    void nurEinstellungsAenderungenZaehlenZuDenVerwaltungsgrenzen() throws Exception {
+        String mandant = "grenze-" + UUID.randomUUID().toString().substring(0, 8);
+        KonfigurationSeed original = ClientProxy.unwrap(seed);
+        QuarkusMock.installMockForType(new KlassenpfadKonfigurationSeed(codec) {
+            @Override
+            public Konfiguration lesen(MandantCode ignoriert) {
+                return original.lesen(new MandantCode("urinet"));
+            }
+        }, KonfigurationSeed.class);
+        try {
+            provisionierung.anlegen(mandant, null, null);
+        } finally {
+            QuarkusMock.installMockForType(original, KonfigurationSeed.class);
+        }
+        String akteur = UUID.randomUUID().toString();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            in(thread, mandant, () -> {
+                for (int i = 0; i < 60; i++) {
+                    protokoll(mandant, akteur, "KONFIGURATION_AENDERN", null, "arten.PROBE.name", null, 0);
+                }
+                for (int i = 0; i < 29; i++) {
+                    protokoll(mandant, akteur, "KONFIGURATION_AENDERN",
+                            null, "einstellungen.branding.name", null, 0);
+                }
+                grenzen.pruefen(akteur, Art.EINSTELLUNG, null);
+                protokoll(mandant, akteur, "KONFIGURATION_AENDERN",
+                        null, "einstellungen.branding.name", null, 0);
+                return null;
+            });
+            assertThatThrownBy(() -> in(thread, mandant, () -> {
+                grenzen.pruefen(akteur, Art.EINSTELLUNG, null);
+                return null;
+            })).hasRootCauseInstanceOf(ZuVieleAnfragen.class);
+            in(thread, mandant, () -> {
+                for (int i = 0; i < 30; i++) {
+                    protokoll(mandant, UUID.randomUUID().toString(), "KONFIGURATION_AENDERN",
+                            null, "einstellungen.chat.aufbewahrungMonate", null, 0);
+                }
+                return null;
+            });
+            assertThatThrownBy(() -> in(thread, mandant, () -> {
+                grenzen.pruefen(UUID.randomUUID().toString(), Art.EINSTELLUNG, null);
                 return null;
             })).hasRootCauseInstanceOf(ZuVieleAnfragen.class);
         }
@@ -217,9 +273,10 @@ class JdbcVerwaltungGrenzenTest {
 
     private void protokoll(String mandant, String akteur, String aktion, String phase, String vorgang,
                            UUID ziel, int alterSekunden) throws Exception {
-        String schema = mandant.equals("urinet") ? "m_urinet" : "m_vhf_gsk";
-        String details = "{\"phase\":\"" + phase + "\",\"vorgang\":\"" + vorgang
-                + "\",\"ziel\":\"" + ziel + "\"}";
+        String schema = new MandantCode(mandant).schema();
+        String details = aktion.equals("KONFIGURATION_AENDERN")
+                ? "{\"aenderungen\":[{\"pfad\":\"" + vorgang + "\"}]}"
+                : "{\"phase\":\"" + phase + "\",\"vorgang\":\"" + vorgang + "\",\"ziel\":\"" + ziel + "\"}";
         try (Connection verbindung = datenquelle.getConnection();
              PreparedStatement einfuegen = verbindung.prepareStatement("insert into " + schema
                      + ".zugriff_protokoll (zeit, benutzer, aktion, details) "

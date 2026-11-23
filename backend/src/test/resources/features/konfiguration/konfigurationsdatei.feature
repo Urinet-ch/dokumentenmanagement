@@ -242,9 +242,12 @@ Funktionalität: Konfigurationsdatei
 
   @req-6.3
   Szenario: Ein ungültiges Geschäftsjahresende wird abgelehnt
+    Angenommen für die Konfigurationsdatei ist eine frische Anmeldung bestätigt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Und in der Datei das Geschäftsjahresende «02-30» steht
     Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 409 und Fehlercode «BESTAETIGUNG_NOETIG»
+    Wenn «inhaber-urinet» die geänderte Konfigurationsdatei mit Bestätigung "geschaeftsjahrEnde" einspielt
     Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
     Und nennt die Antwort den Befund "einstellungen.geschaeftsjahrEnde" mit dem Code «DATUM_UNGUELTIG»
     Und ist die Konfigurationsversion unverändert

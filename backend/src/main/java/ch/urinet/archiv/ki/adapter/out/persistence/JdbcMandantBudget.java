@@ -63,6 +63,25 @@ public class JdbcMandantBudget implements MandantBudget {
     }
 
     @Override
+    @Transactional
+    public Stand stand(MandantCode mandant) {
+        LocalDate monat = monat();
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select tokens_max, tokens_verbraucht from public.mandant_budget where mandant = ? and monat = ?")) {
+            abfrage.setQueryTimeout(ZEITGRENZE_S);
+            abfrage.setString(1, mandant.wert());
+            abfrage.setDate(2, Date.valueOf(monat));
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                return zeile.next() ? new Stand(monat, zeile.getLong(1), zeile.getLong(2))
+                        : new Stand(monat, standard, 0);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Budgetstand des Chatbots nicht lesbar", e);
+        }
+    }
+
+    @Override
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public Reservierung reservieren(MandantCode mandant) {
         LocalDate monat = monat();
