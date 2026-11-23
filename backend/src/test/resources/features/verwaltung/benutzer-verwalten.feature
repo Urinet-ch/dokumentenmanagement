@@ -14,6 +14,11 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber die Rechte beider Benutzer abruft
     Dann sieht er die Rechte aus der Matrix nur für den eigenen Benutzer
 
+  @req-4.8 @verwaltung-beispielmandant
+  Szenario: Ein unabhängiger Beispielverband verwaltet nur seine eigenen Benutzer
+    Angenommen in zwei Mandanten gibt es je einen synthetischen Benutzer
+    Dann sieht ein Inhaber des Beispielverbands nur die Benutzer seines Mandanten
+
   @req-3.18 @req-4.5 @req-4.9
   Szenario: Rollenwechsel verlangt die aktuelle Version und widerruft alte Tokens
     Angenommen die frische Anmeldung ist für den Test bestätigt
