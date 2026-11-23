@@ -51,6 +51,7 @@ export const TEXTE = {
       '/verwaltung/protokoll': 'Wer hat wann was im Archiv getan',
       '/verwaltung/api-tokens': 'Zugänge für Generatoren und Importe',
       '/verwaltung/benutzer': 'Benutzer und ihre Rechte ansehen',
+      '/verwaltung/einstellungen': 'Einstellungen des Mandanten ansehen und pflegen',
     } as Record<string, string>,
     imEingangskorb: (anzahl: number) =>
       anzahl === 1 ? '1 Dokument wartet' : `${anzahl} Dokumente warten`,
@@ -97,6 +98,29 @@ export const TEXTE = {
     kontakte: 'Kontakte',
     wissen: 'Wissen',
     benutzer: 'Benutzer',
+    einstellungen: 'Einstellungen',
+  },
+  einstellungen: {
+    titel: 'Einstellungen',
+    einleitung: 'Werte und Vorgaben für diesen Mandanten.',
+    nurLesen: 'Einstellungen können hier noch nicht geändert werden.',
+    laden: 'Einstellungen werden geladen …',
+    keine: 'Keine Einstellungen vorhanden.',
+    erneut: 'Erneut versuchen',
+    ungueltig: 'Die Einstellungen konnten nicht gelesen werden. Bitte versuchen Sie es erneut.',
+    aktuellerWert: 'Aktueller Wert',
+    standard: 'Standard',
+    grenzen: 'Zulässiger Bereich',
+    wirksamAb: 'Wirksam ab',
+    nichtGesetzt: 'Nicht gesetzt',
+    gruppen: {
+      GESCHAEFTSJAHR: 'Geschäftsjahr',
+      KENNUNGEN: 'Kennungen',
+      BRANDING: 'Branding',
+      CHAT: 'Chat',
+      WEBSEITEN_CHAT: 'Webseiten-Chat',
+      WISSEN: 'Wissensbasis',
+    } as Record<string, string>,
   },
   wissen: {
     import: {

@@ -1,0 +1,46 @@
+<div class="seitenkopf">
+  <p class="vorzeile">{{ bereich }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
+
+<p class="hinweis info">{{ texte.nurLesen }}</p>
+
+@if (fehler(); as meldung) {
+  <div class="hinweis gefahr" role="alert">
+    <p>{{ meldung }}</p>
+    <button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button>
+  </div>
+} @else if (gruppen(); as liste) {
+  @if (liste.length === 0) {
+    <p class="leer" role="status">{{ texte.keine }}</p>
+  }
+  @for (gruppe of liste; track gruppe.code) {
+    <section>
+      <h2>{{ texte.gruppen[gruppe.code] ?? gruppe.code }}</h2>
+      <div class="karten">
+        @for (eintrag of gruppe.eintraege; track eintrag.schluessel) {
+          <article class="karte">
+            <h3>{{ eintrag.name }}</h3>
+            <p>{{ eintrag.beschreibung }}</p>
+            <dl>
+              <dt>{{ texte.aktuellerWert }}</dt><dd>{{ wert(eintrag.aktuellerWert) }}</dd>
+              <dt>{{ texte.standard }}</dt><dd>{{ wert(eintrag.standard) }}</dd>
+              @if (eintrag.minimum != null && eintrag.maximum != null) {
+                <dt>{{ texte.grenzen }}</dt><dd>{{ wert(eintrag.minimum) }} – {{ wert(eintrag.maximum) }} {{ eintrag.einheit }}</dd>
+              }
+              @if (eintrag.wirksamAb) {
+                <dt>{{ texte.wirksamAb }}</dt><dd>{{ eintrag.wirksamAb }}</dd>
+              }
+            </dl>
+            @if (eintrag.hinweis) {
+              <p class="hinweis">{{ eintrag.hinweis }}</p>
+            }
+          </article>
+        }
+      </div>
+    </section>
+  }
+} @else {
+  <p role="status">{{ texte.laden }}</p>
+}

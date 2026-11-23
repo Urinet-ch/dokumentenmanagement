@@ -2,6 +2,10 @@ In der Gruppe «Verwaltung» der Seitenleiste richten Sie das Archiv für Ihren 
 
 Die folgenden Teile beschreiben die Seiten der Verwaltung, die Ihre Rolle nutzen darf.
 
+Unter «Einstellungen» sehen Sie die Einstellungen Ihres Mandanten nach Gruppen. Zu jedem Eintrag zeigt die Seite den
+aktuellen Wert, den Standard sowie vorhandene Grenzen und Hinweise zur Wirksamkeit. Änderungen sind auf dieser Seite
+noch nicht möglich.
+
 Unter «Benutzer» sehen Sie die Benutzer Ihres Mandanten als Karten. Über die Suche finden Sie einen Benutzer nach
 Name, Benutzername oder E-Mail; mit «Nächste Seite» und «Vorherige Seite» wechseln Sie die Ergebnisse. Öffnen Sie
 einen Benutzer, um Status, Anmeldeverfahren und seine Rechte zu sehen. Bei einem Rollenkonflikt ist die
