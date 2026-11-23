@@ -322,6 +322,10 @@ class RealmExportKeycloakTest {
         assertThat(zuerst.claims().path("realm_access").path("roles").toString()).contains("inhaber");
         long ersteZeit = zuerst.claims().path("auth_time").asLong();
         assertThat(ersteZeit).isPositive();
+        Response frischeEinstellung = riskanteEinstellung(zuerst.accessToken());
+        assertThat(frischeEinstellung.statusCode()).as(frischeEinstellung.asString()).isEqualTo(422);
+        assertThat(frischeEinstellung.jsonPath().getString("fehlercode")).isEqualTo("KONFIGURATION_UNGUELTIG");
+        gueltigeRiskanteEinstellung(zuerst.accessToken());
 
         PwaBrowser.Anmeldung sso = browser.anmelden(false, false);
         assertThat(sso.claims().path("auth_time").asLong()).isEqualTo(ersteZeit);
@@ -331,6 +335,9 @@ class RealmExportKeycloakTest {
         assertThat(zuAlt.statusCode()).as(zuAlt.asString()).isEqualTo(401);
         assertThat(zuAlt.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
         assertThat(zuAlt.header("WWW-Authenticate")).contains("insufficient_user_authentication", "max_age=\"60\"");
+        Response alteEinstellung = riskanteEinstellung(zuerst.accessToken());
+        assertThat(alteEinstellung.statusCode()).as(alteEinstellung.asString()).isEqualTo(401);
+        assertThat(alteEinstellung.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
         Response cookieAllein = stepUpAnfrage(sso.accessToken());
         assertThat(cookieAllein.statusCode()).isEqualTo(401);
         assertThat(cookieAllein.jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
@@ -347,6 +354,40 @@ class RealmExportKeycloakTest {
 
     private Response stepUpAnfrage(String token) {
         return given().auth().oauth2(token).contentType(ContentType.JSON).body("{").post("/api/v1/benutzer");
+    }
+
+    private Response riskanteEinstellung(String token) {
+        String pfad = "/api/v1/mandant/einstellungen";
+        Response stand = given().auth().oauth2(token).get(pfad);
+        assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+        return given().auth().oauth2(token).header("If-Match", stand.header("ETag"))
+                .queryParam("bestaetigt", "chat.aufbewahrungMonate")
+                .contentType("application/merge-patch+json").body("{\"chat\":{\"aufbewahrungMonate\":0}}")
+                .patch(pfad);
+    }
+
+    private void gueltigeRiskanteEinstellung(String token) {
+        String pfad = "/api/v1/mandant/einstellungen";
+        Response ausgang = given().auth().oauth2(token).get("/api/v1/konfiguration");
+        assertThat(ausgang.statusCode()).as(ausgang.asString()).isEqualTo(200);
+        String bisher = ausgang.jsonPath().getString("einstellungen.geschaeftsjahrEnde");
+        String neu = "06-30".equals(bisher) ? "09-30" : "06-30";
+        Response geaendert = given().auth().oauth2(token).header("If-Match", ausgang.header("ETag"))
+                .queryParam("bestaetigt", "geschaeftsjahrEnde")
+                .contentType("application/merge-patch+json").body("{\"geschaeftsjahrEnde\":\"" + neu + "\"}")
+                .patch(pfad);
+        try {
+            assertThat(geaendert.statusCode()).as(geaendert.asString()).isEqualTo(200);
+            assertThat(geaendert.jsonPath().getBoolean("geaendert")).isTrue();
+        } finally {
+            if (geaendert.statusCode() == 200) {
+                Response wiederhergestellt = given().auth().oauth2(token).header("If-Match", geaendert.header("ETag"))
+                        .queryParam("bestaetigt", "geschaeftsjahrEnde").contentType(ContentType.JSON)
+                        .body("{\"version\":" + ausgang.jsonPath().getInt("basisVersion") + "}")
+                        .post(pfad + "/zuruecksetzen");
+                assertThat(wiederhergestellt.statusCode()).as(wiederhergestellt.asString()).isEqualTo(200);
+            }
+        }
     }
 
     private static final class PwaBrowser {

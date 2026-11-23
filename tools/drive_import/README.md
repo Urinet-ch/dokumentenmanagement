@@ -35,13 +35,20 @@ java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar --trockenlau
 
 # Import
 java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar "$HOME/Google Drive/UriNet"
+
+# Synthetisches Beispiel für VHF/GSK; Fachgebiet als Klassifikationscode übergeben
+java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar --altbestand \
+  --klassifikation fachgebiet=bad "$HOME/Altbestand-Synthetisch"
 ```
 
 | Option | Bedeutung |
 | --- | --- |
 | `-n`, `--trockenlauf` | nur zählen und auflisten |
+| `--altbestand` | Reihenordner als Dokumentart verwenden; nur für VHF/GSK |
 | `--archiv URL` | Adresse des Archivs (Standard `https://archiv.apps.urinet.ch`; `http` nur für `localhost`) |
 | `--token-datei DATEI` | Datei mit dem API-Token |
+| `--klassifikation CODE=WERT` | Klassifikationswert mit Code; wiederholbar, beim Import zusammen mit `--altbestand` erforderlich |
+| `--art CODE` | Dokumentart für die Vorbelegung; nicht zusammen mit `--altbestand` |
 | `-h`, `--hilfe` | Hilfe |
 
 Exit-Codes: `0` alles übertragen oder schon vorhanden, `1` mindestens eine Datei abgelehnt, `2` Aufruf oder
@@ -74,6 +81,24 @@ Jede Datei bekommt den Hinweis `Drive-Import; Ordner: <pfad>`, dazu erkannte Mus
 
 Alles, was nicht übertragen wurde, steht mit Pfad und Grund unter «Nicht übernommen», auch Dateien, die das Archiv
 abgelehnt hat (z. B. zu gross, Dateityp unbekannt).
+
+## VHF/GSK-Altbestand (Aufgabe 10.5)
+
+`--altbestand` verwendet den ersten Unterordner als Reihe und sendet den dazugehörigen Dokumentart-Code als
+unbestätigte Vorbelegung. Erkannt werden `Bulletin`, `Merkblatt`, `Protokoll` und `Jahresbericht`, unabhängig von
+Gross- und Kleinschreibung. Pro Datei muss genau ein Jahr von 1900 bis 2099 im Pfad oder Dateinamen vorkommen;
+mehrdeutige oder fehlende Angaben sowie unbekannte Reihen werden übersprungen und begründet.
+
+Eine Ausgabenummer erkennt das Werkzeug nur bei einem Dateinamen wie `3.pdf`, `Ausgabe-3.pdf`, `3-2026.pdf` oder
+`2026-3.pdf`. Andere Namen werden weiterhin hochgeladen, aber im Bericht als «Ausgabe-Nr. nicht erkannt» gezählt.
+Die Klassifikation wird mit ihrem Code übergeben, zum Beispiel `--klassifikation fachgebiet=bad`; für mehrere Werte
+die Option wiederholen. `--art` ist mit `--altbestand` nicht zulässig. Im Trockenlauf ist keine Klassifikation nötig.
+
+Der Laufbericht zählt die Dateien je Dokumentart und Jahr im Quellordner. Die Lückenprüfung ist ausdrücklich nicht
+lokal nachgebildet: Massgeblich ist der serverseitige Lückenbericht. Das Import-Token darf nur `POST /dokumente`
+aufrufen; die geschützte Berichtsschnittstelle verlangt eine Archiv-Rolle. Der CLI-Import gibt deshalb keine
+Lückenfreiheit vor. Ein Bericht, der die Dokumente dieses konkreten Importlaufs im Eingangskorb einbezieht, bleibt
+Teil der offenen Abnahme von Aufgabe 10.5.
 
 ## Schlussbericht (Req 12.7)
 

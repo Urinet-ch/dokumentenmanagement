@@ -544,7 +544,9 @@ public class OeffentlicherChatSchritte {
 
     @Dann("steht in der Chatbot-Antwort weder «{}» noch «{}»")
     public void nennt(String eins, String zwei) {
-        assertThat(antwort.asString()).doesNotContain(eins).doesNotContain(zwei);
+        // Die zufällige Fehlerinstanz (urn:uuid:…) kann zufällig «501» enthalten und ist kein Eingabewert.
+        String text = antwort.asString().replaceAll("urn:uuid:[0-9a-fA-F-]+", "urn:uuid:-");
+        assertThat(text).doesNotContain(eins).doesNotContain(zwei);
     }
 
     @Dann("zeigt der Stream des Chatbots genau die Ereignisse «{}»")

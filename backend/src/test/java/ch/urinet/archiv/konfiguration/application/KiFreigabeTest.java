@@ -15,7 +15,7 @@ class KiFreigabeTest {
         TestKiTexteRepository texte = new TestKiTexteRepository();
         TestKonfigurationVerwaltung konfiguration = new TestKonfigurationVerwaltung();
         KonfigurationsdateiVerwaltung verwaltung = new KonfigurationsdateiVerwaltung(null, konfiguration,
-                null, null, null, null, null, texte, null, null);
+                null, null, null, null, null, texte, null, null, null, null);
 
         assertThat(verwaltung.kiFreigeben("betreiber:Fabian", "auswertung-2026-11")).isEqualTo(8);
         assertThat(texte.texte.kiFreigegeben()).isTrue();
@@ -34,7 +34,7 @@ class KiFreigabeTest {
         TestKiTexteRepository texte = new TestKiTexteRepository();
         TestKonfigurationVerwaltung konfiguration = new TestKonfigurationVerwaltung();
         KonfigurationsdateiVerwaltung verwaltung = new KonfigurationsdateiVerwaltung(null, konfiguration,
-                null, null, null, null, null, texte, null, null);
+                null, null, null, null, null, texte, null, null, null, null);
 
         assertThatThrownBy(() -> verwaltung.kiFreigeben("betreiber:Fabian", " "))
                 .isInstanceOf(KonfigurationUngueltig.class);

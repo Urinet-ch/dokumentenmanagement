@@ -2,7 +2,10 @@ package ch.urinet.archiv.driveimport;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Schlussbericht eines Laufs (Req 12.3, 12.5, 12.6, 12.7). Jede gefundene Datei landet in genau einem Zähler:
@@ -15,7 +18,18 @@ final class Bericht {
     record Eintrag(String pfad, String grund) {
     }
 
+    private record ReiheJahr(String art, int jahr) {
+    }
+
+    private static final class AltbestandGruppe {
+        private int dateien;
+        private int ohneAusgabe;
+        private int dubletten;
+        private final Map<Integer, Integer> ausgaben = new TreeMap<>();
+    }
+
     private final boolean trockenlauf;
+    private final boolean altbestandModus;
     private final int gefunden;
     private int uebertragen;
     private int schonVorhanden;
@@ -23,10 +37,27 @@ final class Bericht {
     private int abgelehnt;
     private final List<String> pdfExport = new ArrayList<>();
     private final List<Eintrag> nichtUebernommen = new ArrayList<>();
+    private final Map<ReiheJahr, AltbestandGruppe> altbestand = new TreeMap<>(Comparator
+            .comparing(ReiheJahr::art).thenComparingInt(ReiheJahr::jahr));
 
-    Bericht(boolean trockenlauf, int gefunden) {
+    Bericht(boolean trockenlauf, boolean altbestandModus, int gefunden) {
         this.trockenlauf = trockenlauf;
+        this.altbestandModus = altbestandModus;
         this.gefunden = gefunden;
+    }
+
+    void altbestand(AltbestandPfad pfad) {
+        AltbestandGruppe gruppe = altbestand.computeIfAbsent(new ReiheJahr(pfad.art(), pfad.jahr()),
+                ignored -> new AltbestandGruppe());
+        gruppe.dateien++;
+        if (pfad.ausgabe() == null) {
+            gruppe.ohneAusgabe++;
+        } else {
+            int vorkommen = gruppe.ausgaben.merge(pfad.ausgabe(), 1, Integer::sum);
+            if (vorkommen > 1) {
+                gruppe.dubletten++;
+            }
+        }
     }
 
     void uebertragen() {
@@ -74,6 +105,15 @@ final class Bericht {
         aus.println("Nicht übernommen (" + nichtUebernommen.size() + "):");
         nichtUebernommen.forEach(e -> aus.println("  " + e.pfad() + " – " + e.grund()));
         aus.println();
+        if (altbestandModus) {
+            aus.println("Altbestand nach Reihe und Jahr (Dateien im Quellordner):");
+            altbestand.forEach((schluessel, gruppe) -> aus.println("  " + schluessel.art() + " / "
+                    + schluessel.jahr() + ": " + gruppe.dateien + " Dateien; Ausgabe-Nr. erkannt: "
+                    + gruppe.ausgaben.keySet() + "; nicht erkannt: " + gruppe.ohneAusgabe
+                    + "; Dubletten: " + gruppe.dubletten));
+            aus.println("Lücken: nicht geprüft; massgeblich ist der serverseitige Lückenbericht.");
+            aus.println();
+        }
         aus.println("Gefunden:        " + gefunden);
         if (trockenlauf) {
             aus.println("Würde übertragen: " + uebertragen);

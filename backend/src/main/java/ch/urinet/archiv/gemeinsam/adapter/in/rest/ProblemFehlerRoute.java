@@ -48,6 +48,9 @@ public class ProblemFehlerRoute {
     static final String MULTIPART = "multipart/form-data";
     static final int BEWERTUNG_MAX_BYTES = 8191;
     private static final String BEWERTUNG_PFAD = "^/api/v1/chat/nachrichten/[^/]+/bewertung/?$";
+    private static final int EINSTELLUNGEN_MAX_BYTES = 16 * 1024;
+    private static final String EINSTELLUNGEN_PATCH = "^/api/v1/mandant/einstellungen/?$";
+    private static final String EINSTELLUNGEN_POST = "^/api/v1/mandant/einstellungen/(vorschau|zuruecksetzen)/?$";
 
     private final Optional<MemorySize> grenze;
     private final MemorySize grenzeOhneUpload;
@@ -61,13 +64,19 @@ public class ProblemFehlerRoute {
     void einrichten(@Observes Router router) {
         router.putWithRegex(BEWERTUNG_PFAD).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
                 .handler(BodyHandler.create(false).setBodyLimit(BEWERTUNG_MAX_BYTES))
-                .failureHandler(this::bewertungZuGross);
+                .failureHandler(this::begrenzteAnfrageZuGross);
+        router.patchWithRegex(EINSTELLUNGEN_PATCH).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
+                .handler(BodyHandler.create(false).setBodyLimit(EINSTELLUNGEN_MAX_BYTES))
+                .failureHandler(this::begrenzteAnfrageZuGross);
+        router.postWithRegex(EINSTELLUNGEN_POST).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
+                .handler(BodyHandler.create(false).setBodyLimit(EINSTELLUNGEN_MAX_BYTES))
+                .failureHandler(this::begrenzteAnfrageZuGross);
         router.route(API).order(RouteConstants.ROUTE_ORDER_UPLOAD_LIMIT - 1).handler(this::grenzePruefen);
         router.route().order(-2).failureHandler(this::ueberlastet);
         router.route(API).order(-1).failureHandler(this::behandeln);
     }
 
-    void bewertungZuGross(RoutingContext kontext) {
+    void begrenzteAnfrageZuGross(RoutingContext kontext) {
         if (kontext.statusCode() != 413 || kontext.response().headWritten()) {
             kontext.next();
             return;
