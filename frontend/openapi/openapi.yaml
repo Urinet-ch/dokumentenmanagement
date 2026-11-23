@@ -300,6 +300,16 @@ components:
           type: boolean
         zugeordnet:
           type: boolean
+    Auswirkung:
+      type: object
+      properties:
+        schluessel:
+          type: string
+        text:
+          type: string
+        betroffeneDatensaetze:
+          type: integer
+          format: int64
     AuszugTeil:
       description: Stück der Textstelle; treffer = hervorgehobener Suchbegriff (Req
         14.4)
@@ -659,6 +669,12 @@ components:
           type: boolean
         klartextBestaetigt:
           type: boolean
+    ChatEinstellungen:
+      type: object
+      properties:
+        aufbewahrungMonate:
+          type: integer
+          format: int32
     ChatFrage:
       type: object
       required:
@@ -819,6 +835,16 @@ components:
         anzahl:
           type: integer
           format: int64
+    DayOfWeek:
+      type: string
+      enum:
+      - MONDAY
+      - TUESDAY
+      - WEDNESDAY
+      - THURSDAY
+      - FRIDAY
+      - SATURDAY
+      - SUNDAY
     DiffEintrag:
       type: object
       properties:
@@ -1546,6 +1572,111 @@ components:
         groesse:
           type: integer
           format: int32
+    Einstellungen:
+      type: object
+      properties:
+        geschaeftsjahrEnde:
+          type: string
+        kennungen:
+          $ref: "#/components/schemas/Kennungen"
+        branding:
+          $ref: "#/components/schemas/EinstellungenBranding"
+        chat:
+          $ref: "#/components/schemas/ChatEinstellungen"
+        webseitenChat:
+          $ref: "#/components/schemas/WebseitenChatEinstellungen"
+        wissen:
+          $ref: "#/components/schemas/WissenEinstellungen1"
+    EinstellungenBetrieb:
+      type: object
+      properties:
+        oeffentlicherChat:
+          $ref: "#/components/schemas/OeffentlichesChatBudget"
+        wissenMonatsbudgetTokens:
+          type: integer
+          format: int64
+    EinstellungenBranding:
+      type: object
+      properties:
+        name:
+          type: string
+        primaerfarbe:
+          type: string
+    EinstellungenErgebnis:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        geaendert:
+          type: boolean
+        auswirkungen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Auswirkung"
+    EinstellungenVorschau:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        auswirkungen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Auswirkung"
+    EinstellungenZuruecksetzen:
+      type: object
+      properties:
+        gruppe:
+          type: string
+        version:
+          type: integer
+          format: int32
+    EinstellungskatalogAntwort:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        katalog:
+          type: array
+          items:
+            $ref: "#/components/schemas/EinstellungskatalogEintrag"
+        betrieb:
+          $ref: "#/components/schemas/EinstellungenBetrieb"
+    EinstellungskatalogEintrag:
+      type: object
+      properties:
+        schluessel:
+          type: string
+        gruppe:
+          $ref: "#/components/schemas/Gruppe"
+        name:
+          type: string
+        beschreibung:
+          type: string
+        typ:
+          $ref: "#/components/schemas/Typ"
+        einheit:
+          type: string
+        minimum:
+          type: integer
+          format: int32
+        maximum:
+          type: integer
+          format: int32
+        formregel:
+          type: string
+        standard: {}
+        aktuellerWert: {}
+        eigenerWert:
+          type: boolean
+        riskant:
+          type: boolean
+        wirksamAb:
+          type: string
+        hinweis:
+          type: string
     EntfernteAussage:
       type: object
       properties:
@@ -1823,6 +1954,15 @@ components:
         anzahl:
           type: integer
           format: int64
+    Gruppe:
+      type: string
+      enum:
+      - GESCHAEFTSJAHR
+      - KENNUNGEN
+      - BRANDING
+      - CHAT
+      - WEBSEITEN_CHAT
+      - WISSEN
     ImportHerkunft:
       type: object
       properties:
@@ -2228,6 +2368,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Reihe"
+    Kennungen:
+      type: object
+      properties:
+        uid:
+          type: string
+        ibans:
+          type: array
+          items:
+            type: string
     Klassifikation:
       type: object
       properties:
@@ -2744,6 +2893,14 @@ components:
           $ref: "#/components/schemas/Instant"
         aktion:
           type: string
+    LintZeitplan:
+      type: object
+      properties:
+        wochentag:
+          $ref: "#/components/schemas/DayOfWeek"
+        stunde:
+          type: integer
+          format: int32
     LocalDate:
       type: string
       format: date
@@ -2758,6 +2915,17 @@ components:
           type: boolean
           description: "Mindestens eine aktive Dokumentart hat die Gruppe «finanz»\
             \ (Spec 05, Req 8.8)"
+    OeffentlichesChatBudget:
+      type: object
+      properties:
+        monat:
+          $ref: "#/components/schemas/LocalDate"
+        budgetTokens:
+          type: integer
+          format: int64
+        verbrauchteTokens:
+          type: integer
+          format: int64
     PaketKopf:
       type: object
       properties:
@@ -3199,6 +3367,16 @@ components:
           anyOf:
           - $ref: "#/components/schemas/Fundstelle"
           - type: "null"
+    Typ:
+      type: string
+      enum:
+      - DATUM
+      - UID
+      - IBANS
+      - TEXT
+      - FARBE
+      - GANZZAHL
+      - WOCHENTAG
     UUID:
       type: string
       format: uuid
@@ -3388,6 +3566,12 @@ components:
           - string
           - "null"
           description: Meldung der Dokumentregel
+    WebseitenChatEinstellungen:
+      type: object
+      properties:
+        aufbewahrungTage:
+          type: integer
+          format: int32
     WissenAnalyse:
       type: object
       properties:
@@ -3427,6 +3611,20 @@ components:
           - "null"
           format: int32
           minimum: 1
+    WissenEinstellungen1:
+      type: object
+      properties:
+        budgetTokens:
+          type: integer
+          format: int32
+        lintBudgetTokens:
+          type: integer
+          format: int32
+        monatsbudgetTokens:
+          type: integer
+          format: int32
+        lintZeitplan:
+          $ref: "#/components/schemas/LintZeitplan"
     WissenExport:
       type: object
       properties:
@@ -3758,6 +3956,7 @@ tags:
 - name: Chat
 - name: Dokumentarten
 - name: Dokumente
+- name: Einstellungen
 - name: Exporte
 - name: Importe
 - name: Konfiguration
@@ -6357,6 +6556,10 @@ paths:
       tags:
       - Konfiguration
       parameters:
+      - name: bestaetigt
+        in: query
+        schema:
+          type: string
       - name: X-Aenderungsgrund
         in: header
         schema:
@@ -6938,6 +7141,142 @@ paths:
           description: VERSION_FEHLT
         "401":
           description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/mandant/einstellungen:
+    get:
+      summary: Einstellungskatalog und Betriebsbudget lesen
+      tags:
+      - Einstellungen
+      responses:
+        "200":
+          description: Katalog und aktueller Budgetstand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EinstellungskatalogAntwort"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+    patch:
+      summary: Einstellungen ändern
+      tags:
+      - Einstellungen
+      parameters:
+      - name: bestaetigt
+        in: query
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: "#/components/schemas/Einstellungen"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Einstellungen"
+        required: true
+      responses:
+        "200":
+          description: Änderung oder unveränderter Stand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EinstellungenErgebnis"
+        "409":
+          description: BESTAETIGUNG_NOETIG
+        "412":
+          description: VERSION_KONFLIKT
+        "413":
+          description: DATEI_ZU_GROSS
+        "422":
+          description: KONFIGURATION_UNGUELTIG
+        "428":
+          description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/mandant/einstellungen/vorschau:
+    post:
+      summary: Änderung der Einstellungen vorschauen
+      tags:
+      - Einstellungen
+      parameters:
+      - name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: "#/components/schemas/Einstellungen"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Einstellungen"
+        required: true
+      responses:
+        "200":
+          description: Auswirkungen ohne Änderung
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EinstellungenVorschau"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/mandant/einstellungen/zuruecksetzen:
+    post:
+      summary: Einstellungen einer Gruppe oder Version zurücksetzen
+      tags:
+      - Einstellungen
+      parameters:
+      - name: bestaetigt
+        in: query
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EinstellungenZuruecksetzen"
+        required: true
+      responses:
+        "200":
+          description: Zurückgesetzt oder unveränderter Stand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EinstellungenErgebnis"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
       security:
       - SecurityScheme:
         - inhaber

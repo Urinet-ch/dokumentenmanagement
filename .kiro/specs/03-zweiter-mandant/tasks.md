@@ -100,7 +100,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 7.1, 7.3, 7.4, 7.5, 7.7, 11.1, 11.6_
   - _Abhängig von: 11.6_
 
-- [ ] 11.5 Shortcodes, Blöcke, Download, Chatbot [Frontend]
+- [x] 11.5 Shortcodes, Blöcke, Download, Chatbot [Frontend]
   - `[urinet_archiv_liste]`, `[urinet_archiv_suche]`, `[urinet_chatbot]` + Gutenberg-Blöcke; Download-Route mit 302; WP-REST-Proxy für den Chat (SSE), `assets/chatbot.js`
   - Browser-Szenarien mit Cucumber.js + Playwright gegen wp-env; Barrierefreiheit prüfen (axe), Theme-Übernahme
   - Spec 05 ergänzt: Filter der Liste nach den Klassifikationen mit `oeffentlich_filter`, nur diese werden angezeigt (Spec 05, Req 8.6)

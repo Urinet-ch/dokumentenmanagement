@@ -643,3 +643,11 @@ Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x
 ## Umsetzung (Aufgabe 10.6, 22.11.2026)
 - Die Betriebsanleitung nennt `ARCHIV_AGE_EMPFAENGER_SICHERUNG` und `ARCHIV_AGE_EMPFAENGER_PROBE` als Quelle der unterschiedlichen öffentlichen `age`-Empfänger. Die Klartextprüfung gilt für die zur Abholung freigegebenen Laufartefakte in `laeufe/`; das Vorinventar `.zustand/` ausserhalb davon bleibt absichtlich unverschlüsselt und wird vom Infra-Repository nicht abgeholt.
 - Transport, Zweitkopie, `backup-gate.sh`, VPS-Schritt und Restore-Probe bleiben ausserhalb dieses Repos und damit als Betriebsnachweis offen [Fabian].
+
+## Umsetzung (Aufgabe 11.5, 22.11.2026)
+- Die öffentliche Liste lädt Reihen und Klassifikationen aus `/public/v1/filter`, lässt nur dort gelieferte Werte zu und bietet Filter für Reihe, Jahr, Ausgabe und öffentlich filterbare Klassifikationen. Die Seitennavigation erhält die ausgewählten Filter; Seitengrössen sind auf 1 bis 100 begrenzt.
+- Download-Slots sind atomare `wp_options`-Leases mit 20 Minuten Ablaufzeit. Der Eintrag wird nur gelöscht, wenn sein gespeicherter Lease-Wert noch dem eigenen Request gehört; abgelaufene Einträge des bisherigen Zeitstempelformats werden ebenfalls bereinigt. Die Lease dauert länger als der cURL-Gesamttimeout von 15 Minuten.
+- Der cURL-Header-Callback speichert `Content-Length` im gemeinsamen Stream-Zustand und reicht die Länge vor dem ersten Byte an den Browser weiter. Ein nachträglicher Stream-Abbruch bleibt dadurch an einer kürzeren Antwort als der angekündigten Länge erkennbar.
+- Die Quellenanzeige verwendet ein eigenes Textfeld für Reihe und Ausgabe und überschreibt das DOM-Ausgabeelement nicht mehr. Die wp-env-Test-API liefert dazu eine synthetische Chatquelle; PHPUnit prüft Lease-Ablauf, Eigentümerschaft und Content-Length, Playwright prüft Filter, Navigation und Quellen. axe-core wird auf Liste und Chat-Block mit WCAG-2.1-A/AA-Regeln angewendet.
+- Die Szenarien zu 7.2 prüfen im wp-env alle drei registrierten Shortcodes und Gutenberg-Blöcke; 7.6 prüft WCAG 2.1 AA mit axe-core sowie die geerbte Theme-Schrift.
+- Der Zweitreview-Befund zur Hilfe-Leiste lag ausserhalb des Plugin-Diffs. CI und wp-env-Nachweis für die Plugin-Szenarien sind grün; die Einsatzsperre bleibt bis zum Hosting-Nachweis und dem Test auf einer echten WordPress-Seite bestehen.
