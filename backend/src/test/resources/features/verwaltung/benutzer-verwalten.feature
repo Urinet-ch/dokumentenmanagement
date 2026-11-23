@@ -14,6 +14,11 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn der Inhaber die Rechte beider Benutzer abruft
     Dann sieht er die Rechte aus der Matrix nur für den eigenen Benutzer
 
+  @req-4.8 @verwaltung-beispielmandant
+  Szenario: Ein unabhängiger Beispielverband verwaltet nur seine eigenen Benutzer
+    Angenommen in zwei Mandanten gibt es je einen synthetischen Benutzer
+    Dann sieht ein Inhaber des Beispielverbands nur die Benutzer seines Mandanten
+
   @req-3.18 @req-4.5 @req-4.9
   Szenario: Rollenwechsel verlangt die aktuelle Version und widerruft alte Tokens
     Angenommen die frische Anmeldung ist für den Test bestätigt
@@ -94,6 +99,67 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Und ein synthetischer aktiver Mitarbeiter besteht
     Wenn der Inhaber den Mitarbeiter deaktiviert und reaktiviert
     Dann ist der Austritt verzeichnet und eine neue Zugangseinrichtung verlangt
+
+  @req-3.11 @req-3.12 @req-4.8
+  Szenario: Ein Austritt darf erst nach der Frist gelöscht werden
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter besteht
+    Und der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert
+    Wenn der Inhaber Vorschau und Löschung vor und nach der Frist ausführt
+    Dann wird nur nach der Frist gelöscht und die Archivverweise bleiben bestehen
+
+  @req-3.11 @req-7.2
+  Szenario: Eine Löschung verlangt eine frische Anmeldung
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter besteht
+    Und der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert
+    Wenn der Inhaber nach der Frist ohne frische Anmeldung löscht
+    Dann wird die Löschung wegen fehlendem Step-up abgewiesen
+
+  @req-3.11 @req-4.11
+  Szenario: Ein Löschantrag braucht die Bestätigung eines zweiten Inhabers
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter und zwei Inhaber bestehen im Test-Keycloak
+    Und der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert
+    Wenn zwei Inhaber einen Löschantrag nach der Frist entscheiden
+    Dann löscht nur die Bestätigung des zweiten Inhabers den Benutzer
+
+  @req-3.11 @req-4.7 @req-4.11
+  Szenario: Ein deaktivierter Inhaber kann gelöscht werden, wenn ein aktiver Inhaber verbleibt
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein aktiver und ein deaktivierter Inhaber bestehen im Test-Keycloak
+    Wenn der aktive Inhaber den deaktivierten Inhaber nach der Frist löscht
+    Dann ist nur der deaktivierte Inhaber gelöscht
+
+  @req-3.11 @req-4.7 @req-4.11
+  Szenario: Zwei aktive Inhaber bestätigen die Löschung eines deaktivierten Inhabers
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und zwei aktive und ein deaktivierter Inhaber bestehen im Test-Keycloak
+    Wenn zwei Inhaber einen Löschantrag nach der Frist entscheiden
+    Dann löscht nur die Bestätigung des zweiten Inhabers den Benutzer
+
+  @req-3.11 @req-4.6 @req-4.8
+  Szenario: Eine Löschung schützt eigene, fremde, unbekannte und aktive Benutzer
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter und zwei Inhaber bestehen im Test-Keycloak
+    Wenn der Inhaber unzulässige Löschungen beantragt
+    Dann werden die Löschungen abgewiesen und der Mitarbeiter bleibt aktiv
+
+  @req-3.11 @req-4.11
+  Szenario: Ein abgelehnter, zurückgezogener oder abgelaufener Löschantrag löscht nicht
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter und zwei Inhaber bestehen im Test-Keycloak
+    Und der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert
+    Wenn Löschanträge abgelehnt, zurückgezogen und nach Ablauf bestätigt werden
+    Dann wird kein Benutzer durch diese Anträge gelöscht
+
+  @req-3.11 @req-4.7 @req-4.11
+  Szenario: Gleichzeitige Bestätigungen führen eine Löschung nur einmal aus
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer aktiver Mitarbeiter und zwei Inhaber bestehen im Test-Keycloak
+    Und der Mitarbeiter ist mit einem Dokument verknüpft und deaktiviert
+    Wenn ein Löschantrag gleichzeitig zweimal bestätigt wird
+    Dann wird nur eine Bestätigung ausgeführt
 
   @req-3.4 @req-5.9
   Szenario: Ungültige Angaben und Realm-Konflikte werden ohne Personendaten abgewiesen

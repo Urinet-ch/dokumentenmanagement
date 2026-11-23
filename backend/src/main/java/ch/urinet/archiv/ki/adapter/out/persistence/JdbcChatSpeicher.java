@@ -8,6 +8,7 @@ import ch.urinet.archiv.ki.application.chat.ChatWerkzeugDokument;
 import ch.urinet.archiv.ki.domain.chat.Aufgeraeumt;
 import ch.urinet.archiv.ki.domain.chat.ChatAntwort;
 import ch.urinet.archiv.ki.domain.chat.ChatBewertung;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.ki.domain.chat.ChatNachricht;
 import ch.urinet.archiv.ki.domain.chat.ChatRolle;
 import ch.urinet.archiv.ki.domain.chat.ChatStatus;
@@ -65,9 +66,9 @@ public class JdbcChatSpeicher implements ChatSpeicher {
 
     @Override
     @Transactional(Transactional.TxType.MANDATORY)
-    public boolean gehoertSperren(UUID gespraech, String benutzer) {
-        return !abfragen("select 1 from " + schema() + ".chat_gespraech where id = ? and benutzer = ? for update",
-                z -> 1, gespraech, benutzer).isEmpty();
+    public Optional<Chatmodus> gespraechSperren(UUID gespraech, String benutzer) {
+        return abfragen("select modus from " + schema() + ".chat_gespraech where id = ? and benutzer = ? for update",
+                z -> Chatmodus.valueOf(z.getString(1)), gespraech, benutzer).stream().findFirst();
     }
 
     @Override
@@ -81,10 +82,29 @@ public class JdbcChatSpeicher implements ChatSpeicher {
     }
 
     @Override
-    public void gespraechAnlegen(UUID id, String benutzer, String titel, Instant zeit) {
+    public void gespraechAnlegen(UUID id, String benutzer, String titel, Chatmodus modus, Instant zeit) {
         aendern("insert into " + schema() + ".chat_gespraech "
-                + "(id, benutzer, titel, erstellt, geaendert, verlauf_vollstaendig) "
-                + "values (?, ?, ?, ?, ?, true)", id, benutzer, titel, Timestamp.from(zeit), Timestamp.from(zeit));
+                + "(id, benutzer, titel, modus, erstellt, geaendert, verlauf_vollstaendig) "
+                + "values (?, ?, ?, ?, ?, ?, true)", id, benutzer, titel, modus.name(), Timestamp.from(zeit),
+                Timestamp.from(zeit));
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public Optional<UUID> leeresGespraechSperren(String benutzer, Chatmodus modus) {
+        String s = schema();
+        return abfragen("select id from " + s + ".chat_gespraech g where g.benutzer = ? and g.modus = ? "
+                        + "and not exists (select 1 from " + s + ".chat_nachricht n where n.gespraech_id = g.id) "
+                        + "order by g.erstellt desc, g.id limit 1 for update of g",
+                z -> z.getObject(1, UUID.class), benutzer, modus.name()).stream().findFirst();
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public void titelSetzenWennLeer(UUID gespraech, String titel) {
+        String s = schema();
+        aendern("update " + s + ".chat_gespraech g set titel = ? where g.id = ? and not exists "
+                + "(select 1 from " + s + ".chat_nachricht n where n.gespraech_id = g.id)", titel, gespraech);
     }
 
     @Override
@@ -140,18 +160,23 @@ public class JdbcChatSpeicher implements ChatSpeicher {
 
     @Override
     public List<GespraechKopf> gespraeche(String benutzer, int anzahl) {
-        return abfragen("select id, titel, geaendert from " + schema() + ".chat_gespraech where benutzer = ? "
+        String s = schema();
+        // ein angelegtes, noch nicht gefragtes Gespräch erscheint erst mit seiner ersten Frage in der Liste
+        return abfragen("select id, titel, geaendert, modus from " + s + ".chat_gespraech g where benutzer = ? "
+                        + "and exists (select 1 from " + s + ".chat_nachricht n where n.gespraech_id = g.id) "
                         + "order by geaendert desc, id limit ?",
-                z -> new GespraechKopf(z.getObject(1, UUID.class), z.getString(2), z.getTimestamp(3).toInstant()),
+                z -> new GespraechKopf(z.getObject(1, UUID.class), z.getString(2), z.getTimestamp(3).toInstant(),
+                        Chatmodus.valueOf(z.getString(4))),
                 benutzer, anzahl);
     }
 
     @Override
     public Optional<Gespraech> gespraech(UUID id, String benutzer) {
         String s = schema();
-        Optional<GespraechKopf> kopf = abfragen("select id, titel, geaendert from " + s + ".chat_gespraech "
+        Optional<GespraechKopf> kopf = abfragen("select id, titel, geaendert, modus from " + s + ".chat_gespraech "
                         + "where id = ? and benutzer = ?",
-                z -> new GespraechKopf(z.getObject(1, UUID.class), z.getString(2), z.getTimestamp(3).toInstant()),
+                z -> new GespraechKopf(z.getObject(1, UUID.class), z.getString(2), z.getTimestamp(3).toInstant(),
+                        Chatmodus.valueOf(z.getString(4))),
                 id, benutzer).stream().findFirst();
         return kopf.map(k -> {
             record Zeile(long id, ChatRolle rolle, String inhalt, String quellen, String status, Instant zeit,
@@ -290,7 +315,7 @@ public class JdbcChatSpeicher implements ChatSpeicher {
     /**
      * In einer Transaktion: Nachrichten vor der Grenze, danach Gespräche ohne Nachrichten, deren letzte Änderung vor der
      * Grenze liegt. Die Bedingung auf {@code geaendert} schützt ein Gespräch, in das gerade eine neue Frage kommt
-     * ({@link #gehoertSperren} sperrt die Zeile, {@link #frageSpeichern} setzt {@code geaendert}).
+     * ({@link #gespraechSperren} sperrt die Zeile, {@link #frageSpeichern} setzt {@code geaendert}).
      */
     @Override
     @Transactional(Transactional.TxType.REQUIRES_NEW)

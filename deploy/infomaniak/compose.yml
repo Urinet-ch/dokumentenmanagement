@@ -50,6 +50,8 @@ services:
       ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-a-
       ARCHIV_ABLAGE_MAX_SPERRFRIST: P1D
       ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST: P1D
+      # Interner Admin-Zugang (Spec 06, 19.3); das Dienstkonto-Secret wird nur als Datei eingehängt.
+      ARCHIV_KEYCLOAK_ADMIN_URL: http://kc:8080
       # Zeitstempeldienste des Manifests (Req 15.3, 15.11; 4.9-E1): zuerst der Hauptdienst (TSA der Swiss Government
       # PKI), dann der zweite Dienst; Endpunkte, Policy-OIDs und CAs stehen in application.properties. Ohne Dienst
       # startet prod nicht, mit nur einem warnt der Start (TsaStartpruefung); DeployStufeTest prüft die zwei Dienste.
@@ -85,6 +87,7 @@ services:
       - archiv_smtp_passwort
       # Spec 06, 19.7 (Namenssperre, Weg A): 32 Zufallsbytes in Base64, dauerhaft; ein Austausch macht Sperren unprüfbar
       - namenssperre_salz
+      - keycloak_verwaltung_secret
     networks:
       intern: {}
       web: {}
@@ -260,6 +263,7 @@ services:
     secrets:
       - keycloak_db
       - keycloak_admin
+      - keycloak_smtp_passwort
       # O.8: leer, solange die GitHub-Secrets fehlen; dann bleibt der Google-Provider deaktiviert
       - google_client_id
       - google_client_secret
@@ -329,6 +333,10 @@ secrets:
     file: ./secrets/archiv_smtp_passwort
   namenssperre_salz:
     file: ./secrets/namenssperre_salz
+  keycloak_verwaltung_secret:
+    file: ./secrets/keycloak_verwaltung_secret
+  keycloak_smtp_passwort:
+    file: ./secrets/keycloak_smtp_passwort
   archiv_db_postgres:
     file: ./secrets/archiv_db_postgres
   archiv_db_owner_scram:

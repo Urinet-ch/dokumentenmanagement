@@ -24,3 +24,5 @@ Für die praktische serverseitige Anbindung siehe [Handbuch für Entwickler von 
 - Nur additiv (Req 11.3): `.github/scripts/pruefe-vertrag.sh origin/main` vergleicht jede Datei mit ihrem Stand auf der
   Basis (Exit 0 in Ordnung, 1 nicht additiv, 2 nicht prüfbar). Braucht `git` und `ruby` (Standardbibliothek).
   Selbsttest: `.github/scripts/pruefe-vertrag-test.sh` (läuft auch als `VertragPruefungTest` in den Backend-Tests).
+- CI: Der Build-Job lädt die vollständige Git-Historie, führt zuerst den Selbsttest und danach den Vergleich mit der
+  PR-Basis aus. Der Nachweis liegt im bestehenden CI-Schritt auf `main`; diese Aufgabe ändert keine Workflow-Datei.

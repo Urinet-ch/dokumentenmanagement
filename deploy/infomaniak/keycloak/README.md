@@ -16,6 +16,34 @@ für die noch ausstehende Anbindung:
 > Die E-Mail-Adresse für Ihren Zugang zum UriNet Archiv wurde geändert. Falls Sie diese Änderung nicht erwartet
 > haben, wenden Sie sich umgehend an die Verwaltung.
 
+## Verwaltungsclient und SMTP (Aufgabe 19.3)
+
+Der bestehende Realm wird nicht erneut importiert. Die Vorlage
+[`verwaltung-einrichten-vorlage.sh`](./verwaltung-einrichten-vorlage.sh) richtet den Verwaltungsclient und seine drei
+Rollen, den Scope `kc-admin-api`, SMTP und die Passwort-Richtlinie ein. Sie läuft in einem Wegwerf-Container mit
+`jq` und bereits für den Realm authentifiziertem `kcadm.sh`. Die Secret-Dateien
+`/run/secrets/keycloak_verwaltung_secret` und `/run/secrets/keycloak_smtp_passwort` werden dort eingehängt; die
+SMTP-Angaben `SMTP_HOST`, `SMTP_PORT`, `SMTP_BENUTZER` und `SMTP_ABSENDER` kommen vom Betreiber. Die Vorlage verwendet
+SMTP mit Authentifizierung und STARTTLS und legt temporäre JSON-Dateien ausschliesslich mit Rechten 600 an. Bestehende
+unerwartete direkte Rollen des Dienstkontos führen zum Abbruch, statt sie stillschweigend zu verändern.
+
+Die Vorlage überträgt das SMTP-Passwort in die Realm-Konfiguration; der Secret-Mount allein aktualisiert den Realm
+nicht. Bei einem Wechsel des Passworts ist die Vorlage erneut auszuführen. Die übrigen Realm-Änderungen und die
+Betriebsnachweise von 19.3 bleiben Aufgabe des Betreibers.
+
+**Vor dem Deploy:** Fabian muss den
+[Workflow-Diff](../../../docs/betrieb/keycloak-secrets-workflow.diff) auf `infomaniak-deploy.yml` anwenden und die
+beiden GitHub-Secrets hinterlegen. Erst dann liefert das Bundle die beiden Dateien, die Compose voraussetzt. Die
+Admin-Adresse und das Dienstkonto-Secret werden gemeinsam aktiviert; Realm und Dienstkonto müssen zuvor eingerichtet
+sein. Ohne den Workflow-Diff schlägt ein Deploy mit dem neuen Compose fehl. Die Aufgabe bleibt offen, bis die
+Betriebsnachweise erbracht sind.
+
+Der lokale Test verwendet ausschliesslich synthetische Werte und zwei eigene Wegwerf-Container:
+
+```bash
+bash deploy/infomaniak/keycloak/test/verwaltung-einrichten-keycloak-test.sh
+```
+
 ## Google-IdP
 
 Der Realm-Export enthält den deaktivierten Provider `google`, beide Anmeldeflows und die Ereignistypen. `start.sh` kann

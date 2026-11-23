@@ -37,6 +37,7 @@ const SOLL: readonly Soll[] = [
   { anker: 'eingangskorb-eigene', titel: 'Ihre erfassten Dokumente verfolgen', eltern: 'eingangskorb', eine: ['A5'], ohne: ['A7'] },
   { anker: 'suche', titel: 'Suche', eine: ['A2'], pfade: ['/suche'] },
   { anker: 'chat', titel: 'Chat', eine: ['A2'], pfade: ['/chat'] },
+  { anker: 'chat-bewerten', titel: 'Antworten bewerten', eltern: 'chat', eine: ['A2'] },
   { anker: 'dokument', titel: 'Dokumentansicht', eine: ['A2'], pfade: ['/dokument'] },
   { anker: 'dokument-aendern', titel: 'Angaben ändern', eltern: 'dokument', eine: ['A6'] },
   { anker: 'kontakte', titel: 'Kontakte', eine: ['A6'], pfade: ['/kontakte'] },

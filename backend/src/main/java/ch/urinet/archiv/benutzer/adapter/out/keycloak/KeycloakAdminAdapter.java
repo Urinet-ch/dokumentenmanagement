@@ -1,9 +1,12 @@
 package ch.urinet.archiv.benutzer.adapter.out.keycloak;
 
+import ch.urinet.archiv.benutzer.application.AbgleichIdentitaet;
+import ch.urinet.archiv.benutzer.application.DienstkontoAlarm;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,6 +39,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.Semaphore;
@@ -49,8 +53,8 @@ import java.util.stream.StreamSupport;
  */
 @IfBuildProfile("prod")
 @ApplicationScoped
-@Typed(IdentitaetsDienst.class)
-public class KeycloakAdminAdapter implements IdentitaetsDienst {
+@Typed({IdentitaetsDienst.class, AbgleichIdentitaet.class})
+public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentitaet {
     static final int MAX_ANTWORT = 1024 * 1024;
     static final Duration WARTEZEIT_PARALLEL = Duration.ofMillis(200);
     static final Duration WIEDERHOLUNGSABSTAND = Duration.ofMillis(200);
@@ -77,6 +81,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     private final HttpClient http;
     private final Semaphore plaetze = new Semaphore(MAX_PARALLEL);
     private final Clock clock;
+    private final DienstkontoAlarm dienstkontoAlarm;
     private final Object tokenSperre = new Object();
     private final Object schutzschalterSperre = new Object();
     private volatile Token token;
@@ -99,22 +104,33 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
             @ConfigProperty(name = "archiv.verwaltung.keycloak.verbindungs-zeitgrenze",
                     defaultValue = "PT2S") Duration verbindungsZeitgrenze,
             @ConfigProperty(name = "archiv.verwaltung.keycloak.zeitgrenze",
-                    defaultValue = "PT5S") Duration anfrageZeitgrenze) {
+                    defaultValue = "PT5S") Duration anfrageZeitgrenze,
+            DienstkontoAlarm dienstkontoAlarm) {
         this(json, basisUrl, realm, clientId, clientSecret, einladungsClientId, einladungsRedirectUri.orElse(""),
-                verbindungsZeitgrenze, anfrageZeitgrenze, Clock.systemUTC());
+                verbindungsZeitgrenze, anfrageZeitgrenze, Clock.systemUTC(), dienstkontoAlarm);
+    }
+
+    private void dienstkontoAlarmVormerken(int status) {
+        try {
+            dienstkontoAlarm.vormerken(status);
+        } catch (RuntimeException e) {
+            LOG.errorf("Dienstkonto-Alarm nicht vorgemerkt: Fehler-ID %s, Ursache %s.",
+                    UUID.randomUUID(), Ursachen.kette(e));
+        }
     }
 
     KeycloakAdminAdapter(ObjectMapper json, String basisUrl, String realm, String clientId, String clientSecret,
                          String einladungsClientId, String einladungsRedirectUri, Duration verbindungsZeitgrenze,
-                         Duration anfrageZeitgrenze, Clock clock) {
+                         Duration anfrageZeitgrenze, Clock clock, DienstkontoAlarm dienstkontoAlarm) {
         this(json, Optional.ofNullable(basisUrl), realm, clientId, Optional.ofNullable(clientSecret),
-                einladungsClientId, einladungsRedirectUri, verbindungsZeitgrenze, anfrageZeitgrenze, clock);
+                einladungsClientId, einladungsRedirectUri, verbindungsZeitgrenze, anfrageZeitgrenze, clock,
+                dienstkontoAlarm);
     }
 
     private KeycloakAdminAdapter(ObjectMapper json, Optional<String> basisUrl, String realm, String clientId,
                                  Optional<String> clientSecret, String einladungsClientId,
                                  String einladungsRedirectUri, Duration verbindungsZeitgrenze,
-                                 Duration anfrageZeitgrenze, Clock clock) {
+                                 Duration anfrageZeitgrenze, Clock clock, DienstkontoAlarm dienstkontoAlarm) {
         this.json = json;
         this.basis = basisUrl.filter(url -> !url.isBlank()).map(KeycloakAdminAdapter::basisAdresse);
         this.realm = segment(realm);
@@ -124,6 +140,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
         this.einladungsRedirectUri = einladungsRedirectUri;
         this.anfrageZeitgrenze = anfrageZeitgrenze;
         this.clock = clock;
+        this.dienstkontoAlarm = Objects.requireNonNull(dienstkontoAlarm);
         this.http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(verbindungsZeitgrenze).followRedirects(HttpClient.Redirect.NEVER).build();
     }
@@ -167,6 +184,44 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
     @Override
     public Benutzer benutzerLesen(String mandant, String id) {
         return benutzer(benutzerAbrufen(mandant, id), mandant);
+    }
+
+    @Override
+    public List<RealmBenutzer> seite(int seite) {
+        int start = IdentitaetsDienst.seitenanfang(null, seite, MAX_SEITENGROESSE);
+        String query = "max=" + MAX_SEITENGROESSE + "&first=" + start;
+        JsonNode treffer = json(request("GET", admin("/users"), query, null, true, Set.of()));
+        if (treffer == null || !treffer.isArray() || treffer.size() > MAX_SEITENGROESSE) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        List<RealmBenutzer> ergebnis = new ArrayList<>();
+        for (JsonNode eintrag : treffer) {
+            UUID id;
+            try {
+                String text = eintrag.path("id").asText();
+                id = UUID.fromString(text);
+                if (!id.toString().equalsIgnoreCase(text)) {
+                    throw new IllegalArgumentException("Ungültige Kennung");
+                }
+            } catch (IllegalArgumentException e) {
+                throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            JsonNode attribut = eintrag.path("attributes").path("mandant");
+            List<String> mandanten = new ArrayList<>();
+            if (!attribut.isMissingNode() && !attribut.isNull()) {
+                if (!attribut.isArray()) {
+                    throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                }
+                for (JsonNode wert : attribut) {
+                    if (!wert.isTextual()) {
+                        throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+                    }
+                    mandanten.add(wert.textValue());
+                }
+            }
+            ergebnis.add(new RealmBenutzer(id, mandanten, rollen(id.toString())));
+        }
+        return List.copyOf(ergebnis);
     }
 
     @Override
@@ -635,6 +690,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                 }
                 if (status == 401 || status == 403) {
                     fehlgeschlagen();
+                    dienstkontoAlarmVormerken(status);
                 } else if (status == 409) {
                     throw new KonfliktException();
                 }
@@ -718,6 +774,9 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst {
                     fehlgeschlagen();
                     if (antwort.statusCode() >= 500) {
                         throw fehler(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
+                    }
+                    if (antwort.statusCode() == 401 || antwort.statusCode() == 403) {
+                        dienstkontoAlarmVormerken(antwort.statusCode());
                     }
                     LOG.errorf("Keycloak-Dienstkonto konnte kein Token beziehen: Fehler-ID %s, Ursache %s, HTTP-Status %d.",
                             java.util.UUID.randomUUID(), "KeycloakAntwort", antwort.statusCode());

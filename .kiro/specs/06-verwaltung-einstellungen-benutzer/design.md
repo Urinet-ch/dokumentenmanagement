@@ -736,6 +736,39 @@ Ein internes Ereignis kennzeichnet erfolgreiche Inhabervergaben; die Alarmzustel
 Löschwirkung und die Bestätigung von Löschanträgen folgen in 19.12. Die Benutzeransicht liefert den Verweis und
 Hinweis zu API-Tokens; die Anzeige in der Oberfläche folgt in 20.6/20.7.
 
+## Umsetzung (Aufgabe 19.13, 23.11.2026)
+
+Der Worker liest für den Abgleich den Realm seitenweise und ohne Personenangaben, bevor er je aktivem Mandanten den
+Verwaltungsstand prüft. Er läuft beim Worker-Start und täglich um 01:20 Uhr Europe/Zurich, nicht auf Stufe P.
+Abweichungen werden protokolliert und als Befunde im betroffenen Mandanten vorgemerkt. Ein ungeklärter Vorgang bleibt
+bis zur Klärung gesperrt; ein späterer Abgleich allein schliesst ihn nicht ab.
+
+Inhabervergaben und Schwellenübergänge werden mit dem Zugriffsprotokoll in derselben Transaktion als Alarm vorgemerkt.
+Die Schwellen zählen das Protokoll im gleitenden Zehn-Minuten-Fenster unter einer mandantenbezogenen Transaktionssperre.
+Eine endgültige 401- oder 403-Antwort des Dienstkontos wird unabhängig vom aufrufenden Vorgang vorgemerkt; bei einem
+realmweiten Aufruf ohne Mandantenkontext für alle aktiven Mandanten. Der Überwachungstakt versendet die Mails.
+`120-verwaltungsalarm-anspruch` ergänzt einen befristeten Versandanspruch; nach einem Prozessabbruch ist die Zustellung
+erneut möglich. Ein Abbruch zwischen SMTP-Versand und Bestätigung kann eine zweite Mail auslösen, da SMTP keine atomare
+Bestätigung mit der Datenbank bietet. Noch nicht zugestellte Abgleichbefunde bleiben auch bei zwischenzeitlicher
+Behebung offen. Die Eingrenzung und Betriebsfolgen stehen in `docs/alarme.md`.
+
+Die Szenarien prüfen Abweichungen und deren Zustellung für zwei Mandanten sowie fehlende und mehrdeutige
+Mandantenzuordnungen und mehrere Rollen. Im Mandanten `vhf-gsk` erzeugt ein synthetischer Inhaber zusätzlich den
+Befund `FREMDE_ROLLE`, da dort nur `geschaeftsstelle` vergeben werden darf.
+
+## Vorbereitung (Aufgabe 19.3, 23.11.2026)
+
+Compose bindet die Secret-Datei des Verwaltungsclients in die API und die SMTP-Secret-Datei in Keycloak ein; die
+Admin-Adresse wird gleichzeitig gesetzt. Der Workflow-Diff unter `docs/betrieb/` muss vor einem Deploy auf den
+Deploy-Workflow angewendet werden, damit das Bundle beide Dateien liefert. Die Realm-Vorlage soll Client, Scope,
+Dienstkonto-Rollen, SMTP und Passwort-Richtlinie im bestehenden Realm einrichten. Nicht enthalten sind die übrigen
+Realm-Änderungen und die Betriebsnachweise von 19.3.
+
+Die Compose- und Secret-Prüfungen sind lokal grün. Der Test gegen einen frischen Keycloak scheiterte zweimal, weil
+`mktemp -d` unter macOS das eingehängte Arbeitsverzeichnis nicht verwendete. Die Vorlage nennt dieses Verzeichnis nun
+ausdrücklich; der vollständige Keycloak-Test und die Wirkung der Realm-Vorlage sind damit noch nicht nachgewiesen.
+Die Aufgabe bleibt offen und die Vorlage darf erst nach erfolgreicher Prüfung verwendet werden.
+
 ## Nachtrag Umsetzung (Aufgabe 20.2, 23.11.2026)
 
 Bis zur Überführung in 20.3 zeigt der Katalog die tatsächlich wirksamen Wissenswerte aus `wissens_einstellung`,
@@ -767,3 +800,32 @@ einen zusätzlichen Aufruf ergeben, weil der Vertrag keine Gesamtzahl liefert. F
 wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut geladen. Der Browser-Nachweis nutzt
 synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
 Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
+
+Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
+Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
+
+## Umsetzung (Aufgabe 19.12, 23.11.2026)
+
+Die Löschvorschau zählt Protokolleinträge und unterschiedliche Dokumente mit Bezug zum Benutzer im eigenen Mandanten.
+Die Löschung verlangt einen deaktivierten Zugang, die abgelaufene Frist, einen kategorisierten Grund und Step-up.
+Ab zwei aktiven Inhabern entsteht ein befristeter Antrag, den nur ein anderer aktiver Inhaber bestätigen kann; die
+Voraussetzungen werden unter der Vorgangssperre erneut geprüft. Keycloak beendet die Sitzungen und entfernt den
+Benutzer, das Archiv widerruft Tokens und entfernt den veränderlichen Status. Protokoll, Benutzerverzeichnis,
+Namenssperre und Dokumentverweise bleiben bestehen. Bei unklarer externer Wirkung bleibt der Vorgang gesperrt.
+
+Der Test der Vier-Augen-Löschung verwendet den Keycloak-Testdienst auch für die lesenden Identitätsabfragen: Der
+bisherige Identitäts-Stub kannte die im Test-Keycloak angelegten Akteure nicht. `Loeschvorschau` hat einen eindeutigen
+OpenAPI-Modellnamen, damit die Clientgenerierung das bestehende Wissensimport-Modell `Anzahl` nicht umbenennt.
+
+## Umsetzung (Aufgabe 21.3, 23.11.2026)
+
+`VerwaltungIsolationIT` prüft die Verwaltungsendpunkte mit echten Test-Realm-Tokens und einem synthetischen
+Identitätsdienst in beiden Mandantenrichtungen. Fremde Ziele und Anträge bleiben unsichtbar und unverändert;
+auch Suche, gefälschte Mandantenangaben und Protokolle bleiben auf den Tokenmandanten beschränkt. Ein eigener
+Beispielverband wird zusätzlich mit einem Test-Realm-Benutzer geprüft. Die zwölf Kombinationen aus den drei Rollen
+ohne Verwaltungsrecht und A20 bis A23 weisen HTTP 403 und einen Verweigerungseintrag nach.
+
+Ein paralleler JUnit-Test hält eine Rollenänderung an der externen Wirkung an: Ein zweiter Aufruf erhält
+`STATUS_KONFLIKT`, danach verhindert `LETZTER_INHABER` die Entfernung des letzten aktiven Inhabers. Das bestehende
+Cucumber-Szenario prüft zusätzlich konkurrierende Aufrufe zweier Inhaber. `EskalationTest` deckt auch jede
+Selbstzuweisung ab; Rollen-, Rechtematrix-, Endpunkt- und Keycloak-Ausfalltests ergänzen die Nachweise.

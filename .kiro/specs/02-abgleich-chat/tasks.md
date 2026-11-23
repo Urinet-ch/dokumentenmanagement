@@ -123,7 +123,7 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
   - Changeset `chat_bewertung`, REST `PUT/DELETE/GET /chat/nachrichten/{id}/bewertung`, Grenze, Textbereinigung, Mandantentrennung, Recht A24 in der Rechtematrix; Szenarien `@req-15.2` bis `@req-15.4`.
   - _Anforderungen: 15.2, 15.3, 15.4, 15.5_
   - _Abhängig von: 7.3_
-- [ ] 10.2 Oberfläche Sterne und Hinweis [Frontend]
+- [x] 10.2 Oberfläche Sterne und Hinweis [Frontend]
   - Sterne, Grundauswahl, Freitext, Datenschutzhinweis; Anleitung `chat.md` und Hilfe-Katalog nachziehen; Browser-Szenario, axe, `npm run pruefe:gestaltung`.
   - _Anforderungen: 15.1, 15.9_
   - _Abhängig von: 10.1, 7.4_

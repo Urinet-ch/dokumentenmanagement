@@ -832,7 +832,7 @@
       },
       "ChatGespraech" : {
         "type" : "object",
-        "required" : [ "id", "titel", "geaendert" ],
+        "required" : [ "id", "titel", "geaendert", "modus" ],
         "properties" : {
           "id" : {
             "$ref" : "#/components/schemas/UUID"
@@ -843,6 +843,22 @@
           "geaendert" : {
             "type" : "string",
             "$ref" : "#/components/schemas/Instant"
+          },
+          "modus" : {
+            "type" : "string",
+            "description" : "fester Modus des Gesprächs (Archivchat oder Wissenschat)",
+            "enum" : [ "ARCHIV", "WISSEN" ]
+          }
+        }
+      },
+      "ChatGespraechAnlegen" : {
+        "type" : "object",
+        "properties" : {
+          "modus" : {
+            "type" : [ "string", "null" ],
+            "description" : "Modus des neuen Gesprächs; fehlt er, gilt ARCHIV. WISSEN setzt das Recht A15 voraus",
+            "default" : "ARCHIV",
+            "enum" : [ "ARCHIV", "WISSEN" ]
           }
         }
       },
@@ -945,7 +961,7 @@
       },
       "ChatVerlauf" : {
         "type" : "object",
-        "required" : [ "id", "titel", "geaendert", "nachrichten" ],
+        "required" : [ "id", "titel", "geaendert", "modus", "nachrichten" ],
         "properties" : {
           "id" : {
             "$ref" : "#/components/schemas/UUID"
@@ -956,6 +972,10 @@
           "geaendert" : {
             "type" : "string",
             "$ref" : "#/components/schemas/Instant"
+          },
+          "modus" : {
+            "type" : "string",
+            "enum" : [ "ARCHIV", "WISSEN" ]
           },
           "nachrichten" : {
             "type" : "array",
@@ -1915,6 +1935,14 @@
         "enum" : [ "ERLAUBT", "VERBOTEN", "NICHT_SICHTBAR", "NUR_EIGENE", "NUR_LESEND", "NUR_SELBST_ERFASSTE" ]
       },
       "Ergebnis1" : {
+        "type" : "object",
+        "properties" : {
+          "antragId" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
+      "Ergebnis2" : {
         "type" : "object",
         "properties" : {
           "antragId" : {
@@ -3264,6 +3292,19 @@
         "type" : "string",
         "format" : "date",
         "examples" : [ "2022-03-10" ]
+      },
+      "Loeschvorschau" : {
+        "type" : "object",
+        "properties" : {
+          "protokolleintraege" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "dokumente" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
       },
       "Mandantenfunktionen" : {
         "type" : "object",
@@ -5240,6 +5281,98 @@
         } ]
       }
     },
+    "/api/v1/benutzer/{benutzerId}/loeschen" : {
+      "post" : {
+        "summary" : "Deaktivierten Benutzer nach Ablauf der Frist löschen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Real-Ip",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Grund"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Benutzer gelöscht"
+          },
+          "202" : {
+            "description" : "Vier-Augen-Antrag angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Ergebnis2"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/benutzer/{benutzerId}/loeschvorschau" : {
+      "get" : {
+        "summary" : "Verweise vor dem Löschen anzeigen",
+        "tags" : [ "Benutzerverwaltung" ],
+        "parameters" : [ {
+          "name" : "benutzerId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Anzahl Protokolleinträge und Dokumente",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Loeschvorschau"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
     "/api/v1/benutzer/{benutzerId}/reaktivieren" : {
       "post" : {
         "summary" : "Benutzer reaktivieren",
@@ -5682,7 +5815,7 @@
     "/api/v1/chat/gespraeche" : {
       "get" : {
         "summary" : "Eigene Gespräche",
-        "description" : "Höchstens 20 eigene Gespräche, zuletzt geänderte zuerst.",
+        "description" : "Höchstens 20 eigene Gespräche mit Modus (ARCHIV oder WISSEN) und mindestens einer Frage, zuletzt geänderte zuerst.",
         "tags" : [ "Chat" ],
         "responses" : {
           "200" : {
@@ -5703,6 +5836,58 @@
           },
           "403" : {
             "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "Gespräch mit Modus anlegen",
+        "description" : "Legt ein eigenes Gespräch ohne Frage an (Spec 04, Requirement 21.1 und 21.5). Modus ARCHIV (Standard, auch ohne Körper) oder WISSEN (nur aus der Wissensbasis, Recht A15, sonst 403); ein anderer Wert ergibt 400 ANFRAGE_UNGUELTIG. Der Modus bleibt für das Gespräch fest. Die Fragen folgen wie bisher mit POST /chat und der gespraechId; der Titel ist bis zur ersten Frage «Neues Gespräch». Wer wiederholt anlegt, erhält das noch nicht gefragte Gespräch desselben Modus zurück (200 statt 201). Das Gespräch erscheint in der Liste mit seiner ersten Frage. Der Anfragekörper muss kleiner als 8 KiB sein.",
+        "tags" : [ "Chat" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChatGespraechAnlegen"
+              }
+            }
+          },
+          "required" : false
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Noch nicht gefragtes Gespräch desselben Modus zurückgegeben",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChatGespraech"
+                }
+              }
+            }
+          },
+          "201" : {
+            "description" : "Gespräch angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChatGespraech"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Modus ungültig"
+          },
+          "403" : {
+            "description" : "Modus WISSEN ohne Recht A15"
+          },
+          "413" : {
+            "description" : "Anfragekörper zu gross"
+          },
+          "401" : {
+            "description" : "Not Authorized"
           }
         },
         "security" : [ {

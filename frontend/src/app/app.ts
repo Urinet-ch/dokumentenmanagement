@@ -22,6 +22,7 @@ import { AnmeldungService } from './gemeinsam/anmeldung/anmeldung.service';
 import { BrandingService } from './gemeinsam/branding.service';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { EingangskorbEntwurfSpeicher } from './eingangskorb/entwurf-speicher';
+import { BUILD_INFO, gebautAm } from './gemeinsam/build-info';
 import { FarbschemaService } from './gemeinsam/farbschema';
 import { MENUE, abschnitte, aktiverPfad } from './gemeinsam/navigation';
 import { Symbol } from './gemeinsam/symbol';
@@ -91,6 +92,7 @@ export class App {
     hilfeKontext(this.url(), this.hilfe.rolle(), this.hilfeKatalog, !this.anmeldung.angemeldet() && !this.online()),
   );
   protected readonly farbschema = inject(FarbschemaService);
+  protected readonly stand = { ...BUILD_INFO, gebaut: gebautAm(BUILD_INFO.gebaut) };
 
   constructor() {
     effect(() => {

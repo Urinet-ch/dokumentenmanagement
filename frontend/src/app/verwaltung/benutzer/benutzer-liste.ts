@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Ansicht, BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
@@ -15,7 +16,7 @@ const SEITENGROESSE = 50;
 
 @Component({
   selector: 'app-benutzer-liste',
-  imports: [MatButtonModule, RouterLink, BenutzerRechte],
+  imports: [MatButtonModule, MatProgressBarModule, RouterLink, BenutzerRechte],
   templateUrl: './benutzer-liste.html',
   styleUrl: './benutzer.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
