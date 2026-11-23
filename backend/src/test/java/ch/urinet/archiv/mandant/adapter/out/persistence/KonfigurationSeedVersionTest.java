@@ -71,24 +71,26 @@ class KonfigurationSeedVersionTest {
         datenbank.konfigurationSeedAnlegen(SCHEMA);
 
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
-            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".konfiguration_version")).isEqualTo("3");
+            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".konfiguration_version")).isEqualTo("4");
             assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 1"))
                     .isEqualTo("MIGRATION");
             assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 2"))
                     .isEqualTo("MIGRATION");
             assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 3"))
+                    .isEqualTo("MIGRATION");
+            assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 4"))
                     .isEqualTo("SEED");
             assertThat(wert(befehl, "select inhalt #>> '{arten,0,code}' from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("SEED_A");
+                    + ".konfiguration_version where version = 4")).isEqualTo("SEED_A");
             assertThat(wert(befehl, "select jsonb_typeof(inhalt #> '{arten,1,zusatzSchema}') from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("string");
+                    + ".konfiguration_version where version = 4")).isEqualTo("string");
             assertThat(wert(befehl, "select jsonb_typeof(inhalt #> '{arten,0,gruppen}') from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("array");
+                    + ".konfiguration_version where version = 4")).isEqualTo("array");
             assertThat(wert(befehl, "select inhalt #>> '{regeln,0,code}' from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("seed_folge");
+                    + ".konfiguration_version where version = 4")).isEqualTo("seed_folge");
             assertThat(wert(befehl, "select inhalt #>> '{kiTexte,kiFreigegeben}' from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("true");
-            // 048 lief ohne Arten; 054 hängt die migrierten KI-Texte an, danach folgt der Seed.
+                    + ".konfiguration_version where version = 4")).isEqualTo("true");
+            // 048 lief ohne Arten; 054 und 121 ergänzen Migrationen, danach folgt der Seed.
             assertThat(wert(befehl, "select inhalt -> 'kiTexte' is null from " + SCHEMA
                     + ".konfiguration_version where version = 1")).isEqualTo("t");
         }
