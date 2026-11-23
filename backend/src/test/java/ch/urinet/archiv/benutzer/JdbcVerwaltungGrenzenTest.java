@@ -4,8 +4,10 @@ import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
 import ch.urinet.archiv.benutzer.application.BenutzerAktivitaet;
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
+import ch.urinet.archiv.konfiguration.application.KonfigurationAenderungsProtokoll;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
+import ch.urinet.archiv.konfiguration.domain.KonfigurationQuelle;
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadKonfigurationSeed;
 import ch.urinet.archiv.mandant.application.KonfigurationSeed;
 import ch.urinet.archiv.mandant.application.MandantKontext;
@@ -40,6 +42,7 @@ class JdbcVerwaltungGrenzenTest {
 
     @Inject VerwaltungGrenzen grenzen;
     @Inject BenutzerAktivitaet aktivitaet;
+    @Inject KonfigurationAenderungsProtokoll aenderungsProtokoll;
     @Inject MandantKontext kontext;
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenquelle;
@@ -171,15 +174,13 @@ class JdbcVerwaltungGrenzenTest {
         try (var thread = Executors.newSingleThreadExecutor()) {
             in(thread, mandant, () -> {
                 for (int i = 0; i < 60; i++) {
-                    protokoll(mandant, akteur, "KONFIGURATION_AENDERN", null, "arten.PROBE.name", null, 0);
+                    konfigurationsAenderung(akteur, "arten.PROBE.name");
                 }
                 for (int i = 0; i < 29; i++) {
-                    protokoll(mandant, akteur, "KONFIGURATION_AENDERN",
-                            null, "einstellungen.branding.name", null, 0);
+                    konfigurationsAenderung(akteur, "einstellungen.branding.name");
                 }
                 grenzen.pruefen(akteur, Art.EINSTELLUNG, null);
-                protokoll(mandant, akteur, "KONFIGURATION_AENDERN",
-                        null, "einstellungen.branding.name", null, 0);
+                konfigurationsAenderung(akteur, "einstellungen.branding.name");
                 return null;
             });
             assertThatThrownBy(() -> in(thread, mandant, () -> {
@@ -188,8 +189,8 @@ class JdbcVerwaltungGrenzenTest {
             })).hasRootCauseInstanceOf(ZuVieleAnfragen.class);
             in(thread, mandant, () -> {
                 for (int i = 0; i < 30; i++) {
-                    protokoll(mandant, UUID.randomUUID().toString(), "KONFIGURATION_AENDERN",
-                            null, "einstellungen.chat.aufbewahrungMonate", null, 0);
+                    konfigurationsAenderung(UUID.randomUUID().toString(),
+                            "einstellungen.chat.aufbewahrungMonate");
                 }
                 return null;
             });
@@ -291,6 +292,11 @@ class JdbcVerwaltungGrenzenTest {
             einfuegen.setString(4, details);
             einfuegen.executeUpdate();
         }
+    }
+
+    private void konfigurationsAenderung(String akteur, String pfad) {
+        aenderungsProtokoll.schreiben(1, KonfigurationQuelle.APP, akteur, null,
+                List.of(new Konfiguration.Aenderung(pfad, "vorher", "nachher")));
     }
 
     private <T> T in(ExecutorService thread, String code, Callable<T> arbeit) throws Exception {

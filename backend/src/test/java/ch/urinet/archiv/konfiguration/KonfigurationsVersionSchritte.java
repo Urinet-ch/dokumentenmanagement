@@ -6,6 +6,7 @@ import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
 import ch.urinet.archiv.benutzer.adapter.out.persistence.JdbcVerwaltungGrenzen;
 import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.networknt.schema.InputFormat;
 import com.networknt.schema.Schema;
@@ -18,6 +19,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
+import io.cucumber.java.Scenario;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
@@ -31,10 +33,11 @@ import jakarta.inject.Inject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +64,8 @@ public class KonfigurationsVersionSchritte {
     private StepUp urspruenglichesStepUp;
     @Inject VerwaltungGrenzen grenzen;
     private VerwaltungGrenzen urspruenglicheGrenzen;
+    @Inject MandantAufloesung aufloesung;
+    private boolean kleineEinstellungsgrenze;
     private Response antwort;
     private int versionVorher;
     private int letzteVersion;
@@ -477,12 +482,52 @@ public class KonfigurationsVersionSchritte {
     }
 
     @Before("@20-1-abbild or @20-2-rest")
-    public void grenzenFuerEinstellungsszenarienIsolieren() {
+    public void grenzenFuerEinstellungsszenarienIsolieren(Scenario szenario) throws SQLException {
         urspruenglicheGrenzen = ClientProxy.unwrap(grenzen);
-        QuarkusMock.installMockForType(new JdbcVerwaltungGrenzen(null, null, 1, 1, 1, 1) {
+        kleineEinstellungsgrenze = szenario.getSourceTagNames().contains("@grenze-einstellungen-zwei");
+        if (kleineEinstellungsgrenze) {
+            QuarkusMock.installMockForType(
+                    new JdbcVerwaltungGrenzen(datenbank, aufloesung, 30, 10, 3,
+                            Math.addExact(einstellungsAenderungenInLetzterStunde(), 2)), VerwaltungGrenzen.class);
+        } else {
+            QuarkusMock.installMockForType(ohneGrenzen(), VerwaltungGrenzen.class);
+        }
+    }
+
+    private int einstellungsAenderungenInLetzterStunde() throws SQLException {
+        String schema = new MandantCode("urinet").schema();
+        String sql = "select count(*) from " + schema + ".zugriff_protokoll where zeit > clock_timestamp() "
+                + "- interval '1 hour' and aktion = 'KONFIGURATION_AENDERN' and exists "
+                + "(select 1 from jsonb_array_elements(case when jsonb_typeof(details->'aenderungen') = 'array' "
+                + "then details->'aenderungen' else '[]'::jsonb end) aenderung "
+                + "where aenderung->>'pfad' like 'einstellungen.%')";
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql);
+             ResultSet zeile = abfrage.executeQuery()) {
+            if (!zeile.next()) {
+                throw new IllegalStateException("Einstellungsänderungen nicht zählbar");
+            }
+            return zeile.getInt(1);
+        }
+    }
+
+    @After(order = 10_001)
+    public void grenzenVorBereinigungIsolieren() {
+        if (kleineEinstellungsgrenze) {
+            QuarkusMock.installMockForType(ohneGrenzen(), VerwaltungGrenzen.class);
+        }
+    }
+
+    @Angenommen("die Einstellungsrate ist auf zwei Änderungen begrenzt")
+    public void einstellungsrateKlein() {
+        assertThat(kleineEinstellungsgrenze).isTrue();
+    }
+
+    private VerwaltungGrenzen ohneGrenzen() {
+        return new JdbcVerwaltungGrenzen(null, null, 1, 1, 1, 1) {
             @Override
             public void pruefen(String akteur, Art art, UUID ziel) { }
-        }, VerwaltungGrenzen.class);
+        };
     }
 
     @Wenn("«{word}» die geänderte Konfigurationsdatei mit Bestätigung {string} einspielt")
@@ -853,6 +898,7 @@ public class KonfigurationsVersionSchritte {
             QuarkusMock.installMockForType(urspruenglicheGrenzen, VerwaltungGrenzen.class);
             urspruenglicheGrenzen = null;
         }
+        kleineEinstellungsgrenze = false;
     }
 
     private int aktuelleNummer(String benutzer) {
