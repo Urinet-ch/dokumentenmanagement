@@ -253,11 +253,16 @@ jobs:
           oom_heap=$(grep -c 'java.lang.OutOfMemoryError: Java heap space' status.txt || true)
           oom_meta=$(grep -c 'OutOfMemoryError: Metaspace' status.txt || true)
           oom_kern=$(grep -c -i 'oom-kill\|OOMKilled\|Killed' status.txt || true)
-          rm -f status.txt stand.txt
           echo "OIDC_NICHT_BEREIT im Log: $oidc"
           echo "Waiting for changelog lock im Log: $sperre"
           echo "LIQUIBASE_SPERRE_BELEGT im Log: $belegt"
           echo "OutOfMemoryError Heap/Metaspace/Kernel im Log: $oom_heap/$oom_meta/$oom_kern"
+          # Ursache eingrenzen, ohne Log-Inhalte: nur die Klassennamen der Ausnahmen und Fehler mit Anzahl (keine Meldungen,
+          # keine Werte), dazu die Zahl der Startversuche der API
+          echo "Ausnahmeklassen im Log (Anzahl Klasse):"
+          grep -oE '[A-Za-z_][A-Za-z0-9_.]*(Exception|Error)\b' status.txt | sort | uniq -c | sort -rn | head -8 || true
+          echo "Startversuche der API im Log: $(grep -c 'archiv-api.*started in\|Quarkus .* starting\|Installed features' status.txt || true)"
+          rm -f status.txt stand.txt
           if [ "$oidc" -ne 0 ]; then
             echo "::error::Die API meldet Keycloak nicht bereit (OIDC_NICHT_BEREIT): Realm, Adresse (quarkus.oidc.auth-server-url) und Erreichbarkeit von archiv-auth prüfen."
           fi
