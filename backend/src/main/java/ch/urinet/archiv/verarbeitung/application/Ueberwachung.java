@@ -35,6 +35,7 @@ public class Ueberwachung {
     private final ManifestUeberwachung manifeste;
     private final SicherungUeberwachung sicherung;
     private final VorgangUeberwachung vorgaenge;
+    private final AbgleichAlarmQuelle abgleich;
     private final AlarmSpeicher alarme;
     private final InhaberBenachrichtigung benachrichtigung;
     private final Duration grenze;
@@ -46,7 +47,8 @@ public class Ueberwachung {
     }
 
     public Ueberwachung(MandantRegister register, DokumentUeberwachung dokumente, ManifestUeberwachung manifeste,
-                        SicherungUeberwachung sicherung, VorgangUeberwachung vorgaenge, AlarmSpeicher alarme,
+                        SicherungUeberwachung sicherung, VorgangUeberwachung vorgaenge,
+                        AbgleichAlarmQuelle abgleich, AlarmSpeicher alarme,
                         InhaberBenachrichtigung benachrichtigung,
                         @ConfigProperty(name = "archiv.ueberwachung.grenze") Duration grenze,
                         @ConfigProperty(name = "archiv.ueberwachung.betrieb-mandant") String betrieb) {
@@ -56,6 +58,7 @@ public class Ueberwachung {
         this.manifeste = manifeste;
         this.sicherung = sicherung;
         this.vorgaenge = vorgaenge;
+        this.abgleich = abgleich;
         this.alarme = alarme;
         this.benachrichtigung = benachrichtigung;
         this.grenze = grenze;
@@ -108,6 +111,7 @@ public class Ueberwachung {
                     grenze)));
             gemeldet += quelle(mandant, Befund.Quelle.MANIFEST, () -> manifeste.befunde(mandant));
             gemeldet += quelle(mandant, Befund.Quelle.VERWALTUNG, () -> Optional.of(vorgaenge.ungeklaert(mandant)));
+            gemeldet += abgleichMelden(mandant);
         }
         if (mandanten.contains(betrieb)) {
             gemeldet += quelle(betrieb, Befund.Quelle.SICHERUNG, sicherung::befunde);
@@ -125,24 +129,39 @@ public class Ueberwachung {
                 return 0;
             }
             alarme.abgleichen(mandant, quelle, befunde.get());
-            int gemeldet = 0;
-            for (Befund befund : befunde.get()) {
-                Optional<Instant> anspruch = alarme.beanspruchen(mandant, befund);
-                if (anspruch.isPresent()) {
-                    if (benachrichtigung.alarm(mandant, befund)) {
-                        gemeldet++;
-                    } else {
-                        freigeben(new Freigabe(mandant, befund, anspruch.get()));
-                    }
-                }
-            }
-            return gemeldet;
+            return melden(mandant, befunde.get());
         } catch (RuntimeException e) {
             // nächster Lauf versucht es wieder; nur Mandant, Quelle und Klassennamen (Req 16.7)
             LOG.warnf("Überwachung von %s für Mandant %s fehlgeschlagen, ursache=%s", quelle, mandant.wert(),
                     Ursachen.kette(e));
             return 0;
         }
+    }
+
+    private int abgleichMelden(MandantCode mandant) {
+        try {
+            return melden(mandant, abgleich.offene(mandant));
+        } catch (RuntimeException e) {
+            LOG.warnf("Überwachung von Verwaltungsalarmen für Mandant %s fehlgeschlagen, ursache=%s", mandant.wert(),
+                    Ursachen.kette(e));
+            return 0;
+        }
+    }
+
+    private int melden(MandantCode mandant, List<Befund> befunde) {
+        int gemeldet = 0;
+        for (Befund befund : befunde) {
+            Optional<Instant> anspruch = alarme.beanspruchen(mandant, befund);
+            if (anspruch.isPresent()) {
+                if (benachrichtigung.alarm(mandant, befund)) {
+                    alarme.bestaetigen(mandant, befund, anspruch.get());
+                    gemeldet++;
+                } else {
+                    freigeben(new Freigabe(mandant, befund, anspruch.get()));
+                }
+            }
+        }
+        return gemeldet;
     }
 
     private void offeneFreigabenNachholen() {

@@ -33,6 +33,8 @@
   </div>
 </form>
 
+<app-wissen-quellen />
+
 @if (laedt()) { <p class="status" role="status">{{ texte.laedt }}</p> }
 @if (fehler(); as meldung) {
   <p class="hinweis gefahr" role="alert">{{ meldung }}</p>

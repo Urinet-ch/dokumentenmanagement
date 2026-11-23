@@ -47,6 +47,10 @@ Given(/^ich bin als «(.+)» im Mandanten «(.+)» angemeldet$/, async function 
   await anmelden(this);
 });
 
+Given(/^ich öffne die Seite «(.+)» vor der Anmeldung$/, async function (pfad) {
+  await this.seite.goto(basisUrl + pfad);
+});
+
 When('ich mich anmelde', async function () {
   await anmelden(this);
 });
@@ -62,10 +66,17 @@ When(/^ich auf «(.+)» klicke$/, async function (name) {
 When(/^ich im Menü «(.+)» wähle$/, async function (punkt) {
   // Auf schmalen Bildschirmen liegt das Menü hinter dem Knopf «Menü öffnen»
   const oeffnen = this.seite.getByRole('button', { name: 'Menü öffnen', exact: true });
-  if (await oeffnen.isVisible()) {
+  const mobil = await oeffnen.isVisible();
+  if (mobil) {
     await oeffnen.click();
   }
-  await this.seite.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: punkt }).click();
+  await this.seite
+    .getByRole('navigation', { name: 'Hauptnavigation' })
+    .getByRole('link', { name: punkt, exact: true })
+    .click();
+  if (mobil) {
+    await oeffnen.waitFor({ state: 'visible' });
+  }
 });
 
 When('Keycloak die Erneuerung der Sitzung ablehnt', async function () {
