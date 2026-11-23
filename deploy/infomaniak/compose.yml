@@ -3,7 +3,8 @@
 # .github/workflows/infomaniak-deploy.yml; das Bundle bringt archiv:<sha>, archiv:db-<version> und archiv:kc-<version>
 # mit, deploy-app.sh setzt daraus archiv:current, archiv:db-current und archiv:kc-current.
 # Secrets nur als Dateien unter /run/secrets (tech.md Regel 7), je Dienst nur die eigenen.
-# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 1150 MiB (geändert 21.11.2026, Entscheid Fabian: Keycloak 550m für
+# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 2048 MiB, cpus 1.5 (geändert 23.11.2026, Entscheid Fabian: VPS auf
+# 2 vCPU / 4 GB erweitert; api 1024m, kc 768m, db 256m; vorher 1150 MiB, geändert 21.11.2026, Entscheid Fabian: Keycloak 550m für
 # gut 200 MiB Luft über dem gemessenen Bedarf, API bleibt 500m mit rund 200 MiB Luft; davor 1000 MiB, geändert 13.11.2026, Entscheid Fabian;
 # bisher 900, davor 700 MiB), cpus höchstens 0.75 (Richtwert, Messung 1.10). Erste Messung (Spitzen unter Last: api 309,
 # db 66, kc 358 MiB); seit 3.2 belegt die API schon im Leerlauf rund 300 MiB, mit 320m beendete der cgroup-OOM sie bei
@@ -28,8 +29,10 @@ services:
         target: /var/lib/archiv/arbeit
     cap_drop: [ALL]
     security_opt: [no-new-privileges]
-    mem_limit: 500m
-    cpus: 0.3
+    # api 1024m (23.11.2026, VPS auf 4 GB erweitert): Heap von 112m auf 384m (der Deploy am 22.11.2026 kam nicht gesund;
+    # Heap 112m war für die gewachsene Anwendung zu knapp, ExitOnOutOfMemoryError), Metaspace 192m und Codecache 32m bleiben
+    mem_limit: 1024m
+    cpus: 0.6
     init: true
     environment:
       # Keine Geheimnisse: nur Adressen und Stufenwerte
@@ -69,7 +72,7 @@ services:
       # JVM beim ersten Export mit OutOfMemoryError: Metaspace, 128m liess nur 10 MiB Luft für alles, was in Betrieb dazukommt
       JAVA_OPTS_APPEND: >-
         -Djava.util.logging.manager=org.jboss.logmanager.LogManager
-        -Xmx112m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=32m
+        -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=32m
         -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
     secrets:
       - archiv_db_app
@@ -191,8 +194,8 @@ services:
       - /tmp:size=16m
     cap_drop: [ALL]
     security_opt: [no-new-privileges]
-    mem_limit: 100m
-    cpus: 0.15
+    mem_limit: 256m
+    cpus: 0.3
     stop_grace_period: 60s
     environment:
       POSTGRES_PASSWORD_FILE: /run/secrets/archiv_db_postgres
@@ -237,8 +240,8 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges]
     # Keycloak: gemessen 332 von 400 MiB (21.11.2026), nur 68 MiB Luft; 550m für gut 200 MiB Puffer (Entscheid Fabian)
-    mem_limit: 550m
-    cpus: 0.3
+    mem_limit: 768m
+    cpus: 0.6
     environment:
       KC_DB_URL: jdbc:postgresql://db:5432/keycloak
       ARCHIV_BASIS_URL: ${ARCHIV_BASIS_URL:-}
