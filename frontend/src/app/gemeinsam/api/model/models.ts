@@ -31,6 +31,7 @@ export * from './chat-bewertung-export-eingabe';
 export * from './chat-einstellungen';
 export * from './chat-frage';
 export * from './chat-gespraech';
+export * from './chat-gespraech-anlegen';
 export * from './chat-nachricht';
 export * from './chat-quelldokument';
 export * from './chat-quelle';

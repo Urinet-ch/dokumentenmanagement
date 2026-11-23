@@ -9,6 +9,7 @@ import ch.urinet.archiv.ki.application.chat.WerkzeugKontext;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontextRegister;
 import ch.urinet.archiv.ki.domain.ChatSystemPrompt;
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
@@ -86,7 +87,8 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         AgentLauf lauf = new AgentLauf(id, anfrage, ausgabe, abbruch, fenster);
         laeufe.festhalten(lauf);
         register.festhalten(id, new WerkzeugKontext(anfrage.mandant(), anfrage.benutzer(), anfrage.benutzer().rolle(),
-                anfrage.sichtregel(), anfrage.ip()), anfrage.geseheneDokumente(), anfrage.nummerierteTreffer());
+                anfrage.sichtregel(), anfrage.ip(), anfrage.modus()), anfrage.geseheneDokumente(),
+                anfrage.nummerierteTreffer());
         try {
             starten(lauf, anfrage);
             // Obergrenze: jede Runde und die Schlussantwort je höchstens eine Zeitgrenze, dazu Reserve für Werkzeuge
@@ -113,9 +115,16 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         return Optional.of(ChatSystemPrompt.kennung());
     }
 
+    @Override
+    public Optional<String> systempromptVersion(Chatmodus modus) {
+        return Optional.of(modus == Chatmodus.WISSEN ? ChatSystemPrompt.kennungWissen() : ChatSystemPrompt.kennung());
+    }
+
     private void starten(AgentLauf lauf, ChatAnfrage anfrage) {
-        LOG.infof("Chat-Durchgang mit Prompt %s", ChatSystemPrompt.kennung());
-        String prompt = ChatSystemPrompt.system(anfrage.mandantenname(), uhr.instant());
+        boolean wissen = anfrage.modus() == Chatmodus.WISSEN;
+        LOG.infof("Chat-Durchgang mit Prompt %s", wissen ? ChatSystemPrompt.kennungWissen() : ChatSystemPrompt.kennung());
+        String prompt = wissen ? ChatSystemPrompt.wissenChat(anfrage.mandantenname(), uhr.instant())
+                : ChatSystemPrompt.system(anfrage.mandantenname(), uhr.instant());
         TokenStream strom = agent.antworten(lauf.id(), prompt, anfrage.frage());
         strom.onPartialResponseWithContext((teil, kontext) -> {
                     lauf.handle(kontext.streamingHandle());
@@ -160,7 +169,10 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         long eigeneEin = ein;
         long eigeneAus = aus;
         try {
-            mandanten.mit(lauf.mandant(), () -> verbrauch.erfassen(KiVerbrauchPort.CHAT,
+            // Zweck nach Modus des Gesprächs (Spec 04, Requirement 21.7)
+            String zweck = lauf.anfrage().modus() == Chatmodus.WISSEN ? KiVerbrauchPort.WISSEN_CHAT
+                    : KiVerbrauchPort.CHAT;
+            mandanten.mit(lauf.mandant(), () -> verbrauch.erfassen(zweck,
                     new KiPort.Verbrauch(modell.modell(), eigeneEin, eigeneAus)));
         } catch (RuntimeException e) {
             LOG.errorf("Verbrauch des Chats nicht geschrieben: %s", e.getClass().getSimpleName());

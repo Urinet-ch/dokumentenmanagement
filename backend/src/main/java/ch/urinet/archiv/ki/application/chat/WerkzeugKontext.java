@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.application.chat;
 
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
@@ -15,9 +16,11 @@ import java.util.Optional;
  * nie aus Parametern des Sprachmodells. Rolle und Sichtregel müssen zum Benutzer passen (fail closed).
  *
  * @param ip IP der Chat-Anfrage ({@code X-Real-Ip}) für das Zugriffsprotokoll, leer ohne gültige Adresse
+ * @param modus fester Modus des Gesprächs (Spec 04, Requirement 21): im Modus {@code WISSEN} gibt es nur die
+ *              Wissenswerkzeuge
  */
 public record WerkzeugKontext(MandantCode mandant, Benutzer benutzer, Rolle rolle, Sichtregel sicht,
-                              Optional<IpAdresse> ip) {
+                              Optional<IpAdresse> ip, Chatmodus modus) {
 
     public WerkzeugKontext {
         Objects.requireNonNull(mandant, "mandant");
@@ -25,9 +28,16 @@ public record WerkzeugKontext(MandantCode mandant, Benutzer benutzer, Rolle roll
         Objects.requireNonNull(rolle, "rolle");
         Objects.requireNonNull(sicht, "sicht");
         Objects.requireNonNull(ip, "ip");
+        Objects.requireNonNull(modus, "modus");
         if (rolle != benutzer.rolle() || !sicht.equals(Sichtregel.fuer(benutzer))) {
             throw new IllegalArgumentException("Rolle oder Sichtregel passen nicht zum Benutzer");
         }
+    }
+
+    /** Kontext im Modus {@link Chatmodus#ARCHIV}. */
+    public WerkzeugKontext(MandantCode mandant, Benutzer benutzer, Rolle rolle, Sichtregel sicht,
+                           Optional<IpAdresse> ip) {
+        this(mandant, benutzer, rolle, sicht, ip, Chatmodus.ARCHIV);
     }
 
     /** Kontext aus Mandant, Benutzer und dem Wert des Headers {@code X-Real-Ip} (ungültig oder fehlend: ohne IP). */
