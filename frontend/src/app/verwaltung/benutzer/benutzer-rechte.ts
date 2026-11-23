@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { VerwaltungRolle } from '../../gemeinsam/api';
+import { Ergebnis, VerwaltungRolle } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { rechteGruppen } from './benutzer-logik';
 
@@ -13,7 +13,9 @@ import { rechteGruppen } from './benutzer-logik';
           @for (recht of gruppe.rechte; track recht.aktion) {
             <li>
               <span>{{ recht.bezeichnung }}</span>
-              <strong>{{ texte.ergebnisse[recht.ergebnis] ?? recht.ergebnis }}</strong>
+              <span class="pille {{ ergebnisKlasse(recht.ergebnis) }}">
+                {{ texte.ergebnisse[recht.ergebnis] ?? recht.ergebnis }}
+              </span>
               @for (fussnote of recht.fussnoten; track $index) {
                 <small>{{ fussnote.zeichen }} {{ fussnote.text }}</small>
               }
@@ -27,7 +29,7 @@ import { rechteGruppen } from './benutzer-logik';
     :host { display: grid; gap: 1rem; }
     h3 { margin: 0 0 .5rem; }
     ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
-    li { display: grid; gap: .2rem; overflow-wrap: anywhere; }
+    li { display: grid; justify-items: start; gap: .2rem; overflow-wrap: anywhere; }
     strong { font-size: .9rem; }
     small { color: var(--text-gedaempft); }
   `,
@@ -37,4 +39,13 @@ export class BenutzerRechte {
   readonly rolle = input.required<VerwaltungRolle>();
   protected readonly texte = TEXTE.benutzer;
   protected readonly gruppen = computed(() => rechteGruppen(this.rolle().rechte));
+
+  protected ergebnisKlasse(ergebnis: Ergebnis): 'ok' | 'gefahr' | 'warnung' | 'info' {
+    switch (ergebnis) {
+      case 'ERLAUBT': return 'ok';
+      case 'VERBOTEN': return 'gefahr';
+      case 'NICHT_SICHTBAR': return 'warnung';
+      default: return 'info';
+    }
+  }
 }
