@@ -19,6 +19,7 @@ import jakarta.enterprise.event.Event;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -32,11 +33,13 @@ public class BenutzerAntraege {
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
     private final TokenWiderruf widerruf;
+    private final BenutzerLoeschen loeschen;
     private final Event<BenutzerRolleAendern.InhaberVergabe> alarm;
 
     public BenutzerAntraege(VerwaltungAntragSpeicher antraege, IdentitaetsDienst identitaet,
                             BenutzerStatusSpeicher status, MandantenRollen rollen, VerwaltungVorgang vorgang,
                             Berechtigung berechtigung, StepUp stepUp, TokenWiderruf widerruf,
+                            BenutzerLoeschen loeschen,
                             Event<BenutzerRolleAendern.InhaberVergabe> alarm) {
         this.antraege = antraege;
         this.identitaet = identitaet;
@@ -46,6 +49,7 @@ public class BenutzerAntraege {
         this.berechtigung = berechtigung;
         this.stepUp = stepUp;
         this.widerruf = widerruf;
+        this.loeschen = loeschen;
         this.alarm = alarm;
     }
 
@@ -81,18 +85,25 @@ public class BenutzerAntraege {
             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }
         boolean bestaetigen = entscheid == VerwaltungAntragSpeicher.Status.BESTAETIGT;
-        ProtokollAktion aktion = bestaetigen ? ProtokollAktion.ROLLE_ZUWEISEN : ProtokollAktion.BENUTZER_ANTRAG;
-        ProtokollDetails.Verwaltungsvorgang art = bestaetigen ? ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN
+        boolean loeschAntrag = bestaetigen && initial.art() == VerwaltungAntragSpeicher.Art.LOESCHEN;
+        ProtokollAktion aktion = loeschAntrag ? ProtokollAktion.BENUTZER_LOESCHEN
+                : bestaetigen ? ProtokollAktion.ROLLE_ZUWEISEN : ProtokollAktion.BENUTZER_ANTRAG;
+        ProtokollDetails.Verwaltungsvorgang art = loeschAntrag ? ProtokollDetails.Verwaltungsvorgang.LOESCHEN
+                : bestaetigen ? ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN
                 : ProtokollDetails.Verwaltungsvorgang.ANTRAG;
+        ProtokollDetails.Verwaltungsgrund grund = loeschAntrag
+                ? VerwaltungsgrundPruefung.pruefen(initial.grund()) : null;
         Rolle zielRolle = initial.art() == VerwaltungAntragSpeicher.Art.INHABER_ROLLE ? Rolle.INHABER : null;
         UUID vorgangId = UUID.randomUUID();
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
-        vorgang.ausfuehren(mandant, eintrag(akteur, ip, vorgangId, ziel, aktion, art, null, zielRolle,
+        vorgang.ausfuehren(mandant, eintrag(akteur, ip, vorgangId, ziel, aktion, art, null, zielRolle, grund,
                         ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
                 () -> {
                     var antrag = antraege.lesen(id).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
                     if (antrag.status() != VerwaltungAntragSpeicher.Status.OFFEN
-                            || !antrag.gueltigBis().isAfter(Instant.now()) || !antrag.ziel().equals(initial.ziel())) {
+                            || !antrag.gueltigBis().isAfter(Instant.now()) || !antrag.ziel().equals(initial.ziel())
+                            || antrag.art() != initial.art() || !Objects.equals(antrag.grund(), initial.grund())
+                            || !antrag.beantragtVon().equals(initial.beantragtVon())) {
                         throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
                     }
                     var ausfuehrender = identitaet.benutzerLesen(mandant.wert(), akteur.id());
@@ -105,7 +116,12 @@ public class BenutzerAntraege {
                         berechtigung.eskalationVerweigern(akteur, Aktion.A23);
                     }
                     var benutzer = identitaet.benutzerLesen(mandant.wert(), antrag.ziel());
-                    if (bestaetigen) {
+                    if (loeschAntrag) {
+                        if (antrag.beantragtVon().equals(antrag.ziel())) {
+                            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+                        }
+                        loeschen.pruefen(mandant, akteur, antrag.ziel());
+                    } else if (bestaetigen) {
                         if (antrag.art() != VerwaltungAntragSpeicher.Art.INHABER_ROLLE
                                 || !rollen.lesen().contains(Rolle.INHABER)) {
                             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
@@ -119,7 +135,9 @@ public class BenutzerAntraege {
                         gefunden.set(benutzer);
                     }
                 }, () -> {
-                    if (bestaetigen) {
+                    if (loeschAntrag) {
+                        loeschen.externLoeschen(mandant, initial.ziel());
+                    } else if (bestaetigen) {
                         identitaet.rolleSetzen(mandant.wert(), initial.ziel(), Rolle.INHABER);
                     }
                     return ziel;
@@ -130,7 +148,9 @@ public class BenutzerAntraege {
                     widerruf.setzen(initial.ziel(), Instant.now());
                     return VerwaltungVorgang.Kompensation.UNKLAR;
                 }, ignoriert -> {
-                    if (bestaetigen) {
+                    if (loeschAntrag) {
+                        loeschen.abschluss(initial.ziel());
+                    } else if (bestaetigen) {
                         widerruf.setzen(initial.ziel(), Instant.now());
                     }
                     if (!antraege.entscheiden(id, entscheid, akteur.id(), Instant.now())) {
@@ -139,9 +159,9 @@ public class BenutzerAntraege {
                 }, ignoriert -> eintrag(akteur, ip, vorgangId, ziel, aktion, art,
                         gefunden.get() != null && gefunden.get().rollen().size() == 1
                                 ? gefunden.get().rollen().iterator().next() : null,
-                        zielRolle,
+                        zielRolle, grund,
                         ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
-        if (bestaetigen) {
+        if (bestaetigen && !loeschAntrag) {
             alarm.fire(new BenutzerRolleAendern.InhaberVergabe(mandant, ziel));
         }
     }
@@ -159,10 +179,11 @@ public class BenutzerAntraege {
 
     private static ZugriffEintrag eintrag(Benutzer akteur, Optional<IpAdresse> ip, UUID vorgangId, UUID ziel,
                                           ProtokollAktion aktion, ProtokollDetails.Verwaltungsvorgang art,
-                                          Rolle alt, Rolle neu, ProtokollDetails.Verwaltungsphase phase) {
+                                          Rolle alt, Rolle neu, ProtokollDetails.Verwaltungsgrund grund,
+                                          ProtokollDetails.Verwaltungsphase phase) {
         var details = new ProtokollDetails.Verwaltung(vorgangId, phase, ziel, art,
                 alt == null ? null : ProtokollDetails.Verwaltungsrolle.valueOf(alt.name()),
-                neu == null ? null : ProtokollDetails.Verwaltungsrolle.valueOf(neu.name()), List.of());
+                neu == null ? null : ProtokollDetails.Verwaltungsrolle.valueOf(neu.name()), List.of(), grund);
         return new ZugriffEintrag(Optional.of(akteur.id()), Optional.of(akteur.rolle().name()), aktion,
                 Optional.empty(), ip, ProtokollDetails.verwaltung(details));
     }
