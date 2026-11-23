@@ -85,6 +85,7 @@ model/entfernte-aussage.ts
 model/entscheidung.ts
 model/ergebnis.ts
 model/ergebnis1.ts
+model/ergebnis2.ts
 model/export-anfrage.ts
 model/export.ts
 model/fundstelle.ts
@@ -132,6 +133,7 @@ model/kontakt.ts
 model/kopf.ts
 model/letzte-aktion.ts
 model/lint-zeitplan.ts
+model/loeschvorschau.ts
 model/mandantenfunktionen.ts
 model/models.ts
 model/oeffentliches-chat-budget.ts

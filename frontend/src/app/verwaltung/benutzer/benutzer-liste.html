@@ -4,8 +4,7 @@
   <p>{{ texte.einleitung }}</p>
 </div>
 
-<section aria-labelledby="benutzer-titel">
-  <h2 id="benutzer-titel">{{ texte.titel }}</h2>
+<div>
   <form role="search" class="karte suche" (submit)="$event.preventDefault(); suchen(suchfeld.value)">
     <label for="benutzer-suche">{{ texte.suchen }}</label>
     <div class="knoepfe">
@@ -22,7 +21,7 @@
     </div>
   } @else if (benutzer(); as liste) {
     @if (liste.length === 0) {
-      <p role="status">{{ texte.keine }}</p>
+      <p class="leer" role="status">{{ texte.keine }}</p>
     } @else {
       <ul class="karten" data-test="benutzer-liste">
         @for (person of liste; track person.id ?? $index) {
@@ -50,9 +49,9 @@
       <button mat-button type="button" [disabled]="!hatWeitere()" (click)="laden(seite() + 1)">{{ texte.weiter }}</button>
     </nav>
   } @else {
-    <p role="status">{{ texte.laden }}</p>
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laden" />
   }
-</section>
+</div>
 
 <section aria-labelledby="antraege-titel">
   <h2 id="antraege-titel">{{ texte.antraege }}</h2>
@@ -63,7 +62,7 @@
     </div>
   } @else if (antraege(); as offene) {
     @if (offene.length === 0) {
-      <p role="status">{{ texte.keineAntraege }}</p>
+      <p class="leer" role="status">{{ texte.keineAntraege }}</p>
     } @else {
       <ul class="karten">
         @for (antrag of offene; track antrag.id ?? $index) {
@@ -80,7 +79,7 @@
       </ul>
     }
   } @else {
-    <p role="status">{{ texte.antraegeLaden }}</p>
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.antraegeLaden" />
   }
 </section>
 
@@ -93,7 +92,7 @@
     </div>
   } @else if (rollenListe(); as rollen) {
     @if (rollen.length === 0) {
-      <p role="status">{{ texte.keineRollen }}</p>
+      <p class="leer" role="status">{{ texte.keineRollen }}</p>
     } @else {
       <div class="karten">
         @for (rolle of rollen; track rolle.code) {
@@ -105,6 +104,6 @@
       </div>
     }
   } @else {
-    <p role="status">{{ texte.rollenLaden }}</p>
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.rollenLaden" />
   }
 </section>
