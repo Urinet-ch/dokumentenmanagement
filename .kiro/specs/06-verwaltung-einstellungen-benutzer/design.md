@@ -767,3 +767,16 @@ einen zusätzlichen Aufruf ergeben, weil der Vertrag keine Gesamtzahl liefert. F
 wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut geladen. Der Browser-Nachweis nutzt
 synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
 Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
+
+## Umsetzung (Aufgabe 19.12, 23.11.2026)
+
+Die Löschvorschau zählt Protokolleinträge und unterschiedliche Dokumente mit Bezug zum Benutzer im eigenen Mandanten.
+Die Löschung verlangt einen deaktivierten Zugang, die abgelaufene Frist, einen kategorisierten Grund und Step-up.
+Ab zwei aktiven Inhabern entsteht ein befristeter Antrag, den nur ein anderer aktiver Inhaber bestätigen kann; die
+Voraussetzungen werden unter der Vorgangssperre erneut geprüft. Keycloak beendet die Sitzungen und entfernt den
+Benutzer, das Archiv widerruft Tokens und entfernt den veränderlichen Status. Protokoll, Benutzerverzeichnis,
+Namenssperre und Dokumentverweise bleiben bestehen. Bei unklarer externer Wirkung bleibt der Vorgang gesperrt.
+
+Der Test der Vier-Augen-Löschung verwendet den Keycloak-Testdienst auch für die lesenden Identitätsabfragen: Der
+bisherige Identitäts-Stub kannte die im Test-Keycloak angelegten Akteure nicht. `Loeschvorschau` hat einen eindeutigen
+OpenAPI-Modellnamen, damit die Clientgenerierung das bestehende Wissensimport-Modell `Anzahl` nicht umbenennt.

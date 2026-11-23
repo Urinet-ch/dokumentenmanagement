@@ -137,7 +137,7 @@ components:
         status:
           type: string
         anzahl:
-          $ref: "#/components/schemas/Anzahl1"
+          $ref: "#/components/schemas/Anzahl"
         paketSha256:
           type: string
         befunde:
@@ -153,15 +153,6 @@ components:
             additionalProperties:
               type: string
     Anzahl:
-      type: object
-      properties:
-        protokolleintraege:
-          type: integer
-          format: int64
-        dokumente:
-          type: integer
-          format: int64
-    Anzahl1:
       type: object
       properties:
         neu:
@@ -2920,6 +2911,15 @@ components:
       format: date
       examples:
       - 2022-03-10
+    Loeschvorschau:
+      type: object
+      properties:
+        protokolleintraege:
+          type: integer
+          format: int64
+        dokumente:
+          type: integer
+          format: int64
     Mandantenfunktionen:
       type: object
       required:
@@ -4556,7 +4556,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Anzahl"
+                $ref: "#/components/schemas/Loeschvorschau"
         "401":
           description: Not Authorized
         "403":

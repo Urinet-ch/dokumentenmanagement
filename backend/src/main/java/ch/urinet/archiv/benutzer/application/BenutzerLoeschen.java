@@ -61,7 +61,7 @@ public class BenutzerLoeschen {
         this.antragGueltigkeit = antragGueltigkeit;
     }
 
-    public BenutzerVerweise.Anzahl vorschau(MandantCode mandant, Benutzer akteur, String id) {
+    public BenutzerVerweise.Loeschvorschau vorschau(MandantCode mandant, Benutzer akteur, String id) {
         berechtigung.aktion(akteur, Aktion.A22);
         kennung(id);
         identitaet.benutzerLesen(mandant.wert(), id);

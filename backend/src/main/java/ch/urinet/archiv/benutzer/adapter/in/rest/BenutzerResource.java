@@ -390,8 +390,8 @@ public class BenutzerResource {
     @RolesAllowed("inhaber")
     @Operation(summary = "Verweise vor dem Löschen anzeigen")
     @APIResponse(responseCode = "200", description = "Anzahl Protokolleinträge und Dokumente",
-            content = @Content(schema = @Schema(implementation = BenutzerVerweise.Anzahl.class)))
-    public BenutzerVerweise.Anzahl loeschvorschau(@PathParam("benutzerId") String id) {
+            content = @Content(schema = @Schema(implementation = BenutzerVerweise.Loeschvorschau.class)))
+    public BenutzerVerweise.Loeschvorschau loeschvorschau(@PathParam("benutzerId") String id) {
         return loeschen.vorschau(mandant.pruefen(), akteur(), id);
     }
 

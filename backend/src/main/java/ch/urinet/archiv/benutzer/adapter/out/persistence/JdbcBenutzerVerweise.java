@@ -24,7 +24,7 @@ public class JdbcBenutzerVerweise implements BenutzerVerweise {
     }
 
     @Override
-    public Anzahl zaehlen(String benutzer) {
+    public Loeschvorschau zaehlen(String benutzer) {
         String schema = aufloesung.schema();
         if (!SCHEMA.matcher(schema).matches()) {
             throw new IllegalStateException("Benutzerverweise ohne Mandanten-Schema");
@@ -44,7 +44,7 @@ public class JdbcBenutzerVerweise implements BenutzerVerweise {
                 if (!zeile.next()) {
                     throw new IllegalStateException("Benutzerverweise nicht lesbar");
                 }
-                return new Anzahl(zeile.getLong("protokolle"), zeile.getLong("dokumente"));
+                return new Loeschvorschau(zeile.getLong("protokolle"), zeile.getLong("dokumente"));
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Benutzerverweise nicht lesbar", e);

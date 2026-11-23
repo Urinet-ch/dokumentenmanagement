@@ -136,7 +136,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.18, 4.2, 4.5, 4.6, 4.7, 4.11, 4.12, 4.13_
   - _Abhängig von: 19.8, 19.10_
 
-- [ ] 19.12 Löschen nach Frist [Backend]
+- [x] 19.12 Löschen nach Frist [Backend]
   - `GET /benutzer/{id}/loeschvorschau`, `POST /benutzer/{id}/loeschen` (Frist, Begründung, Step-up, nicht der Akteur, nicht der
     letzte Inhaber, Vier-Augen), Wirkung in Keycloak, Namenssperre bleibt, Protokoll und Verzeichnis unverändert; `KeinLoeschpfadTest`.
   - _Anforderungen: 3.11, 3.12_
