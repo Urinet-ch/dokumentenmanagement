@@ -75,7 +75,11 @@
             from abbild;
 
             insert into wissensquelle_markierung (dokument_id, markiert_von, markiert_am)
-            select id, 'System', clock_timestamp() from dokument where art = 'WISSENSQUELLE';
+            select d.id, 'System', clock_timestamp()
+            from dokument d
+            where d.art = 'WISSENSQUELLE'
+                and not exists (select 1 from wissensquelle_markierung m
+                    where m.dokument_id = d.id and m.beendet_am is null);
 
             update dokument set art = 'PROJEKTDOKUMENT', version = version + 1,
                 konfiguration_version = (select max(version) from konfiguration_version),

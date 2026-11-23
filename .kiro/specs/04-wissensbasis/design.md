@@ -1456,6 +1456,14 @@ Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und 
   Beim erneuten Import muss die Dokumentquelle dagegen aktiv markiert sein; andernfalls ergibt die Quellenauflösung
   `QUELLE_UNBEKANNT` (Requirement 20.9).
 
+### Umsetzung (Aufgabe 17.1, 23.11.2026)
+Das Rollback des Changesets stellt die Dokumentart mit den Werten aus Changeset 044 wieder her, einschliesslich der
+Zusatzfelder für `vhf-gsk`. Es setzt nur Dokumente mit aktiver Markierung zurück auf `WISSENSQUELLE`; unmarkierte
+`PROJEKTDOKUMENT` bleiben unverändert. Die aktive Konfigurationsversion erhält die Dokumentart ebenfalls als neue,
+append-only Version. Die Markierungstabelle und ihre Historie bleiben bestehen. Vor jeder Artänderung wird der
+aktuelle Dokumentstand append-only gesichert. `ON CONFLICT DO NOTHING` und die Artbedingung machen ein wiederholtes
+Rollback wirkungsgleich; das Vorwärts-Changeset ergänzt keine bereits aktive Markierung.
+
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
 1. Lage zu Spec 03: Spec 04 wird nach Spec 03 umgesetzt, Wellen 13–16 (tasks.md). Der Nachtrag in
