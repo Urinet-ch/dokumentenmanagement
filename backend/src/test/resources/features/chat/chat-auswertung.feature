@@ -14,6 +14,10 @@ Funktionalität: Chat-Bewertungen auswerten und exportieren
     Wenn «inhaber-urinet» liest die Chat-Auswertung für die letzten 30 Tage
     Dann ist die Chat-Auswertung mit Status 200 beantwortet
     Und enthält die Auswertung 1 Bewertungen
+    Wenn «mitarbeiter-urinet» liest die Chat-Auswertung für die letzten 30 Tage
+    Dann ist die Chat-Auswertung mit Status 403 beantwortet
+    Wenn «treuhaender-urinet» liest die Chat-Auswertung für die letzten 30 Tage
+    Dann ist die Chat-Auswertung mit Status 403 beantwortet
     Wenn «geschaeftsstelle-vhf-gsk» liest die Chat-Auswertung für die letzten 30 Tage
     Dann ist die Chat-Auswertung mit Status 403 beantwortet
 
@@ -35,14 +39,18 @@ Funktionalität: Chat-Bewertungen auswerten und exportieren
     Und ist der Fehlercode der Chat-Auswertung «STEP_UP_NOETIG»
 
   @req-15.5
-  Szenario: Ein API-Token ohne Inhaberrolle kann die Chat-Auswertung nicht exportieren
+  Szenario: Ein API-Token ohne Inhaberrolle kann die Chat-Auswertung nicht lesen oder exportieren
     Angenommen für die Chat-Auswertung gibt es einen API-Token ohne Inhaberrolle
+    Wenn der API-Token die Chat-Auswertung liest
+    Dann ist die Chat-Auswertung mit Status 403 beantwortet
     Wenn der API-Token die Chat-Auswertung exportiert
     Dann ist der Chat-Auswertungs-Export mit Status 403 beantwortet
 
   @req-15.5
-  Szenario: Ein Webseiten-Schlüssel ohne Inhaberrolle kann die Chat-Auswertung nicht exportieren
+  Szenario: Ein Webseiten-Schlüssel ohne Inhaberrolle kann die Chat-Auswertung nicht lesen oder exportieren
     Angenommen für die Chat-Auswertung gibt es einen Webseiten-Schlüssel ohne Inhaberrolle
+    Wenn der Webseiten-Schlüssel die Chat-Auswertung liest
+    Dann ist die Chat-Auswertung mit Status 403 beantwortet
     Wenn der Webseiten-Schlüssel die Chat-Auswertung exportiert
     Dann ist der Chat-Auswertungs-Export mit Status 403 beantwortet
 

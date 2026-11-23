@@ -34,6 +34,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.MatchResult;
+import java.util.regex.Pattern;
 import java.util.zip.ZipInputStream;
 
 import static io.restassured.RestAssured.given;
@@ -298,9 +300,19 @@ public class ChatAuswertungSchritte {
         letzteAntwort = exportMitToken(apiToken);
     }
 
+    @Wenn("der API-Token die Chat-Auswertung liest")
+    public void apiTokenLiest() {
+        letzteAntwort = auswertungMitToken(apiToken);
+    }
+
     @Wenn("der Webseiten-Schlüssel die Chat-Auswertung exportiert")
     public void webseitenTokenExportiert() {
         letzteAntwort = exportMitToken(webseitenToken);
+    }
+
+    @Wenn("der Webseiten-Schlüssel die Chat-Auswertung liest")
+    public void webseitenTokenLiest() {
+        letzteAntwort = auswertungMitToken(webseitenToken);
     }
 
     @Dann("ist die Chat-Auswertung mit Status {int} beantwortet")
@@ -333,6 +345,13 @@ public class ChatAuswertungSchritte {
         return given().header("Authorization", "Bearer " + token).contentType("application/json")
                 .body(Map.of("von", bis.minusDays(30).toString(), "bis", bis.toString()))
                 .when().post("/api/v1/chat/auswertung/export");
+    }
+
+    private static Response auswertungMitToken(String token) {
+        LocalDate bis = LocalDate.now(ZoneId.of("Europe/Zurich"));
+        return given().header("Authorization", "Bearer " + token)
+                .queryParam("von", bis.minusDays(30).toString()).queryParam("bis", bis.toString())
+                .when().get("/api/v1/chat/auswertung");
     }
 
     @Dann("enthält der Chat-Auswertungs-Export die Dateien «{}», «{}» und «{}»")
@@ -374,8 +393,10 @@ public class ChatAuswertungSchritte {
     @Dann("schwärzt der Export die bekannten Kontakt- und Partnernamen mit demselben Platzhalter")
     public void exportSchwaerztKontaktPartner() {
         String inhalt = zipDateien.get("bewertungen.jsonl");
-        assertThat(inhalt).contains("[PARTNER-1], [PARTNER-1], [PARTNER-1]")
-                .doesNotContain("Müller AG", "Müller GmbH", "mueller", "[PARTNER-2]");
+        List<String> platzhalter = Pattern.compile("\\[PARTNER-\\d+]")
+                .matcher(inhalt).results().map(MatchResult::group).toList();
+        assertThat(platzhalter).hasSize(3).containsOnly(platzhalter.getFirst());
+        assertThat(inhalt).doesNotContain("Müller AG", "Müller GmbH", "mueller");
     }
 
     private static Map<String, String> entpacken(byte[] bytes) throws IOException {
