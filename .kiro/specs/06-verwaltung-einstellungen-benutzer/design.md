@@ -801,6 +801,9 @@ wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut gelade
 synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
 Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
 
+Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
+Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
+
 ## Umsetzung (Aufgabe 19.12, 23.11.2026)
 
 Die Löschvorschau zählt Protokolleinträge und unterschiedliche Dokumente mit Bezug zum Benutzer im eigenen Mandanten.
