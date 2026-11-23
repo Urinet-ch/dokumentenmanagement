@@ -1902,4 +1902,44 @@ export const TEXTE = {
     vorschauLaden: 'Löschvorschau wird geladen …',
     wirdGeloescht: 'Die Löschung wird angefordert …',
   },
+  benutzerStatusdialog: {
+    abbrechen: 'Abbrechen',
+    bestaetigen: 'Bestätigen',
+    grund: 'Grund',
+    grundWaehlen: 'Bitte wählen',
+    aktionen: {
+      sperren: {
+        titel: 'Benutzer sperren',
+        wirkung: 'Die Anmeldung wird gesperrt und die Sitzungen werden beendet. API-Tokens und Webseiten-Schlüssel bleiben gültig. Die Sperre kann aufgehoben werden.',
+      },
+      entsperren: {
+        titel: 'Benutzer entsperren',
+        wirkung: 'Der Zugang wird wieder freigegeben.',
+      },
+      deaktivieren: {
+        titel: 'Benutzer deaktivieren',
+        wirkung: 'Die Anmeldung wird deaktiviert und die Sitzungen werden beendet. Dokumente, Protokolle, API-Tokens und Webseiten-Schlüssel bleiben erhalten.',
+      },
+      reaktivieren: {
+        titel: 'Benutzer reaktivieren',
+        wirkung: 'Die Person erhält eine neue Einladung und richtet ihr Passwort und die Zwei-Faktor-Anmeldung neu ein.',
+      },
+      zugangZuruecksetzen: {
+        titel: 'Zugang zurücksetzen',
+        wirkung: 'Die Sitzungen enden und die Person erhält eine E-Mail, um Passwort und Zwei-Faktor-Anmeldung neu einzurichten.',
+      },
+      einladung: {
+        titel: 'Einladung erneut senden',
+        wirkung: 'Die Person erhält eine weitere Einladung per E-Mail. Frühere Einladungen bleiben bis zu ihrem Ablauf gültig.',
+      },
+      googleLoesen: {
+        titel: 'Google-Verknüpfung lösen',
+        wirkung: 'Die Verknüpfung wird entfernt und die Sitzungen werden beendet. Das Archiv stellt sie nicht wieder her.',
+      },
+    },
+  },
+  benutzerStatusaktionen: {
+    titel: 'Zugang verwalten',
+    laeuft: 'Die Aktion wird ausgeführt …',
+  },
 } as const;

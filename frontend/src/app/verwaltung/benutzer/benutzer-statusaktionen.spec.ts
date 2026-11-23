@@ -1,0 +1,83 @@
+import { HttpErrorResponse } from '@angular/common/http';
+import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
+import { Subject, of, throwError } from 'rxjs';
+import { BenutzerverwaltungService } from '../../gemeinsam/api';
+import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { BenutzerStatusaktionen } from './benutzer-statusaktionen';
+import { BenutzerStatusdialogErgebnis } from './benutzer-statusdialog';
+
+describe('Benutzerstatusaktionen', () => {
+  const api = {
+    apiV1BenutzerBenutzerIdSperrenPost: vi.fn(),
+    apiV1BenutzerBenutzerIdEntsperrenPost: vi.fn(),
+  };
+  const oeffnen = vi.fn();
+  let geschlossen: Subject<BenutzerStatusdialogErgebnis | null>;
+
+  beforeEach(() => {
+    geschlossen = new Subject();
+    oeffnen.mockReset().mockReturnValue({ afterClosed: () => geschlossen, close: vi.fn() });
+    api.apiV1BenutzerBenutzerIdSperrenPost.mockReset().mockReturnValue(of(null));
+    api.apiV1BenutzerBenutzerIdEntsperrenPost.mockReset().mockReturnValue(of(null));
+    TestBed.configureTestingModule({
+      imports: [BenutzerStatusaktionen],
+      providers: [
+        { provide: BenutzerverwaltungService, useValue: api },
+        { provide: MatDialog, useValue: { open: oeffnen } },
+      ],
+    });
+  });
+
+  function starten(person = { id: 'ziel', benutzername: 'alex', status: 'AKTIV' }) {
+    const fixture = TestBed.createComponent(BenutzerStatusaktionen);
+    fixture.componentRef.setInput('person', person);
+    fixture.componentRef.setInput('akteurId', 'akteur');
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    return { fixture, element };
+  }
+
+  function klicken(element: HTMLElement, text: string) {
+    [...element.querySelectorAll('button')].find((button) => button.textContent?.trim() === text)!.click();
+  }
+
+  it('sperrt nach bestätigtem Grund genau das angezeigte Ziel', () => {
+    const { fixture, element } = starten();
+    const ergebnis = vi.fn();
+    fixture.componentInstance.abgeschlossen.subscribe(ergebnis);
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.sperren.titel);
+    fixture.detectChanges();
+    expect([...element.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+    geschlossen.next({ grund: 'AUSTRITT' });
+    expect(api.apiV1BenutzerBenutzerIdSperrenPost).toHaveBeenCalledExactlyOnceWith('ziel', { grund: 'AUSTRITT' });
+    expect(ergebnis).toHaveBeenCalledWith({ id: 'ziel', aktion: 'sperren' });
+  });
+
+  it('führt bei Abbruch oder Zielwechsel keine Aktion aus', () => {
+    const { fixture, element } = starten();
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.sperren.titel);
+    geschlossen.next(null);
+    fixture.detectChanges();
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.sperren.titel);
+    fixture.componentRef.setInput('person', { id: 'andere', benutzername: 'bea', status: 'AKTIV' });
+    fixture.detectChanges();
+    geschlossen.next({ grund: 'AUSTRITT' });
+    expect(api.apiV1BenutzerBenutzerIdSperrenPost).not.toHaveBeenCalled();
+  });
+
+  it('zeigt einen Fehler statt Erfolg und gibt die Aktion wieder frei', () => {
+    api.apiV1BenutzerBenutzerIdEntsperrenPost.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 409, error: { fehlercode: 'STATUS_KONFLIKT' } })),
+    );
+    const { fixture, element } = starten({ id: 'ziel', benutzername: 'alex', status: 'GESPERRT' });
+    const ergebnis = vi.fn();
+    fixture.componentInstance.abgeschlossen.subscribe(ergebnis);
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.entsperren.titel);
+    geschlossen.next({});
+    fixture.detectChanges();
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.benutzerAktionsfehler.statusKonflikt);
+    expect(ergebnis).not.toHaveBeenCalled();
+    expect(element.querySelector('button')!.disabled).toBe(false);
+  });
+});
