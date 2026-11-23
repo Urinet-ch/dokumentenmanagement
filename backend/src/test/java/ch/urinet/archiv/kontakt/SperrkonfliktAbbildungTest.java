@@ -59,18 +59,15 @@ class SperrkonfliktAbbildungTest {
     @Alternative
     @Dependent
     public static class EreignisseOhneVorsperre implements DokumentEreignisse {
-        private final WissenIngestStarten ingest;
         private final QuelldokumentBeobachter beobachter;
 
         @Inject
-        public EreignisseOhneVorsperre(WissenIngestStarten ingest, QuelldokumentBeobachter beobachter) {
-            this.ingest = ingest;
+        public EreignisseOhneVorsperre(QuelldokumentBeobachter beobachter) {
             this.beobachter = beobachter;
         }
 
         @Override
         public void archiviert(UUID dokumentId, String art) {
-            ingest.archiviert(dokumentId, art);
         }
 
         @Override

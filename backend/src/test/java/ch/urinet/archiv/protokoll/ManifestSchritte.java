@@ -246,11 +246,18 @@ public class ManifestSchritte {
         UUID id = dokumente.get(alias + "/" + name);
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement aendern =
                      verbindung.prepareStatement("update " + schema(alias)
-                             + ".dokument set art = 'WISSENSQUELLE', titel = 'Probe Wissensquelle', datum = ? "
+                             + ".dokument set art = 'PROBE_BELEG', titel = 'Probe Wissensquelle', datum = ? "
                              + "where id = ?")) {
             aendern.setObject(1, LocalDate.parse(datum, DATUM));
             aendern.setObject(2, id);
             assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement markieren =
+                     verbindung.prepareStatement("insert into " + schema(alias)
+                             + ".wissensquelle_markierung (dokument_id, markiert_von, markiert_am) "
+                             + "values (?, 'probe', now())")) {
+            markieren.setObject(1, id);
+            markieren.executeUpdate();
         }
     }
 

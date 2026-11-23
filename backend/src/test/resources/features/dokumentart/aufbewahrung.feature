@@ -63,6 +63,7 @@ Funktionalität: Aufbewahrungsfrist der Dokumente
       | /api/v1/chat/nachrichten/{id}/bewertung |
       | /api/v1/dokumentarten/{code} |
       | /api/v1/dokumentarten/{art}/klassifikationen/{code} |
+      | /api/v1/dokumente/{id}/wissensquelle |
       | /api/v1/klassifikationen/{code} |
       | /api/v1/klassifikationen/{code}/werte/{wert} |
       | /api/v1/regeln/{code} |
