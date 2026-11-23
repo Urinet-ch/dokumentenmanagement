@@ -76,6 +76,9 @@ class WorkflowSecretsTest {
         String gueltig = Base64.getEncoder().encodeToString(new byte[32]);
         assertThat(ausfuehren(skript, gueltig, "", ed25519)).isZero();
         assertThat(ausfuehren(skript, gueltig, gueltig, ed25519)).isZero();
+        for (String umrandet : List.of(" " + gueltig, gueltig + "\n", "\t" + gueltig + "\r\n")) {
+            assertThat(ausfuehren(skript, umrandet, umrandet, ed25519)).as("Äusserer Leerraum").isZero();
+        }
         for (String falsch : List.of("", "abcd", Base64.getEncoder().encodeToString(new byte[33]), gueltig + "!",
                 gueltig.substring(0, 10) + " " + gueltig.substring(10), gueltig.replace('A', '_'))) {
             assertThat(ausfuehren(skript, falsch, "", ed25519)).as("Ungültiges Salz").isNotZero();
