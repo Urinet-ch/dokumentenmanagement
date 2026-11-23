@@ -59,6 +59,8 @@
     <include file="changesets/057-wissens-import.xml" relativeToChangelogFile="true"/>
     <include file="changesets/080-chat-kontextnachweis.xml" relativeToChangelogFile="true"/>
     <include file="changesets/081-chat-bewertung.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/082-chat-auswertung-daten.xml" relativeToChangelogFile="true"/>
     <include file="changesets/060-verwaltung-protokoll.xml" relativeToChangelogFile="true"/>
     <include file="changesets/090-vollexport-fehlerart.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/083-chat-bewertung-export-protokoll.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

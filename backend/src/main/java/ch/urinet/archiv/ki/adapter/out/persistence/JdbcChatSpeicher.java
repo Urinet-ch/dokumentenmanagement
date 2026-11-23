@@ -125,13 +125,15 @@ public class JdbcChatSpeicher implements ChatSpeicher {
     public long antwortSpeichern(UUID gespraech, ChatAntwort antwort, Instant zeit) {
         String s = schema();
         long id = abfragen("insert into " + s + ".chat_nachricht (gespraech_id, rolle, inhalt, werkzeuge, quellen, tokens_ein, "
-                        + "tokens_aus, status, zeit, kontext_vollstaendig) "
-                        + "values (?, 'ASSISTENT', ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?) returning id",
+                        + "tokens_aus, status, zeit, kontext_vollstaendig, zeit_bis_erster_text_ms, modellkennung, "
+                        + "systemprompt_version) "
+                        + "values (?, 'ASSISTENT', ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?) returning id",
                 z -> z.getLong(1),
                 gespraech, antwort.inhalt(), ChatJson.werkzeuge(antwort.werkzeuge()), ChatJson.quellen(antwort.quellen()),
                 antwort.tokens().map(t -> (Object) t.tokensEin()).orElse(Leer.INT),
                 antwort.tokens().map(t -> (Object) t.tokensAus()).orElse(Leer.INT), antwort.status().name(),
-                Timestamp.from(zeit), antwort.kontextVollstaendig()).getFirst();
+                Timestamp.from(zeit), antwort.kontextVollstaendig(), antwort.zeitBisErstemTextMs(),
+                antwort.modellkennung(), antwort.systempromptVersion()).getFirst();
         geaendert(s, gespraech, zeit);
         return id;
     }

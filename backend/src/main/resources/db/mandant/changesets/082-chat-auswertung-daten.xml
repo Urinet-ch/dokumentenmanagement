@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="082-chat-auswertung-daten" author="copilot">
+        <addColumn tableName="chat_nachricht">
+            <column name="zeit_bis_erster_text_ms" type="bigint"/>
+            <column name="modellkennung" type="text"/>
+            <column name="systemprompt_version" type="text"/>
+        </addColumn>
+        <sql>
+            alter table chat_nachricht add constraint chat_nachricht_zeit_bis_text_ck
+                check (zeit_bis_erster_text_ms is null or zeit_bis_erster_text_ms &gt;= 0);
+        </sql>
+        <rollback>
+            <sql>
+                alter table chat_nachricht drop constraint chat_nachricht_zeit_bis_text_ck;
+            </sql>
+            <dropColumn tableName="chat_nachricht" columnName="zeit_bis_erster_text_ms"/>
+            <dropColumn tableName="chat_nachricht" columnName="modellkennung"/>
+            <dropColumn tableName="chat_nachricht" columnName="systemprompt_version"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -54,8 +54,20 @@ final class WerkzeugErgebnisse {
         }
         Optional<ChatEreignis.QuellWissen> wissen = "wissen_seite_zeigen".equals(name)
                 ? wissen(wurzel) : Optional.empty();
-        return new ChatEreignis.WerkzeugErgebnis(name, parameter(json, argumente), List.copyOf(dokumente.values()),
-                datenstand, wissen, kontextstufe(name, wurzel));
+        Map<String, Object> parameter = parameter(json, argumente);
+        return new ChatEreignis.WerkzeugErgebnis(name, parameter, List.copyOf(dokumente.values()),
+                datenstand, wissen, kontextstufe(name, wurzel), suchweg(name, parameter, wurzel));
+    }
+
+    private static String suchweg(String name, Map<String, Object> parameter, JsonNode antwort) {
+        if ("wissen_index".equals(name) || "wissen_seite_zeigen".equals(name)) {
+            return "WISSENSSEITEN";
+        }
+        if ("dokumente_suchen".equals(name)) {
+            return Boolean.TRUE.equals(parameter.get("neueste")) || antwort.path("degradiert").asBoolean(false)
+                    ? "VOLLTEXT" : "HYBRID";
+        }
+        return null;
     }
 
     private static Optional<ChatEreignis.Kontextstufe> kontextstufe(String name, JsonNode wurzel) {
@@ -142,7 +154,8 @@ final class WerkzeugErgebnisse {
         try {
             UUID id = UUID.fromString(knoten.path("id").asText(""));
             ziel.putIfAbsent(id.toString(), new ChatEreignis.QuellDokument(id, knoten.path("titel").asText(""),
-                    seite(knoten.path("seiten"))));
+                    seite(knoten.path("seiten")), knoten.path("aehnlichkeit").isNumber()
+                    ? knoten.path("aehnlichkeit").doubleValue() : null));
         } catch (IllegalArgumentException e) {
             // keine gültige ID: kein Dokument
         }

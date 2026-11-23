@@ -574,6 +574,27 @@ components:
           type: string
         sprache:
           type: string
+    ChatAuswertung:
+      type: object
+      properties:
+        anzahl:
+          type: integer
+          format: int64
+        durchschnitt:
+          type: number
+          format: double
+        verteilung:
+          type: array
+          items:
+            $ref: "#/components/schemas/SterneDto"
+        gruende:
+          type: array
+          items:
+            $ref: "#/components/schemas/GrundDto"
+        schlechteAntworten:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchlechteAntwortDto"
     ChatBewertung:
       type: object
       required:
@@ -630,6 +651,23 @@ components:
           - string
           - "null"
           maxLength: 500
+    ChatBewertungExportEingabe:
+      type: object
+      properties:
+        von:
+          type: string
+        bis:
+          type: string
+        minSterne:
+          type: integer
+          format: int32
+        maxSterne:
+          type: integer
+          format: int32
+        schwaerzen:
+          type: boolean
+        klartextBestaetigt:
+          type: boolean
     ChatFrage:
       type: object
       required:
@@ -1791,6 +1829,14 @@ components:
       properties:
         grund:
           type: string
+    GrundDto:
+      type: object
+      properties:
+        grund:
+          type: string
+        anzahl:
+          type: integer
+          format: int64
     ImportHerkunft:
       type: object
       properties:
@@ -2774,6 +2820,7 @@ components:
       - ROLLE_ZUWEISEN
       - BENUTZER_ANTRAG
       - BENUTZER_ABWEICHUNG
+      - CHAT_BEWERTUNG_EXPORT
     ProtokollEintrag:
       description: Eintrag des Zugriffsprotokolls; Name und Rolle aus dem Benutzerverzeichnis
         zur Zeit des Eintrags (Req 10.10)
@@ -2990,6 +3037,18 @@ components:
       properties:
         rolle:
           type: string
+    SchlechteAntwortDto:
+      type: object
+      properties:
+        datum:
+          $ref: "#/components/schemas/LocalDate"
+        sterne:
+          type: integer
+          format: int32
+        grund:
+          type: string
+        frage:
+          type: string
     StatusAnsicht:
       type: object
       properties:
@@ -3001,6 +3060,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Entscheidung"
+    SterneDto:
+      type: object
+      properties:
+        sterne:
+          type: integer
+          format: int32
+        anzahl:
+          type: integer
+          format: int64
     Suchergebnis:
       type: object
       required:
@@ -4550,6 +4618,65 @@ paths:
         - mitarbeiter
         - treuhaender
         - geschaeftsstelle
+  /api/v1/chat/auswertung:
+    get:
+      summary: Chat-Bewertungen auswerten
+      description: "Kennzahlen für den Zeitraum sowie höchstens 100 Antworten mit\
+        \ höchstens 2 Sternen. Zeitraum maximal 12 Monate, nur Inhaber (A24)."
+      tags:
+      - Chat
+      parameters:
+      - name: bis
+        in: query
+        schema:
+          type: string
+      - name: von
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Auswertung für den eigenen Mandanten
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatAuswertung"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/chat/auswertung/export:
+    post:
+      summary: Chat-Bewertungen exportieren
+      description: ZIP im Format chat-bewertungen/v1; Step-up erforderlich; höchstens
+        5'000 Zeilen.
+      tags:
+      - Chat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatBewertungExportEingabe"
+        required: true
+      responses:
+        "200":
+          description: "ZIP-Download, nicht im Archiv abgelegt"
+          content:
+            application/zip: {}
+        "401":
+          description: Step-up erforderlich
+        "413":
+          description: Mehr als 5'000 Bewertungen im gewählten Zeitraum
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
   /api/v1/chat/gespraeche:
     get:
       summary: Eigene Gespräche
