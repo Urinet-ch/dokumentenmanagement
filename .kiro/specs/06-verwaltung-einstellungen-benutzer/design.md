@@ -870,3 +870,41 @@ Changeset 129 übernimmt für bestehende Mandanten die darstellbaren bisherigen 
 Katalogmonate darstellbare Chatfristen bleiben geerbt und verwenden weiterhin die unveränderte ISO-Periode; so wird
 keine Frist erfunden oder verkürzt. Dasselbe gilt für nicht katalogkonforme Startwerte, die sich nicht in das Abbild
 übernehmen lassen. Der Rollback lässt Version und Protokoll stehen; die bisherigen Eigenschaften bleiben verfügbar.
+
+## Umsetzung (Aufgabe 20.7, 24.11.2026)
+Einladen, Profil, Statusaktionen, Rollenwechsel und Löschen sind in Liste und Detail eingebunden und über A22/A23
+begrenzt; unbekannte Rechteergebnisse blenden aus (fail closed). Verwaltungsaktionen laufen nie über die
+Offline-Warteschlange; es gibt weder Passwort noch Einladungslink in der Oberfläche.
+
+**Step-up-Fortsetzung (Req 8.5), vorsichtigere Auslegung als bei den Einstellungen (20.5).** Das Muster von 20.5
+(Eingaben im `sessionStorage`) trägt hier nicht: Die Aktionen an Benutzern enthalten Namen, E-Mail-Adressen und die
+Namensbestätigung des Löschens, also persönliche Daten. Darum gilt: Bei `STEP_UP_NOETIG` (401, Sitzung bleibt bestehen,
+Interceptor unverändert) speichert `BenutzerFortsetzen` im Tab-`sessionStorage` nur Aktion, Kennung des Ziels, ETag und
+Codes (Grund, Rolle) sowie Kennungen von Akteur und Mandant, nie Namen, Adressen oder Freitext; unzulässige Inhalte lehnt
+die Prüfung vor dem Speichern ab. Wie bei 20.5 bindet eine zufällige Kennung die Fortsetzung an den erfolgreich geprüften
+OIDC-Rückruf (`fortsetzungEntnehmen`); Akteur und Mandant müssen übereinstimmen, die Fortsetzung gilt höchstens zehn
+Minuten, wird beim Übernehmen gelöscht und löst ein Neuladen ohne Rückruf nicht aus. Rückkehr ist die Detailseite des
+Ziels (beim Einladen die Liste).
+- **Sperren, Entsperren, Deaktivieren, Reaktivieren, Zugang zurücksetzen, Einladung erneut senden, Google lösen,
+  Rolle ändern:** Sie tragen nur Codes. Nach der frischen Anmeldung sendet die Komponente die Aktion genau einmal selbst,
+  aber nur, wenn Ziel und Zustand noch passen (die Aktion ist weiterhin angeboten, bei der Rolle gilt derselbe ETag
+  wie vor dem Step-up, sonst Meldung «Daten geändert» und keine Sendung). Die erste Sendung wurde laut Req 8.5 nicht
+  ausgeführt. Verlangt auch die Wiederholung wieder ein Step-up, leitet die Oberfläche nicht noch einmal weiter,
+  sondern meldet, dass die Aktion nicht ausgeführt wurde (keine Schleife).
+- **Löschen, Profiländerung, Einladen:** Eingaben (Benutzername zur Bestätigung, Namen, Adressen) werden nicht gespeichert.
+  Nach der Anmeldung öffnet das Löschen die Vorschau und den Dialog neu (Benutzername und Grund werden erneut erfasst,
+  bewusst auch als erneute Bestätigung einer nicht umkehrbaren Aktion); Profil und Einladung zeigen den Hinweis, dass die
+  Eingaben neu erfasst werden müssen. Das Absenden ist dann die einmalige Wiederholung durch den Benutzer. Das weicht
+  vom Wortlaut «sendet die Aktion danach erneut» ab, bleibt aber innerhalb von Req 8.5 und 7: Die erste Aktion wurde
+  nicht ausgeführt, die zweite genau einmal.
+
+**`BESTAETIGUNG_NOETIG` (409).** Die Benutzer-API (OpenAPI) kennt keinen Bestätigungsparameter und das Backend löst den
+Code für Benutzeraktionen nicht aus; es gibt also nichts, was die Oberfläche bestätigen und erneut senden könnte. Sie
+zeigt deshalb eine eigene Meldung mit den geprüften Texten der Auswirkung (höchstens fünf, je höchstens 300 Zeichen,
+nur als Text) und sendet nichts erneut. Bekommt die API später einen Bestätigungsparameter, wird daraus der
+Auswirkungsdialog wie bei den Einstellungen.
+
+Nachweise: Browser-Szenarien `@req-8.4`/`@req-8.6` (Profil, Rollen, Löschen, Einladen auf 375/1280 px in hell/dunkel mit
+axe und Überlaufprüfung) und `@req-8.5` (Step-up für Sperren, Rolle, Löschen, Profil; Bestätigung; Nachweis, dass nichts
+Persönliches in den Browser-Speicher geschrieben wird); Einheitstests der Fortsetzung, der Fehlerbehandlung und der
+Komponenten. Offen bleibt der manuelle Nachweis auf dem Handy [Fabian] (Req 8.2, Aufgabe 21.6).

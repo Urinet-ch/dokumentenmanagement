@@ -201,7 +201,7 @@ auf Server oder Secrets aus der Sitzung.
     acht Szenarien einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505);
     Angular-Tests für Fehler, Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514).
 
-- [ ] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
+- [x] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
   - Einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, Rolle ändern, E-Mail ändern, löschen (mit
     Eingabe des Benutzernamens und Vorschau), Google lösen; Step-up mit genau einer Wiederholung; Fehlermatrix; keine
     Passwörter oder Links in der Oberfläche; keine Offline-Warteschlange.
