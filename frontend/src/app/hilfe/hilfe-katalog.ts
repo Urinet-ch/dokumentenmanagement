@@ -107,6 +107,14 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     eltern: 'chat',
     bedingung: { eine: ['A2'] },
   },
+  {
+    anker: 'chat-auswertung',
+    titel: TEXTE.chat.auswertung.titel,
+    datei: '/anleitung/chat-auswertung.md',
+    eltern: 'chat',
+    bedingung: { eine: ['A24'] },
+    pfade: ['/chat/auswertung'],
+  },
   // Dokumentansicht (Aufgabe 22.5), zwischen «chat» und «kontakte»
   {
     anker: 'dokument',

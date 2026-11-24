@@ -55,4 +55,26 @@ describe('anmeldungInterceptor (Req 2.1)', () => {
     );
     expect(anmeldung.sitzungAbgelaufen).not.toHaveBeenCalled();
   });
+
+  it('verwirft die Sitzung bei einer Step-up-Aufforderung im Blob nicht', async () => {
+    http.get('/api/v1/chat/auswertung/export', { responseType: 'blob' }).subscribe({ error: () => undefined });
+    await tokenAbwarten();
+    kontrolle.expectOne('/api/v1/chat/auswertung/export').flush(
+      new Blob(['{"fehlercode":"STEP_UP_NOETIG"}'], { type: 'application/problem+json' }),
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    await tokenAbwarten();
+    expect(anmeldung.sitzungAbgelaufen).not.toHaveBeenCalled();
+  });
+
+  it('beendet die Sitzung bei einem anderen 401 im Blob', async () => {
+    http.get('/api/v1/chat/auswertung/export', { responseType: 'blob' }).subscribe({ error: () => undefined });
+    await tokenAbwarten();
+    kontrolle.expectOne('/api/v1/chat/auswertung/export').flush(
+      new Blob(['{"fehlercode":"NICHT_ANGEMELDET"}'], { type: 'application/problem+json' }),
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    await tokenAbwarten();
+    expect(anmeldung.sitzungAbgelaufen).toHaveBeenCalledOnce();
+  });
 });
