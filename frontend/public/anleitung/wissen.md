@@ -6,6 +6,7 @@ Unter «Wissen» finden Sie geprüftes Wissen aus Ihren Unterlagen: Seiten, die 
 3. Wählen Sie den Titel einer Seite, um sie zu lesen.
 
 Wissensseiten finden Sie auch in der [Suche](#suche) und im [Chat](#chat): Die Suche zeigt passende Seiten über den Dokumenttreffern, der Chat nennt verwendete Seiten unter den Quellen.
+Im Chat können Sie beim neuen Gespräch «Wissen befragen» wählen. Dieser Modus nutzt nur freigegebene Wissensseiten und bleibt für das Gespräch fest.
 
 ## Eine Wissensseite lesen
 - Oben stehen Seitentyp, Titel und Beschreibung, darunter «Stand» (die Version) und «Freigegeben» (wann die Fassung freigegeben wurde).

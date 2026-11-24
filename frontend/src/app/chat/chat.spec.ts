@@ -10,12 +10,15 @@ import { fehlerText } from './chat-logik';
 import {
   ChatEreignis,
   ChatFehler,
+  ChatModus,
   ChatPort,
   GespeicherteNachricht,
   GespraechKopf,
 } from './chat-port';
 
 class ChatAttrappe extends ChatPort {
+  angelegt: ChatModus[] = [];
+  anlegenFehler = false;
   fragen_: {
     frage: string;
     gespraechId: string | null;
@@ -39,6 +42,11 @@ class ChatAttrappe extends ChatPort {
         abo.unsubscribe();
       };
     });
+  }
+  anlegen(modus: ChatModus): Observable<GespraechKopf> {
+    this.angelegt.push(modus);
+    if (this.anlegenFehler) return throwError(() => new ChatFehler('NICHT_ERLAUBT'));
+    return of({ id: 'neues-wissen', titel: 'Neues Gespräch', geaendert: '2026-11-24T00:00:00Z', modus });
   }
   gespraeche(): Observable<GespraechKopf[]> {
     this.listeAbrufe++;
@@ -71,8 +79,8 @@ describe('Chat (Req 6.1–6.3)', () => {
     port = new ChatAttrappe();
     darfAnalyse = true;
     port.liste = [
-      { id: 'g1', titel: 'Offene Rechnungen im November', geaendert: '2026-11-13T23:30:00Z' },
-      { id: 'g2', titel: 'Fristen 2027', geaendert: '2026-11-01T08:00:00Z' },
+      { id: 'g1', titel: 'Offene Rechnungen im November', geaendert: '2026-11-13T23:30:00Z', modus: 'ARCHIV' },
+      { id: 'g2', titel: 'Fristen 2027', geaendert: '2026-11-01T08:00:00Z', modus: 'WISSEN' },
     ];
     TestBed.configureTestingModule({
       imports: [Chat],
@@ -131,6 +139,43 @@ describe('Chat (Req 6.1–6.3)', () => {
     // 23:30 UTC ist in Zürich schon der nächste Tag
     expect(eintraege[0].querySelector('.datum')!.textContent).toBe('14.11.2026');
     expect(eintraege[1].querySelector('.datum')!.textContent).toBe('01.11.2026');
+  });
+
+  it('legt den gewählten Wissensmodus vor der ersten Frage an und zeigt ihn fest an', async () => {
+    knopf(TEXTE.chatModus.wissen)!.click();
+    await fixture.whenStable();
+    const frage = await senden('Was gilt?');
+    expect(port.angelegt).toEqual(['WISSEN']);
+    expect(frage.gespraechId).toBe('neues-wissen');
+    expect(element.querySelector('[data-test=aktiver-modus]')?.textContent).toContain(TEXTE.chatModus.wissen);
+    expect(element.querySelector('[role=group]')).toBeNull();
+  });
+
+  it('blendet die Auswahl ohne A15 aus', async () => {
+    darfAnalyse = false;
+    await oeffnen();
+    expect(element.querySelector('[role=group]')).toBeNull();
+    await senden('Frage');
+    expect(port.angelegt).toEqual([]);
+  });
+
+  it('stellt bei abgelehntem Wissensgespräch keine Archivfrage und erhält die Eingabe', async () => {
+    port.anlegenFehler = true;
+    knopf(TEXTE.chatModus.wissen)!.click();
+    await fixture.whenStable();
+    await senden('Was gilt?');
+    expect(port.fragen_).toHaveLength(0);
+    expect(feld().value).toBe('Was gilt?');
+    expect(element.querySelector('[role=alert]')).not.toBeNull();
+    expect(knopf(TEXTE.chatModus.wissen)?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('zeigt beim Öffnen eines gespeicherten Gesprächs seinen festen Modus', async () => {
+    port.verlauf.set('g2', []);
+    element.querySelectorAll<HTMLButtonElement>('[data-test=gespraech]')[1].click();
+    await fixture.whenStable();
+    expect(element.querySelector('[data-test=aktiver-modus]')?.textContent).toContain(TEXTE.chatModus.wissen);
+    expect(element.querySelector('[role=group]')).toBeNull();
   });
 
   it('zeigt die Antwort fortlaufend als reinen Text und sperrt Senden, solange gestreamt wird', async () => {
