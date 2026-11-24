@@ -28,11 +28,12 @@ Das Skript [benutzer-migration-entwurf.py](../tools/benutzer-migration-entwurf.p
 einen ausführbaren **lokal bereitgestellten Starter**, der seine Argumente unverändert an das Archiv-Kommando im
 Wegwerf-Container weitergibt und dessen Exit-Code zurückliefert. Der Starter wird vom Betreiber für die vorhandene
 Compose-Konfiguration bereitgestellt und geprüft; er darf keine persönlichen Daten oder Secrets in Argumente schreiben.
-Zum Beispiel kann er nach Setzen von `COMPOSE_DIR` und `COMPOSE_FILE` ausserhalb des Repositorys so aussehen:
+Zum Beispiel kann er nach Exportieren von `COMPOSE_DIR` und `COMPOSE_FILE` ausserhalb des Repositorys so aussehen.
+Die benötigte `sudo`-Berechtigung muss vorher bestehen; `-n` bricht sonst ab, statt unsichtbar auf ein Passwort zu warten:
 
 ```sh
 #!/bin/sh
-exec sudo docker compose --project-directory "$COMPOSE_DIR" -f "$COMPOSE_FILE" \
+exec sudo -n docker compose --project-directory "$COMPOSE_DIR" -f "$COMPOSE_FILE" \
   run --rm --no-deps -T -l traefik.enable=false api \
   sh -c 'exec java $JAVA_OPTS_APPEND -jar /deployments/quarkus-run.jar "$@"' sh "$@"
 ```
