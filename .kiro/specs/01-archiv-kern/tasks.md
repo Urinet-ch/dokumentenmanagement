@@ -219,6 +219,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Handler `ARCHIVIEREN` erledigt mit 3.4 (PR #57, `ArchivierenHandler`: nur bei Status `ARCHIVIERUNG`, bei `ARCHIVIERT` nur Aufräumen von `eingang/`; ein Auftrag je Dokument, weil `wiederholen` nur aus `ARCHIVIERUNG_FEHLER` neu einreiht). Die Checkbox bleibt offen für Generator und `ohneKi` (4.7), Swiss QR Code (3.2) und den Nachweis 5.5 (5.11).
   - Generator und `ohneKi` erledigt mit 4.7 (`VerarbeitungSpeichern.ergebnisSpeichern(…, ohneKi)`: Dokumente mit `quelle = GENERATOR` gehen ohne `KI_VORSCHLAG` nach `ARCHIVIERUNG`, design.md «Umsetzung (Aufgabe 4.7)»). Die Checkbox bleibt offen für Swiss QR Code (3.2) und den Nachweis 5.5 (5.11).
   - Swiss QR Code erledigt mit 3.2 (PR #93): `KI_VORSCHLAG` liest den Code aus den Seiten der PDF/A, nicht `VERARBEITEN` (design.md «Umsetzung (Aufgabe 3.2)»). Die Checkbox bleibt offen für den Nachweis 5.5 (5.11).
+  - Nachprüfung 24.11.2026: `ZxingQrLeserTest` prüft das Lesen synthetischer Codes einschliesslich der zweiten Seite; `features/ki/ki-vorschlag.feature`, Szenario «Die Werte aus dem Swiss QR Code gehen vor den Werten der KI» (`@req-7.11`), belegt die Weitergabe und Vorrangregel. Kein erneuter Bau nötig; die Leistungsmessung auf Stufe B bleibt bei Fabian und ist nicht beauftragt.
   - Nachprüfung (PR #266): Worker-Image, Handler, PDF/A, `pdfa_fehlt`, Vorschauen, veraPDF-Prüfungen und die geforderten Fehlerfälle sind vorhanden; für ARCHIVIEREN prüft `ArchivierenHandlerPflichtenTest` zusätzlich, dass ein verlorener Anspruch weder Ergebnis noch Fehler schreibt und die Zweige für bereits archivierte oder verworfene Dokumente nichts ändern. SQL-, JDBC- und S3-Zeitgrenzen liegen unter der kürzesten Auftragszeitgrenze, die OCR-Zeitgrenze unter der von VERARBEITEN. Das Lastskript verwendet standardmässig 50 Messläufe und 20 Aufwärmläufe; der Compose-Test prüft `deploy/infomaniak/compose.yml` und den eigenständigen Worker-Dienst in `deploy/probe/compose.yml` auf Härtung und eine numerische Nicht-Root-UID. Offen bleibt der Stufe-B-Nachweis 5.5 (5.11); daher bleibt die Checkbox offen.
 
 - [x] 2.7 Frontend-Grundgerüst und Upload [Frontend]
@@ -270,7 +271,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nachtrag (PR #124, Review zu #120): Format aus `pdfinfo -box` (je Richtung das grössere aus MediaBox und CropBox, Seite ohne lesbare MediaBox nicht gerendert), dpi mit je einer Zeile und Spalte Spielraum, Pixelprüfung aus dem Dateikopf im QR-Weg (`ZxingQrLeser` lässt die Seite aus) und im Bildweg (`AwtSeitenbild`, `PpmLeser`: `SeiteUngeeignet` bei ungültigem Kopf, Pixeln über der Grenze oder Grösse ungleich Kopf), `SeiteUngeeignet` → ohne Seitenbild weiter, kein Fehlversuch (design.md «Umsetzung (Aufgabe 3.2)», «Speicher»)
   - Nachtrag (PR #126, Review zu #93): `KI_VORSCHLAG` trägt die `version` des Dokuments nach der Verarbeitung in der Nutzlast (`dokumentVersion`); der `KiVorschlagHandler` ruft das Modell nur bei genau dieser Version auf und speichert nur bei ihr, sonst endet der Auftrag ohne Modellaufruf und ohne Vorschlag (aus `VERARBEITUNG` über `ohneVorschlagWeiter` in den Eingangskorb, im Eingangskorb unverändert; Berichtigung PR #136); Szenarien zu Änderung zwischen zwei Versuchen, alter Nutzlast, letztem Fehlversuch und bestehendem Partner (design.md «Umsetzung (Aufgabe 3.2)», «Version in der Nutzlast»)
 
-- [ ] 3.3 Lernen aus Korrekturen [Backend]
+- [x] 3.3 Lernen aus Korrekturen [Backend]
   - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern, mit den Merkmalen IBAN, UID, E-Mail, Swiss QR Code und Belegnummer-Muster
   - Vorauswahl vor dem KI-Aufruf deterministisch über diese Merkmale, ohne Treffer die 5 neuesten; kein zweiter KI-Aufruf
   - Korrekturquote je Feld als Kennzahl fortschreiben
@@ -278,6 +279,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Umgesetzt (PR #109) hinter `archiv.ki.beispiele.aktiv`: `ki_beispiel` (Changeset 016, Merkmale als Arrays, Sicht aus dem Dokument), `KorrekturLernen` beim Bestätigen, `BeispielAuswahl` und `BeispielVorauswahl` vor dem Aufruf, Zähler `archiv.ki.feld.bestaetigt` und `archiv.ki.feld.korrigiert`; siehe design.md «Umsetzung (Aufgabe 3.3)»
   - Nachtrag (PR #129, Nachprüfung #109): Changeset 022 trägt `ki_partner_id` für unbestätigte Dokumente mit Vorschlag nach, die vor 016 eingegangen sind; die eigene UID kommt per Muster aus `kennungen.uid`; Open Point zum Rang der Kandidaten; siehe design.md «Umsetzung (Aufgabe 3.3)», Nachtrag
   - Offen: Die Beispiele kommen nur mit `archiv.ki.beispiele.aktiv=true` in den Prompt (Standard aus, auch in prod, wegen Gate 0); Req 7.1 (Teil Korrekturbeispiele), 7.9 und 7.10 wirken in prod erst nach einem Golden-Lauf mit Beispielen und dem Einschalten [Fabian]. Die Checkbox wird erst danach abgehakt
+  - Entscheid Fabian (24.11.2026): Haken ohne vorherigen Golden-Lauf. Das Einschalten in prod bleibt davon getrennt: `archiv.ki.beispiele.aktiv` bleibt aus (Gate 0), bis der Golden-Lauf mit Beispielen vorliegt und Fabian einschaltet; Req 7.1 (Teil Korrekturbeispiele), 7.9 und 7.10 wirken in prod erst dann
   - _Anforderungen: 7.7, 7.9, 7.10_
   - _Abhängig von: 3.2_
 
@@ -529,6 +531,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Klarstellung 16.11.2026 (entschieden von Fabian): Die Speicher-Mail darf Bereich, Prozent und MiB nennen; Req 16.7 gilt für Dokument- und Personendaten, Betriebswerte ohne Bezug sind zulässig (requirements.md 16.7)
   - Frühwarnung vor Speicherknappheit der JVM (Metaspace, Class Space, Heap nach GC; Mail je Bereich und Stufe einmal, Gauge `archiv_jvm_speicher_prozent`) umgesetzt (15.11.2026, design.md «Überwachung»); Anbindung Sicherung umgesetzt mit PR #191; 5.6 bleibt wegen prod-Aktivierung nach Start des Sicherungs-Workflows auf Stufe B (Deploy-Teil 5.5) und Teil Infra offen
   - [Infra] Restore-Probe (Req 16.25): Benachrichtigung des maintenance-Workflows (`notify`) bei rotem Lauf; Alarm beim Kontingent des Hostpoint-Webhostings (ein gestohlener Workflow-Schlüssel kann den Webspace durch Anhängen füllen), Schwelle im PR
+  - Vorbereitung ohne Betriebseingriff: abhakbare Betriebsnachweise in `docs/alarme.md` («Betriebsnachweis für Fabian»); Aktivierung und Nachweise einschliesslich Restore-Fehlschlag und letzter grüner Lauf älter als 35 Tage bleiben offen.
   - _Anforderungen: 16.4, 16.5, 16.7, 16.25_
 
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
@@ -549,6 +552,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - interne Kennzahlen und Detail-Health an das Monitoring der VPS (Stufe B aus 5.11) anbinden; Alarme für Erreichbarkeit, Health und Fehleraufträge; Eintrag im Infra-Repo der VPS
   - Regel «Restore-Probe archiv rot oder letzter grüner Lauf älter als 35 Tage» (Req 16.25) im Monitoring; das Status-Artefakt der Probe enthält nur Zähler und IDs
   - Messpunkt `JdbcKiBeispiel.kandidaten`: Zeilenzahl `ki_beispiel` je Mandant überwachen; sobald sie 1'000 übersteigt, auch die Abfragedauer messen (Details in design.md, «Offen»)
+  - Vorbereitung ohne Betriebseingriff: Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; für den KI-Beispiel-Bestand und die Abfragedauer besteht noch keine App-Kennzahl. Anbindung und Nachweise bleiben offen.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 

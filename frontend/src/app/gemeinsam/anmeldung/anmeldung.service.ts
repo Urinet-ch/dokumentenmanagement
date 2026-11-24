@@ -63,6 +63,7 @@ interface Vorgang {
   nonce: string;
   verifier: string;
   ziel: string;
+  fortsetzung?: string;
 }
 
 /**
@@ -80,6 +81,7 @@ export class AnmeldungService {
   private readonly zustandIntern = signal<Sitzungszustand>('abgemeldet');
   private erneuerungsTimer: ReturnType<typeof setTimeout> | undefined;
   private laufendeErneuerung: Promise<void> | null = null;
+  private abgeschlosseneFortsetzung: string | null = null;
 
   readonly zustand = this.zustandIntern.asReadonly();
   readonly angemeldet = computed(() => this.zustandIntern() === 'angemeldet');
@@ -131,8 +133,10 @@ export class AnmeldungService {
     return this.accessToken();
   }
 
-  async anmelden(ziel = '/', neuAuthentifizieren = false): Promise<void> {
-    const vorgang: Vorgang = { state: zufall(), nonce: zufall(), verifier: zufall(48), ziel: sicheresZiel(ziel) };
+  async anmelden(ziel = '/', neuAuthentifizieren = false, fortsetzung?: string): Promise<void> {
+    const vorgang: Vorgang = { state: zufall(), nonce: zufall(), verifier: zufall(48), ziel: sicheresZiel(ziel),
+      fortsetzung: neuAuthentifizieren ? fortsetzung : undefined };
+    this.abgeschlosseneFortsetzung = null;
     this.fenster.sessionStorage.setItem(VORGANG_SCHLUESSEL, JSON.stringify(vorgang));
     const parameter = new URLSearchParams({
       client_id: this.konfiguration.clientId,
@@ -153,6 +157,7 @@ export class AnmeldungService {
 
   /** Verarbeitet die Rückkehr von Keycloak und liefert das Ziel innerhalb der App. */
   async rueckrufVerarbeiten(parameter: URLSearchParams): Promise<string> {
+    this.abgeschlosseneFortsetzung = null;
     const gespeichert = this.fenster.sessionStorage.getItem(VORGANG_SCHLUESSEL);
     this.fenster.sessionStorage.removeItem(VORGANG_SCHLUESSEL);
     const vorgang = gespeichert ? (JSON.parse(gespeichert) as Vorgang) : null;
@@ -178,7 +183,14 @@ export class AnmeldungService {
       throw new AnmeldungFehler('Token ungültig');
     }
     this.uebernehmen(antwort);
+    this.abgeschlosseneFortsetzung = vorgang.fortsetzung ?? null;
     return vorgang.ziel;
+  }
+
+  fortsetzungEntnehmen(): string | null {
+    const fortsetzung = this.abgeschlosseneFortsetzung;
+    this.abgeschlosseneFortsetzung = null;
+    return fortsetzung;
   }
 
   abmelden(): void {
@@ -263,6 +275,7 @@ export class AnmeldungService {
 
   private verwerfen(zustand: Sitzungszustand): void {
     clearTimeout(this.erneuerungsTimer);
+    this.abgeschlosseneFortsetzung = null;
     this.tokens.set(null);
     this.zustandIntern.set(zustand);
   }

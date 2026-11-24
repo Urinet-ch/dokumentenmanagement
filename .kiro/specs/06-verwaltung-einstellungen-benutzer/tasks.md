@@ -15,7 +15,7 @@ Stunden gross. Aufgaben mit **[Fabian]** erledigt Fabian (Realm, Secrets, Deploy
 auf Server oder Secrets aus der Sitzung.
 
 ## Welle 19 — Dienstkonto, Benutzer und Rollen
-- [ ] 19.1 Entscheide und Spike Keycloak [Backend]
+- [x] 19.1 Entscheide und Spike Keycloak [Backend]
   - Die vier Entscheide aus design.md «Open Points» (vhf-gsk, Löschfrist, Wissens-Einstellungen, Alarm-Empfänger und
     Budget) sind mit dem Merge dieses PR gefallen oder stehen als Notiz im PR.
   - Spike gegen den Dev Service mit Keycloak 26.8.2 (Ergebnis als «Umsetzung 19.1» in design.md): feingranulare Admin-Rechte
@@ -27,7 +27,8 @@ auf Server oder Secrets aus der Sitzung.
     Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»); `auth_time`, `prompt=login`,
     `execute-actions-email`, interne Adresse und Secret-Rotation sind mit 19.2 nachgewiesen (design.md «Umsetzung 19.2»).
     Der Entscheid zu FGAP und `manage-users` ist in design.md «Open Points» festgehalten. Betriebsnachweise folgen in 19.3.
-    Checkbox offen: Der vollständige Nachweis von 7.2 (Step-up-Endpunkt) folgt mit 19.10.
+    Nachweis 24.11.2026: Der Step-up-Endpunkt und der Test gegen Keycloak sind mit 19.10 umgesetzt (Req 7.2);
+    die Betriebsnachweise zur internen Compose-Verbindung und zum Ablauf der Secret-Überlappung bleiben bei 19.3 [Fabian].
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
@@ -78,15 +79,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.16, 4.1, 4.2, 4.3, 4.4, 4.6, 4.7, 4.10, 4.12, 9.6_
   - _Abhängig von: Spec 01: 1.4_
 
-- [ ] 19.6 Protokoll, Vorgänge und Persistenz [Backend]
+- [x] 19.6 Protokoll, Vorgänge und Persistenz [Backend]
   - Aktionen `BENUTZER_*`, `ROLLE_ZUWEISEN` und Check-Constraints (neue Changesets), `anlass` `ANLAGE` und `UEBERNAHME`,
     Absicht und Abschluss mit `vorgangId`, Vorgangssperre (`verwaltung_vorgang`), `benutzer_status`, `verwaltung_antrag`,
     Raten aus dem Protokoll (`archiv.verwaltung.grenzen.*`), `VerwaltungProtokollTest` (kein Klartext), `KeinLoeschpfadTest`
     erweitert; Code `ZU_VIELE_ANFRAGEN` mit `grund = VERWALTUNG`.
-  - Offen, bewusst nicht abgehakt: Cucumber-Szenarien `@req-4.7`, `6.1`–`6.4`, `6.6` brauchen einen Endpunkt und kommen mit 19.7;
-    ebenso die Anbindung der Einstellungsgrenze (`Art.EINSTELLUNG`, `einstellungen-je-mandant`) und der Grund-Eingabe.
-    Ebenfalls offen (Req 6.3): das Schreiben der Verzeichniszeilen `ANLAGE`, `UEBERNAHME` und `AUSTRITT` in der Abschlusstransaktion
-    kommt mit 19.7 bis 19.9; hier sind nur Enum-Wert, Check-Constraint und Vertrag umgesetzt.
+  - Nachweis 24.11.2026: Die seit 19.7/19.8 und 20.2 ergänzten Endpunkte, Grund-Eingaben, Verzeichniszeilen und
+    Einstellungsgrenzen sind umgesetzt. `benutzer-verwalten.feature` belegt `@req-4.7`, `6.1`–`6.4` und `6.6`;
+    die ergänzenden Transaktions-, Grenz-, Übernahme- und Append-only-Tests stehen im Umsetzungsvermerk in `design.md`.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 
@@ -115,10 +115,18 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.8, 3.9, 3.10, 3.13, 3.14, 3.15, 3.17, 3.18_
   - _Abhängig von: 19.7_
 
-- [ ] 19.9 Token-Widerruf [Backend]
+- [x] 19.9 Token-Widerruf [Backend]
   - Tabelle `token_widerruf`, `ZugangFilter` lehnt Tokens mit `iat` vor `ab` ab (Zwischenspeicher höchstens 5 s), Aufräumen im
     Worker, Setzen nach Sperren, Deaktivieren, Löschen, Zugang zurücksetzen, Google lösen und Rollenwechsel; Szenarien: Sperre
     wirkt nach höchstens 5 Sekunden; Rollenwechsel wirkt nach Erneuerung.
+  - Nachweis 24.11.2026: `@req-4.9` prüft ein vor der Sperre benutztes Token nach erfolgreicher Sperre und ein altes Token
+    nach Rollenwechsel; ein erneuertes Token trägt `treuhaender` und wird angenommen. `JdbcTokenWiderrufTest` prüft den Cacheablauf,
+    `VerwaltungCacheHttpTest` die Sperre auch bei unklarer Teilwirkung für Deaktivierung, Google-Lösen und Zugangsrücksetzung.
+    Löschung und Persistenz sind in den `@req-3.11`-Szenarien und `BenutzerVerwaltungSchritte` nachgewiesen.
+  - Eine frühere einzelne Beobachtung `200` statt `401` aus PR #502 blieb im ursprünglichen Szenario nicht reproduzierbar.
+    Beim ergänzten Sperrtest entstand zunächst ebenfalls `200`, weil dessen direkt angelegter Keycloak-Benutzer im Stub des
+    Anwendungsfalls fehlte und die Sperre mit 404 endete. Der Test verwendet nun denselben Keycloak-Adapter wie die API und
+    prüft zuerst die erfolgreiche Sperre; danach wird das alte Token mit 401 abgewiesen.
   - _Anforderungen: 4.9_
   - _Abhängig von: 19.8_
 
@@ -182,21 +190,28 @@ auf Server oder Secrets aus der Sitzung.
   - Nachweis: `KonfigurationMigrationTest` (zwei Mandanten und Rollback), `ChatAufbewahrungMandantTest`,
     `MandantEinstellungenResourceTest` und Cucumber-Szenario zum öffentlichen Branding (`@req-1.4`, `@req-2.12`).
 
-- [ ] 20.5 Oberfläche Einstellungen [Frontend]
+- [x] 20.5 Oberfläche Einstellungen [Frontend]
   - Seite `/verwaltung/einstellungen`: Gruppen, Grenzen, Standard, Vorschau, Dialog bei riskanten Werten, Verlauf mit Vergleich,
     Fehlermatrix, 375 px, WCAG 2.1 AA, Texte in `texte.de-CH.ts`.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.4, 8.5, 8.7_
   - _Abhängig von: 20.2_
+  - Nachweis: `einstellungen-pwa.feature` (Vorschau, Bestätigung, Step-up und axe bei 375/1280 px hell/dunkel)
+    sowie Angular-Tests für Rücksetzung, Versionen, Fehler und OIDC-Fortsetzung. Der manuelle Handy-Nachweis bleibt 21.6.
 
 - [ ] 20.6 Oberfläche Benutzer lesen [Frontend]
   - Seiten `/verwaltung/benutzer` und `/verwaltung/benutzer/:id`: Liste, Karten, Status, Rechte-Übersicht, Anträge, Hinweis auf API-Tokens;
     Menüpunkte nach Recht, Seite «Nicht gefunden» ohne Recht.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.7_
   - _Abhängig von: 19.7, 19.11_
-  - Umsetzung und automatisierte Browser-Nachweise vorbereitet; der manuelle Nachweis zu 8.2 und 8.7 bleibt bei 21.6,
-    die zugehörigen Einstellungsseiten folgen in 20.5. Checkbox bis zum vollständigen Nachweis offen.
+  - Automatisierte Nachweise für Benutzerliste, Detail und Rechte-Übersicht liegen vor; die Einstellungsseiten sind mit
+    20.5 umgesetzt. Rest bei 21.6 [Fabian]: manueller Handy-Nachweis zu 8.2 und Beurteilung der Rechte-Übersicht zu 8.7.
+    Die Checkbox bleibt bis zu dieser Abnahme offen.
+  - Nachweis Benutzerseite: `benutzer-lesen-pwa.feature` (`@req-8.1`, `@req-8.2`, `@req-8.3`, `@req-8.7`),
+    einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505); Angular-Tests für Fehler,
+    Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514). #531 ergänzt Browser-Nachweise für die
+    inzwischen eingebundenen Benutzeraktionen; die synthetischen REST-Antworten ersetzen keine manuelle Abnahme.
 
-- [ ] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
+- [x] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
   - Einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, Rolle ändern, E-Mail ändern, löschen (mit
     Eingabe des Benutzernamens und Vorschau), Google lösen; Step-up mit genau einer Wiederholung; Fehlermatrix; keine
     Passwörter oder Links in der Oberfläche; keine Offline-Warteschlange.
@@ -213,7 +228,7 @@ auf Server oder Secrets aus der Sitzung.
     Umstellung eines bestehenden Realms und Prüfung mit echtem Postfach bleiben Betriebsnachweise.
 
 ## Welle 21 — Admin-Kommando, Migration, Tests und Abnahme
-- [ ] 21.1 Admin-Kommando [Backend]
+- [x] 21.1 Admin-Kommando [Backend]
   - `archiv mandant anlegen … --rollen`, `archiv mandant inhaber-einladen`, `archiv benutzer abgleichen [--pruefen]`,
     `archiv mandant benutzer-sperren <code>` für den Mandantenabbau (Exit-Codes, `--json`), Protokoll `betreiber:<name>`;
     README-Abschnitt «Admin-Kommandos auf der VPS» ergänzt.
@@ -223,8 +238,19 @@ auf Server oder Secrets aus der Sitzung.
 - [ ] 21.2 Migration der heutigen Benutzer [Fabian]
   - Lauf `archiv benutzer abgleichen urinet --pruefen`, dann ohne `--pruefen` auf Stufe A; Abweichungen klären (Rollen, `mandant`,
     TOTP); `fabian` bleibt Inhaber; Anmeldungen vor und nach dem Lauf prüfen; Ergebnis in `docs/abnahme/verwaltung.md`.
+  - Vorbereitung: `docs/benutzer-migration-entwurf.md` und `tools/benutzer-migration-entwurf.py` sind ein Entwurf;
+    bei bestehenden Inhabern ist `ROLLE_OHNE_VORGANG` vor 21.2a zu erwarten. Ausführung, Freigabe und Abnahme bleiben bei Fabian.
   - _Anforderungen: 9.4_
-  - _Abhängig von: 21.1, 19.3_
+  - _Abhängig von: 21.1, 21.2a, 19.3_
+
+- [x] 21.2a Betreibervorgang für bestehende Inhaber [Backend]
+  - Einmaliger protokollierter Betreibervorgang `ROLLE_ZUWEISEN` mit Anlass `UEBERNAHME` für bestehende
+    Inhaber ohne Rollenvorgang; Keycloak nur lesen, Trockenlauf standardmässig, idempotent und mandantengebunden.
+    Abgleich-Regel 6.5/9.4 bleibt streng (Entscheid Fabian 24.11.2026).
+  - Nachweis: `inhaber-uebernahme.feature` (`@req-6.3`, `@req-6.5`, `@req-9.4`), `VerwaltungVorgangTest`
+    und `BestehendenInhaberKommandoTest`; der Betriebsnachweis der Migration bleibt bei 21.2.
+  - _Anforderungen: 6.3, 6.5, 9.4_
+  - _Abhängig von: 21.1_
 
 - [x] 21.3 Isolations- und Eskalationstests [QA]
   - `VerwaltungIsolationIT` (zwei Mandanten, vier Rollen, alle Endpunkte), `EskalationTest` (Matrix), `LetzterInhaberTest` mit
@@ -232,7 +258,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.2, 4.3, 4.6, 4.7, 4.8, 4.10, 9.5, 9.6_
   - _Abhängig von: 19.12, 19.13_
 
-- [ ] 21.4 Sicherheits- und Ausfalltests [QA]
+- [x] 21.4 Sicherheits- und Ausfalltests [QA]
   - Ausfall von Keycloak (kein Hängen, keine Wiederholung, Schutzschalter), Step-up, Raten, Header und Medientyp,
     Protokoll ohne Klartext, Einladung bis zum Link mit Mailpit, Konsistenz nach Abbruch zwischen Absicht und Abschluss.
   - _Anforderungen: 5.5, 5.6, 5.7, 5.8, 6.2, 6.4, 6.6, 7.2, 7.5, 7.7, 7.8, 9.5_
@@ -259,7 +285,7 @@ auf Server oder Secrets aus der Sitzung.
     Platzhalter für die Relying-Party-ID; Realm-Tests mit virtuellem Authenticator (Einrichten, Anmelden, Step-up, Entfernen).
   - _Anforderungen: 10.1, 10.2, 10.3, 10.4, 10.8, 10.9, 10.10, 10.11_
   - _Abhängig von: 19.2, 19.10_
-- [ ] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
+- [x] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
   - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
     Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
   - _Anforderungen: 10.5, 10.6, 10.7_

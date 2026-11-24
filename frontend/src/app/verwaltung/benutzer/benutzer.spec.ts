@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
+import { AnmeldungService } from '../../gemeinsam/anmeldung/anmeldung.service';
 import { Ansicht, BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { BenutzerDetail } from './benutzer-detail';
@@ -21,10 +22,16 @@ const ROLLE: VerwaltungRolle = {
     { aktion: 'A21', bezeichnung: 'Benutzer ansehen', ergebnis: 'VERBOTEN', fussnoten: [] },
   ],
 };
+const anmeldung = {
+  benutzer: vi.fn((): { id: string; name: string; mandant: string; rolle: 'inhaber' } | null => null),
+  darf: vi.fn().mockReturnValue(false),
+  fortsetzungEntnehmen: vi.fn((): string | null => null),
+};
 
 describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
   const service = {
     apiV1BenutzerGet: vi.fn(),
+    apiV1BenutzerPost: vi.fn(),
     apiV1RollenGet: vi.fn(),
     apiV1BenutzerAntraegeGet: vi.fn(),
     apiV1BenutzerBenutzerIdGet: vi.fn(),
@@ -39,10 +46,16 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     service.apiV1BenutzerAntraegeGet.mockReset().mockReturnValue(of([
       { id: 'antrag', art: 'INHABER_ROLLE', ziel: 'probe', beantragtVon: 'andere', gueltigBis: '2026-11-24T20:00:00Z' },
     ]));
+    anmeldung.benutzer.mockReturnValue(null);
+    anmeldung.darf.mockReset().mockReturnValue(false);
     vorbereiten?.();
     TestBed.configureTestingModule({
       imports: [BenutzerListe],
-      providers: [provideRouter([]), { provide: BenutzerverwaltungService, useValue: service }],
+      providers: [
+        provideRouter([]),
+        { provide: BenutzerverwaltungService, useValue: service },
+        { provide: AnmeldungService, useValue: anmeldung },
+      ],
     });
     fixture = TestBed.createComponent(BenutzerListe);
     element = fixture.nativeElement as HTMLElement;
@@ -69,6 +82,47 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     expect(element.querySelector('.pille.gefahr')?.textContent).toContain('Nicht erlaubt');
   });
 
+  it('zeigt je Benutzer «Passkey eingerichtet» mit Anzahl, aber keine Gerätedaten (Req 10.6)', async () => {
+    await starten(() => service.apiV1BenutzerGet.mockReturnValue(of([
+      { ...PERSON, id: 'a', passkey: true, passkeyAnzahl: 2 },
+      { ...PERSON, id: 'b', passkey: false, passkeyAnzahl: 0 },
+      { ...PERSON, id: 'c', passkey: true, passkeyAnzahl: 1 },
+    ])));
+    const werte = [...element.querySelectorAll('[data-test=benutzer-liste] [data-test=passkey]')]
+      .map((knoten) => knoten.textContent?.trim());
+    expect(werte).toEqual(['Ja, 2 Passkeys', 'Nein', 'Ja, 1 Passkey']);
+  });
+
+  it('filtert die Liste serverseitig nach Passkey ja oder nein und beginnt wieder bei Seite 1 (Req 10.6)', async () => {
+    await starten();
+    const filter = element.querySelector<HTMLSelectElement>('#benutzer-passkey-filter')!;
+    expect([...filter.options].map((option) => option.textContent?.trim())).toEqual(
+      [TEXTE.benutzer.passkeyFilterAlle, TEXTE.benutzer.passkeyFilterJa, TEXTE.benutzer.passkeyFilterNein]);
+    filter.value = 'ja';
+    filter.dispatchEvent(new Event('change'));
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, 'ja', undefined, 0);
+    filter.value = 'nein';
+    filter.dispatchEvent(new Event('change'));
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, 'nein', undefined, 0);
+    filter.value = '';
+    filter.dispatchEvent(new Event('change'));
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, undefined, 0);
+  });
+
+  it('zeigt das Einladungsformular nur bei A22 und A23', async () => {
+    await starten(() => anmeldung.darf.mockImplementation((aktion: string) => aktion === 'A22' || aktion === 'A23'));
+    expect(element.querySelector('app-benutzer-einladen')).not.toBeNull();
+  });
+
+  it('zeigt unbekannte Rechte-Ergebnisse mit dem sicheren Fallbacktext', async () => {
+    await starten(() => service.apiV1RollenGet.mockReturnValueOnce(of([JSON.parse(`{
+      "code":"inhaber", "beschreibung":"Inhaberin oder Inhaber",
+      "rechte":[{"aktion":"A21","bezeichnung":"Benutzer ansehen","ergebnis":"ZUKUENFTIG","fussnoten":[]}]
+    }`)])));
+    expect(element.textContent).toContain(TEXTE.benutzer.unbekannt);
+    expect(element.textContent).not.toContain('ZUKUENFTIG');
+  });
+
   it('verwirft eine veraltete Suchantwort und setzt die Seitennummer zurück', async () => {
     await starten();
     const alt = new Subject<BenutzerAnsicht[]>();
@@ -81,7 +135,7 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     alt.next([PERSON]);
     fixture.detectChanges();
-    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, 'neue Suche', 0);
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, 'neue Suche', 0);
     expect(element.textContent).toContain(TEXTE.benutzer.keine);
     expect(element.querySelector('.leer')?.textContent).toContain(TEXTE.benutzer.keine);
     expect(element.textContent).not.toContain('Alex Beispiel');
@@ -113,7 +167,7 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     service.apiV1BenutzerGet.mockReturnValueOnce(of([PERSON]));
     element.querySelector<HTMLButtonElement>('[role=alert] button')!.click();
     fixture.detectChanges();
-    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, 1);
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, undefined, 1);
     expect(element.textContent).toContain('Seite 2');
     const vorher = [...element.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.trim() === TEXTE.benutzer.vor)!;
@@ -123,7 +177,7 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     expect(weiterNachSeite2.disabled).toBe(true);
     vorher.click();
     fixture.detectChanges();
-    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, 0);
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, undefined, 0);
     expect(element.textContent).toContain('Seite 1');
   });
 
@@ -189,12 +243,16 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
   const service = {
     apiV1BenutzerBenutzerIdGet: vi.fn(),
     apiV1BenutzerBenutzerIdRechteGet: vi.fn(),
+    apiV1RollenGet: vi.fn(),
   };
   const parameter = new BehaviorSubject(convertToParamMap({ id: 'probe' }));
 
   async function starten(person: BenutzerAnsicht = PERSON, vorbereiten?: () => void) {
     service.apiV1BenutzerBenutzerIdGet.mockReset().mockReturnValue(of(person));
     service.apiV1BenutzerBenutzerIdRechteGet.mockReset().mockReturnValue(of(ROLLE));
+    service.apiV1RollenGet.mockReset().mockReturnValue(of([ROLLE]));
+    anmeldung.benutzer.mockReturnValue(null);
+    anmeldung.darf.mockReset().mockReturnValue(false);
     vorbereiten?.();
     parameter.next(convertToParamMap({ id: 'probe' }));
     TestBed.configureTestingModule({
@@ -202,6 +260,7 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
       providers: [
         provideRouter([]),
         { provide: BenutzerverwaltungService, useValue: service },
+        { provide: AnmeldungService, useValue: anmeldung },
         { provide: ActivatedRoute, useValue: { paramMap: parameter } },
       ],
     });
@@ -220,6 +279,30 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
     expect(element.textContent).toContain(TEXTE.benutzer.apiTokenHinweis);
     expect(element.textContent).toContain('22.11.2026');
     expect(element.querySelector('a[href="/verwaltung/api-tokens"]')).not.toBeNull();
+  });
+
+  it('zeigt im Detail «Passkey eingerichtet» mit Anzahl oder Nein, ohne Gerätedaten (Req 10.6)', async () => {
+    const mit = (await starten({ ...PERSON, passkey: true, passkeyAnzahl: 2 })).nativeElement as HTMLElement;
+    expect(mit.querySelector('[data-test=passkey]')?.textContent?.trim()).toBe('Ja, 2 Passkeys');
+    expect(mit.textContent).toContain(TEXTE.benutzer.passkey);
+    TestBed.resetTestingModule();
+    const ohne = (await starten({ ...PERSON, passkey: false, passkeyAnzahl: 0 })).nativeElement as HTMLElement;
+    expect(ohne.querySelector('[data-test=passkey]')?.textContent?.trim()).toBe('Nein');
+    TestBed.resetTestingModule();
+    const unbekannt = (await starten()).nativeElement as HTMLElement;
+    expect(unbekannt.querySelector('[data-test=passkey]')?.textContent?.trim()).toBe(TEXTE.benutzer.unbekannt);
+  });
+
+  it('bindet Profil-, Status- und Rollenaktionen nur mit den passenden Rechten ein', async () => {
+    const fixture = await starten(PERSON, () => {
+      anmeldung.benutzer.mockReturnValue({ id: 'inhaber', name: 'Inhaberin', mandant: 'urinet', rolle: 'inhaber' });
+      anmeldung.darf.mockReturnValue(true);
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('app-benutzer-profil')).not.toBeNull();
+    expect(element.querySelector('app-benutzer-statusaktionen')).not.toBeNull();
+    expect(element.querySelector('app-benutzer-rollenaktion')).not.toBeNull();
+    expect(service.apiV1RollenGet).toHaveBeenCalledOnce();
   });
 
   it('fragt bei Rollenkonflikt keine falschen Rechte ab', async () => {

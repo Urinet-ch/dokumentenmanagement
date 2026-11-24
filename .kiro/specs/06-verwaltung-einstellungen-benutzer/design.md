@@ -151,7 +151,9 @@ backend/src/main/java/ch/urinet/archiv/
   `/components`, `/partial-import`, Rollen-Definitionen und `client-secret`.
 - **Aufrufe an Keycloak** (Realm `urinet-archiv`): `POST /protocol/openid-connect/token` (Client-Credentials, Token bis
   30 Sekunden vor Ablauf wiederverwendet, ein Abruf gleichzeitig); `GET /admin/realms/…/users?q=mandant:<m>&max=50`,
-  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
+  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`,
+  `GET …/users/{id}/role-mappings/realm/available` (Zielrolle benutzerbezogen auflösen; kein Lesezugriff auf globale
+  Rollendefinitionen nötig), `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
   `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
   `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET …/users/{id}/federated-identity` (Liste, Filter auf `identityProvider = google`; unter `…/federated-identity/google` kennt Keycloak nur POST und DELETE), `DELETE …/users/{id}/federated-identity/google`,
   `GET/DELETE …/attack-detection/brute-force/users/{id}` (GET für die Anzeige und die Prüfung vor dem Entsperren;
@@ -209,7 +211,20 @@ Zustand in Keycloak und schreibt den Abschluss `UNKLAR` mit Alarm; er ändert ni
 Für den Protokollgrund sind ausschliesslich die festen Kategorien `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`,
 `KORREKTUR` und `SONSTIGES` zulässig. So können Namen, E-Mail-Adressen und Geheimnisse nicht durch Freitext ins
 append-only Protokoll gelangen. Die Kategorie muss beim Vorgang explizit gewählt werden; Freitext wird nicht
-automatisch umgedeutet. Die Anbindung der Eingaben und Pflichtprüfung folgt mit den Verwaltungsendpunkten.
+automatisch umgedeutet. Die Verwaltungsendpunkte binden die Eingaben und Pflichtprüfung an.
+
+#### Umsetzung (Aufgabe 19.6, 24.11.2026)
+- Die ursprünglich offenen Anbindungen sind mit 19.7, 19.8, 20.2 und 21.1 umgesetzt: `ANLAGE` und `AUSTRITT`
+  stehen in der Abschlusstransaktion, `UEBERNAHME` wird transaktional und idempotent eingetragen. Sperren,
+  Deaktivieren und Löschen prüfen die feste Grundkategorie. Einstellungen und geänderte Einstellungen beim
+  Dateiimport prüfen `Art.EINSTELLUNG`; unveränderte Einstellungen zählen nicht als Änderung.
+- `benutzer-verwalten.feature` prüft den gleichzeitigen Rollenwechsel (`@req-4.7`), die protokollierte Anlage mit
+  Verzeichniszeile (`@req-6.1`–`6.4`) und die begrenzten Einladungen (`@req-6.6`). Der Austritt wird im
+  Szenario zu `@req-3.9` geprüft; die Übernahme im Szenario zu `@req-9.2` und
+  `BenutzerAdminKommandoAnwendungTest`.
+- `VerwaltungVorgangTest` prüft die festgeschriebene Absicht vor externer Wirkung und den Rollback bei Fehlern im
+  Abschluss. `VerwaltungProtokollTest`, `JdbcVerwaltungGrenzenTest`, die HTTP-Szenarien zur Einstellungsgrenze und
+  `KeinLoeschpfadTest` ergänzen die Nachweise zu Datenschutz, Raten und Append-only (6.2, 6.6, 6.8).
 
 Bei der Anlage eines weiteren Inhabers mit mindestens zwei aktiven Inhabern entsteht zunächst ein Konto ohne
 Archiv-Rolle und ein offener Antrag; die Bestätigung und Rollenvergabe folgen in 19.11. Auch dieses Konto kann seine
@@ -297,6 +312,24 @@ Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach Aufgabe 19.10; 
 - Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach 19.10, der Admin-Reset nach 24.2. Browser- und
   Keycloak-Integrationstests prüfen den exportierten Realm. Die Browser-Szenarien prüfen die Rücksetzung direkt über die
   Keycloak-Admin-API; für den Passwort-Rückfall nutzen sie einen isolierten Browser-Kontext ohne aktive Passkey-Sitzung.
+
+#### Umsetzung (Aufgabe 24.2, 24.11.2026)
+- Der Adapter liest Art und Zahl der Credentials in einem Aufruf (`otp`, `webauthn-passwordless`) und löscht mit
+  `passkeysEntfernen` ausschliesslich Credentials vom Typ `webauthn-passwordless`, nie Passwort, TOTP oder anderes WebAuthn;
+  Kennungen und Bezeichnungen verlassen den Adapter nicht. Fehler laufen wie bei den anderen Schreibaufrufen
+  (`IDENTITAETSDIENST_FEHLER`, `IDENTITAETSDIENST_NICHT_ERREICHBAR`, Konflikt).
+- «Zugang zurücksetzen» nimmt im Körper optional `{"passkeys": true}` (leerer Körper und `{}` wie bisher). Die Option löscht
+  zusätzlich zum bisherigen Zurücksetzen (Passwort und TOTP neu, Sitzungen beenden, Einladung) alle Passkeys; sie ist keine
+  eigene Aktion «nur Passkeys» (vorsichtigere Auslegung von 10.5). Rechte (A22), Step-up, Raten, Eskalations- und Letzter-Inhaber-
+  Regeln, Vorgangssperre und Absicht/Abschluss sind dieselben.
+- Anzeige: `BenutzerAnsicht.passkey` und `passkeyAnzahl` (Detail und Liste, im ETag enthalten); die Liste filtert mit
+  `?passkey=ja|nein` vor der Seitenbildung. Die Oberfläche zeigt die Option im Dialog nur bei vorhandenen Passkeys, standardmässig
+  aus; die Fortsetzung nach Step-up merkt nur den Wahrheitswert.
+- Protokoll: Der Abschluss von `ZUGANG_ZURUECKSETZEN` trägt bei gewählter Option die Zahl `passkeys` der gelöschten Passkeys, sonst
+  nichts; die Absicht nennt die Option nicht. Einrichten und Entfernen in der Kontoverwaltung führt Keycloak selbst; dafür sind im
+  Realm keine zusätzlichen Ereignistypen aktiviert (Entscheid Fabian, siehe `docs/passkey-inbetriebnahme-checkliste.md`).
+- Anleitung: Abschnitt `erste-schritte-passkey` («Mit Passkey anmelden», alle Rollen) und Ergänzung in `verwaltung.md`.
+  Aufgabe 24.3 bleibt offen (Realm Stufe A, Relying-Party-ID, Prüfung mit iPhone und Mac): `docs/passkey-inbetriebnahme-checkliste.md`.
 
 ### Abgleich
 `Abgleich` liest die Benutzer des Mandanten (Seiten zu 50), gleicht mit `benutzer_status`, dem Benutzerverzeichnis und dem
@@ -540,6 +573,26 @@ Benutzerkennung, nie ein Passwort oder Link. `abgleichen` siehe Requirement 9.2.
 wenn Dienstkonto oder SMTP nicht bereit sind.
 
 ## Migration und Inbetriebnahme
+
+### Vorbereitung (Aufgabe 21.2, 24.11.2026)
+`docs/benutzer-migration-entwurf.md` beschreibt Vorprüfung, kontrollierte Übernahme, Nachprüfung und Rückfall.
+Der Entwurf `tools/benutzer-migration-entwurf.py` verwendet das bestehende Abgleichkommando und bricht bei
+Abweichungen oder Fehlern ab; eine begonnene Übernahme kann dennoch bereits Verzeichniszeilen geschrieben haben.
+Für bestehende Inhaber ohne protokollierten Rollenvorgang, insbesondere den heutigen Inhaber im Betriebsmandanten,
+ist `ROLLE_OHNE_VORGANG` zu erwarten; `UEBERNAHME` allein behebt den Befund nicht. Nach Entscheid Fabian vom
+24.11.2026 dokumentiert der Betreibervorgang aus 21.2a die bestehende Rolle, ohne die strenge Abgleich-Regel
+zu lockern oder Keycloak zu ändern. Danach folgen Prüflauf und Schreiblauf. Nur synthetisch getestet; Ausführung
+und Abnahme bleiben bei Fabian, die Checkbox bleibt offen.
+
+### Umsetzung (Aufgabe 21.2a, 24.11.2026)
+`archiv benutzer inhaber-uebernehmen <code> --benutzer <uuid> --wer <uuid> [--ausfuehren]` prüft standardmässig
+nur. Mit `--ausfuehren` dokumentiert es eine vorhandene Inhaberrolle unter der Mandantensperre mit Absicht und
+Abschluss (`ROLLE_ZUWEISEN`, Anlass `UEBERNAHME`); Keycloak wird ausschliesslich gelesen. Die Prüfung wird unter
+der Sperre wiederholt, und bereits dokumentierte Inhaber erzeugen keinen weiteren Vorgang. `--wer` ist eine
+pseudonyme Betreiberkennung; das Protokoll enthält Kennungen und Rollen, keine persönlichen Angaben. Die
+bestehende strenge Abgleich-Regel bleibt unverändert. Das Szenario `inhaber-uebernahme.feature` belegt den Ablauf
+mit anschliessender Verzeichnisübernahme (6.3, 6.5, 9.4); weitere Tests prüfen Mandantengrenze und CLI-Fehler.
+
 1. Realm-Änderungen und Dienstkonto auf Stufe A (19.3, [Fabian]); Realm-Export für Stufe B (19.2).
 2. Migration der Datenbank (Changesets); Einstellungen: Werte aus Eigenschaften und `wissens_einstellung` in die Konfiguration
    (Version, Quelle `MIGRATION`), Verhalten unverändert (Requirement 1.5).
@@ -668,6 +721,15 @@ erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Sec
 `execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
 Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.
 
+### Nachtrag Umsetzung (Aufgabe 19.1, 24.11.2026)
+
+Die oben als offen beschriebenen technischen Spike-Nachweise sind inzwischen mit 19.2 und 19.10 erbracht.
+`RealmExportKeycloakTest.stepUpVerlangtFrischeAuthentifizierungUndPromptLoginErneuertAuthTime` prüft gegen den
+importierten Realm den Step-up-Endpunkt, den unzureichenden SSO-Cookie und die erneute Anmeldung mit Passwort und TOTP.
+`StepUpMitAuthTimeTest` prüft zusätzlich die Claim- und Zeitgrenzen; `benutzer-verwalten.feature` enthält Szenarien zu
+`@req-7.2`. Die konkrete interne Compose-Verbindung mit korrektem Issuer und die automatische Ablaufzeit der
+Secret-Überlappung sind nicht durch den synthetischen Test belegt und bleiben Betriebsnachweise in 19.3 [Fabian].
+
 ## Umsetzung 19.2 — Realm-Export und Tests
 
 Der Export enthält das Dienstkonto mit `kc-admin-api` und den drei vorgesehenen Rollen; der Test-Realm ergänzt SMTP
@@ -722,6 +784,28 @@ Update → Rollback → Update sowie den Erhalt der Widerrufe und Constraints.
 
 Die Anbindung nach Rollenwechsel und Löschen folgt mit 19.11 beziehungsweise 19.12, wenn diese Endpunkte umgesetzt
 werden. Die Checkbox für 19.9 bleibt bis zu diesen Anbindungen offen.
+
+## Umsetzung (Aufgabe 19.9, 24.11.2026)
+
+Die nachgelagerten Verwaltungsaktionen aus 19.11 und 19.12 setzen den Widerruf inzwischen ebenfalls. Das
+`@req-4.9`-Szenario sperrt einen Testbenutzer mit zuvor verwendetem JWT, prüft zuerst HTTP 204 für die Sperre und
+weist danach das alte JWT mit 401 ab; auch nach dem Entsperren bleibt dieses Token widerrufen. Beim Rollenwechsel
+weist es die alte Version zurück, widerruft das zuvor verwendete JWT und prüft nach Erneuerung die Rolle
+`treuhaender` sowie den Zugriff mit dem neuen JWT. Der Testbenutzer liegt dabei im selben Keycloak-Adapter wie der
+Verwaltungsendpunkt; ein isolierter Testbenutzer im Stub würde die reale Tokenbindung nicht belegen.
+
+JWT-`iat` hat Sekundenauflösung, der persistierte Widerrufszeitpunkt höhere Präzision. Ein unmittelbar in derselben
+Sekunde erneuertes Token kann darum vorsorglich ebenfalls abgewiesen werden; der Rollenwechseltest erneuert nach
+der nächsten `iat`-Sekunde und verlangt dann das neue Rollen-Claim. Der bestehende Cachetest prüft die Aktualisierung
+eines zwischengespeicherten Negativbefunds nach Ablauf der Test-Cachezeit; die Produktionskonfiguration bleibt auf
+höchstens fünf Sekunden begrenzt.
+
+Die einzelne historische Beobachtung `200` statt `401` im lokalen Lauf zu PR #502 liess sich im ursprünglichen
+`@req-4.9`-Szenario und im vollständigen Szenarienlauf nicht reproduzieren; ihre Ursache bleibt deshalb offen.
+Ein beim Ausbau des Sperrtests reproduzierter `200` hatte eine andere, festgestellte Ursache: Der Test legte den
+Zielbenutzer direkt in Keycloak an, während der Verwaltungsendpunkt noch den Identitäts-Stub verwendete; die
+Sperre endete mit 404 und widerrief folglich kein Token. Der korrigierte Test nutzt den Keycloak-Adapter und
+assertiert den erfolgreichen Sperrabschluss vor der Tokenprüfung.
 
 ## Umsetzung (Aufgabe 19.11, 22.11.2026)
 
@@ -801,8 +885,26 @@ wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut gelade
 synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
 Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
 
+Nachweisstand 24.11.2026: Die in #505 und #514 geprüfte Benutzerliste und das Detail sind weiterhin durch
+`benutzer-lesen-pwa.feature` und Angular-Tests abgedeckt; #531 ergänzt die Browser-Prüfung der eingebundenen
+Benutzeraktionen. Die Browser-Szenarien verwenden synthetische Antworten und prüfen 375/1280 px, beide Farbschemata,
+axe, Tastatur und den Direktzugriff ohne A21. Die manuelle Prüfung von 8.2 und 8.7 bleibt bei 21.6 [Fabian];
+die Checkbox 20.6 bleibt deshalb offen.
+
 Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
 Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
+
+## Umsetzung (Aufgabe 20.5, 24.11.2026)
+
+Die Einstellungsseite zeigt den Katalog und merkt Änderungen, Rücksetzungen einzelner Felder oder Gruppen und
+Einstellungen einer früheren Version zunächst als Eingaben vor. Auch eine frühere Version wird über die gemeinsame
+Vorschau und den bestätigten Merge-Patch gespeichert; andere Konfigurationsteile bleiben unverändert. Fehlt bei einer
+alten Version die Einstellungsgruppe, gelten die Standards. Kennungen zeigt der Vergleich ohne Werte.
+
+Für Step-up liegt die bestätigte Änderung vorübergehend im `sessionStorage` des Tabs, einschliesslich Eingaben und
+ETag, höchstens zehn Minuten zur Wiederholung gültig. Eine zufällige Kennung bindet sie an den konkreten, erfolgreich
+geprüften OIDC-Rückruf; Benutzer und Mandant müssen übereinstimmen. Vor der einmaligen Wiederholung wird sie gelöscht.
+Ein Neuladen ohne erfolgreichen Rückruf löst keine Wiederholung aus. Der Server prüft Rechte, Bestätigung und ETag erneut.
 
 ## Umsetzung (Aufgabe 20.3, 23.11.2026)
 
@@ -856,3 +958,61 @@ Changeset 129 übernimmt für bestehende Mandanten die darstellbaren bisherigen 
 Katalogmonate darstellbare Chatfristen bleiben geerbt und verwenden weiterhin die unveränderte ISO-Periode; so wird
 keine Frist erfunden oder verkürzt. Dasselbe gilt für nicht katalogkonforme Startwerte, die sich nicht in das Abbild
 übernehmen lassen. Der Rollback lässt Version und Protokoll stehen; die bisherigen Eigenschaften bleiben verfügbar.
+
+## Umsetzung (Aufgabe 20.7, 24.11.2026)
+Einladen, Profil, Statusaktionen, Rollenwechsel und Löschen sind in Liste und Detail eingebunden und über A22/A23
+begrenzt; unbekannte Rechteergebnisse blenden aus (fail closed). Verwaltungsaktionen laufen nie über die
+Offline-Warteschlange; es gibt weder Passwort noch Einladungslink in der Oberfläche.
+
+**Step-up-Fortsetzung (Req 8.5), vorsichtigere Auslegung als bei den Einstellungen (20.5).** Das Muster von 20.5
+(Eingaben im `sessionStorage`) trägt hier nicht: Die Aktionen an Benutzern enthalten Namen, E-Mail-Adressen und die
+Namensbestätigung des Löschens, also persönliche Daten. Darum gilt: Bei `STEP_UP_NOETIG` (401, Sitzung bleibt bestehen,
+Interceptor unverändert) speichert `BenutzerFortsetzen` im Tab-`sessionStorage` nur Aktion, Kennung des Ziels, ETag und
+Codes (Grund, Rolle) sowie Kennungen von Akteur und Mandant, nie Namen, Adressen oder Freitext; unzulässige Inhalte lehnt
+die Prüfung vor dem Speichern ab. Wie bei 20.5 bindet eine zufällige Kennung die Fortsetzung an den erfolgreich geprüften
+OIDC-Rückruf (`fortsetzungEntnehmen`); Akteur und Mandant müssen übereinstimmen, die Fortsetzung gilt höchstens zehn
+Minuten, wird beim Übernehmen gelöscht und löst ein Neuladen ohne Rückruf nicht aus. Rückkehr ist die Detailseite des
+Ziels (beim Einladen die Liste).
+- **Sperren, Entsperren, Deaktivieren, Reaktivieren, Zugang zurücksetzen, Einladung erneut senden, Google lösen,
+  Rolle ändern:** Sie tragen nur Codes. Nach der frischen Anmeldung sendet die Komponente die Aktion genau einmal selbst,
+  aber nur, wenn Ziel und Zustand noch passen (die Aktion ist weiterhin angeboten, bei der Rolle gilt derselbe ETag
+  wie vor dem Step-up, sonst Meldung «Daten geändert» und keine Sendung). Die erste Sendung wurde laut Req 8.5 nicht
+  ausgeführt. Verlangt auch die Wiederholung wieder ein Step-up, leitet die Oberfläche nicht noch einmal weiter,
+  sondern meldet, dass die Aktion nicht ausgeführt wurde (keine Schleife).
+- **Löschen, Profiländerung, Einladen:** Eingaben (Benutzername zur Bestätigung, Namen, Adressen) werden nicht gespeichert.
+  Nach der Anmeldung öffnet das Löschen die Vorschau und den Dialog neu (Benutzername und Grund werden erneut erfasst,
+  bewusst auch als erneute Bestätigung einer nicht umkehrbaren Aktion); Profil und Einladung zeigen den Hinweis, dass die
+  Eingaben neu erfasst werden müssen. Das Absenden ist dann die einmalige Wiederholung durch den Benutzer. Das weicht
+  vom Wortlaut «sendet die Aktion danach erneut» ab, bleibt aber innerhalb von Req 8.5 und 7: Die erste Aktion wurde
+  nicht ausgeführt, die zweite genau einmal.
+
+**`BESTAETIGUNG_NOETIG` (409).** Die Benutzer-API (OpenAPI) kennt keinen Bestätigungsparameter und das Backend löst den
+Code für Benutzeraktionen nicht aus; es gibt also nichts, was die Oberfläche bestätigen und erneut senden könnte. Sie
+zeigt deshalb eine eigene Meldung mit den geprüften Texten der Auswirkung (höchstens fünf, je höchstens 300 Zeichen,
+nur als Text) und sendet nichts erneut. Bekommt die API später einen Bestätigungsparameter, wird daraus der
+Auswirkungsdialog wie bei den Einstellungen.
+
+Nachweise: Browser-Szenarien `@req-8.4`/`@req-8.6` (Profil, Rollen, Löschen, Einladen auf 375/1280 px in hell/dunkel mit
+axe und Überlaufprüfung) und `@req-8.5` (Step-up für Sperren, Rolle, Löschen, Profil; Bestätigung; Nachweis, dass nichts
+Persönliches in den Browser-Speicher geschrieben wird); Einheitstests der Fortsetzung, der Fehlerbehandlung und der
+Komponenten. Offen bleibt der manuelle Nachweis auf dem Handy [Fabian] (Req 8.2, Aufgabe 21.6).
+
+## Umsetzung (Aufgabe 21.4, 24.11.2026)
+
+Die Bestandsaufnahme ergab, dass Zeitgrenzen, Wiederholungen und Schutzschalter bereits in
+`KeycloakAdminAdapterTest` geprüft werden; `ProblemAbbildungTest` deckt `Retry-After`, und die bestehenden Verwaltungs-
+Szenarien prüfen Step-up, Raten, Medientyp, Protokoll und Kompensation. `VerwaltungVorgangTest` prüft den vollständigen
+Betreiber-Aufruf bis zum Einmal-Link aus Mailpit. Die Einladung im Szenario trägt zusätzlich `@req-9.5`; die
+Mandantenisolation und Eskalation bleiben durch die Tests aus Aufgabe 21.3 belegt.
+
+Die Prüfung deckte fehlende Clickjacking-Header auf. `SicherheitsHeaderRoute` setzt deshalb auf allen Antworten
+`Content-Security-Policy: frame-ancestors 'none'` und `X-Frame-Options: DENY`; `SicherheitsHeaderTest` prüft diese
+Header sowie, dass ein Ausfall des Verwaltungs-Identitätsdienstes die API-Readiness nicht verändert und in der
+Detail-Health sichtbar bleibt.
+### Nachtrag (Folge aus PR #529, 24.11.2026)
+
+`BenutzerAbgleichenKommando` beendet auch bei `IDENTITAETSDIENST_FEHLER` mit Exit-Code 3: eine Ablehnung des
+Dienstkontos ist nach Requirement 9.2 ein technischer Fehler, keine Abweichung im Abgleich. Der Aufrufpfad ist mit
+einem Abgleich-Fehler geprüft. Das Szenario `@req-9.1` führt nun `InhaberEinladenKommando.ausfuehren` aus und prüft
+Mandantenkontext, Inhaber-Rolle, Betreiberkennung sowie die datensparsame Terminalausgabe; der tatsächliche
+Einladungsfluss über Keycloak und Mailpit bleibt durch `VerwaltungVorgangTest` und `RealmExportKeycloakTest` belegt.

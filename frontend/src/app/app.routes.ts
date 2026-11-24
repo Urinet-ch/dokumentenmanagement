@@ -145,6 +145,12 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.importe),
   },
   {
+    path: 'verwaltung/einstellungen',
+    loadComponent: () => import('./verwaltung/einstellungen/einstellungen').then((m) => m.EinstellungenSeite),
+    canActivate: [rechtGuard('A20', '/nicht-gefunden')],
+    title: titel(TEXTE.menue.einstellungen),
+  },
+  {
     path: 'verwaltung/benutzer',
     loadComponent: () => import('./verwaltung/benutzer/benutzer-liste').then((m) => m.BenutzerListe),
     canActivate: [rechtGuard('A21', '/nicht-gefunden')],
@@ -170,6 +176,12 @@ export const routes: Routes = [
   },
   // Chat (Spec 02, Aufgabe 7.4): alle vier Rollen mit dem Recht wie A2 (Entscheid Fabian 14.11.2026); Menüpunkt «Chat»
   // seit Aufgabe 7.4b (Backend 7.2, 7.3 gemergt)
+  {
+    path: 'chat/auswertung',
+    loadComponent: () => import('./chat/chat-auswertung').then((m) => m.ChatAuswertung),
+    canActivate: [rechtGuard('A24', '/nicht-gefunden')],
+    title: titel(TEXTE.chat.auswertung.titel),
+  },
   {
     path: 'chat',
     loadChildren: () => import('./chat/chat.routes').then((m) => m.CHAT_ROUTES),

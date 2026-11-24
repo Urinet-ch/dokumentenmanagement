@@ -3,6 +3,7 @@ import { Aktion, Rolle } from '../gemeinsam/anmeldung/rechte';
 import { Anleitungsteil, anleitungMarkdown } from './anleitung-markdown';
 import { istAppPfad } from './app-pfade';
 import { HILFE_KATALOG, HilfeEintrag, bedingungErfuellt, hilfeEintrag } from './hilfe-katalog';
+import { sichtbareAbschnitte } from './hilfe-sichtbar';
 
 // Abschnitte der Anleitung gegen Spec 07, Req 6.1 und design.md «Hilfe-Katalog» (Aufgabe 22.5): Reihenfolge, Titel,
 // Bedingungen, Verweise zwischen Abschnitten und die Namen aus texte.de-CH.ts. Gelesen wird wie in
@@ -28,6 +29,8 @@ interface Soll {
 /** Die Tabelle aus design.md «Hilfe-Katalog» in Lesereihenfolge (Abschnitte nach Req 6.1), mit den dort nachgetragenen Abweichungen. */
 const SOLL: readonly Soll[] = [
   { anker: 'erste-schritte', titel: 'Erste Schritte', pfade: ['/'], abgemeldet: true },
+  // Aufgabe 24.3 (Spec 06, Req 10): für alle angemeldeten Rollen, ohne Pfad
+  { anker: 'erste-schritte-passkey', titel: 'Mit Passkey anmelden', eltern: 'erste-schritte' },
   { anker: 'erfassen', titel: 'Erfassen', eine: ['A1'], pfade: ['/erfassen'] },
   { anker: 'erfassen-handy', titel: 'Mit dem Handy fotografieren', eltern: 'erfassen', eine: ['A1'] },
   { anker: 'erfassen-dateien', titel: 'Dateien hochladen', eltern: 'erfassen', eine: ['A1'] },
@@ -38,6 +41,7 @@ const SOLL: readonly Soll[] = [
   { anker: 'suche', titel: 'Suche', eine: ['A2'], pfade: ['/suche'] },
   { anker: 'chat', titel: 'Chat', eine: ['A2'], pfade: ['/chat'] },
   { anker: 'chat-bewerten', titel: 'Antworten bewerten', eltern: 'chat', eine: ['A2'] },
+  { anker: 'chat-auswertung', titel: 'Chat-Auswertung', eltern: 'chat', eine: ['A24'], pfade: ['/chat/auswertung'] },
   { anker: 'dokument', titel: 'Dokumentansicht', eine: ['A2'], pfade: ['/dokument'] },
   { anker: 'dokument-aendern', titel: 'Angaben ändern', eltern: 'dokument', eine: ['A6'] },
   { anker: 'kontakte', titel: 'Kontakte', eine: ['A6'], pfade: ['/kontakte'] },
@@ -47,7 +51,7 @@ const SOLL: readonly Soll[] = [
   { anker: 'wissen-quellen', titel: 'Wissensquellen markieren und verwalten', eltern: 'wissen', eine: ['A16'] },
   { anker: 'importe', titel: 'Importe', eine: ['A12'], pfade: ['/importe'] },
   { anker: 'jahresexport', titel: 'Jahresexport', eine: ['EXPORT'], pfade: ['/export'] },
-  { anker: 'verwaltung', titel: 'Verwaltung', eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer'] },
+  { anker: 'verwaltung', titel: 'Verwaltung', eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer', '/verwaltung/einstellungen'] },
   { anker: 'verwaltung-dokumentarten', titel: 'Dokumentarten', eltern: 'verwaltung', eine: ['A11'], pfade: ['/verwaltung/dokumentarten'] },
   { anker: 'verwaltung-protokoll', titel: 'Zugriffsprotokoll', eltern: 'verwaltung', eine: ['A13'], pfade: ['/verwaltung/protokoll'] },
   { anker: 'verwaltung-api-tokens', titel: 'API-Tokens', eltern: 'verwaltung', eine: ['A14'], pfade: ['/verwaltung/api-tokens'] },
@@ -120,6 +124,20 @@ describe('Abschnitte der Anleitung (Spec 07, Req 6.1)', () => {
           }
         }
       }
+    }
+  });
+
+  it('zeigt die Markierung einer Wissensquelle nur Rollen mit diesem Recht', () => {
+    const text = (rolle: Rolle) =>
+      sichtbareAbschnitte(HILFE_KATALOG, rolle)
+        .flatMap(({ eintrag, unter }) => [eintrag, ...unter])
+        .map((eintrag) => lesen(`public${eintrag.datei}`))
+        .join('\n');
+    for (const rolle of ['inhaber', 'geschaeftsstelle'] as const) {
+      expect(text(rolle)).toContain('«Als Wissensquelle verwenden»');
+    }
+    for (const rolle of ['mitarbeiter', 'treuhaender'] as const) {
+      expect(text(rolle)).not.toContain('«Als Wissensquelle verwenden»');
     }
   });
 

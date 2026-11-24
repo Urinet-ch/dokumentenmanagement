@@ -4,6 +4,9 @@
   <p>{{ texte.einleitung }}</p>
 </div>
 
+@if (fortsetzungFehler(); as meldung) {
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
+}
 <div>
   <form role="search" class="karte suche" (submit)="$event.preventDefault(); suchen(suchfeld.value)">
     <label for="benutzer-suche">{{ texte.suchen }}</label>
@@ -12,7 +15,17 @@
       <button mat-stroked-button type="submit">{{ texte.suchenKnopf }}</button>
     </div>
     <small id="such-hinweis">{{ texte.suchHinweis }}</small>
+    <label for="benutzer-passkey-filter">{{ texte.passkeyFilter }}</label>
+    <select id="benutzer-passkey-filter" (change)="passkeyFiltern($any($event.target).value)">
+      <option value="">{{ texte.passkeyFilterAlle }}</option>
+      <option value="ja">{{ texte.passkeyFilterJa }}</option>
+      <option value="nein">{{ texte.passkeyFilterNein }}</option>
+    </select>
   </form>
+
+  @if (einladbareRollen(); as verfuegbareRollen) {
+    <app-benutzer-einladen [rollen]="verfuegbareRollen" [fortsetzung]="fortsetzung()" (verbraucht)="fortsetzung.set(null)" (abgeschlossen)="laden(seite())" />
+  }
 
   @if (listenFehler(); as fehler) {
     <div class="hinweis gefahr" role="alert">
@@ -33,6 +46,7 @@
             }
             <p><span>{{ texte.rolle }}:</span> {{ rollen(person) }}</p>
             <p><span>{{ texte.status }}:</span> <span class="pille">{{ texte.statusNamen[person.status ?? ''] ?? texte.unbekannt }}</span></p>
+            <p><span>{{ texte.passkey }}:</span> <span data-test="passkey">{{ person.passkey === undefined ? texte.unbekannt : person.passkey ? texte.passkeyJa(person.passkeyAnzahl ?? 0) : texte.nein }}</span></p>
             @if (person.rollenkonflikt) {
               <p class="hinweis gefahr">{{ texte.rollenkonflikt }}</p>
             }

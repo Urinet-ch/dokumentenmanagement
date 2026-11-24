@@ -11,6 +11,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Legt einen Mandanten an (Req 1.1, 1.5, 9.6; ADR-002): Prüfung des Seeds ({@link SeedPruefung}, vor jeder
@@ -57,6 +58,11 @@ public class MandantProvisionierung {
     }
 
     public Mandant anlegen(String code, String name, String geschaeftsjahresende) {
+        return anlegen(code, name, geschaeftsjahresende, Optional.empty());
+    }
+
+    public Mandant anlegen(String code, String name, String geschaeftsjahresende,
+                           Optional<MandantVerwaltungsrollen> rollen) {
         MandantCode mandantCode;
         Geschaeftsjahresende ende;
         String bucketName;
@@ -86,7 +92,12 @@ public class MandantProvisionierung {
         }
         String anzeigename = name == null || name.isBlank()
                 ? fortsetzen.map(Mandant::name).orElse(code) : name;
-        MandantVerwaltungsrollen verwaltungsrollen = verwaltungsrollenSeed.fuer(mandantCode);
+        MandantVerwaltungsrollen verwaltungsrollen = rollen.orElseGet(() -> fortsetzen
+                .map(Mandant::verwaltungsrollen).orElseGet(() -> verwaltungsrollenSeed.fuer(mandantCode)));
+        if (fortsetzen.isPresent()
+                && Set.copyOf(fortsetzen.get().verwaltungsrollen().werte()).equals(Set.copyOf(verwaltungsrollen.werte()))) {
+            verwaltungsrollen = fortsetzen.get().verwaltungsrollen();
+        }
         Mandant mandant = new Mandant(mandantCode, anzeigename, mandantCode.schema(), bucketName, ende, false,
                 verwaltungsrollen);
         if (fortsetzen.isPresent() && !fortsetzen.get().equals(mandant)) {

@@ -5,7 +5,7 @@ Funktionalität: Archivierte Dokumente als Wissensquellen markieren
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
 
-  @req-20.1 @req-20.2 @req-20.4
+  @req-20.1 @req-20.2 @req-20.4 @req-20.11
   Szenario: Eine Quittung wird markiert und unverändert zum Ingest eingereiht
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «BELEG» der Art «QUITTUNG»
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
@@ -29,7 +29,7 @@ Funktionalität: Archivierte Dokumente als Wissensquellen markieren
     Dann antwortet die Markierung mit Status 422 und Grund «NICHT_ARCHIVIERT»
     Und ist «BELEG» als Wissensquelle unmarkiert
 
-  @req-20.3
+  @req-20.3 @req-20.11
   Szenario: Ein personales Dokument kann nicht markiert werden
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «BELEG» der Art «QUITTUNG»
     Und das Dokument «BELEG» hat Vertraulichkeit «PERSONAL»
@@ -53,7 +53,7 @@ Funktionalität: Archivierte Dokumente als Wissensquellen markieren
     Dann antwortet die Markierung mit Status 422 und Grund «KEINE_PDFA»
     Und ist «BELEG» als Wissensquelle unmarkiert
 
-  @req-20.3
+  @req-20.3 @req-20.11
   Szenario: Sichtbare Dokumente verlangen das Recht A16
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «BELEG» der Art «QUITTUNG»
     Wenn «treuhaender-urinet» markiert «BELEG» als Wissensquelle

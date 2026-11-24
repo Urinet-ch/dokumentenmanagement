@@ -30,7 +30,8 @@ public class BenutzerLesen {
 
     public record BenutzerAnsicht(String id, String benutzername, String vorname, String nachname, String email,
                           Set<Rolle> rollen, boolean rollenkonflikt, BenutzerStatus status,
-                          boolean totp, boolean google, boolean voruebergehendGesperrt, Instant einladungOffenSeit,
+                          boolean totp, boolean google, boolean passkey, int passkeyAnzahl,
+                          boolean voruebergehendGesperrt, Instant einladungOffenSeit,
                           BenutzerAktivitaet.LetzteAktion letzteAktion, String etag,
                           String apiTokenVerwaltungspfad, String apiTokenHinweis) {
         @Override
@@ -40,13 +41,26 @@ public class BenutzerLesen {
     }
 
     public List<BenutzerAnsicht> suchen(String suche, int seite, int groesse) {
+        return suchen(suche, seite, groesse, null);
+    }
+
+    /** {@code passkey}: «ja» oder «nein» filtert nach eingerichtetem Passkey, sonst alle (Requirement 10.6). */
+    public List<BenutzerAnsicht> suchen(String suche, int seite, int groesse, String passkey) {
         try {
             IdentitaetsDienst.seitenanfang(suche, seite, groesse);
         } catch (IllegalArgumentException e) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
+        Boolean filter = null;
+        if (passkey != null && !passkey.isEmpty()) {
+            filter = switch (passkey) {
+                case "ja" -> Boolean.TRUE;
+                case "nein" -> Boolean.FALSE;
+                default -> throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            };
+        }
         String code = mandant.pruefen().wert();
-        return identitaet.benutzerSuchen(code, suche, seite, groesse).stream()
+        return identitaet.benutzerSuchen(code, suche, seite, groesse, filter).stream()
                 .map(benutzer -> darstellen(code, benutzer)).toList();
     }
 
@@ -63,7 +77,8 @@ public class BenutzerLesen {
         BenutzerAktivitaet.Angaben angaben = aktivitaet.lesen(benutzer.id());
         return new BenutzerAnsicht(benutzer.id(), benutzer.benutzername(), benutzer.vorname(), benutzer.nachname(),
                 benutzer.email(), benutzer.rollen(), benutzer.rollen().size() != 1, zustand, benutzer.totp(),
-                benutzer.google(), identitaet.anmeldungGesperrt(code, benutzer.id()),
+                benutzer.google(), benutzer.passkeys() > 0, benutzer.passkeys(),
+                identitaet.anmeldungGesperrt(code, benutzer.id()),
                 zustand == BenutzerStatus.EINGELADEN ? angaben.einladungSeit() : null,
                 angaben.letzteAktion(), BenutzerEtag.berechnen(benutzer, zustand), "/verwaltung/api-tokens",
                 "API-Tokens und Webseiten-Schlüssel bleiben beim Sperren oder Deaktivieren gültig.");

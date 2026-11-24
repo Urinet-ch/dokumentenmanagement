@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="131-wissen-chat-index" author="archiv">
+        <sql>
+            drop index ki_verbrauch_wissen_zeit_ix;
+            create index ki_verbrauch_wissen_zeit_ix on ki_verbrauch (zweck, zeit)
+                where zweck in ('WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_EMBEDDING', 'WISSEN_CHAT');
+        </sql>
+        <rollback>
+            <sql>
+                drop index ki_verbrauch_wissen_zeit_ix;
+                create index ki_verbrauch_wissen_zeit_ix on ki_verbrauch (zweck, zeit)
+                    where zweck in ('WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_EMBEDDING');
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

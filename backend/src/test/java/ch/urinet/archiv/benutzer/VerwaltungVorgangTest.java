@@ -1,5 +1,8 @@
 package ch.urinet.archiv.benutzer;
 
+import ch.urinet.archiv.benutzer.adapter.in.kommando.InhaberEinladenKommando;
+import ch.urinet.archiv.benutzer.adapter.out.keycloak.KeycloakAdminAdapter;
+import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.benutzer.application.VerwaltungVorgang;
 import ch.urinet.archiv.benutzer.application.VerwaltungVorgang.Kompensation;
 import ch.urinet.archiv.benutzer.application.Vorgangssperre;
@@ -10,20 +13,29 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.arc.ClientProxy;
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +47,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -47,6 +60,243 @@ class VerwaltungVorgangTest {
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenquelle;
     @Inject ZugriffProtokoll protokoll;
+    @Inject InhaberEinladenKommando inhaberEinladen;
+    @Inject ch.urinet.archiv.benutzer.adapter.in.kommando.BestehendenInhaberKommando bestehendenInhaber;
+    @Inject ch.urinet.archiv.benutzer.application.AbgleichStand abgleichStand;
+    @Inject IdentitaetsDienst identitaet;
+    @Inject MandantRegister register;
+
+    @Test
+    void betreibervorgangDokumentiertBestehendenInhaberEinmaligOhneKeycloakZuAendern() throws Exception {
+        adminrollenMandantVorbereiten();
+        IdentitaetsDienst original = ClientProxy.unwrap(identitaet);
+        var stub = new IdentitaetsDienstStub();
+        QuarkusMock.installMockForType(stub, IdentitaetsDienst.class);
+        try {
+            String ziel = stub.anlegen("probe-adminrollen",
+                    new IdentitaetsDienst.Neuanlage("inhaber-probe", "probe@example.invalid", "Test", "Person"),
+                    ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+            UUID betreiber = UUID.randomUUID();
+            var ausgabe = new ByteArrayOutputStream();
+            var fehler = new ByteArrayOutputStream();
+            var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+            var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8);
+            var aufruf = new ArrayList<>(List.of("inhaber-uebernehmen", "probe-adminrollen", "--benutzer", ziel,
+                    "--wer", betreiber.toString()));
+            try (var thread = Executors.newSingleThreadExecutor()) {
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(ausgabe.toString(StandardCharsets.UTF_8)).contains("GEPLANT");
+                assertThat(abgleichStand.lesen(new MandantCode("probe-adminrollen")).dokumentierteInhaber())
+                        .doesNotContain(UUID.fromString(ziel));
+                aufruf.add("--ausfuehren");
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(ausgabe.toString(StandardCharsets.UTF_8)).contains("DOKUMENTIERT", "BEREITS_DOKUMENTIERT");
+                assertThat(stub.benutzerLesen("probe-adminrollen", ziel).rollen())
+                        .containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+                assertThat(abgleichStand.lesen(new MandantCode("probe-adminrollen")).dokumentierteInhaber())
+                        .contains(UUID.fromString(ziel));
+                try (Connection verbindung = datenquelle.getConnection();
+                     PreparedStatement abfrage = verbindung.prepareStatement(
+                             "select details->>'phase', details->>'anlass', details::text from "
+                                     + "m_probe_adminrollen.zugriff_protokoll where aktion = 'ROLLE_ZUWEISEN' "
+                                     + "and details->>'ziel' = ? order by id")) {
+                    abfrage.setString(1, ziel);
+                    try (ResultSet zeilen = abfrage.executeQuery()) {
+                        assertThat(zeilen.next()).isTrue();
+                        assertThat(zeilen.getString(1)).isEqualTo("ANGEFRAGT");
+                        assertThat(zeilen.getString(2)).isEqualTo("UEBERNAHME");
+                        assertThat(zeilen.getString(3)).doesNotContain("probe@example.invalid", "inhaber-probe");
+                        assertThat(zeilen.next()).isTrue();
+                        assertThat(zeilen.getString(1)).isEqualTo("ABGESCHLOSSEN");
+                        assertThat(zeilen.getString(2)).isEqualTo("UEBERNAHME");
+                        assertThat(zeilen.next()).isFalse();
+                    }
+                }
+                aufruf.set(1, "vhf-gsk");
+                assertThat(in(thread, "vhf-gsk", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .isEqualTo(1);
+                String mitarbeiter = stub.anlegen("probe-adminrollen",
+                        new IdentitaetsDienst.Neuanlage("mitarbeiter-probe", "andere@example.invalid", "Test", "Person"),
+                        ch.urinet.archiv.sicherheit.domain.Rolle.MITARBEITER);
+                aufruf.set(1, "probe-adminrollen");
+                aufruf.set(3, mitarbeiter);
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .isEqualTo(1);
+                assertThat(stub.benutzerLesen("probe-adminrollen", mitarbeiter).rollen())
+                        .containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.MITARBEITER);
+            }
+        } finally {
+            QuarkusMock.installMockForType(original, IdentitaetsDienst.class);
+        }
+    }
+
+    @Test
+    void betreiberLaedtNurDenErstenInhaberEinUndProtokolliertDieAnlage() throws Exception {
+        adminrollenMandantVorbereiten();
+        IdentitaetsDienst original = ClientProxy.unwrap(identitaet);
+        QuarkusMock.installMockForType(new IdentitaetsDienstStub(), IdentitaetsDienst.class);
+        try {
+            var ausgabe = new ByteArrayOutputStream();
+            var fehler = new ByteArrayOutputStream();
+            var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+            var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8);
+            String name = "probe." + UUID.randomUUID().toString().substring(0, 8);
+            List<String> aufruf = List.of("inhaber-einladen", "probe-adminrollen", "--benutzer", name,
+                    "--email", name + "@example.invalid", "--vorname", "Test", "--nachname", "Person",
+                    "--wer", "test-betreiber");
+            try (var thread = Executors.newSingleThreadExecutor()) {
+                assertThat(in(thread, "probe-adminrollen", () -> inhaberEinladen.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                UUID id = UUID.fromString(ausgabe.toString(StandardCharsets.UTF_8).strip());
+                assertThat(identitaet.benutzerLesen("probe-adminrollen", id.toString()).rollen())
+                        .containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+                assertThatThrownBy(() -> identitaet.benutzerLesen("vhf-gsk", id.toString()))
+                        .isInstanceOf(FachFehler.class);
+                var zweiteEinladung = new ArrayList<>(aufruf);
+                zweiteEinladung.set(3, "zweiter." + name);
+                zweiteEinladung.set(5, "zweiter." + name + "@example.invalid");
+                assertThat(in(thread, "probe-adminrollen",
+                        () -> inhaberEinladen.ausfuehren(zweiteEinladung, aus, fehl))).isEqualTo(1);
+                assertThat(fehler.toString(StandardCharsets.UTF_8)).contains("STATUS_KONFLIKT");
+                assertThat(identitaet.benutzerZaehlen("probe-adminrollen")).isEqualTo(1);
+                try (Connection verbindung = datenquelle.getConnection();
+                     PreparedStatement abfrage = verbindung.prepareStatement(
+                             "select details->>'phase', rolle from m_probe_adminrollen.zugriff_protokoll "
+                                     + "where benutzer = 'betreiber:test-betreiber' and aktion = 'BENUTZER_ANLEGEN' "
+                                     + "order by id")) {
+                    try (ResultSet zeilen = abfrage.executeQuery()) {
+                        assertThat(zeilen.next()).isTrue();
+                        assertThat(zeilen.getString(1)).isEqualTo("ANGEFRAGT");
+                        assertThat(zeilen.getString(2)).isNull();
+                        assertThat(zeilen.next()).isTrue();
+                        assertThat(zeilen.getString(1)).isEqualTo("ABGESCHLOSSEN");
+                        assertThat(zeilen.getString(2)).isNull();
+                        assertThat(zeilen.next()).isFalse();
+                    }
+                }
+            }
+        } finally {
+            QuarkusMock.installMockForType(original, IdentitaetsDienst.class);
+        }
+    }
+
+    @Test
+    void betreibereinladungErreichtKeycloakUndMailpit() throws Exception {
+        adminrollenMandantVorbereiten();
+        String oidc = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
+        String basis = oidc.substring(0, oidc.indexOf("/realms/"));
+        String admin = given().formParam("grant_type", "password").formParam("client_id", "admin-cli")
+                .formParam("username", "admin").formParam("password", "admin")
+                .post(basis + "/realms/master/protocol/openid-connect/token")
+                .then().statusCode(200).extract().path("access_token");
+        String adminPfad = basis + "/admin/realms/urinet-archiv";
+        String clientId = given().auth().oauth2(admin).queryParam("clientId", "archiv-verwaltung")
+                .get(adminPfad + "/clients").then().statusCode(200).extract().path("[0].id");
+        String secret = given().auth().oauth2(admin).get(adminPfad + "/clients/" + clientId + "/client-secret")
+                .then().statusCode(200).extract().path("value");
+        IdentitaetsDienst original = ClientProxy.unwrap(identitaet);
+        var keycloak = new KeycloakAdminAdapter(new ObjectMapper(), Optional.of(basis), "urinet-archiv",
+                "archiv-verwaltung", Optional.of(secret), "archiv-pwa", Optional.empty(),
+                Duration.ofSeconds(2), Duration.ofSeconds(5),
+                status -> { throw new AssertionError("Unerwarteter Dienstkonto-Alarm: " + status); });
+        String name = "probe." + UUID.randomUUID().toString().substring(0, 8);
+        String email = name + "@example.invalid";
+        QuarkusMock.installMockForType(identitaetsDienstMitKeycloak(keycloak), IdentitaetsDienst.class);
+        try {
+            var ausgabe = new ByteArrayOutputStream();
+            var fehler = new ByteArrayOutputStream();
+            var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+            var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8);
+            var aufruf = List.of("inhaber-einladen", "probe-adminrollen", "--benutzer", name,
+                    "--email", email, "--vorname", "Test", "--nachname", "Person", "--wer", "probe-real");
+            try (var thread = Executors.newSingleThreadExecutor()) {
+                assertThat(in(thread, "probe-adminrollen", () -> inhaberEinladen.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+            }
+            String id = UUID.fromString(ausgabe.toString(StandardCharsets.UTF_8).strip()).toString();
+            var benutzer = keycloak.benutzerLesen("probe-adminrollen", id);
+            assertThat(benutzer.rollen()).containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+            assertThat(benutzer.aktionen()).containsExactlyInAnyOrder(
+                    IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL,
+                    IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                    IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+            int port = ConfigProvider.getConfig().getValue("archiv.entwicklung.mailpit-port", Integer.class);
+            String mailpit = "http://localhost:" + port;
+            List<String> mailIds = given().baseUri(mailpit).queryParam("query", "to:" + email)
+                    .get("/api/v1/search").then().statusCode(200).extract().jsonPath().getList("messages.ID");
+            assertThat(mailIds).isNotEmpty();
+            var mail = given().baseUri(mailpit).get("/api/v1/message/" + mailIds.getFirst())
+                    .then().statusCode(200).extract().jsonPath();
+            assertThat(mail.getString("Text") + mail.getString("HTML"))
+                    .as("Mailpit enthält den Einmal-Link zur Einrichtung").contains("action-token?key=");
+            assertThat(ausgabe.toString(StandardCharsets.UTF_8)).doesNotContain(name, email, "http");
+        } finally {
+            QuarkusMock.installMockForType(original, IdentitaetsDienst.class);
+            List<String> ids = given().auth().oauth2(admin).queryParam("username", name).queryParam("exact", "true")
+                    .get(adminPfad + "/users").then().statusCode(200).extract().path("id");
+            for (String id : ids) {
+                given().auth().oauth2(admin).delete(adminPfad + "/users/{id}", id).then().statusCode(204);
+            }
+        }
+    }
+
+    private void adminrollenMandantVorbereiten() {
+        if (!register.existiert(new MandantCode("probe-adminrollen"))) {
+            provisionierung.anlegen("probe-adminrollen", null, null);
+        }
+    }
+
+    private static IdentitaetsDienst identitaetsDienstMitKeycloak(KeycloakAdminAdapter keycloak) {
+        return new IdentitaetsDienstStub() {
+            @Override
+            public synchronized List<IdentitaetsDienst.Benutzer> benutzerSuchen(
+                    String mandant, String suche, int seite, int groesse) {
+                return keycloak.benutzerSuchen(mandant, suche, seite, groesse);
+            }
+
+            @Override
+            public synchronized IdentitaetsDienst.Benutzer benutzerLesen(String mandant, String id) {
+                return keycloak.benutzerLesen(mandant, id);
+            }
+
+            @Override
+            public synchronized String anlegen(String mandant, IdentitaetsDienst.Neuanlage benutzer,
+                                               ch.urinet.archiv.sicherheit.domain.Rolle rolle) {
+                return keycloak.anlegen(mandant, benutzer, rolle);
+            }
+
+            @Override
+            public synchronized String anlegenOhneRolle(String mandant, IdentitaetsDienst.Neuanlage benutzer) {
+                return keycloak.anlegenOhneRolle(mandant, benutzer);
+            }
+
+            @Override
+            public synchronized void einladen(String mandant, String id,
+                                              java.util.Set<IdentitaetsDienst.ErforderlicheAktion> aktionen,
+                                              Duration gueltigkeit) {
+                keycloak.einladen(mandant, id, aktionen, gueltigkeit);
+            }
+
+            @Override
+            public synchronized void anlageRueckgaengig(String mandant, String id) {
+                keycloak.anlageRueckgaengig(mandant, id);
+            }
+
+            @Override
+            public synchronized long benutzerZaehlen(String mandant) {
+                return keycloak.benutzerZaehlen(mandant);
+            }
+
+            @Override
+            public synchronized long inhaberZaehlen(String mandant) {
+                return keycloak.inhaberZaehlen(mandant);
+            }
+        };
+    }
 
     @Test
     void absichtIstVorWirkungFestgeschriebenUndFehlerBleibenGesperrt() throws Exception {
@@ -155,6 +405,55 @@ class VerwaltungVorgangTest {
             assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
         } finally {
             testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void betreiberOhneUebernahmeanlassDarfKeineRolleZuweisen() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        var details = new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ANGEFRAGT,
+                UUID.randomUUID(), ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN,
+                null, ProtokollDetails.Verwaltungsrolle.INHABER, List.of());
+        var absicht = new ZugriffEintrag(Optional.of("betreiber:" + UUID.randomUUID()), Optional.empty(),
+                ProtokollAktion.ROLLE_ZUWEISEN, Optional.empty(), Optional.empty(),
+                ProtokollDetails.verwaltung(details));
+        AtomicBoolean ausgefuehrt = new AtomicBoolean();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { ausgefuehrt.set(true); return true; },
+                    fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(ausgefuehrt).isFalse();
+        }
+    }
+
+    @Test
+    void betreibervorgangNachGeklaertemAbschlussfehlerWiederholbar() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        UUID erneut = UUID.randomUUID();
+        UUID ziel = UUID.randomUUID();
+        String akteur = "betreiber:" + UUID.randomUUID();
+        var absicht = betreiberRolle(id, ziel, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        var abschluss = betreiberRolle(id, ziel, akteur, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> true, fehler -> Kompensation.GEKLAERT,
+                    wert -> { throw new IllegalStateException("synthetischer Abschlussfehler"); },
+                    wert -> abschluss))).hasRootCauseInstanceOf(IllegalStateException.class);
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "FEHLGESCHLAGEN");
+            var neueAbsicht = betreiberRolle(erneut, ziel, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+            var neuerAbschluss = betreiberRolle(erneut, ziel, akteur, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+            assertThat(in(thread, "urinet", () -> vorgang.ausfuehren(mandant, neueAbsicht,
+                    () -> { }, () -> true, fehler -> Kompensation.GEKLAERT,
+                    wert -> { }, wert -> neuerAbschluss))).isTrue();
+            assertThat(phasen(erneut)).containsExactly("ANGEFRAGT", "ABGESCHLOSSEN");
+        } finally {
+            testsperreEntfernen(mandant, id);
+            testsperreEntfernen(mandant, erneut);
         }
     }
 
@@ -554,6 +853,16 @@ class VerwaltungVorgangTest {
     private static ZugriffEintrag eintrag(UUID id, UUID ziel, String akteur, String rolle,
                                           ProtokollDetails.Verwaltungsphase phase) {
         return eintrag(id, ziel, akteur, rolle, phase, ProtokollDetails.Verwaltungsvorgang.SPERREN);
+    }
+
+    private static ZugriffEintrag betreiberRolle(UUID id, UUID ziel, String akteur,
+                                                ProtokollDetails.Verwaltungsphase phase) {
+        var details = new ProtokollDetails.Verwaltung(id, phase, ziel,
+                ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN,
+                ProtokollDetails.Verwaltungsrolle.INHABER, ProtokollDetails.Verwaltungsrolle.INHABER,
+                List.of(), null, null, ProtokollDetails.Verwaltungsanlass.UEBERNAHME, null);
+        return new ZugriffEintrag(Optional.of(akteur), Optional.empty(), ProtokollAktion.ROLLE_ZUWEISEN,
+                Optional.empty(), Optional.empty(), ProtokollDetails.verwaltung(details));
     }
 
     private static ZugriffEintrag eintrag(UUID id, UUID ziel, String akteur, String rolle,

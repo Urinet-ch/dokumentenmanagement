@@ -248,9 +248,14 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         VORGANG_OFFEN
     }
 
+    public enum Verwaltungsanlass {
+        UEBERNAHME
+    }
+
     public record Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
                              Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder,
-                             Verwaltungsgrund grund, Verwaltungsabweichung abweichung) {
+                             Verwaltungsgrund grund, Verwaltungsabweichung abweichung, Verwaltungsanlass anlass,
+                             Integer passkeys) {
         public Verwaltung {
             Objects.requireNonNull(vorgangId);
             Objects.requireNonNull(phase);
@@ -258,21 +263,41 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
             if (abweichung != null && vorgang != Verwaltungsvorgang.ABWEICHUNG) {
                 throw new IllegalArgumentException("Abweichungscode nur beim Abgleich");
             }
+            if (anlass != null && vorgang != Verwaltungsvorgang.ROLLE_ZUWEISEN) {
+                throw new IllegalArgumentException("Übernahmeanlass nur beim Rollenvorgang");
+            }
+            if (passkeys != null && (vorgang != Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN || passkeys < 0
+                    || passkeys > 100)) {
+                throw new IllegalArgumentException("Zahl der Passkeys nur beim Zurücksetzen des Zugangs");
+            }
+        }
+
+        /** Nur die Zahl der gelöschten Passkeys, nie Bezeichnungen, Kennungen oder Gerätedaten (Requirement 10.7). */
+        public Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
+                          Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder,
+                          Verwaltungsgrund grund, Verwaltungsabweichung abweichung, Integer passkeys) {
+            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, grund, abweichung, null, passkeys);
+        }
+
+        public Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
+                          Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder,
+                          Verwaltungsgrund grund, Verwaltungsabweichung abweichung) {
+            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, grund, abweichung, null, null);
         }
 
         public Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
                           Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder,
                           Verwaltungsgrund grund) {
-            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, grund, null);
+            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, grund, null, null, null);
         }
 
         public Verwaltung(UUID vorgangId, Verwaltungsphase phase, UUID ziel, Verwaltungsvorgang vorgang,
                           Verwaltungsrolle rolleAlt, Verwaltungsrolle rolleNeu, List<Verwaltungsfeld> felder) {
-            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, null, null);
+            this(vorgangId, phase, ziel, vorgang, rolleAlt, rolleNeu, felder, null, null, null, null);
         }
 
         public Verwaltung(UUID vorgangId, Verwaltungsphase phase) {
-            this(vorgangId, phase, null, null, null, null, List.of(), null, null);
+            this(vorgangId, phase, null, null, null, null, List.of(), null, null, null, null);
         }
     }
 

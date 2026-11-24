@@ -60,7 +60,7 @@ class ReqAbdeckungTest {
 
     @Test
     void checkboxMitUngueltigerKennungBrichtAb() {
-        for (String zeile : List.of("- [x] 1.1a Gerüst", "- [ ] Gerüst", "- [x] X.1 Gerüst")) {
+        for (String zeile : List.of("- [x] 1.1aa Gerüst", "- [x] 1.1A Gerüst", "- [ ] Gerüst", "- [x] X.1 Gerüst")) {
             assertThatThrownBy(() -> ReqAbdeckung.gefordert(List.of(zeile))).as(zeile)
                     .isInstanceOf(IllegalArgumentException.class);
         }
@@ -108,6 +108,19 @@ class ReqAbdeckungTest {
                 "- [ ] 1.2 Entwicklungsumgebung",
                 "  - _Anforderungen: 2.1_");
         assertThat(ReqAbdeckung.gefordert(tasks)).containsExactly("1.7", "16.13", "16.14");
+    }
+
+    @Test
+    void aufgabenMitBuchstabensuffixZaehlenWieAndereAufgaben() {
+        List<String> tasks = List.of(
+                "- [x] 0.1a Vorarbeit [Backend]",
+                "  - _Anforderungen: 0.1_",
+                "- [x] 21.2a Folgeaufgabe [Backend]",
+                "  - _Anforderungen: 6.3, 6.5_",
+                "- [ ] 21.2b Offen [Backend]",
+                "  - _Anforderungen: 9.4_");
+        assertThat(ReqAbdeckung.gefordert(tasks)).containsExactly("6.3", "6.5");
+        assertThat(ReqAbdeckung.gefordert(tasks, true)).containsExactly("6.3", "6.5");
     }
 
     @Test

@@ -65,6 +65,13 @@ export const MENUE: readonly Menuepunkt[] = [
     symbol: 'export',
   },
   {
+    pfad: '/verwaltung/einstellungen',
+    text: TEXTE.menue.einstellungen,
+    aktion: 'A20',
+    gruppe: 'verwaltung',
+    symbol: 'dokumentarten',
+  },
+  {
     pfad: '/verwaltung/benutzer',
     text: TEXTE.menue.benutzer,
     aktion: 'A21',
@@ -84,6 +91,13 @@ export const MENUE: readonly Menuepunkt[] = [
     aktion: 'A13',
     gruppe: 'verwaltung',
     symbol: 'protokoll',
+  },
+  {
+    pfad: '/chat/auswertung',
+    text: TEXTE.chat.auswertung.titel,
+    aktion: 'A24',
+    gruppe: 'verwaltung',
+    symbol: 'chat',
   },
   {
     pfad: '/verwaltung/api-tokens',

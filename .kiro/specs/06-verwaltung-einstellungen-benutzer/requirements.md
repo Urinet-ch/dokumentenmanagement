@@ -468,6 +468,13 @@ folgenreichen Schritt gewarnt werden, damit ich nichts versehentlich auslöse.
    sich geändert» mit Neu-Laden und erhaltenen Eingaben; 422 mit den Befunden am Feld; 429 mit der Wartezeit; 5xx und
    503 `IDENTITAETSDIENST_NICHT_ERREICHBAR` mit «Später erneut versuchen»; Netzwerkfehler wie 5xx. Verwaltungsaktionen
    werden nie in die Offline-Warteschlange gestellt.
+   _Umsetzungsvermerk zu 4 und 5 (24.11.2026, Entscheid Fabian zu Aufgabe 20.7, PR #531; Kriterien unverändert):_
+   Die Wiederholung nach `STEP_UP_NOETIG` sendet die Aktion nur dort selbst erneut, wo die Fortsetzung keine persönlichen
+   Eingaben braucht (Sperren, Entsperren, Deaktivieren, Reaktivieren, Zugang zurücksetzen, Einladung erneut senden, Google
+   lösen, Rolle ändern); gespeichert werden nur Aktion, Ziel-ID, ETag und Codes, 10 Minuten, einmalig, an den Rückruf
+   gebunden. Löschen, Profil und Einladen speichern nichts und werden nach der Anmeldung neu erfasst (Datensparsamkeit).
+   `BESTAETIGUNG_NOETIG` in der Benutzerverwaltung zeigt die geprüften Auswirkungen als Meldung ohne erneutes Senden, weil
+   die Benutzer-API keinen Bestätigungsparameter kennt und das Backend den Code nur in den Einstellungen auslöst.
 6. Die App SOLL nie ein Passwort, einen Einladungslink oder ein Geheimnis anzeigen; nach dem Einladen steht, dass die
    Person eine E-Mail erhält, und der Status zeigt «Einladung offen seit …». Nachweis: JUnit
    (`RealmExportKeycloakTest.einladungOhnePasswortErreichtMailpit`: Text der Einladung nennt Einmal-Link und nächste

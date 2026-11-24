@@ -22,9 +22,9 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
   @req-3.18 @req-4.5 @req-4.9
   Szenario: Rollenwechsel verlangt die aktuelle Version und widerruft alte Tokens
     Angenommen die frische Anmeldung ist für den Test bestätigt
-    Und ein synthetischer aktiver Mitarbeiter besteht
+    Und ein synthetischer aktiver Mitarbeiter mit erneuerbarem Token besteht
     Wenn der Inhaber die Rolle mit fehlender, veralteter und aktueller Version ändert
-    Dann ist nur die aktuelle Rollenänderung wirksam und das alte Token widerrufen
+    Dann ist nur die aktuelle Rollenänderung wirksam und ein erneuertes Token trägt die neue Rolle
 
   @req-4.11
   Szenario: Eine Inhabervergabe benötigt die Bestätigung eines zweiten Inhabers
@@ -40,7 +40,7 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn beide Inhaber gleichzeitig die Rolle des anderen ändern
     Dann wird ein Vorgang gesperrt und mindestens ein Inhaber bleibt aktiv
 
-  @req-3.2 @req-6.1 @req-6.2 @req-6.3 @req-6.4
+  @req-3.2 @req-6.1 @req-6.2 @req-6.3 @req-6.4 @req-9.5
   Szenario: Ein neuer Benutzer wird eingeladen und die Anlage protokolliert
     Angenommen die frische Anmeldung ist für den Test bestätigt
     Wenn der Inhaber einen synthetischen Mitarbeiter anlegt
@@ -58,6 +58,45 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Und ein synthetischer Mitarbeiter ist eingeladen
     Wenn der Inhaber den Zugang des Mitarbeiters zurücksetzt
     Dann sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert
+
+  @req-10.5 @req-10.7
+  Szenario: Beim Zurücksetzen des Zugangs werden auf Wunsch die Passkeys gelöscht
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer Mitarbeiter ist eingeladen und hat 2 Passkeys
+    Wenn der Inhaber den Zugang des Mitarbeiters mit der Option Passkeys zurücksetzt
+    Dann hat der Mitarbeiter keine Passkeys mehr und sein Zugang ist zurückgesetzt
+    Und das Protokoll nennt nur die Zahl 2 der gelöschten Passkeys
+
+  @req-10.5
+  Szenario: Ohne die Option Passkeys bleiben die Passkeys beim Zurücksetzen erhalten
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer Mitarbeiter ist eingeladen und hat 2 Passkeys
+    Wenn der Inhaber den Zugang des Mitarbeiters ohne die Option Passkeys zurücksetzt
+    Dann hat der Mitarbeiter weiterhin 2 Passkeys
+    Und das Protokoll nennt keine Zahl der Passkeys
+
+  @req-10.5
+  Szenario: Die Option Passkeys verlangt wie das Zurücksetzen eine frische Anmeldung
+    Angenommen die Anmeldung für eine kritische Aktion ist nicht frisch
+    Und ein synthetischer Mitarbeiter ist eingeladen und hat 2 Passkeys
+    Wenn der Inhaber den Zugang des Mitarbeiters mit der Option Passkeys zurücksetzt
+    Dann wird die Aktion wegen fehlendem Step-up abgewiesen und die Passkeys bleiben
+
+  @req-10.5
+  Szenario: Ein ungültiger Körper beim Zurücksetzen wird abgewiesen
+    Angenommen die frische Anmeldung ist für den Test bestätigt
+    Und ein synthetischer Mitarbeiter ist eingeladen und hat 2 Passkeys
+    Wenn der Inhaber den Zugang des Mitarbeiters mit einem ungültigen Körper zurücksetzt
+    Dann wird die Anfrage mit 400 abgewiesen und die Passkeys bleiben
+
+  @req-10.6
+  Szenario: Detail und Liste zeigen Passkey ja oder nein samt Anzahl, ohne Gerätedaten, und filtern danach
+    Angenommen ein synthetischer Mitarbeiter ist eingeladen und hat 2 Passkeys
+    Und ein zweiter synthetischer Mitarbeiter ist eingeladen ohne Passkey
+    Wenn der Inhaber das Detail und die gefilterten Listen abruft
+    Dann zeigt das Detail Passkey ja mit Anzahl 2 und der andere Passkey nein mit Anzahl 0
+    Und der Filter ja liefert nur den ersten und der Filter nein nur den zweiten Mitarbeiter
+    Und ein ungültiger Filterwert wird mit 400 abgewiesen
 
   @req-4.9
   Szenario: Ein altes Benutzertoken wird nach dem Widerruf abgewiesen
@@ -89,9 +128,9 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
   @req-3.8 @req-4.9
   Szenario: Ein aktiver Benutzer wird gesperrt und wieder entsperrt
     Angenommen die frische Anmeldung ist für den Test bestätigt
-    Und ein synthetischer aktiver Mitarbeiter besteht
+    Und ein synthetischer aktiver Mitarbeiter mit erneuerbarem Token besteht
     Wenn der Inhaber den Mitarbeiter sperrt und wieder entsperrt
-    Dann ist der Mitarbeiter wieder aktiv
+    Dann ist der Mitarbeiter wieder aktiv und sein altes Token bleibt abgewiesen
 
   @req-3.9 @req-3.10
   Szenario: Ein Austritt wird erfasst und der Zugang später neu eingerichtet

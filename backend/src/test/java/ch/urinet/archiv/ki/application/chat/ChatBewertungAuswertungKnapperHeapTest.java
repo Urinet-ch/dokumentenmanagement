@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.ki.adapter.out.export.ChatBewertungZipExport;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
 import org.junit.jupiter.api.Assumptions;
@@ -51,7 +52,7 @@ class ChatBewertungAuswertungKnapperHeapTest {
                         Instant zeit = Instant.parse("2026-11-22T11:00:00Z");
                         for (int id = 1; id <= ANZAHL; id++) {
                             verarbeiten.accept(new ExportZeile(zeit, id, 4, null, null, "Frage", LANGE_ANTWORT,
-                                    "[]", "[]", null, null, null, null, null));
+                                    "[]", "[]", null, null, null, null, null, Chatmodus.ARCHIV));
                         }
                     }
 

@@ -1,0 +1,53 @@
+<h2 mat-dialog-title id="chat-bewertung-export-titel">{{ texte.exportTitel }}</h2>
+<mat-dialog-content>
+  <p>{{ texte.exportEinleitung }}</p>
+  <p>{{ texte.schwaerzungHinweis }}</p>
+  <form class="felder" (submit)="$event.preventDefault(); exportieren()">
+    <label>
+      {{ texte.von }}
+      <input type="date" name="von" required [value]="von()" (change)="von.set($any($event.target).value)" />
+    </label>
+    <label>
+      {{ texte.bis }}
+      <input type="date" name="bis" required [value]="bis()" (change)="bis.set($any($event.target).value)" />
+    </label>
+    <label>
+      {{ texte.minSterne }}
+      <select [value]="minSterne()" (change)="minSterne.set(+$any($event.target).value)">
+        @for (wert of [1, 2, 3, 4, 5]; track wert) {
+          <option [value]="wert">{{ wert }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      {{ texte.maxSterne }}
+      <select [value]="maxSterne()" (change)="maxSterne.set(+$any($event.target).value)">
+        @for (wert of [1, 2, 3, 4, 5]; track wert) {
+          <option [value]="wert">{{ wert }}</option>
+        }
+      </select>
+    </label>
+    <label class="schwaerzen">
+      <input type="checkbox" [checked]="schwaerzen()" (change)="schwaerzen.set($any($event.target).checked)" />
+      <span>{{ texte.schwaerzen }}</span>
+    </label>
+    @if (!schwaerzen()) {
+      <div class="hinweis warnung" role="status">
+        <app-symbol name="warnung" />
+        <p>{{ texte.klartextWarnung }}</p>
+      </div>
+      <label class="bestaetigung">
+        <input type="checkbox" [checked]="klartextBestaetigt()"
+          (change)="klartextBestaetigt.set($any($event.target).checked)" />
+        <span>{{ texte.klartextBestaetigung }}</span>
+      </label>
+    }
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" mat-dialog-close>{{ texte.abbrechen }}</button>
+  <button mat-flat-button type="button" (click)="exportieren()" [disabled]="!gueltig()">
+    <app-symbol name="herunterladen" />
+    {{ texte.exportStarten }}
+  </button>
+</mat-dialog-actions>

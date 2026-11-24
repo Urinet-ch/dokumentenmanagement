@@ -2,6 +2,8 @@
 // Szenarien belegen nur die Oberfläche; Rechte, Sichtbarkeit, Protokoll und Rate-Limit belegt das Backend (7.1–7.3).
 import { After, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
+import axe from 'axe-core';
 import { SEEDORF, chatAttrappe, chatAttrappeBeenden } from '../hilfen/chat-attrappe.mjs';
 
 function attrappe(welt) {
@@ -141,6 +143,42 @@ Then(/^sehe ich unter den letzten Gesprächen zuoberst «(.+)»$/, async functio
 Then('sehe ich keine letzten Gespräche', async function () {
   await listeOeffnen(this.seite);
   await this.seite.getByText('Noch keine Gespräche.', { exact: true }).waitFor();
+});
+
+When('ich wähle den Wissenschat', async function () {
+  await this.seite.getByRole('button', { name: 'Wissen befragen', exact: true }).click();
+});
+
+Then('ist der Wissensmodus im Gespräch und in der Liste festgehalten', async function () {
+  await this.seite.locator('[data-test=aktiver-modus]').getByText('Wissen befragen').waitFor();
+  await listeOeffnen(this.seite);
+  const eintrag = this.seite.locator('[data-test=gespraech]').filter({ hasText: 'Welche Regel gilt?' });
+  await eintrag.locator('[data-test=gespraech-modus]').getByText('Wissen befragen').waitFor();
+  const frage = attrappe(this).fragen.at(-1);
+  assert.equal(attrappe(this).gespraeche.find((g) => g.id === frage.gespraechId)?.modus, 'WISSEN');
+});
+
+Then('ist der Chat in beiden Farbschemata ohne axe-Befund und Überlauf sichtbar', async function () {
+  if (!(await this.seite.evaluate(() => typeof window.axe !== 'undefined'))) {
+    await this.seite.addScriptTag({ content: axe.source });
+  }
+  for (const schema of ['light', 'dark']) {
+    await this.seite.emulateMedia({ colorScheme: schema });
+    const ergebnis = await this.seite.evaluate(() => ({
+      breite: document.documentElement.scrollWidth,
+      fenster: document.documentElement.clientWidth,
+    }));
+    assert.ok(ergebnis.breite <= ergebnis.fenster, `Horizontaler Überlauf: ${JSON.stringify(ergebnis)}`);
+    const violations = await this.seite.evaluate(() => window.axe.run(document, {
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+    }));
+    assert.deepEqual(violations.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) })), []);
+    if (process.env.CHAT_MODUS_BILDER) {
+      const breite = this.seite.viewportSize().width;
+      const zustand = await this.seite.locator('[data-test=aktiver-modus]').count() ? 'gespraech' : 'auswahl';
+      await this.seite.screenshot({ path: join(process.env.CHAT_MODUS_BILDER, `chat-modus-${zustand}-${breite}-${schema}.png`), fullPage: true });
+    }
+  }
 });
 
 Then('sehe ich die leere Chat-Aufforderung', async function () {

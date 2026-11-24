@@ -85,11 +85,32 @@ public class BenutzerAnlegen {
     public record BenutzerAnlageErgebnis(UUID id, UUID antragId) {
     }
 
+    private record Akteur(String id, Optional<String> rolle, Optional<Benutzer> angemeldet) {
+    }
+
     public BenutzerAnlageErgebnis anlegen(MandantCode mandant, Benutzer akteur, BenutzerAnlage eingabe,
                                          Optional<IpAdresse> ip) {
         berechtigung.aktion(akteur, Aktion.A22);
         berechtigung.aktion(akteur, Aktion.A23);
         stepUp.pruefen();
+        return anlegen(mandant, new Akteur(akteur.id(), Optional.of(akteur.rolle().name()), Optional.of(akteur)),
+                eingabe, ip);
+    }
+
+    public UUID erstenInhaberEinladen(MandantCode mandant, String betreiber, BenutzerAnlage eingabe) {
+        if (betreiber == null || !betreiber.strip().equals(betreiber)
+                || !betreiber.matches("[^\\p{Cntrl}]{1,80}")) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        if (eingabe == null || !"inhaber".equals(eingabe.rolle())) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        return anlegen(mandant, new Akteur("betreiber:" + betreiber, Optional.empty(), Optional.empty()),
+                eingabe, Optional.empty()).id();
+    }
+
+    private BenutzerAnlageErgebnis anlegen(MandantCode mandant, Akteur akteur, BenutzerAnlage eingabe,
+                                          Optional<IpAdresse> ip) {
         if (eingabe == null) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -97,8 +118,13 @@ public class BenutzerAnlegen {
         Rolle rolle = Rolle.ausRealmRollen(eingabe.rolle() == null ? List.of() : List.of(eingabe.rolle()))
                 .orElseThrow(() -> new KonfigurationUngueltig(List.of(new KonfigurationUngueltig.Befund(
                         "rolle", "ROLLE_UNGUELTIG", "Bitte wählen Sie eine gültige Archiv-Rolle."))));
-        if (!rollen.lesen().contains(rolle) || !akteur.rolle().darfVergeben(rolle)) {
-            berechtigung.eskalationVerweigern(akteur, Aktion.A23);
+        if (!rollen.lesen().contains(rolle)
+                || akteur.angemeldet().filter(benutzer -> !benutzer.rolle().darfVergeben(rolle)).isPresent()) {
+            if (akteur.angemeldet().isPresent()) {
+                berechtigung.eskalationVerweigern(akteur.angemeldet().get(), Aktion.A23);
+            } else {
+                throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            }
         }
         UUID vorgangId = UUID.randomUUID();
         var rolleNeu = ProtokollDetails.Verwaltungsrolle.valueOf(rolle.name());
@@ -114,6 +140,9 @@ public class BenutzerAnlegen {
                 }
                 if (namen.vergeben(eingabe.benutzername())) {
                     throw new FachFehler(Fehlercode.BENUTZER_EXISTIERT);
+                }
+                if (akteur.angemeldet().isEmpty() && inhaberVorhanden(mandant)) {
+                    throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
                 }
                 vierAugen.set(rolle == Rolle.INHABER && identitaet.inhaberZaehlen(mandant.wert()) >= 2);
             }, () -> {
@@ -168,7 +197,7 @@ public class BenutzerAnlegen {
                     var details = new ProtokollDetails.Verwaltung(ergebnis.antragId(),
                             ProtokollDetails.Verwaltungsphase.ANGEFRAGT, ergebnis.id(),
                             ProtokollDetails.Verwaltungsvorgang.ANTRAG, null, rolleNeu, List.of());
-                    protokoll.schreiben(new ZugriffEintrag(Optional.of(akteur.id()), Optional.of(akteur.rolle().name()),
+                    protokoll.schreiben(new ZugriffEintrag(Optional.of(akteur.id()), akteur.rolle(),
                             ProtokollAktion.BENUTZER_ANTRAG, Optional.empty(), ip, ProtokollDetails.verwaltung(details)));
                 }
             }, ergebnis -> eintrag(akteur, ip, vorgangId, ergebnis.id(), rolleNeu,
@@ -183,12 +212,28 @@ public class BenutzerAnlegen {
                 || fachfehler.code() == Fehlercode.UEBERLASTET || fachfehler.code() == Fehlercode.NICHT_GEFUNDEN);
     }
 
-    private static ZugriffEintrag eintrag(Benutzer akteur, Optional<IpAdresse> ip, UUID vorgangId, UUID ziel,
+    private boolean inhaberVorhanden(MandantCode mandant) {
+        for (int seite = 0; seite <= 200; seite++) {
+            List<IdentitaetsDienst.Benutzer> benutzer = identitaet.benutzerSuchen(mandant.wert(), null, seite);
+            if (benutzer.size() > IdentitaetsDienst.MAX_SEITENGROESSE) {
+                throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+            }
+            if (benutzer.stream().anyMatch(b -> b.rollen().contains(Rolle.INHABER))) {
+                return true;
+            }
+            if (benutzer.size() < IdentitaetsDienst.MAX_SEITENGROESSE) {
+                return false;
+            }
+        }
+        throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+    }
+
+    private static ZugriffEintrag eintrag(Akteur akteur, Optional<IpAdresse> ip, UUID vorgangId, UUID ziel,
                                           ProtokollDetails.Verwaltungsrolle rolle,
                                           ProtokollDetails.Verwaltungsphase phase) {
         var details = new ProtokollDetails.Verwaltung(vorgangId, phase, ziel,
                 ProtokollDetails.Verwaltungsvorgang.ANLEGEN, null, rolle, List.of());
-        return new ZugriffEintrag(Optional.of(akteur.id()), Optional.of(akteur.rolle().name()),
+        return new ZugriffEintrag(Optional.of(akteur.id()), akteur.rolle(),
                 ProtokollAktion.BENUTZER_ANLEGEN, Optional.empty(), ip, ProtokollDetails.verwaltung(details));
     }
 }

@@ -1,0 +1,113 @@
+<div class="seitenkopf">
+  <p class="vorzeile">{{ bereich }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
+
+<p class="hinweis info">{{ texte.nurLesen }}</p>
+@if (gespeichert()) {
+  <p class="hinweis ok" role="status">{{ texte.gespeichert }}</p>
+}
+@if (versionVorgemerkt()) {
+  <p class="hinweis info" role="status">{{ texte.versionVorgemerkt }}</p>
+}
+
+@if (fehler(); as meldung) {
+  <div class="hinweis gefahr" role="alert">
+    <p>{{ meldung }}</p>
+    <button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button>
+  </div>
+} @else if (gruppen(); as liste) {
+  @if (liste.length === 0) {
+    <p class="leer" role="status">{{ texte.keine }}</p>
+  }
+  @for (gruppe of liste; track gruppe.code) {
+    <section>
+      <h2>{{ texte.gruppen[gruppe.code] ?? gruppe.code }}</h2>
+      <button mat-button type="button" [disabled]="speichert()" (click)="gruppeZuruecksetzen(gruppe)">
+        {{ texte.gruppeAufStandard }}
+      </button>
+      <div class="karten">
+        @for (eintrag of gruppe.eintraege; track eintrag.schluessel) {
+          <article class="karte">
+            <h3>{{ eintrag.name }}</h3>
+            <p>{{ eintrag.beschreibung }}</p>
+            <dl>
+              <dt>{{ texte.aktuellerWert }}</dt><dd>{{ wert(eintrag.aktuellerWert) }}</dd>
+              <dt>{{ texte.standard }}</dt><dd>{{ wert(eintrag.standard) }}</dd>
+              @if (eintrag.minimum != null && eintrag.maximum != null) {
+                <dt>{{ texte.grenzen }}</dt><dd>{{ wert(eintrag.minimum) }} – {{ wert(eintrag.maximum) }} {{ eintrag.einheit }}</dd>
+              }
+              @if (eintrag.wirksamAb) {
+                <dt>{{ texte.wirksamAb }}</dt><dd>{{ eintrag.wirksamAb }}</dd>
+              }
+            </dl>
+            @if (eintrag.hinweis) {
+              <p class="hinweis">{{ eintrag.hinweis }}</p>
+            }
+            <label [for]="'eingabe-' + eintrag.schluessel">{{ texte.eingabe }}: {{ eintrag.name }}</label>
+            @if (eintrag.typ === 'IBANS') {
+              <textarea #feld [id]="'eingabe-' + eintrag.schluessel" [value]="eingabe(eintrag)"
+                        [disabled]="speichert()"
+                        [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
+                        [attr.aria-describedby]="feldfehler()[eintrag.schluessel ?? ''] ? 'fehler-' + eintrag.schluessel : null"
+                        (input)="setzen(eintrag, feld.value)"></textarea>
+            } @else if (eintrag.typ === 'WOCHENTAG') {
+              <select #feld [id]="'eingabe-' + eintrag.schluessel" [value]="eingabe(eintrag)"
+                      [disabled]="speichert()"
+                      [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
+                      [attr.aria-describedby]="feldfehler()[eintrag.schluessel ?? ''] ? 'fehler-' + eintrag.schluessel : null"
+                      (change)="setzen(eintrag, feld.value)">
+                @for (tag of wochentage; track tag[0]) {
+                  <option [value]="tag[0]">{{ tag[1] }}</option>
+                }
+              </select>
+            } @else {
+              <input #feld [id]="'eingabe-' + eintrag.schluessel"
+                     [disabled]="speichert()"
+                     [type]="eintrag.typ === 'GANZZAHL' ? 'number' : 'text'" [value]="eingabe(eintrag)"
+                     [attr.aria-invalid]="feldfehler()[eintrag.schluessel ?? ''] ? 'true' : null"
+                     [attr.min]="eintrag.minimum ?? null" [attr.max]="eintrag.maximum ?? null"
+                     [attr.aria-describedby]="feldfehler()[eintrag.schluessel ?? ''] ? 'fehler-' + eintrag.schluessel : null"
+                     (input)="setzen(eintrag, feld.value)" />
+            }
+            @if (feldfehler()[eintrag.schluessel ?? '']; as meldung) {
+              <p [id]="'fehler-' + eintrag.schluessel" role="alert">{{ meldung }}</p>
+            }
+            <button mat-button type="button" [disabled]="speichert()" (click)="setzen(eintrag, null)">{{ texte.aufStandard }}</button>
+            @if (eintrag.schluessel && eingaben()[eintrag.schluessel] === null) {
+              <p role="status">{{ texte.standardVorgemerkt }}</p>
+            }
+          </article>
+        }
+      </div>
+    </section>
+  }
+  @if (liste.length > 0) {
+    <button mat-stroked-button type="button" [disabled]="speichert() || vorschauLaeuft() || !hatEingaben()"
+            (click)="pruefen()">{{ texte.vorschau }}</button>
+    @if (vorschauLaeuft()) {
+      <p role="status">{{ texte.vorschauLaeuft }}</p>
+    } @else if (vorschau(); as auswirkungen) {
+      <section class="karte">
+        <h2>{{ texte.vorschauErgebnis }}</h2>
+        @if (auswirkungen.length === 0) {
+          <p>{{ texte.keineAuswirkungen }}</p>
+        } @else {
+          <ul>
+            @for (auswirkung of auswirkungen; track $index) {
+              <li>{{ auswirkung.text }}</li>
+            }
+          </ul>
+        }
+        <button mat-flat-button type="button" [disabled]="speichert()" (click)="speichern()">{{ texte.speichern }}</button>
+      </section>
+    }
+    @if (speichert()) {
+      <p role="status">{{ texte.speichernLaeuft }}</p>
+    }
+  }
+  <app-einstellungen-verlauf (wiederherstellen)="versionVormerken($event)" />
+} @else {
+  <p role="status">{{ texte.laden }}</p>
+}

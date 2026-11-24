@@ -38,6 +38,13 @@ Funktionalität: Chat-Bewertungen auswerten und exportieren
     Dann ist der Chat-Auswertungs-Export mit Status 401 beantwortet
     Und ist der Fehlercode der Chat-Auswertung «STEP_UP_NOETIG»
 
+  @req-15.6
+  Szenario: Export enthält den gespeicherten Chat-Modus
+    Angenommen im Mandanten «urinet» gibt es eine synthetische Chat-Bewertung mit 2 Sternen im Modus «WISSEN»
+    Wenn «inhaber-urinet» exportiert die Chat-Auswertung für die letzten 30 Tage
+    Dann ist der Chat-Auswertungs-Export mit Status 200 beantwortet
+    Und enthält der Chat-Auswertungs-Export den Modus «WISSEN»
+
   @req-15.5
   Szenario: Ein API-Token ohne Inhaberrolle kann die Chat-Auswertung nicht lesen oder exportieren
     Angenommen für die Chat-Auswertung gibt es einen API-Token ohne Inhaberrolle

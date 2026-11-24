@@ -5,6 +5,46 @@ bereitstellt und was man bei einem Alarm zuerst prüft. Sie beschreibt den Stand
 `SpeicherUeberwachung`, `SicherungUeberwachungAdapter`, `ManifestBefunde`, `MicrometerKennzahlen`); Betrieb und
 Einrichtung des Mailversands stehen im [README](../README.md#benachrichtigungen-per-mail-spec-01-aufgabe-56).
 
+## Betriebsnachweis für Fabian (Aufgabe 5.6)
+
+Diese Checkliste ist eine Vorbereitung, kein durchgeführter Nachweis. Es wird nichts auf der VPS geändert;
+der Wechsel auf Stufe B ist nicht beauftragt. Ergebnisse ohne Geheimnisse, Adressen oder Dokumentdaten festhalten.
+
+- [ ] Mailweg und Empfänger anhand des README prüfen; mit einem freigegebenen synthetischen Test einen Alarm
+  auslösen und Zustellung sowie Inhalt (nur IDs und zulässige Betriebswerte) nachweisen.
+- [ ] Öffentlichen schlanken Health-Pfad und die Abschirmung von Detail-Health und Kennzahlen prüfen; intern
+  Auftrags-, Dokument-, Eingangskorb-, Korrekturquoten- und Speicherkennzahlen kontrollieren.
+- [ ] Nach einer allfälligen Freigabe und Aktivierung des Sicherungs-Workflows die Sicherungsüberwachung einschalten
+  und fehlende bzw. zu alte Exporte sowie die Zustellung eines Alarms nachweisen. Bis dahin bleibt sie deaktiviert.
+- [ ] Für die Restore-Probe den Alarm bei Fehlschlag **und** bei einem letzten grünen Lauf älter als 35 Tage
+  separat im Sicherungs-Workflow und Monitoring nachweisen (Req 16.25). Die App-Überwachung kennt dieses Ergebnis
+  nicht; ein Sicherungsalarm allein ist kein Nachweis dafür.
+- [ ] Alarm für das Kontingent der Zweitkopie einrichten bzw. nachweisen; eine geeignete Schwelle und Zustellung
+  prüfen. Eine Schwelle wird hier nicht vorgegeben.
+- [ ] Nachweise mit Datum, geprüftem Stand und Ergebnis ablegen; offene Punkte dokumentieren. Aufgabe 5.6 bleibt
+  bis zur Erfüllung der Infrastruktur- und Betriebsnachweise offen.
+
+## Vorbereitung der Monitoring-Anbindung (Aufgabe 5.9)
+
+Nur Checkliste, keine ausgeführte Anbindung; Stufe B bleibt zurückgestellt. Keine Betriebsadressen, Geheimnisse oder
+Dokumentdaten in Nachweisen ablegen. Die Tabelle «Kennzahlen unter `/q/metrics`» enthält die vorhandenen Namen und Tags.
+
+- [ ] Internen Zugang zu Detail-Health und `/q/metrics` im Monitoring einrichten; prüfen, dass beide nicht öffentlich
+  erreichbar sind. Den öffentlichen Liveness-Pfad getrennt überwachen.
+- [ ] Erreichbarkeit und Health von API und Worker sowie deren Ausfall mit einem freigegebenen Test nachweisen;
+  Alarmweg und Empfänger prüfen.
+- [ ] `archiv_auftraege{mandant,status="FEHLER"}` je aktivem Mandanten überwachen. Fehlende Messreihen und einen
+  ausgefallenen Abruf separat als Ausfall behandeln, nicht als Wert null; eine Schwelle und Wartezeit festlegen.
+- [ ] Restore-Probe bei fehlgeschlagenem Lauf **und** bei einem letzten grünen Lauf älter als 35 Tage alarmieren
+  (Req 16.25). Die Ergebnisse kommen aus dem Status-Artefakt der Probe, nicht aus den App-Kennzahlen; auch ein
+  fehlendes oder veraltetes Artefakt darf nicht als Erfolg gelten.
+- [ ] Zeilenzahl von `ki_beispiel` je Mandant erfassen. Über 1'000 Zeilen die Dauer von
+  `JdbcKiBeispiel.kandidaten` am betreffenden Bestand messen; ab 100 ms je Abfrage oder 10'000 Zeilen je Mandant
+  den Rang bzw. Index prüfen (Spec 01, Design «Offen»). Für Bestand und Abfragedauer gibt es derzeit keine der unten
+  aufgeführten App-Kennzahlen; Verfahren und Messung bleiben offen.
+- [ ] Regeln und Zuständigkeit im zuständigen Infra-Repository dokumentieren; Tests, Zeitpunkt und Ergebnis
+  festhalten. Aufgabe 5.9 erst nach Anbindung und Betriebsnachweisen abschliessen.
+
 ## Grundregeln
 
 - **Nur IDs und Status.** Betreff und Text nennen Dokument-ID, Datum, Sicherungscode oder Speicherbereich, nie
@@ -33,8 +73,8 @@ Einrichtung des Mailversands stehen im [README](../README.md#benachrichtigungen-
 | `Manifest <JJJJ-MM-TT> für <mandant> FEHLT` | Das erste fällige Tages-Manifest fehlt: Das Tagesende und das zuletzt erstellte Manifest liegen beide länger als die Frist zurück, oder ein Auftrag `MANIFEST` ist nach dem Fälligwerden des Tages (Tagesende plus Nachlauf) und nach dem letzten Fortschritt (letztes Manifest, ohne Manifest die Anlage des Mandanten) in `FEHLER` geendet; ein neuerer Folgeauftrag in `OFFEN` oder `LAEUFT` hebt den Befund nicht auf, erst ein neues Manifest. Höchstens ein Befund je Mandant | `archiv.ueberwachung.manifest-frist` (Standard `PT6H`, muss grösser als 0 sein) | Mandant, Datum, Befund `FEHLT`; Hinweis, dass der Nachweis für diesen und alle folgenden Tage fehlt | Erreichbarkeit der Zeitstempeldienste und des Object Storage prüfen, im Log nach dem Datum suchen, Auftrag `MANIFEST` prüfen; der nächste tägliche Lauf holt fehlende Tage nach |
 | `Sicherung <code> FEHLT` oder `ZU_ALT` | Für eine Sicherungsart ist kein Export protokolliert (`FEHLT`) oder der jüngste ist älter als die Frist (`ZU_ALT`). Arten ohne Mandant: `db`, `keycloak`, `realm`, `schluessel`; je aktivem Mandant: `bucket-<mandant>`, `inventar-<mandant>` | `archiv.ueberwachung.sicherung-frist` (Standard `PT36H`), `archiv.ueberwachung.sicherung-aktiv` (Standard `false`: ohne Einschalten keine Prüfung, nur einmal eine Warnung im Log; Ausschalten erledigt offene Sicherungsalarme nicht, sie bleiben stehen); die Prüfung braucht einen aktiven Betriebs-Mandanten, sonst steht bei jedem Lauf eine Warnung im Log; Empfänger gehört dem Mandanten aus `archiv.ueberwachung.betrieb-mandant` (Standard `urinet`) | Mandant, Sicherungscode, Befund | Sicherungs-Export und Sicherungs-Workflow prüfen (Lauf, Fehlermeldung) |
 | `Speicher der <API/Worker/API und Worker> knapp` bzw. `kritisch (<Bereich> <n> %)` | Auslastung eines Bereichs (`Metaspace`, `Compressed Class Space`, `Heap` nach der letzten Garbage Collection) erreicht die Schwelle. Ohne Maximum (z. B. kein `-XX:MaxMetaspaceSize`) gibt es keine Schwelle, nur eine Log-Zeile | `archiv.ueberwachung.speicher.warn-prozent` (Standard 85) und `archiv.ueberwachung.speicher.kritisch-prozent` (Standard 95); es gilt `0 < warn < kritisch <= 100`, sonst bricht der Start ab | Rolle, Bereich, Prozent, benutzte und maximale MiB; Empfänger ist der Betriebs-Mandant (`archiv.ueberwachung.betrieb-mandant`) | Limit des betroffenen Bereichs in den JVM-Optionen prüfen und bei Bedarf erhöhen; läuft ein Bereich voll, beendet sich die JVM und startet neu. Messung und Einordnung: [speicherbudget.md](speicherbudget.md) |
-| `Alarm der Benutzerverwaltung` | Jede wirksame Inhabervergabe, 10 Verwaltungsaktionen oder 5 Verwaltungsverweigerungen innerhalb von 10 Minuten, endgültiges HTTP 401 oder 403 des Keycloak-Dienstkontos | Schwellen je Mandant; ein Alarm beim Erreichen der jeweiligen Schwelle. Eine 401-Antwort, die nach Erneuerung des Tokens erfolgreich ist, löst keinen Alarm aus | Aktion, Anzahl, Zeit und Ereignis-ID, ohne Benutzernamen oder Eingaben | Im Verwaltungsprotokoll nach dem Vorgang suchen; bei einer Dienstkonto-Ablehnung dessen Einrichtung prüfen |
-| `Abweichung in der Benutzerverwaltung` | Der Abgleich findet einen offenen Vorgang oder eine Abweichung zwischen Keycloak und Verwaltungsstand | Beim Worker-Start und täglich um 01:20 Uhr Europe/Zurich; Meldung im nächsten Überwachungstakt | `BENUTZER_ABWEICHUNG`, Anzahl, Zeit, Kennung und Abweichungscode | Verwaltungsprotokoll und Keycloak prüfen; unklare Vorgänge durch den Betreiber klären |
+| `Alarm der Benutzerverwaltung` | Jede wirksame Inhabervergabe, 10 Verwaltungsaktionen oder 5 Verwaltungsverweigerungen innerhalb von 10 Minuten, endgültiges HTTP 401 oder 403 des Keycloak-Dienstkontos | Schwellen je Mandant; ein Alarm beim Erreichen der jeweiligen Schwelle. Eine 401-Antwort, die nach Erneuerung des Tokens erfolgreich ist, löst keinen Alarm aus | Aktion, Anzahl, Zeit und Ereignis-ID, ohne Benutzernamen oder Eingaben | Im Verwaltungsprotokoll nach dem Vorgang suchen; bei einer Dienstkonto-Ablehnung dessen Einrichtung und das Secret `KEYCLOAK_VERWALTUNG_SECRET` prüfen ([Rotation](geheimnisse-rotieren.md)); Notweg bei Ausfall: [Anleitung, Notweg](anleitung-verwaltung.md#notweg-benutzer-per-kcadmsh) |
+| `Abweichung in der Benutzerverwaltung` | Der Abgleich findet einen offenen Vorgang oder eine Abweichung zwischen Keycloak und Verwaltungsstand | Beim Worker-Start und täglich um 01:20 Uhr Europe/Zurich; Meldung im nächsten Überwachungstakt | `BENUTZER_ABWEICHUNG`, Anzahl, Zeit, Kennung und Abweichungscode | Verwaltungsprotokoll und Keycloak prüfen; unklare Vorgänge durch den Betreiber klären; `archiv benutzer abgleichen <code> --pruefen` zeigt die Abweichungen, ohne etwas zu ändern ([Anleitung](anleitung-verwaltung.md#normaler-weg-admin-kommando)) |
 | Jahresexport mit Status `FEHLER` | Der Auftrag `EXPORT_JAHR` ist nach dem letzten Fehlversuch gescheitert | Zeitgrenze `archiv.auftrag.zeitgrenze.EXPORT_JAHR` | **Keine Mail** (so in Spec 02 festgelegt); der Export zeigt Status `FEHLER`, die Fehlerart und die Fehler-ID, im Log steht «Export … gescheitert» | Fehlerart lesen: `VERWAIST` (Worker hat sich nicht mehr gemeldet, z. B. JVM beendet), `ZEITGRENZE` (Lauf zu lang), `FEHLGESCHLAGEN` (anderer Fehler, im Log nach der Fehler-ID suchen); danach den Export neu anfordern |
 
 Zur Stufe des Speicher-Alarms: Pro Bereich geht je eine Mail für `warn` und für `kritisch`. Erneut meldet das Archiv

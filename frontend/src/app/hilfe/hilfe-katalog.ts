@@ -35,6 +35,13 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     pfade: ['/'],
     abgemeldet: true,
   },
+  // Mit Passkey anmelden (Aufgabe 24.3, Spec 06 Req 10): für alle angemeldeten Rollen, ohne Pfad
+  {
+    anker: 'erste-schritte-passkey',
+    titel: TEXTE.hilfe.abschnitte['erste-schritte-passkey'],
+    datei: '/anleitung/erste-schritte-passkey.md',
+    eltern: 'erste-schritte',
+  },
   // Erfassen und Eingangskorb (Aufgabe 22.5)
   {
     anker: 'erfassen',
@@ -107,6 +114,14 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     eltern: 'chat',
     bedingung: { eine: ['A2'] },
   },
+  {
+    anker: 'chat-auswertung',
+    titel: TEXTE.chat.auswertung.titel,
+    datei: '/anleitung/chat-auswertung.md',
+    eltern: 'chat',
+    bedingung: { eine: ['A24'] },
+    pfade: ['/chat/auswertung'],
+  },
   // Dokumentansicht (Aufgabe 22.5), zwischen «chat» und «kontakte»
   {
     anker: 'dokument',
@@ -172,7 +187,7 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     titel: TEXTE.hilfe.abschnitte['verwaltung'],
     datei: '/anleitung/verwaltung.md',
     bedingung: { eine: ['A11', 'A13', 'A14'] },
-    pfade: ['/verwaltung/benutzer'],
+    pfade: ['/verwaltung/benutzer', '/verwaltung/einstellungen'],
   },
   {
     anker: 'verwaltung-dokumentarten',

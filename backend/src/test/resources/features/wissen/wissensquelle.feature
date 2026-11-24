@@ -2,6 +2,12 @@
 @spec-04
 Funktionalität: Wissensquelle als Markierung
 
+  @req-20.8 @req-20.11 @wissensquelle-bestand
+  Szenario: Ein bestehender Wissensbestand wird migriert
+    Angenommen ein bestehender Bestand enthält zwei Dokumente der alten Wissensquellenart
+    Wenn die Wissensquellenmigration für den bestehenden Bestand läuft
+    Dann sind die alten Wissensquellendokumente als Projektdokumente versioniert und markiert
+
   @req-1.1 @req-1.3 @req-20.8
   Szenario: Ein neuer Mandant erhält keine Wissensquellenart und das Manifest enthält markierte Dateien
     Angenommen der Mandant «mf-wissensquelle» ist am «10.01.2026» angelegt

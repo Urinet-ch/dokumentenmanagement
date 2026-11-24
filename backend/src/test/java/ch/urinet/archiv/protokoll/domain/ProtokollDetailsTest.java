@@ -2,6 +2,7 @@ package ch.urinet.archiv.protokoll.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,5 +81,22 @@ class ProtokollDetailsTest {
         var anderesFeld = new ProtokollDetails.Aenderung("arten.PROBE.name", null, "geändert");
         assertThat(anderesFeld.ohneWerte()).isFalse();
         assertThat(anderesFeld.neu()).isEqualTo("geändert");
+    }
+
+    @Test
+    void passkeyZahlGiltNurBeimZuruecksetzenDesZugangsUndIstBegrenzt() {
+        var id = java.util.UUID.randomUUID();
+        var ziel = java.util.UUID.randomUUID();
+        var ok = new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN, ziel,
+                ProtokollDetails.Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN, null, null, List.of(), null, null, 2);
+        assertThat(ok.passkeys()).isEqualTo(2);
+        for (Integer ungueltig : new Integer[] {-1, 101}) {
+            assertThatThrownBy(() -> new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN,
+                    ziel, ProtokollDetails.Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN, null, null, List.of(), null, null,
+                    ungueltig)).isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThatThrownBy(() -> new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN,
+                ziel, ProtokollDetails.Verwaltungsvorgang.SPERREN, null, null, List.of(), null, null, 1))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

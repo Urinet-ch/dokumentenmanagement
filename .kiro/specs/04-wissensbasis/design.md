@@ -1458,6 +1458,15 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
 - **Offen für Folgeaufgaben:** Feld `modus` im Bewertungsexport (`chat-bewertungen/v1`), Auswahl und Kennzeichen in der Oberfläche (18.2); öffentlicher Wissenschat und
   `fuer_webseite` (18.3). Die Tests `@req-21.1` bis `@req-21.3`, `@req-21.5` und `@req-21.7` stehen in `features/wissen/wissenschat.feature`.
 
+### Umsetzung (Aufgabe 18.2, 24.11.2026)
+- Die Auswahl erscheint vor der ersten Frage nur mit A15. `ARCHIV` bleibt ohne gesondertes Anlegen das bisherige Standardverhalten;
+  bei `WISSEN` legt die Oberfläche vor der ersten Frage das Gespräch über `POST /chat/gespraeche` an. Ein Fehler dabei stellt
+  keine Archivfrage und erhält die Eingabe. Im laufenden und gespeicherten Gespräch bleibt der Modus fest; die Liste kennzeichnet ihn.
+- Der Bewertungsexport liest `modus` aus dem zugehörigen Gespräch und führt ihn als Pflichtfeld in `chat-bewertungen/v1`.
+  Changeset Mandant `131` ersetzt den partiellen Index `ki_verbrauch_wissen_zeit_ix` um `WISSEN_CHAT` ergänzt; Rollback stellt den alten Index wieder her.
+- Nachweis: `@req-21.4` in `chat-modus-pwa.feature` und `chat-modus-export.feature`, Angular-Tests und
+  `ChatBewertungAuswertungTest`. Die Browserprüfung deckt 375 und 1280 Pixel, beide Farbschemata und axe ab.
+
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:
 - **Datenmodell (Mandantenschema `m_<code>`):** Tabelle `wissensquelle_markierung(dokument_id uuid, markiert_von text, markiert_am timestamptz,
@@ -1480,6 +1489,11 @@ Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und 
   zusätzlich im Frontend-Rechtemodell abgebildet. Die Liste zeigt Statuswerte als Text und lässt den Tabellenrahmen auf schmalen
   Bildschirmen selbst scrollen. Die Schaltfläche verwendet den Wortlaut «Als Wissensquelle verwenden» aus Requirement 20.1.
   Requirements bleiben unverändert. Die Hilfe enthält einen A16-Unterabschnitt; die Oberfläche ändert weder Dokumentart noch Dateien.
+- **Umsetzung (Aufgabe 17.3, 23.11.2026):** `@req-20.11` verknüpft die Cucumber-Nachweise für Mandantentrennung, `PERSONAL` und
+  A16. Der Markierungsfall prüft, dass der einzelne `WISSEN_INGEST`-Auftrag dem Mandanten der Quelle zugeordnet ist und die Quelle
+  für den zweiten Mandanten nicht in der Liste erscheint. Die Oberfläche bleibt durch `@req-20.10` im Browser belegt; Migration
+  eines Altbestands mit `WISSENSQUELLE` prüft `WissensquelleBestandTest`, der unveränderte Jahresexport ist in
+  `wissensquelle.feature` belegt.
 - **Bedrohungsmodell:** Markieren löst KI-Kosten aus (Tokenbudget, Requirement 12 bleibt: höchstens ein Ingest je Mandant); nur A16;
   Protokoll ohne Titel; kein Weg, die Vertraulichkeit einer Quelle zu umgehen (`PERSONAL` und höhere Stufen nach 5.5 und 5.11).
 - **Exporte:** Die Markierung hat keine Wirkung auf den Jahresexport (Requirement 20.6). Im OKF-Export kennzeichnet

@@ -41,7 +41,11 @@ class AbgleichPruefungTest {
                         new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, VIER),
                         new Abweichung(Verwaltungsabweichung.VORGANG_OFFEN, DREI));
         assertThat(AbgleichPruefung.vergleichen(VHF, false, realm,
-                Set.of(Rolle.INHABER), Set.of(ZWEI), Set.of(ZWEI), Set.of())).isEmpty();
+                Set.of(Rolle.INHABER), Set.of(ZWEI), Set.of(ZWEI), Set.of()))
+                .containsExactlyInAnyOrder(new Abweichung(Verwaltungsabweichung.KEIN_MANDANT, DREI),
+                        new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, DREI),
+                        new Abweichung(Verwaltungsabweichung.MEHRERE_MANDANTEN, VIER),
+                        new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, VIER));
     }
 
     @Test
@@ -55,7 +59,8 @@ class AbgleichPruefungTest {
                 Set.of(Rolle.MITARBEITER), Set.of(EINS, ZWEI, DREI, VIER), Set.of(), Set.of()))
                 .containsExactlyInAnyOrder(new Abweichung(Verwaltungsabweichung.BENUTZER_FEHLT, EINS),
                         new Abweichung(Verwaltungsabweichung.BENUTZER_FEHLT, ZWEI),
-                        new Abweichung(Verwaltungsabweichung.BENUTZER_FEHLT, VIER));
+                        new Abweichung(Verwaltungsabweichung.BENUTZER_FEHLT, VIER),
+                        new Abweichung(Verwaltungsabweichung.MEHRERE_MANDANTEN, ZWEI));
     }
 
     @Test

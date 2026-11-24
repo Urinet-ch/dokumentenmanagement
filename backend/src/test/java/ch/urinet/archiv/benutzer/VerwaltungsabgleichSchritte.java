@@ -58,6 +58,7 @@ public class VerwaltungsabgleichSchritte {
     private UUID ohneMandant;
     private UUID mehrereMandanten;
     private UUID mehrereRollen;
+    private UUID fremdeRolle;
 
     @Before("@verwaltung-abgleich")
     public void vorbereiten() throws Exception {
@@ -101,6 +102,18 @@ public class VerwaltungsabgleichSchritte {
                 new RealmBenutzer(ohneMandant, List.of(), Set.of(Rolle.MITARBEITER)),
                 new RealmBenutzer(mehrereMandanten, List.of(URINET.wert(), VHF.wert()), Set.of(Rolle.MITARBEITER)),
                 new RealmBenutzer(mehrereRollen, List.of(URINET.wert()), Set.of(Rolle.MITARBEITER, Rolle.TREUHAENDER))));
+    }
+
+    @Angenommen("ein synthetischer Realm-Benutzer hat eine unbekannte Realm-Rolle")
+    public void unbekannteRealmRolle() {
+        fremdeRolle = UUID.randomUUID();
+        realmEinrichten(List.of(new RealmBenutzer(fremdeRolle, List.of(URINET.wert()), Set.of(),
+                Set.of("fremde-rolle"))));
+    }
+
+    @Dann("meldet der Abgleich die fremde Rolle")
+    public void fremdeRolleGemeldet() throws Exception {
+        pruefen(URINET, fremdeRolle, "FREMDE_ROLLE");
     }
 
     private void realmEinrichten(List<RealmBenutzer> realm) {
@@ -161,13 +174,17 @@ public class VerwaltungsabgleichSchritte {
         pruefen(URINET, mehrereMandanten, "MEHRERE_MANDANTEN");
         pruefen(URINET, mehrereRollen, "MEHRERE_ROLLEN");
         assertThat(quelle.offene(VHF)).extracting(Befund::gegenstand)
-                .doesNotContain(ohneMandant.toString(), mehrereMandanten.toString(), mehrereRollen.toString());
-        assertThat(zustellungen()).filteredOn(s -> s.contains(ohneMandant.toString())
-                        || s.contains(mehrereMandanten.toString()) || s.contains(mehrereRollen.toString()))
+                .doesNotContain(mehrereRollen.toString());
+        assertThat(zustellungen()).filteredOn(s -> (s.startsWith(URINET.wert() + "/")
+                        || s.startsWith(VHF.wert() + "/"))
+                        && (s.contains(ohneMandant.toString())
+                        || s.contains(mehrereMandanten.toString()) || s.contains(mehrereRollen.toString())))
                 .containsExactlyInAnyOrder(
                         URINET.wert() + "/abgleich:" + ohneMandant + ":KEIN_MANDANT",
                         URINET.wert() + "/abgleich:" + mehrereMandanten + ":MEHRERE_MANDANTEN",
-                        URINET.wert() + "/abgleich:" + mehrereRollen + ":MEHRERE_ROLLEN");
+                        URINET.wert() + "/abgleich:" + mehrereRollen + ":MEHRERE_ROLLEN",
+                        VHF.wert() + "/abgleich:" + ohneMandant + ":KEIN_MANDANT",
+                        VHF.wert() + "/abgleich:" + mehrereMandanten + ":MEHRERE_MANDANTEN");
     }
 
     private List<String> zustellungen() {

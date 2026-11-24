@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "datum",
+    "modus",
     "sterne",
     "grund",
     "freitext",
@@ -23,6 +24,10 @@
     "datum": {
       "type": "string",
       "format": "date"
+    },
+    "modus": {
+      "type": "string",
+      "enum": ["ARCHIV", "WISSEN"]
     },
     "sterne": {
       "type": "integer",
