@@ -139,6 +139,26 @@ describe('AnmeldungService (Req 2.1)', () => {
     expect(JSON.parse(speicher.getItem('archiv.anmeldung.vorgang')!).ziel).toBe('/verwaltung/einstellungen');
   });
 
+  it('gibt die Fortsetzung nur nach erfolgreichem zugehörigem Step-up-Rückruf einmal frei', async () => {
+    await dienst.anmelden('/verwaltung/einstellungen', true, 'fortsetzung');
+    expect(dienst.fortsetzungEntnehmen()).toBeNull();
+    const adresse = new URL(weiterleitung.mock.lastCall![0]);
+    const rueckruf = dienst.rueckrufVerarbeiten(
+      new URLSearchParams({ code: 'code-1', state: adresse.searchParams.get('state')! }),
+    );
+    http.expectOne(TOKEN_URL).flush({ access_token: accessToken, id_token: idToken(adresse), expires_in: 300 });
+    await rueckruf;
+    expect(dienst.fortsetzungEntnehmen()).toBe('fortsetzung');
+    expect(dienst.fortsetzungEntnehmen()).toBeNull();
+  });
+
+  it('gibt eine Fortsetzung bei ungültigem Rückruf nicht frei', async () => {
+    await dienst.anmelden('/verwaltung/einstellungen', true, 'fortsetzung');
+    await expect(dienst.rueckrufVerarbeiten(new URLSearchParams({ code: 'c', state: 'fremd' })))
+      .rejects.toThrow(AnmeldungFehler);
+    expect(dienst.fortsetzungEntnehmen()).toBeNull();
+  });
+
   it('tauscht den Code mit dem Verifier und hält die Tokens nur im Speicher', async () => {
     const adresse = await anmeldungStarten();
     const vorgang = JSON.parse(speicher.getItem('archiv.anmeldung.vorgang')!);

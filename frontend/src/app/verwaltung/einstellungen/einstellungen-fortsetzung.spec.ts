@@ -11,7 +11,7 @@ describe('Einmalige Fortsetzung nach Step-up', () => {
     removeItem: (name: string) => werte.delete(name),
   };
   const fortsetzung: EinstellungsFortsetzung = {
-    benutzer: 'test-id', mandant: 'test-mandant', etag: '"3"',
+    id: 'vorgang', benutzer: 'test-id', mandant: 'test-mandant', etag: '"3"',
     eingaben: { 'chat.aufbewahrungMonate': '6' },
     bestaetigt: ['chat.aufbewahrungMonate'], erstellt: 1000,
   };
@@ -24,8 +24,8 @@ describe('Einmalige Fortsetzung nach Step-up', () => {
 
   it('gibt eine bestätigte Änderung nur einmal an denselben Benutzer und Mandanten zurück', () => {
     dienst.merken(fortsetzung);
-    expect(dienst.entnehmen('test-id', 'test-mandant', 2000)).toEqual(fortsetzung);
-    expect(dienst.entnehmen('test-id', 'test-mandant', 2000)).toBeNull();
+    expect(dienst.entnehmen('vorgang', 'test-id', 'test-mandant', 2000)).toEqual(fortsetzung);
+    expect(dienst.entnehmen('vorgang', 'test-id', 'test-mandant', 2000)).toBeNull();
   });
 
   it('verwirft abgelaufene oder fremde Änderungen ohne Wiederholung', () => {
@@ -33,9 +33,14 @@ describe('Einmalige Fortsetzung nach Step-up', () => {
       ['fremd', 'test-mandant', 2000], ['test-id', 'fremd', 2000], ['test-id', 'test-mandant', 602000],
     ] as const) {
       dienst.merken(fortsetzung);
-      expect(() => dienst.entnehmen(benutzer, mandant, zeit)).toThrow(EinstellungsFortsetzungFehler);
-      expect(dienst.entnehmen('test-id', 'test-mandant', 2000)).toBeNull();
+      expect(() => dienst.entnehmen('vorgang', benutzer, mandant, zeit)).toThrow(EinstellungsFortsetzungFehler);
+      expect(dienst.entnehmen('vorgang', 'test-id', 'test-mandant', 2000)).toBeNull();
     }
+  });
+
+  it('verwirft eine Fortsetzung für einen anderen Anmeldevorgang', () => {
+    dienst.merken(fortsetzung);
+    expect(() => dienst.entnehmen('fremd', 'test-id', 'test-mandant', 2000)).toThrow(EinstellungsFortsetzungFehler);
   });
 
   it('speichert keine fremden Bestätigungsschlüssel oder übergrossen Eingaben', () => {

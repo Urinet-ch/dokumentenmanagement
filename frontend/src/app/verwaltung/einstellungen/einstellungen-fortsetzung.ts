@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { FENSTER } from '../../gemeinsam/anmeldung/anmeldung.service';
 
 export interface EinstellungsFortsetzung {
+  id: string;
   benutzer: string;
   mandant: string;
   etag: string;
@@ -21,7 +22,8 @@ function objekt(wert: unknown): wert is Record<string, unknown> {
 }
 
 function gueltig(wert: unknown): wert is EinstellungsFortsetzung {
-  if (!objekt(wert) || typeof wert['benutzer'] !== 'string' || !wert['benutzer']
+  if (!objekt(wert) || typeof wert['id'] !== 'string' || !wert['id']
+      || typeof wert['benutzer'] !== 'string' || !wert['benutzer']
       || typeof wert['mandant'] !== 'string' || !wert['mandant']
       || typeof wert['etag'] !== 'string' || !/^"[1-9]\d*"$/.test(wert['etag'])
       || typeof wert['erstellt'] !== 'number' || !Number.isFinite(wert['erstellt'])
@@ -49,7 +51,7 @@ export class EinstellungenFortsetzen {
     this.speicher.setItem(SCHLUESSEL, text);
   }
 
-  entnehmen(benutzer: string, mandant: string, jetzt = Date.now()): EinstellungsFortsetzung | null {
+  entnehmen(id: string, benutzer: string, mandant: string, jetzt = Date.now()): EinstellungsFortsetzung | null {
     const text = this.speicher.getItem(SCHLUESSEL);
     this.speicher.removeItem(SCHLUESSEL);
     if (text === null) {
@@ -67,7 +69,7 @@ export class EinstellungenFortsetzen {
       }
       throw new EinstellungsFortsetzungFehler('Änderung ungültig');
     }
-    if (!gueltig(gelesen) || gelesen.benutzer !== benutzer || gelesen.mandant !== mandant
+    if (!gueltig(gelesen) || gelesen.id !== id || gelesen.benutzer !== benutzer || gelesen.mandant !== mandant
         || gelesen.erstellt > jetzt || jetzt - gelesen.erstellt > MAX_ALTER_MS) {
       throw new EinstellungsFortsetzungFehler('Änderung abgelaufen oder Sitzung gewechselt');
     }

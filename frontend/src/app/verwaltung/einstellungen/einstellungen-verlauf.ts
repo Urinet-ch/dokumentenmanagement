@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { Router } from '@angular/router';
@@ -53,6 +53,9 @@ function istVersion(wert: unknown): wert is Version {
             </select>
             <button mat-stroked-button type="button" [disabled]="vergleicht()"
                     (click)="vergleichen(alt.value, neu.value)">{{ texte.vergleichen }}</button>
+            <button mat-stroked-button type="button" (click)="versionVormerken(alt.value)">
+              {{ texte.versionVormerken }}
+            </button>
           </div>
           @if (vergleicht()) {
             <p role="status">{{ texte.vergleichLaeuft }}</p>
@@ -90,6 +93,7 @@ function istVersion(wert: unknown): wert is Version {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EinstellungenVerlauf implements OnInit {
+  readonly wiederherstellen = output<number>();
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly zerstoert = inject(DestroyRef);
@@ -158,6 +162,15 @@ export class EinstellungenVerlauf implements OnInit {
         this.fehlerBehandeln(fehler);
       },
     });
+  }
+
+  protected versionVormerken(wert: string): void {
+    const nummer = Number(wert);
+    if (!this.versionen()?.some((version) => version.version === nummer)) {
+      this.fehler.set(this.texte.vergleichFehler);
+      return;
+    }
+    this.wiederherstellen.emit(nummer);
   }
 
   private fehlerBehandeln(fehler: unknown): void {

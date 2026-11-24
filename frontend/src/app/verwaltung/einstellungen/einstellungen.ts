@@ -6,6 +6,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { Auswirkung, EinstellungskatalogEintrag, EinstellungenErgebnis, EinstellungenService, EinstellungenVorschau } from '../../gemeinsam/api';
 import { AnmeldungService } from '../../gemeinsam/anmeldung/anmeldung.service';
+import { zufall } from '../../gemeinsam/anmeldung/pkce';
 import { httpFehlerMeldung } from '../../gemeinsam/http-fehler';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { EinstellungenVerlauf } from './einstellungen-verlauf';
@@ -16,6 +17,44 @@ import { EinstellungenFortsetzen, EinstellungsFortsetzungFehler } from './einste
 interface Einstellungsgruppe {
   code: string;
   eintraege: EinstellungskatalogEintrag[];
+}
+
+function eingabenAusVersion(antwort: unknown, katalog: readonly EinstellungskatalogEintrag[]): Record<string, string | null> {
+  if (!antwort || typeof antwort !== 'object' || !('inhalt' in antwort)
+      || !antwort.inhalt || typeof antwort.inhalt !== 'object' || Array.isArray(antwort.inhalt)
+      || katalog.length === 0) {
+    throw new EinstellungenEingabeFehler('');
+  }
+  const einstellungen = 'einstellungen' in antwort.inhalt ? antwort.inhalt.einstellungen : null;
+  if (einstellungen != null && (typeof einstellungen !== 'object' || Array.isArray(einstellungen))) {
+    throw new EinstellungenEingabeFehler('');
+  }
+  const eingaben: Record<string, string | null> = {};
+  for (const eintrag of katalog) {
+    if (!eintrag.schluessel) {
+      throw new EinstellungenEingabeFehler('');
+    }
+    let wert: unknown = einstellungen;
+    for (const teil of eintrag.schluessel.split('.')) {
+      if (wert == null) {
+        break;
+      }
+      if (typeof wert !== 'object' || Array.isArray(wert)) {
+        throw new EinstellungenEingabeFehler(eintrag.schluessel);
+      }
+      wert = (wert as Record<string, unknown>)[teil];
+    }
+    if (wert == null) {
+      eingaben[eintrag.schluessel] = null;
+    } else if (typeof wert === 'string' || (typeof wert === 'number' && Number.isSafeInteger(wert))) {
+      eingaben[eintrag.schluessel] = String(wert);
+    } else if (Array.isArray(wert) && wert.every((element) => typeof element === 'string')) {
+      eingaben[eintrag.schluessel] = wert.join('\n');
+    } else {
+      throw new EinstellungenEingabeFehler(eintrag.schluessel);
+    }
+  }
+  return eingaben;
 }
 
 @Component({
@@ -48,6 +87,7 @@ export class EinstellungenSeite implements OnInit {
   protected readonly vorschauLaeuft = signal(false);
   protected readonly speichert = signal(false);
   protected readonly gespeichert = signal(false);
+  protected readonly versionVorgemerkt = signal(false);
   protected readonly wochentage = Object.entries(TEXTE.einstellungen.tage);
 
   ngOnInit(): void {
@@ -115,6 +155,7 @@ export class EinstellungenSeite implements OnInit {
     }
     this.aenderungsnummer++;
     this.gespeichert.set(false);
+    this.versionVorgemerkt.set(false);
     this.eingaben.update((bisher) => ({ ...bisher, [schluessel]: wert }));
     this.feldfehler.update((bisher) => {
       const neu = { ...bisher };
@@ -124,19 +165,58 @@ export class EinstellungenSeite implements OnInit {
     this.vorschau.set(null);
   }
 
+  protected gruppeZuruecksetzen(gruppe: Einstellungsgruppe): void {
+    for (const eintrag of gruppe.eintraege) {
+      this.setzen(eintrag, null);
+    }
+  }
+
+  protected versionVormerken(version: number): void {
+    const nummer = ++this.aenderungsnummer;
+    this.http.get<unknown>(`/api/v1/konfiguration/versionen/${version}`)
+      .pipe(takeUntilDestroyed(this.zerstoert)).subscribe({
+        next: (antwort) => {
+          if (nummer !== this.aenderungsnummer) {
+            return;
+          }
+          try {
+            const eingaben = eingabenAusVersion(antwort, this.gruppen()?.flatMap((gruppe) => gruppe.eintraege) ?? []);
+            this.aenderungsnummer++;
+            this.eingaben.set(eingaben);
+            this.vorschau.set(null);
+            this.feldfehler.set({});
+            this.fehler.set(null);
+            this.gespeichert.set(false);
+            this.versionVorgemerkt.set(true);
+          } catch (fehler: unknown) {
+            if (!(fehler instanceof EinstellungenEingabeFehler)) {
+              throw fehler;
+            }
+            this.fehler.set(this.texte.vergleichFehler);
+          }
+        },
+        error: (fehler: unknown) => {
+          if (nummer === this.aenderungsnummer) {
+            this.fehler.set(httpFehlerMeldung(fehler));
+          }
+        },
+      });
+  }
+
   protected speichern(): void {
     const auswirkungen = this.vorschau();
     const etag = this.etag;
     if (!auswirkungen || !etag || this.speichert()) {
       return;
     }
+
     const eingaben = { ...this.eingaben() };
     const schluessel = this.auswirkungsSchluessel(auswirkungen, eingaben);
     if (schluessel === null) {
       this.fehler.set(this.texte.ungueltig);
       return;
     }
-    if (auswirkungen.length > 0 || Object.values(eingaben).some((wert) => wert === null)) {
+    if (this.versionVorgemerkt() || auswirkungen.length > 0 || Object.values(eingaben).some((wert) => wert === null)) {
       this.bestaetigen(etag, eingaben, schluessel, auswirkungen, false);
     } else {
       this.schreiben(etag, eingaben, schluessel, false);
@@ -185,6 +265,7 @@ export class EinstellungenSeite implements OnInit {
         }
         this.eingaben.set({});
         this.feldfehler.set({});
+        this.versionVorgemerkt.set(false);
         this.gespeichert.set(true);
         this.laden();
       },
@@ -237,8 +318,9 @@ export class EinstellungenSeite implements OnInit {
       this.fehler.set(this.texte.erneuteAnmeldungFehler);
       return;
     }
+    const id = zufall();
     try {
-      this.fortsetzung.merken({ benutzer: benutzer.id, mandant: benutzer.mandant, etag, eingaben,
+      this.fortsetzung.merken({ id, benutzer: benutzer.id, mandant: benutzer.mandant, etag, eingaben,
         bestaetigt, erstellt: Date.now() });
     } catch (fehler: unknown) {
       if (!(fehler instanceof Error)) {
@@ -248,7 +330,7 @@ export class EinstellungenSeite implements OnInit {
       return;
     }
     this.speichert.set(true);
-    void this.anmeldung.anmelden('/verwaltung/einstellungen', true).catch((fehler: unknown) => {
+    void this.anmeldung.anmelden('/verwaltung/einstellungen', true, id).catch((fehler: unknown) => {
       if (!(fehler instanceof Error)) {
         throw fehler;
       }
@@ -263,6 +345,10 @@ export class EinstellungenSeite implements OnInit {
       return;
     }
     this.fortsetzungGeprueft = true;
+    const id = this.anmeldung.fortsetzungEntnehmen();
+    if (!id) {
+      return;
+    }
     const benutzer = this.anmeldung.benutzer();
     if (!benutzer?.id || !benutzer.mandant) {
       this.fortsetzung.verwerfen();
@@ -270,7 +356,7 @@ export class EinstellungenSeite implements OnInit {
       return;
     }
     try {
-      const vorgang = this.fortsetzung.entnehmen(benutzer.id, benutzer.mandant);
+      const vorgang = this.fortsetzung.entnehmen(id, benutzer.id, benutzer.mandant);
       if (vorgang) {
         this.eingaben.set(vorgang.eingaben);
         this.schreiben(vorgang.etag, vorgang.eingaben, vorgang.bestaetigt, true);

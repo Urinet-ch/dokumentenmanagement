@@ -11,7 +11,8 @@ import { EinstellungenSeite } from './einstellungen';
 
 describe('Einstellungskatalog', () => {
   const service = { apiV1MandantEinstellungenGet: vi.fn() };
-  const anmeldung = { benutzer: () => ({ id: 'test-id', mandant: 'test-mandant' }), anmelden: vi.fn().mockResolvedValue(undefined) };
+  const anmeldung = { benutzer: () => ({ id: 'test-id', mandant: 'test-mandant' }),
+    anmelden: vi.fn().mockResolvedValue(undefined), fortsetzungEntnehmen: vi.fn().mockReturnValue(null) };
   const dialog = { open: vi.fn().mockReturnValue({ afterClosed: () => of(true) }) };
   const inhalt = new Map<string, string>();
   const speicher = {
@@ -24,6 +25,7 @@ describe('Einstellungskatalog', () => {
   beforeEach(() => {
     inhalt.clear();
     anmeldung.anmelden.mockClear();
+    anmeldung.fortsetzungEntnehmen.mockReset().mockReturnValue(null);
     dialog.open.mockClear();
   });
 
@@ -168,6 +170,56 @@ describe('Einstellungskatalog', () => {
     http.verify();
   });
 
+  it('merkt die ganze Gruppe als Standard vor und verlangt vor dem Speichern die Vorschau', () => {
+    service.apiV1MandantEinstellungenGet.mockReturnValue(of(antwort([
+      { gruppe: 'CHAT', schluessel: 'chat.aufbewahrungMonate', name: 'Chat', typ: 'GANZZAHL', aktuellerWert: 12 },
+    ])));
+    const fixture = starten();
+    const element = fixture.nativeElement as HTMLElement;
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/v1/konfiguration/versionen').flush([]);
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.einstellungen.gruppeAufStandard)!.click();
+    fixture.detectChanges();
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.einstellungen.vorschau)!.click();
+    const vorschau = http.expectOne('/api/v1/mandant/einstellungen/vorschau');
+    expect(vorschau.request.body).toEqual({ chat: { aufbewahrungMonate: null } });
+    vorschau.flush({ auswirkungen: [] });
+    fixture.detectChanges();
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.einstellungen.speichern)!.click();
+    expect(dialog.open).toHaveBeenCalledOnce();
+    http.expectOne((request) => request.method === 'PATCH').flush({ version: 4, geaendert: true });
+    http.verify();
+  });
+
+  it('übernimmt eine frühere Version nur als Entwurf für die Vorschau', () => {
+    service.apiV1MandantEinstellungenGet.mockReturnValue(of(antwort([
+      { gruppe: 'CHAT', schluessel: 'chat.aufbewahrungMonate', name: 'Chat', typ: 'GANZZAHL', aktuellerWert: 12 },
+      { gruppe: 'KENNUNGEN', schluessel: 'kennungen.ibans', name: 'IBANs', typ: 'IBANS', aktuellerWert: [] },
+    ])));
+    const fixture = starten();
+    const element = fixture.nativeElement as HTMLElement;
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/v1/konfiguration/versionen').flush([{ version: 2, zeit: '2026-11-23T12:00:00Z' }]);
+    fixture.detectChanges();
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.einstellungen.versionVormerken)!.click();
+    http.expectOne('/api/v1/konfiguration/versionen/2').flush({
+      inhalt: { einstellungen: { chat: { aufbewahrungMonate: 6 }, kennungen: { ibans: ['CH00'] } } },
+    });
+    fixture.detectChanges();
+    expect(element.textContent).toContain(TEXTE.einstellungen.versionVorgemerkt);
+    http.expectNone((request) => request.method === 'PATCH');
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.einstellungen.vorschau)!.click();
+    const vorschau = http.expectOne('/api/v1/mandant/einstellungen/vorschau');
+    expect(vorschau.request.body).toEqual({ chat: { aufbewahrungMonate: 6 }, kennungen: { ibans: ['CH00'] } });
+    vorschau.flush({ auswirkungen: [] });
+    http.verify();
+  });
+
   it('bestätigt eine riskante Änderung und wiederholt sie nach Step-up genau einmal', () => {
     service.apiV1MandantEinstellungenGet.mockReturnValue(of(antwort([
       { gruppe: 'CHAT', schluessel: 'chat.aufbewahrungMonate', name: 'Chat', typ: 'GANZZAHL', aktuellerWert: 12 },
@@ -192,11 +244,20 @@ describe('Einstellungskatalog', () => {
     const erste = http.expectOne((request) => request.method === 'PATCH');
     expect(erste.request.params.get('bestaetigt')).toBe('chat.aufbewahrungMonate');
     erste.flush({ fehlercode: 'STEP_UP_NOETIG' }, { status: 401, statusText: 'Unauthorized' });
-    expect(anmeldung.anmelden).toHaveBeenCalledWith('/verwaltung/einstellungen', true);
+    expect(anmeldung.anmelden).toHaveBeenCalledWith('/verwaltung/einstellungen', true, expect.any(String));
+    const id = anmeldung.anmelden.mock.calls[0][2];
     fixture.destroy();
 
+    const vorRueckruf = TestBed.createComponent(EinstellungenSeite);
+    vorRueckruf.detectChanges();
+    http.expectNone((request) => request.method === 'PATCH');
+    http.expectOne('/api/v1/konfiguration/versionen').flush([]);
+    vorRueckruf.destroy();
+
+    anmeldung.fortsetzungEntnehmen.mockReturnValueOnce(id);
     const erneut = TestBed.createComponent(EinstellungenSeite);
     erneut.detectChanges();
+    http.expectOne('/api/v1/konfiguration/versionen').flush([]);
     const wiederholung = http.expectOne((request) => request.method === 'PATCH');
     expect(wiederholung.request.body).toEqual({ chat: { aufbewahrungMonate: 6 } });
     expect(wiederholung.request.headers.get('If-Match')).toBe('"3"');

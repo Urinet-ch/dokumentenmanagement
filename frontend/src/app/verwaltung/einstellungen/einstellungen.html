@@ -8,6 +8,9 @@
 @if (gespeichert()) {
   <p class="hinweis ok" role="status">{{ texte.gespeichert }}</p>
 }
+@if (versionVorgemerkt()) {
+  <p class="hinweis info" role="status">{{ texte.versionVorgemerkt }}</p>
+}
 
 @if (fehler(); as meldung) {
   <div class="hinweis gefahr" role="alert">
@@ -21,6 +24,9 @@
   @for (gruppe of liste; track gruppe.code) {
     <section>
       <h2>{{ texte.gruppen[gruppe.code] ?? gruppe.code }}</h2>
+      <button mat-button type="button" [disabled]="speichert()" (click)="gruppeZuruecksetzen(gruppe)">
+        {{ texte.gruppeAufStandard }}
+      </button>
       <div class="karten">
         @for (eintrag of gruppe.eintraege; track eintrag.schluessel) {
           <article class="karte">
@@ -39,7 +45,7 @@
             @if (eintrag.hinweis) {
               <p class="hinweis">{{ eintrag.hinweis }}</p>
             }
-            <label [for]="'eingabe-' + eintrag.schluessel">{{ texte.eingabe }}</label>
+            <label [for]="'eingabe-' + eintrag.schluessel">{{ texte.eingabe }}: {{ eintrag.name }}</label>
             @if (eintrag.typ === 'IBANS') {
               <textarea #feld [id]="'eingabe-' + eintrag.schluessel" [value]="eingabe(eintrag)"
                         [disabled]="speichert()"
@@ -101,7 +107,7 @@
       <p role="status">{{ texte.speichernLaeuft }}</p>
     }
   }
-  <app-einstellungen-verlauf />
+  <app-einstellungen-verlauf (wiederherstellen)="versionVormerken($event)" />
 } @else {
   <p role="status">{{ texte.laden }}</p>
 }

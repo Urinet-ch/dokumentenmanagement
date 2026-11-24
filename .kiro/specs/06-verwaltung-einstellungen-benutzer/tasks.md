@@ -182,11 +182,13 @@ auf Server oder Secrets aus der Sitzung.
   - Nachweis: `KonfigurationMigrationTest` (zwei Mandanten und Rollback), `ChatAufbewahrungMandantTest`,
     `MandantEinstellungenResourceTest` und Cucumber-Szenario zum öffentlichen Branding (`@req-1.4`, `@req-2.12`).
 
-- [ ] 20.5 Oberfläche Einstellungen [Frontend]
+- [x] 20.5 Oberfläche Einstellungen [Frontend]
   - Seite `/verwaltung/einstellungen`: Gruppen, Grenzen, Standard, Vorschau, Dialog bei riskanten Werten, Verlauf mit Vergleich,
     Fehlermatrix, 375 px, WCAG 2.1 AA, Texte in `texte.de-CH.ts`.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.4, 8.5, 8.7_
   - _Abhängig von: 20.2_
+  - Nachweis: `einstellungen-pwa.feature` (Vorschau, Bestätigung, Step-up und axe bei 375/1280 px hell/dunkel)
+    sowie Angular-Tests für Rücksetzung, Versionen, Fehler und OIDC-Fortsetzung. Der manuelle Handy-Nachweis bleibt 21.6.
 
 - [ ] 20.6 Oberfläche Benutzer lesen [Frontend]
   - Seiten `/verwaltung/benutzer` und `/verwaltung/benutzer/:id`: Liste, Karten, Status, Rechte-Übersicht, Anträge, Hinweis auf API-Tokens;

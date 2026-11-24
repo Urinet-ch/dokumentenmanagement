@@ -155,6 +155,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.wissen.entwuerfe.titel,
         TEXTE.menue.importe,
         TEXTE.menue.export,
+        TEXTE.menue.einstellungen,
         TEXTE.menue.benutzer,
         TEXTE.menue.dokumentarten,
         TEXTE.menue.protokoll,
