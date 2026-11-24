@@ -61,8 +61,78 @@ class VerwaltungVorgangTest {
     @Inject AgroalDataSource datenquelle;
     @Inject ZugriffProtokoll protokoll;
     @Inject InhaberEinladenKommando inhaberEinladen;
+    @Inject ch.urinet.archiv.benutzer.adapter.in.kommando.BestehendenInhaberKommando bestehendenInhaber;
+    @Inject ch.urinet.archiv.benutzer.application.AbgleichStand abgleichStand;
     @Inject IdentitaetsDienst identitaet;
     @Inject MandantRegister register;
+
+    @Test
+    void betreibervorgangDokumentiertBestehendenInhaberEinmaligOhneKeycloakZuAendern() throws Exception {
+        adminrollenMandantVorbereiten();
+        IdentitaetsDienst original = ClientProxy.unwrap(identitaet);
+        var stub = new IdentitaetsDienstStub();
+        QuarkusMock.installMockForType(stub, IdentitaetsDienst.class);
+        try {
+            String ziel = stub.anlegen("probe-adminrollen",
+                    new IdentitaetsDienst.Neuanlage("inhaber-probe", "probe@example.invalid", "Test", "Person"),
+                    ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+            UUID betreiber = UUID.randomUUID();
+            var ausgabe = new ByteArrayOutputStream();
+            var fehler = new ByteArrayOutputStream();
+            var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+            var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8);
+            var aufruf = new ArrayList<>(List.of("inhaber-uebernehmen", "probe-adminrollen", "--benutzer", ziel,
+                    "--wer", betreiber.toString()));
+            try (var thread = Executors.newSingleThreadExecutor()) {
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(ausgabe.toString(StandardCharsets.UTF_8)).contains("GEPLANT");
+                assertThat(abgleichStand.lesen(new MandantCode("probe-adminrollen")).dokumentierteInhaber())
+                        .doesNotContain(UUID.fromString(ziel));
+                aufruf.add("--ausfuehren");
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(ausgabe.toString(StandardCharsets.UTF_8)).contains("DOKUMENTIERT", "BEREITS_DOKUMENTIERT");
+                assertThat(stub.benutzerLesen("probe-adminrollen", ziel).rollen())
+                        .containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+                assertThat(abgleichStand.lesen(new MandantCode("probe-adminrollen")).dokumentierteInhaber())
+                        .contains(UUID.fromString(ziel));
+                try (Connection verbindung = datenquelle.getConnection();
+                     PreparedStatement abfrage = verbindung.prepareStatement(
+                             "select details->>'phase', details->>'anlass', details::text from "
+                                     + "m_probe_adminrollen.zugriff_protokoll where aktion = 'ROLLE_ZUWEISEN' "
+                                     + "and details->>'ziel' = ? order by id")) {
+                    abfrage.setString(1, ziel);
+                    try (ResultSet zeilen = abfrage.executeQuery()) {
+                        assertThat(zeilen.next()).isTrue();
+                        assertThat(zeilen.getString(1)).isEqualTo("ANGEFRAGT");
+                        assertThat(zeilen.getString(2)).isEqualTo("UEBERNAHME");
+                        assertThat(zeilen.getString(3)).doesNotContain("probe@example.invalid", "inhaber-probe");
+                        assertThat(zeilen.next()).isTrue();
+                        assertThat(zeilen.getString(1)).isEqualTo("ABGESCHLOSSEN");
+                        assertThat(zeilen.getString(2)).isEqualTo("UEBERNAHME");
+                        assertThat(zeilen.next()).isFalse();
+                    }
+                }
+                aufruf.set(1, "vhf-gsk");
+                assertThat(in(thread, "vhf-gsk", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .isEqualTo(1);
+                String mitarbeiter = stub.anlegen("probe-adminrollen",
+                        new IdentitaetsDienst.Neuanlage("mitarbeiter-probe", "andere@example.invalid", "Test", "Person"),
+                        ch.urinet.archiv.sicherheit.domain.Rolle.MITARBEITER);
+                aufruf.set(1, "probe-adminrollen");
+                aufruf.set(3, mitarbeiter);
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .isEqualTo(1);
+                assertThat(stub.benutzerLesen("probe-adminrollen", mitarbeiter).rollen())
+                        .containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.MITARBEITER);
+            }
+        } finally {
+            QuarkusMock.installMockForType(original, IdentitaetsDienst.class);
+        }
+    }
 
     @Test
     void betreiberLaedtNurDenErstenInhaberEinUndProtokolliertDieAnlage() throws Exception {
