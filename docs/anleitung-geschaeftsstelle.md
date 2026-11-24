@@ -1,9 +1,10 @@
 # Anleitung für die Geschäftsstelle
 Die Bedienung des Archivs beschreibt die **Anleitung in der App**: Knopf «Hilfe» in der Kopfzeile oder Seite `/hilfe`
 (Spec 07). Sie zeigt nur die Bereiche Ihrer Rolle und ist auch ohne Netz lesbar. Diese Datei enthält nur, was nicht in die
-App gehört: Zugang und Kontaktstelle der Geschäftsstelle und, bis zum Entscheid zu Spec 07, Requirement 2.4, die Regeln
-für die Webseite von VHF/GSK (Zugriffsstufe, Veröffentlichen). Bedienung wird nur in der App gepflegt
-(Spec 07, Requirement 7.7).
+App gehört: Zugang und Kontaktstelle der Geschäftsstelle sowie die organisationsspezifischen Regeln für die Webseite
+von VHF/GSK (Zugriffsstufe, Veröffentlichen). Die Einführung und Anleitung in der App verwenden für alle Mandanten
+dieselben Texte; nur Name und Logo unterscheiden sich (Spec 07, Requirement 2.4, Entscheid Fabian vom 24.11.2026).
+Bedienung wird nur in der App gepflegt (Spec 07, Requirement 7.7).
 
 | Thema | In der App |
 | --- | --- |
@@ -42,9 +43,8 @@ Beim Bulletin sind die Fachgebiete «Bad», «Eis», «Technik», «Recht» und 
 **Verband wählen:** «Verband» ist eine Mehrfachauswahl mit den Kontrollkästchen «VHF» und «GSK». Setzen Sie ein Häkchen bei jedem Verband, zu dem das Dokument gehört; mindestens einer ist nötig (Hinweis unter dem Feld: «Mindestens einen Wert auswählen.»). Wählen Sie nicht auf Verdacht: Ist unklar, zu welchem Verband ein Dokument gehört, fragen Sie bei [Kontaktstelle Geschäftsstelle einsetzen] nach. Dasselbe Feld finden Sie bei «Metadaten bearbeiten»; dort wird ein Speichern ohne Verband ebenfalls abgelehnt.
 
 ## Zugriffsstufe und Webseite
-Gilt bis zum Entscheid zu Spec 07, Requirement 2.4 (Satz zur Webseite im Mandanten `vhf-gsk`). Die Texte der App sind für
-alle Mandanten gleich; einen eigenen Satz zur Webseite brächte nach 2.4 die Konfiguration des Mandanten, nicht die
-Anleitung der App.
+Diese organisationsspezifischen Hinweise erläutern den Ablauf für VHF/GSK. Ein zusätzlicher Satz zur Webseite wird in
+der Einführung und Anleitung der App nicht ergänzt (Spec 07, Requirement 2.4, Entscheid Fabian vom 24.11.2026).
 
 ### Zugriffsstufe beim Bestätigen
 Die «Zugriffsstufe» wählen Sie im Eingangskorb, bevor Sie «Bestätigen» wählen. «Veröffentlicht» steht dort nicht zur Wahl: Neue Dokumente sind nach dem Bestätigen immer unveröffentlicht und erhalten die Einstellung erst unter «Metadaten bearbeiten».
