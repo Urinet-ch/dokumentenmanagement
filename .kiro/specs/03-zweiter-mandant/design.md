@@ -410,6 +410,9 @@ Neu 13.11.2026 (Requirement 11; entschieden von Fabian am 13.11.2026, E-B).
     Aufgabe keine Änderung unter `.github/workflows/` nötig. Der Repo-Nachweis für die Versions- und Additivitätsregel
     besteht aus `PublicVertragTest`, `VertragPruefungTest`, dem Ruby-Vergleicher und dessen Selbsttest. Der Nachweis
     der Traefik-Drosselung und des Deploys bleibt ein manueller Betriebsnachweis.
+  - Umsetzung (Aufgabe 11.6, 24.11.2026): `PublicVertragTest` vergleicht bei direkt beschriebenen Antworten jetzt auch
+    Antwort-Header samt Pflichtstatus und Schema. Eine Gegenprobe belegt, dass eine abweichende Header-Beschreibung
+    den Kompatibilitätstest fehlschlagen lässt.
   - Vorschlag Traefik-Drosselung (17.11.2026, Aufgabe 11.6; wartet auf Prüfung von Fabian, nichts ausgerollt): Router
     `archiv-public` (`PathPrefix(/public/)` ohne die Suche) und `archiv-public-suche` (`Path(/public/v1/suche)`, auch
     mit Schrägstrich am Ende), Labels in `deploy/infomaniak/compose.yml`; der PWA-Router schliesst `/public/` aus.

@@ -9,6 +9,8 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.headers.Header;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
@@ -34,7 +36,8 @@ public class GegenprobeResource {
     @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.LESEN)
     @APIResponse(responseCode = "200", description = "Eintrag",
-            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = Eintrag.class)))
+            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = Eintrag.class)),
+            headers = @Header(name = "ETag", schema = @Schema(type = SchemaType.STRING)))
     @APIResponse(responseCode = "404", ref = "NichtGefunden")
     public Eintrag lesen(@PathParam("id") String id, @QueryParam("stufe") String stufe) {
         return new Eintrag(id, stufe);

@@ -118,6 +118,16 @@ class PublicVertragTest {
     }
 
     @Test
+    void gegenprobeAbweichenderAntwortHeaderIstRot() throws IOException {
+        String integer = ersetzen(gegenprobe,
+                "        ETag:\n          schema:\n            type: string",
+                "        ETag:\n          schema:\n            type: integer");
+        assertThat(PublicVertrag.unterschiede(code(GegenprobeResource.class, GegenprobeResource.Eintrag.class),
+                datei(integer))).containsExactly(
+                        "/public/v1/gegenprobe/{id}/get/antworten/200/headers/ETag/schema/type: Code string, Datei integer");
+    }
+
+    @Test
     void gegenprobeUngueltigeDateiHatBefunde() {
         assertThat(PublicVertrag.befunde(PublicVertrag.roh(ersetzen(vertrag, "openapi: 3.1.0", "openapi: 3.0.3")), 1))
                 .contains("openapi ist nicht 3.1.x");
