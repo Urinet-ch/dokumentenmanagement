@@ -536,11 +536,12 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - Nachweise: `hilfe-kontext.spec.ts` und `hilfe-offline.feature` (`@req-8.1` bis `@req-8.3`), jeweils mit echtem
   Service Worker und vorab geladener Anleitung; der angemeldete Offline-Test prüft alle sichtbaren Abschnittstexte.
 
+## Entscheid Fabian (24.11.2026) — Requirement 2.4
+- Einführung und Anleitung verwenden für alle Mandanten dieselben Texte; nur Name und Logo kommen aus dem Branding.
+  Es gibt keinen zusätzlichen Satz zu den auf der Webseite erscheinenden Dokumenten. Eine spätere Änderung braucht
+  einen neuen Entscheid und bleibt ausserhalb des Codes der Einführung.
+
 ## Open Points
-- [offen: Satz zur Webseite im Mandanten `vhf-gsk` (Requirement 2.4) – ob und wie Einführung und Anleitung erklären,
-  welche bestätigten Dokumente auf der WordPress-Seite erscheinen und ab wann (Spec 03); Wortlaut von Fabian mit der
-  Geschäftsstelle. Bis zum Entscheid sind die Texte für alle Mandanten gleich; ein Zusatz käme über die Konfiguration des
-  Mandanten (Spec 05), nie über eine Abfrage der Kennung im Code.]
 - Alle übrigen Punkte sind Vorschläge (Abschnitt «Entscheide») und gelten mit dem Merge dieses PR.
 
 ## Umsetzung (Aufgabe 23.3, 22.11.2026)

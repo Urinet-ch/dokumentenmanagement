@@ -32,6 +32,17 @@ Funktionalität: Einführung auf der Startseite
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
     Dann zeigt die Einführung den Namen «Musterarchiv» und das Logo aus dem Branding
 
+  @req-2.4
+  Szenariogrundriss: Die Einführungstexte bleiben bei unterschiedlichem Mandanten-Branding gleich
+    Dann bleiben die Einführungstexte für «<rolle>» bei den Brandings «UriNet» und «VHF/GSK» gleich
+
+    Beispiele:
+      | rolle            |
+      | inhaber          |
+      | mitarbeiter      |
+      | treuhaender      |
+      | geschaeftsstelle |
+
   @req-3.8
   Szenario: Die Einführung erzeugt keine zusätzlichen API-Anfragen
     Dann sendet die Startseite mit Einführung dieselben API-Anfragen wie ohne Einführung
