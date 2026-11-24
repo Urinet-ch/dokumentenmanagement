@@ -174,13 +174,15 @@ public class VerwaltungsabgleichSchritte {
         pruefen(URINET, mehrereMandanten, "MEHRERE_MANDANTEN");
         pruefen(URINET, mehrereRollen, "MEHRERE_ROLLEN");
         assertThat(quelle.offene(VHF)).extracting(Befund::gegenstand)
-                .doesNotContain(ohneMandant.toString(), mehrereMandanten.toString(), mehrereRollen.toString());
+                .doesNotContain(mehrereRollen.toString());
         assertThat(zustellungen()).filteredOn(s -> s.contains(ohneMandant.toString())
                         || s.contains(mehrereMandanten.toString()) || s.contains(mehrereRollen.toString()))
                 .containsExactlyInAnyOrder(
                         URINET.wert() + "/abgleich:" + ohneMandant + ":KEIN_MANDANT",
                         URINET.wert() + "/abgleich:" + mehrereMandanten + ":MEHRERE_MANDANTEN",
-                        URINET.wert() + "/abgleich:" + mehrereRollen + ":MEHRERE_ROLLEN");
+                        URINET.wert() + "/abgleich:" + mehrereRollen + ":MEHRERE_ROLLEN",
+                        VHF.wert() + "/abgleich:" + ohneMandant + ":KEIN_MANDANT",
+                        VHF.wert() + "/abgleich:" + mehrereMandanten + ":MEHRERE_MANDANTEN");
     }
 
     private List<String> zustellungen() {
