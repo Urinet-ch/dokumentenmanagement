@@ -69,6 +69,10 @@ export class BenutzerEinladen {
   private readonly api = inject(BenutzerverwaltungService);
   private readonly zerstoert = inject(DestroyRef);
   private readonly stepUp = inject(BenutzerFortsetzen);
+  private readonly stepUpFehlgeschlagen = (): void => {
+    this.laufend.set(false);
+    this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+  };
   private readonly formular = viewChild.required<ElementRef<HTMLFormElement>>('formular');
   protected readonly texte = TEXTE.benutzerEinladen;
   protected readonly textfelder = ['benutzername', 'email', 'vorname', 'nachname'] as const;
@@ -119,7 +123,7 @@ export class BenutzerEinladen {
         this.abgeschlossen.emit({ id: antwort.id, antrag: !!antwort.antragId });
       },
       error: (fehler: unknown) => {
-        if (istStepUp(fehler) && this.stepUp.starten({ aktion: 'einladen', ziel: '' })) return;
+        if (istStepUp(fehler) && this.stepUp.starten({ aktion: 'einladen', ziel: '' }, () => this.stepUpFehlgeschlagen())) return;
         this.laufend.set(false);
         if (istStepUp(fehler)) {
           this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);

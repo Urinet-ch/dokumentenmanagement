@@ -52,6 +52,16 @@ describe('Fortsetzung nach Step-up (Spec 06, Req 8.5)', () => {
     expect(daten.size).toBe(0);
   });
 
+  it('meldet einen asynchronen Fehler beim Start der Anmeldung zurück und verwirft die Fortsetzung', async () => {
+    anmelden.mockRejectedValue(new Error('Anmeldung nicht möglich'));
+    const beiFehler = vi.fn();
+    const fortsetzen = TestBed.inject(BenutzerFortsetzen);
+    expect(fortsetzen.starten({ aktion: 'sperren', ziel: 'ziel-1', grund: 'AUSTRITT' }, beiFehler)).toBe(true);
+    expect(daten.size).toBe(1);
+    await vi.waitFor(() => expect(beiFehler).toHaveBeenCalledTimes(1));
+    expect(daten.size).toBe(0);
+  });
+
   it('lehnt unzulässige Inhalte ab, statt sie zu speichern', () => {
     const fortsetzen = TestBed.inject(BenutzerFortsetzen);
     expect(fortsetzen.starten({ aktion: 'sperren', ziel: 'x@example.org' })).toBe(false);

@@ -115,10 +115,18 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.8, 3.9, 3.10, 3.13, 3.14, 3.15, 3.17, 3.18_
   - _Abhängig von: 19.7_
 
-- [ ] 19.9 Token-Widerruf [Backend]
+- [x] 19.9 Token-Widerruf [Backend]
   - Tabelle `token_widerruf`, `ZugangFilter` lehnt Tokens mit `iat` vor `ab` ab (Zwischenspeicher höchstens 5 s), Aufräumen im
     Worker, Setzen nach Sperren, Deaktivieren, Löschen, Zugang zurücksetzen, Google lösen und Rollenwechsel; Szenarien: Sperre
     wirkt nach höchstens 5 Sekunden; Rollenwechsel wirkt nach Erneuerung.
+  - Nachweis 24.11.2026: `@req-4.9` prüft ein vor der Sperre benutztes Token nach erfolgreicher Sperre und ein altes Token
+    nach Rollenwechsel; ein erneuertes Token trägt `treuhaender` und wird angenommen. `JdbcTokenWiderrufTest` prüft den Cacheablauf,
+    `VerwaltungCacheHttpTest` die Sperre auch bei unklarer Teilwirkung für Deaktivierung, Google-Lösen und Zugangsrücksetzung.
+    Löschung und Persistenz sind in den `@req-3.11`-Szenarien und `BenutzerVerwaltungSchritte` nachgewiesen.
+  - Eine frühere einzelne Beobachtung `200` statt `401` aus PR #502 blieb im ursprünglichen Szenario nicht reproduzierbar.
+    Beim ergänzten Sperrtest entstand zunächst ebenfalls `200`, weil dessen direkt angelegter Keycloak-Benutzer im Stub des
+    Anwendungsfalls fehlte und die Sperre mit 404 endete. Der Test verwendet nun denselben Keycloak-Adapter wie die API und
+    prüft zuerst die erfolgreiche Sperre; danach wird das alte Token mit 401 abgewiesen.
   - _Anforderungen: 4.9_
   - _Abhängig von: 19.8_
 
@@ -195,11 +203,13 @@ auf Server oder Secrets aus der Sitzung.
     Menüpunkte nach Recht, Seite «Nicht gefunden» ohne Recht.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.7_
   - _Abhängig von: 19.7, 19.11_
-  - Umsetzung und automatisierte Browser-Nachweise vorbereitet; der manuelle Nachweis zu 8.2 und 8.7 bleibt bei 21.6,
-    die zugehörigen Einstellungsseiten folgen in 20.5. Checkbox bis zum vollständigen Nachweis offen.
+  - Automatisierte Nachweise für Benutzerliste, Detail und Rechte-Übersicht liegen vor; die Einstellungsseiten sind mit
+    20.5 umgesetzt. Rest bei 21.6 [Fabian]: manueller Handy-Nachweis zu 8.2 und Beurteilung der Rechte-Übersicht zu 8.7.
+    Die Checkbox bleibt bis zu dieser Abnahme offen.
   - Nachweis Benutzerseite: `benutzer-lesen-pwa.feature` (`@req-8.1`, `@req-8.2`, `@req-8.3`, `@req-8.7`),
-    acht Szenarien einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505);
-    Angular-Tests für Fehler, Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514).
+    einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505); Angular-Tests für Fehler,
+    Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514). #531 ergänzt Browser-Nachweise für die
+    inzwischen eingebundenen Benutzeraktionen; die synthetischen REST-Antworten ersetzen keine manuelle Abnahme.
 
 - [x] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
   - Einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, Rolle ändern, E-Mail ändern, löschen (mit

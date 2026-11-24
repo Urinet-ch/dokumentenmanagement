@@ -61,6 +61,10 @@ export class BenutzerProfil {
   private readonly api = inject(BenutzerverwaltungService);
   private readonly zerstoert = inject(DestroyRef);
   private readonly stepUp = inject(BenutzerFortsetzen);
+  private readonly stepUpFehlgeschlagen = (): void => {
+    this.laufend.set(false);
+    this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+  };
   private anfrage?: Subscription;
   private id = '';
   private basis: Werte = { email: '', vorname: '', nachname: '' };
@@ -145,7 +149,7 @@ export class BenutzerProfil {
           this.abgeschlossen.emit(id);
         },
         error: (fehler: unknown) => {
-          if (istStepUp(fehler) && this.stepUp.starten({ aktion: 'profil', ziel: id })) return;
+          if (istStepUp(fehler) && this.stepUp.starten({ aktion: 'profil', ziel: id }, () => this.stepUpFehlgeschlagen())) return;
           this.laufend.set(false);
           if (istStepUp(fehler)) {
             this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);

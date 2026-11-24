@@ -108,7 +108,8 @@ describe('Benutzerstatusaktionen', () => {
     fixture.componentInstance.abgeschlossen.subscribe(ergebnis);
     klicken(element, TEXTE.benutzerStatusdialog.aktionen.sperren.titel);
     geschlossen.next({ grund: 'AUSTRITT' });
-    expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith({ aktion: 'sperren', ziel: 'ziel', grund: 'AUSTRITT' });
+    expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith(
+      { aktion: 'sperren', ziel: 'ziel', grund: 'AUSTRITT' }, expect.any(Function));
     expect(ergebnis).not.toHaveBeenCalled();
   });
 
@@ -162,7 +163,7 @@ describe('Benutzerstatusaktionen', () => {
     klicken(element, TEXTE.benutzerStatusdialog.aktionen.zugangZuruecksetzen.titel);
     geschlossen.next({ passkeys: true });
     expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith(
-      { aktion: 'zugangZuruecksetzen', ziel: 'ziel', grund: undefined, passkeys: true });
+      { aktion: 'zugangZuruecksetzen', ziel: 'ziel', grund: undefined, passkeys: true }, expect.any(Function));
 
     api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost.mockClear();
     const fixture = TestBed.createComponent(BenutzerStatusaktionen);
