@@ -683,6 +683,15 @@ erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Sec
 `execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
 Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.
 
+### Nachtrag Umsetzung (Aufgabe 19.1, 24.11.2026)
+
+Die oben als offen beschriebenen technischen Spike-Nachweise sind inzwischen mit 19.2 und 19.10 erbracht.
+`RealmExportKeycloakTest.stepUpVerlangtFrischeAuthentifizierungUndPromptLoginErneuertAuthTime` prüft gegen den
+importierten Realm den Step-up-Endpunkt, den unzureichenden SSO-Cookie und die erneute Anmeldung mit Passwort und TOTP.
+`StepUpMitAuthTimeTest` prüft zusätzlich die Claim- und Zeitgrenzen; `benutzer-verwalten.feature` enthält Szenarien zu
+`@req-7.2`. Die konkrete interne Compose-Verbindung mit korrektem Issuer und die automatische Ablaufzeit der
+Secret-Überlappung sind nicht durch den synthetischen Test belegt und bleiben Betriebsnachweise in 19.3 [Fabian].
+
 ## Umsetzung 19.2 — Realm-Export und Tests
 
 Der Export enthält das Dienstkonto mit `kc-admin-api` und den drei vorgesehenen Rollen; der Test-Realm ergänzt SMTP
