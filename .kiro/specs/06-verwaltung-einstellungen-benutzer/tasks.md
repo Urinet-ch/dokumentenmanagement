@@ -203,11 +203,13 @@ auf Server oder Secrets aus der Sitzung.
     Menüpunkte nach Recht, Seite «Nicht gefunden» ohne Recht.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.7_
   - _Abhängig von: 19.7, 19.11_
-  - Umsetzung und automatisierte Browser-Nachweise vorbereitet; der manuelle Nachweis zu 8.2 und 8.7 bleibt bei 21.6,
-    die zugehörigen Einstellungsseiten folgen in 20.5. Checkbox bis zum vollständigen Nachweis offen.
+  - Automatisierte Nachweise für Benutzerliste, Detail und Rechte-Übersicht liegen vor; die Einstellungsseiten sind mit
+    20.5 umgesetzt. Rest bei 21.6 [Fabian]: manueller Handy-Nachweis zu 8.2 und Beurteilung der Rechte-Übersicht zu 8.7.
+    Die Checkbox bleibt bis zu dieser Abnahme offen.
   - Nachweis Benutzerseite: `benutzer-lesen-pwa.feature` (`@req-8.1`, `@req-8.2`, `@req-8.3`, `@req-8.7`),
-    acht Szenarien einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505);
-    Angular-Tests für Fehler, Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514).
+    einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505); Angular-Tests für Fehler,
+    Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514). #531 ergänzt Browser-Nachweise für die
+    inzwischen eingebundenen Benutzeraktionen; die synthetischen REST-Antworten ersetzen keine manuelle Abnahme.
 
 - [x] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
   - Einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, Rolle ändern, E-Mail ändern, löschen (mit
