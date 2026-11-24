@@ -5,7 +5,7 @@ import { AnmeldungService } from './anmeldung.service';
 
 /**
  * Bearer-Token nur an die eigene API (relative Pfade unter /api/), nie an fremde Adressen; ein bald ablaufendes Token
- * wird vorher erneuert; 401 beendet die Sitzung, ausser wenn eine erneute Authentisierung verlangt wird.
+ * wird vorher erneuert; 401 beendet die Sitzung, ausser wenn nur eine frische Anmeldung verlangt wird.
  */
 export const anmeldungInterceptor: HttpInterceptorFn = (anfrage, weiter) => {
   if (!anfrage.url.startsWith('/api/')) {

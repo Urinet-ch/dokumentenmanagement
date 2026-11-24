@@ -15,15 +15,14 @@ Funktionalität: Einstellungen über die REST-Schnittstelle verwalten
     Wenn «inhaber-vhf-gsk» den Einstellungskatalog liest
     Dann enthält der REST-Katalog den Branding-Standard des zweiten Mandanten
 
-  @req-2.1 @req-2.2 @req-2.11
-  Szenario: Bestehende Wissenswerte bleiben bis zur Überführung wirksam
+  @req-2.1 @req-2.2 @req-2.11 @req-2.13
+  Szenario: Beide Wissensschnittstellen verwenden dieselbe Konfigurationsversion
     Angenommen ein eigenes Wissensbudget ist über die bisherige Schnittstelle gesetzt
     Wenn «inhaber-urinet» den Einstellungskatalog liest
     Dann zeigt der Katalog das eigene Wissensbudget und den unveränderten Standard
     Wenn das Wissensbudget über die neue Schnittstelle geändert wird
-    Dann antwortet die Einstellungsverwaltung mit Status 422 und ETag des Ausgangsstands
-    Und nennt die Antwort die bisherige Schnittstelle für Wissenseinstellungen
-    Und sind Version und Änderungsprotokoll unverändert
+    Dann ist eine neue APP-Version mit Änderungsprotokoll entstanden
+    Und zeigt die bisherige Wissensschnittstelle den geänderten Wert
     Und ist der zweite Einstellungsstand unverändert
 
   @req-2.3 @req-2.6 @req-2.8 @req-2.14
@@ -127,3 +126,16 @@ Funktionalität: Einstellungen über die REST-Schnittstelle verwalten
     Wenn die ursprüngliche Einstellungsversion über REST wiederhergestellt wird
     Dann entsprechen die Einstellungen wieder dem Ausgangsstand
     Und ist der zweite Einstellungsstand unverändert
+
+  @req-1.4 @req-2.12 @20-4-verbraucher
+  Szenario: Öffentliches Branding folgt der Version und dem Standard
+    Angenommen das öffentliche Branding beider Mandanten ist gemerkt
+    Wenn «inhaber-urinet» den Einstellungskatalog liest
+    Dann nennt der Katalog die Wirkzeit für Branding und Aufbewahrung
+    Wenn die REST-Änderung des Archivnamens gespeichert wird
+    Dann zeigt das öffentliche Branding unmittelbar den neuen Namen
+    Und bleibt das öffentliche Branding des anderen Mandanten unverändert
+    Wenn die Gruppe Branding über REST zurückgesetzt wird
+    Dann zeigt das öffentliche Branding den bisherigen Standard
+    Wenn die ursprüngliche Einstellungsversion über REST wiederhergestellt wird
+    Dann entspricht das öffentliche Branding wieder dem Ausgangsstand

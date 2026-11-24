@@ -243,33 +243,26 @@ class OkfExportDatenTest {
                 provisionierung.anlegen(code.wert(), null, null);
             }
         }
-        String vorher = einstellungen(eigener);
         String fremdVorher = einstellungen(fremder);
         String token = Testanmeldung.token("inhaber-urinet");
         String url = "/api/v1/wissensbasis/einstellungen";
-        String urspruenglicheWerte = given().auth().oauth2(token).when().get(url).then()
-                .statusCode(200).extract().asString();
+        var vorher = given().auth().oauth2(token).when().get(url).then().statusCode(200).extract().response();
         try {
-            given().auth().oauth2(token).contentType("application/json")
-                    .body("{\"budgetTokens\":1234,\"lintBudgetTokens\":2345,\"monatsbudgetTokens\":3456}")
-                    .when().put(url).then().statusCode(200).body("budgetTokens", is(1234));
-            given().auth().oauth2(token).contentType("application/json")
-                    .body("{\"budgetTokens\":0,\"lintBudgetTokens\":2345,\"monatsbudgetTokens\":3456}")
+            String etag = given().auth().oauth2(token).header("If-Match", vorher.getHeader("ETag"))
+                    .contentType("application/json")
+                    .body("{\"budgetTokens\":123456,\"lintBudgetTokens\":234567,\"monatsbudgetTokens\":345678}")
+                    .when().put(url).then().statusCode(200).body("budgetTokens", is(123456))
+                    .extract().header("ETag");
+            given().auth().oauth2(token).header("If-Match", etag).contentType("application/json")
+                    .body("{\"budgetTokens\":0,\"lintBudgetTokens\":234567,\"monatsbudgetTokens\":345678}")
                     .when().put(url).then().statusCode(422);
             given().auth().oauth2(token).when().get(url).then().statusCode(200)
-                    .body("budgetTokens", is(1234)).body("monatsbudgetTokens", is(3456));
+                    .body("budgetTokens", is(123456)).body("monatsbudgetTokens", is(345678));
             assertThat(einstellungen(fremder)).isEqualTo(fremdVorher);
         } finally {
-            if (vorher == null) {
-                try (Connection c = datenbank.get().getConnection();
-                     PreparedStatement sql = c.prepareStatement("delete from " + eigener.schema()
-                             + ".wissens_einstellung where id = 1")) {
-                    sql.executeUpdate();
-                }
-            } else {
-                given().auth().oauth2(token).contentType("application/json").body(urspruenglicheWerte)
-                        .when().put(url).then().statusCode(200);
-            }
+            String etag = given().auth().oauth2(token).get(url).getHeader("ETag");
+            given().auth().oauth2(token).header("If-Match", etag).contentType("application/json")
+                    .body(vorher.asString()).when().put(url).then().statusCode(200);
         }
     }
 

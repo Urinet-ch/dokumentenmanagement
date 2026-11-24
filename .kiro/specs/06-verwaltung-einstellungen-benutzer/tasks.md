@@ -167,18 +167,20 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 1.8, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.14_
   - _Abhängig von: 20.1, 19.10_
 
-- [ ] 20.3 Einstellungen der Wissensbasis in die Mechanik [Backend]
+- [x] 20.3 Einstellungen der Wissensbasis in die Mechanik [Backend]
   - Nach dem Entscheid in 19.1: `/wissensbasis/einstellungen` (A19) über denselben Weg; falls die Tabelle `wissens_einstellung`
     schon Werte trägt, Migration mit Quelle `MIGRATION`; sonst Wegfall der Tabelle in einem späteren Changeset.
   - _Anforderungen: 2.13_
   - _Abhängig von: 20.2, Spec 04: 13.6_
 
-- [ ] 20.4 Dienste lesen die Werte der Konfiguration, Migration [Backend]
+- [x] 20.4 Dienste lesen die Werte der Konfiguration, Migration [Backend]
   - Branding, Aufbewahrung der Chat-Fragen (intern und öffentlich) und die Budgets lesen über `MandantEinstellungen`; die
     Eigenschaften bleiben Standard; Migration der heute wirksamen Werte (Version, Quelle `MIGRATION`); «wirksam ab» wie im
     Katalog.
   - _Anforderungen: 1.4, 1.5, 2.12_
   - _Abhängig von: 20.2_
+  - Nachweis: `KonfigurationMigrationTest` (zwei Mandanten und Rollback), `ChatAufbewahrungMandantTest`,
+    `MandantEinstellungenResourceTest` und Cucumber-Szenario zum öffentlichen Branding (`@req-1.4`, `@req-2.12`).
 
 - [ ] 20.5 Oberfläche Einstellungen [Frontend]
   - Seite `/verwaltung/einstellungen`: Gruppen, Grenzen, Standard, Vorschau, Dialog bei riskanten Werten, Verlauf mit Vergleich,

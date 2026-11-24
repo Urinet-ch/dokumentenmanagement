@@ -2,6 +2,7 @@ package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.ki.domain.chat.Aufgeraeumt;
 import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -21,13 +22,15 @@ public class ChatAufraeumen {
 
     private final MandantKontext kontext;
     private final ChatSpeicher speicher;
+    private final MandantEinstellungen einstellungen;
     private final Period aufbewahrung;
 
     @Inject
-    public ChatAufraeumen(MandantKontext kontext, ChatSpeicher speicher,
+    public ChatAufraeumen(MandantKontext kontext, ChatSpeicher speicher, MandantEinstellungen einstellungen,
                           @ConfigProperty(name = "archiv.chat.aufbewahrung") String aufbewahrung) {
         this.kontext = kontext;
         this.speicher = speicher;
+        this.einstellungen = einstellungen;
         this.aufbewahrung = Period.parse(aufbewahrung);
         if (this.aufbewahrung.isNegative() || this.aufbewahrung.isZero()) {
             throw new IllegalArgumentException("archiv.chat.aufbewahrung muss positiv sein");
@@ -40,7 +43,14 @@ public class ChatAufraeumen {
     }
 
     public Aufgeraeumt aufraeumen(MandantCode mandant, Instant jetzt) {
-        Instant grenze = grenze(jetzt);
-        return kontext.mit(mandant, () -> speicher.aufraeumen(grenze));
+        return kontext.mit(mandant, () -> {
+            Integer monate = einstellungen.aufbewahrung().chatMonate();
+            if (monate != null && (monate < 1 || monate > 60)) {
+                throw new IllegalStateException("Ungültige Chat-Aufbewahrung in der Mandantenkonfiguration");
+            }
+            Instant grenze = monate == null ? grenze(jetzt)
+                    : jetzt.atOffset(ZoneOffset.UTC).minusMonths(monate).toInstant();
+            return speicher.aufraeumen(grenze);
+        });
     }
 }

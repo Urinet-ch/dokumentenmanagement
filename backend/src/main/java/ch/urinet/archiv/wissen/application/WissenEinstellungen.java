@@ -1,54 +1,46 @@
 package ch.urinet.archiv.wissen.application;
 
-import ch.urinet.archiv.gemeinsam.domain.FachFehler;
-import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.BestaetigteEinstellungen;
+import ch.urinet.archiv.konfiguration.application.EinstellungenVerwaltung;
+import ch.urinet.archiv.konfiguration.application.WissenEinstellungenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.util.function.Supplier;
+
 @ApplicationScoped
 public class WissenEinstellungen {
     public record Werte(Integer budgetTokens, Integer lintBudgetTokens, String lintZeitplan, Integer monatsbudgetTokens) {
     }
 
-    private final WissenEinstellungenRepository repository;
     private final Berechtigung berechtigung;
-    private final WissenZeitplan zeitplan;
+    private final WissenEinstellungenVerwaltung verwaltung;
 
-    public WissenEinstellungen(WissenEinstellungenRepository repository, Berechtigung berechtigung,
-                               WissenZeitplan zeitplan) {
-        this.repository = repository;
+    public WissenEinstellungen(Berechtigung berechtigung, WissenEinstellungenVerwaltung verwaltung) {
         this.berechtigung = berechtigung;
-        this.zeitplan = zeitplan;
+        this.verwaltung = verwaltung;
     }
 
     @Transactional
-    public Werte lesen(Benutzer benutzer) {
+    public WissenEinstellungenVerwaltung.Stand lesen(Benutzer benutzer) {
         berechtigung.aktion(benutzer, Aktion.A19);
-        return repository.lesen();
+        return verwaltung.lesen();
     }
 
     @Transactional
-    public Werte speichern(Benutzer benutzer, Werte werte) {
+    public WissenEinstellungenVerwaltung.Stand lesen(Benutzer benutzer, int version) {
         berechtigung.aktion(benutzer, Aktion.A19);
-        pruefen(werte);
-        repository.speichern(werte);
-        return werte;
+        return verwaltung.lesen(version);
     }
 
-    void pruefen(Werte werte) {
-        if (werte == null || ungueltig(werte.budgetTokens()) || ungueltig(werte.lintBudgetTokens())
-                || ungueltig(werte.monatsbudgetTokens())) {
-            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
-        }
-        if (werte.lintZeitplan() != null && !zeitplan.gueltig(werte.lintZeitplan())) {
-            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
-        }
+    @Transactional
+    public EinstellungenVerwaltung.Ergebnis speichern(Benutzer benutzer, int version,
+            Supplier<WissenEinstellungenVerwaltung.Eingabe> werte, BestaetigteEinstellungen bestaetigt) {
+        berechtigung.aktion(benutzer, Aktion.A19);
+        return verwaltung.aendern(version, werte, bestaetigt, benutzer.id());
     }
 
-    private static boolean ungueltig(Integer wert) {
-        return wert != null && wert <= 0;
-    }
 }

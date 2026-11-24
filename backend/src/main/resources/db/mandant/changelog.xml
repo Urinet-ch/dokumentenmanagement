@@ -67,4 +67,6 @@
     <include file="changesets/084-wissensquelle-protokollaktionen.xml" relativeToChangelogFile="true"/>
     <include file="changesets/120-verwaltungsalarm-anspruch.xml" relativeToChangelogFile="true"/>
     <include file="changesets/130-chat-gespraech-modus.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/121-wissenseinstellungen-konfiguration.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/129-einstellungen-bestand.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

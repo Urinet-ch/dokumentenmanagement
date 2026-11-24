@@ -11,4 +11,9 @@ public interface BrandingVerzeichnis {
     Optional<Branding> fuerDomain(String domain);
 
     Optional<Branding> fuerMandant(MandantCode mandant);
+
+    /** Nur die vom Betreiber konfigurierte Domain-Zuordnung, nicht aus einem Token oder einer Eingabe übernommen. */
+    default Optional<MandantCode> mandantFuerDomain(String domain) {
+        return Optional.empty();
+    }
 }

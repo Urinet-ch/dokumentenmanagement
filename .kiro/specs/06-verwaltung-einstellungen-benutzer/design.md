@@ -804,6 +804,20 @@ Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übe
 Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
 Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
 
+## Umsetzung (Aufgabe 20.3, 23.11.2026)
+
+Die Wissenseinstellungen werden auch bei fehlender oder vollständig leerer Tabellenzeile als Konfigurationsversion
+mit Quelle `MIGRATION` übernommen; nicht gesetzte Werte bleiben geerbt. Die bisherige Tabelle
+bleibt als Spiegel für bestehende Verbraucher und den Rückweg erhalten. Der bisherige PUT verwendet die gemeinsame
+Version, Bestätigung und Step-up; ein unverändert zurückgesendeter effektiver Zeitplan bewahrt teilweise geerbte Werte.
+Ein teilweise eigener Zeitplan übernimmt fehlende Teile aus dem instanzweiten Zeitplan, soweit dieser darstellbar ist,
+sonst aus dem Katalogstandard. Der Katalog zeigt den effektiven Wert und weist auf den nicht darstellbaren Zeitplan hin.
+Die Wissensroute begrenzt den Empfang wie die übrigen Einstellungsrouten auch ohne Inhaltslänge.
+
+Entscheid Fabian vom 23.11.2026: Nicht darstellbare bestehende Werte werden auf den Katalogstandard gesetzt,
+ihre alten Werte in `wissens_einstellung_migration` gesichert und die ersetzten Pfade ohne Werte im Zugriffsprotokoll
+vermerkt; es gibt keinen Startabbruch.
+
 ## Umsetzung (Aufgabe 19.12, 23.11.2026)
 
 Die Löschvorschau zählt Protokolleinträge und unterschiedliche Dokumente mit Bezug zum Benutzer im eigenen Mandanten.
@@ -829,3 +843,16 @@ Ein paralleler JUnit-Test hält eine Rollenänderung an der externen Wirkung an:
 `STATUS_KONFLIKT`, danach verhindert `LETZTER_INHABER` die Entfernung des letzten aktiven Inhabers. Das bestehende
 Cucumber-Szenario prüft zusätzlich konkurrierende Aufrufe zweier Inhaber. `EskalationTest` deckt auch jede
 Selbstzuweisung ab; Rollen-, Rechtematrix-, Endpunkt- und Keycloak-Ausfalltests ergänzen die Nachweise.
+
+## Umsetzung (Aufgabe 20.4, 23.11.2026)
+
+Die beiden Aufräumdienste lesen die versionierte Aufbewahrung erst innerhalb des geprüften Mandantenkontexts.
+Das öffentliche Branding verwendet ausschliesslich die vom Betreiber konfigurierte Domain-Zuordnung und liest nur
+Name und Farbe des zugeordneten aktiven Mandanten; unbekannte Domains bleiben neutral. Änderungen sind unmittelbar
+sichtbar, Logo und Sprache bleiben Betreiberkonfiguration.
+
+Changeset 129 übernimmt für bestehende Mandanten die darstellbaren bisherigen Eigenschaftswerte in eine neue
+`MIGRATION`-Version und synchronisiert den Wissensspiegel. Bereits eigene Werte bleiben erhalten. Nicht als ganze
+Katalogmonate darstellbare Chatfristen bleiben geerbt und verwenden weiterhin die unveränderte ISO-Periode; so wird
+keine Frist erfunden oder verkürzt. Dasselbe gilt für nicht katalogkonforme Startwerte, die sich nicht in das Abbild
+übernehmen lassen. Der Rollback lässt Version und Protokoll stehen; die bisherigen Eigenschaften bleiben verfügbar.
