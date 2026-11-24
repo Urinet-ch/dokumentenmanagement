@@ -358,7 +358,11 @@ Then('zeigt die Benutzerliste «Passkey eingerichtet: Ja, 2 Passkeys» ohne Übe
 });
 
 When('ich die Benutzerliste nach «Mit Passkey» filtere', async function () {
-  await this.seite.locator('#benutzer-passkey-filter').selectOption({ label: 'Mit Passkey' });
+  // Auf die gefilterte Abfrage warten, statt auf «networkidle»: Der Filter löst die Abfrage erst nach dem Änderungsereignis aus.
+  await Promise.all([
+    this.seite.waitForRequest((anfrage) => new URL(anfrage.url()).searchParams.get('passkey') === 'ja'),
+    this.seite.locator('#benutzer-passkey-filter').selectOption({ label: 'Mit Passkey' }),
+  ]);
   await this.seite.waitForLoadState('networkidle');
 });
 
