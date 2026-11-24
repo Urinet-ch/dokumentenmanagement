@@ -191,3 +191,92 @@ Funktionalität: Benutzer und Rechte in der PWA lesen
       | breite | schema |
       | 375 | hell |
       | 1280 | dunkel |
+
+  @req-10.6
+  Szenariogrundriss: Liste und Detail zeigen Passkey eingerichtet mit Anzahl, ohne Gerätedaten, und filtern danach
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und der synthetische Benutzer hat 2 Passkeys
+    Und das Browserfenster ist <breite> Pixel breit
+    Und das Farbschema ist «<schema>»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Benutzer» wähle
+    Dann zeigt die Benutzerliste «Passkey eingerichtet: Ja, 2 Passkeys» ohne Überlauf und axe-Befund
+    Wenn ich die Benutzerliste nach «Mit Passkey» filtere
+    Dann wurde die Benutzerliste mit dem Filter «ja» abgefragt
+    Wenn ich den synthetischen Benutzer öffne
+    Dann zeigt das Benutzerdetail «Passkey eingerichtet» «Ja, 2 Passkeys» ohne Gerätedaten, Überlauf und axe-Befund
+
+    Beispiele:
+      | breite | schema |
+      | 375 | hell |
+      | 375 | dunkel |
+      | 1280 | hell |
+      | 1280 | dunkel |
+
+  @req-10.5
+  Szenariogrundriss: Beim Zugang zurücksetzen wählt der Inhaber die Option Passkeys löschen
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und der synthetische Benutzer hat 2 Passkeys
+    Und das Browserfenster ist <breite> Pixel breit
+    Und das Farbschema ist «<schema>»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Benutzer» wähle
+    Und ich den synthetischen Benutzer öffne
+    Und ich öffne den Dialog zum Zugang zurücksetzen
+    Dann zeigt der Dialog die Option Passkeys löschen mit der Zahl 2, nicht gewählt, ohne Überlauf und axe-Befund
+    Wenn ich die Option Passkeys wähle und bestätige
+    Dann wird der Zugang genau einmal mit der Option Passkeys zurückgesetzt
+
+    Beispiele:
+      | breite | schema |
+      | 375 | hell |
+      | 375 | dunkel |
+      | 1280 | hell |
+      | 1280 | dunkel |
+
+  @req-10.5
+  Szenario: Ohne gewählte Option wird der Zugang wie bisher ohne Passkeys zurückgesetzt
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und der synthetische Benutzer hat 2 Passkeys
+    Und das Browserfenster ist 375 Pixel breit
+    Und das Farbschema ist «hell»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Benutzer» wähle
+    Und ich den synthetischen Benutzer öffne
+    Und ich öffne den Dialog zum Zugang zurücksetzen
+    Und ich ohne die Option Passkeys bestätige
+    Dann wird der Zugang genau einmal ohne die Option Passkeys zurückgesetzt
+
+  @req-10.5
+  Szenariogrundriss: Das Zurücksetzen mit Passkeys wird nach frischer Anmeldung genau einmal ausgeführt
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und der synthetische Benutzer hat 2 Passkeys
+    Und die Benutzerverwaltung verlangt vor «zugang» ein Step-up
+    Und das Browserfenster ist <breite> Pixel breit
+    Und das Farbschema ist «<schema>»
+    Und Keycloak kennt mich als «inhaber» im Mandanten «urinet»
+    Wenn ich die Seite «/verwaltung/benutzer/probe» öffne
+    Und ich mich anmelde
+    Und ich öffne den Dialog zum Zugang zurücksetzen
+    Und ich die Option Passkeys wähle und bestätige
+    Dann wird der Zugang nach Step-up genau einmal mit der Option Passkeys zurückgesetzt
+    Und liegt nichts Persönliches im Browser-Speicher
+
+    Beispiele:
+      | breite | schema |
+      | 375 | hell |
+      | 1280 | dunkel |
+
+  @req-10.5
+  Szenario: Ein Fehler des Identitätsdienstes beim Zurücksetzen wird angezeigt und die Aktion bleibt wiederholbar
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und der synthetische Benutzer hat 2 Passkeys
+    Und die Benutzerverwaltung antwortet beim Zurücksetzen des Zugangs mit dem Fehler «IDENTITAETSDIENST_NICHT_ERREICHBAR»
+    Und das Browserfenster ist 375 Pixel breit
+    Und das Farbschema ist «dunkel»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Benutzer» wähle
+    Und ich den synthetischen Benutzer öffne
+    Und ich öffne den Dialog zum Zugang zurücksetzen
+    Und ich die Option Passkeys wähle und bestätige
+    Dann zeigt das Benutzerdetail die Fehlermeldung des Identitätsdienstes ohne Überlauf und axe-Befund

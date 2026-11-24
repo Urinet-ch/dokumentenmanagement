@@ -1,5 +1,6 @@
 package ch.urinet.archiv.benutzer.adapter.out.keycloak;
 
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.AnlageException;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Aenderung;
 import ch.urinet.archiv.benutzer.application.IdentitaetsDienst.KonfliktException;
@@ -839,6 +840,7 @@ class KeycloakAdminAdapterTest {
                 () -> adapter.aktivieren("urinet", "fremd-1", false),
                 () -> adapter.rolleSetzen("urinet", "fremd-1", Rolle.INHABER),
                 () -> adapter.otpEntfernen("urinet", "fremd-1"),
+                () -> adapter.passkeysEntfernen("urinet", "fremd-1"),
                 () -> adapter.googleLoesen("urinet", "fremd-1"),
                 () -> adapter.benutzerLesen("urinet", "fremd-1")}) {
             assertThatThrownBy(aufruf::run).isInstanceOfSatisfying(FachFehler.class,
@@ -995,6 +997,11 @@ class KeycloakAdminAdapterTest {
                 .willReturn(okJson("[{\"id\":\"otp-1\",\"type\":\"otp\"}]")));
         server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/credentials/otp-1"))
                 .willReturn(aResponse().withStatus(202)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials"))
+                .willReturn(okJson("[{\"id\":\"otp-1\",\"type\":\"otp\"},"
+                        + "{\"id\":\"pk-1\",\"type\":\"webauthn-passwordless\"}]")));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/credentials/pk-1"))
+                .willReturn(aResponse().withStatus(202)));
         KeycloakAdminAdapter adapter = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1));
 
         for (Runnable aktion : List.<Runnable>of(
@@ -1003,7 +1010,8 @@ class KeycloakAdminAdapterTest {
                 () -> adapter.sitzungenBeenden("urinet", "benutzer-1"),
                 () -> adapter.googleLoesen("urinet", "benutzer-1"),
                 () -> adapter.sperreAufheben("urinet", "benutzer-1"),
-                () -> adapter.otpEntfernen("urinet", "benutzer-1"))) {
+                () -> adapter.otpEntfernen("urinet", "benutzer-1"),
+                () -> adapter.passkeysEntfernen("urinet", "benutzer-1"))) {
             assertThatThrownBy(aktion::run).isInstanceOfSatisfying(FachFehler.class,
                     fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
         }
@@ -1150,6 +1158,130 @@ class KeycloakAdminAdapterTest {
         public Instant instant() {
             return jetzt;
         }
+    }
+
+    private static final String CREDENTIALS_GEMISCHT = """
+            [{"id":"pw-1","type":"password"},{"id":"otp-1","type":"otp"},
+             {"id":"pk-1","type":"webauthn-passwordless","userLabel":"Geraet A"},
+             {"id":"pk-2","type":"webauthn-passwordless","userLabel":"Geraet B"},
+             {"id":"wa-1","type":"webauthn"}]
+            """;
+
+    @Test
+    void benutzerLesenZaehltNurPasskeysDesTypsWebauthnPasswordless() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm")).willReturn(okJson("[]")));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials")).willReturn(okJson(CREDENTIALS_GEMISCHT)));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/federated-identity")).willReturn(okJson("[]")));
+
+        var benutzer = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).benutzerLesen("urinet", "benutzer-1");
+
+        assertThat(benutzer.passkeys()).isEqualTo(2);
+        assertThat(benutzer.totp()).isTrue();
+        assertThat(benutzer.toString()).doesNotContain("Geraet");
+        server.verify(1, getRequestedFor(urlPathEqualTo(USERS + "/benutzer-1/credentials")));
+    }
+
+    @Test
+    void benutzerLesenOhnePasskeyMeldetNull() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm")).willReturn(okJson("[]")));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials"))
+                .willReturn(okJson("[{\"id\":\"pw-1\",\"type\":\"password\"}]")));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/federated-identity")).willReturn(okJson("[]")));
+
+        var benutzer = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).benutzerLesen("urinet", "benutzer-1");
+
+        assertThat(benutzer.passkeys()).isZero();
+        assertThat(benutzer.totp()).isFalse();
+    }
+
+    @Test
+    void passkeysEntfernenLoeschtNurDenTypWebauthnPasswordlessUndMeldetDieZahl() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials")).willReturn(okJson(CREDENTIALS_GEMISCHT)));
+        server.stubFor(delete(urlPathMatching(USERS + "/benutzer-1/credentials/pk-[12]"))
+                .willReturn(aResponse().withStatus(204)));
+
+        int entfernt = adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).passkeysEntfernen("urinet", "benutzer-1");
+
+        assertThat(entfernt).isEqualTo(2);
+        server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/benutzer-1/credentials/pk-1")));
+        server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/benutzer-1/credentials/pk-2")));
+        // nie Passwort, TOTP oder anderes WebAuthn
+        server.verify(2, deleteRequestedFor(urlPathMatching(".*")));
+    }
+
+    @Test
+    void passkeysEntfernenOhnePasskeyLoeschtNichts() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials"))
+                .willReturn(okJson("[{\"id\":\"pw-1\",\"type\":\"password\"},{\"id\":\"otp-1\",\"type\":\"otp\"}]")));
+
+        assertThat(adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).passkeysEntfernen("urinet", "benutzer-1"))
+                .isZero();
+        server.verify(0, deleteRequestedFor(urlPathMatching(".*")));
+    }
+
+    @Test
+    void passkeysEntfernenMeldetFehlerDerAdminApiOhneKeycloakMeldung() {
+        for (int status : new int[] {400, 403, 404, 500, 503}) {
+            server.resetAll();
+            tokenAntwort();
+            benutzerStub("benutzer-1", "urinet");
+            server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials")).willReturn(okJson(CREDENTIALS_GEMISCHT)));
+            server.stubFor(delete(urlPathMatching(USERS + "/benutzer-1/credentials/pk-.*"))
+                    .willReturn(aResponse().withStatus(status).withBody("{\"errorMessage\":\"geheim-geraet\"}")));
+
+            assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                    .passkeysEntfernen("urinet", "benutzer-1"))
+                    .isInstanceOfSatisfying(FachFehler.class, fehler -> {
+                        assertThat(fehler.code()).isIn(Fehlercode.IDENTITAETSDIENST_FEHLER,
+                                Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR);
+                        assertThat(fehler.getMessage() == null ? "" : fehler.getMessage()).doesNotContain("geheim");
+                    });
+        }
+    }
+
+    @Test
+    void passkeysEntfernenMeldetKonfliktAlsKonfliktNichtAlsAusfall() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials")).willReturn(okJson(CREDENTIALS_GEMISCHT)));
+        server.stubFor(delete(urlPathMatching(USERS + "/benutzer-1/credentials/pk-.*"))
+                .willReturn(aResponse().withStatus(409)));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .passkeysEntfernen("urinet", "benutzer-1"))
+                .isInstanceOf(IdentitaetsDienst.KonfliktException.class);
+    }
+
+    @Test
+    void passkeysEntfernenBeiDienstausfallIstNichtErreichbar() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials")).willReturn(aResponse().withStatus(503)));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .passkeysEntfernen("urinet", "benutzer-1"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+    }
+
+    @Test
+    void passkeysEntfernenWeistUngueltigeCredentialListeZurueck() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials")).willReturn(okJson("{}")));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .passkeysEntfernen("urinet", "benutzer-1"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_FEHLER));
     }
 
     private void tokenAntwort() {

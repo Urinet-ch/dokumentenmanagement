@@ -165,3 +165,4 @@ export * from './wissensquelleneintrag';
 export * from './wissensseite';
 export * from './wissensversion';
 export * from './wissensversionen';
+export * from './zugang-optionen';

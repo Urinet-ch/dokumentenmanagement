@@ -56,6 +56,15 @@ public class BenutzerZugangZuruecksetzen {
     }
 
     public void ausfuehren(MandantCode mandant, Benutzer akteur, String id, Optional<IpAdresse> ip) {
+        ausfuehren(mandant, akteur, id, false, ip);
+    }
+
+    /**
+     * Setzt Passwort und TOTP zurück und lädt neu ein; mit {@code passkeys} zusätzlich alle Passkeys des Benutzers
+     * (Requirement 10.5). Dieselben Rechte, dasselbe Step-up, dieselben Grenzen und derselbe Vorgang wie ohne Option.
+     */
+    public void ausfuehren(MandantCode mandant, Benutzer akteur, String id, boolean passkeys,
+                           Optional<IpAdresse> ip) {
         berechtigung.aktion(akteur, Aktion.A22);
         stepUp.pruefen();
         UUID ziel;
@@ -69,7 +78,8 @@ public class BenutzerZugangZuruecksetzen {
         }
         UUID vorgangId = UUID.randomUUID();
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
-        vorgang.ausfuehren(mandant, eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
+        vorgang.ausfuehren(mandant,
+                eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ANGEFRAGT, null),
                 () -> {
                     var benutzer = identitaet.benutzerLesen(mandant.wert(), id);
                     if (benutzer.rollen().size() > 1) {
@@ -95,21 +105,23 @@ public class BenutzerZugangZuruecksetzen {
                     aktionen.addAll(AKTIONEN);
                     identitaet.aktionenHinzufuegen(mandant.wert(), id, AKTIONEN);
                     identitaet.otpEntfernen(mandant.wert(), id);
+                    int entfernt = passkeys ? identitaet.passkeysEntfernen(mandant.wert(), id) : -1;
                     identitaet.sitzungenBeenden(mandant.wert(), id);
                     identitaet.einladen(mandant.wert(), id, aktionen, gueltigkeit);
                     tokenWiderruf.setzen(id, Instant.now());
-                    return ziel;
+                    return entfernt;
                 }, fehler -> {
                     tokenWiderruf.setzen(id, Instant.now());
                     return VerwaltungVorgang.Kompensation.UNKLAR;
                 }, ignoriert -> { },
-                ignoriert -> eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
+                entfernt -> eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN,
+                        entfernt < 0 ? null : entfernt));
     }
 
     private static ZugriffEintrag eintrag(Benutzer akteur, Optional<IpAdresse> ip, UUID vorgangId, UUID ziel,
-                                          ProtokollDetails.Verwaltungsphase phase) {
+                                          ProtokollDetails.Verwaltungsphase phase, Integer passkeys) {
         var details = new ProtokollDetails.Verwaltung(vorgangId, phase, ziel,
-                ProtokollDetails.Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN, null, null, List.of());
+                ProtokollDetails.Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN, null, null, List.of(), null, null, passkeys);
         return new ZugriffEintrag(Optional.of(akteur.id()), Optional.of(akteur.rolle().name()),
                 ProtokollAktion.BENUTZER_AENDERN, Optional.empty(), ip, ProtokollDetails.verwaltung(details));
     }

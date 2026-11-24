@@ -30,6 +30,13 @@ eine ausdrückliche Bestätigung, die die Benutzerverwaltung nicht vorsieht, fü
 Auswirkung. Nach einer Änderung sehen Sie eine Bestätigung oder bei Vorgängen mit
 Vier-Augen-Freigabe einen offenen Antrag.
 
+Auf der Benutzerseite und in der Liste sehen Sie, ob ein Benutzer einen Passkey eingerichtet hat, und wie viele; Gerätenamen oder
+andere Gerätedaten sehen Sie nicht. In der Liste filtern Sie nach «Mit Passkey» und «Ohne Passkey». Beim «Zugang zurücksetzen»
+erscheint bei einem Benutzer mit Passkeys die Option «Passkeys löschen». Wählen Sie sie, wenn der Benutzer ein Gerät verloren hat:
+Das Archiv löscht dann zusätzlich zum Zurücksetzen alle seine Passkeys. Wie sonst beim Zurücksetzen richtet der Benutzer
+Passwort und Authenticator-App neu ein und kann danach bei Bedarf einen neuen Passkey einrichten. Das Zugriffsprotokoll
+nennt nur die Zahl der gelöschten Passkeys.
+
 Sperren, Deaktivieren und Rollenänderungen verlangen eine Bestätigung vor dem Ausführen. Beim Löschen zeigt das Archiv
 zuerst die Zahl der zugehörigen Dokumente und Protokolleinträge. Sie müssen den Benutzernamen exakt eingeben und einen
 Grund auswählen. Protokolleinträge und dokumentierte Verweise bleiben erhalten.

@@ -527,6 +527,13 @@
           "google" : {
             "type" : "boolean"
           },
+          "passkey" : {
+            "type" : "boolean"
+          },
+          "passkeyAnzahl" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "voruebergehendGesperrt" : {
             "type" : "boolean"
           },
@@ -4528,6 +4535,14 @@
             }
           }
         }
+      },
+      "ZugangOptionen" : {
+        "type" : "object",
+        "properties" : {
+          "passkeys" : {
+            "type" : "boolean"
+          }
+        }
       }
     },
     "securitySchemes" : {
@@ -4749,6 +4764,14 @@
             "type" : "integer",
             "format" : "int32",
             "default" : 50
+          }
+        }, {
+          "name" : "passkey",
+          "in" : "query",
+          "schema" : {
+            "description" : "Filter «Passkey eingerichtet»; ohne Angabe alle",
+            "type" : "string",
+            "enum" : [ "ja", "nein" ]
           }
         }, {
           "name" : "q",
@@ -5590,7 +5613,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "type" : "object"
+                "$ref" : "#/components/schemas/ZugangOptionen"
               }
             }
           },
