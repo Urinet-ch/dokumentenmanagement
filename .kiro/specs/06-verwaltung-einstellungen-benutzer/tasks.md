@@ -276,7 +276,7 @@ auf Server oder Secrets aus der Sitzung.
     Platzhalter für die Relying-Party-ID; Realm-Tests mit virtuellem Authenticator (Einrichten, Anmelden, Step-up, Entfernen).
   - _Anforderungen: 10.1, 10.2, 10.3, 10.4, 10.8, 10.9, 10.10, 10.11_
   - _Abhängig von: 19.2, 19.10_
-- [ ] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
+- [x] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
   - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
     Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
   - _Anforderungen: 10.5, 10.6, 10.7_

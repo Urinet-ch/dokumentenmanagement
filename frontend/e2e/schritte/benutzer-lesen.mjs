@@ -34,10 +34,12 @@ const AKTIONSPFADE = {
   rolle: ['PUT', '/api/v1/benutzer/probe/rolle'],
   loeschen: ['POST', '/api/v1/benutzer/probe/loeschen'],
   profil: ['PATCH', '/api/v1/benutzer/probe'],
+  zugang: ['POST', '/api/v1/benutzer/probe/zugang-zuruecksetzen'],
 };
 
 Given('die Benutzerverwaltung liefert synthetische Daten', async function () {
   this.benutzerAnfragen = [];
+  this.benutzerListenAbfragen = [];
   this.benutzerEinladungen = [];
   this.benutzerAktionen = [];
   this.benutzerPerson = PERSON;
@@ -53,6 +55,10 @@ Given('die Benutzerverwaltung liefert synthetische Daten', async function () {
     if (aktion) {
       const eintrag = { aktion, body: route.request().postDataJSON(), ifMatch: route.request().headers()['if-match'] };
       const verlangt = this.benutzerVerlangt[aktion];
+      if (verlangt?.fehler) {
+        this.benutzerAktionen.push({ ...eintrag, status: 503 });
+        return route.fulfill({ status: 503, json: { fehlercode: verlangt.fehler } });
+      }
       if (verlangt === 'step-up' && !this.benutzerAktionen.some((alt) => alt.aktion === aktion)) {
         this.benutzerAktionen.push({ ...eintrag, status: 401 });
         return route.fulfill({ status: 401, json: { fehlercode: 'STEP_UP_NOETIG' } });
@@ -69,7 +75,10 @@ Given('die Benutzerverwaltung liefert synthetische Daten', async function () {
     } else if (url.pathname === '/api/v1/benutzer' && route.request().method() === 'POST') {
       this.benutzerEinladungen.push(route.request().postDataJSON());
       antwort = { id: 'synthetische-einladung' };
-    } else if (url.pathname === '/api/v1/benutzer') antwort = [PERSON];
+    } else if (url.pathname === '/api/v1/benutzer') {
+      this.benutzerListenAbfragen.push(url.search);
+      antwort = [this.benutzerPerson];
+    }
     else if (url.pathname === '/api/v1/benutzer/probe') antwort = this.benutzerPerson;
     else if (url.pathname === '/api/v1/benutzer/probe/rechte') antwort = ROLLE;
     else if (url.pathname === '/api/v1/rollen') antwort = this.benutzerRollen;
@@ -83,6 +92,14 @@ Given('die Benutzerverwaltung liefert synthetische Daten', async function () {
   });
 });
 
+Given('der synthetische Benutzer hat {int} Passkeys', function (anzahl) {
+  this.benutzerPerson = { ...this.benutzerPerson, passkey: anzahl > 0, passkeyAnzahl: anzahl };
+});
+
+Given('die Benutzerverwaltung antwortet beim Zurücksetzen des Zugangs mit dem Fehler «IDENTITAETSDIENST_NICHT_ERREICHBAR»', function () {
+  this.benutzerVerlangt.zugang = { fehler: 'IDENTITAETSDIENST_NICHT_ERREICHBAR' };
+});
+
 Given('die synthetischen Rollen enthalten zusätzlich «inhaber»', function () {
   this.benutzerRollen = [ROLLE, ROLLE_INHABER];
 });
@@ -91,7 +108,7 @@ Given('der synthetische Benutzer ist deaktiviert', function () {
   this.benutzerPerson = { ...PERSON, status: 'DEAKTIVIERT' };
 });
 
-Given(/^die Benutzerverwaltung verlangt vor «(sperren|rolle|loeschen|profil)» ein Step-up$/, async function (aktion) {
+Given(/^die Benutzerverwaltung verlangt vor «(sperren|rolle|loeschen|profil|zugang)» ein Step-up$/, async function (aktion) {
   this.benutzerVerlangt[aktion] = 'step-up';
   await speicherAufzeichnen(this);
 });
@@ -211,7 +228,7 @@ Then('liegt nichts Persönliches im Browser-Speicher', async function () {
   }
   const fortsetzung = this.speicherSchreibungen.filter(({ schluessel }) => schluessel === 'archiv.benutzer.fortsetzung');
   assert.equal(fortsetzung.length, 1);
-  const erlaubt = ['id', 'benutzer', 'mandant', 'aktion', 'ziel', 'etag', 'grund', 'rolle', 'erstellt'];
+  const erlaubt = ['id', 'benutzer', 'mandant', 'aktion', 'ziel', 'etag', 'grund', 'rolle', 'passkeys', 'erstellt'];
   assert.ok(Object.keys(JSON.parse(fortsetzung[0].wert)).every((schluessel) => erlaubt.includes(schluessel)));
   const uebrig = await this.seite.evaluate(() => [localStorage, sessionStorage]
     .map((speicher) => speicher.getItem('archiv.benutzer.fortsetzung')));
@@ -328,4 +345,97 @@ Then('fehlt der Menüpunkt Benutzer und es wurde kein Benutzer abgefragt', async
   const navigation = this.seite.getByRole('navigation', { name: 'Hauptnavigation' });
   assert.equal(await navigation.getByRole('link', { name: 'Benutzer', exact: true }).count(), 0);
   assert.deepEqual(this.benutzerAnfragen, []);
+});
+
+const GERAETEDATEN = /webauthn|credential|schlüsselkennung|userlabel|authenticator-id/i;
+
+Then('zeigt die Benutzerliste «Passkey eingerichtet: Ja, 2 Passkeys» ohne Überlauf und axe-Befund', async function () {
+  const eintrag = this.seite.locator('[data-test=benutzer-liste] li').first();
+  await eintrag.getByText('Ja, 2 Passkeys', { exact: true }).waitFor();
+  assert.match((await eintrag.textContent()).replace(/\s+/g, ' '), /Passkey eingerichtet:\s*Ja, 2 Passkeys/);
+  assert.doesNotMatch(await this.seite.locator('app-benutzer-liste').textContent(), GERAETEDATEN);
+  await pruefen(this, 'liste-passkey');
+});
+
+When('ich die Benutzerliste nach «Mit Passkey» filtere', async function () {
+  // Auf die gefilterte Abfrage warten, statt auf «networkidle»: Der Filter löst die Abfrage erst nach dem Änderungsereignis aus.
+  await Promise.all([
+    this.seite.waitForRequest((anfrage) => new URL(anfrage.url()).searchParams.get('passkey') === 'ja'),
+    this.seite.locator('#benutzer-passkey-filter').selectOption({ label: 'Mit Passkey' }),
+  ]);
+  await this.seite.waitForLoadState('networkidle');
+});
+
+Then('wurde die Benutzerliste mit dem Filter «ja» abgefragt', async function () {
+  // Der Routenhandler trägt die Abfrage erst nach dem Anfrageereignis ein: kurz auf den Eintrag warten.
+  const gefiltert = () => this.benutzerListenAbfragen.some((suche) => new URLSearchParams(suche).get('passkey') === 'ja');
+  for (let versuch = 0; versuch < 50 && !gefiltert(); versuch += 1) {
+    await new Promise((weiter) => setTimeout(weiter, 100));
+  }
+  assert.ok(gefiltert(), this.benutzerListenAbfragen.join(' | '));
+  await this.seite.locator('[data-test=benutzer-liste] li').first().waitFor();
+});
+
+Then('zeigt das Benutzerdetail «Passkey eingerichtet» «Ja, 2 Passkeys» ohne Gerätedaten, Überlauf und axe-Befund', async function () {
+  await this.seite.getByRole('heading', { name: 'Alex Beispiel' }).waitFor();
+  const wert = this.seite.locator('[data-test=passkey]');
+  assert.equal((await wert.textContent()).trim(), 'Ja, 2 Passkeys');
+  await this.seite.getByText('Passkey eingerichtet', { exact: true }).waitFor();
+  assert.doesNotMatch(await this.seite.locator('app-benutzer-detail').textContent(), GERAETEDATEN);
+  await pruefen(this, 'detail-passkey');
+});
+
+When('ich öffne den Dialog zum Zugang zurücksetzen', async function () {
+  await this.seite.getByRole('button', { name: 'Zugang zurücksetzen', exact: true }).click();
+  await this.seite.getByRole('dialog').waitFor();
+});
+
+Then('zeigt der Dialog die Option Passkeys löschen mit der Zahl 2, nicht gewählt, ohne Überlauf und axe-Befund', async function () {
+  const dialog = this.seite.getByRole('dialog');
+  const option = dialog.getByLabel('Auch die 2 Passkeys löschen');
+  await option.waitFor();
+  assert.equal(await option.isChecked(), false);
+  await dialog.getByText('Gerätedaten sehen Sie nicht', { exact: false }).waitFor();
+  assert.doesNotMatch(await dialog.textContent(), GERAETEDATEN);
+  assert.deepEqual(this.benutzerAktionen, []);
+  await pruefen(this, 'zugang-dialog');
+});
+
+When('ich die Option Passkeys wähle und bestätige', async function () {
+  const dialog = this.seite.getByRole('dialog');
+  await dialog.getByLabel('Auch die 2 Passkeys löschen').check();
+  await dialog.getByRole('button', { name: 'Bestätigen', exact: true }).click();
+});
+
+When('ich ohne die Option Passkeys bestätige', async function () {
+  await this.seite.getByRole('dialog').getByRole('button', { name: 'Bestätigen', exact: true }).click();
+});
+
+Then('wird der Zugang genau einmal mit der Option Passkeys zurückgesetzt', async function () {
+  await this.seite.getByRole('dialog').waitFor({ state: 'detached' });
+  assert.deepEqual(this.benutzerAktionen.map(({ aktion, body, status }) => ({ aktion, body, status })),
+    [{ aktion: 'zugang', body: { passkeys: true }, status: 204 }]);
+});
+
+Then('wird der Zugang genau einmal ohne die Option Passkeys zurückgesetzt', async function () {
+  await this.seite.getByRole('dialog').waitFor({ state: 'detached' });
+  assert.deepEqual(this.benutzerAktionen.map(({ aktion, body, status }) => ({ aktion, body, status })),
+    [{ aktion: 'zugang', body: {}, status: 204 }]);
+});
+
+Then('wird der Zugang nach Step-up genau einmal mit der Option Passkeys zurückgesetzt', async function () {
+  await this.seite.getByText('Die Benutzerangaben wurden aktualisiert.', { exact: false }).waitFor();
+  const eigene = this.benutzerAktionen.filter((eintrag) => eintrag.aktion === 'zugang');
+  assert.deepEqual(eigene.map((eintrag) => eintrag.status), [401, 204]);
+  assert.deepEqual(eigene[0].body, { passkeys: true });
+  assert.deepEqual(eigene[1].body, { passkeys: true });
+  assert.equal(this.keycloak.pkce.length, 2);
+  await pruefen(this, 'stepup-zugang');
+});
+
+Then('zeigt das Benutzerdetail die Fehlermeldung des Identitätsdienstes ohne Überlauf und axe-Befund', async function () {
+  await this.seite.getByRole('alert').getByText('Der Identitätsdienst ist nicht erreichbar.', { exact: false }).waitFor();
+  assert.deepEqual(this.benutzerAktionen.map((eintrag) => eintrag.status), [503]);
+  assert.equal(await this.seite.getByRole('button', { name: 'Zugang zurücksetzen', exact: true }).isEnabled(), true);
+  await pruefen(this, 'zugang-fehler');
 });

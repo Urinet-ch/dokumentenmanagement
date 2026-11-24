@@ -38,6 +38,8 @@ import { Loeschvorschau } from '../model/loeschvorschau';
 import { RollenAenderung } from '../model/rollen-aenderung';
 // @ts-ignore
 import { VerwaltungRolle } from '../model/verwaltung-rolle';
+// @ts-ignore
+import { ZugangOptionen } from '../model/zugang-optionen';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -1216,21 +1218,21 @@ export class BenutzerverwaltungService extends BaseService {
      * Zugang zurücksetzen
      * @endpoint post /api/v1/benutzer/{benutzerId}/zugang-zuruecksetzen
      * @param benutzerId 
-     * @param body 
+     * @param zugangOptionen 
      * @param xRealIp 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(benutzerId: string, body: object, xRealIp?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(benutzerId: string, body: object, xRealIp?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(benutzerId: string, body: object, xRealIp?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(benutzerId: string, body: object, xRealIp?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(benutzerId: string, zugangOptionen: ZugangOptionen, xRealIp?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(benutzerId: string, zugangOptionen: ZugangOptionen, xRealIp?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(benutzerId: string, zugangOptionen: ZugangOptionen, xRealIp?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(benutzerId: string, zugangOptionen: ZugangOptionen, xRealIp?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (benutzerId === null || benutzerId === undefined) {
             throw new Error('Required parameter benutzerId was null or undefined when calling apiV1BenutzerBenutzerIdZugangZuruecksetzenPost.');
         }
-        if (body === null || body === undefined) {
-            throw new Error('Required parameter body was null or undefined when calling apiV1BenutzerBenutzerIdZugangZuruecksetzenPost.');
+        if (zugangOptionen === null || zugangOptionen === undefined) {
+            throw new Error('Required parameter zugangOptionen was null or undefined when calling apiV1BenutzerBenutzerIdZugangZuruecksetzenPost.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -1277,7 +1279,7 @@ export class BenutzerverwaltungService extends BaseService {
         return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: body,
+                body: zugangOptionen,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,
@@ -1292,16 +1294,17 @@ export class BenutzerverwaltungService extends BaseService {
      * Benutzer des Mandanten auflisten
      * @endpoint get /api/v1/benutzer
      * @param groesse 
+     * @param passkey 
      * @param q 
      * @param seite 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1BenutzerGet(groesse?: number, q?: string, seite?: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<BenutzerAnsicht>>;
-    public apiV1BenutzerGet(groesse?: number, q?: string, seite?: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<BenutzerAnsicht>>>;
-    public apiV1BenutzerGet(groesse?: number, q?: string, seite?: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<BenutzerAnsicht>>>;
-    public apiV1BenutzerGet(groesse?: number, q?: string, seite?: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1BenutzerGet(groesse?: number, passkey?: 'ja' | 'nein', q?: string, seite?: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<BenutzerAnsicht>>;
+    public apiV1BenutzerGet(groesse?: number, passkey?: 'ja' | 'nein', q?: string, seite?: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<BenutzerAnsicht>>>;
+    public apiV1BenutzerGet(groesse?: number, passkey?: 'ja' | 'nein', q?: string, seite?: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<BenutzerAnsicht>>>;
+    public apiV1BenutzerGet(groesse?: number, passkey?: 'ja' | 'nein', q?: string, seite?: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
 
@@ -1309,6 +1312,15 @@ export class BenutzerverwaltungService extends BaseService {
             localVarQueryParameters,
             'groesse',
             <any>groesse,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'passkey',
+            <any>passkey,
             QueryParamStyle.Form,
             true,
         );

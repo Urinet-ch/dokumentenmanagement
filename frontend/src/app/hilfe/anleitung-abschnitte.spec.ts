@@ -28,6 +28,8 @@ interface Soll {
 /** Die Tabelle aus design.md «Hilfe-Katalog» in Lesereihenfolge (Abschnitte nach Req 6.1), mit den dort nachgetragenen Abweichungen. */
 const SOLL: readonly Soll[] = [
   { anker: 'erste-schritte', titel: 'Erste Schritte', pfade: ['/'], abgemeldet: true },
+  // Aufgabe 24.3 (Spec 06, Req 10): für alle angemeldeten Rollen, ohne Pfad
+  { anker: 'erste-schritte-passkey', titel: 'Mit Passkey anmelden', eltern: 'erste-schritte' },
   { anker: 'erfassen', titel: 'Erfassen', eine: ['A1'], pfade: ['/erfassen'] },
   { anker: 'erfassen-handy', titel: 'Mit dem Handy fotografieren', eltern: 'erfassen', eine: ['A1'] },
   { anker: 'erfassen-dateien', titel: 'Dateien hochladen', eltern: 'erfassen', eine: ['A1'] },

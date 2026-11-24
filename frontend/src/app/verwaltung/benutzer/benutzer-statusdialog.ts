@@ -9,10 +9,14 @@ export type BenutzerStatusAktion = keyof typeof TEXTE.benutzerStatusdialog.aktio
 export interface BenutzerStatusdialogDaten {
   aktion: BenutzerStatusAktion;
   benutzername: string;
+  /** Zahl der eingerichteten Passkeys; nur bei «Zugang zurücksetzen» relevant. */
+  passkeys?: number;
 }
 
 export interface BenutzerStatusdialogErgebnis {
   grund?: Verwaltungsgrund;
+  /** «Zugang zurücksetzen»: zusätzlich alle Passkeys löschen. */
+  passkeys?: boolean;
 }
 
 @Component({
@@ -32,6 +36,14 @@ export interface BenutzerStatusdialogErgebnis {
           }
         </select>
       }
+      @if (passkeyAnzahl > 0) {
+        <label class="passkey-option">
+          <input type="checkbox" name="passkeys" aria-describedby="status-passkeys-hinweis"
+            [checked]="passkeys()" (change)="passkeys.set($any($event.target).checked)" />
+          <span>{{ texte.passkeysOption(passkeyAnzahl) }}</span>
+        </label>
+        <small id="status-passkeys-hinweis">{{ texte.passkeysHinweis }}</small>
+      }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button class="sekundaer" type="button" [mat-dialog-close]="null">{{ texte.abbrechen }}</button>
@@ -48,6 +60,8 @@ export class BenutzerStatusdialog {
   protected readonly grundTexte = TEXTE.benutzerLoeschdialog.gruende;
   protected readonly gruende = Object.keys(this.grundTexte) as Verwaltungsgrund[];
   protected readonly grund = signal<Verwaltungsgrund | ''>('');
+  protected readonly passkeyAnzahl = this.daten.aktion === 'zugangZuruecksetzen' ? (this.daten.passkeys ?? 0) : 0;
+  protected readonly passkeys = signal(false);
 
   protected grundWaehlen(event: Event): void {
     const wert = (event.target as HTMLSelectElement).value;
@@ -56,6 +70,6 @@ export class BenutzerStatusdialog {
 
   protected ergebnis(): BenutzerStatusdialogErgebnis {
     const grund = this.grund();
-    return grund ? { grund } : {};
+    return { ...(grund ? { grund } : {}), ...(this.passkeyAnzahl > 0 && this.passkeys() ? { passkeys: true } : {}) };
   }
 }

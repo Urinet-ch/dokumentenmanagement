@@ -432,6 +432,133 @@ public class BenutzerVerwaltungSchritte {
         antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/zugang-zuruecksetzen"));
     }
 
+    private String zweiteId;
+
+    private IdentitaetsDienstStub stub() {
+        Object roh = ClientProxy.unwrap(identitaet);
+        assertThat(roh).isInstanceOf(IdentitaetsDienstStub.class);
+        return (IdentitaetsDienstStub) roh;
+    }
+
+    @Angenommen("ein synthetischer Mitarbeiter ist eingeladen und hat {int} Passkeys")
+    public void eingeladenerMitarbeiterMitPasskeys(int anzahl) {
+        eigeneId = anlegen(MANDANT, name);
+        stub().passkeysSetzen(MANDANT, eigeneId, anzahl);
+        identitaet.einladen(MANDANT, eigeneId, Set.of(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL),
+                Duration.ofHours(1));
+    }
+
+    @Angenommen("ein zweiter synthetischer Mitarbeiter ist eingeladen ohne Passkey")
+    public void zweiterMitarbeiterOhnePasskey() {
+        zweiteId = anlegen(MANDANT, name + "-zwei");
+    }
+
+    @Wenn("der Inhaber den Zugang des Mitarbeiters mit der Option Passkeys zurücksetzt")
+    public void zugangMitPasskeysZuruecksetzen() {
+        antworten.add(anfrage().contentType("application/json").body(Map.of("passkeys", true))
+                .post(PFAD + "/" + eigeneId + "/zugang-zuruecksetzen"));
+    }
+
+    @Wenn("der Inhaber den Zugang des Mitarbeiters ohne die Option Passkeys zurücksetzt")
+    public void zugangOhnePasskeysZuruecksetzen() {
+        antworten.add(anfrage().contentType("application/json").body(Map.of("passkeys", false))
+                .post(PFAD + "/" + eigeneId + "/zugang-zuruecksetzen"));
+    }
+
+    @Wenn("der Inhaber den Zugang des Mitarbeiters mit einem ungültigen Körper zurücksetzt")
+    public void zugangMitUngueltigemKoerperZuruecksetzen() {
+        antworten.add(anfrage().contentType("application/json").body("{\"passkeys\":\"ja\",\"geraet\":\"x\"}")
+                .post(PFAD + "/" + eigeneId + "/zugang-zuruecksetzen"));
+    }
+
+    @Dann("hat der Mitarbeiter keine Passkeys mehr und sein Zugang ist zurückgesetzt")
+    public void keinePasskeysMehr() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        var b = identitaet.benutzerLesen(MANDANT, eigeneId);
+        assertThat(b.passkeys()).isZero();
+        assertThat(b.aktionen()).contains(IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
+                IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
+    }
+
+    @Dann("hat der Mitarbeiter weiterhin {int} Passkeys")
+    public void weiterhinPasskeys(int anzahl) {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(204);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).passkeys()).isEqualTo(anzahl);
+    }
+
+    @Dann("das Protokoll nennt nur die Zahl {int} der gelöschten Passkeys")
+    public void protokollNenntPasskeyZahl(int anzahl) throws SQLException {
+        String details = abgeschlossenesProtokoll();
+        assertThat(details).contains("\"passkeys\": " + anzahl).doesNotContain(name, "@example.invalid", "webauthn");
+    }
+
+    @Dann("das Protokoll nennt keine Zahl der Passkeys")
+    public void protokollOhnePasskeyZahl() throws SQLException {
+        assertThat(abgeschlossenesProtokoll()).doesNotContain("passkeys");
+    }
+
+    private String abgeschlossenesProtokoll() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details::text from m_" + SCHEMA + ".zugriff_protokoll "
+                             + "where details->>'ziel' = ? and details->>'phase' = 'ABGESCHLOSSEN' "
+                             + "and details->>'vorgang' = 'ZUGANG_ZURUECKSETZEN'")) {
+            abfrage.setString(1, eigeneId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                return zeile.getString(1);
+            }
+        }
+    }
+
+    @Dann("wird die Aktion wegen fehlendem Step-up abgewiesen und die Passkeys bleiben")
+    public void aktionOhneStepUpAbgewiesen() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(401);
+        assertThat(antworten.getLast().jsonPath().getString("fehlercode")).isEqualTo("STEP_UP_NOETIG");
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).passkeys()).isEqualTo(2);
+    }
+
+    @Dann("wird die Anfrage mit 400 abgewiesen und die Passkeys bleiben")
+    public void anfrageAbgewiesen() {
+        assertThat(antworten.getLast().statusCode()).isEqualTo(400);
+        assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).passkeys()).isEqualTo(2);
+    }
+
+    @Wenn("der Inhaber das Detail und die gefilterten Listen abruft")
+    public void detailUndGefilterteListen() {
+        antworten.add(anfrage().get(PFAD + "/" + eigeneId));
+        antworten.add(anfrage().get(PFAD + "?passkey=ja"));
+        antworten.add(anfrage().get(PFAD + "?passkey=nein"));
+        antworten.add(anfrage().get(PFAD + "?passkey=vielleicht"));
+        antworten.add(anfrage().get(PFAD + "/" + zweiteId));
+    }
+
+    @Dann("zeigt das Detail Passkey ja mit Anzahl {int} und der andere Passkey nein mit Anzahl {int}")
+    public void detailZeigtPasskeys(int erste, int zweite) {
+        var detail = antworten.get(0);
+        assertThat(detail.statusCode()).isEqualTo(200);
+        assertThat(detail.jsonPath().getBoolean("passkey")).isTrue();
+        assertThat(detail.jsonPath().getInt("passkeyAnzahl")).isEqualTo(erste);
+        // nur Ja/Nein und Anzahl: keine Gerätenamen, Schlüsselkennungen oder Credential-Angaben
+        assertThat(detail.asString()).doesNotContain("webauthn", "credential", "userLabel");
+        var anderes = antworten.get(4);
+        assertThat(anderes.jsonPath().getBoolean("passkey")).isFalse();
+        assertThat(anderes.jsonPath().getInt("passkeyAnzahl")).isEqualTo(zweite);
+    }
+
+    @Dann("der Filter ja liefert nur den ersten und der Filter nein nur den zweiten Mitarbeiter")
+    public void filterLiefertPasskeyMitarbeiter() {
+        assertThat(antworten.get(1).statusCode()).isEqualTo(200);
+        assertThat(antworten.get(1).jsonPath().<String>getList("id")).containsExactly(eigeneId);
+        assertThat(antworten.get(2).statusCode()).isEqualTo(200);
+        assertThat(antworten.get(2).jsonPath().<String>getList("id")).containsExactly(zweiteId);
+    }
+
+    @Dann("ein ungültiger Filterwert wird mit 400 abgewiesen")
+    public void ungueltigerFilter() {
+        assertThat(antworten.get(3).statusCode()).isEqualTo(400);
+    }
+
     @Dann("sind Passwort und TOTP erneut einzurichten und der Vorgang ist protokolliert")
     public void zugangZurueckgesetzt() throws SQLException {
         assertThat(antworten.getLast().statusCode()).isEqualTo(204);

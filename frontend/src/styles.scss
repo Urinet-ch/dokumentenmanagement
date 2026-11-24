@@ -133,6 +133,20 @@ body {
   padding: 0 .7rem;
 }
 
+.benutzer-status-dialog .passkey-option {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  min-height: 2.75rem;
+  margin-top: 1rem;
+}
+
+.benutzer-status-dialog .passkey-option input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--brand-primary);
+}
+
 .benutzer-status-dialog .gefaehrlich:not(:disabled) {
   color: var(--gefahr);
 }

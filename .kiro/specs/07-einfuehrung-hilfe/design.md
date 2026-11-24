@@ -146,6 +146,7 @@ Verhalten (z. B. «bestätigen») müssen der umgesetzten App entsprechen (Requi
 | Anker | Titel | Eltern | Bedingung | Pfade | abgemeldet |
 | --- | --- | --- | --- | --- | --- |
 | `erste-schritte` | Erste Schritte | – | allgemein | `/` | ja |
+| `erste-schritte-passkey` | Mit Passkey anmelden | `erste-schritte` | allgemein | – | – |
 | `erfassen` | Erfassen | – | A1 | `/erfassen` | – |
 | `erfassen-handy` | Mit dem Handy fotografieren | `erfassen` | A1 | – | – |
 | `erfassen-dateien` | Dateien hochladen | `erfassen` | A1 | – | – |
