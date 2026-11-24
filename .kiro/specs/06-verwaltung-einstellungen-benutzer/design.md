@@ -328,6 +328,7 @@ Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach Aufgabe 19.10; 
 - Protokoll: Der Abschluss von `ZUGANG_ZURUECKSETZEN` trägt bei gewählter Option die Zahl `passkeys` der gelöschten Passkeys, sonst
   nichts; die Absicht nennt die Option nicht. Einrichten und Entfernen in der Kontoverwaltung führt Keycloak selbst; dafür sind im
   Realm keine zusätzlichen Ereignistypen aktiviert (Entscheid Fabian, siehe `docs/passkey-inbetriebnahme-checkliste.md`).
+  Nachtrag 24.11.2026: Die protokollierte Zahl ist auf 100 begrenzt; 100 bedeutet daher mindestens 100 gelöschte Passkeys.
 - Anleitung: Abschnitt `erste-schritte-passkey` («Mit Passkey anmelden», alle Rollen) und Ergänzung in `verwaltung.md`.
   Aufgabe 24.3 bleibt offen (Realm Stufe A, Relying-Party-ID, Prüfung mit iPhone und Mac): `docs/passkey-inbetriebnahme-checkliste.md`.
 

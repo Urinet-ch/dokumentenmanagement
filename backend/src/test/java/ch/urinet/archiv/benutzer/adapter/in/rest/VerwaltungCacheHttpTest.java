@@ -350,6 +350,66 @@ class VerwaltungCacheHttpTest {
     }
 
     @Test
+    void zugangZuruecksetzenProtokolliertAuchMehrAlsHundertPasskeys() throws SQLException {
+        String token = Testanmeldung.token("inhaber-urinet");
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        var dienst = new IdentitaetsDienstStub();
+        String ziel = dienst.anlegen("urinet", person("passkey." + UUID.randomUUID()), Rolle.MITARBEITER);
+        dienst.passkeysSetzen("urinet", ziel, 101);
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+
+        given().auth().oauth2(token).contentType("application/json").body("{\"passkeys\":true}")
+                .post("/api/v1/benutzer/" + ziel + "/zugang-zuruecksetzen").then().statusCode(204);
+        assertThat(dienst.benutzerLesen("urinet", ziel).passkeys()).isZero();
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select details->>'passkeys' from m_urinet.zugriff_protokoll "
+                             + "where details->>'ziel' = ? and details->>'phase' = 'ABGESCHLOSSEN' "
+                             + "and details->>'vorgang' = 'ZUGANG_ZURUECKSETZEN'")) {
+            abfrage.setString(1, ziel);
+            try (ResultSet zeilen = abfrage.executeQuery()) {
+                assertThat(zeilen.next()).isTrue();
+                assertThat(zeilen.getString(1)).isEqualTo("100");
+                assertThat(zeilen.next()).isFalse();
+            }
+        }
+    }
+
+    @Test
+    void passkeyFilterPaginierenUeberMehrereQuellseiten() {
+        String token = Testanmeldung.token("inhaber-urinet");
+        var quellseiten = new java.util.ArrayList<Integer>();
+        var dienst = new IdentitaetsDienstStub() {
+            @Override
+            public synchronized List<IdentitaetsDienst.Benutzer> benutzerSuchen(
+                    String mandant, String suche, int seite, int groesse) {
+                quellseiten.add(seite);
+                return super.benutzerSuchen(mandant, suche, seite, groesse);
+            }
+        };
+        String prefix = "filter" + UUID.randomUUID().toString().substring(0, 8);
+        for (int i = 0; i < 60; i++) {
+            String id = dienst.anlegen("urinet", person(prefix + "%02d".formatted(i)), Rolle.MITARBEITER);
+            dienst.passkeysSetzen("urinet", id, i % 2 == 0 ? 1 : 0);
+        }
+        QuarkusMock.installMockForType(dienst, IdentitaetsDienst.class);
+
+        for (String filter : List.of("ja", "nein")) {
+            List<String> namen = given().auth().oauth2(token).queryParam("q", prefix)
+                    .queryParam("passkey", filter).queryParam("seite", 2).queryParam("groesse", 10)
+                    .get("/api/v1/benutzer").then().statusCode(200).extract().jsonPath().getList("benutzername");
+            int erster = filter.equals("ja") ? 40 : 41;
+            assertThat(namen).containsExactlyElementsOf(java.util.stream.IntStream.range(0, 10)
+                    .mapToObj(i -> prefix + "%02d".formatted(erster + i * 2)).toList());
+            assertThat(quellseiten).contains(0, 1);
+            quellseiten.clear();
+        }
+    }
+
+    @Test
     void googleLoesenPrueftStepUpMandantUndBestehendeVerknuepfung() {
         String pfad = "/api/v1/benutzer/";
         String token = Testanmeldung.token("inhaber-urinet");
