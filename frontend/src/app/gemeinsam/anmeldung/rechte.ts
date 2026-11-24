@@ -6,7 +6,7 @@ export type Rolle = 'inhaber' | 'geschaeftsstelle' | 'mitarbeiter' | 'treuhaende
 const RANGFOLGE: readonly Rolle[] = ['inhaber', 'geschaeftsstelle', 'mitarbeiter', 'treuhaender'];
 
 // EXPORT: Jahresexport (Spec 02, Req 7.1, 7.5); A24: Chat-Auswertung (Spec 02, Req 15.5–15.8).
-export type Aktion = 'A1' | 'A2' | 'A5' | 'A6' | 'A7' | 'A8' | 'A9' | 'A10' | 'A11' | 'A12' | 'A13' | 'A14' | 'A15' | 'A16' | 'A17' | 'A18' | 'A19' | 'A20' | 'A21' | 'A24' | 'EXPORT';
+export type Aktion = 'A1' | 'A2' | 'A5' | 'A6' | 'A7' | 'A8' | 'A9' | 'A10' | 'A11' | 'A12' | 'A13' | 'A14' | 'A15' | 'A16' | 'A17' | 'A18' | 'A19' | 'A20' | 'A21' | 'A22' | 'A23' | 'A24' | 'EXPORT';
 
 // Rollen, für die die Aktion nicht 403 ist (A2: alle Rollen; Einschränkungen nach Vertraulichkeit macht das Backend).
 const ERLAUBT: Record<Aktion, readonly Rolle[]> = {
@@ -29,6 +29,8 @@ const ERLAUBT: Record<Aktion, readonly Rolle[]> = {
   A19: ['inhaber'],
   A20: ['inhaber'],
   A21: ['inhaber'],
+  A22: ['inhaber'],
+  A23: ['inhaber'],
   A24: ['inhaber'],
   EXPORT: ['inhaber', 'treuhaender'],
 };

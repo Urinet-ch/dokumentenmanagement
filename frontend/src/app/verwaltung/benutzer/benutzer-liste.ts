@@ -1,14 +1,17 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { AnmeldungService } from '../../gemeinsam/anmeldung/anmeldung.service';
 import { Ansicht, BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
 import { zeitpunkt } from '../../gemeinsam/format';
 import { httpFehlerMeldung } from '../../gemeinsam/http-fehler';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { BenutzerFortsetzen, BenutzerFortsetzung } from './benutzer-fortsetzung';
+import { BenutzerEinladen } from './benutzer-einladen';
 import { name, rollen } from './benutzer-logik';
 import { BenutzerRechte } from './benutzer-rechte';
 
@@ -16,15 +19,17 @@ const SEITENGROESSE = 50;
 
 @Component({
   selector: 'app-benutzer-liste',
-  imports: [MatButtonModule, MatProgressBarModule, RouterLink, BenutzerRechte],
+  imports: [MatButtonModule, MatProgressBarModule, RouterLink, BenutzerEinladen, BenutzerRechte],
   templateUrl: './benutzer-liste.html',
   styleUrl: './benutzer.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BenutzerListe implements OnInit {
   private readonly api = inject(BenutzerverwaltungService);
+  private readonly anmeldung = inject(AnmeldungService);
   private readonly router = inject(Router);
   private readonly zerstoert = inject(DestroyRef);
+  private readonly fortsetzen = inject(BenutzerFortsetzen);
   private laufend?: Subscription;
   private suche = '';
 
@@ -35,13 +40,26 @@ export class BenutzerListe implements OnInit {
   protected readonly zeitpunkt = zeitpunkt;
   protected readonly benutzer = signal<readonly BenutzerAnsicht[] | null>(null);
   protected readonly rollenListe = signal<readonly VerwaltungRolle[] | null>(null);
+  protected readonly einladbareRollen = computed(() => {
+    if (!this.anmeldung.darf('A22') || !this.anmeldung.darf('A23')) return null;
+    const rollen = this.rollenListe();
+    return rollen?.length ? rollen : null;
+  });
   protected readonly antraege = signal<readonly Ansicht[] | null>(null);
   protected readonly seite = signal(0);
   protected readonly listenFehler = signal<string | null>(null);
   protected readonly rollenFehler = signal<string | null>(null);
   protected readonly antraegeFehler = signal<string | null>(null);
+  protected readonly fortsetzung = signal<BenutzerFortsetzung | null>(null);
+  protected readonly fortsetzungFehler = signal<string | null>(null);
 
   ngOnInit(): void {
+    const fortsetzung = this.fortsetzen.uebernehmen();
+    if (fortsetzung === 'ungueltig') {
+      this.fortsetzungFehler.set(TEXTE.benutzerFortsetzung.ungueltig);
+    } else {
+      this.fortsetzung.set(fortsetzung);
+    }
     this.laden(0);
     this.rollenLaden();
     this.antraegeLaden();

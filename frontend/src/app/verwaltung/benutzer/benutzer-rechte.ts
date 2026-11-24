@@ -14,7 +14,7 @@ import { rechteGruppen } from './benutzer-logik';
             <li>
               <span>{{ recht.bezeichnung }}</span>
               <span class="pille {{ ergebnisKlasse(recht.ergebnis) }}">
-                {{ texte.ergebnisse[recht.ergebnis] ?? recht.ergebnis }}
+                {{ texte.ergebnisse[recht.ergebnis] ?? texte.unbekannt }}
               </span>
               @for (fussnote of recht.fussnoten; track $index) {
                 <small>{{ fussnote.zeichen }} {{ fussnote.text }}</small>
