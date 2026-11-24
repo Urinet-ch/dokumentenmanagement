@@ -804,6 +804,18 @@ Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übe
 Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
 Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
 
+## Umsetzung (Aufgabe 20.5, 24.11.2026)
+
+Die Einstellungsseite zeigt den Katalog und merkt Änderungen, Rücksetzungen einzelner Felder oder Gruppen und
+Einstellungen einer früheren Version zunächst als Eingaben vor. Auch eine frühere Version wird über die gemeinsame
+Vorschau und den bestätigten Merge-Patch gespeichert; andere Konfigurationsteile bleiben unverändert. Fehlt bei einer
+alten Version die Einstellungsgruppe, gelten die Standards. Kennungen zeigt der Vergleich ohne Werte.
+
+Für Step-up liegt die bestätigte Änderung vorübergehend im `sessionStorage` des Tabs, einschliesslich Eingaben und
+ETag, höchstens zehn Minuten zur Wiederholung gültig. Eine zufällige Kennung bindet sie an den konkreten, erfolgreich
+geprüften OIDC-Rückruf; Benutzer und Mandant müssen übereinstimmen. Vor der einmaligen Wiederholung wird sie gelöscht.
+Ein Neuladen ohne erfolgreichen Rückruf löst keine Wiederholung aus. Der Server prüft Rechte, Bestätigung und ETag erneut.
+
 ## Umsetzung (Aufgabe 20.3, 23.11.2026)
 
 Die Wissenseinstellungen werden auch bei fehlender oder vollständig leerer Tabellenzeile als Konfigurationsversion

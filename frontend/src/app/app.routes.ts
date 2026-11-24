@@ -145,6 +145,12 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.importe),
   },
   {
+    path: 'verwaltung/einstellungen',
+    loadComponent: () => import('./verwaltung/einstellungen/einstellungen').then((m) => m.EinstellungenSeite),
+    canActivate: [rechtGuard('A20', '/nicht-gefunden')],
+    title: titel(TEXTE.menue.einstellungen),
+  },
+  {
     path: 'verwaltung/benutzer',
     loadComponent: () => import('./verwaltung/benutzer/benutzer-liste').then((m) => m.BenutzerListe),
     canActivate: [rechtGuard('A21', '/nicht-gefunden')],

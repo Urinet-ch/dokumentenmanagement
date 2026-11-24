@@ -46,6 +46,13 @@ describe('Rechte (Req 2.2, 2.6)', () => {
     }
   });
 
+  it('erlaubt die Mandanteneinstellungen nur dem Inhaber (A20)', () => {
+    expect(darf('inhaber', 'A20')).toBe(true);
+    for (const rolle of ['mitarbeiter', 'treuhaender', 'geschaeftsstelle'] as const) {
+      expect(darf(rolle, 'A20')).toBe(false);
+    }
+  });
+
   it('erlaubt Wissensentwürfe Inhaber und Geschäftsstelle, ohne A19 zu erweitern', () => {
     expect(darf('inhaber', 'A17')).toBe(true);
     expect(darf('geschaeftsstelle', 'A17')).toBe(true);
