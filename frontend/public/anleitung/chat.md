@@ -33,6 +33,9 @@ Unter jeder Antwort stehen die «Quellen»:
 ## Antworten bewerten
 Wie Sie Sterne vergeben, ändern oder entfernen, steht unter [Antworten bewerten](#chat-bewerten).
 
+Der Inhaber kann die Bewertungen auf der Seite «Chat-Auswertung» prüfen. Diese Seite ist nur für Inhaber zugänglich;
+ihre Anleitung erscheint dort in der Hilfe.
+
 ## Als Analyse vorschlagen
 Steht unter einer Antwort der Knopf «Als Analyse vorschlagen», können Sie die Antwort für die Wissensbasis vorschlagen. Eine Person mit dem Recht zur Freigabe prüft den Vorschlag, ergänzt die Belege und entscheidet. Den Stand Ihrer Vorschläge sehen Sie oben auf der Seite unter «Meine Analysevorschläge». Der Knopf fehlt, wenn der Chat im Gespräch bis zu dieser Antwort Summen, Anzahlen, offene Rechnungen, Fristen oder fehlende Belege abgefragt hat: Solche Zahlen gehören nicht in die Wissensbasis.
 

@@ -46,6 +46,13 @@ describe('Rechte (Req 2.2, 2.6)', () => {
     }
   });
 
+  it('erlaubt die Chat-Auswertung nur dem Inhaber (A24)', () => {
+    expect(darf('inhaber', 'A24')).toBe(true);
+    for (const rolle of ['treuhaender', 'mitarbeiter', 'geschaeftsstelle'] as const) {
+      expect(darf(rolle, 'A24')).toBe(false);
+    }
+  });
+
   it('erlaubt die Mandanteneinstellungen nur dem Inhaber (A20)', () => {
     expect(darf('inhaber', 'A20')).toBe(true);
     for (const rolle of ['mitarbeiter', 'treuhaender', 'geschaeftsstelle'] as const) {

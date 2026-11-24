@@ -1,0 +1,131 @@
+<div class="seitenkopf">
+  <p class="vorzeile">{{ texte.vorzeile }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
+
+<div class="auswertung">
+  <section class="karte filter" aria-labelledby="filter-titel">
+    <h2 id="filter-titel">{{ texte.zeitraumTitel }}</h2>
+    <form (submit)="$event.preventDefault(); laden()">
+      <label>
+        {{ texte.von }}
+        <input type="date" name="von" required [value]="zeitraum().von"
+          (change)="feldSetzen('von', $any($event.target).value)" />
+      </label>
+      <label>
+        {{ texte.bis }}
+        <input type="date" name="bis" required [value]="zeitraum().bis"
+          (change)="feldSetzen('bis', $any($event.target).value)" />
+      </label>
+      <button mat-stroked-button type="submit" [disabled]="laedt()">
+        <app-symbol name="suche" />
+        {{ texte.anzeigen }}
+      </button>
+    </form>
+  </section>
+
+  @if (laedt()) {
+    <p role="status">{{ texte.laden }}</p>
+  }
+  @if (fehler()) {
+    <div class="hinweis gefahr" role="alert">
+      <app-symbol name="warnung" />
+      <p>{{ fehler() }}</p>
+    </div>
+  }
+
+  @if (daten(); as auswertung) {
+    <section class="kennzahlen" [attr.aria-label]="texte.kennzahlen">
+      <div class="kachel">
+        <span class="beschriftung">{{ texte.anzahl }}</span>
+        <strong class="kennzahl" data-test="anzahl-bewertungen">{{ auswertung.anzahl ?? 0 }}</strong>
+      </div>
+      <div class="kachel">
+        <span class="beschriftung">{{ texte.durchschnitt }}</span>
+        <strong class="kennzahl">{{ durchschnitt(auswertung.durchschnitt) }} / 5</strong>
+      </div>
+    </section>
+
+    <section class="karte auswertungskarte" aria-labelledby="verteilung-titel">
+      <h2 id="verteilung-titel">{{ texte.verteilung }}</h2>
+      @if ((auswertung.verteilung ?? []).length === 0) {
+        <p class="leer">{{ texte.keineBewertungen }}</p>
+      } @else {
+        <ul class="verteilung">
+          @for (eintrag of (auswertung.verteilung ?? []); track eintrag.sterne) {
+            <li>
+              <span>{{ texte.sterne(eintrag.sterne ?? 0) }}</span>
+              <progress [value]="anteil(eintrag.anzahl)" max="100"
+                [attr.aria-label]="texte.verteilungBalken(eintrag.sterne ?? 0, eintrag.anzahl ?? 0)">
+                {{ anteil(eintrag.anzahl) }}%
+              </progress>
+              <span class="zahl">{{ eintrag.anzahl ?? 0 }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <section class="karte auswertungskarte" aria-labelledby="gruende-titel">
+      <h2 id="gruende-titel">{{ texte.gruendeTitel }}</h2>
+      @if ((auswertung.gruende ?? []).length === 0) {
+        <p class="leer">{{ texte.keineGruende }}</p>
+      } @else {
+        <ul class="gruende">
+          @for (eintrag of (auswertung.gruende ?? []); track eintrag.grund) {
+            <li><span>{{ grunde(eintrag.grund) }}</span><strong>{{ eintrag.anzahl ?? 0 }}</strong></li>
+          }
+        </ul>
+      }
+    </section>
+
+    <section class="karte auswertungskarte" aria-labelledby="schlechte-titel">
+      <div class="abschnittskopf">
+        <div>
+          <h2 id="schlechte-titel">{{ texte.schlechteAntworten }}</h2>
+          <p>{{ texte.schlechteAntwortenHinweis }}</p>
+        </div>
+        <button mat-flat-button type="button" (click)="exportDialogOeffnen()" [disabled]="exportLaeuft()">
+          <app-symbol name="herunterladen" />
+          {{ exportLaeuft() ? texte.exportLaeuft : texte.exportOeffnen }}
+        </button>
+      </div>
+      @if ((auswertung.schlechteAntworten ?? []).length === 0) {
+        <p class="leer">{{ texte.keineSchlechtenAntworten }}</p>
+      } @else {
+        <ul class="antworten">
+          @for (antwort of (auswertung.schlechteAntworten ?? []); track $index) {
+            <li data-test="schlechte-antwort">
+              <div class="antwort-kopf">
+                <span class="pille warnung">{{ texte.sterne(antwort.sterne ?? 0) }}</span>
+                <time>{{ datum(antwort.datum) }}</time>
+                <span>{{ grunde(antwort.grund) }}</span>
+              </div>
+              <p>{{ frageKurz(antwort.frage) }}</p>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
+  @if (stepUpNoetig()) {
+    <div class="hinweis warnung" role="status">
+      <app-symbol name="schloss" />
+      <p>{{ exportFehler() }}</p>
+      <p>{{ texte.stepUpKeineFortsetzung }}</p>
+      <button mat-stroked-button type="button" (click)="erneutAnmelden()" [disabled]="stepUpLaeuft()">
+        {{ stepUpLaeuft() ? texte.stepUpLaeuft : texte.stepUpStarten }}
+      </button>
+    </div>
+  } @else if (exportFehler()) {
+    <div class="hinweis gefahr" role="alert">
+      <app-symbol name="warnung" />
+      <p>{{ exportFehler() }}</p>
+    </div>
+  }
+  @if (exportMeldung()) {
+    <p class="hinweis ok" role="status">{{ exportMeldung() }}</p>
+  }
+</div>

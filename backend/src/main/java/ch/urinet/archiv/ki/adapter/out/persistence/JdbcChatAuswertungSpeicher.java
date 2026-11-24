@@ -2,6 +2,7 @@ package ch.urinet.archiv.ki.adapter.out.persistence;
 
 import ch.urinet.archiv.ki.application.chat.ChatAuswertungSpeicher;
 import ch.urinet.archiv.ki.application.chat.ChatBewertungAuswertung;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -157,7 +158,7 @@ public class JdbcChatAuswertungSpeicher implements ChatAuswertungSpeicher {
                     + "and q.rolle = 'BENUTZER' and q.id < a.id order by q.id desc limit 1), "
                     + "a.inhalt, coalesce(a.werkzeuge, '[]'::jsonb)::text, "
                     + "coalesce(a.quellen, '[]'::jsonb)::text, a.tokens_ein, a.tokens_aus, "
-                    + "a.zeit_bis_erster_text_ms, a.modellkennung, a.systemprompt_version "
+                    + "a.zeit_bis_erster_text_ms, a.modellkennung, a.systemprompt_version, g.modus "
                     + from(schema) + " order by b.erstellt, a.id, b.benutzer";
             try (PreparedStatement sql = verbindung.prepareStatement(sqlText)) {
                 sql.setFetchSize(100);
@@ -167,7 +168,8 @@ public class JdbcChatAuswertungSpeicher implements ChatAuswertungSpeicher {
                         verarbeiten.accept(new ExportZeile(rs.getTimestamp(1).toInstant(), rs.getLong(2),
                                 rs.getInt(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7),
                                 rs.getString(8), rs.getString(9), nullableInt(rs, 10), nullableInt(rs, 11),
-                                nullableLong(rs, 12), rs.getString(13), rs.getString(14)));
+                                nullableLong(rs, 12), rs.getString(13), rs.getString(14),
+                                Chatmodus.valueOf(rs.getString(15))));
                     }
                 }
             } catch (SQLException e) {

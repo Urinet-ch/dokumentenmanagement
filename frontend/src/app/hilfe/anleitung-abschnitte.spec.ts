@@ -38,6 +38,7 @@ const SOLL: readonly Soll[] = [
   { anker: 'suche', titel: 'Suche', eine: ['A2'], pfade: ['/suche'] },
   { anker: 'chat', titel: 'Chat', eine: ['A2'], pfade: ['/chat'] },
   { anker: 'chat-bewerten', titel: 'Antworten bewerten', eltern: 'chat', eine: ['A2'] },
+  { anker: 'chat-auswertung', titel: 'Chat-Auswertung', eltern: 'chat', eine: ['A24'], pfade: ['/chat/auswertung'] },
   { anker: 'dokument', titel: 'Dokumentansicht', eine: ['A2'], pfade: ['/dokument'] },
   { anker: 'dokument-aendern', titel: 'Angaben ändern', eltern: 'dokument', eine: ['A6'] },
   { anker: 'kontakte', titel: 'Kontakte', eine: ['A6'], pfade: ['/kontakte'] },
