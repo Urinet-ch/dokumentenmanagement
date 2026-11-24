@@ -9,6 +9,10 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Timer;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
@@ -33,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,6 +66,9 @@ class JdbcKiBeispielTest {
 
     @Inject
     Instance<AgroalDataSource> datenbank;
+
+    @Inject
+    MeterRegistry registry;
 
     /** Eigene Art, weil der zweite Mandant ohne Seed keine Dokumentarten hat; nach jedem Test wieder entfernt. */
     private static final String ART = "KI_PROBE";
@@ -107,6 +115,40 @@ class JdbcKiBeispielTest {
 
         assertThat(titel(im(URINET, () -> beispiele.kandidaten(merkmale, INHABER, 10)))).containsExactly("Titel Urinet");
         assertThat(titel(im(ZWEITER, () -> beispiele.kandidaten(merkmale, INHABER, 10)))).containsExactly("Titel VHF");
+    }
+
+    @Test
+    void zaehltBeispieleJeMandant() {
+        speichern(URINET, "Titel Urinet", "NORMAL", null);
+        speichern(ZWEITER, "Titel VHF", "NORMAL", null);
+
+        assertThat(beispiele.anzahl(URINET)).isEqualTo(1);
+        assertThat(beispiele.anzahl(ZWEITER)).isEqualTo(1);
+    }
+
+    @Test
+    void misstKandidatenAbEintausendBeispielen() {
+        String gaugeName = "archiv.ki.beispiele";
+        String timerName = "archiv.ki.beispiel.kandidaten";
+        registry.find(gaugeName).tag("mandant", URINET.wert()).meters().forEach(registry::remove);
+        registry.find(timerName).tag("mandant", URINET.wert()).meters().forEach(registry::remove);
+        AtomicLong zeilen = new AtomicLong(999);
+        Gauge gauge = Gauge.builder(gaugeName, zeilen, AtomicLong::get)
+                .tag("mandant", URINET.wert()).register(registry);
+        try {
+            im(URINET, () -> beispiele.kandidaten(merkmale, INHABER, 10));
+            assertThat(registry.find(timerName).tag("mandant", URINET.wert()).timer()).isNull();
+
+            zeilen.set(1_000);
+            im(URINET, () -> beispiele.kandidaten(merkmale, INHABER, 10));
+
+            Timer timer = registry.find(timerName).tag("mandant", URINET.wert()).timer();
+            assertThat(timer.count()).isEqualTo(1);
+            assertThat(timer.getId().getTags()).containsExactly(Tag.of("mandant", URINET.wert()));
+        } finally {
+            registry.remove(gauge);
+            registry.find(timerName).tag("mandant", URINET.wert()).meters().forEach(registry::remove);
+        }
     }
 
     @Test
