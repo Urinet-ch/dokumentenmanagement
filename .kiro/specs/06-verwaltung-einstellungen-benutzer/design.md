@@ -958,3 +958,11 @@ Nachweise: Browser-Szenarien `@req-8.4`/`@req-8.6` (Profil, Rollen, Löschen, Ei
 axe und Überlaufprüfung) und `@req-8.5` (Step-up für Sperren, Rolle, Löschen, Profil; Bestätigung; Nachweis, dass nichts
 Persönliches in den Browser-Speicher geschrieben wird); Einheitstests der Fortsetzung, der Fehlerbehandlung und der
 Komponenten. Offen bleibt der manuelle Nachweis auf dem Handy [Fabian] (Req 8.2, Aufgabe 21.6).
+
+### Nachtrag (Folge aus PR #529, 24.11.2026)
+
+`BenutzerAbgleichenKommando` beendet auch bei `IDENTITAETSDIENST_FEHLER` mit Exit-Code 3: eine Ablehnung des
+Dienstkontos ist nach Requirement 9.2 ein technischer Fehler, keine Abweichung im Abgleich. Der Aufrufpfad ist mit
+einem Abgleich-Fehler geprüft. Das Szenario `@req-9.1` führt nun `InhaberEinladenKommando.ausfuehren` aus und prüft
+Mandantenkontext, Inhaber-Rolle, Betreiberkennung sowie die datensparsame Terminalausgabe; der tatsächliche
+Einladungsfluss über Keycloak und Mailpit bleibt durch `VerwaltungVorgangTest` und `RealmExportKeycloakTest` belegt.

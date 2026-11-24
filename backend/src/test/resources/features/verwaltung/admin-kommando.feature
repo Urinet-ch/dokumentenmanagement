@@ -3,10 +3,11 @@
 Funktionalität: Betreiberkommandos für Benutzer und Mandanten
 
   @req-9.1 @admin-kommando
-  Szenario: Das Betreiberkommando akzeptiert die Einladung des ersten Inhabers
+  Szenario: Das Betreiberkommando löst die Einladung des ersten Inhabers aus
     Angenommen der Betreiber hat einen Mandanten ohne Inhaber
-    Wenn der Betreiber das Kommando für die erste Inhabereinladung prüft
-    Dann wird die erste Inhabereinladung akzeptiert
+    Wenn der Betreiber das Kommando für die erste Inhabereinladung ausführt
+    Dann wird die erste Inhabereinladung über das Betreiberkommando ausgelöst
+    Und enthält die Terminalausgabe nur die Benutzerkennung
 
   @req-9.4 @verwaltung-abgleich
   Szenario: Der Abgleich meldet unbekannte Realm-Rollen
