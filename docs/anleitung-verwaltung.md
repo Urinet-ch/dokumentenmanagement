@@ -86,6 +86,8 @@ fehlt oder ist mehrwertig), `FREMDE_ROLLE` (Rolle ausserhalb der vier), `BENUTZE
 legt die Spec nicht fest; im Verwaltungsprotokoll und in Keycloak prüfen.**]** Die Migration der heutigen Benutzer
 (`archiv benutzer abgleichen urinet --pruefen`, danach ohne `--pruefen`) ist Aufgabe 21.2 und liegt beim Betreiber; ihr Ergebnis
 steht in `docs/abnahme/verwaltung.md`.
+Ein nicht ausgeführter [Entwurf für Vorbereitung, Prüflauf und Rückfall](benutzer-migration-entwurf.md) unterstützt
+den Betreiber bei 21.2; er ersetzt weder die Freigabe noch den manuellen Betriebsnachweis.
 
 ### Notweg: Benutzer per `kcadm.sh`
 Nur wenn das Dienstkonto oder der Mailversand von Keycloak nicht bereit ist (zum Beispiel bei einem Ausfall von Keycloak oder
