@@ -1,7 +1,20 @@
 # Geheimnisse rotieren
 
-> **Vorbereitung, nicht freigegeben.** Die konkreten Abläufe und ihre Betriebsnachweise fehlen noch.
-> Diese Übersicht ersetzt weder eine Rotationsprobe noch die Notfallunterlagen. Aufgabe 21.5 bleibt offen.
+> **Vorbereitung, nicht freigegeben.** Die Wege unten beruhen auf der Spec und dem Code auf `main`; die Betriebsnachweise
+> (Rotationsprobe, Überlappung der Secrets, Notfallunterlagen) fehlen noch. Diese Übersicht ersetzt weder eine Rotationsprobe
+> noch die Notfallunterlagen. Aufgabe 21.5 bleibt offen.
+
+## Warnung: Datenschlüssel und Salz der Namenssperre nie ungeplant wechseln
+- **Datenschlüssel `archiv_data_key`** (GitHub-Secret `ARCHIV_DATA_KEY`, AES-256-GCM): Er schützt gespeicherte Zugangsdaten, zum
+  Beispiel das Passwort des Mail-Eingangs. Mit einem anderen Schlüssel lassen sie sich nicht mehr entschlüsseln; beim
+  Mail-Eingang muss das Postfach dann neu eingerichtet werden (README, «Mail-Eingang einrichten»). Ein geprüftes
+  Wechselverfahren fehlt. Den Schlüssel dauerhaft sichern und nur mit einem Plan für die Neuverschlüsselung wechseln.
+- **Salz `namenssperre_salz`** (GitHub-Secret `NAMENSSPERRE_SALZ`, 32 zufällige Bytes in Standard-Base64): Die gespeicherten
+  Sperren gesperrter Benutzernamen sind HMAC-Prüfwerte über das Salz. Ein Austausch macht bestehende Sperren unprüfbar; die
+  Datei muss dauerhaft erhalten bleiben (Spec 06, `design.md`). Ein Verfahren, das die Sperren beim Wechsel erhält, gibt es nicht.
+  Bei Verlust oder Verdacht auf Offenlegung nichts auf eigene Faust ersetzen: den Fall zuerst planen und entscheiden.
+- Beide gehören mit in die Notfallunterlagen ([Notfallunterlagen](notfall/notfallunterlagen.md)). Bei Verlust ohne Sicherung
+  gibt es keinen Weg zurück.
 
 Geheimnisse gehören nicht in das Repository, in Protokolle oder in Umgebungsvariablen. Der Betreiber verwaltet die
 GitHub-Secrets und stellt Secret-Dateien ausschliesslich über den Deploy-Workflow bereit. Bei Verdacht auf Offenlegung
@@ -25,6 +38,29 @@ Richtung, **noch keine ausführbare Betriebsanleitung**.
 | Manifest-Schlüssel | Nur mit einem Schlüsselwechselplan wechseln | Alte öffentliche Schlüssel zur Prüfung alter Manifeste aufbewahren; [Manifest-Schlüssel](manifest-schluessel.md#wechsel) beachten |
 | Datenschlüssel | Nur mit einem Plan für die Neuverschlüsselung wechseln | Vorhandene verschlüsselte Daten müssen weiterhin lesbar bleiben; ein geprüftes Wechselverfahren fehlt |
 | Salz der Namenssperre | Nicht durch ein beliebiges neues Salz ersetzen | Die gespeicherten HMAC-Prüfwerte hängen vom Salz ab. Ein Verfahren zur Erhaltung der Namenssperren und dessen Nachweis fehlen |
+
+## Ablauf für Geheimnisse mit belegtem Weg
+Allgemein: Geheimnisse liegen nur als GitHub-Secret und als Secret-Datei unter `/run/secrets/` vor, die der Deploy-Workflow ins
+Bundle schreibt; die Pflichtprüfung im Workflow bricht ab, wenn ein Secret fehlt oder ein falsches Format hat. Wechsel nie
+direkt auf dem Server, sondern über GitHub-Secret und Deploy.
+
+**Dienstkonto Keycloak (`KEYCLOAK_VERWALTUNG_SECRET`)** nach Spec 06, `design.md`:
+1. Keycloak erzeugt ein neues Client-Secret für den Client `archiv-verwaltung` (`kcadm.sh` im Wegwerf-Container, wie im README
+   unter «Admin-Kommandos auf der VPS»); den Wert nicht in Terminal-Verlauf, Protokoll oder Nachweis übernehmen.
+2. GitHub-Secret `KEYCLOAK_VERWALTUNG_SECRET` setzen und deployen; danach ist das alte Secret ungültig.
+3. Nachweis: Token des Dienstkontos ist holbar (Benutzerliste lädt). Keycloak kann zwei Secrets mit Überlappung führen;
+   **[offen:** ob und wie lange auf der Zielumgebung, siehe 19.1 und 19.3**]**.
+Vorbereitet, aber nicht nachgewiesen: die Rotationsprobe ist Teil der manuellen Abnahme 21.6 und liegt beim Betreiber.
+
+**Keycloak-SMTP (`KEYCLOAK_SMTP_PASSWORT`)** und **Archiv-SMTP**: Passwort beim Postfach ändern, GitHub-Secret aktualisieren,
+deployen. **[offen:** Reihenfolge zwischen Postfach und Deploy (Übergang ohne Mailversand) ist nicht belegt.**]**
+
+**Alle weiteren Zeilen** der Tabelle: nur der oben genannte Wechselweg; Details und Nachweise stehen nicht fest.
+
+## Noch offen beim Betreiber
+- Notfallunterlagen um `keycloak_verwaltung_secret`, `keycloak_smtp_passwort` und `namenssperre_salz` ergänzen (19.3,
+  Stand 23.11.2026 in `tasks.md`: offen).
+- Rotationsprobe des Dienstkonto-Geheimnisses (21.6) und Betriebsnachweise zur Secret-Überlappung (19.3).
 
 Die tatsächliche Rotation, die Verwahrung und die Prüfung auf der Betriebsumgebung liegen beim Betreiber. Die
 Rotationsprobe des Dienstkonto-Geheimnisses ist Teil der manuellen Abnahme 21.6; die Betriebsnachweise zur
