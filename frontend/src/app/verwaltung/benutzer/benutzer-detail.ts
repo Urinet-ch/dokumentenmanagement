@@ -9,6 +9,7 @@ import { BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } from '../
 import { zeitpunkt } from '../../gemeinsam/format';
 import { httpFehlerMeldung } from '../../gemeinsam/http-fehler';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { BenutzerFortsetzen, BenutzerFortsetzung } from './benutzer-fortsetzung';
 import { BenutzerLoeschen } from './benutzer-loeschen';
 import { BenutzerProfil } from './benutzer-profil';
 import { name, rollen } from './benutzer-logik';
@@ -31,6 +32,7 @@ export class BenutzerDetail {
   private readonly anmeldung = inject(AnmeldungService);
   private readonly router = inject(Router);
   private readonly zerstoert = inject(DestroyRef);
+  private readonly fortsetzen = inject(BenutzerFortsetzen);
   private laufend?: Subscription;
   private rechteAnfrage?: Subscription;
   private rollenAnfrage?: Subscription;
@@ -55,10 +57,20 @@ export class BenutzerDetail {
   protected readonly rechteFehler = signal<string | null>(null);
   protected readonly rollenFehler = signal<string | null>(null);
   protected readonly aktionMeldung = signal<string | null>(null);
+  protected readonly fortsetzung = signal<BenutzerFortsetzung | null>(null);
+  protected readonly fortsetzungFehler = signal<string | null>(null);
 
   constructor() {
+    // frische Anmeldung nach STEP_UP_NOETIG: nur der erfolgreich geprüfte Rückruf liefert die Fortsetzung, einmalig
+    const fortsetzung = this.fortsetzen.uebernehmen();
+    if (fortsetzung === 'ungueltig') {
+      this.fortsetzungFehler.set(TEXTE.benutzerFortsetzung.ungueltig);
+    } else {
+      this.fortsetzung.set(fortsetzung);
+    }
     inject(ActivatedRoute).paramMap.pipe(takeUntilDestroyed(this.zerstoert)).subscribe((parameter) => {
       this.id = parameter.get('id') ?? '';
+      if (this.fortsetzung() && this.fortsetzung()?.ziel !== this.id) this.fortsetzung.set(null);
       this.aktionMeldung.set(null);
       this.laden();
     });

@@ -25,6 +25,7 @@ const ROLLE: VerwaltungRolle = {
 const anmeldung = {
   benutzer: vi.fn((): { id: string; name: string; mandant: string; rolle: 'inhaber' } | null => null),
   darf: vi.fn().mockReturnValue(false),
+  fortsetzungEntnehmen: vi.fn((): string | null => null),
 };
 
 describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {

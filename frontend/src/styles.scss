@@ -498,3 +498,39 @@ button.kachel {
     animation: none !important;
   }
 }
+
+// Formulare und Dialoge der Benutzerverwaltung (Profil, Einladung, Löschen, Rollenwechsel): Beschriftung über dem Feld
+app-benutzer-profil form > div,
+app-benutzer-einladen form > div {
+  display: grid;
+  gap: .35rem;
+  margin-bottom: 1rem;
+}
+
+app-benutzer-loeschdialog label,
+app-benutzer-rollendialog label {
+  display: block;
+  margin: 1rem 0 .35rem;
+}
+
+app-benutzer-profil input,
+app-benutzer-einladen input,
+app-benutzer-einladen select,
+app-benutzer-loeschdialog input,
+app-benutzer-loeschdialog select,
+app-benutzer-rollendialog select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 28rem;
+  min-height: 2.75rem;
+  padding: 0 .7rem;
+  background-color: var(--karte);
+  color: var(--text);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+}
+
+app-benutzer-loeschdialog mat-dialog-content,
+app-benutzer-rollendialog mat-dialog-content {
+  color: var(--text);
+}

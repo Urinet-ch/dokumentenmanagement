@@ -4,6 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { Subject, of, throwError } from 'rxjs';
 import { BenutzerverwaltungService } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { BenutzerFortsetzen, BenutzerFortsetzung } from './benutzer-fortsetzung';
 import { BenutzerStatusaktionen } from './benutzer-statusaktionen';
 import { BenutzerStatusdialogErgebnis } from './benutzer-statusdialog';
 
@@ -13,10 +14,16 @@ describe('Benutzerstatusaktionen', () => {
     apiV1BenutzerBenutzerIdEntsperrenPost: vi.fn(),
   };
   const oeffnen = vi.fn();
+  const stepUp = { starten: vi.fn() };
+  const stepUpFehler = () => new HttpErrorResponse({ status: 401, error: { fehlercode: 'STEP_UP_NOETIG' } });
+  const fortsetzung = (aktion: BenutzerFortsetzung['aktion'], ziel = 'ziel', grund?: string): BenutzerFortsetzung => ({
+    id: 'f', benutzer: 'akteur', mandant: 'urinet', aktion, ziel, grund, erstellt: Date.now(),
+  });
   let geschlossen: Subject<BenutzerStatusdialogErgebnis | null>;
 
   beforeEach(() => {
     geschlossen = new Subject();
+    stepUp.starten.mockReset().mockReturnValue(true);
     oeffnen.mockReset().mockReturnValue({ afterClosed: () => geschlossen, close: vi.fn() });
     api.apiV1BenutzerBenutzerIdSperrenPost.mockReset().mockReturnValue(of(null));
     api.apiV1BenutzerBenutzerIdEntsperrenPost.mockReset().mockReturnValue(of(null));
@@ -25,6 +32,7 @@ describe('Benutzerstatusaktionen', () => {
       providers: [
         { provide: BenutzerverwaltungService, useValue: api },
         { provide: MatDialog, useValue: { open: oeffnen } },
+        { provide: BenutzerFortsetzen, useValue: stepUp },
       ],
     });
   });
@@ -89,5 +97,55 @@ describe('Benutzerstatusaktionen', () => {
     fixture.detectChanges();
     expect(element.textContent).not.toContain(TEXTE.benutzerStatusdialog.aktionen.entsperren.titel);
     expect(element.textContent).toContain(TEXTE.benutzerStatusdialog.aktionen.reaktivieren.titel);
+  });
+
+  it('merkt bei STEP_UP_NOETIG nur Aktion, Ziel und Grundcode und startet die frische Anmeldung', () => {
+    api.apiV1BenutzerBenutzerIdSperrenPost.mockReturnValue(throwError(stepUpFehler));
+    const { fixture, element } = starten();
+    const ergebnis = vi.fn();
+    fixture.componentInstance.abgeschlossen.subscribe(ergebnis);
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.sperren.titel);
+    geschlossen.next({ grund: 'AUSTRITT' });
+    expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith({ aktion: 'sperren', ziel: 'ziel', grund: 'AUSTRITT' });
+    expect(ergebnis).not.toHaveBeenCalled();
+  });
+
+  it('sendet die Aktion nach der frischen Anmeldung genau einmal und leitet nicht erneut weiter', () => {
+    api.apiV1BenutzerBenutzerIdSperrenPost.mockReturnValue(throwError(stepUpFehler));
+    const fixture = TestBed.createComponent(BenutzerStatusaktionen);
+    fixture.componentRef.setInput('person', { id: 'ziel', benutzername: 'alex', status: 'AKTIV' });
+    fixture.componentRef.setInput('akteurId', 'akteur');
+    fixture.componentRef.setInput('fortsetzung', fortsetzung('sperren', 'ziel', 'AUSTRITT'));
+    fixture.detectChanges();
+    fixture.componentRef.setInput('person', { id: 'ziel', benutzername: 'alex', status: 'AKTIV', totp: true });
+    fixture.detectChanges();
+    expect(api.apiV1BenutzerBenutzerIdSperrenPost).toHaveBeenCalledExactlyOnceWith('ziel', { grund: 'AUSTRITT' });
+    expect(stepUp.starten).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role=alert]')?.textContent)
+      .toContain(TEXTE.benutzerFortsetzung.wiederholtAbgelehnt);
+  });
+
+  it('führt die Fortsetzung nicht aus, wenn Ziel oder Zustand nicht mehr passen', () => {
+    for (const [ziel, status] of [['anderes', 'AKTIV'], ['ziel', 'DEAKTIVIERT']]) {
+      api.apiV1BenutzerBenutzerIdSperrenPost.mockClear();
+      const fixture = TestBed.createComponent(BenutzerStatusaktionen);
+      fixture.componentRef.setInput('person', { id: 'ziel', benutzername: 'alex', status });
+      fixture.componentRef.setInput('akteurId', 'akteur');
+      fixture.componentRef.setInput('fortsetzung', fortsetzung('sperren', ziel, 'AUSTRITT'));
+      fixture.detectChanges();
+      expect(api.apiV1BenutzerBenutzerIdSperrenPost).not.toHaveBeenCalled();
+    }
+  });
+
+  it('zeigt BESTAETIGUNG_NOETIG als eigene Meldung ohne Wiederholung', () => {
+    api.apiV1BenutzerBenutzerIdSperrenPost.mockReturnValue(throwError(() => new HttpErrorResponse({
+      status: 409, error: { fehlercode: 'BESTAETIGUNG_NOETIG', auswirkung: [{ schluessel: 'x', text: 'Folge.' }] },
+    })));
+    const { fixture, element } = starten();
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.sperren.titel);
+    geschlossen.next({ grund: 'AUSTRITT' });
+    fixture.detectChanges();
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.benutzerAktionsfehler.bestaetigungNoetig);
+    expect(api.apiV1BenutzerBenutzerIdSperrenPost).toHaveBeenCalledTimes(1);
   });
 });

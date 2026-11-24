@@ -4,6 +4,9 @@
   <p>{{ texte.einleitung }}</p>
 </div>
 
+@if (fortsetzungFehler(); as meldung) {
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
+}
 <div>
   <form role="search" class="karte suche" (submit)="$event.preventDefault(); suchen(suchfeld.value)">
     <label for="benutzer-suche">{{ texte.suchen }}</label>
@@ -15,7 +18,7 @@
   </form>
 
   @if (einladbareRollen(); as verfuegbareRollen) {
-    <app-benutzer-einladen [rollen]="verfuegbareRollen" (abgeschlossen)="laden(seite())" />
+    <app-benutzer-einladen [rollen]="verfuegbareRollen" [fortsetzung]="fortsetzung()" (verbraucht)="fortsetzung.set(null)" (abgeschlossen)="laden(seite())" />
   }
 
   @if (listenFehler(); as fehler) {

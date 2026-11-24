@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { benutzerAktionsfehler } from './benutzer-aktionsfehler';
+import { BenutzerFortsetzen, BenutzerFortsetzung, istStepUp } from './benutzer-fortsetzung';
 import { BenutzerRollendialog } from './benutzer-rollendialog';
 
 @Component({
@@ -20,11 +21,15 @@ export class BenutzerRollenaktion {
   readonly person = input.required<BenutzerAnsicht>();
   readonly akteurId = input.required<string>();
   readonly rollen = input.required<readonly VerwaltungRolle[]>();
+  readonly fortsetzung = input<BenutzerFortsetzung | null>(null);
+  readonly verbraucht = output<void>();
   readonly abgeschlossen = output<{ id: string; antrag: boolean }>();
 
   private readonly api = inject(BenutzerverwaltungService);
   private readonly dialog = inject(MatDialog);
   private readonly zerstoert = inject(DestroyRef);
+  private readonly stepUp = inject(BenutzerFortsetzen);
+  private fortsetzungVerbraucht = false;
   private geoeffnet?: MatDialogRef<BenutzerRollendialog, string | null>;
 
   protected readonly texte = TEXTE.benutzerRollenaktion;
@@ -33,6 +38,22 @@ export class BenutzerRollenaktion {
 
   constructor() {
     this.zerstoert.onDestroy(() => this.geoeffnet?.close());
+    effect(() => {
+      const fortsetzung = this.fortsetzung();
+      const { id, etag } = this.person();
+      if (this.fortsetzungVerbraucht || fortsetzung?.aktion !== 'rolle' || fortsetzung.ziel !== id) return;
+      this.fortsetzungVerbraucht = true;
+      this.verbraucht.emit();
+      const { rolle } = fortsetzung;
+      if (!id || !rolle || id === this.akteurId() || !this.rollen().some((eintrag) => eintrag.code === rolle)) {
+        this.fehler.set(TEXTE.benutzerFortsetzung.nichtMehrMoeglich);
+      } else if (!etag || etag !== fortsetzung.etag) {
+        this.fehler.set(TEXTE.benutzerAktionsfehler.versionKonflikt);
+      } else {
+        this.laufend.set(true);
+        this.aendern(id, etag, rolle, true);
+      }
+    });
   }
 
   protected oeffnen(): void {
@@ -60,11 +81,11 @@ export class BenutzerRollenaktion {
         this.laufend.set(false);
         return;
       }
-      this.aendern(id, etag, rolle);
+      this.aendern(id, etag, rolle, false);
     });
   }
 
-  private aendern(id: string, etag: string, rolle: string): void {
+  private aendern(id: string, etag: string, rolle: string, ausFortsetzung: boolean): void {
     this.api.apiV1BenutzerBenutzerIdRollePut(id, { rolle }, `"${etag}"`, undefined, 'response')
       .pipe(takeUntilDestroyed(this.zerstoert)).subscribe({
         next: (antwort) => {
@@ -76,6 +97,17 @@ export class BenutzerRollenaktion {
           }
         },
         error: (fehler: unknown) => {
+          if (istStepUp(fehler)) {
+            // genau eine Wiederholung: nach der frischen Anmeldung kein zweites Mal weiterleiten
+            if (ausFortsetzung) {
+              this.laufend.set(false);
+              this.fehler.set(TEXTE.benutzerFortsetzung.wiederholtAbgelehnt);
+            } else if (!this.stepUp.starten({ aktion: 'rolle', ziel: id, etag, rolle })) {
+              this.laufend.set(false);
+              this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+            }
+            return;
+          }
           this.laufend.set(false);
           this.fehler.set(benutzerAktionsfehler(fehler));
         },

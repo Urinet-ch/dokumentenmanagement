@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -6,7 +6,9 @@ import { Observable } from 'rxjs';
 import { BenutzerAnsicht, BenutzerverwaltungService } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { benutzerAktionsfehler } from './benutzer-aktionsfehler';
+import { BenutzerFortsetzen, BenutzerFortsetzung, istStepUp } from './benutzer-fortsetzung';
 import { BenutzerStatusAktion, BenutzerStatusdialog, BenutzerStatusdialogErgebnis } from './benutzer-statusdialog';
+import { Verwaltungsgrund } from './benutzer-loeschdialog';
 
 @Component({
   selector: 'app-benutzer-statusaktionen',
@@ -32,11 +34,15 @@ import { BenutzerStatusAktion, BenutzerStatusdialog, BenutzerStatusdialogErgebni
 export class BenutzerStatusaktionen {
   readonly person = input.required<BenutzerAnsicht>();
   readonly akteurId = input.required<string>();
+  readonly fortsetzung = input<BenutzerFortsetzung | null>(null);
+  readonly verbraucht = output<void>();
   readonly abgeschlossen = output<{ id: string; aktion: BenutzerStatusAktion }>();
 
   private readonly api = inject(BenutzerverwaltungService);
   private readonly dialog = inject(MatDialog);
   private readonly zerstoert = inject(DestroyRef);
+  private readonly stepUp = inject(BenutzerFortsetzen);
+  private fortsetzungVerbraucht = false;
   private geoeffnet?: MatDialogRef<BenutzerStatusdialog, BenutzerStatusdialogErgebnis | null>;
 
   protected readonly texte = TEXTE.benutzerStatusaktionen;
@@ -64,6 +70,21 @@ export class BenutzerStatusaktionen {
 
   constructor() {
     this.zerstoert.onDestroy(() => this.geoeffnet?.close());
+    effect(() => {
+      const fortsetzung = this.fortsetzung();
+      const { id } = this.person();
+      if (this.fortsetzungVerbraucht || !fortsetzung || fortsetzung.ziel !== id
+          || !STATUS_AKTIONEN.has(fortsetzung.aktion)) return;
+      this.fortsetzungVerbraucht = true;
+      this.verbraucht.emit();
+      const aktion = fortsetzung.aktion as BenutzerStatusAktion;
+      if (!id || !this.aktionen().includes(aktion)) {
+        this.fehler.set(TEXTE.benutzerFortsetzung.nichtMehrMoeglich);
+        return;
+      }
+      this.laufend.set(true);
+      this.ausfuehren(id, aktion, { grund: fortsetzung.grund as Verwaltungsgrund | undefined }, true);
+    });
   }
 
   protected oeffnen(aktion: BenutzerStatusAktion): void {
@@ -83,11 +104,12 @@ export class BenutzerStatusaktionen {
         this.laufend.set(false);
         return;
       }
-      this.ausfuehren(id, aktion, ergebnis);
+      this.ausfuehren(id, aktion, ergebnis, false);
     });
   }
 
-  private ausfuehren(id: string, aktion: BenutzerStatusAktion, ergebnis: BenutzerStatusdialogErgebnis): void {
+  private ausfuehren(id: string, aktion: BenutzerStatusAktion, ergebnis: BenutzerStatusdialogErgebnis,
+                     ausFortsetzung: boolean): void {
     let anfrage: Observable<unknown>;
     switch (aktion) {
       case 'sperren':
@@ -118,9 +140,23 @@ export class BenutzerStatusaktionen {
         this.abgeschlossen.emit({ id, aktion });
       },
       error: (fehler: unknown) => {
+        if (istStepUp(fehler)) {
+          // genau eine Wiederholung: nach der frischen Anmeldung kein zweites Mal weiterleiten
+          if (ausFortsetzung) {
+            this.laufend.set(false);
+            this.fehler.set(TEXTE.benutzerFortsetzung.wiederholtAbgelehnt);
+          } else if (!this.stepUp.starten({ aktion, ziel: id, grund: ergebnis.grund })) {
+            this.laufend.set(false);
+            this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+          }
+          return;
+        }
         this.laufend.set(false);
         this.fehler.set(benutzerAktionsfehler(fehler));
       },
     });
   }
 }
+
+const STATUS_AKTIONEN: ReadonlySet<string> = new Set(
+  ['sperren', 'entsperren', 'deaktivieren', 'reaktivieren', 'zugangZuruecksetzen', 'einladung', 'googleLoesen']);

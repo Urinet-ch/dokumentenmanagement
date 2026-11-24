@@ -6,6 +6,9 @@
 @if (aktionMeldung(); as meldung) {
   <p class="hinweis ok" role="status">{{ meldung }}</p>
 }
+@if (fortsetzungFehler(); as meldung) {
+  <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
+}
 @if (fehler(); as meldung) {
   <div class="hinweis gefahr" role="alert">
     <p>{{ meldung }}</p>
@@ -39,16 +42,17 @@
   </section>
 
   @if (darfVerwalten()) {
-    <app-benutzer-profil [person]="person" (abgeschlossen)="aktionAbgeschlossen()" />
+    <app-benutzer-profil [person]="person" [fortsetzung]="fortsetzung()" (verbraucht)="fortsetzung.set(null)" (abgeschlossen)="aktionAbgeschlossen()" />
     <app-benutzer-statusaktionen
       [person]="person"
       [akteurId]="aktuellerBenutzerId()"
+      [fortsetzung]="fortsetzung()" (verbraucht)="fortsetzung.set(null)"
       (abgeschlossen)="aktionAbgeschlossen()" />
 
     @if (person.id !== aktuellerBenutzerId() && person.status === 'DEAKTIVIERT') {
       <section class="karte">
         <h2>{{ loeschdialogTexte.titel }}</h2>
-        <app-benutzer-loeschen [person]="person" (abgeschlossen)="loeschenAbgeschlossen($event)" />
+        <app-benutzer-loeschen [person]="person" [fortsetzung]="fortsetzung()" (verbraucht)="fortsetzung.set(null)" (abgeschlossen)="loeschenAbgeschlossen($event)" />
       </section>
     }
 
@@ -60,6 +64,7 @@
             [person]="person"
             [akteurId]="aktuellerBenutzerId()"
             [rollen]="verfuegbareRollen"
+            [fortsetzung]="fortsetzung()" (verbraucht)="fortsetzung.set(null)"
             (abgeschlossen)="aktionAbgeschlossen($event.antrag)" />
         </section>
       } @else if (rollenFehler(); as rollenMeldung) {

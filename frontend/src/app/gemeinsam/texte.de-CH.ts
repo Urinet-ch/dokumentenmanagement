@@ -1966,6 +1966,15 @@ export const TEXTE = {
     statusKonflikt: 'Die Aktion ist im aktuellen Zustand nicht möglich. Bitte laden Sie die Angaben neu.',
     versionKonflikt: 'Die Daten haben sich geändert. Bitte laden Sie die Angaben neu; Ihre Eingaben bleiben erhalten.',
     identitaetsdienst: 'Der Identitätsdienst ist nicht erreichbar. Bitte versuchen Sie es später erneut.',
+    bestaetigungNoetig: 'Diese Aktion verlangt eine ausdrückliche Bestätigung, die hier nicht vorgesehen ist. Sie wurde nicht ausgeführt.',
+    bestaetigungAuswirkung: 'Auswirkung:',
+    erneuteAnmeldung: 'Die erneute Anmeldung konnte nicht gestartet werden. Die Aktion wurde nicht ausgeführt; bitte versuchen Sie es erneut.',
+  },
+  benutzerFortsetzung: {
+    ungueltig: 'Die Aktion wurde nach der erneuten Anmeldung nicht ausgeführt. Bitte lösen Sie sie erneut aus.',
+    nichtMehrMoeglich: 'Die Aktion ist nach der erneuten Anmeldung nicht mehr möglich und wurde nicht ausgeführt.',
+    wiederholtAbgelehnt: 'Auch nach der erneuten Anmeldung wurde die Aktion nicht zugelassen. Sie wurde nicht ausgeführt.',
+    erneutEingeben: 'Sie sind erneut angemeldet. Aus Datenschutzgründen wurden Ihre Eingaben nicht gespeichert; bitte geben Sie sie erneut ein.',
   },
   benutzerLoeschen: {
     oeffnen: 'Benutzer löschen',

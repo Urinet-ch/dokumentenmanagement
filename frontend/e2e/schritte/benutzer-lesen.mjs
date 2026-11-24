@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import axe from 'axe-core';
 
 const PERSON = {
-  id: 'probe', benutzername: 'a.beispiel', vorname: 'Alex', nachname: 'Beispiel',
+  id: 'probe', etag: 'a'.repeat(64), benutzername: 'a.beispiel', vorname: 'Alex', nachname: 'Beispiel',
   rollen: ['MITARBEITER'], status: 'AKTIV',
   rollenkonflikt: false, totp: true, google: false, voruebergehendGesperrt: false,
   letzteAktion: { zeit: '2026-11-22T20:00:00Z', aktion: 'ANMELDUNG' },
@@ -20,25 +20,59 @@ const ROLLE = {
   ],
 };
 
+const ROLLE_INHABER = {
+  code: 'inhaber', beschreibung: 'Inhaberin oder Inhaber',
+  rechte: [
+    { aktion: 'A1', bezeichnung: 'Dokumente erfassen', ergebnis: 'ERLAUBT', fussnoten: [] },
+    { aktion: 'A2', bezeichnung: 'Dokumente lesen', ergebnis: 'ERLAUBT', fussnoten: [] },
+    { aktion: 'A21', bezeichnung: 'Benutzer ansehen', ergebnis: 'ERLAUBT', fussnoten: [] },
+  ],
+};
+// Aktion -> [Methode, Pfad]; der Pfad der Aktionen am synthetischen Benutzer
+const AKTIONSPFADE = {
+  sperren: ['POST', '/api/v1/benutzer/probe/sperren'],
+  rolle: ['PUT', '/api/v1/benutzer/probe/rolle'],
+  loeschen: ['POST', '/api/v1/benutzer/probe/loeschen'],
+  profil: ['PATCH', '/api/v1/benutzer/probe'],
+};
+
 Given('die Benutzerverwaltung liefert synthetische Daten', async function () {
   this.benutzerAnfragen = [];
   this.benutzerEinladungen = [];
   this.benutzerAktionen = [];
+  this.benutzerPerson = PERSON;
+  this.benutzerRollen = [ROLLE];
+  this.benutzerVerlangt = {};
   await this.seite.route((url) => url.pathname === '/api/v1/rollen'
     || url.pathname === '/api/v1/benutzer' || url.pathname.startsWith('/api/v1/benutzer/'), async (route) => {
     const url = new URL(route.request().url());
     this.benutzerAnfragen.push(url.pathname);
     let antwort;
-    if (url.pathname === '/api/v1/benutzer/probe/sperren' && route.request().method() === 'POST') {
-      this.benutzerAktionen.push({ aktion: 'sperren', body: route.request().postDataJSON() });
+    const aktion = Object.entries(AKTIONSPFADE).find(([, [methode, pfad]]) =>
+      route.request().method() === methode && url.pathname === pfad)?.[0];
+    if (aktion) {
+      const eintrag = { aktion, body: route.request().postDataJSON(), ifMatch: route.request().headers()['if-match'] };
+      const verlangt = this.benutzerVerlangt[aktion];
+      if (verlangt === 'step-up' && !this.benutzerAktionen.some((alt) => alt.aktion === aktion)) {
+        this.benutzerAktionen.push({ ...eintrag, status: 401 });
+        return route.fulfill({ status: 401, json: { fehlercode: 'STEP_UP_NOETIG' } });
+      }
+      if (verlangt === 'bestaetigung') {
+        this.benutzerAktionen.push({ ...eintrag, status: 409 });
+        return route.fulfill({ status: 409, json: { fehlercode: 'BESTAETIGUNG_NOETIG',
+          auswirkung: [{ schluessel: 'sperren', text: 'Alle Sitzungen der Person werden beendet.' }] } });
+      }
+      this.benutzerAktionen.push({ ...eintrag, status: 204 });
       return route.fulfill({ status: 204 });
+    } else if (url.pathname === '/api/v1/benutzer/probe/loeschvorschau') {
+      antwort = { dokumente: 3, protokolleintraege: 7 };
     } else if (url.pathname === '/api/v1/benutzer' && route.request().method() === 'POST') {
       this.benutzerEinladungen.push(route.request().postDataJSON());
       antwort = { id: 'synthetische-einladung' };
     } else if (url.pathname === '/api/v1/benutzer') antwort = [PERSON];
-    else if (url.pathname === '/api/v1/benutzer/probe') antwort = PERSON;
+    else if (url.pathname === '/api/v1/benutzer/probe') antwort = this.benutzerPerson;
     else if (url.pathname === '/api/v1/benutzer/probe/rechte') antwort = ROLLE;
-    else if (url.pathname === '/api/v1/rollen') antwort = [ROLLE];
+    else if (url.pathname === '/api/v1/rollen') antwort = this.benutzerRollen;
     else if (url.pathname === '/api/v1/benutzer/antraege') {
       antwort = [{ id: 'antrag', art: 'INHABER_ROLLE', ziel: 'probe', beantragtVon: 'andere',
         beantragtAm: '2026-11-22T20:00:00Z', gueltigBis: '2026-11-25T20:00:00Z' }];
@@ -47,6 +81,148 @@ Given('die Benutzerverwaltung liefert synthetische Daten', async function () {
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(antwort) });
   });
+});
+
+Given('die synthetischen Rollen enthalten zusätzlich «inhaber»', function () {
+  this.benutzerRollen = [ROLLE, ROLLE_INHABER];
+});
+
+Given('der synthetische Benutzer ist deaktiviert', function () {
+  this.benutzerPerson = { ...PERSON, status: 'DEAKTIVIERT' };
+});
+
+Given(/^die Benutzerverwaltung verlangt vor «(sperren|rolle|loeschen|profil)» ein Step-up$/, async function (aktion) {
+  this.benutzerVerlangt[aktion] = 'step-up';
+  await speicherAufzeichnen(this);
+});
+
+Given('die Benutzerverwaltung verlangt vor «sperren» eine Bestätigung', function () {
+  this.benutzerVerlangt.sperren = 'bestaetigung';
+});
+
+// Zeichnet jede Schreibung in den Browser-Speicher auf, auch über die Weiterleitung zu Keycloak hinweg
+async function speicherAufzeichnen(welt) {
+  welt.speicherSchreibungen = [];
+  await welt.seite.exposeFunction('archivSpeicherSchreibt', (schluessel, wert) => {
+    welt.speicherSchreibungen.push({ schluessel, wert });
+  });
+  await welt.seite.addInitScript(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (schluessel, wert) {
+      window.archivSpeicherSchreibt?.(String(schluessel), String(wert));
+      return original.call(this, schluessel, wert);
+    };
+  });
+}
+
+When('ich die Rolle auf «inhaber» ändere', async function () {
+  await this.seite.getByRole('button', { name: 'Rolle ändern', exact: true }).click();
+  await this.seite.locator('#neue-rolle').selectOption('inhaber');
+  await this.seite.getByRole('button', { name: 'Rollenänderung bestätigen' }).click();
+});
+
+When('ich den Löschdialog öffne', async function () {
+  await this.seite.getByRole('button', { name: 'Benutzer löschen', exact: true }).click();
+  await this.seite.getByRole('dialog').waitFor();
+});
+
+When('ich im Löschdialog den Benutzer «a.beispiel» mit dem Grund «Sicherheit» bestätige', async function () {
+  const dialog = this.seite.getByRole('dialog');
+  await dialog.locator('#loeschen-grund').selectOption({ label: 'Sicherheit' });
+  await dialog.locator('#loeschen-bestaetigung').fill('a.beispiel');
+  await dialog.getByRole('button', { name: 'Löschen', exact: true }).click();
+});
+
+When('ich den Vornamen auf «Neuername» ändere und speichere', async function () {
+  await this.seite.locator('#profil-vorname').fill('Neuername');
+  await this.seite.getByRole('button', { name: 'Änderungen speichern' }).click();
+});
+
+When('ich das Profil, den Rollendialog und den Löschdialog prüfe', async function () {
+  await this.seite.getByRole('heading', { name: 'Benutzerangaben ändern' }).waitFor();
+  await pruefen(this, 'profil');
+  await this.seite.getByRole('button', { name: 'Rolle ändern', exact: true }).click();
+  await this.seite.getByRole('dialog').getByText('Rollenänderung bestätigen').waitFor();
+  await this.seite.locator('#neue-rolle').selectOption('inhaber');
+  await this.seite.getByRole('dialog').getByRole('heading', { name: 'Neue Rechte' }).waitFor();
+  await pruefen(this, 'rollendialog');
+  await this.seite.getByRole('button', { name: 'Abbrechen' }).click();
+  await this.seite.getByRole('dialog').waitFor({ state: 'detached' });
+  await this.seite.getByRole('button', { name: 'Benutzer löschen', exact: true }).click();
+  await this.seite.getByRole('dialog').getByText('Dokumente mit Bezug zum Benutzer').waitFor();
+  await pruefen(this, 'loeschdialog');
+  await this.seite.getByRole('button', { name: 'Abbrechen' }).click();
+});
+
+Then('sind Profil, Rollendialog und Löschdialog ohne Überlauf und axe-Befund bedienbar', async function () {
+  assert.deepEqual(this.benutzerAktionen, []);
+});
+
+Then(/^wird die Aktion «(sperren|rolle)» nach Step-up genau einmal ausgeführt$/, async function (aktion) {
+  await this.seite.getByText('Die Benutzerangaben wurden aktualisiert.', { exact: false }).waitFor();
+  const eigene = this.benutzerAktionen.filter((eintrag) => eintrag.aktion === aktion);
+  assert.deepEqual(eigene.map((eintrag) => eintrag.status), [401, 204]);
+  assert.deepEqual(eigene[1].body, eigene[0].body);
+  assert.equal(eigene[1].ifMatch, eigene[0].ifMatch);
+  if (aktion === 'rolle') assert.equal(eigene[1].ifMatch, `"${'a'.repeat(64)}"`);
+  assert.equal(this.keycloak.pkce.length, 2);
+  assert.ok(this.keycloak.pkce.every(Boolean));
+  await pruefen(this, `stepup-${aktion}`);
+});
+
+Then('öffnet sich der Löschdialog nach dem Step-up erneut ohne gespeicherte Eingaben', async function () {
+  const dialog = this.seite.getByRole('dialog');
+  await dialog.waitFor();
+  await this.seite.getByText('Aus Datenschutzgründen wurden Ihre Eingaben nicht gespeichert', { exact: false }).waitFor();
+  assert.equal(await dialog.locator('#loeschen-bestaetigung').inputValue(), '');
+  assert.equal(await dialog.locator('#loeschen-grund').inputValue(), '');
+  assert.deepEqual(this.benutzerAktionen.map((eintrag) => eintrag.status), [401]);
+  await pruefen(this, 'stepup-loeschen');
+});
+
+Then('wurde der Benutzer nach dem Step-up genau einmal gelöscht', async function () {
+  await this.seite.waitForURL((url) => url.pathname === '/verwaltung/benutzer');
+  assert.deepEqual(this.benutzerAktionen.map((eintrag) => [eintrag.aktion, eintrag.status]),
+    [['loeschen', 401], ['loeschen', 204]]);
+  assert.deepEqual(this.benutzerAktionen[1].body, { grund: 'SICHERHEIT' });
+});
+
+Then('zeigt das Profil nach dem Step-up den Hinweis zur erneuten Eingabe', async function () {
+  await this.seite.getByText('Aus Datenschutzgründen wurden Ihre Eingaben nicht gespeichert', { exact: false }).waitFor();
+  assert.equal(await this.seite.locator('#profil-vorname').inputValue(), 'Alex');
+  assert.deepEqual(this.benutzerAktionen.map((eintrag) => eintrag.status), [401]);
+  await pruefen(this, 'stepup-profil');
+});
+
+Then('wurde die Profiländerung nach dem Step-up genau einmal ausgeführt', async function () {
+  await this.seite.getByText('Die Benutzerangaben wurden aktualisiert.', { exact: false }).waitFor();
+  assert.deepEqual(this.benutzerAktionen.map((eintrag) => [eintrag.aktion, eintrag.status]),
+    [['profil', 401], ['profil', 204]]);
+  assert.deepEqual(this.benutzerAktionen[1].body, { vorname: 'Neuername' });
+});
+
+Then('liegt nichts Persönliches im Browser-Speicher', async function () {
+  const persoenlich = ['Beispiel', 'beispiel', 'Alex', 'example.invalid', 'Neuername', 'MITARBEITER', 'Sicherheit'];
+  assert.ok(this.speicherSchreibungen.length > 0);
+  for (const { schluessel, wert } of this.speicherSchreibungen) {
+    for (const text of persoenlich) {
+      assert.ok(!wert.includes(text), `${schluessel} enthält «${text}»`);
+    }
+  }
+  const fortsetzung = this.speicherSchreibungen.filter(({ schluessel }) => schluessel === 'archiv.benutzer.fortsetzung');
+  assert.equal(fortsetzung.length, 1);
+  const erlaubt = ['id', 'benutzer', 'mandant', 'aktion', 'ziel', 'etag', 'grund', 'rolle', 'erstellt'];
+  assert.ok(Object.keys(JSON.parse(fortsetzung[0].wert)).every((schluessel) => erlaubt.includes(schluessel)));
+  const uebrig = await this.seite.evaluate(() => [localStorage, sessionStorage]
+    .map((speicher) => speicher.getItem('archiv.benutzer.fortsetzung')));
+  assert.deepEqual(uebrig, [null, null]);
+});
+
+Then('zeigt die Benutzerverwaltung die Bestätigungsnotwendigkeit und sendet nichts erneut', async function () {
+  await this.seite.getByText('Diese Aktion verlangt eine ausdrückliche Bestätigung', { exact: false }).waitFor();
+  await this.seite.getByText('Alle Sitzungen der Person werden beendet.', { exact: false }).first().waitFor();
+  assert.deepEqual(this.benutzerAktionen.map((eintrag) => eintrag.status), [409]);
+  await pruefen(this, 'bestaetigung-noetig');
 });
 
 When('ich sende eine synthetische Benutzereinladung', async function () {
@@ -91,7 +267,8 @@ Then('zeigt der Sperrdialog die Auswirkung und wartet auf die Bestätigung', asy
 
 Then('wird die Sperrung erst nach der Bestätigung einmal gesendet', async function () {
     await this.seite.getByRole('dialog').waitFor({ state: 'detached' });
-    assert.deepEqual(this.benutzerAktionen, [{ aktion: 'sperren', body: { grund: 'SICHERHEIT' } }]);
+    assert.deepEqual(this.benutzerAktionen.map(({ aktion, body }) => ({ aktion, body })),
+      [{ aktion: 'sperren', body: { grund: 'SICHERHEIT' } }]);
 });
 
 async function pruefen(welt, name) {

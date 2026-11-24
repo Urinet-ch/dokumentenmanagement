@@ -22,7 +22,12 @@ Benutzers gültig. API-Tokens verwalten Sie auf der separaten Seite «API-Tokens
 Als Inhaberin oder Inhaber können Sie Benutzer einladen und auf der Detailseite Angaben ändern, den Zugang verwalten,
 Rollen ändern und Benutzer löschen. Eine Einladung verschickt Keycloak per E-Mail; das Archiv zeigt weder Passwort noch
 Einladungslink. Falls Ihre Sitzung für eine Änderung nicht mehr frisch genug ist, fragt das Archiv erneut nach Ihrer
-Anmeldung und setzt den Vorgang einmal fort. Nach einer Änderung sehen Sie eine Bestätigung oder bei Vorgängen mit
+Anmeldung. Sperren, Entsperren, Deaktivieren, Reaktivieren, Zugang zurücksetzen und Rollenänderungen sendet das Archiv
+danach genau einmal selbst, sofern sich der Benutzer in der Zwischenzeit nicht geändert hat. Beim Löschen, bei Änderungen
+der Benutzerangaben und beim Einladen müssen Sie Ihre Eingaben nach der Anmeldung neu erfassen: Namen, Adressen und
+der bestätigende Benutzername werden aus Datenschutzgründen nie im Browser zwischengespeichert. Verlangt eine Aktion
+eine ausdrückliche Bestätigung, die die Benutzerverwaltung nicht vorsieht, führt das Archiv sie nicht aus und nennt die
+Auswirkung. Nach einer Änderung sehen Sie eine Bestätigung oder bei Vorgängen mit
 Vier-Augen-Freigabe einen offenen Antrag.
 
 Sperren, Deaktivieren und Rollenänderungen verlangen eine Bestätigung vor dem Ausführen. Beim Löschen zeigt das Archiv

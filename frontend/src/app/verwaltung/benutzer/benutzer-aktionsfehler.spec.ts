@@ -23,4 +23,14 @@ describe('Fehler bei Benutzeraktionen', () => {
       status: 503, error: { fehlercode: 'IDENTITAETSDIENST_NICHT_ERREICHBAR' },
     }))).toBe(TEXTE.benutzerAktionsfehler.identitaetsdienst);
   });
+
+  it('zeigt bei BESTAETIGUNG_NOETIG nur geprüfte Auswirkungstexte und sendet nichts', () => {
+    const fehler = new HttpErrorResponse({ status: 409, error: {
+      fehlercode: 'BESTAETIGUNG_NOETIG', auswirkung: [{ schluessel: 'a', text: 'Der Zugang wird beendet.' }, { text: 7 }],
+    } });
+    expect(benutzerAktionsfehler(fehler)).toBe(
+      `${TEXTE.benutzerAktionsfehler.bestaetigungNoetig} ${TEXTE.benutzerAktionsfehler.bestaetigungAuswirkung} Der Zugang wird beendet.`);
+    expect(benutzerAktionsfehler(new HttpErrorResponse({ status: 409, error: { fehlercode: 'BESTAETIGUNG_NOETIG' } })))
+      .toBe(TEXTE.benutzerAktionsfehler.bestaetigungNoetig);
+  });
 });

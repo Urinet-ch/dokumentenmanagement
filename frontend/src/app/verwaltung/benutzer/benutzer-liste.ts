@@ -10,6 +10,7 @@ import { Ansicht, BenutzerAnsicht, BenutzerverwaltungService, VerwaltungRolle } 
 import { zeitpunkt } from '../../gemeinsam/format';
 import { httpFehlerMeldung } from '../../gemeinsam/http-fehler';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
+import { BenutzerFortsetzen, BenutzerFortsetzung } from './benutzer-fortsetzung';
 import { BenutzerEinladen } from './benutzer-einladen';
 import { name, rollen } from './benutzer-logik';
 import { BenutzerRechte } from './benutzer-rechte';
@@ -28,6 +29,7 @@ export class BenutzerListe implements OnInit {
   private readonly anmeldung = inject(AnmeldungService);
   private readonly router = inject(Router);
   private readonly zerstoert = inject(DestroyRef);
+  private readonly fortsetzen = inject(BenutzerFortsetzen);
   private laufend?: Subscription;
   private suche = '';
 
@@ -48,8 +50,16 @@ export class BenutzerListe implements OnInit {
   protected readonly listenFehler = signal<string | null>(null);
   protected readonly rollenFehler = signal<string | null>(null);
   protected readonly antraegeFehler = signal<string | null>(null);
+  protected readonly fortsetzung = signal<BenutzerFortsetzung | null>(null);
+  protected readonly fortsetzungFehler = signal<string | null>(null);
 
   ngOnInit(): void {
+    const fortsetzung = this.fortsetzen.uebernehmen();
+    if (fortsetzung === 'ungueltig') {
+      this.fortsetzungFehler.set(TEXTE.benutzerFortsetzung.ungueltig);
+    } else {
+      this.fortsetzung.set(fortsetzung);
+    }
     this.laden(0);
     this.rollenLaden();
     this.antraegeLaden();

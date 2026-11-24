@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { BenutzerAenderung, BenutzerAnsicht, BenutzerverwaltungService } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { benutzerAktionsfehler } from './benutzer-aktionsfehler';
+import { BenutzerFortsetzen, BenutzerFortsetzung, istStepUp } from './benutzer-fortsetzung';
 import { BenutzerFeldfehler, benutzerFeldbefunde, emailGueltig, nameGueltig } from './benutzer-formregeln';
 
 type Feld = 'email' | 'vorname' | 'nachname';
@@ -19,6 +20,7 @@ const FELDER: readonly Feld[] = ['email', 'vorname', 'nachname'];
     <section class="karte">
       <h2>{{ texte.titel }}</h2>
       <p>{{ texte.hinweis }}</p>
+      @if (fortsetzungHinweis(); as text) { <p class="hinweis" role="status">{{ text }}</p> }
       @if (fehler(); as text) {
         <div class="hinweis gefahr" role="alert">
           <p>{{ text }}</p>
@@ -51,11 +53,14 @@ const FELDER: readonly Feld[] = ['email', 'vorname', 'nachname'];
 })
 export class BenutzerProfil {
   readonly person = input.required<BenutzerAnsicht>();
+  readonly fortsetzung = input<BenutzerFortsetzung | null>(null);
+  readonly verbraucht = output<void>();
   readonly abgeschlossen = output<string>();
   readonly nachladen = output<void>();
 
   private readonly api = inject(BenutzerverwaltungService);
   private readonly zerstoert = inject(DestroyRef);
+  private readonly stepUp = inject(BenutzerFortsetzen);
   private anfrage?: Subscription;
   private id = '';
   private basis: Werte = { email: '', vorname: '', nachname: '' };
@@ -67,8 +72,17 @@ export class BenutzerProfil {
   protected readonly fehler = signal<string | null>(null);
   protected readonly versionskonflikt = signal(false);
   protected readonly laufend = signal(false);
+  protected readonly fortsetzungHinweis = signal<string | null>(null);
 
   constructor() {
+    effect(() => {
+      const fortsetzung = this.fortsetzung();
+      if (fortsetzung?.aktion === 'profil' && fortsetzung.ziel === this.person().id) {
+        // Eingaben wurden nicht gespeichert (Datenschutz): Formular zeigt die Serverwerte, der Benutzer tippt neu
+        this.fortsetzungHinweis.set(TEXTE.benutzerFortsetzung.erneutEingeben);
+        this.verbraucht.emit();
+      }
+    });
     effect(() => {
       const person = this.person();
       const neu: Werte = { email: person.email ?? '', vorname: person.vorname ?? '', nachname: person.nachname ?? '' };
@@ -100,6 +114,7 @@ export class BenutzerProfil {
   protected speichern(): void {
     if (this.laufend()) return;
     this.fehler.set(null);
+    this.fortsetzungHinweis.set(null);
     const person = this.person();
     const { id, etag } = person;
     if (!id || !etag || !/^[a-f0-9]{64}$/.test(etag) || person.rollenkonflikt) {
@@ -130,7 +145,12 @@ export class BenutzerProfil {
           this.abgeschlossen.emit(id);
         },
         error: (fehler: unknown) => {
+          if (istStepUp(fehler) && this.stepUp.starten({ aktion: 'profil', ziel: id })) return;
           this.laufend.set(false);
+          if (istStepUp(fehler)) {
+            this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+            return;
+          }
           this.feldfehler.set(benutzerFeldbefunde(fehler));
           this.fehler.set(benutzerAktionsfehler(fehler));
           this.versionskonflikt.set(fehler instanceof HttpErrorResponse && fehler.status === 412);

@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { BenutzerverwaltungService, VerwaltungRolle } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { benutzerAktionsfehler } from './benutzer-aktionsfehler';
+import { BenutzerFortsetzen, BenutzerFortsetzung, istStepUp } from './benutzer-fortsetzung';
 import {
   BenutzerFeld, BenutzerFeldfehler, benutzerFeldbefunde, benutzernameGueltig, emailGueltig, nameGueltig,
 } from './benutzer-formregeln';
@@ -21,6 +22,7 @@ type Feldfehler = BenutzerFeldfehler;
       <p>{{ texte.hinweis }}</p>
       @if (fehler(); as text) { <p class="hinweis gefahr" role="alert">{{ text }}</p> }
       @if (meldung(); as text) { <p class="hinweis ok" role="status">{{ text }}</p> }
+      @if (fortsetzungHinweis(); as text) { <p class="hinweis" role="status">{{ text }}</p> }
       @if (laufend()) { <p role="status">{{ texte.laeuft }}</p> }
       <form #formular novalidate (submit)="$event.preventDefault(); senden()">
         @for (feld of textfelder; track feld) {
@@ -60,10 +62,13 @@ type Feldfehler = BenutzerFeldfehler;
 })
 export class BenutzerEinladen {
   readonly rollen = input.required<readonly VerwaltungRolle[]>();
+  readonly fortsetzung = input<BenutzerFortsetzung | null>(null);
+  readonly verbraucht = output<void>();
   readonly abgeschlossen = output<{ id: string; antrag: boolean }>();
 
   private readonly api = inject(BenutzerverwaltungService);
   private readonly zerstoert = inject(DestroyRef);
+  private readonly stepUp = inject(BenutzerFortsetzen);
   private readonly formular = viewChild.required<ElementRef<HTMLFormElement>>('formular');
   protected readonly texte = TEXTE.benutzerEinladen;
   protected readonly textfelder = ['benutzername', 'email', 'vorname', 'nachname'] as const;
@@ -72,6 +77,17 @@ export class BenutzerEinladen {
   protected readonly fehler = signal<string | null>(null);
   protected readonly meldung = signal<string | null>(null);
   protected readonly laufend = signal(false);
+  protected readonly fortsetzungHinweis = signal<string | null>(null);
+
+  constructor() {
+    effect(() => {
+      if (this.fortsetzung()?.aktion === 'einladen') {
+        // Eingaben wurden nicht gespeichert (Datenschutz): leeres Formular, der Benutzer tippt neu
+        this.fortsetzungHinweis.set(TEXTE.benutzerFortsetzung.erneutEingeben);
+        this.verbraucht.emit();
+      }
+    });
+  }
 
   protected setzen(feld: Feld, event: Event): void {
     const wert = (event.target as HTMLInputElement | HTMLSelectElement).value;
@@ -84,6 +100,7 @@ export class BenutzerEinladen {
     if (this.laufend()) return;
     this.fehler.set(null);
     this.meldung.set(null);
+    this.fortsetzungHinweis.set(null);
     const eingabe = this.eingabe();
     const befunde = pruefen(eingabe, this.rollen());
     this.feldfehler.set(befunde);
@@ -102,7 +119,12 @@ export class BenutzerEinladen {
         this.abgeschlossen.emit({ id: antwort.id, antrag: !!antwort.antragId });
       },
       error: (fehler: unknown) => {
+        if (istStepUp(fehler) && this.stepUp.starten({ aktion: 'einladen', ziel: '' })) return;
         this.laufend.set(false);
+        if (istStepUp(fehler)) {
+          this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+          return;
+        }
         const felder = benutzerFeldbefunde(fehler);
         this.feldfehler.set(felder);
         this.fehler.set(benutzerAktionsfehler(fehler));
