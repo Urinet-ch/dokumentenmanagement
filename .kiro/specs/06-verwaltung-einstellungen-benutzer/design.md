@@ -211,7 +211,20 @@ Zustand in Keycloak und schreibt den Abschluss `UNKLAR` mit Alarm; er ändert ni
 Für den Protokollgrund sind ausschliesslich die festen Kategorien `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`,
 `KORREKTUR` und `SONSTIGES` zulässig. So können Namen, E-Mail-Adressen und Geheimnisse nicht durch Freitext ins
 append-only Protokoll gelangen. Die Kategorie muss beim Vorgang explizit gewählt werden; Freitext wird nicht
-automatisch umgedeutet. Die Anbindung der Eingaben und Pflichtprüfung folgt mit den Verwaltungsendpunkten.
+automatisch umgedeutet. Die Verwaltungsendpunkte binden die Eingaben und Pflichtprüfung an.
+
+#### Umsetzung (Aufgabe 19.6, 24.11.2026)
+- Die ursprünglich offenen Anbindungen sind mit 19.7, 19.8, 20.2 und 21.1 umgesetzt: `ANLAGE` und `AUSTRITT`
+  stehen in der Abschlusstransaktion, `UEBERNAHME` wird transaktional und idempotent eingetragen. Sperren,
+  Deaktivieren und Löschen prüfen die feste Grundkategorie. Einstellungen und geänderte Einstellungen beim
+  Dateiimport prüfen `Art.EINSTELLUNG`; unveränderte Einstellungen zählen nicht als Änderung.
+- `benutzer-verwalten.feature` prüft den gleichzeitigen Rollenwechsel (`@req-4.7`), die protokollierte Anlage mit
+  Verzeichniszeile (`@req-6.1`–`6.4`) und die begrenzten Einladungen (`@req-6.6`). Der Austritt wird im
+  Szenario zu `@req-3.9` geprüft; die Übernahme im Szenario zu `@req-9.2` und
+  `BenutzerAdminKommandoAnwendungTest`.
+- `VerwaltungVorgangTest` prüft die festgeschriebene Absicht vor externer Wirkung und den Rollback bei Fehlern im
+  Abschluss. `VerwaltungProtokollTest`, `JdbcVerwaltungGrenzenTest`, die HTTP-Szenarien zur Einstellungsgrenze und
+  `KeinLoeschpfadTest` ergänzen die Nachweise zu Datenschutz, Raten und Append-only (6.2, 6.6, 6.8).
 
 Bei der Anlage eines weiteren Inhabers mit mindestens zwei aktiven Inhabern entsteht zunächst ein Konto ohne
 Archiv-Rolle und ein offener Antrag; die Bestätigung und Rollenvergabe folgen in 19.11. Auch dieses Konto kann seine
@@ -669,6 +682,15 @@ Stand Aufgabe 19.1: Nachgewiesen sind Mandantensuche, Rollenmitglieder, Issuer, 
 erfolgreiche Dienstkonto-Aufruf. Offen sind interne Adresse und Backchannel, Secret-Rotation, `auth_time`, `prompt=login` und
 `execute-actions-email`; dazu der Entscheid zu FGAP gegen `manage-users` (Open Points). Die Entscheide sind am 20.11.2026 gefallen (Open Points);
 Aufgabe 19.2 beginnt mit den offenen Nachweisen oben.
+
+### Nachtrag Umsetzung (Aufgabe 19.1, 24.11.2026)
+
+Die oben als offen beschriebenen technischen Spike-Nachweise sind inzwischen mit 19.2 und 19.10 erbracht.
+`RealmExportKeycloakTest.stepUpVerlangtFrischeAuthentifizierungUndPromptLoginErneuertAuthTime` prüft gegen den
+importierten Realm den Step-up-Endpunkt, den unzureichenden SSO-Cookie und die erneute Anmeldung mit Passwort und TOTP.
+`StepUpMitAuthTimeTest` prüft zusätzlich die Claim- und Zeitgrenzen; `benutzer-verwalten.feature` enthält Szenarien zu
+`@req-7.2`. Die konkrete interne Compose-Verbindung mit korrektem Issuer und die automatische Ablaufzeit der
+Secret-Überlappung sind nicht durch den synthetischen Test belegt und bleiben Betriebsnachweise in 19.3 [Fabian].
 
 ## Umsetzung 19.2 — Realm-Export und Tests
 

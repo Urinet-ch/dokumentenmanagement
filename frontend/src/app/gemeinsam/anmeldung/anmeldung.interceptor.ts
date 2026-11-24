@@ -1,6 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { from, switchMap, tap } from 'rxjs';
+import { httpFehlercode } from '../http-fehler';
 import { AnmeldungService } from './anmeldung.service';
 
 /**
@@ -19,6 +20,14 @@ export const anmeldungInterceptor: HttpInterceptorFn = (anfrage, weiter) => {
     tap({
       error: (fehler: unknown) => {
         if (fehler instanceof HttpErrorResponse && fehler.status === 401
+            && fehler.error instanceof Blob) {
+          void httpFehlercode(fehler).then(
+            (code) => {
+              if (code !== 'STEP_UP_NOETIG') anmeldung.sitzungAbgelaufen();
+            },
+            () => anmeldung.sitzungAbgelaufen(),
+          );
+        } else if (fehler instanceof HttpErrorResponse && fehler.status === 401
             && fehler.error?.fehlercode !== 'STEP_UP_NOETIG') {
           anmeldung.sitzungAbgelaufen();
         }

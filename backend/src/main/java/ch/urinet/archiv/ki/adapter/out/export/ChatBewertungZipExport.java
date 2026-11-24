@@ -57,6 +57,7 @@ public class ChatBewertungZipExport implements ChatBewertungZipPort {
                                        Schwaerzung schwaerzung, byte[] salz) {
         ObjectNode json = JSON.createObjectNode();
         json.put("datum", zeile.zeit().atZone(ZUERICH).toLocalDate().toString());
+        json.put("modus", zeile.modus().name());
         json.put("sterne", zeile.sterne());
         optional(json, "grund", zeile.grund());
         optionalText(json, "freitext", zeile.freitext(), schwaerzung);
@@ -207,6 +208,7 @@ public class ChatBewertungZipExport implements ChatBewertungZipPort {
                 Chat-Bewertungen, Format chat-bewertungen/v1
 
                 Die Datei bewertungen.jsonl enthält eine JSON-Zeile je Bewertung. schema.json beschreibt die Felder.
+                modus bezeichnet den gespeicherten Gesprächsmodus ARCHIV oder WISSEN.
                 Die Treffer-Kennungen sind mit einem nur für diesen Export verwendeten Salz gehashte IDs.
                 Zeit bis zum ersten Text, Modellkennung und Prompt-Version sind null, wenn sie für eine historische
                 Antwort nicht gespeichert wurden. Ähnlichkeit ist null, wenn sie nicht erfasst wurde oder der Treffer

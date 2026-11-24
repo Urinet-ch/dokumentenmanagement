@@ -46,6 +46,13 @@ describe('Rechte (Req 2.2, 2.6)', () => {
     }
   });
 
+  it('erlaubt die Chat-Auswertung nur dem Inhaber (A24)', () => {
+    expect(darf('inhaber', 'A24')).toBe(true);
+    for (const rolle of ['treuhaender', 'mitarbeiter', 'geschaeftsstelle'] as const) {
+      expect(darf(rolle, 'A24')).toBe(false);
+    }
+  });
+
   it('erlaubt Einstellungen und Benutzerverwaltung nur dem Inhaber (A20 bis A23)', () => {
     for (const aktion of ['A20', 'A21', 'A22', 'A23'] as const) {
       expect(darf('inhaber', aktion)).toBe(true);
