@@ -226,8 +226,16 @@ class VerwaltungVorgangTest {
                     IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
             int port = ConfigProvider.getConfig().getValue("archiv.entwicklung.mailpit-port", Integer.class);
             String mailpit = "http://localhost:" + port;
-            List<String> mailIds = given().baseUri(mailpit).queryParam("query", "to:" + email)
-                    .get("/api/v1/search").then().statusCode(200).extract().jsonPath().getList("messages.ID");
+            List<String> mailIds;
+            long frist = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            do {
+                mailIds = given().baseUri(mailpit).queryParam("query", "to:" + email)
+                        .get("/api/v1/search").then().statusCode(200).extract().jsonPath().getList("messages.ID");
+                if (!mailIds.isEmpty()) {
+                    break;
+                }
+                Thread.sleep(100);
+            } while (System.nanoTime() < frist);
             assertThat(mailIds).isNotEmpty();
             var mail = given().baseUri(mailpit).get("/api/v1/message/" + mailIds.getFirst())
                     .then().statusCode(200).extract().jsonPath();
