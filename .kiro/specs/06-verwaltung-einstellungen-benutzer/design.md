@@ -825,6 +825,12 @@ wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut gelade
 synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
 Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
 
+Nachweisstand 24.11.2026: Die in #505 und #514 geprüfte Benutzerliste und das Detail sind weiterhin durch
+`benutzer-lesen-pwa.feature` und Angular-Tests abgedeckt; #531 ergänzt die Browser-Prüfung der eingebundenen
+Benutzeraktionen. Die Browser-Szenarien verwenden synthetische Antworten und prüfen 375/1280 px, beide Farbschemata,
+axe, Tastatur und den Direktzugriff ohne A21. Die manuelle Prüfung von 8.2 und 8.7 bleibt bei 21.6 [Fabian];
+die Checkbox 20.6 bleibt deshalb offen.
+
 Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
 Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
 
