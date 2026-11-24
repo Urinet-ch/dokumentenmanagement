@@ -15,7 +15,7 @@ Stunden gross. Aufgaben mit **[Fabian]** erledigt Fabian (Realm, Secrets, Deploy
 auf Server oder Secrets aus der Sitzung.
 
 ## Welle 19 — Dienstkonto, Benutzer und Rollen
-- [ ] 19.1 Entscheide und Spike Keycloak [Backend]
+- [x] 19.1 Entscheide und Spike Keycloak [Backend]
   - Die vier Entscheide aus design.md «Open Points» (vhf-gsk, Löschfrist, Wissens-Einstellungen, Alarm-Empfänger und
     Budget) sind mit dem Merge dieses PR gefallen oder stehen als Notiz im PR.
   - Spike gegen den Dev Service mit Keycloak 26.8.2 (Ergebnis als «Umsetzung 19.1» in design.md): feingranulare Admin-Rechte
@@ -27,7 +27,8 @@ auf Server oder Secrets aus der Sitzung.
     Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»); `auth_time`, `prompt=login`,
     `execute-actions-email`, interne Adresse und Secret-Rotation sind mit 19.2 nachgewiesen (design.md «Umsetzung 19.2»).
     Der Entscheid zu FGAP und `manage-users` ist in design.md «Open Points» festgehalten. Betriebsnachweise folgen in 19.3.
-    Checkbox offen: Der vollständige Nachweis von 7.2 (Step-up-Endpunkt) folgt mit 19.10.
+    Nachweis 24.11.2026: Der Step-up-Endpunkt und der Test gegen Keycloak sind mit 19.10 umgesetzt (Req 7.2);
+    die Betriebsnachweise zur internen Compose-Verbindung und zum Ablauf der Secret-Überlappung bleiben bei 19.3 [Fabian].
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
