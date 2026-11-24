@@ -17,10 +17,12 @@ Keycloak noch die Betriebsumgebung.
 5. Den Abgleich zunächst lesend ausführen. Abweichungen und Dienstfehler vor der Übernahme getrennt und geschützt
    untersuchen. Nicht allein aus Exit-Code 1 auf einen fachlichen Befund schliessen: der bekannte Folgefall
    `IDENTITAETSDIENST_FEHLER` ist Gegenstand von #529. Keine Annahme aus einem fehlenden JSON-Bericht ableiten.
-   Ein bestehender Inhaber ohne protokollierten Anlage- oder Rollenvorgang kann `ROLLE_OHNE_VORGANG` auslösen;
-   eine `UEBERNAHME` allein dokumentiert diesen Vorgang nicht. Der Entwurf lässt eine solche Abweichung nicht
-   passieren. Vor einem betroffenen Echtlauf muss das Vorgehen dafür separat fachlich und technisch geklärt werden;
-   keine Rolle ändern oder Protokollzeile erfinden, um die Prüfung zu umgehen.
+   Bei bestehenden Inhabern ohne protokollierten Anlage- oder Rollenvorgang ist `ROLLE_OHNE_VORGANG` zu erwarten,
+   insbesondere für `fabian` im Mandanten `urinet`; eine Verzeichnis-`UEBERNAHME` allein behebt den Befund nicht.
+   Der Entwurf bricht dabei gewollt ab. Nach Fabians Entscheid vom 24.11.2026 muss zuerst der in 21.2a noch zu
+   implementierende protokollierte Betreibervorgang ausgeführt werden: Er dokumentiert die bestehende Rolle, ohne
+   Keycloak zu ändern oder die strenge Abgleich-Regel 6.5/9.4 zu lockern. Erst danach Prüflauf und Schreiblauf
+   ausführen; vor Abschluss von 21.2a ist dieser Ablauf nicht verfügbar.
 
 ## Starter und Ablauf
 
@@ -46,7 +48,8 @@ python3 tools/benutzer-migration-entwurf.py /pfad/zum/starter '<mandant>'
 python3 tools/benutzer-migration-entwurf.py /pfad/zum/starter '<mandant>' --uebernehmen
 ```
 
-Der erste Aufruf liest nur. Der zweite wiederholt die Prüfung und verlangt am Terminal `UEBERNEHMEN`. Bei jedem
+Der erste Aufruf liest nur. Der zweite wiederholt die Prüfung und verlangt bei geplanten Übernahmen am Terminal
+`UEBERNEHMEN`; bei null geplanten Übernahmen startet er keinen Schreiblauf. Bei jedem
 nicht erfolgreichen Exit-Code, fehlendem oder widersprüchlichem JSON oder einer Abweichung bricht der Entwurf ab.
 Nach dem Schreiben verlangt er dieselbe Anzahl Übernahmen wie geplant und eine erneute Prüfung ohne Abweichungen
 und ohne noch geplante Übernahmen. Die Ausgabe des Skripts enthält nur Anzahlen und allgemeine Fehler, keine
@@ -54,8 +57,9 @@ Benutzerkennungen. Das zugrunde liegende Kommando kann bei Bedarf **separat** mi
 werden; dessen Ausgabe enthält Kennungen und gehört nicht ins Repository oder ungeschützte Protokolle.
 
 Das vorhandene Kommando liest Keycloak und schreibt ohne `--pruefen` fehlende `UEBERNAHME`-Zeilen ins Verzeichnis;
-es ändert Keycloak nicht. Ein Fehler oder eine Abweichung beim Schreiblauf kann nach bereits erfolgten Übernahmen
+es ändert Keycloak nie und schreibt nur `UEBERNAHME`-Zeilen. Ein Fehler oder eine Abweichung beim Schreiblauf kann nach bereits erfolgten Übernahmen
 gemeldet werden. Deshalb bei jedem Abbruch den tatsächlichen Zustand prüfen, nicht von einem Rollback ausgehen.
+Ein erneuter Lauf nach Prüfung des Zustands ist sicher: bereits übernommene Benutzer werden nicht erneut eingetragen.
 
 ## Nachher und Rückfall
 
@@ -68,3 +72,13 @@ gemeldet werden. Deshalb bei jedem Abbruch den tatsächlichen Zustand prüfen, n
   sind append-only: weder löschen noch als regulären Rollback zurücksetzen. Eine Wiederherstellung aus Sicherung ist
   ein gesonderter Betriebsentscheid mit Datenverlust-Risiko für spätere Änderungen; vorher Auswirkungen und
   Konsistenz prüfen. Wenn keine Wiederherstellung erfolgt, verbleibende Zeilen und nötige Korrekturen dokumentieren.
+
+## Checkliste für den Betrieb
+
+- [ ] 21.2a abgeschlossen und benötigter Betreibervorgang durchgeführt.
+- [ ] Wartungsfenster, Zielmandant und Image geprüft; Sicherung und Zeitpunkt dokumentiert.
+- [ ] Vorherige Anmeldbarkeit, Rolle, Mandant und TOTP jedes Zugangs geschützt geprüft.
+- [ ] Prüflauf ohne Abweichung; geplante Anzahl festgehalten.
+- [ ] Übernahmezahl und Nachprüfung ohne offene Übernahmen oder Abweichungen festgehalten.
+- [ ] Anmeldbarkeit, Rolle, Mandant und TOTP jedes Zugangs nachher geprüft.
+- [ ] Ergebnis ohne personenbezogene Angaben im Abnahmeprotokoll festgehalten.

@@ -560,9 +560,11 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 `docs/benutzer-migration-entwurf.md` beschreibt Vorprüfung, kontrollierte Übernahme, Nachprüfung und Rückfall.
 Der Entwurf `tools/benutzer-migration-entwurf.py` verwendet das bestehende Abgleichkommando und bricht bei
 Abweichungen oder Fehlern ab; eine begonnene Übernahme kann dennoch bereits Verzeichniszeilen geschrieben haben.
-Ein bestehender Inhaber ohne protokollierten Rollenvorgang kann die Prüfung blockieren; `UEBERNAHME` behebt
-den Befund nicht. Das Vorgehen in diesem Fall ist noch zu klären. Nur synthetisch getestet; Ausführung und Abnahme
-bleiben bei Fabian, die Checkbox bleibt offen.
+Für bestehende Inhaber ohne protokollierten Rollenvorgang, insbesondere den heutigen Inhaber im Betriebsmandanten,
+ist `ROLLE_OHNE_VORGANG` zu erwarten; `UEBERNAHME` allein behebt den Befund nicht. Nach Entscheid Fabian vom
+24.11.2026 dokumentiert ein separater Betreibervorgang (21.2a) die bestehende Rolle, ohne die strenge Abgleich-Regel
+zu lockern oder Keycloak zu ändern. Danach folgen Prüflauf und Schreiblauf. Nur synthetisch getestet; Ausführung
+und Abnahme bleiben bei Fabian, die Checkbox bleibt offen.
 
 1. Realm-Änderungen und Dienstkonto auf Stufe A (19.3, [Fabian]); Realm-Export für Stufe B (19.2).
 2. Migration der Datenbank (Changesets); Einstellungen: Werte aus Eigenschaften und `wissens_einstellung` in die Konfiguration

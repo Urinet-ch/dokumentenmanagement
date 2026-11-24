@@ -63,6 +63,27 @@ class MigrationTest(unittest.TestCase):
                 self.assertEqual(1, code)
                 self.assertEqual(1, len(aufrufe))
 
+    def test_keine_bestaetigung_oder_schreiben_bei_null_geplanten_uebernahmen(self):
+        code, aufrufe, _ = self.ausfuehren([antwort()], tty=False)
+        self.assertEqual(0, code)
+        self.assertEqual(1, len(aufrufe))
+
+    def test_dienstfehler_ist_von_abweichung_unterschieden(self):
+        _, _, dienstfehler = self.ausfuehren([antwort(code=3)])
+        _, _, abweichung = self.ausfuehren([antwort(code=1)])
+        self.assertIn("technischer Fehler oder Dienst nicht erreichbar", dienstfehler)
+        self.assertIn("Abweichung oder fachlicher Fehler", abweichung)
+        self.assertIn("nichts geschrieben", dienstfehler)
+
+    def test_abweichung_erst_im_schreiblauf_meldet_moegliche_uebernahmen(self):
+        code, aufrufe, fehler = self.ausfuehren([
+            antwort(2), antwort(2, 2, [{"code": "TEST", "benutzer": "synthetisch"}], code=1)
+        ])
+        self.assertEqual(1, code)
+        self.assertEqual(2, len(aufrufe))
+        self.assertIn("können bereits Zeilen bestehen", fehler)
+        self.assertNotIn("synthetisch", fehler)
+
     def test_teilweiser_lauf_oder_offene_nachpruefung_meldet_abbruch(self):
         for antworten in ([antwort(2), antwort(2, 1)],
                           [antwort(2), antwort(2, 2), antwort(1)]):

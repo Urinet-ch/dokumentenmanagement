@@ -18,9 +18,14 @@ def abgleichen(starter, mandant, pruefen):
     except (OSError, UnicodeError) as fehler:
         raise RuntimeError(f"Starter konnte nicht ausgeführt werden: {type(fehler).__name__}") from fehler
     if ergebnis.returncode != 0:
+        ursache = {
+            1: "Abweichung oder fachlicher Fehler",
+            2: "ungültiger Aufruf",
+            3: "technischer Fehler oder Dienst nicht erreichbar",
+        }.get(ergebnis.returncode, "unerwarteter Fehler")
         raise RuntimeError(
-            f"Abgleich mit Exit-Code {ergebnis.returncode} abgebrochen; "
-            "Befunde oder Dienstfehler separat geschützt prüfen."
+            f"Abgleich mit Exit-Code {ergebnis.returncode} abgebrochen ({ursache}); "
+            "Befunde und Dienststatus separat geschützt prüfen."
         )
     try:
         bericht = json.loads(ergebnis.stdout)
@@ -46,15 +51,20 @@ def main():
     if (len(args.mandant) > 40 or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", args.mandant)
             or args.mandant.startswith(("a-", "p-"))):
         parser.error("Ungültiger Mandantencode.")
+    schreibversuch = False
     try:
         vorher = abgleichen(args.starter, args.mandant, True)
         print(f"Prüfung: {vorher['uebernahme_geplant']} Übernahmen geplant; keine Abweichungen.")
         if not args.uebernehmen:
             return 0
+        if vorher["uebernahme_geplant"] == 0:
+            print("Nichts zu übernehmen; kein Schreiblauf gestartet.")
+            return 0
         if not sys.stdin.isatty():
             raise RuntimeError("Übernahme benötigt eine interaktive Bestätigung.")
-        if input("Für diesen Mandanten UEBERNEHMEN eingeben: ") != "UEBERNEHMEN":
+        if input(f"Für Mandant {args.mandant} ({vorher['uebernahme_geplant']} Übernahmen) UEBERNEHMEN eingeben: ") != "UEBERNEHMEN":
             raise RuntimeError("Nicht bestätigt; keine Übernahme gestartet.")
+        schreibversuch = True
         geschrieben = abgleichen(args.starter, args.mandant, False)
         if geschrieben["uebernommen"] != vorher["uebernahme_geplant"]:
             raise RuntimeError("Übernahmezahl weicht vom Prüflauf ab.")
@@ -65,8 +75,10 @@ def main():
         return 0
     except (RuntimeError, EOFError) as fehler:
         print(f"Abbruch: {fehler}", file=sys.stderr)
-        if args.uebernehmen:
+        if schreibversuch:
             print("Falls die Übernahme gestartet wurde, können bereits Zeilen bestehen; Zustand prüfen.", file=sys.stderr)
+        else:
+            print("Dieser Lauf hat nichts geschrieben.", file=sys.stderr)
         return 1
 
 
