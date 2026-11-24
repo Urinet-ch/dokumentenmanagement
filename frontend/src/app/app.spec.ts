@@ -159,6 +159,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.benutzer,
         TEXTE.menue.dokumentarten,
         TEXTE.menue.protokoll,
+        TEXTE.chat.auswertung.titel,
         TEXTE.menue.apiTokens,
       ],
     ],

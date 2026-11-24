@@ -52,8 +52,7 @@ class ChatBewertungAuswertungKnapperHeapTest {
                         Instant zeit = Instant.parse("2026-11-22T11:00:00Z");
                         for (int id = 1; id <= ANZAHL; id++) {
                             verarbeiten.accept(new ExportZeile(zeit, id, 4, null, null, "Frage", LANGE_ANTWORT,
-                                    "[]", "[]", null, null, null, null, null,
-                                    Chatmodus.ARCHIV));
+                                    "[]", "[]", null, null, null, null, null, Chatmodus.ARCHIV));
                         }
                     }
 
