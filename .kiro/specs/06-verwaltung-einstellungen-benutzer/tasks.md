@@ -256,7 +256,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.2, 4.3, 4.6, 4.7, 4.8, 4.10, 9.5, 9.6_
   - _Abhängig von: 19.12, 19.13_
 
-- [ ] 21.4 Sicherheits- und Ausfalltests [QA]
+- [x] 21.4 Sicherheits- und Ausfalltests [QA]
   - Ausfall von Keycloak (kein Hängen, keine Wiederholung, Schutzschalter), Step-up, Raten, Header und Medientyp,
     Protokoll ohne Klartext, Einladung bis zum Link mit Mailpit, Konsistenz nach Abbruch zwischen Absicht und Abschluss.
   - _Anforderungen: 5.5, 5.6, 5.7, 5.8, 6.2, 6.4, 6.6, 7.2, 7.5, 7.7, 7.8, 9.5_

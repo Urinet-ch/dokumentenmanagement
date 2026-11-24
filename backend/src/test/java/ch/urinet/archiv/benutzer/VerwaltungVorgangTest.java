@@ -155,9 +155,14 @@ class VerwaltungVorgangTest {
                     IdentitaetsDienst.ErforderlicheAktion.UPDATE_PASSWORD,
                     IdentitaetsDienst.ErforderlicheAktion.CONFIGURE_TOTP);
             int port = ConfigProvider.getConfig().getValue("archiv.entwicklung.mailpit-port", Integer.class);
-            int anzahl = given().baseUri("http://localhost:" + port).queryParam("query", "to:" + email)
-                    .get("/api/v1/search").then().statusCode(200).extract().path("total");
-            assertThat(anzahl).isPositive();
+            String mailpit = "http://localhost:" + port;
+            List<String> mailIds = given().baseUri(mailpit).queryParam("query", "to:" + email)
+                    .get("/api/v1/search").then().statusCode(200).extract().jsonPath().getList("messages.ID");
+            assertThat(mailIds).isNotEmpty();
+            var mail = given().baseUri(mailpit).get("/api/v1/message/" + mailIds.getFirst())
+                    .then().statusCode(200).extract().jsonPath();
+            assertThat(mail.getString("Text") + mail.getString("HTML"))
+                    .as("Mailpit enthält den Einmal-Link zur Einrichtung").contains("action-token?key=");
             assertThat(ausgabe.toString(StandardCharsets.UTF_8)).doesNotContain(name, email, "http");
         } finally {
             QuarkusMock.installMockForType(original, IdentitaetsDienst.class);

@@ -988,6 +988,18 @@ axe und Überlaufprüfung) und `@req-8.5` (Step-up für Sperren, Rolle, Löschen
 Persönliches in den Browser-Speicher geschrieben wird); Einheitstests der Fortsetzung, der Fehlerbehandlung und der
 Komponenten. Offen bleibt der manuelle Nachweis auf dem Handy [Fabian] (Req 8.2, Aufgabe 21.6).
 
+## Umsetzung (Aufgabe 21.4, 24.11.2026)
+
+Die Bestandsaufnahme ergab, dass Zeitgrenzen, Wiederholungen und Schutzschalter bereits in
+`KeycloakAdminAdapterTest` geprüft werden; `ProblemAbbildungTest` deckt `Retry-After`, und die bestehenden Verwaltungs-
+Szenarien prüfen Step-up, Raten, Medientyp, Protokoll und Kompensation. `VerwaltungVorgangTest` prüft den vollständigen
+Betreiber-Aufruf bis zum Einmal-Link aus Mailpit. Die Einladung im Szenario trägt zusätzlich `@req-9.5`; die
+Mandantenisolation und Eskalation bleiben durch die Tests aus Aufgabe 21.3 belegt.
+
+Die Prüfung deckte fehlende Clickjacking-Header auf. `SicherheitsHeaderRoute` setzt deshalb auf allen Antworten
+`Content-Security-Policy: frame-ancestors 'none'` und `X-Frame-Options: DENY`; `SicherheitsHeaderTest` prüft diese
+Header sowie, dass ein Ausfall des Verwaltungs-Identitätsdienstes die API-Readiness nicht verändert und in der
+Detail-Health sichtbar bleibt.
 ### Nachtrag (Folge aus PR #529, 24.11.2026)
 
 `BenutzerAbgleichenKommando` beendet auch bei `IDENTITAETSDIENST_FEHLER` mit Exit-Code 3: eine Ablehnung des
