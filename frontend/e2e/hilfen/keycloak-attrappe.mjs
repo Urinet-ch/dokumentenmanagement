@@ -55,9 +55,8 @@ export async function keycloakAttrappe(welt) {
     return { access_token: access, id_token: id, refresh_token: refresh, expires_in: kc.ablaufSekunden, token_type: 'Bearer' };
   };
 
-  // fallback statt continue: früher im Kontext registrierte Attrappen (archivAttrappe mit Service Worker) bleiben aktiv
   await welt.kontext.route('**/*', (route) =>
-    route.request().url().startsWith(origin) ? route.fallback() : route.abort('blockedbyclient'),
+    route.request().url().startsWith(origin) ? route.continue() : route.abort('blockedbyclient'),
   );
 
   await welt.kontext.route(`${AUSSTELLER}/protocol/openid-connect/**`, async (route) => {
