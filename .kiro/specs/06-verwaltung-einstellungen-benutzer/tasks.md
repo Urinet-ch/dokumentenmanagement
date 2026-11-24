@@ -15,7 +15,7 @@ Stunden gross. Aufgaben mit **[Fabian]** erledigt Fabian (Realm, Secrets, Deploy
 auf Server oder Secrets aus der Sitzung.
 
 ## Welle 19 — Dienstkonto, Benutzer und Rollen
-- [ ] 19.1 Entscheide und Spike Keycloak [Backend]
+- [x] 19.1 Entscheide und Spike Keycloak [Backend]
   - Die vier Entscheide aus design.md «Open Points» (vhf-gsk, Löschfrist, Wissens-Einstellungen, Alarm-Empfänger und
     Budget) sind mit dem Merge dieses PR gefallen oder stehen als Notiz im PR.
   - Spike gegen den Dev Service mit Keycloak 26.8.2 (Ergebnis als «Umsetzung 19.1» in design.md): feingranulare Admin-Rechte
@@ -27,7 +27,8 @@ auf Server oder Secrets aus der Sitzung.
     Standard-Scope `kc-admin-api`, 200 mit ihm, siehe design.md «Umsetzung 19.1»); `auth_time`, `prompt=login`,
     `execute-actions-email`, interne Adresse und Secret-Rotation sind mit 19.2 nachgewiesen (design.md «Umsetzung 19.2»).
     Der Entscheid zu FGAP und `manage-users` ist in design.md «Open Points» festgehalten. Betriebsnachweise folgen in 19.3.
-    Checkbox offen: Der vollständige Nachweis von 7.2 (Step-up-Endpunkt) folgt mit 19.10.
+    Nachweis 24.11.2026: Der Step-up-Endpunkt und der Test gegen Keycloak sind mit 19.10 umgesetzt (Req 7.2);
+    die Betriebsnachweise zur internen Compose-Verbindung und zum Ablauf der Secret-Überlappung bleiben bei 19.3 [Fabian].
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
@@ -78,15 +79,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.16, 4.1, 4.2, 4.3, 4.4, 4.6, 4.7, 4.10, 4.12, 9.6_
   - _Abhängig von: Spec 01: 1.4_
 
-- [ ] 19.6 Protokoll, Vorgänge und Persistenz [Backend]
+- [x] 19.6 Protokoll, Vorgänge und Persistenz [Backend]
   - Aktionen `BENUTZER_*`, `ROLLE_ZUWEISEN` und Check-Constraints (neue Changesets), `anlass` `ANLAGE` und `UEBERNAHME`,
     Absicht und Abschluss mit `vorgangId`, Vorgangssperre (`verwaltung_vorgang`), `benutzer_status`, `verwaltung_antrag`,
     Raten aus dem Protokoll (`archiv.verwaltung.grenzen.*`), `VerwaltungProtokollTest` (kein Klartext), `KeinLoeschpfadTest`
     erweitert; Code `ZU_VIELE_ANFRAGEN` mit `grund = VERWALTUNG`.
-  - Offen, bewusst nicht abgehakt: Cucumber-Szenarien `@req-4.7`, `6.1`–`6.4`, `6.6` brauchen einen Endpunkt und kommen mit 19.7;
-    ebenso die Anbindung der Einstellungsgrenze (`Art.EINSTELLUNG`, `einstellungen-je-mandant`) und der Grund-Eingabe.
-    Ebenfalls offen (Req 6.3): das Schreiben der Verzeichniszeilen `ANLAGE`, `UEBERNAHME` und `AUSTRITT` in der Abschlusstransaktion
-    kommt mit 19.7 bis 19.9; hier sind nur Enum-Wert, Check-Constraint und Vertrag umgesetzt.
+  - Nachweis 24.11.2026: Die seit 19.7/19.8 und 20.2 ergänzten Endpunkte, Grund-Eingaben, Verzeichniszeilen und
+    Einstellungsgrenzen sind umgesetzt. `benutzer-verwalten.feature` belegt `@req-4.7`, `6.1`–`6.4` und `6.6`;
+    die ergänzenden Transaktions-, Grenz-, Übernahme- und Append-only-Tests stehen im Umsetzungsvermerk in `design.md`.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 
@@ -115,10 +115,18 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.8, 3.9, 3.10, 3.13, 3.14, 3.15, 3.17, 3.18_
   - _Abhängig von: 19.7_
 
-- [ ] 19.9 Token-Widerruf [Backend]
+- [x] 19.9 Token-Widerruf [Backend]
   - Tabelle `token_widerruf`, `ZugangFilter` lehnt Tokens mit `iat` vor `ab` ab (Zwischenspeicher höchstens 5 s), Aufräumen im
     Worker, Setzen nach Sperren, Deaktivieren, Löschen, Zugang zurücksetzen, Google lösen und Rollenwechsel; Szenarien: Sperre
     wirkt nach höchstens 5 Sekunden; Rollenwechsel wirkt nach Erneuerung.
+  - Nachweis 24.11.2026: `@req-4.9` prüft ein vor der Sperre benutztes Token nach erfolgreicher Sperre und ein altes Token
+    nach Rollenwechsel; ein erneuertes Token trägt `treuhaender` und wird angenommen. `JdbcTokenWiderrufTest` prüft den Cacheablauf,
+    `VerwaltungCacheHttpTest` die Sperre auch bei unklarer Teilwirkung für Deaktivierung, Google-Lösen und Zugangsrücksetzung.
+    Löschung und Persistenz sind in den `@req-3.11`-Szenarien und `BenutzerVerwaltungSchritte` nachgewiesen.
+  - Eine frühere einzelne Beobachtung `200` statt `401` aus PR #502 blieb im ursprünglichen Szenario nicht reproduzierbar.
+    Beim ergänzten Sperrtest entstand zunächst ebenfalls `200`, weil dessen direkt angelegter Keycloak-Benutzer im Stub des
+    Anwendungsfalls fehlte und die Sperre mit 404 endete. Der Test verwendet nun denselben Keycloak-Adapter wie die API und
+    prüft zuerst die erfolgreiche Sperre; danach wird das alte Token mit 401 abgewiesen.
   - _Anforderungen: 4.9_
   - _Abhängig von: 19.8_
 
@@ -195,11 +203,13 @@ auf Server oder Secrets aus der Sitzung.
     Menüpunkte nach Recht, Seite «Nicht gefunden» ohne Recht.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.7_
   - _Abhängig von: 19.7, 19.11_
-  - Umsetzung und automatisierte Browser-Nachweise vorbereitet; der manuelle Nachweis zu 8.2 und 8.7 bleibt bei 21.6,
-    die zugehörigen Einstellungsseiten folgen in 20.5. Checkbox bis zum vollständigen Nachweis offen.
+  - Automatisierte Nachweise für Benutzerliste, Detail und Rechte-Übersicht liegen vor; die Einstellungsseiten sind mit
+    20.5 umgesetzt. Rest bei 21.6 [Fabian]: manueller Handy-Nachweis zu 8.2 und Beurteilung der Rechte-Übersicht zu 8.7.
+    Die Checkbox bleibt bis zu dieser Abnahme offen.
   - Nachweis Benutzerseite: `benutzer-lesen-pwa.feature` (`@req-8.1`, `@req-8.2`, `@req-8.3`, `@req-8.7`),
-    acht Szenarien einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505);
-    Angular-Tests für Fehler, Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514).
+    einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505); Angular-Tests für Fehler,
+    Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514). #531 ergänzt Browser-Nachweise für die
+    inzwischen eingebundenen Benutzeraktionen; die synthetischen REST-Antworten ersetzen keine manuelle Abnahme.
 
 - [x] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
   - Einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, Rolle ändern, E-Mail ändern, löschen (mit

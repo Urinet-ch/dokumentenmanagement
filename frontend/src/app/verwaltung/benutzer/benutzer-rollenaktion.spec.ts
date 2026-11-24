@@ -107,7 +107,8 @@ describe('Rollenänderung', () => {
     const { element } = starten();
     element.querySelector('button')!.click();
     geschlossen.next('inhaber');
-    expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith({ aktion: 'rolle', ziel: 'ziel', etag, rolle: 'inhaber' });
+    expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith(
+      { aktion: 'rolle', ziel: 'ziel', etag, rolle: 'inhaber' }, expect.any(Function));
   });
 
   function mitFortsetzung(wert: BenutzerFortsetzung, personEtag = etag) {

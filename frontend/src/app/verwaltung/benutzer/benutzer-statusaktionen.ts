@@ -42,6 +42,10 @@ export class BenutzerStatusaktionen {
   private readonly dialog = inject(MatDialog);
   private readonly zerstoert = inject(DestroyRef);
   private readonly stepUp = inject(BenutzerFortsetzen);
+  private readonly stepUpFehlgeschlagen = (): void => {
+    this.laufend.set(false);
+    this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+  };
   private fortsetzungVerbraucht = false;
   private geoeffnet?: MatDialogRef<BenutzerStatusdialog, BenutzerStatusdialogErgebnis | null>;
 
@@ -145,7 +149,7 @@ export class BenutzerStatusaktionen {
           if (ausFortsetzung) {
             this.laufend.set(false);
             this.fehler.set(TEXTE.benutzerFortsetzung.wiederholtAbgelehnt);
-          } else if (!this.stepUp.starten({ aktion, ziel: id, grund: ergebnis.grund })) {
+          } else if (!this.stepUp.starten({ aktion, ziel: id, grund: ergebnis.grund }, () => this.stepUpFehlgeschlagen())) {
             this.laufend.set(false);
             this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
           }

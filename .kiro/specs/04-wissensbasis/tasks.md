@@ -233,10 +233,12 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 ## Welle 18 — Wissenschat und Archivchat (Entscheid Fabian 22.11.2026, Requirement 21; Umsetzung nach Welle 17 und Spec 02, Welle 10)
 - [x] 18.1 Modus im Chat und Werkzeuge [Backend]
   - Changeset `chat_gespraech.modus`, `POST /chat/gespraeche {modus}`, Werkzeugliste und Systemprompt `wissen-chat`, Recht A15, `ki_verbrauch`-Zweck `WISSEN_CHAT`; Szenarien `@req-21.1` bis `@req-21.3`, `@req-21.5`, `@req-21.7`.
+  - `@req-21.1`: 403 nur JUnit (`ChatGespraecheAnlegenTest`), da derzeit alle vier Rollen A15 besitzen.
   - _Anforderungen: 21.1, 21.2, 21.3, 21.5, 21.7_
   - _Abhängig von: 15.2, 17.1_
-- [ ] 18.2 Oberfläche Modusauswahl [Frontend]
+- [x] 18.2 Oberfläche Modusauswahl [Frontend]
   - Auswahl beim neuen Gespräch, Kennzeichen im Gespräch und in der Liste, Anleitung `chat.md` und `wissen.md` nachziehen; Feld `modus` im Bewertungsexport (Spec 02, 10.3).
+  - Nachweis `@req-21.4`: `chat-modus-pwa.feature` (375/1280 px, hell/dunkel, axe) und `chat-modus-export.feature` (beide Modi, Index in beiden Mandanten); Angular-Tests zu A15, festem Modus und abgelehntem Anlegen.
   - _Anforderungen: 21.4_
   - _Abhängig von: 18.1_
 - [ ] 18.3 Öffentlicher Wissenschat [Backend] [Frontend]

@@ -22,9 +22,9 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
   @req-3.18 @req-4.5 @req-4.9
   Szenario: Rollenwechsel verlangt die aktuelle Version und widerruft alte Tokens
     Angenommen die frische Anmeldung ist für den Test bestätigt
-    Und ein synthetischer aktiver Mitarbeiter besteht
+    Und ein synthetischer aktiver Mitarbeiter mit erneuerbarem Token besteht
     Wenn der Inhaber die Rolle mit fehlender, veralteter und aktueller Version ändert
-    Dann ist nur die aktuelle Rollenänderung wirksam und das alte Token widerrufen
+    Dann ist nur die aktuelle Rollenänderung wirksam und ein erneuertes Token trägt die neue Rolle
 
   @req-4.11
   Szenario: Eine Inhabervergabe benötigt die Bestätigung eines zweiten Inhabers
@@ -89,9 +89,9 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
   @req-3.8 @req-4.9
   Szenario: Ein aktiver Benutzer wird gesperrt und wieder entsperrt
     Angenommen die frische Anmeldung ist für den Test bestätigt
-    Und ein synthetischer aktiver Mitarbeiter besteht
+    Und ein synthetischer aktiver Mitarbeiter mit erneuerbarem Token besteht
     Wenn der Inhaber den Mitarbeiter sperrt und wieder entsperrt
-    Dann ist der Mitarbeiter wieder aktiv
+    Dann ist der Mitarbeiter wieder aktiv und sein altes Token bleibt abgewiesen
 
   @req-3.9 @req-3.10
   Szenario: Ein Austritt wird erfasst und der Zugang später neu eingerichtet
