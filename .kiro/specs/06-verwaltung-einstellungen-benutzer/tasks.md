@@ -115,10 +115,18 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.8, 3.9, 3.10, 3.13, 3.14, 3.15, 3.17, 3.18_
   - _Abhängig von: 19.7_
 
-- [ ] 19.9 Token-Widerruf [Backend]
+- [x] 19.9 Token-Widerruf [Backend]
   - Tabelle `token_widerruf`, `ZugangFilter` lehnt Tokens mit `iat` vor `ab` ab (Zwischenspeicher höchstens 5 s), Aufräumen im
     Worker, Setzen nach Sperren, Deaktivieren, Löschen, Zugang zurücksetzen, Google lösen und Rollenwechsel; Szenarien: Sperre
     wirkt nach höchstens 5 Sekunden; Rollenwechsel wirkt nach Erneuerung.
+  - Nachweis 24.11.2026: `@req-4.9` prüft ein vor der Sperre benutztes Token nach erfolgreicher Sperre und ein altes Token
+    nach Rollenwechsel; ein erneuertes Token trägt `treuhaender` und wird angenommen. `JdbcTokenWiderrufTest` prüft den Cacheablauf,
+    `VerwaltungCacheHttpTest` die Sperre auch bei unklarer Teilwirkung für Deaktivierung, Google-Lösen und Zugangsrücksetzung.
+    Löschung und Persistenz sind in den `@req-3.11`-Szenarien und `BenutzerVerwaltungSchritte` nachgewiesen.
+  - Eine frühere einzelne Beobachtung `200` statt `401` aus PR #502 blieb im ursprünglichen Szenario nicht reproduzierbar.
+    Beim ergänzten Sperrtest entstand zunächst ebenfalls `200`, weil dessen direkt angelegter Keycloak-Benutzer im Stub des
+    Anwendungsfalls fehlte und die Sperre mit 404 endete. Der Test verwendet nun denselben Keycloak-Adapter wie die API und
+    prüft zuerst die erfolgreiche Sperre; danach wird das alte Token mit 401 abgewiesen.
   - _Anforderungen: 4.9_
   - _Abhängig von: 19.8_
 
