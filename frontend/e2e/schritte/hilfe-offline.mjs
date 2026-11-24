@@ -5,6 +5,7 @@ import { readdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { archivAttrappe } from '../hilfen/archiv-attrappe.mjs';
 import { basisUrl } from '../hilfen/keycloak-attrappe.mjs';
+import { stabilKlicken } from '../hilfen/stabil-klicken.mjs';
 
 async function installieren(welt, url) {
   await welt.kontext.close();
@@ -16,7 +17,9 @@ async function installieren(welt, url) {
   welt.seite = await welt.kontext.newPage();
   welt.archiv = undefined;
   welt.keycloak = undefined;
-  await archivAttrappe(welt);
+  // Mit aktivem Service Worker laufen API-Anfragen an page.route vorbei; ohne Attrappe im Kontext beendete ein 401 des
+  // echten Archivs die Sitzung, und das Inhaltsverzeichnis wurde während des Klicks auf die Abgemeldet-Abschnitte umgebaut.
+  await archivAttrappe(welt, welt.kontext);
   await welt.seite.goto(url);
   await welt.seite.waitForFunction(async () => {
     const registrierung = await navigator.serviceWorker.getRegistration();
@@ -59,11 +62,14 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
   const leiste = this.seite.getByRole('dialog', { name: 'Hilfe', exact: true });
   const nav = leiste.getByRole('navigation', { name: 'Inhalt der Anleitung' });
   const links = nav.getByRole('link');
+  await links.first().waitFor({ state: 'visible' });
   const titel = (await links.allInnerTexts()).map((text) => text.trim());
   assert.ok(titel.length > 0);
+  if (this.keycloak?.benutzer) {
+    assert.ok(titel.includes('Erfassen'), `Sitzung beendet, Inhaltsverzeichnis für Abgemeldete: ${titel.join(', ')}`);
+  }
   for (const name of titel) {
-    const link = nav.getByRole('link', { name, exact: true });
-    await link.click({ timeout: 10_000 });
+    await stabilKlicken(nav.getByRole('link', { name, exact: true }));
     await this.seite.waitForFunction(
       (titel) => [...document.querySelectorAll('[role="dialog"] nav a')].some(
         (element) => element.textContent?.trim() === titel && element.getAttribute('aria-current') === 'location',

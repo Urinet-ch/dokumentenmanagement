@@ -1,5 +1,6 @@
 import { Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { stabilKlicken } from '../hilfen/stabil-klicken.mjs';
 
 const dialog = (seite) => seite.getByRole('dialog', { name: 'Hilfe', exact: true });
 
@@ -35,7 +36,7 @@ When(/^ich in der Hilfe-Leiste den Abschnitt «(.+)» wähle$/, async function (
   const link = leiste
     .getByRole('navigation', { name: 'Inhalt der Anleitung' })
     .getByRole('link', { name: titel, exact: true });
-  await link.click();
+  await stabilKlicken(link);
   await this.seite.waitForFunction(
     (name) =>
       [...document.querySelectorAll('#hilfe-leiste .hilfe-inhalt a')].some(
