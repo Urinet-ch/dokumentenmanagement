@@ -7,6 +7,7 @@ Funktionalität: Anleitung ohne Netz
     Angenommen die PWA mit der Anleitung ist installiert
     Und Keycloak stellt Tokens mit 3600 Sekunden Gültigkeit aus
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und die Archiv-Attrappe beantwortet die Anfrage des Service Workers
     Wenn das Handy offline ist
     Und ich die Hilfe-Leiste öffne
     Dann sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen

@@ -1228,6 +1228,26 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void passkeysEntfernenBrichtNachFehlgeschlagenerZweiterLoeschungAb() {
+        tokenAntwort();
+        benutzerStub("benutzer-1", "urinet");
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/credentials"))
+                .willReturn(okJson(CREDENTIALS_GEMISCHT)));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/credentials/pk-1"))
+                .willReturn(aResponse().withStatus(204)));
+        server.stubFor(delete(urlPathEqualTo(USERS + "/benutzer-1/credentials/pk-2"))
+                .willReturn(aResponse().withStatus(500)));
+
+        assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
+                .passkeysEntfernen("urinet", "benutzer-1"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR));
+        server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/benutzer-1/credentials/pk-1")));
+        server.verify(1, deleteRequestedFor(urlPathEqualTo(USERS + "/benutzer-1/credentials/pk-2")));
+        server.verify(2, deleteRequestedFor(urlPathMatching(".*")));
+    }
+
+    @Test
     void passkeysEntfernenMeldetFehlerDerAdminApiOhneKeycloakMeldung() {
         for (int status : new int[] {400, 403, 404, 500, 503}) {
             server.resetAll();

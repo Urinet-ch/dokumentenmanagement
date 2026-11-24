@@ -42,8 +42,8 @@ const json = (route, status, body) =>
     body: body === undefined ? '' : JSON.stringify(body),
   });
 
-/** Richtet die Attrappe für die Seite ein (einmal je Szenario); der Eingangskorb ist anfangs leer. */
-export async function archivAttrappe(welt) {
+/** Bei aktivem Service Worker den Browser-Kontext als Ziel übergeben. */
+export async function archivAttrappe(welt, ziel = welt.seite) {
   if (welt.archiv) {
     return welt.archiv;
   }
@@ -72,7 +72,7 @@ export async function archivAttrappe(welt) {
       // Zusatzangaben ändern (PATCH) vor dem Bestätigen, wenn die Art Zusatzfelder hat
       /^\/api\/v1\/dokumente\/[^/]+$/.test(url.pathname));
 
-  await welt.seite.route(zustaendig, async (route) => {
+  await ziel.route(zustaendig, async (route) => {
     const anfrage = route.request();
     const url = new URL(anfrage.url());
     if (!(await anfrage.headerValue('authorization'))?.startsWith('Bearer ')) {

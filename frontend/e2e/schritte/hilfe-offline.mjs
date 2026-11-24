@@ -16,7 +16,7 @@ async function installieren(welt, url) {
   welt.seite = await welt.kontext.newPage();
   welt.archiv = undefined;
   welt.keycloak = undefined;
-  await archivAttrappe(welt);
+  await archivAttrappe(welt, welt.kontext);
   await welt.seite.goto(url);
   await welt.seite.waitForFunction(async () => {
     const registrierung = await navigator.serviceWorker.getRegistration();
@@ -45,6 +45,16 @@ Given('die PWA mit der Anleitung ist installiert', { timeout: 120_000 }, async f
   await installieren(this, basisUrl);
 });
 
+Given('die Archiv-Attrappe beantwortet die Anfrage des Service Workers', async function () {
+  const vorher = this.archiv.abfragen.length;
+  const antwort = await this.seite.evaluate(async (token) => {
+    const response = await fetch('/api/v1/eingangskorb', { headers: { authorization: `Bearer ${token}` } });
+    return response.status;
+  }, this.keycloak.accessToken);
+  assert.equal(antwort, 200);
+  assert.equal(this.archiv.abfragen.length, vorher + 1);
+});
+
 Then('sind alle sichtbaren Abschnitte der Anleitung geladen', async function () {
   const texte = this.seite.locator('app-hilfe-seite app-anleitung-text');
   assert.ok(await texte.count() > 0);
@@ -59,8 +69,12 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
   const leiste = this.seite.getByRole('dialog', { name: 'Hilfe', exact: true });
   const nav = leiste.getByRole('navigation', { name: 'Inhalt der Anleitung' });
   const links = nav.getByRole('link');
+  await links.first().waitFor({ state: 'visible' });
   const titel = (await links.allInnerTexts()).map((text) => text.trim());
   assert.ok(titel.length > 0);
+  if (this.keycloak?.benutzer) {
+    assert.ok(titel.includes('Erfassen'), 'Die Sitzung muss für die vollständige Offline-Anleitung bestehen bleiben');
+  }
   for (const name of titel) {
     const link = nav.getByRole('link', { name, exact: true });
     await link.click({ timeout: 10_000 });
@@ -89,6 +103,10 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
     );
     assert.equal(await leiste.locator('[data-test=anleitung-fehler]').count(), 0, name);
     assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0, name);
+  }
+  if (this.keycloak?.benutzer) {
+    assert.ok(await nav.getByRole('link', { name: 'Erfassen', exact: true }).isVisible(),
+      'Die Sitzung wurde während der Prüfung beendet');
   }
 });
 

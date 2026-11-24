@@ -288,6 +288,8 @@ auf Server oder Secrets aus der Sitzung.
 - [x] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
   - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
     Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
+  - Req 10.7 nur teilweise erfüllt: Die Keycloak-Ereignisse `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` für
+    Einrichten und Entfernen in der Kontoverwaltung sind nicht aktiv; Entscheid zur Aktivierung bei Fabian.
   - _Anforderungen: 10.5, 10.6, 10.7_
   - _Abhängig von: 24.1, 19.8, 20.7_
 - [ ] 24.3 Anleitung und Inbetriebnahme [Fabian]
