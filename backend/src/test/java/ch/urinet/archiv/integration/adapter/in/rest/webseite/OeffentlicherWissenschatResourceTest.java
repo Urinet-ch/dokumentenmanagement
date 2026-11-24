@@ -22,8 +22,7 @@ class OeffentlicherWissenschatResourceTest {
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_ERLAUBT));
         var an = resource("urinet", config);
-        assertThatThrownBy(() -> an.fragen("{\"frage\":\"Hallo\",\"gespraechId\":"
-                + "\"00000000-0000-4000-8000-000000000001\"}", null))
+        assertThatThrownBy(() -> an.fragen("{", null))
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.ANFRAGE_UNGUELTIG));
     }

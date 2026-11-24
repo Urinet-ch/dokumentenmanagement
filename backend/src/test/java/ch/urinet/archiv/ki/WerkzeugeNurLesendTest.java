@@ -24,11 +24,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Req 5.3 (Nachweis: JUnit): Die Werkzeuge des Chat-Agenten und ihre Anwendungsdienste haben keine Nebenwirkungen auf das
  * Archiv. Klassen unter {@code ki.adapter.in.werkzeug} und {@code ki.application.chat} erreichen andere Fachbereiche
- * nur über eine Liste lesender Ports und nur über die dort genannten lesenden Methoden; die einzige Ausnahme ist das
- * Zugriffsprotokoll (E4, entschieden von Fabian am 14.11.2026: {@code dokument_zeigen} schreibt {@code ANZEIGEN} und
- * {@code VERWEIGERT} mit Kanal Chat). Dazu kein Zugriff auf Persistenz-Technik (JPA, Hibernate, JDBC) und auf keinen
- * {@code adapter} eines anderen Fachbereichs. Das Modell kann also kein Werkzeug mit Nebenwirkung aufrufen, weil es keines
- * gibt; was ein Dokumenttext verlangt, bleibt wirkungslos.
+ * nur über eine Liste lesender Ports und nur über die dort genannten lesenden Methoden. Die Wissenswerkzeuge dürfen
+ * zusätzlich die Hüllensperre zur Serialisierung von Freigabe und Quellenprüfung anfordern. Die einzige fachliche
+ * Schreibausnahme ist das Zugriffsprotokoll (E4, entschieden von Fabian am 14.11.2026: {@code dokument_zeigen} schreibt
+ * {@code ANZEIGEN} und {@code VERWEIGERT} mit Kanal Chat). Dazu kein Zugriff auf Persistenz-Technik (JPA, Hibernate,
+ * JDBC) und auf keinen {@code adapter} eines anderen Fachbereichs. Das Modell kann also kein Werkzeug mit Nebenwirkung
+ * aufrufen; was ein Dokumenttext verlangt, bleibt wirkungslos.
  */
 @AnalyzeClasses(packages = "ch.urinet.archiv", importOptions = ImportOption.DoNotIncludeTests.class)
 class WerkzeugeNurLesendTest {
@@ -51,8 +52,14 @@ class WerkzeugeNurLesendTest {
                     Set.of("index", "seite", "quellenAnzeige", "inhaltDarstellen")),
             Map.entry("ch.urinet.archiv.wissen.application.WissensSuche", Set.of("suchen")),
             Map.entry("ch.urinet.archiv.wissen.application.WissenKonfiguration", Set.of("ingest")),
+            Map.entry("ch.urinet.archiv.wissen.application.OeffentlichesWissenPort",
+                    Set.of("suchen", "seite", "aktuell")),
             // E4: das Zugriffsprotokoll ist der einzige schreibende Port (Anzeige und Verweigerung mit Kanal Chat)
             Map.entry("ch.urinet.archiv.protokoll.application.ZugriffProtokoll", Set.of("schreiben")));
+
+    /** Synchronisationsdienste ohne fachliche Schreibwirkung. */
+    static final Map<String, Set<String>> SYNCHRONISATIONSDIENSTE = Map.of(
+            "ch.urinet.archiv.wissen.application.WissenHuelleDienst", Set.of("sperren"));
 
     // Daten- und Fehlertypen ohne Zugriff auf andere Fachbereiche.
     static final Set<String> LESENDE_WERTETYPEN = Set.of(
@@ -81,6 +88,7 @@ class WerkzeugeNurLesendTest {
                     klasse.getDirectDependenciesFromSelf().forEach(d -> {
                         JavaClass ziel = d.getTargetClass();
                         if (fremd(ziel) && !LESENDE_PORTS.containsKey(aussen(ziel.getName()))
+                                && !SYNCHRONISATIONSDIENSTE.containsKey(aussen(ziel.getName()))
                                 && !LESENDE_WERTETYPEN.contains(ziel.getName())) {
                             ereignisse.add(SimpleConditionEvent.violated(d, d.getDescription()));
                         }
@@ -99,6 +107,9 @@ class WerkzeugeNurLesendTest {
                         String eigentuemer = aufruf.getTargetOwner().getName();
                         // Zugriffsmethoden verschachtelter Wertetypen eines Ports (z. B. Werte.name()) lesen nur
                         Set<String> erlaubt = eigentuemer.contains("$") ? null : LESENDE_PORTS.get(eigentuemer);
+                        if (erlaubt == null) {
+                            erlaubt = SYNCHRONISATIONSDIENSTE.get(eigentuemer);
+                        }
                         if (erlaubt != null && !erlaubt.contains(aufruf.getName())) {
                             ereignisse.add(SimpleConditionEvent.violated(aufruf, aufruf.getDescription()));
                         }
