@@ -3,7 +3,9 @@ package ch.urinet.archiv.ki.application.oeffentlich;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.ki.domain.chat.ChatRolle;
 import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
+import ch.urinet.archiv.ki.domain.oeffentlich.FrageBereinigung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.OeffentlichesWissenPort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -31,7 +33,9 @@ public class OeffentlicheGespraeche {
     /** Höchste Länge einer gemerkten Antwort in Zeichen (die Antwort selbst ist durch max-tokens begrenzt). */
     static final int ANTWORT_MAX = 4_000;
 
-    private record Gespraech(String bindung, List<VerlaufEintrag> verlauf, Instant geaendert) {
+    private record Gespraech(String bindung, List<VerlaufEintrag> verlauf, Instant geaendert,
+                             List<OeffentlichesWissenPort.Stand> wissensStaende,
+                             List<OeffentlichesWissenPort.Seite> wissensSeiten) {
     }
 
     private final Map<UUID, Gespraech> gespraeche = new LinkedHashMap<>();
@@ -58,16 +62,36 @@ public class OeffentlicheGespraeche {
     }
 
     /** Ergebnis von {@link #oeffnen}: die Gesprächs-ID dieser Frage und der Verlauf davor. */
-    public record Geoeffnet(UUID id, List<VerlaufEintrag> verlauf) {
+    public record Geoeffnet(UUID id, List<VerlaufEintrag> verlauf,
+                            List<OeffentlichesWissenPort.Stand> wissensStaende,
+                            List<OeffentlichesWissenPort.Seite> wissensSeiten) {
+        public Geoeffnet {
+            verlauf = List.copyOf(verlauf);
+            wissensStaende = List.copyOf(wissensStaende);
+            wissensSeiten = List.copyOf(wissensSeiten);
+        }
+
+        public Geoeffnet(UUID id, List<VerlaufEintrag> verlauf) {
+            this(id, verlauf, List.of(), List.of());
+        }
     }
 
     /** Öffnet das Gespräch {@code id} für diese Bindung oder, wenn es nicht passt, ein neues. */
     public synchronized Geoeffnet oeffnen(UUID id, MandantCode mandant, Lesezugriff zugriff) {
+        return oeffnen(id, mandant, zugriff, false);
+    }
+
+    public synchronized Geoeffnet oeffnenWissen(UUID id, MandantCode mandant, Lesezugriff zugriff) {
+        return oeffnen(id, mandant, zugriff, true);
+    }
+
+    private Geoeffnet oeffnen(UUID id, MandantCode mandant, Lesezugriff zugriff, boolean wissen) {
         abgelaufeneEntfernen();
         if (id != null) {
             Gespraech g = gespraeche.get(id);
-            if (g != null && g.bindung().equals(bindung(mandant, zugriff))) {
-                return new Geoeffnet(id, VerlaufEintrag.normalisieren(g.verlauf()));
+            if (g != null && g.bindung().equals(bindung(mandant, zugriff, wissen))) {
+                return new Geoeffnet(id, VerlaufEintrag.normalisieren(g.verlauf()),
+                        g.wissensStaende(), g.wissensSeiten());
             }
         }
         return new Geoeffnet(UUID.randomUUID(), List.of());
@@ -75,8 +99,21 @@ public class OeffentlicheGespraeche {
 
     /** Merkt Frage und Antwort einer erfolgreichen Runde; nur die letzten {@code fenster} Nachrichten bleiben. */
     public synchronized void merken(UUID id, MandantCode mandant, Lesezugriff zugriff, String frage, String antwort) {
+        merken(id, mandant, zugriff, frage, antwort, false, List.of(), List.of());
+    }
+
+    public synchronized void merkenWissen(UUID id, MandantCode mandant, Lesezugriff zugriff, String frage,
+                                           String antwort, List<OeffentlichesWissenPort.Stand> staende,
+                                           List<OeffentlichesWissenPort.Seite> seiten) {
+        merken(id, mandant, zugriff, FrageBereinigung.fuerSpeicher(frage),
+                FrageBereinigung.fuerSpeicher(antwort), true, staende, seiten);
+    }
+
+    private void merken(UUID id, MandantCode mandant, Lesezugriff zugriff, String frage, String antwort,
+                        boolean wissen, List<OeffentlichesWissenPort.Stand> neueStaende,
+                        List<OeffentlichesWissenPort.Seite> neueSeiten) {
         abgelaufeneEntfernen();
-        String bindung = bindung(mandant, zugriff);
+        String bindung = bindung(mandant, zugriff, wissen);
         Gespraech alt = gespraeche.get(id);
         List<VerlaufEintrag> verlauf = alt != null && alt.bindung().equals(bindung) ? new ArrayList<>(alt.verlauf())
                 : new ArrayList<>();
@@ -88,8 +125,19 @@ public class OeffentlicheGespraeche {
         if (verlauf.size() > fenster) {
             verlauf = new ArrayList<>(verlauf.subList(verlauf.size() - fenster, verlauf.size()));
         }
+        Map<UUID, OeffentlichesWissenPort.Stand> staende = new LinkedHashMap<>();
+        if (alt != null && alt.bindung().equals(bindung)) {
+            alt.wissensStaende().forEach(s -> staende.put(s.id(), s));
+        }
+        neueStaende.forEach(s -> staende.put(s.id(), s));
+        Map<UUID, OeffentlichesWissenPort.Seite> seiten = new LinkedHashMap<>();
+        if (alt != null && alt.bindung().equals(bindung)) {
+            alt.wissensSeiten().forEach(s -> seiten.put(s.version().id(), ohneInhalt(s)));
+        }
+        neueSeiten.forEach(s -> seiten.put(s.version().id(), ohneInhalt(s)));
         gespraeche.remove(id);
-        gespraeche.put(id, new Gespraech(bindung, List.copyOf(verlauf), uhr.instant()));
+        gespraeche.put(id, new Gespraech(bindung, List.copyOf(verlauf), uhr.instant(),
+                List.copyOf(staende.values()), List.copyOf(seiten.values())));
         while (gespraeche.size() > maxGespraeche) {
             gespraeche.remove(gespraeche.keySet().iterator().next());
         }
@@ -106,8 +154,13 @@ public class OeffentlicheGespraeche {
         gespraeche.values().removeIf(g -> !g.geaendert().isAfter(grenze));
     }
 
-    private static String bindung(MandantCode mandant, Lesezugriff zugriff) {
+    private static OeffentlichesWissenPort.Seite ohneInhalt(OeffentlichesWissenPort.Seite seite) {
+        return new OeffentlichesWissenPort.Seite(seite.version(), seite.pfad(), seite.titel(), seite.typ(), "",
+                seite.freigegebenAm(), seite.dokumente());
+    }
+
+    private static String bindung(MandantCode mandant, Lesezugriff zugriff, boolean wissen) {
         return mandant.wert() + "\n" + zugriff.webseite() + "\n" + zugriff.clientHash().orElse("-") + "\n"
-                + zugriff.wirksameStufe().name();
+                + zugriff.wirksameStufe().name() + "\n" + wissen;
     }
 }

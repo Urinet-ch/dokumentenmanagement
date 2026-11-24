@@ -13,6 +13,15 @@ public final class OeffentlichesWissenDurchgang {
     private final Map<UUID, OeffentlichesWissenPort.Seite> gezeigt = new LinkedHashMap<>();
     private boolean widerspruch;
 
+    public OeffentlichesWissenDurchgang() {
+    }
+
+    public OeffentlichesWissenDurchgang(List<OeffentlichesWissenPort.Stand> staende,
+                                        List<OeffentlichesWissenPort.Seite> seiten) {
+        staende.forEach(this::merken);
+        seiten.forEach(this::zeigen);
+    }
+
     public synchronized void merken(OeffentlichesWissenPort.Stand stand) {
         var bisher = gesehen.putIfAbsent(stand.id(), stand);
         if (bisher != null && !bisher.equals(stand)) {

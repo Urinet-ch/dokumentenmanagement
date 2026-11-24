@@ -1446,12 +1446,22 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   dieselben öffentlichen Client-Grenzen und das öffentliche Monatsbudget sowie zusätzlich das Wissensbudget. Seiten und auch
   Indexangaben werden vor der Antwort nochmals unter der Hüllensperre auf Freigabe, aktuelle Quellen und Revision geprüft; bei
   Änderungen wird keine Modellantwort ausgegeben. Inhalte und Metadaten sind als Daten gerahmt. Die Szenarien `@req-21.6` und
-  Werkzeug-, Vertrags- und Oberflächentests belegen Teile der Umsetzung.
-  Vorsichtige Abweichung: Der Endpunkt führt derzeit keinen Gesprächsverlauf und speichert keine Fragen; jede Frage beginnt neu.
-  Damit können alte Antworttexte nach einem Entzug nicht erneut ins Modell gelangen. Die vorhandene Fragenbereinigung erkennt
-  Namen nicht zuverlässig; das Nichtspeichern vermeidet Personenbezüge, weicht aber vom Fragenprotokoll nach Spec 03, 6.5 ab.
-  Ob diese Einschränkungen den Anforderungen genügen, ist offen; ebenso der Nachweis, dass eine asynchrone
-  Streamauslieferung nach der Prüfung mit dem sofortigen Entzug vereinbar ist. Aufgabe 18.3 bleibt deshalb offen.
+  Werkzeug-, Vertrags- und Oberflächentests belegen Teile der Umsetzung. Gespräche sind an Mandant, Webseite, Client-Hash,
+  Zugriffsstufe und Wissenschat-Modus gebunden. Der höchstens 30 Minuten gehaltene Verlauf wird bereinigt; Quellenstände werden
+  bei Fortsetzung und vor jeder Antwort erneut geprüft. Das persistierte Fragenprotokoll enthält absichtlich nur eine feste
+  Ereignisbezeichnung, Quellen-IDs und Tokenzahlen: Freitext und Quellentitel könnten trotz Erkennungsmustern Namen enthalten.
+  Damit wird kein Personenbezug aus der Frage oder aus Quellentiteln persistiert; die gespeicherte Frage entspricht jedoch
+  nicht dem Freitextfeld aus Spec 03, 6.5. **Offen für Fabian:** Soll für den Wissenschat dauerhaft ein inhaltsfreies Protokoll
+  gelten (Empfehlung: ja, solange Namen nicht zuverlässig erkannt werden), oder soll ein geprüftes Verfahren für bereinigten
+  Freitext festgelegt werden? Aufwand für eine Protokollanpassung: klein; eine verlässliche Erkennung beliebiger Namen ist
+  nicht sicher zusagbar.
+  Vor einer Fortsetzung werden die alten Quellenstände nochmals unter der Hüllensperre geprüft; bei erkanntem Entzug startet
+  kein weiterer Modellaufruf. Ein Rennen zwischen dieser Prüfung und dem externen Modellaufruf ist nicht atomar mit Keycloak
+  bzw. der Seitenänderung koordinierbar. Auch die Schlussprüfung und das Einreihen der SSE-Ereignisse erfolgen unter der
+  Hüllensperre, der tatsächliche Netzwerkversand liegt danach ausserhalb der Transaktion; ein bereits eingereihtes Ereignis
+  kann nicht zurückgerufen werden. **Offen für Fabian:** Soll die Garantie auf die Prüfung vor dem Modellaufruf und die
+  atomare Prüfung/Einreihung der Antwort begrenzt werden (Empfehlung: diese Grenze explizit akzeptieren), oder ist ein anderes
+  Protokoll für «sofortiger Entzug» zu entscheiden? Der Ende-zu-Ende-Nachweis bis zur Netzauslieferung fehlt.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`

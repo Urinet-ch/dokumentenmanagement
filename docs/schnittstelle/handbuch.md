@@ -376,13 +376,21 @@ Grenzen und dasselbe Monatsbudget. Der Betreiber aktiviert ihn je Mandant mit
 Er berücksichtigt nur ausdrücklich freigegebene Seiten mit ausschliesslich
 öffentlichen Quellen der Vertraulichkeit NORMAL.
 
-Der JSON-Körper enthält `frage`. Jede Frage ist unabhängig; `gespraechId` kann
-nicht fortgesetzt werden und Fragen werden nicht gespeichert. Die SSE-Ereignisse
-entsprechen dem Chat oben; `quellen` enthält Seiten mit `titel`, `pfad` und
-`belege` (je Beleg `dokumentId`, `titel`, `reiheCode`, `reiheName`, `ausgabe`);
-den Dokumentlink bildet die Webseite aus der ID. Quellen und
-Antwort kommen erst nach erneuter Prüfung; bei einer Änderung während der Frage
-endet der Stream mit `fehler`.
+Der JSON-Körper enthält `frage` und optional `gespraechId`. Eine gültige,
+gebundene Gesprächs-ID setzt das höchstens 30 Minuten im Speicher gehaltene
+Gespräch fort; eine unbekannte, abgelaufene oder fremde ID beginnt ohne Hinweis
+ein neues Gespräch. Die SSE-Ereignisse entsprechen dem Chat oben; `quellen`
+enthält Seiten mit `titel`, `pfad` und `belege` (je Beleg `dokumentId`,
+`titel`, `reiheCode`, `reiheName`, `ausgabe`); den Dokumentlink bildet die
+Webseite aus der ID. Quellen und Antwort kommen erst nach erneuter Prüfung;
+bei einem Entzug oder einer Änderung der bisher verwendeten Quellen wird die
+Fortsetzung vor einem weiteren Modellaufruf verworfen; bei einer Änderung
+während der Frage endet der Stream mit `fehler`.
+
+Das persistierte Fragenprotokoll enthält keine Freitextfrage und keine
+Quellentitel, sondern eine feste Ereignisbezeichnung, Quellen-IDs und
+Tokenzahlen. Gesprächsfragen und -antworten bleiben nur befristet im
+Arbeitsspeicher; erkannte Kontaktangaben werden vor dem Merken entfernt.
 Das bestehende WordPress-Plugin nutzt den Archivchat; eine Anbindung an diesen
 Wissenschat ist nicht Teil dieser Umsetzung.
 

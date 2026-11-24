@@ -66,9 +66,9 @@ public class OeffentlicheFragen {
 
     /** Wortlaut bei Ausfall des Agenten: fest, ohne interne Angaben. */
     public static final String NICHT_VERFUEGBAR = ChatFragen.NICHT_VERFUEGBAR;
-    /** Feste Antwort, wenn keine passende Publikation gefunden wird (Req 6.3); {@code %s} ist der Kontakt oder leer. */
-    /** Wartezeit bei laufender Frage des Mandanten: eine Frage dauert Sekunden, nicht eine. */
+    /** Retry-After bei laufender Frage des Mandanten, in Sekunden. */
     static final long MANDANT_LAEUFT_SEKUNDEN = 5;
+    private static final String WISSENSCHAT_PROTOKOLL_FRAGE = "Öffentliche Wissenschat-Frage";
     static final String KEIN_TREFFER = "Dazu habe ich keine passende Publikation gefunden. Bitte wenden Sie sich an die "
             + "Geschäftsstelle%s.";
 
@@ -153,7 +153,12 @@ public class OeffentlicheFragen {
     }
 
     public Annahme wissenAnnehmen(MandantCode mandant, Lesezugriff zugriff, String frage) {
-        return annehmen(mandant, zugriff, frage, Optional.empty(), true);
+        return wissenAnnehmen(mandant, zugriff, frage, Optional.empty());
+    }
+
+    public Annahme wissenAnnehmen(MandantCode mandant, Lesezugriff zugriff, String frage,
+                                  Optional<UUID> gespraechId) {
+        return annehmen(mandant, zugriff, frage, gespraechId, true);
     }
 
     private Annahme annehmen(MandantCode mandant, Lesezugriff zugriff, String frage, Optional<UUID> gespraechId,
@@ -194,17 +199,25 @@ public class OeffentlicheFragen {
         }
         try {
             OeffentlicheGespraeche.Geoeffnet gespraech = wissenschat
-                    ? new OeffentlicheGespraeche.Geoeffnet(UUID.randomUUID(), List.of())
+                    ? gespraeche.oeffnenWissen(gespraechId.orElse(null), mandant, zugriff)
                     : gespraeche.oeffnen(gespraechId.orElse(null), mandant, zugriff);
             OeffentlicheAnfrage anfrage = new OeffentlicheAnfrage(mandant, zugriff, reservierung.monat(),
                     einstellungen.lesen(mandant).name(), text, gespraech.verlauf(),
-                    wissenschat ? new OeffentlichesWissenDurchgang() : null);
+                    wissenschat ? new OeffentlichesWissenDurchgang(gespraech.wissensStaende(),
+                            gespraech.wissensSeiten()) : null);
             return new Annahme(gespraech.id(), anfrage, text, platz);
         } catch (RuntimeException e) {
             platz.freigeben();
             freigebenOhneFehler(mandant, reservierung.monat());
             throw e;
         }
+    }
+
+    private boolean wissenStaendeAktuell(List<OeffentlichesWissenPort.Stand> staende) {
+        return transaktion.neu(() -> {
+            huelle.sperren();
+            return staende.stream().allMatch(wissen::aktuell);
+        });
     }
 
     /** Gibt die Reservierung frei; scheitert das, bleibt nur der Lease als Netz, und der Fehler geht nur ins Log. */
@@ -265,6 +278,11 @@ public class OeffentlicheFragen {
         UUID id = annahme.gespraechId();
         OeffentlicheAnfrage anfrage = annahme.anfrage();
         ChatDurchgang durchgang = new ChatDurchgang();
+        if (anfrage.wissen() != null && !anfrage.wissen().gesehene().isEmpty()
+                && !wissenStaendeAktuell(anfrage.wissen().gesehene())) {
+            strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
+            return;
+        }
         try {
             agent.beantworten(anfrage, ereignis -> {
                 if (!abbruch.gesetzt()) {
@@ -290,7 +308,7 @@ public class OeffentlicheFragen {
             return;
         }
         if (anfrage.wissen() != null) {
-            wissenAusgeben(id, anfrage.wissen(), antwort, strom);
+            wissenAusgeben(annahme, antwort, strom);
             return;
         }
         List<OeffentlicheQuelle> quellen;
@@ -326,8 +344,10 @@ public class OeffentlicheFragen {
         }
     }
 
-    void wissenAusgeben(UUID id, OeffentlichesWissenDurchgang durchgang, ChatAntwort antwort,
-                        Consumer<OeffentlicheAusgabe> strom) {
+    void wissenAusgeben(Annahme annahme, ChatAntwort antwort, Consumer<OeffentlicheAusgabe> strom) {
+        UUID id = annahme.gespraechId();
+        OeffentlicheAnfrage anfrage = annahme.anfrage();
+        OeffentlichesWissenDurchgang durchgang = anfrage.wissen();
         try {
             transaktion.neu(() -> {
                 huelle.sperren();
@@ -342,6 +362,22 @@ public class OeffentlicheFragen {
                                 ohneSteuerzeichen(d.reiheName()), d.ausgabe() == null ? null
                                 : ohneSteuerzeichen(d.ausgabe()))).toList())).toList();
                 String text = quellen.isEmpty() ? "Dazu steht nichts in der Wissensbasis." : antwort.inhalt();
+                List<OeffentlicheQuelle> protokollQuellen = durchgang.gezeigte().stream()
+                        .flatMap(s -> s.dokumente().stream())
+                        .collect(java.util.stream.Collectors.toMap(OeffentlichesWissenPort.Dokument::id,
+                                d -> new OeffentlicheQuelle(d.id(), "", "", "", null, null, null),
+                                (erste, ignoriert) -> erste, LinkedHashMap::new))
+                        .values().stream().toList();
+                int tokens = antwort.tokens()
+                        .map(t -> (int) Math.min(Integer.MAX_VALUE, (long) t.tokensEin() + t.tokensAus()))
+                        .orElse(0);
+                try {
+                    speicher.speichern(WISSENSCHAT_PROTOKOLL_FRAGE, protokollQuellen, tokens, uhr.instant());
+                } catch (RuntimeException e) {
+                    LOG.errorf("Öffentliche Wissensfrage nicht gespeichert, ursache=%s", Ursachen.kette(e));
+                }
+                gespraeche.merkenWissen(id, anfrage.mandant(), anfrage.zugriff(), annahme.frage(), text,
+                        durchgang.gesehene(), durchgang.gezeigte());
                 if (!text.isBlank()) strom.accept(new OeffentlicheAusgabe.Text(text));
                 strom.accept(new OeffentlicheAusgabe.WissenQuellen(quellen));
                 strom.accept(new OeffentlicheAusgabe.Fertig(id));

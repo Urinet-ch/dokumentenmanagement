@@ -29,11 +29,14 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import java.util.UUID;
+
 @Path("/public/v1/wissen/chat")
 @Tag(name = "Webseite")
 public class OeffentlicherWissenschatResource {
     @Schema(name = "WissenschatFrage")
-    public record FrageDto(@Schema(required = true, minLength = 1, maxLength = 500) String frage) { }
+    public record FrageDto(@Schema(required = true, minLength = 1, maxLength = 500) String frage,
+                           @Schema(nullable = true, description = "Vorhandene Gesprächs-ID fortsetzen") UUID gespraechId) { }
 
     private final OeffentlicheFragen fragen;
     private final MandantAufloesung aufloesung;
@@ -56,7 +59,7 @@ public class OeffentlicherWissenschatResource {
     @WebseitenZugang(WebseitenZugang.Art.LESEN)
     @Operation(summary = "Frage an den öffentlichen Wissenschat",
             description = "Nur für den Mandanten aktivierte, ausdrücklich freigegebene Wissensseiten. "
-                    + "Jede Frage ist unabhängig; Gesprächsverläufe werden nicht gespeichert.")
+                    + "Ein Gespräch kann innerhalb der Speicherfrist fortgesetzt werden.")
     @Parameter(name = "X-Archiv-Zugriff", in = ParameterIn.HEADER, required = false,
             schema = @Schema(type = SchemaType.STRING, enumeration = {"oeffentlich", "mitglieder", "vorstand"}))
     @Parameter(name = "X-Archiv-Client", in = ParameterIn.HEADER, required = false,
@@ -76,8 +79,7 @@ public class OeffentlicherWissenschatResource {
             throw new FachFehler(Fehlercode.NICHT_ERLAUBT);
         }
         var eingabe = OeffentlicherChatResource.eingabe(body);
-        if (eingabe.gespraechId().isPresent()) throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
-        var annahme = fragen.wissenAnnehmen(mandant, anfrage.zugriff(), eingabe.frage());
+        var annahme = fragen.wissenAnnehmen(mandant, anfrage.zugriff(), eingabe.frage(), eingabe.gespraechId());
         String hinweis = OeffentlicherChatResource.hinweis(konfiguration, mandant);
         ChatAbbruch abbruch = new ChatAbbruch();
         UnicastProcessor<OutboundSseEvent> strom = UnicastProcessor.create();

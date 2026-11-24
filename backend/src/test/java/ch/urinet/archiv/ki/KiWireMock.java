@@ -222,6 +222,23 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
         chatFolge(antworten, 0, letzteVerzoegerungMillis);
     }
 
+    public static void chatFolgeMitMarker(List<ChatAntwort> antworten, String marker) {
+        WireMock modell = client();
+        String szenario = CHAT_SZENARIO + "-" + marker;
+        for (int i = 0; i < antworten.size(); i++) {
+            boolean letzte = i == antworten.size() - 1;
+            var stub = gestreamt().withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.containing(marker))
+                    .inScenario(szenario)
+                    .whenScenarioStateIs(i == 0 ? com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED
+                            : "antwort-" + i)
+                    .willReturn(strom(antworten.get(i)));
+            if (!letzte) {
+                stub.willSetStateTo("antwort-" + (i + 1));
+            }
+            modell.register(stub);
+        }
+    }
+
     private static void chatFolge(List<ChatAntwort> antworten, int erstePortionenMillis, int letzteVerzoegerungMillis) {
         WireMock modell = client();
         for (int i = 0; i < antworten.size(); i++) {
