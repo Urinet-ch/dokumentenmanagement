@@ -224,7 +224,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
     (Pflegeregel); Browser-Szenario, axe und `npm run pruefe:gestaltung`.
   - _Anforderungen: 20.1, 20.3, 20.10_
   - _Abhängig von: 17.1_
-- [ ] 17.3 Isolations- und Abnahmetests [QA]
+- [x] 17.3 Isolations- und Abnahmetests [QA]
   - Mandantentrennung, `PERSONAL`, A16, Migration (Bestand mit Art `WISSENSQUELLE`), Jahresexport unverändert; ergänzt Aufgabe 16.1.
   - Der vollständige Szenario-Nachweis 20.11 umfasst auch die Oberfläche 20.10 und ist erst nach 17.2 möglich.
   - _Anforderungen: 20.3, 20.6, 20.8, 20.11_

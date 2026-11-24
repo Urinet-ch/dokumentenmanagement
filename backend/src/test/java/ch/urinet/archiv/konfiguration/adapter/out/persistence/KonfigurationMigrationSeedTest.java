@@ -46,7 +46,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Ausgenommen sind {@code version}/{@code basisVersion} und {@code kiTexte.kiFreigegeben}: Changeset 048 übernimmt
  * für den bestehenden Mandanten {@code urinet} die Freigabe des Gate-0-Prompts ({@code true}); ein neuer Mandant
- * beginnt nach Req 6.6/8.4 ohne Freigabe, die Datei setzt sie nie.
+ * beginnt nach Req 6.6/8.4 ohne Freigabe, die Datei setzt sie nie. Changeset 129 übernimmt zudem bestehende
+ * Einstellungen; der Seed-Vergleich prüft deshalb auch die unmittelbar vorherige Version.
  */
 @QuarkusTest
 class KonfigurationMigrationSeedTest {
@@ -105,6 +106,15 @@ class KonfigurationMigrationSeedTest {
             JsonNode export = vergleichbar(codec.schreiben(new Konfiguration(migriert.version(),
                     migriert.einstellungen(), migriert.arten(), migriert.klassifikationen(), migriert.regeln(), live)));
             JsonNode erwartet = vergleichbar(codec.schreiben(seed.lesen(new MandantCode("urinet"))));
+            Konfiguration vorEinstellungsmigration = new PanacheKonfigurationVersionsRepository(json).lesen(
+                    wert(befehl, "select inhalt::text from konfiguration_version order by version desc offset 1 limit 1"));
+            JsonNode vorher = vergleichbar(codec.schreiben(new Konfiguration(vorEinstellungsmigration.version(),
+                    vorEinstellungsmigration.einstellungen(), vorEinstellungsmigration.arten(),
+                    vorEinstellungsmigration.klassifikationen(), vorEinstellungsmigration.regeln(), live)));
+            assertThat(vorher).isEqualTo(erwartet);
+            assertThat(migriert.version()).isEqualTo(vorEinstellungsmigration.version() + 1);
+            ((ObjectNode) export.path("einstellungen")).remove(List.of("branding", "chat", "webseitenChat", "wissen"));
+            ((ObjectNode) erwartet.path("einstellungen")).remove(List.of("branding", "chat", "webseitenChat", "wissen"));
             assertThat(export).isEqualTo(erwartet);
         } finally {
             try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {

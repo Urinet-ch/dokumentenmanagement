@@ -51,6 +51,7 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      ARCHIV_BASIS_URL: https://pwa.example.invalid
     secrets:
       - keycloak_db
       - keycloak_admin
@@ -114,6 +115,7 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
+      ARCHIV_BASIS_URL: https://pwa.example.invalid
     secrets:
       - keycloak_db
       - keycloak_admin

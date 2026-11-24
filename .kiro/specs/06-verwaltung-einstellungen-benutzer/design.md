@@ -151,7 +151,9 @@ backend/src/main/java/ch/urinet/archiv/
   `/components`, `/partial-import`, Rollen-Definitionen und `client-secret`.
 - **Aufrufe an Keycloak** (Realm `urinet-archiv`): `POST /protocol/openid-connect/token` (Client-Credentials, Token bis
   30 Sekunden vor Ablauf wiederverwendet, ein Abruf gleichzeitig); `GET /admin/realms/…/users?q=mandant:<m>&max=50`,
-  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
+  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`,
+  `GET …/users/{id}/role-mappings/realm/available` (Zielrolle benutzerbezogen auflösen; kein Lesezugriff auf globale
+  Rollendefinitionen nötig), `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
   `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
   `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET …/users/{id}/federated-identity` (Liste, Filter auf `identityProvider = google`; unter `…/federated-identity/google` kennt Keycloak nur POST und DELETE), `DELETE …/users/{id}/federated-identity/google`,
   `GET/DELETE …/attack-detection/brute-force/users/{id}` (GET für die Anzeige und die Prüfung vor dem Entsperren;
@@ -804,6 +806,18 @@ Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übe
 Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
 Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
 
+## Umsetzung (Aufgabe 20.5, 24.11.2026)
+
+Die Einstellungsseite zeigt den Katalog und merkt Änderungen, Rücksetzungen einzelner Felder oder Gruppen und
+Einstellungen einer früheren Version zunächst als Eingaben vor. Auch eine frühere Version wird über die gemeinsame
+Vorschau und den bestätigten Merge-Patch gespeichert; andere Konfigurationsteile bleiben unverändert. Fehlt bei einer
+alten Version die Einstellungsgruppe, gelten die Standards. Kennungen zeigt der Vergleich ohne Werte.
+
+Für Step-up liegt die bestätigte Änderung vorübergehend im `sessionStorage` des Tabs, einschliesslich Eingaben und
+ETag, höchstens zehn Minuten zur Wiederholung gültig. Eine zufällige Kennung bindet sie an den konkreten, erfolgreich
+geprüften OIDC-Rückruf; Benutzer und Mandant müssen übereinstimmen. Vor der einmaligen Wiederholung wird sie gelöscht.
+Ein Neuladen ohne erfolgreichen Rückruf löst keine Wiederholung aus. Der Server prüft Rechte, Bestätigung und ETag erneut.
+
 ## Umsetzung (Aufgabe 20.3, 23.11.2026)
 
 Die Wissenseinstellungen werden auch bei fehlender oder vollständig leerer Tabellenzeile als Konfigurationsversion
@@ -843,3 +857,16 @@ Ein paralleler JUnit-Test hält eine Rollenänderung an der externen Wirkung an:
 `STATUS_KONFLIKT`, danach verhindert `LETZTER_INHABER` die Entfernung des letzten aktiven Inhabers. Das bestehende
 Cucumber-Szenario prüft zusätzlich konkurrierende Aufrufe zweier Inhaber. `EskalationTest` deckt auch jede
 Selbstzuweisung ab; Rollen-, Rechtematrix-, Endpunkt- und Keycloak-Ausfalltests ergänzen die Nachweise.
+
+## Umsetzung (Aufgabe 20.4, 23.11.2026)
+
+Die beiden Aufräumdienste lesen die versionierte Aufbewahrung erst innerhalb des geprüften Mandantenkontexts.
+Das öffentliche Branding verwendet ausschliesslich die vom Betreiber konfigurierte Domain-Zuordnung und liest nur
+Name und Farbe des zugeordneten aktiven Mandanten; unbekannte Domains bleiben neutral. Änderungen sind unmittelbar
+sichtbar, Logo und Sprache bleiben Betreiberkonfiguration.
+
+Changeset 129 übernimmt für bestehende Mandanten die darstellbaren bisherigen Eigenschaftswerte in eine neue
+`MIGRATION`-Version und synchronisiert den Wissensspiegel. Bereits eigene Werte bleiben erhalten. Nicht als ganze
+Katalogmonate darstellbare Chatfristen bleiben geerbt und verwenden weiterhin die unveränderte ISO-Periode; so wird
+keine Frist erfunden oder verkürzt. Dasselbe gilt für nicht katalogkonforme Startwerte, die sich nicht in das Abbild
+übernehmen lassen. Der Rollback lässt Version und Protokoll stehen; die bisherigen Eigenschaften bleiben verfügbar.

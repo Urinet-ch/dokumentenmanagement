@@ -12,6 +12,14 @@
 Die Verwaltung finden Sie nur als **Inhaber** unter «Verwaltung». Alle Änderungen gelten nur für Ihren Mandanten und stehen im
 Zugriffsprotokoll (`/verwaltung/protokoll`), ohne E-Mail-Adressen und Namen.
 
+## Normaler Weg für Benutzer
+Benutzer und Rollen pflegt der Inhaber in der Verwaltungsoberfläche. Den ersten Inhaber eines neuen Mandanten lädt der
+Betreiber mit `archiv mandant inhaber-einladen` ein; Keycloak verschickt den einmaligen Link, ohne dass Passwort oder Link
+im Terminal erscheinen. Der Betreiber kann mit `archiv benutzer abgleichen <code> [--pruefen]` bestehende Zugänge prüfen
+und sie bei Bedarf in das Benutzerverzeichnis übernehmen, ohne Keycloak zu ändern. Beim Mandantenabbau deaktiviert
+`archiv mandant benutzer-sperren <code>` die Zugänge und beendet deren Sitzungen; nach 30 Tagen löscht ein erneuter Aufruf
+die Keycloak-Benutzer.
+
 ## Benutzer einladen
 1. «Benutzer» → «Person einladen». Benutzername (nur `a–z`, `0–9`, `.`, `_`, `-`), E-Mail, Vorname, Nachname und **Rolle** wählen.
 2. Sie bestätigen mit Passwort und TOTP (frische Anmeldung, höchstens 5 Minuten alt).
@@ -54,4 +62,5 @@ Nicht hier änderbar: Alarm-Empfänger, Budget des öffentlichen Chats, Modelle,
 | «Letzter Inhaber» | Es muss ein aktiver Inhaber bleiben. |
 | «Zu viele Anfragen» | Grenze erreicht (z. B. 10 Einladungen je Stunde); später wieder. |
 | «Anmeldedienst nicht erreichbar» | Keycloak antwortet nicht; Dokumente und Einstellungen funktionieren weiter. Später erneut versuchen. |
-Weiterhin gilt für Notfälle der Betreiber (Fabian) mit dem Admin-Kommando.
+Für Notfälle bleibt der Betreiberweg mit `kcadm.sh` aus dem README bestehen, falls das Dienstkonto oder der Mailversand
+nicht bereit ist. Er ist nicht der normale Weg für die Benutzerverwaltung.

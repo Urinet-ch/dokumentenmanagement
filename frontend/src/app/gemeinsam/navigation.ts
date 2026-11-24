@@ -65,6 +65,13 @@ export const MENUE: readonly Menuepunkt[] = [
     symbol: 'export',
   },
   {
+    pfad: '/verwaltung/einstellungen',
+    text: TEXTE.menue.einstellungen,
+    aktion: 'A20',
+    gruppe: 'verwaltung',
+    symbol: 'dokumentarten',
+  },
+  {
     pfad: '/verwaltung/benutzer',
     text: TEXTE.menue.benutzer,
     aktion: 'A21',

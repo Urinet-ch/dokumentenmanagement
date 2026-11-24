@@ -1,0 +1,64 @@
+:host {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 72rem;
+  min-width: 0;
+}
+
+.karten {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+}
+
+.karte {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  margin: 0 0 1rem;
+}
+
+h3 {
+  margin: 0 0 .75rem;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .5rem 1rem;
+}
+
+dt {
+  color: var(--text-gedaempft);
+}
+
+dd {
+  min-width: 0;
+  margin: 0;
+}
+
+label {
+  display: block;
+  margin-top: 1rem;
+}
+
+input, textarea, select {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: .5rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--karte);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+}
+
+@media (max-width: 599px) {
+  dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

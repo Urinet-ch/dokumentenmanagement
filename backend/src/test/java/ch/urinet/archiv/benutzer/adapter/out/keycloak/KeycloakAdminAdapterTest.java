@@ -172,6 +172,41 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void abgleichErhaeltUnbekannteRealmRollen() {
+        String id = "9a735b70-5648-42db-8391-1abe070391cb";
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("first", equalTo("0"))
+                .withQueryParam("max", equalTo("50"))
+                .willReturn(okJson("""
+                        [{"id":"%s","attributes":{"mandant":["urinet"]}}]
+                        """.formatted(id))));
+        server.stubFor(get(urlPathEqualTo(USERS + "/" + id + "/role-mappings/realm"))
+                .willReturn(okJson("[{\"name\":\"fremde-rolle\"}]")));
+
+        assertThat(adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).seite(0).getFirst().fremdeRollen())
+                .containsExactly("fremde-rolle");
+    }
+
+    @Test
+    void abgleichMeldetTechnischeKeycloakRollenNichtAlsFremd() {
+        String id = "9a735b70-5648-42db-8391-1abe070391cb";
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("first", equalTo("0"))
+                .withQueryParam("max", equalTo("50"))
+                .willReturn(okJson("""
+                        [{"id":"%s","attributes":{"mandant":["urinet"]}}]
+                        """.formatted(id))));
+        server.stubFor(get(urlPathEqualTo(USERS + "/" + id + "/role-mappings/realm"))
+                .willReturn(okJson("""
+                        [{"name":"default-roles-urinet-archiv"},{"name":"offline_access"},
+                         {"name":"uma_authorization"},{"name":"inhaber"},{"name":"fremde-rolle"}]
+                        """)));
+
+        assertThat(adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).seite(0).getFirst().fremdeRollen())
+                .containsExactly("fremde-rolle");
+    }
+
+    @Test
     void abgleichWeistUngueltigeRealmAntwortZurueck() {
         tokenAntwort();
         server.stubFor(get(urlPathEqualTo(USERS)).willReturn(okJson("""
@@ -462,8 +497,11 @@ class KeycloakAdminAdapterTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> adapter.pruefePositivliste("GET", USERS + "/benutzer-1/credentials/credential-1"))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> adapter.pruefePositivliste("GET",
+                "/admin/realms/urinet-archiv/roles/inhaber")).isInstanceOf(IllegalArgumentException.class);
         adapter.pruefePositivliste("GET", USERS + "/benutzer-1/credentials");
         adapter.pruefePositivliste("DELETE", USERS + "/benutzer-1/credentials/credential-1");
+        adapter.pruefePositivliste("GET", USERS + "/benutzer-1/role-mappings/realm/available");
     }
 
     @Test
@@ -832,8 +870,8 @@ class KeycloakAdminAdapterTest {
                 .withHeader("Location", server.baseUrl() + USERS + "/neu-1")));
         benutzerStub("neu-1", "urinet");
         server.stubFor(get(urlPathEqualTo(USERS + "/neu-1/role-mappings/realm")).willReturn(okJson("[]")));
-        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/mitarbeiter"))
-                .willReturn(okJson("{\"id\":\"r1\",\"name\":\"mitarbeiter\"}")));
+        server.stubFor(get(urlPathEqualTo(USERS + "/neu-1/role-mappings/realm/available"))
+                .willReturn(okJson("[{\"id\":\"r1\",\"name\":\"mitarbeiter\"}]")));
         server.stubFor(post(urlPathEqualTo(USERS + "/neu-1/role-mappings/realm"))
                 .willReturn(aResponse().withStatus(204)));
 
@@ -895,8 +933,6 @@ class KeycloakAdminAdapterTest {
                 .withHeader("Location", server.baseUrl() + USERS + "/neu-1")));
         benutzerStub("neu-1", "urinet");
         server.stubFor(get(urlPathEqualTo(USERS + "/neu-1/role-mappings/realm")).willReturn(aResponse().withStatus(503)));
-        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/mitarbeiter"))
-                .willReturn(okJson("{\"id\":\"r1\",\"name\":\"mitarbeiter\"}")));
         server.stubFor(delete(urlPathEqualTo(USERS + "/neu-1")).willReturn(aResponse().withStatus(204)));
 
         assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).anlegen("urinet",
@@ -1017,7 +1053,7 @@ class KeycloakAdminAdapterTest {
         benutzerStub("benutzer-1", "urinet");
         server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm"))
                 .willReturn(okJson("[{\"id\":\"r0\",\"name\":\"inhaber\"}]")));
-        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/mitarbeiter"))
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm/available"))
                 .willReturn(aResponse().withStatus(503)));
 
         assertThatThrownBy(() -> adapter(Duration.ofSeconds(2), Duration.ofSeconds(1))
@@ -1033,8 +1069,8 @@ class KeycloakAdminAdapterTest {
         server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm")).willReturn(okJson("""
                 [{"id":"r0","name":"inhaber"},{"id":"r9","name":"offline_access"}]
                 """)));
-        server.stubFor(get(urlPathEqualTo("/admin/realms/urinet-archiv/roles/mitarbeiter"))
-                .willReturn(okJson("{\"id\":\"r1\",\"name\":\"mitarbeiter\"}")));
+        server.stubFor(get(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm/available"))
+                .willReturn(okJson("[{\"id\":\"r1\",\"name\":\"mitarbeiter\"}]")));
         server.stubFor(post(urlPathEqualTo(USERS + "/benutzer-1/role-mappings/realm"))
                 .inScenario("rollenfolge").whenScenarioStateIs(STARTED).willSetStateTo("zugewiesen")
                 .willReturn(aResponse().withStatus(204)));

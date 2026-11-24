@@ -173,18 +173,22 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 2.13_
   - _Abhängig von: 20.2, Spec 04: 13.6_
 
-- [ ] 20.4 Dienste lesen die Werte der Konfiguration, Migration [Backend]
+- [x] 20.4 Dienste lesen die Werte der Konfiguration, Migration [Backend]
   - Branding, Aufbewahrung der Chat-Fragen (intern und öffentlich) und die Budgets lesen über `MandantEinstellungen`; die
     Eigenschaften bleiben Standard; Migration der heute wirksamen Werte (Version, Quelle `MIGRATION`); «wirksam ab» wie im
     Katalog.
   - _Anforderungen: 1.4, 1.5, 2.12_
   - _Abhängig von: 20.2_
+  - Nachweis: `KonfigurationMigrationTest` (zwei Mandanten und Rollback), `ChatAufbewahrungMandantTest`,
+    `MandantEinstellungenResourceTest` und Cucumber-Szenario zum öffentlichen Branding (`@req-1.4`, `@req-2.12`).
 
-- [ ] 20.5 Oberfläche Einstellungen [Frontend]
+- [x] 20.5 Oberfläche Einstellungen [Frontend]
   - Seite `/verwaltung/einstellungen`: Gruppen, Grenzen, Standard, Vorschau, Dialog bei riskanten Werten, Verlauf mit Vergleich,
     Fehlermatrix, 375 px, WCAG 2.1 AA, Texte in `texte.de-CH.ts`.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.4, 8.5, 8.7_
   - _Abhängig von: 20.2_
+  - Nachweis: `einstellungen-pwa.feature` (Vorschau, Bestätigung, Step-up und axe bei 375/1280 px hell/dunkel)
+    sowie Angular-Tests für Rücksetzung, Versionen, Fehler und OIDC-Fortsetzung. Der manuelle Handy-Nachweis bleibt 21.6.
 
 - [ ] 20.6 Oberfläche Benutzer lesen [Frontend]
   - Seiten `/verwaltung/benutzer` und `/verwaltung/benutzer/:id`: Liste, Karten, Status, Rechte-Übersicht, Anträge, Hinweis auf API-Tokens;
@@ -193,6 +197,9 @@ auf Server oder Secrets aus der Sitzung.
   - _Abhängig von: 19.7, 19.11_
   - Umsetzung und automatisierte Browser-Nachweise vorbereitet; der manuelle Nachweis zu 8.2 und 8.7 bleibt bei 21.6,
     die zugehörigen Einstellungsseiten folgen in 20.5. Checkbox bis zum vollständigen Nachweis offen.
+  - Nachweis Benutzerseite: `benutzer-lesen-pwa.feature` (`@req-8.1`, `@req-8.2`, `@req-8.3`, `@req-8.7`),
+    acht Szenarien einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505);
+    Angular-Tests für Fehler, Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514).
 
 - [ ] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
   - Einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, Rolle ändern, E-Mail ändern, löschen (mit
@@ -211,7 +218,7 @@ auf Server oder Secrets aus der Sitzung.
     Umstellung eines bestehenden Realms und Prüfung mit echtem Postfach bleiben Betriebsnachweise.
 
 ## Welle 21 — Admin-Kommando, Migration, Tests und Abnahme
-- [ ] 21.1 Admin-Kommando [Backend]
+- [x] 21.1 Admin-Kommando [Backend]
   - `archiv mandant anlegen … --rollen`, `archiv mandant inhaber-einladen`, `archiv benutzer abgleichen [--pruefen]`,
     `archiv mandant benutzer-sperren <code>` für den Mandantenabbau (Exit-Codes, `--json`), Protokoll `betreiber:<name>`;
     README-Abschnitt «Admin-Kommandos auf der VPS» ergänzt.

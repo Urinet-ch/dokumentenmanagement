@@ -11,12 +11,14 @@ import ch.urinet.archiv.mandant.application.MandantSchemaPruefung;
 import ch.urinet.archiv.mandant.application.MandantVerwaltungsrollenSeed;
 import ch.urinet.archiv.mandant.application.SeedPruefung;
 import ch.urinet.archiv.mandant.domain.Mandant;
+import ch.urinet.archiv.mandant.domain.MandantVerwaltungsrollen;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.Dependent;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -46,7 +48,13 @@ public class MandantProvisionierungTestadapter extends MandantProvisionierung {
 
     @Override
     public Mandant anlegen(String code, String name, String geschaeftsjahresende) {
-        return aufFrischemThread(() -> super.anlegen(code, name, geschaeftsjahresende));
+        return anlegen(code, name, geschaeftsjahresende, Optional.empty());
+    }
+
+    @Override
+    public Mandant anlegen(String code, String name, String geschaeftsjahresende,
+                           Optional<MandantVerwaltungsrollen> rollen) {
+        return aufFrischemThread(() -> super.anlegen(code, name, geschaeftsjahresende, rollen));
     }
 
     /** Führt {@code aufgabe} auf einem frischen Plattform-Thread aus und gibt Fehler unverändert weiter. */

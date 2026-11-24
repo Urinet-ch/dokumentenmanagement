@@ -47,11 +47,12 @@ describe('anmeldungInterceptor (Req 2.1)', () => {
     expect(anmeldung.sitzungAbgelaufen).toHaveBeenCalledOnce();
   });
 
-  it('behält die Sitzung bei einer verlangten frischen Anmeldung', async () => {
-    http.get('/api/v1/a').subscribe({ error: () => undefined });
+  it('verwirft die Sitzung bei einer Step-up-Aufforderung nicht', async () => {
+    http.patch('/api/v1/mandant/einstellungen', {}).subscribe({ error: () => undefined });
     await tokenAbwarten();
-    kontrolle.expectOne('/api/v1/a').flush({ fehlercode: 'STEP_UP_NOETIG' },
-      { status: 401, statusText: 'Unauthorized' });
+    kontrolle.expectOne('/api/v1/mandant/einstellungen').flush(
+      { fehlercode: 'STEP_UP_NOETIG' }, { status: 401, statusText: 'Unauthorized' },
+    );
     expect(anmeldung.sitzungAbgelaufen).not.toHaveBeenCalled();
   });
 });

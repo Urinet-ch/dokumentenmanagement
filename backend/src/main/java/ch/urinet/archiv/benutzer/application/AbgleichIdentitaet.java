@@ -13,11 +13,16 @@ import java.util.UUID;
  */
 public interface AbgleichIdentitaet {
 
-    record RealmBenutzer(UUID id, List<String> mandanten, Set<Rolle> rollen) {
+    record RealmBenutzer(UUID id, List<String> mandanten, Set<Rolle> rollen, Set<String> fremdeRollen) {
         public RealmBenutzer {
             Objects.requireNonNull(id);
             mandanten = List.copyOf(mandanten);
             rollen = Set.copyOf(rollen);
+            fremdeRollen = Set.copyOf(fremdeRollen);
+        }
+
+        public RealmBenutzer(UUID id, List<String> mandanten, Set<Rolle> rollen) {
+            this(id, mandanten, rollen, Set.of());
         }
 
         @Override
