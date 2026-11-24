@@ -1,11 +1,14 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
 import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
+import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.benutzer.adapter.out.persistence.JdbcVerwaltungGrenzen;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import ch.urinet.archiv.mandant.application.MandantEinstellungen;
+import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.arc.ClientProxy;
 import io.quarkus.test.junit.QuarkusMock;
@@ -27,6 +30,8 @@ import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.time.Duration;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,7 +43,53 @@ class MandantEinstellungenResourceTest {
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenbank;
     @Inject VerwaltungGrenzen grenzen;
+    @Inject MandantKontext kontext;
+    @Inject MandantEinstellungen einstellungen;
+    @Inject StepUp stepUp;
     private VerwaltungGrenzen urspruenglicheGrenzen;
+
+    @Test
+    void aufbewahrungIstImWorkerKontextAusDerAktuellenVersionLesbar() throws Exception {
+        for (String code : new String[] {"urinet", "vhf-gsk"}) {
+            if (!imRegister(code)) {
+                provisionierung.anlegen(code, null, null);
+            }
+        }
+        String urinet = Testanmeldung.token("inhaber-urinet");
+        Response vorher = given().auth().oauth2(urinet).get("/api/v1/konfiguration");
+        Response gespeichert = patch(urinet, vorher.getHeader("ETag"),
+                "{\"chat\":{\"aufbewahrungMonate\":60},\"webseitenChat\":{\"aufbewahrungTage\":365}}");
+        assertThat(gespeichert.statusCode()).as(gespeichert.asString()).isEqualTo(200);
+        StepUp original = ClientProxy.unwrap(stepUp);
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        try {
+            var geaendert = CompletableFuture.supplyAsync(() ->
+                    kontext.mit(new MandantCode("urinet"), einstellungen::aufbewahrung)).join();
+            var anderer = CompletableFuture.supplyAsync(() ->
+                    kontext.mit(new MandantCode("vhf-gsk"), einstellungen::aufbewahrung)).join();
+            assertThat(geaendert.chatMonate()).isEqualTo(60);
+            assertThat(geaendert.webseitenChatTage()).isEqualTo(365);
+            Response vhf = given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).get("/api/v1/konfiguration");
+            assertThat(anderer.chatMonate()).isEqualTo(
+                    vhf.jsonPath().<Integer>get("einstellungen.chat.aufbewahrungMonate"));
+            assertThat(anderer.webseitenChatTage()).isEqualTo(
+                    vhf.jsonPath().<Integer>get("einstellungen.webseitenChat.aufbewahrungTage"));
+        } finally {
+            try {
+                Response zurueck = given().auth().oauth2(urinet).header("If-Match", gespeichert.getHeader("ETag"))
+                        .queryParam("bestaetigt", "chat.aufbewahrungMonate,webseitenChat.aufbewahrungTage")
+                        .contentType("application/json")
+                        .body("{\"version\":" + vorher.jsonPath().getInt("basisVersion") + "}")
+                        .post(PFAD + "/zuruecksetzen");
+                assertThat(zurueck.statusCode()).as(zurueck.asString()).isEqualTo(200);
+            } finally {
+                QuarkusMock.installMockForType(original, StepUp.class);
+            }
+        }
+    }
 
     @BeforeEach
     void grenzenIsolieren() {
@@ -134,6 +185,10 @@ class MandantEinstellungenResourceTest {
         assertThat(vorher.statusCode()).as(vorher.asString()).isEqualTo(200);
         assertThat(andererMandant.statusCode()).as(andererMandant.asString()).isEqualTo(200);
         String bisher = vorher.jsonPath().getString("einstellungen.branding.name");
+        Response brandingVorher = given().queryParam("domain", "urinet.test.invalid").get("/api/v1/branding");
+        Response anderesBranding = given().queryParam("domain", "vhf-gsk.test.invalid").get("/api/v1/branding");
+        assertThat(brandingVorher.statusCode()).isEqualTo(200);
+        assertThat(anderesBranding.statusCode()).isEqualTo(200);
         String neu = "Testarchiv".equals(bisher) ? "Probe Archiv" : "Testarchiv";
         String body = "{\"branding\":{\"name\":\"" + neu + "\"}}";
         Response vorschau = given().auth().oauth2(urinet).header("If-Match", vorher.getHeader("ETag"))
@@ -147,6 +202,10 @@ class MandantEinstellungenResourceTest {
             assertThat(gespeichert.getHeader("ETag")).isNotEqualTo(vorher.getHeader("ETag"));
             assertThat(given().auth().oauth2(urinet).get("/api/v1/konfiguration")
                     .jsonPath().getString("einstellungen.branding.name")).isEqualTo(neu);
+            assertThat(given().queryParam("domain", "urinet.test.invalid").get("/api/v1/branding")
+                    .jsonPath().getString("name")).isEqualTo(neu);
+            assertThat(given().queryParam("domain", "vhf-gsk.test.invalid").get("/api/v1/branding").asString())
+                    .isEqualTo(anderesBranding.asString());
             Response vhfNachher = given().auth().oauth2(vhf).get("/api/v1/konfiguration");
             assertThat(vhfNachher.getHeader("ETag")).isEqualTo(andererMandant.getHeader("ETag"));
             assertThat(vhfNachher.asString()).isEqualTo(andererMandant.asString());
@@ -159,110 +218,94 @@ class MandantEinstellungenResourceTest {
         }
         assertThat(given().auth().oauth2(urinet).get("/api/v1/konfiguration")
                 .jsonPath().getString("einstellungen.branding.name")).isEqualTo(bisher);
+        assertThat(given().queryParam("domain", "urinet.test.invalid").get("/api/v1/branding").asString())
+                .isEqualTo(brandingVorher.asString());
     }
 
     @Test
-    void wissenZeigtLiveWerteUndVerhindertNochNichtWirksameAenderungen() throws Exception {
+    void wissenWirdVersioniertUndVonBeidenSchnittstellenVerwendet() throws Exception {
         for (String code : new String[] {"urinet", "vhf-gsk"}) {
             if (!imRegister(code)) {
                 provisionierung.anlegen(code, null, null);
             }
         }
-        Wissenswerte vorher = wissenswerte();
         String urinet = Testanmeldung.token("inhaber-urinet");
         String vhf = Testanmeldung.token("inhaber-vhf-gsk");
         String andererMandant = given().auth().oauth2(vhf).get(PFAD).asString();
+        String wissenPfad = "/api/v1/wissensbasis/einstellungen";
+        Response vorher = given().auth().oauth2(urinet).get(wissenPfad);
+        assertThat(vorher.statusCode()).as(vorher.asString()).isEqualTo(200);
         try {
-            wissenswerteSchreiben(new Wissenswerte(true, 123456, 234567, "0 0/15 * * * ?", 345678));
+            String body = "{\"budgetTokens\":123456,\"lintBudgetTokens\":234567,"
+                    + "\"lintZeitplan\":\"0 0 23 ? * MON\",\"monatsbudgetTokens\":345678}";
+            Response gespeichert = given().auth().oauth2(urinet).header("If-Match", vorher.getHeader("ETag"))
+                    .contentType("application/json").body(body).put(wissenPfad);
+            assertThat(gespeichert.statusCode()).as(gespeichert.asString()).isEqualTo(200);
+            assertThat(gespeichert.getHeader("ETag")).isNotEqualTo(vorher.getHeader("ETag"));
             Response katalog = given().auth().oauth2(urinet).get(PFAD);
             assertThat(katalog.statusCode()).as(katalog.asString()).isEqualTo(200);
             String budget = "katalog.find { it.schluessel == 'wissen.budgetTokens' }";
             assertThat(katalog.jsonPath().getInt(budget + ".standard")).isEqualTo(600000);
             assertThat(katalog.jsonPath().getInt(budget + ".aktuellerWert")).isEqualTo(123456);
             assertThat(katalog.jsonPath().getBoolean(budget + ".eigenerWert")).isTrue();
-            assertThat(katalog.jsonPath().getString(budget + ".hinweis")).contains("/wissensbasis/einstellungen");
             String plan = "katalog.find { it.schluessel == 'wissen.lintZeitplan.wochentag' }";
             assertThat(katalog.jsonPath().getString(plan + ".standard")).isEqualTo("SUNDAY");
-            assertThat(katalog.jsonPath().getString(plan + ".aktuellerWert")).isNull();
+            assertThat(katalog.jsonPath().getString(plan + ".aktuellerWert")).isEqualTo("MONDAY");
             assertThat(katalog.jsonPath().getBoolean(plan + ".eigenerWert")).isTrue();
-            assertThat(katalog.jsonPath().getString(plan + ".hinweis")).contains("0 0/15 * * * ?");
             assertThat(katalog.jsonPath().getLong("betrieb.wissenMonatsbudgetTokens")).isEqualTo(345678);
-            Response live = given().auth().oauth2(urinet).get("/api/v1/wissensbasis/einstellungen");
-            assertThat(live.statusCode()).as(live.asString()).isEqualTo(200);
-            assertThat(live.jsonPath().getInt("budgetTokens")).isEqualTo(123456);
-
             String etag = katalog.getHeader("ETag");
-            String patch = "{\"wissen\":{\"budgetTokens\":234567}}";
-            Response aenderung = patch(urinet, etag, patch);
-            assertWissenGesperrt(aenderung);
-            Response vorschau = given().auth().oauth2(urinet).header("If-Match", etag)
-                    .contentType("application/merge-patch+json").body(patch).post(PFAD + "/vorschau");
-            assertWissenGesperrt(vorschau);
-            Response standard = patch(urinet, etag, "{\"wissen\":null}");
-            assertWissenGesperrt(standard);
-            Response gruppe = given().auth().oauth2(urinet).header("If-Match", etag)
-                    .contentType("application/json").body("{\"gruppe\":\"WISSEN\"}").post(PFAD + "/zuruecksetzen");
-            assertWissenGesperrt(gruppe);
-            Response version = given().auth().oauth2(urinet).header("If-Match", etag)
-                    .contentType("application/json").body("{\"version\":" + katalog.jsonPath().getInt("version") + "}")
-                    .post(PFAD + "/zuruecksetzen");
-            assertWissenGesperrt(version);
-
-            Response export = given().auth().oauth2(urinet).get("/api/v1/konfiguration");
-            ObjectNode datei = (ObjectNode) new ObjectMapper().readTree(export.asString());
-            ((ObjectNode) datei.path("einstellungen").path("wissen")).put("budgetTokens", 234567);
-            for (String aktion : new String[] {"pruefen", "vergleichen"}) {
-                Response pruefung = given().auth().oauth2(urinet).contentType("application/json")
-                        .body(datei.toString()).post("/api/v1/konfiguration/" + aktion);
-                assertThat(pruefung.statusCode()).as(pruefung.asString()).isEqualTo(200);
-                assertThat(pruefung.asString()).contains("WISSEN_NOCH_NICHT_UEBERFUEHRT");
+            assertThat(given().auth().oauth2(urinet).contentType("application/json").body(body)
+                    .put(wissenPfad).statusCode()).isEqualTo(428);
+            assertThat(given().auth().oauth2(urinet).header("If-Match", vorher.getHeader("ETag"))
+                    .contentType("application/json").body(body).put(wissenPfad).statusCode()).isEqualTo(412);
+            assertThat(given().auth().oauth2(urinet).header("If-Match", etag).contentType("application/json")
+                    .body("{\"monatsbudgetTokens\":2000001}").put(wissenPfad).statusCode()).isEqualTo(409);
+            assertThat(given().auth().oauth2(urinet).header("If-Match", etag).contentType("application/json")
+                    .body("{\"lintZeitplan\":\"0 0/15 * * * ?\"}").put(wissenPfad).statusCode()).isEqualTo(422);
+            Response aenderung = patch(urinet, etag, "{\"wissen\":{\"budgetTokens\":234567}}");
+            assertThat(aenderung.statusCode()).as(aenderung.asString()).isEqualTo(200);
+            Response live = given().auth().oauth2(urinet).get(wissenPfad);
+            assertThat(live.jsonPath().getInt("budgetTokens")).isEqualTo(234567);
+            assertThat(live.getHeader("ETag")).isEqualTo(aenderung.getHeader("ETag"));
+            try (Connection c = datenbank.getConnection(); PreparedStatement sql = c.prepareStatement(
+                    "select budget_tokens from m_urinet.wissens_einstellung where id = 1"); ResultSet rs = sql.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1)).isEqualTo(234567);
             }
-            Response importAntwort = given().auth().oauth2(urinet).contentType("application/json")
-                    .body(datei.toString()).put("/api/v1/konfiguration");
-            assertWissenGesperrt(importAntwort);
-            Response unveraendert = given().auth().oauth2(urinet).get(PFAD);
-            assertThat(unveraendert.getHeader("ETag")).isEqualTo(etag);
-            assertThat(unveraendert.jsonPath().getInt(budget + ".aktuellerWert")).isEqualTo(123456);
             assertThat(given().auth().oauth2(vhf).get(PFAD).asString()).isEqualTo(andererMandant);
         } finally {
-            wissenswerteSchreiben(vorher);
+            String etag = given().auth().oauth2(urinet).get(wissenPfad).getHeader("ETag");
+            Response wiederhergestellt = given().auth().oauth2(urinet).header("If-Match", etag)
+                    .contentType("application/json").body(vorher.asString()).put(wissenPfad);
+            assertThat(wiederhergestellt.statusCode()).as(wiederhergestellt.asString()).isEqualTo(200);
         }
     }
 
-    private static void assertWissenGesperrt(Response antwort) {
-        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(422);
-        assertThat(antwort.jsonPath().getString("fehlercode")).isEqualTo("KONFIGURATION_UNGUELTIG");
-        assertThat(antwort.asString()).contains("WISSEN_NOCH_NICHT_UEBERFUEHRT");
-    }
-
-    private record Wissenswerte(boolean vorhanden, Integer budget, Integer lintBudget, String plan, Integer monat) { }
-
-    private Wissenswerte wissenswerte() throws Exception {
-        try (Connection c = datenbank.getConnection();
-             PreparedStatement sql = c.prepareStatement("select budget_tokens, lint_budget_tokens, lint_zeitplan, "
-                     + "monatsbudget_tokens from m_urinet.wissens_einstellung where id = 1");
-             ResultSet rs = sql.executeQuery()) {
-            return rs.next() ? new Wissenswerte(true, rs.getObject(1, Integer.class), rs.getObject(2, Integer.class),
-                    rs.getString(3), rs.getObject(4, Integer.class)) : new Wissenswerte(false, null, null, null, null);
+    @Test
+    void wissenPutBehaeltTeilweiseGeerbtenZeitplan() throws Exception {
+        if (!imRegister("urinet")) {
+            provisionierung.anlegen("urinet", null, null);
         }
-    }
-
-    private void wissenswerteSchreiben(Wissenswerte werte) throws Exception {
-        String sql = werte.vorhanden()
-                ? "insert into m_urinet.wissens_einstellung "
-                + "(id, budget_tokens, lint_budget_tokens, lint_zeitplan, monatsbudget_tokens) values (1, ?, ?, ?, ?) "
-                + "on conflict (id) do update set budget_tokens=excluded.budget_tokens, "
-                + "lint_budget_tokens=excluded.lint_budget_tokens, lint_zeitplan=excluded.lint_zeitplan, "
-                + "monatsbudget_tokens=excluded.monatsbudget_tokens"
-                : "delete from m_urinet.wissens_einstellung where id = 1";
-        try (Connection c = datenbank.getConnection(); PreparedStatement befehl = c.prepareStatement(sql)) {
-            if (werte.vorhanden()) {
-                befehl.setObject(1, werte.budget());
-                befehl.setObject(2, werte.lintBudget());
-                befehl.setString(3, werte.plan());
-                befehl.setObject(4, werte.monat());
-            }
-            befehl.executeUpdate();
+        String token = Testanmeldung.token("inhaber-urinet");
+        Response vorher = given().auth().oauth2(token).get("/api/v1/konfiguration");
+        try {
+            Response teilplan = patch(token, vorher.getHeader("ETag"),
+                    "{\"wissen\":{\"lintZeitplan\":{\"wochentag\":\"MONDAY\",\"stunde\":null}}}");
+            assertThat(teilplan.statusCode()).as(teilplan.asString()).isEqualTo(200);
+            Response wissen = given().auth().oauth2(token).get("/api/v1/wissensbasis/einstellungen");
+            assertThat(wissen.jsonPath().getString("lintZeitplan")).isEqualTo("0 0 4 ? * MON");
+            Response gespeichert = given().auth().oauth2(token).header("If-Match", wissen.getHeader("ETag"))
+                    .contentType("application/json").body(wissen.asString()).put("/api/v1/wissensbasis/einstellungen");
+            assertThat(gespeichert.statusCode()).as(gespeichert.asString()).isEqualTo(200);
+            Response aktuell = given().auth().oauth2(token).get("/api/v1/konfiguration");
+            assertThat(aktuell.jsonPath().getString("einstellungen.wissen.lintZeitplan.wochentag")).isEqualTo("MONDAY");
+            assertThat(aktuell.jsonPath().getString("einstellungen.wissen.lintZeitplan.stunde")).isNull();
+        } finally {
+            String etag = given().auth().oauth2(token).get("/api/v1/konfiguration").getHeader("ETag");
+            Response zurueck = given().auth().oauth2(token).header("If-Match", etag).contentType("application/json")
+                    .body("{\"version\":" + vorher.jsonPath().getInt("basisVersion") + "}")
+                    .post(PFAD + "/zuruecksetzen");
+            assertThat(zurueck.statusCode()).as(zurueck.asString()).isEqualTo(200);
         }
     }
 
@@ -274,7 +317,9 @@ class MandantEinstellungenResourceTest {
         String token = Testanmeldung.token("inhaber-urinet");
         for (String[] anfrage : new String[][] {
                 {"PATCH", PFAD}, {"PATCH", "/api/v1/mandant/%65instellungen/"},
-                {"POST", PFAD + "/vorschau"}, {"POST", PFAD + "/zuruecksetzen"}
+                {"POST", PFAD + "/vorschau"}, {"POST", PFAD + "/zuruecksetzen"},
+                {"PUT", "/api/v1/wissensbasis/einstellungen"},
+                {"PUT", "/api/v1/wissensbasis/%65instellungen/"}
         }) {
             try (Socket socket = new Socket("127.0.0.1", RestAssured.port)) {
                 socket.setSoTimeout(10_000);
@@ -305,6 +350,21 @@ class MandantEinstellungenResourceTest {
             aus.write(("{}" + " ".repeat(16 * 1024 - 2)).getBytes(StandardCharsets.US_ASCII));
         }
         assertThat(verbindung.getResponseCode()).isEqualTo(200);
+        verbindung.disconnect();
+
+        verbindung = (HttpURLConnection) URI.create("http://127.0.0.1:" + RestAssured.port
+                + "/api/v1/wissensbasis/einstellungen").toURL().openConnection();
+        verbindung.setRequestMethod("PUT");
+        verbindung.setDoOutput(true);
+        verbindung.setChunkedStreamingMode(1024);
+        verbindung.setRequestProperty("Authorization", "Bearer " + token);
+        verbindung.setRequestProperty("Content-Type", "application/json");
+        verbindung.setRequestProperty("If-Match", etag);
+        String ungueltig = "{\"unbekannt\":true}";
+        try (var aus = verbindung.getOutputStream()) {
+            aus.write((ungueltig + " ".repeat(16 * 1024 - ungueltig.length())).getBytes(StandardCharsets.US_ASCII));
+        }
+        assertThat(verbindung.getResponseCode()).isEqualTo(422);
         verbindung.disconnect();
     }
 

@@ -5,7 +5,7 @@ import { AnmeldungService } from './anmeldung.service';
 
 /**
  * Bearer-Token nur an die eigene API (relative Pfade unter /api/), nie an fremde Adressen; ein bald ablaufendes Token
- * wird vorher erneuert; 401 beendet die Sitzung.
+ * wird vorher erneuert; 401 beendet die Sitzung, ausser wenn nur eine frische Anmeldung verlangt wird.
  */
 export const anmeldungInterceptor: HttpInterceptorFn = (anfrage, weiter) => {
   if (!anfrage.url.startsWith('/api/')) {
@@ -18,7 +18,8 @@ export const anmeldungInterceptor: HttpInterceptorFn = (anfrage, weiter) => {
     ),
     tap({
       error: (fehler: unknown) => {
-        if (fehler instanceof HttpErrorResponse && fehler.status === 401) {
+        if (fehler instanceof HttpErrorResponse && fehler.status === 401
+            && fehler.error?.fehlercode !== 'STEP_UP_NOETIG') {
           anmeldung.sitzungAbgelaufen();
         }
       },

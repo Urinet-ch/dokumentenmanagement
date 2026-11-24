@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="121-wissenseinstellungen-konfiguration" author="archiv">
+        <sql>
+            create table if not exists wissens_einstellung_migration (
+                id bigserial primary key,
+                zeit timestamptz not null default clock_timestamp(),
+                budget_tokens int,
+                lint_budget_tokens int,
+                lint_zeitplan text,
+                monatsbudget_tokens int
+            )
+        </sql>
+        <sql splitStatements="false">
+            do $$
+            declare
+                alt wissens_einstellung%rowtype;
+                vorher jsonb;
+                neu jsonb;
+                wissen jsonb;
+                plan text[];
+                tag text;
+                stunde int;
+                nummer int;
+                ersetzte text[] := array[]::text[];
+            begin
+                select * into alt from wissens_einstellung where id = 1;
+                select version, inhalt into nummer, vorher from konfiguration_version order by version desc limit 1;
+                if not found then
+                    raise exception 'Wissenseinstellungen: Konfigurationsversion fehlt';
+                end if;
+
+                if alt.budget_tokens is not null and alt.budget_tokens not between 10000 and 5000000 then
+                    ersetzte := array_append(ersetzte, 'wissen.budgetTokens');
+                end if;
+                if alt.lint_budget_tokens is not null and alt.lint_budget_tokens not between 10000 and 1000000 then
+                    ersetzte := array_append(ersetzte, 'wissen.lintBudgetTokens');
+                end if;
+                if alt.monatsbudget_tokens is not null and alt.monatsbudget_tokens not between 100000 and 20000000 then
+                    ersetzte := array_append(ersetzte, 'wissen.monatsbudgetTokens');
+                end if;
+                if alt.lint_zeitplan is not null then
+                    plan := regexp_match(upper(alt.lint_zeitplan), '^0 0 ([0-9]{1,2}) \? \* (MON|TUE|WED|THU|FRI|SAT|SUN)$');
+                    if plan is null or plan[1]::int > 23 then
+                        ersetzte := array_append(ersetzte, 'wissen.lintZeitplan');
+                        tag := 'SUNDAY';
+                        stunde := 4;
+                    else
+                        tag := case plan[2] when 'MON' then 'MONDAY' when 'TUE' then 'TUESDAY'
+                            when 'WED' then 'WEDNESDAY' when 'THU' then 'THURSDAY'
+                            when 'FRI' then 'FRIDAY' when 'SAT' then 'SATURDAY' else 'SUNDAY' end;
+                        stunde := plan[1]::int;
+                    end if;
+                end if;
+
+                if cardinality(ersetzte) > 0 then
+                    insert into wissens_einstellung_migration
+                        (budget_tokens, lint_budget_tokens, lint_zeitplan, monatsbudget_tokens)
+                    values (alt.budget_tokens, alt.lint_budget_tokens, alt.lint_zeitplan, alt.monatsbudget_tokens);
+                end if;
+                wissen := jsonb_build_object(
+                    'budgetTokens', case when 'wissen.budgetTokens' = any(ersetzte) then 600000 else alt.budget_tokens end,
+                    'lintBudgetTokens', case when 'wissen.lintBudgetTokens' = any(ersetzte) then 100000 else alt.lint_budget_tokens end,
+                    'monatsbudgetTokens', case when 'wissen.monatsbudgetTokens' = any(ersetzte) then 1000000 else alt.monatsbudget_tokens end,
+                    'lintZeitplan', jsonb_build_object('wochentag', tag, 'stunde', stunde));
+                nummer := nummer + 1;
+                neu := jsonb_set(jsonb_set(vorher, '{version}', to_jsonb(nummer)), '{einstellungen,wissen}', wissen);
+                insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+                values (nummer, 'system:migration', 'Übernahme der Wissenseinstellungen', 'MIGRATION', neu,
+                    encode(sha256(convert_to(neu::text, 'UTF8')), 'hex'));
+                update wissens_einstellung set
+                    budget_tokens = (wissen ->> 'budgetTokens')::int,
+                    lint_budget_tokens = (wissen ->> 'lintBudgetTokens')::int,
+                    monatsbudget_tokens = (wissen ->> 'monatsbudgetTokens')::int,
+                    lint_zeitplan = case when 'wissen.lintZeitplan' = any(ersetzte)
+                        then '0 0 4 ? * SUN' else alt.lint_zeitplan end
+                where id = 1;
+                insert into zugriff_protokoll (benutzer, aktion, details)
+                values ('system:migration', 'KONFIGURATION_AENDERN',
+                    jsonb_build_object('grund', case when cardinality(ersetzte) > 0
+                        then 'Nicht darstellbare Wissenswerte auf Katalogstandard gesetzt' else 'Übernahme der Wissenseinstellungen' end,
+                        'konfiguration', jsonb_build_object('version', nummer, 'quelle', 'MIGRATION',
+                            'aenderungen', coalesce((select jsonb_agg(jsonb_build_object(
+                                'pfad', 'einstellungen.' || wert, 'alt', null, 'neu', null, 'ohneWerte', true))
+                                from unnest(ersetzte) as wert), '[]'::jsonb))));
+            end
+            $$
+        </sql>
+        <rollback>
+            <sql>select 1</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
