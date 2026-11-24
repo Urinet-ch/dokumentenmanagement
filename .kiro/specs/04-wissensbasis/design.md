@@ -1434,8 +1434,14 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Zugriffsstufe der Quelldokumente. Ist eine Quelle nicht `oeffentlich` oder nicht `NORMAL` (insbesondere `PERSONAL`), ist die Freigabe mit Begründung
   deaktiviert. Der Server prüft dieselbe Regel nach Requirement 21.6.
 - **Teilumsetzung (Aufgabe 18.3, 24.11.2026):** Changeset `140-wissen-webseitenfreigabe` ergänzt das Kennzeichen mit Standard `false`.
-  Eine aktivierte Freigabe benötigt Akteur und Zeitpunkt; das Datenmodellszenario `@req-21.6` prüft den Standard und die Constraint. Freigabeablauf,
-  öffentliche Auslieferung, Schutzregeln und Oberfläche fehlen noch; das Szenario allein erfüllt Requirement 21.6 nicht.
+  Eine aktivierte Freigabe benötigt Akteur und Zeitpunkt. A16-Freigabe und Entzug nehmen die Hüllensperre vor der Seitensperre,
+  prüfen den Seiten-ETag und schreiben in derselben Transaktion ins unveränderliche `wissens_log`: Aktion `UPDATE` mit
+  `webseitenfreigabe_aktion` (`WISSEN_WEBSEITE_FREIGEGEBEN` bzw. `WISSEN_WEBSEITE_ENTZOGEN`). Die bestehende Logaktion bleibt
+  für ältere Versionen lesbar. Die Quellenrevision wird auch bei Freigabe und Entzug erhöht, damit ein alter ETag keine neuere
+  Entscheidung überschreibt. Die Freigabe verlangt konservativ mindestens ein belegendes Dokument und den festen Webseitenfilter
+  einschliesslich bestätigter Art, Archivstatus und Veröffentlichung; Analysen sowie indirekt erreichbare Analysen sind ausgeschlossen.
+  Die Seitenansicht zeigt die höchste Quellenstufe und verlangt eine Bestätigung. Die Datenmodell- und Quellenprüfungsszenarien
+  `@req-21.6` sind Teilnachweise; öffentlicher Wissenschat, Auslieferung und dessen Schutzregeln fehlen noch.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`

@@ -165,6 +165,21 @@ export const TEXTE = {
     } as Record<string, string>,
   },
   wissen: {
+    webseite: {
+      titel: 'Webseitenfreigabe',
+      quellenstufe: 'Höchste Zugriffsstufe der Quellen',
+      stufen: { oeffentlich: 'Öffentlich', mitglieder: 'Mitglieder', vorstand: 'Vorstand', unbekannt: 'Unbekannt' } as Record<string, string>,
+      freigegeben: 'Für die Webseite freigegeben',
+      nichtFreigegeben: 'Nicht für die Webseite freigegeben',
+      sperrgrund: 'Eine Freigabe ist nur mit belegten, veröffentlichten öffentlichen Quellen der Vertraulichkeit NORMAL möglich. Analysen sind ausgeschlossen.',
+      freigeben: 'Für die Webseite freigeben',
+      entziehen: 'Webseitenfreigabe entziehen',
+      bestaetigung: 'Webseitenfreigabe bestätigen',
+      frageFreigeben: 'Soll diese Wissensseite für die Webseite freigegeben werden?',
+      frageEntziehen: 'Soll die Webseitenfreigabe dieser Wissensseite entzogen werden?',
+      abbrechen: 'Abbrechen',
+      fehler: 'Die Webseitenfreigabe konnte nicht vollständig geladen werden. Bitte erneut versuchen.',
+    },
     import: {
       titel: 'Wissenspaket importieren', zurListe: 'Zur Entwurfsliste',
       einleitung: 'ZIP mit paket.yaml und OKF-Markdown wählen. Das Archiv prüft das Paket ohne KI; '

@@ -16,6 +16,13 @@ Im Chat können Sie beim neuen Gespräch «Wissen befragen» wählen. Dieser Mod
 - Unter «Versionen» öffnen Sie eine frühere Fassung zum Vergleich; mit «Version schliessen» blenden Sie sie wieder aus.
 - Mit «Zurück zum Wissen» kehren Sie zur Übersicht zurück.
 
+## Für die Webseite freigeben
+In der Seitenansicht zeigt «Webseitenfreigabe» den Freigabestatus und die höchste Zugriffsstufe der Quelldokumente.
+Inhaber und Geschäftsstelle können die Seite nach Bestätigung für die Webseite freigeben oder die Freigabe entziehen.
+Eine Freigabe ist nur möglich, wenn alle Quellen öffentlich, veröffentlicht und von Vertraulichkeit NORMAL sind;
+Analysen sind ausgeschlossen. Änderungen an Quellen können die Auslieferung sofort verhindern. Der öffentliche
+Wissenschat muss zusätzlich für den Mandanten eingeschaltet sein.
+
 ## Hinweise an einer Seite
 - «Aktiv»: Die Seite gilt.
 - «Veraltet»: Die Seite ist als veraltet markiert. Prüfen Sie, ob eine neuere Seite oder ein neueres Dokument gilt.
