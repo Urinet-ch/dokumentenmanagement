@@ -1,6 +1,7 @@
 <h2 mat-dialog-title id="chat-bewertung-export-titel">{{ texte.exportTitel }}</h2>
 <mat-dialog-content>
   <p>{{ texte.exportEinleitung }}</p>
+  <p>{{ texte.schwaerzungHinweis }}</p>
   <form class="felder" (submit)="$event.preventDefault(); exportieren()">
     <label>
       {{ texte.von }}

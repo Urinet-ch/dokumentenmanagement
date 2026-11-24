@@ -11,6 +11,9 @@ Personendaten enthalten; behandeln Sie die angezeigten Inhalte vertraulich.
 3. Lassen Sie «Bekannte Personendaten im Export schwärzen» aktiviert. Das ist die Voreinstellung.
 4. Wählen Sie «ZIP herunterladen». Das ZIP enthält die Daten, das Schema und eine README-Datei.
 
+Die Schwärzung erkennt bekannte Muster und Kontaktnamen, aber freie Namen und Zusammenhänge nicht zuverlässig.
+Prüfen Sie die Datei auch bei aktivierter Schwärzung vor jeder Weitergabe.
+
 Ein ungeschwärzter Export enthält möglicherweise Personendaten. Wählen Sie diese Möglichkeit nur, wenn Sie die Datei
 sicher aufbewahren können; die Anwendung verlangt dafür eine ausdrückliche Bestätigung.
 

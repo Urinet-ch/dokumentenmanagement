@@ -5,6 +5,10 @@
 </div>
 
 <div class="auswertung">
+  <div class="hinweis warnung">
+    <app-symbol name="warnung" />
+    <p>{{ texte.schwaerzungHinweis }}</p>
+  </div>
   <section class="karte filter" aria-labelledby="filter-titel">
     <h2 id="filter-titel">{{ texte.zeitraumTitel }}</h2>
     <form (submit)="$event.preventDefault(); laden()">

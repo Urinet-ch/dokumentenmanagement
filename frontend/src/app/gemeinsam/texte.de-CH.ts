@@ -1644,7 +1644,9 @@ export const TEXTE = {
       zukunft: 'Das Enddatum darf nicht in der Zukunft liegen.',
       exportTitel: 'Chat-Bewertungen exportieren',
       exportEinleitung:
-        'Der Export enthält Frage, Antwort, Bewertung und gewählte Filter als ZIP. Personendaten werden standardmässig geschwärzt.',
+        'Der Export enthält Frage, Antwort, Bewertung und gewählte Filter als ZIP. Standardmässig werden bekannte Muster und Kontaktnamen geschwärzt.',
+      schwaerzungHinweis:
+        'Freie Namen und Zusammenhänge werden nicht zuverlässig erkannt. Prüfen Sie die Datei vor jeder Weitergabe.',
       minSterne: 'Mindestens Sterne',
       maxSterne: 'Höchstens Sterne',
       schwaerzen: 'Bekannte Personendaten im Export schwärzen',

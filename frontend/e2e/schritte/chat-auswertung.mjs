@@ -18,6 +18,15 @@ Then('ist die Schwärzung im Export standardmässig aktiviert', async function (
   assert.equal(await schwaerzen.isChecked(), true);
 });
 
+Then('der Exportdialog weist auf die Grenzen der Schwärzung und die Prüfung vor Weitergabe hin', async function () {
+  const dialog = this.seite.getByRole('dialog');
+  await dialog.getByText('Freie Namen und Zusammenhänge werden nicht zuverlässig erkannt. Prüfen Sie die Datei vor jeder Weitergabe.').waitFor();
+});
+
+Then('die Chat-Auswertung weist auf die Grenzen der Schwärzung und die Prüfung vor Weitergabe hin', async function () {
+  await this.seite.getByText('Freie Namen und Zusammenhänge werden nicht zuverlässig erkannt. Prüfen Sie die Datei vor jeder Weitergabe.').waitFor();
+});
+
 When('ich den Chat-Auswertungs-Export bestätige', async function () {
   if (this.chat.exportStepUpNoetig) {
     await this.seite.getByRole('button', { name: 'ZIP herunterladen' }).click();
