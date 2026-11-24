@@ -42,6 +42,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Vorschlag aus PR #242: Keycloak-Theme `vhf-gsk` ist vorbereitet; die Betriebs- und Entscheidungsgrenzen stehen in `docs/betrieb/branding-mandant2.md` und design.md. Der Traefik-Router bleibt bis zum Entscheid von Fabian bewusst entfernt; Deploy und Prüfung sind weiterhin nicht belegt, deshalb bleibt der Haken offen.
   - PR #299: Traefik-Router für den Host von VHF/GSK wieder entfernt (Compose-Policy der VPS; ein Host nach ihrer Namensregel wäre mit dem Deploy sofort öffentlich, Abweichung von tech.md «Erreichbarkeit»); er kommt mit einem Entscheid von Fabian in einem eigenen PR, Einzelheiten in design.md.
   - Frontend-Nachtrag (23.11.2026): Die Mandanten-Farbtokens stehen in `frontend/src/styles.scss`; App-Rahmen und Anmeldesymbol verwenden sie. Keycloak-Theme, Domain-Entscheid und Traefik-Router bleiben offen; der Aufgabenhaken bleibt deshalb leer.
+  - Betriebscheckliste für Domain, Client, Theme, Router, Prüfung und Rückfall in `docs/betrieb/branding-mandant2.md`; keine Freigabe oder Durchführung. Die offenen Infra- und Betriebsnachweise bleiben bei Fabian.
   - _Anforderungen: 2.1–2.3_
 
 - [x] 10.4 Erfassung für die Geschäftsstelle [Backend] [Frontend]
