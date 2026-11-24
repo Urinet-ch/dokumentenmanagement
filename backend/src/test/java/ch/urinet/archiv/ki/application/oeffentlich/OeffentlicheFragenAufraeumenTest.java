@@ -19,7 +19,7 @@ class OeffentlicheFragenAufraeumenTest {
     private static final Instant JETZT = Instant.parse("2071-06-30T12:00:00Z");
 
     private static OeffentlicheFragenAufraeumen mit(String standard, Map<String, String> eigene) {
-        return new OeffentlicheFragenAufraeumen(null, null, standard, List.copyOf(eigene.keySet()),
+        return new OeffentlicheFragenAufraeumen(null, null, null, standard, List.copyOf(eigene.keySet()),
                 name -> Optional.ofNullable(eigene.get(name)));
     }
 

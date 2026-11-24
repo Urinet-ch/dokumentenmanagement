@@ -48,6 +48,8 @@ class KonfiguriertesBrandingVerzeichnisTest {
     void leereDomainWirdUebersprungen() {
         var v = new KonfiguriertesBrandingVerzeichnis(konfiguration(eintrag("", "A"), eintrag("a.test.invalid", "B")));
         assertThat(v.fuerDomain("a.test.invalid")).isPresent();
+        assertThat(v.mandantFuerDomain("a.test.invalid")).contains(new MandantCode("m1"));
+        assertThat(v.mandantFuerDomain("fremd.test.invalid")).isEmpty();
         assertThat(v.fuerDomain("")).isEmpty();
         assertThat(v.fuerMandant(new MandantCode("m0"))).get().extracting("name").isEqualTo("A");
         assertThat(v.fuerMandant(new MandantCode("m1"))).get().extracting("name").isEqualTo("B");

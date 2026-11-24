@@ -46,6 +46,9 @@ public class MandantEinstellungenSchritte {
     private long protokollAnzahl;
     private boolean geaendert;
     private String wissenVorher;
+    private String brandingVorher;
+    private String brandingAndererMandant;
+    private String brandingStandard;
 
     @Angenommen("die Ausgangsstände der Einstellungen sind gemerkt")
     public void ausgangsstaendeMerken() throws SQLException {
@@ -87,6 +90,52 @@ public class MandantEinstellungenSchritte {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
         assertThat(antwort.jsonPath().getString("katalog.find { it.schluessel == 'branding.name' }.standard"))
                 .isEqualTo("VHF/GSK Archiv");
+    }
+
+    @Angenommen("das öffentliche Branding beider Mandanten ist gemerkt")
+    public void oeffentlichesBrandingMerken() {
+        brandingVorher = brandingLesen("urinet.test.invalid").asString();
+        brandingAndererMandant = brandingLesen("vhf-gsk.test.invalid").asString();
+        Response katalog = given().auth().oauth2(token()).get(PFAD);
+        assertThat(katalog.statusCode()).isEqualTo(200);
+        brandingStandard = katalog.jsonPath().getString("katalog.find { it.schluessel == 'branding.name' }.standard");
+    }
+
+    @Dann("nennt der Katalog die Wirkzeit für Branding und Aufbewahrung")
+    public void wirkzeitenPruefen() {
+        assertThat(antwort.statusCode()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getString("katalog.find { it.schluessel == 'branding.name' }.wirksamAb"))
+                .isEqualTo("Nach höchstens 60 Sekunden.");
+        assertThat(antwort.jsonPath().getString("katalog.find { it.schluessel == 'chat.aufbewahrungMonate' }.wirksamAb"))
+                .isEqualTo("Beim nächsten Aufräumlauf.");
+        assertThat(antwort.jsonPath().getString("katalog.find { it.schluessel == 'webseitenChat.aufbewahrungTage' }.wirksamAb"))
+                .isEqualTo("Beim nächsten Aufräumlauf.");
+    }
+
+    @Dann("zeigt das öffentliche Branding unmittelbar den neuen Namen")
+    public void oeffentlichesBrandingGeaendert() {
+        assertThat(brandingLesen("urinet.test.invalid").jsonPath().getString("name")).isEqualTo(neuerName);
+    }
+
+    @Dann("bleibt das öffentliche Branding des anderen Mandanten unverändert")
+    public void oeffentlichesBrandingAndererUnveraendert() {
+        assertThat(brandingLesen("vhf-gsk.test.invalid").asString()).isEqualTo(brandingAndererMandant);
+    }
+
+    @Dann("zeigt das öffentliche Branding den bisherigen Standard")
+    public void oeffentlichesBrandingStandard() {
+        assertThat(brandingLesen("urinet.test.invalid").jsonPath().getString("name")).isEqualTo(brandingStandard);
+    }
+
+    @Dann("entspricht das öffentliche Branding wieder dem Ausgangsstand")
+    public void oeffentlichesBrandingWiederhergestellt() {
+        assertThat(brandingLesen("urinet.test.invalid").asString()).isEqualTo(brandingVorher);
+    }
+
+    private Response brandingLesen(String domain) {
+        Response ergebnis = given().queryParam("domain", domain).get("/api/v1/branding");
+        assertThat(ergebnis.statusCode()).as(ergebnis.asString()).isEqualTo(200);
+        return ergebnis;
     }
 
     @Angenommen("ein eigenes Wissensbudget ist über die bisherige Schnittstelle gesetzt")
