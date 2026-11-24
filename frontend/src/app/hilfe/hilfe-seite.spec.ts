@@ -122,6 +122,24 @@ describe('Seite /hilfe (Spec 07, Req 5.1 bis 5.4, 6.2, 6.3, 6.5, 7.6)', () => {
     expect(seite.querySelector('[data-test="hilfe-abgemeldet"]')).toBeNull();
   });
 
+  it.each<NonNullable<Benutzer['rolle']>>(['inhaber', 'mitarbeiter', 'treuhaender', 'geschaeftsstelle'])(
+    'zeigt für %s bei gleicher Rolle und gleichem Branding denselben Hilfetext in beiden Mandanten (Req 2.4)',
+    async (rolle) => {
+      anmelden(rolle, 'urinet');
+      const seite = await oeffnen('/hilfe');
+      const text = seite.textContent;
+      const anker = inhalt(seite);
+
+      anmelden(rolle, 'vhf-gsk');
+      harness.detectChanges();
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+
+      expect(seite.textContent).toBe(text);
+      expect(inhalt(seite)).toEqual(anker);
+    },
+  );
+
   it('zeigt Abschnitte ohne Recht weder im Inhaltsverzeichnis noch im Text (Req 6.2)', async () => {
     anmelden('treuhaender');
     const seite = await oeffnen('/hilfe');
