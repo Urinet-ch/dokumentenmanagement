@@ -641,6 +641,7 @@ public class OeffentlicherChatSchritte {
         assertThat(quellenKnoten()).singleElement().satisfies(q -> {
             assertThat(q.path("titel").asText()).isEqualTo("Probe Wissensseite");
             assertThat(q.path("pfad").asText()).isEqualTo(wissenPfad);
+            assertThat(q.path("belege").get(0).path("dokumentId").asText()).isEqualTo(dokumente.get("A").id().toString());
             assertThat(q.path("belege").get(0).path("titel").asText()).isEqualTo("Probe-Bulletin");
             assertThat(q.path("belege").get(0).path("reiheName").asText()).isEqualTo("Probe-Reihe");
             assertThat(q.path("belege").get(0).path("ausgabe").asText()).isEqualTo("3/2071");

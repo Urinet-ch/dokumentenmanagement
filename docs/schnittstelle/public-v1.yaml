@@ -53,7 +53,8 @@ paths:
         schaltet den Wissenschat je Mandant ein; standardmässig ist er aus. Gleiche Grenzen und dasselbe Monatsbudget
         wie `/public/v1/chat`. Fragen sind unabhängig; eine Gesprächs-ID kann nicht fortgesetzt werden und Fragen
         werden nicht gespeichert. Der Stream enthält `werkzeug`, `text`, `quellen` und `fertig` oder `fehler`.
-        `quellen` ist eine Liste von `{titel, pfad, belege: [{titel, reiheCode, reiheName, ausgabe}]}`.
+        `quellen` ist eine Liste von `{titel, pfad, belege: [{dokumentId, titel, reiheCode, reiheName, ausgabe}]}`;
+        den Dokumentlink bildet die Webseite aus der ID.
         Ohne passende Seite ist die Liste leer und der Text lautet «Dazu steht nichts in der Wissensbasis.».
       parameters:
         - name: X-Archiv-Zugriff

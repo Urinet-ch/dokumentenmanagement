@@ -338,7 +338,7 @@ public class OeffentlicheFragen {
                 var quellen = durchgang.gezeigte().stream().map(s -> new OeffentlicheWissensquelle(
                         ohneSteuerzeichen(s.titel()), ohneSteuerzeichen(s.pfad()),
                         s.dokumente().stream().map(d -> new OeffentlicheWissensquelle.Beleg(
-                                ohneSteuerzeichen(d.titel()), ohneSteuerzeichen(d.reiheCode()),
+                                d.id(), ohneSteuerzeichen(d.titel()), ohneSteuerzeichen(d.reiheCode()),
                                 ohneSteuerzeichen(d.reiheName()), d.ausgabe() == null ? null
                                 : ohneSteuerzeichen(d.ausgabe()))).toList())).toList();
                 String text = quellen.isEmpty() ? "Dazu steht nichts in der Wissensbasis." : antwort.inhalt();

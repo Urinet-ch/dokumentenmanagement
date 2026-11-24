@@ -379,9 +379,12 @@ Er berücksichtigt nur ausdrücklich freigegebene Seiten mit ausschliesslich
 Der JSON-Körper enthält `frage`. Jede Frage ist unabhängig; `gespraechId` kann
 nicht fortgesetzt werden und Fragen werden nicht gespeichert. Die SSE-Ereignisse
 entsprechen dem Chat oben; `quellen` enthält Seiten mit `titel`, `pfad` und
-`belege` (je Beleg `titel`, `reiheCode`, `reiheName`, `ausgabe`). Quellen und
+`belege` (je Beleg `dokumentId`, `titel`, `reiheCode`, `reiheName`, `ausgabe`);
+den Dokumentlink bildet die Webseite aus der ID. Quellen und
 Antwort kommen erst nach erneuter Prüfung; bei einer Änderung während der Frage
 endet der Stream mit `fehler`.
+Das bestehende WordPress-Plugin nutzt den Archivchat; eine Anbindung an diesen
+Wissenschat ist nicht Teil dieser Umsetzung.
 
 ## 5. Fehler und Wiederholung
 

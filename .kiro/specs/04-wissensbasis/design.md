@@ -1448,8 +1448,9 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Änderungen wird keine Modellantwort ausgegeben. Inhalte und Metadaten sind als Daten gerahmt. Die Szenarien `@req-21.6` und
   Werkzeug-, Vertrags- und Oberflächentests belegen Teile der Umsetzung.
   Vorsichtige Abweichung: Der Endpunkt führt derzeit keinen Gesprächsverlauf und speichert keine Fragen; jede Frage beginnt neu.
-  Damit können alte Antworttexte nach einem Entzug nicht erneut ins Modell gelangen. Ob diese Einschränkung den geforderten
-  Wissenschat über die öffentliche Schnittstelle ausreichend erfüllt, ist offen; ebenso der Nachweis, dass eine asynchrone
+  Damit können alte Antworttexte nach einem Entzug nicht erneut ins Modell gelangen. Die vorhandene Fragenbereinigung erkennt
+  Namen nicht zuverlässig; das Nichtspeichern vermeidet Personenbezüge, weicht aber vom Fragenprotokoll nach Spec 03, 6.5 ab.
+  Ob diese Einschränkungen den Anforderungen genügen, ist offen; ebenso der Nachweis, dass eine asynchrone
   Streamauslieferung nach der Prüfung mit dem sofortigen Entzug vereinbar ist. Aufgabe 18.3 bleibt deshalb offen.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
