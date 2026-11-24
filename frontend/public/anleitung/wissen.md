@@ -6,6 +6,7 @@ Unter «Wissen» finden Sie geprüftes Wissen aus Ihren Unterlagen: Seiten, die 
 3. Wählen Sie den Titel einer Seite, um sie zu lesen.
 
 Wissensseiten finden Sie auch in der [Suche](#suche) und im [Chat](#chat): Die Suche zeigt passende Seiten über den Dokumenttreffern, der Chat nennt verwendete Seiten unter den Quellen.
+Im Chat können Sie beim neuen Gespräch «Wissen befragen» wählen. Dieser Modus nutzt nur freigegebene Wissensseiten und bleibt für das Gespräch fest.
 
 ## Eine Wissensseite lesen
 - Oben stehen Seitentyp, Titel und Beschreibung, darunter «Stand» (die Version) und «Freigegeben» (wann die Fassung freigegeben wurde).
@@ -26,13 +27,6 @@ Wissensseiten finden Sie auch in der [Suche](#suche) und im [Chat](#chat): Die S
 
 ## Änderungslog
 «Änderungslog» oben auf der Seite «Wissen» zeigt, was sich in der Wissensbasis geändert hat, neueste Einträge zuerst. Links führen zu den betroffenen Seiten; mit «Weiter» sehen Sie ältere Einträge.
-
-## Wissensquellen markieren
-Ein bereits archiviertes Dokument kann mit seiner bestehenden Dokumentart als Wissensquelle verwendet werden. Die Markierung ändert weder die Dokumentart noch Dateien, Vertraulichkeit, Aufbewahrung oder Sperren. Dokumente mit Vertraulichkeit «Personal» sind ausgeschlossen.
-
-Auf der Seite «Wissen» zeigt die Liste «Wissensquellen» Titel, Dokumentart, Zeitpunkt der Markierung und den Stand des letzten Ingest. Inhaber und Geschäftsstelle (Recht A16) können eine Markierung dort aufheben. Bestehende Wissensseiten und ihre Quelleneinträge bleiben dabei erhalten.
-
-Das Archiv reiht beim Markieren einen Ingest ein. Sein Ergebnis ist immer ein Entwurf: Freigegebene Seiten ändern sich erst, wenn eine Person mit dem Recht zur Freigabe jede Änderung einzeln angenommen hat. Bei einer Ablehnung zeigt die Dokumentansicht den Grund; fehlender Volltext oder eine fehlende PDF/A-Fassung müssen vor dem Markieren behoben werden.
 
 ## Eigene Analysevorschläge
 Steht im Chat unter einer Antwort der Knopf «Als Analyse vorschlagen», können Sie die Antwort als Seite vom Typ «Analyse» vorschlagen (siehe [Chat](#chat)). Unter «Meine Analysevorschläge», oben auf der Seite «Chat», sehen Sie den Status jedes Vorschlags, zum Beispiel «Offen», «Angenommen» oder «Verworfen», und bei einem Entscheid den Grund.

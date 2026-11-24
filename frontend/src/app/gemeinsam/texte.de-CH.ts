@@ -1948,6 +1948,12 @@ export const TEXTE = {
       `Sie sind als ‹${rolle}› angemeldet. Diese Anleitung zeigt die Bereiche, die Ihre Rolle nutzen darf.`,
     abgemeldet: 'Nach der Anmeldung sehen Sie die Anleitung für alle Bereiche Ihrer Rolle.',
   },
+  chatModus: {
+    auswahl: 'Modus für ein neues Gespräch',
+    archiv: 'Archiv durchsuchen',
+    wissen: 'Wissen befragen',
+    wissenLeer: 'Stellen Sie eine Frage zu den freigegebenen Wissensseiten.',
+  },
   benutzerLoeschdialog: {
     titel: 'Benutzer löschen',
     folgen: 'Der Zugang und die persönlichen Angaben werden in Keycloak gelöscht. Dieser Schritt kann nicht rückgängig gemacht werden.',

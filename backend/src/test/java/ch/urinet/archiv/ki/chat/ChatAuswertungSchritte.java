@@ -5,6 +5,7 @@ import ch.urinet.archiv.benutzer.application.StepUp;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
@@ -157,18 +158,24 @@ public class ChatAuswertungSchritte {
 
     @Angenommen("im Mandanten «{word}» gibt es eine synthetische Chat-Bewertung mit {int} Sternen")
     public void bewertungAnlegen(String mandant, int sterne) throws SQLException {
+        bewertungImModusAnlegen(mandant, sterne, "ARCHIV");
+    }
+
+    @Angenommen("im Mandanten «{word}» gibt es eine synthetische Chat-Bewertung mit {int} Sternen im Modus «{word}»")
+    public void bewertungImModusAnlegen(String mandant, int sterne, String modus) throws SQLException {
         String s = schema(mandant);
         UUID gespraech = UUID.randomUUID();
         Instant jetzt = Instant.now();
         String benutzer = Testanmeldung.sub("inhaber-" + mandant);
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement gespräch = verbindung.prepareStatement("insert into " + s
-                     + ".chat_gespraech (id, benutzer, titel, erstellt, geaendert) values (?, ?, ?, ?, ?)")) {
+                     + ".chat_gespraech (id, benutzer, titel, erstellt, geaendert, modus) values (?, ?, ?, ?, ?, ?)")) {
             gespräch.setObject(1, gespraech);
             gespräch.setString(2, benutzer);
             gespräch.setString(3, "Synthetische Auswertung");
             gespräch.setTimestamp(4, Timestamp.from(jetzt));
             gespräch.setTimestamp(5, Timestamp.from(jetzt));
+            gespräch.setString(6, modus);
             gespräch.executeUpdate();
         }
         gespraeche.computeIfAbsent(mandant, ignored -> new ArrayList<>()).add(gespraech);
@@ -357,6 +364,29 @@ public class ChatAuswertungSchritte {
     @Dann("enthält der Chat-Auswertungs-Export die Dateien «{}», «{}» und «{}»")
     public void exportDateien(String eins, String zwei, String drei) {
         assertThat(zipDateien.keySet()).contains(eins, zwei, drei);
+    }
+
+    @Dann("enthält der Chat-Auswertungs-Export die Modi ARCHIV und WISSEN")
+    public void exportEnthaeltModi() throws IOException {
+        ObjectMapper json = new ObjectMapper();
+        List<String> modi = new ArrayList<>();
+        for (String zeile : zipDateien.get("bewertungen.jsonl").lines().toList()) {
+            modi.add(json.readTree(zeile).path("modus").asText());
+        }
+        assertThat(modi).containsExactlyInAnyOrder("ARCHIV", "WISSEN");
+    }
+
+    @Dann("umfasst der Wissensverbrauchsindex in «{word}» den Wissenschat")
+    public void wissenChatIndex(String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select indexdef from pg_indexes where schemaname = ? and indexname = 'ki_verbrauch_wissen_zeit_ix'")) {
+            abfrage.setString(1, schema(mandant));
+            try (ResultSet rs = abfrage.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).contains("WISSEN_INGEST", "WISSEN_LINT", "WISSEN_EMBEDDING", "WISSEN_CHAT");
+            }
+        }
     }
 
     @Dann("enthält der Chat-Auswertungs-Export keine Benutzer- oder Mandantenkennung")
