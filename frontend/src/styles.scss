@@ -11,6 +11,10 @@
   --urinet-schwarz: #05070c;
   --urinet-papier: #f2efe7;
 
+  // Das Branding-API überschreibt diese Mandanten-Tokens nach Prüfung der Farbe.
+  --brand-primary: light-dark(var(--urinet-gelb), var(--urinet-gelb));
+  --brand-text: light-dark(var(--urinet-schwarz), var(--urinet-schwarz));
+
   // Flächen und Text je Farbschema
   --flaeche: light-dark(#f2efe7, #05070c);
   --karte: light-dark(#fffdf8, #0d1017);
