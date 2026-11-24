@@ -100,6 +100,11 @@ Exit-Codes: 0 erfolgreich, 1 fachlicher Fehler, 2 falscher Aufruf, 3 technischer
 Die Zuordnung der pseudonymen Betreiberkennung zur verantwortlichen Person wird ausserhalb des Repositorys geschützt
 verwahrt. Die eigentliche Verzeichnisübernahme und ihre Betriebsabnahme bleiben bei 21.2 [Fabian].
 
+Bei einem Abbruch des Betreibervorgangs können Absicht oder ein Abschluss `UNKLAR` bestehen bleiben. Vor einer
+Wiederholung den Vorgang und die Mandantensperre geschützt prüfen und unklare Vorgänge durch den Betreiber klären;
+nicht von einer sicheren automatischen Wiederholung ausgehen. Auch deaktivierte oder noch nicht aktivierte Benutzer
+mit der bestehenden Inhaberrolle können dokumentiert werden; das Kommando aktiviert keinen Zugang.
+
 ### Notweg: Benutzer per `kcadm.sh`
 Nur wenn das Dienstkonto oder der Mailversand von Keycloak nicht bereit ist (zum Beispiel bei einem Ausfall von Keycloak oder
 einem fehlenden Dienstkonto-Secret), legt der Betreiber Benutzer und Rollen mit `kcadm.sh` an: README,

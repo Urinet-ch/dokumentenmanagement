@@ -404,6 +404,55 @@ class VerwaltungVorgangTest {
     }
 
     @Test
+    void betreiberOhneUebernahmeanlassDarfKeineRolleZuweisen() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        var details = new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ANGEFRAGT,
+                UUID.randomUUID(), ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN,
+                null, ProtokollDetails.Verwaltungsrolle.INHABER, List.of());
+        var absicht = new ZugriffEintrag(Optional.of("betreiber:" + UUID.randomUUID()), Optional.empty(),
+                ProtokollAktion.ROLLE_ZUWEISEN, Optional.empty(), Optional.empty(),
+                ProtokollDetails.verwaltung(details));
+        AtomicBoolean ausgefuehrt = new AtomicBoolean();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { ausgefuehrt.set(true); return true; },
+                    fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(ausgefuehrt).isFalse();
+        }
+    }
+
+    @Test
+    void betreibervorgangNachGeklaertemAbschlussfehlerWiederholbar() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        UUID erneut = UUID.randomUUID();
+        UUID ziel = UUID.randomUUID();
+        String akteur = "betreiber:" + UUID.randomUUID();
+        var absicht = betreiberRolle(id, ziel, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        var abschluss = betreiberRolle(id, ziel, akteur, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> true, fehler -> Kompensation.GEKLAERT,
+                    wert -> { throw new IllegalStateException("synthetischer Abschlussfehler"); },
+                    wert -> abschluss))).hasRootCauseInstanceOf(IllegalStateException.class);
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "FEHLGESCHLAGEN");
+            var neueAbsicht = betreiberRolle(erneut, ziel, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+            var neuerAbschluss = betreiberRolle(erneut, ziel, akteur, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+            assertThat(in(thread, "urinet", () -> vorgang.ausfuehren(mandant, neueAbsicht,
+                    () -> { }, () -> true, fehler -> Kompensation.GEKLAERT,
+                    wert -> { }, wert -> neuerAbschluss))).isTrue();
+            assertThat(phasen(erneut)).containsExactly("ANGEFRAGT", "ABGESCHLOSSEN");
+        } finally {
+            testsperreEntfernen(mandant, id);
+            testsperreEntfernen(mandant, erneut);
+        }
+    }
+
+    @Test
     void fehlendesKompensationsergebnisBleibtUngeklaert() throws Exception {
         mandantenVorbereiten();
         MandantCode mandant = new MandantCode("urinet");
@@ -799,6 +848,16 @@ class VerwaltungVorgangTest {
     private static ZugriffEintrag eintrag(UUID id, UUID ziel, String akteur, String rolle,
                                           ProtokollDetails.Verwaltungsphase phase) {
         return eintrag(id, ziel, akteur, rolle, phase, ProtokollDetails.Verwaltungsvorgang.SPERREN);
+    }
+
+    private static ZugriffEintrag betreiberRolle(UUID id, UUID ziel, String akteur,
+                                                ProtokollDetails.Verwaltungsphase phase) {
+        var details = new ProtokollDetails.Verwaltung(id, phase, ziel,
+                ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN,
+                ProtokollDetails.Verwaltungsrolle.INHABER, ProtokollDetails.Verwaltungsrolle.INHABER,
+                List.of(), null, null, ProtokollDetails.Verwaltungsanlass.UEBERNAHME, null);
+        return new ZugriffEintrag(Optional.of(akteur), Optional.empty(), ProtokollAktion.ROLLE_ZUWEISEN,
+                Optional.empty(), Optional.empty(), ProtokollDetails.verwaltung(details));
     }
 
     private static ZugriffEintrag eintrag(UUID id, UUID ziel, String akteur, String rolle,

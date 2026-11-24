@@ -30,6 +30,9 @@ class BestehendenInhaberKommandoTest {
         assertThat(BestehendenInhaberKommando.lesen(
                 List.of("inhaber-uebernehmen", "probe", "--benutzer", ZIEL, "--wer", BETREIBER, "--ausfuehren")))
                 .get().extracting(BestehendenInhaberKommando.Aufruf::schreiben).isEqualTo(true);
+        assertThat(BestehendenInhaberKommando.lesen(
+                List.of("inhaber-uebernehmen", "probe", "--ausfuehren", "--benutzer", ZIEL, "--wer", BETREIBER)))
+                .isEmpty();
     }
 
     @Test
@@ -56,5 +59,28 @@ class BestehendenInhaberKommandoTest {
             assertThat(aus.toString()).isEmpty();
             assertThat(fehler.toString()).contains(code.name()).doesNotContain(ZIEL, BETREIBER);
         }
+    }
+
+    @Test
+    void unerwarteterFehlerErgibtDreiOhneInterneDetails() {
+        var dienst = new BestehendenInhaberDokumentieren(null, null, null) {
+            @Override
+            public Ergebnis ausfuehren(MandantCode mandant, UUID ziel, UUID betreiber, boolean schreiben) {
+                throw new IllegalStateException("synthetische interne Angabe");
+            }
+        };
+        var kontext = new MandantKontext(null, null, null) {
+            @Override
+            public <T> T mit(MandantCode mandant, Supplier<T> arbeit) {
+                return arbeit.get();
+            }
+        };
+        var aus = new ByteArrayOutputStream();
+        var fehler = new ByteArrayOutputStream();
+        int ergebnis = new BestehendenInhaberKommando(dienst, kontext)
+                .ausfuehren(AUFRUF, new PrintStream(aus), new PrintStream(fehler));
+        assertThat(ergebnis).isEqualTo(3);
+        assertThat(fehler.toString()).doesNotContain("synthetische interne Angabe", ZIEL, BETREIBER);
+        assertThat(aus.toString()).isEmpty();
     }
 }

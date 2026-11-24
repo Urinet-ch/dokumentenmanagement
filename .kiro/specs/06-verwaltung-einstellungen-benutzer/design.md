@@ -580,7 +580,7 @@ Der Entwurf `tools/benutzer-migration-entwurf.py` verwendet das bestehende Abgle
 Abweichungen oder Fehlern ab; eine begonnene Übernahme kann dennoch bereits Verzeichniszeilen geschrieben haben.
 Für bestehende Inhaber ohne protokollierten Rollenvorgang, insbesondere den heutigen Inhaber im Betriebsmandanten,
 ist `ROLLE_OHNE_VORGANG` zu erwarten; `UEBERNAHME` allein behebt den Befund nicht. Nach Entscheid Fabian vom
-24.11.2026 dokumentiert ein separater Betreibervorgang (21.2a) die bestehende Rolle, ohne die strenge Abgleich-Regel
+24.11.2026 dokumentiert der Betreibervorgang aus 21.2a die bestehende Rolle, ohne die strenge Abgleich-Regel
 zu lockern oder Keycloak zu ändern. Danach folgen Prüflauf und Schreiblauf. Nur synthetisch getestet; Ausführung
 und Abnahme bleiben bei Fabian, die Checkbox bleibt offen.
 
