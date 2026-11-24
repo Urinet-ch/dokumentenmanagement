@@ -243,10 +243,12 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 9.4_
   - _Abhängig von: 21.1, 21.2a, 19.3_
 
-- [ ] 21.2a Betreibervorgang für bestehende Inhaber [Backend]
+- [x] 21.2a Betreibervorgang für bestehende Inhaber [Backend]
   - Einmaliger protokollierter Betreibervorgang `ROLLE_ZUWEISEN` mit Anlass `UEBERNAHME` für bestehende
     Inhaber ohne Rollenvorgang; Keycloak nur lesen, Trockenlauf standardmässig, idempotent und mandantengebunden.
     Abgleich-Regel 6.5/9.4 bleibt streng (Entscheid Fabian 24.11.2026).
+  - Nachweis: `inhaber-uebernahme.feature` (`@req-6.3`, `@req-6.5`, `@req-9.4`), `VerwaltungVorgangTest`
+    und `BestehendenInhaberKommandoTest`; der Betriebsnachweis der Migration bleibt bei 21.2.
   - _Anforderungen: 6.3, 6.5, 9.4_
   - _Abhängig von: 21.1_
 

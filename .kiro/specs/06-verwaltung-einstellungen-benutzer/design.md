@@ -566,6 +566,15 @@ ist `ROLLE_OHNE_VORGANG` zu erwarten; `UEBERNAHME` allein behebt den Befund nich
 zu lockern oder Keycloak zu ändern. Danach folgen Prüflauf und Schreiblauf. Nur synthetisch getestet; Ausführung
 und Abnahme bleiben bei Fabian, die Checkbox bleibt offen.
 
+### Umsetzung (Aufgabe 21.2a, 24.11.2026)
+`archiv benutzer inhaber-uebernehmen <code> --benutzer <uuid> --wer <uuid> [--ausfuehren]` prüft standardmässig
+nur. Mit `--ausfuehren` dokumentiert es eine vorhandene Inhaberrolle unter der Mandantensperre mit Absicht und
+Abschluss (`ROLLE_ZUWEISEN`, Anlass `UEBERNAHME`); Keycloak wird ausschliesslich gelesen. Die Prüfung wird unter
+der Sperre wiederholt, und bereits dokumentierte Inhaber erzeugen keinen weiteren Vorgang. `--wer` ist eine
+pseudonyme Betreiberkennung; das Protokoll enthält Kennungen und Rollen, keine persönlichen Angaben. Die
+bestehende strenge Abgleich-Regel bleibt unverändert. Das Szenario `inhaber-uebernahme.feature` belegt den Ablauf
+mit anschliessender Verzeichnisübernahme (6.3, 6.5, 9.4); weitere Tests prüfen Mandantengrenze und CLI-Fehler.
+
 1. Realm-Änderungen und Dienstkonto auf Stufe A (19.3, [Fabian]); Realm-Export für Stufe B (19.2).
 2. Migration der Datenbank (Changesets); Einstellungen: Werte aus Eigenschaften und `wissens_einstellung` in die Konfiguration
    (Version, Quelle `MIGRATION`), Verhalten unverändert (Requirement 1.5).
