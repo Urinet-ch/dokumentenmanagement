@@ -1,16 +1,15 @@
 # Anleitung für Inhaber: Einstellungen, Benutzer und Rollen
 
 > **Stand:** Die Abschnitte «Für den Betreiber» (Admin-Kommando, Notweg, Alarme, Geheimnisse) beschreiben den Code auf `main`.
-> Die Bedienung von Benutzern und Einstellungen durch den Inhaber beschreibt die Spec 06 (`.kiro/specs/06-verwaltung-einstellungen-benutzer/`);
-> die Aktionen und Dialoge der Benutzerseiten (Aufgabe 20.7, PR #531) sind noch nicht auf `main`. **Bis zu deren Merge gelten die
-> Abschnitte zu Einladen, Rollen, Sperren und Löschen als Sollbeschreibung**, nicht als Bedienungsanleitung der ausgelieferten Seiten;
-> für Benutzer gilt bis dahin der Weg «Für den Betreiber».
+> Die Benutzeraktionen und Dialoge der App (Aufgabe 20.7, PR #531) sind ebenfalls auf `main`; die folgenden Abschnitte zu Einladen,
+> Rollen, Sperren und Löschen beschreiben deren Bedienung. Nicht in der App-Hilfe enthaltene Betreiberwege bleiben hier dokumentiert.
 >
 > **Bedienung in der App:** Die Seiten «Dokumentarten», «Zugriffsprotokoll» und «API-Tokens» beschreibt die Anleitung in der App
 > unter «Hilfe», Abschnitt «Verwaltung» (`/hilfe#verwaltung`). Nach Spec 07, Requirement 7.7 gehört die Bedienung von Benutzern
 > und Einstellungen ebenfalls dorthin; diese Datei behält, was nicht in die App gehört (Wege des Betreibers, Notweg nach Spec 06,
 > Requirement 9.3). **[offen:** Übernahme in die Hilfe der App und die Kontaktstellen sind nicht Teil dieser Aufgabe.**]**
-> Die Aufgabe 21.5 ist nicht abgehakt: Nachweise des Betreibers fehlen (siehe [Geheimnisse rotieren](geheimnisse-rotieren.md)).
+> Die Dokumentation zu Aufgabe 21.5 ist gegen den Code auf `main` geprüft. Die Ausführung und Bestätigung von Rotationen sowie
+> tatsächliche Verwahrorte bleiben Betreiberaufgaben (siehe [Geheimnisse rotieren](geheimnisse-rotieren.md)).
 
 Die Verwaltung finden Sie nur als **Inhaber** unter «Verwaltung». Alle Änderungen gelten nur für Ihren Mandanten und stehen im
 Zugriffsprotokoll (`/verwaltung/protokoll`), ohne E-Mail-Adressen und Namen.

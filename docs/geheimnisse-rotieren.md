@@ -1,8 +1,7 @@
 # Geheimnisse rotieren
 
-> **Vorbereitung, nicht freigegeben.** Die Wege unten beruhen auf der Spec und dem Code auf `main`; die Betriebsnachweise
-> (Rotationsprobe, Überlappung der Secrets, Notfallunterlagen) fehlen noch. Diese Übersicht ersetzt weder eine Rotationsprobe
-> noch die Notfallunterlagen. Aufgabe 21.5 bleibt offen.
+> Die Übersicht nennt die aus Spec und Code belegten Wechselwege sowie Fälle, in denen ein sicherer Ablauf noch nicht feststeht.
+> Sie dokumentiert keine ausgeführten Rotationen und ersetzt weder die Betreiberprüfung noch die Notfallunterlagen.
 
 ## Warnung: Datenschlüssel und Salz der Namenssperre nie ungeplant wechseln
 - **Datenschlüssel `archiv_data_key`** (GitHub-Secret `ARCHIV_DATA_KEY`, AES-256-GCM): Er schützt gespeicherte Zugangsdaten, zum
@@ -59,8 +58,9 @@ deployen. **[offen:** Reihenfolge zwischen Postfach und Deploy (Übergang ohne M
 
 ## Noch offen beim Betreiber
 - Notfallunterlagen um `keycloak_verwaltung_secret`, `keycloak_smtp_passwort` und `namenssperre_salz` ergänzen (19.3,
-  Stand 23.11.2026 in `tasks.md`: offen).
-- Rotationsprobe des Dienstkonto-Geheimnisses (21.6) und Betriebsnachweise zur Secret-Überlappung (19.3).
+  Stand 24.11.2026 in `tasks.md`: offen).
+- Rotationsprobe des Dienstkonto-Geheimnisses (21.6) und Betriebsnachweise zur Secret-Überlappung (19.3). Diese
+  Betreiberprüfungen stehen getrennt von der Dokumentationsaufgabe 21.5 aus.
 
 Die tatsächliche Rotation, die Verwahrung und die Prüfung auf der Betriebsumgebung liegen beim Betreiber. Die
 Rotationsprobe des Dienstkonto-Geheimnisses ist Teil der manuellen Abnahme 21.6; die Betriebsnachweise zur

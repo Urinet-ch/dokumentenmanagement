@@ -1017,3 +1017,10 @@ Dienstkontos ist nach Requirement 9.2 ein technischer Fehler, keine Abweichung i
 einem Abgleich-Fehler geprüft. Das Szenario `@req-9.1` führt nun `InhaberEinladenKommando.ausfuehren` aus und prüft
 Mandantenkontext, Inhaber-Rolle, Betreiberkennung sowie die datensparsame Terminalausgabe; der tatsächliche
 Einladungsfluss über Keycloak und Mailpit bleibt durch `VerwaltungVorgangTest` und `RealmExportKeycloakTest` belegt.
+
+## Umsetzung (Aufgabe 21.5, 24.11.2026)
+
+Die Betreiberanleitung stimmt mit dem auf `main` verfügbaren normalen Verwaltungsweg und den Benutzeraktionen aus 20.7
+überein; das README behält `kcadm.sh` als Notweg. Alarmhinweise und die dokumentierten Wechselwege der Geheimnisse
+verweisen auf die passenden Nachweise, ohne tatsächliche Zugangsdaten oder Verwahrorte aufzunehmen. Ungeprüfte
+Rotationsdetails und die Befüllung der Notfallunterlagen bleiben als Betreiberaufgaben in 19.3 und 21.6 offen.
