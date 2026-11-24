@@ -2,6 +2,7 @@ package ch.urinet.archiv.benutzer.adapter.in.kommando;
 
 import ch.urinet.archiv.benutzer.application.BenutzerAbgleichen;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -93,8 +94,10 @@ public class BenutzerAbgleichenKommando {
     }
 
     static int exitCode(FachFehler fehler) {
-        return fehler.code() == ch.urinet.archiv.gemeinsam.domain.Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR
-                ? 3 : 1;
+        return switch (fehler.code()) {
+            case IDENTITAETSDIENST_NICHT_ERREICHBAR, IDENTITAETSDIENST_FEHLER -> 3;
+            default -> 1;
+        };
     }
 
     private String json(BenutzerAbgleichen.Bericht bericht, Aufruf aufruf) {

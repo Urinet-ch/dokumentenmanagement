@@ -3,6 +3,7 @@ package ch.urinet.archiv.benutzer.application;
 import ch.urinet.archiv.benutzer.adapter.in.kommando.InhaberEinladenKommando;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.mandant.application.MandantAbbauRegister;
+import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -15,6 +16,9 @@ import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -22,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,7 +42,14 @@ public class BenutzerAdminKommandoSchritte {
     private BenutzerAbgleichen.Bericht abgleich;
     private BenutzerMandantSperren.Bericht sperrBericht;
     private int beendeteSitzungen;
-    private boolean inhaberEinladungGueltig;
+    private MandantCode inhaberMandant;
+    private MandantCode inhaberKontext;
+    private String inhaberBetreiber;
+    private BenutzerAnlegen.BenutzerAnlage inhaberEingabe;
+    private UUID inhaberId;
+    private int inhaberExitCode;
+    private String inhaberTerminalAusgabe;
+    private String inhaberTerminalFehler;
 
     @Before("@admin-kommando")
     public void vorbereiten() {
@@ -48,19 +60,64 @@ public class BenutzerAdminKommandoSchritte {
 
     @Angenommen("der Betreiber hat einen Mandanten ohne Inhaber")
     public void mandantOhneInhaber() {
-        inhaberEinladungGueltig = false;
+        inhaberMandant = new MandantCode("probe-adminrollen");
+        inhaberKontext = null;
+        inhaberBetreiber = null;
+        inhaberEingabe = null;
+        inhaberId = UUID.fromString("08b1d49a-e60c-4c98-9eb3-6cd1a337c1b2");
+        inhaberExitCode = -1;
+        inhaberTerminalAusgabe = "";
+        inhaberTerminalFehler = "";
     }
 
-    @Wenn("der Betreiber das Kommando für die erste Inhabereinladung prüft")
-    public void ersteInhabereinladungPruefen() {
-        inhaberEinladungGueltig = InhaberEinladenKommando.lesen(List.of("inhaber-einladen", "probe-adminrollen",
-                "--benutzer", "probe-inhaber", "--email", "probe-inhaber@example.invalid",
-                "--vorname", "Probe", "--nachname", "Inhaber", "--wer", "probe-betreiber")).isPresent();
+    @Wenn("der Betreiber das Kommando für die erste Inhabereinladung ausführt")
+    public void ersteInhabereinladungAusfuehren() {
+        BenutzerAnlegen anlegen = new BenutzerAnlegen(null, null, null, null, null, null, null, null, null,
+                1, Duration.ofHours(1), Duration.ofHours(1)) {
+            @Override
+            public UUID erstenInhaberEinladen(MandantCode mandant, String betreiber, BenutzerAnlage eingabe) {
+                inhaberMandant = mandant;
+                inhaberBetreiber = betreiber;
+                inhaberEingabe = eingabe;
+                return inhaberId;
+            }
+        };
+        MandantKontext kontext = new MandantKontext(null, null, null) {
+            @Override
+            public <T> T mit(MandantCode mandant, Supplier<T> arbeit) {
+                inhaberKontext = mandant;
+                return arbeit.get();
+            }
+        };
+        var ausgabe = new ByteArrayOutputStream();
+        var fehler = new ByteArrayOutputStream();
+        try (var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+             var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8)) {
+            inhaberExitCode = new InhaberEinladenKommando(anlegen, kontext).ausfuehren(List.of(
+                    "inhaber-einladen", inhaberMandant.wert(), "--benutzer", "probe-inhaber",
+                    "--email", "probe-inhaber@example.invalid", "--vorname", "Probe", "--nachname", "Inhaber",
+                    "--wer", "probe-betreiber"), aus, fehl);
+        }
+        inhaberTerminalAusgabe = ausgabe.toString(StandardCharsets.UTF_8);
+        inhaberTerminalFehler = fehler.toString(StandardCharsets.UTF_8);
     }
 
-    @Dann("wird die erste Inhabereinladung akzeptiert")
+    @Dann("wird die erste Inhabereinladung über das Betreiberkommando ausgelöst")
     public void ersteInhabereinladungAkzeptiert() {
-        assertThat(inhaberEinladungGueltig).isTrue();
+        assertThat(inhaberExitCode).isZero();
+        assertThat(inhaberKontext).isEqualTo(inhaberMandant);
+        assertThat(inhaberMandant).isEqualTo(new MandantCode("probe-adminrollen"));
+        assertThat(inhaberEingabe).isNotNull();
+        assertThat(inhaberEingabe.rolle()).isEqualTo("inhaber");
+        assertThat(inhaberBetreiber).isEqualTo("probe-betreiber");
+        assertThat(inhaberEingabe.benutzername()).isEqualTo("probe-inhaber");
+        assertThat(inhaberEingabe.email()).isEqualTo("probe-inhaber@example.invalid");
+    }
+
+    @Dann("enthält die Terminalausgabe nur die Benutzerkennung")
+    public void terminalausgabeEnthaeltNurBenutzerkennung() {
+        assertThat(inhaberTerminalAusgabe).isEqualTo(inhaberId + System.lineSeparator());
+        assertThat(inhaberTerminalFehler).isEmpty();
     }
 
     @Angenommen("ein aktiver Mandant hat einen bestehenden Keycloak-Benutzer ohne Verzeichniszeile")
