@@ -5,6 +5,7 @@ Funktionalität: Anleitung ohne Netz
   @req-8.1
   Szenario: Die Anleitung wird vorab geladen und ist offline vollständig
     Angenommen die PWA mit der Anleitung ist installiert
+    Und Keycloak stellt Tokens mit 3600 Sekunden Gültigkeit aus
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
     Wenn das Handy offline ist
     Und ich die Hilfe-Leiste öffne
