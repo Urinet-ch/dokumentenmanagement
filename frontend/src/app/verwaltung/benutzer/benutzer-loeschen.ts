@@ -34,6 +34,10 @@ export class BenutzerLoeschen {
   private readonly dialog = inject(MatDialog);
   private readonly zerstoert = inject(DestroyRef);
   private readonly stepUp = inject(BenutzerFortsetzen);
+  private readonly stepUpFehlgeschlagen = (): void => {
+    this.laufend.set(false);
+    this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+  };
   private fortsetzungVerbraucht = false;
   private geoeffnet?: MatDialogRef<BenutzerLoeschdialog, Verwaltungsgrund | null>;
 
@@ -112,7 +116,7 @@ export class BenutzerLoeschen {
         error: (fehler: unknown) => {
           this.meldung.set(null);
           if (istStepUp(fehler)) {
-            if (this.stepUp.starten({ aktion: 'loeschen', ziel: id })) return;
+            if (this.stepUp.starten({ aktion: 'loeschen', ziel: id }, () => this.stepUpFehlgeschlagen())) return;
             this.laufend.set(false);
             this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
             return;
