@@ -84,11 +84,17 @@ public class BenutzerAbgleichenKommando {
             return bericht.abweichungen().isEmpty() ? 0 : 1;
         } catch (FachFehler e) {
             fehler.println(e.code().name());
-            return 1;
+            return exitCode(e);
         } catch (RuntimeException e) {
             fehler.println("Technischer Fehler: " + e.getClass().getSimpleName());
             return 3;
         }
+
+    }
+
+    static int exitCode(FachFehler fehler) {
+        return fehler.code() == ch.urinet.archiv.gemeinsam.domain.Fehlercode.IDENTITAETSDIENST_NICHT_ERREICHBAR
+                ? 3 : 1;
     }
 
     private String json(BenutzerAbgleichen.Bericht bericht, Aufruf aufruf) {

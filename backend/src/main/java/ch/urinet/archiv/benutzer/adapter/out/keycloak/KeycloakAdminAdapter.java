@@ -219,7 +219,8 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
                     mandanten.add(wert.textValue());
                 }
             }
-            ergebnis.add(new RealmBenutzer(id, mandanten, rollen(id.toString())));
+            Rollen rollen = rollenMitFremden(id.toString());
+            ergebnis.add(new RealmBenutzer(id, mandanten, rollen.archiv(), rollen.fremde()));
         }
         return List.copyOf(ergebnis);
     }
@@ -576,19 +577,31 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
     }
 
     private Set<Rolle> rollen(String id) {
+        return rollenMitFremden(id).archiv();
+    }
+
+    private Rollen rollenMitFremden(String id) {
         Set<Rolle> rollen = EnumSet.noneOf(Rolle.class);
+        Set<String> fremde = new java.util.HashSet<>();
         JsonNode mappings = json(request("GET", user(id) + "/role-mappings/realm", null, null, true, Set.of()));
         if (!mappings.isArray()) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
         for (JsonNode mapping : mappings) {
+            String name = mapping.path("name").asText();
             for (Rolle rolle : Rolle.values()) {
-                if (rolle.code().equals(mapping.path("name").asText())) {
+                if (rolle.code().equals(name)) {
                     rollen.add(rolle);
                 }
             }
+            if (!ARCHIV_ROLLEN.contains(name)) {
+                fremde.add(name);
+            }
         }
-        return rollen;
+        return new Rollen(Set.copyOf(rollen), Set.copyOf(fremde));
+    }
+
+    private record Rollen(Set<Rolle> archiv, Set<String> fremde) {
     }
 
     private Set<ErforderlicheAktion> erforderlicheAktionen(JsonNode user) {

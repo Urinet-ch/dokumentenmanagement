@@ -8,7 +8,7 @@ Funktionalität: Realm-Konfiguration für die Benutzerverwaltung
   Szenario: Der Realm begrenzt die Lebensdauer von Access-Tokens auf fünf Minuten
     Dann beträgt die Access-Token-Lebensdauer des Realm-Exports 300 Sekunden
 
-  @req-9.1 @teilnachweis-7.4
+  @teilnachweis-7.4
   Szenario: Der Realm schützt Passwörter und versendet Einladungen mit TOTP-Einrichtung
     Dann verlangt der Realm-Export Passwörter mit mindestens 12 Zeichen ohne Benutzername oder E-Mail
     Und jeder neue Benutzer muss TOTP einrichten

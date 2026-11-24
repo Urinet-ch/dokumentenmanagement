@@ -58,6 +58,7 @@ public class VerwaltungsabgleichSchritte {
     private UUID ohneMandant;
     private UUID mehrereMandanten;
     private UUID mehrereRollen;
+    private UUID fremdeRolle;
 
     @Before("@verwaltung-abgleich")
     public void vorbereiten() throws Exception {
@@ -101,6 +102,18 @@ public class VerwaltungsabgleichSchritte {
                 new RealmBenutzer(ohneMandant, List.of(), Set.of(Rolle.MITARBEITER)),
                 new RealmBenutzer(mehrereMandanten, List.of(URINET.wert(), VHF.wert()), Set.of(Rolle.MITARBEITER)),
                 new RealmBenutzer(mehrereRollen, List.of(URINET.wert()), Set.of(Rolle.MITARBEITER, Rolle.TREUHAENDER))));
+    }
+
+    @Angenommen("ein synthetischer Realm-Benutzer hat eine unbekannte Realm-Rolle")
+    public void unbekannteRealmRolle() {
+        fremdeRolle = UUID.randomUUID();
+        realmEinrichten(List.of(new RealmBenutzer(fremdeRolle, List.of(URINET.wert()), Set.of(),
+                Set.of("fremde-rolle"))));
+    }
+
+    @Dann("meldet der Abgleich die fremde Rolle")
+    public void fremdeRolleGemeldet() throws Exception {
+        pruefen(URINET, fremdeRolle, "FREMDE_ROLLE");
     }
 
     private void realmEinrichten(List<RealmBenutzer> realm) {

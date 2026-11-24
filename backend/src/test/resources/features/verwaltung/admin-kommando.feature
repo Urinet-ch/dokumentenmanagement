@@ -2,6 +2,18 @@
 @spec-06 @admin-kommando
 Funktionalität: Betreiberkommandos für Benutzer und Mandanten
 
+  @req-9.1 @admin-kommando
+  Szenario: Das Betreiberkommando akzeptiert die Einladung des ersten Inhabers
+    Angenommen der Betreiber hat einen Mandanten ohne Inhaber
+    Wenn der Betreiber das Kommando für die erste Inhabereinladung prüft
+    Dann wird die erste Inhabereinladung akzeptiert
+
+  @req-9.4 @verwaltung-abgleich
+  Szenario: Der Abgleich meldet unbekannte Realm-Rollen
+    Angenommen ein synthetischer Realm-Benutzer hat eine unbekannte Realm-Rolle
+    Wenn der Worker die Benutzerverwaltung abgleicht
+    Dann meldet der Abgleich die fremde Rolle
+
   @req-9.2
   Szenario: Der Abgleich übernimmt einen bestehenden Benutzer, ohne Keycloak zu verändern
     Angenommen ein aktiver Mandant hat einen bestehenden Keycloak-Benutzer ohne Verzeichniszeile

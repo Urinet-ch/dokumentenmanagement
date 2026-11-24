@@ -1,5 +1,6 @@
 package ch.urinet.archiv.benutzer.application;
 
+import ch.urinet.archiv.benutzer.adapter.in.kommando.InhaberEinladenKommando;
 import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
 import ch.urinet.archiv.mandant.application.MandantAbbauRegister;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
@@ -36,12 +37,30 @@ public class BenutzerAdminKommandoSchritte {
     private BenutzerAbgleichen.Bericht abgleich;
     private BenutzerMandantSperren.Bericht sperrBericht;
     private int beendeteSitzungen;
+    private boolean inhaberEinladungGueltig;
 
     @Before("@admin-kommando")
     public void vorbereiten() {
         identitaet = new TrackingIdentitaetsDienst(() -> beendeteSitzungen++);
         verzeichnis = new VerzeichnisAttrappe();
         beendeteSitzungen = 0;
+    }
+
+    @Angenommen("der Betreiber hat einen Mandanten ohne Inhaber")
+    public void mandantOhneInhaber() {
+        inhaberEinladungGueltig = false;
+    }
+
+    @Wenn("der Betreiber das Kommando für die erste Inhabereinladung prüft")
+    public void ersteInhabereinladungPruefen() {
+        inhaberEinladungGueltig = InhaberEinladenKommando.lesen(List.of("inhaber-einladen", "probe-adminrollen",
+                "--benutzer", "probe-inhaber", "--email", "probe-inhaber@example.invalid",
+                "--vorname", "Probe", "--nachname", "Inhaber", "--wer", "probe-betreiber")).isPresent();
+    }
+
+    @Dann("wird die erste Inhabereinladung akzeptiert")
+    public void ersteInhabereinladungAkzeptiert() {
+        assertThat(inhaberEinladungGueltig).isTrue();
     }
 
     @Angenommen("ein aktiver Mandant hat einen bestehenden Keycloak-Benutzer ohne Verzeichniszeile")
