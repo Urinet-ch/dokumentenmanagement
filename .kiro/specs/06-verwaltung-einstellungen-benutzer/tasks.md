@@ -173,12 +173,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 2.13_
   - _Abhängig von: 20.2, Spec 04: 13.6_
 
-- [ ] 20.4 Dienste lesen die Werte der Konfiguration, Migration [Backend]
+- [x] 20.4 Dienste lesen die Werte der Konfiguration, Migration [Backend]
   - Branding, Aufbewahrung der Chat-Fragen (intern und öffentlich) und die Budgets lesen über `MandantEinstellungen`; die
     Eigenschaften bleiben Standard; Migration der heute wirksamen Werte (Version, Quelle `MIGRATION`); «wirksam ab» wie im
     Katalog.
   - _Anforderungen: 1.4, 1.5, 2.12_
   - _Abhängig von: 20.2_
+  - Nachweis: `KonfigurationMigrationTest` (zwei Mandanten und Rollback), `ChatAufbewahrungMandantTest`,
+    `MandantEinstellungenResourceTest` und Cucumber-Szenario zum öffentlichen Branding (`@req-1.4`, `@req-2.12`).
 
 - [ ] 20.5 Oberfläche Einstellungen [Frontend]
   - Seite `/verwaltung/einstellungen`: Gruppen, Grenzen, Standard, Vorschau, Dialog bei riskanten Werten, Verlauf mit Vergleich,

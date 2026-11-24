@@ -220,8 +220,8 @@ import { VermerkArt } from '../hilfe/einfuehrung-vermerk-speicher';
       border-radius: 14px;
       display: grid;
       place-items: center;
-      background: var(--urinet-gelb);
-      color: var(--urinet-schwarz);
+      background: var(--brand-primary);
+      color: var(--brand-text);
       --symbol-groesse: 28px;
     }
   `,

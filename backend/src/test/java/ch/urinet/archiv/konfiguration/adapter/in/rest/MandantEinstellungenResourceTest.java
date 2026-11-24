@@ -1,9 +1,14 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
 import ch.urinet.archiv.benutzer.application.VerwaltungGrenzen;
+import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
 import ch.urinet.archiv.benutzer.adapter.out.persistence.JdbcVerwaltungGrenzen;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantEinstellungen;
+import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.arc.ClientProxy;
 import io.quarkus.test.junit.QuarkusMock;
@@ -25,6 +30,8 @@ import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.time.Duration;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +43,53 @@ class MandantEinstellungenResourceTest {
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenbank;
     @Inject VerwaltungGrenzen grenzen;
+    @Inject MandantKontext kontext;
+    @Inject MandantEinstellungen einstellungen;
+    @Inject StepUp stepUp;
     private VerwaltungGrenzen urspruenglicheGrenzen;
+
+    @Test
+    void aufbewahrungIstImWorkerKontextAusDerAktuellenVersionLesbar() throws Exception {
+        for (String code : new String[] {"urinet", "vhf-gsk"}) {
+            if (!imRegister(code)) {
+                provisionierung.anlegen(code, null, null);
+            }
+        }
+        String urinet = Testanmeldung.token("inhaber-urinet");
+        Response vorher = given().auth().oauth2(urinet).get("/api/v1/konfiguration");
+        Response gespeichert = patch(urinet, vorher.getHeader("ETag"),
+                "{\"chat\":{\"aufbewahrungMonate\":60},\"webseitenChat\":{\"aufbewahrungTage\":365}}");
+        assertThat(gespeichert.statusCode()).as(gespeichert.asString()).isEqualTo(200);
+        StepUp original = ClientProxy.unwrap(stepUp);
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() { }
+        }, StepUp.class);
+        try {
+            var geaendert = CompletableFuture.supplyAsync(() ->
+                    kontext.mit(new MandantCode("urinet"), einstellungen::aufbewahrung)).join();
+            var anderer = CompletableFuture.supplyAsync(() ->
+                    kontext.mit(new MandantCode("vhf-gsk"), einstellungen::aufbewahrung)).join();
+            assertThat(geaendert.chatMonate()).isEqualTo(60);
+            assertThat(geaendert.webseitenChatTage()).isEqualTo(365);
+            Response vhf = given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).get("/api/v1/konfiguration");
+            assertThat(anderer.chatMonate()).isEqualTo(
+                    vhf.jsonPath().<Integer>get("einstellungen.chat.aufbewahrungMonate"));
+            assertThat(anderer.webseitenChatTage()).isEqualTo(
+                    vhf.jsonPath().<Integer>get("einstellungen.webseitenChat.aufbewahrungTage"));
+        } finally {
+            try {
+                Response zurueck = given().auth().oauth2(urinet).header("If-Match", gespeichert.getHeader("ETag"))
+                        .queryParam("bestaetigt", "chat.aufbewahrungMonate,webseitenChat.aufbewahrungTage")
+                        .contentType("application/json")
+                        .body("{\"version\":" + vorher.jsonPath().getInt("basisVersion") + "}")
+                        .post(PFAD + "/zuruecksetzen");
+                assertThat(zurueck.statusCode()).as(zurueck.asString()).isEqualTo(200);
+            } finally {
+                QuarkusMock.installMockForType(original, StepUp.class);
+            }
+        }
+    }
 
     @BeforeEach
     void grenzenIsolieren() {
@@ -132,6 +185,10 @@ class MandantEinstellungenResourceTest {
         assertThat(vorher.statusCode()).as(vorher.asString()).isEqualTo(200);
         assertThat(andererMandant.statusCode()).as(andererMandant.asString()).isEqualTo(200);
         String bisher = vorher.jsonPath().getString("einstellungen.branding.name");
+        Response brandingVorher = given().queryParam("domain", "urinet.test.invalid").get("/api/v1/branding");
+        Response anderesBranding = given().queryParam("domain", "vhf-gsk.test.invalid").get("/api/v1/branding");
+        assertThat(brandingVorher.statusCode()).isEqualTo(200);
+        assertThat(anderesBranding.statusCode()).isEqualTo(200);
         String neu = "Testarchiv".equals(bisher) ? "Probe Archiv" : "Testarchiv";
         String body = "{\"branding\":{\"name\":\"" + neu + "\"}}";
         Response vorschau = given().auth().oauth2(urinet).header("If-Match", vorher.getHeader("ETag"))
@@ -145,6 +202,10 @@ class MandantEinstellungenResourceTest {
             assertThat(gespeichert.getHeader("ETag")).isNotEqualTo(vorher.getHeader("ETag"));
             assertThat(given().auth().oauth2(urinet).get("/api/v1/konfiguration")
                     .jsonPath().getString("einstellungen.branding.name")).isEqualTo(neu);
+            assertThat(given().queryParam("domain", "urinet.test.invalid").get("/api/v1/branding")
+                    .jsonPath().getString("name")).isEqualTo(neu);
+            assertThat(given().queryParam("domain", "vhf-gsk.test.invalid").get("/api/v1/branding").asString())
+                    .isEqualTo(anderesBranding.asString());
             Response vhfNachher = given().auth().oauth2(vhf).get("/api/v1/konfiguration");
             assertThat(vhfNachher.getHeader("ETag")).isEqualTo(andererMandant.getHeader("ETag"));
             assertThat(vhfNachher.asString()).isEqualTo(andererMandant.asString());
@@ -157,6 +218,8 @@ class MandantEinstellungenResourceTest {
         }
         assertThat(given().auth().oauth2(urinet).get("/api/v1/konfiguration")
                 .jsonPath().getString("einstellungen.branding.name")).isEqualTo(bisher);
+        assertThat(given().queryParam("domain", "urinet.test.invalid").get("/api/v1/branding").asString())
+                .isEqualTo(brandingVorher.asString());
     }
 
     @Test

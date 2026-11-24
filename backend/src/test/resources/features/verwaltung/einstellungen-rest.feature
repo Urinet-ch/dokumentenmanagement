@@ -126,3 +126,16 @@ Funktionalität: Einstellungen über die REST-Schnittstelle verwalten
     Wenn die ursprüngliche Einstellungsversion über REST wiederhergestellt wird
     Dann entsprechen die Einstellungen wieder dem Ausgangsstand
     Und ist der zweite Einstellungsstand unverändert
+
+  @req-1.4 @req-2.12 @20-4-verbraucher
+  Szenario: Öffentliches Branding folgt der Version und dem Standard
+    Angenommen das öffentliche Branding beider Mandanten ist gemerkt
+    Wenn «inhaber-urinet» den Einstellungskatalog liest
+    Dann nennt der Katalog die Wirkzeit für Branding und Aufbewahrung
+    Wenn die REST-Änderung des Archivnamens gespeichert wird
+    Dann zeigt das öffentliche Branding unmittelbar den neuen Namen
+    Und bleibt das öffentliche Branding des anderen Mandanten unverändert
+    Wenn die Gruppe Branding über REST zurückgesetzt wird
+    Dann zeigt das öffentliche Branding den bisherigen Standard
+    Wenn die ursprüngliche Einstellungsversion über REST wiederhergestellt wird
+    Dann entspricht das öffentliche Branding wieder dem Ausgangsstand
