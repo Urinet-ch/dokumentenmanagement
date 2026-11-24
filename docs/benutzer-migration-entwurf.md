@@ -19,10 +19,16 @@ Keycloak noch die Betriebsumgebung.
    `IDENTITAETSDIENST_FEHLER` ist Gegenstand von #529. Keine Annahme aus einem fehlenden JSON-Bericht ableiten.
    Bei bestehenden Inhabern ohne protokollierten Anlage- oder Rollenvorgang ist `ROLLE_OHNE_VORGANG` zu erwarten,
    insbesondere für `fabian` im Mandanten `urinet`; eine Verzeichnis-`UEBERNAHME` allein behebt den Befund nicht.
-   Der Entwurf bricht dabei gewollt ab. Nach Fabians Entscheid vom 24.11.2026 muss zuerst der in 21.2a noch zu
-   implementierende protokollierte Betreibervorgang ausgeführt werden: Er dokumentiert die bestehende Rolle, ohne
-   Keycloak zu ändern oder die strenge Abgleich-Regel 6.5/9.4 zu lockern. Erst danach Prüflauf und Schreiblauf
-   ausführen; vor Abschluss von 21.2a ist dieser Ablauf nicht verfügbar.
+   Der Entwurf bricht dabei gewollt ab. Nach Fabians Entscheid vom 24.11.2026 dokumentiert der Betreibervorgang
+   aus 21.2a die bestehende Rolle, ohne Keycloak zu ändern oder die strenge Abgleich-Regel 6.5/9.4 zu lockern.
+   Mandant und Inhaberrolle anhand der geschützten Kennung prüfen. Das Kommando zuerst ohne, dann mit
+   `--ausfuehren` aufrufen; Einzelheiten und Ausgänge stehen in der [Verwaltungsanleitung](anleitung-verwaltung.md).
+   Danach den Abgleich erneut prüfen, den Schreiblauf starten und die Nachprüfung durchführen.
+
+   ```sh
+   /pfad/zum/starter benutzer inhaber-uebernehmen '<mandant>' --benutzer '<uuid>' --wer '<betreiber-uuid>'
+   /pfad/zum/starter benutzer inhaber-uebernehmen '<mandant>' --benutzer '<uuid>' --wer '<betreiber-uuid>' --ausfuehren
+   ```
 
 ## Starter und Ablauf
 
@@ -63,6 +69,8 @@ Ein erneuter Lauf nach Prüfung des Zustands ist sicher: bereits übernommene Be
 
 ## Nachher und Rückfall
 
+- Die Verzeichnisübernahme ändert Keycloak nie und schreibt nur `UEBERNAHME`-Zeilen. Solange nur diese Zeilen
+  geschrieben wurden und keine weitere Korrektur nötig ist, ist keine Wiederherstellung aus Sicherung nötig.
 - Anmeldbarkeit, Rolle, Mandant und TOTP der betroffenen Zugänge erneut geschützt prüfen; der Inhaber bleibt Inhaber.
   Keine Zugangsdaten erfassen. Abweichungen vor Freigabe klären; Wartungsfenster erst nach Prüfung beenden.
 - In `docs/abnahme/verwaltung.md` nur Datum, Ergebnis der Prüfungen, Anzahl und anonymisierte Befundcodes festhalten;
@@ -75,7 +83,7 @@ Ein erneuter Lauf nach Prüfung des Zustands ist sicher: bereits übernommene Be
 
 ## Checkliste für den Betrieb
 
-- [ ] 21.2a abgeschlossen und benötigter Betreibervorgang durchgeführt.
+- [ ] Bestehende Inhaber geschützt geprüft und benötigten Betreibervorgang nach Trockenlauf durchgeführt.
 - [ ] Wartungsfenster, Zielmandant und Image geprüft; Sicherung und Zeitpunkt dokumentiert.
 - [ ] Vorherige Anmeldbarkeit, Rolle, Mandant und TOTP jedes Zugangs geschützt geprüft.
 - [ ] Prüflauf ohne Abweichung; geplante Anzahl festgehalten.

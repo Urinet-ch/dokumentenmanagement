@@ -61,8 +61,78 @@ class VerwaltungVorgangTest {
     @Inject AgroalDataSource datenquelle;
     @Inject ZugriffProtokoll protokoll;
     @Inject InhaberEinladenKommando inhaberEinladen;
+    @Inject ch.urinet.archiv.benutzer.adapter.in.kommando.BestehendenInhaberKommando bestehendenInhaber;
+    @Inject ch.urinet.archiv.benutzer.application.AbgleichStand abgleichStand;
     @Inject IdentitaetsDienst identitaet;
     @Inject MandantRegister register;
+
+    @Test
+    void betreibervorgangDokumentiertBestehendenInhaberEinmaligOhneKeycloakZuAendern() throws Exception {
+        adminrollenMandantVorbereiten();
+        IdentitaetsDienst original = ClientProxy.unwrap(identitaet);
+        var stub = new IdentitaetsDienstStub();
+        QuarkusMock.installMockForType(stub, IdentitaetsDienst.class);
+        try {
+            String ziel = stub.anlegen("probe-adminrollen",
+                    new IdentitaetsDienst.Neuanlage("inhaber-probe", "probe@example.invalid", "Test", "Person"),
+                    ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+            UUID betreiber = UUID.randomUUID();
+            var ausgabe = new ByteArrayOutputStream();
+            var fehler = new ByteArrayOutputStream();
+            var aus = new PrintStream(ausgabe, true, StandardCharsets.UTF_8);
+            var fehl = new PrintStream(fehler, true, StandardCharsets.UTF_8);
+            var aufruf = new ArrayList<>(List.of("inhaber-uebernehmen", "probe-adminrollen", "--benutzer", ziel,
+                    "--wer", betreiber.toString()));
+            try (var thread = Executors.newSingleThreadExecutor()) {
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(ausgabe.toString(StandardCharsets.UTF_8)).contains("GEPLANT");
+                assertThat(abgleichStand.lesen(new MandantCode("probe-adminrollen")).dokumentierteInhaber())
+                        .doesNotContain(UUID.fromString(ziel));
+                aufruf.add("--ausfuehren");
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .as(fehler.toString(StandardCharsets.UTF_8)).isZero();
+                assertThat(ausgabe.toString(StandardCharsets.UTF_8)).contains("DOKUMENTIERT", "BEREITS_DOKUMENTIERT");
+                assertThat(stub.benutzerLesen("probe-adminrollen", ziel).rollen())
+                        .containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.INHABER);
+                assertThat(abgleichStand.lesen(new MandantCode("probe-adminrollen")).dokumentierteInhaber())
+                        .contains(UUID.fromString(ziel));
+                try (Connection verbindung = datenquelle.getConnection();
+                     PreparedStatement abfrage = verbindung.prepareStatement(
+                             "select details->>'phase', details->>'anlass', details::text from "
+                                     + "m_probe_adminrollen.zugriff_protokoll where aktion = 'ROLLE_ZUWEISEN' "
+                                     + "and details->>'ziel' = ? order by id")) {
+                    abfrage.setString(1, ziel);
+                    try (ResultSet zeilen = abfrage.executeQuery()) {
+                        assertThat(zeilen.next()).isTrue();
+                        assertThat(zeilen.getString(1)).isEqualTo("ANGEFRAGT");
+                        assertThat(zeilen.getString(2)).isEqualTo("UEBERNAHME");
+                        assertThat(zeilen.getString(3)).doesNotContain("probe@example.invalid", "inhaber-probe");
+                        assertThat(zeilen.next()).isTrue();
+                        assertThat(zeilen.getString(1)).isEqualTo("ABGESCHLOSSEN");
+                        assertThat(zeilen.getString(2)).isEqualTo("UEBERNAHME");
+                        assertThat(zeilen.next()).isFalse();
+                    }
+                }
+                aufruf.set(1, "vhf-gsk");
+                assertThat(in(thread, "vhf-gsk", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .isEqualTo(1);
+                String mitarbeiter = stub.anlegen("probe-adminrollen",
+                        new IdentitaetsDienst.Neuanlage("mitarbeiter-probe", "andere@example.invalid", "Test", "Person"),
+                        ch.urinet.archiv.sicherheit.domain.Rolle.MITARBEITER);
+                aufruf.set(1, "probe-adminrollen");
+                aufruf.set(3, mitarbeiter);
+                assertThat(in(thread, "probe-adminrollen", () -> bestehendenInhaber.ausfuehren(aufruf, aus, fehl)))
+                        .isEqualTo(1);
+                assertThat(stub.benutzerLesen("probe-adminrollen", mitarbeiter).rollen())
+                        .containsExactly(ch.urinet.archiv.sicherheit.domain.Rolle.MITARBEITER);
+            }
+        } finally {
+            QuarkusMock.installMockForType(original, IdentitaetsDienst.class);
+        }
+    }
 
     @Test
     void betreiberLaedtNurDenErstenInhaberEinUndProtokolliertDieAnlage() throws Exception {
@@ -335,6 +405,55 @@ class VerwaltungVorgangTest {
             assertThat(sperre.belegen(mandant, UUID.randomUUID())).isFalse();
         } finally {
             testsperreEntfernen(mandant, id);
+        }
+    }
+
+    @Test
+    void betreiberOhneUebernahmeanlassDarfKeineRolleZuweisen() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        var details = new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ANGEFRAGT,
+                UUID.randomUUID(), ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN,
+                null, ProtokollDetails.Verwaltungsrolle.INHABER, List.of());
+        var absicht = new ZugriffEintrag(Optional.of("betreiber:" + UUID.randomUUID()), Optional.empty(),
+                ProtokollAktion.ROLLE_ZUWEISEN, Optional.empty(), Optional.empty(),
+                ProtokollDetails.verwaltung(details));
+        AtomicBoolean ausgefuehrt = new AtomicBoolean();
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> { ausgefuehrt.set(true); return true; },
+                    fehler -> Kompensation.GEKLAERT, wert -> { }, wert -> absicht)))
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class);
+            assertThat(ausgefuehrt).isFalse();
+        }
+    }
+
+    @Test
+    void betreibervorgangNachGeklaertemAbschlussfehlerWiederholbar() throws Exception {
+        mandantenVorbereiten();
+        MandantCode mandant = new MandantCode("urinet");
+        UUID id = UUID.randomUUID();
+        UUID erneut = UUID.randomUUID();
+        UUID ziel = UUID.randomUUID();
+        String akteur = "betreiber:" + UUID.randomUUID();
+        var absicht = betreiberRolle(id, ziel, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+        var abschluss = betreiberRolle(id, ziel, akteur, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            assertThatThrownBy(() -> in(thread, "urinet", () -> vorgang.ausfuehren(mandant, absicht,
+                    () -> { }, () -> true, fehler -> Kompensation.GEKLAERT,
+                    wert -> { throw new IllegalStateException("synthetischer Abschlussfehler"); },
+                    wert -> abschluss))).hasRootCauseInstanceOf(IllegalStateException.class);
+            assertThat(phasen(id)).containsExactly("ANGEFRAGT", "FEHLGESCHLAGEN");
+            var neueAbsicht = betreiberRolle(erneut, ziel, akteur, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
+            var neuerAbschluss = betreiberRolle(erneut, ziel, akteur, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN);
+            assertThat(in(thread, "urinet", () -> vorgang.ausfuehren(mandant, neueAbsicht,
+                    () -> { }, () -> true, fehler -> Kompensation.GEKLAERT,
+                    wert -> { }, wert -> neuerAbschluss))).isTrue();
+            assertThat(phasen(erneut)).containsExactly("ANGEFRAGT", "ABGESCHLOSSEN");
+        } finally {
+            testsperreEntfernen(mandant, id);
+            testsperreEntfernen(mandant, erneut);
         }
     }
 
@@ -734,6 +853,16 @@ class VerwaltungVorgangTest {
     private static ZugriffEintrag eintrag(UUID id, UUID ziel, String akteur, String rolle,
                                           ProtokollDetails.Verwaltungsphase phase) {
         return eintrag(id, ziel, akteur, rolle, phase, ProtokollDetails.Verwaltungsvorgang.SPERREN);
+    }
+
+    private static ZugriffEintrag betreiberRolle(UUID id, UUID ziel, String akteur,
+                                                ProtokollDetails.Verwaltungsphase phase) {
+        var details = new ProtokollDetails.Verwaltung(id, phase, ziel,
+                ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN,
+                ProtokollDetails.Verwaltungsrolle.INHABER, ProtokollDetails.Verwaltungsrolle.INHABER,
+                List.of(), null, null, ProtokollDetails.Verwaltungsanlass.UEBERNAHME, null);
+        return new ZugriffEintrag(Optional.of(akteur), Optional.empty(), ProtokollAktion.ROLLE_ZUWEISEN,
+                Optional.empty(), Optional.empty(), ProtokollDetails.verwaltung(details));
     }
 
     private static ZugriffEintrag eintrag(UUID id, UUID ziel, String akteur, String rolle,

@@ -77,6 +77,7 @@ Dienst. Jeder Aufruf steht im Protokoll als `betreiber:<name>` (`--wer`). Aufruf
 | --- | --- |
 | `mandant inhaber-einladen <code> --benutzer <name> --email <adresse> --vorname <v> --nachname <n> --wer <betreiber>` | Legt den ersten Inhaber des Mandanten über das Dienstkonto an; Keycloak versendet den Einmal-Link. Passwort und Link erscheinen nie im Terminal. `mandant anlegen` legt keine Benutzer an. |
 | `benutzer abgleichen <code> [--pruefen] [--json]` | Liest die Benutzer des Mandanten in Keycloak und gibt Abweichungen aus. Ohne `--pruefen` schreibt es die fehlenden Zeilen ins Benutzerverzeichnis (Übernahme); mit `--pruefen` ändert es nichts. Keycloak ändert es nie. |
+| `benutzer inhaber-uebernehmen <code> --benutzer <uuid> --wer <uuid> [--ausfuehren]` | Dokumentiert eine bereits bestehende Inhaberrolle einmalig als Betreibervorgang mit Anlass `UEBERNAHME`; Keycloak bleibt unverändert. Ohne `--ausfuehren` nur prüfen. `--wer` ist eine geschützte, stabile pseudonyme Betreiberkennung, kein Name. |
 | `mandant benutzer-sperren <code> [--json]` | Mandantenabbau: deaktiviert alle Keycloak-Benutzer des Mandanten und beendet ihre Sitzungen; ab 30 Tagen nach der Deaktivierung löscht ein erneuter Aufruf die Keycloak-Benutzer. Zugriffsprotokoll und Benutzerverzeichnis bleiben bis zum Mandantenabbau. |
 
 Exit-Codes von `benutzer abgleichen`: 0 keine Abweichung, 1 mindestens eine Abweichung, 2 falscher Aufruf, 3 technischer Fehler.
@@ -88,6 +89,21 @@ legt die Spec nicht fest; im Verwaltungsprotokoll und in Keycloak prüfen.**]** 
 steht in `docs/abnahme/verwaltung.md`.
 Ein nicht ausgeführter [Entwurf für Vorbereitung, Prüflauf und Rückfall](benutzer-migration-entwurf.md) unterstützt
 den Betreiber bei 21.2; er ersetzt weder die Freigabe noch den manuellen Betriebsnachweis.
+
+Vor der Migration eines bestehenden Inhabers ohne dokumentierten Rollenvorgang meldet der Abgleich
+`ROLLE_OHNE_VORGANG`. Der Betreiber prüft die Mandantenzugehörigkeit und Inhaberrolle geschützt, führt das neue
+Kommando zuerst ohne, nach Prüfung mit `--ausfuehren` aus und wiederholt danach den Abgleich. `GEPLANT` bedeutet
+Trockenlauf, `DOKUMENTIERT` einen abgeschlossenen Vorgang und `BEREITS_DOKUMENTIERT` eine idempotente Wiederholung.
+Das Kommando akzeptiert nur eine Person mit genau der Archiv-Rolle `inhaber` im angegebenen Mandanten; es ändert
+weder Rolle noch Zugang. Es schreibt pro erfolgreichem Vorgang Absicht und Abschluss, ohne Name oder Adresse.
+Exit-Codes: 0 erfolgreich, 1 fachlicher Fehler, 2 falscher Aufruf, 3 technischer Fehler oder Identitätsdienstfehler.
+Die Zuordnung der pseudonymen Betreiberkennung zur verantwortlichen Person wird ausserhalb des Repositorys geschützt
+verwahrt. Die eigentliche Verzeichnisübernahme und ihre Betriebsabnahme bleiben bei 21.2 [Fabian].
+
+Bei einem Abbruch des Betreibervorgangs können Absicht oder ein Abschluss `UNKLAR` bestehen bleiben. Vor einer
+Wiederholung den Vorgang und die Mandantensperre geschützt prüfen und unklare Vorgänge durch den Betreiber klären;
+nicht von einer sicheren automatischen Wiederholung ausgehen. Auch deaktivierte oder noch nicht aktivierte Benutzer
+mit der bestehenden Inhaberrolle können dokumentiert werden; das Kommando aktiviert keinen Zugang.
 
 ### Notweg: Benutzer per `kcadm.sh`
 Nur wenn das Dienstkonto oder der Mailversand von Keycloak nicht bereit ist (zum Beispiel bei einem Ausfall von Keycloak oder

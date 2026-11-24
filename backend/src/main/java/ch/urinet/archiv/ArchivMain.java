@@ -1,6 +1,7 @@
 package ch.urinet.archiv;
 
 import ch.urinet.archiv.benutzer.adapter.in.kommando.InhaberEinladenKommando;
+import ch.urinet.archiv.benutzer.adapter.in.kommando.BestehendenInhaberKommando;
 import ch.urinet.archiv.benutzer.adapter.in.kommando.BenutzerAbgleichenKommando;
 import ch.urinet.archiv.benutzer.adapter.in.kommando.BenutzerMandantSperrenKommando;
 import ch.urinet.archiv.integration.adapter.in.kommando.AlteLinksKommando;
@@ -80,6 +81,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     BenutzerAbgleichenKommando benutzerAbgleichen;
+
+    @Inject
+    BestehendenInhaberKommando bestehendenInhaber;
 
     @Inject
     BenutzerMandantSperrenKommando benutzerMandantSperren;
@@ -181,8 +185,11 @@ public class ArchivMain implements QuarkusApplication {
         List<String> liste = List.of(argumente);
         List<String> rest = liste.subList(1, liste.size());
         return switch (liste.getFirst()) {
-            case "benutzer" -> BenutzerAbgleichenKommando.lesen(rest).isPresent()
-                    ? Optional.empty() : Optional.of(BenutzerAbgleichenKommando.AUFRUF);
+            case "benutzer" -> !rest.isEmpty() && rest.getFirst().equals("inhaber-uebernehmen")
+                    ? BestehendenInhaberKommando.lesen(rest).isPresent()
+                        ? Optional.empty() : Optional.of(BestehendenInhaberKommando.AUFRUF)
+                    : BenutzerAbgleichenKommando.lesen(rest).isPresent()
+                        ? Optional.empty() : Optional.of(BenutzerAbgleichenKommando.AUFRUF);
             case "mandant" -> !rest.isEmpty() && rest.getFirst().equals("benutzer-sperren")
                     ? BenutzerMandantSperrenKommando.lesen(rest).isPresent()
                             ? Optional.empty() : Optional.of(BenutzerMandantSperrenKommando.AUFRUF)
@@ -217,6 +224,7 @@ public class ArchivMain implements QuarkusApplication {
                     + System.lineSeparator() + AlteLinksKommando.AUFRUF + System.lineSeparator()
                     + EmbeddingKommando.AUFRUF + System.lineSeparator()
                     + BenutzerAbgleichenKommando.AUFRUF + System.lineSeparator()
+                    + BestehendenInhaberKommando.AUFRUF + System.lineSeparator()
                     + BenutzerMandantSperrenKommando.AUFRUF);
         };
     }
@@ -271,7 +279,9 @@ public class ArchivMain implements QuarkusApplication {
                     : !rest.isEmpty() && rest.getFirst().equals("inhaber-einladen")
                             ? inhaberEinladen.ausfuehren(rest, ergebnis, System.err)
                     : mandant.ausfuehren(rest, ergebnis, System.err);
-            case "benutzer" -> benutzerAbgleichen.ausfuehren(rest, ergebnis, System.err);
+            case "benutzer" -> !rest.isEmpty() && rest.getFirst().equals("inhaber-uebernehmen")
+                    ? bestehendenInhaber.ausfuehren(rest, ergebnis, System.err)
+                    : benutzerAbgleichen.ausfuehren(rest, ergebnis, System.err);
             default -> mandant.ausfuehren(rest, ergebnis, System.err);
         };
     }
