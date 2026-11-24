@@ -111,7 +111,7 @@ class PublicVertragTest {
     void gegenprobeAbweichendesSchemaIstRot() throws IOException {
         String integer = ersetzen(gegenprobe, "titel:\n          type: string", "titel:\n          type: integer");
         assertThat(PublicVertrag.unterschiede(code(GegenprobeResource.class, GegenprobeResource.Eintrag.class), datei(integer))).singleElement()
-                .asString().contains("/antworten/200/application/json/properties/titel/type");
+                .asString().contains("/antworten/200/inhalt/application/json/properties/titel/type");
         String ohneFeld = ersetzen(gegenprobe, "        titel:\n          type: string\n", "");
         assertThat(PublicVertrag.unterschiede(code(GegenprobeResource.class, GegenprobeResource.Eintrag.class), datei(ohneFeld))).singleElement()
                 .asString().endsWith("/properties/titel: nur im Code");
@@ -120,11 +120,11 @@ class PublicVertragTest {
     @Test
     void gegenprobeAbweichenderAntwortHeaderIstRot() throws IOException {
         String integer = ersetzen(gegenprobe,
-                "        ETag:\n          schema:\n            type: string",
-                "        ETag:\n          schema:\n            type: integer");
+                "            ETag:\n              schema:\n                type: string",
+                "            ETag:\n              schema:\n                type: integer");
         assertThat(PublicVertrag.unterschiede(code(GegenprobeResource.class, GegenprobeResource.Eintrag.class),
                 datei(integer))).containsExactly(
-                        "/public/v1/gegenprobe/{id}/get/antworten/200/headers/ETag/schema/type: Code string, Datei integer");
+                        "/public/v1/gegenprobe/{id}/get/antworten/200/headers/ETag/schema/type: Code [string], Datei [integer]");
     }
 
     @Test
