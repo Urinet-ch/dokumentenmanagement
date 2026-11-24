@@ -367,8 +367,12 @@ When('ich die Benutzerliste nach «Mit Passkey» filtere', async function () {
 });
 
 Then('wurde die Benutzerliste mit dem Filter «ja» abgefragt', async function () {
-  assert.ok(this.benutzerListenAbfragen.some((suche) => new URLSearchParams(suche).get('passkey') === 'ja'),
-    this.benutzerListenAbfragen.join(' | '));
+  // Der Routenhandler trägt die Abfrage erst nach dem Anfrageereignis ein: kurz auf den Eintrag warten.
+  const gefiltert = () => this.benutzerListenAbfragen.some((suche) => new URLSearchParams(suche).get('passkey') === 'ja');
+  for (let versuch = 0; versuch < 50 && !gefiltert(); versuch += 1) {
+    await new Promise((weiter) => setTimeout(weiter, 100));
+  }
+  assert.ok(gefiltert(), this.benutzerListenAbfragen.join(' | '));
   await this.seite.locator('[data-test=benutzer-liste] li').first().waitFor();
 });
 
