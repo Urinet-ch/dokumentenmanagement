@@ -188,7 +188,7 @@ class KonfigurationMigrationTest {
                 befehl.execute("create schema " + schema);
                 befehl.execute("set search_path to " + schema);
                 alleMigrieren(verbindung, schema);
-                aendern(verbindung, schema, "rollbackCount", 2);
+                rollbackAbWissenseinstellungen(verbindung, schema, befehl);
                 int protokolleVorher = Integer.parseInt(wert(befehl, "select count(*)::text from zugriff_protokoll "
                         + "where aktion = 'KONFIGURATION_AENDERN' and benutzer = 'system:migration'"));
                 String werte = schema.endsWith("_a")
@@ -244,7 +244,7 @@ class KonfigurationMigrationTest {
                 befehl.execute("create schema " + schema);
                 befehl.execute("set search_path to " + schema);
                 alleMigrieren(verbindung, schema);
-                aendern(verbindung, schema, "rollbackCount", 2);
+                rollbackAbWissenseinstellungen(verbindung, schema, befehl);
                 if (schema.endsWith("_d")) {
                     befehl.execute("insert into wissens_einstellung (id) values (1)");
                 }
@@ -286,7 +286,7 @@ class KonfigurationMigrationTest {
                     befehl.execute("create schema " + schema);
                     befehl.execute("set search_path to " + schema);
                     alleMigrieren(verbindung, schema);
-                    aendern(verbindung, schema, "rollbackCount", 2);
+                    rollbackAbWissenseinstellungen(verbindung, schema, befehl);
                     befehl.execute("insert into public.mandant (code, name, schema_name, bucket, "
                             + "geschaeftsjahr_ende, aktiv) values ('" + code + "', 'Probe', '" + schema
                             + "', '" + code + "', '12-31', true)");
@@ -375,6 +375,15 @@ class KonfigurationMigrationTest {
 
     private static void migrieren(Connection verbindung, String schema, int anzahl) throws Exception {
         aendern(verbindung, schema, "updateCount", anzahl);
+    }
+
+    private static void rollbackAbWissenseinstellungen(Connection verbindung, String schema, Statement befehl)
+            throws Exception {
+        int anzahl = Integer.parseInt(wert(befehl, "select count(*)::text from databasechangelog "
+                + "where orderexecuted >= (select orderexecuted from databasechangelog "
+                + "where id = '121-wissenseinstellungen-konfiguration')"));
+        assertThat(anzahl).isPositive();
+        aendern(verbindung, schema, "rollbackCount", anzahl);
     }
 
     private static void aendern(Connection verbindung, String schema, String kommando, int anzahl) throws Exception {

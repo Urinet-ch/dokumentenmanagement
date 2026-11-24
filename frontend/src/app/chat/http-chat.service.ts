@@ -5,6 +5,7 @@ import { retryAfterSekunden } from '../gemeinsam/retry-after';
 import {
   ChatEreignis,
   ChatFehler,
+  ChatModus,
   ChatPort,
   GespeicherteNachricht,
   GespraechKopf,
@@ -128,6 +129,12 @@ export class HttpChatService extends ChatPort {
     return this.http
       .get<GespraechKopf[]>(`${PFAD}/gespraeche`)
       .pipe(catchError((fehler: unknown) => throwError(() => chatFehlerAus(fehler))));
+  }
+
+  anlegen(modus: ChatModus): Observable<GespraechKopf> {
+    return this.http.post<GespraechKopf>(`${PFAD}/gespraeche`, { modus }).pipe(
+      catchError((fehler: unknown) => throwError(() => chatFehlerAus(fehler))),
+    );
   }
 
   gespraech(id: string): Observable<GespeicherteNachricht[]> {

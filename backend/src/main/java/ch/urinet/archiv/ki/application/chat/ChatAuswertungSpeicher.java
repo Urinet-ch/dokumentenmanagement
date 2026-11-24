@@ -1,5 +1,7 @@
 package ch.urinet.archiv.ki.application.chat;
 
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
@@ -32,7 +34,8 @@ public interface ChatAuswertungSpeicher {
 
     record ExportZeile(Instant zeit, long nachrichtId, int sterne, String grund, String freitext, String frage,
                        String antwort, String werkzeugeJson, String quellenJson, Integer tokensEin,
-                       Integer tokensAus, Long zeitBisErstemTextMs, String modellkennung, String systempromptVersion) {
+                       Integer tokensAus, Long zeitBisErstemTextMs, String modellkennung, String systempromptVersion,
+                       Chatmodus modus) {
     }
 
     interface ExportSnapshot extends AutoCloseable {

@@ -30,10 +30,13 @@ export type ChatEreignis =
   | { typ: 'fertig'; gespraechId: string; nachrichtId?: string }
   | { typ: 'fehler'; meldung: string; gespraechId?: string };
 
+export type ChatModus = 'ARCHIV' | 'WISSEN';
+
 export interface GespraechKopf {
   id: string;
   titel: string;
   geaendert: string;
+  modus: ChatModus;
 }
 
 export type Rolle = 'BENUTZER' | 'ASSISTENT';
@@ -76,6 +79,7 @@ export class ChatFehler extends Error {
 export abstract class ChatPort {
   /** Stellt eine Frage; der Strom endet nach `fertig` oder `fehler`, Abmelden bricht die Anfrage ab. */
   abstract fragen(frage: string, gespraechId: string | null): Observable<ChatEreignis>;
+  abstract anlegen(modus: ChatModus): Observable<GespraechKopf>;
   /** Die letzten 20 eigenen Gespräche, neueste zuerst. */
   abstract gespraeche(): Observable<GespraechKopf[]>;
   abstract gespraech(id: string): Observable<GespeicherteNachricht[]>;

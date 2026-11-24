@@ -12,7 +12,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
-import { Subscription, map } from 'rxjs';
+import { Subscription, map, switchMap } from 'rxjs';
 import { Symbol } from '../gemeinsam/symbol';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
@@ -20,6 +20,7 @@ import { ChatBewertung } from './chat-bewertung';
 import {
   ChatEreignis,
   ChatFehler,
+  ChatModus,
   ChatPort,
   GespraechKopf,
   NachrichtStatus,
@@ -71,6 +72,7 @@ export class Chat {
   protected readonly anmeldung = inject(AnmeldungService);
 
   protected readonly texte = TEXTE.chat;
+  protected readonly modusTexte = TEXTE.chatModus;
   protected readonly neuLadenText = TEXTE.eingangskorb.neuLaden;
   protected readonly tag = tag;
   protected readonly frageMax = FRAGE_MAX;
@@ -87,6 +89,7 @@ export class Chat {
   protected readonly gespraeche = signal<GespraechKopf[] | null>(null);
   protected readonly listeFehler = signal(false);
   protected readonly gespraechId = signal<string | null>(null);
+  protected readonly modus = signal<ChatModus>('ARCHIV');
   protected readonly nachrichten = signal<Nachricht[]>([]);
   protected readonly laedt = signal(false);
   protected readonly laeuft = signal(false);
@@ -187,7 +190,14 @@ export class Chat {
       { rolle: 'ASSISTENT', inhalt: '', quellen: [], status: null, fehler: null },
     ]);
     this.laeuft.set(true);
-    this.frage = this.port.fragen(frage, this.gespraechId()).subscribe({
+    const gespraechId = this.gespraechId();
+    const anfrage = !gespraechId && this.modus() === 'WISSEN'
+      ? this.port.anlegen('WISSEN').pipe(switchMap((kopf) => {
+          this.gespraechId.set(kopf.id);
+          return this.port.fragen(frage, kopf.id);
+        }))
+      : this.port.fragen(frage, gespraechId);
+    this.frage = anfrage.subscribe({
       next: (ereignis) => this.verarbeiten(ereignis),
       error: (fehler: unknown) =>
         this.gescheitert(
@@ -214,6 +224,7 @@ export class Chat {
     this.laden?.unsubscribe();
     this.laedt.set(false);
     this.gespraechId.set(null);
+    this.modus.set('ARCHIV');
     this.nachrichten.set([]);
     this.neuBeginnen.set(false);
     this.fehler.set(null);
@@ -232,6 +243,7 @@ export class Chat {
     this.laden = this.port.gespraech(kopf.id).subscribe({
       next: (liste) => {
         this.gespraechId.set(kopf.id);
+        this.modus.set(kopf.modus);
         this.neuBeginnen.set(false);
         this.nachrichten.set(
           liste.map((n) => ({
@@ -259,6 +271,13 @@ export class Chat {
         }
       },
     });
+  }
+
+  protected modusWaehlen(modus: ChatModus): void {
+    if (this.anmeldung.darf('A15') && !this.gespraechId() && !this.laeuft() && !this.laedt()
+        && this.nachrichten().length === 0) {
+      this.modus.set(modus);
+    }
   }
 
   private verarbeiten(ereignis: ChatEreignis): void {
