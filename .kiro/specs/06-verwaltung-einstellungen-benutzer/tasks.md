@@ -78,15 +78,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.16, 4.1, 4.2, 4.3, 4.4, 4.6, 4.7, 4.10, 4.12, 9.6_
   - _Abhängig von: Spec 01: 1.4_
 
-- [ ] 19.6 Protokoll, Vorgänge und Persistenz [Backend]
+- [x] 19.6 Protokoll, Vorgänge und Persistenz [Backend]
   - Aktionen `BENUTZER_*`, `ROLLE_ZUWEISEN` und Check-Constraints (neue Changesets), `anlass` `ANLAGE` und `UEBERNAHME`,
     Absicht und Abschluss mit `vorgangId`, Vorgangssperre (`verwaltung_vorgang`), `benutzer_status`, `verwaltung_antrag`,
     Raten aus dem Protokoll (`archiv.verwaltung.grenzen.*`), `VerwaltungProtokollTest` (kein Klartext), `KeinLoeschpfadTest`
     erweitert; Code `ZU_VIELE_ANFRAGEN` mit `grund = VERWALTUNG`.
-  - Offen, bewusst nicht abgehakt: Cucumber-Szenarien `@req-4.7`, `6.1`–`6.4`, `6.6` brauchen einen Endpunkt und kommen mit 19.7;
-    ebenso die Anbindung der Einstellungsgrenze (`Art.EINSTELLUNG`, `einstellungen-je-mandant`) und der Grund-Eingabe.
-    Ebenfalls offen (Req 6.3): das Schreiben der Verzeichniszeilen `ANLAGE`, `UEBERNAHME` und `AUSTRITT` in der Abschlusstransaktion
-    kommt mit 19.7 bis 19.9; hier sind nur Enum-Wert, Check-Constraint und Vertrag umgesetzt.
+  - Nachweis 24.11.2026: Die seit 19.7/19.8 und 20.2 ergänzten Endpunkte, Grund-Eingaben, Verzeichniszeilen und
+    Einstellungsgrenzen sind umgesetzt. `benutzer-verwalten.feature` belegt `@req-4.7`, `6.1`–`6.4` und `6.6`;
+    die ergänzenden Transaktions-, Grenz-, Übernahme- und Append-only-Tests stehen im Umsetzungsvermerk in `design.md`.
   - _Anforderungen: 4.7, 6.1, 6.2, 6.3, 6.4, 6.6, 6.8_
   - _Abhängig von: 19.5, Spec 01: 5.1_
 

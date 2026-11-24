@@ -211,7 +211,20 @@ Zustand in Keycloak und schreibt den Abschluss `UNKLAR` mit Alarm; er ändert ni
 Für den Protokollgrund sind ausschliesslich die festen Kategorien `SICHERHEIT`, `AUSTRITT`, `RECHTEAENDERUNG`,
 `KORREKTUR` und `SONSTIGES` zulässig. So können Namen, E-Mail-Adressen und Geheimnisse nicht durch Freitext ins
 append-only Protokoll gelangen. Die Kategorie muss beim Vorgang explizit gewählt werden; Freitext wird nicht
-automatisch umgedeutet. Die Anbindung der Eingaben und Pflichtprüfung folgt mit den Verwaltungsendpunkten.
+automatisch umgedeutet. Die Verwaltungsendpunkte binden die Eingaben und Pflichtprüfung an.
+
+#### Umsetzung (Aufgabe 19.6, 24.11.2026)
+- Die ursprünglich offenen Anbindungen sind mit 19.7, 19.8, 20.2 und 21.1 umgesetzt: `ANLAGE` und `AUSTRITT`
+  stehen in der Abschlusstransaktion, `UEBERNAHME` wird transaktional und idempotent eingetragen. Sperren,
+  Deaktivieren und Löschen prüfen die feste Grundkategorie. Einstellungen und geänderte Einstellungen beim
+  Dateiimport prüfen `Art.EINSTELLUNG`; unveränderte Einstellungen zählen nicht als Änderung.
+- `benutzer-verwalten.feature` prüft den gleichzeitigen Rollenwechsel (`@req-4.7`), die protokollierte Anlage mit
+  Verzeichniszeile (`@req-6.1`–`6.4`) und die begrenzten Einladungen (`@req-6.6`). Der Austritt wird im
+  Szenario zu `@req-3.9` geprüft; die Übernahme im Szenario zu `@req-9.2` und
+  `BenutzerAdminKommandoAnwendungTest`.
+- `VerwaltungVorgangTest` prüft die festgeschriebene Absicht vor externer Wirkung und den Rollback bei Fehlern im
+  Abschluss. `VerwaltungProtokollTest`, `JdbcVerwaltungGrenzenTest`, die HTTP-Szenarien zur Einstellungsgrenze und
+  `KeinLoeschpfadTest` ergänzen die Nachweise zu Datenschutz, Raten und Append-only (6.2, 6.6, 6.8).
 
 Bei der Anlage eines weiteren Inhabers mit mindestens zwei aktiven Inhabern entsteht zunächst ein Konto ohne
 Archiv-Rolle und ein offener Antrag; die Bestätigung und Rollenvergabe folgen in 19.11. Auch dieses Konto kann seine
