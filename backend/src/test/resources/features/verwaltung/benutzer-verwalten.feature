@@ -40,7 +40,7 @@ Funktionalität: Benutzer des eigenen Mandanten verwalten
     Wenn beide Inhaber gleichzeitig die Rolle des anderen ändern
     Dann wird ein Vorgang gesperrt und mindestens ein Inhaber bleibt aktiv
 
-  @req-3.2 @req-6.1 @req-6.2 @req-6.3 @req-6.4
+  @req-3.2 @req-6.1 @req-6.2 @req-6.3 @req-6.4 @req-9.5
   Szenario: Ein neuer Benutzer wird eingeladen und die Anlage protokolliert
     Angenommen die frische Anmeldung ist für den Test bestätigt
     Wenn der Inhaber einen synthetischen Mitarbeiter anlegt
