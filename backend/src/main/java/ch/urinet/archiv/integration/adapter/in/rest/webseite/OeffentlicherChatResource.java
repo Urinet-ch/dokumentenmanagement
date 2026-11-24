@@ -120,13 +120,9 @@ public class OeffentlicherChatResource {
         ChatAbbruch abbruch = new ChatAbbruch();
         // sofort starten und puffern, bis Quarkus abonniert: der Platz wird auch frei, wenn nie jemand abonniert
         UnicastProcessor<OutboundSseEvent> strom = UnicastProcessor.create();
-        fragen.starten(annahme, ausgabe -> {
+        fragen.starten(annahme, ausgabe ->
             strom.onNext(sse.newEventBuilder().name(ausgabe.name()).mediaType(MediaType.TEXT_PLAIN_TYPE)
-                    .data(String.class, daten(ausgabe, hinweis)).build());
-            if (ausgabe.letzte()) {
-                strom.onComplete();
-            }
-        }, abbruch);
+                    .data(String.class, daten(ausgabe, hinweis)).build()), abbruch, strom::onComplete);
         // Client hat den Stream geschlossen (Abmeldung des Abonnenten)
         return strom.onCancellation().invoke(abbruch::setzen);
     }
