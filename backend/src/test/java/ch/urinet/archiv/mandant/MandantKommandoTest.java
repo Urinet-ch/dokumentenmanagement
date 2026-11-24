@@ -1,6 +1,7 @@
 package ch.urinet.archiv.mandant;
 
 import ch.urinet.archiv.ArchivMain;
+import ch.urinet.archiv.benutzer.adapter.in.kommando.InhaberEinladenKommando;
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.verarbeitung.adapter.in.kommando.EmbeddingKommando;
 import io.quarkus.test.junit.main.Launch;
@@ -55,6 +56,13 @@ class MandantKommandoTest {
     void optionOhneWert(LaunchResult ergebnis) {
         assertThat(ergebnis.getErrorOutput()).contains("Aufruf: archiv mandant anlegen");
         assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
+    }
+
+    @Test
+    @Launch(value = {"mandant", "inhaber-einladen", "urinet", "--benutzer", "test.person"}, exitCode = 2)
+    void inhaberEinladenOhneOptionenStartetQuarkusNicht(LaunchResult ergebnis) {
+        assertThat(ergebnis.getErrorOutput()).contains(InhaberEinladenKommando.AUFRUF);
+        assertThat(ergebnis.getOutput()).doesNotContain("Installed features");
     }
 
     @Test

@@ -873,9 +873,12 @@ public class WissenIngestSchritte {
     @Dann("ist für «{word}» ein Auftrag «WISSEN_INGEST» eingereiht")
     public void auftragEingereiht(String name) throws SQLException {
         Ort ort = ort(name);
-        assertThat(((Number) zeile("select count(*) as anzahl from public.auftrag where typ = 'WISSEN_INGEST' "
-                + "and nutzlast ->> 'entwurfId' in (select id::text from " + schema(ort.mandant())
-                + ".wissens_entwurf where dokument_id = ?)", ort.id()).get("anzahl")).intValue()).isEqualTo(1);
+        Map<String, Object> auftrag = zeile("select count(*) as gesamt, "
+                + "count(*) filter (where mandant = ?) as mandant_anzahl from public.auftrag "
+                + "where typ = 'WISSEN_INGEST' and nutzlast ->> 'entwurfId' in (select id::text from "
+                + schema(ort.mandant()) + ".wissens_entwurf where dokument_id = ?)", ort.mandant(), ort.id());
+        assertThat(((Number) auftrag.get("gesamt")).intValue()).isEqualTo(1);
+        assertThat(((Number) auftrag.get("mandant_anzahl")).intValue()).isEqualTo(1);
     }
 
     @Dann("hält das Zugriffsprotokoll den Ingest-Start von «{word}» für «{word}» fest")

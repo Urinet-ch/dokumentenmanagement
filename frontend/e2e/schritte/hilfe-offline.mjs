@@ -62,11 +62,33 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
   const titel = (await links.allInnerTexts()).map((text) => text.trim());
   assert.ok(titel.length > 0);
   for (const name of titel) {
-    await nav.getByRole('link', { name, exact: true }).click({ timeout: 10_000 });
+    const link = nav.getByRole('link', { name, exact: true });
+    await link.click({ timeout: 10_000 });
+    await this.seite.waitForFunction(
+      (titel) => [...document.querySelectorAll('[role="dialog"] nav a')].some(
+        (element) => element.textContent?.trim() === titel && element.getAttribute('aria-current') === 'location',
+      ),
+      name,
+    );
     await leiste.getByRole('heading', { name, exact: true }).waitFor({ timeout: 10_000 });
-    await leiste.locator('app-anleitung-text .text').waitFor({ timeout: 10_000 });
-    assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0, name);
+    await this.seite.waitForFunction(
+      (titel) => {
+        const dialog = document.querySelector('[role="dialog"]');
+        if (!dialog) return false;
+        const ausgewaehlt = [...dialog.querySelectorAll('nav a')].some(
+          (element) =>
+            element.textContent?.trim() === titel &&
+            element.getAttribute('aria-current') === 'location',
+        );
+        const text = dialog.querySelector('app-anleitung-text');
+        return ausgewaehlt &&
+          (text?.querySelector('.text') || text?.querySelector('[data-test=anleitung-fehler]'));
+      },
+      name,
+      { timeout: 10_000 },
+    );
     assert.equal(await leiste.locator('[data-test=anleitung-fehler]').count(), 0, name);
+    assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0, name);
   }
 });
 

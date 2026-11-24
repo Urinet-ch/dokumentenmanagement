@@ -58,8 +58,10 @@ class AbgleichTest {
                 "abgleich:" + ohneMandant + ":KEIN_MANDANT",
                 "abgleich:" + offenerVorgang + ":VORGANG_OFFEN");
         assertThat(befunde.get(vhf)).extracting(Befund::schluessel)
-                .containsExactly("abgleich:" + fremderInhaber + ":ROLLE_OHNE_VORGANG");
-        assertThat(protokoll).containsEntry(urinet, 2).containsEntry(vhf, 1);
+                .containsExactlyInAnyOrder(
+                        "abgleich:" + fremderInhaber + ":ROLLE_OHNE_VORGANG",
+                        "abgleich:" + ohneMandant + ":KEIN_MANDANT");
+        assertThat(protokoll).containsEntry(urinet, 2).containsEntry(vhf, 2);
     }
 
     @Test

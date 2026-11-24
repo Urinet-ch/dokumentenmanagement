@@ -221,7 +221,10 @@ public class VerwaltungVorgang {
         Objects.requireNonNull(eintrag);
         ProtokollDetails.Verwaltung details = eintrag.details().verwaltung();
         if (!AKTIONEN.contains(eintrag.aktion()) || eintrag.dokumentId().isPresent()
-                || eintrag.rolle().isEmpty() || details == null || details.phase() != phase
+                || eintrag.rolle().isEmpty() && (eintrag.aktion() != ProtokollAktion.BENUTZER_ANLEGEN
+                        || eintrag.benutzer().filter(benutzer -> benutzer.matches("betreiber:[^\\p{Cntrl}]{1,80}"))
+                                .isEmpty())
+                || details == null || details.phase() != phase
                 || (eintrag.aktion() != ProtokollAktion.BENUTZER_ANLEGEN && details.ziel() == null)) {
             throw new IllegalArgumentException("Ungültiges Verwaltungsprotokoll");
         }

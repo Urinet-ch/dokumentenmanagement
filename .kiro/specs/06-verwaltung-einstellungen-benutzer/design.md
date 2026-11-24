@@ -151,7 +151,9 @@ backend/src/main/java/ch/urinet/archiv/
   `/components`, `/partial-import`, Rollen-Definitionen und `client-secret`.
 - **Aufrufe an Keycloak** (Realm `urinet-archiv`): `POST /protocol/openid-connect/token` (Client-Credentials, Token bis
   30 Sekunden vor Ablauf wiederverwendet, ein Abruf gleichzeitig); `GET /admin/realms/…/users?q=mandant:<m>&max=50`,
-  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
+  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`,
+  `GET …/users/{id}/role-mappings/realm/available` (Zielrolle benutzerbezogen auflösen; kein Lesezugriff auf globale
+  Rollendefinitionen nötig), `GET …/roles/{rolle}/users?briefRepresentation=false` (ohne den Parameter fehlen `attributes`; fehlt das Feld trotzdem, wird der Benutzer einzeln gelesen),
   `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
   `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET …/users/{id}/federated-identity` (Liste, Filter auf `identityProvider = google`; unter `…/federated-identity/google` kennt Keycloak nur POST und DELETE), `DELETE …/users/{id}/federated-identity/google`,
   `GET/DELETE …/attack-detection/brute-force/users/{id}` (GET für die Anzeige und die Prüfung vor dem Entsperren;
@@ -803,6 +805,18 @@ Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übe
 
 Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
 Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.
+
+## Umsetzung (Aufgabe 20.5, 24.11.2026)
+
+Die Einstellungsseite zeigt den Katalog und merkt Änderungen, Rücksetzungen einzelner Felder oder Gruppen und
+Einstellungen einer früheren Version zunächst als Eingaben vor. Auch eine frühere Version wird über die gemeinsame
+Vorschau und den bestätigten Merge-Patch gespeichert; andere Konfigurationsteile bleiben unverändert. Fehlt bei einer
+alten Version die Einstellungsgruppe, gelten die Standards. Kennungen zeigt der Vergleich ohne Werte.
+
+Für Step-up liegt die bestätigte Änderung vorübergehend im `sessionStorage` des Tabs, einschliesslich Eingaben und
+ETag, höchstens zehn Minuten zur Wiederholung gültig. Eine zufällige Kennung bindet sie an den konkreten, erfolgreich
+geprüften OIDC-Rückruf; Benutzer und Mandant müssen übereinstimmen. Vor der einmaligen Wiederholung wird sie gelöscht.
+Ein Neuladen ohne erfolgreichen Rückruf löst keine Wiederholung aus. Der Server prüft Rechte, Bestätigung und ETag erneut.
 
 ## Umsetzung (Aufgabe 20.3, 23.11.2026)
 
