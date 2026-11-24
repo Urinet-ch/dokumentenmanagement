@@ -91,7 +91,7 @@ describe('Hilfe-Katalog (Spec 07, Req 7.2)', () => {
     const erwartet: Record<string, { eine: string[]; eltern?: string; pfade?: string[] }> = {
       importe: { eine: ['A12'], pfade: ['/importe'] },
       jahresexport: { eine: ['EXPORT'], pfade: ['/export'] },
-      verwaltung: { eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer'] },
+      verwaltung: { eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer', '/verwaltung/einstellungen'] },
       'verwaltung-dokumentarten': { eine: ['A11'], eltern: 'verwaltung', pfade: ['/verwaltung/dokumentarten'] },
       'verwaltung-protokoll': { eine: ['A13'], eltern: 'verwaltung', pfade: ['/verwaltung/protokoll'] },
       'verwaltung-api-tokens': { eine: ['A14'], eltern: 'verwaltung', pfade: ['/verwaltung/api-tokens'] },

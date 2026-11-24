@@ -603,3 +603,12 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - Die Anleitung «Verwaltung» beschreibt neu die Benutzerübersicht. Abweichend von der Tabelle «Hilfe-Katalog»
   ordnet der Katalog den Pfad `/verwaltung/benutzer` samt Detailseite diesem Abschnitt zu; seine bestehende
   Sichtbarkeitsbedingung bleibt unverändert.
+
+## Umsetzung (Vorbereitung Aufgabe 23.6, 24.11.2026)
+- Die Einstellungen sind auf `main` umgesetzt und in der Anleitung «Verwaltung» beschrieben. Der Katalog ordnet nun
+  auch `/verwaltung/einstellungen` samt Unterseiten diesem Abschnitt zu. Die bestehende Bedingung bleibt unverändert:
+  Nach der Rechteprüfung sieht derzeit nur der Inhaber diesen Abschnitt und den Menüpunkt. `hilfe-kontext.spec.ts`
+  prüft Zuordnung und Sichtbarkeit für alle Rollen und abgemeldet.
+- Die Aktion «Als Wissensquelle verwenden» steht nicht mehr im allgemeinen Abschnitt zur Dokumentansicht, sondern im
+  Unterabschnitt `wissen-quellen` mit Bedingung A16. `anleitung-abschnitte.spec.ts` prüft die Sichtbarkeit anhand des
+  tatsächlichen Filters für alle vier Rollen.

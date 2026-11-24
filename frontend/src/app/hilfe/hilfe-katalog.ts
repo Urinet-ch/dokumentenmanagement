@@ -172,7 +172,7 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     titel: TEXTE.hilfe.abschnitte['verwaltung'],
     datei: '/anleitung/verwaltung.md',
     bedingung: { eine: ['A11', 'A13', 'A14'] },
-    pfade: ['/verwaltung/benutzer'],
+    pfade: ['/verwaltung/benutzer', '/verwaltung/einstellungen'],
   },
   {
     anker: 'verwaltung-dokumentarten',
