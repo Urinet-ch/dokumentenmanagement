@@ -44,7 +44,7 @@ class WerkzeugeNurLesendTest {
             Map.entry("ch.urinet.archiv.kontakt.application.KontaktRegister", Set.of("aehnlichste", "mitWortanfaengen", "finden")),
             Map.entry("ch.urinet.archiv.dokumentart.application.DokumentartRepository", Set.of("alle")),
             Map.entry("ch.urinet.archiv.mandant.application.MandantKontext", Set.of("mit", "aktuell")),
-            Map.entry("ch.urinet.archiv.mandant.application.MandantEinstellungen", Set.of("lesen")),
+            Map.entry("ch.urinet.archiv.mandant.application.MandantEinstellungen", Set.of("lesen", "aufbewahrung")),
             // Angebot von kennzahl und offene_posten (7.1b, Spec 05, Req 8.8)
             Map.entry("ch.urinet.archiv.konfiguration.application.Funktionen", Set.of("finanzVerfuegbar")),
             Map.entry("ch.urinet.archiv.wissen.application.WissenLesen",

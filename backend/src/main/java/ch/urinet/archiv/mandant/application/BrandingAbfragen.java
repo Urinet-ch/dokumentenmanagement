@@ -7,12 +7,22 @@ import jakarta.enterprise.context.ApplicationScoped;
 public class BrandingAbfragen {
 
     private final BrandingVerzeichnis verzeichnis;
+    private final MandantEinstellungen einstellungen;
 
-    public BrandingAbfragen(BrandingVerzeichnis verzeichnis) {
+    public BrandingAbfragen(BrandingVerzeichnis verzeichnis, MandantEinstellungen einstellungen) {
         this.verzeichnis = verzeichnis;
+        this.einstellungen = einstellungen;
     }
 
     public Branding fuerDomain(String domain) {
-        return verzeichnis.fuerDomain(Branding.validierteDomain(domain)).orElse(Branding.STANDARD);
+        String gueltig = Branding.validierteDomain(domain);
+        Branding standard = verzeichnis.fuerDomain(gueltig).orElse(Branding.STANDARD);
+        return verzeichnis.mandantFuerDomain(gueltig)
+                .flatMap(einstellungen::oeffentlichesBranding)
+                .map(werte -> Branding.ausKonfiguration(
+                        werte.name() == null ? standard.name() : werte.name(), standard.logoUrl(),
+                        werte.primaerfarbe() == null ? standard.primaerfarbe() : werte.primaerfarbe(),
+                        standard.sprache()))
+                .orElse(standard);
     }
 }

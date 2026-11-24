@@ -843,3 +843,16 @@ Ein paralleler JUnit-Test hält eine Rollenänderung an der externen Wirkung an:
 `STATUS_KONFLIKT`, danach verhindert `LETZTER_INHABER` die Entfernung des letzten aktiven Inhabers. Das bestehende
 Cucumber-Szenario prüft zusätzlich konkurrierende Aufrufe zweier Inhaber. `EskalationTest` deckt auch jede
 Selbstzuweisung ab; Rollen-, Rechtematrix-, Endpunkt- und Keycloak-Ausfalltests ergänzen die Nachweise.
+
+## Umsetzung (Aufgabe 20.4, 23.11.2026)
+
+Die beiden Aufräumdienste lesen die versionierte Aufbewahrung erst innerhalb des geprüften Mandantenkontexts.
+Das öffentliche Branding verwendet ausschliesslich die vom Betreiber konfigurierte Domain-Zuordnung und liest nur
+Name und Farbe des zugeordneten aktiven Mandanten; unbekannte Domains bleiben neutral. Änderungen sind unmittelbar
+sichtbar, Logo und Sprache bleiben Betreiberkonfiguration.
+
+Changeset 129 übernimmt für bestehende Mandanten die darstellbaren bisherigen Eigenschaftswerte in eine neue
+`MIGRATION`-Version und synchronisiert den Wissensspiegel. Bereits eigene Werte bleiben erhalten. Nicht als ganze
+Katalogmonate darstellbare Chatfristen bleiben geerbt und verwenden weiterhin die unveränderte ISO-Periode; so wird
+keine Frist erfunden oder verkürzt. Dasselbe gilt für nicht katalogkonforme Startwerte, die sich nicht in das Abbild
+übernehmen lassen. Der Rollback lässt Version und Protokoll stehen; die bisherigen Eigenschaften bleiben verfügbar.
