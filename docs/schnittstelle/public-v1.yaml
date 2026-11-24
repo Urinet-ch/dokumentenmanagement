@@ -44,6 +44,56 @@ info:
     - **`x-erweiterbar: true`** an einem Feld mit Aufzählung (`enum`) heisst: Innerhalb der Hauptversion können
       neue Werte dazukommen; Nutzer müssen unbekannte Werte vertragen.
 paths:
+  /public/v1/wissen/chat:
+    post:
+      tags: [Webseite]
+      summary: Frage an den öffentlichen Wissenschat
+      description: |
+        Nur für ausdrücklich freigegebene Wissensseiten, deren Quellen öffentlich und NORMAL sind. Der Betreiber
+        schaltet den Wissenschat je Mandant ein; standardmässig ist er aus. Gleiche Grenzen und dasselbe Monatsbudget
+        wie `/public/v1/chat`. Fragen sind unabhängig; eine Gesprächs-ID kann nicht fortgesetzt werden und Fragen
+        werden nicht gespeichert. Der Stream enthält `werkzeug`, `text`, `quellen` und `fertig` oder `fehler`.
+        `quellen` ist eine Liste von `{titel, pfad, belege: [{titel, reiheCode, reiheName, ausgabe}]}`.
+        Ohne passende Seite ist die Liste leer und der Text lautet «Dazu steht nichts in der Wissensbasis.».
+      parameters:
+        - name: X-Archiv-Zugriff
+          in: header
+          schema:
+            type: string
+            enum: [oeffentlich, mitglieder, vorstand]
+        - name: X-Archiv-Client
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [frage]
+              properties:
+                frage:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+      responses:
+        "200":
+          description: Stream der Ereignisse
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
   /public/v1/chat:
     post:
       tags: [Webseite]

@@ -215,15 +215,27 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
 
     /** Wie {@link #chatFolge(List)}; die erste Antwort kommt über {@code erstePortionenMillis} ms verteilt (0: sofort). */
     public static void chatFolge(List<ChatAntwort> antworten, int erstePortionenMillis) {
+        chatFolge(antworten, erstePortionenMillis, 0);
+    }
+
+    public static void chatFolgeLetzteVerzoegert(List<ChatAntwort> antworten, int letzteVerzoegerungMillis) {
+        chatFolge(antworten, 0, letzteVerzoegerungMillis);
+    }
+
+    private static void chatFolge(List<ChatAntwort> antworten, int erstePortionenMillis, int letzteVerzoegerungMillis) {
         WireMock modell = client();
         for (int i = 0; i < antworten.size(); i++) {
             boolean letzte = i == antworten.size() - 1;
+            var antwort = strom(antworten.get(i));
+            if (i == 0 && erstePortionenMillis > 0) {
+                antwort.withChunkedDribbleDelay(20, erstePortionenMillis);
+            } else if (letzte && letzteVerzoegerungMillis > 0) {
+                antwort.withFixedDelay(letzteVerzoegerungMillis);
+            }
             var stub = gestreamt().inScenario(CHAT_SZENARIO)
                     .whenScenarioStateIs(i == 0 ? com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED
                             : "antwort-" + i)
-                    .willReturn(i == 0 && erstePortionenMillis > 0
-                            ? strom(antworten.get(i)).withChunkedDribbleDelay(20, erstePortionenMillis)
-                            : strom(antworten.get(i)));
+                    .willReturn(antwort);
             if (!letzte) {
                 stub.willSetStateTo("antwort-" + (i + 1));
             }

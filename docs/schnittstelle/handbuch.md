@@ -368,6 +368,21 @@ Datenschutzhinweis der Webseite muss das berücksichtigen.
 Tokens. Ist das Budget aufgebraucht, antwortet der Chat mit `429 BUDGET`
 (siehe Abschnitt 5); Liste, Suche und Details bleiben nutzbar.
 
+### Öffentlichen Wissenschat abfragen
+
+`POST /public/v1/wissen/chat` verwendet denselben Lese-Schlüssel, dieselben
+Grenzen und dasselbe Monatsbudget. Der Betreiber aktiviert ihn je Mandant mit
+`archiv.mandant.<code>.oeffentlich.wissenschat=true`; standardmässig ist er aus.
+Er berücksichtigt nur ausdrücklich freigegebene Seiten mit ausschliesslich
+öffentlichen Quellen der Vertraulichkeit NORMAL.
+
+Der JSON-Körper enthält `frage`. Jede Frage ist unabhängig; `gespraechId` kann
+nicht fortgesetzt werden und Fragen werden nicht gespeichert. Die SSE-Ereignisse
+entsprechen dem Chat oben; `quellen` enthält Seiten mit `titel`, `pfad` und
+`belege` (je Beleg `titel`, `reiheCode`, `reiheName`, `ausgabe`). Quellen und
+Antwort kommen erst nach erneuter Prüfung; bei einer Änderung während der Frage
+endet der Stream mit `fehler`.
+
 ## 5. Fehler und Wiederholung
 
 Fehler sind Problem Details nach RFC 9457 mit dem Medientyp

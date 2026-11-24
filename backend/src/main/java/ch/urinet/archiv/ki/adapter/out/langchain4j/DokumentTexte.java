@@ -18,7 +18,7 @@ import java.util.List;
 final class DokumentTexte {
 
     static final List<String> FELDER = List.of("inhalt", "auszug");
-    static final List<String> WISSEN_FELDER = List.of("titel", "beschreibung");
+    static final List<String> WISSEN_FELDER = List.of("titel", "beschreibung", "reiheCode", "reiheName", "ausgabe");
     static final String NICHT_VERFUEGBAR = "{\"fehler\":\"Werkzeug nicht verfügbar\"}";
 
     private DokumentTexte() {

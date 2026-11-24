@@ -8,6 +8,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.adapter.out.persistence.JdbcManifestDaten;
 import ch.urinet.archiv.protokoll.application.ManifestDaten;
 import ch.urinet.archiv.protokoll.domain.ProtokollHash;
+import ch.urinet.archiv.wissen.application.OeffentlichesWissenPort;
 import ch.urinet.archiv.wissen.application.WebseitenfreigabePort;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.de.Angenommen;
@@ -75,6 +76,9 @@ public class WissenDatenmodellSchritte {
 
     @Inject
     WebseitenfreigabePort webseitenfreigabe;
+
+    @Inject
+    OeffentlichesWissenPort oeffentlichesWissen;
 
     @Angenommen("das Wissensdatenmodell ist für den Mandanten «{word}» migriert")
     public void mandantMigriert(String code) throws SQLException {
@@ -156,13 +160,24 @@ public class WissenDatenmodellSchritte {
                         assertThat(offen.freigegeben()).isFalse();
                         assertThat(offen.freigabefaehig()).isTrue();
                         assertThat(offen.hoechsteZugriffsstufe()).isEqualTo("oeffentlich");
+                        assertThat(oeffentlichesWissen.seite("probe/" + seite)).isEmpty();
                         webseitenfreigabe.setzen(seite, offen, true, "probe");
                         var freigegeben = webseitenfreigabe.lesen(seite, true).orElseThrow();
                         assertThat(freigegeben.freigegeben()).isTrue();
                         assertThat(freigegeben.quellenRevision()).isEqualTo(offen.quellenRevision() + 1);
+                        var oeffentlicheSeite = oeffentlichesWissen.seite("probe/" + seite).orElseThrow();
+                        assertThat(oeffentlicheSeite.dokumente()).extracting(OeffentlichesWissenPort.Dokument::id)
+                                .containsExactly(dokument);
+                        assertThat(oeffentlichesWissen.suchen("synthetische", 5))
+                                .extracting(z -> z.stand().id()).contains(seite);
+                        assertThat(oeffentlichesWissen.aktuell(oeffentlicheSeite.version())).isTrue();
 
                         sql.execute("update " + schema + ".dokument set zusatz = "
                                 + "'{\"zugriff\":\"mitglieder\",\"veroeffentlicht\":true}' where id = '" + dokument + "'");
+                        assertThat(oeffentlichesWissen.seite("probe/" + seite)).isEmpty();
+                        assertThat(oeffentlichesWissen.aktuell(oeffentlicheSeite.version())).isFalse();
+                        assertThat(oeffentlichesWissen.suchen("synthetische", 5))
+                                .extracting(z -> z.stand().id()).doesNotContain(seite);
                         var eingeschraenkt = webseitenfreigabe.lesen(seite, false).orElseThrow();
                         assertThat(eingeschraenkt.freigabefaehig()).isFalse();
                         assertThat(eingeschraenkt.hoechsteZugriffsstufe()).isEqualTo("mitglieder");
@@ -182,6 +197,7 @@ public class WissenDatenmodellSchritte {
                         assertThat(webseitenfreigabe.lesen(seite, false).orElseThrow().freigabefaehig()).isFalse();
                         webseitenfreigabe.setzen(seite, freigegeben, false, "probe");
                         assertThat(webseitenfreigabe.lesen(seite, false).orElseThrow().freigegeben()).isFalse();
+                        assertThat(oeffentlichesWissen.seite("probe/" + seite)).isEmpty();
                         try (ResultSet logs = sql.executeQuery("select array_agg(angaben ->> 'webseitenfreigabe_aktion' "
                                 + "order by id) from " + schema + ".wissens_log "
                                 + "where seiten @> array['" + seite + "']::uuid[] "

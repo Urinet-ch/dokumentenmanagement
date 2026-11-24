@@ -17,9 +17,13 @@ import ch.urinet.archiv.ki.domain.chat.Quelle;
 import ch.urinet.archiv.ki.domain.oeffentlich.FrageBereinigung;
 import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicheAusgabe;
 import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicheQuelle;
+import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicheWissensquelle;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.OeffentlichesWissenPort;
+import ch.urinet.archiv.wissen.application.WissenHuelleDienst;
+import ch.urinet.archiv.wissen.application.WissenModellBudget;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -74,6 +78,9 @@ public class OeffentlicheFragen {
     private final OeffentlicheGespraeche gespraeche;
     private final OeffentlicheFragenSpeicher speicher;
     private final OeffentlicheDokumente dokumente;
+    private final OeffentlichesWissenPort wissen;
+    private final WissenHuelleDienst huelle;
+    private final WissenModellBudget wissenBudget;
     private final WerkzeugTransaktion transaktion;
     private final WerkzeugDaten daten;
     private final MandantKontext kontext;
@@ -87,7 +94,9 @@ public class OeffentlicheFragen {
     @Inject
     public OeffentlicheFragen(OeffentlicherChatAgentPort agent, OeffentlicheGrenzen grenzen, MandantBudget budget,
                               OeffentlicheGespraeche gespraeche, OeffentlicheFragenSpeicher speicher,
-                              OeffentlicheDokumente dokumente, WerkzeugTransaktion transaktion, WerkzeugDaten daten,
+                              OeffentlicheDokumente dokumente, OeffentlichesWissenPort wissen, WissenHuelleDienst huelle,
+                              WissenModellBudget wissenBudget,
+                              WerkzeugTransaktion transaktion, WerkzeugDaten daten,
                               MandantKontext kontext, MandantEinstellungen einstellungen, Config konfiguration,
                               @ConfigProperty(name = "archiv.webseite.chat.max-frage") int maxFrage) {
         if (maxFrage < 1) {
@@ -99,6 +108,9 @@ public class OeffentlicheFragen {
         this.gespraeche = gespraeche;
         this.speicher = speicher;
         this.dokumente = dokumente;
+        this.wissen = wissen;
+        this.huelle = huelle;
+        this.wissenBudget = wissenBudget;
         this.transaktion = transaktion;
         this.daten = daten;
         this.kontext = kontext;
@@ -137,6 +149,15 @@ public class OeffentlicheFragen {
      * Reservierung scheitert, zählt in keiner Grenze (Platz wird verworfen).
      */
     public Annahme annehmen(MandantCode mandant, Lesezugriff zugriff, String frage, Optional<UUID> gespraechId) {
+        return annehmen(mandant, zugriff, frage, gespraechId, false);
+    }
+
+    public Annahme wissenAnnehmen(MandantCode mandant, Lesezugriff zugriff, String frage) {
+        return annehmen(mandant, zugriff, frage, Optional.empty(), true);
+    }
+
+    private Annahme annehmen(MandantCode mandant, Lesezugriff zugriff, String frage, Optional<UUID> gespraechId,
+                            boolean wissenschat) {
         String text = frage(frage);
         OeffentlicheGrenzen.Platz platz = grenzen.annehmen(mandant, zugriff);
         MandantBudget.Reservierung reservierung;
@@ -159,10 +180,25 @@ public class OeffentlicheFragen {
             platz.verwerfen();
             throw e;
         }
+        if (wissenschat) {
+            try {
+                transaktion.neu(() -> {
+                    wissenBudget.chatPruefen();
+                    return null;
+                });
+            } catch (RuntimeException e) {
+                platz.verwerfen();
+                freigebenOhneFehler(mandant, reservierung.monat());
+                throw e;
+            }
+        }
         try {
-            OeffentlicheGespraeche.Geoeffnet gespraech = gespraeche.oeffnen(gespraechId.orElse(null), mandant, zugriff);
+            OeffentlicheGespraeche.Geoeffnet gespraech = wissenschat
+                    ? new OeffentlicheGespraeche.Geoeffnet(UUID.randomUUID(), List.of())
+                    : gespraeche.oeffnen(gespraechId.orElse(null), mandant, zugriff);
             OeffentlicheAnfrage anfrage = new OeffentlicheAnfrage(mandant, zugriff, reservierung.monat(),
-                    einstellungen.lesen(mandant).name(), text, gespraech.verlauf());
+                    einstellungen.lesen(mandant).name(), text, gespraech.verlauf(),
+                    wissenschat ? new OeffentlichesWissenDurchgang() : null);
             return new Annahme(gespraech.id(), anfrage, text, platz);
         } catch (RuntimeException e) {
             platz.freigeben();
@@ -253,6 +289,10 @@ public class OeffentlicheFragen {
             LOG.info("Öffentlicher Chat: Frage vom Client abgebrochen");
             return;
         }
+        if (anfrage.wissen() != null) {
+            wissenAusgeben(id, anfrage.wissen(), antwort, strom);
+            return;
+        }
         List<OeffentlicheQuelle> quellen;
         try {
             quellen = quellen(antwort, anfrage);
@@ -283,6 +323,33 @@ public class OeffentlicheFragen {
             strom.accept(new OeffentlicheAusgabe.Fertig(id));
         } catch (RuntimeException e) {
             LOG.warnf("Öffentlicher Chat: Ausgabe nach dem Speichern gescheitert, ursache=%s", Ursachen.kette(e));
+        }
+    }
+
+    void wissenAusgeben(UUID id, OeffentlichesWissenDurchgang durchgang, ChatAntwort antwort,
+                        Consumer<OeffentlicheAusgabe> strom) {
+        try {
+            transaktion.neu(() -> {
+                huelle.sperren();
+                if (durchgang.widerspruch() || durchgang.gesehene().stream().anyMatch(s -> !wissen.aktuell(s))) {
+                    strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
+                    return null;
+                }
+                var quellen = durchgang.gezeigte().stream().map(s -> new OeffentlicheWissensquelle(
+                        ohneSteuerzeichen(s.titel()), ohneSteuerzeichen(s.pfad()),
+                        s.dokumente().stream().map(d -> new OeffentlicheWissensquelle.Beleg(
+                                ohneSteuerzeichen(d.titel()), ohneSteuerzeichen(d.reiheCode()),
+                                ohneSteuerzeichen(d.reiheName()), d.ausgabe() == null ? null
+                                : ohneSteuerzeichen(d.ausgabe()))).toList())).toList();
+                String text = quellen.isEmpty() ? "Dazu steht nichts in der Wissensbasis." : antwort.inhalt();
+                if (!text.isBlank()) strom.accept(new OeffentlicheAusgabe.Text(text));
+                strom.accept(new OeffentlicheAusgabe.WissenQuellen(quellen));
+                strom.accept(new OeffentlicheAusgabe.Fertig(id));
+                return null;
+            });
+        } catch (RuntimeException e) {
+            LOG.errorf("Öffentliche Wissensquellen nicht geprüft, ursache=%s", Ursachen.kette(e));
+            strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
         }
     }
 
