@@ -282,7 +282,7 @@ public class VerwaltungVorgang {
         var details = new ProtokollDetails.Verwaltung(bisher.vorgangId(), phase,
                 bisher.ziel() != null ? bisher.ziel() : ziel, bisher.vorgang(),
                 bisher.rolleAlt(), bisher.rolleNeu(), bisher.felder(), bisher.grund(), bisher.abweichung(),
-                bisher.anlass());
+                bisher.anlass(), bisher.passkeys());
         return new ZugriffEintrag(eintrag.benutzer(), eintrag.rolle(), eintrag.aktion(), eintrag.dokumentId(),
                 eintrag.ip(), ProtokollDetails.verwaltung(details), eintrag.bearbeiter());
     }

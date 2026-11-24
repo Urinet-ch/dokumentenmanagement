@@ -57,10 +57,20 @@ public interface IdentitaetsDienst {
 
     record Benutzer(String id, String benutzername, String email, String vorname, String nachname,
                     boolean aktiv, Set<Rolle> rollen, Set<ErforderlicheAktion> aktionen,
-                    boolean totp, boolean google) {
+                    boolean totp, boolean google, int passkeys) {
         public Benutzer {
             rollen = Set.copyOf(rollen);
             aktionen = Set.copyOf(aktionen);
+            if (passkeys < 0) {
+                throw new IllegalArgumentException("Ungültige Zahl der Passkeys");
+            }
+        }
+
+        /** Ohne Passkey; die Zahl der Passkeys liefert nur der Identitätsdienst (Requirement 10.6). */
+        public Benutzer(String id, String benutzername, String email, String vorname, String nachname,
+                        boolean aktiv, Set<Rolle> rollen, Set<ErforderlicheAktion> aktionen,
+                        boolean totp, boolean google) {
+            this(id, benutzername, email, vorname, nachname, aktiv, rollen, aktionen, totp, google, 0);
         }
 
         @Override
@@ -89,6 +99,34 @@ public interface IdentitaetsDienst {
     }
 
     List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse);
+
+    /**
+     * Wie {@link #benutzerSuchen(String, String, int, int)}, zusätzlich gefiltert nach «Passkey eingerichtet»
+     * ({@code true}: mindestens ein Passkey, {@code false}: keiner, {@code null}: alle; Requirement 10.6). Die Seite
+     * zählt nach dem Filter.
+     */
+    default List<Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse, Boolean passkey) {
+        if (passkey == null) {
+            return benutzerSuchen(mandant, suche, seite, groesse);
+        }
+        int start = seitenanfang(suche, seite, groesse);
+        List<Benutzer> ergebnis = new java.util.ArrayList<>();
+        long passende = 0;
+        for (int quellSeite = 0; ; quellSeite++) {
+            List<Benutzer> teil = benutzerSuchen(mandant, suche, quellSeite, MAX_SEITENGROESSE);
+            for (Benutzer benutzer : teil) {
+                if ((benutzer.passkeys() > 0) == passkey && passende++ >= start) {
+                    ergebnis.add(benutzer);
+                    if (ergebnis.size() == groesse) {
+                        return List.copyOf(ergebnis);
+                    }
+                }
+            }
+            if (teil.size() < MAX_SEITENGROESSE) {
+                return List.copyOf(ergebnis);
+            }
+        }
+    }
 
     static int seitenanfang(String suche, int seite, int groesse) {
         long start = (long) seite * groesse;
@@ -128,6 +166,12 @@ public interface IdentitaetsDienst {
     void sitzungenBeenden(String mandant, String id);
 
     void otpEntfernen(String mandant, String id);
+
+    /**
+     * Löscht ausschliesslich die Passkeys (Credential-Typ {@code webauthn-passwordless}), nie Passwort oder TOTP
+     * (Requirement 10.5). Liefert die Zahl der gelöschten Passkeys; Kennungen und Gerätedaten gibt der Dienst nicht weiter.
+     */
+    int passkeysEntfernen(String mandant, String id);
 
     void sperreAufheben(String mandant, String id);
 

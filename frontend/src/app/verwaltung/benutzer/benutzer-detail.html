@@ -23,6 +23,7 @@
       <dt>{{ texte.rolle }}</dt><dd>{{ rollen(person) }}</dd>
       <dt>{{ texte.status }}</dt><dd>{{ texte.statusNamen[person.status ?? ''] ?? texte.unbekannt }}</dd>
       <dt>{{ texte.totp }}</dt><dd>{{ person.totp === undefined ? texte.unbekannt : person.totp ? texte.ja : texte.nein }}</dd>
+      <dt>{{ texte.passkey }}</dt><dd data-test="passkey">{{ person.passkey === undefined ? texte.unbekannt : person.passkey ? texte.passkeyJa(person.passkeyAnzahl ?? 0) : texte.nein }}</dd>
       <dt>{{ texte.google }}</dt><dd>{{ person.google === undefined ? texte.unbekannt : person.google ? texte.ja : texte.nein }}</dd>
       @if (person.einladungOffenSeit) {
         <dt>{{ texte.einladungOffenSeit }}</dt><dd>{{ zeitpunkt(person.einladungOffenSeit) }}</dd>

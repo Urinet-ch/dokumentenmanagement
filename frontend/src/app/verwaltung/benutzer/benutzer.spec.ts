@@ -82,6 +82,33 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     expect(element.querySelector('.pille.gefahr')?.textContent).toContain('Nicht erlaubt');
   });
 
+  it('zeigt je Benutzer «Passkey eingerichtet» mit Anzahl, aber keine Gerätedaten (Req 10.6)', async () => {
+    await starten(() => service.apiV1BenutzerGet.mockReturnValue(of([
+      { ...PERSON, id: 'a', passkey: true, passkeyAnzahl: 2 },
+      { ...PERSON, id: 'b', passkey: false, passkeyAnzahl: 0 },
+      { ...PERSON, id: 'c', passkey: true, passkeyAnzahl: 1 },
+    ])));
+    const werte = [...element.querySelectorAll('[data-test=benutzer-liste] [data-test=passkey]')]
+      .map((knoten) => knoten.textContent?.trim());
+    expect(werte).toEqual(['Ja, 2 Passkeys', 'Nein', 'Ja, 1 Passkey']);
+  });
+
+  it('filtert die Liste serverseitig nach Passkey ja oder nein und beginnt wieder bei Seite 1 (Req 10.6)', async () => {
+    await starten();
+    const filter = element.querySelector<HTMLSelectElement>('#benutzer-passkey-filter')!;
+    expect([...filter.options].map((option) => option.textContent?.trim())).toEqual(
+      [TEXTE.benutzer.passkeyFilterAlle, TEXTE.benutzer.passkeyFilterJa, TEXTE.benutzer.passkeyFilterNein]);
+    filter.value = 'ja';
+    filter.dispatchEvent(new Event('change'));
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, 'ja', undefined, 0);
+    filter.value = 'nein';
+    filter.dispatchEvent(new Event('change'));
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, 'nein', undefined, 0);
+    filter.value = '';
+    filter.dispatchEvent(new Event('change'));
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, undefined, 0);
+  });
+
   it('zeigt das Einladungsformular nur bei A22 und A23', async () => {
     await starten(() => anmeldung.darf.mockImplementation((aktion: string) => aktion === 'A22' || aktion === 'A23'));
     expect(element.querySelector('app-benutzer-einladen')).not.toBeNull();
@@ -108,7 +135,7 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     alt.next([PERSON]);
     fixture.detectChanges();
-    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, 'neue Suche', 0);
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, 'neue Suche', 0);
     expect(element.textContent).toContain(TEXTE.benutzer.keine);
     expect(element.querySelector('.leer')?.textContent).toContain(TEXTE.benutzer.keine);
     expect(element.textContent).not.toContain('Alex Beispiel');
@@ -140,7 +167,7 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     service.apiV1BenutzerGet.mockReturnValueOnce(of([PERSON]));
     element.querySelector<HTMLButtonElement>('[role=alert] button')!.click();
     fixture.detectChanges();
-    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, 1);
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, undefined, 1);
     expect(element.textContent).toContain('Seite 2');
     const vorher = [...element.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent?.trim() === TEXTE.benutzer.vor)!;
@@ -150,7 +177,7 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     expect(weiterNachSeite2.disabled).toBe(true);
     vorher.click();
     fixture.detectChanges();
-    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, 0);
+    expect(service.apiV1BenutzerGet).toHaveBeenLastCalledWith(50, undefined, undefined, 0);
     expect(element.textContent).toContain('Seite 1');
   });
 
@@ -252,6 +279,18 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
     expect(element.textContent).toContain(TEXTE.benutzer.apiTokenHinweis);
     expect(element.textContent).toContain('22.11.2026');
     expect(element.querySelector('a[href="/verwaltung/api-tokens"]')).not.toBeNull();
+  });
+
+  it('zeigt im Detail «Passkey eingerichtet» mit Anzahl oder Nein, ohne Gerätedaten (Req 10.6)', async () => {
+    const mit = (await starten({ ...PERSON, passkey: true, passkeyAnzahl: 2 })).nativeElement as HTMLElement;
+    expect(mit.querySelector('[data-test=passkey]')?.textContent?.trim()).toBe('Ja, 2 Passkeys');
+    expect(mit.textContent).toContain(TEXTE.benutzer.passkey);
+    TestBed.resetTestingModule();
+    const ohne = (await starten({ ...PERSON, passkey: false, passkeyAnzahl: 0 })).nativeElement as HTMLElement;
+    expect(ohne.querySelector('[data-test=passkey]')?.textContent?.trim()).toBe('Nein');
+    TestBed.resetTestingModule();
+    const unbekannt = (await starten()).nativeElement as HTMLElement;
+    expect(unbekannt.querySelector('[data-test=passkey]')?.textContent?.trim()).toBe(TEXTE.benutzer.unbekannt);
   });
 
   it('bindet Profil-, Status- und Rollenaktionen nur mit den passenden Rechten ein', async () => {

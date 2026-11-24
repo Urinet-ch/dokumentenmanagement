@@ -313,6 +313,24 @@ Der End-zu-End-Nachweis des Step-up im Archiv-Backend folgt nach Aufgabe 19.10; 
   Keycloak-Integrationstests prüfen den exportierten Realm. Die Browser-Szenarien prüfen die Rücksetzung direkt über die
   Keycloak-Admin-API; für den Passwort-Rückfall nutzen sie einen isolierten Browser-Kontext ohne aktive Passkey-Sitzung.
 
+#### Umsetzung (Aufgabe 24.2, 24.11.2026)
+- Der Adapter liest Art und Zahl der Credentials in einem Aufruf (`otp`, `webauthn-passwordless`) und löscht mit
+  `passkeysEntfernen` ausschliesslich Credentials vom Typ `webauthn-passwordless`, nie Passwort, TOTP oder anderes WebAuthn;
+  Kennungen und Bezeichnungen verlassen den Adapter nicht. Fehler laufen wie bei den anderen Schreibaufrufen
+  (`IDENTITAETSDIENST_FEHLER`, `IDENTITAETSDIENST_NICHT_ERREICHBAR`, Konflikt).
+- «Zugang zurücksetzen» nimmt im Körper optional `{"passkeys": true}` (leerer Körper und `{}` wie bisher). Die Option löscht
+  zusätzlich zum bisherigen Zurücksetzen (Passwort und TOTP neu, Sitzungen beenden, Einladung) alle Passkeys; sie ist keine
+  eigene Aktion «nur Passkeys» (vorsichtigere Auslegung von 10.5). Rechte (A22), Step-up, Raten, Eskalations- und Letzter-Inhaber-
+  Regeln, Vorgangssperre und Absicht/Abschluss sind dieselben.
+- Anzeige: `BenutzerAnsicht.passkey` und `passkeyAnzahl` (Detail und Liste, im ETag enthalten); die Liste filtert mit
+  `?passkey=ja|nein` vor der Seitenbildung. Die Oberfläche zeigt die Option im Dialog nur bei vorhandenen Passkeys, standardmässig
+  aus; die Fortsetzung nach Step-up merkt nur den Wahrheitswert.
+- Protokoll: Der Abschluss von `ZUGANG_ZURUECKSETZEN` trägt bei gewählter Option die Zahl `passkeys` der gelöschten Passkeys, sonst
+  nichts; die Absicht nennt die Option nicht. Einrichten und Entfernen in der Kontoverwaltung führt Keycloak selbst; dafür sind im
+  Realm keine zusätzlichen Ereignistypen aktiviert (Entscheid Fabian, siehe `docs/passkey-inbetriebnahme-checkliste.md`).
+- Anleitung: Abschnitt `erste-schritte-passkey` («Mit Passkey anmelden», alle Rollen) und Ergänzung in `verwaltung.md`.
+  Aufgabe 24.3 bleibt offen (Realm Stufe A, Relying-Party-ID, Prüfung mit iPhone und Mac): `docs/passkey-inbetriebnahme-checkliste.md`.
+
 ### Abgleich
 `Abgleich` liest die Benutzer des Mandanten (Seiten zu 50), gleicht mit `benutzer_status`, dem Benutzerverzeichnis und dem
 Protokoll ab und meldet die Abweichungen nach Requirement 6.5 als `BENUTZER_ABWEICHUNG` (Code: `ROLLE_OHNE_VORGANG`,
@@ -978,3 +996,11 @@ Nachweise: Browser-Szenarien `@req-8.4`/`@req-8.6` (Profil, Rollen, Löschen, Ei
 axe und Überlaufprüfung) und `@req-8.5` (Step-up für Sperren, Rolle, Löschen, Profil; Bestätigung; Nachweis, dass nichts
 Persönliches in den Browser-Speicher geschrieben wird); Einheitstests der Fortsetzung, der Fehlerbehandlung und der
 Komponenten. Offen bleibt der manuelle Nachweis auf dem Handy [Fabian] (Req 8.2, Aufgabe 21.6).
+
+### Nachtrag (Folge aus PR #529, 24.11.2026)
+
+`BenutzerAbgleichenKommando` beendet auch bei `IDENTITAETSDIENST_FEHLER` mit Exit-Code 3: eine Ablehnung des
+Dienstkontos ist nach Requirement 9.2 ein technischer Fehler, keine Abweichung im Abgleich. Der Aufrufpfad ist mit
+einem Abgleich-Fehler geprüft. Das Szenario `@req-9.1` führt nun `InhaberEinladenKommando.ausfuehren` aus und prüft
+Mandantenkontext, Inhaber-Rolle, Betreiberkennung sowie die datensparsame Terminalausgabe; der tatsächliche
+Einladungsfluss über Keycloak und Mailpit bleibt durch `VerwaltungVorgangTest` und `RealmExportKeycloakTest` belegt.

@@ -64,7 +64,7 @@ public class BestehendenInhaberDokumentieren {
         var details = new ProtokollDetails.Verwaltung(id, phase, ziel,
                 ProtokollDetails.Verwaltungsvorgang.ROLLE_ZUWEISEN,
                 ProtokollDetails.Verwaltungsrolle.INHABER, ProtokollDetails.Verwaltungsrolle.INHABER,
-                List.of(), null, null, ProtokollDetails.Verwaltungsanlass.UEBERNAHME);
+                List.of(), null, null, ProtokollDetails.Verwaltungsanlass.UEBERNAHME, null);
         return new ZugriffEintrag(Optional.of("betreiber:" + betreiber), Optional.empty(),
                 ProtokollAktion.ROLLE_ZUWEISEN, Optional.empty(), Optional.empty(),
                 ProtokollDetails.verwaltung(details));

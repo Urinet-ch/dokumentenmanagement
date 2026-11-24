@@ -98,7 +98,7 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst, AbgleichIdentit
         e.wert = new Benutzer(id, b.benutzername(), aenderung.email() == null ? b.email() : aenderung.email(),
                 aenderung.vorname() == null ? b.vorname() : aenderung.vorname(),
                 aenderung.nachname() == null ? b.nachname() : aenderung.nachname(), b.aktiv(), b.rollen(),
-                b.aktionen(), b.totp(), b.google());
+                b.aktionen(), b.totp(), b.google(), b.passkeys());
     }
 
     @Override
@@ -145,6 +145,23 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst, AbgleichIdentit
         Eintrag e = finden(mandant, id);
         Benutzer b = e.wert;
         e.wert = kopie(b, b.aktiv(), b.rollen(), b.aktionen(), false, b.google());
+    }
+
+    @Override
+    public synchronized int passkeysEntfernen(String mandant, String id) {
+        Eintrag e = finden(mandant, id);
+        Benutzer b = e.wert;
+        e.wert = new Benutzer(b.id(), b.benutzername(), b.email(), b.vorname(), b.nachname(), b.aktiv(), b.rollen(),
+                b.aktionen(), b.totp(), b.google(), 0);
+        return b.passkeys();
+    }
+
+    /** Nur für Entwicklung und Tests: setzt die Zahl der eingerichteten Passkeys. */
+    public synchronized void passkeysSetzen(String mandant, String id, int anzahl) {
+        Eintrag e = finden(mandant, id);
+        Benutzer b = e.wert;
+        e.wert = new Benutzer(b.id(), b.benutzername(), b.email(), b.vorname(), b.nachname(), b.aktiv(), b.rollen(),
+                b.aktionen(), b.totp(), b.google(), anzahl);
     }
 
     @Override
@@ -206,7 +223,7 @@ public class IdentitaetsDienstStub implements IdentitaetsDienst, AbgleichIdentit
     private static Benutzer kopie(Benutzer b, boolean aktiv, Set<Rolle> rollen, Set<ErforderlicheAktion> aktionen,
                                   boolean totp, boolean google) {
         return new Benutzer(b.id(), b.benutzername(), b.email(), b.vorname(), b.nachname(), aktiv, rollen, aktionen,
-                totp, google);
+                totp, google, b.passkeys());
     }
 
     private static final class Eintrag {

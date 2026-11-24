@@ -22,6 +22,7 @@ import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.quarkus.arc.ClientProxy;
 import io.quarkus.test.junit.QuarkusMock;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.io.ByteArrayOutputStream;
@@ -46,7 +47,7 @@ public class BestehendenInhaberSchritte {
     @Inject AbgleichStand stand;
     @Inject MandantAbbauRegister register;
     @Inject BenutzerVerzeichnisUebernahme uebernahme;
-    @Inject AgroalDataSource datenquelle;
+    @Inject Instance<AgroalDataSource> datenquelle;
 
     private IdentitaetsDienst original;
     private IdentitaetsDienstStub stub;
@@ -118,7 +119,7 @@ public class BestehendenInhaberSchritte {
 
     @Dann("sind der Rollenvorgang und genau eine Übernahme ohne persönliche Angaben protokolliert")
     public void protokollPruefen() throws Exception {
-        try (Connection verbindung = datenquelle.getConnection();
+        try (Connection verbindung = datenquelle.get().getConnection();
              var abfrage = verbindung.prepareStatement(
                      "select details->>'phase', details->>'anlass', details::text from " + mandant.schema()
                              + ".zugriff_protokoll where aktion = 'ROLLE_ZUWEISEN' and details->>'ziel' = ? order by id")) {

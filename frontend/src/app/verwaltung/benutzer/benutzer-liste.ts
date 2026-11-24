@@ -32,6 +32,7 @@ export class BenutzerListe implements OnInit {
   private readonly fortsetzen = inject(BenutzerFortsetzen);
   private laufend?: Subscription;
   private suche = '';
+  private passkey: 'ja' | 'nein' | undefined;
 
   protected readonly texte = TEXTE.benutzer;
   protected readonly gruppe = TEXTE.menueGruppen.verwaltung;
@@ -70,12 +71,17 @@ export class BenutzerListe implements OnInit {
     this.laden(0);
   }
 
+  protected passkeyFiltern(wert: string): void {
+    this.passkey = wert === 'ja' || wert === 'nein' ? wert : undefined;
+    this.laden(0);
+  }
+
   protected laden(seite: number): void {
     this.laufend?.unsubscribe();
     this.listenFehler.set(null);
     this.benutzer.set(null);
     this.seite.set(seite);
-    this.laufend = this.api.apiV1BenutzerGet(SEITENGROESSE, this.suche || undefined, seite)
+    this.laufend = this.api.apiV1BenutzerGet(SEITENGROESSE, this.passkey, this.suche || undefined, seite)
       .pipe(takeUntilDestroyed(this.zerstoert))
       .subscribe({
         next: (benutzer) => {

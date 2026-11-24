@@ -34,6 +34,7 @@ public final class BenutzerEtag {
         digest.update((byte) (benutzer.aktiv() ? 1 : 0));
         digest.update((byte) (benutzer.totp() ? 1 : 0));
         digest.update((byte) (benutzer.google() ? 1 : 0));
+        digest.update((byte) Math.min(benutzer.passkeys(), 255));
         return HexFormat.of().formatHex(digest.digest());
     }
 

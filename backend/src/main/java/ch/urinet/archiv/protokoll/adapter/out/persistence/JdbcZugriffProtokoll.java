@@ -174,6 +174,9 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             if (verwaltung.anlass() != null) {
                 knoten.put("anlass", verwaltung.anlass().name());
             }
+            if (verwaltung.passkeys() != null) {
+                knoten.put("passkeys", verwaltung.passkeys());
+            }
             if (!verwaltung.felder().isEmpty()) {
                 ObjectNode felder = knoten.putObject("felder");
                 for (ProtokollDetails.Verwaltungsfeld feld : verwaltung.felder()) {
