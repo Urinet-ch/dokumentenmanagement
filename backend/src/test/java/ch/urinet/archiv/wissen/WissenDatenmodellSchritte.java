@@ -99,6 +99,29 @@ public class WissenDatenmodellSchritte {
                 + ".databasechangelog where exectype = 'EXECUTED'")).contains(changeset);
     }
 
+    @Dann("ist die Webseitenfreigabe einer neuen Wissensseite aus und verlangt Akteur und Zeitpunkt")
+    public void webseitenfreigabe() throws SQLException {
+        String schema = MANDANT.schema();
+        zurueckgerolltJdbc(befehl -> {
+            UUID seite = seite(befehl);
+            try (ResultSet zeile = befehl.executeQuery("select fuer_webseite, fuer_webseite_von, fuer_webseite_am "
+                    + "from " + schema + ".wissensseite where id = '" + seite + "'")) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getBoolean(1)).isFalse();
+                assertThat(zeile.getString(2)).isNull();
+                assertThat(zeile.getObject(3)).isNull();
+            }
+            Savepoint vorher = befehl.getConnection().setSavepoint();
+            assertThatThrownBy(() -> befehl.execute("update " + schema + ".wissensseite set fuer_webseite = true "
+                    + "where id = '" + seite + "'"))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("wissensseite_webseitenfreigabe_ck");
+            befehl.getConnection().rollback(vorher);
+            assertThat(befehl.executeUpdate("update " + schema + ".wissensseite set fuer_webseite = true, "
+                    + "fuer_webseite_von = 'human:probe', fuer_webseite_am = now() where id = '" + seite + "'"))
+                    .isEqualTo(1);
+        });
+    }
+
     @Dann("speichert eine Seitenversion Fassung, Akteure, Zeit und Entwurf und lehnt eine doppelte Versionsnummer ab")
     public void versionVollstaendig() throws SQLException {
         assertThat(werte("select column_name from information_schema.columns where table_schema = ? "

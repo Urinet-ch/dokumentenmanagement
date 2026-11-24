@@ -1433,6 +1433,9 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Recht A16 bedienbar. Freigabe und Entzug verlangen eine Bestätigung und werden protokolliert; der Entzug wirkt sofort. Eine Pille zeigt die höchste
   Zugriffsstufe der Quelldokumente. Ist eine Quelle nicht `oeffentlich` oder nicht `NORMAL` (insbesondere `PERSONAL`), ist die Freigabe mit Begründung
   deaktiviert. Der Server prüft dieselbe Regel nach Requirement 21.6.
+- **Teilumsetzung (Aufgabe 18.3, 24.11.2026):** Changeset `140-wissen-webseitenfreigabe` ergänzt das Kennzeichen mit Standard `false`.
+  Eine aktivierte Freigabe benötigt Akteur und Zeitpunkt; das Datenmodellszenario `@req-21.6` prüft den Standard und die Constraint. Freigabeablauf,
+  öffentliche Auslieferung, Schutzregeln und Oberfläche fehlen noch; das Szenario allein erfüllt Requirement 21.6 nicht.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`
