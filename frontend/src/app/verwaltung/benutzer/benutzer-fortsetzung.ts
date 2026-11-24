@@ -74,9 +74,11 @@ export class BenutzerFortsetzen {
 
   /**
    * Merkt Aktion, Ziel-Kennung, ETag und Codes (nie Namen, Adressen oder Freitext) und leitet zur frischen Anmeldung.
-   * `false`, wenn das nicht möglich ist; die Aufrufer zeigen dann die Fehlermeldung.
+   * `false`, wenn das nicht möglich ist; die Aufrufer zeigen dann die Fehlermeldung. Scheitert der Start der Anmeldung erst
+   * asynchron (vor der Weiterleitung), ruft der Dienst `beiFehler` auf: Die Aufrufer lösen den Laufzustand und zeigen dieselbe
+   * Meldung zur Wiederholung.
    */
-  starten(eingabe: FortsetzungEingabe): boolean {
+  starten(eingabe: FortsetzungEingabe, beiFehler: () => void = () => undefined): boolean {
     const anmeldung = this.injector.get(AnmeldungService);
     const benutzer = anmeldung.benutzer();
     if (!benutzer?.id || !benutzer.mandant) return false;
@@ -93,6 +95,7 @@ export class BenutzerFortsetzen {
     void anmeldung.anmelden(zielPfad(fortsetzung.ziel), true, fortsetzung.id).catch((fehler: unknown) => {
       if (!(fehler instanceof Error)) throw fehler;
       this.verwerfen();
+      beiFehler();
     });
     return true;
   }

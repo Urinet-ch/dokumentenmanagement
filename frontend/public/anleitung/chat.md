@@ -25,6 +25,8 @@ Unter jeder Antwort stehen die «Quellen»:
 > **Hinweis:** Prüfen Sie wichtige Angaben in der Quelle, bevor Sie sie weitergeben.
 
 ## Gespräche
+- Beim neuen Gespräch wählen Sie «Archiv durchsuchen» oder «Wissen befragen». Der Wissenschat antwortet nur aus freigegebenen Wissensseiten; die Auswahl erscheint nur mit dem Recht A15. Ohne Auswahl beginnt ein Archivchat.
+- Der Modus steht im Gespräch und in der Liste. Für einen anderen Modus beginnen Sie ein neues Gespräch.
 - «Letzte Gespräche» zeigt Ihre letzten 20 Gespräche. Mit einem Tipp öffnen Sie eines und setzen es fort. Die Liste zeigt nur Ihre eigenen Gespräche.
 - Auf dem Handy öffnen Sie die Liste mit «Letzte Gespräche zeigen».
 - «Neues Gespräch» beginnt ohne den bisherigen Verlauf.

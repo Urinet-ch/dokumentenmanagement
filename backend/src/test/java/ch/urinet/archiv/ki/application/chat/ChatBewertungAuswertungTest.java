@@ -52,7 +52,7 @@ class ChatBewertungAuswertungTest {
                   "suchweg":"HYBRID","aehnlichkeiten":{"%s":0.87}}]
                 """.formatted(DOKUMENT, DOKUMENT, DOKUMENT),
                 "[{\"id\":\"" + DOKUMENT + "\",\"titel\":\"Synthetische Quelle\",\"link\":\"/dokument/"
-                        + DOKUMENT + "\"}]", 12, 9, 350L, "test-modell", "prompt-v1", Chatmodus.ARCHIV));
+                        + DOKUMENT + "\"}]", 12, 9, 350L, "test-modell", "prompt-v1", Chatmodus.WISSEN));
         List<ZugriffEintrag> protokoll = new ArrayList<>();
         ChatBewertungAuswertung anwendung = new ChatBewertungAuswertung(
                 speicher, protokoll::add, new ChatBewertungZipExport());
@@ -68,11 +68,11 @@ class ChatBewertungAuswertungTest {
         assertThat(dateien.keySet()).containsExactlyInAnyOrder("schema.json", "README.txt", "bewertungen.jsonl");
         JsonNode export = JSON.readTree(dateien.get("bewertungen.jsonl").lines().findFirst().orElseThrow());
         assertThat(schema(dateien.get("schema.json")).validate(export.toString(), InputFormat.JSON)).isEmpty();
-        assertThat(export.path("modus").asText()).isEqualTo("ARCHIV");
-        ObjectNode wissenExport = (ObjectNode) export.deepCopy();
-        wissenExport.put("modus", "WISSEN");
+        assertThat(export.path("modus").asText()).isEqualTo("WISSEN");
+        ObjectNode archivExport = (ObjectNode) export.deepCopy();
+        archivExport.put("modus", "ARCHIV");
         assertThat(schema(dateien.get("schema.json"))
-                .validate(wissenExport.toString(), InputFormat.JSON)).isEmpty();
+                .validate(archivExport.toString(), InputFormat.JSON)).isEmpty();
         assertThat(export.path("frage").asText()).contains("[E-MAIL]", "[BETRAG]", "[DATUM]")
                 .doesNotContain("ada@example.test", "42.50", "Ada Muster");
         assertThat(export.path("freitext").asText()).contains("[PARTNER-1]").doesNotContain("Ada Muster");

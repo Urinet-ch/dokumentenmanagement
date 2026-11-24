@@ -106,7 +106,8 @@ describe('Benutzerstatusaktionen', () => {
     fixture.componentInstance.abgeschlossen.subscribe(ergebnis);
     klicken(element, TEXTE.benutzerStatusdialog.aktionen.sperren.titel);
     geschlossen.next({ grund: 'AUSTRITT' });
-    expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith({ aktion: 'sperren', ziel: 'ziel', grund: 'AUSTRITT' });
+    expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith(
+      { aktion: 'sperren', ziel: 'ziel', grund: 'AUSTRITT' }, expect.any(Function));
     expect(ergebnis).not.toHaveBeenCalled();
   });
 

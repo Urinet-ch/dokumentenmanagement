@@ -59,6 +59,7 @@
                 [attr.aria-current]="kopf.id === gespraechId() ? 'true' : null"
               >
                 <span class="titel">{{ kopf.titel }}</span>
+                <span class="pille" data-test="gespraech-modus">{{ kopf.modus === 'WISSEN' ? modusTexte.wissen : modusTexte.archiv }}</span>
                 <span class="datum">{{ tag(kopf.geaendert) }}</span>
               </button>
             </li>
@@ -70,12 +71,20 @@
 
   <section class="gespraech karte" aria-labelledby="verlauf-titel">
     <h2 id="verlauf-titel" class="nur-screenreader">{{ texte.verlauf }}</h2>
+    @if (anmeldung.darf('A15') && !gespraechId() && nachrichten().length === 0 && !laedt()) {
+      <div class="segment" role="group" [attr.aria-label]="modusTexte.auswahl">
+        <button type="button" [attr.aria-pressed]="modus() === 'ARCHIV'" (click)="modusWaehlen('ARCHIV')">{{ modusTexte.archiv }}</button>
+        <button type="button" [attr.aria-pressed]="modus() === 'WISSEN'" (click)="modusWaehlen('WISSEN')">{{ modusTexte.wissen }}</button>
+      </div>
+    } @else {
+      <p data-test="aktiver-modus">{{ modus() === 'WISSEN' ? modusTexte.wissen : modusTexte.archiv }}</p>
+    }
     @if (laedt()) {
       <p class="gedaempft" role="status">{{ texte.gespraechLaden }}</p>
     } @else if (nachrichten().length === 0) {
       <div class="anfang">
         <app-symbol name="chat" />
-        <p>{{ texte.leer }}</p>
+        <p>{{ modus() === 'WISSEN' ? modusTexte.wissenLeer : texte.leer }}</p>
       </div>
     }
     <ol class="verlauf">
