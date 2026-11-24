@@ -270,7 +270,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nachtrag (PR #124, Review zu #120): Format aus `pdfinfo -box` (je Richtung das grössere aus MediaBox und CropBox, Seite ohne lesbare MediaBox nicht gerendert), dpi mit je einer Zeile und Spalte Spielraum, Pixelprüfung aus dem Dateikopf im QR-Weg (`ZxingQrLeser` lässt die Seite aus) und im Bildweg (`AwtSeitenbild`, `PpmLeser`: `SeiteUngeeignet` bei ungültigem Kopf, Pixeln über der Grenze oder Grösse ungleich Kopf), `SeiteUngeeignet` → ohne Seitenbild weiter, kein Fehlversuch (design.md «Umsetzung (Aufgabe 3.2)», «Speicher»)
   - Nachtrag (PR #126, Review zu #93): `KI_VORSCHLAG` trägt die `version` des Dokuments nach der Verarbeitung in der Nutzlast (`dokumentVersion`); der `KiVorschlagHandler` ruft das Modell nur bei genau dieser Version auf und speichert nur bei ihr, sonst endet der Auftrag ohne Modellaufruf und ohne Vorschlag (aus `VERARBEITUNG` über `ohneVorschlagWeiter` in den Eingangskorb, im Eingangskorb unverändert; Berichtigung PR #136); Szenarien zu Änderung zwischen zwei Versuchen, alter Nutzlast, letztem Fehlversuch und bestehendem Partner (design.md «Umsetzung (Aufgabe 3.2)», «Version in der Nutzlast»)
 
-- [ ] 3.3 Lernen aus Korrekturen [Backend]
+- [x] 3.3 Lernen aus Korrekturen [Backend]
   - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern, mit den Merkmalen IBAN, UID, E-Mail, Swiss QR Code und Belegnummer-Muster
   - Vorauswahl vor dem KI-Aufruf deterministisch über diese Merkmale, ohne Treffer die 5 neuesten; kein zweiter KI-Aufruf
   - Korrekturquote je Feld als Kennzahl fortschreiben
@@ -278,6 +278,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Umgesetzt (PR #109) hinter `archiv.ki.beispiele.aktiv`: `ki_beispiel` (Changeset 016, Merkmale als Arrays, Sicht aus dem Dokument), `KorrekturLernen` beim Bestätigen, `BeispielAuswahl` und `BeispielVorauswahl` vor dem Aufruf, Zähler `archiv.ki.feld.bestaetigt` und `archiv.ki.feld.korrigiert`; siehe design.md «Umsetzung (Aufgabe 3.3)»
   - Nachtrag (PR #129, Nachprüfung #109): Changeset 022 trägt `ki_partner_id` für unbestätigte Dokumente mit Vorschlag nach, die vor 016 eingegangen sind; die eigene UID kommt per Muster aus `kennungen.uid`; Open Point zum Rang der Kandidaten; siehe design.md «Umsetzung (Aufgabe 3.3)», Nachtrag
   - Offen: Die Beispiele kommen nur mit `archiv.ki.beispiele.aktiv=true` in den Prompt (Standard aus, auch in prod, wegen Gate 0); Req 7.1 (Teil Korrekturbeispiele), 7.9 und 7.10 wirken in prod erst nach einem Golden-Lauf mit Beispielen und dem Einschalten [Fabian]. Die Checkbox wird erst danach abgehakt
+  - Entscheid Fabian (24.11.2026): Haken ohne vorherigen Golden-Lauf. Das Einschalten in prod bleibt davon getrennt: `archiv.ki.beispiele.aktiv` bleibt aus (Gate 0), bis der Golden-Lauf mit Beispielen vorliegt und Fabian einschaltet; Req 7.1 (Teil Korrekturbeispiele), 7.9 und 7.10 wirken in prod erst dann
   - _Anforderungen: 7.7, 7.9, 7.10_
   - _Abhängig von: 3.2_
 
