@@ -7,7 +7,7 @@ services:
     # Upstream minio/minio ist seit 24.04.2026 archiviert; Chainguard baut aus dem Fork chainguard-forks/minio (Pflege
     # «best-effort»). Free Tier nur :latest, darum per Digest gepinnt; Dependabot (docker-compose) zieht ihn nach.
     # Ausweiche, falls das Image entfällt: docker.io/pgsty/silo (Drop-in, nur gepinnt und mit voller Suite).
-    image: cgr.dev/chainguard/minio:latest@sha256:59953701f8f8d0de81aab456f0b0b6c0a1804119415559bf7ede79d944108879
+    image: cgr.dev/chainguard/minio:latest@sha256:f2e56aceb4d38ad9b05c901270946e2353b19f86ba4396f25cf75b15b455b38c
     command: ["server", "/tmp/daten"]
     environment:
       MINIO_ROOT_USER: archiv-dev
