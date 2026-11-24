@@ -28,7 +28,7 @@ public final class Schwaerzung {
             "(?<!\\d)756(?:[.\\s-]?\\d{4}){2}[.\\s-]?\\d{2}(?!\\d)");
     private static final Pattern GELDBETRAG = Pattern.compile(
             "(?iu)(?<![\\p{L}\\p{N}])(?:CHF|EUR|USD|GBP|CAD|AUD|JPY|Fr\\.?)\\s*[-+]?\\d(?:[\\d'’., ]*\\d)?"
-                    + "|(?<![\\p{L}\\p{N}])[-+]?\\d(?:[\\d'’., ]*\\d)?\\s*(?:CHF|EUR|USD|GBP|CAD|AUD|JPY|Fr\\.?)"
+                    + "|(?<![\\p{L}\\p{N}])[-+]?\\d(?:[\\d'’., ]*\\d)?\\s*(?:CHF|EUR|USD|GBP|CAD|AUD|JPY|Fr\\.?)(?![\\p{L}])"
                     + "|(?<![\\p{L}\\p{N}])[€$£]\\s*[-+]?\\d(?:[\\d'’., ]*\\d)?");
     private static final Pattern DATUM = Pattern.compile(
             "(?iu)(?<![\\p{L}\\p{N}])(?:\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4}|\\d{4}-\\d{2}-\\d{2}"
@@ -80,7 +80,7 @@ public final class Schwaerzung {
         if (text == null || text.isEmpty()) {
             return text;
         }
-        String geschwaerzt = ersetzen(text, IBAN, Schwaerzung::iban, "[IBAN]");
+        String geschwaerzt = ibanSchwaerzen(text);
         geschwaerzt = ersetzen(geschwaerzt, UID, "[UID]");
         geschwaerzt = ersetzen(geschwaerzt, AHV, "[AHV-NUMMER]");
         geschwaerzt = ersetzen(geschwaerzt, E_MAIL, "[E-MAIL]");
@@ -98,16 +98,31 @@ public final class Schwaerzung {
         return muster.matcher(text).replaceAll(Matcher.quoteReplacement(platzhalter));
     }
 
-    private static String ersetzen(String text, Pattern muster, java.util.function.Predicate<String> pruefen,
-                                   String platzhalter) {
-        Matcher matcher = muster.matcher(text);
-        StringBuffer ergebnis = new StringBuffer();
-        while (matcher.find()) {
-            matcher.appendReplacement(ergebnis, Matcher.quoteReplacement(
-                    pruefen.test(matcher.group()) ? platzhalter : matcher.group()));
+    private static String ibanSchwaerzen(String text) {
+        Matcher matcher = IBAN.matcher(text);
+        StringBuilder ergebnis = new StringBuilder();
+        int uebernommenBis = 0;
+        int sucheAb = 0;
+        while (matcher.find(sucheAb)) {
+            int ende = matcher.end();
+            // Ein Kandidat kann nach der IBAN weitere Wörter enthalten; nur an Wortgrenzen kürzen.
+            while (ende >= matcher.start() + 15) {
+                if (Character.isLetterOrDigit(text.charAt(ende - 1))
+                        && (ende == text.length() || !Character.isLetterOrDigit(text.charAt(ende)))
+                        && iban(text.substring(matcher.start(), ende))) {
+                    break;
+                }
+                ende--;
+            }
+            if (ende >= matcher.start() + 15) {
+                ergebnis.append(text, uebernommenBis, matcher.start()).append("[IBAN]");
+                uebernommenBis = ende;
+                sucheAb = ende;
+            } else {
+                sucheAb = matcher.start() + 4;
+            }
         }
-        matcher.appendTail(ergebnis);
-        return ergebnis.toString();
+        return ergebnis.append(text, uebernommenBis, text.length()).toString();
     }
 
     private static boolean iban(String wert) {

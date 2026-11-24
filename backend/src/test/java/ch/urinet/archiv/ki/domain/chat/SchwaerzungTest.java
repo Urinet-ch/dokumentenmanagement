@@ -51,6 +51,40 @@ class SchwaerzungTest {
     }
 
     @Test
+    void schwaerztIbansAuchVorNachfolgendenWoerternUndSatzzeichen() {
+        Schwaerzung schwaerzung = new Schwaerzung(List.of());
+
+        assertThat(schwaerzung.anwenden("IBAN CH93 0076 2011 6238 5295 7 bitte"))
+                .isEqualTo("IBAN [IBAN] bitte");
+        assertThat(schwaerzung.anwenden("CH93 0076 2011 6238 5295 7 Rechnung 12"))
+                .isEqualTo("[IBAN] Rechnung 12");
+        assertThat(schwaerzung.anwenden("IBAN: CH93 0076 2011 6238 5295 7 an Hans"))
+                .isEqualTo("IBAN: [IBAN] an Hans");
+        assertThat(schwaerzung.anwenden("CH9300762011623852957 und mehr"))
+                .isEqualTo("[IBAN] und mehr");
+        assertThat(schwaerzung.anwenden("DE89 3704 0044 0532 0130 00 ok"))
+                .isEqualTo("[IBAN] ok");
+        assertThat(schwaerzung.anwenden("ch93 0076 2011 6238 5295 7"))
+                .isEqualTo("[IBAN]");
+        assertThat(schwaerzung.anwenden("CH9300762011623852957. DE89370400440532013000,"))
+                .isEqualTo("[IBAN]. [IBAN],");
+        assertThat(schwaerzung.anwenden("CH93 0076 2011 6238 5295 7\nDE89 3704 0044 0532 0130 00"))
+                .isEqualTo("[IBAN]\n[IBAN]");
+        assertThat(schwaerzung.anwenden("CH93 0076 2011 6238 5295 7 DE89 3704 0044 0532 0130 00"))
+                .isEqualTo("[IBAN] [IBAN]");
+        assertThat(schwaerzung.anwenden("AB12 3456 7890 1234 5678 CH9300762011623852957"))
+                .isEqualTo("AB12 3456 7890 1234 5678 [IBAN]");
+    }
+
+    @Test
+    void kuerztFrankenNichtAufDasWaehrungskuerzelFr() {
+        Schwaerzung schwaerzung = new Schwaerzung(List.of());
+
+        assertThat(schwaerzung.anwenden("1'250 Franken und 1'250 Fr. sowie 50 CHF"))
+                .isEqualTo("1'250 Franken und [BETRAG] sowie [BETRAG]");
+    }
+
+    @Test
     void verwendetFuerNamensvariantenDerselbenKontaktgruppeEinenPlatzhalter() {
         Schwaerzung schwaerzung = new Schwaerzung(List.of(List.of("Müller AG", "mueller", "Müller GmbH")));
 
