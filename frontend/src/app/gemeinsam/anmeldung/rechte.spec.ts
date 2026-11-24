@@ -46,10 +46,12 @@ describe('Rechte (Req 2.2, 2.6)', () => {
     }
   });
 
-  it('erlaubt die Mandanteneinstellungen nur dem Inhaber (A20)', () => {
-    expect(darf('inhaber', 'A20')).toBe(true);
-    for (const rolle of ['mitarbeiter', 'treuhaender', 'geschaeftsstelle'] as const) {
-      expect(darf(rolle, 'A20')).toBe(false);
+  it('erlaubt Einstellungen und Benutzerverwaltung nur dem Inhaber (A20 bis A23)', () => {
+    for (const aktion of ['A20', 'A21', 'A22', 'A23'] as const) {
+      expect(darf('inhaber', aktion)).toBe(true);
+      for (const rolle of ['mitarbeiter', 'treuhaender', 'geschaeftsstelle'] as const) {
+        expect(darf(rolle, aktion)).toBe(false);
+      }
     }
   });
 
