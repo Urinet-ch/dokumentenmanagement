@@ -48,7 +48,7 @@ public final class AbgleichPruefung {
             }
             if (benutzer.mandanten().isEmpty()
                     || benutzer.mandanten().size() == 1 && benutzer.mandanten().getFirst().isBlank()) {
-                if (betrieb && !benutzer.rollen().isEmpty()) {
+                if (!benutzer.rollen().isEmpty() || !benutzer.fremdeRollen().isEmpty()) {
                     befunde.add(new Abweichung(Verwaltungsabweichung.KEIN_MANDANT, benutzer.id()));
                     if (benutzer.rollen().size() > 1) {
                         befunde.add(new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, benutzer.id()));
@@ -57,7 +57,7 @@ public final class AbgleichPruefung {
                 continue;
             }
             if (benutzer.mandanten().size() != 1) {
-                if (betrieb && !benutzer.rollen().isEmpty()) {
+                if (!benutzer.rollen().isEmpty() || !benutzer.fremdeRollen().isEmpty()) {
                     befunde.add(new Abweichung(Verwaltungsabweichung.MEHRERE_MANDANTEN, benutzer.id()));
                     if (benutzer.rollen().size() > 1) {
                         befunde.add(new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, benutzer.id()));
@@ -72,7 +72,7 @@ public final class AbgleichPruefung {
             if (benutzer.rollen().size() > 1) {
                 befunde.add(new Abweichung(Verwaltungsabweichung.MEHRERE_ROLLEN, benutzer.id()));
             }
-            if (!erlaubteRollen.containsAll(benutzer.rollen())) {
+            if (!benutzer.fremdeRollen().isEmpty() || !erlaubteRollen.containsAll(benutzer.rollen())) {
                 befunde.add(new Abweichung(Verwaltungsabweichung.FREMDE_ROLLE, benutzer.id()));
             }
             if (benutzer.rollen().contains(Rolle.INHABER) && !dokumentierteInhaber.contains(benutzer.id())) {
