@@ -1,0 +1,157 @@
+:host {
+  display: block;
+  max-width: 72rem;
+  min-width: 0;
+}
+
+h2,
+p {
+  margin: 0;
+}
+
+h2 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.auswertung {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.filter {
+  display: grid;
+  gap: 0.75rem;
+
+  form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.75rem;
+  }
+
+  label {
+    display: grid;
+    flex: 1 1 10rem;
+    gap: 0.3125rem;
+    color: var(--text-gedaempft);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--linie-stark);
+    border-radius: var(--radius-klein);
+    background: var(--karte);
+    color: var(--text);
+    font: inherit;
+  }
+}
+
+.kennzahlen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem;
+}
+
+.auswertungskarte {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.verteilung,
+.gruende,
+.antworten {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.verteilung li {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.verteilung progress {
+  width: 100%;
+  height: 0.75rem;
+  accent-color: var(--urinet-gelb);
+}
+
+.zahl {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.gruende li,
+.antworten li {
+  padding: 0.75rem;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--karte-2);
+}
+
+.gruende li,
+.antwort-kopf,
+.abschnittskopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.antworten li {
+  display: grid;
+  gap: 0.5rem;
+
+  p {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+}
+
+.antwort-kopf {
+  justify-content: flex-start;
+  color: var(--text-gedaempft);
+  font-size: 0.8125rem;
+
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.abschnittskopf > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+
+  p {
+    color: var(--text-gedaempft);
+  }
+}
+
+@media (max-width: 480px) {
+  .filter form > button {
+    width: 100%;
+  }
+
+  .abschnittskopf > button {
+    width: 100%;
+  }
+
+  .verteilung li {
+    grid-template-columns: 5.5rem minmax(2rem, 1fr) 2rem;
+    gap: 0.5rem;
+  }
+}

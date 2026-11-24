@@ -127,8 +127,8 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
   - Sterne, Grundauswahl, Freitext, Datenschutzhinweis; Anleitung `chat.md` und Hilfe-Katalog nachziehen; Browser-Szenario, axe, `npm run pruefe:gestaltung`.
   - _Anforderungen: 15.1, 15.9_
   - _Abhängig von: 10.1, 7.4_
-- [ ] 10.3 Auswertung, Export und Schwärzung [Backend] [Frontend]
-  - `GET /chat/auswertung`, `POST /chat/auswertung/export` (ZIP, `schema.json`, README), Domain-Dienst `Schwaerzung`, Seite «Chat-Auswertung», Step-up, Protokoll `CHAT_BEWERTUNG_EXPORT`; Marker `[offen: …]` im Design auflösen.
+- [x] 10.3 Auswertung, Export und Schwärzung [Backend] [Frontend]
+  - Auswertung und ZIP-Export mit `schema.json`, README, `modus`, Schwärzung und Step-up; A24-Seite, Anleitung, Protokoll `CHAT_BEWERTUNG_EXPORT` und Browser-Szenarien.
   - _Anforderungen: 15.5, 15.6, 15.7, 15.8, 15.10_
   - _Abhängig von: 10.1, Spec 06: 19.10 (Step-up)_
 - [ ] 10.4 Isolations- und Abnahmetests [QA]

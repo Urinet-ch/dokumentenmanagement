@@ -27,6 +27,7 @@ export async function keycloakAttrappe(welt) {
     pkce: [],
     erneuerungen: 0,
     abmeldungen: [],
+    authAnfragen: [],
     tokens: [],
     get accessToken() {
       return this.tokens.findLast((t) => t.typ === 'access')?.wert;
@@ -67,6 +68,7 @@ export async function keycloakAttrappe(welt) {
     const cors = { 'access-control-allow-origin': origin, 'content-type': 'application/json' };
 
     if (endpunkt === 'auth') {
+      kc.authAnfragen.push(Object.fromEntries(p));
       const code = randomUUID();
       kc.vorgaenge.set(code, {
         challenge: p.get('code_challenge'),

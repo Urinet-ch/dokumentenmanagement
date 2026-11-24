@@ -26,6 +26,7 @@
       "format": "date"
     },
     "modus": {
+      "type": "string",
       "enum": ["ARCHIV", "WISSEN"]
     },
     "sterne": {

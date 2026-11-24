@@ -154,6 +154,28 @@ export async function chatAttrappe(welt) {
     ],
     verlauf: new Map(),
     bewertungen: new Map(),
+    exporte: [],
+    exportStepUpNoetig: false,
+    auswertungsAnfragen: [],
+    auswertung: {
+      anzahl: 3,
+      durchschnitt: 2.33,
+      verteilung: [
+        { sterne: 1, anzahl: 1 },
+        { sterne: 2, anzahl: 1 },
+        { sterne: 5, anzahl: 1 },
+      ],
+      gruende: [
+        { grund: 'FALSCH', anzahl: 1 },
+        { grund: 'UNVOLLSTAENDIG', anzahl: 1 },
+      ],
+      schlechteAntworten: [{
+        datum: '2026-11-02',
+        sterne: 2,
+        grund: 'FALSCH',
+        frage: 'Synthetische Frage für die Auswertung',
+      }],
+    },
     fragen: [],
     stroeme: new Map(),
     halte: [],
@@ -248,6 +270,29 @@ export async function chatAttrappe(welt) {
           200,
           chat.gespraeche.filter((g) => !g.leer).sort((a, b) => b.geaendert.localeCompare(a.geaendert)).slice(0, 20),
         );
+      }
+      if (pfad === `${PFAD}/auswertung` && anfrage.method() === 'GET') {
+        const url = new URL(anfrage.url());
+        chat.auswertungsAnfragen.push({
+          von: url.searchParams.get('von'),
+          bis: url.searchParams.get('bis'),
+        });
+        return json(route, 200, chat.auswertung);
+      }
+      if (pfad === `${PFAD}/auswertung/export` && anfrage.method() === 'POST') {
+        chat.exporte.push(anfrage.postDataJSON());
+        if (chat.exportStepUpNoetig) {
+          return json(route, 401, {
+            status: 401,
+            title: 'Frische Anmeldung erforderlich',
+            fehlercode: 'STEP_UP_NOETIG',
+          });
+        }
+        return route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'application/zip', 'cache-control': 'no-store' },
+          body: Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+        });
       }
       if (pfad === `${PFAD}/gespraeche` && anfrage.method() === 'POST') {
         const gespraech = {
