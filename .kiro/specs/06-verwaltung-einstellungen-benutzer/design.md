@@ -971,3 +971,10 @@ Die Prüfung deckte fehlende Clickjacking-Header auf. `SicherheitsHeaderRoute` s
 `Content-Security-Policy: frame-ancestors 'none'` und `X-Frame-Options: DENY`; `SicherheitsHeaderTest` prüft diese
 Header sowie, dass ein Ausfall des Verwaltungs-Identitätsdienstes die API-Readiness nicht verändert und in der
 Detail-Health sichtbar bleibt.
+### Nachtrag (Folge aus PR #529, 24.11.2026)
+
+`BenutzerAbgleichenKommando` beendet auch bei `IDENTITAETSDIENST_FEHLER` mit Exit-Code 3: eine Ablehnung des
+Dienstkontos ist nach Requirement 9.2 ein technischer Fehler, keine Abweichung im Abgleich. Der Aufrufpfad ist mit
+einem Abgleich-Fehler geprüft. Das Szenario `@req-9.1` führt nun `InhaberEinladenKommando.ausfuehren` aus und prüft
+Mandantenkontext, Inhaber-Rolle, Betreiberkennung sowie die datensparsame Terminalausgabe; der tatsächliche
+Einladungsfluss über Keycloak und Mailpit bleibt durch `VerwaltungVorgangTest` und `RealmExportKeycloakTest` belegt.

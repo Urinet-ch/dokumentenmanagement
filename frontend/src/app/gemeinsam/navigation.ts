@@ -93,6 +93,13 @@ export const MENUE: readonly Menuepunkt[] = [
     symbol: 'protokoll',
   },
   {
+    pfad: '/chat/auswertung',
+    text: TEXTE.chat.auswertung.titel,
+    aktion: 'A24',
+    gruppe: 'verwaltung',
+    symbol: 'chat',
+  },
+  {
     pfad: '/verwaltung/api-tokens',
     text: TEXTE.menue.apiTokens,
     aktion: 'A14',

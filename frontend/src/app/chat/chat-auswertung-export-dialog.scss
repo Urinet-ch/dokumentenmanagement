@@ -1,0 +1,64 @@
+.felder {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+
+  > label:not(.schwaerzen, .bestaetigung) {
+    display: grid;
+    gap: 0.3125rem;
+    color: var(--text-gedaempft);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  input[type='date'],
+  select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--linie-stark);
+    border-radius: var(--radius-klein);
+    background: var(--karte);
+    color: var(--text);
+    font: inherit;
+  }
+
+  .schwaerzen,
+  .bestaetigung,
+  .hinweis {
+    grid-column: 1 / -1;
+  }
+
+  .schwaerzen,
+  .bestaetigung {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    line-height: 1.5;
+
+    input {
+      flex: none;
+      width: 1.125rem;
+      height: 1.125rem;
+      margin: 0.15rem 0 0;
+      accent-color: var(--urinet-gelb);
+    }
+  }
+}
+
+mat-dialog-content > p {
+  color: var(--text-2);
+}
+
+mat-dialog-actions {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .felder {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -12,6 +12,26 @@ export function httpFehlerMeldung(fehler: unknown): string {
   );
 }
 
+export async function httpFehlercode(fehler: unknown): Promise<string | undefined> {
+  if (!(fehler instanceof HttpErrorResponse)) return undefined;
+  const inhalt: unknown = fehler.error;
+  if (typeof Blob !== 'undefined' && inhalt instanceof Blob) {
+    try {
+      return problemFehlercode(JSON.parse(await inhalt.text()));
+    } catch {
+      return undefined;
+    }
+  }
+  return problemFehlercode(inhalt);
+}
+
+function problemFehlercode(inhalt: unknown): string | undefined {
+  return typeof inhalt === 'object' && inhalt !== null
+    && 'fehlercode' in inhalt && typeof inhalt.fehlercode === 'string'
+    ? inhalt.fehlercode
+    : undefined;
+}
+
 export function httpFehlerText(status: number, retryAfter: number | null = null): string {
   switch (status) {
     case 0:
