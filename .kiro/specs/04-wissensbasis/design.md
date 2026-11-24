@@ -1429,7 +1429,10 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
 - **Öffentlich (Spec 03):** `POST /public/v1/wissen/chat` (Webseiten-Schlüssel, `OeffentlicheWissenWerkzeuge`: `wissen_index_oeffentlich`, `wissen_seite_zeigen_oeffentlich`, Sicht nur auf
   Seiten mit `fuer_webseite` und Quellen der Stufe `oeffentlich` und Vertraulichkeit `NORMAL`, Prüfung bei jeder Anfrage, nicht aus einem Cache), eigene Grenzen je Client und Budget je Mandant,
   Schalter `archiv.oeffentlich.wissenschat` (Standard aus, je Mandant).
-- **Offen für die Umsetzung (Welle 18):** `[offen: Form der Freigabe «für Webseite» in der Oberfläche der Wissensseite (Schalter in der Seitenansicht, Recht A16) und Anzeige der Quellen-Zugriffsstufen; Aufgabe 18.3 klärt es und ergänzt hier]`
+- **Entscheid Fabian vom 24.11.2026 (Aufgabe 18.3, noch umzusetzen):** Der Schalter «Für die Webseite freigeben» steht in der Seitenansicht und ist nur mit
+  Recht A16 bedienbar. Freigabe und Entzug verlangen eine Bestätigung und werden protokolliert; der Entzug wirkt sofort. Eine Pille zeigt die höchste
+  Zugriffsstufe der Quelldokumente. Ist eine Quelle nicht `oeffentlich` oder nicht `NORMAL` (insbesondere `PERSONAL`), ist die Freigabe mit Begründung
+  deaktiviert. Der Server prüft dieselbe Regel nach Requirement 21.6.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`
