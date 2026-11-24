@@ -409,6 +409,11 @@ components:
           type: boolean
         google:
           type: boolean
+        passkey:
+          type: boolean
+        passkeyAnzahl:
+          type: integer
+          format: int32
         voruebergehendGesperrt:
           type: boolean
         einladungOffenSeit:
@@ -4000,6 +4005,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Wissensversion"
+    ZugangOptionen:
+      type: object
+      properties:
+        passkeys:
+          type: boolean
   securitySchemes:
     SecurityScheme:
       type: openIdConnect
@@ -4157,6 +4167,14 @@ paths:
           type: integer
           format: int32
           default: 50
+      - name: passkey
+        in: query
+        schema:
+          description: Filter «Passkey eingerichtet»; ohne Angabe alle
+          type: string
+          enum:
+          - ja
+          - nein
       - name: q
         in: query
         schema:
@@ -4746,7 +4764,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/ZugangOptionen"
         required: true
       responses:
         "204":

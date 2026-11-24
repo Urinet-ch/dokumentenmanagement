@@ -64,7 +64,8 @@ dd {
   gap: .5rem;
 }
 
-input {
+input,
+select {
   font: inherit;
   color: var(--text);
   background: var(--karte);

@@ -42,6 +42,16 @@ describe('Fortsetzung nach Step-up (Spec 06, Req 8.5)', () => {
     expect(anmelden).toHaveBeenCalledExactlyOnceWith('/verwaltung/benutzer/ziel-1', true, gespeichert.id);
   });
 
+  it('speichert die Option Passkeys nur als Wahrheitswert bei «Zugang zurücksetzen» (Req 10.5)', () => {
+    const fortsetzen = TestBed.inject(BenutzerFortsetzen);
+    expect(fortsetzen.starten({ aktion: 'zugangZuruecksetzen', ziel: 'ziel-1', passkeys: true })).toBe(true);
+    expect(JSON.parse([...daten.values()][0]).passkeys).toBe(true);
+    daten.clear();
+    expect(fortsetzen.starten({ aktion: 'sperren', ziel: 'ziel-1', passkeys: true })).toBe(false);
+    expect(fortsetzen.starten({ aktion: 'zugangZuruecksetzen', ziel: 'ziel-1', passkeys: 'Gerät A' as never })).toBe(false);
+    expect(daten.size).toBe(0);
+  });
+
   it('lehnt unzulässige Inhalte ab, statt sie zu speichern', () => {
     const fortsetzen = TestBed.inject(BenutzerFortsetzen);
     expect(fortsetzen.starten({ aktion: 'sperren', ziel: 'x@example.org' })).toBe(false);

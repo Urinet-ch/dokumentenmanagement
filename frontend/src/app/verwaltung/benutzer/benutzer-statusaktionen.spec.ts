@@ -12,6 +12,7 @@ describe('Benutzerstatusaktionen', () => {
   const api = {
     apiV1BenutzerBenutzerIdSperrenPost: vi.fn(),
     apiV1BenutzerBenutzerIdEntsperrenPost: vi.fn(),
+    apiV1BenutzerBenutzerIdZugangZuruecksetzenPost: vi.fn(),
   };
   const oeffnen = vi.fn();
   const stepUp = { starten: vi.fn() };
@@ -27,6 +28,7 @@ describe('Benutzerstatusaktionen', () => {
     oeffnen.mockReset().mockReturnValue({ afterClosed: () => geschlossen, close: vi.fn() });
     api.apiV1BenutzerBenutzerIdSperrenPost.mockReset().mockReturnValue(of(null));
     api.apiV1BenutzerBenutzerIdEntsperrenPost.mockReset().mockReturnValue(of(null));
+    api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost.mockReset().mockReturnValue(of(null));
     TestBed.configureTestingModule({
       imports: [BenutzerStatusaktionen],
       providers: [
@@ -135,6 +137,40 @@ describe('Benutzerstatusaktionen', () => {
       fixture.detectChanges();
       expect(api.apiV1BenutzerBenutzerIdSperrenPost).not.toHaveBeenCalled();
     }
+  });
+
+  it('sendet «Zugang zurücksetzen» mit Option Passkeys nur, wenn sie gewählt wurde, und zeigt die Anzahl im Dialog (Req 10.5)', () => {
+    const { fixture, element } = starten({ id: 'ziel', benutzername: 'alex', status: 'AKTIV', passkeyAnzahl: 2 } as never);
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.zugangZuruecksetzen.titel);
+    expect(oeffnen).toHaveBeenLastCalledWith(expect.anything(),
+      expect.objectContaining({ data: { aktion: 'zugangZuruecksetzen', benutzername: 'alex', passkeys: 2 } }));
+    geschlossen.next({ passkeys: true });
+    fixture.detectChanges();
+    expect(api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost).toHaveBeenCalledExactlyOnceWith('ziel', { passkeys: true });
+  });
+
+  it('sendet ohne die Option einen leeren Körper wie bisher', () => {
+    const { element } = starten();
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.zugangZuruecksetzen.titel);
+    geschlossen.next({});
+    expect(api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost).toHaveBeenCalledExactlyOnceWith('ziel', {});
+  });
+
+  it('merkt bei STEP_UP_NOETIG die Option Passkeys nur als Code und setzt sie nach der Anmeldung einmal fort (Req 10.5)', () => {
+    api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost.mockReturnValueOnce(throwError(stepUpFehler));
+    const { element } = starten();
+    klicken(element, TEXTE.benutzerStatusdialog.aktionen.zugangZuruecksetzen.titel);
+    geschlossen.next({ passkeys: true });
+    expect(stepUp.starten).toHaveBeenCalledExactlyOnceWith(
+      { aktion: 'zugangZuruecksetzen', ziel: 'ziel', grund: undefined, passkeys: true });
+
+    api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost.mockClear();
+    const fixture = TestBed.createComponent(BenutzerStatusaktionen);
+    fixture.componentRef.setInput('person', { id: 'ziel', benutzername: 'alex', status: 'AKTIV' });
+    fixture.componentRef.setInput('akteurId', 'akteur');
+    fixture.componentRef.setInput('fortsetzung', { ...fortsetzung('zugangZuruecksetzen'), passkeys: true });
+    fixture.detectChanges();
+    expect(api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost).toHaveBeenCalledExactlyOnceWith('ziel', { passkeys: true });
   });
 
   it('zeigt BESTAETIGUNG_NOETIG als eigene Meldung ohne Wiederholung', () => {

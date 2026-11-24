@@ -83,7 +83,8 @@ export class BenutzerStatusaktionen {
         return;
       }
       this.laufend.set(true);
-      this.ausfuehren(id, aktion, { grund: fortsetzung.grund as Verwaltungsgrund | undefined }, true);
+      this.ausfuehren(id, aktion, { grund: fortsetzung.grund as Verwaltungsgrund | undefined,
+        passkeys: fortsetzung.passkeys }, true);
     });
   }
 
@@ -94,7 +95,7 @@ export class BenutzerStatusaktionen {
     this.fehler.set(null);
     this.laufend.set(true);
     this.geoeffnet = this.dialog.open(BenutzerStatusdialog, {
-      data: { aktion, benutzername },
+      data: { aktion, benutzername, passkeys: this.person().passkeyAnzahl },
       panelClass: 'benutzer-status-dialog',
     });
     this.geoeffnet.afterClosed().pipe(takeUntilDestroyed(this.zerstoert)).subscribe((ergebnis) => {
@@ -125,7 +126,7 @@ export class BenutzerStatusaktionen {
         anfrage = this.api.apiV1BenutzerBenutzerIdReaktivierenPost(id, {});
         break;
       case 'zugangZuruecksetzen':
-        anfrage = this.api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(id, {});
+        anfrage = this.api.apiV1BenutzerBenutzerIdZugangZuruecksetzenPost(id, ergebnis.passkeys ? { passkeys: true } : {});
         break;
       case 'einladung':
         anfrage = this.api.apiV1BenutzerBenutzerIdEinladungPost(id, {});
@@ -145,7 +146,7 @@ export class BenutzerStatusaktionen {
           if (ausFortsetzung) {
             this.laufend.set(false);
             this.fehler.set(TEXTE.benutzerFortsetzung.wiederholtAbgelehnt);
-          } else if (!this.stepUp.starten({ aktion, ziel: id, grund: ergebnis.grund })) {
+          } else if (!this.stepUp.starten({ aktion, ziel: id, grund: ergebnis.grund, passkeys: ergebnis.passkeys })) {
             this.laufend.set(false);
             this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
           }

@@ -188,6 +188,7 @@ model/wissensquelleneintrag.ts
 model/wissensseite.ts
 model/wissensversion.ts
 model/wissensversionen.ts
+model/zugang-optionen.ts
 param.ts
 provide-api.ts
 query.params.ts

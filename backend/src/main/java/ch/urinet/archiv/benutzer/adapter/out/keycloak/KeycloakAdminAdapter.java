@@ -55,6 +55,8 @@ import java.util.stream.StreamSupport;
 @ApplicationScoped
 @Typed({IdentitaetsDienst.class, AbgleichIdentitaet.class})
 public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentitaet {
+    /** Credential-Typ der Passkeys (WebAuthn passwordless); nur dieser Typ wird je gelöscht. */
+    static final String PASSKEY_TYP = "webauthn-passwordless";
     static final int MAX_ANTWORT = 1024 * 1024;
     static final Duration WARTEZEIT_PARALLEL = Duration.ofMillis(200);
     static final Duration WIEDERHOLUNGSABSTAND = Duration.ofMillis(200);
@@ -412,6 +414,25 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
     }
 
     @Override
+    public int passkeysEntfernen(String mandant, String id) {
+        benutzerAbrufen(mandant, id);
+        JsonNode credentials = json(request("GET", user(id) + "/credentials", null, null, true, Set.of()));
+        if (!credentials.isArray()) {
+            throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
+        }
+        int entfernt = 0;
+        for (JsonNode credential : credentials) {
+            // nur Passkeys: Passwort und TOTP bleiben unberührt (Requirement 10.5)
+            if (PASSKEY_TYP.equals(credential.path("type").asText())) {
+                nur204(request("DELETE", user(id) + "/credentials/" + segment(credential.path("id").asText()),
+                        null, null, false, Set.of(204)));
+                entfernt++;
+            }
+        }
+        return entfernt;
+    }
+
+    @Override
     public void sperreAufheben(String mandant, String id) {
         benutzerAbrufen(mandant, id);
         nur204(request("DELETE", admin("/attack-detection/brute-force/users/" + segment(id)),
@@ -571,9 +592,10 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
         } catch (IllegalArgumentException e) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
+        Zugangsdaten zugang = zugangsdaten(id);
         return new Benutzer(id, user.path("username").asText(), text(user, "email"),
                 text(user, "firstName"), text(user, "lastName"), user.path("enabled").asBoolean(), rollen(id),
-                erforderlicheAktionen(user), hatOtp(id), hatGoogle(id));
+                erforderlicheAktionen(user), zugang.otp(), hatGoogle(id), zugang.passkeys());
     }
 
     private Set<Rolle> rollen(String id) {
@@ -628,17 +650,26 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
         return aktionen;
     }
 
-    private boolean hatOtp(String id) {
+    /** Nur Art und Zahl; Kennungen, Bezeichnungen und Geräteangaben der Credentials verlassen diese Methode nicht. */
+    private record Zugangsdaten(boolean otp, int passkeys) {
+    }
+
+    private Zugangsdaten zugangsdaten(String id) {
         JsonNode credentials = json(request("GET", user(id) + "/credentials", null, null, true, Set.of()));
         if (!credentials.isArray()) {
             throw fehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
         }
+        boolean otp = false;
+        int passkeys = 0;
         for (JsonNode credential : credentials) {
-            if ("otp".equals(credential.path("type").asText())) {
-                return true;
+            String typ = credential.path("type").asText();
+            if ("otp".equals(typ)) {
+                otp = true;
+            } else if (PASSKEY_TYP.equals(typ)) {
+                passkeys++;
             }
         }
-        return false;
+        return new Zugangsdaten(otp, passkeys);
     }
 
     private boolean hatGoogle(String id) {

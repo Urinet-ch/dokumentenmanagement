@@ -105,8 +105,11 @@ public class BenutzerResource {
     @Operation(summary = "Benutzer des Mandanten auflisten")
     public List<BenutzerLesen.BenutzerAnsicht> suchen(@QueryParam("q") String suche,
                                               @QueryParam("seite") @DefaultValue("0") int seite,
-                                              @QueryParam("groesse") @DefaultValue("50") int groesse) {
-        return lesen.suchen(suche, seite, groesse);
+                                              @QueryParam("groesse") @DefaultValue("50") int groesse,
+                                              @QueryParam("passkey") @Schema(enumeration = {"ja", "nein"},
+                                                      description = "Filter «Passkey eingerichtet»; ohne Angabe alle")
+                                              String passkey) {
+        return lesen.suchen(suche, seite, groesse, passkey);
     }
 
     @GET
@@ -300,13 +303,37 @@ public class BenutzerResource {
         }
     }
 
+    /** Optionen von «Zugang zurücksetzen»; {@code passkeys}: zusätzlich alle Passkeys des Benutzers löschen. */
+    public record ZugangOptionen(Boolean passkeys) {
+    }
+
+    /** Leerer Körper oder {@code {}} wie bisher; sonst nur das Feld {@code passkeys} (Wahrheitswert). */
+    private boolean zugangOptionen(String contentType, InputStream body) throws IOException {
+        jsonPruefen(contentType);
+        byte[] eingabe = begrenztLesen(body);
+        if (eingabe.length == 0) {
+            return false;
+        }
+        try {
+            var wert = json.readTree(eingabe);
+            if (wert == null || !wert.isObject() || wert.size() > 1
+                    || (wert.size() == 1 && !wert.path("passkeys").isBoolean())) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            return wert.path("passkeys").asBoolean(false);
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+    }
+
     @POST
     @Path("/{benutzerId}/zugang-zuruecksetzen")
     @Consumes(MediaType.APPLICATION_JSON)
     @ErfordertAktion(Aktion.A22)
     @RolesAllowed("inhaber")
     @Operation(summary = "Zugang zurücksetzen")
-    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.OBJECT)))
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = ZugangOptionen.class)))
     @APIResponse(responseCode = "204", description = "Zugang zurückgesetzt und Einladung gesendet")
     public Response zugangZuruecksetzen(@PathParam("benutzerId") String benutzerId,
                                        @HeaderParam("X-Real-Ip") String ip,
@@ -316,8 +343,7 @@ public class BenutzerResource {
         Benutzer akteur = akteur();
         berechtigung.aktion(akteur, Aktion.A22);
         stepUp.pruefen();
-        leerenKoerperPruefen(contentType, body);
-        zugang.ausfuehren(code, akteur, benutzerId, IpAdresse.aus(ip));
+        zugang.ausfuehren(code, akteur, benutzerId, zugangOptionen(contentType, body), IpAdresse.aus(ip));
         return Response.noContent().build();
     }
 

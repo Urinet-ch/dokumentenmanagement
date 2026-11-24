@@ -35,6 +35,13 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     pfade: ['/'],
     abgemeldet: true,
   },
+  // Mit Passkey anmelden (Aufgabe 24.3, Spec 06 Req 10): für alle angemeldeten Rollen, ohne Pfad
+  {
+    anker: 'erste-schritte-passkey',
+    titel: TEXTE.hilfe.abschnitte['erste-schritte-passkey'],
+    datei: '/anleitung/erste-schritte-passkey.md',
+    eltern: 'erste-schritte',
+  },
   // Erfassen und Eingangskorb (Aufgabe 22.5)
   {
     anker: 'erfassen',

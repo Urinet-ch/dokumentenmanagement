@@ -22,10 +22,12 @@ export interface BenutzerFortsetzung {
   etag?: string;
   grund?: string;
   rolle?: string;
+  /** Nur der Code der Option «Passkeys löschen» (Wahrheitswert), nie Gerätedaten. */
+  passkeys?: boolean;
   erstellt: number;
 }
 
-export type FortsetzungEingabe = Pick<BenutzerFortsetzung, 'aktion' | 'ziel' | 'etag' | 'grund' | 'rolle'>;
+export type FortsetzungEingabe = Pick<BenutzerFortsetzung, 'aktion' | 'ziel' | 'etag' | 'grund' | 'rolle' | 'passkeys'>;
 
 const SCHLUESSEL = 'archiv.benutzer.fortsetzung';
 const MAX_ALTER_MS = 10 * 60 * 1000;
@@ -44,7 +46,7 @@ function text(wert: unknown, muster: RegExp): wert is string {
 
 function gueltig(wert: unknown): wert is BenutzerFortsetzung {
   if (!objekt(wert)) return false;
-  const erlaubt = ['id', 'benutzer', 'mandant', 'aktion', 'ziel', 'etag', 'grund', 'rolle', 'erstellt'];
+  const erlaubt = ['id', 'benutzer', 'mandant', 'aktion', 'ziel', 'etag', 'grund', 'rolle', 'passkeys', 'erstellt'];
   if (Object.keys(wert).some((schluessel) => !erlaubt.includes(schluessel))) return false;
   const aktion = wert['aktion'];
   const einladen = aktion === 'einladen';
@@ -54,6 +56,7 @@ function gueltig(wert: unknown): wert is BenutzerFortsetzung {
     && (wert['etag'] === undefined || text(wert['etag'], /^[a-f0-9]{64}$/))
     && (wert['grund'] === undefined || text(wert['grund'], /^[A-Z_a-z]{1,40}$/))
     && (wert['rolle'] === undefined || text(wert['rolle'], /^[a-z_]{1,40}$/))
+    && (wert['passkeys'] === undefined || (wert['passkeys'] === true && aktion === 'zugangZuruecksetzen'))
     && (aktion !== 'rolle' || (wert['etag'] !== undefined && wert['rolle'] !== undefined))
     && typeof wert['erstellt'] === 'number' && Number.isFinite(wert['erstellt']);
 }

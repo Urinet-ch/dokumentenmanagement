@@ -1840,6 +1840,12 @@ export const TEXTE = {
     email: 'E-Mail',
     totp: 'Zwei-Faktor-Anmeldung',
     google: 'Google verknüpft',
+    passkey: 'Passkey eingerichtet',
+    passkeyJa: (anzahl: number) => `Ja, ${anzahl} ${anzahl === 1 ? 'Passkey' : 'Passkeys'}`,
+    passkeyFilter: 'Passkey',
+    passkeyFilterAlle: 'Alle',
+    passkeyFilterJa: 'Mit Passkey',
+    passkeyFilterNein: 'Ohne Passkey',
     ja: 'Ja',
     nein: 'Nein',
     unbekannt: 'Nicht bekannt',
@@ -1901,6 +1907,7 @@ export const TEXTE = {
     soFunktioniertEs: 'So funktioniert es',
     abschnitte: {
       'erste-schritte': 'Erste Schritte',
+      'erste-schritte-passkey': 'Mit Passkey anmelden',
       // Aufgabe 22.5
       erfassen: 'Erfassen',
       'erfassen-handy': 'Mit dem Handy fotografieren',
@@ -1987,6 +1994,9 @@ export const TEXTE = {
     bestaetigen: 'Bestätigen',
     grund: 'Grund',
     grundWaehlen: 'Bitte wählen',
+    passkeysOption: (anzahl: number) =>
+      `Auch ${anzahl === 1 ? 'den Passkey' : `die ${anzahl} Passkeys`} löschen`,
+    passkeysHinweis: 'Die Person meldet sich danach mit Passwort und Zwei-Faktor-Anmeldung an und richtet bei Bedarf einen neuen Passkey ein. Gerätedaten sehen Sie nicht.',
     aktionen: {
       sperren: {
         titel: 'Benutzer sperren',
