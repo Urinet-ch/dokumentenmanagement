@@ -5,6 +5,25 @@ bereitstellt und was man bei einem Alarm zuerst prüft. Sie beschreibt den Stand
 `SpeicherUeberwachung`, `SicherungUeberwachungAdapter`, `ManifestBefunde`, `MicrometerKennzahlen`); Betrieb und
 Einrichtung des Mailversands stehen im [README](../README.md#benachrichtigungen-per-mail-spec-01-aufgabe-56).
 
+## Betriebsnachweis für Fabian (Aufgabe 5.6)
+
+Diese Checkliste ist eine Vorbereitung, kein durchgeführter Nachweis. Es wird nichts auf der VPS geändert;
+der Wechsel auf Stufe B ist nicht beauftragt. Ergebnisse ohne Geheimnisse, Adressen oder Dokumentdaten festhalten.
+
+- [ ] Mailweg und Empfänger anhand des README prüfen; mit einem freigegebenen synthetischen Test einen Alarm
+  auslösen und Zustellung sowie Inhalt (nur IDs und zulässige Betriebswerte) nachweisen.
+- [ ] Öffentlichen schlanken Health-Pfad und die Abschirmung von Detail-Health und Kennzahlen prüfen; intern
+  Auftrags-, Dokument-, Eingangskorb-, Korrekturquoten- und Speicherkennzahlen kontrollieren.
+- [ ] Nach einer allfälligen Freigabe und Aktivierung des Sicherungs-Workflows die Sicherungsüberwachung einschalten
+  und fehlende bzw. zu alte Exporte sowie die Zustellung eines Alarms nachweisen. Bis dahin bleibt sie deaktiviert.
+- [ ] Für die Restore-Probe den Alarm bei Fehlschlag **und** bei einem letzten grünen Lauf älter als 35 Tage
+  separat im Sicherungs-Workflow und Monitoring nachweisen (Req 16.25). Die App-Überwachung kennt dieses Ergebnis
+  nicht; ein Sicherungsalarm allein ist kein Nachweis dafür.
+- [ ] Alarm für das Kontingent der Zweitkopie einrichten bzw. nachweisen; eine geeignete Schwelle und Zustellung
+  prüfen. Eine Schwelle wird hier nicht vorgegeben.
+- [ ] Nachweise mit Datum, geprüftem Stand und Ergebnis ablegen; offene Punkte dokumentieren. Aufgabe 5.6 bleibt
+  bis zur Erfüllung der Infrastruktur- und Betriebsnachweise offen.
+
 ## Grundregeln
 
 - **Nur IDs und Status.** Betreff und Text nennen Dokument-ID, Datum, Sicherungscode oder Speicherbereich, nie

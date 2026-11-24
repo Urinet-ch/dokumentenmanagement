@@ -530,6 +530,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Klarstellung 16.11.2026 (entschieden von Fabian): Die Speicher-Mail darf Bereich, Prozent und MiB nennen; Req 16.7 gilt für Dokument- und Personendaten, Betriebswerte ohne Bezug sind zulässig (requirements.md 16.7)
   - Frühwarnung vor Speicherknappheit der JVM (Metaspace, Class Space, Heap nach GC; Mail je Bereich und Stufe einmal, Gauge `archiv_jvm_speicher_prozent`) umgesetzt (15.11.2026, design.md «Überwachung»); Anbindung Sicherung umgesetzt mit PR #191; 5.6 bleibt wegen prod-Aktivierung nach Start des Sicherungs-Workflows auf Stufe B (Deploy-Teil 5.5) und Teil Infra offen
   - [Infra] Restore-Probe (Req 16.25): Benachrichtigung des maintenance-Workflows (`notify`) bei rotem Lauf; Alarm beim Kontingent des Hostpoint-Webhostings (ein gestohlener Workflow-Schlüssel kann den Webspace durch Anhängen füllen), Schwelle im PR
+  - Vorbereitung ohne Betriebseingriff: abhakbare Betriebsnachweise in `docs/alarme.md` («Betriebsnachweis für Fabian»); Aktivierung und Nachweise einschliesslich Restore-Fehlschlag und letzter grüner Lauf älter als 35 Tage bleiben offen.
   - _Anforderungen: 16.4, 16.5, 16.7, 16.25_
 
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
