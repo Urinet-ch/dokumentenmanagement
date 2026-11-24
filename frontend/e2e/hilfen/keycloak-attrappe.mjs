@@ -57,7 +57,7 @@ export async function keycloakAttrappe(welt) {
   };
 
   await welt.kontext.route('**/*', (route) =>
-    route.request().url().startsWith(origin) ? route.continue() : route.abort('blockedbyclient'),
+    route.request().url().startsWith(origin) ? route.fallback() : route.abort('blockedbyclient'),
   );
 
   await welt.kontext.route(`${AUSSTELLER}/protocol/openid-connect/**`, async (route) => {
