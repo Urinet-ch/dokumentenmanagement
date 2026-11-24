@@ -1,14 +1,20 @@
-# Abhängigkeiten wöchentlich aktualisieren (Aufgabe 1.8). Jeder PR läuft durch die CI und wird von Fabian gemergt.
+# Abhängigkeiten wöchentlich aktualisieren (Aufgabe 1.8). Jeder PR läuft durch die CI und wird von Claude nach Prüfung gemergt; Major-Sprünge nur nach Entscheid.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
   - package-ecosystem: docker
     directory: /backend/src/main/docker
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
     ignore:
       # Das Projekt bleibt auf Java 25 LTS (tech.md); Patch- und Minor-Updates auf 25.x kommen weiter.
       # Der Wechsel auf die nächste LTS (Java 29) ist ein eigener Entscheid.
@@ -22,14 +28,46 @@ updates:
       - /deploy/infomaniak/keycloak
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+    ignore:
+      - dependency-name: eclipse-temurin
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker-compose
     directory: /backend
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      docker-compose-digests:
+        patterns:
+          - "*"
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+        update-types:
+          - "minor"
+          - "patch"
+      npm-dev:
+        patterns:
+          - "prettier"
+          - "jsdom"
+          - "eslint*"
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       # TypeScript-Major folgt dem Update von Angular.
       - dependency-name: typescript
@@ -41,3 +79,14 @@ updates:
       - /tools/drive_import
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      snakeyaml:
+        patterns:
+          - "org.yaml:snakeyaml"
+          - "org.snakeyaml:*"
+      commonmark:
+        patterns:
+          - "org.commonmark:*"
