@@ -188,6 +188,25 @@ class KeycloakAdminAdapterTest {
     }
 
     @Test
+    void abgleichMeldetTechnischeKeycloakRollenNichtAlsFremd() {
+        String id = "9a735b70-5648-42db-8391-1abe070391cb";
+        tokenAntwort();
+        server.stubFor(get(urlPathEqualTo(USERS)).withQueryParam("first", equalTo("0"))
+                .withQueryParam("max", equalTo("50"))
+                .willReturn(okJson("""
+                        [{"id":"%s","attributes":{"mandant":["urinet"]}}]
+                        """.formatted(id))));
+        server.stubFor(get(urlPathEqualTo(USERS + "/" + id + "/role-mappings/realm"))
+                .willReturn(okJson("""
+                        [{"name":"default-roles-urinet-archiv"},{"name":"offline_access"},
+                         {"name":"uma_authorization"},{"name":"inhaber"},{"name":"fremde-rolle"}]
+                        """)));
+
+        assertThat(adapter(Duration.ofSeconds(2), Duration.ofSeconds(1)).seite(0).getFirst().fremdeRollen())
+                .containsExactly("fremde-rolle");
+    }
+
+    @Test
     void abgleichWeistUngueltigeRealmAntwortZurueck() {
         tokenAntwort();
         server.stubFor(get(urlPathEqualTo(USERS)).willReturn(okJson("""

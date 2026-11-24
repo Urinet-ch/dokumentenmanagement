@@ -594,7 +594,7 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
                     rollen.add(rolle);
                 }
             }
-            if (!ARCHIV_ROLLEN.contains(name)) {
+            if (!ARCHIV_ROLLEN.contains(name) && !technischeRolle(name)) {
                 fremde.add(name);
             }
         }
@@ -602,6 +602,11 @@ public class KeycloakAdminAdapter implements IdentitaetsDienst, AbgleichIdentita
     }
 
     private record Rollen(Set<Rolle> archiv, Set<String> fremde) {
+    }
+
+    /** Keycloak vergibt diese Rollen jedem Benutzer selbst; sie sind keine Abweichung im Abgleich (Req 9.4). */
+    private static boolean technischeRolle(String name) {
+        return "offline_access".equals(name) || "uma_authorization".equals(name) || name.startsWith("default-roles-");
     }
 
     private Set<ErforderlicheAktion> erforderlicheAktionen(JsonNode user) {
