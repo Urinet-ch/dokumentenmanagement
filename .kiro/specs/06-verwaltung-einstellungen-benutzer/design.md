@@ -718,9 +718,11 @@ Die Szenarien `@req-4.9` in `benutzer-verwalten.feature` weisen Rollenwechsel, e
 `realm.feature` enthält für 7.4 weiterhin nur `@teilnachweis-7.4`: Passwortregeln, TOTP und Einladungsversand
 sind geprüft, nicht aber der vollständige Einladungsablauf. Insbesondere fehlt das in 7.4 geforderte Kennzeichen
 «abgelaufen» beim Status `EINGELADEN`. Aufgabe 19.2 bleibt deshalb offen; die Betriebsnachweise bleiben bei 19.3.
-`einladungOffenSeit` allein ist kein verlässlicher Ablaufnachweis: `JdbcBenutzerAktivitaet` berücksichtigt bislang
-Anlage und Reaktivierung, nicht aber erneutes Senden. Das Kennzeichen darf deshalb nicht allein aus diesem Datum
-abgeleitet werden, ohne den erneuten Versand und die tatsächliche Link-Lebensdauer zu berücksichtigen.
+`JdbcBenutzerAktivitaet` berücksichtigt neben Anlage und Reaktivierung auch erfolgreich abgeschlossenes erneutes
+Senden. `EinladungZeitTest` weist zwei Sendeläufe und einen fehlgeschlagenen dritten nach; nur der erfolgreiche
+Versand aktualisiert das Datum. `einladungOffenSeit` allein ist trotzdem kein verlässlicher Ablaufnachweis:
+Das Kennzeichen darf nicht ohne die tatsächliche Link-Lebensdauer abgeleitet werden. Anzeige und vollständiger
+Nachweis bleiben offen.
 
 ## Umsetzung 19.4 — Keycloak-Adapter
 
