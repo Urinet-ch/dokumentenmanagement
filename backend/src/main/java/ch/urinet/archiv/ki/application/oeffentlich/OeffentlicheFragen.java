@@ -183,9 +183,12 @@ public class OeffentlicheFragen {
     /**
      * Startet den Durchgang auf einem eigenen Thread und gibt die Ausgaben in Reihenfolge an {@code strom}; nach
      * {@link OeffentlicheAusgabe.Fertig} oder {@link OeffentlicheAusgabe.Fehler} kommt nichts mehr. Gibt den Platz der
-     * Annahme in jedem Fall frei.
+     * Annahme in jedem Fall frei und ruft danach {@code nachFreigabe} auf, damit der Transport erst nach der Freigabe
+     * endet.
      */
-    public void starten(Annahme annahme, Consumer<OeffentlicheAusgabe> strom, ChatAbbruch abbruch) {
+    public void starten(Annahme annahme, Consumer<OeffentlicheAusgabe> strom, ChatAbbruch abbruch,
+                        Runnable nachFreigabe) {
+        Objects.requireNonNull(nachFreigabe, "nachFreigabe");
         Consumer<OeffentlicheAusgabe> einmalig = einmalig(strom);
         UUID id = annahme.gespraechId();
         try {
@@ -196,13 +199,21 @@ public class OeffentlicheFragen {
                     LOG.errorf("Öffentlicher Chat-Durchgang gescheitert, ursache=%s", Ursachen.kette(e));
                     einmalig.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
                 } finally {
-                    freigeben(annahme);
+                    try {
+                        freigeben(annahme);
+                    } finally {
+                        nachFreigabe.run();
+                    }
                 }
             });
         } catch (RejectedExecutionException e) {
-            freigeben(annahme);
-            LOG.errorf("Öffentlicher Chat-Durchgang nicht gestartet, ursache=%s", Ursachen.kette(e));
-            einmalig.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
+            try {
+                freigeben(annahme);
+                LOG.errorf("Öffentlicher Chat-Durchgang nicht gestartet, ursache=%s", Ursachen.kette(e));
+                einmalig.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
+            } finally {
+                nachFreigabe.run();
+            }
         }
     }
 

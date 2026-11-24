@@ -28,6 +28,7 @@ Unter jeder Antwort stehen die «Quellen»:
 - «Letzte Gespräche» zeigt Ihre letzten 20 Gespräche. Mit einem Tipp öffnen Sie eines und setzen es fort. Die Liste zeigt nur Ihre eigenen Gespräche.
 - Auf dem Handy öffnen Sie die Liste mit «Letzte Gespräche zeigen».
 - «Neues Gespräch» beginnt ohne den bisherigen Verlauf.
+- Chatnachrichten werden nach der Aufbewahrungsdauer Ihres Mandanten beim nächsten Aufräumlauf gelöscht. Gespräche ohne Nachrichten verschwinden danach ebenfalls aus der Liste.
 
 ## Antworten bewerten
 Wie Sie Sterne vergeben, ändern oder entfernen, steht unter [Antworten bewerten](#chat-bewerten).

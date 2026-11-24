@@ -290,6 +290,19 @@ assert grep -q 'update users/synthetic-service-account-id .*restore_oidc_service
 assert grep -q 'add-roles .*service-account-archiv-restore-' "$MOCK_LOG"
 assert grep -q 'client_credentials' "$repo_root/backend/src/test/java/ch/urinet/archiv/sicherung/SicherungPaketRoundtripTest.java"
 assert grep -q 'restore_oidc_service_account' "$compose_file"
+# deploy/infomaniak/keycloak/start.sh bricht ohne HTTPS-ARCHIV_BASIS_URL ab; beide Keycloak-Dienste brauchen sie.
+for dienst in kc kc_restore; do
+  basis_url=$(awk -v dienst="$dienst" '
+    /^  [A-Za-z0-9_-]+:$/ { im_dienst = ($1 == dienst ":") }
+    /^[^ ]/ { im_dienst = 0 }
+    im_dienst && $1 == "ARCHIV_BASIS_URL:" { print $2 }
+  ' "$compose_file")
+  if [[ ! "$basis_url" =~ ^https://[a-zA-Z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+    printf 'restore-compose.yml: Dienst %s braucht ARCHIV_BASIS_URL mit HTTPS-Adresse, sonst startet Keycloak nicht.\n' \
+      "$dienst" >&2
+    exit 1
+  fi
+done
 assert grep -q 'add-roles ' "$MOCK_LOG"
 assert grep -q '^ARCHIV_MANDANTEN=urinet vhf-gsk$' "$MOCK_LOG"
 assert grep -q 'docker compose --project-name archiv-restore-' "$MOCK_LOG"
