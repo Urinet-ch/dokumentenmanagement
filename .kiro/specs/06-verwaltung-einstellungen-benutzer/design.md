@@ -742,6 +742,12 @@ Versand aktualisiert das Datum. `einladungOffenSeit` allein ist trotzdem kein ve
 Das Kennzeichen darf nicht ohne die tatsächliche Link-Lebensdauer abgeleitet werden. Anzeige und vollständiger
 Nachweis bleiben offen.
 
+Nachtrag 24.11.2026: Die Keycloak-Admin-Operation `execute-actions-email` erzeugt das Ablaufdatum im signierten
+Aktionslink und antwortet bei Erfolg nur mit 204, ohne Token oder Ablaufdatum. Liste und Detail zeigen darum bei
+offener Einladung den letzten bekannten Versand und «Ablauf nicht bekannt»; weder die aktuelle Konfiguration noch
+das Versanddatum beweisen den Ablauf des tatsächlich verschickten Links. Das geforderte Kennzeichen «abgelaufen»
+und sein vollständiger Nachweis zu 7.4 bleiben offen.
+
 ## Umsetzung 19.4 — Keycloak-Adapter
 
 `KeycloakAdminAdapter` ist nur im Profil `prod` aktiv; Dev und Tests verwenden den speicherbasierten Stub. Der Adapter
