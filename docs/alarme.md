@@ -24,6 +24,27 @@ der Wechsel auf Stufe B ist nicht beauftragt. Ergebnisse ohne Geheimnisse, Adres
 - [ ] Nachweise mit Datum, geprüftem Stand und Ergebnis ablegen; offene Punkte dokumentieren. Aufgabe 5.6 bleibt
   bis zur Erfüllung der Infrastruktur- und Betriebsnachweise offen.
 
+## Vorbereitung der Monitoring-Anbindung (Aufgabe 5.9)
+
+Nur Checkliste, keine ausgeführte Anbindung; Stufe B bleibt zurückgestellt. Keine Betriebsadressen, Geheimnisse oder
+Dokumentdaten in Nachweisen ablegen. Die Tabelle «Kennzahlen unter `/q/metrics`» enthält die vorhandenen Namen und Tags.
+
+- [ ] Internen Zugang zu Detail-Health und `/q/metrics` im Monitoring einrichten; prüfen, dass beide nicht öffentlich
+  erreichbar sind. Den öffentlichen Liveness-Pfad getrennt überwachen.
+- [ ] Erreichbarkeit und Health von API und Worker sowie deren Ausfall mit einem freigegebenen Test nachweisen;
+  Alarmweg und Empfänger prüfen.
+- [ ] `archiv_auftraege{mandant,status="FEHLER"}` je aktivem Mandanten überwachen. Fehlende Messreihen und einen
+  ausgefallenen Abruf separat als Ausfall behandeln, nicht als Wert null; eine Schwelle und Wartezeit festlegen.
+- [ ] Restore-Probe bei fehlgeschlagenem Lauf **und** bei einem letzten grünen Lauf älter als 35 Tage alarmieren
+  (Req 16.25). Die Ergebnisse kommen aus dem Status-Artefakt der Probe, nicht aus den App-Kennzahlen; auch ein
+  fehlendes oder veraltetes Artefakt darf nicht als Erfolg gelten.
+- [ ] Zeilenzahl von `ki_beispiel` je Mandant erfassen. Über 1'000 Zeilen die Dauer von
+  `JdbcKiBeispiel.kandidaten` am betreffenden Bestand messen; ab 100 ms je Abfrage oder 10'000 Zeilen je Mandant
+  den Rang bzw. Index prüfen (Spec 01, Design «Offen»). Für Bestand und Abfragedauer gibt es derzeit keine der unten
+  aufgeführten App-Kennzahlen; Verfahren und Messung bleiben offen.
+- [ ] Regeln und Zuständigkeit im zuständigen Infra-Repository dokumentieren; Tests, Zeitpunkt und Ergebnis
+  festhalten. Aufgabe 5.9 erst nach Anbindung und Betriebsnachweisen abschliessen.
+
 ## Grundregeln
 
 - **Nur IDs und Status.** Betreff und Text nennen Dokument-ID, Datum, Sicherungscode oder Speicherbereich, nie

@@ -552,6 +552,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - interne Kennzahlen und Detail-Health an das Monitoring der VPS (Stufe B aus 5.11) anbinden; Alarme für Erreichbarkeit, Health und Fehleraufträge; Eintrag im Infra-Repo der VPS
   - Regel «Restore-Probe archiv rot oder letzter grüner Lauf älter als 35 Tage» (Req 16.25) im Monitoring; das Status-Artefakt der Probe enthält nur Zähler und IDs
   - Messpunkt `JdbcKiBeispiel.kandidaten`: Zeilenzahl `ki_beispiel` je Mandant überwachen; sobald sie 1'000 übersteigt, auch die Abfragedauer messen (Details in design.md, «Offen»)
+  - Vorbereitung ohne Betriebseingriff: Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; für den KI-Beispiel-Bestand und die Abfragedauer besteht noch keine App-Kennzahl. Anbindung und Nachweise bleiben offen.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 
