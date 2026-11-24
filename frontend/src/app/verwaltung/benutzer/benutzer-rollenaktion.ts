@@ -29,6 +29,10 @@ export class BenutzerRollenaktion {
   private readonly dialog = inject(MatDialog);
   private readonly zerstoert = inject(DestroyRef);
   private readonly stepUp = inject(BenutzerFortsetzen);
+  private readonly stepUpFehlgeschlagen = (): void => {
+    this.laufend.set(false);
+    this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
+  };
   private fortsetzungVerbraucht = false;
   private geoeffnet?: MatDialogRef<BenutzerRollendialog, string | null>;
 
@@ -102,7 +106,7 @@ export class BenutzerRollenaktion {
             if (ausFortsetzung) {
               this.laufend.set(false);
               this.fehler.set(TEXTE.benutzerFortsetzung.wiederholtAbgelehnt);
-            } else if (!this.stepUp.starten({ aktion: 'rolle', ziel: id, etag, rolle })) {
+            } else if (!this.stepUp.starten({ aktion: 'rolle', ziel: id, etag, rolle }, () => this.stepUpFehlgeschlagen())) {
               this.laufend.set(false);
               this.fehler.set(TEXTE.benutzerAktionsfehler.erneuteAnmeldung);
             }

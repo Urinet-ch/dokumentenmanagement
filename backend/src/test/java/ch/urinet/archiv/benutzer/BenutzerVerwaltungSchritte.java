@@ -28,6 +28,7 @@ import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
@@ -42,6 +43,7 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
 
+import java.io.IOException;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -50,6 +52,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -107,6 +110,7 @@ public class BenutzerVerwaltungSchritte {
     private CountDownLatch loeschungFortsetzen;
     private UUID loeschDokument;
     private String altesToken;
+    private String erneuerungsToken;
     private final Map<String, Rolle> gleichzeitigeRollen = new ConcurrentHashMap<>();
 
     @Before("@benutzer-verwaltung")
@@ -562,6 +566,16 @@ public class BenutzerVerwaltungSchritte {
         identitaet.einladen(MANDANT, eigeneId, Set.of(), Duration.ofHours(1));
     }
 
+    @Angenommen("ein synthetischer aktiver Mitarbeiter mit erneuerbarem Token besteht")
+    public void aktiverMitarbeiterMitErneuerbaremToken() {
+        keycloakBenutzerMitDienstkonto("mitarbeiter", false);
+        Response anmeldung = Testanmeldung.anmelden(name, true);
+        assertThat(anmeldung.statusCode()).isEqualTo(200);
+        altesToken = anmeldung.path("access_token");
+        erneuerungsToken = anmeldung.path("refresh_token");
+        given().auth().oauth2(altesToken).get("/api/v1/mandant/funktionen").then().statusCode(200);
+    }
+
     @Wenn("der Inhaber die Rolle mit fehlender, veralteter und aktueller Version ändert")
     public void rolleAendern() {
         String pfad = PFAD + "/" + eigeneId;
@@ -574,11 +588,24 @@ public class BenutzerVerwaltungSchritte {
                 .body(Map.of("rolle", "treuhaender")).put(pfad + "/rolle"));
     }
 
-    @Dann("ist nur die aktuelle Rollenänderung wirksam und das alte Token widerrufen")
+    @Dann("ist nur die aktuelle Rollenänderung wirksam und ein erneuertes Token trägt die neue Rolle")
     public void rolleGeaendert() {
         assertThat(antworten).extracting(Response::statusCode).containsExactly(428, 412, 204);
         assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).rollen()).containsExactly(Rolle.TREUHAENDER);
         assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
+        Response altesTokenAntwort = given().auth().oauth2(altesToken).get("/api/v1/mandant/funktionen");
+        assertThat(ProblemDetails.pruefen(altesTokenAntwort, 401)).isEqualTo("NICHT_ANGEMELDET");
+
+        wartenAufNaechsteTokenSekunde();
+        Response erneuertesToken = given().formParam("grant_type", "refresh_token")
+                .formParam("client_id", "archiv-test").formParam("refresh_token", erneuerungsToken)
+                .post(ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class)
+                        + "/protocol/openid-connect/token");
+        assertThat(erneuertesToken.statusCode()).isEqualTo(200);
+        String zugang = erneuertesToken.path("access_token");
+        assertThat(tokenRollen(zugang)).contains("treuhaender").doesNotContain("mitarbeiter");
+        assertThat(tokenWiderruf.widerrufen(eigeneId, tokenIat(zugang))).isFalse();
+        given().auth().oauth2(zugang).get("/api/v1/mandant/funktionen").then().statusCode(200);
     }
 
     @Angenommen("ein synthetischer aktiver Mitarbeiter und zwei aktive Inhaber bestehen")
@@ -597,10 +624,10 @@ public class BenutzerVerwaltungSchritte {
 
     @Angenommen("ein synthetischer aktiver Mitarbeiter und zwei Inhaber bestehen im Test-Keycloak")
     public void loeschungMitEchtemKeycloak() {
-        loeschungMitEchtemKeycloak("mitarbeiter", true);
+        keycloakBenutzerMitDienstkonto("mitarbeiter", true);
     }
 
-    private void loeschungMitEchtemKeycloak(String zielRolle, boolean zweiterInhaber) {
+    private void keycloakBenutzerMitDienstkonto(String zielRolle, boolean zweiterInhaber) {
         String realmUrl = ConfigProvider.getConfig().getValue("quarkus.oidc.auth-server-url", String.class);
         String basis = realmUrl.substring(0, realmUrl.indexOf("/realms/"));
         String clientId = given().auth().oauth2(admin).queryParam("clientId", "archiv-verwaltung")
@@ -621,6 +648,11 @@ public class BenutzerVerwaltungSchritte {
             @Override
             public long inhaberZaehlen(String mandant) {
                 return keycloak.inhaberZaehlen(mandant);
+            }
+
+            @Override
+            public void rolleSetzen(String mandant, String id, Rolle rolle) {
+                keycloak.rolleSetzen(mandant, id, rolle);
             }
 
             @Override
@@ -653,6 +685,11 @@ public class BenutzerVerwaltungSchritte {
             public boolean anmeldungGesperrt(String mandant, String id) {
                 return keycloak.anmeldungGesperrt(mandant, id);
             }
+
+            @Override
+            public void sperreAufheben(String mandant, String id) {
+                keycloak.sperreAufheben(mandant, id);
+            }
         }, IdentitaetsDienst.class);
         loeschungMitKeycloak = true;
         eigeneId = keycloakBenutzerAnlegen(MANDANT, name, zielRolle);
@@ -673,7 +710,7 @@ public class BenutzerVerwaltungSchritte {
     }
 
     private void inhaberFuerLoeschung(boolean zweiterInhaber) {
-        loeschungMitEchtemKeycloak("inhaber", zweiterInhaber);
+        keycloakBenutzerMitDienstkonto("inhaber", zweiterInhaber);
         anfrage().contentType("application/json").body(Map.of("grund", "AUSTRITT"))
                 .post(PFAD + "/" + eigeneId + "/deaktivieren").then().statusCode(204);
         assertThat(identitaet.inhaberZaehlen(MANDANT)).isEqualTo(zweiterInhaber ? 2 : 1);
@@ -811,18 +848,24 @@ public class BenutzerVerwaltungSchritte {
 
     @Wenn("der Inhaber den Mitarbeiter sperrt und wieder entsperrt")
     public void sperrenUndEntsperren() {
-        antworten.add(anfrage().contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
-                .post(PFAD + "/" + eigeneId + "/sperren"));
+        Response sperrung = anfrage().contentType("application/json").body("{\"grund\":\"SICHERHEIT\"}")
+                .post(PFAD + "/" + eigeneId + "/sperren");
+        assertThat(sperrung.statusCode()).isEqualTo(204);
+        antworten.add(sperrung);
+        Response altesTokenAntwort = given().auth().oauth2(altesToken).get("/api/v1/mandant/funktionen");
+        assertThat(ProblemDetails.pruefen(altesTokenAntwort, 401)).isEqualTo("NICHT_ANGEMELDET");
         antworten.add(anfrage().get(PFAD + "/" + eigeneId));
         antworten.add(anfrage().contentType("application/json").post(PFAD + "/" + eigeneId + "/entsperren"));
     }
 
-    @Dann("ist der Mitarbeiter wieder aktiv")
+    @Dann("ist der Mitarbeiter wieder aktiv und sein altes Token bleibt abgewiesen")
     public void wiederAktiv() {
         assertThat(antworten).extracting(Response::statusCode).containsExactly(204, 200, 204);
         assertThat(antworten.get(1).jsonPath().<String>get("status")).isEqualTo("GESPERRT");
         assertThat(tokenWiderruf.widerrufen(eigeneId, Instant.EPOCH)).isTrue();
         assertThat(identitaet.benutzerLesen(MANDANT, eigeneId).aktiv()).isTrue();
+        Response altesTokenAntwort = given().auth().oauth2(altesToken).get("/api/v1/mandant/funktionen");
+        assertThat(ProblemDetails.pruefen(altesTokenAntwort, 401)).isEqualTo("NICHT_ANGEMELDET");
         anfrage().get(PFAD + "/" + eigeneId).then().statusCode(200).body("status", org.hamcrest.Matchers.is("AKTIV"));
     }
 
@@ -1290,6 +1333,33 @@ public class BenutzerVerwaltungSchritte {
                 benutzername + "@example.invalid", "Test", "Person"), Rolle.MITARBEITER);
         benutzer.add(Map.entry(mandant, id));
         return id;
+    }
+
+    private static List<String> tokenRollen(String token) {
+        List<String> rollen = new ArrayList<>();
+        tokenNutzlast(token).path("realm_access").path("roles").forEach(rolle -> rollen.add(rolle.asText()));
+        return rollen;
+    }
+
+    private static Instant tokenIat(String token) {
+        return Instant.ofEpochSecond(tokenNutzlast(token).path("iat").asLong());
+    }
+
+    private static JsonNode tokenNutzlast(String token) {
+        try {
+            return new ObjectMapper().readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
+        } catch (IOException e) {
+            throw new IllegalStateException("Testtoken konnte nicht gelesen werden", e);
+        }
+    }
+
+    private static void wartenAufNaechsteTokenSekunde() {
+        try {
+            TimeUnit.MILLISECONDS.sleep(1_100);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Test unterbrochen", e);
+        }
     }
 
     private io.restassured.specification.RequestSpecification anfrage() {

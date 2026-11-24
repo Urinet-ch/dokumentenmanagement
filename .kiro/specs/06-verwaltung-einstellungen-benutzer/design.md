@@ -738,6 +738,28 @@ Update → Rollback → Update sowie den Erhalt der Widerrufe und Constraints.
 Die Anbindung nach Rollenwechsel und Löschen folgt mit 19.11 beziehungsweise 19.12, wenn diese Endpunkte umgesetzt
 werden. Die Checkbox für 19.9 bleibt bis zu diesen Anbindungen offen.
 
+## Umsetzung (Aufgabe 19.9, 24.11.2026)
+
+Die nachgelagerten Verwaltungsaktionen aus 19.11 und 19.12 setzen den Widerruf inzwischen ebenfalls. Das
+`@req-4.9`-Szenario sperrt einen Testbenutzer mit zuvor verwendetem JWT, prüft zuerst HTTP 204 für die Sperre und
+weist danach das alte JWT mit 401 ab; auch nach dem Entsperren bleibt dieses Token widerrufen. Beim Rollenwechsel
+weist es die alte Version zurück, widerruft das zuvor verwendete JWT und prüft nach Erneuerung die Rolle
+`treuhaender` sowie den Zugriff mit dem neuen JWT. Der Testbenutzer liegt dabei im selben Keycloak-Adapter wie der
+Verwaltungsendpunkt; ein isolierter Testbenutzer im Stub würde die reale Tokenbindung nicht belegen.
+
+JWT-`iat` hat Sekundenauflösung, der persistierte Widerrufszeitpunkt höhere Präzision. Ein unmittelbar in derselben
+Sekunde erneuertes Token kann darum vorsorglich ebenfalls abgewiesen werden; der Rollenwechseltest erneuert nach
+der nächsten `iat`-Sekunde und verlangt dann das neue Rollen-Claim. Der bestehende Cachetest prüft die Aktualisierung
+eines zwischengespeicherten Negativbefunds nach Ablauf der Test-Cachezeit; die Produktionskonfiguration bleibt auf
+höchstens fünf Sekunden begrenzt.
+
+Die einzelne historische Beobachtung `200` statt `401` im lokalen Lauf zu PR #502 liess sich im ursprünglichen
+`@req-4.9`-Szenario und im vollständigen Szenarienlauf nicht reproduzieren; ihre Ursache bleibt deshalb offen.
+Ein beim Ausbau des Sperrtests reproduzierter `200` hatte eine andere, festgestellte Ursache: Der Test legte den
+Zielbenutzer direkt in Keycloak an, während der Verwaltungsendpunkt noch den Identitäts-Stub verwendete; die
+Sperre endete mit 404 und widerrief folglich kein Token. Der korrigierte Test nutzt den Keycloak-Adapter und
+assertiert den erfolgreichen Sperrabschluss vor der Tokenprüfung.
+
 ## Umsetzung (Aufgabe 19.11, 22.11.2026)
 
 Die Rechte-Übersicht liest die bestehende Rechtematrix. Bei keiner oder mehreren Archiv-Rollen meldet sie
