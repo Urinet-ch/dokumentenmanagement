@@ -3,13 +3,13 @@
 # Der Deploy-Workflow taggt das Image als archiv:kc-<version> (Compose-Policy der VPS). Build-Kontext: deploy/.
 FROM quay.io/keycloak/keycloak:26.8.2-3@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3 AS keycloak
 
-FROM eclipse-temurin:25.0.5.1_2-jdk-noble@sha256:c7eef3dfeb81468533ea48c67bddaa8c7ca916454259e4d0d734d12bcff8e125 AS build
+FROM eclipse-temurin:26.0.2.1_1-jdk-noble@sha256:9c0e8eddecccc0d5679b317b0c90fa7103ad25cae33df1c00280675eb681c7f8 AS build
 ENV KC_RUN_IN_CONTAINER=true
 COPY --from=keycloak --chown=1000:0 /opt/keycloak/ /opt/keycloak/
 USER 1000:0
 RUN /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --cache=local
 
-FROM eclipse-temurin:25.0.5.1_2-jre-noble@sha256:2ec98aa522c472deadfd2b7c5b39bca680e33ef522a53a72f10789bdf89a6bb5
+FROM eclipse-temurin:26.0.2.1_1-jre-noble@sha256:adfd44c114916dc79fa9a24087fbac34252096edb9892d1c2d9d82db3f8947b3
 ENV KC_RUN_IN_CONTAINER=true
 COPY --from=build --chown=1000:0 /opt/keycloak/ /opt/keycloak/
 COPY --chown=1000:0 keycloak/realm-export.json /opt/keycloak/data/import/realm-export.json
