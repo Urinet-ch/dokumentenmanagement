@@ -28,7 +28,7 @@ public final class ReqAbdeckung {
     private static final Pattern AUFGABE = Pattern.compile("^\\s*- \\[([ xX])](\\*?) (\\S+)");
     private static final Pattern CHECKBOX = Pattern.compile("^\\s*[-*] \\[[ xX]]");
     private static final Pattern LABEL = Pattern.compile("^\\s*-?\\s*[*_]*Anforderungen[*_]*\\s*:");
-    private static final Pattern WELLE = Pattern.compile("^(\\d+)\\.\\d+$");
+    private static final Pattern WELLE = Pattern.compile("^(\\d+)\\.\\d+[a-z]?$");
     private static final Pattern OPTIONAL = Pattern.compile("^O\\.\\d+$");
     private static final Pattern ANFORDERUNGEN = Pattern.compile("^\\s*(?:- )?_Anforderungen: ([^_]*)_\\s*$");
     private static final Pattern KRITERIEN = Pattern.compile("^(\\d+)\\.(\\d+)(\\s*–\\s*(?:(\\d+)\\.)?(\\d+))?$");
