@@ -16,7 +16,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <!-- Quarkus 3.40 LTS; 3.40.1.2 ist das aktuelle Patch-Release (CVE-Fixes) -->
         <quarkus.platform.version>3.40.1.2</quarkus.platform.version>
-        <quinoa.version>2.9.3</quinoa.version>
+        <quinoa.version>4.0.0</quinoa.version>
         <quarkus-cucumber.version>1.5.0</quarkus-cucumber.version>
         <archunit.version>1.5.1</archunit.version>
         <assertj.version>3.27.7</assertj.version>
