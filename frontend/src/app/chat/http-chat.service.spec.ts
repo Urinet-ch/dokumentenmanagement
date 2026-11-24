@@ -207,9 +207,9 @@ describe('HttpChatService (Spec 02, Aufgabe 7.4)', () => {
     await Promise.resolve();
     http
       .expectOne('/api/v1/chat/gespraeche')
-      .flush([{ id: 'g1', titel: 'Offene Rechnungen', geaendert: '2026-11-14T08:00:00Z' }]);
+      .flush([{ id: 'g1', titel: 'Offene Rechnungen', geaendert: '2026-11-14T08:00:00Z', modus: 'ARCHIV' }]);
     expect(liste).toEqual([
-      { id: 'g1', titel: 'Offene Rechnungen', geaendert: '2026-11-14T08:00:00Z' },
+      { id: 'g1', titel: 'Offene Rechnungen', geaendert: '2026-11-14T08:00:00Z', modus: 'ARCHIV' },
     ]);
 
     let nachrichten: unknown;

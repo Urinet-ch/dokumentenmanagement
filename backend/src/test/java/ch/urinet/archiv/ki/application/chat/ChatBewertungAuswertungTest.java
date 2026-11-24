@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.ki.adapter.out.export.ChatBewertungZipExport;
 import ch.urinet.archiv.ki.domain.chat.Schwaerzung;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
@@ -50,7 +51,7 @@ class ChatBewertungAuswertungTest {
                   "suchweg":"HYBRID","aehnlichkeiten":{"%s":0.87}}]
                 """.formatted(DOKUMENT, DOKUMENT, DOKUMENT),
                 "[{\"id\":\"" + DOKUMENT + "\",\"titel\":\"Synthetische Quelle\",\"link\":\"/dokument/"
-                        + DOKUMENT + "\"}]", 12, 9, 350L, "test-modell", "prompt-v1"));
+                        + DOKUMENT + "\"}]", 12, 9, 350L, "test-modell", "prompt-v1", Chatmodus.WISSEN));
         List<ZugriffEintrag> protokoll = new ArrayList<>();
         ChatBewertungAuswertung anwendung = new ChatBewertungAuswertung(
                 speicher, protokoll::add, new ChatBewertungZipExport());
@@ -66,6 +67,7 @@ class ChatBewertungAuswertungTest {
         assertThat(dateien.keySet()).containsExactlyInAnyOrder("schema.json", "README.txt", "bewertungen.jsonl");
         JsonNode export = JSON.readTree(dateien.get("bewertungen.jsonl").lines().findFirst().orElseThrow());
         assertThat(schema(dateien.get("schema.json")).validate(export.toString(), InputFormat.JSON)).isEmpty();
+        assertThat(export.path("modus").asText()).isEqualTo("WISSEN");
         assertThat(export.path("frage").asText()).contains("[E-MAIL]", "[BETRAG]", "[DATUM]")
                 .doesNotContain("ada@example.test", "42.50", "Ada Muster");
         assertThat(export.path("freitext").asText()).contains("[PARTNER-1]").doesNotContain("Ada Muster");

@@ -57,6 +57,7 @@ public class ChatBewertungZipExport implements ChatBewertungZipPort {
                                        Schwaerzung schwaerzung, byte[] salz) {
         ObjectNode json = JSON.createObjectNode();
         json.put("datum", zeile.zeit().atZone(ZUERICH).toLocalDate().toString());
+        json.put("modus", zeile.modus().name());
         json.put("sterne", zeile.sterne());
         optional(json, "grund", zeile.grund());
         optionalText(json, "freitext", zeile.freitext(), schwaerzung);
