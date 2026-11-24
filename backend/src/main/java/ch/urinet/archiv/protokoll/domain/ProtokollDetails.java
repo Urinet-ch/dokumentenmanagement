@@ -266,9 +266,11 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
             if (anlass != null && vorgang != Verwaltungsvorgang.ROLLE_ZUWEISEN) {
                 throw new IllegalArgumentException("Übernahmeanlass nur beim Rollenvorgang");
             }
-            if (passkeys != null && (vorgang != Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN || passkeys < 0
-                    || passkeys > 100)) {
+            if (passkeys != null && (vorgang != Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN || passkeys < 0)) {
                 throw new IllegalArgumentException("Zahl der Passkeys nur beim Zurücksetzen des Zugangs");
+            }
+            if (passkeys != null) {
+                passkeys = Math.min(passkeys, 100);
             }
         }
 

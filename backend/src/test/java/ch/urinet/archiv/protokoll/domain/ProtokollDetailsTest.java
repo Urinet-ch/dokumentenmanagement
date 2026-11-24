@@ -90,11 +90,12 @@ class ProtokollDetailsTest {
         var ok = new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN, ziel,
                 ProtokollDetails.Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN, null, null, List.of(), null, null, 2);
         assertThat(ok.passkeys()).isEqualTo(2);
-        for (Integer ungueltig : new Integer[] {-1, 101}) {
-            assertThatThrownBy(() -> new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN,
-                    ziel, ProtokollDetails.Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN, null, null, List.of(), null, null,
-                    ungueltig)).isInstanceOf(IllegalArgumentException.class);
-        }
+        var viele = new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN, ziel,
+                ProtokollDetails.Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN, null, null, List.of(), null, null, 101);
+        assertThat(viele.passkeys()).isEqualTo(100);
+        assertThatThrownBy(() -> new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN,
+                ziel, ProtokollDetails.Verwaltungsvorgang.ZUGANG_ZURUECKSETZEN, null, null, List.of(), null, null,
+                -1)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ProtokollDetails.Verwaltung(id, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN,
                 ziel, ProtokollDetails.Verwaltungsvorgang.SPERREN, null, null, List.of(), null, null, 1))
                 .isInstanceOf(IllegalArgumentException.class);

@@ -59,6 +59,16 @@ class BenutzerEtagTest {
         assertThat(BenutzerEtag.berechnen(leerStattNull, BenutzerStatus.AKTIV)).isNotEqualTo(etag);
     }
 
+    @Test
+    void passkeyAnzahlBeeinflusstDenEtag() {
+        var ohne = new Benutzer("id", "user", "a@b", "Vor", "Nach", true, Set.of(Rolle.MITARBEITER),
+                Set.of(), false, false, 0);
+        var mit = new Benutzer("id", "user", "a@b", "Vor", "Nach", true, Set.of(Rolle.MITARBEITER),
+                Set.of(), false, false, 1);
+        assertThat(BenutzerEtag.berechnen(mit, BenutzerStatus.AKTIV))
+                .isNotEqualTo(BenutzerEtag.berechnen(ohne, BenutzerStatus.AKTIV));
+    }
+
     private static Benutzer benutzer(String name, String email, String vorname, String nachname, boolean aktiv,
                                      Set<Rolle> rollen, Set<IdentitaetsDienst.ErforderlicheAktion> aktionen,
                                      boolean totp, boolean google) {
