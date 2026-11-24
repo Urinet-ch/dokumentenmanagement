@@ -21,6 +21,14 @@ describe('hilfeKontext (Spec 07, Req 4.3)', () => {
     expect(hilfeKontext('/erfassen', null, HILFE_KATALOG)).toBeNull();
   });
 
+  it('zeigt die Verwaltungshilfe zu Einstellungen nur dem Inhaber', () => {
+    expect(hilfeKontext('/verwaltung/einstellungen', 'inhaber', HILFE_KATALOG)).toBe('verwaltung');
+    expect(hilfeKontext('/verwaltung/einstellungen/verlauf', 'inhaber', HILFE_KATALOG)).toBe('verwaltung');
+    for (const rolle of ['mitarbeiter', 'treuhaender', 'geschaeftsstelle', null] as const) {
+      expect(hilfeKontext('/verwaltung/einstellungen', rolle, HILFE_KATALOG)).toBeNull();
+    }
+  });
+
   it('zeigt beim Erfassen abgemeldet und offline die Offline-Anleitung', () => {
     expect(hilfeKontext('/erfassen?test=1', null, HILFE_KATALOG, true)).toBe('erfassen-offline');
     expect(hilfeKontext('/suche', null, HILFE_KATALOG, true)).toBeNull();

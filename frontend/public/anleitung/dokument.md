@@ -21,11 +21,6 @@ Unter «Metadaten» stehen die Angaben, die das Dokument hat, zum Beispiel Dokum
 - «Dateiname» ist der Name der Datei beim Erfassen; eine Erfassung am Handy heisst Aufnahme mit Datum und Uhrzeit der ersten Seite, zum Beispiel `Aufnahme 13.11.2026 08:15`. Der Dateiname ist kein Titel und lässt sich nicht ändern.
 - Dürfen Sie Kontakte sehen, führt der Partner zu seinem Kontakt.
 
-## Als Wissensquelle verwenden
-Inhaber und Geschäftsstelle (Recht A16) können ein archiviertes Dokument mit «Als Wissensquelle verwenden» als Wissensquelle verwenden. Die Dokumentart bleibt unverändert. Das Archiv zeigt die Markierung als Kennzeichen und reiht einen Ingest ein; das Ergebnis ist ein Entwurf, der erst nach der einzelnen Freigabe wirksam wird.
-
-Ein Dokument lässt sich nicht markieren, wenn es noch nicht archiviert ist, die Vertraulichkeit «Personal» hat, kein Volltext vorhanden ist oder die PDF/A-Fassung fehlt. Die Meldung nennt den Grund. Die Markierung lässt sich mit «Wissensquelle entfernen» aufheben. Bereits erstellte Wissensseiten und ihre Quelleneinträge bleiben erhalten.
-
 ## Aufbewahrung
 
 - «Aufbewahren bis» nennt das Datum, bis zu dem das Dokument aufbewahrt wird.

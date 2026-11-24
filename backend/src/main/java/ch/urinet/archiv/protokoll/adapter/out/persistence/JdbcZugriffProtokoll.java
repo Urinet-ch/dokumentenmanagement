@@ -171,6 +171,9 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             if (verwaltung.abweichung() != null) {
                 knoten.put("abweichung", verwaltung.abweichung().name());
             }
+            if (verwaltung.anlass() != null) {
+                knoten.put("anlass", verwaltung.anlass().name());
+            }
             if (verwaltung.passkeys() != null) {
                 knoten.put("passkeys", verwaltung.passkeys());
             }

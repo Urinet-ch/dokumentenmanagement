@@ -1,6 +1,6 @@
 Die Liste «Wissensquellen» auf der Seite «Wissen» zeigt Dokumente, die für den Ingest markiert sind. Sie sehen Titel, Dokumentart, den Zeitpunkt der Markierung und den Stand des letzten Ingest. Wählen Sie einen Titel, um das Dokument zu öffnen.
 
-Ein bereits archiviertes Dokument kann mit seiner bestehenden Dokumentart als Wissensquelle verwendet werden. Die Markierung ändert weder die Dokumentart noch Dateien, Vertraulichkeit, Aufbewahrung oder Sperren.
+Ein bereits archiviertes Dokument kann mit seiner bestehenden Dokumentart als Wissensquelle verwendet werden. Öffnen Sie es in der Dokumentansicht und wählen Sie «Als Wissensquelle verwenden». Die Markierung ändert weder die Dokumentart noch Dateien, Vertraulichkeit, Aufbewahrung oder Sperren; die Dokumentansicht zeigt sie als Kennzeichen.
 
 Inhaber und Geschäftsstelle mit Recht A16 können «Wissensquelle entfernen» wählen. Dadurch endet nur die Markierung: Bestehende Wissensseiten und Quelleneinträge werden nicht gelöscht oder geändert. Eine Markierung lässt sich nicht setzen, wenn das Dokument nicht archiviert oder «Personal» ist, kein Volltext vorhanden ist oder die PDF/A-Fassung fehlt. Der genaue Grund erscheint in der Dokumentansicht.
 

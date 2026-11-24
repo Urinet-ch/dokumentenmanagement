@@ -131,6 +131,7 @@ public class VerwaltungVorgang {
                     || !absicht.rolle().equals(eintrag.rolle())
                     || details.vorgang() != ende.vorgang()
                     || details.grund() != ende.grund()
+                    || details.anlass() != ende.anlass()
                     || (details.rolleAlt() != null && details.rolleAlt() != ende.rolleAlt())
                     || (details.rolleNeu() != null && details.rolleNeu() != ende.rolleNeu())
                     || (!details.felder().isEmpty() && !details.felder().equals(ende.felder()))
@@ -221,14 +222,19 @@ public class VerwaltungVorgang {
         Objects.requireNonNull(eintrag);
         ProtokollDetails.Verwaltung details = eintrag.details().verwaltung();
         if (!AKTIONEN.contains(eintrag.aktion()) || eintrag.dokumentId().isPresent()
-                || eintrag.rolle().isEmpty() && (eintrag.aktion() != ProtokollAktion.BENUTZER_ANLEGEN
-                        || eintrag.benutzer().filter(benutzer -> benutzer.matches("betreiber:[^\\p{Cntrl}]{1,80}"))
-                                .isEmpty())
+                || eintrag.rolle().isEmpty() && !betreiberZulaessig(eintrag, details)
                 || details == null || details.phase() != phase
                 || (eintrag.aktion() != ProtokollAktion.BENUTZER_ANLEGEN && details.ziel() == null)) {
             throw new IllegalArgumentException("Ungültiges Verwaltungsprotokoll");
         }
         return details;
+    }
+
+    private static boolean betreiberZulaessig(ZugriffEintrag eintrag, ProtokollDetails.Verwaltung details) {
+        return eintrag.benutzer().filter(benutzer -> benutzer.matches("betreiber:[^\\p{Cntrl}]{1,80}")).isPresent()
+                && (eintrag.aktion() == ProtokollAktion.BENUTZER_ANLEGEN
+                    || eintrag.aktion() == ProtokollAktion.ROLLE_ZUWEISEN && details != null
+                        && details.anlass() == ProtokollDetails.Verwaltungsanlass.UEBERNAHME);
     }
 
     private static VerwaltungGrenzen.Art grenzart(ProtokollAktion aktion,
@@ -275,7 +281,8 @@ public class VerwaltungVorgang {
         ProtokollDetails.Verwaltung bisher = eintrag.details().verwaltung();
         var details = new ProtokollDetails.Verwaltung(bisher.vorgangId(), phase,
                 bisher.ziel() != null ? bisher.ziel() : ziel, bisher.vorgang(),
-                bisher.rolleAlt(), bisher.rolleNeu(), bisher.felder(), bisher.grund());
+                bisher.rolleAlt(), bisher.rolleNeu(), bisher.felder(), bisher.grund(), bisher.abweichung(),
+                bisher.anlass(), bisher.passkeys());
         return new ZugriffEintrag(eintrag.benutzer(), eintrag.rolle(), eintrag.aktion(), eintrag.dokumentId(),
                 eintrag.ip(), ProtokollDetails.verwaltung(details), eintrag.bearbeiter());
     }

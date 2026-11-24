@@ -112,10 +112,8 @@ ich nicht nach Funktionen suche, die mir nicht offenstehen.
 3. Die Einführung SOLL Namen und Logo des Mandanten aus dem Branding zeigen (`GET /branding`, Spec 03, 2.1; im Frontend
    `BrandingService`) und keinen Mandantennamen fest im Text führen.
 4. Die Texte der Einführung und der Anleitung SOLLEN für alle Mandanten gleich sein; nur Name und Logo aus dem Branding
-   unterscheiden sich, und der Code SOLL nie die Kennung eines Mandanten abfragen. [offen: ob der Mandant `vhf-gsk` einen
-   eigenen Satz zur Webseite braucht (welche bestätigten Dokumente auf der WordPress-Seite erscheinen und ab wann,
-   Spec 03) – Wortlaut von Fabian mit der Geschäftsstelle; falls ja, kommt er über die Konfiguration des Mandanten
-   (Spec 05), nicht über eine Abfrage im Code; bis dahin entfällt er.]
+   unterscheiden sich, und der Code SOLL nie die Kennung eines Mandanten abfragen. Ein zusätzlicher Satz zu den auf der
+   Webseite erscheinenden Dokumenten ist nicht vorgesehen (Entscheid Fabian vom 24.11.2026).
 
 ### Requirement 3: Bedienung der Einführung (ohne Konzept-ID)
 **User Story:** Als neue Person möchte ich die Einführung in meinem Tempo durchgehen, jederzeit überspringen und später

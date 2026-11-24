@@ -3,6 +3,7 @@ import { Aktion, Rolle } from '../gemeinsam/anmeldung/rechte';
 import { Anleitungsteil, anleitungMarkdown } from './anleitung-markdown';
 import { istAppPfad } from './app-pfade';
 import { HILFE_KATALOG, HilfeEintrag, bedingungErfuellt, hilfeEintrag } from './hilfe-katalog';
+import { sichtbareAbschnitte } from './hilfe-sichtbar';
 
 // Abschnitte der Anleitung gegen Spec 07, Req 6.1 und design.md «Hilfe-Katalog» (Aufgabe 22.5): Reihenfolge, Titel,
 // Bedingungen, Verweise zwischen Abschnitten und die Namen aus texte.de-CH.ts. Gelesen wird wie in
@@ -50,7 +51,7 @@ const SOLL: readonly Soll[] = [
   { anker: 'wissen-quellen', titel: 'Wissensquellen markieren und verwalten', eltern: 'wissen', eine: ['A16'] },
   { anker: 'importe', titel: 'Importe', eine: ['A12'], pfade: ['/importe'] },
   { anker: 'jahresexport', titel: 'Jahresexport', eine: ['EXPORT'], pfade: ['/export'] },
-  { anker: 'verwaltung', titel: 'Verwaltung', eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer'] },
+  { anker: 'verwaltung', titel: 'Verwaltung', eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer', '/verwaltung/einstellungen'] },
   { anker: 'verwaltung-dokumentarten', titel: 'Dokumentarten', eltern: 'verwaltung', eine: ['A11'], pfade: ['/verwaltung/dokumentarten'] },
   { anker: 'verwaltung-protokoll', titel: 'Zugriffsprotokoll', eltern: 'verwaltung', eine: ['A13'], pfade: ['/verwaltung/protokoll'] },
   { anker: 'verwaltung-api-tokens', titel: 'API-Tokens', eltern: 'verwaltung', eine: ['A14'], pfade: ['/verwaltung/api-tokens'] },
@@ -123,6 +124,20 @@ describe('Abschnitte der Anleitung (Spec 07, Req 6.1)', () => {
           }
         }
       }
+    }
+  });
+
+  it('zeigt die Markierung einer Wissensquelle nur Rollen mit diesem Recht', () => {
+    const text = (rolle: Rolle) =>
+      sichtbareAbschnitte(HILFE_KATALOG, rolle)
+        .flatMap(({ eintrag, unter }) => [eintrag, ...unter])
+        .map((eintrag) => lesen(`public${eintrag.datei}`))
+        .join('\n');
+    for (const rolle of ['inhaber', 'geschaeftsstelle'] as const) {
+      expect(text(rolle)).toContain('«Als Wissensquelle verwenden»');
+    }
+    for (const rolle of ['mitarbeiter', 'treuhaender'] as const) {
+      expect(text(rolle)).not.toContain('«Als Wissensquelle verwenden»');
     }
   });
 

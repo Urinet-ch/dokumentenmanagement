@@ -544,9 +544,14 @@ public class OeffentlicherChatSchritte {
 
     @Dann("steht in der Chatbot-Antwort weder «{}» noch «{}»")
     public void nennt(String eins, String zwei) {
-        // Die zufällige Fehlerinstanz (urn:uuid:…) kann zufällig «501» enthalten und ist kein Eingabewert.
-        String text = antwort.asString().replaceAll("urn:uuid:[0-9a-fA-F-]+", "urn:uuid:-");
+        String text = ohneZufaelligeKennungen(antwort.asString());
         assertThat(text).doesNotContain(eins).doesNotContain(zwei);
+    }
+
+    static String ohneZufaelligeKennungen(String text) {
+        return text.replaceAll("urn:uuid:[0-9a-fA-F-]+", "urn:uuid:-")
+                .replaceAll("(\"gespraechId\"\\s*:\\s*\")[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+                        + "[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=\")", "$1-");
     }
 
     @Dann("zeigt der Stream des Chatbots genau die Ereignisse «{}»")

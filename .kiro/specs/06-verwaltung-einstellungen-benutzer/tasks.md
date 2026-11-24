@@ -240,8 +240,19 @@ auf Server oder Secrets aus der Sitzung.
 - [ ] 21.2 Migration der heutigen Benutzer [Fabian]
   - Lauf `archiv benutzer abgleichen urinet --pruefen`, dann ohne `--pruefen` auf Stufe A; Abweichungen klären (Rollen, `mandant`,
     TOTP); `fabian` bleibt Inhaber; Anmeldungen vor und nach dem Lauf prüfen; Ergebnis in `docs/abnahme/verwaltung.md`.
+  - Vorbereitung: `docs/benutzer-migration-entwurf.md` und `tools/benutzer-migration-entwurf.py` sind ein Entwurf;
+    bei bestehenden Inhabern ist `ROLLE_OHNE_VORGANG` vor 21.2a zu erwarten. Ausführung, Freigabe und Abnahme bleiben bei Fabian.
   - _Anforderungen: 9.4_
-  - _Abhängig von: 21.1, 19.3_
+  - _Abhängig von: 21.1, 21.2a, 19.3_
+
+- [x] 21.2a Betreibervorgang für bestehende Inhaber [Backend]
+  - Einmaliger protokollierter Betreibervorgang `ROLLE_ZUWEISEN` mit Anlass `UEBERNAHME` für bestehende
+    Inhaber ohne Rollenvorgang; Keycloak nur lesen, Trockenlauf standardmässig, idempotent und mandantengebunden.
+    Abgleich-Regel 6.5/9.4 bleibt streng (Entscheid Fabian 24.11.2026).
+  - Nachweis: `inhaber-uebernahme.feature` (`@req-6.3`, `@req-6.5`, `@req-9.4`), `VerwaltungVorgangTest`
+    und `BestehendenInhaberKommandoTest`; der Betriebsnachweis der Migration bleibt bei 21.2.
+  - _Anforderungen: 6.3, 6.5, 9.4_
+  - _Abhängig von: 21.1_
 
 - [x] 21.3 Isolations- und Eskalationstests [QA]
   - `VerwaltungIsolationIT` (zwei Mandanten, vier Rollen, alle Endpunkte), `EskalationTest` (Matrix), `LetzterInhaberTest` mit
@@ -249,7 +260,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.2, 4.3, 4.6, 4.7, 4.8, 4.10, 9.5, 9.6_
   - _Abhängig von: 19.12, 19.13_
 
-- [ ] 21.4 Sicherheits- und Ausfalltests [QA]
+- [x] 21.4 Sicherheits- und Ausfalltests [QA]
   - Ausfall von Keycloak (kein Hängen, keine Wiederholung, Schutzschalter), Step-up, Raten, Header und Medientyp,
     Protokoll ohne Klartext, Einladung bis zum Link mit Mailpit, Konsistenz nach Abbruch zwischen Absicht und Abschluss.
   - _Anforderungen: 5.5, 5.6, 5.7, 5.8, 6.2, 6.4, 6.6, 7.2, 7.5, 7.7, 7.8, 9.5_

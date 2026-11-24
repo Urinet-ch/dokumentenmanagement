@@ -15,6 +15,37 @@ Given(/^das Branding heisst «(.+)» und hat ein Logo$/, async function (name) {
   this.brandingLogo = logo;
 });
 
+async function einfuehrungsSchritte(seite, rolle, name) {
+  const quelltexte = await Promise.all([
+    'gemeinsam/texte.de-CH.ts',
+    'gemeinsam/navigation.ts',
+    'gemeinsam/anmeldung/rechte.ts',
+    'hilfe/einfuehrung-schritte.ts',
+  ].map(async (pfad) => ts.transpileModule(
+    await readFile(new URL(`../../src/app/${pfad}`, import.meta.url), 'utf8'),
+    { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+  ).outputText));
+  return seite.evaluate(async ({ quelltexte, rolle, name }) => {
+    const urls = [];
+    const modul = (code) => {
+      const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+      urls.push(url);
+      return url;
+    };
+    try {
+      const texte = modul(quelltexte[0]);
+      const navigation = modul(quelltexte[1].replace("'./texte.de-CH'", `'${texte}'`));
+      const rechte = await import(modul(quelltexte[2]));
+      const schrittModul = await import(modul(quelltexte[3]
+        .replace("'../gemeinsam/navigation'", `'${navigation}'`)
+        .replace("'../gemeinsam/texte.de-CH'", `'${texte}'`)));
+      return schrittModul.einfuehrungSchritte((aktion) => rechte.darf(rolle, aktion), name, rolle);
+    } finally {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    }
+  }, { quelltexte, rolle, name });
+}
+
 Then(/^zeigt die Einführung den Namen «(.+)» und das Logo aus dem Branding$/, async function (name) {
   const karte = this.seite.locator('app-start .einfuehrung');
   await karte.getByRole('heading', { name: `Willkommen im ${name}` }).waitFor();
@@ -47,40 +78,24 @@ Then(/^sehe ich die Einführung mit meiner Rolle «(.+)» über den Kacheln$/, a
 });
 
 Then(/^enthält die Schrittfolge für «(.+)» die Schritte «(.*)» und Bereiche «(.*)»$/, async function (rolle, schritte, bereiche) {
-  const quelltexte = await Promise.all([
-    'gemeinsam/texte.de-CH.ts',
-    'gemeinsam/navigation.ts',
-    'gemeinsam/anmeldung/rechte.ts',
-    'hilfe/einfuehrung-schritte.ts',
-  ].map(async (pfad) => ts.transpileModule(
-    await readFile(new URL(`../../src/app/${pfad}`, import.meta.url), 'utf8'),
-    { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-  ).outputText));
-  const ergebnis = await this.seite.evaluate(async ({ quelltexte, rolle }) => {
-    const urls = [];
-    const modul = (code) => {
-      const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
-      urls.push(url);
-      return url;
-    };
-    try {
-      const texte = modul(quelltexte[0]);
-      const navigation = modul(quelltexte[1].replace("'./texte.de-CH'", `'${texte}'`));
-      const rechte = await import(modul(quelltexte[2]));
-      const schrittModul = await import(modul(quelltexte[3]
-        .replace("'../gemeinsam/navigation'", `'${navigation}'`)
-        .replace("'../gemeinsam/texte.de-CH'", `'${texte}'`)));
-      const folge = schrittModul.einfuehrungSchritte((aktion) => rechte.darf(rolle, aktion), 'Archiv', rolle);
-      return {
-        schritte: folge.map((schritt) => schritt.titel),
-        bereiche: folge.flatMap((schritt) => schritt.bereiche?.map((bereich) => bereich.text) ?? []),
-      };
-    } finally {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-    }
-  }, { quelltexte, rolle });
+  const folge = await einfuehrungsSchritte(this.seite, rolle, 'Archiv');
+  const ergebnis = {
+    schritte: folge.map((schritt) => schritt.titel),
+    bereiche: folge.flatMap((schritt) => schritt.bereiche?.map((bereich) => bereich.text) ?? []),
+  };
   assert.deepEqual(ergebnis.schritte, schritte.split('; '));
   assert.deepEqual(ergebnis.bereiche, bereiche ? bereiche.split('; ') : []);
+});
+
+Then(/^bleiben die Einführungstexte für «(.+)» bei den Brandings «(.+)» und «(.+)» gleich$/, async function (rolle, erstesBranding, zweitesBranding) {
+  const erste = await einfuehrungsSchritte(this.seite, rolle, erstesBranding);
+  const zweite = await einfuehrungsSchritte(this.seite, rolle, zweitesBranding);
+  assert.equal(erste[0].titel, `Willkommen im ${erstesBranding}`);
+  assert.equal(zweite[0].titel, `Willkommen im ${zweitesBranding}`);
+  const ohneBranding = (schritte) => schritte.map((schritt, index) =>
+    index === 0 ? { ...schritt, titel: '' } : schritt,
+  );
+  assert.deepEqual(ohneBranding(erste), ohneBranding(zweite));
 });
 
 Then('sehe ich die Startseite ohne Einführung', async function () {

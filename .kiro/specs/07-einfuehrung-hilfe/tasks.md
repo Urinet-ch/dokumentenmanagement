@@ -5,8 +5,9 @@ das bestehende Frontend (App-Rahmen mit Seitenleiste und Kopfzeile, `navigation.
 Anmeldung, PWA); sie hängt nicht von Gate Phase 1 ab und kann parallel zu den übrigen Wellen laufen. Wellen, Rollen und
 Gates wie in `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe) nach `CLAUDE.md`, Branch
 `feature/07-<aufgabe>-<stichwort>`. Die Wellen 22 und 23 folgen auf die Nummern von Spec 06. Steht ein Wert noch auf
-«[offen: …]», wird er nicht geraten; die Aufgabe setzt bis zum Entscheid die Fassung ohne den offenen Teil um (bei 2.4:
-gleiche Texte für alle Mandanten). Abhängigkeiten zu anderen Specs stehen als `Spec 0n: <Aufgabe>`. Jede Aufgabe liefert
+«[offen: …]», wird er nicht geraten; die Aufgabe setzt bis zum Entscheid die Fassung ohne den offenen Teil um. Bei 2.4
+gilt der Entscheid Fabian vom 24.11.2026: gleiche Texte für alle Mandanten. Abhängigkeiten zu anderen Specs stehen als
+`Spec 0n: <Aufgabe>`. Jede Aufgabe liefert
 für ihre Anforderungen Cucumber-Szenarien mit `@req-<x.y>` und `@spec-07` unter `features/hilfe/` (Browser-Szenarien
 zusätzlich mit `@browser`; ausser bei Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`, bei Oberfläche
 mit Bildschirmfotos bei 375 und 1280 px in hell und dunkel, axe ohne neuen Befund und `npm run pruefe:gestaltung`. Jede

@@ -573,6 +573,26 @@ Benutzerkennung, nie ein Passwort oder Link. `abgleichen` siehe Requirement 9.2.
 wenn Dienstkonto oder SMTP nicht bereit sind.
 
 ## Migration und Inbetriebnahme
+
+### Vorbereitung (Aufgabe 21.2, 24.11.2026)
+`docs/benutzer-migration-entwurf.md` beschreibt Vorprüfung, kontrollierte Übernahme, Nachprüfung und Rückfall.
+Der Entwurf `tools/benutzer-migration-entwurf.py` verwendet das bestehende Abgleichkommando und bricht bei
+Abweichungen oder Fehlern ab; eine begonnene Übernahme kann dennoch bereits Verzeichniszeilen geschrieben haben.
+Für bestehende Inhaber ohne protokollierten Rollenvorgang, insbesondere den heutigen Inhaber im Betriebsmandanten,
+ist `ROLLE_OHNE_VORGANG` zu erwarten; `UEBERNAHME` allein behebt den Befund nicht. Nach Entscheid Fabian vom
+24.11.2026 dokumentiert der Betreibervorgang aus 21.2a die bestehende Rolle, ohne die strenge Abgleich-Regel
+zu lockern oder Keycloak zu ändern. Danach folgen Prüflauf und Schreiblauf. Nur synthetisch getestet; Ausführung
+und Abnahme bleiben bei Fabian, die Checkbox bleibt offen.
+
+### Umsetzung (Aufgabe 21.2a, 24.11.2026)
+`archiv benutzer inhaber-uebernehmen <code> --benutzer <uuid> --wer <uuid> [--ausfuehren]` prüft standardmässig
+nur. Mit `--ausfuehren` dokumentiert es eine vorhandene Inhaberrolle unter der Mandantensperre mit Absicht und
+Abschluss (`ROLLE_ZUWEISEN`, Anlass `UEBERNAHME`); Keycloak wird ausschliesslich gelesen. Die Prüfung wird unter
+der Sperre wiederholt, und bereits dokumentierte Inhaber erzeugen keinen weiteren Vorgang. `--wer` ist eine
+pseudonyme Betreiberkennung; das Protokoll enthält Kennungen und Rollen, keine persönlichen Angaben. Die
+bestehende strenge Abgleich-Regel bleibt unverändert. Das Szenario `inhaber-uebernahme.feature` belegt den Ablauf
+mit anschliessender Verzeichnisübernahme (6.3, 6.5, 9.4); weitere Tests prüfen Mandantengrenze und CLI-Fehler.
+
 1. Realm-Änderungen und Dienstkonto auf Stufe A (19.3, [Fabian]); Realm-Export für Stufe B (19.2).
 2. Migration der Datenbank (Changesets); Einstellungen: Werte aus Eigenschaften und `wissens_einstellung` in die Konfiguration
    (Version, Quelle `MIGRATION`), Verhalten unverändert (Requirement 1.5).
@@ -995,6 +1015,18 @@ axe und Überlaufprüfung) und `@req-8.5` (Step-up für Sperren, Rolle, Löschen
 Persönliches in den Browser-Speicher geschrieben wird); Einheitstests der Fortsetzung, der Fehlerbehandlung und der
 Komponenten. Offen bleibt der manuelle Nachweis auf dem Handy [Fabian] (Req 8.2, Aufgabe 21.6).
 
+## Umsetzung (Aufgabe 21.4, 24.11.2026)
+
+Die Bestandsaufnahme ergab, dass Zeitgrenzen, Wiederholungen und Schutzschalter bereits in
+`KeycloakAdminAdapterTest` geprüft werden; `ProblemAbbildungTest` deckt `Retry-After`, und die bestehenden Verwaltungs-
+Szenarien prüfen Step-up, Raten, Medientyp, Protokoll und Kompensation. `VerwaltungVorgangTest` prüft den vollständigen
+Betreiber-Aufruf bis zum Einmal-Link aus Mailpit. Die Einladung im Szenario trägt zusätzlich `@req-9.5`; die
+Mandantenisolation und Eskalation bleiben durch die Tests aus Aufgabe 21.3 belegt.
+
+Die Prüfung deckte fehlende Clickjacking-Header auf. `SicherheitsHeaderRoute` setzt deshalb auf allen Antworten
+`Content-Security-Policy: frame-ancestors 'none'` und `X-Frame-Options: DENY`; `SicherheitsHeaderTest` prüft diese
+Header sowie, dass ein Ausfall des Verwaltungs-Identitätsdienstes die API-Readiness nicht verändert und in der
+Detail-Health sichtbar bleibt.
 ### Nachtrag (Folge aus PR #529, 24.11.2026)
 
 `BenutzerAbgleichenKommando` beendet auch bei `IDENTITAETSDIENST_FEHLER` mit Exit-Code 3: eine Ablehnung des
