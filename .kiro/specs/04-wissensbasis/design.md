@@ -1460,7 +1460,12 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Hüllensperre, der tatsächliche Netzwerkversand liegt danach ausserhalb der Transaktion; ein bereits eingereihtes Ereignis
   kann nicht zurückgerufen werden. **Entscheid Fabian 24.11.2026 (Klarstellung zu 21.6, Requirements unverändert):** Die Garantie des sofortigen
   Entzugs gilt «vor dem Modellaufruf und vor dem Einreihen der Antwort»; ein bereits eingereihtes Ereignis ist nicht rückrufbar.
-  Bei erkanntem Entzug vor einer Fortsetzung wird zudem der gemerkte Gesprächsverlauf verworfen. Der Ende-zu-Ende-Nachweis bis zur Netzauslieferung fehlt.
+  Bei erkanntem Entzug vor einer Fortsetzung wird zudem der gemerkte Gesprächsverlauf verworfen.
+  **Nachweis 25.11.2026:** Die HTTP/SSE-Gegenprobe liest das erste Werkzeug-Ereignis live vom Endpunkt, ändert danach
+  die Freigabe während der Anfrage und liest den Stream bis zum Ende. Es folgt nur `fehler`, kein Text, keine Quellen und
+  kein `fertig`; damit ist die Schlussprüfung bis zur Netzauslieferung geprüft. Die Grenze bleibt unverändert:
+  Quellenstände werden vor Modellaufruf und vor Einreihen der Antwort geprüft; ein bereits eingereihtes Ereignis ist
+  nicht rückrufbar.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`

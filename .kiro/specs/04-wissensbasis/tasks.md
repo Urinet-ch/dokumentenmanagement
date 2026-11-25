@@ -243,6 +243,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 18.1_
 - [ ] 18.3 Öffentlicher Wissenschat [Backend] [Frontend]
   - Kennzeichen «für Webseite» je Seite (A16, Protokoll), `/public/v1/wissen/chat`, eigene Werkzeuge, Prüfung bei jeder Anfrage, Grenzen und Budget, Schalter je Mandant; Marker `[offen: …]` im Design auflösen; Plugin (Spec 03, 11.5) nur als Hinweis.
+  - Nachweis 25.11.2026: `OeffentlicherWissenschatResourceTest` prüft die mandantenbezogene Schalterauflösung pro Anfrage. `@req-21.6` liest im Cucumber-Netztest ein Werkzeug-Ereignis aus dem SSE-Stream, entzieht danach die Freigabe und prüft den Reststrom: `fehler`, kein Text und keine Quellen. Die Ausschlussfälle «ohne Webseitenfreigabe» und Quellenstufe `mitglieder` sind in der parallelen Nacharbeit #605 abgedeckt und werden hier nicht dupliziert. Die Checkbox bleibt offen; der Plugin-Hinweis und die vollständige Abnahme sind noch ausstehend.
   - _Anforderungen: 21.6_
   - _Abhängig von: 18.1, Spec 03: 11.2_
 - [x] 18.4 Isolations- und Abnahmetests [QA]
