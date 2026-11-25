@@ -21,8 +21,9 @@ import java.util.regex.Pattern;
 
 /**
  * {@code m_<code>.oeffentliche_frage} des Mandanten aus dem Kontext (Changeset {@code mandant/030}, Schema immer
- * qualifiziert): bereinigte Frage, Quellen (ID, Titel, Reihe, Ausgabe, Jahr und Fundstelle) und Tokens, Zeit; nie Antwort, Client, IP,
- * Schlüssel oder Webseite (Spec 03, Req 6.5). Jede Operation in eigener Transaktion mit Zeitgrenze.
+ * qualifiziert): im Archivchat bereinigte Frage und erweiterte Quellen; im Wissenschat feste Ereignisbezeichnung und
+ * Quellen-IDs. Jeweils mit Tokens und Zeit; nie Antwort, Client, IP, Schlüssel oder Webseite (Spec 03, Req 6.5).
+ * Jede Operation in eigener Transaktion mit Zeitgrenze.
  */
 @ApplicationScoped
 public class JdbcOeffentlicheFragen implements OeffentlicheFragenSpeicher {

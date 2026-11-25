@@ -1498,6 +1498,15 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
 - Nachweis: `@req-21.4` in `chat-modus-pwa.feature` und `chat-modus-export.feature`, Angular-Tests und
   `ChatBewertungAuswertungTest`. Die Browserprüfung deckt 375 und 1280 Pixel, beide Farbschemata und axe ab.
 
+### Teilnachweis (Aufgabe 18.4, 25.11.2026)
+- `@req-21.8` ist an Szenarien für Mandantentrennung, festen Modus, gesperrte Archivwerkzeuge, öffentliche Sichtbarkeit
+  nur mit Kennzeichen und Zugriffsstufe `oeffentlich`, Entzug vor dem Einreihen der SSE-Ereignisse, Prompt-Injection
+  aus Seiteninhalt und das inhaltsfreie Fragenprotokoll gebunden. Die öffentlichen Endpunkt-Szenarien prüfen zusätzlich,
+  dass ohne Freigabe bzw. bei Quellenstufe `mitglieder` weder Modelltext noch Quellen ausgeliefert werden.
+- **Noch offen (Muss):** A15/403 ist weiterhin nur durch `ChatGespraecheAnlegenTest` belegt. Eine Cucumber-Anfrage ohne
+  A15 lässt sich mit der bestehenden Rechtematrix nicht als echter Benutzer abbilden, da alle vier Rollen A15 besitzen.
+  Weder wird eine Rolle künstlich verändert noch die Rechtematrix oder Requirement 21.8 stillschweigend angepasst.
+
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:
 - **Datenmodell (Mandantenschema `m_<code>`):** Tabelle `wissensquelle_markierung(dokument_id uuid, markiert_von text, markiert_am timestamptz,
