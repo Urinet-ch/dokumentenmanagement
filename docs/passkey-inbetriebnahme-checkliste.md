@@ -8,7 +8,7 @@ die Admin-Konsole ist nicht öffentlich, und das Hilfsskript zum Listen der Erei
 iPhone und Mac geprüft (25.11.2026); der virtuelle Authenticator war und ist dafür kein Nachweis.
 
 Realm- und RP-ID-Änderungen führt der Betreiber aus. Die manuellen Gerätetests und ihre Beurteilung bleiben bei Fabian.
-Ob 24.3 abgehakt wird, entscheidet Fabian; offen ist die Ereignisprotokoll-Probe. Keine Hostnamen,
+24.3 ist von Fabian am 25.11.2026 abgenommen; offen bleibt die Ereignisprotokoll-Probe (Hilfsskript folgt separat). Keine Hostnamen,
 Adressen oder Geheimnisse gehören in diese Datei oder ins Repo.
 
 ## Reihenfolge
