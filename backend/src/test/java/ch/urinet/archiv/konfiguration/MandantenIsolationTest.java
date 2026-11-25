@@ -52,6 +52,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 abstract class MandantenIsolationIT {
 
+    private record DokumentFall(String benutzer, UUID eigeneId, UUID fremdeId) { }
+    private record ApiFehler(String type, String title, String detail, String fehlercode) { }
+
     @Inject
     MandantProvisionierung provisionierung;
 
@@ -205,6 +208,55 @@ abstract class MandantenIsolationIT {
     }
 
     @Test
+    void fremdeDokumenteSindWieUnbekannteDokumenteNichtSichtbar() throws Exception {
+        UUID urinetDokument = null;
+        UUID vhfDokument = null;
+        Throwable testFehler = null;
+        try {
+            urinetDokument = Testdokumente.anlegen(datenbank.get(),
+                    new Testdokumente.Angaben("urinet", "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+            vhfDokument = Testdokumente.anlegen(datenbank.get(),
+                    new Testdokumente.Angaben("vhf-gsk", "BULLETIN", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+            for (DokumentFall fall : List.of(
+                    new DokumentFall("inhaber-urinet", urinetDokument, vhfDokument),
+                    new DokumentFall("inhaber-vhf-gsk", vhfDokument, urinetDokument))) {
+                String token = Testanmeldung.token(fall.benutzer());
+                given().auth().oauth2(token).get("/api/v1/dokumente/" + fall.eigeneId())
+                        .then().statusCode(200);
+                for (String suffix : List.of("", "/datei", "/vorschau")) {
+                    var fremd = given().auth().oauth2(token)
+                            .get("/api/v1/dokumente/" + fall.fremdeId() + suffix).then().statusCode(404)
+                            .extract().response();
+                    var unbekannt = given().auth().oauth2(token)
+                            .get("/api/v1/dokumente/" + UUID.randomUUID() + suffix).then().statusCode(404)
+                            .extract().response();
+                    assertThat(apiFehler(fremd)).as("Fremde und unbekannte Dokument-ID bei %s", suffix)
+                            .isEqualTo(apiFehler(unbekannt));
+                    assertThat(fremd.asString()).doesNotContain(fall.fremdeId().toString());
+                }
+            }
+        } catch (Throwable t) {
+            testFehler = t;
+            throw t;
+        } finally {
+            Throwable fehler = null;
+            for (var eintrag : java.util.Map.of("urinet", java.util.Optional.ofNullable(urinetDokument),
+                    "vhf-gsk", java.util.Optional.ofNullable(vhfDokument)).entrySet()) {
+                if (eintrag.getValue().isEmpty()) continue;
+                try {
+                    Testdokumente.loeschen(datenbank.get(), eintrag.getKey(), List.of(eintrag.getValue().get()));
+                } catch (Exception e) {
+                    fehler = merken(fehler, e);
+                }
+            }
+            if (fehler != null) {
+                if (testFehler != null) testFehler.addSuppressed(fehler);
+                else throw new IllegalStateException("Aufräumen fehlgeschlagen", fehler);
+            }
+        }
+    }
+
+    @Test
     void wissensseitenBleibenBeimMandantenAusDerAnmeldung() throws Exception {
         UUID urinetSeite = UUID.randomUUID();
         UUID vhfSeite = UUID.randomUUID();
@@ -279,6 +331,11 @@ abstract class MandantenIsolationIT {
         if (erster == null) return weiterer;
         erster.addSuppressed(weiterer);
         return erster;
+    }
+
+    private static ApiFehler apiFehler(io.restassured.response.Response antwort) {
+        return new ApiFehler(antwort.path("type"), antwort.path("title"), antwort.path("detail"),
+                antwort.path("fehlercode"));
     }
 
     private void wissensseiteAnlegen(String schema, UUID seite, UUID dokument) throws SQLException {
