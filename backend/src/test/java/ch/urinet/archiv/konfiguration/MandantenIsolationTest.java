@@ -220,14 +220,29 @@ abstract class MandantenIsolationIT {
             Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "vhf-gsk", vhfDokument);
             wissensseiteAnlegen("m_urinet", urinetSeite, urinetDokument);
             wissensseiteAnlegen("m_vhf_gsk", vhfSeite, vhfDokument);
+            ObjectMapper mapper = new ObjectMapper();
             for (String benutzer : List.of("inhaber-urinet", "mitarbeiter-urinet", "treuhaender-urinet",
                     "inhaber-vhf-gsk", "geschaeftsstelle-vhf-gsk")) {
                 boolean verband = benutzer.endsWith("vhf-gsk");
                 String token = Testanmeldung.token(benutzer);
-                given().auth().oauth2(token).get("/api/v1/wissensseiten/" + (verband ? vhfSeite : urinetSeite))
-                        .then().statusCode(200);
-                given().auth().oauth2(token).get("/api/v1/wissensseiten/" + (verband ? urinetSeite : vhfSeite))
-                        .then().statusCode(404);
+                UUID eigeneSeite = verband ? vhfSeite : urinetSeite;
+                UUID fremdeSeite = verband ? urinetSeite : vhfSeite;
+                String eigeneAntwort = given().auth().oauth2(token).get("/api/v1/wissensseiten/" + eigeneSeite)
+                        .then().statusCode(200).extract().asString();
+                String fremdeAntwort = given().auth().oauth2(token).get("/api/v1/wissensseiten/" + fremdeSeite)
+                        .then().statusCode(404).extract().asString();
+                String unbekannteAntwort = given().auth().oauth2(token)
+                        .get("/api/v1/wissensseiten/" + UUID.randomUUID())
+                        .then().statusCode(404).extract().asString();
+                var fremderFehler = mapper.readTree(fremdeAntwort);
+                var unbekannterFehler = mapper.readTree(unbekannteAntwort);
+                assertThat(fremderFehler.path("type").asText()).isEqualTo(unbekannterFehler.path("type").asText());
+                assertThat(fremderFehler.path("title").asText()).isEqualTo(unbekannterFehler.path("title").asText());
+                assertThat(fremderFehler.path("detail").asText()).isEqualTo(unbekannterFehler.path("detail").asText());
+                assertThat(fremderFehler.path("fehlercode").asText())
+                        .isEqualTo(unbekannterFehler.path("fehlercode").asText());
+                assertThat(fremdeAntwort).doesNotContain(fremdeSeite.toString(), "Isolationsprobe-", "Inhalt-");
+                assertThat(eigeneAntwort).contains("Isolationsprobe-" + eigeneSeite, "Inhalt-" + eigeneSeite);
             }
         } catch (Throwable t) {
             testFehler = t;
@@ -272,13 +287,15 @@ abstract class MandantenIsolationIT {
                      insert into %s.wissensseite
                          (id, pfad, typ, titel, beschreibung, tags, vertraulichkeit, vertraulichkeit_mindest, inhalt,
                           version, erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am)
-                     values (?, ?, 'Konzept', 'Isolationsprobe', 'Synthetisch', array['isolation'],
-                             'NORMAL', 'NORMAL', 'Aussage', 1, 'probe', now(), 'probe', now())
+                     values (?, ?, 'Konzept', ?, 'Synthetisch', array['isolation'],
+                             'NORMAL', 'NORMAL', ?, 1, 'probe', now(), 'probe', now())
                      """.formatted(schema));
              PreparedStatement huelle = verbindung.prepareStatement(
                      "insert into " + schema + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)")) {
             einfuegen.setObject(1, seite);
             einfuegen.setString(2, "konzepte/isolation-" + seite);
+            einfuegen.setString(3, "Isolationsprobe-" + seite);
+            einfuegen.setString(4, "Inhalt-" + seite);
             einfuegen.executeUpdate();
             huelle.setObject(1, seite);
             huelle.setObject(2, dokument);
