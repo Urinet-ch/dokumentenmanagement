@@ -154,7 +154,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Auftrag `WISSEN_EXPORT`, ZIP mit Frontmatter (SnakeYAML), `index.md`, `log.md`, URN-Verweise, Links im Inhalt auf `.md` umgeschrieben; Download 24 h; Protokoll mit SHA-256; Einstellungen `/wissensbasis/einstellungen` (A19, `geschaeftsstelle` erhält 403)
   - `OkfKonformitaetTest` (JUnit, Nachweis für 17.3, im PR verlinkt); Vollexport nach Spec 03, 8.2 (Aufgabe 12.2) um den OKF-Export ergänzen
   - Nachprüfung 20.11.2026: PR #328 ist gemergt, einschliesslich Changeset `056-wissens-export` und Changelog-Einbindung. Nachweise: `export.feature` (@req-17.1, @req-17.2, @req-17.4, @req-17.5), `OkfKonformitaetTest` (@req-17.3), `WissenExportTest` (exakte 24-Stunden-Grenze und SHA-256), `WissenEinstellungenTest`, `MandantVollexportSchreiber` mit `wissensbasis.zip`. Kein Export oder Paketformat neu gebaut.
-  - Nachtrag (PR #608, 25.11.2026): Die Einstellungsseite zeigt beim OKF-Export den Hinweis zu Cloud-Modellen; `wissen.spec.ts` prüft den Text (Req 19.24).
+  - Nachtrag (PR #608, 25.11.2026): Die Einstellungsseite zeigt beim OKF-Export den Hinweis zu Cloud-Modellen; `wissen.spec.ts` und `okf-export-hinweis.feature` prüfen den Text (Req 19.24). Das Backend-Rundlaufszenario für den lokalen Export ist ebenfalls damit markiert.
   - _Anforderungen: 17.1–17.5, 19.24, 14.3_
   - _Abhängig von: 13.6_
 

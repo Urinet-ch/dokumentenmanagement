@@ -827,7 +827,8 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
   vom Text des Originals abweichen kann.
 - **Umsetzung (Aufgaben 15.5 und 15.7, 25.11.2026):** `wissen_paket` gibt die Cloud-Modell-Regel auch für
   lokale Erarbeitung als Prozesshinweis aus. Die Seite «Wissensbasis exportieren» zeigt denselben Hinweis vor dem
-  OKF-Export; `WissenPaketCliTest` und `wissen.spec.ts` prüfen die Ausgaben (Requirement 19.24). Die Hinweise
+  OKF-Export; `WissenPaketCliTest`, `wissen.spec.ts` und `okf-export-hinweis.feature` prüfen die Ausgaben
+  (Requirement 19.24). Das Backend-Rundlaufszenario in `import.feature` trägt dieselbe Anforderungszuordnung. Die Hinweise
   informieren, erzwingen die Regeln ausserhalb des Archivs aber nicht.
 - **Nicht offline prüfbar** (Hinweis statt Befund): Zuordnung der Quellen, Seitenzahl der Dokumente, vergebene Pfade,
   `STUFE_UEBERBLICK`, Sichtbarkeit; sie prüft nur der Import.

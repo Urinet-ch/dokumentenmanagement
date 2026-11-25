@@ -45,6 +45,21 @@ Then('sind die Wissenseinstellungen ohne Überlauf und axe-Befund sichtbar', asy
   }
 });
 
+Then('sehe ich den Cloud-Modell-Hinweis vor dem OKF-Export', async function () {
+  const bereich = this.seite.getByRole('region', { name: 'Wissensbasis exportieren' });
+  const hinweis = bereich.getByText(/^Cloud-Modelle dürfen nur Quellen der Stufe NORMAL ohne Personendaten sehen/);
+  const exportknopf = bereich.getByRole('button', { name: 'OKF-Export anfordern' });
+  await hinweis.scrollIntoViewIfNeeded();
+  await exportknopf.waitFor();
+  const stehtVorExport = await hinweis.evaluate((element) => {
+    const button = [...(element.closest('section')?.querySelectorAll('button') ?? [])]
+      .find((kandidat) => kandidat.textContent?.trim() === 'OKF-Export anfordern');
+    return button !== undefined
+      && Boolean(element.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  assert.equal(stehtVorExport, true);
+});
+
 When('ich ein erhöhtes Wissensbudget bestätige', async function () {
   await this.seite.getByLabel('Monatliches Tokenbudget').fill('2500000');
   await this.seite.getByRole('button', { name: 'Einstellungen speichern' }).click();
