@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 
 /**
  * Kennzahlen je aktiven Mandanten (Req 16.4): offene, laufende und fehlgeschlagene Aufträge, Dokumente je Status ausser
@@ -44,12 +45,12 @@ public class Kennzahlen {
         this.kiBeispiele = kiBeispiele;
     }
 
-    /** Stand eines Mandanten; jeder Status aus {@link #AUFTRAG_STATUS} und {@link #DOKUMENT_STATUS} ist enthalten. */
+    /** Stand eines Mandanten; KI-Beispiel-Zähler ist bei isoliertem Zählfehler leer. */
     public record Stand(MandantCode mandant, Map<String, Long> auftraege, Map<String, Long> dokumente,
-                        long eingangskorb, long kiBeispiele) {
+                        long eingangskorb, OptionalLong kiBeispiele) {
     }
 
-    /** Erhebt den Stand je aktiven Mandanten; ein Mandant mit Fehler fehlt in der Liste (WARN im Log). */
+    /** Erhebt den Stand je aktiven Mandanten; Fehler bei übrigen Zählern lassen den Mandanten aus, jeweils mit WARN. */
     public List<Stand> erheben() {
         List<Stand> stand = new ArrayList<>();
         for (Mandant mandant : register.aktive()) {
@@ -59,7 +60,15 @@ public class Kennzahlen {
                         dokumente.anzahlJeStatus(mandant.code()));
                 long korb = DokumentStatus.EINGANGSKORB_STATUS.stream()
                         .mapToLong(s -> dokument.getOrDefault(s.name(), 0L)).sum();
-                stand.add(new Stand(mandant.code(), auftrag, dokument, korb, kiBeispiele.anzahl(mandant.code())));
+                OptionalLong kiBeispielAnzahl;
+                try {
+                    kiBeispielAnzahl = OptionalLong.of(kiBeispiele.anzahl(mandant.code()));
+                } catch (RuntimeException e) {
+                    LOG.warnf("KI-Beispiel-Kennzahl für Mandant %s nicht erhoben, ursache=%s", mandant.code().wert(),
+                            Ursachen.kette(e));
+                    kiBeispielAnzahl = OptionalLong.empty();
+                }
+                stand.add(new Stand(mandant.code(), auftrag, dokument, korb, kiBeispielAnzahl));
             } catch (RuntimeException e) {
                 LOG.warnf("Kennzahlen für Mandant %s nicht erhoben, ursache=%s", mandant.code().wert(),
                         Ursachen.kette(e));
