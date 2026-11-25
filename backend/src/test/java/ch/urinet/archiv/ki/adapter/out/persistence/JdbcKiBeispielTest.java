@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * {@code ki_beispiel} je Mandant (Aufgabe 3.3, Req 7.7, 7.9, 7.10): Jeder Mandant liest nur die Beispiele seines Schemas
@@ -124,6 +125,15 @@ class JdbcKiBeispielTest {
 
         assertThat(beispiele.anzahl(URINET)).isEqualTo(1);
         assertThat(beispiele.anzahl(ZWEITER)).isEqualTo(1);
+    }
+
+    @Test
+    void zaehlfehlerEnthaeltNurDenSqlState() {
+        MandantCode nichtVorhanden = new MandantCode("fehlend-" + UUID.randomUUID().toString().replace("-", ""));
+
+        assertThatThrownBy(() -> beispiele.anzahl(nichtVorhanden))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageMatching("KI-Beispiele nicht gezählt \\(SQLState [A-Z0-9]{5}\\)");
     }
 
     @Test
