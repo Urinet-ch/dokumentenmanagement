@@ -7,7 +7,7 @@
 | `test_pruefe_speicherbudget.py` | Tests für das Deploy-Speicherbudget: `python3 -m unittest tools/test_pruefe_speicherbudget.py` |
 | `golden_synth/` | Generator für synthetische Golden-Belege (Req 0.10) |
 | `crm/` | synthetischer Beispiel-Export 21.CRM |
-| `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
+| `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--begleit-pdf` reiht für die HEIC-Messung einen synthetischen 20-seitigen Scan ein; `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
 
 ## Generator-Client `archiv_client.py`
 
