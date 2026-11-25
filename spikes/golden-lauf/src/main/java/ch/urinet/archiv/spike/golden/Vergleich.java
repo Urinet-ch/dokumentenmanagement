@@ -17,7 +17,7 @@ public final class Vergleich {
     }
 
     public static boolean art(String erwartet, String vorschlag) {
-        return text(erwartet, vorschlag, s -> s.strip());
+        return text(erwartet, vorschlag, s -> s);
     }
 
     public static boolean datum(LocalDate erwartet, LocalDate vorschlag) {

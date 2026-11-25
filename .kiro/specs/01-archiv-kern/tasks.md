@@ -50,6 +50,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Prompt und Sicherheitsschwelle nur auf den 30 Belegen zum Abstimmen iterieren; die 20 zurückgehaltenen erst im Gate-Lauf verwenden
   - Bericht getrennt nach Abstimmungs- und Prüfteil: Trefferquote je Feld und gesamt, Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, 0.9), Liste der Fehlschläge; der Bericht liegt im Verzeichnis aus `ARCHIV_GOLDEN_DIR`, ins Repository (`docs/spikes/golden-ergebnis.md`) kommen nur Kennzahlen und Beleg-IDs, keine Inhalte
   - im Repository nur das Schema von `erwartet.json` und `GoldenDatensatzIT` (manuell gestartet, nie in der CI)
+  - Req 0.7: Feldregeln mit synthetischen In-Memory-Werten in `VergleichTest` prüfen; der Test lädt keine Golden-Daten
   - Hostprüfung: `GoldenLauf` und `GoldenDatensatzIT` brechen vor dem ersten Beleg ab, wenn `archiv.ki.basis-url` nicht per `https` auf den Host `api.infomaniak.com` zeigt (exakter Vergleich, ohne Suffix-Treffer); Unit-Test mit `localhost`, `http` und Suffix-Trick (`api.infomaniak.com.example.org`) → Abbruch
   - Ergebnis 09.11.2026: Gate-Lauf auf dem Merge-Commit von PR #21: Prüfteil 20/20, 1 Fehler ab 0.8, Schwelle 0.8, Modell `google/gemma-4-31B-it` (`docs/spikes/golden-ergebnis.md`)
   - _Anforderungen: 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 7.11, 16.22_
