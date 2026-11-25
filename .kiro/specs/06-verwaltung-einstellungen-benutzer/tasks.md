@@ -32,7 +32,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
-- [ ] 19.2 Realm-Export und Realm-Tests [Infra]
+- [x] 19.2 Realm-Export und Realm-Tests [Infra]
   - Client `archiv-verwaltung` ohne Secret im Export und mit den drei Rollen des Dienstkontos und dem Standard-Scope `kc-admin-api` (Härtung nach 19.1);
     Passwort-Richtlinie; Access-Token-Lebensdauer 300 s; Lebensdauer der Aktions-Links; Ereignisse und Admin-Ereignisse mit
     400 Tagen; `auth_time`-Mapper; Test-Realm mit Dienstkonto und SMTP an Mailpit; `RealmExportTest` und `ExportKeycloak`
@@ -40,7 +40,13 @@ auf Server oder Secrets aus der Sitzung.
   - Stand: Export, Test-Realm und Tests umgesetzt (PR #385); `adminEventsExpiration` gesetzt. Keycloak erzeugt beim
     Erstimport das Dienstkonto-Secret selbst; `start.sh` übergibt keines. `ARCHIV_BASIS_URL` schreibt `schreibe-env.sh`
     aus `HOST_ARCHIV`. Das tatsächlich verwendete Secret und seine Pflichtprüfung folgen in 19.3.
-    Checkbox offen: Vollständige Szenarien zu 4.9 und 7.4 folgen mit 19.7 bis 19.9.
+    Nachweis 4.9: Szenarien zu Rollenwechsel und Sperre in `benutzer-verwalten.feature` (19.9).
+    Nachweis 25.11.2026: Die Ablaufgrenze wird pro Mandant aus derselben Gültigkeitsdauer berechnet, die beim
+    erfolgreichen Versand an Keycloak übergeben wird. Liste und Detail zeigen Ablaufdatum und Status; Altbestände
+    bleiben «Ablauf nicht bekannt». `EinladungZeitTest` prüft `ANLEGEN`, `REAKTIVIEREN`, erneutes Senden,
+    fehlgeschlagenen Versand und Altbestand. `EinladungVersandpfadeTest` prüft Zugang zurücksetzen und E-Mail-Änderung,
+    einschliesslich «Versand ok, Speichern schlägt fehl»; `@req-7.4` prüft beide Status und Altbestand bei 375/1280 px
+    in hell/dunkel samt axe. Die Checkbox wird durch diese Nachweise geschlossen; Betriebsnachweise bleiben 19.3.
   - Nachgelagert [Fabian] (Entscheid 21.11.2026): Betriebsnachweis der internen Compose-Verbindung mit korrektem
     Issuer und der automatischen Ablaufzeit der Secret-Überlappung in 19.3.
   - _Anforderungen: 3.17, 4.9, 5.2, 5.3, 6.9, 7.4_
@@ -297,3 +303,7 @@ auf Server oder Secrets aus der Sitzung.
     setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
   - _Anforderungen: 10.1, 10.2, 10.8_
   - _Abhängig von: 24.1, 24.2_
+  - Vorbereitung 25.11.2026 (bleibt offen, [Fabian]): Die Vorlage `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` und die
+    kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
+    Related Origins und Gerätetest stehen aus. Req 10.7 (Entscheid Fabian 25.11.2026): Die Ereignisse werden aktiviert, der
+    Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).

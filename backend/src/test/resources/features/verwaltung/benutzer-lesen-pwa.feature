@@ -37,6 +37,48 @@ Funktionalität: Benutzer und Rechte in der PWA lesen
       | treuhaender      | /verwaltung/benutzer        |
       | geschaeftsstelle | /verwaltung/benutzer/probe  |
 
+  @req-7.4 @req-8.6
+  Szenariogrundriss: Liste und Detail zeigen bei Altbestand einen unbekannten Ablauf
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und der synthetische Benutzer hat eine offene Einladung
+    Und das Browserfenster ist <breite> Pixel breit
+    Und das Farbschema ist «<schema>»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Benutzer» wähle
+    Dann zeigt die Liste die offene Einladung mit unbekanntem Ablauf ohne Überlauf und axe-Befund
+    Wenn ich den synthetischen Benutzer öffne
+    Dann zeigt die Detailseite die offene Einladung mit unbekanntem Ablauf ohne Überlauf und axe-Befund
+
+    Beispiele:
+      | breite | schema |
+      | 375    | hell   |
+      | 375    | dunkel |
+      | 1280   | hell   |
+      | 1280   | dunkel |
+
+  @req-7.4 @req-8.6
+  Szenariogrundriss: Liste und Detail zeigen den gespeicherten Ablaufstatus
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und der synthetische Benutzer hat eine gespeicherte Ablaufgrenze «<ablauf>»
+    Und das Browserfenster ist <breite> Pixel breit
+    Und das Farbschema ist «<schema>»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Benutzer» wähle
+    Dann zeigt die Liste die offene Einladung mit Ablauf «<ablauf>» ohne Überlauf und axe-Befund
+    Wenn ich den synthetischen Benutzer öffne
+    Dann zeigt die Detailseite die offene Einladung mit Ablauf «<ablauf>» ohne Überlauf und axe-Befund
+
+    Beispiele:
+      | ablauf          | breite | schema |
+      | abgelaufen      | 375    | hell   |
+      | abgelaufen      | 375    | dunkel |
+      | abgelaufen      | 1280   | hell   |
+      | abgelaufen      | 1280   | dunkel |
+      | nicht-abgelaufen | 375    | hell   |
+      | nicht-abgelaufen | 375    | dunkel |
+      | nicht-abgelaufen | 1280   | hell   |
+      | nicht-abgelaufen | 1280   | dunkel |
+
   @req-8.4
   Szenariogrundriss: Eine Benutzeraktion wird erst nach sichtbarer Bestätigung gesendet
     Angenommen die Benutzerverwaltung liefert synthetische Daten

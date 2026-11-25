@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="140-wissen-webseitenfreigabe" author="archiv">
+        <sql>
+            alter table wissensseite
+                add column fuer_webseite boolean not null default false,
+                add column fuer_webseite_von text,
+                add column fuer_webseite_am timestamptz,
+                add constraint wissensseite_webseitenfreigabe_ck check (
+                    not fuer_webseite or (
+                        fuer_webseite_von is not null and length(trim(fuer_webseite_von)) > 0
+                        and fuer_webseite_am is not null
+                    )
+                );
+        </sql>
+        <rollback>
+            <sql>
+                alter table wissensseite drop constraint wissensseite_webseitenfreigabe_ck;
+                alter table wissensseite drop column fuer_webseite_am;
+                alter table wissensseite drop column fuer_webseite_von;
+                alter table wissensseite drop column fuer_webseite;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

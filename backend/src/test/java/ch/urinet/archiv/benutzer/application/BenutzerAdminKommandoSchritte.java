@@ -72,7 +72,7 @@ public class BenutzerAdminKommandoSchritte {
 
     @Wenn("der Betreiber das Kommando für die erste Inhabereinladung ausführt")
     public void ersteInhabereinladungAusfuehren() {
-        BenutzerAnlegen anlegen = new BenutzerAnlegen(null, null, null, null, null, null, null, null, null,
+        BenutzerAnlegen anlegen = new BenutzerAnlegen(null, null, null, null, null, null, null, null, null, null,
                 1, Duration.ofHours(1), Duration.ofHours(1)) {
             @Override
             public UUID erstenInhaberEinladen(MandantCode mandant, String betreiber, BenutzerAnlage eingabe) {

@@ -24,7 +24,7 @@ Funktionalität: Fehlerantworten als Problem Details (design.md «Error Handling
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Und das ganze Log wird mitgeschnitten
     Wenn «inhaber-urinet» zweimal die Dokumentart «PROBE_LOGWERT_4711» über das Probe-Dokument «NORMAL» anlegt
-    Und «inhaber-urinet» mit verfälschter Signatur die Dokumentart «PROBE_VHF_BULLETIN» abfragt
+    Und «inhaber-urinet» mit verfälschter Signatur die Dokumentart «BULLETIN» abfragt
     Dann scheitert die zweite Anlage mit Status 500 und Fehlercode «INTERNER_FEHLER»
     Und wird das verfälschte Token mit Status 401 und Fehlercode «NICHT_ANGEMELDET» abgelehnt
     Und enthält weder eine Antwort noch das ganze Log einen dieser Werte

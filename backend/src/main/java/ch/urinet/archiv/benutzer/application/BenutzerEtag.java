@@ -4,6 +4,7 @@ import ch.urinet.archiv.benutzer.domain.BenutzerStatus;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Objects;
 
@@ -13,6 +14,11 @@ public final class BenutzerEtag {
     }
 
     public static String berechnen(IdentitaetsDienst.Benutzer benutzer, BenutzerStatus status) {
+        return berechnen(benutzer, status, null);
+    }
+
+    public static String berechnen(IdentitaetsDienst.Benutzer benutzer, BenutzerStatus status,
+                                   Instant einladungGueltigBis) {
         Objects.requireNonNull(benutzer);
         Objects.requireNonNull(status);
         MessageDigest digest;
@@ -24,6 +30,7 @@ public final class BenutzerEtag {
         schreiben(digest, benutzer.id());
         schreiben(digest, benutzer.benutzername());
         schreiben(digest, status.name());
+        schreiben(digest, einladungGueltigBis == null ? null : einladungGueltigBis.toString());
         schreiben(digest, benutzer.email());
         schreiben(digest, benutzer.vorname());
         schreiben(digest, benutzer.nachname());

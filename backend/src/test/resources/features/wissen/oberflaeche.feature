@@ -8,3 +8,10 @@ Funktionalität: Wissensbasis auf schmalen Bildschirmen lesen
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
     Wenn ich die Wissensoberfläche auf 375 Pixeln öffne
     Dann sind Index, Seite, Quellen und Log ohne horizontales Scrollen und ohne axe-Befund bedienbar
+
+  @req-21.6
+  Szenario: Webseitenfreigabe in allen Ansichten bestätigen und entziehen
+    Angenommen synthetische Wissensseiten sind für die Oberfläche verfügbar
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich die Wissensoberfläche auf 375 Pixeln öffne
+    Dann ist die Webseitenfreigabe auf Handy und Desktop zugänglich und nur nach Bestätigung veränderbar

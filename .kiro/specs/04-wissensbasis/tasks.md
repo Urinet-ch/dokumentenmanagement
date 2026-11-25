@@ -243,12 +243,25 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 18.1_
 - [ ] 18.3 Öffentlicher Wissenschat [Backend] [Frontend]
   - Kennzeichen «für Webseite» je Seite (A16, Protokoll), `/public/v1/wissen/chat`, eigene Werkzeuge, Prüfung bei jeder Anfrage, Grenzen und Budget, Schalter je Mandant; Marker `[offen: …]` im Design auflösen; Plugin (Spec 03, 11.5) nur als Hinweis.
+  - Nachweis 25.11.2026: `OeffentlicherWissenschatResourceTest` prüft die mandantenbezogene Schalterauflösung pro Anfrage. `@req-21.6` liest im Cucumber-Netztest ein Werkzeug-Ereignis aus dem SSE-Stream, entzieht danach die Freigabe und prüft den Reststrom: `fehler`, kein Text und keine Quellen. Die Ausschlussfälle «ohne Webseitenfreigabe» und Quellenstufe `mitglieder` sind in der parallelen Nacharbeit #605 abgedeckt und werden hier nicht dupliziert. Die Checkbox bleibt offen; der Plugin-Hinweis und die vollständige Abnahme sind noch ausstehend.
   - _Anforderungen: 21.6_
   - _Abhängig von: 18.1, Spec 03: 11.2_
-- [ ] 18.4 Isolations- und Abnahmetests [QA]
-  - Mandantentrennung, A15 (403), Modus fest, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar, öffentliche Auslieferung nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug, Prompt-Injection aus Seiteninhalt.
+- [x] 18.4 Isolations- und Abnahmetests [QA]
+  - Mandantentrennung, A15 (403), fester Modus, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar, öffentliche Auslieferung
+    nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug vor dem Einreihen des SSE-Ereignisses (Entscheid Fabian
+    24.11.2026), Prompt-Injection aus Seiteninhalt und inhaltsfreies Fragenprotokoll (Entscheid Fabian 24.11.2026).
+  - Nachweis: Szenarien `@req-21.8` unter `features/wissen/`; A15-Verweigerung zusätzlich in den JUnit-Tests für Anlegen und Fragen.
+  - Nachtrag Review PR #605: Die Szenarien ohne Webseitenfreigabe und mit Quellenstufe `mitglieder` prüfen zusätzlich
+    den Nullaufruf des Modells und die Unsichtbarkeit im zweiten Mandanten.
   - _Anforderungen: 21.8_
   - _Abhängig von: 18.3_
+- [x] 18.5 Kennzahl für öffentliche Fragen ohne Beleg [Backend]
+  - Zählt gespeicherte Zeilen in `oeffentliche_frage` mit `quellen = '[]'` je aktivem Mandanten; nur die Anzahl wird als Gauge ausgegeben.
+    Bestehende Tabelle und Aufbewahrung bleiben unverändert.
+  - Nachweis: JUnit prüft leere/nichtleere Quellen und Mandantentrennung sowie den Mandanten-Tag der Kennzahl.
+  - Quellenbezug: Spec 03, 6.5; Spec 01, 16.4. Erfüllt den Kennzahlen-Baustein für Spec 04, 18.7.
+  - _Anforderungen: 18.7_
+  - _Abhängig von: Spec 03: 11.3_
 
 ## Optionen
 Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort. O.5 ist seit dem 18.11.2026 in den Plan übernommen (15.6 bis 15.8).

@@ -1,17 +1,20 @@
 package ch.urinet.archiv.ki.adapter.out.persistence;
 
 import ch.urinet.archiv.ki.application.KiBeispielPort;
+import ch.urinet.archiv.ki.application.KiBeispielZaehler;
 import ch.urinet.archiv.ki.domain.Beispiel;
 import ch.urinet.archiv.ki.domain.BeispielSicht;
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.Korrektur;
 import ch.urinet.archiv.ki.domain.Merkmale;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 
@@ -31,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
@@ -43,9 +47,10 @@ import java.util.regex.Pattern;
  * Inhalte.
  */
 @ApplicationScoped
-public class JdbcKiBeispiel implements KiBeispielPort {
+public class JdbcKiBeispiel implements KiBeispielPort, KiBeispielZaehler {
 
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
+    private static final long KANDIDATEN_MESSEN_AB = 1_000;
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     private static final String SPALTEN = "b.id, b.art, b.korrektur::text, b.iban, b.uid, b.email, b.muster, "
@@ -56,10 +61,13 @@ public class JdbcKiBeispiel implements KiBeispielPort {
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
+    private final MeterRegistry registry;
 
-    public JdbcKiBeispiel(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung) {
+    public JdbcKiBeispiel(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung,
+                          MeterRegistry registry) {
         this.datenquelle = datenquelle;
         this.aufloesung = aufloesung;
+        this.registry = registry;
     }
 
     @Override
@@ -125,8 +133,13 @@ public class JdbcKiBeispiel implements KiBeispielPort {
 
     @Override
     public List<Beispiel> kandidaten(Merkmale merkmale, BeispielSicht sicht, int hoechstens) {
+        String schema = schema();
+        String mandant = schema.substring(2).replace('_', '-');
+        var bestand = registry.find("archiv.ki.beispiele").tag("mandant", mandant).gauge();
+        boolean messen = bestand != null && bestand.value() >= KANDIDATEN_MESSEN_AB;
+        long start = messen ? System.nanoTime() : 0;
         String sql = "with m (iban, uid, email, muster) as (select ?::text[], ?::text[], ?::text[], ?::text[]) "
-                + "select " + SPALTEN + " from " + schema() + ".ki_beispiel b join " + schema()
+                + "select " + SPALTEN + " from " + schema + ".ki_beispiel b join " + schema
                 + ".dokument d on d.id = b.dokument_id cross join m "
                 + "where (b.iban && m.iban or b.uid && m.uid or b.email && m.email or b.muster && m.muster) and " + SICHT
                 + " order by " + gemeinsam("iban") + " + " + gemeinsam("uid") + " + " + gemeinsam("email") + " + "
@@ -142,6 +155,27 @@ public class JdbcKiBeispiel implements KiBeispielPort {
             return lesen(abfrage);
         } catch (SQLException e) {
             throw new IllegalStateException("KI-Beispiele nicht gelesen", e);
+        } finally {
+            if (messen) {
+                registry.timer("archiv.ki.beispiel.kandidaten", "mandant", mandant)
+                        .record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+            }
+        }
+    }
+
+    @Override
+    public long anzahl(MandantCode mandant) {
+        String sql = "select count(*) from " + mandant.schema() + ".ki_beispiel";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql);
+             ResultSet zeile = abfrage.executeQuery()) {
+            if (!zeile.next()) {
+                throw new IllegalStateException("KI-Beispiele nicht gezählt");
+            }
+            return zeile.getLong(1);
+        } catch (SQLException e) {
+            throw new IllegalStateException("KI-Beispiele nicht gezählt (SQLState " + e.getSQLState() + ")",
+                    new SQLException((String) null, e.getSQLState()));
         }
     }
 

@@ -34,10 +34,12 @@ class KonfigurationWissensquelleSeedTest {
     }
 
     @Test
-    void vhfSeedEnthaeltKeineWissensquelleUndBehaeltDieUebrigeArt() {
+    void vhfSeedEnthaeltKeineWissensquelleUndSeineEchtenArten() {
         Konfiguration vhf = seed.lesen(new MandantCode("vhf-gsk"));
         assertThat(vhf.arten()).extracting(Art::code)
-                .containsExactly("PROBE_VHF_BULLETIN").doesNotContain("WISSENSQUELLE");
+                .containsExactlyInAnyOrder("BULLETIN", "NORM_RICHTLINIE", "VORSTANDSPROTOKOLL", "MERKBLATT",
+                        "FORMULAR", "SONSTIGES", "JAHRESBERICHT")
+                .doesNotContain("WISSENSQUELLE");
     }
 
     @Test

@@ -70,7 +70,7 @@ Funktionalität: Archivierte Dokumente als Wissensquellen markieren
 
   @req-20.3
   Szenario: Ein Dokument eines anderen Mandanten bleibt unbekannt
-    Angenommen im Mandanten «vhf-gsk» liegt ein archiviertes Dokument «BELEG» der Art «PROBE_VHF_BULLETIN»
+    Angenommen im Mandanten «vhf-gsk» liegt ein archiviertes Dokument «BELEG» der Art «BULLETIN»
     Wenn «inhaber-urinet» markiert «BELEG» als Wissensquelle
     Dann antwortet die Markierung mit Status 404
     Und ist «BELEG» als Wissensquelle unmarkiert

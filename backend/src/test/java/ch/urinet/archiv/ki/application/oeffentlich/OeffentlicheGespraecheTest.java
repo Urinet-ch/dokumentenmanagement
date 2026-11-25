@@ -4,6 +4,7 @@ import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.integration.domain.webseite.Zugriffsstufe;
 import ch.urinet.archiv.ki.domain.chat.ChatRolle;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.OeffentlichesWissenPort;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -86,6 +87,29 @@ class OeffentlicheGespraecheTest {
         assertThat(niedriger.id()).isNotEqualTo(id);
         assertThat(niedriger.verlauf()).isEmpty();
         assertThat(g.oeffnen(id, URINET, vorstand).verlauf()).hasSize(2);
+    }
+
+    @Test
+    void wissenschatFortsetzungBewahrtNurBereinigtenVerlaufUndQuellenstand() {
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 10, 6, new Uhr());
+        Lesezugriff z = zugriff("w", "a".repeat(64));
+        UUID id = g.oeffnenWissen(null, URINET, z).id();
+        var stand = new OeffentlichesWissenPort.Stand(UUID.randomUUID(), 2, 4);
+        var seite = new OeffentlichesWissenPort.Seite(stand, "probe/seite", "Titel", "Konzept", "Vertraulicher Inhalt",
+                Instant.EPOCH, java.util.List.of());
+
+        g.merkenWissen(id, URINET, z, "Frage max.muster@example.invalid", "Antwort mit max.muster@example.invalid",
+                java.util.List.of(stand), java.util.List.of(seite));
+
+        var fortsetzung = g.oeffnenWissen(id, URINET, z);
+        assertThat(fortsetzung.verlauf()).extracting(e -> e.inhalt())
+                .contains("Frage [entfernt]", "Antwort mit [entfernt]");
+        assertThat(fortsetzung.wissensStaende()).containsExactly(stand);
+        assertThat(fortsetzung.wissensSeiten()).singleElement().satisfies(s -> {
+            assertThat(s.pfad()).isEqualTo("probe/seite");
+            assertThat(s.inhalt()).isEmpty();
+        });
+        assertThat(g.oeffnen(id, URINET, z).verlauf()).isEmpty();
     }
 
     @Test
