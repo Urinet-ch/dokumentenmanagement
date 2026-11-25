@@ -42,7 +42,7 @@ import java.util.UUID;
  * <p>
  * Idempotent: Ist das Dokument schon {@code ARCHIVIERT} (ein früherer Lauf hat festgehalten, aber {@code eingang/} nicht
  * mehr gelöscht), räumt der Lauf nur {@code eingang/} auf; in jedem anderen Status ausser {@code ARCHIVIERUNG} endet er
- * ohne Änderung.
+ * ohne Änderung. Eine sitzungsgebundene Sperre serialisiert parallele Läufe desselben Dokuments über Worker-JVMs hinweg.
  */
 @ApplicationScoped
 public class ArchivierenHandler implements AuftragHandler {
@@ -57,13 +57,16 @@ public class ArchivierenHandler implements AuftragHandler {
     private final AblageService ablageService;
     private final AblagePort ablage;
     private final InhaberBenachrichtigung benachrichtigung;
+    private final DokumentArchivierungSperre archivierungSperre;
 
     public ArchivierenHandler(ArchivierungSpeichern speichern, AblageService ablageService, AblagePort ablage,
-                              InhaberBenachrichtigung benachrichtigung) {
+                              InhaberBenachrichtigung benachrichtigung,
+                              DokumentArchivierungSperre archivierungSperre) {
         this.speichern = speichern;
         this.ablageService = ablageService;
         this.ablage = ablage;
         this.benachrichtigung = benachrichtigung;
+        this.archivierungSperre = archivierungSperre;
     }
 
     @Override
@@ -75,31 +78,33 @@ public class ArchivierenHandler implements AuftragHandler {
     public void ausfuehren(Auftrag auftrag) throws Exception {
         UUID id = auftrag.nutzlast().uuid(DOKUMENT_ID)
                 .orElseThrow(() -> new IllegalArgumentException("Nutzlast ohne " + DOKUMENT_ID));
-        Archivierungsstand stand = speichern.laden(id)
-                .orElseThrow(() -> new IllegalStateException("Dokument fehlt im Mandanten: " + id));
         MandantCode mandant = auftrag.mandant();
-        int jahr = stand.eingang().atZone(ZUERICH).getYear();
-        if (stand.status() == DokumentStatus.ARCHIVIERT) {
-            ablage.loeschenEingang(mandant, jahr, id);
-            LOG.infof("Dokument %s schon archiviert; eingang/ aufgeräumt", id);
-            return;
-        }
-        if (stand.status() != DokumentStatus.ARCHIVIERUNG) {
-            LOG.infof("Archivierung übersprungen: Dokument %s ist %s", id, stand.status());
-            return;
-        }
-        List<Zuordnung> zuordnungen = zuordnungen(stand, jahr);
-        unterbrochen();
-        Sperrvorgabe vorgabe = new Sperrvorgabe(stand.gesetzlichePflicht(), stand.aufbewahrenBis(),
-                stand.fristAbgelaufen());
-        try {
-            ablageService.archivieren(mandant, zuordnungen.stream().map(Zuordnung::datei).toList(), vorgabe,
-                    archiviert -> festhalten(auftrag, id, zuordnungen, archiviert));
-        } catch (ArchivierungAbgebrochen e) {
-            UUID fehlerId = UUID.randomUUID();
-            LOG.errorf("Archivierung von Dokument %s abgebrochen: %s (fehler-id=%s)", id, e.grund(), fehlerId);
-            if (speichern.fehlerSetzen(auftrag, id, fehlertext(fehlerId))) {
-                benachrichtigung.archivierungGescheitert(mandant, id, fehlerId);
+        try (DokumentArchivierungSperre.Sperre ignoriert = archivierungSperre.sperren(mandant, id)) {
+            Archivierungsstand stand = speichern.laden(id)
+                    .orElseThrow(() -> new IllegalStateException("Dokument fehlt im Mandanten: " + id));
+            int jahr = stand.eingang().atZone(ZUERICH).getYear();
+            if (stand.status() == DokumentStatus.ARCHIVIERT) {
+                ablage.loeschenEingang(mandant, jahr, id);
+                LOG.infof("Dokument %s schon archiviert; eingang/ aufgeräumt", id);
+                return;
+            }
+            if (stand.status() != DokumentStatus.ARCHIVIERUNG) {
+                LOG.infof("Archivierung übersprungen: Dokument %s ist %s", id, stand.status());
+                return;
+            }
+            List<Zuordnung> zuordnungen = zuordnungen(stand, jahr);
+            unterbrochen();
+            Sperrvorgabe vorgabe = new Sperrvorgabe(stand.gesetzlichePflicht(), stand.aufbewahrenBis(),
+                    stand.fristAbgelaufen());
+            try {
+                ablageService.archivieren(mandant, zuordnungen.stream().map(Zuordnung::datei).toList(), vorgabe,
+                        archiviert -> festhalten(auftrag, id, zuordnungen, archiviert));
+            } catch (ArchivierungAbgebrochen e) {
+                UUID fehlerId = UUID.randomUUID();
+                LOG.errorf("Archivierung von Dokument %s abgebrochen: %s (fehler-id=%s)", id, e.grund(), fehlerId);
+                if (speichern.fehlerSetzen(auftrag, id, fehlertext(fehlerId))) {
+                    benachrichtigung.archivierungGescheitert(mandant, id, fehlerId);
+                }
             }
         }
     }
