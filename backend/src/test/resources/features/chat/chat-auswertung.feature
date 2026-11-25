@@ -63,6 +63,18 @@ Funktionalität: Chat-Bewertungen auswerten und exportieren
     Wenn der API-Token die Chat-Auswertung exportiert
     Dann ist der Chat-Auswertungs-Export mit Status 403 beantwortet
 
+  @req-15.6
+  Szenariogrundriss: Nur der Inhaber darf die Chat-Auswertung exportieren
+    Angenommen im Mandanten «<mandant>» gibt es eine synthetische Chat-Bewertung mit 4 Sternen
+    Wenn «<benutzer>» exportiert die Chat-Auswertung für die letzten 30 Tage
+    Dann ist der Chat-Auswertungs-Export mit Status 403 beantwortet
+
+    Beispiele:
+      | mandant | benutzer                    |
+      | urinet  | mitarbeiter-urinet          |
+      | urinet  | treuhaender-urinet          |
+      | vhf-gsk | geschaeftsstelle-vhf-gsk    |
+
   @req-15.5
   Szenario: Ein Webseiten-Schlüssel ohne Inhaberrolle kann die Chat-Auswertung nicht lesen oder exportieren
     Angenommen für die Chat-Auswertung gibt es einen Webseiten-Schlüssel ohne Inhaberrolle

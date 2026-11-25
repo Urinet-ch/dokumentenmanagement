@@ -480,8 +480,11 @@ abaninja_beleg(abaninja_uuid text pk, art text, belegnummer text, kontakt_id uui
 
 `chat-schnittstelle.feature` belegt bereits Anfragen, Verlauf und fremde Gespräche über zwei Mandanten. `chat-auswertung.feature`
 ergänzt den mandantenübergreifenden Exportfall mit einem eindeutigen synthetischen Fremdtext. Der Exporttest prüft jetzt
-die exakte Obergrenze von 5'000 Datensätzen sowie die Ablehnung von 5'001; Schwärzungsmuster und JSON-Schema bleiben durch
-`ChatAuswertungSchritte`, `SchwaerzungTest` und `ChatBewertungAuswertungTest` abgedeckt.
+die exakte Obergrenze von 5'000 Datensätzen sowie die Ablehnung von 5'001. `chat-auswertung.feature` prüft die
+A24-Zugriffsbeschränkung beim Lesen und Exportieren für Inhaber, Mitarbeiter, Treuhänder, Geschäftsstelle, API-Token und
+Webseiten-Schlüssel; `chat-bewertungen.feature` belegt 404 für fremde Gespräche und die Löschung der Bewertung nach
+12 Monaten. Die synthetischen Schwärzungsmuster sind durch `ChatAuswertungSchritte` und `SchwaerzungTest` abgedeckt;
+`ChatBewertungAuswertungTest` validiert einen JSONL-Datensatz gegen das `schema.json` aus dem erzeugten ZIP.
 
 ## Error Handling
 - Chat: Werkzeugfehler werden dem Agenten als `{"fehler":"…"}` zurückgegeben; der Agent sagt, dass die Information nicht verfügbar ist. Modell nicht erreichbar → SSE `fehler` mit «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» Fehler vor dem Stream (400, 404, 429) und die Form von `fehler` nach «Vertrag Welle 7» (ergänzt 14.11.2026).
