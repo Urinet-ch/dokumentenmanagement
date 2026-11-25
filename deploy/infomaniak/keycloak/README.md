@@ -252,6 +252,53 @@ Mit `PASSKEY_PLAYWRIGHT_VERZEICHNIS=<Verzeichnis mit node_modules/playwright>` r
 macOS mit Colima im Home-Verzeichnis) und `KEYCLOAK_CLIENT_IMAGE` (z. B. ein aus dem Dockerfile gebautes Image) anpassbar. Beide
 Tests laufen nicht in der CI.
 
+## Passkey-Ereignisse auflisten (Aufgabe 24.3, Ereignis-Probe)
+Die Admin-Konsole ist über Traefik nicht öffentlich. Für die Probe aus Req 10.7 (`UPDATE_CREDENTIAL` nach dem Einrichten,
+`REMOVE_CREDENTIAL` nach dem Entfernen eines Passkeys) listet
+[`ereignisse-auflisten-vorlage.sh`](./ereignisse-auflisten-vorlage.sh) die Benutzerereignisse des Realms per `kcadm.sh get events`
+im selben Wegwerf-Container wie die anderen Vorlagen. Das Skript liest nur (nur `get`), keine Änderung am Realm.
+
+```text
+ereignisse-auflisten-vorlage.sh [--typ <TYP>]… [--max <n>] [--seit <Tage>]
+  --typ    Ereignistyp, mehrfach oder kommagetrennt (Standard UPDATE_CREDENTIAL,REMOVE_CREDENTIAL); nur A-Z, 0-9, Unterstrich
+  --max    höchstens so viele Zeilen (Standard 20, höchstens 200), neueste zuerst
+  --seit   Ereignisse der letzten Tage (Standard 1, höchstens 365)
+Exit: 0 = mindestens ein Ereignis, 3 = keines gefunden, 1 = Fehler, 2 = Aufruf falsch
+```
+Die Ausgabe ist datensparsam (Req 9): Zeit (UTC), Typ, Benutzerkennung (`userId`, die UUID) und Client, dazu je Typ eine Summenzeile. Nie
+Benutzername, E-Mail, IP-Adresse oder Details. Die `userId` ordnet das Ereignis dem Testbenutzer zu (in der Admin-Konsole oder über den
+Benutzer-Eintrag der App). Exit 1 mit Meldung gibt es, wenn die Ereignisse des Realms ausgeschaltet sind (`eventsEnabled` false) oder
+`enabledEventTypes` einen der Typen nicht enthält (dann zuerst `passkey-einrichten-vorlage.sh --ereignisse`; frühere Vorgänge fehlen).
+Exit 3 heisst: nichts im Zeitraum (`--seit` erhöhen) oder der Vorgang hat kein Ereignis ausgelöst.
+
+**Ablegen auf der VPS** (als root; die Werkzeuge liegen in `/opt/archiv-werkzeuge`, `jq` und `vorlage-ausfuehren.sh` sind dort schon). `<commit>` ist
+die Commit-ID des gemergten Stands auf `main`; die Prüfsumme steht im Hinweis des PR-Textes (erst nach dem Merge verbindlich):
+
+```sh
+curl -fsSL -o /opt/archiv-werkzeuge/keycloak/ereignisse-auflisten-vorlage.sh \
+  https://raw.githubusercontent.com/Urinet-ch/dokumentenmanagement/<commit>/deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh
+echo "<sha256 aus dem PR-Text>  /opt/archiv-werkzeuge/keycloak/ereignisse-auflisten-vorlage.sh" | sha256sum -c -
+chmod -R a+rX /opt/archiv-werkzeuge
+```
+`sha256sum -c` muss `OK` melden; sonst die Datei löschen und nicht verwenden. `chmod` ist nötig, weil der Container als Benutzer 1000 liest.
+
+**Aufruf** (nach der Passkey-Einrichtung beziehungsweise -Entfernung in der Kontoverwaltung; `echo "Exit: $?"` zeigt 0, 3 oder 1):
+
+```sh
+docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml \
+  run --rm --no-deps -T -l traefik.enable=false \
+  -e KC_OPTS="-Duser.home=/tmp -XX:+UseSerialGC -Xmx96m -XX:TieredStopAtLevel=1 -Xss512k" \
+  -v /opt/archiv-werkzeuge/jq:/usr/local/bin/jq:ro -v /opt/archiv-werkzeuge/keycloak:/arbeit:ro \
+  --entrypoint bash kc \
+  /arbeit/vorlage-ausfuehren.sh /arbeit/ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL --typ REMOVE_CREDENTIAL
+echo "Exit: $?"
+```
+Die Anmeldung läuft wie bei den anderen Vorlagen über `vorlage-ausfuehren.sh` (Passwort nie im Terminal). Die Tests:
+`bash deploy/infomaniak/keycloak/test/ereignisse-auflisten-vorlage-test.sh` (kcadm-Stub, kein Docker) und
+`test/ereignisse-auflisten-keycloak-test.sh` (Wegwerf-Keycloak; mit `PASSKEY_PLAYWRIGHT_VERZEICHNIS` richtet ein virtueller
+Authenticator einen Passkey ein und das echte `UPDATE_CREDENTIAL` wird gelistet). Beide laufen nicht in der CI. Nicht belegt: der Lauf
+auf der VPS selbst und `REMOVE_CREDENTIAL` (kein Test entfernt einen Passkey).
+
 ## Nachbesserung Review (PR #334)
 
 - Die Vorlage ist wiederholbar: Flows, Ausführungen und Provider werden vor dem Anlegen geprüft, ein vorhandener Provider

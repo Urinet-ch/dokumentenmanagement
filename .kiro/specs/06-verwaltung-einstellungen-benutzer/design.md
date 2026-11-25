@@ -1102,3 +1102,14 @@ Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fa
 - **Nachweis:** Stub-Test (`test/passkey-einrichten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2 mit dem Realm vor 24.1
   (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR. Nicht belegt (beim ersten Lauf auf der VPS prüfen, Prüfzeilen im README): Ausführung auf der VPS, der
   `docker compose run`-Aufruf, Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io`.
+
+## Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)
+Hilfsmittel für die Probe aus Req 10.7; Aufgabe 24.3 bleibt offen ([Fabian], Abnahme in einem anderen PR).
+- **Skript:** `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet im Wegwerf-Container (Muster wie `passkey-einrichten-vorlage.sh`,
+  Anmeldung über `vorlage-ausfuehren.sh`) die Benutzerereignisse des Realms `urinet-archiv` per `kcadm.sh get events`. Die Admin-Konsole ist über
+  Traefik nicht öffentlich. Parameter `--typ` (mehrfach, Standard `UPDATE_CREDENTIAL,REMOVE_CREDENTIAL`), `--max` (Standard 20, höchstens 200), `--seit` (Tage, Standard 1).
+- **Datensparsam (Req 9):** Ausgabe nur Zeit (UTC), Typ, `userId` (UUID) und Client, dazu je Typ eine Summenzeile; nie Benutzername, E-Mail, IP-Adresse
+  oder Details. Rein lesend (nur `get`). Exit 0 = Ereignis gefunden, 3 = keines, 1 = Fehler, auch bei ausgeschalteten Ereignissen oder nicht aktiviertem Typ.
+- **Nachweis:** Stub-Test (`test/ereignisse-auflisten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2
+  (`test/ereignisse-auflisten-keycloak-test.sh`, mit virtuellem Authenticator ein echtes `UPDATE_CREDENTIAL`). Nicht belegt: der Lauf auf der VPS und
+  `REMOVE_CREDENTIAL` im Echtbetrieb. Anleitung: README, «Passkey-Ereignisse auflisten». Keine Änderung der Requirements.

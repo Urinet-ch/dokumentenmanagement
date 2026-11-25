@@ -310,3 +310,5 @@ auf Server oder Secrets aus der Sitzung.
     kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
     Related Origins und Gerätetest stehen aus. Req 10.7 (Entscheid Fabian 25.11.2026): Die Ereignisse werden aktiviert, der
     Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).
+  - Vermerk 25.11.2026 (Ereignis-Probe, bleibt offen, [Fabian]): `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet `UPDATE_CREDENTIAL`
+    und `REMOVE_CREDENTIAL` ohne Admin-Konsole (design.md, «Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)»); nichts abgehakt.
