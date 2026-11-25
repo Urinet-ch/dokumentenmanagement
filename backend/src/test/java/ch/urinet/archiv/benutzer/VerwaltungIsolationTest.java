@@ -249,10 +249,15 @@ abstract class VerwaltungIsolationIT {
                         .then().statusCode(200).extract().asString();
                 assertThat(eigene).contains(fall.eigenerAntrag().toString())
                         .doesNotContain(fall.fremderAntrag().toString());
+                UUID unbekannterAntrag = UUID.randomUUID();
                 for (String entscheid : List.of("bestaetigen", "ablehnen", "zurueckziehen")) {
-                    given().auth().oauth2(token).contentType("application/json").body("{}")
-                            .post(BENUTZER + "/antraege/" + fall.fremderAntrag() + "/" + entscheid)
-                            .then().statusCode(404);
+                    Response fremd = given().auth().oauth2(token).contentType("application/json").body("{}")
+                            .post(BENUTZER + "/antraege/" + fall.fremderAntrag() + "/" + entscheid);
+                    Response unbekannt = given().auth().oauth2(token).contentType("application/json").body("{}")
+                            .post(BENUTZER + "/antraege/" + unbekannterAntrag + "/" + entscheid);
+                    assertThat(fremd.statusCode()).isEqualTo(404);
+                    assertThat(fehler(fremd)).isEqualTo(fehler(unbekannt));
+                    assertThat(fremd.asString()).doesNotContain(fall.fremderAntrag().toString());
                 }
                 assertThat(protokoll(token, fall.eigenerMarker())).contains(fall.eigenerMarker());
                 assertThat(protokoll(token, fall.fremderMarker())).doesNotContain(fall.fremderMarker());
