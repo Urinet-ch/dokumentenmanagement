@@ -218,6 +218,7 @@ public class OeffentlicherChatSchritte {
 
     @Angenommen("das simulierte Sprachmodell liest diese öffentliche Wissensseite")
     public void wissenModell() {
+        KiWireMock.zuruecksetzen();
         KiWireMock.chatFolge(wissenAntworten());
     }
 

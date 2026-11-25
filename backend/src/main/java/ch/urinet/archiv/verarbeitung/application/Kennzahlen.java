@@ -3,6 +3,7 @@ package ch.urinet.archiv.verarbeitung.application;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.ki.application.KiBeispielZaehler;
+import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicheFragenZaehler;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -36,18 +37,20 @@ public class Kennzahlen {
     private final AuftragZaehler auftraege;
     private final DokumentUeberwachung dokumente;
     private final KiBeispielZaehler kiBeispiele;
+    private final OeffentlicheFragenZaehler oeffentlicheFragen;
 
     public Kennzahlen(MandantRegister register, AuftragZaehler auftraege, DokumentUeberwachung dokumente,
-                      KiBeispielZaehler kiBeispiele) {
+                      KiBeispielZaehler kiBeispiele, OeffentlicheFragenZaehler oeffentlicheFragen) {
         this.register = register;
         this.auftraege = auftraege;
         this.dokumente = dokumente;
         this.kiBeispiele = kiBeispiele;
+        this.oeffentlicheFragen = oeffentlicheFragen;
     }
 
     /** Stand eines Mandanten; KI-Beispiel-Zähler ist bei isoliertem Zählfehler leer. */
     public record Stand(MandantCode mandant, Map<String, Long> auftraege, Map<String, Long> dokumente,
-                        long eingangskorb, OptionalLong kiBeispiele) {
+                        long eingangskorb, OptionalLong kiBeispiele, OptionalLong oeffentlicheFragenOhneBeleg) {
     }
 
     /** Erhebt den Stand je aktiven Mandanten; Fehler bei übrigen Zählern lassen den Mandanten aus, jeweils mit WARN. */
@@ -68,7 +71,15 @@ public class Kennzahlen {
                             Ursachen.kette(e));
                     kiBeispielAnzahl = OptionalLong.empty();
                 }
-                stand.add(new Stand(mandant.code(), auftrag, dokument, korb, kiBeispielAnzahl));
+                OptionalLong fragenOhneBeleg;
+                try {
+                    fragenOhneBeleg = OptionalLong.of(oeffentlicheFragen.anzahlOhneBeleg(mandant.code()));
+                } catch (RuntimeException e) {
+                    LOG.warnf("Kennzahl öffentliche Fragen ohne Beleg für Mandant %s nicht erhoben, ursache=%s",
+                            mandant.code().wert(), Ursachen.kette(e));
+                    fragenOhneBeleg = OptionalLong.empty();
+                }
+                stand.add(new Stand(mandant.code(), auftrag, dokument, korb, kiBeispielAnzahl, fragenOhneBeleg));
             } catch (RuntimeException e) {
                 LOG.warnf("Kennzahlen für Mandant %s nicht erhoben, ursache=%s", mandant.code().wert(),
                         Ursachen.kette(e));

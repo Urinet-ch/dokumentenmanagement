@@ -37,6 +37,8 @@ Funktionalität: Öffentlicher Wissenschat
     Und lautet der Text des Chatbots «Dazu steht nichts in der Wissensbasis.»
     Und sind die Quellen des Chatbots leer
     Und enthält der Text des Chatbots nicht «Belegte synthetische Antwort.»
+    Und hat das simulierte Sprachmodell keine Anfrage erhalten
+    Und bleibt die öffentliche Wissensseite im anderen Mandanten unsichtbar
 
   @req-21.6 @req-21.8
   Szenario: Eine Wissensseite mit Quellenstufe «mitglieder» bleibt öffentlich unsichtbar
@@ -56,6 +58,8 @@ Funktionalität: Öffentlicher Wissenschat
     Und lautet der Text des Chatbots «Dazu steht nichts in der Wissensbasis.»
     Und sind die Quellen des Chatbots leer
     Und enthält der Text des Chatbots nicht «Belegte synthetische Antwort.»
+    Und hat das simulierte Sprachmodell keine Anfrage erhalten
+    Und bleibt die öffentliche Wissensseite im anderen Mandanten unsichtbar
 
   @req-21.6 @req-21.8
   Szenario: Ein gebundenes Gespräch wird fortgesetzt und die Frage ohne erkennbare Kontaktdaten protokolliert
@@ -185,7 +189,14 @@ Funktionalität: Öffentlicher Wissenschat
   @req-21.6 @req-21.8
   Szenario: Antwortet das Modell erst nach der Zeitgrenze, meldet der Wissenschat den festen Fehler ohne Quellen
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und im Mandanten «urinet» gibt es die Reihen:
+      | code         | name        |
+      | PROBE_WISSEN | Probe-Reihe |
+    Und im Mandanten «urinet» liegen diese Chatbot-Dokumente:
+      | name | titel          | reihe        | ausgabe | jahr | zugriff     | veroeffentlicht | vertraulichkeit | status     | text  |
+      | A    | Probe-Bulletin | PROBE_WISSEN | 3/2071  | 2071 | oeffentlich | true            | NORMAL          | ARCHIVIERT | Probe |
     Und der Chatbot-Schlüssel «wissen» der Webseite «probe-wissen» im Mandanten «urinet» hat die höchste Stufe «oeffentlich»
+    Und eine freigegebene öffentliche Wissensseite belegt das Chatbot-Dokument «A»
     Und das simulierte Sprachmodell antwortet erst nach 9 Sekunden
     Wenn die Webseite mit dem Schlüssel «wissen» den Wissenschat fragt: «Was steht in der Wissensbasis?»
     Dann meldet der Stream des Chatbots «fehler» «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» und weder «quellen» noch «fertig»

@@ -285,6 +285,13 @@ public class OeffentlicheFragen {
             strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
             return;
         }
+        if (anfrage.wissen() != null && !transaktion.neu(() -> {
+            huelle.sperren();
+            return wissen.hatFreigegebeneSeite();
+        })) {
+            wissenAusgeben(annahme, new ChatAntwort("", List.of(), List.of(), Optional.empty(), ChatStatus.OK), strom);
+            return;
+        }
         try {
             agent.beantworten(anfrage, ereignis -> {
                 if (!abbruch.gesetzt()) {
