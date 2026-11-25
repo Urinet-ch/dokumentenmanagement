@@ -363,7 +363,7 @@ When('das Handy offline ist', async function () {
   await this.kontext.setOffline(true);
 });
 
-When('ich das Handy nach der PWA-Installation offline schalte', async function () {
+When('ich schalte das Handy nach der PWA-Installation offline', async function () {
   assert.equal(
     await this.seite.evaluate(() => Boolean(navigator.serviceWorker.controller)),
     true,

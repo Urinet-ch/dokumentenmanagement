@@ -56,5 +56,24 @@ Belege:
 ## Einordnung
 
 Die Logs belegen die genannten Fehlerbilder, aber nicht deren weitergehende
-Ursachen oder eine Wiederholbarkeit. Es wurden keine Stabilisierungspatches
-vorgenommen.
+Ursachen oder eine Wiederholbarkeit.
+
+## Nachtrag 25.11.2026: Offline-Erfassung
+
+Im Lauf [45556027064](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45556027064)
+scheiterte das Szenario «Offline und ohne Anmeldung erfassen; die Aufnahmen
+bleiben auf dem Gerät» im Schritt «das Handy offline ist» am
+`page.waitForLoadState('networkidle')`. Das Log belegt den abgelaufenen Wait,
+nicht, welche Anfrage das Netzwerk aktiv hielt.
+
+Das Installations-Given lädt bereits alle App-Dateien in den Service-Worker-Cache
+und prüft nach nötigen Reloads, dass der Service Worker die Seite kontrolliert.
+Für dieses Szenario ersetzt deshalb ein eigener Schritt den zusätzlichen
+`networkidle`-Wait durch die Prüfung dieses Controllers, bevor Playwright das
+Handy offline schaltet. Die anderen Erfassungsszenarien behalten ihren bisherigen
+Wait. Am Produktcode ändert sich nichts.
+
+Nachweis: Das Szenario lief lokal zehnmal hintereinander erfolgreich; der
+Frontend-Build und der App-Build für den Browser-Test waren erfolgreich. Die
+Wiederholungen belegen die Stabilität dieses Testpfads, nicht die Ursache der
+ursprünglichen Netzaktivität.
