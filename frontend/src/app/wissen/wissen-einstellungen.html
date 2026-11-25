@@ -46,6 +46,7 @@
 }
 <section class="karte" aria-labelledby="wissen-export-titel">
   <h2 id="wissen-export-titel">{{ texte.exportTitel }}</h2>
+  <p class="hinweis warnung">{{ cloudHinweis }}</p>
   <div class="knoepfe">
     <button mat-stroked-button type="button" [disabled]="startet() || (export()?.status === 'OFFEN' && !exportFehler())"
       (click)="exportStarten()">{{ texte.exportStart }}</button>

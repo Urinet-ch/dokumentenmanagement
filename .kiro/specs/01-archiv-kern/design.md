@@ -742,6 +742,12 @@ Dev Services, Ablage und OCR laufen ebenfalls nur auf dem Entwicklerrechner (Req
 - `GoldenLauf` und `GoldenDatensatzIT` laufen nur per HTTPS gegen `api.infomaniak.com`, sonst Abbruch
   vor dem ersten Beleg (Req 16.22, umgesetzt in Aufgabe 0.5).
 
+**Umsetzung Aufgabe 0.5 (25.11.2026), Req 0.7:** `VergleichTest` prüft die fünf Feldregeln mit
+synthetischen In-Memory-Werten, einschliesslich fehlender Erwartungswerte; es liest weder
+`ARCHIV_GOLDEN_DIR` noch `erwartet.json`. Art und Datum werden exakt verglichen, Beträge auf zwei
+Dezimalstellen, Partner nach `Normalisierung.name` und Belegnummern nach Entfernen aller Leerzeichen.
+Der Vergleich der Art entfernt keine Leerzeichen; das entspricht dem Kriterium «exakt gleich».
+
 **Umsetzung Aufgabe 1.11 (10.11.2026), Präzisierungen und Abweichungen** (vorsichtigere Auslegung, im PR unter
 «Offen für Fabian»):
 - `lokal` erbt per `%lokal.quarkus.config.profile.parent=dev`; Quarkus wertet das nur aus, wenn das Profil über

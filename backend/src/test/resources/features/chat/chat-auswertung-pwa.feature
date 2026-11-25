@@ -1,5 +1,5 @@
 # language: de
-@spec-02 @browser @attrappe
+@spec-02 @browser @attrappe @req-15.11
 Funktionalität: Chat-Auswertung in der PWA
   Der Inhaber wertet die Bewertungen des eigenen Mandanten aus und exportiert sie nach frischer Anmeldung.
   Sämtliche Antworten und Bewertungen in diesen Szenarien sind synthetisch.

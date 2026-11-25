@@ -1,5 +1,5 @@
 # language: de
-@spec-02
+@spec-02 @req-15.11
 Funktionalität: Chat-Bewertungen speichern
   Benutzer dürfen eigene Chat-Antworten bewerten. Eine Bewertung verweist auf die Nachricht, wird nach 12 Monaten mit ihr
   gelöscht, und Freitext bleibt sicherer Text. Alle Inhalte sind synthetisch.

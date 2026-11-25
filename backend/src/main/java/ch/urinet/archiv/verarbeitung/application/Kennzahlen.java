@@ -17,9 +17,10 @@ import java.util.Map;
 import java.util.OptionalLong;
 
 /**
- * Kennzahlen je aktiven Mandanten (Req 16.4): offene, laufende und fehlgeschlagene Aufträge, Dokumente je Status ausser
- * den Endzuständen, die Grösse des Eingangskorbs und die Anzahl KI-Beispiele. Nur Zähler, keine Inhalte. Die
- * Korrekturquote je Feld wird beim Bestätigen eines KI-Vorschlags fortgeschrieben (Aufgabe 3.3).
+ * Kennzahlen je aktiven Mandanten: offene, laufende und fehlgeschlagene Aufträge, Dokumente je Status ausser den
+ * Endzuständen, die Grösse des Eingangskorbs sowie die Anzahl KI-Beispiele und öffentlichen Fragen ohne Beleg. Nur
+ * Zähler, keine Inhalte. Die Korrekturquote je Feld wird beim Bestätigen eines KI-Vorschlags fortgeschrieben
+ * (Aufgabe 3.3).
  */
 @ApplicationScoped
 public class Kennzahlen {
@@ -53,7 +54,10 @@ public class Kennzahlen {
                         long eingangskorb, OptionalLong kiBeispiele, OptionalLong oeffentlicheFragenOhneBeleg) {
     }
 
-    /** Erhebt den Stand je aktiven Mandanten; Fehler bei übrigen Zählern lassen den Mandanten aus, jeweils mit WARN. */
+    /**
+     * Erhebt den Stand je aktiven Mandanten. Fehler bei Auftrags- oder Dokumentzählern lassen den gesamten Stand aus;
+     * Fehler bei KI-Beispielen und öffentlichen Fragen ohne Beleg melden WARN und entfernen nur die jeweilige Gauge.
+     */
     public List<Stand> erheben() {
         List<Stand> stand = new ArrayList<>();
         for (Mandant mandant : register.aktive()) {

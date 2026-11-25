@@ -1,5 +1,5 @@
 # language: de
-@spec-02
+@spec-02 @req-15.11
 Funktionalität: Chat-Bewertungen auswerten und exportieren
   Der Inhaber wertet nur die Bewertungen des eigenen Mandanten aus und exportiert sie als geschwärztes ZIP.
   Alle Daten in diesen Szenarien sind synthetisch.
@@ -20,6 +20,16 @@ Funktionalität: Chat-Bewertungen auswerten und exportieren
     Dann ist die Chat-Auswertung mit Status 403 beantwortet
     Wenn «geschaeftsstelle-vhf-gsk» liest die Chat-Auswertung für die letzten 30 Tage
     Dann ist die Chat-Auswertung mit Status 403 beantwortet
+
+  @req-15.5
+  @req-15.6
+  Szenario: Der Export enthält nur Bewertungen des eigenen Mandanten
+    Angenommen im Mandanten «urinet» gibt es eine synthetische Chat-Bewertung mit 4 Sternen
+    Und im Mandanten «vhf-gsk» gibt es eine synthetische Chat-Bewertung mit 5 Sternen und der Frage «SYNTH-VHF-FREMD-TEXT-9173»
+    Wenn «inhaber-urinet» exportiert die Chat-Auswertung für die letzten 30 Tage
+    Dann ist der Chat-Auswertungs-Export mit Status 200 beantwortet
+    Und enthält der Chat-Auswertungs-Export 1 Bewertungen
+    Und enthält der Chat-Auswertungs-Export den Text «SYNTH-VHF-FREMD-TEXT-9173» nicht
 
   @req-15.6
   @req-15.8
@@ -53,6 +63,18 @@ Funktionalität: Chat-Bewertungen auswerten und exportieren
     Wenn der API-Token die Chat-Auswertung exportiert
     Dann ist der Chat-Auswertungs-Export mit Status 403 beantwortet
 
+  @req-15.6
+  Szenariogrundriss: Nur der Inhaber darf die Chat-Auswertung exportieren
+    Angenommen im Mandanten «<mandant>» gibt es eine synthetische Chat-Bewertung mit 4 Sternen
+    Wenn «<benutzer>» exportiert die Chat-Auswertung für die letzten 30 Tage
+    Dann ist der Chat-Auswertungs-Export mit Status 403 beantwortet
+
+    Beispiele:
+      | mandant | benutzer                    |
+      | urinet  | mitarbeiter-urinet          |
+      | urinet  | treuhaender-urinet          |
+      | vhf-gsk | geschaeftsstelle-vhf-gsk    |
+
   @req-15.5
   Szenario: Ein Webseiten-Schlüssel ohne Inhaberrolle kann die Chat-Auswertung nicht lesen oder exportieren
     Angenommen für die Chat-Auswertung gibt es einen Webseiten-Schlüssel ohne Inhaberrolle
@@ -67,6 +89,13 @@ Funktionalität: Chat-Bewertungen auswerten und exportieren
     Wenn «inhaber-urinet» exportiert die Chat-Auswertung für die letzten 30 Tage
     Dann ist der Chat-Auswertungs-Export mit Status 413 beantwortet
     Und ist der Fehlercode der Chat-Auswertung «BEWERTUNG_EXPORT_ZU_GROSS»
+
+  @req-15.6
+  Szenario: Export mit genau 5000 Bewertungen bleibt innerhalb der Grenze
+    Angenommen im Mandanten «urinet» gibt es 5000 synthetische Chat-Bewertungen
+    Wenn «inhaber-urinet» exportiert die Chat-Auswertung für die letzten 30 Tage
+    Dann ist der Chat-Auswertungs-Export mit Status 200 beantwortet
+    Und enthält der Chat-Auswertungs-Export 5000 Bewertungen
 
   @req-15.7
   Szenario: Der Export schwärzt standardmässig bekannte Personendaten

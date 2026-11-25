@@ -815,7 +815,7 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
   - `wissen_paket validate <ordner|paket.zip> [--quellen <ordner>] [--json]` – prüft Format, Grenzen, Pfade,
     Frontmatter, Markdown und die Regeln von `WissensPruefung`, soweit sie ohne Archiv prüfbar sind; Rückgabewert 0 ohne
     sperrenden Befund, sonst 1; Ausgabe nur Befund-Codes, Pfade und Zähler; am Ende die Regel zu Cloud-Modellen als
-    Hinweis (Requirement 19.25).
+    Hinweis (Requirements 19.24 und 19.25).
   - `wissen_paket bauen <ordner> -o <paket.zip> --mandant <code> --erzeugt-von <name> --erzeugt-mit lokal|cloud
     --kontext-stufe NORMAL|INTERN [--ueberschreiben]` – schreibt `paket.yaml` (falls im Ordner keine liegt), führt
     zuerst `validate` aus und baut das ZIP nur, wenn kein sperrender Befund besteht; keine Symlinks, feste Reihenfolge und
@@ -825,6 +825,11 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
   vorgeprüft (nur `.pdf`, über `pdftotext`, falls vorhanden; sonst Hinweis). Das Ergebnis ist ein Hinweis
   `AUSZUG_LOKAL_NICHT_GEFUNDEN`, nicht massgeblich: Das Archiv prüft den Volltext der PDF/A-Fassung, der nach OCR
   vom Text des Originals abweichen kann.
+- **Umsetzung (Aufgaben 15.5 und 15.7, 25.11.2026):** `wissen_paket` gibt die Cloud-Modell-Regel auch für
+  lokale Erarbeitung als Prozesshinweis aus. Die Seite «Wissensbasis exportieren» zeigt denselben Hinweis vor dem
+  OKF-Export; `WissenPaketCliTest`, `wissen.spec.ts` und `okf-export-hinweis.feature` prüfen die Ausgaben
+  (Requirement 19.24). Das Backend-Rundlaufszenario in `import.feature` trägt dieselbe Anforderungszuordnung. Die Hinweise
+  informieren, erzwingen die Regeln ausserhalb des Archivs aber nicht.
 - **Nicht offline prüfbar** (Hinweis statt Befund): Zuordnung der Quellen, Seitenzahl der Dokumente, vergebene Pfade,
   `STUFE_UEBERBLICK`, Sichtbarkeit; sie prüft nur der Import.
 - **Gleiche Regeln – Entscheid:** Das Werkzeug **bindet den Quelltext der Domain-Regeln ein**, es kopiert ihn nicht und
@@ -1465,7 +1470,9 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   die Freigabe während der Anfrage und liest den Stream bis zum Ende. Es folgt nur `fehler`, kein Text, keine Quellen und
   kein `fertig`; damit ist die Schlussprüfung bis zur Netzauslieferung geprüft. Die Grenze bleibt unverändert:
   Quellenstände werden vor Modellaufruf und vor Einreihen der Antwort geprüft; ein bereits eingereihtes Ereignis ist
-  nicht rückrufbar.
+  nicht rückrufbar. **Nachtrag Stabilität 25.11.2026:** Die simulierte Schlussantwort wartet 3 Sekunden, damit auch
+  langsame CI-Runner Zeit für die Änderung während der laufenden Anfrage haben. Die SSE-Gegenprobe begrenzt das Lesen
+  einschliesslich des ersten Ereignisses und des Reststroms auf eine Gesamtfrist von 30 Sekunden.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`
@@ -1520,13 +1527,19 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
 - `archiv.oeffentliche.fragen.ohne.beleg{mandant}` zählt je aktivem Mandanten die gespeicherten Zeilen aus
   `oeffentliche_frage`, deren `quellen` dem leeren JSON-Array entspricht. Das Monitoring liest weder Fragen noch Quellen;
   die Kennzahl wird mit der bestehenden periodischen Kennzahlen-Erhebung aktualisiert.
+- **Entscheid Fabian 25.11.2026:** Der Zähler umfasst Zeilen aus Archivchat und Wissenschat. `oeffentliche_frage` hat
+  keine Spalte zur Trennung der Chat-Modi; separate Zähler würden eine Schemaänderung erfordern, die nicht vorgenommen
+  wird.
 - Vor dem Modellaufruf prüft der Wissenschat, ob mindestens eine aktuell freigegebene, öffentlich sichtbare Wissensseite
   verfügbar ist. Ohne solche Seite liefert er den festen Hinweis ohne Modellaufruf.
+- **Entscheid Fabian 25.11.2026:** Fehlt eine aktuell freigegebene, öffentlich sichtbare Wissensseite, erfolgt kein
+  Modellaufruf; die Frage wird weiterhin inhaltsfrei mit leerem Quellenarray protokolliert.
 - Es gibt keine Schemaänderung; der tägliche Aufräumjob entfernt alte Zeilen auch aus der gemessenen Anzahl. Fehler beim
   Zählen entfernen nur die betroffene Gauge und lassen die übrigen Kennzahlen des Mandanten bestehen.
 - JUnit prüft leere gegen nichtleere Quellen in beiden Mandantenschemas und den Gauge-Tag `mandant`. Die beiden
   Ausschluss-Szenarien in `oeffentlicher-wissenschat.feature` prüfen ausserdem `KiWireMock.chatAnfragen()` auf leer
-  und kontrollieren die Unsichtbarkeit im zweiten Mandanten.
+  und kontrollieren die Unsichtbarkeit im zweiten Mandanten. Der Fall ohne aktuelle Webseitenfreigabe prüft zudem genau
+  eine inhaltsfreie gespeicherte Zeile mit leerem Quellenarray.
 
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:

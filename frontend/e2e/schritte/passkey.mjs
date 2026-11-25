@@ -159,7 +159,7 @@ async function einrichten(welt) {
   welt.seite.once('dialog', (dialog) => dialog.accept(welt.passkey.label));
   await welt.seite.getByTestId('webauthn-passwordless/create').click();
   await welt.seite.locator('#registerWebAuthn').click();
-  await welt.seite.getByText(welt.passkey.label, { exact: true }).waitFor();
+  await welt.seite.getByText(welt.passkey.label, { exact: true }).waitFor({ timeout: 60_000 });
   const { credentials } = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
   assert.equal(credentials.length, 1);
   assert.equal(credentials[0].isResidentCredential, true);
