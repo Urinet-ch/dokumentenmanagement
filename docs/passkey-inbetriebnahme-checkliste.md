@@ -1,14 +1,13 @@
 # Passkey: Checkliste für die Inbetriebnahme (Aufgabe 24.3, Fabian)
 
-**Status: ausgeführt am 25.11.2026 (Fabian), mit einem offenen Punkt.** Realm auf Stufe A eingerichtet (Prüflauf Exit 10,
+**Status: ausgeführt und belegt am 25.11.2026 (Fabian), nichts offen.** Realm auf Stufe A eingerichtet (Prüflauf Exit 10,
 Einrichten Exit 0 mit 18 Änderungen, Nachprüfung Exit 0, Wiederholung «nichts zu tun»). Auf iPhone und Mac bestätigt: Anmelde-Rückfall mit
 Passwort und TOTP, Related Origins, Passkey einrichten, anmelden, Step-up und entfernen, «Zugang zurücksetzen» mit «Passkeys löschen»
-sowie TOTP bei Passwortanmeldung trotz Passkey. **Offen:** die Probe im Ereignisprotokoll (`UPDATE_CREDENTIAL`, `REMOVE_CREDENTIAL`);
-die Admin-Konsole ist nicht öffentlich, und das Hilfsskript zum Listen der Ereignisse fehlt noch. Die App-Anleitung gilt damit als auf
+sowie TOTP bei Passwortanmeldung trotz Passkey. **Ereignis-Probe belegt am 25.11.2026** (Req 10.7, Stufe A, siehe «Ereignis-Probe» unten). Die App-Anleitung gilt damit als auf
 iPhone und Mac geprüft (25.11.2026); der virtuelle Authenticator war und ist dafür kein Nachweis.
 
 Realm- und RP-ID-Änderungen führt der Betreiber aus. Die manuellen Gerätetests und ihre Beurteilung bleiben bei Fabian.
-24.3 ist von Fabian am 25.11.2026 abgenommen; offen bleibt die Ereignisprotokoll-Probe (Hilfsskript folgt separat). Keine Hostnamen,
+24.3 ist von Fabian am 25.11.2026 abgenommen; die Ereignisprotokoll-Probe ist am 25.11.2026 belegt. Keine Hostnamen,
 Adressen oder Geheimnisse gehören in diese Datei oder ins Repo.
 
 ## Reihenfolge
@@ -32,8 +31,8 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
    **Standardaufruf mit `--ereignisse`** (Entscheid Fabian 25.11.2026, Req 10.7: `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` werden
    aktiviert); die Option steht also in allen drei Aufrufen. Sind die Ereignisse des Realms aus oder `enabledEventTypes` leer, bricht die
    Vorlage ab, ohne etwas zu ändern. Probe: Nach der Passkey-Einrichtung in Punkt 4 erscheint `UPDATE_CREDENTIAL` im Ereignisprotokoll
-   des Realms. Die Admin-Konsole ist nicht öffentlich; stattdessen auf der VPS (in `/opt/archiv-werkzeuge`)
-   `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL` (Aufruf im README, «Passkey-Ereignisse auflisten»; Probe offen bis zur Ausführung).
+   des Realms (belegt am 25.11.2026). Die Admin-Konsole ist nicht öffentlich; stattdessen auf der VPS (in `/opt/archiv-werkzeuge`)
+   `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL` (Aufruf im README, «Passkey-Ereignisse auflisten»).
 2. **Relying-Party-ID setzen.** Der Export enthält den Platzhalter `${ARCHIV_PASSKEY_RP_ID}` (`webAuthnPolicyPasswordlessRpId`);
    der Wert ist der Host der App-Basisadresse (`ARCHIV_BASIS_URL`) ohne Schema und Port, abgeleitet wie in
    `deploy/infomaniak/keycloak/start.sh`. Das Hilfsskript `vorlage-ausfuehren.sh` leitet ihn im Wegwerf-Container aus der
@@ -44,7 +43,7 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
 4. **Mit iPhone und Mac prüfen:** Auf beiden Geräten den Passkey in der Kontoverwaltung einrichten, damit anmelden, eine
    Step-up-Aktion auslösen (Passkey genügt) und den Passkey wieder entfernen. Danach als Inhaber bei einem synthetischen
    Testbenutzer «Zugang zurücksetzen» mit der Option «Passkeys löschen» ausführen und prüfen, dass der Benutzer nur noch
-   mit Passwort und TOTP hereinkommt. Im Ereignisprotokoll des Realms sollte `REMOVE_CREDENTIAL` stehen (Probe offen, nicht belegt; `ereignisse-auflisten-vorlage.sh --typ REMOVE_CREDENTIAL`, Exit 3 = nichts gefunden, siehe Punkt 1). Geprüft am 25.11.2026 auf iPhone und Mac (Fabian).
+   mit Passwort und TOTP hereinkommt. Im Ereignisprotokoll des Realms sollte `REMOVE_CREDENTIAL` stehen (belegt am 25.11.2026, siehe «Ereignis-Probe»; Prüfung mit `ereignisse-auflisten-vorlage.sh --typ REMOVE_CREDENTIAL`, Exit 3 = nichts gefunden, siehe Punkt 1). Geprüft am 25.11.2026 auf iPhone und Mac (Fabian).
 5. **Rückfall prüfen:** Ein Benutzer ohne Passkey meldet sich weiter mit Passwort und TOTP an; auch mit eingerichtetem Passkey
    bleibt TOTP für die Passwortanmeldung verlangt.
 
@@ -55,7 +54,18 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
 | Passkey entfernen | ok (Fabian, 25.11.2026) | ok (Fabian, 25.11.2026) |
 | Passwort- und TOTP-Rückfall | ok (Fabian, 25.11.2026) | ok (Fabian, 25.11.2026) |
 
-Offen: Ereignisprotokoll `UPDATE_CREDENTIAL` / `REMOVE_CREDENTIAL` (Admin-Konsole nicht öffentlich, Werkzeug fehlt noch).
+## Ereignis-Probe (Req 10.7): belegt am 25.11.2026
+Auf der VPS mit `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL --typ REMOVE_CREDENTIAL` im Realm `urinet-archiv` geprüft (Exit 0).
+Alle Ereignisse betreffen eine Benutzerkennung und den Client `account-console` (Zeiten UTC):
+
+| Zeit | Typ | Vorgang |
+| --- | --- | --- |
+| 13:12:00Z | `UPDATE_CREDENTIAL` | erste Einrichtung eines Passkeys |
+| 16:01:23Z | `REMOVE_CREDENTIAL` | Passkey in der Kontoverwaltung entfernt |
+| 16:03:09Z | `UPDATE_CREDENTIAL` | neuer Passkey eingerichtet |
+| 16:03:48Z | `UPDATE_CREDENTIAL` | zweiter neuer Passkey eingerichtet |
+
+Summen: `UPDATE_CREDENTIAL` 3, `REMOVE_CREDENTIAL` 1. Damit ist Req 10.7 (Einrichten und Entfernen eines Passkeys wird protokolliert) auf Stufe A belegt.
 
 ## Domainwechsel
 Passkeys sind an die Relying-Party-ID gebunden. Nach einem Wechsel der Domain gelten bestehende Passkeys nicht mehr. Rückfall ist
