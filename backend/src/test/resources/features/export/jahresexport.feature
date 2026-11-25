@@ -19,7 +19,7 @@ Funktionalität: Jahresexport für den Treuhänder (Aufgabe 6.5)
    | B_VORJAHR | QUITTUNG | 2024-12-31 | 2024 | ARCHIVIERT | Bäckerei Beispiel | | AUSGABE | 8.50 | NORMAL | nein |
   Und im Mandanten «vhf-gsk» liegen diese Belege:
    | name | art | datum | jahr | status | partner | belegnummer | richtung | betrag | vertraulichkeit | pdfa_fehlt |
-   | V_FREMD | PROBE_VHF_BULLETIN | 2025-05-05 | 2025 | ARCHIVIERT | Fremder Verein | | AUSGABE | 1.00 | NORMAL | nein |
+   | V_FREMD | BULLETIN | 2025-05-05 | 2025 | ARCHIVIERT | Fremder Verein | | AUSGABE | 1.00 | NORMAL | nein |
   Und im Mandanten «urinet» liegen die Manifeste vom 2025-03-14 und vom 2024-06-01 mit Zeitstempel «sgpki»
 
   @req-7.1 @req-7.4

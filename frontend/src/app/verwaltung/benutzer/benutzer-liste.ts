@@ -12,7 +12,7 @@ import { httpFehlerMeldung } from '../../gemeinsam/http-fehler';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { BenutzerFortsetzen, BenutzerFortsetzung } from './benutzer-fortsetzung';
 import { BenutzerEinladen } from './benutzer-einladen';
-import { name, rollen } from './benutzer-logik';
+import { einladungAblauf, name, rollen } from './benutzer-logik';
 import { BenutzerRechte } from './benutzer-rechte';
 
 const SEITENGROESSE = 50;
@@ -39,6 +39,7 @@ export class BenutzerListe implements OnInit {
   protected readonly name = name;
   protected readonly rollen = rollen;
   protected readonly zeitpunkt = zeitpunkt;
+  protected readonly einladungAblauf = einladungAblauf;
   protected readonly benutzer = signal<readonly BenutzerAnsicht[] | null>(null);
   protected readonly rollenListe = signal<readonly VerwaltungRolle[] | null>(null);
   protected readonly einladbareRollen = computed(() => {

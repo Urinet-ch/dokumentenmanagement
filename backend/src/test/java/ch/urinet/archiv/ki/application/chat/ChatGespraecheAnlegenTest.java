@@ -2,8 +2,9 @@ package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
-import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.ki.application.WissenschatZugang;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
+import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ class ChatGespraecheAnlegenTest {
             @Override
             public void rechtPruefen(Benutzer benutzer) {
                 geprueft.add("A15");
-                throw new IllegalStateException("403");
+                throw new Verweigerung(Verweigerung.Grund.NICHT_ERLAUBT);
             }
 
             @Override
@@ -57,7 +58,9 @@ class ChatGespraecheAnlegenTest {
             }
         };
         ChatGespraecheAnlegen anlegen = new ChatGespraecheAnlegen(speicher, ohneRecht);
-        assertThatThrownBy(() -> anlegen.anlegen(BENUTZER, Chatmodus.WISSEN)).hasMessage("403");
+        assertThatThrownBy(() -> anlegen.anlegen(BENUTZER, Chatmodus.WISSEN))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        e -> assertThat(e.code()).isEqualTo(Fehlercode.NICHT_ERLAUBT));
         assertThat(geprueft).containsExactly("A15");
         assertThat(aufrufe).isEmpty();
     }
