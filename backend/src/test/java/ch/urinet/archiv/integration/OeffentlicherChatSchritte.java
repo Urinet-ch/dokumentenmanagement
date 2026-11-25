@@ -27,6 +27,10 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -101,6 +105,8 @@ public class OeffentlicherChatSchritte {
     private final Set<String> frageMandanten = new LinkedHashSet<>();
     private String ip;
     private Response antwort;
+    private String netzStrom;
+    private int netzStatus;
     private List<Response> paralleleAntworten = List.of();
     private List<Ereignis> ereignisse = List.of();
     private String gespraech;
@@ -171,6 +177,8 @@ public class OeffentlicherChatSchritte {
         frageMandanten.clear();
         ip = null;
         gespraech = null;
+        netzStrom = null;
+        netzStatus = 0;
         paralleleAntworten = List.of();
     }
 
@@ -556,36 +564,81 @@ public class OeffentlicherChatSchritte {
                 .ifPresent(e -> gespraech = e.daten().path("gespraechId").asText());
     }
 
-    @Wenn("die Webseite mit dem Schlüssel «{word}» fragt und danach «{word}» geändert wird")
+    @Wenn("die Webseite mit dem Schlüssel «{word}» fragt und nach dem ersten SSE-Ereignis «{word}» geändert wird")
     public void wissenAenderungWaerendFrage(String name, String aenderung) throws Exception {
-        RequestSpecification anfrage = anfrage(name, "oeffentlich", "wissen")
-                .body("{\"frage\":\"Was steht in der Wissensbasis?\"}");
-        CompletableFuture<Response> lauf = CompletableFuture.supplyAsync(
-                () -> anfrage.when().post("/public/v1/wissen/chat"));
-        long frist = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
-        while (KiWireMock.chatAnfragen().size() < 3 && System.nanoTime() < frist) {
-            Thread.sleep(50);
+        String mandant = schluesselMandant.get(name);
+        frageMandanten.add(mandant);
+        byte[] koerper = JSON.createObjectNode().put("frage", "Was steht in der Wissensbasis?")
+                .toString().getBytes(StandardCharsets.UTF_8);
+        var ziel = URI.create("http://localhost:" + io.restassured.RestAssured.port
+                + "/public/v1/wissen/chat").toURL();
+        HttpURLConnection verbindung = (HttpURLConnection) ziel.openConnection();
+        verbindung.setRequestMethod("POST");
+        verbindung.setConnectTimeout(10_000);
+        verbindung.setReadTimeout(20_000);
+        verbindung.setDoOutput(true);
+        verbindung.setFixedLengthStreamingMode(koerper.length);
+        verbindung.setRequestProperty("Authorization", "Bearer " + schluessel.get(name));
+        verbindung.setRequestProperty("Content-Type", "application/json");
+        verbindung.setRequestProperty("Accept", "text/event-stream");
+        verbindung.setRequestProperty("X-Archiv-Zugriff", "oeffentlich");
+        verbindung.setRequestProperty("X-Archiv-Client", hash("wissen"));
+        if (ip != null) {
+            verbindung.setRequestProperty("X-Real-Ip", ip);
         }
-        assertThat(KiWireMock.chatAnfragen()).hasSizeGreaterThanOrEqualTo(3);
-        if ("Entzug".equals(aenderung)) {
-            ausfuehren("update m_urinet.wissensseite set fuer_webseite = false, "
-                    + "quellen_revision = quellen_revision + 1 where id = ?", wissenSeite);
-        } else if ("Höherstufung".equals(aenderung)) {
-            ausfuehren("update m_urinet.dokument set zusatz = jsonb_set(zusatz, '{zugriff}', '\"mitglieder\"') "
-                    + "where id = ?", dokumente.get("A").id());
-        } else {
-            throw new IllegalArgumentException("Unbekannte synthetische Änderung");
+        try {
+            try (var ausgabe = verbindung.getOutputStream()) {
+                ausgabe.write(koerper);
+            }
+            netzStatus = verbindung.getResponseCode();
+            assertThat(netzStatus).isEqualTo(200);
+            assertThat(verbindung.getContentType()).startsWith("text/event-stream");
+            try (var leser = new BufferedReader(new InputStreamReader(
+                    verbindung.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder strom = new StringBuilder();
+                String zeile;
+                while ((zeile = leser.readLine()) != null && !zeile.isEmpty()) {
+                    strom.append(zeile).append('\n');
+                }
+                assertThat(strom.toString().replace(" ", "")).contains("event:werkzeug");
+                long frist = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+                while (KiWireMock.chatAnfragen().size() < 3 && System.nanoTime() < frist) {
+                    Thread.sleep(50);
+                }
+                assertThat(KiWireMock.chatAnfragen()).hasSizeGreaterThanOrEqualTo(3);
+                if ("Entzug".equals(aenderung)) {
+                    ausfuehren("update m_urinet.wissensseite set fuer_webseite = false, "
+                            + "quellen_revision = quellen_revision + 1 where id = ?", wissenSeite);
+                } else if ("Höherstufung".equals(aenderung)) {
+                    ausfuehren("update m_urinet.dokument set zusatz = jsonb_set(zusatz, '{zugriff}', '\"mitglieder\"') "
+                            + "where id = ?", dokumente.get("A").id());
+                } else {
+                    throw new IllegalArgumentException("Unbekannte synthetische Änderung");
+                }
+                while ((zeile = leser.readLine()) != null) {
+                    strom.append(zeile).append('\n');
+                }
+                netzStrom = strom.toString();
+            }
+        } finally {
+            verbindung.disconnect();
         }
-        antwort = lauf.get(20, TimeUnit.SECONDS);
-        ereignisse = lesen();
     }
 
     @Dann("liefert der Wissenschat nach der Änderung weder Modelltext noch Quellen")
     public void wissenAntwortUnterdrueckt() throws SQLException {
-        assertThat(antwort.statusCode()).isEqualTo(200);
-        assertThat(ereignisse).extracting(Ereignis::name).contains("fehler")
-                .doesNotContain("text", "quellen", "fertig");
-        assertThat(antwort.asString()).doesNotContain("Belegte synthetische Antwort.");
+        if (netzStatus > 0) {
+            String strom = netzStrom.replace(" ", "");
+            assertThat(netzStatus).isEqualTo(200);
+            assertThat(strom).contains("event:werkzeug", "event:fehler")
+                    .doesNotContain("event:text", "event:quellen", "event:fertig",
+                            "Belegte synthetische Antwort.");
+        } else {
+            assertThat(antwort.statusCode()).isEqualTo(200);
+            assertThat(ereignisse).extracting(Ereignis::name).contains("fehler")
+                    .doesNotContain("text", "quellen", "fertig");
+            assertThat(antwort.asString()).doesNotContain("Belegte synthetische Antwort.");
+        }
         assertThat(zahl("select count(*) from m_urinet.ki_verbrauch where zweck = 'WISSEN_CHAT' and id > ?",
                 wissenVerbrauchVorher)).isEqualTo(3);
         assertThat(zahl("select count(*) from m_urinet.oeffentliche_frage")).isEqualTo(fragenVorWissenschat);

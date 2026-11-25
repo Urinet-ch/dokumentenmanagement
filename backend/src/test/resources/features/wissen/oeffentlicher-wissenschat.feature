@@ -109,7 +109,7 @@ Funktionalität: Öffentlicher Wissenschat
     Und der Chatbot-Schlüssel «wissen» der Webseite «probe-wissen» im Mandanten «urinet» hat die höchste Stufe «oeffentlich»
     Und eine freigegebene öffentliche Wissensseite belegt das Chatbot-Dokument «A»
     Und das simulierte Sprachmodell liest diese öffentliche Wissensseite und verzögert die Schlussantwort
-    Wenn die Webseite mit dem Schlüssel «wissen» fragt und danach «<änderung>» geändert wird
+    Wenn die Webseite mit dem Schlüssel «wissen» fragt und nach dem ersten SSE-Ereignis «<änderung>» geändert wird
     Dann liefert der Wissenschat nach der Änderung weder Modelltext noch Quellen
 
     Beispiele:
