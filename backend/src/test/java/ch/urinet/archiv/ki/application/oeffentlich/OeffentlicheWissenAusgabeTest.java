@@ -62,6 +62,33 @@ class OeffentlicheWissenAusgabeTest {
         assertThat(ausgeben(lauf, true).ausgaben()).singleElement().isInstanceOf(OeffentlicheAusgabe.Fehler.class);
     }
 
+    @Test
+    void entzugVorFortsetzungVerwirftDenVerlauf() {
+        var gespraechId = UUID.randomUUID();
+        var zugriff = new Lesezugriff("probe", Zugriffsstufe.OEFFENTLICH, Zugriffsstufe.OEFFENTLICH,
+                Optional.of("a".repeat(64)));
+        var lauf = new OeffentlichesWissenDurchgang(List.of(STAND), List.of());
+        var ergebnis = ausgeben(lauf, false, gespraechId, g -> {
+            g.merkenWissen(gespraechId, MANDANT, zugriff, "Frage", "Antwort", List.of(STAND), List.of(seite()));
+            assertThat(g.anzahl()).isEqualTo(1);
+        });
+        assertThat(ergebnis.ausgaben()).singleElement().isInstanceOf(OeffentlicheAusgabe.Fehler.class);
+        assertThat(ergebnis.gespraeche().anzahl()).isZero();
+        assertThat(ergebnis.gespraeche().oeffnenWissen(gespraechId, MANDANT, zugriff).verlauf()).isEmpty();
+    }
+
+    @Test
+    void folgefrageOhneWerkzeugZeigtKeineQuellenFrueehererRunden() {
+        var frueher = seite();
+        var lauf = new OeffentlichesWissenDurchgang(List.of(STAND), List.of(frueher));
+        var ausgaben = ausgeben(lauf, true).ausgaben();
+        assertThat(ausgaben.getFirst()).isEqualTo(new OeffentlicheAusgabe.Text("Dazu steht nichts in der Wissensbasis."));
+        assertThat(((OeffentlicheAusgabe.WissenQuellen) ausgaben.get(1)).quellen()).isEmpty();
+
+        lauf.zeigen(frueher);
+        assertThat(((OeffentlicheAusgabe.WissenQuellen) ausgeben(lauf, true).ausgaben().get(1)).quellen()).hasSize(1);
+    }
+
     private static OeffentlichesWissenPort.Seite seite() {
         return new OeffentlichesWissenPort.Seite(STAND, "probe/seite", "Titel", "Konzept", "Inhalt", Instant.EPOCH,
                 List.of(new OeffentlichesWissenPort.Dokument(UUID.randomUUID(), "Beleg", "R", "Reihe", "1")));
@@ -72,6 +99,11 @@ class OeffentlicheWissenAusgabeTest {
     }
 
     private static Ergebnis ausgeben(OeffentlichesWissenDurchgang lauf, boolean gueltig) {
+        return ausgeben(lauf, gueltig, UUID.randomUUID(), g -> { });
+    }
+
+    private static Ergebnis ausgeben(OeffentlichesWissenDurchgang lauf, boolean gueltig, UUID gespraechId,
+                                     java.util.function.Consumer<OeffentlicheGespraeche> vorbereiten) {
         OeffentlichesWissenPort port = new OeffentlichesWissenPort() {
             public List<Indexzeile> suchen(String begriff, int hoechstens) { return List.of(); }
             public Optional<Seite> seite(String pfad) { return Optional.empty(); }
@@ -85,6 +117,7 @@ class OeffentlicheWissenAusgabeTest {
             public <T> T neu(Supplier<T> arbeit) { return arbeit.get(); }
         };
         var gespraeche = new OeffentlicheGespraeche(java.time.Duration.ofMinutes(30), 2, 6, Clock.systemUTC());
+        vorbereiten.accept(gespraeche);
         var protokollierteFrage = new AtomicReference<String>();
         OeffentlicheFragenSpeicher speicher = new OeffentlicheFragenSpeicher() {
             public void speichern(String frage, List<ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicheQuelle> quellen,
@@ -102,7 +135,7 @@ class OeffentlicheWissenAusgabeTest {
         var platz = grenzen.annehmen(MANDANT, zugriff);
         var frage = "Frage max.muster@example.invalid";
         var anfrage = new OeffentlicheAnfrage(MANDANT, zugriff, LocalDate.now(), "", frage, List.of(), lauf);
-        var annahme = new OeffentlicheFragen.Annahme(UUID.randomUUID(), anfrage, frage, platz);
+        var annahme = new OeffentlicheFragen.Annahme(gespraechId, anfrage, frage, platz);
         List<OeffentlicheAusgabe> ausgaben = new ArrayList<>();
         try {
             dienst.wissenAusgeben(annahme, ANTWORT, ausgabe -> {

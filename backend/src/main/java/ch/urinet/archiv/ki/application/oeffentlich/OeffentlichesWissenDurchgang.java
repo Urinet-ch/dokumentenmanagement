@@ -11,6 +11,7 @@ import java.util.UUID;
 public final class OeffentlichesWissenDurchgang {
     private final Map<UUID, OeffentlichesWissenPort.Stand> gesehen = new LinkedHashMap<>();
     private final Map<UUID, OeffentlichesWissenPort.Seite> gezeigt = new LinkedHashMap<>();
+    private final Map<UUID, OeffentlichesWissenPort.Seite> dieseRunde = new LinkedHashMap<>();
     private boolean widerspruch;
 
     public OeffentlichesWissenDurchgang() {
@@ -19,7 +20,10 @@ public final class OeffentlichesWissenDurchgang {
     public OeffentlichesWissenDurchgang(List<OeffentlichesWissenPort.Stand> staende,
                                         List<OeffentlichesWissenPort.Seite> seiten) {
         staende.forEach(this::merken);
-        seiten.forEach(this::zeigen);
+        seiten.forEach(seite -> {
+            merken(seite.version());
+            gezeigt.put(seite.version().id(), seite);
+        });
     }
 
     public synchronized void merken(OeffentlichesWissenPort.Stand stand) {
@@ -32,6 +36,7 @@ public final class OeffentlichesWissenDurchgang {
     public synchronized void zeigen(OeffentlichesWissenPort.Seite seite) {
         merken(seite.version());
         gezeigt.put(seite.version().id(), seite);
+        dieseRunde.put(seite.version().id(), seite);
     }
 
     public synchronized List<OeffentlichesWissenPort.Stand> gesehene() {
@@ -40,6 +45,11 @@ public final class OeffentlichesWissenDurchgang {
 
     public synchronized List<OeffentlichesWissenPort.Seite> gezeigte() {
         return List.copyOf(gezeigt.values());
+    }
+
+    /** Nur die Seiten, die das Modell in dieser Runde gezeigt hat (nicht die aus früheren Runden des Gesprächs). */
+    public synchronized List<OeffentlichesWissenPort.Seite> gezeigteDieserRunde() {
+        return List.copyOf(dieseRunde.values());
     }
 
     public synchronized boolean widerspruch() {

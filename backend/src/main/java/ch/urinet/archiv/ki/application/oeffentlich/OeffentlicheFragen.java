@@ -280,6 +280,7 @@ public class OeffentlicheFragen {
         ChatDurchgang durchgang = new ChatDurchgang();
         if (anfrage.wissen() != null && !anfrage.wissen().gesehene().isEmpty()
                 && !wissenStaendeAktuell(anfrage.wissen().gesehene())) {
+            gespraeche.verwerfen(id);
             strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
             return;
         }
@@ -352,17 +353,18 @@ public class OeffentlicheFragen {
             transaktion.neu(() -> {
                 huelle.sperren();
                 if (durchgang.widerspruch() || durchgang.gesehene().stream().anyMatch(s -> !wissen.aktuell(s))) {
+                    gespraeche.verwerfen(id);
                     strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
                     return null;
                 }
-                var quellen = durchgang.gezeigte().stream().map(s -> new OeffentlicheWissensquelle(
+                var quellen = durchgang.gezeigteDieserRunde().stream().map(s -> new OeffentlicheWissensquelle(
                         ohneSteuerzeichen(s.titel()), ohneSteuerzeichen(s.pfad()),
                         s.dokumente().stream().map(d -> new OeffentlicheWissensquelle.Beleg(
                                 d.id(), ohneSteuerzeichen(d.titel()), ohneSteuerzeichen(d.reiheCode()),
                                 ohneSteuerzeichen(d.reiheName()), d.ausgabe() == null ? null
                                 : ohneSteuerzeichen(d.ausgabe()))).toList())).toList();
                 String text = quellen.isEmpty() ? "Dazu steht nichts in der Wissensbasis." : antwort.inhalt();
-                List<OeffentlicheQuelle> protokollQuellen = durchgang.gezeigte().stream()
+                List<OeffentlicheQuelle> protokollQuellen = durchgang.gezeigteDieserRunde().stream()
                         .flatMap(s -> s.dokumente().stream())
                         .collect(java.util.stream.Collectors.toMap(OeffentlichesWissenPort.Dokument::id,
                                 d -> new OeffentlicheQuelle(d.id(), "", "", "", null, null, null),

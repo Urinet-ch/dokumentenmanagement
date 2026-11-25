@@ -143,6 +143,13 @@ public class OeffentlicheGespraeche {
         }
     }
 
+    /** Verwirft den Verlauf des Gesprächs {@code id} (z. B. nach Entzug einer Freigabe). */
+    public synchronized void verwerfen(UUID id) {
+        if (id != null) {
+            gespraeche.remove(id);
+        }
+    }
+
     /** Zahl der gemerkten Gespräche (für Tests). */
     public synchronized int anzahl() {
         abgelaufeneEntfernen();
