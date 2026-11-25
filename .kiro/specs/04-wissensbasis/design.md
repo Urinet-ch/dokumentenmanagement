@@ -815,7 +815,7 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
   - `wissen_paket validate <ordner|paket.zip> [--quellen <ordner>] [--json]` – prüft Format, Grenzen, Pfade,
     Frontmatter, Markdown und die Regeln von `WissensPruefung`, soweit sie ohne Archiv prüfbar sind; Rückgabewert 0 ohne
     sperrenden Befund, sonst 1; Ausgabe nur Befund-Codes, Pfade und Zähler; am Ende die Regel zu Cloud-Modellen als
-    Hinweis (Requirement 19.25).
+    Hinweis (Requirements 19.24 und 19.25).
   - `wissen_paket bauen <ordner> -o <paket.zip> --mandant <code> --erzeugt-von <name> --erzeugt-mit lokal|cloud
     --kontext-stufe NORMAL|INTERN [--ueberschreiben]` – schreibt `paket.yaml` (falls im Ordner keine liegt), führt
     zuerst `validate` aus und baut das ZIP nur, wenn kein sperrender Befund besteht; keine Symlinks, feste Reihenfolge und
@@ -825,6 +825,10 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
   vorgeprüft (nur `.pdf`, über `pdftotext`, falls vorhanden; sonst Hinweis). Das Ergebnis ist ein Hinweis
   `AUSZUG_LOKAL_NICHT_GEFUNDEN`, nicht massgeblich: Das Archiv prüft den Volltext der PDF/A-Fassung, der nach OCR
   vom Text des Originals abweichen kann.
+- **Umsetzung (Aufgaben 15.5 und 15.7, 25.11.2026):** `wissen_paket` gibt die Cloud-Modell-Regel auch für
+  lokale Erarbeitung als Prozesshinweis aus. Die Seite «Wissensbasis exportieren» zeigt denselben Hinweis vor dem
+  OKF-Export; `WissenPaketCliTest` und `wissen.spec.ts` prüfen die Ausgaben (Requirement 19.24). Die Hinweise
+  informieren, erzwingen die Regeln ausserhalb des Archivs aber nicht.
 - **Nicht offline prüfbar** (Hinweis statt Befund): Zuordnung der Quellen, Seitenzahl der Dokumente, vergebene Pfade,
   `STUFE_UEBERBLICK`, Sichtbarkeit; sie prüft nur der Import.
 - **Gleiche Regeln – Entscheid:** Das Werkzeug **bindet den Quelltext der Domain-Regeln ein**, es kopiert ihn nicht und
