@@ -22,6 +22,8 @@ public interface OeffentlichesWissenPort {
         }
     }
 
+    boolean hatFreigegebeneSeite();
+
     List<Indexzeile> suchen(String begriff, int hoechstens);
 
     Optional<Seite> seite(String pfad);

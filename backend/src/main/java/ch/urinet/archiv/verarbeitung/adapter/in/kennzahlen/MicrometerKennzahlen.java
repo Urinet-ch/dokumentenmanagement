@@ -17,7 +17,8 @@ import java.util.stream.Collectors;
 /**
  * Stellt die {@link Kennzahlen} als Micrometer-Gauges bereit (Req 16.4): {@code archiv_auftraege{mandant,status}},
  * {@code archiv_dokumente{mandant,status}}, {@code archiv_eingangskorb{mandant}} und
- * {@code archiv_ki_beispiele{mandant}}. Die Werte erhebt ein eigener Takt ({@code archiv.kennzahlen.intervall}), nicht
+ * {@code archiv_ki_beispiele{mandant}} sowie {@code archiv_oeffentliche_fragen_ohne_beleg{mandant}}. Die Werte erhebt
+ * ein eigener Takt ({@code archiv.kennzahlen.intervall}), nicht
  * der Abruf von {@code /q/metrics}; ein neuer Mandant erhält seine Gauges beim nächsten Takt. Liefert ein Mandant
  * keinen Stand (Erhebung gescheitert oder nicht mehr aktiv), entfernt der Takt seine Gauges, statt den letzten Wert
  * stehen zu lassen (Review PR #91); im Monitoring fehlt die Reihe dann.
@@ -64,11 +65,21 @@ public class MicrometerKennzahlen {
             if (stand.kiBeispiele().isPresent()) {
                 wert("archiv.ki.beispiele", mandant, null).set(stand.kiBeispiele().getAsLong());
             } else {
-                Eintrag eintrag = werte.remove(new Schluessel("archiv.ki.beispiele", mandant, null));
-                if (eintrag != null) {
-                    registry.remove(eintrag.gauge());
-                }
+                entfernen("archiv.ki.beispiele", mandant);
             }
+            if (stand.oeffentlicheFragenOhneBeleg().isPresent()) {
+                wert("archiv.oeffentliche.fragen.ohne.beleg", mandant, null)
+                        .set(stand.oeffentlicheFragenOhneBeleg().getAsLong());
+            } else {
+                entfernen("archiv.oeffentliche.fragen.ohne.beleg", mandant);
+            }
+        }
+    }
+
+    private void entfernen(String name, String mandant) {
+        Eintrag eintrag = werte.remove(new Schluessel(name, mandant, null));
+        if (eintrag != null) {
+            registry.remove(eintrag.gauge());
         }
     }
 

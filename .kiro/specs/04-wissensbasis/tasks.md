@@ -251,8 +251,17 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
     nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug vor dem Einreihen des SSE-Ereignisses (Entscheid Fabian
     24.11.2026), Prompt-Injection aus Seiteninhalt und inhaltsfreies Fragenprotokoll (Entscheid Fabian 24.11.2026).
   - Nachweis: Szenarien `@req-21.8` unter `features/wissen/`; A15-Verweigerung zusätzlich in den JUnit-Tests für Anlegen und Fragen.
+  - Nachtrag Review PR #605: Die Szenarien ohne Webseitenfreigabe und mit Quellenstufe `mitglieder` prüfen zusätzlich
+    den Nullaufruf des Modells und die Unsichtbarkeit im zweiten Mandanten.
   - _Anforderungen: 21.8_
   - _Abhängig von: 18.3_
+- [x] 18.5 Kennzahl für öffentliche Fragen ohne Beleg [Backend]
+  - Zählt gespeicherte Zeilen in `oeffentliche_frage` mit `quellen = '[]'` je aktivem Mandanten; nur die Anzahl wird als Gauge ausgegeben.
+    Bestehende Tabelle und Aufbewahrung bleiben unverändert.
+  - Nachweis: JUnit prüft leere/nichtleere Quellen und Mandantentrennung sowie den Mandanten-Tag der Kennzahl.
+  - Quellenbezug: Spec 03, 6.5; Spec 01, 16.4. Erfüllt den Kennzahlen-Baustein für Spec 04, 18.7.
+  - _Anforderungen: 18.7_
+  - _Abhängig von: Spec 03: 11.3_
 
 ## Optionen
 Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort. O.5 ist seit dem 18.11.2026 in den Plan übernommen (15.6 bis 15.8).
