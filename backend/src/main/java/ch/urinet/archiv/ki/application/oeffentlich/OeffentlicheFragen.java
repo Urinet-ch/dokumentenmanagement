@@ -55,7 +55,8 @@ import java.util.function.Consumer;
  *       aus den Werkzeugergebnissen, nie aus dem Modelltext, und werden über den festen Filter nochmals geprüft und mit
  *       Titel, Reihe, Ausgabe, Jahr und Fundstellenseite angereichert. Modelltext wird erst nach der Quellenprüfung
  *       ausgegeben; ohne Quelle folgt nur der feste Hinweis auf die Geschäftsstelle (Req 6.3).</li>
- *   <li>danach Speichern von Frage (bereinigt), Quellen und Tokens in {@code oeffentliche_frage} (Req 6.5).</li>
+ *   <li>danach Speichern in {@code oeffentliche_frage}: im Archivchat die bereinigte Frage und erweiterten Quellen,
+ *       im Wissenschat eine feste Ereignisbezeichnung und Quellen-IDs, jeweils mit Tokenzahl.</li>
  * </ol>
  * Frage, Antwort, Titel und Werkzeugparameter erscheinen nie im Log, nur IDs, Zahlen und Klassennamen.
  */

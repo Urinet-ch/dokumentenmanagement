@@ -584,6 +584,13 @@ Der Micrometer-Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` enthält
 oder Personendaten. Der Tag `mandant` folgt den bestehenden Auftrags-, Dokument- und KI-Korrekturkennzahlen. Die
 Metriken liegen am nur intern erreichbaren `/q/metrics`; die Anbindung und Alarmregeln bleiben Infrastrukturarbeit.
 
+#### Nachtrag Fehlerisolation (Aufgabe 5.9, 25.11.2026)
+
+Ein Fehler beim Zählen in `ki_beispiel` wird separat behandelt: Die übrigen Kennzahlen des Mandanten bleiben
+verfügbar, nur `archiv_ki_beispiele{mandant}` fehlt bis zur nächsten erfolgreichen Erhebung. Eine fehlende Gauge ist
+kein Wert null. `JdbcKiBeispielTest` prüft den SQL-Fehlerpfad von `anzahl`; `MicrometerKennzahlenTest` prüft die
+fehlende Gauge bei weiterhin vorhandenen übrigen Reihen.
+
 ### KI (`ki`)
 - `MetadatenExtraktor` als LangChain4j-`@RegisterAiService` ohne Chat-Memory (`NoChatMemoryProviderSupplier`; sonst vermischen sich Belege im selben Request-Kontext), Antwort als Java-Record `MetadatenVorschlag` im JSON-Schema-Antwortformat (`response-format=json_schema`, `strict-json-schema=true`). Infomaniak lehnt den JSON-Modus (`json_object`) ab; einen Rückfall gibt es nicht, ohne gültige Antwort gilt Req 7.1 (ohne Vorschlag in den Eingangskorb). Spike 0.3: `docs/spikes/infomaniak-ai.md`.
 - Driven Port `KiPort` mit Adapter gegen Infomaniak AI Services und Dev-Stub (feste Antworten); in Tests WireMock.
