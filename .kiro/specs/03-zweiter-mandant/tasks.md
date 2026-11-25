@@ -98,10 +98,11 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 6.1–6.5_
   - _Abhängig von: 11.1_
 
-- [ ] 11.4 WordPress-Plugin Grundgerüst [Frontend]
+- [x] 11.4 WordPress-Plugin Grundgerüst [Frontend]
   - Einstellungsseite (Lese- und Erfassungs-Schlüssel verschlüsselt; geändert 13.11.2026, bisher «Site-Key»), Client mit Fehlerbehandlung (Problem Details) und Transients, Zugriffsstufe aus Login/Rolle (drei Stufen, Rollen für Mitglieder und Vorstand)
   - Client nur nach `docs/schnittstelle/public-v1.yaml`, unbekannte Felder ignorieren; Mock des Archivs aus dieser Datei
   - wp-env für lokale Entwicklung, PHPUnit
+  - Abschlussnachweis (PR #616, 25.11.2026): PHPUnit auf PHP 8.2 mit 19 Tests/96 Assertions; Cucumber/Playwright mit 10 Szenarien/41 Schritten einschliesslich Zugriffsstufen, Cache, Fehlern, Vertrag, PHP Coding Standards und Darstellung des vom Archiv gelieferten Chat-Hinweises.
   - _Anforderungen: 7.1, 7.3, 7.4, 7.5, 7.7, 11.1, 11.6_
   - _Abhängig von: 11.6_
 
