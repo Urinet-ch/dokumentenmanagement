@@ -35,9 +35,10 @@ import java.util.stream.Stream;
  * Scanner von smallrye-open-api direkt auf einem Jandex-Index, ohne Quarkus-Start und ohne den Ausschluss der
  * App-OpenAPI, und aus der Datei {@code public-v<n>.yaml} mit demselben Parser. Verglichen wird eine normalisierte Form
  * der Pfade unter {@code /public/}: Parameter ({@code in}, Name, Pflicht, Schema), Anfrage-Inhalt, Statuscodes und
- * Schemas je Medientyp, mit aufgelösten Schema-Referenzen. Beschreibungen, Beispiele, Erweiterungen {@code x-…} und
- * Grenzen wie {@code pattern} zählen nicht; Antworten, die auf {@code #/components/responses/…} verweisen, vergleicht
- * der Test über den Namen der Referenz.
+ * Schemas je Medientyp, mit aufgelösten Schema-Referenzen. Bei direkt beschriebenen Antworten werden auch Header samt
+ * Pflichtstatus und Schema verglichen. Beschreibungen, Beispiele, Erweiterungen {@code x-…} und Grenzen wie
+ * {@code pattern} zählen nicht; Antworten, die auf {@code #/components/responses/…} verweisen, vergleicht der Test über
+ * den Namen der Referenz.
  */
 final class PublicVertrag {
 
@@ -168,10 +169,28 @@ final class PublicVertrag {
         for (Iterator<Map.Entry<String, JsonNode>> it = operation.path("responses").fields(); it.hasNext(); ) {
             Map.Entry<String, JsonNode> antwort = it.next();
             JsonNode wert = antwort.getValue();
-            antworten.put(antwort.getKey(), wert.has("$ref") ? Map.of("$ref", wert.get("$ref").asText())
-                    : inhalt(dokument, wert.path("content")));
+            if (wert.has("$ref")) {
+                antworten.put(antwort.getKey(), Map.of("$ref", wert.get("$ref").asText()));
+            } else {
+                Map<String, Object> beschreibung = new TreeMap<>();
+                beschreibung.put("headers", kopfzeilen(dokument, wert.path("headers")));
+                beschreibung.put("inhalt", inhalt(dokument, wert.path("content")));
+                antworten.put(antwort.getKey(), beschreibung);
+            }
         }
         ergebnis.put("antworten", antworten);
+        return ergebnis;
+    }
+
+    private static Map<String, Object> kopfzeilen(JsonNode dokument, JsonNode kopfzeilen) {
+        Map<String, Object> ergebnis = new TreeMap<>();
+        kopfzeilen.fields().forEachRemaining(kopfzeile -> {
+            JsonNode aufgeloest = aufloesen(dokument, kopfzeile.getValue());
+            Map<String, Object> eintrag = new TreeMap<>();
+            eintrag.put("pflicht", aufgeloest.path("required").asBoolean(false));
+            eintrag.put("schema", schema(dokument, aufgeloest.path("schema"), new HashSet<>()));
+            ergebnis.put(kopfzeile.getKey(), eintrag);
+        });
         return ergebnis;
     }
 

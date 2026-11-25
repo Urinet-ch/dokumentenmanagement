@@ -411,6 +411,9 @@ Neu 13.11.2026 (Requirement 11; entschieden von Fabian am 13.11.2026, E-B).
     Aufgabe keine Änderung unter `.github/workflows/` nötig. Der Repo-Nachweis für die Versions- und Additivitätsregel
     besteht aus `PublicVertragTest`, `VertragPruefungTest`, dem Ruby-Vergleicher und dessen Selbsttest. Der Nachweis
     der Traefik-Drosselung und des Deploys bleibt ein manueller Betriebsnachweis.
+  - Umsetzung (Aufgabe 11.6, 24.11.2026): `PublicVertragTest` vergleicht bei direkt beschriebenen Antworten jetzt auch
+    Antwort-Header samt Pflichtstatus und Schema. Eine Gegenprobe belegt, dass eine abweichende Header-Beschreibung
+    den Kompatibilitätstest fehlschlagen lässt.
   - Vorschlag Traefik-Drosselung (17.11.2026, Aufgabe 11.6; wartet auf Prüfung von Fabian, nichts ausgerollt): Router
     `archiv-public` (`PathPrefix(/public/)` ohne die Suche) und `archiv-public-suche` (`Path(/public/v1/suche)`, auch
     mit Schrägstrich am Ende), Labels in `deploy/infomaniak/compose.yml`; der PWA-Router schliesst `/public/` aus.
@@ -678,3 +681,8 @@ Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x
 - Die Quellenanzeige verwendet ein eigenes Textfeld für Reihe und Ausgabe und überschreibt das DOM-Ausgabeelement nicht mehr. Die wp-env-Test-API liefert dazu eine synthetische Chatquelle; PHPUnit prüft Lease-Ablauf, Eigentümerschaft und Content-Length, Playwright prüft Filter, Navigation und Quellen. axe-core wird auf Liste und Chat-Block mit WCAG-2.1-A/AA-Regeln angewendet.
 - Die Szenarien zu 7.2 prüfen im wp-env alle drei registrierten Shortcodes und Gutenberg-Blöcke; 7.6 prüft WCAG 2.1 AA mit axe-core sowie die geerbte Theme-Schrift.
 - Der Zweitreview-Befund zur Hilfe-Leiste lag ausserhalb des Plugin-Diffs. CI und wp-env-Nachweis für die Plugin-Szenarien sind grün; die Einsatzsperre bleibt bis zum Hosting-Nachweis und dem Test auf einer echten WordPress-Seite bestehen.
+
+## Umsetzung (Aufgabe 11.6 Traefik-Nachweis, 26.11.2026)
+- Messmethode: Labels am laufenden Container per `docker inspect` (nur Labels) gegen `deploy/infomaniak/compose.yml` verglichen; Wirkung von der VPS über den öffentlichen App-Hostnamen mit `curl -Z --parallel-max 100` (HTTP/2, parallele Anfragen in einem Lauf). Suche: 60 gleichzeitig → 24× 401 (durchgelassen, kein Schlüssel; entspricht `inflightreq` 24), 36× 429. Allgemeiner Router: 3000 Anfragen in 0,63 s → 111× 401, 2889× 429. Gegenprobe nach ca. 10 s: Suche 401 (kein 429), `/` 200.
+- Einzelne curl-Prozesse (ca. 45 Anfragen/s, durch TLS-Aufbau begrenzt) bleiben unter der Rate und liefern nur 401; für den Nachweis ungeeignet, daher die parallele Methode.
+- Einschränkung: Der Test lief von der VPS selbst, nicht von einer fremden IP. Die Drosselung je Client-IP (Traefik-ratelimit, Quell-IP als Standardschlüssel) ist nicht gegen eine zweite IP belegt.
