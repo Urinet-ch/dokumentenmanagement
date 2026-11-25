@@ -22,8 +22,8 @@ Bestehende `data-test`-Attribute und die in Szenarien verwendeten ARIA-Rollen un
 ## Prüfungen
 
 - `npm run pruefe:gestaltung`: 9/9 Prüfungen bestanden.
-- Produktionsbuild: bestanden. Die bestehenden Warnungen zu Initial-Bundle (737.54 kB gegenüber 500 kB) und `app.scss` (4.35 kB gegenüber 4 kB) bleiben.
-- Gezielte Frontend-Tests: 127 Tests in 5 Dateien bestanden.
+- Produktionsbuild: bestanden. Die Warnungen zu Initial-Bundle (738.29 kB gegenüber 500 kB) und `app.scss` (4.41 kB gegenüber 4 kB) bleiben.
+- Frontend-Testlauf: 104 Dateien und 1'228 Tests bestanden.
 - Gezielte Wiederholungen der drei im vollständigen Browserlauf betroffenen Szenarien bestanden: Budgetänderung (4 Szenarien, 72 Schritte), Chatquelle (1 Szenario, 20 Schritte) und abgewiesenes Paket (1 Szenario, 13 Schritte).
 
-Der vollständige Browserlauf endete mit 333/336 Szenarien; fünf bekannte Offline-Flake-Szenarien waren ausgeschlossen. Bei den drei übrigen Fehlern bestanden die Anwendungsszenarien in den gezielten Wiederholungen; ein Lauf des temporären Audit-Hooks überschritt zusätzlich sein Zeitlimit von 240 Sekunden. Der Hook wurde danach entfernt. Die vollständige Browser-Suite wurde ohne diesen Hook nicht erneut ausgeführt; ihr Gesamtergebnis bleibt deshalb 333/336 und ist kein vollständig grüner Suite-Nachweis.
+Der vollständige Browserlauf vor dem Merge von `origin/main` endete mit 333/336 Szenarien; fünf bekannte Offline-Flake-Szenarien waren ausgeschlossen. Bei den drei übrigen Fehlern bestanden die Anwendungsszenarien in den gezielten Wiederholungen; ein Lauf des temporären Audit-Hooks überschritt zusätzlich sein Zeitlimit von 240 Sekunden. Der Hook wurde danach entfernt. Die vollständige Browser-Suite wurde ohne diesen Hook nicht erneut ausgeführt; ihr Gesamtergebnis bleibt deshalb 333/336 und ist kein vollständig grüner Suite-Nachweis.
