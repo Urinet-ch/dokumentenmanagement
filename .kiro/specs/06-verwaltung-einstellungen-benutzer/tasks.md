@@ -310,3 +310,7 @@ auf Server oder Secrets aus der Sitzung.
     kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
     Related Origins und Gerätetest stehen aus. Req 10.7 (Entscheid Fabian 25.11.2026): Die Ereignisse werden aktiviert, der
     Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).
+  - Nachweis 25.11.2026 (Fabian): Realm auf Stufe A eingerichtet; Rückfall, Related Origins, Passkey einrichten/anmelden/Step-up/entfernen
+    (iPhone und Mac), «Passkeys löschen» und TOTP-Pflicht bei Passwortanmeldung bestätigt (design.md, «Umsetzung (Aufgabe 24.3
+    Inbetriebnahme, 25.11.2026)»). Offen: Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL` (Admin-Konsole nicht öffentlich,
+    Hilfsskript fehlt); Abhaken bleibt bei Fabian.
