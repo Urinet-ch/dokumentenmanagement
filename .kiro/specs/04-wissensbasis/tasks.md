@@ -261,8 +261,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Zählt gespeicherte Zeilen in `oeffentliche_frage` mit `quellen = '[]'` je aktivem Mandanten; nur die Anzahl wird als Gauge ausgegeben.
     Bestehende Tabelle und Aufbewahrung bleiben unverändert.
   - Nachweis: JUnit prüft leere/nichtleere Quellen und Mandantentrennung sowie den Mandanten-Tag der Kennzahl.
-  - Quellenbezug: Spec 03, 6.5; Spec 01, 16.4. Erfüllt den Kennzahlen-Baustein für Spec 04, 18.7.
-  - _Anforderungen: 18.7_
+  - Einordnung: Monitoring-Ergänzung ohne eigenes Akzeptanzkriterium; das Gate «Phase 4» bleibt davon unberührt.
   - _Abhängig von: Spec 03: 11.3_
 
 ## Optionen

@@ -200,6 +200,8 @@ public class OeffentlicherChatSchritte {
                 + "values (?,'q',?,1)", wissenSeite, dokument.id());
         ausfuehren("insert into m_urinet.wissensseite_dokument (seite_id,dokument_id) values (?,?)",
                 wissenSeite, dokument.id());
+        frageMandanten.add("urinet");
+        frageMandanten.add("vhf-gsk");
         fragenVorWissenschat = zahl("select count(*) from m_urinet.oeffentliche_frage");
         fragenVorVhfWissenschat = zahl("select count(*) from m_vhf_gsk.oeffentliche_frage");
         wissenVerbrauchVorher = zahl("select coalesce(max(id), 0) from m_urinet.ki_verbrauch");
@@ -799,6 +801,15 @@ public class OeffentlicherChatSchritte {
         assertThat(ereignisse).extracting(Ereignis::name).containsExactly("fehler");
         assertThat(KiWireMock.chatAnfragen()).isEmpty();
         assertThat(zahl("select count(*) from m_urinet.oeffentliche_frage")).isEqualTo(fragenVorWissenschat + 1);
+    }
+
+    @Dann("speichert der Wissenschat das Schweigen ohne Beleg in genau eine inhaltsfreie Frage")
+    public void wissenschatSchweigenProtokoll() throws SQLException {
+        assertThat(zahl("select count(*) from m_urinet.oeffentliche_frage"))
+                .isEqualTo(fragenVorWissenschat + 1);
+        assertThat(texte("select frage || '|' || quellen::text from m_urinet.oeffentliche_frage "
+                + "order by id desc limit 1").getFirst())
+                .isEqualTo("Öffentliche Wissenschat-Frage|[]");
     }
 
     @Dann("bleibt die öffentliche Wissensseite im anderen Mandanten unsichtbar")

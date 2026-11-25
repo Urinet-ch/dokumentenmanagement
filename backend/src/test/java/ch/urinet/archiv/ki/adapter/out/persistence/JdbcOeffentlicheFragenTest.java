@@ -1,24 +1,33 @@
 package ch.urinet.archiv.ki.adapter.out.persistence;
 
 import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicheFragenZaehler;
+import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantVerzeichnis;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @QuarkusTest
 class JdbcOeffentlicheFragenTest {
@@ -33,9 +42,22 @@ class JdbcOeffentlicheFragenTest {
     MandantProvisionierung provisionierung;
 
     @Inject
+    MandantAufloesung aufloesung;
+
+    @Inject
+    ObjectMapper json;
+
+    @Inject
     Instance<AgroalDataSource> datenquelle;
 
+    @Inject
+    S3Client s3;
+
+    @ConfigProperty(name = "archiv.ablage.bucket-praefix")
+    String bucketPraefix;
+
     private final List<Eintrag> testzeilen = new ArrayList<>();
+    private final List<MandantCode> mandantenNeuAngelegt = new ArrayList<>();
 
     private record Eintrag(MandantCode mandant, long id) {
     }
@@ -44,6 +66,7 @@ class JdbcOeffentlicheFragenTest {
     void mandantenSicherstellen() throws SQLException {
         for (MandantCode code : List.of(URINET, VHF)) {
             if (!vorhanden(code)) {
+                mandantenNeuAngelegt.add(code);
                 provisionierung.anlegen(code.wert(), null, null);
             }
         }
@@ -60,6 +83,26 @@ class JdbcOeffentlicheFragenTest {
             }
         }
         testzeilen.clear();
+        List<MandantCode> mandantenZumEntfernen = new ArrayList<>(mandantenNeuAngelegt);
+        mandantenNeuAngelegt.clear();
+        for (MandantCode mandant : mandantenZumEntfernen) {
+            try {
+                s3.deleteBucket(r -> r.bucket(mandant.bucket(bucketPraefix)));
+            } catch (S3Exception e) {
+                if (e.statusCode() != 404) {
+                    throw e;
+                }
+            }
+            try (Connection verbindung = datenquelle.get().getConnection();
+                 Statement befehl = verbindung.createStatement()) {
+                befehl.execute("drop schema if exists " + mandant.schema() + " cascade");
+                try (PreparedStatement loeschen = verbindung.prepareStatement(
+                        "delete from public.mandant where code = ?")) {
+                    loeschen.setString(1, mandant.wert());
+                    loeschen.executeUpdate();
+                }
+            }
+        }
     }
 
     @Test
@@ -75,6 +118,21 @@ class JdbcOeffentlicheFragenTest {
 
         assertThat(zaehler.anzahlOhneBeleg(URINET)).isEqualTo(urinetVorher + 1);
         assertThat(zaehler.anzahlOhneBeleg(VHF)).isEqualTo(vhfVorher + 2);
+    }
+
+    @Test
+    void wirftBeiFehlendemOderUngueltigemSchema() {
+        OeffentlicheFragenZaehler ohneSchema = new JdbcOeffentlicheFragen(
+                datenquelle, aufloesung, code -> Optional.empty(), json);
+        assertThatThrownBy(() -> ohneSchema.anzahlOhneBeleg(URINET))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Öffentliche Fragen ohne aktives Mandantenschema");
+
+        OeffentlicheFragenZaehler ungueltigesSchema = new JdbcOeffentlicheFragen(
+                datenquelle, aufloesung, code -> Optional.of("m_urinet;drop"), json);
+        assertThatThrownBy(() -> ungueltigesSchema.anzahlOhneBeleg(URINET))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Öffentliche Fragen ohne gültiges Mandantenschema");
     }
 
     private void einfuegen(MandantCode mandant, String quellen) throws SQLException {
