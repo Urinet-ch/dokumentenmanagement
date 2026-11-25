@@ -791,9 +791,11 @@ fehlgeschlagenen Versand und Altbestand; `BenutzerEtagTest` prüft die Versions�
 Schlägt nach erfolgreichem Versand nur das Speichern fehl, bleibt der alte Eintrag stehen; der Vorgang endet als `UNKLAR`
 (Protokoll, Fehlermeldung ohne Personendaten) und die Vorgangssperre verhindert eine blinde Wiederholung. Der alte Eintrag
 liegt vor der neuen Grenze und zeigt höchstens zu früh «Abgelaufen» (sichtbar, Link bleibt gültig), nie zu spät
-«Nicht abgelaufen»; deshalb wird er nicht vorab gelöscht. `EinladungVersandpfadeTest` belegt je Pfad (Zugang zurücksetzen,
-E-Mail-Änderung) Erfolg, Fehlversand ohne Schreiben, Namensänderung ohne Schreiben und den Fall «Versand ok, Speichern
-fehlgeschlagen».
+«Nicht abgelaufen»; deshalb wird er nicht vorab gelöscht. Scheitert nach dem Versand eine Abschlussaktion, bevor der
+Einladungseintrag gespeichert wird (`mitteilung.emailGeaendert` bei der E-Mail-Änderung oder `tokenWiderruf.setzen` beim
+Zurücksetzen), bleibt die Ablaufgrenze ebenfalls unverändert und der Vorgang wird konservativ als `UNKLAR` behandelt.
+`EinladungVersandpfadeTest` belegt je Pfad (Zugang zurücksetzen, E-Mail-Änderung) Erfolg, Fehlversand ohne Schreiben,
+Namensänderung ohne Schreiben und den Fall «Versand ok, Speichern fehlgeschlagen».
 
 «Abgelaufen» wird im Browser mit der Geräteuhr bestimmt (`einladungAblauf`); eine falsch gehende Uhr kann den Hinweis
 verfälschen. Das gilt als bekannte Einschränkung: die Anzeige ist ein Hinweis, der Server prüft die Gültigkeit des Links

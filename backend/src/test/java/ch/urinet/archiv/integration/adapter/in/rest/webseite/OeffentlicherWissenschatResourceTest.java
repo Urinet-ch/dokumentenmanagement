@@ -8,28 +8,35 @@ import io.smallrye.config.SmallRyeConfigBuilder;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OeffentlicherWissenschatResourceTest {
     @Test
-    void schalterIstJeMandantStandardmaessigAus() {
+    void schalterWirdProMandantJeAnfrageGelesenUndVorEingabeGeprueft() {
         var config = new SmallRyeConfigBuilder().withDefaultValues(Map.of(
                 "archiv.mandant.urinet.oeffentlich.wissenschat", "true")).build();
-        var aus = resource("vhf-gsk", config);
-        assertThatThrownBy(() -> aus.fragen("{\"frage\":\"Hallo\"}", null))
+        var mandant = new AtomicReference<>("vhf-gsk");
+        var resource = resource(mandant, config);
+        assertThatThrownBy(() -> resource.fragen("{\"frage\":\"Hallo\"}", null))
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_ERLAUBT));
-        var an = resource("urinet", config);
-        assertThatThrownBy(() -> an.fragen("{", null))
+        mandant.set("urinet");
+        assertThatThrownBy(() -> resource.fragen("{", null))
                 .isInstanceOfSatisfying(FachFehler.class,
                         fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.ANFRAGE_UNGUELTIG));
+        mandant.set("vhf-gsk");
+        assertThatThrownBy(() -> resource.fragen("{", null))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_ERLAUBT));
     }
 
-    private static OeffentlicherWissenschatResource resource(String mandant, org.eclipse.microprofile.config.Config config) {
+    private static OeffentlicherWissenschatResource resource(AtomicReference<String> mandant,
+                                                              org.eclipse.microprofile.config.Config config) {
         var aufloesung = new MandantAufloesung(null, null, null) {
-            public MandantCode pruefen() { return new MandantCode(mandant); }
+            public MandantCode pruefen() { return new MandantCode(mandant.get()); }
         };
         return new OeffentlicherWissenschatResource(null, aufloesung, null, config);
     }
