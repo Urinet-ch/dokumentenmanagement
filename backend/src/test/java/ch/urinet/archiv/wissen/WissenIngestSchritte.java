@@ -451,7 +451,7 @@ public class WissenIngestSchritte {
     @Angenommen("im Mandanten «{word}» liegt die archivierte Wissensquelle «{word}» mit Vertraulichkeit «{word}» "
             + "und {int} Seiten")
     public void wissensquelle(String mandant, String name, String vertraulichkeit, int seiten) throws SQLException {
-        quelleAnlegen(mandant, name, mandant.equals("vhf-gsk") ? "PROBE_VHF_BULLETIN" : "PROJEKTDOKUMENT",
+        quelleAnlegen(mandant, name, mandant.equals("vhf-gsk") ? "BULLETIN" : "PROJEKTDOKUMENT",
                 vertraulichkeit, seiten);
         Testdokumente.alsWissensquelleMarkieren(datenbank.get(), mandant, ort(name).id());
     }
