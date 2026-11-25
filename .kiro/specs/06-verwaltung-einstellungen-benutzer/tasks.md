@@ -44,8 +44,9 @@ auf Server oder Secrets aus der Sitzung.
     Nachweis 25.11.2026: Die Ablaufgrenze wird pro Mandant aus derselben Gültigkeitsdauer berechnet, die beim
     erfolgreichen Versand an Keycloak übergeben wird. Liste und Detail zeigen Ablaufdatum und Status; Altbestände
     bleiben «Ablauf nicht bekannt». `EinladungZeitTest` prüft `ANLEGEN`, `REAKTIVIEREN`, erneutes Senden,
-    fehlgeschlagenen Versand und Altbestand; `@req-7.4` prüft beide Status und Altbestand bei 375/1280 px in hell/dunkel
-    samt axe. Die Checkbox wird durch diese Nachweise geschlossen; Betriebsnachweise bleiben 19.3.
+    fehlgeschlagenen Versand und Altbestand. `EinladungVersandpfadeTest` prüft Zugang zurücksetzen und E-Mail-Änderung,
+    einschliesslich «Versand ok, Speichern schlägt fehl»; `@req-7.4` prüft beide Status und Altbestand bei 375/1280 px
+    in hell/dunkel samt axe. Die Checkbox wird durch diese Nachweise geschlossen; Betriebsnachweise bleiben 19.3.
   - Nachgelagert [Fabian] (Entscheid 21.11.2026): Betriebsnachweis der internen Compose-Verbindung mit korrektem
     Issuer und der automatischen Ablaufzeit der Secret-Überlappung in 19.3.
   - _Anforderungen: 3.17, 4.9, 5.2, 5.3, 6.9, 7.4_

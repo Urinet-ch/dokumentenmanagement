@@ -1,8 +1,11 @@
 package ch.urinet.archiv.ki.adapter.out.persistence;
 
 import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicheFragenSpeicher;
+import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicheFragenZaehler;
 import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicheQuelle;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
+import ch.urinet.archiv.mandant.application.MandantVerzeichnis;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -21,23 +24,26 @@ import java.util.regex.Pattern;
 
 /**
  * {@code m_<code>.oeffentliche_frage} des Mandanten aus dem Kontext (Changeset {@code mandant/030}, Schema immer
- * qualifiziert): bereinigte Frage, Quellen (ID, Titel, Reihe, Ausgabe, Jahr und Fundstelle) und Tokens, Zeit; nie Antwort, Client, IP,
- * Schlüssel oder Webseite (Spec 03, Req 6.5). Jede Operation in eigener Transaktion mit Zeitgrenze.
+ * qualifiziert): im Archivchat bereinigte Frage und erweiterte Quellen; im Wissenschat feste Ereignisbezeichnung und
+ * Quellen-IDs. Jeweils mit Tokens und Zeit; nie Antwort, Client, IP, Schlüssel oder Webseite (Spec 03, Req 6.5).
+ * Jede Operation in eigener Transaktion mit Zeitgrenze.
  */
 @ApplicationScoped
-public class JdbcOeffentlicheFragen implements OeffentlicheFragenSpeicher {
+public class JdbcOeffentlicheFragen implements OeffentlicheFragenSpeicher, OeffentlicheFragenZaehler {
 
     static final int ZEITGRENZE_S = 30;
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
+    private final MandantVerzeichnis verzeichnis;
     private final ObjectMapper json;
 
     public JdbcOeffentlicheFragen(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung,
-                                  ObjectMapper json) {
+                                  MandantVerzeichnis verzeichnis, ObjectMapper json) {
         this.datenquelle = datenquelle;
         this.aufloesung = aufloesung;
+        this.verzeichnis = verzeichnis;
         this.json = json;
     }
 
@@ -90,6 +96,27 @@ public class JdbcOeffentlicheFragen implements OeffentlicheFragenSpeicher {
             return befehl.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Öffentliche Fragen nicht gelöscht", e);
+        }
+    }
+
+    @Override
+    public long anzahlOhneBeleg(MandantCode mandant) {
+        String schema = verzeichnis.aktivesSchema(mandant)
+                .orElseThrow(() -> new IllegalStateException("Öffentliche Fragen ohne aktives Mandantenschema"));
+        if (!SCHEMA.matcher(schema).matches()) {
+            throw new IllegalStateException("Öffentliche Fragen ohne gültiges Mandantenschema");
+        }
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from " + schema + ".oeffentliche_frage where quellen = '[]'::jsonb")) {
+            abfrage.setQueryTimeout(ZEITGRENZE_S);
+            try (var ergebnis = abfrage.executeQuery()) {
+                ergebnis.next();
+                return ergebnis.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Öffentliche Fragen ohne Beleg nicht gezählt (SQLState "
+                    + e.getSQLState() + ")", e);
         }
     }
 

@@ -3,6 +3,7 @@ package ch.urinet.archiv.verarbeitung.application;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.ki.application.KiBeispielZaehler;
+import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicheFragenZaehler;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 
 /**
  * Kennzahlen je aktiven Mandanten (Req 16.4): offene, laufende und fehlgeschlagene Aufträge, Dokumente je Status ausser
@@ -35,21 +37,23 @@ public class Kennzahlen {
     private final AuftragZaehler auftraege;
     private final DokumentUeberwachung dokumente;
     private final KiBeispielZaehler kiBeispiele;
+    private final OeffentlicheFragenZaehler oeffentlicheFragen;
 
     public Kennzahlen(MandantRegister register, AuftragZaehler auftraege, DokumentUeberwachung dokumente,
-                      KiBeispielZaehler kiBeispiele) {
+                      KiBeispielZaehler kiBeispiele, OeffentlicheFragenZaehler oeffentlicheFragen) {
         this.register = register;
         this.auftraege = auftraege;
         this.dokumente = dokumente;
         this.kiBeispiele = kiBeispiele;
+        this.oeffentlicheFragen = oeffentlicheFragen;
     }
 
-    /** Stand eines Mandanten; jeder Status aus {@link #AUFTRAG_STATUS} und {@link #DOKUMENT_STATUS} ist enthalten. */
+    /** Stand eines Mandanten; KI-Beispiel-Zähler ist bei isoliertem Zählfehler leer. */
     public record Stand(MandantCode mandant, Map<String, Long> auftraege, Map<String, Long> dokumente,
-                        long eingangskorb, long kiBeispiele) {
+                        long eingangskorb, OptionalLong kiBeispiele, OptionalLong oeffentlicheFragenOhneBeleg) {
     }
 
-    /** Erhebt den Stand je aktiven Mandanten; ein Mandant mit Fehler fehlt in der Liste (WARN im Log). */
+    /** Erhebt den Stand je aktiven Mandanten; Fehler bei übrigen Zählern lassen den Mandanten aus, jeweils mit WARN. */
     public List<Stand> erheben() {
         List<Stand> stand = new ArrayList<>();
         for (Mandant mandant : register.aktive()) {
@@ -59,7 +63,23 @@ public class Kennzahlen {
                         dokumente.anzahlJeStatus(mandant.code()));
                 long korb = DokumentStatus.EINGANGSKORB_STATUS.stream()
                         .mapToLong(s -> dokument.getOrDefault(s.name(), 0L)).sum();
-                stand.add(new Stand(mandant.code(), auftrag, dokument, korb, kiBeispiele.anzahl(mandant.code())));
+                OptionalLong kiBeispielAnzahl;
+                try {
+                    kiBeispielAnzahl = OptionalLong.of(kiBeispiele.anzahl(mandant.code()));
+                } catch (RuntimeException e) {
+                    LOG.warnf("KI-Beispiel-Kennzahl für Mandant %s nicht erhoben, ursache=%s", mandant.code().wert(),
+                            Ursachen.kette(e));
+                    kiBeispielAnzahl = OptionalLong.empty();
+                }
+                OptionalLong fragenOhneBeleg;
+                try {
+                    fragenOhneBeleg = OptionalLong.of(oeffentlicheFragen.anzahlOhneBeleg(mandant.code()));
+                } catch (RuntimeException e) {
+                    LOG.warnf("Kennzahl öffentliche Fragen ohne Beleg für Mandant %s nicht erhoben, ursache=%s",
+                            mandant.code().wert(), Ursachen.kette(e));
+                    fragenOhneBeleg = OptionalLong.empty();
+                }
+                stand.add(new Stand(mandant.code(), auftrag, dokument, korb, kiBeispielAnzahl, fragenOhneBeleg));
             } catch (RuntimeException e) {
                 LOG.warnf("Kennzahlen für Mandant %s nicht erhoben, ursache=%s", mandant.code().wert(),
                         Ursachen.kette(e));

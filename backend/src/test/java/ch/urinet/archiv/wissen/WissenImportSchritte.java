@@ -681,7 +681,7 @@ public class WissenImportSchritte {
 
     private void quelle(String code, String hash) throws SQLException {
         UUID id = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(code,
-                code.equals("vhf-gsk") ? "PROBE_VHF_BULLETIN" : "PROJEKTDOKUMENT",
+                code.equals("vhf-gsk") ? "BULLETIN" : "PROJEKTDOKUMENT",
                 "NORMAL", true, "probe", null, "ARCHIVIERT"));
         dokumente.get(code).add(id);
         Testdokumente.alsWissensquelleMarkieren(datenbank.get(), code, id);

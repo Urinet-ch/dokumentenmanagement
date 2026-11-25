@@ -105,6 +105,7 @@ class OeffentlicheWissenAusgabeTest {
     private static Ergebnis ausgeben(OeffentlichesWissenDurchgang lauf, boolean gueltig, UUID gespraechId,
                                      java.util.function.Consumer<OeffentlicheGespraeche> vorbereiten) {
         OeffentlichesWissenPort port = new OeffentlichesWissenPort() {
+            public boolean hatFreigegebeneSeite() { return true; }
             public List<Indexzeile> suchen(String begriff, int hoechstens) { return List.of(); }
             public Optional<Seite> seite(String pfad) { return Optional.empty(); }
             public boolean aktuell(Stand stand) { return gueltig; }

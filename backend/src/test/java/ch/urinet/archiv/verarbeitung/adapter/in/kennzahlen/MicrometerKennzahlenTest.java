@@ -7,6 +7,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.application.DokumentUeberwachung;
 import ch.urinet.archiv.verarbeitung.application.Kennzahlen;
 import ch.urinet.archiv.verarbeitung.domain.Befund;
+import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -29,9 +30,21 @@ class MicrometerKennzahlenTest {
 
     private final List<MandantCode> aktiv = new ArrayList<>(List.of(URINET, VHF));
     private final Set<MandantCode> scheitert = new HashSet<>();
+    private final Set<MandantCode> kiBeispielScheitert = new HashSet<>();
+    private final Set<MandantCode> fragenScheitern = new HashSet<>();
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final MicrometerKennzahlen kennzahlen = new MicrometerKennzahlen(new Kennzahlen(register(),
-            mandant -> Map.of("FEHLER", 2L), dokumente(), mandant -> mandant.equals(URINET) ? 5 : 7), registry);
+            mandant -> Map.of("FEHLER", 2L), dokumente(), mandant -> {
+                if (kiBeispielScheitert.contains(mandant)) {
+                    throw new IllegalStateException("Zählen der KI-Beispiele fehlgeschlagen");
+                }
+                return mandant.equals(URINET) ? 5 : 7;
+            }, mandant -> {
+                if (fragenScheitern.contains(mandant)) {
+                    throw new IllegalStateException("Zählen der Fragen fehlgeschlagen");
+                }
+                return mandant.equals(URINET) ? 2 : 3;
+            }), registry);
 
     @Test
     void gescheiterteErhebungEntferntDieGaugesDesMandanten() {
@@ -39,6 +52,10 @@ class MicrometerKennzahlenTest {
         assertThat(fehler("vhf-gsk")).isEqualTo(3.0);
         assertThat(beispiele("urinet")).isEqualTo(5.0);
         assertThat(beispiele("vhf-gsk")).isEqualTo(7.0);
+        assertThat(ohneBeleg("urinet")).isEqualTo(2.0);
+        assertThat(ohneBeleg("vhf-gsk")).isEqualTo(3.0);
+        assertThat(registry.get("archiv.oeffentliche.fragen.ohne.beleg").tag("mandant", "urinet").gauge()
+                .getId().getTags()).extracting(Tag::getKey).containsExactly("mandant");
 
         scheitert.add(VHF);
         kennzahlen.aktualisieren();
@@ -46,12 +63,31 @@ class MicrometerKennzahlenTest {
         assertThat(registry.find("archiv.dokumente").tag("mandant", "vhf-gsk").gauges()).isEmpty();
         assertThat(registry.find("archiv.eingangskorb").tag("mandant", "vhf-gsk").gauges()).isEmpty();
         assertThat(registry.find("archiv.ki.beispiele").tag("mandant", "vhf-gsk").gauges()).isEmpty();
+        assertThat(registry.find("archiv.oeffentliche.fragen.ohne.beleg").tag("mandant", "vhf-gsk").gauges())
+                .isEmpty();
         assertThat(fehler("urinet")).isEqualTo(3.0);
 
         scheitert.clear();
         kennzahlen.aktualisieren();
         assertThat(fehler("vhf-gsk")).as("nach erfolgreicher Erhebung wieder da").isEqualTo(3.0);
         assertThat(beispiele("vhf-gsk")).isEqualTo(7.0);
+    }
+
+    @Test
+    void fehlerBeimZaehlenUnbelegterFragenEntferntNurDerenGauge() {
+        kennzahlen.aktualisieren();
+        fragenScheitern.add(URINET);
+
+        kennzahlen.aktualisieren();
+
+        assertThat(registry.find("archiv.oeffentliche.fragen.ohne.beleg").tag("mandant", "urinet").gauges())
+                .isEmpty();
+        assertThat(ohneBeleg("vhf-gsk")).isEqualTo(3.0);
+        assertThat(fehler("urinet")).isEqualTo(3.0);
+
+        fragenScheitern.clear();
+        kennzahlen.aktualisieren();
+        assertThat(ohneBeleg("urinet")).isEqualTo(2.0);
     }
 
     @Test
@@ -66,12 +102,34 @@ class MicrometerKennzahlenTest {
         assertThat(registry.find("archiv.auftraege").tag("mandant", "urinet").gauges()).isNotEmpty();
     }
 
+    @Test
+    void fehlerBeimKiBeispielZaehlenEntferntNurDessenGauge() {
+        kennzahlen.aktualisieren();
+        kiBeispielScheitert.add(URINET);
+
+        kennzahlen.aktualisieren();
+
+        assertThat(registry.find("archiv.auftraege").tag("mandant", "urinet").gauges()).isNotEmpty();
+        assertThat(registry.find("archiv.dokumente").tag("mandant", "urinet").gauges()).isNotEmpty();
+        assertThat(registry.find("archiv.eingangskorb").tag("mandant", "urinet").gauges()).isNotEmpty();
+        assertThat(registry.find("archiv.ki.beispiele").tag("mandant", "urinet").gauges()).isEmpty();
+        assertThat(beispiele("vhf-gsk")).isEqualTo(7.0);
+
+        kiBeispielScheitert.clear();
+        kennzahlen.aktualisieren();
+        assertThat(beispiele("urinet")).isEqualTo(5.0);
+    }
+
     private double fehler(String mandant) {
         return registry.get("archiv.dokumente").tag("mandant", mandant).tag("status", "FEHLER").gauge().value();
     }
 
     private double beispiele(String mandant) {
         return registry.get("archiv.ki.beispiele").tag("mandant", mandant).gauge().value();
+    }
+
+    private double ohneBeleg(String mandant) {
+        return registry.get("archiv.oeffentliche.fragen.ohne.beleg").tag("mandant", mandant).gauge().value();
     }
 
     private DokumentUeberwachung dokumente() {

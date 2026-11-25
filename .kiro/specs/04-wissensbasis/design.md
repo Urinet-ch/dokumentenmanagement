@@ -1464,7 +1464,12 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Hüllensperre, der tatsächliche Netzwerkversand liegt danach ausserhalb der Transaktion; ein bereits eingereihtes Ereignis
   kann nicht zurückgerufen werden. **Entscheid Fabian 24.11.2026 (Klarstellung zu 21.6, Requirements unverändert):** Die Garantie des sofortigen
   Entzugs gilt «vor dem Modellaufruf und vor dem Einreihen der Antwort»; ein bereits eingereihtes Ereignis ist nicht rückrufbar.
-  Bei erkanntem Entzug vor einer Fortsetzung wird zudem der gemerkte Gesprächsverlauf verworfen. Der Ende-zu-Ende-Nachweis bis zur Netzauslieferung fehlt.
+  Bei erkanntem Entzug vor einer Fortsetzung wird zudem der gemerkte Gesprächsverlauf verworfen.
+  **Nachweis 25.11.2026:** Die HTTP/SSE-Gegenprobe liest das erste Werkzeug-Ereignis live vom Endpunkt, ändert danach
+  die Freigabe während der Anfrage und liest den Stream bis zum Ende. Es folgt nur `fehler`, kein Text, keine Quellen und
+  kein `fertig`; damit ist die Schlussprüfung bis zur Netzauslieferung geprüft. Die Grenze bleibt unverändert:
+  Quellenstände werden vor Modellaufruf und vor Einreihen der Antwort geprüft; ein bereits eingereihtes Ereignis ist
+  nicht rückrufbar.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`
@@ -1501,6 +1506,31 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Changeset Mandant `131` ersetzt den partiellen Index `ki_verbrauch_wissen_zeit_ix` um `WISSEN_CHAT` ergänzt; Rollback stellt den alten Index wieder her.
 - Nachweis: `@req-21.4` in `chat-modus-pwa.feature` und `chat-modus-export.feature`, Angular-Tests und
   `ChatBewertungAuswertungTest`. Die Browserprüfung deckt 375 und 1280 Pixel, beide Farbschemata und axe ab.
+
+### Umsetzung (Aufgabe 18.4, 25.11.2026)
+- `@req-21.8` ist an Szenarien für Mandantentrennung, festen Modus, gesperrte Archivwerkzeuge, öffentliche Sichtbarkeit
+  nur mit Kennzeichen und Zugriffsstufe `oeffentlich`, Entzug vor dem Einreihen der SSE-Ereignisse, Prompt-Injection
+  aus Seiteninhalt und das inhaltsfreie Fragenprotokoll gebunden. Die öffentlichen Endpunkt-Szenarien prüfen zusätzlich,
+  dass ohne Freigabe bzw. bei Quellenstufe `mitglieder` weder Modelltext noch Quellen ausgeliefert werden.
+- Der Endpunkt-Fall mit `ohne-rolle-urinet` prüft den 403 vor dem Anlegen eines Gesprächs. Die JUnit-Tests
+  `ChatGespraecheAnlegenTest` und `ChatFragenModusTest` prüfen zusätzlich die ausdrückliche A15-Verweigerung als
+  `NICHT_ERLAUBT`, vor Zugriff auf Gesprächsspeicher bzw. Budget.
+- **Auslegung:** Gemäss Requirement 12.1 haben alle vier gültigen Archivrollen A15; eine Cucumber-Anfrage als gültiger
+  Benutzer ohne A15 wäre daher eine erfundene Rolle. Die öffentliche Schnittstelle aus 18.3 verwendet fachlich den
+  Webseiten-Schlüssel und die öffentliche Seitenfreigabe, nicht A15. Deshalb belegen die JUnit-Tests den internen
+  A15-Fehlerpfad und das Cucumber-Szenario den realen 403-Endpunktrand. Rechtematrix und Requirement 21.8 bleiben unverändert.
+
+### Umsetzung (Aufgabe 18.5, 25.11.2026)
+- `archiv.oeffentliche.fragen.ohne.beleg{mandant}` zählt je aktivem Mandanten die gespeicherten Zeilen aus
+  `oeffentliche_frage`, deren `quellen` dem leeren JSON-Array entspricht. Das Monitoring liest weder Fragen noch Quellen;
+  die Kennzahl wird mit der bestehenden periodischen Kennzahlen-Erhebung aktualisiert.
+- Vor dem Modellaufruf prüft der Wissenschat, ob mindestens eine aktuell freigegebene, öffentlich sichtbare Wissensseite
+  verfügbar ist. Ohne solche Seite liefert er den festen Hinweis ohne Modellaufruf.
+- Es gibt keine Schemaänderung; der tägliche Aufräumjob entfernt alte Zeilen auch aus der gemessenen Anzahl. Fehler beim
+  Zählen entfernen nur die betroffene Gauge und lassen die übrigen Kennzahlen des Mandanten bestehen.
+- JUnit prüft leere gegen nichtleere Quellen in beiden Mandantenschemas und den Gauge-Tag `mandant`. Die beiden
+  Ausschluss-Szenarien in `oeffentlicher-wissenschat.feature` prüfen ausserdem `KiWireMock.chatAnfragen()` auf leer
+  und kontrollieren die Unsichtbarkeit im zweiten Mandanten.
 
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:

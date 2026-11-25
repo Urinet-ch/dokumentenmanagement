@@ -50,7 +50,7 @@ Funktionalität: Zugriffsprotokoll (Grundlage aus Aufgabe 1.6)
       | mitarbeiter-urinet | das Probe-Dokument «NORMAL» bestätigt        | 403    | NICHT_ERLAUBT  | MITARBEITER | NORMAL   | A7    | sichtbar, aber ohne Recht |
       | mitarbeiter-urinet | das Probe-Dokument «INTERN» bestätigt        | 404    | NICHT_GEFUNDEN | MITARBEITER | INTERN   | A7    | nicht sichtbar            |
       | treuhaender-urinet | ein Dokument erfasst                         | 403    | NICHT_ERLAUBT  | TREUHAENDER |          | A1    | Rolle nach @RolesAllowed  |
-      | ohne-rolle-urinet  | die Dokumentart «PROBE_VHF_BULLETIN» abfragt | 403    | NICHT_ERLAUBT  |             |          |       | ohne Archiv-Rolle         |
+      | ohne-rolle-urinet  | die Dokumentart «BULLETIN» abfragt | 403    | NICHT_ERLAUBT  |             |          |       | ohne Archiv-Rolle         |
 
   @req-10.7
   Szenario: Die Dokument-ID eines anderen Mandanten wird im eigenen Mandanten als VERWEIGERT protokolliert
@@ -64,7 +64,7 @@ Funktionalität: Zugriffsprotokoll (Grundlage aus Aufgabe 1.6)
 
   @req-10.7
   Szenario: Ohne gültigen Mandanten gibt es kein Mandanten-Schema und keinen Eintrag
-    Wenn «unbekannt-mandant» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
+    Wenn «unbekannt-mandant» die Dokumentart «BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und Fehlercode «MANDANT_FEHLT»
     Und das Zugriffsprotokoll von «urinet» hat keinen neuen Eintrag
 
