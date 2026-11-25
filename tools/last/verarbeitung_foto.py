@@ -4,7 +4,8 @@
 Nur Standardbibliothek. Der Nachweis gilt erst auf Stufe B (Req 16.16, Aufgabe 5.11), nur mit synthetischen
 Testfotos. Das Skript lädt das Foto nacheinander hoch (je Lauf mit eindeutigem Anhang, damit keine Dublette entsteht:
 bei JPEG hinter dem EOI-Marker, bei HEIC/HEIF als ISO-BMFF-Box `free` am Ende) und fragt den Status ab, bis
-EINGANGSKORB oder FEHLER erreicht ist. `--aufwaermen` schickt vorher Läufe, die nicht zählen.
+EINGANGSKORB oder FEHLER erreicht ist. `--aufwaermen` schickt vorher Läufe, die nicht zählen. Optional reiht
+`--begleit-pdf` direkt vor den Messläufen einmal einen synthetischen 20-seitigen Scan ein.
 
 Messpunkt: von der Antwort 202 bis zum ersten gelesenen EINGANGSKORB. Das ist eine obere Schranke für «Start des
 Auftrags bis EINGANGSKORB»: Wartezeit in der Schlange und Abfrageintervall zählen mit. Ohne KI-Wartezeit heisst:
@@ -104,7 +105,8 @@ def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: floa
     koerper, medientyp = multipart("dateien[]", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
     start = time.monotonic()
-    if status != 202 or not isinstance(ergebnis, list) or not ergebnis or "id" not in ergebnis[0]:
+    if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
+            or "id" not in ergebnis[0]):
         raise RuntimeError(f"Upload nicht angenommen (HTTP {status}).")
     dokument = ergebnis[0]["id"]
     while time.monotonic() - start < grenze:
@@ -119,6 +121,20 @@ def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: floa
     raise RuntimeError(f"Dokument {dokument} nach {grenze:.0f} s nicht im Eingangskorb.")
 
 
+def begleit_scan_einreihen(basis: str, token: str, pfad: Path) -> None:
+    scan = pfad.read_bytes()
+    if not scan.startswith(b"%PDF-"):
+        raise ValueError("--begleit-pdf muss ein PDF sein.")
+    koerper, medientyp = multipart("dateien[]", "lastlauf-20-seiten-scan.pdf", scan, "application/pdf")
+    status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
+    if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
+            or "id" not in ergebnis[0]):
+        raise RuntimeError(f"Begleit-Scan nicht angenommen (HTTP {status}).")
+    if ergebnis[0].get("status") == "DUBLETTE":
+        raise RuntimeError("Begleit-Scan ist eine Dublette; eine noch nicht hochgeladene synthetische PDF-Datei "
+                           "verwenden.")
+
+
 def p95(werte: list[float]) -> float:
     """Nächster Rang (ohne Interpolation), damit p95 immer ein gemessener Wert ist."""
     geordnet = sorted(werte)
@@ -129,6 +145,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--basis-url", required=True, help="z. B. https://archiv.apps.urinet.ch")
     parser.add_argument("--foto", required=True, type=Path, help="synthetisches einseitiges JPEG oder HEIC/HEIF")
+    parser.add_argument("--begleit-pdf", type=Path,
+                        help="synthetischer 20-seitiger Scan, einmal vor den Messläufen eingereiht")
     parser.add_argument("--anzahl", type=int, default=50)
     parser.add_argument("--aufwaermen", type=int, default=20, help="Läufe vorweg, die nicht zählen")
     parser.add_argument("--intervall", type=float, default=0.5, help="Abfrageintervall in Sekunden")
@@ -144,6 +162,9 @@ def main() -> int:
     for nr in range(1, args.aufwaermen + 1):
         dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
         print(f"Aufwärmen {nr:3d}: {dauer:6.1f} s (zählt nicht)")
+    if args.begleit_pdf:
+        begleit_scan_einreihen(basis, token, args.begleit_pdf)
+        print("Synthetischer Begleit-Scan eingereiht.")
     zeiten = []
     for nr in range(1, args.anzahl + 1):
         dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
