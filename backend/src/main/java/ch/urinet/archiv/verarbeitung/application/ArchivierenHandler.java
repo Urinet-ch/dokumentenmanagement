@@ -79,7 +79,15 @@ public class ArchivierenHandler implements AuftragHandler {
         UUID id = auftrag.nutzlast().uuid(DOKUMENT_ID)
                 .orElseThrow(() -> new IllegalArgumentException("Nutzlast ohne " + DOKUMENT_ID));
         MandantCode mandant = auftrag.mandant();
-        try (DokumentArchivierungSperre.Sperre ignoriert = archivierungSperre.sperren(mandant, id)) {
+        DokumentArchivierungSperre.Sperre gehalten = archivierungSperre.sperren(mandant, id);
+        try (DokumentArchivierungSperre.Sperre ignoriert = () -> {
+            try {
+                gehalten.close();
+            } catch (RuntimeException e) {
+                LOG.errorf("Dokumentarchivierungssperre konnte nicht freigegeben werden (fehler-id=%s)",
+                        UUID.randomUUID());
+            }
+        }) {
             Archivierungsstand stand = speichern.laden(id)
                     .orElseThrow(() -> new IllegalStateException("Dokument fehlt im Mandanten: " + id));
             int jahr = stand.eingang().atZone(ZUERICH).getYear();
