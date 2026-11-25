@@ -11,6 +11,7 @@ import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Zaehler;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.Mailer;
 import io.smallrye.config.SmallRyeConfigBuilder;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -164,6 +165,21 @@ class MailInhaberBenachrichtigungTest {
                 new Befund(Befund.Quelle.DOKUMENT, UUID.randomUUID().toString(), "VERARBEITUNG"));
 
         assertThat(text).doesNotContain("Standard 1 Stunde").contains("archiv.ueberwachung.grenze");
+    }
+
+    @Test
+    @Tag("req-16.5")
+    @Tag("req-16.7")
+    void sicherungsalarmNenntNurMandantSicherungscodeUndBefund() {
+        var befund = new Befund(Befund.Quelle.SICHERUNG, "db", "ZU_ALT");
+        var benachrichtigung = benachrichtigung("inhaber@example.ch", mails -> gesendet.addAll(List.of(mails)));
+
+        assertThat(benachrichtigung.alarm(MANDANT, befund)).isTrue();
+        assertThat(gesendet).singleElement().satisfies(mail -> {
+            assertThat(mail.getSubject()).isEqualTo("UriNet Archiv: Sicherung db ZU_ALT");
+            assertThat(mail.getText()).contains("Mandant: urinet", "Sicherung db", "Befund ZU_ALT")
+                    .doesNotContain("@", "://", "Dokument");
+        });
     }
 
     @Test

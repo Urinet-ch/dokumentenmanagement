@@ -31,7 +31,7 @@ class UeberwachungTest {
     private static final MandantCode URINET = new MandantCode("urinet");
     private static final MandantCode VHF = new MandantCode("vhf-gsk");
     private static final Befund HAENGT = new Befund(Befund.Quelle.DOKUMENT, UUID.randomUUID().toString(), "FEHLER");
-    private static final Befund SICHERUNG = new Befund(Befund.Quelle.SICHERUNG, "export", "FEHLGESCHLAGEN");
+    private static final Befund SICHERUNG = new Befund(Befund.Quelle.SICHERUNG, "db", "ZU_ALT");
 
     private final Speicher speicher = new Speicher();
     private final Post post = new Post();
