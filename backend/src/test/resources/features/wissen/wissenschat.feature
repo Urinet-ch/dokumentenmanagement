@@ -5,8 +5,8 @@ Funktionalität: Wissenschat und Archivchat (Requirement 21, Aufgabe 18.1)
   freigegebenen Wissensseiten). «POST /api/v1/chat/gespraeche» legt das Gespräch an, die Fragen folgen wie bisher mit
   «POST /api/v1/chat». Der Agent läuft echt gegen das simulierte Sprachmodell (WireMock), die Werkzeuge gegen die
   Datenbank. Alle Daten sind synthetisch. Der öffentliche Wissenschat (21.6) gehört zu Aufgabe 18.3, Oberfläche und
-  Bewertungsexport (21.4) zu 18.2. Das Recht A15 liegt nach der Rechtematrix bei allen vier Rollen; ein 403 ohne A15
-  belegt der JUnit-Test «ChatGespraecheAnlegenTest» (keine Rolle ohne A15).
+  Bewertungsexport (21.4) zu 18.2. Alle vier Rollen haben A15; der Endpunkt-Fall ohne Archiv-Rolle belegt den 403,
+  die JUnit-Tests «ChatGespraecheAnlegenTest» und «ChatFragenModusTest» prüfen die explizite A15-Verweigerung.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -73,6 +73,13 @@ Funktionalität: Wissenschat und Archivchat (Requirement 21, Aufgabe 18.1)
       | mitarbeiter-urinet       |
       | treuhaender-urinet       |
       | geschaeftsstelle-vhf-gsk |
+
+  @req-21.1 @req-21.8
+  Szenario: Ohne Archiv-Rolle ist WISSEN nicht erreichbar
+    Wenn «ohne-rolle-urinet» ein Gespräch im Modus «WISSEN» anlegt
+    Dann antwortet das Archiv auf das Anlegen mit Status 403
+    Und antwortet das Archiv mit Status 403 und dem Fehlercode «NICHT_ERLAUBT»
+    Und gibt es in «urinet» 0 Gespräche
 
   @req-21.1 @req-21.2 @req-21.8
   Szenario: Der Modus wechselt nicht: ein Modus im Körper der Frage ändert nichts

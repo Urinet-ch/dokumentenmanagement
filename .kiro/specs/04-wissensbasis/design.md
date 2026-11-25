@@ -1498,14 +1498,18 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
 - Nachweis: `@req-21.4` in `chat-modus-pwa.feature` und `chat-modus-export.feature`, Angular-Tests und
   `ChatBewertungAuswertungTest`. Die Browserprüfung deckt 375 und 1280 Pixel, beide Farbschemata und axe ab.
 
-### Teilnachweis (Aufgabe 18.4, 25.11.2026)
+### Umsetzung (Aufgabe 18.4, 25.11.2026)
 - `@req-21.8` ist an Szenarien für Mandantentrennung, festen Modus, gesperrte Archivwerkzeuge, öffentliche Sichtbarkeit
   nur mit Kennzeichen und Zugriffsstufe `oeffentlich`, Entzug vor dem Einreihen der SSE-Ereignisse, Prompt-Injection
   aus Seiteninhalt und das inhaltsfreie Fragenprotokoll gebunden. Die öffentlichen Endpunkt-Szenarien prüfen zusätzlich,
   dass ohne Freigabe bzw. bei Quellenstufe `mitglieder` weder Modelltext noch Quellen ausgeliefert werden.
-- **Noch offen (Muss):** A15/403 ist weiterhin nur durch `ChatGespraecheAnlegenTest` belegt. Eine Cucumber-Anfrage ohne
-  A15 lässt sich mit der bestehenden Rechtematrix nicht als echter Benutzer abbilden, da alle vier Rollen A15 besitzen.
-  Weder wird eine Rolle künstlich verändert noch die Rechtematrix oder Requirement 21.8 stillschweigend angepasst.
+- Der Endpunkt-Fall mit `ohne-rolle-urinet` prüft den 403 vor dem Anlegen eines Gesprächs. Die JUnit-Tests
+  `ChatGespraecheAnlegenTest` und `ChatFragenModusTest` prüfen zusätzlich die ausdrückliche A15-Verweigerung als
+  `NICHT_ERLAUBT`, vor Zugriff auf Gesprächsspeicher bzw. Budget.
+- **Auslegung:** Gemäss Requirement 12.1 haben alle vier gültigen Archivrollen A15; eine Cucumber-Anfrage als gültiger
+  Benutzer ohne A15 wäre daher eine erfundene Rolle. Die öffentliche Schnittstelle aus 18.3 verwendet fachlich den
+  Webseiten-Schlüssel und die öffentliche Seitenfreigabe, nicht A15. Deshalb belegen die JUnit-Tests den internen
+  A15-Fehlerpfad und das Cucumber-Szenario den realen 403-Endpunktrand. Rechtematrix und Requirement 21.8 bleiben unverändert.
 
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:
