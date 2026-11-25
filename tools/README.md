@@ -27,6 +27,8 @@ Exit `0` bedeutet keine Befunde, `1` Befunde und `2` einen Ausführungsfehler. J
 Die Klartextprüfung ist eine namensbasierte Heuristik, kein vollständiger Secret-Scan. Sie prüft weder Laufzeitwerte
 noch die Wirksamkeit von Healthchecks, Routerregeln und Limits. Dienstimages ohne Digest werden auch gemeldet, wenn sie
 lokal gebaut wurden; ein gepinntes Basisimage macht den veränderlichen Dienst-Tag nicht unveränderlich.
+Die Tests laufen nicht automatisch in der CI; ein Vorschlag dafür liegt unter
+[`docs/betrieb/compose-konsistenz-ci.diff`](../docs/betrieb/compose-konsistenz-ci.diff).
 
 ## Generator-Client `archiv_client.py`
 
