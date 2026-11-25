@@ -128,3 +128,9 @@ Die Mails «Alarm der Benutzerverwaltung» und «Abweichung in der Benutzerverwa
 ### Geheimnisse
 `NAMENSSPERRE_SALZ`, `KEYCLOAK_VERWALTUNG_SECRET`, `KEYCLOAK_SMTP_PASSWORT` und die übrigen Geheimnisse wechselt nur der Betreiber,
 nach [Geheimnisse rotieren](geheimnisse-rotieren.md). **Datenschlüssel und Salz der Namenssperre nie ungeplant wechseln.**
+
+Die drei Secrets der Benutzerverwaltung sind auf Stufe A eingerichtet; der Dienstkonto-Zugriff und der Keycloak-Mailversand
+wurden geprüft. Das ist kein Nachweis einer Rotation oder der geschützten Offline-Verwahrung. Die Passkey-Realm-Vorlage und
+die separate, nur lesende Ereignis-Probe sind in der [Keycloak-Betriebsanleitung](../deploy/infomaniak/keycloak/README.md)
+dokumentiert. Die Hilfsdateien liegen auf Stufe A unter `/opt/archiv-werkzeuge`; Zugangsdaten und konkrete Betriebsadressen
+gehören nicht in diese Anleitung.

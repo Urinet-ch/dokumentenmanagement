@@ -51,14 +51,22 @@ direkt auf dem Server, sondern über GitHub-Secret und Deploy.
    **[offen:** ob und wie lange auf der Zielumgebung, siehe 19.1 und 19.3**]**.
 Vorbereitet, aber nicht nachgewiesen: die Rotationsprobe ist Teil der manuellen Abnahme 21.6 und liegt beim Betreiber.
 
+**Stufe-A-Stand (25.11.2026):** `keycloak_verwaltung_secret`, `keycloak_smtp_passwort` und `namenssperre_salz` sind im
+Deploy eingerichtet; der Dienstkonto-Zugriff und der Keycloak-Mailversand wurden geprüft. Das belegt die Einrichtung,
+nicht einen Secret-Wechsel. Die interne Verbindung mit korrektem Issuer, die automatische Ablaufzeit einer Secret-Überlappung
+und die Rotationsprobe sind weiterhin offen (19.3, 21.6). Passkey-Realm und Ereignis-Probe sind keine Rotation; die
+kopierbaren Vorlagen und deren Stufe-A-Nachweis stehen in
+[deploy/infomaniak/keycloak/README.md](../deploy/infomaniak/keycloak/README.md).
+
 **Keycloak-SMTP (`KEYCLOAK_SMTP_PASSWORT`)** und **Archiv-SMTP**: Passwort beim Postfach ändern, GitHub-Secret aktualisieren,
 deployen. **[offen:** Reihenfolge zwischen Postfach und Deploy (Übergang ohne Mailversand) ist nicht belegt.**]**
 
 **Alle weiteren Zeilen** der Tabelle: nur der oben genannte Wechselweg; Details und Nachweise stehen nicht fest.
 
 ## Noch offen beim Betreiber
-- Notfallunterlagen um `keycloak_verwaltung_secret`, `keycloak_smtp_passwort` und `namenssperre_salz` ergänzen (19.3,
-  Stand 24.11.2026 in `tasks.md`: offen).
+- Die Notfallunterlagen nennen `keycloak_verwaltung_secret`, `keycloak_smtp_passwort` und `namenssperre_salz` nur als
+  Platzhalter. Die geschützte Offline-Verwahrung und deren Erreichbarkeit sind nicht bestätigt (21.6); Secret-Werte bleiben
+  ausserhalb des Repositorys.
 - Rotationsprobe des Dienstkonto-Geheimnisses (21.6) und Betriebsnachweise zur Secret-Überlappung (19.3). Diese
   Betreiberprüfungen stehen getrennt von der Dokumentationsaufgabe 21.5 aus.
 

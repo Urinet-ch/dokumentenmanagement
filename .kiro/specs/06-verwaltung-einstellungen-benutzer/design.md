@@ -1079,6 +1079,11 @@ Die Betreiberanleitung stimmt mit dem auf `main` verfügbaren normalen Verwaltun
 verweisen auf die passenden Nachweise, ohne tatsächliche Zugangsdaten oder Verwahrorte aufzunehmen. Ungeprüfte
 Rotationsdetails und die Befüllung der Notfallunterlagen bleiben als Betreiberaufgaben in 19.3 und 21.6 offen.
 
+Nachtrag 26.11.2026: Die drei Dokumente unterscheiden den auf Stufe A belegten Erstaufbau der Secrets und die eingerichtete
+Passkey-Realm samt Ereignis-Probe von der weiterhin offenen Secret-Rotation, Überlappungsdauer und bestätigten Offline-Verwahrung.
+Die Anleitung verlinkt auf die Keycloak-Vorlagen unter `deploy/infomaniak/keycloak/`; `/opt/archiv-werkzeuge` ist als Ablagepfad
+der Hilfsdateien festgehalten. Zugangsdaten, Hostnamen, IP-Adressen und Mail-Adressen bleiben ausserhalb des Repositorys.
+
 ## Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)
 Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fabian]: Ausführung auf der VPS, Related Origins, Gerätetest).
 - **Vorlage:** `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` zieht die Änderungen von Aufgabe 24.1 aus `deploy/keycloak/realm-export.json`
