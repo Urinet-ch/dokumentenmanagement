@@ -71,4 +71,5 @@
     <include file="changesets/129-einstellungen-bestand.xml" relativeToChangelogFile="true"/>
     <include file="changesets/131-wissen-chat-index.xml" relativeToChangelogFile="true"/>
     <include file="changesets/140-wissen-webseitenfreigabe.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/141-benutzer-einladung-ablauf.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

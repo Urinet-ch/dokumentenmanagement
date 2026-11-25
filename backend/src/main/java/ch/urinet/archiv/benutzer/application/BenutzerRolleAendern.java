@@ -1,5 +1,6 @@
 package ch.urinet.archiv.benutzer.application;
 
+import ch.urinet.archiv.benutzer.domain.BenutzerStatus;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
@@ -34,6 +35,7 @@ public class BenutzerRolleAendern {
 
     private final IdentitaetsDienst identitaet;
     private final BenutzerStatusSpeicher status;
+    private final BenutzerAktivitaet aktivitaet;
     private final MandantenRollen rollen;
     private final VerwaltungAntragSpeicher antraege;
     private final VerwaltungVorgang vorgang;
@@ -43,7 +45,8 @@ public class BenutzerRolleAendern {
     private final Event<InhaberVergabe> alarm;
     private final Duration antragGueltigkeit;
 
-    public BenutzerRolleAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status, MandantenRollen rollen,
+    public BenutzerRolleAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
+                                BenutzerAktivitaet aktivitaet, MandantenRollen rollen,
                                 VerwaltungAntragSpeicher antraege, VerwaltungVorgang vorgang,
                                 Berechtigung berechtigung, StepUp stepUp, TokenWiderruf widerruf,
                                 Event<InhaberVergabe> alarm,
@@ -54,6 +57,7 @@ public class BenutzerRolleAendern {
         }
         this.identitaet = identitaet;
         this.status = status;
+        this.aktivitaet = aktivitaet;
         this.rollen = rollen;
         this.antraege = antraege;
         this.vorgang = vorgang;
@@ -91,8 +95,8 @@ public class BenutzerRolleAendern {
                         null, rolle, ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
                 () -> {
                     var benutzer = identitaet.benutzerLesen(mandant.wert(), id);
-                    if (!ifMatch.equals("\"" + BenutzerEtag.berechnen(benutzer, BenutzerLesen.status(benutzer, status))
-                            + "\"")) {
+                    BenutzerStatus zustand = BenutzerLesen.status(benutzer, status);
+                    if (!ifMatch.equals("\"" + BenutzerLesen.etag(benutzer, zustand, aktivitaet.lesen(id)) + "\"")) {
                         throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
                     }
                     if (akteur.id().equals(id) || !rollen.lesen().contains(rolle)

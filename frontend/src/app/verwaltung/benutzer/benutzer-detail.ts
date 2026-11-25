@@ -12,7 +12,7 @@ import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { BenutzerFortsetzen, BenutzerFortsetzung } from './benutzer-fortsetzung';
 import { BenutzerLoeschen } from './benutzer-loeschen';
 import { BenutzerProfil } from './benutzer-profil';
-import { name, rollen } from './benutzer-logik';
+import { einladungAblauf, name, rollen } from './benutzer-logik';
 import { BenutzerRechte } from './benutzer-rechte';
 import { BenutzerRollenaktion } from './benutzer-rollenaktion';
 import { BenutzerStatusaktionen } from './benutzer-statusaktionen';
@@ -50,6 +50,7 @@ export class BenutzerDetail {
   protected readonly name = name;
   protected readonly rollen = rollen;
   protected readonly zeitpunkt = zeitpunkt;
+  protected readonly einladungAblauf = einladungAblauf;
   protected readonly benutzer = signal<BenutzerAnsicht | null>(null);
   protected readonly rechte = signal<VerwaltungRolle | null>(null);
   protected readonly rollenListe = signal<readonly VerwaltungRolle[] | null>(null);
