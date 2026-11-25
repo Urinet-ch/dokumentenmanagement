@@ -305,4 +305,5 @@ auf Server oder Secrets aus der Sitzung.
   - _Abhängig von: 24.1, 24.2_
   - Vorbereitung 25.11.2026 (bleibt offen, [Fabian]): Die Vorlage `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` und die
     kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
-    Related Origins und Gerätetest stehen aus.
+    Related Origins und Gerätetest stehen aus. Req 10.7 (Entscheid Fabian 25.11.2026): Die Ereignisse werden aktiviert, der
+    Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).

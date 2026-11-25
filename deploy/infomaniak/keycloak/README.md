@@ -102,16 +102,19 @@ Quelle ist [`deploy/keycloak/realm-export.json`](../../keycloak/realm-export.jso
 - Kontoverwaltung: Der Client `account-console` darf die Rollen `manage-account` und `view-profile` des Clients `account`
   verwenden (sonst fehlt der Bereich «Anmelden»).
 - Nur mit `--ereignisse`: Die Ereignistypen `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` kommen zu `enabledEventTypes` hinzu
-  (Req 10.7). **Der Entscheid von Fabian steht aus; ohne die Option bleiben die Ereignisse unverändert.**
+  (Req 10.7). **Entscheid von Fabian (25.11.2026): Die Ereignisse werden aktiviert; der Standardaufruf auf der VPS enthält
+  `--ereignisse`.** Ohne die Option bleiben sie unverändert. Sind die Ereignisse des Realms ausgeschaltet oder ist
+  `enabledEventTypes` leer, bricht die Vorlage ab (Meldung, Exit 1), statt zu raten.
 
 Die Vorlage bricht mit einer Meldung ab (Exit 1), statt zu raten, wenn der Zustand nicht zum Export passt: anderer `browserFlow`,
 bereits eine andere Relying-Party-ID (bestehende Passkeys würden ungültig), unerwartete Ausführungen im Formular-Flow oder
-Teilflow, mehrdeutige Clients. Nach dem Einrichten prüft sie sich im selben Lauf selbst nach.
+Teilflow, mehrdeutige Clients. Beim Einrichten (ohne `--pruefen`) läuft zuerst ein Probelauf ohne Änderung; bricht er ab, ist nichts
+verändert. Nach dem Einrichten prüft sich die Vorlage im selben Lauf selbst nach.
 
 ```text
 passkey-einrichten-vorlage.sh [--pruefen] [--ereignisse]
   --pruefen     nur lesen: Exit 0 = nichts zu tun, Exit 10 = Änderungen nötig, Exit 1 = Fehler oder unerwarteter Zustand
-  --ereignisse  zusätzlich die Ereignistypen aktivieren (nur nach Entscheid)
+  --ereignisse  zusätzlich die Ereignistypen aktivieren (Entscheid 25.11.2026: im Standardaufruf auf der VPS enthalten)
 Umgebung: ARCHIV_PASSKEY_RP_ID (Pflicht: nur der Host, ohne Schema, Port und Pfad), KC_REALM (urinet-archiv), KCADM
 ```
 
@@ -131,13 +134,20 @@ Keycloak-Image bleibt unverändert:
 
 ```sh
 mkdir -p "$HOME/archiv-werkzeuge/keycloak"
-sudo docker create --name urinet-jq-holen \
+sudo docker rm -f urinet-jq-holen 2>/dev/null
+sudo docker create --platform linux/amd64 --name urinet-jq-holen \
   ghcr.io/jqlang/jq:1.7.1@sha256:096b83865ad59b5b02841f103f83f45c51318394331bf1995e187ea3be937432
 sudo docker cp urinet-jq-holen:/jq "$HOME/archiv-werkzeuge/jq"
 sudo docker rm urinet-jq-holen
+echo "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5  $HOME/archiv-werkzeuge/jq" | sha256sum -c -
 ```
-
-Erreicht die VPS `ghcr.io` nicht, die Datei auf einem anderen Rechner mit `--platform` der VPS auf dieselbe Weise holen und per
+`sha256sum -c` muss `OK` melden; sonst die Datei löschen und nicht verwenden. Die Prüfsumme gilt für die Datei `jq` der
+Plattform `linux/amd64` (die VPS ist x86-64); sie wurde aus genau dem oben mit Digest festgelegten Image entnommen (`docker create`,
+`docker cp`, `sha256sum`; ELF x86-64, statisch). Der Digest allein sichert den Inhalt des Images; die Prüfsumme der entnommenen Datei
+schliesst zusätzlich eine Verwechslung der Plattform oder eine beschädigte Übertragung aus. Eine Signatur- oder
+Provenance-Prüfung des Images gibt es nicht. Wird das Image oder die Plattform gewechselt, die Prüfsumme neu aus dem lokal
+gezogenen Image ermitteln und hier zusammen mit dem Digest ändern (der Digest steht auch im Echt-Test). Erreicht die VPS `ghcr.io`
+nicht, die Datei auf einem anderen Rechner mit `--platform linux/amd64` auf dieselbe Weise holen, dieselbe Prüfsumme prüfen und per
 `scp` übertragen. Die Skripte stammen aus dem gemergten Stand des Repos (Prüfsumme oder Commit notieren) und kommen auf demselben
 Weg auf die VPS (`<vps>` ist der Zugang des Betreibers):
 
@@ -145,6 +155,18 @@ Weg auf die VPS (`<vps>` ist der Zugang des Betreibers):
 scp deploy/infomaniak/keycloak/{passkey-einrichten-vorlage.sh,verwaltung-einrichten-vorlage.sh,vorlage-ausfuehren.sh} \
   <vps>:archiv-werkzeuge/keycloak/
 ```
+**Rechte für den Container.** Der Wegwerf-Container läuft als Benutzer 1000:1000 und hängt `jq` und das Verzeichnis `keycloak` nur
+lesend ein. Bei einer `umask` von 077 auf der VPS (und beim `scp`) wären beide für ihn unlesbar. Darum auf der VPS nach dem
+Ablegen (die Secret-Dateien sind davon **nicht** betroffen und werden nie geöffnet):
+
+```sh
+chmod -R a+rX "$HOME/archiv-werkzeuge"
+chmod a+rx "$HOME/archiv-werkzeuge/jq"
+ls -l "$HOME/archiv-werkzeuge/jq" "$HOME/archiv-werkzeuge/keycloak"
+```
+Meldet der Lauf später `Permission denied` oder `jq: not found`, ist fast immer dies die Ursache. Auch das Heimverzeichnis selbst
+muss für den Container durchsuchbar sein (`stat -c '%A' "$HOME"` zeigt `x` für andere); sonst die Dateien in ein anderes Verzeichnis legen.
+
 
 **Passkey-Vorlage, zuerst nur prüfen** (Exit 10 heisst: Änderungen nötig; `echo $?` zeigt den Exit-Code):
 
@@ -158,8 +180,25 @@ sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/com
 echo "Exit: $?"
 ```
 
-Danach dasselbe ohne `--pruefen` (einrichten und nachprüfen), anschliessend noch einmal mit `--pruefen` (erwartet Exit 0). Die
-Ereignisse (10.7) nur nach Entscheid mit `--ereignisse` hinten anhängen.
+**Standardaufruf auf der VPS** (Entscheid Fabian 25.11.2026, Req 10.7): Danach dasselbe ohne `--pruefen`, aber mit `--ereignisse`
+(einrichten und nachprüfen), das heisst `… /arbeit/passkey-einrichten-vorlage.sh --ereignisse`; anschliessend noch einmal
+`--pruefen --ereignisse` (erwartet Exit 0). Auch das erste `--pruefen` darf `--ereignisse` tragen, dann zählen die Ereignisse als
+Abweichung mit. Probe: Nach einer Passkey-Einrichtung in der Kontoverwaltung erscheint `UPDATE_CREDENTIAL` im Ereignisprotokoll des
+Realms (Admin-Konsole, Realm `urinet-archiv`, «Ereignisse»).
+
+**Nicht belegt, beim ersten Lauf prüfen.** Lokal belegt sind die Vorlage selbst (Stub-Test und Echt-Test gegen Keycloak 26.8.2, mit
+`docker run` und denselben Optionen). Nicht belegt sind:
+
+| Punkt | Prüfzeile |
+| --- | --- |
+| Ausführung auf der VPS selbst (nie dort gelaufen) | erster Aufruf nur mit `--pruefen`; `echo "Exit: $?"` zeigt 10 oder 0, nicht 1 |
+| der `docker compose run`-Aufruf selbst (lokal `docker run`) | `sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml config --quiet && echo ok` |
+| Lesbarkeit der Secret-Datei für Benutzer 1000 | `sudo ls -ln /srv/apps/archiv/secrets/keycloak_admin` (nur Rechte und Besitzer ansehen, Inhalt nie ausgeben) |
+| Erreichbarkeit von `ghcr.io` von der VPS | `sudo docker pull --platform linux/amd64 ghcr.io/jqlang/jq:1.7.1@sha256:096b83865ad59b5b02841f103f83f45c51318394331bf1995e187ea3be937432` |
+| `jq` im Container lauffähig | Aufruf wie oben, aber mit `--entrypoint /usr/local/bin/jq kc --version` und nur dem `jq`-Mount (erwartet `jq-1.7.1`) |
+
+Ist die Secret-Datei für den Benutzer 1000 nicht lesbar, meldet `vorlage-ausfuehren.sh` «Die Secret-Datei des Keycloak-Admins fehlt
+oder ist leer». Die Rechte der Secrets nicht pauschal öffnen, sondern nur so anpassen, wie es der Dienst `kc` braucht.
 
 **Verwaltungsclient und SMTP (Aufgabe 19.3)** laufen im selben Muster; zuerst, weil die Passkey-Vorlage einen funktionierenden
 Realm voraussetzt. Die SMTP-Angaben sind Betriebsangaben (hier Platzhalter); `keycloak_smtp_passwort` hängt der Dienst `kc` schon

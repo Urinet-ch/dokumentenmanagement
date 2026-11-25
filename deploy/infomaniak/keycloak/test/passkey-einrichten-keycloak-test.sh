@@ -152,6 +152,26 @@ grep -q 'nichts zu tun' "$temp/lauf-2.log"
 echo "4. Wiederholung: --pruefen Exit 0, kein Eingriff."
 
 # 6. Ereignisse nur mit der ausdrücklichen Option
+# Ereignisse ausgeschaltet oder leere Typenliste: Abbruch ohne Änderung (die Vorlage rät nicht)
+kcadm get realms/urinet-archiv --fields enabledEventTypes > "$temp/typen-vorher.json"
+kcadm update realms/urinet-archiv -s eventsEnabled=false >/dev/null
+status=0
+vorlage --ereignisse > "$temp/ereignisse-aus.log" 2>&1 || status=$?
+[[ $status == 1 ]] && grep -q '^Abbruch: Die Ereignisse des Realms sind ausgeschaltet' "$temp/ereignisse-aus.log"
+kcadm update realms/urinet-archiv -s eventsEnabled=true >/dev/null
+kcadm update realms/urinet-archiv -s 'enabledEventTypes=[]' >/dev/null
+# Verhalten von Keycloak 26.8.2 bei leerer Liste: bleibt sie leer oder füllt Keycloak Vorgaben ein? Die Vorlage bricht nur bei leerer Liste ab.
+kcadm get realms/urinet-archiv --fields enabledEventTypes | jq -c '"Liste nach Setzen von []: \(.enabledEventTypes | length) Typ(en)"' -r
+status=0
+vorlage --ereignisse > "$temp/ereignisse-leer.log" 2>&1 || status=$?
+if kcadm get realms/urinet-archiv --fields enabledEventTypes | jq -e '(.enabledEventTypes // []) | length == 0' >/dev/null; then
+  [[ $status == 1 ]] && grep -q '^Abbruch: Die Liste enabledEventTypes ist leer' "$temp/ereignisse-leer.log"
+  echo "5a. Leere Typenliste (bleibt in 26.8.2 leer): Abbruch, nichts geändert."
+else
+  echo "5a. Keycloak 26.8.2 füllt eine leere Typenliste selbst auf; der Abbruch bei leerer Liste greift dort nicht."
+fi
+kcadm update realms/urinet-archiv -s "enabledEventTypes=$(jq -c '.enabledEventTypes' "$temp/typen-vorher.json")" >/dev/null
+
 vorlage --pruefen --ereignisse > "$temp/ereignisse-pruefen.log" 2>&1 && { echo "--ereignisse --pruefen hätte Abweichungen melden müssen." >&2; exit 1; } || [[ $? == 10 ]]
 vorlage --ereignisse > "$temp/ereignisse.log" 2>&1
 kcadm get realms/urinet-archiv --fields enabledEventTypes |

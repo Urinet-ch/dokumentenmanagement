@@ -1084,11 +1084,14 @@ Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fa
 - **Wiederholbar und vorsichtig:** `--pruefen` liest nur (Exit 0 nichts zu tun, 10 Änderungen nötig). Bei unerwartetem Zustand (anderer
   `browserFlow`, andere Relying-Party-ID, unerwartete Ausführungen, mehrdeutige Clients) bricht sie mit Exit 1 ab. Nach dem Einrichten prüft sie sich im
   selben Lauf nach. Die Relying-Party-ID kommt aus `ARCHIV_PASSKEY_RP_ID` (nur Host, validiert, nie im Repo).
-- **Auslegung Req 10.7:** Die Ereignistypen `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` setzt die Vorlage nur mit `--ereignisse`; der Entscheid
-  von Fabian steht aus (`docs/passkey-inbetriebnahme-checkliste.md`).
+- **Auslegung Req 10.7:** Die Ereignistypen `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` setzt die Vorlage nur mit `--ereignisse`.
+  Entscheid von Fabian (25.11.2026): Die Ereignisse werden aktiviert, der Standardaufruf auf der VPS enthält `--ereignisse`
+  (`docs/passkey-inbetriebnahme-checkliste.md`). Sind die Ereignisse des Realms ausgeschaltet oder `enabledEventTypes` leer, bricht die Vorlage ab.
+  Vermerk, keine Änderung der Requirements.
 - **Betrieb:** `jq` fehlt im Keycloak-Image (geprüft); die Anleitung (`deploy/infomaniak/keycloak/README.md`, «Passkey-Realm nachrüsten») holt eine
   statische `jq`-Datei aus einem auf Digest festgelegten Hilfs-Image und hängt sie nur lesend ein. Das Hilfsskript `vorlage-ausfuehren.sh`
   meldet `kcadm` am Realm `master` mit dem Passwort aus der Secret-Datei `keycloak_admin` an (`KC_CLI_PASSWORD` nur im Prozess, nie im Befehl).
   Dasselbe Muster gilt für die Vorlage 19.3 (`verwaltung-einrichten-vorlage.sh`).
 - **Nachweis:** Stub-Test (`test/passkey-einrichten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2 mit dem Realm vor 24.1
-  (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR.
+  (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR. Nicht belegt (beim ersten Lauf auf der VPS prüfen, Prüfzeilen im README): Ausführung auf der VPS, der
+  `docker compose run`-Aufruf, Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io`.

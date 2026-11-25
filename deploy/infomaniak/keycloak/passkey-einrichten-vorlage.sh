@@ -300,6 +300,9 @@ schritt_ereignisse() {
   kc get "realms/$realm" > "$arbeit/realm.json"
   jq -e '.eventsEnabled == true' "$arbeit/realm.json" >/dev/null ||
     abbruch "Die Ereignisse des Realms sind ausgeschaltet; die Option --ereignisse ändert das nicht, manuell prüfen."
+  # Bei leerer Liste ist die Bedeutung (alle Typen oder keiner) nicht geprüft; Anfügen könnte die Erfassung einschränken.
+  jq -e '(.enabledEventTypes // []) | length > 0' "$arbeit/realm.json" >/dev/null ||
+    abbruch "Die Liste enabledEventTypes ist leer oder fehlt; das Anfügen könnte die Erfassung auf zwei Typen einschränken, manuell prüfen."
   jq '{enabledEventTypes: ((.enabledEventTypes // []) + ["UPDATE_CREDENTIAL", "REMOVE_CREDENTIAL"] | unique)}' \
     "$arbeit/realm.json" > "$arbeit/ereignisse.json"
   if ! jq -e '(.enabledEventTypes // []) as $ist | (["UPDATE_CREDENTIAL", "REMOVE_CREDENTIAL"] - $ist) | length == 0' \
@@ -321,6 +324,14 @@ if ! "$kcadm" get "realms/$realm" --fields realm >/dev/null 2>"$arbeit/fehler"; 
   abbruch "Der Realm $realm ist nicht lesbar; Anmeldung (kcadm config credentials, Realm master) und KC_REALM prüfen: $(tail -n 1 "$arbeit/fehler")"
 fi
 
+# Beim Anwenden zuerst ein Probelauf ohne Änderung: Ein unerwarteter Zustand (Abbruch, Exit 1) im Flow oder bei den
+# Ereignissen verändert so gar nichts, statt erst nach den ersten Änderungen aufzufallen.
+if [[ $modus == anwenden ]]; then
+  modus=pruefen
+  lauf > /dev/null
+  modus=anwenden
+  abweichungen=0
+fi
 lauf
 if [[ $modus == pruefen ]]; then
   if (( abweichungen == 0 )); then
