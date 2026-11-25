@@ -85,6 +85,9 @@ public class ChatSchritte {
     record Antwort(int status, HttpResponse<?> roh, String rumpf, List<Ereignis> ereignisse) {
     }
 
+    private record ApiFehler(String type, String title, String detail, String fehlercode, int status) {
+    }
+
     // HTTP/1.1: Schliessen des Rumpfs schliesst die Verbindung (Abmeldung des Abonnenten)
     private final HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(10)).build();
@@ -94,6 +97,8 @@ public class ChatSchritte {
     private final Map<String, UUID> letztesGespraech = new HashMap<>();
     private Antwort antwort;
     private String letzterKoerper;
+    private String letzterBenutzer;
+    private String letzteFrage;
     private CompletableFuture<Antwort> offen;
     private LogMitschnitt mitschnitt;
     private JsonNode abgerufen;
@@ -188,6 +193,8 @@ public class ChatSchritte {
 
     @Wenn("«{word}» im Gespräch von «{word}» die Frage «{}» stellt")
     public void imFremden(String benutzer, String besitzer, String frage) throws Exception {
+        letzterBenutzer = benutzer;
+        letzteFrage = frage;
         antwort = fragenMit(benutzer, koerper(frage, letztesGespraech.get(besitzer)));
     }
 
@@ -335,6 +342,19 @@ public class ChatSchritte {
         if (letzterKoerper != null) {
             assertThat(antwort.rumpf()).doesNotContain(letzterKoerper.length() > 3 ? letzterKoerper : "\u0000");
         }
+    }
+
+    @Dann("ist die Chat-Ablehnung wie bei einer unbekannten Gesprächs-ID")
+    public void chatFehlerGegenprobe() throws Exception {
+        Antwort unbekannt = fragenMit(letzterBenutzer, koerper(letzteFrage, UUID.randomUUID()));
+        assertThat(apiFehler(antwort)).isEqualTo(apiFehler(unbekannt));
+    }
+
+    @Dann("ist die Verlaufsablehnung wie bei einer unbekannten Gesprächs-ID")
+    public void verlaufFehlerGegenprobe() throws Exception {
+        HttpResponse<String> r = get(letzterBenutzer, "/api/v1/chat/gespraeche/" + UUID.randomUUID());
+        Antwort unbekannt = new Antwort(r.statusCode(), r, r.body(), List.of());
+        assertThat(apiFehler(antwort)).isEqualTo(apiFehler(unbekannt));
     }
 
     @Dann("nennt die Ablehnung Retry-After von {int} bis {int} Sekunden")
@@ -552,6 +572,7 @@ public class ChatSchritte {
 
     @Wenn("«{word}» den Verlauf des Gesprächs von «{word}» abruft")
     public void verlaufAbrufen(String benutzer, String besitzer) throws Exception {
+        letzterBenutzer = benutzer;
         HttpResponse<String> r = get(benutzer, "/api/v1/chat/gespraeche/" + letztesGespraech.get(besitzer));
         antwort = new Antwort(r.statusCode(), r, r.body(), List.of());
         abgerufen = r.statusCode() == 200 ? JSON.readTree(r.body()) : null;
@@ -704,6 +725,13 @@ public class ChatSchritte {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + RestAssured.port + pfad))
                 .header("Authorization", "Bearer " + Testanmeldung.token(benutzer)).timeout(GEDULD).GET().build(),
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    }
+
+    private static ApiFehler apiFehler(Antwort antwort) throws IOException {
+        JsonNode problem = JSON.readTree(antwort.rumpf());
+        return new ApiFehler(problem.path("type").asText(), problem.path("title").asText(),
+                problem.path("detail").asText(), problem.path("fehlercode").asText(),
+                problem.path("status").asInt());
     }
 
     private static String koerper(String frage, UUID gespraech) throws IOException {

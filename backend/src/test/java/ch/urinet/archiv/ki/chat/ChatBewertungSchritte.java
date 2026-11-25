@@ -48,14 +48,24 @@ public class ChatBewertungSchritte {
     ChatAufraeumer aufraeumer;
 
     private final Map<String, Antwort> antworten = new HashMap<>();
-    private final List<UUID> gespraeche = new ArrayList<>();
+    private final List<ChatGespraech> gespraeche = new ArrayList<>();
     private final List<RateVersuch> rateVersuche = new ArrayList<>();
     private Response letzteAntwort;
+    private LetzteAnfrage letzteAnfrage;
 
     private record Antwort(long id, UUID gespraech, String mandant) {
     }
 
+    private record ChatGespraech(UUID id, String mandant) {
+    }
+
     private record RateVersuch(String benutzer, Instant zeit) {
+    }
+
+    private record LetzteAnfrage(String benutzer, String antwort, String methode, String body) {
+    }
+
+    private record ApiFehler(String type, String title, String detail, String fehlercode) {
     }
 
     @Before
@@ -64,6 +74,7 @@ public class ChatBewertungSchritte {
         gespraeche.clear();
         rateVersuche.clear();
         letzteAntwort = null;
+        letzteAnfrage = null;
     }
 
     @After
@@ -77,10 +88,10 @@ public class ChatBewertungSchritte {
                     befehl.executeUpdate();
                 }
             }
-            for (UUID gespraech : gespraeche) {
+            for (ChatGespraech gespraech : gespraeche) {
                 try (PreparedStatement befehl = verbindung.prepareStatement(
-                        "delete from " + SCHEMA + ".chat_gespraech where id = ?")) {
-                    befehl.setObject(1, gespraech);
+                        "delete from " + schema(gespraech.mandant()) + ".chat_gespraech where id = ?")) {
+                    befehl.setObject(1, gespraech.id());
                     befehl.executeUpdate();
                 }
             }
@@ -103,7 +114,7 @@ public class ChatBewertungSchritte {
             einfuegen.setTimestamp(5, Timestamp.from(jetzt));
             einfuegen.executeUpdate();
         }
-        gespraeche.add(gespraech);
+        gespraeche.add(new ChatGespraech(gespraech, mandant));
         long id = ID_BASIS + Math.floorMod(UUID.randomUUID().getLeastSignificantBits(), 1_000_000_000_000L);
         try (Connection verbindung = datenbank.get().getConnection()) {
             try (PreparedStatement frage = verbindung.prepareStatement("insert into " + schema
@@ -132,16 +143,33 @@ public class ChatBewertungSchritte {
     @Wenn("«{word}» bewertet «{word}» mit dem Körper «{}»")
     public void bewerten(String benutzer, String antwort, String body) {
         letzteAntwort = anfrage(benutzer, antworten.get(antwort).id(), "PUT", body);
+        letzteAnfrage = new LetzteAnfrage(benutzer, antwort, "PUT", body);
     }
 
     @Wenn("«{word}» ruft die Bewertung von «{word}» ab")
     public void lesen(String benutzer, String antwort) {
         letzteAntwort = anfrage(benutzer, antworten.get(antwort).id(), "GET", null);
+        letzteAnfrage = new LetzteAnfrage(benutzer, antwort, "GET", null);
     }
 
     @Wenn("«{word}» löscht die Bewertung von «{word}»")
     public void loeschen(String benutzer, String antwort) {
         letzteAntwort = anfrage(benutzer, antworten.get(antwort).id(), "DELETE", null);
+        letzteAnfrage = new LetzteAnfrage(benutzer, antwort, "DELETE", null);
+    }
+
+    @Dann("ist die fremde Bewertungsanfrage wie eine unbekannte ID abgelehnt")
+    public void fremdeBewertungWieUnbekannt() throws SQLException {
+        assertThat(letzteAnfrage).isNotNull();
+        Antwort antwort = antworten.get(letzteAnfrage.antwort());
+        long unbekannteId = unbekannteNachrichtId(antwort.id());
+        Response unbekannt = anfrage(letzteAnfrage.benutzer(), unbekannteId,
+                letzteAnfrage.methode(), letzteAnfrage.body());
+        assertThat(letzteAntwort.statusCode()).isEqualTo(404);
+        assertThat(unbekannt.statusCode()).isEqualTo(404);
+        assertThat(apiFehler(letzteAntwort)).isEqualTo(apiFehler(unbekannt));
+        assertThat(letzteAntwort.asString()).doesNotContain(Long.toString(antwort.id()),
+                antwort.gespraech().toString(), "Synthetische Testantwort");
     }
 
     @Dann("wird eine unvollständige Chunked-Bewertung von «{word}» für «{word}» vor ihrem Ende mit 413 abgelehnt")
@@ -282,6 +310,32 @@ public class ChatBewertungSchritte {
             case "DELETE" -> spezifikation.when().delete(pfad);
             default -> throw new IllegalArgumentException("Unbekannte Bewertungsoperation");
         };
+    }
+
+    private long unbekannteNachrichtId(long fremdeId) throws SQLException {
+        long id;
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            do {
+                id = ID_BASIS + Math.floorMod(UUID.randomUUID().getLeastSignificantBits(), 1_000_000_000_000L);
+                try (PreparedStatement abfrage = verbindung.prepareStatement(
+                        "select exists (select 1 from m_urinet.chat_nachricht where id = ?) "
+                                + "or exists (select 1 from m_vhf_gsk.chat_nachricht where id = ?)")) {
+                    abfrage.setLong(1, id);
+                    abfrage.setLong(2, id);
+                    try (ResultSet zeile = abfrage.executeQuery()) {
+                        zeile.next();
+                        if (!zeile.getBoolean(1) && id != fremdeId) {
+                            return id;
+                        }
+                    }
+                }
+            } while (true);
+        }
+    }
+
+    private static ApiFehler apiFehler(Response antwort) {
+        return new ApiFehler(antwort.path("type"), antwort.path("title"), antwort.path("detail"),
+                antwort.path("fehlercode"));
     }
 
     private static String schema(String mandant) {

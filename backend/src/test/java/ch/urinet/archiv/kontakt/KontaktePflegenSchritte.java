@@ -63,6 +63,9 @@ public class KontaktePflegenSchritte {
     private record Ergebnis(int status, String fehlercode) {
     }
 
+    private record ApiFehler(String type, String title, String detail, String fehlercode) {
+    }
+
     private final Map<String, Ort> kontakte = new LinkedHashMap<>();
     private final Map<String, Ort> dokumente = new LinkedHashMap<>();
     private final Map<String, Integer> gemerkteVersionen = new HashMap<>();
@@ -72,6 +75,8 @@ public class KontaktePflegenSchritte {
     private LogMitschnitt mitschnitt;
     private Map<String, Object> stand;
     private Response antwort;
+    private String letzterBenutzer;
+    private String letzterUnbekannterPfad;
     private Duration dauer;
     private List<Ergebnis> gleichzeitig;
     private CompletableFuture<Void> sperre;
@@ -301,12 +306,18 @@ public class KontaktePflegenSchritte {
 
     @Wenn("«{word}» den Kontakt {word} ansieht")
     public void ansehen(String benutzer, String kennung) {
-        antwort = anfrage(benutzer).when().get(KONTAKTE + "/" + kontakt(kennung).id());
+        UUID id = kontakt(kennung).id();
+        letzterBenutzer = benutzer;
+        letzterUnbekannterPfad = KONTAKTE + "/" + UUID.randomUUID();
+        antwort = anfrage(benutzer).when().get(KONTAKTE + "/" + id);
     }
 
     @Wenn("«{word}» die Verweise auf den Kontakt {word} abfragt")
     public void verweise(String benutzer, String kennung) {
-        antwort = anfrage(benutzer).when().get(KONTAKTE + "/" + kontakt(kennung).id() + "/verweise");
+        UUID id = kontakt(kennung).id();
+        letzterBenutzer = benutzer;
+        letzterUnbekannterPfad = KONTAKTE + "/" + UUID.randomUUID() + "/verweise";
+        antwort = anfrage(benutzer).when().get(KONTAKTE + "/" + id + "/verweise");
     }
 
     @Wenn("«{word}» in der Partnerauswahl nach «{}» sucht")
@@ -456,6 +467,13 @@ public class KontaktePflegenSchritte {
         // Fehler nennen weder Kontaktdaten noch Eingabewerte (Req 16.7)
         werte.forEach(w -> assertThat(antwort.asString()).as("Antwort ohne Kontaktdaten").doesNotContain(w));
         eingaben.forEach(w -> assertThat(antwort.asString()).as("Antwort ohne Eingabewert").doesNotContain(w));
+    }
+
+    @Dann("ist die Antwort für eine unbekannte Kontakt-ID gleich")
+    public void unbekannteKontaktIdGegenprobe() {
+        Response unbekannt = anfrage(letzterBenutzer).when().get(letzterUnbekannterPfad);
+        assertThat(unbekannt.statusCode()).isEqualTo(antwort.statusCode());
+        assertThat(apiFehler(antwort)).isEqualTo(apiFehler(unbekannt));
     }
 
     @Dann("antwortet die Kontaktpflege nach höchstens {int} Sekunden mit Status {int} und Fehlercode «{word}»")
@@ -878,6 +896,11 @@ public class KontaktePflegenSchritte {
 
     private Ort dokument(String kennung) {
         return Objects.requireNonNull(dokumente.get(kennung), "Dokument " + kennung);
+    }
+
+    private static ApiFehler apiFehler(Response antwort) {
+        return new ApiFehler(antwort.path("type"), antwort.path("title"), antwort.path("detail"),
+                antwort.path("fehlercode"));
     }
 
     private static RequestSpecification anfrage(String benutzer) {

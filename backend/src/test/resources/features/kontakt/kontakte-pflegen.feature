@@ -164,8 +164,10 @@ Funktionalität: Kontakte ansehen und pflegen (Aufgabe 4.11)
   Szenario: Ein Kontakt eines anderen Mandanten ist unbekannt
     Wenn «inhaber-vhf-gsk» den Kontakt K1 ansieht
     Dann antwortet die Kontaktpflege mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und ist die Antwort für eine unbekannte Kontakt-ID gleich
     Wenn «inhaber-vhf-gsk» die Verweise auf den Kontakt K1 abfragt
     Dann antwortet die Kontaktpflege mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und ist die Antwort für eine unbekannte Kontakt-ID gleich
     Wenn «inhaber-vhf-gsk» die Kontaktliste mit «status=ALLE» abfragt
     Dann listet die Kontaktliste 2 Kontakte, auf der Seite «F2, F1»
     Wenn «inhaber-vhf-gsk» die Kontaktliste mit «q=CRM-P01» abfragt

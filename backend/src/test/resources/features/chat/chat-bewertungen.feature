@@ -22,6 +22,21 @@ Funktionalität: Chat-Bewertungen speichern
     Und ist die Bewertung von «EIGENE» nicht mehr gespeichert
 
   @req-15.2
+  Szenario: Bewertungen fremder Mandanten verhalten sich wie unbekannte Antworten
+    Angenommen für «inhaber-vhf-gsk» existiert im Mandanten «vhf-gsk» die Chat-Antwort «MANDANT-B»
+    Wenn «inhaber-vhf-gsk» bewertet «MANDANT-B» mit dem Körper «{"sterne":4,"freitext":"Nur Mandant B"}»
+    Dann ist die Bewertungsanfrage mit Status 200 beantwortet
+    Wenn «inhaber-urinet» ruft die Bewertung von «MANDANT-B» ab
+    Dann ist die fremde Bewertungsanfrage wie eine unbekannte ID abgelehnt
+    Wenn «inhaber-urinet» bewertet «MANDANT-B» mit dem Körper «{"sterne":1,"freitext":"Fremder Schreibversuch"}»
+    Dann ist die fremde Bewertungsanfrage wie eine unbekannte ID abgelehnt
+    Wenn «inhaber-urinet» löscht die Bewertung von «MANDANT-B»
+    Dann ist die fremde Bewertungsanfrage wie eine unbekannte ID abgelehnt
+    Wenn «inhaber-vhf-gsk» ruft die Bewertung von «MANDANT-B» ab
+    Dann ist die Bewertungsanfrage mit Status 200 beantwortet
+    Und enthält die Antwort den gespeicherten Freitext «Nur Mandant B»
+
+  @req-15.2
   Szenario: Bewertungen fremder Benutzer und Mandanten sind nicht zugänglich
     Angenommen für «mitarbeiter-urinet» existiert im Mandanten «urinet» die Chat-Antwort «FREMD»
     Wenn «mitarbeiter-urinet» bewertet «FREMD» mit dem Körper «{"sterne":2,"freitext":"Eigene Bewertung"}»
