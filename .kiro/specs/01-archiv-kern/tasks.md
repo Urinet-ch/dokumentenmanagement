@@ -205,6 +205,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `AuftragService.einreihen(typ, nutzlast)`, `AuftragPoller` mit `SKIP LOCKED`, insgesamt 3 Versuche mit wachsender Wartezeit, Mandantenkontext pro Auftrag
   - Zeitgrenze je Auftragstyp (design.md) und Lebenszeichen; verwaiste `LAEUFT`-Aufträge nach Ablauf der Zeitgrenze freigeben, zählt als Versuch
   - Tests: zwei Worker holen denselben Auftrag nie doppelt; Zeitüberschreitung und verwaister Auftrag zählen als Fehlversuch
+  - Resilienz-Nachweis (PR #645): fünf deterministische Fälle von `VERARBEITEN` einschliesslich Abbruch einer echten Testdatenbank-Sitzung sowie doppelte Zustellung von `ARCHIVIEREN`; ein vorübergehendes, nicht referenziertes PDF/A nach Datenbankabbruch bleibt zur Einordnung im Review.
   - _Anforderungen: 1.6, 5.4, 5.6, 5.7_
 
 - [ ] 2.6 Worker-Image und Verarbeitung [Backend] [Infra]
