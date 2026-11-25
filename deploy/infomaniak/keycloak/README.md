@@ -133,13 +133,13 @@ offiziellen Hilfs-Image `ghcr.io/jqlang/jq` (mehrarchitektur, auf Digest festgel
 Keycloak-Image bleibt unverändert:
 
 ```sh
-mkdir -p "$HOME/archiv-werkzeuge/keycloak"
+sudo mkdir -p /opt/archiv-werkzeuge/keycloak
 sudo docker rm -f urinet-jq-holen 2>/dev/null
 sudo docker create --platform linux/amd64 --name urinet-jq-holen \
   ghcr.io/jqlang/jq:1.7.1@sha256:096b83865ad59b5b02841f103f83f45c51318394331bf1995e187ea3be937432
-sudo docker cp urinet-jq-holen:/jq "$HOME/archiv-werkzeuge/jq"
+sudo docker cp urinet-jq-holen:/jq /opt/archiv-werkzeuge/jq
 sudo docker rm urinet-jq-holen
-echo "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5  $HOME/archiv-werkzeuge/jq" | sha256sum -c -
+echo "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5  /opt/archiv-werkzeuge/jq" | sha256sum -c -
 ```
 `sha256sum -c` muss `OK` melden; sonst die Datei löschen und nicht verwenden. Die Prüfsumme gilt für die Datei `jq` der
 Plattform `linux/amd64` (die VPS ist x86-64); sie wurde aus genau dem oben mit Digest festgelegten Image entnommen (`docker create`,
@@ -153,19 +153,19 @@ Weg auf die VPS (`<vps>` ist der Zugang des Betreibers):
 
 ```sh
 scp deploy/infomaniak/keycloak/{passkey-einrichten-vorlage.sh,verwaltung-einrichten-vorlage.sh,vorlage-ausfuehren.sh} \
-  <vps>:archiv-werkzeuge/keycloak/
+  <vps>:/opt/archiv-werkzeuge/keycloak/
 ```
 **Rechte für den Container.** Der Wegwerf-Container läuft als Benutzer 1000:1000 und hängt `jq` und das Verzeichnis `keycloak` nur
 lesend ein. Bei einer `umask` von 077 auf der VPS (und beim `scp`) wären beide für ihn unlesbar. Darum auf der VPS nach dem
 Ablegen (die Secret-Dateien sind davon **nicht** betroffen und werden nie geöffnet):
 
 ```sh
-chmod -R a+rX "$HOME/archiv-werkzeuge"
-chmod a+rx "$HOME/archiv-werkzeuge/jq"
-ls -l "$HOME/archiv-werkzeuge/jq" "$HOME/archiv-werkzeuge/keycloak"
+sudo chmod -R a+rX /opt/archiv-werkzeuge
+sudo chmod a+rx /opt/archiv-werkzeuge/jq
+ls -l "/opt/archiv-werkzeuge/jq" "/opt/archiv-werkzeuge/keycloak"
 ```
-Meldet der Lauf später `Permission denied` oder `jq: not found`, ist fast immer dies die Ursache. Auch das Heimverzeichnis selbst
-muss für den Container durchsuchbar sein (`stat -c '%A' "$HOME"` zeigt `x` für andere); sonst die Dateien in ein anderes Verzeichnis legen.
+Meldet der Lauf später `Permission denied` oder `jq: not found`, ist fast immer dies die Ursache. Die Werkzeuge liegen in `/opt/archiv-werkzeuge`, nicht im Heimverzeichnis: Als root ist `$HOME` gleich `/root`, und das ist für Benutzer 1000
+nicht durchsuchbar. Die Befehle stehen bewusst ohne Shell-Variable für den Pfad (eine eingefügte erste Zeile wurde abgeschnitten).
 
 
 **Passkey-Vorlage, zuerst nur prüfen** (Exit 10 heisst: Änderungen nötig; `echo $?` zeigt den Exit-Code):
@@ -174,7 +174,7 @@ muss für den Container durchsuchbar sein (`stat -c '%A' "$HOME"` zeigt `x` für
 sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml \
   run --rm --no-deps -T -l traefik.enable=false \
   -e KC_OPTS="-Duser.home=/tmp -XX:+UseSerialGC -Xmx96m -XX:TieredStopAtLevel=1 -Xss512k" \
-  -v "$HOME/archiv-werkzeuge/jq:/usr/local/bin/jq:ro" -v "$HOME/archiv-werkzeuge/keycloak:/arbeit:ro" \
+  -v "/opt/archiv-werkzeuge/jq:/usr/local/bin/jq:ro" -v "/opt/archiv-werkzeuge/keycloak:/arbeit:ro" \
   --entrypoint bash kc \
   /arbeit/vorlage-ausfuehren.sh /arbeit/passkey-einrichten-vorlage.sh --pruefen
 echo "Exit: $?"
@@ -184,18 +184,16 @@ echo "Exit: $?"
 (einrichten und nachprüfen), das heisst `… /arbeit/passkey-einrichten-vorlage.sh --ereignisse`; anschliessend noch einmal
 `--pruefen --ereignisse` (erwartet Exit 0). Auch das erste `--pruefen` darf `--ereignisse` tragen, dann zählen die Ereignisse als
 Abweichung mit. Probe: Nach einer Passkey-Einrichtung in der Kontoverwaltung erscheint `UPDATE_CREDENTIAL` im Ereignisprotokoll des
-Realms (Admin-Konsole, Realm `urinet-archiv`, «Ereignisse»).
+Realms. Die Admin-Konsole ist über Traefik nicht öffentlich; die Ereignisse werden über `kcadm` im Wegwerf-Container gelesen
+(Hilfsskript noch nicht vorhanden, Probe offen).
 
-**Nicht belegt, beim ersten Lauf prüfen.** Lokal belegt sind die Vorlage selbst (Stub-Test und Echt-Test gegen Keycloak 26.8.2, mit
-`docker run` und denselben Optionen). Nicht belegt sind:
+**Beim ersten Lauf auf der VPS (25.11.2026, Fabian) belegt:** Ausführung auf der VPS selbst, der `docker compose run`-Aufruf,
+Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io` und `jq` im Container. Der Lauf mit `--ereignisse`
+endete so: Prüflauf Exit 10, Einrichten Exit 0 (18 Änderungen), Nachprüfung Exit 0; ein weiterer Lauf meldet «nichts zu tun».
+Lokal belegt waren zuvor die Vorlage selbst (Stub-Test und Echt-Test gegen Keycloak 26.8.2, mit `docker run`).
 
-| Punkt | Prüfzeile |
-| --- | --- |
-| Ausführung auf der VPS selbst (nie dort gelaufen) | erster Aufruf nur mit `--pruefen`; `echo "Exit: $?"` zeigt 10 oder 0, nicht 1 |
-| der `docker compose run`-Aufruf selbst (lokal `docker run`) | `sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml config --quiet && echo ok` |
-| Lesbarkeit der Secret-Datei für Benutzer 1000 | `sudo ls -ln /srv/apps/archiv/secrets/keycloak_admin` (nur Rechte und Besitzer ansehen, Inhalt nie ausgeben) |
-| Erreichbarkeit von `ghcr.io` von der VPS | `sudo docker pull --platform linux/amd64 ghcr.io/jqlang/jq:1.7.1@sha256:096b83865ad59b5b02841f103f83f45c51318394331bf1995e187ea3be937432` |
-| `jq` im Container lauffähig | Aufruf wie oben, aber mit `--entrypoint /usr/local/bin/jq kc --version` und nur dem `jq`-Mount (erwartet `jq-1.7.1`) |
+**Weiter nicht belegt:** die Probe auf `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` im Ereignisprotokoll. Die Admin-Konsole ist nicht
+öffentlich, und ein Hilfsskript, das die Ereignisse per `kcadm.sh get events` im Wegwerf-Container listet, fehlt noch.
 
 Ist die Secret-Datei für den Benutzer 1000 nicht lesbar, meldet `vorlage-ausfuehren.sh` «Die Secret-Datei des Keycloak-Admins fehlt
 oder ist leer». Die Rechte der Secrets nicht pauschal öffnen, sondern nur so anpassen, wie es der Dienst `kc` braucht.
@@ -210,7 +208,7 @@ sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/com
   run --rm --no-deps -T -l traefik.enable=false \
   -e KC_OPTS="-Duser.home=/tmp -XX:+UseSerialGC -Xmx96m -XX:TieredStopAtLevel=1 -Xss512k" \
   -e SMTP_HOST=<smtp-host> -e SMTP_PORT=<587> -e SMTP_BENUTZER=<smtp-benutzer> -e SMTP_ABSENDER=<absender-adresse> \
-  -v "$HOME/archiv-werkzeuge/jq:/usr/local/bin/jq:ro" -v "$HOME/archiv-werkzeuge/keycloak:/arbeit:ro" \
+  -v "/opt/archiv-werkzeuge/jq:/usr/local/bin/jq:ro" -v "/opt/archiv-werkzeuge/keycloak:/arbeit:ro" \
   -v /srv/apps/archiv/secrets/keycloak_verwaltung_secret:/run/secrets/keycloak_verwaltung_secret:ro \
   --entrypoint bash kc \
   /arbeit/vorlage-ausfuehren.sh /arbeit/verwaltung-einrichten-vorlage.sh
