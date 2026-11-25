@@ -270,11 +270,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 5.5, 5.6, 5.7, 5.8, 6.2, 6.4, 6.6, 7.2, 7.5, 7.7, 7.8, 9.5_
   - _Abhängig von: 19.13, 20.7_
 
-- [ ] 21.5 Dokumentation [Backend]
+- [x] 21.5 Dokumentation [Backend]
   - `docs/anleitung-verwaltung.md` (vom Entwurf zur gültigen Anleitung), Abschnitt «Geheimnisse rotieren» in `docs/` (Rotation je
     Geheimnis der Klasse (c), Dienstkonto), README «Benutzer in Keycloak anlegen» als Notweg, `docs/alarme.md`, Notfallunterlagen.
   - _Anforderungen: 1.7, 9.3_
   - _Abhängig von: 20.7, 21.1_
+  - Nachweis 24.11.2026: Normalweg und Notweg sind in README und Anleitung gegen den Stand auf `main` geprüft; die
+    Alarmhinweise und Rotationswege stehen in `docs/alarme.md` und `docs/geheimnisse-rotieren.md`. Die Notfallunterlagen
+    enthalten nur Platzhalter für die geschützte Verwahrung. Ausführung und Betriebsbestätigung der Rotation bleiben 19.3/21.6.
 
 - [ ] 21.6 Abnahme Verwaltung [Fabian]
   - `docs/abnahme/verwaltung.md` nur mit Nummern und Ergebnissen: Szenarien und Tests grün; manuell: Einladung mit echtem
@@ -303,3 +306,7 @@ auf Server oder Secrets aus der Sitzung.
     setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
   - _Anforderungen: 10.1, 10.2, 10.8_
   - _Abhängig von: 24.1, 24.2_
+  - Vorbereitung 25.11.2026 (bleibt offen, [Fabian]): Die Vorlage `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` und die
+    kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
+    Related Origins und Gerätetest stehen aus. Req 10.7 (Entscheid Fabian 25.11.2026): Die Ereignisse werden aktiviert, der
+    Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).
