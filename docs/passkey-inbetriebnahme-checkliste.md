@@ -61,7 +61,9 @@ Passkeys sind an die Relying-Party-ID gebunden. Nach einem Wechsel der Domain ge
 Passwort plus TOTP; die Benutzer richten die Passkeys für die neue ID neu ein. Die Anleitung in der App nennt das ebenfalls.
 
 ## Entscheide für Fabian
-- Ein Link zur Kontoverwaltung in der App fehlt; die Anleitung verweist auf die Person, die den Zugang eingerichtet hat.
+- ~~Ein Link zur Kontoverwaltung in der App fehlt; die Anleitung verweist auf die Person, die den Zugang eingerichtet hat.~~
+  **Erledigt am 25.11.2026 (Aufgabe 24.4):** Die Kopfzeile der App zeigt jedem angemeldeten Benutzer «Passkey einrichten»; der Link öffnet
+  `<Keycloak-Aussteller>/account` in einem neuen Tab, die Adresse stammt aus der OIDC-Konfiguration der App. Die Anleitung nennt den Knopf.
 - Keycloak-Ereignisse zum Einrichten und Entfernen eines Passkeys (Requirement 10.7) sind im Realm nicht aktiviert; sie würden
   `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` in `enabledEventTypes` brauchen und einen weiteren Realm-Eingriff auf Stufe A.
   Die Vorlage kann das (Option `--ereignisse`, ergänzt nur die beiden Typen), tut es aber nie von selbst.
