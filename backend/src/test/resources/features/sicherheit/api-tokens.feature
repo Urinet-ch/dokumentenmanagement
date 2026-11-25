@@ -110,7 +110,7 @@ Funktionalität: API-Tokens für Skripte
     Und der Stand des Zugriffsprotokolls von «urinet» ist für die Tokens gemerkt
     Wenn das Token «vhf» an «/api/v1/dokumente» sendet
     Dann liegt das zuletzt hochgeladene Dokument des Tokens «vhf» im Mandanten «vhf-gsk» mit Quelle «DRIVE»
-    Wenn das Token «vhf-generator» an «/api/v1/dokumente/generator?art=PROBE_VHF_BULLETIN» sendet
+    Wenn das Token «vhf-generator» an «/api/v1/dokumente/generator?art=BULLETIN» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
     Wenn das Token «vhf-generator» an «/api/v1/dokumente/generator?art=PROJEKTDOKUMENT» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»

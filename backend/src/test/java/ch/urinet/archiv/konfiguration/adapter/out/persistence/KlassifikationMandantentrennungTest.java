@@ -117,13 +117,13 @@ class KlassifikationMandantentrennungTest {
         // Gleicher Code im zweiten Mandanten: eigene Werte, eigene Zuordnung, eigenes Löschen.
         in("vhf-gsk", () -> {
             klassifikationen.anlegen(klassifikation("VHF", "statik"));
-            klassifikationen.zuordnen("PROBE_VHF_BULLETIN", new ArtKlassifikation(CODE, true, "statik"));
+            klassifikationen.zuordnen("BULLETIN", new ArtKlassifikation(CODE, true, "statik"));
             assertThat(klassifikationen.finden(CODE).orElseThrow().werte())
                     .extracting(KlassifikationWert::code).containsExactly("statik");
-            assertThat(klassifikationen.zuordnungen("PROBE_VHF_BULLETIN"))
+            assertThat(klassifikationen.zuordnungen("BULLETIN"))
                     .contains(new ArtKlassifikation(CODE, true, "statik"));
             dokumentKlassifikationen.ersetzen(dokument, Map.of());
-            klassifikationen.zuordnungEntfernen("PROBE_VHF_BULLETIN", CODE);
+            klassifikationen.zuordnungEntfernen("BULLETIN", CODE);
             klassifikationen.loeschen(CODE);
             assertThat(klassifikationen.finden(CODE)).isEmpty();
             return null;
@@ -135,7 +135,7 @@ class KlassifikationMandantentrennungTest {
             assertThat(eigene.werte()).extracting(KlassifikationWert::code).containsExactly("bau");
             assertThat(klassifikationen.zuordnungen("PROJEKTDOKUMENT"))
                     .contains(new ArtKlassifikation(CODE, false, "bau"));
-            assertThat(klassifikationen.zugeordnet("PROBE_VHF_BULLETIN", CODE)).isFalse();
+            assertThat(klassifikationen.zugeordnet("BULLETIN", CODE)).isFalse();
             assertThat(klassifikationen.inGebrauch(CODE)).isTrue();
             assertThat(klassifikationen.wertInGebrauch(CODE, "bau")).isTrue();
             assertThat(dokumentKlassifikationen.laden(dokument)).containsExactly(Map.entry(CODE, List.of("bau")));
@@ -149,7 +149,7 @@ class KlassifikationMandantentrennungTest {
     }
 
     private static String art(String mandant) {
-        return "urinet".equals(mandant) ? "PROJEKTDOKUMENT" : "PROBE_VHF_BULLETIN";
+        return "urinet".equals(mandant) ? "PROJEKTDOKUMENT" : "BULLETIN";
     }
 
     private static Klassifikation klassifikation(String name, String wert) {

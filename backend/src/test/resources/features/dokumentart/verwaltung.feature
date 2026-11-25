@@ -277,7 +277,7 @@ Funktionalität: Dokumentarten verwalten
       | benutzer                 | mandant | rolle            | inhaber         | art                | name          |
       | mitarbeiter-urinet       | urinet  | MITARBEITER      | inhaber-urinet  | KORRESPONDENZ      | Korrespondenz |
       | treuhaender-urinet       | urinet  | TREUHAENDER      | inhaber-urinet  | KORRESPONDENZ      | Korrespondenz |
-      | geschaeftsstelle-vhf-gsk | vhf-gsk | GESCHAEFTSSTELLE | inhaber-vhf-gsk | PROBE_VHF_BULLETIN | Probe-Bulletin |
+      | geschaeftsstelle-vhf-gsk | vhf-gsk | GESCHAEFTSSTELLE | inhaber-vhf-gsk | BULLETIN | Bulletin       |
 
   @req-9.4
   Szenario: Auch eine Art aus dem Seed lässt sich nur deaktivieren, solange sie Dokumente hat
