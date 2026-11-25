@@ -170,6 +170,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Token-Bucket je Schlüssel (Startwerte in design.md «Grenzen»), Uploads je Stunde, 429 `ZU_VIELE_ANFRAGEN` mit `Retry-After` (Fehlercode im selben PR in Spec 01 design.md eintragen, falls noch nicht eingetragen); Grenze des Chats je Client-Hash bleibt; Startwerte messen
   - Reihenfolge (entschieden 16.11.2026): 11.11 kommt vor dem Livegang der Webseite von VHF/GSK, weil jede öffentliche Suche Embedding und Reranker auslöst; bis dahin nur Urinet und Testmandanten
   - Umsetzung Repo-Teil (PR #220, #253, #263, #258): `WebseitenGrenzen`, `TokenBucket`, `Grenzklasse`, `WebseitenGrenzenFilter`, `@WebseitenGrenze`, `MicrometerWebseitenGrenzen`; Einstellungen `archiv.webseite.grenzen.*`; strengerer Bucket für die Suche (Startwert 2/s, Spitze 10); Vertrag mit 429, `Retry-After` und Fehlercode; `@req-15.1`/`@req-6.4` in `features/integration/webseiten-grenzen.feature`; Einzelheiten in design.md, «Grenzen». Echte Upload-Grenze, engere Prüfdateigrenze und Fehlerpfad-/Kennzahlnachweis sind umgesetzt. Lokal sind Startwerte und 429-Abbildung durch Unit- und Szenariotests belegt. Offen bleibt die Messung der Startwerte am Livegang (Kennzahl `archiv_webseite_grenze_abgelehnt_total`); deshalb kein Haken.
+  - Vorbereitung 25.11.2026: Messanleitung und Auswertungsskript mit synthetischen Tests liegen unter `docs/webseiten-grenzen-kalibrierung.md` und `tools/`; die Live-Messung durch Fabian bleibt offen, deshalb kein Haken.
   - _Anforderungen: 15.1, 6.4_
   - _Abhängig von: 11.7_
 
