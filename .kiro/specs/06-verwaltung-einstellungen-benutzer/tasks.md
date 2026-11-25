@@ -278,6 +278,7 @@ auf Server oder Secrets aus der Sitzung.
   - Nachweis 24.11.2026: Normalweg und Notweg sind in README und Anleitung gegen den Stand auf `main` geprüft; die
     Alarmhinweise und Rotationswege stehen in `docs/alarme.md` und `docs/geheimnisse-rotieren.md`. Die Notfallunterlagen
     enthalten nur Platzhalter für die geschützte Verwahrung. Ausführung und Betriebsbestätigung der Rotation bleiben 19.3/21.6.
+  - Nachtrag 26.11.2026: `anleitung-verwaltung.md`, `geheimnisse-rotieren.md` und `notfall/notfallunterlagen.md` unterscheiden nun den auf Stufe A belegten Erstaufbau der drei Secrets vom weiterhin offenen Rotations- und Offline-Verwahrungsnachweis. Passkey-Realm und Ereignis-Probe sind als eingerichtet/belegt verlinkt; Zugangsdaten und Betriebsadressen stehen nicht im Repo.
 
 - [ ] 21.6 Abnahme Verwaltung [Fabian]
   - `docs/abnahme/verwaltung.md` nur mit Nummern und Ergebnissen: Szenarien und Tests grün; manuell: Einladung mit echtem
