@@ -1,8 +1,13 @@
 # Passkey: Checkliste für die Inbetriebnahme (Aufgabe 24.3, Fabian)
 
-Diese Schritte kann nur der Betreiber ausführen. Der Code, die Anleitung in der App (`/hilfe#erste-schritte-passkey`) und
-die Admin-Option «Passkeys löschen» sind mit Aufgabe 24.2 fertig. Die Aufgabe 24.3 bleibt offen, bis die Punkte 1 bis 5
-erledigt sind. Keine Hostnamen, Adressen oder Geheimnisse gehören in diese Datei oder ins Repo.
+**Status: nicht ausgeführt.** Der Code, die Anleitung in der App (`/hilfe#erste-schritte-passkey`) und die Admin-Option
+«Passkeys löschen» sind umgesetzt. Die Wortlaute der App-Anleitung sind aber noch nicht auf einem echten iPhone und Mac
+bestätigt; der virtuelle Authenticator ist dafür kein Nachweis. Erst nach den Gerätetests unten darf die Anleitung als
+auf diesen Geräten geprüft bezeichnet werden.
+
+Realm- und RP-ID-Änderungen führt der Betreiber aus. Die manuellen Gerätetests und ihre Beurteilung bleiben bei Fabian.
+Die Aufgabe 24.3 bleibt offen, bis alle Punkte 1 bis 5 erledigt und die Gerätetests dokumentiert sind. Keine Hostnamen,
+Adressen oder Geheimnisse gehören in diese Datei oder ins Repo.
 
 ## Reihenfolge
 Die Reihenfolge ist verbindlich: zuerst der Realm von Aufgabe 19.3 (Verwaltungsclient, SMTP, Passwort-Richtlinie), dann die
@@ -34,12 +39,21 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
    weil bestehende Passkeys ungültig würden). Er gehört in die Betriebsangaben, nicht ins Repo.
 3. **Related Origins prüfen** (`docs/passkey-related-origins.md`): Die App liefert unter `/.well-known/webauthn` die öffentliche
    Keycloak-Origin; HTTP 200, `Content-Type: application/json`, keine Weiterleitung.
-4. **Mit iPhone und Mac prüfen:** Passkey in der Kontoverwaltung einrichten, mit dem Passkey anmelden, eine Step-up-Aktion
-   auslösen (Passkey genügt), Passkey wieder entfernen. Danach als Inhaber bei einem Testbenutzer «Zugang zurücksetzen» mit der
-   Option «Passkeys löschen» ausführen und prüfen, dass der Benutzer nur noch mit Passwort und TOTP hereinkommt. Im Ereignisprotokoll
-   des Realms sollte `REMOVE_CREDENTIAL` stehen (nicht belegt, beim ersten Lauf beobachten).
+4. **Mit iPhone und Mac prüfen:** Auf beiden Geräten den Passkey in der Kontoverwaltung einrichten, damit anmelden, eine
+   Step-up-Aktion auslösen (Passkey genügt) und den Passkey wieder entfernen. Danach als Inhaber bei einem synthetischen
+   Testbenutzer «Zugang zurücksetzen» mit der Option «Passkeys löschen» ausführen und prüfen, dass der Benutzer nur noch
+   mit Passwort und TOTP hereinkommt. Im Ereignisprotokoll des Realms sollte `REMOVE_CREDENTIAL` stehen (nicht belegt, beim
+   ersten Lauf beobachten). Die Wortlaute der App-Anleitung erst nach erfolgreicher Prüfung auf beiden Geräten als belegt
+   markieren.
 5. **Rückfall prüfen:** Ein Benutzer ohne Passkey meldet sich weiter mit Passwort und TOTP an; auch mit eingerichtetem Passkey
    bleibt TOTP für die Passwortanmeldung verlangt.
+
+| Prüfung | iPhone | Mac |
+| --- | --- | --- |
+| Passkey einrichten und damit anmelden | offen | offen |
+| Step-up mit Passkey | offen | offen |
+| Passkey entfernen | offen | offen |
+| Passwort- und TOTP-Rückfall | offen | offen |
 
 ## Domainwechsel
 Passkeys sind an die Relying-Party-ID gebunden. Nach einem Wechsel der Domain gelten bestehende Passkeys nicht mehr. Rückfall ist
