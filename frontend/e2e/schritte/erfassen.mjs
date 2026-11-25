@@ -370,6 +370,7 @@ When('ich schalte das Handy nach der PWA-Installation offline', async function (
     'Die PWA wird vor dem Offline-Schalten nicht vom Service Worker kontrolliert',
   );
   await this.kontext.setOffline(true);
+  await this.seite.locator('[data-test=offline-hinweis]').waitFor();
 });
 
 When('das Handy wieder online ist', async function () {

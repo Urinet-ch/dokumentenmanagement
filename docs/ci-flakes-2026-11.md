@@ -69,11 +69,16 @@ nicht, welche Anfrage das Netzwerk aktiv hielt.
 Das Installations-Given lädt bereits alle App-Dateien in den Service-Worker-Cache
 und prüft nach nötigen Reloads, dass der Service Worker die Seite kontrolliert.
 Für dieses Szenario ersetzt deshalb ein eigener Schritt den zusätzlichen
-`networkidle`-Wait durch die Prüfung dieses Controllers, bevor Playwright das
-Handy offline schaltet. Die anderen Erfassungsszenarien behalten ihren bisherigen
-Wait. Am Produktcode ändert sich nichts.
+`networkidle`-Wait durch die Prüfung dieses Controllers. Nach dem Offline-Schalten
+wartet er zudem auf den Offline-Hinweis der App, bevor die Seite erneut geöffnet
+wird. Die anderen Erfassungsszenarien behalten ihren bisherigen Wait. Am
+Produktcode ändert sich nichts.
 
-Nachweis: Das Szenario lief lokal zehnmal hintereinander erfolgreich; der
-Frontend-Build und der App-Build für den Browser-Test waren erfolgreich. Die
-Wiederholungen belegen die Stabilität dieses Testpfads, nicht die Ursache der
+Bei der Kalibrierung scheiterte lokal ein Durchlauf danach noch beim Link-Klick
+«Ohne Verbindung erfassen». Das belegt einen fehlenden Synchronisationspunkt,
+nicht die tiefergehende Ursache. Mit dem zusätzlichen Wait auf den Offline-Hinweis
+lief das Szenario zehnmal hintereinander erfolgreich.
+
+Nachweis: Frontend-Build und App-Build für den Browser-Test waren erfolgreich.
+Die Wiederholungen belegen die Stabilität dieses Testpfads, nicht die Ursache der
 ursprünglichen Netzaktivität.
