@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
 import { provideApi } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
@@ -33,6 +34,12 @@ describe('Wissensoberfläche', () => {
   });
 
   afterEach(() => http.verify());
+
+  function webseitenstatus(freigegeben = false, freigabefaehig = true, stufe = 'oeffentlich'): void {
+    http.expectOne('/api/v1/wissensseiten/s1/webseitenfreigabe').flush(
+      { freigegeben, freigabefaehig, hoechsteZugriffsstufe: stufe }, { headers: { ETag: '"1-0"' } },
+    );
+  }
 
   it('speichert Einstellungen und setzt leere Felder auf den Startwert zurück', async () => {
     const fixture = TestBed.createComponent(WissenEinstellungenSeite);
@@ -249,6 +256,7 @@ describe('Wissensoberfläche', () => {
     });
     http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
     http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+    webseitenstatus();
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     expect(element.textContent).toContain(TEXTE.wissen.quellePruefen);
@@ -282,6 +290,7 @@ describe('Wissensoberfläche', () => {
     });
     http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
     http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+    webseitenstatus();
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     expect(element.textContent).toContain(TEXTE.wissen.abgelaufen);
@@ -300,6 +309,7 @@ describe('Wissensoberfläche', () => {
     });
     http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
     http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+    webseitenstatus();
     await fixture.whenStable();
     const bloecke = (fixture.nativeElement as HTMLElement).querySelectorAll('article blockquote');
     expect(bloecke[0].classList).toContain('widerspruch');
@@ -314,6 +324,7 @@ describe('Wissensoberfläche', () => {
       http.expectOne((r) => r.url === '/api/v1/wissensseiten').flush({ id: 's1', titel: 'Probe', quellen: [], ...seite });
       http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
       http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+      webseitenstatus();
       await fixture.whenStable();
       expect(fixture.nativeElement.textContent).not.toContain(TEXTE.wissen.abgelaufen);
     }
@@ -353,6 +364,7 @@ describe('Wissensoberfläche', () => {
     http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [
       { nummer: 1 }, { nummer: 2, zeit: '2026-01-01T10:00:00Z' },
     ] });
+    webseitenstatus();
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     const buttons = Array.from(element.querySelectorAll('button'));
@@ -369,6 +381,64 @@ describe('Wissensoberfläche', () => {
     await fixture.whenStable();
     expect(element.textContent).toContain(TEXTE.httpFehler.nichtGefunden);
     expect(element.textContent).not.toContain('Frühere Fassung');
+  });
+
+  it('zeigt Quellenstufe und verhindert Freigabe bei ungeeigneten Quellen', async () => {
+    const fixture = TestBed.createComponent(WissenSeite);
+    fixture.componentRef.setInput('pfad', 'konzepte/probe');
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/v1/wissensseiten').flush({ id: 's1', titel: 'Probe', quellen: [] });
+    http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
+    http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+    webseitenstatus(false, false, 'vorstand');
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Vorstand');
+    expect(element.textContent).toContain(TEXTE.wissen.webseite.sperrgrund);
+    const knopf = [...element.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes(TEXTE.wissen.webseite.freigeben))!;
+    expect(knopf.disabled).toBe(true);
+  });
+
+  it('zeigt ohne A16 keinen Freigabeknopf', async () => {
+    rolle.wert = 'mitarbeiter';
+    const fixture = TestBed.createComponent(WissenSeite);
+    fixture.componentRef.setInput('pfad', 'konzepte/probe');
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/v1/wissensseiten').flush({ id: 's1', titel: 'Probe', quellen: [] });
+    http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
+    http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+    webseitenstatus();
+    await fixture.whenStable();
+    const buttons = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')];
+    expect(buttons.some((button) => button.textContent?.includes(TEXTE.wissen.webseite.freigeben))).toBe(false);
+  });
+
+  it('verlangt Bestätigung und sendet den aktuellen ETag bei der Freigabe', async () => {
+    const dialog = TestBed.inject(MatDialog);
+    const fixture = TestBed.createComponent(WissenSeite);
+    fixture.componentRef.setInput('pfad', 'konzepte/probe');
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/v1/wissensseiten').flush({ id: 's1', titel: 'Probe', quellen: [] });
+    http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
+    http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+    webseitenstatus();
+    await fixture.whenStable();
+    [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')]
+      .find((button) => button.textContent?.includes(TEXTE.wissen.webseite.freigeben))!.click();
+    await fixture.whenStable();
+    http.expectNone((r) => r.method === 'POST' && r.url.endsWith('/webseitenfreigabe'));
+    expect(dialog.openDialogs).toHaveLength(1);
+    dialog.openDialogs[0].close(true);
+    await vi.waitFor(() => expect(dialog.openDialogs).toHaveLength(0));
+    const anfrage = http.expectOne('/api/v1/wissensseiten/s1/webseitenfreigabe');
+    expect(anfrage.request.method).toBe('POST');
+    expect(anfrage.request.headers.get('If-Match')).toBe('"1-0"');
+    expect(anfrage.request.body).toEqual({ freigeben: true });
+    anfrage.flush(null, { status: 204, statusText: 'No Content' });
+    webseitenstatus(true);
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain(TEXTE.wissen.webseite.freigegeben);
   });
 
   it('zeigt nur die vom Dokumentfilter gelieferten Seiten und setzt Paging beim Dokumentwechsel zurück', async () => {
