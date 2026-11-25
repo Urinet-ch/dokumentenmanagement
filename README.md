@@ -133,6 +133,9 @@ sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/com
   überschreibt nie und legt sie mit Rechten 600 an.
 - Der Wegwerf-Container belegt für einige Sekunden ein zweites `mem_limit` der API; nicht während einer Messung des
   Speicherbudgets (Aufgabe 1.10) starten.
+- Keycloak-Vorlagen mit `kcadm.sh` (Passkey-Realm 24.3, Verwaltungsclient und SMTP 19.3) laufen im selben Muster, aber mit dem
+  Dienst `kc` und `--entrypoint bash` (kopierbare Aufrufe, `jq` und die Anmeldung ohne Passwort im Terminal:
+  `deploy/infomaniak/keycloak/README.md`, «Passkey-Realm nachrüsten»).
 
 ## Embeddings nachberechnen
 ```bash

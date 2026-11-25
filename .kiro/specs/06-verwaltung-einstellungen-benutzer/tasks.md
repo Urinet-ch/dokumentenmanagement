@@ -303,3 +303,6 @@ auf Server oder Secrets aus der Sitzung.
     setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
   - _Anforderungen: 10.1, 10.2, 10.8_
   - _Abhängig von: 24.1, 24.2_
+  - Vorbereitung 25.11.2026 (bleibt offen, [Fabian]): Die Vorlage `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` und die
+    kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
+    Related Origins und Gerätetest stehen aus.

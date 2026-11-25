@@ -1071,3 +1071,24 @@ Dienstkontos ist nach Requirement 9.2 ein technischer Fehler, keine Abweichung i
 einem Abgleich-Fehler geprüft. Das Szenario `@req-9.1` führt nun `InhaberEinladenKommando.ausfuehren` aus und prüft
 Mandantenkontext, Inhaber-Rolle, Betreiberkennung sowie die datensparsame Terminalausgabe; der tatsächliche
 Einladungsfluss über Keycloak und Mailpit bleibt durch `VerwaltungVorgangTest` und `RealmExportKeycloakTest` belegt.
+
+## Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)
+Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fabian]: Ausführung auf der VPS, Related Origins, Gerätetest).
+- **Vorlage:** `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` zieht die Änderungen von Aufgabe 24.1 aus `deploy/keycloak/realm-export.json`
+  auf einem früher importierten Realm per `kcadm.sh` nach: Richtlinie `webAuthnPolicyPasswordless*`, Teilflow `browser-passkey-otp`
+  (Bedingung `conditional-credential` mit Konfiguration `otp-nur-ohne-passkey` und TOTP-Formular) in `browser-totp-pflicht-formulare`,
+  Required Actions `webauthn-register-passwordless` und `delete_credential`, Rollen `manage-account` und `view-profile` für `account-console`.
+  Der Export hängt den Passkey-Weg nicht über den Realm-`browserFlow` ein, sondern ersetzt das direkte TOTP-Formular im Formular-Flow durch
+  den bedingten Teilflow; die Vorlage folgt dem, lässt `browserFlow` und alle anderen Flows unberührt und legt den Teilflow vollständig an,
+  bevor sie das direkte TOTP-Formular entfernt (nie ein Zustand ohne zweiten Faktor).
+- **Wiederholbar und vorsichtig:** `--pruefen` liest nur (Exit 0 nichts zu tun, 10 Änderungen nötig). Bei unerwartetem Zustand (anderer
+  `browserFlow`, andere Relying-Party-ID, unerwartete Ausführungen, mehrdeutige Clients) bricht sie mit Exit 1 ab. Nach dem Einrichten prüft sie sich im
+  selben Lauf nach. Die Relying-Party-ID kommt aus `ARCHIV_PASSKEY_RP_ID` (nur Host, validiert, nie im Repo).
+- **Auslegung Req 10.7:** Die Ereignistypen `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` setzt die Vorlage nur mit `--ereignisse`; der Entscheid
+  von Fabian steht aus (`docs/passkey-inbetriebnahme-checkliste.md`).
+- **Betrieb:** `jq` fehlt im Keycloak-Image (geprüft); die Anleitung (`deploy/infomaniak/keycloak/README.md`, «Passkey-Realm nachrüsten») holt eine
+  statische `jq`-Datei aus einem auf Digest festgelegten Hilfs-Image und hängt sie nur lesend ein. Das Hilfsskript `vorlage-ausfuehren.sh`
+  meldet `kcadm` am Realm `master` mit dem Passwort aus der Secret-Datei `keycloak_admin` an (`KC_CLI_PASSWORD` nur im Prozess, nie im Befehl).
+  Dasselbe Muster gilt für die Vorlage 19.3 (`verwaltung-einrichten-vorlage.sh`).
+- **Nachweis:** Stub-Test (`test/passkey-einrichten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2 mit dem Realm vor 24.1
+  (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR.
