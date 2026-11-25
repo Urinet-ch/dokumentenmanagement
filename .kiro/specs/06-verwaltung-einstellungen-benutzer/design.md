@@ -751,6 +751,24 @@ bezogen werden kann. Das tatsächlich verwendete Secret wird erst in 19.3 ausser
 liest oder übergibt es nicht. Ein bereits importierter Realm wird durch den Startimport nicht aktualisiert;
 die einmalige Aktualisierung ist in 19.3 nachgelagert (Entscheid Fabian 21.11.2026).
 
+### Nachweisstand 19.2 (24.11.2026)
+
+Die Szenarien `@req-4.9` in `benutzer-verwalten.feature` weisen Rollenwechsel, erneuertes Token und Sperre nach.
+`realm.feature` enthält für 7.4 weiterhin nur `@teilnachweis-7.4`: Passwortregeln, TOTP und Einladungsversand
+sind geprüft, nicht aber der vollständige Einladungsablauf. Insbesondere fehlt das in 7.4 geforderte Kennzeichen
+«abgelaufen» beim Status `EINGELADEN`. Aufgabe 19.2 bleibt deshalb offen; die Betriebsnachweise bleiben bei 19.3.
+`JdbcBenutzerAktivitaet` berücksichtigt neben Anlage und Reaktivierung auch erfolgreich abgeschlossenes erneutes
+Senden. `EinladungZeitTest` weist zwei Sendeläufe und einen fehlgeschlagenen dritten nach; nur der erfolgreiche
+Versand aktualisiert das Datum. `einladungOffenSeit` allein ist trotzdem kein verlässlicher Ablaufnachweis:
+Das Kennzeichen darf nicht ohne die tatsächliche Link-Lebensdauer abgeleitet werden. Anzeige und vollständiger
+Nachweis bleiben offen.
+
+Nachtrag 24.11.2026: Die Keycloak-Admin-Operation `execute-actions-email` erzeugt das Ablaufdatum im signierten
+Aktionslink und antwortet bei Erfolg nur mit 204, ohne Token oder Ablaufdatum. Liste und Detail zeigen darum bei
+offener Einladung den letzten bekannten Versand und «Ablauf nicht bekannt»; weder die aktuelle Konfiguration noch
+das Versanddatum beweisen den Ablauf des tatsächlich verschickten Links. Das geforderte Kennzeichen «abgelaufen»
+und sein vollständiger Nachweis zu 7.4 bleiben offen.
+
 ## Umsetzung 19.4 — Keycloak-Adapter
 
 `KeycloakAdminAdapter` ist nur im Profil `prod` aktiv; Dev und Tests verwenden den speicherbasierten Stub. Der Adapter

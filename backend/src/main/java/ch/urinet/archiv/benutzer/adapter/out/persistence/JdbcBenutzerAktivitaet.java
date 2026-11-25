@@ -32,7 +32,7 @@ public class JdbcBenutzerAktivitaet implements BenutzerAktivitaet {
         }
         String sql = "select (select zeit from " + schema + ".zugriff_protokoll "
                 + "where details->>'ziel' = ? and details->>'phase' = 'ABGESCHLOSSEN' "
-                + "and details->>'vorgang' in ('ANLEGEN', 'REAKTIVIEREN') "
+                + "and details->>'vorgang' in ('ANLEGEN', 'REAKTIVIEREN', 'EINLADUNG_ERNEUT') "
                 + "order by zeit desc, id desc limit 1) as einladung, "
                 + "(select zeit from " + schema + ".zugriff_protokoll where benutzer = ? "
                 + "order by zeit desc, id desc limit 1) as letzte_zeit, "

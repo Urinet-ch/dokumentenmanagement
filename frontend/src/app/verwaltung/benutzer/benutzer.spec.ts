@@ -93,6 +93,20 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     expect(werte).toEqual(['Ja, 2 Passkeys', 'Nein', 'Ja, 1 Passkey']);
   });
 
+  it('zeigt bei offenen Einladungen den letzten Versand und einen unbekannten Ablauf', async () => {
+    await starten(() => service.apiV1BenutzerGet.mockReturnValue(of([
+      { ...PERSON, status: 'EINGELADEN' },
+      { ...PERSON, id: 'ohne-datum', status: 'EINGELADEN', einladungOffenSeit: undefined },
+      { ...PERSON, id: 'aktiv', status: 'AKTIV' },
+    ])));
+    const karten = [...element.querySelectorAll('[data-test=benutzer-liste] li')];
+    expect(karten[0].textContent).toContain('22.11.2026');
+    expect(karten[1].textContent).toContain(TEXTE.benutzer.unbekannt);
+    expect(karten.slice(0, 2).map((karte) => karte.querySelector('[data-test=einladung-ablauf]')?.textContent?.trim()))
+      .toEqual([TEXTE.benutzer.einladungAblaufUnbekannt, TEXTE.benutzer.einladungAblaufUnbekannt]);
+    expect(karten[2].querySelector('[data-test=einladung-ablauf]')).toBeNull();
+  });
+
   it('filtert die Liste serverseitig nach Passkey ja oder nein und beginnt wieder bei Seite 1 (Req 10.6)', async () => {
     await starten();
     const filter = element.querySelector<HTMLSelectElement>('#benutzer-passkey-filter')!;
@@ -277,8 +291,14 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
     expect(service.apiV1BenutzerBenutzerIdRechteGet).toHaveBeenCalledWith('probe');
     expect(element.textContent).toContain('Nur eigene Dokumente');
     expect(element.textContent).toContain(TEXTE.benutzer.apiTokenHinweis);
-    expect(element.textContent).toContain('22.11.2026');
     expect(element.querySelector('a[href="/verwaltung/api-tokens"]')).not.toBeNull();
+  });
+
+  it('zeigt den letzten Einladungsversand und einen unbekannten Ablauf im Detail', async () => {
+    const element = (await starten({ ...PERSON, status: 'EINGELADEN' })).nativeElement as HTMLElement;
+    expect(element.textContent).toContain('22.11.2026');
+    expect(element.querySelector('[data-test=einladung-ablauf]')?.textContent?.trim())
+      .toBe(TEXTE.benutzer.einladungAblaufUnbekannt);
   });
 
   it('zeigt im Detail «Passkey eingerichtet» mit Anzahl oder Nein, ohne Gerätedaten (Req 10.6)', async () => {

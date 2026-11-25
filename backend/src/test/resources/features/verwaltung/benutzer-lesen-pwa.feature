@@ -37,6 +37,25 @@ Funktionalität: Benutzer und Rechte in der PWA lesen
       | treuhaender      | /verwaltung/benutzer        |
       | geschaeftsstelle | /verwaltung/benutzer/probe  |
 
+  @req-8.6
+  Szenariogrundriss: Liste und Detail zeigen die offene Einladung ohne geratenen Ablauf
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und der synthetische Benutzer hat eine offene Einladung
+    Und das Browserfenster ist <breite> Pixel breit
+    Und das Farbschema ist «<schema>»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Benutzer» wähle
+    Dann zeigt die Liste die offene Einladung mit unbekanntem Ablauf ohne Überlauf und axe-Befund
+    Wenn ich den synthetischen Benutzer öffne
+    Dann zeigt die Detailseite die offene Einladung mit unbekanntem Ablauf ohne Überlauf und axe-Befund
+
+    Beispiele:
+      | breite | schema |
+      | 375    | hell   |
+      | 375    | dunkel |
+      | 1280   | hell   |
+      | 1280   | dunkel |
+
   @req-8.4
   Szenariogrundriss: Eine Benutzeraktion wird erst nach sichtbarer Bestätigung gesendet
     Angenommen die Benutzerverwaltung liefert synthetische Daten

@@ -96,6 +96,10 @@ Given('der synthetische Benutzer hat {int} Passkeys', function (anzahl) {
   this.benutzerPerson = { ...this.benutzerPerson, passkey: anzahl > 0, passkeyAnzahl: anzahl };
 });
 
+Given('der synthetische Benutzer hat eine offene Einladung', function () {
+  this.benutzerPerson = { ...this.benutzerPerson, status: 'EINGELADEN', einladungOffenSeit: '2026-11-22T20:00:00Z' };
+});
+
 Given('die Benutzerverwaltung antwortet beim Zurücksetzen des Zugangs mit dem Fehler «IDENTITAETSDIENST_NICHT_ERREICHBAR»', function () {
   this.benutzerVerlangt.zugang = { fehler: 'IDENTITAETSDIENST_NICHT_ERREICHBAR' };
 });
@@ -328,6 +332,17 @@ Then('zeigt die Benutzerverwaltung Liste, Anträge und Rollen ohne Überlauf und
 
 When('ich den synthetischen Benutzer öffne', async function () {
   await this.seite.getByRole('link', { name: 'Alex Beispiel' }).click();
+});
+
+Then('zeigt die {word} die offene Einladung mit unbekanntem Ablauf ohne Überlauf und axe-Befund', async function (seite) {
+  const liste = seite === 'Liste';
+  assert.ok(liste || seite === 'Detailseite');
+  await this.seite.locator(liste ? 'app-benutzer-liste' : 'app-benutzer-detail').waitFor();
+  await this.seite.getByText('Einladung offen seit', { exact: false }).first().waitFor();
+  await this.seite.getByText('22.11.2026 21:00', { exact: false }).first().waitFor();
+  const ablauf = this.seite.locator('[data-test=einladung-ablauf]');
+  assert.equal((await ablauf.textContent()).trim(), 'Ablauf nicht bekannt');
+  await pruefen(this, liste ? 'einladung-liste' : 'einladung-detail');
 });
 
 Then('zeigt das Benutzerdetail Status, Rechte und Token-Hinweis ohne Überlauf und axe-Befund', async function () {

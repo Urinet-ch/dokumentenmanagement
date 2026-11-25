@@ -40,7 +40,9 @@ auf Server oder Secrets aus der Sitzung.
   - Stand: Export, Test-Realm und Tests umgesetzt (PR #385); `adminEventsExpiration` gesetzt. Keycloak erzeugt beim
     Erstimport das Dienstkonto-Secret selbst; `start.sh` übergibt keines. `ARCHIV_BASIS_URL` schreibt `schreibe-env.sh`
     aus `HOST_ARCHIV`. Das tatsächlich verwendete Secret und seine Pflichtprüfung folgen in 19.3.
-    Checkbox offen: Vollständige Szenarien zu 4.9 und 7.4 folgen mit 19.7 bis 19.9.
+    Nachweis 4.9: Szenarien zu Rollenwechsel und Sperre in `benutzer-verwalten.feature` (19.9).
+    Checkbox offen: Für 7.4 besteht nur der Teilnachweis in `realm.feature`; die Anzeige des Kennzeichens
+    «abgelaufen» und ein vollständiger Nachweis des Einladungsablaufs fehlen noch.
   - Nachgelagert [Fabian] (Entscheid 21.11.2026): Betriebsnachweis der internen Compose-Verbindung mit korrektem
     Issuer und der automatischen Ablaufzeit der Secret-Überlappung in 19.3.
   - _Anforderungen: 3.17, 4.9, 5.2, 5.3, 6.9, 7.4_

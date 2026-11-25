@@ -1903,6 +1903,8 @@ export const TEXTE = {
     unbekannt: 'Nicht bekannt',
     voruebergehendGesperrt: 'Anmeldung vorübergehend gesperrt',
     einladungOffenSeit: 'Einladung offen seit',
+    einladungAblauf: 'Einladung läuft ab',
+    einladungAblaufUnbekannt: 'Ablauf nicht bekannt',
     letzteAktion: 'Letzte Aktion',
     keineAktion: 'Keine Aktion bekannt',
     rollenkonflikt: 'Die Rollenzuweisung ist nicht eindeutig. Die Rechte können nicht angezeigt werden.',
