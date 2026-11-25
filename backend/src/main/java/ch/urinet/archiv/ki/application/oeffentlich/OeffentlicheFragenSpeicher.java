@@ -6,9 +6,9 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Driven Port: {@code oeffentliche_frage} im Schema des Mandanten aus dem Kontext (Spec 03, Req 6.5): bereinigte Frage,
- * Quellen und Tokens, nie Antwort, Gespräch, Client-Hash, IP, Schlüssel oder Webseite. Jede Operation in eigener
- * Transaktion.
+ * Driven Port: {@code oeffentliche_frage} im Schema des Mandanten aus dem Kontext (Spec 03, Req 6.5). Im Archivchat:
+ * bereinigte Frage und Quellen; im Wissenschat: feste Ereignisbezeichnung und Quellen-IDs. Nie Antwort, Gespräch,
+ * Client-Hash, IP, Schlüssel oder Webseite. Jede Operation in eigener Transaktion.
  */
 public interface OeffentlicheFragenSpeicher {
 

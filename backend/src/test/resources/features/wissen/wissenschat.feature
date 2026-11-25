@@ -5,8 +5,8 @@ Funktionalität: Wissenschat und Archivchat (Requirement 21, Aufgabe 18.1)
   freigegebenen Wissensseiten). «POST /api/v1/chat/gespraeche» legt das Gespräch an, die Fragen folgen wie bisher mit
   «POST /api/v1/chat». Der Agent läuft echt gegen das simulierte Sprachmodell (WireMock), die Werkzeuge gegen die
   Datenbank. Alle Daten sind synthetisch. Der öffentliche Wissenschat (21.6) gehört zu Aufgabe 18.3, Oberfläche und
-  Bewertungsexport (21.4) zu 18.2. Das Recht A15 liegt nach der Rechtematrix bei allen vier Rollen; ein 403 ohne A15
-  belegt der JUnit-Test «ChatGespraecheAnlegenTest» (keine Rolle ohne A15).
+  Bewertungsexport (21.4) zu 18.2. Alle vier Rollen haben A15; der Endpunkt-Fall ohne Archiv-Rolle belegt den 403,
+  die JUnit-Tests «ChatGespraecheAnlegenTest» und «ChatFragenModusTest» prüfen die explizite A15-Verweigerung.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -74,7 +74,14 @@ Funktionalität: Wissenschat und Archivchat (Requirement 21, Aufgabe 18.1)
       | treuhaender-urinet       |
       | geschaeftsstelle-vhf-gsk |
 
-  @req-21.1 @req-21.2
+  @req-21.1 @req-21.8
+  Szenario: Ohne Archiv-Rolle ist WISSEN nicht erreichbar
+    Wenn «ohne-rolle-urinet» ein Gespräch im Modus «WISSEN» anlegt
+    Dann antwortet das Archiv auf das Anlegen mit Status 403
+    Und antwortet das Archiv mit Status 403 und dem Fehlercode «NICHT_ERLAUBT»
+    Und gibt es in «urinet» 0 Gespräche
+
+  @req-21.1 @req-21.2 @req-21.8
   Szenario: Der Modus wechselt nicht: ein Modus im Körper der Frage ändert nichts
     Angenommen das simulierte Sprachmodell ruft Index und sichtbare Wissensseite der Leseprobe auf
     Wenn «mitarbeiter-urinet» ein Gespräch im Modus «WISSEN» anlegt
@@ -83,7 +90,7 @@ Funktionalität: Wissenschat und Archivchat (Requirement 21, Aufgabe 18.1)
     Und hat das gespeicherte Gespräch in «urinet» den Modus «WISSEN»
     Und zeigen Liste und Verlauf von «mitarbeiter-urinet» für das Gespräch den Modus «WISSEN»
 
-  @req-21.1 @req-21.5
+  @req-21.1 @req-21.5 @req-21.8
   Szenario: Fremde Gespräche und andere Mandanten bleiben unsichtbar
     Wenn «mitarbeiter-urinet» ein Gespräch im Modus «WISSEN» anlegt
     Und «inhaber-urinet» im angelegten Gespräch versucht, eine Frage zu stellen
@@ -103,7 +110,7 @@ Funktionalität: Wissenschat und Archivchat (Requirement 21, Aufgabe 18.1)
     Und zeigt der Stream des Agenten 2 Werkzeugaufrufe
     Und hat die Antwort im Gespräch die Systemprompt-Version «wissen-chat-v1-[0-9a-f]{12}»
 
-  @req-21.2
+  @req-21.2 @req-21.8
   Szenario: Archivwerkzeuge sind im Wissenschat nicht aufrufbar, auch nicht per simuliertem Tool-Call
     Angenommen das simulierte Sprachmodell ruft im Wissenschat zuerst Archivwerkzeuge auf und liest dann die Wissensseite
     Wenn «mitarbeiter-urinet» ein Gespräch im Modus «WISSEN» anlegt
@@ -180,7 +187,7 @@ Funktionalität: Wissenschat und Archivchat (Requirement 21, Aufgabe 18.1)
     Dann antwortet das Archiv mit Status 400 und dem Fehlercode «ANFRAGE_UNGUELTIG»
     Und hat das simulierte Sprachmodell 0 Anfragen erhalten
 
-  @req-21.7
+  @req-21.7 @req-21.8
   Szenario: Eine Anweisung auf einer Wissensseite löst im Wissenschat keinen Aufruf aus
     Angenommen eine Wissensleseseite enthält eine synthetische Anweisung
     Und das simulierte Sprachmodell versucht nach dem Lesen der Wissensseite einen schreibenden Aufruf

@@ -29,9 +29,15 @@ class MicrometerKennzahlenTest {
 
     private final List<MandantCode> aktiv = new ArrayList<>(List.of(URINET, VHF));
     private final Set<MandantCode> scheitert = new HashSet<>();
+    private final Set<MandantCode> kiBeispielScheitert = new HashSet<>();
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final MicrometerKennzahlen kennzahlen = new MicrometerKennzahlen(new Kennzahlen(register(),
-            mandant -> Map.of("FEHLER", 2L), dokumente(), mandant -> mandant.equals(URINET) ? 5 : 7), registry);
+            mandant -> Map.of("FEHLER", 2L), dokumente(), mandant -> {
+                if (kiBeispielScheitert.contains(mandant)) {
+                    throw new IllegalStateException("Zählen der KI-Beispiele fehlgeschlagen");
+                }
+                return mandant.equals(URINET) ? 5 : 7;
+            }), registry);
 
     @Test
     void gescheiterteErhebungEntferntDieGaugesDesMandanten() {
@@ -64,6 +70,24 @@ class MicrometerKennzahlenTest {
         assertThat(registry.find("archiv.auftraege").tag("mandant", "vhf-gsk").gauges()).isEmpty();
         assertThat(registry.find("archiv.ki.beispiele").tag("mandant", "vhf-gsk").gauges()).isEmpty();
         assertThat(registry.find("archiv.auftraege").tag("mandant", "urinet").gauges()).isNotEmpty();
+    }
+
+    @Test
+    void fehlerBeimKiBeispielZaehlenEntferntNurDessenGauge() {
+        kennzahlen.aktualisieren();
+        kiBeispielScheitert.add(URINET);
+
+        kennzahlen.aktualisieren();
+
+        assertThat(registry.find("archiv.auftraege").tag("mandant", "urinet").gauges()).isNotEmpty();
+        assertThat(registry.find("archiv.dokumente").tag("mandant", "urinet").gauges()).isNotEmpty();
+        assertThat(registry.find("archiv.eingangskorb").tag("mandant", "urinet").gauges()).isNotEmpty();
+        assertThat(registry.find("archiv.ki.beispiele").tag("mandant", "urinet").gauges()).isEmpty();
+        assertThat(beispiele("vhf-gsk")).isEqualTo(7.0);
+
+        kiBeispielScheitert.clear();
+        kennzahlen.aktualisieren();
+        assertThat(beispiele("urinet")).isEqualTo(5.0);
     }
 
     private double fehler(String mandant) {
