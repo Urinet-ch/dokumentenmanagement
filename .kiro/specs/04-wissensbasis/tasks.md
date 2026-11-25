@@ -245,8 +245,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Kennzeichen «für Webseite» je Seite (A16, Protokoll), `/public/v1/wissen/chat`, eigene Werkzeuge, Prüfung bei jeder Anfrage, Grenzen und Budget, Schalter je Mandant; Marker `[offen: …]` im Design auflösen; Plugin (Spec 03, 11.5) nur als Hinweis.
   - _Anforderungen: 21.6_
   - _Abhängig von: 18.1, Spec 03: 11.2_
-- [ ] 18.4 Isolations- und Abnahmetests [QA]
-  - Mandantentrennung, A15 (403), Modus fest, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar, öffentliche Auslieferung nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug, Prompt-Injection aus Seiteninhalt.
+- [x] 18.4 Isolations- und Abnahmetests [QA]
+  - Mandantentrennung, A15 (403), fester Modus, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar, öffentliche Auslieferung
+    nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug vor dem Einreihen des SSE-Ereignisses (Entscheid Fabian
+    24.11.2026), Prompt-Injection aus Seiteninhalt und inhaltsfreies Fragenprotokoll (Entscheid Fabian 24.11.2026).
+  - Nachweis: Szenarien `@req-21.8` unter `features/wissen/`; A15-Verweigerung zusätzlich in den JUnit-Tests für Anlegen und Fragen.
   - _Anforderungen: 21.8_
   - _Abhängig von: 18.3_
 
