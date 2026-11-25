@@ -1102,3 +1102,19 @@ Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fa
 - **Nachweis:** Stub-Test (`test/passkey-einrichten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2 mit dem Realm vor 24.1
   (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR. Nicht belegt (beim ersten Lauf auf der VPS prüfen, Prüfzeilen im README): Ausführung auf der VPS, der
   `docker compose run`-Aufruf, Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io`.
+
+## Umsetzung (Aufgabe 24.4 Link zur Kontoverwaltung, 25.11.2026)
+- **Ziel (Req 10.1):** Ein angemeldeter Benutzer findet den Einstieg zur Passkey-Einrichtung, ohne die Keycloak-Adresse zu kennen. Die
+  WebAuthn-Registrierung bleibt in der Kontoverwaltung von Keycloak (`webauthn-register-passwordless`); die App baut sie nicht nach.
+- **Stelle:** Kopfzeile der App (`app.html`), links neben dem Benutzer, nach «Hilfe». Sie ist auf jeder Seite sichtbar (auch in «Erfassen»,
+  wo der Link wegen `target="_blank"` nie navigiert und keine Aufnahme verliert) und braucht keinen neuen Hauptmenüpunkt. Bausteine nach
+  `docs/oberflaeche/README.md`: `.knopf` mit Symbol `schluessel`, auf breiten Bildschirmen mit Text, unter 600 px nur das Symbol (Name für
+  Screenreader bleibt). Keine Farbe ausserhalb der Tokens, kein Hinweis oder Banner (freiwillig, kein Aufdrängen).
+- **Adresse:** `kontoverwaltungUrl()` (`gemeinsam/anmeldung/kontoverwaltung.ts`) leitet `<Aussteller>/account` aus `UMGEBUNG.oidc.aussteller`
+  ab, derselben Konfiguration, die die Anmeldung nutzt; kein neuer Betriebswert, kein Eintrag im Repo ausser dem bestehenden Aussteller.
+- **Link:** `<a target="_blank" rel="noopener noreferrer">`; zugänglicher Name «Passkey einrichten (öffnet die Kontoverwaltung in einem
+  neuen Tab)» beginnt mit dem sichtbaren Text. Sichtbar nur bei `anmeldung.angemeldet()`, für alle Rollen, ohne Anzeige von Gerätedaten.
+- **Anleitung:** `erste-schritte-passkey.md` und `erste-schritte.md` nennen den Knopf statt «die Person, die Ihren Zugang eingerichtet hat».
+- **Nachweis:** Komponententests (`app.spec.ts`, `kontoverwaltung.spec.ts`); Browser-Szenario `@req-10.1` in
+  `features/verwaltung/passkey-einstieg-pwa.feature` (mit Attrappe, ohne echtes Keycloak: Knopf sichtbar, neuer Tab zeigt die Kontoverwaltung,
+  die App-Seite bleibt, ohne Überlauf und axe-Befund bei 375/1280 px, hell/dunkel).

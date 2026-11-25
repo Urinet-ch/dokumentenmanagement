@@ -35,7 +35,7 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     pfade: ['/'],
     abgemeldet: true,
   },
-  // Mit Passkey anmelden (Aufgabe 24.3, Spec 06 Req 10): für alle angemeldeten Rollen, ohne Pfad
+  // Mit Passkey anmelden (Aufgabe 24.3, Spec 06 Req 10): für alle angemeldeten Rollen, ohne Pfad; nennt seit 24.4 den Knopf «Passkey einrichten» der Kopfzeile
   {
     anker: 'erste-schritte-passkey',
     titel: TEXTE.hilfe.abschnitte['erste-schritte-passkey'],

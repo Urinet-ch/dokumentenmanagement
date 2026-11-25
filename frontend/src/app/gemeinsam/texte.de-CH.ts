@@ -34,6 +34,8 @@ export const TEXTE = {
     suchePlatzhalter: 'Dokumente, Belegnummern, Partner suchen …',
     hell: 'Helles Farbschema verwenden',
     dunkel: 'Dunkles Farbschema verwenden',
+    passkeyEinrichten: 'Passkey einrichten',
+    passkeyEinrichtenNeuerTab: 'Passkey einrichten (öffnet die Kontoverwaltung in einem neuen Tab)',
     rollen: {
       inhaber: 'Inhaber',
       geschaeftsstelle: 'Geschäftsstelle',

@@ -144,6 +144,17 @@
         <span class="nur-breit">{{ texte.hilfe.titel }}</span>
       </button>
       @if (anmeldung.angemeldet()) {
+        <a
+          class="knopf"
+          data-test="passkey-einrichten"
+          [href]="kontoverwaltung"
+          target="_blank"
+          rel="noopener noreferrer"
+          [attr.aria-label]="texte.kopf.passkeyEinrichtenNeuerTab"
+        >
+          <app-symbol name="schluessel" />
+          <span class="nur-breit" aria-hidden="true">{{ texte.kopf.passkeyEinrichten }}</span>
+        </a>
         @if (anmeldung.benutzer(); as benutzer) {
           <span class="benutzer" data-test="benutzer">
             <span class="avatar" aria-hidden="true">{{ initialen(benutzer.name) }}</span>
