@@ -73,6 +73,11 @@ class WissenPaketCliTest {
         assertThat(text.toString()).contains("Cloud-Modelle", "INTERN", "PERSONAL");
     }
 
+    @Test void req19_24PruefwerkzeugNenntRegelFuerLokalesModell() throws Exception {
+        assertThat(aufruf(bauen(ausgabe))).isZero();
+        assertThat(text.toString()).contains("Lokal: keine Personendaten und kein PERSONAL");
+    }
+
     @Test void fehlerhafteGrenzenUndCloudStufeErzeugenKeinZip() throws Exception {
         Path seite = eingabe.resolve("konzepte/test.md");
         Files.writeString(seite, "x".repeat(131_073));
