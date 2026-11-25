@@ -74,6 +74,28 @@
       </section>
     </div>
     <div class="leiste">
+      <section class="karte" aria-labelledby="wissen-webseitenfreigabe">
+        <h2 id="wissen-webseitenfreigabe">{{ texte.webseite.titel }}</h2>
+        @if (webseitenfehler(); as meldung) {
+          <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
+          <button mat-button type="button" (click)="webseitenstatusLaden()">{{ texte.erneut }}</button>
+        }
+        @if (webseitenstatus(); as status) {
+          <p><span class="pille" [class.ok]="status.freigegeben">
+            {{ status.freigegeben ? texte.webseite.freigegeben : texte.webseite.nichtFreigegeben }}
+          </span></p>
+          <p>{{ texte.webseite.quellenstufe }}:
+            <span class="pille">{{ texte.webseite.stufen[status.hoechsteZugriffsstufe] ?? texte.webseite.stufen['unbekannt'] }}</span>
+          </p>
+          @if (!status.freigabefaehig) { <p class="hinweis warnung">{{ texte.webseite.sperrgrund }}</p> }
+          @if (anmeldung.darf('A16')) {
+            <button mat-stroked-button type="button" (click)="webseitenfreigabeAendern()"
+              [disabled]="webseiteSendet() || (!status.freigegeben && !status.freigabefaehig)">
+              {{ status.freigegeben ? texte.webseite.entziehen : texte.webseite.freigeben }}
+            </button>
+          }
+        }
+      </section>
       <section class="karte" aria-labelledby="wissen-quellen">
         <h2 id="wissen-quellen">{{ texte.quellen }}</h2>
         <ul class="quellen">

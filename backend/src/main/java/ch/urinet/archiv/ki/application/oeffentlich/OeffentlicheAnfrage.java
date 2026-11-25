@@ -17,7 +17,13 @@ import java.util.Objects;
  * @param verlauf       die letzten Fragen und Antworten dieses Gesprächs vor dieser Frage, älteste zuerst
  */
 public record OeffentlicheAnfrage(MandantCode mandant, Lesezugriff zugriff, LocalDate budgetMonat,
-                                  String mandantenname, String frage, List<VerlaufEintrag> verlauf) {
+                                  String mandantenname, String frage, List<VerlaufEintrag> verlauf,
+                                  OeffentlichesWissenDurchgang wissen) {
+
+    public OeffentlicheAnfrage(MandantCode mandant, Lesezugriff zugriff, LocalDate budgetMonat,
+                               String mandantenname, String frage, List<VerlaufEintrag> verlauf) {
+        this(mandant, zugriff, budgetMonat, mandantenname, frage, verlauf, null);
+    }
 
     public OeffentlicheAnfrage {
         Objects.requireNonNull(mandant, "mandant");

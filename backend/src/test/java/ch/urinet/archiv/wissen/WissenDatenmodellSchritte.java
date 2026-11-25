@@ -8,6 +8,8 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.adapter.out.persistence.JdbcManifestDaten;
 import ch.urinet.archiv.protokoll.application.ManifestDaten;
 import ch.urinet.archiv.protokoll.domain.ProtokollHash;
+import ch.urinet.archiv.wissen.application.OeffentlichesWissenPort;
+import ch.urinet.archiv.wissen.application.WebseitenfreigabePort;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
@@ -72,6 +74,12 @@ public class WissenDatenmodellSchritte {
     @Inject
     UserTransaction transaktion;
 
+    @Inject
+    WebseitenfreigabePort webseitenfreigabe;
+
+    @Inject
+    OeffentlichesWissenPort oeffentlichesWissen;
+
     @Angenommen("das Wissensdatenmodell ist für den Mandanten «{word}» migriert")
     public void mandantMigriert(String code) throws SQLException {
         assertThat(code).isEqualTo(MANDANT.wert());
@@ -97,6 +105,117 @@ public class WissenDatenmodellSchritte {
                 MANDANT.schema())).containsAll(TABELLEN);
         assertThat(werte("select id from " + MANDANT.schema()
                 + ".databasechangelog where exectype = 'EXECUTED'")).contains(changeset);
+    }
+
+    @Dann("ist die Webseitenfreigabe einer neuen Wissensseite aus und verlangt Akteur und Zeitpunkt")
+    public void webseitenfreigabe() throws SQLException {
+        String schema = MANDANT.schema();
+        zurueckgerolltJdbc(befehl -> {
+            UUID seite = seite(befehl);
+            try (ResultSet zeile = befehl.executeQuery("select fuer_webseite, fuer_webseite_von, fuer_webseite_am "
+                    + "from " + schema + ".wissensseite where id = '" + seite + "'")) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getBoolean(1)).isFalse();
+                assertThat(zeile.getString(2)).isNull();
+                assertThat(zeile.getObject(3)).isNull();
+            }
+            Savepoint vorher = befehl.getConnection().setSavepoint();
+            assertThatThrownBy(() -> befehl.execute("update " + schema + ".wissensseite set fuer_webseite = true "
+                    + "where id = '" + seite + "'"))
+                    .isInstanceOf(SQLException.class).hasMessageContaining("wissensseite_webseitenfreigabe_ck");
+            befehl.getConnection().rollback(vorher);
+            assertThat(befehl.executeUpdate("update " + schema + ".wissensseite set fuer_webseite = true, "
+                    + "fuer_webseite_von = 'human:probe', fuer_webseite_am = now() where id = '" + seite + "'"))
+                    .isEqualTo(1);
+        });
+    }
+
+    @Dann("erlaubt die Quellenprüfung nur belegte öffentliche normale Seiten und protokolliert Freigabe und Entzug")
+    public void webseitenQuellenpruefung() throws Exception {
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            CompletableFuture.runAsync(() -> kontext.mit(MANDANT, () -> {
+                try {
+                    transaktion.begin();
+                    try (Connection verbindung = datenquelle.get().getConnection();
+                         Statement sql = verbindung.createStatement()) {
+                        String schema = MANDANT.schema();
+                        UUID seite = seite(sql);
+                        UUID quelle = seite(sql);
+                        UUID dokument = UUID.randomUUID();
+                        sql.execute("insert into " + schema + ".dokument "
+                                + "(id, quelle, erstellt_von, status, vertraulichkeit, bestaetigt, bestaetigt_von, zusatz) "
+                                + "values ('" + dokument + "', 'UPLOAD', 'probe', 'ARCHIVIERT', 'NORMAL', now(), "
+                                + "'probe', '{\"zugriff\":\"oeffentlich\",\"veroeffentlicht\":true}')");
+                        sql.execute("insert into " + schema + ".wissensseite_quelle "
+                                + "(seite_id, schluessel, quell_seite_id) values ('" + seite + "', 'q', '" + quelle + "')");
+                        sql.execute("insert into " + schema + ".wissensseite_quelle "
+                                + "(seite_id, schluessel, dokument_id, seite_von) values ('" + quelle + "', 'd', '"
+                                + dokument + "', 1)");
+
+                        assertThat(webseitenfreigabe.lesen(seite, false).orElseThrow().freigabefaehig()).isFalse();
+                        sql.execute("insert into " + schema + ".wissensseite_dokument (seite_id, dokument_id) values ('"
+                                + seite + "', '" + dokument + "')");
+                        var offen = webseitenfreigabe.lesen(seite, true).orElseThrow();
+                        assertThat(offen.freigegeben()).isFalse();
+                        assertThat(offen.freigabefaehig()).isTrue();
+                        assertThat(offen.hoechsteZugriffsstufe()).isEqualTo("oeffentlich");
+                        assertThat(oeffentlichesWissen.seite("probe/" + seite)).isEmpty();
+                        webseitenfreigabe.setzen(seite, offen, true, "probe");
+                        var freigegeben = webseitenfreigabe.lesen(seite, true).orElseThrow();
+                        assertThat(freigegeben.freigegeben()).isTrue();
+                        assertThat(freigegeben.quellenRevision()).isEqualTo(offen.quellenRevision() + 1);
+                        var oeffentlicheSeite = oeffentlichesWissen.seite("probe/" + seite).orElseThrow();
+                        assertThat(oeffentlicheSeite.dokumente()).extracting(OeffentlichesWissenPort.Dokument::id)
+                                .containsExactly(dokument);
+                        assertThat(oeffentlichesWissen.suchen("synthetische", 5))
+                                .extracting(z -> z.stand().id()).contains(seite);
+                        assertThat(oeffentlichesWissen.aktuell(oeffentlicheSeite.version())).isTrue();
+
+                        sql.execute("update " + schema + ".dokument set zusatz = "
+                                + "'{\"zugriff\":\"mitglieder\",\"veroeffentlicht\":true}' where id = '" + dokument + "'");
+                        assertThat(oeffentlichesWissen.seite("probe/" + seite)).isEmpty();
+                        assertThat(oeffentlichesWissen.aktuell(oeffentlicheSeite.version())).isFalse();
+                        assertThat(oeffentlichesWissen.suchen("synthetische", 5))
+                                .extracting(z -> z.stand().id()).doesNotContain(seite);
+                        var eingeschraenkt = webseitenfreigabe.lesen(seite, false).orElseThrow();
+                        assertThat(eingeschraenkt.freigabefaehig()).isFalse();
+                        assertThat(eingeschraenkt.hoechsteZugriffsstufe()).isEqualTo("mitglieder");
+                        sql.execute("update " + schema + ".dokument set zusatz = '{\"zugriff\":\"oeffentlich\"}' "
+                                + "where id = '" + dokument + "'");
+                        assertThat(webseitenfreigabe.lesen(seite, false).orElseThrow().freigabefaehig()).isFalse();
+                        sql.execute("update " + schema + ".dokument set zusatz = "
+                                + "'{\"zugriff\":\"oeffentlich\",\"veroeffentlicht\":true}', "
+                                + "vertraulichkeit = 'PERSONAL' where id = '" + dokument + "'");
+                        assertThat(webseitenfreigabe.lesen(seite, false).orElseThrow().freigabefaehig()).isFalse();
+                        sql.execute("update " + schema + ".dokument set vertraulichkeit = 'INTERN' where id = '"
+                                + dokument + "'");
+                        assertThat(webseitenfreigabe.lesen(seite, false).orElseThrow().freigabefaehig()).isFalse();
+                        sql.execute("update " + schema + ".dokument set vertraulichkeit = 'NORMAL' where id = '"
+                                + dokument + "'");
+                        sql.execute("update " + schema + ".wissensseite set typ = 'Analyse' where id = '" + quelle + "'");
+                        assertThat(webseitenfreigabe.lesen(seite, false).orElseThrow().freigabefaehig()).isFalse();
+                        webseitenfreigabe.setzen(seite, freigegeben, false, "probe");
+                        assertThat(webseitenfreigabe.lesen(seite, false).orElseThrow().freigegeben()).isFalse();
+                        assertThat(oeffentlichesWissen.seite("probe/" + seite)).isEmpty();
+                        try (ResultSet logs = sql.executeQuery("select array_agg(angaben ->> 'webseitenfreigabe_aktion' "
+                                + "order by id) from " + schema + ".wissens_log "
+                                + "where seiten @> array['" + seite + "']::uuid[] "
+                                + "and angaben ? 'webseitenfreigabe'")) {
+                            assertThat(logs.next()).isTrue();
+                            assertThat((String[]) logs.getArray(1).getArray()).containsExactly(
+                                    "WISSEN_WEBSEITE_FREIGEGEBEN", "WISSEN_WEBSEITE_ENTZOGEN");
+                        }
+                    } finally {
+                        transaktion.rollback();
+                    }
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }), worker).get(1, TimeUnit.MINUTES);
+        } finally {
+            worker.shutdown();
+        }
     }
 
     @Dann("speichert eine Seitenversion Fassung, Akteure, Zeit und Entwurf und lehnt eine doppelte Versionsnummer ab")

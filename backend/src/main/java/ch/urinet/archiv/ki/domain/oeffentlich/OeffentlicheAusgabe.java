@@ -47,6 +47,17 @@ public sealed interface OeffentlicheAusgabe {
         }
     }
 
+    record WissenQuellen(List<OeffentlicheWissensquelle> quellen) implements OeffentlicheAusgabe {
+        public WissenQuellen {
+            quellen = List.copyOf(quellen);
+        }
+
+        @Override
+        public String name() {
+            return "quellen";
+        }
+    }
+
     record Fertig(UUID gespraechId) implements OeffentlicheAusgabe {
         public Fertig {
             Objects.requireNonNull(gespraechId, "gespraechId");

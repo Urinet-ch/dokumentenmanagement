@@ -751,6 +751,60 @@ bezogen werden kann. Das tatsächlich verwendete Secret wird erst in 19.3 ausser
 liest oder übergibt es nicht. Ein bereits importierter Realm wird durch den Startimport nicht aktualisiert;
 die einmalige Aktualisierung ist in 19.3 nachgelagert (Entscheid Fabian 21.11.2026).
 
+### Nachweisstand 19.2 (24.11.2026)
+
+Die Szenarien `@req-4.9` in `benutzer-verwalten.feature` weisen Rollenwechsel, erneuertes Token und Sperre nach.
+`realm.feature` enthält für 7.4 weiterhin nur `@teilnachweis-7.4`: Passwortregeln, TOTP und Einladungsversand
+sind geprüft, nicht aber der vollständige Einladungsablauf. Insbesondere fehlt das in 7.4 geforderte Kennzeichen
+«abgelaufen» beim Status `EINGELADEN`. Aufgabe 19.2 bleibt deshalb offen; die Betriebsnachweise bleiben bei 19.3.
+`JdbcBenutzerAktivitaet` berücksichtigt neben Anlage und Reaktivierung auch erfolgreich abgeschlossenes erneutes
+Senden. `EinladungZeitTest` weist zwei Sendeläufe und einen fehlgeschlagenen dritten nach; nur der erfolgreiche
+Versand aktualisiert das Datum. `einladungOffenSeit` allein ist trotzdem kein verlässlicher Ablaufnachweis:
+Das Kennzeichen darf nicht ohne die tatsächliche Link-Lebensdauer abgeleitet werden. Anzeige und vollständiger
+Nachweis bleiben offen.
+
+Nachtrag 24.11.2026: Die Keycloak-Admin-Operation `execute-actions-email` erzeugt das Ablaufdatum im signierten
+Aktionslink und antwortet bei Erfolg nur mit 204, ohne Token oder Ablaufdatum. Liste und Detail zeigen darum bei
+offener Einladung den letzten bekannten Versand und «Ablauf nicht bekannt»; weder die aktuelle Konfiguration noch
+das Versanddatum beweisen den Ablauf des tatsächlich verschickten Links. Das geforderte Kennzeichen «abgelaufen»
+und sein vollständiger Nachweis zu 7.4 bleiben offen.
+
+## Umsetzung (Aufgabe 19.2 Ablauf, 25.11.2026)
+
+Changeset 141 ergänzt im Mandantenschema `benutzer_einladung` mit Versandzeit und Ablaufgrenze, einer positiven
+Maximaldauer von sieben Tagen und Rollback. Die Ablaufgrenze wird aus derselben `Duration` berechnet, die der
+Versandpfad an `execute-actions-email` übergibt. Gespeichert wird sie erst im Abschluss nach erfolgreichem Versand;
+ein Versandfehler lässt den bisherigen Eintrag unverändert. Anlage, Reaktivierung, erneutes Senden, Zugang
+zurücksetzen und E-Mail-Änderung (nur mit neuer Adresse, `VERIFY_EMAIL`) verwenden denselben Pfad; `KeycloakAdminAdapter.einladen`
+ist der einzige Aufrufer von `execute-actions-email`, und jeder seiner fünf Aufrufer speichert im Abschluss. Die Versandzeit wird
+unmittelbar vor `einladen` gemessen und an `speichern` übergeben: die gespeicherte Grenze liegt höchstens um die Versanddauer
+früher als die echte, nie später («Nicht abgelaufen» wird nie zu lange gezeigt). Eine Realm-Konfiguration wird nicht als Ersatz für die konkrete Versanddauer gelesen.
+
+Liste und Detail liefern `einladungGueltigBis`; fehlende Einträge bleiben bei Altbeständen unbekannt. Die Grenze
+fliesst in den ETag ein. Der bestehende Mandantenkontext und die Rechte der Benutzer-API bleiben unverändert.
+Die Oberfläche nennt den letzten Versand «Letzter Einladungsversand» und zeigt Ablaufdatum sowie «Abgelaufen»,
+«Nicht abgelaufen» oder «Ablauf nicht bekannt». `EinladungZeitTest` belegt Anlage, Reaktivierung, erneutes Senden,
+fehlgeschlagenen Versand und Altbestand; `BenutzerEtagTest` prüft die Versionsänderung. Die Browser-Szenarien
+`@req-7.4` prüfen die drei Zustände in Liste und Detail bei 375 und 1280 px in hell und dunkel, einschliesslich
+Überlauf- und axe-Prüfung. `VerwaltungCacheHttpTest` deckt die Benutzer-API und Mandantentrennung ab.
+
+Schlägt nach erfolgreichem Versand nur das Speichern fehl, bleibt der alte Eintrag stehen; der Vorgang endet als `UNKLAR`
+(Protokoll, Fehlermeldung ohne Personendaten) und die Vorgangssperre verhindert eine blinde Wiederholung. Der alte Eintrag
+liegt vor der neuen Grenze und zeigt höchstens zu früh «Abgelaufen» (sichtbar, Link bleibt gültig), nie zu spät
+«Nicht abgelaufen»; deshalb wird er nicht vorab gelöscht. Scheitert nach dem Versand eine Abschlussaktion, bevor der
+Einladungseintrag gespeichert wird (`mitteilung.emailGeaendert` bei der E-Mail-Änderung oder `tokenWiderruf.setzen` beim
+Zurücksetzen), bleibt die Ablaufgrenze ebenfalls unverändert und der Vorgang wird konservativ als `UNKLAR` behandelt.
+`EinladungVersandpfadeTest` belegt je Pfad (Zugang zurücksetzen, E-Mail-Änderung) Erfolg, Fehlversand ohne Schreiben,
+Namensänderung ohne Schreiben und den Fall «Versand ok, Speichern fehlgeschlagen».
+
+«Abgelaufen» wird im Browser mit der Geräteuhr bestimmt (`einladungAblauf`); eine falsch gehende Uhr kann den Hinweis
+verfälschen. Das gilt als bekannte Einschränkung: die Anzeige ist ein Hinweis, der Server prüft die Gültigkeit des Links
+nicht über diese Anzeige. Changeset 141 liegt ausserhalb der Spuren 120–129 und 130–139; die Nummer ist frei.
+
+Die Anleitungen in `frontend/public/anleitung/verwaltung.md` und `docs/anleitung-verwaltung.md` beschreiben die
+gespeicherte Ablaufgrenze und das Verhalten bei fehlgeschlagenem Versand. Betriebsnachweise aus Aufgabe 19.3
+bleiben bei Fabian.
+
 ## Umsetzung 19.4 — Keycloak-Adapter
 
 `KeycloakAdminAdapter` ist nur im Profil `prod` aktiv; Dev und Tests verwenden den speicherbasierten Stub. Der Adapter
@@ -1017,3 +1071,27 @@ Dienstkontos ist nach Requirement 9.2 ein technischer Fehler, keine Abweichung i
 einem Abgleich-Fehler geprüft. Das Szenario `@req-9.1` führt nun `InhaberEinladenKommando.ausfuehren` aus und prüft
 Mandantenkontext, Inhaber-Rolle, Betreiberkennung sowie die datensparsame Terminalausgabe; der tatsächliche
 Einladungsfluss über Keycloak und Mailpit bleibt durch `VerwaltungVorgangTest` und `RealmExportKeycloakTest` belegt.
+
+## Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)
+Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fabian]: Ausführung auf der VPS, Related Origins, Gerätetest).
+- **Vorlage:** `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` zieht die Änderungen von Aufgabe 24.1 aus `deploy/keycloak/realm-export.json`
+  auf einem früher importierten Realm per `kcadm.sh` nach: Richtlinie `webAuthnPolicyPasswordless*`, Teilflow `browser-passkey-otp`
+  (Bedingung `conditional-credential` mit Konfiguration `otp-nur-ohne-passkey` und TOTP-Formular) in `browser-totp-pflicht-formulare`,
+  Required Actions `webauthn-register-passwordless` und `delete_credential`, Rollen `manage-account` und `view-profile` für `account-console`.
+  Der Export hängt den Passkey-Weg nicht über den Realm-`browserFlow` ein, sondern ersetzt das direkte TOTP-Formular im Formular-Flow durch
+  den bedingten Teilflow; die Vorlage folgt dem, lässt `browserFlow` und alle anderen Flows unberührt und legt den Teilflow vollständig an,
+  bevor sie das direkte TOTP-Formular entfernt (nie ein Zustand ohne zweiten Faktor).
+- **Wiederholbar und vorsichtig:** `--pruefen` liest nur (Exit 0 nichts zu tun, 10 Änderungen nötig). Bei unerwartetem Zustand (anderer
+  `browserFlow`, andere Relying-Party-ID, unerwartete Ausführungen, mehrdeutige Clients) bricht sie mit Exit 1 ab. Nach dem Einrichten prüft sie sich im
+  selben Lauf nach. Die Relying-Party-ID kommt aus `ARCHIV_PASSKEY_RP_ID` (nur Host, validiert, nie im Repo).
+- **Auslegung Req 10.7:** Die Ereignistypen `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` setzt die Vorlage nur mit `--ereignisse`.
+  Entscheid von Fabian (25.11.2026): Die Ereignisse werden aktiviert, der Standardaufruf auf der VPS enthält `--ereignisse`
+  (`docs/passkey-inbetriebnahme-checkliste.md`). Sind die Ereignisse des Realms ausgeschaltet oder `enabledEventTypes` leer, bricht die Vorlage ab.
+  Vermerk, keine Änderung der Requirements.
+- **Betrieb:** `jq` fehlt im Keycloak-Image (geprüft); die Anleitung (`deploy/infomaniak/keycloak/README.md`, «Passkey-Realm nachrüsten») holt eine
+  statische `jq`-Datei aus einem auf Digest festgelegten Hilfs-Image und hängt sie nur lesend ein. Das Hilfsskript `vorlage-ausfuehren.sh`
+  meldet `kcadm` am Realm `master` mit dem Passwort aus der Secret-Datei `keycloak_admin` an (`KC_CLI_PASSWORD` nur im Prozess, nie im Befehl).
+  Dasselbe Muster gilt für die Vorlage 19.3 (`verwaltung-einrichten-vorlage.sh`).
+- **Nachweis:** Stub-Test (`test/passkey-einrichten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2 mit dem Realm vor 24.1
+  (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR. Nicht belegt (beim ersten Lauf auf der VPS prüfen, Prüfzeilen im README): Ausführung auf der VPS, der
+  `docker compose run`-Aufruf, Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io`.

@@ -96,6 +96,20 @@ Given('der synthetische Benutzer hat {int} Passkeys', function (anzahl) {
   this.benutzerPerson = { ...this.benutzerPerson, passkey: anzahl > 0, passkeyAnzahl: anzahl };
 });
 
+Given('der synthetische Benutzer hat eine offene Einladung', function () {
+  this.benutzerPerson = { ...this.benutzerPerson, status: 'EINGELADEN', einladungOffenSeit: '2026-11-22T20:00:00Z' };
+});
+
+Given('der synthetische Benutzer hat eine gespeicherte Ablaufgrenze «{word}»', function (status) {
+  const einladungGueltigBis = status === 'abgelaufen' ? '2000-01-01T00:00:00Z' : '2099-01-01T00:00:00Z';
+  this.benutzerPerson = {
+    ...this.benutzerPerson,
+    status: 'EINGELADEN',
+    einladungOffenSeit: '2026-11-22T20:00:00Z',
+    einladungGueltigBis,
+  };
+});
+
 Given('die Benutzerverwaltung antwortet beim Zurücksetzen des Zugangs mit dem Fehler «IDENTITAETSDIENST_NICHT_ERREICHBAR»', function () {
   this.benutzerVerlangt.zugang = { fehler: 'IDENTITAETSDIENST_NICHT_ERREICHBAR' };
 });
@@ -304,10 +318,19 @@ async function pruefen(welt, name) {
   assert.equal(ergebnis.ueberlauf, false, `${name}: horizontaler Überlauf`);
   assert.deepEqual(ergebnis.befunde, [], `${name}: ${JSON.stringify(ergebnis.befunde)}`);
   if (process.env.BENUTZER_BILDER) {
-    await welt.seite.locator('h1').first().scrollIntoViewIfNeeded();
+    const ablauf = welt.seite.locator('[data-test=einladung-ablauf]');
+    const ablaufSichtbar = await ablauf.count() > 0;
+    if (ablaufSichtbar) {
+      await ablauf.first().scrollIntoViewIfNeeded();
+    } else {
+      await welt.seite.locator('h1').first().scrollIntoViewIfNeeded();
+    }
     const groesse = welt.seite.viewportSize().width;
     const schema = await welt.seite.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches ? 'dunkel' : 'hell');
-    await welt.seite.screenshot({ path: join(process.env.BENUTZER_BILDER, `${name}-${groesse}-${schema}.png`), fullPage: true });
+    await welt.seite.screenshot({
+      path: join(process.env.BENUTZER_BILDER, `${name}-${groesse}-${schema}.png`),
+      fullPage: !ablaufSichtbar,
+    });
   }
 }
 
@@ -328,6 +351,32 @@ Then('zeigt die Benutzerverwaltung Liste, Anträge und Rollen ohne Überlauf und
 
 When('ich den synthetischen Benutzer öffne', async function () {
   await this.seite.getByRole('link', { name: 'Alex Beispiel' }).click();
+});
+
+Then('zeigt die {word} die offene Einladung mit unbekanntem Ablauf ohne Überlauf und axe-Befund', async function (seite) {
+  const liste = seite === 'Liste';
+  assert.ok(liste || seite === 'Detailseite');
+  const bereich = this.seite.locator(liste ? 'app-benutzer-liste' : 'app-benutzer-detail');
+  await bereich.waitFor();
+  await bereich.getByText('Letzter Einladungsversand', { exact: false }).first().waitFor();
+  await this.seite.getByText('22.11.2026 21:00', { exact: false }).first().waitFor();
+  const ablauf = bereich.locator('[data-test=einladung-ablauf]');
+  assert.equal(await ablauf.count(), 1);
+  assert.equal((await ablauf.textContent()).trim(), 'Ablauf nicht bekannt');
+  await pruefen(this, liste ? 'einladung-liste' : 'einladung-detail');
+});
+
+Then('zeigt die {word} die offene Einladung mit Ablauf «{word}» ohne Überlauf und axe-Befund', async function (seite, status) {
+  const liste = seite === 'Liste';
+  assert.ok(liste || seite === 'Detailseite');
+  const bereich = this.seite.locator(liste ? 'app-benutzer-liste' : 'app-benutzer-detail');
+  await bereich.waitFor();
+  const ablauf = bereich.locator('[data-test=einladung-ablauf]');
+  const erwartet = status === 'abgelaufen' ? 'Abgelaufen' : 'Nicht abgelaufen';
+  assert.equal((await ablauf.textContent()).trim(), erwartet);
+  const grenze = status === 'abgelaufen' ? '2000-01-01T00:00:00Z' : '2099-01-01T00:00:00Z';
+  assert.equal(await bereich.locator('time').getAttribute('datetime'), grenze);
+  await pruefen(this, `${liste ? 'einladung-liste' : 'einladung-detail'}-${status}`);
 });
 
 Then('zeigt das Benutzerdetail Status, Rechte und Token-Hinweis ohne Überlauf und axe-Befund', async function () {

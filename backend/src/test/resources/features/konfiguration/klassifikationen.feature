@@ -276,7 +276,7 @@ Funktionalität: Klassifikationen je Mandant
     Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «bau» zu
     Dann antwortet die Klassifikationsverwaltung mit Status 201
     Angenommen «inhaber-urinet» legt ein Dokument «Trennung-urinet» der Art «PROJEKTDOKUMENT» mit der Klassifikation «fachgebiet» und dem Wert «bau» im Status «ARCHIVIERT» an
-    Und «inhaber-vhf-gsk» legt ein Dokument «Trennung-vhf» der Art «PROBE_VHF_BULLETIN» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
+    Und «inhaber-vhf-gsk» legt ein Dokument «Trennung-vhf» der Art «BULLETIN» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
     Wenn «inhaber-vhf-gsk» liest die Klassifikationen
     Dann fehlt die Klassifikation «fachgebiet» in der Liste
     Wenn «inhaber-vhf-gsk» deaktiviert den Wert «bau» der Klassifikation «fachgebiet»
@@ -291,14 +291,14 @@ Funktionalität: Klassifikationen je Mandant
        "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
       """
     Dann antwortet die Klassifikationsverwaltung mit Status 201
-    Wenn «inhaber-vhf-gsk» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROBE_VHF_BULLETIN» mit dem Standardwert «statik» zu
+    Wenn «inhaber-vhf-gsk» ordnet die Klassifikation «fachgebiet» der Dokumentart «BULLETIN» mit dem Standardwert «statik» zu
     Dann antwortet die Klassifikationsverwaltung mit Status 201
     Wenn «inhaber-vhf-gsk» ändert die Klassifikationen des Dokuments «Trennung-vhf» auf:
       """
       {"fachgebiet":["bau"]}
       """
     Dann antwortet die Klassifikationsverwaltung mit Status 422 und Fehlercode «KLASSIFIKATION_UNGUELTIG»
-    Wenn «inhaber-vhf-gsk» entfernt die Zuordnung «fachgebiet» von der Dokumentart «PROBE_VHF_BULLETIN»
+    Wenn «inhaber-vhf-gsk» entfernt die Zuordnung «fachgebiet» von der Dokumentart «BULLETIN»
     Dann antwortet die Klassifikationsverwaltung mit Status 204
     Wenn «inhaber-vhf-gsk» versucht, die Klassifikation «fachgebiet» zu löschen
     Dann antwortet die Klassifikationsverwaltung mit Status 204

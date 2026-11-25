@@ -186,6 +186,8 @@ model/wissens-suchergebnis.ts
 model/wissensdiff.ts
 model/wissensquelleneintrag.ts
 model/wissensseite.ts
+model/wissensseiten-webseitenfreigabe-aenderung.ts
+model/wissensseiten-webseitenfreigabe.ts
 model/wissensversion.ts
 model/wissensversionen.ts
 model/zugang-optionen.ts

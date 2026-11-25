@@ -32,7 +32,7 @@ public class BenutzerLesen {
                           Set<Rolle> rollen, boolean rollenkonflikt, BenutzerStatus status,
                           boolean totp, boolean google, boolean passkey, int passkeyAnzahl,
                           boolean voruebergehendGesperrt, Instant einladungOffenSeit,
-                          BenutzerAktivitaet.LetzteAktion letzteAktion, String etag,
+                          Instant einladungGueltigBis, BenutzerAktivitaet.LetzteAktion letzteAktion, String etag,
                           String apiTokenVerwaltungspfad, String apiTokenHinweis) {
         @Override
         public String toString() {
@@ -80,8 +80,18 @@ public class BenutzerLesen {
                 benutzer.google(), benutzer.passkeys() > 0, benutzer.passkeys(),
                 identitaet.anmeldungGesperrt(code, benutzer.id()),
                 zustand == BenutzerStatus.EINGELADEN ? angaben.einladungSeit() : null,
-                angaben.letzteAktion(), BenutzerEtag.berechnen(benutzer, zustand), "/verwaltung/api-tokens",
+                einladungGueltigBis(zustand, angaben),
+                angaben.letzteAktion(), etag(benutzer, zustand, angaben), "/verwaltung/api-tokens",
                 "API-Tokens und Webseiten-Schlüssel bleiben beim Sperren oder Deaktivieren gültig.");
+    }
+
+    static Instant einladungGueltigBis(BenutzerStatus status, BenutzerAktivitaet.Angaben angaben) {
+        return status == BenutzerStatus.EINGELADEN ? angaben.einladungGueltigBis() : null;
+    }
+
+    static String etag(IdentitaetsDienst.Benutzer benutzer, BenutzerStatus status,
+                       BenutzerAktivitaet.Angaben angaben) {
+        return BenutzerEtag.berechnen(benutzer, status, einladungGueltigBis(status, angaben));
     }
 
     static BenutzerStatus status(IdentitaetsDienst.Benutzer benutzer, BenutzerStatusSpeicher speicher) {

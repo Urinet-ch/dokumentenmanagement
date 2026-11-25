@@ -7,10 +7,10 @@ Funktionalität: Isolation der Mandantenkonfiguration
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Dann enthält der Export die Art «AUSGANGSRECHNUNG»
-    Und enthält der Export die Art «PROBE_VHF_BULLETIN» nicht
+    Und enthält der Export die Art «BULLETIN» nicht
     Und enthält der Export die Art «WISSENSQUELLE» nicht
     Wenn «inhaber-vhf-gsk» die Konfigurationsdatei exportiert
-    Dann enthält der Export die Art «PROBE_VHF_BULLETIN»
+    Dann enthält der Export die Art «BULLETIN»
     Und enthält der Export die Art «AUSGANGSRECHNUNG» nicht
     Und enthält der Export die Art «WISSENSQUELLE» nicht
 

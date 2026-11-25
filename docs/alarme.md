@@ -35,13 +35,16 @@ Dokumentdaten in Nachweisen ablegen. Die Tabelle «Kennzahlen unter `/q/metrics`
   Alarmweg und Empfänger prüfen.
 - [ ] `archiv_auftraege{mandant,status="FEHLER"}` je aktivem Mandanten überwachen. Fehlende Messreihen und einen
   ausgefallenen Abruf separat als Ausfall behandeln, nicht als Wert null; eine Schwelle und Wartezeit festlegen.
+- [ ] `archiv_ki_beispiele{mandant}` je aktivem Mandanten überwachen. Fehlt diese Reihe nach einem Zählfehler, ist das
+  ein Erhebungsfehler und kein Bestand von null; die übrigen Kennzahlen des Mandanten bleiben davon unabhängig.
 - [ ] Restore-Probe bei fehlgeschlagenem Lauf **und** bei einem letzten grünen Lauf älter als 35 Tage alarmieren
   (Req 16.25). Die Ergebnisse kommen aus dem Status-Artefakt der Probe, nicht aus den App-Kennzahlen; auch ein
   fehlendes oder veraltetes Artefakt darf nicht als Erfolg gelten.
-- [ ] Zeilenzahl von `ki_beispiel` je Mandant erfassen. Über 1'000 Zeilen die Dauer von
+- [ ] Zeilenzahl von `ki_beispiel` je Mandant erfassen. Ab 1'000 Zeilen die Dauer von
   `JdbcKiBeispiel.kandidaten` am betreffenden Bestand messen; ab 100 ms je Abfrage oder 10'000 Zeilen je Mandant
-  den Rang bzw. Index prüfen (Spec 01, Design «Offen»). Für Bestand und Abfragedauer gibt es derzeit keine der unten
-  aufgeführten App-Kennzahlen; Verfahren und Messung bleiben offen.
+  den Rang bzw. Index prüfen (Spec 01, Design «Offen»). Die App stellt dazu `archiv_ki_beispiele{mandant}` und ab
+  1'000 Zeilen `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` bereit; Schwellenprüfung, Alarm und Anbindung
+  bleiben offen.
 - [ ] Regeln und Zuständigkeit im zuständigen Infra-Repository dokumentieren; Tests, Zeitpunkt und Ergebnis
   festhalten. Aufgabe 5.9 erst nach Anbindung und Betriebsnachweisen abschliessen.
 
@@ -105,6 +108,8 @@ der Abruf; liefert ein Mandant keinen Stand, verschwinden seine Reihen, statt ei
 | `archiv_jvm_speicher_prozent` | Gauge | `pool` (`Metaspace`, `Compressed Class Space`, `Heap`) | Auslastung des Bereichs in Prozent des Maximums, gemessen im Takt der Speicherprüfung; ohne Maximum keine Reihe. Grundlage des Speicher-Alarms, siehe [speicherbudget.md](speicherbudget.md) |
 | `archiv_ki_feld_bestaetigt_total`, `archiv_ki_feld_korrigiert_total` | Zähler | `feld`, `mandant` | Wie oft ein KI-Vorschlag für das Feld unverändert bestätigt bzw. korrigiert wurde; die Reihen aller Felder entstehen beim ersten Zählen eines Mandanten mit 0 |
 | `archiv_ki_feld_korrekturquote` | Gauge | `feld`, `mandant` | korrigiert geteilt durch bestätigt seit dem Start des Prozesses (0 ohne Bestätigung); die Quote über einen längeren Zeitraum rechnet das Monitoring aus den Zählern (`increase(…[90d])`) |
+| `archiv_ki_beispiele` | Gauge | `mandant` | Zeilen in `ki_beispiel` je aktivem Mandanten, erhoben im Takt von `archiv.kennzahlen.intervall`; bei Zählfehler fehlt nur diese Reihe, nicht als null interpretieren |
+| `archiv_ki_beispiel_kandidaten_seconds_*` | Timer | `mandant` | Dauer von `JdbcKiBeispiel.kandidaten`; wird nur erfasst, wenn der zuletzt erhobene Bestand mindestens 1'000 Zeilen hat |
 | `archiv_webseite_grenze_ausgefallen_total` | Zähler | – | Prüfung einer Grenze je Webseiten-Schlüssel ist fehlgeschlagen; die Anfrage wurde wie vorgesehen durchgelassen |
 | `archiv_oeffentlicher_chat_nutzung_schreibfehler_total` | Zähler | – | Tokenverbrauch oder `ki_verbrauch` des öffentlichen Chats konnte nicht geschrieben werden; die Antwort wurde trotzdem ausgegeben |
 

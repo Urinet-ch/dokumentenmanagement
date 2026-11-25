@@ -551,8 +551,10 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.9 Anbindung an das Monitoring der VPS [Infra]
   - interne Kennzahlen und Detail-Health an das Monitoring der VPS (Stufe B aus 5.11) anbinden; Alarme für Erreichbarkeit, Health und Fehleraufträge; Eintrag im Infra-Repo der VPS
   - Regel «Restore-Probe archiv rot oder letzter grüner Lauf älter als 35 Tage» (Req 16.25) im Monitoring; das Status-Artefakt der Probe enthält nur Zähler und IDs
-  - Messpunkt `JdbcKiBeispiel.kandidaten`: Zeilenzahl `ki_beispiel` je Mandant überwachen; sobald sie 1'000 übersteigt, auch die Abfragedauer messen (Details in design.md, «Offen»)
-  - Vorbereitung ohne Betriebseingriff: Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; für den KI-Beispiel-Bestand und die Abfragedauer besteht noch keine App-Kennzahl. Anbindung und Nachweise bleiben offen.
+  - Messpunkt `JdbcKiBeispiel.kandidaten`: Zeilenzahl `ki_beispiel` je Mandant überwachen; ab 1'000 Zeilen auch die Abfragedauer messen (Details in design.md, «Offen»)
+  - Vorbereitung ohne Betriebseingriff (PR #569): Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; Anbindung und Nachweise bleiben offen.
+  - Folgeumsetzung (24.11.2026): App-Gauge `archiv_ki_beispiele{mandant}` und Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` ab 1'000 Beispielen; dokumentiert in `docs/alarme.md`. Die VPS-Anbindung und Betriebsnachweise bleiben offen, daher bleibt die Aufgabe ungeprüft.
+  - Nachtrag (25.11.2026): Ein Fehler beim Zählen der KI-Beispiele lässt die übrigen Kennzahlen des Mandanten bestehen; die fehlende KI-Gauge signalisiert den Messfehler statt eines Nullwerts. Tests in `JdbcKiBeispielTest` und `MicrometerKennzahlenTest`.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 

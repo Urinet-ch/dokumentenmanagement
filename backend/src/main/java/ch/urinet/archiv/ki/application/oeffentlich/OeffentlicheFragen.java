@@ -17,9 +17,13 @@ import ch.urinet.archiv.ki.domain.chat.Quelle;
 import ch.urinet.archiv.ki.domain.oeffentlich.FrageBereinigung;
 import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicheAusgabe;
 import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicheQuelle;
+import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicheWissensquelle;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.OeffentlichesWissenPort;
+import ch.urinet.archiv.wissen.application.WissenHuelleDienst;
+import ch.urinet.archiv.wissen.application.WissenModellBudget;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -51,7 +55,8 @@ import java.util.function.Consumer;
  *       aus den Werkzeugergebnissen, nie aus dem Modelltext, und werden über den festen Filter nochmals geprüft und mit
  *       Titel, Reihe, Ausgabe, Jahr und Fundstellenseite angereichert. Modelltext wird erst nach der Quellenprüfung
  *       ausgegeben; ohne Quelle folgt nur der feste Hinweis auf die Geschäftsstelle (Req 6.3).</li>
- *   <li>danach Speichern von Frage (bereinigt), Quellen und Tokens in {@code oeffentliche_frage} (Req 6.5).</li>
+ *   <li>danach Speichern in {@code oeffentliche_frage}: im Archivchat die bereinigte Frage und erweiterten Quellen,
+ *       im Wissenschat eine feste Ereignisbezeichnung und Quellen-IDs, jeweils mit Tokenzahl.</li>
  * </ol>
  * Frage, Antwort, Titel und Werkzeugparameter erscheinen nie im Log, nur IDs, Zahlen und Klassennamen.
  */
@@ -62,9 +67,9 @@ public class OeffentlicheFragen {
 
     /** Wortlaut bei Ausfall des Agenten: fest, ohne interne Angaben. */
     public static final String NICHT_VERFUEGBAR = ChatFragen.NICHT_VERFUEGBAR;
-    /** Feste Antwort, wenn keine passende Publikation gefunden wird (Req 6.3); {@code %s} ist der Kontakt oder leer. */
-    /** Wartezeit bei laufender Frage des Mandanten: eine Frage dauert Sekunden, nicht eine. */
+    /** Retry-After bei laufender Frage des Mandanten, in Sekunden. */
     static final long MANDANT_LAEUFT_SEKUNDEN = 5;
+    private static final String WISSENSCHAT_PROTOKOLL_FRAGE = "Öffentliche Wissenschat-Frage";
     static final String KEIN_TREFFER = "Dazu habe ich keine passende Publikation gefunden. Bitte wenden Sie sich an die "
             + "Geschäftsstelle%s.";
 
@@ -74,6 +79,9 @@ public class OeffentlicheFragen {
     private final OeffentlicheGespraeche gespraeche;
     private final OeffentlicheFragenSpeicher speicher;
     private final OeffentlicheDokumente dokumente;
+    private final OeffentlichesWissenPort wissen;
+    private final WissenHuelleDienst huelle;
+    private final WissenModellBudget wissenBudget;
     private final WerkzeugTransaktion transaktion;
     private final WerkzeugDaten daten;
     private final MandantKontext kontext;
@@ -87,7 +95,9 @@ public class OeffentlicheFragen {
     @Inject
     public OeffentlicheFragen(OeffentlicherChatAgentPort agent, OeffentlicheGrenzen grenzen, MandantBudget budget,
                               OeffentlicheGespraeche gespraeche, OeffentlicheFragenSpeicher speicher,
-                              OeffentlicheDokumente dokumente, WerkzeugTransaktion transaktion, WerkzeugDaten daten,
+                              OeffentlicheDokumente dokumente, OeffentlichesWissenPort wissen, WissenHuelleDienst huelle,
+                              WissenModellBudget wissenBudget,
+                              WerkzeugTransaktion transaktion, WerkzeugDaten daten,
                               MandantKontext kontext, MandantEinstellungen einstellungen, Config konfiguration,
                               @ConfigProperty(name = "archiv.webseite.chat.max-frage") int maxFrage) {
         if (maxFrage < 1) {
@@ -99,6 +109,9 @@ public class OeffentlicheFragen {
         this.gespraeche = gespraeche;
         this.speicher = speicher;
         this.dokumente = dokumente;
+        this.wissen = wissen;
+        this.huelle = huelle;
+        this.wissenBudget = wissenBudget;
         this.transaktion = transaktion;
         this.daten = daten;
         this.kontext = kontext;
@@ -137,6 +150,20 @@ public class OeffentlicheFragen {
      * Reservierung scheitert, zählt in keiner Grenze (Platz wird verworfen).
      */
     public Annahme annehmen(MandantCode mandant, Lesezugriff zugriff, String frage, Optional<UUID> gespraechId) {
+        return annehmen(mandant, zugriff, frage, gespraechId, false);
+    }
+
+    public Annahme wissenAnnehmen(MandantCode mandant, Lesezugriff zugriff, String frage) {
+        return wissenAnnehmen(mandant, zugriff, frage, Optional.empty());
+    }
+
+    public Annahme wissenAnnehmen(MandantCode mandant, Lesezugriff zugriff, String frage,
+                                  Optional<UUID> gespraechId) {
+        return annehmen(mandant, zugriff, frage, gespraechId, true);
+    }
+
+    private Annahme annehmen(MandantCode mandant, Lesezugriff zugriff, String frage, Optional<UUID> gespraechId,
+                            boolean wissenschat) {
         String text = frage(frage);
         OeffentlicheGrenzen.Platz platz = grenzen.annehmen(mandant, zugriff);
         MandantBudget.Reservierung reservierung;
@@ -159,16 +186,39 @@ public class OeffentlicheFragen {
             platz.verwerfen();
             throw e;
         }
+        if (wissenschat) {
+            try {
+                transaktion.neu(() -> {
+                    wissenBudget.chatPruefen();
+                    return null;
+                });
+            } catch (RuntimeException e) {
+                platz.verwerfen();
+                freigebenOhneFehler(mandant, reservierung.monat());
+                throw e;
+            }
+        }
         try {
-            OeffentlicheGespraeche.Geoeffnet gespraech = gespraeche.oeffnen(gespraechId.orElse(null), mandant, zugriff);
+            OeffentlicheGespraeche.Geoeffnet gespraech = wissenschat
+                    ? gespraeche.oeffnenWissen(gespraechId.orElse(null), mandant, zugriff)
+                    : gespraeche.oeffnen(gespraechId.orElse(null), mandant, zugriff);
             OeffentlicheAnfrage anfrage = new OeffentlicheAnfrage(mandant, zugriff, reservierung.monat(),
-                    einstellungen.lesen(mandant).name(), text, gespraech.verlauf());
+                    einstellungen.lesen(mandant).name(), text, gespraech.verlauf(),
+                    wissenschat ? new OeffentlichesWissenDurchgang(gespraech.wissensStaende(),
+                            gespraech.wissensSeiten()) : null);
             return new Annahme(gespraech.id(), anfrage, text, platz);
         } catch (RuntimeException e) {
             platz.freigeben();
             freigebenOhneFehler(mandant, reservierung.monat());
             throw e;
         }
+    }
+
+    private boolean wissenStaendeAktuell(List<OeffentlichesWissenPort.Stand> staende) {
+        return transaktion.neu(() -> {
+            huelle.sperren();
+            return staende.stream().allMatch(wissen::aktuell);
+        });
     }
 
     /** Gibt die Reservierung frei; scheitert das, bleibt nur der Lease als Netz, und der Fehler geht nur ins Log. */
@@ -229,6 +279,19 @@ public class OeffentlicheFragen {
         UUID id = annahme.gespraechId();
         OeffentlicheAnfrage anfrage = annahme.anfrage();
         ChatDurchgang durchgang = new ChatDurchgang();
+        if (anfrage.wissen() != null && !anfrage.wissen().gesehene().isEmpty()
+                && !wissenStaendeAktuell(anfrage.wissen().gesehene())) {
+            gespraeche.verwerfen(id);
+            strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
+            return;
+        }
+        if (anfrage.wissen() != null && !transaktion.neu(() -> {
+            huelle.sperren();
+            return wissen.hatFreigegebeneSeite();
+        })) {
+            wissenAusgeben(annahme, new ChatAntwort("", List.of(), List.of(), Optional.empty(), ChatStatus.OK), strom);
+            return;
+        }
         try {
             agent.beantworten(anfrage, ereignis -> {
                 if (!abbruch.gesetzt()) {
@@ -251,6 +314,10 @@ public class OeffentlicheFragen {
         }
         if (antwort.status() == ChatStatus.ABGEBROCHEN) {
             LOG.info("Öffentlicher Chat: Frage vom Client abgebrochen");
+            return;
+        }
+        if (anfrage.wissen() != null) {
+            wissenAusgeben(annahme, antwort, strom);
             return;
         }
         List<OeffentlicheQuelle> quellen;
@@ -283,6 +350,52 @@ public class OeffentlicheFragen {
             strom.accept(new OeffentlicheAusgabe.Fertig(id));
         } catch (RuntimeException e) {
             LOG.warnf("Öffentlicher Chat: Ausgabe nach dem Speichern gescheitert, ursache=%s", Ursachen.kette(e));
+        }
+    }
+
+    void wissenAusgeben(Annahme annahme, ChatAntwort antwort, Consumer<OeffentlicheAusgabe> strom) {
+        UUID id = annahme.gespraechId();
+        OeffentlicheAnfrage anfrage = annahme.anfrage();
+        OeffentlichesWissenDurchgang durchgang = anfrage.wissen();
+        try {
+            transaktion.neu(() -> {
+                huelle.sperren();
+                if (durchgang.widerspruch() || durchgang.gesehene().stream().anyMatch(s -> !wissen.aktuell(s))) {
+                    gespraeche.verwerfen(id);
+                    strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
+                    return null;
+                }
+                var quellen = durchgang.gezeigteDieserRunde().stream().map(s -> new OeffentlicheWissensquelle(
+                        ohneSteuerzeichen(s.titel()), ohneSteuerzeichen(s.pfad()),
+                        s.dokumente().stream().map(d -> new OeffentlicheWissensquelle.Beleg(
+                                d.id(), ohneSteuerzeichen(d.titel()), ohneSteuerzeichen(d.reiheCode()),
+                                ohneSteuerzeichen(d.reiheName()), d.ausgabe() == null ? null
+                                : ohneSteuerzeichen(d.ausgabe()))).toList())).toList();
+                String text = quellen.isEmpty() ? "Dazu steht nichts in der Wissensbasis." : antwort.inhalt();
+                List<OeffentlicheQuelle> protokollQuellen = durchgang.gezeigteDieserRunde().stream()
+                        .flatMap(s -> s.dokumente().stream())
+                        .collect(java.util.stream.Collectors.toMap(OeffentlichesWissenPort.Dokument::id,
+                                d -> new OeffentlicheQuelle(d.id(), "", "", "", null, null, null),
+                                (erste, ignoriert) -> erste, LinkedHashMap::new))
+                        .values().stream().toList();
+                int tokens = antwort.tokens()
+                        .map(t -> (int) Math.min(Integer.MAX_VALUE, (long) t.tokensEin() + t.tokensAus()))
+                        .orElse(0);
+                try {
+                    speicher.speichern(WISSENSCHAT_PROTOKOLL_FRAGE, protokollQuellen, tokens, uhr.instant());
+                } catch (RuntimeException e) {
+                    LOG.errorf("Öffentliche Wissensfrage nicht gespeichert, ursache=%s", Ursachen.kette(e));
+                }
+                gespraeche.merkenWissen(id, anfrage.mandant(), anfrage.zugriff(), annahme.frage(), text,
+                        durchgang.gesehene(), durchgang.gezeigte());
+                if (!text.isBlank()) strom.accept(new OeffentlicheAusgabe.Text(text));
+                strom.accept(new OeffentlicheAusgabe.WissenQuellen(quellen));
+                strom.accept(new OeffentlicheAusgabe.Fertig(id));
+                return null;
+            });
+        } catch (RuntimeException e) {
+            LOG.errorf("Öffentliche Wissensquellen nicht geprüft, ursache=%s", Ursachen.kette(e));
+            strom.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
         }
     }
 
