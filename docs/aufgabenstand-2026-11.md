@@ -89,6 +89,6 @@ erledigten Umsetzungen.
 
 ## Grenzen des Abgleichs
 
-- Offene PRs #624 und #643–#647 zählen nicht als Nachweise auf `main`.
+- Offene PRs #624 und #643–#648 zählen nicht als Nachweise auf `main`.
 - Der Stand der Taskdateien und offenen PRs ist eine Momentaufnahme; die Checkboxen wurden nicht verändert.
 - Betriebsdetails und Zugangsdaten wurden nicht erhoben oder in diesen Bericht übernommen.

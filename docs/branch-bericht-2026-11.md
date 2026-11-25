@@ -3,7 +3,7 @@
 ## Abgleich vom 25.11.2026
 
 Grundlage: `origin/main` bei `dbd00f2e4`, tatsächliche Remote-Refs aus `git ls-remote --heads origin`
-und offene PRs #624, #643–#647. Von 40 Remote-Branches der unten genannten Präfixe haben 6 einen
+und offene PRs #624, #643–#648. Von 41 Remote-Branches der unten genannten Präfixe haben 7 einen
 offenen PR; von den übrigen 34 sind 20 Vorfahren von `origin/main` und 14 nicht. Ein nicht als
 Vorfahr erkannter Branch kann trotzdem per Squash-PR gemergt sein; daraus folgt keine Löschfreigabe.
 Kein Branch und kein Worktree wurde gelöscht.
