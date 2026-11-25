@@ -569,9 +569,27 @@ Die Spalte «Beschreibung» (Aufgabe 2.1, entschieden von Fabian am 09.11.2026; 
 #### Vorbereitung (Aufgabe 5.9, 24.11.2026)
 
 `docs/alarme.md` enthält eine Checkliste für die spätere interne Anbindung, die vorhandenen Metriken und ihre Tags.
-Die Restore-Probe liefert ihren Status ausserhalb der App; fehlende Messreihen sind kein Nullwert. Für die Anzahl
-der KI-Beispiele und die Abfragedauer ist noch keine App-Kennzahl vorhanden. Messung, Anbindung, Alarmtests und
-Infrastruktur-Eintrag sind nicht ausgeführt; Stufe B bleibt zurückgestellt und 5.9 offen.
+Die Restore-Probe liefert ihren Status ausserhalb der App; fehlende Messreihen sind kein Nullwert. Die App-Messung
+für die KI-Beispiele ist in der Umsetzung unten ergänzt. Anbindung, Alarmtests und Infrastruktur-Eintrag sind nicht
+ausgeführt; Stufe B bleibt zurückgestellt und 5.9 offen.
+
+#### Umsetzung (Aufgabe 5.9, 24.11.2026)
+
+`Kennzahlen` zählt im Takt für jeden aktiven Mandanten die Zeilen in dessen `ki_beispiel`-Tabelle. Unter
+`/q/metrics` steht dafür die Gauge `archiv_ki_beispiele{mandant}` bereit. Scheitert die Erhebung für einen Mandanten,
+verschwinden seine Reihen wie bei den übrigen Kennzahlen, statt veraltete Werte zu zeigen.
+
+`JdbcKiBeispiel.kandidaten` misst die Abfragedauer nur, wenn der zuletzt erhobene Bestand mindestens 1'000 Zeilen hat.
+Der Micrometer-Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` enthält keine Abfragewerte, Beispielinhalte
+oder Personendaten. Der Tag `mandant` folgt den bestehenden Auftrags-, Dokument- und KI-Korrekturkennzahlen. Die
+Metriken liegen am nur intern erreichbaren `/q/metrics`; die Anbindung und Alarmregeln bleiben Infrastrukturarbeit.
+
+#### Nachtrag Fehlerisolation (Aufgabe 5.9, 25.11.2026)
+
+Ein Fehler beim Zählen in `ki_beispiel` wird separat behandelt: Die übrigen Kennzahlen des Mandanten bleiben
+verfügbar, nur `archiv_ki_beispiele{mandant}` fehlt bis zur nächsten erfolgreichen Erhebung. Eine fehlende Gauge ist
+kein Wert null. `JdbcKiBeispielTest` prüft den SQL-Fehlerpfad von `anzahl`; `MicrometerKennzahlenTest` prüft die
+fehlende Gauge bei weiterhin vorhandenen übrigen Reihen.
 
 ### KI (`ki`)
 - `MetadatenExtraktor` als LangChain4j-`@RegisterAiService` ohne Chat-Memory (`NoChatMemoryProviderSupplier`; sonst vermischen sich Belege im selben Request-Kontext), Antwort als Java-Record `MetadatenVorschlag` im JSON-Schema-Antwortformat (`response-format=json_schema`, `strict-json-schema=true`). Infomaniak lehnt den JSON-Modus (`json_object`) ab; einen Rückfall gibt es nicht, ohne gültige Antwort gilt Req 7.1 (ohne Vorschlag in den Eingangskorb). Spike 0.3: `docs/spikes/infomaniak-ai.md`.

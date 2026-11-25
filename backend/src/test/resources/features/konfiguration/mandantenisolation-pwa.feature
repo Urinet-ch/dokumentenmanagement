@@ -14,5 +14,5 @@ Funktionalität: Mandantenkonfiguration in der Verwaltungsoberfläche
 
     Beispiele:
       | mandant | anderer | eigene             | fremde             | regel           |
-      | urinet  | vhf-gsk | AUSGANGSRECHNUNG   | PROBE_VHF_BULLETIN | sichtbar        |
-      | vhf-gsk | urinet  | PROBE_VHF_BULLETIN | AUSGANGSRECHNUNG   | nicht sichtbar  |
+      | urinet  | vhf-gsk | AUSGANGSRECHNUNG   | BULLETIN | sichtbar        |
+      | vhf-gsk | urinet  | BULLETIN | AUSGANGSRECHNUNG   | nicht sichtbar  |

@@ -75,6 +75,7 @@ final class AgentWerkzeug implements ToolExecutor {
         }
         lauf.melden(ergebnis);
         return DokumentTexte.kennzeichnen(json, roh,
-                "wissen_index".equals(name) || "wissen_seite_zeigen".equals(name));
+                "wissen_index".equals(name) || "wissen_seite_zeigen".equals(name)
+                        || "wissen_index_oeffentlich".equals(name) || "wissen_seite_zeigen_oeffentlich".equals(name));
     }
 }

@@ -101,10 +101,24 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     ])));
     const karten = [...element.querySelectorAll('[data-test=benutzer-liste] li')];
     expect(karten[0].textContent).toContain('22.11.2026');
+    expect(karten[0].textContent).toContain(TEXTE.benutzer.einladungOffenSeit);
     expect(karten[1].textContent).toContain(TEXTE.benutzer.unbekannt);
     expect(karten.slice(0, 2).map((karte) => karte.querySelector('[data-test=einladung-ablauf]')?.textContent?.trim()))
       .toEqual([TEXTE.benutzer.einladungAblaufUnbekannt, TEXTE.benutzer.einladungAblaufUnbekannt]);
+    expect(karten[0].textContent?.match(/Ablauf nicht bekannt/g)).toHaveLength(1);
     expect(karten[2].querySelector('[data-test=einladung-ablauf]')).toBeNull();
+  });
+
+  it('zeigt für gespeicherte Ablaufgrenzen Datum und Status', async () => {
+    await starten(() => service.apiV1BenutzerGet.mockReturnValue(of([
+      { ...PERSON, id: 'abgelaufen', status: 'EINGELADEN', einladungGueltigBis: '2000-01-01T00:00:00Z' },
+      { ...PERSON, id: 'gueltig', status: 'EINGELADEN', einladungGueltigBis: '2099-01-01T00:00:00Z' },
+    ])));
+    const karten = [...element.querySelectorAll('[data-test=benutzer-liste] li')];
+    expect(karten.map((karte) => karte.querySelector('[data-test=einladung-ablauf]')?.textContent?.trim()))
+      .toEqual([TEXTE.benutzer.einladungAbgelaufen, TEXTE.benutzer.einladungNichtAbgelaufen]);
+    expect([...element.querySelectorAll('[data-test=benutzer-liste] time')])
+      .toHaveLength(2);
   });
 
   it('filtert die Liste serverseitig nach Passkey ja oder nein und beginnt wieder bei Seite 1 (Req 10.6)', async () => {
@@ -297,8 +311,19 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
   it('zeigt den letzten Einladungsversand und einen unbekannten Ablauf im Detail', async () => {
     const element = (await starten({ ...PERSON, status: 'EINGELADEN' })).nativeElement as HTMLElement;
     expect(element.textContent).toContain('22.11.2026');
+    expect(element.textContent).toContain(TEXTE.benutzer.einladungOffenSeit);
     expect(element.querySelector('[data-test=einladung-ablauf]')?.textContent?.trim())
       .toBe(TEXTE.benutzer.einladungAblaufUnbekannt);
+  });
+
+  it('zeigt den gespeicherten Ablauf im Detail als abgelaufen', async () => {
+    const person: BenutzerAnsicht = {
+      ...PERSON, status: 'EINGELADEN', einladungGueltigBis: '2000-01-01T00:00:00Z',
+    };
+    const element = (await starten(person)).nativeElement as HTMLElement;
+    expect(element.querySelector('time')?.getAttribute('datetime')).toBe(person.einladungGueltigBis);
+    expect(element.querySelector('[data-test=einladung-ablauf]')?.textContent?.trim())
+      .toBe(TEXTE.benutzer.einladungAbgelaufen);
   });
 
   it('zeigt im Detail «Passkey eingerichtet» mit Anzahl oder Nein, ohne Gerätedaten (Req 10.6)', async () => {

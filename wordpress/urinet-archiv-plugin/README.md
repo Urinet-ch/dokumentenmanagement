@@ -37,7 +37,9 @@ Ergebnisse blättern; pro Seite sind höchstens 100 Einträge möglich.
 Der Chat wird über `/wp-json/urinet-archiv/v1/chat` als Server-Sent Events
 weitergereicht. Der Schlüssel bleibt dabei auf dem Server. Die Seite muss
 `wp_enqueue_scripts` ausführen; das Plugin lädt `assets/chatbot.js` auf Seiten
-mit dem Chatbot-Shortcode oder -Block.
+mit dem Chatbot-Shortcode oder -Block. Einen vom Archiv im Ereignis `fertig`
+gelieferten `hinweis` zeigt das Plugin nach der Antwort an; den Wortlaut
+bestimmt die API.
 
 ## Pflicht vor dem Einsatz: Empfang begrenzen
 

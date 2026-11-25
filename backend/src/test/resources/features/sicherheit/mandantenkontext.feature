@@ -12,7 +12,7 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
 
   @req-1.3
   Szenariogrundriss: Ohne gültigen Mandanten antwortet das Archiv mit 403 und liefert keine Daten
-    Wenn «<benutzer>» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
+    Wenn «<benutzer>» die Dokumentart «BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und liefert keine Daten
     Und antwortet das Archiv mit Status 403 und Fehlercode «MANDANT_FEHLT»
 
@@ -24,33 +24,33 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
   @req-1.3
   Szenario: Ein inaktiver Mandant erhält 403 und keine Daten
     Angenommen im Register steht der inaktive Mandant «probe-inaktiv»
-    Wenn «inaktiv-mandant» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
+    Wenn «inaktiv-mandant» die Dokumentart «BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und liefert keine Daten
     Und antwortet das Archiv mit Status 403 und Fehlercode «MANDANT_FEHLT»
 
   @req-1.4
   # Teilnachweis: Die Tabelle dokument entsteht mit 2.2; dort folgt «fremde Dokument-ID → 404».
   Szenario: Ein Datensatz eines anderen Mandanten gilt als nicht vorhanden (Teilnachweis)
-    Wenn «geschaeftsstelle-vhf-gsk» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
-    Dann antwortet das Archiv mit Status 200 und liefert die Dokumentart «PROBE_VHF_BULLETIN»
-    Wenn «inhaber-urinet» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
+    Wenn «geschaeftsstelle-vhf-gsk» die Dokumentart «BULLETIN» abfragt
+    Dann antwortet das Archiv mit Status 200 und liefert die Dokumentart «BULLETIN»
+    Wenn «inhaber-urinet» die Dokumentart «BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 404 und liefert keine Daten
 
   @req-1.2
   Szenario: Header und Query-Parameter setzen den Mandanten nicht
-    Wenn «inhaber-urinet» die Dokumentart «PROBE_VHF_BULLETIN» abfragt und dabei «vhf-gsk» als Mandant in Header und Query angibt
+    Wenn «inhaber-urinet» die Dokumentart «BULLETIN» abfragt und dabei «vhf-gsk» als Mandant in Header und Query angibt
     Dann antwortet das Archiv mit Status 404 und liefert keine Daten
 
   @req-1.6
   Szenario: Der Worker arbeitet im Kontext des Mandanten aus dem Auftrag
-    Wenn der Worker im Mandanten-Kontext «vhf-gsk» die Dokumentart «PROBE_VHF_BULLETIN» liest
+    Wenn der Worker im Mandanten-Kontext «vhf-gsk» die Dokumentart «BULLETIN» liest
     Dann findet der Worker die Dokumentart
-    Wenn der Worker im Mandanten-Kontext «urinet» die Dokumentart «PROBE_VHF_BULLETIN» liest
+    Wenn der Worker im Mandanten-Kontext «urinet» die Dokumentart «BULLETIN» liest
     Dann findet der Worker die Dokumentart nicht
 
   @req-2.2
   Szenario: Ohne Archiv-Rolle antwortet das Archiv mit 403
-    Wenn «ohne-rolle-urinet» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
+    Wenn «ohne-rolle-urinet» die Dokumentart «BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und liefert keine Daten
     Und antwortet das Archiv mit Status 403 und Fehlercode «NICHT_ERLAUBT»
 
