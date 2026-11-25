@@ -46,6 +46,18 @@
             }
             <p><span>{{ texte.rolle }}:</span> {{ rollen(person) }}</p>
             <p><span>{{ texte.status }}:</span> <span class="pille">{{ texte.statusNamen[person.status ?? ''] ?? texte.unbekannt }}</span></p>
+            @if (person.status === 'EINGELADEN') {
+              <p><span>{{ texte.einladungOffenSeit }}:</span> {{ person.einladungOffenSeit ? zeitpunkt(person.einladungOffenSeit) : texte.unbekannt }}</p>
+              <p>
+                <span>{{ texte.einladungAblauf }}:</span>
+                &#32;
+                @if (person.einladungGueltigBis) {
+                  <time [attr.datetime]="person.einladungGueltigBis">{{ zeitpunkt(person.einladungGueltigBis) }}</time>
+                  &#32;
+                }
+                <span class="pille" data-test="einladung-ablauf">{{ einladungAblauf(person) }}</span>
+              </p>
+            }
             <p><span>{{ texte.passkey }}:</span> <span data-test="passkey">{{ person.passkey === undefined ? texte.unbekannt : person.passkey ? texte.passkeyJa(person.passkeyAnzahl ?? 0) : texte.nein }}</span></p>
             @if (person.rollenkonflikt) {
               <p class="hinweis gefahr">{{ texte.rollenkonflikt }}</p>

@@ -71,7 +71,12 @@
   } @else if (laeufe()!.length === 0) {
     <p class="nebentext">{{ texte.keineLaeufe }}</p>
   } @else {
-    <div class="tabelle-rahmen randbuendig" tabindex="0" role="region" aria-labelledby="laeufe-titel">
+    <div
+      class="tabelle-rahmen randbuendig"
+      tabindex="0"
+      role="region"
+      [attr.aria-label]="texte.laeufeTabelle"
+    >
       <table class="tabelle">
         <thead>
           <tr>

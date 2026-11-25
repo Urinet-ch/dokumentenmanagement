@@ -11,6 +11,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
   selector: 'app-rueckruf',
   imports: [MatButtonModule],
   template: `
+    <div class="seitenkopf"><h1>{{ texte.titel }}</h1></div>
     @if (fehlgeschlagen()) {
       <p role="alert">{{ fehlermeldung() }}</p>
       <button mat-flat-button type="button" (click)="anmelden()">{{ texte.anmelden }}</button>

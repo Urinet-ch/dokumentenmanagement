@@ -27,6 +27,7 @@ export interface BenutzerAnsicht {
     passkeyAnzahl?: number;
     voruebergehendGesperrt?: boolean;
     einladungOffenSeit?: string;
+    einladungGueltigBis?: string;
     letzteAktion?: LetzteAktion;
     etag?: string;
     apiTokenVerwaltungspfad?: string;

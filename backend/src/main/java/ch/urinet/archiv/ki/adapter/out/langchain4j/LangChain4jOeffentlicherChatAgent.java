@@ -10,6 +10,7 @@ import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicherKontext;
 import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicherKontextRegister;
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
 import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicherSystemPrompt;
+import ch.urinet.archiv.ki.domain.oeffentlich.OeffentlicherWissenSystemPrompt;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
@@ -89,7 +90,7 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
         UUID id = UUID.randomUUID();
         AgentLauf lauf = new AgentLauf(id, anfrage.mandant(), anfrage.verlauf(), ausgabe, abbruch, fenster);
         laeufe.festhalten(lauf);
-        register.festhalten(id, new OeffentlicherKontext(anfrage.mandant(), anfrage.zugriff()));
+        register.festhalten(id, new OeffentlicherKontext(anfrage.mandant(), anfrage.zugriff(), anfrage.wissen()));
         try {
             starten(lauf, anfrage);
             // Obergrenze: jede Runde und die Schlussantwort je höchstens eine Zeitgrenze, dazu Reserve für Werkzeuge
@@ -107,8 +108,10 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
     }
 
     private void starten(AgentLauf lauf, OeffentlicheAnfrage anfrage) {
-        LOG.infof("Öffentlicher Chat-Durchgang mit Prompt %s", OeffentlicherSystemPrompt.kennung());
-        String prompt = OeffentlicherSystemPrompt.system(anfrage.mandantenname(), uhr.instant());
+        LOG.infof("Öffentlicher Chat-Durchgang mit Prompt %s",
+                anfrage.wissen() == null ? OeffentlicherSystemPrompt.kennung() : "wissen-oeffentlich-v1");
+        String prompt = anfrage.wissen() == null ? OeffentlicherSystemPrompt.system(anfrage.mandantenname(), uhr.instant())
+                : OeffentlicherWissenSystemPrompt.system();
         TokenStream strom = agent.antworten(lauf.id(), prompt, anfrage.frage());
         strom.onPartialResponseWithContext((teil, kontext) -> {
                     lauf.handle(kontext.streamingHandle());
@@ -149,7 +152,8 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
         long eigeneEin = ein;
         long eigeneAus = aus;
         try {
-            mandanten.mit(lauf.mandant(), () -> verbrauch.erfassen(KiVerbrauchPort.CHAT,
+            mandanten.mit(lauf.mandant(), () -> verbrauch.erfassen(
+                    anfrage.wissen() == null ? KiVerbrauchPort.CHAT : KiVerbrauchPort.WISSEN_CHAT,
                     new KiPort.Verbrauch(modell.modell(), eigeneEin, eigeneAus)));
         } catch (RuntimeException e) {
             nutzungSchreibfehler.increment();

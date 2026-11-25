@@ -24,6 +24,7 @@ export class WissenEinstellungenSeite {
   private etag: string | null = null;
   private ausstehendeEingabe: WissenEinstellungen | null = null;
   protected readonly texte = TEXTE.wissenEinstellungen;
+  protected readonly cloudHinweis = TEXTE.wissen.import.cloudHinweis;
   protected readonly werte = signal<WissenEinstellungen | null>(null);
   protected readonly fehler = signal<string | null>(null);
   protected readonly gespeichert = signal(false);

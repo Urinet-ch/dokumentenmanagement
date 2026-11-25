@@ -12,6 +12,7 @@ import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenLesen;
 import ch.urinet.archiv.wissen.application.WissenLesenRepository;
 import ch.urinet.archiv.wissen.application.QuellenPruefung;
+import ch.urinet.archiv.wissen.application.Webseitenfreigabe;
 import ch.urinet.archiv.wissen.application.WissensSuche;
 import ch.urinet.archiv.wissen.application.WissensEmbeddingSpeichern;
 import ch.urinet.archiv.wissen.application.WissenModellBudget;
@@ -24,6 +25,7 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -65,6 +67,7 @@ public class WissensseiteResource {
 
     private final WissenLesen lesen;
     private final QuellenPruefung quellenPruefung;
+    private final Webseitenfreigabe webseitenfreigabe;
     private final WissensseiteAbrufProtokoll abrufProtokoll;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
@@ -73,13 +76,14 @@ public class WissensseiteResource {
     private final Berechtigung rechte;
     private final WissenModellBudget budget;
 
-    public WissensseiteResource(WissenLesen lesen, QuellenPruefung quellenPruefung,
+    public WissensseiteResource(WissenLesen lesen, QuellenPruefung quellenPruefung, Webseitenfreigabe webseitenfreigabe,
                                 WissensseiteAbrufProtokoll abrufProtokoll,
                                 MandantAufloesung aufloesung, SecurityIdentity identitaet,
                                 WissensSuche suche, WissensEmbeddingSpeichern embeddings, Berechtigung rechte,
                                 WissenModellBudget budget) {
         this.lesen = lesen;
         this.quellenPruefung = quellenPruefung;
+        this.webseitenfreigabe = webseitenfreigabe;
         this.abrufProtokoll = abrufProtokoll;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
@@ -115,6 +119,16 @@ public class WissensseiteResource {
                                   List<QuelleDto> quellen, String inhaltHtml, int version, String erzeugtVon,
                                   Instant erzeugtAm, String freigegebenVon, Instant freigegebenAm,
                                   boolean quellePruefen, boolean widerspruchOffen, UUID wissensquelleId) {
+    }
+
+    @Schema(name = "WissensseitenWebseitenfreigabe")
+    public record WebseitenfreigabeDto(@Schema(required = true) boolean freigegeben,
+                                       @Schema(required = true) boolean freigabefaehig,
+                                       @Schema(required = true) String hoechsteZugriffsstufe) {
+    }
+
+    @Schema(name = "WissensseitenWebseitenfreigabeAenderung")
+    public record WebseitenfreigabeAenderungDto(@Schema(required = true) Boolean freigeben) {
     }
 
     @Schema(name = "Wissensquelleneintrag")
@@ -237,6 +251,50 @@ public class WissensseiteResource {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer();
         return seitenAntwort(benutzer, lesen.seite(benutzer, uuid(benutzer, id)));
+    }
+
+    @GET
+    @Path("/wissensseiten/{id}/webseitenfreigabe")
+    @ErfordertAktion(Aktion.A15)
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Operation(summary = "Webseitenfreigabe und Quellenstufe einer Wissensseite abrufen")
+    @APIResponse(responseCode = "200", description = "Freigabe und aktuelle Quellenprüfung mit ETag")
+    @APIResponse(responseCode = "404", description = "Seite nicht vorhanden")
+    public Response webseitenfreigabe(@Parameter(description = "ID der Wissensseite") @PathParam("id") String id) {
+        aufloesung.pruefen();
+        Benutzer benutzer = benutzer();
+        var stand = webseitenfreigabe.lesen(benutzer, uuid(benutzer, id));
+        return privateAntwort(new WebseitenfreigabeDto(stand.freigegeben(), stand.freigabefaehig(),
+                stand.hoechsteZugriffsstufe()))
+                .tag(new EntityTag(stand.version() + "-" + stand.quellenRevision())).build();
+    }
+
+    @POST
+    @Path("/wissensseiten/{id}/webseitenfreigabe")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A16)
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Operation(summary = "Webseitenfreigabe einer Wissensseite setzen oder entziehen")
+    @APIResponse(responseCode = "204", description = "Freigabe geändert")
+    @APIResponse(responseCode = "400", description = "Ungültige Anfrage")
+    @APIResponse(responseCode = "403", description = "Kein Freigaberecht")
+    @APIResponse(responseCode = "404", description = "Seite nicht vorhanden")
+    @APIResponse(responseCode = "409", description = "Freigabe nicht möglich oder bereits gesetzt")
+    @APIResponse(responseCode = "412", description = "Seitenstand geändert")
+    @APIResponse(responseCode = "428", description = "If-Match fehlt")
+    public Response webseitenfreigabeSetzen(@Parameter(description = "ID der Wissensseite") @PathParam("id") String id,
+                                            @Parameter(description = "Aktueller ETag") @HeaderParam("If-Match") String ifMatch,
+                                            @org.eclipse.microprofile.openapi.annotations.parameters.RequestBody(
+                                                    description = "Gewünschter Freigabestatus", required = true)
+                                            WebseitenfreigabeAenderungDto eingabe) {
+        aufloesung.pruefen();
+        Benutzer benutzer = benutzer();
+        if (eingabe == null || eingabe.freigeben() == null) {
+            throw ungueltigeAnfrage();
+        }
+        webseitenfreigabe.setzen(benutzer, uuid(benutzer, id), eingabe.freigeben(),
+                () -> WissensseitenVersionskopf.lesen(ifMatch));
+        return Response.noContent().build();
     }
 
     @POST

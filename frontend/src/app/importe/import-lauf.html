@@ -142,7 +142,12 @@
       <p>{{ texte.keineZeilen }}</p>
     } @else {
       @let mitEntscheid = art() === 'kontakt' && entscheidbar() && hatDubletten();
-      <div class="tabelle-rahmen" tabindex="0" role="region" aria-labelledby="vorschau-titel">
+      <div
+        class="tabelle-rahmen"
+        tabindex="0"
+        role="region"
+        [attr.aria-label]="texte.vorschauTabelle"
+      >
         <table class="tabelle">
           <thead>
             <tr>

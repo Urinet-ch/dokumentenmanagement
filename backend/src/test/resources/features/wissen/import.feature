@@ -80,7 +80,7 @@ Funktionalität: Wissenspakete synchron und ohne KI als Entwurf importieren
   Szenario: Wissenspaketeingang prüft Multipart und die exakte ZIP-Grenze ohne Inhaltslogs
     Dann Multipart und ZIP-Grenze werden ohne Paketinhalt in Antwort oder Log geprüft
 
-  @req-19.23 @req-17.2
+  @req-19.23 @req-17.2 @req-19.24
   Szenario: Lokaler OKF-Export durchläuft denselben Paketleser und Import mit SHA-Quellen
     Dann ein OKF-Export mit lokaler Herkunft ist ohne ID-Zuordnung als Wissenspaket importierbar
 

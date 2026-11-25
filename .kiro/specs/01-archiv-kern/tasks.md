@@ -50,6 +50,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Prompt und Sicherheitsschwelle nur auf den 30 Belegen zum Abstimmen iterieren; die 20 zurückgehaltenen erst im Gate-Lauf verwenden
   - Bericht getrennt nach Abstimmungs- und Prüfteil: Trefferquote je Feld und gesamt, Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, 0.9), Liste der Fehlschläge; der Bericht liegt im Verzeichnis aus `ARCHIV_GOLDEN_DIR`, ins Repository (`docs/spikes/golden-ergebnis.md`) kommen nur Kennzahlen und Beleg-IDs, keine Inhalte
   - im Repository nur das Schema von `erwartet.json` und `GoldenDatensatzIT` (manuell gestartet, nie in der CI)
+  - Req 0.7: Feldregeln mit synthetischen In-Memory-Werten in `VergleichTest` prüfen; der Test lädt keine Golden-Daten
   - Hostprüfung: `GoldenLauf` und `GoldenDatensatzIT` brechen vor dem ersten Beleg ab, wenn `archiv.ki.basis-url` nicht per `https` auf den Host `api.infomaniak.com` zeigt (exakter Vergleich, ohne Suffix-Treffer); Unit-Test mit `localhost`, `http` und Suffix-Trick (`api.infomaniak.com.example.org`) → Abbruch
   - Ergebnis 09.11.2026: Gate-Lauf auf dem Merge-Commit von PR #21: Prüfteil 20/20, 1 Fehler ab 0.8, Schwelle 0.8, Modell `google/gemma-4-31B-it` (`docs/spikes/golden-ergebnis.md`)
   - _Anforderungen: 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 7.11, 16.22_
@@ -551,8 +552,10 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.9 Anbindung an das Monitoring der VPS [Infra]
   - interne Kennzahlen und Detail-Health an das Monitoring der VPS (Stufe B aus 5.11) anbinden; Alarme für Erreichbarkeit, Health und Fehleraufträge; Eintrag im Infra-Repo der VPS
   - Regel «Restore-Probe archiv rot oder letzter grüner Lauf älter als 35 Tage» (Req 16.25) im Monitoring; das Status-Artefakt der Probe enthält nur Zähler und IDs
-  - Messpunkt `JdbcKiBeispiel.kandidaten`: Zeilenzahl `ki_beispiel` je Mandant überwachen; sobald sie 1'000 übersteigt, auch die Abfragedauer messen (Details in design.md, «Offen»)
-  - Vorbereitung ohne Betriebseingriff: Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; für den KI-Beispiel-Bestand und die Abfragedauer besteht noch keine App-Kennzahl. Anbindung und Nachweise bleiben offen.
+  - Messpunkt `JdbcKiBeispiel.kandidaten`: Zeilenzahl `ki_beispiel` je Mandant überwachen; ab 1'000 Zeilen auch die Abfragedauer messen (Details in design.md, «Offen»)
+  - Vorbereitung ohne Betriebseingriff (PR #569): Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; Anbindung und Nachweise bleiben offen.
+  - Folgeumsetzung (24.11.2026): App-Gauge `archiv_ki_beispiele{mandant}` und Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` ab 1'000 Beispielen; dokumentiert in `docs/alarme.md`. Die VPS-Anbindung und Betriebsnachweise bleiben offen, daher bleibt die Aufgabe ungeprüft.
+  - Nachtrag (25.11.2026): Ein Fehler beim Zählen der KI-Beispiele lässt die übrigen Kennzahlen des Mandanten bestehen; die fehlende KI-Gauge signalisiert den Messfehler statt eines Nullwerts. Tests in `JdbcKiBeispielTest` und `MicrometerKennzahlenTest`.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 

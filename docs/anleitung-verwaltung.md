@@ -1,16 +1,15 @@
 # Anleitung für Inhaber: Einstellungen, Benutzer und Rollen
 
 > **Stand:** Die Abschnitte «Für den Betreiber» (Admin-Kommando, Notweg, Alarme, Geheimnisse) beschreiben den Code auf `main`.
-> Die Bedienung von Benutzern und Einstellungen durch den Inhaber beschreibt die Spec 06 (`.kiro/specs/06-verwaltung-einstellungen-benutzer/`);
-> die Aktionen und Dialoge der Benutzerseiten (Aufgabe 20.7, PR #531) sind noch nicht auf `main`. **Bis zu deren Merge gelten die
-> Abschnitte zu Einladen, Rollen, Sperren und Löschen als Sollbeschreibung**, nicht als Bedienungsanleitung der ausgelieferten Seiten;
-> für Benutzer gilt bis dahin der Weg «Für den Betreiber».
+> Die Benutzeraktionen und Dialoge der App (Aufgabe 20.7, PR #531) sind ebenfalls auf `main`; die folgenden Abschnitte zu Einladen,
+> Rollen, Sperren und Löschen beschreiben deren Bedienung. Nicht in der App-Hilfe enthaltene Betreiberwege bleiben hier dokumentiert.
 >
 > **Bedienung in der App:** Die Seiten «Dokumentarten», «Zugriffsprotokoll» und «API-Tokens» beschreibt die Anleitung in der App
 > unter «Hilfe», Abschnitt «Verwaltung» (`/hilfe#verwaltung`). Nach Spec 07, Requirement 7.7 gehört die Bedienung von Benutzern
 > und Einstellungen ebenfalls dorthin; diese Datei behält, was nicht in die App gehört (Wege des Betreibers, Notweg nach Spec 06,
 > Requirement 9.3). **[offen:** Übernahme in die Hilfe der App und die Kontaktstellen sind nicht Teil dieser Aufgabe.**]**
-> Die Aufgabe 21.5 ist nicht abgehakt: Nachweise des Betreibers fehlen (siehe [Geheimnisse rotieren](geheimnisse-rotieren.md)).
+> Die Dokumentation zu Aufgabe 21.5 ist gegen den Code auf `main` geprüft. Die Ausführung und Bestätigung von Rotationen sowie
+> tatsächliche Verwahrorte bleiben Betreiberaufgaben (siehe [Geheimnisse rotieren](geheimnisse-rotieren.md)).
 
 Die Verwaltung finden Sie nur als **Inhaber** unter «Verwaltung». Alle Änderungen gelten nur für Ihren Mandanten und stehen im
 Zugriffsprotokoll (`/verwaltung/protokoll`), ohne E-Mail-Adressen und Namen.
@@ -26,10 +25,14 @@ die Keycloak-Benutzer.
 ## Benutzer einladen
 1. «Benutzer» → «Person einladen». Benutzername (nur `a–z`, `0–9`, `.`, `_`, `-`), E-Mail, Vorname, Nachname und **Rolle** wählen.
 2. Sie bestätigen mit Passwort und TOTP (frische Anmeldung, höchstens 5 Minuten alt).
-3. Die Person erhält eine E-Mail von «UriNet Archiv» mit einem Link (gilt 24 Stunden, einmal). Darüber bestätigt sie die
-   E-Mail-Adresse, setzt ein Passwort und richtet TOTP ein. **Sie sehen weder Passwort noch Link.**
-4. Der Status zeigt «Einladung offen seit …». Ist der Link abgelaufen oder verloren: «Einladung erneut senden» (höchstens 3 Mal
-   in 24 Stunden).
+3. Die Person erhält eine E-Mail von «UriNet Archiv» mit einem einmaligen Link. Seine Gültigkeit entspricht der beim
+   Versand verwendeten Dauer. Darüber bestätigt sie die E-Mail-Adresse, setzt ein Passwort und richtet TOTP ein.
+   **Sie sehen weder Passwort noch Link.**
+4. Liste und Detail zeigen «Letzter Einladungsversand» sowie «Einladung läuft ab» mit Datum und Status «Abgelaufen»
+   oder «Nicht abgelaufen». Bei älteren Einladungen ohne gespeicherte Ablaufgrenze steht «Ablauf nicht bekannt».
+   Erst nach erfolgreichem Versand werden Versandzeit und Ablaufgrenze aktualisiert; bei einem Fehler bleibt der
+   bisherige Stand bestehen. Ist der Link abgelaufen oder verloren: «Einladung erneut senden» (höchstens 3 Mal in
+   24 Stunden).
 
 ## Rollen und was sie dürfen
 Sie vergeben **Rollen**, keine einzelnen Rechte. Unter «Rechte» sehen Sie je Person, was sie darf («Dokumente lesen»,
@@ -67,6 +70,11 @@ Nicht hier änderbar: Alarm-Empfänger, Budget des öffentlichen Chats, Modelle,
 | «Anmeldedienst nicht erreichbar» | Keycloak antwortet nicht; Dokumente und Einstellungen funktionieren weiter. Später erneut versuchen. |
 
 ## Für den Betreiber
+
+### Öffentlicher Wissenschat
+Der öffentliche Wissenschat ist je Mandant über `archiv.mandant.<code>.oeffentlich.wissenschat` geschaltet; `<code>` ist ein
+Platzhalter für den Mandantencode. Der Standard ist ausgeschaltet. Der Schalter ersetzt weder die Webseitenfreigabe der
+einzelnen Wissensseite noch die Quellenbedingungen aus Spec 04, Requirement 21.6.
 
 ### Normaler Weg: Admin-Kommando
 Die Kommandos laufen im Wegwerf-Container wie im README unter «Admin-Kommandos auf der VPS» beschrieben, nie in einem laufenden

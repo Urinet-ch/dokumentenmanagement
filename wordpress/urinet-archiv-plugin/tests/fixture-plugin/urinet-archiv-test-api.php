@@ -55,7 +55,7 @@ add_filter(
 		if ( str_ends_with( $pfad, '/chat' ) ) {
 			$body = "event: text\ndata: {\"delta\":\"Synthetische Antwort\"}\n\n"
 				. "event: quellen\ndata: [{\"dokumentId\":\"00000000-0000-4000-8000-000000000001\",\"titel\":\"Synthetisches Merkblatt\",\"reihe\":{\"code\":\"MERKBLATT\",\"name\":\"Merkblatt\"},\"ausgabe\":\"3/2071\",\"jahr\":2071,\"fundstelle\":{\"seite\":7}}]\n\n"
-				. "event: fertig\ndata: {}\n\n";
+				. "event: fertig\ndata: {\"hinweis\":\"Synthetischer Hinweis aus dem Archiv\"}\n\n";
 		} elseif ( str_ends_with( $pfad, '/filter' ) ) {
 			$daten = array(
 				'reihen'           => array(

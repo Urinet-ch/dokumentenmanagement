@@ -815,7 +815,7 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
   - `wissen_paket validate <ordner|paket.zip> [--quellen <ordner>] [--json]` – prüft Format, Grenzen, Pfade,
     Frontmatter, Markdown und die Regeln von `WissensPruefung`, soweit sie ohne Archiv prüfbar sind; Rückgabewert 0 ohne
     sperrenden Befund, sonst 1; Ausgabe nur Befund-Codes, Pfade und Zähler; am Ende die Regel zu Cloud-Modellen als
-    Hinweis (Requirement 19.25).
+    Hinweis (Requirements 19.24 und 19.25).
   - `wissen_paket bauen <ordner> -o <paket.zip> --mandant <code> --erzeugt-von <name> --erzeugt-mit lokal|cloud
     --kontext-stufe NORMAL|INTERN [--ueberschreiben]` – schreibt `paket.yaml` (falls im Ordner keine liegt), führt
     zuerst `validate` aus und baut das ZIP nur, wenn kein sperrender Befund besteht; keine Symlinks, feste Reihenfolge und
@@ -825,6 +825,11 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
   vorgeprüft (nur `.pdf`, über `pdftotext`, falls vorhanden; sonst Hinweis). Das Ergebnis ist ein Hinweis
   `AUSZUG_LOKAL_NICHT_GEFUNDEN`, nicht massgeblich: Das Archiv prüft den Volltext der PDF/A-Fassung, der nach OCR
   vom Text des Originals abweichen kann.
+- **Umsetzung (Aufgaben 15.5 und 15.7, 25.11.2026):** `wissen_paket` gibt die Cloud-Modell-Regel auch für
+  lokale Erarbeitung als Prozesshinweis aus. Die Seite «Wissensbasis exportieren» zeigt denselben Hinweis vor dem
+  OKF-Export; `WissenPaketCliTest`, `wissen.spec.ts` und `okf-export-hinweis.feature` prüfen die Ausgaben
+  (Requirement 19.24). Das Backend-Rundlaufszenario in `import.feature` trägt dieselbe Anforderungszuordnung. Die Hinweise
+  informieren, erzwingen die Regeln ausserhalb des Archivs aber nicht.
 - **Nicht offline prüfbar** (Hinweis statt Befund): Zuordnung der Quellen, Seitenzahl der Dokumente, vergebene Pfade,
   `STUFE_UEBERBLICK`, Sichtbarkeit; sie prüft nur der Import.
 - **Gleiche Regeln – Entscheid:** Das Werkzeug **bindet den Quelltext der Domain-Regeln ein**, es kopiert ihn nicht und
@@ -1427,9 +1432,47 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   `wissen-chat` (nur Wissensseiten, Fehlanzeige «Dazu steht nichts in der Wissensbasis», Quelle je Aussage). Kein Umschalten im Gespräch.
 - **REST (intern):** `POST /chat/gespraeche {modus}`; `GET /chat/gespraeche` liefert `modus`; Recht A15 für `WISSEN`.
 - **Öffentlich (Spec 03):** `POST /public/v1/wissen/chat` (Webseiten-Schlüssel, `OeffentlicheWissenWerkzeuge`: `wissen_index_oeffentlich`, `wissen_seite_zeigen_oeffentlich`, Sicht nur auf
-  Seiten mit `fuer_webseite` und Quellen der Stufe `oeffentlich` und Vertraulichkeit `NORMAL`, Prüfung bei jeder Anfrage, nicht aus einem Cache), eigene Grenzen je Client und Budget je Mandant,
-  Schalter `archiv.oeffentlich.wissenschat` (Standard aus, je Mandant).
-- **Offen für die Umsetzung (Welle 18):** `[offen: Form der Freigabe «für Webseite» in der Oberfläche der Wissensseite (Schalter in der Seitenansicht, Recht A16) und Anzeige der Quellen-Zugriffsstufen; Aufgabe 18.3 klärt es und ergänzt hier]`
+  Seiten mit `fuer_webseite` und Quellen der Stufe `oeffentlich` und Vertraulichkeit `NORMAL`, Prüfung bei jeder Anfrage, nicht aus einem Cache), dieselben Grenzen je Client und dasselbe Budget je Mandant wie beim öffentlichen Archivchat,
+  Schalter `archiv.mandant.<code>.oeffentlich.wissenschat` (Standard aus, je Mandant).
+- **Entscheid Fabian vom 24.11.2026 (Aufgabe 18.3):** Der Schalter «Für die Webseite freigeben» steht in der Seitenansicht und ist nur mit
+  Recht A16 bedienbar. Freigabe und Entzug verlangen eine Bestätigung und werden protokolliert; der Entzug wirkt sofort. Eine Pille zeigt die höchste
+  Zugriffsstufe der Quelldokumente. Ist eine Quelle nicht `oeffentlich` oder nicht `NORMAL` (insbesondere `PERSONAL`), ist die Freigabe mit Begründung
+  deaktiviert. Der Server prüft dieselbe Regel nach Requirement 21.6.
+- **Teilumsetzung (Aufgabe 18.3, 24.11.2026):** Changeset `140-wissen-webseitenfreigabe` ergänzt das Kennzeichen mit Standard `false`.
+  Eine aktivierte Freigabe benötigt Akteur und Zeitpunkt. A16-Freigabe und Entzug nehmen die Hüllensperre vor der Seitensperre,
+  prüfen den Seiten-ETag und schreiben in derselben Transaktion ins unveränderliche `wissens_log`: Aktion `UPDATE` mit
+  `webseitenfreigabe_aktion` (`WISSEN_WEBSEITE_FREIGEGEBEN` bzw. `WISSEN_WEBSEITE_ENTZOGEN`). Die bestehende Logaktion bleibt
+  für ältere Versionen lesbar. Die Quellenrevision wird auch bei Freigabe und Entzug erhöht, damit ein alter ETag keine neuere
+  Entscheidung überschreibt. Die Freigabe verlangt konservativ mindestens ein belegendes Dokument und den festen Webseitenfilter
+  einschliesslich bestätigter Art, Archivstatus und Veröffentlichung; Analysen sowie indirekt erreichbare Analysen sind ausgeschlossen.
+  Die Seitenansicht zeigt die höchste Quellenstufe und verlangt eine Bestätigung.
+- **Teilumsetzung öffentlicher Wissenschat (Aufgabe 18.3, 24.11.2026):** `POST /public/v1/wissen/chat` verwendet nur öffentliche
+  Wissenswerkzeuge und den mandantenbezogenen Schalter `archiv.mandant.<code>.oeffentlich.wissenschat` (Standard aus). Es gelten
+  dieselben öffentlichen Client-Grenzen und das öffentliche Monatsbudget sowie zusätzlich das Wissensbudget. Seiten und auch
+  Indexangaben werden vor der Antwort nochmals unter der Hüllensperre auf Freigabe, aktuelle Quellen und Revision geprüft; bei
+  Änderungen wird keine Modellantwort ausgegeben. Inhalte und Metadaten sind als Daten gerahmt. Die Szenarien `@req-21.6` und
+  Werkzeug-, Vertrags- und Oberflächentests belegen Teile der Umsetzung. Gespräche sind an Mandant, Webseite, Client-Hash,
+  Zugriffsstufe und Wissenschat-Modus gebunden. Der höchstens 30 Minuten gehaltene Verlauf wird bereinigt; Quellenstände werden
+  bei Fortsetzung und vor jeder Antwort erneut geprüft. Das persistierte Fragenprotokoll enthält absichtlich nur eine feste
+  Ereignisbezeichnung, Quellen-IDs und Tokenzahlen: Freitext und Quellentitel könnten trotz Erkennungsmustern Namen enthalten.
+  Damit wird kein Personenbezug aus der Frage oder aus Quellentiteln persistiert; die gespeicherte Frage entspricht jedoch
+  nicht dem Freitextfeld aus Spec 03, 6.5. **Entscheid Fabian 24.11.2026 (Klarstellung zu 21.6, Requirements unverändert):** Das Fragenprotokoll
+  des Wissenschats bleibt inhaltsfrei (feste Ereignisbezeichnung, Quellen-IDs, Tokenzahl), solange Namen in Freitext nicht
+  zuverlässig erkennbar sind.
+  Vor einer Fortsetzung werden die alten Quellenstände nochmals unter der Hüllensperre geprüft; bei erkanntem Entzug startet
+  kein weiterer Modellaufruf. Ein Rennen zwischen dieser Prüfung und dem externen Modellaufruf ist nicht atomar mit Keycloak
+  bzw. der Seitenänderung koordinierbar. Auch die Schlussprüfung und das Einreihen der SSE-Ereignisse erfolgen unter der
+  Hüllensperre, der tatsächliche Netzwerkversand liegt danach ausserhalb der Transaktion; ein bereits eingereihtes Ereignis
+  kann nicht zurückgerufen werden. **Entscheid Fabian 24.11.2026 (Klarstellung zu 21.6, Requirements unverändert):** Die Garantie des sofortigen
+  Entzugs gilt «vor dem Modellaufruf und vor dem Einreihen der Antwort»; ein bereits eingereihtes Ereignis ist nicht rückrufbar.
+  Bei erkanntem Entzug vor einer Fortsetzung wird zudem der gemerkte Gesprächsverlauf verworfen.
+  **Nachweis 25.11.2026:** Die HTTP/SSE-Gegenprobe liest das erste Werkzeug-Ereignis live vom Endpunkt, ändert danach
+  die Freigabe während der Anfrage und liest den Stream bis zum Ende. Es folgt nur `fehler`, kein Text, keine Quellen und
+  kein `fertig`; damit ist die Schlussprüfung bis zur Netzauslieferung geprüft. Die Grenze bleibt unverändert:
+  Quellenstände werden vor Modellaufruf und vor Einreihen der Antwort geprüft; ein bereits eingereihtes Ereignis ist
+  nicht rückrufbar. **Nachtrag Stabilität 25.11.2026:** Die simulierte Schlussantwort wartet 3 Sekunden, damit auch
+  langsame CI-Runner Zeit für die Änderung während der laufenden Anfrage haben. Die SSE-Gegenprobe begrenzt das Lesen
+  einschliesslich des ersten Ereignisses und des Reststroms auf eine Gesamtfrist von 30 Sekunden.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`
@@ -1466,6 +1509,37 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Changeset Mandant `131` ersetzt den partiellen Index `ki_verbrauch_wissen_zeit_ix` um `WISSEN_CHAT` ergänzt; Rollback stellt den alten Index wieder her.
 - Nachweis: `@req-21.4` in `chat-modus-pwa.feature` und `chat-modus-export.feature`, Angular-Tests und
   `ChatBewertungAuswertungTest`. Die Browserprüfung deckt 375 und 1280 Pixel, beide Farbschemata und axe ab.
+
+### Umsetzung (Aufgabe 18.4, 25.11.2026)
+- `@req-21.8` ist an Szenarien für Mandantentrennung, festen Modus, gesperrte Archivwerkzeuge, öffentliche Sichtbarkeit
+  nur mit Kennzeichen und Zugriffsstufe `oeffentlich`, Entzug vor dem Einreihen der SSE-Ereignisse, Prompt-Injection
+  aus Seiteninhalt und das inhaltsfreie Fragenprotokoll gebunden. Die öffentlichen Endpunkt-Szenarien prüfen zusätzlich,
+  dass ohne Freigabe bzw. bei Quellenstufe `mitglieder` weder Modelltext noch Quellen ausgeliefert werden.
+- Der Endpunkt-Fall mit `ohne-rolle-urinet` prüft den 403 vor dem Anlegen eines Gesprächs. Die JUnit-Tests
+  `ChatGespraecheAnlegenTest` und `ChatFragenModusTest` prüfen zusätzlich die ausdrückliche A15-Verweigerung als
+  `NICHT_ERLAUBT`, vor Zugriff auf Gesprächsspeicher bzw. Budget.
+- **Auslegung:** Gemäss Requirement 12.1 haben alle vier gültigen Archivrollen A15; eine Cucumber-Anfrage als gültiger
+  Benutzer ohne A15 wäre daher eine erfundene Rolle. Die öffentliche Schnittstelle aus 18.3 verwendet fachlich den
+  Webseiten-Schlüssel und die öffentliche Seitenfreigabe, nicht A15. Deshalb belegen die JUnit-Tests den internen
+  A15-Fehlerpfad und das Cucumber-Szenario den realen 403-Endpunktrand. Rechtematrix und Requirement 21.8 bleiben unverändert.
+
+### Umsetzung (Aufgabe 18.5, 25.11.2026)
+- `archiv.oeffentliche.fragen.ohne.beleg{mandant}` zählt je aktivem Mandanten die gespeicherten Zeilen aus
+  `oeffentliche_frage`, deren `quellen` dem leeren JSON-Array entspricht. Das Monitoring liest weder Fragen noch Quellen;
+  die Kennzahl wird mit der bestehenden periodischen Kennzahlen-Erhebung aktualisiert.
+- **Entscheid Fabian 25.11.2026:** Der Zähler umfasst Zeilen aus Archivchat und Wissenschat. `oeffentliche_frage` hat
+  keine Spalte zur Trennung der Chat-Modi; separate Zähler würden eine Schemaänderung erfordern, die nicht vorgenommen
+  wird.
+- Vor dem Modellaufruf prüft der Wissenschat, ob mindestens eine aktuell freigegebene, öffentlich sichtbare Wissensseite
+  verfügbar ist. Ohne solche Seite liefert er den festen Hinweis ohne Modellaufruf.
+- **Entscheid Fabian 25.11.2026:** Fehlt eine aktuell freigegebene, öffentlich sichtbare Wissensseite, erfolgt kein
+  Modellaufruf; die Frage wird weiterhin inhaltsfrei mit leerem Quellenarray protokolliert.
+- Es gibt keine Schemaänderung; der tägliche Aufräumjob entfernt alte Zeilen auch aus der gemessenen Anzahl. Fehler beim
+  Zählen entfernen nur die betroffene Gauge und lassen die übrigen Kennzahlen des Mandanten bestehen.
+- JUnit prüft leere gegen nichtleere Quellen in beiden Mandantenschemas und den Gauge-Tag `mandant`. Die beiden
+  Ausschluss-Szenarien in `oeffentlicher-wissenschat.feature` prüfen ausserdem `KiWireMock.chatAnfragen()` auf leer
+  und kontrollieren die Unsichtbarkeit im zweiten Mandanten. Der Fall ohne aktuelle Webseitenfreigabe prüft zudem genau
+  eine inhaltsfreie gespeicherte Zeile mit leerem Quellenarray.
 
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:

@@ -540,6 +540,9 @@
           "einladungOffenSeit" : {
             "$ref" : "#/components/schemas/Instant"
           },
+          "einladungGueltigBis" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
           "letzteAktion" : {
             "$ref" : "#/components/schemas/LetzteAktion"
           },
@@ -4485,6 +4488,30 @@
           },
           "wissensquelleId" : {
             "$ref" : "#/components/schemas/UUID"
+          }
+        }
+      },
+      "WissensseitenWebseitenfreigabe" : {
+        "type" : "object",
+        "required" : [ "freigegeben", "freigabefaehig", "hoechsteZugriffsstufe" ],
+        "properties" : {
+          "freigegeben" : {
+            "type" : "boolean"
+          },
+          "freigabefaehig" : {
+            "type" : "boolean"
+          },
+          "hoechsteZugriffsstufe" : {
+            "type" : "string"
+          }
+        }
+      },
+      "WissensseitenWebseitenfreigabeAenderung" : {
+        "type" : "object",
+        "required" : [ "freigeben" ],
+        "properties" : {
+          "freigeben" : {
+            "type" : "boolean"
           }
         }
       },
@@ -10659,6 +10686,103 @@
           },
           "404" : {
             "description" : "Version nicht vorhanden"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/wissensseiten/{id}/webseitenfreigabe" : {
+      "post" : {
+        "summary" : "Webseitenfreigabe einer Wissensseite setzen oder entziehen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "description" : "ID der Wissensseite",
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Aktueller ETag",
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "description" : "Gewünschter Freigabestatus",
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissensseitenWebseitenfreigabeAenderung"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Freigabe geändert"
+          },
+          "400" : {
+            "description" : "Ungültige Anfrage"
+          },
+          "403" : {
+            "description" : "Kein Freigaberecht"
+          },
+          "404" : {
+            "description" : "Seite nicht vorhanden"
+          },
+          "409" : {
+            "description" : "Freigabe nicht möglich oder bereits gesetzt"
+          },
+          "412" : {
+            "description" : "Seitenstand geändert"
+          },
+          "428" : {
+            "description" : "If-Match fehlt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "get" : {
+        "summary" : "Webseitenfreigabe und Quellenstufe einer Wissensseite abrufen",
+        "tags" : [ "Wissensbasis" ],
+        "parameters" : [ {
+          "description" : "ID der Wissensseite",
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Freigabe und aktuelle Quellenprüfung mit ETag",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Seite nicht vorhanden"
           },
           "401" : {
             "description" : "Not Authorized"

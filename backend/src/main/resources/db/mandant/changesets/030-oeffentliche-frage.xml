@@ -7,7 +7,8 @@
     <!--
         Spec 03, Aufgabe 11.3, Req 6.5: Fragen des öffentlichen Chatbots, 90 Tage. Bewusst ohne Spalte für Client-Hash,
         IP, Webseite, Schlüssel, Gespräch oder Antwort: Die Zeile verrät nicht, wer gefragt hat. Die gespeicherte
-        Frage ist bereinigt (E-Mail, Telefon, lange Zifferfolgen); der Löschjob entfernt nach archiv.webseite.chat.aufbewahrung.
+        Im Archivchat ist die Frage bereinigt (E-Mail, Telefon, lange Zifferfolgen); der Wissenschat speichert eine feste
+        Ereignisbezeichnung und Quellen-IDs. Der Löschjob entfernt nach archiv.webseite.chat.aufbewahrung.
     -->
     <changeSet id="030-oeffentliche-frage" author="archiv">
         <sql>

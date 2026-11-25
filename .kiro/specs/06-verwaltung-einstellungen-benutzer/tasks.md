@@ -32,7 +32,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 5.2, 5.3, 7.2_
   - _Abhängig von: Spec 01: 1.4_
 
-- [ ] 19.2 Realm-Export und Realm-Tests [Infra]
+- [x] 19.2 Realm-Export und Realm-Tests [Infra]
   - Client `archiv-verwaltung` ohne Secret im Export und mit den drei Rollen des Dienstkontos und dem Standard-Scope `kc-admin-api` (Härtung nach 19.1);
     Passwort-Richtlinie; Access-Token-Lebensdauer 300 s; Lebensdauer der Aktions-Links; Ereignisse und Admin-Ereignisse mit
     400 Tagen; `auth_time`-Mapper; Test-Realm mit Dienstkonto und SMTP an Mailpit; `RealmExportTest` und `ExportKeycloak`
@@ -40,7 +40,13 @@ auf Server oder Secrets aus der Sitzung.
   - Stand: Export, Test-Realm und Tests umgesetzt (PR #385); `adminEventsExpiration` gesetzt. Keycloak erzeugt beim
     Erstimport das Dienstkonto-Secret selbst; `start.sh` übergibt keines. `ARCHIV_BASIS_URL` schreibt `schreibe-env.sh`
     aus `HOST_ARCHIV`. Das tatsächlich verwendete Secret und seine Pflichtprüfung folgen in 19.3.
-    Checkbox offen: Vollständige Szenarien zu 4.9 und 7.4 folgen mit 19.7 bis 19.9.
+    Nachweis 4.9: Szenarien zu Rollenwechsel und Sperre in `benutzer-verwalten.feature` (19.9).
+    Nachweis 25.11.2026: Die Ablaufgrenze wird pro Mandant aus derselben Gültigkeitsdauer berechnet, die beim
+    erfolgreichen Versand an Keycloak übergeben wird. Liste und Detail zeigen Ablaufdatum und Status; Altbestände
+    bleiben «Ablauf nicht bekannt». `EinladungZeitTest` prüft `ANLEGEN`, `REAKTIVIEREN`, erneutes Senden,
+    fehlgeschlagenen Versand und Altbestand. `EinladungVersandpfadeTest` prüft Zugang zurücksetzen und E-Mail-Änderung,
+    einschliesslich «Versand ok, Speichern schlägt fehl»; `@req-7.4` prüft beide Status und Altbestand bei 375/1280 px
+    in hell/dunkel samt axe. Die Checkbox wird durch diese Nachweise geschlossen; Betriebsnachweise bleiben 19.3.
   - Nachgelagert [Fabian] (Entscheid 21.11.2026): Betriebsnachweis der internen Compose-Verbindung mit korrektem
     Issuer und der automatischen Ablaufzeit der Secret-Überlappung in 19.3.
   - _Anforderungen: 3.17, 4.9, 5.2, 5.3, 6.9, 7.4_
@@ -264,11 +270,14 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 5.5, 5.6, 5.7, 5.8, 6.2, 6.4, 6.6, 7.2, 7.5, 7.7, 7.8, 9.5_
   - _Abhängig von: 19.13, 20.7_
 
-- [ ] 21.5 Dokumentation [Backend]
+- [x] 21.5 Dokumentation [Backend]
   - `docs/anleitung-verwaltung.md` (vom Entwurf zur gültigen Anleitung), Abschnitt «Geheimnisse rotieren» in `docs/` (Rotation je
     Geheimnis der Klasse (c), Dienstkonto), README «Benutzer in Keycloak anlegen» als Notweg, `docs/alarme.md`, Notfallunterlagen.
   - _Anforderungen: 1.7, 9.3_
   - _Abhängig von: 20.7, 21.1_
+  - Nachweis 24.11.2026: Normalweg und Notweg sind in README und Anleitung gegen den Stand auf `main` geprüft; die
+    Alarmhinweise und Rotationswege stehen in `docs/alarme.md` und `docs/geheimnisse-rotieren.md`. Die Notfallunterlagen
+    enthalten nur Platzhalter für die geschützte Verwahrung. Ausführung und Betriebsbestätigung der Rotation bleiben 19.3/21.6.
 
 - [ ] 21.6 Abnahme Verwaltung [Fabian]
   - `docs/abnahme/verwaltung.md` nur mit Nummern und Ergebnissen: Szenarien und Tests grün; manuell: Einladung mit echtem
@@ -288,12 +297,34 @@ auf Server oder Secrets aus der Sitzung.
 - [x] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
   - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
     Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
-  - Req 10.7 nur teilweise erfüllt: Die Keycloak-Ereignisse `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` für
-    Einrichten und Entfernen in der Kontoverwaltung sind nicht aktiv; Entscheid zur Aktivierung bei Fabian.
+  - Req 10.7: Die Keycloak-Ereignisse `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` für Einrichten und Entfernen in der
+    Kontoverwaltung sind aktiviert (Entscheid Fabian 25.11.2026) und auf Stufe A belegt (siehe 24.3, Nachweis Ereignis-Probe).
   - _Anforderungen: 10.5, 10.6, 10.7_
   - _Abhängig von: 24.1, 19.8, 20.7_
-- [ ] 24.3 Anleitung und Inbetriebnahme [Fabian]
+- [x] 24.3 Anleitung und Inbetriebnahme [Fabian]
   - Anleitung (Spec 07, `frontend/public/anleitung/`) um «Mit Passkey anmelden» ergänzen; auf Stufe A Realm einmalig aktualisieren, Relying-Party-ID
     setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
   - _Anforderungen: 10.1, 10.2, 10.8_
   - _Abhängig von: 24.1, 24.2_
+  - Vorbereitung 25.11.2026 (bleibt offen, [Fabian]): Die Vorlage `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` und die
+    kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
+    Related Origins und Gerätetest stehen aus. Req 10.7 (Entscheid Fabian 25.11.2026): Die Ereignisse werden aktiviert, der
+    Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).
+  - Nachweis 25.11.2026 (Fabian): Realm auf Stufe A eingerichtet; Rückfall, Related Origins, Passkey einrichten/anmelden/Step-up/entfernen
+    (iPhone und Mac), «Passkeys löschen» und TOTP-Pflicht bei Passwortanmeldung bestätigt (design.md, «Umsetzung (Aufgabe 24.3
+    Inbetriebnahme, 25.11.2026)»). Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL`: später belegt (Nachweis Ereignis-Probe unten).
+  - Abgenommen von Fabian am 25.11.2026; Ereignisprotokoll-Probe (UPDATE_CREDENTIAL/REMOVE_CREDENTIAL) danach belegt (siehe unten).
+  - Hilfsskript Ereignis-Probe 25.11.2026: `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet `UPDATE_CREDENTIAL`
+    und `REMOVE_CREDENTIAL` ohne Admin-Konsole (design.md, «Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)»). Abnahme von 24.3 erfolgt;
+    Aufgabe bleibt abgehakt.
+  - Nachweis Ereignis-Probe 25.11.2026 (Fabian, VPS, Stufe A): `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL --typ REMOVE_CREDENTIAL`, Exit 0; `UPDATE_CREDENTIAL` 3,
+    `REMOVE_CREDENTIAL` 1 (Client `account-console`, eine Benutzerkennung). Req 10.7 auf Stufe A belegt (design.md, «Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)»).
+- [x] 24.4 Einstieg zur Kontoverwaltung (Passkey) [Frontend]
+  - Die Kopfzeile zeigt jedem angemeldeten Benutzer «Passkey einrichten» (Schlüssel-Symbol, daneben «Hilfe»); der Link öffnet die
+    Kontoverwaltung des Realms (`<Aussteller>/account`, Aussteller aus der OIDC-Konfiguration der App) in einem neuen Tab
+    (`target="_blank" rel="noopener noreferrer"`). Die WebAuthn-Registrierung selbst bleibt in Keycloak. Anleitung
+    («Mit Passkey anmelden», «Erste Schritte») und Inbetriebnahme-Checkliste nachgezogen.
+  - Nachweis 25.11.2026: Komponententests (`app.spec.ts`, `kontoverwaltung.spec.ts`), Szenario `@req-10.1` in
+    `passkey-einstieg-pwa.feature` (Browser: Knopf sichtbar, öffnet die Kontoverwaltung in neuem Tab, Seite bleibt, axe), `npm run pruefe:gestaltung`.
+  - _Anforderungen: 10.1_
+  - _Abhängig von: 24.1_

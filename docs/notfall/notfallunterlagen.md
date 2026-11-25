@@ -43,7 +43,7 @@ Kontozugänge stehen weder hier noch im Repository. Verwahrung bzw. Bezug: `<…
 - Öffentlicher Manifest-Schlüssel: `<Verweis/Ablageort>`.
 - Geheimnisse der Benutzerverwaltung (Spec 06): `keycloak_verwaltung_secret` (Dienstkonto), `keycloak_smtp_passwort`,
   `namenssperre_salz` (nie ungeplant wechseln, siehe [Geheimnisse rotieren](../geheimnisse-rotieren.md)) und der Datenschlüssel
-  `archiv_data_key`: `<Verweis/Ablageort>`. Noch nicht durch den Betreiber bestätigt (19.3, 21.5).
+  `archiv_data_key`: `<Verweis/Ablageort>`. Noch nicht durch den Betreiber bestätigt (19.3, 21.6).
 - Probe-Schlüssel: **nicht aufnehmen**; er ist ersetzbar und sein privater Teil gehört nicht in diesen Satz (Req 16.12, 16.23).
 
 ## Jährliche Übung und Nachweis

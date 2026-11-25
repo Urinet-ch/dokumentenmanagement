@@ -161,11 +161,20 @@ public class ChatAuswertungSchritte {
 
     @Angenommen("im Mandanten «{word}» gibt es eine synthetische Chat-Bewertung mit {int} Sternen")
     public void bewertungAnlegen(String mandant, int sterne) throws SQLException {
-        bewertungAnlegen(mandant, sterne, Chatmodus.ARCHIV.name());
+        bewertungAnlegen(mandant, sterne, Chatmodus.ARCHIV.name(), FRAGE + frageZusatz);
     }
 
     @Angenommen("im Mandanten «{word}» gibt es eine synthetische Chat-Bewertung mit {int} Sternen im Modus «{word}»")
     public void bewertungAnlegen(String mandant, int sterne, String modus) throws SQLException {
+        bewertungAnlegen(mandant, sterne, modus, FRAGE + frageZusatz);
+    }
+
+    @Angenommen("im Mandanten «{word}» gibt es eine synthetische Chat-Bewertung mit {int} Sternen und der Frage «{}»")
+    public void bewertungAnlegenMitFrage(String mandant, int sterne, String frage) throws SQLException {
+        bewertungAnlegen(mandant, sterne, Chatmodus.ARCHIV.name(), frage);
+    }
+
+    private void bewertungAnlegen(String mandant, int sterne, String modus, String frageText) throws SQLException {
         String s = schema(mandant);
         UUID gespraech = UUID.randomUUID();
         Instant jetzt = Instant.now();
@@ -187,7 +196,7 @@ public class ChatAuswertungSchritte {
              PreparedStatement frage = verbindung.prepareStatement("insert into " + s
                      + ".chat_nachricht (gespraech_id, rolle, inhalt, zeit) values (?, 'BENUTZER', ?, ?)")) {
             frage.setObject(1, gespraech);
-            frage.setString(2, FRAGE + frageZusatz);
+            frage.setString(2, frageText);
             frage.setTimestamp(3, Timestamp.from(jetzt));
             frage.executeUpdate();
         }
@@ -220,8 +229,8 @@ public class ChatAuswertungSchritte {
         }
     }
 
-    @Angenommen("im Mandanten «{word}» gibt es 5001 synthetische Chat-Bewertungen")
-    public void vieleBewertungenAnlegen(String mandant) throws SQLException {
+    @Angenommen("im Mandanten «{word}» gibt es {int} synthetische Chat-Bewertungen")
+    public void vieleBewertungenAnlegen(String mandant, int anzahl) throws SQLException {
         String s = schema(mandant);
         UUID gespraech = UUID.randomUUID();
         Instant jetzt = Instant.now();
@@ -243,16 +252,17 @@ public class ChatAuswertungSchritte {
                      + "(gespraech_id, rolle, inhalt, status, quellen, zeit) "
                      + "select ?, 'ASSISTENT', 'Synthetische Antwort', 'OK', '[]'::jsonb, "
                      + "?::timestamptz + nummer * interval '1 millisecond' "
-                     + "from generate_series(1, 5001) as reihe(nummer) "
+                     + "from generate_series(1, ?) as reihe(nummer) "
                      + "returning id) insert into " + s + ".chat_bewertung "
                      + "(nachricht_id, benutzer, sterne, erstellt, geaendert) "
                      + "select id, ?, 4, ?, ? from antworten")) {
             daten.setObject(1, gespraech);
             daten.setTimestamp(2, Timestamp.from(jetzt));
-            daten.setString(3, benutzer);
-            daten.setTimestamp(4, Timestamp.from(jetzt));
+            daten.setInt(3, anzahl);
+            daten.setString(4, benutzer);
             daten.setTimestamp(5, Timestamp.from(jetzt));
-            assertThat(daten.executeUpdate()).isEqualTo(5001);
+            daten.setTimestamp(6, Timestamp.from(jetzt));
+            assertThat(daten.executeUpdate()).isEqualTo(anzahl);
         }
     }
 
@@ -368,6 +378,16 @@ public class ChatAuswertungSchritte {
     @Dann("enthält der Chat-Auswertungs-Export die Dateien «{}», «{}» und «{}»")
     public void exportDateien(String eins, String zwei, String drei) {
         assertThat(zipDateien.keySet()).contains(eins, zwei, drei);
+    }
+
+    @Dann("enthält der Chat-Auswertungs-Export {int} Bewertungen")
+    public void exportAnzahl(int anzahl) {
+        assertThat(zipDateien.get("bewertungen.jsonl").lines().count()).isEqualTo(anzahl);
+    }
+
+    @Dann("enthält der Chat-Auswertungs-Export den Text «{}» nicht")
+    public void exportOhneText(String text) {
+        assertThat(String.join("\n", zipDateien.values())).doesNotContain(text);
     }
 
     @Dann("enthält der Chat-Auswertungs-Export den Modus «{word}»")

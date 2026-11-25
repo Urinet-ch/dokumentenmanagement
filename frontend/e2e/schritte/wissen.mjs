@@ -1,5 +1,6 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import axe from 'axe-core';
 import { DOKUMENTE, sucheAttrappe } from '../hilfen/suche-attrappe.mjs';
 import { basisUrl } from '../hilfen/keycloak-attrappe.mjs';
@@ -92,12 +93,28 @@ Then('zeigt die Wissensquellenliste den Leerzustand nach der Entfernung', async 
 
 Given('synthetische Wissensseiten sind für die Oberfläche verfügbar', async function () {
   await sucheAttrappe(this);
+  this.webseitenfreigabe = { freigegeben: false, freigabefaehig: true, hoechsteZugriffsstufe: 'oeffentlich' };
+  this.webseitenAnfragen = [];
+  this.webseitenRevision = 0;
   await this.seite.route((url) => url.pathname.startsWith('/api/v1/wissensseiten')
     || url.pathname === '/api/v1/wissensbasis/log', async (route) => {
     const url = new URL(route.request().url());
     let antwort;
     if (url.pathname === '/api/v1/wissensbasis/log') {
       antwort = { eintraege: [{ id: 1, text: 'Synthetischer Logeintrag', seiten: [] }] };
+    } else if (url.pathname.endsWith('/webseitenfreigabe')) {
+      if (route.request().method() === 'POST') {
+        this.webseitenAnfragen.push({
+          etag: await route.request().headerValue('if-match'),
+          daten: route.request().postDataJSON(),
+        });
+        this.webseitenfreigabe.freigegeben = route.request().postDataJSON().freigeben;
+        this.webseitenRevision++;
+        await route.fulfill({ status: 204 });
+        return;
+      }
+      await route.fulfill({ status: 200, headers: { etag: `"1-${this.webseitenRevision}"` }, json: this.webseitenfreigabe });
+      return;
     } else if (url.pathname.endsWith('/eingehend')) {
       antwort = [{ id: 'seite-0', pfad: 'konzepte/verweis', typ: 'Konzept', titel: 'Synthetische Verweisseite' }];
     } else if (url.pathname.endsWith('/versionen')) {
@@ -144,15 +161,17 @@ async function pruefenUeberlauf(seite) {
   assert.ok(breite.inhalt <= breite.fenster, `Horizontaler Überlauf: ${JSON.stringify(breite)}`);
 }
 
-async function pruefenAnsichten(seite, axePruefen = true) {
+async function pruefenAnsichten(seite, axePruefen = true, bildname = null) {
   for (const farbschema of ['light', 'dark']) {
     for (const breite of [375, 1280]) {
       await seite.setViewportSize({ width: breite, height: breite === 375 ? 812 : 800 });
       await seite.emulateMedia({ colorScheme: farbschema });
-      if (breite === 375) {
-        await seite.getByRole('button', { name: 'Menü öffnen', exact: true }).waitFor();
-      } else {
-        await seite.getByRole('button', { name: 'Menü öffnen', exact: true }).waitFor({ state: 'detached' });
+      if (!(await seite.getByRole('dialog').count())) {
+        if (breite === 375) {
+          await seite.getByRole('button', { name: 'Menü öffnen', exact: true }).waitFor();
+        } else {
+          await seite.getByRole('button', { name: 'Menü öffnen', exact: true }).waitFor({ state: 'detached' });
+        }
       }
       await seite.waitForTimeout(400);
       if (axePruefen) {
@@ -160,9 +179,35 @@ async function pruefenAnsichten(seite, axePruefen = true) {
       } else {
         await pruefenUeberlauf(seite);
       }
+      if (bildname && process.env.WISSEN_BILDER) {
+        await seite.screenshot({ path: join(process.env.WISSEN_BILDER, `${bildname}-${breite}-${farbschema}.png`),
+          fullPage: true });
+      }
     }
   }
 }
+
+Then('ist die Webseitenfreigabe auf Handy und Desktop zugänglich und nur nach Bestätigung veränderbar', { timeout: 90000 },
+  async function () {
+    const seite = this.seite;
+    await seite.getByRole('link', { name: zeile.titel }).click();
+    await seite.getByRole('heading', { name: 'Webseitenfreigabe' }).waitFor();
+    await seite.getByText('Nicht für die Webseite freigegeben', { exact: true }).waitFor();
+    await seite.getByText('Öffentlich', { exact: true }).waitFor();
+    await pruefenAnsichten(seite, true, 'webseitenfreigabe');
+    await seite.getByRole('button', { name: 'Für die Webseite freigeben', exact: true }).click();
+    const dialog = seite.getByRole('dialog');
+    await dialog.getByText('Soll diese Wissensseite für die Webseite freigegeben werden?').waitFor();
+    assert.equal(this.webseitenAnfragen.length, 0);
+    await pruefenAnsichten(seite, true, 'webseitenfreigabe-dialog');
+    await dialog.getByRole('button', { name: 'Für die Webseite freigeben' }).click();
+    await seite.getByText('Für die Webseite freigegeben', { exact: true }).waitFor();
+    assert.deepEqual(this.webseitenAnfragen, [{ etag: '"1-0"', daten: { freigeben: true } }]);
+    await seite.getByRole('button', { name: 'Webseitenfreigabe entziehen' }).click();
+    await seite.getByRole('dialog').getByRole('button', { name: 'Webseitenfreigabe entziehen' }).click();
+    await seite.getByText('Nicht für die Webseite freigegeben', { exact: true }).waitFor();
+    assert.deepEqual(this.webseitenAnfragen[1], { etag: '"1-1"', daten: { freigeben: false } });
+  });
 
 Then('stehen Wissensseiten mit Titel, Typ und Beschreibung über den Dokumenttreffern und öffnen ihre Seite',
   async function () {
