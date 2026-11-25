@@ -184,6 +184,7 @@ public class OeffentlicherChatResource {
             case OeffentlicheAusgabe.Werkzeug w -> JSON.createObjectNode().put("werkzeug", w.werkzeug()).toString();
             case OeffentlicheAusgabe.Text t -> JSON.createObjectNode().put("delta", t.delta()).toString();
             case OeffentlicheAusgabe.Quellen q -> quellen(q).toString();
+            case OeffentlicheAusgabe.WissenQuellen q -> JSON.valueToTree(q.quellen()).toString();
             case OeffentlicheAusgabe.Fertig f -> JSON.createObjectNode().put("gespraechId", f.gespraechId().toString())
                     .put("hinweis", hinweis).toString();
             case OeffentlicheAusgabe.Fehler f -> JSON.createObjectNode().put("meldung", f.meldung())

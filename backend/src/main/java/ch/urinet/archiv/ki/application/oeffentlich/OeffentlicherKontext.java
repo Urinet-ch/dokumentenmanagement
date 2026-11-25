@@ -6,7 +6,11 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import java.util.Objects;
 
 /** Was die Werkzeuge einer öffentlichen Frage vom Server wissen: Mandant und Lesezugriff, nie vom Modell. */
-public record OeffentlicherKontext(MandantCode mandant, Lesezugriff zugriff) {
+public record OeffentlicherKontext(MandantCode mandant, Lesezugriff zugriff, OeffentlichesWissenDurchgang wissen) {
+
+    public OeffentlicherKontext(MandantCode mandant, Lesezugriff zugriff) {
+        this(mandant, zugriff, null);
+    }
 
     public OeffentlicherKontext {
         Objects.requireNonNull(mandant, "mandant");
