@@ -301,7 +301,7 @@ auf Server oder Secrets aus der Sitzung.
     Einrichten und Entfernen in der Kontoverwaltung sind nicht aktiv; Entscheid zur Aktivierung bei Fabian.
   - _Anforderungen: 10.5, 10.6, 10.7_
   - _Abhängig von: 24.1, 19.8, 20.7_
-- [ ] 24.3 Anleitung und Inbetriebnahme [Fabian]
+- [x] 24.3 Anleitung und Inbetriebnahme [Fabian]
   - Anleitung (Spec 07, `frontend/public/anleitung/`) um «Mit Passkey anmelden» ergänzen; auf Stufe A Realm einmalig aktualisieren, Relying-Party-ID
     setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
   - _Anforderungen: 10.1, 10.2, 10.8_
@@ -310,6 +310,11 @@ auf Server oder Secrets aus der Sitzung.
     kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
     Related Origins und Gerätetest stehen aus. Req 10.7 (Entscheid Fabian 25.11.2026): Die Ereignisse werden aktiviert, der
     Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).
+  - Nachweis 25.11.2026 (Fabian): Realm auf Stufe A eingerichtet; Rückfall, Related Origins, Passkey einrichten/anmelden/Step-up/entfernen
+    (iPhone und Mac), «Passkeys löschen» und TOTP-Pflicht bei Passwortanmeldung bestätigt (design.md, «Umsetzung (Aufgabe 24.3
+    Inbetriebnahme, 25.11.2026)»). Offen: Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL` (Admin-Konsole nicht öffentlich,
+    Hilfsskript fehlt).
+  - Abgenommen von Fabian am 25.11.2026; offen: Ereignisprotokoll-Probe (UPDATE_CREDENTIAL/REMOVE_CREDENTIAL), Hilfsskript folgt separat.
 - [x] 24.4 Einstieg zur Kontoverwaltung (Passkey) [Frontend]
   - Die Kopfzeile zeigt jedem angemeldeten Benutzer «Passkey einrichten» (Schlüssel-Symbol, daneben «Hilfe»); der Link öffnet die
     Kontoverwaltung des Realms (`<Aussteller>/account`, Aussteller aus der OIDC-Konfiguration der App) in einem neuen Tab

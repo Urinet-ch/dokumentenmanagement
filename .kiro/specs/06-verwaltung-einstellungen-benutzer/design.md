@@ -1103,6 +1103,17 @@ Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fa
   (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR. Nicht belegt (beim ersten Lauf auf der VPS prüfen, Prüfzeilen im README): Ausführung auf der VPS, der
   `docker compose run`-Aufruf, Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io`.
 
+### Umsetzung (Aufgabe 24.3 Inbetriebnahme, 25.11.2026)
+
+Fabian hat die Passkey-Inbetriebnahme auf Stufe A ausgeführt (`passkey-einrichten-vorlage.sh --ereignisse`: Prüflauf Exit 10, Einrichten
+Exit 0 mit 18 Änderungen, Nachprüfung Exit 0, Wiederholung «nichts zu tun»). Auf iPhone und Mac bestätigt: Passwort-und-TOTP-Rückfall,
+Related Origins (`/.well-known/webauthn`: 200, JSON, richtige Origin, keine Weiterleitung), Passkey einrichten, anmelden, Step-up und
+entfernen, «Zugang zurücksetzen» mit «Passkeys löschen» sowie TOTP bei Passwortanmeldung trotz Passkey. Auf der VPS damit belegt:
+Ausführung, `docker compose run`-Aufruf, Secret-Lesbarkeit für Benutzer 1000, `ghcr.io`, `jq` im Container; die Werkzeuge liegen in
+`/opt/archiv-werkzeuge` (als root ist `$HOME` für Benutzer 1000 nicht durchsuchbar). **Offen:** Probe `UPDATE_CREDENTIAL` und
+`REMOVE_CREDENTIAL` im Ereignisprotokoll (Admin-Konsole nicht öffentlich, Hilfsskript für `kcadm.sh get events` fehlt); Req 10.7
+bleibt bis dahin nur teilweise belegt.
+
 ## Umsetzung (Aufgabe 24.4 Link zur Kontoverwaltung, 25.11.2026)
 - **Ziel (Req 10.1):** Ein angemeldeter Benutzer findet den Einstieg zur Passkey-Einrichtung, ohne die Keycloak-Adresse zu kennen. Die
   WebAuthn-Registrierung bleibt in der Kontoverwaltung von Keycloak (`webauthn-register-passwordless`); die App baut sie nicht nach.

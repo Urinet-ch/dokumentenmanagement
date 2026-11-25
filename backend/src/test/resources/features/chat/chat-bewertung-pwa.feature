@@ -1,5 +1,5 @@
 # language: de
-@spec-02 @browser @attrappe
+@spec-02 @browser @attrappe @req-15.11
 Funktionalität: Chat-Antworten in der PWA bewerten
 
   @req-15.1 @req-15.9
