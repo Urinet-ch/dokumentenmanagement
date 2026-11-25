@@ -506,6 +506,15 @@ Umsetzung (Aufgabe 11.11; Stand: Baustein, Lese-Endpunkte und echter Upload umge
   Konfigurationsprüfung nachvollzogen. Die tatsächliche Kalibrierung am Livegang bleibt ein manueller Nachweis über
   `archiv_webseite_grenze_abgelehnt_total` und die 429-Einträge im Zugriffsprotokoll; sie ist nicht lokal ersetzbar.
 
+## Umsetzung (Aufgabe 11.11, 25.11.2026)
+- `docs/webseiten-grenzen-kalibrierung.md` beschreibt die Messung je synthetischem Schlüssel-Alias und die CSV-Eingabe;
+  Rohdaten und Alias-Zuordnung bleiben ausserhalb des Repositories. Startwerte werden nicht ohne Messung angepasst.
+- `tools/webseiten_grenzen_auswertung.py` berechnet je Alias, Grenze und Modus P95 der angebotenen Dauerlast oder den
+  grössten Stoss, 429-Anteil und Auslastung gegenüber dem wirksamen Startwert. Nicht-429-Antworten werden nicht als
+  erfolgreiche Antworten bezeichnet. Das Skript ändert keine Konfiguration.
+- Die synthetischen Tests prüfen Auswertung, Eingabevalidierung und die Abgrenzung von Nicht-429-Antworten. Die Messung
+  am Livegang bleibt bei Fabian; Aufgabe 11.11 bleibt deshalb unabgehakt.
+
 ### WordPress-Plugin `wordpress/urinet-archiv-plugin`
 Nutzer des Vertrags `public-v1` (geändert 13.11.2026, E-B): Das Plugin nutzt nur, was in `docs/schnittstelle/public-v1.yaml`
 steht, und ignoriert unbekannte Felder (Requirement 11.6).
