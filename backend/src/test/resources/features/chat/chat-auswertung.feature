@@ -1,5 +1,5 @@
 # language: de
-@spec-02
+@spec-02 @req-15.11
 Funktionalität: Chat-Bewertungen auswerten und exportieren
   Der Inhaber wertet nur die Bewertungen des eigenen Mandanten aus und exportiert sie als geschwärztes ZIP.
   Alle Daten in diesen Szenarien sind synthetisch.

@@ -139,7 +139,8 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
     `chat-auswertung.feature` prüft den Export ohne fremde Mandantendaten, die Grenze 5'000/5'001 und 403 beim Lesen/Export
     für Rollen, API-Token und Webseiten-Schlüssel. `chat-bewertungen.feature` prüft fremde Gespräche (404) und Löschung
     nach 12 Monaten. Schwärzung aller Muster und Schema sind durch `SchwaerzungTest` und `ChatBewertungAuswertungTest`
-    belegt.
+    belegt. Nachtrag 25.11.2026: Die vier Rating-/Auswertungs-Features führen zusätzlich `@req-15.11` als Zuordnung der
+    Kriterienabdeckung.
 
 ## Optionen
 Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit den Aufgaben 10.x von Spec 03 kollidieren. Spec 04 belegt die Nummern O.4–O.6.

@@ -486,6 +486,10 @@ Webseiten-Schlüssel; `chat-bewertungen.feature` belegt 404 für fremde Gespräc
 12 Monaten. Die synthetischen Schwärzungsmuster sind durch `ChatAuswertungSchritte` und `SchwaerzungTest` abgedeckt;
 `ChatBewertungAuswertungTest` validiert einen JSONL-Datensatz gegen das `schema.json` aus dem erzeugten ZIP.
 
+Nachtrag 25.11.2026: Die vier Feature-Dateien mit den Abnahmefällen zu Bewertungen und Auswertung tragen zusätzlich
+`@req-15.11`; damit ist die übergreifende Testabdeckung der Kriterien 15.1–15.10 selbst in der Repo-Abdeckungsprüfung
+zugeordnet.
+
 ## Error Handling
 - Chat: Werkzeugfehler werden dem Agenten als `{"fehler":"…"}` zurückgegeben; der Agent sagt, dass die Information nicht verfügbar ist. Modell nicht erreichbar → SSE `fehler` mit «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» Fehler vor dem Stream (400, 404, 429) und die Form von `fehler` nach «Vertrag Welle 7» (ergänzt 14.11.2026).
 - IMAP-Ausfall: Auftrag nicht wiederholen, nächster Lauf in 10 Min.; nach 6 Fehlschlägen in Folge E-Mail an Inhaber.
