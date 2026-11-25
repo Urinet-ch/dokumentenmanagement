@@ -70,10 +70,11 @@ public class JdbcBenutzerAktivitaet implements BenutzerAktivitaet, BenutzerEinla
     }
 
     @Override
-    public void speichern(String benutzer, Duration gueltigkeit) {
+    public void speichern(String benutzer, Instant versendetAm, Duration gueltigkeit) {
         if (benutzer == null || benutzer.isBlank()) {
             throw new IllegalArgumentException("Benutzerkennung ist Pflicht");
         }
+        Objects.requireNonNull(versendetAm);
         Objects.requireNonNull(gueltigkeit);
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
             throw new IllegalArgumentException("Ungültige Einladungsgültigkeit");
@@ -81,7 +82,6 @@ public class JdbcBenutzerAktivitaet implements BenutzerAktivitaet, BenutzerEinla
         if (!QuarkusTransaction.isActive()) {
             throw new IllegalStateException("Einladungsablauf nur in einer Transaktion speichern");
         }
-        Instant versendetAm = Instant.now();
         Instant gueltigBis = versendetAm.plus(gueltigkeit);
         String sql = "insert into " + schema() + ".benutzer_einladung (benutzer, versendet_am, gueltig_bis) "
                 + "values (?, ?, ?) on conflict (benutzer) do update set "

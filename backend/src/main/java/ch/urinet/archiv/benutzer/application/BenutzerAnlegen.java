@@ -135,6 +135,7 @@ public class BenutzerAnlegen {
                 ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
         AtomicBoolean vierAugen = new AtomicBoolean();
         AtomicBoolean arbeitAbgeschlossen = new AtomicBoolean();
+        AtomicReference<Instant> versendetAm = new AtomicReference<>();
         AtomicReference<String> angelegt = new AtomicReference<>();
         try {
             return vorgang.ausfuehren(mandant, absicht, () -> {
@@ -164,6 +165,7 @@ public class BenutzerAnlegen {
                     throw new FachFehler(Fehlercode.IDENTITAETSDIENST_FEHLER);
                 }
                 try {
+                    versendetAm.set(Instant.now());
                     identitaet.einladen(mandant.wert(), id, AKTIONEN, einladung);
                 } catch (RuntimeException fehler) {
                     throw new VerwaltungVorgang.ArbeitFehler(ziel, fehler);
@@ -187,7 +189,7 @@ public class BenutzerAnlegen {
                 }
                 return VerwaltungVorgang.Kompensation.UNKLAR;
             }, ergebnis -> {
-                einladungen.speichern(ergebnis.id().toString(), einladung);
+                einladungen.speichern(ergebnis.id().toString(), versendetAm.get(), einladung);
                 namen.sperren(eingabe.benutzername());
                 verzeichnis.einfuegen(Optional.empty(), new BenutzerVerzeichnis.Neu(ergebnis.id().toString(),
                         Optional.of(eingabe.benutzername()), vierAugen.get() ? Optional.empty() : Optional.of(rolle.name()),

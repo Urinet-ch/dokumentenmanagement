@@ -774,8 +774,11 @@ und sein vollständiger Nachweis zu 7.4 bleiben offen.
 Changeset 141 ergänzt im Mandantenschema `benutzer_einladung` mit Versandzeit und Ablaufgrenze, einer positiven
 Maximaldauer von sieben Tagen und Rollback. Die Ablaufgrenze wird aus derselben `Duration` berechnet, die der
 Versandpfad an `execute-actions-email` übergibt. Gespeichert wird sie erst im Abschluss nach erfolgreichem Versand;
-ein Versandfehler lässt den bisherigen Eintrag unverändert. Anlage, Reaktivierung und erneutes Senden verwenden
-denselben Pfad. Eine Realm-Konfiguration wird nicht als Ersatz für die konkrete Versanddauer gelesen.
+ein Versandfehler lässt den bisherigen Eintrag unverändert. Anlage, Reaktivierung, erneutes Senden, Zugang
+zurücksetzen und E-Mail-Änderung (nur mit neuer Adresse, `VERIFY_EMAIL`) verwenden denselben Pfad; `KeycloakAdminAdapter.einladen`
+ist der einzige Aufrufer von `execute-actions-email`, und jeder seiner fünf Aufrufer speichert im Abschluss. Die Versandzeit wird
+unmittelbar vor `einladen` gemessen und an `speichern` übergeben: die gespeicherte Grenze liegt höchstens um die Versanddauer
+früher als die echte, nie später («Nicht abgelaufen» wird nie zu lange gezeigt). Eine Realm-Konfiguration wird nicht als Ersatz für die konkrete Versanddauer gelesen.
 
 Liste und Detail liefern `einladungGueltigBis`; fehlende Einträge bleiben bei Altbeständen unbekannt. Die Grenze
 fliesst in den ETag ein. Der bestehende Mandantenkontext und die Rechte der Benutzer-API bleiben unverändert.
@@ -784,6 +787,17 @@ Die Oberfläche nennt den letzten Versand «Letzter Einladungsversand» und zeig
 fehlgeschlagenen Versand und Altbestand; `BenutzerEtagTest` prüft die Versionsänderung. Die Browser-Szenarien
 `@req-7.4` prüfen die drei Zustände in Liste und Detail bei 375 und 1280 px in hell und dunkel, einschliesslich
 Überlauf- und axe-Prüfung. `VerwaltungCacheHttpTest` deckt die Benutzer-API und Mandantentrennung ab.
+
+Schlägt nach erfolgreichem Versand nur das Speichern fehl, bleibt der alte Eintrag stehen; der Vorgang endet als `UNKLAR`
+(Protokoll, Fehlermeldung ohne Personendaten) und die Vorgangssperre verhindert eine blinde Wiederholung. Der alte Eintrag
+liegt vor der neuen Grenze und zeigt höchstens zu früh «Abgelaufen» (sichtbar, Link bleibt gültig), nie zu spät
+«Nicht abgelaufen»; deshalb wird er nicht vorab gelöscht. `EinladungVersandpfadeTest` belegt je Pfad (Zugang zurücksetzen,
+E-Mail-Änderung) Erfolg, Fehlversand ohne Schreiben, Namensänderung ohne Schreiben und den Fall «Versand ok, Speichern
+fehlgeschlagen».
+
+«Abgelaufen» wird im Browser mit der Geräteuhr bestimmt (`einladungAblauf`); eine falsch gehende Uhr kann den Hinweis
+verfälschen. Das gilt als bekannte Einschränkung: die Anzeige ist ein Hinweis, der Server prüft die Gültigkeit des Links
+nicht über diese Anzeige. Changeset 141 liegt ausserhalb der Spuren 120–129 und 130–139; die Nummer ist frei.
 
 Die Anleitungen in `frontend/public/anleitung/verwaltung.md` und `docs/anleitung-verwaltung.md` beschreiben die
 gespeicherte Ablaufgrenze und das Verhalten bei fehlgeschlagenem Versand. Betriebsnachweise aus Aufgabe 19.3

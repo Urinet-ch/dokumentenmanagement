@@ -16,6 +16,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.EnumSet;
@@ -34,10 +35,12 @@ public class BenutzerAendern {
     private final VerwaltungVorgang vorgang;
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
+    private final BenutzerEinladungSpeicher einladungen;
     private final Duration gueltigkeit;
 
     public BenutzerAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
                                BenutzerAktivitaet aktivitaet, BenutzerMitteilung mitteilung,
+                               BenutzerEinladungSpeicher einladungen,
                                VerwaltungVorgang vorgang, Berechtigung berechtigung,
                                StepUp stepUp, @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit",
                                        defaultValue = "PT24H") Duration gueltigkeit) {
@@ -46,6 +49,7 @@ public class BenutzerAendern {
         }
         this.identitaet = identitaet;
         this.status = status;
+        this.einladungen = einladungen;
         this.aktivitaet = aktivitaet;
         this.mitteilung = mitteilung;
         this.vorgang = vorgang;
@@ -76,6 +80,7 @@ public class BenutzerAendern {
         UUID vorgangId = UUID.randomUUID();
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
         AtomicBoolean emailGeaendert = new AtomicBoolean();
+        AtomicReference<Instant> versendetAm = new AtomicReference<>();
         var felder = new ArrayList<ProtokollDetails.Verwaltungsfeld>();
         if (email != null) {
             felder.add(ProtokollDetails.Verwaltungsfeld.EMAIL);
@@ -118,13 +123,18 @@ public class BenutzerAendern {
                         aktionen.add(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL);
                         identitaet.aktionenHinzufuegen(mandant.wert(), id,
                                 Set.of(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL));
+                        versendetAm.set(Instant.now());
                         identitaet.einladen(mandant.wert(), id, aktionen, gueltigkeit);
                         mitteilung.emailGeaendert(gefunden.get().email());
                     }
                     return ziel;
                 }, fehler -> fehler instanceof IdentitaetsDienst.KonfliktException && !emailGeaendert.get()
                         ? VerwaltungVorgang.Kompensation.GEKLAERT : VerwaltungVorgang.Kompensation.UNKLAR,
-                ignoriert -> { },
+                ignoriert -> {
+                    if (emailGeaendert.get()) {
+                        einladungen.speichern(id, versendetAm.get(), gueltigkeit);
+                    }
+                },
                 ignoriert -> eintrag(akteur, ip, vorgangId, ziel, art, felder,
                         ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
         } catch (IdentitaetsDienst.KonfliktException e) {

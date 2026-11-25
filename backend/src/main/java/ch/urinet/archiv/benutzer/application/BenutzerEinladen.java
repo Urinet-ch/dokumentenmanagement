@@ -12,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,6 +53,7 @@ public class BenutzerEinladen {
         UUID vorgangId = UUID.randomUUID();
         ZugriffEintrag absicht = eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
+        AtomicReference<Instant> versendetAm = new AtomicReference<>();
         vorgang.ausfuehren(mandant, absicht, () -> {
             IdentitaetsDienst.Benutzer benutzer = identitaet.benutzerLesen(mandant.wert(), id);
             if (!benutzer.aktiv() || benutzer.aktionen().isEmpty() || benutzer.rollen().size() > 1
@@ -60,10 +62,11 @@ public class BenutzerEinladen {
             }
             gefunden.set(benutzer);
         }, () -> {
+            versendetAm.set(Instant.now());
             identitaet.einladen(mandant.wert(), id, gefunden.get().aktionen(), gueltigkeit);
             return ziel;
         }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR,
-                ignoriert -> einladungen.speichern(id, gueltigkeit),
+                ignoriert -> einladungen.speichern(id, versendetAm.get(), gueltigkeit),
                 ignoriert -> eintrag(akteur, ip, vorgangId, ziel,
                         ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
     }

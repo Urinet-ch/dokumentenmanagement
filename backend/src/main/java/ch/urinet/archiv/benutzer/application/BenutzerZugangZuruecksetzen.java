@@ -32,6 +32,7 @@ public class BenutzerZugangZuruecksetzen {
 
     private final IdentitaetsDienst identitaet;
     private final BenutzerStatusSpeicher status;
+    private final BenutzerEinladungSpeicher einladungen;
     private final VerwaltungVorgang vorgang;
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
@@ -39,7 +40,7 @@ public class BenutzerZugangZuruecksetzen {
     private final Duration gueltigkeit;
 
     public BenutzerZugangZuruecksetzen(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
-                                      VerwaltungVorgang vorgang, Berechtigung berechtigung, StepUp stepUp,
+                                      BenutzerEinladungSpeicher einladungen, VerwaltungVorgang vorgang, Berechtigung berechtigung, StepUp stepUp,
                                       TokenWiderruf tokenWiderruf,
                                       @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit",
                                               defaultValue = "PT24H") Duration gueltigkeit) {
@@ -48,6 +49,7 @@ public class BenutzerZugangZuruecksetzen {
         }
         this.identitaet = identitaet;
         this.status = status;
+        this.einladungen = einladungen;
         this.vorgang = vorgang;
         this.berechtigung = berechtigung;
         this.stepUp = stepUp;
@@ -78,6 +80,7 @@ public class BenutzerZugangZuruecksetzen {
         }
         UUID vorgangId = UUID.randomUUID();
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
+        AtomicReference<Instant> versendetAm = new AtomicReference<>();
         vorgang.ausfuehren(mandant,
                 eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ANGEFRAGT, null),
                 () -> {
@@ -107,13 +110,14 @@ public class BenutzerZugangZuruecksetzen {
                     identitaet.otpEntfernen(mandant.wert(), id);
                     int entfernt = passkeys ? identitaet.passkeysEntfernen(mandant.wert(), id) : -1;
                     identitaet.sitzungenBeenden(mandant.wert(), id);
+                    versendetAm.set(Instant.now());
                     identitaet.einladen(mandant.wert(), id, aktionen, gueltigkeit);
                     tokenWiderruf.setzen(id, Instant.now());
                     return entfernt;
                 }, fehler -> {
                     tokenWiderruf.setzen(id, Instant.now());
                     return VerwaltungVorgang.Kompensation.UNKLAR;
-                }, ignoriert -> { },
+                }, ignoriert -> einladungen.speichern(id, versendetAm.get(), gueltigkeit),
                 entfernt -> eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN,
                         entfernt < 0 ? null : entfernt));
     }

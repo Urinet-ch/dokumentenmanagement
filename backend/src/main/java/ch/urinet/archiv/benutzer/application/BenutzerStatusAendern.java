@@ -81,6 +81,7 @@ public class BenutzerStatusAendern {
         }
         UUID vorgangId = UUID.randomUUID();
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
+        AtomicReference<Instant> versendetAm = new AtomicReference<>();
         verwaltung.ausfuehren(mandant, eintrag(akteur, ip, vorgangId, ziel, vorgang, kategorie,
                         ProtokollDetails.Verwaltungsphase.ANGEFRAGT),
                 () -> {
@@ -134,6 +135,7 @@ public class BenutzerStatusAendern {
                             identitaet.aktionenHinzufuegen(mandant.wert(), id, aktionen);
                             identitaet.otpEntfernen(mandant.wert(), id);
                             identitaet.aktivieren(mandant.wert(), id, true);
+                            versendetAm.set(Instant.now());
                             identitaet.einladen(mandant.wert(), id, aktionen, gueltigkeit);
                         }
                     }
@@ -152,7 +154,7 @@ public class BenutzerStatusAendern {
                         }
                     } else {
                         if (vorgang == Vorgang.REAKTIVIEREN) {
-                            einladungen.speichern(id, gueltigkeit);
+                            einladungen.speichern(id, versendetAm.get(), gueltigkeit);
                         }
                         status.entfernen(id);
                     }
