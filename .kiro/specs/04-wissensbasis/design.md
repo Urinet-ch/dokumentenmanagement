@@ -1520,13 +1520,19 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
 - `archiv.oeffentliche.fragen.ohne.beleg{mandant}` zählt je aktivem Mandanten die gespeicherten Zeilen aus
   `oeffentliche_frage`, deren `quellen` dem leeren JSON-Array entspricht. Das Monitoring liest weder Fragen noch Quellen;
   die Kennzahl wird mit der bestehenden periodischen Kennzahlen-Erhebung aktualisiert.
+- **Entscheid Fabian 25.11.2026:** Der Zähler umfasst Zeilen aus Archivchat und Wissenschat. `oeffentliche_frage` hat
+  keine Spalte zur Trennung der Chat-Modi; separate Zähler würden eine Schemaänderung erfordern, die nicht vorgenommen
+  wird.
 - Vor dem Modellaufruf prüft der Wissenschat, ob mindestens eine aktuell freigegebene, öffentlich sichtbare Wissensseite
   verfügbar ist. Ohne solche Seite liefert er den festen Hinweis ohne Modellaufruf.
+- **Entscheid Fabian 25.11.2026:** Fehlt eine aktuell freigegebene, öffentlich sichtbare Wissensseite, erfolgt kein
+  Modellaufruf; die Frage wird weiterhin inhaltsfrei mit leerem Quellenarray protokolliert.
 - Es gibt keine Schemaänderung; der tägliche Aufräumjob entfernt alte Zeilen auch aus der gemessenen Anzahl. Fehler beim
   Zählen entfernen nur die betroffene Gauge und lassen die übrigen Kennzahlen des Mandanten bestehen.
 - JUnit prüft leere gegen nichtleere Quellen in beiden Mandantenschemas und den Gauge-Tag `mandant`. Die beiden
   Ausschluss-Szenarien in `oeffentlicher-wissenschat.feature` prüfen ausserdem `KiWireMock.chatAnfragen()` auf leer
-  und kontrollieren die Unsichtbarkeit im zweiten Mandanten.
+  und kontrollieren die Unsichtbarkeit im zweiten Mandanten. Der Fall ohne aktuelle Webseitenfreigabe prüft zudem genau
+  eine inhaltsfreie gespeicherte Zeile mit leerem Quellenarray.
 
 ## Wissensquelle als Markierung (Requirement 20, Entscheid Fabian 21.11.2026)
 Die Dokumentart `WISSENSQUELLE` wird entfernt (Entscheid Fabian 21.11.2026) und ist nicht mehr der Weg, ein Dokument zur Wissensquelle zu machen. Stattdessen:
