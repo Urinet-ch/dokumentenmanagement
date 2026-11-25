@@ -21,6 +21,8 @@ import java.util.stream.Collectors;
  * der Abruf von {@code /q/metrics}; ein neuer Mandant erhält seine Gauges beim nächsten Takt. Liefert ein Mandant
  * keinen Stand (Erhebung gescheitert oder nicht mehr aktiv), entfernt der Takt seine Gauges, statt den letzten Wert
  * stehen zu lassen (Review PR #91); im Monitoring fehlt die Reihe dann.
+ * Scheitert nur das Zählen der KI-Beispiele, bleibt der übrige Stand erhalten und nur dessen Gauge fehlt bis zur
+ * nächsten erfolgreichen Erhebung.
  * {@code /q/metrics} ist nur intern erreichbar (Traefik leitet nur {@code /q/health/live} weiter).
  */
 @ApplicationScoped
@@ -59,7 +61,14 @@ public class MicrometerKennzahlen {
             stand.auftraege().forEach((status, anzahl) -> wert("archiv.auftraege", mandant, status).set(anzahl));
             stand.dokumente().forEach((status, anzahl) -> wert("archiv.dokumente", mandant, status).set(anzahl));
             wert("archiv.eingangskorb", mandant, null).set(stand.eingangskorb());
-            wert("archiv.ki.beispiele", mandant, null).set(stand.kiBeispiele());
+            if (stand.kiBeispiele().isPresent()) {
+                wert("archiv.ki.beispiele", mandant, null).set(stand.kiBeispiele().getAsLong());
+            } else {
+                Eintrag eintrag = werte.remove(new Schluessel("archiv.ki.beispiele", mandant, null));
+                if (eintrag != null) {
+                    registry.remove(eintrag.gauge());
+                }
+            }
         }
     }
 
