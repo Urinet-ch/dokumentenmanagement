@@ -185,15 +185,14 @@ echo "Exit: $?"
 `--pruefen --ereignisse` (erwartet Exit 0). Auch das erste `--pruefen` darf `--ereignisse` tragen, dann zählen die Ereignisse als
 Abweichung mit. Probe: Nach einer Passkey-Einrichtung in der Kontoverwaltung erscheint `UPDATE_CREDENTIAL` im Ereignisprotokoll des
 Realms. Die Admin-Konsole ist über Traefik nicht öffentlich; die Ereignisse werden über `kcadm` im Wegwerf-Container gelesen
-(Hilfsskript noch nicht vorhanden, Probe offen).
+(Hilfsskript `ereignisse-auflisten-vorlage.sh`, siehe «Passkey-Ereignisse auflisten»; Probe am 25.11.2026 belegt).
 
 **Beim ersten Lauf auf der VPS (25.11.2026, Fabian) belegt:** Ausführung auf der VPS selbst, der `docker compose run`-Aufruf,
 Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io` und `jq` im Container. Der Lauf mit `--ereignisse`
 endete so: Prüflauf Exit 10, Einrichten Exit 0 (18 Änderungen), Nachprüfung Exit 0; ein weiterer Lauf meldet «nichts zu tun».
 Lokal belegt waren zuvor die Vorlage selbst (Stub-Test und Echt-Test gegen Keycloak 26.8.2, mit `docker run`).
 
-**Weiter nicht belegt:** die Probe auf `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` im Ereignisprotokoll. Die Admin-Konsole ist nicht
-öffentlich, und ein Hilfsskript, das die Ereignisse per `kcadm.sh get events` im Wegwerf-Container listet, fehlt noch.
+**Ereignis-Probe belegt (25.11.2026):** `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` stehen im Ereignisprotokoll, siehe «Passkey-Ereignisse auflisten».
 
 Ist die Secret-Datei für den Benutzer 1000 nicht lesbar, meldet `vorlage-ausfuehren.sh` «Die Secret-Datei des Keycloak-Admins fehlt
 oder ist leer». Die Rechte der Secrets nicht pauschal öffnen, sondern nur so anpassen, wie es der Dienst `kc` braucht.
@@ -294,8 +293,20 @@ echo "Exit: $?"
 Die Anmeldung läuft wie bei den anderen Vorlagen über `vorlage-ausfuehren.sh` (Passwort nie im Terminal). Die Tests:
 `bash deploy/infomaniak/keycloak/test/ereignisse-auflisten-vorlage-test.sh` (kcadm-Stub, kein Docker) und
 `test/ereignisse-auflisten-keycloak-test.sh` (Wegwerf-Keycloak; mit `PASSKEY_PLAYWRIGHT_VERZEICHNIS` richtet ein virtueller
-Authenticator einen Passkey ein und das echte `UPDATE_CREDENTIAL` wird gelistet). Beide laufen nicht in der CI. Nicht belegt: der Lauf
-auf der VPS selbst und `REMOVE_CREDENTIAL` (kein Test entfernt einen Passkey).
+Authenticator einen Passkey ein und das echte `UPDATE_CREDENTIAL` wird gelistet). Beide laufen nicht in der CI. Der Lauf auf der VPS ist belegt (25.11.2026, Exit 0), auch
+`REMOVE_CREDENTIAL` im Echtbetrieb (Entfernen eines Passkeys in der Kontoverwaltung); der Echt-Test gegen das Wegwerf-Keycloak entfernt selbst keinen Passkey.
+
+**Beispielausgabe** (Echtlauf vom 25.11.2026, Benutzerkennung durch Platzhalter ersetzt; alle Ereignisse einer Benutzerkennung, Client `account-console`):
+
+```text
+13:12:00Z  UPDATE_CREDENTIAL  <benutzer-uuid>  account-console
+16:01:23Z  REMOVE_CREDENTIAL  <benutzer-uuid>  account-console
+16:03:09Z  UPDATE_CREDENTIAL  <benutzer-uuid>  account-console
+16:03:48Z  UPDATE_CREDENTIAL  <benutzer-uuid>  account-console
+Summe UPDATE_CREDENTIAL: 3
+Summe REMOVE_CREDENTIAL: 1
+```
+Die Zeilen sind sinngemäss wiedergegeben (Zeit, Typ, Benutzerkennung, Client); das genaue Format gibt das Skript vor.
 
 ## Nachbesserung Review (PR #334)
 

@@ -297,8 +297,8 @@ auf Server oder Secrets aus der Sitzung.
 - [x] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
   - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
     Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
-  - Req 10.7 nur teilweise erfüllt: Die Keycloak-Ereignisse `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` für
-    Einrichten und Entfernen in der Kontoverwaltung sind nicht aktiv; Entscheid zur Aktivierung bei Fabian.
+  - Req 10.7: Die Keycloak-Ereignisse `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` für Einrichten und Entfernen in der
+    Kontoverwaltung sind aktiviert (Entscheid Fabian 25.11.2026) und auf Stufe A belegt (siehe 24.3, Nachweis Ereignis-Probe).
   - _Anforderungen: 10.5, 10.6, 10.7_
   - _Abhängig von: 24.1, 19.8, 20.7_
 - [x] 24.3 Anleitung und Inbetriebnahme [Fabian]
@@ -312,12 +312,13 @@ auf Server oder Secrets aus der Sitzung.
     Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).
   - Nachweis 25.11.2026 (Fabian): Realm auf Stufe A eingerichtet; Rückfall, Related Origins, Passkey einrichten/anmelden/Step-up/entfernen
     (iPhone und Mac), «Passkeys löschen» und TOTP-Pflicht bei Passwortanmeldung bestätigt (design.md, «Umsetzung (Aufgabe 24.3
-    Inbetriebnahme, 25.11.2026)»). Offen: Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL` (Admin-Konsole nicht öffentlich;
-    Hilfsskript siehe nächster Punkt).
-  - Abgenommen von Fabian am 25.11.2026; offen: Ereignisprotokoll-Probe (UPDATE_CREDENTIAL/REMOVE_CREDENTIAL), Hilfsskript liegt vor (nächster Punkt).
+    Inbetriebnahme, 25.11.2026)»). Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL`: später belegt (Nachweis Ereignis-Probe unten).
+  - Abgenommen von Fabian am 25.11.2026; Ereignisprotokoll-Probe (UPDATE_CREDENTIAL/REMOVE_CREDENTIAL) danach belegt (siehe unten).
   - Hilfsskript Ereignis-Probe 25.11.2026: `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet `UPDATE_CREDENTIAL`
     und `REMOVE_CREDENTIAL` ohne Admin-Konsole (design.md, «Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)»). Abnahme von 24.3 erfolgt;
-    Probe der Ereignisse offen bis Ausführung auf der VPS (`REMOVE_CREDENTIAL` im Echtbetrieb nicht belegt). Aufgabe bleibt abgehakt.
+    Aufgabe bleibt abgehakt.
+  - Nachweis Ereignis-Probe 25.11.2026 (Fabian, VPS, Stufe A): `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL --typ REMOVE_CREDENTIAL`, Exit 0; `UPDATE_CREDENTIAL` 3,
+    `REMOVE_CREDENTIAL` 1 (Client `account-console`, eine Benutzerkennung). Req 10.7 auf Stufe A belegt (design.md, «Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)»).
 - [x] 24.4 Einstieg zur Kontoverwaltung (Passkey) [Frontend]
   - Die Kopfzeile zeigt jedem angemeldeten Benutzer «Passkey einrichten» (Schlüssel-Symbol, daneben «Hilfe»); der Link öffnet die
     Kontoverwaltung des Realms (`<Aussteller>/account`, Aussteller aus der OIDC-Konfiguration der App) in einem neuen Tab
