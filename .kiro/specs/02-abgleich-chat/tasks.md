@@ -131,10 +131,13 @@ Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der
   - Auswertung und ZIP-Export mit `schema.json`, README, `modus`, Schwärzung und Step-up; A24-Seite, Anleitung, Protokoll `CHAT_BEWERTUNG_EXPORT` und Browser-Szenarien.
   - _Anforderungen: 15.5, 15.6, 15.7, 15.8, 15.10_
   - _Abhängig von: 10.1, Spec 06: 19.10 (Step-up)_
-- [ ] 10.4 Isolations- und Abnahmetests [QA]
+- [x] 10.4 Isolations- und Abnahmetests [QA]
   - Fremdes Gespräch (404), Rechte (A24, Geschäftsstelle, API-Token), Schwärzung mit allen Mustern, 5'000 Zeilen, Löschung nach 12 Monaten, Schematest; ergänzt Welle 9.
   - _Anforderungen: 15.11_
   - _Abhängig von: 10.3_
+  - Nachweis 24.11.2026: `chat-schnittstelle.feature` deckt Anfrage, Verlauf und fremde Gespräche mit zwei Mandanten ab;
+    `chat-auswertung.feature` prüft den Export ohne fremde Mandantendaten sowie die Grenze 5'000/5'001. Rechte,
+    Schwärzung, Löschung nach 12 Monaten und Schema sind durch die vorhandenen Cucumber- und JUnit-Tests belegt.
 
 ## Optionen
 Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit den Aufgaben 10.x von Spec 03 kollidieren. Spec 04 belegt die Nummern O.4–O.6.
