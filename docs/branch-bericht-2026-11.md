@@ -1,7 +1,7 @@
 # Branch- und Worktree-Bericht
 
 Stichtag: 25.11.2026. Grundlage: `origin/main` nach `git fetch -q origin`
-(Commit `c83770932`). Erfasst sind Remote-Branches `feature/*`, `fix/*`,
+(Commit `50ec30cb8`). Erfasst sind Remote-Branches `feature/*`, `fix/*`,
 `docs/*` und `spec/*`, für die kein offener PR besteht. Kein Branch und kein
 Worktree wurde gelöscht.
 
@@ -9,8 +9,8 @@ Worktree wurde gelöscht.
 
 «Gemergt» bedeutet: `git branch -r --merged origin/main` führt den Branch.
 «Verwaist» bedeutet hier nur: nicht in `origin/main` gemergt und ohne offenen
-PR; daraus folgt keine Löschfreigabe. Total: 50 Branches, davon 20 gemergt
-und 30 verwaist. 14 Branches mit offenem PR sind nicht aufgeführt.
+PR; daraus folgt keine Löschfreigabe. Total: 51 Branches, davon 20 gemergt
+und 31 verwaist. 15 Branches mit offenem PR sind nicht aufgeführt.
 
 ### Gemergt (20)
 
@@ -35,13 +35,14 @@ und 30 verwaist. 14 Branches mit offenem PR sind nicht aufgeführt.
 - `origin/fix/01-0.1-golden-synth-ausgabe`
 - `origin/spec/01-lokales-modell`
 
-### Nicht gemergt / verwaist (30)
+### Nicht gemergt / verwaist (31)
 
 - `origin/docs/aufgabenstand-2026-11`
 - `origin/feature/01-3.3-korrekturlernen`
 - `origin/feature/01-5.11-lastprobe`
 - `origin/feature/01-5.11-messbericht`
 - `origin/feature/01-5.11-stufe-b-werte`
+- `origin/feature/01-5.9-ki-beispiel-fehlerisolierung`
 - `origin/feature/01-5.9-ki-beispiel-kennzahlen`
 - `origin/feature/01-5.9-monitoring-vorbereitung`
 - `origin/feature/01-o8-google-login`
