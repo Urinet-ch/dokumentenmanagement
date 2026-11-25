@@ -2,11 +2,12 @@ package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
-import ch.urinet.archiv.ki.domain.chat.Chatmodus;
-import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.ki.application.WissenschatZugang;
+import ch.urinet.archiv.ki.domain.chat.Chatmodus;
+import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
@@ -43,7 +44,7 @@ class ChatFragenModusTest {
             public void rechtPruefen(Benutzer benutzer) {
                 ereignisse.add("A15");
                 if (!a15) {
-                    throw new IllegalStateException("403");
+                    throw new Verweigerung(Verweigerung.Grund.NICHT_ERLAUBT);
                 }
             }
 
@@ -65,7 +66,9 @@ class ChatFragenModusTest {
     void ohneA15KommtDas403VorDem429DesBudgets() {
         ChatFragen fragen = fragen(false, true);
         assertThatThrownBy(() -> fragen.annehmen(BENUTZER, new MandantCode("urinet"), Optional.empty(), "Frage?",
-                Optional.of(UUID.randomUUID()))).hasMessage("403");
+                Optional.of(UUID.randomUUID())))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        e -> assertThat(e.code()).isEqualTo(Fehlercode.NICHT_ERLAUBT));
         assertThat(ereignisse).containsExactly("A15");
         assertThat(speicherAufrufe).containsExactly("benutzerSperren", "gespraechSperren");
     }
