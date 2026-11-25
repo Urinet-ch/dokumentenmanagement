@@ -1,6 +1,7 @@
 package ch.urinet.archiv.verarbeitung;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.ablage.application.AblageService;
 import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
@@ -11,9 +12,12 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe.Quelle;
 import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
 import ch.urinet.archiv.verarbeitung.application.ArchivierenHandler;
+import ch.urinet.archiv.verarbeitung.application.ArchivierungSpeichern;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
+import ch.urinet.archiv.verarbeitung.application.DokumentArchivierungSperre;
 import ch.urinet.archiv.verarbeitung.application.EmbeddingSpeichern;
+import ch.urinet.archiv.verarbeitung.application.InhaberBenachrichtigung;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -31,8 +35,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -65,6 +73,18 @@ class ArchivierenHandlerPflichtenTest {
 
     @Inject
     AblagePort ablage;
+
+    @Inject
+    AblageService ablageService;
+
+    @Inject
+    ArchivierungSpeichern speichern;
+
+    @Inject
+    InhaberBenachrichtigung benachrichtigung;
+
+    @Inject
+    DokumentArchivierungSperre sperre;
 
     @Inject
     Instance<AgroalDataSource> datenbank;
@@ -163,6 +183,76 @@ class ArchivierenHandlerPflichtenTest {
         assertThat(hilfe.versionen(URINET, archivOrdner(id))).isEmpty();
     }
 
+    /** @req-6.3: Zwei parallele Handlerläufe kopieren ein Dokument nur einmal. */
+    @Test
+    void paralleleHandlerSerialisierenArchivierung() throws Exception {
+        UUID id = anlegen("ARCHIVIERUNG");
+        Auftrag erster = beansprucht(id);
+        Auftrag zweiter = beansprucht(id);
+        CountDownLatch ersteSperre = new CountDownLatch(1);
+        CountDownLatch zweiterGestartet = new CountDownLatch(1);
+        AtomicInteger aufrufe = new AtomicInteger();
+        DokumentArchivierungSperre beobachtet = (mandant, dokument) -> {
+            if (aufrufe.incrementAndGet() == 1) {
+                var gehalten = sperre.sperren(mandant, dokument);
+                ersteSperre.countDown();
+                if (!zweiterGestartet.await(5, TimeUnit.SECONDS)) {
+                    gehalten.close();
+                    throw new IllegalStateException("Zweiter Handler nicht gestartet");
+                }
+                return gehalten;
+            }
+            zweiterGestartet.countDown();
+            return sperre.sperren(mandant, dokument);
+        };
+        ArchivierenHandler testHandler = handlerMit(beobachtet);
+        CompletableFuture<Void> lauf1 = starten(testHandler, erster);
+        assertThat(ersteSperre.await(5, TimeUnit.SECONDS)).isTrue();
+        CompletableFuture<Void> lauf2 = starten(testHandler, zweiter);
+        CompletableFuture.allOf(lauf1, lauf2).get(30, TimeUnit.SECONDS);
+
+        assertThat(aufrufe).hasValue(2);
+        assertThat(zeile(id)).contains("\"status\":\"ARCHIVIERT\"");
+        assertThat(hilfe.versionen(URINET, archivOrdner(id))).hasSize(1);
+        assertThat(hilfe.versionen(URINET, VerarbeitungTestHilfe.eingangOrdner(id))).isEmpty();
+    }
+
+    /** @req-6.3: Auch bei verlorenem Anspruch wird die Sperre freigegeben. */
+    @Test
+    void ausnahmeGibtHandlerSperreFrei() throws Exception {
+        UUID id = anlegen("ARCHIVIERUNG");
+        AtomicBoolean freigegeben = new AtomicBoolean();
+        DokumentArchivierungSperre beobachtet = (mandant, dokument) -> {
+            var gehalten = sperre.sperren(mandant, dokument);
+            return () -> {
+                gehalten.close();
+                freigegeben.set(true);
+            };
+        };
+        assertThatThrownBy(() -> starten(handlerMit(beobachtet), fremd(id)).get())
+                .hasRootCauseInstanceOf(AuftragService.AnspruchVerloren.class);
+        assertThat(freigegeben).isTrue();
+        try (DokumentArchivierungSperre.Sperre erneut = sperre.sperren(MANDANT, id)) {
+            assertThat(erneut).isNotNull();
+        }
+    }
+
+    /** @req-6.3: Ein Freigabefehler macht eine abgeschlossene Archivierung nicht zum Fehlversuch. */
+    @Test
+    void freigabefehlerNachErfolgWirftNicht() throws Exception {
+        UUID id = anlegen("ARCHIVIERUNG");
+        DokumentArchivierungSperre fehlerhaft = (mandant, dokument) -> {
+            var gehalten = sperre.sperren(mandant, dokument);
+            return () -> {
+                gehalten.close();
+                throw new IllegalStateException("synthetischer Freigabefehler");
+            };
+        };
+        starten(handlerMit(fehlerhaft), beansprucht(id)).get(30, TimeUnit.SECONDS);
+        assertThat(zeile(id)).contains("\"status\":\"ARCHIVIERT\"");
+        assertThat(hilfe.versionen(URINET, archivOrdner(id))).hasSize(1);
+    }
+
     /** Dokument mit Original unter {@code eingang/}, ohne PDF/A ({@code pdfa_fehlt}), damit nur das Original zählt. */
     private UUID anlegen(String status) throws Exception {
         byte[] pdf = OcrTestdateien.textPdf("Archivierung " + HexFormat.of().formatHex(VerarbeitungTestHilfe.zufall(4)));
@@ -181,6 +271,27 @@ class ArchivierenHandlerPflichtenTest {
     private long einreihen(UUID id) throws Exception {
         return auftraege.rohEinreihen(URINET, ArchivierenHandler.TYP,
                 "{\"" + ArchivierenHandler.DOKUMENT_ID + "\":\"" + id + "\"}");
+    }
+
+    private Auftrag beansprucht(UUID id) throws Exception {
+        long auftrag = einreihen(id);
+        auftraege.aendern(auftrag, "status = 'LAEUFT', versuche = 1, lebenszeichen = now()");
+        return new Auftrag(auftrag, MANDANT, ArchivierenHandler.TYP,
+                new Nutzlast(Map.of(ArchivierenHandler.DOKUMENT_ID, id)), 1);
+    }
+
+    private ArchivierenHandler handlerMit(DokumentArchivierungSperre testSperre) {
+        return new ArchivierenHandler(speichern, ablageService, ablage, benachrichtigung, testSperre);
+    }
+
+    private CompletableFuture<Void> starten(ArchivierenHandler testHandler, Auftrag auftrag) {
+        return CompletableFuture.runAsync(() -> kontext.mit(MANDANT, () -> {
+            try {
+                testHandler.ausfuehren(auftrag);
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        }), threads);
     }
 
     /** Ein Auftrag, den kein Arbeiter hält: {@code anspruchSichern} schlägt fehl. */
