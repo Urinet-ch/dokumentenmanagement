@@ -32,7 +32,8 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
    **Standardaufruf mit `--ereignisse`** (Entscheid Fabian 25.11.2026, Req 10.7: `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` werden
    aktiviert); die Option steht also in allen drei Aufrufen. Sind die Ereignisse des Realms aus oder `enabledEventTypes` leer, bricht die
    Vorlage ab, ohne etwas zu ändern. Probe: Nach der Passkey-Einrichtung in Punkt 4 erscheint `UPDATE_CREDENTIAL` im Ereignisprotokoll
-   des Realms. Die Admin-Konsole ist nicht öffentlich; lesen über `kcadm` im Wegwerf-Container (Hilfsskript noch nicht vorhanden, Probe offen).
+   des Realms. Die Admin-Konsole ist nicht öffentlich; stattdessen auf der VPS (in `/opt/archiv-werkzeuge`)
+   `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL` (Aufruf im README, «Passkey-Ereignisse auflisten»; Probe offen bis zur Ausführung).
 2. **Relying-Party-ID setzen.** Der Export enthält den Platzhalter `${ARCHIV_PASSKEY_RP_ID}` (`webAuthnPolicyPasswordlessRpId`);
    der Wert ist der Host der App-Basisadresse (`ARCHIV_BASIS_URL`) ohne Schema und Port, abgeleitet wie in
    `deploy/infomaniak/keycloak/start.sh`. Das Hilfsskript `vorlage-ausfuehren.sh` leitet ihn im Wegwerf-Container aus der
@@ -43,7 +44,7 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
 4. **Mit iPhone und Mac prüfen:** Auf beiden Geräten den Passkey in der Kontoverwaltung einrichten, damit anmelden, eine
    Step-up-Aktion auslösen (Passkey genügt) und den Passkey wieder entfernen. Danach als Inhaber bei einem synthetischen
    Testbenutzer «Zugang zurücksetzen» mit der Option «Passkeys löschen» ausführen und prüfen, dass der Benutzer nur noch
-   mit Passwort und TOTP hereinkommt. Im Ereignisprotokoll des Realms sollte `REMOVE_CREDENTIAL` stehen (Probe offen, siehe Punkt 1). Geprüft am 25.11.2026 auf iPhone und Mac (Fabian).
+   mit Passwort und TOTP hereinkommt. Im Ereignisprotokoll des Realms sollte `REMOVE_CREDENTIAL` stehen (Probe offen, nicht belegt; `ereignisse-auflisten-vorlage.sh --typ REMOVE_CREDENTIAL`, Exit 3 = nichts gefunden, siehe Punkt 1). Geprüft am 25.11.2026 auf iPhone und Mac (Fabian).
 5. **Rückfall prüfen:** Ein Benutzer ohne Passkey meldet sich weiter mit Passwort und TOTP an; auch mit eingerichtetem Passkey
    bleibt TOTP für die Passwortanmeldung verlangt.
 

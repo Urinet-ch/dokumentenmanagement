@@ -1111,8 +1111,19 @@ Related Origins (`/.well-known/webauthn`: 200, JSON, richtige Origin, keine Weit
 entfernen, «Zugang zurücksetzen» mit «Passkeys löschen» sowie TOTP bei Passwortanmeldung trotz Passkey. Auf der VPS damit belegt:
 Ausführung, `docker compose run`-Aufruf, Secret-Lesbarkeit für Benutzer 1000, `ghcr.io`, `jq` im Container; die Werkzeuge liegen in
 `/opt/archiv-werkzeuge` (als root ist `$HOME` für Benutzer 1000 nicht durchsuchbar). **Offen:** Probe `UPDATE_CREDENTIAL` und
-`REMOVE_CREDENTIAL` im Ereignisprotokoll (Admin-Konsole nicht öffentlich, Hilfsskript für `kcadm.sh get events` fehlt); Req 10.7
-bleibt bis dahin nur teilweise belegt.
+`REMOVE_CREDENTIAL` im Ereignisprotokoll (Admin-Konsole nicht öffentlich; das Hilfsskript `ereignisse-auflisten-vorlage.sh` liegt vor, siehe «Ereignis-Probe»); Req 10.7
+bleibt bis zur Ausführung auf der VPS nur teilweise belegt.
+
+## Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)
+Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabian, 25.11.2026, siehe «Inbetriebnahme»); die Probe der Ereignisse bleibt offen bis zur Ausführung auf der VPS.
+- **Skript:** `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet im Wegwerf-Container (Muster wie `passkey-einrichten-vorlage.sh`,
+  Anmeldung über `vorlage-ausfuehren.sh`) die Benutzerereignisse des Realms `urinet-archiv` per `kcadm.sh get events`. Die Admin-Konsole ist über
+  Traefik nicht öffentlich. Parameter `--typ` (mehrfach, Standard `UPDATE_CREDENTIAL,REMOVE_CREDENTIAL`), `--max` (Standard 20, höchstens 200), `--seit` (Tage, Standard 1).
+- **Datensparsam (Req 9):** Ausgabe nur Zeit (UTC), Typ, `userId` (UUID) und Client, dazu je Typ eine Summenzeile; nie Benutzername, E-Mail, IP-Adresse
+  oder Details. Rein lesend (nur `get`). Exit 0 = Ereignis gefunden, 3 = keines, 1 = Fehler, auch bei ausgeschalteten Ereignissen oder nicht aktiviertem Typ.
+- **Nachweis:** Stub-Test (`test/ereignisse-auflisten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2
+  (`test/ereignisse-auflisten-keycloak-test.sh`, mit virtuellem Authenticator ein echtes `UPDATE_CREDENTIAL`). Nicht belegt: der Lauf auf der VPS und
+  `REMOVE_CREDENTIAL` im Echtbetrieb. Anleitung: README, «Passkey-Ereignisse auflisten». Keine Änderung der Requirements.
 
 ## Umsetzung (Aufgabe 24.4 Link zur Kontoverwaltung, 25.11.2026)
 - **Ziel (Req 10.1):** Ein angemeldeter Benutzer findet den Einstieg zur Passkey-Einrichtung, ohne die Keycloak-Adresse zu kennen. Die

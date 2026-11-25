@@ -312,9 +312,12 @@ auf Server oder Secrets aus der Sitzung.
     Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).
   - Nachweis 25.11.2026 (Fabian): Realm auf Stufe A eingerichtet; Rückfall, Related Origins, Passkey einrichten/anmelden/Step-up/entfernen
     (iPhone und Mac), «Passkeys löschen» und TOTP-Pflicht bei Passwortanmeldung bestätigt (design.md, «Umsetzung (Aufgabe 24.3
-    Inbetriebnahme, 25.11.2026)»). Offen: Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL` (Admin-Konsole nicht öffentlich,
-    Hilfsskript fehlt).
-  - Abgenommen von Fabian am 25.11.2026; offen: Ereignisprotokoll-Probe (UPDATE_CREDENTIAL/REMOVE_CREDENTIAL), Hilfsskript folgt separat.
+    Inbetriebnahme, 25.11.2026)»). Offen: Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL` (Admin-Konsole nicht öffentlich;
+    Hilfsskript siehe nächster Punkt).
+  - Abgenommen von Fabian am 25.11.2026; offen: Ereignisprotokoll-Probe (UPDATE_CREDENTIAL/REMOVE_CREDENTIAL), Hilfsskript liegt vor (nächster Punkt).
+  - Hilfsskript Ereignis-Probe 25.11.2026: `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet `UPDATE_CREDENTIAL`
+    und `REMOVE_CREDENTIAL` ohne Admin-Konsole (design.md, «Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)»). Abnahme von 24.3 erfolgt;
+    Probe der Ereignisse offen bis Ausführung auf der VPS (`REMOVE_CREDENTIAL` im Echtbetrieb nicht belegt). Aufgabe bleibt abgehakt.
 - [x] 24.4 Einstieg zur Kontoverwaltung (Passkey) [Frontend]
   - Die Kopfzeile zeigt jedem angemeldeten Benutzer «Passkey einrichten» (Schlüssel-Symbol, daneben «Hilfe»); der Link öffnet die
     Kontoverwaltung des Realms (`<Aussteller>/account`, Aussteller aus der OIDC-Konfiguration der App) in einem neuen Tab
