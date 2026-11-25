@@ -2263,7 +2263,7 @@ class JdbcWissenIngestTest {
 
     private UUID quelle(MandantCode code) throws SQLException {
         UUID id = Testdokumente.anlegen(datenbank.get(),
-                new Testdokumente.Angaben(code.wert(), code.equals(ZWEITER) ? "PROBE_VHF_BULLETIN"
+                new Testdokumente.Angaben(code.wert(), code.equals(ZWEITER) ? "BULLETIN"
                         : "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, "ARCHIVIERT"));
         dokumente.get(code).add(id);
         Testdokumente.alsWissensquelleMarkieren(datenbank.get(), code.wert(), id);

@@ -40,7 +40,7 @@ Funktionalität: WordPress-Grundgerüst
     Dann gibt das Plugin keinen veralteten Cache aus und bricht bei Feed-Ausfall geschlossen ab
 
   @req-5.8 @req-6.2 @req-7.6
-  Szenario: Die Liste filtert nach öffentlichen Werten und zeigt Chatquellen
+  Szenario: Die Liste filtert nach öffentlichen Werten und zeigt Chatquellen und Hinweis
     Angenommen ein WordPress mit dem Archiv-Plugin
     Wenn Besucher die Archivliste und den Chat öffnen
     Dann zeigt das Plugin dynamische Filter, Seitennavigation und lesbare Chatquellen

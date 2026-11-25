@@ -148,6 +148,25 @@ class EinladungVersandpfadeTest {
         });
     }
 
+    @Test
+    @Tag("req-7.4")
+    void emailAenderungVersandOkSpeichernFehlschlagLaesstAltenEintragUndMeldetFehler() throws Exception {
+        mitProbe((mandant, benutzer, akteur, versandFehler, speicherFehler, thread) -> {
+            var vorher = ablauf(mandant, benutzer);
+            speicherFehler.set(true);
+            String tag = etag(mandant, thread, benutzer);
+            assertThatThrownBy(() -> thread.submit(() -> kontext.mit(mandant, () ->
+                    aendern.ausfuehren(mandant, akteur, benutzer, tag,
+                            "neu-" + benutzer + "@example.invalid", null, null, Optional.empty())))
+                    .get(30, TimeUnit.SECONDS))
+                    .hasRootCauseInstanceOf(IllegalStateException.class)
+                    .hasStackTraceContaining("Einladungsablauf nicht gespeichert")
+                    .satisfies(e -> assertThat(String.valueOf(e.getMessage())).doesNotContain(benutzer));
+            assertThat(ablauf(mandant, benutzer)).isEqualTo(vorher);
+            assertThat(vorgangPhasen(mandant)).contains("UNKLAR");
+        });
+    }
+
     private static void pruefeNeuerAblauf(Ablauf vorher, Ablauf nachher, Instant vorAufruf) {
         assertThat(nachher.versendetAm()).isAfter(vorher.versendetAm());
         assertThat(nachher.versendetAm()).isAfterOrEqualTo(vorAufruf.minusMillis(1));

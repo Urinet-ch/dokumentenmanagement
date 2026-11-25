@@ -24,6 +24,14 @@ public class JdbcOeffentlichesWissen implements OeffentlichesWissenPort {
     }
 
     @Override
+    public boolean hatFreigegebeneSeite() {
+        Query abfrage = abfrage("""
+                select exists (select 1 from wissensseite s where s.fuer_webseite and %s)
+                """);
+        return Boolean.TRUE.equals(abfrage.getSingleResult());
+    }
+
+    @Override
     public List<Indexzeile> suchen(String begriff, int hoechstens) {
         Query abfrage = abfrage("""
                 select s.id, s.version, s.quellen_revision, s.pfad, s.titel, s.typ, s.beschreibung
