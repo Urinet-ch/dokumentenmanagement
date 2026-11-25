@@ -37,8 +37,21 @@ async function installieren(welt, url) {
     (await (await fetch('/ngsw.json')).json()).assetGroups.find((gruppe) => gruppe.name === 'anleitung').urls.sort(),
   );
   assert.deepEqual(manifestDateien, dateien);
-  await welt.seite.reload();
-  await welt.seite.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await kontrolliertNachReload(welt.seite);
+}
+
+// Nach dem ersten Laden ist die Seite noch nicht vom aktiven Service Worker kontrolliert; auf dem CI-Runner bleibt
+// sie nach einem Reload gelegentlich unkontrolliert. Wie in erfassen.mjs: erneut laden statt lange ergebnislos warten.
+async function kontrolliertNachReload(seite) {
+  await seite.reload();
+  for (let versuch = 0; versuch < 5; versuch += 1) {
+    const kontrolliert = await seite
+      .waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 15_000, polling: 250 })
+      .then(() => true, () => false);
+    if (kontrolliert) return;
+    await seite.reload();
+  }
+  throw new Error('PWA nicht kontrolliert: Der Service Worker steuert die Seite auch nach mehreren Reloads nicht');
 }
 
 Given('die PWA mit der Anleitung ist installiert', { timeout: 120_000 }, async function () {
@@ -243,9 +256,13 @@ Then('ist der Updateknopf wieder bedienbar', async function () {
 });
 
 When('ich die neue App-Version aktiviere', async function () {
+  // Die App aktiviert die Version und lädt dann die Seite neu (asynchron). Ohne Marke liefe waitForLoadState sofort
+  // auf dem alten Dokument zurück und die nächste Abfrage träfe den Navigationswechsel.
+  await this.seite.evaluate(() => { window.altesDokument = true; });
   await this.seite.locator('[data-test=update-hinweis] button').click();
-  await this.seite.waitForLoadState();
-  await this.seite.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await this.seite.waitForFunction(() => !window.altesDokument, undefined, { timeout: 60_000, polling: 250 });
+  await this.seite.waitForLoadState('load');
+  await this.seite.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 60_000, polling: 250 });
 });
 
 Then('zeigt die PWA die neue App und die neue Anleitung', async function () {

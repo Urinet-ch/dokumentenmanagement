@@ -32,6 +32,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Nachtrag (PR #227): Produktions-Seed mit sieben Verbandsarten (inkl. `JAHRESBERICHT` nach Req 1.2; `NORM_RICHTLINIE`, `FORMULAR`, `SONSTIGES` sind zusätzlich, weil Req 1.2 «mindestens» sagt) ergänzt. «Keine Finanzarten» belegt allein `VhfGskDokumentartSeedTest`, der den echten Seed liest; ein Cucumber-Szenario dazu entfällt, weil der Test-Seed den echten Seed im Klassenpfad überdeckt und `werkzeuge-finanzen.feature` die Werkzeugauswahl ohne Finanzarten schon prüft. Der Test-Seed `PROBE_VHF_BULLETIN` bleibt, weil zahlreiche Szenarien aus Aufgabe 1.4 ihn direkt verwenden; Werte zu Aufbewahrung und Vertraulichkeit sind vorsichtig ausgelegt. Die `default`-Werte im Schema (`zugriff` `mitglieder`, `veroeffentlicht` `false`) wendet das Backend nicht an; wo Standardwerte gesetzt werden, regelt Spec 05.
   - Stand `origin/main` (19.11.2026): Die Spec-05-Konfigurationsdatei, Seed und Provisionierungsbefehl aus Aufgabe 17.7 sind mit PRs #310 und #325 gemergt; `KonfigurationSeedTest` und `VhfGskDokumentartSeedTest` prüfen die Seeds. Der Test-Seed `PROBE_VHF_BULLETIN` bleibt trotzdem bestehen und wird von Szenarien aus Aufgabe 1.4 verwendet; die Umstellung dieser Szenarien auf den echten Seed und das Entfernen der Test-Art sind noch offen. Ebenfalls nicht durch Repository-Tests belegt sind die Produktiv-Provisionierung samt Bucket-Policy/Object-Lock und die manuelle Keycloak-Einrichtung. Haken bleibt offen.
   - Entscheid Fabian 17.11.2026: Standard-Zugriffsstufe von `VORSTANDSPROTOKOLL` im Seed ist `vorstand` (alle anderen Arten bleiben `mitglieder`); `VhfGskDokumentartSeedTest` prüft den Standard je Art. Die Anwendung setzt Schema-Standards nicht selbst ein, die Stufe wählt weiterhin eine Person.
+  - Nachtrag (PR #615, 25.11.2026): Spec 04, Aufgabe 17.1 (PR #454) hat `WISSENSQUELLE` als Dokumentart durch eine Markierung am Dokument ersetzt; der aktuelle Seed muss diesen Code daher nicht enthalten. Die Tests prüfen den Produktions-Seed und die Abwesenheit der Art. Der Test-Seed `PROBE_VHF_BULLETIN` ist entfernt und die Szenarien verwenden `BULLETIN`. Provisionierung mit Object Lock/Bucket Policy sowie die manuelle Keycloak-Einrichtung bleiben Betreiberarbeiten; die Checkbox bleibt offen. S3-Isolationsnachweise sind Aufgabe 12.3 zugeordnet.
   - _Anforderungen: 1.1, 1.2, 1.3, 1.5, 1.6, 3.7_
   - Anzeigetexte (PR #256): Der Seed hängt an `verband` jeder Art `"x-labels": {"vhf": "VHF", "gsk": "GSK"}`; die Oberfläche zeigt diese Texte, gespeichert und gesendet wird weiter der Enum-Wert (`VhfGskDokumentartSeedTest`)
   - Entscheid Fabian 17.11.2026 (PR #257): Das Archiv legt keinen mandantenspezifischen Keycloak-Client an. Falls für Theme oder Redirect-URI nötig, richtet ihn der Betreiber manuell ein;
@@ -98,10 +99,11 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 6.1–6.5_
   - _Abhängig von: 11.1_
 
-- [ ] 11.4 WordPress-Plugin Grundgerüst [Frontend]
+- [x] 11.4 WordPress-Plugin Grundgerüst [Frontend]
   - Einstellungsseite (Lese- und Erfassungs-Schlüssel verschlüsselt; geändert 13.11.2026, bisher «Site-Key»), Client mit Fehlerbehandlung (Problem Details) und Transients, Zugriffsstufe aus Login/Rolle (drei Stufen, Rollen für Mitglieder und Vorstand)
   - Client nur nach `docs/schnittstelle/public-v1.yaml`, unbekannte Felder ignorieren; Mock des Archivs aus dieser Datei
   - wp-env für lokale Entwicklung, PHPUnit
+  - Abschlussnachweis (PR #616, 25.11.2026): PHPUnit auf PHP 8.2 mit 19 Tests/96 Assertions; Cucumber/Playwright mit 10 Szenarien/41 Schritten einschliesslich Zugriffsstufen, Cache, Fehlern, Vertrag, PHP Coding Standards und Darstellung des vom Archiv gelieferten Chat-Hinweises.
   - _Anforderungen: 7.1, 7.3, 7.4, 7.5, 7.7, 11.1, 11.6_
   - _Abhängig von: 11.6_
 

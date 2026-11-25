@@ -196,8 +196,8 @@ abstract class MandantenIsolationIT {
                 .then().statusCode(200).extract().asString();
         String andereDatei = given().auth().oauth2(vhf).when().get("/api/v1/konfiguration")
                 .then().statusCode(200).extract().asString();
-        assertThat(eigeneDatei).contains("AUSGANGSRECHNUNG").doesNotContain("PROBE_VHF_BULLETIN");
-        assertThat(andereDatei).contains("PROBE_VHF_BULLETIN").doesNotContain("AUSGANGSRECHNUNG");
+        assertThat(eigeneDatei).contains("AUSGANGSRECHNUNG").doesNotContain("BULLETIN");
+        assertThat(andereDatei).contains("BULLETIN").doesNotContain("AUSGANGSRECHNUNG");
         given().auth().oauth2(urinet).queryParam("klassifikation.sitzungsthema", "projekte")
                 .when().get("/api/v1/dokumente").then().statusCode(400);
         given().auth().oauth2(vhf).queryParam("klassifikation.sitzungsthema", "projekte")
@@ -215,7 +215,7 @@ abstract class MandantenIsolationIT {
             urinetDokument = Testdokumente.anlegen(datenbank.get(),
                     new Testdokumente.Angaben("urinet", "PROJEKTDOKUMENT", "NORMAL", true, "probe", null, "ARCHIVIERT"));
             vhfDokument = Testdokumente.anlegen(datenbank.get(),
-                    new Testdokumente.Angaben("vhf-gsk", "PROBE_VHF_BULLETIN", "NORMAL", true, "probe", null, "ARCHIVIERT"));
+                    new Testdokumente.Angaben("vhf-gsk", "BULLETIN", "NORMAL", true, "probe", null, "ARCHIVIERT"));
             Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "urinet", urinetDokument);
             Testdokumente.alsWissensquelleMarkieren(datenbank.get(), "vhf-gsk", vhfDokument);
             wissensseiteAnlegen("m_urinet", urinetSeite, urinetDokument);

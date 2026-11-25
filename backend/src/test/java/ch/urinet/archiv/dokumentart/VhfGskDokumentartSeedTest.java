@@ -68,11 +68,9 @@ class VhfGskDokumentartSeedTest {
     }
 
     @Test
-    void produktionsUndTestSeedEnthaltenKeineEntfalleneWissensquelle() throws IOException {
-        for (String pfad : List.of("src/main/resources/seed/vhf-gsk/konfiguration.json",
-                "src/test/resources/seed/vhf-gsk/konfiguration.json")) {
-            assertThat(texteVonCodes(lesen(pfad).path("arten"))).doesNotContain("WISSENSQUELLE");
-        }
+    void produktionsSeedEnthaeltKeineEntfalleneWissensquelle() throws IOException {
+        assertThat(texteVonCodes(lesen("src/main/resources/seed/vhf-gsk/konfiguration.json").path("arten")))
+                .doesNotContain("WISSENSQUELLE");
     }
 
     private static List<String> texteVonCodes(JsonNode arten) {

@@ -15,6 +15,12 @@ Name, Benutzername oder E-Mail; mit «Nächste Seite» und «Vorherige Seite» w
 einen Benutzer, um Status, Anmeldeverfahren und seine Rechte zu sehen. Bei einem Rollenkonflikt ist die
 Rechte-Übersicht nicht verfügbar.
 
+Bei offenen Einladungen zeigen Liste und Detail «Letzter Einladungsversand» sowie das gespeicherte Ablaufdatum und
+den Status «Abgelaufen» oder «Nicht abgelaufen». Das Ablaufdatum wird aus der beim Versand verwendeten Gültigkeit
+berechnet und nur nach erfolgreichem Versand gespeichert. Bei älteren Einladungen ohne gespeicherte Ablaufgrenze
+steht «Ablauf nicht bekannt»; weder das Versanddatum noch die aktuelle Konfiguration ersetzen diese Information.
+Ein fehlgeschlagener Versand ändert den zuvor gespeicherten Ablauf nicht.
+
 Auf der Benutzerseite finden Sie auch offene Anträge und die Rechte je Rolle. Die Rechte sind in Gruppen geordnet;
 Hinweise erläutern Einschränkungen. API-Tokens und Webseiten-Schlüssel bleiben beim Sperren oder Deaktivieren eines
 Benutzers gültig. API-Tokens verwalten Sie auf der separaten Seite «API-Tokens».

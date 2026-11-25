@@ -4,6 +4,7 @@ import ch.urinet.archiv.benutzer.domain.BenutzerStatus;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.Set;
 
 import static ch.urinet.archiv.benutzer.application.IdentitaetsDienst.Benutzer;
@@ -67,6 +68,16 @@ class BenutzerEtagTest {
                 Set.of(), false, false, 1);
         assertThat(BenutzerEtag.berechnen(mit, BenutzerStatus.AKTIV))
                 .isNotEqualTo(BenutzerEtag.berechnen(ohne, BenutzerStatus.AKTIV));
+    }
+
+    @Test
+    void einladungsablaufBeeinflusstDenEtag() {
+        Benutzer basis = benutzer("user", "a@b", "Vor", "Nach", true, Set.of(Rolle.MITARBEITER),
+                Set.of(VERIFY_EMAIL), false, false);
+        Instant ablauf = Instant.parse("2026-11-26T20:00:00Z");
+        assertThat(BenutzerEtag.berechnen(basis, BenutzerStatus.EINGELADEN, ablauf))
+                .isNotEqualTo(BenutzerEtag.berechnen(basis, BenutzerStatus.EINGELADEN,
+                        ablauf.plusSeconds(1)));
     }
 
     private static Benutzer benutzer(String name, String email, String vorname, String nachname, boolean aktiv,

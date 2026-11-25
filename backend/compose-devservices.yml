@@ -20,7 +20,7 @@ services:
       io.quarkus.devservices.compose.config_map.env.MINIO_ROOT_PASSWORD: quarkus.s3.aws.credentials.static-provider.secret-access-key
       io.quarkus.devservices.compose.wait_for.logs: .*API:.*
   mailpit:
-    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    image: axllent/mailpit:v1.34.0@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e
     ports:
       - '1025'
       - '8025'

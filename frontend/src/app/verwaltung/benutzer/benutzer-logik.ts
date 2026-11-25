@@ -32,6 +32,14 @@ export function rollen(benutzer: BenutzerAnsicht): string {
   return namen.length ? namen.join(', ') : TEXTE.benutzer.keineRolle;
 }
 
+export function einladungAblauf(benutzer: BenutzerAnsicht): string {
+  if (!benutzer.einladungGueltigBis) return TEXTE.benutzer.einladungAblaufUnbekannt;
+  const ablauf = Date.parse(benutzer.einladungGueltigBis);
+  if (!Number.isFinite(ablauf)) return TEXTE.benutzer.einladungAblaufUnbekannt;
+  return ablauf <= Date.now()
+    ? TEXTE.benutzer.einladungAbgelaufen : TEXTE.benutzer.einladungNichtAbgelaufen;
+}
+
 export function rechteGruppen(rechte: readonly VerwaltungRollenrecht[]) {
   return (Object.keys(TEXTE.benutzer.gruppen) as Gruppe[]).map((gruppe) => ({
     titel: TEXTE.benutzer.gruppen[gruppe],

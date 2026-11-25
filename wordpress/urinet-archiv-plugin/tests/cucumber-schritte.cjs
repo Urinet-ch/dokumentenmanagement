@@ -86,7 +86,9 @@ Then('zeigt das Plugin dynamische Filter, Seitennavigation und lesbare Chatquell
   await this.page.getByRole('button', { name: 'Fragen' }).click();
   const quelle = this.page.getByRole('link', { name: 'Quelle: Synthetisches Merkblatt (Merkblatt, 3/2071)' });
   await quelle.waitFor();
-  assert.match(await this.page.locator('[data-urinet-chat-ausgabe]').innerText(), /Synthetische Antwort/);
+  const ausgabe = await this.page.locator('[data-urinet-chat-ausgabe]').innerText();
+  assert.match(ausgabe, /Synthetische Antwort/);
+  assert.match(ausgabe, /Synthetischer Hinweis aus dem Archiv/);
   assert.match(await quelle.getAttribute('href'), /00000000-0000-4000-8000-000000000001$/);
 });
 

@@ -163,6 +163,8 @@ export * from './wissens-suchergebnis';
 export * from './wissensdiff';
 export * from './wissensquelleneintrag';
 export * from './wissensseite';
+export * from './wissensseiten-webseitenfreigabe';
+export * from './wissensseiten-webseitenfreigabe-aenderung';
 export * from './wissensversion';
 export * from './wissensversionen';
 export * from './zugang-optionen';

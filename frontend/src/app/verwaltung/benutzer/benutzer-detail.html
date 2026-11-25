@@ -21,12 +21,21 @@
       <dt>{{ texte.benutzername }}</dt><dd><bdi>{{ person.benutzername || texte.unbekannt }}</bdi></dd>
       <dt>{{ texte.email }}</dt><dd><bdi>{{ person.email || texte.unbekannt }}</bdi></dd>
       <dt>{{ texte.rolle }}</dt><dd>{{ rollen(person) }}</dd>
-      <dt>{{ texte.status }}</dt><dd>{{ texte.statusNamen[person.status ?? ''] ?? texte.unbekannt }}</dd>
+      <dt>{{ texte.status }}</dt><dd><span class="pille">{{ texte.statusNamen[person.status ?? ''] ?? texte.unbekannt }}</span></dd>
       <dt>{{ texte.totp }}</dt><dd>{{ person.totp === undefined ? texte.unbekannt : person.totp ? texte.ja : texte.nein }}</dd>
       <dt>{{ texte.passkey }}</dt><dd data-test="passkey">{{ person.passkey === undefined ? texte.unbekannt : person.passkey ? texte.passkeyJa(person.passkeyAnzahl ?? 0) : texte.nein }}</dd>
       <dt>{{ texte.google }}</dt><dd>{{ person.google === undefined ? texte.unbekannt : person.google ? texte.ja : texte.nein }}</dd>
-      @if (person.einladungOffenSeit) {
-        <dt>{{ texte.einladungOffenSeit }}</dt><dd>{{ zeitpunkt(person.einladungOffenSeit) }}</dd>
+      @if (person.status === 'EINGELADEN') {
+        <dt>{{ texte.einladungOffenSeit }}</dt><dd>{{ person.einladungOffenSeit ? zeitpunkt(person.einladungOffenSeit) : texte.unbekannt }}</dd>
+        <dt>{{ texte.einladungAblauf }}</dt>
+        <dd>
+          &#32;
+          @if (person.einladungGueltigBis) {
+            <time [attr.datetime]="person.einladungGueltigBis">{{ zeitpunkt(person.einladungGueltigBis) }}</time>
+            &#32;
+          }
+          <span class="pille" data-test="einladung-ablauf">{{ einladungAblauf(person) }}</span>
+        </dd>
       }
       <dt>{{ texte.letzteAktion }}</dt>
       <dd>
