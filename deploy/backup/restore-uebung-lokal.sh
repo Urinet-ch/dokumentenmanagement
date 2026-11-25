@@ -180,7 +180,8 @@ fi
 
 baue_maven() {
   local start=$SECONDS
-  if (cd "$backend" && mvn -ntp -Dquarkus.http.test-port=0 -DskipTests package) >"$temp/package.log" 2>&1; then
+  if (cd "$backend" && mvn -ntp -Dquarkus.http.test-port=0 \
+    "-Dquarkus.smallrye-openapi.store-schema-directory=$temp/openapi" -DskipTests package) >"$temp/package.log" 2>&1; then
     bericht OK "Quarkus-Artefakt bauen" "$((SECONDS - start))"
   else
     local status=$?
@@ -347,6 +348,7 @@ test_maven() {
     -ntp
     -Dtest=SicherungPaketRoundtripTest
     -Dquarkus.http.test-port=0
+    "-Dquarkus.smallrye-openapi.store-schema-directory=$temp/openapi"
     -Darchiv.restore.e2e=true
     "-Darchiv.restore.phase=$phase"
     "-Darchiv.restore.stufe=$stufe"

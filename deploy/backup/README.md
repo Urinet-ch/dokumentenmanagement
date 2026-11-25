@@ -170,7 +170,8 @@ Zeitstempelprüfung verwendet eine synthetische TSA-Attrappe ohne Netzaufruf.
 
 Alle Daten liegen in einem temporären Verzeichnis. Beim Beenden entfernt das Skript nur den Compose-Stack und die
 Testimage-Tags mit seinem eindeutigen Projektnamen sowie das temporäre Verzeichnis; es verwendet weder `down -v`
-noch `prune`. Die Übung ist ein
+noch `prune`. Generierte OpenAPI-Dateien werden ebenfalls im temporären Verzeichnis statt im Arbeitsbaum abgelegt.
+Die Übung ist ein
 lokaler Funktionstest mit synthetischen Daten und ersetzt nicht die Restore-Probe auf der VPS im Infra-Repository.
 
 Die Orchestrierung lässt sich ohne Docker und Maven mit Attrappen prüfen:
