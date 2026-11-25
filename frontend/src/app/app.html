@@ -24,7 +24,7 @@
     [attr.inert]="hilfe.offen() ? '' : null"
   >
     @if (menue().length > 0) {
-      <aside class="seitenleiste">
+      <aside class="seitenleiste" [attr.aria-label]="texte.seitenleiste">
         <a class="marke" routerLink="/" (click)="mobil() && nav.close()">
           @if (branding.branding().logoUrl; as logoUrl) {
             <img class="logo" [src]="logoUrl" alt="" />
@@ -109,7 +109,12 @@
         </a>
       }
       @if (darfSuchen()) {
-        <form class="kopfsuche" role="search" (submit)="suchen($event, suchfeld)">
+        <form
+          class="kopfsuche"
+          role="search"
+          [attr.aria-label]="texte.kopf.sucheLandmark"
+          (submit)="suchen($event, suchfeld)"
+        >
           <app-symbol name="suche" />
           <input
             #suchfeld

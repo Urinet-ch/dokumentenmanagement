@@ -132,7 +132,7 @@
                   rel="noopener noreferrer"
                   [href]="pdfaUrl()"
                   (click)="pdfaKlick($event)"
-                  [attr.aria-label]="texte.vorschauTitel(titel())"
+                  [attr.aria-label]="texte.pdfOeffnen + ': ' + titel()"
                 >
                   <app-symbol name="dokument" />
                   <span>{{ texte.pdfOeffnen }}</span>

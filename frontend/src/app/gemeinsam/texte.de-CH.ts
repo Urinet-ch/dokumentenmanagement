@@ -11,6 +11,7 @@ export const TEXTE = {
   zumInhalt: 'Zum Inhalt springen',
   menueOeffnen: 'Menü öffnen',
   menueSchliessen: 'Menü schliessen',
+  seitenleiste: 'Seitenleiste',
   /** Platzhalter an Stelle des Titels (Req 8.11, 14.9, 14.10): der Dateiname, kein Titel. */
   titelPlatzhalter: {
     ohneTitel: 'Ohne Titel',
@@ -30,6 +31,7 @@ export const TEXTE = {
   },
   kopf: {
     suche: 'Im Archiv suchen',
+    sucheLandmark: 'Schnellsuche',
     mandant: (mandant: string) => `Mandant ${mandant}`,
     suchePlatzhalter: 'Dokumente, Belegnummern, Partner suchen …',
     hell: 'Helles Farbschema verwenden',
@@ -361,6 +363,7 @@ export const TEXTE = {
   eingangskorbAnzahl: (anzahl: number) =>
     anzahl === 1 ? '1 Dokument im Eingangskorb' : `${anzahl} Dokumente im Eingangskorb`,
   anmeldung: {
+    titel: 'Anmeldung',
     anmelden: 'Anmelden',
     abmelden: 'Abmelden',
     hinweis: 'Bitte melden Sie sich an, um das Archiv zu verwenden.',
@@ -464,6 +467,7 @@ export const TEXTE = {
     anpassen: (nr: number) => `Zuschnitt Seite ${nr} anpassen`,
     verwerfen: (nr: number) => `Seite ${nr} verwerfen`,
     verwerfenKurz: 'Verwerfen',
+    zuschnittKurz: 'Zuschnitt',
     zuschnitt: 'Zuschnitt anpassen',
     zuschnittHinweis:
       'Ziehen Sie die Ecken auf die Ecken des Blatts, oder wählen Sie eine Ecke und verschieben Sie sie mit den Pfeiltasten.',
@@ -934,6 +938,7 @@ export const TEXTE = {
     fortschritt: 'Fortschritt des Uploads',
     fortschrittProzent: (prozent: number) => `${prozent} % übertragen`,
     laeufe: 'Bisherige Importe',
+    laeufeTabelle: 'Tabelle bisheriger Importe',
     keineLaeufe: 'Noch keine Importe.',
     ohneDateiname: 'ohne Dateiname',
     laufZeile: (zeilen: string, erstellt: string) =>
@@ -990,6 +995,7 @@ export const TEXTE = {
     abfrageGestoert:
       'Die Verbindung zum Archiv ist unterbrochen. Die Seite fragt den Stand weiter ab.',
     vorschauTitel: 'Vorschau',
+    vorschauTabelle: 'Tabelle der Importvorschau',
     vorschauEinleitung:
       'Noch ist nichts übernommen. Prüfen Sie die Zeilen und übernehmen Sie danach den Import.',
     zaehler: {
