@@ -315,3 +315,12 @@ auf Server oder Secrets aus der Sitzung.
     Inbetriebnahme, 25.11.2026)»). Offen: Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL` (Admin-Konsole nicht öffentlich,
     Hilfsskript fehlt).
   - Abgenommen von Fabian am 25.11.2026; offen: Ereignisprotokoll-Probe (UPDATE_CREDENTIAL/REMOVE_CREDENTIAL), Hilfsskript folgt separat.
+- [x] 24.4 Einstieg zur Kontoverwaltung (Passkey) [Frontend]
+  - Die Kopfzeile zeigt jedem angemeldeten Benutzer «Passkey einrichten» (Schlüssel-Symbol, daneben «Hilfe»); der Link öffnet die
+    Kontoverwaltung des Realms (`<Aussteller>/account`, Aussteller aus der OIDC-Konfiguration der App) in einem neuen Tab
+    (`target="_blank" rel="noopener noreferrer"`). Die WebAuthn-Registrierung selbst bleibt in Keycloak. Anleitung
+    («Mit Passkey anmelden», «Erste Schritte») und Inbetriebnahme-Checkliste nachgezogen.
+  - Nachweis 25.11.2026: Komponententests (`app.spec.ts`, `kontoverwaltung.spec.ts`), Szenario `@req-10.1` in
+    `passkey-einstieg-pwa.feature` (Browser: Knopf sichtbar, öffnet die Kontoverwaltung in neuem Tab, Seite bleibt, axe), `npm run pruefe:gestaltung`.
+  - _Anforderungen: 10.1_
+  - _Abhängig von: 24.1_
