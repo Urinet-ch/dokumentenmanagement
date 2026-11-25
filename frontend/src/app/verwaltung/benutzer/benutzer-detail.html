@@ -27,7 +27,15 @@
       <dt>{{ texte.google }}</dt><dd>{{ person.google === undefined ? texte.unbekannt : person.google ? texte.ja : texte.nein }}</dd>
       @if (person.status === 'EINGELADEN') {
         <dt>{{ texte.einladungOffenSeit }}</dt><dd>{{ person.einladungOffenSeit ? zeitpunkt(person.einladungOffenSeit) : texte.unbekannt }}</dd>
-        <dt>{{ texte.einladungAblauf }}</dt><dd><span class="pille" data-test="einladung-ablauf">{{ texte.einladungAblaufUnbekannt }}</span></dd>
+        <dt>{{ texte.einladungAblauf }}</dt>
+        <dd>
+          &#32;
+          @if (person.einladungGueltigBis) {
+            <time [attr.datetime]="person.einladungGueltigBis">{{ zeitpunkt(person.einladungGueltigBis) }}</time>
+            &#32;
+          }
+          <span class="pille" data-test="einladung-ablauf">{{ einladungAblauf(person) }}</span>
+        </dd>
       }
       <dt>{{ texte.letzteAktion }}</dt>
       <dd>

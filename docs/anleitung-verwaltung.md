@@ -26,10 +26,14 @@ die Keycloak-Benutzer.
 ## Benutzer einladen
 1. «Benutzer» → «Person einladen». Benutzername (nur `a–z`, `0–9`, `.`, `_`, `-`), E-Mail, Vorname, Nachname und **Rolle** wählen.
 2. Sie bestätigen mit Passwort und TOTP (frische Anmeldung, höchstens 5 Minuten alt).
-3. Die Person erhält eine E-Mail von «UriNet Archiv» mit einem Link (gilt 24 Stunden, einmal). Darüber bestätigt sie die
-   E-Mail-Adresse, setzt ein Passwort und richtet TOTP ein. **Sie sehen weder Passwort noch Link.**
-4. Der Status zeigt «Einladung offen seit …». Ist der Link abgelaufen oder verloren: «Einladung erneut senden» (höchstens 3 Mal
-   in 24 Stunden).
+3. Die Person erhält eine E-Mail von «UriNet Archiv» mit einem einmaligen Link. Seine Gültigkeit entspricht der beim
+   Versand verwendeten Dauer. Darüber bestätigt sie die E-Mail-Adresse, setzt ein Passwort und richtet TOTP ein.
+   **Sie sehen weder Passwort noch Link.**
+4. Liste und Detail zeigen «Letzter Einladungsversand» sowie «Einladung läuft ab» mit Datum und Status «Abgelaufen»
+   oder «Nicht abgelaufen». Bei älteren Einladungen ohne gespeicherte Ablaufgrenze steht «Ablauf nicht bekannt».
+   Erst nach erfolgreichem Versand werden Versandzeit und Ablaufgrenze aktualisiert; bei einem Fehler bleibt der
+   bisherige Stand bestehen. Ist der Link abgelaufen oder verloren: «Einladung erneut senden» (höchstens 3 Mal in
+   24 Stunden).
 
 ## Rollen und was sie dürfen
 Sie vergeben **Rollen**, keine einzelnen Rechte. Unter «Rechte» sehen Sie je Person, was sie darf («Dokumente lesen»,

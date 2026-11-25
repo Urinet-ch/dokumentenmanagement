@@ -12,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,10 +22,12 @@ import java.util.concurrent.atomic.AtomicReference;
 public class BenutzerEinladen {
     private final IdentitaetsDienst identitaet;
     private final BenutzerStatusSpeicher status;
+    private final BenutzerEinladungSpeicher einladungen;
     private final VerwaltungVorgang vorgang;
     private final Duration gueltigkeit;
 
-    public BenutzerEinladen(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status, VerwaltungVorgang vorgang,
+    public BenutzerEinladen(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
+            BenutzerEinladungSpeicher einladungen, VerwaltungVorgang vorgang,
             @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit", defaultValue = "PT24H")
             Duration gueltigkeit) {
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
@@ -32,6 +35,7 @@ public class BenutzerEinladen {
         }
         this.identitaet = identitaet;
         this.status = status;
+        this.einladungen = einladungen;
         this.vorgang = vorgang;
         this.gueltigkeit = gueltigkeit;
     }
@@ -49,6 +53,7 @@ public class BenutzerEinladen {
         UUID vorgangId = UUID.randomUUID();
         ZugriffEintrag absicht = eintrag(akteur, ip, vorgangId, ziel, ProtokollDetails.Verwaltungsphase.ANGEFRAGT);
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
+        AtomicReference<Instant> versendetAm = new AtomicReference<>();
         vorgang.ausfuehren(mandant, absicht, () -> {
             IdentitaetsDienst.Benutzer benutzer = identitaet.benutzerLesen(mandant.wert(), id);
             if (!benutzer.aktiv() || benutzer.aktionen().isEmpty() || benutzer.rollen().size() > 1
@@ -57,9 +62,11 @@ public class BenutzerEinladen {
             }
             gefunden.set(benutzer);
         }, () -> {
+            versendetAm.set(Instant.now());
             identitaet.einladen(mandant.wert(), id, gefunden.get().aktionen(), gueltigkeit);
             return ziel;
-        }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR, ignoriert -> { },
+        }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR,
+                ignoriert -> einladungen.speichern(id, versendetAm.get(), gueltigkeit),
                 ignoriert -> eintrag(akteur, ip, vorgangId, ziel,
                         ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
     }
