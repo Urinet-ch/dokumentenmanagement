@@ -1,0 +1,245 @@
+{
+  "nichtAngemeldet": "401",
+  "aktionen": [
+    {
+      "id": "A1",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A2",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "treuhaender": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A3",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "404", "http": ["404"]},
+        "treuhaender": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A4",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "nur eigene ²", "http": ["2XX", "404"]},
+        "treuhaender": {"ergebnis": "erlaubt (nur lesend)", "http": ["2XX"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A5",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "nur selbst erfasste", "http": ["2XX"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A6",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A7",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A8",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A9",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A10",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A11",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A12",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A13",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A14",
+      "quelle": "Spec 01, Req 2.6",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A15",
+      "quelle": "Spec 04, Req 12.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "treuhaender": {"ergebnis": "erlaubt (nur lesend)", "http": ["2XX"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A16",
+      "quelle": "Spec 04, Req 12.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A17",
+      "quelle": "Spec 04, Req 12.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A18",
+      "quelle": "Spec 04, Req 12.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
+      }
+    },
+    {
+      "id": "A19",
+      "quelle": "Spec 04, Req 12.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A20",
+      "quelle": "Spec 06, Req 4.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A21",
+      "quelle": "Spec 06, Req 4.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A22",
+      "quelle": "Spec 06, Req 4.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A23",
+      "quelle": "Spec 06, Req 4.1",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    },
+    {
+      "id": "A24",
+      "quelle": "Spec 02, Req 15.5",
+      "rollen": {
+        "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
+        "mitarbeiter": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "geschaeftsstelle": {"ergebnis": "403", "http": ["403"]}
+      }
+    }
+  ]
+}

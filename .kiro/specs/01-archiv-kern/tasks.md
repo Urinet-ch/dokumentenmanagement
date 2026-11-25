@@ -104,6 +104,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `MandantTenantResolver`, `MandantKontext` für Worker, `@RolesAllowed` je Endpunkt
   - Rechtematrix A1–A14 als eine Domain-Regel (Rolle × Aktion), die alle Endpunkte abfragen; 404 vor 403 bei unsichtbaren Dokumenten; spätere Aufgaben ergänzen je Endpunkt die Szenarien ihrer Matrixzeilen
   - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; Mandantentrennung per Probe (Teilnachweis, voll in 2.2); `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
+  - Ergänzung (26.11.2026): Maschinenlesbare Matrix A1–A24 mit Quellen je Zeile und OpenAPI-Abgleich aller REST-Operationen in `EndpunktWaechterTest`
   - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4, 2.6_
 
 - [x] 1.5 API-Tokens für Generatoren und Import [Backend]
