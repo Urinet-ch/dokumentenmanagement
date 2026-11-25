@@ -31,23 +31,27 @@ class MicrometerKennzahlenTest {
     private final Set<MandantCode> scheitert = new HashSet<>();
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final MicrometerKennzahlen kennzahlen = new MicrometerKennzahlen(new Kennzahlen(register(),
-            mandant -> Map.of("FEHLER", 2L), dokumente()), registry);
+            mandant -> Map.of("FEHLER", 2L), dokumente(), mandant -> mandant.equals(URINET) ? 5 : 7), registry);
 
     @Test
     void gescheiterteErhebungEntferntDieGaugesDesMandanten() {
         kennzahlen.aktualisieren();
         assertThat(fehler("vhf-gsk")).isEqualTo(3.0);
+        assertThat(beispiele("urinet")).isEqualTo(5.0);
+        assertThat(beispiele("vhf-gsk")).isEqualTo(7.0);
 
         scheitert.add(VHF);
         kennzahlen.aktualisieren();
 
         assertThat(registry.find("archiv.dokumente").tag("mandant", "vhf-gsk").gauges()).isEmpty();
         assertThat(registry.find("archiv.eingangskorb").tag("mandant", "vhf-gsk").gauges()).isEmpty();
+        assertThat(registry.find("archiv.ki.beispiele").tag("mandant", "vhf-gsk").gauges()).isEmpty();
         assertThat(fehler("urinet")).isEqualTo(3.0);
 
         scheitert.clear();
         kennzahlen.aktualisieren();
         assertThat(fehler("vhf-gsk")).as("nach erfolgreicher Erhebung wieder da").isEqualTo(3.0);
+        assertThat(beispiele("vhf-gsk")).isEqualTo(7.0);
     }
 
     @Test
@@ -58,11 +62,16 @@ class MicrometerKennzahlenTest {
         kennzahlen.aktualisieren();
 
         assertThat(registry.find("archiv.auftraege").tag("mandant", "vhf-gsk").gauges()).isEmpty();
+        assertThat(registry.find("archiv.ki.beispiele").tag("mandant", "vhf-gsk").gauges()).isEmpty();
         assertThat(registry.find("archiv.auftraege").tag("mandant", "urinet").gauges()).isNotEmpty();
     }
 
     private double fehler(String mandant) {
         return registry.get("archiv.dokumente").tag("mandant", mandant).tag("status", "FEHLER").gauge().value();
+    }
+
+    private double beispiele(String mandant) {
+        return registry.get("archiv.ki.beispiele").tag("mandant", mandant).gauge().value();
     }
 
     private DokumentUeberwachung dokumente() {

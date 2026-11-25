@@ -2,6 +2,7 @@ package ch.urinet.archiv.verarbeitung.application;
 
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
+import ch.urinet.archiv.ki.application.KiBeispielZaehler;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -15,8 +16,8 @@ import java.util.Map;
 
 /**
  * Kennzahlen je aktiven Mandanten (Req 16.4): offene, laufende und fehlgeschlagene Aufträge, Dokumente je Status ausser
- * den Endzuständen und die Grösse des Eingangskorbs. Nur Zähler, keine Inhalte. Die Korrekturquote je Feld wird beim
- * Bestätigen eines KI-Vorschlags fortgeschrieben (Aufgabe 3.3).
+ * den Endzuständen, die Grösse des Eingangskorbs und die Anzahl KI-Beispiele. Nur Zähler, keine Inhalte. Die
+ * Korrekturquote je Feld wird beim Bestätigen eines KI-Vorschlags fortgeschrieben (Aufgabe 3.3).
  */
 @ApplicationScoped
 public class Kennzahlen {
@@ -33,16 +34,19 @@ public class Kennzahlen {
     private final MandantRegister register;
     private final AuftragZaehler auftraege;
     private final DokumentUeberwachung dokumente;
+    private final KiBeispielZaehler kiBeispiele;
 
-    public Kennzahlen(MandantRegister register, AuftragZaehler auftraege, DokumentUeberwachung dokumente) {
+    public Kennzahlen(MandantRegister register, AuftragZaehler auftraege, DokumentUeberwachung dokumente,
+                      KiBeispielZaehler kiBeispiele) {
         this.register = register;
         this.auftraege = auftraege;
         this.dokumente = dokumente;
+        this.kiBeispiele = kiBeispiele;
     }
 
     /** Stand eines Mandanten; jeder Status aus {@link #AUFTRAG_STATUS} und {@link #DOKUMENT_STATUS} ist enthalten. */
     public record Stand(MandantCode mandant, Map<String, Long> auftraege, Map<String, Long> dokumente,
-                        long eingangskorb) {
+                        long eingangskorb, long kiBeispiele) {
     }
 
     /** Erhebt den Stand je aktiven Mandanten; ein Mandant mit Fehler fehlt in der Liste (WARN im Log). */
@@ -55,7 +59,7 @@ public class Kennzahlen {
                         dokumente.anzahlJeStatus(mandant.code()));
                 long korb = DokumentStatus.EINGANGSKORB_STATUS.stream()
                         .mapToLong(s -> dokument.getOrDefault(s.name(), 0L)).sum();
-                stand.add(new Stand(mandant.code(), auftrag, dokument, korb));
+                stand.add(new Stand(mandant.code(), auftrag, dokument, korb, kiBeispiele.anzahl(mandant.code())));
             } catch (RuntimeException e) {
                 LOG.warnf("Kennzahlen für Mandant %s nicht erhoben, ursache=%s", mandant.code().wert(),
                         Ursachen.kette(e));
