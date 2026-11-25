@@ -19,6 +19,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { SwUpdate } from '@angular/service-worker';
 import { filter, map } from 'rxjs';
 import { AnmeldungService } from './gemeinsam/anmeldung/anmeldung.service';
+import { kontoverwaltungUrl } from './gemeinsam/anmeldung/kontoverwaltung';
 import { BrandingService } from './gemeinsam/branding.service';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { EingangskorbEntwurfSpeicher } from './eingangskorb/entwurf-speicher';
@@ -92,6 +93,8 @@ export class App {
     hilfeKontext(this.url(), this.hilfe.rolle(), this.hilfeKatalog, !this.anmeldung.angemeldet() && !this.online()),
   );
   protected readonly farbschema = inject(FarbschemaService);
+  /** Einstieg zur Kontoverwaltung des Realms (Passkey einrichten, Req 10.1); Adresse aus der OIDC-Konfiguration. */
+  protected readonly kontoverwaltung = kontoverwaltungUrl();
   protected readonly stand = { ...BUILD_INFO, gebaut: gebautAm(BUILD_INFO.gebaut) };
 
   constructor() {

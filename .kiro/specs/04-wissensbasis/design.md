@@ -1470,7 +1470,9 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   die Freigabe während der Anfrage und liest den Stream bis zum Ende. Es folgt nur `fehler`, kein Text, keine Quellen und
   kein `fertig`; damit ist die Schlussprüfung bis zur Netzauslieferung geprüft. Die Grenze bleibt unverändert:
   Quellenstände werden vor Modellaufruf und vor Einreihen der Antwort geprüft; ein bereits eingereihtes Ereignis ist
-  nicht rückrufbar.
+  nicht rückrufbar. **Nachtrag Stabilität 25.11.2026:** Die simulierte Schlussantwort wartet 3 Sekunden, damit auch
+  langsame CI-Runner Zeit für die Änderung während der laufenden Anfrage haben. Die SSE-Gegenprobe begrenzt das Lesen
+  einschliesslich des ersten Ereignisses und des Reststroms auf eine Gesamtfrist von 30 Sekunden.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`

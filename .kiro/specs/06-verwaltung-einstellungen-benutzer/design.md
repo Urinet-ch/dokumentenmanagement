@@ -1103,8 +1103,19 @@ Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fa
   (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR. Nicht belegt (beim ersten Lauf auf der VPS prüfen, Prüfzeilen im README): Ausführung auf der VPS, der
   `docker compose run`-Aufruf, Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io`.
 
+### Umsetzung (Aufgabe 24.3 Inbetriebnahme, 25.11.2026)
+
+Fabian hat die Passkey-Inbetriebnahme auf Stufe A ausgeführt (`passkey-einrichten-vorlage.sh --ereignisse`: Prüflauf Exit 10, Einrichten
+Exit 0 mit 18 Änderungen, Nachprüfung Exit 0, Wiederholung «nichts zu tun»). Auf iPhone und Mac bestätigt: Passwort-und-TOTP-Rückfall,
+Related Origins (`/.well-known/webauthn`: 200, JSON, richtige Origin, keine Weiterleitung), Passkey einrichten, anmelden, Step-up und
+entfernen, «Zugang zurücksetzen» mit «Passkeys löschen» sowie TOTP bei Passwortanmeldung trotz Passkey. Auf der VPS damit belegt:
+Ausführung, `docker compose run`-Aufruf, Secret-Lesbarkeit für Benutzer 1000, `ghcr.io`, `jq` im Container; die Werkzeuge liegen in
+`/opt/archiv-werkzeuge` (als root ist `$HOME` für Benutzer 1000 nicht durchsuchbar). **Offen:** Probe `UPDATE_CREDENTIAL` und
+`REMOVE_CREDENTIAL` im Ereignisprotokoll (Admin-Konsole nicht öffentlich; das Hilfsskript `ereignisse-auflisten-vorlage.sh` liegt vor, siehe «Ereignis-Probe»); Req 10.7
+bleibt bis zur Ausführung auf der VPS nur teilweise belegt.
+
 ## Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)
-Hilfsmittel für die Probe aus Req 10.7; Aufgabe 24.3 bleibt offen ([Fabian], Abnahme in einem anderen PR).
+Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabian, 25.11.2026, siehe «Inbetriebnahme»); die Probe der Ereignisse bleibt offen bis zur Ausführung auf der VPS.
 - **Skript:** `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet im Wegwerf-Container (Muster wie `passkey-einrichten-vorlage.sh`,
   Anmeldung über `vorlage-ausfuehren.sh`) die Benutzerereignisse des Realms `urinet-archiv` per `kcadm.sh get events`. Die Admin-Konsole ist über
   Traefik nicht öffentlich. Parameter `--typ` (mehrfach, Standard `UPDATE_CREDENTIAL,REMOVE_CREDENTIAL`), `--max` (Standard 20, höchstens 200), `--seit` (Tage, Standard 1).
@@ -1113,3 +1124,19 @@ Hilfsmittel für die Probe aus Req 10.7; Aufgabe 24.3 bleibt offen ([Fabian], Ab
 - **Nachweis:** Stub-Test (`test/ereignisse-auflisten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2
   (`test/ereignisse-auflisten-keycloak-test.sh`, mit virtuellem Authenticator ein echtes `UPDATE_CREDENTIAL`). Nicht belegt: der Lauf auf der VPS und
   `REMOVE_CREDENTIAL` im Echtbetrieb. Anleitung: README, «Passkey-Ereignisse auflisten». Keine Änderung der Requirements.
+
+## Umsetzung (Aufgabe 24.4 Link zur Kontoverwaltung, 25.11.2026)
+- **Ziel (Req 10.1):** Ein angemeldeter Benutzer findet den Einstieg zur Passkey-Einrichtung, ohne die Keycloak-Adresse zu kennen. Die
+  WebAuthn-Registrierung bleibt in der Kontoverwaltung von Keycloak (`webauthn-register-passwordless`); die App baut sie nicht nach.
+- **Stelle:** Kopfzeile der App (`app.html`), links neben dem Benutzer, nach «Hilfe». Sie ist auf jeder Seite sichtbar (auch in «Erfassen»,
+  wo der Link wegen `target="_blank"` nie navigiert und keine Aufnahme verliert) und braucht keinen neuen Hauptmenüpunkt. Bausteine nach
+  `docs/oberflaeche/README.md`: `.knopf` mit Symbol `schluessel`, auf breiten Bildschirmen mit Text, unter 600 px nur das Symbol (Name für
+  Screenreader bleibt). Keine Farbe ausserhalb der Tokens, kein Hinweis oder Banner (freiwillig, kein Aufdrängen).
+- **Adresse:** `kontoverwaltungUrl()` (`gemeinsam/anmeldung/kontoverwaltung.ts`) leitet `<Aussteller>/account` aus `UMGEBUNG.oidc.aussteller`
+  ab, derselben Konfiguration, die die Anmeldung nutzt; kein neuer Betriebswert, kein Eintrag im Repo ausser dem bestehenden Aussteller.
+- **Link:** `<a target="_blank" rel="noopener noreferrer">`; zugänglicher Name «Passkey einrichten (öffnet die Kontoverwaltung in einem
+  neuen Tab)» beginnt mit dem sichtbaren Text. Sichtbar nur bei `anmeldung.angemeldet()`, für alle Rollen, ohne Anzeige von Gerätedaten.
+- **Anleitung:** `erste-schritte-passkey.md` und `erste-schritte.md` nennen den Knopf statt «die Person, die Ihren Zugang eingerichtet hat».
+- **Nachweis:** Komponententests (`app.spec.ts`, `kontoverwaltung.spec.ts`); Browser-Szenario `@req-10.1` in
+  `features/verwaltung/passkey-einstieg-pwa.feature` (mit Attrappe, ohne echtes Keycloak: Knopf sichtbar, neuer Tab zeigt die Kontoverwaltung,
+  die App-Seite bleibt, ohne Überlauf und axe-Befund bei 375/1280 px, hell/dunkel).

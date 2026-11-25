@@ -56,5 +56,29 @@ Belege:
 ## Einordnung
 
 Die Logs belegen die genannten Fehlerbilder, aber nicht deren weitergehende
-Ursachen oder eine Wiederholbarkeit. Es wurden keine Stabilisierungspatches
-vorgenommen.
+Ursachen oder eine Wiederholbarkeit.
+
+## Nachtrag 25.11.2026: Offline-Erfassung
+
+Im Lauf [45556027064](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45556027064)
+scheiterte das Szenario «Offline und ohne Anmeldung erfassen; die Aufnahmen
+bleiben auf dem Gerät» im Schritt «das Handy offline ist» am
+`page.waitForLoadState('networkidle')`. Das Log belegt den abgelaufenen Wait,
+nicht, welche Anfrage das Netzwerk aktiv hielt.
+
+Das Installations-Given lädt bereits alle App-Dateien in den Service-Worker-Cache
+und prüft nach nötigen Reloads, dass der Service Worker die Seite kontrolliert.
+Für dieses Szenario ersetzt deshalb ein eigener Schritt den zusätzlichen
+`networkidle`-Wait durch die Prüfung dieses Controllers. Nach dem Offline-Schalten
+wartet er zudem auf den Offline-Hinweis der App, bevor die Seite erneut geöffnet
+wird. Die anderen Erfassungsszenarien behalten ihren bisherigen Wait. Am
+Produktcode ändert sich nichts.
+
+Bei der Kalibrierung scheiterte lokal ein Durchlauf danach noch beim Link-Klick
+«Ohne Verbindung erfassen». Das belegt einen fehlenden Synchronisationspunkt,
+nicht die tiefergehende Ursache. Mit dem zusätzlichen Wait auf den Offline-Hinweis
+lief das Szenario zehnmal hintereinander erfolgreich.
+
+Nachweis: Frontend-Build und App-Build für den Browser-Test waren erfolgreich.
+Die Wiederholungen belegen die Stabilität dieses Testpfads, nicht die Ursache der
+ursprünglichen Netzaktivität.
