@@ -96,6 +96,9 @@ ursprünglichen Netzaktivität.
   `.hilfe-abschnitt h3` ein. `@req-8.1` bestand lokal zehnmal, vor und nach
   dem Abgleich mit `origin/main`; `@req-8.3` bestand je einmal. Das belegt
   den Locator-Fix, aber nicht die Ursache des historischen Klick-Timeouts.
+  Der vollständige CI-Lauf
+  [45634770924](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45634770924)
+  bestand einschliesslich Browser-Szenarien und Gitleaks.
 - **PWA-Installation und Versionswechsel:** Der Log von
   [45463659941](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45463659941)
   belegt einen während der Navigation zerstörten Playwright-Ausführungskontext.
