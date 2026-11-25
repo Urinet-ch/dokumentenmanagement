@@ -25,6 +25,7 @@ class VergleichTest {
     void artUndDatumExakt() {
         assertThat(Vergleich.art("QUITTUNG", "QUITTUNG")).isTrue();
         assertThat(Vergleich.art("QUITTUNG", "LIEFERANTENBELEG")).isFalse();
+        assertThat(Vergleich.art("QUITTUNG", " QUITTUNG ")).isFalse();
         assertThat(Vergleich.datum(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 1))).isTrue();
         assertThat(Vergleich.datum(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 1, 3))).isFalse();
     }
@@ -46,6 +47,9 @@ class VergleichTest {
 
     @Test
     void erwartetNullNurMitLeeremVorschlagRichtig() {
+        assertThat(Vergleich.art(null, null)).isTrue();
+        assertThat(Vergleich.art(null, "  ")).isTrue();
+        assertThat(Vergleich.art(null, "QUITTUNG")).isFalse();
         assertThat(Vergleich.belegnummer(null, null)).isTrue();
         assertThat(Vergleich.belegnummer(null, "  ")).isTrue();
         assertThat(Vergleich.belegnummer(null, "4711")).isFalse();
@@ -53,6 +57,8 @@ class VergleichTest {
         assertThat(Vergleich.betrag(null, BigDecimal.ZERO)).isFalse();
         assertThat(Vergleich.datum(null, null)).isTrue();
         assertThat(Vergleich.datum(null, LocalDate.of(2026, 1, 1))).isFalse();
+        assertThat(Vergleich.partner(null, null)).isTrue();
+        assertThat(Vergleich.partner(null, "  ")).isTrue();
         assertThat(Vergleich.partner(null, "x")).isFalse();
         assertThat(Vergleich.betrag(BigDecimal.ONE, null)).isFalse();
     }
