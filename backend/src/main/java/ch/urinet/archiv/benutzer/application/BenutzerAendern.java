@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer.application;
 
 import ch.urinet.archiv.benutzer.domain.BenutzerFormregeln;
+import ch.urinet.archiv.benutzer.domain.BenutzerStatus;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -15,6 +16,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.EnumSet;
@@ -28,14 +30,18 @@ import java.util.concurrent.atomic.AtomicReference;
 public class BenutzerAendern {
     private final IdentitaetsDienst identitaet;
     private final BenutzerStatusSpeicher status;
+    private final BenutzerAktivitaet aktivitaet;
     private final BenutzerMitteilung mitteilung;
     private final VerwaltungVorgang vorgang;
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
+    private final BenutzerEinladungSpeicher einladungen;
     private final Duration gueltigkeit;
 
     public BenutzerAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
-                               BenutzerMitteilung mitteilung, VerwaltungVorgang vorgang, Berechtigung berechtigung,
+                               BenutzerAktivitaet aktivitaet, BenutzerMitteilung mitteilung,
+                               BenutzerEinladungSpeicher einladungen,
+                               VerwaltungVorgang vorgang, Berechtigung berechtigung,
                                StepUp stepUp, @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit",
                                        defaultValue = "PT24H") Duration gueltigkeit) {
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
@@ -43,6 +49,8 @@ public class BenutzerAendern {
         }
         this.identitaet = identitaet;
         this.status = status;
+        this.einladungen = einladungen;
+        this.aktivitaet = aktivitaet;
         this.mitteilung = mitteilung;
         this.vorgang = vorgang;
         this.berechtigung = berechtigung;
@@ -72,6 +80,7 @@ public class BenutzerAendern {
         UUID vorgangId = UUID.randomUUID();
         AtomicReference<IdentitaetsDienst.Benutzer> gefunden = new AtomicReference<>();
         AtomicBoolean emailGeaendert = new AtomicBoolean();
+        AtomicReference<Instant> versendetAm = new AtomicReference<>();
         var felder = new ArrayList<ProtokollDetails.Verwaltungsfeld>();
         if (email != null) {
             felder.add(ProtokollDetails.Verwaltungsfeld.EMAIL);
@@ -92,7 +101,8 @@ public class BenutzerAendern {
                     if (benutzer.rollen().size() > 1) {
                         throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
                     }
-                    String etag = BenutzerEtag.berechnen(benutzer, BenutzerLesen.status(benutzer, status));
+                    BenutzerStatus zustand = BenutzerLesen.status(benutzer, status);
+                    String etag = BenutzerLesen.etag(benutzer, zustand, aktivitaet.lesen(id));
                     if (!ifMatch.equals("\"" + etag + "\"")) {
                         throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
                     }
@@ -113,13 +123,18 @@ public class BenutzerAendern {
                         aktionen.add(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL);
                         identitaet.aktionenHinzufuegen(mandant.wert(), id,
                                 Set.of(IdentitaetsDienst.ErforderlicheAktion.VERIFY_EMAIL));
+                        versendetAm.set(Instant.now());
                         identitaet.einladen(mandant.wert(), id, aktionen, gueltigkeit);
                         mitteilung.emailGeaendert(gefunden.get().email());
                     }
                     return ziel;
                 }, fehler -> fehler instanceof IdentitaetsDienst.KonfliktException && !emailGeaendert.get()
                         ? VerwaltungVorgang.Kompensation.GEKLAERT : VerwaltungVorgang.Kompensation.UNKLAR,
-                ignoriert -> { },
+                ignoriert -> {
+                    if (emailGeaendert.get()) {
+                        einladungen.speichern(id, versendetAm.get(), gueltigkeit);
+                    }
+                },
                 ignoriert -> eintrag(akteur, ip, vorgangId, ziel, art, felder,
                         ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
         } catch (IdentitaetsDienst.KonfliktException e) {
