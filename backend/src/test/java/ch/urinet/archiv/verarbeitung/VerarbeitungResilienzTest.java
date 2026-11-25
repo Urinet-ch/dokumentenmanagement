@@ -7,6 +7,7 @@ import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe.Quelle;
 import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
+import ch.urinet.archiv.verarbeitung.application.ArchivierenHandler;
 import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
 import ch.urinet.archiv.verarbeitung.application.AuftragHandler;
 import ch.urinet.archiv.verarbeitung.application.AuftragHandlerVerzeichnis;
@@ -69,6 +70,7 @@ class VerarbeitungResilienzTest {
     @Inject VerarbeitungSpeichern speichern;
     @Inject AblagePort ablage;
     @Inject OcrPort ocr;
+    @Inject ArchivierenHandler archivieren;
     @Inject Instance<AgroalDataSource> datenquelle;
     @ConfigProperty(name = "archiv.ocr.arbeitsverzeichnis") Path arbeitsverzeichnis;
     @TempDir Path temp;
@@ -145,13 +147,42 @@ class VerarbeitungResilienzTest {
     }
 
     @Test
+    void doppelteArchivierungVeraendertDasArchivNicht() throws Exception {
+        UUID id = hilfe.anlegen(MANDANT, "SCAN", "ARCHIVIERUNG",
+                List.of(new Quelle(DateiRolle.ORIGINAL, 1, "pdf", "application/pdf",
+                        OcrTestdateien.textPdf("Synthetische Archivierung"))));
+        auftraege.ausfuehren("update m_urinet.dokument set pdfa_fehlt = true where id = '" + id + "'");
+        String nutzlast = "{\"" + ArchivierenHandler.DOKUMENT_ID + "\":\"" + id + "\"}";
+        long erster = auftraege.rohEinreihen(MANDANT, ArchivierenHandler.TYP, nutzlast);
+        AuftragArbeiter worker = worker(archivieren);
+        starten(worker).get(5, TimeUnit.MINUTES);
+        assertThat(auftraege.zeile(erster).status()).isEqualTo("FERTIG");
+        Map<String, Object> stand = hilfe.dokument(MANDANT, id);
+        assertThat(stand).containsEntry("status", "ARCHIVIERT");
+        String archivOrdner = DateiSchluessel.ordner(Ablageort.ARCHIV, VerarbeitungTestHilfe.JAHR, id);
+        List<String> archiv = hilfe.versionen(MANDANT, archivOrdner);
+        assertThat(archiv).hasSize(1);
+        assertThat(hilfe.versionen(MANDANT, VerarbeitungTestHilfe.eingangOrdner(id))).isEmpty();
+
+        long zweiter = auftraege.rohEinreihen(MANDANT, ArchivierenHandler.TYP, nutzlast);
+        starten(worker).get(5, TimeUnit.MINUTES);
+        assertThat(auftraege.zeile(zweiter).status()).isEqualTo("FERTIG");
+        assertThat(hilfe.dokument(MANDANT, id)).isEqualTo(stand);
+        assertThat(hilfe.versionen(MANDANT, archivOrdner)).isEqualTo(archiv);
+    }
+
+    @Test
     void vollerDatentraegerBeimSchreibenErhaeltOriginalUndErlaubtWiederholung() throws Exception {
         UUID id = dokument();
         List<String> original = original(id);
         long auftrag = hilfe.einreihen(MANDANT, id);
+        AtomicReference<Path> teildatei = new AtomicReference<>();
         AblagePort fehlerhafteAblage = AblagePort.class.cast(Proxy.newProxyInstance(
                 AblagePort.class.getClassLoader(), new Class<?>[]{AblagePort.class}, (proxy, methode, argumente) -> {
                     if (methode.getName().equals("lesenEingang")) {
+                        Path ziel = (Path) argumente[4];
+                        Files.write(ziel, new byte[]{1});
+                        teildatei.set(ziel);
                         throw new UncheckedIOException(new FileSystemException("synthetische-quelle", null,
                                 "No space left on device"));
                     }
@@ -163,6 +194,7 @@ class VerarbeitungResilienzTest {
                 }));
         starten(worker(fehlerhafteAblage, ocr)).get(30, TimeUnit.SECONDS);
         assertUnvollstaendig(id, original);
+        assertThat(teildatei.get()).isNotNull().doesNotExist();
         assertThat(auftraege.zeile(auftrag).status()).isEqualTo("OFFEN");
         assertThat(auftraege.zeile(auftrag).versuche()).isEqualTo(1);
 
@@ -303,15 +335,19 @@ class VerarbeitungResilienzTest {
 
     private AuftragArbeiter worker(AblagePort testAblage, OcrPort testOcr) {
         var verarbeiten = new VerarbeitenHandler(speichern, testAblage, testOcr, arbeitsverzeichnis);
+        return worker(verarbeiten);
+    }
+
+    private AuftragArbeiter worker(AuftragHandler testHandler) {
         var verzeichnis = new AuftragHandlerVerzeichnis(handler, config) {
             @Override
             public Set<AuftragTyp> typen() {
-                return Set.of(VerarbeitenHandler.TYP);
+                return Set.of(testHandler.typ());
             }
 
             @Override
             public AuftragHandler handler(AuftragTyp typ) {
-                return verarbeiten;
+                return testHandler;
             }
         };
         var worker = new AuftragArbeiter(schlange, verzeichnis, kontext, 1, Duration.ofSeconds(1),
