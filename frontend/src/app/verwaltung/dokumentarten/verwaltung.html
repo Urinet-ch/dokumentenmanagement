@@ -742,7 +742,7 @@
     } @else if (versionen().length === 0) {
       <p>{{ texte.versionen.keineVersionen }}</p>
     } @else {
-      <div class="tabelle-rahmen">
+      <div class="tabelle-rahmen" tabindex="0">
         <table class="tabelle">
           <thead>
             <tr>
@@ -798,7 +798,7 @@
       @if (diff().length === 0) {
         <p>{{ texte.versionen.keineAenderungen }}</p>
       } @else {
-        <div class="tabelle-rahmen">
+        <div class="tabelle-rahmen" tabindex="0">
           <table class="tabelle">
             <thead>
               <tr>
@@ -876,7 +876,7 @@
         @if (aenderungen(vergleich).length === 0) {
           <p>{{ texte.datei.keineAenderungen }}</p>
         } @else {
-          <div class="tabelle-rahmen">
+          <div class="tabelle-rahmen" tabindex="0">
             <table class="tabelle">
               <thead>
                 <tr>
