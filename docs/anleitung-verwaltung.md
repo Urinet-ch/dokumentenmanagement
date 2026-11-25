@@ -72,6 +72,11 @@ Nicht hier änderbar: Alarm-Empfänger, Budget des öffentlichen Chats, Modelle,
 
 ## Für den Betreiber
 
+### Öffentlicher Wissenschat
+Der öffentliche Wissenschat ist je Mandant über `archiv.mandant.<code>.oeffentlich.wissenschat` geschaltet; `<code>` ist ein
+Platzhalter für den Mandantencode. Der Standard ist ausgeschaltet. Der Schalter ersetzt weder die Webseitenfreigabe der
+einzelnen Wissensseite noch die Quellenbedingungen aus Spec 04, Requirement 21.6.
+
 ### Normaler Weg: Admin-Kommando
 Die Kommandos laufen im Wegwerf-Container wie im README unter «Admin-Kommandos auf der VPS» beschrieben, nie in einem laufenden
 Dienst. Jeder Aufruf steht im Protokoll als `betreiber:<name>` (`--wer`). Aufruf und Platzhalter stehen im README unter
