@@ -33,9 +33,29 @@ Funktionalität: Öffentlicher Wissenschat
     Und das simulierte Sprachmodell liest diese öffentliche Wissensseite
     Wenn die Webseite mit dem Schlüssel «wissen» den Wissenschat fragt: «Was steht in der Wissensbasis? Meine Kontaktadresse ist max.muster@example.invalid.»
     Dann liefert der Wissenschat die Seite mit belegter Quelle und protokolliert die bereinigte Frage
-    Angenommen das simulierte Sprachmodell beantwortet die Fortsetzung
+    Angenommen das simulierte Sprachmodell liest in der Fortsetzung die Wissensseite erneut und antwortet
     Wenn die Webseite mit dem Schlüssel «wissen» das bisherige Wissenschat-Gespräch mit «Fortsetzung-2071» fortsetzt
     Dann enthält die Fortsetzung den vorherigen Antwortverlauf und bleibt an die freigegebene Seite gebunden
+
+  @req-21.6
+  Szenario: Eine Folgefrage ohne Beleg zeigt keine Quellen früherer Runden
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und im Mandanten «urinet» gibt es die Reihen:
+      | code        | name        |
+      | PROBE_WISSEN | Probe-Reihe |
+    Und im Mandanten «urinet» liegen diese Chatbot-Dokumente:
+      | name | titel          | reihe        | ausgabe | jahr | zugriff     | veroeffentlicht | vertraulichkeit | status     | text  |
+      | A    | Probe-Bulletin | PROBE_WISSEN | 3/2071  | 2071 | oeffentlich | true            | NORMAL          | ARCHIVIERT | Probe |
+    Und der Chatbot-Schlüssel «wissen» der Webseite «probe-wissen» im Mandanten «urinet» hat die höchste Stufe «oeffentlich»
+    Und eine freigegebene öffentliche Wissensseite belegt das Chatbot-Dokument «A»
+    Und das simulierte Sprachmodell liest diese öffentliche Wissensseite
+    Wenn die Webseite mit dem Schlüssel «wissen» den Wissenschat fragt: «Was steht in der Wissensbasis?»
+    Dann liefert der Wissenschat die Seite mit belegter Quelle und protokolliert die bereinigte Frage
+    Angenommen das simulierte Sprachmodell beantwortet die Fortsetzung
+    Wenn die Webseite mit dem Schlüssel «wissen» das bisherige Wissenschat-Gespräch mit «Fortsetzung-2071» fortsetzt
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und lautet der Text des Chatbots «Dazu steht nichts in der Wissensbasis.»
+    Und sind die Quellen des Chatbots leer
 
   @req-21.6
   Szenario: Ein Entzug vor der Fortsetzung verhindert den nächsten Modellaufruf
@@ -96,3 +116,38 @@ Funktionalität: Öffentlicher Wissenschat
       | änderung     |
       | Entzug       |
       | Höherstufung |
+
+  @req-21.6 @req-21.7
+  Szenario: Eine zu lange Frage wird abgelehnt, ohne das Modell zu fragen
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und der Chatbot-Schlüssel «wissen» der Webseite «probe-wissen» im Mandanten «urinet» hat die höchste Stufe «oeffentlich»
+    Und das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt      | argumente | tokens |
+      | 1       | text | Kein Beleg. |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «wissen» eine Wissenschat-Frage mit 501 Zeichen stellt
+    Dann liefert der Chatbot Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und steht in der Chatbot-Antwort weder «aaaaaaaaaa» noch «501»
+    Und hat das simulierte Sprachmodell keine Anfrage erhalten
+    Wenn die Webseite mit dem Schlüssel «wissen» eine Wissenschat-Frage mit 500 Zeichen stellt
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+
+  @req-21.6 @req-21.7
+  Szenario: Höchstens 20 Wissenschat-Fragen je Client und Stunde, danach 429 mit Retry-After
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und der Chatbot-Schlüssel «wissen» der Webseite «probe-wissen» im Mandanten «urinet» hat die höchste Stufe «oeffentlich»
+    Und das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt      | argumente | tokens |
+      | 1       | text | Kein Beleg. |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «wissen» 20 Wissenschat-Fragen «Was steht in der Wissensbasis?» stellt
+    Und die Webseite mit dem Schlüssel «wissen» den Wissenschat fragt: «Und noch etwas?»
+    Dann liefert der Chatbot Status 429 und Fehlercode «ZU_VIELE_ANFRAGEN»
+    Und trägt die Chatbot-Antwort den Header «Retry-After»
+    Und nennt das Problem den Grund «STUNDENLIMIT»
+
+  @req-21.6 @req-21.8
+  Szenario: Antwortet das Modell erst nach der Zeitgrenze, meldet der Wissenschat den festen Fehler ohne Quellen
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und der Chatbot-Schlüssel «wissen» der Webseite «probe-wissen» im Mandanten «urinet» hat die höchste Stufe «oeffentlich»
+    Und das simulierte Sprachmodell antwortet erst nach 9 Sekunden
+    Wenn die Webseite mit dem Schlüssel «wissen» den Wissenschat fragt: «Was steht in der Wissensbasis?»
+    Dann meldet der Stream des Chatbots «fehler» «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» und weder «quellen» noch «fertig»

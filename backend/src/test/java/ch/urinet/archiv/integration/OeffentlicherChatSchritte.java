@@ -210,6 +210,15 @@ public class OeffentlicherChatSchritte {
                 "Fortsetzung-2071");
     }
 
+    @Angenommen("das simulierte Sprachmodell liest in der Fortsetzung die Wissensseite erneut und antwortet")
+    public void wissenFortsetzungLiestErneut() {
+        KiWireMock.zuruecksetzen();
+        KiWireMock.chatFolgeMitMarker(List.of(
+                KiWireMock.ChatAntwort.werkzeuge(100, 10, new KiWireMock.ChatAufruf("wissen_seite_zeigen_oeffentlich",
+                        "{\"pfad\":" + quote(wissenPfad) + "}")),
+                KiWireMock.ChatAntwort.text("Fortgesetzte synthetische Antwort.", 20, 5)), "Fortsetzung-2071");
+    }
+
     @Angenommen("das simulierte Sprachmodell liest diese öffentliche Wissensseite und verzögert die Schlussantwort")
     public void wissenModellVerzoegert() {
         KiWireMock.chatFolgeLetzteVerzoegert(wissenAntworten(), 1200);
@@ -508,6 +517,19 @@ public class OeffentlicherChatSchritte {
     @Wenn("die Webseite mit dem Schlüssel «{word}» den Wissenschat fragt: «{}»")
     public void wissenschatFragen(String name, String frage) {
         wissenschatSenden(name, frage, null);
+    }
+
+    @Wenn("die Webseite mit dem Schlüssel «{word}» {int} Wissenschat-Fragen «{}» stellt")
+    public void wissenschatVieleFragen(String name, int anzahl, String frage) {
+        for (int i = 0; i < anzahl; i++) {
+            wissenschatSenden(name, frage, null);
+            assertThat(antwort.statusCode()).as("Frage " + (i + 1) + ": " + antwort.asString()).isEqualTo(200);
+        }
+    }
+
+    @Wenn("die Webseite mit dem Schlüssel «{word}» eine Wissenschat-Frage mit {int} Zeichen stellt")
+    public void wissenschatLangeFrage(String name, int zeichen) {
+        wissenschatSenden(name, "a".repeat(zeichen), null);
     }
 
     @Wenn("die Webseite mit dem Schlüssel «{word}» das bisherige Wissenschat-Gespräch mit «{}» fortsetzt")
