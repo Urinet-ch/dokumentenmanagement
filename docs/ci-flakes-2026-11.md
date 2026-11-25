@@ -1,9 +1,11 @@
 # CI-Fehlerstatistik (November 2026)
 
-Stichtag: 25.11.2026, 06:35 UTC. Auswertung der 30 jüngsten Läufe des
-GitHub-Actions-Workflows `CI` auf `main` (`gh run list --branch main
---workflow CI --limit 30`). Zeitraum: 24.11.2026, 13:37 UTC bis
-25.11.2026, 06:35 UTC. 13 Läufe fehlgeschlagen, 17 erfolgreich.
+Stand: 25.11.2026, 07:23:45 UTC. Auswertung der 30 jüngsten abgeschlossenen
+Läufe des GitHub-Actions-Workflows `CI` auf `main` (`gh run list --branch main
+--workflow CI --status completed --limit 30`). Zeitraum: 24.11.2026,
+13:37:32 UTC bis 25.11.2026, 06:35:09 UTC. 13 Läufe fehlgeschlagen,
+17 erfolgreich. Lauf [45567057968](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45567057968)
+war zum Stichtag noch in Arbeit und ist nicht gezählt.
 Ausgewertet wurden fehlgeschlagene Jobs und deren Logs (`gh run view --log-failed`).
 
 ## Häufigkeit
