@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="141-benutzer-einladung-ablauf" author="archiv">
+        <createTable tableName="benutzer_einladung">
+            <column name="benutzer" type="varchar(200)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="versendet_am" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="gueltig_bis" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            alter table benutzer_einladung
+                add constraint benutzer_einladung_ablauf_ck
+                check (gueltig_bis > versendet_am
+                    and gueltig_bis &lt;= versendet_am + interval '7 days')
+        </sql>
+        <rollback>
+            <dropTable tableName="benutzer_einladung"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

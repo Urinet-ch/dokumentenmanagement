@@ -1,6 +1,7 @@
 package ch.urinet.archiv.benutzer.application;
 
 import ch.urinet.archiv.benutzer.domain.BenutzerFormregeln;
+import ch.urinet.archiv.benutzer.domain.BenutzerStatus;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class BenutzerAendern {
     private final IdentitaetsDienst identitaet;
     private final BenutzerStatusSpeicher status;
+    private final BenutzerAktivitaet aktivitaet;
     private final BenutzerMitteilung mitteilung;
     private final VerwaltungVorgang vorgang;
     private final Berechtigung berechtigung;
@@ -35,7 +37,8 @@ public class BenutzerAendern {
     private final Duration gueltigkeit;
 
     public BenutzerAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
-                               BenutzerMitteilung mitteilung, VerwaltungVorgang vorgang, Berechtigung berechtigung,
+                               BenutzerAktivitaet aktivitaet, BenutzerMitteilung mitteilung,
+                               VerwaltungVorgang vorgang, Berechtigung berechtigung,
                                StepUp stepUp, @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit",
                                        defaultValue = "PT24H") Duration gueltigkeit) {
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
@@ -43,6 +46,7 @@ public class BenutzerAendern {
         }
         this.identitaet = identitaet;
         this.status = status;
+        this.aktivitaet = aktivitaet;
         this.mitteilung = mitteilung;
         this.vorgang = vorgang;
         this.berechtigung = berechtigung;
@@ -92,7 +96,8 @@ public class BenutzerAendern {
                     if (benutzer.rollen().size() > 1) {
                         throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
                     }
-                    String etag = BenutzerEtag.berechnen(benutzer, BenutzerLesen.status(benutzer, status));
+                    BenutzerStatus zustand = BenutzerLesen.status(benutzer, status);
+                    String etag = BenutzerLesen.etag(benutzer, zustand, aktivitaet.lesen(id));
                     if (!ifMatch.equals("\"" + etag + "\"")) {
                         throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
                     }

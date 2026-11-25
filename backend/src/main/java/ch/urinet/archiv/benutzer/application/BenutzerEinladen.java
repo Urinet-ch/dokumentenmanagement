@@ -21,10 +21,12 @@ import java.util.concurrent.atomic.AtomicReference;
 public class BenutzerEinladen {
     private final IdentitaetsDienst identitaet;
     private final BenutzerStatusSpeicher status;
+    private final BenutzerEinladungSpeicher einladungen;
     private final VerwaltungVorgang vorgang;
     private final Duration gueltigkeit;
 
-    public BenutzerEinladen(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status, VerwaltungVorgang vorgang,
+    public BenutzerEinladen(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
+            BenutzerEinladungSpeicher einladungen, VerwaltungVorgang vorgang,
             @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit", defaultValue = "PT24H")
             Duration gueltigkeit) {
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
@@ -32,6 +34,7 @@ public class BenutzerEinladen {
         }
         this.identitaet = identitaet;
         this.status = status;
+        this.einladungen = einladungen;
         this.vorgang = vorgang;
         this.gueltigkeit = gueltigkeit;
     }
@@ -59,7 +62,8 @@ public class BenutzerEinladen {
         }, () -> {
             identitaet.einladen(mandant.wert(), id, gefunden.get().aktionen(), gueltigkeit);
             return ziel;
-        }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR, ignoriert -> { },
+        }, fehler -> VerwaltungVorgang.Kompensation.UNKLAR,
+                ignoriert -> einladungen.speichern(id, gueltigkeit),
                 ignoriert -> eintrag(akteur, ip, vorgangId, ziel,
                         ProtokollDetails.Verwaltungsphase.ABGESCHLOSSEN));
     }

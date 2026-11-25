@@ -769,6 +769,26 @@ offener Einladung den letzten bekannten Versand und «Ablauf nicht bekannt»; we
 das Versanddatum beweisen den Ablauf des tatsächlich verschickten Links. Das geforderte Kennzeichen «abgelaufen»
 und sein vollständiger Nachweis zu 7.4 bleiben offen.
 
+## Umsetzung (Aufgabe 19.2 Ablauf, 25.11.2026)
+
+Changeset 141 ergänzt im Mandantenschema `benutzer_einladung` mit Versandzeit und Ablaufgrenze, einer positiven
+Maximaldauer von sieben Tagen und Rollback. Die Ablaufgrenze wird aus derselben `Duration` berechnet, die der
+Versandpfad an `execute-actions-email` übergibt. Gespeichert wird sie erst im Abschluss nach erfolgreichem Versand;
+ein Versandfehler lässt den bisherigen Eintrag unverändert. Anlage, Reaktivierung und erneutes Senden verwenden
+denselben Pfad. Eine Realm-Konfiguration wird nicht als Ersatz für die konkrete Versanddauer gelesen.
+
+Liste und Detail liefern `einladungGueltigBis`; fehlende Einträge bleiben bei Altbeständen unbekannt. Die Grenze
+fliesst in den ETag ein. Der bestehende Mandantenkontext und die Rechte der Benutzer-API bleiben unverändert.
+Die Oberfläche nennt den letzten Versand «Letzter Einladungsversand» und zeigt Ablaufdatum sowie «Abgelaufen»,
+«Nicht abgelaufen» oder «Ablauf nicht bekannt». `EinladungZeitTest` belegt Anlage, Reaktivierung, erneutes Senden,
+fehlgeschlagenen Versand und Altbestand; `BenutzerEtagTest` prüft die Versionsänderung. Die Browser-Szenarien
+`@req-7.4` prüfen die drei Zustände in Liste und Detail bei 375 und 1280 px in hell und dunkel, einschliesslich
+Überlauf- und axe-Prüfung. `VerwaltungCacheHttpTest` deckt die Benutzer-API und Mandantentrennung ab.
+
+Die Anleitungen in `frontend/public/anleitung/verwaltung.md` und `docs/anleitung-verwaltung.md` beschreiben die
+gespeicherte Ablaufgrenze und das Verhalten bei fehlgeschlagenem Versand. Betriebsnachweise aus Aufgabe 19.3
+bleiben bei Fabian.
+
 ## Umsetzung 19.4 — Keycloak-Adapter
 
 `KeycloakAdminAdapter` ist nur im Profil `prod` aktiv; Dev und Tests verwenden den speicherbasierten Stub. Der Adapter

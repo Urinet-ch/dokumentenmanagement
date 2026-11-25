@@ -42,6 +42,7 @@ public class BenutzerAnlegen {
     private final VerwaltungAntragSpeicher antraege;
     private final ZugriffProtokoll protokoll;
     private final VerwaltungVorgang vorgang;
+    private final BenutzerEinladungSpeicher einladungen;
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
     private final int maximum;
@@ -50,7 +51,8 @@ public class BenutzerAnlegen {
 
     public BenutzerAnlegen(IdentitaetsDienst identitaet, MandantenRollen rollen, BenutzerNamen namen,
                            BenutzerVerzeichnis verzeichnis, VerwaltungAntragSpeicher antraege,
-                           ZugriffProtokoll protokoll, VerwaltungVorgang vorgang, Berechtigung berechtigung,
+                           ZugriffProtokoll protokoll, VerwaltungVorgang vorgang,
+                           BenutzerEinladungSpeicher einladungen, Berechtigung berechtigung,
                            StepUp stepUp,
                            @ConfigProperty(name = "archiv.verwaltung.max-benutzer", defaultValue = "25") int maximum,
                            @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit", defaultValue = "PT24H")
@@ -68,6 +70,7 @@ public class BenutzerAnlegen {
         this.antraege = antraege;
         this.protokoll = protokoll;
         this.vorgang = vorgang;
+        this.einladungen = einladungen;
         this.berechtigung = berechtigung;
         this.stepUp = stepUp;
         this.maximum = maximum;
@@ -184,6 +187,7 @@ public class BenutzerAnlegen {
                 }
                 return VerwaltungVorgang.Kompensation.UNKLAR;
             }, ergebnis -> {
+                einladungen.speichern(ergebnis.id().toString(), einladung);
                 namen.sperren(eingabe.benutzername());
                 verzeichnis.einfuegen(Optional.empty(), new BenutzerVerzeichnis.Neu(ergebnis.id().toString(),
                         Optional.of(eingabe.benutzername()), vierAugen.get() ? Optional.empty() : Optional.of(rolle.name()),

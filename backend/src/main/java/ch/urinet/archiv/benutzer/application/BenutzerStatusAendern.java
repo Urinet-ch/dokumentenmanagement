@@ -40,11 +40,13 @@ public class BenutzerStatusAendern {
     private final Berechtigung berechtigung;
     private final StepUp stepUp;
     private final TokenWiderruf tokenWiderruf;
+    private final BenutzerEinladungSpeicher einladungen;
     private final Duration gueltigkeit;
 
     public BenutzerStatusAendern(IdentitaetsDienst identitaet, BenutzerStatusSpeicher status,
                                 BenutzerVerzeichnis verzeichnis, VerwaltungVorgang verwaltung,
                                 Berechtigung berechtigung, StepUp stepUp, TokenWiderruf tokenWiderruf,
+                                BenutzerEinladungSpeicher einladungen,
                                 @ConfigProperty(name = "archiv.verwaltung.einladung-gueltigkeit",
                                         defaultValue = "PT24H") Duration gueltigkeit) {
         if (gueltigkeit.isZero() || gueltigkeit.isNegative() || gueltigkeit.compareTo(Duration.ofDays(7)) > 0) {
@@ -57,6 +59,7 @@ public class BenutzerStatusAendern {
         this.berechtigung = berechtigung;
         this.stepUp = stepUp;
         this.tokenWiderruf = tokenWiderruf;
+        this.einladungen = einladungen;
         this.gueltigkeit = gueltigkeit;
     }
 
@@ -148,6 +151,9 @@ public class BenutzerStatusAendern {
                             austritt(gefunden.get(), akteur);
                         }
                     } else {
+                        if (vorgang == Vorgang.REAKTIVIEREN) {
+                            einladungen.speichern(id, gueltigkeit);
+                        }
                         status.entfernen(id);
                     }
                 }, ignoriert -> eintrag(akteur, ip, vorgangId, ziel, vorgang, kategorie,

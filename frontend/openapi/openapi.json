@@ -540,6 +540,9 @@
           "einladungOffenSeit" : {
             "$ref" : "#/components/schemas/Instant"
           },
+          "einladungGueltigBis" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
           "letzteAktion" : {
             "$ref" : "#/components/schemas/LetzteAktion"
           },
