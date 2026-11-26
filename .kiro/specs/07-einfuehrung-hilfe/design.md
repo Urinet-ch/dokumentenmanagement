@@ -1,7 +1,9 @@
 # Design Document — 07 Einführung und Hilfe
 
 ## Overview
+
 Zwei Teile, beide nur im Frontend:
+
 1. **Einführung** auf der Startseite: Ein neuer Benutzer sieht über den Kacheln eine Karte mit höchstens sechs Schritten,
    die sich nach seinen Rechten richten. Ob er die Einführung schon kennt, merkt sich der Browser (Einführungsvermerk).
 2. **Benutzeranleitung**: Markdown-Dateien im Repository, die mit der App gebaut, vom Service Worker vorab geladen und im
@@ -16,6 +18,7 @@ Das Backend ändert sich nicht; neue Feature-Dateien liegen unter `backend/src/t
 alle Szenarien liegen (tech.md).
 
 ## Architektur
+
 ```mermaid
 flowchart LR
   subgraph Repo
@@ -37,35 +40,44 @@ flowchart LR
   BR[BrandingService] --> EINF
   BR --> SEITE
 ```
+
 Kein Pfeil führt zum Server ausser dem Laden der statischen Dateien, die der Service Worker mit der App holt.
 
 ## Entscheide
+
 Alle Punkte sind vorgeschlagen am 21.11.2026 und gelten als entschieden mit dem Merge dieses PR.
 
-| Nr. | Frage | Vorschlag | Verworfene Alternativen (Begründung unten oder in «Abgelehnte Optionen») | Requirement |
-| --- | --- | --- | --- | --- |
-| E1 | Wer ist «neu», wo wird das gemerkt? | Neu ist, wer in diesem Browser für Mandant und `sub` keinen Vermerk hat; der Vermerk liegt im `localStorage`, Kennung als SHA-256, nichts geht an den Server | Keycloak-Attribut, Tabelle im Mandantenschema, Ableitung aus dem Benutzerverzeichnis (Abschnitt «Einführungsvermerk») | 1 |
-| E2 | Form der Einführung | Karte zwischen Seitenkopf und Kacheln, höchstens sechs Schritte, Schritte nach Rechten | modaler Dialog, Tour mit Markierung einzelner Elemente, eigene Seite `/willkommen` | 2, 3.1 |
-| E3 | Wo steht der Menüpunkt «Hilfe»? | Kopfzeile, neben dem Farbschema-Knopf, für jeden Besucher | Eintrag in der Seitenleiste (fehlt auf dem Handy hinter dem Menüknopf und ganz, wenn das Menü leer ist) | 4.1 |
-| E4 | Kontextbezogene Hilfe | Hilfe-Leiste über der Seite, ohne Navigation; die Seite `/hilfe` für die ganze Anleitung | jede Seite navigiert zu `/hilfe#…` (Aufnahmen in «Erfassen», Chatverlauf und offene Formulare gingen verloren, weil sie nur im Arbeitsspeicher liegen) | 4.2 |
-| E5 | Quelle der Texte | Markdown unter `frontend/public/anleitung/`, eine Datei je Abschnitt, Hilfe-Katalog in TypeScript | Texte in `texte.de-CH.ts`; Markdown unter `docs/`; Wissensbasis (Spec 04); Endpunkt im Backend | 7.1, 7.2 |
-| E6 | Darstellung | eigene, kleine Markdown-Teilmenge im Frontend → Baum aus `Textteil` wie die Wissensseite, nur Interpolation | Bibliothek `marked` plus `wissenText()`; Darstellung durch den Renderer des Backends (`WissensMarkdown`) | 7.3, 7.4 |
-| E7 | Offline | eigene Asset-Gruppe `anleitung` mit `installMode: prefetch` | `lazy` (fehlt offline, wenn nie geöffnet); `dataGroups` für einen Endpunkt | 8 |
-| E8 | Pflege | Ergänzung der Definition of Done in `tech.md` (in diesem PR) | eigene Prüfung in der CI, die bei Änderungen unter `frontend/src/app/` eine Änderung der Anleitung verlangt (zu viele Fehlalarme) | 7.5 |
-| E9 | Bilder | keine Bildschirmfotos und keine Videos in der ersten Fassung | Bildschirmfotos (veralten mit jeder Gestaltungsänderung, Gefahr echter Daten, Grösse offline) | Introduction |
-| E10 | Anleitungen unter `docs/` | Bedienung wandert in die App, `docs/` behält Betreiber-Wege, Notweg, Kontaktstellen | beide parallel pflegen | 7.7 |
-| E11 | Einordnung | Wellen 22 und 23, nach dem Merge parallel zu den übrigen Wellen | nach Gate Phase 1 | Introduction |
-| E12 | Bestehende Benutzer | Fabian, Joel und der Treuhänder sehen die Einführung nach der Einführung dieser Spec einmal je Browser (kein Vermerk); sie können sie überspringen | Vermerk für alle bestehenden Benutzer vorbelegen (bräuchte Serverdaten) | 1.1 |
+| Nr. | Frage                               | Vorschlag                                                                                                                                                    | Verworfene Alternativen (Begründung unten oder in «Abgelehnte Optionen»)                                                                               | Requirement  |
+| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| E1  | Wer ist «neu», wo wird das gemerkt? | Neu ist, wer in diesem Browser für Mandant und `sub` keinen Vermerk hat; der Vermerk liegt im `localStorage`, Kennung als SHA-256, nichts geht an den Server | Keycloak-Attribut, Tabelle im Mandantenschema, Ableitung aus dem Benutzerverzeichnis (Abschnitt «Einführungsvermerk»)                                  | 1            |
+| E2  | Form der Einführung                 | Karte zwischen Seitenkopf und Kacheln, höchstens sechs Schritte, Schritte nach Rechten                                                                       | modaler Dialog, Tour mit Markierung einzelner Elemente, eigene Seite `/willkommen`                                                                     | 2, 3.1       |
+| E3  | Wo steht der Menüpunkt «Hilfe»?     | Kopfzeile, neben dem Farbschema-Knopf, für jeden Besucher                                                                                                    | Eintrag in der Seitenleiste (fehlt auf dem Handy hinter dem Menüknopf und ganz, wenn das Menü leer ist)                                                | 4.1          |
+| E4  | Kontextbezogene Hilfe               | Hilfe-Leiste über der Seite, ohne Navigation; die Seite `/hilfe` für die ganze Anleitung                                                                     | jede Seite navigiert zu `/hilfe#…` (Aufnahmen in «Erfassen», Chatverlauf und offene Formulare gingen verloren, weil sie nur im Arbeitsspeicher liegen) | 4.2          |
+| E5  | Quelle der Texte                    | Markdown unter `frontend/public/anleitung/`, eine Datei je Abschnitt, Hilfe-Katalog in TypeScript                                                            | Texte in `texte.de-CH.ts`; Markdown unter `docs/`; Wissensbasis (Spec 04); Endpunkt im Backend                                                         | 7.1, 7.2     |
+| E6  | Darstellung                         | eigene, kleine Markdown-Teilmenge im Frontend → Baum aus `Textteil` wie die Wissensseite, nur Interpolation                                                  | Bibliothek `marked` plus `wissenText()`; Darstellung durch den Renderer des Backends (`WissensMarkdown`)                                               | 7.3, 7.4     |
+| E7  | Offline                             | eigene Asset-Gruppe `anleitung` mit `installMode: prefetch`                                                                                                  | `lazy` (fehlt offline, wenn nie geöffnet); `dataGroups` für einen Endpunkt                                                                             | 8            |
+| E8  | Pflege                              | Ergänzung der Definition of Done in `tech.md` (in diesem PR)                                                                                                 | eigene Prüfung in der CI, die bei Änderungen unter `frontend/src/app/` eine Änderung der Anleitung verlangt (zu viele Fehlalarme)                      | 7.5          |
+| E9  | Bilder                              | keine Bildschirmfotos und keine Videos in der ersten Fassung                                                                                                 | Bildschirmfotos (veralten mit jeder Gestaltungsänderung, Gefahr echter Daten, Grösse offline)                                                          | Introduction |
+| E10 | Anleitungen unter `docs/`           | Bedienung wandert in die App, `docs/` behält Betreiber-Wege, Notweg, Kontaktstellen                                                                          | beide parallel pflegen                                                                                                                                 | 7.7          |
+| E11 | Einordnung                          | Wellen 22 und 23, nach dem Merge parallel zu den übrigen Wellen                                                                                              | nach Gate Phase 1                                                                                                                                      | Introduction |
+| E12 | Bestehende Benutzer                 | Fabian, Joel und der Treuhänder sehen die Einführung nach der Einführung dieser Spec einmal je Browser (kein Vermerk); sie können sie überspringen           | Vermerk für alle bestehenden Benutzer vorbelegen (bräuchte Serverdaten)                                                                                | 1.1          |
 
 ## Einführungsvermerk (Requirement 1)
+
 ```json
 {
   "v": 1,
   "eintraege": [
-    { "k": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "version": 1, "art": "ABGESCHLOSSEN", "am": "2026-11-21" }
+    {
+      "k": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "version": 1,
+      "art": "ABGESCHLOSSEN",
+      "am": "2026-11-21"
+    }
   ]
 }
 ```
+
 - Schlüssel `archiv.einfuehrung`; `k` ist der SHA-256 (hex) von `<mandant>:<sub>` über `crypto.subtle.digest` (nur in
   sicherem Kontext; ohne `crypto.subtle` gilt der Fall «Speicher nicht verfügbar», Requirement 1.5). `am` nur als Datum.
 - Höchstens 20 Einträge, ältester zuerst entfernt (geteilte Geräte, Requirement 1.6). Jeder Lese- und Schreibzugriff in
@@ -77,14 +89,15 @@ Alle Punkte sind vorgeschlagen am 21.11.2026 und gelten als entschieden mit dem 
 
 **Vor- und Nachteile des Vermerks im Browser (E1):**
 
-| Vorteile | Nachteile |
-| --- | --- |
-| kein Endpunkt, keine Tabelle, keine Migration, kein Protokoll; Spec 06 (keine Kopie von Personendaten) bleibt unberührt | erscheint erneut auf einem neuen Gerät, in einem anderen Browser, nach dem Löschen der Website-Daten und in jedem privaten Fenster |
-| wirkt offline und ohne Verzögerung | keine Übersicht, wer die Einführung gesehen hat (gewollt: kein Tracking) |
-| ein geteiltes Gerät (Büro-PC) trennt die Benutzer über die Kennung | auf einem geteilten Gerät sieht man am Speicher, dass *ein* Benutzer den Browser genutzt hat (nur als Hash; ohne `sub` nicht zuzuordnen) |
-| derselbe Mechanismus wie das Farbschema (tech.md) | bestehende Benutzer sehen die Einführung einmal je Browser (E12) |
+| Vorteile                                                                                                                | Nachteile                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| kein Endpunkt, keine Tabelle, keine Migration, kein Protokoll; Spec 06 (keine Kopie von Personendaten) bleibt unberührt | erscheint erneut auf einem neuen Gerät, in einem anderen Browser, nach dem Löschen der Website-Daten und in jedem privaten Fenster       |
+| wirkt offline und ohne Verzögerung                                                                                      | keine Übersicht, wer die Einführung gesehen hat (gewollt: kein Tracking)                                                                 |
+| ein geteiltes Gerät (Büro-PC) trennt die Benutzer über die Kennung                                                      | auf einem geteilten Gerät sieht man am Speicher, dass _ein_ Benutzer den Browser genutzt hat (nur als Hash; ohne `sub` nicht zuzuordnen) |
+| derselbe Mechanismus wie das Farbschema (tech.md)                                                                       | bestehende Benutzer sehen die Einführung einmal je Browser (E12)                                                                         |
 
 **Alternative serverseitig (für später, falls das Wiedererscheinen stört):**
+
 - (a) Benutzerattribut in Keycloak (z. B. `archiv_einfuehrung`), geschrieben über das Dienstkonto `archiv-verwaltung`
   (Spec 06, ADR-015) hinter einem neuen Endpunkt `PUT /api/v1/ich/einfuehrung`. Nachteile: Admin-API-Aufruf je Benutzer,
   Änderung am User Profile des Realms (Spec 06, 3.17), das Dienstkonto schreibt dann auch ohne Verwaltungsrecht des
@@ -93,9 +106,10 @@ Alle Punkte sind vorgeschlagen am 21.11.2026 und gelten als entschieden mit dem 
   Aufbewahrung und dem Datenschutz der Spec 06 («Löschen und Datenschutz»).
 - (c) «Neu» aus dem Benutzerverzeichnis ableiten (Anlass `ANLAGE` nach Spec 06, 6.3, z. B. in den letzten 30 Tagen): ohne
   Schreibzugriff, erfasst aber weder «übersprungen» noch Benutzer aus der Übernahme.
-Empfehlung: Browser jetzt; (a) erst prüfen, wenn Spec 06 umgesetzt ist und Fabian das Wiedererscheinen als störend meldet.
+  Empfehlung: Browser jetzt; (a) erst prüfen, wenn Spec 06 umgesetzt ist und Fabian das Wiedererscheinen als störend meldet.
 
 **Umsetzung (Aufgabe 23.1):**
+
 - Zwei Dateien unter `frontend/src/app/hilfe/`: `einfuehrung-vermerk-speicher.ts` (Format, Kennung, Lesen, Ablegen,
   Datum; ohne Angular und ohne Importe, damit die Browser-Szenarien das Modul unverändert in Chromium laden können) und
   `einfuehrung-vermerk.ts` (Dienst `EinfuehrungVermerk`, root, liest Benutzer und Mandant aus `AnmeldungService.benutzer`).
@@ -121,54 +135,57 @@ Empfehlung: Browser jetzt; (a) erst prüfen, wenn Spec 06 umgesetzt ist und Fabi
   Abschliessen und Überspringen über die Karte belegen die Szenarien zu Req 3.3 und 3.4 (Aufgabe 23.3).
 
 ## Schritte der Einführung (Requirement 2)
+
 Texte in `texte.de-CH.ts` (`einfuehrung.schritte`); `{name}` = Name aus dem Branding, `{rolle}` = Bezeichnung der Rolle
 aus `texte.kopf.rollen`. Jeder Schritt höchstens drei Sätze und ein Link «In der Anleitung lesen», der die Hilfe-Leiste
 mit dem genannten Abschnitt öffnet. Die Bedingung prüft `AnmeldungService.darf` wie das Menü.
 
-| Nr. | Titel | Entwurf des Textes | Bedingung | Abschnitt |
-| --- | --- | --- | --- | --- |
-| 1 | Willkommen im {name} | «Hier legen Sie Dokumente einmal ab und finden sie danach in Sekunden wieder, immer mit Quelle. Sie sind als ‹{rolle}› angemeldet; die App zeigt Ihnen nur die Bereiche, die Ihre Rolle nutzen darf.» | immer | `erste-schritte` |
-| 2 | Dokumente erfassen | «Unter ‹Erfassen› fotografieren Sie Papier mit dem Handy, auch mehrseitig, oder laden Dateien hoch. Ohne Netz wartet die Aufnahme auf dem Gerät und wird hochgeladen, sobald wieder eine Verbindung besteht.» | A1 | `erfassen` |
-| 3 (mit A7) | Prüfen und bestätigen | «Neue Dokumente kommen in den ‹Eingangskorb›. Das Archiv schlägt Art und Angaben vor; Sie prüfen den Vorschlag, korrigieren ihn wo nötig und bestätigen.» | A5 und A7 | `eingangskorb` |
-| 3 (ohne A7) | Ihre erfassten Dokumente | «Im ‹Eingangskorb› sehen Sie die Dokumente, die Sie erfasst haben, mit dem Vorschlag des Archivs. Bestätigt werden sie von einer Person mit diesem Recht.» | A5 ohne A7 | `eingangskorb` |
-| 4 | Finden | «Mit der ‹Suche› finden Sie Dokumente über Wörter, Belegnummern oder Partner. Im ‹Chat› fragen Sie in eigenen Worten; jede Antwort nennt ihre Quelle.» Mit A15 zusätzlich: «Unter ‹Wissen› finden Sie geprüftes Wissen aus Ihren Unterlagen.» | A2 | `suche` |
-| 5 | Bestand und Abschluss | Liste der erlaubten Menüpunkte unter Kontakte, Importe, Jahresexport und Verwaltung, je mit der Beschreibung der Kachel aus `texte.start.beschreibung` (eine Quelle für beide) | A6, A12, `EXPORT`, A11, A13 oder A14 | der erste erlaubte |
-| 6 | Hilfe finden | «Über ‹Hilfe› oben rechts öffnen Sie jederzeit die Anleitung zur Seite, auf der Sie gerade sind. Dort können Sie auch diese Einführung erneut ansehen.» | immer | `erste-schritte` |
+| Nr.                        | Titel                    | Entwurf des Textes                                                                                                                                                                                                                            | Bedingung                            | Abschnitt          |
+| -------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------ |
+| 1                          | Willkommen im {name}     | «Hier legen Sie Dokumente einmal ab und finden sie danach in Sekunden wieder, immer mit Quelle. Sie sind als ‹{rolle}› angemeldet; die App zeigt Ihnen nur die Bereiche, die Ihre Rolle nutzen darf.»                                         | immer                                | `erste-schritte`   |
+| 2                          | Dokumente erfassen       | «Unter ‹Erfassen› fotografieren Sie Papier mit dem Handy, auch mehrseitig, oder laden Dateien hoch. Ohne Netz wartet die Aufnahme auf dem Gerät und wird hochgeladen, sobald wieder eine Verbindung besteht.»                                 | A1                                   | `erfassen`         |
+| 3 (mit A7)                 | Prüfen und bestätigen    | «Neue Dokumente kommen in den ‹Eingangskorb›. Das Archiv schlägt Art und Angaben vor; Sie prüfen den Vorschlag, korrigieren ihn wo nötig und bestätigen.»                                                                                     | A5 und A7                            | `eingangskorb`     |
+| 3 (ohne A7)                | Ihre erfassten Dokumente | «Im ‹Eingangskorb› sehen Sie die Dokumente, die Sie erfasst haben, mit dem Vorschlag des Archivs. Bestätigt werden sie von einer Person mit diesem Recht.»                                                                                    | A1 und A5, ohne A7                   | `eingangskorb`     |
+| 3 (nur A5, ohne A1 und A7) | Eingangskorb ansehen     | «Im ‹Eingangskorb› sehen Sie, welche Dokumente noch auf Prüfung warten, nur zur Ansicht. Prüfen und Bestätigen sind anderen Rollen vorbehalten.» (Treuhänder, A5 lesend seit 26.11.2026)                                                      | A5 ohne A1 und A7                    | `eingangskorb`     |
+| 4                          | Finden                   | «Mit der ‹Suche› finden Sie Dokumente über Wörter, Belegnummern oder Partner. Im ‹Chat› fragen Sie in eigenen Worten; jede Antwort nennt ihre Quelle.» Mit A15 zusätzlich: «Unter ‹Wissen› finden Sie geprüftes Wissen aus Ihren Unterlagen.» | A2                                   | `suche`            |
+| 5                          | Bestand und Abschluss    | Liste der erlaubten Menüpunkte unter Kontakte, Importe, Jahresexport und Verwaltung, je mit der Beschreibung der Kachel aus `texte.start.beschreibung` (eine Quelle für beide)                                                                | A6, A12, `EXPORT`, A11, A13 oder A14 | der erste erlaubte |
+| 6                          | Hilfe finden             | «Über ‹Hilfe› oben rechts öffnen Sie jederzeit die Anleitung zur Seite, auf der Sie gerade sind. Dort können Sie auch diese Einführung erneut ansehen.»                                                                                       | immer                                | `erste-schritte`   |
 
 Die Texte sind Entwürfe; der endgültige Wortlaut entsteht in Aufgabe 23.2 und folgt Requirement 9.3. Aussagen über das
 Verhalten (z. B. «bestätigen») müssen der umgesetzten App entsprechen (Requirement 6.4).
 
 ## Hilfe-Katalog (Requirements 5, 6)
+
 `frontend/src/app/hilfe/hilfe-katalog.ts`, eine Liste in Lesereihenfolge. Felder: `anker`, `titel` (aus `texte.de-CH.ts`),
 `datei` (`/anleitung/<anker>.md`), `eltern` (Anker oder leer), `bedingung` (`{ eine: Aktion[]; ohne?: Aktion[] }` oder leer
 = allgemein), `pfade` (Präfixe der App für die Kontext-Zuordnung), `abgemeldet` (auch ohne Anmeldung sichtbar).
 
-| Anker | Titel | Eltern | Bedingung | Pfade | abgemeldet |
-| --- | --- | --- | --- | --- | --- |
-| `erste-schritte` | Erste Schritte | – | allgemein | `/` | ja |
-| `erste-schritte-passkey` | Mit Passkey anmelden | `erste-schritte` | allgemein | – | – |
-| `erfassen` | Erfassen | – | A1 | `/erfassen` | – |
-| `erfassen-handy` | Mit dem Handy fotografieren | `erfassen` | A1 | – | – |
-| `erfassen-dateien` | Dateien hochladen | `erfassen` | A1 | – | – |
-| `erfassen-offline` | Ohne Netz erfassen | `erfassen` | A1 | – | ja |
-| `eingangskorb` | Eingangskorb | – | A5 | `/eingangskorb` | – |
-| `eingangskorb-bestaetigen` | Prüfen, korrigieren und bestätigen | `eingangskorb` | A7 | – | – |
-| `eingangskorb-eigene` | Ihre erfassten Dokumente verfolgen | `eingangskorb` | A5 ohne A7 | – | – |
-| `suche` | Suche | – | A2 | `/suche` | – |
-| `chat` | Chat | – | A2 | `/chat` | – |
-| `chat-bewerten` | Antworten bewerten | `chat` | A2 | – | – |
-| `dokument` | Dokumentansicht | – | A2 | `/dokument` | – |
-| `dokument-aendern` | Angaben ändern | `dokument` | A6 | – | – |
-| `kontakte` | Kontakte | – | A6 | `/kontakte` | – |
-| `wissen` | Wissen | – | A15 | `/wissen` | – |
-| `wissen-entwuerfe` | Wissensentwürfe | `wissen` | A17 | `/wissen/entwuerfe` | – |
-| `importe` | Importe | – | A12 | `/importe` | – |
-| `jahresexport` | Jahresexport | – | `EXPORT` | `/export` | – |
-| `verwaltung` | Verwaltung | – | A11, A13 oder A14 | – | – |
-| `verwaltung-dokumentarten` | Dokumentarten | `verwaltung` | A11 | `/verwaltung/dokumentarten` | – |
-| `verwaltung-protokoll` | Zugriffsprotokoll | `verwaltung` | A13 | `/verwaltung/protokoll` | – |
-| `verwaltung-api-tokens` | API-Tokens | `verwaltung` | A14 | `/verwaltung/api-tokens` | – |
-| `probleme` | Wenn etwas nicht klappt | – | allgemein | `/nicht-gefunden` | ja |
+| Anker                      | Titel                              | Eltern           | Bedingung         | Pfade                       | abgemeldet |
+| -------------------------- | ---------------------------------- | ---------------- | ----------------- | --------------------------- | ---------- |
+| `erste-schritte`           | Erste Schritte                     | –                | allgemein         | `/`                         | ja         |
+| `erste-schritte-passkey`   | Mit Passkey anmelden               | `erste-schritte` | allgemein         | –                           | –          |
+| `erfassen`                 | Erfassen                           | –                | A1                | `/erfassen`                 | –          |
+| `erfassen-handy`           | Mit dem Handy fotografieren        | `erfassen`       | A1                | –                           | –          |
+| `erfassen-dateien`         | Dateien hochladen                  | `erfassen`       | A1                | –                           | –          |
+| `erfassen-offline`         | Ohne Netz erfassen                 | `erfassen`       | A1                | –                           | ja         |
+| `eingangskorb`             | Eingangskorb                       | –                | A5                | `/eingangskorb`             | –          |
+| `eingangskorb-bestaetigen` | Prüfen, korrigieren und bestätigen | `eingangskorb`   | A7                | –                           | –          |
+| `eingangskorb-eigene`      | Ihre erfassten Dokumente verfolgen | `eingangskorb`   | A1 ohne A7        | –                           | –          |
+| `suche`                    | Suche                              | –                | A2                | `/suche`                    | –          |
+| `chat`                     | Chat                               | –                | A2                | `/chat`                     | –          |
+| `chat-bewerten`            | Antworten bewerten                 | `chat`           | A2                | –                           | –          |
+| `dokument`                 | Dokumentansicht                    | –                | A2                | `/dokument`                 | –          |
+| `dokument-aendern`         | Angaben ändern                     | `dokument`       | A6                | –                           | –          |
+| `kontakte`                 | Kontakte                           | –                | A6                | `/kontakte`                 | –          |
+| `wissen`                   | Wissen                             | –                | A15               | `/wissen`                   | –          |
+| `wissen-entwuerfe`         | Wissensentwürfe                    | `wissen`         | A17               | `/wissen/entwuerfe`         | –          |
+| `importe`                  | Importe                            | –                | A12               | `/importe`                  | –          |
+| `jahresexport`             | Jahresexport                       | –                | `EXPORT`          | `/export`                   | –          |
+| `verwaltung`               | Verwaltung                         | –                | A11, A13 oder A14 | –                           | –          |
+| `verwaltung-dokumentarten` | Dokumentarten                      | `verwaltung`     | A11               | `/verwaltung/dokumentarten` | –          |
+| `verwaltung-protokoll`     | Zugriffsprotokoll                  | `verwaltung`     | A13               | `/verwaltung/protokoll`     | –          |
+| `verwaltung-api-tokens`    | API-Tokens                         | `verwaltung`     | A14               | `/verwaltung/api-tokens`    | –          |
+| `probleme`                 | Wenn etwas nicht klappt            | –                | allgemein         | `/nicht-gefunden`           | ja         |
 
 - Ein Unterabschnitt erscheint nur, wenn auch sein Abschnitt erscheint. Ein Abschnitt mit Unterabschnitten hat eine
   eigene, kurze Datei (Einleitung).
@@ -183,6 +200,7 @@ Verhalten (z. B. «bestätigen») müssen der umgesetzten App entsprechen (Requi
   eingerichtet hat», weil `vhf-gsk` keinen Inhaber hat (Spec 06, Open Points, entschieden 20.11.2026).
 
 ## Markdown-Teilmenge und Darstellung (Requirement 7)
+
 **Befund Wissensseite:** Das Frontend hat heute keinen Markdown-Renderer. Die Wissensbasis wandelt Markdown im Backend mit
 commonmark-java um (`wissen/domain/WissensMarkdown.java`, Abhängigkeit `org.commonmark` 0.32.0 in `backend/pom.xml`) und
 liefert `inhaltHtml`. Die Wissensseite liest dieses HTML mit `DOMParser` in einen Baum aus erlaubten Elementen
@@ -195,22 +213,23 @@ rekursiven `ng-template` nur über Interpolation dar (`wissen-seite.html`, `text
 `Textteil` wird aus `wissen/wissen-text.ts` importiert (eine Verschiebung nach `gemeinsam/` ist eine Auslegung der
 Aufgabe 22.1).
 
-| Markdown | Teil (`art`) | Darstellung |
-| --- | --- | --- |
-| `## `, `### `, `#### ` | `h2`, `h3`, `h4` | Überschrift mit `id` aus dem Anker (`#` der Stufe 1 ist der Titel aus dem Katalog und im Text nicht erlaubt) |
-| Absatz (Zeilen bis Leerzeile) | `p` | Absatz |
-| `- ` bzw. `1. ` (eine Ebene) | `ul` bzw. `ol` mit `li` | Liste |
-| `**…**`, `*…*`, `` `…` `` | `strong`, `em`, `code` | wie im Text |
-| `> **Hinweis:** …` bzw. `> **Achtung:** …` | `hinweis` (`info` bzw. `warnung`) | Baustein `.hinweis` mit Symbol |
-| `[Text](/pfad)` | `link` mit `pfad` | `routerLink`, schliesst die Leiste |
-| `[Text](#anker)` | `abschnitt` mit `anker` | wechselt den Inhalt der Leiste bzw. springt auf `/hilfe` |
-| `{name}`, `{rolle}` | `text` | Name aus dem Branding bzw. Bezeichnung der Rolle |
-| alles andere (HTML, Bilder, Tabellen, Codeblöcke, Fussnoten, andere Links) | `text` | wörtlich als Text; `anleitung-inhalt.spec.ts` meldet es als Fehler |
+| Markdown                                                                   | Teil (`art`)                      | Darstellung                                                                                                  |
+| -------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `## `, `### `, `#### `                                                     | `h2`, `h3`, `h4`                  | Überschrift mit `id` aus dem Anker (`#` der Stufe 1 ist der Titel aus dem Katalog und im Text nicht erlaubt) |
+| Absatz (Zeilen bis Leerzeile)                                              | `p`                               | Absatz                                                                                                       |
+| `- ` bzw. `1. ` (eine Ebene)                                               | `ul` bzw. `ol` mit `li`           | Liste                                                                                                        |
+| `**…**`, `*…*`, `` `…` ``                                                  | `strong`, `em`, `code`            | wie im Text                                                                                                  |
+| `> **Hinweis:** …` bzw. `> **Achtung:** …`                                 | `hinweis` (`info` bzw. `warnung`) | Baustein `.hinweis` mit Symbol                                                                               |
+| `[Text](/pfad)`                                                            | `link` mit `pfad`                 | `routerLink`, schliesst die Leiste                                                                           |
+| `[Text](#anker)`                                                           | `abschnitt` mit `anker`           | wechselt den Inhalt der Leiste bzw. springt auf `/hilfe`                                                     |
+| `{name}`, `{rolle}`                                                        | `text`                            | Name aus dem Branding bzw. Bezeichnung der Rolle                                                             |
+| alles andere (HTML, Bilder, Tabellen, Codeblöcke, Fussnoten, andere Links) | `text`                            | wörtlich als Text; `anleitung-inhalt.spec.ts` meldet es als Fehler                                           |
 
 Der Parser arbeitet zeilenweise ohne reguläre Ausdrücke mit Rückverfolgung (kein ReDoS bei langen Zeilen) und begrenzt
 eine Datei auf 32 KiB; darüber gilt der Fehlerfall 7.6.
 
 ## Hilfe-Leiste und Seite `/hilfe` (Requirements 4, 5)
+
 - **Leiste:** zweiter `mat-sidenav` mit `position="end"` und `mode="over"` im bestehenden `mat-sidenav-container` von
   `app.html` (Fokusfalle, Escape und Abdunklung bringt Angular Material mit), `role="dialog"`, Name «Hilfe». Inhalt in
   `@defer (when hilfeOffen())`. Dienst `HilfeLeiste` (root) mit `oeffnen(anker, ausloeser)`, `schliessen()`, `anker` als Signal; der
@@ -230,10 +249,18 @@ eine Datei auf 32 KiB; darüber gilt der Fehlerfall 7.6.
   Hinweis aus Requirement 6.3.
 
 ## Offline und Aktualisierung (Requirement 8)
+
 Ergänzung von `frontend/ngsw-config.json` um eine Asset-Gruppe:
+
 ```json
-{ "name": "anleitung", "installMode": "prefetch", "updateMode": "prefetch", "resources": { "files": ["/anleitung/**"] } }
+{
+  "name": "anleitung",
+  "installMode": "prefetch",
+  "updateMode": "prefetch",
+  "resources": { "files": ["/anleitung/**"] }
+}
 ```
+
 - Der Service Worker führt die Dateien mit Hash im Manifest der App-Version; eine neue Version tauscht App und Anleitung
   gemeinsam (Requirement 8.2), angezeigt mit dem bestehenden Hinweis «Neue Version verfügbar» (`app.html`).
 - Die Navigationsregel `!/**/*.*` lässt `/anleitung/*.md` nicht auf `index.html` fallen; Quinoa liefert die Datei aus
@@ -243,19 +270,21 @@ Ergänzung von `frontend/ngsw-config.json` um eine Asset-Gruppe:
   (Requirement 9.4).
 
 ## Fehlerbehandlung
-| Fall | Verhalten | Requirement |
-| --- | --- | --- |
-| Datei der Anleitung nicht ladbar (kein Netz, kein Cache, HTTP-Fehler, grösser als 32 KiB) | `.hinweis gefahr` mit Text nach 7.6 und «Erneut versuchen» beim Abschnitt; andere Abschnitte bleiben | 7.6 |
-| unbekanntes Markdown-Konstrukt | erscheint als Text; der Inhaltstest wird rot | 7.3 |
-| Link auf fremdes Ziel | erscheint als Text | 7.4 |
-| unbekannter oder verborgener Anker | Seite von oben bzw. Inhaltsverzeichnis in der Leiste, ohne Meldung | 4.3, 5.2 |
-| `localStorage` gesperrt, voll oder beschädigt; `crypto.subtle` fehlt | Vermerk nur im Arbeitsspeicher; beschädigter Eintrag wird beim nächsten Schreiben ersetzt; keine Meldung | 1.5 |
-| Branding noch nicht geladen oder fehlerhaft | Standardname wie heute (`BrandingService`) | 2.3 |
-| kein Mandant oder keine Rolle | keine Einführung; Anleitung wie abgemeldet | 1.7, 6.3 |
+
+| Fall                                                                                      | Verhalten                                                                                                | Requirement |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------- |
+| Datei der Anleitung nicht ladbar (kein Netz, kein Cache, HTTP-Fehler, grösser als 32 KiB) | `.hinweis gefahr` mit Text nach 7.6 und «Erneut versuchen» beim Abschnitt; andere Abschnitte bleiben     | 7.6         |
+| unbekanntes Markdown-Konstrukt                                                            | erscheint als Text; der Inhaltstest wird rot                                                             | 7.3         |
+| Link auf fremdes Ziel                                                                     | erscheint als Text                                                                                       | 7.4         |
+| unbekannter oder verborgener Anker                                                        | Seite von oben bzw. Inhaltsverzeichnis in der Leiste, ohne Meldung                                       | 4.3, 5.2    |
+| `localStorage` gesperrt, voll oder beschädigt; `crypto.subtle` fehlt                      | Vermerk nur im Arbeitsspeicher; beschädigter Eintrag wird beim nächsten Schreiben ersetzt; keine Meldung | 1.5         |
+| Branding noch nicht geladen oder fehlerhaft                                               | Standardname wie heute (`BrandingService`)                                                               | 2.3         |
+| kein Mandant oder keine Rolle                                                             | keine Einführung; Anleitung wie abgemeldet                                                               | 1.7, 6.3    |
 
 Neue Fehlercodes der API gibt es nicht.
 
 ## Barrierefreiheit (Requirements 3.7, 4.5, 9.2)
+
 - Einführung: `section` mit `aria-labelledby` auf die Überschrift des Schritts; «Schritt n von m» als Text; Knöpfe als
   `button`; Fokuswechsel nach jedem Schritt auf die Überschrift (`tabindex="-1"`); Abschluss und Überspringen melden über
   einen `role="status"`-Bereich; keine Bewegung ohne `prefers-reduced-motion: no-preference`.
@@ -265,6 +294,7 @@ Neue Fehlercodes der API gibt es nicht.
   zuletzt angesprungenen Abschnitt.
 
 ## Datenschutz und Sicherheit
+
 - Keine Daten an Dritte: alle Dateien vom eigenen Ursprung, Schrift lokal (tech.md), keine Einbettungen, keine Zählung.
   Die Szenarien zu 9.4 zeichnen alle Anfragen auf und verlangen: nur eigener Ursprung, keine zusätzlichen `/api/`-Aufrufe.
 - Die Dateien unter `/anleitung/` sind wie das JavaScript der App **ohne Anmeldung abrufbar**. Darum enthält die
@@ -277,6 +307,7 @@ Neue Fehlercodes der API gibt es nicht.
   liest nur eine Beschreibung; jede Aktion prüft weiterhin die API (Spec 01, 2.6).
 
 ## Testing Strategy
+
 - **Vitest** (Frontend, `ng test`): `hilfe-katalog.spec.ts` (Dateien, Anker, Bedingungen, Routen, Gleichlauf mit `MENUE`),
   `anleitung-markdown.spec.ts` (jede Zeile der Teilmenge, fremde Links, HTML als Text, Grenze 32 KiB, lange Zeilen ohne
   Zeitüberschreitung), `anleitung-inhalt.spec.ts` (alle Dateien: Teilmenge ohne Fehler, kein «ß», keine Anführungszeichen
@@ -296,20 +327,22 @@ Neue Fehlercodes der API gibt es nicht.
 - **Abnahme:** `docs/abnahme/hilfe.md` (Aufgabe 23.6).
 
 ## Folgeänderungen
-| Wo | Änderung | Wann |
-| --- | --- | --- |
-| `.kiro/steering/tech.md`, «Tests und Qualität» | Spec-Tag `@spec-01` bis `@spec-07`; Definition of Done um die Pflegeregel ergänzt (Requirement 7.5) | in diesem PR |
-| `.kiro/steering/tech.md`, «Konventionen Frontend» | Ausnahme: Anleitung als Markdown unter `frontend/public/anleitung/`, nicht in `texte.de-CH.ts` | in diesem PR |
-| `.kiro/steering/structure.md` | Baum: Specs 06 und 07, `frontend/src/app/hilfe/`, `frontend/public/anleitung/`, `features/hilfe/` | in diesem PR |
-| `docs/umsetzungsplan.md` | Zeile Spec 07, Wellen 22 und 23 | in diesem PR |
-| `frontend/ngsw-config.json` | Asset-Gruppe `anleitung` | Aufgabe 22.4 |
-| `frontend/src/app/gemeinsam/symbol.ts` | Symbol `hilfe` am Ende von `SYMBOLE` | Aufgabe 22.3 |
-| `docs/oberflaeche/prototyp.html` | Ansichten Hilfe-Leiste, Seite `/hilfe` und Einführung mit erfundenen, gekennzeichneten Beispieldaten (Leitfaden, «Neue Seite ohne Vorbild») | Aufgaben 22.2, 22.3, 23.2 (nicht in diesem PR: eine HTML-Datei erzwingt den vollen CI-Lauf) |
-| `docs/anleitung-geschaeftsstelle.md`, `docs/anleitung-verwaltung.md` | Bedienung in die App, Verweis auf `/hilfe` (Requirement 7.7) | Aufgabe 22.7 bzw. Spec 06, Aufgabe 21.5 |
-| Spec 06 | keine Textänderung; die Pflegeregel in `tech.md` gilt auch für die Aufgaben 20.5 bis 20.7 und 21.5 (Abschnitte `verwaltung-einstellungen`, `verwaltung-benutzer`) | – |
-| `.kiro/steering/product.md` | keine: die Tabelle «Phasen und Specs» führt nur die Phasen 0 bis 4, nicht die Specs 05 bis 07 | – |
+
+| Wo                                                                   | Änderung                                                                                                                                                          | Wann                                                                                        |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `.kiro/steering/tech.md`, «Tests und Qualität»                       | Spec-Tag `@spec-01` bis `@spec-07`; Definition of Done um die Pflegeregel ergänzt (Requirement 7.5)                                                               | in diesem PR                                                                                |
+| `.kiro/steering/tech.md`, «Konventionen Frontend»                    | Ausnahme: Anleitung als Markdown unter `frontend/public/anleitung/`, nicht in `texte.de-CH.ts`                                                                    | in diesem PR                                                                                |
+| `.kiro/steering/structure.md`                                        | Baum: Specs 06 und 07, `frontend/src/app/hilfe/`, `frontend/public/anleitung/`, `features/hilfe/`                                                                 | in diesem PR                                                                                |
+| `docs/umsetzungsplan.md`                                             | Zeile Spec 07, Wellen 22 und 23                                                                                                                                   | in diesem PR                                                                                |
+| `frontend/ngsw-config.json`                                          | Asset-Gruppe `anleitung`                                                                                                                                          | Aufgabe 22.4                                                                                |
+| `frontend/src/app/gemeinsam/symbol.ts`                               | Symbol `hilfe` am Ende von `SYMBOLE`                                                                                                                              | Aufgabe 22.3                                                                                |
+| `docs/oberflaeche/prototyp.html`                                     | Ansichten Hilfe-Leiste, Seite `/hilfe` und Einführung mit erfundenen, gekennzeichneten Beispieldaten (Leitfaden, «Neue Seite ohne Vorbild»)                       | Aufgaben 22.2, 22.3, 23.2 (nicht in diesem PR: eine HTML-Datei erzwingt den vollen CI-Lauf) |
+| `docs/anleitung-geschaeftsstelle.md`, `docs/anleitung-verwaltung.md` | Bedienung in die App, Verweis auf `/hilfe` (Requirement 7.7)                                                                                                      | Aufgabe 22.7 bzw. Spec 06, Aufgabe 21.5                                                     |
+| Spec 06                                                              | keine Textänderung; die Pflegeregel in `tech.md` gilt auch für die Aufgaben 20.5 bis 20.7 und 21.5 (Abschnitte `verwaltung-einstellungen`, `verwaltung-benutzer`) | –                                                                                           |
+| `.kiro/steering/product.md`                                          | keine: die Tabelle «Phasen und Specs» führt nur die Phasen 0 bis 4, nicht die Specs 05 bis 07                                                                     | –                                                                                           |
 
 ## Abgelehnte Optionen
+
 - **Tour mit Markierung von Elementen (Coachmarks) oder modaler Dialog:** bricht bei Gestaltungsänderungen, verdeckt auf
   375 px die Seite, schwer barrierefrei (Fokus, Vorlesen); abgelehnt.
 - **Eigene Seite `/willkommen` mit Umleitung nach der Anmeldung:** stört das Ziel nach der Anmeldung (`ziel`, z. B. ein
@@ -331,7 +364,9 @@ Neue Fehlercodes der API gibt es nicht.
 - **Menüpunkt in der Seitenleiste:** siehe E3; abgelehnt.
 
 ## Umsetzung (Aufgabe 22.1, 21.11.2026)
+
 Stand von PR #411; Schnittstellen für die Aufgaben 22.2 bis 22.7.
+
 - **Katalog** (`hilfe/hilfe-katalog.ts`): `HILFE_KATALOG` mit `erste-schritte` und `probleme` (beide allgemein,
   `abgemeldet`), Typen `HilfeEintrag` und `Bedingung`, `bedingungErfuellt(bedingung, rolle)` (über `darf`, ohne
   Bedingung immer erfüllt; den Filter nach Rolle, Eltern und abgemeldet baut 22.2) und `hilfeEintrag(anker)`. Titel
@@ -374,10 +409,12 @@ Stand von PR #411; Schnittstellen für die Aufgaben 22.2 bis 22.7.
   22.5 bzw. 22.7 vervollständigen sie (z. B. Knopf «Hilfe» und Verweise auf `#erfassen-offline`, sobald es sie gibt).
 
 ## Umsetzung (Aufgabe 22.5, 21.11.2026)
+
 Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben ist nur, was auf `main` umgesetzt ist
 (Requirement 6.4), mit dem Wortlaut der Knöpfe und Meldungen aus `texte.de-CH.ts`.
+
 - **Katalog:** Einträge `erfassen`, `erfassen-handy`, `erfassen-dateien`, `erfassen-offline` (`abgemeldet`),
-  `eingangskorb`, `eingangskorb-bestaetigen` (A7), `eingangskorb-eigene` (A5 ohne A7), `dokument`, `dokument-aendern`
+  `eingangskorb`, `eingangskorb-bestaetigen` (A7), `eingangskorb-eigene` (A1 ohne A7), `dokument`, `dokument-aendern`
   (A6) wie in der Tabelle «Hilfe-Katalog», in zwei Blöcken: Erfassen und Eingangskorb nach `erste-schritte`,
   Dokumentansicht zwischen `chat` und `kontakte` aus 22.6 (nach dem Merge von #423 eingeordnet). Titel in `TEXTE.hilfe.abschnitte`.
 - **Prüfung** (`anleitung-abschnitte.spec.ts`): (1) Der Katalog folgt der Tabelle «Hilfe-Katalog» (Reihenfolge, Titel,
@@ -400,8 +437,11 @@ Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben
   `erste-schritte` und `probleme`, nicht `erfassen-offline` (A1). `erste-schritte.md` nennt darum nur den Link «Ohne
   Verbindung erfassen» der Startseite; den Weg zu `#erfassen-offline` bringen die Links «So funktioniert es»
   (Requirement 4.6, Aufgabe 23.4). `probleme.md` bleibt bei 22.7.
+
 ## Umsetzung (Aufgabe 22.2, 21.11.2026)
+
 Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
+
 - **Filter** (`hilfe/hilfe-sichtbar.ts`): `sichtbareAbschnitte(katalog, rolle)` ergibt die Abschnitte mit ihren
   Unterabschnitten in Katalogreihenfolge, `sichtbareAnker(abschnitte)` alle Anker daraus. `rolle` ist nur gesetzt, wenn
   jemand mit Mandant und Rolle angemeldet ist (wie `AnmeldungService.darf`); sonst zählt nur `abgemeldet`. Mit Rolle
@@ -434,7 +474,21 @@ Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
 - **Prototyp:** Ansicht `#hilfe` in `docs/oberflaeche/prototyp.html` mit erfundenen, als «Beispiel» gekennzeichneten
   Texten; erreichbar nur über die Adresse, bis 22.3 den Knopf in der Kopfzeile bringt.
 
+## Umsetzung (Nachtrag Abnahme Hilfe-Leiste, 26.11.2026)
+
+- **Anlass:** Die Abnahmetests (Fabian) zeigten am Desktop, dass die Leiste zu schmal ist und das Inhaltsverzeichnis zu viel
+  Platz beansprucht. Req 4.5 geändert (Breite), Req 4.7 neu (kompaktes, zuklappbares Verzeichnis).
+- **Breite:** `min(100vw, clamp(480px, 42vw, 760px))` ab 960 px statt höchstens 420 px; darunter unverändert ganze Breite.
+- **Verzeichnis:** Knopf «Abschnitte» (zeigt den gewählten Abschnitt, `aria-expanded`, `aria-controls`) über einem
+  kompakten, umbrechenden Link-Verzeichnis (`hidden` im zugeklappten Zustand). Beim Öffnen der Leiste mit einem Abschnitt zugeklappt, ohne Abschnitt
+  (kein Seitenkontext) aufgeklappt; die Wahl eines Abschnitts klappt es zu; der Zustand
+  wird nicht gespeichert. Browser-Schritte, die Abschnitte wählen oder zählen, klappen es über
+  `e2e/hilfen/hilfe-verzeichnis.mjs` auf.
+- **Wiederöffnen:** Beim Öffnen wird eine manuelle Verzeichniswahl zurückgesetzt; der Startzustand wird erneut aus dem
+  aktuellen Seitenkontext abgeleitet. Damit bleibt das Verzeichnis nach dem Schliessen nicht irrtümlich aufgeklappt.
+
 ## Umsetzung (Aufgabe 22.3, 21.11.2026)
+
 - **Kopfzeile:** «Hilfe» steht neben dem Farbschema-Knopf, für alle Besucher und mit zugänglichem Namen. Unter 600 px
   bleibt nur das Symbol sichtbar. Das neue Symbol `hilfe` wurde am Ende von `SYMBOLE` ergänzt.
 - **Leiste:** zweiter `mat-sidenav` am Ende des bestehenden Rahmens, als Overlay mit maximal 420 px Breite ab 960 px und
@@ -458,9 +512,11 @@ Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
   `features/hilfe/hilfe-leiste.feature`.
 
 ## Umsetzung (Aufgabe 22.6, 21.11.2026)
+
 Abschnitte `suche`, `chat`, `kontakte`, `wissen` und `wissen-entwuerfe` mit Dateien unter `frontend/public/anleitung/`,
 Einträgen im Katalog (Bedingungen wie im Menü: A2, A2, A6, A15, A17) und Titeln in `TEXTE.hilfe.abschnitte`. Beschrieben
 ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `texte.de-CH.ts`.
+
 - **Reihenfolge:** Die Einträge stehen vor `probleme` in der Reihenfolge von Requirement 6.1; `dokument` (Aufgabe 22.5)
   gehört zwischen `chat` und `kontakte`.
 - **Pfade, abweichend von der Tabelle «Hilfe-Katalog»:** `wissen` trägt zusätzlich `/wissen/entwuerfe/meine` und
@@ -487,6 +543,7 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   6.6 per Review (Nachweis: Dokument).
 
 ## Umsetzung (Aufgabe 22.7, 21.11.2026)
+
 - **Katalog:** Block «Bestand und Verwaltung» vor `probleme`: `importe` (A12, `/importe`, deckt auch `/importe/:id`),
   `jahresexport` (`EXPORT`, `/export`), `verwaltung` (A11, A13 oder A14, ohne Pfad, kurze Einleitung) mit
   `verwaltung-dokumentarten` (A11), `verwaltung-protokoll` (A13), `verwaltung-api-tokens` (A14), Bedingungen und Pfade wie
@@ -520,6 +577,7 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   Prod-Build) und `hilfe-katalog.spec.ts` (Reihenfolge); 6.4, 6.6, 7.5 und 7.7 Nachweis: Dokument (Review des PR).
 
 ## Umsetzung (Aufgabe 23.2, 21.11.2026)
+
 - `EinfuehrungVermerk.bekannt` steuert die Karte; solange die Kennung berechnet wird oder Rolle und Mandant fehlen,
   erscheint sie nicht. Die Kacheln bleiben darunter bedienbar. Name und optionales Logo kommen aus dem Branding.
 - `einfuehrungSchritte` erstellt die Schritte aus denselben Rechten wie das Menü; der fünfte Schritt verwendet die
@@ -529,6 +587,7 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   für alle Rollen; die Bedienung und Anzeige der weiteren Schritte prüft 23.3.
 
 ## Umsetzung (Aufgabe 22.4, 21.11.2026)
+
 - Die eigene Asset-Gruppe `anleitung` lädt alle Dateien vorab und gehört zum gehashten Manifest der App. Der bestehende
   Aktualisierungshinweis aktiviert die neue Version; der Browsertest prüft alte und neue App und Anleitung vor und nach
   der Aktivierung mit zwei synthetischen Versionen und einem lokalen Test-Proxy.
@@ -538,14 +597,17 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   Service Worker und vorab geladener Anleitung; der angemeldete Offline-Test prüft alle sichtbaren Abschnittstexte.
 
 ## Entscheid Fabian (24.11.2026) — Requirement 2.4
+
 - Einführung und Anleitung verwenden für alle Mandanten dieselben Texte; nur Name und Logo kommen aus dem Branding.
   Es gibt keinen zusätzlichen Satz zu den auf der Webseite erscheinenden Dokumenten. Eine spätere Änderung braucht
   einen neuen Entscheid und bleibt ausserhalb des Codes der Einführung.
 
 ## Open Points
+
 - Alle übrigen Punkte sind Vorschläge (Abschnitt «Entscheide») und gelten mit dem Merge dieses PR.
 
 ## Umsetzung (Aufgabe 23.3, 22.11.2026)
+
 - Die Karte zeigt Fortschritt und Schritte, einschliesslich der für die Rolle erlaubten Bereiche. Der aktuelle Schritt
   und ein erzwungener Wiederaufruf bleiben im Dienst nur im Arbeitsspeicher und sind an Mandant und Benutzer gebunden;
   ein Neuladen setzt den Schritt zurück. Abschluss und Überspringen ersetzen den lokalen Vermerk.
@@ -561,6 +623,7 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   Schrittstand und die Trennung nach Benutzer, `hilfe-seite.spec.ts` für den rollenabhängigen Wiederaufruf.
 
 ## Umsetzung (Aufgabe 23.4, 22.11.2026)
+
 - Die Links bei Warteschlange, fehlgeschlagenen Uploads und auf der Offline-Anmeldekarte öffnen `erfassen-offline`,
   der Link bei fehlendem Mandant oder fehlender Rolle öffnet `probleme`. Die vorhandenen Katalogeinträge bleiben
   unverändert: Beide sind bereits für die jeweiligen Besucher sichtbar. Die Hilfe-Leiste erhält den auslösenden Link
@@ -572,6 +635,7 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   Zustände der Komponenten.
 
 ## Umsetzung (Aufgabe 23.5, 22.11.2026)
+
 - `hilfe-qualitaet.feature` prüft Einführungsschritte, ganze Anleitung und jeden sichtbaren Abschnitt der Hilfe-Leiste
   mit axe auf dem ganzen Dokument, für alle vier Rollen und ohne Anmeldung, bei 375 und 1280 px in hell und dunkel.
   Sie prüft auch den waagrechten Bildlauf und zeichnet nach der Anmeldung beziehungsweise dem Laden der Startseite
@@ -602,11 +666,13 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
   Maus, Fokus und Zugänglichkeitsbaum vor und nach dem Schliessen.
 
 ## Umsetzung (Spec 06, Aufgabe 20.6, 23.11.2026)
+
 - Die Anleitung «Verwaltung» beschreibt neu die Benutzerübersicht. Abweichend von der Tabelle «Hilfe-Katalog»
   ordnet der Katalog den Pfad `/verwaltung/benutzer` samt Detailseite diesem Abschnitt zu; seine bestehende
   Sichtbarkeitsbedingung bleibt unverändert.
 
 ## Umsetzung (Vorbereitung Aufgabe 23.6, 24.11.2026)
+
 - Die Einstellungen sind auf `main` umgesetzt und in der Anleitung «Verwaltung» beschrieben. Der Katalog ordnet nun
   auch `/verwaltung/einstellungen` samt Unterseiten diesem Abschnitt zu. Die bestehende Bedingung bleibt unverändert:
   Nach der Rechteprüfung sieht derzeit nur der Inhaber diesen Abschnitt und den Menüpunkt. `hilfe-kontext.spec.ts`

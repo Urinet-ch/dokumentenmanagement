@@ -406,4 +406,41 @@ class VorschlagNachbearbeitungTest {
         assertThat(v.partnerIban()).isEqualTo(qr.iban());
         assertThat(v.sicherheit().get(Feld.PARTNER)).isEqualByComparingTo("1");
     }
+
+    @Test
+    void dynamischeWerteMuessenZurAktivenArtUndZumSchemaDerKlassifikationPassen() {
+        ArtEintrag art = new ArtEintrag("TESTART", "Testart", null, "NORMAL", List.of(), false, true, List.of(),
+                null, null, List.of("titel", "anzahl", "zugriff"), null, 0, "{}", Map.of(
+                        "titel", "string", "anzahl", "integer", "zugriff", "string"),
+                List.of("status", "themen"));
+        KiKlassifikation status = new KiKlassifikation("status", "Status", null, false,
+                List.of(new KiKlassifikation.Wert("offen", "Offen", null, true)));
+        KiKlassifikation themen = new KiKlassifikation("themen", "Themen", null, true,
+                List.of(new KiKlassifikation.Wert("archiv", "Archiv", null, true),
+                        new KiKlassifikation.Wert("intern", "Intern", null, false)));
+        Rohvorschlag basis = roh("TESTART", null, BigDecimal.ONE, "NORMAL");
+        Rohvorschlag roh = new Rohvorschlag(basis.art(), basis.titel(), basis.datum(), basis.partnerName(),
+                basis.partnerUid(), basis.partnerIban(), basis.partnerEmail(), basis.belegnummer(), basis.richtung(),
+                basis.betrag(), basis.waehrung(), basis.faelligkeit(), basis.qrReferenz(), basis.vertraulichkeit(),
+                basis.tags(), basis.sicherheit(), Map.of(
+                        "zusatz.titel", "Hinweis",
+                        "zusatz.anzahl", new BigDecimal("1.5"),
+                        "zusatz.zugriff", "INTERN",
+                        "zusatz.unbekannt", "ignorieren",
+                        "klassifikationen.status", "offen",
+                        "klassifikationen.themen", List.of("archiv", "intern")),
+                Map.of("zusatz.titel", new BigDecimal("0.8"), "zusatz.anzahl", new BigDecimal("0.9"),
+                        "klassifikationen.status", new BigDecimal("0.7")));
+
+        Vorschlag vorschlag = VorschlagNachbearbeitung.bearbeiteMitProtokoll(roh, Optional.empty(), FREMDER_KOPF,
+                MANDANT, List.of(art), List.of(status, themen), EINGANG,
+                Merkmale.Frist.cpu(java.time.Duration.ofMillis(100))).vorschlag();
+
+        assertThat(vorschlag.dynamischeWerte()).containsOnlyKeys("zusatz.titel", "klassifikationen.status")
+                .containsEntry("zusatz.titel", "Hinweis")
+                .containsEntry("klassifikationen.status", "offen");
+        assertThat(vorschlag.dynamischeSicherheit()).containsOnlyKeys("zusatz.titel", "klassifikationen.status")
+                .containsEntry("zusatz.titel", new BigDecimal("0.8"))
+                .containsEntry("klassifikationen.status", new BigDecimal("0.7"));
+    }
 }

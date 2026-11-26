@@ -9,10 +9,19 @@ FROM eclipse-temurin:25.0.5.1_2-jre-noble@sha256:2ec98aa522c472deadfd2b7c5b39bca
 
 # OCRmyPDF mit Tesseract (deu, eng, osd für --rotate-pages), Ghostscript (PDF/A), img2pdf, libheif mit HEVC-Decoder
 # (heif-convert), poppler-utils (pdftotext, pdftoppm) und tini; die Versionsabfragen brechen den Build ab, falls eines fehlt
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ocrmypdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng tesseract-ocr-osd \
-        ghostscript img2pdf libheif-examples libheif-plugin-libde265 poppler-utils tini \
+# Der Paketmirror ist auf den GitHub-Runnern gelegentlich sehr langsam (26.11.2026: 70 kB/s, Download 16 Minuten); in der
+# Zwischenzeit löscht er veraltete Sicherheits-Pakete (404 auf libtiff6), und der Build bricht ab. Darum die Schleife:
+# Paketlisten und Installation bis zu dreimal neu (Acquire::Retries wiederholt nur einzelne Downloads)
+RUN set -eu; \
+    for versuch in 1 2 3; do \
+        apt-get -o Acquire::Retries=5 update \
+        && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
+            ocrmypdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng tesseract-ocr-osd \
+            ghostscript img2pdf libheif-examples libheif-plugin-libde265 poppler-utils tini \
+        && break; \
+        [ "$versuch" -lt 3 ] || exit 1; \
+        sleep 15; \
+    done \
     && rm -rf /var/lib/apt/lists/* \
     && tini --version && ocrmypdf --version && img2pdf --version && gs --version && pdftotext -v && pdftoppm -v \
     && command -v heif-convert \
