@@ -2,11 +2,11 @@
 
 ## Umfang und Ergebnis
 
-Abgleich gegen `origin/main` bei `8696dd3c8` (PR #694). In den sieben Taskdateien stehen 44 offene
+Abgleich gegen `origin/main` bei `db667786f` (PR #695). In den sieben Taskdateien stehen 43 offene
 Checkboxen; Spec 05 und Spec 07 haben keine offenen Checkboxen. Keine Checkbox wurde geändert. Ein gemergter Teil-PR
 allein gilt nicht als Abschluss, wenn die Taskdatei noch Abnahme, Betrieb, Messung oder Folgearbeiten nennt.
 
-**Faktisch vollständig erledigt:** keine der 44 offenen Checkboxen konnte anhand der Taskdateien und der darin
+**Faktisch vollständig erledigt:** keine der 43 offenen Checkboxen konnte anhand der Taskdateien und der darin
 verlinkten PR-/Testnachweise als vollständig abgeschlossen bestätigt werden. Wo ein gemergter PR nur einen Teil
 abdeckt, ist er als solcher aufgeführt. Die Entfallen- und Übernahmeentscheide sind separat ausgewiesen und keine
 erledigten Umsetzungen.
@@ -18,7 +18,7 @@ erledigten Umsetzungen.
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
 | 0.7 | PR #18 belegt die Zugangsvorbereitung, nicht den Abschluss der gesamten Stufe A. | Fabian / Infra |
-| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; kein positiver Abschlussnachweis. | Infra; Entscheid zum weiteren Vorgehen |
+| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. | Infra; Entscheid zum weiteren Vorgehen |
 | 2.6 | Teilumsetzungen in #46, #54, #266, #568, #638 sowie den am 25.11. gemergten #644 und #645; Stufe-B-Leistungsnachweis fehlt. | Backend / Infra |
 | 3.7 | PWA und Eingabegrenzen in #123 und #472; die Abnahme bleibt ausstehend. | Fabian / Frontend |
 | 5.4 | Kein vollständiger Produktiv- und Stufe-B-Nachweis in den geprüften Belegen. | Fabian / Infra; abhängig von 5.11 |
@@ -46,15 +46,15 @@ erledigten Umsetzungen.
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
 | 10.1 | Vertrag und Domain nicht als abgeschlossen belegt. | Fabian |
-| 10.2 | PR #473 belegt Rollen-Seed und Tests, nennt aber selbst den fehlenden Seed ohne `WISSENSQUELLE` sowie ausstehende Isolationsnachweise. | Backend; Teilaufgabe offen |
+| 10.2 | Seeds und Testumstellung sind gemäss #615 nachgeführt; Produktiv-Provisionierung mit Object Lock/Bucket Policy und manuelle Keycloak-Einrichtung bleiben offen. S3-Isolation gehört zu 12.3. | Fabian / Infra |
 | 10.3 | Branding-Teile in #228, #498, #541 und Betriebscheckliste #567; kein vollständiger Abschlussnachweis. | Frontend / Infra; parallele Arbeit nicht duplizieren |
 | 10.5 | Importwerkzeug in #504; der PR ordnet weitere Req-4.2-Arbeit Spec 05 zu. Keine abgeschlossene Übernahme und Abnahme der Altbestände belegt. | Backend / Fabian |
 | 10.6 | Repo-Teile in #331 und #497; vollständiger Backup-Nachweis für Mandant 2 bleibt offen. | Infra |
 | 11.11 | #495 belegt Repo-Umsetzung und Tests; laut Taskdatei fehlen Messung der Startwerte am Livegang und deren Nachweis. | Backend; Messung beim Livegang |
-| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. HSTS #690 und Korrektur #694 sowie Ausgabeschutz #692 sind gemergt; App-Header #689 und authentisierter lokaler Scan #691 sind offen. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
+| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. HSTS #690, Korrektur #694, Ausgabeschutz #692 und App-Header #689 sind gemergt; authentisierter lokaler Scan #691 und Staging-Anleitung #697 sind offen. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
 | 12.4 | Abnahme nicht belegt. | Fabian |
 
-### Spec 04 – Wissensbasis (11)
+### Spec 04 – Wissensbasis (10)
 
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
@@ -62,7 +62,6 @@ erledigten Umsetzungen.
 | 13.7 | #688 ergänzt den lokalen synthetischen Restore-Zählvergleich je Mandant; die wiederkehrende betriebliche Restore-Probe ist damit nicht nachgewiesen. | Infra |
 | 16.2 | Prüfliste und Gate nicht abgenommen. | Fabian / QA |
 | 18.3 | PR #576 ist gemergt; Plugin-Hinweis und vollständige Abnahme fehlen laut Taskdatei. | Backend / Frontend |
-| 19.3 | #682 ist Ready; kein gemergter Nachweis für Fragen, Optionen und Bedingungen. | Backend |
 | 19.4 | Abschnittsfehler, sichtbare Befunde und Wiederholung bleiben offen. | Backend / Frontend |
 | 19.5 | Tabellen-Gruppierung und Vertraulichkeitsvorschlag bleiben offen. | Backend |
 | 19.6 | Wiederholung und Auswertung des Test-Ingests; abhängig von 19.1–19.5. | QA / Fabian |
@@ -83,9 +82,10 @@ erledigten Umsetzungen.
   (Abnahme und Ereignisnachweis belegt, #627 und #637).
 - Spec 06 19.3, 20.6 und 21.2 (#686; 20.6 mit Nachtrag #685); Spec 07 23.6 (#683, Abnahme vom 26.11.).
 - Spec 04 19.2 (#687, Tabellen und Seitenbilder).
+- Spec 04 19.3 (#682, Fragen, Optionen und Bedingungen).
 
 ## Grenzen des Abgleichs
 
-- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 ist Draft; #682, #689, #691 und #695 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
+- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 ist Draft; #691, #697, #698 und #699 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
 - Der Stand der Taskdateien und offenen PRs ist eine Momentaufnahme; die Checkboxen wurden nicht verändert.
 - Betriebsdetails und Zugangsdaten wurden nicht erhoben oder in diesen Bericht übernommen.

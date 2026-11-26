@@ -94,4 +94,20 @@ describe('Löschvorschau und Löschauftrag', () => {
     expect(ergebnis).not.toHaveBeenCalled();
     expect(element.querySelector('button')!.disabled).toBe(false);
   });
+
+  it('zeigt STATUS_KONFLIKT beim Löschen verständlich und meldet keinen Erfolg', () => {
+    service.apiV1BenutzerBenutzerIdLoeschenPost.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 409, error: { fehlercode: 'STATUS_KONFLIKT' } })),
+    );
+    const ergebnis = vi.fn();
+    fixture.componentInstance.abgeschlossen.subscribe(ergebnis);
+    element.querySelector('button')!.click();
+    geschlossen.next('AUSTRITT');
+    fixture.detectChanges();
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(
+      TEXTE.benutzerAktionsfehler.statusKonflikt,
+    );
+    expect(ergebnis).not.toHaveBeenCalled();
+    expect(element.querySelector('button')!.disabled).toBe(false);
+  });
 });

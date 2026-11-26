@@ -247,6 +247,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Lokale ZAP-Vorbereitung (26.11.2026): isolierter Teststack und passive Scans beider OpenAPI-Verträge; der unangemeldete Lauf ersetzt weder die Prüfung geschützter Funktionen noch die Staging-Baseline. Der Haken bleibt offen.
   - Sicherheits-Header-Nachtrag (26.11.2026): `nosniff` für Antworten, `same-origin` für äussere `/api/`-Pfade; `/public/` bleibt ohne pauschale Herkunftssperre. HTTP- und Datei-Szenarien prüfen Erfolg, Fehler und Stream; der Haken bleibt für die übrigen Nachweise offen.
   - Nachgang zu PR #673 (26.11.2026): Ausgabeziele im Repository werden zurückgewiesen; Temurin-JRE/JDK und pgvector sind per Multi-Arch-Digest gebunden. Der Ausgabetest ist lokal, ohne Docker- oder Serverzugriff.
+  - Staging-Anleitung (26.11.2026): Passiver Scan beider OpenAPI-Verträge mit geschützter Ausgabe und Fehlerbehandlung beschrieben; die Anleitung ersetzt keinen authentisierten Scan oder Abnahmenachweis. Der Haken bleibt offen.
   - _Anforderungen: 1.4, 9.1, 9.2, 9.4_
 
 - [ ] 12.4 Einführung und Abnahme [Fabian]
