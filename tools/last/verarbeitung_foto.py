@@ -19,11 +19,13 @@ Festlegung trifft Aufgabe 5.11.
 """
 
 import argparse
+import csv
 import json
 import math
 import os
 import stat
 import struct
+import subprocess
 import sys
 import time
 import urllib.error
@@ -100,15 +102,8 @@ def anfrage(url: str, token: str, daten: bytes | None = None, medientyp: str | N
         return fehler.code, None
 
 
-def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float) -> float:
-    endung, typ = fototyp(foto)
-    koerper, medientyp = multipart("dateien[]", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
-    status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
-    start = time.monotonic()
-    if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
-            or "id" not in ergebnis[0]):
-        raise RuntimeError(f"Upload nicht angenommen (HTTP {status}).")
-    dokument = ergebnis[0]["id"]
+def auf_abschluss_warten(basis: str, token: str, dokument: str, intervall: float, grenze: float,
+                         start: float) -> float:
     while time.monotonic() - start < grenze:
         status, daten = anfrage(f"{basis}/api/v1/dokumente/{dokument}", token)
         if status != 200 or not isinstance(daten, dict):
@@ -121,10 +116,27 @@ def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: floa
     raise RuntimeError(f"Dokument {dokument} nach {grenze:.0f} s nicht im Eingangskorb.")
 
 
-def begleit_scan_einreihen(basis: str, token: str, pfad: Path) -> None:
+def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float) -> float:
+    endung, typ = fototyp(foto)
+    koerper, medientyp = multipart("dateien[]", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
+    status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
+    start = time.monotonic()
+    if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
+            or "id" not in ergebnis[0]):
+        raise RuntimeError(f"Upload nicht angenommen (HTTP {status}).")
+    return auf_abschluss_warten(basis, token, ergebnis[0]["id"], intervall, grenze, start)
+
+
+def begleit_scan_einreihen(basis: str, token: str, pfad: Path) -> str:
+    try:
+        info = subprocess.run(["pdfinfo", str(pfad)], check=True, capture_output=True, text=True)
+    except (OSError, subprocess.CalledProcessError) as fehler:
+        raise ValueError(f"Begleit-PDF nicht prüfbar (pdfinfo erforderlich): {fehler}") from fehler
+    seiten = [zeile.split(":", 1)[1].strip() for zeile in info.stdout.splitlines()
+              if zeile.startswith("Pages:")]
+    if seiten != ["20"]:
+        raise ValueError("--begleit-pdf muss genau 20 Seiten haben.")
     scan = pfad.read_bytes()
-    if not scan.startswith(b"%PDF-"):
-        raise ValueError("--begleit-pdf muss ein PDF sein.")
     koerper, medientyp = multipart("dateien[]", "lastlauf-20-seiten-scan.pdf", scan, "application/pdf")
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
     if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
@@ -133,6 +145,7 @@ def begleit_scan_einreihen(basis: str, token: str, pfad: Path) -> None:
     if ergebnis[0].get("status") == "DUBLETTE":
         raise RuntimeError("Begleit-Scan ist eine Dublette; eine noch nicht hochgeladene synthetische PDF-Datei "
                            "verwenden.")
+    return ergebnis[0]["id"]
 
 
 def p95(werte: list[float]) -> float:
@@ -151,10 +164,13 @@ def main() -> int:
     parser.add_argument("--aufwaermen", type=int, default=20, help="Läufe vorweg, die nicht zählen")
     parser.add_argument("--intervall", type=float, default=0.5, help="Abfrageintervall in Sekunden")
     parser.add_argument("--grenze", type=float, default=600.0, help="Abbruch je Lauf in Sekunden")
+    parser.add_argument("--csv", type=Path, help="Messwerte ausserhalb des Repositories als CSV speichern")
     args = parser.parse_args()
 
     if args.anzahl < 1 or args.aufwaermen < 0:
         parser.error("--anzahl muss grösser als 0 sein, --aufwaermen mindestens 0")
+    if not all(math.isfinite(x) and x > 0 for x in (args.intervall, args.grenze)):
+        parser.error("--intervall und --grenze müssen endlich und grösser als 0 sein")
     token = token_lesen()
     foto = args.foto.read_bytes()
     fototyp(foto)
@@ -162,17 +178,41 @@ def main() -> int:
     for nr in range(1, args.aufwaermen + 1):
         dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
         print(f"Aufwärmen {nr:3d}: {dauer:6.1f} s (zählt nicht)")
+    scan = None
     if args.begleit_pdf:
-        begleit_scan_einreihen(basis, token, args.begleit_pdf)
+        scan = begleit_scan_einreihen(basis, token, args.begleit_pdf)
         print("Synthetischer Begleit-Scan eingereiht.")
     zeiten = []
+    messwerte = []
     for nr in range(1, args.anzahl + 1):
-        dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
+        try:
+            dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
+        except (RuntimeError, OSError) as fehler:
+            messwerte.append((nr, "fehler", ""))
+            if args.csv:
+                csv_schreiben(args.csv, messwerte)
+            print(f"Messung abgebrochen: {fehler}", file=sys.stderr)
+            return 1
         zeiten.append(dauer)
+        messwerte.append((nr, "ok", f"{dauer:.6f}"))
         print(f"Lauf {nr:3d}: {dauer:6.1f} s")
+    if args.csv:
+        csv_schreiben(args.csv, messwerte)
+    if scan:
+        auf_abschluss_warten(basis, token, scan, args.intervall, args.grenze, time.monotonic())
+        print("Begleit-Scan im Eingangskorb.")
     wert = p95(zeiten)
+    print(f"p50 über {len(zeiten)} Läufe: {sorted(zeiten)[math.ceil(0.5 * len(zeiten)) - 1]:.1f} s")
+    print("Fehlerquote: 0.0 %")
     print(f"p95 über {len(zeiten)} Läufe: {wert:.1f} s (Ziel <= {ZIEL_P95_SEKUNDEN:.0f} s)")
     return 0 if wert <= ZIEL_P95_SEKUNDEN else 1
+
+
+def csv_schreiben(pfad: Path, messwerte: list[tuple[int, str, str]]) -> None:
+    with pfad.open("x", encoding="utf-8", newline="") as datei:
+        writer = csv.writer(datei)
+        writer.writerow(("lauf", "status", "dauer_s"))
+        writer.writerows(messwerte)
 
 
 if __name__ == "__main__":
