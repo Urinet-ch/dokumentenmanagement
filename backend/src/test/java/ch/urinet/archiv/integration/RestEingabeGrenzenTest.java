@@ -14,9 +14,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.arc.ClientProxy;
 import io.quarkus.runtime.configuration.MemorySize;
+import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import org.eclipse.microprofile.config.ConfigProvider;
@@ -67,6 +67,9 @@ class RestEingabeGrenzenTest {
 
     @TempDir
     Path tempDir;
+
+    @TestHTTPResource
+    URI basis;
 
     private StepUp originalStepUp;
     private boolean testDokumentartAngelegt;
@@ -143,8 +146,7 @@ class RestEingabeGrenzenTest {
 
                     String ziel = pfadMitBeispielwerten(pfad.getKey());
                     String token = Testanmeldung.token("inhaber-urinet");
-                    HttpRequest anfrage = HttpRequest.newBuilder(
-                                    URI.create("http://localhost:" + RestAssured.port + ziel))
+                    HttpRequest anfrage = HttpRequest.newBuilder(basis.resolve(ziel))
                             .header("Authorization", "Bearer " + token)
                             .header("Content-Type", "application/json")
                             .expectContinue(true)
@@ -191,8 +193,7 @@ class RestEingabeGrenzenTest {
                     }
 
                     String endpoint = operation.getKey().toUpperCase() + " " + pfad.getKey();
-                    HttpRequest anfrage = HttpRequest.newBuilder(URI.create("http://localhost:" + RestAssured.port
-                                    + pfadMitBeispielwerten(pfad.getKey())))
+                    HttpRequest anfrage = HttpRequest.newBuilder(basis.resolve(pfadMitBeispielwerten(pfad.getKey())))
                             .header("Authorization", "Bearer " + token)
                             .header("Content-Type", MULTIPART + "; boundary=grenztest")
                             .expectContinue(true)
@@ -376,7 +377,7 @@ class RestEingabeGrenzenTest {
 
                     String name = parameter.path("name").asText();
                     String ziel = pfadMitBeispielwerten(pfad.getKey());
-                    Response antwort = given()
+                    Response antwort = http()
                             .auth().oauth2(token)
                             .queryParam(name, MARKER)
                             .when().get(ziel);
@@ -391,7 +392,7 @@ class RestEingabeGrenzenTest {
                     JsonNode maximum = parameter.path("schema").path("maximum");
                     if (maximum.canConvertToLong()) {
                         long zuGross = maximum.asLong() + 1;
-                        Response grenzAntwort = given()
+                        Response grenzAntwort = http()
                                 .auth().oauth2(token)
                                 .queryParam(name, zuGross)
                                 .when().get(ziel);
@@ -487,7 +488,7 @@ class RestEingabeGrenzenTest {
     }
 
     private RequestSpecification anfrage(String token, String methode, String pfad) {
-        RequestSpecification anfrage = given().auth().oauth2(token);
+        RequestSpecification anfrage = http().auth().oauth2(token);
         if ("get".equalsIgnoreCase(methode)) {
             return anfrage;
         }
@@ -508,6 +509,8 @@ class RestEingabeGrenzenTest {
             }
         } else if (pfad.startsWith("/api/v1/regeln")) {
             anfrage.header("If-Match", etag(token, "/api/v1/regeln"));
+        } else if (pfad.startsWith("/api/v1/wissensbasis/einstellungen")) {
+            anfrage.header("If-Match", etag(token, "/api/v1/wissensbasis/einstellungen"));
         }
         return anfrage;
     }
@@ -526,16 +529,16 @@ class RestEingabeGrenzenTest {
 
     private void testDokumentartSicherstellen() {
         String token = Testanmeldung.token("inhaber-urinet");
-        Response stand = given().auth().oauth2(token).get("/api/v1/dokumentarten");
+        Response stand = http().auth().oauth2(token).get("/api/v1/dokumentarten");
         assertThat(stand.statusCode())
                 .as("Dokumentarten für Grenztest abrufen: " + stand.body().asString())
                 .isEqualTo(200);
         if (stand.jsonPath().<List<String>>getList("code").contains(TEST_DOKUMENTART)) {
-            given().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
+            http().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
                     .delete("/api/v1/dokumentarten/" + TEST_DOKUMENTART).then().statusCode(204);
-            stand = given().auth().oauth2(token).get("/api/v1/dokumentarten");
+            stand = http().auth().oauth2(token).get("/api/v1/dokumentarten");
         }
-        Response erstellt = given().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
+        Response erstellt = http().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
                 .contentType("application/json")
                 .body("""
                         {"code":"GRENZTEST","name":"Grenztest","gruppen":["frei"],"pflichtfelder":[],
@@ -552,15 +555,15 @@ class RestEingabeGrenzenTest {
             return;
         }
         String token = Testanmeldung.token("inhaber-urinet");
-        Response stand = given().auth().oauth2(token).get("/api/v1/dokumentarten");
+        Response stand = http().auth().oauth2(token).get("/api/v1/dokumentarten");
         assertThat(stand.statusCode()).as("Dokumentarten nach Grenztest abrufen").isEqualTo(200);
-        given().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
+        http().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
                 .delete("/api/v1/dokumentarten/" + TEST_DOKUMENTART).then().statusCode(204);
         testDokumentartAngelegt = false;
     }
 
     private String kontaktAnlegen() {
-        Response erstellt = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+        Response erstellt = http().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
                 .contentType("application/json")
                 .body("""
                         {"typ":"ORGANISATION","name":"Grenztest"}
@@ -583,8 +586,12 @@ class RestEingabeGrenzenTest {
         testKontaktId = null;
     }
 
-    private static String etag(String token, String pfad) {
-        Response stand = given().auth().oauth2(token).get(pfad);
+    private RequestSpecification http() {
+        return given().baseUri(basis.toString());
+    }
+
+    private String etag(String token, String pfad) {
+        Response stand = http().auth().oauth2(token).get(pfad);
         assertThat(stand.statusCode()).as("ETag für " + pfad + " abrufen").isEqualTo(200);
         String etag = stand.getHeader("ETag");
         assertThat(etag).as("ETag für " + pfad).isNotBlank();
