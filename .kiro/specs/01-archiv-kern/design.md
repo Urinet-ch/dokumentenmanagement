@@ -1,5 +1,12 @@
 # Design Document
 
+### Umsetzung (Aufgabe 5.11 Messvorbereitung, 26.11.2026)
+
+`tools/last/verarbeitung_foto.py` prüft die Seitenzahl eines Begleit-PDFs, beobachtet die Überlappung und wartet
+auf dessen Abschluss. CSV-Auswertung und synthetischer Scan-Generator sind in `docs/betrieb/stufe-b-messung.md`
+beschrieben. Der Clientwert ab 202 ist nur unter den dort genannten Bedingungen eine obere Schranke; der
+serverseitige Messpunkt bleibt massgeblich. Tests: `tools/last/test_last.py`; 5.11 bleibt bis zur Messung offen.
+
 ### Umsetzung (Aufgabe 5.7 Entwurf, 26.11.2026)
 
 `docs/verfahrensbeschreibung-erfassen-archivieren.md` beschreibt den vorgesehenen Ablauf mit Quellen und offenen
@@ -1317,6 +1324,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
 - Anleitung `docs/wiederherstellung.md`, einmal vollständig in einer Testumgebung durchgespielt (Req 16.3, Nachweis manuell). Sie schreibt vor, nur Snapshots einzuspielen, deren SHA-256 ein Manifest unter `sicherung` belegt, und die Sperren aus dem Inventar ohne Kappung neu zu setzen (Req 16.27).
 - Umsetzung Shell-Aufgabe 5.5: `deploy/backup/taeglich.sh` erstellt die Datenbank-Dumps, den Realm-Export, den Manifest-Schlüssel sowie je Mandant Inventar und Bucket-Zuwachs; alle Artefakte werden mit `age` an Sicherungs- und Probe-Empfänger verschlüsselt und ihre SHA-256-Werte im Sicherungsregister festgehalten. Inventar und Zuwachs werden in der geforderten Reihenfolge gelesen, das Vorinventar bleibt mit restriktiven Dateirechten ausserhalb der abgeholten Läufe. Der Realm-Export stoppt Keycloak kurz, weil der offizielle Export bei laufendem Dienst keine konsistente Sicherung garantiert; ein Trap startet den Dienst auch bei Fehlern erneut. Die Backend-Kommandos laufen im Wegwerf-Container (`compose run --rm --no-deps`), nie per `exec`; der Realm-Export schreibt in ein Bind-Mount statt ins tmpfs; ein Wechsel des Probe-Schlüssels (Prüfsumme im Zustand) oder `ARCHIV_VOLLEXPORT=1` erzwingt einen Vollexport (Req 16.23); eine veraltete Sperre wird übernommen (Nachbesserung Review PR #209). restic und Probe-Workflow bleiben im Infra-Repository.
 - Umsetzung (Aufgabe 5.5/5.12, lokaler Nachweis, 25.11.2026): Die Restore-Übung vergleicht Dokument-, Wissensseiten- und Versionszahlen je Mandant zwischen Quelle und wiederhergestelltem Ziel und prüft fremde Dokumente und Originaldateien auf Abwesenheit. Ein eindeutiger Projektname isoliert Compose und die gebauten Image-Tags; beim Aufräumen werden nur die eigenen Tags entfernt. `SicherungPaketRoundtripTest` und `restore-uebung-lokal-test.sh` belegen den lokalen Ablauf mit synthetischen Daten. Die betriebliche Restore-Probe mit Zählvergleich (Spec 04, 13.7) ist damit nicht nachgewiesen.
+- Umsetzung (Aufgabe 5.5, Nachtrag 26.11.2026): Der lokale Roundtrip prüft in beiden Ziel-Buckets auch, dass weder Versionen noch Löschmarken des fremden PDF/A-Schlüssels vorhanden sind (Req 16.3).
 
 ### Frontend
 - Routen: `/erfassen`, `/eingangskorb`, `/suche`, `/dokument/:id`, `/importe`, `/importe/:id`, `/verwaltung/dokumentarten`, `/verwaltung/protokoll`, `/verwaltung/api-tokens`; Spec 02 ergänzt `/chat` (Spec 02, Aufgabe 7.4; Recht wie A2, Menüpunkt erst mit Aufgabe 7.4b).
@@ -1436,6 +1444,10 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     selbst belegen die Java-Szenarien (`features/dokument/eingangskorb.feature`, `bestaetigen.feature`). Die Attrappe
     beantwortet in jedem Browser-Szenario auch den Zähler. Die Datei trägt darum `@attrappe` (Abschluss 4.10); den
     Platzhalter (Req 8.11) belegt `features/dokument/dateiname-pwa.feature` gegen das echte Archiv im Testmodus.
+- Umsetzung (Aufgabe 3.6, Treuhänder-Hinweis, 26.11.2026): Der leere Eingangskorb erklärt Treuhändern, dass nur
+  bestätigte und für sie sichtbare Dokumente erscheinen. Das Browser-Szenario in `features/gemeinsam/navigation-pwa.feature`
+  nutzt die Keycloak- und Archiv-Attrappen; axe und die vier Kombinationen aus 375/1280 px und hell/dunkel prüfen den
+  Zustand. Die serverseitige Sichtbarkeitsfilterung bleibt durch `features/dokument/sichtbarkeit.feature` belegt.
 - Umsetzung (Aufgabe 3.7, Handy-Erfassung, 13.11.2026):
   - Seite `/erfassen` (Komponente `erfassen/handy/handy-erfassung`, lazy geladen, `erfassenGuard`): angemeldet mit Recht A1; ohne Anmeldung nur offline
     zugänglich (Tokens nur im Arbeitsspeicher, entschieden von Fabian am 11.11.2026), online führt der Weg über die

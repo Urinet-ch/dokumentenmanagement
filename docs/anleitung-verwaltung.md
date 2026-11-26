@@ -55,10 +55,11 @@ Sie vergeben **Rollen**, keine einzelnen Rechte. Unter «Rechte» sehen Sie je P
 - API-Tokens und Webseiten-Schlüssel bleiben gültig; prüfen Sie «API-Tokens» beim Austritt.
 
 ## Einstellungen ändern
-«Einstellungen» zeigt Gruppen mit **Grenzen**, **Standardwert** und «wirksam ab». Mit «Vorschau» sehen Sie vor dem Speichern, was
-geschieht (z. B. «N Fragen werden gelöscht»). Riskante Änderungen (kürzere Aufbewahrung, Geschäftsjahr-Ende, hohes Budget)
-verlangen eine Bestätigung. «Auf Standard» setzt zurück; der Verlauf zeigt jede Version mit Vergleich und lässt `einstellungen` auf
-einen früheren Stand zurücksetzen. Ändert jemand gleichzeitig, meldet die App «Die Daten haben sich geändert».
+«Einstellungen» zeigt Gruppen mit **Grenzen**, **Standardwert** und «wirksam ab». Mit «Änderungen prüfen» sehen Sie vor dem
+Speichern, was geschieht (z. B. «N Fragen werden gelöscht»). Riskante Änderungen (kürzere Aufbewahrung, Geschäftsjahr-Ende,
+hohes Budget) verlangen eine Bestätigung. «Auf Standard setzen» übernimmt den Standardwert. Der Verlauf zeigt jede Version
+mit Vergleich; mit «Frühere Version vormerken» übernehmen Sie deren Einstellungen als Entwurf. Prüfen und bestätigen Sie die
+Auswirkungen, bevor Sie den Entwurf speichern. Ändert jemand gleichzeitig, meldet die App «Die Daten haben sich geändert».
 Nicht hier änderbar: Alarm-Empfänger, Budget des öffentlichen Chats, Modelle, Limits und Geheimnisse (Betreiber).
 
 ## Wenn etwas nicht geht

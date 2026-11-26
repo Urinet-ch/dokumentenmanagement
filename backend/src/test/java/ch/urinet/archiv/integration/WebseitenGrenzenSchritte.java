@@ -3,6 +3,7 @@ package ch.urinet.archiv.integration;
 import ch.urinet.archiv.ablage.TestAblage;
 import ch.urinet.archiv.dokument.Testdateien;
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
@@ -48,6 +49,7 @@ public class WebseitenGrenzenSchritte {
     private static final int OBERGRENZE = 200;
     private static final byte[] UPLOAD = Testdateien.pdf();
     private static final String UPLOAD_PFAD = "/public/v1/erfassung/dokumente";
+    private static final String LOG_MARKER = "logmarker-person@example.invalid";
 
     @Inject
     WebseitenSchluesselVerwaltung verwaltung;
@@ -61,6 +63,8 @@ public class WebseitenGrenzenSchritte {
     private final Map<String, String> schluessel = new HashMap<>();
     private final Set<UUID> dokumente = ConcurrentHashMap.newKeySet();
     private final List<String> tokenIds = new ArrayList<>();
+    private final List<String> clientWerte = new ArrayList<>();
+    private LogMitschnitt log;
     private Response letzte;
     private Response ablehnung;
     private int ablehnungNr;
@@ -68,6 +72,9 @@ public class WebseitenGrenzenSchritte {
 
     @After
     public void grenzenAufraeumen() throws SQLException {
+        if (log != null) {
+            log.close();
+        }
         if (!dokumente.isEmpty()) {
             List<UUID> ids = List.copyOf(dokumente);
             try (Connection verbindung = datenbank.get().getConnection();
@@ -90,7 +97,13 @@ public class WebseitenGrenzenSchritte {
             }
         }
         tokenIds.clear();
+        clientWerte.clear();
         schluessel.clear();
+    }
+
+    @Angenommen("das ganze Log der Webseiten-Grenze wird mitgeschnitten")
+    public void logMitschneiden() {
+        log = LogMitschnitt.starten();
     }
 
     private void anlegen(String name, String art) {
@@ -139,7 +152,9 @@ public class WebseitenGrenzenSchritte {
     private void bisAbgelehnt(String name, String pfad, boolean post) {
         ablehnung = null;
         for (int i = 1; i <= OBERGRENZE; i++) {
-            RequestSpecification r = mit(name).header("X-Archiv-Client", hash(i));
+            String clientWert = hash(i);
+            clientWerte.add(clientWert);
+            RequestSpecification r = mit(name).header("X-Archiv-Client", clientWert);
             if (i % 2 == 0) {
                 r = r.header("X-Archiv-Zugriff", "oeffentlich");
             }
@@ -236,6 +251,15 @@ public class WebseitenGrenzenSchritte {
         assertThat(text).doesNotContain(hash(1), hash(2), "oeffentlich");
         schluessel.values().forEach(s -> assertThat(text).doesNotContain(s)
                 .doesNotContain(ApiToken.lesen(s).orElseThrow().id()));
+    }
+
+    @Dann("enthält das Log weder den Schlüssel noch den synthetischen Marker noch die Client-Hashes")
+    public void logOhneEingaben() {
+        String text = log.volltext();
+        assertThat(text).doesNotContain(LOG_MARKER);
+        clientWerte.forEach(wert -> assertThat(text).doesNotContain(wert));
+        schluessel.values().forEach(wert -> assertThat(text).doesNotContain(wert));
+        assertThat(ablehnung.asString()).doesNotContain(LOG_MARKER);
     }
 
     @Dann("antwortet die Grenze mit Status {int}")
