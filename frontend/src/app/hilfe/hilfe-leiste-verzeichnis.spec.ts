@@ -17,26 +17,26 @@ describe('Hilfe-Leiste, Inhaltsverzeichnis (Spec 07, Req 4.7)', () => {
     return fixture;
   }
 
-  it('startet zugeklappt: Knopf «Abschnitte» mit aria-expanded=false und verstecktem Verzeichnis', () => {
+  it('ohne gewählten Abschnitt ist das Verzeichnis aufgeklappt (Knopf «Abschnitte», aria-expanded=true)', () => {
     const el = leiste().nativeElement as HTMLElement;
     const knopf = el.querySelector<HTMLButtonElement>('[data-test=hilfe-verzeichnis-knopf]')!;
     expect(knopf.textContent).toContain('Abschnitte');
-    expect(knopf.getAttribute('aria-expanded')).toBe('false');
+    expect(knopf.getAttribute('aria-expanded')).toBe('true');
     expect(knopf.getAttribute('aria-controls')).toBe('hilfe-verzeichnis');
-    expect(el.querySelector<HTMLElement>('#hilfe-verzeichnis')!.hidden).toBe(true);
+    expect(el.querySelector<HTMLElement>('#hilfe-verzeichnis')!.hidden).toBe(false);
   });
 
-  it('klappt mit dem Knopf auf und wieder zu', () => {
+  it('klappt mit dem Knopf zu und wieder auf', () => {
     const fixture = leiste();
     const el = fixture.nativeElement as HTMLElement;
     const knopf = el.querySelector<HTMLButtonElement>('[data-test=hilfe-verzeichnis-knopf]')!;
     knopf.click();
     fixture.detectChanges();
-    expect(knopf.getAttribute('aria-expanded')).toBe('true');
-    expect(el.querySelector<HTMLElement>('#hilfe-verzeichnis')!.hidden).toBe(false);
-    knopf.click();
-    fixture.detectChanges();
     expect(knopf.getAttribute('aria-expanded')).toBe('false');
     expect(el.querySelector<HTMLElement>('#hilfe-verzeichnis')!.hidden).toBe(true);
+    knopf.click();
+    fixture.detectChanges();
+    expect(knopf.getAttribute('aria-expanded')).toBe('true');
+    expect(el.querySelector<HTMLElement>('#hilfe-verzeichnis')!.hidden).toBe(false);
   });
 });

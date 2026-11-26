@@ -170,8 +170,8 @@ meine Eingaben, Aufnahmen oder mein Chatverlauf verloren gehen, damit ich mir se
    Mandant oder Rolle (`#probleme`).
 
 7. Das Inhaltsverzeichnis der Hilfe-Leiste SOLL kompakt sein (Abschnitte nebeneinander) und sich auf- und zuklappen
-   lassen (Knopf «Abschnitte» mit dem gewählten Abschnitt und `aria-expanded`); beim Öffnen der Leiste ist es zugeklappt,
-   damit der Text den Platz bekommt. Aufgenommen am 26.11.2026 nach der Abnahme (Fabian).
+   lassen (Knopf «Abschnitte» mit dem gewählten Abschnitt und `aria-expanded`); beim Öffnen der Leiste mit einem Abschnitt ist es
+   zugeklappt, damit der Text den Platz bekommt; ohne Abschnitt ist es aufgeklappt. Aufgenommen am 26.11.2026 nach der Abnahme (Fabian).
 
 ### Requirement 5: Seite `/hilfe` – die ganze Anleitung (ohne Konzept-ID)
 **User Story:** Als Benutzer möchte ich die ganze Anleitung für meine Rolle an einem Ort lesen und gezielt zu einem Bereich

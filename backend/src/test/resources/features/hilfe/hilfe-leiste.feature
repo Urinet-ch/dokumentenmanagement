@@ -44,9 +44,11 @@ Funktionalität: Hilfe-Leiste ohne Verlassen der aktuellen Seite
     Dann ist die Hilfe-Leiste zwischen 480 und 760 Pixel breit
 
   @req-4.7
-  Szenario: Das Inhaltsverzeichnis der Leiste ist zugeklappt und lässt sich aufklappen
+  Szenario: Das Inhaltsverzeichnis der Leiste ist mit einem Abschnitt zugeklappt und lässt sich aufklappen
     Angenommen ein Bildschirm mit 1280 Pixel Breite
-    Wenn ich die Seite «/» öffne
+    Und das Archiv liefert synthetische Suchtreffer
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Suche» wähle
     Und ich die Hilfe-Leiste öffne
     Dann ist das Inhaltsverzeichnis der Hilfe-Leiste zugeklappt
     Wenn ich das Inhaltsverzeichnis der Hilfe-Leiste aufklappe

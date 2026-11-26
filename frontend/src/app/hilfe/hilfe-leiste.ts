@@ -29,8 +29,12 @@ export class HilfeLeisteAnsicht {
   protected readonly texte = TEXTE.hilfe;
   readonly navigiert = output<void>();
 
-  /** Das Inhaltsverzeichnis ist beim Öffnen zugeklappt, damit der Text den Platz bekommt (Req 4.7). */
-  protected readonly verzeichnisOffen = signal(false);
+  /**
+   * Zeigt die Leiste einen Abschnitt, ist das Inhaltsverzeichnis beim Öffnen zugeklappt, damit der Text den Platz
+   * bekommt; ohne Abschnitt ist es aufgeklappt, weil es dann der einzige Inhalt ist (Req 4.7).
+   */
+  private readonly verzeichnisWunsch = signal<boolean | null>(null);
+  protected readonly verzeichnisOffen = computed(() => this.verzeichnisWunsch() ?? !this.ausgewaehlt());
 
   protected readonly eintraege = computed(() =>
     sichtbareAbschnitte(this.katalog, this.hilfe.rolle()).flatMap(({ eintrag, unter }) => [eintrag, ...unter]),
@@ -47,7 +51,7 @@ export class HilfeLeisteAnsicht {
   }
 
   protected verzeichnisUmschalten(): void {
-    this.verzeichnisOffen.update((offen) => !offen);
+    this.verzeichnisWunsch.set(!this.verzeichnisOffen());
   }
 
   protected waehlen(ereignis: MouseEvent, anker: string): void {
