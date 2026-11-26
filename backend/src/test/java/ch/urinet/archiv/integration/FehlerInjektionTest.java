@@ -62,10 +62,12 @@ import io.quarkus.arc.ClientProxy;
 import io.quarkus.runtime.configuration.MemorySize;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.RestAssured;
 import io.restassured.builder.MultiPartSpecBuilder;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.eclipse.microprofile.config.ConfigProvider;
@@ -75,6 +77,9 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.Socket;
 import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
@@ -94,6 +99,7 @@ import java.util.function.Supplier;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 /** Reale REST-Anfragen mit gezielt simulierten Ausfällen; keine fremden Datenbanken werden angehalten. */
 @QuarkusTest
@@ -209,6 +215,47 @@ class FehlerInjektionTest {
             assertThat(ProblemDetails.pruefen(antwort, 413)).isEqualTo("DATEI_ZU_GROSS");
             assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
             assertThat(log.volltext()).doesNotContain(MARKER, token, "\tat ", "Caused by:");
+        }
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "archiv.qa.chunked-problem", matches = "true")
+    void uebergrosseChunkedAnfrageLiefertProblemDetail() throws Exception {
+        long grenze = ConfigProvider.getConfig().getValue("archiv.upload.max-anfrage", MemorySize.class)
+                .asLongValue();
+        String token = Testanmeldung.token("inhaber-urinet");
+        given().auth().oauth2(token).when().get("/api/v1/kontakte").then().statusCode(200);
+        try (LogMitschnitt log = LogMitschnitt.starten(); Socket socket = new Socket("127.0.0.1", RestAssured.port)) {
+            socket.setSoTimeout(30_000);
+            var aus = socket.getOutputStream();
+            String kopf = "POST /api/v1/kontakte?probe=" + MARKER + " HTTP/1.1\r\nHost: localhost\r\n"
+                    + "Authorization: Bearer " + token + "\r\n"
+                    + "Content-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+            aus.write(kopf.getBytes(StandardCharsets.US_ASCII));
+            aus.write((Long.toHexString(grenze + 1) + "\r\n").getBytes(StandardCharsets.US_ASCII));
+            byte[] block = " ".repeat(8192).getBytes(StandardCharsets.US_ASCII);
+            for (long uebrig = grenze + 1; uebrig > 0;) {
+                int laenge = (int) Math.min(uebrig, block.length);
+                aus.write(block, 0, laenge);
+                uebrig -= laenge;
+            }
+            aus.flush();
+            BufferedReader leser = new BufferedReader(new InputStreamReader(socket.getInputStream(),
+                    StandardCharsets.UTF_8));
+            assertThat(leser.readLine()).contains(" 413 ");
+            String antwort = leser.lines().collect(java.util.stream.Collectors.joining("\n"));
+            String protokoll = log.volltext();
+            assertAll(
+                    () -> assertThat(antwort.contains(MARKER) || antwort.contains(token)
+                            || antwort.contains("Exception") || antwort.contains("\tat ")
+                            || antwort.contains("Caused by:")).as("Antwort enthält Eingabe, Token oder Stacktrace")
+                            .isFalse(),
+                    () -> assertThat(protokoll.contains(MARKER) || protokoll.contains(token)
+                            || protokoll.contains("\tat ") || protokoll.contains("Caused by:"))
+                            .as("Log enthält Eingabe, Token oder Stacktrace").isFalse(),
+                    () -> assertThat(antwort.toLowerCase(java.util.Locale.ROOT).contains("application/problem+json"))
+                            .as("Antwort ist Problem Detail").isTrue(),
+                    () -> assertThat(antwort.contains("\"fehlercode\"")).as("Antwort enthält Fehlercode").isTrue());
         }
     }
 
