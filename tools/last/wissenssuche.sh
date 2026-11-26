@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# != 1 || "$1" != "--freigabe" ]]; then
-  echo "Einmaliger lokaler Messlauf: bash tools/last/wissenssuche.sh --freigabe" >&2
+if [[ $# -lt 1 || $# -gt 2 || "$1" != "--freigabe" || ( $# == 2 && "$2" != "--leistungsbasis" ) ]]; then
+  echo "Einmaliger lokaler Messlauf: bash tools/last/wissenssuche.sh --freigabe [--leistungsbasis]" >&2
   exit 2
 fi
 
@@ -53,8 +53,17 @@ for i in {1..60}; do
 done
 docker exec "$container" pg_isready -h 127.0.0.1 -U postgres -d wissen_leistung >/dev/null
 port="$(docker port "$container" 5432/tcp | sed 's/.*://')"
+testklasse=WissenssucheLeistungIT
+testoption=-Darchiv.wissen-leistung=true
+if [[ $# == 2 ]]; then
+  testklasse=LeistungsbasisIT
+  testoption=-Darchiv.leistungsbasis=true
+fi
 TMPDIR="$arbeitsordner" mvn -B -ntp -f backend/pom.xml test-compile surefire:test \
   -Djava.io.tmpdir="$arbeitsordner" -Dquarkus.http.test-port=0 \
   -Dquarkus.datasource.jdbc.url="jdbc:postgresql://127.0.0.1:$port/wissen_leistung" \
   -Dquarkus.datasource.username=postgres -Dquarkus.datasource.password=lokales-testpasswort \
-  -Darchiv.wissen-leistung=true -Dtest=WissenssucheLeistungIT
+  "$testoption" "-Dtest=$testklasse"
+if [[ $# == 2 ]]; then
+  python3 tools/last/leistungsbasis.py backend/target/leistungsbasis-roh.csv
+fi
