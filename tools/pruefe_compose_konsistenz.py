@@ -97,6 +97,27 @@ def pruefe_compose(compose):
             if GEHEIMNIS.search(schluessel) and not wert_ist_referenz(wert):
                 melde("KLARTEXT", f"{ort}.environment.{schluessel}", "Möglicher Klartextwert.")
 
+        dienstlabels = dienst.get("labels") or {}
+        if isinstance(dienstlabels, list):
+            dienstlabels = dict(e.split("=", 1) if "=" in e else (e, "") for e in dienstlabels)
+        definiert = {
+            treffer.group(1)
+            for label in dienstlabels
+            if (treffer := re.fullmatch(r"traefik\.http\.middlewares\.([^.]+)\..+", label))
+        }
+        for label, wert in dienstlabels.items():
+            router = re.fullmatch(r"traefik\.http\.routers\.([^.]+)\.middlewares", label)
+            if not router:
+                continue
+            for mittel in str(wert or "").split(","):
+                mittel = mittel.strip()
+                if not mittel:
+                    continue
+                teile = mittel.split("@")
+                if len(teile) > 2 or (len(teile) == 2 and teile[1] != "docker") or teile[0] not in definiert:
+                    melde("MIDDLEWARE_FREMDER_DIENST", f"{ort}.routers.{router.group(1)}",
+                          f"Middleware {mittel} ist nicht am Dienst des Routers definiert.")
+
     labels = dienste.get("api", {}).get("labels") or {}
     if isinstance(labels, list):
         labels = dict(e.split("=", 1) if "=" in e else (e, "") for e in labels)
