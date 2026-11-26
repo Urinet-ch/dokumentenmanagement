@@ -26,6 +26,11 @@ import ch.urinet.archiv.kontakt.application.KontaktVerwaltung;
 import ch.urinet.archiv.kontakt.application.KontaktVerweise;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
+import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
+import ch.urinet.archiv.konfiguration.domain.ArtKlassifikation;
+import ch.urinet.archiv.konfiguration.domain.Klassifikation;
+import ch.urinet.archiv.konfiguration.domain.KonfigurationsVersion;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -80,6 +85,8 @@ class FehlerInjektionTest {
     @Inject DokumentLesen dokumentLesen;
     @Inject DokumentAendern dokumentAendern;
     @Inject DokumentartVerwaltung dokumentarten;
+    @Inject KonfigurationVerwaltung konfiguration;
+    @Inject KlassifikationVerwaltung klassifikationen;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -223,6 +230,102 @@ class FehlerInjektionTest {
                 }
             }
 
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void klassifikationenBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) {
+        List<String> tokens = List.of(Testanmeldung.token("inhaber-urinet"), Testanmeldung.token("inhaber-vhf-gsk"));
+        List<String> arten = new ArrayList<>();
+        for (String token : tokens) {
+            var liste = given().auth().oauth2(token).when().get("/api/v1/dokumentarten");
+            liste.then().statusCode(200);
+            String art = liste.jsonPath().getString("[0].code");
+            assertThat(art).isNotBlank();
+            arten.add(art);
+            given().auth().oauth2(token).when().get("/api/v1/klassifikationen").then().statusCode(200);
+            given().auth().oauth2(token).when().get("/api/v1/dokumentarten/" + art + "/klassifikationen")
+                    .then().statusCode(200);
+        }
+        KlassifikationVerwaltung original = ClientProxy.unwrap(klassifikationen);
+        AtomicInteger getroffen = new AtomicInteger();
+        QuarkusMock.installMockForType(new KlassifikationVerwaltung(null, null, null) {
+            @Override
+            public List<Klassifikation> alle() {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+
+            @Override
+            public List<ArtKlassifikation> artKlassifikationen(String art) {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+        }, KlassifikationVerwaltung.class);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (int i = 0; i < tokens.size(); i++) {
+                String token = tokens.get(i);
+                for (String pfad : List.of("/api/v1/klassifikationen",
+                        "/api/v1/dokumentarten/" + arten.get(i) + "/klassifikationen")) {
+                    var antwort = given().auth().oauth2(token).when().get(pfad);
+                    assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                    assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+                }
+            }
+            assertThat(getroffen).hasValue(4);
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+            for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
+        } finally {
+            QuarkusMock.installMockForType(original, KlassifikationVerwaltung.class);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void konfigurationsversionenBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) {
+        List<String> tokens = List.of(Testanmeldung.token("inhaber-urinet"), Testanmeldung.token("inhaber-vhf-gsk"));
+        List<Integer> versionen = new ArrayList<>();
+        for (String token : tokens) {
+            var liste = given().auth().oauth2(token).when().get("/api/v1/konfiguration/versionen");
+            liste.then().statusCode(200);
+            int version = liste.jsonPath().getInt("[0].version");
+            assertThat(version).isPositive();
+            given().auth().oauth2(token).when().get("/api/v1/konfiguration/versionen/" + version)
+                    .then().statusCode(200);
+            versionen.add(version);
+        }
+        KonfigurationVerwaltung original = ClientProxy.unwrap(konfiguration);
+        AtomicInteger getroffen = new AtomicInteger();
+        QuarkusMock.installMockForType(new KonfigurationVerwaltung(null, null, null, null, null, null,
+                null, null, null, null, null) {
+            @Override
+            public List<KonfigurationsVersion> versionen() {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+
+            @Override
+            public KonfigurationsVersion version(int nummer) {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+        }, KonfigurationVerwaltung.class);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (int i = 0; i < tokens.size(); i++) {
+                String token = tokens.get(i);
+                for (String pfad : List.of("/api/v1/konfiguration/versionen",
+                        "/api/v1/konfiguration/versionen/" + versionen.get(i))) {
+                    var antwort = given().auth().oauth2(token).when().get(pfad);
+                    assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                    assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+                }
+            }
+            assertThat(getroffen).hasValue(4);
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+            for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
+        } finally {
+            QuarkusMock.installMockForType(original, KonfigurationVerwaltung.class);
         }
     }
 
