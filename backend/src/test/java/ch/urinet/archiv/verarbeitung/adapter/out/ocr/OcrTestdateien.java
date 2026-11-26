@@ -44,8 +44,8 @@ import java.util.List;
 
 /**
  * Synthetische Testdateien für den OCR-Adapter (keine echten Belege, Req 16.15): Fotos mit gezeichnetem Text,
- * Mehrseiten-PDF ohne Textebene, PDF mit Textebene, verschlüsseltes und signiertes PDF. HEIC liegt als Fixture unter
- * {@code src/test/resources/ocr/} (Herkunft dort in der README).
+ * Mehrseiten-PDF ohne Textebene, PDF mit Textebene und Tabelle, verschlüsseltes und signiertes PDF. HEIC liegt als
+ * Fixture unter {@code src/test/resources/ocr/} (Herkunft dort in der README).
  */
 public final class OcrTestdateien {
 
@@ -128,6 +128,26 @@ public final class OcrTestdateien {
         }
     }
 
+    /** Synthetische Tabelle mit mehrzeiliger Zelle und Gedankenstrich-Platzhalter. */
+    public static byte[] tabellenPdf() {
+        try (PDDocument dok = new PDDocument()) {
+            PDPage seite = new PDPage(PDRectangle.A4);
+            dok.addPage(seite);
+            try (var inhalt = new PDPageContentStream(dok, seite)) {
+                tabellenText(inhalt, "Bezeichnung", 50, 760);
+                tabellenText(inhalt, "Beschreibung", 170, 760);
+                tabellenText(inhalt, "Preis", 450, 760);
+                tabellenText(inhalt, "Service A", 50, 730);
+                tabellenText(inhalt, "Zusatzleistung mit", 170, 730);
+                tabellenText(inhalt, "––", 450, 730);
+                tabellenText(inhalt, "mehrzeiliger Beschreibung", 170, 710);
+            }
+            return speichern(dok);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     /** PDF mit Benutzerpasswort: ohne Passwort nicht lesbar. */
     public static byte[] verschluesseltesPdf() {
         try (PDDocument dok = new PDDocument()) {
@@ -199,6 +219,15 @@ public final class OcrTestdateien {
             }
             inhalt.endText();
         }
+    }
+
+    private static void tabellenText(PDPageContentStream inhalt, String text, float x, float y)
+            throws IOException {
+        inhalt.beginText();
+        inhalt.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+        inhalt.newLineAtOffset(x, y);
+        inhalt.showText(text);
+        inhalt.endText();
     }
 
     private static byte[] speichern(PDDocument dok) throws IOException {

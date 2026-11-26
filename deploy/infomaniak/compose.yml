@@ -118,6 +118,12 @@ services:
       traefik.http.services.archiv.loadbalancer.server.port: "8080"
       # Drosselung je Client-IP (design.md «Sicherheit», Argon2-Sperre): jede Anfrage mit «Bearer ua_…» rechnet
       # Argon2, auf allen Pfaden (proaktive Anmeldung)
+      # HSTS (ZAP-Baseline gegen die VPS 26.11.2026, Regel 10035): zunächst ein Tag; nach Prüfung auf 31536000 erhöhen.
+      # Ohne includeSubDomains (apps.urinet.ch hostet weitere Apps), ohne preload. Nur bei HTTPS-Antworten (Port 80 leitet um).
+      traefik.http.middlewares.archiv-sts.headers.stsseconds: "86400"
+      traefik.http.middlewares.archiv-sts.headers.stsincludesubdomains: "false"
+      traefik.http.middlewares.archiv-sts.headers.stspreload: "false"
+      traefik.http.middlewares.archiv-sts.headers.forcestsheader: "false"
       traefik.http.middlewares.archiv-drossel.ratelimit.average: "10"
       traefik.http.middlewares.archiv-drossel.ratelimit.period: 1s
       traefik.http.middlewares.archiv-drossel.ratelimit.burst: "50"
@@ -156,24 +162,24 @@ services:
       traefik.http.routers.archiv-public-suche.entrypoints: websecure
       traefik.http.routers.archiv-public-suche.tls.certresolver: le
       traefik.http.routers.archiv-public-suche.service: archiv
-      traefik.http.routers.archiv-public-suche.middlewares: archiv-public-suche-drossel,archiv-public-drossel,archiv-public-gleichzeitig
+      traefik.http.routers.archiv-public-suche.middlewares: archiv-public-suche-drossel,archiv-public-drossel,archiv-public-gleichzeitig,archiv-sts
       traefik.http.routers.archiv-public.rule: Host(`archiv.apps.urinet.ch`) && PathPrefix(`/public/`) && !Path(`/public/v1/suche`) && !Path(`/public/v1/suche/`)
       traefik.http.routers.archiv-public.entrypoints: websecure
       traefik.http.routers.archiv-public.tls.certresolver: le
       traefik.http.routers.archiv-public.service: archiv
-      traefik.http.routers.archiv-public.middlewares: archiv-public-drossel,archiv-public-gleichzeitig
+      traefik.http.routers.archiv-public.middlewares: archiv-public-drossel,archiv-public-gleichzeitig,archiv-sts
       # API
       traefik.http.routers.archiv-api.rule: Host(`archiv.apps.urinet.ch`) && PathPrefix(`/api/`)
       traefik.http.routers.archiv-api.entrypoints: websecure
       traefik.http.routers.archiv-api.tls.certresolver: le
       traefik.http.routers.archiv-api.service: archiv
-      traefik.http.routers.archiv-api.middlewares: archiv-drossel
+      traefik.http.routers.archiv-api.middlewares: archiv-drossel,archiv-sts
       # PWA: alles ausser /api/, /q/ und /public/ (Readiness und Kennzahlen bleiben intern, Req 16.4)
       traefik.http.routers.archiv.rule: Host(`archiv.apps.urinet.ch`) && !PathPrefix(`/api/`) && !PathPrefix(`/q/`) && !PathPrefix(`/public/`)
       traefik.http.routers.archiv.entrypoints: websecure
       traefik.http.routers.archiv.tls.certresolver: le
       traefik.http.routers.archiv.service: archiv
-      traefik.http.routers.archiv.middlewares: archiv-drossel
+      traefik.http.routers.archiv.middlewares: archiv-drossel,archiv-sts
       # Mandant VHF/GSK (Aufgabe 10.3): vorerst kein Router (Review PR #299, M1). Ein Router machte seinen Host mit dem
       # Deploy öffentlich, einen dritten neben archiv.… und archiv-auth.… (tech.md «Erreichbarkeit», ADR-010 P15); er
       # kommt erst mit einem Entscheid von Fabian in einem eigenen PR (Spec 03, design.md, «Vorschlag Rest von 10.3»).
@@ -182,7 +188,7 @@ services:
       traefik.http.routers.archiv-health.entrypoints: websecure
       traefik.http.routers.archiv-health.tls.certresolver: le
       traefik.http.routers.archiv-health.service: archiv
-      traefik.http.routers.archiv-health.middlewares: archiv-drossel-health
+      traefik.http.routers.archiv-health.middlewares: archiv-drossel-health,archiv-sts
 
   db:
     image: archiv:db-current
@@ -297,7 +303,7 @@ services:
       traefik.http.routers.archiv-auth.entrypoints: websecure
       traefik.http.routers.archiv-auth.tls.certresolver: le
       traefik.http.routers.archiv-auth.service: archiv-auth
-      traefik.http.routers.archiv-auth.middlewares: archiv-auth-drossel
+      traefik.http.routers.archiv-auth.middlewares: archiv-auth-drossel,archiv-sts
 
 networks:
   intern:

@@ -132,6 +132,25 @@ class DeployHaertungTest {
         assertThat(prioritaet).isEmpty();
     }
 
+    /** HSTS an jedem Router (ZAP-Baseline gegen die VPS, Regel 10035, 26.11.2026): Die Middleware {@code archiv-sts}
+     *  ist definiert, ohne Unterdomänen und ohne preload (apps.urinet.ch hostet weitere Apps), und hängt an jedem Router. */
+    @Test
+    void jederRouterSetztHsts() throws IOException {
+        Map<String, String> alle = new java.util.TreeMap<>();
+        labels().values().forEach(alle::putAll);
+        assertThat(alle).containsEntry("traefik.http.middlewares.archiv-sts.headers.stsincludesubdomains", "false");
+        assertThat(alle).containsEntry("traefik.http.middlewares.archiv-sts.headers.stspreload", "false");
+        assertThat(Long.parseLong(alle.get("traefik.http.middlewares.archiv-sts.headers.stsseconds"))).isPositive();
+        List<String> ohne = new ArrayList<>();
+        routerRegeln().keySet().forEach(router -> {
+            String mittel = alle.getOrDefault("traefik.http.routers." + router + ".middlewares", "");
+            if (!List.of(mittel.replace(" ", "").split(",")).contains("archiv-sts")) {
+                ohne.add(router);
+            }
+        });
+        assertThat(ohne).isEmpty();
+    }
+
     /** Öffentlich nur archiv.… und archiv-auth.… (tech.md «Erreichbarkeit», ADR-010 P15); ein weiterer Host (z. B.
      *  VHF/GSK) braucht einen Entscheid von Fabian (Review PR #299, M1). Standardwerte von {@code ${…:-…}} gelten. */
     @Test
