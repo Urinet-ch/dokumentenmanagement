@@ -363,6 +363,12 @@ class RestEingabeGrenzenTest {
         List<String> geprueft = new ArrayList<>();
         String token = Testanmeldung.token("inhaber-urinet");
 
+        Response kontrollAntwort = http().auth().oauth2(token)
+                .queryParam("groesse", 50).when().get("/api/v1/benutzer");
+        assertThat(kontrollAntwort.statusCode())
+                .as("Gültige Anmeldung und gültiger Query-Parameter für Benutzerliste")
+                .isEqualTo(200);
+
         try (LogMitschnitt logs = LogMitschnitt.starten()) {
             openApi.path("paths").fields().forEachRemaining(pfad -> {
                 JsonNode get = pfad.getValue().path("get");
@@ -385,7 +391,7 @@ class RestEingabeGrenzenTest {
                     String endpoint = "GET " + pfad.getKey() + "?" + name;
                     geprueft.add(endpoint);
                     assertThat(antwort.statusCode()).as(endpoint + " muss den numerischen Typ ablehnen")
-                            .isBetween(400, 499);
+                            .isIn(400, 413, 422);
                     assertThat(antwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
                             .doesNotContain(MARKER, "Exception", "at ch.urinet");
 
@@ -399,7 +405,7 @@ class RestEingabeGrenzenTest {
 
                         geprueft.add(endpoint + " max");
                         assertThat(grenzAntwort.statusCode()).as(endpoint + " muss den Maximalwert anwenden")
-                                .isIn(400, 403, 404, 413, 422);
+                                .isIn(400, 413, 422);
                         assertThat(grenzAntwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
                                 .doesNotContain("Exception", "at ch.urinet");
                     }
