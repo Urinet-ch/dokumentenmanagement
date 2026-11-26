@@ -32,7 +32,7 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     anker: 'erste-schritte',
     titel: TEXTE.hilfe.abschnitte['erste-schritte'],
     datei: '/anleitung/erste-schritte.md',
-    pfade: ['/'],
+    pfade: ['/', '/anmeldung'],
     abgemeldet: true,
   },
   // Mit Passkey anmelden (24.3, Req 10): alle angemeldeten Rollen, ohne Pfad
