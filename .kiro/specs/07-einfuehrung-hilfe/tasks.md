@@ -136,7 +136,7 @@ was auf `main` umgesetzt ist (Requirement 6.4).
   - _Anforderungen: 9.2, 9.4, 9.6, 10.1, 10.2_
   - _Abhängig von: 22.4, 23.3, 23.4_
 
-- [ ] 23.6 Abnahme Einführung und Hilfe [Fabian]
+- [x] 23.6 Abnahme Einführung und Hilfe [Fabian]
   - `docs/abnahme/hilfe.md` nur mit Nummern und Ergebnissen: Szenarien und Tests grün; manuell: Einführung als neuer
     Benutzer je Rolle auf Stufe A (Testbenutzer), Handy bei 375 px mit iOS und Android, Anleitung offline am Handy,
     Stichprobe mit Screenreader, Bildschirmfotos hell und dunkel, Lesetest durch eine Person, die das Archiv nicht kennt;
