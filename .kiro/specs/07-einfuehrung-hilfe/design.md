@@ -440,7 +440,8 @@ Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
 - **Breite:** `min(100vw, clamp(480px, 42vw, 760px))` ab 960 px statt höchstens 420 px; darunter unverändert ganze Breite.
 - **Verzeichnis:** Knopf «Abschnitte» (zeigt den gewählten Abschnitt, `aria-expanded`, `aria-controls`) über einem
   kompakten, umbrechenden Link-Verzeichnis (`hidden` im zugeklappten Zustand). Beim Öffnen der Leiste mit einem Abschnitt zugeklappt, ohne Abschnitt
-  (kein Seitenkontext) aufgeklappt; der Zustand wird nicht gespeichert. Browser-Schritte, die Abschnitte wählen oder zählen, klappen es über
+  (kein Seitenkontext) aufgeklappt; die Wahl eines Abschnitts klappt es zu; der Zustand
+  wird nicht gespeichert. Browser-Schritte, die Abschnitte wählen oder zählen, klappen es über
   `e2e/hilfen/hilfe-verzeichnis.mjs` auf.
 
 ## Umsetzung (Aufgabe 22.3, 21.11.2026)

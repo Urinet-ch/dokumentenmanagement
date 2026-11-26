@@ -80,7 +80,9 @@ Then(/^zeigt die Hilfe-Leiste den Abschnitt «(.+)»$/, async function (titel) {
 });
 
 Then(/^zeigt die Hilfe-Leiste ihr Inhaltsverzeichnis «(.+)»$/, async function (name) {
-  await dialog(this.seite).getByRole('navigation', { name, exact: true }).waitFor();
+  // Das Verzeichnis ist mit einem gewählten Abschnitt zugeklappt (Req 4.7): aufklappen, dann sichtbar prüfen.
+  await verzeichnisOeffnen(dialog(this.seite));
+  await dialog(this.seite).getByRole('navigation', { name, exact: true }).waitFor({ state: 'visible' });
 });
 
 Then('zeigt die Hilfe-Leiste keinen ausgewählten Abschnitt', async function () {

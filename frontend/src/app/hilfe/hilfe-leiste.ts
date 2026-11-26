@@ -57,5 +57,6 @@ export class HilfeLeisteAnsicht {
   protected waehlen(ereignis: MouseEvent, anker: string): void {
     ereignis.preventDefault();
     this.hilfe.wechseln(anker);
+    this.verzeichnisWunsch.set(false);
   }
 }

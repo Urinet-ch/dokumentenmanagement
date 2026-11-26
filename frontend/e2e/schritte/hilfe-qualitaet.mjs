@@ -63,11 +63,10 @@ async function hilfePruefen(seite) {
 
   await seite.getByRole('button', { name: 'Hilfe', exact: true }).click();
   await dialog.waitFor();
-  const navigation = await verzeichnisOeffnen(dialog);
-  const links = await navigation.getByRole('link').allTextContents();
+  const links = await (await verzeichnisOeffnen(dialog)).getByRole('link').allTextContents();
   await pruefen(seite, 'Hilfe-Leiste über der Anleitung');
   for (const titel of links) {
-    await navigation.getByRole('link', { name: titel.trim(), exact: true }).click();
+    await (await verzeichnisOeffnen(dialog)).getByRole('link', { name: titel.trim(), exact: true }).click();
     await dialog.getByRole('heading', { name: titel.trim(), level: 3, exact: true }).waitFor();
     await seite.waitForFunction(() => !document.querySelector('app-hilfe-leiste mat-progress-bar'));
     await pruefen(seite, `Hilfe-Leiste: ${titel.trim()}`);
