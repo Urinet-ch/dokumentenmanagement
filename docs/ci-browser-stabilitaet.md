@@ -27,7 +27,7 @@ Hilfe-Leiste), die Unit-Tests nicht sahen. Ausserhalb des Builds würden solche 
   zwei Shards sparen höchstens 3 bis 4 min und verdoppeln den Aufbau. Lohnt erst bei deutlich mehr Szenarien.
 - **Eigener nächtlicher Workflow für `@flaky`:** wäre eine Änderung unter `.github/workflows` (geschützter Pfad); erst nötig,
   wenn ein Szenario markiert wird.
-- **`apt-get` im Werkzeug-Image:** Mehrere Läufe scheiterten am Paketmirror (nicht Browser). Behoben mit `Acquire::Retries=5` in `Dockerfile.jvm`.
+- **`apt-get` im Werkzeug-Image:** Mehrere Läufe scheiterten am Paketmirror (nicht Browser). Ursache am 26.11.: Der Ubuntu-Mirror lieferte nur 70 kB/s (Download 16 min), danach 404 auf ein inzwischen ersetztes Sicherheitspaket (libtiff6). Behoben mit einer Schleife (bis zu 3 Versuche mit frischen Paketlisten) und `Acquire::Retries=5` in `Dockerfile.jvm`.
 
 ## Beobachtung
 Nach dem Merge die Quote regelmässig messen (Stichtag = Merge von `retry`); Ziel: Browser-Job rot nur bei echten Fehlern,
