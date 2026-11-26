@@ -22,6 +22,8 @@ class WissenKonfigurationTest {
         assertThat(properties.getProperty("archiv.wissen.modell")).isEqualTo("${archiv.ki.chat-modell}");
         assertThat(properties.getProperty("archiv.wissen.budget-tokens")).isEqualTo("600000");
         assertThat(properties.getProperty("archiv.wissen.monatsbudget-tokens")).isEqualTo("1000000");
+        assertThat(properties.getProperty("archiv.wissen.auszug-mindest-zeichen")).isEqualTo("20");
+        assertThat(properties.getProperty("archiv.wissen.aussage-ueberlappung")).isEqualTo("0.5");
         assertThat(properties.containsKey("archiv.wissen.basis-url")).isFalse();
     }
 

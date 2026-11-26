@@ -213,16 +213,13 @@ public class WissenIngestVerarbeiten {
                     hinweise.add("Ungültige Kernaussage im Abschnitt " + (index + 1) + " verworfen.");
                     continue;
                 }
-                List<Integer> seiten = aussage.seiten() == null ? List.of() : aussage.seiten().stream()
+                List<Integer> angegebeneSeiten = aussage.seiten() == null ? List.of() : aussage.seiten().stream()
                         .filter(Objects::nonNull).filter(seite -> seite >= von && seite <= bis)
                         .distinct().sorted().toList();
-                List<Integer> mitAuszug = seiten.stream()
-                        .filter(seite -> WissenIngestAuszuege.belegt(text.seiten().get(seite - 1), aussage.auszug()))
-                        .toList();
-                boolean belegt = !mitAuszug.isEmpty();
-                if (belegt) {
-                    seiten = mitAuszug;
-                }
+                WissenIngestAuszuege.Pruefung auszug = WissenIngestAuszuege.pruefen(
+                        aussage.text(), aussage.auszug(), text, grenzen);
+                boolean belegt = auszug.belegt();
+                List<Integer> seiten = auszug.seiten().isEmpty() ? angegebeneSeiten : auszug.seiten();
                 int nummer = Math.addExact(Math.multiplyExact(index, MAX_AUSSAGEN_PRO_ABSCHNITT), aussage.nr());
                 String schluessel = schluessel(lauf.dokumentId(), Math.addExact(basis, aussage.nr()));
                 aussagen.add(new Kernaussage(nummer, schluessel, aussage.text(), seiten, aussage.auszug(), belegt));

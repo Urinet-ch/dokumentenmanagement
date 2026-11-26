@@ -135,6 +135,26 @@ public class WissenIngestSchritte {
         }
     }
 
+    @Angenommen("das Dokument «{word}» hat synthetische PDF-Seiten für die Auszugsprüfung")
+    public void pdfaMitSynthetischenSeiten(String name) throws SQLException {
+        Ort ort = ort(name);
+        UUID id = ort.id();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement anweisung = verbindung.prepareStatement("""
+                     update %s.dokument
+                     set volltext = ?, seiten = 2, s3_pdfa = ?, s3_version_pdfa = ?, pdfa_fehlt = false
+                     where id = ?
+                     """.formatted(schema(ort.mandant())))) {
+            anweisung.setString(1, "Kopfzeile: Fabel AG – interne Ausgabe\nSeite 1 ohne Beleg.\f"
+                    + "Kopfzeile: Fabel AG – interne Ausgabe\nDie fiktive Firma Fabel AG bietet "
+                    + "eine Zusatzoption zum Preis von CHF 125.00 pro Gerät.\f");
+            anweisung.setString(2, "synthetisch/" + id);
+            anweisung.setString(3, "synthetische-version");
+            anweisung.setObject(4, id);
+            assertThat(anweisung.executeUpdate()).isEqualTo(1);
+        }
+    }
+
     @Angenommen("das Dokument «{word}» hat ein Belegdatum")
     public void belegdatumSetzen(String name) throws SQLException {
         Ort ort = ort(name);
@@ -232,6 +252,21 @@ public class WissenIngestSchritte {
                 {"nr":2,"text":"Die Frist ist im April.","seiten":[1],
                 "auszug":"Dieser Auszug steht nicht im Dokument."}]}
                 """);
+        KiWireMock.zuruecksetzen();
+        KiWireMock.wissenFolge(antworten);
+    }
+
+    @Angenommen("WireMock liefert eine Kernaussage mit falscher Seitenangabe")
+    public void antwortMitFalscherSeitenangabe() {
+        List<String> antworten = new ArrayList<>();
+        antworten.add("{\"aussagen\":[]}");
+        antworten.add("""
+                {"aussagen":[{"nr":1,
+                "text":"Fabel AG bietet eine Zusatzoption für CHF 125.00.",
+                "seiten":[1],
+                "auszug":"Die fiktive Firma Fabel AG bietet eine Zusatzoption zum Preis von CHF 125.00 pro Gerät."}]}
+                """);
+        antworten.addAll(gueltigeAntworten(dokumente.values().iterator().next().id()).subList(1, 3));
         KiWireMock.zuruecksetzen();
         KiWireMock.wissenFolge(antworten);
     }
@@ -647,6 +682,13 @@ public class WissenIngestSchritte {
         var ansicht = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
                 .when().get("/api/v1/wissensentwuerfe/" + entwurfId).then().statusCode(200).extract().jsonPath();
         assertThat(ansicht.getList("kernaussagen.zugeordnet", Boolean.class)).containsExactly(true, false);
+    }
+
+    @Dann("die Kernaussage erhält die belegte PDF-Seite {int}")
+    public void belegteSeiteKorrigiert(int seite) {
+        var ansicht = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensentwuerfe/" + entwurfId).then().statusCode(200).extract().jsonPath();
+        assertThat(ansicht.getList("kernaussagen.seiten")).containsExactly(List.of(seite));
     }
 
     @Dann("der Ingest-Entwurf wird mit drei KI-Aufrufen «OFFEN»")

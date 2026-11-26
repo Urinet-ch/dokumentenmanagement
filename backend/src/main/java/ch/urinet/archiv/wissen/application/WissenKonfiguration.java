@@ -2,6 +2,7 @@ package ch.urinet.archiv.wissen.application;
 
 import ch.urinet.archiv.wissen.domain.WissenIngestGrenzen;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
@@ -10,6 +11,7 @@ public class WissenKonfiguration {
     private final String modell;
     private final WissenIngestGrenzen ingest;
 
+    @Inject
     public WissenKonfiguration(@ConfigProperty(name = "archiv.wissen.modell") String modell,
                                @ConfigProperty(name = "archiv.wissen.abschnitt-zeichen") int abschnittZeichen,
                                @ConfigProperty(name = "archiv.wissen.max-seiten") int maxSeiten,
@@ -17,13 +19,22 @@ public class WissenKonfiguration {
                                @ConfigProperty(name = "archiv.wissen.seite-max-zeichen") int seiteMaxZeichen,
                                @ConfigProperty(name = "archiv.wissen.werkzeug-max-zeichen") int werkzeugMaxZeichen,
                                @ConfigProperty(name = "archiv.wissen.budget-tokens") long budgetTokens,
-                               @ConfigProperty(name = "archiv.wissen.monatsbudget-tokens") long monatsbudgetTokens) {
+                               @ConfigProperty(name = "archiv.wissen.monatsbudget-tokens") long monatsbudgetTokens,
+                               @ConfigProperty(name = "archiv.wissen.auszug-mindest-zeichen") int auszugMindestZeichen,
+                               @ConfigProperty(name = "archiv.wissen.aussage-ueberlappung") double aussageUeberlappung) {
         if (modell == null || modell.isBlank()) {
             throw new IllegalStateException("archiv.wissen.modell muss gesetzt sein");
         }
         this.modell = modell.strip();
         this.ingest = new WissenIngestGrenzen(abschnittZeichen, maxSeiten, indexMaxZeichen, seiteMaxZeichen,
-                werkzeugMaxZeichen, budgetTokens, monatsbudgetTokens);
+                werkzeugMaxZeichen, budgetTokens, monatsbudgetTokens, auszugMindestZeichen, aussageUeberlappung);
+    }
+
+    public WissenKonfiguration(String modell, int abschnittZeichen, int maxSeiten, int indexMaxZeichen,
+                               int seiteMaxZeichen, int werkzeugMaxZeichen, long budgetTokens,
+                               long monatsbudgetTokens) {
+        this(modell, abschnittZeichen, maxSeiten, indexMaxZeichen, seiteMaxZeichen, werkzeugMaxZeichen,
+                budgetTokens, monatsbudgetTokens, 20, 0.5);
     }
 
     public String modell() {
