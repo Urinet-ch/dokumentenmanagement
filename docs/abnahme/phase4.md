@@ -26,7 +26,7 @@ automatisierte Prüfteil sind kein Abnahmenachweis.
 4. Im Verzeichnis `backend/` den manuellen Lauf starten:
 
    ```sh
-   mvn -ntp test -Dtest=WissenPrueflisteIT -Darchiv.wissen-pruefliste=true \
+   mvn -ntp test -Dtest=WissenPrueflisteIT -Dwissen-pruefliste=true \
      -Dquarkus.http.test-port=0
    ```
 

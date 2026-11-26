@@ -32,7 +32,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Manueller Gate-Lauf durch Fabian auf Stufe B; kein Aufruf in CI oder regulären Tests. */
-@EnabledIfSystemProperty(named = "archiv.wissen-pruefliste", matches = "true")
+@EnabledIfSystemProperty(named = "wissen-pruefliste", matches = "true")
 class WissenPrueflisteIT {
     private static final YAMLMapper YAML = YAMLMapper.builder().build();
     private static final JsonMapper JSON = JsonMapper.builder().build();
