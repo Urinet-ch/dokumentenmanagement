@@ -9,6 +9,7 @@
     "test": "ng test",
     "api:generieren": "node scripts/api-leeren.mjs && openapi-generator-cli generate -i openapi/openapi.yaml -g typescript-angular -o src/app/gemeinsam/api --additional-properties=ngVersion=22.2.6,fileNaming=kebab-case",
     "e2e": "cucumber-js",
+    "e2e:flaky": "cucumber-js --tags '@browser and @flaky' --retry 0",
     "pruefe:build-info": "node --test scripts/ng-build.test.mjs",
     "pruefe:gestaltung": "node --test scripts/pruefe-gestaltung.test.mjs && node scripts/pruefe-gestaltung.mjs"
   },

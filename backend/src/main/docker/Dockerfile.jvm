@@ -9,8 +9,9 @@ FROM eclipse-temurin:25.0.5.1_2-jre-noble@sha256:2ec98aa522c472deadfd2b7c5b39bca
 
 # OCRmyPDF mit Tesseract (deu, eng, osd für --rotate-pages), Ghostscript (PDF/A), img2pdf, libheif mit HEVC-Decoder
 # (heif-convert), poppler-utils (pdftotext, pdftoppm) und tini; die Versionsabfragen brechen den Build ab, falls eines fehlt
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+# Acquire::Retries: der Paketmirror antwortet auf den GitHub-Runnern gelegentlich nicht (CI-Läufe vom 26.11.2026)
+RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
         ocrmypdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng tesseract-ocr-osd \
         ghostscript img2pdf libheif-examples libheif-plugin-libde265 poppler-utils tini \
     && rm -rf /var/lib/apt/lists/* \
