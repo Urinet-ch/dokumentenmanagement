@@ -1612,6 +1612,14 @@ Rollback wirkungsgleich; das Vorwärts-Changeset ergänzt keine bereits aktive M
   Eigennamen, Tausendertrenner, Tabellenumbruch, Formatierung und Seitenkorrektur; WireMock-Szenario `@req-5.3` mit
   synthetischem Dokument.
 
+### Umsetzung (Aufgabe 19.2, 26.11.2026)
+`pdftotext` verwendet beim Volltext nun `-layout`, damit Spaltenpositionen und Zeilenumbrüche in Tabellen bis zum
+Wissens-Ingest erhalten bleiben. Der Kernaussagen-Prompt ordnet Tabellenzellen den Spaltentiteln zu, fasst Umbrüche
+zur selben Datenzeile zusammen, verbietet Aussagen aus Spaltentiteln allein und erhält Platzhalter wie «––».
+Nachweise: OCR-Adaptertest mit synthetischem PDF (Spalten Bezeichnung, Beschreibung und Preis; mehrzeilige Zelle und
+Platzhalter) sowie JUnit-Test, der den tabellenbewussten Prompt und den unveränderten Tabelleninhalt prüft. Keine
+Änderung an Requirements oder Datenbankschema.
+
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
 1. Lage zu Spec 03: Spec 04 wird nach Spec 03 umgesetzt, Wellen 13–16 (tasks.md). Der Nachtrag in

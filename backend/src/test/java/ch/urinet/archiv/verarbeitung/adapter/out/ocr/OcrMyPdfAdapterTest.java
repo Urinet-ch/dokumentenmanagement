@@ -111,7 +111,18 @@ class OcrMyPdfAdapterTest {
         assertThat(p.pdfa).isTrue();
         assertThat(p.ergebnis.ocrAusgefuehrt()).isFalse();
         assertThat(p.ergebnis.volltext()).contains("Textebene vorhanden");
+        assertThat(befehle.stream().filter(b -> b.programm().equals("pdftotext"))
+                .map(Befehl::argumente).toList()).anySatisfy(argumente -> assertThat(argumente).contains("-layout"));
         assertThat(ocrmypdf().argumente()).contains("--skip-text");
+    }
+
+    @Test
+    void tabellenzeilenBehaltenSpaltenbezugUmbruchUndPlatzhalter() throws Exception {
+        Pruefung p = verarbeiten(OcrEingabe.von(quelle(Quelltyp.PDF, OcrTestdateien.tabellenPdf())));
+
+        assertThat(p.ergebnis.volltext()).contains("Bezeichnung", "Beschreibung", "Preis", "Service A",
+                "Zusatzleistung mit", "mehrzeiliger Beschreibung", "––")
+                .containsPattern("(?m)^.*Service A\\s+Zusatzleistung mit\\s+––.*$");
     }
 
     /** Textebene nur aus Satzzeichen: pdftotext findet keinen Text, OCRmyPDF schon (Exit-Code 6) → mit --skip-text. */
