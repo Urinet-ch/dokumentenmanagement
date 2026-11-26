@@ -29,7 +29,7 @@ public final class Rechtematrix {
         zeile(Aktion.A2, ERLAUBT, ERLAUBT, ERLAUBT, ERLAUBT);
         zeile(Aktion.A3, ERLAUBT, NICHT_SICHTBAR, ERLAUBT, ERLAUBT);
         zeile(Aktion.A4, ERLAUBT, NUR_EIGENE, NUR_LESEND, ERLAUBT);
-        zeile(Aktion.A5, ERLAUBT, NUR_SELBST_ERFASSTE, VERBOTEN, ERLAUBT);
+        zeile(Aktion.A5, ERLAUBT, NUR_SELBST_ERFASSTE, NUR_LESEND, ERLAUBT);
         zeile(Aktion.A6, ERLAUBT, VERBOTEN, VERBOTEN, ERLAUBT);
         zeile(Aktion.A7, ERLAUBT, VERBOTEN, VERBOTEN, ERLAUBT);
         zeile(Aktion.A8, ERLAUBT, VERBOTEN, VERBOTEN, ERLAUBT);
