@@ -43,7 +43,7 @@ Buchungsbelege oder Geschäftsbücher nach GeBüV und nicht aufbewahrungspflicht
 ## Rollen und Protokollierung
 
 Die Rechtematrix unterscheidet Inhaber, Mitarbeitende, Treuhänder und Geschäftsstelle. Entscheidend sind Mandant,
-Vertraulichkeit und konkrete Aktion; Treuhänder lesen, bestätigen oder ändern aber nicht. Details und Ausnahmen
+Vertraulichkeit und konkrete Aktion; Treuhänder dürfen lesen, aber nicht bestätigen oder ändern. Details und Ausnahmen
 stehen in der verbindlichen Matrix ([Spec 01, Req 2.3 und 2.6](../.kiro/specs/01-archiv-kern/requirements.md)).
 
 Anzeigen, Herunterladen, Ändern, Bestätigen, Verwerfen, Export und verweigerte Zugriffe werden nach der Spec
