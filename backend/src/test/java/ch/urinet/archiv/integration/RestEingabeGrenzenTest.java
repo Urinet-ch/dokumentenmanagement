@@ -53,6 +53,7 @@ class RestEingabeGrenzenTest {
     void jedeJsonOperationMitBodyLehntUeberlangeAnfrageOhneEchoOderStacktraceAb() throws IOException {
         JsonNode openApi = JSON.readTree(OPENAPI.toFile());
         byte[] body = uebergrosseAnfrage();
+        String token = Testanmeldung.token("inhaber-urinet");
         List<String> geprueft = new ArrayList<>();
 
         try (LogMitschnitt logs = LogMitschnitt.starten()) {
@@ -64,7 +65,7 @@ class RestEingabeGrenzenTest {
 
                 String ziel = pfadMitBeispielwerten(pfad.getKey());
                 Response antwort = given()
-                        .auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                        .auth().oauth2(token)
                         .config(io.restassured.RestAssured.config().httpClient(
                                 io.restassured.config.HttpClientConfig.httpClientConfig()
                                         .setParam("http.protocol.expect-continue", true)))
@@ -90,6 +91,7 @@ class RestEingabeGrenzenTest {
             throws IOException, InterruptedException {
         JsonNode openApi = JSON.readTree(OPENAPI.toFile());
         List<String> geprueft = new ArrayList<>();
+        String token = Testanmeldung.token("inhaber-urinet");
         long grenze = ConfigProvider.getConfig().getValue("archiv.upload.max-anfrage", MemorySize.class)
                 .asLongValue();
         Path body = sparseAnfrage(grenze + 1);
@@ -110,7 +112,7 @@ class RestEingabeGrenzenTest {
                     String endpoint = operation.getKey().toUpperCase() + " " + pfad.getKey();
                     HttpRequest anfrage = HttpRequest.newBuilder(URI.create("http://localhost:" + RestAssured.port
                                     + pfadMitBeispielwerten(pfad.getKey())))
-                            .header("Authorization", "Bearer " + Testanmeldung.token("inhaber-urinet"))
+                            .header("Authorization", "Bearer " + token)
                             .header("Content-Type", MULTIPART + "; boundary=grenztest")
                             .expectContinue(true)
                             .timeout(Duration.ofSeconds(30))
@@ -135,6 +137,7 @@ class RestEingabeGrenzenTest {
     void jsonOperationenLehnenFalschenBodyTypOhneEchoOderStacktraceAb() throws IOException {
         JsonNode openApi = JSON.readTree(OPENAPI.toFile());
         List<String> geprueft = new ArrayList<>();
+        String token = Testanmeldung.token("inhaber-urinet");
         String body = "[\"" + MARKER + "\"]";
 
         try (LogMitschnitt logs = LogMitschnitt.starten()) {
@@ -149,7 +152,7 @@ class RestEingabeGrenzenTest {
 
                 String ziel = pfadMitBeispielwerten(pfad.getKey());
                 Response antwort = given()
-                        .auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                        .auth().oauth2(token)
                         .contentType("application/json")
                         .body(body)
                         .when().request(operation.getKey().toUpperCase(), ziel);
@@ -171,6 +174,7 @@ class RestEingabeGrenzenTest {
     void jsonFelderUeberschreitenIhreOpenApiMaxLengthGrenzeNichtUnbemerkt() throws IOException {
         JsonNode openApi = JSON.readTree(OPENAPI.toFile());
         List<String> geprueft = new ArrayList<>();
+        String token = Testanmeldung.token("inhaber-urinet");
 
         try (LogMitschnitt logs = LogMitschnitt.starten()) {
             openApi.path("paths").fields().forEachRemaining(pfad -> pfad.getValue().fields().forEachRemaining(operation -> {
@@ -192,7 +196,7 @@ class RestEingabeGrenzenTest {
                     int maxLength = grenze.asInt();
                     String body = JSON.valueToTree(Map.of(feld.getKey(), MARKER + "x".repeat(maxLength))).toString();
                     Response antwort = given()
-                            .auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                            .auth().oauth2(token)
                             .contentType("application/json")
                             .body(body)
                             .when().request(operation.getKey().toUpperCase(), pfadMitBeispielwerten(pfad.getKey()));
@@ -215,6 +219,7 @@ class RestEingabeGrenzenTest {
     void jsonListenLehnenUngueltigeElementtypenUndUeberschreitungenVonMaxItemsAb() throws IOException {
         JsonNode openApi = JSON.readTree(OPENAPI.toFile());
         List<String> geprueft = new ArrayList<>();
+        String token = Testanmeldung.token("inhaber-urinet");
 
         try (LogMitschnitt logs = LogMitschnitt.starten()) {
             openApi.path("paths").fields().forEachRemaining(pfad -> pfad.getValue().fields().forEachRemaining(operation -> {
@@ -240,7 +245,7 @@ class RestEingabeGrenzenTest {
                     } else {
                         arrayFeld(falscherTyp, array).add(MARKER);
                     }
-                    Response typAntwort = jsonAnfrage(operation.getKey(), pfad.getKey(), falscherTyp);
+                    Response typAntwort = jsonAnfrage(token, operation.getKey(), pfad.getKey(), falscherTyp);
                     geprueft.add(endpoint + " Typ");
                     assertThat(typAntwort.statusCode()).as(endpoint + " muss den Elementtyp ablehnen")
                             .isIn(400, 403, 413, 422);
@@ -254,7 +259,7 @@ class RestEingabeGrenzenTest {
                         for (int i = 0; i <= maxItems.asInt(); i++) {
                             werte.add(gueltigerArraywert(items));
                         }
-                        Response mengeAntwort = jsonAnfrage(operation.getKey(), pfad.getKey(), zuViele);
+                        Response mengeAntwort = jsonAnfrage(token, operation.getKey(), pfad.getKey(), zuViele);
                         geprueft.add(endpoint + " maxItems");
                         assertThat(mengeAntwort.statusCode()).as(endpoint + " muss maxItems anwenden")
                                 .isIn(400, 403, 413, 422);
@@ -273,6 +278,7 @@ class RestEingabeGrenzenTest {
     void numerischeQueryParameterLehnenUngueltigeTypenOhneStacktraceAb() throws IOException {
         JsonNode openApi = JSON.readTree(OPENAPI.toFile());
         List<String> geprueft = new ArrayList<>();
+        String token = Testanmeldung.token("inhaber-urinet");
 
         try (LogMitschnitt logs = LogMitschnitt.starten()) {
             openApi.path("paths").fields().forEachRemaining(pfad -> {
@@ -289,7 +295,7 @@ class RestEingabeGrenzenTest {
                     String name = parameter.path("name").asText();
                     String ziel = pfadMitBeispielwerten(pfad.getKey());
                     Response antwort = given()
-                            .auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                            .auth().oauth2(token)
                             .queryParam(name, MARKER)
                             .when().get(ziel);
 
@@ -299,6 +305,21 @@ class RestEingabeGrenzenTest {
                             .isIn(400, 403);
                     assertThat(antwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
                             .doesNotContain(MARKER, "Exception", "at ch.urinet");
+
+                    JsonNode maximum = parameter.path("schema").path("maximum");
+                    if (maximum.canConvertToLong()) {
+                        long zuGross = maximum.asLong() + 1;
+                        Response grenzAntwort = given()
+                                .auth().oauth2(token)
+                                .queryParam(name, zuGross)
+                                .when().get(ziel);
+
+                        geprueft.add(endpoint + " max");
+                        assertThat(grenzAntwort.statusCode()).as(endpoint + " muss den Maximalwert anwenden")
+                                .isIn(400, 403, 404, 413, 422);
+                        assertThat(grenzAntwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
+                                .doesNotContain("Exception", "at ch.urinet");
+                    }
                 });
             });
 
@@ -384,9 +405,9 @@ class RestEingabeGrenzenTest {
         };
     }
 
-    private static Response jsonAnfrage(String methode, String pfad, ObjectNode body) {
+    private static Response jsonAnfrage(String token, String methode, String pfad, ObjectNode body) {
         return given()
-                .auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .auth().oauth2(token)
                 .contentType("application/json")
                 .body(body.toString())
                 .when().request(methode.toUpperCase(), pfadMitBeispielwerten(pfad));
