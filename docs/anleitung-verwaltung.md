@@ -94,8 +94,8 @@ Abweichungscodes: `MEHRERE_ROLLEN` (keine oder mehrere Archiv-Rollen), `KEIN_MAN
 fehlt oder ist mehrwertig), `FREMDE_ROLLE` (Rolle ausserhalb der vier), `BENUTZER_FEHLT`, `ROLLE_OHNE_VORGANG`, `VORGANG_OFFEN`.
 **[offen:** Die genaue Bedeutung von `ROLLE_OHNE_VORGANG`, `BENUTZER_FEHLT` und `VORGANG_OFFEN` und das Vorgehen je Code
 legt die Spec nicht fest; im Verwaltungsprotokoll und in Keycloak prüfen.**]** Die Migration der heutigen Benutzer
-(`archiv benutzer abgleichen urinet --pruefen`, danach ohne `--pruefen`) ist Aufgabe 21.2 und liegt beim Betreiber; ihr Ergebnis
-steht in `docs/abnahme/verwaltung.md`.
+(`archiv benutzer abgleichen urinet --pruefen`, danach ohne `--pruefen`) ist Aufgabe 21.2 und liegt beim Betreiber;
+das Ergebnis wird als geschützter Betriebsnachweis ausserhalb des Repositorys festgehalten.
 Ein nicht ausgeführter [Entwurf für Vorbereitung, Prüflauf und Rückfall](benutzer-migration-entwurf.md) unterstützt
 den Betreiber bei 21.2; er ersetzt weder die Freigabe noch den manuellen Betriebsnachweis.
 

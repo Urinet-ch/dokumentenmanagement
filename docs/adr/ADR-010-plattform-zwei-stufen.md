@@ -26,7 +26,7 @@
 2. **Netz:** Am Netz «web» hängen nur `archiv-api` und `archiv-keycloak`; Datenbank, Worker und
    Sicherung bleiben intern. Öffentlich nur `archiv.apps.urinet.ch` (ohne `/q/*` ausser
    `/q/health/live`) und `archiv-auth.apps.urinet.ch` (nur `/realms/`, `/resources/`) (P15).
-3. **Deploy nur über `.github/workflows/deploy.yml`:** `mvn verify`, Images bauen, Bundle per SSH
+3. **Deploy nur über `.github/workflows/infomaniak-deploy.yml`:** `mvn verify`, Images bauen, Bundle per SSH
    an den Deploy-Befehl der VPS, Health-Prüfung; schlägt sie fehl, Rollback auf das
    Vorgänger-Image ohne Rückbau der Datenbank (Migrationen rückwärtskompatibel, Req 16.11,
    ADR-002). Kein manuelles `docker compose up`.
