@@ -29,9 +29,11 @@ import ch.urinet.archiv.kontakt.application.KontaktVerweise;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
 import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
+import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiVerwaltung;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
 import ch.urinet.archiv.konfiguration.domain.ArtKlassifikation;
 import ch.urinet.archiv.konfiguration.domain.Klassifikation;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.konfiguration.domain.KonfigurationsVersion;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -88,6 +90,7 @@ class FehlerInjektionTest {
     @Inject DokumentAendern dokumentAendern;
     @Inject DokumentartVerwaltung dokumentarten;
     @Inject KonfigurationVerwaltung konfiguration;
+    @Inject KonfigurationsdateiVerwaltung konfigurationsdatei;
     @Inject KlassifikationVerwaltung klassifikationen;
     @Inject VollstaendigkeitAbfrage vollstaendigkeit;
 
@@ -135,6 +138,69 @@ class FehlerInjektionTest {
             for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
         } finally {
             QuarkusMock.installMockForType(original, VollstaendigkeitAbfrage.class);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void konfigurationsdateiBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) {
+        record Probe(String token, String datei) { }
+        List<Probe> proben = new ArrayList<>();
+        for (String mandant : List.of("urinet", "vhf-gsk")) {
+            String token = Testanmeldung.token("inhaber-" + mandant);
+            var export = given().auth().oauth2(token).when().get("/api/v1/konfiguration");
+            assertThat(export.statusCode()).isEqualTo(200);
+            String datei = export.asString();
+            given().auth().oauth2(token).when().get("/api/v1/konfiguration/ki-texte").then().statusCode(200);
+            for (String aktion : List.of("pruefen", "vergleichen")) {
+                var analyse = given().auth().oauth2(token).contentType("application/json").body(datei)
+                        .when().post("/api/v1/konfiguration/" + aktion);
+                assertThat(analyse.statusCode()).isEqualTo(200);
+                assertThat(analyse.jsonPath().getBoolean("gueltig")).isTrue();
+            }
+            proben.add(new Probe(token, datei));
+        }
+        KonfigurationsdateiVerwaltung original = ClientProxy.unwrap(konfigurationsdatei);
+        AtomicInteger getroffen = new AtomicInteger();
+        QuarkusMock.installMockForType(new KonfigurationsdateiVerwaltung(
+                null, null, null, null, null, null, null, null, null, null, null, null) {
+            private IllegalStateException ausfall() {
+                getroffen.incrementAndGet();
+                return fehler(ausfall);
+            }
+
+            @Override
+            public Export exportieren() { throw ausfall(); }
+
+            @Override
+            public Analyse pruefen(String text) { throw ausfall(); }
+
+            @Override
+            public Analyse vergleichen(String text) { throw ausfall(); }
+
+            @Override
+            public Konfiguration.KiTexte kiTexte() { throw ausfall(); }
+        }, KonfigurationsdateiVerwaltung.class);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (Probe probe : proben) {
+                List<io.restassured.response.Response> antworten = new ArrayList<>();
+                antworten.add(given().auth().oauth2(probe.token()).when().get("/api/v1/konfiguration"));
+                antworten.add(given().auth().oauth2(probe.token()).when().get("/api/v1/konfiguration/ki-texte"));
+                for (String aktion : List.of("pruefen", "vergleichen")) {
+                    antworten.add(given().auth().oauth2(probe.token()).contentType("application/json")
+                            .body(probe.datei()).when().post("/api/v1/konfiguration/" + aktion));
+                }
+                for (var antwort : antworten) {
+                    assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                    assertThat(antwort.asString())
+                            .doesNotContain(MARKER, probe.token(), "Exception", "\tat ", "Caused by:");
+                }
+            }
+            assertThat(getroffen).hasValue(8);
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+            for (Probe probe : proben) assertThat(log.volltext()).doesNotContain(probe.token());
+        } finally {
+            QuarkusMock.installMockForType(original, KonfigurationsdateiVerwaltung.class);
         }
     }
 
