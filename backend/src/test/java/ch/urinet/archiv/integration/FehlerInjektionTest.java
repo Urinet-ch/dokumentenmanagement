@@ -20,6 +20,8 @@ import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteReihe;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
+import ch.urinet.archiv.ki.application.chat.VollstaendigkeitAbfrage;
+import ch.urinet.archiv.ki.application.chat.WerkzeugKontext;
 import ch.urinet.archiv.kontakt.application.KontaktSeite;
 import ch.urinet.archiv.kontakt.application.KontaktSuche;
 import ch.urinet.archiv.kontakt.application.KontaktVerwaltung;
@@ -87,6 +89,7 @@ class FehlerInjektionTest {
     @Inject DokumentartVerwaltung dokumentarten;
     @Inject KonfigurationVerwaltung konfiguration;
     @Inject KlassifikationVerwaltung klassifikationen;
+    @Inject VollstaendigkeitAbfrage vollstaendigkeit;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -100,6 +103,38 @@ class FehlerInjektionTest {
                     if (!zeilen.next()) provisionierung.anlegen(code, null, null);
                 }
             }
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void lueckenberichtBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) {
+        List<String> tokens = List.of(Testanmeldung.token("inhaber-urinet"), Testanmeldung.token("inhaber-vhf-gsk"));
+        for (String token : tokens) {
+            given().auth().oauth2(token).queryParam("geschaeftsjahr", 2025)
+                    .when().get("/api/v1/berichte/luecken").then().statusCode(200);
+        }
+        VollstaendigkeitAbfrage original = ClientProxy.unwrap(vollstaendigkeit);
+        AtomicInteger getroffen = new AtomicInteger();
+        QuarkusMock.installMockForType(new VollstaendigkeitAbfrage(null, null, null) {
+            @Override
+            public Antwort vollstaendigkeit(WerkzeugKontext kontext, Integer geschaeftsjahr) {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+        }, VollstaendigkeitAbfrage.class);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (String token : tokens) {
+                var antwort = given().auth().oauth2(token).queryParam("geschaeftsjahr", 2025)
+                        .when().get("/api/v1/berichte/luecken");
+                assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+            }
+            assertThat(getroffen).hasValue(2);
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+            for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
+        } finally {
+            QuarkusMock.installMockForType(original, VollstaendigkeitAbfrage.class);
         }
     }
 
