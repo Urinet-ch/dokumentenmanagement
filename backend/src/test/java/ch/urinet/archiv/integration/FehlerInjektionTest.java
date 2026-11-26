@@ -2,7 +2,10 @@ package ch.urinet.archiv.integration;
 
 import ch.urinet.archiv.ablage.S3Stoerung;
 import ch.urinet.archiv.dokument.Testdateien;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.dokument.adapter.out.persistence.PanacheDokumentSuche;
+import ch.urinet.archiv.dokument.application.Aenderung;
+import ch.urinet.archiv.dokument.application.DokumentAendern;
 import ch.urinet.archiv.dokument.application.DokumentLesen;
 import ch.urinet.archiv.dokument.application.Seite;
 import ch.urinet.archiv.dokument.domain.Dokument;
@@ -54,6 +57,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,6 +74,7 @@ class FehlerInjektionTest {
     @Inject WebseitenSchluesselVerwaltung schluesselVerwaltung;
     @Inject KontaktVerwaltung kontaktVerwaltung;
     @Inject DokumentLesen dokumentLesen;
+    @Inject DokumentAendern dokumentAendern;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -357,6 +362,73 @@ class FehlerInjektionTest {
                     s.executeUpdate();
                 }
             }
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void dokumentBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) throws Exception {
+        record Probe(String mandant, String token, UUID id, String etag) { }
+        List<Probe> proben = new ArrayList<>();
+        try {
+            for (String mandant : List.of("urinet", "vhf-gsk")) {
+                String token = Testanmeldung.token("inhaber-" + mandant);
+                UUID id = Testdokumente.anlegen(datenbank, new Testdokumente.Angaben(
+                        mandant, null, "NORMAL", false, "probe", null, "EINGANGSKORB"));
+                proben.add(new Probe(mandant, token, id, null));
+                String pfad = "/api/v1/dokumente/" + id;
+                var gelesen = given().auth().oauth2(token).when().get(pfad);
+                assertThat(gelesen.statusCode()).isEqualTo(200);
+                var geaendert = given().auth().oauth2(token).header("If-Match", gelesen.header("ETag"))
+                        .contentType("application/json").body("{\"titel\":\"Probe\"}").when().patch(pfad);
+                assertThat(geaendert.statusCode()).isEqualTo(200);
+                proben.set(proben.size() - 1, new Probe(mandant, token, id, geaendert.header("ETag")));
+            }
+            DokumentLesen originalesLesen = ClientProxy.unwrap(dokumentLesen);
+            DokumentAendern originalesAendern = ClientProxy.unwrap(dokumentAendern);
+            AtomicInteger gelesen = new AtomicInteger();
+            AtomicInteger geaendert = new AtomicInteger();
+            QuarkusMock.installMockForType(new DokumentLesen(null, null, null, null, null, null, null, null, null) {
+                @Override
+                public Ansicht ansicht(Benutzer benutzer, UUID id) {
+                    gelesen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+            }, DokumentLesen.class);
+            try {
+                QuarkusMock.installMockForType(new DokumentAendern(null, null, null, null, null, null, null,
+                        null, null, null, null, null, null) {
+                    @Override
+                    public int aendern(Benutzer benutzer, UUID id, int version, Supplier<Aenderung> angaben) {
+                        geaendert.incrementAndGet();
+                        throw fehler(ausfall);
+                    }
+                }, DokumentAendern.class);
+                try (LogMitschnitt log = LogMitschnitt.starten()) {
+                    for (Probe probe : proben) {
+                        String pfad = "/api/v1/dokumente/" + probe.id();
+                        var detail = given().auth().oauth2(probe.token()).when().get(pfad);
+                        var patch = given().auth().oauth2(probe.token()).header("If-Match", probe.etag())
+                                .contentType("application/json").body("{\"titel\":\"" + MARKER + "\"}")
+                                .when().patch(pfad);
+                        for (var antwort : List.of(detail, patch)) {
+                            assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                            assertThat(antwort.asString())
+                                    .doesNotContain(MARKER, probe.token(), "Exception", "\tat ", "Caused by:");
+                        }
+                    }
+                    assertThat(gelesen).hasValue(2);
+                    assertThat(geaendert).hasValue(2);
+                    assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+                    for (Probe probe : proben) assertThat(log.volltext()).doesNotContain(probe.token());
+                } finally {
+                    QuarkusMock.installMockForType(originalesAendern, DokumentAendern.class);
+                }
+            } finally {
+                QuarkusMock.installMockForType(originalesLesen, DokumentLesen.class);
+            }
+        } finally {
+            for (Probe probe : proben) Testdokumente.loeschen(datenbank, probe.mandant(), List.of(probe.id()));
         }
     }
 
