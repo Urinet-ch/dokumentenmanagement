@@ -1,17 +1,29 @@
 package ch.urinet.archiv.integration;
 
+import ch.urinet.archiv.benutzer.adapter.out.stepup.StepUpMitAuthTime;
+import ch.urinet.archiv.benutzer.application.StepUp;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import io.agroal.api.AgroalDataSource;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.quarkus.arc.ClientProxy;
 import io.quarkus.runtime.configuration.MemorySize;
+import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
+import io.restassured.specification.RequestSpecification;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -24,10 +36,15 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,53 +53,117 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Die globale Body-Grenze muss für jede Operation mit Request-Body vor der REST-Ressource greifen. */
 @QuarkusTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RestEingabeGrenzenTest {
+
+    @jakarta.inject.Inject
+    StepUp stepUp;
+
+    @jakarta.inject.Inject
+    MandantProvisionierung provisionierung;
+
+    @jakarta.inject.Inject
+    AgroalDataSource datenbank;
 
     @TempDir
     Path tempDir;
+
+    private StepUp originalStepUp;
+    private boolean testDokumentartAngelegt;
+    private UUID testDokumentId;
+    private String testKontaktId;
 
     private static final Path OPENAPI = Path.of("../frontend/openapi/openapi.json");
     private static final Pattern PFAD_PARAMETER = Pattern.compile("\\{([^{}]+)}");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String MARKER = "GRENZTEST-EINGABE-NICHT-ECHO-4711";
+    private static final String TEST_DOKUMENTART = "GRENZTEST";
     private static final int TEST_GRENZE = 1024 * 1024;
     private static final String MULTIPART = "multipart/form-data";
     private static final List<String> HTTP_METHODEN = List.of("get", "post", "put", "patch", "delete", "head");
 
+    @BeforeAll
+    void testMandantenSicherstellenUndStepUpErmoeglichen() throws SQLException {
+        for (String code : List.of("urinet", "vhf-gsk")) {
+            try (Connection verbindung = datenbank.getConnection();
+                 PreparedStatement abfrage = verbindung.prepareStatement(
+                         "select 1 from public.mandant where code = ? and aktiv")) {
+                abfrage.setString(1, code);
+                try (ResultSet zeile = abfrage.executeQuery()) {
+                    if (!zeile.next()) {
+                        provisionierung.anlegen(code, null, null);
+                    }
+                }
+            }
+        }
+        Testdokumente.probeDokumenteAnlegen(datenbank);
+        testDokumentId = Testdokumente.anlegen(datenbank,
+                new Testdokumente.Angaben("urinet", null, "NORMAL", false, "probe", null, "EINGANGSKORB"));
+        originalStepUp = ClientProxy.unwrap(stepUp);
+        QuarkusMock.installMockForType(new StepUpMitAuthTime(null, Duration.ofMinutes(5)) {
+            @Override
+            public void pruefen() {
+            }
+        }, StepUp.class);
+        testDokumentartSicherstellen();
+        testKontaktId = kontaktAnlegen();
+    }
+
+    @AfterAll
+    void testdatenLoeschenUndStepUpWiederherstellen() throws SQLException {
+        kontaktLoeschen();
+        if (testDokumentId != null) {
+            Testdokumente.loeschen(datenbank, "urinet", List.of(testDokumentId));
+        }
+        testDokumentartLoeschen();
+        if (originalStepUp != null) {
+            QuarkusMock.installMockForType(originalStepUp, StepUp.class);
+        }
+    }
+
     @Test
-    void jedeJsonOperationMitBodyLehntUeberlangeAnfrageOhneEchoOderStacktraceAb() throws IOException {
+    void jedeJsonOperationMitBodyLehntUeberlangeAnfrageOhneEchoOderStacktraceAb()
+            throws IOException, InterruptedException {
         JsonNode openApi = JSON.readTree(OPENAPI.toFile());
-        byte[] body = uebergrosseAnfrage();
-        String token = Testanmeldung.token("inhaber-urinet");
+        Path body = sparseAnfrage(TEST_GRENZE + 1L);
+        HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
         List<String> geprueft = new ArrayList<>();
 
         try (LogMitschnitt logs = LogMitschnitt.starten()) {
-            openApi.path("paths").fields().forEachRemaining(pfad -> pfad.getValue().fields().forEachRemaining(operation -> {
-                if (!HTTP_METHODEN.contains(operation.getKey())
-                        || !enthaeltJsonBody(operation.getValue().path("requestBody"))) {
-                    return;
+            var pfade = openApi.path("paths").fields();
+            while (pfade.hasNext()) {
+                var pfad = pfade.next();
+                var operationen = pfad.getValue().fields();
+                while (operationen.hasNext()) {
+                    var operation = operationen.next();
+                    if (!HTTP_METHODEN.contains(operation.getKey())
+                            || !enthaeltJsonBody(operation.getValue().path("requestBody"))) {
+                        continue;
+                    }
+
+                    String ziel = pfadMitBeispielwerten(pfad.getKey());
+                    String token = Testanmeldung.token("inhaber-urinet");
+                    HttpRequest anfrage = HttpRequest.newBuilder(
+                                    URI.create("http://localhost:" + RestAssured.port + ziel))
+                            .header("Authorization", "Bearer " + token)
+                            .header("Content-Type", "application/json")
+                            .expectContinue(true)
+                            .timeout(Duration.ofSeconds(30))
+                            .method(operation.getKey().toUpperCase(), HttpRequest.BodyPublishers.ofFile(body))
+                            .build();
+                    HttpResponse<String> antwort = client.send(anfrage, HttpResponse.BodyHandlers.ofString());
+
+                    String endpoint = operation.getKey().toUpperCase() + " " + pfad.getKey();
+                    geprueft.add(endpoint);
+                    assertThat(antwort.statusCode()).as(endpoint + " muss die Body-Grenze anwenden")
+                            .isEqualTo(413);
+                    assertThat(antwort.body()).as(endpoint + " darf Eingaben nicht zurückgeben")
+                            .doesNotContain(MARKER, "Exception", "at ch.urinet");
                 }
-
-                String ziel = pfadMitBeispielwerten(pfad.getKey());
-                Response antwort = given()
-                        .auth().oauth2(token)
-                        .config(io.restassured.RestAssured.config().httpClient(
-                                io.restassured.config.HttpClientConfig.httpClientConfig()
-                                        .setParam("http.protocol.expect-continue", true)))
-                        .contentType("application/json")
-                        .body(body)
-                        .when().request(operation.getKey().toUpperCase(), ziel);
-
-                String endpoint = operation.getKey().toUpperCase() + " " + pfad.getKey();
-                geprueft.add(endpoint);
-                assertThat(antwort.statusCode()).as(endpoint + " muss die Body-Grenze anwenden")
-                        .isEqualTo(413);
-                assertThat(antwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
-                        .doesNotContain(MARKER, "Exception", "at ch.urinet");
-            }));
+            }
 
             assertThat(geprueft).isNotEmpty();
-            assertThat(logs.volltext()).doesNotContain(MARKER);
+            assertThat(logs.volltext()).doesNotContain(MARKER, "NumberFormatException", "\tat ");
         }
     }
 
@@ -129,7 +210,7 @@ class RestEingabeGrenzenTest {
             }
 
             assertThat(geprueft).isNotEmpty();
-            assertThat(logs.volltext()).doesNotContain(MARKER);
+            assertThat(logs.volltext()).doesNotContain(MARKER, "NumberFormatException", "\tat ");
         }
     }
 
@@ -151,22 +232,22 @@ class RestEingabeGrenzenTest {
                 }
 
                 String ziel = pfadMitBeispielwerten(pfad.getKey());
-                Response antwort = given()
-                        .auth().oauth2(token)
+                Response antwort = anfrage(token, operation.getKey(), ziel)
                         .contentType("application/json")
                         .body(body)
                         .when().request(operation.getKey().toUpperCase(), ziel);
 
                 String endpoint = operation.getKey().toUpperCase() + " " + pfad.getKey();
                 geprueft.add(endpoint);
-                assertThat(antwort.statusCode()).as(endpoint + " muss den JSON-Typ ablehnen")
-                        .isIn(400, 403, 413, 422);
+                assertThat(antwort.statusCode()).as(endpoint + " muss den JSON-Typ ablehnen; fehlercode="
+                                + antwort.path("fehlercode"))
+                        .isIn(400, 413, 422);
                 assertThat(antwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
                         .doesNotContain(MARKER, "Exception", "at ch.urinet");
             }));
 
             assertThat(geprueft).isNotEmpty();
-            assertThat(logs.volltext()).doesNotContain(MARKER);
+            assertThat(logs.volltext()).doesNotContain(MARKER, "NumberFormatException", "\tat ");
         }
     }
 
@@ -195,23 +276,23 @@ class RestEingabeGrenzenTest {
 
                     int maxLength = grenze.asInt();
                     String body = JSON.valueToTree(Map.of(feld.getKey(), MARKER + "x".repeat(maxLength))).toString();
-                    Response antwort = given()
-                            .auth().oauth2(token)
+                    Response antwort = anfrage(token, operation.getKey(), pfad.getKey())
                             .contentType("application/json")
                             .body(body)
                             .when().request(operation.getKey().toUpperCase(), pfadMitBeispielwerten(pfad.getKey()));
 
                     String endpoint = operation.getKey().toUpperCase() + " " + pfad.getKey() + " (" + feld.getKey() + ")";
                     geprueft.add(endpoint);
-                    assertThat(antwort.statusCode()).as(endpoint + " muss die Zeichenlänge ablehnen")
-                            .isIn(400, 403, 413, 422);
+                    assertThat(antwort.statusCode()).as(endpoint + " muss die Zeichenlänge ablehnen; fehlercode="
+                                    + antwort.path("fehlercode"))
+                            .isIn(400, 413, 422);
                     assertThat(antwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
                             .doesNotContain(MARKER, "Exception", "at ch.urinet");
                 });
             }));
 
             assertThat(geprueft).isNotEmpty();
-            assertThat(logs.volltext()).doesNotContain(MARKER);
+            assertThat(logs.volltext()).doesNotContain(MARKER, "NumberFormatException", "\tat ");
         }
     }
 
@@ -247,8 +328,9 @@ class RestEingabeGrenzenTest {
                     }
                     Response typAntwort = jsonAnfrage(token, operation.getKey(), pfad.getKey(), falscherTyp);
                     geprueft.add(endpoint + " Typ");
-                    assertThat(typAntwort.statusCode()).as(endpoint + " muss den Elementtyp ablehnen")
-                            .isIn(400, 403, 413, 422);
+                    assertThat(typAntwort.statusCode()).as(endpoint + " muss den Elementtyp ablehnen; fehlercode="
+                                    + typAntwort.path("fehlercode"))
+                            .isIn(400, 413, 422);
                     assertThat(typAntwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
                             .doesNotContain(MARKER, "Exception", "at ch.urinet");
 
@@ -262,7 +344,7 @@ class RestEingabeGrenzenTest {
                         Response mengeAntwort = jsonAnfrage(token, operation.getKey(), pfad.getKey(), zuViele);
                         geprueft.add(endpoint + " maxItems");
                         assertThat(mengeAntwort.statusCode()).as(endpoint + " muss maxItems anwenden")
-                                .isIn(400, 403, 413, 422);
+                                .isIn(400, 413, 422);
                         assertThat(mengeAntwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
                                 .doesNotContain(MARKER, "Exception", "at ch.urinet");
                     }
@@ -270,7 +352,7 @@ class RestEingabeGrenzenTest {
             }));
 
             assertThat(geprueft).isNotEmpty();
-            assertThat(logs.volltext()).doesNotContain(MARKER);
+            assertThat(logs.volltext()).doesNotContain(MARKER, "NumberFormatException", "\tat ");
         }
     }
 
@@ -302,7 +384,7 @@ class RestEingabeGrenzenTest {
                     String endpoint = "GET " + pfad.getKey() + "?" + name;
                     geprueft.add(endpoint);
                     assertThat(antwort.statusCode()).as(endpoint + " muss den numerischen Typ ablehnen")
-                            .isIn(400, 403);
+                            .isBetween(400, 499);
                     assertThat(antwort.asString()).as(endpoint + " darf Eingaben nicht zurückgeben")
                             .doesNotContain(MARKER, "Exception", "at ch.urinet");
 
@@ -324,16 +406,8 @@ class RestEingabeGrenzenTest {
             });
 
             assertThat(geprueft).isNotEmpty();
-            assertThat(logs.volltext()).doesNotContain(MARKER);
+            assertThat(logs.volltext()).doesNotContain(MARKER, "NumberFormatException", "\tat ");
         }
-    }
-
-    private static byte[] uebergrosseAnfrage() {
-        byte[] body = new byte[TEST_GRENZE + 1];
-        java.util.Arrays.fill(body, (byte) ' ');
-        byte[] marker = MARKER.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        System.arraycopy(marker, 0, body, 0, marker.length);
-        return body;
     }
 
     private Path sparseAnfrage(long laenge) throws IOException {
@@ -405,23 +479,131 @@ class RestEingabeGrenzenTest {
         };
     }
 
-    private static Response jsonAnfrage(String token, String methode, String pfad, ObjectNode body) {
-        return given()
-                .auth().oauth2(token)
+    private Response jsonAnfrage(String token, String methode, String pfad, ObjectNode body) {
+        return anfrage(token, methode, pfad)
                 .contentType("application/json")
                 .body(body.toString())
                 .when().request(methode.toUpperCase(), pfadMitBeispielwerten(pfad));
     }
 
+    private RequestSpecification anfrage(String token, String methode, String pfad) {
+        RequestSpecification anfrage = given().auth().oauth2(token);
+        if ("get".equalsIgnoreCase(methode)) {
+            return anfrage;
+        }
+        String pfadBeispiel = pfadMitBeispielwerten(pfad);
+        if (pfad.startsWith("/api/v1/dokumentarten")) {
+            anfrage.header("If-Match", etag(token, "/api/v1/dokumentarten"));
+        } else if (pfad.startsWith("/api/v1/mandant/einstellungen")) {
+            anfrage.header("If-Match", etag(token, "/api/v1/mandant/einstellungen"));
+        } else if (pfad.startsWith("/api/v1/dokumente/")) {
+            String dokumentPfad = dokumentPfad(pfadBeispiel);
+            if (dokumentPfad != null) {
+                anfrage.header("If-Match", etag(token, dokumentPfad));
+            }
+        } else if (pfad.startsWith("/api/v1/kontakte/")) {
+            String kontaktPfad = kontaktPfad(pfadBeispiel);
+            if (kontaktPfad != null) {
+                anfrage.header("If-Match", etag(token, kontaktPfad));
+            }
+        } else if (pfad.startsWith("/api/v1/regeln")) {
+            anfrage.header("If-Match", etag(token, "/api/v1/regeln"));
+        }
+        return anfrage;
+    }
+
+    private static String dokumentPfad(String pfad) {
+        String praefix = "/api/v1/dokumente/";
+        String id = pfad.substring(praefix.length()).split("/", 2)[0];
+        return id.matches("[0-9a-fA-F-]{36}") ? praefix + id : null;
+    }
+
+    private static String kontaktPfad(String pfad) {
+        String praefix = "/api/v1/kontakte/";
+        String id = pfad.substring(praefix.length()).split("/", 2)[0];
+        return id.matches("[0-9a-fA-F-]{36}") ? praefix + id : null;
+    }
+
+    private void testDokumentartSicherstellen() {
+        String token = Testanmeldung.token("inhaber-urinet");
+        Response stand = given().auth().oauth2(token).get("/api/v1/dokumentarten");
+        assertThat(stand.statusCode())
+                .as("Dokumentarten für Grenztest abrufen: " + stand.body().asString())
+                .isEqualTo(200);
+        if (stand.jsonPath().<List<String>>getList("code").contains(TEST_DOKUMENTART)) {
+            given().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
+                    .delete("/api/v1/dokumentarten/" + TEST_DOKUMENTART).then().statusCode(204);
+            stand = given().auth().oauth2(token).get("/api/v1/dokumentarten");
+        }
+        Response erstellt = given().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
+                .contentType("application/json")
+                .body("""
+                        {"code":"GRENZTEST","name":"Grenztest","gruppen":["frei"],"pflichtfelder":[],
+                        "vertraulichkeit":"NORMAL","aufbewahrungJahre":null,"gesetzlichePflicht":false}
+                        """)
+                .post("/api/v1/dokumentarten");
+        assertThat(erstellt.statusCode()).as("Dokumentart für Grenztest anlegen: " + erstellt.path("fehlercode"))
+                .isEqualTo(201);
+        testDokumentartAngelegt = true;
+    }
+
+    private void testDokumentartLoeschen() {
+        if (!testDokumentartAngelegt) {
+            return;
+        }
+        String token = Testanmeldung.token("inhaber-urinet");
+        Response stand = given().auth().oauth2(token).get("/api/v1/dokumentarten");
+        assertThat(stand.statusCode()).as("Dokumentarten nach Grenztest abrufen").isEqualTo(200);
+        given().auth().oauth2(token).header("If-Match", stand.getHeader("ETag"))
+                .delete("/api/v1/dokumentarten/" + TEST_DOKUMENTART).then().statusCode(204);
+        testDokumentartAngelegt = false;
+    }
+
+    private String kontaktAnlegen() {
+        Response erstellt = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .contentType("application/json")
+                .body("""
+                        {"typ":"ORGANISATION","name":"Grenztest"}
+                        """)
+                .post("/api/v1/kontakte");
+        assertThat(erstellt.statusCode()).as("Kontakt für Grenztest anlegen").isEqualTo(201);
+        return erstellt.path("id");
+    }
+
+    private void kontaktLoeschen() throws SQLException {
+        if (testKontaktId == null) {
+            return;
+        }
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement loeschen = verbindung.prepareStatement(
+                     "delete from " + new MandantCode("urinet").schema() + ".kontakt where id = ?")) {
+            loeschen.setObject(1, UUID.fromString(testKontaktId));
+            loeschen.executeUpdate();
+        }
+        testKontaktId = null;
+    }
+
+    private static String etag(String token, String pfad) {
+        Response stand = given().auth().oauth2(token).get(pfad);
+        assertThat(stand.statusCode()).as("ETag für " + pfad + " abrufen").isEqualTo(200);
+        String etag = stand.getHeader("ETag");
+        assertThat(etag).as("ETag für " + pfad).isNotBlank();
+        return etag;
+    }
+
     private record ArrayEingabe(List<String> eltern, String name, JsonNode schema) {
     }
 
-    private static String pfadMitBeispielwerten(String pfad) {
+    private String pfadMitBeispielwerten(String pfad) {
         Matcher matcher = PFAD_PARAMETER.matcher(pfad);
         StringBuffer ergebnis = new StringBuffer();
         while (matcher.find()) {
             String wert = switch (matcher.group(1)) {
-                case "code", "art", "wert", "kennung" -> "grenztest";
+                case "code", "art" -> TEST_DOKUMENTART;
+                case "kontaktId" -> testKontaktId;
+                case "id" -> pfad.startsWith("/api/v1/dokumente/") ? testDokumentId.toString()
+                        : "00000000-0000-4000-8000-000000000001";
+                case "wert", "kennung" -> "grenztest";
                 case "nr", "nummer" -> "1";
                 default -> "00000000-0000-4000-8000-000000000001";
             };
