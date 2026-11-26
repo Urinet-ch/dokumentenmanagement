@@ -38,7 +38,9 @@ import ch.urinet.archiv.konfiguration.domain.KonfigurationsVersion;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
+import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
+import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
@@ -64,8 +66,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -85,6 +90,7 @@ class FehlerInjektionTest {
     @Inject WebseiteLesen webseiteLesen;
     @Inject WebseiteSuche webseiteSuche;
     @Inject WebseitenSchluesselVerwaltung schluesselVerwaltung;
+    @Inject ApiTokenVerwaltung apiTokens;
     @Inject KontaktVerwaltung kontaktVerwaltung;
     @Inject DokumentLesen dokumentLesen;
     @Inject DokumentAendern dokumentAendern;
@@ -201,6 +207,88 @@ class FehlerInjektionTest {
             for (Probe probe : proben) assertThat(log.volltext()).doesNotContain(probe.token());
         } finally {
             QuarkusMock.installMockForType(original, KonfigurationsdateiVerwaltung.class);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void apiTokenVerwaltungBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) throws Exception {
+        record Probe(String anmeldung, String id, String token) { }
+        List<Probe> proben = new ArrayList<>();
+        String body = "{\"name\":\"" + MARKER + "\",\"scope\":\"generator\"}";
+        String ablauf = "{\"gueltigBis\":\"" + LocalDate.now(ZoneId.of("Europe/Zurich")).plusDays(1) + "\"}";
+        try {
+            for (String mandant : List.of("urinet", "vhf-gsk")) {
+                String anmeldung = Testanmeldung.token("inhaber-" + mandant);
+                given().auth().oauth2(anmeldung).when().get("/api/v1/api-tokens").then().statusCode(200);
+                var erstellt = given().auth().oauth2(anmeldung).contentType("application/json").body(body)
+                        .when().post("/api/v1/api-tokens");
+                assertThat(erstellt.statusCode()).isEqualTo(201);
+                proben.add(new Probe(anmeldung, erstellt.jsonPath().getString("id"),
+                        erstellt.jsonPath().getString("token")));
+                String pfad = "/api/v1/api-tokens/" + proben.get(proben.size() - 1).id() + "/gueltig-bis";
+                given().auth().oauth2(anmeldung).contentType("application/json").body(ablauf)
+                        .when().put(pfad).then().statusCode(204);
+                given().auth().oauth2(anmeldung).when().delete(pfad).then().statusCode(204);
+            }
+            ApiTokenVerwaltung original = ClientProxy.unwrap(apiTokens);
+            AtomicInteger getroffen = new AtomicInteger();
+            QuarkusMock.installMockForType(new ApiTokenVerwaltung(null, null, null, null, null) {
+                @Override
+                public List<ApiClient> liste(MandantCode mandant) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+
+                @Override
+                public Erstellt erstellen(String mandant, String name, String scope, Optional<LocalDate> gueltigBis) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+
+                @Override
+                public void gueltigBisSetzen(MandantCode mandant, String id, LocalDate datum) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+
+                @Override
+                public void gueltigBisEntfernen(MandantCode mandant, String id) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+            }, ApiTokenVerwaltung.class);
+            try (LogMitschnitt log = LogMitschnitt.starten()) {
+                for (Probe probe : proben) {
+                    var liste = given().auth().oauth2(probe.anmeldung()).when().get("/api/v1/api-tokens");
+                    var anlegen = given().auth().oauth2(probe.anmeldung()).contentType("application/json").body(body)
+                            .when().post("/api/v1/api-tokens");
+                    String pfad = "/api/v1/api-tokens/" + probe.id() + "/gueltig-bis";
+                    var setzen = given().auth().oauth2(probe.anmeldung()).contentType("application/json").body(ablauf)
+                            .when().put(pfad);
+                    var entfernen = given().auth().oauth2(probe.anmeldung()).when().delete(pfad);
+                    for (var antwort : List.of(liste, anlegen, setzen, entfernen)) {
+                        assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                        assertThat(antwort.asString())
+                                .doesNotContain(MARKER, probe.anmeldung(), probe.token(), "Exception", "\tat ", "Caused by:");
+                    }
+                }
+                assertThat(getroffen).hasValue(8);
+                assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+                for (Probe probe : proben) {
+                    assertThat(log.volltext()).doesNotContain(probe.anmeldung(), probe.token());
+                }
+            } finally {
+                QuarkusMock.installMockForType(original, ApiTokenVerwaltung.class);
+            }
+        } finally {
+            try (Connection c = datenbank.getConnection();
+                 PreparedStatement s = c.prepareStatement("delete from public.api_client where id = ?")) {
+                for (Probe probe : proben) {
+                    s.setString(1, probe.id());
+                    s.executeUpdate();
+                }
+            }
         }
     }
 
