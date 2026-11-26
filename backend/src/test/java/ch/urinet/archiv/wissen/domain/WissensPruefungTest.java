@@ -30,6 +30,30 @@ class WissensPruefungTest {
     }
 
     @Test
+    void auszugspruefungLehntFehlendeUndInkonsistenteSeitendatenAb() {
+        Quelleneintrag ohneSeite = new Quelleneintrag("q1", DOKUMENT, null, null, "Text", null);
+        Quelleneintrag umgekehrterBereich = new Quelleneintrag("q1", DOKUMENT, 2, 1, "Text", null);
+        Quelleneintrag ohneAuszug = new Quelleneintrag("q1", DOKUMENT, 2, null, null, null);
+        WissensPruefung.DokumentQuelle ohneSeitentext = new WissensPruefung.DokumentQuelle(true, true, false, 2,
+                DOKUMENTDATUM, Optional.empty());
+        WissensPruefung.DokumentQuelle falscheSeitenzahl = new WissensPruefung.DokumentQuelle(true, true, false, 3,
+                DOKUMENTDATUM, Optional.of(PDF));
+
+        assertThat(WissensPruefung.auszugPruefen(ohneSeite, kontextMitDokument(false).dokumente().get(DOKUMENT)))
+                .isEqualTo(WissensPruefung.AuszugsErgebnis.SEITE_FEHLT);
+        assertThat(WissensPruefung.auszugPruefen(umgekehrterBereich, kontextMitDokument(false).dokumente()
+                .get(DOKUMENT))).isEqualTo(WissensPruefung.AuszugsErgebnis.QUELLE_UNGUELTIG);
+        assertThat(WissensPruefung.auszugPruefen(ohneAuszug, kontextMitDokument(false).dokumente().get(DOKUMENT)))
+                .isEqualTo(WissensPruefung.AuszugsErgebnis.FEHLT);
+        assertThat(WissensPruefung.auszugPruefen(
+                new Quelleneintrag("q1", DOKUMENT, 1, null, "Text", null), ohneSeitentext))
+                .isEqualTo(WissensPruefung.AuszugsErgebnis.NICHT_PRUEFBAR);
+        assertThat(WissensPruefung.auszugPruefen(
+                new Quelleneintrag("q1", DOKUMENT, 1, null, "Text", null), falscheSeitenzahl))
+                .isEqualTo(WissensPruefung.AuszugsErgebnis.QUELLE_UNGUELTIG);
+    }
+
+    @Test
     void pathUndPflichtfelderWerdenGeprueft() {
         Wissensseite reservierterPfad = seite("konzepte/index", Seitentyp.KONZEPT, "", List.of());
         Wissensseite falscherOrdner = seite("akteure/beratung", Seitentyp.KONZEPT, "", List.of());

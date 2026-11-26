@@ -104,6 +104,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `MandantTenantResolver`, `MandantKontext` für Worker, `@RolesAllowed` je Endpunkt
   - Rechtematrix A1–A14 als eine Domain-Regel (Rolle × Aktion), die alle Endpunkte abfragen; 404 vor 403 bei unsichtbaren Dokumenten; spätere Aufgaben ergänzen je Endpunkt die Szenarien ihrer Matrixzeilen
   - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; Mandantentrennung per Probe (Teilnachweis, voll in 2.2); `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
+  - Ergänzung (26.11.2026): Maschinenlesbare Matrix A1–A24 mit Quellen je Zeile und OpenAPI-Abgleich aller REST-Operationen in `EndpunktWaechterTest`
   - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4, 2.6_
 
 - [x] 1.5 API-Tokens für Generatoren und Import [Backend]
@@ -543,6 +544,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
   - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten, neu anzulegen): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe (Frist nach Req 10.9, Zweck Nachweis nach GeBüV und Datensicherheit, keine Auswertung des Verhaltens, Einsicht nur Inhaber nach A13; vorgemerkt mit 4.9-E6), Umgang mit Papier (Konzept-Entscheid E5, entschieden 15.11.2026: Papieroriginale werden nach dem Scan nicht vernichtet, sondern aufbewahrt, das Archiv ist eine Kopie; darum keine Vernichtungskontrolle und kein Vernichtungsprotokoll im Verfahren), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
   - Ungeprüfter Entwurf gemäss Auftrag: `docs/verfahren/erfassen-und-archivieren.md`; Prüfung und Freigabe durch Fabian sowie Gegenlesen durch den Treuhänder offen. Der Haken 5.7 bleibt offen.
+  - Ergänzender quellenbezogener Entwurf: `docs/verfahrensbeschreibung-erfassen-archivieren.md`; Zielpfad und Seitenlimit der freigegebenen Fassung bleiben unverändert.
   - jede freigegebene Fassung mit «gültig ab» als PDF/A im Archiv ablegen
   - _Anforderungen: 10.9, 16.6, 16.12_
 

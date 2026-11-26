@@ -67,7 +67,11 @@ Stand: `application.properties` (Präfixe `archiv.*`), Umgebung und Compose, Kon
 `wissens_einstellung` (Spec 04), `public.mandant` und `public.mandant_budget` (Spec 01 und 03). Klassen: **(a)** im
 Betrieb in der App änderbar, je Mandant, mit Versionen, Prüfung und Protokoll; **(b)** nur über Deployment oder
 Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 1.1) prüft die Präfixe dieser Tabelle gegen
-`application.properties`. Einzelne Schlüssel in Klasse (a) gehen einem allgemeineren Präfix in Klasse (b) vor.
+`application.properties` und direkte `@ConfigProperty`-Injektionen im Backend; ausserdem meldet der Test
+Inventareinträge ohne passenden Schlüssel im Code und nicht zugeordnete Konfigurationsverweise in `docs/` und den
+Design-Dateien. Die begründeten Ausnahmen sind nicht als Backend-Einstellungen verwendete Hostnamen, Dateinamen,
+Browser-Schlüssel, der separate Infomaniak-Spike und der historische TSA-Schlüssel. Testprofil-spezifische Werte bleiben
+ausgenommen. Einzelne Schlüssel in Klasse (a) gehen einem allgemeineren Präfix in Klasse (b) vor.
 
 ### Klasse (a): in der App änderbar (Einstellungskatalog)
 | Einstellung | Heute | Grenzen und Standard | riskant | Recht | Begründung der Klasse |
