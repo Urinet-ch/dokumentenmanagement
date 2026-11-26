@@ -2,7 +2,7 @@ Mit einem Passkey melden Sie sich im {name} ohne Passwort und ohne Einmalcode an
 
 ## Passkey einrichten
 1. Melden Sie sich wie gewohnt mit Passwort und Code an.
-2. Wählen Sie oben rechts «Passkey einrichten» (Schlüssel-Symbol, neben «Hilfe»). Die Kontoverwaltung der Anmeldung öffnet sich in einem neuen Tab; das Archiv bleibt in Ihrem bisherigen Tab offen.
+2. Ab 600 px wählen Sie oben rechts «Passkey einrichten» (Schlüssel-Symbol, neben «Hilfe»); unter 600 px wählen Sie dort das Schlüssel-Symbol. Die Kontoverwaltung der Anmeldung öffnet sich in einem neuen Tab; das Archiv bleibt in Ihrem bisherigen Tab offen.
 3. Wählen Sie in der Kontoverwaltung den Bereich zur Anmeldung und dort «Passkey einrichten».
 4. Geben Sie dem Passkey einen Namen, zum Beispiel «iPhone», und bestätigen Sie mit Fingerabdruck, Gesicht oder PIN Ihres Geräts.
 
