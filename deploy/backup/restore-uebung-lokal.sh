@@ -8,8 +8,13 @@ compose_file="$repo_root/deploy/backup/test/restore-compose.yml"
 mandanten=(urinet vhf-gsk)
 temp=$(mktemp -d "${TMPDIR:-/tmp}/archiv-restore.XXXXXX")
 chmod 700 "$temp"
-project="archiv-restore-$$"
-oidc_client="archiv-restore-$$"
+suffix=$(printf '%s' "${temp##*.}" | tr '[:upper:]' '[:lower:]')
+project="archiv-restore-$$-$suffix"
+oidc_client="$project"
+api_image="archiv:restore-roundtrip-$project"
+keycloak_image="archiv:restore-roundtrip-kc-$project"
+api_image_gebaut=0
+keycloak_image_gebaut=0
 compose_started=0
 network_retry=0
 export ARCHIV_RESTORE_TMP="$temp"
@@ -70,6 +75,16 @@ aufräumen() {
       (( status != 0 )) || status=3
     fi
   fi
+  for image in "$api_image" "$keycloak_image"; do
+    if [[ $image == "$api_image" && $api_image_gebaut == 0 ]] \
+      || [[ $image == "$keycloak_image" && $keycloak_image_gebaut == 0 ]]; then
+      continue
+    fi
+    if ! docker image rm "$image" >/dev/null 2>&1; then
+      printf 'FEHLER  Eigenes Restore-Testimage konnte nicht entfernt werden: %s\n' "$image" >&2
+      (( status != 0 )) || status=3
+    fi
+  done
   if ! rm -rf -- "$temp"; then
     printf 'FEHLER  Temporäre Restore-Testdaten konnten nicht entfernt werden.\n' >&2
     (( status != 0 )) || status=3
@@ -165,7 +180,8 @@ fi
 
 baue_maven() {
   local start=$SECONDS
-  if (cd "$backend" && mvn -ntp -DskipTests package) >"$temp/package.log" 2>&1; then
+  if (cd "$backend" && mvn -ntp -Dquarkus.http.test-port=0 \
+    "-Dquarkus.smallrye-openapi.store-schema-directory=$temp/openapi" -DskipTests package) >"$temp/package.log" 2>&1; then
     bericht OK "Quarkus-Artefakt bauen" "$((SECONDS - start))"
   else
     local status=$?
@@ -190,10 +206,12 @@ baue_image() {
 }
 
 baue_maven
-baue_image "API-Testimage bauen" docker build --tag archiv:restore-roundtrip \
+baue_image "API-Testimage bauen" docker build --tag "$api_image" \
   --file "$backend/src/main/docker/Dockerfile.jvm" "$backend"
-baue_image "Keycloak-Testimage bauen" docker build --tag archiv:restore-roundtrip-kc \
+api_image_gebaut=1
+baue_image "Keycloak-Testimage bauen" docker build --tag "$keycloak_image" \
   --file "$repo_root/deploy/infomaniak/keycloak/Dockerfile" "$repo_root/deploy"
+keycloak_image_gebaut=1
 
 start_dienste() {
   local ausgabe="$temp/compose-up.log"
@@ -330,6 +348,7 @@ test_maven() {
     -ntp
     -Dtest=SicherungPaketRoundtripTest
     -Dquarkus.http.test-port=0
+    "-Dquarkus.smallrye-openapi.store-schema-directory=$temp/openapi"
     -Darchiv.restore.e2e=true
     "-Darchiv.restore.phase=$phase"
     "-Darchiv.restore.stufe=$stufe"

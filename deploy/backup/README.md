@@ -160,14 +160,18 @@ verlangt; darum verwendet der Funktionstest ein Dienstkonto, ohne TOTP-Pflicht o
 Bucket-Strom wird mit `archiv sicherung wiederherstellen`
 in den neuen `urinet-archiv-p-`-Bucket eingespielt; eine absichtlich unvollständige Inventarliste ohne Manifest wird
 vorher zurückgewiesen. Die Quarkus-Testanwendung startet gegen die wiederhergestellte Archivdatenbank und prüft
-Dokumentanzahl, IDs, SHA-256 und Lesbarkeit der Dateien. `archiv manifest pruefen` validiert danach das signierte
+Dokument-, Seiten- und Versionszahlen gegen die Quelle, IDs, SHA-256 und Lesbarkeit der Dateien. Zusätzlich prüft
+sie, dass weder das Dokument noch sein Original aus dem anderen Mandanten im jeweiligen Ziel vorhanden ist.
+`archiv manifest pruefen` validiert danach das signierte
 Manifest im Ziel-Bucket anhand der Schlüssel und SHA-256, nicht anhand der alten S3-Versions-IDs, und gleicht es mit
 dem in der Datenbank festgehaltenen Hash ab; eine zusätzliche, veränderte Fassung im Ziel-Bucket lässt die Prüfung
 scheitern. Die
 Zeitstempelprüfung verwendet eine synthetische TSA-Attrappe ohne Netzaufruf.
 
-Alle Daten liegen in einem temporären Verzeichnis. Beim Beenden entfernt das Skript nur den Compose-Stack mit seinem
-eigenen Projektnamen und das temporäre Verzeichnis; es verwendet weder `down -v` noch `prune`. Die Übung ist ein
+Alle Daten liegen in einem temporären Verzeichnis. Beim Beenden entfernt das Skript nur den Compose-Stack und die
+Testimage-Tags mit seinem eindeutigen Projektnamen sowie das temporäre Verzeichnis; es verwendet weder `down -v`
+noch `prune`. Generierte OpenAPI-Dateien werden ebenfalls im temporären Verzeichnis statt im Arbeitsbaum abgelegt.
+Die Übung ist ein
 lokaler Funktionstest mit synthetischen Daten und ersetzt nicht die Restore-Probe auf der VPS im Infra-Repository.
 
 Die Orchestrierung lässt sich ohne Docker und Maven mit Attrappen prüfen:
@@ -178,3 +182,18 @@ bash deploy/backup/test/restore-uebung-lokal-test.sh
 
 Der lokale Lauf prüft die Sicherungs-Shell und den Restore-Kern gemeinsam, ersetzt aber nicht die spätere Restore-Probe
 auf der VPS im Infra-Repository.
+
+## Vorschlag für den betrieblichen Zählvergleich
+
+`docs/betrieb/restore-zaehlvergleich-workflow.diff` ist ein noch nicht integrierter Vorschlag für den Infra-Workflow.
+Er vergleicht pro Mandant die Zahlen für `seiten`, `versionen` und `dokumente` und bricht bei fehlenden, ungültigen
+oder abweichenden Daten ab. Erwartet werden zwei JSON-Objekte der Form
+`{"mandant": {"seiten": 1, "versionen": 2, "dokumente": 3}}` unter `out/archiv-quelle.json` und
+`out/archiv-restore.json`.
+
+Der bestehende Infra-Workflow stellt noch kein Archiv wieder her und erzeugt diese Dateien nicht. Vor der Integration
+muss eine separate Archiv-Restore-Probe die Quellzahlen aus dem Sicherungszeitpunkt und die Zielzahlen aus der
+unabhängig wiederhergestellten Datenbank liefern; zwei Dateien allein beweisen diese Herkunft nicht. Der Vorschlag ist
+deshalb zunächst nur über die manuelle Option aktivierbar und schlägt ohne diese Voraussetzung fehl. Für den
+wiederkehrenden Betrieb müssen Probe, Zählquellen und Zeitsteuerung ergänzt und auf Stufe B nachgewiesen werden;
+Spec 04, Aufgabe 13.7 bleibt offen.

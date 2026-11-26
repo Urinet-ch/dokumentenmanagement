@@ -74,7 +74,7 @@ import java.util.concurrent.Executors;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Echter Export-/Datenbank-/Bucket-Roundtrip; wird nur vom lokalen Restore-Skript aktiviert. */
+/** Lokaler Export-/Datenbank-/Bucket-Roundtrip (Req 16.3, Teilnachweis Spec 04 Req 4.7). */
 @QuarkusTest
 @TestProfile(SicherungPaketRoundtripTest.ExternesRestoreProfil.class)
 @Tag("start-2")
@@ -152,6 +152,9 @@ class SicherungPaketRoundtripTest {
             String prefix = code + ".";
             zustand.setProperty(prefix + "wissen.seiten", Long.toString(wissen[0]));
             zustand.setProperty(prefix + "wissen.versionen", Long.toString(wissen[1]));
+            long dokumente = dokumenteZaehlen(mandant.schema());
+            assertThat(dokumente).isEqualTo(1);
+            zustand.setProperty(prefix + "dokument.anzahl", Long.toString(dokumente));
             zustand.setProperty(prefix + "dokument.id", id.toString());
             zustand.setProperty(prefix + "dokument.original.schluessel", originalKey);
             zustand.setProperty(prefix + "dokument.original.sha256", Pruefsumme.von(ORIGINAL));
@@ -248,12 +251,23 @@ class SicherungPaketRoundtripTest {
         assertThat(wissenZaehlen(schema)).containsExactly(
                 Long.parseLong(erwartet.getProperty(prefix + "wissen.seiten")),
                 Long.parseLong(erwartet.getProperty(prefix + "wissen.versionen")));
+        assertThat(dokumenteZaehlen(schema)).isEqualTo(
+                Long.parseLong(erwartet.getProperty(prefix + "dokument.anzahl")));
         UUID id = UUID.fromString(erwartet.getProperty(prefix + "dokument.id"));
+        String fremderMandant = MANDANTEN.stream().filter(anderer -> !anderer.equals(code)).findFirst().orElseThrow();
+        UUID fremdeId = UUID.fromString(erwartet.getProperty(fremderMandant + ".dokument.id"));
+        assertThat(fremdeId).isNotEqualTo(id);
+        var fremdeObjekte = s3.listObjectVersions(r -> r.bucket(zielBucket)
+                .prefix(erwartet.getProperty(fremderMandant + ".dokument.original.schluessel")));
+        assertThat(fremdeObjekte.versions()).isEmpty();
+        assertThat(fremdeObjekte.deleteMarkers()).isEmpty();
         try (Connection connection = datenquelle.getConnection()) {
-            try (PreparedStatement p = connection.prepareStatement("select count(*) from " + schema + ".dokument");
-                 ResultSet r = p.executeQuery()) {
-                assertThat(r.next()).isTrue();
-                assertThat(r.getLong(1)).isEqualTo(1);
+            try (PreparedStatement p = connection.prepareStatement(
+                    "select 1 from " + schema + ".dokument where id = ?")) {
+                p.setObject(1, fremdeId);
+                try (ResultSet r = p.executeQuery()) {
+                    assertThat(r.next()).isFalse();
+                }
             }
             try (PreparedStatement p = connection.prepareStatement("select d.sha256_pdfa, d.s3_pdfa, "
                     + "d.s3_version_pdfa, f.sha256, f.s3_schluessel, f.s3_version "
@@ -397,6 +411,15 @@ class SicherungPaketRoundtripTest {
              ResultSet r = p.executeQuery()) {
             assertThat(r.next()).isTrue();
             return new long[] {r.getLong(1), r.getLong(2)};
+        }
+    }
+
+    private long dokumenteZaehlen(String schema) throws Exception {
+        try (Connection connection = datenquelle.getConnection();
+             PreparedStatement p = connection.prepareStatement("select count(*) from " + schema + ".dokument");
+             ResultSet r = p.executeQuery()) {
+            assertThat(r.next()).isTrue();
+            return r.getLong(1);
         }
     }
 

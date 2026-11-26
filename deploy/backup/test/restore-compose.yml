@@ -25,7 +25,7 @@ services:
       retries: 60
 
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:59953701f8f8d0de81aab456f0b0b6c0a1804119415559bf7ede79d944108879
+    image: cgr.dev/chainguard/minio:latest@sha256:f2e56aceb4d38ad9b05c901270946e2353b19f86ba4396f25cf75b15b455b38c
     command: ["server", "/tmp/daten"]
     environment:
       MINIO_ROOT_USER: archiv-dev
@@ -37,7 +37,7 @@ services:
       - 127.0.0.1::9000
 
   kc:
-    image: archiv:restore-roundtrip-kc
+    image: archiv:restore-roundtrip-kc-${COMPOSE_PROJECT_NAME:?}
     # Speichergrenze, damit drei JVMs in eine kleine Docker-VM passen (z. B. Colima mit 6 GB)
     mem_limit: 768m
     environment:
@@ -64,7 +64,7 @@ services:
     networks: [intern]
 
   api:
-    image: archiv:restore-roundtrip
+    image: archiv:restore-roundtrip-${COMPOSE_PROJECT_NAME:?}
     mem_limit: 768m
     environment:
       SMALLRYE_CONFIG_SOURCE_FILE_LOCATIONS: /run/secrets
@@ -101,7 +101,7 @@ services:
     networks: [intern]
 
   kc_restore:
-    image: archiv:restore-roundtrip-kc
+    image: archiv:restore-roundtrip-kc-${COMPOSE_PROJECT_NAME:?}
     # Speichergrenze, damit drei JVMs in eine kleine Docker-VM passen (z. B. Colima mit 6 GB)
     mem_limit: 768m
     environment:
