@@ -117,3 +117,37 @@ ursprünglichen Netzaktivität.
   Anforderungsreferenz in `ci.feature`, Lauf 45589578420 erneut am virtuellen
   Passkey. Diese Läufe belegen keine neue Ursache für den historischen
   Hilfe-Leisten-Klick- oder Installations-Timeout.
+
+## Nachtrag 26.11.2026: Abgleich der letzten 15 abgeschlossenen CI-Läufe auf `main`
+
+Zeitraum: 25.11.2026, 18:07 UTC bis 26.11.2026, 10:07 UTC. Zwölf Läufe waren
+erfolgreich, drei fehlgeschlagen:
+
+- **Run [45776652401](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45776652401):**
+  `npx cucumber-js` bestand mit 348 Szenarien und 5'982 Schritten. Der Browser-Job
+  scheiterte erst im nachgelagerten Cache-Schritt an `hashFiles('**/pom.xml')`.
+  Das ist kein Szenariofehler; die Workflow-Datei bleibt ausserhalb des Auftrags.
+- **Run [45714785683](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45714785683):**
+  Das Szenario «Offline und ohne Anmeldung erfassen; die Aufnahmen bleiben auf dem
+  Gerät» scheiterte nach Merge von PR #630 erneut beim 30-s-Klick auf «Ohne
+  Verbindung erfassen». Der Log belegt, dass der Link nicht sichtbar wurde, nicht
+  warum er fehlte. Die zehn lokalen Wiederholungen aus PR #630 belegen den
+  Testpfad lokal, aber keine Ursache des CI-Ausfalls. Der bestehende Test wartet
+  bereits auf installierte App-Dateien, Service-Worker-Kontrolle und den
+  Offline-Hinweis. Ohne reproduzierbaren Browserzustand gibt es keine belegte,
+  kleinere Korrektur; keine weitere Änderung am Testcode.
+- **Run [45691792909](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45691792909):**
+  Nach Merge von PR #631 wurde beim Passkey-Test 60 s lang die sichtbare
+  Credential-Bestätigung vermisst. Die anschliessende Testbenutzer-Löschung
+  scheiterte zusätzlich mit HTTP 401. Der Log beweist weder, ob die
+  WebAuthn-Registrierung gestartet wurde, noch warum die Bestätigung ausblieb;
+  der 401 ist ein Folgefehler beim Aufräumen. Eine weitere Wartezeitverlängerung
+  wäre ohne Ursache nicht belegt; keine weitere Änderung am Testcode.
+
+Der jüngste erfolgreiche Main-Lauf
+[45798343409](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45798343409)
+bestand mit 349 Browser-Szenarien und 5'999 Schritten. Das bestätigt, dass die
+beiden betroffenen Pfade nicht deterministisch fehlschlagen. `hilfe-offline` kam
+in den fehlgeschlagenen Browser-Jobs dieser 15 Läufe nicht vor; es gibt dafür
+keinen neuen Fix-Nachweis. Die Wiederholungsfehler bleiben zur gezielten Diagnose
+offen, statt sie durch unbewiesene Wartezeiten oder Retry-Verhalten zu verdecken.
