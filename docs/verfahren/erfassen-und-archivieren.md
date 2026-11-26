@@ -31,7 +31,7 @@ nicht aufbewahrungspflichtig; sie werden ohne Sperre abgelegt und gehören nicht
 
 ## Zugriffe, Kontrollen und Aufbewahrung
 
-> Zielpfad und Umfang: Req 16.6 verlangt `docs/verfahrensbeschreibung.md` mit höchstens 2 Seiten. Beides ist bei der Freigabe herzustellen; dieser Abschnitt trägt den in tasks.md 4.9 genannten Abschnitt «Zugriffe».
+> Umfang: Req 16.6 verlangt eine freigegebene Verfahrensbeschreibung von höchstens 2 Seiten. Dieser Abschnitt trägt den in tasks.md 4.9 genannten Abschnitt «Zugriffe».
 
 **Grenzen der Unveränderbarkeit.** Eine Sperre besteht nur bei gesetzlicher Pflicht (Req 6.12). Dokumente unter `archiv/` sind im Modus GOVERNANCE gesperrt; das schützt vor Anwendungsfehlern und Versehen, nicht vor einem Eingriff mit dem Schlüssel der Anwendung, der das Bypass-Recht hat. Nur Manifeste sind im Modus COMPLIANCE gesperrt (Req 6.5, 6.11). Ohne Sperre oder bei Umgehung fällt eine Manipulation nur über Manifest und SHA-256-Prüfsumme im Prüflauf auf (Req 6.11, 15.5, 15.10).
 
