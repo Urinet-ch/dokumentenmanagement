@@ -21,20 +21,30 @@ public class WissenKonfiguration {
                                @ConfigProperty(name = "archiv.wissen.budget-tokens") long budgetTokens,
                                @ConfigProperty(name = "archiv.wissen.monatsbudget-tokens") long monatsbudgetTokens,
                                @ConfigProperty(name = "archiv.wissen.auszug-mindest-zeichen") int auszugMindestZeichen,
-                               @ConfigProperty(name = "archiv.wissen.aussage-ueberlappung") double aussageUeberlappung) {
+                               @ConfigProperty(name = "archiv.wissen.aussage-ueberlappung") double aussageUeberlappung,
+                               @ConfigProperty(name = "archiv.wissen.randzeilen-mindest-anteil")
+                               double randzeilenMindestAnteil) {
         if (modell == null || modell.isBlank()) {
             throw new IllegalStateException("archiv.wissen.modell muss gesetzt sein");
         }
         this.modell = modell.strip();
         this.ingest = new WissenIngestGrenzen(abschnittZeichen, maxSeiten, indexMaxZeichen, seiteMaxZeichen,
-                werkzeugMaxZeichen, budgetTokens, monatsbudgetTokens, auszugMindestZeichen, aussageUeberlappung);
+                werkzeugMaxZeichen, budgetTokens, monatsbudgetTokens, auszugMindestZeichen, aussageUeberlappung,
+                randzeilenMindestAnteil);
     }
 
     public WissenKonfiguration(String modell, int abschnittZeichen, int maxSeiten, int indexMaxZeichen,
                                int seiteMaxZeichen, int werkzeugMaxZeichen, long budgetTokens,
                                long monatsbudgetTokens) {
         this(modell, abschnittZeichen, maxSeiten, indexMaxZeichen, seiteMaxZeichen, werkzeugMaxZeichen,
-                budgetTokens, monatsbudgetTokens, 20, 0.5);
+                budgetTokens, monatsbudgetTokens, 20, 0.5, 0.3);
+    }
+
+    public WissenKonfiguration(String modell, int abschnittZeichen, int maxSeiten, int indexMaxZeichen,
+                               int seiteMaxZeichen, int werkzeugMaxZeichen, long budgetTokens,
+                               long monatsbudgetTokens, int auszugMindestZeichen, double aussageUeberlappung) {
+        this(modell, abschnittZeichen, maxSeiten, indexMaxZeichen, seiteMaxZeichen, werkzeugMaxZeichen,
+                budgetTokens, monatsbudgetTokens, auszugMindestZeichen, aussageUeberlappung, 0.3);
     }
 
     public String modell() {

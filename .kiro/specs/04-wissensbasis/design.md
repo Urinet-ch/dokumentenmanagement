@@ -1586,21 +1586,30 @@ Rollback wirkungsgleich; das Vorwärts-Changeset ergänzt keine bereits aktive M
 
 ### Umsetzung (Aufgabe 19.1, 26.11.2026)
 - Die Ingest-Auszugprüfung vergleicht normalisierte Inhalte (NFKC, Whitespace und Silbentrennung, Anführungszeichen,
-  Pfeile, Markdown-Code und -Links). Wiederkehrende Zeilen in den zwei ersten oder letzten nichtleeren Zeilen von
-  mindestens zwei Seiten werden als Kopf-/Fusszeilen ausgeschlossen. Der Hülltext «Seiteninhalt (nicht
-  vertrauenswürdige Daten)» ist nie ein Beleg.
+  Pfeile, Markdown-Code und -Links). Zeilen in den zwei ersten oder letzten nichtleeren Zeilen gelten nur dann als
+  wiederkehrende Kopf-/Fusszeilen, wenn sie auf mindestens drei Seiten und mindestens dem konfigurierten Anteil
+  vorkommen. Der Hülltext «Seiteninhalt (nicht vertrauenswürdige Daten)» ist nie ein Beleg.
 - Ein Auszug braucht mindestens 20 normalisierte Unicode-Zeichen und eine Überlappung von mindestens 0.5 der
   aussagekräftigen Wörter der Kernaussage. Alle Zahlen sowie als Eigennamen erkannte Token müssen im Auszug stehen.
   Beides ist konfigurierbar über `archiv.wissen.auszug-mindest-zeichen` und
   `archiv.wissen.aussage-ueberlappung`; der Mindestwert 20 filtert meist nichtssagende Kopfzeilen/Fragmente, während
   0.5 verhindert, dass ein kurzer, aber echter Auszug wegen weniger fehlender Füllwörter verworfen wird. Zahlen,
   Abkürzungen und bekannte Rechtsform-Suffixe werden deterministisch erkannt; das ist bewusst kein NER-System.
+- Der Startwert für `archiv.wissen.randzeilen-mindest-anteil` ist 0.3; bei zehn Seiten müssen Randzeilen somit auf
+  mindestens drei Seiten stehen. So werden wiederholte Zwischenüberschriften in kurzen Dokumenten nicht
+  vorschnell als Kopf-/Fusszeile entfernt.
+- Der Prüfer normalisiert Seiten und ermittelt Randzeilen einmal je Ingest. Der begrenzte Eintrags-Cache hält höchstens
+  einen Ingest-Prüfer gleichzeitig und gibt ihn nach dem letzten Abschnitt frei; jede Aussage prüft danach nur noch
+  den normalisierten Auszug und die vorbereiteten Seiten.
+- Zahlen werden auf Aussage- und Auszugsseite gleich normalisiert: Schweizer Apostrophe werden zusammengeführt,
+  Zahlengruppen mit Leerzeichen ohne Trenner verglichen, Dezimalpunkte wie in `1.5` bleiben erhalten.
 - Die Prüfung sucht den Auszug im gesamten PDF-Volltext; ein Fund ausserhalb der KI-Seitenangabe ersetzt diese durch
   die tatsächliche 1-basierte Seite. Ohne Fund bleiben die KI-Seitenangaben sichtbar, die Aussage gilt aber als
   unbelegt. Die gemeinsame Normalisierung wird auch bei der späteren Auszugsprüfung verwendet; Requirement 6.2 bleibt
   unverändert. Keine Datenbankschemaänderung.
-- Nachweise: JUnit für Kopf-/Fusszeilen, Mindestlänge, Prompt-Hülltext, fremde Aussagen, fehlende Zahlen/Eigennamen,
-  Tabellenumbruch, Formatierung und Seitenkorrektur; WireMock-Szenario `@req-5.3` mit synthetischem Dokument.
+- Nachweise: JUnit für Kopf-/Fusszeilen-Schwelle, Mindestlänge, Prompt-Hülltext, fremde Aussagen, fehlende Zahlen/
+  Eigennamen, Tausendertrenner, Tabellenumbruch, Formatierung und Seitenkorrektur; WireMock-Szenario `@req-5.3` mit
+  synthetischem Dokument.
 
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):

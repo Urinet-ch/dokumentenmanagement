@@ -24,6 +24,7 @@ class WissenKonfigurationTest {
         assertThat(properties.getProperty("archiv.wissen.monatsbudget-tokens")).isEqualTo("1000000");
         assertThat(properties.getProperty("archiv.wissen.auszug-mindest-zeichen")).isEqualTo("20");
         assertThat(properties.getProperty("archiv.wissen.aussage-ueberlappung")).isEqualTo("0.5");
+        assertThat(properties.getProperty("archiv.wissen.randzeilen-mindest-anteil")).isEqualTo("0.3");
         assertThat(properties.containsKey("archiv.wissen.basis-url")).isFalse();
     }
 

@@ -69,6 +69,7 @@ public class WissenIngestVerarbeiten {
     private final KiVerbrauchPort verbrauch;
     private final DiffDienst diffDienst;
     private final WissenIngestIndex index;
+    private CachedAuszugPruefer auszugPruefer;
 
     public WissenIngestVerarbeiten(WissenIngestSpeichern speichern, WissenKonfiguration konfiguration,
                                    KiPort ki, KiVerbrauchPort verbrauch, DiffDienst diffDienst, WissenIngestIndex index) {
@@ -83,15 +84,21 @@ public class WissenIngestVerarbeiten {
     public void ausfuehren(Auftrag auftrag, UUID entwurfId) throws InterruptedException {
         OptionalStand geladen = laden(entwurfId, Set.of());
         if (geladen.stand() == null) {
+            auszugPrueferVerwerfen(entwurfId);
             return;
         }
         WissenIngestSpeichern.Stand stand = geladen.stand();
         Lauf lauf = stand.lauf();
         if (!"IN_ARBEIT".equals(lauf.entwurfStatus()) || lauf.schritt() == null) {
+            auszugPrueferVerwerfen(entwurfId);
             return;
+        }
+        if (!"KERNAUSSAGEN".equals(lauf.schritt())) {
+            auszugPrueferVerwerfen(entwurfId);
         }
         Fortschritt fortschritt = fortschritt(lauf);
         if (nichtFreigegeben(auftrag, stand, fortschritt)) {
+            auszugPrueferVerwerfen(entwurfId);
             return;
         }
         if (Thread.currentThread().isInterrupted()) {
@@ -103,10 +110,12 @@ public class WissenIngestVerarbeiten {
         long budget = begrenzt(lauf.budgetTokens(), grenzen.budgetTokens());
         long monatsbudget = begrenzt(lauf.monatsbudgetTokens(), grenzen.monatsbudgetTokens());
         if (!"ABSCHLUSS".equals(lauf.schritt()) && stand.monatsverbrauch() >= monatsbudget) {
+            auszugPrueferVerwerfen(entwurfId);
             fehlerSichern(auftrag, lauf, fortschritt, "Budget erschöpft");
             return;
         }
         if (summe(lauf.tokensEin(), lauf.tokensAus()) >= budget && !"ABSCHLUSS".equals(lauf.schritt())) {
+            auszugPrueferVerwerfen(entwurfId);
             if ("NEU_ERZEUGEN".equals(lauf.schritt())) {
                 speichern.neuerzeugungFehler(auftrag, entwurfId, "Budget erschöpft");
             } else {
@@ -173,8 +182,10 @@ public class WissenIngestVerarbeiten {
         int bis = lauf.seiteBis() == null ? text.anzahl() : lauf.seiteBis();
         List<WissenIngestSegmentierer.Abschnitt> abschnitte =
                 WissenIngestSegmentierer.zerlegen(text, von, bis, grenzen.abschnittZeichen());
+        WissenIngestAuszuege.Pruefer pruefer = auszugPruefer(lauf.entwurfId(), text, grenzen);
         int index = bisher.abschnitt();
         if (index >= abschnitte.size()) {
+            auszugPrueferVerwerfen(lauf.entwurfId());
             speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "PLANUNG", bisher,
                     lauf.tokensEin(), lauf.tokensAus(), false, null);
             return;
@@ -216,8 +227,8 @@ public class WissenIngestVerarbeiten {
                 List<Integer> angegebeneSeiten = aussage.seiten() == null ? List.of() : aussage.seiten().stream()
                         .filter(Objects::nonNull).filter(seite -> seite >= von && seite <= bis)
                         .distinct().sorted().toList();
-                WissenIngestAuszuege.Pruefung auszug = WissenIngestAuszuege.pruefen(
-                        aussage.text(), aussage.auszug(), text, grenzen);
+                WissenIngestAuszuege.Pruefung auszug = pruefer.pruefen(
+                        aussage.text(), aussage.auszug(), grenzen);
                 boolean belegt = auszug.belegt();
                 List<Integer> seiten = auszug.seiten().isEmpty() ? angegebeneSeiten : auszug.seiten();
                 int nummer = Math.addExact(Math.multiplyExact(index, MAX_AUSSAGEN_PRO_ABSCHNITT), aussage.nr());
@@ -235,10 +246,31 @@ public class WissenIngestVerarbeiten {
         }
         Fortschritt aktualisiert = new Fortschritt(index + 1, bisher.seite(), bisher.quelleErzeugt(), aussagen,
                 bisher.planung(), bisher.vorschlaege(), hinweise, bisher.kontextStufe());
+        if (index + 1 >= abschnitte.size()) {
+            auszugPrueferVerwerfen(lauf.entwurfId());
+        }
         speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(),
                 antwort.budgetErreicht() ? "ABSCHLUSS" : "KERNAUSSAGEN", aktualisiert,
                 addiere(lauf.tokensEin(), antwort.tokensEin()), addiere(lauf.tokensAus(), antwort.tokensAus()),
                 antwort.budgetErreicht(), antwort.budgetErreicht() ? "Budget erschöpft" : null);
+    }
+
+    synchronized void auszugPrueferVerwerfen(UUID entwurfId) {
+        if (auszugPruefer != null && auszugPruefer.entwurfId().equals(entwurfId)) {
+            auszugPruefer = null;
+        }
+    }
+
+    private synchronized WissenIngestAuszuege.Pruefer auszugPruefer(UUID entwurfId, Seitentext text,
+                                                                     WissenIngestGrenzen grenzen) {
+        if (auszugPruefer == null || !auszugPruefer.entwurfId().equals(entwurfId)) {
+            auszugPruefer = new CachedAuszugPruefer(entwurfId,
+                    WissenIngestAuszuege.pruefer(text, grenzen.randzeilenMindestAnteil()));
+        }
+        return auszugPruefer.pruefer();
+    }
+
+    private record CachedAuszugPruefer(UUID entwurfId, WissenIngestAuszuege.Pruefer pruefer) {
     }
 
     private void planung(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher, long budget,

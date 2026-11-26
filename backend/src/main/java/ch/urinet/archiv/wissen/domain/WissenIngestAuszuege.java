@@ -18,7 +18,8 @@ public final class WissenIngestAuszuege {
 
     private static final Pattern WORT = Pattern.compile("[\\p{L}\\p{N}]+");
     private static final Pattern ZAHL = Pattern.compile(
-            "(?<![\\p{L}\\p{N}])\\p{N}+(?:[.,:/-]\\p{N}+)*(?![\\p{L}\\p{N}])");
+            "(?<![\\p{L}\\p{N}])\\p{N}+(?:[\\s\\u00a0\\u202f]\\p{N}{3})*(?:[.,:/-]\\p{N}+)*"
+                    + "(?![\\p{L}\\p{N}])");
     private static final Set<String> SATZANFAENGE = Set.of(
             "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer", "eines", "einem", "einen",
             "und", "oder", "aber", "auch", "so", "wenn", "falls", "bei", "mit", "für", "von", "im", "in");
@@ -39,21 +40,18 @@ public final class WissenIngestAuszuege {
 
     public static Pruefung pruefen(String aussage, String auszug, Seitentext dokument,
                                    WissenIngestGrenzen grenzen) {
-        if (aussage == null || aussage.isBlank() || dokument == null || grenzen == null
-                || !auszugZulaessig(auszug, grenzen.auszugMindestZeichen())) {
+        if (dokument == null || grenzen == null) {
             return new Pruefung(false, List.of());
         }
-        String zitat = normalisieren(auszug);
-        Set<String> kopfFusszeilen = wiederkehrendeRandzeilen(dokument);
-        List<Integer> fundstellen = new ArrayList<>();
-        for (int i = 0; i < dokument.anzahl(); i++) {
-            if (seiteEnthaeltAuszug(dokument.seiten().get(i), zitat, kopfFusszeilen)) {
-                fundstellen.add(i + 1);
-            }
+        return pruefer(dokument, grenzen.randzeilenMindestAnteil()).pruefen(aussage, auszug, grenzen);
+    }
+
+    public static Pruefer pruefer(Seitentext dokument, double randzeilenMindestAnteil) {
+        if (dokument == null || !Double.isFinite(randzeilenMindestAnteil)
+                || randzeilenMindestAnteil <= 0 || randzeilenMindestAnteil > 1) {
+            throw new IllegalArgumentException("Ungültige Seiten oder Randzeilen-Schwelle");
         }
-        boolean belegt = !fundstellen.isEmpty()
-                && ueberlappung(aussage, zitat, grenzen.aussageUeberlappung());
-        return new Pruefung(belegt, fundstellen);
+        return new Pruefer(dokument, randzeilenMindestAnteil);
     }
 
     public static boolean kommtVor(String auszug, Seitentext dokument, int von, int bis) {
@@ -61,17 +59,7 @@ public final class WissenIngestAuszuege {
                 || bis > dokument.anzahl()) {
             return false;
         }
-        String zitat = normalisieren(auszug);
-        if (zitat.isBlank()) {
-            return false;
-        }
-        Set<String> kopfFusszeilen = wiederkehrendeRandzeilen(dokument);
-        for (int seite = von; seite <= bis; seite++) {
-            if (seiteEnthaeltAuszug(dokument.seiten().get(seite - 1), zitat, kopfFusszeilen)) {
-                return true;
-            }
-        }
-        return false;
+        return pruefer(dokument, 0.3).kommtVor(auszug, von, bis);
     }
 
     static String normalisieren(String text) {
@@ -114,7 +102,18 @@ public final class WissenIngestAuszuege {
                 leerraum = false;
             }
         }
-        return ergebnis.toString().strip();
+        return zahlenOhneTausendertrenner(ergebnis.toString().strip());
+    }
+
+    private static String zahlenOhneTausendertrenner(String text) {
+        Matcher matcher = ZAHL.matcher(text);
+        StringBuilder normalisiert = new StringBuilder(text.length());
+        while (matcher.find()) {
+            String zahl = matcher.group().replaceAll("[\\s\\u00a0\\u202f]", "");
+            matcher.appendReplacement(normalisiert, Matcher.quoteReplacement(zahl));
+        }
+        matcher.appendTail(normalisiert);
+        return normalisiert.toString();
     }
 
     private static boolean auszugZulaessig(String auszug, int mindestZeichen) {
@@ -127,52 +126,45 @@ public final class WissenIngestAuszuege {
                 && zitat.codePointCount(0, zitat.length()) >= mindestZeichen;
     }
 
-    private static boolean seiteEnthaeltAuszug(String seitentext, String zitat) {
-        return seiteEnthaeltAuszug(seitentext, zitat, Set.of());
-    }
-
-    private static boolean seiteEnthaeltAuszug(String seitentext, String zitat, Set<String> kopfFusszeilen) {
-        String inhalt = randzeilenEntfernen(seitentext, kopfFusszeilen);
-        return normalisieren(inhalt).contains(zitat);
-    }
-
-    private static Set<String> wiederkehrendeRandzeilen(Seitentext dokument) {
+    private static Set<String> wiederkehrendeRandzeilen(List<List<String>> zeilenJeSeite,
+                                                         double mindestAnteil) {
         Map<String, Integer> vorkommen = new HashMap<>();
-        for (String seite : dokument.seiten()) {
-            List<String> zeilen = seite.lines().filter(line -> !normalisieren(line).isBlank()).toList();
+        for (List<String> zeilen : zeilenJeSeite) {
             Set<String> randzeilen = new HashSet<>();
-            for (int i = 0; i < Math.min(2, zeilen.size()); i++) {
-                randzeilen.add(normalisieren(zeilen.get(i)));
-                randzeilen.add(normalisieren(zeilen.get(zeilen.size() - i - 1)));
+            int erste = ersterInhalt(zeilen);
+            int letzte = letzterInhalt(zeilen);
+            if (erste >= 0) {
+                for (int i = erste; i <= Math.min(letzte, erste + 1); i++) {
+                    randzeilen.add(zeilen.get(i));
+                }
+                for (int i = Math.max(erste, letzte - 1); i <= letzte; i++) {
+                    randzeilen.add(zeilen.get(i));
+                }
             }
             randzeilen.stream().filter(line -> line.codePointCount(0, line.length()) >= 5)
                     .forEach(line -> vorkommen.merge(line, 1, Integer::sum));
         }
-        return vorkommen.entrySet().stream().filter(entry -> entry.getValue() >= 2).map(Map.Entry::getKey)
+        int schwelle = Math.max(3, (int) Math.ceil(zeilenJeSeite.size() * mindestAnteil));
+        return vorkommen.entrySet().stream().filter(entry -> entry.getValue() >= schwelle).map(Map.Entry::getKey)
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
-    private static String randzeilenEntfernen(String seitentext, Set<String> kopfFusszeilen) {
-        if (kopfFusszeilen.isEmpty()) {
-            return seitentext;
-        }
-        List<String> zeilen = seitentext.lines().toList();
-        int erste = 0;
-        while (erste < zeilen.size() && normalisieren(zeilen.get(erste)).isBlank()) {
-            erste++;
-        }
-        int letzte = zeilen.size() - 1;
-        while (letzte >= erste && normalisieren(zeilen.get(letzte)).isBlank()) {
-            letzte--;
-        }
-        List<String> behalten = new ArrayList<>(zeilen.size());
+    private static int ersterInhalt(List<String> zeilen) {
         for (int i = 0; i < zeilen.size(); i++) {
-            boolean rand = i <= erste + 1 || i >= letzte - 1;
-            if (!rand || !kopfFusszeilen.contains(normalisieren(zeilen.get(i)))) {
-                behalten.add(zeilen.get(i));
+            if (!zeilen.get(i).isBlank()) {
+                return i;
             }
         }
-        return String.join("\n", behalten);
+        return -1;
+    }
+
+    private static int letzterInhalt(List<String> zeilen) {
+        for (int i = zeilen.size() - 1; i >= 0; i--) {
+            if (!zeilen.get(i).isBlank()) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static boolean ueberlappung(String aussage, String zitat, double minimum) {
@@ -185,7 +177,7 @@ public final class WissenIngestAuszuege {
         if ((double) gemeinsameWoerter / aussageWoerter.size() < minimum) {
             return false;
         }
-        return zahlen(aussage).stream().allMatch(zahlen(zitat)::contains)
+        return zahlen(normalisieren(aussage)).stream().allMatch(zahlen(zitat)::contains)
                 && eigennamen(aussage).stream().allMatch(zitatWoerter::contains);
     }
 
@@ -206,7 +198,7 @@ public final class WissenIngestAuszuege {
         Set<String> result = new HashSet<>();
         Matcher matcher = ZAHL.matcher(text);
         while (matcher.find()) {
-            result.add(matcher.group());
+            result.add(matcher.group().replaceAll("[\\s\\u00a0\\u202f]", ""));
         }
         return result;
     }
@@ -247,5 +239,68 @@ public final class WissenIngestAuszuege {
         public Pruefung {
             seiten = List.copyOf(seiten);
         }
+    }
+
+    public static final class Pruefer {
+        private final List<String> seiten;
+
+        private Pruefer(Seitentext dokument, double randzeilenMindestAnteil) {
+            List<List<String>> roheZeilen = dokument.seiten().stream()
+                    .map(seite -> seite.lines().toList()).toList();
+            List<List<String>> normalisierteZeilen = roheZeilen.stream()
+                    .map(zeilen -> zeilen.stream().map(WissenIngestAuszuege::normalisieren).toList()).toList();
+            Set<String> randzeilen = wiederkehrendeRandzeilen(normalisierteZeilen, randzeilenMindestAnteil);
+            this.seiten = java.util.stream.IntStream.range(0, roheZeilen.size())
+                    .mapToObj(i -> normalisieren(seiteOhneRandzeilen(
+                            roheZeilen.get(i), normalisierteZeilen.get(i), randzeilen)))
+                    .toList();
+        }
+
+        public Pruefung pruefen(String aussage, String auszug, WissenIngestGrenzen grenzen) {
+            if (aussage == null || aussage.isBlank() || grenzen == null
+                    || !auszugZulaessig(auszug, grenzen.auszugMindestZeichen())) {
+                return new Pruefung(false, List.of());
+            }
+            String zitat = normalisieren(auszug);
+            List<Integer> fundstellen = new ArrayList<>();
+            for (int i = 0; i < seiten.size(); i++) {
+                if (!zitat.isBlank() && seiten.get(i).contains(zitat)) {
+                    fundstellen.add(i + 1);
+                }
+            }
+            boolean belegt = !fundstellen.isEmpty()
+                    && ueberlappung(aussage, zitat, grenzen.aussageUeberlappung());
+            return new Pruefung(belegt, fundstellen);
+        }
+
+        public boolean kommtVor(String auszug, int von, int bis) {
+            if (auszug == null || auszug.isBlank() || von < 1 || bis < von || bis > seiten.size()) {
+                return false;
+            }
+            String zitat = normalisieren(auszug);
+            if (zitat.isBlank()) {
+                return false;
+            }
+            for (int seite = von; seite <= bis; seite++) {
+                if (seiten.get(seite - 1).contains(zitat)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private static String seiteOhneRandzeilen(List<String> roheZeilen, List<String> normalisierteZeilen,
+                                              Set<String> randzeilen) {
+        int erste = ersterInhalt(normalisierteZeilen);
+        int letzte = letzterInhalt(normalisierteZeilen);
+        List<String> behalten = new ArrayList<>(roheZeilen.size());
+        for (int i = 0; i < roheZeilen.size(); i++) {
+            boolean rand = erste >= 0 && (i <= erste + 1 || i >= letzte - 1);
+            if (!rand || !randzeilen.contains(normalisierteZeilen.get(i))) {
+                behalten.add(roheZeilen.get(i));
+            }
+        }
+        return String.join("\n", behalten);
     }
 }
