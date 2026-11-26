@@ -5,7 +5,7 @@ describe('Einführung nach Rechten', () => {
   it.each<{ rolle: Rolle; titel: string[]; bereiche: string[] }>([
     { rolle: 'inhaber', titel: ['Willkommen im Archiv', 'Dokumente erfassen', 'Prüfen und bestätigen', 'Finden', 'Bestand und Abschluss', 'Hilfe finden'], bereiche: ['Kontakte', 'Importe', 'Jahresexport', 'Dokumentarten', 'Zugriffsprotokoll', 'API-Tokens'] },
     { rolle: 'mitarbeiter', titel: ['Willkommen im Archiv', 'Dokumente erfassen', 'Ihre erfassten Dokumente', 'Finden', 'Hilfe finden'], bereiche: [] },
-    { rolle: 'treuhaender', titel: ['Willkommen im Archiv', 'Finden', 'Bestand und Abschluss', 'Hilfe finden'], bereiche: ['Jahresexport'] },
+    { rolle: 'treuhaender', titel: ['Willkommen im Archiv', 'Eingangskorb ansehen', 'Finden', 'Bestand und Abschluss', 'Hilfe finden'], bereiche: ['Jahresexport'] },
     { rolle: 'geschaeftsstelle', titel: ['Willkommen im Archiv', 'Dokumente erfassen', 'Prüfen und bestätigen', 'Finden', 'Bestand und Abschluss', 'Hilfe finden'], bereiche: ['Kontakte'] },
   ])('zeigt für $rolle nur erlaubte Schritte und Bereiche', ({ rolle, titel, bereiche }) => {
     const schritte = einfuehrungSchritte((aktion) => darf(rolle, aktion), 'Archiv', rolle);

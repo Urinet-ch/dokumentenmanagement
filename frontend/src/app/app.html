@@ -198,7 +198,7 @@
     position="end"
     mode="over"
     autoFocus="dialog"
-    [style.width]="mobil() ? '100%' : 'min(420px, 100vw)'"
+    [style.width]="mobil() ? '100%' : 'min(100vw, clamp(480px, 42vw, 760px))'"
     [opened]="hilfe.offen()"
     (closedStart)="hilfe.drawerGeschlossen()"
   >

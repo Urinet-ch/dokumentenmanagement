@@ -32,7 +32,7 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     anker: 'erste-schritte',
     titel: TEXTE.hilfe.abschnitte['erste-schritte'],
     datei: '/anleitung/erste-schritte.md',
-    pfade: ['/'],
+    pfade: ['/', '/anmeldung'],
     abgemeldet: true,
   },
   // Mit Passkey anmelden (24.3, Req 10): alle angemeldeten Rollen, ohne Pfad
@@ -91,7 +91,7 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     titel: TEXTE.hilfe.abschnitte['eingangskorb-eigene'],
     datei: '/anleitung/eingangskorb-eigene.md',
     eltern: 'eingangskorb',
-    bedingung: { eine: ['A5'], ohne: ['A7'] },
+    bedingung: { eine: ['A1'], ohne: ['A7'] },
   },
   {
     anker: 'suche',

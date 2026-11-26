@@ -105,7 +105,7 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
       | A2  | erlaubt | erlaubt             | erlaubt              | erlaubt          |
       | A3  | erlaubt | 404                 | erlaubt              | erlaubt          |
       | A4  | erlaubt | nur eigene ²        | erlaubt (nur lesend) | erlaubt          |
-      | A5  | erlaubt | nur selbst erfasste | 403                  | erlaubt          |
+      | A5  | erlaubt | nur selbst erfasste | erlaubt (nur lesend) | erlaubt          |
       | A6  | erlaubt | 403                 | 403                  | erlaubt          |
       | A7  | erlaubt | 403                 | 403                  | erlaubt          |
       | A8  | erlaubt | 403                 | 403                  | erlaubt          |

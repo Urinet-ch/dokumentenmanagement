@@ -130,7 +130,7 @@ damit Lohn- und Vertragsdaten geschützt sind.
 | A2 | `NORMAL` lesen, suchen, herunterladen | erlaubt | erlaubt | erlaubt | erlaubt |
 | A3 | `INTERN` lesen, suchen, herunterladen | erlaubt | 404 | erlaubt | erlaubt |
 | A4 | `PERSONAL` lesen, suchen, herunterladen | erlaubt | nur eigene ² | erlaubt (nur lesend) | erlaubt |
-| A5 | Eingangskorb einsehen | erlaubt | nur selbst erfasste | 403 | erlaubt |
+| A5 | Eingangskorb einsehen | erlaubt | nur selbst erfasste | erlaubt (nur lesend) | erlaubt |
 | A6 | Metadaten ändern, Vorschläge korrigieren | erlaubt | 403 | 403 | erlaubt |
 | A7 | Bestätigen | erlaubt | 403 | 403 | erlaubt |
 | A8 | Vertraulichkeit und `person_benutzer` setzen | erlaubt | 403 | 403 | erlaubt |
@@ -165,7 +165,7 @@ Präzisierung zu A6 und A12 (entschieden von Fabian am 14.11.2026, Requirement 1
 8. WENN ein angemeldeter Benutzer des Mandanten ein Dokument mit Vertraulichkeit `NORMAL` anfragt (A2), DANN SOLL das Archiv es unabhängig von der Rolle liefern.
 9. FALLS ein Benutzer mit Rolle `mitarbeiter` ein Dokument mit Vertraulichkeit `INTERN` anfragt (A3), DANN SOLL das Archiv nach 2.3 verfahren.
 10. FALLS ein Benutzer mit Rolle `mitarbeiter` ein `PERSONAL`-Dokument anfragt, das nicht seines ist (A4, Fussnote ²), DANN SOLL das Archiv nach 2.3 verfahren.
-11. FALLS ein Benutzer mit Rolle `treuhaender` den Eingangskorb abruft (A5), DANN SOLL das Archiv mit HTTP 403 antworten.
+11. WENN ein Benutzer mit Rolle `treuhaender` den Eingangskorb abruft (A5), DANN SOLL das Archiv nur die für ihn nach A2 bis A4 und Requirement 2.21 sichtbaren Dokumente liefern, ohne Bestätigen oder Korrigieren (A6, A7: 403). Geändert am 26.11.2026 auf Entscheid von Fabian; vorher 403.
 12. FALLS ein Benutzer mit Rolle `mitarbeiter` oder `treuhaender` Metadaten ändern oder einen Vorschlag korrigieren will (A6), DANN SOLL das Archiv mit HTTP 403 antworten und nichts ändern.
 13. FALLS ein Benutzer mit Rolle `mitarbeiter` oder `treuhaender` ein Dokument bestätigen will (A7), DANN SOLL das Archiv mit HTTP 403 antworten und den Status nicht ändern.
 14. FALLS ein Benutzer mit Rolle `mitarbeiter` oder `treuhaender` die Vertraulichkeit oder `person_benutzer` setzen will (A8), DANN SOLL das Archiv mit HTTP 403 antworten und nichts ändern.

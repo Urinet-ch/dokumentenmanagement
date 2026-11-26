@@ -12,8 +12,11 @@ import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import ch.urinet.archiv.sicherheit.application.WebseitenErfassungAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
+import ch.urinet.archiv.sicherheit.domain.Ergebnis;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -40,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -95,6 +99,9 @@ class EndpunktWaechterTest {
     private static final String ID = "\\{\\s*id\\s*(:([^{}]|\\{[^{}]*})*)?}";
     private static final Pattern DOKUMENT_ID = Pattern.compile(ID);
     private static final Pattern HERUNTERLADEN = Pattern.compile(".*" + ID + "/datei/?$");
+    private static final java.nio.file.Path OPENAPI = java.nio.file.Path.of("../frontend/openapi/openapi.json");
+    private static final java.nio.file.Path MATRIX = java.nio.file.Path.of("src/test/resources/rechtematrix.json");
+    private static final List<String> HTTP_NAMEN = List.of("get", "post", "put", "patch", "delete", "head", "options");
     private static final Map<ApiTokenScope, String> SCOPE_PFAD =
             Map.of(ApiTokenScope.IMPORT, "/dokumente", ApiTokenScope.GENERATOR, "/dokumente/generator");
 
@@ -107,6 +114,138 @@ class EndpunktWaechterTest {
 
         assertThat(ressourcen).as("mindestens die Probe-Ressource").isNotEmpty();
         assertThat(ressourcen.stream().flatMap(k -> verstoesse(k).stream())).isEmpty();
+    }
+
+    @Test
+    void openApiOperationenSindDurchDieRechtematrixAbgedeckt() throws IOException {
+        ObjectMapper json = new ObjectMapper();
+        JsonNode openApi = json.readTree(OPENAPI.toFile());
+        JsonNode matrix = json.readTree(MATRIX.toFile());
+        Map<String, JsonNode> zeilen = new LinkedHashMap<>();
+        matrix.path("aktionen").forEach(zeile -> zeilen.put(zeile.path("id").asText(), zeile));
+
+        Map<String, Method> codeOperationen = new LinkedHashMap<>();
+        new ClassFileImporter().importPackages("ch.urinet.archiv").stream()
+                .filter(k -> !k.getName().contains("EndpunktWaechterTest"))
+                .filter(k -> k.getName().startsWith("ch.urinet.archiv.") && !k.isInterface()
+                        && !k.getModifiers().contains(JavaModifier.ABSTRACT) && hatPfad(k))
+                .map(JavaClass::reflect)
+                .forEach(ressource -> {
+                    String klassenPfad = hierarchie(ressource).stream().map(k -> k.getAnnotation(Path.class))
+                            .filter(Objects::nonNull).map(Path::value).findFirst().orElse("");
+                    endpunktMethoden(ressource).values().forEach(deklarationen -> {
+                        Optional<Method> methode = umsetzung(ressource, deklarationen.getFirst());
+                        Optional<Method> verb = deklarationen.stream()
+                                .filter(m -> HTTP.stream().anyMatch(m::isAnnotationPresent)).findFirst();
+                        if (methode.isEmpty() || verb.isEmpty()
+                                || methode.get().isAnnotationPresent(WebseitenZugang.class)) {
+                            return;
+                        }
+                        String methodenPfad = deklarationen.stream().map(m -> m.getAnnotation(Path.class))
+                                .filter(Objects::nonNull).map(Path::value).findFirst().orElse("");
+                        String pfad = normalisiert("/api/v1" + klassenPfad + "/" + methodenPfad);
+                        if (!pfad.startsWith("/api/v1/")) {
+                            return;
+                        }
+                        String httpMethode = HTTP.stream().filter(verb.get()::isAnnotationPresent)
+                                .findFirst().orElseThrow().getSimpleName().toLowerCase();
+                        if (!openApi.path("paths").path(pfad).has(httpMethode)) {
+                            return;
+                        }
+                        String schluessel = httpMethode + " " + pfad;
+                        assertThat(codeOperationen.put(schluessel, methode.get()))
+                                .as("doppelte REST-Operation " + schluessel).isNull();
+                    });
+                });
+
+        Map<String, JsonNode> openApiOperationen = new LinkedHashMap<>();
+        openApi.path("paths").fields().forEachRemaining(pfad -> pfad.getValue().fields().forEachRemaining(operation -> {
+            if (HTTP_NAMEN.contains(operation.getKey())) {
+                openApiOperationen.put(operation.getKey() + " " + pfad.getKey(), operation.getValue());
+            }
+        }));
+        assertThat(openApiOperationen).as("alle Operationen im OpenAPI-Vertrag müssen aus REST-Ressourcen stammen")
+                .containsOnlyKeys(codeOperationen.keySet().toArray(String[]::new));
+        assertThat(codeOperationen.keySet()).as("jede REST-Ressource muss im OpenAPI-Vertrag stehen")
+                .containsExactlyInAnyOrderElementsOf(openApiOperationen.keySet());
+
+        List<String> abweichungen = new ArrayList<>();
+        openApiOperationen.forEach((schluessel, operation) -> {
+            Method methode = codeOperationen.get(schluessel);
+            Set<String> rollenImCode = methode.isAnnotationPresent(RolesAllowed.class)
+                    ? Set.of(methode.getAnnotation(RolesAllowed.class).value()) : Set.of();
+            Set<String> rollenImVertrag = rollenImVertrag(operation.path("security"), schluessel);
+            if (!rollenImVertrag.equals(rollenImCode)) {
+                abweichungen.add(schluessel + ": OpenAPI-Rollen " + rollenImVertrag + " statt Code-Rollen "
+                        + rollenImCode);
+            }
+            Set<String> erwarteteRollen = new LinkedHashSet<>();
+            ErfordertAktion erklaerung = methode.getAnnotation(ErfordertAktion.class);
+            if (erklaerung != null) {
+                JsonNode zeile = zeilen.get(erklaerung.value().name());
+                if (zeile == null) {
+                    abweichungen.add(schluessel + ": Matrixzeile fehlt für " + erklaerung.value());
+                    return;
+                }
+                boolean dokumentbezogen = erklaerung.value().dokumentbezogen()
+                        && !methode.isAnnotationPresent(NichtDokumentbezogen.class)
+                        && DOKUMENT_ID.matcher(schluessel).find();
+                for (Rolle rolle : Rolle.values()) {
+                    JsonNode zelle = zeile.path("rollen").path(rolle.code());
+                    Ergebnis ergebnis = RechtematrixZelle.ergebnis(zelle.path("ergebnis").asText());
+                    List<String> erwarteteStatus = new ArrayList<>();
+                    zelle.path("http").forEach(status -> erwarteteStatus.add(status.asText()));
+                    assertThat(erwarteteStatus).as(schluessel + " " + rolle.code() + " HTTP")
+                            .isEqualTo(RechtematrixSpecTest.httpErgebnisse(ergebnis));
+                    if (ergebnis.zugaenglich() || dokumentbezogen) {
+                        erwarteteRollen.add(rolle.code());
+                    }
+                    if (ergebnis == Ergebnis.VERBOTEN) {
+                        if (!operation.path("responses").has("403")) {
+                            abweichungen.add(schluessel + " " + rolle.code() + ": 403-Antwort fehlt");
+                        }
+                    }
+                    if ((ergebnis == Ergebnis.NICHT_SICHTBAR || ergebnis == Ergebnis.NUR_EIGENE)
+                            && DOKUMENT_ID.matcher(schluessel).find()) {
+                        if (!operation.path("responses").has("404")) {
+                            abweichungen.add(schluessel + " " + rolle.code() + ": 404-Antwort fehlt");
+                        }
+                    }
+                }
+            } else if (methode.isAnnotationPresent(AlleArchivRollen.class)) {
+                erwarteteRollen.addAll(ALLE);
+            }
+            ErlaubtScope scope = methode.getAnnotation(ErlaubtScope.class);
+            if (scope != null) {
+                erwarteteRollen.add(scope.value().rolle());
+            }
+            if (!rollenImVertrag.equals(erwarteteRollen)) {
+                abweichungen.add(schluessel + ": Rollen aus Matrix/Scope " + erwarteteRollen
+                        + " statt OpenAPI-Rollen " + rollenImVertrag);
+            }
+            if (!rollenImCode.isEmpty()) {
+                if (!operation.path("responses").has("401")) {
+                    abweichungen.add(schluessel + ": 401-Antwort fehlt");
+                }
+                if (!operation.path("responses").has("403")) {
+                    abweichungen.add(schluessel + ": 403-Antwort fehlt");
+                }
+            }
+        });
+        assertThat(abweichungen).as("Abweichungen zwischen Rechtematrix, REST-Code und OpenAPI").isEmpty();
+    }
+
+    private static Set<String> rollenImVertrag(JsonNode security, String operation) {
+        if (!security.isArray() || security.isEmpty()) {
+            return Set.of();
+        }
+        assertThat(security).as(operation + " Sicherheitsalternativen").hasSize(1);
+        JsonNode anforderung = security.get(0);
+        assertThat(anforderung.size()).as(operation + " Sicherheitsschema").isEqualTo(1);
+        JsonNode scopes = anforderung.elements().next();
+        Set<String> rollen = new LinkedHashSet<>();
+        scopes.forEach(scope -> rollen.add(scope.asText()));
+        return rollen;
     }
 
     @Test
