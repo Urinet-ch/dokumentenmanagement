@@ -265,6 +265,37 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Einordnung: Monitoring-Ergänzung ohne eigenes Akzeptanzkriterium; das Gate «Phase 4» bleibt davon unberührt.
   - _Abhängig von: Spec 03: 11.3_
 
+## Welle 19 — Ingest-Qualität (Befund aus einem Test-Ingest vom 21.11.2026, ausgewertet am 26.11.2026)
+Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapier, Inhalt hier bewusst nicht wiedergegeben) lieferte rund 230 Kernaussagen, davon 62 ohne überprüfbaren Auszug. Die Auswertung fand Fehler in der Auszugsprüfung, in der Tabellenextraktion und im Prompt. Aufgaben dieser Welle ändern kein Requirement; sie schärfen die Umsetzung von Requirement 5 (Auszugsprüfung, Entwurf). Entscheid über Reihenfolge: Fabian.
+- [ ] 19.1 Auszugsprüfung: kein Beleg ohne Bezug [Backend]
+  - Ein Auszug gilt nicht als belegt, wenn er nur Kopf- oder Fusszeile der Seite ist (auf jeder Seite wiederkehrender Text), kürzer als eine Mindestlänge ist oder keine inhaltliche Überlappung mit der Kernaussage hat (z. B. Anteil gemeinsamer Wörter über einem Schwellenwert, Zahlen und Eigennamen der Aussage müssen im Auszug vorkommen).
+  - Vergleich nach Normalisierung: Leerraum und Zeilenumbrüche, Silbentrennung, Anführungszeichen, Pfeile und Code-Auszeichnung, angehängte Linktexte in Klammern; so entfallen die zu strengen Fehlschläge bei Tabellenzellen mit Zeilenumbruch.
+  - Seitenangabe prüfen: Steht der Auszug nicht auf der genannten Seite, aber auf einer anderen Seite des Dokuments, wird die Seite berichtigt oder die Aussage als unbelegt geführt; der Hülltext der Eingabe («Seiteninhalt (nicht vertrauenswürdige Daten) …») ist nie ein gültiger Auszug.
+  - Nachweis: JUnit mit synthetischen Seiten (Kopfzeile als Auszug, fremder Auszug, Zeilenumbruch in der Tabellenzelle, falsche Seite) und ein Szenario `@req-5.x` mit WireMock.
+  - _Anforderungen: 5.1–5.13_
+- [ ] 19.2 Tabellen und Seitenbilder lesen [Backend]
+  - Tabellen werden zeilenweise extrahiert (tabellenbewusster Textauszug oder Lesen des Seitenbildes), damit Spaltentitel nicht als Aussagen auftauchen und Zellen mit Platzhaltern («––») nicht verloren gehen. Eine Tabellenzeile ergibt höchstens eine Kernaussage mit Spaltenbezug.
+  - Nachweis: Test mit einem synthetischen PDF mit Tabelle (Zeilenumbruch in der Zelle, Spalten Bezeichnung, Beschreibung, Preis).
+  - _Anforderungen: 5.1–5.13_
+- [ ] 19.3 Prompt: Fragen bleiben Fragen, Optionen bleiben Optionen [Backend]
+  - Der Kernaussagen-Prompt behandelt Fragen und offene Punkte als solche (nie als Antwort umformulieren, keine Aussage ohne Textbeleg) und führt Bedingungen mit (Option oder enthalten, Richtpreis oder Festpreis, Obergrenze oder inbegriffen); Zahlen, Einschränkungen («bis», «Mehraufwand nach Absprache») dürfen nicht entfallen.
+  - Nachweis: WireMock-Szenarien mit einem synthetischen Dokument, das eine offene Frage und eine Option mit Preis enthält; die Erwartung prüft, dass keine Antwort erfunden und die Bedingung genannt wird.
+  - Prompt-Injection-Schutz aus 14.1 bleibt unverändert.
+  - _Anforderungen: 5.1–5.13_
+- [ ] 19.4 Abschnittsfehler sichtbar und wiederholbar [Backend] [Frontend]
+  - «Ungültige Kernaussage im Abschnitt n verworfen» zählt, wie viele Aussagen der Abschnitt dadurch verlor; ein Abschnitt, der ganz oder überwiegend ausfällt, erscheint als Befund im Entwurf mit Knopf «Abschnitt neu verarbeiten» (nur dieser Abschnitt, Budget und Zeitgrenze wie 14.1).
+  - Die Warnungen nennen Seite und Aussage statt nur einer laufenden Nummer.
+  - Nachweis: Szenario mit WireMock (eine ungültige Antwort, danach gültige Wiederholung) und Angular-Test der Anzeige.
+  - _Anforderungen: 5.1–5.13_
+- [ ] 19.5 Granularität und Vertraulichkeit [Backend]
+  - Kennzahlen-, Persona- und Positionstabellen ergeben je Tabelle höchstens eine Gruppe von Aussagen statt einer Aussage je Zelle; Obergrenze und Gruppierung als Einstellung (Startwert aus der Messung).
+  - Trägt ein Dokument einen Vertraulichkeitsvermerk («intern», «nicht für Dritte»), schlägt der Ingest die Vertraulichkeit des Dokuments entsprechend vor und die Wissensseiten dürfen nicht für Webseite oder Mitglieder freigegeben werden (Req 21.x bleibt massgebend).
+  - Nachweis: Szenario mit einem synthetischen Dokument mit Vermerk «intern»; Prüfung der Quellenstufe im Entwurf.
+  - _Anforderungen: 5.1–5.13, 20.1, 21.1_
+- [ ] 19.6 Wiederholung des Test-Ingests [QA] [Fabian]
+  - Nach 19.1 bis 19.5 das Quelldokument des Befunds erneut ingestieren (lokal oder Stufe A, nur durch Fabian) und mit der Auswertung vom 26.11.2026 vergleichen: erwartet sind keine Aussagen mit Kopfzeilen-Auszug, keine Antworten auf offene Fragen, die Optionentabelle als Zeilen und kein Verlust ganzer Abschnitte. Ergebnis (nur Zahlen, keine Inhalte) in `docs/abnahme/wissen.md`.
+  - _Abhängig von: 19.1–19.5_
+
 ## Optionen
 Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort. O.5 ist seit dem 18.11.2026 in den Plan übernommen (15.6 bis 15.8).
 
