@@ -15,6 +15,25 @@ class EinstellungsInventarTest {
     }
 
     @Test
+    void alleInventareintraegeEntsprechenAktuellenKonfigurationsschluesseln() throws IOException {
+        assertThat(EinstellungsInventar.veralteteInventareintraege()).isEmpty();
+    }
+
+    @Test
+    void dokumentierteSchluesselSindImCodeOderBegruendeteAusnahme() throws IOException {
+        assertThat(EinstellungsInventar.undokumentierteReferenzen()).isEmpty();
+        assertThat(EinstellungsInventar.verwendeteAusnahmen())
+                .containsExactlyInAnyOrder(
+                        "archiv.apps.urinet.ch",
+                        "archiv.dump",
+                        "archiv.einfuehrung",
+                        "archiv.example.invalid",
+                        "archiv.ki.token-datei",
+                        "archiv.php",
+                        "archiv.tsa.url");
+    }
+
+    @Test
     void unbekannteUndMehrdeutigeSchluesselWerdenNichtStillKlassifiziert() {
         var inventar = EinstellungsInventar.inventar(List.of(
                 "### Klasse (a)", "| Wert | `archiv.chat.aufbewahrung` | Grenzen |",
