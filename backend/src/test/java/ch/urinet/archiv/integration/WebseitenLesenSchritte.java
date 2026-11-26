@@ -640,6 +640,12 @@ public class WebseitenLesenSchritte {
         assertThat(antwort.header(name)).isEqualTo(wert);
     }
 
+    @Dann("trägt die Lese-Antwort den Header «{}» genau einmal mit dem Wert «{}»")
+    public void headerGenauEinmal(String name, String wert) {
+        assertThat(antwort.headers().getList(name))
+                .extracting(io.restassured.http.Header::getValue).containsExactly(wert);
+    }
+
     @Dann("trägt die Lese-Antwort keinen Header «{}»")
     public void keinHeader(String name) {
         assertThat(antwort.headers().hasHeaderWithName(name)).as(antwort.headers().toString()).isFalse();
