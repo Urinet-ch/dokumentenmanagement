@@ -73,8 +73,9 @@ Ein erneuter Lauf nach Prüfung des Zustands ist sicher: bereits übernommene Be
   geschrieben wurden und keine weitere Korrektur nötig ist, ist keine Wiederherstellung aus Sicherung nötig.
 - Anmeldbarkeit, Rolle, Mandant und TOTP der betroffenen Zugänge erneut geschützt prüfen; der Inhaber bleibt Inhaber.
   Keine Zugangsdaten erfassen. Abweichungen vor Freigabe klären; Wartungsfenster erst nach Prüfung beenden.
-- In `docs/abnahme/verwaltung.md` nur Datum, Ergebnis der Prüfungen, Anzahl und anonymisierte Befundcodes festhalten;
-  keine Kennungen, Namen, Adressen, Secrets oder personenbezogene Rohberichte. Aufgabe 21.2 erst nach Fabians
+- Den Betriebsnachweis geschützt ausserhalb des Repositorys festhalten; nur Datum, Ergebnis der Prüfungen, Anzahl
+  und anonymisierte Befundcodes, keine Kennungen, Namen, Adressen, Secrets oder personenbezogene Rohberichte.
+  Aufgabe 21.2 erst nach Fabians
   tatsächlicher Ausführung und Abnahme abhaken.
 - Bei Fehlern stoppen, Zustand und Folgeänderungen sichern und den Betreiberentscheid einholen. Die Verzeichniszeilen
   sind append-only: weder löschen noch als regulären Rollback zurücksetzen. Eine Wiederherstellung aus Sicherung ist

@@ -1,6 +1,6 @@
 # Abnahme Einführung und Hilfe – Vorbereitung
 
-Stand 24.11.2026. **Nicht abgenommen:** Aufgabe 23.6 und alle manuellen Prüfungen sind offen.
+Stand 26.11.2026. **Abgenommen am 26.11.2026** (Aufgabe 23.6); Ergebnis siehe «Abnahmeprotokoll» am Ende.
 Nur synthetische Testdaten verwenden; keine Inhalte aus Dokumenten, keine Bildschirmfotos mit echten Daten und keine
 Personendaten in diesem Protokoll festhalten. Ergebnisse mit Nummern, Status, Zeiten und Fehler-IDs dokumentieren.
 
@@ -61,16 +61,16 @@ Für jede Rolle mit einem neuen Testbenutzer anmelden und die Startseite öffnen
 zulässige Schritte und Bereiche; «Weiter», «Zurück», Hilfe zum Schritt, «Fertig» oder «Überspringen» und anschliessend
 «Einführung erneut zeigen» funktionieren. Beim erneuten Öffnen beginnt die Einführung bei Schritt 1.
 
-- [ ] 1.1 Inhaber
-- [ ] 1.2 Treuhänder
-- [ ] 1.3 Mitarbeiter
-- [ ] 1.4 Geschäftsstelle
+- [x] 1.1 Inhaber
+- [x] 1.2 Treuhänder
+- [x] 1.3 Mitarbeiter
+- [x] 1.4 Geschäftsstelle
 
 ### 2. Handy und Offline – 10 Minuten
 
-- [ ] 2.1 iOS: Einführung und Hilfe bei 375 CSS-Pixel Breite bedienen; kein waagrechter Seitenbildlauf.
-- [ ] 2.2 Android: dieselbe Prüfung bei 375 CSS-Pixel Breite.
-- [ ] 2.3 Auf beiden Geräten die App zuerst online laden und die Anleitung öffnen. Flugmodus aktivieren und WLAN
+- [x] 2.1 iOS: Einführung und Hilfe bei 375 CSS-Pixel Breite bedienen; kein waagrechter Seitenbildlauf.
+- [x] 2.2 Android: dieselbe Prüfung bei 375 CSS-Pixel Breite.
+- [x] 2.3 Auf beiden Geräten die App zuerst online laden und die Anleitung öffnen. Flugmodus aktivieren und WLAN
   ausschalten; die installierte App erneut öffnen. Hilfe-Leiste und Anleitung öffnen und sichtbare Abschnitte lesen.
   Danach Flugmodus ausschalten. Falls 375 CSS-Pixel auf einem Gerät nicht erreichbar sind, Ergebnis offen lassen und
   die tatsächlich geprüfte Breite als Zahl notieren.
@@ -114,7 +114,7 @@ Bewertung je Nummer: **2** selbständig gelöst, **1** mit Hinweis gelöst, **0*
 **Frage:** Soll für den zweiten Mandanten in Einführung oder Anleitung erklärt werden, welche bestätigten Dokumente
 wann auf der Webseite erscheinen?
 
-- [ ] 6.1 Option A: kein Zusatz; Texte bleiben für alle Mandanten gleich.
+- [x] 6.1 Option A: kein Zusatz; Texte bleiben für alle Mandanten gleich.
 - [ ] 6.2 Option B: Zusatz nach abgestimmtem Wortlaut über die Mandantenkonfiguration; keine Abfrage der
   Mandantenkennung im Code.
 - [ ] 6.3 Entscheid bleibt offen.
@@ -123,9 +123,13 @@ wann auf der Webseite erscheinen?
 Weitere `[offen: …]`-Stellen in Spec 07 nennen nur diesen Punkt oder den allgemeinen Umgang mit offenen Punkten.
 
 ## Abnahmeprotokoll
-
-- Datum: ___
-- Ergebnis: offen / bestanden / nicht bestanden
-- Prüfnummern mit Abweichung und gegebenenfalls Fehler-ID: ___
-- Bemerkung ohne Inhalte oder Personendaten: ___
-- CI-Lauf-ID und Ergebnis des endgültigen Stands: ___
+- Datum: 26.11.2026
+- Ergebnis: bestanden
+- Prüfnummern mit Abweichung und gegebenenfalls Fehler-ID: keine. Beim Löschen eines frisch angelegten, noch aktiven
+  Benutzers erscheint «Die Aktion ist im aktuellen Zustand nicht möglich. Bitte laden Sie die Angaben neu.»; das ist
+  das erwartete `STATUS_KONFLIKT`, der Text nennt aber den Grund nicht (Verbesserungsvorschlag, kein Abnahmehindernis).
+- Bemerkung ohne Inhalte oder Personendaten: Abschnitte 1, 2 und 6 von Fabian geprüft und bestätigt. Abschnitte 3 bis 5
+  (Screenreader, Bildschirmfotos, Lesetest) ohne protokollierte Einzelergebnisse, auf Fabians Anweisung abgeschlossen;
+  ihre Kästchen bleiben deshalb offen. Entscheid 2.4: Option A, kein Zusatz
+  (Fabian, 26.11.2026).
+- CI-Lauf-ID und Ergebnis des endgültigen Stands: 45835742257 auf `3902d7704b9c4bb2d18048907194c36c2a61bc74`, bestanden.

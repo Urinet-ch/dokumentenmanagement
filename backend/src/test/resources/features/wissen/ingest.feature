@@ -40,6 +40,18 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
     Und die Entwurfsansicht kennzeichnet beide Kernaussagen entsprechend ihrer Zuordnung
 
+  @req-5.3
+  Szenario: Die Auszugsprüfung korrigiert die PDF-Seite anhand des synthetischen Belegs
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
+    Und das Dokument «QUELLE» hat synthetische PDF-Seiten für die Auszugsprüfung
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert eine Kernaussage mit falscher Seitenangabe
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und die Kernaussage erhält die belegte PDF-Seite 2
+
   @req-7.6
   Szenario: Eine KI-Antwort setzt keine Freigabefelder oder Seitenstufe
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
