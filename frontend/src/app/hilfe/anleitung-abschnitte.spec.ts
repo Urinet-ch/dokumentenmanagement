@@ -37,7 +37,7 @@ const SOLL: readonly Soll[] = [
   { anker: 'erfassen-offline', titel: 'Ohne Netz erfassen', eltern: 'erfassen', eine: ['A1'], abgemeldet: true },
   { anker: 'eingangskorb', titel: 'Eingangskorb', eine: ['A5'], pfade: ['/eingangskorb'] },
   { anker: 'eingangskorb-bestaetigen', titel: 'Prüfen, korrigieren und bestätigen', eltern: 'eingangskorb', eine: ['A7'] },
-  { anker: 'eingangskorb-eigene', titel: 'Ihre erfassten Dokumente verfolgen', eltern: 'eingangskorb', eine: ['A5'], ohne: ['A7'] },
+  { anker: 'eingangskorb-eigene', titel: 'Ihre erfassten Dokumente verfolgen', eltern: 'eingangskorb', eine: ['A1'], ohne: ['A7'] },
   { anker: 'suche', titel: 'Suche', eine: ['A2'], pfade: ['/suche'] },
   { anker: 'chat', titel: 'Chat', eine: ['A2'], pfade: ['/chat'] },
   { anker: 'chat-bewerten', titel: 'Antworten bewerten', eltern: 'chat', eine: ['A2'] },

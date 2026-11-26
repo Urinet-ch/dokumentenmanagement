@@ -136,10 +136,13 @@ Funktionalität: Sichtbarkeit der Dokumente nach Rolle und Vertraulichkeit (Aufg
     Dann liefert der Eingangskorb die Gesamtzahl 1 und diese Dokumente:
       | V_OFFEN |
 
-  @req-2.3
-  Szenario: treuhaender hat keinen Eingangskorb (A5 verboten)
+  # Entscheid Fabian 26.11.2026: A5 für treuhaender lesend; unbestätigte Dokumente bleiben nach Req 2.21 unsichtbar.
+  @req-2.3 @req-2.11 @req-2.21
+  Szenario: treuhaender sieht im Eingangskorb nur die für ihn sichtbaren bestätigten Dokumente
     Wenn «treuhaender-urinet» den Eingangskorb abruft
-    Dann antwortet der Dokument-Endpunkt mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Dann liefert der Eingangskorb die Gesamtzahl 2 und diese Dokumente:
+      | U_FEHLER_INTERN |
+      | U_FEHLER_FREMD  |
 
   Szenario: Ungültige Seite oder Grösse im Eingangskorb
     Wenn «inhaber-urinet» den Eingangskorb mit Seite 0 und Grösse 101 abruft
