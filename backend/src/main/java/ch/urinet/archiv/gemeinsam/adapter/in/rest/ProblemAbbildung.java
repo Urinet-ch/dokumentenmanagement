@@ -20,6 +20,7 @@ import io.quarkus.oidc.OIDCException;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.AuthenticationRedirectException;
 import io.quarkus.security.UnauthorizedException;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
@@ -124,11 +125,14 @@ public class ProblemAbbildung {
     public Response framework(WebApplicationException fehler) {
         Response ursprung = fehler.getResponse();
         int status = ursprung == null ? 500 : ursprung.getStatus();
+        boolean ungueltigerZahlenparameter = fehler instanceof NotFoundException
+                && Ursachen.enthaelt(fehler, NumberFormatException.class);
         Response.ResponseBuilder antwort = switch (status) {
             case 400 -> builder(ProblemAntwort.fuer(Fehlercode.ANFRAGE_UNGUELTIG));
             case 401 -> nichtAngemeldetBuilder(fehler);
             case 403 -> builder(ProblemAntwort.fuer(Fehlercode.NICHT_ERLAUBT));
-            case 404 -> builder(ProblemAntwort.fuer(Fehlercode.NICHT_GEFUNDEN));
+            case 404 -> builder(ProblemAntwort.fuer(ungueltigerZahlenparameter
+                    ? Fehlercode.ANFRAGE_UNGUELTIG : Fehlercode.NICHT_GEFUNDEN));
             case 413 -> builder(ProblemAntwort.fuer(Fehlercode.DATEI_ZU_GROSS));
             case 415 -> builder(ProblemAntwort.fuer(Fehlercode.MEDIENTYP_FALSCH));
             default -> status >= 400 && status < 500
