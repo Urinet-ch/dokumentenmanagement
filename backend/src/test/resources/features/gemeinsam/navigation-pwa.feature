@@ -13,7 +13,7 @@ Funktionalität: Navigation der PWA nach Rolle
       | rolle            | menü                                                                       |
       | inhaber          | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Kontakte, Wissen, Wissensentwürfe, Importe, Jahresexport, Einstellungen, Benutzer, Dokumentarten, Zugriffsprotokoll, Chat-Auswertung, API-Tokens |
       | mitarbeiter      | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Wissen                                              |
-      | treuhaender      | Übersicht, Suche, Chat, Wissen, Jahresexport                                                       |
+      | treuhaender      | Übersicht, Eingangskorb, Suche, Chat, Wissen, Jahresexport                                                       |
       | geschaeftsstelle | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Kontakte, Wissen, Wissensentwürfe                    |
 
   @req-2.6
@@ -33,7 +33,7 @@ Funktionalität: Navigation der PWA nach Rolle
     Dann zeigt die Navigation den Eingangskorb-Zähler «3»
 
   @req-2.11
-  Szenario: Ohne Recht auf den Eingangskorb fragt die PWA keinen Zähler ab
+  Szenario: Der Treuhänder sieht den Eingangskorb-Zähler lesend (A5, seit 26.11.2026)
     Angenommen der Eingangskorb enthält 3 Dokumente
     Und ich bin als «treuhaender» im Mandanten «urinet» angemeldet
-    Dann ruft die PWA den Eingangskorb nicht ab und zeigt keinen Zähler
+    Dann zeigt die Navigation den Eingangskorb-Zähler «3»
