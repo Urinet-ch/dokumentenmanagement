@@ -161,7 +161,8 @@ Bucket-Strom wird mit `archiv sicherung wiederherstellen`
 in den neuen `urinet-archiv-p-`-Bucket eingespielt; eine absichtlich unvollständige Inventarliste ohne Manifest wird
 vorher zurückgewiesen. Die Quarkus-Testanwendung startet gegen die wiederhergestellte Archivdatenbank und prüft
 Dokument-, Seiten- und Versionszahlen gegen die Quelle, IDs, SHA-256 und Lesbarkeit der Dateien. Zusätzlich prüft
-sie, dass weder das Dokument noch sein Original aus dem anderen Mandanten im jeweiligen Ziel vorhanden ist.
+sie, dass weder das Dokument noch Versionen oder Löschmarken seines Originals und PDF/A aus dem anderen Mandanten
+im jeweiligen Ziel vorhanden sind. Dies wird für beide Mandanten geprüft.
 `archiv manifest pruefen` validiert danach das signierte
 Manifest im Ziel-Bucket anhand der Schlüssel und SHA-256, nicht anhand der alten S3-Versions-IDs, und gleicht es mit
 dem in der Datenbank festgehaltenen Hash ab; eine zusätzliche, veränderte Fassung im Ziel-Bucket lässt die Prüfung
