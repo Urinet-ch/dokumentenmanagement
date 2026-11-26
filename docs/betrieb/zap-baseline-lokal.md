@@ -42,6 +42,9 @@ der Stufen `oeffentlich`, `mitglieder` und `vorstand` geprüft. Die Tokens und S
 werden nur im wegwerfbaren Teststack erstellt, in einem temporären Arbeitsverzeichnis
 ausserhalb des Repositories gespeichert und vor der Ausgabe der ZAP-Berichte aus
 Berichten und Logs entfernt.
+Die temporäre ZAP-Konfiguration wird mit Rechten 600 angelegt und über die
+Standardeingabe an den Scanner übergeben; auch dort wird sie mit Rechten 600
+als Scannerbenutzer angelegt.
 Sie werden weder ausgegeben noch in Repository-Dateien übernommen. Das Arbeitsverzeichnis
 wird beim Beenden des Skripts entfernt. Die Datenbank und die zugehörigen Container werden
 anschliessend entfernt; der Testserver stoppt spätestens nach 40 Minuten.
