@@ -9,6 +9,8 @@ import ch.urinet.archiv.dokument.application.DokumentAendern;
 import ch.urinet.archiv.dokument.application.DokumentLesen;
 import ch.urinet.archiv.dokument.application.Seite;
 import ch.urinet.archiv.dokument.domain.Dokument;
+import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
+import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.integration.application.webseite.WebseiteLesen;
@@ -77,6 +79,7 @@ class FehlerInjektionTest {
     @Inject KontaktVerwaltung kontaktVerwaltung;
     @Inject DokumentLesen dokumentLesen;
     @Inject DokumentAendern dokumentAendern;
+    @Inject DokumentartVerwaltung dokumentarten;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -220,6 +223,36 @@ class FehlerInjektionTest {
                 }
             }
 
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void dokumentartenBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) {
+        List<String> tokens = List.of(Testanmeldung.token("inhaber-urinet"), Testanmeldung.token("inhaber-vhf-gsk"));
+        for (String token : tokens) {
+            given().auth().oauth2(token).when().get("/api/v1/dokumentarten").then().statusCode(200);
+        }
+        DokumentartVerwaltung original = ClientProxy.unwrap(dokumentarten);
+        AtomicInteger getroffen = new AtomicInteger();
+        QuarkusMock.installMockForType(new DokumentartVerwaltung(null, null, null, null, null, null) {
+            @Override
+            public List<Dokumentart> alle() {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+        }, DokumentartVerwaltung.class);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (String token : tokens) {
+                var antwort = given().auth().oauth2(token).when().get("/api/v1/dokumentarten");
+                assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+            }
+            assertThat(getroffen).hasValue(2);
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+            for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
+        } finally {
+            QuarkusMock.installMockForType(original, DokumentartVerwaltung.class);
         }
     }
 
