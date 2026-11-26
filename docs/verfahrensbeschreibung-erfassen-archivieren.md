@@ -1,7 +1,7 @@
 # Verfahrensbeschreibung «Erfassen und Archivieren»
 
-**Entwurf, von Fabian zu prüfen und freizugeben.** Noch nicht verbindlich; Gegenlesen durch den Treuhänder
-und Festlegung «gültig ab» stehen aus. Dieser Entwurf ist keine rechtliche Zusicherung. Die vorgeschriebene
+**Freigabe durch Fabian, gültig ab dem Merge dieser Fassung (Entscheid 26.11.2026).** Das Gegenlesen durch den
+Treuhänder folgt; Anpassungen kommen als eigener Änderungsvorschlag. Dieses Dokument ist keine rechtliche Zusicherung. Die vorgeschriebene
 freigegebene Fassung soll höchstens zwei Seiten umfassen und als PDF/A im Archiv liegen
 ([Spec 01, Req 16.6](../.kiro/specs/01-archiv-kern/requirements.md#requirement-16-betrieb-sicherung-und-dokumentation-ohne-konzept-id-nicht-funktional),
 [Aufgabe 5.7](../.kiro/specs/01-archiv-kern/tasks.md)).
@@ -66,8 +66,10 @@ einschliesslich Objektbestand und Manifest. Schlüssel und Zugänge gehören nic
 ([Spec 01, Req 16.2–16.3, 16.8](../.kiro/specs/01-archiv-kern/requirements.md),
 [Sicherungsanleitung](../deploy/backup/README.md), [Wiederherstellung](wiederherstellung.md)).
 
-## Offene Fragen an Fabian
-
-- Welcher Kontaktweg und welche verantwortliche Person gelten im Notfall für den Treuhänder?
-- Wo werden die versiegelten Notfallunterlagen verwahrt, ohne Zugangsdaten im Repository festzuhalten?
-- Wer prüft den Entwurf und das Gegenlesen des Treuhänders, und ab wann gilt die freigegebene Fassung?
+## Notfall und Verwahrung (Entscheide 26.11.2026)
+- **Notfallkontakt:** Es gelten die Rollen Inhaber und Treuhänder; die Kontaktwege stehen ausschliesslich in den
+  Notfallunterlagen, nie in diesem Dokument oder im Repository.
+- **Verwahrung:** Die versiegelten Notfallunterlagen liegen an einem geschützten Ort laut Notfallunterlagen; Ort, Zugänge
+  und Schlüssel stehen nicht im Repository.
+- **Freigabe und Geltung:** Fabian gibt frei; die Fassung gilt ab dem Merge. Gegenlesen durch den Treuhänder und die
+  Ablage als PDF/A im Archiv (Req 16.6) sind Folgeschritte bei Fabian.
