@@ -5,8 +5,15 @@ import ch.urinet.archiv.dokument.Testdateien;
 import ch.urinet.archiv.dokument.adapter.out.persistence.PanacheDokumentSuche;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.integration.application.webseite.WebseiteLesen;
+import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
+import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
+import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
+import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
+import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
+import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.application.SuchePort;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
@@ -30,13 +37,15 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Reale REST-Anfragen mit einem gezielt ausfallenden Such-Port; keine fremden Datenbanken werden angehalten. */
+/** Reale REST-Anfragen mit gezielt simulierten Ausfällen; keine fremden Datenbanken werden angehalten. */
 @QuarkusTest
 class FehlerInjektionTest {
     private static final String MARKER = "SYNTHETISCHER_INHALT_7F42";
@@ -44,6 +53,8 @@ class FehlerInjektionTest {
     @Inject MandantProvisionierung provisionierung;
     @Inject AgroalDataSource datenbank;
     @Inject SuchePort suche;
+    @Inject WebseiteLesen webseiteLesen;
+    @Inject WebseitenSchluesselVerwaltung schluesselVerwaltung;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -74,11 +85,7 @@ class FehlerInjektionTest {
             @Override
             public Suchergebnis suchen(Suchanfrage anfrage, Sichtregel sichtregel, boolean mitDateiname) {
                 getroffen.incrementAndGet();
-                Exception ursache = switch (ausfall) {
-                    case DATENBANK -> new SQLTransientConnectionException(MARKER);
-                    case ZEITUEBERSCHREITUNG -> new SocketTimeoutException(MARKER);
-                };
-                throw new IllegalStateException(MARKER, ursache);
+                throw fehler(ausfall);
             }
         }, SuchePort.class);
         try (LogMitschnitt log = LogMitschnitt.starten()) {
@@ -118,5 +125,64 @@ class FehlerInjektionTest {
         } finally {
             S3Stoerung.aus();
         }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void webseitenlisteBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) throws Exception {
+        List<String> tokens = new ArrayList<>();
+        try {
+            for (String mandant : List.of("urinet", "vhf-gsk")) {
+                tokens.add(schluesselVerwaltung.erstellen(mandant, "qa-fehlerantwort",
+                        "lesen", "oeffentlich", false).token().text());
+            }
+            for (String token : tokens) {
+                given().auth().oauth2(token).when().get("/public/v1/dokumente").then().statusCode(200);
+            }
+            WebseiteLesen original = ClientProxy.unwrap(webseiteLesen);
+            AtomicInteger getroffen = new AtomicInteger();
+            QuarkusMock.installMockForType(new WebseiteLesen(null) {
+                @Override
+                public Set<String> oeffentlicheKlassifikationsCodes() {
+                    return Set.of();
+                }
+
+                @Override
+                public WebseiteSeite liste(Lesezugriff zugriff, ListenFilter filter, WebseiteSortierung sortierung,
+                                           int seite, int proSeite) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+            }, WebseiteLesen.class);
+            try (LogMitschnitt log = LogMitschnitt.starten()) {
+                for (String token : tokens) {
+                    var antwort = given().auth().oauth2(token).when().get("/public/v1/dokumente");
+                    assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                    assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+                }
+                assertThat(getroffen).hasValue(2);
+                assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+                for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
+            } finally {
+                QuarkusMock.installMockForType(original, WebseiteLesen.class);
+            }
+        } finally {
+            try (Connection c = datenbank.getConnection();
+                 PreparedStatement s = c.prepareStatement("delete from public.api_client where id = ?")) {
+                for (String token : tokens) {
+                    s.setString(1, ApiToken.lesen(token).orElseThrow().id());
+                    s.executeUpdate();
+                }
+            }
+
+        }
+    }
+
+    private static IllegalStateException fehler(Ausfall ausfall) {
+        Exception ursache = switch (ausfall) {
+            case DATENBANK -> new SQLTransientConnectionException(MARKER);
+            case ZEITUEBERSCHREITUNG -> new SocketTimeoutException(MARKER);
+        };
+        return new IllegalStateException(MARKER, ursache);
     }
 }
