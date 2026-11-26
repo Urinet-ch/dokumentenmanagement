@@ -6,6 +6,7 @@ import ch.urinet.archiv.sicherheit.ProblemDetails;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
+import io.cucumber.datatable.DataTable;
 import io.quarkus.security.AuthenticationFailedException;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
@@ -63,6 +64,7 @@ public class LogSchritte {
         signatur[10] = signatur[10] == 'A' ? 'B' : 'A';
         String falsch = teile[0] + "." + teile[1] + "." + new String(signatur);
         JsonNode claims = new ObjectMapper().readTree(Base64.getUrlDecoder().decode(teile[1]));
+        werte.add(token);
         werte.add(falsch);
         werte.add(teile[1]);
         werte.add(new String(signatur));
@@ -93,6 +95,14 @@ public class LogSchritte {
             for (Response antwort : antworten) {
                 assertThat(antwort.asString()).as("Antwort").doesNotContain(wert);
             }
+        }
+    }
+
+    @Dann("enthält das Log keine der folgenden Markierungen")
+    public void logOhneMarkierungen(DataTable tabelle) {
+        String log = mitschnitt.volltext();
+        for (String wert : tabelle.asList()) {
+            assertThat(log).as("Log darf den synthetischen Marker nicht enthalten").doesNotContain(wert);
         }
     }
 

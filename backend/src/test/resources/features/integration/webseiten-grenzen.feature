@@ -12,9 +12,11 @@ Funktionalität: Grenzen je Schlüssel der Webseiten-Schnittstelle (Aufgabe 11.1
   @req-15.1
   Szenario: Schlüssel A wird begrenzt, Schlüssel B nicht, und wechselnde Header umgehen die Grenze nicht
     Angenommen es gibt den Lese-Schlüssel «A» und den Lese-Schlüssel «B» für Grenzen
-    Wenn der Schlüssel «A» «/public/v1/probe» mit wechselnden Clients und Stufen aufruft, bis eine Anfrage abgelehnt wird
+    Und das ganze Log der Webseiten-Grenze wird mitgeschnitten
+    Wenn der Schlüssel «A» «/public/v1/probe?marker=logmarker-person@example.invalid» mit wechselnden Clients und Stufen aufruft, bis eine Anfrage abgelehnt wird
     Dann wurde die erste Anfrage zwischen der 41. und der 44. abgelehnt
     Und die Ablehnung ist 429 «ZU_VIELE_ANFRAGEN» mit «Retry-After» zwischen 1 und 3600 Sekunden und dem Grund «ANFRAGEN»
+    Und enthält das Log weder den Schlüssel noch den synthetischen Marker noch die Client-Hashes
     Und die Ablehnung nennt weder den Schlüssel noch einen Header-Wert
     Wenn der Schlüssel «A» «/public/v1/probe» mit einem anderen Client und der Stufe «oeffentlich» aufgerufen wird
     Dann antwortet die Grenze mit Status 429
