@@ -22,6 +22,9 @@ import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
 import ch.urinet.archiv.ki.application.chat.VollstaendigkeitAbfrage;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontext;
+import ch.urinet.archiv.ki.application.chat.ChatVerlauf;
+import ch.urinet.archiv.ki.domain.chat.Gespraech;
+import ch.urinet.archiv.ki.domain.chat.GespraechKopf;
 import ch.urinet.archiv.kontakt.application.KontaktSeite;
 import ch.urinet.archiv.kontakt.application.KontaktSuche;
 import ch.urinet.archiv.kontakt.application.KontaktVerwaltung;
@@ -99,6 +102,7 @@ class FehlerInjektionTest {
     @Inject KonfigurationsdateiVerwaltung konfigurationsdatei;
     @Inject KlassifikationVerwaltung klassifikationen;
     @Inject VollstaendigkeitAbfrage vollstaendigkeit;
+    @Inject ChatVerlauf chatVerlauf;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -286,6 +290,84 @@ class FehlerInjektionTest {
                  PreparedStatement s = c.prepareStatement("delete from public.api_client where id = ?")) {
                 for (Probe probe : proben) {
                     s.setString(1, probe.id());
+                    s.executeUpdate();
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void chatVerlaufBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) throws Exception {
+        record Probe(String mandant, String anmeldung, UUID id) { }
+        List<Probe> proben = new ArrayList<>();
+        try {
+            for (String mandant : List.of("urinet", "vhf-gsk")) {
+                String benutzer = "inhaber-" + mandant;
+                Probe probe = new Probe(mandant, Testanmeldung.token(benutzer), UUID.randomUUID());
+                String schema = new MandantCode(mandant).schema();
+                try (Connection c = datenbank.getConnection();
+                     PreparedStatement s = c.prepareStatement("insert into " + schema
+                             + ".chat_gespraech (id, benutzer, titel, erstellt, geaendert) values (?, ?, ?, now(), now())")) {
+                    s.setObject(1, probe.id());
+                    s.setString(2, Testanmeldung.sub(benutzer));
+                    s.setString(3, "Synthetisches Testgespräch");
+                    s.executeUpdate();
+                }
+                proben.add(probe);
+                try (Connection c = datenbank.getConnection();
+                     PreparedStatement s = c.prepareStatement("insert into " + schema
+                             + ".chat_nachricht (gespraech_id, rolle, inhalt, zeit) values (?, 'BENUTZER', ?, now())")) {
+                    s.setObject(1, probe.id());
+                    s.setString(2, MARKER);
+                    s.executeUpdate();
+                }
+                var liste = given().auth().oauth2(probe.anmeldung()).when().get("/api/v1/chat/gespraeche");
+                assertThat(liste.statusCode()).isEqualTo(200);
+                assertThat(liste.asString()).contains(probe.id().toString());
+                var detail = given().auth().oauth2(probe.anmeldung())
+                        .when().get("/api/v1/chat/gespraeche/" + probe.id());
+                assertThat(detail.statusCode()).isEqualTo(200);
+                assertThat(detail.asString()).contains(MARKER);
+            }
+            ChatVerlauf original = ClientProxy.unwrap(chatVerlauf);
+            AtomicInteger getroffen = new AtomicInteger();
+            QuarkusMock.installMockForType(new ChatVerlauf(null) {
+                @Override
+                public List<GespraechKopf> gespraeche(Benutzer benutzer) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+
+                @Override
+                public Gespraech gespraech(Benutzer benutzer, UUID id) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+            }, ChatVerlauf.class);
+            try (LogMitschnitt log = LogMitschnitt.starten()) {
+                for (Probe probe : proben) {
+                    var liste = given().auth().oauth2(probe.anmeldung()).when().get("/api/v1/chat/gespraeche");
+                    var detail = given().auth().oauth2(probe.anmeldung())
+                            .when().get("/api/v1/chat/gespraeche/" + probe.id());
+                    for (var antwort : List.of(liste, detail)) {
+                        assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                        assertThat(antwort.asString())
+                                .doesNotContain(MARKER, probe.anmeldung(), "Exception", "\tat ", "Caused by:");
+                    }
+                }
+                assertThat(getroffen).hasValue(4);
+                assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+                for (Probe probe : proben) assertThat(log.volltext()).doesNotContain(probe.anmeldung());
+            } finally {
+                QuarkusMock.installMockForType(original, ChatVerlauf.class);
+            }
+        } finally {
+            for (Probe probe : proben) {
+                try (Connection c = datenbank.getConnection();
+                     PreparedStatement s = c.prepareStatement("delete from "
+                             + new MandantCode(probe.mandant()).schema() + ".chat_gespraech where id = ?")) {
+                    s.setObject(1, probe.id());
                     s.executeUpdate();
                 }
             }
