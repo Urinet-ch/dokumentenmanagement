@@ -74,7 +74,7 @@ Funktionalität: Eingangskorb – Angaben für die Oberfläche
     Dann zeigt der Eingangskorb beim Dokument «F» den Fehlertext "Verarbeitung fehlgeschlagen (synthetisch)", ohne PDF/A nein
     Und zeigt der Eingangskorb beim Dokument «P» den Fehlertext "Keine PDF/A-Fassung möglich", ohne PDF/A ja
 
-  @req-8.1 @req-10.2
+  @req-8.1 @req-10.2 @sicherheits-header
   Szenario: Das Vorschaubild einer Seite wird geliefert und protokolliert
     Angenommen im Mandanten «urinet» liegt das Dokument «V» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Und für das Dokument «V» liegt ein Vorschaubild der Seite 1
