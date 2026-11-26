@@ -1,5 +1,6 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { verzeichnisOeffnen } from '../hilfen/hilfe-verzeichnis.mjs';
 import { createHash } from 'node:crypto';
 import axe from 'axe-core';
 import { AUSSTELLER, basisUrl } from '../hilfen/keycloak-attrappe.mjs';
@@ -62,7 +63,7 @@ async function hilfePruefen(seite) {
 
   await seite.getByRole('button', { name: 'Hilfe', exact: true }).click();
   await dialog.waitFor();
-  const navigation = dialog.getByRole('navigation', { name: 'Inhalt der Anleitung' });
+  const navigation = await verzeichnisOeffnen(dialog);
   const links = await navigation.getByRole('link').allTextContents();
   await pruefen(seite, 'Hilfe-Leiste über der Anleitung');
   for (const titel of links) {

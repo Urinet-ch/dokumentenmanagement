@@ -1,5 +1,6 @@
 import { After, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { verzeichnisOeffnen } from '../hilfen/hilfe-verzeichnis.mjs';
 import { createHash } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -80,7 +81,7 @@ Then('sind alle sichtbaren Abschnitte der Anleitung geladen', async function () 
 
 Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_000 }, async function () {
   const leiste = this.seite.getByRole('dialog', { name: 'Hilfe', exact: true });
-  const nav = leiste.getByRole('navigation', { name: 'Inhalt der Anleitung' });
+  const nav = await verzeichnisOeffnen(leiste);
   const links = nav.getByRole('link');
   await links.first().waitFor({ state: 'visible' });
   const titel = (await links.allInnerTexts()).map((text) => text.trim());

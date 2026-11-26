@@ -37,11 +37,20 @@ Funktionalität: Hilfe-Leiste ohne Verlassen der aktuellen Seite
     Dann ist die Hilfe-Leiste 375 Pixel breit
 
   @req-4.5
-  Szenario: Die Leiste ist am breiten Bildschirm höchstens 420 Pixel breit
+  Szenario: Die Leiste ist am breiten Bildschirm breiter als 480 und höchstens 760 Pixel breit
     Angenommen ein Bildschirm mit 1280 Pixel Breite
     Wenn ich die Seite «/» öffne
     Und ich die Hilfe-Leiste öffne
-    Dann ist die Hilfe-Leiste höchstens 420 Pixel breit
+    Dann ist die Hilfe-Leiste zwischen 480 und 760 Pixel breit
+
+  @req-4.7
+  Szenario: Das Inhaltsverzeichnis der Leiste ist zugeklappt und lässt sich aufklappen
+    Angenommen ein Bildschirm mit 1280 Pixel Breite
+    Wenn ich die Seite «/» öffne
+    Und ich die Hilfe-Leiste öffne
+    Dann ist das Inhaltsverzeichnis der Hilfe-Leiste zugeklappt
+    Wenn ich das Inhaltsverzeichnis der Hilfe-Leiste aufklappe
+    Dann ist das Inhaltsverzeichnis der Hilfe-Leiste aufgeklappt
 
   @req-4.2
   Szenario: Eine Aufnahme bleibt beim Öffnen und Schliessen der Hilfe-Leiste erhalten

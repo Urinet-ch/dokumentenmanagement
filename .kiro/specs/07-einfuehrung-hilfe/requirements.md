@@ -160,13 +160,18 @@ meine Eingaben, Aufnahmen oder mein Chatverlauf verloren gehen, damit ich mir se
 4. Die Hilfe-Leiste SOLL den Titel des Abschnitts, seinen Text, einen Link «Ganze Anleitung öffnen» (`/hilfe#<anker>`)
    und den Knopf «Schliessen» zeigen. Links auf andere Abschnitte SOLLEN den Inhalt der Leiste wechseln, ohne zu
    navigieren; Links auf Seiten der App SOLLEN navigieren und die Leiste schliessen.
-5. Die Hilfe-Leiste SOLL als Dialog mit dem Namen «Hilfe» über der Seite liegen (ab 960 px rechts mit höchstens 420 px
-   Breite, darunter in ganzer Breite), beim Öffnen den Fokus auf ihre Überschrift setzen, den Fokus in der Leiste halten,
+5. Die Hilfe-Leiste SOLL als Dialog mit dem Namen «Hilfe» über der Seite liegen (ab 960 px rechts, mindestens 480 px,
+   höchstens 760 px und etwa 42 % der Fensterbreite breit, darunter in ganzer Breite; geändert 26.11.2026 nach der
+   Abnahme, vorher höchstens 420 px), beim Öffnen den Fokus auf ihre Überschrift setzen, den Fokus in der Leiste halten,
    mit Escape und «Schliessen» schliessen und den Fokus danach auf den Knopf «Hilfe» zurückgeben.
 6. Die App SOLL zusätzlich an diesen Stellen einen Link «So funktioniert es» zeigen, der die Hilfe-Leiste mit dem
    genannten Unterabschnitt öffnet: auf der Seite «Erfassen» bei der Warteschlange und bei fehlerhaften Uploads
    (`#erfassen-offline`), auf der Anmeldekarte der Startseite ohne Netz (`#erfassen-offline`) und bei der Meldung ohne
    Mandant oder Rolle (`#probleme`).
+
+7. Das Inhaltsverzeichnis der Hilfe-Leiste SOLL kompakt sein (Abschnitte nebeneinander) und sich auf- und zuklappen
+   lassen (Knopf «Abschnitte» mit dem gewählten Abschnitt und `aria-expanded`); beim Öffnen der Leiste ist es zugeklappt,
+   damit der Text den Platz bekommt. Aufgenommen am 26.11.2026 nach der Abnahme (Fabian).
 
 ### Requirement 5: Seite `/hilfe` – die ganze Anleitung (ohne Konzept-ID)
 **User Story:** Als Benutzer möchte ich die ganze Anleitung für meine Rolle an einem Ort lesen und gezielt zu einem Bereich

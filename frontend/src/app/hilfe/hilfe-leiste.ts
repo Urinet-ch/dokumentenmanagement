@@ -6,6 +6,7 @@ import {
   computed,
   inject,
   output,
+  signal,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
@@ -28,6 +29,9 @@ export class HilfeLeisteAnsicht {
   protected readonly texte = TEXTE.hilfe;
   readonly navigiert = output<void>();
 
+  /** Das Inhaltsverzeichnis ist beim Öffnen zugeklappt, damit der Text den Platz bekommt (Req 4.7). */
+  protected readonly verzeichnisOffen = signal(false);
+
   protected readonly eintraege = computed(() =>
     sichtbareAbschnitte(this.katalog, this.hilfe.rolle()).flatMap(({ eintrag, unter }) => [eintrag, ...unter]),
   );
@@ -40,6 +44,10 @@ export class HilfeLeisteAnsicht {
     afterRenderEffect(() => {
       if (this.hilfe.offen()) this.host.nativeElement.querySelector<HTMLElement>('#hilfe-leiste-titel')?.focus();
     });
+  }
+
+  protected verzeichnisUmschalten(): void {
+    this.verzeichnisOffen.update((offen) => !offen);
   }
 
   protected waehlen(ereignis: MouseEvent, anker: string): void {
