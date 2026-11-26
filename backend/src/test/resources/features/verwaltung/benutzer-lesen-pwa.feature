@@ -21,6 +21,23 @@ Funktionalität: Benutzer und Rechte in der PWA lesen
       | 1280   | hell   |
       | 1280   | dunkel |
 
+  @req-8.7
+  Szenariogrundriss: Die Rechte-Übersicht zeigt je Gruppe eine barrierefreie Tabelle
+    Angenommen die Benutzerverwaltung liefert synthetische Daten
+    Und das Browserfenster ist <breite> Pixel breit
+    Und das Farbschema ist «<schema>»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich im Menü «Benutzer» wähle
+    Und ich den synthetischen Benutzer öffne
+    Dann zeigt die Rechte-Übersicht Gruppentabellen mit Spalten, Ergebnissen und Fussnoten ohne Überlauf und axe-Befund
+
+    Beispiele:
+      | breite | schema |
+      | 375    | hell   |
+      | 375    | dunkel |
+      | 1280   | hell   |
+      | 1280   | dunkel |
+
   @req-8.1
   Szenariogrundriss: Ohne A21 sind Liste und Detail nicht sichtbar
     Angenommen die Benutzerverwaltung liefert synthetische Daten

@@ -1,73 +1,23 @@
 /// <reference lib="webworker" />
 // Scanner der Handy-Erfassung (Req 4.3): erkennt das Blatt, schneidet zu, entzerrt und liefert die Arbeitsfassung als
 // JPEG. Läuft im Worker, damit OpenCV.js die Oberfläche nicht blockiert; Chunk und WebAssembly kommen aus dem Bundle.
-import { Ecken, skalieren } from './ecken';
-import { Cv, eckenFinden, entzerren, openCvLaden } from './kanten';
-import { ScannerAntwort, ScannerAuftrag } from './scanner-nachricht';
-import { AufnahmeGrenzeFehler, MAX_AUFNAHME_BYTES, pruefeBildPixel } from '../aufnahme-grenzen';
-import { leseBildAbmessungen } from '../bild-abmessungen';
-
-/** Die Kanten werden auf einer Verkleinerung gesucht; das spart Zeit und dämpft Rauschen. */
-const ERKENNUNG_KANTE = 1000;
-const JPEG_QUALITAET = 0.85;
+import { eckenFinden, entzerren, openCvLaden } from './kanten';
+import type { Cv } from './kanten';
+import type { ScannerAuftrag } from './scanner-nachricht';
+import { scannerVerarbeiten } from './scanner-verarbeitung';
+import type { ScannerVerarbeitungsWerkzeuge } from './scanner-verarbeitung';
 
 let opencv: Promise<{ cv: Cv }> | undefined;
 
+const werkzeuge: ScannerVerarbeitungsWerkzeuge = {
+  openCvLaden: () => (opencv ??= openCvLaden()),
+  bildErzeugen: (bild) => createImageBitmap(bild),
+  eckenFinden,
+  entzerren,
+  leinwandErzeugen: (breite, hoehe) => new OffscreenCanvas(breite, hoehe),
+  bilddatenErzeugen: (daten, breite, hoehe) => new ImageData(daten, breite, hoehe),
+};
+
 addEventListener('message', ({ data }: MessageEvent<ScannerAuftrag>) => {
-  void verarbeiten(data);
+  void scannerVerarbeiten(data, werkzeuge).then((antwort) => postMessage(antwort));
 });
-
-async function verarbeiten(data: ScannerAuftrag): Promise<void> {
-  let antwort: ScannerAntwort;
-  try {
-    antwort = { nr: data.nr, ok: true, ...(await aufbereiten(data)) };
-  } catch (fehler) {
-    antwort = {
-      nr: data.nr,
-      ok: false,
-      fehler: fehler instanceof AufnahmeGrenzeFehler ? fehler.grenze : fehler instanceof Error ? fehler.message : String(fehler),
-    };
-  }
-  postMessage(antwort);
-}
-
-async function aufbereiten(auftrag: ScannerAuftrag) {
-  if (auftrag.bild.size > MAX_AUFNAHME_BYTES) {
-    throw new AufnahmeGrenzeFehler('groesse');
-  }
-  await leseBildAbmessungen(auftrag.bild);
-  const { cv } = await (opencv ??= openCvLaden());
-  const bild = await createImageBitmap(auftrag.bild);
-  const { width: breite, height: hoehe } = bild;
-  try {
-    pruefeBildPixel(breite, hoehe);
-    let ecken: Ecken | null | undefined = auftrag.ecken;
-    if (ecken === undefined) {
-      const faktor = Math.min(1, ERKENNUNG_KANTE / Math.max(breite, hoehe));
-      const klein = pixel(cv, bild, Math.round(breite * faktor), Math.round(hoehe * faktor));
-      try {
-        const gefunden = eckenFinden(cv, klein);
-        ecken = gefunden && skalieren(gefunden, 1 / faktor);
-      } finally {
-        klein.delete();
-      }
-    }
-    const voll = pixel(cv, bild, breite, hoehe);
-    const aus = entzerren(cv, voll, ecken);
-    voll.delete();
-    const leinwand = new OffscreenCanvas(aus.cols, aus.rows);
-    leinwand.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(aus.data), aus.cols, aus.rows), 0, 0);
-    aus.delete();
-    const arbeitsfassung = await leinwand.convertToBlob({ type: 'image/jpeg', quality: JPEG_QUALITAET });
-    return { ecken, breite, hoehe, arbeitsfassung };
-  } finally {
-    bild.close();
-  }
-}
-
-function pixel(cv: Cv, bild: ImageBitmap, breite: number, hoehe: number) {
-  const leinwand = new OffscreenCanvas(breite, hoehe);
-  const kontext = leinwand.getContext('2d', { willReadFrequently: true });
-  kontext.drawImage(bild, 0, 0, breite, hoehe);
-  return cv.matFromImageData(kontext.getImageData(0, 0, breite, hoehe));
-}

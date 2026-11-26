@@ -267,13 +267,13 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
 ## Welle 19 — Ingest-Qualität (Befund aus einem Test-Ingest vom 21.11.2026, ausgewertet am 26.11.2026)
 Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapier, Inhalt hier bewusst nicht wiedergegeben) lieferte rund 230 Kernaussagen, davon 62 ohne überprüfbaren Auszug. Die Auswertung fand Fehler in der Auszugsprüfung, in der Tabellenextraktion und im Prompt. Aufgaben dieser Welle ändern kein Requirement; sie schärfen die Umsetzung von Requirement 5 (Auszugsprüfung, Entwurf). Entscheid über Reihenfolge: Fabian.
-- [ ] 19.1 Auszugsprüfung: kein Beleg ohne Bezug [Backend]
-  - Ein Auszug gilt nicht als belegt, wenn er nur Kopf- oder Fusszeile der Seite ist (auf jeder Seite wiederkehrender Text), kürzer als eine Mindestlänge ist oder keine inhaltliche Überlappung mit der Kernaussage hat (z. B. Anteil gemeinsamer Wörter über einem Schwellenwert, Zahlen und Eigennamen der Aussage müssen im Auszug vorkommen).
+- [x] 19.1 Auszugsprüfung: kein Beleg ohne Bezug [Backend]
+  - Ein Auszug gilt nicht als belegt, wenn er nur Kopf- oder Fusszeile der Seite ist (auf mindestens drei Seiten und mindestens dem konfigurierten Anteil wiederkehrender Text), kürzer als eine Mindestlänge ist oder keine inhaltliche Überlappung mit der Kernaussage hat (z. B. Anteil gemeinsamer Wörter über einem Schwellenwert, Zahlen und Eigennamen der Aussage müssen im Auszug vorkommen). Seiten und Randzeilen werden je Ingest einmal vorbereitet; der Startwert der Randzeilen-Schwelle ist 0.3.
   - Vergleich nach Normalisierung: Leerraum und Zeilenumbrüche, Silbentrennung, Anführungszeichen, Pfeile und Code-Auszeichnung, angehängte Linktexte in Klammern; so entfallen die zu strengen Fehlschläge bei Tabellenzellen mit Zeilenumbruch.
   - Seitenangabe prüfen: Steht der Auszug nicht auf der genannten Seite, aber auf einer anderen Seite des Dokuments, wird die Seite berichtigt oder die Aussage als unbelegt geführt; der Hülltext der Eingabe («Seiteninhalt (nicht vertrauenswürdige Daten) …») ist nie ein gültiger Auszug.
   - Nachweis: JUnit mit synthetischen Seiten (Kopfzeile als Auszug, fremder Auszug, Zeilenumbruch in der Tabellenzelle, falsche Seite) und ein Szenario `@req-5.x` mit WireMock.
   - _Anforderungen: 5.1–5.13_
-- [ ] 19.2 Tabellen und Seitenbilder lesen [Backend]
+- [x] 19.2 Tabellen und Seitenbilder lesen [Backend]
   - Tabellen werden zeilenweise extrahiert (tabellenbewusster Textauszug oder Lesen des Seitenbildes), damit Spaltentitel nicht als Aussagen auftauchen und Zellen mit Platzhaltern («––») nicht verloren gehen. Eine Tabellenzeile ergibt höchstens eine Kernaussage mit Spaltenbezug.
   - Nachweis: Test mit einem synthetischen PDF mit Tabelle (Zeilenumbruch in der Zelle, Spalten Bezeichnung, Beschreibung, Preis).
   - _Anforderungen: 5.1–5.13_

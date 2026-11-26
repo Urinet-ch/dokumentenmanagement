@@ -558,9 +558,11 @@ Bestehende Codes: 401 `NICHT_ANGEMELDET`, 403 `NICHT_ERLAUBT`, 404 `NICHT_GEFUND
   Signals und OnPush; Angular Material; 375 px, Karten statt Tabellen; Statusmeldungen als `role="status"`.
 - Einstellungen: Gruppen als Abschnitte, je Feld Hilfetext, Grenzen, Standard, «wirksam ab», «auf Standard»; ein Knopf
   «Vorschau» zeigt die Auswirkung (`/vorschau`); riskante Änderungen öffnen den Dialog der Auswirkung; Verlauf mit Vergleich.
-- Benutzer: Liste mit Status (Text und Symbol), Karte je Benutzer; Detail mit Rechte-Übersicht (gruppiert:
-  Dokumente lesen, erfassen und bestätigen, Verwalten, Wissensbasis), Aktionen je nach Status, Hinweis auf API-Tokens. Dialoge nach
-  Requirement 8.4; Löschen mit Eingabe des Benutzernamens.
+- Benutzer: Liste mit Status (Text und Symbol), Karte je Benutzer; Rechte-Übersicht für Benutzer und Rollen als Tabelle
+  pro Gruppe (Dokumente und Wissen lesen, Erfassen und verarbeiten, Prüfen und bestätigen, Verwalten), mit den Spalten «Recht»,
+  «Ergebnis» und «Hinweis». Tabellenkopf und Zeilenkopf sind semantisch ausgezeichnet; Ergebnistext bleibt neben der
+  Farbe sichtbar. Bei 375 px brechen Zellinhalte um, ohne horizontalen Seitenlauf. Aktionen je nach Status, Hinweis
+  auf API-Tokens. Dialoge nach Requirement 8.4; Löschen mit Eingabe des Benutzernamens.
 - Fehlermatrix nach Requirement 8.5; `STEP_UP_NOETIG`: Weiterleitung zu Keycloak mit `max_age=0` und `prompt=login`, danach genau
   eine Wiederholung. Keine Offline-Warteschlange für Verwaltungsaktionen.
 
@@ -941,21 +943,26 @@ Protokolladapter wie der Schreibweg, damit Änderungen am Protokollformat die Ra
 
 Die Benutzerseiten verwenden ausschliesslich die Lese-Endpunkte aus 19.7 und 19.11. Der Menüpunkt und beide Routen
 verlangen A21; ohne Recht zeigt der Direktaufruf «Nicht gefunden». Liste und Detail verwenden Karten, die
-Rechte-Übersicht zeigt die Ergebnisse und Fussnoten der API in vier Gruppen. Ein Rollenkonflikt verhindert das Laden
-der Rechte. Anträge sind lesend sichtbar; die Aktionen folgen in 20.7. API-Tokens und Webseiten-Schlüssel werden
-nicht über die Benutzerverwaltung ausgegeben; ein Hinweis verweist auf die separate Token-Verwaltung.
+Rechte-Übersicht zeigt die Ergebnisse und Fussnoten der API als Tabelle je Gruppe. Ein Rollenkonflikt verhindert das
+Laden der Rechte. Anträge sind lesend sichtbar; die Aktionen folgen in 20.7. API-Tokens und Webseiten-Schlüssel
+werden nicht über die Benutzerverwaltung ausgegeben; ein Hinweis verweist auf die separate Token-Verwaltung.
 
 Suche und Blättern nutzen die durch den REST-Vertrag begrenzte Seitengrösse 50. Ein voller letzter Abschnitt kann
 einen zusätzlichen Aufruf ergeben, weil der Vertrag keine Gesamtzahl liefert. Fehler bleiben sichtbar und sind
 wiederholbar; nach einem Fehler beim Blättern wird dieselbe Seite erneut geladen. Der Browser-Nachweis nutzt
 synthetische REST-Antworten; die serverseitigen Rechte und die Mandantentrennung prüfen die Tests von 19.7 und 19.11.
-Der manuelle Nachweis auf dem Handy und die manuelle Beurteilung der Rechte-Übersicht bleiben bei 21.6.
+Der manuelle Handy-Nachweis zu 8.2 bleibt bei 21.6.
 
 Nachweisstand 24.11.2026: Die in #505 und #514 geprüfte Benutzerliste und das Detail sind weiterhin durch
 `benutzer-lesen-pwa.feature` und Angular-Tests abgedeckt; #531 ergänzt die Browser-Prüfung der eingebundenen
 Benutzeraktionen. Die Browser-Szenarien verwenden synthetische Antworten und prüfen 375/1280 px, beide Farbschemata,
 axe, Tastatur und den Direktzugriff ohne A21. Die manuelle Prüfung von 8.2 und 8.7 bleibt bei 21.6 [Fabian];
 die Checkbox 20.6 bleibt deshalb offen.
+
+Nachtrag (Abnahme Verwaltung, 26.11.2026): Die Rechte-Übersicht ist je Gruppe als native Tabelle mit den Spalten
+«Recht», «Ergebnis» und «Hinweis» umgesetzt. `scope="col"` und `scope="row"` kennzeichnen die Tabellenköpfe; Ergebnisse
+bleiben als Text sichtbar, Fussnoten stehen in der Hinweis-Spalte. Zellinhalte umbrechen bei 375 px. Der gezielte
+Browser-Nachweis prüft diese Struktur sowie axe und horizontalen Überlauf bei 375 und 1280 px in beiden Farbschemata.
 
 Die Review-Nachbesserung verwendet die globalen Bausteine für Lade-, Leer- und Rechtezustände. Fehler in Liste,
 Anträgen, Rollen und Rechten bleiben mit einem gezielten Wiederholknopf sichtbar.

@@ -1123,9 +1123,10 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
 - Req 4.7 ist offen: Die Sicherung erfasst die ganze Archiv-Datenbank mit `pg_dump`. Seit PR #357 stellt
   `restore-uebung-lokal.sh` den Datenbankdump tatsächlich mit `pg_restore` in einer eigenen Ziel-Datenbank
   wieder her (Spec 01, Aufgabe 5.12). Seit PR #397 vergleicht der lokale Rundlauf
-  (`SicherungPaketRoundtripTest`, Nachprüfung 21.11.2026) je Mandant zwei Wissensseiten und drei Versionen
-  (nichtleerer Bestand) vor und nach dem Datenbank-Restore. Offen bleibt nur der Zählvergleich in der
-  wiederkehrenden betrieblichen Restore-Probe (4.7); dieser Teil ist nachgelagert als Aufgabe 13.7 offen.
+  (`SicherungPaketRoundtripTest`, Nachprüfung 21.11.2026) je Mandant Wissensseiten und Versionen vor und nach dem
+  Datenbank-Restore. Die lokale synthetische Probe vergleicht zusätzlich die Zahlen der Quelleneinträge und Dokumente
+  mit dem Stand vor der Sicherung (**Umsetzung (Aufgabe 13.7, 26.11.2026)**). Offen bleibt der Zählvergleich in der
+  wiederkehrenden betrieblichen Restore-Probe (4.7); Aufgabe 13.7 bleibt dafür offen.
   Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis (Review PR #295, M1).
 - Das Secret `keycloak_verwaltung_secret` steht seit PR #397 in der Secret-Liste von `restore-uebung-lokal.sh` und im
   Restore-Compose-Stack: `application.properties` (`%prod`, Spec 06, ADR-015) verlangt es, der Stack startet sonst
@@ -1583,6 +1584,41 @@ Zusatzfelder für `vhf-gsk`. Es setzt nur Dokumente mit aktiver Markierung zurü
 append-only Version. Die Markierungstabelle und ihre Historie bleiben bestehen. Vor jeder Artänderung wird der
 aktuelle Dokumentstand append-only gesichert. `ON CONFLICT DO NOTHING` und die Artbedingung machen ein wiederholtes
 Rollback wirkungsgleich; das Vorwärts-Changeset ergänzt keine bereits aktive Markierung.
+
+### Umsetzung (Aufgabe 19.1, 26.11.2026)
+- Die Ingest-Auszugprüfung vergleicht normalisierte Inhalte (NFKC, Whitespace und Silbentrennung, Anführungszeichen,
+  Pfeile, Markdown-Code und -Links). Zeilen in den zwei ersten oder letzten nichtleeren Zeilen gelten nur dann als
+  wiederkehrende Kopf-/Fusszeilen, wenn sie auf mindestens drei Seiten und mindestens dem konfigurierten Anteil
+  vorkommen. Der Hülltext «Seiteninhalt (nicht vertrauenswürdige Daten)» ist nie ein Beleg.
+- Ein Auszug braucht mindestens 20 normalisierte Unicode-Zeichen und eine Überlappung von mindestens 0.5 der
+  aussagekräftigen Wörter der Kernaussage. Alle Zahlen sowie als Eigennamen erkannte Token müssen im Auszug stehen.
+  Beides ist konfigurierbar über `archiv.wissen.auszug-mindest-zeichen` und
+  `archiv.wissen.aussage-ueberlappung`; der Mindestwert 20 filtert meist nichtssagende Kopfzeilen/Fragmente, während
+  0.5 verhindert, dass ein kurzer, aber echter Auszug wegen weniger fehlender Füllwörter verworfen wird. Zahlen,
+  Abkürzungen und bekannte Rechtsform-Suffixe werden deterministisch erkannt; das ist bewusst kein NER-System.
+- Der Startwert für `archiv.wissen.randzeilen-mindest-anteil` ist 0.3; bei zehn Seiten müssen Randzeilen somit auf
+  mindestens drei Seiten stehen. So werden wiederholte Zwischenüberschriften in kurzen Dokumenten nicht
+  vorschnell als Kopf-/Fusszeile entfernt.
+- Der Prüfer normalisiert Seiten und ermittelt Randzeilen einmal je Ingest. Der begrenzte Eintrags-Cache hält höchstens
+  einen Ingest-Prüfer gleichzeitig und gibt ihn nach dem letzten Abschnitt frei; jede Aussage prüft danach nur noch
+  den normalisierten Auszug und die vorbereiteten Seiten.
+- Zahlen werden auf Aussage- und Auszugsseite gleich normalisiert: Schweizer Apostrophe werden zusammengeführt,
+  Zahlengruppen mit Leerzeichen ohne Trenner verglichen, Dezimalpunkte wie in `1.5` bleiben erhalten.
+- Die Prüfung sucht den Auszug im gesamten PDF-Volltext; ein Fund ausserhalb der KI-Seitenangabe ersetzt diese durch
+  die tatsächliche 1-basierte Seite. Ohne Fund bleiben die KI-Seitenangaben sichtbar, die Aussage gilt aber als
+  unbelegt. Die gemeinsame Normalisierung wird auch bei der späteren Auszugsprüfung verwendet; Requirement 6.2 bleibt
+  unverändert. Keine Datenbankschemaänderung.
+- Nachweise: JUnit für Kopf-/Fusszeilen-Schwelle, Mindestlänge, Prompt-Hülltext, fremde Aussagen, fehlende Zahlen/
+  Eigennamen, Tausendertrenner, Tabellenumbruch, Formatierung und Seitenkorrektur; WireMock-Szenario `@req-5.3` mit
+  synthetischem Dokument.
+
+### Umsetzung (Aufgabe 19.2, 26.11.2026)
+`pdftotext` verwendet beim Volltext nun `-layout`, damit Spaltenpositionen und Zeilenumbrüche in Tabellen bis zum
+Wissens-Ingest erhalten bleiben. Der Kernaussagen-Prompt ordnet Tabellenzellen den Spaltentiteln zu, fasst Umbrüche
+zur selben Datenzeile zusammen, verbietet Aussagen aus Spaltentiteln allein und erhält Platzhalter wie «––».
+Nachweise: OCR-Adaptertest mit synthetischem PDF (Spalten Bezeichnung, Beschreibung und Preis; mehrzeilige Zelle und
+Platzhalter) sowie JUnit-Test, der den tabellenbewussten Prompt und den unveränderten Tabelleninhalt prüft. Keine
+Änderung an Requirements oder Datenbankschema.
 
 ### Umsetzung (Aufgabe 19.3, 26.11.2026)
 Der Zusatzprompt gilt nur für `KERNAUSSAGEN`; die bestehenden Regeln zum Schutz vor Prompt-Injection und zur Kennzeichnung

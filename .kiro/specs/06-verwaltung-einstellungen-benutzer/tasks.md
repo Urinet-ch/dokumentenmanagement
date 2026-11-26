@@ -52,7 +52,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.17, 4.9, 5.2, 5.3, 6.9, 7.4_
   - _Abhängig von: 19.1_
 
-- [ ] 19.3 Stufe A: Dienstkonto, SMTP, Secrets, Deploy [Fabian]
+- [x] 19.3 Stufe A: Dienstkonto, SMTP, Secrets, Deploy [Fabian]
   - [Fabian] (neu 21.11.2026) Secret-Datei `namenssperre_salz` (32 zufällige Bytes, Base64-kodiert) als GitHub-Secret hinterlegen und ins Deploy-Bundle aufnehmen; dauerhaft sichern, Pflichtprüfung wie beim Dienstkonto-Secret (erst mit 19.7).
   - Realm-Änderungen einmalig per `kcadm.sh` im Wegwerf-Container (der Import wirkt nur beim ersten Start); GitHub-Secrets
     `KEYCLOAK_VERWALTUNG_SECRET` und `KEYCLOAK_SMTP_PASSWORT`, Secret-Dateien im Deploy-Bundle und Pflichtprüfung im Workflow;
@@ -204,17 +204,19 @@ auf Server oder Secrets aus der Sitzung.
   - Nachweis: `einstellungen-pwa.feature` (Vorschau, Bestätigung, Step-up und axe bei 375/1280 px hell/dunkel)
     sowie Angular-Tests für Rücksetzung, Versionen, Fehler und OIDC-Fortsetzung. Der manuelle Handy-Nachweis bleibt 21.6.
 
-- [ ] 20.6 Oberfläche Benutzer lesen [Frontend]
+- [x] 20.6 Oberfläche Benutzer lesen [Frontend]
   - Seiten `/verwaltung/benutzer` und `/verwaltung/benutzer/:id`: Liste, Karten, Status, Rechte-Übersicht, Anträge, Hinweis auf API-Tokens;
     Menüpunkte nach Recht, Seite «Nicht gefunden» ohne Recht.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.7_
   - _Abhängig von: 19.7, 19.11_
   - Automatisierte Nachweise für Benutzerliste, Detail und Rechte-Übersicht liegen vor; die Einstellungsseiten sind mit
-    20.5 umgesetzt. Rest bei 21.6 [Fabian]: manueller Handy-Nachweis zu 8.2 und Beurteilung der Rechte-Übersicht zu 8.7.
-    Die Checkbox bleibt bis zu dieser Abnahme offen.
+    20.5 umgesetzt. Nachtrag 26.11.2026: Die Rechte-Übersicht ist je Gruppe als responsive Tabelle mit den Spalten
+    «Recht», «Ergebnis» und «Hinweis» umgesetzt und automatisiert geprüft. Rest bei 21.6 [Fabian]: manueller
+    Handy-Nachweis zu 8.2. Die Checkbox bleibt bis zu dieser Abnahme offen.
   - Nachweis Benutzerseite: `benutzer-lesen-pwa.feature` (`@req-8.1`, `@req-8.2`, `@req-8.3`, `@req-8.7`),
     einschliesslich axe, Tastatur, 375/1280 px hell/dunkel und Zugriff ohne A21 (#505); Angular-Tests für Fehler,
-    Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514). #531 ergänzt Browser-Nachweise für die
+    Rechte und Blättern sowie Gestaltungsnachbesserung und Bilder (#514). Der Nachtrag ergänzt einen spezifischen
+    Tabellen-Nachweis für 8.7 bei 375/1280 px hell/dunkel. #531 ergänzt Browser-Nachweise für die
     inzwischen eingebundenen Benutzeraktionen; die synthetischen REST-Antworten ersetzen keine manuelle Abnahme.
 
 - [x] 20.7 Oberfläche Benutzer: Aktionen und Dialoge [Frontend]
@@ -241,7 +243,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 4.4, 9.1, 9.2, 9.8_
   - _Abhängig von: 19.7, 19.13_
 
-- [ ] 21.2 Migration der heutigen Benutzer [Fabian]
+- [x] 21.2 Migration der heutigen Benutzer [Fabian]
   - Lauf `archiv benutzer abgleichen urinet --pruefen`, dann ohne `--pruefen` auf Stufe A; Abweichungen klären (Rollen, `mandant`,
     TOTP); `fabian` bleibt Inhaber; Anmeldungen vor und nach dem Lauf prüfen; Ergebnis in `docs/abnahme/verwaltung.md`.
   - Vorbereitung: `docs/benutzer-migration-entwurf.md` und `tools/benutzer-migration-entwurf.py` sind ein Entwurf;

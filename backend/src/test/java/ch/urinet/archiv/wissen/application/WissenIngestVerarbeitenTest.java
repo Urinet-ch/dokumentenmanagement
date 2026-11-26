@@ -1,5 +1,6 @@
 package ch.urinet.archiv.wissen.application;
 
+import ch.urinet.archiv.gemeinsam.domain.Seitentext;
 import ch.urinet.archiv.ki.application.KiPort;
 import ch.urinet.archiv.ki.application.KiVerbrauchPort;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -57,6 +58,51 @@ class WissenIngestVerarbeitenTest {
         assertThat(verbrauch.entwurfId).isEqualTo(ENTWURF_ID);
         assertThat(speichern.freigegebeneReservierung).isEqualTo(speichern.reservierungId);
         assertThat(speichern.fortschritt.kontextStufe()).isEqualTo(WissensStufe.NORMAL);
+    }
+
+    @Test
+    void korrigiertDieSeitenangabeZumFundortDesBelegtenAuszugs() throws InterruptedException {
+        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
+                true, "Testquelle", LocalDate.of(2026, 4, 30),
+                "Kopfzeile: Fabel AG – interne Ausgabe\nSeite 1 ohne Beleg.\f"
+                        + "Kopfzeile: Fabel AG – interne Ausgabe\nDie fiktive Firma Fabel AG bietet "
+                        + "eine Zusatzoption zum Preis von CHF 125.00 pro Gerät.\f",
+                2, true, null, null, "KERNAUSSAGEN", 0, 0, "test-modell", false, 300_000, 1_000_000,
+                Fortschritt.leer());
+        Speicher speichern = new Speicher(stand(lauf, 0));
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of(
+                new KiPort.Aussage(1, "Fabel AG bietet eine Zusatzoption für CHF 125.00.", List.of(1),
+                        "Die fiktive Firma Fabel AG bietet eine Zusatzoption zum Preis von CHF 125.00 pro Gerät.")
+        )), new KiPort.Verbrauch("test-modell", 10, 10)));
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        assertThat(speichern.fortschritt.kernaussagen()).singleElement().satisfies(aussage -> {
+            assertThat(aussage.belegt()).isTrue();
+            assertThat(aussage.seiten()).containsExactly(2);
+        });
+    }
+
+    @Test
+    void uebergibtTabellenzeilenMitSpaltenbezugUndPlatzhalternAnDasModell() throws InterruptedException {
+        String tabellenText = "Bezeichnung      Beschreibung                  Preis\n"
+                + "Service A        Zusatzleistung mit            ––\n"
+                + "                 mehrzeiliger Beschreibung\f";
+        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
+                true, "Testquelle", LocalDate.of(2026, 4, 30), tabellenText, 1, true,
+                null, null, "KERNAUSSAGEN", 0, 0, "test-modell", false, 300_000, 1_000_000,
+                Fortschritt.leer());
+        Speicher speichern = new Speicher(stand(lauf, 0));
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of()),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        assertThat(ki.anfrage.systemPrompt()).contains("Verarbeite Tabellen zeilenweise",
+                "höchstens eine Kernaussage je Tabellenzeile", "Spaltentitel allein",
+                "Erhalte Platzhalter wie «––»");
+        assertThat(ki.anfrage.nachricht()).contains("Bezeichnung", "Beschreibung", "Preis", "Service A",
+                "Zusatzleistung mit", "mehrzeiliger Beschreibung", "––");
     }
 
     @Test
