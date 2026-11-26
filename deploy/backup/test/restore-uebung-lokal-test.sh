@@ -215,7 +215,7 @@ cat > "$bin/mvn" <<'MOCK'
 #!/bin/bash
 printf 'mvn cwd=%s %s\n' "$PWD" "$*" >> "$MOCK_LOG"
 if [[ ${MOCK_FAIL_MVN:-0} == 1 && " $* " == *" -Darchiv.restore.phase=ziel "* ]]; then
-  printf '[ERROR] forced test failure\n' >&2
+  printf '[ERROR] Restore-Zählvergleich je Mandant fehlgeschlagen: urinet.quellen erwartet 2, gefunden 1\n' >&2
   exit 1
 fi
 MOCK
@@ -273,7 +273,7 @@ assert grep -q '^OK      Echter Sicherungs-Roundtrip: Phase quelle' "$temp/erfol
 assert grep -q '^OK      Echter täglicher Export' "$temp/erfolg.stdout"
 assert grep -q '^OK      Archiv-Datenbankdump in neue Datenbank einspielen' "$temp/erfolg.stdout"
 assert grep -q '^OK      Keycloak-Datenbankdump in neue Datenbank einspielen' "$temp/erfolg.stdout"
-assert grep -q '^OK      Echter Sicherungs-Roundtrip: Phase ziel' "$temp/erfolg.stdout"
+assert grep -q '^OK      Restore-Zählvergleich je Mandant: Wissensseiten, Versionen, Quellen, Dokumente' "$temp/erfolg.stdout"
 assert grep -q '^OK      Vollständiger lokaler Sicherungs-Roundtrip abgeschlossen' "$temp/erfolg.stdout"
 assert grep -q 'OIDC-Testdienstkonto mit Mandant und Rolle vorbereiten' "$temp/erfolg.stdout"
 assert grep -q "shelltest $MOCK_BACKUP_TEST" "$MOCK_LOG"
@@ -340,6 +340,8 @@ else
 fi
 assert grep -q '^OK      Echter Sicherungs-Roundtrip: Phase quelle' "$temp/fehler.stdout"
 assert grep -q '^FEHLER  Sicherungs-Roundtrip Phase ziel (Exit 1)' "$temp/fehler.stdout"
+assert grep -q 'Restore-Zählvergleich je Mandant fehlgeschlagen: urinet.quellen erwartet 2, gefunden 1' \
+  "$temp/fehler.stderr"
 assert grep -q 'down --remove-orphans' "$MOCK_LOG"
 if grep -q '^OK      Vollständiger lokaler Sicherungs-Roundtrip abgeschlossen' "$temp/fehler.stdout"; then
   printf 'Der Übungslauf wurde trotz Testfehler als abgeschlossen gemeldet.\n' >&2
