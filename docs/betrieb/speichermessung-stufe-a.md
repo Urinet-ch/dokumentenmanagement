@@ -44,7 +44,8 @@ Das Werkzeug führt diese Schritte nicht selbst aus.
   (Rechte 700); jede CSV wird neu mit Rechten 600 angelegt und nie
   überschrieben. Bei Fehler oder unvollständiger Messung nicht als Nachweis
   verwenden. Die Skripte und der Ausgabepfad müssen im Wegwerfcontainer
-  verfügbar sein.
+  verfügbar sein. Fehlermeldungen nennen Aufruf und Fehlerart beziehungsweise
+  `errno`, geben aber keine Docker-Fehlertexte, IDs, Pfade oder CSV-Werte aus.
 
 ## Ablauf
 

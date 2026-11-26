@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Wertet drei Stufe-A-Stichproben und die manuell geprüften Abbruchkriterien aus."""
 
-import argparse
 import csv
 import re
 import sys
@@ -9,7 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from speichermessung_stufe_a import SPALTEN
+from speichermessung_stufe_a import MessdatenFehler, SichererArgumentParser, SPALTEN
 
 PHASEN = ("leerlauf", "upload", "ocr")
 MIB = Decimal(1024 ** 2)
@@ -18,7 +17,7 @@ MIB = Decimal(1024 ** 2)
 def speicher_bytes(text: str) -> Decimal:
     treffer = re.fullmatch(r"(\d+(?:\.\d+)?)(B|[kKMGTPE]i?B)", text)
     if not treffer:
-        raise ValueError("Ungültiger Speicherwert.")
+        raise MessdatenFehler("Ungültiger Speicherwert.")
     wert, einheit = treffer.groups()
     if einheit == "B":
         return Decimal(wert)
@@ -28,13 +27,13 @@ def speicher_bytes(text: str) -> Decimal:
 
 def cpu_limit(nano: int, periode: int, quote: int) -> Decimal:
     if nano < 0 or periode < 0 or quote < -1:
-        raise ValueError("Ungültiges CPU-Limit.")
+        raise MessdatenFehler("Ungültiges CPU-Limit.")
     per_nano = Decimal(nano) / Decimal(10 ** 9) if nano else None
     per_quote = Decimal(quote) / Decimal(periode or 100000) if quote > 0 else None
     if per_nano is not None and per_quote is not None and per_nano != per_quote:
-        raise ValueError("Widersprüchliche CPU-Limits.")
+        raise MessdatenFehler("Widersprüchliche CPU-Limits.")
     if per_nano is None and per_quote is None:
-        raise ValueError("CPU-Limit fehlt; Budget nicht prüfbar.")
+        raise MessdatenFehler("CPU-Limit fehlt; Budget nicht prüfbar.")
     return per_nano if per_nano is not None else per_quote
 
 
@@ -45,44 +44,53 @@ def auswerten(pfade: list[Path], vorpruefung: bool = False) -> dict:
         with pfad.open(encoding="utf-8", newline="") as datei:
             leser = csv.DictReader(datei)
             if leser.fieldnames != SPALTEN:
-                raise ValueError("Ungültige CSV-Spalten.")
+                raise MessdatenFehler("Ungültige CSV-Spalten.")
             zeilen = list(leser)
         if not zeilen:
-            raise ValueError("Leere Messung.")
+            raise MessdatenFehler("Leere Messung.")
         phase = zeilen[0]["phase"]
         if phase not in PHASEN or phase in messwerte:
-            raise ValueError("Phase fehlt oder ist doppelt.")
+            raise MessdatenFehler("Phase fehlt oder ist doppelt.")
         spitzen, gesehen, anzahl = {}, set(), None
-        for zeile in zeilen:
+        for zeilen_nr, zeile in enumerate(zeilen, 2):
             if None in zeile or any(wert is None for wert in zeile.values()) or zeile["phase"] != phase:
-                raise ValueError("Ungültige Messzeile.")
-            lauf, n, dienst = (int(zeile[name]) for name in ("lauf", "anzahl", "dienst"))
+                raise MessdatenFehler("Ungültige Messzeile.")
+            try:
+                lauf, n, dienst = (int(zeile[name]) for name in ("lauf", "anzahl", "dienst"))
+            except ValueError as fehler:
+                raise MessdatenFehler(f"Ungültige Lauf-, Anzahl- oder Dienstnummer in CSV-Zeile {zeilen_nr}.") from fehler
             if n < 1 or (anzahl is not None and n != anzahl) or not 1 <= lauf <= n or dienst not in (1, 2, 3):
-                raise ValueError("Ungültige Laufnummer, Anzahl oder Dienstnummer.")
+                raise MessdatenFehler("Ungültige Laufnummer, Anzahl oder Dienstnummer.")
             anzahl = n
             if (lauf, dienst) in gesehen:
-                raise ValueError("Doppelte Messzeile.")
+                raise MessdatenFehler("Doppelte Messzeile.")
             gesehen.add((lauf, dienst))
-            zeit = datetime.fromisoformat(zeile["zeit_utc"])
+            try:
+                zeit = datetime.fromisoformat(zeile["zeit_utc"])
+            except ValueError as fehler:
+                raise MessdatenFehler(f"Ungültiger Zeitstempel in CSV-Zeile {zeilen_nr}.") from fehler
             if zeit.utcoffset() is None:
-                raise ValueError("Zeitstempel ohne Zeitzone.")
-            limit, nano, periode, quote = (int(zeile[name]) for name in
-                                           ("mem_limit_bytes", "nano_cpus", "cpu_period", "cpu_quota"))
+                raise MessdatenFehler("Zeitstempel ohne Zeitzone.")
+            try:
+                limit, nano, periode, quote = (int(zeile[name]) for name in
+                                               ("mem_limit_bytes", "nano_cpus", "cpu_period", "cpu_quota"))
+            except ValueError as fehler:
+                raise MessdatenFehler(f"Ungültiger Limitwert in CSV-Zeile {zeilen_nr}.") from fehler
             if limit <= 0:
-                raise ValueError("Speicherlimit fehlt; Budget nicht prüfbar.")
+                raise MessdatenFehler("Speicherlimit fehlt; Budget nicht prüfbar.")
             aktuelle_limits = (limit, cpu_limit(nano, periode, quote))
             if dienst in limits and limits[dienst] != aktuelle_limits:
-                raise ValueError("Limits änderten sich während der Messung.")
+                raise MessdatenFehler("Limits änderten sich während der Messung.")
             limits[dienst] = aktuelle_limits
             verbrauch = speicher_bytes(zeile["verbrauch"])
             spitzen[dienst] = max(spitzen.get(dienst, Decimal(0)), verbrauch)
         if len(gesehen) != anzahl * 3:
-            raise ValueError("Messung unvollständig.")
+            raise MessdatenFehler("Messung unvollständig.")
         messwerte[phase] = spitzen
     if vorpruefung and len(messwerte) != 1:
-        raise ValueError("Die Vorprüfung benötigt genau eine Phase.")
+        raise MessdatenFehler("Die Vorprüfung benötigt genau eine Phase.")
     if not vorpruefung and set(messwerte) != set(PHASEN):
-        raise ValueError("Alle drei Phasen sind erforderlich.")
+        raise MessdatenFehler("Alle drei Phasen sind erforderlich.")
     return {"messwerte": messwerte, "limits": limits}
 
 
@@ -98,7 +106,7 @@ def abbruch(ergebnis: dict, oom: str, health: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = SichererArgumentParser(description=__doc__)
     parser.add_argument("csv", type=Path, nargs="+")
     parser.add_argument("--vorpruefung", action="store_true", help="Eine Phase vor weiterer Last prüfen")
     parser.add_argument("--oom", required=True, choices=["nein", "ja", "manuell", "unbekannt"])
@@ -106,8 +114,14 @@ def main() -> int:
     args = parser.parse_args()
     try:
         ergebnis = auswerten(args.csv, args.vorpruefung)
-    except (OSError, ValueError, csv.Error) as fehler:
+    except MessdatenFehler as fehler:
         print(f"Auswertung nicht möglich: {fehler}", file=sys.stderr)
+        return 2
+    except OSError as fehler:
+        print(f"Auswertung nicht möglich: Datei-Zugriff fehlgeschlagen (errno {fehler.errno}).", file=sys.stderr)
+        return 2
+    except (ValueError, csv.Error):
+        print("Auswertung nicht möglich: Ungültiger Zahlenwert, Zeitstempel oder CSV-Inhalt.", file=sys.stderr)
         return 2
     print("| Messpunkt | Dienst | Verbrauch | Limit | Anteil |")
     print("|---|---:|---:|---:|---:|")

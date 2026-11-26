@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -84,7 +84,7 @@ class SpeichermessungTest(unittest.TestCase):
             messung.messen("ocr", Path(self.tmp.name) / "doppelt", 1, 0, [IDS[0]] * 3)
         with patch.object(messung.subprocess, "run", return_value=subprocess.CompletedProcess(
                 ["docker"], 1, stdout="", stderr="Daemon nicht erreichbar")):
-            with self.assertRaisesRegex(RuntimeError, "Daemon nicht erreichbar"):
+            with self.assertRaisesRegex(RuntimeError, "Docker-Aufruf fehlgeschlagen"):
                 messung.messen("ocr", Path(self.tmp.name) / "fehler.csv", 1, 0, IDS)
         with patch.object(messung.subprocess, "run", return_value=subprocess.CompletedProcess(
                 ["docker"], 0, stdout="fremd api 123 123 0 0", stderr="")):
@@ -118,6 +118,66 @@ class SpeichermessungTest(unittest.TestCase):
                 self.assertEqual(auswertung.main(), erwartet)
             self.assertEqual(ausgabe.getvalue().count("| ocr |"), 4)
             self.assertIn("Limit-Summe: 2048.0 MiB; CPU-Summe: 1.5.", ausgabe.getvalue())
+
+    def test_fehlerausgaben_enthalten_keine_ids_pfade_oder_csv_inhalte(self):
+        marker = "synthetisch-vertraulich"
+        ausgabe = Path(self.tmp.name) / f"{marker}.csv"
+        args = ["messung", "ocr", str(ausgabe), "--anzahl", "1", "--intervall", "0", "--container", *IDS]
+        for meldung in ("No such container", "error: no such object"):
+            ausgabe.unlink(missing_ok=True)
+            fehler = io.StringIO()
+            antwort = subprocess.CompletedProcess(["docker"], 1, stdout="", stderr=f"{meldung}: {IDS[0]} {marker}")
+            with patch.object(sys, "argv", args), patch.object(messung.subprocess, "run", return_value=antwort), redirect_stderr(fehler):
+                self.assertEqual(messung.main(), 2)
+            self.assertIn("Container nicht gefunden", fehler.getvalue())
+            self.assertNotIn(IDS[0], fehler.getvalue())
+            self.assertNotIn(marker, fehler.getvalue())
+
+        fehlender_pfad = Path(self.tmp.name) / marker / "daten.csv"
+        args[2] = str(fehlender_pfad)
+        fehler = io.StringIO()
+        with patch.object(sys, "argv", args), redirect_stderr(fehler):
+            self.assertEqual(messung.main(), 2)
+        self.assertIn("errno", fehler.getvalue())
+        self.assertNotIn(marker, fehler.getvalue())
+        self.assertNotIn(str(fehlender_pfad), fehler.getvalue())
+
+        for feld in ("lauf", "zeit_utc"):
+            pfad = self.pfade[0]
+            with pfad.open(newline="") as datei:
+                daten = list(csv.DictReader(datei))
+            original = daten[0][feld]
+            daten[0][feld] = marker
+            with pfad.open("w", newline="") as datei:
+                schreiber = csv.DictWriter(datei, fieldnames=messung.SPALTEN)
+                schreiber.writeheader()
+                schreiber.writerows(daten)
+            args = ["auswertung", *map(str, self.pfade), "--oom", "nein", "--health", "ok"]
+            fehler = io.StringIO()
+            with patch.object(sys, "argv", args), redirect_stderr(fehler):
+                self.assertEqual(auswertung.main(), 2)
+            self.assertIn("CSV-Zeile 2", fehler.getvalue())
+            self.assertNotIn(marker, fehler.getvalue())
+            daten[0][feld] = original
+            with pfad.open("w", newline="") as datei:
+                schreiber = csv.DictWriter(datei, fieldnames=messung.SPALTEN)
+                schreiber.writeheader()
+                schreiber.writerows(daten)
+
+        args = ["auswertung", str(fehlender_pfad), "--vorpruefung", "--oom", "nein", "--health", "ok"]
+        fehler = io.StringIO()
+        with patch.object(sys, "argv", args), redirect_stderr(fehler):
+            self.assertEqual(auswertung.main(), 2)
+        self.assertIn("errno", fehler.getvalue())
+        self.assertNotIn(marker, fehler.getvalue())
+
+        args[-1] = marker
+        fehler = io.StringIO()
+        with patch.object(sys, "argv", args), redirect_stderr(fehler), self.assertRaises(SystemExit) as ende:
+            auswertung.main()
+        self.assertEqual(ende.exception.code, 2)
+        self.assertIn("Ungültige Argumente", fehler.getvalue())
+        self.assertNotIn(marker, fehler.getvalue())
 
 
 if __name__ == "__main__":
