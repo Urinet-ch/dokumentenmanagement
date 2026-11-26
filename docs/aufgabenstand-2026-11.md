@@ -18,7 +18,7 @@ erledigten Umsetzungen.
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
 | 0.7 | PR #18 belegt die Zugangsvorbereitung, nicht den Abschluss der gesamten Stufe A. | Fabian / Infra |
-| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. | Infra; Entscheid zum weiteren Vorgehen |
+| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. Fabian hat in #699 das Budget 2048 MiB / 1.5 CPU und eine erneute Messung bestätigt; das Messwerkzeug in #699 ist noch offen. | Fabian / Infra; Messung und Nachweis |
 | 2.6 | Teilumsetzungen in #46, #54, #266, #568, #638 sowie den am 25.11. gemergten #644 und #645; Stufe-B-Leistungsnachweis fehlt. | Backend / Infra |
 | 3.7 | PWA und Eingabegrenzen in #123 und #472; die Abnahme bleibt ausstehend. | Fabian / Frontend |
 | 5.4 | Kein vollständiger Produktiv- und Stufe-B-Nachweis in den geprüften Belegen. | Fabian / Infra; abhängig von 5.11 |
