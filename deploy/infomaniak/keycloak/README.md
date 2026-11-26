@@ -123,8 +123,9 @@ Die Relying-Party-ID ist der Host der App-Basisadresse ohne Port, abgeleitet wie
 
 ### Ausführung auf der VPS (Wegwerf-Container)
 
-Nie per `docker exec` im laufenden Keycloak (zweite JVM, `mem_limit`; siehe Haupt-README, «Admin-Kommandos auf der VPS»). Der
-Wegwerf-Container nutzt das Image `archiv:kc-current` und die Einstellungen des Dienstes `kc` (Netz `intern`, nicht-root,
+Nie per `docker exec` im laufenden Keycloak (zweite JVM, `mem_limit`; siehe
+[Haupt-README, «Admin-Kommandos auf der VPS»](../../../README.md#admin-kommandos-auf-der-vps)). Der Wegwerf-Container
+nutzt das Image `archiv:kc-current` und die Einstellungen des Dienstes `kc` (Netz `intern`, nicht-root,
 schreibgeschützt, `mem_limit`, Secret `keycloak_admin`), startet aber nur `bash` und nicht Keycloak.
 
 **`jq` fehlt im Keycloak-Image.** Geprüft an einem aus `deploy/infomaniak/keycloak/Dockerfile` gebauten Image: Sicher belegt ist `bash`;

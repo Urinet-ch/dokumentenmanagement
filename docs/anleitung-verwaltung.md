@@ -55,10 +55,11 @@ Sie vergeben **Rollen**, keine einzelnen Rechte. Unter «Rechte» sehen Sie je P
 - API-Tokens und Webseiten-Schlüssel bleiben gültig; prüfen Sie «API-Tokens» beim Austritt.
 
 ## Einstellungen ändern
-«Einstellungen» zeigt Gruppen mit **Grenzen**, **Standardwert** und «wirksam ab». Mit «Vorschau» sehen Sie vor dem Speichern, was
-geschieht (z. B. «N Fragen werden gelöscht»). Riskante Änderungen (kürzere Aufbewahrung, Geschäftsjahr-Ende, hohes Budget)
-verlangen eine Bestätigung. «Auf Standard» setzt zurück; der Verlauf zeigt jede Version mit Vergleich und lässt `einstellungen` auf
-einen früheren Stand zurücksetzen. Ändert jemand gleichzeitig, meldet die App «Die Daten haben sich geändert».
+«Einstellungen» zeigt Gruppen mit **Grenzen**, **Standardwert** und «wirksam ab». Mit «Änderungen prüfen» sehen Sie vor dem
+Speichern, was geschieht (z. B. «N Fragen werden gelöscht»). Riskante Änderungen (kürzere Aufbewahrung, Geschäftsjahr-Ende,
+hohes Budget) verlangen eine Bestätigung. «Auf Standard setzen» übernimmt den Standardwert. Der Verlauf zeigt jede Version
+mit Vergleich; mit «Frühere Version vormerken» übernehmen Sie deren Einstellungen als Entwurf. Prüfen und bestätigen Sie die
+Auswirkungen, bevor Sie den Entwurf speichern. Ändert jemand gleichzeitig, meldet die App «Die Daten haben sich geändert».
 Nicht hier änderbar: Alarm-Empfänger, Budget des öffentlichen Chats, Modelle, Limits und Geheimnisse (Betreiber).
 
 ## Wenn etwas nicht geht
@@ -93,8 +94,8 @@ Abweichungscodes: `MEHRERE_ROLLEN` (keine oder mehrere Archiv-Rollen), `KEIN_MAN
 fehlt oder ist mehrwertig), `FREMDE_ROLLE` (Rolle ausserhalb der vier), `BENUTZER_FEHLT`, `ROLLE_OHNE_VORGANG`, `VORGANG_OFFEN`.
 **[offen:** Die genaue Bedeutung von `ROLLE_OHNE_VORGANG`, `BENUTZER_FEHLT` und `VORGANG_OFFEN` und das Vorgehen je Code
 legt die Spec nicht fest; im Verwaltungsprotokoll und in Keycloak prüfen.**]** Die Migration der heutigen Benutzer
-(`archiv benutzer abgleichen urinet --pruefen`, danach ohne `--pruefen`) ist Aufgabe 21.2 und liegt beim Betreiber; ihr Ergebnis
-steht in `docs/abnahme/verwaltung.md`.
+(`archiv benutzer abgleichen urinet --pruefen`, danach ohne `--pruefen`) ist Aufgabe 21.2 und liegt beim Betreiber;
+das Ergebnis wird als geschützter Betriebsnachweis ausserhalb des Repositorys festgehalten.
 Ein nicht ausgeführter [Entwurf für Vorbereitung, Prüflauf und Rückfall](benutzer-migration-entwurf.md) unterstützt
 den Betreiber bei 21.2; er ersetzt weder die Freigabe noch den manuellen Betriebsnachweis.
 

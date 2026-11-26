@@ -534,6 +534,8 @@ export const TEXTE = {
     einleitung: 'Neue Dokumente prüfen und bestätigen, neueste zuerst.',
     laedt: 'Eingangskorb wird geladen …',
     leer: 'Der Eingangskorb ist leer.',
+    leerHinweisTreuhaender:
+      'Es werden nur bestätigte Dokumente angezeigt, die für Sie sichtbar sind. Unbestätigte Dokumente sind für Ihre Rolle nicht sichtbar.',
     anzahl: (gezeigt: number, gesamt: number) => `${gezeigt} von ${gesamt} Dokumenten`,
     mehr: 'Weitere laden',
     neuLaden: 'Neu laden',
@@ -1976,6 +1978,11 @@ export const TEXTE = {
       NUR_LESEND: 'Nur lesend',
       NUR_SELBST_ERFASSTE: 'Nur selbst erfasste',
     } as Record<string, string>,
+    tabellenkoepfe: {
+      recht: 'Recht',
+      ergebnis: 'Ergebnis',
+      hinweis: 'Hinweis',
+    },
     gruppen: {
       lesen: 'Dokumente und Wissen lesen',
       erfassen: 'Erfassen und verarbeiten',

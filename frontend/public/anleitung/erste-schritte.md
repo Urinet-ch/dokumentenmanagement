@@ -36,6 +36,8 @@ Die App folgt dem hellen oder dunklen Farbschema Ihres Geräts. Mit dem Knopf mi
 
 Wählen Sie oben neben dem Farbschema «Hilfe». Die Hilfe-Leiste zeigt den Abschnitt zur aktuellen Seite, ohne sie zu verlassen. Über «Ganze Anleitung öffnen» lesen Sie alle für Ihre Rolle sichtbaren Bereiche; dort können Sie auch einen Abschnitt direkt öffnen.
 
+Auf breiten Bildschirmen öffnet sich die Hilfe-Leiste rechts mit mehr Platz; auf kleinen Bildschirmen nimmt sie die ganze Breite ein. Mit «Abschnitte» klappen Sie das Verzeichnis auf oder zu. Ist beim Öffnen ein Abschnitt zur Seite gewählt, ist das Verzeichnis zuerst zugeklappt; ohne gewählten Abschnitt ist es offen. Wenn Sie einen Abschnitt wählen, klappt es zu.
+
 ## Abmelden
 
 1. Wählen Sie oben rechts «Abmelden». Auf dem Handy zeigt der Knopf nur das Symbol.

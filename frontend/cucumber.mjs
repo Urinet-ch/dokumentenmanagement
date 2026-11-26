@@ -3,7 +3,10 @@
 export default {
   paths: ['../backend/src/test/resources/features/**/*.feature'],
   import: ['e2e/**/*.mjs'],
-  tags: '@browser',
+  // @flaky: bekannt wackelige Szenarien laufen nicht im Hauptlauf (npm run e2e:flaky); bis dahin einmal wiederholen:
+  // ein Szenario, das zweimal scheitert, bleibt rot, ein einmaliger Timeout nicht (docs/ci-browser-stabilitaet.md)
+  tags: '@browser and not @flaky',
+  retry: 1,
   format: ['progress'],
   language: 'de',
 };

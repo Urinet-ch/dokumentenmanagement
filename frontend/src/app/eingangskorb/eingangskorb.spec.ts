@@ -5,7 +5,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Dokument, provideApi } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
-import { Aktion, darf } from '../gemeinsam/anmeldung/rechte';
+import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from '../gemeinsam/eingangskorb-zaehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { Eingangskorb } from './eingangskorb';
@@ -44,8 +44,10 @@ describe('Eingangskorb (Req 8.1, 8.6)', () => {
   let element: HTMLElement;
   let http: HttpTestingController;
   let zaehler: ZaehlerAttrappe;
+  const benutzerRolle = signal<Rolle | null>(null);
 
   beforeEach(async () => {
+    benutzerRolle.set('inhaber');
     zaehler = new ZaehlerAttrappe();
     TestBed.configureTestingModule({
       imports: [Eingangskorb],
@@ -57,8 +59,11 @@ describe('Eingangskorb (Req 8.1, 8.6)', () => {
         {
           provide: AnmeldungService,
           useValue: {
-            darf: (a: Aktion) => darf('inhaber', a),
-            benutzer: () => null,
+            darf: (a: Aktion) => darf(benutzerRolle(), a),
+            benutzer: () =>
+              benutzerRolle()
+                ? { id: 'test', name: 'Test', mandant: 'urinet', rolle: benutzerRolle() }
+                : null,
             zustand: () => 'abgemeldet',
           },
         },
@@ -108,6 +113,15 @@ describe('Eingangskorb (Req 8.1, 8.6)', () => {
   it('zeigt einen leeren Eingangskorb', async () => {
     await seite(0, [], 0);
     expect(element.querySelector('[data-test=leer]')?.textContent).toContain(T.leer);
+    expect(element.querySelector('.treuhaender-hinweis')).toBeNull();
+  });
+
+  it('erklärt dem Treuhänder den leeren, nach Sichtbarkeit gefilterten Eingangskorb', async () => {
+    benutzerRolle.set('treuhaender');
+    fixture.detectChanges();
+    await seite(0, [], 0);
+    expect(element.querySelector('[data-test=leer]')?.textContent).toContain(T.leer);
+    expect(element.querySelector('.treuhaender-hinweis')?.textContent).toContain(T.leerHinweisTreuhaender);
   });
 
   it('lädt nach einer Aktion neu, meldet sie und frischt den Zähler auf', async () => {

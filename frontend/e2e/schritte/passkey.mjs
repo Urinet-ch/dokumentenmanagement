@@ -19,12 +19,9 @@ async function pruefeAntwort(antwort, status, aktion) {
   assert.equal(antwort.status, status, `${aktion}: HTTP ${antwort.status}`);
 }
 
-async function testbenutzer(welt) {
-  const url = new URL(backend().keycloak);
-  assert.ok(['localhost', '127.0.0.1'].includes(url.hostname), 'Keycloak muss lokal laufen');
-  url.hostname = 'localhost';
-  const realm = url.toString().replace(/\/$/, '');
-  const adminAntwort = await fetch(`${url.origin}/realms/master/protocol/openid-connect/token`, {
+// Admin-Tokens sind kurzlebig; vor Admin-Aufrufen nach längeren Passkey-Schritten neu anmelden.
+async function adminHeader(url, aktion) {
+  const antwort = await fetch(`${url.origin}/realms/master/protocol/openid-connect/token`, {
     method: 'POST',
     body: new URLSearchParams({
       client_id: 'admin-cli',
@@ -33,10 +30,18 @@ async function testbenutzer(welt) {
       password: 'admin',
     }),
   });
-  await pruefeAntwort(adminAntwort, 200, 'Test-Admin anmelden');
-  const admin = (await adminAntwort.json()).access_token;
+  await pruefeAntwort(antwort, 200, aktion);
+  const admin = (await antwort.json()).access_token;
+  return { authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+}
+
+async function testbenutzer(welt) {
+  const url = new URL(backend().keycloak);
+  assert.ok(['localhost', '127.0.0.1'].includes(url.hostname), 'Keycloak muss lokal laufen');
+  url.hostname = 'localhost';
+  const realm = url.toString().replace(/\/$/, '');
   const name = `passkey-${randomBytes(8).toString('hex')}`;
-  const header = { authorization: `Bearer ${admin}`, 'content-type': 'application/json' };
+  const header = await adminHeader(url, 'Test-Admin anmelden');
   const adminUrl = `${url.origin}/admin/realms/urinet-archiv`;
   const anlegen = await fetch(`${adminUrl}/partialImport`, {
     method: 'POST',
@@ -80,7 +85,7 @@ async function testbenutzer(welt) {
   await pruefeAntwort(abfrage, 200, 'Testbenutzer suchen');
   const benutzer = await abfrage.json();
   assert.equal(benutzer.length, 1);
-  welt.passkey = { realm, adminUrl, header, name, id: benutzer[0].id, letzterOtpSchritt: -1 };
+  welt.passkey = { realm, adminUrl, name, id: benutzer[0].id, letzterOtpSchritt: -1 };
   const callbackServer = createServer((anfrage, antwort) => antwort.end('OK'));
   welt.passkey.callbackServer = callbackServer;
   await new Promise((weiter, fehler) =>
@@ -204,9 +209,13 @@ async function entfernen(welt) {
 After({ tags: '@passkey' }, async function () {
   try {
     if (this.passkey?.id) {
+      const header = await adminHeader(
+        new URL(this.passkey.adminUrl),
+        'Test-Admin für Bereinigung anmelden',
+      );
       const antwort = await fetch(`${this.passkey.adminUrl}/users/${this.passkey.id}`, {
         method: 'DELETE',
-        headers: this.passkey.header,
+        headers: header,
       });
       await pruefeAntwort(antwort, 204, 'Testbenutzer entfernen');
     }
@@ -219,10 +228,14 @@ Given('ein Testbenutzer ohne Passkey existiert', { timeout: 90_000 }, async func
   await testbenutzer(this);
 });
 
-Given('ein Testbenutzer ist mit Passwort und TOTP angemeldet', { timeout: 90_000 }, async function () {
-  await testbenutzer(this);
-  await passwortAnmelden(this, this.seite);
-});
+Given(
+  'ein Testbenutzer ist mit Passwort und TOTP angemeldet',
+  { timeout: 90_000 },
+  async function () {
+    await testbenutzer(this);
+    await passwortAnmelden(this, this.seite);
+  },
+);
 
 Given('ein Testbenutzer hat einen Passkey eingerichtet', { timeout: 90_000 }, async function () {
   await testbenutzer(this);
@@ -242,14 +255,18 @@ Given('er ist mit dem Passkey angemeldet', { timeout: 90_000 }, async function (
   await passkeyAnmelden(this);
 });
 
-When('er sich für den Step-up mit dem Passkey erneut anmeldet', { timeout: 90_000 }, async function () {
-  this.passkey.vorher = this.passkey.claims.auth_time;
-  await new Promise((weiter) => setTimeout(weiter, 2100));
-  await this.seite.goto(anmeldeUrl(this.passkey, { prompt: 'login', max_age: '0' }));
-  await this.seite.locator('#authenticateWebAuthnButton').click();
-  await this.seite.waitForURL(amCallback(this.passkey));
-  this.passkey.claims = await accessToken(this);
-});
+When(
+  'er sich für den Step-up mit dem Passkey erneut anmeldet',
+  { timeout: 90_000 },
+  async function () {
+    this.passkey.vorher = this.passkey.claims.auth_time;
+    await new Promise((weiter) => setTimeout(weiter, 2100));
+    await this.seite.goto(anmeldeUrl(this.passkey, { prompt: 'login', max_age: '0' }));
+    await this.seite.locator('#authenticateWebAuthnButton').click();
+    await this.seite.waitForURL(amCallback(this.passkey));
+    this.passkey.claims = await accessToken(this);
+  },
+);
 
 Then('erhält er ein Access-Token mit auth_time', function () {
   assert.equal(typeof this.passkey.claims.auth_time, 'number');
@@ -324,7 +341,8 @@ Then('kann er diesen Passkey in der Kontoverwaltung entfernen', async function (
 });
 
 When('ein Keycloak-Admin diesen Passkey zurücksetzt', async function () {
-  const { adminUrl, id, header } = this.passkey;
+  const { adminUrl, id } = this.passkey;
+  const header = await adminHeader(new URL(adminUrl), 'Test-Admin für Passkey-Reset anmelden');
   const url = `${adminUrl}/users/${id}/credentials`;
   const antwort = await fetch(url, { headers: header });
   await pruefeAntwort(antwort, 200, 'Zugangsdaten lesen');

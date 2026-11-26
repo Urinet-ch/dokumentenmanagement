@@ -78,8 +78,11 @@ describe('Benutzerübersicht (Spec 06, Req 8.1, 8.3, 8.7)', () => {
     expect(element.querySelector('a[href="/verwaltung/benutzer/probe"]')).not.toBeNull();
     expect([...element.querySelectorAll('h1, h2')]
       .filter((heading) => heading.textContent?.trim() === TEXTE.benutzer.titel)).toHaveLength(1);
-    expect(element.querySelector('.pille.info')?.textContent).toContain('Nur eigene');
-    expect(element.querySelector('.pille.gefahr')?.textContent).toContain('Nicht erlaubt');
+    const rechte = [...element.querySelectorAll('app-benutzer-rechte tbody tr')];
+    expect(rechte.find((zeile) => zeile.querySelector('th')?.textContent?.includes('Dokumente lesen'))
+      ?.querySelectorAll('td')[0].textContent).toContain('Nur eigene');
+    expect(rechte.find((zeile) => zeile.querySelector('th')?.textContent?.includes('Benutzer ansehen'))
+      ?.querySelectorAll('td')[0].textContent).toContain('Nicht erlaubt');
   });
 
   it('zeigt je Benutzer «Passkey eingerichtet» mit Anzahl, aber keine Gerätedaten (Req 10.6)', async () => {
@@ -306,6 +309,29 @@ describe('Benutzerdetail (Spec 06, Req 8.7)', () => {
     expect(element.textContent).toContain('Nur eigene Dokumente');
     expect(element.textContent).toContain(TEXTE.benutzer.apiTokenHinweis);
     expect(element.querySelector('a[href="/verwaltung/api-tokens"]')).not.toBeNull();
+  });
+
+  it('stellt Rechte je Gruppe als semantische Tabelle mit Text-Ergebnissen und Fussnoten dar', async () => {
+    const element = (await starten()).nativeElement as HTMLElement;
+    const tabellen = [...element.querySelectorAll('app-benutzer-rechte table')];
+    expect(tabellen).toHaveLength(3);
+
+    for (const tabelle of tabellen) {
+      expect(tabelle.querySelector('caption')?.textContent?.trim()).not.toBe('');
+      expect([...tabelle.querySelectorAll('thead th')].map((kopf) => ({
+        text: kopf.textContent?.trim(),
+        scope: kopf.getAttribute('scope'),
+      }))).toEqual([
+        { text: TEXTE.benutzer.tabellenkoepfe.recht, scope: 'col' },
+        { text: TEXTE.benutzer.tabellenkoepfe.ergebnis, scope: 'col' },
+        { text: TEXTE.benutzer.tabellenkoepfe.hinweis, scope: 'col' },
+      ]);
+    }
+
+    const leserecht = tabellen[0].querySelector('tbody tr')!;
+    expect(leserecht.querySelector('th[scope="row"]')?.textContent).toContain('Dokumente lesen');
+    expect(leserecht.querySelector('td')?.textContent).toContain('Nur eigene');
+    expect(leserecht.querySelectorAll('td')[1].textContent).toContain('Nur eigene Dokumente');
   });
 
   it('zeigt den letzten Einladungsversand und einen unbekannten Ablauf im Detail', async () => {

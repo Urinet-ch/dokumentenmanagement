@@ -28,7 +28,12 @@
 } @else if (!fehlerLaden() && eintraege().length === 0) {
   <div class="karte erledigt">
     <app-symbol name="haken" />
-    <p data-test="leer">{{ texte.leer }}</p>
+    <div>
+      <p data-test="leer">{{ texte.leer }}</p>
+      @if (treuhaender()) {
+        <p class="treuhaender-hinweis">{{ texte.leerHinweisTreuhaender }}</p>
+      }
+    </div>
   </div>
 } @else if (eintraege().length > 0) {
   <p class="anzahl" data-test="anzahl">{{ texte.anzahl(eintraege().length, gesamt()) }}</p>

@@ -37,3 +37,10 @@ Funktionalität: Navigation der PWA nach Rolle
     Angenommen der Eingangskorb enthält 3 Dokumente
     Und ich bin als «treuhaender» im Mandanten «urinet» angemeldet
     Dann zeigt die Navigation den Eingangskorb-Zähler «3»
+
+  @req-2.11 @req-2.21 @qa-treuhaender-eingangskorb
+  Szenario: Der Treuhänder versteht den leeren, gefilterten Eingangskorb
+    Angenommen der Eingangskorb enthält 0 Dokumente
+    Wenn ich als «treuhaender» im Mandanten «urinet» den Eingangskorb auf dem Handy öffne
+    Dann erklärt der Eingangskorb dem Treuhänder den leeren, gefilterten Zustand
+    Und ist der leere Eingangskorb bei 375 und 1280 px in beiden Farbschemata barrierefrei

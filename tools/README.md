@@ -6,6 +6,7 @@
 | `test_archiv_client.py` | Tests zum Client: `python3 -m unittest tools/test_archiv_client.py` |
 | `test_pruefe_speicherbudget.py` | Tests für das Deploy-Speicherbudget: `python3 -m unittest tools/test_pruefe_speicherbudget.py` |
 | `pruefe_compose_konsistenz.py` | Statische Prüfung von Compose und Keycloak-Vorlagen; startet keine Dienste |
+| `pruefe_dokumentverweise.py` | Prüft lokale Markdown-Links und Dateiverweise unter `docs/` und `deploy/` |
 | `golden_synth/` | Generator für synthetische Golden-Belege (Req 0.10) |
 | `crm/` | synthetischer Beispiel-Export 21.CRM |
 | `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--begleit-pdf` reiht für die HEIC-Messung einen synthetischen 20-seitigen Scan ein; `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
@@ -29,6 +30,19 @@ noch die Wirksamkeit von Healthchecks, Routerregeln und Limits. Dienstimages ohn
 lokal gebaut wurden; ein gepinntes Basisimage macht den veränderlichen Dienst-Tag nicht unveränderlich.
 Die Tests laufen nicht automatisch in der CI; ein Vorschlag dafür liegt unter
 [`docs/betrieb/compose-konsistenz-ci.diff`](../docs/betrieb/compose-konsistenz-ci.diff).
+
+## Dokumentverweise
+
+```sh
+python3 tools/pruefe_dokumentverweise.py
+python3 tools/pruefe_dokumentverweise.py --json
+python3 -m unittest tools/test_pruefe_dokumentverweise.py
+```
+
+Die Prüfung läuft lokal ohne Netzwerkzugriff. Sie kontrolliert relative Markdown-Links, Referenzlinks und
+repo-relative Dateiverweise in Markdown-Dateien unter `docs/` und `deploy/`; externe URLs und reine Anker bleiben
+unberührt. Zeilenangaben in Quellverweisen werden entfernt; Vorlagen, Platzhalter und generierte Build-Pfade
+werden nicht als fehlende Dateien gemeldet. Es gibt keinen bestehenden Linkcheck, in den sie eingehängt werden könnte.
 
 ## Generator-Client `archiv_client.py`
 
