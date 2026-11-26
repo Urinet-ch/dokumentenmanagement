@@ -1,21 +1,9 @@
 import { Eintrag } from './eintrag';
+import { SpeicherImArbeitsspeicher } from './speicher';
 
-const daten = vi.hoisted(() => new Map<string, { id: string; aufgenommen: string }>());
-vi.mock('idb', () => ({
-  openDB: vi.fn(async () => ({
-    getAll: async () => [...daten.values()],
-    put: async (_ablage: string, eintrag: { id: string; aufgenommen: string }) => daten.set(eintrag.id, eintrag),
-    delete: async (_ablage: string, id: string) => daten.delete(id),
-  })),
-}));
-
-import { IndexedDbSpeicher } from './speicher';
-
-describe('IndexedDbSpeicher', () => {
-  beforeEach(() => daten.clear());
-
+describe('SpeicherImArbeitsspeicher', () => {
   it('speichert, sortiert nach Aufnahmezeit und löscht gezielt', async () => {
-    const speicher = new IndexedDbSpeicher();
+    const speicher = new SpeicherImArbeitsspeicher();
     const eintrag = (id: string, aufgenommen: string): Eintrag =>
       ({ id, aufgenommen, seiten: [], fehlversuche: 0, zustand: 'wartet' });
     const spaeter = eintrag('b', '2026-01-02T00:00:00Z');
