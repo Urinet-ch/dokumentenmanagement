@@ -319,8 +319,6 @@ paths:
           "$ref": "#/components/responses/NichtAngemeldet"
         '403':
           "$ref": "#/components/responses/NichtErlaubt"
-        '429':
-          "$ref": "#/components/responses/ZuVieleAnfragen"
         '404':
           "$ref": "#/components/responses/NichtGefunden"
         '429':

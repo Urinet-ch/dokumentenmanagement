@@ -6,6 +6,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.jboss.jandex.IndexView;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.DuplicateKeyException;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Req 11.2 (Spec 03): Die Pfade unter {@code /public/}, die der Code beschreibt, und der Vertrag
@@ -56,6 +62,16 @@ class PublicVertragTest {
             assertThat(namen(gelesen.path("components").path(art))).as(art)
                     .isNotEmpty().isEqualTo(namen(roh.path("components").path(art)));
         }
+    }
+
+    @Test
+    void vertragEnthaeltKeineDoppeltenYamlSchluessel() {
+        LoaderOptions optionen = new LoaderOptions();
+        optionen.setAllowDuplicateKeys(false);
+        Yaml yaml = new Yaml(new SafeConstructor(optionen));
+        assertThatCode(() -> yaml.load(vertrag)).doesNotThrowAnyException();
+        String doppelt = vertrag.replaceFirst("(?m)^        '429':", "        '429': {}\n        '429':");
+        assertThatThrownBy(() -> yaml.load(doppelt)).isInstanceOf(DuplicateKeyException.class);
     }
 
     @Test
