@@ -20,38 +20,53 @@ Then(/^erklärt der Eingangskorb dem Treuhänder den leeren, gefilterten Zustand
   );
 });
 
-Then(/^ist der leere Eingangskorb bei 375 und 1280 px in beiden Farbschemata barrierefrei$/, async function () {
-  await this.seite.addScriptTag({ content: axe.source });
-  const bildordner = process.env.EINGANGSKORB_BILDER;
-  if (bildordner) await mkdir(bildordner, { recursive: true });
+Then(
+  /^ist der leere Eingangskorb bei 375 und 1280 px in beiden Farbschemata barrierefrei$/,
+  async function () {
+    await this.seite.addScriptTag({ content: axe.source });
+    const bildordner = process.env.EINGANGSKORB_BILDER;
+    if (bildordner) await mkdir(bildordner, { recursive: true });
 
-  for (const breite of [375, 1280]) {
-    await this.seite.setViewportSize({ width: breite, height: breite === 375 ? 812 : 800 });
-    for (const [schema, farbschema] of [
-      ['hell', 'light'],
-      ['dunkel', 'dark'],
-    ]) {
-      await this.seite.emulateMedia({ colorScheme: farbschema });
-      const ergebnis = await this.seite.evaluate(async () => ({
-        ueberlauf: [document.documentElement, document.querySelector('mat-sidenav-content')].some(
-          (element) => element.scrollWidth > element.clientWidth,
-        ),
-        befunde: (await window.axe.run(document)).violations.map(({ id, nodes }) => ({
-          id,
-          targets: nodes.map((node) => node.target),
-        })),
-      }));
-      assert.equal(ergebnis.ueberlauf, false, `${schema}, ${breite}px: waagrechter Bildlauf`);
-      assert.deepEqual(ergebnis.befunde, [], `${schema}, ${breite}px: ${JSON.stringify(ergebnis.befunde)}`);
-      if (bildordner) {
-        await this.seite.screenshot({
-          path: join(bildordner, `eingangskorb-treuhaender-${breite}-${schema}.png`),
-          fullPage: true,
-        });
+    for (const breite of [375, 1280]) {
+      await this.seite.setViewportSize({ width: breite, height: breite === 375 ? 812 : 800 });
+      await this.seite.waitForFunction((viewport) => {
+        const navigation = document.querySelector('mat-sidenav');
+        return (
+          navigation &&
+          !navigation.classList.contains('mat-drawer-animating') &&
+          (viewport < 960 || navigation.classList.contains('mat-drawer-opened'))
+        );
+      }, breite);
+      for (const [schema, farbschema] of [
+        ['hell', 'light'],
+        ['dunkel', 'dark'],
+      ]) {
+        await this.seite.emulateMedia({ colorScheme: farbschema });
+        const ergebnis = await this.seite.evaluate(async () => ({
+          ueberlauf: [document.documentElement, document.querySelector('mat-sidenav-content')].some(
+            (element) => element.scrollWidth > element.clientWidth,
+          ),
+          befunde: (await window.axe.run(document)).violations.map(({ id, nodes }) => ({
+            id,
+            targets: nodes.map((node) => node.target),
+          })),
+        }));
+        assert.equal(ergebnis.ueberlauf, false, `${schema}, ${breite}px: waagrechter Bildlauf`);
+        assert.deepEqual(
+          ergebnis.befunde,
+          [],
+          `${schema}, ${breite}px: ${JSON.stringify(ergebnis.befunde)}`,
+        );
+        if (bildordner) {
+          await this.seite.screenshot({
+            path: join(bildordner, `eingangskorb-treuhaender-${breite}-${schema}.png`),
+            fullPage: true,
+          });
+        }
       }
     }
-  }
-});
+  },
+);
 
 // Karten der Dokumente, die das Szenario im echten Archiv angelegt hat (über ihre ID, damit ein weiterer Lauf gegen
 // dasselbe Archiv nicht die Karten früherer Läufe mit demselben Namen trifft); sonst alle Karten.

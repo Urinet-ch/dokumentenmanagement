@@ -1436,6 +1436,10 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     selbst belegen die Java-Szenarien (`features/dokument/eingangskorb.feature`, `bestaetigen.feature`). Die Attrappe
     beantwortet in jedem Browser-Szenario auch den Zähler. Die Datei trägt darum `@attrappe` (Abschluss 4.10); den
     Platzhalter (Req 8.11) belegt `features/dokument/dateiname-pwa.feature` gegen das echte Archiv im Testmodus.
+- Umsetzung (Aufgabe 3.6, Treuhänder-Hinweis, 26.11.2026): Der leere Eingangskorb erklärt Treuhändern, dass nur
+  bestätigte und für sie sichtbare Dokumente erscheinen. Das Browser-Szenario in `features/gemeinsam/navigation-pwa.feature`
+  nutzt die Keycloak- und Archiv-Attrappen; axe und die vier Kombinationen aus 375/1280 px und hell/dunkel prüfen den
+  Zustand. Die serverseitige Sichtbarkeitsfilterung bleibt durch `features/dokument/sichtbarkeit.feature` belegt.
 - Umsetzung (Aufgabe 3.7, Handy-Erfassung, 13.11.2026):
   - Seite `/erfassen` (Komponente `erfassen/handy/handy-erfassung`, lazy geladen, `erfassenGuard`): angemeldet mit Recht A1; ohne Anmeldung nur offline
     zugänglich (Tokens nur im Arbeitsspeicher, entschieden von Fabian am 11.11.2026), online führt der Weg über die

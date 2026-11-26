@@ -132,10 +132,3 @@ Funktionalität: Eingangskorb in der PWA
     Wenn ich beim Eintrag «Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» auf «Bestätigen» tippe
     Dann hat das Archiv den Eintrag mit dem Dateinamen «Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» ohne Titel bestätigt
     Und sehe ich die Meldung ««Ohne Titel · Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» bestätigt, wird archiviert.» mit isoliertem Dateinamen
-
-  @qa-treuhaender-eingangskorb
-  Szenario: Der Treuhänder versteht den leeren, gefilterten Eingangskorb
-    Angenommen der Eingangskorb enthält 0 Dokumente
-    Wenn ich als «treuhaender» im Mandanten «urinet» den Eingangskorb auf dem Handy öffne
-    Dann erklärt der Eingangskorb dem Treuhänder den leeren, gefilterten Zustand
-    Und ist der leere Eingangskorb bei 375 und 1280 px in beiden Farbschemata barrierefrei
