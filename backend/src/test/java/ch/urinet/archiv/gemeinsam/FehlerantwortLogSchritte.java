@@ -16,7 +16,9 @@ public class FehlerantwortLogSchritte {
 
     @Dann("das Fehlerantwort-Log enthält weder «{}» noch einen Stacktrace")
     public void ohneInhalt(String marker) {
-        assertThat(log.volltext()).doesNotContain(marker, "\tat ", "Caused by:");
+        String text = log.volltext();
+        assertThat(text.contains(marker)).as("Log enthält den synthetischen Marker").isFalse();
+        assertThat(text.contains("\tat ") || text.contains("Caused by:")).as("Log enthält einen Stacktrace").isFalse();
     }
 
     @After

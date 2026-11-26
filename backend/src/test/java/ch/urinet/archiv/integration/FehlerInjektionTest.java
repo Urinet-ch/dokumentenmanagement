@@ -1,6 +1,12 @@
 package ch.urinet.archiv.integration;
 
 import ch.urinet.archiv.ablage.S3Stoerung;
+import ch.urinet.archiv.ablage.adapter.out.AblageEinstellungen;
+import ch.urinet.archiv.ablage.adapter.out.s3.BypassVerbot;
+import ch.urinet.archiv.ablage.adapter.out.s3.S3Ablage;
+import ch.urinet.archiv.benutzer.adapter.out.keycloak.KeycloakAdminAdapter;
+import ch.urinet.archiv.benutzer.adapter.out.stub.IdentitaetsDienstStub;
+import ch.urinet.archiv.benutzer.application.IdentitaetsDienst;
 import ch.urinet.archiv.dokument.Testdateien;
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.dokument.adapter.out.persistence.PanacheDokumentSuche;
@@ -61,8 +67,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.ByteArrayOutputStream;
+import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -103,6 +114,9 @@ class FehlerInjektionTest {
     @Inject KlassifikationVerwaltung klassifikationen;
     @Inject VollstaendigkeitAbfrage vollstaendigkeit;
     @Inject ChatVerlauf chatVerlauf;
+    @Inject S3Ablage s3Ablage;
+    @Inject AblageEinstellungen ablageEinstellungen;
+    @Inject IdentitaetsDienst identitaetsDienst;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -423,10 +437,99 @@ class FehlerInjektionTest {
                         .isEqualTo("SPEICHER_NICHT_ERREICHBAR");
                 assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
             }
+
             assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
             for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
         } finally {
             S3Stoerung.aus();
+        }
+    }
+
+    @Test
+    void nichtErreichbarerS3EndpunktBeimUploadOhneDetails() throws Exception {
+        List<String> tokens = List.of(Testanmeldung.token("inhaber-urinet"), Testanmeldung.token("inhaber-vhf-gsk"));
+        ByteArrayOutputStream datei = new ByteArrayOutputStream();
+        datei.write(Testdateien.erzeugen("pdf"));
+        datei.write(("\n% " + MARKER).getBytes(StandardCharsets.UTF_8));
+        ByteArrayOutputStream funktionierendeDatei = new ByteArrayOutputStream();
+        datei.writeTo(funktionierendeDatei);
+        funktionierendeDatei.write("\n% vor dem Ausfall".getBytes(StandardCharsets.UTF_8));
+        for (String token : tokens) {
+            given().auth().oauth2(token).contentType("multipart/form-data")
+                    .multiPart(new MultiPartSpecBuilder(funktionierendeDatei.toByteArray()).controlName("dateien")
+                            .fileName("probe.pdf").mimeType("application/octet-stream").build())
+                    .when().post("/api/v1/dokumente").then().statusCode(202);
+        }
+        var original = ClientProxy.unwrap(s3Ablage);
+        try (S3Client client = S3Client.builder()
+                .endpointOverride(URI.create("http://127.0.0.1:1"))
+                .region(Region.US_EAST_1)
+                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("probe", "probe")))
+                .forcePathStyle(true)
+                .overrideConfiguration(c -> c.addExecutionInterceptor(new BypassVerbot())
+                        .apiCallTimeout(Duration.ofSeconds(5)))
+                .build();
+             var presigner = S3Ablage.presigner(client, true);
+             LogMitschnitt log = LogMitschnitt.starten()) {
+            QuarkusMock.installMockForType(new S3Ablage(client, presigner, ablageEinstellungen,
+                    java.time.Clock.systemUTC()), S3Ablage.class);
+            for (String token : tokens) {
+                var antwort = given().auth().oauth2(token).contentType("multipart/form-data")
+                        .multiPart(new MultiPartSpecBuilder(datei.toByteArray()).controlName("dateien")
+                                .fileName("probe.pdf").mimeType("application/octet-stream").build())
+                        .when().post("/api/v1/dokumente");
+                assertThat(ProblemDetails.pruefen(antwort, 503, "ergebnisse")).isEqualTo("SPEICHER_NICHT_ERREICHBAR");
+                String antwortText = antwort.asString();
+                assertThat(antwortText.contains(MARKER) || antwortText.contains(token)
+                        || antwortText.contains("Exception") || antwortText.contains("\tat ")
+                        || antwortText.contains("Caused by:"))
+                        .as("Antwort enthält Eingabe, Token oder Stacktrace").isFalse();
+            }
+            String protokoll = log.volltext();
+            assertThat(protokoll.contains(MARKER) || tokens.stream().anyMatch(protokoll::contains)
+                    || protokoll.contains("\tat ") || protokoll.contains("Caused by:"))
+                    .as("Log enthält Eingabe, Token oder Stacktrace").isFalse();
+        } finally {
+            QuarkusMock.installMockForType(original, S3Ablage.class);
+        }
+    }
+
+    @Test
+    void nichtErreichbarerKeycloakBeiBenutzerlisteOhneDetails() {
+        List<String> tokens = List.of(Testanmeldung.token("inhaber-urinet"), Testanmeldung.token("inhaber-vhf-gsk"));
+        for (String token : tokens) {
+            given().auth().oauth2(token).queryParam("q", MARKER)
+                    .when().get("/api/v1/benutzer").then().statusCode(200);
+        }
+        var original = ClientProxy.unwrap(identitaetsDienst);
+        AtomicInteger alarme = new AtomicInteger();
+        var adapter = new KeycloakAdminAdapter(new ObjectMapper(), Optional.of("http://127.0.0.1:1"),
+                "urinet-archiv", "probe", Optional.of("synthetisches-secret"), "archiv-pwa", Optional.empty(),
+                Duration.ofSeconds(1), Duration.ofSeconds(2), status -> alarme.incrementAndGet());
+        var ersatz = new IdentitaetsDienstStub() {
+            @Override
+            public List<IdentitaetsDienst.Benutzer> benutzerSuchen(String mandant, String suche, int seite, int groesse) {
+                return adapter.benutzerSuchen(mandant, suche, seite, groesse);
+            }
+        };
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            QuarkusMock.installMockForType(ersatz, IdentitaetsDienst.class);
+            for (String token : tokens) {
+                var antwort = given().auth().oauth2(token).queryParam("q", MARKER)
+                        .when().get("/api/v1/benutzer");
+                assertThat(ProblemDetails.pruefen(antwort, 503)).isEqualTo("IDENTITAETSDIENST_NICHT_ERREICHBAR");
+                String text = antwort.asString();
+                assertThat(text.contains(MARKER) || text.contains(token) || text.contains("synthetisches-secret")
+                        || text.contains("Exception") || text.contains("\tat ") || text.contains("Caused by:"))
+                        .as("Antwort enthält Eingabe, Zugang oder Stacktrace").isFalse();
+            }
+            String protokoll = log.volltext();
+            assertThat(protokoll.contains(MARKER) || tokens.stream().anyMatch(protokoll::contains)
+                    || protokoll.contains("synthetisches-secret") || protokoll.contains("\tat ")
+                    || protokoll.contains("Caused by:")).as("Log enthält Eingabe, Zugang oder Stacktrace").isFalse();
+            assertThat(alarme).hasValue(0);
+        } finally {
+            QuarkusMock.installMockForType(original, IdentitaetsDienst.class);
         }
     }
 
