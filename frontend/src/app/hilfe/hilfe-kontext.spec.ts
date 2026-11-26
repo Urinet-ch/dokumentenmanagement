@@ -9,6 +9,7 @@ describe('hilfeKontext (Spec 07, Req 4.3)', () => {
     );
     expect(hilfeKontext('/kontakte/beispiel', 'inhaber', HILFE_KATALOG)).toBe('kontakte');
     expect(hilfeKontext('/verwaltung/benutzer/beispiel', 'inhaber', HILFE_KATALOG)).toBe('verwaltung');
+    expect(hilfeKontext('/anmeldung', null, HILFE_KATALOG)).toBe('erste-schritte');
   });
 
   it('zeigt bei unbekanntem Kontext das Inhaltsverzeichnis', () => {
