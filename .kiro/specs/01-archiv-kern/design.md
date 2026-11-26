@@ -1,4 +1,10 @@
-# Design Document — 01 Archiv-Kern
+# Design Document
+
+### Umsetzung (Aufgabe 5.7 Entwurf, 26.11.2026)
+
+`docs/verfahrensbeschreibung-erfassen-archivieren.md` beschreibt den vorgesehenen Ablauf mit Quellen und offenen
+Fragen. Der Entwurf ersetzt weder die Freigabe durch Fabian und das Gegenlesen noch den Betriebsnachweis nach
+Requirement 16.6; Aufgabe 5.7 bleibt offen. — 01 Archiv-Kern
 
 ## Overview
 Ein Quarkus-Dienst (Java 25) in zwei Laufarten: **API** (REST für Web-App, Handy-App, Generatoren
