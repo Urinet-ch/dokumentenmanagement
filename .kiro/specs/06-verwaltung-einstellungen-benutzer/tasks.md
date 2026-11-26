@@ -246,6 +246,8 @@ auf Server oder Secrets aus der Sitzung.
     TOTP); `fabian` bleibt Inhaber; Anmeldungen vor und nach dem Lauf prüfen; Ergebnis in `docs/abnahme/verwaltung.md`.
   - Vorbereitung: `docs/benutzer-migration-entwurf.md` und `tools/benutzer-migration-entwurf.py` sind ein Entwurf;
     bei bestehenden Inhabern ist `ROLLE_OHNE_VORGANG` vor 21.2a zu erwarten. Ausführung, Freigabe und Abnahme bleiben bei Fabian.
+  - Ergänzende Vorbereitung: synthetischer Offline-Migrationsplan mit Konfliktprüfung, `docs/betrieb/benutzer-migration.md`;
+    kein Keycloak-Abgleich und kein Betriebsnachweis.
   - _Anforderungen: 9.4_
   - _Abhängig von: 21.1, 21.2a, 19.3_
 
