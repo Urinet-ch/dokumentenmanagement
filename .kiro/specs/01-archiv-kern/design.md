@@ -6,6 +6,13 @@
 Fragen. Der Entwurf ersetzt weder die Freigabe durch Fabian und das Gegenlesen noch den Betriebsnachweis nach
 Requirement 16.6; Aufgabe 5.7 bleibt offen. — 01 Archiv-Kern
 
+### Umsetzung (QA-Aufgabe 4, 26.11.2026)
+
+`LiquibaseChangelogIndexTest` prüft eindeutige Changeset-IDs und Nummernpräfixe über die letzten 20 Changesets je
+Changelog sowie die bekannten Include-Abstiege im Mandanten-Changelog. Die vollständige Rollback-/Reapply-Matrix für
+leere und gefüllte Schemas wurde nicht ausgeführt. Die bisherigen Integrationstests prüfen ausgewählte Migrationen;
+ein sicher isolierter Lauf über alle letzten 20 Changesets fehlt noch. — QA
+
 ## Overview
 Ein Quarkus-Dienst (Java 25) in zwei Laufarten: **API** (REST für Web-App, Handy-App, Generatoren
 und Drive-Import; liefert die Angular-PWA über Quinoa im selben Artefakt aus) und **Worker**
