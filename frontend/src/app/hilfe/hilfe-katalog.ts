@@ -91,7 +91,7 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     titel: TEXTE.hilfe.abschnitte['eingangskorb-eigene'],
     datei: '/anleitung/eingangskorb-eigene.md',
     eltern: 'eingangskorb',
-    bedingung: { eine: ['A5'], ohne: ['A7'] },
+    bedingung: { eine: ['A1'], ohne: ['A7'] },
   },
   {
     anker: 'suche',

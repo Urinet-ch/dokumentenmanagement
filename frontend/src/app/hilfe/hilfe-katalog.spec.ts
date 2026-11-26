@@ -176,7 +176,7 @@ describe('bedingungErfuellt', () => {
   });
 
   it('mindestens eine Aktion aus «eine» und keine aus «ohne»', () => {
-    const bedingung = { eine: ['A5'], ohne: ['A7'] } as const;
+    const bedingung = { eine: ['A1'], ohne: ['A7'] } as const;
     expect(bedingungErfuellt(bedingung, 'mitarbeiter')).toBe(true);
     expect(bedingungErfuellt(bedingung, 'inhaber')).toBe(false);
     expect(bedingungErfuellt(bedingung, 'treuhaender')).toBe(false);
