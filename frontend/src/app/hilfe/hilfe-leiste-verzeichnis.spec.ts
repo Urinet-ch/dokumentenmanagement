@@ -61,5 +61,16 @@ describe('Hilfe-Leiste, Inhaltsverzeichnis (Spec 07, Req 4.7)', () => {
     hilfe.offen.set(true);
     fixture.detectChanges();
     expect(knopf.getAttribute('aria-expanded')).toBe('false');
+
+    knopf.click();
+    fixture.detectChanges();
+    expect(knopf.getAttribute('aria-expanded')).toBe('true');
+
+    hilfe.offen.set(false);
+    fixture.detectChanges();
+    hilfe.anker.set(null);
+    hilfe.offen.set(true);
+    fixture.detectChanges();
+    expect(knopf.getAttribute('aria-expanded')).toBe('true');
   });
 });

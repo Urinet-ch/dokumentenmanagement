@@ -145,6 +145,35 @@ When('ich das Inhaltsverzeichnis der Hilfe-Leiste aufklappe', async function () 
   await verzeichnisOeffnen(dialog(this.seite));
 });
 
+Then(
+  'lässt sich das Inhaltsverzeichnis mit Enter und Leertaste umschalten, ohne den Fokus zu verlieren',
+  async function () {
+    const knopf = dialog(this.seite).getByRole('button', { name: /^Abschnitte/ });
+    assert.equal(await knopf.getAttribute('aria-expanded'), 'true');
+
+    await knopf.focus();
+    await knopf.press('Enter');
+    await this.seite.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-test="hilfe-verzeichnis-knopf"]')
+          ?.getAttribute('aria-expanded') === 'false',
+    );
+    assert.equal(await knopf.getAttribute('aria-expanded'), 'false');
+    assert.equal(await knopf.evaluate((element) => document.activeElement === element), true);
+
+    await knopf.press(' ');
+    await this.seite.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-test="hilfe-verzeichnis-knopf"]')
+          ?.getAttribute('aria-expanded') === 'true',
+    );
+    assert.equal(await knopf.getAttribute('aria-expanded'), 'true');
+    assert.equal(await knopf.evaluate((element) => document.activeElement === element), true);
+  },
+);
+
 Then('ist das Inhaltsverzeichnis der Hilfe-Leiste aufgeklappt', async function () {
   const knopf = dialog(this.seite).getByRole('button', { name: /^Abschnitte/ });
   assert.equal(await knopf.getAttribute('aria-expanded'), 'true');

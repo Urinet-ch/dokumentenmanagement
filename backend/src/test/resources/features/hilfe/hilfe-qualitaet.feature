@@ -43,6 +43,8 @@ Funktionalität: Barrierefreiheit und Datenschutz der Einführung und Hilfe
       | 375    | dunkel |
       | 1280   | hell   |
       | 1280   | dunkel |
+      | 1920   | hell   |
+      | 1920   | dunkel |
 
   @req-9.2 @req-4.5
   Szenario: Der Fokus kehrt auch bei schnellem Schliessen mit Escape zurück
