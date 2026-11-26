@@ -26,6 +26,8 @@ info:
     Regeln:
     - **Nur serverseitig.** Nur der Server einer Webseite ruft die Schnittstelle auf. Das Archiv erlaubt kein CORS;
       ein Schlüssel gehört nie in einen Browser, eine App oder ein Skript beim Besucher.
+    - **Sicherheitsheader.** Antworten tragen `X-Content-Type-Options: nosniff`. Für `/public/` wird keine
+      pauschale `Cross-Origin-Resource-Policy` gesetzt; das ändert weder die Anmeldung noch die CORS-Regel.
     - **Innerhalb einer Hauptversion nur additiv.** Erlaubt sind neue Endpunkte, neue optionale Parameter, neue
       Antwortfelder und neue Werte bei Feldern mit `x-erweiterbar: true`. Alles andere (Pfad, Feld oder Parameter
       entfernen oder umbenennen, Typ ändern, neuer Pflichtparameter, Statuscode entfernen, neuer Wert eines nicht

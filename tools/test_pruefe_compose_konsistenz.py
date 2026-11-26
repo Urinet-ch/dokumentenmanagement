@@ -39,6 +39,28 @@ class ComposePruefungTest(unittest.TestCase):
     def test_synthetische_vorlage_ohne_befund(self):
         self.assertEqual([], pruefung.pruefe_compose(modell()))
 
+    def test_auth_router_darf_nicht_middleware_der_api_nutzen(self):
+        daten = modell()
+        daten["services"]["api"]["labels"]["traefik.http.middlewares.archiv-sts.headers.stsseconds"] = "86400"
+        daten["services"]["kc"]["labels"] = [
+            "traefik.http.routers.archiv-auth.middlewares=archiv-sts",
+        ]
+        befunde = pruefung.pruefe_compose(daten)
+        self.assertEqual(
+            [("MIDDLEWARE_FREMDER_DIENST", "services.kc.routers.archiv-auth")],
+            [(b["code"], b["ort"]) for b in befunde],
+        )
+
+    def test_auth_router_mit_eigener_middleware_und_docker_provider(self):
+        daten = modell()
+        daten["services"]["kc"]["labels"] = [
+            "traefik.http.routers.archiv-auth.middlewares= archiv-auth-sts@docker ",
+            "traefik.http.middlewares.archiv-auth-sts.headers.stsseconds=86400",
+        ]
+        self.assertEqual([], pruefung.pruefe_compose(daten))
+        daten["services"]["kc"]["labels"][0] = "traefik.http.routers.archiv-auth.middlewares=archiv-auth-sts@file"
+        self.assertIn("MIDDLEWARE_FREMDER_DIENST", {b["code"] for b in pruefung.pruefe_compose(daten)})
+
     def test_jede_kategorie_meldet_regression(self):
         aenderungen = (
             ("HEALTHCHECK", lambda d: d["services"]["db"].pop("healthcheck")),

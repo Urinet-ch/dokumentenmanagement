@@ -128,7 +128,7 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Wenn der Webseiten-Lesezugang «vorstand» ein unbekanntes Dokument mit der Stufe «vorstand» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
 
-  @req-13.5
+  @req-9.2 @req-13.5 @sicherheits-header
   Szenario: Der Stream trägt Typ, Länge und strenge Header und nennt keinen Dateinamen
     Angenommen das Dokument «b3» hat eine Datei
     Und das Dokument «b3» trägt den Dateinamen «geheimer-dateiname-4711.pdf» und den Partner «Geheimpartner AG»
@@ -136,11 +136,19 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Dann antwortet die Lese-Schnittstelle mit Status 200
     Und liefert die Antwort die Datei von «b3» als «application/pdf» mit der Länge der Datei
     Und trägt die Lese-Antwort den Header «Cache-Control» mit dem Wert «private, no-store»
-    Und trägt die Lese-Antwort den Header «X-Content-Type-Options» mit dem Wert «nosniff»
+    Und trägt die Lese-Antwort den Header «X-Content-Type-Options» genau einmal mit dem Wert «nosniff»
+    Und trägt die Lese-Antwort keinen Header «Cross-Origin-Resource-Policy»
     Und trägt die Lese-Antwort den Header «Content-Disposition» mit dem Wert «inline»
     Und trägt die Lese-Antwort den Header «Accept-Ranges» mit dem Wert «none»
     Und steht in keinem Header der Antwort der Dateiname «geheimer-dateiname»
     Und steht in keinem Header der Antwort der Dateiname «Geheimpartner»
+
+  @req-13.2 @sicherheits-header
+  Szenario: Auch eine fehlende Datei hat sichere Header ohne pauschale Herkunftssperre
+    Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «b3» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und trägt die Lese-Antwort den Header «X-Content-Type-Options» genau einmal mit dem Wert «nosniff»
+    Und trägt die Lese-Antwort keinen Header «Cross-Origin-Resource-Policy»
 
   @req-13.5
   Szenario: Eine Range-Anfrage wird nicht bedient, sondern mit der ganzen Datei beantwortet

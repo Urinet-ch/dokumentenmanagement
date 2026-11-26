@@ -1620,6 +1620,16 @@ Nachweise: OCR-Adaptertest mit synthetischem PDF (Spalten Bezeichnung, Beschreib
 Platzhalter) sowie JUnit-Test, der den tabellenbewussten Prompt und den unveränderten Tabelleninhalt prüft. Keine
 Änderung an Requirements oder Datenbankschema.
 
+### Umsetzung (Aufgabe 19.3, 26.11.2026)
+Der Zusatzprompt gilt nur für `KERNAUSSAGEN`; die bestehenden Regeln zum Schutz vor Prompt-Injection und zur Kennzeichnung
+des Seiteninhalts als nicht vertrauenswürdige Daten bleiben unverändert. Er verlangt, offene Fragen als offene Fragen
+zu erhalten, keine unbelegten Aussagen zu bilden und Optionen, Preisarten, Grenzen sowie Zahlen, Daten und Einheiten
+vollständig zu übernehmen. Die Eingabe- und Budgetobergrenze wird mit der tatsächlichen Länge dieses erweiterten
+System-Prompts berechnet. Es wurden weder Konfiguration noch Antwortschema geändert. `@req-5.3` prüft mit synthetischen
+zwei Seiten, dass Frage und optionale Preisbedingung in den Kernaussagen samt Auszügen erhalten bleiben. Weil die
+Extraktion pro Seite aufgerufen wird, umfasst der WireMock-Lauf zwei Kernaussagen-Aufrufe sowie Planung, Seite und
+Quelle, insgesamt fünf Aufrufe.
+
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
 1. Lage zu Spec 03: Spec 04 wird nach Spec 03 umgesetzt, Wellen 13–16 (tasks.md). Der Nachtrag in
