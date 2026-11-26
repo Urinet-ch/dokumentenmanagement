@@ -8,8 +8,13 @@ import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.integration.application.webseite.WebseiteLesen;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
+import ch.urinet.archiv.integration.domain.webseite.WebseiteReihe;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
+import ch.urinet.archiv.kontakt.application.KontaktSeite;
+import ch.urinet.archiv.kontakt.application.KontaktSuche;
+import ch.urinet.archiv.kontakt.application.KontaktVerwaltung;
+import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
@@ -55,6 +60,7 @@ class FehlerInjektionTest {
     @Inject SuchePort suche;
     @Inject WebseiteLesen webseiteLesen;
     @Inject WebseitenSchluesselVerwaltung schluesselVerwaltung;
+    @Inject KontaktVerwaltung kontaktVerwaltung;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -131,13 +137,16 @@ class FehlerInjektionTest {
     @EnumSource(Ausfall.class)
     void webseitenlisteBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) throws Exception {
         List<String> tokens = new ArrayList<>();
+        List<String> pfade = List.of("/public/v1/dokumente", "/public/v1/filter");
         try {
             for (String mandant : List.of("urinet", "vhf-gsk")) {
                 tokens.add(schluesselVerwaltung.erstellen(mandant, "qa-fehlerantwort",
                         "lesen", "oeffentlich", false).token().text());
             }
             for (String token : tokens) {
-                given().auth().oauth2(token).when().get("/public/v1/dokumente").then().statusCode(200);
+                for (String pfad : pfade) {
+                    given().auth().oauth2(token).when().get(pfad).then().statusCode(200);
+                }
             }
             WebseiteLesen original = ClientProxy.unwrap(webseiteLesen);
             AtomicInteger getroffen = new AtomicInteger();
@@ -153,14 +162,22 @@ class FehlerInjektionTest {
                     getroffen.incrementAndGet();
                     throw fehler(ausfall);
                 }
+
+                @Override
+                public List<WebseiteReihe> reihen(Lesezugriff zugriff) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
             }, WebseiteLesen.class);
             try (LogMitschnitt log = LogMitschnitt.starten()) {
                 for (String token : tokens) {
-                    var antwort = given().auth().oauth2(token).when().get("/public/v1/dokumente");
-                    assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
-                    assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+                    for (String pfad : pfade) {
+                        var antwort = given().auth().oauth2(token).when().get(pfad);
+                        assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                        assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+                    }
                 }
-                assertThat(getroffen).hasValue(2);
+                assertThat(getroffen).hasValue(4);
                 assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
                 for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
             } finally {
@@ -175,6 +192,48 @@ class FehlerInjektionTest {
                 }
             }
 
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void kontakteBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) {
+        List<String> tokens = List.of(Testanmeldung.token("inhaber-urinet"), Testanmeldung.token("inhaber-vhf-gsk"));
+        List<String> pfade = List.of("/api/v1/kontakte", "/api/v1/kontakte/liste");
+        for (String token : tokens) {
+            for (String pfad : pfade) {
+                given().auth().oauth2(token).queryParam("q", MARKER).when().get(pfad).then().statusCode(200);
+            }
+        }
+        KontaktVerwaltung original = ClientProxy.unwrap(kontaktVerwaltung);
+        AtomicInteger getroffen = new AtomicInteger();
+        QuarkusMock.installMockForType(new KontaktVerwaltung(null, null, null, null) {
+            @Override
+            public List<Kontakt> suchen(String text) {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+
+            @Override
+            public KontaktSeite liste(String text, KontaktSuche.Status status, String quelle, Boolean nichtImExport,
+                                     int seite, int groesse) {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+        }, KontaktVerwaltung.class);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (String token : tokens) {
+                for (String pfad : pfade) {
+                    var antwort = given().auth().oauth2(token).queryParam("q", MARKER).when().get(pfad);
+                    assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                    assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+                }
+            }
+            assertThat(getroffen).hasValue(4);
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+            for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
+        } finally {
+            QuarkusMock.installMockForType(original, KontaktVerwaltung.class);
         }
     }
 
