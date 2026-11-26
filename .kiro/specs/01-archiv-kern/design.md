@@ -1891,6 +1891,12 @@ Nachweis: jedes Kriterium ohne Vermerk «Nachweis: manuell [Fabian]», «Nachwei
 `backend/src/test/resources/features/<fachbereich>/`, je Datei auf Feature-Ebene genau ein Tag `@spec-NN`.
 Testdaten im Repository sind ausschliesslich synthetisch (Req 16.7).
 
+Umsetzung (QA Eingabegrenzen, 26.11.2026): `RestEingabeGrenzenTest` liest die Grenzen für JSON-Anfragen und
+Multipart aus `archiv.http.max-anfrage` beziehungsweise `archiv.upload.max-anfrage` und prüft ergänzend zu
+`@req-16.7` auf Eingaben und Stacktraces in Antworten und Logs. Feldgrenzen stammen aus `maxLength`, `maxItems`
+und `maximum` der OpenAPI; die separate CSV-Dateigrenze von 5 MiB bleibt `archiv.import.max-groesse` (Req 13.10).
+Der Test belegt nur deklarierte Grenzen; die im PR zu #659 gemeldeten Vertragslücken bleiben offen.
+
 Aufteilung der CI (`.github/workflows/ci.yml`, Entscheid Fabian 13.11.2026; vorher ein Backend-Job mit 22.5 min, davon
 rund 12 min für 25 Klassen mit eigenem Quarkus-Start): Keine Prüfung entfällt, sie laufen parallel, ausser bei reinen
 Spec-Anpassungen (nur `.md`-Dateien unter `.kiro/` oder `docs/`, `.github/scripts/nur-spec.py`; ergänzt 13.11.2026,
