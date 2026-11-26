@@ -5,6 +5,8 @@ export async function verzeichnisOeffnen(leiste) {
   const knopf = leiste.getByRole('button', { name: /^Abschnitte/ });
   const nav = leiste.getByRole('navigation', { name: 'Inhalt der Anleitung' });
   for (let versuch = 0; versuch < 5; versuch += 1) {
+    // Zwei Frames warten: Klickt man den schon gewählten Abschnitt, klappt das Verzeichnis erst nach dem Rendern zu.
+    await leiste.page().evaluate(() => new Promise((fertig) => requestAnimationFrame(() => requestAnimationFrame(fertig))));
     if (await nav.isVisible()) return nav;
     await knopf.waitFor({ state: 'visible' });
     if ((await knopf.getAttribute('aria-expanded')) === 'false') await knopf.click();
