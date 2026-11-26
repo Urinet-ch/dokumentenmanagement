@@ -291,7 +291,7 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
   - Kennzahlen-, Persona- und Positionstabellen ergeben je Tabelle höchstens eine Gruppe von Aussagen statt einer Aussage je Zelle; Obergrenze und Gruppierung als Einstellung (Startwert aus der Messung).
   - Trägt ein Dokument einen Vertraulichkeitsvermerk («intern», «nicht für Dritte»), schlägt der Ingest die Vertraulichkeit des Dokuments entsprechend vor und die Wissensseiten dürfen nicht für Webseite oder Mitglieder freigegeben werden (Req 21.x bleibt massgebend).
   - Nachweis: Szenario mit einem synthetischen Dokument mit Vermerk «intern»; Prüfung der Quellenstufe im Entwurf.
-  - _Anforderungen: 5.1–5.13, 20, 21_
+  - _Anforderungen: 5.1–5.13, 20.1, 21.1_
 - [ ] 19.6 Wiederholung des Test-Ingests [QA] [Fabian]
   - Nach 19.1 bis 19.5 das Quelldokument des Befunds erneut ingestieren (lokal oder Stufe A, nur durch Fabian) und mit der Auswertung vom 26.11.2026 vergleichen: erwartet sind keine Aussagen mit Kopfzeilen-Auszug, keine Antworten auf offene Fragen, die Optionentabelle als Zeilen und kein Verlust ganzer Abschnitte. Ergebnis (nur Zahlen, keine Inhalte) in `docs/abnahme/wissen.md`.
   - _Abhängig von: 19.1–19.5_
