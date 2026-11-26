@@ -48,6 +48,7 @@ public class WissenIngestHandler implements AuftragHandler {
     @Override
     public void nachLetztemFehlversuch(Auftrag auftrag, UUID fehlerId) {
         auftrag.nutzlast().uuid(WissenIngestStarten.NUTZLAST_ENTWURF_ID).ifPresent(entwurfId -> {
+            verarbeiten.auszugPrueferVerwerfen(entwurfId);
             if (auftrag.nutzlast().zahl("aenderungNr").isPresent()) {
                 manuellSpeichern.nachFehlversuch(auftrag, entwurfId,
                         Math.toIntExact(auftrag.nutzlast().zahl("aenderungNr").orElseThrow()));

@@ -13,10 +13,22 @@ export abstract class WarteschlangeSpeicher {
 const DATENBANK = 'urinet-archiv';
 const ABLAGE = 'warteschlange';
 
-export class IndexedDbSpeicher extends WarteschlangeSpeicher {
-  private readonly db = openDB(DATENBANK, 1, {
+interface WarteschlangenDatenbank {
+  getAll(ablage: string): Promise<unknown[]>;
+  put(ablage: string, eintrag: Eintrag): Promise<unknown>;
+  delete(ablage: string, id: string): Promise<unknown>;
+}
+
+function datenbankOeffnen(): Promise<WarteschlangenDatenbank> {
+  return openDB(DATENBANK, 1, {
     upgrade: (db) => db.createObjectStore(ABLAGE, { keyPath: 'id' }),
   });
+}
+
+export class IndexedDbSpeicher extends WarteschlangeSpeicher {
+  constructor(private readonly db: Promise<WarteschlangenDatenbank> = datenbankOeffnen()) {
+    super();
+  }
 
   async alle(): Promise<Eintrag[]> {
     const eintraege = (await (await this.db).getAll(ABLAGE)) as Eintrag[];

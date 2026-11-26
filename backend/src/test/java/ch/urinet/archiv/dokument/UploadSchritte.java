@@ -833,7 +833,7 @@ public class UploadSchritte {
     @Dann("taucht «{}» weder im Log noch im Zugriffsprotokoll, in Nutzlasten von Aufträgen, S3-Schlüsseln oder "
             + "Antwort-Headern auf")
     public void nirgends(String teil) throws SQLException {
-        assertThat(mitschnitt.volltext()).as("Log").doesNotContain(teil);
+        assertThat(mitschnitt.volltext()).as("Log").doesNotContain(teil, "Testrechnung Upload");
         assertThat(abfragen("select id from " + schema() + ".zugriff_protokoll where strpos(coalesce(details::text, "
                 + "''), ?) > 0", teil)).as("Zugriffsprotokoll").isEmpty();
         assertThat(abfragen("select id from public.auftrag where strpos(nutzlast::text, ?) > 0", teil))

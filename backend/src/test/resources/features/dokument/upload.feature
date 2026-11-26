@@ -405,7 +405,7 @@ Funktionalität: Upload von Dateien
       | Team {U+1F468}{U+200D}{U+1F469}.pdf | NEU    |
     Und hat jedes neue Dokument den Dateinamen «Team {U+1F468}{U+200D}{U+1F469}.pdf» und keinen Titel
 
-  @req-3.12
+  @req-3.12 @req-16.7
   Szenario: Der Dateiname erscheint nicht in Log, Zugriffsprotokoll, Aufträgen, S3-Schlüsseln, KI-Aufruf und Download
     Angenommen die Verarbeitung ist bereit
     Und das Sprachmodell ist bereit

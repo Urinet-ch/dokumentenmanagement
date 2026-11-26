@@ -2,7 +2,6 @@ package ch.urinet.archiv.wissen.domain;
 
 import ch.urinet.archiv.gemeinsam.domain.Seitentext;
 
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -312,52 +311,16 @@ public final class WissensPruefung {
     }
 
     private static boolean auszugGefunden(String auszug, Seitentext seiten, int von, int bis) {
-        String gesucht = normalisieren(auszug);
-        if (gesucht.isBlank()) {
-            return false;
-        }
-        for (int seite = von; seite <= bis; seite++) {
-            if (normalisieren(seiten.seiten().get(seite - 1)).contains(gesucht)) {
-                return true;
-            }
-        }
-        return false;
+        return WissenIngestAuszuege.kommtVor(auszug, seiten, von, bis);
     }
 
-    /**
-     * Normalisiert Auszug und Seitentext gleich für Ingest und Prüfung: NFKC, Silbentrennung am Zeilenende entfernen,
-     * Leerraum zusammenfassen.
-     */
+    /** Normalisiert Auszug und Seitentext mit derselben Regel für Ingest und spätere Prüfung. */
     public static String auszugNormalisieren(String text) {
         return normalisieren(text);
     }
 
     private static String normalisieren(String text) {
-        String normalisiert = Normalizer.normalize(text, Normalizer.Form.NFKC);
-        StringBuilder ergebnis = new StringBuilder(normalisiert.length());
-        boolean leerraum = true;
-        for (int i = 0; i < normalisiert.length(); i++) {
-            char zeichen = normalisiert.charAt(i);
-            if ((zeichen == '-' || zeichen == '\u00ad') && i + 1 < normalisiert.length()
-                    && (normalisiert.charAt(i + 1) == '\n' || normalisiert.charAt(i + 1) == '\r')) {
-                i++;
-                if (i + 1 < normalisiert.length() && normalisiert.charAt(i) == '\r'
-                        && normalisiert.charAt(i + 1) == '\n') {
-                    i++;
-                }
-                continue;
-            }
-            if (Character.isWhitespace(zeichen)) {
-                if (!leerraum) {
-                    ergebnis.append(' ');
-                }
-                leerraum = true;
-            } else {
-                ergebnis.append(zeichen);
-                leerraum = false;
-            }
-        }
-        return ergebnis.toString().strip();
+        return WissenIngestAuszuege.normalisieren(text);
     }
 
     private static void pruefeAbschnitte(Wissensseite seite, WissensMarkdown.Analyse markdown,

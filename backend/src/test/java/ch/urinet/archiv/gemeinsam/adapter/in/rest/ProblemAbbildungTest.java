@@ -7,6 +7,7 @@ import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
 import ch.urinet.archiv.gemeinsam.domain.StepUpNoetig;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import jakarta.persistence.PersistenceException;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 import org.postgresql.util.PSQLException;
@@ -43,6 +44,24 @@ class ProblemAbbildungTest {
     void fremderSqlStateBleibtEinInternerFehler() {
         pruefen(new SQLException("synthetischer Constraint-Fehler", "23505"),
                 500, Fehlercode.INTERNER_FEHLER);
+    }
+
+    @Test
+    void ungueltigerNumerischerParameterIstEineUngueltigeAnfrage() {
+        try (Response antwort = abbildung.framework(new NotFoundException(new NumberFormatException("synthetisch")))) {
+            assertThat(antwort.getStatus()).isEqualTo(400);
+            assertThat(antwort.getEntity()).asString()
+                    .contains("\"fehlercode\":\"ANFRAGE_UNGUELTIG\"")
+                    .doesNotContain("synthetisch", "NumberFormatException");
+        }
+    }
+
+    @Test
+    void fehlendeRessourceBleibtEinNichtGefundenFehler() {
+        try (Response antwort = abbildung.framework(new NotFoundException())) {
+            assertThat(antwort.getStatus()).isEqualTo(404);
+            assertThat(antwort.getEntity()).asString().contains("\"fehlercode\":\"NICHT_GEFUNDEN\"");
+        }
     }
 
     @Test
