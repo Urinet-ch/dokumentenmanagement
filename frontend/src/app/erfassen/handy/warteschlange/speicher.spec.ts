@@ -1,9 +1,15 @@
-import { Eintrag } from './eintrag';
-import { SpeicherImArbeitsspeicher } from './speicher';
+import type { Eintrag } from './eintrag';
+import { IndexedDbSpeicher } from './speicher';
 
-describe('SpeicherImArbeitsspeicher', () => {
+describe('IndexedDbSpeicher', () => {
   it('speichert, sortiert nach Aufnahmezeit und löscht gezielt', async () => {
-    const speicher = new SpeicherImArbeitsspeicher();
+    const daten = new Map<string, Eintrag>();
+    const datenbank = {
+      getAll: vi.fn(async () => [...daten.values()]),
+      put: vi.fn(async (_ablage: string, eintrag: Eintrag) => daten.set(eintrag.id, eintrag)),
+      delete: vi.fn(async (_ablage: string, id: string) => daten.delete(id)),
+    };
+    const speicher = new IndexedDbSpeicher(Promise.resolve(datenbank));
     const eintrag = (id: string, aufgenommen: string): Eintrag =>
       ({ id, aufgenommen, seiten: [], fehlversuche: 0, zustand: 'wartet' });
     const spaeter = eintrag('b', '2026-01-02T00:00:00Z');
