@@ -277,7 +277,7 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
   - Tabellen werden zeilenweise extrahiert (tabellenbewusster Textauszug oder Lesen des Seitenbildes), damit Spaltentitel nicht als Aussagen auftauchen und Zellen mit Platzhaltern («––») nicht verloren gehen. Eine Tabellenzeile ergibt höchstens eine Kernaussage mit Spaltenbezug.
   - Nachweis: Test mit einem synthetischen PDF mit Tabelle (Zeilenumbruch in der Zelle, Spalten Bezeichnung, Beschreibung, Preis).
   - _Anforderungen: 5.1–5.13_
-- [ ] 19.3 Prompt: Fragen bleiben Fragen, Optionen bleiben Optionen [Backend]
+- [x] 19.3 Prompt: Fragen bleiben Fragen, Optionen bleiben Optionen [Backend]
   - Der Kernaussagen-Prompt behandelt Fragen und offene Punkte als solche (nie als Antwort umformulieren, keine Aussage ohne Textbeleg) und führt Bedingungen mit (Option oder enthalten, Richtpreis oder Festpreis, Obergrenze oder inbegriffen); Zahlen, Einschränkungen («bis», «Mehraufwand nach Absprache») dürfen nicht entfallen.
   - Nachweis: WireMock-Szenarien mit einem synthetischen Dokument, das eine offene Frage und eine Option mit Preis enthält; die Erwartung prüft, dass keine Antwort erfunden und die Bedingung genannt wird.
   - Prompt-Injection-Schutz aus 14.1 bleibt unverändert.
