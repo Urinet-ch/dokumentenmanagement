@@ -1,5 +1,6 @@
 import { After, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { verzeichnisOeffnen } from '../hilfen/hilfe-verzeichnis.mjs';
 import { createHash } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -80,7 +81,7 @@ Then('sind alle sichtbaren Abschnitte der Anleitung geladen', async function () 
 
 Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_000 }, async function () {
   const leiste = this.seite.getByRole('dialog', { name: 'Hilfe', exact: true });
-  const nav = leiste.getByRole('navigation', { name: 'Inhalt der Anleitung' });
+  const nav = await verzeichnisOeffnen(leiste);
   const links = nav.getByRole('link');
   await links.first().waitFor({ state: 'visible' });
   const titel = (await links.allInnerTexts()).map((text) => text.trim());
@@ -89,7 +90,7 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
     assert.ok(titel.includes('Erfassen'), 'Die Sitzung muss für die vollständige Offline-Anleitung bestehen bleiben');
   }
   for (const name of titel) {
-    const link = nav.getByRole('link', { name, exact: true });
+    const link = (await verzeichnisOeffnen(leiste)).getByRole('link', { name, exact: true });
     await link.click({ timeout: 10_000 });
     await this.seite.waitForFunction(
       (titel) => [...document.querySelectorAll('[role="dialog"] nav a')].some(
@@ -121,7 +122,7 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
     assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0, name);
   }
   if (this.keycloak?.benutzer) {
-    assert.ok(await nav.getByRole('link', { name: 'Erfassen', exact: true }).isVisible(),
+    assert.ok(await (await verzeichnisOeffnen(leiste)).getByRole('link', { name: 'Erfassen', exact: true }).isVisible(),
       'Die Sitzung wurde während der Prüfung beendet');
   }
 });
