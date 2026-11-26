@@ -4,6 +4,8 @@ import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Ergebnis;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -25,10 +27,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class RechtematrixSpecTest {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
     private static final Path REQUIREMENTS = Path.of("../.kiro/specs/01-archiv-kern/requirements.md");
     private static final Path WISSEN_REQUIREMENTS = Path.of("../.kiro/specs/04-wissensbasis/requirements.md");
     private static final Path VERWALTUNG_REQUIREMENTS =
             Path.of("../.kiro/specs/06-verwaltung-einstellungen-benutzer/requirements.md");
+    private static final Path MASCHINENLESBARE_MATRIX = Path.of("src/test/resources/rechtematrix.json");
     private static final Pattern ZEILE = Pattern.compile("^\\| (A\\d+) \\|.*");
     private static final Pattern TRENNZEILE = Pattern.compile("^\\|( --- \\|)+$");
     private static final List<String> KOPF = List.of("Nr.", "Aktion", "`inhaber`", "`mitarbeiter`", "`treuhaender`",
@@ -49,6 +53,33 @@ class RechtematrixSpecTest {
         assertThat(spec.keySet()).containsExactlyInAnyOrder(Aktion.values());
         spec.forEach((aktion, zeile) -> zeile.forEach((rolle, ergebnis) ->
                 assertThat(Rechtematrix.ergebnis(rolle, aktion)).as(aktion + " " + rolle.code()).isEqualTo(ergebnis)));
+    }
+
+    @Test
+    void maschinenlesbareMatrixEntsprichtSpecsUndHttpErgebnissen() throws IOException {
+        JsonNode json = JSON.readTree(MASCHINENLESBARE_MATRIX.toFile());
+        assertThat(json.path("nichtAngemeldet").asText()).isEqualTo("401");
+
+        Map<Aktion, Map<Rolle, Ergebnis>> spec = new java.util.LinkedHashMap<>(
+                lesen(Files.readAllLines(REQUIREMENTS)));
+        spec.putAll(lesen(Files.readAllLines(WISSEN_REQUIREMENTS)));
+        spec.putAll(lesen(Files.readAllLines(VERWALTUNG_REQUIREMENTS)));
+
+        Map<Aktion, JsonNode> dateizeilen = new java.util.LinkedHashMap<>();
+        json.path("aktionen").forEach(zeile -> {
+            Aktion aktion = Aktion.valueOf(zeile.path("id").asText());
+            assertThat(zeile.path("quelle").asText()).as(aktion.toString()).isEqualTo(quelle(aktion));
+            assertThat(dateizeilen.put(aktion, zeile)).as("doppelte Zeile " + aktion).isNull();
+        });
+        assertThat(dateizeilen.keySet()).containsExactlyInAnyOrderElementsOf(spec.keySet());
+
+        spec.forEach((aktion, rollen) -> rollen.forEach((rolle, ergebnis) -> {
+            JsonNode zelle = dateizeilen.get(aktion).path("rollen").path(rolle.code());
+            assertThat(RechtematrixZelle.ergebnis(zelle.path("ergebnis").asText()))
+                    .as(aktion + " " + rolle.code()).isEqualTo(ergebnis);
+            assertThat(zelle.path("http")).as(aktion + " " + rolle.code() + " HTTP")
+                    .isEqualTo(JSON.valueToTree(httpErgebnisse(ergebnis)));
+        }));
     }
 
     @Test
@@ -123,5 +154,27 @@ class RechtematrixSpecTest {
     private static List<String> zellen(String zeile) {
         String innen = zeile.strip().substring(1, zeile.strip().length() - 1);
         return Arrays.stream(innen.split("\\|")).map(String::strip).toList();
+    }
+
+    private static String quelle(Aktion aktion) {
+        if (aktion.compareTo(Aktion.A15) >= 0 && aktion.compareTo(Aktion.A19) <= 0) {
+            return "Spec 04, Req 12.1";
+        }
+        if (aktion.compareTo(Aktion.A20) >= 0 && aktion.compareTo(Aktion.A23) <= 0) {
+            return "Spec 06, Req 4.1";
+        }
+        if (aktion == Aktion.A24) {
+            return "Spec 02, Req 15.5";
+        }
+        return "Spec 01, Req 2.6";
+    }
+
+    static List<String> httpErgebnisse(Ergebnis ergebnis) {
+        return switch (ergebnis) {
+            case ERLAUBT, NUR_LESEND, NUR_SELBST_ERFASSTE -> List.of("2XX");
+            case VERBOTEN -> List.of("403");
+            case NICHT_SICHTBAR -> List.of("404");
+            case NUR_EIGENE -> List.of("2XX", "404");
+        };
     }
 }
