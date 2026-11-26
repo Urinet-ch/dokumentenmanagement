@@ -1,5 +1,47 @@
 # Branch- und Worktree-Bericht
 
+## Abgleich vom 25.11.2026
+
+Grundlage: `origin/main` bei `dbd00f2e4`, tatsächliche Remote-Refs aus `git ls-remote --heads origin`
+und offene PRs #624, #643–#648. Von 41 Remote-Branches der unten genannten Präfixe haben 7 einen
+offenen PR; von den übrigen 34 sind 20 Vorfahren von `origin/main` und 14 nicht. Ein nicht als
+Vorfahr erkannter Branch kann trotzdem per Squash-PR gemergt sein; daraus folgt keine Löschfreigabe.
+Kein Branch und kein Worktree wurde gelöscht.
+
+Seit dem nachstehenden älteren Snapshot neu ohne offenen PR und als Vorfahr von `origin/main` erkannt:
+
+- `origin/feature/01-03-eingabegrenzen`
+- `origin/feature/03-a11y-restpruefung`
+
+Diese im älteren Snapshot aufgeführten Remote-Branches waren beim Abgleich nicht mehr auf dem Remote
+vorhanden (keine Aussage über die Ursache):
+
+- `origin/docs/aufgabenstand-2026-11`
+- `origin/feature/01-5.9-ki-beispiel-fehlerisolierung`
+- `origin/feature/01-5.9-ki-beispiel-kennzahlen`
+- `origin/feature/01-5.9-monitoring-vorbereitung`
+- `origin/feature/03-10.2-wissensquelle-seed`
+- `origin/feature/03-chat-fehlerstabilitaet`
+- `origin/feature/04-18.3-oeffentlicher-wissenschat`
+- `origin/feature/06-19.2-ablauf-versand`
+- `origin/feature/06-19.2-realm-nachweise`
+- `origin/feature/06-21.2-migration-entwurf`
+- `origin/feature/06-21.2a-betreiber-folgetests`
+- `origin/feature/06-21.2a-betreibervorgang`
+- `origin/feature/06-21.4-sicherheit-testnachtrag`
+- `origin/feature/06-21.4-sicherheits-ausfalltests`
+- `origin/feature/06-21.5-dokumentation-abgleich`
+- `origin/feature/06-24.2-passkey-folgetests`
+- `origin/feature/07-23.6-pflegeregel`
+- `origin/feature/07-hilfe-offline-stabilitaet`
+- `origin/fix/hilfe-offline-31`
+
+Die folgende Branch- und Worktree-Liste bleibt als historischer Snapshot erhalten; sie ist keine
+aktuelle Liste lokaler Worktrees. Die Angaben zum Remote unterscheiden sich bewusst von lokalen
+Tracking-Refs, die ohne `--prune` veraltete Einträge behalten können.
+
+## Historischer Snapshot
+
 Stichtag: 25.11.2026. Grundlage: `origin/main` nach `git fetch -q origin`
 (Commit `50ec30cb8`). Erfasst sind Remote-Branches `feature/*`, `fix/*`,
 `docs/*` und `spec/*`, für die kein offener PR besteht. Kein Branch und kein

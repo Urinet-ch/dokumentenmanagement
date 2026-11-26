@@ -13,10 +13,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
+/** Teilnachweis @req-6.3: Dokumentarchivierungen sind je Mandant und Dokument serialisiert. */
 class JdbcDokumentArchivierungSperreTest {
 
     private static final MandantCode MANDANT = new MandantCode("urinet");
@@ -65,5 +67,56 @@ class JdbcDokumentArchivierungSperreTest {
 
         assertThat(zweiterErhieltSperre.await(5, TimeUnit.SECONDS)).isTrue();
         zweiterLauf.get(5, TimeUnit.SECONDS);
+    }
+
+    @Test
+    void gleicheDokumentIdInAnderemMandantenWartetNicht() throws Exception {
+        UUID id = UUID.randomUUID();
+        try (DokumentArchivierungSperre.Sperre gehalten = sperre.sperren(MANDANT, id)) {
+            Future<?> andererMandant = threads.submit(() -> {
+                try (DokumentArchivierungSperre.Sperre ignoriert = sperre.sperren(new MandantCode("vhf-gsk"), id)) {
+                    return null;
+                }
+            });
+            andererMandant.get(5, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    void unterbrechenGibtDieVerbindungFrei() throws Exception {
+        UUID id = UUID.randomUUID();
+        CountDownLatch gestartet = new CountDownLatch(1);
+        AtomicReference<Thread> wartender = new AtomicReference<>();
+        try (DokumentArchivierungSperre.Sperre gehalten = sperre.sperren(MANDANT, id)) {
+            Future<Boolean> ergebnis = threads.submit(() -> {
+                wartender.set(Thread.currentThread());
+                gestartet.countDown();
+                try (DokumentArchivierungSperre.Sperre ignoriert = sperre.sperren(MANDANT, id)) {
+                    return false;
+                } catch (InterruptedException e) {
+                    return Thread.currentThread().isInterrupted();
+                }
+            });
+            assertThat(gestartet.await(5, TimeUnit.SECONDS)).isTrue();
+            long frist = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (!wartetAufSperre(wartender.get()) && System.nanoTime() < frist) {
+                Thread.onSpinWait();
+            }
+            assertThat(wartetAufSperre(wartender.get())).isTrue();
+            wartender.get().interrupt();
+            assertThat(ergebnis.get(5, TimeUnit.SECONDS)).isTrue();
+        }
+        try (DokumentArchivierungSperre.Sperre erneut = sperre.sperren(MANDANT, id)) {
+            assertThat(erneut).isNotNull();
+        }
+    }
+
+    private static boolean wartetAufSperre(Thread thread) {
+        if (thread.getState() != Thread.State.TIMED_WAITING) {
+            return false;
+        }
+        return java.util.Arrays.stream(thread.getStackTrace())
+                .anyMatch(frame -> frame.getClassName().endsWith("JdbcDokumentArchivierungSperre")
+                        && frame.getMethodName().equals("sperren"));
     }
 }
