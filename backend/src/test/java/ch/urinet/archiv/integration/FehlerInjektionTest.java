@@ -3,6 +3,9 @@ package ch.urinet.archiv.integration;
 import ch.urinet.archiv.ablage.S3Stoerung;
 import ch.urinet.archiv.dokument.Testdateien;
 import ch.urinet.archiv.dokument.adapter.out.persistence.PanacheDokumentSuche;
+import ch.urinet.archiv.dokument.application.DokumentLesen;
+import ch.urinet.archiv.dokument.application.Seite;
+import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.integration.application.webseite.WebseiteLesen;
@@ -19,6 +22,7 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.application.SuchePort;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
@@ -61,6 +65,7 @@ class FehlerInjektionTest {
     @Inject WebseiteLesen webseiteLesen;
     @Inject WebseitenSchluesselVerwaltung schluesselVerwaltung;
     @Inject KontaktVerwaltung kontaktVerwaltung;
+    @Inject DokumentLesen dokumentLesen;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
 
@@ -234,6 +239,36 @@ class FehlerInjektionTest {
             for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
         } finally {
             QuarkusMock.installMockForType(original, KontaktVerwaltung.class);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void eingangskorbBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) {
+        List<String> tokens = List.of(Testanmeldung.token("inhaber-urinet"), Testanmeldung.token("inhaber-vhf-gsk"));
+        for (String token : tokens) {
+            given().auth().oauth2(token).when().get("/api/v1/eingangskorb").then().statusCode(200);
+        }
+        DokumentLesen original = ClientProxy.unwrap(dokumentLesen);
+        AtomicInteger getroffen = new AtomicInteger();
+        QuarkusMock.installMockForType(new DokumentLesen(null, null, null, null, null, null, null, null, null) {
+            @Override
+            public Seite<Dokument> eingangskorb(Benutzer benutzer, int seite, int groesse) {
+                getroffen.incrementAndGet();
+                throw fehler(ausfall);
+            }
+        }, DokumentLesen.class);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (String token : tokens) {
+                var antwort = given().auth().oauth2(token).when().get("/api/v1/eingangskorb");
+                assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+            }
+            assertThat(getroffen).hasValue(2);
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+            for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
+        } finally {
+            QuarkusMock.installMockForType(original, DokumentLesen.class);
         }
     }
 
