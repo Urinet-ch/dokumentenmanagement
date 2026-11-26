@@ -182,3 +182,18 @@ bash deploy/backup/test/restore-uebung-lokal-test.sh
 
 Der lokale Lauf prüft die Sicherungs-Shell und den Restore-Kern gemeinsam, ersetzt aber nicht die spätere Restore-Probe
 auf der VPS im Infra-Repository.
+
+## Vorschlag für den betrieblichen Zählvergleich
+
+`docs/betrieb/restore-zaehlvergleich-workflow.diff` ist ein noch nicht integrierter Vorschlag für den Infra-Workflow.
+Er vergleicht pro Mandant die Zahlen für `seiten`, `versionen` und `dokumente` und bricht bei fehlenden, ungültigen
+oder abweichenden Daten ab. Erwartet werden zwei JSON-Objekte der Form
+`{"mandant": {"seiten": 1, "versionen": 2, "dokumente": 3}}` unter `out/archiv-quelle.json` und
+`out/archiv-restore.json`.
+
+Der bestehende Infra-Workflow stellt noch kein Archiv wieder her und erzeugt diese Dateien nicht. Vor der Integration
+muss eine separate Archiv-Restore-Probe die Quellzahlen aus dem Sicherungszeitpunkt und die Zielzahlen aus der
+unabhängig wiederhergestellten Datenbank liefern; zwei Dateien allein beweisen diese Herkunft nicht. Der Vorschlag ist
+deshalb zunächst nur über die manuelle Option aktivierbar und schlägt ohne diese Voraussetzung fehl. Für den
+wiederkehrenden Betrieb müssen Probe, Zählquellen und Zeitsteuerung ergänzt und auf Stufe B nachgewiesen werden;
+Spec 04, Aufgabe 13.7 bleibt offen.
