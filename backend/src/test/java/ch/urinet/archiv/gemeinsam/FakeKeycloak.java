@@ -120,10 +120,14 @@ public final class FakeKeycloak implements QuarkusTestResourceLifecycleManager {
 
     /** Gültiges Token für {@code issuer}, angemeldet als {@code mitarbeiter} (ohne Rolle {@code inhaber}). */
     static String signiertesJwt(RsaJsonWebKey schluessel, String issuer) throws JoseException {
+        return signiertesJwt(schluessel, issuer, "fake-keycloak");
+    }
+
+    static String signiertesJwt(RsaJsonWebKey schluessel, String issuer, String benutzer) throws JoseException {
         JwtClaims inhalt = new JwtClaims();
         inhalt.setIssuer(issuer);
         inhalt.setAudience("archiv-api");
-        inhalt.setSubject("fake-keycloak");
+        inhalt.setSubject(benutzer);
         inhalt.setIssuedAtToNow();
         inhalt.setExpirationTimeMinutesInTheFuture(5);
         inhalt.setClaim("mandant", "urinet");
