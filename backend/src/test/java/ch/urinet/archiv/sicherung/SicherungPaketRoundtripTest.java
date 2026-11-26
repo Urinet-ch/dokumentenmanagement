@@ -257,10 +257,12 @@ class SicherungPaketRoundtripTest {
         String fremderMandant = MANDANTEN.stream().filter(anderer -> !anderer.equals(code)).findFirst().orElseThrow();
         UUID fremdeId = UUID.fromString(erwartet.getProperty(fremderMandant + ".dokument.id"));
         assertThat(fremdeId).isNotEqualTo(id);
-        var fremdeObjekte = s3.listObjectVersions(r -> r.bucket(zielBucket)
-                .prefix(erwartet.getProperty(fremderMandant + ".dokument.original.schluessel")));
-        assertThat(fremdeObjekte.versions()).isEmpty();
-        assertThat(fremdeObjekte.deleteMarkers()).isEmpty();
+        for (String datei : List.of("original", "pdfa")) {
+            String fremderSchluessel = erwartet.getProperty(fremderMandant + ".dokument." + datei + ".schluessel");
+            var fremdeObjekte = s3.listObjectVersions(r -> r.bucket(zielBucket).prefix(fremderSchluessel));
+            assertThat(fremdeObjekte.versions()).as("Fremde %s-Versionen in %s", datei, zielBucket).isEmpty();
+            assertThat(fremdeObjekte.deleteMarkers()).as("Fremde %s-Löschmarken in %s", datei, zielBucket).isEmpty();
+        }
         try (Connection connection = datenquelle.getConnection()) {
             try (PreparedStatement p = connection.prepareStatement(
                     "select 1 from " + schema + ".dokument where id = ?")) {
