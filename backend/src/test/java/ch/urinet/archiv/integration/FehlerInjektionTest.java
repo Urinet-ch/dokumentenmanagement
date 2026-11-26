@@ -12,6 +12,7 @@ import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.integration.application.webseite.WebseiteLesen;
+import ch.urinet.archiv.integration.application.webseite.WebseiteSuche;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteReihe;
@@ -71,6 +72,7 @@ class FehlerInjektionTest {
     @Inject AgroalDataSource datenbank;
     @Inject SuchePort suche;
     @Inject WebseiteLesen webseiteLesen;
+    @Inject WebseiteSuche webseiteSuche;
     @Inject WebseitenSchluesselVerwaltung schluesselVerwaltung;
     @Inject KontaktVerwaltung kontaktVerwaltung;
     @Inject DokumentLesen dokumentLesen;
@@ -149,9 +151,10 @@ class FehlerInjektionTest {
 
     @ParameterizedTest
     @EnumSource(Ausfall.class)
-    void webseitenlisteBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) throws Exception {
+    void webseitenLesepfadeBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) throws Exception {
         List<String> tokens = new ArrayList<>();
-        List<String> pfade = List.of("/public/v1/dokumente", "/public/v1/filter");
+        List<String> pfade = List.of("/public/v1/dokumente", "/public/v1/filter",
+                "/public/v1/suche?q=" + MARKER);
         try {
             for (String mandant : List.of("urinet", "vhf-gsk")) {
                 tokens.add(schluesselVerwaltung.erstellen(mandant, "qa-fehlerantwort",
@@ -163,6 +166,7 @@ class FehlerInjektionTest {
                 }
             }
             WebseiteLesen original = ClientProxy.unwrap(webseiteLesen);
+            WebseiteSuche originalSuche = ClientProxy.unwrap(webseiteSuche);
             AtomicInteger getroffen = new AtomicInteger();
             QuarkusMock.installMockForType(new WebseiteLesen(null) {
                 @Override
@@ -183,19 +187,29 @@ class FehlerInjektionTest {
                     throw fehler(ausfall);
                 }
             }, WebseiteLesen.class);
-            try (LogMitschnitt log = LogMitschnitt.starten()) {
-                for (String token : tokens) {
-                    for (String pfad : pfade) {
-                        var antwort = given().auth().oauth2(token).when().get(pfad);
-                        assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
-                        assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+            try {
+                QuarkusMock.installMockForType(new WebseiteSuche(null, null, null, null) {
+                    @Override
+                    public Ergebnis suchen(Lesezugriff zugriff, String begriff, ListenFilter filter) {
+                        getroffen.incrementAndGet();
+                        throw fehler(ausfall);
                     }
+                }, WebseiteSuche.class);
+                try (LogMitschnitt log = LogMitschnitt.starten()) {
+                    for (String token : tokens) {
+                        for (String pfad : pfade) {
+                            var antwort = given().auth().oauth2(token).when().get(pfad);
+                            assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                            assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+                        }
+                    }
+                    assertThat(getroffen).hasValue(6);
+                    assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+                    for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
                 }
-                assertThat(getroffen).hasValue(4);
-                assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
-                for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
             } finally {
                 QuarkusMock.installMockForType(original, WebseiteLesen.class);
+                QuarkusMock.installMockForType(originalSuche, WebseiteSuche.class);
             }
         } finally {
             try (Connection c = datenbank.getConnection();
