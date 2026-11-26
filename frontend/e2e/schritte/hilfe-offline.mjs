@@ -122,7 +122,7 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
     assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0, name);
   }
   if (this.keycloak?.benutzer) {
-    assert.ok(await nav.getByRole('link', { name: 'Erfassen', exact: true }).isVisible(),
+    assert.ok(await (await verzeichnisOeffnen(leiste)).getByRole('link', { name: 'Erfassen', exact: true }).isVisible(),
       'Die Sitzung wurde während der Prüfung beendet');
   }
 });
