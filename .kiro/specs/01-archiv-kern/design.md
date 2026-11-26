@@ -16,9 +16,13 @@ Requirement 16.6; Aufgabe 5.7 bleibt offen. — 01 Archiv-Kern
 ### Umsetzung (QA-Aufgabe 4, 26.11.2026)
 
 `LiquibaseChangelogIndexTest` prüft eindeutige Changeset-IDs und Nummernpräfixe über die letzten 20 Changesets je
-Changelog sowie die bekannten Include-Abstiege im Mandanten-Changelog. Die vollständige Rollback-/Reapply-Matrix für
-leere und gefüllte Schemas wurde nicht ausgeführt. Die bisherigen Integrationstests prüfen ausgewählte Migrationen;
-ein sicher isolierter Lauf über alle letzten 20 Changesets fehlt noch. — QA
+Changelog sowie die bekannten Include-Abstiege im Mandanten-Changelog. `LiquibaseRollbackMatrixTest` prüft manuell in
+isolierten lokalen Wegwerfdatenbanken alle 23 ausgeführten öffentlichen und 69 ausgeführten Mandanten-Changesets mit
+leeren und synthetisch gefüllten Proben auf Rollback und Reapply. Die Tabelle in der Testausgabe weist fehlende und
+abweichende Rollbacks sowie Schema- und Datenabweichungen aus; ein grüner Lauf bedeutet nicht, dass alle Rollbacks
+verlustfrei sind. Die gefüllten Proben decken nicht jede betroffene Tabelle oder mögliche Wertekombination ab. Die
+technische Rücknahme ist nicht Voraussetzung für die Rückwärtskompatibilität zum Vorgänger-Image ohne Datenbankrückbau
+nach Req 16.11. — QA
 
 ## Overview
 Ein Quarkus-Dienst (Java 25) in zwei Laufarten: **API** (REST für Web-App, Handy-App, Generatoren
