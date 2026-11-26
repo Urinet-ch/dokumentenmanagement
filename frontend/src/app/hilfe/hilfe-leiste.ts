@@ -4,6 +4,7 @@ import {
   ElementRef,
   afterRenderEffect,
   computed,
+  effect,
   inject,
   output,
   signal,
@@ -45,6 +46,10 @@ export class HilfeLeisteAnsicht {
   );
 
   constructor() {
+    effect(() => {
+      if (this.hilfe.offen()) this.verzeichnisWunsch.set(null);
+    });
+
     afterRenderEffect(() => {
       if (this.hilfe.offen()) this.host.nativeElement.querySelector<HTMLElement>('#hilfe-leiste-titel')?.focus();
     });

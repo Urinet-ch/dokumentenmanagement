@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class WissensLintTest {
     private static final UUID A = UUID.fromString("00000000-0000-0000-0000-000000000101");
@@ -18,6 +19,13 @@ class WissensLintTest {
     private static final UUID Q = UUID.fromString("00000000-0000-0000-0000-000000000103");
     private static final UUID ALT = UUID.fromString("00000000-0000-0000-0000-000000000201");
     private static final UUID NEU = UUID.fromString("00000000-0000-0000-0000-000000000202");
+
+    @Test
+    void negativePaargrenzeUndNichtAufsteigendePaarIdsWerdenAbgelehnt() {
+        assertThatIllegalArgumentException().isThrownBy(() -> pruefen(List.of(), Map.of(), -1));
+        assertThatIllegalArgumentException().isThrownBy(() -> new WissensLint.PaarId(A, A));
+        assertThatIllegalArgumentException().isThrownBy(() -> new WissensLint.PaarId(B, A));
+    }
 
     @Test
     void eingehendeDokumentquellenFehlendeLinksUndQuerverweise() {

@@ -6,7 +6,7 @@ Funktionalität: Altbestand von VHF/GSK übernehmen
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
 
-  @req-4.1
+  @req-4.1 @req-4.2
   Szenario: Reihe und Jahr aus einem synthetischen Altbestand übernehmen
     Wenn «inhaber-vhf-gsk» legt die Klassifikation mit dem aktuellen Stand an:
       """
