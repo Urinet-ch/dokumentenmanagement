@@ -306,13 +306,14 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 2.12, 2.14, 2.23, 9.7, 10.1, 10.4, 10.6_
   - erledigt (PR #67): `PATCH /api/v1/dokumente/{id}` mit `DokumentAendern` (Fassung, Grund, Frist und Sperre, `SPERRE_KONFLIKT`); Probe-Endpunkt und `DokumentZusatzSpeichern` entfernt, 9.5 und 10.1 über den echten Endpunkt; Szenarien `features/dokument/aendern.feature`, `datenmodell.feature`; JUnit `DokumentAendernTest` (design.md «Umsetzung (Aufgabe 3.5, 12.11.2026)»)
 
-- [x] 3.6 Eingangskorb-Oberfläche [Frontend] (PR #68)
+- [x] 3.6 Eingangskorb-Oberfläche [Frontend] (PR #68, QA-Nachtrag #663)
   - Liste nach Recht A5 (`mitarbeiter` nur selbst erfasste) mit Vorschaubild, Vorschlägen, «bitte prüfen»-Markierung, Partnerauswahl mit Suche, Bestätigen in ≤ 2 Tipps, Verwerfen mit Rückfrage und Grund
   - `FEHLER` mit Fehlertext, «erneut verarbeiten» und «verwerfen»; `ARCHIVIERUNG_FEHLER` mit «Archivierung wiederholen»; Hinweise «Frist abgelaufen», `pdfa_fehlt` und Belegnummer-Warnung bei Fremdbelegen
   - Aktionen nur nach Rechtematrix sichtbar
   - Playwright im 375-px-Viewport
   - _Anforderungen: 2.11, 2.24, 8.1–8.10_
   - Nachtrag (PR #128, Review zu #117): Partnersuche der Karte nach dem Muster aus 4.6, Vitests in `eingangskorb-karte.spec.ts` (verzögerter Abruf, laufende Wartezeit, gleiche Eingabe nach Entfernen)
+  - Nachtrag (PR #663, 26.11.2026): Treuhänder-Hinweis für den leeren, nach Sichtbarkeit gefilterten Eingangskorb; Szenario in `navigation-pwa.feature`
 
 - [ ] 3.7 Handy-Erfassung (PWA) [Frontend] [Fabian]
   - Kamera mehrseitig, jscanify im Web Worker (Kanten, Zuschnitt, Entzerrung), ohne erkannte Kanten das ganze Bild, Vorschau anpassen/verwerfen, JPEG 2'480 px

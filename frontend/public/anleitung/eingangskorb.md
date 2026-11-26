@@ -4,6 +4,7 @@ Im Eingangskorb landen neue Dokumente, sobald das Archiv sie gelesen hat: mit Vo
 
 - Die neuesten Dokumente stehen zuoberst. Über der Liste steht, wie viele Dokumente gezeigt werden, zum Beispiel 20 von 35 Dokumenten. Mit «Weitere laden» holen Sie die nächsten.
 - Die Zahl bei «Eingangskorb» in der Seitenleiste und auf der Kachel der Startseite zeigt, wie viele Dokumente warten.
+- Treuhänder sehen nur bestätigte Dokumente, die für sie sichtbar sind. Unbestätigte Dokumente bleiben ausgeblendet; ein leerer Eingangskorb bedeutet, dass keine für sie sichtbaren Dokumente darin liegen.
 - Jede Karte zeigt die erste Seite, den Titel, den Zustand und das Datum des Eingangs. Fehlt ein Titel, steht dort «Ohne Titel» und, falls vorhanden, der Dateiname.
 - Unsichere Angaben im Vorschlag sind mit «bitte prüfen» markiert. Unten auf der Karte steht, wie viele unsichere Felder es gibt, oder «Vorschlag vollständig».
 - Hat das Archiv einen Partner erkannt, den es noch keinem Kontakt zuordnen konnte, steht der erkannte Name mit dem Zusatz «noch keinem Kontakt zugeordnet» dabei.
