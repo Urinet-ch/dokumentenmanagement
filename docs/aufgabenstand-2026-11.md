@@ -2,11 +2,11 @@
 
 ## Umfang und Ergebnis
 
-Abgleich gegen `origin/main` bei `2fa9ffa01` (PR #667). In den sieben Taskdateien stehen 45 offene
+Abgleich gegen `origin/main` bei `8696dd3c8` (PR #694). In den sieben Taskdateien stehen 44 offene
 Checkboxen; Spec 05 und Spec 07 haben keine offenen Checkboxen. Keine Checkbox wurde geändert. Ein gemergter Teil-PR
 allein gilt nicht als Abschluss, wenn die Taskdatei noch Abnahme, Betrieb, Messung oder Folgearbeiten nennt.
 
-**Faktisch vollständig erledigt:** keine der 45 offenen Checkboxen konnte anhand der Taskdateien und der darin
+**Faktisch vollständig erledigt:** keine der 44 offenen Checkboxen konnte anhand der Taskdateien und der darin
 verlinkten PR-/Testnachweise als vollständig abgeschlossen bestätigt werden. Wo ein gemergter PR nur einen Teil
 abdeckt, ist er als solcher aufgeführt. Die Entfallen- und Übernahmeentscheide sind separat ausgewiesen und keine
 erledigten Umsetzungen.
@@ -51,10 +51,10 @@ erledigten Umsetzungen.
 | 10.5 | Importwerkzeug in #504; der PR ordnet weitere Req-4.2-Arbeit Spec 05 zu. Keine abgeschlossene Übernahme und Abnahme der Altbestände belegt. | Backend / Fabian |
 | 10.6 | Repo-Teile in #331 und #497; vollständiger Backup-Nachweis für Mandant 2 bleibt offen. | Infra |
 | 11.11 | #495 belegt Repo-Umsetzung und Tests; laut Taskdatei fehlen Messung der Startwerte am Livegang und deren Nachweis. | Backend; Messung beim Livegang |
-| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. Header-Folgeaufträge #689 und #690 laufen; der lokale authentisierte Scan und Ausgabeschutz (#691/#692) sind noch nicht gemergt. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
+| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. HSTS #690 und Korrektur #694 sowie Ausgabeschutz #692 sind gemergt; App-Header #689 und authentisierter lokaler Scan #691 sind offen. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
 | 12.4 | Abnahme nicht belegt. | Fabian |
 
-### Spec 04 – Wissensbasis (12)
+### Spec 04 – Wissensbasis (11)
 
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
@@ -62,8 +62,7 @@ erledigten Umsetzungen.
 | 13.7 | #688 ergänzt den lokalen synthetischen Restore-Zählvergleich je Mandant; die wiederkehrende betriebliche Restore-Probe ist damit nicht nachgewiesen. | Infra |
 | 16.2 | Prüfliste und Gate nicht abgenommen. | Fabian / QA |
 | 18.3 | PR #576 ist gemergt; Plugin-Hinweis und vollständige Abnahme fehlen laut Taskdatei. | Backend / Frontend |
-| 19.2 | #687 ist Ready und CI-grün; die Checkbox bleibt bis zum Merge offen. | Backend |
-| 19.3 | #682 ist Draft; kein gemergter Nachweis für Fragen, Optionen und Bedingungen. | Backend |
+| 19.3 | #682 ist Ready; kein gemergter Nachweis für Fragen, Optionen und Bedingungen. | Backend |
 | 19.4 | Abschnittsfehler, sichtbare Befunde und Wiederholung bleiben offen. | Backend / Frontend |
 | 19.5 | Tabellen-Gruppierung und Vertraulichkeitsvorschlag bleiben offen. | Backend |
 | 19.6 | Wiederholung und Auswertung des Test-Ingests; abhängig von 19.1–19.5. | QA / Fabian |
@@ -83,9 +82,10 @@ erledigten Umsetzungen.
 - Spec 06 19.2 (Betriebsnachweise bleiben bei 19.3), 21.5 (#595 und #641) und 24.3
   (Abnahme und Ereignisnachweis belegt, #627 und #637).
 - Spec 06 19.3, 20.6 und 21.2 (#686; 20.6 mit Nachtrag #685); Spec 07 23.6 (#683, Abnahme vom 26.11.).
+- Spec 04 19.2 (#687, Tabellen und Seitenbilder).
 
 ## Grenzen des Abgleichs
 
-- Offene PRs: #674, #682 und #689 sind Drafts; #687 und #690 sind Ready und CI-grün; #691 und #692 sind Ready, CI noch ausstehend. Kein offener PR zählt als Nachweis auf `main`.
+- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 ist Draft; #682, #689, #691 und #695 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
 - Der Stand der Taskdateien und offenen PRs ist eine Momentaufnahme; die Checkboxen wurden nicht verändert.
 - Betriebsdetails und Zugangsdaten wurden nicht erhoben oder in diesen Bericht übernommen.
