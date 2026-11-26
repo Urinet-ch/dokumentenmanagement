@@ -22,7 +22,7 @@ Funktionalität: Seite «Hilfe» mit Inhaltsverzeichnis und Sprungmarken
       | rolle            | mandant | bezeichnung     | verborgen                                                                                                                                                                                                  |
       | inhaber          | urinet  | Inhaber         | eingangskorb-eigene                                                                                                                                                                                        |
       | mitarbeiter      | urinet  | Mitarbeiter     | eingangskorb-bestaetigen, dokument-aendern, kontakte, wissen-entwuerfe, importe, jahresexport, verwaltung, verwaltung-dokumentarten, verwaltung-protokoll, verwaltung-api-tokens                          |
-      | treuhaender      | urinet  | Treuhänder      | erfassen, erfassen-handy, erfassen-dateien, erfassen-offline, eingangskorb, eingangskorb-bestaetigen, eingangskorb-eigene, dokument-aendern, kontakte, wissen-entwuerfe, importe, verwaltung, verwaltung-dokumentarten, verwaltung-protokoll, verwaltung-api-tokens |
+      | treuhaender      | urinet  | Treuhänder      | erfassen, erfassen-handy, erfassen-dateien, erfassen-offline, eingangskorb-bestaetigen, eingangskorb-eigene, dokument-aendern, kontakte, wissen-entwuerfe, importe, verwaltung, verwaltung-dokumentarten, verwaltung-protokoll, verwaltung-api-tokens |
       | geschaeftsstelle | vhf-gsk | Geschäftsstelle | eingangskorb-eigene, importe, jahresexport, verwaltung, verwaltung-dokumentarten, verwaltung-protokoll, verwaltung-api-tokens                                                                              |
 
   @req-5.1 @req-6.3

@@ -211,7 +211,7 @@ or (v_eff = 'PERSONAL' and ((d.bestaetigt is not null and d.person_benutzer = :b
                             or (d.bestaetigt is null and d.erstellt_von = :benutzer)))
 ```
   Umsetzung 2.2: Die Regel je Rolle steht framework-frei in `Sichtregel` (`sicherheit/domain`, aus der Rechtematrix abgeleitet), der `VertraulichkeitFilter` (`dokument/adapter/out/persistence`) übersetzt sie in ein HQL-Prädikat, gleichwertig zum SQL oben. Ein unbestätigtes Dokument sieht ein `mitarbeiter` nur, wenn er es selbst erfasst hat; eines, das ein anderer erfasst hat, sieht er nicht, auch wenn `person_benutzer` er selbst ist (Req 2.21, Fussnote ²; P45 = nein, entschieden von Fabian am 11.11.2026). `person_benutzer` wirkt erst nach der Bestätigung (`Sichtregel.Unbestaetigt.ERFASSTE`).
-- Eingangskorb (A5): `mitarbeiter` zusätzlich nur `d.erstellt_von = :benutzer` (Req 2.24); `treuhaender` 403 (Req 2.11).
+- Eingangskorb (A5): `mitarbeiter` zusätzlich nur `d.erstellt_von = :benutzer` (Req 2.24); `treuhaender` nur lesend, begrenzt auf die nach A2–A4 und Req 2.21 sichtbaren Dokumente (Req 2.11, geändert 26.11.2026; vorher 403).
 - `vertraulichkeit` und `person_benutzer` ändern nur Aktion A8 (`PATCH`, `bestaetigen`) und die Generator-Metadaten (Req 2.23); ein `PATCH` mit diesen Feldern ohne A8 antwortet 403 als Ganzes.
 
 ### Dokument (`dokument`)

@@ -99,7 +99,7 @@ ich nicht nach Funktionen suche, die mir nicht offenstehen.
 | --- | --- | --- | --- |
 | 1 | Willkommen | Name des Mandanten aus dem Branding, wozu das Archiv dient, die eigene Rolle | immer |
 | 2 | Dokumente erfassen | Fotografieren am Handy, Dateien hochladen, Warteschlange ohne Netz | A1 |
-| 3 | Prüfen und bestätigen | Eingangskorb und Vorschlag der KI; mit A7 prüfen und bestätigen, ohne A7 die selbst erfassten Dokumente verfolgen | A5 |
+| 3 | Prüfen und bestätigen | Eingangskorb und Vorschlag der KI; mit A7 prüfen und bestätigen, ohne A7 mit A1 die selbst erfassten Dokumente verfolgen, ohne A7 und A1 (Treuhänder, A5 lesend seit 26.11.2026) den Eingangskorb nur ansehen | A5 |
 | 4 | Finden | Suche, Chat mit Quelle, Dokumentansicht; Wissen, wenn A15 | A2 |
 | 5 | Bestand und Abschluss | nur die erlaubten unter Kontakte (A6), Importe (A12), Jahresexport (`EXPORT`), Verwaltung (A11, A13, A14) | mindestens eine davon |
 | 6 | Hilfe finden | wo die Hilfe ist und wie die Einführung erneut erscheint | immer |
@@ -107,7 +107,7 @@ ich nicht nach Funktionen suche, die mir nicht offenstehen.
 2. Die Einführung SOLL keinen Bereich und keine Aktion nennen, die die Rolle nach der Rechtematrix nicht darf, und dafür
    dieselbe Rechteprüfung verwenden wie das Menü (`darf` in `rechte.ts`), ohne eigene Kopie der Rechte. Im Mandanten
    `urinet` ergeben sich damit: `inhaber` Schritte 1 bis 6; `mitarbeiter` 1, 2, 3 (ohne Bestätigen), 4 und 6;
-   `treuhaender` 1, 4, 5 (nur Jahresexport) und 6; im Mandanten `vhf-gsk` `geschaeftsstelle` 1, 2, 3, 4, 5 (nur Kontakte)
+   `treuhaender` 1, 3 (nur ansehen, seit 26.11.2026), 4, 5 (nur Jahresexport) und 6; im Mandanten `vhf-gsk` `geschaeftsstelle` 1, 2, 3, 4, 5 (nur Kontakte)
    und 6.
 3. Die Einführung SOLL Namen und Logo des Mandanten aus dem Branding zeigen (`GET /branding`, Spec 03, 2.1; im Frontend
    `BrandingService`) und keinen Mandantennamen fest im Text führen.
