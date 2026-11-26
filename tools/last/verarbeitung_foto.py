@@ -103,8 +103,10 @@ def anfrage(url: str, token: str, daten: bytes | None = None, medientyp: str | N
 
 
 def auf_abschluss_warten(basis: str, token: str, dokument: str, intervall: float, grenze: float,
-                         start: float) -> float:
+                         start: float, beobachten=None) -> float:
     while time.monotonic() - start < grenze:
+        if beobachten:
+            beobachten()
         status, daten = anfrage(f"{basis}/api/v1/dokumente/{dokument}", token)
         if status != 200 or not isinstance(daten, dict):
             raise RuntimeError(f"Dokument {dokument} nicht lesbar (HTTP {status}).")
@@ -116,7 +118,7 @@ def auf_abschluss_warten(basis: str, token: str, dokument: str, intervall: float
     raise RuntimeError(f"Dokument {dokument} nach {grenze:.0f} s nicht im Eingangskorb.")
 
 
-def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float) -> float:
+def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float, beobachten=None) -> float:
     endung, typ = fototyp(foto)
     koerper, medientyp = multipart("dateien[]", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
@@ -124,7 +126,7 @@ def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: floa
     if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
             or "id" not in ergebnis[0]):
         raise RuntimeError(f"Upload nicht angenommen (HTTP {status}).")
-    return auf_abschluss_warten(basis, token, ergebnis[0]["id"], intervall, grenze, start)
+    return auf_abschluss_warten(basis, token, ergebnis[0]["id"], intervall, grenze, start, beobachten)
 
 
 def begleit_scan_einreihen(basis: str, token: str, pfad: Path) -> str:
@@ -139,12 +141,13 @@ def begleit_scan_einreihen(basis: str, token: str, pfad: Path) -> str:
     scan = pfad.read_bytes()
     koerper, medientyp = multipart("dateien[]", "lastlauf-20-seiten-scan.pdf", scan, "application/pdf")
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
-    if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
-            or "id" not in ergebnis[0]):
+    if status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict):
         raise RuntimeError(f"Begleit-Scan nicht angenommen (HTTP {status}).")
     if ergebnis[0].get("status") == "DUBLETTE":
         raise RuntimeError("Begleit-Scan ist eine Dublette; eine noch nicht hochgeladene synthetische PDF-Datei "
                            "verwenden.")
+    if "id" not in ergebnis[0]:
+        raise RuntimeError("Begleit-Scan ohne Dokument-ID angenommen.")
     return ergebnis[0]["id"]
 
 
@@ -171,6 +174,8 @@ def main() -> int:
         parser.error("--anzahl muss grösser als 0 sein, --aufwaermen mindestens 0")
     if not all(math.isfinite(x) and x > 0 for x in (args.intervall, args.grenze)):
         parser.error("--intervall und --grenze müssen endlich und grösser als 0 sein")
+    if args.csv and args.csv.exists():
+        parser.error("--csv darf keine bestehende Datei überschreiben")
     token = token_lesen()
     foto = args.foto.read_bytes()
     fototyp(foto)
@@ -184,9 +189,22 @@ def main() -> int:
         print("Synthetischer Begleit-Scan eingereiht.")
     zeiten = []
     messwerte = []
+    ueberlappung = 0
     for nr in range(1, args.anzahl + 1):
+        scan_aktiv = False
+
+        def scan_beobachten():
+            nonlocal scan_aktiv
+            status, daten = anfrage(f"{basis}/api/v1/dokumente/{scan}", token)
+            if status != 200 or not isinstance(daten, dict) or not isinstance(daten.get("status"), str):
+                raise RuntimeError(f"Begleit-Scan nicht lesbar (HTTP {status}).")
+            if daten["status"] == "FEHLER":
+                raise RuntimeError("Begleit-Scan endete in FEHLER.")
+            if daten["status"] == "VERARBEITUNG":
+                scan_aktiv = True
+
         try:
-            dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
+            dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze, scan_beobachten if scan else None)
         except (RuntimeError, OSError) as fehler:
             messwerte.append((nr, "fehler", ""))
             if args.csv:
@@ -194,6 +212,7 @@ def main() -> int:
             print(f"Messung abgebrochen: {fehler}", file=sys.stderr)
             return 1
         zeiten.append(dauer)
+        ueberlappung += int(scan_aktiv)
         messwerte.append((nr, "ok", f"{dauer:.6f}"))
         print(f"Lauf {nr:3d}: {dauer:6.1f} s")
     if args.csv:
@@ -201,6 +220,10 @@ def main() -> int:
     if scan:
         auf_abschluss_warten(basis, token, scan, args.intervall, args.grenze, time.monotonic())
         print("Begleit-Scan im Eingangskorb.")
+        print(f"Fotoläufe mit beobachtetem Scan in VERARBEITUNG: {ueberlappung}")
+        if not ueberlappung:
+            print("Keine Überlappung beobachtet; Begleitlast nicht nachgewiesen.", file=sys.stderr)
+            return 1
     wert = p95(zeiten)
     print(f"p50 über {len(zeiten)} Läufe: {sorted(zeiten)[math.ceil(0.5 * len(zeiten)) - 1]:.1f} s")
     print("Fehlerquote: 0.0 %")
@@ -216,4 +239,8 @@ def csv_schreiben(pfad: Path, messwerte: list[tuple[int, str, str]]) -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, RuntimeError) as fehler:
+        print(f"Abbruch: {fehler}", file=sys.stderr)
+        sys.exit(1)

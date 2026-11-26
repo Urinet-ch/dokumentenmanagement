@@ -83,6 +83,8 @@ class FototypTest(unittest.TestCase):
 class Server(BaseHTTPRequestHandler):
     anfragen: list[tuple[str, str, bytes]] = []
     sperre = threading.Lock()
+    scan_abfragen = 0
+    scan_sofort_fertig = False
 
     def log_message(self, *_):
         pass
@@ -98,7 +100,11 @@ class Server(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         with self.sperre:
             self.anfragen.append(("GET", self.path, b""))
-        if self.path.startswith("/api/v1/dokumente/"):
+        if self.path == "/api/v1/dokumente/scan":
+            Server.scan_abfragen += 1
+            status = "EINGANGSKORB" if Server.scan_sofort_fertig or Server.scan_abfragen > 1 else "VERARBEITUNG"
+            self.antworten(200, {"status": status})
+        elif self.path.startswith("/api/v1/dokumente/"):
             self.antworten(200, {"status": "EINGANGSKORB"})
         else:
             self.antworten(200, {"gesamt": 7, "treffer": []})
@@ -107,7 +113,8 @@ class Server(BaseHTTPRequestHandler):
         koerper = self.rfile.read(int(self.headers["Content-Length"]))
         with self.sperre:
             self.anfragen.append(("POST", self.path, koerper))
-        self.antworten(202, [{"id": "00000000-0000-0000-0000-000000000001"}])
+        dokument = "scan" if b'filename="lastlauf-20-seiten-scan.pdf"' in koerper else "00000000-0000-0000-0000-000000000001"
+        self.antworten(202, [{"id": dokument}])
 
 
 class SkriptTest(unittest.TestCase):
@@ -131,6 +138,8 @@ class SkriptTest(unittest.TestCase):
 
     def setUp(self):
         Server.anfragen = []
+        Server.scan_abfragen = 0
+        Server.scan_sofort_fertig = False
 
     def starten(self, skript: str, *argumente: str) -> subprocess.CompletedProcess:
         umgebung = {**os.environ, "ARCHIV_TOKEN_DATEI": str(self.token),
@@ -195,7 +204,19 @@ class SkriptTest(unittest.TestCase):
         self.assertIn(b'filename="lastlauf.heic"', uploads[2])
         self.assertIn(b'filename="lastlauf.heic"', uploads[3])
         self.assertIn("Begleit-Scan im Eingangskorb.", lauf.stdout)
-        self.assertEqual(len([a for a in Server.anfragen if a[0] == "GET"]), 4)
+        self.assertIn("Fotoläufe mit beobachtetem Scan in VERARBEITUNG: 1", lauf.stdout)
+        self.assertEqual(Server.anfragen[-1][:2], ("GET", "/api/v1/dokumente/scan"))
+
+    def test_begleit_scan_ohne_beobachtete_ueberlappung_ist_kein_nachweis(self):
+        foto = Path(self.ordner.name) / "foto-heic.heic"
+        foto.write_bytes(HEIC)
+        scan = Path(self.ordner.name) / "scan-fertig.pdf"
+        scan.write_bytes(b"%PDF-1.7")
+        Server.scan_sofort_fertig = True
+        lauf = self.starten("verarbeitung_foto.py", "--basis-url", self.url, "--foto", str(foto),
+                            "--begleit-pdf", str(scan), "--anzahl", "1", "--aufwaermen", "0")
+        self.assertEqual(lauf.returncode, 1)
+        self.assertIn("Keine Überlappung beobachtet", lauf.stderr)
 
     def test_begleit_scan_lehnt_falsche_seitenzahl_ab(self):
         scan = Path(self.ordner.name) / "falsch.pdf"

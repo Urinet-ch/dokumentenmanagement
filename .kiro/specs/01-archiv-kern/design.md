@@ -1,5 +1,12 @@
 # Design Document
 
+### Umsetzung (Aufgabe 5.11 Messvorbereitung, 26.11.2026)
+
+`tools/last/verarbeitung_foto.py` prüft die Seitenzahl eines Begleit-PDFs, beobachtet die Überlappung und wartet
+auf dessen Abschluss. CSV-Auswertung und synthetischer Scan-Generator sind in `docs/betrieb/stufe-b-messung.md`
+beschrieben. Der Clientwert ab 202 ist nur unter den dort genannten Bedingungen eine obere Schranke; der
+serverseitige Messpunkt bleibt massgeblich. Tests: `tools/last/test_last.py`; 5.11 bleibt bis zur Messung offen.
+
 ### Umsetzung (Aufgabe 5.7 Entwurf, 26.11.2026)
 
 `docs/verfahrensbeschreibung-erfassen-archivieren.md` beschreibt den vorgesehenen Ablauf mit Quellen und offenen
