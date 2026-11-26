@@ -544,6 +544,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
   - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten, neu anzulegen): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe (Frist nach Req 10.9, Zweck Nachweis nach GeBüV und Datensicherheit, keine Auswertung des Verhaltens, Einsicht nur Inhaber nach A13; vorgemerkt mit 4.9-E6), Umgang mit Papier (Konzept-Entscheid E5, entschieden 15.11.2026: Papieroriginale werden nach dem Scan nicht vernichtet, sondern aufbewahrt, das Archiv ist eine Kopie; darum keine Vernichtungskontrolle und kein Vernichtungsprotokoll im Verfahren), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
   - Ungeprüfter Entwurf gemäss Auftrag: `docs/verfahren/erfassen-und-archivieren.md`; Prüfung und Freigabe durch Fabian sowie Gegenlesen durch den Treuhänder offen. Der Haken 5.7 bleibt offen.
+  - Ergänzender quellenbezogener Entwurf: `docs/verfahrensbeschreibung-erfassen-archivieren.md`; Zielpfad und Seitenlimit der freigegebenen Fassung bleiben unverändert.
   - jede freigegebene Fassung mit «gültig ab» als PDF/A im Archiv ablegen
   - _Anforderungen: 10.9, 16.6, 16.12_
 
