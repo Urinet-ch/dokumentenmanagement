@@ -90,7 +90,7 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
     assert.ok(titel.includes('Erfassen'), 'Die Sitzung muss für die vollständige Offline-Anleitung bestehen bleiben');
   }
   for (const name of titel) {
-    const link = nav.getByRole('link', { name, exact: true });
+    const link = (await verzeichnisOeffnen(leiste)).getByRole('link', { name, exact: true });
     await link.click({ timeout: 10_000 });
     await this.seite.waitForFunction(
       (titel) => [...document.querySelectorAll('[role="dialog"] nav a')].some(
