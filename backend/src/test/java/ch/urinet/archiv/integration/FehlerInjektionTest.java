@@ -59,6 +59,7 @@ import ch.urinet.archiv.suche.domain.Suchergebnis;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.arc.ClientProxy;
+import io.quarkus.runtime.configuration.MemorySize;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.builder.MultiPartSpecBuilder;
@@ -67,6 +68,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.eclipse.microprofile.config.ConfigProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -119,6 +121,7 @@ class FehlerInjektionTest {
     @Inject IdentitaetsDienst identitaetsDienst;
 
     enum Ausfall { DATENBANK, ZEITUEBERSCHREITUNG }
+    enum Klientenfehler { FEHLENDE_ANMELDUNG, KEIN_RECHT, UNGUELTIGE_GROESSE, UNBEKANNTER_BENUTZER }
 
     @BeforeEach
     void mandanten() throws Exception {
@@ -130,6 +133,82 @@ class FehlerInjektionTest {
                     if (!zeilen.next()) provisionierung.anlegen(code, null, null);
                 }
             }
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Klientenfehler.class)
+    void benutzerverwaltungBeiKlientenfehlerOhneEingabeUndStacktrace(Klientenfehler fehler) {
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String mitarbeiter = Testanmeldung.token("mitarbeiter-urinet");
+        given().auth().oauth2(inhaber).queryParam("q", MARKER)
+                .when().get("/api/v1/benutzer").then().statusCode(200);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            var antwort = switch (fehler) {
+                case FEHLENDE_ANMELDUNG -> given().queryParam("q", MARKER)
+                        .when().get("/api/v1/benutzer");
+                case KEIN_RECHT -> given().auth().oauth2(mitarbeiter).queryParam("q", MARKER)
+                        .when().get("/api/v1/benutzer");
+                case UNGUELTIGE_GROESSE -> given().auth().oauth2(inhaber).queryParam("q", MARKER)
+                        .queryParam("groesse", 51).when().get("/api/v1/benutzer");
+                case UNBEKANNTER_BENUTZER -> given().auth().oauth2(inhaber).queryParam("q", MARKER)
+                        .when().get("/api/v1/benutzer/" + UUID.randomUUID());
+            };
+            int status = switch (fehler) {
+                case FEHLENDE_ANMELDUNG -> 401;
+                case KEIN_RECHT -> 403;
+                case UNGUELTIGE_GROESSE -> 400;
+                case UNBEKANNTER_BENUTZER -> 404;
+            };
+            assertThat(ProblemDetails.pruefen(antwort, status)).isNotBlank();
+            String text = antwort.asString();
+            assertThat(text.contains(MARKER) || text.contains(inhaber) || text.contains(mitarbeiter)
+                    || text.contains("Exception") || text.contains("\tat ") || text.contains("Caused by:"))
+                    .as("Antwort enthält Eingabe, Token oder Stacktrace").isFalse();
+            String protokoll = log.volltext();
+            assertThat(protokoll.contains(MARKER) || protokoll.contains(inhaber) || protokoll.contains(mitarbeiter)
+                    || protokoll.contains("\tat ") || protokoll.contains("Caused by:"))
+                    .as("Log enthält Eingabe, Token oder Stacktrace").isFalse();
+        }
+    }
+
+    @Test
+    void wiederholenBeiStatuskonfliktOhneEingabeUndStacktrace() throws Exception {
+        for (String mandant : List.of("urinet", "vhf-gsk")) {
+            String token = Testanmeldung.token("inhaber-" + mandant);
+            UUID id = Testdokumente.anlegen(datenbank, new Testdokumente.Angaben(
+                    mandant, null, "NORMAL", false, "probe", null, "EINGANGSKORB"));
+            try {
+                String pfad = "/api/v1/dokumente/" + id;
+                var gelesen = given().auth().oauth2(token).when().get(pfad);
+                assertThat(gelesen.statusCode()).isEqualTo(200);
+                assertThat(gelesen.header("ETag")).isNotBlank();
+                try (LogMitschnitt log = LogMitschnitt.starten()) {
+                    var antwort = given().auth().oauth2(token).header("If-Match", gelesen.header("ETag"))
+                            .queryParam("probe", MARKER).when().post(pfad + "/wiederholen");
+                    assertThat(ProblemDetails.pruefen(antwort, 409)).isEqualTo("STATUS_KONFLIKT");
+                    assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+                    assertThat(log.volltext()).doesNotContain(MARKER, token, "\tat ", "Caused by:");
+                }
+            } finally {
+                Testdokumente.loeschen(datenbank, mandant, List.of(id));
+            }
+        }
+    }
+
+    @Test
+    void uebergrosseJsonAnfrageOhneEingabeUndStacktrace() {
+        int grenze = Math.toIntExact(ConfigProvider.getConfig()
+                .getValue("archiv.http.max-anfrage", MemorySize.class).asLongValue());
+        String token = Testanmeldung.token("inhaber-urinet");
+        given().auth().oauth2(token).when().get("/api/v1/kontakte").then().statusCode(200);
+        String body = "{\"name\":\"" + MARKER + "x".repeat(grenze) + "\"}";
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            var antwort = given().auth().oauth2(token).contentType("application/json").body(body)
+                    .when().post("/api/v1/kontakte");
+            assertThat(ProblemDetails.pruefen(antwort, 413)).isEqualTo("DATEI_ZU_GROSS");
+            assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+            assertThat(log.volltext()).doesNotContain(MARKER, token, "\tat ", "Caused by:");
         }
     }
 
