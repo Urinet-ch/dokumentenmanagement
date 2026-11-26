@@ -3,10 +3,55 @@
 // Getippt wird mit click(); jeder Tipp zählt für Req 8.4 («Bestätigen in höchstens zwei Tipps»).
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import axe from 'axe-core';
 import { basisUrl, benutzer, keycloakAttrappe } from '../hilfen/keycloak-attrappe.mjs';
 import { dokumentAus } from '../hilfen/archiv-attrappe.mjs';
 import { echteDokumente } from '../hilfen/echtes-backend.mjs';
 import { platzhalterPruefen } from '../hilfen/platzhalter.mjs';
+
+Then(/^erklärt der Eingangskorb dem Treuhänder den leeren, gefilterten Zustand$/, async function () {
+  const hinweis = this.seite.locator('.treuhaender-hinweis');
+  await hinweis.waitFor();
+  assert.equal(
+    (await hinweis.textContent())?.trim(),
+    'Es werden nur bestätigte Dokumente angezeigt, die für Sie sichtbar sind. Unbestätigte Dokumente sind für Ihre Rolle nicht sichtbar.',
+  );
+});
+
+Then(/^ist der leere Eingangskorb bei 375 und 1280 px in beiden Farbschemata barrierefrei$/, async function () {
+  await this.seite.addScriptTag({ content: axe.source });
+  const bildordner = process.env.EINGANGSKORB_BILDER;
+  if (bildordner) await mkdir(bildordner, { recursive: true });
+
+  for (const breite of [375, 1280]) {
+    await this.seite.setViewportSize({ width: breite, height: breite === 375 ? 812 : 800 });
+    for (const [schema, farbschema] of [
+      ['hell', 'light'],
+      ['dunkel', 'dark'],
+    ]) {
+      await this.seite.emulateMedia({ colorScheme: farbschema });
+      const ergebnis = await this.seite.evaluate(async () => ({
+        ueberlauf: [document.documentElement, document.querySelector('mat-sidenav-content')].some(
+          (element) => element.scrollWidth > element.clientWidth,
+        ),
+        befunde: (await window.axe.run(document)).violations.map(({ id, nodes }) => ({
+          id,
+          targets: nodes.map((node) => node.target),
+        })),
+      }));
+      assert.equal(ergebnis.ueberlauf, false, `${schema}, ${breite}px: waagrechter Bildlauf`);
+      assert.deepEqual(ergebnis.befunde, [], `${schema}, ${breite}px: ${JSON.stringify(ergebnis.befunde)}`);
+      if (bildordner) {
+        await this.seite.screenshot({
+          path: join(bildordner, `eingangskorb-treuhaender-${breite}-${schema}.png`),
+          fullPage: true,
+        });
+      }
+    }
+  }
+});
 
 // Karten der Dokumente, die das Szenario im echten Archiv angelegt hat (über ihre ID, damit ein weiterer Lauf gegen
 // dasselbe Archiv nicht die Karten früherer Läufe mit demselben Namen trifft); sonst alle Karten.

@@ -6,6 +6,7 @@ import {
   Injector,
   OnInit,
   afterNextRender,
+  computed,
   inject,
   signal,
   viewChild,
@@ -13,6 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { Dokument, Dokumentart, DokumentartenService, DokumenteService } from '../gemeinsam/api';
+import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { EingangskorbZaehler } from '../gemeinsam/eingangskorb-zaehler';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { Symbol } from '../gemeinsam/symbol';
@@ -33,11 +35,13 @@ export class Eingangskorb implements OnInit {
   private readonly api = inject(DokumenteService);
   private readonly artenApi = inject(DokumentartenService);
   private readonly zaehler = inject(EingangskorbZaehler);
+  private readonly anmeldung = inject(AnmeldungService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly ueberschrift = viewChild.required<ElementRef<HTMLElement>>('ueberschrift');
 
   protected readonly texte = TEXTE.eingangskorb;
+  protected readonly treuhaender = computed(() => this.anmeldung.benutzer()?.rolle === 'treuhaender');
   protected readonly eintraege = signal<readonly Dokument[]>([]);
   protected readonly gesamt = signal(0);
   protected readonly laedt = signal(true);
