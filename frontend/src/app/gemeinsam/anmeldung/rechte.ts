@@ -12,7 +12,7 @@ export type Aktion = 'A1' | 'A2' | 'A5' | 'A6' | 'A7' | 'A8' | 'A9' | 'A10' | 'A
 const ERLAUBT: Record<Aktion, readonly Rolle[]> = {
   A1: ['inhaber', 'mitarbeiter', 'geschaeftsstelle'],
   A2: ['inhaber', 'mitarbeiter', 'treuhaender', 'geschaeftsstelle'],
-  A5: ['inhaber', 'mitarbeiter', 'geschaeftsstelle'],
+  A5: ['inhaber', 'mitarbeiter', 'treuhaender', 'geschaeftsstelle'],
   A6: ['inhaber', 'geschaeftsstelle'],
   A7: ['inhaber', 'geschaeftsstelle'],
   A8: ['inhaber', 'geschaeftsstelle'],

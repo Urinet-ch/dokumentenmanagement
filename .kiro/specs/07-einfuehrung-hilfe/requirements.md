@@ -99,7 +99,7 @@ ich nicht nach Funktionen suche, die mir nicht offenstehen.
 | --- | --- | --- | --- |
 | 1 | Willkommen | Name des Mandanten aus dem Branding, wozu das Archiv dient, die eigene Rolle | immer |
 | 2 | Dokumente erfassen | Fotografieren am Handy, Dateien hochladen, Warteschlange ohne Netz | A1 |
-| 3 | Prüfen und bestätigen | Eingangskorb und Vorschlag der KI; mit A7 prüfen und bestätigen, ohne A7 die selbst erfassten Dokumente verfolgen | A5 |
+| 3 | Prüfen und bestätigen | Eingangskorb und Vorschlag der KI; mit A7 prüfen und bestätigen, ohne A7 mit A1 die selbst erfassten Dokumente verfolgen, ohne A7 und A1 (Treuhänder, A5 lesend seit 26.11.2026) den Eingangskorb nur ansehen | A5 |
 | 4 | Finden | Suche, Chat mit Quelle, Dokumentansicht; Wissen, wenn A15 | A2 |
 | 5 | Bestand und Abschluss | nur die erlaubten unter Kontakte (A6), Importe (A12), Jahresexport (`EXPORT`), Verwaltung (A11, A13, A14) | mindestens eine davon |
 | 6 | Hilfe finden | wo die Hilfe ist und wie die Einführung erneut erscheint | immer |
@@ -107,7 +107,7 @@ ich nicht nach Funktionen suche, die mir nicht offenstehen.
 2. Die Einführung SOLL keinen Bereich und keine Aktion nennen, die die Rolle nach der Rechtematrix nicht darf, und dafür
    dieselbe Rechteprüfung verwenden wie das Menü (`darf` in `rechte.ts`), ohne eigene Kopie der Rechte. Im Mandanten
    `urinet` ergeben sich damit: `inhaber` Schritte 1 bis 6; `mitarbeiter` 1, 2, 3 (ohne Bestätigen), 4 und 6;
-   `treuhaender` 1, 4, 5 (nur Jahresexport) und 6; im Mandanten `vhf-gsk` `geschaeftsstelle` 1, 2, 3, 4, 5 (nur Kontakte)
+   `treuhaender` 1, 3 (nur ansehen, seit 26.11.2026), 4, 5 (nur Jahresexport) und 6; im Mandanten `vhf-gsk` `geschaeftsstelle` 1, 2, 3, 4, 5 (nur Kontakte)
    und 6.
 3. Die Einführung SOLL Namen und Logo des Mandanten aus dem Branding zeigen (`GET /branding`, Spec 03, 2.1; im Frontend
    `BrandingService`) und keinen Mandantennamen fest im Text führen.
@@ -160,13 +160,18 @@ meine Eingaben, Aufnahmen oder mein Chatverlauf verloren gehen, damit ich mir se
 4. Die Hilfe-Leiste SOLL den Titel des Abschnitts, seinen Text, einen Link «Ganze Anleitung öffnen» (`/hilfe#<anker>`)
    und den Knopf «Schliessen» zeigen. Links auf andere Abschnitte SOLLEN den Inhalt der Leiste wechseln, ohne zu
    navigieren; Links auf Seiten der App SOLLEN navigieren und die Leiste schliessen.
-5. Die Hilfe-Leiste SOLL als Dialog mit dem Namen «Hilfe» über der Seite liegen (ab 960 px rechts mit höchstens 420 px
-   Breite, darunter in ganzer Breite), beim Öffnen den Fokus auf ihre Überschrift setzen, den Fokus in der Leiste halten,
+5. Die Hilfe-Leiste SOLL als Dialog mit dem Namen «Hilfe» über der Seite liegen (ab 960 px rechts, mindestens 480 px,
+   höchstens 760 px und etwa 42 % der Fensterbreite breit, darunter in ganzer Breite; geändert 26.11.2026 nach der
+   Abnahme, vorher höchstens 420 px), beim Öffnen den Fokus auf ihre Überschrift setzen, den Fokus in der Leiste halten,
    mit Escape und «Schliessen» schliessen und den Fokus danach auf den Knopf «Hilfe» zurückgeben.
 6. Die App SOLL zusätzlich an diesen Stellen einen Link «So funktioniert es» zeigen, der die Hilfe-Leiste mit dem
    genannten Unterabschnitt öffnet: auf der Seite «Erfassen» bei der Warteschlange und bei fehlerhaften Uploads
    (`#erfassen-offline`), auf der Anmeldekarte der Startseite ohne Netz (`#erfassen-offline`) und bei der Meldung ohne
    Mandant oder Rolle (`#probleme`).
+
+7. Das Inhaltsverzeichnis der Hilfe-Leiste SOLL kompakt sein (Abschnitte nebeneinander) und sich auf- und zuklappen
+   lassen (Knopf «Abschnitte» mit dem gewählten Abschnitt und `aria-expanded`); beim Öffnen der Leiste mit einem Abschnitt ist es
+   zugeklappt, damit der Text den Platz bekommt; ohne Abschnitt ist es aufgeklappt. Aufgenommen am 26.11.2026 nach der Abnahme (Fabian).
 
 ### Requirement 5: Seite `/hilfe` – die ganze Anleitung (ohne Konzept-ID)
 **User Story:** Als Benutzer möchte ich die ganze Anleitung für meine Rolle an einem Ort lesen und gezielt zu einem Bereich

@@ -130,7 +130,8 @@ mit dem genannten Abschnitt öffnet. Die Bedingung prüft `AnmeldungService.darf
 | 1 | Willkommen im {name} | «Hier legen Sie Dokumente einmal ab und finden sie danach in Sekunden wieder, immer mit Quelle. Sie sind als ‹{rolle}› angemeldet; die App zeigt Ihnen nur die Bereiche, die Ihre Rolle nutzen darf.» | immer | `erste-schritte` |
 | 2 | Dokumente erfassen | «Unter ‹Erfassen› fotografieren Sie Papier mit dem Handy, auch mehrseitig, oder laden Dateien hoch. Ohne Netz wartet die Aufnahme auf dem Gerät und wird hochgeladen, sobald wieder eine Verbindung besteht.» | A1 | `erfassen` |
 | 3 (mit A7) | Prüfen und bestätigen | «Neue Dokumente kommen in den ‹Eingangskorb›. Das Archiv schlägt Art und Angaben vor; Sie prüfen den Vorschlag, korrigieren ihn wo nötig und bestätigen.» | A5 und A7 | `eingangskorb` |
-| 3 (ohne A7) | Ihre erfassten Dokumente | «Im ‹Eingangskorb› sehen Sie die Dokumente, die Sie erfasst haben, mit dem Vorschlag des Archivs. Bestätigt werden sie von einer Person mit diesem Recht.» | A5 ohne A7 | `eingangskorb` |
+| 3 (ohne A7) | Ihre erfassten Dokumente | «Im ‹Eingangskorb› sehen Sie die Dokumente, die Sie erfasst haben, mit dem Vorschlag des Archivs. Bestätigt werden sie von einer Person mit diesem Recht.» | A1 und A5, ohne A7 | `eingangskorb` |
+| 3 (nur A5, ohne A1 und A7) | Eingangskorb ansehen | «Im ‹Eingangskorb› sehen Sie, welche Dokumente noch auf Prüfung warten, nur zur Ansicht. Prüfen und Bestätigen sind anderen Rollen vorbehalten.» (Treuhänder, A5 lesend seit 26.11.2026) | A5 ohne A1 und A7 | `eingangskorb` |
 | 4 | Finden | «Mit der ‹Suche› finden Sie Dokumente über Wörter, Belegnummern oder Partner. Im ‹Chat› fragen Sie in eigenen Worten; jede Antwort nennt ihre Quelle.» Mit A15 zusätzlich: «Unter ‹Wissen› finden Sie geprüftes Wissen aus Ihren Unterlagen.» | A2 | `suche` |
 | 5 | Bestand und Abschluss | Liste der erlaubten Menüpunkte unter Kontakte, Importe, Jahresexport und Verwaltung, je mit der Beschreibung der Kachel aus `texte.start.beschreibung` (eine Quelle für beide) | A6, A12, `EXPORT`, A11, A13 oder A14 | der erste erlaubte |
 | 6 | Hilfe finden | «Über ‹Hilfe› oben rechts öffnen Sie jederzeit die Anleitung zur Seite, auf der Sie gerade sind. Dort können Sie auch diese Einführung erneut ansehen.» | immer | `erste-schritte` |
@@ -153,7 +154,7 @@ Verhalten (z. B. «bestätigen») müssen der umgesetzten App entsprechen (Requi
 | `erfassen-offline` | Ohne Netz erfassen | `erfassen` | A1 | – | ja |
 | `eingangskorb` | Eingangskorb | – | A5 | `/eingangskorb` | – |
 | `eingangskorb-bestaetigen` | Prüfen, korrigieren und bestätigen | `eingangskorb` | A7 | – | – |
-| `eingangskorb-eigene` | Ihre erfassten Dokumente verfolgen | `eingangskorb` | A5 ohne A7 | – | – |
+| `eingangskorb-eigene` | Ihre erfassten Dokumente verfolgen | `eingangskorb` | A1 ohne A7 | – | – |
 | `suche` | Suche | – | A2 | `/suche` | – |
 | `chat` | Chat | – | A2 | `/chat` | – |
 | `chat-bewerten` | Antworten bewerten | `chat` | A2 | – | – |
@@ -377,7 +378,7 @@ Stand von PR #411; Schnittstellen für die Aufgaben 22.2 bis 22.7.
 Texte zu Erste Schritte, Erfassen, Eingangskorb und Dokumentansicht; beschrieben ist nur, was auf `main` umgesetzt ist
 (Requirement 6.4), mit dem Wortlaut der Knöpfe und Meldungen aus `texte.de-CH.ts`.
 - **Katalog:** Einträge `erfassen`, `erfassen-handy`, `erfassen-dateien`, `erfassen-offline` (`abgemeldet`),
-  `eingangskorb`, `eingangskorb-bestaetigen` (A7), `eingangskorb-eigene` (A5 ohne A7), `dokument`, `dokument-aendern`
+  `eingangskorb`, `eingangskorb-bestaetigen` (A7), `eingangskorb-eigene` (A1 ohne A7), `dokument`, `dokument-aendern`
   (A6) wie in der Tabelle «Hilfe-Katalog», in zwei Blöcken: Erfassen und Eingangskorb nach `erste-schritte`,
   Dokumentansicht zwischen `chat` und `kontakte` aus 22.6 (nach dem Merge von #423 eingeordnet). Titel in `TEXTE.hilfe.abschnitte`.
 - **Prüfung** (`anleitung-abschnitte.spec.ts`): (1) Der Katalog folgt der Tabelle «Hilfe-Katalog» (Reihenfolge, Titel,
@@ -433,6 +434,16 @@ Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
   `hilfe-sichtbar.spec.ts` gegen dieselbe Tabelle.
 - **Prototyp:** Ansicht `#hilfe` in `docs/oberflaeche/prototyp.html` mit erfundenen, als «Beispiel» gekennzeichneten
   Texten; erreichbar nur über die Adresse, bis 22.3 den Knopf in der Kopfzeile bringt.
+
+## Umsetzung (Nachtrag Abnahme Hilfe-Leiste, 26.11.2026)
+- **Anlass:** Die Abnahmetests (Fabian) zeigten am Desktop, dass die Leiste zu schmal ist und das Inhaltsverzeichnis zu viel
+  Platz beansprucht. Req 4.5 geändert (Breite), Req 4.7 neu (kompaktes, zuklappbares Verzeichnis).
+- **Breite:** `min(100vw, clamp(480px, 42vw, 760px))` ab 960 px statt höchstens 420 px; darunter unverändert ganze Breite.
+- **Verzeichnis:** Knopf «Abschnitte» (zeigt den gewählten Abschnitt, `aria-expanded`, `aria-controls`) über einem
+  kompakten, umbrechenden Link-Verzeichnis (`hidden` im zugeklappten Zustand). Beim Öffnen der Leiste mit einem Abschnitt zugeklappt, ohne Abschnitt
+  (kein Seitenkontext) aufgeklappt; die Wahl eines Abschnitts klappt es zu; der Zustand
+  wird nicht gespeichert. Browser-Schritte, die Abschnitte wählen oder zählen, klappen es über
+  `e2e/hilfen/hilfe-verzeichnis.mjs` auf.
 
 ## Umsetzung (Aufgabe 22.3, 21.11.2026)
 - **Kopfzeile:** «Hilfe» steht neben dem Farbschema-Knopf, für alle Besucher und mit zugänglichem Namen. Unter 600 px

@@ -104,6 +104,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `MandantTenantResolver`, `MandantKontext` für Worker, `@RolesAllowed` je Endpunkt
   - Rechtematrix A1–A14 als eine Domain-Regel (Rolle × Aktion), die alle Endpunkte abfragen; 404 vor 403 bei unsichtbaren Dokumenten; spätere Aufgaben ergänzen je Endpunkt die Szenarien ihrer Matrixzeilen
   - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; Mandantentrennung per Probe (Teilnachweis, voll in 2.2); `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
+  - Ergänzung (26.11.2026): Maschinenlesbare Matrix A1–A24 mit Quellen je Zeile und OpenAPI-Abgleich aller REST-Operationen in `EndpunktWaechterTest`
   - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4, 2.6_
 
 - [x] 1.5 API-Tokens für Generatoren und Import [Backend]
@@ -543,6 +544,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
   - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten, neu anzulegen): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe (Frist nach Req 10.9, Zweck Nachweis nach GeBüV und Datensicherheit, keine Auswertung des Verhaltens, Einsicht nur Inhaber nach A13; vorgemerkt mit 4.9-E6), Umgang mit Papier (Konzept-Entscheid E5, entschieden 15.11.2026: Papieroriginale werden nach dem Scan nicht vernichtet, sondern aufbewahrt, das Archiv ist eine Kopie; darum keine Vernichtungskontrolle und kein Vernichtungsprotokoll im Verfahren), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
   - Ungeprüfter Entwurf gemäss Auftrag: `docs/verfahren/erfassen-und-archivieren.md`; Prüfung und Freigabe durch Fabian sowie Gegenlesen durch den Treuhänder offen. Der Haken 5.7 bleibt offen.
+  - Ergänzender quellenbezogener Entwurf: `docs/verfahrensbeschreibung-erfassen-archivieren.md`; Zielpfad und Seitenlimit der freigegebenen Fassung bleiben unverändert.
   - jede freigegebene Fassung mit «gültig ab» als PDF/A im Archiv ablegen
   - _Anforderungen: 10.9, 16.6, 16.12_
 
@@ -593,6 +595,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Manifest-Versionen: `manifest` und `manifest_zeitstempel` sind nur einfügbar (Trigger) und behalten nach dem Restore die alten S3-Versions-IDs. Festlegen, wie Prüfwerkzeug und Export die Manifestdateien im Ziel auffinden (Auflösung über Schlüssel und SHA-256 statt über die Versions-ID, Req 15.5), und im Roundtrip eine Manifestprüfung (`archiv manifest pruefen`) einschliessen
   - Teilumsetzung (PR #262): Manifest-Prüfwerkzeug und Exporte lesen per Schlüssel und SHA-256; S3-Restore-Tests decken neue Versions-IDs, falschen Hash, fehlendes Manifest und zusätzliche Versionen ab. `restore-uebung-lokal.sh` prüft das Sicherungspaket, stellt Datenbanken und Bucket wieder her und vergleicht Dokumentanzahl, IDs, Prüfsummen und Dateien. `SicherungPaketRoundtripTest` prüft das Manifest gegen Datenbank und Ziel-Bucket. Der lokale Lauf wartete damals auf die Realm-Bereitschaft, prüfte aber noch keine OIDC-Anmeldung; der Nachtrag unten schliesst diese Lücke.
   - Nachtrag (PR #357): Der vollständige lokale Lauf besteht mit Export über `taeglich.sh`, Wegwerf-`age`-Schlüsseln, SHA256SUMS-Prüfung, Datenbank- und Bucket-Restore, Manifestprüfung sowie OIDC-Token und geschütztem API-Aufruf. Der synthetische Testclient verwendet `client_credentials` mit Dienstkonto, `mandant`-Mapper und Rolle `inhaber`; so wird TOTP nicht umgangen oder abgeschaltet. Der Testclient und sein Dienstkonto existieren nur im lokalen Wegwerf-Realm; Realm-Dateien und Produktionsflows bleiben unverändert.
+  - Nachtrag (PR #646): expliziter Quell-/Zielvergleich der Dokumentzahl sowie Prüfung der Mandantentrennung im Datenbank- und Bucket-Restore; Seiten- und Versionszahlen werden weiterhin verglichen. Eindeutige Testimages werden gezielt aufgeräumt. Die betriebliche Probe bleibt Spec 04, 13.7.
   - _Anforderungen: 15.5, 16.3_
   - _Abhängig von: 5.5_
 

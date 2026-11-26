@@ -1,4 +1,4 @@
-Im Eingangskorb landen neue Dokumente, sobald das Archiv sie gelesen hat: mit Vorschaubild und einem Vorschlag für Art, Titel, Belegdatum, Partner und weitere Angaben. Hier wird der Vorschlag geprüft und bestätigt; erst nach der Bestätigung wird ein Dokument archiviert. Wie Dokumente hierher kommen, steht unter [Erfassen](#erfassen).
+Im Eingangskorb landen neue Dokumente, sobald das Archiv sie gelesen hat: mit Vorschaubild und einem Vorschlag für Art, Titel, Belegdatum, Partner und weitere Angaben. Hier wird der Vorschlag geprüft und bestätigt; erst nach der Bestätigung wird ein Dokument archiviert. Wie Dokumente hierher kommen, steht im Abschnitt «Erfassen». Mit der Rolle «Treuhänder» sehen Sie die für Sie freigegebenen Dokumente nur zur Ansicht; Prüfen und Bestätigen sind nicht möglich.
 
 ## Was Sie sehen
 

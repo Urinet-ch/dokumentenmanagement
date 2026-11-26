@@ -181,7 +181,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.wissen.entwuerfe.titel,
       ],
     ],
-    ['treuhaender', [TEXTE.menue.uebersicht, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen, TEXTE.menue.export]],
+    ['treuhaender', [TEXTE.menue.uebersicht, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen, TEXTE.menue.export]],
   ])('zeigt der Rolle %s nur die erlaubten Menüpunkte', async (rolle, erwartet) => {
     anmeldung.als(rolle);
     const element = await zeigen();

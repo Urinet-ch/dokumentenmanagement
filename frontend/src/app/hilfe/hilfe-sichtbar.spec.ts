@@ -17,7 +17,7 @@ const KATALOG: readonly HilfeEintrag[] = [
   eintrag('erfassen-offline', { eltern: 'erfassen', bedingung: { eine: ['A1'] }, abgemeldet: true }),
   eintrag('eingangskorb', { bedingung: { eine: ['A5'] } }),
   eintrag('eingangskorb-bestaetigen', { eltern: 'eingangskorb', bedingung: { eine: ['A7'] } }),
-  eintrag('eingangskorb-eigene', { eltern: 'eingangskorb', bedingung: { eine: ['A5'], ohne: ['A7'] } }),
+  eintrag('eingangskorb-eigene', { eltern: 'eingangskorb', bedingung: { eine: ['A1'], ohne: ['A7'] } }),
   eintrag('suche', { bedingung: { eine: ['A2'] } }),
   eintrag('dokument', { bedingung: { eine: ['A2'] } }),
   eintrag('dokument-aendern', { eltern: 'dokument', bedingung: { eine: ['A6'] } }),
@@ -59,8 +59,8 @@ describe('Sichtbare Abschnitte der Anleitung (Spec 07, Req 6.2, 6.3)', () => {
     ]);
   });
 
-  it('zeigt dem Treuhänder Suche, Dokument und Jahresexport, nichts zum Erfassen', () => {
-    expect(gliederung('treuhaender')).toEqual(['erste-schritte', 'suche', 'dokument', 'jahresexport', 'probleme']);
+  it('zeigt dem Treuhänder Eingangskorb, Suche, Dokument und Jahresexport, nichts zum Erfassen', () => {
+    expect(gliederung('treuhaender')).toEqual(['erste-schritte', 'eingangskorb', 'suche', 'dokument', 'jahresexport', 'probleme']);
   });
 
   it('zeigt der Geschäftsstelle Erfassen, Bestätigen und Ändern, nicht Importe, Jahresexport und Verwaltung', () => {
@@ -86,6 +86,7 @@ describe('Sichtbare Abschnitte der Anleitung (Spec 07, Req 6.2, 6.3)', () => {
   it('nennt alle Anker aus Abschnitten und Unterabschnitten', () => {
     expect([...sichtbareAnker(sichtbareAbschnitte(KATALOG, 'treuhaender'))]).toEqual([
       'erste-schritte',
+      'eingangskorb',
       'suche',
       'dokument',
       'jahresexport',
@@ -102,7 +103,7 @@ describe('Sichtbare Abschnitte der Anleitung (Spec 07, Req 6.2, 6.3)', () => {
       'verwaltung', 'verwaltung-dokumentarten', 'verwaltung-protokoll', 'verwaltung-api-tokens',
     ],
     treuhaender: [
-      'erfassen', 'erfassen-handy', 'erfassen-dateien', 'erfassen-offline', 'eingangskorb', 'eingangskorb-bestaetigen',
+      'erfassen', 'erfassen-handy', 'erfassen-dateien', 'erfassen-offline', 'eingangskorb-bestaetigen',
       'eingangskorb-eigene', 'dokument-aendern', 'kontakte', 'wissen-entwuerfe', 'importe', 'verwaltung',
       'verwaltung-dokumentarten', 'verwaltung-protokoll', 'verwaltung-api-tokens',
     ],

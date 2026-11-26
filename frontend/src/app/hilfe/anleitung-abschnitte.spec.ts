@@ -28,7 +28,7 @@ interface Soll {
 
 /** Die Tabelle aus design.md «Hilfe-Katalog» in Lesereihenfolge (Abschnitte nach Req 6.1), mit den dort nachgetragenen Abweichungen. */
 const SOLL: readonly Soll[] = [
-  { anker: 'erste-schritte', titel: 'Erste Schritte', pfade: ['/'], abgemeldet: true },
+  { anker: 'erste-schritte', titel: 'Erste Schritte', pfade: ['/', '/anmeldung'], abgemeldet: true },
   // Aufgabe 24.3 (Spec 06, Req 10): für alle angemeldeten Rollen, ohne Pfad
   { anker: 'erste-schritte-passkey', titel: 'Mit Passkey anmelden', eltern: 'erste-schritte' },
   { anker: 'erfassen', titel: 'Erfassen', eine: ['A1'], pfade: ['/erfassen'] },
@@ -37,7 +37,7 @@ const SOLL: readonly Soll[] = [
   { anker: 'erfassen-offline', titel: 'Ohne Netz erfassen', eltern: 'erfassen', eine: ['A1'], abgemeldet: true },
   { anker: 'eingangskorb', titel: 'Eingangskorb', eine: ['A5'], pfade: ['/eingangskorb'] },
   { anker: 'eingangskorb-bestaetigen', titel: 'Prüfen, korrigieren und bestätigen', eltern: 'eingangskorb', eine: ['A7'] },
-  { anker: 'eingangskorb-eigene', titel: 'Ihre erfassten Dokumente verfolgen', eltern: 'eingangskorb', eine: ['A5'], ohne: ['A7'] },
+  { anker: 'eingangskorb-eigene', titel: 'Ihre erfassten Dokumente verfolgen', eltern: 'eingangskorb', eine: ['A1'], ohne: ['A7'] },
   { anker: 'suche', titel: 'Suche', eine: ['A2'], pfade: ['/suche'] },
   { anker: 'chat', titel: 'Chat', eine: ['A2'], pfade: ['/chat'] },
   { anker: 'chat-bewerten', titel: 'Antworten bewerten', eltern: 'chat', eine: ['A2'] },

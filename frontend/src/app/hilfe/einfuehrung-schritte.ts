@@ -21,9 +21,10 @@ export function einfuehrungSchritte(
   if (darf('A1')) schritte.push({ titel: texte.titel.erfassen, text: texte.erfassen, anker: 'erfassen' });
   if (darf('A5')) {
     const bestaetigen = darf('A7');
+    const eigene = !bestaetigen && darf('A1');
     schritte.push({
-      titel: bestaetigen ? texte.titel.pruefen : texte.titel.eigene,
-      text: bestaetigen ? texte.pruefen : texte.eigene,
+      titel: bestaetigen ? texte.titel.pruefen : eigene ? texte.titel.eigene : texte.titel.ansehen,
+      text: bestaetigen ? texte.pruefen : eigene ? texte.eigene : texte.ansehen,
       anker: 'eingangskorb',
     });
   }

@@ -585,6 +585,13 @@ ist `ROLLE_OHNE_VORGANG` zu erwarten; `UEBERNAHME` allein behebt den Befund nich
 zu lockern oder Keycloak zu ändern. Danach folgen Prüflauf und Schreiblauf. Nur synthetisch getestet; Ausführung
 und Abnahme bleiben bei Fabian, die Checkbox bleibt offen.
 
+### Umsetzung (Aufgabe 21.2 Vorbereitung, 26.11.2026)
+
+`tools/benutzer_migrationsplan.py` wertet eine ausschliesslich synthetische lokale Liste aus und meldet Mandanten-,
+Rollen- und Identitätskonflikte. Er führt keine Abgleiche oder Schreibvorgänge aus; die Eingabe ist keine Quelle für
+den Betriebszustand. Tests: `tools/test_benutzer_migrationsplan.py`. Anleitung und Abgrenzung:
+`docs/betrieb/benutzer-migration.md`. Der manuelle Nachweis nach Requirement 9.4 bleibt offen.
+
 ### Umsetzung (Aufgabe 21.2a, 24.11.2026)
 `archiv benutzer inhaber-uebernehmen <code> --benutzer <uuid> --wer <uuid> [--ausfuehren]` prüft standardmässig
 nur. Mit `--ausfuehren` dokumentiert es eine vorhandene Inhaberrolle unter der Mandantensperre mit Absicht und
