@@ -1,11 +1,14 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { basisUrl } from '../hilfen/keycloak-attrappe.mjs';
+import { navigationAttrappe } from '../hilfen/navigation-attrappe.mjs';
 
 Given('ich zeichne Browserfehler für die Navigation auf', function () {
   this.navigationFehler = [];
   this.seite.setViewportSize({ width: 1280, height: 900 });
-  this.seite.on('pageerror', (fehler) => this.navigationFehler.push(`pageerror: ${fehler.message}`));
+  this.seite.on('pageerror', (fehler) =>
+    this.navigationFehler.push(`pageerror: ${fehler.message}`),
+  );
   this.seite.on('console', (meldung) => {
     if (meldung.type() === 'error') {
       this.navigationFehler.push(`console.error: ${meldung.text()}`);
@@ -20,6 +23,7 @@ Given('ich zeichne Browserfehler für die Navigation auf', function () {
 });
 
 When('ich alle sichtbaren Menüpunkte öffne', async function () {
+  await navigationAttrappe(this);
   const nav = this.seite.getByRole('navigation', { name: 'Hauptnavigation' });
   const punkte = await nav.getByRole('link').evaluateAll((links) =>
     links.map((link) => ({
@@ -30,13 +34,19 @@ When('ich alle sichtbaren Menüpunkte öffne', async function () {
   assert.ok(punkte.length > 0, 'Hauptnavigation enthält keine Menüpunkte');
 
   for (const { name, pfad } of punkte) {
-    await nav.getByRole('link', { name, exact: true }).click();
+    const link = nav.locator(`a[href="${pfad}"]`);
+    assert.equal(await link.count(), 1, `Menüpunkt «${name}» fehlt in der Hauptnavigation`);
+    await link.click();
     await this.seite.waitForURL((url) => url.pathname === pfad);
     const ueberschrift = this.seite.getByRole('heading', { level: 1 }).first();
     await ueberschrift.waitFor({ state: 'visible' });
     const text = (await ueberschrift.innerText()).trim();
     assert.ok(text, `Menüpunkt «${name}» hat keine Überschrift`);
-    assert.doesNotMatch(text, /nicht gefunden|403|zugriff verweigert/i, `Fehlerseite bei «${name}»`);
+    assert.doesNotMatch(
+      text,
+      /nicht gefunden|403|zugriff verweigert/i,
+      `Fehlerseite bei «${name}»`,
+    );
     assert.notEqual(pfad, '/nicht-gefunden', `Menüpunkt «${name}» führt zur Fehlerseite`);
   }
 });
