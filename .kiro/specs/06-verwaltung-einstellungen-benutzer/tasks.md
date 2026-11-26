@@ -225,6 +225,8 @@ auf Server oder Secrets aus der Sitzung.
     Passwörter oder Links in der Oberfläche; keine Offline-Warteschlange.
   - _Anforderungen: 8.4, 8.5, 8.6_
   - _Abhängig von: 19.12, 20.6_
+  - Nachtrag 26.11.2026: `benutzer-loeschen.spec.ts` prüft `409 STATUS_KONFLIKT` beim Löschen als eigene Fehlermeldung
+    ohne Erfolgsmeldung; die bestehende Fehlerübersetzung deckt den Fall ab.
 
 - [x] 20.8 E-Mail-Texte und Theme von Keycloak [Infra]
   - Deutsche Texte der Einladung (Einmal-Link, Gültigkeit, Hinweis, was zu tun ist) und der Mitteilung an die alte Adresse, Theme
