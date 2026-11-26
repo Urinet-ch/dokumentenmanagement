@@ -9,7 +9,7 @@ import { Aktion, Rolle, darf } from './anmeldung/rechte';
 import { HttpEingangskorbZaehler } from './eingangskorb-zaehler';
 
 describe('HttpEingangskorbZaehler (Req 8.6)', () => {
-  function zaehler(rolle: Rolle) {
+  function zaehler(rolle: Rolle, recht: (rolle: Rolle, aktion: Aktion) => boolean = darf) {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -19,7 +19,7 @@ describe('HttpEingangskorbZaehler (Req 8.6)', () => {
         HttpEingangskorbZaehler,
         {
           provide: AnmeldungService,
-          useValue: { darf: (a: Aktion) => darf(rolle, a), benutzer: signal({ rolle }) },
+          useValue: { darf: (a: Aktion) => recht(rolle, a), benutzer: signal({ rolle }) },
         },
       ],
     });
@@ -62,7 +62,7 @@ describe('HttpEingangskorbZaehler (Req 8.6)', () => {
   });
 
   it('fragt ohne Recht A5 nicht und zeigt keinen Zähler', () => {
-    const { dienst, http } = zaehler('treuhaender');
+    const { dienst, http } = zaehler('treuhaender', () => false);
     http.expectNone('/api/v1/eingangskorb?groesse=1&seite=0');
     expect(dienst.anzahl()).toBeNull();
   });

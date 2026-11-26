@@ -97,7 +97,6 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
       ),
       name,
     );
-    await leiste.getByRole('heading', { name, exact: true }).waitFor({ timeout: 10_000 });
     await this.seite.waitForFunction(
       (titel) => {
         const dialog = document.querySelector('[role="dialog"]');
@@ -114,6 +113,10 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
       name,
       { timeout: 10_000 },
     );
+    const ueberschrift = leiste
+      .locator('.hilfe-abschnitt')
+      .getByRole('heading', { name, level: 3, exact: true });
+    await ueberschrift.waitFor({ timeout: 10_000 });
     assert.equal(await leiste.locator('[data-test=anleitung-fehler]').count(), 0, name);
     assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0, name);
   }
@@ -125,7 +128,10 @@ Then('sind alle sichtbaren Abschnitte der Hilfe-Leiste geladen', { timeout: 120_
 
 Then(/^zeigt die Hilfe-Leiste den geladenen Abschnitt «(.+)»$/, async function (titel) {
   const leiste = this.seite.getByRole('dialog', { name: 'Hilfe', exact: true });
-  await leiste.getByRole('heading', { name: titel, exact: true }).waitFor();
+  const ueberschrift = leiste
+    .locator('.hilfe-abschnitt')
+    .getByRole('heading', { name: titel, level: 3, exact: true });
+  await ueberschrift.waitFor();
   await leiste.locator('app-anleitung-text .text').waitFor();
   assert.ok((await leiste.locator('app-anleitung-text .text').innerText()).trim().length > 0);
 });

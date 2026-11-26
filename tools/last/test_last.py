@@ -171,6 +171,24 @@ class SkriptTest(unittest.TestCase):
         self.assertTrue(all(b'filename="lastlauf.heic"' in u and b"Content-Type: image/heic" in u for u in uploads))
         self.assertEqual(len(set(uploads)), 5)
 
+    def test_foto_mit_synthetischem_begleit_scan(self):
+        foto = Path(self.ordner.name) / "foto.heic"
+        foto.write_bytes(HEIC)
+        scan = Path(self.ordner.name) / "scan.pdf"
+        scan.write_bytes(b"%PDF-1.7 synthetischer 20-Seiten-Scan")
+
+        lauf = self.starten("verarbeitung_foto.py", "--basis-url", self.url, "--foto", str(foto),
+                            "--begleit-pdf", str(scan), "--anzahl", "2", "--aufwaermen", "1",
+                            "--intervall", "0.01")
+
+        self.assertEqual(lauf.returncode, 0, lauf.stderr)
+        uploads = [a[2] for a in Server.anfragen if a[0] == "POST"]
+        self.assertEqual(len(uploads), 4)
+        self.assertIn(b'filename="lastlauf-20-seiten-scan.pdf"', uploads[1])
+        self.assertIn(b"Content-Type: application/pdf", uploads[1])
+        self.assertIn(b'filename="lastlauf.heic"', uploads[2])
+        self.assertIn(b'filename="lastlauf.heic"', uploads[3])
+
     def test_foto_standardwerte_entsprechen_messbedingungen(self):
         foto = Path(self.ordner.name) / "foto.jpg"
         foto.write_bytes(JPEG)

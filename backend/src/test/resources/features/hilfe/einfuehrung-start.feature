@@ -12,7 +12,7 @@ Funktionalität: Einführung auf der Startseite
       | rolle            | mandant | bezeichnung      | schritte                                                                               | bereiche                                                                  |
       | inhaber          | urinet  | Inhaber          | Willkommen im Archiv; Dokumente erfassen; Prüfen und bestätigen; Finden; Bestand und Abschluss; Hilfe finden | Kontakte; Importe; Jahresexport; Dokumentarten; Zugriffsprotokoll; API-Tokens |
       | mitarbeiter      | urinet  | Mitarbeiter      | Willkommen im Archiv; Dokumente erfassen; Ihre erfassten Dokumente; Finden; Hilfe finden |                                                                           |
-      | treuhaender      | urinet  | Treuhänder       | Willkommen im Archiv; Finden; Bestand und Abschluss; Hilfe finden                       | Jahresexport                                                              |
+      | treuhaender      | urinet  | Treuhänder       | Willkommen im Archiv; Eingangskorb ansehen; Finden; Bestand und Abschluss; Hilfe finden                        | Jahresexport                                                              |
       | geschaeftsstelle | vhf-gsk | Geschäftsstelle  | Willkommen im Archiv; Dokumente erfassen; Prüfen und bestätigen; Finden; Bestand und Abschluss; Hilfe finden | Kontakte                                                                  |
 
   @req-1.2

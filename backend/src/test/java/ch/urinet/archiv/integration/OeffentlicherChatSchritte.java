@@ -28,6 +28,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -53,7 +54,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
@@ -71,6 +76,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class OeffentlicherChatSchritte {
 
     private static final String PFAD = "/public/v1/chat";
+    private static final int SSE_GESAMTFRIST_SEKUNDEN = 30;
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final List<String> MANDANTEN = List.of("urinet", "vhf-gsk");
 
@@ -200,6 +206,8 @@ public class OeffentlicherChatSchritte {
                 + "values (?,'q',?,1)", wissenSeite, dokument.id());
         ausfuehren("insert into m_urinet.wissensseite_dokument (seite_id,dokument_id) values (?,?)",
                 wissenSeite, dokument.id());
+        frageMandanten.add("urinet");
+        frageMandanten.add("vhf-gsk");
         fragenVorWissenschat = zahl("select count(*) from m_urinet.oeffentliche_frage");
         fragenVorVhfWissenschat = zahl("select count(*) from m_vhf_gsk.oeffentliche_frage");
         wissenVerbrauchVorher = zahl("select coalesce(max(id), 0) from m_urinet.ki_verbrauch");
@@ -240,7 +248,7 @@ public class OeffentlicherChatSchritte {
 
     @Angenommen("das simulierte Sprachmodell liest diese öffentliche Wissensseite und verzögert die Schlussantwort")
     public void wissenModellVerzoegert() {
-        KiWireMock.chatFolgeLetzteVerzoegert(wissenAntworten(), 1200);
+        KiWireMock.chatFolgeLetzteVerzoegert(wissenAntworten(), 3000);
     }
 
     private List<KiWireMock.ChatAntwort> wissenAntworten() {
@@ -586,7 +594,7 @@ public class OeffentlicherChatSchritte {
         HttpURLConnection verbindung = (HttpURLConnection) ziel.openConnection();
         verbindung.setRequestMethod("POST");
         verbindung.setConnectTimeout(10_000);
-        verbindung.setReadTimeout(20_000);
+        verbindung.setReadTimeout((int) TimeUnit.SECONDS.toMillis(SSE_GESAMTFRIST_SEKUNDEN));
         verbindung.setDoOutput(true);
         verbindung.setFixedLengthStreamingMode(koerper.length);
         verbindung.setRequestProperty("Authorization", "Bearer " + schluessel.get(name));
@@ -597,6 +605,12 @@ public class OeffentlicherChatSchritte {
         if (ip != null) {
             verbindung.setRequestProperty("X-Real-Ip", ip);
         }
+        ExecutorService leserExecutor = Executors.newSingleThreadExecutor(aufgabe -> {
+            Thread thread = new Thread(aufgabe, "wissenschat-sse-leser");
+            thread.setDaemon(true);
+            return thread;
+        });
+        long frist = System.nanoTime() + TimeUnit.SECONDS.toNanos(SSE_GESAMTFRIST_SEKUNDEN);
         try {
             try (var ausgabe = verbindung.getOutputStream()) {
                 ausgabe.write(koerper);
@@ -608,11 +622,11 @@ public class OeffentlicherChatSchritte {
                     verbindung.getInputStream(), StandardCharsets.UTF_8))) {
                 StringBuilder strom = new StringBuilder();
                 String zeile;
-                while ((zeile = leser.readLine()) != null && !zeile.isEmpty()) {
+                while ((zeile = leseSseZeile(leserExecutor, leser, verbindung, frist)) != null
+                        && !zeile.isEmpty()) {
                     strom.append(zeile).append('\n');
                 }
                 assertThat(strom.toString().replace(" ", "")).contains("event:werkzeug");
-                long frist = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
                 while (KiWireMock.chatAnfragen().size() < 3 && System.nanoTime() < frist) {
                     Thread.sleep(50);
                 }
@@ -625,13 +639,41 @@ public class OeffentlicherChatSchritte {
                 } else {
                     throw new IllegalArgumentException("Unbekannte synthetische Änderung");
                 }
-                while ((zeile = leser.readLine()) != null) {
+                while ((zeile = leseSseZeile(leserExecutor, leser, verbindung, frist)) != null) {
                     strom.append(zeile).append('\n');
                 }
                 netzStrom = strom.toString();
             }
         } finally {
             verbindung.disconnect();
+            leserExecutor.shutdownNow();
+        }
+    }
+
+    private static String leseSseZeile(
+            ExecutorService leserExecutor, BufferedReader leser, HttpURLConnection verbindung, long frist)
+            throws IOException, InterruptedException {
+        long verbleibend = frist - System.nanoTime();
+        if (verbleibend <= 0) {
+            verbindung.disconnect();
+            throw new AssertionError("SSE-Stream hat die Gesamtfrist von "
+                    + SSE_GESAMTFRIST_SEKUNDEN + " Sekunden überschritten");
+        }
+        var zeilenLesung = leserExecutor.submit(leser::readLine);
+        try {
+            return zeilenLesung.get(verbleibend, TimeUnit.NANOSECONDS);
+        } catch (TimeoutException e) {
+            zeilenLesung.cancel(true);
+            verbindung.disconnect();
+            throw new AssertionError("SSE-Stream hat die Gesamtfrist von "
+                    + SSE_GESAMTFRIST_SEKUNDEN + " Sekunden überschritten", e);
+        } catch (InterruptedException e) {
+            zeilenLesung.cancel(true);
+            verbindung.disconnect();
+            Thread.currentThread().interrupt();
+            throw e;
+        } catch (ExecutionException e) {
+            throw new IOException("SSE-Stream konnte nicht gelesen werden", e.getCause());
         }
     }
 
@@ -799,6 +841,15 @@ public class OeffentlicherChatSchritte {
         assertThat(ereignisse).extracting(Ereignis::name).containsExactly("fehler");
         assertThat(KiWireMock.chatAnfragen()).isEmpty();
         assertThat(zahl("select count(*) from m_urinet.oeffentliche_frage")).isEqualTo(fragenVorWissenschat + 1);
+    }
+
+    @Dann("speichert der Wissenschat das Schweigen ohne Beleg in genau eine inhaltsfreie Frage")
+    public void wissenschatSchweigenProtokoll() throws SQLException {
+        assertThat(zahl("select count(*) from m_urinet.oeffentliche_frage"))
+                .isEqualTo(fragenVorWissenschat + 1);
+        assertThat(texte("select frage || '|' || quellen::text from m_urinet.oeffentliche_frage "
+                + "order by id desc limit 1").getFirst())
+                .isEqualTo("Öffentliche Wissenschat-Frage|[]");
     }
 
     @Dann("bleibt die öffentliche Wissensseite im anderen Mandanten unsichtbar")

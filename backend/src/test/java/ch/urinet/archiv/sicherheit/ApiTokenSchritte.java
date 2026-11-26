@@ -56,6 +56,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class ApiTokenSchritte {
 
+    private record ApiFehler(String type, String title, String detail, String fehlercode) {
+    }
+
     private static final String VERWALTUNG = "/api/v1/api-tokens";
     private static final ZoneId ZEITZONE = ZoneId.of("Europe/Zurich");
     private static final String UPLOAD = "/api/v1/dokumente";
@@ -92,6 +95,8 @@ public class ApiTokenSchritte {
     private String kommandoFehler;
     private LogMitschnitt mitschnitt;
     private Response antwort;
+    private String letzterBenutzer;
+    private UUID letzteUnbekannteId;
 
     @Before(order = 0)
     public void grenzenZuruecksetzen() {
@@ -252,6 +257,8 @@ public class ApiTokenSchritte {
 
     @Wenn("«{word}» das Token «{word}» widerruft")
     public void widerrufen(String benutzer, String name) {
+        letzterBenutzer = benutzer;
+        letzteUnbekannteId = UUID.randomUUID();
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
                 .delete(VERWALTUNG + "/" + ApiToken.lesen(tokens.get(name)).orElseThrow().id());
     }
@@ -308,6 +315,14 @@ public class ApiTokenSchritte {
     public void fehlercode(int status, String fehlercode) {
         assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(fehlercode);
         geheimnisseFehlenIn(antwort.asString());
+    }
+
+    @Dann("ist die Token-Ablehnung wie bei einer unbekannten ID")
+    public void unbekannteIdGegenprobe() {
+        Response unbekannt = given().auth().oauth2(Testanmeldung.token(letzterBenutzer)).when()
+                .delete(VERWALTUNG + "/" + letzteUnbekannteId);
+        assertThat(unbekannt.statusCode()).isEqualTo(antwort.statusCode());
+        assertThat(apiFehler(antwort)).isEqualTo(apiFehler(unbekannt));
     }
 
     @Dann("enthält die Antwort das Token «{word}» genau dieses eine Mal, nicht zwischenspeicherbar")
@@ -486,6 +501,11 @@ public class ApiTokenSchritte {
     private RequestSpecification gesendet(String wert) {
         gesendet.add(wert);
         return mitToken(wert);
+    }
+
+    private static ApiFehler apiFehler(Response antwort) {
+        return new ApiFehler(antwort.path("type"), antwort.path("title"), antwort.path("detail"),
+                antwort.path("fehlercode"));
     }
 
     private static RequestSpecification mitToken(String token) {

@@ -17,6 +17,7 @@ import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
+import { UMGEBUNG } from '../umgebung/umgebung';
 import { WissenEntwurfZaehler } from './wissen/wissen-entwurf-zaehler';
 
 class AnmeldungAttrappe {
@@ -180,7 +181,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.wissen.entwuerfe.titel,
       ],
     ],
-    ['treuhaender', [TEXTE.menue.uebersicht, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen, TEXTE.menue.export]],
+    ['treuhaender', [TEXTE.menue.uebersicht, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen, TEXTE.menue.export]],
   ])('zeigt der Rolle %s nur die erlaubten Menüpunkte', async (rolle, erwartet) => {
     anmeldung.als(rolle);
     const element = await zeigen();
@@ -249,6 +250,23 @@ describe('App (Req 2.6, 8.6)', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(element.querySelector('[data-test=update-fehler]')?.textContent).toContain(TEXTE.updateFehler);
+  });
+
+  it('bietet für jeden angemeldeten Benutzer den Einstieg zur Kontoverwaltung in einem neuen Tab (Req 10.1)', async () => {
+    anmeldung.als('mitarbeiter');
+    const element = await zeigen();
+    const link = element.querySelector<HTMLAnchorElement>('[data-test=passkey-einrichten]');
+    expect(link?.getAttribute('href')).toBe(`${UMGEBUNG.oidc.aussteller}/account`);
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(link?.getAttribute('aria-label')).toBe(TEXTE.kopf.passkeyEinrichtenNeuerTab);
+    expect(link?.getAttribute('aria-label')?.startsWith(TEXTE.kopf.passkeyEinrichten)).toBe(true);
+    expect(link?.textContent).toContain(TEXTE.kopf.passkeyEinrichten);
+  });
+
+  it('zeigt den Einstieg zur Kontoverwaltung nicht ohne Anmeldung', async () => {
+    const element = await zeigen();
+    expect(element.querySelector('[data-test=passkey-einrichten]')).toBeNull();
   });
 
   it('meldet über Keycloak ab', async () => {

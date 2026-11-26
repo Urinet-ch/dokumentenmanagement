@@ -122,13 +122,47 @@ describe('Seite /hilfe (Spec 07, Req 5.1 bis 5.4, 6.2, 6.3, 6.5, 7.6)', () => {
     expect(seite.querySelector('[data-test="hilfe-abgemeldet"]')).toBeNull();
   });
 
-  it.each<NonNullable<Benutzer['rolle']>>(['inhaber', 'mitarbeiter', 'treuhaender', 'geschaeftsstelle'])(
-    'zeigt für %s bei gleicher Rolle und gleichem Branding denselben Hilfetext in beiden Mandanten (Req 2.4)',
-    async (rolle) => {
+  it.each([
+    [
+      'inhaber',
+      [
+        '/hilfe#erste-schritte',
+        '/hilfe#erfassen',
+        '/hilfe#erfassen-offline',
+        '/hilfe#suche',
+        '/hilfe#importe',
+        '/hilfe#probleme',
+      ],
+    ],
+    [
+      'mitarbeiter',
+      [
+        '/hilfe#erste-schritte',
+        '/hilfe#erfassen',
+        '/hilfe#erfassen-offline',
+        '/hilfe#suche',
+        '/hilfe#probleme',
+      ],
+    ],
+    ['treuhaender', ['/hilfe#erste-schritte', '/hilfe#suche', '/hilfe#probleme']],
+    [
+      'geschaeftsstelle',
+      [
+        '/hilfe#erste-schritte',
+        '/hilfe#erfassen',
+        '/hilfe#erfassen-offline',
+        '/hilfe#suche',
+        '/hilfe#probleme',
+      ],
+    ],
+  ] as const)(
+    'zeigt für %s genau die Rollenabschnitte in beiden Mandanten (Req 2.4, 6.2)',
+    async (rolle, erwarteteAbschnitte) => {
       anmelden(rolle, 'urinet');
       const seite = await oeffnen('/hilfe');
       const text = seite.textContent;
       const anker = inhalt(seite);
+      expect(anker).toEqual(erwarteteAbschnitte);
 
       anmelden(rolle, 'vhf-gsk');
       harness.detectChanges();
@@ -136,7 +170,7 @@ describe('Seite /hilfe (Spec 07, Req 5.1 bis 5.4, 6.2, 6.3, 6.5, 7.6)', () => {
       harness.detectChanges();
 
       expect(seite.textContent).toBe(text);
-      expect(inhalt(seite)).toEqual(anker);
+      expect(inhalt(seite)).toEqual(erwarteteAbschnitte);
     },
   );
 

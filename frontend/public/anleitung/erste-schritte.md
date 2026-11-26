@@ -26,7 +26,7 @@ Ein Zurücksetzen des Passworts auf der Anmeldeseite gibt es nicht. Haben Sie Ih
 
 ## Ihre Rolle
 
-Auf breiten Bildschirmen stehen oben rechts Ihr Name, Ihre Rolle und der Mandant, auf dem Handy nur Ihre Initialen. Die Rolle bestimmt, welche Bereiche Sie sehen. Fehlt Ihnen ein Bereich, wenden Sie sich an die Person, die Ihren Zugang eingerichtet hat.
+Auf breiten Bildschirmen stehen oben rechts Ihr Name, Ihre Rolle und der Mandant, auf dem Handy nur Ihre Initialen. Die Rolle bestimmt, welche Bereiche Sie sehen. Fehlt Ihnen ein Bereich, wenden Sie sich an die Person, die Ihren Zugang eingerichtet hat. Daneben führt «Passkey einrichten» (Schlüssel-Symbol) in einem neuen Tab zur Kontoverwaltung der Anmeldung; wie das geht, steht im Abschnitt «Mit Passkey anmelden».
 
 ## Hell oder dunkel
 

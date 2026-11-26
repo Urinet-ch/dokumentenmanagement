@@ -115,6 +115,7 @@ describe('Wissensoberfläche', () => {
       http.expectOne('/api/v1/wissensbasis/einstellungen').flush({}, { headers: { ETag: '"1"' } });
       fixture.detectChanges();
       const element = fixture.nativeElement as HTMLElement;
+      expect(element.textContent).toContain(TEXTE.wissen.import.cloudHinweis);
       const start = [...element.querySelectorAll('button')]
         .find((button) => button.textContent?.includes(TEXTE.wissenEinstellungen.exportStart))!;
       start.click();

@@ -5,9 +5,30 @@
 | `archiv_client.py` | Client für den Generator-Endpunkt (Spec 01, Req 11.4, 11.5, 11.9; Aufgabe 4.7) |
 | `test_archiv_client.py` | Tests zum Client: `python3 -m unittest tools/test_archiv_client.py` |
 | `test_pruefe_speicherbudget.py` | Tests für das Deploy-Speicherbudget: `python3 -m unittest tools/test_pruefe_speicherbudget.py` |
+| `pruefe_compose_konsistenz.py` | Statische Prüfung von Compose und Keycloak-Vorlagen; startet keine Dienste |
 | `golden_synth/` | Generator für synthetische Golden-Belege (Req 0.10) |
 | `crm/` | synthetischer Beispiel-Export 21.CRM |
-| `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
+| `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--begleit-pdf` reiht für die HEIC-Messung einen synthetischen 20-seitigen Scan ein; `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
+
+## Compose-Konsistenzprüfung
+
+```sh
+python3 tools/pruefe_compose_konsistenz.py
+python3 tools/pruefe_compose_konsistenz.py --json
+python3 -m unittest tools/test_pruefe_compose_konsistenz.py
+```
+
+Die Prüfung verwendet Python und Docker Compose zur lokalen Konfigurationsauswertung ohne Interpolation; sie
+startet und verändert keine Container. Sie meldet fehlende Healthchecks, Ressourcen- und Netzvorgaben,
+Public-Router/Drosselung, Image-Digests und mögliche Klartextwerte in Umgebungsvariablen und Keycloak-Skripten.
+Exit `0` bedeutet keine Befunde, `1` Befunde und `2` einen Ausführungsfehler. JSON enthält `befunde` mit
+`code`, `ort` und `meldung`; Werte möglicher Geheimnisse werden nicht ausgegeben.
+
+Die Klartextprüfung ist eine namensbasierte Heuristik, kein vollständiger Secret-Scan. Sie prüft weder Laufzeitwerte
+noch die Wirksamkeit von Healthchecks, Routerregeln und Limits. Dienstimages ohne Digest werden auch gemeldet, wenn sie
+lokal gebaut wurden; ein gepinntes Basisimage macht den veränderlichen Dienst-Tag nicht unveränderlich.
+Die Tests laufen nicht automatisch in der CI; ein Vorschlag dafür liegt unter
+[`docs/betrieb/compose-konsistenz-ci.diff`](../docs/betrieb/compose-konsistenz-ci.diff).
 
 ## Generator-Client `archiv_client.py`
 

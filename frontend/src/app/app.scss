@@ -225,6 +225,8 @@ nav {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box; // auch für den Link «Passkey einrichten» (ein Knopf hat es von Haus aus)
 
   &:hover {
     color: var(--text);
@@ -357,6 +359,10 @@ main {
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
+  }
+
+  .kopf {
+    gap: 6px;
   }
 
   .kopf:has(.kopfsuche) .titel {

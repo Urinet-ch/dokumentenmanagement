@@ -65,7 +65,7 @@ Funktionalität: Handy-Erfassung
   @req-4.4
   Szenario: Offline und ohne Anmeldung erfassen; die Aufnahmen bleiben auf dem Gerät
     Angenommen ein Handy mit installierter PWA, dessen Rückkamera «ein Blatt» filmt
-    Und das Handy offline ist
+    Und ich schalte das Handy nach der PWA-Installation offline
     Wenn ich die Startseite öffne
     Und ich auf den Link «Ohne Verbindung erfassen» tippe
     Dann bin ich auf der Seite «/erfassen»

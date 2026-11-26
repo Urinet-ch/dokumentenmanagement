@@ -18,6 +18,10 @@ paths:
       responses:
         "200":
           description: Eintrag
+          headers:
+            ETag:
+              schema:
+                type: string
           content:
             application/json:
               schema:

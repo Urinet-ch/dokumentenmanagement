@@ -1,0 +1,66 @@
+diff --git a/.github/workflows/restore-test.yml b/.github/workflows/restore-test.yml
+--- a/.github/workflows/restore-test.yml
++++ b/.github/workflows/restore-test.yml
+@@ -13,6 +13,11 @@ on:
+         description: "Nur diese Site (leer = alle)"
+         required: false
+         default: ""
++      archiv_zaehlvergleich:
++        description: "Archiv-Zählvergleich nach separater Archiv-Restore-Probe"
++        type: boolean
++        required: false
++        default: false
+ 
+ permissions:
+   contents: read
+@@ -78,6 +83,50 @@ jobs:
+           MARIADB_CONTAINER: ${{ job.services.mariadb.id }}
+         run: bash scripts/restore-test.sh "$ONLY_SITE"
+ 
++      # Voraussetzung: Eine Archiv-Restore-Probe erzeugt beide Dateien unabhängig
++      # aus der Quelle des Sicherungszeitpunkts bzw. der wiederhergestellten DB.
++      - name: Archiv-Zählvergleich
++        if: ${{ inputs.archiv_zaehlvergleich }}
++        run: |
++          python3 - <<'PY'
++          import json
++          import os
++          import sys
++
++          quelle = "out/archiv-quelle.json"
++          ziel = "out/archiv-restore.json"
++          def eindeutig(paare):
++              daten = {}
++              for schluessel, wert in paare:
++                  if schluessel in daten:
++                      raise ValueError("Doppelter Schlüssel im Zählformat")
++                  daten[schluessel] = wert
++              return daten
++
++          try:
++              if os.path.samefile(quelle, ziel):
++                  raise ValueError("Quelle und Restore sind dieselbe Datei")
++              with open(quelle, encoding="utf-8") as f:
++                  vorher = json.load(f, object_pairs_hook=eindeutig)
++              with open(ziel, encoding="utf-8") as f:
++                  nachher = json.load(f, object_pairs_hook=eindeutig)
++              felder = {"seiten", "versionen", "dokumente"}
++              for daten in (vorher, nachher):
++                  if not isinstance(daten, dict) or not daten:
++                      raise ValueError("Mandantenliste fehlt")
++                  for mandant, zahlen in daten.items():
++                      if not mandant or not isinstance(zahlen, dict) or set(zahlen) != felder:
++                          raise ValueError("Ungültiges Zählformat")
++                      if any(type(n) is not int or n < 0 for n in zahlen.values()):
++                          raise ValueError("Ungültige Zählwerte")
++              if vorher != nachher:
++                  raise ValueError("Quell- und Restore-Zahlen weichen ab")
++          except (OSError, ValueError) as e:
++              print(f"Archiv-Zählvergleich fehlgeschlagen: {e}", file=sys.stderr)
++              sys.exit(1)
++          print("Archiv-Zählvergleich erfolgreich")
++          PY
++
+       - name: Status fürs Ops-Dashboard
+         if: always()
+         continue-on-error: true   # nur fürs Dashboard: Störung des Artefakt-Diensts ist kein Fehlalarm

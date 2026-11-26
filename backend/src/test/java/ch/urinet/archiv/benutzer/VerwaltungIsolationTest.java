@@ -37,6 +37,7 @@ abstract class VerwaltungIsolationIT {
     private static final String BENUTZER = "/api/v1/benutzer";
 
     private record Aufruf(String methode, String pfad, String body) { }
+    private record Fehler(String type, String title, String detail, String fehlercode) { }
 
     private static final List<Aufruf> ZIELAUFRUFE = List.of(
             new Aufruf("GET", "", null),
@@ -107,12 +108,18 @@ abstract class VerwaltungIsolationIT {
         for (var zugang : List.of(Map.entry("inhaber-urinet", verbandId),
                 Map.entry("inhaber-vhf-gsk", urinetId))) {
             String token = Testanmeldung.token(zugang.getKey());
+            String unbekannteId = UUID.randomUUID().toString();
             for (Aufruf aufruf : ZIELAUFRUFE) {
                 Response antwort = senden(token, BENUTZER + "/" + zugang.getValue(), aufruf);
                 assertThat(antwort.statusCode()).as("%s %s für %s",
                         aufruf.methode(), aufruf.pfad(), zugang.getKey()).isEqualTo(404);
                 assertThat(antwort.<String>path("fehlercode")).isEqualTo("NICHT_GEFUNDEN");
                 assertThat(antwort.asString()).doesNotContain(name);
+                Response unbekannt = senden(token, BENUTZER + "/" + unbekannteId, aufruf);
+                assertThat(unbekannt.statusCode()).as("Unbekannte ID für %s %s",
+                        aufruf.methode(), aufruf.pfad()).isEqualTo(404);
+                assertThat(fehler(antwort)).as("Fremde und unbekannte ID für %s %s",
+                        aufruf.methode(), aufruf.pfad()).isEqualTo(fehler(unbekannt));
             }
         }
         assertThat(identitaet.benutzerLesen("urinet", urinetId)).isEqualTo(a);
@@ -242,10 +249,15 @@ abstract class VerwaltungIsolationIT {
                         .then().statusCode(200).extract().asString();
                 assertThat(eigene).contains(fall.eigenerAntrag().toString())
                         .doesNotContain(fall.fremderAntrag().toString());
+                UUID unbekannterAntrag = UUID.randomUUID();
                 for (String entscheid : List.of("bestaetigen", "ablehnen", "zurueckziehen")) {
-                    given().auth().oauth2(token).contentType("application/json").body("{}")
-                            .post(BENUTZER + "/antraege/" + fall.fremderAntrag() + "/" + entscheid)
-                            .then().statusCode(404);
+                    Response fremd = given().auth().oauth2(token).contentType("application/json").body("{}")
+                            .post(BENUTZER + "/antraege/" + fall.fremderAntrag() + "/" + entscheid);
+                    Response unbekannt = given().auth().oauth2(token).contentType("application/json").body("{}")
+                            .post(BENUTZER + "/antraege/" + unbekannterAntrag + "/" + entscheid);
+                    assertThat(fremd.statusCode()).isEqualTo(404);
+                    assertThat(fehler(fremd)).isEqualTo(fehler(unbekannt));
+                    assertThat(fremd.asString()).doesNotContain(fall.fremderAntrag().toString());
                 }
                 assertThat(protokoll(token, fall.eigenerMarker())).contains(fall.eigenerMarker());
                 assertThat(protokoll(token, fall.fremderMarker())).doesNotContain(fall.fremderMarker());
@@ -322,6 +334,11 @@ abstract class VerwaltungIsolationIT {
         assertThat(antwort.statusCode()).as("%s %s für %s",
                 aufruf.methode(), aufruf.pfad(), benutzer).isEqualTo(403);
         assertThat(antwort.<String>path("fehlercode")).isEqualTo("NICHT_ERLAUBT");
+    }
+
+    private static Fehler fehler(Response antwort) {
+        return new Fehler(antwort.path("type"), antwort.path("title"), antwort.path("detail"),
+                antwort.path("fehlercode"));
     }
 }
 

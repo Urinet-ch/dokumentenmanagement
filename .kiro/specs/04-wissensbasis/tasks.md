@@ -154,7 +154,8 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Auftrag `WISSEN_EXPORT`, ZIP mit Frontmatter (SnakeYAML), `index.md`, `log.md`, URN-Verweise, Links im Inhalt auf `.md` umgeschrieben; Download 24 h; Protokoll mit SHA-256; Einstellungen `/wissensbasis/einstellungen` (A19, `geschaeftsstelle` erhält 403)
   - `OkfKonformitaetTest` (JUnit, Nachweis für 17.3, im PR verlinkt); Vollexport nach Spec 03, 8.2 (Aufgabe 12.2) um den OKF-Export ergänzen
   - Nachprüfung 20.11.2026: PR #328 ist gemergt, einschliesslich Changeset `056-wissens-export` und Changelog-Einbindung. Nachweise: `export.feature` (@req-17.1, @req-17.2, @req-17.4, @req-17.5), `OkfKonformitaetTest` (@req-17.3), `WissenExportTest` (exakte 24-Stunden-Grenze und SHA-256), `WissenEinstellungenTest`, `MandantVollexportSchreiber` mit `wissensbasis.zip`. Kein Export oder Paketformat neu gebaut.
-  - _Anforderungen: 17.1–17.5, 14.3_
+  - Nachtrag (PR #608, 25.11.2026): Die Einstellungsseite zeigt beim OKF-Export den Hinweis zu Cloud-Modellen; `wissen.spec.ts` und `okf-export-hinweis.feature` prüfen den Text (Req 19.24). Das Backend-Rundlaufszenario für den lokalen Export ist ebenfalls damit markiert.
+  - _Anforderungen: 17.1–17.5, 19.24, 14.3_
   - _Abhängig von: 13.6_
 
 - [x] 15.6 Import eines Wissenspakets als Entwurf [Backend]
@@ -172,8 +173,9 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - CI: eigener Schritt für `tools/wissen_paket` und Pfadfilter für Änderungen an `wissen/domain`; `README.md` des Werkzeugs
   - `PaketRegelnGleichheitTest` (JUnit, Nachweis für 19.27): dieselben Beispielpakete wie 15.6 ergeben dieselben Befund-Listen; Test, dass das Werkzeug keine Netzverbindung aufbaut und keine Datei ausser dem Ausgabe-ZIP schreibt
   - Erledigt (PR #379, #395, #396, #413): Offline-Werkzeug und Tests; `PaketRegelnGleichheitTest` vergleicht die offline prüfbaren Codes und Pfade von Werkzeug und tatsächlicher REST-Antwort für 18 Beispielpakete. Der CI-Schritt läuft bei jeder Nicht-Spec-Änderung und damit auch bei Änderungen an `wissen/domain`. Abweichung von design.md: Der Bericht enthält Befund-Codes und Pfade, aber keine Zähler (Requirement 19.27 verlangt nur Codes und Pfade). `WissenPaketNetzTest` prüft unter Linux mit `strace` zur Laufzeit `bauen` und `validate` samt Quellenprüfung und Kindprozessen; eine Loopback-Gegenprobe belegt die Erkennung. Der Test hängt von `strace` und ptrace; der CI-Schritt «strace bereitstellen» installiert es bei Bedarf, fehlt es trotzdem, schlägt der Test fehl (kein stilles Überspringen). Ein Marker der Attrappe `pdftotext` belegt, dass die Quellenprüfung wirklich lief. Zusätzlich durchsucht der bisherige Netz-Test die eigenen Klassen statisch nach Bytecode; die Paketgrenze sichert die ArchUnit-Regel im Backend.
+  - Nachtrag (PR #608, 25.11.2026): `WissenPaketCliTest.req19_24PruefwerkzeugNenntRegelFuerLokalesModell` prüft den ausgegebenen Hinweis für lokale Modelle.
   - Abgrenzung: nur das Paketformat und die Domain-Regeln aus 13.4/15.6 werden gebraucht, nicht der Endpunkt; Aufgabe 15.6 und 15.7 dürfen parallel laufen, sobald `WissensPaketLeser` steht (Klasse aus 15.6, zuerst mergen)
-  - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.25, 19.27_
+  - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.24, 19.25, 19.27_
   - _Abhängig von: 13.4 (`WissensPruefung`), Paketformat aus 15.6 (`WissensPaketLeser`)_
 
 - [x] 15.8 Oberfläche Import [Frontend]
@@ -246,6 +248,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Nachweis 25.11.2026: `OeffentlicherWissenschatResourceTest` prüft die mandantenbezogene Schalterauflösung pro Anfrage. `@req-21.6` liest im Cucumber-Netztest ein Werkzeug-Ereignis aus dem SSE-Stream, entzieht danach die Freigabe und prüft den Reststrom: `fehler`, kein Text und keine Quellen. Die Ausschlussfälle «ohne Webseitenfreigabe» und Quellenstufe `mitglieder` sind in der parallelen Nacharbeit #605 abgedeckt und werden hier nicht dupliziert. Die Checkbox bleibt offen; der Plugin-Hinweis und die vollständige Abnahme sind noch ausstehend.
   - _Anforderungen: 21.6_
   - _Abhängig von: 18.1, Spec 03: 11.2_
+  - Abgleich 25.11.2026: #576 und die oben genannte Nacharbeit #605 sind gemergt; 18.4 ist abgehakt, 18.3 bleibt für den genannten Rest offen.
 - [x] 18.4 Isolations- und Abnahmetests [QA]
   - Mandantentrennung, A15 (403), fester Modus, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar, öffentliche Auslieferung
     nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug vor dem Einreihen des SSE-Ereignisses (Entscheid Fabian
@@ -259,8 +262,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Zählt gespeicherte Zeilen in `oeffentliche_frage` mit `quellen = '[]'` je aktivem Mandanten; nur die Anzahl wird als Gauge ausgegeben.
     Bestehende Tabelle und Aufbewahrung bleiben unverändert.
   - Nachweis: JUnit prüft leere/nichtleere Quellen und Mandantentrennung sowie den Mandanten-Tag der Kennzahl.
-  - Quellenbezug: Spec 03, 6.5; Spec 01, 16.4. Erfüllt den Kennzahlen-Baustein für Spec 04, 18.7.
-  - _Anforderungen: 18.7_
+  - Einordnung: Monitoring-Ergänzung ohne eigenes Akzeptanzkriterium; das Gate «Phase 4» bleibt davon unberührt.
   - _Abhängig von: Spec 03: 11.3_
 
 ## Optionen

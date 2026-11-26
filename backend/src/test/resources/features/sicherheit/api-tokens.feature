@@ -168,6 +168,7 @@ Funktionalität: API-Tokens für Skripte
     Dann enthält die Liste das Token «vhf» nicht
     Wenn «inhaber-urinet» das Token «vhf» widerruft
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und ist die Token-Ablehnung wie bei einer unbekannten ID
     Wenn das Token «vhf» an «/api/v1/dokumente» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
 

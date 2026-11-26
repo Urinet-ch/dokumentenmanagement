@@ -101,14 +101,18 @@ Funktionalität: Chat-Schnittstelle (Aufgabe 7.3)
     Wenn «mitarbeiter-urinet» die Frage «Meine eigene Frage» stellt
     Und «inhaber-urinet» im Gespräch von «mitarbeiter-urinet» die Frage «Fremdes Gespräch?» stellt
     Dann lehnt das Archiv die Anfrage mit 404 «NICHT_GEFUNDEN» ab
+    Und ist die Chat-Ablehnung wie bei einer unbekannten Gesprächs-ID
     Wenn «inhaber-vhf-gsk» im Gespräch von «mitarbeiter-urinet» die Frage «Fremder Mandant?» stellt
     Dann lehnt das Archiv die Anfrage mit 404 «NICHT_GEFUNDEN» ab
+    Und ist die Chat-Ablehnung wie bei einer unbekannten Gesprächs-ID
     Wenn «inhaber-urinet» in einem unbekannten Gespräch die Frage «Unbekannt?» stellt
     Dann lehnt das Archiv die Anfrage mit 404 «NICHT_GEFUNDEN» ab
     Wenn «inhaber-urinet» den Verlauf des Gesprächs von «mitarbeiter-urinet» abruft
     Dann lehnt das Archiv die Anfrage mit 404 «NICHT_GEFUNDEN» ab
+    Und ist die Verlaufsablehnung wie bei einer unbekannten Gesprächs-ID
     Wenn «inhaber-vhf-gsk» den Verlauf des Gesprächs von «mitarbeiter-urinet» abruft
     Dann lehnt das Archiv die Anfrage mit 404 «NICHT_GEFUNDEN» ab
+    Und ist die Verlaufsablehnung wie bei einer unbekannten Gesprächs-ID
     Wenn «mitarbeiter-urinet» den Verlauf des Gesprächs von «mitarbeiter-urinet» abruft
     Dann zeigt der Verlauf mit dem Titel «Meine eigene Frage» diese Nachrichten:
       | rolle     | inhalt                                                                       | status | quellen |

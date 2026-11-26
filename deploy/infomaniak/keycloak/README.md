@@ -127,19 +127,19 @@ Nie per `docker exec` im laufenden Keycloak (zweite JVM, `mem_limit`; siehe Haup
 Wegwerf-Container nutzt das Image `archiv:kc-current` und die Einstellungen des Dienstes `kc` (Netz `intern`, nicht-root,
 schreibgeschützt, `mem_limit`, Secret `keycloak_admin`), startet aber nur `bash` und nicht Keycloak.
 
-**`jq` fehlt im Keycloak-Image.** Geprüft an einem aus `deploy/infomaniak/keycloak/Dockerfile` gebauten Image: Es enthält `bash`,
-`awk`, aber weder `jq` noch `curl`. Die Vorlagen (Passkey und 19.3) brauchen `jq`. Einmalig wird eine statische `jq`-Datei aus dem
+**`jq` fehlt im Keycloak-Image.** Geprüft an einem aus `deploy/infomaniak/keycloak/Dockerfile` gebauten Image: Sicher belegt ist `bash`;
+`jq`, `curl` und `awk` fehlen. Die Vorlagen (Passkey und 19.3) brauchen `jq`. Einmalig wird eine statische `jq`-Datei aus dem
 offiziellen Hilfs-Image `ghcr.io/jqlang/jq` (mehrarchitektur, auf Digest festgelegt) geholt und nur lesend eingehängt; das
 Keycloak-Image bleibt unverändert:
 
 ```sh
-mkdir -p "$HOME/archiv-werkzeuge/keycloak"
+sudo mkdir -p /opt/archiv-werkzeuge/keycloak
 sudo docker rm -f urinet-jq-holen 2>/dev/null
 sudo docker create --platform linux/amd64 --name urinet-jq-holen \
   ghcr.io/jqlang/jq:1.7.1@sha256:096b83865ad59b5b02841f103f83f45c51318394331bf1995e187ea3be937432
-sudo docker cp urinet-jq-holen:/jq "$HOME/archiv-werkzeuge/jq"
+sudo docker cp urinet-jq-holen:/jq /opt/archiv-werkzeuge/jq
 sudo docker rm urinet-jq-holen
-echo "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5  $HOME/archiv-werkzeuge/jq" | sha256sum -c -
+echo "5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5  /opt/archiv-werkzeuge/jq" | sha256sum -c -
 ```
 `sha256sum -c` muss `OK` melden; sonst die Datei löschen und nicht verwenden. Die Prüfsumme gilt für die Datei `jq` der
 Plattform `linux/amd64` (die VPS ist x86-64); sie wurde aus genau dem oben mit Digest festgelegten Image entnommen (`docker create`,
@@ -153,19 +153,19 @@ Weg auf die VPS (`<vps>` ist der Zugang des Betreibers):
 
 ```sh
 scp deploy/infomaniak/keycloak/{passkey-einrichten-vorlage.sh,verwaltung-einrichten-vorlage.sh,vorlage-ausfuehren.sh} \
-  <vps>:archiv-werkzeuge/keycloak/
+  <vps>:/opt/archiv-werkzeuge/keycloak/
 ```
 **Rechte für den Container.** Der Wegwerf-Container läuft als Benutzer 1000:1000 und hängt `jq` und das Verzeichnis `keycloak` nur
 lesend ein. Bei einer `umask` von 077 auf der VPS (und beim `scp`) wären beide für ihn unlesbar. Darum auf der VPS nach dem
 Ablegen (die Secret-Dateien sind davon **nicht** betroffen und werden nie geöffnet):
 
 ```sh
-chmod -R a+rX "$HOME/archiv-werkzeuge"
-chmod a+rx "$HOME/archiv-werkzeuge/jq"
-ls -l "$HOME/archiv-werkzeuge/jq" "$HOME/archiv-werkzeuge/keycloak"
+sudo chmod -R a+rX /opt/archiv-werkzeuge
+sudo chmod a+rx /opt/archiv-werkzeuge/jq
+ls -l "/opt/archiv-werkzeuge/jq" "/opt/archiv-werkzeuge/keycloak"
 ```
-Meldet der Lauf später `Permission denied` oder `jq: not found`, ist fast immer dies die Ursache. Auch das Heimverzeichnis selbst
-muss für den Container durchsuchbar sein (`stat -c '%A' "$HOME"` zeigt `x` für andere); sonst die Dateien in ein anderes Verzeichnis legen.
+Meldet der Lauf später `Permission denied` oder `jq: not found`, ist fast immer dies die Ursache. Die Werkzeuge liegen in `/opt/archiv-werkzeuge`, nicht im Heimverzeichnis: Als root ist `$HOME` gleich `/root`, und das ist für Benutzer 1000
+nicht durchsuchbar. Die Befehle stehen bewusst ohne Shell-Variable für den Pfad (eine eingefügte erste Zeile wurde abgeschnitten).
 
 
 **Passkey-Vorlage, zuerst nur prüfen** (Exit 10 heisst: Änderungen nötig; `echo $?` zeigt den Exit-Code):
@@ -174,7 +174,7 @@ muss für den Container durchsuchbar sein (`stat -c '%A' "$HOME"` zeigt `x` für
 sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml \
   run --rm --no-deps -T -l traefik.enable=false \
   -e KC_OPTS="-Duser.home=/tmp -XX:+UseSerialGC -Xmx96m -XX:TieredStopAtLevel=1 -Xss512k" \
-  -v "$HOME/archiv-werkzeuge/jq:/usr/local/bin/jq:ro" -v "$HOME/archiv-werkzeuge/keycloak:/arbeit:ro" \
+  -v "/opt/archiv-werkzeuge/jq:/usr/local/bin/jq:ro" -v "/opt/archiv-werkzeuge/keycloak:/arbeit:ro" \
   --entrypoint bash kc \
   /arbeit/vorlage-ausfuehren.sh /arbeit/passkey-einrichten-vorlage.sh --pruefen
 echo "Exit: $?"
@@ -184,18 +184,15 @@ echo "Exit: $?"
 (einrichten und nachprüfen), das heisst `… /arbeit/passkey-einrichten-vorlage.sh --ereignisse`; anschliessend noch einmal
 `--pruefen --ereignisse` (erwartet Exit 0). Auch das erste `--pruefen` darf `--ereignisse` tragen, dann zählen die Ereignisse als
 Abweichung mit. Probe: Nach einer Passkey-Einrichtung in der Kontoverwaltung erscheint `UPDATE_CREDENTIAL` im Ereignisprotokoll des
-Realms (Admin-Konsole, Realm `urinet-archiv`, «Ereignisse»).
+Realms. Die Admin-Konsole ist über Traefik nicht öffentlich; die Ereignisse werden über `kcadm` im Wegwerf-Container gelesen
+(Hilfsskript `ereignisse-auflisten-vorlage.sh`, siehe «Passkey-Ereignisse auflisten»; Probe am 25.11.2026 belegt).
 
-**Nicht belegt, beim ersten Lauf prüfen.** Lokal belegt sind die Vorlage selbst (Stub-Test und Echt-Test gegen Keycloak 26.8.2, mit
-`docker run` und denselben Optionen). Nicht belegt sind:
+**Beim ersten Lauf auf der VPS (25.11.2026, Fabian) belegt:** Ausführung auf der VPS selbst, der `docker compose run`-Aufruf,
+Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io` und `jq` im Container. Der Lauf mit `--ereignisse`
+endete so: Prüflauf Exit 10, Einrichten Exit 0 (18 Änderungen), Nachprüfung Exit 0; ein weiterer Lauf meldet «nichts zu tun».
+Lokal belegt waren zuvor die Vorlage selbst (Stub-Test und Echt-Test gegen Keycloak 26.8.2, mit `docker run`).
 
-| Punkt | Prüfzeile |
-| --- | --- |
-| Ausführung auf der VPS selbst (nie dort gelaufen) | erster Aufruf nur mit `--pruefen`; `echo "Exit: $?"` zeigt 10 oder 0, nicht 1 |
-| der `docker compose run`-Aufruf selbst (lokal `docker run`) | `sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml config --quiet && echo ok` |
-| Lesbarkeit der Secret-Datei für Benutzer 1000 | `sudo ls -ln /srv/apps/archiv/secrets/keycloak_admin` (nur Rechte und Besitzer ansehen, Inhalt nie ausgeben) |
-| Erreichbarkeit von `ghcr.io` von der VPS | `sudo docker pull --platform linux/amd64 ghcr.io/jqlang/jq:1.7.1@sha256:096b83865ad59b5b02841f103f83f45c51318394331bf1995e187ea3be937432` |
-| `jq` im Container lauffähig | Aufruf wie oben, aber mit `--entrypoint /usr/local/bin/jq kc --version` und nur dem `jq`-Mount (erwartet `jq-1.7.1`) |
+**Ereignis-Probe belegt (25.11.2026):** `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` stehen im Ereignisprotokoll, siehe «Passkey-Ereignisse auflisten».
 
 Ist die Secret-Datei für den Benutzer 1000 nicht lesbar, meldet `vorlage-ausfuehren.sh` «Die Secret-Datei des Keycloak-Admins fehlt
 oder ist leer». Die Rechte der Secrets nicht pauschal öffnen, sondern nur so anpassen, wie es der Dienst `kc` braucht.
@@ -210,7 +207,7 @@ sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/com
   run --rm --no-deps -T -l traefik.enable=false \
   -e KC_OPTS="-Duser.home=/tmp -XX:+UseSerialGC -Xmx96m -XX:TieredStopAtLevel=1 -Xss512k" \
   -e SMTP_HOST=<smtp-host> -e SMTP_PORT=<587> -e SMTP_BENUTZER=<smtp-benutzer> -e SMTP_ABSENDER=<absender-adresse> \
-  -v "$HOME/archiv-werkzeuge/jq:/usr/local/bin/jq:ro" -v "$HOME/archiv-werkzeuge/keycloak:/arbeit:ro" \
+  -v "/opt/archiv-werkzeuge/jq:/usr/local/bin/jq:ro" -v "/opt/archiv-werkzeuge/keycloak:/arbeit:ro" \
   -v /srv/apps/archiv/secrets/keycloak_verwaltung_secret:/run/secrets/keycloak_verwaltung_secret:ro \
   --entrypoint bash kc \
   /arbeit/vorlage-ausfuehren.sh /arbeit/verwaltung-einrichten-vorlage.sh
@@ -251,6 +248,65 @@ Mit `PASSKEY_PLAYWRIGHT_VERZEICHNIS=<Verzeichnis mit node_modules/playwright>` r
 (Chromium) in der Kontoverwaltung einen Passkey ein und meldet sich damit ohne Passwort und TOTP an. Mit `URINET_TEST_TMP` (unter
 macOS mit Colima im Home-Verzeichnis) und `KEYCLOAK_CLIENT_IMAGE` (z. B. ein aus dem Dockerfile gebautes Image) anpassbar. Beide
 Tests laufen nicht in der CI.
+
+## Passkey-Ereignisse auflisten (Aufgabe 24.3, Ereignis-Probe)
+Die Admin-Konsole ist über Traefik nicht öffentlich. Für die Probe aus Req 10.7 (`UPDATE_CREDENTIAL` nach dem Einrichten,
+`REMOVE_CREDENTIAL` nach dem Entfernen eines Passkeys) listet
+[`ereignisse-auflisten-vorlage.sh`](./ereignisse-auflisten-vorlage.sh) die Benutzerereignisse des Realms per `kcadm.sh get events`
+im selben Wegwerf-Container wie die anderen Vorlagen. Das Skript liest nur (nur `get`), keine Änderung am Realm.
+
+```text
+ereignisse-auflisten-vorlage.sh [--typ <TYP>]… [--max <n>] [--seit <Tage>]
+  --typ    Ereignistyp, mehrfach oder kommagetrennt (Standard UPDATE_CREDENTIAL,REMOVE_CREDENTIAL); nur A-Z, 0-9, Unterstrich
+  --max    höchstens so viele Zeilen (Standard 20, höchstens 200), neueste zuerst
+  --seit   Ereignisse der letzten Tage (Standard 1, höchstens 365)
+Exit: 0 = mindestens ein Ereignis, 3 = keines gefunden, 1 = Fehler, 2 = Aufruf falsch
+```
+Die Ausgabe ist datensparsam (Req 9): Zeit (UTC), Typ, Benutzerkennung (`userId`, die UUID) und Client, dazu je Typ eine Summenzeile. Nie
+Benutzername, E-Mail, IP-Adresse oder Details. Die `userId` ordnet das Ereignis dem Testbenutzer zu (in der Admin-Konsole oder über den
+Benutzer-Eintrag der App). Exit 1 mit Meldung gibt es, wenn die Ereignisse des Realms ausgeschaltet sind (`eventsEnabled` false) oder
+`enabledEventTypes` einen der Typen nicht enthält (dann zuerst `passkey-einrichten-vorlage.sh --ereignisse`; frühere Vorgänge fehlen).
+Exit 3 heisst: nichts im Zeitraum (`--seit` erhöhen) oder der Vorgang hat kein Ereignis ausgelöst.
+
+**Ablegen auf der VPS** (als root; die Werkzeuge liegen in `/opt/archiv-werkzeuge`, `jq` und `vorlage-ausfuehren.sh` sind dort schon). `<commit>` ist
+die Commit-ID des gemergten Stands auf `main`; die Prüfsumme steht im Hinweis des PR-Textes (erst nach dem Merge verbindlich):
+
+```sh
+curl -fsSL -o /opt/archiv-werkzeuge/keycloak/ereignisse-auflisten-vorlage.sh \
+  https://raw.githubusercontent.com/Urinet-ch/dokumentenmanagement/<commit>/deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh
+echo "<sha256 aus dem PR-Text>  /opt/archiv-werkzeuge/keycloak/ereignisse-auflisten-vorlage.sh" | sha256sum -c -
+chmod -R a+rX /opt/archiv-werkzeuge
+```
+`sha256sum -c` muss `OK` melden; sonst die Datei löschen und nicht verwenden. `chmod` ist nötig, weil der Container als Benutzer 1000 liest.
+
+**Aufruf** (nach der Passkey-Einrichtung beziehungsweise -Entfernung in der Kontoverwaltung; `echo "Exit: $?"` zeigt 0, 3 oder 1):
+
+```sh
+docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml \
+  run --rm --no-deps -T -l traefik.enable=false \
+  -e KC_OPTS="-Duser.home=/tmp -XX:+UseSerialGC -Xmx96m -XX:TieredStopAtLevel=1 -Xss512k" \
+  -v /opt/archiv-werkzeuge/jq:/usr/local/bin/jq:ro -v /opt/archiv-werkzeuge/keycloak:/arbeit:ro \
+  --entrypoint bash kc \
+  /arbeit/vorlage-ausfuehren.sh /arbeit/ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL --typ REMOVE_CREDENTIAL
+echo "Exit: $?"
+```
+Die Anmeldung läuft wie bei den anderen Vorlagen über `vorlage-ausfuehren.sh` (Passwort nie im Terminal). Die Tests:
+`bash deploy/infomaniak/keycloak/test/ereignisse-auflisten-vorlage-test.sh` (kcadm-Stub, kein Docker) und
+`test/ereignisse-auflisten-keycloak-test.sh` (Wegwerf-Keycloak; mit `PASSKEY_PLAYWRIGHT_VERZEICHNIS` richtet ein virtueller
+Authenticator einen Passkey ein und das echte `UPDATE_CREDENTIAL` wird gelistet). Beide laufen nicht in der CI. Der Lauf auf der VPS ist belegt (25.11.2026, Exit 0), auch
+`REMOVE_CREDENTIAL` im Echtbetrieb (Entfernen eines Passkeys in der Kontoverwaltung); der Echt-Test gegen das Wegwerf-Keycloak entfernt selbst keinen Passkey.
+
+**Beispielausgabe** (Echtlauf vom 25.11.2026, Benutzerkennung durch Platzhalter ersetzt; alle Ereignisse einer Benutzerkennung, Client `account-console`):
+
+```text
+13:12:00Z  UPDATE_CREDENTIAL  <benutzer-uuid>  account-console
+16:01:23Z  REMOVE_CREDENTIAL  <benutzer-uuid>  account-console
+16:03:09Z  UPDATE_CREDENTIAL  <benutzer-uuid>  account-console
+16:03:48Z  UPDATE_CREDENTIAL  <benutzer-uuid>  account-console
+Summe UPDATE_CREDENTIAL: 3
+Summe REMOVE_CREDENTIAL: 1
+```
+Die Zeilen sind sinngemäss wiedergegeben (Zeit, Typ, Benutzerkennung, Client); das genaue Format gibt das Skript vor.
 
 ## Nachbesserung Review (PR #334)
 

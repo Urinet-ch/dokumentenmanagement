@@ -1,12 +1,13 @@
 # Passkey: Checkliste für die Inbetriebnahme (Aufgabe 24.3, Fabian)
 
-**Status: nicht ausgeführt.** Der Code, die Anleitung in der App (`/hilfe#erste-schritte-passkey`) und die Admin-Option
-«Passkeys löschen» sind umgesetzt. Die Wortlaute der App-Anleitung sind aber noch nicht auf einem echten iPhone und Mac
-bestätigt; der virtuelle Authenticator ist dafür kein Nachweis. Erst nach den Gerätetests unten darf die Anleitung als
-auf diesen Geräten geprüft bezeichnet werden.
+**Status: ausgeführt und belegt am 25.11.2026 (Fabian), nichts offen.** Realm auf Stufe A eingerichtet (Prüflauf Exit 10,
+Einrichten Exit 0 mit 18 Änderungen, Nachprüfung Exit 0, Wiederholung «nichts zu tun»). Auf iPhone und Mac bestätigt: Anmelde-Rückfall mit
+Passwort und TOTP, Related Origins, Passkey einrichten, anmelden, Step-up und entfernen, «Zugang zurücksetzen» mit «Passkeys löschen»
+sowie TOTP bei Passwortanmeldung trotz Passkey. **Ereignis-Probe belegt am 25.11.2026** (Req 10.7, Stufe A, siehe «Ereignis-Probe» unten). Die App-Anleitung gilt damit als auf
+iPhone und Mac geprüft (25.11.2026); der virtuelle Authenticator war und ist dafür kein Nachweis.
 
 Realm- und RP-ID-Änderungen führt der Betreiber aus. Die manuellen Gerätetests und ihre Beurteilung bleiben bei Fabian.
-Die Aufgabe 24.3 bleibt offen, bis alle Punkte 1 bis 5 erledigt und die Gerätetests dokumentiert sind. Keine Hostnamen,
+24.3 ist von Fabian am 25.11.2026 abgenommen; die Ereignisprotokoll-Probe ist am 25.11.2026 belegt. Keine Hostnamen,
 Adressen oder Geheimnisse gehören in diese Datei oder ins Repo.
 
 ## Reihenfolge
@@ -19,10 +20,9 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
 ## Ablauf
 0. **Vorbereitung auf der VPS:** `jq` aus dem Hilfs-Image holen (Prüfsumme `sha256sum -c`, `linux/amd64`) und die drei Skripte
    (`passkey-einrichten-vorlage.sh`, `verwaltung-einrichten-vorlage.sh`, `vorlage-ausfuehren.sh`) aus dem gemergten Stand ablegen,
-   dann `chmod -R a+rX "$HOME/archiv-werkzeuge"` (sonst kann der Container bei `umask 077` nichts lesen; README, «Ausführung auf der VPS»).
-   **Nicht belegt, beim ersten Lauf prüfen** (je eine Prüfzeile im README): Ausführung auf der VPS selbst, der `docker compose run`-Aufruf
-   selbst, Lesbarkeit der Secret-Datei `keycloak_admin` für Benutzer 1000 (`ls -ln`), Erreichbarkeit von `ghcr.io` (`docker pull`),
-   `jq` im Container lauffähig. Lokal belegt sind nur die Vorlage (Stub-Test, Echt-Test gegen Keycloak 26.8.2) und `docker run` mit denselben Optionen.
+   dann `sudo chmod -R a+rX /opt/archiv-werkzeuge` (nicht unter `$HOME`: als root ist es `/root`, für Benutzer 1000 nicht durchsuchbar) (sonst kann der Container bei `umask 077` nichts lesen; README, «Ausführung auf der VPS»).
+   Am 25.11.2026 auf der VPS belegt: Ausführung, `docker compose run`-Aufruf, Lesbarkeit der Secret-Datei für Benutzer 1000,
+   Erreichbarkeit von `ghcr.io`, `jq` im Container.
 1. **Realm einmalig auf Stufe A aktualisieren.** Der Realm-Import wirkt nur beim ersten Start. Erst `verwaltung-einrichten-vorlage.sh`
    (19.3, SMTP-Angaben als `<smtp-host>`, `<587>`, `<smtp-benutzer>`, `<absender-adresse>`), dann
    `passkey-einrichten-vorlage.sh --pruefen` (Exit 10 = Änderungen nötig), dann ohne `--pruefen`, dann wieder `--pruefen`
@@ -31,7 +31,8 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
    **Standardaufruf mit `--ereignisse`** (Entscheid Fabian 25.11.2026, Req 10.7: `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` werden
    aktiviert); die Option steht also in allen drei Aufrufen. Sind die Ereignisse des Realms aus oder `enabledEventTypes` leer, bricht die
    Vorlage ab, ohne etwas zu ändern. Probe: Nach der Passkey-Einrichtung in Punkt 4 erscheint `UPDATE_CREDENTIAL` im Ereignisprotokoll
-   des Realms (Admin-Konsole, «Ereignisse»).
+   des Realms (belegt am 25.11.2026). Die Admin-Konsole ist nicht öffentlich; stattdessen auf der VPS (in `/opt/archiv-werkzeuge`)
+   `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL` (Aufruf im README, «Passkey-Ereignisse auflisten»).
 2. **Relying-Party-ID setzen.** Der Export enthält den Platzhalter `${ARCHIV_PASSKEY_RP_ID}` (`webAuthnPolicyPasswordlessRpId`);
    der Wert ist der Host der App-Basisadresse (`ARCHIV_BASIS_URL`) ohne Schema und Port, abgeleitet wie in
    `deploy/infomaniak/keycloak/start.sh`. Das Hilfsskript `vorlage-ausfuehren.sh` leitet ihn im Wegwerf-Container aus der
@@ -42,25 +43,38 @@ Passkey-Vorlage, `--pruefen`, die Related Origins und zuletzt der Gerätetest. D
 4. **Mit iPhone und Mac prüfen:** Auf beiden Geräten den Passkey in der Kontoverwaltung einrichten, damit anmelden, eine
    Step-up-Aktion auslösen (Passkey genügt) und den Passkey wieder entfernen. Danach als Inhaber bei einem synthetischen
    Testbenutzer «Zugang zurücksetzen» mit der Option «Passkeys löschen» ausführen und prüfen, dass der Benutzer nur noch
-   mit Passwort und TOTP hereinkommt. Im Ereignisprotokoll des Realms sollte `REMOVE_CREDENTIAL` stehen (nicht belegt, beim
-   ersten Lauf beobachten). Die Wortlaute der App-Anleitung erst nach erfolgreicher Prüfung auf beiden Geräten als belegt
-   markieren.
+   mit Passwort und TOTP hereinkommt. Im Ereignisprotokoll des Realms sollte `REMOVE_CREDENTIAL` stehen (belegt am 25.11.2026, siehe «Ereignis-Probe»; Prüfung mit `ereignisse-auflisten-vorlage.sh --typ REMOVE_CREDENTIAL`, Exit 3 = nichts gefunden, siehe Punkt 1). Geprüft am 25.11.2026 auf iPhone und Mac (Fabian).
 5. **Rückfall prüfen:** Ein Benutzer ohne Passkey meldet sich weiter mit Passwort und TOTP an; auch mit eingerichtetem Passkey
    bleibt TOTP für die Passwortanmeldung verlangt.
 
 | Prüfung | iPhone | Mac |
 | --- | --- | --- |
-| Passkey einrichten und damit anmelden | offen | offen |
-| Step-up mit Passkey | offen | offen |
-| Passkey entfernen | offen | offen |
-| Passwort- und TOTP-Rückfall | offen | offen |
+| Passkey einrichten und damit anmelden | ok (Fabian, 25.11.2026) | ok (Fabian, 25.11.2026) |
+| Step-up mit Passkey | ok (Fabian, 25.11.2026) | ok (Fabian, 25.11.2026) |
+| Passkey entfernen | ok (Fabian, 25.11.2026) | ok (Fabian, 25.11.2026) |
+| Passwort- und TOTP-Rückfall | ok (Fabian, 25.11.2026) | ok (Fabian, 25.11.2026) |
+
+## Ereignis-Probe (Req 10.7): belegt am 25.11.2026
+Auf der VPS mit `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL --typ REMOVE_CREDENTIAL` im Realm `urinet-archiv` geprüft (Exit 0).
+Alle Ereignisse betreffen eine Benutzerkennung und den Client `account-console` (Zeiten UTC):
+
+| Zeit | Typ | Vorgang |
+| --- | --- | --- |
+| 13:12:00Z | `UPDATE_CREDENTIAL` | erste Einrichtung eines Passkeys |
+| 16:01:23Z | `REMOVE_CREDENTIAL` | Passkey in der Kontoverwaltung entfernt |
+| 16:03:09Z | `UPDATE_CREDENTIAL` | neuer Passkey eingerichtet |
+| 16:03:48Z | `UPDATE_CREDENTIAL` | zweiter neuer Passkey eingerichtet |
+
+Summen: `UPDATE_CREDENTIAL` 3, `REMOVE_CREDENTIAL` 1. Damit ist Req 10.7 (Einrichten und Entfernen eines Passkeys wird protokolliert) auf Stufe A belegt.
 
 ## Domainwechsel
 Passkeys sind an die Relying-Party-ID gebunden. Nach einem Wechsel der Domain gelten bestehende Passkeys nicht mehr. Rückfall ist
 Passwort plus TOTP; die Benutzer richten die Passkeys für die neue ID neu ein. Die Anleitung in der App nennt das ebenfalls.
 
 ## Entscheide für Fabian
-- Ein Link zur Kontoverwaltung in der App fehlt; die Anleitung verweist auf die Person, die den Zugang eingerichtet hat.
+- ~~Ein Link zur Kontoverwaltung in der App fehlt; die Anleitung verweist auf die Person, die den Zugang eingerichtet hat.~~
+  **Erledigt am 25.11.2026 (Aufgabe 24.4):** Die Kopfzeile der App zeigt jedem angemeldeten Benutzer «Passkey einrichten»; der Link öffnet
+  `<Keycloak-Aussteller>/account` in einem neuen Tab, die Adresse stammt aus der OIDC-Konfiguration der App. Die Anleitung nennt den Knopf.
 - Keycloak-Ereignisse zum Einrichten und Entfernen eines Passkeys (Requirement 10.7) sind im Realm nicht aktiviert; sie würden
   `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` in `enabledEventTypes` brauchen und einen weiteren Realm-Eingriff auf Stufe A.
   Die Vorlage kann das (Option `--ereignisse`, ergänzt nur die beiden Typen), tut es aber nie von selbst.

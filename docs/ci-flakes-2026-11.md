@@ -56,5 +56,64 @@ Belege:
 ## Einordnung
 
 Die Logs belegen die genannten Fehlerbilder, aber nicht deren weitergehende
-Ursachen oder eine Wiederholbarkeit. Es wurden keine Stabilisierungspatches
-vorgenommen.
+Ursachen oder eine Wiederholbarkeit. Die folgenden Nachträge halten belegte
+Fixes fest und trennen sie von weiterhin ungeklärten historischen Timeouts.
+
+## Nachtrag 25.11.2026: Offline-Erfassung
+
+Im Lauf [45556027064](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45556027064)
+scheiterte das Szenario «Offline und ohne Anmeldung erfassen; die Aufnahmen
+bleiben auf dem Gerät» im Schritt «das Handy offline ist» am
+`page.waitForLoadState('networkidle')`. Das Log belegt den abgelaufenen Wait,
+nicht, welche Anfrage das Netzwerk aktiv hielt.
+
+Das Installations-Given lädt bereits alle App-Dateien in den Service-Worker-Cache
+und prüft nach nötigen Reloads, dass der Service Worker die Seite kontrolliert.
+Für dieses Szenario ersetzt deshalb ein eigener Schritt den zusätzlichen
+`networkidle`-Wait durch die Prüfung dieses Controllers. Nach dem Offline-Schalten
+wartet er zudem auf den Offline-Hinweis der App, bevor die Seite erneut geöffnet
+wird. Die anderen Erfassungsszenarien behalten ihren bisherigen Wait. Am
+Produktcode ändert sich nichts.
+
+Bei der Kalibrierung scheiterte lokal ein Durchlauf danach noch beim Link-Klick
+«Ohne Verbindung erfassen». Das belegt einen fehlenden Synchronisationspunkt,
+nicht die tiefergehende Ursache. Mit dem zusätzlichen Wait auf den Offline-Hinweis
+lief das Szenario zehnmal hintereinander erfolgreich.
+
+Nachweis: Frontend-Build und App-Build für den Browser-Test waren erfolgreich.
+Die Wiederholungen belegen die Stabilität dieses Testpfads, nicht die Ursache der
+ursprünglichen Netzaktivität.
+
+## Weitere Nachträge (25.11.2026)
+
+- **Hilfe-Leiste, PR #633:** Der frühere Timeout beim Klick auf «Mit Passkey
+  anmelden» ist im Log von [45439238870](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45439238870)
+  als fehlender sichtbarer Navigationslink nach 10 Sekunden belegt; das Log
+  erklärt nicht, weshalb der Link unsichtbar war. Davon getrennt liess sich
+  lokal ein Strict-Mode-Fehler reproduzieren: Der bisherige Überschriften-
+  Locator traf sowohl die Abschnittsüberschrift `h3` als auch eine gleich
+  benannte Markdown-Überschrift im Artikel. PR #633 grenzt den Locator auf
+  `.hilfe-abschnitt h3` ein. `@req-8.1` bestand lokal zehnmal, vor und nach
+  dem Abgleich mit `origin/main`; `@req-8.3` bestand je einmal. Das belegt
+  den Locator-Fix, aber nicht die Ursache des historischen Klick-Timeouts.
+  Der vollständige CI-Lauf
+  [45634770924](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45634770924)
+  bestand einschliesslich Browser-Szenarien und Gitleaks.
+- **PWA-Installation und Versionswechsel:** Der Log von
+  [45463659941](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45463659941)
+  belegt einen während der Navigation zerstörten Playwright-Ausführungskontext.
+  Die Installations-Timeouts zeigen nicht, ob Service Worker, Manifest oder
+  Cache-Bedingung ausblieb. Für diese Fehlerbilder ist keine Ursache
+  nachgewiesen; PR #633 ändert sie nicht.
+- **Virtueller Passkey:** Lauf
+  [45625316316](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45625316316)
+  wartete beim Einrichten 30 Sekunden erfolglos auf den sichtbaren virtuellen
+  Passkey. PR #631 verlängert genau diese Locator-Frist auf 60 Sekunden. Das
+  betroffene Szenario bestand zehnmal lokal; der vollständige CI-Lauf
+  [45629899185](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45629899185)
+  einschliesslich Browser-Szenarien und Gitleaks bestand.
+- **Jüngere Fehlerlogs:** In Lauf 45575435751 fand sich kein Eintrag zu
+  `hilfe-offline.feature`; Lauf 45585871929 scheiterte an einer ungültigen
+  Anforderungsreferenz in `ci.feature`, Lauf 45589578420 erneut am virtuellen
+  Passkey. Diese Läufe belegen keine neue Ursache für den historischen
+  Hilfe-Leisten-Klick- oder Installations-Timeout.

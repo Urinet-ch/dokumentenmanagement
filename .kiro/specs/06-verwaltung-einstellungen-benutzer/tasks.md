@@ -246,6 +246,8 @@ auf Server oder Secrets aus der Sitzung.
     TOTP); `fabian` bleibt Inhaber; Anmeldungen vor und nach dem Lauf prüfen; Ergebnis in `docs/abnahme/verwaltung.md`.
   - Vorbereitung: `docs/benutzer-migration-entwurf.md` und `tools/benutzer-migration-entwurf.py` sind ein Entwurf;
     bei bestehenden Inhabern ist `ROLLE_OHNE_VORGANG` vor 21.2a zu erwarten. Ausführung, Freigabe und Abnahme bleiben bei Fabian.
+  - Ergänzende Vorbereitung: synthetischer Offline-Migrationsplan mit Konfliktprüfung, `docs/betrieb/benutzer-migration.md`;
+    kein Keycloak-Abgleich und kein Betriebsnachweis.
   - _Anforderungen: 9.4_
   - _Abhängig von: 21.1, 21.2a, 19.3_
 
@@ -278,6 +280,7 @@ auf Server oder Secrets aus der Sitzung.
   - Nachweis 24.11.2026: Normalweg und Notweg sind in README und Anleitung gegen den Stand auf `main` geprüft; die
     Alarmhinweise und Rotationswege stehen in `docs/alarme.md` und `docs/geheimnisse-rotieren.md`. Die Notfallunterlagen
     enthalten nur Platzhalter für die geschützte Verwahrung. Ausführung und Betriebsbestätigung der Rotation bleiben 19.3/21.6.
+  - Nachtrag 26.11.2026: `anleitung-verwaltung.md`, `geheimnisse-rotieren.md` und `notfall/notfallunterlagen.md` unterscheiden nun den auf Stufe A belegten Erstaufbau der drei Secrets vom weiterhin offenen Rotations- und Offline-Verwahrungsnachweis. Passkey-Realm und Ereignis-Probe sind als eingerichtet/belegt verlinkt; Zugangsdaten und Betriebsadressen stehen nicht im Repo.
 
 - [ ] 21.6 Abnahme Verwaltung [Fabian]
   - `docs/abnahme/verwaltung.md` nur mit Nummern und Ergebnissen: Szenarien und Tests grün; manuell: Einladung mit echtem
@@ -297,11 +300,11 @@ auf Server oder Secrets aus der Sitzung.
 - [x] 24.2 Admin: Passkeys zurücksetzen und Anzeige [Backend] [Frontend]
   - Adapter liest die Zahl der Passkeys und löscht sie (nur Typ `webauthn-passwordless`); «Zugang zurücksetzen» mit Option «Passkeys»;
     Anzeige «Passkey eingerichtet: ja/nein, Anzahl» und Filter; Protokoll ohne Gerätedaten; Szenarien und Tests.
-  - Req 10.7 nur teilweise erfüllt: Die Keycloak-Ereignisse `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` für
-    Einrichten und Entfernen in der Kontoverwaltung sind nicht aktiv; Entscheid zur Aktivierung bei Fabian.
+  - Req 10.7: Die Keycloak-Ereignisse `UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` für Einrichten und Entfernen in der
+    Kontoverwaltung sind aktiviert (Entscheid Fabian 25.11.2026) und auf Stufe A belegt (siehe 24.3, Nachweis Ereignis-Probe).
   - _Anforderungen: 10.5, 10.6, 10.7_
   - _Abhängig von: 24.1, 19.8, 20.7_
-- [ ] 24.3 Anleitung und Inbetriebnahme [Fabian]
+- [x] 24.3 Anleitung und Inbetriebnahme [Fabian]
   - Anleitung (Spec 07, `frontend/public/anleitung/`) um «Mit Passkey anmelden» ergänzen; auf Stufe A Realm einmalig aktualisieren, Relying-Party-ID
     setzen und mit iPhone und Mac prüfen; Hinweis zum Domainwechsel.
   - _Anforderungen: 10.1, 10.2, 10.8_
@@ -310,3 +313,21 @@ auf Server oder Secrets aus der Sitzung.
     kopierbare Betriebsanleitung liegen vor (design.md, «Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)»); Ausführung auf Stufe A,
     Related Origins und Gerätetest stehen aus. Req 10.7 (Entscheid Fabian 25.11.2026): Die Ereignisse werden aktiviert, der
     Standardaufruf der Vorlage auf der VPS enthält `--ereignisse` (nur Vermerk, Requirements unverändert).
+  - Nachweis 25.11.2026 (Fabian): Realm auf Stufe A eingerichtet; Rückfall, Related Origins, Passkey einrichten/anmelden/Step-up/entfernen
+    (iPhone und Mac), «Passkeys löschen» und TOTP-Pflicht bei Passwortanmeldung bestätigt (design.md, «Umsetzung (Aufgabe 24.3
+    Inbetriebnahme, 25.11.2026)»). Ereignisprotokoll-Probe `UPDATE_CREDENTIAL`/`REMOVE_CREDENTIAL`: später belegt (Nachweis Ereignis-Probe unten).
+  - Abgenommen von Fabian am 25.11.2026; Ereignisprotokoll-Probe (UPDATE_CREDENTIAL/REMOVE_CREDENTIAL) danach belegt (siehe unten).
+  - Hilfsskript Ereignis-Probe 25.11.2026: `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet `UPDATE_CREDENTIAL`
+    und `REMOVE_CREDENTIAL` ohne Admin-Konsole (design.md, «Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)»). Abnahme von 24.3 erfolgt;
+    Aufgabe bleibt abgehakt.
+  - Nachweis Ereignis-Probe 25.11.2026 (Fabian, VPS, Stufe A): `ereignisse-auflisten-vorlage.sh --typ UPDATE_CREDENTIAL --typ REMOVE_CREDENTIAL`, Exit 0; `UPDATE_CREDENTIAL` 3,
+    `REMOVE_CREDENTIAL` 1 (Client `account-console`, eine Benutzerkennung). Req 10.7 auf Stufe A belegt (design.md, «Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)»).
+- [x] 24.4 Einstieg zur Kontoverwaltung (Passkey) [Frontend]
+  - Die Kopfzeile zeigt jedem angemeldeten Benutzer «Passkey einrichten» (Schlüssel-Symbol, daneben «Hilfe»); der Link öffnet die
+    Kontoverwaltung des Realms (`<Aussteller>/account`, Aussteller aus der OIDC-Konfiguration der App) in einem neuen Tab
+    (`target="_blank" rel="noopener noreferrer"`). Die WebAuthn-Registrierung selbst bleibt in Keycloak. Anleitung
+    («Mit Passkey anmelden», «Erste Schritte») und Inbetriebnahme-Checkliste nachgezogen.
+  - Nachweis 25.11.2026: Komponententests (`app.spec.ts`, `kontoverwaltung.spec.ts`), Szenario `@req-10.1` in
+    `passkey-einstieg-pwa.feature` (Browser: Knopf sichtbar, öffnet die Kontoverwaltung in neuem Tab, Seite bleibt, axe), `npm run pruefe:gestaltung`.
+  - _Anforderungen: 10.1_
+  - _Abhängig von: 24.1_

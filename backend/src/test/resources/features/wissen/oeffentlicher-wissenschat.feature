@@ -38,6 +38,7 @@ Funktionalität: Öffentlicher Wissenschat
     Und sind die Quellen des Chatbots leer
     Und enthält der Text des Chatbots nicht «Belegte synthetische Antwort.»
     Und hat das simulierte Sprachmodell keine Anfrage erhalten
+    Und speichert der Wissenschat das Schweigen ohne Beleg in genau eine inhaltsfreie Frage
     Und bleibt die öffentliche Wissensseite im anderen Mandanten unsichtbar
 
   @req-21.6 @req-21.8

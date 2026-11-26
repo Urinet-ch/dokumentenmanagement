@@ -43,8 +43,17 @@ Kontozugänge stehen weder hier noch im Repository. Verwahrung bzw. Bezug: `<…
 - Öffentlicher Manifest-Schlüssel: `<Verweis/Ablageort>`.
 - Geheimnisse der Benutzerverwaltung (Spec 06): `keycloak_verwaltung_secret` (Dienstkonto), `keycloak_smtp_passwort`,
   `namenssperre_salz` (nie ungeplant wechseln, siehe [Geheimnisse rotieren](../geheimnisse-rotieren.md)) und der Datenschlüssel
-  `archiv_data_key`: `<Verweis/Ablageort>`. Noch nicht durch den Betreiber bestätigt (19.3, 21.6).
+  `archiv_data_key`: `<Verweis/Ablageort>`. Die ersten drei Secrets sind auf Stufe A eingerichtet; der Verweis bezeichnet
+  ausschliesslich die geschützte Verwahrung, nicht die GitHub-Secrets oder das Deploy-Bundle. Diese Offline-Verwahrung ist
+  noch nicht durch den Betreiber bestätigt (21.6). Secret-Werte gehören nicht in dieses Dokument.
 - Probe-Schlüssel: **nicht aufnehmen**; er ist ersetzbar und sein privater Teil gehört nicht in diesen Satz (Req 16.12, 16.23).
+
+**Keycloak-Stand auf Stufe A (25.11.2026):** Der Passkey-Realm ist eingerichtet; die Ereignis-Probe für
+`UPDATE_CREDENTIAL` und `REMOVE_CREDENTIAL` ist belegt. Bei einer Wiederherstellung sind Realm und Datenbank gemäss
+[Wiederherstellungsanleitung](../wiederherstellung.md) wiederherzustellen. Die Vorlagen für Realm-Nachrüstung und die nur
+lesende Ereignis-Probe stehen unter [`deploy/infomaniak/keycloak/`](../../deploy/infomaniak/keycloak/); die Ablage der
+Hilfsdateien auf Stufe A ist `/opt/archiv-werkzeuge`. Das ersetzt weder die Bestätigung der versiegelten Secret-Verwahrung
+noch die noch offene Rotationsprobe.
 
 ## Jährliche Übung und Nachweis
 

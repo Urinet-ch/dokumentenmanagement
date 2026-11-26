@@ -585,6 +585,13 @@ ist `ROLLE_OHNE_VORGANG` zu erwarten; `UEBERNAHME` allein behebt den Befund nich
 zu lockern oder Keycloak zu ändern. Danach folgen Prüflauf und Schreiblauf. Nur synthetisch getestet; Ausführung
 und Abnahme bleiben bei Fabian, die Checkbox bleibt offen.
 
+### Umsetzung (Aufgabe 21.2 Vorbereitung, 26.11.2026)
+
+`tools/benutzer_migrationsplan.py` wertet eine ausschliesslich synthetische lokale Liste aus und meldet Mandanten-,
+Rollen- und Identitätskonflikte. Er führt keine Abgleiche oder Schreibvorgänge aus; die Eingabe ist keine Quelle für
+den Betriebszustand. Tests: `tools/test_benutzer_migrationsplan.py`. Anleitung und Abgrenzung:
+`docs/betrieb/benutzer-migration.md`. Der manuelle Nachweis nach Requirement 9.4 bleibt offen.
+
 ### Umsetzung (Aufgabe 21.2a, 24.11.2026)
 `archiv benutzer inhaber-uebernehmen <code> --benutzer <uuid> --wer <uuid> [--ausfuehren]` prüft standardmässig
 nur. Mit `--ausfuehren` dokumentiert es eine vorhandene Inhaberrolle unter der Mandantensperre mit Absicht und
@@ -1079,6 +1086,11 @@ Die Betreiberanleitung stimmt mit dem auf `main` verfügbaren normalen Verwaltun
 verweisen auf die passenden Nachweise, ohne tatsächliche Zugangsdaten oder Verwahrorte aufzunehmen. Ungeprüfte
 Rotationsdetails und die Befüllung der Notfallunterlagen bleiben als Betreiberaufgaben in 19.3 und 21.6 offen.
 
+Nachtrag 26.11.2026: Die drei Dokumente unterscheiden den auf Stufe A belegten Erstaufbau der Secrets und die eingerichtete
+Passkey-Realm samt Ereignis-Probe von der weiterhin offenen Secret-Rotation, Überlappungsdauer und bestätigten Offline-Verwahrung.
+Die Anleitung verlinkt auf die Keycloak-Vorlagen unter `deploy/infomaniak/keycloak/`; `/opt/archiv-werkzeuge` ist als Ablagepfad
+der Hilfsdateien festgehalten. Zugangsdaten, Hostnamen, IP-Adressen und Mail-Adressen bleiben ausserhalb des Repositorys.
+
 ## Umsetzung (Aufgabe 24.3 Vorlage, 25.11.2026)
 Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fabian]: Ausführung auf der VPS, Related Origins, Gerätetest).
 - **Vorlage:** `deploy/infomaniak/keycloak/passkey-einrichten-vorlage.sh` zieht die Änderungen von Aufgabe 24.1 aus `deploy/keycloak/realm-export.json`
@@ -1102,3 +1114,43 @@ Vorbereitung für die Inbetriebnahme auf Stufe A; Aufgabe 24.3 bleibt offen ([Fa
 - **Nachweis:** Stub-Test (`test/passkey-einrichten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2 mit dem Realm vor 24.1
   (`test/passkey-einrichten-keycloak-test.sh`, optional mit Browser-Prüfung per virtuellem Authenticator); Ergebnis im PR. Nicht belegt (beim ersten Lauf auf der VPS prüfen, Prüfzeilen im README): Ausführung auf der VPS, der
   `docker compose run`-Aufruf, Lesbarkeit der Secret-Datei für Benutzer 1000, Erreichbarkeit von `ghcr.io`.
+
+### Umsetzung (Aufgabe 24.3 Inbetriebnahme, 25.11.2026)
+
+Fabian hat die Passkey-Inbetriebnahme auf Stufe A ausgeführt (`passkey-einrichten-vorlage.sh --ereignisse`: Prüflauf Exit 10, Einrichten
+Exit 0 mit 18 Änderungen, Nachprüfung Exit 0, Wiederholung «nichts zu tun»). Auf iPhone und Mac bestätigt: Passwort-und-TOTP-Rückfall,
+Related Origins (`/.well-known/webauthn`: 200, JSON, richtige Origin, keine Weiterleitung), Passkey einrichten, anmelden, Step-up und
+entfernen, «Zugang zurücksetzen» mit «Passkeys löschen» sowie TOTP bei Passwortanmeldung trotz Passkey. Auf der VPS damit belegt:
+Ausführung, `docker compose run`-Aufruf, Secret-Lesbarkeit für Benutzer 1000, `ghcr.io`, `jq` im Container; die Werkzeuge liegen in
+`/opt/archiv-werkzeuge` (als root ist `$HOME` für Benutzer 1000 nicht durchsuchbar). Die Probe `UPDATE_CREDENTIAL` und
+`REMOVE_CREDENTIAL` im Ereignisprotokoll ist ebenfalls belegt (siehe «Ereignis-Probe», «Beleg»); Req 10.7 ist auf Stufe A belegt.
+
+## Umsetzung (Aufgabe 24.3 Ereignis-Probe, 25.11.2026)
+Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabian, 25.11.2026, siehe «Inbetriebnahme»); die Probe der Ereignisse ist am 25.11.2026 auf der VPS belegt (siehe «Beleg»).
+- **Skript:** `deploy/infomaniak/keycloak/ereignisse-auflisten-vorlage.sh` listet im Wegwerf-Container (Muster wie `passkey-einrichten-vorlage.sh`,
+  Anmeldung über `vorlage-ausfuehren.sh`) die Benutzerereignisse des Realms `urinet-archiv` per `kcadm.sh get events`. Die Admin-Konsole ist über
+  Traefik nicht öffentlich. Parameter `--typ` (mehrfach, Standard `UPDATE_CREDENTIAL,REMOVE_CREDENTIAL`), `--max` (Standard 20, höchstens 200), `--seit` (Tage, Standard 1).
+- **Datensparsam (Req 9):** Ausgabe nur Zeit (UTC), Typ, `userId` (UUID) und Client, dazu je Typ eine Summenzeile; nie Benutzername, E-Mail, IP-Adresse
+  oder Details. Rein lesend (nur `get`). Exit 0 = Ereignis gefunden, 3 = keines, 1 = Fehler, auch bei ausgeschalteten Ereignissen oder nicht aktiviertem Typ.
+- **Nachweis:** Stub-Test (`test/ereignisse-auflisten-vorlage-test.sh`) und Echt-Test gegen ein Wegwerf-Keycloak 26.8.2
+  (`test/ereignisse-auflisten-keycloak-test.sh`, mit virtuellem Authenticator ein echtes `UPDATE_CREDENTIAL`). Anleitung: README, «Passkey-Ereignisse auflisten». Keine Änderung der Requirements.
+- **Beleg (25.11.2026, Stufe A):** Lauf auf der VPS mit `--typ UPDATE_CREDENTIAL --typ REMOVE_CREDENTIAL` im Realm `urinet-archiv`, Exit 0. Ergebnis (eine Benutzerkennung,
+  Client `account-console`, Zeiten UTC): 13:12:00Z `UPDATE_CREDENTIAL` (erste Einrichtung), 16:01:23Z `REMOVE_CREDENTIAL` (Entfernen in der Kontoverwaltung), 16:03:09Z und
+  16:03:48Z `UPDATE_CREDENTIAL` (zwei neue Passkeys); Summen `UPDATE_CREDENTIAL` 3, `REMOVE_CREDENTIAL` 1. Damit ist Req 10.7 auf Stufe A belegt, auch `REMOVE_CREDENTIAL`
+  im Echtbetrieb. Keine Benutzerkennung in den Dateien.
+
+## Umsetzung (Aufgabe 24.4 Link zur Kontoverwaltung, 25.11.2026)
+- **Ziel (Req 10.1):** Ein angemeldeter Benutzer findet den Einstieg zur Passkey-Einrichtung, ohne die Keycloak-Adresse zu kennen. Die
+  WebAuthn-Registrierung bleibt in der Kontoverwaltung von Keycloak (`webauthn-register-passwordless`); die App baut sie nicht nach.
+- **Stelle:** Kopfzeile der App (`app.html`), links neben dem Benutzer, nach «Hilfe». Sie ist auf jeder Seite sichtbar (auch in «Erfassen»,
+  wo der Link wegen `target="_blank"` nie navigiert und keine Aufnahme verliert) und braucht keinen neuen Hauptmenüpunkt. Bausteine nach
+  `docs/oberflaeche/README.md`: `.knopf` mit Symbol `schluessel`, auf breiten Bildschirmen mit Text, unter 600 px nur das Symbol (Name für
+  Screenreader bleibt). Keine Farbe ausserhalb der Tokens, kein Hinweis oder Banner (freiwillig, kein Aufdrängen).
+- **Adresse:** `kontoverwaltungUrl()` (`gemeinsam/anmeldung/kontoverwaltung.ts`) leitet `<Aussteller>/account` aus `UMGEBUNG.oidc.aussteller`
+  ab, derselben Konfiguration, die die Anmeldung nutzt; kein neuer Betriebswert, kein Eintrag im Repo ausser dem bestehenden Aussteller.
+- **Link:** `<a target="_blank" rel="noopener noreferrer">`; zugänglicher Name «Passkey einrichten (öffnet die Kontoverwaltung in einem
+  neuen Tab)» beginnt mit dem sichtbaren Text. Sichtbar nur bei `anmeldung.angemeldet()`, für alle Rollen, ohne Anzeige von Gerätedaten.
+- **Anleitung:** `erste-schritte-passkey.md` und `erste-schritte.md` nennen den Knopf statt «die Person, die Ihren Zugang eingerichtet hat».
+- **Nachweis:** Komponententests (`app.spec.ts`, `kontoverwaltung.spec.ts`); Browser-Szenario `@req-10.1` in
+  `features/verwaltung/passkey-einstieg-pwa.feature` (mit Attrappe, ohne echtes Keycloak: Knopf sichtbar, neuer Tab zeigt die Kontoverwaltung,
+  die App-Seite bleibt, ohne Überlauf und axe-Befund bei 375/1280 px, hell/dunkel).
