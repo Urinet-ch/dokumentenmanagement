@@ -17,8 +17,11 @@ import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
 import ch.urinet.archiv.kontakt.application.KontaktSeite;
 import ch.urinet.archiv.kontakt.application.KontaktSuche;
 import ch.urinet.archiv.kontakt.application.KontaktVerwaltung;
+import ch.urinet.archiv.kontakt.application.KontaktVerweise;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
+import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
@@ -49,6 +52,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.restassured.RestAssured.given;
@@ -269,6 +273,90 @@ class FehlerInjektionTest {
             for (String token : tokens) assertThat(log.volltext()).doesNotContain(token);
         } finally {
             QuarkusMock.installMockForType(original, DokumentLesen.class);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Ausfall.class)
+    void kontaktBearbeitungBeiAusfallOhneInhaltUndStacktrace(Ausfall ausfall) throws Exception {
+        record Probe(String mandant, String token, UUID id, String etag) { }
+        List<Probe> proben = new ArrayList<>();
+        String neuerKontakt = "{\"typ\":\"PERSON\",\"name\":\"" + MARKER + "\"}";
+        try {
+            for (String mandant : List.of("urinet", "vhf-gsk")) {
+                String token = Testanmeldung.token("inhaber-" + mandant);
+                var erstellt = given().auth().oauth2(token).contentType("application/json").body(neuerKontakt)
+                        .when().post("/api/v1/kontakte");
+                assertThat(erstellt.statusCode()).isEqualTo(201);
+                UUID id = UUID.fromString(erstellt.jsonPath().getString("id"));
+                proben.add(new Probe(mandant, token, id, erstellt.header("ETag")));
+                String pfad = "/api/v1/kontakte/" + id;
+                given().auth().oauth2(token).when().get(pfad).then().statusCode(200);
+                given().auth().oauth2(token).when().get(pfad + "/verweise").then().statusCode(200);
+                var geaendert = given().auth().oauth2(token).header("If-Match", erstellt.header("ETag"))
+                        .contentType("application/json").body("{\"vorname\":\"Probe\"}")
+                        .when().patch(pfad);
+                assertThat(geaendert.statusCode()).isEqualTo(200);
+                proben.set(proben.size() - 1, new Probe(mandant, token, id, geaendert.header("ETag")));
+            }
+            KontaktVerwaltung original = ClientProxy.unwrap(kontaktVerwaltung);
+            AtomicInteger getroffen = new AtomicInteger();
+            QuarkusMock.installMockForType(new KontaktVerwaltung(null, null, null, null) {
+                @Override
+                public Detail detail(UUID id) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+
+                @Override
+                public KontaktVerweise.Zahlen verweise(UUID id) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+
+                @Override
+                public Kontakt anlegen(KontaktAngaben angaben) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+
+                @Override
+                public Kontakt aendern(UUID id, int version, KontaktAngaben angaben) {
+                    getroffen.incrementAndGet();
+                    throw fehler(ausfall);
+                }
+            }, KontaktVerwaltung.class);
+            try (LogMitschnitt log = LogMitschnitt.starten()) {
+                for (Probe probe : proben) {
+                    String pfad = "/api/v1/kontakte/" + probe.id();
+                    var detail = given().auth().oauth2(probe.token()).when().get(pfad);
+                    var verweise = given().auth().oauth2(probe.token()).when().get(pfad + "/verweise");
+                    var anlegen = given().auth().oauth2(probe.token()).contentType("application/json")
+                            .body(neuerKontakt).when().post("/api/v1/kontakte");
+                    var aendern = given().auth().oauth2(probe.token()).header("If-Match", probe.etag())
+                            .contentType("application/json").body("{\"vorname\":\"" + MARKER + "\"}")
+                            .when().patch(pfad);
+                    for (var antwort : List.of(detail, verweise, anlegen, aendern)) {
+                        assertThat(ProblemDetails.pruefen(antwort, 500)).isEqualTo("INTERNER_FEHLER");
+                        assertThat(antwort.asString())
+                                .doesNotContain(MARKER, probe.token(), "Exception", "\tat ", "Caused by:");
+                    }
+                }
+                assertThat(getroffen).hasValue(8);
+                assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+                for (Probe probe : proben) assertThat(log.volltext()).doesNotContain(probe.token());
+            } finally {
+                QuarkusMock.installMockForType(original, KontaktVerwaltung.class);
+            }
+        } finally {
+            for (Probe probe : proben) {
+                try (Connection c = datenbank.getConnection();
+                     PreparedStatement s = c.prepareStatement("delete from "
+                             + new MandantCode(probe.mandant()).schema() + ".kontakt where id = ?")) {
+                    s.setObject(1, probe.id());
+                    s.executeUpdate();
+                }
+            }
         }
     }
 
