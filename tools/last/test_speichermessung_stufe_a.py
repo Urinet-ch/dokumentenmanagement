@@ -24,11 +24,11 @@ def docker_antwort(argumente, **_kwargs):
     kennung = argumente[-1]
     dienst = IDS.index(kennung)
     if argumente[1] == "inspect":
-        limits = [(400, 300000000), (350, 250000000), (250, 200000000)]
+        limits = [(1024, 600000000), (768, 500000000), (256, 400000000)]
         mib, nano = limits[dienst]
         ausgabe = f"archiv {('api', 'kc', 'db')[dienst]} {mib * 1024 ** 2} {nano} 0 0"
     else:
-        ausgabe = ["100MiB / 400MiB", "0.2GiB / 350MiB", "10MB / 250MiB"][dienst]
+        ausgabe = ["100MiB / 1024MiB", "0.2GiB / 768MiB", "10MB / 256MiB"][dienst]
     return subprocess.CompletedProcess(argumente, 0, stdout=ausgabe, stderr="")
 
 
@@ -52,9 +52,11 @@ class SpeichermessungTest(unittest.TestCase):
         self.assertEqual(auswertung.abbruch(ergebnis, "unbekannt", "ok"), "ungeklaert")
         self.assertEqual(auswertung.abbruch(ergebnis, "ja", "ok"), "abbruch")
         self.assertEqual(auswertung.abbruch(ergebnis, "nein", "fehler"), "abbruch")
-        ergebnis["limits"][1] = (400 * 1024 ** 2 + 1, auswertung.Decimal("0.3"))
+        ergebnis["limits"][1] = (1024 * 1024 ** 2 - 1, auswertung.Decimal("0.599999999"))
+        self.assertEqual(auswertung.abbruch(ergebnis, "nein", "ok"), "kein-abbruch")
+        ergebnis["limits"][1] = (1024 * 1024 ** 2 + 1, auswertung.Decimal("0.6"))
         self.assertEqual(auswertung.abbruch(ergebnis, "nein", "ok"), "abbruch")
-        ergebnis["limits"][1] = (400 * 1024 ** 2, auswertung.Decimal("0.300001"))
+        ergebnis["limits"][1] = (1024 * 1024 ** 2, auswertung.Decimal("0.600000001"))
         self.assertEqual(auswertung.abbruch(ergebnis, "nein", "ok"), "abbruch")
 
     def test_unvollstaendige_und_veraenderte_messung_abgelehnt(self):
@@ -115,7 +117,7 @@ class SpeichermessungTest(unittest.TestCase):
             with patch.object(sys, "argv", args), redirect_stdout(ausgabe):
                 self.assertEqual(auswertung.main(), erwartet)
             self.assertEqual(ausgabe.getvalue().count("| ocr |"), 4)
-            self.assertIn("Limit-Summe: 1000.0 MiB; CPU-Summe: 0.75.", ausgabe.getvalue())
+            self.assertIn("Limit-Summe: 2048.0 MiB; CPU-Summe: 1.5.", ausgabe.getvalue())
 
 
 if __name__ == "__main__":

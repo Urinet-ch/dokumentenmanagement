@@ -4,16 +4,18 @@ Dieses Werkzeug ist keine Messung und kein Abnahmenachweis. Ausführung,
 Beurteilung und Nachweis nach Aufgabe 1.10 und Req 16.18 bleiben bei Fabian.
 Nur synthetische Belege im isolierten Messumfeld verwenden; keine produktiven
 Daten, Zugangsdaten, Adressen oder Berichte in das Repository schreiben.
-Vor der Messung prüfen, ob sie nach dem früheren Abbruch überhaupt freigegeben
-ist. Die Werkzeuge starten, stoppen oder verändern keine Archiv-Dienste.
+Fabian hat am 27.11.2026 eine erneute Messung nach dem früheren Abbruch
+freigegeben; er führt sie selbst aus. Die Werkzeuge starten, stoppen oder
+verändern keine Archiv-Dienste.
 
 ## Budget und Abbruch
 
-Aufgabe 1.10 und Req 16.18 nennen 1000 MiB und 0.75 CPU als Grenzen; die
-spätere Steering-Angabe vom 23.11.2026 nennt 2048 MiB und 1.5 CPU. Das
-Werkzeug prüft vorsorglich die engeren Spec-Grenzen, **ohne** die abweichenden
-Angaben aufzulösen oder eine Freigabe abzuleiten. Bei Überschreitung der engeren
-Grenze nicht mit der Messung beginnen; die Auslegung muss geklärt werden.
+Fabian bestätigte am 27.11.2026 das Budget nach der Erweiterung vom 23.11.2026:
+Summe der `mem_limit` höchstens 2048 MiB und der `cpus` höchstens 1.5. Das
+Werkzeug prüft diese Grenzen. Die älteren Angaben von 1000 MiB und 0.75 CPU in
+Aufgabe 1.10 und Req 16.18 sind diesbezüglich überholt; der Nachzug des
+Requirement-Texts erfolgt separat. Bei Überschreitung nicht mit weiterer Last
+beginnen.
 
 Nach Req 16.18 ist auch ein speicherbedingter Abbruch eines Containers auf dem
 Host oder der Health-Ausfall einer anderen App ein Abbruchgrund. Ein durch

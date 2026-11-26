@@ -88,8 +88,8 @@ def auswerten(pfade: list[Path], vorpruefung: bool = False) -> dict:
 
 def abbruch(ergebnis: dict, oom: str, health: str) -> str:
     limits = ergebnis["limits"].values()
-    if (sum(limit for limit, _ in limits) > 1000 * MIB
-            or sum(cpu for _, cpu in limits) > Decimal("0.75")
+    if (sum(limit for limit, _ in limits) > 2048 * MIB
+            or sum(cpu for _, cpu in limits) > Decimal("1.5")
             or oom == "ja" or health == "fehler"):
         return "abbruch"
     if oom == "unbekannt" or health == "unbekannt":

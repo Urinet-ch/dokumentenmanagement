@@ -150,7 +150,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - **Abbruchkriterium:** Das Archiv braucht mehr als das Budget (Summe `mem_limit` > 1000 MiB (geändert 13.11.2026, Entscheid Fabian; bisher 900 MiB) oder `cpus` > 0.75), ein Container auf der VPS wird wegen Speichermangel beendet, oder die Health einer anderen App fällt während der Messung aus → Archiv-Dienste auf Stufe A stoppen, Fabian informieren, K5 (4.9) und Wechsel (5.11) vorziehen (16.18). Ein Speicherabbruch durch einen manuellen Eingriff (z. B. zweite JVM per `docker exec` wie am 12.11.2026) zählt nicht; er wird mit Datum im Messbericht festgehalten (vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #86)
   - Statischer Teilnachweis (PR #648): Compose- und Keycloak-Vorlagen mit synthetisch getesteter Prüfung ausgewertet; die drei veränderlichen Dienstimage-Tags sind als Digest-Befunde dokumentiert. Die Betriebs- und Messnachweise bleiben offen.
   - Nachtrag 26.11.2026: Die statische Prüfung erkennt Router-Middlewares auf einem fremden Dienst; die Grenzen des Image-Rollbacks sind dokumentiert. Der Messnachweis bleibt offen.
-  - Messvorbereitung 26.11.2026: Stichproben- und Auswertungswerkzeug mit synthetischen Tests sowie Anleitung liegen vor; die Budgetabweichung zu Steering ist offengelegt. Messung, Health- und OOM-Prüfung sowie Nachweis bleiben bei Fabian offen.
+  - Messvorbereitung 26.11.2026: Stichproben- und Auswertungswerkzeug mit synthetischen Tests sowie Anleitung liegen vor. Entscheid Fabian 27.11.2026: Budget 2048 MiB/1.5 CPU, erneute Messung freigegeben; der Nachzug der älteren Budgetangaben in Req 16.18 erfolgt separat. Messung, Health- und OOM-Prüfung sowie Nachweis bleiben bei Fabian offen.
   - _Anforderungen: 16.1, 16.10, 16.15, 16.18_
   - _Abhängig von: 0.7, 1.9_
 
