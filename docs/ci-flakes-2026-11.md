@@ -151,3 +151,10 @@ beiden betroffenen Pfade nicht deterministisch fehlschlagen. `hilfe-offline` kam
 in den fehlgeschlagenen Browser-Jobs dieser 15 Läufe nicht vor; es gibt dafür
 keinen neuen Fix-Nachweis. Die Wiederholungsfehler bleiben zur gezielten Diagnose
 offen, statt sie durch unbewiesene Wartezeiten oder Retry-Verhalten zu verdecken.
+
+Zusätzlicher Beleg aus den jüngsten PR-Läufen (nicht Teil der Main-Stichprobe):
+Im Lauf [45808466691](https://github.com/Urinet-ch/dokumentenmanagement/actions/runs/45808466691)
+zu PR #659 scheiterte dasselbe Passkey-Setup erneut nach 60 s beim sichtbaren
+Credential-Text; der After-Hook erhielt beim Löschen des Testbenutzers ebenfalls
+HTTP 401. 348 von 349 Szenarien bestanden. Das bestätigt die Wiederholung des
+Fehlerbilds, liefert aber weiterhin keine Ursache der fehlenden Bestätigung.
