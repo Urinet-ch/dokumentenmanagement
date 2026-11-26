@@ -2,7 +2,7 @@
 
 ## Umfang und Ergebnis
 
-Abgleich gegen `origin/main` bei `db667786f` (PR #695). In den sieben Taskdateien stehen 43 offene
+Abgleich gegen `origin/main` bei `83e53278e` (PR #702). In den sieben Taskdateien stehen 43 offene
 Checkboxen; Spec 05 und Spec 07 haben keine offenen Checkboxen. Keine Checkbox wurde geändert. Ein gemergter Teil-PR
 allein gilt nicht als Abschluss, wenn die Taskdatei noch Abnahme, Betrieb, Messung oder Folgearbeiten nennt.
 
@@ -51,7 +51,7 @@ erledigten Umsetzungen.
 | 10.5 | Importwerkzeug in #504; der PR ordnet weitere Req-4.2-Arbeit Spec 05 zu. Keine abgeschlossene Übernahme und Abnahme der Altbestände belegt. | Backend / Fabian |
 | 10.6 | Repo-Teile in #331 und #497; vollständiger Backup-Nachweis für Mandant 2 bleibt offen. | Infra |
 | 11.11 | #495 belegt Repo-Umsetzung und Tests; laut Taskdatei fehlen Messung der Startwerte am Livegang und deren Nachweis. | Backend; Messung beim Livegang |
-| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. HSTS #690, Korrektur #694, Ausgabeschutz #692 und App-Header #689 sind gemergt; authentisierter lokaler Scan #691 und Staging-Anleitung #697 sind offen. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
+| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. HSTS #690, Korrektur #694, Ausgabeschutz #692, App-Header #689, authentisierter lokaler Scan #691 und Staging-Anleitung #697 sind gemergt. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
 | 12.4 | Abnahme nicht belegt. | Fabian |
 
 ### Spec 04 – Wissensbasis (10)
@@ -64,7 +64,7 @@ erledigten Umsetzungen.
 | 18.3 | PR #576 ist gemergt; Plugin-Hinweis und vollständige Abnahme fehlen laut Taskdatei. | Backend / Frontend |
 | 19.4 | Abschnittsfehler, sichtbare Befunde und Wiederholung bleiben offen. | Backend / Frontend |
 | 19.5 | Tabellen-Gruppierung und Vertraulichkeitsvorschlag bleiben offen. | Backend |
-| 19.6 | Wiederholung und Auswertung des Test-Ingests; abhängig von 19.1–19.5. | QA / Fabian |
+| 19.6 | #702 ergänzt eine vorbereitende Checkliste; Wiederholung und Auswertung des Test-Ingests bleiben offen und hängen von 19.1–19.5 ab. | QA / Fabian |
 | O.4 | Keine Umsetzung belegt. | Backend |
 | O.5 | Laut Taskdatei in 15.6–15.8 übernommen; nicht doppelt umsetzen. | In den übernommenen Aufgaben nachverfolgen |
 | O.6 | Mit Entscheid vom 18.11.2026 ausdrücklich **entfallen**. | Kein Umsetzungsauftrag |
@@ -86,6 +86,6 @@ erledigten Umsetzungen.
 
 ## Grenzen des Abgleichs
 
-- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 ist Draft; #691, #697, #698 und #699 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
+- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 und #703 sind Draft; #699 und #704 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
 - Der Stand der Taskdateien und offenen PRs ist eine Momentaufnahme; die Checkboxen wurden nicht verändert.
 - Betriebsdetails und Zugangsdaten wurden nicht erhoben oder in diesen Bericht übernommen.
