@@ -341,7 +341,7 @@ Then('zeigt die Benutzerverwaltung Liste, Anträge und Rollen ohne Überlauf und
   await this.seite.locator('app-benutzer-liste summary').click();
   await this.seite.getByText('Nur eigene Dokumente').waitFor();
   for (const gruppe of ['Dokumente und Wissen lesen', 'Erfassen und verarbeiten', 'Prüfen und bestätigen', 'Verwalten']) {
-    await this.seite.getByRole('heading', { name: gruppe }).waitFor();
+    await this.seite.getByRole('table', { name: gruppe }).waitFor();
   }
   await this.seite.getByLabel('Benutzer suchen').focus();
   await this.seite.keyboard.press('Tab');
@@ -386,6 +386,34 @@ Then('zeigt das Benutzerdetail Status, Rechte und Token-Hinweis ohne Überlauf u
   await this.seite.getByText('API-Tokens und Webseiten-Schlüssel bleiben beim Sperren oder Deaktivieren gültig.').waitFor();
   await this.seite.getByRole('link', { name: 'API-Tokens verwalten' }).waitFor();
   await pruefen(this, 'detail');
+});
+
+Then('zeigt die Rechte-Übersicht Gruppentabellen mit Spalten, Ergebnissen und Fussnoten ohne Überlauf und axe-Befund', async function () {
+  const tabellen = this.seite.locator('app-benutzer-rechte table');
+  await tabellen.first().waitFor();
+  const struktur = await tabellen.evaluateAll((elemente) => elemente.map((tabelle) => ({
+    caption: tabelle.querySelector('caption')?.textContent?.trim(),
+    spalten: [...tabelle.querySelectorAll('thead th')].map((kopf) => ({
+      text: kopf.textContent?.trim(),
+      scope: kopf.getAttribute('scope'),
+    })),
+    zeilen: [...tabelle.querySelectorAll('tbody tr')].map((zeile) => ({
+      recht: zeile.querySelector('th[scope="row"]')?.textContent?.trim(),
+      ergebnis: zeile.querySelector('td')?.textContent?.trim(),
+      hinweis: zeile.querySelectorAll('td')[1]?.textContent?.trim(),
+    })),
+  })));
+  assert.ok(struktur.length > 0);
+  for (const tabelle of struktur) {
+    assert.ok(tabelle.caption);
+    assert.deepEqual(tabelle.spalten.map(({ text }) => text), ['Recht', 'Ergebnis', 'Hinweis']);
+    assert.deepEqual(tabelle.spalten.map(({ scope }) => scope), ['col', 'col', 'col']);
+    assert.ok(tabelle.zeilen.every(({ recht }) => recht));
+  }
+  const zeile = struktur.flatMap(({ zeilen }) => zeilen).find(({ recht }) => recht === 'Dokumente lesen');
+  assert.equal(zeile?.ergebnis, 'Nur eigene');
+  assert.equal(zeile?.hinweis, '1 Nur eigene Dokumente');
+  await pruefen(this, 'rechte-uebersicht');
 });
 
 Then('fehlt der Menüpunkt Benutzer und es wurde kein Benutzer abgefragt', async function () {

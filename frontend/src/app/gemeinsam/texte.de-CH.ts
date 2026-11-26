@@ -1978,6 +1978,11 @@ export const TEXTE = {
       NUR_LESEND: 'Nur lesend',
       NUR_SELBST_ERFASSTE: 'Nur selbst erfasste',
     } as Record<string, string>,
+    tabellenkoepfe: {
+      recht: 'Recht',
+      ergebnis: 'Ergebnis',
+      hinweis: 'Hinweis',
+    },
     gruppen: {
       lesen: 'Dokumente und Wissen lesen',
       erfassen: 'Erfassen und verarbeiten',
