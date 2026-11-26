@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { signal } from '@angular/core';
 import { HilfeLeisteAnsicht } from './hilfe-leiste';
+import { HilfeLeiste } from './hilfe-leiste.service';
 
 describe('Hilfe-Leiste, Inhaltsverzeichnis (Spec 07, Req 4.7)', () => {
   function leiste() {
@@ -38,5 +39,27 @@ describe('Hilfe-Leiste, Inhaltsverzeichnis (Spec 07, Req 4.7)', () => {
     fixture.detectChanges();
     expect(knopf.getAttribute('aria-expanded')).toBe('true');
     expect(el.querySelector<HTMLElement>('#hilfe-verzeichnis')!.hidden).toBe(false);
+  });
+
+  it('setzt beim erneuten Öffnen den Ausgangszustand passend zum aktuellen Abschnitt zurück', () => {
+    const fixture = leiste();
+    const hilfe = TestBed.inject(HilfeLeiste);
+    const el = fixture.nativeElement as HTMLElement;
+    const knopf = el.querySelector<HTMLButtonElement>('[data-test=hilfe-verzeichnis-knopf]')!;
+
+    hilfe.anker.set('erste-schritte');
+    hilfe.offen.set(true);
+    fixture.detectChanges();
+    expect(knopf.getAttribute('aria-expanded')).toBe('false');
+
+    knopf.click();
+    fixture.detectChanges();
+    expect(knopf.getAttribute('aria-expanded')).toBe('true');
+
+    hilfe.offen.set(false);
+    fixture.detectChanges();
+    hilfe.offen.set(true);
+    fixture.detectChanges();
+    expect(knopf.getAttribute('aria-expanded')).toBe('false');
   });
 });
