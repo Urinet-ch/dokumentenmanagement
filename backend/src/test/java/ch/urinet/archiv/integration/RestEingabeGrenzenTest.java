@@ -51,7 +51,10 @@ import java.util.regex.Pattern;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Die globale Body-Grenze muss für jede Operation mit Request-Body vor der REST-Ressource greifen. */
+/**
+ * Die globale Body-Grenze muss für jede Operation mit Request-Body vor der REST-Ressource greifen.
+ * Die Prüfung auf Eingaben und Stacktraces in Antwort und Log ergänzt den Nachweis zu {@code @req-16.7}.
+ */
 @QuarkusTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RestEingabeGrenzenTest {
@@ -81,7 +84,6 @@ class RestEingabeGrenzenTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String MARKER = "GRENZTEST-EINGABE-NICHT-ECHO-4711";
     private static final String TEST_DOKUMENTART = "GRENZTEST";
-    private static final int TEST_GRENZE = 1024 * 1024;
     private static final String MULTIPART = "multipart/form-data";
     private static final List<String> HTTP_METHODEN = List.of("get", "post", "put", "patch", "delete", "head");
 
@@ -128,7 +130,9 @@ class RestEingabeGrenzenTest {
     void jedeJsonOperationMitBodyLehntUeberlangeAnfrageOhneEchoOderStacktraceAb()
             throws IOException, InterruptedException {
         JsonNode openApi = JSON.readTree(OPENAPI.toFile());
-        Path body = sparseAnfrage(TEST_GRENZE + 1L);
+        long grenze = ConfigProvider.getConfig().getValue("archiv.http.max-anfrage", MemorySize.class)
+                .asLongValue();
+        Path body = sparseAnfrage(Math.addExact(grenze, 1));
         HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
         List<String> geprueft = new ArrayList<>();
 
