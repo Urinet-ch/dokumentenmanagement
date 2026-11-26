@@ -115,7 +115,9 @@ nichts daran, dass ein Snapshot nur mit passendem Manifestnachweis verwendet wer
 ## Status
 
 Die lokale synthetische Teilprobe steht unter `deploy/backup/restore-uebung-lokal.sh`. Sie prüft den
-Sicherungs-Shellablauf mit Attrappen sowie S3-Restore und Dateireferenzen mit lokalen Dev Services. Die
-Backend-Sperrprüfung ist implementiert. Eine vollständige manuelle Wiederherstellung einschliesslich
-Datenbank-Dumps und Keycloak-Realm in einer getrennten Testumgebung bleibt als Nachweis nach tasks.md 5.5 offen;
+Sicherungs-Shellablauf mit Attrappen sowie S3-Restore und Dateireferenzen mit lokalen Dev Services. Beim
+Datenbank-Restore vergleicht sie je Mandant die Zahlen für Wissensseiten, Versionen, Quelleneinträge und Dokumente mit
+dem vor der Sicherung erfassten Stand. Die Backend-Sperrprüfung ist implementiert. Eine vollständige manuelle
+Wiederherstellung einschliesslich Datenbank-Dumps und Keycloak-Realm in einer getrennten Testumgebung bleibt als
+Nachweis nach tasks.md 5.5 offen;
 die wiederkehrende Probe auf der VPS gehört zur Infra.
