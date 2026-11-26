@@ -47,7 +47,7 @@
       "rollen": {
         "inhaber": {"ergebnis": "erlaubt", "http": ["2XX"]},
         "mitarbeiter": {"ergebnis": "nur selbst erfasste", "http": ["2XX"]},
-        "treuhaender": {"ergebnis": "403", "http": ["403"]},
+        "treuhaender": {"ergebnis": "erlaubt (nur lesend)", "http": ["2XX"]},
         "geschaeftsstelle": {"ergebnis": "erlaubt", "http": ["2XX"]}
       }
     },
