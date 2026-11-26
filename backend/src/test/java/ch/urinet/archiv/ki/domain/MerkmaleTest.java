@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,6 +49,18 @@ class MerkmaleTest {
     void qrIbanZaehltAuchOhneText() {
         assertThat(Merkmale.erkennen("", Optional.of("CH4431999123000889012"), null, List.of(), List.of(),
                 OHNE_GRENZE).merkmale().ibans()).containsExactly("CH4431999123000889012");
+    }
+
+    @Test
+    void begrenztDieErkanntenMerkmaleJeTypAufZehn() {
+        String text = IntStream.rangeClosed(1, 11).mapToObj(n -> "person" + n + "@example.ch")
+                .collect(java.util.stream.Collectors.joining(" "));
+
+        assertThat(Merkmale.erkennen(text, Optional.empty(), null, List.of(), List.of(), OHNE_GRENZE)
+                .merkmale().emails())
+                .hasSize(Merkmale.MAX_JE_TYP)
+                .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, 10)
+                        .mapToObj(n -> "person" + n + "@example.ch").toList());
     }
 
     @Test

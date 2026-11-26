@@ -82,6 +82,15 @@ class WissensMarkdownTest {
     }
 
     @Test
+    void nichtSichtbareInterneLinksWerdenBeimDarstellenErsetzt() {
+        String html = WissensMarkdown.darstellen(
+                "[Sichtbar](/konzepte/arbeit) [Vertraulich](/konzepte/lohn)", java.util.Set.of("konzepte/arbeit"));
+
+        assertThat(html).contains("href=\"/wissen/konzepte/arbeit\"", "Seite nicht vorhanden")
+                .doesNotContain("Vertraulich", "href=\"/wissen/konzepte/lohn\"");
+    }
+
+    @Test
     void externeLinksBilderWikilinksUndHtmlWerdenErkanntUndSicherGerendert() {
         String markdown = "[extern](https://example.invalid) ![Bild](https://example.invalid/bild.png) "
                 + "<script>alert(1)</script> [[Wikiseite]]";
