@@ -1,5 +1,6 @@
 import { Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
+import { verzeichnisOeffnen } from '../hilfen/hilfe-verzeichnis.mjs';
 
 const dialog = (seite) => seite.getByRole('dialog', { name: 'Hilfe', exact: true });
 
@@ -32,9 +33,7 @@ When('ich die Hilfe-Leiste mit Escape schliesse', async function () {
 
 When(/^ich in der Hilfe-Leiste den Abschnitt «(.+)» wähle$/, async function (titel) {
   const leiste = dialog(this.seite);
-  const link = leiste
-    .getByRole('navigation', { name: 'Inhalt der Anleitung' })
-    .getByRole('link', { name: titel, exact: true });
+  const link = (await verzeichnisOeffnen(leiste)).getByRole('link', { name: titel, exact: true });
   await link.click();
   await this.seite.waitForFunction(
     (name) =>
@@ -81,7 +80,9 @@ Then(/^zeigt die Hilfe-Leiste den Abschnitt «(.+)»$/, async function (titel) {
 });
 
 Then(/^zeigt die Hilfe-Leiste ihr Inhaltsverzeichnis «(.+)»$/, async function (name) {
-  await dialog(this.seite).getByRole('navigation', { name, exact: true }).waitFor();
+  // Das Verzeichnis ist mit einem gewählten Abschnitt zugeklappt (Req 4.7): aufklappen, dann sichtbar prüfen.
+  await verzeichnisOeffnen(dialog(this.seite));
+  await dialog(this.seite).getByRole('navigation', { name, exact: true }).waitFor({ state: 'visible' });
 });
 
 Then('zeigt die Hilfe-Leiste keinen ausgewählten Abschnitt', async function () {
@@ -124,17 +125,33 @@ Then(/^ist die Hilfe-Leiste (\d+) Pixel breit$/, async function (breite) {
   assert.equal(Math.round(await leistenBreite(this.seite)), Number(breite));
 });
 
-Then(/^ist die Hilfe-Leiste höchstens (\d+) Pixel breit$/, async function (breite) {
+Then(/^ist die Hilfe-Leiste zwischen (\d+) und (\d+) Pixel breit$/, async function (von, bis) {
   await this.seite.waitForFunction(
-    (soll) => {
+    ([min, max]) => {
       const b = document.querySelector('#hilfe-leiste').getBoundingClientRect().width;
-      return b > 0 && b <= soll;
+      return b >= min && b <= max;
     },
-    Number(breite),
+    [Number(von), Number(bis)],
   );
 });
 
+Then('ist das Inhaltsverzeichnis der Hilfe-Leiste zugeklappt', async function () {
+  const knopf = dialog(this.seite).getByRole('button', { name: /^Abschnitte/ });
+  assert.equal(await knopf.getAttribute('aria-expanded'), 'false');
+  assert.equal(await dialog(this.seite).getByRole('navigation', { name: 'Inhalt der Anleitung' }).count(), 0);
+});
+
+When('ich das Inhaltsverzeichnis der Hilfe-Leiste aufklappe', async function () {
+  await verzeichnisOeffnen(dialog(this.seite));
+});
+
+Then('ist das Inhaltsverzeichnis der Hilfe-Leiste aufgeklappt', async function () {
+  const knopf = dialog(this.seite).getByRole('button', { name: /^Abschnitte/ });
+  assert.equal(await knopf.getAttribute('aria-expanded'), 'true');
+  await dialog(this.seite).getByRole('navigation', { name: 'Inhalt der Anleitung' }).waitFor({ state: 'visible' });
+});
+
 Then(/^enthält das Inhaltsverzeichnis der Hilfe-Leiste den Abschnitt «(.+)» nicht$/, async function (titel) {
-  const verzeichnis = dialog(this.seite).getByRole('navigation', { name: 'Inhalt der Anleitung' });
+  const verzeichnis = await verzeichnisOeffnen(dialog(this.seite));
   assert.equal(await verzeichnis.getByRole('link', { name: titel, exact: true }).count(), 0);
 });

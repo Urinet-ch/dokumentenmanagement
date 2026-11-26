@@ -2025,6 +2025,7 @@ export const TEXTE = {
     ganzeAnleitung: 'Ganze Anleitung öffnen',
     schliessen: 'Schliessen',
     inhalt: 'Inhalt der Anleitung',
+    verzeichnis: 'Abschnitte',
     rolle: (rolle: string) =>
       `Sie sind als ‹${rolle}› angemeldet. Diese Anleitung zeigt die Bereiche, die Ihre Rolle nutzen darf.`,
     abgemeldet: 'Nach der Anmeldung sehen Sie die Anleitung für alle Bereiche Ihrer Rolle.',

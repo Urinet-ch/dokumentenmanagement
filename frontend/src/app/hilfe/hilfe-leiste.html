@@ -4,7 +4,22 @@
     <button mat-button type="button" (click)="hilfe.schliessen()">{{ texte.schliessen }}</button>
   </div>
 
-  <nav class="hilfe-inhalt" [attr.aria-label]="texte.inhalt">
+  <button
+    type="button"
+    class="verzeichnis-knopf"
+    data-test="hilfe-verzeichnis-knopf"
+    aria-controls="hilfe-verzeichnis"
+    [attr.aria-expanded]="verzeichnisOffen()"
+    (click)="verzeichnisUmschalten()"
+  >
+    <span class="verzeichnis-name">{{ texte.verzeichnis }}</span>
+    @if (ausgewaehlt(); as eintrag) {
+      <span class="verzeichnis-aktuell">{{ eintrag.titel }}</span>
+    }
+    <span class="verzeichnis-pfeil" aria-hidden="true"></span>
+  </button>
+
+  <nav id="hilfe-verzeichnis" class="hilfe-inhalt" [attr.aria-label]="texte.inhalt" [hidden]="!verzeichnisOffen()">
     @for (eintrag of eintraege(); track eintrag.anker) {
       <a
         [href]="'/hilfe#' + eintrag.anker"
