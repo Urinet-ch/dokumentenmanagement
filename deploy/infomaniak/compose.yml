@@ -295,6 +295,13 @@ services:
       traefik.enable: "true"
       traefik.docker.network: web
       traefik.http.services.archiv-auth.loadbalancer.server.port: "8080"
+      # HSTS für den Anmeldedienst: eigene Middleware am Dienst kc. Der Router archiv-auth darf nicht von einer Middleware
+      # des Dienstes api abhängen: Die API wartet beim Start auf Keycloak über archiv-auth, Traefik führt Router nur für
+      # gesunde Container (Deploy 26.11.2026: beide Dienste warteten aufeinander, 404 auf archiv und archiv-auth).
+      traefik.http.middlewares.archiv-auth-sts.headers.stsseconds: "86400"
+      traefik.http.middlewares.archiv-auth-sts.headers.stsincludesubdomains: "false"
+      traefik.http.middlewares.archiv-auth-sts.headers.stspreload: "false"
+      traefik.http.middlewares.archiv-auth-sts.headers.forcestsheader: "false"
       traefik.http.middlewares.archiv-auth-drossel.ratelimit.average: "10"
       traefik.http.middlewares.archiv-auth-drossel.ratelimit.period: 1s
       traefik.http.middlewares.archiv-auth-drossel.ratelimit.burst: "50"
@@ -303,7 +310,7 @@ services:
       traefik.http.routers.archiv-auth.entrypoints: websecure
       traefik.http.routers.archiv-auth.tls.certresolver: le
       traefik.http.routers.archiv-auth.service: archiv-auth
-      traefik.http.routers.archiv-auth.middlewares: archiv-auth-drossel,archiv-sts
+      traefik.http.routers.archiv-auth.middlewares: archiv-auth-drossel,archiv-auth-sts
 
 networks:
   intern:
