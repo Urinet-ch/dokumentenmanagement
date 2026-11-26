@@ -33,7 +33,9 @@ trap aufraeumen EXIT
 
 maven_home="$(mvn --version | sed -n 's/^Maven home: //p')"
 [ -d "$maven_home" ] || { echo "Maven-Verzeichnis nicht gefunden." >&2; exit 1; }
-cp -R "$maven_home" "$arbeit/maven"
+mkdir -p "$arbeit/maven/conf/logging"
+cp -R "$maven_home/bin" "$maven_home/boot" "$maven_home/lib" "$arbeit/maven/"
+printf '<settings/>\n' >"$arbeit/settings.xml"
 mkdir "$arbeit/locks"
 anker="$(docker run -d --network none eclipse-temurin:25.0.5.1_2-jre-noble sleep 1200)"
 db="$(docker run -d --network "container:$anker" \
@@ -50,7 +52,7 @@ server="$(docker run -d --network "container:$anker" \
     --mount "type=bind,source=$HOME/.m2/repository,target=/m2,readonly" \
     --mount "type=bind,source=$arbeit/locks,target=/m2/.locks" \
     --workdir /workspace/backend eclipse-temurin:25.0.5.1_2-jdk-noble \
-    /scan/maven/bin/mvn -o -B -ntp -Dmaven.repo.local=/m2 \
+    /scan/maven/bin/mvn -o -B -ntp -s /scan/settings.xml -gs /scan/settings.xml -Dmaven.repo.local=/m2 \
     -Dquarkus.http.test-port=0 -Dtest=ZapBaselineIT -Darchiv.zap-baseline=true \
     -Darchiv.zap.verzeichnis=/scan -Dquarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:5432/zap_baseline \
     -Dquarkus.datasource.username=postgres -Dquarkus.datasource.password=synthetisch test)"

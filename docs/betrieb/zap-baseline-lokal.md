@@ -8,7 +8,8 @@ Sie ersetzt **nicht** die Staging-Prüfung durch Fabian nach Spec 03, Aufgabe 12
 Docker, Java 25 und Maven müssen lokal verfügbar sein. Der Maven-Cache muss die
 Abhängigkeiten des Backends einschliesslich der Linux-Abhängigkeiten für die Architektur
 des Docker-Hosts enthalten. Das Skript arbeitet im Testcontainer offline und liest nur
-`~/.m2/repository`, keine Maven-Einstellungen oder Zugangsdaten. Fehlt ein Artefakt,
+`~/.m2/repository`; es verwendet leere Maven-Einstellungen und kopiert keine vorhandenen
+Einstellungen oder Zugangsdaten. Fehlt ein Artefakt,
 meldet Maven dessen Koordinaten; dieses kann vor einem erneuten Lauf auf dem Host mit
 `mvn -Dquarkus.http.test-port=0 dependency:get -Dartifact=<Koordinaten>` im Backend-Worktree
 geladen werden.
