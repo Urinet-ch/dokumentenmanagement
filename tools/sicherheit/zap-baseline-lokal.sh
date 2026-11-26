@@ -3,8 +3,28 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd -P)"
 ausgabe="${1:?Bitte ein leeres Ausgabeverzeichnis angeben.}"
+pruefe_ausgabe() {
+    case "$1" in
+        "$root"|"$root"/*)
+            echo "Das Ausgabeverzeichnis muss ausserhalb des Repositories liegen." >&2
+            return 1
+            ;;
+    esac
+}
+if [ -d "$ausgabe" ]; then
+    ausgabe="$(cd "$ausgabe" && pwd -P)"
+else
+    ausgabe_eltern="$(dirname "$ausgabe")"
+    [ -d "$ausgabe_eltern" ] || {
+        echo "Das übergeordnete Ausgabeverzeichnis muss existieren." >&2
+        exit 1
+    }
+    ausgabe="$(cd "$ausgabe_eltern" && pwd -P)/$(basename "$ausgabe")"
+fi
+pruefe_ausgabe "$ausgabe"
 mkdir -p "$ausgabe" "$root/backend/target"
 ausgabe="$(cd "$ausgabe" && pwd -P)"
+pruefe_ausgabe "$ausgabe"
 if [ -n "$(ls -A "$ausgabe")" ]; then
     echo "Das Ausgabeverzeichnis muss leer sein." >&2
     exit 1
@@ -16,6 +36,9 @@ case "$(docker info --format '{{.Architecture}}')" in
     *) echo "Nicht unterstützte Docker-Architektur." >&2; exit 1 ;;
 esac
 zap="ghcr.io/zaproxy/zaproxy@$digest"
+temurin_jre="eclipse-temurin@sha256:2ec98aa522c472deadfd2b7c5b39bca680e33ef522a53a72f10789bdf89a6bb5"
+temurin_jdk="eclipse-temurin@sha256:c7eef3dfeb81468533ea48c67bddaa8c7ca916454259e4d0d734d12bcff8e125"
+pgvector="pgvector/pgvector@sha256:01215e09bd4bd582d20230e025b6c971deeeffee49ceef1aae167e839cb62a7e"
 docker image inspect "$zap" >/dev/null 2>&1 || docker pull "$zap"
 arbeit="$(mktemp -d "${TMPDIR:-/tmp}/zap-baseline-lokal.XXXXXXXX")"
 anker=""
@@ -53,10 +76,10 @@ mkdir -p "$arbeit/maven/conf/logging"
 cp -R "$maven_home/bin" "$maven_home/boot" "$maven_home/lib" "$arbeit/maven/"
 printf '<settings/>\n' >"$arbeit/settings.xml"
 mkdir "$arbeit/locks"
-anker="$(docker run -d --network none eclipse-temurin:25.0.5.1_2-jre-noble sleep 2700)"
+anker="$(docker run -d --network none "$temurin_jre" sleep 2700)"
 db="$(docker run -d --network "container:$anker" \
     -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=zap_baseline \
-    pgvector/pgvector:0.8.7-pg17-trixie)"
+    "$pgvector")"
 for _ in $(seq 1 60); do
     if docker exec "$db" pg_isready -h 127.0.0.1 -U postgres -d zap_baseline >/dev/null 2>&1; then break; fi
     sleep 1
@@ -67,7 +90,7 @@ server="$(docker run -d --network "container:$anker" \
     --mount "type=bind,source=$arbeit,target=/scan" \
     --mount "type=bind,source=$HOME/.m2/repository,target=/m2,readonly" \
     --mount "type=bind,source=$arbeit/locks,target=/m2/.locks" \
-    --workdir /workspace/backend eclipse-temurin:25.0.5.1_2-jdk-noble \
+    --workdir /workspace/backend "$temurin_jdk" \
     /scan/maven/bin/mvn -o -B -ntp -s /scan/settings.xml -gs /scan/settings.xml -Dmaven.repo.local=/m2 \
     -Dquarkus.http.test-port=0 -Dtest=ZapBaselineIT -Darchiv.zap-baseline=true \
     -Darchiv.zap.verzeichnis=/scan -Dquarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:5432/zap_baseline \

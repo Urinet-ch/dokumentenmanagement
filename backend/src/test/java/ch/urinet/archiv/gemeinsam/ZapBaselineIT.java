@@ -2,7 +2,6 @@ package ch.urinet.archiv.gemeinsam;
 
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
-import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -27,7 +26,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
-@QuarkusTestResource(FakeKeycloak.class)
 @Tag("start-3")
 @TestProfile(WissenssucheLeistungIT.Isoliert.class)
 @EnabledIfSystemProperty(named = "archiv.zap-baseline", matches = "true")

@@ -273,7 +273,7 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
   - Seitenangabe prüfen: Steht der Auszug nicht auf der genannten Seite, aber auf einer anderen Seite des Dokuments, wird die Seite berichtigt oder die Aussage als unbelegt geführt; der Hülltext der Eingabe («Seiteninhalt (nicht vertrauenswürdige Daten) …») ist nie ein gültiger Auszug.
   - Nachweis: JUnit mit synthetischen Seiten (Kopfzeile als Auszug, fremder Auszug, Zeilenumbruch in der Tabellenzelle, falsche Seite) und ein Szenario `@req-5.x` mit WireMock.
   - _Anforderungen: 5.1–5.13_
-- [ ] 19.2 Tabellen und Seitenbilder lesen [Backend]
+- [x] 19.2 Tabellen und Seitenbilder lesen [Backend]
   - Tabellen werden zeilenweise extrahiert (tabellenbewusster Textauszug oder Lesen des Seitenbildes), damit Spaltentitel nicht als Aussagen auftauchen und Zellen mit Platzhaltern («––») nicht verloren gehen. Eine Tabellenzeile ergibt höchstens eine Kernaussage mit Spaltenbezug.
   - Nachweis: Test mit einem synthetischen PDF mit Tabelle (Zeilenumbruch in der Zelle, Spalten Bezeichnung, Beschreibung, Preis).
   - _Anforderungen: 5.1–5.13_

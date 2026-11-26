@@ -20,7 +20,14 @@ Im Worktree ein neues, leeres Ausgabeverzeichnis angeben:
 tools/sicherheit/zap-baseline-lokal.sh /absoluter/pfad/zum/leeren-verzeichnis
 ```
 
+Das Ausgabeverzeichnis muss ausserhalb des Repositories liegen; das Skript prüft den
+kanonischen Pfad und weist auch Symlinks ins Repository zurück. Das Ziel darf neu sein,
+sein übergeordnetes Verzeichnis muss bereits existieren. Berichte werden nicht im
+Repository abgelegt.
+
 Das Skript lädt das nach Plattform per Digest gepinnte OWASP-ZAP-Image bei Bedarf.
+Temurin-JRE, Temurin-JDK und pgvector sind ebenfalls unveränderlich per
+Multi-Arch-Digest gebunden.
 Es startet PostgreSQL, ein Quarkus-Testprofil mit Ablage-, Fake-Keycloak- und
 KI-Attrappen und ZAP in einem gemeinsamen Docker-Netzraum ohne externes Netzwerk.
 Der Testserver lauscht ausschliesslich auf `127.0.0.1`; das Scan-Ziel wird nicht vom
@@ -42,7 +49,6 @@ anschliessend entfernt; der Testserver stoppt spätestens nach 40 Minuten.
 Der Lauf ist ausschliesslich auf Loopback und das isolierte Docker-Netz beschränkt.
 Er darf nicht für VPS- oder Staging-Hosts umkonfiguriert werden und ersetzt nicht
 Fabians Staging-Prüfung nach Spec 03, Aufgabe 12.3.
-
 ## Ergebnisse und Grenzen
 
 `testserver.log` steht im Ausgabeverzeichnis. Die Unterverzeichnisse `app`,
