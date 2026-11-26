@@ -29,3 +29,7 @@ Stand: 17.11.2026
 - `mvn dependency:tree -Dincludes=com.google.guava:guava` (ohne Scope-Filter) zeigt `guava:33.7.2-jre` nur mit Scope `test`.
 - Der Pin in `backend/pom.xml` trägt einen Kommentar mit Ausstiegsbedingung; Wiedervorlage, sobald die Quarkus-BOM Guava >= 33.7.2 verwaltet.
 - Backend-Tests, SpotBugs und Browser-Szenarien laufen in der CI dieses PR (Jobs `mvn verify` und `browser`); der Nachweis sind die grünen PR-Checks. Der Pin ändert nur die Testbibliothek Guava; ein lokaler `mvn verify` war wegen erschöpfter Docker-Netzwerkadressen nicht möglich.
+
+## Nachprüfung (26.11.2026)
+
+Diese Nachprüfung vergleicht `npm audit --omit=dev`, die Maven-Update-Vorschläge und offene Dependabot-PRs mit den Befunden vom 17.11.2026. Es werden nur Bericht und Empfehlungen aktualisiert, keine Paketversionen geändert.
