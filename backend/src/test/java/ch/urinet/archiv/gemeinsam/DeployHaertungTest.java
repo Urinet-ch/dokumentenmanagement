@@ -144,8 +144,9 @@ class DeployHaertungTest {
                 return;
             }
             List<String> mittel = List.of(wert.replace(" ", "").split(","));
-            if (mittel.stream().noneMatch(m -> m.endsWith("-sts"))) {
-                befunde.add(dienst + ": " + router.group(1) + " ohne HSTS");
+            // HSTS zuerst: eine Antwort der Drosselung (429) liefe sonst an der Header-Middleware vorbei (ZAP 27.11.2026)
+            if (!mittel.get(0).endsWith("-sts")) {
+                befunde.add(dienst + ": " + router.group(1) + " ohne HSTS an erster Stelle");
             }
             for (String m : mittel) {
                 String praefix = "traefik.http.middlewares." + m + ".";
