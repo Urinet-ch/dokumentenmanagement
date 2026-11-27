@@ -118,7 +118,7 @@ Zusätzliche Caches, temporäre Dateien, Analyse-/Exportdateien oder Kopien auss
 
 **Empfehlung:** B als Zwischenstand; beide Datenorte werden sichtbar geprüft und in der Auskunft berücksichtigt, aber nicht automatisch geändert. Eine abweichende Löschung oder Minimierung braucht einen datierten Entscheid und die Prüfung durch eine Fachperson.
 
-[offen: Gehören `benutzer_verzeichnis` und Keycloak-Identitätsdaten selbst zum Löschbegehren, und welche Teile dürfen nach Ablauf der jeweiligen Aufbewahrung gelöscht oder minimiert werden?]
+[offen: Gehören `benutzer_verzeichnis` und Keycloak-Identitätsdaten selbst zum Löschbegehren, und welche Teile dürfen nach Ablauf der jeweiligen Aufbewahrung gelöscht oder minimiert werden? Rechtliche Einordnung und Auskunft durch eine Fachperson prüfen.]
 
 ## Noch zu klären
 
