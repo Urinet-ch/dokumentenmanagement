@@ -149,12 +149,30 @@ gesamt_status=0
 fataler_scan=0
 scan_zap() {
     local name="$1" ziel="$2" zugangsdatei="${3:-}" stufe="${4:-}"
-    local zap_optionen="-silent" konfiguration=""
+    local zap_optionen="-silent" konfiguration="" auth_scope="" auth_probe=""
     mkdir "$arbeitsberichte/$name"
     if [ -n "$zugangsdatei" ]; then
         local token
         token="$(<"$zugangsdatei")"
         [ -n "$token" ] || { echo "Testzugang für $name fehlt." >&2; return 1; }
+        if [ -n "$stufe" ]; then
+            auth_scope='^http://127\.0\.0\.1:[0-9]+/public/v1/.*$'
+            auth_probe='http://127.0.0.1:43123/public/v1/dokumente'
+        else
+            auth_scope='^http://127\.0\.0\.1:[0-9]+/api/v1/.*$'
+            auth_probe='http://127.0.0.1:43123/api/v1/dokumente'
+        fi
+        if ! printf '%s\n' "$auth_probe" | grep -Eq "$auth_scope"; then
+            echo "Der Authentisierungsbereich deckt keine Loopback-API-Route ab." >&2
+            return 1
+        fi
+        if printf '%s\n' \
+            'http://zap/JSON/openapi/action/importUrl/?url=http%3A%2F%2F127.0.0.1%3A45657%2Fq%2Fopenapi' \
+            'http://zap/JSON/spider/action/scan/?url=http://127.0.0.1:45657/api/v1/dokumente' \
+            'https://example.invalid/api/v1/dokumente' | grep -Eq "$auth_scope"; then
+            echo "Der Authentisierungsbereich umfasst eine ZAP-Steuerung oder ein fremdes Ziel." >&2
+            return 1
+        fi
         konfiguration="$arbeit/$name-zap.conf"
         (
             umask 077
@@ -165,7 +183,7 @@ scan_zap() {
                 printf 'replacer.full_list(0).matchstr=Authorization\n'
                 printf 'replacer.full_list(0).regex=false\n'
                 printf 'replacer.full_list(0).replacement=Bearer %s\n' "$token"
-                printf 'replacer.full_list(0).url=.*127\\.0\\.0\\.1.*\n'
+                printf 'replacer.full_list(0).url=%s\n' "$auth_scope"
                 if [ -n "$stufe" ]; then
                     printf 'replacer.full_list(1).description=zap-zugriffsstufe\n'
                     printf 'replacer.full_list(1).enabled=true\n'
@@ -173,7 +191,7 @@ scan_zap() {
                     printf 'replacer.full_list(1).matchstr=X-Archiv-Zugriff\n'
                     printf 'replacer.full_list(1).regex=false\n'
                     printf 'replacer.full_list(1).replacement=%s\n' "$stufe"
-                    printf 'replacer.full_list(1).url=.*127\\.0\\.0\\.1.*\n'
+                    printf 'replacer.full_list(1).url=%s\n' "$auth_scope"
                 fi
             } >"$konfiguration"
         )
