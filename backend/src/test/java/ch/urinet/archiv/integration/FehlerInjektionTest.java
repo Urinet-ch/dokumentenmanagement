@@ -76,12 +76,16 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
-import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
 import java.net.URI;
 import java.net.SocketTimeoutException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -203,17 +207,30 @@ class FehlerInjektionTest {
     }
 
     @Test
-    void uebergrosseJsonAnfrageOhneEingabeUndStacktrace() {
+    void uebergrosseJsonAnfrageOhneEingabeUndStacktrace() throws IOException, InterruptedException {
         int grenze = Math.toIntExact(ConfigProvider.getConfig()
                 .getValue("archiv.http.max-anfrage", MemorySize.class).asLongValue());
         String token = Testanmeldung.token("inhaber-urinet");
         given().auth().oauth2(token).when().get("/api/v1/kontakte").then().statusCode(200);
         String body = "{\"name\":\"" + MARKER + "x".repeat(grenze) + "\"}";
         try (LogMitschnitt log = LogMitschnitt.starten()) {
-            var antwort = given().auth().oauth2(token).contentType("application/json").body(body)
-                    .when().post("/api/v1/kontakte");
-            assertThat(ProblemDetails.pruefen(antwort, 413)).isEqualTo("DATEI_ZU_GROSS");
-            assertThat(antwort.asString()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
+            var anfrage = HttpRequest.newBuilder(
+                            URI.create("http://127.0.0.1:" + RestAssured.port + "/api/v1/kontakte"))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Content-Type", "application/json")
+                    .expectContinue(true)
+                    .timeout(Duration.ofSeconds(30))
+                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                    .build();
+            var antwort = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()
+                    .send(anfrage, HttpResponse.BodyHandlers.ofString());
+            assertThat(antwort.statusCode()).isEqualTo(413);
+            assertThat(antwort.headers().firstValue("Content-Type").orElse(""))
+                    .startsWith("application/problem+json");
+            var problem = new ObjectMapper().readTree(antwort.body());
+            assertThat(problem.path("fehlercode").asText()).isEqualTo("DATEI_ZU_GROSS");
+            assertThat(problem.path("status").asInt()).isEqualTo(413);
+            assertThat(antwort.body()).doesNotContain(MARKER, token, "Exception", "\tat ", "Caused by:");
             assertThat(log.volltext()).doesNotContain(MARKER, token, "\tat ", "Caused by:");
         }
     }
