@@ -680,3 +680,12 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - Die Aktion «Als Wissensquelle verwenden» steht nicht mehr im allgemeinen Abschnitt zur Dokumentansicht, sondern im
   Unterabschnitt `wissen-quellen` mit Bedingung A16. `anleitung-abschnitte.spec.ts` prüft die Sichtbarkeit anhand des
   tatsächlichen Filters für alle vier Rollen.
+
+## Umsetzung (Anleitungsabgleich, 27.11.2026)
+
+- `wissen-entwuerfe.md` nennt die Rollen mit Recht A17, die eine Abschnittswiederholung ausführen können, und beschreibt
+  die Wirkung eines eigenständigen Vertraulichkeitsvermerks aus Spec 04, Req 19.5: Der Entwurf und seine Vorschläge
+  werden `INTERN`; Quelle und archivierte Dokumentmetadaten bleiben unverändert.
+- `verwaltung.md` nennt die Löschbedingungen aus Spec 06, Req 3.11 und den Rollenkonflikt aus Req 4.5.
+- Nachweis: `anleitung-inhalt.spec.ts` und `anleitung-abschnitte.spec.ts`; kompletter Frontend-Testlauf mit
+  `npm test -- --watch=false` (110 Dateien, 1'245 Tests).
