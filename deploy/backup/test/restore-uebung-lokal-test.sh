@@ -273,7 +273,7 @@ assert grep -q '^OK      Echter Sicherungs-Roundtrip: Phase quelle' "$temp/erfol
 assert grep -q '^OK      Echter täglicher Export' "$temp/erfolg.stdout"
 assert grep -q '^OK      Archiv-Datenbankdump in neue Datenbank einspielen' "$temp/erfolg.stdout"
 assert grep -q '^OK      Keycloak-Datenbankdump in neue Datenbank einspielen' "$temp/erfolg.stdout"
-assert grep -q '^OK      Restore-Zählvergleich je Mandant: Wissensseiten, Versionen, Quellen, Dokumente' "$temp/erfolg.stdout"
+assert grep -q '^OK      Restore-Zählvergleich je Mandant: Wissensseiten, Versionen, Quellen, Dokumente, Webfreigaben, öffentliche Fragen, Benutzereinladungen' "$temp/erfolg.stdout"
 assert grep -q '^OK      Vollständiger lokaler Sicherungs-Roundtrip abgeschlossen' "$temp/erfolg.stdout"
 assert grep -q 'OIDC-Testdienstkonto mit Mandant und Rolle vorbereiten' "$temp/erfolg.stdout"
 assert grep -q "shelltest $MOCK_BACKUP_TEST" "$MOCK_LOG"
