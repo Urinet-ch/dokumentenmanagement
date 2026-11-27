@@ -62,9 +62,9 @@ erledigten Umsetzungen.
 | 13.7 | #688 ergänzt den lokalen synthetischen Restore-Zählvergleich je Mandant; die wiederkehrende betriebliche Restore-Probe ist damit nicht nachgewiesen. | Infra |
 | 16.2 | Prüfliste und Gate nicht abgenommen. | Fabian / QA |
 | 18.3 | PR #576 ist gemergt; Plugin-Hinweis und vollständige Abnahme fehlen laut Taskdatei. | Backend / Frontend |
-| 19.4 | Abschnittsfehler, sichtbare Befunde und Wiederholung bleiben offen. | Backend / Frontend |
-| 19.5 | Tabellen-Gruppierung und Vertraulichkeitsvorschlag bleiben offen. | Backend |
-| 19.6 | #702 ergänzt eine vorbereitende Checkliste; Wiederholung und Auswertung des Test-Ingests bleiben offen und hängen von 19.1–19.5 ab. | QA / Fabian |
+| 19.4 | Umsetzung gemergt (#707); Abnahme der sichtbaren Abschnittsbefunde und Wiederholung bleibt in 19.6 offen. | QA / Fabian |
+| 19.5 | Umsetzung gemergt (#714); Gruppierung und Vertraulichkeitsvorschlag bleiben in 19.6 manuell zu prüfen. | QA / Fabian |
+| 19.6 | #702 enthält die Checkliste; Test-Ingest und Auswertung bleiben offen, Voraussetzungen 19.1–19.5 sind umgesetzt. | QA / Fabian |
 | O.4 | Keine Umsetzung belegt. | Backend |
 | O.5 | Laut Taskdatei in 15.6–15.8 übernommen; nicht doppelt umsetzen. | In den übernommenen Aufgaben nachverfolgen |
 | O.6 | Mit Entscheid vom 18.11.2026 ausdrücklich **entfallen**. | Kein Umsetzungsauftrag |

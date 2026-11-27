@@ -5,8 +5,8 @@ Fabian nach Abschluss von 19.1 bis 19.5 durch. Diese Checkliste ist kein Abnahme
 
 ## Vorbereitung
 
-- [ ] Abschluss und Bereitstellung von 19.1 bis 19.5 prüfen. 19.4 und 19.5 sind noch offen;
-      ihre Prüfpunkte gelten erst nach deren Umsetzung.
+- [ ] Abschluss und Bereitstellung von 19.1 bis 19.5 prüfen. 19.4 und 19.5 sind umgesetzt;
+      ihre Prüfpunkte 5 und 6 bleiben bis zur manuellen Prüfung offen.
 - [ ] Den Befund vom 26.11.2026 für den persönlichen Vergleich bereithalten. Quelldokument,
       Auszüge, Aussagen und Antworten bleiben ausserhalb des Repositorys.
 - [ ] Laufumgebung wählen: lokal oder Stufe A. Auf Stufe A ausschliesslich Testdaten oder
@@ -24,7 +24,7 @@ Fabian nach Abschluss von 19.1 bis 19.5 durch. Diese Checkliste ist kein Abnahme
 2. Fehlerbehandlung und Vertraulichkeit zusätzlich mit synthetischen Daten prüfen, soweit
    dafür ein gezielt ausgelöster Fehler oder Vertraulichkeitsvermerk nötig ist.
 3. Nur Nummern, Status, Anzahlen und Zeiten protokollieren. Das Ergebnis von 19.6 gehört
-   gemäss Aufgabenplan nach `docs/abnahme/wissen.md`, ohne Inhalte des Quelldokuments.
+   gemäss Aufgabenplan in das vorgesehene Abnahmeprotokoll, ohne Inhalte des Quelldokuments.
 4. Bei einem fehlgeschlagenen oder nicht prüfbaren Punkt den Status entsprechend setzen;
    nicht geprüfte Punkte sind kein Erfolg. Fabian entscheidet über die Abnahme.
 
@@ -36,8 +36,8 @@ Fabian nach Abschluss von 19.1 bis 19.5 durch. Diese Checkliste ist kein Abnahme
 | 2 | Tabellenzeilen bleiben mit ihren zugehörigen Spalten und Bedingungen erhalten; keine Spalten sind verschoben. |
 | 3 | Offene Fragen bleiben Fragen; erfundene Antworten erscheinen nicht als Aussagen. |
 | 4 | Bedingungen und Einschränkungen von Optionen bleiben erhalten; die Optionentabelle wird zeilenweise wiedergegeben. |
-| 5 | **Nach Umsetzung 19.4:** Ausgefallene oder überwiegend ausgefallene Abschnitte sind als Befund sichtbar und können abschnittsweise erneut verarbeitet werden; das Ergebnis der Wiederholung ist sichtbar. |
-| 6 | **Nach Umsetzung 19.5:** Gruppierung und Vertraulichkeitsvorschlag prüfen; bei synthetischem Vertraulichkeitsvermerk dürfen betroffene Wissensseiten nicht für Webseite oder Mitglieder freigegeben werden. |
+| 5 | **19.4:** Ausgefallene oder überwiegend ausgefallene Abschnitte sind als Befund sichtbar und können nur mit Recht A17 abschnittsweise erneut verarbeitet werden; das Ergebnis der Wiederholung ist sichtbar. |
+| 6 | **19.5:** Gruppierung und Vertraulichkeitsvorschlag prüfen; bei synthetischem Vertraulichkeitsvermerk dürfen betroffene Wissensseiten nicht für Webseite oder Mitglieder freigegeben werden. |
 
 ## Protokollvorlage
 

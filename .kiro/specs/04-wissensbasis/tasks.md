@@ -287,10 +287,16 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
   - Die Warnungen nennen Seite und Aussage statt nur einer laufenden Nummer.
   - Nachweis: Szenario mit WireMock (eine ungültige Antwort, danach gültige Wiederholung) und Angular-Test der Anzeige.
   - _Anforderungen: 5.1–5.13_
-- [ ] 19.5 Granularität und Vertraulichkeit [Backend]
+- [x] 19.5 Granularität und Vertraulichkeit [Backend]
   - Kennzahlen-, Persona- und Positionstabellen ergeben je Tabelle höchstens eine Gruppe von Aussagen statt einer Aussage je Zelle; Obergrenze und Gruppierung als Einstellung (Startwert aus der Messung).
   - Trägt ein Dokument einen Vertraulichkeitsvermerk («intern», «nicht für Dritte»), schlägt der Ingest die Vertraulichkeit des Dokuments entsprechend vor und die Wissensseiten dürfen nicht für Webseite oder Mitglieder freigegeben werden (Req 21.x bleibt massgebend).
   - Nachweis: Szenario mit einem synthetischen Dokument mit Vermerk «intern»; Prüfung der Quellenstufe im Entwurf.
+  - Umsetzung 27.11.2026: Die Tabellen-Gruppierung ist konfigurierbar; der Startwert von einer Gruppe je Tabelle
+    ist mit einer synthetischen zweizeiligen Kennzahlentabelle geprüft. Ein expliziter Vermerk «intern» im Volltext
+    hebt die Quellenstufe im Ingest auf `INTERN`, setzt alle Seitenvorschläge auf `INTERN` und zeigt einen Hinweis,
+    ohne archivierte Dokumentmetadaten zu ändern.
+    Die vorhandene Freigabeprüfung für Webseiten verlangt weiterhin Quellen der Zugriffsstufe `oeffentlich` und
+    Seiten auf Stufe `NORMAL`.
   - _Anforderungen: 5.1–5.13, 20.1, 21.1_
 - [ ] 19.6 Wiederholung des Test-Ingests [QA] [Fabian]
   - Nach 19.1 bis 19.5 das Quelldokument des Befunds erneut ingestieren (lokal oder Stufe A, nur durch Fabian) und mit der Auswertung vom 26.11.2026 vergleichen: erwartet sind keine Aussagen mit Kopfzeilen-Auszug, keine Antworten auf offene Fragen, die Optionentabelle als Zeilen und kein Verlust ganzer Abschnitte. Ergebnis (nur Zahlen, keine Inhalte) in `docs/abnahme/wissen.md`.
