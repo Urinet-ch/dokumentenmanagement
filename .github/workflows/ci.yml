@@ -391,6 +391,15 @@ jobs:
         run: npm run pruefe:build-info
       - name: Generator-Client (tools/archiv_client.py, unittest)
         run: python3 -m unittest tools/test_archiv_client.py
+      - name: Compose-Konsistenzprüfung (synthetische Tests)
+        run: python3 -m unittest tools/test_pruefe_compose_konsistenz.py
+      - name: Compose-Konsistenzprüfung (Deploy-Vorlage)
+        run: |
+          status=0
+          python3 tools/pruefe_compose_konsistenz.py --json > "$RUNNER_TEMP/compose-befunde.json" || status=$?
+          cat "$RUNNER_TEMP/compose-befunde.json"
+          test "$status" -le 1
+          jq -e 'all(.befunde[]; .code == "IMAGE_DIGEST" and (.ort == "services.api" or .ort == "services.db" or .ort == "services.kc"))' "$RUNNER_TEMP/compose-befunde.json"
       - name: Lastskripte (tools/last, unittest)
         run: python3 -m unittest tools/last/test_last.py
 
