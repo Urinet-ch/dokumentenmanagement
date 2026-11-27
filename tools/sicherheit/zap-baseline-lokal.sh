@@ -121,37 +121,36 @@ scan_zap() {
         token="$(<"$zugangsdatei")"
         [ -n "$token" ] || { echo "Testzugang für $name fehlt." >&2; return 1; }
         konfiguration="$arbeit/$name-zap.conf"
-        {
-            printf 'replacer.full_list(0).description=zap-bearer\n'
-            printf 'replacer.full_list(0).enabled=true\n'
-            printf 'replacer.full_list(0).matchtype=REQ_HEADER\n'
-            printf 'replacer.full_list(0).matchstr=Authorization\n'
-            printf 'replacer.full_list(0).regex=false\n'
-            printf 'replacer.full_list(0).replacement=Bearer %s\n' "$token"
-            if [ -n "$stufe" ]; then
-                printf 'replacer.full_list(1).description=zap-zugriffsstufe\n'
-                printf 'replacer.full_list(1).enabled=true\n'
-                printf 'replacer.full_list(1).matchtype=REQ_HEADER\n'
-                printf 'replacer.full_list(1).matchstr=X-Archiv-Zugriff\n'
-                printf 'replacer.full_list(1).regex=false\n'
-                printf 'replacer.full_list(1).replacement=%s\n' "$stufe"
-            fi
-        } >"$konfiguration"
-        chmod 644 "$konfiguration"
+        (
+            umask 077
+            {
+                printf 'replacer.full_list(0).description=zap-bearer\n'
+                printf 'replacer.full_list(0).enabled=true\n'
+                printf 'replacer.full_list(0).matchtype=REQ_HEADER\n'
+                printf 'replacer.full_list(0).matchstr=Authorization\n'
+                printf 'replacer.full_list(0).regex=false\n'
+                printf 'replacer.full_list(0).replacement=Bearer %s\n' "$token"
+                if [ -n "$stufe" ]; then
+                    printf 'replacer.full_list(1).description=zap-zugriffsstufe\n'
+                    printf 'replacer.full_list(1).enabled=true\n'
+                    printf 'replacer.full_list(1).matchtype=REQ_HEADER\n'
+                    printf 'replacer.full_list(1).matchstr=X-Archiv-Zugriff\n'
+                    printf 'replacer.full_list(1).regex=false\n'
+                    printf 'replacer.full_list(1).replacement=%s\n' "$stufe"
+                fi
+            } >"$konfiguration"
+        )
         zap_optionen="$zap_optionen -configfile /tmp/zap-auth.conf"
     fi
-    scanner="$(docker create --pull=never --network "container:$anker" \
+    scanner="$(docker create -i --pull=never --network "container:$anker" \
         --cap-drop ALL --security-opt no-new-privileges --memory 2g --workdir /zap \
         --mount "type=bind,source=$root/tools/sicherheit/zap-ausnahmen.conf,target=/zap/ausnahmen.conf,readonly" \
         --mount "type=bind,source=$root/docs/schnittstelle/public-v1.yaml,target=/zap/public-v1.yaml,readonly" \
-        --entrypoint /bin/sh "$zap" -c 'mkdir -p /zap/wrk; exec /zap/zap-api-scan.py "$@"' sh \
+        --entrypoint /bin/sh "$zap" -c 'set -e; umask 077; cat > /tmp/zap-auth.conf; mkdir -p /zap/wrk; exec /zap/zap-api-scan.py "$@"' sh \
         -S -f openapi -t "$ziel" -O "$url" \
         -c /zap/ausnahmen.conf -J bericht.json -w bericht.md -r bericht.html -T 5 -s -z "$zap_optionen")"
-    if [ -n "$konfiguration" ]; then
-        docker cp "$konfiguration" "$scanner:/tmp/zap-auth.conf"
-    fi
     set +e
-    docker start -a "$scanner" >"$arbeitsberichte/$name/zap.log" 2>&1
+    docker start -a -i "$scanner" <"${konfiguration:-/dev/null}" >"$arbeitsberichte/$name/zap.log" 2>&1
     scan_status=$?
     set -e
     docker cp "$scanner:/zap/zap.out" "$arbeitsberichte/$name/zap.out" 2>/dev/null \
