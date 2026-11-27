@@ -1,5 +1,13 @@
 # Design Document
 
+### Umsetzung (Folgeauftrag 1.10 Testdaten, 27.11.2026)
+
+`tools/last/testdaten_erzeugen.py` erzeugt lokal und ohne Netzwerk einen
+20-seitigen Bildscan ohne Textebene (rund 15 MB) und ein synthetisches 12-MP-
+Handy-Foto in einem geschützten Ordner ausserhalb des Repositorys. Der Test
+prüft Grösse, Seiten und Bildinhalt, Fotoauflösung sowie Dateirechte. Es wurden
+keine Testdaten hochgeladen; Messung und Betriebsnachweis bleiben offen.
+
 ### Umsetzung (Aufgabe 5.11 Messvorbereitung, 26.11.2026)
 
 `tools/last/verarbeitung_foto.py` prüft die Seitenzahl eines Begleit-PDFs, beobachtet die Überlappung und wartet
@@ -119,6 +127,7 @@ den Auftrags-Poller ein. Aus einem Build entstehen zwei Images: `archiv` (API mi
   - Umsetzung (Aufgabe 1.10, statische Konsistenzprüfung, 25.11.2026): `tools/pruefe_compose_konsistenz.py` prüft Healthchecks, Ressourcen, Netze, Public-Router und Drosselung, Image-Digests sowie mögliche Klartextwerte in Compose und Keycloak-Skripten. Synthetische Tests prüfen erkannte Abweichungen und Ausgabestruktur. Die drei Dienstimages verwenden veränderliche Tags und werden deshalb als Befunde gemeldet; gepinnte Basisimages ersetzen keinen Digest am Dienstimage. Die Klartextsuche ist eine Heuristik und keine Prüfung der Laufzeit.
   - Umsetzung (Aufgabe 1.10, Ausfall-Nachbereitung, 26.11.2026): Die Konsistenzprüfung meldet Router-Middlewares, die nicht am selben Compose-Dienst definiert sind. Der Test bildet die fehlerhafte Zuordnung von `archiv-auth` zur API und die eigene Middleware am Dienst `kc` nach. Die Rollback-Grenzen stehen in `docs/betrieb/deploy-rollback.md`; die Prüfung ersetzt keinen Laufzeitnachweis.
   - Umsetzung (Aufgabe 1.10, Messvorbereitung, 26.11.2026): `tools/last/speichermessung_stufe_a.py` erfasst geschützte Stichproben der drei Archiv-Dienste; `speicherauswertung_stufe_a.py` prüft Limits und manuell bestätigte Abbruchgründe. Synthetische Tests und `docs/betrieb/speichermessung-stufe-a.md` beschreiben Grenzen und Ablauf. Entscheid Fabian 27.11.2026: Nach der Erweiterung vom 23.11.2026 gelten 2048 MiB/1.5 CPU; die älteren Budgetangaben in Req 16.18 und Aufgabe 1.10 sind insoweit überholt, der Requirement-Nachzug erfolgt separat. Eine erneute Messung ist freigegeben; Messung und Nachweis bleiben bei Fabian.
+  - Umsetzung (Aufgabe 1.9, lokaler Router-Rauchtest, 27.11.2026): `tools/traefik_rauchtest.py` leitet Router, Regeln und Middlewares aus den Compose-Labels ab, ersetzt die Backends durch synthetische HTTP-Attrappen und prüft je Router 200 sowie eine gedrosselte 429 mit HSTS. Die Ableitung ist dockerfrei getestet; der Laufzeitnachweis nutzt Traefik `v3.5`, ein internes Netz und `docker cp`, ohne TLS/ACME oder Produktionsimages. Die Gegenprobe vertauscht HSTS und Drosselung und verlangt, dass der fehlende Header erkannt wird. `forceSTSHeader` und reduzierte Rate-Limits gelten nur in der lokalen Testkonfiguration. Der Laufzeitnachweis läuft nicht in der CI; ein Vorschlag für die dockerfreien Tests liegt in `docs/betrieb/traefik-rauchtest-ci.diff`.
 - Traefik-Labels nur an `archiv-api` und `archiv-keycloak`; nur diese beiden hängen zusätzlich am Netz «web» von Traefik. Datenbank, Worker und Sicherung hängen nur im eigenen internen Docker-Netz des Archivs. Die API ist nur über Traefik erreichbar (kein veröffentlichter Port), deshalb ist `X-Real-Ip` vertrauenswürdig.
 - Router `archiv.apps.urinet.ch`: alle Pfade ausser `/q/*`, dazu ein eigener Router nur für `/q/health/live` (schlanker Health-Pfad ohne Details). `/q/health/ready` und `/q/metrics` bleiben im internen Netz für das Monitoring der VPS (Anbindung in Welle 5).
 - Router `archiv-auth.apps.urinet.ch`: nur `/realms/` und `/resources/`; die Admin-Konsole ist nicht öffentlich.

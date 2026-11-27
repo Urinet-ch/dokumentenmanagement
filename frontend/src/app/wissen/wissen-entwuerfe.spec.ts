@@ -76,6 +76,9 @@ describe('Wissensentwürfe', () => {
     });
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).not.toContain('Fehlerhafte Ingest-Abschnitte');
+    const status = fixture.nativeElement.querySelector('[role="status"]');
+    expect(status.textContent).toContain(TEXTE.wissen.entwuerfe.abschnittWirdVerarbeitet);
+    expect(document.activeElement).toBe(status);
     expect(auffrischen).toHaveBeenCalledOnce();
   });
 

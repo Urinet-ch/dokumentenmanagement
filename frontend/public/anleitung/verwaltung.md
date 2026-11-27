@@ -46,3 +46,7 @@ nennt nur die Zahl der gelöschten Passkeys.
 Sperren, Deaktivieren und Rollenänderungen verlangen eine Bestätigung vor dem Ausführen. Beim Löschen zeigt das Archiv
 zuerst die Zahl der zugehörigen Dokumente und Protokolleinträge. Sie müssen den Benutzernamen exakt eingeben und einen
 Grund auswählen. Protokolleinträge und dokumentierte Verweise bleiben erhalten.
+
+Ein Benutzer kann nur gelöscht werden, wenn sein Zugang deaktiviert ist, die für das Archiv geltende Löschfrist
+abgelaufen ist (standardmässig 30 Tage) und ihm genau eine Archiv-Rolle zugewiesen ist. Bei einem Rollenkonflikt
+weisen Sie zuerst eine eindeutige Rolle zu. Sie können weder Ihr eigenes Konto noch den letzten aktiven Inhaber löschen.

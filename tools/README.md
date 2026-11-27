@@ -6,10 +6,14 @@
 | `test_archiv_client.py` | Tests zum Client: `python3 -m unittest tools/test_archiv_client.py` |
 | `test_pruefe_speicherbudget.py` | Tests für das Deploy-Speicherbudget: `python3 -m unittest tools/test_pruefe_speicherbudget.py` |
 | `pruefe_compose_konsistenz.py` | Statische Prüfung von Compose und Keycloak-Vorlagen; startet keine Dienste |
+| `traefik_rauchtest.py` | Lokaler Laufzeittest aller Traefik-Router mit synthetischen Diensten; Details unter `docs/betrieb/traefik-rauchtest.md` |
+| `test_traefik_rauchtest.py` | Dockerfreie Tests zur Ableitung der lokalen Traefik-Konfiguration |
 | `pruefe_dokumentverweise.py` | Prüft lokale Markdown-Links und Dateiverweise unter `docs/` und `deploy/` |
 | `golden_synth/` | Generator für synthetische Golden-Belege (Req 0.10) |
 | `crm/` | synthetischer Beispiel-Export 21.CRM |
 | `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--begleit-pdf` reiht für die HEIC-Messung einen synthetischen 20-seitigen Scan ein; `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
+| `last/testdaten_erzeugen.py` | Erzeugt lokal und ohne Netzwerk in einem neuen geschützten Ordner einen 20-seitigen Bildscan und ein synthetisches 12-MP-JPEG |
+| `last/test_testdaten_erzeugen.py` | Prüft Scan-Grösse, Seitenzahl, fehlende Textebene, Fotoauflösung und Dateirechte: `python3 -m unittest tools/last/test_testdaten_erzeugen.py` |
 
 ## Compose-Konsistenzprüfung
 
@@ -30,6 +34,18 @@ noch die Wirksamkeit von Healthchecks, Routerregeln und Limits. Dienstimages ohn
 lokal gebaut wurden; ein gepinntes Basisimage macht den veränderlichen Dienst-Tag nicht unveränderlich.
 Die Tests laufen nicht automatisch in der CI; ein Vorschlag dafür liegt unter
 [`docs/betrieb/compose-konsistenz-ci.diff`](../docs/betrieb/compose-konsistenz-ci.diff).
+
+## Lokaler Traefik-Rauchtest
+
+```sh
+python3 -m unittest tools/test_traefik_rauchtest.py
+python3 tools/traefik_rauchtest.py
+```
+
+Die Ableitungstests brauchen Docker nicht. Der Laufzeittest verwendet Docker Desktop,
+Traefik `v3.5`, ein internes Testnetz, synthetische HTTP-Attrappen und `docker cp`;
+er prüft für jeden Router die Antwort der richtigen Attrappe und HSTS auf 200 und
+429. Details und Grenzen: [`docs/betrieb/traefik-rauchtest.md`](../docs/betrieb/traefik-rauchtest.md).
 
 ## Dokumentverweise
 

@@ -16,6 +16,7 @@
   <p class="hinweis gefahr" role="alert">{{ meldung }}</p>
   <div class="knoepfe"><button mat-button type="button" (click)="laden(true)">{{ wissen.erneut }}</button></div>
 }
+@if (abschnittLaeuft()) { <p #abschnittStatus tabindex="-1" class="hinweis warnung" role="status">{{ texte.abschnittWirdVerarbeitet }}</p> }
 @if (!id()) {
   <form class="karte felder" (ngSubmit)="laden()">
     <div class="feld">
@@ -72,7 +73,6 @@
       @if (ingestFehler(); as meldung) { <p class="hinweis gefahr" role="alert">{{ meldung }}</p> }
     </section>
   }
-  @if (abschnittLaeuft()) { <p class="hinweis warnung" role="status">{{ texte.abschnittWirdVerarbeitet }}</p> }
   @if (ansicht.ingestHinweise?.length) {
     <section class="karte">
       <h2>{{ texte.ingestHinweiseTitel }}</h2>
