@@ -20,6 +20,7 @@ api/wissensbasis.service.ts
 configuration.ts
 encoder.ts
 index.ts
+model/abschnittsfehler.ts
 model/aenderung.ts
 model/aktion.ts
 model/ansicht.ts

@@ -9,6 +9,7 @@
  */
 import { Kopf } from './kopf';
 import { Aenderung } from './aenderung';
+import { Abschnittsfehler } from './abschnittsfehler';
 import { Aussage } from './aussage';
 
 
@@ -16,5 +17,7 @@ export interface Vollansicht {
     entwurf?: Kopf;
     kernaussagen?: Array<Aussage>;
     aenderungen?: Array<Aenderung>;
+    ingestHinweise?: Array<string>;
+    abschnittFehler?: Array<Abschnittsfehler>;
 }
 

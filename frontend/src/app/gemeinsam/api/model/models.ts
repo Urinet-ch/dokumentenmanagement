@@ -1,3 +1,4 @@
+export * from './abschnittsfehler';
 export * from './aenderung';
 export * from './aktion';
 export * from './ansicht';

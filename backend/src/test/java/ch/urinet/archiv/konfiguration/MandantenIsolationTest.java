@@ -384,6 +384,10 @@ abstract class MandantenIsolationIT {
             pruefeRessourcenIsolation(tokenA, "POST", "/api/v1/wissensentwuerfe/" + entwurfId + "/neu-pruefen",
                     "/api/v1/wissensentwuerfe/" + unbekannterEntwurf + "/neu-pruefen",
                     null, null, entwurfId.toString());
+            pruefeRessourcenIsolation(tokenA, "POST", "/api/v1/wissensentwuerfe/" + entwurfId
+                            + "/abschnitte/1/wiederholen",
+                    "/api/v1/wissensentwuerfe/" + unbekannterEntwurf + "/abschnitte/1/wiederholen",
+                    "{}", null, entwurfId.toString());
             for (String aktion : List.of("annehmen", "verwerfen", "neu-erzeugen")) {
                 String pfad = "/api/v1/wissensentwuerfe/" + entwurfId + "/aenderungen/1/" + aktion;
                 String unbekannt = "/api/v1/wissensentwuerfe/" + unbekannterEntwurf
