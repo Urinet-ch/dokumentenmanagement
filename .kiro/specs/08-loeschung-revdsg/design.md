@@ -30,19 +30,21 @@ Jeder freigegebene Vorgang braucht vor dem Löschen ein Inventar je Mandant, Per
 | Korrekturbeispiele | `ki_beispiel` mit bestätigten Werten und Merkmalen, insbesondere `dokument_id`, `partner_id`, IBAN und E-Mail | Auch Drittpersonendaten einbeziehen; vorläufig werden Beispiele zu fehlenden, verworfenen oder unbestätigten Dokumenten nicht ausgewählt (Spec 01 design.md, Open Points). |
 | Gespräche | `chat_gespraech` und `chat_nachricht`: Fragen, Werkzeugparameter und Dokument-IDs, Quellen, Tokens, Antwortinhalt | Spec 02 verlangt Löschung nach 12 Monaten; Vorziehen oder inhaltsfreie Nachweise brauchen Entscheid und gegebenenfalls Spec-Nachzug. |
 | Protokolle und Nachweise | `zugriff_protokoll`, `dokument_version`, `wissens_log`, Manifestzeilen, Signaturen, Zeitstempel und Löschbeleg | Getrennt nach Aufbewahrungsfrist, Append-only-Regeln und Manifestbindung prüfen; kein stilles Umschreiben historischer Nachweise. |
-| Sicherungen | tägliche Datenbank- und Bucket-Exporte, restic-Snapshots, Probe- und Wiederherstellungsstände | Sicherungen sind Kopien mit eigener Lebensdauer. Die inkrementellen Bucket-Zuwächse sind aktuell vom `forget` ausgenommen; deshalb reicht Löschen im Produktivbestand nicht. |
+| Archivisches Benutzerverzeichnis | `benutzer_verzeichnis` je Mandant mit `benutzer` (Keycloak-`sub`, `token:<id>` oder `<webseite>/<bearbeiter>`), Name/Anzeigename, Rolle, Gültigkeitszeitraum und Anlass | Zugehörige Einträge anhand der `sub` bzw. des gespeicherten Bearbeiter-Schlüssels in Prüfung und Auskunft aufnehmen. Nach Spec 01, Req 10.10 INSERT-only und überlebt einen Neuaufbau von Keycloak; Aufbewahrung und eine allfällige spätere Minimierung brauchen einen Entscheid. |
+| Laufender Keycloak-Benutzerbestand | Aktuelle Benutzerkonten des Realm `urinet-archiv` mit `sub` und vorhandenen Identitätsattributen wie Benutzername, E-Mail, Vor- und Nachname, `mandant` und Rollen; Konten stehen nicht im Realm-Export | Passendes Konto anhand des stabilen `sub` in Prüfung und Auskunft aufnehmen. Kontolöschung bleibt vom Dokumentlöschlauf getrennt und folgt bis zu einem Entscheid dem Lebenszyklus aus Spec 06. Die Keycloak-Datenbank wird separat gesichert; Löschung aus dieser Sicherung folgt der gewählten Sicherungsvariante. |
+| Sicherungen | tägliche PostgreSQL-Exporte (Archiv und Keycloak), Bucket-Exporte, restic-Snapshots, Probe- und Wiederherstellungsstände | Sicherungen sind Kopien mit eigener Lebensdauer. Die inkrementellen Bucket-Zuwächse sind aktuell vom `forget` ausgenommen; deshalb reicht Löschen im Produktivbestand nicht. |
 
 Zusätzliche Caches, temporäre Dateien, Analyse-/Exportdateien oder Kopien ausserhalb dieser Liste dürfen nicht als gelöscht gelten, bevor ihr Speicherort und ihre Bereinigung geprüft sind. [offen: Welche weiteren persistenten oder temporären Datenorte sind verbindlich in das Inventar aufzunehmen?]
 
 ## Vorgeschlagener Ablauf
 
 1. **Vorgang erfassen:** Löschbegehren oder Fristablauf mit Mandant, anfragender Person und gewünschtem Umfang aufnehmen. Eingangsbestätigung ist keine Zusage, dass Daten gelöscht werden.
-2. **Identität und Umfang prüfen:** Anfrage der betroffenen Person zuordnen, Personen- und Drittpersonendaten unterscheiden und verbundene Dokumente, Beispiele, Seiten, Gespräche sowie Sicherungen inventarisieren. [offen: Welche Rolle darf Identität, Vertretung und Umfang bestätigen?]
+2. **Identität und Umfang prüfen:** Anfrage der betroffenen Person zuordnen, Personen- und Drittpersonendaten unterscheiden und verbundene Dokumente, Beispiele, Seiten, Gespräche sowie Sicherungen inventarisieren. Bei einer Person mit Archivzugang zusätzlich den passenden Eintrag in `benutzer_verzeichnis` und – soweit das Konto besteht – das aktuelle Keycloak-Benutzerkonto samt vorhandenen Identitätsattributen anhand des `sub` erfassen. [offen: Welche Rolle darf Identität, Vertretung und Umfang bestätigen?]
 3. **Aufbewahrung und Sperren prüfen:** `aufbewahren_bis`, `gesetzliche_pflicht`, aktive Object-Lock-Sperren, Manifestbindungen, Protokollfristen und bestehende Gesprächsfrist pro Datenort prüfen. Rechtsgrundlage, Ausnahmen und Fristberechnung sind durch eine Fachperson zu prüfen.
 4. **Entscheid dokumentieren:** Freigabe, Zurückstellung bis zu einem konkreten Fristende oder begründete Ablehnung festhalten. Bei aktiver Sperre nur eine spätere Prüfung vormerken; keine Datei vor Fristende löschen.
 5. **Datenorte abarbeiten:** freigegebene, nicht gesperrte Bestände und abgeleitete Daten entfernen oder gemäss beschlossenem Verfahren unzugänglich machen; abhängige Seiten und Indizes aktualisieren. Sicherungen separat gemäss gewählter Variante behandeln.
 6. **Prüfen und abschliessen:** je Datenort den Erfolg verifizieren. Fehler oder nicht erreichbare Kopien bleiben sichtbar als «unvollständig»; der Vorgang darf dann nicht als gelöscht bestätigt werden.
-7. **Auskunft und Nachweis:** der betroffenen Person eine verständliche Antwort mit Ergebnis, Kategorien, Fristen und verbleibenden Daten geben. Den internen Nachweis inhaltsarm halten und nur die nach Entscheid erlaubten Kennungen aufnehmen.
+7. **Auskunft und Nachweis:** der betroffenen Person eine verständliche Antwort mit Ergebnis, Kategorien, Fristen und verbleibenden Daten geben; bei einem Archivzugang auch Datenorte, Zweck, Herkunft und Aufbewahrungsstatus von `benutzer_verzeichnis` und passendem Keycloak-Konto berücksichtigen. Den internen Nachweis inhaltsarm halten und nur die nach Entscheid erlaubten Kennungen aufnehmen.
 
 ## Varianten und Entscheide
 
@@ -108,6 +110,16 @@ Zusätzliche Caches, temporäre Dateien, Analyse-/Exportdateien oder Kopien auss
 
 [offen: Welche Daten und Drittpersonenmerkmale gehören in die Auskunft, und welche dürfen oder müssen geschwärzt werden?]
 
+### 8. Benutzerverzeichnis und Keycloak-Identitäten
+
+- **A — Beide Datenorte unmittelbar mitlöschen:** Entfernt beim freigegebenen Begehren den Keycloak-Benutzer und den zugehörigen `benutzer_verzeichnis`-Eintrag. Das wäre ein direkter Löschweg, widerspricht aber dem INSERT-only-Grundsatz und den Aufbewahrungsfristen aus Spec 01, Req 10.9/10.10; hoher Änderungs- und Nachweisaufwand.
+- **B — In Prüfung und Auskunft aufnehmen, bestehende Lebenszyklen getrennt lassen (vorläufige Empfehlung):** `benutzer_verzeichnis` bleibt nach Req 10.10 anfügend und wird bis zur festgelegten Frist aufbewahrt; Änderungen am Keycloak-Konto folgen bis zu einem Entscheid dem Lebenszyklus aus Spec 06. Geringster Umbau und keine stillschweigende Änderung bestehender Regeln, lässt aber Identitätsdaten bestehen.
+- **C — Getrennter, zweistufiger Prozess:** Den Keycloak-Benutzer nach separater Freigabe gemäss Spec 06 löschen, den append-only-Eintrag im Benutzerverzeichnis bis zum Ende seiner Aufbewahrung behalten und erst danach eine ausdrücklich beschlossene Minimierung ausführen. Hoher Aufwand für Fristen, Protokoll- und Manifestfolgen; erfordert Entscheide und Anpassungen an bestehenden Specs.
+
+**Empfehlung:** B als Zwischenstand; beide Datenorte werden sichtbar geprüft und in der Auskunft berücksichtigt, aber nicht automatisch geändert. Eine abweichende Löschung oder Minimierung braucht einen datierten Entscheid und die Prüfung durch eine Fachperson.
+
+[offen: Gehören `benutzer_verzeichnis` und Keycloak-Identitätsdaten selbst zum Löschbegehren, und welche Teile dürfen nach Ablauf der jeweiligen Aufbewahrung gelöscht oder minimiert werden?]
+
 ## Noch zu klären
 
 - [offen: Welche Fristen und rechtlichen Ausnahmen gelten für jedes Datenobjekt? Durch eine Fachperson zu prüfen.]
@@ -120,5 +132,6 @@ Zusätzliche Caches, temporäre Dateien, Analyse-/Exportdateien oder Kopien auss
 - [Spec 01, Open Points zu Wissensversionen, `ki_beispiel` und Sicherungen](../01-archiv-kern/design.md)
 - [Spec 04, Requirement 15.5 und append-only `wissensseite_version`](../04-wissensbasis/requirements.md)
 - [Spec 02, Requirement 3.4](../02-abgleich-chat/requirements.md)
+- [Spec 06, Identitätsquelle und Benutzerlebenszyklus](../06-verwaltung-einstellungen-benutzer/requirements.md), [Design](../06-verwaltung-einstellungen-benutzer/design.md)
 - [ADR-004: Zweistufige Ablage](../../../docs/adr/ADR-004-zweistufige-ablage.md), [ADR-007: Unveränderbarkeit](../../../docs/adr/ADR-007-unveraenderbarkeit-governance.md), [ADR-008: Sicherung](../../../docs/adr/ADR-008-sicherung-zweitkopie.md)
 - [Verfahrensbeschreibung](../../../docs/verfahrensbeschreibung-erfassen-archivieren.md)
