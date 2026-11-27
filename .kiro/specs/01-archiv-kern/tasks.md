@@ -569,6 +569,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Vorbereitung ohne Betriebseingriff (PR #569): Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; Anbindung und Nachweise bleiben offen.
   - Folgeumsetzung (24.11.2026): App-Gauge `archiv_ki_beispiele{mandant}` und Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` ab 1'000 Beispielen; dokumentiert in `docs/alarme.md`. Die VPS-Anbindung und Betriebsnachweise bleiben offen, daher bleibt die Aufgabe ungeprüft.
   - Nachtrag (25.11.2026): Ein Fehler beim Zählen der KI-Beispiele lässt die übrigen Kennzahlen des Mandanten bestehen; die fehlende KI-Gauge signalisiert den Messfehler statt eines Nullwerts. Tests in `JdbcKiBeispielTest` und `MicrometerKennzahlenTest`.
+  - Vorschlag nach Erreichbarkeitsausfall (27.11.2026): `docs/betrieb/ueberwachung-erreichbarkeit.md` vergleicht Anwendungsalarme und Deploy-Prüfungen mit der Lücke bei einem Ausfall zwischen Deploys und skizziert externe HTTP-, Zertifikats- und Deploy-Fehlermeldungen mit Aufwand und Ablageort. Keine Änderung an Infra oder Workflow; Auswahl durch Fabian offen. Aufgabe 5.9 bleibt bis zur freigegebenen Umsetzung und den Betriebsnachweisen ungeprüft.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 
