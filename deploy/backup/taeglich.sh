@@ -315,15 +315,16 @@ fi
 verschluesseln keycloak - "$plain/keycloak.dump"
 realm_container_angelegt=1
 # shellcheck disable=SC2016 # Der Befehl wird im Container ausgewertet, nicht im Host-Shellprozess.
-# /tmp des Dienstes ist ein 32-MiB-tmpfs, und tmpfs-Inhalt überlebt das Containerende nicht (docker cp erfasst ihn
-# nicht). Darum schreibt der Export in ein Bind-Mount unter dem Arbeitsverzeichnis. Der Keycloak-Benutzer (uid 1000)
-# braucht Schreibrecht; das übergeordnete Arbeitsverzeichnis ist 700, andere Benutzer erreichen das Verzeichnis nicht.
+# Der Export bleibt im beschreibbaren Container-Dateisystem; docker cp überträgt ihn nach dem Containerlauf in das
+# private Arbeitsverzeichnis. So hängt der Keycloak-Benutzer (uid 1000) nicht von Host-Bind-Mount-Rechten ab.
 # Der Export braucht keinen Bootstrap-Admin; Keycloak 26.8 bricht ab, wenn der Name ohne Passwort gesetzt ist.
-realm_export_befehl='set -euo pipefail; umask 022; unset KC_BOOTSTRAP_ADMIN_USERNAME; export KC_DB_PASSWORD="$(< /run/secrets/keycloak_db)"; exec /opt/keycloak/bin/kc.sh export --optimized --dir /archiv-export --realm urinet-archiv --users same_file'
-chmod 777 "$plain/realm" || fehler 3 "Verzeichnis für den Realm-Export konnte nicht vorbereitet werden."
-compose run --no-deps -T --name "$realm_container" --volume "$plain/realm:/archiv-export" --entrypoint /bin/bash \
+realm_export_pfad=/opt/keycloak/data/archiv-export
+realm_export_befehl='set -euo pipefail; umask 077; unset KC_BOOTSTRAP_ADMIN_USERNAME; mkdir -p /opt/keycloak/data/archiv-export; export KC_DB_PASSWORD="$(< /run/secrets/keycloak_db)"; exec /opt/keycloak/bin/kc.sh export --optimized --dir /opt/keycloak/data/archiv-export --realm urinet-archiv --users same_file'
+compose run --no-deps -T --name "$realm_container" --entrypoint /bin/bash \
   "$ARCHIV_KEYCLOAK_SERVICE" -c "$realm_export_befehl" \
   || fehler 3 "Keycloak-Realm konnte nicht exportiert werden."
+"$ARCHIV_DOCKER_BIN" cp "$realm_container:$realm_export_pfad/." "$plain/realm/" \
+  || fehler 3 "Keycloak-Realm-Export konnte nicht aus dem Container kopiert werden."
 compose start "$ARCHIV_KEYCLOAK_SERVICE" >/dev/null \
   || fehler 3 "Keycloak konnte nach dem Realm-Export nicht gestartet werden."
 keycloak_angehalten=0
