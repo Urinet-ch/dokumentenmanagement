@@ -31,8 +31,14 @@ if [ -n "$(ls -A "$ausgabe")" ]; then
 fi
 
 case "$(docker info --format '{{.Architecture}}')" in
-    aarch64|arm64) digest=sha256:0b8847b2c722b16f0964431aabcbb499560a1f17e8698d52326d82db29efac1d ;;
-    x86_64|amd64) digest=sha256:c2d63bbb2d907a5c5257914fb20e26e969c92b25f265def7f89f08203f912882 ;;
+    aarch64|arm64)
+        digest=sha256:0b8847b2c722b16f0964431aabcbb499560a1f17e8698d52326d82db29efac1d
+        brotli_native=native-linux-aarch64
+        ;;
+    x86_64|amd64)
+        digest=sha256:c2d63bbb2d907a5c5257914fb20e26e969c92b25f265def7f89f08203f912882
+        brotli_native=native-linux-x86_64
+        ;;
     *) echo "Nicht unterstützte Docker-Architektur." >&2; exit 1 ;;
 esac
 zap="ghcr.io/zaproxy/zaproxy@$digest"
@@ -60,6 +66,25 @@ redact_ausgaben() {
         done < <(find "$arbeitsberichte" -type f -print0)
     done
 }
+pruefe_ausgaben_ohne_zugangsdaten() {
+    for zugangsdatei in "$arbeit"/zugang/*; do
+        [ -f "$zugangsdatei" ] || continue
+        token="$(<"$zugangsdatei")"
+        [ -n "$token" ] || continue
+        while IFS= read -r -d '' datei; do
+            if grep -aFq -- "$token" "$datei"; then
+                echo "Eine ZAP-Ausgabe enthält noch einen synthetischen Zugang." >&2
+                return 1
+            else
+                grep_status=$?
+                if [ "$grep_status" -ne 1 ]; then
+                    echo "ZAP-Ausgaben konnten nicht auf Zugangsdaten geprüft werden." >&2
+                    return 1
+                fi
+            fi
+        done < <(find "$arbeitsberichte" -type f -print0)
+    done
+}
 aufraeumen() {
     redact_ausgaben || echo "Zugangsdaten konnten nicht aus allen ZAP-Ausgaben entfernt werden." >&2
     [ -z "$scanner" ] || docker rm -f "$scanner" >/dev/null || echo "Scanner konnte nicht entfernt werden: $scanner" >&2
@@ -75,6 +100,16 @@ maven_home="$(mvn --version | sed -n 's/^Maven home: //p')"
 mkdir -p "$arbeit/maven/conf/logging"
 cp -R "$maven_home/bin" "$maven_home/boot" "$maven_home/lib" "$arbeit/maven/"
 printf '<settings/>\n' >"$arbeit/settings.xml"
+brotli_cache="$HOME/.m2/repository/com/aayushatharva/brotli4j/$brotli_native/1.24.0"
+if [ ! -s "$brotli_cache/$brotli_native-1.24.0.jar" ] ||
+    [ ! -s "$brotli_cache/$brotli_native-1.24.0.pom" ]; then
+    if ! mvn -B -ntp -s "$arbeit/settings.xml" -gs "$arbeit/settings.xml" \
+        -Dmaven.repo.local="$HOME/.m2/repository" dependency:get \
+        -Dartifact="com.aayushatharva.brotli4j:$brotli_native:1.24.0" -Dtransitive=false; then
+        echo "Das Linux-Brotli-Artefakt für die Docker-Architektur konnte nicht vorab geladen werden." >&2
+        exit 1
+    fi
+fi
 mkdir "$arbeit/locks"
 anker="$(docker run -d --network none "$temurin_jre" sleep 2700)"
 db="$(docker run -d --network "container:$anker" \
@@ -200,6 +235,7 @@ if [ "$server_status" != 0 ]; then
 fi
 
 redact_ausgaben
+pruefe_ausgaben_ohne_zugangsdaten
 cp -R "$arbeitsberichte/." "$ausgabe/"
 echo "ZAP-Status $gesamt_status. Berichte: $ausgabe"
 exit "$gesamt_status"

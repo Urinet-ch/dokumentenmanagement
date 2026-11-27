@@ -6,11 +6,15 @@ Sie ersetzt **nicht** die Staging-Prüfung durch Fabian nach Spec 03, Aufgabe 12
 ## Voraussetzungen und Aufruf
 
 Docker, Java 25 und Maven müssen lokal verfügbar sein. Der Maven-Cache muss die
-Abhängigkeiten des Backends einschliesslich der Linux-Abhängigkeiten für die Architektur
-des Docker-Hosts enthalten. Das Skript arbeitet im Testcontainer offline und liest nur
-`~/.m2/repository`; es verwendet leere Maven-Einstellungen und kopiert keine vorhandenen
-Einstellungen oder Zugangsdaten. Fehlt ein Artefakt,
-meldet Maven dessen Koordinaten; dieses kann vor einem erneuten Lauf auf dem Host mit
+Abhängigkeiten des Backends enthalten. Das Skript arbeitet im Testcontainer offline und liest
+nur `~/.m2/repository`; es verwendet leere Maven-Einstellungen und kopiert keine vorhandenen
+Einstellungen oder Zugangsdaten. Vor dem Containerstart löst es bei Bedarf mit leeren
+Einstellungen das Linux-Brotli-Native für die Docker-Architektur auf (`native-linux-aarch64`
+oder `native-linux-x86_64`). Das ist nötig, weil die App-Abhängigkeit auf dem Mac sonst das
+macOS-Native auswählt, während der Testcontainer Linux ausführt. Nur für diese Vorauflösung
+wird Maven Central vom Host kontaktiert; im Testcontainer bleibt Maven offline und der
+Anwendungstest ohne externes Netzwerk. Andere fehlende Maven-Artefakte meldet Maven mit ihren
+Koordinaten; sie können vor einem erneuten Lauf auf dem Host mit
 `mvn -Dquarkus.http.test-port=0 dependency:get -Dartifact=<Koordinaten>` im Backend-Worktree
 geladen werden.
 
@@ -38,10 +42,11 @@ und den separaten Webseiten-Vertrag `docs/schnittstelle/public-v1.yaml` und füh
 Zusätzlich zum unangemeldeten Scan prüft ZAP `/api/v1/*` mit einem kurzlebigen,
 synthetisch signierten Fake-Keycloak-Token mit den Rollen `inhaber` und `mitarbeiter`.
 Der Webseiten-Vertrag wird zusätzlich je einmal mit einem neu erzeugten Lese-Schlüssel
-der Stufen `oeffentlich`, `mitglieder` und `vorstand` geprüft. Die Tokens und Schlüssel
-werden nur im wegwerfbaren Teststack erstellt, in einem temporären Arbeitsverzeichnis
-ausserhalb des Repositories gespeichert und vor der Ausgabe der ZAP-Berichte aus
-Berichten und Logs entfernt.
+der Stufen `oeffentlich`, `mitglieder` und `vorstand` geprüft. Die Tokens und Schlüssel werden nur im wegwerfbaren Teststack erstellt, in einem temporären
+Arbeitsverzeichnis ausserhalb des Repositories gespeichert und vor der Ausgabe der ZAP-Berichte
+aus allen Berichten und Logs entfernt. Danach prüft das Skript automatisiert sämtliche
+Berichts- und Logdateien erneut auf jeden synthetischen Zugang und bricht ab, falls einer
+zurückgeblieben ist.
 Die temporäre ZAP-Konfiguration wird mit Rechten 600 angelegt und über die
 Standardeingabe an den Scanner übergeben; auch dort wird sie mit Rechten 600
 als Scannerbenutzer angelegt.
