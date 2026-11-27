@@ -5,10 +5,11 @@ Unter «Wissensentwürfe» prüfen Sie, was die Wissensbasis ändern soll: Entw�
 2. Wählen Sie einen Entwurf. Er zeigt je betroffene Seite eine Änderung, zum Beispiel «Änderung 1 von 3».
 3. Lesen Sie bei jeder Änderung die Abschnitte «Begründung», «Änderungsvergleich» mit «Bisher» und «Neu» (entfernte Zeilen mit −, neue mit +), «Sperrende Befunde», «Hinweise», «Widersprüche» und «Entfernte Aussagen». Unter «Vorgeschlagene Fassung» sehen Sie den ganzen neuen Text.
 4. Bei einem Entwurf aus einer Wissensquelle prüfen Sie zudem die «Kernaussagen» mit PDF-Seite und Auszug. «Auszug nicht belegt» oder «Keiner Änderung zugeordnet» verlangen einen genauen Blick.
-5. Wählen Sie «Prüfen und entscheiden».
-6. Lassen Sie bei «Vertraulichkeit nach Annahme» die Wahl «Vom Archiv berechnen» stehen oder erhöhen Sie auf «INTERN». Senken lässt sich die Stufe nicht.
-7. Wählen Sie «Einzeln annehmen» oder «Verwerfen». Zum Verwerfen geben Sie unter «Grund für den Entscheid» an, warum.
-8. Bestätigen Sie im Fenster «Einzelentscheid bestätigen». Mit «Abbrechen» kehren Sie ohne Entscheid zurück.
+5. Ist ein Abschnitt ganz oder überwiegend fehlgeschlagen, zeigt der Entwurf den Befund mit Abschnitt und PDF-Seite. «Abschnitt neu verarbeiten» wiederholt nur die Aussagegewinnung dieses Abschnitts; die übrigen Kernaussagen bleiben erhalten und die Vorschläge werden neu aufgebaut. Offene bisherige Vorschläge werden dabei als veraltet markiert. Warten Sie, bis der Status wieder «Offen» ist, und laden Sie den Entwurf erneut.
+6. Wählen Sie «Prüfen und entscheiden».
+7. Lassen Sie bei «Vertraulichkeit nach Annahme» die Wahl «Vom Archiv berechnen» stehen oder erhöhen Sie auf «INTERN». Senken lässt sich die Stufe nicht.
+8. Wählen Sie «Einzeln annehmen» oder «Verwerfen». Zum Verwerfen geben Sie unter «Grund für den Entscheid» an, warum.
+9. Bestätigen Sie im Fenster «Einzelentscheid bestätigen». Mit «Abbrechen» kehren Sie ohne Entscheid zurück.
 
 Sind alle Änderungen eines Entwurfs entschieden, ist er erledigt. Angenommene Änderungen erscheinen sofort im Wissen und im Änderungslog.
 

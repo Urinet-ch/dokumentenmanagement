@@ -258,6 +258,18 @@ public class WissenIngestSchritte {
         KiWireMock.wissenFolge(gueltigeAntworten(dokumente.values().iterator().next().id()));
     }
 
+    @Angenommen("WireMock liefert eine ungültige Aussage und gültige Folgeantworten")
+    public void ungueltigeAussageMitFolgeantworten() {
+        List<String> antworten = new ArrayList<>(gueltigeAntworten(dokumente.values().iterator().next().id()));
+        String aussage = """
+                {"nr":1,"text":"Die Abgabefrist endet am 30. April.","seiten":[1],
+                "auszug":"Die Abgabefrist endet am 30. April."}
+                """;
+        antworten.set(0, "{\"aussagen\":[" + aussage + "," + aussage + "," + aussage + "]}");
+        KiWireMock.zuruecksetzen();
+        KiWireMock.wissenFolge(antworten);
+    }
+
     @Angenommen("WireMock liefert eine offene Frage und eine optionale Preisbedingung")
     public void antwortenFrageUndOption() {
         UUID id = dokumente.values().iterator().next().id();
@@ -688,6 +700,17 @@ public class WissenIngestSchritte {
         ingestStarten(benutzer, name, Map.of("seiteVon", von, "seiteBis", bis));
     }
 
+    @Wenn("«{word}» Abschnitt {int} des Ingest-Entwurfs erneut verarbeitet")
+    public void abschnittWiederholen(String benutzer, int nummer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(Map.of()).when().post("/api/v1/wissensentwuerfe/" + entwurfId
+                        + "/abschnitte/" + nummer + "/wiederholen");
+        if (antwort.statusCode() == 202) {
+            UUID zurueckgegeben = UUID.fromString(antwort.jsonPath().getString("entwurfId"));
+            assertThat(zurueckgegeben).isEqualTo(entwurfId);
+        }
+    }
+
     @Wenn("«{word}» den Ingest für ein unbekanntes Dokument startet")
     public void unbekannt(String benutzer) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
@@ -732,6 +755,27 @@ public class WissenIngestSchritte {
         var ansicht = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
                 .when().get("/api/v1/wissensentwuerfe/" + entwurfId).then().statusCode(200).extract().jsonPath();
         assertThat(ansicht.getList("kernaussagen.zugeordnet", Boolean.class)).containsExactly(true, false);
+    }
+
+    @Dann("ist der Abschnittsfehler für den Ingest mit Seite und Aussage sichtbar")
+    public void abschnittsfehlerSichtbar() {
+        var ansicht = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensentwuerfe/" + entwurfId).then().statusCode(200).extract().jsonPath();
+        assertThat(ansicht.getList("abschnittFehler.nummer", Integer.class)).containsExactly(1);
+        assertThat(ansicht.getInt("abschnittFehler[0].seite")).isEqualTo(1);
+        assertThat(ansicht.getInt("abschnittFehler[0].verworfen")).isEqualTo(2);
+        assertThat(ansicht.getInt("abschnittFehler[0].behalten")).isEqualTo(1);
+        assertThat(ansicht.getList("ingestHinweise", String.class))
+                .anySatisfy(hinweis -> assertThat(hinweis).contains("Seite 1", "Aussage 2"));
+    }
+
+    @Dann("ist der Abschnittsfehler nach der Wiederholung behoben")
+    public void abschnittsfehlerBehoben() {
+        var ansicht = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                .when().get("/api/v1/wissensentwuerfe/" + entwurfId).then().statusCode(200).extract().jsonPath();
+        assertThat(ansicht.getList("abschnittFehler")).isEmpty();
+        assertThat(ansicht.getList("ingestHinweise", String.class))
+                .noneSatisfy(hinweis -> assertThat(hinweis).contains("Abschnitt 1,"));
     }
 
     @Dann("die Kernaussage erhält die belegte PDF-Seite {int}")

@@ -66,6 +66,31 @@ public final class WissenIngestSchaetzung {
             throw new IllegalArgumentException("Der Seitenbereich enthält keinen Volltext");
         }
 
+        return schaetzen(textZeichen, abschnitte, normal, grenzen, systempromptZeichen);
+    }
+
+    public static Schaetzung abschnittSchaetzen(String volltext, int seiten, Integer seiteVon, Integer seiteBis,
+                                                 int abschnittNr, int abschnittZeichen, boolean normal,
+                                                 WissenIngestGrenzen grenzen, int systempromptZeichen) {
+        List<String> pdfSeiten = Seitentext.von(volltext, seiten)
+                .orElseThrow(() -> new IllegalArgumentException("Seitenzahl passt nicht zum Volltext"))
+                .seiten();
+        int von = seiteVon == null ? 1 : seiteVon;
+        int bis = seiteBis == null ? seiten : seiteBis;
+        if (systempromptZeichen < 0 || abschnittNr < 0 || abschnittZeichen < 1
+                || von < 1 || bis < von || bis > seiten) {
+            throw new IllegalArgumentException("Ungültiger Abschnitt oder Seitenbereich");
+        }
+        List<WissenIngestSegmentierer.Abschnitt> abschnitte = WissenIngestSegmentierer.zerlegen(
+                new Seitentext(pdfSeiten), von, bis, abschnittZeichen);
+        if (abschnittNr >= abschnitte.size()) {
+            throw new IllegalArgumentException("Abschnitt nicht vorhanden");
+        }
+        return schaetzen(abschnitte.get(abschnittNr).text().length(), 1, normal, grenzen, systempromptZeichen);
+    }
+
+    private static Schaetzung schaetzen(long textZeichen, long abschnitte, boolean normal,
+                                         WissenIngestGrenzen grenzen, int systempromptZeichen) {
         long aufrufe = add(add(abschnitte, grenzen.maxSeiten()), 2);
         long gesamtZeichen = add(add(add(add(textZeichen, grenzen.indexMaxZeichen()),
                         normal ? grenzen.seiteMaxZeichen() : 0),

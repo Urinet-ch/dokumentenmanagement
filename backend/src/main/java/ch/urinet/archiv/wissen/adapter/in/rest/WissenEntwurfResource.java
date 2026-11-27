@@ -16,6 +16,7 @@ import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.FreigabeAnnahme;
 import ch.urinet.archiv.wissen.application.ManuellerWissensentwurf;
 import ch.urinet.archiv.wissen.application.ChatWissensentwurf;
+import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.GET;
@@ -46,15 +47,18 @@ public class WissenEntwurfResource {
     private final FreigabeDienst freigabe;
     private final ManuellerWissensentwurf manuell;
     private final ChatWissensentwurf analyse;
+    private final WissenIngestStarten ingest;
     private final MandantAufloesung mandant;
     private final SecurityIdentity identitaet;
 
     public WissenEntwurfResource(WissenEntwurfLesen lesen, FreigabeDienst freigabe, ManuellerWissensentwurf manuell,
-                                 ChatWissensentwurf analyse, MandantAufloesung mandant, SecurityIdentity identitaet) {
+                                 ChatWissensentwurf analyse, WissenIngestStarten ingest, MandantAufloesung mandant,
+                                 SecurityIdentity identitaet) {
         this.lesen = lesen;
         this.freigabe = freigabe;
         this.manuell = manuell;
         this.analyse = analyse;
+        this.ingest = ingest;
         this.mandant = mandant;
         this.identitaet = identitaet;
     }
@@ -86,6 +90,28 @@ public class WissenEntwurfResource {
     public Response lesen(@PathParam("id") UUID id) {
         mandant.pruefen();
         return privat(lesen.lesen(benutzer(), id));
+    }
+
+    @POST
+    @Path("/{entwurfId}/abschnitte/{nr}/wiederholen")
+    @ErfordertAktion(Aktion.A17)
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Protokolliert(aktion = ProtokollAktion.WISSEN_INGEST)
+    @Operation(summary = "Fehlerhaften Ingest-Abschnitt wiederholen",
+            description = "Verarbeitet nur den betroffenen Abschnitt erneut und baut die Vorschläge darauf neu auf.")
+    @APIResponse(responseCode = "202", description = "Abschnitt erneut eingereiht",
+            content = @Content(schema = @Schema(implementation = WissenIngestResource.AuftragDto.class)))
+    @APIResponse(responseCode = "400", description = "Abschnittsnummer ungültig")
+    @APIResponse(responseCode = "403", description = "Rolle darf den Abschnitt nicht wiederholen")
+    @APIResponse(responseCode = "404", description = "Ingest-Entwurf nicht gefunden")
+    @APIResponse(responseCode = "409", description = "Entwurf, Quelle oder Abschnitt ist nicht mehr aktuell")
+    @APIResponse(responseCode = "429", description = "Ingest- oder Monatsbudget reicht nicht aus")
+    public Response abschnittWiederholen(@PathParam("entwurfId") UUID entwurfId, @PathParam("nr") int nummer) {
+        mandant.pruefen();
+        WissenIngestStarten.Ergebnis ergebnis = ingest.abschnittWiederholen(entwurfId, nummer, benutzer().id());
+        return Response.accepted(new WissenIngestResource.AuftragDto(ergebnis.entwurfId(), ergebnis.status(),
+                ergebnis.geschaetzteTokens(), ergebnis.hinweis())).build();
     }
 
     @Schema(name = "WissenVerwerfen")

@@ -234,6 +234,17 @@ export const TEXTE = {
       ],
       kernaussagen: 'Kernaussagen', pdfSeiten: 'PDF-Seiten', belegt: 'Auszug belegt',
       nichtBelegt: 'Auszug nicht belegt', nichtZugeordnet: 'Keiner Änderung zugeordnet',
+      abschnittFehlerTitel: 'Fehlerhafte Ingest-Abschnitte',
+      abschnittFehlerMeldung: (nummer: number, seite: number, verworfen: number, behalten: number,
+        antwortUngueltig: boolean) => antwortUngueltig
+        ? `Abschnitt ${nummer}, Seite ${seite}: Die Antwort war ungültig; mindestens eine Aussage ging verloren.`
+        : `Abschnitt ${nummer}, Seite ${seite}: ${verworfen} Aussagen verworfen, ${behalten} übernommen.`,
+      abschnittWiederholen: 'Abschnitt neu verarbeiten',
+      abschnittWiederholenInfo: 'Offene Vorschläge werden dabei als veraltet markiert und auf Basis der korrigierten '
+        + 'Kernaussagen neu erstellt.',
+      abschnittWirdVerarbeitet: 'Der Abschnitt wird neu verarbeitet. Aktualisieren Sie den Entwurf nach Abschluss.',
+      abschnittWiederholenFehler: 'Der Abschnitt konnte nicht erneut verarbeitet werden. Bitte aktualisieren Sie den Entwurf.',
+      ingestHinweiseTitel: 'Ingest-Hinweise',
       basis: 'Basisversion', kontext: 'Kontextstufe', begruendung: 'Begründung', diff: 'Änderungsvergleich',
       fassung: 'Vorgeschlagene Fassung', befunde: 'Sperrende Befunde', hinweise: 'Hinweise',
       widersprueche: 'Widersprüche', aufloesung: 'Widerspruch wird aufgelöst',

@@ -52,6 +52,15 @@ class WissenIngestSchaetzungTest {
     }
 
     @Test
+    void wiederholungSchaetztNurDenAngefordertenAbschnitt() {
+        var schaetzung = WissenIngestSchaetzung.abschnittSchaetzen("AAA\fBBB\fCCC\f", 3, null, null,
+                1, grenzen.abschnittZeichen(), false, grenzen, 20);
+
+        assertThat(schaetzung.textZeichen()).isEqualTo("[Seite 2]\nBBB".length());
+        assertThat(schaetzung.abschnitte()).isEqualTo(1);
+    }
+
+    @Test
     void derSchlusstrennerVonPdftotextErgibtKeineZusaetzlicheSeite() {
         assertThat(WissenIngestSchaetzung.schaetzen("eine Seite\f", 1, null, null, true, grenzen, 20).textZeichen())
                 .isEqualTo(10);

@@ -48,6 +48,39 @@
     </div>
     @if (ansicht.entwurf.hinweis) { <p>{{ ansicht.entwurf.hinweis }}</p> }
   </div>
+  @if (ansicht.abschnittFehler?.length) {
+    <section class="karte">
+      <h2>{{ texte.abschnittFehlerTitel }}</h2>
+      <p>{{ texte.abschnittWiederholenInfo }}</p>
+      <ul class="eintraege">
+        @for (abschnitt of ansicht.abschnittFehler; track abschnitt.nummer) {
+          <li>
+            <p class="hinweis warnung"><app-symbol name="warnung" />{{
+              texte.abschnittFehlerMeldung(abschnitt.nummer, abschnitt.seite, abschnitt.verworfen,
+                abschnitt.behalten, abschnitt.antwortUngueltig)
+            }}</p>
+            @if (ansicht.entwurf.anlass === 'INGEST' && ansicht.entwurf.status === 'OFFEN'
+                && abschnittWiederholungErlaubt()) {
+              <button mat-stroked-button type="button" [disabled]="sendet()"
+                (click)="abschnittWiederholen(abschnitt)">
+                <app-symbol name="wiederholen" />{{ texte.abschnittWiederholen }}
+              </button>
+            }
+          </li>
+        }
+      </ul>
+      @if (ingestFehler(); as meldung) { <p class="hinweis gefahr" role="alert">{{ meldung }}</p> }
+    </section>
+  }
+  @if (abschnittLaeuft()) { <p class="hinweis warnung" role="status">{{ texte.abschnittWirdVerarbeitet }}</p> }
+  @if (ansicht.ingestHinweise?.length) {
+    <section class="karte">
+      <h2>{{ texte.ingestHinweiseTitel }}</h2>
+      @for (hinweis of ansicht.ingestHinweise; track $index) {
+        <p class="befund">{{ hinweis }}</p>
+      }
+    </section>
+  }
   @if (ansicht.entwurf.anlass === 'IMPORT') {
     <section class="karte importherkunft">
       <h2>{{ importe.herkunft }}</h2>
