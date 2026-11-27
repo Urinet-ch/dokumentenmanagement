@@ -8,6 +8,7 @@ Given('synthetische Wissensentwürfe sind für die Oberfläche verfügbar', asyn
   const widerspruch = { text: 'Synthetischer Widerspruch', fussnoten: ['alt', 'neu'] };
   const ansicht = {
     entwurf: kopf,
+    abschnittFehler: [{ nummer: 1, seite: 1, verworfen: 2, behalten: 1, antwortUngueltig: false }],
     kernaussagen: [{ nr: 1, schluessel: 'q1', text: 'Synthetische Kernaussage', seiten: [1],
       auszug: 'Synthetischer Auszug', belegt: true, zugeordnet: false }],
     aenderungen: [{
@@ -23,11 +24,17 @@ Given('synthetische Wissensentwürfe sind für die Oberfläche verfügbar', asyn
   await this.seite.route((url) => url.pathname.startsWith('/api/v1/wissensentwuerfe'), async (route) => {
     const request = route.request();
     if (request.method() === 'POST') {
-      this.wissensEntscheide.push({ pfad: new URL(request.url()).pathname,
-        etag: request.headers()['if-match'], angaben: request.postDataJSON() });
-      ansicht.aenderungen[0].status = 'ANGENOMMEN';
-      kopf.status = 'ERLEDIGT';
-      await route.fulfill({ status: 204 });
+      const pfad = new URL(request.url()).pathname;
+      if (pfad.endsWith('/wiederholen')) {
+        await route.fulfill({ status: 202, contentType: 'application/json',
+          body: JSON.stringify({ entwurfId: 'e1', status: 'IN_ARBEIT' }) });
+      } else {
+        this.wissensEntscheide.push({ pfad,
+          etag: request.headers()['if-match'], angaben: request.postDataJSON() });
+        ansicht.aenderungen[0].status = 'ANGENOMMEN';
+        kopf.status = 'ERLEDIGT';
+        await route.fulfill({ status: 204 });
+      }
     } else {
       const detail = new URL(request.url()).pathname.endsWith('/e1');
       await route.fulfill({ status: 200, contentType: 'application/json',
@@ -45,6 +52,23 @@ When('ich einen Wissensentwurf auf {int} Pixeln öffne', async function (breite)
     .getByRole('link', { name: /^Wissensentwürfe/ }).click();
   await this.seite.getByRole('link', { name: /INGEST/ }).click();
   await this.seite.getByRole('heading', { name: 'konzepte/probe' }).waitFor();
+});
+
+When('ich den betroffenen Abschnitt erneut verarbeite', async function () {
+  await this.seite.getByRole('button', { name: 'Abschnitt neu verarbeiten' }).click();
+  await this.seite.getByRole('status')
+    .filter({ hasText: 'Der Abschnitt wird neu verarbeitet.' }).waitFor();
+  this.abschnittWiederholung = true;
+});
+
+Then('ist der Abschnittsfehler sichtbar', async function () {
+  await this.seite.getByText(/Abschnitt 1, Seite 1: 2 Aussagen verworfen, 1 übernommen/).waitFor();
+  if (this.abschnittWiederholung) {
+    const status = this.seite.getByRole('status')
+      .filter({ hasText: 'Der Abschnitt wird neu verarbeitet.' });
+    await status.waitFor();
+    assert.equal(await status.evaluate((element) => element === document.activeElement), true);
+  }
 });
 
 Then('sehe ich Diffzeichen, Befunde, Kontext und nicht zugeordnete Kernaussagen', async function () {

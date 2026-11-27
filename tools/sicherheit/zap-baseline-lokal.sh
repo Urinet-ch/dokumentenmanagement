@@ -31,8 +31,14 @@ if [ -n "$(ls -A "$ausgabe")" ]; then
 fi
 
 case "$(docker info --format '{{.Architecture}}')" in
-    aarch64|arm64) digest=sha256:0b8847b2c722b16f0964431aabcbb499560a1f17e8698d52326d82db29efac1d ;;
-    x86_64|amd64) digest=sha256:c2d63bbb2d907a5c5257914fb20e26e969c92b25f265def7f89f08203f912882 ;;
+    aarch64|arm64)
+        digest=sha256:0b8847b2c722b16f0964431aabcbb499560a1f17e8698d52326d82db29efac1d
+        brotli_native=native-linux-aarch64
+        ;;
+    x86_64|amd64)
+        digest=sha256:c2d63bbb2d907a5c5257914fb20e26e969c92b25f265def7f89f08203f912882
+        brotli_native=native-linux-x86_64
+        ;;
     *) echo "Nicht unterstützte Docker-Architektur." >&2; exit 1 ;;
 esac
 zap="ghcr.io/zaproxy/zaproxy@$digest"
@@ -60,6 +66,25 @@ redact_ausgaben() {
         done < <(find "$arbeitsberichte" -type f -print0)
     done
 }
+pruefe_ausgaben_ohne_zugangsdaten() {
+    for zugangsdatei in "$arbeit"/zugang/*; do
+        [ -f "$zugangsdatei" ] || continue
+        token="$(<"$zugangsdatei")"
+        [ -n "$token" ] || continue
+        while IFS= read -r -d '' datei; do
+            if grep -aFq -- "$token" "$datei"; then
+                echo "Eine ZAP-Ausgabe enthält noch einen synthetischen Zugang." >&2
+                return 1
+            else
+                grep_status=$?
+                if [ "$grep_status" -ne 1 ]; then
+                    echo "ZAP-Ausgaben konnten nicht auf Zugangsdaten geprüft werden." >&2
+                    return 1
+                fi
+            fi
+        done < <(find "$arbeitsberichte" -type f -print0)
+    done
+}
 aufraeumen() {
     redact_ausgaben || echo "Zugangsdaten konnten nicht aus allen ZAP-Ausgaben entfernt werden." >&2
     [ -z "$scanner" ] || docker rm -f "$scanner" >/dev/null || echo "Scanner konnte nicht entfernt werden: $scanner" >&2
@@ -75,6 +100,16 @@ maven_home="$(mvn --version | sed -n 's/^Maven home: //p')"
 mkdir -p "$arbeit/maven/conf/logging"
 cp -R "$maven_home/bin" "$maven_home/boot" "$maven_home/lib" "$arbeit/maven/"
 printf '<settings/>\n' >"$arbeit/settings.xml"
+brotli_cache="$HOME/.m2/repository/com/aayushatharva/brotli4j/$brotli_native/1.24.0"
+if [ ! -s "$brotli_cache/$brotli_native-1.24.0.jar" ] ||
+    [ ! -s "$brotli_cache/$brotli_native-1.24.0.pom" ]; then
+    if ! mvn -B -ntp -s "$arbeit/settings.xml" -gs "$arbeit/settings.xml" \
+        -Dmaven.repo.local="$HOME/.m2/repository" dependency:get \
+        -Dartifact="com.aayushatharva.brotli4j:$brotli_native:1.24.0" -Dtransitive=false; then
+        echo "Das Linux-Brotli-Artefakt für die Docker-Architektur konnte nicht vorab geladen werden." >&2
+        exit 1
+    fi
+fi
 mkdir "$arbeit/locks"
 anker="$(docker run -d --network none "$temurin_jre" sleep 2700)"
 db="$(docker run -d --network "container:$anker" \
@@ -114,12 +149,30 @@ gesamt_status=0
 fataler_scan=0
 scan_zap() {
     local name="$1" ziel="$2" zugangsdatei="${3:-}" stufe="${4:-}"
-    local zap_optionen="-silent" konfiguration=""
+    local zap_optionen="-silent" konfiguration="" auth_scope="" auth_probe=""
     mkdir "$arbeitsberichte/$name"
     if [ -n "$zugangsdatei" ]; then
         local token
         token="$(<"$zugangsdatei")"
         [ -n "$token" ] || { echo "Testzugang für $name fehlt." >&2; return 1; }
+        if [ -n "$stufe" ]; then
+            auth_scope='^http://127\.0\.0\.1:[0-9]+/public/v1/.*$'
+            auth_probe='http://127.0.0.1:43123/public/v1/dokumente'
+        else
+            auth_scope='^http://127\.0\.0\.1:[0-9]+/api/v1/.*$'
+            auth_probe='http://127.0.0.1:43123/api/v1/dokumente'
+        fi
+        if ! printf '%s\n' "$auth_probe" | grep -Eq "$auth_scope"; then
+            echo "Der Authentisierungsbereich deckt keine Loopback-API-Route ab." >&2
+            return 1
+        fi
+        if printf '%s\n' \
+            'http://zap/JSON/openapi/action/importUrl/?url=http%3A%2F%2F127.0.0.1%3A45657%2Fq%2Fopenapi' \
+            'http://zap/JSON/spider/action/scan/?url=http://127.0.0.1:45657/api/v1/dokumente' \
+            'https://example.invalid/api/v1/dokumente' | grep -Eq "$auth_scope"; then
+            echo "Der Authentisierungsbereich umfasst eine ZAP-Steuerung oder ein fremdes Ziel." >&2
+            return 1
+        fi
         konfiguration="$arbeit/$name-zap.conf"
         (
             umask 077
@@ -130,6 +183,7 @@ scan_zap() {
                 printf 'replacer.full_list(0).matchstr=Authorization\n'
                 printf 'replacer.full_list(0).regex=false\n'
                 printf 'replacer.full_list(0).replacement=Bearer %s\n' "$token"
+                printf 'replacer.full_list(0).url=%s\n' "$auth_scope"
                 if [ -n "$stufe" ]; then
                     printf 'replacer.full_list(1).description=zap-zugriffsstufe\n'
                     printf 'replacer.full_list(1).enabled=true\n'
@@ -137,6 +191,7 @@ scan_zap() {
                     printf 'replacer.full_list(1).matchstr=X-Archiv-Zugriff\n'
                     printf 'replacer.full_list(1).regex=false\n'
                     printf 'replacer.full_list(1).replacement=%s\n' "$stufe"
+                    printf 'replacer.full_list(1).url=%s\n' "$auth_scope"
                 fi
             } >"$konfiguration"
         )
@@ -144,6 +199,8 @@ scan_zap() {
     fi
     scanner="$(docker create -i --pull=never --network "container:$anker" \
         --cap-drop ALL --security-opt no-new-privileges --memory 2g --workdir /zap \
+        --env HTTP_PROXY= --env HTTPS_PROXY= --env ALL_PROXY= \
+        --env http_proxy= --env https_proxy= --env all_proxy= \
         --mount "type=bind,source=$root/tools/sicherheit/zap-ausnahmen.conf,target=/zap/ausnahmen.conf,readonly" \
         --mount "type=bind,source=$root/docs/schnittstelle/public-v1.yaml,target=/zap/public-v1.yaml,readonly" \
         --entrypoint /bin/sh "$zap" -c 'set -e; umask 077; cat > /tmp/zap-auth.conf; mkdir -p /zap/wrk; exec /zap/zap-api-scan.py "$@"' sh \
@@ -200,6 +257,7 @@ if [ "$server_status" != 0 ]; then
 fi
 
 redact_ausgaben
+pruefe_ausgaben_ohne_zugangsdaten
 cp -R "$arbeitsberichte/." "$ausgabe/"
 echo "ZAP-Status $gesamt_status. Berichte: $ausgabe"
 exit "$gesamt_status"

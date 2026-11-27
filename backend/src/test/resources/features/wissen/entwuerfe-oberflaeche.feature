@@ -18,3 +18,22 @@ Funktionalität: Wissensentwürfe einzeln prüfen und entscheiden
       | 1023   |
       | 1024   |
       | 1280   |
+
+  @req-19.4
+  Szenariogrundriss: Abschnittsfehler wird bei <breite> px in <schema> wiederholbar und barrierefrei
+    Angenommen synthetische Wissensentwürfe sind für die Oberfläche verfügbar
+    Und das Farbschema ist «<schema>»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich einen Wissensentwurf auf <breite> Pixeln öffne
+    Dann ist der Abschnittsfehler sichtbar
+    Und die Entwurfsansicht hat keinen horizontalen Überlauf und keinen axe-Befund
+    Wenn ich den betroffenen Abschnitt erneut verarbeite
+    Dann ist der Abschnittsfehler sichtbar
+    Und die Entwurfsansicht hat keinen horizontalen Überlauf und keinen axe-Befund
+
+    Beispiele:
+      | breite | schema |
+      | 375    | hell   |
+      | 375    | dunkel |
+      | 1280   | hell   |
+      | 1280   | dunkel |
