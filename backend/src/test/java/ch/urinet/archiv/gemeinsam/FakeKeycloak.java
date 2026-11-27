@@ -14,7 +14,6 @@ import org.jose4j.lang.JoseException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
@@ -31,13 +30,17 @@ public final class FakeKeycloak implements QuarkusTestResourceLifecycleManager {
     /** Schlüssel samt privatem Teil für den Test; über eine System-Property, weil Ressource und Test in
      *  verschiedenen Classloadern laufen. */
     static final String SCHLUESSEL = "archiv.test.oidc-schluessel";
+    private static final String VERFUEGBAR = "archiv.test.oidc-verfuegbar";
+    private static final String ISSUER = "archiv.test.oidc-issuer";
 
     private String realm = REALM;
+    private boolean spaeterStarten;
     private HttpServer server;
 
     @Override
     public void init(Map<String, String> argumente) {
         realm = argumente.getOrDefault("realm", REALM);
+        spaeterStarten = Boolean.parseBoolean(argumente.getOrDefault("spaeter-starten", "false"));
     }
 
     @Override
@@ -45,9 +48,11 @@ public final class FakeKeycloak implements QuarkusTestResourceLifecycleManager {
         try {
             RsaJsonWebKey schluessel = neuerSchluessel();
             System.setProperty(SCHLUESSEL, schluessel.toJson(JsonWebKey.OutputControlLevel.INCLUDE_PRIVATE));
-            int port = freierPort();
-            String issuer = issuer(port);
-            server = starten(port, realm, issuer(port, realm), schluessel);
+            System.setProperty(VERFUEGBAR, spaeterStarten ? "false" : "true");
+            server = serverErstellen(0, realm, schluessel);
+            server.start();
+            String issuer = issuer(server.getAddress().getPort(), realm);
+            System.setProperty(ISSUER, issuer);
             return konfiguration(issuer);
         } catch (IOException | JoseException e) {
             throw new IllegalStateException(e);
@@ -60,6 +65,8 @@ public final class FakeKeycloak implements QuarkusTestResourceLifecycleManager {
             server.stop(0);
         }
         System.clearProperty(SCHLUESSEL);
+        System.clearProperty(VERFUEGBAR);
+        System.clearProperty(ISSUER);
     }
 
     /** Overrides für einen Test ohne Dev-Services-Keycloak gegen {@code issuer}. */
@@ -71,18 +78,8 @@ public final class FakeKeycloak implements QuarkusTestResourceLifecycleManager {
                 "quarkus.smallrye-openapi.store-schema-directory", "target/openapi-oidc-test");
     }
 
-    static String issuer(int port) {
-        return issuer(port, REALM);
-    }
-
     private static String issuer(int port, String realm) {
         return "http://127.0.0.1:" + port + realm;
-    }
-
-    static int freierPort() throws IOException {
-        try (ServerSocket frei = new ServerSocket(0)) {
-            return frei.getLocalPort();
-        }
     }
 
     static RsaJsonWebKey neuerSchluessel() throws JoseException {
@@ -96,17 +93,35 @@ public final class FakeKeycloak implements QuarkusTestResourceLifecycleManager {
         return (RsaJsonWebKey) JsonWebKey.Factory.newJwk(System.getProperty(SCHLUESSEL));
     }
 
-    static HttpServer starten(int port, String realm, String issuer, RsaJsonWebKey schluessel) throws IOException {
+    static String issuerDesServers() {
+        return System.getProperty(ISSUER);
+    }
+
+    static void spaeterVerfuegbarMachen() {
+        System.setProperty(VERFUEGBAR, "true");
+    }
+
+    private static HttpServer serverErstellen(int port, String realm, RsaJsonWebKey schluessel) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
+        String issuer = issuer(server.getAddress().getPort(), realm);
         String konfiguration = """
                 {"issuer":"%1$s","jwks_uri":"%1$s/protocol/openid-connect/certs",\
                 "token_endpoint":"%1$s/protocol/openid-connect/token",\
                 "authorization_endpoint":"%1$s/protocol/openid-connect/auth"}""".formatted(issuer);
-        server.createContext(realm + "/.well-known/openid-configuration", ex -> json(ex, konfiguration));
+        server.createContext(realm + "/.well-known/openid-configuration",
+                ex -> jsonWennVerfuegbar(ex, konfiguration));
         server.createContext(realm + "/protocol/openid-connect/certs",
-                ex -> json(ex, "{\"keys\":[" + schluessel.toJson() + "]}"));
-        server.start();
+                ex -> jsonWennVerfuegbar(ex, "{\"keys\":[" + schluessel.toJson() + "]}"));
         return server;
+    }
+
+    private static void jsonWennVerfuegbar(HttpExchange austausch, String inhalt) throws IOException {
+        if (!Boolean.parseBoolean(System.getProperty(VERFUEGBAR, "true"))) {
+            austausch.sendResponseHeaders(503, -1);
+            austausch.close();
+            return;
+        }
+        json(austausch, inhalt);
     }
 
     private static void json(HttpExchange austausch, String inhalt) throws IOException {
