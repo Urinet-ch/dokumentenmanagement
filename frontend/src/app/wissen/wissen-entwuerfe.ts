@@ -20,6 +20,9 @@ interface Kopf {
   herkunft?: { paketSha256: string; unveraendert: number; ignoriert: number;
     kopf: { erzeugtVon: string; erzeugtMit: string; kontextStufe: string; erzeugtAm: string } };
 }
+interface Abschnittsfehler {
+  nummer: number; seite: number; verworfen: number; behalten: number; antwortUngueltig: boolean;
+}
 interface Befund { code: string; meldung?: string; text?: string }
 interface Fassung {
   titel: string; beschreibung: string; tags: string[]; veraltetAb?: string;
@@ -39,7 +42,10 @@ interface Aenderung {
     widersprueche?: { alt: { text: string; fussnoten: string[] }[]; neu: { text: string; fussnoten: string[] }[] };
     entfernteWidersprueche?: { text: string; fussnoten: string[] }[] };
 }
-interface Entwurf { entwurf: Kopf; aenderungen: Aenderung[]; kernaussagen: Aussage[] }
+interface Entwurf {
+  entwurf: Kopf; aenderungen: Aenderung[]; kernaussagen: Aussage[];
+  ingestHinweise?: string[]; abschnittFehler?: Abschnittsfehler[];
+}
 type Aktion = 'annehmen' | 'verwerfen' | 'neu-erzeugen';
 
 @Component({
@@ -91,6 +97,8 @@ export class WissenEntwuerfe {
   protected readonly aktionsBefunde = signal<string[]>([]);
   protected readonly prueft = signal(false);
   protected readonly pruefFehler = signal<string | null>(null);
+  protected readonly abschnittLaeuft = signal(false);
+  protected readonly ingestFehler = signal<string | null>(null);
   protected status = 'OFFEN';
   protected bearbeitet?: number;
   protected auswahl?: number;
@@ -121,6 +129,8 @@ export class WissenEntwuerfe {
         this.pruefFehler.set(null);
         this.aktionsFehler.set(null);
         this.aktionsBefunde.set([]);
+        this.abschnittLaeuft.set(false);
+        this.ingestFehler.set(null);
         this.laden();
       });
     });
@@ -246,6 +256,38 @@ export class WissenEntwuerfe {
           this.sendet.set(false);
           this.prueft.set(false);
           this.pruefFehler.set(httpFehlerMeldung(fehler));
+        },
+      }));
+  }
+
+  protected abschnittWiederholungErlaubt(): boolean {
+    return this.anmeldung.darf('A17');
+  }
+
+  protected abschnittWiederholen(abschnitt: Abschnittsfehler): void {
+    if (this.sendet()) return;
+    this.ingestFehler.set(null);
+    this.abschnittLaeuft.set(false);
+    const entwurf = this.entwurf();
+    const id = this.id();
+    if (!id || !this.anmeldung.darf('A17') || entwurf?.entwurf.anlass !== 'INGEST'
+        || entwurf.entwurf.status !== 'OFFEN') {
+      this.ingestFehler.set(this.texte.abschnittWiederholenFehler);
+      return;
+    }
+    this.sendet.set(true);
+    this.aktionen.add(this.http.post(`/api/v1/wissensentwuerfe/${encodeURIComponent(id)}`
+      + `/abschnitte/${abschnitt.nummer}/wiederholen`, null)
+      .pipe(takeUntilDestroyed(this.destroy)).subscribe({
+        next: () => {
+          this.sendet.set(false);
+          this.abschnittLaeuft.set(true);
+          this.zaehler.auffrischen();
+          this.laden(true);
+        },
+        error: (fehler: unknown) => {
+          this.sendet.set(false);
+          this.ingestFehler.set(httpFehlerMeldung(fehler));
         },
       }));
   }

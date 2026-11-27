@@ -61,6 +61,59 @@ class WissenIngestVerarbeitenTest {
     }
 
     @Test
+    void verarbeitetBeiWiederholungNurDenFehlerhaftenAbschnitt() throws InterruptedException {
+        String text = "Fiktive Einleitung: Die Abgabefrist endet am 28. Februar.\f"
+                + "Synthetische Aussage: Die Abgabefrist endet am 30. April.\f"
+                + "Fiktive Schlussnotiz: Die Abgabefrist endet am 31. Mai.\f";
+        Fortschritt fortschritt = new Fortschritt(1, 0, false, List.of(), List.of(), List.of(), List.of(), null,
+                List.of(), 1, 1_000, 0);
+        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
+                true, "Testquelle", LocalDate.of(2026, 4, 30), text, 3, true,
+                null, null, "KERNAUSSAGEN", 0, 0, "test-modell", false, 300_000, 1_000_000, fortschritt);
+        Speicher speichern = new Speicher(stand(lauf, 0));
+        String aussage = "Die Abgabefrist endet am 30. April.";
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of(
+                new KiPort.Aussage(1, aussage, List.of(2), aussage)
+        )), new KiPort.Verbrauch("test-modell", 10, 10)));
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        assertThat(ki.aufrufe).isEqualTo(1);
+        assertThat(ki.anfrage.nachricht()).contains("[Seite 2]", aussage)
+                .doesNotContain("[Seite 1]", "[Seite 3]");
+        assertThat(speichern.neuerSchritt).isEqualTo("PLANUNG");
+        assertThat(speichern.fortschritt.abschnittNur()).isNull();
+    }
+
+    @Test
+    void zaehltUngueltigeAussagenUndNenntSeiteUndAussage() throws InterruptedException {
+        String text = "Die Abgabefrist endet am 30. April.\f";
+        String gueltig = "Die Abgabefrist endet am 30. April.";
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of(
+                new KiPort.Aussage(1, gueltig, List.of(1), gueltig),
+                new KiPort.Aussage(1, "Doppelte Aussage mit gleichem Nummernfeld", List.of(1), gueltig),
+                new KiPort.Aussage(99, "Aussage mit ungültiger Nummer", List.of(1), gueltig)
+        )), new KiPort.Verbrauch("test-modell", 10, 10)));
+        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
+                true, "Testquelle", LocalDate.of(2026, 4, 30), text, 1, true,
+                null, null, "KERNAUSSAGEN", 0, 0, "test-modell", false, 300_000, 1_000_000,
+                Fortschritt.leer());
+        Speicher speichern = new Speicher(stand(lauf, 0));
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        assertThat(speichern.fortschritt.abschnittFehler()).singleElement().satisfies(fehler -> {
+            assertThat(fehler.nummer()).isEqualTo(1);
+            assertThat(fehler.seite()).isEqualTo(1);
+            assertThat(fehler.verworfen()).isEqualTo(2);
+            assertThat(fehler.behalten()).isEqualTo(1);
+        });
+        assertThat(speichern.fortschritt.hinweise())
+                .anySatisfy(hinweis -> assertThat(hinweis).contains("Seite 1", "Aussage 2"))
+                .anySatisfy(hinweis -> assertThat(hinweis).contains("Seite 1", "Aussage 3"));
+    }
+
+    @Test
     void korrigiertDieSeitenangabeZumFundortDesBelegtenAuszugs() throws InterruptedException {
         Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
                 true, "Testquelle", LocalDate.of(2026, 4, 30),

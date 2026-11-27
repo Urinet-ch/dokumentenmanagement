@@ -126,6 +126,7 @@ class MandantenIsolationOpenApiTest {
                 "GET /api/v1/wissensbasis/exporte/{id}",
                 "GET /api/v1/wissensentwuerfe/{id}",
                 "POST /api/v1/wissensentwuerfe/{id}/neu-pruefen",
+                "POST /api/v1/wissensentwuerfe/{entwurfId}/abschnitte/{nr}/wiederholen",
                 "POST /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/annehmen",
                 "POST /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/neu-erzeugen",
                 "POST /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/verwerfen");

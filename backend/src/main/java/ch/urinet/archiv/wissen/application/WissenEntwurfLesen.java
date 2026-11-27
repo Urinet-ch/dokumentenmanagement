@@ -7,6 +7,8 @@ import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.wissen.domain.WissensMarkdown;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Abschnittsfehler;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Fortschritt;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -56,7 +58,9 @@ public class WissenEntwurfLesen {
         List<Aussage> aussagen = repository.kernaussagen(id).stream()
                 .map(a -> new Aussage(a.nr(), a.schluessel(), a.text(), a.seiten(), a.auszug(), a.belegt(),
                         genutzteSchluessel.contains(a.schluessel()))).toList();
-        return new Vollansicht(entwurf, aussagen, aenderungen);
+        Fortschritt fortschritt = repository.ingestFortschritt(id).orElseGet(Fortschritt::leer);
+        return new Vollansicht(entwurf, aussagen, aenderungen, fortschritt.hinweise(),
+                fortschritt.abschnittFehler());
     }
 
     private static Set<String> quellenSchluessel(java.util.Map<String, Object> daten) {
@@ -89,7 +93,9 @@ public class WissenEntwurfLesen {
     }
 
     public record Vollansicht(WissenEntwurfLesenRepository.Kopf entwurf, List<Aussage> kernaussagen,
-                             List<WissenEntwurfLesenRepository.Aenderung> aenderungen) implements Ansicht {
+                             List<WissenEntwurfLesenRepository.Aenderung> aenderungen,
+                             List<String> ingestHinweise, List<Abschnittsfehler> abschnittFehler)
+            implements Ansicht {
     }
 
     public record StatusAnsicht(UUID id, String status, List<Entscheidung> entscheidungen) implements Ansicht {

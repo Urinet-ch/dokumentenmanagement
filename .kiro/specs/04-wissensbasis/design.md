@@ -1633,6 +1633,20 @@ zwei Seiten, dass Frage und optionale Preisbedingung in den Kernaussagen samt Au
 Extraktion pro Seite aufgerufen wird, umfasst der WireMock-Lauf zwei Kernaussagen-Aufrufe sowie Planung, Seite und
 Quelle, insgesamt fünf Aufrufe.
 
+### Umsetzung (Aufgabe 19.4, 26.11.2026)
+Eine Abschnittsantwort erzeugt einen sichtbaren Abschnittsbefund, wenn sie ungültig ist oder mehr Aussagen verworfen
+als übernommen werden; «überwiegend» bedeutet damit strikt `verworfen > behalten`. Warnungen enthalten Abschnitt,
+PDF-Seite und laufende Nummer innerhalb der KI-Antwort. Die Entwurfsansicht zeigt Anzahl verworfener und
+übernommener Aussagen sowie für A17 einen Knopf zur Wiederholung.
+
+Die Wiederholung prüft erneut Quelle, Rechte, Status, Abschnitt und verbleibendes Ingest- sowie Monatsbudget. Sie
+stellt denselben Entwurf wieder her und reiht denselben Auftragstyp ein; nur die Kernaussagen-Extraktion des
+betroffenen Abschnitts wird wiederholt, danach werden Planung und Vorschläge neu aufgebaut. Frühere offene
+Vorschläge werden als veraltet markiert. Fortschritt und Fehler liegen im bestehenden JSONB-Feld; ein Changeset ist
+nicht erforderlich. Eine vollständig ungültige Antwort zählt als ausgefallener Abschnitt, auch wenn sie keine
+Aussageobjekte enthält. Der WireMock-Nachweis deckt ungültige Aussagen und anschliessend gültige Wiederholung ab;
+JUnit prüft Fehlerzählung, Seitenauswahl und Abschnittsschätzung, Angular prüft Meldung und POST-Aktion.
+
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
 1. Lage zu Spec 03: Spec 04 wird nach Spec 03 umgesetzt, Wellen 13–16 (tasks.md). Der Nachtrag in

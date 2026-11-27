@@ -8,6 +8,9 @@ import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.NeuerEntwurf;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Quelle;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Abschnittsfehler;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Fortschritt;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Lauf;
 import ch.urinet.archiv.wissen.domain.WissenIngestGrenzen;
 import ch.urinet.archiv.wissen.domain.WissenIngestSchaetzung;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,6 +19,7 @@ import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +64,76 @@ public class WissenIngestStarten {
     @Transactional
     public Ergebnis nachMarkierung(UUID dokumentId, String akteur) {
         return starten(dokumentId, null, null, akteur, false);
+    }
+
+    @Transactional
+    public Ergebnis abschnittWiederholen(UUID entwurfId, int abschnittNr, String akteur) {
+        if (abschnittNr < 1) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        auftraege.offen(TYP, Optional.empty(), true);
+        Lauf lauf = port.laufLaden(entwurfId)
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        if (!"OFFEN".equals(lauf.entwurfStatus()) || !WissenIngestSpeichern.freigegeben(lauf)) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        Abschnittsfehler abschnittsfehler = lauf.fortschritt().abschnittFehler().stream()
+                .filter(fehler -> fehler.nummer() == abschnittNr).findFirst()
+                .orElseThrow(() -> new FachFehler(Fehlercode.STATUS_KONFLIKT));
+        if (abschnittsfehler.maxZeichen() < 1 || port.entwurfFuerDokumentLaufend(lauf.dokumentId())) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        Quelle quelle = port.quelleLaden(lauf.dokumentId())
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        if (!ARCHIVIERT.equals(quelle.status()) || !quelle.markiert() || hindernis(quelle).isPresent()) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+
+        WissenIngestGrenzen grenzen = konfiguration.ingest();
+        int index = abschnittNr - 1;
+        long geschaetzt;
+        try {
+            geschaetzt = WissenIngestSchaetzung.abschnittSchaetzen(quelle.volltext(), quelle.seiten(),
+                    lauf.seiteVon(), lauf.seiteBis(), index, abschnittsfehler.maxZeichen(),
+                    "NORMAL".equals(quelle.vertraulichkeit()), grenzen, systempromptZeichen(grenzen)).tokens();
+        } catch (IllegalArgumentException e) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        long budget = quelle.budgetTokens() == null ? grenzen.budgetTokens() : quelle.budgetTokens();
+        long verbrauchLauf = (long) lauf.tokensEin() + lauf.tokensAus();
+        if (verbrauchLauf >= budget || geschaetzt > budget - verbrauchLauf) {
+            throw new FachFehler(Fehlercode.BUDGET);
+        }
+        long monatsbudget = quelle.monatsbudgetTokens() == null
+                ? grenzen.monatsbudgetTokens() : quelle.monatsbudgetTokens();
+        Zeitraum monat = monat(Instant.now());
+        long monatsverbrauch = port.verbrauchImZeitraum(monat.von(), monat.bis());
+        if (monatsverbrauch >= monatsbudget || geschaetzt > monatsbudget - monatsverbrauch) {
+            throw new FachFehler(Fehlercode.BUDGET);
+        }
+        if (!auftraege.hatHandler(TYP)) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+
+        Fortschritt bisher = lauf.fortschritt();
+        List<WissenIngestPort.Kernaussage> behalten = bisher.kernaussagen().stream()
+                .filter(aussage -> aussage.nr() < 1
+                        || (aussage.nr() - 1) / WissenIngestVerarbeiten.MAX_AUSSAGEN_PRO_ABSCHNITT != index)
+                .toList();
+        List<Abschnittsfehler> fehler = bisher.abschnittFehler().stream()
+                .filter(eintrag -> eintrag.nummer() != abschnittNr).toList();
+        String praefix = "Abschnitt " + abschnittNr + ", ";
+        List<String> hinweise = bisher.hinweise().stream()
+                .filter(hinweis -> !hinweis.startsWith(praefix)).toList();
+        int vorschlagBasis = Math.max(bisher.vorschlagBasis(), bisher.vorschlaege().stream()
+                .mapToInt(WissenIngestPort.SeitenVorschlag::nummer).max().orElse(0));
+        Fortschritt fortschritt = new Fortschritt(index, 0, false, behalten, List.of(), List.of(), hinweise,
+                bisher.kontextStufe(), fehler, index, abschnittsfehler.maxZeichen(), vorschlagBasis);
+        if (!port.abschnittWiederholen(entwurfId, abschnittNr, fortschritt)) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        auftraege.einreihen(TYP, new Nutzlast(Map.of(NUTZLAST_ENTWURF_ID, entwurfId)));
+        return new Ergebnis(entwurfId, "IN_ARBEIT", geschaetzt, null);
     }
 
     private Ergebnis starten(UUID dokumentId, Integer seiteVon, Integer seiteBis, String akteur, boolean manuell) {

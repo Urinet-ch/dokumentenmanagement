@@ -42,6 +42,8 @@ public interface WissenIngestPort {
 
     Optional<Lauf> laufLaden(UUID entwurfId);
 
+    boolean abschnittWiederholen(UUID entwurfId, int abschnittNr, Fortschritt fortschritt);
+
     List<SeitenMetadaten> seitenMetadatenLaden();
 
     Set<UUID> personalDokumenteLaden(Set<UUID> dokumentIds);
@@ -114,17 +116,30 @@ public interface WissenIngestPort {
      */
     record Fortschritt(int abschnitt, int seite, boolean quelleErzeugt, List<Kernaussage> kernaussagen,
                        List<Planung> planung, List<SeitenVorschlag> vorschlaege, List<String> hinweise,
-                       WissensStufe kontextStufe) {
+                       WissensStufe kontextStufe, List<Abschnittsfehler> abschnittFehler,
+                       Integer abschnittNur, Integer abschnittZeichen, int vorschlagBasis) {
         public Fortschritt {
             kernaussagen = kernaussagen == null ? List.of() : List.copyOf(kernaussagen);
             planung = planung == null ? List.of() : List.copyOf(planung);
             vorschlaege = vorschlaege == null ? List.of() : List.copyOf(vorschlaege);
             hinweise = hinweise == null ? List.of() : List.copyOf(hinweise);
+            abschnittFehler = abschnittFehler == null ? List.of() : List.copyOf(abschnittFehler);
+        }
+
+        public Fortschritt(int abschnitt, int seite, boolean quelleErzeugt, List<Kernaussage> kernaussagen,
+                           List<Planung> planung, List<SeitenVorschlag> vorschlaege, List<String> hinweise,
+                           WissensStufe kontextStufe) {
+            this(abschnitt, seite, quelleErzeugt, kernaussagen, planung, vorschlaege, hinweise, kontextStufe,
+                    List.of(), null, null, 0);
         }
 
         public static Fortschritt leer() {
             return new Fortschritt(0, 0, false, List.of(), List.of(), List.of(), List.of(), null);
         }
+    }
+
+    record Abschnittsfehler(int nummer, int seite, int verworfen, int behalten, boolean antwortUngueltig,
+                            int maxZeichen) {
     }
 
     record Kernaussage(int nr, String schluessel, String text, List<Integer> seiten, String auszug, boolean belegt) {

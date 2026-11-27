@@ -59,6 +59,26 @@ describe('Wissensentwürfe', () => {
     expect(fixture.nativeElement.textContent).toContain('INTERN');
   });
 
+  it('zeigt den Abschnittsfehler und sendet die gezielte Wiederholung', async () => {
+    const fehlerhafteDaten = { ...daten,
+      ingestHinweise: ['Abschnitt 1, Seite 1, Aussage 2 verworfen: ungültige Antwort.'],
+      abschnittFehler: [{ nummer: 1, seite: 1, verworfen: 2, behalten: 1, antwortUngueltig: false }],
+    };
+    const fixture = await zeigen(fehlerhafteDaten);
+    expect(fixture.nativeElement.textContent).toContain('2 Aussagen verworfen, 1 übernommen');
+    klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.abschnittWiederholen);
+    const request = http.expectOne('/api/v1/wissensentwuerfe/e1/abschnitte/1/wiederholen');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    request.flush({ entwurfId: 'e1', status: 'IN_ARBEIT' });
+    http.expectOne('/api/v1/wissensentwuerfe/e1').flush({ ...daten,
+      ingestHinweise: [], abschnittFehler: [],
+    });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).not.toContain('Fehlerhafte Ingest-Abschnitte');
+    expect(auffrischen).toHaveBeenCalledOnce();
+  });
+
   it('sendet genau eine Annahme erst nach Bestätigung mit dem angezeigten ETag', async () => {
     const fixture = await zeigen();
     klicken(fixture.nativeElement, TEXTE.wissen.entwuerfe.entscheiden);

@@ -14,6 +14,8 @@ public interface WissenEntwurfLesenRepository {
 
     List<WissenIngestPort.Kernaussage> kernaussagen(UUID id);
 
+    Optional<WissenIngestPort.Fortschritt> ingestFortschritt(UUID id);
+
     List<Aenderung> aenderungen(UUID id);
 
     List<WissenEntwurfLesen.Entscheidung> entscheidungen(UUID id);

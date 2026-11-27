@@ -694,6 +694,70 @@ export class WissensbasisService extends BaseService {
     }
 
     /**
+     * Fehlerhaften Ingest-Abschnitt wiederholen
+     * Verarbeitet nur den betroffenen Abschnitt erneut und baut die Vorschläge darauf neu auf.
+     * @endpoint post /api/v1/wissensentwuerfe/{entwurfId}/abschnitte/{nr}/wiederholen
+     * @param entwurfId 
+     * @param nr 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1WissensentwuerfeEntwurfIdAbschnitteNrWiederholenPost(entwurfId: string, nr: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<WissenIngestAuftrag>;
+    public apiV1WissensentwuerfeEntwurfIdAbschnitteNrWiederholenPost(entwurfId: string, nr: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<WissenIngestAuftrag>>;
+    public apiV1WissensentwuerfeEntwurfIdAbschnitteNrWiederholenPost(entwurfId: string, nr: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<WissenIngestAuftrag>>;
+    public apiV1WissensentwuerfeEntwurfIdAbschnitteNrWiederholenPost(entwurfId: string, nr: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (entwurfId === null || entwurfId === undefined) {
+            throw new Error('Required parameter entwurfId was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAbschnitteNrWiederholenPost.');
+        }
+        if (nr === null || nr === undefined) {
+            throw new Error('Required parameter nr was null or undefined when calling apiV1WissensentwuerfeEntwurfIdAbschnitteNrWiederholenPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/wissensentwuerfe/${this.configuration.encodeParam({name: "entwurfId", value: entwurfId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/abschnitte/${this.configuration.encodeParam({name: "nr", value: nr, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int32"})}/wiederholen`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<WissenIngestAuftrag>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
      * Eine Wissensänderung annehmen
      * @endpoint post /api/v1/wissensentwuerfe/{entwurfId}/aenderungen/{nr}/annehmen
      * @param entwurfId 

@@ -232,6 +232,40 @@ public class JdbcWissenIngest implements WissenIngestPort {
     }
 
     @Override
+    public boolean abschnittWiederholen(UUID entwurfId, int abschnittNr, Fortschritt fortschritt) {
+        zeitgrenze();
+        List<?> gesperrt = em().createNativeQuery("""
+                select e.id from wissens_entwurf e
+                where e.id = :id and e.anlass = 'INGEST' and e.status = 'OFFEN'
+                    and exists (
+                        select 1 from jsonb_array_elements(
+                            coalesce(e.ingest_daten->'abschnittFehler', '[]'::jsonb)) f
+                        where (f->>'nummer')::integer = :abschnitt
+                    )
+                for update of e
+                """).setParameter("id", entwurfId).setParameter("abschnitt", abschnittNr).getResultList();
+        if (gesperrt.isEmpty()) {
+            return false;
+        }
+        em().createNativeQuery("""
+                update wissens_aenderung set status = 'VERALTET', etag = etag + 1
+                where entwurf_id = :id and status = 'OFFEN'
+                """).setParameter("id", entwurfId).executeUpdate();
+        int aktualisiert = em().createNativeQuery("""
+                update wissens_entwurf
+                set status = 'IN_ARBEIT', schritt = 'KERNAUSSAGEN',
+                    ingest_daten = cast(:fortschritt as jsonb), kernaussagen = cast(:kernaussagen as jsonb),
+                    unvollstaendig = false, hinweis = null, abgeschlossen = null
+                where id = :id and anlass = 'INGEST' and status = 'OFFEN'
+                """)
+                .setParameter("fortschritt", json(fortschritt))
+                .setParameter("kernaussagen", json(fortschritt.kernaussagen()))
+                .setParameter("id", entwurfId)
+                .executeUpdate();
+        return aktualisiert == 1;
+    }
+
+    @Override
     public List<SeitenMetadaten> seitenMetadatenLaden() {
         zeitgrenze();
         return seitenMetadaten(em().createNativeQuery("""

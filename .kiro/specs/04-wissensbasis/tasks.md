@@ -282,7 +282,7 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
   - Nachweis: WireMock-Szenarien mit einem synthetischen Dokument, das eine offene Frage und eine Option mit Preis enthält; die Erwartung prüft, dass keine Antwort erfunden und die Bedingung genannt wird.
   - Prompt-Injection-Schutz aus 14.1 bleibt unverändert.
   - _Anforderungen: 5.1–5.13_
-- [ ] 19.4 Abschnittsfehler sichtbar und wiederholbar [Backend] [Frontend]
+- [x] 19.4 Abschnittsfehler sichtbar und wiederholbar [Backend] [Frontend]
   - «Ungültige Kernaussage im Abschnitt n verworfen» zählt, wie viele Aussagen der Abschnitt dadurch verlor; ein Abschnitt, der ganz oder überwiegend ausfällt, erscheint als Befund im Entwurf mit Knopf «Abschnitt neu verarbeiten» (nur dieser Abschnitt, Budget und Zeitgrenze wie 14.1).
   - Die Warnungen nennen Seite und Aussage statt nur einer laufenden Nummer.
   - Nachweis: Szenario mit WireMock (eine ungültige Antwort, danach gültige Wiederholung) und Angular-Test der Anzeige.
