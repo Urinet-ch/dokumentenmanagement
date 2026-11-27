@@ -1287,6 +1287,9 @@ getrennt. Oberfläche mit Cucumber.js + Playwright.
 | Abnahme | `WissenPruefliste` (Wissensquellen, Fussnoten-Stichprobe, Fragen; YAML unter `ARCHIV_GOLDEN_DIR`, nicht im Repo) manuell auf Stufe B, nie in der CI; Bericht `docs/abnahme/phase4.md` ohne Inhalte |
 | Last | Suche nach Wissensseiten bei 2'000 Seiten p95 ≤ 1 s, Messbedingungen wie Spec 01, 3.2 |
 
+### Umsetzung (Aufgabe 16.2, Vorbereitung, 27.11.2026)
+PR #703 ergänzt das JSON-Schema `backend/src/test/resources/abnahme/wissen-pruefliste.schema.json` und den manuellen, nur per Systemeigenschaft aktivierten Lauf `WissenPrueflisteIT`. `WissenPrueflisteTest` prüft Schema und Ablauf mit synthetischen Daten über einen Fake-HTTP-Server. `docs/abnahme/phase4.md` ist die Vorlage; die echte `wissen-pruefliste.yaml` und der vollständige Bericht bleiben ausschliesslich unter `ARCHIV_GOLDEN_DIR` ausserhalb des Repositorys. Der Gate-Lauf auf Stufe B und die Gate-Entscheidung bleiben bei Fabian.
+
 ## Folgeänderungen in anderen Dokumenten
 Diese Spec ändert die folgenden Dateien nicht selbst; nachgezogen mit PR #20 (Aufgabe 13.1). Grund: Die
 Folgeänderungen kommen gesammelt in einem PR, und Spec 01 bleibt im Umfang stabil. Noch offen: Spec 01 Nr. 3 (eigener PR
