@@ -1,5 +1,7 @@
 # Stufe A: Speichermessung und Abbruch (Aufgabe 1.10)
 
+> **Überholt als aktuelle Budgetgrundlage:** Dieser Messstand liegt vor der VPS-Erweiterung. Entscheid Fabian vom 27.11.2026: Budget Stufe A höchstens 2048 MiB und 1.5 CPU; erneute Messung freigegeben. Die historischen Messwerte und der Vorfall vom 22.11.2026 bleiben unverändert.
+
 Stand 22.11.2026. Nur Zahlen, keine Namen anderer Apps. Alle Werte stammen von der VPS der Stufe A (Host mit 1973 MiB Speicher, kein Swap) und wurden von Fabian erhoben.
 
 ## Ergebnis
