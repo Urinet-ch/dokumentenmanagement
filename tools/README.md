@@ -12,6 +12,8 @@
 | `golden_synth/` | Generator für synthetische Golden-Belege (Req 0.10) |
 | `crm/` | synthetischer Beispiel-Export 21.CRM |
 | `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--begleit-pdf` reiht für die HEIC-Messung einen synthetischen 20-seitigen Scan ein; `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
+| `last/testdaten_erzeugen.py` | Erzeugt lokal und ohne Netzwerk in einem neuen geschützten Ordner einen 20-seitigen Bildscan und ein synthetisches 12-MP-JPEG |
+| `last/test_testdaten_erzeugen.py` | Prüft Scan-Grösse, Seitenzahl, fehlende Textebene, Fotoauflösung und Dateirechte: `python3 -m unittest tools/last/test_testdaten_erzeugen.py` |
 
 ## Compose-Konsistenzprüfung
 
