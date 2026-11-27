@@ -1070,6 +1070,10 @@ axe und Überlaufprüfung) und `@req-8.5` (Step-up für Sperren, Rolle, Löschen
 Persönliches in den Browser-Speicher geschrieben wird); Einheitstests der Fortsetzung, der Fehlerbehandlung und der
 Komponenten. Offen bleibt der manuelle Nachweis auf dem Handy [Fabian] (Req 8.2, Aufgabe 21.6).
 
+Nachtrag (26.11.2026): `BenutzerLoeschen` zeigt bei `409 STATUS_KONFLIKT` die eigene Meldung aus
+`benutzerAktionsfehler` als Alert, meldet keine erfolgreiche Löschung und gibt die Aktion wieder frei. Der gezielte
+Angular-Test deckt diesen Löschpfad ab; die bestehende Fehlerübersetzung genügt, daher ist keine Produktänderung nötig.
+
 ## Umsetzung (Aufgabe 21.4, 24.11.2026)
 
 Die Bestandsaufnahme ergab, dass Zeitgrenzen, Wiederholungen und Schutzschalter bereits in

@@ -345,7 +345,7 @@ public class OcrMyPdfAdapter implements OcrPort {
         /** Volltext mit {@code \f} als Seitentrenner; ohne PDF/A nur soweit lesbar (Req 5.9). */
         private String text(Path pdf, boolean pflicht) throws IOException, InterruptedException {
             Path text = datei("volltext.txt");
-            Werkzeugstarter.Lauf lauf = starter.ausfuehren(Befehl.von("pdftotext", "-q", "-enc", "UTF-8",
+            Werkzeugstarter.Lauf lauf = starter.ausfuehren(Befehl.von("pdftotext", "-q", "-layout", "-enc", "UTF-8",
                     pdf.toString(), text.toString()), verzeichnis, frist);
             if (!lauf.erfolgreich() || !Files.exists(text)) {
                 if (pflicht) {

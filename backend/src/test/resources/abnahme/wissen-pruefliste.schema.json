@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Prüfliste Gate Phase 4",
+  "description": "Echte Werte ausschliesslich ausserhalb des Repositorys unter ARCHIV_GOLDEN_DIR.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["quellen", "fussnoten", "fragen"],
+  "properties": {
+    "quellen": {
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["nr", "dokument"],
+        "properties": {
+          "nr": {"type": "integer", "minimum": 1, "maximum": 5},
+          "dokument": {"type": "string", "format": "uuid"}
+        }
+      }
+    },
+    "fussnoten": {
+      "type": "array", "minItems": 50, "maxItems": 50,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["nr", "quelle", "seite", "fundstelle"],
+        "properties": {
+          "nr": {"type": "integer", "minimum": 1, "maximum": 50},
+          "quelle": {"type": "integer", "minimum": 1, "maximum": 5},
+          "seite": {"type": "integer", "minimum": 1},
+          "fundstelle": {"type": "string", "minLength": 1, "maxLength": 1000}
+        }
+      }
+    },
+    "fragen": {
+      "type": "array", "minItems": 15, "maxItems": 15,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["nr", "frage", "antwort", "quelle", "seite"],
+        "properties": {
+          "nr": {"type": "integer", "minimum": 1, "maximum": 15},
+          "frage": {"type": "string", "minLength": 1, "maxLength": 2000},
+          "antwort": {"type": "string", "minLength": 1, "maxLength": 10000},
+          "quelle": {"type": "integer", "minimum": 1, "maximum": 5},
+          "seite": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  }
+}

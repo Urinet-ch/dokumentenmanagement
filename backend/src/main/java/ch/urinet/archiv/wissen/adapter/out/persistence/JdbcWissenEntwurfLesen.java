@@ -3,6 +3,7 @@ package ch.urinet.archiv.wissen.adapter.out.persistence;
 import ch.urinet.archiv.wissen.application.WissenEntwurfLesenRepository;
 import ch.urinet.archiv.wissen.application.WissenEntwurfLesen.Entscheidung;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Kernaussage;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Fortschritt;
 import ch.urinet.archiv.wissen.application.DiffDienst;
 import ch.urinet.archiv.wissen.domain.WissensMarkdown;
 import ch.urinet.archiv.wissen.domain.paket.PaketKopf;
@@ -79,6 +80,23 @@ public class JdbcWissenEntwurfLesen implements WissenEntwurfLesenRepository {
                         "select cast(kernaussagen as text) from wissens_entwurf where id = :id")
                 .setParameter("id", id).getResultList();
         return rows.isEmpty() || rows.getFirst() == null ? List.of() : lesen(rows.getFirst(), AUSSAGEN);
+    }
+
+    @Override
+    public Optional<Fortschritt> ingestFortschritt(UUID id) {
+        @SuppressWarnings("unchecked")
+        List<String> rows = em.get().createNativeQuery("""
+                        select cast(ingest_daten as text) from wissens_entwurf
+                        where id = :id and anlass = 'INGEST'
+                        """).setParameter("id", id).getResultList();
+        if (rows.isEmpty() || rows.getFirst() == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(json.readValue(rows.getFirst(), Fortschritt.class));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Ingest-Fortschritt nicht lesbar", e);
+        }
     }
 
     @Override

@@ -1,6 +1,26 @@
 ---
 components:
   schemas:
+    Abschnittsfehler:
+      type: object
+      properties:
+        nummer:
+          type: integer
+          format: int32
+        seite:
+          type: integer
+          format: int32
+        verworfen:
+          type: integer
+          format: int32
+        behalten:
+          type: integer
+          format: int32
+        antwortUngueltig:
+          type: boolean
+        maxZeichen:
+          type: integer
+          format: int32
     Aenderung:
       type: object
       properties:
@@ -3606,6 +3626,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Aenderung"
+        ingestHinweise:
+          type: array
+          items:
+            type: string
+        abschnittFehler:
+          type: array
+          items:
+            $ref: "#/components/schemas/Abschnittsfehler"
     Warnung:
       type: object
       description: "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)"
@@ -8190,6 +8218,48 @@ paths:
           description: Kein ZIP oder falscher Medientyp
         "422":
           description: Paket ungültig; Codes und Pfade ohne Inhalte
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
+  /api/v1/wissensentwuerfe/{entwurfId}/abschnitte/{nr}/wiederholen:
+    post:
+      summary: Fehlerhaften Ingest-Abschnitt wiederholen
+      description: Verarbeitet nur den betroffenen Abschnitt erneut und baut die Vorschläge
+        darauf neu auf.
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: entwurfId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: nr
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "202":
+          description: Abschnitt erneut eingereiht
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WissenIngestAuftrag"
+        "400":
+          description: Abschnittsnummer ungültig
+        "403":
+          description: Rolle darf den Abschnitt nicht wiederholen
+        "404":
+          description: Ingest-Entwurf nicht gefunden
+        "409":
+          description: "Entwurf, Quelle oder Abschnitt ist nicht mehr aktuell"
+        "429":
+          description: Ingest- oder Monatsbudget reicht nicht aus
         "401":
           description: Not Authorized
       security:

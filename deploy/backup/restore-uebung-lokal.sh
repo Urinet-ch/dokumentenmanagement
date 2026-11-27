@@ -370,7 +370,11 @@ test_maven() {
     )
   fi
   if (cd "$backend" && mvn "${args[@]}" test) >"$temp/$phase-test.log" 2>&1; then
-    bericht OK "Echter Sicherungs-Roundtrip: Phase $phase" "$((SECONDS - start))"
+    if [[ $phase == ziel ]]; then
+      bericht OK "Restore-Zählvergleich je Mandant: Wissensseiten, Versionen, Quellen, Dokumente" "$((SECONDS - start))"
+    else
+      bericht OK "Echter Sicherungs-Roundtrip: Phase $phase" "$((SECONDS - start))"
+    fi
   else
     local status=$?
     bericht FEHLER "Sicherungs-Roundtrip Phase $phase (Exit $status)" "$((SECONDS - start))"

@@ -294,6 +294,10 @@ Content-Disposition: inline
 Accept-Ranges: none
 ```
 
+Alle Antworten der Webseiten-Schnittstelle tragen `X-Content-Type-Options:
+nosniff`. Eine pauschale `Cross-Origin-Resource-Policy` wird hier nicht gesetzt;
+die Schnittstelle bleibt ohne CORS-Freigabe und wird serverseitig aufgerufen.
+
 Der Stream enthält die ganze Datei in Blöcken von 64 KiB. Ein `Range`-Header
 wird ignoriert; die Antwort bleibt `200` mit der vollständigen Datei. `HEAD`
 wird mit `405` abgelehnt. Pro Lese-Schlüssel und insgesamt sind höchstens acht

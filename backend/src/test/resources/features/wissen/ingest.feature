@@ -28,6 +28,37 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
     Und sind Dokumentzeile und Dateizeilen von «QUELLE» unverändert
 
+  @req-5.3 @req-5.8 @req-13.7 @req-13.8
+  Szenario: Ein fehlerhafter Abschnitt wird angezeigt und gezielt wiederholt
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert eine ungültige Aussage und gültige Folgeantworten
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und ist der Abschnittsfehler für den Ingest mit Seite und Aussage sichtbar
+    Angenommen WireMock liefert gültige Antworten für alle vier Ingest-Schritte
+    Wenn «inhaber-urinet» Abschnitt 1 des Ingest-Entwurfs erneut verarbeitet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und ist der Abschnittsfehler nach der Wiederholung behoben
+
+  @req-5.3
+  Szenario: Offene Fragen und Preisbedingungen bleiben erhalten
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und das Dokument «QUELLE» enthält eine synthetische Frage und optionale Preisbedingung
+    Und WireMock liefert eine offene Frage und eine optionale Preisbedingung
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit fünf KI-Aufrufen «OFFEN»
+    Und der Kernaussagen-Prompt bewahrt Frage und Preisbedingungen als Daten
+    Und die gespeicherten Kernaussagen enthalten die offene Frage und die Option
+
   @req-6.1
   Szenario: Nicht zugeordnete Kernaussagen bleiben im Ingest-Entwurf sichtbar
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt

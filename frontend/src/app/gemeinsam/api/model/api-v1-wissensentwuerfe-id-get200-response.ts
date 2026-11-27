@@ -11,6 +11,7 @@ import { Vollansicht } from './vollansicht';
 import { Entscheidung } from './entscheidung';
 import { Kopf } from './kopf';
 import { Aenderung } from './aenderung';
+import { Abschnittsfehler } from './abschnittsfehler';
 import { StatusAnsicht } from './status-ansicht';
 import { Aussage } from './aussage';
 

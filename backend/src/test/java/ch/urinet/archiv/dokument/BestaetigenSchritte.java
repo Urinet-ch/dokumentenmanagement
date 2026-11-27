@@ -826,6 +826,10 @@ public class BestaetigenSchritte {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
         assertThat(antwort.contentType()).startsWith("image/png");
         assertThat(antwort.header("Cache-Control")).contains("private").contains("no-store");
+        assertThat(antwort.headers().getList("X-Content-Type-Options"))
+                .extracting(io.restassured.http.Header::getValue).containsExactly("nosniff");
+        assertThat(antwort.headers().getList("Cross-Origin-Resource-Policy"))
+                .extracting(io.restassured.http.Header::getValue).containsExactly("same-origin");
         assertThat(antwort.asByteArray()).isEqualTo(vorschauen.get(ort(name).id()));
     }
 

@@ -89,6 +89,11 @@ class WissenEntwurfLesenTest {
         }
 
         @Override
+        public Optional<WissenIngestPort.Fortschritt> ingestFortschritt(UUID id) {
+            return Optional.empty();
+        }
+
+        @Override
         public List<Aenderung> aenderungen(UUID id) {
             inhaltGeladen = true;
             return List.of(new Aenderung(1, 1, "NEU", null, "analyse/test", null,

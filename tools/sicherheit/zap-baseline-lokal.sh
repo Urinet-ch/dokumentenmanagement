@@ -3,8 +3,28 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd -P)"
 ausgabe="${1:?Bitte ein leeres Ausgabeverzeichnis angeben.}"
+pruefe_ausgabe() {
+    case "$1" in
+        "$root"|"$root"/*)
+            echo "Das Ausgabeverzeichnis muss ausserhalb des Repositories liegen." >&2
+            return 1
+            ;;
+    esac
+}
+if [ -d "$ausgabe" ]; then
+    ausgabe="$(cd "$ausgabe" && pwd -P)"
+else
+    ausgabe_eltern="$(dirname "$ausgabe")"
+    [ -d "$ausgabe_eltern" ] || {
+        echo "Das übergeordnete Ausgabeverzeichnis muss existieren." >&2
+        exit 1
+    }
+    ausgabe="$(cd "$ausgabe_eltern" && pwd -P)/$(basename "$ausgabe")"
+fi
+pruefe_ausgabe "$ausgabe"
 mkdir -p "$ausgabe" "$root/backend/target"
 ausgabe="$(cd "$ausgabe" && pwd -P)"
+pruefe_ausgabe "$ausgabe"
 if [ -n "$(ls -A "$ausgabe")" ]; then
     echo "Das Ausgabeverzeichnis muss leer sein." >&2
     exit 1
@@ -16,13 +36,32 @@ case "$(docker info --format '{{.Architecture}}')" in
     *) echo "Nicht unterstützte Docker-Architektur." >&2; exit 1 ;;
 esac
 zap="ghcr.io/zaproxy/zaproxy@$digest"
+temurin_jre="eclipse-temurin@sha256:2ec98aa522c472deadfd2b7c5b39bca680e33ef522a53a72f10789bdf89a6bb5"
+temurin_jdk="eclipse-temurin@sha256:c7eef3dfeb81468533ea48c67bddaa8c7ca916454259e4d0d734d12bcff8e125"
+pgvector="pgvector/pgvector@sha256:01215e09bd4bd582d20230e025b6c971deeeffee49ceef1aae167e839cb62a7e"
 docker image inspect "$zap" >/dev/null 2>&1 || docker pull "$zap"
-arbeit="$(mktemp -d "$root/backend/target/zap-lokal.XXXXXXXX")"
+arbeit="$(mktemp -d "${TMPDIR:-/tmp}/zap-baseline-lokal.XXXXXXXX")"
 anker=""
 db=""
 server=""
 scanner=""
+arbeitsberichte="$arbeit/berichte"
+mkdir "$arbeitsberichte"
+redact_ausgaben() {
+    [ -d "$arbeit/zugang" ] || return 0
+    for zugangsdatei in "$arbeit"/zugang/*; do
+        [ -f "$zugangsdatei" ] || continue
+        token="$(<"$zugangsdatei")"
+        [ -n "$token" ] || continue
+        while IFS= read -r -d '' datei; do
+            redigiert="$datei.redigiert"
+            ZAP_SECRET="$token" perl -0777 -pe 's/\Q$ENV{ZAP_SECRET}\E/[REDACTED]/g' "$datei" >"$redigiert"
+            mv "$redigiert" "$datei"
+        done < <(find "$arbeitsberichte" -type f -print0)
+    done
+}
 aufraeumen() {
+    redact_ausgaben || echo "Zugangsdaten konnten nicht aus allen ZAP-Ausgaben entfernt werden." >&2
     [ -z "$scanner" ] || docker rm -f "$scanner" >/dev/null || echo "Scanner konnte nicht entfernt werden: $scanner" >&2
     [ -z "$server" ] || docker rm -f "$server" >/dev/null || echo "Testserver konnte nicht entfernt werden: $server" >&2
     [ -z "$db" ] || docker rm -fv "$db" >/dev/null || echo "Testdatenbank konnte nicht entfernt werden: $db" >&2
@@ -37,10 +76,10 @@ mkdir -p "$arbeit/maven/conf/logging"
 cp -R "$maven_home/bin" "$maven_home/boot" "$maven_home/lib" "$arbeit/maven/"
 printf '<settings/>\n' >"$arbeit/settings.xml"
 mkdir "$arbeit/locks"
-anker="$(docker run -d --network none eclipse-temurin:25.0.5.1_2-jre-noble sleep 1200)"
+anker="$(docker run -d --network none "$temurin_jre" sleep 2700)"
 db="$(docker run -d --network "container:$anker" \
     -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=zap_baseline \
-    pgvector/pgvector:0.8.7-pg17-trixie)"
+    "$pgvector")"
 for _ in $(seq 1 60); do
     if docker exec "$db" pg_isready -h 127.0.0.1 -U postgres -d zap_baseline >/dev/null 2>&1; then break; fi
     sleep 1
@@ -51,7 +90,7 @@ server="$(docker run -d --network "container:$anker" \
     --mount "type=bind,source=$arbeit,target=/scan" \
     --mount "type=bind,source=$HOME/.m2/repository,target=/m2,readonly" \
     --mount "type=bind,source=$arbeit/locks,target=/m2/.locks" \
-    --workdir /workspace/backend eclipse-temurin:25.0.5.1_2-jdk-noble \
+    --workdir /workspace/backend "$temurin_jdk" \
     /scan/maven/bin/mvn -o -B -ntp -s /scan/settings.xml -gs /scan/settings.xml -Dmaven.repo.local=/m2 \
     -Dquarkus.http.test-port=0 -Dtest=ZapBaselineIT -Darchiv.zap-baseline=true \
     -Darchiv.zap.verzeichnis=/scan -Dquarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:5432/zap_baseline \
@@ -70,50 +109,97 @@ if ! printf '%s\n' "$url" | grep -Eq '^http://127\.0\.0\.1:[0-9]{1,5}/$'; then
     echo "Testserver meldet keine gültige Loopback-Adresse." >&2
     exit 1
 fi
+scan_status=0
 gesamt_status=0
-for schnittstelle in app webseite; do
-    mkdir "$ausgabe/$schnittstelle"
-    if [ "$schnittstelle" = app ]; then
-        ziel="${url}q/openapi"
-    else
-        ziel=/zap/public-v1.yaml
+fataler_scan=0
+scan_zap() {
+    local name="$1" ziel="$2" zugangsdatei="${3:-}" stufe="${4:-}"
+    local zap_optionen="-silent" konfiguration=""
+    mkdir "$arbeitsberichte/$name"
+    if [ -n "$zugangsdatei" ]; then
+        local token
+        token="$(<"$zugangsdatei")"
+        [ -n "$token" ] || { echo "Testzugang für $name fehlt." >&2; return 1; }
+        konfiguration="$arbeit/$name-zap.conf"
+        (
+            umask 077
+            {
+                printf 'replacer.full_list(0).description=zap-bearer\n'
+                printf 'replacer.full_list(0).enabled=true\n'
+                printf 'replacer.full_list(0).matchtype=REQ_HEADER\n'
+                printf 'replacer.full_list(0).matchstr=Authorization\n'
+                printf 'replacer.full_list(0).regex=false\n'
+                printf 'replacer.full_list(0).replacement=Bearer %s\n' "$token"
+                if [ -n "$stufe" ]; then
+                    printf 'replacer.full_list(1).description=zap-zugriffsstufe\n'
+                    printf 'replacer.full_list(1).enabled=true\n'
+                    printf 'replacer.full_list(1).matchtype=REQ_HEADER\n'
+                    printf 'replacer.full_list(1).matchstr=X-Archiv-Zugriff\n'
+                    printf 'replacer.full_list(1).regex=false\n'
+                    printf 'replacer.full_list(1).replacement=%s\n' "$stufe"
+                fi
+            } >"$konfiguration"
+        )
+        zap_optionen="$zap_optionen -configfile /tmp/zap-auth.conf"
     fi
-    scanner="$(docker create --pull=never --network "container:$anker" \
+    scanner="$(docker create -i --pull=never --network "container:$anker" \
         --cap-drop ALL --security-opt no-new-privileges --memory 2g --workdir /zap \
         --mount "type=bind,source=$root/tools/sicherheit/zap-ausnahmen.conf,target=/zap/ausnahmen.conf,readonly" \
         --mount "type=bind,source=$root/docs/schnittstelle/public-v1.yaml,target=/zap/public-v1.yaml,readonly" \
-        --entrypoint /bin/sh "$zap" -c 'mkdir -p /zap/wrk; exec /zap/zap-api-scan.py "$@"' sh \
+        --entrypoint /bin/sh "$zap" -c 'set -e; umask 077; cat > /tmp/zap-auth.conf; mkdir -p /zap/wrk; exec /zap/zap-api-scan.py "$@"' sh \
         -S -f openapi -t "$ziel" -O "$url" \
-        -c /zap/ausnahmen.conf -J bericht.json -w bericht.md -r bericht.html -T 5 -s -z "-silent")"
+        -c /zap/ausnahmen.conf -J bericht.json -w bericht.md -r bericht.html -T 5 -s -z "$zap_optionen")"
     set +e
-    docker start -a "$scanner" >"$ausgabe/$schnittstelle/zap.log" 2>&1
+    docker start -a -i "$scanner" <"${konfiguration:-/dev/null}" >"$arbeitsberichte/$name/zap.log" 2>&1
     scan_status=$?
     set -e
-    docker cp "$scanner:/zap/zap.out" "$ausgabe/$schnittstelle/zap.out" 2>/dev/null \
-        || echo "ZAP-Startprotokoll für $schnittstelle nicht verfügbar." >&2
-    if [ "$scan_status" -gt 2 ]; then
-        echo "ZAP-Scan $schnittstelle fehlgeschlagen; siehe zap.log." >&2
-        gesamt_status="$scan_status"
-        break
+    docker cp "$scanner:/zap/zap.out" "$arbeitsberichte/$name/zap.out" 2>/dev/null \
+        || echo "ZAP-Startprotokoll für $name nicht verfügbar." >&2
+    if [ "$scan_status" -le 2 ]; then
+        for bericht in bericht.json bericht.md bericht.html; do
+            docker cp "$scanner:/zap/wrk/$bericht" "$arbeitsberichte/$name/$bericht"
+            [ -s "$arbeitsberichte/$name/$bericht" ] || { echo "ZAP-Bericht $bericht ist leer." >&2; exit 1; }
+        done
     fi
-    for bericht in bericht.json bericht.md bericht.html; do
-        docker cp "$scanner:/zap/wrk/$bericht" "$ausgabe/$schnittstelle/$bericht"
-        [ -s "$ausgabe/$schnittstelle/$bericht" ] || { echo "ZAP-Bericht $bericht ist leer." >&2; exit 1; }
-    done
     docker rm -f "$scanner" >/dev/null
     scanner=""
-    if [ "$scan_status" = 1 ]; then
+}
+
+scan_und_sammeln() {
+    scan_zap "$@"
+    if [ "$scan_status" -gt 2 ]; then
+        echo "ZAP-Scan $1 fehlgeschlagen; siehe zap.log." >&2
+        gesamt_status="$scan_status"
+        fataler_scan=1
+    elif [ "$scan_status" = 1 ]; then
         gesamt_status=1
     elif [ "$scan_status" = 2 ] && [ "$gesamt_status" = 0 ]; then
         gesamt_status=2
     fi
+}
+
+for _ in 1; do
+    scan_und_sammeln app "${url}q/openapi"
+    [ "$fataler_scan" = 0 ] || break
+    scan_und_sammeln webseite /zap/public-v1.yaml
+    [ "$fataler_scan" = 0 ] || break
+    scan_und_sammeln app-authentisiert "${url}q/openapi" "$arbeit/zugang/api-token"
+    [ "$fataler_scan" = 0 ] || break
+    for stufe in oeffentlich mitglieder vorstand; do
+        scan_und_sammeln "webseite-$stufe" /zap/public-v1.yaml "$arbeit/zugang/webseite-$stufe" "$stufe"
+        [ "$fataler_scan" = 0 ] || break
+    done
+    [ "$fataler_scan" = 0 ] || break
 done
 touch "$arbeit/abgeschlossen"
 server_status="$(docker wait "$server")"
-docker logs "$server" >"$ausgabe/testserver.log" 2>&1
+docker logs "$server" >"$arbeitsberichte/testserver.log" 2>&1
 if [ "$server_status" != 0 ]; then
     echo "Testserver fehlgeschlagen; siehe testserver.log." >&2
     exit 1
 fi
+
+redact_ausgaben
+cp -R "$arbeitsberichte/." "$ausgabe/"
 echo "ZAP-Status $gesamt_status. Berichte: $ausgabe"
 exit "$gesamt_status"

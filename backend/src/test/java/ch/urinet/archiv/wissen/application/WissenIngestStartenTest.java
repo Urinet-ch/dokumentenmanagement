@@ -413,6 +413,11 @@ class WissenIngestStartenTest {
         }
 
         @Override
+        public boolean abschnittWiederholen(UUID entwurfId, int abschnittNr, Fortschritt fortschritt) {
+            return false;
+        }
+
+        @Override
         public List<SeitenMetadaten> seitenMetadatenLaden() {
             return List.of();
         }

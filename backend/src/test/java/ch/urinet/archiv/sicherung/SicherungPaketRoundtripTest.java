@@ -138,9 +138,9 @@ class SicherungPaketRoundtripTest {
             String originalVersion = ablegen(mandant.bucket(), originalKey, ORIGINAL);
             String pdfaVersion = ablegen(mandant.bucket(), pdfaKey, PDFA);
             dokumentAnlegen(mandant.schema(), id, pdfaKey, pdfaVersion, originalKey, originalVersion);
-            wissenAnlegen(mandant.schema());
+            wissenAnlegen(mandant.schema(), id);
             long[] wissen = wissenZaehlen(mandant.schema());
-            assertThat(wissen).containsExactly(2, 3);
+            assertThat(wissen).containsExactly(2, 3, 2);
 
             KeyPair schluessel = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
             ManifestTestdaten manifest = manifestErzeugen(schluessel, code);
@@ -152,6 +152,7 @@ class SicherungPaketRoundtripTest {
             String prefix = code + ".";
             zustand.setProperty(prefix + "wissen.seiten", Long.toString(wissen[0]));
             zustand.setProperty(prefix + "wissen.versionen", Long.toString(wissen[1]));
+            zustand.setProperty(prefix + "wissen.quellen", Long.toString(wissen[2]));
             long dokumente = dokumenteZaehlen(mandant.schema());
             assertThat(dokumente).isEqualTo(1);
             zustand.setProperty(prefix + "dokument.anzahl", Long.toString(dokumente));
@@ -250,7 +251,8 @@ class SicherungPaketRoundtripTest {
         String prefix = code + ".";
         assertThat(wissenZaehlen(schema)).containsExactly(
                 Long.parseLong(erwartet.getProperty(prefix + "wissen.seiten")),
-                Long.parseLong(erwartet.getProperty(prefix + "wissen.versionen")));
+                Long.parseLong(erwartet.getProperty(prefix + "wissen.versionen")),
+                Long.parseLong(erwartet.getProperty(prefix + "wissen.quellen")));
         assertThat(dokumenteZaehlen(schema)).isEqualTo(
                 Long.parseLong(erwartet.getProperty(prefix + "dokument.anzahl")));
         UUID id = UUID.fromString(erwartet.getProperty(prefix + "dokument.id"));
@@ -378,7 +380,7 @@ class SicherungPaketRoundtripTest {
         }
     }
 
-    private void wissenAnlegen(String schema) throws Exception {
+    private void wissenAnlegen(String schema, UUID dokumentId) throws Exception {
         try (Connection connection = datenquelle.getConnection()) {
             for (int nr = 1; nr <= 2; nr++) {
                 UUID seite = UUID.randomUUID();
@@ -402,6 +404,19 @@ class SicherungPaketRoundtripTest {
                         p.executeUpdate();
                     }
                 }
+                try (PreparedStatement p = connection.prepareStatement("insert into " + schema
+                        + ".wissensseite_quelle (seite_id, schluessel, dokument_id, seite_von) values (?, ?, ?, 1)")) {
+                    p.setObject(1, seite);
+                    p.setString(2, "q-" + nr);
+                    p.setObject(3, dokumentId);
+                    p.executeUpdate();
+                }
+                try (PreparedStatement p = connection.prepareStatement("insert into " + schema
+                        + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)")) {
+                    p.setObject(1, seite);
+                    p.setObject(2, dokumentId);
+                    p.executeUpdate();
+                }
             }
         }
     }
@@ -409,10 +424,11 @@ class SicherungPaketRoundtripTest {
     private long[] wissenZaehlen(String schema) throws Exception {
         try (Connection connection = datenquelle.getConnection();
              PreparedStatement p = connection.prepareStatement("select (select count(*) from " + schema
-                     + ".wissensseite), (select count(*) from " + schema + ".wissensseite_version)");
+                     + ".wissensseite), (select count(*) from " + schema + ".wissensseite_version), "
+                     + "(select count(*) from " + schema + ".wissensseite_quelle)");
              ResultSet r = p.executeQuery()) {
             assertThat(r.next()).isTrue();
-            return new long[] {r.getLong(1), r.getLong(2)};
+            return new long[] {r.getLong(1), r.getLong(2), r.getLong(3)};
         }
     }
 

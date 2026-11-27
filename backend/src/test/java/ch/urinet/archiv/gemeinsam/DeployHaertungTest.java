@@ -132,6 +132,39 @@ class DeployHaertungTest {
         assertThat(prioritaet).isEmpty();
     }
 
+    /** HSTS an jedem Router (ZAP-Baseline gegen die VPS, Regel 10035, 26.11.2026) und jede Middleware am Dienst des
+     *  Routers definiert: Traefik führt Router nur für gesunde Container. Hing {@code archiv-auth} an einer Middleware
+     *  des Dienstes {@code api}, warteten beide Dienste aufeinander (Deploy 26.11.2026: 404 auf archiv und archiv-auth). */
+    @Test
+    void jederRouterSetztHstsMitEigenerMiddlewareDesDienstes() throws IOException {
+        List<String> befunde = new ArrayList<>();
+        labels().forEach((dienst, labels) -> labels.forEach((schluessel, wert) -> {
+            Matcher router = Pattern.compile("traefik\\.http\\.routers\\.([^.]+)\\.middlewares").matcher(schluessel);
+            if (!router.matches()) {
+                return;
+            }
+            List<String> mittel = List.of(wert.replace(" ", "").split(","));
+            if (mittel.stream().noneMatch(m -> m.endsWith("-sts"))) {
+                befunde.add(dienst + ": " + router.group(1) + " ohne HSTS");
+            }
+            for (String m : mittel) {
+                String praefix = "traefik.http.middlewares." + m + ".";
+                if (labels.keySet().stream().noneMatch(k -> k.startsWith(praefix))) {
+                    befunde.add(dienst + ": " + router.group(1) + " nutzt " + m + " ohne Definition am eigenen Dienst");
+                }
+            }
+        }));
+        assertThat(befunde).isEmpty();
+        Map<String, String> alle = new java.util.TreeMap<>();
+        labels().values().forEach(alle::putAll);
+        for (String name : List.of("archiv-sts", "archiv-auth-sts")) {
+            String basis = "traefik.http.middlewares." + name + ".headers.";
+            assertThat(alle).containsEntry(basis + "stsincludesubdomains", "false");
+            assertThat(alle).containsEntry(basis + "stspreload", "false");
+            assertThat(Long.parseLong(alle.get(basis + "stsseconds"))).isPositive();
+        }
+    }
+
     /** Öffentlich nur archiv.… und archiv-auth.… (tech.md «Erreichbarkeit», ADR-010 P15); ein weiterer Host (z. B.
      *  VHF/GSK) braucht einen Entscheid von Fabian (Review PR #299, M1). Standardwerte von {@code ${…:-…}} gelten. */
     @Test

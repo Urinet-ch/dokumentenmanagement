@@ -159,8 +159,10 @@ API-Endpunkt auf. Der Passwort-Grant ist für diesen synthetischen Test ungeeign
 verlangt; darum verwendet der Funktionstest ein Dienstkonto, ohne TOTP-Pflicht oder Produktionsflows zu ändern. Der
 Bucket-Strom wird mit `archiv sicherung wiederherstellen`
 in den neuen `urinet-archiv-p-`-Bucket eingespielt; eine absichtlich unvollständige Inventarliste ohne Manifest wird
-vorher zurückgewiesen. Die Quarkus-Testanwendung startet gegen die wiederhergestellte Archivdatenbank und prüft
-Dokument-, Seiten- und Versionszahlen gegen die Quelle, IDs, SHA-256 und Lesbarkeit der Dateien. Zusätzlich prüft
+vorher zurückgewiesen. Die Quarkus-Testanwendung startet gegen die wiederhergestellte Archivdatenbank und vergleicht je
+Mandant die vor der Sicherung erfassten Zahlen für Dokumente, Wissensseiten, Seitenversionen und Quelleneinträge mit dem
+Restore. Sie
+prüft zusätzlich IDs, SHA-256 und Lesbarkeit der Dateien. Zudem prüft
 sie, dass weder das Dokument noch Versionen oder Löschmarken seines Originals und PDF/A aus dem anderen Mandanten
 im jeweiligen Ziel vorhanden sind. Dies wird für beide Mandanten geprüft.
 `archiv manifest pruefen` validiert danach das signierte
