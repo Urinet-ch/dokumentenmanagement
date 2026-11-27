@@ -1,0 +1,11 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -394,5 +394,7 @@ jobs:
+       - name: Compose-Konsistenzprüfung (synthetische Tests)
+         run: python3 -m unittest tools/test_pruefe_compose_konsistenz.py
++      - name: Traefik-Rauchtest (Ableitung, synthetische Tests)
++        run: python3 -m unittest tools/test_traefik_rauchtest.py
+       - name: Compose-Konsistenzprüfung (Deploy-Vorlage)
+         run: |
+           status=0

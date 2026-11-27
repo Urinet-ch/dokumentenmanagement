@@ -46,6 +46,24 @@ Das Werkzeug führt diese Schritte nicht selbst aus.
   verfügbar sein. Fehlermeldungen nennen Aufruf und Fehlerart beziehungsweise
   `errno`, geben aber keine Docker-Fehlertexte, IDs, Pfade oder CSV-Werte aus.
 
+### Synthetische Testbelege lokal erzeugen
+
+Für eine spätere, separat freigegebene Messung lassen sich Scan und Handy-Foto
+mit einem Aufruf erzeugen. Pillow und reportlab müssen wie für den Scan-
+Generator in `tools/golden_synth/requirements.txt` installiert sein. Der
+Zielordner muss neu sein und ausserhalb des Repositorys liegen:
+
+```sh
+python3 tools/last/testdaten_erzeugen.py /ausserhalb/messbelege-neu
+```
+
+Der Ordner wird mit Rechten 700 angelegt; PDF und JPEG erhalten Rechte 600.
+Der Scan ist ein 20-seitiges Bild-PDF ohne Textinhalt, rund 15 MB gross; das
+JPEG ist ein synthetisches 12-MP-Handy-Foto. Der Generator arbeitet lokal und
+ohne Netzwerkzugriff: Er lädt nichts hoch und kontaktiert keine VPS. Die
+Erzeugung allein gibt keine Messung frei. Die Testdaten nicht ins Repository
+legen.
+
 ## Ablauf
 
 In jedem Aufruf die drei **Container-IDs** und einen neuen Ausgabepfad
@@ -100,4 +118,5 @@ Dienstnummern 1, 2 und 3 entsprechen API, Keycloak und Datenbank. Der Bericht
 enthält keine Namen anderer Apps. Fabian bestätigt dort die verwendeten
 Testdaten; Rohdaten geschützt ausserhalb des Repositorys aufbewahren.
 
-Synthetische Tests: `python3 -m unittest tools/last/test_speichermessung_stufe_a.py`.
+Synthetische Tests:
+`python3 -m unittest tools/last/test_speichermessung_stufe_a.py tools/last/test_testdaten_erzeugen.py`.
