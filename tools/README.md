@@ -6,6 +6,8 @@
 | `test_archiv_client.py` | Tests zum Client: `python3 -m unittest tools/test_archiv_client.py` |
 | `test_pruefe_speicherbudget.py` | Tests für das Deploy-Speicherbudget: `python3 -m unittest tools/test_pruefe_speicherbudget.py` |
 | `pruefe_compose_konsistenz.py` | Statische Prüfung von Compose und Keycloak-Vorlagen; startet keine Dienste |
+| `traefik_rauchtest.py` | Lokaler Laufzeittest aller Traefik-Router mit synthetischen Diensten; Details unter `docs/betrieb/traefik-rauchtest.md` |
+| `test_traefik_rauchtest.py` | Dockerfreie Tests zur Ableitung der lokalen Traefik-Konfiguration |
 | `pruefe_dokumentverweise.py` | Prüft lokale Markdown-Links und Dateiverweise unter `docs/` und `deploy/` |
 | `golden_synth/` | Generator für synthetische Golden-Belege (Req 0.10) |
 | `crm/` | synthetischer Beispiel-Export 21.CRM |
@@ -30,6 +32,18 @@ noch die Wirksamkeit von Healthchecks, Routerregeln und Limits. Dienstimages ohn
 lokal gebaut wurden; ein gepinntes Basisimage macht den veränderlichen Dienst-Tag nicht unveränderlich.
 Die Tests laufen nicht automatisch in der CI; ein Vorschlag dafür liegt unter
 [`docs/betrieb/compose-konsistenz-ci.diff`](../docs/betrieb/compose-konsistenz-ci.diff).
+
+## Lokaler Traefik-Rauchtest
+
+```sh
+python3 -m unittest tools/test_traefik_rauchtest.py
+python3 tools/traefik_rauchtest.py
+```
+
+Die Ableitungstests brauchen Docker nicht. Der Laufzeittest verwendet Docker Desktop,
+Traefik `v3.5`, ein internes Testnetz, synthetische HTTP-Attrappen und `docker cp`;
+er prüft für jeden Router die Antwort der richtigen Attrappe und HSTS auf 200 und
+429. Details und Grenzen: [`docs/betrieb/traefik-rauchtest.md`](../docs/betrieb/traefik-rauchtest.md).
 
 ## Dokumentverweise
 
