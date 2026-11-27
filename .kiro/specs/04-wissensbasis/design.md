@@ -1649,6 +1649,10 @@ nicht erforderlich. Eine vollständig ungültige Antwort zählt als ausgefallene
 Aussageobjekte enthält. Der WireMock-Nachweis deckt ungültige Aussagen und anschliessend gültige Wiederholung ab;
 JUnit prüft Fehlerzählung, Seitenauswahl und Abschnittsschätzung, Angular prüft Meldung und POST-Aktion.
 
+Nachtrag (27.11.2026): Nach erfolgreicher Wiederholung bleibt die Meldung «Der Abschnitt wird neu verarbeitet» auch
+während des erneuten Ladens sichtbar und erhält nach dem Rendern den Fokus. Das Browser-Szenario prüft Statusmeldung,
+Fokus, axe und horizontalen Überlauf bei 375 und 1280 px in beiden Farbschemata.
+
 ### Umsetzung (Aufgabe 19.5, 27.11.2026)
 Die Kernaussagen-Extraktion erhält zwei globale Konfigurationswerte für Tabellen: Gruppierung aktiviert und höchstens
 eine Gruppe je Kennzahlen-, Persona- oder Positionstabelle. Der Startwert wurde mit einer synthetischen Tabelle mit
