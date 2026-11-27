@@ -3,14 +3,12 @@ package ch.urinet.archiv.gemeinsam;
 import ch.urinet.archiv.gemeinsam.adapter.in.health.OidcBereitschaftWaechter;
 import ch.urinet.archiv.gemeinsam.adapter.in.health.ProzessEnde;
 import ch.urinet.archiv.gemeinsam.domain.Bereitschaftsfrist.Lage;
-import com.sun.net.httpserver.HttpServer;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.jose4j.jwk.RsaJsonWebKey;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -18,7 +16,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -44,27 +41,14 @@ import static org.hamcrest.Matchers.containsString;
 class OidcNichtErreichbarTest {
 
     static final List<Integer> EXIT_CODES = new CopyOnWriteArrayList<>();
-    private static HttpServer keycloak;
 
     @Inject
     OidcBereitschaftWaechter waechter;
 
-    /** Fester Port für den spät startenden Fake-Keycloak; über eine System-Property, weil Profil und Test in
-     *  verschiedenen Classloadern laufen. */
-    static int port() {
-        return Integer.parseInt(System.getProperties().computeIfAbsent("archiv.test.oidc-port", k -> {
-            try {
-                return String.valueOf(FakeKeycloak.freierPort());
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }).toString());
-    }
-
     public static class OhneKeycloak implements QuarkusTestProfile {
         @Override
-        public Map<String, String> getConfigOverrides() {
-            return FakeKeycloak.konfiguration(FakeKeycloak.issuer(port()));
+        public List<TestResourceEntry> testResources() {
+            return List.of(new TestResourceEntry(FakeKeycloak.class, Map.of("spaeter-starten", "true")));
         }
     }
 
@@ -81,13 +65,6 @@ class OidcNichtErreichbarTest {
     @BeforeEach
     void ende() {
         prozessEndeMerken();
-    }
-
-    @AfterAll
-    static void keycloakStoppen() {
-        if (keycloak != null) {
-            keycloak.stop(0);
-        }
     }
 
     @Test
@@ -137,9 +114,9 @@ class OidcNichtErreichbarTest {
     @Test
     @Order(5)
     void spaeterKeycloakHeiltErstMitAngemeldeterAnfrage() throws Exception {
-        RsaJsonWebKey schluessel = FakeKeycloak.neuerSchluessel();
-        String issuer = FakeKeycloak.issuer(port());
-        keycloak = FakeKeycloak.starten(port(), FakeKeycloak.REALM, issuer, schluessel);
+        RsaJsonWebKey schluessel = FakeKeycloak.schluesselDerRessource();
+        String issuer = FakeKeycloak.issuerDesServers();
+        FakeKeycloak.spaeterVerfuegbarMachen();
 
         // ohne angemeldete Anfrage baut Quarkus den Tenant nicht neu auf: ohne Neustart bliebe die API unhealthy
         given().when().get("/q/health/ready").then().statusCode(503);
