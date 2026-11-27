@@ -135,6 +135,13 @@ public class WissenIngestSchritte {
         }
     }
 
+    @Angenommen("das Dokument «{word}» trägt einen synthetischen Vertraulichkeitsvermerk «intern»")
+    public void internerVermerkSetzen(String name) throws SQLException {
+        Ort ort = ort(name);
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set volltext = ? where id = ?",
+                "INTERN\nDie Abgabefrist endet am 30. April.\f", ort.id());
+    }
+
     @Angenommen("das Dokument «{word}» hat synthetische PDF-Seiten für die Auszugsprüfung")
     public void pdfaMitSynthetischenSeiten(String name) throws SQLException {
         Ort ort = ort(name);

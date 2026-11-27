@@ -25,6 +25,8 @@ class WissenKonfigurationTest {
         assertThat(properties.getProperty("archiv.wissen.auszug-mindest-zeichen")).isEqualTo("20");
         assertThat(properties.getProperty("archiv.wissen.aussage-ueberlappung")).isEqualTo("0.5");
         assertThat(properties.getProperty("archiv.wissen.randzeilen-mindest-anteil")).isEqualTo("0.3");
+        assertThat(properties.getProperty("archiv.wissen.tabellen-gruppierung")).isEqualTo("true");
+        assertThat(properties.getProperty("archiv.wissen.tabellen-max-gruppen")).isEqualTo("1");
         assertThat(properties.containsKey("archiv.wissen.basis-url")).isFalse();
     }
 
@@ -32,5 +34,11 @@ class WissenKonfigurationTest {
     void leeresModellWirdBeimStartAbgelehnt() {
         assertThatIllegalStateException().isThrownBy(() -> new WissenKonfiguration("", 30_000, 15, 60_000,
                 20_000, 12_000, 600_000, 1_000_000));
+    }
+
+    @Test
+    void tabellengruppenSindBegrenzt() {
+        assertThatIllegalStateException().isThrownBy(() -> new WissenKonfiguration("test-modell", 30_000, 15,
+                60_000, 20_000, 12_000, 600_000, 1_000_000, 20, 0.5, 0.3, true, 41));
     }
 }

@@ -978,6 +978,8 @@ die Mandantentrennung.
 | `archiv.wissen.index-max-zeichen` | 60'000 |
 | `archiv.wissen.seite-max-zeichen` | 20'000 |
 | `archiv.wissen.werkzeug-max-zeichen` | 12'000 |
+| `archiv.wissen.tabellen-gruppierung` | `true` |
+| `archiv.wissen.tabellen-max-gruppen` | 1 je Tabelle (Startwert anhand einer synthetischen Kennzahlentabelle) |
 | `archiv.wissen.budget-tokens` | 600'000 (entschieden von Fabian am 18.11.2026) |
 | `archiv.wissen.lint-budget-tokens` | 100'000 |
 | `archiv.wissen.monatsbudget-tokens` | 1'000'000 je Mandant und Kalendermonat (entschieden von Fabian am 09.11.2026) |
@@ -1646,6 +1648,19 @@ Vorschläge werden als veraltet markiert. Fortschritt und Fehler liegen im beste
 nicht erforderlich. Eine vollständig ungültige Antwort zählt als ausgefallener Abschnitt, auch wenn sie keine
 Aussageobjekte enthält. Der WireMock-Nachweis deckt ungültige Aussagen und anschliessend gültige Wiederholung ab;
 JUnit prüft Fehlerzählung, Seitenauswahl und Abschnittsschätzung, Angular prüft Meldung und POST-Aktion.
+
+### Umsetzung (Aufgabe 19.5, 27.11.2026)
+Die Kernaussagen-Extraktion erhält zwei globale Konfigurationswerte für Tabellen: Gruppierung aktiviert und höchstens
+eine Gruppe je Kennzahlen-, Persona- oder Positionstabelle. Der Startwert wurde mit einer synthetischen Tabelle mit
+zwei Kennzahlzeilen geprüft; die WireMock-Antwort fasst beide Werte in einer belegten Kernaussage zusammen. Andere
+Tabellen behalten die zeilenweise Regel aus Aufgabe 19.2.
+
+Ein Vertraulichkeitsvermerk wird nur bei einer eigenständigen Zeile `INTERN`, `Vertraulichkeit: intern` oder
+`Nicht für Dritte` erkannt. Der Ingest setzt die Quellen-Kontextstufe mindestens auf `INTERN` und zeigt den Hinweis
+«Vertraulichkeitsvermerk erkannt …» im Entwurf; Quelldokument und dessen Metadaten bleiben unverändert. Damit erben
+Änderungsvorschläge diese Kontextstufe (Requirement 11.7). Die bestehende Freigabeprüfung für Webseiten liefert nur
+Seiten mit Quellen auf Zugriffsstufe `oeffentlich` und Seitenvertraulichkeit `NORMAL` aus; ein so eingestufter
+Entwurf kann daher nicht für Webseite oder Mitglieder freigegeben werden. Requirements bleiben unverändert.
 
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):

@@ -18,6 +18,7 @@ import ch.urinet.archiv.wissen.domain.Seitentyp;
 import ch.urinet.archiv.wissen.domain.WissenIngestAuszuege;
 import ch.urinet.archiv.wissen.domain.WissenIngestGrenzen;
 import ch.urinet.archiv.wissen.domain.WissenIngestSegmentierer;
+import ch.urinet.archiv.wissen.domain.WissenVertraulichkeitsvermerk;
 import ch.urinet.archiv.wissen.domain.WissensGraph;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
@@ -79,6 +80,8 @@ public class WissenIngestVerarbeiten {
     static final String UEBERBLICK_HOEHER = "Überblick nicht aktualisiert (höhere Vertraulichkeit)";
     static final String STUFE_GESENKT = "Die Vertraulichkeit der Wissensquelle wurde während des Ingests gesenkt; "
             + "bitte den Ingest neu starten.";
+    static final String INTERN_VERMERK = "Vertraulichkeitsvermerk erkannt; die Quelle wird in diesem Entwurf als "
+            + "INTERN behandelt. Bitte die Vertraulichkeit des Dokuments prüfen.";
 
     private final WissenIngestSpeichern speichern;
     private final WissenKonfiguration konfiguration;
@@ -114,7 +117,12 @@ public class WissenIngestVerarbeiten {
             auszugPrueferVerwerfen(entwurfId);
         }
         Fortschritt fortschritt = fortschritt(lauf);
-        if (nichtFreigegeben(auftrag, stand, fortschritt)) {
+        boolean internerVermerk = WissenVertraulichkeitsvermerk.istIntern(lauf.volltext());
+        WissensStufe quellStufe = quellStufe(lauf, stand.quellStufe());
+        if (internerVermerk && !fortschritt.hinweise().contains(INTERN_VERMERK)) {
+            fortschritt = mitHinweis(fortschritt, INTERN_VERMERK);
+        }
+        if (nichtFreigegeben(auftrag, stand, fortschritt, quellStufe)) {
             auszugPrueferVerwerfen(entwurfId);
             return;
         }
@@ -122,7 +130,7 @@ public class WissenIngestVerarbeiten {
             throw new InterruptedException("Wissens-Ingest unterbrochen");
         }
 
-        fortschritt = mitKontextStufe(fortschritt, stand.quellStufe());
+        fortschritt = mitKontextStufe(fortschritt, quellStufe);
         WissenIngestGrenzen grenzen = konfiguration.ingest();
         long budget = begrenzt(lauf.budgetTokens(), grenzen.budgetTokens());
         long monatsbudget = begrenzt(lauf.monatsbudgetTokens(), grenzen.monatsbudgetTokens());
@@ -162,16 +170,21 @@ public class WissenIngestVerarbeiten {
      * Vertraulichkeit unter eine Stufe gesunken ist, die schon in den Kontext gelangt ist (Req 11.7): Sonst trügen
      * spätere Änderungen eine zu tiefe Kontextstufe. Geprüft vor jedem Schritt und nach jedem erneuten Laden.
      */
-    private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher) {
-        if (!WissenIngestSpeichern.freigegeben(stand.lauf()) || stand.quellStufe() == null) {
+    private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher,
+                                     WissensStufe quellStufe) {
+        if (!WissenIngestSpeichern.freigegeben(stand.lauf()) || quellStufe == null) {
             fehlerSichern(auftrag, stand.lauf(), bisher, NICHT_FREIGEGEBEN);
             return true;
         }
-        if (bisher.kontextStufe() != null && stand.quellStufe().ordinal() < bisher.kontextStufe().ordinal()) {
+        if (bisher.kontextStufe() != null && quellStufe.ordinal() < bisher.kontextStufe().ordinal()) {
             fehlerSichern(auftrag, stand.lauf(), bisher, STUFE_GESENKT);
             return true;
         }
         return false;
+    }
+
+    private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher) {
+        return nichtFreigegeben(auftrag, stand, bisher, quellStufe(stand.lauf(), stand.quellStufe()));
     }
 
     private void fehlerSichern(Auftrag auftrag, Lauf lauf, Fortschritt fortschritt, String hinweis) {
@@ -188,6 +201,13 @@ public class WissenIngestVerarbeiten {
                 bisher.quelleErzeugt(), bisher.kernaussagen(), bisher.planung(), bisher.vorschlaege(),
                 bisher.hinweise(), hoechste, bisher.abschnittFehler(), bisher.abschnittNur(),
                 bisher.abschnittZeichen(), bisher.vorschlagBasis());
+    }
+
+    private static WissensStufe quellStufe(Lauf lauf, WissensStufe archivierteStufe) {
+        if (archivierteStufe == null || !WissenVertraulichkeitsvermerk.istIntern(lauf.volltext())) {
+            return archivierteStufe;
+        }
+        return archivierteStufe.hoechste(WissensStufe.INTERN);
     }
 
     private void kernaussagen(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher,
@@ -1001,9 +1021,22 @@ public class WissenIngestVerarbeiten {
         return new KiErgebnis(null, tokensEin, tokensAus, budgetErreicht, monatsbudgetErreicht, false);
     }
 
-    private static String systemPrompt(KiPort.WissensSchritt schritt) {
-        return schritt == KiPort.WissensSchritt.KERNAUSSAGEN
-                ? SYSTEM_PROMPT + KERNAUSSAGEN_PROMPT : SYSTEM_PROMPT;
+    private String systemPrompt(KiPort.WissensSchritt schritt) {
+        if (schritt != KiPort.WissensSchritt.KERNAUSSAGEN) {
+            return SYSTEM_PROMPT;
+        }
+        String gruppierung = konfiguration.tabellenGruppierung() ? "aktiv" : "inaktiv";
+        String gruppierungsRegel = konfiguration.tabellenGruppierung()
+                ? "Fasse solche Tabellen als zusammengehörige Gruppe(n) auf Tabellenebene zusammen"
+                : "Verarbeite solche Tabellen nach der zeilenweisen Regel";
+        String gruppen = konfiguration.tabellenMaxGruppen() == 1 ? "Gruppe" : "Gruppen";
+        return SYSTEM_PROMPT + KERNAUSSAGEN_PROMPT + """
+
+                - Gruppierung für Kennzahlen-, Persona- und Positionstabellen: %s; höchstens %d %s je Tabelle.
+                  %s, nicht als einzelne Aussagen je Zelle. Bewahre dabei die belegten Werte, Einheiten,
+                  Einschränkungen und Zeilenbezüge. Für andere Tabellen gilt weiterhin höchstens eine Aussage je
+                  Tabellenzeile.
+                """.formatted(gruppierung, konfiguration.tabellenMaxGruppen(), gruppen, gruppierungsRegel);
     }
 
     private SeitenVorschlag seitenVorschlag(Planung plan, int nummer, KiPort.Seite inhalt,
