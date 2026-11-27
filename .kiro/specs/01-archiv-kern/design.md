@@ -1,5 +1,13 @@
 # Design Document
 
+### Umsetzung (Folgeauftrag 1.10 Testdaten, 27.11.2026)
+
+`tools/last/testdaten_erzeugen.py` erzeugt lokal und ohne Netzwerk einen
+20-seitigen Bildscan ohne Textebene (rund 15 MB) und ein synthetisches 12-MP-
+Handy-Foto in einem geschützten Ordner ausserhalb des Repositorys. Der Test
+prüft Grösse, Seiten und Bildinhalt, Fotoauflösung sowie Dateirechte. Es wurden
+keine Testdaten hochgeladen; Messung und Betriebsnachweis bleiben offen.
+
 ### Umsetzung (Aufgabe 5.11 Messvorbereitung, 26.11.2026)
 
 `tools/last/verarbeitung_foto.py` prüft die Seitenzahl eines Begleit-PDFs, beobachtet die Überlappung und wartet
