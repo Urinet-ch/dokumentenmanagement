@@ -1,0 +1,7 @@
+diff --git a/.github/workflows/infomaniak-deploy.yml b/.github/workflows/infomaniak-deploy.yml
+--- a/.github/workflows/infomaniak-deploy.yml
++++ b/.github/workflows/infomaniak-deploy.yml
+@@ -27,2 +27,2 @@
+-  # Speicherbudget Stufe A aus tech.md (1150 MiB, geändert 21.11.2026, Entscheid Fabian: Keycloak 550m; davor 1000 MiB seit 13.11.2026, 900 MiB); liegt compose.yml darüber,
++  # Speicherbudget Stufe A aus tech.md (2048 MiB / 1.5 CPU, geändert 27.11.2026, Entscheid Fabian nach VPS-Erweiterung am 23.11.2026); liegt compose.yml darüber,
+   # gilt Req 16.18 (kein Deploy auf Stufe A)

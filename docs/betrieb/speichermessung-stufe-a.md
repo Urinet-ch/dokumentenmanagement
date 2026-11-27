@@ -12,10 +12,9 @@ verändern keine Archiv-Dienste.
 
 Fabian bestätigte am 27.11.2026 das Budget nach der Erweiterung vom 23.11.2026:
 Summe der `mem_limit` höchstens 2048 MiB und der `cpus` höchstens 1.5. Das
-Werkzeug prüft diese Grenzen. Die älteren Angaben von 1000 MiB und 0.75 CPU in
-Aufgabe 1.10 und Req 16.18 sind diesbezüglich überholt; der Nachzug des
-Requirement-Texts erfolgt separat. Bei Überschreitung nicht mit weiterer Last
-beginnen.
+Werkzeug prüft diese Grenzen. Die früheren Werte von 1000 MiB und 0.75 CPU in
+Aufgabe 1.10 und Req 16.18 sind überholt; beide Texte wurden mit Entscheid und
+Datum nachgeführt. Bei Überschreitung nicht mit weiterer Last beginnen.
 
 Nach Req 16.18 ist auch ein speicherbedingter Abbruch eines Containers auf dem
 Host oder der Health-Ausfall einer anderen App ein Abbruchgrund. Ein durch

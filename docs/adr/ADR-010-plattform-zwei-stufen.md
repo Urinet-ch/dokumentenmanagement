@@ -136,6 +136,12 @@ Vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #86 (Aufgabe 4.9, Ent
 - Restrisiko VPS Lite: keine SLA, keine Snapshots, ausgehend kein Port 25; Infomaniak empfiehlt sie für Projekte, die
   noch nicht geschäftskritisch sind. Vertretbar, weil Object Lock, Zweitkopie und Restore-Probe die Daten tragen.
 
+## Nachtrag 27.11.2026 (Speicherbudget Stufe A)
+Entschieden von Fabian am 27.11.2026 nach der VPS-Erweiterung vom 23.11.2026: Die Obergrenzen der Stufe A betragen
+2048 MiB für die Summe der `mem_limit` und 1.5 für die Summe der `cpus`. Eine erneute Messung ist freigegeben und
+bleibt Aufgabe 1.10. Die Messwerte vom 22.11.2026 bleiben unverändert als historischer Messstand; Req 16.18,
+`tech.md`, design.md und tasks.md führen die aktualisierten Grenzen.
+
 ## Verweise
 - Req 3.2, 5.5, 14.3, 16.1, 16.4, 16.7, 16.9–16.11, 16.15–16.19, 16.26; P1 (geändert 08.11.2026), P5, P15, K5
 - `tech.md` «Plattform und Betrieb»; design.md «Betrieb auf der VPS», «Stufen der Plattform»
