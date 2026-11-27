@@ -87,6 +87,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLTransientConnectionException;
@@ -143,6 +145,85 @@ class FehlerInjektionTest {
                     if (!zeilen.next()) provisionierung.anlegen(code, null, null);
                 }
             }
+        }
+    }
+
+    @Test
+    void alleOpenApiOperationenLiefernUnangemeldetSaubereProblemDetails() throws Exception {
+        String dokumentation = given().when().get("/q/openapi?format=json")
+                .then().statusCode(200).extract().asString();
+        var pfade = new ObjectMapper().readTree(dokumentation).path("paths");
+        assertThat(pfade.isObject()).isTrue();
+
+        record Operation(String methode, String pfad) { }
+        List<Operation> operationen = new ArrayList<>();
+        Set<String> methoden = Set.of("get", "post", "put", "patch", "delete", "head", "options");
+        pfade.fields().forEachRemaining(pfad -> pfad.getValue().fields().forEachRemaining(operation -> {
+            if (methoden.contains(operation.getKey())) {
+                operationen.add(new Operation(operation.getKey(), pfad.getKey()));
+            }
+        }));
+        assertThat(operationen).hasSizeGreaterThan(100);
+
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (Operation operation : operationen) {
+                String pfad = operation.pfad()
+                        .replaceAll("\\{(nummer|nr|jahr|seite|groesse)\\}", "1")
+                        .replaceAll("\\{[^/}]+\\}", "00000000-0000-0000-0000-000000000001");
+                int erwarteterStatus = 401;
+                String erwarteterCode = "NICHT_ANGEMELDET";
+                var anfrage = given().queryParam("probe", MARKER);
+                if (pfad.equals("/api/v1/branding")) {
+                    anfrage.queryParam("domain", MARKER);
+                    erwarteterStatus = 400;
+                    erwarteterCode = "ANFRAGE_UNGUELTIG";
+                }
+                var antwort = anfrage.when().request(operation.methode(), pfad);
+                String aufruf = operation.methode().toUpperCase(java.util.Locale.ROOT) + " " + operation.pfad();
+                assertThat(antwort.statusCode()).as(aufruf).isEqualTo(erwarteterStatus);
+                assertThat(ProblemDetails.pruefen(antwort, erwarteterStatus))
+                        .as(aufruf)
+                        .isEqualTo(erwarteterCode);
+                assertThat(antwort.asString())
+                        .as(aufruf)
+                        .doesNotContain(MARKER, "Exception", "\tat ", "Caused by:");
+            }
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
+        }
+    }
+
+    @Test
+    void alleWebseitenvertragsoperationenLiefernSaubereFehler() throws Exception {
+        String vertrag = Files.readString(Path.of("..", "docs", "schnittstelle", "public-v1.yaml"),
+                StandardCharsets.UTF_8);
+        var pfade = PublicVertrag.roh(vertrag).path("paths");
+        record Operation(String methode, String pfad) { }
+        List<Operation> operationen = new ArrayList<>();
+        Set<String> methoden = Set.of("get", "post", "put", "patch", "delete", "head", "options");
+        pfade.fields().forEachRemaining(pfad -> pfad.getValue().fields().forEachRemaining(operation -> {
+            if (methoden.contains(operation.getKey())) {
+                operationen.add(new Operation(operation.getKey(), pfad.getKey()));
+            }
+        }));
+        assertThat(operationen).hasSizeGreaterThan(20);
+
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            for (Operation operation : operationen) {
+                String pfad = operation.pfad()
+                        .replaceAll("\\{(nummer|nr|jahr|seite|groesse)\\}", "1")
+                        .replaceAll("\\{[^/}]+\\}", "00000000-0000-0000-0000-000000000001");
+                var antwort = given().header("X-Archiv-Zugriff", MARKER)
+                        .queryParam("probe", MARKER).when().request(operation.methode(), pfad);
+                String aufruf = operation.methode().toUpperCase(java.util.Locale.ROOT) + " " + operation.pfad();
+                assertThat(antwort.statusCode()).as(aufruf).isBetween(400, 499);
+                assertThat(ProblemDetails.pruefen(antwort, antwort.statusCode()))
+                        .as(aufruf)
+                        .isNotBlank();
+                assertThat(antwort.asString())
+                        .as(aufruf)
+                        .doesNotContain(MARKER, "Exception", "\tat ", "Caused by:");
+            }
+            assertThat(log.volltext()).doesNotContain(MARKER, "\tat ", "Caused by:");
         }
     }
 
