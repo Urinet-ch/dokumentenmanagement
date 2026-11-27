@@ -86,6 +86,6 @@ erledigten Umsetzungen.
 
 ## Grenzen des Abgleichs
 
-- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 und #703 sind Draft; #699 und #704 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
+- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 und #707 sind Draft; #699, #703, #704, #705 und #706 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
 - Der Stand der Taskdateien und offenen PRs ist eine Momentaufnahme; die Checkboxen wurden nicht verändert.
 - Betriebsdetails und Zugangsdaten wurden nicht erhoben oder in diesen Bericht übernommen.
