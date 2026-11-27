@@ -165,6 +165,7 @@ scan_zap() {
                 printf 'replacer.full_list(0).matchstr=Authorization\n'
                 printf 'replacer.full_list(0).regex=false\n'
                 printf 'replacer.full_list(0).replacement=Bearer %s\n' "$token"
+                printf 'replacer.full_list(0).url=.*127\\.0\\.0\\.1.*\n'
                 if [ -n "$stufe" ]; then
                     printf 'replacer.full_list(1).description=zap-zugriffsstufe\n'
                     printf 'replacer.full_list(1).enabled=true\n'
@@ -172,6 +173,7 @@ scan_zap() {
                     printf 'replacer.full_list(1).matchstr=X-Archiv-Zugriff\n'
                     printf 'replacer.full_list(1).regex=false\n'
                     printf 'replacer.full_list(1).replacement=%s\n' "$stufe"
+                    printf 'replacer.full_list(1).url=.*127\\.0\\.0\\.1.*\n'
                 fi
             } >"$konfiguration"
         )
@@ -179,6 +181,8 @@ scan_zap() {
     fi
     scanner="$(docker create -i --pull=never --network "container:$anker" \
         --cap-drop ALL --security-opt no-new-privileges --memory 2g --workdir /zap \
+        --env HTTP_PROXY= --env HTTPS_PROXY= --env ALL_PROXY= \
+        --env http_proxy= --env https_proxy= --env all_proxy= \
         --mount "type=bind,source=$root/tools/sicherheit/zap-ausnahmen.conf,target=/zap/ausnahmen.conf,readonly" \
         --mount "type=bind,source=$root/docs/schnittstelle/public-v1.yaml,target=/zap/public-v1.yaml,readonly" \
         --entrypoint /bin/sh "$zap" -c 'set -e; umask 077; cat > /tmp/zap-auth.conf; mkdir -p /zap/wrk; exec /zap/zap-api-scan.py "$@"' sh \

@@ -55,9 +55,16 @@ wird beim Beenden des Skripts entfernt. Die Datenbank und die zugehörigen Conta
 anschliessend entfernt; der Testserver stoppt spätestens nach 40 Minuten.
 
 Der Lauf ist ausschliesslich auf Loopback und das isolierte Docker-Netz beschränkt.
+Proxy-Umgebungsvariablen werden im ZAP-Container geleert. Die Authentisierungs-Ersetzung ist
+auf Loopback-Ziele des Testservers begrenzt und greift nicht auf ZAPs eigene API-Steueraufrufe.
 Er darf nicht für VPS- oder Staging-Hosts umkonfiguriert werden und ersetzt nicht
 Fabians Staging-Prüfung nach Spec 03, Aufgabe 12.3.
 ## Ergebnisse und Grenzen
+
+Am 27.11.2026 entstanden in drei lokalen Versuchen keine vollständigen Baseline-Ergebnisse:
+der authentisierte OpenAPI-Import brach jeweils ab, bevor alle sechs Scanläufe abgeschlossen waren.
+Die automatische Token-Gegenprobe bestand in allen drei Läufen. Es gibt deshalb keine
+Regelnummer-/Schweregrad-/Anzahl-Tabelle für diese Versuche.
 
 `testserver.log` steht im Ausgabeverzeichnis. Die Unterverzeichnisse `app`,
 `webseite`, `app-authentisiert`, `webseite-oeffentlich`,
