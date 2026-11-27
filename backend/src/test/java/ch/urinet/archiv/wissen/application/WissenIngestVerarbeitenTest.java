@@ -138,24 +138,28 @@ class WissenIngestVerarbeitenTest {
 
     @Test
     void uebergibtTabellenzeilenMitSpaltenbezugUndPlatzhalternAnDasModell() throws InterruptedException {
-        String tabellenText = "Bezeichnung      Beschreibung                  Preis\n"
-                + "Service A        Zusatzleistung mit            ––\n"
-                + "                 mehrzeiliger Beschreibung\f";
+        String tabellenText = "Kennzahl       Wert\nUmsatz         CHF 100.00\nKosten         CHF 20.00\f";
         Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", true, "NORMAL",
                 true, "Testquelle", LocalDate.of(2026, 4, 30), tabellenText, 1, true,
                 null, null, "KERNAUSSAGEN", 0, 0, "test-modell", false, 300_000, 1_000_000,
                 Fortschritt.leer());
         Speicher speichern = new Speicher(stand(lauf, 0));
-        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of()),
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of(
+                new KiPort.Aussage(1, "Kennzahlen: Umsatz CHF 100.00; Kosten CHF 20.00.", List.of(1), tabellenText))),
                 new KiPort.Verbrauch("test-modell", 10, 10)));
 
         verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
 
         assertThat(ki.anfrage.systemPrompt()).contains("Verarbeite Tabellen zeilenweise",
                 "höchstens eine Kernaussage je Tabellenzeile", "Spaltentitel allein",
-                "Erhalte Platzhalter wie «––»");
-        assertThat(ki.anfrage.nachricht()).contains("Bezeichnung", "Beschreibung", "Preis", "Service A",
-                "Zusatzleistung mit", "mehrzeiliger Beschreibung", "––");
+                "Erhalte Platzhalter wie «––»",
+                "Gruppierung für Kennzahlen-, Persona- und Positionstabellen: aktiv; höchstens 1 Gruppe je Tabelle",
+                "zusammengehörige Gruppe(n) auf Tabellenebene zusammen",
+                "nicht als einzelne Aussagen je Zelle");
+        assertThat(ki.anfrage.nachricht()).contains("Kennzahl", "Wert", "Umsatz", "CHF 100.00", "Kosten",
+                "CHF 20.00");
+        assertThat(speichern.fortschritt.kernaussagen()).singleElement().satisfies(aussage ->
+                assertThat(aussage.text()).contains("Umsatz CHF 100.00", "Kosten CHF 20.00"));
     }
 
     @Test

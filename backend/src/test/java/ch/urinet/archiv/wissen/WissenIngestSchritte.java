@@ -135,6 +135,13 @@ public class WissenIngestSchritte {
         }
     }
 
+    @Angenommen("das Dokument «{word}» trägt einen synthetischen Vertraulichkeitsvermerk «intern»")
+    public void internerVermerkSetzen(String name) throws SQLException {
+        Ort ort = ort(name);
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set volltext = ? where id = ?",
+                "INTERN\nDie Abgabefrist endet am 30. April.\f", ort.id());
+    }
+
     @Angenommen("das Dokument «{word}» hat synthetische PDF-Seiten für die Auszugsprüfung")
     public void pdfaMitSynthetischenSeiten(String name) throws SQLException {
         Ort ort = ort(name);
@@ -838,6 +845,15 @@ public class WissenIngestSchritte {
         assertThat(zeile("select vertraulichkeit_kontext from m_urinet.wissens_aenderung "
                 + "where entwurf_id = ? order by nr limit 1", entwurfId).get("vertraulichkeit_kontext"))
                 .isEqualTo(stufe);
+    }
+
+    @Dann("jede vorgeschlagene Wissensseite hat die Vertraulichkeit «{word}»")
+    public void vorgeschlageneSeitenVertraulichkeit(String stufe) throws SQLException {
+        assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "
+                + "where entwurf_id = ?", entwurfId).get("anzahl")).intValue()).isPositive();
+        assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "
+                + "where entwurf_id = ? and coalesce(daten->>'vertraulichkeit', '') <> ?", entwurfId, stufe)
+                .get("anzahl")).intValue()).isZero();
     }
 
     @Dann("die Änderung hat den Befund «{word}» und Hinweis «{word}»")

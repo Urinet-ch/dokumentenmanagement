@@ -199,6 +199,20 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Und der Ingest-Hinweis enthält den Text "Überblick nicht aktualisiert (höhere Vertraulichkeit)"
     Und die Änderung hat die Kontextstufe «INTERN»
 
+  @req-5.3 @req-11.7
+  Szenario: Ein interner Vertraulichkeitsvermerk stuft den Quellenkontext des Entwurfs intern ein
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 2 Seiten
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und das Dokument «QUELLE» trägt einen synthetischen Vertraulichkeitsvermerk «intern»
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert gültige Antworten für alle vier Ingest-Schritte
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und die Änderung hat die Kontextstufe «INTERN»
+    Und jede vorgeschlagene Wissensseite hat die Vertraulichkeit «INTERN»
+    Und der Ingest-Hinweis enthält den Text "Vertraulichkeitsvermerk erkannt"
+
   @req-5.11 @req-5.3
   Szenario: Eine interne Quelle mit leerer Seitenplanung meldet den nicht aktualisierten Überblick
     Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «INTERN» und 2 Seiten
