@@ -5,19 +5,19 @@ diff --git a/.github/workflows/infomaniak-deploy.yml b/.github/workflows/infoman
        - name: Rollback
 +        id: rollback
          # Nur wenn der Server den neuen Stand übernommen hat: entweder lief der Deploy durch, oder compose hat
-@@ -374,4 +375,6 @@
+@@ -374,6 +375,9 @@
              echo "::error::Deploy fehlgeschlagen; erster Deploy: kein Rollback möglich (kein Vorgänger-Stand). Fabian informieren; er prüft oder stoppt die Archiv-Dienste auf der VPS."
 +            exit 1
            elif [ "$rc" -ne 0 ]; then
              echo "::error::Deploy fehlgeschlagen, und der Rollback ist ebenfalls fehlgeschlagen (Exit $rc). Fabian informieren, Zustand auf der VPS prüfen."
 +            exit 1
            else
-@@ -381,4 +384,25 @@
--
-+-
-++
+             echo "::error::Deploy fehlgeschlagen, Rollback auf den Vorgänger-Stand ausgeführt."
++            printf 'ausgefuehrt=true\n' >> "$GITHUB_OUTPUT"
+           fi
+@@ -382,3 +386,24 @@
 +      - name: Zustand nach Rollback prüfen
-+        if: always() && steps.rollback.outcome == 'success'
++        if: always() && steps.rollback.outputs.ausgefuehrt == 'true'
 +        env:
 +          HOST: ${{ vars.INFOMANIAK_HOST }}
 +        run: |
