@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -78,6 +78,8 @@ export class WissenEntwuerfe {
   private readonly destroy = inject(DestroyRef);
   private readonly zaehler = inject(WissenEntwurfZaehler);
   private readonly anmeldung = inject(AnmeldungService);
+  private readonly injector = inject(Injector);
+  private readonly abschnittStatus = viewChild<ElementRef<HTMLElement>>('abschnittStatus');
   private readonly kontext = computed(() => {
     const benutzer = this.anmeldung.benutzer();
     return `${benutzer?.id}/${benutzer?.mandant}/${benutzer?.rolle}/${this.anmeldung.darf('A17')}`;
@@ -284,6 +286,7 @@ export class WissenEntwuerfe {
           this.abschnittLaeuft.set(true);
           this.zaehler.auffrischen();
           this.laden(true);
+          afterNextRender(() => this.abschnittStatus()?.nativeElement.focus(), { injector: this.injector });
         },
         error: (fehler: unknown) => {
           this.sendet.set(false);
