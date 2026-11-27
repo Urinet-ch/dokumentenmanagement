@@ -11,6 +11,9 @@ Fabian nach Abschluss von 19.1 bis 19.5 durch. Diese Checkliste ist kein Abnahme
       Auszüge, Aussagen und Antworten bleiben ausserhalb des Repositorys.
 - [ ] Laufumgebung wählen: lokal oder Stufe A. Auf Stufe A ausschliesslich Testdaten oder
       anonymisierte Daten verwenden; andernfalls den Lauf lokal durchführen.
+      Das lokale Modell nach ADR-012 ist nur für Entwicklung und Prompt-Vorarbeit
+      zugelassen, nicht für Abnahmen oder als Gate-Nachweis. Für eine Abnahme auch
+      bei lokal laufendem Archiv keinen Ingest mit dem lokalen Modell verwenden.
 - [ ] Für die Prüfung von Fehlerbehandlung und Vertraulichkeit synthetische Daten vorbereiten.
       Keine echten Inhalte in Testdaten, Protokoll, Screenshots oder PR-Kommentare übernehmen.
 
