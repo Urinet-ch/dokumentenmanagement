@@ -118,7 +118,7 @@ public class WissenIngestVerarbeiten {
         }
         Fortschritt fortschritt = fortschritt(lauf);
         boolean internerVermerk = WissenVertraulichkeitsvermerk.istIntern(lauf.volltext());
-        WissensStufe quellStufe = quellStufe(lauf, stand.quellStufe());
+        WissensStufe quellStufe = stand.quellStufe();
         if (internerVermerk && !fortschritt.hinweise().contains(INTERN_VERMERK)) {
             fortschritt = mitHinweis(fortschritt, INTERN_VERMERK);
         }
@@ -184,7 +184,7 @@ public class WissenIngestVerarbeiten {
     }
 
     private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher) {
-        return nichtFreigegeben(auftrag, stand, bisher, quellStufe(stand.lauf(), stand.quellStufe()));
+        return nichtFreigegeben(auftrag, stand, bisher, stand.quellStufe());
     }
 
     private void fehlerSichern(Auftrag auftrag, Lauf lauf, Fortschritt fortschritt, String hinweis) {
@@ -201,13 +201,6 @@ public class WissenIngestVerarbeiten {
                 bisher.quelleErzeugt(), bisher.kernaussagen(), bisher.planung(), bisher.vorschlaege(),
                 bisher.hinweise(), hoechste, bisher.abschnittFehler(), bisher.abschnittNur(),
                 bisher.abschnittZeichen(), bisher.vorschlagBasis());
-    }
-
-    private static WissensStufe quellStufe(Lauf lauf, WissensStufe archivierteStufe) {
-        if (archivierteStufe == null || !WissenVertraulichkeitsvermerk.istIntern(lauf.volltext())) {
-            return archivierteStufe;
-        }
-        return archivierteStufe.hoechste(WissensStufe.INTERN);
     }
 
     private void kernaussagen(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher,

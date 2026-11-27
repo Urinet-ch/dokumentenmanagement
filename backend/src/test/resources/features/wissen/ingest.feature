@@ -210,6 +210,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Dann antwortet der Ingest-Endpunkt mit Status 202
     Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
     Und die Änderung hat die Kontextstufe «INTERN»
+    Und jede vorgeschlagene Wissensseite hat die Vertraulichkeit «INTERN»
     Und der Ingest-Hinweis enthält den Text "Vertraulichkeitsvermerk erkannt"
 
   @req-5.11 @req-5.3

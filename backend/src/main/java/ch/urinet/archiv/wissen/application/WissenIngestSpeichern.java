@@ -12,6 +12,7 @@ import ch.urinet.archiv.wissen.application.WissenIngestPort.SeitenMetadaten;
 import ch.urinet.archiv.wissen.domain.WissensGraph;
 import ch.urinet.archiv.wissen.domain.WissensPruefung;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
+import ch.urinet.archiv.wissen.domain.WissenVertraulichkeitsvermerk;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -339,11 +340,15 @@ public class WissenIngestSpeichern {
         if (!lauf.bestaetigt() || lauf.quelleVertraulichkeit() == null) {
             return null;
         }
-        return switch (lauf.quelleVertraulichkeit()) {
+        WissensStufe stufe = switch (lauf.quelleVertraulichkeit()) {
             case "NORMAL" -> WissensStufe.NORMAL;
             case "INTERN" -> WissensStufe.INTERN;
             default -> null;
         };
+        if (stufe == null || !WissenVertraulichkeitsvermerk.istIntern(lauf.volltext())) {
+            return stufe;
+        }
+        return stufe.hoechste(WissensStufe.INTERN);
     }
 
     private static int rang(WissensStufe stufe) {

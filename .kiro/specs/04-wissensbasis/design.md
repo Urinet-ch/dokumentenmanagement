@@ -1656,11 +1656,11 @@ zwei Kennzahlzeilen geprüft; die WireMock-Antwort fasst beide Werte in einer be
 Tabellen behalten die zeilenweise Regel aus Aufgabe 19.2.
 
 Ein Vertraulichkeitsvermerk wird nur bei einer eigenständigen Zeile `INTERN`, `Vertraulichkeit: intern` oder
-`Nicht für Dritte` erkannt. Der Ingest setzt die Quellen-Kontextstufe mindestens auf `INTERN` und zeigt den Hinweis
-«Vertraulichkeitsvermerk erkannt …» im Entwurf; Quelldokument und dessen Metadaten bleiben unverändert. Damit erben
-Änderungsvorschläge diese Kontextstufe (Requirement 11.7). Die bestehende Freigabeprüfung für Webseiten liefert nur
-Seiten mit Quellen auf Zugriffsstufe `oeffentlich` und Seitenvertraulichkeit `NORMAL` aus; ein so eingestufter
-Entwurf kann daher nicht für Webseite oder Mitglieder freigegeben werden. Requirements bleiben unverändert.
+`Nicht für Dritte` erkannt. Beim Laden des Ingests wird die wirksame Quellenstufe mindestens auf `INTERN` gehoben
+und gilt damit für alle Ingest-Schritte, Sichtbarkeitsprüfungen und Seitenvorschläge. Der Entwurf zeigt zusätzlich den
+Hinweis «Vertraulichkeitsvermerk erkannt …»; Quelldokument und dessen Metadaten bleiben unverändert (Requirement
+11.7). Die bestehenden Freigabeprüfungen liefern keine Seiten mit Stufe `INTERN` für Webseite oder Mitglieder aus.
+Requirements bleiben unverändert.
 
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):

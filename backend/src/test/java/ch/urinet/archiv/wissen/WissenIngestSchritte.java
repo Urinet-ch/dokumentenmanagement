@@ -847,6 +847,15 @@ public class WissenIngestSchritte {
                 .isEqualTo(stufe);
     }
 
+    @Dann("jede vorgeschlagene Wissensseite hat die Vertraulichkeit «{word}»")
+    public void vorgeschlageneSeitenVertraulichkeit(String stufe) throws SQLException {
+        assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "
+                + "where entwurf_id = ?", entwurfId).get("anzahl")).intValue()).isPositive();
+        assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "
+                + "where entwurf_id = ? and coalesce(daten->>'vertraulichkeit', '') <> ?", entwurfId, stufe)
+                .get("anzahl")).intValue()).isZero();
+    }
+
     @Dann("die Änderung hat den Befund «{word}» und Hinweis «{word}»")
     public void aenderungMitBefundUndHinweis(String befund, String hinweis) throws SQLException {
         assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "

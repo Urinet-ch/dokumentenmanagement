@@ -293,7 +293,8 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
   - Nachweis: Szenario mit einem synthetischen Dokument mit Vermerk «intern»; Prüfung der Quellenstufe im Entwurf.
   - Umsetzung 27.11.2026: Die Tabellen-Gruppierung ist konfigurierbar; der Startwert von einer Gruppe je Tabelle
     ist mit einer synthetischen zweizeiligen Kennzahlentabelle geprüft. Ein expliziter Vermerk «intern» im Volltext
-    hebt die Kontextstufe im Entwurf auf `INTERN` und zeigt einen Hinweis, ohne archivierte Dokumentmetadaten zu ändern.
+    hebt die Quellenstufe im Ingest auf `INTERN`, setzt alle Seitenvorschläge auf `INTERN` und zeigt einen Hinweis,
+    ohne archivierte Dokumentmetadaten zu ändern.
     Die vorhandene Freigabeprüfung für Webseiten verlangt weiterhin Quellen der Zugriffsstufe `oeffentlich` und
     Seiten auf Stufe `NORMAL`.
   - _Anforderungen: 5.1–5.13, 20.1, 21.1_
