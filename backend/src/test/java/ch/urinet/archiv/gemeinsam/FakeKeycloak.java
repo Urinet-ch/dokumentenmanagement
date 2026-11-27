@@ -51,7 +51,7 @@ public final class FakeKeycloak implements QuarkusTestResourceLifecycleManager {
             System.setProperty(VERFUEGBAR, spaeterStarten ? "false" : "true");
             server = serverErstellen(0, realm, schluessel);
             server.start();
-            String issuer = issuer(server.getAddress().getPort(), realm);
+            String issuer = issuer(server.getAddress().getPort(), REALM);
             System.setProperty(ISSUER, issuer);
             return konfiguration(issuer);
         } catch (IOException | JoseException e) {
