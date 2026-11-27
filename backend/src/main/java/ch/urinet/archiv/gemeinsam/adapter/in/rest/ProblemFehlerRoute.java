@@ -107,6 +107,7 @@ public class ProblemFehlerRoute {
             }
         });
         kontext.response().putHeader(HttpHeaders.CONNECTION, "close")
+                .putHeader(HttpHeaders.CACHE_CONTROL, "no-store")
                 .endHandler(ende -> kontext.request().connection().close());
         senden(kontext, ProblemAntwort.fuer(Fehlercode.DATEI_ZU_GROSS), false);
     }
@@ -155,7 +156,8 @@ public class ProblemFehlerRoute {
 
     void chunkedBegrenzen(RoutingContext kontext) {
         String inhaltstyp = kontext.request().getHeader(HttpHeaders.CONTENT_TYPE);
-        if (hatEigeneGrenze(kontext) || istMultipart(inhaltstyp) || !hatKoerper(kontext)) {
+        if (hatEigeneGrenze(kontext) || istMultipart(inhaltstyp)
+                || kontext.request().getHeader(HttpHeaders.CONTENT_LENGTH) != null || !hatKoerper(kontext)) {
             kontext.next();
             return;
         }
