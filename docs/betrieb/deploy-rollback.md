@@ -1,6 +1,6 @@
 # Deploy und Rollback
 
-Stand: Prüfung des lokalen Infra-Skripts `deploy-app.sh` am 26.11.2026;
+Stand: Abgleich der versionierten Konfiguration am 27.11.2026;
 kein Zugriff auf den Zielhost. Deploys laufen über die Pipeline.
 
 ## Wirkung und Grenzen
@@ -36,6 +36,29 @@ curl --fail --show-error --silent https://<ziel-adresse>/q/health/live
 Ein erfolgreicher Health-Aufruf allein beweist weder Anmeldung noch
 Datenbankintegrität. Bei Fehlern nicht von einem erfolgreichen Rollback
 ausgehen; die Prüfung der Anmeldung und weitere Diagnose erfolgen separat.
+
+## Router und Sicherheits-Header
+
+Die Router der Anwendung (PWA, API, öffentliche Schnittstelle und Health) in
+[compose.yml](../../deploy/infomaniak/compose.yml) nutzen `archiv-sts`,
+definiert beim Dienst `api`; der Router `archiv-auth`
+nutzt `archiv-auth-sts`, definiert beim Dienst `kc`. Der Anmeldedienst darf
+keine Middleware des API-Dienstes verwenden. Damit hängt seine Route nicht
+von der Gesundheit der API ab und umgekehrt; die Zusammenhänge des Ausfalls
+vom 26.11.2026 stehen im nächsten Abschnitt.
+
+Beide HSTS-Middlewares starten mit `max-age=86400` (ein Tag),
+`includeSubDomains` und `preload` sind ausgeschaltet. Den Wert erst nach
+Beobachtung der ausgelieferten HTTPS-Header auf `31536000` (ein Jahr) erhöhen.
+HSTS wird am Reverse Proxy gesetzt, nicht durch die Anwendung.
+
+Die Anwendung setzt unabhängig davon in
+[`SicherheitsHeaderRoute.java`](../../backend/src/main/java/ch/urinet/archiv/gemeinsam/adapter/in/rest/SicherheitsHeaderRoute.java)
+`Content-Security-Policy: frame-ancestors 'none'` und `X-Frame-Options: DENY` auf ihren Antworten sowie
+`X-Content-Type-Options: nosniff`. Für `/api` und `/api/*` kommt
+`Cross-Origin-Resource-Policy: same-origin` dazu. Die [lokale ZAP-Baseline](./zap-baseline-lokal.md)
+prüft nur einen isolierten Teststack; die [Staging-Anleitung](./zap-baseline-staging.md)
+gilt nur für ein ausdrücklich freigegebenes Ziel.
 
 ## Lehre aus dem Ausfall vom 26.11.2026
 
