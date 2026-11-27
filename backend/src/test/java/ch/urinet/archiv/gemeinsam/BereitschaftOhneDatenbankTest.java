@@ -6,7 +6,6 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.util.Map;
 
@@ -24,6 +23,7 @@ class BereitschaftOhneDatenbankTest {
         @Override
         public Map<String, String> getConfigOverrides() {
             return Map.of(
+                    "archiv.rolle", "api",
                     "quarkus.datasource.devservices.enabled", "false",
                     "quarkus.datasource.jdbc.url", "jdbc:postgresql://127.0.0.1:1/archiv",
                     "quarkus.datasource.username", "archiv",
@@ -46,7 +46,6 @@ class BereitschaftOhneDatenbankTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "archiv.qa.db-log", matches = "true")
     void authentisierteSucheBeiNichtErreichbarerDatenbankOhneDetails() {
         String token = Testanmeldung.token("inhaber-urinet");
         String marker = "SYNTHETISCHER_INHALT_7F42";

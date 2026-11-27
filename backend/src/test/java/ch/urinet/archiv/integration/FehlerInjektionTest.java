@@ -67,7 +67,6 @@ import io.restassured.builder.MultiPartSpecBuilder;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.eclipse.microprofile.config.ConfigProvider;
@@ -317,9 +316,8 @@ class FehlerInjektionTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "archiv.qa.chunked-problem", matches = "true")
     void uebergrosseChunkedAnfrageLiefertProblemDetail() throws Exception {
-        long grenze = ConfigProvider.getConfig().getValue("archiv.upload.max-anfrage", MemorySize.class)
+        long grenze = ConfigProvider.getConfig().getValue("archiv.http.max-anfrage", MemorySize.class)
                 .asLongValue();
         String token = Testanmeldung.token("inhaber-urinet");
         given().auth().oauth2(token).when().get("/api/v1/kontakte").then().statusCode(200);
