@@ -2,7 +2,7 @@
 
 ## Umfang und Ergebnis
 
-Abgleich gegen `origin/main` bei `db667786f` (PR #695). In den sieben Taskdateien stehen 43 offene
+Abgleich gegen `origin/main` bei `83e53278e` (PR #702). In den sieben Taskdateien stehen 43 offene
 Checkboxen; Spec 05 und Spec 07 haben keine offenen Checkboxen. Keine Checkbox wurde geändert. Ein gemergter Teil-PR
 allein gilt nicht als Abschluss, wenn die Taskdatei noch Abnahme, Betrieb, Messung oder Folgearbeiten nennt.
 
@@ -18,7 +18,7 @@ erledigten Umsetzungen.
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
 | 0.7 | PR #18 belegt die Zugangsvorbereitung, nicht den Abschluss der gesamten Stufe A. | Fabian / Infra |
-| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. | Infra; Entscheid zum weiteren Vorgehen |
+| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. Fabian hat in #699 das Budget 2048 MiB / 1.5 CPU und eine erneute Messung bestätigt; das Messwerkzeug in #699 ist noch offen. | Fabian / Infra; Messung und Nachweis |
 | 2.6 | Teilumsetzungen in #46, #54, #266, #568, #638 sowie den am 25.11. gemergten #644 und #645; Stufe-B-Leistungsnachweis fehlt. | Backend / Infra |
 | 3.7 | PWA und Eingabegrenzen in #123 und #472; die Abnahme bleibt ausstehend. | Fabian / Frontend |
 | 5.4 | Kein vollständiger Produktiv- und Stufe-B-Nachweis in den geprüften Belegen. | Fabian / Infra; abhängig von 5.11 |
@@ -51,7 +51,7 @@ erledigten Umsetzungen.
 | 10.5 | Importwerkzeug in #504; der PR ordnet weitere Req-4.2-Arbeit Spec 05 zu. Keine abgeschlossene Übernahme und Abnahme der Altbestände belegt. | Backend / Fabian |
 | 10.6 | Repo-Teile in #331 und #497; vollständiger Backup-Nachweis für Mandant 2 bleibt offen. | Infra |
 | 11.11 | #495 belegt Repo-Umsetzung und Tests; laut Taskdatei fehlen Messung der Startwerte am Livegang und deren Nachweis. | Backend; Messung beim Livegang |
-| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. HSTS #690, Korrektur #694, Ausgabeschutz #692 und App-Header #689 sind gemergt; authentisierter lokaler Scan #691 und Staging-Anleitung #697 sind offen. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
+| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. HSTS #690, Korrektur #694, Ausgabeschutz #692, App-Header #689, authentisierter lokaler Scan #691 und Staging-Anleitung #697 sind gemergt. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
 | 12.4 | Abnahme nicht belegt. | Fabian |
 
 ### Spec 04 – Wissensbasis (10)
@@ -64,7 +64,7 @@ erledigten Umsetzungen.
 | 18.3 | PR #576 ist gemergt; Plugin-Hinweis und vollständige Abnahme fehlen laut Taskdatei. | Backend / Frontend |
 | 19.4 | Abschnittsfehler, sichtbare Befunde und Wiederholung bleiben offen. | Backend / Frontend |
 | 19.5 | Tabellen-Gruppierung und Vertraulichkeitsvorschlag bleiben offen. | Backend |
-| 19.6 | Wiederholung und Auswertung des Test-Ingests; abhängig von 19.1–19.5. | QA / Fabian |
+| 19.6 | #702 ergänzt eine vorbereitende Checkliste; Wiederholung und Auswertung des Test-Ingests bleiben offen und hängen von 19.1–19.5 ab. | QA / Fabian |
 | O.4 | Keine Umsetzung belegt. | Backend |
 | O.5 | Laut Taskdatei in 15.6–15.8 übernommen; nicht doppelt umsetzen. | In den übernommenen Aufgaben nachverfolgen |
 | O.6 | Mit Entscheid vom 18.11.2026 ausdrücklich **entfallen**. | Kein Umsetzungsauftrag |
@@ -86,6 +86,6 @@ erledigten Umsetzungen.
 
 ## Grenzen des Abgleichs
 
-- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 ist Draft; #691, #697, #698 und #699 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
+- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 und #707 sind Draft; #699, #703, #704, #705 und #706 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
 - Der Stand der Taskdateien und offenen PRs ist eine Momentaufnahme; die Checkboxen wurden nicht verändert.
 - Betriebsdetails und Zugangsdaten wurden nicht erhoben oder in diesen Bericht übernommen.
