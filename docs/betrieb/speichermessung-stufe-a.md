@@ -39,6 +39,20 @@ Das Werkzeug führt diese Schritte nicht selbst aus.
   erscheinen nicht in der CSV. `docker inspect` prüft die Compose-Labels
   für Projekt und Dienst und liest Speicher- und CPU-Limits;
   `docker stats --no-stream` liest den aktuellen Speicherverbrauch.
+- Die IDs einzeln und in dieser Reihenfolge abfragen; jeder Befehl muss genau
+  einen Container liefern:
+
+  ```sh
+  docker ps --filter label=com.docker.compose.project=archiv \
+    --filter label=com.docker.compose.service=api --format '{{.ID}}'
+  docker ps --filter label=com.docker.compose.project=archiv \
+    --filter label=com.docker.compose.service=kc --format '{{.ID}}'
+  docker ps --filter label=com.docker.compose.project=archiv \
+    --filter label=com.docker.compose.service=db --format '{{.ID}}'
+  ```
+
+  Bei null oder mehreren Treffern nicht messen. Keine IDs aus einem anderen
+  Docker-Kontext verwenden.
 - Ein neues geschütztes Ausgabeverzeichnis ausserhalb des Repositorys nutzen
   (Rechte 700); jede CSV wird neu mit Rechten 600 angelegt und nie
   überschrieben. Bei Fehler oder unvollständiger Messung nicht als Nachweis
@@ -50,8 +64,14 @@ Das Werkzeug führt diese Schritte nicht selbst aus.
 
 Für eine spätere, separat freigegebene Messung lassen sich Scan und Handy-Foto
 mit einem Aufruf erzeugen. Pillow und reportlab müssen wie für den Scan-
-Generator in `tools/golden_synth/requirements.txt` installiert sein. Der
-Zielordner muss neu sein und ausserhalb des Repositorys liegen:
+Generator in `tools/golden_synth/requirements.txt` installiert sein. Im
+Wegwerfcontainer aus der Repository-Wurzel installieren:
+
+```sh
+python3 -m pip install -r tools/golden_synth/requirements.txt
+```
+
+Der Zielordner muss neu sein und ausserhalb des Repositorys liegen:
 
 ```sh
 python3 tools/last/testdaten_erzeugen.py /ausserhalb/messbelege-neu
@@ -85,9 +105,13 @@ python3 tools/last/speichermessung_stufe_a.py ocr /ausserhalb/ocr.csv \
   --anzahl 10 --intervall 2 --container <api-id> <kc-id> <db-id>
 ```
 
-Leerlauf, Upload und OCR jeweils tatsächlich während der Stichproben
-beobachten. `docker stats` ist gerundet und zeitlich diskret: kurze Spitzen
-können fehlen. Die Summe der je Dienst beobachteten Spitzen ist eine
+Die Phasenangabe im Aufruf benennt nur die CSV; das Skript startet oder prüft
+keinen Upload und keine OCR. Leerlauf, Upload und OCR jeweils tatsächlich
+während der Stichproben beobachten. Ein lokaler Werkzeug-Trockenlauf mit
+Platzhalter-Containern prüft nur Docker-Zugriff, Labels, Limits, CSV und
+Auswertung; er ist weder eine Lastmessung noch ein Betriebsnachweis.
+`docker stats` ist gerundet und zeitlich diskret: kurze Spitzen können fehlen.
+Die Summe der je Dienst beobachteten Spitzen ist eine
 konservative Summe, keine gleichzeitig gemessene Hostlast. Zusätzlich den
 verfügbaren Hostspeicher und den Vergleich zum Ausgangswert unabhängig messen.
 Vor Upload und OCR jeweils Limits, OOM und Health prüfen; bei Abbruch oder
@@ -119,4 +143,7 @@ enthält keine Namen anderer Apps. Fabian bestätigt dort die verwendeten
 Testdaten; Rohdaten geschützt ausserhalb des Repositorys aufbewahren.
 
 Synthetische Tests:
-`python3 -m unittest tools/last/test_speichermessung_stufe_a.py tools/last/test_testdaten_erzeugen.py`.
+```sh
+python3 tools/last/test_speichermessung_stufe_a.py
+python3 tools/last/test_testdaten_erzeugen.py
+```

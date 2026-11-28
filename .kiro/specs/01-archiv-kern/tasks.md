@@ -153,6 +153,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nachtrag 26.11.2026: Die statische Prüfung erkennt Router-Middlewares auf einem fremden Dienst; die Grenzen des Image-Rollbacks sind dokumentiert. Der Messnachweis bleibt offen.
   - Messvorbereitung 26.11.2026: Stichproben- und Auswertungswerkzeug mit synthetischen Tests sowie Anleitung liegen vor. Entscheid Fabian 27.11.2026: Budget 2048 MiB/1.5 CPU, erneute Messung freigegeben; der Nachzug der älteren Budgetangaben in Req 16.18 erfolgt separat. Messung, Health- und OOM-Prüfung sowie Nachweis bleiben bei Fabian offen.
   - Folgeauftrag 27.11.2026: `tools/last/testdaten_erzeugen.py` erstellt lokal einen 20-seitigen Bildscan ohne Textebene und ein synthetisches 12-MP-Foto; Unit-Test und Anleitung ergänzt. Keine Daten hochgeladen oder VPS angesprochen. Messung und Betriebsnachweis bleiben offen.
+  - Lokaler Werkzeug-Trockenlauf 27.11.2026: synthetische Daten, Docker-Stichproben aller drei Phasen, Vorprüfung und Gesamtauswertung liefen gegen lokale Wegwerf-Container mit den erwarteten Compose-Labels und Limits. Die Container führten keine Anwendung, Uploads oder OCR aus; die Ausgabe ist kein Mess- oder Betriebsnachweis. Die Anleitung nennt jetzt die Docker-Filter für die IDs und direkte Testdatei-Aufrufe; Stufe-A-Messung, Health-/OOM-Prüfung und Betriebsnachweis bleiben offen.
   - _Anforderungen: 16.1, 16.10, 16.15, 16.18_
   - _Abhängig von: 0.7, 1.9_
 
