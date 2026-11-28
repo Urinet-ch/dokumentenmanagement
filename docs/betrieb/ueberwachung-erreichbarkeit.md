@@ -28,7 +28,7 @@ wurde nicht gewählt.
 | Prüfung | Entscheid und Stand | Offen |
 | --- | --- | --- |
 | Erreichbarkeit des Anwendungs-Hosts | Gewählt und im Infra-Repo umgesetzt. | — |
-| Erreichbarkeit des Anmelde-Hosts | Bewusst nicht extern überwacht; externe Prüfung entfernt, da die externe Prüfung des Anwendungs-Hosts genügt. | Kein Betriebsnachweis offen. |
+| Erreichbarkeit des Anmelde-Hosts | Bewusst nicht extern überwacht; externe Prüfung entfernt, da die Prüfung des Anwendungs-Hosts genügt. | Kein Betriebsnachweis offen. |
 | Zertifikatsprüfung | Nicht gewählt. | — |
 | Fehlgeschlagener Deploy | Gewählt und im Infra-Repo umgesetzt. | — |
 

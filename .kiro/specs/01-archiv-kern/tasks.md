@@ -156,6 +156,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Messvorbereitung 26.11.2026: Stichproben- und Auswertungswerkzeug mit synthetischen Tests sowie Anleitung liegen vor. Entscheid Fabian 27.11.2026: Budget 2048 MiB/1.5 CPU, erneute Messung freigegeben; der Nachzug der älteren Budgetangaben in Req 16.18 erfolgt separat. Messung, Health- und OOM-Prüfung sowie Nachweis bleiben bei Fabian offen.
   - Folgeauftrag 27.11.2026: `tools/last/testdaten_erzeugen.py` erstellt lokal einen 20-seitigen Bildscan ohne Textebene und ein synthetisches 12-MP-Foto; Unit-Test und Anleitung ergänzt. Keine Daten hochgeladen oder VPS angesprochen. Messung und Betriebsnachweis bleiben offen.
   - Lokaler Werkzeug-Trockenlauf 27.11.2026: synthetische Daten, Docker-Stichproben aller drei Phasen, Vorprüfung und Gesamtauswertung liefen gegen lokale Wegwerf-Container mit den erwarteten Compose-Labels und Limits. Die Container führten keine Anwendung, Uploads oder OCR aus; die Ausgabe ist kein Mess- oder Betriebsnachweis. Die Anleitung nennt jetzt die Docker-Filter für die IDs und direkte Testdatei-Aufrufe; Stufe-A-Messung, Health-/OOM-Prüfung und Betriebsnachweis bleiben offen.
+  - **Ergänzt 28.11.2026 (entschieden von Fabian am 28.11.2026, Variante B):** Die Messung ist Voraussetzung für Stufe B auf derselben VPS (Aufgabe 31.3, Req 16.30). Tritt das Abbruchkriterium ein, heisst das neu: Archiv auf Stufe A stoppen und Fabian informieren; statt «K5 (4.9) und Wechsel (5.11) vorziehen» entscheidet Fabian über Budget oder Plattform (Req 16.18).
   - _Anforderungen: 16.1, 16.10, 16.15, 16.18_
   - _Abhängig von: 0.7, 1.9_
 
@@ -509,6 +510,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Bucket `urinet-archiv-urinet` im Public-Cloud-Projekt produktiv, mit der Bucket Policy aus 1.3 (Deny auf `s3:BypassGovernanceRetention`)
   - [Fabian] App-Schlüssel (zwei GitHub-Secrets `s3_app_zugang_id` und `s3_app_zugang_geheimnis`; hat technisch das Bypass-Recht, Option B, ADR-007, Nachtrag 09.11.2026) als GitHub-Secret hinterlegen (auf dem Server nur unter `/run/secrets/`); Inhaber-Zugang zum Public-Cloud-Projekt des Object Storage (Zugangsdaten, mit denen Schlüssel ausgestellt und Korrekturen ausgeführt werden) nur offline ablegen (Notfallunterlagen, 5.10), nie auf dem Server oder in GitHub-Secrets
   - produktives Archivieren erst, wenn der Zeitstempeldienst angebunden ist (15.3)
+  - **Geändert 28.11.2026 (entschieden von Fabian am 28.11.2026, Variante B):** Produktion auf der bestehenden VPS statt «Stufe B (VPS aus 5.11)»; die Schritte dieser Aufgabe (Bucket, Realm mit TOTP, App-Schlüssel, Zeitstempeldienst) laufen im Wechsel nach Aufgabe 31.7; die Abhängigkeit von 5.11 ist ersetzt durch 31.7.
   - _Anforderungen: 6.5, 6.10, 15.3, 16.1, 16.7, 16.9, 16.10, 16.17_
   - _Abhängig von: 1.9, 4.9, 5.11_
 
@@ -534,6 +536,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `docs/wiederherstellung.md`, mit dem S3-Wiederherstellungsziel in PR #200 ergänzt; einmal vollständig in einer Testumgebung durchgespielt (Nachweis: manuell [Fabian]); darin: nur Snapshots einspielen, deren SHA-256 ein Manifest unter `sicherung` belegt; Sperren nach der Wiederherstellung aus dem Inventar ohne Kappung neu setzen; Ausdünnen von Hand; Rückfall cloudscale.ch
   - Lokale synthetische Restore-Übung vorhanden: `deploy/backup/restore-uebung-lokal.sh` prüft den Sicherungs-Shellablauf mit temporären Testschlüsseln sowie S3- und DB-Dateireferenzen mit Dev Services; nur Teilprobe; der vollständige lokale Roundtrip (Export entschlüsseln, in neue Datenbank und neuen Bucket einspielen, Archiv dagegen starten) ist Aufgabe 5.12, die wiederkehrende Probe auf der VPS bleibt Infra
   - solange Stufe A läuft: nur Funktionstest mit Testdaten und eigenem Testschlüsselpaar auf der VPS der Stufe A (16.19; der Probe-Schlüssel entsteht erst auf Stufe B), keine Aufbewahrungspflicht; Aufbewahrung nach 16.2 erst auf Stufe B (5.11)
+  - **Geändert 28.11.2026 (entschieden von Fabian am 28.11.2026, Variante B):** «Stufe-B-VPS» und «neue VPS aus 5.11» sind die bestehende VPS. Der Probe-Schlüssel entsteht dort in Aufgabe 31.4, und der erste Lauf der Restore-Probe läuft dort vor dem Wechsel mit synthetischen Daten der Stufe A (statt «in 5.11 vor dem Umstellen»); Aufbewahrung nach 16.2 ab dem Wechsel (31.7). Der Rest dieser Aufgabe läuft in 31.4.
   - _Anforderungen: 6.11, 16.2, 16.3, 16.7, 16.8, 16.19, 16.23, 16.24, 16.27_
   - _Abhängig von: 4.9, 5.3; für die Restore-Probe auf Stufe B die neue VPS aus 5.11_
 
@@ -561,6 +564,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - CRM-Kontakte per CSV importieren, Drive-Altbestand importieren und im Eingangskorb bestätigen, Papierbelege 2026 fotografieren, Generatoren umstellen
   - Abnahmetest: Stichprobe 20 Dokumente auffindbar, Schlussbericht des Drive-Imports geht auf, Prüflauf ohne Abweichung, Mandantentrennung mit Testmandant `test` geprüft
   - **Gate Phase 1:** alle Belege 2026 im Archiv, Prüflauf grün
+  - **Geändert 28.11.2026 (entschieden von Fabian am 28.11.2026, Variante B):** Voraussetzung ist der Wechsel nach Welle 31 (31.7, Go/No-go 31.8) statt 5.11; die Übernahme läuft über Spec 09, Welle 30, deren Abschluss (Spec 09, 30.5) diese Aufgabe nachweist (Spec 09, 16.7).
   - _Anforderungen: 1.4, 12.7, 13.6, 15.3, 15.5, 16.3, 16.17_
   - _Abhängig von: 2.9, 5.1–5.7, 5.9, 5.10, 5.11_
 
@@ -571,7 +575,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Vorbereitung ohne Betriebseingriff (PR #569): Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; Anbindung und Nachweise bleiben offen.
   - Folgeumsetzung (24.11.2026): App-Gauge `archiv_ki_beispiele{mandant}` und Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` ab 1'000 Beispielen; dokumentiert in `docs/alarme.md`. Die VPS-Anbindung und Betriebsnachweise bleiben offen, daher bleibt die Aufgabe ungeprüft.
   - Nachtrag (25.11.2026): Ein Fehler beim Zählen der KI-Beispiele lässt die übrigen Kennzahlen des Mandanten bestehen; die fehlende KI-Gauge signalisiert den Messfehler statt eines Nullwerts. Tests in `JdbcKiBeispielTest` und `MicrometerKennzahlenTest`.
-  - Entscheid Fabian (27.11.2026, PR #724; präzisiert am 28.11.2026): unabhängige externe Erreichbarkeitsprüfung des Anwendungs-Hosts und Meldung bei fehlgeschlagenem Deploy gewählt; beides im Infra-Repo umgesetzt. Fabian entschied am 28.11.2026, den Anmelde-Host bewusst nicht extern zu überwachen: Die Prüfung des Anwendungs-Hosts genügt, die externe Prüfung des Anmelde-Hosts wurde wieder entfernt. Fällt nur der Anmeldedienst aus, bleibt die Health der App grün. Für den Anmelde-Host bleibt deshalb kein Betriebsnachweis offen; die übrigen Schritte aus 5.9 bleiben ungeprüft.
+  - Entscheid Fabian (27.11.2026, PR #724; präzisiert am 28.11.2026): unabhängige externe Erreichbarkeitsprüfung des Anwendungs-Hosts und Meldung bei fehlgeschlagenem Deploy gewählt; beides im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Fabian entschied am 28.11.2026, den Anmelde-Host bewusst nicht extern zu überwachen, da die Prüfung des Anwendungs-Hosts genügt; die externe Prüfung des Anmelde-Hosts wurde wieder entfernt. Bekannte Lücke: Fällt nur der Anmeldedienst aus, bleibt die Health der App grün. Für den Anmelde-Host bleibt kein Betriebsnachweis offen; die Anbindung und übrigen Nachweise laufen in Aufgabe 31.5.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 
@@ -583,6 +587,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 6.10, 16.12_
 
 - [ ] 5.11 Wechsel auf Stufe B [Infra] [Fabian]
+  - **Ersetzt durch Welle 31 (entschieden von Fabian am 28.11.2026, Variante B, ADR-020):** Es gibt keine eigene VPS; Stufe B läuft auf der bestehenden VPS. Entfallen: Bestellung, Einrichtung, Cloud-Firewall und DNS einer neuen VPS, Umstellen des Deploy-Ziels, getrennter Dienst `archiv-worker` mit dem Speicherbudget der Stufe B (3'200 MiB / 4.5 CPU), Aufrüsten auf 4/8/160 und VPS Cloud, Entfernen der Archiv-Dienste auf Stufe A samt Rückbau im Infra-Repo. Weiter gelten, verschoben: Testdaten verwerfen → 31.7, Sicherung und Restore-Probe → 31.4, Leistungsmessung (Messbedingungen, Bildweg und Dateinamen unten, Req 16.26 geändert) → 31.6, Monitoring → 31.5. Verweise anderer Specs auf 5.11 meinen die Umstellung nach Welle 31. Die Aufgabe wird nicht abgehakt; sie gilt mit 31.7 als ersetzt. Die Unterpunkte unten bleiben als Herkunft stehen.
   - Vorbereitung Foto-Messung: `docs/betrieb/stufe-b-messung.md` und synthetische Last-/Auswertungstests; Messung und Betriebsnachweis bleiben offen.
   - Zeitpunkt: zu Beginn von Welle 5, vor 5.4 und vor der Übernahme 5.8; vorgezogen (Ausnahme von «Aufgaben anderer Wellen nicht vorziehen»), wenn 1.10 abbricht oder 16.18 später eintritt
   - [Fabian] [Infra] vor der Bestellung (4.9-E7): Lastskripte aus 2.4, 2.6 und 4.5 einige Stunden auf einer stundenweise abgerechneten Infomaniak-Public-Cloud-Instanz ähnlicher Grösse (4 vCPU, 4 GB) mit synthetischen Daten laufen lassen; Ergebnis im Messbericht **Geändert 22.11.2026 (Entscheid Fabian):** Stufe B ist eine VPS mit 4 vCPU / 8 GB / 160 GB (CHF 18.00/Mt.); die Lastmessung auf einer Public-Cloud-Instanz vor der Bestellung entfällt; Messungen nach Req 3.2, 5.5, 14.3 und 16.26 erfolgen, falls noch nötig, auf der Stufe-B-VPS. Die übrigen Angaben dieser Zeile zu Lite 4/4/80 und der Lastmessung gelten nicht mehr.
@@ -608,6 +613,77 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nachtrag (PR #646): expliziter Quell-/Zielvergleich der Dokumentzahl sowie Prüfung der Mandantentrennung im Datenbank- und Bucket-Restore; Seiten- und Versionszahlen werden weiterhin verglichen. Eindeutige Testimages werden gezielt aufgeräumt. Die betriebliche Probe bleibt Spec 04, 13.7.
   - _Anforderungen: 15.5, 16.3_
   - _Abhängig von: 5.5_
+
+## Welle 31 — Produktivbetrieb auf der bestehenden VPS (Variante B)
+Entschieden von Fabian am 28.11.2026 (ersetzt PR #731, Entscheidungshilfe `docs/betrieb/start-echtbelege.md`): Die
+bestehende VPS wird produktiv, eine zweite VPS wird nicht bestellt (ADR-020, Req 16.15, 16.17, 16.28–16.31). Die
+Nummer folgt auf Spec 09 (Welle 30); die Welle läuft parallel zu Spec 09, Wellen 27 bis 29, und muss vor Spec 09,
+Aufgabe 30.1 abgeschlossen sein. Termine sind Richtwerte, rückwärts gerechnet vom Stichtag 01.01.2027 (Spec 09, E7);
+der Bestand 2026 ist bis 31.01.2027 importiert. Kein Agent greift auf die VPS, das Infra-Repo der VPS, Secrets oder
+`.github/workflows/` zu und deployt nicht; solche Schritte sind **[Fabian]**, vorbereitet als Patch oder Anleitung im Repo.
+Betriebswerte (Hostnamen, Adressen, Kapazitäten) stehen nicht im Repo. Häkchen nur mit Betriebsnachweis.
+
+- [ ] 31.1 Entscheide zu Variante B [Fabian]
+  - Entschieden von Fabian am 28.11.2026 (eingetragen in Req 16.17, 16.26, 16.28–16.30): Leistungsmessung vor dem Stichtag (31.6), ein verfehltes Ziel wird Fabian als Entscheid vorgelegt, kein automatischer Stopp; eigenes Netz nur für Traefik und das Archiv im Infra-Repo (31.10); Zugangsdaten, Daten- und Manifest-Schlüssel der Stufe A bleiben, nur Testdaten werden bereinigt; Restore-Probe mit angehaltener API in einem Wartungsfenster, ohne Zusatzbudget; Spec 09, E11: Budget 2144 MiB / 1.6 CPU inklusive `sftp`
+  - Offen, Richtwert bis 02.12.2026: Zielzeit für den Wiederanlauf auf einer neuen VPS (16.31); die Aufgabe bleibt bis dahin offen
+  - _Anforderungen: 16.17, 16.26, 16.28, 16.29, 16.30, 16.31_
+
+- [ ] 31.2 Stufenwerte der Stufe B und Prüfungen im Repo [Backend] [Infra]
+  - Richtwert bis 11.12.2026, Merge und Deploy erst in 31.7. `deploy/infomaniak/compose.yml` mit den Werten der Stufe B auf derselben VPS: `ARCHIV_STUFE: B`, Präfix `urinet-archiv-`, keine Höchstfristen `ARCHIV_ABLAGE_MAX_SPERRFRIST` und `ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST` (Startprüfung nach 6.11, `DeployStufeTest`), API und Worker weiter in einem Dienst (`archiv.rolle=api,worker`), Limits im Budget nach 16.30 (`.github/scripts/pruefe-speicherbudget.py`, `DeployHaertungTest`)
+  - Weg zum leeren Start festlegen (z. B. neue Volume-Namen für Datenbank und Arbeitsverzeichnis der Stufe B, die Volumes der Stufe A danach entfernen [Fabian]); im PR begründen
+  - `api` und `kc` nur am internen Netz und am eigenen Netz von Traefik und Archiv aus 31.10 (statt «web»; Traefik-Label `traefik.docker.network`, `ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE` auf dieses Netz), `tools/pruefe_compose_konsistenz.py` und `DeployHaertungTest` entsprechend
+  - Test der Compose-Datei: Secret-Dateien nur an den Diensten, die sie brauchen (16.29); Netze und Ports nach 16.28; `deploy/probe/compose.yml` mit Limits zusammen höchstens im Anteil von `api`; `probe-gate.sh` (Infra-Repo) hält `api` statt des Workers an und startet es mit `trap` bei jedem Ende wieder (16.30)
+  - Ergänzung von `docs/wiederherstellung.md` um den Wiederaufbau auf einer neuen VPS (16.31)
+  - _Anforderungen: 6.11, 15.4, 16.1, 16.28, 16.29, 16.30, 16.31_
+  - _Abhängig von: 31.10 (Name des Netzes)_
+
+- [ ] 31.3 Speichermessung und Schutzmassnahmen auf der VPS prüfen [Fabian] [Infra] [QA]
+  - Richtwert bis 11.12.2026. Messung aus 1.10 mit Budget 2144 MiB / 1.6 CPU inklusive `sftp` (Entscheid Fabian 28.11.2026, Spec 09, E11) abschliessen (Messbericht ohne Namen anderer Apps), Health und Speicherabbrüche der anderen Apps während der Messung (16.18)
+  - Auf der VPS prüfen: in den internen Netzen des Archivs nur Container des Archivs, `api` und `kc` nur am internen Netz und am eigenen Netz von Traefik und Archiv, an dem keine andere App hängt, nicht mehr am Netz «web», keine veröffentlichten Ports ausser dem Eingang nach Spec 09, 1.6 (16.28); Secret-Dateien nur in Diensten des Archivs (16.29)
+  - Ergebnis im Wechselprotokoll (nur Namen und Zähler, keine Werte)
+  - _Anforderungen: 16.15, 16.18, 16.28, 16.29, 16.30_
+  - _Abhängig von: 1.10, 31.10_
+
+- [ ] 31.4 Sicherung mit Zweitkopie und Restore-Probe auf der VPS [Infra] [Fabian]
+  - Richtwert bis 18.12.2026. Rest von 5.5 auf der bestehenden VPS: Probe-Schlüssel dort erzeugen (privater Teil nur root-lesbar, in keinem Container), Probe-Projekt und dessen Schlüssel [Fabian], Sicherungs-Workflow mit restic auf das Hostpoint-Webhosting (Test vor dem Echtbetrieb: `backup`, `check`, `restore` gelingen, `forget` scheitert), Alarm bei roter Probe (16.25)
+  - Erster Lauf der Restore-Probe mit synthetischen Daten der Stufe A grün, mit Zählvergleich nach Spec 04, Aufgabe 13.7 (Stände mit eigenem Tag, beim nächsten Ausdünnen von Hand entfernt); in einem Wartungsfenster (z. B. nachts) mit angehaltenem Dienst `api`, ohne Zusatzbudget (16.30); Laufzeit und Speicher messen und die Länge des Wartungsfensters festhalten
+  - _Anforderungen: 16.2, 16.3, 16.8, 16.23, 16.24, 16.25, 16.27_
+  - _Abhängig von: 31.2 (Probe-Compose), 5.5 (Teile im Repo)_
+
+- [ ] 31.5 Überwachung auf der VPS [Infra] [Fabian]
+  - Richtwert bis 18.12.2026. Rest von 5.9: interne Kennzahlen und Detail-Health an das Monitoring der VPS, Alarme für Erreichbarkeit, Health, Fehleraufträge und Restore-Probe (16.25); Alarm bei Speicherabbruch auf der VPS oder kranker anderer App (16.30); Mail-Alarme aus 5.6 mit gesetzten Werten
+  - Wartungsfenster der Restore-Probe (16.30): Ausfallalarme von Erreichbarkeit und Health des Archivs im Fenster gelten als erwartet (im Monitoring als Fenster hinterlegt); Alarm, wenn `api` nach dem Ende des Fensters nicht wieder gesund ist oder die Probe scheitert (16.25)
+  - Bekannte Lücke nach Entscheid 28.11.2026: keine eigene externe Prüfung des Anmelde-Hosts; fällt nur Keycloak aus, meldet die externe Erreichbarkeitsprüfung das nicht eigens
+  - _Anforderungen: 16.4, 16.5, 16.25, 16.30_
+  - _Abhängig von: 5.6, 5.9 (Teile im Repo)_
+
+- [ ] 31.6 Leistungsmessung auf der VPS [Fabian] [Infra]
+  - Richtwert bis 22.12.2026, vor dem Wechsel (entschieden von Fabian am 28.11.2026). Messung nach 16.26 als eigenes Compose-Projekt (z. B. `archiv-last`) mit Mandant `last` und Bucket `urinet-archiv-a-last`, Limits nach 16.30, nur synthetische Daten; Messbedingungen, Bildweg und Dateinamen wie in 5.11; der Archiv-Stack ruht während der Messung; Health der anderen Apps (16.18); danach Projekt, Messdaten und Bucket verwerfen
+  - Verfehlt die Messung ein Ziel: Ergebnis Fabian als Entscheid vorlegen (16.17, 16.26); kein automatischer Stopp, kein Aufrüsten ohne Entscheid
+  - _Anforderungen: 3.2, 5.5, 14.3, 16.16, 16.26_
+  - _Abhängig von: 2.4, 2.6, 4.5_
+
+- [ ] 31.7 Wechsel: Testdaten bereinigen und Stufe B starten [Fabian] [Infra]
+  - Richtwert 29.12. bis 30.12.2026, nach dem synthetischen Probelauf auf Stufe A (Spec 09, 29.10); der letzte Upload auf Stufe A liegt mindestens 1 Tag zurück
+  - Testdaten verwerfen: Test-Buckets `urinet-archiv-a-<code>` (auch `manifest/` mit Sperre P1D) mit dem App-Schlüssel ohne Bypass-Header leeren und löschen (ohne Inhaber-Zugang, entschieden von Fabian am 09.11.2026); Archiv- und Keycloak-Datenbank leer neu nach dem Weg aus 31.2 (damit sind auch die Testbenutzer in Keycloak weg); Testschlüsselpaar nach 16.19 verwerfen; Zugangsdaten, Daten- und Manifest-Schlüssel bleiben (entschieden von Fabian am 28.11.2026); prüfen und im Wechselprotokoll festhalten, dass keine Testbenutzer, Test-API-Tokens und Test-Webseiten-Schlüssel übrig sind (16.29); im Wechselprotokoll bestätigen, welche Testdaten auf Stufe A lagen (16.15)
+  - Produktiv einrichten (Rest von 5.4): Bucket `urinet-archiv-urinet` mit Versionierung, Object Lock und Bucket Policy (Deny auf `s3:BypassGovernanceRetention`); PR aus 31.2 mergen und über den Workflow deployen; Realm mit TOTP; Mandant `urinet` im Wegwerf-Container anlegen; Zeitstempeldienst angebunden (15.3); `archiv.ueberwachung.sicherung-aktiv` einschalten, sobald die tägliche Sicherung läuft
+  - _Anforderungen: 6.11, 15.3, 15.4, 16.15, 16.17, 16.19_
+  - _Abhängig von: 31.2, 31.3, 31.4, 31.5, 31.6, Spec 09: 29.10_
+
+- [ ] 31.8 Go/No-go vor dem ersten echten Beleg [Fabian] [QA]
+  - Richtwert 31.12.2026, vor Spec 09, 30.1: Checkliste in `docs/betrieb/start-echtbelege.md` mit Betriebsnachweisen abgehakt, Ergebnis im Wechselprotokoll; bei No-go kommt kein echter Beleg ins Archiv, Fabian entscheidet über Stichtag und Massnahmen
+  - _Anforderungen: 16.17_
+  - _Abhängig von: 31.7_
+
+- [ ] 31.9 Restore-Probe auf Stufe B vor dem Bestandsimport [Infra] [Fabian]
+  - Richtwert bis 08.01.2027: Restore-Probe auf Stufe B nach dem Probelauf mit echten Belegen (Spec 09, 30.1) und vor dem Import des Bestands (Spec 09, 30.3) grün (16.3); Status nur mit IDs und Zählern
+  - _Anforderungen: 16.3, 16.23_
+  - _Abhängig von: 31.8, Spec 09: 30.1_
+
+- [ ] 31.10 Eigenes Netz für Traefik und das Archiv [Infra] [Fabian]
+  - Richtwert bis 09.12.2026 (entschieden von Fabian am 28.11.2026): im Infra-Repo der VPS ein eigenes Docker-Netz, an dem nur Traefik und das Archiv hängen, keine andere App; Traefik zusätzlich daran anschliessen; Vorschlag als Patch oder Anleitung, Fabian merged und rollt aus; Name des Netzes für 31.2 (kein Betriebswert)
+  - Ausrollen zusammen mit 31.2 in 31.7 abstimmen, damit Traefik `api` und `kc` beim Wechsel des Netzes ohne Unterbruch erreicht oder der Unterbruch im Wechselfenster liegt
+  - _Anforderungen: 16.28_
 
 ## Optionen
 Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spec 02, O.4–O.6 in Spec 04, O.7–O.10 in Spec 01).

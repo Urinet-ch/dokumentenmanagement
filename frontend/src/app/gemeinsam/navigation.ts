@@ -34,6 +34,14 @@ export const MENUE: readonly Menuepunkt[] = [
   },
   { pfad: '/suche', text: TEXTE.menue.suche, aktion: 'A2', gruppe: 'archiv', symbol: 'suche' },
   { pfad: '/chat', text: TEXTE.menue.chat, aktion: 'A2', gruppe: 'archiv', symbol: 'chat' },
+  // Spec 09, Aufgabe 27.5: Trennblätter erzeugen gehört zu A1 (Req 15.1)
+  {
+    pfad: '/trennblaetter',
+    text: TEXTE.menue.trennblaetter,
+    aktion: 'A1',
+    gruppe: 'archiv',
+    symbol: 'dokument',
+  },
   {
     pfad: '/kontakte',
     text: TEXTE.menue.kontakte,
