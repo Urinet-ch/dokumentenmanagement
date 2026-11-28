@@ -84,7 +84,7 @@ zu den Wellen 27 bis 29.
   - _Abhängig von: 27.2_
 
 ## Welle 28 — Scan-Eingang und Stapelverarbeitung
-- [x] 28.1 Datenmodell Stapel [Backend]
+- [ ] 28.1 Datenmodell Stapel [Backend]
   - Changesets `stapel`, `stapel_seite`, Spalten `dokument.stapel_id`, `stapel_von`, `stapel_bis`; Auftragstypen.
   - Verbindlich (10.6): Die Prüfsummen-Abfrage aus 27.6 (`JdbcQuellenRegister.vorhandenePruefsummen`) meldet auch
     die SHA-256 nicht verworfener Stapel-Originale; für Benutzer nur Stapel, die sie sehen dürfen (Sichtregel mit
