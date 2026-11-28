@@ -954,6 +954,23 @@ public class WissenIngestSchritte {
                 .hasSize(1);
     }
 
+    /** Spec 04, Req 22.9: der wartende Auftrag endet nach dem Abschalten ohne Modellaufruf mit dem Grund. */
+    @Dann("endet der Ingest-Entwurf mit «{word}» und dem Hinweis «{}»")
+    public void entwurfEndetMitHinweis(String status, String hinweis)
+            throws SQLException, InterruptedException, ExecutionException, TimeoutException {
+        entwurfWarten(status);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement anweisung = verbindung.prepareStatement(
+                     "select status, hinweis from m_urinet.wissens_entwurf where id = ?")) {
+            anweisung.setObject(1, entwurfId);
+            try (ResultSet ergebnis = anweisung.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getString(1)).isEqualTo(status);
+                assertThat(ergebnis.getString(2)).contains(hinweis);
+            }
+        }
+    }
+
     @Dann("es erfolgt kein KI-Aufruf")
     public void keinKiAufruf() {
         assertThat(KiWireMock.client().find(postRequestedFor(urlPathEqualTo(KiWireMock.CHAT_PFAD)))).isEmpty();

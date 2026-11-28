@@ -89,10 +89,13 @@ public class WissenIngestVerarbeiten {
     private final KiVerbrauchPort verbrauch;
     private final DiffDienst diffDienst;
     private final WissenIngestIndex index;
+    private final Wissensfreischaltung freischaltung;
     private CachedAuszugPruefer auszugPruefer;
 
     public WissenIngestVerarbeiten(WissenIngestSpeichern speichern, WissenKonfiguration konfiguration,
-                                   KiPort ki, KiVerbrauchPort verbrauch, DiffDienst diffDienst, WissenIngestIndex index) {
+                                   KiPort ki, KiVerbrauchPort verbrauch, DiffDienst diffDienst, WissenIngestIndex index,
+                                   Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.speichern = speichern;
         this.konfiguration = konfiguration;
         this.ki = ki;
@@ -129,6 +132,12 @@ public class WissenIngestVerarbeiten {
         if (Thread.currentThread().isInterrupted()) {
             throw new InterruptedException("Wissens-Ingest unterbrochen");
         }
+        if (!freischaltung.aktuell()) {
+            // Spec 04, Req 22.9: wartender Auftrag nach dem Abschalten, ohne Modellaufruf und ohne neuen Entwurf
+            auszugPrueferVerwerfen(entwurfId);
+            fehlerSichern(auftrag, lauf, fortschritt, Wissensfreischaltung.GRUND_AUSGESCHALTET);
+            return;
+        }
 
         fortschritt = mitKontextStufe(fortschritt, quellStufe);
         WissenIngestGrenzen grenzen = konfiguration.ingest();
@@ -149,15 +158,21 @@ public class WissenIngestVerarbeiten {
             return;
         }
 
-        switch (lauf.schritt()) {
-            case "KERNAUSSAGEN" -> kernaussagen(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
-            case "PLANUNG" -> planung(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
-            case "SEITE" -> seite(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
-            case "QUELLE" -> quelle(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
-            case "ABSCHLUSS" -> abschluss(auftrag, entwurfId, fortschritt, budget);
-            case "NEU_ERZEUGEN" -> neuerzeugen(auftrag, stand, fortschritt, budget, monatsbudget);
-            default -> speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt,
-                    "Unbekannter Wissens-Ingest-Schritt");
+        try {
+            switch (lauf.schritt()) {
+                case "KERNAUSSAGEN" -> kernaussagen(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
+                case "PLANUNG" -> planung(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
+                case "SEITE" -> seite(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
+                case "QUELLE" -> quelle(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
+                case "ABSCHLUSS" -> abschluss(auftrag, entwurfId, fortschritt, budget);
+                case "NEU_ERZEUGEN" -> neuerzeugen(auftrag, stand, fortschritt, budget, monatsbudget);
+                default -> speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt,
+                        "Unbekannter Wissens-Ingest-Schritt");
+            }
+        } catch (WissenAusgeschaltet e) {
+            // abgeschaltet während des Laufs (Req 22.9): vor dem nächsten Modellaufruf abgebrochen, Schritt verworfen
+            auszugPrueferVerwerfen(entwurfId);
+            fehlerSichern(auftrag, lauf, fortschritt, Wissensfreischaltung.GRUND_AUSGESCHALTET);
         }
     }
 
@@ -949,6 +964,8 @@ public class WissenIngestVerarbeiten {
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException("Wissens-Ingest unterbrochen");
             }
+            // Spec 04, Req 22.9: unmittelbar vor jedem Modellaufruf, nicht nur beim Start des Auftrags
+            freischaltung.modellaufrufPruefen();
             long verbraucht = summe(bisherEin, bisherAus, tokensEin, tokensAus);
             long monatVerbraucht = addiere(monatsverbrauch, summe(tokensEin, tokensAus));
             long frei = Math.min(budget - verbraucht, monatsbudget - monatVerbraucht);

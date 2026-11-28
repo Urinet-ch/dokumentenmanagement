@@ -16,6 +16,8 @@ public enum Fehlercode {
             "Ihre Anmeldung gehört zu keinem gültigen, aktiven Mandanten. Bitte wenden Sie sich an den Inhaber."),
     NICHT_ERLAUBT(403, "Nicht erlaubt",
             "Ihre Rolle erlaubt diese Aktion nicht. Bitte wenden Sie sich an den Inhaber, falls Sie sie brauchen."),
+    WISSEN_NICHT_FREIGESCHALTET(403, "Nicht verfügbar",
+            "Diese Funktion steht für Ihren Mandanten nicht zur Verfügung."),
     ESKALATION_VERBOTEN(403, "Eskalation verhindert",
             "Die angeforderte Änderung überschreitet Ihre Berechtigung. Bitte wenden Sie sich an den Inhaber."),
     NICHT_GEFUNDEN(404, "Nicht gefunden",

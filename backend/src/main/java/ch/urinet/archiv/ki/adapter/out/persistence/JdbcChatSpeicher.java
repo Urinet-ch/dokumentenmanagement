@@ -118,6 +118,18 @@ public class JdbcChatSpeicher implements ChatSpeicher {
     }
 
     @Override
+    public List<VerlaufEintrag> verlaufOhneWissen(UUID gespraech, int anzahl) {
+        List<VerlaufEintrag> neueste = abfragen("select rolle, inhalt from " + schema() + ".chat_nachricht "
+                        + "where gespraech_id = ? and inhalt <> '' and not (rolle = 'ASSISTENT' and coalesce("
+                        + "jsonb_path_exists(werkzeuge, '$[*] ? (@.name starts with \"wissen_\")'), false)) "
+                        + "order by id desc limit ?",
+                z -> new VerlaufEintrag(ChatRolle.valueOf(z.getString(1)), z.getString(2)), gespraech, anzahl);
+        List<VerlaufEintrag> verlauf = new ArrayList<>(neueste);
+        Collections.reverse(verlauf);
+        return verlauf;
+    }
+
+    @Override
     public List<ChatWerkzeugDokument> werkzeugDokumente(UUID gespraech) {
         String s = schema();
         return abfragen("select aufruf.wert ->> 'name', dokument.id::uuid from " + s

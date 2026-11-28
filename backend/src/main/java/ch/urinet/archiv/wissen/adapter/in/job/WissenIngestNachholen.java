@@ -7,6 +7,7 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.wissen.application.WissenIngestSpeichern;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -24,11 +25,13 @@ public class WissenIngestNachholen {
     private final MandantRegister mandanten;
     private final MandantKontext kontext;
     private final WissenIngestSpeichern speichern;
+    private final Wissensfreischaltung freischaltung;
     private final boolean worker;
     private final AtomicBoolean abgeschlossen = new AtomicBoolean();
 
     public WissenIngestNachholen(MandantRegister mandanten, MandantKontext kontext, WissenIngestSpeichern speichern,
-                                 @ConfigProperty(name = "archiv.rolle") String rolle) {
+                                 Wissensfreischaltung freischaltung, @ConfigProperty(name = "archiv.rolle") String rolle) {
+        this.freischaltung = freischaltung;
         this.mandanten = mandanten;
         this.kontext = kontext;
         this.speichern = speichern;
@@ -47,6 +50,10 @@ public class WissenIngestNachholen {
     void alleNachholen() {
         boolean erfolgreich = true;
         for (Mandant mandant : mandanten.aktive()) {
+            if (!freischaltung.freigeschaltet(mandant.code())) {
+                // Spec 04, Req 22.9: kein Nachholen ohne Freischaltung, auch nicht später von selbst
+                continue;
+            }
             try {
                 int anzahl = kontext.mit(mandant.code(), speichern::handlerFehltNachholen);
                 if (anzahl > 0) {

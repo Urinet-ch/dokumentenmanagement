@@ -41,6 +41,16 @@ class ChatFragenModusTest {
                 });
         WissenschatZugang zugang = new WissenschatZugang() {
             @Override
+            public boolean freigeschaltet(ch.urinet.archiv.mandant.domain.MandantCode mandant) {
+                return true;
+            }
+
+            @Override
+            public boolean freigeschaltet() {
+                return true;
+            }
+
+            @Override
             public void rechtPruefen(Benutzer benutzer) {
                 ereignisse.add("A15");
                 if (!a15) {

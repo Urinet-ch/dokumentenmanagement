@@ -17,7 +17,11 @@ import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
+import ch.urinet.archiv.wissen.application.Wissenspfade;
 import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.ws.rs.Path;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ResourceInfo;
 import org.eclipse.microprofile.jwt.JsonWebToken;
@@ -25,8 +29,10 @@ import org.jboss.resteasy.reactive.server.ServerRequestFilter;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Prüft jede Anfrage an einen Endpunkt, bevor Daten gelesen werden (Req 1.3, 2.2, 2.6): gültiger, aktiver Mandant aus
@@ -41,6 +47,11 @@ import java.util.UUID;
  * Ein API-Token (Attribut {@link TokenIdentitaet#SCOPE}, Req 2.5) hat keine Archiv-Rolle: Nach der Mandantenprüfung
  * zählt nur, ob die Methode mit {@link ErlaubtScope} genau seinen Scope erlaubt; Webseiten-Schlüssel verwenden
  * {@link WebseitenZugang}; sonst 403 {@code NICHT_ERLAUBT}.
+ * <p>
+ * Wissensbasis (Spec 04, Req 22.6): Gehört die Pfadvorlage zur Wissensbasis ({@link Wissenspfade}) und ist Wissen für
+ * den Mandanten nicht freigeschaltet ({@link Wissensfreischaltung}), antwortet der Filter nach der Anmeldung (401, auch
+ * widerrufene Sitzung) und vor Rechtematrix, Dokumentprüfung (404) und Laden von Daten mit 403
+ * {@code WISSEN_NICHT_FREIGESCHALTET}, für Rollen und API-Tokens gleich.
  */
 public class ZugangFilter {
 
@@ -50,13 +61,16 @@ public class ZugangFilter {
     private final MandantAufloesung aufloesung;
     private final Berechtigung berechtigung;
     private final TokenWiderruf tokenWiderruf;
+    private final Wissensfreischaltung wissen;
+    private static final Map<Method, Boolean> WISSENSPFAD = new ConcurrentHashMap<>();
 
     public ZugangFilter(SecurityIdentity identitaet, MandantAufloesung aufloesung, Berechtigung berechtigung,
-                        TokenWiderruf tokenWiderruf) {
+                        TokenWiderruf tokenWiderruf, Wissensfreischaltung wissen) {
         this.identitaet = identitaet;
         this.aufloesung = aufloesung;
         this.berechtigung = berechtigung;
         this.tokenWiderruf = tokenWiderruf;
+        this.wissen = wissen;
     }
 
     @ServerRequestFilter
@@ -68,8 +82,9 @@ public class ZugangFilter {
         // Benutzer-ID = Claim sub (quarkus.oidc.token.principal-claim); fehlt er, kein Zugang
         Optional<String> benutzerId = identitaet.isAnonymous() ? Optional.empty()
                 : Optional.ofNullable(identitaet.getPrincipal().getName()).filter(id -> !id.isBlank());
+        MandantCode mandant = null;
         try {
-            aufloesung.pruefen();
+            mandant = aufloesung.pruefen();
         } catch (MandantVerweigert e) {
             berechtigung.ohneMandant(benutzerId);
         }
@@ -96,6 +111,9 @@ public class ZugangFilter {
             return;
         }
         if (scope != null) {
+            if (benutzerId.isPresent()) {
+                wissenPruefen(ressource, mandant);
+            }
             scopePruefen(methode, scope, benutzerId, aktion);
             return;
         }
@@ -109,6 +127,7 @@ public class ZugangFilter {
         if (tokenWiderruf.widerrufen(benutzerId.get(), ausgestellt)) {
             throw new FachFehler(Fehlercode.NICHT_ANGEMELDET);
         }
+        wissenPruefen(ressource, mandant);
         if (aktion.isPresent()) {
             aktion(new Benutzer(benutzerId.get(), rolle.get()), aktion.get(),
                     methode.isAnnotationPresent(NichtDokumentbezogen.class) ? null
@@ -116,6 +135,26 @@ public class ZugangFilter {
         } else if (!methode.isAnnotationPresent(AlleArchivRollen.class)) {
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
         }
+    }
+
+    private void wissenPruefen(ResourceInfo ressource, MandantCode mandant) {
+        if (mandant != null && wissenspfad(ressource.getResourceClass(), ressource.getResourceMethod())
+                && !wissen.freigeschaltet(mandant)) {
+            throw new FachFehler(Fehlercode.WISSEN_NICHT_FREIGESCHALTET);
+        }
+    }
+
+    /** Gehört die Vorlage aus {@code @Path} von Klasse und Methode zur Wissensbasis ({@link Wissenspfade})? */
+    static boolean wissenspfad(Class<?> klasse, Method methode) {
+        return WISSENSPFAD.computeIfAbsent(methode, m -> Wissenspfade.gesperrt(
+                vorlage(klasse != null ? klasse : m.getDeclaringClass(), m)));
+    }
+
+    static String vorlage(Class<?> klasse, Method methode) {
+        Path aussen = klasse.getAnnotation(Path.class);
+        Path innen = methode.getAnnotation(Path.class);
+        String pfad = (aussen == null ? "" : "/" + aussen.value()) + (innen == null ? "" : "/" + innen.value());
+        return pfad.replaceAll("/+", "/");
     }
 
     private static boolean webseitenScopePasst(WebseitenZugang zugang,

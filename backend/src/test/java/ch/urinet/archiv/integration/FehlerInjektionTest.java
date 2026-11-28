@@ -568,7 +568,7 @@ class FehlerInjektionTest {
             }
             ChatVerlauf original = ClientProxy.unwrap(chatVerlauf);
             AtomicInteger getroffen = new AtomicInteger();
-            QuarkusMock.installMockForType(new ChatVerlauf(null) {
+            QuarkusMock.installMockForType(new ChatVerlauf(null, null) {
                 @Override
                 public List<GespraechKopf> gespraeche(Benutzer benutzer) {
                     getroffen.incrementAndGet();

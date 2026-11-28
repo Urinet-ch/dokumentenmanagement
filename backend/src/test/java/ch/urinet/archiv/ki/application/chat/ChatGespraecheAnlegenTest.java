@@ -47,6 +47,16 @@ class ChatGespraecheAnlegenTest {
         List<String> geprueft = new ArrayList<>();
         WissenschatZugang ohneRecht = new WissenschatZugang() {
             @Override
+            public boolean freigeschaltet(ch.urinet.archiv.mandant.domain.MandantCode mandant) {
+                return true;
+            }
+
+            @Override
+            public boolean freigeschaltet() {
+                return true;
+            }
+
+            @Override
             public void rechtPruefen(Benutzer benutzer) {
                 geprueft.add("A15");
                 throw new Verweigerung(Verweigerung.Grund.NICHT_ERLAUBT);
@@ -74,6 +84,16 @@ class ChatGespraecheAnlegenTest {
                     throw new IllegalStateException("weiter");
                 });
         WissenschatZugang verbietetAlles = new WissenschatZugang() {
+            @Override
+            public boolean freigeschaltet(ch.urinet.archiv.mandant.domain.MandantCode mandant) {
+                return true;
+            }
+
+            @Override
+            public boolean freigeschaltet() {
+                return true;
+            }
+
             @Override
             public void rechtPruefen(Benutzer benutzer) {
                 throw new AssertionError("A15 gilt nur für WISSEN");

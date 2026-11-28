@@ -182,7 +182,8 @@ class WissenLintAblaufTest {
                                         """).setParameter("zweck", zweck).setParameter("entwurf", entwurf).executeUpdate();
                             }
                         };
-                        var verarbeitung = new WissenLintVerarbeiten(speichern, ki, verbrauch, diff, json);
+                        var verarbeitung = new WissenLintVerarbeiten(speichern, ki, verbrauch, diff, json,
+                                ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
                         int schritte = 0;
                         while (speichern.laden(lintId).isPresent() && schritte++ < 15) {
                             @SuppressWarnings("unchecked")

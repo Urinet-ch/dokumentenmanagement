@@ -1,5 +1,6 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.ProblemAbbildung;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -91,11 +92,14 @@ public class MandantEinstellungenResource {
     private final Berechtigung rechte;
     private final SecurityIdentity identitaet;
     private final ObjectMapper json;
+    private final Wissensfreischaltung freischaltung;
 
     public MandantEinstellungenResource(EinstellungenVerwaltung verwaltung, EinstellungskatalogLesen katalog,
                                         KonfigurationVerwaltung konfiguration,
                                         MandantAufloesung aufloesung, Berechtigung rechte,
-                                        SecurityIdentity identitaet, ObjectMapper json) {
+                                        SecurityIdentity identitaet, ObjectMapper json,
+                                        Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.verwaltung = verwaltung;
         this.katalog = katalog;
         this.konfiguration = konfiguration;
@@ -174,6 +178,9 @@ public class MandantEinstellungenResource {
                                   @QueryParam("bestaetigt") String bestaetigt, InputStream body) throws IOException {
         aufloesung.pruefen();
         Anfrage anfrage = lesen(body);
+        if (anfrage.json() != null && "WISSEN".equals(anfrage.json().path("gruppe").asText())) {
+            freischaltung.pruefen();
+        }
         if (anfrage.json() != null && (anfrage.json().has("version")
                 || "WISSEN".equals(anfrage.json().path("gruppe").asText()))) {
             rechte.aktion(benutzer(), Aktion.A19);
@@ -209,6 +216,8 @@ public class MandantEinstellungenResource {
 
     private void wissenPruefen(Anfrage anfrage) {
         if (anfrage.json() != null && anfrage.json().has("wissen")) {
+            // Einstellungen der Wissensbasis nur bei Freischaltung (Spec 04, Req 22.6), vor dem Recht A19
+            freischaltung.pruefen();
             rechte.aktion(benutzer(), Aktion.A19);
         }
     }

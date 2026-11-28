@@ -301,7 +301,7 @@ class ArchivWerkzeugeTest {
                 return arbeit.get();
             }
         };
-        Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(m -> true), mandanten);
+        Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(m -> true, m -> true), mandanten);
         return new ArchivWerkzeuge(lauf, suchen, zeigen, fristen, kennzahl, offenePosten,
                 new VollstaendigkeitAbfrage(null, null, null), null, new ObjectMapper());
     }

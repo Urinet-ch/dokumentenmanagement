@@ -4,6 +4,9 @@ import ch.urinet.archiv.gemeinsam.adapter.in.rest.ProblemAbbildung;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.ProblemAntwort;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantVerweigert;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
@@ -30,26 +33,33 @@ import java.util.function.Supplier;
  * und meldet die Verweigerung sonst über {@link Berechtigung} (Zugriffsprotokoll {@code VERWEIGERT}, Req 10.7).
  * Die Prüfung von {@code @RolesAllowed} scheitert auf dem Event-Loop; Mandantenprüfung und Protokoll brauchen JDBC und
  * JTA und laufen darum auf einem Worker-Thread, im Request-Kontext der Anfrage.
+ * <p>
+ * Wissensbasis (Spec 04, Req 22.6): Gehört der Endpunkt zur Wissensbasis und ist Wissen für den Mandanten nicht
+ * freigeschaltet, antwortet sie wie der {@link ZugangFilter} mit 403 {@code WISSEN_NICHT_FREIGESCHALTET}, damit diese
+ * Antwort unabhängig von der Rolle auch {@code @RolesAllowed} vorgeht.
  */
 public class RollenVerweigerungAbbildung {
 
     private final SecurityIdentity identitaet;
     private final MandantAufloesung aufloesung;
     private final Berechtigung berechtigung;
+    private final Wissensfreischaltung wissen;
 
     public RollenVerweigerungAbbildung(SecurityIdentity identitaet, MandantAufloesung aufloesung,
-                                       Berechtigung berechtigung) {
+                                       Berechtigung berechtigung, Wissensfreischaltung wissen) {
         this.identitaet = identitaet;
         this.aufloesung = aufloesung;
         this.berechtigung = berechtigung;
+        this.wissen = wissen;
     }
 
     @ServerExceptionMapper
     public Uni<Response> verweigert(ForbiddenException fehler, ResourceInfo ressource) {
         Method methode = ressource == null ? null : ressource.getResourceMethod();
+        Class<?> klasse = ressource == null ? null : ressource.getResourceClass();
         ManagedContext anfrageKontext = Arc.container().requestContext();
         InjectableContext.ContextState zustand = anfrageKontext.getStateIfActive();
-        return Uni.createFrom().item(() -> imKontext(anfrageKontext, zustand, () -> antwort(methode)))
+        return Uni.createFrom().item(() -> imKontext(anfrageKontext, zustand, () -> antwort(klasse, methode)))
                 .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
@@ -66,14 +76,19 @@ public class RollenVerweigerungAbbildung {
         }
     }
 
-    private Response antwort(Method methode) {
+    private Response antwort(Class<?> klasse, Method methode) {
         Optional<String> benutzerId = identitaet.isAnonymous() ? Optional.empty()
                 : Optional.ofNullable(identitaet.getPrincipal().getName()).filter(id -> !id.isBlank());
         try {
+            MandantCode mandant = null;
             try {
-                aufloesung.pruefen();
+                mandant = aufloesung.pruefen();
             } catch (MandantVerweigert e) {
                 berechtigung.ohneMandant(benutzerId);
+            }
+            if (mandant != null && methode != null && ZugangFilter.wissenspfad(klasse, methode)
+                    && !wissen.freigeschaltet(mandant)) {
+                return ProblemAbbildung.antwort(ProblemAntwort.fuer(Fehlercode.WISSEN_NICHT_FREIGESCHALTET));
             }
             Optional<Aktion> aktion = Optional.ofNullable(methode)
                     .map(m -> m.getAnnotation(ErfordertAktion.class)).map(ErfordertAktion::value);

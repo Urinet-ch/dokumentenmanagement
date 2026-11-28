@@ -2,6 +2,8 @@ package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
 import ch.urinet.archiv.konfiguration.application.Funktionen;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.GET;
@@ -20,16 +22,21 @@ public class FunktionenResource {
 
     private final Funktionen funktionen;
     private final MandantAufloesung aufloesung;
+    private final Wissensfreischaltung freischaltung;
 
-    public FunktionenResource(Funktionen funktionen, MandantAufloesung aufloesung) {
+    public FunktionenResource(Funktionen funktionen, MandantAufloesung aufloesung, Wissensfreischaltung freischaltung) {
         this.funktionen = funktionen;
         this.aufloesung = aufloesung;
+        this.freischaltung = freischaltung;
     }
 
     @Schema(name = "Mandantenfunktionen")
     public record FunktionenDto(@Schema(required = true,
             description = "Mindestens eine aktive Dokumentart hat die Gruppe «finanz» (Spec 05, Req 8.8)")
-                                  boolean finanzVerfuegbar) {
+                                  boolean finanzVerfuegbar,
+                                  @Schema(required = true,
+            description = "Wissen ist für den Mandanten freigeschaltet (Spec 04, Req 22.4)")
+                                  boolean wissenVerfuegbar) {
     }
 
     @GET
@@ -38,7 +45,7 @@ public class FunktionenResource {
     @Operation(summary = "Verfügbare Funktionen des Mandanten")
     @APIResponse(responseCode = "200", description = "Funktionen des aktuellen Mandanten")
     public FunktionenDto lesen() {
-        aufloesung.pruefen();
-        return new FunktionenDto(funktionen.finanzVerfuegbar());
+        MandantCode mandant = aufloesung.pruefen();
+        return new FunktionenDto(funktionen.finanzVerfuegbar(), freischaltung.freigeschaltet(mandant));
     }
 }
