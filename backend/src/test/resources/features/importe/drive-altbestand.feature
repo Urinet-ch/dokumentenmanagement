@@ -1,5 +1,5 @@
 # language: de
-@spec-03
+@spec-03 @quellenregister
 Funktionalität: Altbestand von VHF/GSK übernehmen
   Der Import verwendet ausschliesslich synthetische Dateien und einen Token des Mandanten «vhf-gsk».
 
@@ -20,6 +20,8 @@ Funktionalität: Altbestand von VHF/GSK übernehmen
       | pfad                 | typ |
       | Bulletin/2026/1.pdf | pdf |
       | Bulletin/2026/3.pdf | pdf |
+    Wenn «inhaber-vhf-gsk» die Quelle «drive» vom Typ «DRIVE» anlegt
+    Dann antwortet das Quellenregister mit Status 201
     Und ein Token vom Scope «import» für «vhf-gsk» liegt in einer Datei mit Rechten 600
     Wenn der Drive-Import den Altbestand «Altbestand» mit Klassifikation «fachgebiet» und Wert «bau» lädt
     Dann endet der Drive-Import mit Exit-Code 0
@@ -38,6 +40,8 @@ Funktionalität: Altbestand von VHF/GSK übernehmen
     Angenommen ein Ordner «Altbestand» mit diesen synthetischen Dateien:
       | pfad                | typ |
       | Unbekannt/2026/1.pdf | pdf |
+    Wenn «inhaber-vhf-gsk» die Quelle «drive» vom Typ «DRIVE» anlegt
+    Dann antwortet das Quellenregister mit Status 201
     Und ein Token vom Scope «import» für «vhf-gsk» liegt in einer Datei mit Rechten 600
     Wenn der Drive-Import den Altbestand «Altbestand» mit Klassifikation «fachgebiet» und Wert «bau» lädt
     Dann endet der Drive-Import mit Exit-Code 0
