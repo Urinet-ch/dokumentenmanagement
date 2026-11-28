@@ -35,6 +35,9 @@ public interface QuellenRegister {
 
     void geheimnisSetzen(String code, byte[] chiffrat);
 
+    /** Liefert das verschlüsselte Geheimnis nur intern an den Worker; leere Antwort, wenn keines gesetzt ist. */
+    Optional<byte[]> geheimnisLaden(String code);
+
     /** Der laufende Lauf der Quelle, gesperrt bis zum Ende der Transaktion (Abschluss und Uploads nacheinander). */
     Optional<QuellLauf> laufenderLauf(UUID quelleId);
 

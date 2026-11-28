@@ -6,7 +6,14 @@ package ch.urinet.archiv.integration.application.mail;
  */
 public class PostfachNichtErreichbar extends RuntimeException {
 
+    private final String stelle;
+
     public PostfachNichtErreichbar(String stelle, Throwable ursache) {
         super(stelle, ursache);
+        this.stelle = stelle;
+    }
+
+    public String stelle() {
+        return stelle;
     }
 }

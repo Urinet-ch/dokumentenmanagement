@@ -74,6 +74,7 @@ public class DokumentErfassen {
     public static final String QUELLE_DRIVE = "DRIVE";
     public static final String QUELLE_GENERATOR = "GENERATOR";
     public static final String QUELLE_EMAIL = "EMAIL";
+    public static final String QUELLE_GMAIL = "GMAIL";
     public static final String QUELLE_WEBSEITE = "WEBSEITE";
     /** Art einer Mail ohne unterstützten Anhang (Spec 02, Req 1.3), vorbelegt, solange der Mandant sie kennt. */
     public static final String ART_KORRESPONDENZ = "KORRESPONDENZ";
@@ -291,6 +292,12 @@ public class DokumentErfassen {
      * Aufrufers.
      */
     public UploadErgebnis korrespondenzErfassen(Path eml, Path textPdf, Optional<String> hinweis, String erstelltVon) {
+        return korrespondenzErfassen(eml, textPdf, hinweis, erstelltVon, QUELLE_EMAIL);
+    }
+
+    /** Korrespondenz eines Quelllaufs, dessen Herkunft nicht der bestehende E-Mail-Eingang ist. */
+    public UploadErgebnis korrespondenzErfassen(Path eml, Path textPdf, Optional<String> hinweis, String erstelltVon,
+                                                String quelle) {
         MandantCode mandant = aufloesung.ausKontext();
         // die Nachricht nur nach Grösse: Ihren Typ prüft das Archiv nicht am Inhalt, sie kommt vom Postfach-Adapter
         Geprueft nachricht = empfangen(mandant, eml, DateiRolle.ORIGINAL);
@@ -313,7 +320,7 @@ public class DokumentErfassen {
         Instant eingang = uhr.instant();
         int jahr = eingang.atZone(ZUERICH).getYear();
         UUID id = UUID.randomUUID();
-        repository.anlegen(new NeuesDokument(id, eingang, QUELLE_EMAIL, erstelltVon,
+        repository.anlegen(new NeuesDokument(id, eingang, quelle, erstelltVon,
                 hinweis.filter(h -> !h.isBlank()), Optional.empty()));
         transaktion.registerInterposedSynchronization(new EingangAufraeumen(mandant, jahr, id));
         repository.artVorbelegen(id, ART_KORRESPONDENZ);

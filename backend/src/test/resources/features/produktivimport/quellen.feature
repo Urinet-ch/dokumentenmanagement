@@ -154,3 +154,50 @@ Funktionalität: Quellenregister, Quellläufe und Prüfsummen-Abfrage
       | treuhaender-urinet       | urinet  | papier | 403    | eine       |
       | mitarbeiter-urinet       | urinet  | papier | 403    | eine       |
       | geschaeftsstelle-vhf-gsk | vhf-gsk | papier | 403    | eine       |
+
+  @req-7.1 @req-7.8
+  Szenario: Eine Gmail-Quelle startet einen begrenzten Quelllauf als Auftrag
+    Angenommen ein Werkzeug von «urinet» hat ein Token vom Scope «import»
+    Wenn «inhaber-urinet» die Gmail-Quelle «gmail» mit synthetischer Konfiguration setzt
+    Dann antwortet das Quellenregister mit Status 200
+    Wenn «inhaber-urinet» das Geheimnis der Quelle «gmail» setzt
+    Dann antwortet das Quellenregister mit Status 204
+    Wenn das Werkzeug einen Lauf «ECHT» der Quelle «gmail» startet
+    Dann antwortet das Quellenregister mit Status 201
+    Und ist für den Gmail-Quelllauf ein Auftrag «QUELLLAUF_GMAIL» eingereiht
+
+  @req-7.2
+  Szenario: Ein Gmail-Label bleibt beim lesenden Abruf unverändert
+    Angenommen ein Gmail-Label mit einer synthetischen Nachricht existiert
+    Wenn das Archiv das Gmail-Label nur lesend abruft
+    Dann bleibt die Gmail-Nachricht ungelesen und unverändert im Label
+
+  @req-7.3 @req-7.4 @gmail-verarbeitung
+  Szenario: Gmail-Anhänge werden einzeln mit Hinweis erfasst und Kleinstbilder übersprungen
+    Angenommen eine Gmail-Nachricht mit unterstützten und nicht unterstützten Anhängen vorliegt
+    Wenn das Archiv die Gmail-Nachricht erfasst
+    Dann werden nur unterstützte Dateien einzeln erfasst und kleine Bilder übersprungen
+
+  @req-7.5 @gmail-verarbeitung
+  Szenario: Nachrichten ohne Anhang werden nur auf Wunsch Korrespondenz
+    Angenommen eine Gmail-Nachricht ohne Anhänge vorliegt
+    Wenn das Archiv die Gmail-Nachricht ohne Anhang mit beiden Optionen erfasst
+    Dann wird die Nachricht ohne Anhang nur mit aktivierter Option als Korrespondenz erfasst
+
+  @req-7.6 @gmail-verarbeitung
+  Szenario: Bereits bekannte Message-IDs werden bei Wiederholung und Herkunftsmix übersprungen
+    Angenommen eine Message-ID ist bereits im E-Mail-Eingang erfasst
+    Wenn das Archiv dieselbe Gmail-Nachricht erneut erfasst
+    Dann erzeugt die wiederholte oder bereits bekannte Message-ID keine neuen Dokumente
+
+  @req-7.7
+  Szenario: Ein falsches App-Passwort wird weder angezeigt noch protokolliert
+    Angenommen ein Gmail-Label mit einer synthetischen Nachricht existiert
+    Wenn das Archiv das Gmail-Label mit falschem App-Passwort abruft
+    Dann meldet Gmail einen sicheren Anmeldefehler ohne das Passwort
+
+  @req-7.8
+  Szenario: Gmail-Läufe beachten Startdatum und Nachrichtengrenze
+    Angenommen ein Gmail-Label mit zwei synthetischen Nachrichten existiert
+    Wenn das Archiv das Gmail-Label je Lauf begrenzt abruft
+    Dann liest der Gmail-Import höchstens die konfigurierte Anzahl ab dem Startdatum

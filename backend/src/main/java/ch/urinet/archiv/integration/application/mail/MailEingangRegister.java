@@ -1,6 +1,7 @@
 package ch.urinet.archiv.integration.application.mail;
 
 import ch.urinet.archiv.integration.domain.mail.MailStatus;
+import ch.urinet.archiv.integration.domain.mail.MailHerkunft;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 
 import java.util.List;
@@ -17,7 +18,12 @@ public interface MailEingangRegister {
 
     /** @return {@code false}, wenn die Message-ID schon eingetragen ist (dann bleibt alles unverändert) */
     boolean eintragen(MandantCode mandant, String messageId, Optional<String> absender, Optional<String> betreff,
-                      MailStatus status);
+                      MailStatus status, MailHerkunft herkunft);
+
+    default boolean eintragen(MandantCode mandant, String messageId, Optional<String> absender,
+                              Optional<String> betreff, MailStatus status) {
+        return eintragen(mandant, messageId, absender, betreff, status, MailHerkunft.POSTFACH);
+    }
 
     /**
      * Setzt eine Mail aus der Quarantäne auf {@code ERFASST}, wenn ihr Absender inzwischen zugelassen ist.

@@ -4,6 +4,11 @@ import ch.urinet.archiv.ablage.TestAblage;
 import ch.urinet.archiv.dokument.Testdateien;
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.integration.TestPostfach;
+import ch.urinet.archiv.gemeinsam.LogMitschnitt;
+import ch.urinet.archiv.integration.application.mail.PostfachPort;
+import ch.urinet.archiv.integration.application.mail.PostfachNichtErreichbar;
+import ch.urinet.archiv.integration.domain.mail.Postfach;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import io.agroal.api.AgroalDataSource;
@@ -15,6 +20,9 @@ import io.cucumber.java.de.Wenn;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
+import jakarta.mail.Flags;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
@@ -24,12 +32,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -56,6 +66,9 @@ public class QuellenSchritte {
     @Inject
     ApiTokenVerwaltung tokens;
 
+    @Inject
+    PostfachPort postfach;
+
     private final Map<String, byte[]> dateien = new HashMap<>();
     private final Map<String, UUID> dokumente = new HashMap<>();
     private final Map<String, List<UUID>> hochgeladen = new HashMap<>();
@@ -65,6 +78,13 @@ public class QuellenSchritte {
     private String token;
     private String tokenMandant;
     private UUID lauf;
+    private TestPostfach gmailPostfach;
+    private String gmailLabel;
+    private String gmailMessageId;
+    private Set<Flags.Flag> gmailFlags;
+    private List<String> gmailMessageIds = List.of();
+    private PostfachPort.Abruf gmailBegrenzterAbruf;
+    private PostfachPort.Abruf gmailDatumAbruf;
 
     @Angenommen("der Stand der Verweigerungen von «{word}» ist gemerkt")
     public void standMerken(String mandant) throws SQLException {
@@ -73,6 +93,10 @@ public class QuellenSchritte {
 
     @After("@quellenregister")
     public void aufraeumen() throws SQLException {
+        if (lauf != null) {
+            ausfuehren("delete from public.auftrag where typ = 'QUELLLAUF_GMAIL' "
+                    + "and nutzlast->>'laufId' = ?", lauf.toString());
+        }
         for (Map.Entry<String, List<UUID>> eintrag : hochgeladen.entrySet()) {
             ausfuehren("delete from public.auftrag where typ = 'VERARBEITEN' "
                     + "and nutzlast->>'dokumentId' = any (string_to_array(?, ','))",
@@ -86,7 +110,8 @@ public class QuellenSchritte {
             ausfuehren("update " + schema + ".dokument set quelle_lauf_id = null where quelle_lauf_id is not null");
             ausfuehren("update " + schema + ".quelle set letzter_lauf = null");
             ausfuehren("delete from " + schema + ".quelle_lauf");
-            ausfuehren("update " + schema + ".quelle set status = 'OFFEN', bemerkung = null, geheimnis = null");
+            ausfuehren("update " + schema + ".quelle set status = 'OFFEN', bemerkung = null, geheimnis = null, "
+                    + "konfiguration = case when code = 'gmail' then '{}'::jsonb else konfiguration end");
         }
         for (String code : angelegt) {
             ausfuehren("delete from m_urinet.quelle where code = ?", code);
@@ -129,6 +154,120 @@ public class QuellenSchritte {
     public void geheimnis(String benutzer, String code) {
         antwort = alsBenutzer(benutzer).contentType(ContentType.JSON).body(Map.of("geheimnis", "synthetisch-123"))
                 .when().put(QUELLEN + "/" + code + "/geheimnis");
+    }
+
+    @Wenn("«{word}» die Gmail-Quelle «{word}» mit synthetischer Konfiguration setzt")
+    public void gmailKonfiguration(String benutzer, String code) throws SQLException {
+        Map<String, Object> konfiguration = Map.of("host", "imap.gmail.com", "port", 993,
+                "benutzer", "synthetisch@example.invalid", "label", "Synthetisches Label", "seit", "2020-01-01",
+                "ohneAnhang", false, "maxJeLauf", 25);
+        antwort = aendern(alsBenutzer(benutzer), code, version(benutzer, code),
+                Map.of("konfiguration", konfiguration));
+    }
+
+    @Angenommen("ein Gmail-Label mit einer synthetischen Nachricht existiert")
+    public void gmailLabelAnlegen() throws Exception {
+        gmailPostfach = TestPostfach.neu();
+        gmailLabel = "Gmail-" + UUID.randomUUID().toString().substring(0, 8);
+        gmailPostfach.ordnerAnlegen(gmailLabel);
+        gmailMessageId = "<" + UUID.randomUUID() + "@test.example.invalid>";
+        MimeMessage nachricht = new MimeMessage(Session.getInstance(new Properties()));
+        nachricht.setFrom("synthetisch@example.invalid");
+        nachricht.setSubject("Synthetische Gmail-Nachricht");
+        nachricht.setText("Synthetischer Inhalt");
+        nachricht.saveChanges();
+        nachricht.setHeader("Message-ID", gmailMessageId);
+        gmailPostfach.zustellen(nachricht);
+        gmailPostfach.kopieren("INBOX", gmailLabel, gmailMessageId);
+        gmailFlags = gmailPostfach.flags(gmailLabel, gmailMessageId);
+    }
+
+    @Wenn("das Archiv das Gmail-Label nur lesend abruft")
+    public void gmailLabelAbrufen() {
+        var abruf = postfach.abrufenNurLesend(new Postfach(TestPostfach.HOST, TestPostfach.port(),
+                gmailPostfach.login()), gmailPostfach.passwort(), gmailLabel, LocalDate.of(2020, 1, 1), 10,
+                nachricht -> {
+                    assertThat(nachricht.messageId()).isEqualTo(gmailMessageId);
+                    return PostfachPort.Ziel.ARCHIVIERT;
+                });
+        assertThat(abruf).isEqualTo(new PostfachPort.Abruf(1, 0));
+    }
+
+    @Angenommen("ein Gmail-Label mit zwei synthetischen Nachrichten existiert")
+    public void gmailLabelMitZweiNachrichtenAnlegen() throws Exception {
+        gmailPostfach = TestPostfach.neu();
+        gmailLabel = "Gmail-" + UUID.randomUUID().toString().substring(0, 8);
+        gmailPostfach.ordnerAnlegen(gmailLabel);
+        gmailMessageIds = List.of(gmailZustellen("Erste synthetische Nachricht"),
+                gmailZustellen("Zweite synthetische Nachricht"));
+    }
+
+    @Wenn("das Archiv das Gmail-Label mit falschem App-Passwort abruft")
+    public void gmailFalschesPasswort() {
+        String falsch = "synthetisches-falsches-passwort";
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> postfach.abrufenNurLesend(
+                    new Postfach(TestPostfach.HOST, TestPostfach.port(), gmailPostfach.login()), falsch, gmailLabel,
+                    LocalDate.of(2020, 1, 1), 10, nachricht -> PostfachPort.Ziel.ARCHIVIERT)))
+                    .isInstanceOf(PostfachNichtErreichbar.class).hasMessage("Anmeldung")
+                    .hasMessageNotContaining(falsch);
+            assertThat(log.volltext()).doesNotContain(falsch);
+        }
+    }
+
+    @Wenn("das Archiv das Gmail-Label je Lauf begrenzt abruft")
+    public void gmailBegrenztAbrufen() {
+        Postfach zugang = new Postfach(TestPostfach.HOST, TestPostfach.port(), gmailPostfach.login());
+        List<String> gelesen = new ArrayList<>();
+        gmailBegrenzterAbruf = postfach.abrufenNurLesend(zugang, gmailPostfach.passwort(), gmailLabel,
+                LocalDate.of(2020, 1, 1), 1, nachricht -> {
+                    gelesen.add(nachricht.messageId());
+                    return PostfachPort.Ziel.ARCHIVIERT;
+                });
+        assertThat(gelesen).hasSize(1).containsAnyOf(gmailMessageIds.toArray(String[]::new));
+        gmailDatumAbruf = postfach.abrufenNurLesend(zugang, gmailPostfach.passwort(), gmailLabel,
+                LocalDate.now(java.time.ZoneOffset.UTC).plusDays(1), 10, nachricht -> {
+                    throw new AssertionError("Die Nachricht liegt vor dem Startdatum");
+                });
+    }
+
+    @Dann("meldet Gmail einen sicheren Anmeldefehler ohne das Passwort")
+    public void gmailAnmeldefehlerSicher() {
+        assertThat(gmailPostfach).isNotNull();
+    }
+
+    @Dann("liest der Gmail-Import höchstens die konfigurierte Anzahl ab dem Startdatum")
+    public void gmailGrenzenGeprueft() {
+        assertThat(gmailBegrenzterAbruf).isEqualTo(new PostfachPort.Abruf(1, 0));
+        assertThat(gmailDatumAbruf).isEqualTo(new PostfachPort.Abruf(0, 0));
+    }
+
+    @Dann("bleibt die Gmail-Nachricht ungelesen und unverändert im Label")
+    public void gmailLabelUnveraendert() throws Exception {
+        assertThat(gmailPostfach.ordner(gmailLabel)).containsExactly(gmailMessageId);
+        assertThat(gmailPostfach.flags(gmailLabel, gmailMessageId)).isEqualTo(gmailFlags)
+                .doesNotContain(Flags.Flag.SEEN);
+        assertThat(gmailPostfach.ordnerAbonniert(gmailLabel)).isFalse();
+    }
+
+    @Dann("ist für den Gmail-Quelllauf ein Auftrag «{word}» eingereiht")
+    public void gmailAuftrag(String typ) throws SQLException {
+        assertThat(zahl("select count(*) from public.auftrag where typ = ? and mandant = ? "
+                        + "and nutzlast->>'laufId' = ?", typ, tokenMandant, lauf.toString()))
+                .isEqualTo(1);
+    }
+
+    private String gmailZustellen(String betreff) throws Exception {
+        String id = "<" + UUID.randomUUID() + "@test.example.invalid>";
+        MimeMessage nachricht = new MimeMessage(Session.getInstance(new Properties()));
+        nachricht.setFrom("synthetisch@example.invalid");
+        nachricht.setSubject(betreff);
+        nachricht.setText("Synthetischer Inhalt");
+        nachricht.saveChanges();
+        nachricht.setHeader("Message-ID", id);
+        gmailPostfach.zustellen(nachricht);
+        gmailPostfach.kopieren("INBOX", gmailLabel, id);
+        return id;
     }
 
     @Dann("antwortet das Quellenregister mit Status {int}")

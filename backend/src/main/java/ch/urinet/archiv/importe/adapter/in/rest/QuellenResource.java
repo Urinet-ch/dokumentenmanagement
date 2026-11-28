@@ -3,6 +3,7 @@ package ch.urinet.archiv.importe.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.importe.application.quelle.QuellenVerwaltung;
+import ch.urinet.archiv.importe.application.quelle.GmailQuelllaufStarten;
 import ch.urinet.archiv.importe.domain.quelle.QuellLauf;
 import ch.urinet.archiv.importe.domain.quelle.Quelle;
 import ch.urinet.archiv.importe.domain.quelle.Zaehler;
@@ -60,10 +61,13 @@ public class QuellenResource {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final QuellenVerwaltung verwaltung;
+    private final GmailQuelllaufStarten gmailQuelllauf;
     private final SecurityIdentity identitaet;
 
-    public QuellenResource(QuellenVerwaltung verwaltung, SecurityIdentity identitaet) {
+    public QuellenResource(QuellenVerwaltung verwaltung, GmailQuelllaufStarten gmailQuelllauf,
+                           SecurityIdentity identitaet) {
         this.verwaltung = verwaltung;
+        this.gmailQuelllauf = gmailQuelllauf;
         this.identitaet = identitaet;
     }
 
@@ -238,7 +242,7 @@ public class QuellenResource {
     @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN")
     @APIResponse(responseCode = "409", description = "QUELLE_LAEUFT: ein Trocken- oder echter Lauf läuft schon")
     public Response laufStarten(@PathParam("code") String code, StartDto start) {
-        QuellLauf lauf = verwaltung.laufStarten(code, start == null ? null : start.art(), benutzer());
+        QuellLauf lauf = gmailQuelllauf.starten(code, start == null ? null : start.art(), benutzer());
         return Response.status(Response.Status.CREATED).entity(LaufDto.aus(lauf)).build();
     }
 

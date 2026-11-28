@@ -591,6 +591,7 @@ Die Spalte «Beschreibung» (Aufgabe 2.1, entschieden von Fabian am 09.11.2026; 
 | `WISSEN_EMBEDDING` (Spec 04) | 10 min |
 | `WISSEN_EMBEDDING_ALLE` (Spec 04) | 30 min je Teilauftrag (500 Seiten) |
 | `WISSEN_EXPORT` (Spec 04) | 15 min |
+| `QUELLLAUF_GMAIL` (Spec 09) | 15 min |
 
 - Externe Werkzeuge laufen per `ProcessBuilder` mit `waitFor(zeitgrenze)` und danach `destroyForcibly()`. Jede Ein- und Ausgabe in Java hat eine eigene Zeitgrenze unter der Zeitgrenze des Typs (JDBC `queryTimeout` bzw. `statement_timeout`, S3 `apiCallTimeout`), weil weder `orTimeout` noch ein Interrupt blockierende Ein- und Ausgabe sicher beendet (zweite Nachbesserung Review PR #41, Pflichten der Handler unter «Umsetzung»). Eine Überschreitung zählt als fehlgeschlagener Versuch.
 - Lebenszeichen (Req 5.7): Der Worker schreibt während eines Auftrags alle 30 s `auftrag.lebenszeichen`. `AuftragAufraeumer` (jede Minute) gibt `LAEUFT`-Aufträge mit `lebenszeichen < now() - zeitgrenze(typ)` frei; das zählt als Fehlversuch nach Req 5.4: `versuche + 1`, `fehler = 'verwaist fehler-id=<uuid>'`, zurück auf `OFFEN` mit Wartezeit, nach dem dritten Versuch `FEHLER` (Aufgabe 2.5). Das Freigabe-UPDATE prüft das Alter des Lebenszeichens erneut.
