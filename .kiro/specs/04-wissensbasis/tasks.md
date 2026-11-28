@@ -245,10 +245,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 18.1_
 - [ ] 18.3 Öffentlicher Wissenschat [Backend] [Frontend]
   - Kennzeichen «für Webseite» je Seite (A16, Protokoll), `/public/v1/wissen/chat`, eigene Werkzeuge, Prüfung bei jeder Anfrage, Grenzen und Budget, Schalter je Mandant; Marker `[offen: …]` im Design auflösen; Plugin (Spec 03, 11.5) nur als Hinweis.
-  - Nachweis 25.11.2026: `OeffentlicherWissenschatResourceTest` prüft die mandantenbezogene Schalterauflösung pro Anfrage. `@req-21.6` liest im Cucumber-Netztest ein Werkzeug-Ereignis aus dem SSE-Stream, entzieht danach die Freigabe und prüft den Reststrom: `fehler`, kein Text und keine Quellen. Die Ausschlussfälle «ohne Webseitenfreigabe» und Quellenstufe `mitglieder` sind in der parallelen Nacharbeit #605 abgedeckt und werden hier nicht dupliziert. Die Checkbox bleibt offen; der Plugin-Hinweis und die vollständige Abnahme sind noch ausstehend.
+  - Abgleich 28.11.2026: Die Belege für alle Teilanforderungen von 21.6 stehen in [design.md](./design.md). Endpunkt, Schalter, Quellenfilter, A16-Protokoll, Entzug, Werkzeuge und Quellenangaben sind belegt. Offen für Fabian bleibt, ob die bereinigte 30-Minuten-Gesprächshistorie trotz nicht zuverlässig erkannter Namen das Verbot personenbezogener Speicherung erfüllt; deshalb bleibt die Checkbox offen.
+  - Der im Arbeitsauftrag erwähnte `[offen: …]`-Marker war im 18.3-Abschnitt von `design.md` nicht vorhanden; andere Marker wurden nicht verändert. Plugin Spec 03, Aufgabe 11.5, bleibt ein Hinweis und wurde nicht bearbeitet. Das zusätzliche Gate aus Requirement 22.8 ist der Folgeaufgabe 25.2 zugeordnet.
   - _Anforderungen: 21.6_
   - _Abhängig von: 18.1, Spec 03: 11.2_
-  - Abgleich 25.11.2026: #576 und die oben genannte Nacharbeit #605 sind gemergt; 18.4 ist abgehakt, 18.3 bleibt für den genannten Rest offen.
+  - Abgleich: #576 und die parallele Nacharbeit #605 sind gemergt; 18.4 ist abgehakt. 18.3 bleibt bis zum Entscheid zum offenen Datenschutzpunkt unabgehakt.
 - [x] 18.4 Isolations- und Abnahmetests [QA]
   - Mandantentrennung, A15 (403), fester Modus, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar, öffentliche Auslieferung
     nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug vor dem Einreihen des SSE-Ereignisses (Entscheid Fabian
