@@ -1,5 +1,19 @@
 # Design Document
 
+### Umsetzung (Aufgabe 1.9 Vorschlag, 27.11.2026)
+
+`docs/betrieb/deploy-rollback-pruefung.diff` ist ein nicht angewendeter Vorschlag; der Workflow bleibt unverändert.
+Der aktuelle Workflow wartet nach einem Deploy bis zu zehn Minuten auf gesunde Container `api`, `db` und `kc` und
+rollt bei einem Deploy-Fehler auf die Vorgänger-Images zurück. Der Entwurf ergänzt die Prüfung des Rollback-Ausgangs:
+fehlender Vorgänger oder fehlgeschlagener Rollback sollen einen fehlgeschlagenen Schritt ergeben; nach erfolgreichem
+Rollback prüft `pruefe-container.py` erneut den Zustand aller drei Container und meldet, wenn sie nicht gesund werden.
+Das prüft weder öffentliche Routen noch Anmeldung oder Datenintegrität.
+
+Der Rollback verwendet weiterhin die aktuelle Compose-Datei: Labels und Konfiguration kehren nicht zurück. Ebenso
+wird das Datenbankschema nicht zurückgesetzt. Ist das Schema neuer als das Vorgänger-Image, kann dieses trotz
+Rollback nicht starten; automatisches Zurückrollen der Datenbank wäre ein separates, potenziell verlustreiches
+Verfahren und ist nicht Teil des Entwurfs. Bei fehlgeschlagener Nachprüfung muss Fabian den Zustand prüfen.
+
 ### Umsetzung (Folgeauftrag 1.10 Testdaten, 27.11.2026)
 
 `tools/last/testdaten_erzeugen.py` erzeugt lokal und ohne Netzwerk einen

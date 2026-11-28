@@ -1,0 +1,43 @@
+diff --git a/.github/workflows/infomaniak-deploy.yml b/.github/workflows/infomaniak-deploy.yml
+--- a/.github/workflows/infomaniak-deploy.yml
++++ b/.github/workflows/infomaniak-deploy.yml
+@@ -353,2 +353,3 @@
+       - name: Rollback
++        id: rollback
+         # Nur wenn der Server den neuen Stand übernommen hat: entweder lief der Deploy durch, oder compose hat
+@@ -374,6 +375,9 @@
+             echo "::error::Deploy fehlgeschlagen; erster Deploy: kein Rollback möglich (kein Vorgänger-Stand). Fabian informieren; er prüft oder stoppt die Archiv-Dienste auf der VPS."
++            exit 1
+           elif [ "$rc" -ne 0 ]; then
+             echo "::error::Deploy fehlgeschlagen, und der Rollback ist ebenfalls fehlgeschlagen (Exit $rc). Fabian informieren, Zustand auf der VPS prüfen."
++            exit 1
+           else
+             echo "::error::Deploy fehlgeschlagen, Rollback auf den Vorgänger-Stand ausgeführt."
++            printf 'ausgefuehrt=true\n' >> "$GITHUB_OUTPUT"
+           fi
+@@ -382,3 +386,24 @@
++      - name: Zustand nach Rollback prüfen
++        if: always() && steps.rollback.outputs.ausgefuehrt == 'true'
++        env:
++          HOST: ${{ vars.INFOMANIAK_HOST }}
++        run: |
++          umask 077
++          for _ in $(seq 1 40); do
++            ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null > rollback-status.txt || true
++            if python3 .github/scripts/pruefe-container.py gesund "$RUNNER_TEMP/rollback-container.json" \
++                < rollback-status.txt > rollback-stand.txt; then
++              cat rollback-stand.txt
++              rm -f rollback-status.txt rollback-stand.txt "$RUNNER_TEMP/rollback-container.json"
++              exit 0
++            fi
++            sleep 15
++          done
++          cat rollback-stand.txt
++          echo "::error::Rollback ausgeführt, aber api, db und kc sind danach nicht alle healthy. Fabian muss den Zustand prüfen."
++          rm -f rollback-status.txt rollback-stand.txt "$RUNNER_TEMP/rollback-container.json"
++          exit 1
++
+       - name: Aufräumen
+         if: always()
+-        run: rm -rf ~/.ssh/deploy bundle deploy.log rollback.log status.txt stand.txt "$RUNNER_TEMP/container.json"
++        run: rm -rf ~/.ssh/deploy bundle deploy.log rollback.log status.txt stand.txt rollback-status.txt rollback-stand.txt "$RUNNER_TEMP/container.json" "$RUNNER_TEMP/rollback-container.json"
