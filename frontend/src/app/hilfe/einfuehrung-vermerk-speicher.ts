@@ -82,21 +82,32 @@ export function vermerkAblegen(speicher: Storage | null, vermerk: Vermerk): bool
 }
 
 /**
- * Entfernt nur den Vermerk dieser Kennung (Spec 06, Req 11.9); Vermerke anderer bleiben, ein unlesbarer Wert bleibt
- * unberührt. Ohne weitere Vermerke entfällt der Schlüssel. Liefert `false`, wenn der Browser nicht speichert.
+ * Entfernt nur die Einträge dieser Kennung (Spec 06, Req 11.9); alle übrigen Einträge bleiben unverändert erhalten, auch
+ * unlesbare, ebenso ein unlesbarer Wert. Ohne weitere Einträge entfällt der Schlüssel. Liefert `false`, wenn der Browser
+ * nicht speichert oder das Schreiben scheitert.
  */
 export function vermerkEntfernen(speicher: Storage | null, k: string): boolean {
   if (!speicher) {
     return false;
   }
-  const alle = vermerkeLesen(speicher);
-  if (!alle.some((e) => e.k === k)) {
+  let inhalt: Record<string, unknown>;
+  try {
+    inhalt = objekt(JSON.parse(speicher.getItem(VERMERK_SCHLUESSEL) ?? 'null'));
+  } catch {
+    // Fehlender oder unlesbarer Wert: kein eigener Vermerk, nichts zu tun
     return true;
   }
-  const uebrig = alle.filter((e) => e.k !== k);
+  const eintraege = inhalt['v'] === FORMAT ? inhalt['eintraege'] : undefined;
+  if (!Array.isArray(eintraege)) {
+    return true;
+  }
+  const uebrig = eintraege.filter((e) => objekt(e)['k'] !== k);
+  if (uebrig.length === eintraege.length) {
+    return true;
+  }
   try {
     if (uebrig.length > 0) {
-      speicher.setItem(VERMERK_SCHLUESSEL, JSON.stringify({ v: FORMAT, eintraege: uebrig }));
+      speicher.setItem(VERMERK_SCHLUESSEL, JSON.stringify({ ...inhalt, eintraege: uebrig }));
     } else {
       speicher.removeItem(VERMERK_SCHLUESSEL);
     }

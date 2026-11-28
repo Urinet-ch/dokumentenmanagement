@@ -52,10 +52,12 @@ if [[ $bereit != true ]]; then
 fi
 
 "$temp/kcadm" create realms -s realm=urinet-archiv -s enabled=true >/dev/null
-# Benutzerprofil wie im Export, aber mit dem Stand vor 26.2: Vor- und Nachname für admin und user änderbar
+# Benutzerprofil wie im Export, aber mit dem Stand vor 26.2: Vorname für admin und user änderbar. Der Nachname ist hier
+# strenger als im Export (für niemanden änderbar): Die Vorlage darf ihn nicht erweitern.
 jq -r '.components["org.keycloak.userprofile.UserProfileProvider"][0].config["kc.user.profile.config"][0]' \
   "$root/deploy/keycloak/realm-export.json" |
-  jq '.attributes |= map(if .name == "firstName" or .name == "lastName" then .permissions.edit = ["admin", "user"] else . end)' \
+  jq '.attributes |= map(if .name == "firstName" then .permissions.edit = ["admin", "user"]
+    elif .name == "lastName" then .permissions.edit = [] else . end)' \
   > "$temp/profil-alt.json"
 "$temp/kcadm" update users/profile -r urinet-archiv -f "$temp/profil-alt.json" >/dev/null
 
@@ -65,13 +67,15 @@ status=0
 bash "$vorlage" --pruefen >"$temp/pruefen.log" || status=$?
 [[ $status == 10 ]] || { echo "Prüflauf vor dem Einrichten: Exit $status statt 10." >&2; exit 1; }
 # Ein neu angelegter Realm hat idp_link aktiv (der importierte Export nicht): beides meldet der Prüflauf
-grep -q 'firstName lastName idp_link' "$temp/pruefen.log"
+grep -q 'offen: firstName idp_link$' "$temp/pruefen.log"
 bash "$vorlage" >/dev/null
 bash "$vorlage" --pruefen >/dev/null
 bash "$vorlage" | grep -q 'nichts zu tun'
 "$temp/kcadm" get users/profile -r urinet-archiv > "$temp/profil.json"
 jq -e 'all(.attributes[] | select(.name == "username" or .name == "email" or .name == "firstName"
-  or .name == "lastName" or .name == "mandant"); .permissions.edit == ["admin"])' "$temp/profil.json" >/dev/null
+  or .name == "mandant"); .permissions.edit == ["admin"])' "$temp/profil.json" >/dev/null
+# Strengere Rechte bleiben unverändert
+jq -e '.attributes[] | select(.name == "lastName") | .permissions.edit == []' "$temp/profil.json" >/dev/null
 "$temp/kcadm" get authentication/required-actions -r urinet-archiv |
   jq -e 'all(.[]; .alias != "idp_link" or (.enabled | not))' >/dev/null
 # Ansehen bleibt erlaubt: Die Seite «Mein Konto» und die Kontoverwaltung zeigen Name und E-Mail weiter an

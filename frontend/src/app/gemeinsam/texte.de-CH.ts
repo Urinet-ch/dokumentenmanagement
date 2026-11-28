@@ -36,7 +36,9 @@ export const TEXTE = {
     suchePlatzhalter: 'Dokumente, Belegnummern, Partner suchen …',
     hell: 'Helles Farbschema verwenden',
     dunkel: 'Dunkles Farbschema verwenden',
-    konto: 'Mein Konto',
+    // Nur für Screenreader vor dem sichtbaren Namen: zugänglicher Name mit Benutzername (Spec 06, Req 11.1)
+    kontoName: (benutzername: string | null | undefined) =>
+      benutzername ? `Mein Konto (${benutzername}): ` : 'Mein Konto: ',
     rollen: {
       inhaber: 'Inhaber',
       geschaeftsstelle: 'Geschäftsstelle',
@@ -394,6 +396,8 @@ export const TEXTE = {
     titel: 'Mein Konto',
     vorzeile: 'Persönlich',
     untertitel: 'Ihre Angaben, Ihre Anmeldung und Ihre Einstellungen auf diesem Gerät.',
+    abgelaufen:
+      'Ihre Sitzung ist abgelaufen. Darstellung, «Dieses Gerät» und «Abmelden» bleiben hier nutzbar; Ihre Angaben und die Anmeldung erscheinen nach der nächsten Anmeldung.',
     person: {
       titel: 'Angaben zur Person',
       name: 'Name',
@@ -430,12 +434,13 @@ export const TEXTE = {
     },
     geraet: {
       titel: 'Dieses Gerät',
+      // Gezählt wie die Liste in «Erfassen»: eigene Aufnahmen und solche, die ohne Anmeldung aufgenommen wurden
       aufnahmen: (anzahl: number) =>
         anzahl === 0
-          ? 'Auf diesem Gerät wartet keine Aufnahme von Ihnen auf den Upload.'
+          ? 'Auf diesem Gerät wartet keine Aufnahme von Ihnen oder ohne Anmeldung auf den Upload.'
           : anzahl === 1
-            ? '1 Aufnahme von Ihnen wartet auf diesem Gerät auf den Upload oder wurde nicht hochgeladen.'
-            : `${anzahl} Aufnahmen von Ihnen warten auf diesem Gerät auf den Upload oder wurden nicht hochgeladen.`,
+            ? '1 Aufnahme (von Ihnen oder ohne Anmeldung aufgenommen) wartet auf diesem Gerät auf den Upload oder wurde nicht hochgeladen.'
+            : `${anzahl} Aufnahmen (von Ihnen oder ohne Anmeldung aufgenommen) warten auf diesem Gerät auf den Upload oder wurden nicht hochgeladen.`,
       zurListe: 'Zur Warteschlange in «Erfassen»',
       entfernen: 'Lokale Einstellungen entfernen',
       frage:
@@ -443,6 +448,8 @@ export const TEXTE = {
       bestaetigen: 'Entfernen',
       abbrechen: 'Abbrechen',
       entfernt: 'Die lokalen Einstellungen wurden entfernt.',
+      fehler:
+        'Die lokalen Einstellungen konnten nicht vollständig entfernt werden, weil der Browser den Speicher nicht freigibt. Bitte versuchen Sie es erneut oder löschen Sie die Website-Daten in den Einstellungen des Browsers.',
     },
     abmelden: {
       hinweis: 'Melden Sie sich auf einem Gerät, das auch andere benutzen, nach der Arbeit immer ab.',

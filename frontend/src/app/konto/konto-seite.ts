@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { WarteschlangeService } from '../erfassen/handy/warteschlange/warteschlange.service';
-import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { AnmeldungService, Benutzer } from '../gemeinsam/anmeldung/anmeldung.service';
+import { darf } from '../gemeinsam/anmeldung/rechte';
 import { kontoverwaltungEinstiege } from '../gemeinsam/anmeldung/kontoverwaltung';
 import { Farbschema, FarbschemaService } from '../gemeinsam/farbschema';
 import { ONLINE } from '../gemeinsam/online';
@@ -15,7 +16,9 @@ import { LokaleEinstellungen } from './lokale-einstellungen';
 /**
  * Seite «Mein Konto» (`/konto`, Spec 06, Requirement 11): Angaben aus dem Token, Einstiege in die Kontoverwaltung von
  * Keycloak, Darstellung, Einführung, «Dieses Gerät» und Abmelden. Keine Anfrage an die API und nichts Neues auf dem
- * Server (Req 11.12); offline bleiben Darstellung, «Dieses Gerät» und «Abmelden» nutzbar (Req 11.11).
+ * Server (Req 11.12); offline bleiben Darstellung, «Dieses Gerät» und «Abmelden» nutzbar (Req 11.11), auch wenn die
+ * Sitzung dabei abläuft: Dann zeigt die Seite keine Angaben und keine Einstiege mehr, «Dieses Gerät» gilt weiter für den
+ * zuletzt angemeldeten Benutzer (nur im Arbeitsspeicher, wie die Warteschlange).
  */
 @Component({
   selector: 'app-konto-seite',
@@ -37,11 +40,21 @@ export class KontoSeite {
   private readonly abmeldung = inject(Abmeldung);
   private readonly lokaleEinstellungen = inject(LokaleEinstellungen);
 
-  protected readonly benutzer = this.anmeldung.benutzer;
+  protected readonly angemeldet = this.anmeldung.angemeldet;
+  /** Zuletzt angemeldeter Benutzer; gilt weiter, solange die Sitzung nur abgelaufen ist (nur Arbeitsspeicher). */
+  private readonly zuletzt = signal<Benutzer | null>(this.anmeldung.benutzer());
+  /** Angaben zur Person nur mit gültiger Anmeldung (Req 11.3). */
+  protected readonly benutzer = computed(() => (this.anmeldung.angemeldet() ? this.anmeldung.benutzer() : null));
   /** Einführung und Anleitung nur mit Mandant und Rolle (Req 11.7, wie Spec 07, 5.5). */
   protected readonly mitRolle = computed(() => !!this.benutzer()?.mandant && !!this.benutzer()?.rolle);
-  /** Die bestehende Liste liegt in «Erfassen» (Recht A1). */
-  protected readonly darfErfassen = computed(() => this.anmeldung.darf('A1'));
+  /**
+   * Zähler und Link zur Liste nur mit Mandant und Recht A1, wie die Liste in «Erfassen» (Req 11.8); nach Ablauf der
+   * Sitzung für den zuletzt angemeldeten Benutzer, wie die Warteschlange selbst.
+   */
+  protected readonly darfErfassen = computed(() => {
+    const benutzer = this.zuletzt();
+    return !!benutzer?.mandant && darf(benutzer.rolle, 'A1') && this.anmeldung.zustand() !== 'abgemeldet';
+  });
   /** Eigene Aufnahmen und solche ohne Benutzer, wie die Liste in «Erfassen»; nie die anderer (Req 11.8). */
   protected readonly aufnahmen = computed(() => this.warteschlange.eintraege().length);
 
@@ -61,17 +74,26 @@ export class KontoSeite {
   ];
 
   protected readonly frageOffen = signal(false);
-  protected readonly entfernt = signal(false);
+  protected readonly ergebnis = signal<'entfernt' | 'fehler' | null>(null);
+
+  constructor() {
+    effect(() => {
+      const benutzer = this.anmeldung.benutzer();
+      if (benutzer && this.anmeldung.angemeldet()) {
+        this.zuletzt.set(benutzer);
+      }
+    });
+  }
 
   protected fragen(): void {
-    this.entfernt.set(false);
+    this.ergebnis.set(null);
     this.frageOffen.set(true);
   }
 
   protected async entfernen(): Promise<void> {
-    await this.lokaleEinstellungen.entfernen();
+    const erfolg = await this.lokaleEinstellungen.entfernen(this.zuletzt());
     this.frageOffen.set(false);
-    this.entfernt.set(true);
+    this.ergebnis.set(erfolg ? 'entfernt' : 'fehler');
   }
 
   protected abmelden(): void {

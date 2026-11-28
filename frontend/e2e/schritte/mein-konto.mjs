@@ -58,16 +58,24 @@ Given(/^im Browser ist das Farbschema «(hell|dunkel)» gespeichert$/, async fun
 });
 
 When('ich «Mein Konto» in der Kopfzeile wähle', async function () {
-  await this.seite.locator('header.kopf').getByRole('link', { name: KONTO }).click();
-  await this.seite.waitForURL((url) => url.pathname === '/konto');
-  await seiteKonto(this).locator('h1').waitFor();
-  // Ab hier: jede Anfrage an die API, die Daten senden würde (Req 11.12)
+  // Schon vor der Navigation: jede Anfrage an die API, die Daten senden würde (Req 11.12)
   this.kontoSchreibend = [];
   this.seite.on('request', (anfrage) => {
     if (new URL(anfrage.url()).pathname.startsWith('/api/') && anfrage.method() !== 'GET') {
       this.kontoSchreibend.push(`${anfrage.method()} ${new URL(anfrage.url()).pathname}`);
     }
   });
+  await this.seite.locator('header.kopf').getByRole('link', { name: KONTO }).click();
+  await this.seite.waitForURL((url) => url.pathname === '/konto');
+  await seiteKonto(this).locator('h1').waitFor();
+});
+
+Then('meldet «Mein Konto» die abgelaufene Sitzung und zeigt keine Angaben mehr', { timeout: 40_000 }, async function () {
+  await seiteKonto(this).locator('[data-test=konto-abgelaufen]').waitFor({ timeout: 30_000 });
+  for (const titel of ['Angaben zur Person', 'Anmeldung und Sicherheit', 'Hilfe und Einführung']) {
+    assert.equal(await seiteKonto(this).getByRole('heading', { name: titel, exact: true }).count(), 0, titel);
+  }
+  assert.equal(await seiteKonto(this).getByText(this.keycloak.benutzer.name).count(), 0, 'Name sichtbar');
 });
 
 When('ich mich unter «Mein Konto» abmelde', async function () {
@@ -273,4 +281,21 @@ Then('sind nur meine lokalen Einstellungen entfernt', async function () {
 Then('bin ich weiterhin angemeldet', async function () {
   await this.seite.locator('header.kopf').getByRole('link', { name: KONTO }).waitFor();
   assert.equal(this.keycloak.abmeldungen.length, 0);
+});
+
+When('das Gerät sofort offline geht', async function () {
+  // Die Keycloak-Attrappe antwortet über eine Route auch offline; wie im echten Netz scheitert die Erneuerung hier
+  await this.kontext.route(`${AUSSTELLER}/**`, (route) => route.abort('internetdisconnected'));
+  await this.kontext.setOffline(true);
+});
+
+Then(/^ist die Seite «\/konto» als Ziel nach der Anmeldung gemerkt$/, async function () {
+  await this.seite.waitForURL((url) => url.pathname === '/' && url.searchParams.get('ziel') === '/konto');
+});
+
+Then('zeigt «Dieses Gerät» keinen Zähler und keinen Link zur Warteschlange', async function () {
+  const karte = abschnitt(this, 'Dieses Gerät');
+  await karte.getByRole('button', { name: 'Lokale Einstellungen entfernen', exact: true }).waitFor();
+  assert.equal(await karte.locator('[data-test=konto-aufnahmen]').count(), 0);
+  assert.equal(await karte.getByRole('link').count(), 0);
 });

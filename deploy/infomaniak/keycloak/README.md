@@ -311,11 +311,12 @@ Die Zeilen sind sinngemäss wiedergegeben (Zeit, Typ, Benutzerkennung, Client); 
 
 ## Kontoverwaltung einschränken (Aufgabe 26.2)
 Spec 06, Req 11.5: In der Kontoverwaltung ändert ein Benutzer weder Benutzername, Name, E-Mail noch Mandant und verknüpft kein
-Google-Konto. Der Realm-Export regelt das seit 26.2 selbst (Vor- und Nachname nur für `admin` änderbar; die Pflichtaktion
+Google-Konto (eine bestehende Verknüpfung darf er lösen, entschieden von Fabian am 28.11.2026). Der Realm-Export regelt das seit 26.2 selbst (Vor- und Nachname nur für `admin` änderbar; die Pflichtaktion
 `idp_link` fehlt im Export). Ein früher importierter Realm zieht es mit
-[`konto-einschraenken-vorlage.sh`](./konto-einschraenken-vorlage.sh) nach: Sie setzt im Benutzerprofil die Bearbeitungsrechte
-von `firstName` und `lastName` auf `["admin"]` (Ansehen bleibt) und schaltet `idp_link` ab, falls aktiv. Sind Benutzername,
-E-Mail oder Mandant für Benutzer änderbar oder fehlt ein Attribut, bricht sie ab (Exit 1), statt mehr zu ändern.
+[`konto-einschraenken-vorlage.sh`](./konto-einschraenken-vorlage.sh) nach: Sie entfernt im Benutzerprofil bei `firstName` und
+`lastName` nur `user` aus den Bearbeitungsrechten (übrige und strengere Rechte sowie Ansehen bleiben) und schaltet `idp_link`
+ab, falls aktiv. Sind Benutzername, E-Mail oder Mandant für `user` änderbar oder fehlt ein Attribut, bricht sie ab (Exit 1),
+statt mehr zu ändern.
 `--pruefen` liest nur (Exit 0 nichts zu tun, 10 Änderungen nötig). Nach dem Einrichten prüft sie sich im selben Lauf nach.
 
 Ablegen und Aufruf wie bei den anderen Vorlagen (Prüfsumme aus dem PR-Text, `chmod -R a+rX /opt/archiv-werkzeuge`), zuerst mit
@@ -332,8 +333,8 @@ echo "Exit: $?"
 ```
 Test: `bash deploy/infomaniak/keycloak/test/konto-einschraenken-keycloak-test.sh` (Wegwerf-Keycloak, nicht in der CI). Die Wirkung
 in der Kontoverwaltung belegt `RealmExportKeycloakTest` gegen den Export (Abschnitt «Umsetzung (Aufgabe 26.2 …)» in Spec 06,
-design.md). **Nicht abgedeckt:** Das Lösen einer bestehenden Google-Verknüpfung über die Kontoverwaltung erlaubt Keycloak 26.8
-jedem Benutzer mit `manage-account`; eine Einstellung im Realm dagegen gibt es nicht (siehe dort).
+design.md). Das Lösen einer bestehenden Google-Verknüpfung erlaubt Keycloak 26.8 jedem Benutzer mit `manage-account`; das ist
+so gewollt (Spec 01, 2.27, entschieden von Fabian am 28.11.2026) und erscheint als `REMOVE_FEDERATED_IDENTITY` im Ereignisprotokoll.
 
 ## Nachbesserung Review (PR #334)
 

@@ -345,13 +345,13 @@ auf Server oder Secrets aus der Sitzung.
   - Nachweis 28.11.2026: `konto-seite.spec.ts`, `abmeldung.spec.ts`, `app.spec.ts`; `features/verwaltung/mein-konto-pwa.feature`
     (design.md, «Umsetzung (Aufgabe 26.1, 28.11.2026)»).
   - _Anforderungen: 11.1–11.3, 11.6, 11.7, 11.10–11.12_
-- [ ] 26.2 Anmeldung und Sicherheit [Frontend] [Backend] [Infra]
+- [x] 26.2 Anmeldung und Sicherheit [Frontend] [Backend] [Infra]
   - Pfade der Kontoverwaltung gegen ein Wegwerf-Keycloak prüfen, Einschränkungen im Realm-Export, Nachweis nach 11.5.
-  - Stand 28.11.2026 (bleibt offen): Pfade geprüft und Einstiege umgesetzt (11.4, Szenario `@req-11.4`); Vor- und Nachname
-    nur noch für `admin` änderbar, `idp_link` nicht aktiv, Einmalcode-Pflicht nach dem Entfernen belegt (`RealmExportKeycloakTest`,
-    `kontoverwaltung-pwa.feature` mit `@teilnachweis-11.5`, Vorlage `konto-einschraenken-vorlage.sh` für Stufe A). Offen:
-    Keycloak 26.8 lässt jeden Benutzer mit `manage-account` eine Google-Verknüpfung lösen; Entscheid Fabian zum Weg
-    (design.md, «Umsetzung (Aufgabe 26.2, 28.11.2026)»), danach Lauf der Vorlage auf Stufe A.
+  - Nachweis 28.11.2026: Pfade geprüft und Einstiege umgesetzt (11.4, Szenario `@req-11.4`); Vor- und Nachname nur noch für
+    `admin` änderbar, `idp_link` nicht aktiv, Lösen einer Google-Verknüpfung erlaubt und protokolliert (Entscheid Fabian
+    28.11.2026, 11.5 und Spec 01, 2.27 angepasst), Einmalcode-Pflicht nach dem Entfernen belegt (`RealmExportKeycloakTest`,
+    `kontoverwaltung-pwa.feature` mit `@req-11.5`). Offen nur der Betrieb: Lauf von `konto-einschraenken-vorlage.sh` auf
+    Stufe A ([Fabian], README «Kontoverwaltung einschränken»); design.md, «Umsetzung (Aufgabe 26.2, 28.11.2026)».
   - _Anforderungen: 11.4, 11.5_
   - _Abhängig von: 26.1_
 - [x] 26.3 Dieses Gerät [Frontend]

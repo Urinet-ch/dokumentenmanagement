@@ -115,23 +115,21 @@ export class EinfuehrungVermerk {
   }
 
   /**
-   * Entfernt den Vermerk des angemeldeten Benutzers in diesem Browser (Spec 06, Req 11.9), auch ohne Rolle; danach gilt
-   * er wieder als neu. Vermerke anderer Benutzer bleiben.
+   * Entfernt den Vermerk dieser Person (Standard: der angemeldete Benutzer) in diesem Browser (Spec 06, Req 11.9), auch
+   * ohne Rolle; danach gilt sie wieder als neu. Vermerke anderer bleiben. Liefert `false`, wenn das Entfernen scheitert.
    */
-  async entfernen(): Promise<void> {
-    const benutzer = this.anmeldung.benutzer();
-    if (!this.anmeldung.angemeldet() || !benutzer?.id || !benutzer.mandant) {
-      return;
+  async entfernen(wer: { id: string; mandant: string | null } | null = this.anmeldung.benutzer()): Promise<boolean> {
+    if (!wer?.id || !wer.mandant) {
+      return true;
     }
-    const person: Person = { mandant: benutzer.mandant, sub: benutzer.id };
+    const person: Person = { mandant: wer.mandant, sub: wer.id };
     this.sitzung.delete(schluessel(person));
     if (this.gelesen()?.person === schluessel(person)) {
       this.gelesen.set({ person: schluessel(person), bekannt: false });
     }
     const k = await vermerkKennung(person.mandant, person.sub, this.subtle());
-    if (k) {
-      vermerkEntfernen(this.speicher(), k);
-    }
+    // Ohne Kennung (kein sicherer Kontext) legt dieser Browser auch keinen Vermerk ab (Spec 07, Req 1.5)
+    return k ? vermerkEntfernen(this.speicher(), k) : true;
   }
 
   private async nachsehen(person: Person): Promise<void> {

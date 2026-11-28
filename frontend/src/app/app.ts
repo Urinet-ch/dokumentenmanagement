@@ -135,10 +135,15 @@ export class App {
     );
     // Abgelaufene Sitzung: zurück zur Startseite, dort stehen der Hinweis und «Anmelden»; die Seite bleibt als Ziel.
     // «Erfassen» zeigt beides selbst und sichert vor der Anmeldung die aufgenommenen Seiten (Req 4.4).
+    // «Mein Konto» bleibt offline stehen (Spec 06, Req 11.11: Darstellung, «Dieses Gerät», «Abmelden»), ohne Angaben;
+    // sobald das Gerät wieder online ist, geht es wie bei den übrigen Seiten zur Anmeldung.
     effect(() => {
       if (this.anmeldung.zustand() === 'abgelaufen') {
         const ziel = untracked(() => this.router.url);
         if (ziel === '/erfassen' || ziel.startsWith('/erfassen?')) {
+          return;
+        }
+        if (aktiverPfad(ziel, ['/konto']) && !this.online()) {
           return;
         }
         const queryParams = ziel.startsWith('/?') || ziel === '/' ? {} : { ziel };

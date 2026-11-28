@@ -507,7 +507,8 @@ class RealmExportKeycloakTest {
 
     /**
      * Spec 06, Req 11.5: Die Kontoverwaltung ändert weder Benutzername, Name, E-Mail noch Mandant, verknüpft kein
-     * Google-Konto, und ohne Einmalcode verlangt die nächste Anmeldung mit Passwort dessen neue Einrichtung. Der
+     * Google-Konto (eine bestehende Verknüpfung darf der Benutzer lösen, protokolliert), und ohne Einmalcode verlangt die
+     * nächste Anmeldung mit Passwort dessen neue Einrichtung. Der
      * Probe-Client hat dieselbe Rollenzuordnung wie {@code account-console}, damit das Token dieselben Rechte trägt.
      */
     @Test
@@ -567,6 +568,19 @@ class RealmExportKeycloakTest {
             assertThat(verknuepfen.statusCode()).isNotEqualTo(200);
             assertThat(adminGet(REALM + "/authentication/required-actions").jsonPath().<Map<String, Object>>getList("$"))
                     .noneMatch(aktion -> "idp_link".equals(aktion.get("alias")) && Boolean.TRUE.equals(aktion.get("enabled")));
+
+            // Eine bestehende Verknüpfung darf der Benutzer selbst lösen (Spec 01, 2.27, entschieden von Fabian am
+            // 28.11.2026); Keycloak hält das im Ereignisprotokoll fest
+            given().auth().oauth2(admin).contentType(ContentType.JSON)
+                    .body(Map.of("identityProvider", "google", "userId", "google-konto-probe", "userName", benutzer))
+                    .post(ExportKeycloak.basisUrl + REALM + "/users/{id}/federated-identity/google", id)
+                    .then().statusCode(204);
+            given().auth().oauth2(token).accept(ContentType.JSON).delete(konto + "linked-accounts/google")
+                    .then().statusCode(204);
+            assertThat(adminGet(REALM + "/users/{id}/federated-identity", id).jsonPath().<Object>getList("$")).isEmpty();
+            assertThat(given().auth().oauth2(admin).queryParam("user", id).queryParam("type", "REMOVE_FEDERATED_IDENTITY")
+                    .get(ExportKeycloak.basisUrl + REALM + "/events").then().statusCode(200).extract().jsonPath()
+                    .<Object>getList("$")).hasSize(1);
 
             // Einmalcode entfernen: danach kein Token mit Passwort allein, die Anmeldung verlangt die neue Einrichtung
             String otp = adminGet(REALM + "/users/{id}/credentials", id).jsonPath()

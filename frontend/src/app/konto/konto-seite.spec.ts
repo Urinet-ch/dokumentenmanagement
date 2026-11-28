@@ -21,7 +21,7 @@ const T = TEXTE.konto;
 const ENTWURF = { art: '', titel: 'x', tags: [] } as unknown as Entwurf;
 
 class AnmeldungAttrappe {
-  readonly zustand = signal<'angemeldet' | 'abgemeldet'>('angemeldet');
+  readonly zustand = signal<'angemeldet' | 'abgemeldet' | 'abgelaufen'>('angemeldet');
   readonly angemeldet = computed(() => this.zustand() === 'angemeldet');
   readonly benutzer = signal<Benutzer | null>(null);
   darf(aktion: Aktion) {
@@ -166,11 +166,57 @@ describe('Mein Konto (Spec 06, Req 11)', () => {
     expect(element.querySelector('[data-test=konto-geraet] a')?.getAttribute('href')).toBe('/erfassen');
   });
 
-  it('zeigt ohne Recht A1 keinen Link zur Liste (Req 11.8)', async () => {
-    als('treuhaender');
+  it('zeigt ohne Recht A1 oder ohne Mandant weder Zähler noch Link (Req 11.8)', async () => {
+    eintraege.set([{ id: '1' }] as Eintrag[]);
+    for (const [rolle, mandant] of [['treuhaender', 'urinet'], ['mitarbeiter', null]] as [Rolle, string | null][]) {
+      als(rolle, mandant);
+      const element = await zeigen();
+      expect(element.querySelector('[data-test=konto-aufnahmen]'), `${rolle}/${mandant}`).toBeNull();
+      expect(element.querySelector('[data-test=konto-geraet] a')).toBeNull();
+      expect(element.querySelector('[data-test=konto-entfernen]')).not.toBeNull();
+    }
+  });
+
+  it('meldet einen Speicherfehler beim Entfernen statt Erfolg (Req 11.9)', async () => {
+    als('mitarbeiter');
+    localStorage.setItem('archiv.farbschema', 'dunkel');
     const element = await zeigen();
-    expect(text(element, 'konto-aufnahmen')).toBe(T.geraet.aufnahmen(0));
-    expect(element.querySelector('[data-test=konto-geraet] a')).toBeNull();
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('gesperrt');
+    });
+    element.querySelector<HTMLButtonElement>('[data-test=konto-entfernen]')!.click();
+    TestBed.tick();
+    element.querySelector<HTMLButtonElement>('[data-test=konto-entfernen-ja]')!.click();
+    await vi.waitFor(() => expect(element.querySelector('[data-test=konto-entfernen-fehler]')).not.toBeNull());
+    expect(text(element, 'konto-entfernen-fehler')).toBe(T.geraet.fehler);
+    expect(element.querySelector('[data-test=konto-entfernt]')).toBeNull();
+    vi.restoreAllMocks();
+  });
+
+  it('bleibt bei abgelaufener Sitzung ohne Angaben nutzbar: Darstellung, Dieses Gerät, Abmelden (Req 11.11)', async () => {
+    als('mitarbeiter');
+    eintraege.set([{ id: '1' }] as Eintrag[]);
+    TestBed.inject(EingangskorbEntwurfSpeicher).speichern(SUB, 'd1', ENTWURF, {});
+    const fixture = TestBed.createComponent(KontoSeite);
+    await fixture.whenStable();
+    anmeldung.zustand.set('abgelaufen');
+    anmeldung.benutzer.set(null);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(text(element, 'konto-abgelaufen')).toBe(T.abgelaufen);
+    for (const test of ['konto-person', 'konto-sicherheit', 'konto-hilfe']) {
+      expect(element.querySelector(`[data-test=${test}]`), test).toBeNull();
+    }
+    for (const test of ['konto-darstellung', 'konto-geraet', 'konto-abmelden']) {
+      expect(element.querySelector(`[data-test=${test}]`), test).not.toBeNull();
+    }
+    expect(text(element, 'konto-aufnahmen')).toBe(T.geraet.aufnahmen(1));
+    expect(element.textContent).not.toContain('Muster Hans');
+    element.querySelector<HTMLButtonElement>('[data-test=konto-entfernen]')!.click();
+    fixture.detectChanges();
+    element.querySelector<HTMLButtonElement>('[data-test=konto-entfernen-ja]')!.click();
+    await vi.waitFor(() => expect(element.querySelector('[data-test=konto-entfernt]')).not.toBeNull());
+    expect(sessionStorage.getItem(`archiv.eingangskorb.entwurf.v1:${SUB}:d1`)).toBeNull();
   });
 
   it('entfernt nach der Rückfrage genau die eigenen lokalen Einstellungen (Req 11.9)', async () => {

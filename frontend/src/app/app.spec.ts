@@ -30,7 +30,7 @@ class AnmeldungAttrappe {
     return this.angemeldet() && !!benutzer?.mandant && darf(benutzer.rolle, aktion);
   }
   als(rolle: Rolle | null, mandant: string | null = 'urinet') {
-    this.benutzer.set({ id: 'u', name: 'Test Benutzer', mandant, rolle });
+    this.benutzer.set({ id: 'u', name: 'Test Benutzer', mandant, rolle, benutzername: 'tbenutzer' });
     this.zustand.set('angemeldet');
   }
 }
@@ -259,7 +259,8 @@ describe('App (Req 2.6, 8.6)', () => {
     expect(link?.getAttribute('href')).toBe('/konto');
     // Zugänglicher Name ohne aria-label: «Mein Konto: » für Screenreader, dann der sichtbare Name (WCAG 2.5.3)
     expect(link?.hasAttribute('aria-label')).toBe(false);
-    expect(link?.querySelector('.nur-screenreader')?.textContent).toBe(`${TEXTE.kopf.konto}: `);
+    expect(link?.querySelector('.nur-screenreader')?.textContent).toBe(TEXTE.kopf.kontoName('tbenutzer'));
+    expect(TEXTE.kopf.kontoName('tbenutzer')).toBe('Mein Konto (tbenutzer): ');
     expect(link?.querySelector('.wer')?.textContent).toContain('Test Benutzer');
     expect(link?.querySelector('.avatar')?.getAttribute('aria-hidden')).toBe('true');
     expect(link?.querySelector('.avatar')?.textContent?.trim()).toBe('TB');
@@ -343,6 +344,21 @@ describe('App (Req 2.6, 8.6)', () => {
     anmeldung.zustand.set('abgelaufen');
     await fixture.whenStable();
     expect(router.url).toBe('/?ziel=%2Fsuche');
+  });
+
+  it('bleibt bei abgelaufener Sitzung offline auf «Mein Konto» und geht online zur Anmeldung (Spec 06, Req 11.11)', async () => {
+    anmeldung.als('mitarbeiter');
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/konto');
+    await fixture.whenStable();
+    online.set(false);
+    anmeldung.zustand.set('abgelaufen');
+    await fixture.whenStable();
+    expect(router.url).toBe('/konto');
+    online.set(true);
+    await fixture.whenStable();
+    expect(router.url).toBe('/?ziel=%2Fkonto');
   });
 
   it('bleibt bei abgelaufener Sitzung auf «Erfassen», damit aufgenommene Seiten nicht verloren gehen', async () => {

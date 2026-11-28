@@ -160,8 +160,8 @@
             [attr.aria-current]="aufKonto() ? 'page' : null"
           >
             <span class="avatar" aria-hidden="true">{{ initialen(benutzer.name) }}</span>
-            <!-- Zugänglicher Name «Mein Konto: <Name> …» enthält den sichtbaren Text (WCAG 2.5.3) -->
-            <span class="nur-screenreader">{{ texte.kopf.konto }}: </span>
+            <!-- Zugänglicher Name «Mein Konto (<Benutzername>): <Name> …» enthält den sichtbaren Text (WCAG 2.5.3) -->
+            <span class="nur-screenreader">{{ texte.kopf.kontoName(benutzer.benutzername) }}</span>
             <span class="wer">
               {{ benutzer.name }}
               <small>

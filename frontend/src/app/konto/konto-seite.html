@@ -6,10 +6,17 @@
   </div>
 </div>
 
+@if (!angemeldet()) {
+  <div class="hinweis warnung" role="status" data-test="konto-abgelaufen">
+    <app-symbol name="warnung" />
+    <p>{{ texte.abgelaufen }}</p>
+  </div>
+}
+
 <div class="raster">
-  <section class="karte" aria-labelledby="konto-person" data-test="konto-person">
-    <h2 id="konto-person">{{ texte.person.titel }}</h2>
-    @if (benutzer(); as person) {
+  @if (benutzer(); as person) {
+    <section class="karte" aria-labelledby="konto-person" data-test="konto-person">
+      <h2 id="konto-person">{{ texte.person.titel }}</h2>
       <dl>
         @if (person.name) {
           <dt>{{ texte.person.name }}</dt><dd><bdi>{{ person.name }}</bdi></dd>
@@ -27,11 +34,11 @@
           <dt>{{ texte.person.mandant }}</dt><dd><bdi>{{ person.mandant }}</bdi></dd>
         }
       </dl>
-    }
-    <p class="nebentext">{{ texte.person.hinweis }}</p>
-  </section>
+      <p class="nebentext">{{ texte.person.hinweis }}</p>
+    </section>
+  }
 
-  @if (einstiege; as liste) {
+  @if (angemeldet() && einstiege; as liste) {
     <section class="karte" aria-labelledby="konto-sicherheit" data-test="konto-sicherheit">
       <h2 id="konto-sicherheit">{{ texte.sicherheit.titel }}</h2>
       <p class="nebentext">{{ texte.sicherheit.hinweis }}</p>
@@ -96,8 +103,8 @@
 
   <section class="karte" aria-labelledby="konto-geraet" data-test="konto-geraet">
     <h2 id="konto-geraet">{{ texte.geraet.titel }}</h2>
-    <p data-test="konto-aufnahmen">{{ texte.geraet.aufnahmen(aufnahmen()) }}</p>
     @if (darfErfassen()) {
+      <p data-test="konto-aufnahmen">{{ texte.geraet.aufnahmen(aufnahmen()) }}</p>
       <p><a routerLink="/erfassen">{{ texte.geraet.zurListe }}</a></p>
     }
     @if (frageOffen()) {
@@ -112,8 +119,10 @@
     } @else {
       <button mat-button type="button" class="knopf-gefahr" data-test="konto-entfernen" (click)="fragen()">{{ texte.geraet.entfernen }}</button>
     }
-    @if (entfernt()) {
+    @if (ergebnis() === 'entfernt') {
       <p class="hinweis ok" role="status" data-test="konto-entfernt">{{ texte.geraet.entfernt }}</p>
+    } @else if (ergebnis() === 'fehler') {
+      <p class="hinweis gefahr" role="alert" data-test="konto-entfernen-fehler">{{ texte.geraet.fehler }}</p>
     }
   </section>
 

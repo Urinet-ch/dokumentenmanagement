@@ -508,3 +508,46 @@ Then(
     }
   },
 );
+
+Given('ein Admin hat sein Konto mit Google verknüpft', async function () {
+  const header = await adminHeader(new URL(this.passkey.adminUrl), 'Google verknüpfen');
+  const antwort = await fetch(`${this.passkey.adminUrl}/users/${this.passkey.id}/federated-identity/google`, {
+    method: 'POST',
+    headers: header,
+    body: JSON.stringify({ identityProvider: 'google', userId: `google-${this.passkey.name}`, userName: this.passkey.name }),
+  });
+  await pruefeAntwort(antwort, 204, 'Google verknüpfen');
+});
+
+async function googleVerknuepfungen(welt) {
+  const header = await adminHeader(new URL(welt.passkey.adminUrl), 'Verknüpfungen lesen');
+  const antwort = await fetch(`${welt.passkey.adminUrl}/users/${welt.passkey.id}/federated-identity`, { headers: header });
+  await pruefeAntwort(antwort, 200, 'Verknüpfungen lesen');
+  return (await antwort.json()).filter((v) => v.identityProvider === 'google');
+}
+
+Then('kann er die Google-Verknüpfung in der Kontoverwaltung selbst lösen', async function () {
+  assert.equal((await googleVerknuepfungen(this)).length, 1);
+  await pruefeAntwort(await konto(this, 'linked-accounts/google', { method: 'DELETE' }), 204, 'Verknüpfung lösen');
+  assert.equal((await googleVerknuepfungen(this)).length, 0);
+});
+
+Then('steht das Lösen im Ereignisprotokoll von Keycloak', async function () {
+  const header = await adminHeader(new URL(this.passkey.adminUrl), 'Ereignisse lesen');
+  const parameter = new URLSearchParams({ user: this.passkey.id, type: 'REMOVE_FEDERATED_IDENTITY' });
+  const antwort = await fetch(`${this.passkey.adminUrl}/events?${parameter}`, { headers: header });
+  await pruefeAntwort(antwort, 200, 'Ereignisse lesen');
+  assert.equal((await antwort.json()).length, 1);
+});
+
+Then(
+  /^zeigt die Kontoverwaltung unter «(.+)» die Bereiche «(.+)»$/,
+  { timeout: 60_000 },
+  async function (pfad, bereiche) {
+    await this.seite.goto(`${this.passkey.realm}/account/${pfad}`);
+    await this.seite.waitForURL((url) => url.pathname.endsWith(`/account/${pfad}`), { timeout: 30_000 });
+    for (const name of bereiche.split(', ')) {
+      await this.seite.getByRole('heading', { name, exact: true }).first().waitFor({ timeout: 30_000 });
+    }
+  },
+);

@@ -1231,7 +1231,8 @@ Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabia
     antwortet `400 error-user-attribute-read-only`.
   - Vor- und Nachname waren für Benutzer änderbar (`["admin", "user"]`, Review PR #88). Jetzt nur noch `admin` im Export und
     in `realm-test.json` (Ansehen bleibt). Bestehende Realms: `deploy/infomaniak/keycloak/konto-einschraenken-vorlage.sh`
-    (README «Kontoverwaltung einschränken»); der Lauf auf Stufe A steht aus. `NameAusAnmeldung` (Spec 01) nutzt weiter den
+    (README «Kontoverwaltung einschränken»); sie entfernt nur `user` aus den Bearbeitungsrechten und erweitert strengere
+    Rechte nie (Nachbesserung Review #743). Der Lauf auf Stufe A steht aus. `NameAusAnmeldung` (Spec 01) nutzt weiter den
     Benutzernamen, das bleibt richtig.
   - Rollen: Die Kontoverwaltung hat keine Schnittstelle dafür; das Token von `account-console` trägt nur `manage-account`
     und `view-profile`.
@@ -1239,20 +1240,20 @@ Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabia
     «Legacy client-initiated account linking is disabled»). Der neue Weg (`kc_action=idp_link:<alias>`) braucht die
     Pflichtaktion `idp_link`; der importierte Export registriert sie nicht, ein neu angelegter Realm hätte sie aktiv. Die
     Vorlage schaltet sie ab, die Tests prüfen, dass sie nicht aktiv ist.
-  - **Google lösen: nicht erfüllt.** `DELETE /account/linked-accounts/{alias}` verlangt in 26.8.2 nur `manage-account`
-    (geprüft am Bytecode von `LinkedAccountsResource.removeLinkedAccount`: Rolle, Verknüpfung vorhanden, nicht an eine
-    Organisation gebunden, nicht der letzte Anmeldeweg). Probe: `204`, die Verknüpfung ist weg, auch bei deaktiviertem
-    Google-Anbieter. Der Ausschluss von `manage-account-links` (Spec 01, 2.27) greift dafür nicht, eine Realm-Einstellung
-    dagegen gibt es nicht. Mögliche Wege, keiner umgesetzt: (a) Traefik-Regel gegen `DELETE …/account/linked-accounts/…`
-    (Traefik-Version und Pfad-Normalisierung der VPS nicht geprüft), (b) eigene Keycloak-Erweiterung (neuer Infra-Weg),
-    (c) `manage-account` entziehen (verhindert die Passkey-Verwaltung nach 10.1). Das Ereignis `REMOVE_FEDERATED_IDENTITY`
-    ist im Realm aktiv. Entscheid offen bei Fabian; Aufgabe 26.2 bleibt bis dahin offen.
+  - **Google lösen:** `DELETE /account/linked-accounts/{alias}` verlangt in 26.8.2 nur `manage-account` (geprüft am
+    Bytecode von `LinkedAccountsResource.removeLinkedAccount`: Rolle, Verknüpfung vorhanden, nicht an eine Organisation
+    gebunden, nicht der letzte Anmeldeweg); Probe: `204`, auch bei deaktiviertem Google-Anbieter. **Entscheid Fabian
+    28.11.2026:** Das Lösen durch den Benutzer selbst ist erlaubt (es entzieht nur einen Anmeldeweg; Passwort plus
+    Einmalcode bleiben), selbst verknüpfen bleibt ausgeschlossen; 11.5 und Spec 01, 2.27 sind angepasst. Keycloak hält das
+    Lösen als Benutzerereignis `REMOVE_FEDERATED_IDENTITY` fest (im Realm aktiv, Tests prüfen es). Die Sitzungen enden dabei
+    nicht von selbst; 2.27 verlangt das nur nach dem Lösen durch den Admin (Auslegung im PR).
   - Zweiter Faktor: Entfernt die Person den Einmalcode (Kontoverwaltung oder Account-REST), führt die nächste Anmeldung mit
     Passwort in die Pflichtaktion `CONFIGURE_TOTP`; ein Direct Grant ohne Code liefert kein Token. Die Pflichtaktion
     `delete_account` ist aus.
 - **Nachweis:** `RealmExportKeycloakTest#kontoverwaltungAendertKeineStammdatenUndVerlangtDenZweitenFaktor` (Export),
   `RealmExportTest#benutzerprofilBehaeltSeineBerechtigungen`, `features/verwaltung/kontoverwaltung-pwa.feature`
-  (`@teilnachweis-11.5`, Test-Realm, ohne «Google lösen»), `test/konto-einschraenken-keycloak-test.sh`.
+  (`@req-11.5`, Test-Realm, mit Lösen und Ereignis), `test/konto-einschraenken-keycloak-test.sh` (auch mit strengerem
+  Ausgangszustand).
 
 ## Umsetzung (Aufgabe 26.3, 28.11.2026)
 - **Dieses Gerät (11.8):** Die Zahl kommt aus `WarteschlangeService.eintraege()`, derselben Menge wie die Liste in
@@ -1275,3 +1276,21 @@ Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabia
   nach Spec 07, 7.1 unter `frontend/public/anleitung/`, nicht unter `docs/anleitung/` (gibt es nicht).
 - Angepasste Szenarien: Anmeldung wartet auf das Benutzerelement statt «Abmelden» (`anmeldung.mjs`,
   `einfuehrung-start.mjs`); «Abmelden» über «Mein Konto» (`anmeldung-pwa.feature`, `erfassen-handy-pwa.feature`).
+
+## Nachbesserung Review PR #743 (28.11.2026)
+- **11.5 und Spec 01, 2.27:** nach Entscheid Fabian 28.11.2026 angepasst (Lösen erlaubt, Verknüpfen nur durch den Admin);
+  `kontoverwaltung-pwa.feature` trägt `@req-11.5`, 26.2 ist abgehakt.
+- **Vorlage:** entfernt nur `user` aus den Bearbeitungsrechten von Vor- und Nachname; der Test beginnt mit einem strengeren
+  Nachnamen (für niemanden änderbar), der unverändert bleibt.
+- **Vermerk (11.9):** `vermerkEntfernen` entfernt nur Einträge mit der eigenen Kennung und lässt alle übrigen roh stehen,
+  auch unlesbare und weitere Felder des Werts.
+- **Zähler (11.8):** nur mit Mandant und Recht A1; der Text nennt, dass auch ohne Anmeldung aufgenommene Aufnahmen zählen.
+- **Ablauf offline (11.11):** Läuft die Sitzung ab, während «Mein Konto» offline offen ist, bleibt die Seite stehen
+  (`app.ts`, wie bei «Erfassen»), zeigt einen Hinweis und keine Angaben, Einstiege und Einführung mehr; Darstellung, «Dieses
+  Gerät» (für den zuletzt angemeldeten Benutzer, nur im Arbeitsspeicher wie die Warteschlange) und «Abmelden» bleiben.
+  Sobald das Gerät wieder online ist, geht es zur Anmeldung mit `/konto` als Ziel. Der Wächter bleibt unverändert: Nach dem
+  Neuladen gibt es keine Anmeldung mehr, `/konto` führt dann zur Anmeldung. «Abmelden» braucht für Keycloak eine Verbindung
+  (wie bisher in der Kopfzeile).
+- **Zugänglicher Name (11.1):** «Mein Konto (<Benutzername>): » vor dem sichtbaren Text.
+- **Fehler beim Entfernen (11.9):** Farbschema, Entwürfe, Erscheinungsbild und Vermerk melden Speicherfehler; die Seite
+  zeigt dann einen Fehlerhinweis statt der Erfolgsmeldung.

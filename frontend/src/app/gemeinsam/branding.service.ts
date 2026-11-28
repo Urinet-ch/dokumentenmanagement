@@ -107,13 +107,14 @@ export class BrandingService {
       });
   }
 
-  /** Entfernt das zwischengespeicherte Erscheinungsbild dieser Domain (Spec 06, Req 11.9); das angezeigte bleibt. */
-  zwischenspeicherEntfernen(): void {
+  /** Entfernt das zwischengespeicherte Erscheinungsbild dieser Domain (Spec 06, Req 11.9); `false` bei gesperrtem Speicher. */
+  zwischenspeicherEntfernen(): boolean {
     try {
       const fenster = this.dokument.defaultView;
       fenster?.localStorage.removeItem(SPEICHER + (fenster.location.hostname ?? ''));
+      return true;
     } catch {
-      // Speicher gesperrt: es gibt nichts zu entfernen.
+      return false;
     }
   }
 

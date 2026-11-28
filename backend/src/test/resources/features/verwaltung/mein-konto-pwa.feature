@@ -9,7 +9,7 @@ Funktionalität: Mein Konto
   Angenommen das Browserfenster ist <breite> Pixel breit
   Und das Farbschema ist «<schema>»
   Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
-  Dann zeigt die Kopfzeile rechts nur «Hilfe» und «Mein Konto: Test inhaber Inhaber · urinet»
+  Dann zeigt die Kopfzeile rechts nur «Hilfe» und «Mein Konto (test.inhaber): Test inhaber Inhaber · urinet»
   Und zeigt das Benutzerelement die Initialen «TI» und ab 960 px auch den Namen «Test inhaber»
   Wenn ich «Mein Konto» in der Kopfzeile wähle
   Dann ist das Benutzerelement als aktuelle Seite markiert
@@ -76,7 +76,7 @@ Funktionalität: Mein Konto
   Dann sind die Einstiege in die Kontoverwaltung deaktiviert und «Mein Konto» sagt warum
   Wenn ich unter «Darstellung» «Dunkel» wähle
   Dann gilt das Farbschema «dunkel» und ist nur im Browser gemerkt
-  Und zeigt «Mein Konto» «Auf diesem Gerät wartet keine Aufnahme von Ihnen auf den Upload.»
+  Und zeigt «Mein Konto» «Auf diesem Gerät wartet keine Aufnahme von Ihnen oder ohne Anmeldung auf den Upload.»
   Und ist auf «Mein Konto» der Knopf «Abmelden» bedienbar
 
  @req-11.6
@@ -114,14 +114,14 @@ Funktionalität: Mein Konto
   Und ich die Erfassung abschliesse
   Dann hat das Archiv einen Upload-Versuch erhalten
   Wenn ich «Mein Konto» in der Kopfzeile wähle
-  Dann zeigt «Mein Konto» «1 Aufnahme von Ihnen wartet auf diesem Gerät auf den Upload oder wurde nicht hochgeladen.»
+  Dann zeigt «Mein Konto» «1 Aufnahme (von Ihnen oder ohne Anmeldung aufgenommen) wartet auf diesem Gerät auf den Upload oder wurde nicht hochgeladen.»
   Und führt auf «Mein Konto» der Link zur Warteschlange zur Seite «/erfassen»
   Wenn ich mich unter «Mein Konto» abmelde
   Dann hat Keycloak die Abmeldung erhalten
   Angenommen Keycloak kennt mich als «mitarbeiter» im Mandanten «urinet»
   Wenn ich mich anmelde
   Und ich «Mein Konto» in der Kopfzeile wähle
-  Dann zeigt «Mein Konto» «Auf diesem Gerät wartet keine Aufnahme von Ihnen auf den Upload.»
+  Dann zeigt «Mein Konto» «Auf diesem Gerät wartet keine Aufnahme von Ihnen oder ohne Anmeldung auf den Upload.»
   Und liegen 1 Erfassung im lokalen Speicher
 
  @req-11.9
@@ -156,3 +156,25 @@ Funktionalität: Mein Konto
   Dann sehe ich den Knopf «Anmelden»
   Wenn ich mich anmelde
   Dann bin ich auf der Seite «/konto»
+
+ @req-11.11
+ Szenario: Läuft die Sitzung offline ab, bleibt «Mein Konto» ohne Angaben nutzbar
+  Angenommen Keycloak stellt Tokens mit 6 Sekunden Gültigkeit aus
+  Und ich bin als «mitarbeiter» im Mandanten «urinet» angemeldet
+  Wenn ich «Mein Konto» in der Kopfzeile wähle
+  Und das Gerät sofort offline geht
+  Dann meldet «Mein Konto» die abgelaufene Sitzung und zeigt keine Angaben mehr
+  Und bin ich auf der Seite «/konto»
+  Wenn ich unter «Darstellung» «Dunkel» wähle
+  Dann gilt das Farbschema «dunkel» und ist nur im Browser gemerkt
+  Und zeigt «Mein Konto» «Auf diesem Gerät wartet keine Aufnahme von Ihnen oder ohne Anmeldung auf den Upload.»
+  Und ist auf «Mein Konto» der Knopf «Abmelden» bedienbar
+  Wenn das Handy wieder online ist
+  Dann sehe ich den Knopf «Anmelden»
+  Und ist die Seite «/konto» als Ziel nach der Anmeldung gemerkt
+
+ @req-11.8
+ Szenario: Ohne Recht A1 zeigt «Dieses Gerät» keinen Zähler
+  Angenommen ich bin als «treuhaender» im Mandanten «urinet» angemeldet
+  Wenn ich «Mein Konto» in der Kopfzeile wähle
+  Dann zeigt «Dieses Gerät» keinen Zähler und keinen Link zur Warteschlange
