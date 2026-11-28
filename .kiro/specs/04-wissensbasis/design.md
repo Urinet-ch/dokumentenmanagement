@@ -1700,6 +1700,50 @@ Requirements bleiben unverändert.
 | Spec 07, Einführung und Hilfe | Wissens-Schritte und Hilfeseiten nur bei Freischaltung (22.5). |
 | `docs/` | Betriebsanleitung für das Kommando, Anleitung zum Anlegen eines Mandanten. |
 
+### Umsetzung (Aufgaben 25.1 bis 25.5, 28.11.2026)
+- **25.1 Zustand, Kommando, Funktionen:** Changeset `db/public` `045-mandant-wissen-freigeschaltet` (Spalte mit
+  Standard `false`, `true` für `urinet`, Rollback entfernt die Spalte) und `db/mandant`
+  `142-protokoll-wissen-freischaltung` (Aktionen `WISSEN_FREIGESCHALTET`, `WISSEN_ABGESCHALTET`). Port
+  `WissensfreischaltungPort` (JDBC `JdbcWissensfreischaltung`, `public.mandant` qualifiziert), die eine Stelle
+  `Wissensfreischaltung` (Zwischenspeicher je Mandant, `archiv.wissen.freischaltung-zwischenspeicher`, Standard und
+  Höchstwert 60 s; Lesefehler und unbekannte Mandanten werden nicht zwischengespeichert und gelten als nicht
+  freigeschaltet) und der Anwendungsfall `WissenFreischalten` (Zeile `for update`, Zustand und Protokoll in einer
+  Transaktion, Akteur `betreiber`, ohne Rolle, Dokument und Details; derselbe Zustand ändert und protokolliert nichts;
+  unbekannter oder inaktiver Mandant: nichts). Kommando `WissenFreischaltungKommando` unter `archiv mandant wissen`
+  (Exit 0, 1 unbekannt oder inaktiv, 2 Aufruf, 3 technisch). `GET /mandant/funktionen` liefert `wissenVerfuegbar`.
+  Testdaten: Der Decorator `WissenInTestdaten` (nur `src/test`) schaltet für die Standard-Testmandanten `urinet` und
+  `vhf-gsk` bei der Aktivierung ein; jeder andere Testmandant bleibt ohne Wissen, Unit-Tests übergeben
+  `FesteWissensfreischaltung.ein()` ausdrücklich.
+- **25.2 Sperre:** im gemeinsamen `ZugangFilter` nach Mandant und Anmeldung (401 auch bei widerrufener Sitzung) und vor
+  Rechtematrix, Dokumentprüfung (404) und Laden von Daten, für Rollen und API-Tokens gleich. Erfasst ist jede
+  Pfadvorlage aus `@Path` mit einem Abschnitt, der mit `wissen` beginnt (`Wissenspfade`, ausser `/public/`);
+  `WissenspfadeVertragTest` prüft alle Operationen, auch künftige. Der Modus `WISSEN` steht nicht im Pfad: Anlegen,
+  Verlauf und Fortsetzen prüft der Chat selbst (`WissenschatZugang.freischaltungPruefen`, vor A15 und Budget), die Liste
+  lässt solche Gespräche weg. Im Archivchat fehlen `wissen_index` und `wissen_seite_zeigen` (`WerkzeugAuswahl`, fail
+  closed); Antworten mit einem Wissenswerkzeug gehen beim Fortsetzen nicht erneut an das Modell
+  (`ChatSpeicher.verlaufOhneWissen`), Quellen auf Wissensseiten erscheinen im Verlauf ohne Titel und Link, und keine
+  Nachricht bietet eine Analyse an. Dokumentansicht ohne Wissensseiten (`WissenLesen.seitenFuerDokument`). Der
+  öffentliche Wissenschat antwortet wie bei ausgeschaltetem Schalter (403 `NICHT_ERLAUBT`). Einstellungen: ein Patch
+  mit `wissen` und das Zurücksetzen der Gruppe `WISSEN` ergeben 403 `WISSEN_NICHT_FREIGESCHALTET` vor A19; das
+  Zurücksetzen einer ganzen Version bleibt möglich (Auslegung).
+- **25.3 Keine KI-Läufe:** Ingest-Start (manuell, nach Markierung, Abschnitt wiederholen) und Lint von Hand ergeben 403;
+  Nachholen und Lint-Zeitplan überspringen den Mandanten (kein späteres Nachholen). `Wissensfreischaltung
+  .modellaufrufPruefen` steht unmittelbar vor jedem Modellaufruf von Ingest, Neuerzeugung und Lint; zusätzlich prüfen
+  Ingest und Lint vor jedem Schritt. Ein laufender oder wartender Auftrag endet dann ohne neuen Entwurf mit dem Hinweis
+  `WISSEN_AUSGESCHALTET` (Ingest `FEHLER`, Lint unvollständig, manuelle Neuerzeugung abgebrochen). Embeddings der
+  Wissensseiten und die Budgetprüfungen (Embedding, Reranker, Wissenschat) sind ebenfalls gesperrt. Warnungen oder
+  Berichtsteile zur Wissensbasis versendet das Archiv heute keine (der Wochenbericht des Mandanten enthält keine
+  Wissensteile); kommen solche hinzu, fragen sie dieselbe Stelle. Regeln ohne KI (Quellenhinweise nach Requirement 15,
+  Sichtbarkeit, Aufbewahrung, Sicherung, Vollexport) laufen unverändert; gelöscht wird nichts.
+- **25.4 Oberfläche:** Dienst `MandantFunktionen` (einmal je Anmeldung, bis geladen und bei Fehler ohne Wissen);
+  `AnmeldungService.darf` gewährt A15 bis A19 nur bei Freischaltung, darum folgen Menü (samt Zähler, der ohne
+  Freischaltung nicht abfragt), Startseite, Einführung und Analyse-Links an einer Stelle. `wissenGuard` für alle
+  Wissensrouten (Direktaufruf → `/nicht-gefunden`), Dokumentansicht, Chat (Moduswahl, WISSEN-Gespräche), Suche,
+  Einstellungsgruppe und Hilfe (`hilfeKontext`, `sichtbareAbschnitte` mit Parameter `wissen`). Browser-Szenarien
+  `freischaltung-oberflaeche.feature` mit axe.
+- **25.5 Folgeänderungen:** Spec 02, 03, 05, 06 und 07 (design.md, «Spec 04 ergänzt»), Spec 01 Fehlercode-Tabelle,
+  README «Wissen je Mandant freischalten» und «Mandant anlegen», `docs/anleitung-verwaltung.md`.
+
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
 1. Lage zu Spec 03: Spec 04 wird nach Spec 03 umgesetzt, Wellen 13–16 (tasks.md). Der Nachtrag in

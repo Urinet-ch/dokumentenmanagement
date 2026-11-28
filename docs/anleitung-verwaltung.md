@@ -76,6 +76,15 @@ Nicht hier änderbar: Alarm-Empfänger, Budget des öffentlichen Chats, Modelle,
 Der öffentliche Wissenschat ist je Mandant über `archiv.mandant.<code>.oeffentlich.wissenschat` geschaltet; `<code>` ist ein
 Platzhalter für den Mandantencode. Der Standard ist ausgeschaltet. Der Schalter ersetzt weder die Webseitenfreigabe der
 einzelnen Wissensseite noch die Quellenbedingungen aus Spec 04, Requirement 21.6.
+Er wirkt nur, wenn Wissen für den Mandanten freigeschaltet ist (nächster Abschnitt).
+
+### Wissen freischalten
+Der Bereich Wissen ist eine Zusatzleistung und je Mandant ein- oder ausgeschaltet; ein neuer Mandant hat ihn nicht.
+Geschaltet wird nur mit dem Admin-Kommando `mandant wissen <code> [ein|aus]` (Aufruf, Wirkung und Exit-Codes im README
+unter [«Wissen je Mandant freischalten»](../README.md#wissen-je-mandant-freischalten)); der Inhaber kann es in der App
+nicht selbst einschalten. Ausgeschaltet sieht der Mandant den Bereich nicht, und die Wissensbasis verursacht keine
+KI-Kosten; gelöscht wird nichts. Die Änderung wirkt nach spätestens 60 Sekunden; wer die App offen hat, sieht sie nach
+dem Neuladen.
 
 ### Normaler Weg: Admin-Kommando
 Die Kommandos laufen im Wegwerf-Container wie im README unter «Admin-Kommandos auf der VPS» beschrieben, nie in einem laufenden
@@ -88,6 +97,7 @@ Dienst. Jeder Aufruf steht im Protokoll als `betreiber:<name>` (`--wer`). Aufruf
 | `benutzer abgleichen <code> [--pruefen] [--json]` | Liest die Benutzer des Mandanten in Keycloak und gibt Abweichungen aus. Ohne `--pruefen` schreibt es die fehlenden Zeilen ins Benutzerverzeichnis (Übernahme); mit `--pruefen` ändert es nichts. Keycloak ändert es nie. |
 | `benutzer inhaber-uebernehmen <code> --benutzer <uuid> --wer <uuid> [--ausfuehren]` | Dokumentiert eine bereits bestehende Inhaberrolle einmalig als Betreibervorgang mit Anlass `UEBERNAHME`; Keycloak bleibt unverändert. Ohne `--ausfuehren` nur prüfen. `--wer` ist eine geschützte, stabile pseudonyme Betreiberkennung, kein Name. |
 | `mandant benutzer-sperren <code> [--json]` | Mandantenabbau: deaktiviert alle Keycloak-Benutzer des Mandanten und beendet ihre Sitzungen; ab 30 Tagen nach der Deaktivierung löscht ein erneuter Aufruf die Keycloak-Benutzer. Zugriffsprotokoll und Benutzerverzeichnis bleiben bis zum Mandantenabbau. |
+| `mandant wissen <code> [ein\|aus]` | Schaltet den Bereich Wissen für den Mandanten ein oder aus; ohne `ein`/`aus` nur den Zustand ausgeben. Protokolliert als Betreiber ohne `--wer` (Aktion `WISSEN_FREIGESCHALTET` bzw. `WISSEN_ABGESCHALTET`). Löscht nichts. |
 
 Exit-Codes von `benutzer abgleichen`: 0 keine Abweichung, 1 mindestens eine Abweichung, 2 falscher Aufruf, 3 technischer Fehler.
 Abweichungscodes: `MEHRERE_ROLLEN` (keine oder mehrere Archiv-Rollen), `KEIN_MANDANT`, `MEHRERE_MANDANTEN` (Attribut `mandant`

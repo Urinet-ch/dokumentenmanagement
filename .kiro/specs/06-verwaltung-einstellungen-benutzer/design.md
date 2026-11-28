@@ -383,6 +383,13 @@ bleibt, neue Felder kommen flach dazu; die genaue Form legt Aufgabe 20.2 gegen d
 | GET, PUT | `/wissensbasis/einstellungen` | wie bisher (Spec 04), nach derselben Mechanik; `If-Match` mit der Konfigurationsversion | A19 |
 | GET | `/konfiguration/versionen[/{n}]` | Verlauf; die Seite der Einstellungen zeigt nur `einstellungen.*`, Kennungen ohne Werte | A11 |
 
+Spec 04 ergänzt (Spec 04, Req 22.3, 22.5 und 22.6, Entscheid Fabian 28.11.2026): Die Einstellungsgruppe der Wissensbasis
+(`wissen`) erscheint in der Oberfläche nur, wenn Wissen für den Mandanten freigeschaltet ist (`wissenVerfuegbar` aus
+`GET /mandant/funktionen`); ohne Freischaltung antworten `/wissensbasis/einstellungen`, ein Patch mit `wissen` und das
+Zurücksetzen der Gruppe `WISSEN` mit 403 `WISSEN_NICHT_FREIGESCHALTET` vor A19. Die Freischaltung selbst ist keine
+Einstellung: Sie steht weder im Einstellungskatalog noch in der Konfigurationsdatei, sondern nur in `public.mandant`
+und wird nur mit dem Betreiber-Kommando `archiv mandant wissen <code> [ein|aus]` geändert.
+
 **Umsetzung (Aufgabe 20.2, 22.11.2026):** `GET /mandant/einstellungen` liefert `version`, `katalog[]` und `betrieb`;
 Katalogeinträge enthalten Wert, Standard, Herkunft, Grenzen und Wirkung. Dokumentarten, Klassifikationen, Regeln und
 KI-Texte bleiben bei ihren bestehenden A11-Schnittstellen. A19 wird zusätzlich beim Ändern der Wissensgruppe geprüft,
