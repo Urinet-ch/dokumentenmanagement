@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd -P)
 script="$repo_root/deploy/backup/restore-uebung-lokal.sh"
 compose_file="$repo_root/deploy/backup/test/restore-compose.yml"
+production_compose_file="$repo_root/deploy/infomaniak/compose.yml"
 temp=$(mktemp -d)
 trap 'rm -rf -- "$temp"' EXIT
 
@@ -29,6 +30,23 @@ compose_images() {
 from_images() {
   awk 'toupper($1) == "FROM" && $2 ~ /[:@]/ { print $2 }' "$@"
 }
+
+keycloak_sicherheitsvorgaben() {
+  awk '
+    $0 == "  kc:" { dienst = 1; next }
+    dienst && /^  [A-Za-z0-9_-]+:$/ { exit }
+    dienst && /^    (user|read_only|tmpfs):/ { print; next }
+    dienst && /^      - \/(tmp|opt\/keycloak\/data\/tmp):/ { print }
+  ' "$1"
+}
+
+keycloak_sicherheitsvorgaben "$compose_file" > "$temp/kc-test-sicherheit"
+keycloak_sicherheitsvorgaben "$production_compose_file" > "$temp/kc-produktion-sicherheit"
+if ! cmp -s "$temp/kc-test-sicherheit" "$temp/kc-produktion-sicherheit"; then
+  printf 'Keycloak-Sicherheitsvorgaben im Restore-Test weichen von der Produktion ab.\n' >&2
+  diff -u "$temp/kc-produktion-sicherheit" "$temp/kc-test-sicherheit" >&2 || true
+  exit 1
+fi
 
 # Statische Prüfungen der Quellen: keine eigene Digest-Liste im Skript, gleiche Images wie Dev Services und Deploy.
 if grep -Eq 'sha256:[0-9a-f]{64}' "$script"; then
@@ -273,7 +291,7 @@ assert grep -q '^OK      Echter Sicherungs-Roundtrip: Phase quelle' "$temp/erfol
 assert grep -q '^OK      Echter täglicher Export' "$temp/erfolg.stdout"
 assert grep -q '^OK      Archiv-Datenbankdump in neue Datenbank einspielen' "$temp/erfolg.stdout"
 assert grep -q '^OK      Keycloak-Datenbankdump in neue Datenbank einspielen' "$temp/erfolg.stdout"
-assert grep -q '^OK      Restore-Zählvergleich je Mandant: Wissensseiten, Versionen, Quellen, Dokumente' "$temp/erfolg.stdout"
+assert grep -q '^OK      Restore-Zählvergleich je Mandant: Wissensseiten, Versionen, Quellen, Dokumente, Webfreigaben, öffentliche Fragen, Benutzereinladungen' "$temp/erfolg.stdout"
 assert grep -q '^OK      Vollständiger lokaler Sicherungs-Roundtrip abgeschlossen' "$temp/erfolg.stdout"
 assert grep -q 'OIDC-Testdienstkonto mit Mandant und Rolle vorbereiten' "$temp/erfolg.stdout"
 assert grep -q "shelltest $MOCK_BACKUP_TEST" "$MOCK_LOG"

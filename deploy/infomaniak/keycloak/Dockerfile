@@ -13,6 +13,9 @@ FROM eclipse-temurin:25.0.5.1_2-jre-noble@sha256:2ec98aa522c472deadfd2b7c5b39bca
 ENV KC_RUN_IN_CONTAINER=true
 COPY --from=build --chown=1000:0 /opt/keycloak/ /opt/keycloak/
 COPY --chown=1000:0 keycloak/realm-export.json /opt/keycloak/data/import/realm-export.json
+RUN mkdir -p /opt/keycloak/data/archiv-export \
+    && chown 1000:1000 /opt/keycloak/data/archiv-export \
+    && chmod 0700 /opt/keycloak/data/archiv-export
 # Login-Theme des Mandanten VHF/GSK (Aufgabe 10.3); gewählt wird es am Client im Realm (Admin-Konsole, Hinweis in design.md)
 COPY --chown=1000:0 infomaniak/keycloak/themes/vhf-gsk /opt/keycloak/themes/vhf-gsk
 COPY --chown=1000:0 infomaniak/keycloak/themes/urinet-archiv /opt/keycloak/themes/urinet-archiv

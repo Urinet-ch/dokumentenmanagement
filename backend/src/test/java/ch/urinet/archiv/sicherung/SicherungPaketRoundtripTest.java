@@ -139,6 +139,8 @@ class SicherungPaketRoundtripTest {
             String pdfaVersion = ablegen(mandant.bucket(), pdfaKey, PDFA);
             dokumentAnlegen(mandant.schema(), id, pdfaKey, pdfaVersion, originalKey, originalVersion);
             wissenAnlegen(mandant.schema(), id);
+            restoreNeueDatenAnlegen(mandant.schema());
+            restoreNeueDatenPruefen(mandant.schema());
             long[] wissen = wissenZaehlen(mandant.schema());
             assertThat(wissen).containsExactly(2, 3, 2);
 
@@ -253,6 +255,7 @@ class SicherungPaketRoundtripTest {
                 Long.parseLong(erwartet.getProperty(prefix + "wissen.seiten")),
                 Long.parseLong(erwartet.getProperty(prefix + "wissen.versionen")),
                 Long.parseLong(erwartet.getProperty(prefix + "wissen.quellen")));
+        restoreNeueDatenPruefen(schema);
         assertThat(dokumenteZaehlen(schema)).isEqualTo(
                 Long.parseLong(erwartet.getProperty(prefix + "dokument.anzahl")));
         UUID id = UUID.fromString(erwartet.getProperty(prefix + "dokument.id"));
@@ -386,12 +389,18 @@ class SicherungPaketRoundtripTest {
                 UUID seite = UUID.randomUUID();
                 try (PreparedStatement p = connection.prepareStatement("insert into " + schema
                         + ".wissensseite (id, pfad, typ, titel, beschreibung, vertraulichkeit, inhalt, version, "
-                        + "erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am) "
+                        + "erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am, fuer_webseite, "
+                        + "fuer_webseite_von, fuer_webseite_am) "
                         + "values (?, ?, 'Konzept', 'Synthetische Probe', 'Probe', 'NORMAL', 'Testinhalt', ?, "
-                        + "'human:probe', '2030-01-01T00:00:00Z', 'human:probe', '2030-01-01T00:00:00Z')")) {
+                        + "'human:probe', '2030-01-01T00:00:00Z', 'human:probe', '2030-01-01T00:00:00Z', ?, ?, ?)")) {
                     p.setObject(1, seite);
                     p.setString(2, "restore/" + seite);
                     p.setInt(3, nr);
+                    boolean fuerWebseite = nr == 1;
+                    p.setBoolean(4, fuerWebseite);
+                    p.setString(5, fuerWebseite ? "human:restore-roundtrip" : null);
+                    p.setObject(6, fuerWebseite
+                            ? OffsetDateTime.parse("2030-01-02T03:04:05Z") : null);
                     p.executeUpdate();
                 }
                 for (int version = 1; version <= nr; version++) {
@@ -418,6 +427,65 @@ class SicherungPaketRoundtripTest {
                     p.executeUpdate();
                 }
             }
+        }
+    }
+
+    private void restoreNeueDatenAnlegen(String schema) throws Exception {
+        try (Connection connection = datenquelle.getConnection()) {
+            try (PreparedStatement p = connection.prepareStatement("insert into " + schema
+                    + ".oeffentliche_frage (frage, quellen, tokens, zeit) "
+                    + "values (?, cast(? as jsonb), ?, ?)")) {
+                p.setString(1, "Synthetische Restore-Frage");
+                p.setString(2, "[]");
+                p.setInt(3, 7);
+                p.setObject(4, OffsetDateTime.parse("2030-01-03T04:05:06Z"));
+                p.executeUpdate();
+            }
+            try (PreparedStatement p = connection.prepareStatement("insert into " + schema
+                    + ".benutzer_einladung (benutzer, versendet_am, gueltig_bis) values (?, ?, ?)")) {
+                p.setString(1, "restore-roundtrip-benutzer");
+                p.setObject(2, OffsetDateTime.parse("2030-01-01T00:00:00Z"));
+                p.setObject(3, OffsetDateTime.parse("2030-01-08T00:00:00Z"));
+                p.executeUpdate();
+            }
+        }
+    }
+
+    private void restoreNeueDatenPruefen(String schema) throws Exception {
+        try (Connection connection = datenquelle.getConnection();
+             PreparedStatement p = connection.prepareStatement("select fuer_webseite, fuer_webseite_von, "
+                     + "fuer_webseite_am from " + schema + ".wissensseite order by fuer_webseite desc");
+             ResultSet r = p.executeQuery()) {
+            assertThat(r.next()).isTrue();
+            assertThat(r.getBoolean(1)).isTrue();
+            assertThat(r.getString(2)).isEqualTo("human:restore-roundtrip");
+            assertThat(r.getTimestamp(3).toInstant()).isEqualTo(Instant.parse("2030-01-02T03:04:05Z"));
+            assertThat(r.next()).isTrue();
+            assertThat(r.getBoolean(1)).isFalse();
+            assertThat(r.getString(2)).isNull();
+            assertThat(r.getTimestamp(3)).isNull();
+            assertThat(r.next()).isFalse();
+        }
+        try (Connection connection = datenquelle.getConnection();
+             PreparedStatement p = connection.prepareStatement("select frage, quellen::text, tokens, zeit from "
+                     + schema + ".oeffentliche_frage");
+             ResultSet r = p.executeQuery()) {
+            assertThat(r.next()).isTrue();
+            assertThat(r.getString(1)).isEqualTo("Synthetische Restore-Frage");
+            assertThat(r.getString(2)).isEqualTo("[]");
+            assertThat(r.getInt(3)).isEqualTo(7);
+            assertThat(r.getTimestamp(4).toInstant()).isEqualTo(Instant.parse("2030-01-03T04:05:06Z"));
+            assertThat(r.next()).isFalse();
+        }
+        try (Connection connection = datenquelle.getConnection();
+             PreparedStatement p = connection.prepareStatement("select benutzer, versendet_am, gueltig_bis from "
+                     + schema + ".benutzer_einladung");
+             ResultSet r = p.executeQuery()) {
+            assertThat(r.next()).isTrue();
+            assertThat(r.getString(1)).isEqualTo("restore-roundtrip-benutzer");
+            assertThat(r.getTimestamp(2).toInstant()).isEqualTo(Instant.parse("2030-01-01T00:00:00Z"));
+            assertThat(r.getTimestamp(3).toInstant()).isEqualTo(Instant.parse("2030-01-08T00:00:00Z"));
+            assertThat(r.next()).isFalse();
         }
     }
 
