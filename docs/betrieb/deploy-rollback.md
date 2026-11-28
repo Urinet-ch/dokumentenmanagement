@@ -47,9 +47,8 @@ keine Middleware des API-Dienstes verwenden. Damit hängt seine Route nicht
 von der Gesundheit der API ab und umgekehrt; die Zusammenhänge des Ausfalls
 vom 26.11.2026 stehen im nächsten Abschnitt.
 
-Beide HSTS-Middlewares starten mit `max-age=86400` (ein Tag),
-`includeSubDomains` und `preload` sind ausgeschaltet. Den Wert erst nach
-Beobachtung der ausgelieferten HTTPS-Header auf `31536000` (ein Jahr) erhöhen.
+Beide HSTS-Middlewares verwenden `max-age=31536000` (ein Jahr);
+`includeSubDomains` und `preload` sind ausgeschaltet.
 HSTS wird am Reverse Proxy gesetzt, nicht durch die Anwendung.
 
 Die Anwendung setzt unabhängig davon in

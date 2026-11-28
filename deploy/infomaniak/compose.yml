@@ -116,11 +116,11 @@ services:
       traefik.http.services.archiv.loadbalancer.server.port: "8080"
       # Drosselung je Client-IP (design.md «Sicherheit», Argon2-Sperre): jede Anfrage mit «Bearer ua_…» rechnet
       # Argon2, auf allen Pfaden (proaktive Anmeldung)
-      # HSTS (ZAP-Baseline gegen die VPS 26.11.2026, Regel 10035): zunächst ein Tag; nach Prüfung auf 31536000 erhöhen.
+      # HSTS (ZAP-Baseline, Regel 10035): max-age ein Jahr nach erfolgreicher Header-Prüfung.
       # Ohne includeSubDomains (apps.urinet.ch hostet weitere Apps), ohne preload. Nur bei HTTPS-Antworten (Port 80 leitet um).
       # In jeder Router-Liste steht die HSTS-Middleware zuerst: Traefik führt Middlewares der Reihe nach aus, eine
       # Antwort 429 der Drosselung trüge sonst keinen Header (ZAP-Baseline 27.11.2026, Regel 10035).
-      traefik.http.middlewares.archiv-sts.headers.stsseconds: "86400"
+      traefik.http.middlewares.archiv-sts.headers.stsseconds: "31536000"
       traefik.http.middlewares.archiv-sts.headers.stsincludesubdomains: "false"
       traefik.http.middlewares.archiv-sts.headers.stspreload: "false"
       traefik.http.middlewares.archiv-sts.headers.forcestsheader: "false"
@@ -298,7 +298,7 @@ services:
       # HSTS für den Anmeldedienst: eigene Middleware am Dienst kc. Der Router archiv-auth darf nicht von einer Middleware
       # des Dienstes api abhängen: Die API wartet beim Start auf Keycloak über archiv-auth, Traefik führt Router nur für
       # gesunde Container (Deploy 26.11.2026: beide Dienste warteten aufeinander, 404 auf archiv und archiv-auth).
-      traefik.http.middlewares.archiv-auth-sts.headers.stsseconds: "86400"
+      traefik.http.middlewares.archiv-auth-sts.headers.stsseconds: "31536000"
       traefik.http.middlewares.archiv-auth-sts.headers.stsincludesubdomains: "false"
       traefik.http.middlewares.archiv-auth-sts.headers.stspreload: "false"
       traefik.http.middlewares.archiv-auth-sts.headers.forcestsheader: "false"
