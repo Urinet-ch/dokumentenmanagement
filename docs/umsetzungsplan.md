@@ -29,6 +29,9 @@ Jede Spec folgt dem Kiro-Muster: `requirements.md` (User Stories + Akzeptanzkrit
 Rückverweis `_Anforderungen: x.y_`). Umgesetzt wird nicht mit dem Werkzeug Kiro, sondern mit
 Claude Code; Einstieg ist `CLAUDE.md`.
 
+Spec 09: Der Start einer Aufgabe richtet sich nach ihren «Abhängig von»-Angaben, nicht nach der Wellengrenze
+(entschieden von Fabian am 28.11.2026).
+
 ## 2. Crew und Rollen
 
 | Rolle | Wer | Aufgaben |

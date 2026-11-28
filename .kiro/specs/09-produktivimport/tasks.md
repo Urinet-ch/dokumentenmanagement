@@ -1,5 +1,8 @@
 # Implementation Plan — 09 Produktivimport
 
+Der Start einer Aufgabe richtet sich nach ihren «Abhängig von»-Angaben, nicht nach der Wellengrenze (entschieden von
+Fabian am 28.11.2026).
+
 Voraussetzungen: Spec 09 auf `main` gemergt; Spec 01 bis Welle 4, Spec 02 Wellen 6 und 7, Spec 05 Wellen 17 und 18
 umgesetzt (Bestandsaufnahme `docs/spikes/09-bestandsaufnahme.md`). Die Wellen 27 bis 30 folgen auf die Nummern
 von Spec 06 (Welle 26). Wellen, Rollen und Gates wie in `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je
@@ -86,6 +89,7 @@ zu den Wellen 27 bis 29.
   - Verbindlich (10.6): Die Prüfsummen-Abfrage aus 27.6 (`JdbcQuellenRegister.vorhandenePruefsummen`) meldet auch
     die SHA-256 nicht verworfener Stapel-Originale; für Benutzer nur Stapel, die sie sehen dürfen (Sichtregel mit
     dieser Aufgabe festlegen, Vorgabe wie bei Dokumenten), für das Import-Token alle. Szenario dazu unter `@req-10.6`.
+  - 5.1 und 5.2 bleiben bis zum Integrationstest der Erfassung und Zuordnung in 28.5/28.8 Teilnachweise.
   - _Anforderungen: 5.1, 5.2, 10.6_
 
 - [ ] 28.2 Dienst `sftp` vollständig [Backend]

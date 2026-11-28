@@ -11,7 +11,9 @@ import ch.urinet.archiv.importe.domain.quelle.QuellenTyp;
 import ch.urinet.archiv.importe.domain.quelle.Zaehler;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.Verschluesselung;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -145,9 +147,9 @@ public class QuellenVerwaltung {
     }
 
     /**
-     * Welche Prüfsummen schon zu einem nicht verworfenen Dokument gehören; ohne IDs (10.6). Ein Benutzer erfährt nur
-     * von Dokumenten, die er sieht (Spec 01, 2.3, 2.21), sonst verriete die Antwort vertrauliche Dokumente; ohne
-     * Benutzer fragt das Import-Token, das nur der Inhaber anlegt (A14), ohne Sichtfilter.
+     * Welche Prüfsummen schon zu einem nicht verworfenen Dokument oder Stapel gehören; ohne IDs (10.6). Dokumente
+     * folgen der Sichtregel aus Spec 01, 2.3 und 2.21, Stapel dem Recht A25, da jedes Original alle Vertraulichkeiten
+     * enthalten kann. Das Import-Token fragt ohne Sichtfilter.
      */
     @Transactional
     public Set<String> pruefsummen(List<String> sha256, Optional<Benutzer> benutzer) {
@@ -162,7 +164,10 @@ public class QuellenVerwaltung {
             }
             gesucht.add(klein);
         }
-        return gesucht.isEmpty() ? Set.of() : register.vorhandenePruefsummen(gesucht, benutzer.map(Sichtregel::fuer));
+        boolean stapelEinsehbar = benutzer.map(b -> Rechtematrix.ergebnis(b.rolle(), Aktion.A25).zugaenglich())
+                .orElse(true);
+        return gesucht.isEmpty() ? Set.of() : register.vorhandenePruefsummen(gesucht,
+                benutzer.map(Sichtregel::fuer), stapelEinsehbar);
     }
 
     private Quelle quelle(String code) {
