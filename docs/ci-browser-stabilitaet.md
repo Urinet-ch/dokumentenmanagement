@@ -2,6 +2,9 @@
 
 Stand 26.11.2026. Anlass: Der Job «Browser-Szenarien (Cucumber.js, Playwright)» ist der häufigste Grund für rote CI-Läufe.
 
+## Nachmessung (in Bearbeitung)
+Messwerte und Stichtag werden in diesem PR gemeinsam aus einer UTC-Erhebung ermittelt.
+
 ## Ausgangslage (Messung 26.11.2026, 80 jüngste Läufe)
 - 31 Läufe mit Browser-Job; Browser-Job in 9 davon rot (29 %); in allen 9 war er der einzige rote Job.
 - Browser-Dauer: Median rund 11 min, Maximum 22 min.
