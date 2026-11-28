@@ -168,7 +168,7 @@ zu den Wellen 27 bis 29.
   - _Anforderungen: 13.1, 13.2, 13.3_
 
 ## Welle 29 — Quellen, Dubletten und Vollständigkeit
-- [ ] 29.1 Quellen in Werkzeugen und Web-App [Backend] [Frontend]
+- [x] 29.1 Quellen in Werkzeugen und Web-App [Backend] [Frontend]
   - Drive-Import (`tools/drive_import`) und `archiv_client.py` ordnen Uploads einem Quelllauf zu; Trockenlauf mit
     Prüfsummen-Abfrage; Schlussbericht als Zähler des Laufs.
   - Seite «Quellen» mit Status, Zählern und Läufen (A27), Pflege nur mit A28; Anleitung nachgeführt.

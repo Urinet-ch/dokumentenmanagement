@@ -54,6 +54,7 @@ const SOLL: readonly Soll[] = [
   { anker: 'wissen-entwuerfe', titel: 'Wissensentwürfe', eltern: 'wissen', eine: ['A17'], pfade: ['/wissen/entwuerfe'] },
   { anker: 'wissen-quellen', titel: 'Wissensquellen markieren und verwalten', eltern: 'wissen', eine: ['A16'] },
   { anker: 'importe', titel: 'Importe', eine: ['A12'], pfade: ['/importe'] },
+  { anker: 'quellen', titel: 'Quellen', eine: ['A27'], pfade: ['/quellen'] },
   { anker: 'jahresexport', titel: 'Jahresexport', eine: ['EXPORT'], pfade: ['/export'] },
   { anker: 'verwaltung', titel: 'Verwaltung', eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer', '/verwaltung/einstellungen'] },
   { anker: 'verwaltung-dokumentarten', titel: 'Dokumentarten', eltern: 'verwaltung', eine: ['A11'], pfade: ['/verwaltung/dokumentarten'] },

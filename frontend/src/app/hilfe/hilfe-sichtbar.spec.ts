@@ -100,7 +100,7 @@ describe('Sichtbare Abschnitte der Anleitung (Spec 07, Req 6.2, 6.3)', () => {
     inhaber: ['eingangskorb-eigene'],
     mitarbeiter: [
       'eingangskorb-bestaetigen', 'dokument-aendern', 'kontakte', 'wissen-entwuerfe', 'importe', 'jahresexport',
-      'verwaltung', 'verwaltung-dokumentarten', 'verwaltung-protokoll', 'verwaltung-api-tokens',
+      'quellen', 'verwaltung', 'verwaltung-dokumentarten', 'verwaltung-protokoll', 'verwaltung-api-tokens',
     ],
     treuhaender: [
       'erfassen', 'erfassen-handy', 'erfassen-dateien', 'erfassen-offline', 'eingangskorb-bestaetigen',
@@ -117,7 +117,7 @@ describe('Sichtbare Abschnitte der Anleitung (Spec 07, Req 6.2, 6.3)', () => {
   const TABELLE = new Set([
     'erste-schritte', 'erfassen', 'erfassen-handy', 'erfassen-dateien', 'erfassen-offline', 'eingangskorb',
     'eingangskorb-bestaetigen', 'eingangskorb-eigene', 'suche', 'chat', 'chat-bewerten', 'dokument', 'dokument-aendern', 'kontakte',
-    'wissen', 'wissen-entwuerfe', 'importe', 'jahresexport', 'verwaltung', 'verwaltung-dokumentarten',
+    'wissen', 'wissen-entwuerfe', 'importe', 'quellen', 'jahresexport', 'verwaltung', 'verwaltung-dokumentarten',
     'verwaltung-protokoll', 'verwaltung-api-tokens', 'probleme',
   ]);
 

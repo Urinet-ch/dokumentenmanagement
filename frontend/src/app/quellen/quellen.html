@@ -1,0 +1,243 @@
+<div class="seitenkopf">
+  <p class="vorzeile">{{ gruppe }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+  @if (darfPflegen()) {
+    <button mat-flat-button type="button" (click)="quelleHinzufuegen()">
+      {{ neueQuelleOffen() ? texte.quelleSchliessen : texte.neueQuelle }}
+    </button>
+  }
+</div>
+@if (meldung(); as text) {
+  <p role="status" aria-live="polite">{{ text }}</p>
+}
+@if (fehler(); as text) {
+  <div class="hinweis gefahr" role="alert">
+    <p>{{ text }}</p>
+    @if (quellen() === null) {
+      <button mat-button type="button" data-test="erneut-laden" (click)="laden()">
+        {{ texte.erneut }}
+      </button>
+    }
+  </div>
+}
+@if (quellen() === null) {
+  @if (!fehler()) {
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laden"></mat-progress-bar>
+    <p>{{ texte.laden }}</p>
+  }
+} @else if (quellen()!.length === 0) {
+  <p class="leer">{{ texte.keineQuellen }}</p>
+} @else {
+  @for (quelle of quellen(); track quelle.code) {
+    <section class="karte quelle" [attr.data-test]="'quelle-' + quelle.code">
+      <div class="quelle-kopf">
+        <div>
+          <p class="vorzeile">{{ texte.quelle }} · <span class="mono">{{ quelle.code }}</span></p>
+          <h2>{{ quelle.name }}</h2>
+        </div>
+        <span
+          class="pille"
+          [class.ok]="quelle.status === 'ABGESCHLOSSEN'"
+          [class.warnung]="quelle.status === 'OFFEN' || quelle.status === 'LAEUFT'"
+          [class.info]="quelle.status === 'LAUFEND'"
+        >{{ statusLabel(quelle.status) }}</span>
+      </div>
+      <dl class="quelle-daten">
+        <div><dt>{{ texte.typ }}</dt><dd>{{ typLabel(quelle.typ) }}</dd></div>
+        <div>
+          <dt>{{ texte.geheimnis }}</dt>
+          <dd>{{ quelle.geheimnisGesetzt ? texte.geheimnisGesetzt : texte.geheimnisNichtGesetzt }}</dd>
+        </div>
+        @if (quelle.bemerkung) {
+          <div class="bemerkung"><dt>{{ texte.bemerkung }}</dt><dd>{{ quelle.bemerkung }}</dd></div>
+        }
+      </dl>
+      <details>
+        <summary>{{ texte.konfiguration }}</summary>
+        <pre class="json">{{ konfigurationText(quelle.konfiguration) }}</pre>
+      </details>
+
+      @if (quelle.letzterLauf; as letzterLauf) {
+        <div class="zaehler">
+          @for (feld of zaehlerFelder; track feld) {
+            <div class="kachel">
+              <span class="beschriftung">{{ zaehlerLabel(feld) }}</span>
+              <span class="kennzahl">{{ letzterLauf.zaehler[feld] }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (darfPflegen()) {
+        @if (bearbeitung()?.code === quelle.code) {
+          <div class="bearbeitung">
+            <label>
+              {{ texte.status }}
+              <select [value]="bearbeitung()!.status" (change)="statusAendern($event)">
+                @for (status of stati; track status) {
+                  <option [value]="status">{{ statusLabel(status) }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              {{ texte.bemerkung }}
+              <textarea rows="2" [value]="bearbeitung()!.bemerkung" (input)="bearbeitungsTextAendern('bemerkung', $event)"></textarea>
+            </label>
+            <label>
+              {{ texte.konfiguration }}
+              <textarea class="json" rows="5" spellcheck="false" [value]="bearbeitung()!.konfiguration" (input)="bearbeitungsTextAendern('konfiguration', $event)"></textarea>
+            </label>
+            <div class="aktionen">
+              <button
+                mat-flat-button
+                type="button"
+                [disabled]="aktionLaeuft() !== null"
+                (click)="speichern(quelle)"
+              >{{ aktionIst('speichern:' + quelle.code) ? texte.speichert : texte.speichern }}</button>
+              <button mat-button type="button" [disabled]="aktionLaeuft() !== null" (click)="abbrechen()">
+                {{ texte.bearbeitenAbbrechen }}
+              </button>
+            </div>
+          </div>
+        } @else {
+          <button mat-button type="button" (click)="bearbeiten(quelle)">{{ texte.bearbeiten }}</button>
+        }
+
+        <div class="geheimnis-formular">
+          <label [for]="'geheimnis-' + quelle.code">{{ texte.geheimnis }}</label>
+          <input #geheimnis [id]="'geheimnis-' + quelle.code" type="password" autocomplete="new-password" />
+          <p>{{ texte.geheimnisHinweis }}</p>
+          <button
+            mat-button
+            type="button"
+            [disabled]="aktionLaeuft() !== null"
+            (click)="geheimnisSpeichern(quelle, geheimnis.value); geheimnis.value = ''"
+          >{{ aktionIst('geheimnis:' + quelle.code) ? texte.speichert : texte.geheimnisSpeichern }}</button>
+        </div>
+        <div class="aktionen lauf-aktionen">
+          <button
+            mat-button
+            type="button"
+            [disabled]="aktionLaeuft() !== null"
+            (click)="laufStarten(quelle, 'TROCKEN')"
+          >{{ aktionIst('lauf:' + quelle.code) ? texte.speichert : texte.trockenStarten }}</button>
+          <button
+            mat-button
+            type="button"
+            [disabled]="aktionLaeuft() !== null"
+            (click)="laufStarten(quelle, 'ECHT')"
+          >{{ texte.echtStarten }}</button>
+        </div>
+        @if (bestaetigungEcht() === quelle.code) {
+          <div class="hinweis warnung" role="alert">
+            <p>{{ texte.echtWarnung }}</p>
+            <div class="aktionen">
+              <button mat-flat-button type="button" [disabled]="aktionLaeuft() !== null" (click)="laufStarten(quelle, 'ECHT')">
+                {{ texte.echtBestaetigen }}
+              </button>
+              <button mat-button type="button" (click)="echtlaufAbbrechen()">{{ texte.echtAbbrechen }}</button>
+            </div>
+          </div>
+        }
+      }
+
+      @if (laeufeFuer(quelle.code); as laufErgebnis) {
+        @if (laufErgebnis.fehler) {
+          <div class="hinweis gefahr" role="alert">
+            <p>{{ texte.laeufeFehler }}</p>
+            <button mat-button type="button" (click)="laden()">{{ texte.erneut }}</button>
+          </div>
+        } @else if (laufErgebnis.laeufe.length === 0) {
+          <p class="leer">{{ texte.keineLaeufe }}</p>
+        } @else {
+          <h3>{{ texte.laeufe }}</h3>
+          <div class="tabelle-rahmen laeufe" tabindex="0" role="region" [attr.aria-label]="texte.laeufe">
+            <table class="tabelle">
+              <thead>
+                <tr>
+                  <th scope="col">{{ texte.gestartet }}</th>
+                  <th scope="col">{{ texte.beendet }}</th>
+                  <th scope="col">{{ texte.laufArt }}</th>
+                  <th scope="col">{{ texte.laufStatus }}</th>
+                  @for (feld of zaehlerFelder; track feld) {
+                    <th scope="col" class="zahl">{{ zaehlerLabel(feld) }}</th>
+                  }
+                  <th scope="col">{{ texte.meldungen }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (lauf of laufErgebnis.laeufe; track lauf.id) {
+                  <tr>
+                    <td><time [attr.datetime]="lauf.gestartet">{{ zeitpunkt(lauf.gestartet) }}</time></td>
+                    <td>
+                      @if (lauf.beendet) {
+                        <time [attr.datetime]="lauf.beendet">{{ zeitpunkt(lauf.beendet) }}</time>
+                      } @else {
+                        <span class="gedaempft">–</span>
+                      }
+                    </td>
+                    <td>{{ laufArtLabel(lauf.art) }}</td>
+                    <td>{{ statusLabel(lauf.status) }}</td>
+                    @for (feld of zaehlerFelder; track feld) {
+                      <td class="zahl">{{ lauf.zaehler[feld] }}</td>
+                    }
+                    <td>
+                      @if (lauf.meldungen.length) {
+                        <ul>
+                          @for (meldung of lauf.meldungen; track $index) { <li>{{ meldung }}</li> }
+                        </ul>
+                      } @else {
+                        <span class="gedaempft">–</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      } @else if (laeufe() === null) {
+        <p>{{ texte.laeufeLaden }}</p>
+      }
+    </section>
+  }
+}
+
+@if (darfPflegen() && neueQuelleOffen()) {
+  <section class="karte neue-quelle">
+    <h2>{{ texte.quelleAnlegen }}</h2>
+    <form (submit)="quelleAnlegen($event)">
+      <label>
+        {{ texte.code }}
+        <input required maxlength="40" pattern="[a-z0-9][a-z0-9-]*" autocomplete="off" [value]="formular().code" (input)="textAendern('code', $event)" />
+      </label>
+      <label>
+        {{ texte.name }}
+        <input required maxlength="100" [value]="formular().name" (input)="textAendern('name', $event)" />
+      </label>
+      <label>
+        {{ texte.typ }}
+        <select [value]="formular().typ" (change)="typAendern($event)">
+          @for (typ of typen; track typ) { <option [value]="typ">{{ typLabel(typ) }}</option> }
+        </select>
+      </label>
+      <label>
+        {{ texte.konfiguration }}
+        <textarea class="json" rows="5" spellcheck="false" [value]="formular().konfiguration" (input)="textAendern('konfiguration', $event)"></textarea>
+      </label>
+      <label>
+        {{ texte.bemerkung }}
+        <textarea rows="2" [value]="formular().bemerkung" (input)="textAendern('bemerkung', $event)"></textarea>
+      </label>
+      <div class="aktionen">
+        <button mat-flat-button type="submit" [disabled]="aktionLaeuft() !== null">
+          {{ aktionIst('anlegen') ? texte.speichert : texte.anlegen }}
+        </button>
+        <button mat-button type="button" [disabled]="aktionLaeuft() !== null" (click)="quelleHinzufuegen()">
+          {{ texte.echtAbbrechen }}
+        </button>
+      </div>
+    </form>
+  </section>
+}

@@ -1,9 +1,9 @@
 # Drive-Import (Aufgabe 4.8)
 
-Einmaliger Import des Google-Drive-Altbestands ins UriNet Archiv (Spec 01, Requirement 12). Das Werkzeug liest einen
-lokalen Ordner von «Google Drive für Desktop» rekursiv und lädt jede Datei über `POST /api/v1/dokumente` hoch, mit
-ihrem Ordnerpfad als Hinweis. Das Archiv behandelt die Dateien wie jeden Upload: Prüfsumme, Dublettenprüfung,
-Verarbeitung und Eingangskorb. Es archiviert nie direkt (Req 12.8).
+Einmaliger Import eines lokalen Ordners ins UriNet Archiv (Spec 01, Requirement 12). Das Werkzeug liest Dateien
+rekursiv und lädt jede über `POST /api/v1/dokumente` hoch, mit ihrem Ordnerpfad als Hinweis. Jede Datei wird einem
+Quelllauf zugeordnet. Das Archiv behandelt sie wie jeden Upload: Prüfsumme, Dublettenprüfung, Verarbeitung und
+Eingangskorb. Es archiviert nie direkt (Req 12.8; Spec 09, Req 10.7).
 
 ## Bauen
 
@@ -14,8 +14,10 @@ mvn -B -ntp -f tools/drive_import/pom.xml verify
 
 ## Token
 
-Der `inhaber` stellt ein API-Token mit Scope `import` aus (`POST /api/v1/api-tokens`). Das Werkzeug liest
-das Token nur aus einer Datei, nie aus einer Umgebungsvariable, und schreibt es nie in die Ausgabe.
+Der `inhaber` stellt ein API-Token mit Scope `import` aus (`POST /api/v1/api-tokens`). Sowohl der echte Import als
+auch der Trockenlauf brauchen das Token: Der Trockenlauf fragt den Archivbestand nach Prüfsummen ab und meldet den
+Quelllauf samt Zählern zurück. Das Werkzeug liest das Token nur aus einer Datei, nie aus einer Umgebungsvariable,
+und schreibt es nie in die Ausgabe.
 
 ```sh
 mkdir -p ~/.config/urinet-archiv
@@ -30,11 +32,13 @@ symbolischer Link ist, andere Rechte als 600 oder 400 hat (auch Ausführen) oder
 ## Aufruf
 
 ```sh
-# Trockenlauf: zählt und listet auf, liest kein Token, überträgt nichts (Req 12.3)
-java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar --trockenlauf "$HOME/Google Drive/UriNet"
+# Trockenlauf: fragt Prüfsummen ab und zählt; überträgt keine PDFs (Req 12.3, Spec 09, Req 10.7)
+java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar --trockenlauf \
+  --quelle <quellcode> "PFAD_ZUM_ORDNER"
 
 # Import
-java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar "$HOME/Google Drive/UriNet"
+java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar \
+  --quelle <quellcode> "PFAD_ZUM_ORDNER"
 
 # Synthetisches Beispiel für VHF/GSK; Fachgebiet als Klassifikationscode übergeben
 java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar --altbestand \
@@ -43,7 +47,8 @@ java -jar tools/drive_import/target/drive-import-0.1.0-SNAPSHOT.jar --altbestand
 
 | Option | Bedeutung |
 | --- | --- |
-| `-n`, `--trockenlauf` | nur zählen und auflisten |
+| `-n`, `--trockenlauf` | Prüfsummen abfragen, zählen und auflisten; keine PDFs übertragen |
+| `--quelle CODE` | Quellcode aus dem Register (Standard: `drive`) |
 | `--altbestand` | Reihenordner als Dokumentart verwenden; nur für VHF/GSK |
 | `--archiv URL` | Adresse des Archivs (Standard `https://archiv.apps.urinet.ch`; `http` nur für `localhost`) |
 | `--token-datei DATEI` | Datei mit dem API-Token |
@@ -81,6 +86,11 @@ Jede Datei bekommt den Hinweis `Drive-Import; Ordner: <pfad>`, dazu erkannte Mus
 
 Alles, was nicht übertragen wurde, steht mit Pfad und Grund unter «Nicht übernommen», auch Dateien, die das Archiv
 abgelehnt hat (z. B. zu gross, Dateityp unbekannt).
+
+Jeder Aufruf startet einen Quelllauf. Beim Trockenlauf berechnet das Werkzeug lokale SHA-256-Prüfsummen und fragt
+das Archiv in Batches von höchstens 1'000 ab; es lädt keine Dokumentdateien hoch. Der Schlussbericht enthält die
+Quelllauf-ID und die vom Archiv bestätigten Zähler. Ein echter Lauf übergibt die Quelllauf-ID bei jedem Upload und
+meldet beim Abschluss übersprungene Dateien und Meldungen.
 
 ## VHF/GSK-Altbestand (Aufgabe 10.5)
 

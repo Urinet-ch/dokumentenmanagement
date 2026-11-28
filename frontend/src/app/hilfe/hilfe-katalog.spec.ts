@@ -75,7 +75,7 @@ describe('Hilfe-Katalog (Spec 07, Req 7.2)', () => {
   it('führt die Abschnitte in der Reihenfolge von Req 6.1 und Unterabschnitte nur unter ihrem Abschnitt', () => {
     // Req 6.1; die Abschnitte kommen mit 22.5 bis 22.7, darum genügt hier die Reihenfolge der vorhandenen.
     const reihenfolge = ['erste-schritte', 'erfassen', 'eingangskorb', 'suche', 'chat', 'dokument', 'kontakte', 'wissen',
-      'importe', 'jahresexport', 'verwaltung', 'probleme'];
+      'importe', 'quellen', 'jahresexport', 'verwaltung', 'probleme'];
     const abschnitte = HILFE_KATALOG.filter((e) => !e.eltern).map((e) => e.anker);
     expect(abschnitte.every((a) => reihenfolge.includes(a)), abschnitte.join(', ')).toBe(true);
     expect(abschnitte).toEqual(reihenfolge.filter((a) => abschnitte.includes(a)));
@@ -90,6 +90,7 @@ describe('Hilfe-Katalog (Spec 07, Req 7.2)', () => {
   it('Bestand und Verwaltung nach design.md «Hilfe-Katalog» (Aufgabe 22.7)', () => {
     const erwartet: Record<string, { eine: string[]; eltern?: string; pfade?: string[] }> = {
       importe: { eine: ['A12'], pfade: ['/importe'] },
+      quellen: { eine: ['A27'], pfade: ['/quellen'] },
       jahresexport: { eine: ['EXPORT'], pfade: ['/export'] },
       verwaltung: { eine: ['A11', 'A13', 'A14'], pfade: ['/verwaltung/benutzer', '/verwaltung/einstellungen'] },
       'verwaltung-dokumentarten': { eine: ['A11'], eltern: 'verwaltung', pfade: ['/verwaltung/dokumentarten'] },

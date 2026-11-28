@@ -163,6 +163,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.protokoll,
         TEXTE.chat.auswertung.titel,
         TEXTE.menue.apiTokens,
+        TEXTE.menue.quellen,
       ],
     ],
     [
@@ -189,9 +190,10 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.kontakte,
         TEXTE.menue.wissen,
         TEXTE.wissen.entwuerfe.titel,
+        TEXTE.menue.quellen,
       ],
     ],
-    ['treuhaender', [TEXTE.menue.uebersicht, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen, TEXTE.menue.export]],
+    ['treuhaender', [TEXTE.menue.uebersicht, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen, TEXTE.menue.export, TEXTE.menue.quellen]],
   ])('zeigt der Rolle %s nur die erlaubten Menüpunkte', async (rolle, erwartet) => {
     anmeldung.als(rolle);
     const element = await zeigen();

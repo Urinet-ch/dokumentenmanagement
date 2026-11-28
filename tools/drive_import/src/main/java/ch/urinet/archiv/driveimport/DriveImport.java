@@ -16,6 +16,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -47,12 +48,18 @@ public final class DriveImport implements Callable<Integer> {
     private static final Set<String> LOKAL = Set.of("localhost", "127.0.0.1", "[::1]");
     private static final Pattern ART_CODE = Pattern.compile("^[A-Z][A-Z0-9_]{1,39}$");
     private static final Pattern KLASSIFIKATIONSCODE = Pattern.compile("^[a-z][a-z0-9_]{0,39}$");
+    private static final Pattern QUELLENCODE = Pattern.compile("^[a-z0-9][a-z0-9-]{0,39}$");
 
     @Parameters(index = "0", paramLabel = "ORDNER", description = "Startordner, z. B. «~/Google Drive/UriNet»")
     Path ordner;
 
-    @Option(names = {"-n", "--trockenlauf"}, description = "Nur zählen und auflisten, nichts übertragen")
+    @Option(names = {"-n", "--trockenlauf"},
+            description = "Prüfsummen im Archiv abfragen und Zähler als Trockenlauf speichern; nichts übertragen")
     boolean trockenlauf;
+
+    @Option(names = "--quelle", paramLabel = "CODE", defaultValue = "drive",
+            description = "Quelle im Register (Standard: drive)")
+    String quelle;
 
     @Option(names = "--altbestand",
             description = "VHF/GSK-Altbestand: Reihenordner als Dokumentart und Jahr/Ausgabe aus Pfad und Dateiname")
@@ -141,15 +148,17 @@ public final class DriveImport implements Callable<Integer> {
             fehler.println(ordner + " ist kein Ordner.");
             return UNGUELTIG;
         }
-        ArchivClient client = null;
-        if (!trockenlauf) {
-            try {
-                Path datei = TokenDatei.pfad(tokenDatei, umgebung, System.getProperty("user.home"));
-                client = new ArchivClient(ziel, TokenDatei.lesen(datei), warten);
-            } catch (TokenDatei.Ungueltig e) {
-                fehler.println(e.getMessage());
-                return UNGUELTIG;
-            }
+        if (quelle == null || !QUELLENCODE.matcher(quelle).matches()) {
+            fehler.println("Quellcode ungültig. Bitte einen Code aus dem Quellenregister angeben.");
+            return UNGUELTIG;
+        }
+        ArchivClient client;
+        try {
+            Path datei = TokenDatei.pfad(tokenDatei, umgebung, System.getProperty("user.home"));
+            client = new ArchivClient(ziel, TokenDatei.lesen(datei), warten);
+        } catch (TokenDatei.Ungueltig e) {
+            fehler.println(e.getMessage());
+            return UNGUELTIG;
         }
         List<Fund> funde = durchsuchen(wurzel);
         Bericht bericht = new Bericht(trockenlauf, altbestand, funde.size());
@@ -167,9 +176,54 @@ public final class DriveImport implements Callable<Integer> {
                 }
             }
         }
+        Map<Path, String> dateiPruefsummen = new LinkedHashMap<>();
+        Map<Path, String> prueffehler = new LinkedHashMap<>();
+        Set<String> vorhanden = new HashSet<>();
+        if (trockenlauf) {
+            List<String> batch = new ArrayList<>(1000);
+            for (Fund fund : funde) {
+                if (!kannGesendetWerden(fund, altbestandErkennungen)) {
+                    continue;
+                }
+                try {
+                    String sha256 = ArchivClient.sha256(fund.pfad());
+                    dateiPruefsummen.put(fund.pfad(), sha256);
+                } catch (ArchivClient.ArchivFehler e) {
+                    prueffehler.put(fund.pfad(), e.getMessage());
+                }
+            }
+            for (String sha256 : dateiPruefsummen.values()) {
+                batch.add(sha256);
+                if (batch.size() == 1000) {
+                    try {
+                        vorhanden.addAll(client.pruefsummenAbfragen(List.copyOf(batch)));
+                    } catch (ArchivClient.ArchivFehler e) {
+                        fehler.println(e.getMessage());
+                        return ABGELEHNT;
+                    }
+                    batch.clear();
+                }
+            }
+            if (!batch.isEmpty()) {
+                try {
+                    vorhanden.addAll(client.pruefsummenAbfragen(List.copyOf(batch)));
+                } catch (ArchivClient.ArchivFehler e) {
+                    fehler.println(e.getMessage());
+                    return ABGELEHNT;
+                }
+            }
+        }
+        String quelllauf;
+        try {
+            quelllauf = client.quelllaufStarten(quelle, trockenlauf);
+        } catch (ArchivClient.ArchivFehler e) {
+            fehler.println(e.getMessage());
+            return ABGELEHNT;
+        }
         aus.println((trockenlauf ? "Trockenlauf" : "Import nach " + ziel) + ": " + funde.size() + " Dateien in "
-                + anzeige(wurzel, wurzel));
+                + anzeige(wurzel, wurzel) + " (Quelle: " + quelle + ")");
         String abbruch = null;
+        Set<String> lokalePruefsummen = new HashSet<>();
         for (Fund fund : funde) {
             String pfad = anzeige(wurzel, fund.pfad());
             if (abbruch != null) {
@@ -213,13 +267,25 @@ public final class DriveImport implements Callable<Integer> {
                     }
                     String hinweis = OrdnerHinweis.von(wurzel, fund.pfad(), altbestandPfad);
                     String artFuerDatei = altbestandPfad == null ? art : altbestandPfad.art();
-                    if (client == null) {
-                        bericht.uebertragen();
-                        aus.println("würde übertragen: " + pfad + "  [" + hinweis + "]");
+                    if (trockenlauf) {
+                        String pruefGrund = prueffehler.get(fund.pfad());
+                        if (pruefGrund != null) {
+                            bericht.abgelehnt(pfad, pruefGrund);
+                            aus.println("abgelehnt:        " + pfad + " – " + pruefGrund);
+                        } else {
+                            String sha256 = dateiPruefsummen.get(fund.pfad());
+                            if (vorhanden.contains(sha256) || !lokalePruefsummen.add(sha256)) {
+                                bericht.schonVorhanden();
+                                aus.println("schon vorhanden:  " + pfad);
+                            } else {
+                                bericht.uebertragen();
+                                aus.println("würde übertragen: " + pfad + "  [" + hinweis + "]");
+                            }
+                        }
                     } else {
                         String name = OrdnerHinweis.sauber(fund.pfad().getFileName().toString());
                         ArchivClient.Ergebnis ergebnis = client.senden(fund.pfad(), name, hinweis, artFuerDatei,
-                                klassifikationen);
+                                klassifikationen, quelllauf);
                         switch (ergebnis.status()) {
                             case UEBERTRAGEN -> {
                                 bericht.uebertragen();
@@ -244,11 +310,30 @@ public final class DriveImport implements Callable<Integer> {
                 }
             }
         }
+        ArchivClient.QuelllaufZaehler quelllaufZaehler;
+        try {
+            quelllaufZaehler = client.quelllaufAbschliessen(quelllauf, bericht, trockenlauf, abbruch != null);
+        } catch (ArchivClient.ArchivFehler e) {
+            fehler.println(e.getMessage());
+            bericht.ausgeben(aus);
+            return ABGELEHNT;
+        }
         bericht.ausgeben(aus);
+        bericht.ausgebenQuelllauf(aus, quelllauf, quelllaufZaehler);
         if (abbruch != null) {
             return ABGEBROCHEN;
         }
         return bericht.abgelehnt() > 0 ? ABGELEHNT : OK;
+    }
+
+    private static boolean kannGesendetWerden(Fund fund,
+                                               Map<Path, AltbestandPfad.Erkennung> altbestandErkennungen) {
+        if (fund.problem() != null
+                || Einordnung.von(fund.pfad().getFileName().toString()).weg() != Einordnung.Weg.SENDEN) {
+            return false;
+        }
+        AltbestandPfad.Erkennung erkennung = altbestandErkennungen.get(fund.pfad());
+        return erkennung == null || erkennung.pfad() != null;
     }
 
     private Map<String, List<String>> klassifikationen() {

@@ -193,6 +193,13 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     pfade: ['/importe'],
   },
   {
+    anker: 'quellen',
+    titel: TEXTE.hilfe.abschnitte['quellen'],
+    datei: '/anleitung/quellen.md',
+    bedingung: { eine: ['A27'] },
+    pfade: ['/quellen'],
+  },
+  {
     anker: 'jahresexport',
     titel: TEXTE.hilfe.abschnitte['jahresexport'],
     datei: '/anleitung/jahresexport.md',
