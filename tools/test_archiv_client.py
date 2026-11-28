@@ -80,6 +80,8 @@ class _Archiv(BaseHTTPRequestHandler):
                 "dateiname": teile["datei"].get_filename(),
                 "pdf": teile["datei"].get_payload(decode=True),
                 "metadaten": json.loads(teile["metadaten"].get_payload(decode=True).decode("utf-8")),
+                "quelllauf": (teile["quelllauf"].get_payload(decode=True).decode("ascii")
+                              if "quelllauf" in teile else None),
             }
         else:
             auftrag = {
@@ -160,6 +162,16 @@ class ArchivClientTest(unittest.TestCase):
         pfad.write_bytes(b"%PDF-1.4\n% synthetisch " + name.encode("ascii") + b"\n%%EOF\n")
         return pfad
 
+    def rechnung_gen(self, name: str, *, pdf_name: str | None = None, metadaten: dict | None = None) -> Path:
+        pdf_name = pdf_name or name.removesuffix(".json") + ".pdf"
+        self.pdf(pdf_name)
+        json_datei = self.ausgabe / name
+        json_datei.write_text(json.dumps({
+            "pdf": pdf_name,
+            "metadaten": metadaten or self.metadaten("2026-901"),
+        }), encoding="utf-8")
+        return json_datei
+
     @staticmethod
     def metadaten(belegnummer: str) -> dict:
         return {"art": "AUSGANGSRECHNUNG", "titel": "Probe-Rechnüng", "datum": "2026-03-10",
@@ -217,6 +229,61 @@ class ArchivClientTest(unittest.TestCase):
         ergebnis = archiv_client.archivieren(self.pdf("r.pdf"), self.metadaten("2026-901"), url=self.url)
 
         self.assertEqual(("VORHANDEN", "d-1"), (ergebnis.zustand, ergebnis.id))
+
+    def test_nachlauf_sendet_json_zuordnung_und_quelllauf_ohne_dateien_zu_verschieben(self):
+        self.rechnung_gen("erste.json", metadaten=self.metadaten("2026-901"))
+        self.rechnung_gen("zweite.json", metadaten=self.metadaten("2026-902"))
+        self.rechnung_gen("dritte.json", metadaten=self.metadaten("2026-903"))
+        _Archiv.antworten = [
+            (202, {"id": "d-1", "status": "NEU"}),
+            (200, {"id": "d-2", "status": "ARCHIVIERT"}),
+            (409, {"fehlercode": "BELEGNUMMER_VERGEBEN", "detail": "Bereits vergeben."}),
+        ]
+
+        ergebnis = archiv_client.nachlauf(self.ausgabe, quelllauf=_Archiv.lauf_id, url=self.url)
+
+        self.assertEqual({"gefunden": 3, "neu": 1, "schonVorhanden": 2, "fehler": 0}, ergebnis["anzahl"])
+        self.assertEqual(["NEU", "SCHON_VORHANDEN", "SCHON_VORHANDEN"],
+                         [eintrag["status"] for eintrag in ergebnis["ergebnisse"]])
+        self.assertEqual(3, len(_Archiv.empfangen))
+        self.assertTrue(all(anfrage["quelllauf"] == _Archiv.lauf_id for anfrage in _Archiv.empfangen))
+        self.assertTrue(all((self.ausgabe / f"{name}.pdf").is_file()
+                            for name in ("erste", "zweite", "dritte")))
+        self.assertFalse((self.ausgabe / archiv_client.KONFLIKT).exists())
+
+    def test_nachlauf_trocken_prueft_pruefsummen_und_sendet_nichts(self):
+        self.rechnung_gen("rechnung.json")
+        pdf = self.ausgabe / "rechnung.pdf"
+        _Archiv.vorhandene_pruefsummen = {archiv_client._sha256(pdf)}
+
+        ergebnis = archiv_client.nachlauf(self.ausgabe, trocken=True, url=self.url)
+
+        self.assertEqual({"gefunden": 1, "neu": 0, "schonVorhanden": 1, "fehler": 0}, ergebnis["anzahl"])
+        self.assertEqual("SCHON_VORHANDEN", ergebnis["ergebnisse"][0]["status"])
+        self.assertEqual([], _Archiv.empfangen)
+        self.assertEqual(["/api/v1/dokumente/pruefsummen"],
+                         [anfrage["pfad"] for anfrage in _Archiv.quellenanfragen])
+
+    def test_nachlauf_bricht_bei_fehlenden_json_feldern_vor_dem_senden_ab(self):
+        (self.ausgabe / "unvollstaendig.json").write_text(json.dumps({"pdf": "fehlt.pdf"}), encoding="utf-8")
+
+        with self.assertRaisesRegex(archiv_client.ArchivFehler, "fehlende JSON-Felder: metadaten"):
+            archiv_client.nachlauf(self.ausgabe, url=self.url)
+
+        self.assertEqual([], _Archiv.empfangen)
+
+    def test_nachlauf_verhindert_pdf_pfade_ausserhalb_des_ausgabeordners(self):
+        ausserhalb = self.ordner / "ausserhalb.pdf"
+        ausserhalb.write_bytes(b"%PDF-1.4\n% synthetisch\n%%EOF\n")
+        (self.ausgabe / "pfad.json").write_text(json.dumps({
+            "pdf": "../ausserhalb.pdf",
+            "metadaten": self.metadaten("2026-901"),
+        }), encoding="utf-8")
+
+        with self.assertRaisesRegex(archiv_client.ArchivFehler, "muss im Ausgabeordner liegen"):
+            archiv_client.nachlauf(self.ausgabe, url=self.url)
+
+        self.assertEqual([], _Archiv.empfangen)
 
     def test_quelllauf_trocken_fragt_pruefsumme_ab_und_speichert_zaehler(self):
         pdf = self.pdf("probe.pdf")

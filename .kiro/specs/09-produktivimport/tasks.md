@@ -187,12 +187,13 @@ zu den Wellen 27 bis 29.
   - _Anforderungen: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
   - _Abhängig von: 29.1_
 
-- [ ] 29.3 Dateinamen-Regeln, Aliasse und Nachlauf [Backend]
-  - Abschnitt `dateinamenRegeln` der Konfiguration (Schema, Prüfung, Seed-Beispiele mit `<generator-praefix>` erst mit
-    Wert von Fabian), Tabelle `belegnummer_alias` (A11), `DateinamenErkennung` im Erfassungsweg für Scope `import`,
-    `DateinamenAbgleich` nach der OCR.
-  - `archiv_client.py nachlauf` mit `--trocken` und `--quelllauf`; Zuordnung der JSON-Felder aus `rechnung_gen.py`
-    (Format von Fabian bestätigen lassen, nicht raten).
+- [x] 29.3 Dateinamen-Regeln, Aliasse und Nachlauf [Backend]
+  - Abschnitt `dateinamenRegeln` der Konfiguration (Schema, Prüfung, Seed-Beispiele mit dem unveränderten Platzhalter
+    `<generator-praefix>`), Tabelle `belegnummer_alias` (A11), `DateinamenErkennung` im Erfassungsweg für Scope
+    `import` (ohne passende Regel kein Treffer), `DateinamenAbgleich` nach der OCR.
+  - `archiv_client.py nachlauf` mit `--trocken` und `--quelllauf`; synthetisch getestete Zuordnung über
+    `RechnungGenJsonAdapter` (tatsächliches JSON-Format von Fabian bestätigen lassen, nicht raten).
+  - Anleitung zum Eingangskorb um den Prüfhinweis bei einem Widerspruch zwischen Dateiname und OCR ergänzt.
   - _Anforderungen: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
   - _Abhängig von: 27.1, 29.1_
 

@@ -2,6 +2,8 @@ package ch.urinet.archiv.dokument;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
@@ -96,6 +98,9 @@ public class GeneratorSchritte {
     private Path skript;
     private String clientZustand;
     private String clientId;
+    private String clientImportToken;
+    private UUID generatorLauf;
+    private JsonNode nachlaufAntwort;
 
     @After
     public void aufraeumen() throws Exception {
@@ -123,6 +128,11 @@ public class GeneratorSchritte {
         }
         for (Map.Entry<String, List<UUID>> e : jeMandant.entrySet()) {
             Testdokumente.loeschen(datenbank.get(), e.getKey(), e.getValue());
+        }
+        if (generatorLauf != null) {
+            ausfuehren("update " + schema(mandant) + ".quelle set letzter_lauf = null where letzter_lauf = ?",
+                    generatorLauf);
+            ausfuehren("delete from " + schema(mandant) + ".quelle_lauf where id = ?", generatorLauf);
         }
         for (Ort kontakt : kontakte) {
             ausfuehren("delete from " + schema(kontakt.mandant()) + ".kontakt where id = ?", kontakt.id());
@@ -153,6 +163,84 @@ public class GeneratorSchritte {
         ausfuehren("insert into " + schema(code) + ".kontakt (id, typ, name, name_normalisiert, quelle, crm_id) "
                 + "values (?, 'ORGANISATION', ?, ?, 'TEST', ?)", id, name, name.toLowerCase(), crmId);
         kontakte.add(new Ort(code, id));
+    }
+
+    @Angenommen("es gibt einen offenen Generator-Quelllauf")
+    public void generatorQuelllauf() {
+        ApiTokenVerwaltung.Erstellt erstellt = tokens.erstellen(mandant, "Probe Generator Quelllauf", "import");
+        tokenIds.add(erstellt.token().id());
+        Response laufAntwort = given().header("Authorization", "Bearer " + erstellt.token().text())
+                .contentType(ContentType.JSON).body(Map.of("art", "ECHT")).when()
+                .post("/api/v1/quellen/generatoren/laeufe");
+        assertThat(laufAntwort.statusCode()).as(laufAntwort.asString()).isEqualTo(201);
+        generatorLauf = UUID.fromString(laufAntwort.jsonPath().getString("id"));
+    }
+
+    @Angenommen("das Skript hat ein API-Token vom Scope «import»")
+    public void importToken() {
+        ApiTokenVerwaltung.Erstellt erstellt = tokens.erstellen(mandant, "Probe Nachlauf Trockenlauf", "import");
+        tokenIds.add(erstellt.token().id());
+        clientImportToken = erstellt.token().text();
+    }
+
+    @Angenommen("der Nachlaufordner enthält die synthetische PDF «{word}»")
+    public void nachlaufOrdner(String pdf) throws Exception {
+        nachlaufEintrag(pdf, "{\"art\":\"PROJEKTDOKUMENT\",\"titel\":\"Synthetischer Nachlauf\","
+                + "\"projekt\":\"Probe\"}");
+    }
+
+    @Angenommen("der Nachlaufordner enthält die PDF «{word}» mit diesen Metadaten:")
+    public void nachlaufRechnung(String pdf, String metadaten) throws Exception {
+        nachlaufEintrag(pdf, metadaten);
+    }
+
+    @Wenn("der Python-Nachlauf den Ausgabeordner mit dem offenen Quelllauf sendet")
+    public void pythonNachlaufMitQuelllauf() throws Exception {
+        nachlaufAufrufen(false, tokenJeMandant.get(mandant), true);
+    }
+
+    @Wenn("der Python-Nachlauf die Dateien «{}» mit diesen Metadaten sendet:")
+    public void pythonNachlauf(String dateien, String metadaten) throws Exception {
+        for (String datei : dateien.split(",\\s*")) {
+            nachlaufEintrag(datei, metadaten);
+        }
+        nachlaufAufrufen(false, tokenJeMandant.get(mandant), true);
+    }
+
+    @Wenn("der Python-Nachlauf den Ordner im Trockenlauf prüft")
+    public void pythonNachlaufTrocken() throws Exception {
+        nachlaufAufrufen(true, clientImportToken, false);
+    }
+
+    @Dann("meldet der Nachlauf {int} neue und {int} schon vorhandene Dokumente")
+    public void nachlaufZaehler(int neu, int schonVorhanden) {
+        assertThat(nachlaufAntwort.path("anzahl").path("neu").asInt()).isEqualTo(neu);
+        assertThat(nachlaufAntwort.path("anzahl").path("schonVorhanden").asInt()).isEqualTo(schonVorhanden);
+    }
+
+    @Dann("bleibt die PDF «{word}» im Nachlaufordner und nicht in archiv-konflikt")
+    public void nachlaufDateiBleibt(String name) {
+        assertThat(skript.resolve("rechnung-gen").resolve(name + ".pdf")).isRegularFile();
+        assertThat(skript.resolve("archiv-konflikt")).doesNotExist();
+    }
+
+    @Dann("ist die neue Nachlauf-PDF dem offenen Generator-Quelllauf zugeordnet")
+    public void nachlaufQuelllaufZuordnung() throws Exception {
+        String sha256 = VerarbeitungTestHilfe.sha256(pdfs.get("nachlauf-neu"));
+        assertThat(abfragen("select quelle_lauf_id::text || ':' || quelle from " + schema(mandant)
+                        + ".dokument where id in (select dokument_id from " + schema(mandant)
+                        + ".dokument_datei where sha256 = ? and rolle = 'ORIGINAL')", sha256))
+                .containsExactly(generatorLauf + ":GENERATOR");
+    }
+
+    @Dann("meldet der Trockenlauf die Datei als «{word}» ohne Upload")
+    public void nachlaufTrockenErgebnis(String status) throws Exception {
+        assertThat(nachlaufAntwort.path("ergebnisse").get(0).path("status").asText()).isEqualTo(status);
+        assertThat(nachlaufAntwort.path("anzahl").path("neu").asInt())
+                .isEqualTo("WIRD_GESENDET".equals(status) ? 1 : 0);
+        assertThat(nachlaufAntwort.path("anzahl").path("schonVorhanden").asInt())
+                .isEqualTo("SCHON_VORHANDEN".equals(status) ? 1 : 0);
+        assertThat(dokumenteZurPdf(mandant, "nachlauf-trocken")).isEmpty();
     }
 
     @Wenn("der Generator die PDF «{word}» mit diesen Metadaten sendet:")
@@ -413,6 +501,55 @@ public class GeneratorSchritte {
         String[] teile = ausgabe.split(" ", 2);
         clientZustand = teile[0];
         clientId = teile.length > 1 ? teile[1].strip() : "";
+    }
+
+    private void nachlaufEintrag(String name, String metadaten) throws Exception {
+        if (skript == null) {
+            skript = Files.createTempDirectory("generator-nachlauf");
+        }
+        Path ordner = skript.resolve("rechnung-gen");
+        Files.createDirectories(ordner);
+        Path pdfDatei = ordner.resolve(name + ".pdf");
+        Files.write(pdfDatei, pdf(name));
+        clientPdfs.add(name);
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode jsonMetadaten = mapper.readTree(metadaten);
+        Files.writeString(ordner.resolve(name + ".json"),
+                mapper.writeValueAsString(Map.of("pdf", pdfDatei.getFileName().toString(),
+                        "metadaten", jsonMetadaten)), StandardCharsets.UTF_8);
+    }
+
+    private void nachlaufAufrufen(boolean trocken, String apiToken, boolean mitQuelllauf) throws Exception {
+        Path tokenDatei = skript.resolve(trocken ? ".token-import" : ".token");
+        if (!Files.exists(tokenDatei)) {
+            Files.createFile(tokenDatei,
+                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        }
+        Files.writeString(tokenDatei, apiToken, StandardCharsets.UTF_8);
+        Path fehler = skript.resolve(".fehler-nachlauf");
+        List<String> befehl = new ArrayList<>(List.of("python3", TOOLS.resolve("archiv_client.py").toString(),
+                "nachlauf", "--rechnungen", skript.resolve("rechnung-gen").toString()));
+        if (trocken) {
+            befehl.add("--trocken");
+        }
+        if (mitQuelllauf) {
+            befehl.add("--quelllauf");
+            befehl.add(generatorLauf.toString());
+        }
+        ProcessBuilder aufruf = new ProcessBuilder(befehl).redirectError(fehler.toFile());
+        Map<String, String> umgebung = aufruf.environment();
+        umgebung.put("PYTHONPATH", TOOLS.toString());
+        umgebung.put("PYTHONDONTWRITEBYTECODE", "1");
+        umgebung.put("ARCHIV_URL", "http://localhost:" + RestAssured.port);
+        umgebung.put("ARCHIV_TOKEN_DATEI", tokenDatei.toString());
+        umgebung.put("NO_PROXY", "localhost,127.0.0.1");
+        umgebung.put("no_proxy", "localhost,127.0.0.1");
+        Process prozess = aufruf.start();
+        String ausgabe = new String(prozess.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+        assertThat(prozess.waitFor(60, TimeUnit.SECONDS)).as("Python-Nachlauf beendet").isTrue();
+        assertThat(prozess.exitValue()).as("Exit-Code des Python-Nachlaufs: " + Files.readString(fehler)
+                + ", Ausgabe: " + ausgabe).isZero();
+        nachlaufAntwort = new ObjectMapper().readTree(ausgabe);
     }
 
     private byte[] pdf(String pdf) {

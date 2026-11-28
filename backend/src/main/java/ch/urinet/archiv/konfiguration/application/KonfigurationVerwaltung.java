@@ -14,6 +14,7 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
@@ -34,6 +35,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     private final MandantAufloesung aufloesung;
     private final MandantKontext kontext;
     private final KonfigurationAenderungsProtokoll protokoll;
+    private final DateinamenRegelRepository dateinamenRegeln;
 
     public KonfigurationVerwaltung(KonfigurationVersionsRepository repository, KonfigurationCache cache,
                                    KiTexteRepository kiTexteRepository,
@@ -41,6 +43,18 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
                                    KlassifikationRepository klassifikationen, RegelRepository regeln,
                                    MandantEinstellungen einstellungen, MandantAufloesung aufloesung,
                                    MandantKontext kontext, KonfigurationAenderungsProtokoll protokoll) {
+        this(repository, cache, kiTexteRepository, dokumentarten, zusatzSchema, klassifikationen, regeln,
+                einstellungen, aufloesung, kontext, protokoll, null);
+    }
+
+    @Inject
+    public KonfigurationVerwaltung(KonfigurationVersionsRepository repository, KonfigurationCache cache,
+                                   KiTexteRepository kiTexteRepository,
+                                   DokumentartRepository dokumentarten, ZusatzSchemaPruefer zusatzSchema,
+                                   KlassifikationRepository klassifikationen, RegelRepository regeln,
+                                   MandantEinstellungen einstellungen, MandantAufloesung aufloesung,
+                                   MandantKontext kontext, KonfigurationAenderungsProtokoll protokoll,
+                                   DateinamenRegelRepository dateinamenRegeln) {
         this.repository = repository;
         this.kiTexteRepository = kiTexteRepository;
         this.cache = cache;
@@ -52,6 +66,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         this.aufloesung = aufloesung;
         this.kontext = kontext;
         this.protokoll = protokoll;
+        this.dateinamenRegeln = dateinamenRegeln;
     }
 
     @Override
@@ -162,7 +177,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         Konfiguration ergaenzt = new Konfiguration(inhalt.version(), inhalt.einstellungen(), inhalt.arten().stream()
                 .map(art -> art.mitZusatzFeldTypen(zusatzSchema.feldTypen(art.zusatzSchema()))).toList(),
                 inhalt.klassifikationen(), inhalt.regeln(),
-                inhalt.ohneKiTexte() ? kiTexteRepository.lesen() : inhalt.kiTexte());
+                inhalt.ohneKiTexte() ? kiTexteRepository.lesen() : inhalt.kiTexte(), inhalt.dateinamenRegeln());
         return new KonfigurationsVersion(stand.version(), stand.zeit(), stand.wer(), stand.grund(), stand.quelle(),
                 ergaenzt, stand.sha256());
     }
@@ -174,7 +189,14 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
                 bisher == null ? null : bisher.branding(), bisher == null ? null : bisher.chat(),
                 bisher == null ? null : bisher.webseitenChat(), bisher == null ? null : bisher.wissen()),
                 dokumentarten.alle().stream()
-                .map(this::art).toList(), klassifikationen.alle(), regeln.alle(), kiTexteRepository.lesen());
+                .map(this::art).toList(), klassifikationen.alle(), regeln.alle(), kiTexteRepository.lesen(),
+                dateinamenRegeln == null ? List.of() : dateinamenRegeln.alle());
+    }
+
+    public void dateinamenRegelnErsetzen(List<Konfiguration.DateinamenRegel> neueRegeln) {
+        if (dateinamenRegeln != null) {
+            dateinamenRegeln.ersetzen(neueRegeln);
+        }
     }
 
     private Konfiguration.Art art(Dokumentart art) {

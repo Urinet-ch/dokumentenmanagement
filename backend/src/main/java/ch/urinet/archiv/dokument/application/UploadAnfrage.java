@@ -14,10 +14,16 @@ import java.util.Optional;
  * Upload (nur zur Anzeige), von der Handy-App dazu die Arbeitsfassung (Req 4.7).
  */
 public record UploadAnfrage(List<Seite> seiten, boolean zusammenfassen, Optional<String> hinweis, Erfasser erfasser,
-                            String art, Map<String, List<String>> klassifikationen) {
+                            String art, Map<String, List<String>> klassifikationen,
+                            boolean dateinamenRegelnAnwenden) {
 
     public UploadAnfrage(List<Seite> seiten, boolean zusammenfassen, Optional<String> hinweis, Erfasser erfasser) {
-        this(seiten, zusammenfassen, hinweis, erfasser, null, Map.of());
+        this(seiten, zusammenfassen, hinweis, erfasser, null, Map.of(), false);
+    }
+
+    public UploadAnfrage(List<Seite> seiten, boolean zusammenfassen, Optional<String> hinweis, Erfasser erfasser,
+                         String art, Map<String, List<String>> klassifikationen) {
+        this(seiten, zusammenfassen, hinweis, erfasser, art, klassifikationen, false);
     }
 
     public UploadAnfrage {

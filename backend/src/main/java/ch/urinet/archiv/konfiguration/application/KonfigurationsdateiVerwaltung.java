@@ -154,7 +154,7 @@ public class KonfigurationsdateiVerwaltung {
         Konfiguration aktuell = konfiguration.aktuell();
         KiTexte texte = kiTexte.lesen();
         return new Konfiguration(aktuell.version(), aktuell.einstellungen(), aktuell.arten(),
-                aktuell.klassifikationen(), aktuell.regeln(), texte);
+                aktuell.klassifikationen(), aktuell.regeln(), texte, aktuell.dateinamenRegeln());
     }
 
     /**
@@ -313,7 +313,7 @@ public class KonfigurationsdateiVerwaltung {
                     art.reihenfolge(), zuordnungen, art.zusatzFeldTypen());
         }).toList();
         return new Konfiguration(datei.version(), datei.einstellungen(), artenMitKlassen,
-                klassen.values().stream().toList(), datei.regeln(), datei.kiTexte());
+                klassen.values().stream().toList(), datei.regeln(), datei.kiTexte(), datei.dateinamenRegeln());
     }
 
     private Klassifikation verwendeteWerteErhalten(Klassifikation alt, Klassifikation neu) {
@@ -358,6 +358,7 @@ public class KonfigurationsdateiVerwaltung {
         }
         zuordnungenSpeichern(ziel, alteArten.keySet(), zielKlassen);
         regeln.ersetzen(ziel.regeln());
+        konfiguration.dateinamenRegelnErsetzen(ziel.dateinamenRegeln());
         Set<String> zielArten = ziel.arten().stream().map(Art::code).collect(java.util.stream.Collectors.toSet());
         for (String code : alteArten.keySet()) {
             if (!zielArten.contains(code)) {

@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ki.application;
 
 import ch.urinet.archiv.konfiguration.application.KonfigurationLesen;
+import ch.urinet.archiv.konfiguration.application.DateinamenTreffer;
 import ch.urinet.archiv.konfiguration.domain.Klassifikation;
 import ch.urinet.archiv.konfiguration.domain.KlassifikationWert;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
@@ -79,7 +80,12 @@ public class MetadatenExtraktion {
      * @param eingang Eingangsdatum in Europe/Zurich (Regel R3)
      */
     public record Eingabe(UUID dokumentId, MandantCode mandant, String text, Optional<QrDaten> qr,
-                          Optional<byte[]> bild, LocalDate eingang) {
+                          Optional<byte[]> bild, LocalDate eingang, Optional<DateinamenTreffer> dateinameRegel) {
+        public Eingabe(UUID dokumentId, MandantCode mandant, String text, Optional<QrDaten> qr,
+                       Optional<byte[]> bild, LocalDate eingang) {
+            this(dokumentId, mandant, text, qr, bild, eingang, Optional.empty());
+        }
+
         public Eingabe {
             Objects.requireNonNull(dokumentId, "dokumentId");
             Objects.requireNonNull(mandant, "mandant");
@@ -87,6 +93,7 @@ public class MetadatenExtraktion {
             Objects.requireNonNull(qr, "qr");
             Objects.requireNonNull(bild, "bild");
             Objects.requireNonNull(eingang, "eingang");
+            Objects.requireNonNull(dateinameRegel, "dateinameRegel");
         }
     }
 
@@ -127,8 +134,10 @@ public class MetadatenExtraktion {
      */
     public Optional<Vorschlag> vorschlagen(Eingabe eingabe) {
         Konfiguration konfig = konfiguration.aktuell();
+        Optional<Vorschlag> dateinameVorschlag = DateinamenAbgleich.anwenden(Optional.empty(),
+                eingabe.dateinameRegel(), eingabe.text());
         if (!konfig.kiTexte().kiFreigegeben()) {
-            return Optional.empty();
+            return dateinameVorschlag;
         }
         MandantEinstellungen.Werte werte = einstellungen.lesen(eingabe.mandant());
         List<ArtEintrag> alleArten = arten(konfig, zusatzSchema);
@@ -137,7 +146,7 @@ public class MetadatenExtraktion {
         List<ArtEintrag> arten = ErfassungPrompt.schemaArten(
                 alleArten.stream().filter(ArtEintrag::kiVorschlag).toList(), eigeneArten);
         if (arten.isEmpty()) {
-            return Optional.empty();
+            return dateinameVorschlag;
         }
         ErfassungMandant mandant = new ErfassungMandant(werte.name(), konfig.einstellungen().kennungen().uid(),
                 konfig.einstellungen().kennungen().ibans(), eigeneArten,
@@ -177,18 +186,18 @@ public class MetadatenExtraktion {
                 LOG.infof("KI-Vorschlag für Dokument %s (Prompt %s, Nachbearbeitung %s, QR %s, Bildweg %s)",
                         eingabe.dokumentId(), kennung, VorschlagNachbearbeitung.FASSUNG,
                         qr.isPresent(), bild.isPresent());
-                yield Optional.of(vorschlag);
+                yield DateinamenAbgleich.anwenden(Optional.of(vorschlag), eingabe.dateinameRegel(), eingabe.text());
             }
             case KiPort.Schemafehler s -> {
                 LOG.warnf("KI-Vorschlag für Dokument %s ohne Ergebnis: auch die Nachfrage ausserhalb des Schemas (%s)",
                         eingabe.dokumentId(), s.grund());
-                yield Optional.empty();
+                yield dateinameVorschlag;
             }
             case KiPort.Ausfall a -> throw new KiAusfall(eingabe.dokumentId(), a.grund());
             case KiPort.OhneZugang o -> {
                 LOG.warnf("KI-Vorschlag für Dokument %s ohne Ergebnis: kein Token für das Sprachmodell",
                         eingabe.dokumentId());
-                yield Optional.empty();
+                yield dateinameVorschlag;
             }
         };
     }

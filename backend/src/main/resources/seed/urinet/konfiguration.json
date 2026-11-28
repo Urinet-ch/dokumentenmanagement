@@ -462,5 +462,61 @@
       "meldung": "Für einen Monat fehlt ein bestätigter Bankbeleg."
     }
   ],
+  "dateinamenRegeln": [
+    {
+      "nr": 1,
+      "muster": "^<generator-praefix>(?<belegnummer>\\d{4}-\\d{3})_(?<partner>.+)\\.pdf$",
+      "art": "AUSGANGSRECHNUNG",
+      "felder": {
+        "belegnummer": "belegnummer",
+        "partner": "partner"
+      }
+    },
+    {
+      "nr": 2,
+      "muster": "^<generator-praefix>(?<belegnummer>O-\\d{4}-\\d{3})_(?<partner>.+)\\.pdf$",
+      "art": "OFFERTE",
+      "felder": {
+        "belegnummer": "belegnummer",
+        "partner": "partner"
+      }
+    },
+    {
+      "nr": 3,
+      "muster": "^<generator-praefix>(?<periode>\\d{4}-\\d{2})_(?<person>.+)\\.pdf$",
+      "art": "LOHNABRECHNUNG",
+      "felder": {
+        "periode": "periode",
+        "person": "person"
+      }
+    },
+    {
+      "nr": 4,
+      "muster": "^(?<belegnummer>F\\d{4})[_ ](?<partner>.+)\\.pdf$",
+      "art": "LIEFERANTENBELEG",
+      "felder": {
+        "belegnummer": "belegnummer",
+        "partner": "partner"
+      }
+    },
+    {
+      "nr": 5,
+      "muster": "^(?<belegnummer>R\\d{4})[_ ](?<partner>.+)\\.pdf$",
+      "art": "AUSGANGSRECHNUNG",
+      "felder": {
+        "belegnummer": "belegnummer",
+        "partner": "partner"
+      }
+    },
+    {
+      "nr": 6,
+      "muster": "^(?<belegnummer>\\d{4}-\\d{3})[_ ](?<partner>.+)\\.pdf$",
+      "art": "AUSGANGSRECHNUNG",
+      "felder": {
+        "belegnummer": "belegnummer",
+        "partner": "partner"
+      }
+    }
+  ],
   "_quelle": "Konzept «UriNet Archiv — Konzept und Anforderungen», Tabelle «Dokumentarten UriNet» und Kapitel GeBüV (Art. 958f OR: Bücher und Buchungsbelege 10 Jahre ab Ende Geschäftsjahr); Prüfentscheide P6 und P12. Muss mit der Stammdaten-Tabelle in .kiro/specs/01-archiv-kern/design.md übereinstimmen (Req 9.2). Werte entschieden von Fabian am 10.11.2026; ebenso die Anpassungen F3 (AUSGANGSRECHNUNG ohne Pflichtfeld faelligkeit), F5 (BEHOERDE mit Gruppe finanz) und F7 (LOHNABRECHNUNG: periode JJJJ-MM oder JJJJ für den Lohnausweis) sowie die Beschreibungen (entschieden von Fabian am 10.11.2026)."
 }

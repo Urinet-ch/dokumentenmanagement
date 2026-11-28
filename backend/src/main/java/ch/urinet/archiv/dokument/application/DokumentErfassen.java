@@ -12,6 +12,8 @@ import ch.urinet.archiv.dokument.domain.Dateityp;
 import ch.urinet.archiv.dokument.domain.UploadErgebnis;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.DateinamenErkennung;
+import ch.urinet.archiv.konfiguration.application.DateinamenTreffer;
 import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -98,35 +100,47 @@ public class DokumentErfassen {
     private final Clock uhr;
     private final KlassifikationVerwaltung klassifikationVerwaltung;
     private final DokumentKlassifikationenPort dokumentKlassifikationen;
+    private final DateinamenErkennung dateinamenErkennung;
 
     @Inject
     public DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
                             AuftragService auftraege, MandantAufloesung aufloesung,
                             TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen,
                             KlassifikationVerwaltung klassifikationVerwaltung,
+                            DokumentKlassifikationenPort dokumentKlassifikationen,
+                            DateinamenErkennung dateinamenErkennung) {
+        this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, Clock.systemUTC(),
+                klassifikationVerwaltung, dokumentKlassifikationen, dateinamenErkennung);
+    }
+
+    public DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
+                            AuftragService auftraege, MandantAufloesung aufloesung,
+                            TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen,
+                            KlassifikationVerwaltung klassifikationVerwaltung,
                             DokumentKlassifikationenPort dokumentKlassifikationen) {
         this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, Clock.systemUTC(),
-                klassifikationVerwaltung, dokumentKlassifikationen);
+                klassifikationVerwaltung, dokumentKlassifikationen, null);
     }
 
     public DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
                             AuftragService auftraege, MandantAufloesung aufloesung,
                             TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen) {
         this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, Clock.systemUTC(), null,
-                null);
+                null, null);
     }
 
     DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
                      AuftragService auftraege, MandantAufloesung aufloesung,
                      TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen, Clock uhr) {
-        this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, uhr, null, null);
+        this(repository, typerkennung, ablage, auftraege, aufloesung, transaktion, grenzen, uhr, null, null, null);
     }
 
     private DokumentErfassen(DokumentRepository repository, Typerkennung typerkennung, AblagePort ablage,
                              AuftragService auftraege, MandantAufloesung aufloesung,
                              TransactionSynchronizationRegistry transaktion, UploadGrenzen grenzen, Clock uhr,
                              KlassifikationVerwaltung klassifikationVerwaltung,
-                             DokumentKlassifikationenPort dokumentKlassifikationen) {
+                             DokumentKlassifikationenPort dokumentKlassifikationen,
+                             DateinamenErkennung dateinamenErkennung) {
         this.repository = repository;
         this.typerkennung = typerkennung;
         this.ablage = ablage;
@@ -137,6 +151,7 @@ public class DokumentErfassen {
         this.uhr = uhr;
         this.klassifikationVerwaltung = klassifikationVerwaltung;
         this.dokumentKlassifikationen = dokumentKlassifikationen;
+        this.dateinamenErkennung = dateinamenErkennung;
     }
 
     /** Ein Ergebnis je Seite in der gesendeten Reihenfolge; Fehler der ganzen Anfrage als {@link FachFehler}. */
@@ -219,7 +234,11 @@ public class DokumentErfassen {
                 nr++;
             } else {
                 // bei zusammenfassen der Name der ersten angenommenen Original-Datei (Req 3.9)
-                id = anlegen(anfrage, mandant, jahr, eingang, name.speicherbar());
+                Optional<DateinamenTreffer> dateinameRegel = anfrage.dateinamenRegelnAnwenden()
+                        && dateinamenErkennung != null
+                        ? dateinamenErkennung.erkennen(name.speicherbar().orElse(null))
+                        : Optional.empty();
+                id = anlegen(anfrage, mandant, jahr, eingang, name.speicherbar(), dateinameRegel);
                 gemeinsam = id;
                 nr = 1;
                 neue.add(id);
@@ -334,10 +353,10 @@ public class DokumentErfassen {
     }
 
     private UUID anlegen(UploadAnfrage anfrage, MandantCode mandant, int jahr, Instant eingang,
-                         Optional<String> dateiname) {
+                         Optional<String> dateiname, Optional<DateinamenTreffer> dateinameRegel) {
         UUID id = UUID.randomUUID();
         repository.anlegen(new NeuesDokument(id, eingang, anfrage.erfasser().quelle(), anfrage.erfasser().id(),
-                anfrage.hinweis().filter(h -> !h.isBlank()), dateiname));
+                anfrage.hinweis().filter(h -> !h.isBlank()), dateiname, dateinameRegel));
         transaktion.registerInterposedSynchronization(new EingangAufraeumen(mandant, jahr, id));
         if (!anfrage.klassifikationen().isEmpty()) {
             if (!repository.artVorbelegen(id, anfrage.art())) {

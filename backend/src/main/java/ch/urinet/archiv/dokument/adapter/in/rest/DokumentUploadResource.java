@@ -184,7 +184,8 @@ public class DokumentUploadResource {
                 seiten.add(new UploadAnfrage.Seite(original.uploadedFile(), original.fileName(), fassung));
             }
             ergebnisse = erfassen.erfassen(new UploadAnfrage(seiten, zusammenfassen, Optional.ofNullable(hinweis),
-                    erfasser(!arbeit.isEmpty()), artCode, werte));
+                    erfasser(!arbeit.isEmpty()), artCode, werte,
+                    identitaet.getAttribute(TokenIdentitaet.SCOPE) == ApiTokenScope.IMPORT));
         }
         if (!teile.contains(false)) {
             return ergebnisse;

@@ -2,6 +2,7 @@ package ch.urinet.archiv.dokument.application;
 
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.konfiguration.application.DateinamenTreffer;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -70,12 +71,21 @@ public interface DokumentVerarbeitungPort {
      * @param mime Medientyp des Originals (Nr. 1), für den Bildweg (Req 7.1)
      */
     record KiStand(UUID id, DokumentStatus status, boolean bestaetigt, int version, boolean pdfaFehlt,
-                   boolean vorschlagVorhanden, String volltext, Instant eingang, Optional<Datei> pdfa, String mime) {
+                   boolean vorschlagVorhanden, String volltext, Instant eingang, Optional<Datei> pdfa, String mime,
+                   Optional<DateinamenTreffer> dateinameRegel) {
+        public KiStand(UUID id, DokumentStatus status, boolean bestaetigt, int version, boolean pdfaFehlt,
+                       boolean vorschlagVorhanden, String volltext, Instant eingang, Optional<Datei> pdfa,
+                       String mime) {
+            this(id, status, bestaetigt, version, pdfaFehlt, vorschlagVorhanden, volltext, eingang, pdfa, mime,
+                    Optional.empty());
+        }
+
         public KiStand {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(eingang, "eingang");
             Objects.requireNonNull(pdfa, "pdfa");
+            Objects.requireNonNull(dateinameRegel, "dateinameRegel");
         }
     }
 

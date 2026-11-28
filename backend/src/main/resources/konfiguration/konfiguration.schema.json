@@ -22,6 +22,11 @@
       "type": "array",
       "maxItems": 200,
       "items": { "$ref": "#/$defs/regel" }
+    },
+    "dateinamenRegeln": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/dateinamenRegel" }
     }
   },
   "patternProperties": {
@@ -40,6 +45,33 @@
     "codeKlassifikation": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,39}$"
+    },
+    "dateinamenRegel": {
+      "type": "object",
+      "required": ["nr", "muster", "art", "felder"],
+      "properties": {
+        "nr": { "type": "integer", "minimum": 1 },
+        "muster": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "art": { "$ref": "#/$defs/codeArt" },
+        "felder": {
+          "type": "object",
+          "minProperties": 1,
+          "properties": {
+            "belegnummer": { "$ref": "#/$defs/regexGruppe" },
+            "periode": { "$ref": "#/$defs/regexGruppe" },
+            "partner": { "$ref": "#/$defs/regexGruppe" },
+            "person": { "$ref": "#/$defs/regexGruppe" }
+          },
+          "patternProperties": { "^_": { "$ref": "#/$defs/kommentar" } },
+          "additionalProperties": false
+        }
+      },
+      "patternProperties": { "^_": { "$ref": "#/$defs/kommentar" } },
+      "additionalProperties": false
+    },
+    "regexGruppe": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$"
     },
     "einstellungen": {
       "type": "object",

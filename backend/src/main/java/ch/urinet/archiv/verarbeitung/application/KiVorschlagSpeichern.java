@@ -109,6 +109,12 @@ public class KiVorschlagSpeichern {
             werte.put("tags", v.tags());
         }
         werte.putAll(v.dynamischeWerte());
+        if (!v.herkunft().isEmpty()) {
+            werte.put("herkunft", v.herkunft());
+        }
+        if (!v.bittePruefen().isEmpty()) {
+            werte.put("bittePruefen", v.bittePruefen());
+        }
         return werte;
     }
 

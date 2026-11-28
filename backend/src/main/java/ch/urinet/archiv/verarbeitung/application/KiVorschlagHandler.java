@@ -159,7 +159,7 @@ public class KiVorschlagHandler implements AuftragHandler {
         LocalDate eingang = stand.eingang().atZone(ZUERICH).toLocalDate();
         if (stand.pdfaFehlt() || stand.pdfa().isEmpty()) {
             return extraktion.vorschlagen(new MetadatenExtraktion.Eingabe(stand.id(), mandant, stand.volltext(),
-                    Optional.empty(), Optional.empty(), eingang));
+                    Optional.empty(), Optional.empty(), eingang, stand.dateinameRegel()));
         }
         boolean bildweg = Quelltyp.ausMedientyp(stand.mime()).map(Quelltyp::istBild).orElse(false);
         Datei pdfa = stand.pdfa().get();
@@ -203,7 +203,8 @@ public class KiVorschlagHandler implements AuftragHandler {
                 }
                 fristAbgelaufen(stand.id(), qr.isPresent(), bildweg);
             }
-            eingabe = new MetadatenExtraktion.Eingabe(stand.id(), mandant, text, qr, bild, eingang);
+            eingabe = new MetadatenExtraktion.Eingabe(stand.id(), mandant, text, qr, bild, eingang,
+                    stand.dateinameRegel());
         } finally {
             loeschen(verzeichnis);
         }

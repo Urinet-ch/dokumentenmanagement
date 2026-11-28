@@ -209,6 +209,34 @@ class KonfigurationTest {
     }
 
     @Test
+    void prueftDateinamenMusterDokumentartUndBenannteGruppen() {
+        var dokumentart = art("RECHNUNG", "NORMAL", true, false);
+        var ungueltigesMuster = new Konfiguration.DateinamenRegel(1, "(", "RECHNUNG",
+                Map.of("belegnummer", "nummer"));
+        var fehlendeGruppe = new Konfiguration.DateinamenRegel(2, "^(?<nr>\\\\d+)$", "RECHNUNG",
+                Map.of("belegnummer", "nummer"));
+        var unbekannteArt = new Konfiguration.DateinamenRegel(3, "^(?<nummer>\\\\d+)$", "FEHLT",
+                Map.of("belegnummer", "nummer"));
+        var konfiguration = new Konfiguration(1, einstellungen(), List.of(dokumentart), List.of(), List.of(),
+                Konfiguration.KiTexte.LEER, List.of(ungueltigesMuster, fehlendeGruppe, unbekannteArt));
+
+        assertThat(konfiguration.pruefen()).extracting(Konfiguration.Befund::code)
+                .containsExactly("MUSTER_UNGUELTIG", "FELDER_UNGUELTIG", "ART_UNGUELTIG");
+    }
+
+    @Test
+    void nummeriertDateinamenRegelnInFesterReihenfolge() {
+        var regelZwei = new Konfiguration.DateinamenRegel(2, "^zwei$", "RECHNUNG", Map.of("belegnummer", "nr"));
+        var regelEins = new Konfiguration.DateinamenRegel(1, "^eins$", "RECHNUNG", Map.of("belegnummer", "nr"));
+
+        var konfiguration = new Konfiguration(1, einstellungen(),
+                List.of(art("RECHNUNG", "NORMAL", true, false)), List.of(), List.of(), Konfiguration.KiTexte.LEER,
+                List.of(regelZwei, regelEins));
+
+        assertThat(konfiguration.dateinamenRegeln()).containsExactly(regelEins, regelZwei);
+    }
+
+    @Test
     void validiertRegelfelderGegenZusatzschemaUndMustergruppe() {
         var art = new Konfiguration.Art("RECHNUNG", "Rechnung", null, List.of("finanz", "frei"),
                 List.of("titel"), "{\"type\":\"object\"}", "NORMAL",
