@@ -13,7 +13,7 @@ Funktionalität: Hauptnavigation der Rollen
 
     Beispiele:
       | rolle            | menü                                                                                                                                              |
-      | inhaber          | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Kontakte, Wissen, Wissensentwürfe, Importe, Jahresexport, Einstellungen, Benutzer, Dokumentarten, Zugriffsprotokoll, Chat-Auswertung, API-Tokens |
-      | mitarbeiter      | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Wissen                                                                                              |
+      | inhaber          | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Trennblätter, Kontakte, Wissen, Wissensentwürfe, Importe, Jahresexport, Einstellungen, Benutzer, Dokumentarten, Zugriffsprotokoll, Chat-Auswertung, API-Tokens |
+      | mitarbeiter      | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Trennblätter, Wissen                                                                                              |
       | treuhaender      | Übersicht, Eingangskorb, Suche, Chat, Wissen, Jahresexport                                                                                          |
-      | geschaeftsstelle | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Kontakte, Wissen, Wissensentwürfe                                                                    |
+      | geschaeftsstelle | Übersicht, Eingangskorb, Erfassen, Suche, Chat, Trennblätter, Kontakte, Wissen, Wissensentwürfe                                                                    |

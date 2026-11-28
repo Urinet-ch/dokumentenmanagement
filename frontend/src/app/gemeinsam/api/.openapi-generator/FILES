@@ -15,6 +15,7 @@ api/konfiguration.service.ts
 api/kontakte.service.ts
 api/protokoll.service.ts
 api/quellen.service.ts
+api/trennblaetter.service.ts
 api/wissen-ingest-resource.service.ts
 api/wissen-lint-resource.service.ts
 api/wissensbasis.service.ts
@@ -167,6 +168,8 @@ model/status-ansicht.ts
 model/sterne-dto.ts
 model/suchergebnis.ts
 model/suchtreffer.ts
+model/trennblatt-anfrage.ts
+model/trennblatt-wunsch.ts
 model/typ.ts
 model/upload-ergebnis.ts
 model/upload-fehler.ts

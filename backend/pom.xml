@@ -40,6 +40,8 @@
         <zxing.version>3.5.4</zxing.version>
         <wiremock.version>3.13.2</wiremock.version>
         <greenmail.version>2.1.15</greenmail.version>
+        <!-- Gleiche Version wie deploy/infomaniak/sftp/pom.xml (ScanEingangVersionTest) -->
+        <sshd.version>2.20.1</sshd.version>
         <snakeyaml-engine.version>3.2</snakeyaml-engine.version>
     </properties>
 
@@ -313,6 +315,47 @@
         </dependency>
         <!-- OCR-Adapter (Aufgabe 2.6): synthetische Test-PDFs (Textebene, verschlüsselt, signiert) und PDF/A-Prüfung -->
         <!-- IMAP-Server für die Szenarien des Mail-Eingangs (Spec 02, design.md «Testing Strategy») -->
+        <!-- Dienst sftp in-process für die Szenarien des Scan-Eingangs (Spec 09, Aufgabe 27.3); Quellen über
+             build-helper aus deploy/infomaniak/sftp wie beim Drive-Import -->
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-core</artifactId>
+            <version>${sshd.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <!-- Quarkus bringt commons-logging selbst (jboss-logging) -->
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>jcl-over-slf4j</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-sftp</artifactId>
+            <version>${sshd.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>jcl-over-slf4j</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Die Quarkus-BOM verwaltet sshd-common in einer älteren Version; hier dieselbe wie sshd-core -->
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-common</artifactId>
+            <version>${sshd.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>jcl-over-slf4j</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <dependency>
             <groupId>com.icegreen</groupId>
             <artifactId>greenmail</artifactId>
@@ -380,6 +423,7 @@
                             <sources>
                                 <source>${project.basedir}/../tools/drive_import/src/main/java</source>
                                 <source>${project.basedir}/../tools/wissen_paket/src/main/java</source>
+                                <source>${project.basedir}/../deploy/infomaniak/sftp/src/main/java</source>
                             </sources>
                         </configuration>
                     </execution>

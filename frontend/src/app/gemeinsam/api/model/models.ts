@@ -143,6 +143,8 @@ export * from './status-ansicht';
 export * from './sterne-dto';
 export * from './suchergebnis';
 export * from './suchtreffer';
+export * from './trennblatt-anfrage';
+export * from './trennblatt-wunsch';
 export * from './typ';
 export * from './upload-ergebnis';
 export * from './upload-fehler';

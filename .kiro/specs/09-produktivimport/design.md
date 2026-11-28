@@ -73,7 +73,7 @@ flowchart LR
     SC["&lt;scanner&gt;<br/>Profile Stapel, Einzeln, Glas"]
     MAC["Mac<br/>drive_import eingang, archiv_client.py"]
   end
-  subgraph VPS["VPS (Stufe A bzw. nach Entscheid #731)"]
+  subgraph VPS["bestehende VPS (Stufe A, nach dem Wechsel Stufe B, Variante B)"]
     TR["Traefik<br/>TCP-Eingang (E10, Infra-Repo)"]
     SFTP["sftp<br/>MINA SSHD, nur SFTP"]
     VOL[("Volume archiv_eingang")]
@@ -113,6 +113,34 @@ Image `archiv:sftp-…` nach dem Muster von `db` und `kc`) auf Basis Apache MINA
 Einrichtung am Scanner (Aufgabe 28.6, Fabian): Client-Schlüsselpaar am Gerät erzeugen, öffentlichen Schlüssel als
 GitHub-Secret für `archiv_sftp_schluessel`, Host-Schlüssel des Dienstes im Profil hinterlegen, Ziel `<sftp-host>`,
 Port `<sftp-port>`, Zielordner `/stapel`, `/einzeln`, `/glas`.
+
+#### Umsetzung (Aufgabe 27.3, 28.11.2026)
+- Modul `deploy/infomaniak/sftp/` (Artefakt `scan-eingang-sftp`, Hauptklasse `ScanEingang`): Apache MINA SSHD 2.20.1,
+  BouncyCastle für Ed25519 (MINA SSHD kann Ed25519 sonst nicht lesen), `slf4j-simple` nur für Warnungen von MINA auf
+  stderr; stdout gehört dem JSON-Log. Konfiguration über Umgebungsvariablen `ARCHIV_SFTP_PORT`, `ARCHIV_SFTP_WURZEL`,
+  `ARCHIV_SFTP_HOSTSCHLUESSEL`, `ARCHIV_SFTP_SCHLUESSEL`, `ARCHIV_SFTP_AELTERE_VERFAHREN` (nur Pfade und Schalter,
+  Standardpfade der Secret-Dateien `archiv_sftp_hostkey`, `archiv_sftp_schluessel`); Port unter 1025 und uid 0 brechen
+  den Start ab. Die Datei des Host-Schlüssels darf mehrere Schlüssel enthalten (z. B. Ed25519 und RSA), falls das Gerät
+  kein Ed25519 kann.
+- Verfahren: Standard von MINA SSHD ohne die SHA-1-Verfahren, die MINA noch anbietet (`ssh-rsa`, `hmac-sha1`,
+  `hmac-sha1-etm@openssh.com`); mit BouncyCastle kommen die hybriden Verfahren `mlkem768x25519-sha256` und
+  `sntrup761x25519-sha512` dazu. Als «älter» gilt jedes Verfahren mit SHA-1, MD5, CBC, `arcfour`, `ssh-dss` sowie
+  `ssh-rsa`; es kommt nur über die Liste hinzu, hinten angehängt; unbekannte Namen brechen den Start ab.
+- Prototyp für den Spike: In der eigenen Wurzel sind alle SFTP-Operationen erlaubt und werden als Ereignis `sftp`
+  protokolliert (Operation, Pfad in der Wurzel, Ergebnis), damit der Spike die nötigen Operationen (0.3) aus dem Log
+  ablesen kann. Die Einschränkung nach 1.4 baut Aufgabe 28.2 nach dem Spike-Bericht. Weitere Ereignisse: `start` (mit
+  den angebotenen Verfahren), `verfahren` (ausgehandelt oder bei fehlender Einigung das Angebot des Geräts),
+  `anmeldung`, `datei` (Unterordner, Dateiname, Grösse), `stopp`. Bei abgelehnten Anmeldungen steht der Benutzer nur,
+  wenn das Gerät einen Schlüssel versucht hat (MINA SSHD setzt den Namen sonst erst nach erfolgreicher Anmeldung).
+- Szenarien: Das Backend übersetzt die Quellen des Moduls als Testquellen (`build-helper`, wie `tools/drive_import`)
+  und startet den Dienst in `features/produktivimport/scan-eingang.feature` in-process (`ScanEingangSchritte`); MINA
+  SSHD dafür im Test-Scope, `sshd-common` ausdrücklich, weil die Quarkus-BOM eine ältere Version verwaltet.
+  `ScanEingangVersionTest` hält `sshd.version` in beiden Maven-Projekten gleich. Die Unit-Tests des Moduls laufen in der
+  CI erst mit dem Patch `docs/betrieb/sftp-ci-dependabot.diff` (Schritt im Job «Build» und Einträge für Dependabot,
+  Maven und Docker); Workflows ändert nur Fabian.
+- Image: Basis wie die API (Temurin 25 JRE per Digest), uid 10001, Heap 48 MiB, `-XX:+UseSerialGC`. Lokal mit
+  `--read-only`, `--cap-drop ALL`, `--memory 96m`, `--cpus 0.1` gestartet: nach Anmeldung und Upload rund 56 MiB belegt
+  (Richtwert, Messung mit Compose in 28.3). Healthcheck, Compose und Deploy folgen in 28.2 bis 28.4.
 
 ### 2. Scan-Eingang im Worker (`stapel/`)
 - `ScanEingangTakt` (Quarkus Scheduler, nur Rolle `worker`, Muster `MailTakt` mit `skipExecutionIf=VorMigrationUeberspringen`), alle 10 s: liest je konfiguriertem Mandanten `stapel/`, `einzeln/`, `glas/`; merkt sich je Datei Grösse und Änderungszeit; nach der Stabilitätszeit → `StapelEmpfang.annehmen(mandant, profil, pfad)`.
@@ -191,6 +219,47 @@ bilanz: inhalt + trenn + ordner + leer == n und jedes Dokument hat >= 1 Seite
 - QR-Inhalte: `URINET-TRENN;v=1`, `URINET-TRENN;v=1;art=QUITTUNG`, `URINET-ORDNER;v=1;titel=Versicherungen%202026` (URL-kodiert, UTF-8).
 - Schrift: eingebettete Schrift aus dem Image (PDFBox `PDType0Font`), damit Umlaute und Guillemets sicher sind.
 - Frontend: Seite `/trennblaetter` in der Gruppe «Archiv» (Gestaltung nach `docs/oberflaeche/README.md`), Auswahl Art, Anzahl, Deckblatt-Titel; Download. Anleitung unter `frontend/public/anleitung/` (Spec 07, 7.5).
+
+Umsetzung (Aufgabe 27.5, 28.11.2026):
+- Fachbereich `stapel/`: `TrennblattCode` (Domain: QR-Inhalte, Prüfung des Titels, `lesen` für die Seitenanalyse in
+  28.7), `TrennblattService` (Application: höchstens 100 Blätter, Arten nur aus den aktiven Dokumentarten des eigenen
+  Mandanten über `DokumentartVerwaltung`), `PdfBoxTrennblattPdf` (Adapter mit ZXing und PDFBox), `TrennblattResource`.
+- Titel: NFC, Leerraum aussen entfernt, höchstens 60 Unicode-Codepunkte. URL-Kodierung mit `URLEncoder` (UTF-8), das
+  Leerzeichen als `%20` statt `+`; der Code enthält so nur ASCII, und `;`, `=`, `+` und `%` im Titel bleiben eindeutig.
+  Fehlt der Titel oder ist er nach dem Kürzen leer, gilt ebenfalls 400 `TRENNBLATT_UNGUELTIG`. Alle übrigen
+  Formfehler (Typ, Anzahl unter 1, mehr als 100 Blätter, unbekanntes Feld, Feld des anderen Typs, Art keine aktive
+  Dokumentart des Mandanten) ergeben 400 `ANFRAGE_UNGUELTIG`. Der Körper wird streng gelesen (`StrengesJson`: keine
+  doppelten Schlüssel, nichts nach dem JSON-Wert) und ist vor der Ressource auf 64 KiB begrenzt
+  (`ProblemFehlerRoute`, 413 `DATEI_ZU_GROSS`); 100 Deckblätter mit je 60 als JSON-Escape geschriebenen Zeichen
+  brauchen rund 39 KiB.
+- `TrennblattCode.lesen` ist streng: Der Inhalt muss genau dem entsprechen, was `inhalt()` erzeugt; ungültiges UTF-8
+  (z. B. `%FF`), unkodierte Trennzeichen (`=`, `+`, Leerzeichen), Hex in Kleinbuchstaben oder nicht NFC sind kein
+  Trennblatt-Code.
+- Schrift: Liberation Sans aus dem PDFBox-Artefakt (`org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf`, SIL
+  Open Font License), als Teilmenge eingebettet. Das Image bringt keine Schrift mit; statt eines neuen Pakets im
+  Dockerfile dient die Schrift, die PDFBox ohnehin mitliefert (gleiche Wirkung wie «aus dem Image»). Damit das Blatt
+  den Titel trägt (6.2), lehnt das Archiv einen Titel mit Zeichen, die die Schrift nicht enthält (z. B. Emoji,
+  chinesische Schriftzeichen), ebenfalls mit 400 `TRENNBLATT_UNGUELTIG` ab (Auslegung zu 6.5, Review PR #747). Die
+  Oberfläche prüft das schon bei der Eingabe mit den Unicode-Bereichen der Schrift (`schrift-abdeckung.ts`);
+  `PdfBoxTrennblattPdfTest` vergleicht diese Bereiche mit der Schrift. Nur der Name einer Art kann noch Zeichen ohne
+  Glyphe enthalten; sie erscheinen als «?», darunter steht der Code der Art.
+- Seite: «TRENNBLATT» bzw. «ORDNER» in 22 pt, Aufschrift (Name der Art, «Ohne Art» oder Titel) in 36 pt, bei mehr als
+  drei Zeilen in 30 bzw. 24 pt, beim Trennblatt mit Art darunter «Art <CODE>»; QR-Symbol 60 mm (ohne Ruhezone), Mitte
+  15 mm unter der Seitenmitte, Ruhezone mindestens 4 Module weiss. Der QR-Code ist eine Vektor-Form (XObject), die alle
+  Seiten eines Satzes zeichnen: 100 Blätter (200 Seiten) bleiben unter 512 KB. Der längste Titel (60 × «€», 60 × «ẞ»)
+  bleibt bei 150 dpi lesbar. Erkenntnis für 28.7: Ein einzelner ZXing-`QRCodeReader` verfehlt bei 150 dpi einzelne,
+  sonst einwandfreie Codes (z. B. 20 × «ж», 60 × «ẞ»); mit `QRCodeMultiReader` und zwei Binarisierern (wie
+  `ZxingQrLeser`) werden alle gelesen.
+- Protokoll: Das PDF wird nicht abgelegt und berührt kein Dokument, darum kein Eintrag `ERFASSEN`; `EndpunktWaechterTest`
+  nimmt `POST /trennblaetter` von der Regel «A1 verlangt `ERFASSEN`» aus.
+- Frontend: Menüpunkt «Trennblätter» in der Gruppe «Archiv» nach «Chat» (A1), Route mit `rechtGuard('A1')`;
+  Hilfe-Abschnitt `erfassen-trennblaetter` («Trennblätter drucken») unter «Erfassen» mit A1 und Pfad `/trennblaetter`
+  (Pflegeregel Spec 07, Req 7.5).
+- Tests: `TrennblattCodeTest` (QR-Inhalte, URL-Kodierung von Umlauten, Guillemets und Trennzeichen, Titelgrenzen),
+  `PdfBoxTrennblattPdfTest` (Rundlauf PDF → 150 dpi → ZXing, Kante, Fehlerkorrektur, Schrift eingebettet),
+  `features/produktivimport/trennblaetter.feature` (`@req-6.1`, `@req-6.2`, `@req-6.3`, `@req-6.5`, A1 je Rolle),
+  `trennblaetter-pwa.feature` (Browser mit Attrappe, axe, 375 und 1280 px hell und dunkel), Vitest `trennblaetter*.spec.ts`.
+  Der Rundlauf mit einem Stapel (6.4) folgt mit 28.8.
 
 ### 5. Quellenregister und Quellläufe (`importe/`)
 - Quellentypen: `GENERATOR`, `DRIVE`, `ORDNER`, `MAC_EINGANG`, `GMAIL_LABEL`, `CRM_CSV`, `SCAN`.
@@ -476,13 +545,13 @@ Alle Fixtures sind synthetisch (wie `tools/golden_synth`); keine echten Belege, 
 
 ## Open Points
 - E6: Übertragungsweg des Scanners (SFTP, Rückfall E-Mail-Eingang oder Mac-Netzwerkordner); Empfehlung SFTP nach erfolgreichem Spike 27.3, sonst E-Mail-Eingang (besteht schon).
-- E7: Stichtag (Richtwert 01.01.2027) und Ende des Bestandsimports (Richtwert 31.01.2027), abhängig vom Entscheid #731.
+- E7: **entschieden von Fabian am 28.11.2026** mit Variante B: Stichtag 01.01.2027, Bestand 2026 bis 31.01.2027 importiert (bisher «Richtwert 01.01.2027 … Richtwert 31.01.2027, abhängig vom Entscheid #731»).
 - E8 (entschieden von Fabian am 28.11.2026): ja, private Zahlungsquittungen kommen als Anhang zum Beleg (Aktion `ANHANG`, Requirement 11.6).
 - E9 (entschieden von Fabian am 28.11.2026): ja, Projektdokumente nur als freigegebene PDF (Quelle `<quelle-projekt>`).
 - E10 (entschieden von Fabian am 28.11.2026): Variante (a), TCP-Eingang `sftp` in Traefik mit IP-Freigabe für `<heim-adresse>`; die App-Compose bleibt ohne `ports:`, die Härtung (`DeployHaertungTest`, `tools/pruefe_compose_konsistenz.py`) bleibt unverändert. Traefik, Compose-Policy, ufw und Cloud-Firewall richtet Fabian im Infra-Repo ein (Aufgabe 28.4); kein Agent greift darauf zu.
 - E11 (entschieden von Fabian am 28.11.2026): Budget Stufe A +96 MiB und +0.1 CPU für den Dienst `sftp` (`mem_limit` 96m, Heap 48m, `cpus` 0.1), neu höchstens 2144 MiB und 1.6 CPU; Compose, `DeployHaertungTest` und `.github/scripts/pruefe-speicherbudget.py` ziehen das mit Aufgabe 28.3 nach, bis dahin gilt 2048 MiB und 1.5 CPU.
 - E12 (entschieden von Fabian am 28.11.2026): ja, Dateinamen-Regeln dürfen Vorschlagsfelder mit Sicherheit 1.0 vorsetzen; der Mensch bestätigt wie bisher im Eingangskorb, ein Widerspruch zur OCR ergibt einen Hinweis (9.3); der Dateiname bleibt aus dem Prompt (Ergänzung zu Spec 01, 3.11 und 3.12).
 - E13 (entschieden von Fabian am 28.11.2026): Seiten verworfener Dokumente bleiben im gesperrten Stapel-Original (ADR-018); die Alternative (Original nach der Entscheidung durch die Auszüge ersetzen) entfällt.
-- E6 entscheidet Fabian nach dem Spike 27.4; E7 hängt am Entscheid #731 (offen).
-- Entscheid #731: Start mit Echtbelegen (Varianten A, B, C); bestimmt, wann und wo Welle 30 laufen darf.
+- E6 entscheidet Fabian nach dem Spike 27.4.
+- Entscheid #731: Start mit Echtbelegen (Varianten A, B, C); bestimmt, wann und wo Welle 30 laufen darf. **Entschieden von Fabian am 28.11.2026: Variante B** – Welle 30 läuft auf der bestehenden VPS (Stufe B), nach den Gates aus Spec 01, Welle 31 (ADR-020). E11 (entschieden von Fabian am 28.11.2026: +96 MiB / +0.1 CPU für `sftp`, Budget 2144 MiB / 1.6 CPU; Eintrag oben mit PR #749) gilt auch für Stufe B (Spec 01, 16.30).
 - K6 feste Adresse oder DNS-Name; K7 Verfahren des Geräts (Spike 27.3); K8 `<papierbestand>`; K9 Gmail-Zugang; K11 `<startwerte-vollstaendigkeit>` und Begründungen `<erwartete-luecken>`. K10 ist mit der Bestandsaufnahme erledigt.
