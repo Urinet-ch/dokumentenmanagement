@@ -24,12 +24,12 @@ diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
 --- a/.github/workflows/ci.yml
 +++ b/.github/workflows/ci.yml
 @@ -237,6 +237,9 @@
- 
+
        - name: Drive-Import-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
          run: mvn -B -ntp -f tools/drive_import/pom.xml verify
 +
 +      - name: Scan-Eingang SFTP (mvn verify, Unit-Tests, SpotBugs)
 +        run: mvn -B -ntp -f deploy/infomaniak/sftp/pom.xml verify
- 
+
        - name: strace bereitstellen (Netzlaufzeitnachweis Wissenspaket)
          run: command -v strace >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq strace)
