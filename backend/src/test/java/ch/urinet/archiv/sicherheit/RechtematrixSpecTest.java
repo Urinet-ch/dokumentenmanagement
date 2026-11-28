@@ -130,8 +130,9 @@ class RechtematrixSpecTest {
     }
 
     /**
-     * Liest die Zeilen der ersten Tabelle mit dem Kopf von Spec 01, Req 2.6 in einer {@code requirements.md}; spätere
-     * Tabellen derselben Datei nicht. Jede der vier Quellen hat genau eine solche Tabelle.
+     * Liest die Zeilen der ersten Tabelle mit dem gemeinsamen Tabellenkopf der vier Quellen ({@code | Nr. | Aktion |}
+     * und die Rollen wie in Spec 01, Req 2.6) in einer {@code requirements.md}; spätere Tabellen derselben Datei nicht.
+     * Jede der vier Quellen hat genau eine solche Tabelle.
      */
     static Map<Aktion, Map<Rolle, Ergebnis>> lesen(List<String> zeilen) {
         Map<Aktion, Map<Rolle, Ergebnis>> matrix = new java.util.LinkedHashMap<>();

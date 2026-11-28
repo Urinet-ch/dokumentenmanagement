@@ -534,8 +534,9 @@ Alle Fixtures sind synthetisch (wie `tools/golden_synth`); keine echten Belege, 
 - E10 Variante (a) heisst: Traefik erreicht den Dienst `sftp` nur über ein gemeinsames Netz. Das ist nicht das
   geteilte Netz «web», sondern das eigene Netz nur für Traefik und das Archiv (Spec 01, 16.28, Entscheid Fabian
   28.11.2026); `tech.md` und ADR-016 nennen es für den TCP-Router (ab 28.3). Requirement 1.1 deckt das («am für E10
-  bestimmten Eingang»). Spec 01, 16.28 zählt `sftp` wörtlich zu den Diensten nur in internen Netzen; der TCP-Eingang
-  braucht diese eine Ausnahme (offen für Fabian, vor Aufgabe 28.3).
+  bestimmten Eingang»). Spec 01, 16.28 nimmt `sftp` dafür ausdrücklich aus (entschieden von Fabian am 28.11.2026):
+  am internen Netz des Archivs und zusätzlich am eigenen Netz von Traefik und Archiv, von aussen nur über den
+  TCP-Router mit IP-Freigabe.
 - Die `[offen]`-Marker in 1.6 (E10), 1.9 (E11), 5.8 (E13) und 9.1 (E12) tragen jetzt den Entscheid mit Datum.
 - Rechte: Enum `Aktion` um A25 bis A29, `Rechtematrix` (Fussnote ¹ für `geschaeftsstelle` auch bei A28 und A29),
   `rechtematrix.json` mit Quelle «Spec 09, Req 15.1», `RechtematrixSpecTest` liest diese Spec als vierte Quelle und

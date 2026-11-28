@@ -229,6 +229,24 @@ if (( veraltete_sperre )); then
   done
 fi
 
+loesche_verwaiste_realm_export_volumes() {
+  local volumen containeren
+  local volumes
+  volumes=$("$ARCHIV_DOCKER_BIN" volume ls --filter name=archiv-realm-export- --format '{{.Name}}') \
+    || fehler 3 "Temporäre Realm-Export-Volumes konnten nicht aufgelistet werden."
+  while IFS= read -r volumen; do
+    [[ $volumen =~ ^archiv-realm-export-[0-9]{8}T[0-9]{6}Z-[0-9]+$ ]] || continue
+    containeren=$("$ARCHIV_DOCKER_BIN" ps -a --filter "volume=$volumen" --format '{{.Names}}') \
+      || fehler 3 "Verwendung eines temporären Realm-Export-Volumes konnte nicht geprüft werden."
+    [[ -z $containeren ]] \
+      || fehler 3 "Temporäres Realm-Export-Volume $volumen ist noch an einen Container gebunden; bitte prüfen und erneut sichern."
+    "$ARCHIV_DOCKER_BIN" volume rm "$volumen" >/dev/null \
+      || fehler 3 "Verwaistes Realm-Export-Volume $volumen konnte nicht entfernt werden."
+    printf 'Hinweis: Verwaistes Realm-Export-Volume entfernt: %s\n' "$volumen" >&2
+  done <<< "$volumes"
+}
+loesche_verwaiste_realm_export_volumes
+
 arbeitsverzeichnis=$(mktemp -d "$sicherungswurzel/.arbeit.XXXXXXXX") \
   || fehler 3 "Arbeitsverzeichnis kann nicht angelegt werden."
 plain="$arbeitsverzeichnis/klartext"

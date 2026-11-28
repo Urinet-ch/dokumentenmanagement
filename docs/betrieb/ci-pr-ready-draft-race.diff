@@ -1,0 +1,22 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index be67af4..990f1f8 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -67,7 +67,7 @@ jobs:
+   # Jobs samt NurSpecTest überspringen. Fehlt die Regel im Basis-Stand, ist das Ergebnis «false».
+   art:
+     name: Änderungsart (nur Spec?)
+-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
++    if: github.event_name != 'pull_request' || github.event.action == 'ready_for_review' || !github.event.pull_request.draft
+     runs-on: ubuntu-24.04
+     outputs:
+       nur-spec: ${{ steps.art.outputs.nur-spec }}
+@@ -112,7 +112,7 @@ jobs:
+     # Job, und Regel 1 des Deploy-Nachweises («jeder Job erfolgreich») bleibt unverändert; die Doppelung mit «backend»
+     # kostet etwa eine Minute auf einem eigenen Runner, parallel zu den anderen Jobs.
+     name: Spec-Prüfungen (nur Spec)
+-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
++    if: github.event_name != 'pull_request' || github.event.action == 'ready_for_review' || !github.event.pull_request.draft
+     runs-on: ubuntu-24.04
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
