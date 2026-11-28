@@ -73,7 +73,7 @@ flowchart LR
     SC["&lt;scanner&gt;<br/>Profile Stapel, Einzeln, Glas"]
     MAC["Mac<br/>drive_import eingang, archiv_client.py"]
   end
-  subgraph VPS["VPS (Stufe A bzw. nach Entscheid #731)"]
+  subgraph VPS["bestehende VPS (Stufe A, nach dem Wechsel Stufe B, Variante B)"]
     TR["Traefik<br/>TCP-Eingang (E10, Infra-Repo)"]
     SFTP["sftp<br/>MINA SSHD, nur SFTP"]
     VOL[("Volume archiv_eingang")]
@@ -462,12 +462,12 @@ Alle Fixtures sind synthetisch (wie `tools/golden_synth`); keine echten Belege, 
 
 ## Open Points
 - E6: Übertragungsweg des Scanners (SFTP, Rückfall E-Mail-Eingang oder Mac-Netzwerkordner); Empfehlung SFTP nach erfolgreichem Spike 27.3, sonst E-Mail-Eingang (besteht schon).
-- E7: Stichtag (Richtwert 01.01.2027) und Ende des Bestandsimports (Richtwert 31.01.2027), abhängig vom Entscheid #731.
+- E7: **entschieden von Fabian am 28.11.2026** mit Variante B: Stichtag 01.01.2027, Bestand 2026 bis 31.01.2027 importiert (bisher «Richtwert 01.01.2027 … Richtwert 31.01.2027, abhängig vom Entscheid #731»).
 - E8: private Zahlungsquittungen als Anhang zum Beleg (Aktion `ANHANG`).
 - E9: Projektdokumente nur als freigegebene PDF (Quelle `<quelle-projekt>`).
 - E10: Weg des Scan-Eingangs nach aussen, Varianten (a) bis (c) in Abschnitt 1; Empfehlung (a).
 - E11: Speicherbudget Stufe A für den Dienst `sftp` (Budget 2048 MiB und 1.5 CPU sind heute voll belegt; Vorschlag +96 MiB und +0.1 CPU oder Abzug bei `api`), sonst greift Spec 01, 16.18.
 - E12: Dateinamen-Regeln dürfen Vorschlagsfelder mit Sicherheit 1.0 setzen (Ergänzung zu Spec 01, 3.11 und 3.12; der Dateiname bleibt aus dem Prompt).
 - E13: Seiten verworfener Dokumente bleiben im gesperrten Stapel-Original (ADR-018); Alternative: Stapel-Original nur bis zur Entscheidung aller Dokumente aufbewahren und danach durch die Auszüge ersetzen (schwächerer Nachweis der Trennung).
-- Entscheid #731: Start mit Echtbelegen (Varianten A, B, C); bestimmt, wann und wo Welle 30 laufen darf.
+- Entscheid #731: Start mit Echtbelegen (Varianten A, B, C); bestimmt, wann und wo Welle 30 laufen darf. **Entschieden von Fabian am 28.11.2026: Variante B** – Welle 30 läuft auf der bestehenden VPS (Stufe B), nach den Gates aus Spec 01, Welle 31 (ADR-020). E11 (entschieden von Fabian am 28.11.2026: +96 MiB / +0.1 CPU für `sftp`, Budget 2144 MiB / 1.6 CPU; Eintrag oben mit PR #749) gilt auch für Stufe B (Spec 01, 16.30).
 - K6 feste Adresse oder DNS-Name; K7 Verfahren des Geräts (Spike 27.3); K8 `<papierbestand>`; K9 Gmail-Zugang; K11 `<startwerte-vollstaendigkeit>` und Begründungen `<erwartete-luecken>`. K10 ist mit der Bestandsaufnahme erledigt.
