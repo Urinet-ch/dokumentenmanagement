@@ -9,7 +9,7 @@ EINGANGSKORB oder FEHLER erreicht ist. `--aufwaermen` schickt vorher Läufe, die
 
 Messpunkt: von der Antwort 202 bis zum ersten gelesenen EINGANGSKORB. Das ist eine obere Schranke für «Start des
 Auftrags bis EINGANGSKORB»: Wartezeit in der Schlange und Abfrageintervall zählen mit. Ohne KI-Wartezeit heisst:
-gegen ein Archiv mit KI-Stub messen oder die KI-Zeit aus `ki_verbrauch` abziehen (Festlegung in 5.11).
+gegen ein Archiv mit geeignetem KI-Stub messen oder die KI-Wartezeit separat serverseitig erfassen.
 
 Token: aus der Datei in ARCHIV_TOKEN_DATEI oder ~/.config/urinet-archiv/token, Rechte 600, nie aus einer
 Umgebungsvariable (tech.md, Regel 7). Das Token braucht die Rechte A1 (Upload) und A2 (Dokument lesen). Ein
@@ -120,11 +120,11 @@ def auf_abschluss_warten(basis: str, token: str, dokument: str, intervall: float
 
 def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float, beobachten=None) -> float:
     endung, typ = fototyp(foto)
-    koerper, medientyp = multipart("dateien[]", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
+    koerper, medientyp = multipart("dateien", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
     start = time.monotonic()
     if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
-            or "id" not in ergebnis[0]):
+            or ergebnis[0].get("status") != "NEU" or not ergebnis[0].get("id")):
         raise RuntimeError(f"Upload nicht angenommen (HTTP {status}).")
     return auf_abschluss_warten(basis, token, ergebnis[0]["id"], intervall, grenze, start, beobachten)
 
@@ -139,15 +139,13 @@ def begleit_scan_einreihen(basis: str, token: str, pfad: Path) -> str:
     if seiten != ["20"]:
         raise ValueError("--begleit-pdf muss genau 20 Seiten haben.")
     scan = pfad.read_bytes()
-    koerper, medientyp = multipart("dateien[]", "lastlauf-20-seiten-scan.pdf", scan, "application/pdf")
+    koerper, medientyp = multipart("dateien", "lastlauf-20-seiten-scan.pdf", scan, "application/pdf")
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
     if status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict):
         raise RuntimeError(f"Begleit-Scan nicht angenommen (HTTP {status}).")
-    if ergebnis[0].get("status") == "DUBLETTE":
-        raise RuntimeError("Begleit-Scan ist eine Dublette; eine noch nicht hochgeladene synthetische PDF-Datei "
+    if ergebnis[0].get("status") != "NEU" or not ergebnis[0].get("id"):
+        raise RuntimeError("Begleit-Scan nicht neu angenommen; eine noch nicht hochgeladene synthetische PDF-Datei "
                            "verwenden.")
-    if "id" not in ergebnis[0]:
-        raise RuntimeError("Begleit-Scan ohne Dokument-ID angenommen.")
     return ergebnis[0]["id"]
 
 

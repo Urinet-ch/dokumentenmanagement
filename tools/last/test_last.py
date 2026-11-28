@@ -21,6 +21,8 @@ sys.path.insert(0, str(HIER))
 
 import verarbeitung_foto  # noqa: E402
 import auswertung  # noqa: E402
+import upload  # noqa: E402
+import suche  # noqa: E402
 
 
 def box(typ: bytes, inhalt: bytes) -> bytes:
@@ -85,6 +87,7 @@ class Server(BaseHTTPRequestHandler):
     sperre = threading.Lock()
     scan_abfragen = 0
     scan_sofort_fertig = False
+    upload_status = "NEU"
 
     def log_message(self, *_):
         pass
@@ -113,8 +116,11 @@ class Server(BaseHTTPRequestHandler):
         koerper = self.rfile.read(int(self.headers["Content-Length"]))
         with self.sperre:
             self.anfragen.append(("POST", self.path, koerper))
+        if b'name="dateien"' not in koerper:
+            self.antworten(400, {})
+            return
         dokument = "scan" if b'filename="lastlauf-20-seiten-scan.pdf"' in koerper else "00000000-0000-0000-0000-000000000001"
-        self.antworten(202, [{"id": dokument}])
+        self.antworten(202, [{"id": dokument, "status": Server.upload_status}])
 
 
 class SkriptTest(unittest.TestCase):
@@ -140,6 +146,7 @@ class SkriptTest(unittest.TestCase):
         Server.anfragen = []
         Server.scan_abfragen = 0
         Server.scan_sofort_fertig = False
+        Server.upload_status = "NEU"
 
     def starten(self, skript: str, *argumente: str) -> subprocess.CompletedProcess:
         umgebung = {**os.environ, "ARCHIV_TOKEN_DATEI": str(self.token),
@@ -154,6 +161,48 @@ class SkriptTest(unittest.TestCase):
         bericht = json.loads(lauf.stdout)
         self.assertEqual((bericht["angenommen"], bericht["aufwaermen"]), (5, 3))
         self.assertEqual(len([a for a in Server.anfragen if a[0] == "POST"]), 8)
+
+    def test_upload_lehnt_dublette_trotz_202_ab(self):
+        Server.upload_status = "DUBLETTE"
+        lauf = self.starten("upload.py", "--url", self.url, "--anzahl", "2", "--parallel", "1",
+                            "--groesse", "2000", "--aufwaermen", "1")
+        self.assertNotEqual(lauf.returncode, 0)
+        self.assertIn("Aufwärmen fehlgeschlagen", lauf.stderr)
+        self.assertEqual(len(Server.anfragen), 1)
+
+    def test_foto_lehnt_dublette_trotz_202_ab(self):
+        Server.upload_status = "DUBLETTE"
+        foto = Path(self.ordner.name) / "foto-dublette.jpg"
+        foto.write_bytes(JPEG)
+        lauf = self.starten("verarbeitung_foto.py", "--basis-url", self.url, "--foto", str(foto),
+                            "--anzahl", "1", "--aufwaermen", "0")
+        self.assertNotEqual(lauf.returncode, 0)
+        self.assertIn("Upload nicht angenommen", lauf.stderr)
+        self.assertEqual(len(Server.anfragen), 1)
+
+    def test_upload_pdf_hat_gueltige_kreuzreferenz_und_eine_seite(self):
+        dokument = upload.pdf(200000)
+        xref = int(dokument.split(b"startxref\n")[1].splitlines()[0])
+        self.assertTrue(dokument[xref:].startswith(b"xref\n0 4\n"))
+        for nummer, zeile in enumerate(dokument[xref:].splitlines()[3:6], 1):
+            offset = int(zeile[:10])
+            self.assertTrue(dokument[offset:].startswith(f"{nummer} 0 obj\n".encode()))
+        self.assertIn(b"/Type /Page ", dokument)
+        self.assertNotEqual(dokument, upload.pdf(200000))
+
+    def test_p95_entscheidung_nicht_gerundet(self):
+        with patch.object(upload, "token_lesen", return_value="token"), \
+             patch.object(upload, "hochladen", return_value=(202, 2.0004)), \
+             patch.object(sys, "argv", ["upload.py", "--url", self.url, "--anzahl", "1",
+                                        "--parallel", "1", "--groesse", "2000"]), \
+             patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(upload.main(), 1)
+        with patch.object(suche, "token_lesen", return_value="token"), \
+             patch.object(suche, "suchen", return_value=(200, 1.0004, 50000)), \
+             patch.object(sys, "argv", ["suche.py", "--url", self.url, "--anzahl", "1",
+                                        "--parallel", "1"]), \
+             patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(suche.main(), 1)
 
     def test_suche_zaehlt_aufwaermen_nicht(self):
         lauf = self.starten("suche.py", "--url", self.url, "--anzahl", "6", "--parallel", "2", "--aufwaermen", "4",

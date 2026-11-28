@@ -2,8 +2,9 @@
 """Lastskript für den Upload (Spec 01, Req 3.2, Aufgabe 2.4).
 
 Lädt synthetische PDFs parallel an POST /api/v1/dokumente hoch und gibt p50, p95 und Maximum der Antwortzeit aus.
-Gemessen wird ab vollständig gesendeter Anfrage bis zum Eintreffen der Antwort (nahe am Messpunkt «Server, ab
-vollständig empfangener Anfrage»; die Netzlaufzeit ist enthalten). Der Nachweis erfolgt erst auf Stufe B in Aufgabe
+Gemessen wird ab vollständig gesendeter Anfrage bis zur vollständig gelesenen Antwort. Der Server kann die Anfrage
+bereits vor diesem Start verarbeitet haben; die Clientzeit ersetzt den serverseitigen Messpunkt nicht. Der Nachweis
+erfolgt erst auf Stufe B in Aufgabe
 5.11; Eingabe, Last und Hardware sind dort festzulegen ([offen: Messbedingungen nach VPS-Grösse K5]). Darum sind
 Anzahl, Parallelität und Grösse Pflichtparameter ohne Standardwerte. `--aufwaermen` schickt vorher Uploads mit
 derselben Parallelität und Grösse, die nicht zählen (sie legen ebenfalls Dokumente an).
@@ -49,12 +50,29 @@ def token_lesen() -> str:
 
 
 def pdf(groesse: int) -> bytes:
-    """Gültiges, eindeutiges Mini-PDF, mit Kommentarzeilen auf etwa `groesse` Bytes aufgefüllt."""
+    """Einseitiges, eindeutiges PDF mit Kommentarzeilen auf etwa `groesse` Bytes aufgefüllt."""
     kopf = f"%PDF-1.4\n% Lasttest {secrets.token_hex(16)}\n".encode("ascii")
-    inhalt = b"1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n"
-    fuellung = max(0, groesse - len(kopf) - len(inhalt))
+    objekte = (
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << >> >>",
+    )
+    inhalt = bytearray(kopf)
+    offsets = []
+    for nummer, objekt in enumerate(objekte, 1):
+        offsets.append(len(inhalt))
+        inhalt.extend(f"{nummer} 0 obj\n".encode("ascii") + objekt + b"\nendobj\n")
+    # Padding ist ein PDF-Kommentar vor der Kreuzreferenztabelle.
+    rest = 9 + (len(objekte) + 1) * 20 + 80
+    fuellung = max(0, groesse - len(inhalt) - rest)
     zeilen = (b"%" + b" " * 78 + b"\n") * (fuellung // 80)
-    return kopf + zeilen + inhalt
+    inhalt.extend(zeilen)
+    xref = len(inhalt)
+    inhalt.extend(b"xref\n0 4\n0000000000 65535 f \n")
+    for offset in offsets:
+        inhalt.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    inhalt.extend(f"trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode("ascii"))
+    return bytes(inhalt)
 
 
 def multipart(name: str, daten: bytes) -> tuple[str, bytes]:
@@ -85,9 +103,16 @@ def hochladen(url: str, token: str, groesse: int, nummer: int) -> tuple[int, flo
         verbindung.send(koerper)
         start = time.perf_counter()
         antwort = verbindung.getresponse()
-        antwort.read()
-        return antwort.status, time.perf_counter() - start
-    except OSError:
+        koerper = antwort.read()
+        dauer = time.perf_counter() - start
+        if antwort.status == 202:
+            ergebnis = json.loads(koerper)
+            if (not isinstance(ergebnis, list) or len(ergebnis) != 1
+                    or not isinstance(ergebnis[0], dict) or ergebnis[0].get("status") != "NEU"
+                    or not ergebnis[0].get("id")):
+                return 0, dauer
+        return antwort.status, dauer
+    except (OSError, ValueError):
         return 0, 0.0
     finally:
         verbindung.close()
@@ -113,12 +138,16 @@ def main() -> int:
         parser.error("--anzahl, --parallel und --groesse müssen grösser als 0 sein")
     if args.aufwaermen < 0:
         parser.error("--aufwaermen muss mindestens 0 sein")
+    if not math.isfinite(args.grenze) or args.grenze <= 0:
+        parser.error("--grenze muss endlich und grösser als 0 sein")
 
     token = token_lesen()
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
         # Aufwärmen mit eigenen Nummern, Ergebnis verworfen
         vorweg = range(args.anzahl, args.anzahl + args.aufwaermen)
-        list(pool.map(lambda n: hochladen(args.url, token, args.groesse, n), vorweg))
+        vorergebnisse = list(pool.map(lambda n: hochladen(args.url, token, args.groesse, n), vorweg))
+        if any(status != 202 for status, _ in vorergebnisse):
+            sys.exit("Aufwärmen fehlgeschlagen; Messung nicht gestartet.")
         ergebnisse = list(pool.map(lambda n: hochladen(args.url, token, args.groesse, n), range(args.anzahl)))
 
     zeiten = [dauer for status, dauer in ergebnisse if status == 202]
@@ -134,11 +163,11 @@ def main() -> int:
         "angenommen": len(zeiten),
         "fehler": {str(status): zahl for status, zahl in sorted(fehler.items())},
         "p50_s": round(statistics.median(zeiten), 3) if zeiten else None,
-        "p95_s": round(perzentil(zeiten, 95), 3) if zeiten else None,
+        "p95_s": perzentil(zeiten, 95) if zeiten else None,
         "max_s": round(max(zeiten), 3) if zeiten else None,
         "grenze_s": args.grenze,
     }
-    bericht["bestanden"] = not fehler and bericht["p95_s"] is not None and bericht["p95_s"] <= args.grenze
+    bericht["bestanden"] = not fehler and bool(zeiten) and perzentil(zeiten, 95) <= args.grenze
     if args.json:
         print(json.dumps(bericht, ensure_ascii=False))
     else:

@@ -135,13 +135,17 @@ def main() -> int:
     if status != 200:
         sys.exit(f"Die Suche antwortet mit Status {status}. Bitte URL und Token (Recht A2) prüfen.")
     grenze = args.grenze if args.grenze is not None else (2.0 if args.modus == "hybrid" else 1.0)
+    if not math.isfinite(grenze) or grenze <= 0:
+        parser.error("--grenze muss endlich und grösser als 0 sein")
     zufall = random.Random(args.seed)
     # Gemessene Anfragen hängen nur vom Seed ab, nicht von der Zahl der Aufwärm-Anfragen
     anfragen = [parameter(n, begriffe, zufall, args.modus) for n in range(args.anzahl)]
     zufall_vorweg = random.Random(args.seed + 1)
     aufwaermen = [parameter(n, begriffe, zufall_vorweg, args.modus) for n in range(args.aufwaermen)]
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
-        list(pool.map(lambda w: suchen(args.url, token, w), aufwaermen))
+        vorergebnisse = list(pool.map(lambda w: suchen(args.url, token, w), aufwaermen))
+        if any(status != 200 for status, _, _ in vorergebnisse):
+            sys.exit("Aufwärmen fehlgeschlagen; Messung nicht gestartet.")
         ergebnisse = list(pool.map(lambda w: suchen(args.url, token, w), anfragen))
 
     zeiten = [dauer for status, dauer, _ in ergebnisse if status == 200]
@@ -158,11 +162,11 @@ def main() -> int:
         "beantwortet": len(zeiten),
         "fehler": {str(status): zahl for status, zahl in sorted(fehler.items())},
         "p50_s": round(statistics.median(zeiten), 3) if zeiten else None,
-        "p95_s": round(perzentil(zeiten, 95), 3) if zeiten else None,
+        "p95_s": perzentil(zeiten, 95) if zeiten else None,
         "max_s": round(max(zeiten), 3) if zeiten else None,
         "grenze_s": grenze,
     }
-    bericht["bestanden"] = not fehler and bericht["p95_s"] is not None and bericht["p95_s"] <= grenze
+    bericht["bestanden"] = not fehler and bool(zeiten) and perzentil(zeiten, 95) <= grenze
     if args.json:
         print(json.dumps(bericht, ensure_ascii=False))
     else:
