@@ -438,7 +438,7 @@ rückwärtskompatibel (tech.md Regel 11); die neuen Spalten haben Standardwerte,
 - Die Auftragsnamen `STAPEL_ANALYSE`, `STAPEL_TRENNEN` und `STAPEL_ABSCHLUSS` sind als typisierte Auftragskonstanten
   zentral definiert.
 - Diese Aufgabe liefert nur das Datenmodell und den Auftragstyp-Vertrag. Rechte A25/A26 und ihre Einträge in der
-  Rechtematrix bleiben Folgearbeit zu #749 (Aufgabe 27.2).
+  Rechtematrix wurden in der Folgearbeit 27.2 (#749) umgesetzt; diese Aufgabe ändert keine Rechte.
 
 ## Konfiguration (neu, Klasse (b) nach Spec 06, ausser Leer-Schwelle)
 Die Schlüssel stehen hier ohne das Präfix «archiv» und ohne Code-Formatierung, bis sie im Code bestehen
