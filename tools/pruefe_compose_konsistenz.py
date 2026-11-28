@@ -18,6 +18,18 @@ DOCKERFILES = (
     "deploy/infomaniak/db/Dockerfile",
     "deploy/infomaniak/keycloak/Dockerfile",
 )
+DIENST_SECRETS = {
+    "api": {"archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis",
+            "infomaniak_ai_token", "archiv_manifest_key", "archiv_data_key", "archiv_smtp_passwort",
+            "namenssperre_salz", "keycloak_verwaltung_secret"},
+    "db": {"archiv_db_postgres", "archiv_db_owner_scram", "archiv_db_app_scram", "keycloak_db_scram"},
+    "kc": {"keycloak_db", "keycloak_admin", "keycloak_smtp_passwort", "google_client_id", "google_client_secret"},
+}
+# Spec 09 E11: Platz für den noch nicht vorhandenen Scan-Eingang.
+SFTP_RESERVE_BYTES = 96 * 1024 * 1024
+SFTP_RESERVE_CPUS = Decimal("0.1")
+BUDGET_BYTES = 2144 * 1024 * 1024
+BUDGET_CPUS = Decimal("1.6")
 
 
 def positiv(wert):
@@ -29,8 +41,16 @@ def positiv(wert):
 
 
 def limit(wert):
-    treffer = re.fullmatch(r"(\d+(?:\.\d+)?)(?:[kmg](?:b)?)?", str(wert), re.IGNORECASE)
+    treffer = re.fullmatch(r"(\d+(?:\.\d+)?)([kmg]?)(?:b)?", str(wert), re.IGNORECASE)
     return bool(treffer and positiv(treffer.group(1)))
+
+
+def limit_bytes(wert):
+    treffer = re.fullmatch(r"(\d+(?:\.\d+)?)([kmg]?)(?:b)?", str(wert), re.IGNORECASE)
+    if not treffer or not positiv(treffer.group(1)):
+        return None
+    faktor = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3}[treffer.group(2).lower()]
+    return Decimal(treffer.group(1)) * faktor
 
 
 def dauer(wert):
@@ -68,9 +88,15 @@ def pruefe_compose(compose):
             melde("DIENST_FEHLT", name, "Erwarteter Dienst fehlt.")
     if not netze.get("intern", {}).get("internal"):
         melde("NETZ_INTERN", "networks.intern", "Internes Netz fehlt oder ist nicht isoliert.")
-    if not netze.get("web", {}).get("external"):
-        melde("NETZ_WEB", "networks.web", "Externes Webnetz fehlt.")
+    archivnetz = netze.get("web-archiv") or {}
+    if archivnetz.get("external") is not True or archivnetz.get("name", "web-archiv") != "web-archiv":
+        melde("NETZ_WEB", "networks.web-archiv", "Externes Netz mit Namen web-archiv erforderlich.")
+    for name, netz in netze.items():
+        if (netz or {}).get("name", name) == "web":
+            melde("NETZ_GETEILT", f"networks.{name}", "Das geteilte Netz web ist nicht zulässig.")
 
+    summe_bytes = Decimal(0) if "sftp" in dienste else Decimal(SFTP_RESERVE_BYTES)
+    summe_cpus = Decimal(0) if "sftp" in dienste else SFTP_RESERVE_CPUS
     for name, dienst in sorted(dienste.items()):
         ort = f"services.{name}"
         health = dienst.get("healthcheck") or {}
@@ -81,13 +107,28 @@ def pruefe_compose(compose):
             melde("HEALTHCHECK", ort, "Aktiver Healthcheck mit positiven Grenzen fehlt.")
         if not limit(dienst.get("mem_limit")) or not positiv(dienst.get("cpus")):
             melde("RESSOURCEN", ort, "Positives Speicher- und CPU-Limit erforderlich.")
+        else:
+            summe_bytes += limit_bytes(dienst["mem_limit"])
+            summe_cpus += Decimal(str(dienst["cpus"]))
         dienstnetze = set(dienst.get("networks") or [])
         if "intern" not in dienstnetze or not dienstnetze <= set(netze):
             melde("DIENST_NETZ", ort, "Internes oder deklariertes Netz fehlt.")
-        if ("web" in dienstnetze) != (name in {"api", "kc"}):
-            melde("WEB_ZUGRIFF", ort, "Webnetz darf nur API und Keycloak verbinden.")
+        erwartet = {"intern", "web-archiv"} if name in {"api", "kc", "sftp"} else {"intern"}
+        if dienstnetze != erwartet:
+            melde("WEB_ZUGRIFF", ort, "Dienst ist nicht ausschliesslich mit den vorgesehenen Netzen verbunden.")
         if dienst.get("ports"):
             melde("PORTS", ort, "Direkt veröffentlichte Ports sind nicht vorgesehen.")
+        for secret in dienst.get("secrets") or []:
+            quelle = secret.get("source") if isinstance(secret, dict) else secret
+            ziel = secret.get("target", quelle) if isinstance(secret, dict) else quelle
+            if quelle not in DIENST_SECRETS.get(name, set()) or ziel not in (quelle, f"/run/secrets/{quelle}"):
+                melde("SECRET_ZUGRIFF", ort, "Secret ist für diesen Dienst oder dieses Ziel nicht vorgesehen.")
+        for volume in dienst.get("volumes") or []:
+            ziel = volume.get("target", "") if isinstance(volume, dict) else str(volume).split(":")[1:2]
+            if isinstance(ziel, list):
+                ziel = ziel[0] if ziel else ""
+            if ziel == "/run/secrets" or ziel.startswith("/run/secrets/"):
+                melde("SECRET_VOLUME", ort, "Secret-Dateien dürfen nicht über Volumes eingehängt werden.")
         if not DIGEST.fullmatch(str(dienst.get("image", ""))):
             melde("IMAGE_DIGEST", ort, "Dienstimage ist nicht mit SHA-256-Digest gepinnt.")
         umgebung = dienst.get("environment") or {}
@@ -100,6 +141,8 @@ def pruefe_compose(compose):
         dienstlabels = dienst.get("labels") or {}
         if isinstance(dienstlabels, list):
             dienstlabels = dict(e.split("=", 1) if "=" in e else (e, "") for e in dienstlabels)
+        if name in {"api", "kc", "sftp"} and dienstlabels.get("traefik.docker.network") != "web-archiv":
+            melde("TRAEFIK_NETZ", ort, "Traefik muss das Archivnetz verwenden.")
         definiert = {
             treffer.group(1)
             for label in dienstlabels
@@ -117,6 +160,9 @@ def pruefe_compose(compose):
                 if len(teile) > 2 or (len(teile) == 2 and teile[1] != "docker") or teile[0] not in definiert:
                     melde("MIDDLEWARE_FREMDER_DIENST", f"{ort}.routers.{router.group(1)}",
                           f"Middleware {mittel} ist nicht am Dienst des Routers definiert.")
+
+    if summe_bytes > BUDGET_BYTES or summe_cpus > BUDGET_CPUS:
+        melde("BUDGET", "services", "Speicher- oder CPU-Budget inklusive SFTP ist überschritten.")
 
     labels = dienste.get("api", {}).get("labels") or {}
     if isinstance(labels, list):

@@ -272,21 +272,29 @@ class DeployStufeTest {
     }
 
     @Test
-    void ohneArchivStufeWirdDiePruefungRot() throws IOException {
+    void stufeBMitTestpraefixOderHoechstfristWirdRot() throws IOException {
         Map<String, String> umgebung = apiUmgebung();
-        assertThat(umgebung).containsKey("ARCHIV_STUFE");
-        umgebung.remove("ARCHIV_STUFE");
-
+        assertThat(umgebung).containsEntry("ARCHIV_STUFE", "B")
+                .containsEntry("ARCHIV_ABLAGE_BUCKET_PRAEFIX", "urinet-archiv-")
+                .doesNotContainKeys("ARCHIV_ABLAGE_MAX_SPERRFRIST", "ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST");
+        umgebung.put("ARCHIV_ABLAGE_BUCKET_PRAEFIX", "urinet-archiv-a-");
+        umgebung.put("ARCHIV_ABLAGE_MAX_SPERRFRIST", "P1D");
         assertThat(pruefen(umgebung)).contains("archiv.ablage.bucket-praefix", "archiv.ablage.max-sperrfrist");
     }
 
     @Test
     void stufeAMitZuLangerOderFehlenderHoechstfristWirdRot() throws IOException {
         Map<String, String> zuLang = apiUmgebung();
+        zuLang.put("ARCHIV_STUFE", "A");
+        zuLang.put("ARCHIV_ABLAGE_BUCKET_PRAEFIX", "urinet-archiv-a-");
+        zuLang.put("ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST", "P1D");
         zuLang.put("ARCHIV_ABLAGE_MAX_SPERRFRIST", "P2D");
         assertThat(pruefen(zuLang)).containsExactly("archiv.ablage.max-sperrfrist");
 
         Map<String, String> ohneManifestFrist = apiUmgebung();
+        ohneManifestFrist.put("ARCHIV_STUFE", "A");
+        ohneManifestFrist.put("ARCHIV_ABLAGE_BUCKET_PRAEFIX", "urinet-archiv-a-");
+        ohneManifestFrist.put("ARCHIV_ABLAGE_MAX_SPERRFRIST", "P1D");
         ohneManifestFrist.remove("ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST");
         assertThat(pruefen(ohneManifestFrist)).containsExactly("archiv.ablage.manifest-max-sperrfrist");
     }

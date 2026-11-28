@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -43,6 +44,11 @@ class DeployHaertungTest {
     private static final Pattern ROUTER_REGEL = Pattern.compile("traefik\\.http\\.routers\\.([^.]+)\\.rule");
     private static final Pattern HOST = Pattern.compile("Host\\(`([^`]*)`\\)");
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)}");
+    // Reserve für den noch fehlenden Scan-Eingang, Spec 09 E11.
+    private static final long SFTP_RESERVE_BYTES = 96L * 1024 * 1024;
+    private static final BigDecimal SFTP_RESERVE_CPUS = new BigDecimal("0.1");
+    private static final long BUDGET_BYTES = 2144L * 1024 * 1024;
+    private static final BigDecimal BUDGET_CPUS = new BigDecimal("1.6");
     /** Schreibt in eine Datei (nicht {@code >&}, nicht {@code /dev/null}). */
     /** Schreibt eine Datei: Umleitung (auch {@code 2>}) ausser nach /dev/null, auf einen Deskriptor oder in die
      *  Dateien von Actions ({@code $GITHUB_OUTPUT} u. a.), oder ein Befehl, der Dateien anlegt. */
@@ -95,16 +101,109 @@ class DeployHaertungTest {
     }
 
     @Test
-    void amNetzWebNurApiUndKeycloak() throws IOException {
-        List<String> amWeb = new ArrayList<>();
-        dienste().forEach((name, dienst) -> {
-            if (dienst.get("networks") instanceof Map<?, ?> netze && netze.containsKey("web")
-                    || dienst.get("networks") instanceof List<?> liste && liste.contains("web")) {
-                amWeb.add(name);
+    void netzeUndSecretsNurAnVorgesehenenDiensten() throws IOException {
+        Map<String, Map<String, Object>> dienste = dienste();
+        assertThat(fehlerNetzeUndSecrets(dienste)).isEmpty();
+        Map<String, Object> netze = karte(yaml(COMPOSE).get("networks"));
+        assertThat(karte(netze.get("intern")).get("internal")).isEqualTo(true);
+        assertThat(fehlerNetznamen(netze)).isEmpty();
+        dienste.get("db").put("networks", Map.of("intern", Map.of(), "web-archiv", Map.of()));
+        assertThat(fehlerNetzeUndSecrets(dienste)).contains("db: Netze");
+        dienste.get("db").put("secrets", List.of("archiv_manifest_key"));
+        assertThat(fehlerNetzeUndSecrets(dienste)).contains("db: Secrets");
+        dienste.put("sftp", new TreeMap<>(Map.of(
+                "networks", Map.of("intern", Map.of(), "web-archiv", Map.of()),
+                "labels", Map.of("traefik.docker.network", "web-archiv"))));
+        assertThat(fehlerNetzeUndSecrets(dienste)).doesNotContain("sftp: Netze");
+        dienste.get("sftp").put("networks", Map.of("intern", Map.of(), "web", Map.of()));
+        assertThat(fehlerNetzeUndSecrets(dienste)).contains("sftp: Netze");
+        dienste.get("sftp").put("ports", List.of("2222:22"));
+        assertThat(fehlerNetzeUndSecrets(dienste)).contains("sftp: Ports");
+    }
+
+    @Test
+    void tatsaechlicheNetznamenWerdenGeprueft() throws IOException {
+        Map<String, Object> netze = karte(yaml(COMPOSE).get("networks"));
+        netze.put("web-archiv", Map.of("external", true, "name", "web-archiv"));
+        assertThat(fehlerNetznamen(netze)).isEmpty();
+        netze.put("web-archiv", Map.of("external", true, "name", "web"));
+        assertThat(fehlerNetznamen(netze)).contains("web-archiv: Name oder external", "web-archiv: geteiltes Netz");
+        netze.put("web-archiv", Map.of("external", true, "name", "anderes-netz"));
+        assertThat(fehlerNetznamen(netze)).contains("web-archiv: Name oder external");
+        netze.put("web-archiv", Map.of("external", false, "name", "web-archiv"));
+        assertThat(fehlerNetznamen(netze)).contains("web-archiv: Name oder external");
+        netze.put("web-archiv", Map.of("external", true));
+        netze.put("intern", Map.of("internal", true, "name", "web"));
+        assertThat(fehlerNetznamen(netze)).contains("intern: geteiltes Netz");
+    }
+
+    private static List<String> fehlerNetznamen(Map<String, Object> netze) {
+        List<String> fehler = new ArrayList<>();
+        Map<String, Object> archivnetz = karte(netze.get("web-archiv"));
+        if (!Boolean.TRUE.equals(archivnetz.get("external"))
+                || !"web-archiv".equals(archivnetz.getOrDefault("name", "web-archiv"))) {
+            fehler.add("web-archiv: Name oder external");
+        }
+        netze.forEach((name, wert) -> {
+            Map<String, Object> netz = wert == null ? Map.of() : karte(wert);
+            if ("web".equals(netz.getOrDefault("name", name))) {
+                fehler.add(name + ": geteiltes Netz");
             }
         });
-        assertThat(amWeb).containsExactlyInAnyOrder("api", "kc");
-        assertThat(karte(karte(yaml(COMPOSE).get("networks")).get("intern")).get("internal")).isEqualTo(true);
+        return fehler;
+    }
+
+    private static List<String> fehlerNetzeUndSecrets(Map<String, Map<String, Object>> dienste) {
+        Map<String, Set<String>> secrets = Map.of(
+                "api", Set.of("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id",
+                        "s3_app_zugang_geheimnis", "infomaniak_ai_token", "archiv_manifest_key",
+                        "archiv_data_key", "archiv_smtp_passwort", "namenssperre_salz", "keycloak_verwaltung_secret"),
+                "db", Set.of("archiv_db_postgres", "archiv_db_owner_scram", "archiv_db_app_scram", "keycloak_db_scram"),
+                "kc", Set.of("keycloak_db", "keycloak_admin", "keycloak_smtp_passwort",
+                        "google_client_id", "google_client_secret"));
+        List<String> fehler = new ArrayList<>();
+        dienste.forEach((name, dienst) -> {
+            Set<String> erwartet = Set.of("api", "kc", "sftp").contains(name)
+                    ? Set.of("intern", "web-archiv") : Set.of("intern");
+            Object netze = dienst.get("networks");
+            Set<?> angebunden = netze instanceof Map<?, ?> map ? map.keySet()
+                    : netze instanceof List<?> liste ? Set.copyOf(liste) : Set.of();
+            if (!angebunden.equals(erwartet)) {
+                fehler.add(name + ": Netze");
+            }
+            if (dienst.containsKey("ports")) {
+                fehler.add(name + ": Ports");
+            }
+            if (Set.of("api", "kc", "sftp").contains(name)
+                    && !"web-archiv".equals(karte(dienst.get("labels")).get("traefik.docker.network"))) {
+                fehler.add(name + ": Traefik-Netz");
+            }
+            if (!Set.copyOf((List<?>) dienst.getOrDefault("secrets", List.of()))
+                    .equals(secrets.getOrDefault(name, Set.of()))) {
+                fehler.add(name + ": Secrets");
+            }
+        });
+        return fehler;
+    }
+
+    @Test
+    void probeBleibtImAnteilDerAngehaltenenApi() throws IOException {
+        Map<String, Map<String, Object>> probe = dienste(REPO.resolve("deploy/probe/compose.yml"));
+        Map<String, Object> api = dienste().get("api");
+        assertThat(probeImApiAnteil(probe, api)).isTrue();
+        probe.get("worker").put("cpus", "0.61");
+        assertThat(probeImApiAnteil(probe, api)).isFalse();
+        probe.get("worker").put("cpus", "0.15");
+        probe.get("worker").put("mem_limit", "1024m");
+        assertThat(probeImApiAnteil(probe, api)).isFalse();
+    }
+
+    private static boolean probeImApiAnteil(Map<String, Map<String, Object>> probe, Map<String, Object> api) {
+        long speicher = probe.values().stream().mapToLong(d -> bytes(String.valueOf(d.get("mem_limit")))).sum();
+        BigDecimal cpus = probe.values().stream().map(d -> new BigDecimal(String.valueOf(d.get("cpus"))))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return speicher <= bytes(String.valueOf(api.get("mem_limit")))
+                && cpus.compareTo(new BigDecimal(String.valueOf(api.get("cpus")))) <= 0;
     }
 
     @Test
@@ -114,12 +213,53 @@ class DeployHaertungTest {
         BigDecimal budgetCpus = new BigDecimal(String.valueOf(env.get("BUDGET_CPUS")));
         long summeBytes = 0;
         BigDecimal summeCpus = BigDecimal.ZERO;
-        for (Map<String, Object> dienst : dienste().values()) {
+        Map<String, Map<String, Object>> alleDienste = dienste();
+        for (Map<String, Object> dienst : alleDienste.values()) {
             summeBytes += bytes(String.valueOf(dienst.get("mem_limit")));
             summeCpus = summeCpus.add(new BigDecimal(String.valueOf(dienst.get("cpus"))));
         }
+        Map<String, Object> sftp = alleDienste.get("sftp");
+        if (sftp != null) {
+            summeBytes -= bytes(String.valueOf(sftp.get("mem_limit")));
+            summeCpus = summeCpus.subtract(new BigDecimal(String.valueOf(sftp.get("cpus"))));
+        }
         assertThat(summeBytes).isLessThanOrEqualTo(budgetMib * 1024 * 1024);
         assertThat(summeCpus).isLessThanOrEqualTo(budgetCpus);
+        assertThat(imBudget(alleDienste)).isTrue();
+    }
+
+    @Test
+    void budgetMitReserveOderSftp() throws IOException {
+        Map<String, Map<String, Object>> dienste = dienste();
+        dienste.remove("sftp");
+        assertThat(imBudget(dienste)).isTrue();
+        dienste.get("api").put("mem_limit", "1025m");
+        assertThat(imBudget(dienste)).isFalse();
+        dienste.get("api").put("mem_limit", "1024m");
+        dienste.get("api").put("cpus", "0.61");
+        assertThat(imBudget(dienste)).isFalse();
+        dienste.get("api").put("cpus", "0.6");
+        dienste.put("sftp", Map.of("mem_limit", "96m", "cpus", "0.1"));
+        assertThat(imBudget(dienste)).isTrue();
+        dienste.put("sftp", Map.of("mem_limit", "97m", "cpus", "0.1"));
+        assertThat(imBudget(dienste)).isFalse();
+        dienste.put("sftp", Map.of("mem_limit", "96m", "cpus", "0.11"));
+        assertThat(imBudget(dienste)).isFalse();
+    }
+
+    private static boolean imBudget(Map<String, Map<String, Object>> dienste) {
+        long summeBytes = dienste.containsKey("sftp") ? 0 : SFTP_RESERVE_BYTES;
+        BigDecimal summeCpus = dienste.containsKey("sftp") ? BigDecimal.ZERO : SFTP_RESERVE_CPUS;
+        for (Map<String, Object> dienst : dienste.values()) {
+            long speicher = bytes(String.valueOf(dienst.get("mem_limit")));
+            BigDecimal cpus = new BigDecimal(String.valueOf(dienst.get("cpus")));
+            if (speicher <= 0 || cpus.signum() <= 0) {
+                return false;
+            }
+            summeBytes += speicher;
+            summeCpus = summeCpus.add(cpus);
+        }
+        return summeBytes <= BUDGET_BYTES && summeCpus.compareTo(BUDGET_CPUS) <= 0;
     }
 
     /** Die Compose-Policy der VPS lehnt {@code priority} überall ab (Deploy vom 18.11.2026, PR #299). */
