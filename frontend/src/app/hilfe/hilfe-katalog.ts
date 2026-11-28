@@ -42,6 +42,14 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     datei: '/anleitung/erste-schritte-passkey.md',
     eltern: 'erste-schritte',
   },
+  // Mein Konto (Spec 06, Req 11): alle angemeldeten Rollen, Seite /konto
+  {
+    anker: 'erste-schritte-konto',
+    titel: TEXTE.hilfe.abschnitte['erste-schritte-konto'],
+    datei: '/anleitung/erste-schritte-konto.md',
+    eltern: 'erste-schritte',
+    pfade: ['/konto'],
+  },
   // Erfassen und Eingangskorb (Aufgabe 22.5)
   {
     anker: 'erfassen',

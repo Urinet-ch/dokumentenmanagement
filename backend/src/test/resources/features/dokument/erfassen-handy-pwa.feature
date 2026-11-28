@@ -180,7 +180,7 @@ Funktionalität: Handy-Erfassung
     Und ich die Erfassung abschliesse
     Dann hat das Archiv einen Upload-Versuch erhalten
     Und zeigt der Zähler «Wartet auf Upload: 1»
-    Wenn ich auf «Abmelden» klicke
+    Wenn ich mich unter «Mein Konto» abmelde
     Dann hat Keycloak die Abmeldung erhalten
     Und liegen 1 Erfassung im lokalen Speicher
     Angenommen Keycloak kennt mich als «mitarbeiter» im Mandanten «urinet»
@@ -202,7 +202,7 @@ Funktionalität: Handy-Erfassung
     Und ich 1 Seite aufnehme
     Und ich die Erfassung abschliesse
     Dann hat das Archiv einen Upload-Versuch erhalten
-    Wenn ich auf «Abmelden» klicke
+    Wenn ich mich unter «Mein Konto» abmelde
     Dann hat Keycloak die Abmeldung erhalten
     Angenommen Keycloak kennt mich als «mitarbeiter» im Mandanten «urinet»
     Wenn ich mich anmelde
@@ -228,7 +228,7 @@ Funktionalität: Handy-Erfassung
     Und ich 1 Seite aufnehme
     Und ich die Erfassung abschliesse
     Dann sehe ich die Erfassung unter «Nicht hochgeladen» mit der Meldung «Die Anfrage ist ungültig.»
-    Wenn ich auf «Abmelden» klicke
+    Wenn ich mich unter «Mein Konto» abmelde
     Dann hat Keycloak die Abmeldung erhalten
     Angenommen Keycloak kennt mich als «mitarbeiter» im Mandanten «urinet»
     Wenn ich mich anmelde

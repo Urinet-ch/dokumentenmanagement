@@ -51,7 +51,7 @@ Alle Punkte sind vorgeschlagen am 21.11.2026 und gelten als entschieden mit dem 
 | --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
 | E1  | Wer ist «neu», wo wird das gemerkt? | Neu ist, wer in diesem Browser für Mandant und `sub` keinen Vermerk hat; der Vermerk liegt im `localStorage`, Kennung als SHA-256, nichts geht an den Server | Keycloak-Attribut, Tabelle im Mandantenschema, Ableitung aus dem Benutzerverzeichnis (Abschnitt «Einführungsvermerk»)                                  | 1            |
 | E2  | Form der Einführung                 | Karte zwischen Seitenkopf und Kacheln, höchstens sechs Schritte, Schritte nach Rechten                                                                       | modaler Dialog, Tour mit Markierung einzelner Elemente, eigene Seite `/willkommen`                                                                     | 2, 3.1       |
-| E3  | Wo steht der Menüpunkt «Hilfe»?     | Kopfzeile, neben dem Farbschema-Knopf, für jeden Besucher                                                                                                    | Eintrag in der Seitenleiste (fehlt auf dem Handy hinter dem Menüknopf und ganz, wenn das Menü leer ist)                                                | 4.1          |
+| E3  | Wo steht der Menüpunkt «Hilfe»?     | Kopfzeile, neben dem Farbschema-Knopf, für jeden Besucher; angemeldet neben dem Benutzerelement, Farbschema-Knopf nur ohne Anmeldung (Spec 06, Req 11.2, Entscheid Fabian 28.11.2026) | Eintrag in der Seitenleiste (fehlt auf dem Handy hinter dem Menüknopf und ganz, wenn das Menü leer ist)                                                | 4.1          |
 | E4  | Kontextbezogene Hilfe               | Hilfe-Leiste über der Seite, ohne Navigation; die Seite `/hilfe` für die ganze Anleitung                                                                     | jede Seite navigiert zu `/hilfe#…` (Aufnahmen in «Erfassen», Chatverlauf und offene Formulare gingen verloren, weil sie nur im Arbeitsspeicher liegen) | 4.2          |
 | E5  | Quelle der Texte                    | Markdown unter `frontend/public/anleitung/`, eine Datei je Abschnitt, Hilfe-Katalog in TypeScript                                                            | Texte in `texte.de-CH.ts`; Markdown unter `docs/`; Wissensbasis (Spec 04); Endpunkt im Backend                                                         | 7.1, 7.2     |
 | E6  | Darstellung                         | eigene, kleine Markdown-Teilmenge im Frontend → Baum aus `Textteil` wie die Wissensseite, nur Interpolation                                                  | Bibliothek `marked` plus `wissenText()`; Darstellung durch den Renderer des Backends (`WissensMarkdown`)                                               | 7.3, 7.4     |
@@ -164,6 +164,7 @@ Verhalten (z. B. «bestätigen») müssen der umgesetzten App entsprechen (Requi
 | -------------------------- | ---------------------------------- | ---------------- | ----------------- | --------------------------- | ---------- |
 | `erste-schritte`           | Erste Schritte                     | –                | allgemein         | `/`                         | ja         |
 | `erste-schritte-passkey`   | Mit Passkey anmelden               | `erste-schritte` | allgemein         | –                           | –          |
+| `erste-schritte-konto`     | Mein Konto                         | `erste-schritte` | allgemein         | `/konto`                    | –          |
 | `erfassen`                 | Erfassen                           | –                | A1                | `/erfassen`                 | –          |
 | `erfassen-handy`           | Mit dem Handy fotografieren        | `erfassen`       | A1                | –                           | –          |
 | `erfassen-dateien`         | Dateien hochladen                  | `erfassen`       | A1                | –                           | –          |
@@ -497,6 +498,8 @@ Stand des PR zu 22.2; Schnittstellen für 22.3, 23.3 und 23.4.
 
 - **Kopfzeile:** «Hilfe» steht neben dem Farbschema-Knopf, für alle Besucher und mit zugänglichem Namen. Unter 600 px
   bleibt nur das Symbol sichtbar. Das neue Symbol `hilfe` wurde am Ende von `SYMBOLE` ergänzt.
+  Nachtrag (Spec 06, Aufgabe 26.4): Angemeldet steht «Hilfe» neben dem Benutzerelement («Mein Konto»); den
+  Farbschema-Knopf gibt es nur noch ohne Anmeldung (Req 11.2).
 - **Leiste:** zweiter `mat-sidenav` am Ende des bestehenden Rahmens, als Overlay mit maximal 420 px Breite ab 960 px und
   voller Breite auf schmalen Geräten. Inhalt wird erst beim ersten Öffnen mit `@defer` geladen. Der Dialog erhält Fokus
   auf der Überschrift, Escape und die Material-Fokusfalle bleiben aktiv; beim Schliessen kehrt der Fokus zum Auslöser
@@ -695,3 +698,12 @@ ist nur, was die Seiten auf `main` zeigen (Requirement 6.4), mit den Namen aus `
 - `verwaltung.md` nennt die Löschbedingungen aus Spec 06, Req 3.11 und den Rollenkonflikt aus Req 4.5.
 - Nachweis: `anleitung-inhalt.spec.ts` und `anleitung-abschnitte.spec.ts`; kompletter Frontend-Testlauf mit
   `npm test -- --watch=false` (110 Dateien, 1'245 Tests).
+
+## Umsetzung (Spec 06, Aufgabe 26.4, 28.11.2026)
+- Folgeänderungen aus Spec 06, Requirement 11 (Entscheid Fabian 28.11.2026): E3 und «Kopfzeile» (Aufgabe 22.3) oben
+  nachgetragen; 3.5 und 5.5 nennen «Mein Konto» zusätzlich (Änderung der Requirements im PR ausgewiesen). Der
+  Hilfe-Katalog hat den Unterabschnitt `erste-schritte-konto` («Mein Konto», Pfad `/konto`, allgemein);
+  `erste-schritte.md` und `erste-schritte-passkey.md` beschreiben Benutzerelement, Darstellung und Abmelden auf «Mein Konto».
+- Requirement 4.1 («neben dem Knopf für das Farbschema») bleibt unverändert; angemeldet gilt Spec 06, 11.2 (Auslegung im PR).
+- Nachweis: `anleitung-abschnitte.spec.ts`, `hilfe-katalog.spec.ts`, `anleitung-inhalt.spec.ts`; Szenarien in
+  `features/verwaltung/mein-konto-pwa.feature`.

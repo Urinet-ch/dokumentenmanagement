@@ -19,7 +19,6 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { SwUpdate } from '@angular/service-worker';
 import { filter, map } from 'rxjs';
 import { AnmeldungService } from './gemeinsam/anmeldung/anmeldung.service';
-import { kontoverwaltungUrl } from './gemeinsam/anmeldung/kontoverwaltung';
 import { BrandingService } from './gemeinsam/branding.service';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { EingangskorbEntwurfSpeicher } from './eingangskorb/entwurf-speicher';
@@ -34,6 +33,7 @@ import { WissenEntwurfZaehler } from './wissen/wissen-entwurf-zaehler';
 import { HILFE_EINTRAEGE } from './hilfe/hilfe-sichtbar';
 import { HilfeLeisteAnsicht } from './hilfe/hilfe-leiste';
 import { HilfeLeiste } from './hilfe/hilfe-leiste.service';
+import { Abmeldung } from './konto/abmeldung';
 import { hilfeKontext } from './hilfe/hilfe-kontext';
 
 export const SEITE_NEU_LADEN = new InjectionToken<() => void>('SEITE_NEU_LADEN', {
@@ -96,8 +96,9 @@ export class App {
       this.funktionen.wissenVerfuegbar()),
   );
   protected readonly farbschema = inject(FarbschemaService);
-  /** Einstieg zur Kontoverwaltung des Realms (Passkey einrichten, Req 10.1); Adresse aus der OIDC-Konfiguration. */
-  protected readonly kontoverwaltung = kontoverwaltungUrl();
+  private readonly abmeldung = inject(Abmeldung);
+  /** Das Benutzerelement führt zu «Mein Konto» und ist dort die aktuelle Seite (Spec 06, Req 11.1). */
+  protected readonly aufKonto = computed(() => aktiverPfad(this.url(), ['/konto']) === '/konto');
   protected readonly stand = { ...BUILD_INFO, gebaut: gebautAm(BUILD_INFO.gebaut) };
 
   constructor() {
@@ -137,10 +138,15 @@ export class App {
     );
     // Abgelaufene Sitzung: zurück zur Startseite, dort stehen der Hinweis und «Anmelden»; die Seite bleibt als Ziel.
     // «Erfassen» zeigt beides selbst und sichert vor der Anmeldung die aufgenommenen Seiten (Req 4.4).
+    // «Mein Konto» bleibt offline stehen (Spec 06, Req 11.11: Darstellung, «Dieses Gerät», «Abmelden»), ohne Angaben;
+    // sobald das Gerät wieder online ist, geht es wie bei den übrigen Seiten zur Anmeldung.
     effect(() => {
       if (this.anmeldung.zustand() === 'abgelaufen') {
         const ziel = untracked(() => this.router.url);
         if (ziel === '/erfassen' || ziel.startsWith('/erfassen?')) {
+          return;
+        }
+        if (aktiverPfad(ziel, ['/konto']) && !this.online()) {
           return;
         }
         const queryParams = ziel.startsWith('/?') || ziel === '/' ? {} : { ziel };
@@ -174,9 +180,9 @@ export class App {
     }
   }
 
+  /** Nur noch ohne gültige Sitzung in der Kopfzeile (abgelaufen); angemeldet auf «Mein Konto» (Req 11.2, 11.10). */
   protected abmelden(): void {
-    this.entwurfSpeicher.alleLoeschen();
-    this.anmeldung.abmelden();
+    this.abmeldung.abmelden();
   }
 
   protected async aktualisieren(): Promise<void> {
