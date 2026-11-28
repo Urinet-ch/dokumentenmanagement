@@ -708,6 +708,11 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             webseitenChat = webseitenChat == null ? new WebseitenChatEinstellungen(null) : webseitenChat;
             wissen = wissen == null ? new WissenEinstellungen(null, null, null, null) : wissen;
         }
+
+        /** Dieselben Einstellungen mit anderen Einstellungen der Wissensbasis. */
+        public Einstellungen mitWissen(WissenEinstellungen andere) {
+            return new Einstellungen(geschaeftsjahrEnde, kennungen, branding, chat, webseitenChat, andere);
+        }
     }
 
     public record EinstellungenBranding(String name, String primaerfarbe) {

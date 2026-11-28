@@ -576,8 +576,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Vorbereitung ohne Betriebseingriff (PR #569): Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; Anbindung und Nachweise bleiben offen.
   - Folgeumsetzung (24.11.2026): App-Gauge `archiv_ki_beispiele{mandant}` und Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` ab 1'000 Beispielen; dokumentiert in `docs/alarme.md`. Die VPS-Anbindung und Betriebsnachweise bleiben offen, daher bleibt die Aufgabe ungeprüft.
   - Nachtrag (25.11.2026): Ein Fehler beim Zählen der KI-Beispiele lässt die übrigen Kennzahlen des Mandanten bestehen; die fehlende KI-Gauge signalisiert den Messfehler statt eines Nullwerts. Tests in `JdbcKiBeispielTest` und `MicrometerKennzahlenTest`.
-  - Entscheid Fabian (27.11.2026, PR #724): unabhängige Erreichbarkeitsprüfung beider Hosts und Meldung bei fehlgeschlagenem Deploy gewählt; beides im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Der Betriebsnachweis für die Prüfung des Anmelde-Hosts bleibt bei Fabian offen; Aufgabe 5.9 bleibt bis zu diesem Nachweis ungeprüft.
-  - **Geändert 28.11.2026 (entschieden von Fabian am 28.11.2026):** Auf eine eigene externe Prüfung des Anmelde-Hosts `archiv-auth.apps.urinet.ch` wird verzichtet; der Betriebsnachweis dafür entfällt. Bekannte Lücke: Fällt nur Keycloak aus, meldet die externe Erreichbarkeitsprüfung das nicht eigens. Mit Variante B ist «Stufe B aus 5.11» die bestehende VPS; die Anbindung und die Nachweise laufen in Aufgabe 31.5.
+  - Entscheid Fabian (27.11.2026, PR #724; präzisiert am 28.11.2026): unabhängige externe Erreichbarkeitsprüfung des Anwendungs-Hosts und Meldung bei fehlgeschlagenem Deploy gewählt; beides im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Fabian entschied am 28.11.2026, den Anmelde-Host bewusst nicht extern zu überwachen, da die Prüfung des Anwendungs-Hosts genügt; die externe Prüfung des Anmelde-Hosts wurde wieder entfernt. Bekannte Lücke: Fällt nur der Anmeldedienst aus, bleibt die Health der App grün. Für den Anmelde-Host bleibt kein Betriebsnachweis offen; die Anbindung und übrigen Nachweise laufen in Aufgabe 31.5.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 
@@ -660,6 +659,7 @@ Betriebswerte (Hostnamen, Adressen, Kapazitäten) stehen nicht im Repo. Häkchen
   - _Abhängig von: 5.6, 5.9 (Teile im Repo)_
 
 - [ ] 31.6 Leistungsmessung auf der VPS [Fabian] [Infra]
+  - Repo-Vorbereitung: `deploy/last/compose.yml`, `seed/last/konfiguration.json`, Generator und Prüfung des Suchbestands, HEIC-/Bild-PDF-Generator sowie Auswertung der Serverhistogramme und Auftragszeitstempel unter `tools/last/`; Ablauf und Grenzen in `docs/betrieb/leistungsmessung-stufe-b.md`. Messprojekt-Ziel im freigegebenen Deploy-Betriebsweg, Bildweg-/Hybrid-Nachweis und Durchführung bleiben offen; kein Betriebsnachweis.
   - Richtwert bis 22.12.2026, vor dem Wechsel (entschieden von Fabian am 28.11.2026). Messung nach 16.26 als eigenes Compose-Projekt (z. B. `archiv-last`) mit Mandant `last` und Bucket `urinet-archiv-a-last`, Limits nach 16.30, nur synthetische Daten; Messbedingungen, Bildweg und Dateinamen wie in 5.11; der Archiv-Stack ruht während der Messung; Health der anderen Apps (16.18); danach Projekt, Messdaten und Bucket verwerfen
   - Verfehlt die Messung ein Ziel: Ergebnis Fabian als Entscheid vorlegen (16.17, 16.26); kein automatischer Stopp, kein Aufrüsten ohne Entscheid
   - _Anforderungen: 3.2, 5.5, 14.3, 16.16, 16.26_
@@ -682,8 +682,9 @@ Betriebswerte (Hostnamen, Adressen, Kapazitäten) stehen nicht im Repo. Häkchen
   - _Anforderungen: 16.3, 16.23_
   - _Abhängig von: 31.8, Spec 09: 30.1_
 
-- [ ] 31.10 Eigenes Netz für Traefik und das Archiv [Infra] [Fabian]
+- [x] 31.10 Eigenes Netz für Traefik und das Archiv [Infra] [Fabian]
   - Richtwert bis 09.12.2026 (entschieden von Fabian am 28.11.2026): im Infra-Repo der VPS ein eigenes Docker-Netz, an dem nur Traefik und das Archiv hängen, keine andere App; Traefik zusätzlich daran anschliessen; Vorschlag als Patch oder Anleitung, Fabian merged und rollt aus; Name des Netzes für 31.2 (kein Betriebswert)
+  - Erledigt 28.11.2026 (Fabian): eigenes Netz im Infra-Repo umgesetzt und ausgerollt; Betriebswerte nur im Infra-Repo. Das Archiv wechselt mit #757 in 31.7
   - Ausrollen zusammen mit 31.2 in 31.7 abstimmen, damit Traefik `api` und `kc` beim Wechsel des Netzes ohne Unterbruch erreicht oder der Unterbruch im Wechselfenster liegt
   - _Anforderungen: 16.28_
 

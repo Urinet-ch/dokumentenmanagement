@@ -8,6 +8,8 @@ import { KontaktePort } from './kontakte/kontakte-port';
 import { anmeldungGuard } from './gemeinsam/anmeldung/anmeldung.guard';
 import { erfassenGuard } from './gemeinsam/anmeldung/erfassen.guard';
 import { rechtGuard } from './gemeinsam/anmeldung/recht.guard';
+import { wissenGuard } from './gemeinsam/anmeldung/wissen.guard';
+import { WISSENSROUTE } from './gemeinsam/mandant-funktionen';
 import { TEXTE } from './gemeinsam/texte.de-CH';
 import { Rueckruf } from './start/rueckruf';
 import { Start } from './start/start';
@@ -67,62 +69,71 @@ export const routes: Routes = [
   {
     path: 'wissensbasis/einstellungen',
     loadComponent: () => import('./wissen/wissen-einstellungen').then((m) => m.WissenEinstellungenSeite),
-    canActivate: [rechtGuard('A19')],
+    canActivate: [wissenGuard('A19')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.wissenEinstellungen.titel),
   },
   {
     path: 'wissen',
     loadComponent: () => import('./wissen/wissen-index').then((m) => m.WissenIndex),
-    canActivate: [rechtGuard('A15')],
+    canActivate: [wissenGuard('A15')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.wissen.titel),
   },
   {
     path: 'wissen/log',
     loadComponent: () => import('./wissen/wissen-log').then((m) => m.WissenLog),
-    canActivate: [rechtGuard('A15')],
+    canActivate: [wissenGuard('A15')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.wissen.log),
   },
   {
     path: 'wissen/ueberblick',
     loadComponent: () => import('./wissen/wissen-seite').then((m) => m.WissenSeite),
-    canActivate: [rechtGuard('A15')],
-    data: { pfad: 'ueberblick' },
+    canActivate: [wissenGuard('A15')],
+    data: { [WISSENSROUTE]: true, pfad: 'ueberblick' },
     title: titel(TEXTE.wissen.titel),
   },
   {
     path: 'wissen/entwuerfe',
     loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
-    canActivate: [rechtGuard('A17')],
+    canActivate: [wissenGuard('A17')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.wissen.entwuerfe.titel),
   },
   {
     path: 'wissen/entwuerfe/import',
     loadComponent: () => import('./wissen/wissen-import').then((m) => m.WissenImport),
-    canActivate: [rechtGuard('A17')],
+    canActivate: [wissenGuard('A17')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.wissen.import.titel),
   },
   {
     path: 'wissen/entwuerfe/meine',
     loadComponent: () => import('./wissen/meine-analysen').then((m) => m.MeineAnalysen),
-    canActivate: [rechtGuard('A18')],
+    canActivate: [wissenGuard('A18')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.chat.analysen),
   },
   {
     path: 'wissen/entwuerfe/meine/:id',
     loadComponent: () => import('./wissen/meine-analysen').then((m) => m.MeineAnalysen),
-    canActivate: [rechtGuard('A18')],
+    canActivate: [wissenGuard('A18')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.chat.analysen),
   },
   {
     path: 'wissen/entwuerfe/:id',
     loadComponent: () => import('./wissen/wissen-entwuerfe').then((m) => m.WissenEntwuerfe),
-    canActivate: [rechtGuard('A17')],
+    canActivate: [wissenGuard('A17')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.wissen.entwuerfe.titel),
   },
   {
     path: 'wissen/:ordner/:name',
     loadComponent: () => import('./wissen/wissen-seite').then((m) => m.WissenSeite),
-    canActivate: [rechtGuard('A15')],
+    canActivate: [wissenGuard('A15')],
+    data: { [WISSENSROUTE]: true },
     title: titel(TEXTE.wissen.titel),
   },
   {
@@ -145,6 +156,12 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A6')],
     providers: [{ provide: KontaktePort, useClass: HttpKontakteService }],
     title: titel(TEXTE.menue.kontakte),
+  },
+  {
+    path: 'quellen',
+    loadComponent: () => import('./quellen/quellen').then((m) => m.QuellenSeite),
+    canActivate: [rechtGuard('A27')],
+    title: titel(TEXTE.menue.quellen),
   },
   {
     path: 'importe',

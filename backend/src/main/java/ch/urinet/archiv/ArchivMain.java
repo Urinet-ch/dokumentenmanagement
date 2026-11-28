@@ -15,6 +15,7 @@ import ch.urinet.archiv.sicherheit.adapter.in.kommando.WebseitenSchluesselKomman
 import ch.urinet.archiv.sicherung.adapter.in.kommando.SicherungKommando;
 import ch.urinet.archiv.sicherung.adapter.in.kommando.SperrpruefungKommando;
 import ch.urinet.archiv.verarbeitung.adapter.in.kommando.EmbeddingKommando;
+import ch.urinet.archiv.wissen.adapter.in.kommando.WissenFreischaltungKommando;
 import io.quarkus.runtime.ApplicationLifecycleManager;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
@@ -35,7 +36,7 @@ import java.util.function.BiConsumer;
  * Ohne Argumente läuft der Dienst; mit Argumenten ein Admin-Kommando wie {@code archiv mandant anlegen urinet},
  * {@code archiv token erstellen urinet Rechnungsgenerator generator} oder
  * {@code archiv alte-links importieren links.csv --mandant urinet} oder
- * {@code archiv embedding nachberechnen urinet}.
+ * {@code archiv embedding nachberechnen urinet} oder {@code archiv mandant wissen urinet ein}.
  * Exit-Codes des Kommandos: 0 ok, 1 fachlicher Fehler, 2 falscher Aufruf (geprüft, bevor Quarkus startet),
  * 3 technischer Fehler, auch wenn schon der Start der Anwendung scheitert (z. B. falscher Zugang für {@code archiv_owner}),
  * 4 nur bei {@code mandant abbauen}: Abbau unvollständig (gesperrte Objekte, Schema oder Bucket bleiben; erneut aufrufen).
@@ -114,6 +115,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     EmbeddingKommando embedding;
+
+    @Inject
+    WissenFreischaltungKommando wissen;
 
     public static void main(String... argumente) {
         if (argumente.length == 0) {
@@ -199,6 +203,9 @@ public class ArchivMain implements QuarkusApplication {
                     : !rest.isEmpty() && rest.getFirst().equals("inhaber-einladen")
                             ? InhaberEinladenKommando.lesen(rest).isPresent() ? Optional.empty()
                                     : Optional.of(InhaberEinladenKommando.AUFRUF)
+                    : !rest.isEmpty() && rest.getFirst().equals("wissen")
+                            ? WissenFreischaltungKommando.lesen(rest).isPresent() ? Optional.empty()
+                                    : Optional.of(WissenFreischaltungKommando.AUFRUF)
                     : MandantKommando.gueltig(rest) ? Optional.empty() : Optional.of(MandantKommando.AUFRUF);
             case "token" -> TokenKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(TokenKommando.AUFRUF);
@@ -225,7 +232,8 @@ public class ArchivMain implements QuarkusApplication {
                     + EmbeddingKommando.AUFRUF + System.lineSeparator()
                     + BenutzerAbgleichenKommando.AUFRUF + System.lineSeparator()
                     + BestehendenInhaberKommando.AUFRUF + System.lineSeparator()
-                    + BenutzerMandantSperrenKommando.AUFRUF);
+                    + BenutzerMandantSperrenKommando.AUFRUF + System.lineSeparator()
+                    + WissenFreischaltungKommando.AUFRUF);
         };
     }
 
@@ -278,6 +286,8 @@ public class ArchivMain implements QuarkusApplication {
                             ? benutzerMandantSperren.ausfuehren(rest, ergebnis, System.err)
                     : !rest.isEmpty() && rest.getFirst().equals("inhaber-einladen")
                             ? inhaberEinladen.ausfuehren(rest, ergebnis, System.err)
+                    : !rest.isEmpty() && rest.getFirst().equals("wissen")
+                            ? wissen.ausfuehren(rest, ergebnis, System.err)
                     : mandant.ausfuehren(rest, ergebnis, System.err);
             case "benutzer" -> !rest.isEmpty() && rest.getFirst().equals("inhaber-uebernehmen")
                     ? bestehendenInhaber.ausfuehren(rest, ergebnis, System.err)

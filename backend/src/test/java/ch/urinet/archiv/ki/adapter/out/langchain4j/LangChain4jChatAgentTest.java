@@ -31,7 +31,7 @@ class LangChain4jChatAgentTest {
 
     private static LangChain4jChatAgent agent(int runden) {
         return new LangChain4jChatAgent(null, null, null, new WerkzeugKontextRegister(), null, null,
-                runden, 10, Duration.ofSeconds(1));
+                runden, 10, Duration.ofSeconds(1), null);
     }
 
     private static AgentLauf lauf() {
@@ -66,7 +66,7 @@ class LangChain4jChatAgentTest {
             public <T> T mit(MandantCode code, Supplier<T> arbeit) {
                 return arbeit.get();
             }
-        }, 5, 10, Duration.ofSeconds(1));
+        }, 5, 10, Duration.ofSeconds(1), null);
         ChatResponse antwort = ChatResponse.builder().aiMessage(AiMessage.from("Antwort"))
                 .tokenUsage(new TokenUsage(10, 5)).build();
 

@@ -1455,7 +1455,7 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   Entscheidung überschreibt. Die Freigabe verlangt konservativ mindestens ein belegendes Dokument und den festen Webseitenfilter
   einschliesslich bestätigter Art, Archivstatus und Veröffentlichung; Analysen sowie indirekt erreichbare Analysen sind ausgeschlossen.
   Die Seitenansicht zeigt die höchste Quellenstufe und verlangt eine Bestätigung.
-- **Teilumsetzung öffentlicher Wissenschat (Aufgabe 18.3, 24.11.2026):** `POST /public/v1/wissen/chat` verwendet nur öffentliche
+- **Umsetzung öffentlicher Wissenschat (Aufgabe 18.3, 24.11.2026):** `POST /public/v1/wissen/chat` verwendet nur öffentliche
   Wissenswerkzeuge und den mandantenbezogenen Schalter `archiv.mandant.<code>.oeffentlich.wissenschat` (Standard aus). Es gelten
   dieselben öffentlichen Client-Grenzen und das öffentliche Monatsbudget sowie zusätzlich das Wissensbudget. Seiten und auch
   Indexangaben werden vor der Antwort nochmals unter der Hüllensperre auf Freigabe, aktuelle Quellen und Revision geprüft; bei
@@ -1482,6 +1482,27 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   nicht rückrufbar. **Nachtrag Stabilität 25.11.2026:** Die simulierte Schlussantwort wartet 3 Sekunden, damit auch
   langsame CI-Runner Zeit für die Änderung während der laufenden Anfrage haben. Die SSE-Gegenprobe begrenzt das Lesen
   einschliesslich des ersten Ereignisses und des Reststroms auf eine Gesamtfrist von 30 Sekunden.
+  **Entscheid Fabian vom 28.11.2026 (Aufgabe 18.3):** Der nach Bereinigung im Arbeitsspeicher gehaltene Frage- und Antwortverlauf
+  darf für Folgefragen bis zu 30 Minuten bestehen; er wird nach Ablauf aus dem Speicher entfernt und nie auf Platte, im Log
+  oder in der Datenbank gespeichert. Der Chat weist Besucherinnen und Besucher darauf hin, keine Personendaten einzugeben.
+  Diese vorübergehende Speicherung gilt nicht als unzulässige Speicherung personenbezogener Daten.
+
+### Umsetzung (Aufgabe 18.3, 28.11.2026)
+Abgleich der Teilanforderungen von Requirement 21.6 mit dem aktuellen Code und den Szenarien; Requirements bleiben unverändert.
+
+| Teilanforderung aus 21.6 | Beleg | Status |
+| --- | --- | --- |
+| Öffentlicher Endpunkt mit Webseiten-Schlüssel, mandantenbezogenem Standardschalter sowie öffentlichen Client-Grenzen und Monatsbudget | [OeffentlicherWissenschatResource.java:34](../../../backend/src/main/java/ch/urinet/archiv/integration/adapter/in/rest/webseite/OeffentlicherWissenschatResource.java#L34), [OeffentlicherWissenschatResource.java:59](../../../backend/src/main/java/ch/urinet/archiv/integration/adapter/in/rest/webseite/OeffentlicherWissenschatResource.java#L59), [OeffentlicherWissenschatResource.java:77](../../../backend/src/main/java/ch/urinet/archiv/integration/adapter/in/rest/webseite/OeffentlicherWissenschatResource.java#L77), [OeffentlicheFragen.java:168](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheFragen.java#L168), [OeffentlicheFragen.java:169](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheFragen.java#L169), [OeffentlicheFragen.java:189](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheFragen.java#L189), [OeffentlicheGrenzen.java:101](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheGrenzen.java#L101), [oeffentlicher-wissenschat.feature:122](../../../backend/src/test/resources/features/wissen/oeffentlicher-wissenschat.feature#L122), [oeffentlicher-wissenschat.feature:130](../../../backend/src/test/resources/features/wissen/oeffentlicher-wissenschat.feature#L130) | Belegt |
+| Menschliche Freigabe je Seite mit Recht A16 und Protokollierung | [WissensseiteResource.java:275](../../../backend/src/main/java/ch/urinet/archiv/wissen/adapter/in/rest/WissensseiteResource.java#L275), [Webseitenfreigabe.java:42](../../../backend/src/main/java/ch/urinet/archiv/wissen/application/Webseitenfreigabe.java#L42), [JdbcWebseitenfreigabe.java:76](../../../backend/src/main/java/ch/urinet/archiv/wissen/adapter/out/persistence/JdbcWebseitenfreigabe.java#L76), [wissen-webseitenfreigabe.feature:11](../../../backend/src/test/resources/features/wissen/wissen-webseitenfreigabe.feature#L11) | Belegt |
+| Nur ausdrücklich freigegebene Seiten mit ausschliesslich `oeffentlich` zugänglichen, `NORMAL` eingestuften Quellen; keine Entwürfe oder Analysen | [WissenWebseiteSql.java:17](../../../backend/src/main/java/ch/urinet/archiv/wissen/adapter/out/persistence/WissenWebseiteSql.java#L17), [WissenWebseiteSql.java:38](../../../backend/src/main/java/ch/urinet/archiv/wissen/adapter/out/persistence/WissenWebseiteSql.java#L38), [JdbcOeffentlichesWissen.java:39](../../../backend/src/main/java/ch/urinet/archiv/wissen/adapter/out/persistence/JdbcOeffentlichesWissen.java#L39), [oeffentlicher-wissenschat.feature:45](../../../backend/src/test/resources/features/wissen/oeffentlicher-wissenschat.feature#L45) | Belegt |
+| Entzug oder Höherstufung macht eine Quelle sofort ungültig | [JdbcOeffentlichesWissen.java:63](../../../backend/src/main/java/ch/urinet/archiv/wissen/adapter/out/persistence/JdbcOeffentlichesWissen.java#L63), [OeffentlicheFragen.java:283](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheFragen.java#L283), [OeffentlicheFragen.java:362](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheFragen.java#L362), [oeffentlicher-wissenschat.feature:104](../../../backend/src/test/resources/features/wissen/oeffentlicher-wissenschat.feature#L104), [oeffentlicher-wissenschat.feature:146](../../../backend/src/test/resources/features/wissen/oeffentlicher-wissenschat.feature#L146) | Belegt gemäss Entscheid vom 24.11.2026: Prüfung vor Modellaufruf und vor Einreihen der Antwort; bereits eingereihte SSE-Ereignisse sind nicht rückrufbar. |
+| Öffentlicher Wissenschat kennt keine Archivwerkzeuge | [OeffentlicherToolProvider.java:66](../../../backend/src/main/java/ch/urinet/archiv/ki/adapter/out/langchain4j/OeffentlicherToolProvider.java#L66), [OeffentlicheWissenWerkzeuge.java:21](../../../backend/src/main/java/ch/urinet/archiv/ki/adapter/in/werkzeug/OeffentlicheWissenWerkzeuge.java#L21), [oeffentlicher-wissenschat.feature:18](../../../backend/src/test/resources/features/wissen/oeffentlicher-wissenschat.feature#L18) | Belegt |
+| Bereinigter Gesprächsverlauf nur im Arbeitsspeicher, mit Ablaufbereinigung; kein Freitext in Log oder Datenbank | [OeffentlicheFragen.java:385](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheFragen.java#L385), [OeffentlicheGespraeche.java:108](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheGespraeche.java#L108), [OeffentlicheGespraeche.java:161](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheGespraeche.java#L161), [OeffentlicheGespraecheTest.java:139](../../../backend/src/test/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheGespraecheTest.java#L139), [FrageBereinigung.java:9](../../../backend/src/main/java/ch/urinet/archiv/ki/domain/oeffentlich/FrageBereinigung.java#L9) | Belegt gemäss Entscheid Fabian vom 28.11.2026; der Aufräumtakt entfernt abgelaufene Verläufe unabhängig von Folgeanfragen. |
+| Besuchende werden vor der Eingabe auf Personendaten hingewiesen | [public-v1.yaml:56](../../../docs/schnittstelle/public-v1.yaml#L56), [handbuch.md:383](../../../docs/schnittstelle/handbuch.md#L383), [PublicVertragTest.java:68](../../../backend/src/test/java/ch/urinet/archiv/integration/PublicVertragTest.java#L68) | Belegt; der Vertrag verpflichtet die Webseite zum Hinweis vor dem Eingabefeld. |
+| Antwort nennt Seitentitel und Quellenverweis mit Titel, Reihe und Ausgabe | [OeffentlicheFragen.java:368](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheFragen.java#L368), [OeffentlicheFragen.java:370](../../../backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheFragen.java#L370), [oeffentlicher-wissenschat.feature:18](../../../backend/src/test/resources/features/wissen/oeffentlicher-wissenschat.feature#L18) | Belegt |
+
+- **Abgrenzung:** Das zusätzliche Gate «Wissen freigeschaltet» aus Requirement 22.8 ist der Folgeaufgabe 25.2 zugeordnet ([tasks.md:312](./tasks.md#L312)) und wird hier nicht als Nachweis für 18.3 angerechnet.
+- Im Abschnitt zu 18.3 war kein `[offen: …]`-Marker vorhanden; andere offene Marker ausserhalb dieses Abschnitts bleiben unverändert.
 
 ### Umsetzung (Aufgabe 18.1, 23.11.2026)
 - **Changeset** Mandant `130-chat-gespraech-modus`: `chat_gespraech.modus text not null default 'ARCHIV'` mit Check-Constraint `chat_gespraech_modus_ck`
@@ -1507,8 +1528,9 @@ ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachf
   `WissenModellBudget.chatPruefen` das Monatsbudget und antwortet bei Überschreitung mit 429 `BUDGET`, ohne Modellaufruf. Das Monatsbudget wird nicht reserviert; eine Frage
   kann es um ihre eigenen Tokens überschreiten wie ein Embedding-Batch (Requirement 13.6 verlangt nur, bei erschöpftem Budget keinen Aufruf auszuführen).
   Frage, Antwort, Rate-Limit je Stunde und Gleichzeitigkeit gelten unverändert und gemeinsam für beide Modi.
-- **Offen für Folgeaufgaben:** Feld `modus` im Bewertungsexport (`chat-bewertungen/v1`), Auswahl und Kennzeichen in der Oberfläche (18.2); öffentlicher Wissenschat und
-  `fuer_webseite` (18.3). Die Tests `@req-21.1` bis `@req-21.3`, `@req-21.5` und `@req-21.7` stehen in `features/wissen/wissenschat.feature`.
+- **Ausblick bei Umsetzung 18.1:** Feld `modus` im Bewertungsexport (`chat-bewertungen/v1`), Auswahl und Kennzeichen in der Oberfläche (18.2) sowie
+  öffentlicher Wissenschat und `fuer_webseite` (18.3). **Nachtrag 28.11.2026:** 18.2 ist umgesetzt; der aktuelle Abgleich für 18.3 steht im Abschnitt
+  «Umsetzung (Aufgabe 18.3, 28.11.2026)». Die Tests `@req-21.1` bis `@req-21.3`, `@req-21.5` und `@req-21.7` stehen in `features/wissen/wissenschat.feature`.
 
 ### Umsetzung (Aufgabe 18.2, 24.11.2026)
 - Die Auswahl erscheint vor der ersten Frage nur mit A15. `ARCHIV` bleibt ohne gesondertes Anlegen das bisherige Standardverhalten;
@@ -1705,6 +1727,70 @@ Requirements bleiben unverändert.
 | Spec 06, Einstellungen | Gruppe der Wissensbasis nur bei Freischaltung; Freischaltung nicht im Katalog (22.3, 22.5). |
 | Spec 07, Einführung und Hilfe | Wissens-Schritte und Hilfeseiten nur bei Freischaltung (22.5). |
 | `docs/` | Betriebsanleitung für das Kommando, Anleitung zum Anlegen eines Mandanten. |
+
+### Umsetzung (Aufgaben 25.1 bis 25.5, 28.11.2026)
+- **25.1 Zustand, Kommando, Funktionen:** Changeset `db/public` `045-mandant-wissen-freigeschaltet` (Spalte mit
+  Standard `false`, `true` für `urinet`, Rollback entfernt die Spalte) und `db/mandant`
+  `142-protokoll-wissen-freischaltung` (Aktionen `WISSEN_FREIGESCHALTET`, `WISSEN_ABGESCHALTET`; der Rollback lässt
+  die Aktionen bewusst zu, weil das Protokoll unveränderlich ist, wie `083`; Folgen eines Rückfalls auf ein älteres
+  Image in `docs/betrieb/deploy-rollback.md`; Entscheid Fabian 28.11.2026: Rückfall auf ein Image vor #751 wird nicht unterstützt; Abhilfe ist ein Deploy nach vorn). Port
+  `WissensfreischaltungPort` (JDBC `JdbcWissensfreischaltung`, `public.mandant` qualifiziert), die eine Stelle
+  `Wissensfreischaltung` (Zwischenspeicher je Mandant, `archiv.wissen.freischaltung-zwischenspeicher`, Standard und
+  Höchstwert 30 s, damit Archiv und App zusammen unter 60 s bleiben; Review PR #751; Lesefehler und unbekannte Mandanten werden nicht zwischengespeichert und gelten als nicht
+  freigeschaltet) und der Anwendungsfall `WissenFreischalten` (Zeile `for update`, Zustand und Protokoll in einer
+  Transaktion, Akteur `betreiber`, ohne Rolle, Dokument und Details; derselbe Zustand ändert und protokolliert nichts;
+  unbekannter oder inaktiver Mandant: nichts). Kommando `WissenFreischaltungKommando` unter `archiv mandant wissen`
+  (Exit 0, 1 unbekannt oder inaktiv, 2 Aufruf, 3 technisch). `GET /mandant/funktionen` liefert `wissenVerfuegbar`.
+  Testdaten: Der Decorator `WissenInTestdaten` (nur `src/test`) schaltet für die Standard-Testmandanten `urinet` und
+  `vhf-gsk` bei der Aktivierung ein; jeder andere Testmandant bleibt ohne Wissen, Unit-Tests übergeben
+  `FesteWissensfreischaltung.ein()` ausdrücklich.
+- **25.2 Sperre:** im gemeinsamen `ZugangFilter` nach Mandant und Anmeldung (401 auch bei widerrufener Sitzung; dieselbe
+  Prüfung `ZugangFilter.sitzungPruefen` nutzt `RollenVerweigerungAbbildung`, wenn `@RolesAllowed` vorher scheitert,
+  Review PR #751) und vor
+  Rechtematrix, Dokumentprüfung (404) und Laden von Daten, für Rollen und API-Tokens gleich. Erfasst ist jede
+  Pfadvorlage aus `@Path` mit einem Abschnitt, der mit `wissen` beginnt (`Wissenspfade`, ausser `/public/`);
+  `WissenspfadeVertragTest` prüft alle Operationen, auch künftige. Der Modus `WISSEN` steht nicht im Pfad: Anlegen,
+  Verlauf und Fortsetzen prüft der Chat selbst (`WissenschatZugang.freischaltungPruefen`, vor A15 und Budget), die Liste
+  lässt solche Gespräche weg. Im Archivchat fehlen `wissen_index` und `wissen_seite_zeigen` (`WerkzeugAuswahl`, fail
+  closed); ab der ersten Antwort mit einem Wissenswerkzeug geht beim Fortsetzen keine Antwort des Gesprächs mehr an das
+  Modell, auch keine, die darauf aufbaut; die Fragen bleiben (`ChatSpeicher.verlaufOhneWissen`, Review PR #751). Fällt
+  Wissen während eines Durchgangs weg (Archivchat und öffentlicher Chat), endet er vor dem nächsten Werkzeug und damit
+  vor der nächsten Modellrunde mit dem festen Ausfalltext (`AgentWerkzeug`, `AgentLauf.wissenBeobachten`); das Modell
+  der Chat-Durchgänge (`EntkoppeltesModell`) prüft zusätzlich vor jedem Aufruf, auch wenn Wissen während eines
+  Werkzeugs wegfällt; Quellen auf Wissensseiten erscheinen im Verlauf ohne Titel und Link, und keine
+  Nachricht bietet eine Analyse an. Dokumentansicht ohne Wissensseiten (`WissenLesen.seitenFuerDokument`). Der
+  öffentliche Wissenschat antwortet wie bei ausgeschaltetem Schalter (403 `NICHT_ERLAUBT`). Einstellungen: ein Patch
+  mit `wissen` und das Zurücksetzen der Gruppe `WISSEN` ergeben 403 `WISSEN_NICHT_FREIGESCHALTET` vor A19;
+  `GET /mandant/einstellungen` lässt die Gruppe der Wissensbasis und im Block `betrieb` das Wissensbudget weg
+  (Review PR #751). Export der Konfigurationsdatei (`GET /konfiguration`) und Versionsdetails
+  (`GET /konfiguration/versionen/{nummer}`) zeigen `einstellungen.wissen` nicht; eine eingespielte Datei
+  (`PUT /konfiguration`, Prüfen, Vergleichen) und das Zurücksetzen einer ganzen Version lassen die Einstellungen der
+  Wissensbasis unverändert (`WissenOhneFreischaltung`, Review PR #751). Das Betreiber-Kommando
+  `archiv konfiguration` ist nicht betroffen.
+- **25.3 Keine KI-Läufe:** Ingest-Start (manuell, nach Markierung, Abschnitt wiederholen) und Lint von Hand ergeben 403;
+  Nachholen und Lint-Zeitplan überspringen den Mandanten (kein späteres Nachholen). `Wissensfreischaltung
+  .modellaufrufPruefen` steht unmittelbar vor jedem Modellaufruf von Ingest, Neuerzeugung und Lint (an einer Stelle im
+  KI-Adapter direkt vor `chat(...)`, `LangChain4jKiAdapter.wissensIngest`, Review PR #751); zusätzlich prüfen
+  Ingest und Lint vor jedem Schritt. Ein laufender oder wartender Auftrag endet dann ohne neuen Entwurf mit dem Hinweis
+  `WISSEN_AUSGESCHALTET` (Ingest `FEHLER`, Lint unvollständig ohne gespeicherte Änderungsvorschläge, auch im Schritt
+  `ABSCHLUSS`, manuelle Neuerzeugung abgebrochen). Embeddings der
+  Wissensseiten und die Budgetprüfungen (Embedding, Reranker, Wissenschat) sind ebenfalls gesperrt. Warnungen oder
+  Berichtsteile zur Wissensbasis versendet das Archiv heute keine (der Wochenbericht des Mandanten enthält keine
+  Wissensteile); kommen solche hinzu, fragen sie dieselbe Stelle. Regeln ohne KI (Quellenhinweise nach Requirement 15,
+  Sichtbarkeit, Aufbewahrung, Sicherung, Vollexport) laufen unverändert; gelöscht wird nichts.
+- **25.4 Oberfläche:** Dienst `MandantFunktionen` (je Anmeldung; danach alle 30 s im Hintergrund, solange die App
+  sichtbar ist, beim Seitenwechsel und beim Zurückkehren in die App, sobald der Stand älter als 30 s ist; sofort nach
+  einer Antwort 403 `WISSEN_NICHT_FREIGESCHALTET` über `wissenSperreInterceptor`, wobei eine ältere laufende Abfrage
+  verfällt; fällt Wissen weg, wechselt eine Wissensroute (`data.wissen`) auf «Seite nicht gefunden» und der Chat schliesst
+  ein Gespräch im Modus `WISSEN`; Review PR #751; bis geladen und bei Fehler ohne Wissen);
+  `AnmeldungService.darf` gewährt A15 bis A19 nur bei Freischaltung, darum folgen Menü (samt Zähler, der ohne
+  Freischaltung nicht abfragt), Startseite, Einführung und Analyse-Links an einer Stelle. `wissenGuard` für alle
+  Wissensrouten (Direktaufruf → `/nicht-gefunden`), Dokumentansicht, Chat (Moduswahl, WISSEN-Gespräche), Suche,
+  Einstellungsgruppe und Hilfe (`hilfeKontext`, `sichtbareAbschnitte` mit Parameter `wissen`; was Suche und Chat
+  über Wissen sagen, steht in den Unterabschnitten `suche-wissen` und `chat-wissen` mit Bedingung A15). Browser-Szenarien
+  `freischaltung-oberflaeche.feature` mit axe.
+- **25.5 Folgeänderungen:** Spec 02, 03, 05, 06 und 07 (design.md, «Spec 04 ergänzt»), Spec 01 Fehlercode-Tabelle,
+  README «Wissen je Mandant freischalten» und «Mandant anlegen», `docs/anleitung-verwaltung.md`.
 
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):

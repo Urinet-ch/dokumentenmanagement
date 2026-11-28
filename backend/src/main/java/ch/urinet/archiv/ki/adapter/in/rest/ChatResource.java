@@ -116,7 +116,12 @@ public class ChatResource {
     }
 
     @Schema(name = "ChatWissensquelle")
-    public record WissensquelleDto(String titel, String link, Instant stand) {
+    public record WissensquelleDto(
+            @Schema(nullable = true, description = "leer, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.7)")
+            String titel,
+            @Schema(nullable = true, description = "leer, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.7)")
+            String link,
+            Instant stand) {
     }
 
     @Schema(name = "ChatQuelldokument")
@@ -277,8 +282,9 @@ public class ChatResource {
         }
         Gespraech gespraech = verlauf.gespraech(benutzer(), gespraechId);
         GespraechKopf kopf = gespraech.kopf();
+        boolean wissen = verlauf.wissenVerfuegbar();
         return new VerlaufDto(kopf.id(), kopf.titel(), kopf.geaendert(), kopf.modus().name(),
-                gespraech.nachrichten().stream().map(ChatResource::dto).toList());
+                gespraech.nachrichten().stream().map(n -> dto(n, wissen)).toList());
     }
 
     @PUT
@@ -446,9 +452,19 @@ public class ChatResource {
         return new GespraechDto(kopf.id(), kopf.titel(), kopf.geaendert(), kopf.modus().name());
     }
 
-    private static NachrichtDto dto(ChatNachricht n) {
-        return new NachrichtDto(Long.toString(n.id()), n.rolle().name(), n.inhalt(), n.quellen().stream().map(ChatResource::dto).toList(),
-                n.status().map(Enum::name).orElse(null), n.zeit(), n.analyseMoeglich());
+    /** Ohne Freischaltung (Spec 04, Req 22.7): Wissensquellen ohne Titel und Link, keine Analyse. */
+    private static NachrichtDto dto(ChatNachricht n, boolean wissen) {
+        return new NachrichtDto(Long.toString(n.id()), n.rolle().name(), n.inhalt(),
+                n.quellen().stream().map(q -> wissen ? dto(q) : ohneWissen(q)).toList(),
+                n.status().map(Enum::name).orElse(null), n.zeit(), wissen && n.analyseMoeglich());
+    }
+
+    private static QuelleDto ohneWissen(Quelle quelle) {
+        if (quelle instanceof Quelle.Wissen w) {
+            return new QuelleDto(null, null, null, null, null, null, new WissensquelleDto(null, null, w.stand()),
+                    w.dokumente().stream().map(d -> new QuelldokumentDto(d.titel(), d.link(), d.seite())).toList());
+        }
+        return dto(quelle);
     }
 
     private static QuelleDto dto(Quelle quelle) {

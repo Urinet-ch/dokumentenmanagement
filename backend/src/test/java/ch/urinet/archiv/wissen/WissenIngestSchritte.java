@@ -55,6 +55,9 @@ public class WissenIngestSchritte {
     private record Einstellung(boolean vorhanden, Integer budget, Integer monatsbudget) {
     }
 
+    private record IngestAuftragszahl(int gesamt, int mandant) {
+    }
+
     private final Map<String, Ort> dokumente = new HashMap<>();
     private final Map<String, UUID> entwuerfe = new HashMap<>();
     private final Map<String, List<UUID>> wissensseiten = new HashMap<>();
@@ -67,6 +70,7 @@ public class WissenIngestSchritte {
     private UUID entwurfId;
     private Long kiVerbrauchId;
     private List<Integer> gleichzeitigeWiederholungen;
+    private IngestAuftragszahl auftraegeVorWiederholung;
 
     @After
     public void aufraeumen() throws SQLException {
@@ -725,7 +729,8 @@ public class WissenIngestSchritte {
 
     @Wenn("«{word}» Abschnitt {int} des Ingest-Entwurfs gleichzeitig zweimal erneut verarbeitet")
     public void abschnittGleichzeitigWiederholen(String benutzer, int nummer)
-            throws InterruptedException, ExecutionException, TimeoutException {
+            throws SQLException, InterruptedException, ExecutionException, TimeoutException {
+        auftraegeVorWiederholung = ingestAuftragszahl(ort("QUELLE"), entwurfId);
         String token = Testanmeldung.token(benutzer);
         String pfad = "/api/v1/wissensentwuerfe/" + entwurfId + "/abschnitte/" + nummer + "/wiederholen";
         CountDownLatch start = new CountDownLatch(1);
@@ -749,6 +754,14 @@ public class WissenIngestSchritte {
     @Dann("wird genau eine Wiederholung angenommen und die andere abgewiesen")
     public void eineWiederholungAngenommen() {
         assertThat(gleichzeitigeWiederholungen).containsExactlyInAnyOrder(202, 409);
+    }
+
+    @Dann("ist für «{word}» genau ein zusätzlicher Auftrag «WISSEN_INGEST» eingereiht")
+    public void genauEinZusaetzlicherAuftrag(String name) throws SQLException {
+        assertThat(auftraegeVorWiederholung).isNotNull();
+        IngestAuftragszahl nachher = ingestAuftragszahl(ort(name), entwurfId);
+        assertThat(nachher.gesamt() - auftraegeVorWiederholung.gesamt()).isEqualTo(1);
+        assertThat(nachher.mandant() - auftraegeVorWiederholung.mandant()).isEqualTo(1);
     }
 
     @Wenn("«{word}» den Ingest für ein unbekanntes Dokument startet")
@@ -987,6 +1000,23 @@ public class WissenIngestSchritte {
                 .hasSize(1);
     }
 
+    /** Spec 04, Req 22.9: der wartende Auftrag endet nach dem Abschalten ohne Modellaufruf mit dem Grund. */
+    @Dann("endet der Ingest-Entwurf mit «{word}» und dem Hinweis «{}»")
+    public void entwurfEndetMitHinweis(String status, String hinweis)
+            throws SQLException, InterruptedException, ExecutionException, TimeoutException {
+        entwurfWarten(status);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement anweisung = verbindung.prepareStatement(
+                     "select status, hinweis from m_urinet.wissens_entwurf where id = ?")) {
+            anweisung.setObject(1, entwurfId);
+            try (ResultSet ergebnis = anweisung.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getString(1)).isEqualTo(status);
+                assertThat(ergebnis.getString(2)).contains(hinweis);
+            }
+        }
+    }
+
     @Dann("es erfolgt kein KI-Aufruf")
     public void keinKiAufruf() {
         assertThat(KiWireMock.client().find(postRequestedFor(urlPathEqualTo(KiWireMock.CHAT_PFAD)))).isEmpty();
@@ -1100,6 +1130,15 @@ public class WissenIngestSchritte {
                 + schema(ort.mandant()) + ".wissens_entwurf where dokument_id = ?)", ort.mandant(), ort.id());
         assertThat(((Number) auftrag.get("gesamt")).intValue()).isEqualTo(1);
         assertThat(((Number) auftrag.get("mandant_anzahl")).intValue()).isEqualTo(1);
+    }
+
+    private IngestAuftragszahl ingestAuftragszahl(Ort ort, UUID id) throws SQLException {
+        Map<String, Object> auftrag = zeile("select count(*) as gesamt, "
+                + "count(*) filter (where mandant = ?) as mandant_anzahl from public.auftrag "
+                + "where typ = 'WISSEN_INGEST' and nutzlast ->> 'entwurfId' = ?",
+                ort.mandant(), id.toString());
+        return new IngestAuftragszahl(((Number) auftrag.get("gesamt")).intValue(),
+                ((Number) auftrag.get("mandant_anzahl")).intValue());
     }
 
     @Dann("hält das Zugriffsprotokoll den Ingest-Start von «{word}» für «{word}» fest")

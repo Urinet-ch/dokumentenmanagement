@@ -1,0 +1,392 @@
+package ch.urinet.archiv.wissen;
+
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.ki.KiWireMock;
+import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.ProblemDetails;
+import ch.urinet.archiv.wissen.application.WissenFreischalten;
+import ch.urinet.archiv.wissen.application.WissenLintStarten;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.agroal.api.AgroalDataSource;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.java.After;
+import io.cucumber.java.de.Angenommen;
+import io.cucumber.java.de.Dann;
+import io.cucumber.java.de.Wenn;
+import io.restassured.http.ContentType;
+import io.restassured.response.Response;
+import io.restassured.specification.RequestSpecification;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+import static io.restassured.RestAssured.given;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Schritte zu Spec 04, Requirement 22 (Wissen je Mandant freischalten). Geschaltet wird wie im Betrieb über
+ * {@link WissenFreischalten}, den Anwendungsfall des Betreiber-Kommandos; nach jedem Szenario mit
+ * {@code @wissen-freischaltung} sind die Standard-Testmandanten wieder freigeschaltet (Testdaten,
+ * {@link WissenInTestdaten}). Alle Daten sind synthetisch.
+ */
+public class WissenFreischaltungSchritte {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final List<String> BESTAND = List.of(
+            "select count(*) from %s.wissensseite",
+            "select count(*) from %s.wissensseite_version",
+            "select count(*) from %s.wissensseite_quelle",
+            "select count(*) from %s.wissens_entwurf",
+            "select count(*) from %s.wissens_aenderung",
+            "select count(*) from %s.wissens_log",
+            "select count(*) from %s.wissens_lint",
+            "select count(*) from %s.wissens_einstellung",
+            "select count(*) from %s.wissensquelle_markierung",
+            "select count(*) from %s.wissensseite where fuer_webseite");
+
+    @Inject
+    WissenFreischalten freischalten;
+
+    @Inject
+    MandantKontext kontext;
+
+    @Inject
+    WissenLintStarten lint;
+
+    @Inject
+    Instance<AgroalDataSource> datenbank;
+
+    @Inject
+    ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung tokens;
+
+    @Inject
+    ch.urinet.archiv.sicherheit.application.TokenWiderruf tokenWiderruf;
+
+    /** Benutzer mit widerrufener Sitzung und ihr Token von vorher; das {@code @After} hebt den Widerruf auf. */
+    private final Map<String, String> widerrufeneSitzungen = new LinkedHashMap<>();
+
+    private final List<String> tokenIds = new ArrayList<>();
+
+    private final Map<String, List<Long>> gezaehlt = new LinkedHashMap<>();
+    private Optional<UUID> geplanterLint;
+    private long lintLaeufeVorher;
+    /** Konfigurationsversion vor einer im Szenario gesetzten Wissenseinstellung; das {@code @After} stellt sie wieder her. */
+    private Integer versionVorWissen;
+    private String benutzerVorWissen;
+
+    @After("@wissen-freischaltung")
+    public void standardWiederherstellen() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement loeschen = verbindung.prepareStatement("delete from public.api_client where id = ?")) {
+            for (String id : tokenIds) {
+                loeschen.setString(1, id);
+                loeschen.executeUpdate();
+            }
+        }
+        tokenIds.clear();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement loeschen = verbindung.prepareStatement(
+                     "delete from public.token_widerruf where benutzer = ?")) {
+            for (String benutzer : widerrufeneSitzungen.keySet()) {
+                loeschen.setString(1, Testanmeldung.sub(benutzer));
+                loeschen.executeUpdate();
+            }
+        }
+        for (String benutzer : widerrufeneSitzungen.keySet()) {
+            // der Zwischenspeicher des Widerrufs hält höchstens wenige Sekunden
+            long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+            while (tokenWiderruf.widerrufen(Testanmeldung.sub(benutzer), Instant.EPOCH) && System.nanoTime() < bis) {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        widerrufeneSitzungen.clear();
+        for (String code : List.of(WissenInTestdaten.URINET, WissenInTestdaten.VHF_GSK)) {
+            ohneAnfrage(() -> freischalten.setzen(new MandantCode(code), true));
+        }
+        if (versionVorWissen != null) {
+            String token = Testanmeldung.token(benutzerVorWissen);
+            String etag = given().auth().oauth2(token).get(EINSTELLUNGEN).getHeader("ETag");
+            given().auth().oauth2(token).header("If-Match", etag).contentType(ContentType.JSON)
+                    .body("{\"version\":" + versionVorWissen + "}").post(EINSTELLUNGEN + "/zuruecksetzen")
+                    .then().statusCode(200);
+            versionVorWissen = null;
+        }
+    }
+
+    private static final String EINSTELLUNGEN = "/api/v1/mandant/einstellungen";
+
+    /** Setzt bei Freischaltung ein eigenes Budget je Wissens-Ingest und merkt die Version davor. */
+    @Angenommen("«{word}» hat das Budget je Wissens-Ingest auf {int} gesetzt")
+    public void wissensbudgetSetzen(String benutzer, int budget) {
+        String token = Testanmeldung.token(benutzer);
+        Response vorher = given().auth().oauth2(token).get(EINSTELLUNGEN);
+        assertThat(vorher.statusCode()).as(vorher.asString()).isEqualTo(200);
+        versionVorWissen = vorher.jsonPath().getInt("version");
+        benutzerVorWissen = benutzer;
+        Response gesetzt = given().auth().oauth2(token).header("If-Match", vorher.getHeader("ETag"))
+                .contentType("application/merge-patch+json").body("{\"wissen\":{\"budgetTokens\":" + budget + "}}")
+                .patch(EINSTELLUNGEN);
+        assertThat(gesetzt.statusCode()).as(gesetzt.asString()).isEqualTo(200);
+    }
+
+    /** Req 22.6: Export und Versionsdetails ohne {@code einstellungen.wissen}, solange gesperrt. */
+    @Dann("zeigen Konfigurationsdatei und Versionsabbild für «{word}» die Einstellungen der Wissensbasis nicht")
+    public void konfigurationOhneWissen(String benutzer) {
+        konfigurationPruefen(benutzer, false);
+    }
+
+    @Dann("zeigen Konfigurationsdatei und Versionsabbild für «{word}» die Einstellungen der Wissensbasis")
+    public void konfigurationMitWissen(String benutzer) {
+        konfigurationPruefen(benutzer, true);
+    }
+
+    private static void konfigurationPruefen(String benutzer, boolean mitWissen) {
+        String token = Testanmeldung.token(benutzer);
+        var datei = given().auth().oauth2(token).get("/api/v1/konfiguration").then().statusCode(200).extract()
+                .jsonPath();
+        assertThat(datei.getMap("einstellungen")).isNotEmpty();
+        assertThat(datei.getMap("einstellungen").containsKey("wissen")).as("Export mit Wissen").isEqualTo(mitWissen);
+        List<Integer> versionen = given().auth().oauth2(token).get("/api/v1/konfiguration/versionen").then()
+                .statusCode(200).extract().jsonPath().getList("version", Integer.class);
+        for (int version : List.of(versionen.stream().max(Integer::compare).orElseThrow(),
+                versionen.stream().min(Integer::compare).orElseThrow())) {
+            var detail = given().auth().oauth2(token).get("/api/v1/konfiguration/versionen/" + version).then()
+                    .statusCode(200).extract().jsonPath();
+            assertThat(detail.getMap("inhalt.einstellungen")).isNotEmpty();
+            assertThat(detail.getMap("inhalt.einstellungen").containsKey("wissen"))
+                    .as("Version " + version + " mit Wissen").isEqualTo(mitWissen);
+        }
+    }
+
+    /** Ohne Freischaltung: Die Datei kommt an (200), ihr Wissensblock ändert nichts (Req 22.6). */
+    @Wenn("«{word}» eine Konfigurationsdatei mit dem Budget je Wissens-Ingest {int} einspielt")
+    public void dateiMitWissen(String benutzer, int budget) throws Exception {
+        String token = Testanmeldung.token(benutzer);
+        JsonNode datei = JSON.readTree(given().auth().oauth2(token).get("/api/v1/konfiguration").then()
+                .statusCode(200).extract().asString());
+        ((com.fasterxml.jackson.databind.node.ObjectNode) datei.path("einstellungen")).putObject("wissen")
+                .put("budgetTokens", budget);
+        Response eingespielt = given().auth().oauth2(token).contentType(ContentType.JSON)
+                .body(JSON.writeValueAsString(datei)).put("/api/v1/konfiguration");
+        assertThat(eingespielt.statusCode()).as(eingespielt.asString()).isEqualTo(200);
+        assertThat(eingespielt.jsonPath().getList("aenderungen.pfad", String.class))
+                .noneMatch(pfad -> pfad.contains("wissen"));
+    }
+
+    @Wenn("«{word}» die Einstellungen auf die Version vor dem Budget je Wissens-Ingest zurücksetzt")
+    public void versionZuruecksetzen(String benutzer) {
+        String token = Testanmeldung.token(benutzer);
+        String etag = given().auth().oauth2(token).get(EINSTELLUNGEN).getHeader("ETag");
+        Response zurueck = given().auth().oauth2(token).header("If-Match", etag).contentType(ContentType.JSON)
+                .body("{\"version\":" + versionVorWissen + "}").post(EINSTELLUNGEN + "/zuruecksetzen");
+        assertThat(zurueck.statusCode()).as(zurueck.asString()).isEqualTo(200);
+    }
+
+    @Dann("beträgt das Budget je Wissens-Ingest von «{word}» {int}")
+    public void wissensbudget(String code, int budget) throws SQLException {
+        assertThat(zahl("select budget_tokens from " + new MandantCode(code).schema()
+                + ".wissens_einstellung where id = 1")).isEqualTo(budget);
+    }
+
+    /** Wie das Kommando: eigener Plattform-Thread ohne Anmeldung und ohne Request-Kontext des Schritts. */
+    private static <T> T ohneAnfrage(java.util.concurrent.Callable<T> arbeit) {
+        java.util.concurrent.FutureTask<T> aufgabe = new java.util.concurrent.FutureTask<>(arbeit);
+        Thread.ofPlatform().start(aufgabe);
+        try {
+            return aufgabe.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw new IllegalStateException(e.getCause());
+        }
+    }
+
+    @Angenommen("Wissen ist für «{word}» abgeschaltet")
+    @Wenn("Wissen für «{word}» abgeschaltet wird")
+    public void abschalten(String code) {
+        assertThat(ohneAnfrage(() -> freischalten.setzen(new MandantCode(code), false))).isPresent();
+    }
+
+    @Angenommen("Wissen ist für «{word}» freigeschaltet")
+    @Wenn("Wissen für «{word}» wieder freigeschaltet wird")
+    public void freischalten(String code) {
+        assertThat(ohneAnfrage(() -> freischalten.setzen(new MandantCode(code), true))).isPresent();
+    }
+
+    @Dann("ist Wissen für «{word}» nicht freigeschaltet")
+    public void nichtFreigeschaltet(String code) {
+        assertThat(freischalten.zustand(new MandantCode(code))).contains(false);
+    }
+
+    /**
+     * Spalten {@code methode}, {@code pfad} und {@code koerper} (JSON, leer: ohne Körper); {@code <unbekannt>} im Pfad
+     * wird zu einer zufälligen UUID, damit der Pfad ohne die Sperre 404 ergäbe.
+     */
+    @Dann("antworten für «{word}» diese Anfragen mit Status {int} und Fehlercode «{word}»:")
+    public void anfragen(String benutzer, int status, String code, DataTable tabelle) {
+        String token = Testanmeldung.token(benutzer);
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Response antwort = senden(given().auth().oauth2(token), zeile);
+            assertThat(ProblemDetails.pruefen(antwort, status))
+                    .as(zeile.get("methode") + " " + zeile.get("pfad") + ": " + antwort.asString()).isEqualTo(code);
+        }
+    }
+
+    /** Anmeldeweg API-Token (Req 22.6, «unabhängig vom Anmeldeweg»): ein echtes Token mit Scope, nicht nur der Pfad. */
+    @Dann("antworten mit einem API-Token «{word}» von «{word}» diese Anfragen mit Status {int} und Fehlercode «{word}»:")
+    public void mitApiToken(String scope, String code, int status, String fehlercode, DataTable tabelle) {
+        var erstellt = tokens.erstellen(code, "Probe Wissen", scope);
+        tokenIds.add(erstellt.token().id());
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Response antwort = senden(given().auth().oauth2(erstellt.token().text()), zeile);
+            assertThat(ProblemDetails.pruefen(antwort, status))
+                    .as(zeile.get("methode") + " " + zeile.get("pfad") + ": " + antwort.asString()).isEqualTo(fehlercode);
+        }
+    }
+
+    /** Wie «Abmelden überall»: Tokens, die vor jetzt (plus Reserve für die Sekunden-Genauigkeit) ausgestellt wurden. */
+    @Angenommen("die Sitzung von «{word}» ist widerrufen")
+    public void sitzungWiderrufen(String benutzer) {
+        widerrufeneSitzungen.put(benutzer, Testanmeldung.token(benutzer));
+        tokenWiderruf.setzen(Testanmeldung.sub(benutzer), Instant.now().plusSeconds(2));
+    }
+
+    /** Req 22.6 «nach 401»: auch wenn die Rolle den Endpunkt nie darf ({@code @RolesAllowed} läuft vor dem Filter). */
+    @Dann("antworten mit der widerrufenen Sitzung von «{word}» diese Anfragen mit Status {int} und Fehlercode «{word}»:")
+    public void widerrufeneSitzung(String benutzer, int status, String code, DataTable tabelle) {
+        String token = widerrufeneSitzungen.get(benutzer);
+        assertThat(token).as("Sitzung von " + benutzer + " widerrufen").isNotNull();
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Response antwort = senden(given().auth().oauth2(token), zeile);
+            assertThat(ProblemDetails.pruefen(antwort, status))
+                    .as(zeile.get("methode") + " " + zeile.get("pfad") + ": " + antwort.asString()).isEqualTo(code);
+        }
+    }
+
+    /** Req 22.6: Einstellungskatalog ohne Gruppe der Wissensbasis und ohne Wissensbudget, solange gesperrt. */
+    @Dann("zeigt der Einstellungskatalog für «{word}» die Wissensbasis nicht")
+    public void katalogOhneWissen(String benutzer) {
+        var antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get("/api/v1/mandant/einstellungen")
+                .then().statusCode(200).extract().jsonPath();
+        assertThat(antwort.getList("katalog.gruppe", String.class)).isNotEmpty().doesNotContain("WISSEN");
+        assertThat(antwort.getList("katalog.schluessel", String.class)).noneMatch(k -> k.startsWith("wissen."));
+        assertThat(antwort.getMap("betrieb")).containsKey("oeffentlicherChat");
+        assertThat(antwort.get("betrieb.wissenMonatsbudgetTokens") == null).as("kein Wissensbudget").isTrue();
+    }
+
+    @Dann("zeigt der Einstellungskatalog für «{word}» die Wissensbasis")
+    public void katalogMitWissen(String benutzer) {
+        var antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get("/api/v1/mandant/einstellungen")
+                .then().statusCode(200).extract().jsonPath();
+        assertThat(antwort.getList("katalog.gruppe", String.class)).contains("WISSEN");
+        assertThat(antwort.getLong("betrieb.wissenMonatsbudgetTokens")).isPositive();
+    }
+
+    @Dann("antworten ohne Anmeldung diese Anfragen mit Status {int}:")
+    public void ohneAnmeldung(int status, DataTable tabelle) {
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Response antwort = senden(given(), zeile);
+            assertThat(antwort.statusCode()).as(zeile.get("methode") + " " + zeile.get("pfad")).isEqualTo(status);
+        }
+    }
+
+    private static Response senden(RequestSpecification anfrage, Map<String, String> zeile) {
+        String pfad = zeile.get("pfad").replace("<unbekannt>", UUID.randomUUID().toString());
+        String koerper = zeile.get("koerper");
+        if (koerper != null && !koerper.isBlank()) {
+            anfrage = anfrage.contentType(ContentType.JSON).body(koerper);
+        }
+        return anfrage.when().request(zeile.get("methode"), pfad);
+    }
+
+    @Angenommen("der Bestand der Wissensbasis von «{word}» ist gezählt")
+    public void bestandZaehlen(String code) throws SQLException {
+        gezaehlt.put(code, bestand(code));
+    }
+
+    @Dann("ist der Bestand der Wissensbasis von «{word}» unverändert")
+    public void bestandUnveraendert(String code) throws SQLException {
+        assertThat(gezaehlt).containsKey(code);
+        assertThat(bestand(code)).as("Seiten, Versionen, Quellen, Entwürfe, Änderungen, Log, Lint, Einstellungen, "
+                + "Markierungen, Webfreigaben").isEqualTo(gezaehlt.get(code));
+    }
+
+    private List<Long> bestand(String code) throws SQLException {
+        String schema = new MandantCode(code).schema();
+        List<Long> zahlen = new ArrayList<>();
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            for (String sql : BESTAND) {
+                try (PreparedStatement abfrage = verbindung.prepareStatement(sql.formatted(schema));
+                     ResultSet zeile = abfrage.executeQuery()) {
+                    zeile.next();
+                    zahlen.add(zeile.getLong(1));
+                }
+            }
+        }
+        return zahlen;
+    }
+
+    @Wenn("der Lint-Zeitplan von «{word}» jetzt fällig ist")
+    public void lintFaellig(String code) throws SQLException {
+        lintLaeufeVorher = zahl("select count(*) from " + new MandantCode(code).schema() + ".wissens_lint");
+        geplanterLint = ohneAnfrage(() -> kontext.mit(new MandantCode(code), () -> lint.geplant(Instant.now())));
+    }
+
+    @Dann("legt der Zeitplan in «{word}» keinen Lint-Lauf an")
+    public void keinLint(String code) throws SQLException {
+        assertThat(geplanterLint).isEmpty();
+        assertThat(zahl("select count(*) from " + new MandantCode(code).schema() + ".wissens_lint"))
+                .isEqualTo(lintLaeufeVorher);
+    }
+
+    @Dann("wartet in «{word}» kein Auftrag der Wissensbasis")
+    public void keinAuftrag(String code) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select count(*) from public.auftrag where mandant = ? "
+                        + "and typ like 'WISSEN%' and status in ('OFFEN', 'LAEUFT')")) {
+            abfrage.setString(1, code);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                assertThat(zeile.getLong(1)).isZero();
+            }
+        }
+    }
+
+    @Dann("bietet die Anfrage {int} dem Sprachmodell genau die Werkzeuge «{}»")
+    public void werkzeugeDerAnfrage(int nummer, String namen) throws Exception {
+        List<String> anfragen = KiWireMock.chatAnfragen();
+        assertThat(anfragen).hasSizeGreaterThanOrEqualTo(nummer);
+        JsonNode anfrage = JSON.readTree(anfragen.get(nummer - 1));
+        List<String> da = new ArrayList<>();
+        anfrage.path("tools").forEach(t -> da.add(t.path("function").path("name").asText()));
+        assertThat(da).containsExactlyInAnyOrderElementsOf(Arrays.stream(namen.split(",")).map(String::strip).toList());
+    }
+
+    private long zahl(String sql) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql); ResultSet zeile = abfrage.executeQuery()) {
+            zeile.next();
+            return zeile.getLong(1);
+        }
+    }
+}

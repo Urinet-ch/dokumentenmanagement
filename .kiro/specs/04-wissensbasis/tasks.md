@@ -243,12 +243,13 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Nachweis `@req-21.4`: `chat-modus-pwa.feature` (375/1280 px, hell/dunkel, axe) und `chat-modus-export.feature` (beide Modi, Index in beiden Mandanten); Angular-Tests zu A15, festem Modus und abgelehntem Anlegen.
   - _Anforderungen: 21.4_
   - _Abhängig von: 18.1_
-- [ ] 18.3 Öffentlicher Wissenschat [Backend] [Frontend]
+- [x] 18.3 Öffentlicher Wissenschat [Backend] [Frontend]
   - Kennzeichen «für Webseite» je Seite (A16, Protokoll), `/public/v1/wissen/chat`, eigene Werkzeuge, Prüfung bei jeder Anfrage, Grenzen und Budget, Schalter je Mandant; Marker `[offen: …]` im Design auflösen; Plugin (Spec 03, 11.5) nur als Hinweis.
-  - Nachweis 25.11.2026: `OeffentlicherWissenschatResourceTest` prüft die mandantenbezogene Schalterauflösung pro Anfrage. `@req-21.6` liest im Cucumber-Netztest ein Werkzeug-Ereignis aus dem SSE-Stream, entzieht danach die Freigabe und prüft den Reststrom: `fehler`, kein Text und keine Quellen. Die Ausschlussfälle «ohne Webseitenfreigabe» und Quellenstufe `mitglieder` sind in der parallelen Nacharbeit #605 abgedeckt und werden hier nicht dupliziert. Die Checkbox bleibt offen; der Plugin-Hinweis und die vollständige Abnahme sind noch ausstehend.
+  - Abgeschlossen 28.11.2026 nach Entscheid Fabian: Die Belegmatrix zu 21.6, der entschiedene Datenschutzpunkt und die Abgrenzung zu 22.8 stehen in [design.md](./design.md). Der bereinigte Verlauf bleibt höchstens 30 Minuten im Arbeitsspeicher und wird unabhängig von Folgeanfragen aufgeräumt; die Webseite muss vor der Eingabe auf Personendaten hinweisen.
+  - Nachweis: vorhandene `@req-21.6`-Szenarien; `OeffentlicheGespraecheTest` prüft Ablaufbereinigung, `PublicVertragTest` prüft Hinweis und Speichergrenzen im Vertrag. Plugin Spec 03, Aufgabe 11.5, bleibt ein Hinweis und wurde nicht bearbeitet; Requirement 22.8 ist Folgeaufgabe 25.2.
   - _Anforderungen: 21.6_
   - _Abhängig von: 18.1, Spec 03: 11.2_
-  - Abgleich 25.11.2026: #576 und die oben genannte Nacharbeit #605 sind gemergt; 18.4 ist abgehakt, 18.3 bleibt für den genannten Rest offen.
+  - Abgleich: #576 und die parallele Nacharbeit #605 sind gemergt; 18.4 ist abgehakt. 18.3 wurde am 28.11.2026 nach dem Entscheid abgeschlossen.
 - [x] 18.4 Isolations- und Abnahmetests [QA]
   - Mandantentrennung, A15 (403), fester Modus, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar, öffentliche Auslieferung
     nur mit Kennzeichen und Stufe `oeffentlich`, sofortiger Entzug vor dem Einreihen des SSE-Ereignisses (Entscheid Fabian
@@ -304,22 +305,22 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
 
 
 ## Welle 25 — Wissen je Mandant freischalten (Entscheid Fabian 28.11.2026, Requirement 22)
-- [ ] 25.1 Zustand, Kommando und Funktionsabfrage [Backend]
+- [x] 25.1 Zustand, Kommando und Funktionsabfrage [Backend]
   - Changeset `db/public` (Standard nein, `urinet` ja), Port «Wissensfreischaltung», Kommando
     `archiv mandant wissen <code> [ein|aus]` mit Protokoll, `wissenVerfuegbar` in `GET /mandant/funktionen`;
     bestehende Tests schalten Wissen in den Testdaten ausdrücklich ein.
   - _Anforderungen: 22.1–22.4_
-- [ ] 25.2 Sperre in API, Chat, Suche und öffentlicher Schnittstelle [Backend]
+- [x] 25.2 Sperre in API, Chat, Suche und öffentlicher Schnittstelle [Backend]
   - _Anforderungen: 22.6–22.8_
   - _Abhängig von: 25.1_
-- [ ] 25.3 Keine KI-Läufe, Daten bleiben erhalten [Backend]
+- [x] 25.3 Keine KI-Läufe, Daten bleiben erhalten [Backend]
   - _Anforderungen: 22.9, 22.10_
   - _Abhängig von: 25.1_
-- [ ] 25.4 Oberfläche ausblenden, Einführung und Hilfe [Frontend]
+- [x] 25.4 Oberfläche ausblenden, Einführung und Hilfe [Frontend]
   - Browser-Szenario mit zwei Mandanten (ein, aus) und axe.
   - _Anforderungen: 22.5_
   - _Abhängig von: 25.1_
-- [ ] 25.5 Folgeänderungen und Betriebsanleitung [Backend] [Infra]
+- [x] 25.5 Folgeänderungen und Betriebsanleitung [Backend] [Infra]
   - Tabelle «Folgeänderungen» in design.md abarbeiten.
   - _Anforderungen: 22.2, 22.3_
   - _Abhängig von: 25.2–25.4_

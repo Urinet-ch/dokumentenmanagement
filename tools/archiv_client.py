@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Client für den Generator-Endpunkt des UriNet Archivs (Spec 01, Req 11.4, 11.5, 11.9; Aufgabe 4.7).
+"""Generator-Client und Quellenimport für das UriNet Archiv.
 
 Generatoren wie rechnung_gen.py und urinet_pdf.py legen ein fertiges PDF mit einer Zeile ab:
 
@@ -28,12 +28,18 @@ Nur Python-Standardbibliothek, damit der Client ohne Installation in jedes Gener
 Aufruf von der Kommandozeile:
     python3 tools/archiv_client.py ausgabe/rechnung-2026-003.pdf metadaten.json
     python3 tools/archiv_client.py --nachsenden ausgabe
+    python3 tools/archiv_client.py --import-quelle <quellcode> [--trocken] <datei.pdf>
+
+Der Generator-Aufruf verwendet Scope `generator`; `--import-quelle` verwendet Scope `import`, fragt im Trockenlauf
+Prüfsummen ab und ordnet Upload und Zähler einem Quelllauf zu (Spec 09, Req 10.7).
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import shutil
 import socket
 import stat
@@ -49,6 +55,9 @@ from typing import Any, Mapping
 
 STANDARD_URL = "https://archiv.apps.urinet.ch"
 PFAD = "/api/v1/dokumente/generator"
+IMPORT_PFAD = "/api/v1/dokumente"
+QUELLEN_PFAD = "/api/v1/quellen"
+PRUEFSUMMEN_PFAD = "/api/v1/dokumente/pruefsummen"
 AUSSTEHEND = "archiv-ausstehend"
 KONFLIKT = "archiv-konflikt"
 ZEITGRENZE = 120
@@ -82,6 +91,15 @@ class Ergebnis:
     meldung: str | None = None
 
 
+@dataclass(frozen=True)
+class QuelllaufErgebnis:
+    """Zähler und Status des abgeschlossenen Quelllaufs."""
+
+    id: str
+    status: str
+    zaehler: Mapping[str, int]
+
+
 class _NichtErreichbar(Exception):
     pass
 
@@ -106,6 +124,59 @@ def archivieren(pdf: str | os.PathLike, metadaten: Mapping[str, Any], *, url: st
 def nachsenden(ordner: str | os.PathLike, *, url: str | None = None) -> bool:
     """Sendet die ausstehenden PDFs aus `<ordner>/archiv-ausstehend/`; False, wenn das Archiv nicht erreichbar ist."""
     return _nachsenden(_adresse(url), token_lesen(), Path(ordner))
+
+
+def quelle_importieren(pdf: str | os.PathLike, quelle: str, *, trocken: bool = False,
+                       url: str | None = None) -> QuelllaufErgebnis:
+    """Importiert eine PDF-Datei mit Scope `import` und führt den Quellenlauf samt Zählern."""
+    pdf = Path(pdf)
+    if not pdf.is_file():
+        raise ArchivFehler(f"Das PDF {pdf} gibt es nicht.")
+    if not quelle or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,39}", quelle):
+        raise ArchivFehler("Der Quellcode ist ungültig.")
+    adresse = _adresse(url)
+    token = token_lesen()
+    pruefsumme = _sha256(pdf) if trocken else None
+    vorhanden = _pruefsummen_abfragen(adresse, token, [pruefsumme]) if trocken else set()
+    lauf = _quelllauf_starten(adresse, token, quelle, trocken)
+    if trocken:
+        dublette = pruefsumme in vorhanden
+        zaehler = {
+            "gefunden": 1,
+            "neu": 0 if dublette else 1,
+            "dublettePruefsumme": 1 if dublette else 0,
+            "dubletteFachlich": 0,
+            "uebersprungen": 0,
+            "fehler": 0,
+        }
+        abgeschlossen = _quelllauf_abschliessen(adresse, token, lauf, {"zaehler": zaehler})
+    else:
+        try:
+            status, antwort = _import_upload(adresse, token, pdf, lauf)
+        except _NichtErreichbar as fehler:
+            try:
+                _quelllauf_abschliessen(adresse, token, lauf,
+                                        {"uebersprungen": 0, "meldungen": [str(fehler)], "abgebrochen": True})
+            except (ArchivFehler, _NichtErreichbar) as abschlussfehler:
+                raise _NichtErreichbar(f"{fehler} Der Quelllauf konnte nicht abgeschlossen werden: "
+                                       f"{abschlussfehler}") from abschlussfehler
+            raise
+        ergebnisse = antwort if isinstance(antwort, list) else antwort.get("ergebnisse", [])
+        if status not in (200, 202, 400, 413, 415, 422) or not ergebnisse:
+            meldung = _meldung(status, antwort if isinstance(antwort, dict) else {})
+            try:
+                _quelllauf_abschliessen(adresse, token, lauf,
+                                        {"uebersprungen": 0, "meldungen": [meldung], "abgebrochen": True})
+            except (ArchivFehler, _NichtErreichbar) as fehler:
+                raise ArchivFehler(f"{meldung} Der Quelllauf konnte nicht abgeschlossen werden: {fehler}",
+                                   status=status) from fehler
+            raise ArchivFehler(meldung, status=status)
+        abgeschlossen = _quelllauf_abschliessen(adresse, token, lauf,
+                                                {"uebersprungen": 0, "meldungen": [], "abgebrochen": False})
+    server_zaehler = abgeschlossen.get("zaehler")
+    if not isinstance(server_zaehler, dict):
+        raise ArchivFehler("Das Archiv hat keine gültigen Zähler zum Quelllauf zurückgegeben.")
+    return QuelllaufErgebnis(lauf, abgeschlossen.get("status", "FERTIG"), server_zaehler)
 
 
 def token_lesen() -> str:
@@ -210,6 +281,92 @@ def _senden(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]) -
         raise _NichtErreichbar(f"Das Archiv ist nicht erreichbar ({fehler}).") from None
 
 
+def _import_upload(adresse: str, token: str, pdf: Path, lauf: str) -> tuple[int, dict | list]:
+    grenze = f"----archiv-client-{uuid.uuid4().hex}"
+    dateiname = _dateiname(pdf.name)
+    koerper = b"".join([
+        f"--{grenze}\r\n".encode("ascii"),
+        b'Content-Disposition: form-data; name="quelllauf"\r\n\r\n',
+        lauf.encode("ascii"),
+        f"\r\n--{grenze}\r\n".encode("ascii"),
+        f'Content-Disposition: form-data; name="dateien"; filename="{dateiname}"\r\n'.encode("utf-8"),
+        b"Content-Type: application/pdf\r\n\r\n",
+        pdf.read_bytes(),
+        f"\r\n--{grenze}--\r\n".encode("ascii"),
+    ])
+    anfrage = urllib.request.Request(adresse + IMPORT_PFAD, data=koerper, method="POST", headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": f"multipart/form-data; boundary={grenze}",
+        "Accept": "application/json, application/problem+json",
+    })
+    try:
+        with _OEFFNER.open(anfrage, timeout=ZEITGRENZE) as antwort:
+            return antwort.status, _json_any(antwort.read())
+    except urllib.error.HTTPError as fehler:
+        inhalt = _json_any(fehler.read())
+        if 300 <= fehler.code < 400:
+            raise ArchivFehler(f"Das Archiv leitet weiter (HTTP {fehler.code}); der Client folgt keiner Weiterleitung. "
+                               "Bitte die Adresse (ARCHIV_URL) prüfen.", status=fehler.code) from None
+        if fehler.code >= 500:
+            raise _NichtErreichbar(f"Das Archiv antwortet mit HTTP {fehler.code}.") from None
+        return fehler.code, inhalt
+    except (urllib.error.URLError, socket.timeout, ConnectionError, TimeoutError) as fehler:
+        raise _NichtErreichbar(f"Das Archiv ist nicht erreichbar ({fehler}).") from None
+
+
+def _post_json(adresse: str, token: str, pfad: str, koerper: Mapping[str, Any]) -> dict:
+    daten = json.dumps(koerper, ensure_ascii=False).encode("utf-8")
+    anfrage = urllib.request.Request(adresse + pfad, data=daten, method="POST", headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json, application/problem+json",
+    })
+    try:
+        with _OEFFNER.open(anfrage, timeout=ZEITGRENZE) as antwort:
+            status, inhalt = antwort.status, _json(antwort.read())
+    except urllib.error.HTTPError as fehler:
+        status, inhalt = fehler.code, _json(fehler.read())
+    except (urllib.error.URLError, socket.timeout, ConnectionError, TimeoutError) as fehler:
+        raise _NichtErreichbar(f"Das Archiv ist nicht erreichbar ({fehler}).") from None
+    if status >= 500:
+        raise _NichtErreichbar(f"Das Archiv antwortet mit HTTP {status}.")
+    if status < 200 or status >= 300:
+        raise ArchivFehler(_meldung(status, inhalt), status=status, code=inhalt.get("fehlercode"))
+    return inhalt
+
+
+def _quelllauf_starten(adresse: str, token: str, quelle: str, trocken: bool) -> str:
+    antwort = _post_json(adresse, token, f"{QUELLEN_PFAD}/{quelle}/laeufe",
+                         {"art": "TROCKEN" if trocken else "ECHT"})
+    lauf = antwort.get("id")
+    if not isinstance(lauf, str) or not lauf:
+        raise ArchivFehler("Das Archiv hat keinen Quelllauf zurückgegeben.")
+    return lauf
+
+
+def _quelllauf_abschliessen(adresse: str, token: str, lauf: str, abschluss: Mapping[str, Any]) -> dict:
+    return _post_json(adresse, token, f"{QUELLEN_PFAD}/laeufe/{lauf}/abschliessen", abschluss)
+
+
+def _pruefsummen_abfragen(adresse: str, token: str, sha256: list[str]) -> set[str]:
+    antwort = _post_json(adresse, token, PRUEFSUMMEN_PFAD, {"sha256": sha256})
+    vorhanden = antwort.get("vorhanden")
+    if not isinstance(vorhanden, list) or not all(isinstance(wert, str) for wert in vorhanden):
+        raise ArchivFehler("Das Archiv hat keine gültige Prüfsummen-Antwort zurückgegeben.")
+    return set(vorhanden)
+
+
+def _sha256(pdf: Path) -> str:
+    pruefsumme = hashlib.sha256()
+    try:
+        with pdf.open("rb") as datei:
+            for block in iter(lambda: datei.read(1024 * 1024), b""):
+                pruefsumme.update(block)
+    except OSError:
+        raise ArchivFehler(f"Das PDF {pdf} ist nicht lesbar.") from None
+    return pruefsumme.hexdigest()
+
+
 def _dateiname(name: str) -> str:
     """Ersetzt Anführungszeichen und die Zeichen nach Req 3.10 (Cc, Cs, Zl, Zp, Cf ausser U+200C/U+200D) durch «_».
 
@@ -220,11 +377,16 @@ def _dateiname(name: str) -> str:
 
 
 def _json(inhalt: bytes) -> dict:
+    wert = _json_any(inhalt)
+    return wert if isinstance(wert, dict) else {}
+
+
+def _json_any(inhalt: bytes) -> dict | list:
     try:
         wert = json.loads(inhalt.decode("utf-8")) if inhalt else {}
     except ValueError:
         return {}
-    return wert if isinstance(wert, dict) else {}
+    return wert if isinstance(wert, (dict, list)) else {}
 
 
 def _meldung(status: int, antwort: dict) -> str:
@@ -266,6 +428,19 @@ def _freier_name(ordner: Path, name: str) -> Path:
 
 def main(argumente: list[str]) -> int:
     try:
+        if argumente and argumente[0] == "--import-quelle":
+            if len(argumente) < 2:
+                print("Aufruf: archiv_client.py --import-quelle QUELLE [--trocken] PDF", file=sys.stderr)
+                return 2
+            trocken = "--trocken" in argumente[2:]
+            rest = [wert for wert in argumente[2:] if wert != "--trocken"]
+            if len(rest) != 2:
+                print("Aufruf: archiv_client.py --import-quelle QUELLE [--trocken] PDF", file=sys.stderr)
+                return 2
+            ergebnis = quelle_importieren(rest[1], argumente[1], trocken=trocken)
+            print(f"Quelllauf: {ergebnis.id} ({ergebnis.status})")
+            print("Zähler: " + ", ".join(f"{name} {wert}" for name, wert in ergebnis.zaehler.items()))
+            return 1 if ergebnis.zaehler.get("fehler", 0) else 0
         if len(argumente) == 2 and argumente[0] == "--nachsenden":
             return 0 if nachsenden(argumente[1]) else 3
         if len(argumente) != 2:
@@ -276,6 +451,9 @@ def main(argumente: list[str]) -> int:
     except ArchivFehler as fehler:
         print(f"archiv_client: {fehler}", file=sys.stderr)
         return 1
+    except _NichtErreichbar as fehler:
+        print(f"archiv_client: {fehler}", file=sys.stderr)
+        return 3
     except ValueError as fehler:
         print(f"archiv_client: Die Metadaten sind kein gültiges JSON ({fehler}).", file=sys.stderr)
         return 2

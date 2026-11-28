@@ -114,6 +114,7 @@ export const MENUE: readonly Menuepunkt[] = [
     gruppe: 'verwaltung',
     symbol: 'schluessel',
   },
+  { pfad: '/quellen', text: TEXTE.menue.quellen, aktion: 'A27', gruppe: 'verwaltung', symbol: 'importe' },
 ];
 
 export interface Menueabschnitt {

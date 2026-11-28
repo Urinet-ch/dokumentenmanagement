@@ -35,7 +35,8 @@ class KiZugangTest {
         modell.basisUrl = INFOMANIAK;
         modell.modell = "google/gemma-4-31B-it";
         modell.token = Optional.empty();
-        LangChain4jKiAdapter adapter = new LangChain4jKiAdapter(new TokenZaehler(), modell);
+        LangChain4jKiAdapter adapter = new LangChain4jKiAdapter(new TokenZaehler(), modell,
+                ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
 
         KiPort.Antwort antwort = adapter.metadaten(new KiPort.Anfrage("System", "", "Text", Optional.empty(),
                 Optional.empty()));
@@ -43,6 +44,38 @@ class KiZugangTest {
         assertThat(antwort).isInstanceOf(KiPort.OhneZugang.class);
         assertThat(antwort.verbrauch().tokensEin()).isZero();
         assertThatThrownBy(modell::get).isInstanceOf(IllegalStateException.class);
+    }
+
+    /** Spec 04, Req 22.9: Ingest, Neuerzeugung und Lint rufen das Modell nicht mehr auf, sobald Wissen aus ist. */
+    @Test
+    @org.junit.jupiter.api.Tag("req-22.9")
+    void ohneFreischaltungKeinWissensaufruf() {
+        java.util.concurrent.atomic.AtomicInteger aufrufe = new java.util.concurrent.atomic.AtomicInteger();
+        KiModell modell = new KiModell() {
+            @Override
+            public boolean bereit() {
+                return true;
+            }
+
+            @Override
+            public dev.langchain4j.model.chat.ChatModel get() {
+                return new dev.langchain4j.model.chat.ChatModel() {
+                    @Override
+                    public dev.langchain4j.model.chat.response.ChatResponse doChat(
+                            dev.langchain4j.model.chat.request.ChatRequest anfrage) {
+                        aufrufe.incrementAndGet();
+                        throw new AssertionError("kein Modellaufruf ohne Freischaltung");
+                    }
+                };
+            }
+        };
+        LangChain4jKiAdapter adapter = new LangChain4jKiAdapter(new TokenZaehler(), modell,
+                ch.urinet.archiv.wissen.FesteWissensfreischaltung.aus());
+
+        assertThatThrownBy(() -> adapter.wissensIngest(new KiPort.WissensAnfrage(KiPort.WissensSchritt.LINT_PAAR,
+                "modell", "System", "Nachricht", 100)))
+                .isInstanceOf(ch.urinet.archiv.wissen.application.WissenAusgeschaltet.class);
+        assertThat(aufrufe).hasValue(0);
     }
 
     @Test

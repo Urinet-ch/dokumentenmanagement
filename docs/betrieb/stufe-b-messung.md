@@ -24,6 +24,7 @@ Die weiteren Last- und Restore-Nachweise aus 5.11 ersetzt dieser Foto-Test nicht
   Es benötigt A1 und A2. Keine Tokens, echten Belege oder personenbezogenen Angaben in Berichten oder Logs.
 - KI-Wartezeit darf nach Req 5.5 nicht in den Zielwert eingehen: mit geeignetem KI-Stub messen oder die
   serverseitigen Zeiten einschliesslich KI-Anteil separat erfassen und nachvollziehbar auswerten.
+  `ki_verbrauch` enthält keine Aufrufdauer und erlaubt allein keinen Abzug der KI-Wartezeit.
 
 ## Ablauf
 

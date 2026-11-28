@@ -101,6 +101,7 @@ ausgenommen. Einzelne Schlüssel in Klasse (a) gehen einem allgemeineren Präfix
 | `archiv.chat.*` (Raten je Benutzer, Gleichzeitigkeit, Aufräumzeit) | Konfiguration | Schutz der Instanz |
 | `archiv.mail.*` (Postfach, Intervall, Ordner, Grössen) | Konfiguration | ein Postfach und ein Abrufer je Instanz (Spec 02) |
 | `archiv.ueberwachung.*`, `archiv.oidc.waechter.*`, `archiv.kennzahlen.*`, `archiv.mandant.bericht.*` | Konfiguration | Betrieb und Alarmschwellen der Instanz |
+| `archiv.last.histogramme` | Konfiguration, nur Messprojekt (Spec 01, 31.6) | feste HTTP-Ziel-Buckets der Leistungsmessung, standardmässig aus; keine Mandanteneinstellung |
 | `archiv.adresse`, `archiv.integration.*` | Konfiguration | Instanzweite Adresse und Integrationsadapter; keine Mandanten-Einstellung |
 | `archiv.wissen.*` | Konfiguration | Instanzweite Modelle und technische Grenzen; die oben einzeln genannten Startwerte der Klasse (a) sind ausgenommen |
 | `archiv.benachrichtigung.empfaenger.<code>` | Umgebung `ARCHIV_ALARM_EMPFAENGER_<CODE>` | E-Mail-Adressen sind Personendaten und gehören nicht in unveränderliche Konfigurationsversionen; Umleiten der Alarme wäre ein Missbrauchsweg (Entscheid Fabian offen, Open Points) |
@@ -382,6 +383,14 @@ bleibt, neue Felder kommen flach dazu; die genaue Form legt Aufgabe 20.2 gegen d
 | POST | `/mandant/einstellungen/zuruecksetzen` | `{ "gruppe": … }` auf Standard oder `{ "version": n }` auf den Stand der `einstellungen.*` jener Version; neue Version, Quelle `APP` | A20 |
 | GET, PUT | `/wissensbasis/einstellungen` | wie bisher (Spec 04), nach derselben Mechanik; `If-Match` mit der Konfigurationsversion | A19 |
 | GET | `/konfiguration/versionen[/{n}]` | Verlauf; die Seite der Einstellungen zeigt nur `einstellungen.*`, Kennungen ohne Werte | A11 |
+
+Spec 04 ergänzt (Spec 04, Req 22.3, 22.5 und 22.6, Entscheid Fabian 28.11.2026): Die Einstellungsgruppe der Wissensbasis
+(`wissen`) erscheint in der Oberfläche nur, wenn Wissen für den Mandanten freigeschaltet ist (`wissenVerfuegbar` aus
+`GET /mandant/funktionen`); ohne Freischaltung fehlen in `GET /mandant/einstellungen` die Gruppe der Wissensbasis
+und im Block `betrieb` das Wissensbudget, und es antworten `/wissensbasis/einstellungen`, ein Patch mit `wissen` und das
+Zurücksetzen der Gruppe `WISSEN` mit 403 `WISSEN_NICHT_FREIGESCHALTET` vor A19. Die Freischaltung selbst ist keine
+Einstellung: Sie steht weder im Einstellungskatalog noch in der Konfigurationsdatei, sondern nur in `public.mandant`
+und wird nur mit dem Betreiber-Kommando `archiv mandant wissen <code> [ein|aus]` geändert.
 
 **Umsetzung (Aufgabe 20.2, 22.11.2026):** `GET /mandant/einstellungen` liefert `version`, `katalog[]` und `betrieb`;
 Katalogeinträge enthalten Wert, Standard, Herkunft, Grenzen und Wirkung. Dokumentarten, Klassifikationen, Regeln und

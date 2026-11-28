@@ -2,7 +2,7 @@
 
 | Pfad | Zweck |
 | --- | --- |
-| `archiv_client.py` | Client für den Generator-Endpunkt (Spec 01, Req 11.4, 11.5, 11.9; Aufgabe 4.7) |
+| `archiv_client.py` | Client für Generator-Uploads und Quellimporte (Spec 01, Req 11.4, 11.5, 11.9; Spec 09, Req 10.7) |
 | `test_archiv_client.py` | Tests zum Client: `python3 -m unittest tools/test_archiv_client.py` |
 | `test_pruefe_speicherbudget.py` | Tests für das Deploy-Speicherbudget: `python3 -m unittest tools/test_pruefe_speicherbudget.py` |
 | `pruefe_compose_konsistenz.py` | Statische Prüfung von Compose und Keycloak-Vorlagen; startet keine Dienste |
@@ -60,17 +60,19 @@ repo-relative Dateiverweise in Markdown-Dateien unter `docs/` und `deploy/`; ext
 unberührt. Zeilenangaben in Quellverweisen werden entfernt; Vorlagen, Platzhalter und generierte Build-Pfade
 werden nicht als fehlende Dateien gemeldet. Es gibt keinen bestehenden Linkcheck, in den sie eingehängt werden könnte.
 
-## Generator-Client `archiv_client.py`
+## Generator-Client und Quellenimport `archiv_client.py`
 
-Legt ein fertig erzeugtes PDF mit exakten Metadaten über `POST /api/v1/dokumente/generator` im Archiv ab. Das
-Archiv verarbeitet und archiviert es ohne KI-Vorschlag. Nur Python-Standardbibliothek (ab 3.10).
+Der Generator-Aufruf legt ein fertig erzeugtes PDF mit exakten Metadaten über `POST /api/v1/dokumente/generator` im
+Archiv ab. Das Archiv verarbeitet und archiviert es ohne KI-Vorschlag. Der getrennte Quellen-Aufruf ordnet einen
+Import einem Quelllauf zu. Nur Python-Standardbibliothek (ab 3.10).
 
 ### Einrichten
 
-1. Der Inhaber stellt ein API-Token vom Scope `generator` aus (`POST /api/v1/api-tokens`, Req 2.20). Es wird nur
-   einmal angezeigt.
-2. Das Token in eine Datei mit Rechten 600 legen, Standard `~/.config/urinet-archiv/token`, ein anderer Pfad über
-   `ARCHIV_TOKEN_DATEI`. Das Token selbst nie in den Code oder in eine Umgebungsvariable (tech.md Regel 7):
+1. Für Generator-Uploads stellt der Inhaber ein API-Token vom Scope `generator` aus; für den Quellen-Aufruf braucht
+   es ein eigenes Token vom Scope `import` (`POST /api/v1/api-tokens`). Ein Token wird nur einmal angezeigt.
+2. Das gerade verwendete Token in eine Datei mit Rechten 600 legen, Standard `~/.config/urinet-archiv/token`, ein
+   anderer Pfad über `ARCHIV_TOKEN_DATEI`. Das Token selbst nie in den Code oder in eine Umgebungsvariable
+   (tech.md Regel 7):
    ```sh
    mkdir -p ~/.config/urinet-archiv
    install -m 600 /dev/null ~/.config/urinet-archiv/token
@@ -134,3 +136,15 @@ PDFs lassen sich auch ohne neues PDF senden: `python3 tools/archiv_client.py --n
 
 Von der Kommandozeile: `python3 tools/archiv_client.py <pdf> <metadaten.json>`; Exit-Code 0 bei 200/202, 1 bei
 Ablehnung, 3 ausstehend, 4 Konflikt.
+
+### Quelle importieren
+
+```sh
+python3 tools/archiv_client.py --import-quelle <quellcode> <datei.pdf>
+python3 tools/archiv_client.py --import-quelle <quellcode> --trocken <datei.pdf>
+```
+
+Der Trockenlauf braucht ebenfalls das Import-Token: Er fragt die SHA-256-Prüfsumme beim Archiv ab, legt keine
+Dokumentdatei an und schliesst den Quelllauf mit Zählern ab. Der echte Lauf lädt die PDF-Datei mit der Quelllauf-ID
+hoch und meldet danach die vom Archiv bestätigten Zähler. Generator-Aufrufe bleiben davon getrennt und verwenden
+weiterhin den Scope `generator`.

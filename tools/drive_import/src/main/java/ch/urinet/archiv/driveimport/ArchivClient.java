@@ -14,11 +14,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Sendet eine Datei an {@code POST /api/v1/dokumente} (Req 12.1, 12.8): eine Datei je Anfrage, Multipart mit den
@@ -30,7 +33,15 @@ import java.util.Map;
  */
 final class ArchivClient {
 
+    static final class ArchivFehler extends RuntimeException {
+        ArchivFehler(String meldung) {
+            super(meldung);
+        }
+    }
+
     static final String PFAD = "/api/v1/dokumente";
+    private static final String QUELLEN_PFAD = "/api/v1/quellen";
+    private static final String PRUEFSUMMEN_PFAD = "/api/v1/dokumente/pruefsummen";
     static final int MAX_VERSUCHE = 5;
     static final Duration MAX_WARTEN = Duration.ofSeconds(60);
     static final Duration NETZ_PAUSE = Duration.ofSeconds(5);
@@ -40,6 +51,9 @@ final class ArchivClient {
     enum Status { UEBERTRAGEN, SCHON_VORHANDEN, ABGELEHNT, ABBRUCH }
 
     record Ergebnis(Status status, String grund) {
+    }
+
+    record QuelllaufZaehler(int gefunden, int neu, int dublettePruefsumme, int uebersprungen, int fehler) {
     }
 
     /** Wartet vor einer Wiederholung; in Tests ersetzbar. */
@@ -73,6 +87,11 @@ final class ArchivClient {
 
     Ergebnis senden(Path datei, String dateiname, String hinweis, String art,
                     Map<String, List<String>> klassifikationen) throws InterruptedException {
+        return senden(datei, dateiname, hinweis, art, klassifikationen, null);
+    }
+
+    Ergebnis senden(Path datei, String dateiname, String hinweis, String art,
+                    Map<String, List<String>> klassifikationen, String quelllauf) throws InterruptedException {
         if (dateiname.codePoints().anyMatch(c -> Character.getType(c) == Character.CONTROL)) {
             return abgelehnt("Dateiname enthält Steuerzeichen, bitte umbenennen");
         }
@@ -83,7 +102,7 @@ final class ArchivClient {
         for (int versuch = 1; versuch <= MAX_VERSUCHE; versuch++) {
             HttpResponse<String> antwort;
             try {
-                antwort = http.send(anfrage(datei, dateiname, hinweis, art, klassifikationen),
+                antwort = http.send(anfrage(datei, dateiname, hinweis, art, klassifikationen, quelllauf),
                         HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             } catch (FileNotFoundException e) {
                 return abgelehnt(NICHT_LESBAR);
@@ -107,6 +126,71 @@ final class ArchivClient {
         return abgelehnt(grund);
     }
 
+    String quelllaufStarten(String quelle, boolean trockenlauf) {
+        JsonNode antwort = postJson(QUELLEN_PFAD + "/" + quelle + "/laeufe",
+                Map.of("art", trockenlauf ? "TROCKEN" : "ECHT"), 201);
+        String id = antwort == null ? null : antwort.path("id").asText(null);
+        if (id == null || id.isBlank()) {
+            throw new ArchivFehler("Das Archiv hat keinen Quelllauf zurückgegeben.");
+        }
+        return id;
+    }
+
+    Set<String> pruefsummenAbfragen(List<String> sha256) {
+        if (sha256.isEmpty() || sha256.size() > 1000) {
+            throw new ArchivFehler("Die Prüfsummen-Abfrage muss 1 bis 1'000 Prüfsummen enthalten.");
+        }
+        JsonNode antwort = postJson(PRUEFSUMMEN_PFAD, Map.of("sha256", sha256), 200);
+        JsonNode vorhanden = antwort == null ? null : antwort.path("vorhanden");
+        if (vorhanden == null || !vorhanden.isArray()) {
+            throw new ArchivFehler("Das Archiv hat keine gültige Prüfsummen-Antwort zurückgegeben.");
+        }
+        java.util.HashSet<String> ergebnis = new java.util.HashSet<>();
+        vorhanden.forEach(wert -> ergebnis.add(wert.asText()));
+        return Set.copyOf(ergebnis);
+    }
+
+    QuelllaufZaehler quelllaufAbschliessen(String laufId, Bericht bericht, boolean trockenlauf,
+                                            boolean abgebrochen) {
+        Map<String, Object> inhalt;
+        if (trockenlauf) {
+            inhalt = Map.of("zaehler", Map.of(
+                    "gefunden", bericht.gefunden(),
+                    "neu", bericht.anzahlUebertragen(),
+                    "dublettePruefsumme", bericht.anzahlSchonVorhanden(),
+                    "dubletteFachlich", 0,
+                    "uebersprungen", bericht.uebersprungen(),
+                    "fehler", bericht.abgelehnt()));
+        } else {
+            inhalt = Map.of("uebersprungen", bericht.uebersprungen(),
+                    "meldungen", List.of(), "abgebrochen", abgebrochen);
+        }
+        JsonNode antwort = postJson(QUELLEN_PFAD + "/laeufe/" + laufId + "/abschliessen", inhalt, 200);
+        JsonNode zaehler = antwort == null ? null : antwort.path("zaehler");
+        if (zaehler == null || !zaehler.isObject()) {
+            throw new ArchivFehler("Das Archiv hat keine Laufzähler zurückgegeben.");
+        }
+        return new QuelllaufZaehler(zaehler.path("gefunden").asInt(), zaehler.path("neu").asInt(),
+                zaehler.path("dublettePruefsumme").asInt(), zaehler.path("uebersprungen").asInt(),
+                zaehler.path("fehler").asInt());
+    }
+
+    static String sha256(Path datei) {
+        try (var eingabe = Files.newInputStream(datei)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] puffer = new byte[8192];
+            int gelesen;
+            while ((gelesen = eingabe.read(puffer)) != -1) {
+                digest.update(puffer, 0, gelesen);
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (IOException e) {
+            throw new ArchivFehler("Datei nicht lesbar, bitte Leserechte prüfen.");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 wird von der Laufzeit nicht unterstützt", e);
+        }
+    }
+
     /**
      * Öffnet die Datei einmal zur Probe, bevor sie gesendet wird: Fehlt das Leserecht, meldet {@code ofFile} das
      * sonst erst beim Senden als {@link IOException}, und der Lauf hielte es für einen Netzfehler (Review PR #64, S3).
@@ -120,12 +204,19 @@ final class ArchivClient {
     }
 
     private HttpRequest anfrage(Path datei, String dateiname, String hinweis, String art,
-                                Map<String, List<String>> klassifikationen) throws FileNotFoundException {
+                                Map<String, List<String>> klassifikationen, String quelllauf)
+            throws FileNotFoundException {
         String grenze = "----drive-import-" + HexFormat.of().formatHex(zufall());
         String kopf = "--" + grenze + "\r\n"
                 + "Content-Disposition: form-data; name=\"hinweis\"\r\n"
                 + "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
                 + hinweis + "\r\n";
+        if (quelllauf != null) {
+            kopf += "--" + grenze + "\r\n"
+                    + "Content-Disposition: form-data; name=\"quelllauf\"\r\n"
+                    + "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
+                    + quelllauf + "\r\n";
+        }
         if (art != null) {
             kopf += "--" + grenze + "\r\n"
                     + "Content-Disposition: form-data; name=\"art\"\r\n"
@@ -152,6 +243,36 @@ final class ArchivClient {
                 .header("Content-Type", "multipart/form-data; boundary=" + grenze)
                 .POST(inhalt)
                 .build();
+    }
+
+    private JsonNode postJson(String pfad, Object koerper, int erwarteterStatus) {
+        String inhalt;
+        try {
+            inhalt = JSON.writeValueAsString(koerper);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Anfrage konnte nicht serialisiert werden", e);
+        }
+        HttpRequest anfrage = HttpRequest.newBuilder(ziel.resolve(pfad))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Bearer " + token)
+                .header("Accept", "application/json, application/problem+json")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(inhalt, StandardCharsets.UTF_8))
+                .build();
+        try {
+            HttpResponse<String> antwort = http.send(anfrage,
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            JsonNode json = json(antwort.body());
+            if (antwort.statusCode() != erwarteterStatus) {
+                throw new ArchivFehler(beschreiben(antwort));
+            }
+            return json;
+        } catch (IOException e) {
+            throw new ArchivFehler("Das Archiv ist für den Quelllauf nicht erreichbar.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ArchivFehler("Der Quelllauf wurde unterbrochen.");
+        }
     }
 
     private static String json(Map<String, List<String>> klassifikationen) {

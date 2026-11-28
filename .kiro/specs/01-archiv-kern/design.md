@@ -1,5 +1,23 @@
 # Design Document
 
+### Umsetzung (Aufgabe 31.6 Repo-Vorbereitung, 28.11.2026)
+
+`deploy/last/compose.yml` beschreibt ein isoliertes Messprojekt mit Stufe-A-Buckets,
+echter OCR/S3 und KI-Stub, ohne veröffentlichte Ports. `seed/last/konfiguration.json`
+enthält ausschliesslich synthetische Messarten. `tools/last/bestand.py` erzeugt und
+prüft eine deterministische Suchfixture, keine archivierten Dateien. Die bestehende
+HTTP-Servermetrik erhält nur mit `archiv.last.histogramme=true` feste 1-/2-s-Buckets
+für `/api/v1/dokumente` (keine neuen Labels); Differenzen zweier interner Abrufe
+belegen die Grenzbuckets, nicht ein exaktes Perzentil. Die Fotoauswertung verwendet
+vorhandene Auftragszeitstempel vom Start von `VERARBEITEN` bis zum Ende von
+`KI_VORSCHLAG`, bei bestätigtem KI-Stub und ohne Fehlversuch. Zwischenwarteschlange
+und Abschlussarbeiten zählen konservativ mit. HEIC und dreiseitiges farbiges
+Bild-PDF entstehen lokal mit den vorhandenen Generator-Bibliotheken.
+Durchführung, isoliertes Deploy-Ziel im Betriebsweg, tatsächliche OCR-Überlappung,
+Renderdauer/Bildweg und Hybrid-Nachweis bleiben bei Fabian beziehungsweise offen;
+Anleitung und Grenzen: `docs/betrieb/leistungsmessung-stufe-b.md`. Requirements
+und Checkbox 31.6 bleiben unverändert.
+
 ### Umsetzung (Aufgabe 1.9 Vorschlag, 27.11.2026)
 
 `docs/betrieb/deploy-rollback-pruefung.diff` ist ein nicht angewendeter Vorschlag; der Workflow bleibt unverändert.
@@ -553,6 +571,7 @@ Die Spalte «Beschreibung» (Aufgabe 2.1, entschieden von Fabian am 09.11.2026; 
 ### Verarbeitung (`verarbeitung`)
 - Tabelle `public.auftrag`; `AuftragPoller` (Quarkus Scheduler, alle 2 s) holt `LIMIT n FOR UPDATE SKIP LOCKED`, Parallelität `archiv.worker.parallel` (Standard 2; Stufe A 1; Stufe B 1 nach dem Speicherbudget, Startwert 12.11.2026, nach der Messung in 5.11 prüfen; 2 erst mit mehr Speicher, z. B. nach dem Aufrüsten auf 4/8).
 - Auftragstypen Phase 1: `VERARBEITEN`, `KI_VORSCHLAG`, `ARCHIVIEREN`, `CSV_VORSCHAU`, `CSV_UEBERNEHMEN`, `MANIFEST`, `PRUEFLAUF`.
+- Auftragstypen für Stapel (Spec 09, Aufgabe 28.1): `STAPEL_ANALYSE`, `STAPEL_TRENNEN`, `STAPEL_ABSCHLUSS`.
 - `VERARBEITEN`: Typ per Tika-Detektor → HEIC→JPEG (`heif-convert`) → Bilder→PDF (`img2pdf`; bei Handy-Erfassung aus den Arbeitsfassungen, Req 5.10) → `ocrmypdf --output-type pdfa-2 --rotate-pages --deskew -l deu+eng [--skip-text]` → Text via `pdftotext` (`dokument.volltext` behält `\f` als Seitentrenner von `pdftotext`; Seitenangaben und Auszugsprüfung der Wissensbasis beruhen darauf, Spec 04, Req 5.6) → Vorschaubilder (`pdftoppm -r 72`) → Swiss QR Code lesen (siehe «KI») → Folgeauftrag `KI_VORSCHLAG`, bei Generator-Dokumenten Status `ARCHIVIERUNG` und Auftrag `ARCHIVIEREN`.
 - Digital signierte PDFs (Req 5.8): OCRmyPDF bricht ohne Freigabe ab; der Worker ruft es dann mit `--invalidate-digital-signatures` auf. Nur die PDF/A-Fassung verliert die Signatur, das Original bleibt unverändert.
 - Keine PDF/A-Fassung möglich, z. B. verschlüsseltes PDF (Req 5.9): `pdfa_fehlt = true`, Fehlertext in `fehler`, Status `EINGANGSKORB`; den Text liest Tika, soweit möglich, und die KI läuft trotzdem.
@@ -660,11 +679,14 @@ fehlende Gauge bei weiterhin vorhandenen übrigen Reihen.
 
 #### Umsetzung (Aufgabe 5.9, 28.11.2026)
 
-Der Entscheid vom 27.11.2026 (PR #724) wählte eine unabhängige Erreichbarkeitsprüfung beider Hosts und eine Meldung bei
-fehlgeschlagenem Deploy; beides ist im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Eine
-unabhängige externe HTTP-Prüfung des Anwendungs-Hosts bestand seit dem 13.11.2026 ausserhalb der VPS-Konfiguration
-und erfasste den Ausfall vom 26.11.2026 (rund 75 Minuten). Eine Aussage zur Benachrichtigung ist nicht belegt. Der
-Betriebsnachweis für die Prüfung des Anmelde-Hosts bleibt bei Fabian; Aufgabe 5.9 bleibt offen.
+Der Entscheid vom 27.11.2026 (PR #724) wählte eine unabhängige externe Erreichbarkeitsprüfung des Anwendungs-Hosts
+sowie eine Meldung bei fehlgeschlagenem Deploy; beides ist im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht
+gewählt. Fabian entschied am 28.11.2026, den Anmelde-Host bewusst nicht extern zu überwachen: Die externe Prüfung des
+Anwendungs-Hosts genügt, die externe Prüfung des Anmelde-Hosts wurde wieder entfernt. Fällt nur der Anmeldedienst aus, bleibt
+die Health der App grün. Eine unabhängige externe HTTP-Prüfung des Anwendungs-Hosts bestand seit dem 13.11.2026
+ausserhalb der VPS-Konfiguration und erfasste den Ausfall vom 26.11.2026 (rund 75 Minuten). Eine Aussage zur
+Benachrichtigung ist nicht belegt. Für den Anmelde-Host bleibt kein Betriebsnachweis offen; die übrigen Schritte aus
+Aufgabe 5.9 bleiben offen.
 
 ### KI (`ki`)
 - `MetadatenExtraktor` als LangChain4j-`@RegisterAiService` ohne Chat-Memory (`NoChatMemoryProviderSupplier`; sonst vermischen sich Belege im selben Request-Kontext), Antwort als Java-Record `MetadatenVorschlag` im JSON-Schema-Antwortformat (`response-format=json_schema`, `strict-json-schema=true`). Infomaniak lehnt den JSON-Modus (`json_object`) ab; einen Rückfall gibt es nicht, ohne gültige Antwort gilt Req 7.1 (ohne Vorschlag in den Eingangskorb). Spike 0.3: `docs/spikes/infomaniak-ai.md`.
@@ -1888,6 +1910,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 403 | `MANDANT_FEHLT` | kein gültiger oder inaktiver Mandant (Req 1.3) |
 | 403 | `NICHT_ERLAUBT` | Rolle oder Token-Scope ohne Recht (Req 2.4–2.20) |
 | 403 | `ESKALATION_VERBOTEN` | Benutzerverwaltung würde die Rolle des Akteurs überschreiten oder die festgelegten Vergaberegeln verletzen (Spec 06, Req 4.6) |
+| 403 | `WISSEN_NICHT_FREIGESCHALTET` | Wissen für den Mandanten nicht freigeschaltet; nach 401, vor Rechtematrix und 404, auf allen internen Wissenspfaden (Spec 04, Req 22.6) |
 | 404 | `NICHT_GEFUNDEN` | fremder Mandant oder unsichtbar, vor 403 (Req 1.4, 2.3) |
 | 409 | `API_TOKEN_ABGELAUFEN` | Ablauf eines abgelaufenen API-Tokens setzen oder entfernen; ein neues Token muss ausgestellt werden (Req 2.5, Review PR #248) |
 | 409 | `STATUS_KONFLIKT` | Aktion im falschen Status (Req 6.7, 6.13, 8.8) |

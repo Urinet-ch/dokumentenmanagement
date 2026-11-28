@@ -5,6 +5,8 @@ import ch.urinet.archiv.ki.domain.ArtEintrag;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.KiKlassifikation;
+import ch.urinet.archiv.wissen.application.WissenAusgeschaltet;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import ch.urinet.archiv.ki.domain.Rohvorschlag;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,10 +55,12 @@ public class LangChain4jKiAdapter implements KiPort {
 
     private final TokenZaehler zaehler;
     private final KiModell modell;
+    private final Wissensfreischaltung freischaltung;
 
-    public LangChain4jKiAdapter(TokenZaehler zaehler, KiModell modell) {
+    public LangChain4jKiAdapter(TokenZaehler zaehler, KiModell modell, Wissensfreischaltung freischaltung) {
         this.zaehler = zaehler;
         this.modell = modell;
+        this.freischaltung = freischaltung;
     }
 
     @Override
@@ -113,6 +117,8 @@ public class LangChain4jKiAdapter implements KiPort {
                             .responseFormat(schema)
                             .build())
                     .build();
+            // Spec 04, Req 22.9: unmittelbar vor dem Aufruf, für Ingest, Neuerzeugung und Lint an einer Stelle
+            freischaltung.modellaufrufPruefen();
             ChatResponse ergebnis = modell.get().chat(request);
             String roh = ergebnis == null || ergebnis.aiMessage() == null ? null : ergebnis.aiMessage().text();
             TokenUsage tokenUsage = ergebnis == null ? null : ergebnis.tokenUsage();
@@ -127,6 +133,8 @@ public class LangChain4jKiAdapter implements KiPort {
                 return new WissensSchemafehler("Antwort ausserhalb des Schemas", verbrauch);
             }
             return new WissensGueltig(WissenIngestSchemas.lesen(roh, anfrage.schritt()), verbrauch);
+        } catch (WissenAusgeschaltet e) {
+            throw e;
         } catch (RuntimeException e) {
             Verbrauch verbrauch = verbrauch(null, anfrage.modell());
             return KiFehler.istSchemafehler(e) ? new WissensSchemafehler(KiFehler.grund(e), verbrauch)

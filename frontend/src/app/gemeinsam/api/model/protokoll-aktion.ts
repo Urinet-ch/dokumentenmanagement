@@ -40,6 +40,8 @@ export const ProtokollAktion = {
     BenutzerAntrag: 'BENUTZER_ANTRAG',
     BenutzerAbweichung: 'BENUTZER_ABWEICHUNG',
     ChatBewertungExport: 'CHAT_BEWERTUNG_EXPORT',
+    WissenFreigeschaltet: 'WISSEN_FREIGESCHALTET',
+    WissenAbgeschaltet: 'WISSEN_ABGESCHALTET',
 } as const;
 export type ProtokollAktion = typeof ProtokollAktion[keyof typeof ProtokollAktion];
 

@@ -137,6 +137,10 @@ export class DokumentAnsicht {
   /** Der Partner verlinkt auf den Kontakt nur mit A6 (Req 17.1). */
   protected readonly darfKontakt = computed(() => this.anmeldung.darf('A6'));
   protected readonly darfWissensquelle = computed(() => this.anmeldung.darf('A16'));
+  /** Wissen freigeschaltet (Spec 04, Req 22.5): sonst keine Wissensquellen, keine Wissensseiten in der Ansicht. */
+  protected readonly wissen = computed(() => this.anmeldung.darf('A15'));
+  /** Zählt jedes geladene Dokument, damit die Wissensquellen auch nach dem Neuladen desselben Dokuments folgen. */
+  private readonly geladenNr = signal(0);
   private readonly wissensquellen = signal<Quelle[]>([]);
   protected readonly wissensquellenLadezustand = signal<'laedt' | 'ok' | 'fehler'>('laedt');
   protected readonly wissensquelleFehler = signal<string | null>(null);
@@ -144,7 +148,7 @@ export class DokumentAnsicht {
   protected readonly wissensquelleAktionLaeuft = signal(false);
   protected readonly istWissensquelle = computed(() => {
     const id = this.dokument()?.id;
-    return !!id && this.wissensquellen().some((quelle) => quelle.dokumentId === id);
+    return !!id && this.wissen() && this.wissensquellen().some((quelle) => quelle.dokumentId === id);
   });
   protected readonly darfBearbeiten = computed(() => {
     const d = this.dokument();
@@ -301,6 +305,14 @@ export class DokumentAnsicht {
       const id = this.id();
       untracked(() => this.oeffnen(id));
     });
+    // Wissensquellen erst, wenn Dokument und Freischaltung bekannt sind; ohne Freischaltung keine Anfrage (Req 22.5)
+    effect(() => {
+      this.geladenNr();
+      const id = untracked(() => this.dokument()?.id);
+      if (id && this.wissen()) {
+        untracked(() => this.wissensquellenLaden(id));
+      }
+    });
     effect(() => {
       const code = this.artVorbelegung();
       const d = this.dokument();
@@ -437,7 +449,7 @@ export class DokumentAnsicht {
           this.dokument.set(dokument);
           this.laden.set('ok');
           this.vorschauLaden(id);
-          this.wissensquellenLaden(id);
+          this.geladenNr.update((nr) => nr + 1);
         },
         error: (fehler: unknown) => this.laden.set(ladeFehler(fehler)),
       }),

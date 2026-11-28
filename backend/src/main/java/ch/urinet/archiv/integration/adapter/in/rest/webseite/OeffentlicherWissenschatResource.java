@@ -6,6 +6,7 @@ import ch.urinet.archiv.ki.application.chat.ChatAbbruch;
 import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicheFragen;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import io.quarkus.security.Authenticated;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Multi;
@@ -42,13 +43,16 @@ public class OeffentlicherWissenschatResource {
     private final MandantAufloesung aufloesung;
     private final LeseAnfrage anfrage;
     private final Config konfiguration;
+    private final Wissensfreischaltung freischaltung;
 
     public OeffentlicherWissenschatResource(OeffentlicheFragen fragen, MandantAufloesung aufloesung,
-                                            LeseAnfrage anfrage, Config konfiguration) {
+                                            LeseAnfrage anfrage, Config konfiguration,
+                                            Wissensfreischaltung freischaltung) {
         this.fragen = fragen;
         this.aufloesung = aufloesung;
         this.anfrage = anfrage;
         this.konfiguration = konfiguration;
+        this.freischaltung = freischaltung;
     }
 
     @POST
@@ -74,7 +78,8 @@ public class OeffentlicherWissenschatResource {
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
     public Multi<OutboundSseEvent> fragen(String body, @Context Sse sse) {
         var mandant = aufloesung.pruefen();
-        if (!konfiguration.getOptionalValue("archiv.mandant." + mandant.wert() + ".oeffentlich.wissenschat",
+        // Spec 04, Req 22.8: ohne Freischaltung wie bei ausgeschaltetem Schalter (21.6), unabhängig von ihm
+        if (!freischaltung.freigeschaltet(mandant) || !konfiguration.getOptionalValue("archiv.mandant." + mandant.wert() + ".oeffentlich.wissenschat",
                 Boolean.class).orElse(false)) {
             throw new FachFehler(Fehlercode.NICHT_ERLAUBT);
         }

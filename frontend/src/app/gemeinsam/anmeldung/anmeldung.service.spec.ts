@@ -1,6 +1,8 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { MandantFunktionen } from '../mandant-funktionen';
 import { anmeldungInterceptor } from './anmeldung.interceptor';
 import {
   AnmeldungFehler,
@@ -52,13 +54,20 @@ describe('AnmeldungService (Req 2.1)', () => {
   let speicher: SpeicherAttrappe;
   let weiterleitung: ReturnType<typeof vi.fn<(url: string) => void>>;
 
+  const funktionen = { fuer: vi.fn(), zuruecksetzen: vi.fn(), wissenVerfuegbar: signal(false) };
+
   beforeEach(() => {
+    funktionen.fuer.mockClear();
+    funktionen.zuruecksetzen.mockClear();
+    funktionen.wissenVerfuegbar.set(false);
     speicher = new SpeicherAttrappe();
     weiterleitung = vi.fn<(url: string) => void>();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([anmeldungInterceptor])),
         provideHttpClientTesting(),
+        // Die Funktionen des Mandanten prüft mandant-funktionen.spec.ts; hier keine zusätzliche Anfrage
+        { provide: MandantFunktionen, useValue: funktionen },
         { provide: OIDC_KONFIGURATION, useValue: { aussteller: AUSSTELLER, clientId: 'archiv-pwa' } },
         {
           provide: FENSTER,
@@ -185,6 +194,14 @@ describe('AnmeldungService (Req 2.1)', () => {
       email: 'benutzer-1@example.invalid',
     });
     expect(dienst.darf('A13')).toBe(true);
+    // Rechte der Wissensbasis nur bei freigeschaltetem Wissen; die Funktionen lädt die Anmeldung (Spec 04, Req 22.5)
+    TestBed.tick();
+    expect(funktionen.fuer).toHaveBeenCalledWith('urinet|u-1');
+    expect(dienst.darf('A15')).toBe(false);
+    expect(dienst.darf('A19')).toBe(false);
+    funktionen.wissenVerfuegbar.set(true);
+    expect(dienst.darf('A15')).toBe(true);
+    expect(dienst.darf('A19')).toBe(true);
     expect(speicher.length).toBe(0);
     expect(localStorage.length).toBe(0);
     expect(sessionStorage.length).toBe(0);

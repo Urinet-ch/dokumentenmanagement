@@ -299,11 +299,11 @@ Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderu
 - Abschluss: Beim Trockenlauf meldet das Werkzeug alle Zähler (sie müssen aufgehen, ohne fachliche Dubletten), beim
   echten Lauf zählt der Server und das Werkzeug ergänzt nur übersprungene Dateien und Meldungen.
 - Prüfsummen-Abfrage: A1 und Scope `import`, höchstens 1'000, nur nicht verworfene Originale nicht verworfener
-  Dokumente, Antwort nur `vorhanden` ohne IDs; Stapel (10.6) kommen verbindlich mit Aufgabe 28.1 dazu. Ein Benutzer
-  erfährt nur von Dokumenten, die er sieht (dasselbe Prädikat `SichtregelSql` wie Suche und Listen, also auch
-  `PERSONAL` und unbestätigte nach Spec 01, 2.21): Sonst verriete die Antwort einem `mitarbeiter`, dass ein
-  vertrauliches Dokument mit dieser Datei existiert (Nachtrag aus dem Review). Das Import-Token fragt ohne Sichtfilter,
-  weil nur der Inhaber es anlegt (A14) und der Inhaber alle Dokumente sieht.
+  Dokumente und nicht verworfene Stapel-Originale, Antwort nur `vorhanden` ohne IDs. Ein Benutzer erfährt nur von
+  Dokumenten, die er sieht (dasselbe Prädikat `SichtregelSql` wie Suche und Listen, also auch `PERSONAL` und
+  unbestätigte nach Spec 01, 2.21), und nur von Stapeln, die er mit A25 sehen darf. Sonst verriete die Antwort einem
+  `mitarbeiter`, dass ein vertrauliches Dokument oder Stapel-Original existiert. Das Import-Token fragt ohne
+  Sichtfilter; es sieht alle Stapel-Originale.
 - Nebenläufigkeit: Der Upload sperrt den Lauf (`for update`) bis zu seinem Commit; der Abschluss wartet darauf und
   zählt den Upload mit, ein späterer Upload erhält 409 `STATUS_KONFLIKT`. `verbuchen` zählt zudem nur, solange der
   Lauf `LAEUFT` (Nachtrag aus dem Review, Test `QuellLaufWettlaufTest`).
@@ -314,6 +314,21 @@ Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderu
   eigene Aktionen `QUELLE_*` bräuchten eine Änderung von `zugriff_protokoll_aktion_ck`, die parallel auch andere
   Aufgaben ändern, und folgen bei Bedarf. Neue Fehlercodes `QUELLE_LAEUFT` und `QUELLE_EXISTIERT` (409); keine neuen
   Konfigurationsschlüssel. Die Lauf-Art `GMAIL_LABEL` startet noch keinen Worker (Aufgabe 29.4, Gmail-Import).
+
+#### Umsetzung (Aufgabe 29.1, 28.11.2026)
+- Drive-Import startet vor dem Import einen Quelllauf und übergibt dessen ID mit jedem Upload. Der Trockenlauf
+  benötigt ebenfalls ein Import-Token: Er berechnet SHA-256 lokal, fragt vorhandene Prüfsummen in Batches zu höchstens
+  1'000 ab, lädt keine PDF-Dateien hoch und schliesst den Lauf mit den Zählern ab. Der Bericht enthält Lauf-ID und
+  serverseitig bestätigte Zähler.
+- `archiv_client.py` hat einen getrennten Aufruf `--import-quelle <quellcode> [--trocken] <pdf>` und die Funktion
+  `quelle_importieren`; der bestehende Generator-Aufruf samt Scope `generator` bleibt unverändert. Auch der
+  Quellen-Trockenlauf fragt die Prüfsumme ab und meldet seine Zähler an den Quelllauf.
+- Die Seite `/quellen` zeigt Register, Status, Konfiguration, Geheimnis-Status, Zähler und bis zu 100 Quellläufe.
+  A27 darf lesen; Pflege, Geheimnis setzen und Laufstart sind in der Oberfläche auf A28 beschränkt. Änderungen
+  verwenden die Quellversion als starkes `If-Match`; Geheimnisse werden nie angezeigt. Ein echter Lauf verlangt eine
+  Bestätigung. Hilfe-Katalog und Anleitung sind ergänzt.
+- Nachweise: `DriveImportTest`, `test_archiv_client.py`, `rechte.spec.ts`, `quellen.spec.ts` (A27/A28 und axe),
+  `quellen-pwa.feature` (A27/A28, vier Ansichten mit axe und ohne Überlauf) sowie der vollständige Frontend-Testlauf.
 
 ### 6. Gmail-Import (`integration/`, Quelllauf in `importe/`)
 - Konfiguration der Quelle: `{"host":"imap.gmail.com","port":993,"benutzer":"<gmail-konto>","label":"<gmail-label>","seit":"2026-01-01","ohneAnhang":false,"maxJeLauf":500}`; App-Passwort in `quelle.geheimnis` über `Verschluesselung` (wie `integration_mail.passwort_verschluesselt`).
@@ -431,6 +446,18 @@ create table dokument_seite_vermerk (dokument_id uuid, seite int, grund text, we
 `public.auftrag`: neue Typen `STAPEL_ANALYSE`, `STAPEL_TRENNEN`, `STAPEL_ABSCHLUSS`, `QUELLLAUF_GMAIL`,
 `DUBLETTEN_PRUEFUNG` (Nutzlast nur IDs). `public.api_client.scope` bleibt unverändert. Jede Migration bleibt
 rückwärtskompatibel (tech.md Regel 11); die neuen Spalten haben Standardwerte, alte Releases lesen sie nicht.
+
+### Umsetzung (Aufgabe 28.1, 28.11.2026)
+- Changeset `143-stapel-datenmodell` ergänzt `stapel`, `stapel_seite` und die Stapel-/Seitenbereich-Verweise am
+  Dokument. Die Mandantentrennung folgt dem bestehenden Schema-pro-Mandant-Modell.
+- Die Prüfsummen-Abfrage bezieht nicht verworfene Stapel-Originale ein. App-Benutzer sehen deren Prüfsummen nur mit
+  Recht A25; das Import-Token sieht alle. Der Rollback bricht ab, sobald Stapel, Seiten oder Dokumentverweise existieren.
+- Die Auftragsnamen `STAPEL_ANALYSE`, `STAPEL_TRENNEN` und `STAPEL_ABSCHLUSS` sind als typisierte Auftragskonstanten
+  zentral definiert.
+- Diese Aufgabe liefert nur das Datenmodell und den Auftragstyp-Vertrag. Rechte A25/A26 und ihre Einträge in der
+  Rechtematrix wurden in der Folgearbeit 27.2 (#749) umgesetzt; diese Aufgabe ändert keine Rechte.
+- Die Szenarien zu 5.1 und 5.2 sind Teilnachweise, weil sie das Schema direkt statt den späteren Erfassungs- und
+  Zuordnungsweg prüfen. 10.6 wird mit sichtbaren, verworfenen und nicht sichtbaren Stapel-Prüfsummen belegt.
 
 ## Konfiguration (neu, Klasse (b) nach Spec 06, ausser Leer-Schwelle)
 Die Schlüssel stehen hier ohne das Präfix «archiv» und ohne Code-Formatierung, bis sie im Code bestehen

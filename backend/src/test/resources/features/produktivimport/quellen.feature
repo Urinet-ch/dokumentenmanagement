@@ -41,7 +41,7 @@ Funktionalität: Quellenregister, Quellläufe und Prüfsummen-Abfrage
       | probe-ordner | ORDNER | ABGESCHLOSSEN | ja        |
     Und die Antwort des Quellenregisters enthält das Geheimnis nicht
 
-  @req-10.3 @req-10.4 @req-10.9
+  @req-10.3 @req-10.4 @req-10.7 @req-10.9
   Szenario: Ein echter Lauf zählt Uploads serverseitig, und jedes neue Dokument verweist auf ihn
     Angenommen ein Werkzeug von «urinet» hat ein Token vom Scope «import»
     Wenn das Werkzeug einen Lauf «ECHT» der Quelle «drive» startet
@@ -112,6 +112,24 @@ Funktionalität: Quellenregister, Quellläufe und Prüfsummen-Abfrage
     Wenn das Werkzeug die Prüfsummen der Dateien «G, H, P, Q» abfragt
     Dann meldet die Prüfsummen-Abfrage genau die Dateien «G, H, P, Q» als vorhanden
 
+  @req-10.6
+  Szenario: Stapel-Prüfsummen sind nur für Berechtigte sichtbar
+    Angenommen ein Werkzeug von «urinet» hat ein Token vom Scope «import»
+    Und das Stapel-Original der Datei «R» liegt im Status «EMPFANGEN»
+    Und das Stapel-Original der Datei «S» liegt im Status «VERWORFEN»
+    Wenn «mitarbeiter-urinet» die Prüfsummen der Dateien «R, S» abfragt
+    Dann meldet die Prüfsummen-Abfrage keine Datei als vorhanden
+    Wenn «inhaber-urinet» die Prüfsummen der Dateien «R, S» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «R» als vorhanden, ohne IDs
+    Wenn das Werkzeug die Prüfsummen der Dateien «R, S» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «R» als vorhanden, ohne IDs
+    Angenommen ein Werkzeug von «vhf-gsk» hat ein Token vom Scope «import»
+    Und das Stapel-Original der Datei «T» liegt im Status «EMPFANGEN»
+    Wenn «geschaeftsstelle-vhf-gsk» die Prüfsummen der Dateien «R, T» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «T» als vorhanden, ohne IDs
+    Wenn das Werkzeug die Prüfsummen der Dateien «R, T» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «T» als vorhanden, ohne IDs
+
   @req-10.1
   Szenario: Quellen und Läufe sind je Mandant getrennt
     Angenommen ein Werkzeug von «urinet» hat ein Token vom Scope «import»
@@ -127,7 +145,7 @@ Funktionalität: Quellenregister, Quellläufe und Prüfsummen-Abfrage
     Wenn das Werkzeug die Quelle «drive» auf Status «LAUFEND» setzt
     Dann antwortet das Quellenregister mit Status 403
 
-  @req-15.2
+  @req-10.8 @req-15.2
   Szenariogrundriss: A27 Quellenregister ansehen je Rolle
     Angenommen der Stand der Verweigerungen von «<mandant>» ist gemerkt
     Wenn «<benutzer>» das Quellenregister abfragt
@@ -141,7 +159,7 @@ Funktionalität: Quellenregister, Quellläufe und Prüfsummen-Abfrage
       | mitarbeiter-urinet       | urinet  | 403    | eine       |
       | geschaeftsstelle-vhf-gsk | vhf-gsk | 200    | keine      |
 
-  @req-15.2
+  @req-10.8 @req-15.2
   Szenariogrundriss: A28 Quellen pflegen je Rolle
     Angenommen der Stand der Verweigerungen von «<mandant>» ist gemerkt
     Wenn «<benutzer>» die Quelle «<quelle>» auf Status «OFFEN» setzt

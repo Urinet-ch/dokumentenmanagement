@@ -62,6 +62,17 @@ describe('Rechte (Req 2.2, 2.6)', () => {
     }
   });
 
+  it('erlaubt Quellen ansehen mit A27 und Quellen pflegen nur mit A28', () => {
+    for (const rolle of ['inhaber', 'treuhaender', 'geschaeftsstelle'] as const) {
+      expect(darf(rolle, 'A27')).toBe(true);
+    }
+    expect(darf('mitarbeiter', 'A27')).toBe(false);
+    expect(darf('inhaber', 'A28')).toBe(true);
+    for (const rolle of ['mitarbeiter', 'treuhaender', 'geschaeftsstelle'] as const) {
+      expect(darf(rolle, 'A28')).toBe(false);
+    }
+  });
+
   it('erlaubt Wissensentwürfe Inhaber und Geschäftsstelle, ohne A19 zu erweitern', () => {
     expect(darf('inhaber', 'A17')).toBe(true);
     expect(darf('geschaeftsstelle', 'A17')).toBe(true);

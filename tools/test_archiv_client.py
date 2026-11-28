@@ -28,6 +28,10 @@ class _Archiv(BaseHTTPRequestHandler):
     antworten: list[tuple[int, dict]] = []
     empfangen: list[dict] = []
     weitergeleitet: list[dict] = []
+    quellenanfragen: list[dict] = []
+    vorhandene_pruefsummen: set[str] = set()
+    lauf_zaehler = {"neu": 0, "dublettePruefsumme": 0, "fehler": 0}
+    lauf_id = "865335ab-8ea9-4c50-a1dd-ff7c2748e3ee"
 
     def do_GET(self):
         self.weitergeleitet.append({"pfad": self.path, "token": self.headers["Authorization"]})
@@ -38,20 +42,71 @@ class _Archiv(BaseHTTPRequestHandler):
     def do_POST(self):
         laenge = int(self.headers["Content-Length"])
         roh = self.rfile.read(laenge)
+        if self.path == "/api/v1/dokumente/pruefsummen":
+            anfrage = json.loads(roh.decode("utf-8"))
+            self.quellenanfragen.append({"pfad": self.path, "token": self.headers["Authorization"],
+                                         "inhalt": anfrage})
+            vorhanden = sorted(set(anfrage["sha256"]) & self.vorhandene_pruefsummen)
+            self._antwort(200, {"vorhanden": vorhanden})
+            return
+        if self.path.startswith("/api/v1/quellen/") and self.path.endswith("/laeufe"):
+            inhalt = json.loads(roh.decode("utf-8"))
+            self.quellenanfragen.append({"pfad": self.path, "token": self.headers["Authorization"],
+                                         "inhalt": inhalt})
+            self._antwort(201, {"id": self.lauf_id, "status": "LAEUFT"})
+            return
+        if self.path.endswith("/abschliessen"):
+            inhalt = json.loads(roh.decode("utf-8"))
+            self.quellenanfragen.append({"pfad": self.path, "token": self.headers["Authorization"],
+                                         "inhalt": inhalt})
+            zaehler = inhalt.get("zaehler") or {
+                "gefunden": self.lauf_zaehler["neu"] + self.lauf_zaehler["dublettePruefsumme"]
+                + self.lauf_zaehler["fehler"] + inhalt.get("uebersprungen", 0),
+                "neu": self.lauf_zaehler["neu"],
+                "dublettePruefsumme": self.lauf_zaehler["dublettePruefsumme"],
+                "dubletteFachlich": 0,
+                "uebersprungen": inhalt.get("uebersprungen", 0),
+                "fehler": self.lauf_zaehler["fehler"],
+            }
+            self._antwort(200, {"id": self.lauf_id, "status": "FERTIG", "zaehler": zaehler})
+            return
         nachricht = BytesParser(policy=HTTP).parsebytes(
             f"Content-Type: {self.headers['Content-Type']}\r\n\r\n".encode("ascii") + roh)
         teile = {teil.get_param("name", header="content-disposition"): teil for teil in nachricht.iter_parts()}
-        self.empfangen.append({
-            "pfad": self.path,
-            "token": self.headers["Authorization"],
-            "dateiname": teile["datei"].get_filename(),
-            "pdf": teile["datei"].get_payload(decode=True),
-            "metadaten": json.loads(teile["metadaten"].get_payload(decode=True).decode("utf-8")),
-        })
+        if self.path == "/api/v1/dokumente/generator":
+            auftrag = {
+                "pfad": self.path,
+                "token": self.headers["Authorization"],
+                "dateiname": teile["datei"].get_filename(),
+                "pdf": teile["datei"].get_payload(decode=True),
+                "metadaten": json.loads(teile["metadaten"].get_payload(decode=True).decode("utf-8")),
+            }
+        else:
+            auftrag = {
+                "pfad": self.path,
+                "token": self.headers["Authorization"],
+                "dateiname": teile["dateien"].get_filename(),
+                "pdf": teile["dateien"].get_payload(decode=True),
+                "quelllauf": teile["quelllauf"].get_payload(decode=True).decode("ascii"),
+            }
+        self.empfangen.append(auftrag)
         status, inhalt = self.antworten.pop(0)
+        ergebnisse = inhalt if isinstance(inhalt, list) else inhalt.get("ergebnisse", [])
+        if self.path == "/api/v1/dokumente" and ergebnisse:
+            for ergebnis in ergebnisse:
+                statusname = ergebnis.get("status")
+                if statusname == "NEU":
+                    self.lauf_zaehler["neu"] += 1
+                elif statusname == "DUBLETTE":
+                    self.lauf_zaehler["dublettePruefsumme"] += 1
+                elif statusname == "ABGELEHNT":
+                    self.lauf_zaehler["fehler"] += 1
+        self._antwort(status, inhalt)
+
+    def _antwort(self, status: int, inhalt: dict | list):
         daten = json.dumps(inhalt).encode("utf-8")
         self.send_response(status)
-        if "Location" in inhalt:
+        if isinstance(inhalt, dict) and "Location" in inhalt:
             self.send_header("Location", inhalt["Location"])
         self.send_header("Content-Type", "application/json" if status < 400 else "application/problem+json")
         self.send_header("Content-Length", str(len(daten)))
@@ -75,6 +130,9 @@ class ArchivClientTest(unittest.TestCase):
         _Archiv.antworten = []
         _Archiv.empfangen = []
         _Archiv.weitergeleitet = []
+        _Archiv.quellenanfragen = []
+        _Archiv.vorhandene_pruefsummen = set()
+        _Archiv.lauf_zaehler = {"neu": 0, "dublettePruefsumme": 0, "fehler": 0}
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _Archiv)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
@@ -159,6 +217,39 @@ class ArchivClientTest(unittest.TestCase):
         ergebnis = archiv_client.archivieren(self.pdf("r.pdf"), self.metadaten("2026-901"), url=self.url)
 
         self.assertEqual(("VORHANDEN", "d-1"), (ergebnis.zustand, ergebnis.id))
+
+    def test_quelllauf_trocken_fragt_pruefsumme_ab_und_speichert_zaehler(self):
+        pdf = self.pdf("probe.pdf")
+        _Archiv.vorhandene_pruefsummen = {archiv_client._sha256(pdf)}
+
+        ergebnis = archiv_client.quelle_importieren(pdf, "drive", trocken=True, url=self.url)
+
+        self.assertEqual(_Archiv.lauf_id, ergebnis.id)
+        self.assertEqual("FERTIG", ergebnis.status)
+        self.assertEqual(1, ergebnis.zaehler["gefunden"])
+        self.assertEqual(1, ergebnis.zaehler["dublettePruefsumme"])
+        self.assertEqual(0, ergebnis.zaehler["neu"])
+        self.assertEqual([], _Archiv.empfangen)
+        self.assertEqual([
+            "/api/v1/dokumente/pruefsummen",
+            "/api/v1/quellen/drive/laeufe",
+            f"/api/v1/quellen/laeufe/{_Archiv.lauf_id}/abschliessen",
+        ], [anfrage["pfad"] for anfrage in _Archiv.quellenanfragen])
+        self.assertEqual({"art": "TROCKEN"}, _Archiv.quellenanfragen[1]["inhalt"])
+        self.assertEqual(1, _Archiv.quellenanfragen[2]["inhalt"]["zaehler"]["dublettePruefsumme"])
+        self.assertTrue(all(anfrage["token"] == f"Bearer {TOKEN}" for anfrage in _Archiv.quellenanfragen))
+
+    def test_quelllauf_echt_ordnet_upload_zu_und_zeigt_serverzaehler(self):
+        _Archiv.antworten = [(202, [{"datei": "probe.pdf", "status": "NEU", "id": "d-1"}])]
+        pdf = self.pdf("probe.pdf")
+
+        ergebnis = archiv_client.quelle_importieren(pdf, "mac-ordner", url=self.url)
+
+        self.assertEqual(1, ergebnis.zaehler["neu"])
+        self.assertEqual(1, ergebnis.zaehler["gefunden"])
+        self.assertEqual("/api/v1/dokumente", _Archiv.empfangen[0]["pfad"])
+        self.assertEqual(_Archiv.lauf_id, _Archiv.empfangen[0]["quelllauf"])
+        self.assertEqual(pdf.read_bytes(), _Archiv.empfangen[0]["pdf"])
 
     def test_req_11_5_ohne_archiv_ausstehend_ablegen_und_beim_naechsten_aufruf_senden(self):
         erstes = self.pdf("rechnung-2026-901.pdf")

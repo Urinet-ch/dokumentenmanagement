@@ -50,6 +50,8 @@ public class ChatGespraecheAnlegen {
     @Transactional
     public Ergebnis anlegen(Benutzer benutzer, Chatmodus modus) {
         if (modus == Chatmodus.WISSEN) {
+            // ohne Freischaltung 403 vor dem Recht A15 (Spec 04, Req 22.6)
+            wissenschat.freischaltungPruefen();
             wissenschat.rechtPruefen(benutzer);
         }
         speicher.benutzerSperren(benutzer.id());
