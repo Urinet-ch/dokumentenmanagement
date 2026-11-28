@@ -101,6 +101,7 @@ ausgenommen. Einzelne Schlüssel in Klasse (a) gehen einem allgemeineren Präfix
 | `archiv.chat.*` (Raten je Benutzer, Gleichzeitigkeit, Aufräumzeit) | Konfiguration | Schutz der Instanz |
 | `archiv.mail.*` (Postfach, Intervall, Ordner, Grössen) | Konfiguration | ein Postfach und ein Abrufer je Instanz (Spec 02) |
 | `archiv.ueberwachung.*`, `archiv.oidc.waechter.*`, `archiv.kennzahlen.*`, `archiv.mandant.bericht.*` | Konfiguration | Betrieb und Alarmschwellen der Instanz |
+| `archiv.last.histogramme` | Konfiguration, nur Messprojekt (Spec 01, 31.6) | feste HTTP-Ziel-Buckets der Leistungsmessung, standardmässig aus; keine Mandanteneinstellung |
 | `archiv.adresse`, `archiv.integration.*` | Konfiguration | Instanzweite Adresse und Integrationsadapter; keine Mandanten-Einstellung |
 | `archiv.wissen.*` | Konfiguration | Instanzweite Modelle und technische Grenzen; die oben einzeln genannten Startwerte der Klasse (a) sind ausgenommen |
 | `archiv.benachrichtigung.empfaenger.<code>` | Umgebung `ARCHIV_ALARM_EMPFAENGER_<CODE>` | E-Mail-Adressen sind Personendaten und gehören nicht in unveränderliche Konfigurationsversionen; Umleiten der Alarme wäre ein Missbrauchsweg (Entscheid Fabian offen, Open Points) |

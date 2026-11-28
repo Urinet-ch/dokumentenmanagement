@@ -1,0 +1,75 @@
+{
+  "format": 1,
+  "einstellungen": {
+    "geschaeftsjahrEnde": "12-31",
+    "kennungen": {"uid": null, "ibans": []}
+  },
+  "kiTexte": {"rolle": "", "feldregeln": "", "kiFreigegeben": false},
+  "klassifikationen": [],
+  "arten": [
+    {
+      "code": "KORRESPONDENZ",
+      "name": "Synthetische Korrespondenz",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel"],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {"jahre": 10, "ab": "GESCHAEFTSJAHR"},
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "kiHinweise": "",
+      "reihenfolge": 1,
+      "zusatzSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "beschreibung": "Ausschliesslich synthetische Messbelege."
+    },
+    {
+      "code": "AUSGANGSRECHNUNG", "name": "Synthetische Ausgangsrechnung",
+      "gruppen": ["finanz"], "pflichtfelder": ["titel"], "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {"jahre": 10, "ab": "GESCHAEFTSJAHR"}, "gesetzlichePflicht": false,
+      "aktiv": true, "selbstAusgestellt": false, "belegnummerMuster": [], "kiVorschlag": true,
+      "kiFelder": [], "kiHinweise": "", "reihenfolge": 2,
+      "zusatzSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "beschreibung": "Ausschliesslich synthetische Messbelege."
+    },
+    {
+      "code": "LIEFERANTENBELEG", "name": "Synthetischer Lieferantenbeleg",
+      "gruppen": ["finanz"], "pflichtfelder": ["titel"], "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {"jahre": 10, "ab": "GESCHAEFTSJAHR"}, "gesetzlichePflicht": false,
+      "aktiv": true, "selbstAusgestellt": false, "belegnummerMuster": [], "kiVorschlag": true,
+      "kiFelder": [], "kiHinweise": "", "reihenfolge": 3,
+      "zusatzSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "beschreibung": "Ausschliesslich synthetische Messbelege."
+    },
+    {
+      "code": "OFFERTE", "name": "Synthetische Offerte",
+      "gruppen": ["finanz"], "pflichtfelder": ["titel"], "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {"jahre": 10, "ab": "GESCHAEFTSJAHR"}, "gesetzlichePflicht": false,
+      "aktiv": true, "selbstAusgestellt": false, "belegnummerMuster": [], "kiVorschlag": true,
+      "kiFelder": [], "kiHinweise": "", "reihenfolge": 4,
+      "zusatzSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "beschreibung": "Ausschliesslich synthetische Messbelege."
+    },
+    {
+      "code": "QUITTUNG", "name": "Synthetische Quittung",
+      "gruppen": ["finanz"], "pflichtfelder": ["titel"], "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {"jahre": 10, "ab": "GESCHAEFTSJAHR"}, "gesetzlichePflicht": false,
+      "aktiv": true, "selbstAusgestellt": false, "belegnummerMuster": [], "kiVorschlag": true,
+      "kiFelder": [], "kiHinweise": "", "reihenfolge": 5,
+      "zusatzSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "beschreibung": "Ausschliesslich synthetische Messbelege."
+    },
+    {
+      "code": "VERTRAG", "name": "Synthetischer Vertrag",
+      "gruppen": ["frei"], "pflichtfelder": ["titel"], "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {"jahre": 10, "ab": "GESCHAEFTSJAHR"}, "gesetzlichePflicht": false,
+      "aktiv": true, "selbstAusgestellt": false, "belegnummerMuster": [], "kiVorschlag": true,
+      "kiFelder": [], "kiHinweise": "", "reihenfolge": 6,
+      "zusatzSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "beschreibung": "Ausschliesslich synthetische Messbelege."
+    }
+  ],
+  "regeln": []
+}
