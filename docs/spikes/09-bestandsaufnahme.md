@@ -2,6 +2,7 @@
 
 Stand 28.11.2026, `main` bei Commit `ba3cf6cfa`. Die Vorlage der Spec entstand ohne Einblick ins Repo; diese
 Aufnahme prüft jeden vorausgesetzten Baustein gegen den Code und hält fest, was die Spec deshalb anders macht.
+Bestätigt mit dem Merge von #745 am 28.11.2026 (Aufgabe 27.1).
 Pfade: J = `backend/src/main/java/ch/urinet/archiv/`, M = `backend/src/main/resources/db/mandant/`,
 P = `backend/src/main/resources/db/public/`.
 

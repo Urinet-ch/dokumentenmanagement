@@ -521,6 +521,8 @@ class RestEingabeGrenzenTest {
             anfrage.header("If-Match", etag(token, "/api/v1/regeln"));
         } else if (pfad.startsWith("/api/v1/wissensbasis/einstellungen")) {
             anfrage.header("If-Match", etag(token, "/api/v1/wissensbasis/einstellungen"));
+        } else if (pfad.equals("/api/v1/quellen/{code}") && "patch".equalsIgnoreCase(methode)) {
+            anfrage.header("If-Match", "\"" + quelleVersion(token, TEST_QUELLE) + "\"");
         }
         return anfrage;
     }
@@ -600,6 +602,17 @@ class RestEingabeGrenzenTest {
         return given().baseUri(basis.toString());
     }
 
+    /** Seed-Quelle des Mandanten (Changeset 150-quelle): PATCH /quellen/{code} braucht ihre Version, 428 kommt vor 422. */
+    private static final String TEST_QUELLE = "drive";
+
+    private int quelleVersion(String token, String code) {
+        Response liste = http().auth().oauth2(token).when().get("/api/v1/quellen");
+        assertThat(liste.statusCode()).as("Quellenregister abrufen").isEqualTo(200);
+        Integer version = liste.path("find { it.code == '" + code + "' }.version");
+        assertThat(version).as("Version der Quelle " + code).isNotNull();
+        return version;
+    }
+
     private String etag(String token, String pfad) {
         Response stand = http().auth().oauth2(token).get(pfad);
         assertThat(stand.statusCode()).as("ETag für " + pfad + " abrufen").isEqualTo(200);
@@ -616,7 +629,8 @@ class RestEingabeGrenzenTest {
         StringBuffer ergebnis = new StringBuffer();
         while (matcher.find()) {
             String wert = switch (matcher.group(1)) {
-                case "code", "art" -> TEST_DOKUMENTART;
+                case "code" -> pfad.startsWith("/api/v1/quellen/") ? TEST_QUELLE : TEST_DOKUMENTART;
+                case "art" -> TEST_DOKUMENTART;
                 case "kontaktId" -> testKontaktId;
                 case "id" -> pfad.startsWith("/api/v1/dokumente/") ? testDokumentId.toString()
                         : "00000000-0000-4000-8000-000000000001";
