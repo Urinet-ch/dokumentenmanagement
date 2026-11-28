@@ -52,6 +52,10 @@ public class ProblemFehlerRoute {
     private static final String EINSTELLUNGEN_PATCH = "^/api/v1/mandant/einstellungen/?$";
     private static final String EINSTELLUNGEN_POST = "^/api/v1/mandant/einstellungen/(vorschau|zuruecksetzen)/?$";
     private static final String WISSEN_EINSTELLUNGEN_PUT = "^/api/v1/wissensbasis/einstellungen/?$";
+    // Trennblätter (Spec 09, Aufgabe 27.5): 100 Deckblätter mit je 60 als JSON-Escape geschriebenen Zeichen brauchen
+    // rund 39 KiB; mehr ist nie eine gültige Anfrage
+    static final int TRENNBLAETTER_MAX_BYTES = 64 * 1024;
+    private static final String TRENNBLAETTER_POST = "^/api/v1/trennblaetter/?$";
 
     private final Optional<MemorySize> grenze;
     private final MemorySize grenzeOhneUpload;
@@ -86,6 +90,9 @@ public class ProblemFehlerRoute {
                 .failureHandler(this::begrenzteAnfrageZuGross);
         router.putWithRegex(WISSEN_EINSTELLUNGEN_PUT).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
                 .handler(BodyHandler.create(false).setBodyLimit(EINSTELLUNGEN_MAX_BYTES))
+                .failureHandler(this::begrenzteAnfrageZuGross);
+        router.postWithRegex(TRENNBLAETTER_POST).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
+                .handler(BodyHandler.create(false).setBodyLimit(TRENNBLAETTER_MAX_BYTES))
                 .failureHandler(this::begrenzteAnfrageZuGross);
         router.route(API).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
                 .handler(this::chunkedBegrenzen)
@@ -168,7 +175,8 @@ public class ProblemFehlerRoute {
         String methode = kontext.request().method().name();
         String pfad = kontext.request().path();
         return (methode.equals("PUT") && (pfad.matches(BEWERTUNG_PFAD) || pfad.matches(WISSEN_EINSTELLUNGEN_PUT)))
-                || (methode.equals("POST") && (pfad.matches(GESPRAECHE_POST) || pfad.matches(EINSTELLUNGEN_POST)))
+                || (methode.equals("POST") && (pfad.matches(GESPRAECHE_POST) || pfad.matches(EINSTELLUNGEN_POST)
+                        || pfad.matches(TRENNBLAETTER_POST)))
                 || (methode.equals("PATCH") && pfad.matches(EINSTELLUNGEN_PATCH));
     }
 

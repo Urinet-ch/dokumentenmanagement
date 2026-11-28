@@ -1,4 +1,5 @@
 import { TrennblattAnfrage, TrennblattWunsch } from '../gemeinsam/api';
+import { SCHRIFT_ABDECKUNG } from './schrift-abdeckung';
 
 /** Höchstens so viele Blätter je PDF (Spec 09, design.md «Trennblatt-Generator»). */
 export const MAX_BLAETTER = 100;
@@ -8,7 +9,7 @@ export const TITEL_MAX = 60;
 // Zeichen nach Spec 01, Req 3.10 wie im Backend: Cc, Cs, Zl, Zp und Cf ausser den Verbindern U+200C/U+200D
 const VERBOTEN = /[\p{Cc}\p{Cs}\p{Zl}\p{Zp}]|(?![\u200C\u200D])\p{Cf}/u;
 
-export type TitelFehler = 'leer' | 'lang' | 'zeichen';
+export type TitelFehler = 'leer' | 'lang' | 'zeichen' | 'schrift';
 
 export interface Deckblatt {
   readonly titel: string;
@@ -20,7 +21,14 @@ export function titelFehler(titel: string): TitelFehler | null {
   if (VERBOTEN.test(titel)) return 'zeichen';
   const sauber = titel.normalize('NFC').trim();
   if (sauber === '') return 'leer';
-  return [...sauber].length > TITEL_MAX ? 'lang' : null;
+  const zeichen = [...sauber];
+  if (zeichen.length > TITEL_MAX) return 'lang';
+  return zeichen.every((z) => darstellbar(z.codePointAt(0)!)) ? null : 'schrift';
+}
+
+/** Ob die Schrift der Trennblätter das Zeichen enthält (wie `darstellbar` im Backend). */
+export function darstellbar(zeichen: number): boolean {
+  return SCHRIFT_ABDECKUNG.some(([von, bis]) => zeichen >= von && zeichen <= bis);
 }
 
 /** Zeichen nach NFC und ohne Leerraum aussen, wie das Backend zählt. */

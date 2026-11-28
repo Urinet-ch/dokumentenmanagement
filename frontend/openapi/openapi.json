@@ -9743,6 +9743,9 @@
           "403" : {
             "description" : "NICHT_ERLAUBT: ohne Recht A1"
           },
+          "413" : {
+            "description" : "DATEI_ZU_GROSS: Anfrage über 64 KiB"
+          },
           "401" : {
             "description" : "Not Authorized"
           }

@@ -12,5 +12,6 @@ Ein Trennblatt lässt sich wiederverwenden. Legen Sie es nach dem Scannen zurüc
 ## Häufige Meldungen
 - «Der Titel ist länger als 60 Zeichen. Bitte kürzen Sie ihn.»: Kürzen Sie den Titel des Deckblatts.
 - «Der Titel enthält Steuer- oder Formatzeichen. Bitte entfernen Sie sie.»: Der Titel enthält unsichtbare Zeichen, zum Beispiel aus einer kopierten Textstelle. Tippen Sie den Titel neu ein.
+- «Der Titel enthält Zeichen, die das Trennblatt nicht drucken kann, zum Beispiel Emoji oder chinesische Schriftzeichen. Bitte ersetzen Sie sie.»: Die Schrift der Trennblätter kennt lateinische, griechische, kyrillische und hebräische Buchstaben, aber keine Emoji und keine chinesischen, japanischen oder koreanischen Schriftzeichen. Ersetzen Sie diese Zeichen.
 - «Das sind mehr als 100 Blätter. Bitte erstellen Sie mehrere PDF.»: Verteilen Sie die Blätter auf mehrere PDF.
 - «Die Dokumentarten konnten nicht geladen werden.»: Wählen Sie «Erneut versuchen». Trennblätter ohne Art und Ordner-Deckblätter können Sie trotzdem erstellen.

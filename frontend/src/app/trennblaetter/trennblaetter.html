@@ -111,7 +111,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (blatt of deckblaetter(); track $index) {
+              @for (blatt of deckblaetter(); track blatt.id) {
                 <tr data-test="deckblatt">
                   <td><bdi class="name">{{ blatt.titel }}</bdi></td>
                   <td class="zahl">
@@ -123,8 +123,8 @@
                       step="1"
                       [value]="blatt.anzahl"
                       [attr.aria-label]="texte.anzahlFuer(blatt.titel)"
-                      [attr.aria-invalid]="ungueltig().has('deckblatt-' + $index)"
-                      (input)="anzahlSetzen('deckblatt-' + $index, $any($event.target).value)"
+                      [attr.aria-invalid]="ungueltig().has('deckblatt-' + blatt.id)"
+                      (input)="anzahlSetzen('deckblatt-' + blatt.id, $any($event.target).value)"
                     />
                   </td>
                   <td class="rechts">
@@ -133,7 +133,7 @@
                       type="button"
                       class="gefahr"
                       [attr.aria-label]="texte.entfernenFuer(blatt.titel)"
-                      (click)="deckblattEntfernen($index)"
+                      (click)="deckblattEntfernen(blatt.id)"
                     >
                       {{ texte.entfernen }}
                     </button>

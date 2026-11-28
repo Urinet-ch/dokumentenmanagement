@@ -25,6 +25,11 @@ import {
   titelLaenge,
 } from './trennblaetter-logik';
 
+/** Ein Deckblatt der Liste mit fester ID: Fehler der Anzahl gehören zu dieser ID, nicht zur Stelle in der Liste. */
+interface DeckblattZeile extends Deckblatt {
+  readonly id: number;
+}
+
 interface ArtZeile {
   readonly code: string;
   readonly name: string;
@@ -57,21 +62,24 @@ export class Trennblaetter implements OnInit {
   protected readonly artenFehler = signal(false);
   protected readonly ohneArt = signal(0);
   protected readonly jeArt = signal<Readonly<Record<string, number>>>({});
-  protected readonly deckblaetter = signal<readonly Deckblatt[]>([]);
+  protected readonly deckblaetter = signal<readonly DeckblattZeile[]>([]);
+  private naechsteId = 0;
   protected readonly titel = signal('');
   protected readonly titelGeprueft = signal(false);
-  /** Felder mit ungültiger Anzahl, nach Schlüssel («ohne», Code der Art oder «deckblatt-<n>»). */
+  /** Felder mit ungültiger Anzahl, nach Schlüssel («ohne», Code der Art oder «deckblatt-<ID>»). */
   protected readonly ungueltig = signal<ReadonlySet<string>>(new Set());
   protected readonly laeuft = signal(false);
   protected readonly meldung = signal<string | null>(null);
   protected readonly fehler = signal<string | null>(null);
 
   protected readonly titelZeichen = computed(() => titelLaenge(this.titel()));
+  /** Zu lang, Steuerzeichen oder Zeichen ausserhalb der Schrift schon bei der Eingabe; «leer» erst beim Hinzufügen. */
   protected readonly titelMeldung = computed(() => {
-    if (!this.titelGeprueft()) return null;
     switch (titelFehler(this.titel())) {
       case 'leer':
-        return this.texte.titelLeer;
+        return this.titelGeprueft() ? this.texte.titelLeer : null;
+      case 'schrift':
+        return this.texte.titelSchrift;
       case 'lang':
         return this.texte.titelLang;
       case 'zeichen':
@@ -131,9 +139,9 @@ export class Trennblaetter implements OnInit {
     if (schluessel === 'ohne') {
       this.ohneArt.set(zahl);
     } else if (schluessel.startsWith('deckblatt-')) {
-      const index = Number(schluessel.slice('deckblatt-'.length));
+      const id = Number(schluessel.slice('deckblatt-'.length));
       this.deckblaetter.update((liste) =>
-        liste.map((blatt, i) => (i === index ? { ...blatt, anzahl: zahl } : blatt)),
+        liste.map((blatt) => (blatt.id === id ? { ...blatt, anzahl: zahl } : blatt)),
       );
     } else {
       this.jeArt.update((alt) => ({ ...alt, [schluessel]: zahl }));
@@ -150,16 +158,16 @@ export class Trennblaetter implements OnInit {
     this.titelGeprueft.set(true);
     if (titelFehler(this.titel()) !== null) return;
     const titel = this.titel().normalize('NFC').trim();
-    this.deckblaetter.update((liste) => [...liste, { titel, anzahl: 1 }]);
+    this.deckblaetter.update((liste) => [...liste, { id: this.naechsteId++, titel, anzahl: 1 }]);
     this.titel.set('');
     this.titelGeprueft.set(false);
     this.meldung.set(null);
   }
 
-  protected deckblattEntfernen(index: number): void {
-    this.deckblaetter.update((liste) => liste.filter((_, i) => i !== index));
-    // Schlüssel der Deckblätter folgen dem Index; nach dem Entfernen gelten nur noch gültige Werte
-    this.ungueltig.update((alt) => new Set([...alt].filter((s) => !s.startsWith('deckblatt-'))));
+  protected deckblattEntfernen(id: number): void {
+    this.deckblaetter.update((liste) => liste.filter((blatt) => blatt.id !== id));
+    // nur der Fehler dieses Deckblatts entfällt, die der übrigen bleiben
+    this.ungueltig.update((alt) => new Set([...alt].filter((s) => s !== `deckblatt-${id}`)));
   }
 
   protected erstellen(): void {
@@ -174,7 +182,7 @@ export class Trennblaetter implements OnInit {
         anfrage(
           this.ohneArt(),
           arten.map((art) => ({ code: art.code, anzahl: jeArt[art.code] ?? 0 })),
-          this.deckblaetter(),
+          this.deckblaetter().map(({ titel, anzahl }) => ({ titel, anzahl })),
         ),
         'response',
         false,

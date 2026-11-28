@@ -66,7 +66,11 @@ class TrennblattCodeTest {
     @ValueSource(strings = {"SPC\n0200\n1\nCH4431999123000889012", "URINET-TRENN;v=2", "URINET-TRENN;v=1;art=quittung",
             "URINET-TRENN;v=1;art=", "URINET-TRENN;v=1;foo=bar", "URINET-TRENN;v=1;art=QUITTUNG;x=1", "URINET-TRENN",
             "URINET-ORDNER;v=1", "URINET-ORDNER;v=1;titel=", "URINET-ORDNER;v=1;titel=%ZZ",
-            "URINET-ORDNER;v=1;titel=A%07", "URINET-ORDNER;v=1;titel=%20A", "urinet-trenn;v=1", "URINET-TRENN;V=1"})
+            "URINET-ORDNER;v=1;titel=A%07", "URINET-ORDNER;v=1;titel=%20A", "urinet-trenn;v=1", "URINET-TRENN;V=1",
+            "URINET-ORDNER;v=1;titel=%FF", "URINET-ORDNER;v=1;titel=A%C3", "URINET-ORDNER;v=1;titel=%ED%A0%80",
+            "URINET-ORDNER;v=1;titel=A=B", "URINET-ORDNER;v=1;titel=A+B", "URINET-ORDNER;v=1;titel=A B",
+            "URINET-ORDNER;v=1;titel=B%c3%bcro", "URINET-ORDNER;v=1;titel=%41", "URINET-ORDNER;v=1;titel=A%2",
+            "URINET-ORDNER;v=1;titel=Bu%CC%88ro", "URINET-ORDNER;v=1;titel=A;titel=B"})
     void fremdeOderFalscheInhalteSindKeinCode(String inhalt) {
         assertThat(TrennblattCode.lesen(inhalt)).isEmpty();
     }

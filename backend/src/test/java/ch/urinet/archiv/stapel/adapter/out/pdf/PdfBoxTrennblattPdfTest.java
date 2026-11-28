@@ -6,6 +6,11 @@ import ch.urinet.archiv.stapel.domain.TrennblattSatz;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.BitSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,7 +53,7 @@ class PdfBoxTrennblattPdfTest {
 
     @Test
     void auchDerLaengsteTitelBleibtBei150DpiLesbar() throws IOException {
-        for (String titel : List.of("€".repeat(60), "😀".repeat(60),
+        for (String titel : List.of("€".repeat(60), "ẞ".repeat(60), "ж".repeat(20), "ш".repeat(20), "Ω".repeat(40),
                 "Versicherungen und Verträge der Liegenschaft Musterweg 1")) {
             TrennblattCode code = TrennblattCode.ordner(titel.substring(0, titel.offsetByCodePoints(0,
                     Math.min(60, titel.codePointCount(0, titel.length())))));
@@ -65,14 +70,43 @@ class PdfBoxTrennblattPdfTest {
     }
 
     @Test
-    void zeichenOhneGlypheErscheinenAlsFragezeichenImQrCodeUnveraendert() throws IOException {
-        TrennblattCode code = TrennblattCode.ordner("Ordner 😀");
-        byte[] datei = pdf.erzeugen(List.of(new TrennblattSatz(code, code.titel(), 1)));
+    void darstellbarIstNurWasDieSchriftAbdeckt() {
+        assertThat(pdf.darstellbar("Bürokosten «Ä» – 2026 € ẞ Ελληνικά Кириллица")).isTrue();
+        assertThat(pdf.darstellbar("档案 2026")).isFalse();
+        assertThat(pdf.darstellbar("Ordner 😀")).isFalse();
+        assertThat(pdf.darstellbar("Team 👩\u200D💻")).isFalse();
+    }
+
+    @Test
+    void derNameEinerArtOhneGlypheErscheintAlsFragezeichenMitCode() throws IOException {
+        byte[] datei = pdf.erzeugen(List.of(new TrennblattSatz(TrennblattCode.trenn("PROBE_ART"), "Probe 😀", 1)));
 
         TrennblattPdfLeser.Seite seite = TrennblattPdfLeser.seiten(datei).get(0);
 
-        assertThat(seite.text()).contains("Ordner ?");
-        assertThat(TrennblattCode.lesen(seite.qr()).orElseThrow().titel()).isEqualTo("Ordner 😀");
+        assertThat(seite.text()).contains("Probe ?", "Art PROBE_ART");
+        assertThat(seite.qr()).isEqualTo("URINET-TRENN;v=1;art=PROBE_ART");
+    }
+
+    /**
+     * Die Oberfläche prüft den Titel schon bei der Eingabe mit den Bereichen aus {@code schrift-abdeckung.ts}; sie
+     * müssen genau der Unicode-Tabelle der eingebetteten Schrift entsprechen.
+     */
+    @Test
+    void dieBereicheDerOberflaecheEntsprechenDerSchrift() throws IOException {
+        Matcher bereich = Pattern.compile("\\[0x([0-9A-F]+), 0x([0-9A-F]+)]")
+                .matcher(Files.readString(Path.of("../frontend/src/app/trennblaetter/schrift-abdeckung.ts")));
+        BitSet oberflaeche = new BitSet();
+        while (bereich.find()) {
+            oberflaeche.set(Integer.parseInt(bereich.group(1), 16), Integer.parseInt(bereich.group(2), 16) + 1);
+        }
+        BitSet schrift = new BitSet();
+        for (int c = 0; c <= Character.MAX_CODE_POINT; c++) {
+            if (pdf.darstellbar(Character.toString(c))) {
+                schrift.set(c);
+            }
+        }
+        assertThat(oberflaeche.cardinality()).isPositive();
+        assertThat(oberflaeche).isEqualTo(schrift);
     }
 
     @Test

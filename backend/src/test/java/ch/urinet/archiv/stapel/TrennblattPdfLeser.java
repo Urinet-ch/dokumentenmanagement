@@ -1,16 +1,16 @@
 package ch.urinet.archiv.stapel;
 
+import com.google.zxing.Binarizer;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.DecodeHintType;
 import com.google.zxing.NotFoundException;
-import com.google.zxing.ChecksumException;
-import com.google.zxing.FormatException;
 import com.google.zxing.Result;
 import com.google.zxing.ResultMetadataType;
 import com.google.zxing.ResultPoint;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
+import com.google.zxing.common.GlobalHistogramBinarizer;
 import com.google.zxing.common.HybridBinarizer;
-import com.google.zxing.qrcode.QRCodeReader;
+import com.google.zxing.multi.qrcode.QRCodeMultiReader;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -108,13 +108,26 @@ public final class TrennblattPdfLeser {
         }
     }
 
+    /**
+     * Wie {@code ZxingQrLeser}: mehrere Kandidaten je Seite ({@link QRCodeMultiReader}) mit zwei Binarisierern. Ein
+     * einzelner {@code QRCodeReader} verfehlt bei 150 dpi einzelne, sonst einwandfreie Codes (z. B. 20 × «ж»); die
+     * Seitenanalyse (28.7) braucht darum ebenfalls diesen Weg.
+     */
     private static Result qr(BufferedImage bild) {
-        try {
-            return new QRCodeReader().decode(new BinaryBitmap(new HybridBinarizer(new BufferedImageLuminanceSource(bild))),
-                    Map.of(DecodeHintType.TRY_HARDER, Boolean.TRUE));
-        } catch (NotFoundException | ChecksumException | FormatException e) {
-            return null;
+        BufferedImageLuminanceSource quelle = new BufferedImageLuminanceSource(bild);
+        for (Binarizer binarisierer : List.of(new HybridBinarizer(quelle), new GlobalHistogramBinarizer(quelle))) {
+            try {
+                for (Result r : new QRCodeMultiReader().decodeMultiple(new BinaryBitmap(binarisierer),
+                        Map.of(DecodeHintType.TRY_HARDER, Boolean.TRUE))) {
+                    if (r.getText().startsWith("URINET-")) {
+                        return r;
+                    }
+                }
+            } catch (NotFoundException e) {
+                // nächster Binarisierer
+            }
         }
+        return null;
     }
 
     /**

@@ -71,6 +71,8 @@ Funktionalität: Trennblatt-Generator
       | Zeilentrenner      | AU+2028B            |
       | Nullbreitenzeichen | AU+200BB            |
       | leer               | U+0020U+0020        |
+      | Schrift ohne CJK   | 档案 2026            |
+      | Schrift ohne Emoji | Ordner 😀           |
 
   @req-6.5
   Szenario: Ein Titel über 60 Zeichen ergibt 400 TRENNBLATT_UNGUELTIG
@@ -126,3 +128,24 @@ Funktionalität: Trennblatt-Generator
       | unbekannter Typ     | LEER   |          |        | 1      | 400 ANFRAGE_UNGUELTIG |
       | Titel am Trennblatt | TRENN  |          | Ordner | 1      | 400 ANFRAGE_UNGUELTIG |
       | Art am Deckblatt    | ORDNER | QUITTUNG | Ordner | 1      | 400 ANFRAGE_UNGUELTIG |
+
+  @req-6.1
+  Szenariogrundriss: Nur streng gültiges JSON: <fall>
+    Wenn «inhaber-urinet» den Trennblatt-Generator mit dem Körper «<koerper>» aufruft
+    Dann antwortet der Trennblatt-Generator mit «400 ANFRAGE_UNGUELTIG»
+
+    Beispiele:
+      | fall                       | koerper                                                     |
+      | doppelter Schlüssel        | {"blaetter":[{"typ":"TRENN","anzahl":1,"anzahl":2}]}        |
+      | doppelte Liste             | {"blaetter":[{"typ":"TRENN","anzahl":1}],"blaetter":[]}     |
+      | weiterer Wert nach dem JSON | {"blaetter":[{"typ":"TRENN","anzahl":1}]} {"blaetter":[]} |
+
+  @req-6.1
+  Szenario: Ein Körper über 64 KiB ergibt 413 DATEI_ZU_GROSS, bevor die Ressource ihn liest
+    Wenn «inhaber-urinet» den Trennblatt-Generator mit einem Körper von 65537 Bytes aufruft
+    Dann antwortet der Trennblatt-Generator mit «413 DATEI_ZU_GROSS»
+
+  @req-6.1
+  Szenario: 100 Deckblätter mit je 60 Zeichen als JSON-Escape bleiben unter der Grenze
+    Wenn «inhaber-urinet» 100 Ordner-Deckblätter mit je 60 Zeichen «Ä» als JSON-Escape anfordert
+    Dann antwortet der Trennblatt-Generator mit «200 PDF»

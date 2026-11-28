@@ -42,7 +42,8 @@ public class TrennblattService {
     /**
      * PDF für alle Wünsche in ihrer Reihenfolge. 400 {@code ANFRAGE_UNGUELTIG}: keine Wünsche, Anzahl unter 1, mehr als
      * {@value #MAX_BLAETTER} Blätter zusammen, Feld des anderen Typs gesetzt oder Art keine aktive Dokumentart des
-     * Mandanten. 400 {@code TRENNBLATT_UNGUELTIG}: Titel eines Deckblatts ungültig (Req 6.5).
+     * Mandanten. 400 {@code TRENNBLATT_UNGUELTIG}: Titel eines Deckblatts ungültig (Req 6.5) oder mit Zeichen, die
+     * die eingebettete Schrift nicht darstellen kann (sonst trüge das Blatt den Titel nicht, Req 6.2).
      */
     public byte[] erzeugen(List<Wunsch> wuensche) {
         if (wuensche == null || wuensche.isEmpty()) {
@@ -68,6 +69,10 @@ public class TrennblattService {
                         throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
                     }
                     TrennblattCode code = TrennblattCode.ordner(w.titel());
+                    // das Blatt muss den Titel tragen (Req 6.2): Zeichen ausserhalb der Schrift lehnt 6.5 mit ab
+                    if (!pdf.darstellbar(code.titel())) {
+                        throw new FachFehler(Fehlercode.TRENNBLATT_UNGUELTIG);
+                    }
                     yield new TrennblattSatz(code, code.titel(), w.anzahl());
                 }
             });

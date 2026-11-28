@@ -10,6 +10,9 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.apache.fontbox.ttf.CmapLookup;
+import org.apache.fontbox.ttf.TTFParser;
+import org.apache.pdfbox.io.RandomAccessReadBuffer;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDFormContentStream;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -36,8 +39,10 @@ import java.util.Map;
  * Satzes zeichnen dieselbe Form (XObject), das PDF bleibt so auch bei 100 Blättern klein.
  * <p>
  * Schrift: Liberation Sans aus dem PDFBox-Artefakt (SIL Open Font License), als Teilmenge eingebettet
- * ({@link PDType0Font}), damit Umlaute und Guillemets ohne Schriften des Systems sicher sind. Zeichen ohne Glyphe
- * (z. B. Emoji) erscheinen in der Aufschrift als «?»; der QR-Code enthält den Titel unverändert.
+ * ({@link PDType0Font}), damit Umlaute und Guillemets ohne Schriften des Systems sicher sind. Einen Titel mit Zeichen
+ * ohne Glyphe (z. B. CJK, Emoji) lehnt {@code TrennblattService} vorher über {@link #darstellbar(String)} ab. Nur der
+ * Name einer Art, den der Inhaber pflegt, kann solche Zeichen noch enthalten; sie erscheinen als «?», darunter steht
+ * der Code der Art in ASCII.
  */
 @ApplicationScoped
 public class PdfBoxTrennblattPdf implements TrennblattPdfPort {
@@ -78,6 +83,27 @@ public class PdfBoxTrennblattPdf implements TrennblattPdfPort {
             return aus.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public boolean darstellbar(String text) {
+        return text.codePoints().allMatch(c -> Abdeckung.CMAP.getGlyphId(c) > 0);
+    }
+
+    /** Unicode-Tabelle der Schrift, einmal gelesen (nur lesend genutzt). */
+    private static final class Abdeckung {
+        static final CmapLookup CMAP = laden();
+
+        private static CmapLookup laden() {
+            try (InputStream ein = PDDocument.class.getResourceAsStream(SCHRIFT)) {
+                if (ein == null) {
+                    throw new IllegalStateException("Schrift für Trennblätter fehlt im PDFBox-Artefakt");
+                }
+                return new TTFParser().parse(new RandomAccessReadBuffer(ein)).getUnicodeCmapLookup();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 

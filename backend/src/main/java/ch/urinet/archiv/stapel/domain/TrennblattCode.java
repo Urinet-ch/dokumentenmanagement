@@ -3,8 +3,10 @@ package ch.urinet.archiv.stapel.domain;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 
-import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Objects;
@@ -33,6 +35,8 @@ public record TrennblattCode(Typ typ, String art, String titel) {
     static final String VERSION = "v=1";
     // Syntax der Codes von Dokumentarten (Spec 01, Req 9.1); ob die Art aktiv ist, prüft die Anwendung
     private static final Pattern ART = Pattern.compile("^[A-Z][A-Z0-9_]{1,39}$");
+    // Ausgabe von URLEncoder: unreservierte Zeichen und %XX mit grossen Hex-Ziffern ("+" kommt nie vor)
+    private static final Pattern KODIERT = Pattern.compile("^(?:[A-Za-z0-9*._-]|%[0-9A-F]{2})+$");
 
     public TrennblattCode {
         Objects.requireNonNull(typ, "typ");
@@ -73,8 +77,10 @@ public record TrennblattCode(Typ typ, String art, String titel) {
     }
 
     /**
-     * Liest einen QR-Inhalt in genau dem Aufbau von {@link #inhalt()}; alles andere (fremde Codes wie Swiss QR,
-     * andere Version, unbekannte Felder, ungültiger Titel) ist leer.
+     * Liest einen QR-Inhalt in genau dem Aufbau von {@link #inhalt()}; alles andere ist leer: fremde Codes wie Swiss QR,
+     * andere Version, unbekannte oder doppelte Felder, ungültiger Titel, ungültiges UTF-8 (z. B. {@code %FF}) und jede
+     * nicht kanonische Kodierung (unkodierte Trennzeichen wie {@code =} oder {@code +}, Hex in Kleinbuchstaben). Der
+     * Inhalt muss Zeichen für Zeichen dem entsprechen, was {@link #inhalt()} für den gelesenen Code erzeugt.
      */
     public static Optional<TrennblattCode> lesen(String inhalt) {
         if (inhalt == null) {
@@ -84,22 +90,38 @@ public record TrennblattCode(Typ typ, String art, String titel) {
         if (teile.length < 2 || !VERSION.equals(teile[1])) {
             return Optional.empty();
         }
+        TrennblattCode code = null;
         try {
             if (TRENN.equals(teile[0]) && teile.length == 2) {
-                return Optional.of(trenn(null));
+                code = trenn(null);
+            } else if (TRENN.equals(teile[0]) && teile.length == 3 && teile[2].startsWith("art=")) {
+                code = trenn(teile[2].substring(4));
+            } else if (ORDNER.equals(teile[0]) && teile.length == 3 && teile[2].startsWith("titel=")) {
+                code = ordner(dekodieren(teile[2].substring(6)));
             }
-            if (TRENN.equals(teile[0]) && teile.length == 3 && teile[2].startsWith("art=")) {
-                return Optional.of(trenn(teile[2].substring(4)));
-            }
-            if (ORDNER.equals(teile[0]) && teile.length == 3 && teile[2].startsWith("titel=")) {
-                String titel = URLDecoder.decode(teile[2].substring(6), StandardCharsets.UTF_8);
-                return titel.equals(Normalizer.normalize(titel, Normalizer.Form.NFC).strip())
-                        ? Optional.of(ordner(titel)) : Optional.empty();
-            }
-        } catch (IllegalArgumentException | FachFehler e) {
-            // ungültige Art, falsche %-Folge oder ungültiger Titel: kein Trennblatt-Code
+        } catch (IllegalArgumentException | FachFehler | CharacterCodingException e) {
+            // ungültige Art, falsche %-Folge, ungültiges UTF-8 oder ungültiger Titel: kein Trennblatt-Code
         }
-        return Optional.empty();
+        return code != null && code.inhalt().equals(inhalt) ? Optional.of(code) : Optional.empty();
+    }
+
+    /** %-Kodierung streng: nur die Zeichen von {@link URLEncoder} und {@code %XX}, Bytes als gültiges UTF-8. */
+    private static String dekodieren(String kodiert) throws CharacterCodingException {
+        if (!KODIERT.matcher(kodiert).matches()) {
+            throw new IllegalArgumentException("Kodierung");
+        }
+        ByteBuffer bytes = ByteBuffer.allocate(kodiert.length());
+        for (int i = 0; i < kodiert.length(); i++) {
+            char c = kodiert.charAt(i);
+            if (c == '%') {
+                bytes.put((byte) Integer.parseInt(kodiert, i + 1, i + 3, 16));
+                i += 2;
+            } else {
+                bytes.put((byte) c);
+            }
+        }
+        return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(bytes.flip()).toString();
     }
 
     private static boolean titelGueltig(String titel) {

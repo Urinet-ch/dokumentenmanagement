@@ -1,5 +1,6 @@
 package ch.urinet.archiv.stapel.adapter.in.rest;
 
+import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
@@ -9,7 +10,6 @@ import ch.urinet.archiv.stapel.application.TrennblattService;
 import ch.urinet.archiv.stapel.domain.TrennblattCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
@@ -34,14 +34,15 @@ import java.util.Set;
 /**
  * Trennblatt-Generator (Spec 09, Req 6.1–6.3, 6.5; design.md «Trennblatt-Generator»). Trennblätter erzeugen gehört
  * zum Recht A1 (Spec 09, Req 15.1). Das PDF wird nicht im Archiv abgelegt und berührt kein Dokument; darum gibt es
- * keinen Eintrag {@code ERFASSEN} (Spec 01, design.md «Protokoll und Manifest»).
+ * keinen Eintrag {@code ERFASSEN} (Spec 01, design.md «Protokoll und Manifest»). Der Körper ist vor der Ressource auf
+ * {@code ProblemFehlerRoute.TRENNBLAETTER_MAX_BYTES} begrenzt (413 {@code DATEI_ZU_GROSS}), damit die Grenze von 100
+ * Blättern nicht erst nach dem Aufbau eines grossen JSON-Baums greift.
  */
 @Path("/trennblaetter")
 @Tag(name = "Trennblaetter")
 public class TrennblattResource {
 
     static final String PDF = "application/pdf";
-    private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> FELDER = Set.of("typ", "art", "titel", "anzahl");
 
     private final TrennblattService service;
@@ -83,6 +84,7 @@ public class TrennblattResource {
             + "oder enthält Steuer- oder Formatzeichen (Req 6.5); ANFRAGE_UNGUELTIG: Format, Anzahl, mehr als 100 "
             + "Blätter oder Art keine aktive Dokumentart")
     @APIResponse(responseCode = "403", description = "NICHT_ERLAUBT: ohne Recht A1")
+    @APIResponse(responseCode = "413", description = "DATEI_ZU_GROSS: Anfrage über 64 KiB")
     public Response erzeugen(String body) {
         aufloesung.pruefen();
         byte[] pdf = service.erzeugen(wuensche(body));
@@ -94,7 +96,8 @@ public class TrennblattResource {
     static List<TrennblattService.Wunsch> wuensche(String body) {
         JsonNode blaetter;
         try {
-            JsonNode wurzel = body == null || body.isBlank() ? null : JSON.readTree(body);
+            // streng: doppelte Schlüssel und Zeichen nach dem JSON-Wert sind ungültig
+            JsonNode wurzel = body == null || body.isBlank() ? null : StrengesJson.lesen(body);
             blaetter = wurzel == null || !wurzel.isObject() || wurzel.size() != 1 ? null : wurzel.get("blaetter");
         } catch (JsonProcessingException e) {
             throw ungueltig();

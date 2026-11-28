@@ -109,6 +109,44 @@ describe('Trennblätter: Seite (Spec 09, Aufgabe 27.5)', () => {
     expect(titel.getAttribute('aria-invalid')).toBe('true');
   });
 
+  it('meldet Zeichen ausserhalb der Schrift schon bei der Eingabe', async () => {
+    await starten();
+    const titel = element.querySelector('[data-test="deckblatt-titel"]') as HTMLInputElement;
+    eingeben(titel, '档案 2026');
+    expect(element.textContent).toContain(texte.titelSchrift);
+    expect(titel.getAttribute('aria-invalid')).toBe('true');
+    (element.querySelector('[data-test="deckblatt-hinzufuegen"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(element.querySelectorAll('[data-test="deckblatt"]')).toHaveLength(0);
+    eingeben(titel, 'Archiv 2026');
+    expect(element.textContent).not.toContain(texte.titelSchrift);
+  });
+
+  it('behält den Fehler eines Deckblatts, wenn ein anderes entfernt wird', async () => {
+    await starten();
+    const titel = element.querySelector('[data-test="deckblatt-titel"]') as HTMLInputElement;
+    const hinzufuegen = element.querySelector('[data-test="deckblatt-hinzufuegen"]') as HTMLButtonElement;
+    for (const name of ['Erster', 'Zweiter']) {
+      eingeben(titel, name);
+      hinzufuegen.click();
+      fixture.detectChanges();
+    }
+    eingeben(anzahlFeld('Zweiter'), '-1');
+    expect(knopf().disabled).toBe(true);
+
+    const entfernen = element.querySelector(`button[aria-label="${texte.entfernenFuer('Erster')}"]`) as HTMLButtonElement;
+    entfernen.click();
+    fixture.detectChanges();
+
+    expect(element.querySelectorAll('[data-test="deckblatt"]')).toHaveLength(1);
+    expect(anzahlFeld('Zweiter').getAttribute('aria-invalid')).toBe('true');
+    expect(element.textContent).toContain(texte.anzahlUngueltig);
+    expect(knopf().disabled).toBe(true);
+
+    eingeben(anzahlFeld('Zweiter'), '2');
+    expect(knopf().disabled).toBe(false);
+  });
+
   it('sperrt das Erstellen über 100 Blätter und bei ungültiger Anzahl', async () => {
     await starten();
     eingeben(anzahlFeld(texte.ohneArt), '60');

@@ -106,6 +106,31 @@ public class TrennblattSchritte {
         deckblatt(benutzer, zeichen.repeat(laenge));
     }
 
+    @Wenn("«{word}» den Trennblatt-Generator mit dem Körper «{}» aufruft")
+    public void roherKoerper(String benutzer, String koerper) {
+        sendenRoh(benutzer, koerper);
+    }
+
+    /** Gültiges JSON, mit Leerzeichen auf die Länge aufgefüllt. */
+    @Wenn("«{word}» den Trennblatt-Generator mit einem Körper von {int} Bytes aufruft")
+    public void grosserKoerper(String benutzer, int bytes) {
+        String json = "{\"blaetter\":[{\"typ\":\"TRENN\",\"anzahl\":1}]}";
+        sendenRoh(benutzer, json + " ".repeat(bytes - json.length()));
+    }
+
+    /** Jedes Zeichen des Titels als JSON-Escape, so wird der Körper so gross wie eine gültige Anfrage werden kann. */
+    @Wenn("«{word}» {int} Ordner-Deckblätter mit je {int} Zeichen «{word}» als JSON-Escape anfordert")
+    public void vieleDeckblaetter(String benutzer, int anzahl, int laenge, String zeichen) {
+        String titel = String.format("\\u%04X", zeichen.codePointAt(0)).repeat(laenge);
+        List<String> blaetter = new ArrayList<>();
+        for (int i = 0; i < anzahl; i++) {
+            blaetter.add("{\"typ\":\"ORDNER\",\"titel\":\"" + titel + "\",\"anzahl\":1}");
+        }
+        String json = "{\"blaetter\":[" + String.join(",", blaetter) + "]}";
+        assertThat(json.length()).as("Körper").isGreaterThan(32 * 1024).isLessThan(64 * 1024);
+        sendenRoh(benutzer, json);
+    }
+
     @Dann("liefert der Trennblatt-Generator ein PDF zum Herunterladen mit {int} Seiten im Format A4 hochkant")
     public void pdf(int anzahl) throws IOException {
         pdfAntwort();
@@ -191,6 +216,14 @@ public class TrennblattSchritte {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
                 .accept("application/pdf, application/problem+json").body(Map.of("blaetter", blaetter))
                 .when().post(PFAD);
+    }
+
+    private void sendenRoh(String benutzer, String koerper) {
+        seiten = null;
+        aufschriften.clear();
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .accept("application/pdf, application/problem+json")
+                .body(koerper.getBytes(StandardCharsets.UTF_8)).when().post(PFAD);
     }
 
     private static String zeichen(String text) {

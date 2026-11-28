@@ -5,8 +5,10 @@ describe('Trennblätter: Logik (Spec 09, Req 6.1, 6.5)', () => {
     expect(titelFehler('Versicherungen 2026')).toBeNull();
     expect(titelFehler('Ä'.repeat(60))).toBeNull();
     expect(titelFehler('A\u0308'.repeat(60))).toBeNull();
-    expect(titelFehler('😀'.repeat(60))).toBeNull();
-    expect(titelFehler('Team 👩\u200D💻')).toBeNull();
+    expect(titelFehler('Ελληνικά – Кириллица € ẞ «Ä»')).toBeNull();
+    expect(titelFehler('😀'.repeat(60))).toBe('schrift');
+    expect(titelFehler('Team 👩\u200D💻')).toBe('schrift');
+    expect(titelFehler('档案 2026')).toBe('schrift');
     expect(titelFehler('   ')).toBe('leer');
     expect(titelFehler('Ä'.repeat(61))).toBe('lang');
     for (const zeichen of ['\u0007', '\t', '\n', '\u202E', '\u2028', '\u2029', '\u200B', '\uFEFF', '\uD800']) {

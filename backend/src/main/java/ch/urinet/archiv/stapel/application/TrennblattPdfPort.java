@@ -9,4 +9,7 @@ public interface TrennblattPdfPort {
 
     /** A4, je Blatt zwei gleiche Seiten (Vorder- und Rückseite), in der Reihenfolge der Sätze. */
     byte[] erzeugen(List<TrennblattSatz> saetze);
+
+    /** {@code true}, wenn die eingebettete Schrift jedes Zeichen des Textes darstellen kann. */
+    boolean darstellbar(String text);
 }

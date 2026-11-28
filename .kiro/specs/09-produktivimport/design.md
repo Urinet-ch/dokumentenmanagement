@@ -200,16 +200,28 @@ Umsetzung (Aufgabe 27.5, 28.11.2026):
   Leerzeichen als `%20` statt `+`; der Code enthält so nur ASCII, und `;`, `=`, `+` und `%` im Titel bleiben eindeutig.
   Fehlt der Titel oder ist er nach dem Kürzen leer, gilt ebenfalls 400 `TRENNBLATT_UNGUELTIG`. Alle übrigen
   Formfehler (Typ, Anzahl unter 1, mehr als 100 Blätter, unbekanntes Feld, Feld des anderen Typs, Art keine aktive
-  Dokumentart des Mandanten) ergeben 400 `ANFRAGE_UNGUELTIG`.
+  Dokumentart des Mandanten) ergeben 400 `ANFRAGE_UNGUELTIG`. Der Körper wird streng gelesen (`StrengesJson`: keine
+  doppelten Schlüssel, nichts nach dem JSON-Wert) und ist vor der Ressource auf 64 KiB begrenzt
+  (`ProblemFehlerRoute`, 413 `DATEI_ZU_GROSS`); 100 Deckblätter mit je 60 als JSON-Escape geschriebenen Zeichen
+  brauchen rund 39 KiB.
+- `TrennblattCode.lesen` ist streng: Der Inhalt muss genau dem entsprechen, was `inhalt()` erzeugt; ungültiges UTF-8
+  (z. B. `%FF`), unkodierte Trennzeichen (`=`, `+`, Leerzeichen), Hex in Kleinbuchstaben oder nicht NFC sind kein
+  Trennblatt-Code.
 - Schrift: Liberation Sans aus dem PDFBox-Artefakt (`org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf`, SIL
   Open Font License), als Teilmenge eingebettet. Das Image bringt keine Schrift mit; statt eines neuen Pakets im
-  Dockerfile dient die Schrift, die PDFBox ohnehin mitliefert (gleiche Wirkung wie «aus dem Image»). Zeichen ohne
-  Glyphe (z. B. Emoji) erscheinen in der Aufschrift als «?», der QR-Code enthält den Titel unverändert.
+  Dockerfile dient die Schrift, die PDFBox ohnehin mitliefert (gleiche Wirkung wie «aus dem Image»). Damit das Blatt
+  den Titel trägt (6.2), lehnt das Archiv einen Titel mit Zeichen, die die Schrift nicht enthält (z. B. Emoji,
+  chinesische Schriftzeichen), ebenfalls mit 400 `TRENNBLATT_UNGUELTIG` ab (Auslegung zu 6.5, Review PR #747). Die
+  Oberfläche prüft das schon bei der Eingabe mit den Unicode-Bereichen der Schrift (`schrift-abdeckung.ts`);
+  `PdfBoxTrennblattPdfTest` vergleicht diese Bereiche mit der Schrift. Nur der Name einer Art kann noch Zeichen ohne
+  Glyphe enthalten; sie erscheinen als «?», darunter steht der Code der Art.
 - Seite: «TRENNBLATT» bzw. «ORDNER» in 22 pt, Aufschrift (Name der Art, «Ohne Art» oder Titel) in 36 pt, bei mehr als
   drei Zeilen in 30 bzw. 24 pt, beim Trennblatt mit Art darunter «Art <CODE>»; QR-Symbol 60 mm (ohne Ruhezone), Mitte
   15 mm unter der Seitenmitte, Ruhezone mindestens 4 Module weiss. Der QR-Code ist eine Vektor-Form (XObject), die alle
-  Seiten eines Satzes zeichnen: 100 Blätter (200 Seiten) bleiben unter 512 KB. Der längste Titel (60 × «€», 60 Emoji)
-  bleibt bei 150 dpi lesbar.
+  Seiten eines Satzes zeichnen: 100 Blätter (200 Seiten) bleiben unter 512 KB. Der längste Titel (60 × «€», 60 × «ẞ»)
+  bleibt bei 150 dpi lesbar. Erkenntnis für 28.7: Ein einzelner ZXing-`QRCodeReader` verfehlt bei 150 dpi einzelne,
+  sonst einwandfreie Codes (z. B. 20 × «ж», 60 × «ẞ»); mit `QRCodeMultiReader` und zwei Binarisierern (wie
+  `ZxingQrLeser`) werden alle gelesen.
 - Protokoll: Das PDF wird nicht abgelegt und berührt kein Dokument, darum kein Eintrag `ERFASSEN`; `EndpunktWaechterTest`
   nimmt `POST /trennblaetter` von der Regel «A1 verlangt `ERFASSEN`» aus.
 - Frontend: Menüpunkt «Trennblätter» in der Gruppe «Archiv» nach «Chat» (A1), Route mit `rechtGuard('A1')`;

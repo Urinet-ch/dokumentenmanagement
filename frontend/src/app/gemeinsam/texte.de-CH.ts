@@ -2278,6 +2278,8 @@ export const TEXTE = {
     titelLeer: 'Bitte geben Sie einen Titel ein.',
     titelLang: 'Der Titel ist länger als 60 Zeichen. Bitte kürzen Sie ihn.',
     titelZeichen: 'Der Titel enthält Steuer- oder Formatzeichen. Bitte entfernen Sie sie.',
+    titelSchrift:
+      'Der Titel enthält Zeichen, die das Trennblatt nicht drucken kann, zum Beispiel Emoji oder chinesische Schriftzeichen. Bitte ersetzen Sie sie.',
     keineDeckblaetter: 'Noch keine Deckblätter. Geben Sie einen Titel ein und wählen Sie «Deckblatt hinzufügen».',
     titelSpalte: 'Titel',
     aktionen: 'Aktionen',
@@ -2294,6 +2296,6 @@ export const TEXTE = {
     fertig: 'Das PDF ist heruntergeladen. Drucken Sie es beidseitig auf farbiges Papier.',
     pdfUngueltig: 'Das PDF ist leer angekommen. Bitte versuchen Sie es erneut.',
     titelUngueltig:
-      'Ein Titel ist ungültig: höchstens 60 Zeichen, ohne Steuer- oder Formatzeichen. Bitte korrigieren Sie ihn.',
+      'Ein Titel ist ungültig: höchstens 60 Zeichen, ohne Steuer- oder Formatzeichen und nur mit Zeichen, die das Trennblatt drucken kann. Bitte korrigieren Sie ihn.',
   },
 } as const;
