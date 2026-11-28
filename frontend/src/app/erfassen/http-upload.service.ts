@@ -24,6 +24,8 @@ export class HttpUploadService extends UploadPort {
         undefined,
         undefined,
         undefined,
+        undefined,
+        undefined,
         'events',
         true,
       )

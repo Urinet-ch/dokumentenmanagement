@@ -3115,6 +3115,27 @@ components:
         groesse:
           type: integer
           format: int32
+    PruefsummenAnfrage:
+      type: object
+      required:
+      - sha256
+      properties:
+        sha256:
+          type: array
+          items:
+            type: string
+          description: SHA-256 als 64 Hex-Zeichen
+          maxItems: 1000
+    PruefsummenAntwort:
+      type: object
+      required:
+      - vorhanden
+      properties:
+        vorhanden:
+          type: array
+          items:
+            type: string
+          description: "die schon vorhandenen Prüfsummen, sortiert"
     Quelle:
       type: object
       properties:
@@ -3128,6 +3149,58 @@ components:
           $ref: "#/components/schemas/Instant"
         ingestStatus:
           type: string
+    QuelleAendern:
+      description: Fehlende Felder bleiben; eine leere Bemerkung löscht sie
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - OFFEN
+          - LAEUFT
+          - ABGESCHLOSSEN
+          - LAUFEND
+        bemerkung:
+          type: string
+          maxLength: 1000
+        konfiguration:
+          $ref: "#/components/schemas/JsonObjekt"
+    QuelleAnlegen:
+      type: object
+      required:
+      - code
+      - name
+      - typ
+      properties:
+        code:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,39}$"
+        name:
+          type: string
+          maxLength: 100
+        typ:
+          type: string
+          enum:
+          - GENERATOR
+          - DRIVE
+          - ORDNER
+          - MAC_EINGANG
+          - GMAIL_LABEL
+          - CRM_CSV
+          - SCAN
+        konfiguration:
+          $ref: "#/components/schemas/JsonObjekt"
+        bemerkung:
+          type: string
+          maxLength: 1000
+    QuelleGeheimnis:
+      type: object
+      required:
+      - geheimnis
+      properties:
+        geheimnis:
+          type: string
+          description: z. B. App-Passwort; nur verschlüsselt gespeichert
     Quelleneintrag:
       type: object
       properties:
@@ -3147,6 +3220,119 @@ components:
           $ref: "#/components/schemas/UUID"
         sha256:
           type: string
+    Quelllauf:
+      type: object
+      required:
+      - id
+      - quelle
+      - art
+      - status
+      - zaehler
+      - meldungen
+      - gestartet
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        quelle:
+          type: string
+        art:
+          type: string
+          enum:
+          - TROCKEN
+          - ECHT
+          - AUTOMATISCH
+        status:
+          type: string
+          enum:
+          - LAEUFT
+          - FERTIG
+          - ABGEBROCHEN
+        zaehler:
+          $ref: "#/components/schemas/Quellzaehler"
+        meldungen:
+          type: array
+          items:
+            type: string
+        benutzer:
+          type:
+          - string
+          - "null"
+        gestartet:
+          type: string
+          $ref: "#/components/schemas/Instant"
+        beendet:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+    QuelllaufAbschliessen:
+      description: "Trockenlauf: alle Zähler vom Werkzeug; echter Lauf: der Server\
+        \ zählt, das Werkzeug meldet nur übersprungene Dateien"
+      type: object
+      properties:
+        zaehler:
+          anyOf:
+          - $ref: "#/components/schemas/Quellzaehler"
+          - type: "null"
+        uebersprungen:
+          type:
+          - integer
+          - "null"
+          format: int32
+        meldungen:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+        abgebrochen:
+          type:
+          - boolean
+          - "null"
+          description: "true: Lauf ABGEBROCHEN"
+    QuelllaufStarten:
+      type: object
+      required:
+      - art
+      properties:
+        art:
+          type: string
+          enum:
+          - TROCKEN
+          - ECHT
+    Quellzaehler:
+      type: object
+      description: "Zähler eines Quelllaufs (Spec 09, 10.3); gefunden = neu + duplettePruefsumme\
+        \ + uebersprungen + fehler"
+      required:
+      - gefunden
+      - neu
+      - duplettePruefsumme
+      - dubletteFachlich
+      - uebersprungen
+      - fehler
+      properties:
+        gefunden:
+          type: integer
+          format: int32
+        neu:
+          type: integer
+          format: int32
+        duplettePruefsumme:
+          type: integer
+          format: int32
+        dubletteFachlich:
+          type: integer
+          format: int32
+          description: im Trockenlauf immer 0
+        uebersprungen:
+          type: integer
+          format: int32
+        fehler:
+          type: integer
+          format: int32
     Regel:
       type: object
       properties:
@@ -3247,6 +3433,56 @@ components:
           - string
           - "null"
           maxLength: 1000
+    Registerquelle:
+      description: "Eintrag im Quellenregister (Spec 09, 10.1); das Geheimnis wird\
+        \ nie zurückgegeben"
+      type: object
+      required:
+      - code
+      - name
+      - typ
+      - konfiguration
+      - status
+      - geheimnisGesetzt
+      - version
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        typ:
+          type: string
+          enum:
+          - GENERATOR
+          - DRIVE
+          - ORDNER
+          - MAC_EINGANG
+          - GMAIL_LABEL
+          - CRM_CSV
+          - SCAN
+        konfiguration:
+          $ref: "#/components/schemas/JsonObjekt"
+        status:
+          type: string
+          enum:
+          - OFFEN
+          - LAEUFT
+          - ABGESCHLOSSEN
+          - LAUFEND
+        bemerkung:
+          type:
+          - string
+          - "null"
+        geheimnisGesetzt:
+          type: boolean
+        version:
+          type: integer
+          format: int32
+          description: Version für If-Match
+        letzterLauf:
+          anyOf:
+          - $ref: "#/components/schemas/Quelllauf"
+          - type: "null"
     Reihe:
       type: object
       properties:
@@ -4085,6 +4321,7 @@ tags:
 - name: Konfiguration
 - name: Kontakte
 - name: Protokoll
+- name: Quellen
 - name: Wissensbasis
 paths:
   /api/v1/api-tokens:
@@ -5500,7 +5737,9 @@ paths:
         \ ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen»\
         \ als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprü\
         ft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der\
-        \ ersten Ablehnung und der Erweiterung «ergebnisse»."
+        \ ersten Ablehnung und der Erweiterung «ergebnisse». Werkzeuge mit Token vom\
+        \ Scope import ordnen die Dateien mit «quelllauf» (ID) oder «quelle» (Code)\
+        \ einem Quelllauf zu (Spec 09, 10.4)."
       tags:
       - Dokumente
       requestBody:
@@ -5527,6 +5766,10 @@ paths:
                   type: string
                 klassifikationen:
                   type: string
+                quelle:
+                  type: string
+                quelllauf:
+                  type: string
         required: true
       responses:
         "202":
@@ -5544,6 +5787,9 @@ paths:
         "413":
           description: "Anfrage über archiv.upload.max-anfrage oder alle Dateien abgelehnt,\
             \ erste über 50 MB"
+        "409":
+          description: "STATUS_KONFLIKT: Quelllauf beendet oder Trockenlauf; QUELLE_LAEUFT:\
+            \ Quelle im Trockenlauf; nichts wurde angelegt"
         "415":
           description: "Alle Dateien abgelehnt, erste mit unbekanntem Typ"
         "422":
@@ -5767,6 +6013,37 @@ paths:
         - mitarbeiter
         - geschaeftsstelle
         - api-token:generator
+  /api/v1/dokumente/pruefsummen:
+    post:
+      summary: Prüfsummen abfragen
+      description: "Höchstens 1'000 Prüfsummen; Antwort ohne IDs (A1, Scope import)"
+      tags:
+      - Quellen
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PruefsummenAnfrage"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PruefsummenAntwort"
+        "400":
+          description: "ANFRAGE_UNGUELTIG: mehr als 1'000 oder keine gültige SHA-256"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - geschaeftsstelle
+        - api-token:import
   /api/v1/dokumente/{id}:
     get:
       summary: Metadaten eines Dokuments lesen
@@ -7717,6 +7994,257 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/quellen:
+    get:
+      summary: Quellenregister
+      description: Alle Quellen des Mandanten mit letztem Lauf (A27)
+      tags:
+      - Quellen
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Registerquelle"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - treuhaender
+        - geschaeftsstelle
+    post:
+      summary: Quelle anlegen
+      description: "Neue Quelle im Register, Status OFFEN (A28)"
+      tags:
+      - Quellen
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuelleAnlegen"
+        required: true
+      responses:
+        "201":
+          description: Angelegt
+          headers:
+            ETag:
+              description: Version für If-Match
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Registerquelle"
+        "400":
+          description: ANFRAGE_UNGUELTIG
+        "409":
+          description: "QUELLE_EXISTIERT: Code schon vergeben"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/quellen/laeufe/{laufId}/abschliessen:
+    post:
+      summary: Quelllauf abschliessen
+      description: "Zähler und Meldungen des Werkzeugs; ein Trockenlauf legt keine\
+        \ Dokumente an (A28, Scope import)"
+      tags:
+      - Quellen
+      parameters:
+      - name: laufId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuelllaufAbschliessen"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quelllauf"
+        "400":
+          description: "ANFRAGE_UNGUELTIG: Zähler gehen nicht auf oder passen nicht\
+            \ zur Art des Laufs"
+        "404":
+          description: NICHT_GEFUNDEN
+        "409":
+          description: "STATUS_KONFLIKT: Lauf schon beendet"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - api-token:import
+  /api/v1/quellen/{code}:
+    patch:
+      summary: Quelle ändern
+      description: "Status, Bemerkung, Konfiguration; optimistisches Locking über\
+        \ If-Match (A28)"
+      tags:
+      - Quellen
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuelleAendern"
+        required: true
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              description: Neue Version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Registerquelle"
+        "400":
+          description: ANFRAGE_UNGUELTIG
+        "404":
+          description: NICHT_GEFUNDEN
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/quellen/{code}/geheimnis:
+    put:
+      summary: Geheimnis einer Quelle setzen
+      description: "Nur verschlüsselt gespeichert, nie zurückgegeben (A28)"
+      tags:
+      - Quellen
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuelleGeheimnis"
+        required: true
+      responses:
+        "204":
+          description: Gesetzt
+        "400":
+          description: ANFRAGE_UNGUELTIG
+        "404":
+          description: NICHT_GEFUNDEN
+        "409":
+          description: "STATUS_KONFLIKT: Datenschlüssel fehlt"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/quellen/{code}/laeufe:
+    post:
+      summary: Quelllauf starten
+      description: "Trockenlauf oder echter Lauf; ein laufender automatischer Lauf\
+        \ endet dabei (A28, Scope import)"
+      tags:
+      - Quellen
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuelllaufStarten"
+        required: true
+      responses:
+        "201":
+          description: Lauf gestartet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quelllauf"
+        "400":
+          description: ANFRAGE_UNGUELTIG
+        "404":
+          description: NICHT_GEFUNDEN
+        "409":
+          description: "QUELLE_LAEUFT: ein Trocken- oder echter Lauf läuft schon"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - api-token:import
+    get:
+      summary: Quellläufe einer Quelle
+      description: "Neueste zuerst, höchstens 100 (A27)"
+      tags:
+      - Quellen
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quelllauf"
+        "404":
+          description: NICHT_GEFUNDEN
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/regeln:
     get:
       summary: Regeln des Mandanten auflisten

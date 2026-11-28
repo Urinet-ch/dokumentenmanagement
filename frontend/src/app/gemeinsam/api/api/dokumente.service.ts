@@ -879,7 +879,7 @@ export class DokumenteService extends BaseService {
 
     /**
      * Dateien hochladen
-     * PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen» als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprüft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».
+     * PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen» als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprüft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse». Werkzeuge mit Token vom Scope import ordnen die Dateien mit «quelllauf» (ID) oder «quelle» (Code) einem Quelllauf zu (Spec 09, 10.4).
      * @endpoint post /api/v1/dokumente
      * @param dateien 
      * @param arbeitsfassungen 
@@ -887,14 +887,16 @@ export class DokumenteService extends BaseService {
      * @param hinweis 
      * @param art 
      * @param klassifikationen 
+     * @param quelle 
+     * @param quelllauf 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<UploadErgebnis>>;
-    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<UploadErgebnis>>>;
-    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<UploadErgebnis>>>;
-    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, quelle?: string, quelllauf?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<UploadErgebnis>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, quelle?: string, quelllauf?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<UploadErgebnis>>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, quelle?: string, quelllauf?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<UploadErgebnis>>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, art?: string, klassifikationen?: string, quelle?: string, quelllauf?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -963,6 +965,12 @@ export class DokumenteService extends BaseService {
         }
         if (klassifikationen !== undefined) {
             localVarFormParams = localVarFormParams.append('klassifikationen', <any>klassifikationen) as any || localVarFormParams;
+        }
+        if (quelle !== undefined) {
+            localVarFormParams = localVarFormParams.append('quelle', <any>quelle) as any || localVarFormParams;
+        }
+        if (quelllauf !== undefined) {
+            localVarFormParams = localVarFormParams.append('quelllauf', <any>quelllauf) as any || localVarFormParams;
         }
 
         let responseType_: 'text' | 'json' | 'blob' = 'json';

@@ -64,7 +64,7 @@ Zeitrahmen (Richtwert, gebunden an Entscheid #731): Welle 27 vom 01.12. bis 04.1
   - Unit-Test: QR-Inhalte inklusive URL-Kodierung von Umlauten; Szenario für `TRENNBLATT_UNGUELTIG`.
   - _Anforderungen: 6.1, 6.2, 6.3, 6.5_
 
-- [ ] 27.6 Quellenregister, Quellläufe und Prüfsummen-Abfrage [Backend]
+- [x] 27.6 Quellenregister, Quellläufe und Prüfsummen-Abfrage [Backend]
   - Changesets `quelle`, `quelle_lauf`, Spalte `dokument.quelle_lauf_id`, `dokument_quelle_ck` mit `GMAIL` und
     `ORDNER`; Seed der allgemeinen Quellen für `urinet` (ohne Zugang, ohne Geschäftsangaben).
   - Endpunkte nach design.md, Abschnitt 5, inklusive `POST /api/v1/dokumente/pruefsummen`; Formularfelder
