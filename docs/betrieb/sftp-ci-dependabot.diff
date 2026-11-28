@@ -1,0 +1,35 @@
+diff --git a/.github/dependabot.yml b/.github/dependabot.yml
+--- a/.github/dependabot.yml
++++ b/.github/dependabot.yml
+@@ -26,6 +26,8 @@
+     directories:
+       - /deploy/infomaniak/db
+       - /deploy/infomaniak/keycloak
++      # Dienst sftp (Spec 09, Aufgabe 27.3), Basis wie das Image der API
++      - /deploy/infomaniak/sftp
+     schedule:
+       interval: weekly
+     open-pull-requests-limit: 5
+@@ -77,6 +79,9 @@
+       - /backend
+       # Drive-Import-Werkzeug (Aufgabe 4.8), eigenes Maven-Projekt
+       - /tools/drive_import
++      # Dienst sftp (Spec 09, Aufgabe 27.3), eigenes Maven-Projekt; sshd.version im Backend nachziehen
++      # (ScanEingangVersionTest)
++      - /deploy/infomaniak/sftp
+     schedule:
+       interval: weekly
+     open-pull-requests-limit: 5
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -237,6 +237,9 @@
+
+       - name: Drive-Import-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
+         run: mvn -B -ntp -f tools/drive_import/pom.xml verify
++
++      - name: Scan-Eingang SFTP (mvn verify, Unit-Tests, SpotBugs)
++        run: mvn -B -ntp -f deploy/infomaniak/sftp/pom.xml verify
+
+       - name: strace bereitstellen (Netzlaufzeitnachweis Wissenspaket)
+         run: command -v strace >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq strace)

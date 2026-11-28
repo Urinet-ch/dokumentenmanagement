@@ -23,7 +23,7 @@ wurde nicht gewählt.
 
 | Prüfung | Entscheid und Stand | Offen |
 | --- | --- | --- |
-| Erreichbarkeit beider Hosts | Gewählt und im Infra-Repo umgesetzt. | Betriebsnachweis der Prüfung des Anmelde-Hosts durch Fabian. |
+| Erreichbarkeit beider Hosts | Gewählt und im Infra-Repo umgesetzt. Nachtrag 28.11.2026 (Entscheid Fabian): Auf eine eigene externe Prüfung des Anmelde-Hosts wird verzichtet; bekannte Lücke: Fällt nur Keycloak aus, meldet die externe Prüfung das nicht eigens. | Der Betriebsnachweis für den Anmelde-Host entfällt (Spec 01, Aufgabe 5.9). |
 | Zertifikatsprüfung | Nicht gewählt. | — |
 | Fehlgeschlagener Deploy | Gewählt und im Infra-Repo umgesetzt. | — |
 

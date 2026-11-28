@@ -31,7 +31,9 @@ synthetisch.
 
 Einordnung: Wellen 27 bis 30. Echte Belege kommen erst ins Archiv, wenn Fabian über den Start mit Echtbelegen
 entschieden hat (Entscheidungshilfe PR #731, Varianten A, B und C) und die dann geltenden Voraussetzungen erfüllt
-sind; bis dahin gilt Spec 01, 16.15 und 16.17 unverändert (Requirement 16).
+sind; bis dahin gilt Spec 01, 16.15 und 16.17 unverändert (Requirement 16). **Entschieden von Fabian am 28.11.2026:**
+Variante B, die bestehende VPS wird produktiv; Voraussetzungen sind Spec 01, 16.17 (geändert 28.11.2026), 16.28 bis
+16.31 und die Gates aus Spec 01, Welle 31 (ADR-020).
 
 ## Glossary
 - **Scan-Eingang** – der SFTP-Dienst, in den der Scanner Dateien schreibt, und das Verzeichnis, aus dem der Worker sie abholt.
@@ -46,7 +48,7 @@ sind; bis dahin gilt Spec 01, 16.15 und 16.17 unverändert (Requirement 16).
 - **Quelllauf** – ein Import aus einer Quelle mit Zählern, als Trockenlauf oder echt.
 - **Fachliche Dublette** – derselbe Beleg in einer anderen Datei (andere Prüfsumme).
 - **Hauptfassung** – die Fassung eines Belegs, die in Kennzahlen, Lückenbericht, Vollständigkeit und Export zählt.
-- **Stichtag** – Tag, ab dem jeder neue Beleg über das Archiv läuft; Richtwert 01.01.2027 (E7), [offen: Stichtag – Entscheid #731 und E7].
+- **Stichtag** – Tag, ab dem jeder neue Beleg über das Archiv läuft: 01.01.2027; der Bestand 2026 ist bis 31.01.2027 importiert (E7, entschieden von Fabian am 28.11.2026 mit Variante B; bisher «Richtwert 01.01.2027 (E7), [offen: Stichtag – Entscheid #731 und E7]»).
 
 ---
 
@@ -272,7 +274,7 @@ vollständig und korrekt im Archiv ist.
 
 #### Acceptance Criteria
 1. WENN ein synthetischer Probestapel mit 20 Blatt, 5 Trennblättern (davon 2 mit Art), 1 Ordner-Deckblatt und leeren Rückseiten mit dem Profil «Archiv Stapel» in einen Testmandanten gescannt wird, DANN SOLL das Archiv genau die erwarteten Dokumente mit den erwarteten Seiten erzeugen und die Seitenbilanz bestätigen (Gate «Probelauf»). Nachweis: manuell [Fabian] (Abnahmebericht).
-2. Der Probelauf mit echten Belegen, die Umstellung zum Stichtag (16.5) und der Import des Bestands (16.3, 16.4) SOLLEN erst beginnen, wenn Fabian über den Start mit Echtbelegen entschieden hat und die dann geltenden Voraussetzungen erfüllt sind (Spec 01, 16.15 und 16.17 oder deren Änderung durch diesen Entscheid); bis dahin SOLLEN Stufe A und alle Tests nur synthetische Daten enthalten. Nachweis: manuell [Fabian] (Gate-Bericht). [offen: Start mit Echtbelegen – Entscheid #731]
+2. Der Probelauf mit echten Belegen, die Umstellung zum Stichtag (16.5) und der Import des Bestands (16.3, 16.4) SOLLEN erst beginnen, wenn das Archiv nach Spec 01, 16.17 auf Stufe B läuft (bestehende VPS, Variante B) und die Gates aus Spec 01, Welle 31 mit Go/No-go (Spec 01, Aufgabe 31.8) erfüllt sind; bis dahin SOLLEN Stufe A und alle Tests nur synthetische Daten enthalten. Nachweis: manuell [Fabian] (Gate-Bericht). (geändert 28.11.2026, entschieden von Fabian am 28.11.2026, Variante B: bisher «wenn Fabian über den Start mit Echtbelegen entschieden hat und die dann geltenden Voraussetzungen erfüllt sind (Spec 01, 16.15 und 16.17 oder deren Änderung durch diesen Entscheid)» mit «[offen: Start mit Echtbelegen – Entscheid #731]»)
 3. Der Produktivimport SOLL in dieser Reihenfolge laufen: CRM-CSV, Generatoren (`nachlauf`), Downloads aus der Buchhaltung, Gmail, Drive und Mac-Ordner, weitere Quellen des Registers, Papier. Nachweis: manuell [Fabian] (Quellenregister).
 4. Jede Quelle SOLL zuerst als Trockenlauf und danach echt importiert werden; die Zähler beider Läufe SOLLEN im Quellenregister stehen. Nachweis: manuell [Fabian] (Quellenregister).
 5. Ab dem Stichtag SOLLEN Generatoren, E-Mail-Eingang, Mac-Eingangsordner und Scan-Eingang (oder der Rückfall nach E6) für den Mandanten `urinet` aktiv sein. Nachweis: manuell [Fabian] (Umstellungsprotokoll).

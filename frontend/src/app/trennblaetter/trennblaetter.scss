@@ -1,0 +1,123 @@
+// Aus den Bausteinen von docs/oberflaeche/README.md (kein Vorbild im Prototyp): Karten, Tabelle, Kachel, Hinweis
+:host {
+  display: block;
+  max-width: 72rem;
+}
+
+h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+// Mobil eine Spalte, breit Auswahl links und Druck rechts
+.raster {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+
+  @media (min-width: 60rem) {
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  }
+}
+
+.spalte,
+.bereich {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.spalte {
+  gap: 1rem;
+}
+
+.nebentext {
+  color: var(--text-gedaempft);
+  font-size: 0.875rem;
+}
+
+.name {
+  font-weight: 600;
+  overflow-wrap: break-word;
+  margin-right: 0.5rem;
+}
+
+td.zahl {
+  width: 1%;
+}
+
+.rechts {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.formular {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.feld {
+  display: grid;
+  gap: 0.3rem;
+  flex: 1 1 14rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-gedaempft);
+}
+
+input {
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--karte);
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+input[type='number'] {
+  width: 5.5rem;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+input[aria-invalid='true'] {
+  border-color: var(--gefahr);
+}
+
+.fehlertext,
+.zu-lang {
+  color: var(--gefahr);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.fehlertext:empty {
+  display: none;
+}
+
+.drucken {
+  justify-items: start;
+}
+
+button app-symbol {
+  --symbol-groesse: 16px;
+  vertical-align: -0.2em;
+  margin-right: 0.375rem;
+}
+
+button.gefahr {
+  --mat-button-text-label-text-color: var(--gefahr);
+  --mat-button-text-state-layer-color: var(--gefahr);
+}
