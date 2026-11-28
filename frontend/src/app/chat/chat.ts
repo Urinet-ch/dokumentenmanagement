@@ -4,8 +4,10 @@ import {
   DestroyRef,
   ElementRef,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -87,6 +89,12 @@ export class Chat {
   protected readonly listeOffen = computed(() => this.listeGeoeffnet() ?? !this.mobil());
 
   protected readonly gespraeche = signal<GespraechKopf[] | null>(null);
+  /** Wissen freigeschaltet und Recht A15 (Spec 04, Req 22.5): sonst keine Moduswahl und keine Gespräche im Modus WISSEN. */
+  protected readonly wissen = computed(() => this.anmeldung.darf('A15'));
+  protected readonly sichtbareGespraeche = computed(() => {
+    const liste = this.gespraeche();
+    return liste === null || this.wissen() ? liste : liste.filter((kopf) => kopf.modus !== 'WISSEN');
+  });
   protected readonly listeFehler = signal(false);
   protected readonly gespraechId = signal<string | null>(null);
   protected readonly modus = signal<ChatModus>('ARCHIV');
@@ -131,14 +139,27 @@ export class Chat {
       this.analyseStatus?.unsubscribe();
     });
     this.listeLaden();
+    // Wissen während der Sitzung abgeschaltet (Spec 04, Req 22.5): ein offenes Gespräch im Modus WISSEN schliessen
+    effect(() => {
+      if (!this.wissen() && this.modus() === 'WISSEN') {
+        untracked(() => {
+          this.abbrechen();
+          this.neuesGespraech();
+        });
+      }
+    });
   }
 
   protected chips(quellen: readonly Quelle[]): Chip[] {
     return quellen.flatMap((q): Chip[] => {
       if (istDatenstand(q)) return [{ text: datenstandText(q), link: null, art: 'datenstand' }];
       if ('wissen' in q) {
+        // Ohne Freischaltung (Spec 04, Req 22.7) liefert das Archiv die Wissensseite ohne Titel und Link: nur die Quelldokumente
+        const seite: Chip[] = this.wissen() && q.wissen.titel && q.wissen.link
+          ? [{ text: q.wissen.titel, link: wissenLink(q.wissen.link), art: 'wissen' }]
+          : [];
         return [
-          { text: q.wissen.titel, link: wissenLink(q.wissen.link), art: 'wissen' },
+          ...seite,
           ...q.dokumente.map((d): Chip => ({
             text: d.seiten ? this.texte.dokumentMitSeiten(d.titel, d.seiten) : d.titel,
             link: dokumentLink(d.link),
@@ -274,7 +295,7 @@ export class Chat {
   }
 
   protected modusWaehlen(modus: ChatModus): void {
-    if (this.anmeldung.darf('A15') && !this.gespraechId() && !this.laeuft() && !this.laedt()
+    if (this.wissen() && !this.gespraechId() && !this.laeuft() && !this.laedt()
         && this.nachrichten().length === 0) {
       this.modus.set(modus);
     }

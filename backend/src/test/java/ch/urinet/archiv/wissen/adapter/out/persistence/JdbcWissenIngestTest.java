@@ -1057,7 +1057,8 @@ class JdbcWissenIngestTest {
         try {
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
                 try {
-                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst, ingestIndex)
+                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst, ingestIndex,
+                            ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein())
                             .ausfuehren(auftrag, entwurf);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -1093,7 +1094,8 @@ class JdbcWissenIngestTest {
                     new Nutzlast(Map.of("entwurfId", entwurf, "aenderungNr", 1)), 0);
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
                 try {
-                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst, ingestIndex)
+                    new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, ki, kiVerbrauch, diffDienst, ingestIndex,
+                            ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein())
                             .ausfuehren(zweiter, entwurf);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -1174,8 +1176,9 @@ class JdbcWissenIngestTest {
         };
         try {
             var verarbeiten = new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, testKi, kiVerbrauch,
-                    diffDienst, ingestIndex);
-            var manuell = new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration);
+                    diffDienst, ingestIndex, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
+            var manuell = new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration,
+                    ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
             var handler = new WissenIngestHandler(verarbeiten, ingestSpeichern, manuell, manuellSpeichern);
             CompletableFuture.runAsync(() -> kontext.mit(URINET, () -> {
                 try {
@@ -1274,9 +1277,10 @@ class JdbcWissenIngestTest {
             }
         };
         var verarbeiten = new WissenIngestVerarbeiten(ingestSpeichern, wissenKonfiguration, testKi, kiVerbrauch,
-                diffDienst, ingestIndex);
+                diffDienst, ingestIndex, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
         var handler = new WissenIngestHandler(verarbeiten, ingestSpeichern,
-                new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration), manuellSpeichern);
+                new ManuelleNeuerzeugung(manuellSpeichern, verarbeiten, wissenKonfiguration,
+                    ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein()), manuellSpeichern);
         try {
             ausfuehren("update " + URINET.schema() + ".dokument set vertraulichkeit = 'PERSONAL' where id = ?",
                     dokument);
@@ -2184,7 +2188,7 @@ class JdbcWissenIngestTest {
             };
             var modelle = new HybridSuche(null, null, embedding, reranker, (zweck, eintrag) -> { }, null);
             var suche = new WissensSuche(wissensSuche, modelle, wissensSucheTransaktion, null,
-                    new WissenModellBudget(null, null, true, true));
+                    new WissenModellBudget(null, null, true, true, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein()));
             var grenzen = new WissenKonfiguration("test-modell", 30_000, 15, 100,
                     20_000, 12_000, 300_000, 1_000_000);
             var index = new WissenIngestIndex(ingestSpeichern, suche, grenzen);

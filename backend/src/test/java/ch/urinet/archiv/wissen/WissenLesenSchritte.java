@@ -202,6 +202,17 @@ public class WissenLesenSchritte {
                 KiWireMock.ChatAntwort.text("Die Wissensseite nennt eine Aussage.", 10, 2)));
     }
 
+    /** Spec 04, Requirement 22.7: erste Frage liest die Wissensseite, die Folgefrage antwortet ohne Werkzeug. */
+    @Angenommen("das simulierte Sprachmodell liest die Wissensseite der Leseprobe und beantwortet danach eine Folgefrage")
+    public void wissenUndFolgefrage() {
+        KiWireMock.chatFolge(List.of(
+                KiWireMock.ChatAntwort.werkzeuge(10, 2, new KiWireMock.ChatAufruf("wissen_index", "{}")),
+                KiWireMock.ChatAntwort.werkzeuge(10, 2, new KiWireMock.ChatAufruf("wissen_seite_zeigen",
+                        "{\"pfad\":\"" + normaleSeitePfad + "\"}")),
+                KiWireMock.ChatAntwort.text("Die Wissensseite nennt eine Aussage.", 10, 2),
+                KiWireMock.ChatAntwort.text("Ohne Wissensbasis keine Angabe.", 10, 2)));
+    }
+
     /** Spec 04, Requirement 21.2: simulierte Aufrufe von Archivwerkzeugen im Wissenschat, danach der gültige Weg. */
     @Angenommen("das simulierte Sprachmodell ruft im Wissenschat zuerst Archivwerkzeuge auf und liest dann die Wissensseite")
     public void archivwerkzeugeImWissenschat() {

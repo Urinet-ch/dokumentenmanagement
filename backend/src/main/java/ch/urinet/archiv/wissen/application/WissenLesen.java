@@ -23,12 +23,14 @@ public class WissenLesen {
     private final WissenLesenRepository repository;
     private final WissenSichtbarkeit sichtbarkeit;
     private final Berechtigung berechtigung;
+    private final Wissensfreischaltung freischaltung;
 
     public WissenLesen(WissenLesenRepository repository, WissenSichtbarkeit sichtbarkeit,
-                       Berechtigung berechtigung) {
+                       Berechtigung berechtigung, Wissensfreischaltung freischaltung) {
         this.repository = repository;
         this.sichtbarkeit = sichtbarkeit;
         this.berechtigung = berechtigung;
+        this.freischaltung = freischaltung;
     }
 
     @Transactional
@@ -41,6 +43,10 @@ public class WissenLesen {
     }
 
     public List<WissenLesenRepository.SeiteVerweis> seitenFuerDokument(Benutzer benutzer, UUID dokumentId) {
+        // Dokumentansicht ohne Freischaltung (Spec 04, Req 22.5, 22.6): keine Wissensseiten, keine Prüfung von A15
+        if (!freischaltung.aktuell()) {
+            return List.of();
+        }
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, true);
         return repository.seitenFuerDokument(Sichtregel.fuer(benutzer), dokumentId);
     }

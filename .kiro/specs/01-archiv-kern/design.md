@@ -657,11 +657,14 @@ fehlende Gauge bei weiterhin vorhandenen übrigen Reihen.
 
 #### Umsetzung (Aufgabe 5.9, 28.11.2026)
 
-Der Entscheid vom 27.11.2026 (PR #724) wählte eine unabhängige Erreichbarkeitsprüfung beider Hosts und eine Meldung bei
-fehlgeschlagenem Deploy; beides ist im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Eine
-unabhängige externe HTTP-Prüfung des Anwendungs-Hosts bestand seit dem 13.11.2026 ausserhalb der VPS-Konfiguration
-und erfasste den Ausfall vom 26.11.2026 (rund 75 Minuten). Eine Aussage zur Benachrichtigung ist nicht belegt. Der
-Betriebsnachweis für die Prüfung des Anmelde-Hosts bleibt bei Fabian; Aufgabe 5.9 bleibt offen.
+Der Entscheid vom 27.11.2026 (PR #724) wählte eine unabhängige externe Erreichbarkeitsprüfung des Anwendungs-Hosts
+sowie eine Meldung bei fehlgeschlagenem Deploy; beides ist im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht
+gewählt. Fabian entschied am 28.11.2026, den Anmelde-Host bewusst nicht extern zu überwachen: Die externe Prüfung des
+Anwendungs-Hosts genügt, die externe Prüfung des Anmelde-Hosts wurde wieder entfernt. Fällt nur der Anmeldedienst aus, bleibt
+die Health der App grün. Eine unabhängige externe HTTP-Prüfung des Anwendungs-Hosts bestand seit dem 13.11.2026
+ausserhalb der VPS-Konfiguration und erfasste den Ausfall vom 26.11.2026 (rund 75 Minuten). Eine Aussage zur
+Benachrichtigung ist nicht belegt. Für den Anmelde-Host bleibt kein Betriebsnachweis offen; die übrigen Schritte aus
+Aufgabe 5.9 bleiben offen.
 
 ### KI (`ki`)
 - `MetadatenExtraktor` als LangChain4j-`@RegisterAiService` ohne Chat-Memory (`NoChatMemoryProviderSupplier`; sonst vermischen sich Belege im selben Request-Kontext), Antwort als Java-Record `MetadatenVorschlag` im JSON-Schema-Antwortformat (`response-format=json_schema`, `strict-json-schema=true`). Infomaniak lehnt den JSON-Modus (`json_object`) ab; einen Rückfall gibt es nicht, ohne gültige Antwort gilt Req 7.1 (ohne Vorschlag in den Eingangskorb). Spike 0.3: `docs/spikes/infomaniak-ai.md`.
@@ -1885,6 +1888,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 403 | `MANDANT_FEHLT` | kein gültiger oder inaktiver Mandant (Req 1.3) |
 | 403 | `NICHT_ERLAUBT` | Rolle oder Token-Scope ohne Recht (Req 2.4–2.20) |
 | 403 | `ESKALATION_VERBOTEN` | Benutzerverwaltung würde die Rolle des Akteurs überschreiten oder die festgelegten Vergaberegeln verletzen (Spec 06, Req 4.6) |
+| 403 | `WISSEN_NICHT_FREIGESCHALTET` | Wissen für den Mandanten nicht freigeschaltet; nach 401, vor Rechtematrix und 404, auf allen internen Wissenspfaden (Spec 04, Req 22.6) |
 | 404 | `NICHT_GEFUNDEN` | fremder Mandant oder unsichtbar, vor 403 (Req 1.4, 2.3) |
 | 409 | `API_TOKEN_ABGELAUFEN` | Ablauf eines abgelaufenen API-Tokens setzen oder entfernen; ein neues Token muss ausgestellt werden (Req 2.5, Review PR #248) |
 | 409 | `STATUS_KONFLIKT` | Aktion im falschen Status (Req 6.7, 6.13, 8.8) |

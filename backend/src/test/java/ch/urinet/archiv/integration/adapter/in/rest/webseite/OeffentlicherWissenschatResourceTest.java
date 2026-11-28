@@ -38,6 +38,7 @@ class OeffentlicherWissenschatResourceTest {
         var aufloesung = new MandantAufloesung(null, null, null) {
             public MandantCode pruefen() { return new MandantCode(mandant.get()); }
         };
-        return new OeffentlicherWissenschatResource(null, aufloesung, null, config);
+        return new OeffentlicherWissenschatResource(null, aufloesung, null, config,
+                ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
     }
 }

@@ -36,7 +36,7 @@ class WissenWerkzeugeTest {
             List.of(new Quelleneintrag("a", DOKUMENT, 2, 3, "", null)),
             Wissensseite.Vertraulichkeit.NORMAL, "😀aaa [^a] und [^a]\n\n[^a]: Quelle", 1, "test",
             Instant.EPOCH, "test", Instant.EPOCH, true, true, null);
-    private final WissenLesen lesen = new WissenLesen(null, null, null) {
+    private final WissenLesen lesen = new WissenLesen(null, null, null, null) {
         @Override
         public Wissensseite seite(Benutzer benutzer, String pfad) {
             assertThat(benutzer).isEqualTo(KONTEXT.benutzer());
@@ -92,7 +92,7 @@ class WissenWerkzeugeTest {
     }
 
     private WissenWerkzeuge mitIndex(WissenLesen.IndexErgebnis index, WissensSuche suche, List<Object> aufrufe) {
-        var l = new WissenLesen(null, null, null) {
+        var l = new WissenLesen(null, null, null, null) {
             @Override
             public IndexErgebnis index(Benutzer b, Seitentyp typ, String tag, String q, UUID d, int offset,
                                        int groesse) {

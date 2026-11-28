@@ -130,7 +130,7 @@ class WissensSucheTest {
         var lokal = new WissensSuche(port,
                 new HybridSuche(null, null, embedding, reranker, (zweck, verbrauch) -> zwecke.add(zweck),
                         new SucheTransaktion()),
-                transaktion, new Berechtigung(null, null), new WissenModellBudget(null, null, true, true));
+                transaktion, new Berechtigung(null, null), new WissenModellBudget(null, null, true, true, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein()));
         var ergebnis = lokal.suchen(BENUTZER, "Frage", null, null, null, 30, true);
         assertThat(ergebnis.treffer()).containsExactly(a.seite());
         assertThat(ergebnis.degradiert()).isTrue();
@@ -158,7 +158,7 @@ class WissensSucheTest {
 
     private class Budget extends WissenModellBudget {
         boolean erschoepft;
-        Budget() { super(null, null, false, false); }
+        Budget() { super(null, null, false, false, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein()); }
         @Override public void embeddingPruefen() { pruefen(); }
         @Override public void rerankerPruefen() { pruefen(); }
         private void pruefen() {

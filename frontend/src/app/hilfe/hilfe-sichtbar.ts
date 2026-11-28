@@ -20,10 +20,11 @@ export const HILFE_EINTRAEGE = new InjectionToken<readonly HilfeEintrag[]>('HILF
  *
  * Mit Rolle erscheint ein Unterabschnitt nur, wenn auch sein Abschnitt erscheint (design.md «Hilfe-Katalog»). Ohne
  * Rolle steht ein Unterabschnitt mit `abgemeldet`, dessen Abschnitt verborgen ist, als eigener Abschnitt an seiner
- * Stelle (Req 6.3: `erfassen-offline` ohne `erfassen`).
+ * Stelle (Req 6.3: `erfassen-offline` ohne `erfassen`). Ohne freigeschaltetes Wissen (`wissen`) entfallen die
+ * Abschnitte der Wissensbasis (Spec 04, Req 22.5).
  */
-export function sichtbareAbschnitte(katalog: readonly HilfeEintrag[], rolle: Rolle | null): HilfeAbschnitt[] {
-  const sichtbar = katalog.filter((eintrag) => (rolle ? bedingungErfuellt(eintrag.bedingung, rolle) : !!eintrag.abgemeldet));
+export function sichtbareAbschnitte(katalog: readonly HilfeEintrag[], rolle: Rolle | null, wissen = true): HilfeAbschnitt[] {
+  const sichtbar = katalog.filter((eintrag) => (rolle ? bedingungErfuellt(eintrag.bedingung, rolle, wissen) : !!eintrag.abgemeldet));
   const anker = new Set(sichtbar.map((eintrag) => eintrag.anker));
   const abschnitte: { eintrag: HilfeEintrag; unter: HilfeEintrag[] }[] = [];
   for (const eintrag of sichtbar) {

@@ -45,6 +45,9 @@ export function rolleAusRealmRollen(rollen: readonly unknown[] | undefined): Rol
   return RANGFOLGE.find((rolle) => rollen.includes(rolle)) ?? null;
 }
 
+/** Rechte der Wissensbasis (Spec 04, Req 12.1); sie wirken nur bei freigeschaltetem Wissen (Spec 04, Req 22.6). */
+export const WISSEN_AKTIONEN: ReadonlySet<Aktion> = new Set<Aktion>(['A15', 'A16', 'A17', 'A18', 'A19']);
+
 export function darf(rolle: Rolle | null, aktion: Aktion): boolean {
   return rolle !== null && ERLAUBT[aktion].includes(rolle);
 }

@@ -42,6 +42,12 @@ final class EntkoppeltesModell implements StreamingChatModel {
      */
     private static final ThreadLocal<Boolean> NAECHSTER_AUFRUF_ABGEBROCHEN = new ThreadLocal<>();
 
+    /**
+     * Durchgang, zu dem der laufende Thread gerade gehört: gesetzt beim Start ({@link #imLauf}) und von der
+     * {@code Weitergabe} für jeden Rückruf, in dem der AI-Service Werkzeuge ausführt und die nächste Runde startet.
+     */
+    private static final ThreadLocal<AgentLauf> LAUF = new ThreadLocal<>();
+
     private final StreamingChatModel ziel;
 
     EntkoppeltesModell(StreamingChatModel ziel) {
@@ -58,6 +64,25 @@ final class EntkoppeltesModell implements StreamingChatModel {
         NAECHSTER_AUFRUF_ABGEBROCHEN.set(Boolean.TRUE);
     }
 
+    /** Führt {@code arbeit} als Teil von {@code lauf} aus: Modellaufrufe darin gehören zu diesem Durchgang. */
+    static void imLauf(AgentLauf lauf, Runnable arbeit) {
+        AgentLauf vorher = LAUF.get();
+        LAUF.set(lauf);
+        try {
+            arbeit.run();
+        } finally {
+            if (vorher == null) {
+                LAUF.remove();
+            } else {
+                LAUF.set(vorher);
+            }
+        }
+    }
+
+    /**
+     * Vor jedem Modellaufruf: nach einem Abbruch keiner mehr; ist Wissen seit Beginn des Durchgangs abgeschaltet
+     * (Spec 04, Req 22.9), endet der Durchgang mit dem festen Ausfalltext, bevor der Aufruf hinausgeht.
+     */
     @Override
     public void doChat(ChatRequest anfrage, StreamingChatResponseHandler handler) {
         if (Boolean.TRUE.equals(NAECHSTER_AUFRUF_ABGEBROCHEN.get())) {
@@ -65,7 +90,13 @@ final class EntkoppeltesModell implements StreamingChatModel {
             handler.onError(new AgentWerkzeug.Abgebrochen());
             return;
         }
-        ziel.doChat(anfrage, new Weitergabe(handler, neuerThread()));
+        AgentLauf lauf = LAUF.get();
+        if (lauf != null && lauf.wissenWeggefallen()) {
+            lauf.wissenAusgeschaltet();
+            handler.onError(new AgentWerkzeug.Abgebrochen());
+            return;
+        }
+        ziel.doChat(anfrage, new Weitergabe(handler, neuerThread(), lauf));
     }
 
     @Override
@@ -97,58 +128,63 @@ final class EntkoppeltesModell implements StreamingChatModel {
     }
 
     /** Gibt jeden Rückruf in Reihenfolge auf dem eigenen Thread weiter; nach dem Ende wird der Thread frei. */
-    private record Weitergabe(StreamingChatResponseHandler ziel, ExecutorService thread)
+    private record Weitergabe(StreamingChatResponseHandler ziel, ExecutorService thread, AgentLauf lauf)
             implements StreamingChatResponseHandler {
+
+        /** Jeder Rückruf läuft im Durchgang, damit die nächste Runde aus ihm heraus geprüft wird. */
+        private void weiter(Runnable rueckruf) {
+            thread.execute(() -> imLauf(lauf, rueckruf));
+        }
 
         @Override
         public void onPartialResponse(String teil) {
-            thread.execute(() -> ziel.onPartialResponse(teil));
+            weiter(() -> ziel.onPartialResponse(teil));
         }
 
         @Override
         public void onPartialResponse(PartialResponse teil, PartialResponseContext kontext) {
-            thread.execute(() -> ziel.onPartialResponse(teil, kontext));
+            weiter(() -> ziel.onPartialResponse(teil, kontext));
         }
 
         @Override
         public void onPartialThinking(PartialThinking teil) {
-            thread.execute(() -> ziel.onPartialThinking(teil));
+            weiter(() -> ziel.onPartialThinking(teil));
         }
 
         @Override
         public void onPartialThinking(PartialThinking teil, PartialThinkingContext kontext) {
-            thread.execute(() -> ziel.onPartialThinking(teil, kontext));
+            weiter(() -> ziel.onPartialThinking(teil, kontext));
         }
 
         @Override
         public void onPartialToolCall(PartialToolCall teil) {
-            thread.execute(() -> ziel.onPartialToolCall(teil));
+            weiter(() -> ziel.onPartialToolCall(teil));
         }
 
         @Override
         public void onPartialToolCall(PartialToolCall teil, PartialToolCallContext kontext) {
-            thread.execute(() -> ziel.onPartialToolCall(teil, kontext));
+            weiter(() -> ziel.onPartialToolCall(teil, kontext));
         }
 
         @Override
         public void onCompleteToolCall(CompleteToolCall aufruf) {
-            thread.execute(() -> ziel.onCompleteToolCall(aufruf));
+            weiter(() -> ziel.onCompleteToolCall(aufruf));
         }
 
         @Override
         public void onUnmappedRawEvent(Object ereignis) {
-            thread.execute(() -> ziel.onUnmappedRawEvent(ereignis));
+            weiter(() -> ziel.onUnmappedRawEvent(ereignis));
         }
 
         @Override
         public void onCompleteResponse(ChatResponse antwort) {
-            thread.execute(() -> ziel.onCompleteResponse(antwort));
+            weiter(() -> ziel.onCompleteResponse(antwort));
             thread.shutdown();
         }
 
         @Override
         public void onError(Throwable fehler) {
-            thread.execute(() -> ziel.onError(fehler));
+            weiter(() -> ziel.onError(fehler));
             thread.shutdown();
         }
     }

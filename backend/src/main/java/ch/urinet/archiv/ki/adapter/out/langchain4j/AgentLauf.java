@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -33,6 +34,8 @@ final class AgentLauf {
 
     /** Reserve für Werkzeugnachrichten des Durchgangs im Speicher (je Runde Aufruf und Ergebnisse). */
     private static final int REICHWEITE_DURCHGANG = 80;
+    /** Grund im {@link ChatEreignis.Ausfall}, wenn Wissen während des Durchgangs wegfällt (Req 22.9). */
+    static final String WISSEN_AUSGESCHALTET = "WissenAusgeschaltet";
 
     private final UUID id;
     private final ChatAnfrage anfrage;
@@ -47,6 +50,8 @@ final class AgentLauf {
     private boolean beendet;
     private boolean regulaer;
     private volatile StreamingHandle handle;
+    /** Nur wenn Wissen zu Beginn freigeschaltet war: gilt die Freischaltung noch (Spec 04, Req 22.9)? */
+    private volatile BooleanSupplier wissenNochFrei;
 
     AgentLauf(UUID id, ChatAnfrage anfrage, Consumer<ChatEreignis> ausgabe, ChatAbbruch abbruch, int fenster) {
         this(id, anfrage, anfrage.mandant(), anfrage.verlauf(), ausgabe, abbruch, fenster);
@@ -74,6 +79,25 @@ final class AgentLauf {
 
     UUID id() {
         return id;
+    }
+
+    /**
+     * Der Durchgang begann mit freigeschaltetem Wissen: Vor jedem weiteren Werkzeug und damit vor jeder weiteren
+     * Modellrunde fragt {@link AgentWerkzeug} hier nach (Spec 04, Req 22.9).
+     */
+    void wissenBeobachten(BooleanSupplier nochFrei) {
+        wissenNochFrei = nochFrei;
+    }
+
+    /** Wurde Wissen seit Beginn des Durchgangs abgeschaltet? */
+    boolean wissenWeggefallen() {
+        BooleanSupplier nochFrei = wissenNochFrei;
+        return nochFrei != null && !nochFrei.getAsBoolean();
+    }
+
+    /** Wissen fiel während des Durchgangs weg: Ausfall mit festem Wortlaut, laufender Modellaufruf endet. */
+    void wissenAusgeschaltet() {
+        ausfall(WISSEN_AUSGESCHALTET, true);
     }
 
     ChatAnfrage anfrage() {

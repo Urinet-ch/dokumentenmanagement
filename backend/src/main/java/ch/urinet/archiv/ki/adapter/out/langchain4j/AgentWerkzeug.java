@@ -15,7 +15,7 @@ import java.util.Optional;
  * Hülle um den Aufruf eines Werkzeugs im Durchgang (Spec 02, Aufgabe 7.2): meldet {@link ChatEreignis.WerkzeugStart}
  * vor und {@link ChatEreignis.WerkzeugErgebnis} nach dem Aufruf, setzt die Rundengrenze durch und kennzeichnet
  * Dokumenttexte in der Antwort als Daten (Req 5.3). Nach einem Abbruch des Clients führt sie nichts mehr aus und verhindert den
- * nächsten Modellaufruf. Ab der Runde {@code runden + 1} wird nichts mehr ausgeführt: Das Modell
+ * nächsten Modellaufruf; ebenso, wenn Wissen seit Beginn des Durchgangs abgeschaltet wurde (Spec 04, Req 22.9). Ab der Runde {@code runden + 1} wird nichts mehr ausgeführt: Das Modell
  * erhält {@value #GRENZE}, damit es mit dem Bisherigen antwortet. Mandant und Benutzer des Aufrufs kommen nie von
  * hier, sondern aus dem {@code WerkzeugKontextRegister} unter derselben Lauf-ID ({@code ArchivWerkzeuge}). Weder
  * Parameter noch Antworten gehören ins Log (Req 16.7).
@@ -51,6 +51,12 @@ final class AgentWerkzeug implements ToolExecutor {
         if (lauf.abgebrochen() || lauf.beendet()) {
             // Die Bibliothek macht aus der Ausnahme ein Fehlerergebnis und riefe das Modell trotzdem noch einmal auf; der
             // Marker auf diesem Thread verhindert den Aufruf (EntkoppeltesModell), damit keine Runde mehr bezahlt wird
+            EntkoppeltesModell.naechstenAufrufVerhindern();
+            throw new Abgebrochen();
+        }
+        if (lauf.wissenWeggefallen()) {
+            // Spec 04, Req 22.9: kein Werkzeug und keine weitere Modellrunde mehr, Ausfall mit festem Wortlaut
+            lauf.wissenAusgeschaltet();
             EntkoppeltesModell.naechstenAufrufVerhindern();
             throw new Abgebrochen();
         }

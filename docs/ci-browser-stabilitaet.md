@@ -28,6 +28,10 @@ und «WordPress-Plugin») sowie `46039250227` («WordPress-Plugin»). Kein Backe
   «Testbenutzer entfernen: HTTP 401»), dazu `apt-get` beim Bauen des Werkzeug-Images (nicht Browser, siehe unten).
   Details: `docs/ci-flakes-2026-11.md`, `docs/ci-laufzeit-2026-11.md`.
 
+## Bekannte Ursachen
+Am 27.11.2026 scheiterte die Playwright-Installation beim Abruf aus dem Paket-Repository mit HTTP 403. Das war kein
+Test-Flake; der Fehler trat bei der Installation und nicht in einem Szenario auf.
+
 ## Entscheid: im Build lassen und entschärfen
 Die Szenarien sind der einzige Test, der die Oberfläche bedient; sie haben am 26.11. echte Brüche gefunden (Treuhänder-Menü,
 Hilfe-Leiste), die Unit-Tests nicht sahen. Ausserhalb des Builds würden solche Brüche erst nach dem Merge auffallen.
