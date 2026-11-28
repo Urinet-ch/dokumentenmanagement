@@ -10,6 +10,7 @@ import ch.urinet.archiv.importe.domain.quelle.QuellenStatus;
 import ch.urinet.archiv.importe.domain.quelle.QuellenTyp;
 import ch.urinet.archiv.importe.domain.quelle.Zaehler;
 import ch.urinet.archiv.integration.application.mail.GmailLabelKonfiguration;
+import ch.urinet.archiv.integration.application.mail.GmailLabelKonfigurationLeser;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.Verschluesselung;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
@@ -47,12 +48,14 @@ public class QuellenVerwaltung {
     private final QuellenRegister register;
     private final Verschluesselung verschluesselung;
     private final MandantAufloesung aufloesung;
+    private final GmailLabelKonfigurationLeser gmailKonfigurationLeser;
 
     public QuellenVerwaltung(QuellenRegister register, Verschluesselung verschluesselung,
-                             MandantAufloesung aufloesung) {
+                             MandantAufloesung aufloesung, GmailLabelKonfigurationLeser gmailKonfigurationLeser) {
         this.register = register;
         this.verschluesselung = verschluesselung;
         this.aufloesung = aufloesung;
+        this.gmailKonfigurationLeser = gmailKonfigurationLeser;
     }
 
     @Transactional
@@ -150,7 +153,7 @@ public class QuellenVerwaltung {
         }
         GmailLabelKonfiguration konfiguration;
         try {
-            konfiguration = GmailLabelKonfiguration.lesen(quelle.konfiguration());
+            konfiguration = gmailKonfigurationLeser.lesen(quelle.konfiguration());
         } catch (IllegalArgumentException e) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -234,9 +237,9 @@ public class QuellenVerwaltung {
         return "quelle:" + aufloesung.schema() + ":" + code;
     }
 
-    private static void gmailKonfigurationPruefen(String json) {
+    private void gmailKonfigurationPruefen(String json) {
         try {
-            GmailLabelKonfiguration.lesen(json);
+            gmailKonfigurationLeser.lesen(json);
         } catch (IllegalArgumentException e) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }

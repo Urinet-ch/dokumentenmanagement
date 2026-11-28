@@ -330,6 +330,9 @@ Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderu
 - `MailErfassen.erfassenGmail` verwendet `mail_eingang` für gemeinsame Message-ID-Deduplizierung mit dem normalen
   E-Mail-Eingang. Unterstützte Anhänge gehen einzeln über `DokumentErfassen`, kleine Bilder und unbekannte Typen
   werden im Quelllauf übersprungen; Korrespondenz ohne Anhang ist optional.
+- Der JSON-Adapter liest die Quellkonfiguration ausserhalb der Anwendungslogik. Changeset 151 ergänzt `herkunft`
+  rückwärtskompatibel mit Standard `POSTFACH`; sein Rollback wird abgebrochen, sobald Gmail-Nachrichten die Herkunft
+  `GMAIL_LABEL` verwenden.
 - Nachweise: `quellen.feature` (`@req-7.1` bis `@req-7.8`), `ImapPostfachTest` (GreenMail: Flags, Grenzen,
   falsches Passwort), `MailErfassenGmailTest` (Anhänge, Hinweis, Korrespondenz und Deduplizierung),
   `GmailImportHandlerTest` (sicherer Anmeldefehler und abgebrochener Trockenlauf), `JdbcQuellenRegisterTest`

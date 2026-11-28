@@ -109,7 +109,9 @@ class GmailImportHandlerTest {
         private boolean abgebrochen;
 
         TestQuellen(LaufArt art) {
-            super(null, null, null);
+            super(null, null, null, json -> {
+                throw new UnsupportedOperationException("Konfigurationsleser wird in diesem Test nicht verwendet");
+            });
             GmailLabelKonfiguration konfiguration = new GmailLabelKonfiguration(
                     new Postfach("imap.gmail.com", 993, "synthetisch@example.invalid"), "Synthetisches Label",
                     LocalDate.of(2026, 1, 1), false, 500);
