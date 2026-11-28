@@ -125,6 +125,23 @@ class OcrMyPdfAdapterTest {
                 .containsPattern("(?m)^.*Service A\\s+Zusatzleistung mit\\s+––.*$");
     }
 
+    @Test
+    void scanMitTabelleUndVermerkWirdPerOcrMitLayoutAusgelesen() throws Exception {
+        Pruefung p = verarbeiten(OcrEingabe.von(quelle(Quelltyp.PDF, OcrTestdateien.tabellenScanPdf())));
+
+        assertThat(p.pdfa).isTrue();
+        assertThat(p.ergebnis.ocrAusgefuehrt()).isTrue();
+        assertThat(p.ergebnis.volltext()).contains("Vertraulichkeit", "INTERN", "Leistung", "Service A", "120.00",
+                "CHF", "Service B", "85.00");
+        assertThat(p.ergebnis.volltext())
+                .containsPattern("(?m)^.*Service A\\s+120\\.00\\s+CHF.*$");
+        assertThat(ch.urinet.archiv.wissen.domain.WissenVertraulichkeitsvermerk
+                .istIntern(p.ergebnis.volltext())).isTrue();
+        assertThat(befehle).filteredOn(b -> b.programm().equals("pdftotext"))
+                .anySatisfy(b -> assertThat(b.argumente()).contains("-layout"));
+        assertThat(befehle).extracting(Befehl::programm).contains("ocrmypdf");
+    }
+
     /** Textebene nur aus Satzzeichen: pdftotext findet keinen Text, OCRmyPDF schon (Exit-Code 6) → mit --skip-text. */
     @Test
     void nichtErkannteTextebeneWirdMitSkipTextWiederholt() throws Exception {

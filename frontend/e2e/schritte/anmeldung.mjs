@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { basisUrl, benutzer, keycloakAttrappe } from '../hilfen/keycloak-attrappe.mjs';
 
 const KNOPF_ANMELDEN = 'Anmelden';
-const KNOPF_ABMELDEN = 'Abmelden';
+// Angemeldet zeigt die Kopfzeile das Benutzerelement «Mein Konto», nicht mehr «Abmelden» (Spec 06, Req 11.2)
+const KONTO = /^Mein Konto/;
 
 async function anmelden(welt) {
   const seite = welt.seite;
@@ -11,7 +12,7 @@ async function anmelden(welt) {
     await seite.goto(basisUrl);
   }
   await seite.getByRole('button', { name: KNOPF_ANMELDEN, exact: true }).click();
-  await seite.getByRole('button', { name: KNOPF_ABMELDEN, exact: true }).waitFor();
+  await seite.getByRole('link', { name: KONTO }).waitFor();
   await seite.waitForURL((url) => url.pathname !== '/anmeldung');
 }
 

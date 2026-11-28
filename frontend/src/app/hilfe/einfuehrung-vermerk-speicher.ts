@@ -81,6 +81,49 @@ export function vermerkAblegen(speicher: Storage | null, vermerk: Vermerk): bool
   }
 }
 
+/**
+ * Entfernt nur die Einträge dieser Kennung (Spec 06, Req 11.9); alle übrigen Einträge bleiben unverändert erhalten, auch
+ * unlesbare, ebenso ein unlesbarer Wert. Ohne weitere Einträge entfällt der Schlüssel. Liefert `false`, wenn der Browser
+ * nicht speichert oder das Schreiben scheitert.
+ */
+export function vermerkEntfernen(speicher: Storage | null, k: string): boolean {
+  if (!speicher) {
+    return false;
+  }
+  let roh: string | null;
+  try {
+    roh = speicher.getItem(VERMERK_SCHLUESSEL);
+  } catch {
+    // Lesen gesperrt: ob ein eigener Vermerk besteht, ist unbekannt, also kein Erfolg
+    return false;
+  }
+  let inhalt: Record<string, unknown>;
+  try {
+    inhalt = objekt(JSON.parse(roh ?? 'null'));
+  } catch {
+    // Fehlender oder unlesbarer Wert: kein eigener Vermerk, nichts zu tun
+    return true;
+  }
+  const eintraege = inhalt['v'] === FORMAT ? inhalt['eintraege'] : undefined;
+  if (!Array.isArray(eintraege)) {
+    return true;
+  }
+  const uebrig = eintraege.filter((e) => objekt(e)['k'] !== k);
+  if (uebrig.length === eintraege.length) {
+    return true;
+  }
+  try {
+    if (uebrig.length > 0) {
+      speicher.setItem(VERMERK_SCHLUESSEL, JSON.stringify({ ...inhalt, eintraege: uebrig }));
+    } else {
+      speicher.removeItem(VERMERK_SCHLUESSEL);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Kalenderdatum in Europe/Zurich als `JJJJ-MM-TT`. */
 export function vermerkDatum(jetzt: Date): string {
   const teile = new Intl.DateTimeFormat('de-CH', {

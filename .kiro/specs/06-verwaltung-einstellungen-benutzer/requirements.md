@@ -592,7 +592,9 @@ Einführung, «Dieses Gerät» und Abmelden. Die Kopfzeile wird aufgeräumt.
    Die App SOLL keine eigenen Formulare für Zugangsdaten anbieten und nie Passwörter oder Codes erhalten. Ohne
    verfügbare Kontoverwaltung entfällt der Abschnitt; offline sind die Einstiege deaktiviert und die Seite sagt warum.
 5. Die Kontoverwaltung SOLL einem Benutzer weder Benutzername, Name, E-Mail-Adresse, Mandant oder Rollen ändern noch ein
-   Google-Konto verknüpfen oder lösen lassen (Spec 01, 2.27, und 10.9 bleiben massgebend), und sie SOLL keinen Zugang ohne
+   Google-Konto verknüpfen lassen; eine bestehende Verknüpfung darf er selbst lösen (entschieden von Fabian am 28.11.2026:
+   das Lösen entzieht nur einen Anmeldeweg, Passwort plus Einmalcode bleiben; Spec 01, 2.27, und 10.9 bleiben
+   massgebend), und sie SOLL keinen Zugang ohne
    zweiten Faktor ermöglichen: Entfernt die Person ihren Einmalcode, verlangt die nächste Anmeldung mit Passwort dessen
    neue Einrichtung (Spec 01, 2.1). Nachweis gegen ein Wegwerf-Keycloak.
 6. Die Seite SOLL unter «Darstellung» die Wahl «Wie das Gerät», «Hell» und «Dunkel» bieten, sie sofort anwenden und nur
