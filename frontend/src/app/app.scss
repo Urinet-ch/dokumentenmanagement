@@ -226,7 +226,7 @@ nav {
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
-  box-sizing: border-box; // auch für den Link «Passkey einrichten» (ein Knopf hat es von Haus aus)
+  box-sizing: border-box;
 
   &:hover {
     color: var(--text);
@@ -275,6 +275,17 @@ nav {
   padding: 0 10px 0 4px;
   max-width: 40vw;
   min-width: 0;
+  color: var(--text);
+  text-decoration: none;
+  box-sizing: border-box;
+
+  &:hover {
+    border-color: var(--linie-stark);
+  }
+
+  &[aria-current='page'] {
+    border-color: var(--akzent-text);
+  }
 }
 
 .avatar {
@@ -341,8 +352,13 @@ main {
     padding: 4px 16px 32px;
   }
 
+  // Nur sichtbar ausgeblendet: Name, Rolle und Mandant bleiben Teil des zugänglichen Namens (Spec 06, Req 11.1)
   .wer {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
   }
 
   .benutzer {

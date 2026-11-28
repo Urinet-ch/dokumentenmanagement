@@ -116,7 +116,8 @@ class RealmExportTest {
 
     /**
      * Das Benutzerverzeichnis (Req 10.10) übernimmt den Benutzernamen als Name, weil nur der Admin ihn ändern darf
-     * (Review PR #88, S4); Vor- und Nachname darf der Benutzer selbst ändern.
+     * (Review PR #88, S4). Seit Spec 06, Req 11.5 (Entscheid Fabian 28.11.2026) ändert der Benutzer in der Kontoverwaltung
+     * auch Vor- und Nachname nicht mehr selbst; Wirkung gegen Keycloak: {@code RealmExportKeycloakTest}.
      */
     @Test
     void benutzerprofilBehaeltSeineBerechtigungen() throws IOException {
@@ -140,8 +141,8 @@ class RealmExportTest {
         assertThat(bearbeiten.get("username")).containsExactly("admin");
         assertThat(bearbeiten.get("email")).containsExactly("admin");
         assertThat(bearbeiten.get("mandant")).containsExactly("admin");
-        assertThat(bearbeiten.get("firstName")).containsExactly("admin", "user");
-        assertThat(bearbeiten.get("lastName")).containsExactly("admin", "user");
+        assertThat(bearbeiten.get("firstName")).containsExactly("admin");
+        assertThat(bearbeiten.get("lastName")).containsExactly("admin");
         assertThat(ansehen.get("mandant")).containsExactly("admin");
         for (String name : List.of("username", "email", "firstName", "lastName")) {
             assertThat(ansehen.get(name)).containsExactly("admin", "user");

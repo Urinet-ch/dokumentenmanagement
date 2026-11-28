@@ -30,13 +30,26 @@ export class FarbschemaService {
 
   /** Wechselt zum jeweils anderen Farbschema und merkt sich die Wahl. */
   umschalten(): void {
-    const neu: Farbschema = this.dunkel() ? 'hell' : 'dunkel';
-    this.wahl.set(neu);
-    this.anwenden(neu);
+    this.waehlen(this.dunkel() ? 'hell' : 'dunkel');
+  }
+
+  /**
+   * Wendet die Wahl sofort an und merkt sie sich; «system» entfernt die gemerkte Wahl (Spec 06, Req 11.6, 11.9).
+   * Liefert `false`, wenn der Browser nicht speichert (die Wahl gilt dann nur bis zum Neuladen).
+   */
+  waehlen(wahl: Farbschema): boolean {
+    this.wahl.set(wahl);
+    this.anwenden(wahl);
     try {
-      this.fenster?.localStorage.setItem(SCHLUESSEL, neu);
+      if (wahl === 'system') {
+        this.fenster?.localStorage.removeItem(SCHLUESSEL);
+      } else {
+        this.fenster?.localStorage.setItem(SCHLUESSEL, wahl);
+      }
+      return true;
     } catch {
       // Ohne Speicher gilt die Wahl nur bis zum Neuladen.
+      return false;
     }
   }
 
