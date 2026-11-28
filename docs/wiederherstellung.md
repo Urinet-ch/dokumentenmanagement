@@ -125,4 +125,4 @@ in Fehlerfällen geprüft. Die wiederkehrende betriebliche Probe bleibt offen.
 
 | Lauf | Dauer (s) | Exit-Code |
 | --- | ---: | ---: |
-| 28.11.2026, lokal, synthetisch | 306 | 0 |
+| 28.11.2026, lokal, synthetisch | 282 | 0 |
