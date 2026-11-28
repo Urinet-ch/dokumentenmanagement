@@ -116,6 +116,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `ExceptionMapper` → RFC 9457 mit `fehlercode`
   - Tabelle `zugriff_protokoll` mit Trigger (nur `INSERT`); `@Protokolliert`-Interceptor schreibt synchron in derselben Transaktion, IP aus `X-Real-Ip`; schlägt der Eintrag fehl, wird die Aktion nicht ausgeführt; verweigerte Zugriffe mit Aktion `VERWEIGERT`
   - ArchUnit-Regeln aus `structure.md` (Blueprint)
+  - Nachtrag (28.11.2026): `FehlerInjektionTest` prüft übergrosse und knapp unter der Grenze liegende chunked-Anfragen auf einem `/api`-Pfad ohne eigene Grenze; die gültige Anfrage erreicht die Resource vollständig. `fehlerseiten-pwa.feature` trägt nur `@qa-fehlerseiten`: sein Szenario prüft den Offline-Hinweis, nicht Req 4.4 (IndexedDB-Warteschlange und Zähler), das weiterhin durch die Erfassungsszenarien belegt wird.
   - _Anforderungen: 10.2, 10.3, 10.7, 10.8, 16.13_
 
 - [x] 1.7 Stammdaten der Dokumentarten festlegen [Fabian]
