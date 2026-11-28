@@ -520,7 +520,8 @@ class WissenIngestStartenTest {
 
     private static WissenIngestStarten.Ergebnis wiederholungsStarten(Speicher speicher, Auftraege auftraege,
                                                                       int abschnittNr) {
-        return new WissenIngestStarten(speicher, GROSSES_BUDGET, auftraege)
+        return new WissenIngestStarten(speicher, GROSSES_BUDGET, auftraege,
+                ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein())
                 .abschnittWiederholen(ENTWURF_ID, abschnittNr, "benutzer-id");
     }
 
