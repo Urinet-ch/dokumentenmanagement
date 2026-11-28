@@ -1,5 +1,8 @@
 # Implementation Plan — 09 Produktivimport
 
+Der Start einer Aufgabe richtet sich nach ihren «Abhängig von»-Angaben, nicht nach der Wellengrenze (entschieden von
+Fabian am 28.11.2026).
+
 Voraussetzungen: Spec 09 auf `main` gemergt; Spec 01 bis Welle 4, Spec 02 Wellen 6 und 7, Spec 05 Wellen 17 und 18
 umgesetzt (Bestandsaufnahme `docs/spikes/09-bestandsaufnahme.md`). Die Wellen 27 bis 30 folgen auf die Nummern
 von Spec 06 (Welle 26). Wellen, Rollen und Gates wie in `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je
@@ -78,7 +81,7 @@ zu den Wellen 27 bis 29.
   - _Abhängig von: 27.2_
 
 ## Welle 28 — Scan-Eingang und Stapelverarbeitung
-- [ ] 28.1 Datenmodell Stapel [Backend]
+- [x] 28.1 Datenmodell Stapel [Backend]
   - Changesets `stapel`, `stapel_seite`, Spalten `dokument.stapel_id`, `stapel_von`, `stapel_bis`; Auftragstypen.
   - _Anforderungen: 5.1, 5.2_
 

@@ -399,6 +399,14 @@ create table dokument_seite_vermerk (dokument_id uuid, seite int, grund text, we
 `DUBLETTEN_PRUEFUNG` (Nutzlast nur IDs). `public.api_client.scope` bleibt unverändert. Jede Migration bleibt
 rückwärtskompatibel (tech.md Regel 11); die neuen Spalten haben Standardwerte, alte Releases lesen sie nicht.
 
+### Umsetzung (Aufgabe 28.1, 28.11.2026)
+- Changeset `142-stapel-datenmodell` ergänzt `stapel`, `stapel_seite` und die Stapel-/Seitenbereich-Verweise am
+  Dokument. Die Mandantentrennung folgt dem bestehenden Schema-pro-Mandant-Modell.
+- Die Auftragsnamen `STAPEL_ANALYSE`, `STAPEL_TRENNEN` und `STAPEL_ABSCHLUSS` sind als typisierte Auftragskonstanten
+  zentral definiert.
+- Diese Aufgabe liefert nur das Datenmodell und den Auftragstyp-Vertrag. Rechte A25/A26 und ihre Einträge in der
+  Rechtematrix bleiben Folgearbeit zu #749 (Aufgabe 27.2).
+
 ## Konfiguration (neu, Klasse (b) nach Spec 06, ausser Leer-Schwelle)
 Die Schlüssel stehen hier ohne das Präfix «archiv» und ohne Code-Formatierung, bis sie im Code bestehen
 (`EinstellungsInventarTest` prüft jeden Schlüssel mit diesem Präfix in `docs/` und `design.md` gegen den Code); die
