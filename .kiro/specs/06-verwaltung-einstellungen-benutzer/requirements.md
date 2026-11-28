@@ -567,6 +567,54 @@ Besitz des Geräts und Prüfung der Person); Passwort plus TOTP bleibt für alle
     Wegwerf-Keycloak prüfen: Einrichten, Anmelden, Step-up, Entfernen, Zurücksetzen durch den Admin. Nachweis auf echten Geräten
     (iPhone, Mac) ist Aufgabe von Fabian bei der Inbetriebnahme.
 
+### Requirement 11: Mein Konto (ohne Konzept-ID, Entscheid Fabian 28.11.2026)
+**User Story:** Als Benutzer möchte ich mit einem Klick auf meinen Namen meine persönlichen Einstellungen finden, damit
+Passkey, Anmeldung, Darstellung, Einführung und Abmelden an einem Ort sind und die Kopfzeile ruhig bleibt.
+
+Entscheid Fabian 28.11.2026: Die Seite enthält Angaben zur Person, Anmeldung und Sicherheit, Darstellung, Hilfe und
+Einführung, «Dieses Gerät» und Abmelden. Die Kopfzeile wird aufgeräumt.
+
+#### Acceptance Criteria
+1. WENN ein angemeldeter Benutzer in der Kopfzeile seinen Namen wählt, DANN SOLL die App die Seite «Mein Konto»
+   (`/konto`) zeigen. Das Element zeigt Initialen und Name, auf schmalen Anzeigen (375 px) mindestens die Initialen, hat
+   den zugänglichen Namen «Mein Konto» mit dem Benutzernamen und erscheint für jeden angemeldeten Benutzer, auch ohne
+   Mandant oder Rolle und ohne verfügbare Kontoverwaltung.
+2. SOLANGE ein Benutzer angemeldet ist, SOLL die Kopfzeile rechts nur «Hilfe» und das Element nach 1 zeigen; die Knöpfe
+   für das Farbschema, «Passkey einrichten» und «Abmelden» entfallen dort. Menü, Titel und Suche bleiben. Ohne
+   Anmeldung bleibt die Kopfzeile wie bisher, samt Farbschema-Knopf. SOLANGE die App weder angemeldet noch abgemeldet
+   ist (z. B. abgelaufene Sitzung oder Fehler der Anmeldung), bleibt «Abmelden» in der Kopfzeile erreichbar.
+3. Die Seite SOLL unter «Angaben zur Person» Name, Benutzername, E-Mail-Adresse, Rolle und Mandant nur lesend zeigen,
+   soweit das Token sie enthält, mit dem Hinweis, wer sie ändern kann. Fehlende Angaben entfallen. Die Seite SOLL weder
+   Token noch technische Kennungen zeigen.
+4. Die Seite SOLL unter «Anmeldung und Sicherheit» Einstiege in die Kontoverwaltung von Keycloak bieten: «Passkeys
+   verwalten» (ergänzt 10.1), «Passwort ändern», «Einmalcode (Authenticator) verwalten» und «Angemeldete Geräte», wo die
+   Person Sitzungen ansehen und beenden kann. Jeder Einstieg öffnet einen neuen Tab, der das im zugänglichen Namen sagt.
+   Die App SOLL keine eigenen Formulare für Zugangsdaten anbieten und nie Passwörter oder Codes erhalten. Ohne
+   verfügbare Kontoverwaltung entfällt der Abschnitt; offline sind die Einstiege deaktiviert und die Seite sagt warum.
+5. Die Kontoverwaltung SOLL einem Benutzer weder Benutzername, Name, E-Mail-Adresse, Mandant oder Rollen ändern noch ein
+   Google-Konto verknüpfen oder lösen lassen (Spec 01, 2.27, und 10.9 bleiben massgebend), und sie SOLL keinen Zugang ohne
+   zweiten Faktor ermöglichen: Entfernt die Person ihren Einmalcode, verlangt die nächste Anmeldung mit Passwort dessen
+   neue Einrichtung (Spec 01, 2.1). Nachweis gegen ein Wegwerf-Keycloak.
+6. Die Seite SOLL unter «Darstellung» die Wahl «Wie das Gerät», «Hell» und «Dunkel» bieten, sie sofort anwenden und nur
+   in diesem Browser speichern. Eine bisher gespeicherte Wahl gilt weiter.
+7. SOLANGE der Benutzer eine Rolle und einen Mandanten hat, SOLL die Seite unter «Hilfe und Einführung» den Knopf
+   «Einführung erneut zeigen» (Spec 07, 3.5) und einen Link zur Anleitung bieten.
+8. Die Seite SOLL unter «Dieses Gerät» die Zahl der eigenen Aufnahmen zeigen, die auf den Upload warten oder nicht
+   hochgeladen sind, mit Link zur bestehenden Liste. Aufnahmen anderer Benutzer oder Mandanten SOLL sie weder zeigen noch
+   zählen.
+9. WENN der Benutzer «Lokale Einstellungen entfernen» wählt und die Rückfrage bestätigt, DANN SOLL die App die auf diesem
+   Gerät gespeicherte Farbschema-Wahl, seinen Einführungsvermerk, seine lokalen Entwürfe und das zwischengespeicherte
+   Erscheinungsbild löschen und das in der Rückfrage vorher nennen. Aufnahmen der Warteschlange SOLL sie dabei nie
+   löschen (Spec 01, 4.11), ebenso nichts, was anderen Benutzern gehört. Der Benutzer bleibt angemeldet.
+10. WENN der Benutzer auf der Seite «Abmelden» wählt, DANN SOLL sich die App gleich verhalten wie bisher beim Knopf in
+    der Kopfzeile.
+11. Die Seite SOLL für jeden angemeldeten Benutzer erreichbar sein; ohne Mandant oder Rolle zeigt sie mindestens die
+    vorhandenen Angaben, Anmeldung und Sicherheit, Darstellung und «Abmelden». Ohne Anmeldung führt `/konto` zur
+    Anmeldung wie andere geschützte Seiten. Offline bleibt die Seite mit Darstellung, «Dieses Gerät» und «Abmelden»
+    nutzbar.
+12. Die Seite SOLL bei 375 und 1280 px, hell und dunkel, ohne waagrechtes Scrollen und ohne axe-Befund bedienbar sein
+    (Gestaltung nach `docs/oberflaeche/`). Das Archiv SOLL für sie keine neuen Daten auf dem Server speichern.
+
 ## Rückverfolgung Auftrag → Spec
 | Auftrag Fabian (18.11.2026) | Requirement |
 | --- | --- |
@@ -577,3 +625,4 @@ Besitz des Geräts und Prüfung der Person); Passwort plus TOTP bleibt für alle
 | Sicherheit und Bedrohungsmodell | 5, 7 (design.md «Bedrohungsmodell») |
 | Inbetriebnahme, Migration, Tests, Abnahme, Mandantenabbau | 9 |
 | Passkey als Anmeldeweg (iPhone, Mac), Entscheid 21.11.2026 | 10 |
+| Benutzereinstellungen «Mein Konto» (Entscheid 28.11.2026) | 11 |

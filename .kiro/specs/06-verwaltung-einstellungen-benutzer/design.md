@@ -1169,3 +1169,24 @@ Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabia
 - **Nachweis:** Komponententests (`app.spec.ts`, `kontoverwaltung.spec.ts`); Browser-Szenario `@req-10.1` in
   `features/verwaltung/passkey-einstieg-pwa.feature` (mit Attrappe, ohne echtes Keycloak: Knopf sichtbar, neuer Tab zeigt die Kontoverwaltung,
   die App-Seite bleibt, ohne Überlauf und axe-Befund bei 375/1280 px, hell/dunkel).
+
+## Mein Konto (Requirement 11, Entscheid Fabian 28.11.2026)
+- **Route:** `/konto`, nur mit Anmeldung, ohne Recht der Rechtematrix; kein Menüpunkt in der Seitenleiste, Einstieg ist das
+  Benutzerelement der Kopfzeile (Link mit `aria-current` auf der Seite). Keine neue REST-Operation: Angaben aus dem Token.
+- **Aufbau:** je Abschnitt eine Karte in der Reihenfolge Angaben zur Person, Anmeldung und Sicherheit, Darstellung, Hilfe
+  und Einführung, Dieses Gerät, Abmelden. Bestehende Dienste weiterverwenden: `FarbschemaService` (kennt `system`,
+  `hell`, `dunkel`), `kontoverwaltungUrl()`, Einführung (Spec 07), Warteschlange (Spec 01, Requirement 4), `abmelden()`.
+- **Kontoverwaltung:** Die Adressen der vier Einstiege werden aus dem Aussteller abgeleitet. Welche Pfade oder Keycloak-
+  Aktionen die eingesetzte Version dafür anbietet, wird gegen ein Wegwerf-Keycloak geprüft und hier festgehalten; ein
+  Einstieg ohne verlässliche Adresse führt auf die Startseite der Kontoverwaltung. Einschränkungen nach 11.5 gehören in
+  den Realm-Export (Benutzerprofil, Rollen der Kontoverwaltung), nicht in die App.
+- **Lokale Daten:** Eine Funktion löscht genau die in 11.9 genannten Schlüssel des angemeldeten Benutzers; sie leert nie
+  den ganzen Speicher des Browsers und rührt die Datenbank der Warteschlange nicht an.
+
+### Folgeänderungen (mit der Umsetzung nachführen)
+| Dokument | Änderung |
+| --- | --- |
+| Spec 06, 10.1 und Aufgabe 24.4 | Einstieg zum Passkey liegt auf «Mein Konto» statt in der Kopfzeile; Szenario anpassen. |
+| Spec 07, design.md E3 und «Kopfzeile» | «Hilfe» steht neben dem Benutzerelement; der Farbschema-Knopf nur noch ohne Anmeldung. |
+| Spec 07, 3.5 und 5.5 | «Einführung erneut zeigen» zusätzlich auf «Mein Konto». |
+| `docs/anleitung/`, Hilfe-Katalog | Seite «Mein Konto» beschreiben, Texte zu Kopfzeile, Abmelden und Passkey anpassen. |
