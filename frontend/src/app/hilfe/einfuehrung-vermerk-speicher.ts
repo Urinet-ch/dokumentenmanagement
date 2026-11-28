@@ -81,6 +81,31 @@ export function vermerkAblegen(speicher: Storage | null, vermerk: Vermerk): bool
   }
 }
 
+/**
+ * Entfernt nur den Vermerk dieser Kennung (Spec 06, Req 11.9); Vermerke anderer bleiben, ein unlesbarer Wert bleibt
+ * unberührt. Ohne weitere Vermerke entfällt der Schlüssel. Liefert `false`, wenn der Browser nicht speichert.
+ */
+export function vermerkEntfernen(speicher: Storage | null, k: string): boolean {
+  if (!speicher) {
+    return false;
+  }
+  const alle = vermerkeLesen(speicher);
+  if (!alle.some((e) => e.k === k)) {
+    return true;
+  }
+  const uebrig = alle.filter((e) => e.k !== k);
+  try {
+    if (uebrig.length > 0) {
+      speicher.setItem(VERMERK_SCHLUESSEL, JSON.stringify({ v: FORMAT, eintraege: uebrig }));
+    } else {
+      speicher.removeItem(VERMERK_SCHLUESSEL);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Kalenderdatum in Europe/Zurich als `JJJJ-MM-TT`. */
 export function vermerkDatum(jetzt: Date): string {
   const teile = new Intl.DateTimeFormat('de-CH', {

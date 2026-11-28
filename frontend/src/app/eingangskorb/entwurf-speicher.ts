@@ -145,6 +145,23 @@ export class EingangskorbEntwurfSpeicher {
     }
   }
 
+  /** Löscht nur die Entwürfe dieses Benutzers und seinen Marker (Spec 06, Req 11.9); Fremdes bleibt. */
+  benutzerLoeschen(benutzerId: string): void {
+    const speicher = this.speicher();
+    if (!benutzerId || !speicher) {
+      return;
+    }
+    const eigene = `${ENTWURF_PRAEFIX}${encodeURIComponent(benutzerId)}:`;
+    for (const schluessel of this.schluesselMitPraefix(speicher)) {
+      if (schluessel.startsWith(eigene)) {
+        this.entfernen(speicher, schluessel);
+      }
+    }
+    if (this.lesenWert(speicher, BENUTZER_SCHLUESSEL) === benutzerId) {
+      this.entfernen(speicher, BENUTZER_SCHLUESSEL);
+    }
+  }
+
   /** Löscht Einträge eines anderen Benutzers. Schreibt nie (der Marker entsteht erst in speichern()). */
   private fremdeEintraegeLoeschen(speicher: Storage, benutzerId: string): void {
     const vorher = this.lesenWert(speicher, BENUTZER_SCHLUESSEL);

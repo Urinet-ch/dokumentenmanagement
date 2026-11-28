@@ -17,7 +17,6 @@ import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
-import { UMGEBUNG } from '../umgebung/umgebung';
 import { WissenEntwurfZaehler } from './wissen/wissen-entwurf-zaehler';
 
 class AnmeldungAttrappe {
@@ -88,6 +87,7 @@ describe('App (Req 2.6, 8.6)', () => {
           { path: 'chat', component: Leer },
           { path: 'wissen', component: Leer },
           { path: 'wissen/entwuerfe', component: Leer },
+          { path: 'konto', component: Leer },
         ]),
         { provide: WarteschlangeService, useFactory: () => ((warteschlangeGestartet = true), {}) },
         { provide: AnmeldungService, useValue: anmeldung },
@@ -252,36 +252,46 @@ describe('App (Req 2.6, 8.6)', () => {
     expect(element.querySelector('[data-test=update-fehler]')?.textContent).toContain(TEXTE.updateFehler);
   });
 
-  it('bietet für jeden angemeldeten Benutzer den Einstieg zur Kontoverwaltung in einem neuen Tab (Req 10.1)', async () => {
+  it('zeigt angemeldet rechts nur «Hilfe» und das Benutzerelement als Link zu «Mein Konto» (Spec 06, Req 11.1, 11.2)', async () => {
     anmeldung.als('mitarbeiter');
     const element = await zeigen();
-    const link = element.querySelector<HTMLAnchorElement>('[data-test=passkey-einrichten]');
-    expect(link?.getAttribute('href')).toBe(`${UMGEBUNG.oidc.aussteller}/account`);
-    expect(link?.getAttribute('target')).toBe('_blank');
-    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
-    expect(link?.getAttribute('aria-label')).toBe(TEXTE.kopf.passkeyEinrichtenNeuerTab);
-    expect(link?.getAttribute('aria-label')?.startsWith(TEXTE.kopf.passkeyEinrichten)).toBe(true);
-    expect(link?.textContent).toContain(TEXTE.kopf.passkeyEinrichten);
-  });
-
-  it('zeigt den Einstieg zur Kontoverwaltung nicht ohne Anmeldung', async () => {
-    const element = await zeigen();
+    const link = element.querySelector<HTMLAnchorElement>('a[data-test=benutzer]');
+    expect(link?.getAttribute('href')).toBe('/konto');
+    // Zugänglicher Name ohne aria-label: «Mein Konto: » für Screenreader, dann der sichtbare Name (WCAG 2.5.3)
+    expect(link?.hasAttribute('aria-label')).toBe(false);
+    expect(link?.querySelector('.nur-screenreader')?.textContent).toBe(`${TEXTE.kopf.konto}: `);
+    expect(link?.querySelector('.wer')?.textContent).toContain('Test Benutzer');
+    expect(link?.querySelector('.avatar')?.getAttribute('aria-hidden')).toBe('true');
+    expect(link?.querySelector('.avatar')?.textContent?.trim()).toBe('TB');
+    expect(element.querySelector('[data-test=farbschema]')).toBeNull();
     expect(element.querySelector('[data-test=passkey-einrichten]')).toBeNull();
+    expect(element.querySelector('header a[target=_blank]')).toBeNull();
+    expect([...element.querySelectorAll('header button')].map((b) => b.textContent?.trim())).not.toContain(
+      TEXTE.anmeldung.abmelden,
+    );
+    expect(element.querySelector('[aria-controls="hilfe-leiste"]')).not.toBeNull();
   });
 
-  it('meldet über Keycloak ab', async () => {
-    anmeldung.als('mitarbeiter');
+  it('zeigt das Benutzerelement auch ohne Mandant oder Rolle (Req 11.1)', async () => {
+    anmeldung.als(null, null);
     const element = await zeigen();
-    window.sessionStorage.clear();
-    const entwurfSpeicher = TestBed.inject(EingangskorbEntwurfSpeicher);
-    entwurfSpeicher.speichern('u', 'd1', LEERER_ENTWURF, {});
-    expect(window.sessionStorage.getItem('archiv.eingangskorb.entwurf.v1:u:d1')).not.toBeNull();
-    const abmelden = [...element.querySelectorAll('button')].find(
-      (b) => b.textContent?.trim() === TEXTE.anmeldung.abmelden,
-    );
-    abmelden!.click();
-    expect(window.sessionStorage.getItem('archiv.eingangskorb.entwurf.v1:u:d1')).toBeNull();
-    expect(anmeldung.abmelden).toHaveBeenCalledOnce();
+    expect(element.querySelector('a[data-test=benutzer]')?.getAttribute('href')).toBe('/konto');
+  });
+
+  it('markiert das Benutzerelement auf «Mein Konto» als aktuelle Seite (Req 11.1)', async () => {
+    anmeldung.als('inhaber');
+    const fixture = TestBed.createComponent(App);
+    await TestBed.inject(Router).navigateByUrl('/konto');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[data-test=benutzer]');
+    expect(link?.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('zeigt ohne Anmeldung den Farbschema-Knopf und kein Benutzerelement (Req 11.2)', async () => {
+    const element = await zeigen();
+    expect(element.querySelector('[data-test=farbschema]')).not.toBeNull();
+    expect(element.querySelector('[data-test=benutzer]')).toBeNull();
   });
 
   it('schreibt bei der Anmeldung ohne Entwurf nichts in den sessionStorage', async () => {
@@ -311,13 +321,16 @@ describe('App (Req 2.6, 8.6)', () => {
     expect(window.sessionStorage.getItem('archiv.eingangskorb.entwurf.v1:u:d1')).toBeNull();
   });
 
-  it('bietet «Abmelden» auch nach Ablauf der Sitzung an (Keycloak-Sitzung beenden)', async () => {
+  it('bietet «Abmelden» auch nach Ablauf der Sitzung an (Keycloak-Sitzung beenden, Req 11.2)', async () => {
     anmeldung.zustand.set('abgelaufen');
     const element = await zeigen();
+    window.sessionStorage.clear();
+    TestBed.inject(EingangskorbEntwurfSpeicher).speichern('u', 'd1', LEERER_ENTWURF, {});
     const abmelden = [...element.querySelectorAll('button')].find(
       (b) => b.textContent?.trim() === TEXTE.anmeldung.abmelden,
     );
     abmelden!.click();
+    expect(window.sessionStorage.getItem('archiv.eingangskorb.entwurf.v1:u:d1')).toBeNull();
     expect(anmeldung.abmelden).toHaveBeenCalledOnce();
   });
 

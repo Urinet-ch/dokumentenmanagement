@@ -1,0 +1,127 @@
+<div class="seitenkopf">
+  <div>
+    <p class="vorzeile">{{ texte.vorzeile }}</p>
+    <h1>{{ texte.titel }}</h1>
+    <p>{{ texte.untertitel }}</p>
+  </div>
+</div>
+
+<div class="raster">
+  <section class="karte" aria-labelledby="konto-person" data-test="konto-person">
+    <h2 id="konto-person">{{ texte.person.titel }}</h2>
+    @if (benutzer(); as person) {
+      <dl>
+        @if (person.name) {
+          <dt>{{ texte.person.name }}</dt><dd><bdi>{{ person.name }}</bdi></dd>
+        }
+        @if (person.benutzername) {
+          <dt>{{ texte.person.benutzername }}</dt><dd><bdi>{{ person.benutzername }}</bdi></dd>
+        }
+        @if (person.email) {
+          <dt>{{ texte.person.email }}</dt><dd><bdi>{{ person.email }}</bdi></dd>
+        }
+        @if (person.rolle) {
+          <dt>{{ texte.person.rolle }}</dt><dd>{{ rollen[person.rolle] }}</dd>
+        }
+        @if (person.mandant) {
+          <dt>{{ texte.person.mandant }}</dt><dd><bdi>{{ person.mandant }}</bdi></dd>
+        }
+      </dl>
+    }
+    <p class="nebentext">{{ texte.person.hinweis }}</p>
+  </section>
+
+  @if (einstiege; as liste) {
+    <section class="karte" aria-labelledby="konto-sicherheit" data-test="konto-sicherheit">
+      <h2 id="konto-sicherheit">{{ texte.sicherheit.titel }}</h2>
+      <p class="nebentext">{{ texte.sicherheit.hinweis }}</p>
+      @if (!online()) {
+        <div class="hinweis warnung" role="status" id="konto-offline" data-test="konto-offline">
+          <app-symbol name="warnung" />
+          <p>{{ texte.sicherheit.offline }}</p>
+        </div>
+      }
+      <ul class="einstiege">
+        @for (einstieg of liste; track einstieg.test) {
+          <li>
+            @if (online()) {
+              <a
+                mat-stroked-button
+                [href]="einstieg.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                [attr.aria-label]="texte.sicherheit.neuerTab(einstieg.text)"
+                [attr.data-test]="'konto-' + einstieg.test"
+              >{{ einstieg.text }}</a>
+            } @else {
+              <button
+                mat-stroked-button
+                type="button"
+                disabled
+                aria-describedby="konto-offline"
+                [attr.data-test]="'konto-' + einstieg.test"
+              >{{ einstieg.text }}</button>
+            }
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  <section class="karte" aria-labelledby="konto-darstellung" data-test="konto-darstellung">
+    <h2 id="konto-darstellung">{{ texte.darstellung.titel }}</h2>
+    <p class="nebentext">{{ texte.darstellung.hinweis }}</p>
+    <div class="segment" role="group" [attr.aria-label]="texte.darstellung.gruppe">
+      @for (schema of farbschemata; track schema.wert) {
+        <button
+          type="button"
+          [attr.aria-pressed]="farbschema.wahl() === schema.wert"
+          [attr.data-test]="'farbschema-' + schema.wert"
+          (click)="farbschema.waehlen(schema.wert)"
+        >{{ schema.text }}</button>
+      }
+    </div>
+  </section>
+
+  @if (mitRolle()) {
+    <section class="karte" aria-labelledby="konto-hilfe" data-test="konto-hilfe">
+      <h2 id="konto-hilfe">{{ texte.hilfe.titel }}</h2>
+      <p class="nebentext">{{ texte.hilfe.hinweis }}</p>
+      <div class="aktionen">
+        <a mat-stroked-button routerLink="/" [queryParams]="{ einfuehrung: '' }" (click)="vermerk.neuBeginnen()">{{ erneutText }}</a>
+        <a routerLink="/hilfe">{{ texte.hilfe.anleitung }}</a>
+      </div>
+    </section>
+  }
+
+  <section class="karte" aria-labelledby="konto-geraet" data-test="konto-geraet">
+    <h2 id="konto-geraet">{{ texte.geraet.titel }}</h2>
+    <p data-test="konto-aufnahmen">{{ texte.geraet.aufnahmen(aufnahmen()) }}</p>
+    @if (darfErfassen()) {
+      <p><a routerLink="/erfassen">{{ texte.geraet.zurListe }}</a></p>
+    }
+    @if (frageOffen()) {
+      <div class="hinweis warnung" role="alert" data-test="konto-entfernen-frage">
+        <app-symbol name="warnung" />
+        <p>{{ texte.geraet.frage }}</p>
+      </div>
+      <div class="aktionen">
+        <button mat-flat-button type="button" data-test="konto-entfernen-ja" (click)="entfernen()">{{ texte.geraet.bestaetigen }}</button>
+        <button mat-button type="button" (click)="frageOffen.set(false)">{{ texte.geraet.abbrechen }}</button>
+      </div>
+    } @else {
+      <button mat-button type="button" class="knopf-gefahr" data-test="konto-entfernen" (click)="fragen()">{{ texte.geraet.entfernen }}</button>
+    }
+    @if (entfernt()) {
+      <p class="hinweis ok" role="status" data-test="konto-entfernt">{{ texte.geraet.entfernt }}</p>
+    }
+  </section>
+
+  <section class="karte" aria-labelledby="konto-abmelden" data-test="konto-abmelden">
+    <h2 id="konto-abmelden">{{ abmeldenText }}</h2>
+    <p class="nebentext">{{ texte.abmelden.hinweis }}</p>
+    <button mat-stroked-button type="button" (click)="abmelden()">
+      <app-symbol name="abmelden" />{{ abmeldenText }}
+    </button>
+  </section>
+</div>

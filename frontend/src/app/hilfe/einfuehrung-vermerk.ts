@@ -6,6 +6,7 @@ import {
   VermerkArt,
   vermerkAblegen,
   vermerkDatum,
+  vermerkEntfernen,
   vermerkeLesen,
   vermerkKennung,
 } from './einfuehrung-vermerk-speicher';
@@ -110,6 +111,26 @@ export class EinfuehrungVermerk {
         art,
         am: vermerkDatum(new Date()),
       });
+    }
+  }
+
+  /**
+   * Entfernt den Vermerk des angemeldeten Benutzers in diesem Browser (Spec 06, Req 11.9), auch ohne Rolle; danach gilt
+   * er wieder als neu. Vermerke anderer Benutzer bleiben.
+   */
+  async entfernen(): Promise<void> {
+    const benutzer = this.anmeldung.benutzer();
+    if (!this.anmeldung.angemeldet() || !benutzer?.id || !benutzer.mandant) {
+      return;
+    }
+    const person: Person = { mandant: benutzer.mandant, sub: benutzer.id };
+    this.sitzung.delete(schluessel(person));
+    if (this.gelesen()?.person === schluessel(person)) {
+      this.gelesen.set({ person: schluessel(person), bekannt: false });
+    }
+    const k = await vermerkKennung(person.mandant, person.sub, this.subtle());
+    if (k) {
+      vermerkEntfernen(this.speicher(), k);
     }
   }
 

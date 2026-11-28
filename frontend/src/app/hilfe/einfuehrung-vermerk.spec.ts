@@ -324,6 +324,26 @@ describe('Einführungsvermerk (Spec 07, Req 1.3–1.6)', () => {
     expect(await bekannt(dienst())).toBe(true);
   });
 
+  it('entfernt nur den eigenen Vermerk; danach gilt der Benutzer wieder als neu (Spec 06, Req 11.9)', async () => {
+    const eigener: Vermerk = { k: HASH_A, version: 1, art: 'ABGESCHLOSSEN', am: '2026-11-21' };
+    vermerkAblegen(localStorage, fremd(1));
+    vermerkAblegen(localStorage, eigener);
+    const vermerk = dienst();
+    expect(await bekannt(vermerk)).toBe(true);
+    await vermerk.entfernen();
+    expect(vermerk.bekannt()).toBe(false);
+    expect(vermerkeLesen(localStorage)).toEqual([fremd(1)]);
+  });
+
+  it('entfernt den Schlüssel ohne weitere Vermerke und lässt einen unlesbaren Wert stehen (Req 11.9)', async () => {
+    vermerkAblegen(localStorage, { k: HASH_A, version: 1, art: 'UEBERSPRUNGEN', am: '2026-11-21' });
+    await dienst().entfernen();
+    expect(localStorage.getItem(VERMERK_SCHLUESSEL)).toBeNull();
+    localStorage.setItem(VERMERK_SCHLUESSEL, 'kein json');
+    await dienst().entfernen();
+    expect(localStorage.getItem(VERMERK_SCHLUESSEL)).toBe('kein json');
+  });
+
   it('Datum in Europe/Zurich, ohne Uhrzeit', () => {
     expect(vermerkDatum(new Date('2026-11-21T23:30:00Z'))).toBe('2026-11-22');
     expect(vermerkDatum(new Date('2026-07-01T21:59:00Z'))).toBe('2026-07-01');

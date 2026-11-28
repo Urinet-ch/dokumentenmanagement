@@ -31,6 +31,8 @@ const SOLL: readonly Soll[] = [
   { anker: 'erste-schritte', titel: 'Erste Schritte', pfade: ['/', '/anmeldung'], abgemeldet: true },
   // Aufgabe 24.3 (Spec 06, Req 10): für alle angemeldeten Rollen, ohne Pfad
   { anker: 'erste-schritte-passkey', titel: 'Mit Passkey anmelden', eltern: 'erste-schritte' },
+  // Aufgabe 26.4 (Spec 06, Req 11): für alle angemeldeten Rollen, Seite /konto
+  { anker: 'erste-schritte-konto', titel: 'Mein Konto', eltern: 'erste-schritte', pfade: ['/konto'] },
   { anker: 'erfassen', titel: 'Erfassen', eine: ['A1'], pfade: ['/erfassen'] },
   { anker: 'erfassen-handy', titel: 'Mit dem Handy fotografieren', eltern: 'erfassen', eine: ['A1'] },
   { anker: 'erfassen-dateien', titel: 'Dateien hochladen', eltern: 'erfassen', eine: ['A1'] },
