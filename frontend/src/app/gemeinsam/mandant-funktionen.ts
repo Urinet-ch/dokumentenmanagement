@@ -1,5 +1,13 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import {
+  EnvironmentProviders,
+  Injectable,
+  Injector,
+  computed,
+  inject,
+  provideEnvironmentInitializer,
+  signal,
+} from '@angular/core';
 import { ActivatedRouteSnapshot, NavigationStart, Router } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
 import { Mandantenfunktionen } from './api';
@@ -26,7 +34,8 @@ export const WISSENSROUTE = 'wissen';
 @Injectable({ providedIn: 'root' })
 export class MandantFunktionen {
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private navigationGebunden = false;
   private readonly standIntern = signal<FunktionenStand>('offen');
   private readonly werte = signal<Mandantenfunktionen | null>(null);
   private schluessel: string | null = null;
@@ -37,7 +46,19 @@ export class MandantFunktionen {
   readonly stand = this.standIntern.asReadonly();
   readonly wissenVerfuegbar = computed(() => this.standIntern() === 'geladen' && this.werte()?.wissenVerfuegbar === true);
 
-  constructor() {
+  /**
+   * Der Router wird erst hier geholt, nicht im Konstruktor: Den Dienst erzeugen auch Anfragen aus dem Aufbau des Routers
+   * (Branding über die Titelstrategie → `anmeldungInterceptor` → `AnmeldungService`); ein Router im Konstruktor ergäbe
+   * dort einen Zirkel. Gebunden wird über {@link provideMandantFunktionen}.
+   */
+  private get router(): Router {
+    return this.injector.get(Router);
+  }
+
+  /** Prüft bei jedem Navigationsbeginn, ob der Stand aufzufrischen ist (einmalig). */
+  anNavigationBinden(): void {
+    if (this.navigationGebunden) return;
+    this.navigationGebunden = true;
     this.router.events
       .pipe(filter((ereignis) => ereignis instanceof NavigationStart))
       .subscribe(() => this.auffrischen());
@@ -128,6 +149,11 @@ export class MandantFunktionen {
     this.wartende = [];
     wartende.forEach((erfuellen) => erfuellen());
   }
+}
+
+/** Bindet {@link MandantFunktionen} an die Navigation des Routers (Auffrischen nach dem Höchstalter, Req 22.5). */
+export function provideMandantFunktionen(): EnvironmentProviders {
+  return provideEnvironmentInitializer(() => inject(MandantFunktionen).anNavigationBinden());
 }
 
 /** Schlüssel der Anmeldung für {@link MandantFunktionen.fuer}; ohne Mandant keiner. */

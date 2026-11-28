@@ -1,11 +1,17 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
-import { Component } from '@angular/core';
-import { FUNKTIONEN_HOECHSTALTER_MS, MandantFunktionen, WISSENSROUTE, funktionenSchluessel } from './mandant-funktionen';
+import { provideRouter, Router, RouterStateSnapshot, TitleStrategy } from '@angular/router';
+import { Component, Injectable, inject, signal } from '@angular/core';
+import {
+  FUNKTIONEN_HOECHSTALTER_MS,
+  MandantFunktionen,
+  WISSENSROUTE,
+  funktionenSchluessel,
+  provideMandantFunktionen,
+} from './mandant-funktionen';
 import { wissenSperreInterceptor, fehlercodeAus } from './wissen-sperre.interceptor';
-import { HttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpInterceptorFn, withInterceptors } from '@angular/common/http';
 
 @Component({ template: '' })
 class Leer {}
@@ -19,6 +25,7 @@ describe('MandantFunktionen (Spec 04, Req 22.4, 22.5)', () => {
       providers: [
         provideHttpClient(withInterceptors([wissenSperreInterceptor])),
         provideHttpClientTesting(),
+        provideMandantFunktionen(),
         provideRouter([
           { path: 'wissen', component: Leer, data: { [WISSENSROUTE]: true } },
           { path: 'chat', component: Leer },
@@ -149,5 +156,42 @@ describe('MandantFunktionen (Spec 04, Req 22.4, 22.5)', () => {
       expect(fehlercodeAus('kein json')).toBeNull();
       expect(fehlercodeAus(null)).toBeNull();
     });
+  });
+});
+
+/** Wie `BrandingTitelStrategie`: Der Router erzeugt die Titelstrategie, deren Dienst beim Aufbau eine Anfrage stellt. */
+@Injectable()
+class TitelMitAnfrage extends TitleStrategy {
+  readonly antwort = signal<string | null>(null);
+  constructor() {
+    super();
+    inject(HttpClient).get<string>('/api/v1/branding').subscribe({
+      next: (wert) => this.antwort.set(wert),
+      error: (fehler: unknown) => this.antwort.set(`Fehler: ${String(fehler)}`),
+    });
+  }
+  override updateTitle(_: RouterStateSnapshot): void {}
+}
+
+describe('wissenSperreInterceptor beim Aufbau des Routers', () => {
+  it('lässt Anfragen aus Diensten des Routers ohne Zirkel durch', () => {
+    // wie `anmeldungInterceptor` über `AnmeldungService`: braucht die Funktionen schon bei jeder Anfrage
+    const wieAnmeldung: HttpInterceptorFn = (anfrage, weiter) => {
+      inject(MandantFunktionen);
+      return weiter(anfrage);
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([wieAnmeldung, wissenSperreInterceptor])),
+        provideHttpClientTesting(),
+        provideMandantFunktionen(),
+        provideRouter([]),
+        { provide: TitleStrategy, useClass: TitelMitAnfrage },
+      ],
+    });
+    TestBed.inject(Router);
+    const titel = TestBed.inject(TitleStrategy) as TitelMitAnfrage;
+    TestBed.inject(HttpTestingController).expectOne('/api/v1/branding').flush('Musterarchiv');
+    expect(titel.antwort()).toBe('Musterarchiv');
   });
 });
