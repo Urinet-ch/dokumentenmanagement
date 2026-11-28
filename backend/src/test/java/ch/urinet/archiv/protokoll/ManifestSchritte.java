@@ -550,9 +550,19 @@ public class ManifestSchritte {
 
     @Dann("die Manifeste von «{word}» wurden in Datumsreihenfolge erzeugt")
     public void reihenfolge(String alias) throws SQLException {
-        List<Object> nachErstellung = daten(alias, "select datum from %s.manifest order by erstellt, datum");
-        List<Object> nachDatum = daten(alias, "select datum from %s.manifest order by datum");
-        assertThat(nachErstellung).containsExactlyElementsOf(nachDatum);
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select datum, sha256, vorher_sha256 from " + schema(alias)
+                        + ".manifest order by datum"); ResultSet zeilen = abfrage.executeQuery()) {
+            String vorher = null;
+            int anzahl = 0;
+            while (zeilen.next()) {
+                assertThat(zeilen.getString("vorher_sha256")).as("Vorgänger von %s", zeilen.getObject("datum"))
+                        .isEqualTo(vorher);
+                vorher = zeilen.getString("sha256");
+                anzahl++;
+            }
+            assertThat(anzahl).isGreaterThan(1);
+        }
     }
 
     @Dann("unter «manifest\\/» von «{word}» ist keine Datei dazugekommen")
