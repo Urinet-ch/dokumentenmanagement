@@ -168,9 +168,11 @@ public class DriveImportSchritte {
 
     @Wenn("der Drive-Import den Ordner «{}» im Trockenlauf durchgeht")
     public void trockenlauf(String ordner) throws SQLException {
-        mandant = "urinet";
-        starten("--trockenlauf", "--token-datei", verzeichnis.resolve("fehlt").toString(),
-                verzeichnis.resolve(ordner).toString());
+        assertThat(tokenDatei).as("Der Trockenlauf benötigt ein Import-Token").isNotNull();
+        List<String> argumente = importArgumente();
+        argumente.add("--trockenlauf");
+        argumente.add(verzeichnis.resolve(ordner).toString());
+        starten(argumente.toArray(String[]::new));
     }
 
     @Dann("endet der Drive-Import mit Exit-Code {int}")
@@ -250,12 +252,13 @@ public class DriveImportSchritte {
                         + abgelehnt + " (geht auf)");
     }
 
-    @Dann("geht der Bericht des Trockenlaufs auf: {int} gefunden = {int} würde übertragen + {int} übersprungen + "
-            + "{int} abgelehnt")
-    public void bilanzTrockenlauf(int gefunden, int wuerde, int uebersprungen, int abgelehnt) {
-        assertThat(gefunden).isEqualTo(wuerde + uebersprungen + abgelehnt);
+    @Dann("geht der Bericht des Trockenlaufs auf: {int} gefunden = {int} würde übertragen + "
+            + "{int} Dublette nach Prüfsumme + {int} übersprungen + {int} Fehler")
+    public void bilanzTrockenlauf(int gefunden, int wuerde, int dublette, int uebersprungen, int fehler) {
+        assertThat(gefunden).isEqualTo(wuerde + dublette + uebersprungen + fehler);
         assertThat(ausgabe).contains("Schlussbericht (Trockenlauf: nichts übertragen)",
-                "Kontrolle: " + gefunden + " = " + wuerde + " + " + uebersprungen + " + " + abgelehnt + " (geht auf)");
+                "Kontrolle: " + gefunden + " = " + wuerde + " + " + dublette + " + " + uebersprungen + " + " + fehler
+                        + " (geht auf)");
     }
 
     @Dann("ist im Mandanten «{word}» keine Datei des Ordners gespeichert")
