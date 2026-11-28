@@ -70,7 +70,9 @@ public class MandantEinstellungenResource {
     }
 
     @Schema(name = "EinstellungenBetrieb")
-    public record BetriebDto(ChatBudgetDto oeffentlicherChat, long wissenMonatsbudgetTokens) {
+    public record BetriebDto(ChatBudgetDto oeffentlicherChat,
+                             @Schema(nullable = true, description = "fehlt, solange Wissen nicht freigeschaltet ist "
+                                     + "(Spec 04, Req 22.6)") Long wissenMonatsbudgetTokens) {
     }
 
     @Schema(name = "EinstellungskatalogAntwort")

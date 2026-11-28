@@ -4,8 +4,10 @@ import {
   DestroyRef,
   ElementRef,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -137,6 +139,15 @@ export class Chat {
       this.analyseStatus?.unsubscribe();
     });
     this.listeLaden();
+    // Wissen während der Sitzung abgeschaltet (Spec 04, Req 22.5): ein offenes Gespräch im Modus WISSEN schliessen
+    effect(() => {
+      if (!this.wissen() && this.modus() === 'WISSEN') {
+        untracked(() => {
+          this.abbrechen();
+          this.neuesGespraech();
+        });
+      }
+    });
   }
 
   protected chips(quellen: readonly Quelle[]): Chip[] {

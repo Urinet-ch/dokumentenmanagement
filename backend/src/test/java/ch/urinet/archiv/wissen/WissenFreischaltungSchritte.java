@@ -70,12 +70,25 @@ public class WissenFreischaltungSchritte {
     @Inject
     Instance<AgroalDataSource> datenbank;
 
+    @Inject
+    ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung tokens;
+
+    private final List<String> tokenIds = new ArrayList<>();
+
     private final Map<String, List<Long>> gezaehlt = new LinkedHashMap<>();
     private Optional<UUID> geplanterLint;
     private long lintLaeufeVorher;
 
     @After("@wissen-freischaltung")
-    public void standardWiederherstellen() {
+    public void standardWiederherstellen() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement loeschen = verbindung.prepareStatement("delete from public.api_client where id = ?")) {
+            for (String id : tokenIds) {
+                loeschen.setString(1, id);
+                loeschen.executeUpdate();
+            }
+        }
+        tokenIds.clear();
         for (String code : List.of(WissenInTestdaten.URINET, WissenInTestdaten.VHF_GSK)) {
             ohneAnfrage(() -> freischalten.setzen(new MandantCode(code), true));
         }
@@ -124,6 +137,37 @@ public class WissenFreischaltungSchritte {
             assertThat(ProblemDetails.pruefen(antwort, status))
                     .as(zeile.get("methode") + " " + zeile.get("pfad") + ": " + antwort.asString()).isEqualTo(code);
         }
+    }
+
+    /** Anmeldeweg API-Token (Req 22.6, «unabhängig vom Anmeldeweg»): ein echtes Token mit Scope, nicht nur der Pfad. */
+    @Dann("antworten mit einem API-Token «{word}» von «{word}» diese Anfragen mit Status {int} und Fehlercode «{word}»:")
+    public void mitApiToken(String scope, String code, int status, String fehlercode, DataTable tabelle) {
+        var erstellt = tokens.erstellen(code, "Probe Wissen", scope);
+        tokenIds.add(erstellt.token().id());
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Response antwort = senden(given().auth().oauth2(erstellt.token().text()), zeile);
+            assertThat(ProblemDetails.pruefen(antwort, status))
+                    .as(zeile.get("methode") + " " + zeile.get("pfad") + ": " + antwort.asString()).isEqualTo(fehlercode);
+        }
+    }
+
+    /** Req 22.6: Einstellungskatalog ohne Gruppe der Wissensbasis und ohne Wissensbudget, solange gesperrt. */
+    @Dann("zeigt der Einstellungskatalog für «{word}» die Wissensbasis nicht")
+    public void katalogOhneWissen(String benutzer) {
+        var antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get("/api/v1/mandant/einstellungen")
+                .then().statusCode(200).extract().jsonPath();
+        assertThat(antwort.getList("katalog.gruppe", String.class)).isNotEmpty().doesNotContain("WISSEN");
+        assertThat(antwort.getList("katalog.schluessel", String.class)).noneMatch(k -> k.startsWith("wissen."));
+        assertThat(antwort.getMap("betrieb")).containsKey("oeffentlicherChat");
+        assertThat(antwort.get("betrieb.wissenMonatsbudgetTokens") == null).as("kein Wissensbudget").isTrue();
+    }
+
+    @Dann("zeigt der Einstellungskatalog für «{word}» die Wissensbasis")
+    public void katalogMitWissen(String benutzer) {
+        var antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get("/api/v1/mandant/einstellungen")
+                .then().statusCode(200).extract().jsonPath();
+        assertThat(antwort.getList("katalog.gruppe", String.class)).contains("WISSEN");
+        assertThat(antwort.getLong("betrieb.wissenMonatsbudgetTokens")).isPositive();
     }
 
     @Dann("antworten ohne Anmeldung diese Anfragen mit Status {int}:")

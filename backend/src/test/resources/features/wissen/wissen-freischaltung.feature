@@ -58,6 +58,12 @@ Funktionalität: Wissen je Mandant freischalten (Requirement 22, Aufgaben 25.1 b
       | methode | pfad                               | koerper |
       | GET     | /api/v1/wissensbasis/einstellungen |         |
       | POST    | /api/v1/wissensbasis/lint          | {}      |
+    Und antworten mit einem API-Token «generator» von «urinet» diese Anfragen mit Status 403 und Fehlercode «WISSEN_NICHT_FREIGESCHALTET»:
+      | methode | pfad                                        | koerper |
+      | GET     | /api/v1/wissensseiten                       |         |
+      | GET     | /api/v1/wissensbasis/log                    |         |
+      | POST    | /api/v1/dokumente/<unbekannt>/wissensquelle |         |
+    Und zeigt der Einstellungskatalog für «inhaber-urinet» die Wissensbasis nicht
     Und ist der Bestand der Wissensbasis von «urinet» unverändert
     Und wartet in «urinet» kein Auftrag der Wissensbasis
     Wenn Wissen für «urinet» wieder freigeschaltet wird
@@ -67,6 +73,7 @@ Funktionalität: Wissen je Mandant freischalten (Requirement 22, Aufgaben 25.1 b
     Und antworten für «mitarbeiter-urinet» diese Anfragen mit Status 403 und Fehlercode «NICHT_ERLAUBT»:
       | methode | pfad                               | koerper |
       | GET     | /api/v1/wissensbasis/einstellungen |         |
+    Und zeigt der Einstellungskatalog für «inhaber-urinet» die Wissensbasis
 
   @req-22.6 @req-22.7
   Szenario: Gespräche im Modus WISSEN sind ohne Freischaltung weder sichtbar noch lesbar noch fortsetzbar

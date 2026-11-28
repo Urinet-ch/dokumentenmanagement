@@ -1,14 +1,31 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { MandantFunktionen, funktionenSchluessel } from './mandant-funktionen';
+import { provideRouter, Router } from '@angular/router';
+import { Component } from '@angular/core';
+import { FUNKTIONEN_HOECHSTALTER_MS, MandantFunktionen, WISSENSROUTE, funktionenSchluessel } from './mandant-funktionen';
+import { wissenSperreInterceptor, fehlercodeAus } from './wissen-sperre.interceptor';
+import { HttpClient, withInterceptors } from '@angular/common/http';
+
+@Component({ template: '' })
+class Leer {}
 
 describe('MandantFunktionen (Spec 04, Req 22.4, 22.5)', () => {
   let funktionen: MandantFunktionen;
   let http: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([wissenSperreInterceptor])),
+        provideHttpClientTesting(),
+        provideRouter([
+          { path: 'wissen', component: Leer, data: { [WISSENSROUTE]: true } },
+          { path: 'chat', component: Leer },
+          { path: 'nicht-gefunden', component: Leer },
+        ]),
+      ],
+    });
     funktionen = TestBed.inject(MandantFunktionen);
     http = TestBed.inject(HttpTestingController);
   });
@@ -68,5 +85,69 @@ describe('MandantFunktionen (Spec 04, Req 22.4, 22.5)', () => {
     expect(funktionenSchluessel({ id: 'u1', mandant: 'urinet' })).toBe('urinet|u1');
     expect(funktionenSchluessel({ id: 'u1', mandant: null })).toBeNull();
     expect(funktionenSchluessel(null)).toBeNull();
+  });
+
+  describe('Abschalten während der Sitzung (Req 22.2, 22.5)', () => {
+    const ein = { finanzVerfuegbar: true, wissenVerfuegbar: true };
+    const aus = { finanzVerfuegbar: true, wissenVerfuegbar: false };
+
+    it('lädt bei einer Navigation erst nach dem Höchstalter neu und behält bis dahin den Stand', () => {
+      funktionen.fuer('urinet|u1');
+      http.expectOne('/api/v1/mandant/funktionen').flush(ein);
+      funktionen.auffrischen(Date.now() + FUNKTIONEN_HOECHSTALTER_MS - 1000);
+      http.expectNone('/api/v1/mandant/funktionen');
+      funktionen.auffrischen(Date.now() + FUNKTIONEN_HOECHSTALTER_MS);
+      const anfrage = http.expectOne('/api/v1/mandant/funktionen');
+      expect(funktionen.wissenVerfuegbar()).toBe(true);
+      anfrage.flush(aus);
+      expect(funktionen.wissenVerfuegbar()).toBe(false);
+    });
+
+    it('wartet im Wächter auf eine laufende Auffrischung', async () => {
+      funktionen.fuer('urinet|u1');
+      http.expectOne('/api/v1/mandant/funktionen').flush(ein);
+      funktionen.auffrischen(Date.now() + FUNKTIONEN_HOECHSTALTER_MS);
+      let fertig = false;
+      const bereit = funktionen.bereit().then(() => (fertig = true));
+      await Promise.resolve();
+      expect(fertig).toBe(false);
+      http.expectOne('/api/v1/mandant/funktionen').flush(aus);
+      await bereit;
+      expect(funktionen.wissenVerfuegbar()).toBe(false);
+    });
+
+    it('blendet bei 403 WISSEN_NICHT_FREIGESCHALTET sofort aus, lädt neu und verlässt die Wissensroute', async () => {
+      const router = TestBed.inject(Router);
+      funktionen.fuer('urinet|u1');
+      http.expectOne('/api/v1/mandant/funktionen').flush(ein);
+      await router.navigateByUrl('/wissen');
+      TestBed.inject(HttpClient).get('/api/v1/wissensseiten').subscribe({ error: () => undefined });
+      http.expectOne('/api/v1/wissensseiten').flush({ fehlercode: 'WISSEN_NICHT_FREIGESCHALTET' },
+        { status: 403, statusText: 'Forbidden' });
+      expect(funktionen.wissenVerfuegbar()).toBe(false);
+      http.expectOne('/api/v1/mandant/funktionen').flush(aus);
+      await new Promise((r) => setTimeout(r));
+      expect(router.url).toBe('/nicht-gefunden');
+    });
+
+    it('lässt andere 403 und andere Seiten unberührt', async () => {
+      const router = TestBed.inject(Router);
+      funktionen.fuer('urinet|u1');
+      http.expectOne('/api/v1/mandant/funktionen').flush(ein);
+      await router.navigateByUrl('/chat');
+      TestBed.inject(HttpClient).get('/api/v1/wissensseiten').subscribe({ error: () => undefined });
+      http.expectOne('/api/v1/wissensseiten').flush({ fehlercode: 'NICHT_ERLAUBT' }, { status: 403, statusText: 'Forbidden' });
+      expect(funktionen.wissenVerfuegbar()).toBe(true);
+      funktionen.gesperrt();
+      http.expectOne('/api/v1/mandant/funktionen').flush(aus);
+      await new Promise((r) => setTimeout(r));
+      expect(router.url).toBe('/chat');
+    });
+
+    it('liest den Fehlercode auch aus einem Textkörper', () => {
+      expect(fehlercodeAus('{"fehlercode":"WISSEN_NICHT_FREIGESCHALTET"}')).toBe('WISSEN_NICHT_FREIGESCHALTET');
+      expect(fehlercodeAus('kein json')).toBeNull();
+      expect(fehlercodeAus(null)).toBeNull();
+    });
   });
 });

@@ -385,7 +385,8 @@ bleibt, neue Felder kommen flach dazu; die genaue Form legt Aufgabe 20.2 gegen d
 
 Spec 04 ergänzt (Spec 04, Req 22.3, 22.5 und 22.6, Entscheid Fabian 28.11.2026): Die Einstellungsgruppe der Wissensbasis
 (`wissen`) erscheint in der Oberfläche nur, wenn Wissen für den Mandanten freigeschaltet ist (`wissenVerfuegbar` aus
-`GET /mandant/funktionen`); ohne Freischaltung antworten `/wissensbasis/einstellungen`, ein Patch mit `wissen` und das
+`GET /mandant/funktionen`); ohne Freischaltung fehlen in `GET /mandant/einstellungen` die Gruppe der Wissensbasis
+und im Block `betrieb` das Wissensbudget, und es antworten `/wissensbasis/einstellungen`, ein Patch mit `wissen` und das
 Zurücksetzen der Gruppe `WISSEN` mit 403 `WISSEN_NICHT_FREIGESCHALTET` vor A19. Die Freischaltung selbst ist keine
 Einstellung: Sie steht weder im Einstellungskatalog noch in der Konfigurationsdatei, sondern nur in `public.mandant`
 und wird nur mit dem Betreiber-Kommando `archiv mandant wissen <code> [ein|aus]` geändert.

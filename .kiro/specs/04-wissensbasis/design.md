@@ -1730,8 +1730,9 @@ Requirements bleiben unverändert.
   (`ChatSpeicher.verlaufOhneWissen`), Quellen auf Wissensseiten erscheinen im Verlauf ohne Titel und Link, und keine
   Nachricht bietet eine Analyse an. Dokumentansicht ohne Wissensseiten (`WissenLesen.seitenFuerDokument`). Der
   öffentliche Wissenschat antwortet wie bei ausgeschaltetem Schalter (403 `NICHT_ERLAUBT`). Einstellungen: ein Patch
-  mit `wissen` und das Zurücksetzen der Gruppe `WISSEN` ergeben 403 `WISSEN_NICHT_FREIGESCHALTET` vor A19; das
-  Zurücksetzen einer ganzen Version bleibt möglich (Auslegung).
+  mit `wissen` und das Zurücksetzen der Gruppe `WISSEN` ergeben 403 `WISSEN_NICHT_FREIGESCHALTET` vor A19;
+  `GET /mandant/einstellungen` lässt die Gruppe der Wissensbasis und im Block `betrieb` das Wissensbudget weg
+  (Review PR #751); das Zurücksetzen einer ganzen Version bleibt möglich (Auslegung).
 - **25.3 Keine KI-Läufe:** Ingest-Start (manuell, nach Markierung, Abschnitt wiederholen) und Lint von Hand ergeben 403;
   Nachholen und Lint-Zeitplan überspringen den Mandanten (kein späteres Nachholen). `Wissensfreischaltung
   .modellaufrufPruefen` steht unmittelbar vor jedem Modellaufruf von Ingest, Neuerzeugung und Lint; zusätzlich prüfen
@@ -1741,7 +1742,10 @@ Requirements bleiben unverändert.
   Berichtsteile zur Wissensbasis versendet das Archiv heute keine (der Wochenbericht des Mandanten enthält keine
   Wissensteile); kommen solche hinzu, fragen sie dieselbe Stelle. Regeln ohne KI (Quellenhinweise nach Requirement 15,
   Sichtbarkeit, Aufbewahrung, Sicherung, Vollexport) laufen unverändert; gelöscht wird nichts.
-- **25.4 Oberfläche:** Dienst `MandantFunktionen` (einmal je Anmeldung, bis geladen und bei Fehler ohne Wissen);
+- **25.4 Oberfläche:** Dienst `MandantFunktionen` (je Anmeldung, bei jeder Navigation neu, sobald der Stand älter
+  als 60 s ist, und sofort nach einer Antwort 403 `WISSEN_NICHT_FREIGESCHALTET` über `wissenSperreInterceptor`;
+  fällt Wissen weg, wechselt eine Wissensroute (`data.wissen`) auf «Seite nicht gefunden» und der Chat schliesst
+  ein Gespräch im Modus `WISSEN`; Review PR #751; bis geladen und bei Fehler ohne Wissen);
   `AnmeldungService.darf` gewährt A15 bis A19 nur bei Freischaltung, darum folgen Menü (samt Zähler, der ohne
   Freischaltung nicht abfragt), Startseite, Einführung und Analyse-Links an einer Stelle. `wissenGuard` für alle
   Wissensrouten (Direktaufruf → `/nicht-gefunden`), Dokumentansicht, Chat (Moduswahl, WISSEN-Gespräche), Suche,

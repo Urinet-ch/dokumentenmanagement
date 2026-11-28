@@ -64,3 +64,25 @@ Funktionalität: Wissen je Mandant freischalten – Oberfläche
     Und zeigt die Dokumentansicht keine Aktion «Als Wissensquelle verwenden»
     Und zeigt der Chat keine Wahl des Modus
     Und ruft die PWA keine Schnittstelle der Wissensbasis auf
+
+  @browser @req-22.5
+  Szenario: Nach dem Abschalten in einer offenen Sitzung verschwindet der Bereich nach höchstens 60 Sekunden
+    Angenommen die Uhr der App ist steuerbar
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Dann zeigt das Menü die Punkte «Wissen» und «Entwürfe»
+    Und zeigt der Chat die Wahl des Modus
+    Wenn ich im Chat den Modus «Wissen befragen» wähle
+    Und Wissen für den Mandanten «urinet» während der Sitzung abgeschaltet wird
+    Und mehr als 60 Sekunden vergehen
+    Und ich in der App die Seite «/chat?neu=1» öffne
+    Dann ist im Chat kein Gespräch im Modus «Wissen befragen» mehr offen
+    Und verschwinden die Punkte «Wissen» und «Entwürfe» aus dem Menü
+
+  @browser @req-22.5
+  Szenario: Meldet das Archiv in einer offenen Sitzung die Sperre, wechselt eine Wissensroute auf «Seite nicht gefunden»
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Dann zeigt das Menü die Punkte «Wissen» und «Entwürfe»
+    Wenn Wissen für den Mandanten «urinet» während der Sitzung abgeschaltet wird
+    Und ich in der App die Seite «/wissen/entwuerfe» öffne
+    Dann bin ich auf der Seite «/nicht-gefunden»
+    Und zeigt das Menü keine Punkte «Wissen» und «Entwürfe»

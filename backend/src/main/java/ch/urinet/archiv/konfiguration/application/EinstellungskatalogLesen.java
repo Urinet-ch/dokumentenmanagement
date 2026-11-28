@@ -14,6 +14,7 @@ import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenKonfiguration;
 import ch.urinet.archiv.wissen.application.WissenLintStarten;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -30,7 +31,8 @@ public class EinstellungskatalogLesen {
                           boolean riskant, String wirksamAb, String hinweis) {
     }
 
-    public record Betrieb(MandantBudget.Stand oeffentlicherChat, long wissenMonatsbudgetTokens) {
+    /** {@code wissenMonatsbudgetTokens} fehlt ({@code null}), solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.6). */
+    public record Betrieb(MandantBudget.Stand oeffentlicherChat, Long wissenMonatsbudgetTokens) {
     }
 
     public record Ergebnis(int version, List<Eintrag> katalog, Betrieb betrieb) {
@@ -48,6 +50,7 @@ public class EinstellungskatalogLesen {
     private final WissenLintStarten lint;
     private final long lintBudget;
     private final String lintStandardZeitplan;
+    private final Wissensfreischaltung freischaltung;
 
     public EinstellungskatalogLesen(KonfigurationVerwaltung konfiguration, MandantAufloesung aufloesung,
                                     MandantBudget budget, EinstellungsStartwerte startwerte,
@@ -56,7 +59,9 @@ public class EinstellungskatalogLesen {
                                     @ConfigProperty(name = "archiv.wissen.lint-budget-tokens", defaultValue = "100000")
                                     long lintBudget,
                                     @ConfigProperty(name = "archiv.wissen.lint-zeitplan",
-                                            defaultValue = "0 0 4 ? * SUN") String lintStandardZeitplan) {
+                                            defaultValue = "0 0 4 ? * SUN") String lintStandardZeitplan,
+                                    Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.konfiguration = konfiguration;
         this.aufloesung = aufloesung;
         this.budget = budget;
@@ -76,14 +81,18 @@ public class EinstellungskatalogLesen {
         var wissenswerte = aktuell.einstellungen().wissen();
         Branding branding = brandings.fuerMandant(mandant).orElse(Branding.STANDARD);
         String zeitplan = lint.zeitplan();
+        // Spec 04, Req 22.6: ohne Freischaltung weder die Gruppe der Wissensbasis noch ihr Monatsbudget
+        boolean wissen = freischaltung.freigeschaltet(mandant);
         List<Eintrag> eintraege = Einstellungskatalog.alle().stream()
+                .filter(e -> wissen || e.gruppe() != Einstellungskatalog.Gruppe.WISSEN)
                 .filter(e -> Rechtematrix.ergebnis(rolle,
                         e.recht() == Einstellungskatalog.Recht.A19 ? Aktion.A19 : Aktion.A20).zugaenglich())
                 .map(e -> eintrag(e, aktuell.einstellungen(), mandant, branding, start, wissenswerte, zeitplan))
                 .toList();
         return new Ergebnis(aktuell.version(), eintraege,
-                new Betrieb(budget.stand(mandant), wissenswerte.monatsbudgetTokens() == null
-                        ? start.wissenMonatsbudget() : wissenswerte.monatsbudgetTokens()));
+                new Betrieb(budget.stand(mandant), !wissen ? null : Long.valueOf(
+                        wissenswerte.monatsbudgetTokens() == null
+                                ? start.wissenMonatsbudget() : wissenswerte.monatsbudgetTokens())));
     }
 
     private Eintrag eintrag(Einstellung einstellung, Einstellungen werte, MandantCode mandant, Branding branding,

@@ -1817,8 +1817,9 @@
             "$ref" : "#/components/schemas/OeffentlichesChatBudget"
           },
           "wissenMonatsbudgetTokens" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "fehlt, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.6)"
           }
         }
       },

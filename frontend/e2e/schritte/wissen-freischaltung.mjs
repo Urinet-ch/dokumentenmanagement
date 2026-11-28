@@ -144,3 +144,57 @@ Then('sind Dokumentansicht und Chat ohne Wissen bei 375 und 1280 Pixeln in hell 
       }
     }
   });
+
+// Abschalten während einer offenen Sitzung (Spec 04, Req 22.2, 22.5): Nach höchstens 60 s oder bei der ersten Antwort
+// 403 WISSEN_NICHT_FREIGESCHALTET verschwindet der Bereich ohne Neuladen; die Uhr der Seite ist dafür steuerbar.
+Given('die Uhr der App ist steuerbar', async function () {
+  await this.seite.clock.install();
+});
+
+Given(/^Wissen für den Mandanten «(.+)» während der Sitzung abgeschaltet wird$/, async function (mandant) {
+  (await archivAttrappe(this)).wissenAus.add(mandant);
+  // spätere Routen gehen in Playwright vor: jede Wissensanfrage antwortet wie das Archiv ohne Freischaltung
+  await this.seite.route((url) => url.pathname.startsWith('/api/v1/') && wissenspfad(url.pathname),
+    (route) => route.fulfill({
+      status: 403,
+      contentType: 'application/problem+json',
+      json: { status: 403, fehlercode: 'WISSEN_NICHT_FREIGESCHALTET', title: 'Nicht verfügbar' },
+    }));
+});
+
+Given('mehr als 60 Sekunden vergehen', async function () {
+  await this.seite.clock.fastForward(61_000);
+  // danach wieder mit der Wanduhr, damit Warteschritte mit requestAnimationFrame weiterlaufen
+  await this.seite.clock.resume();
+});
+
+Given(/^ich in der App die Seite «(.+)» öffne$/, async function (ziel) {
+  await this.seite.evaluate((adresse) => {
+    history.pushState(null, '', adresse);
+    dispatchEvent(new PopStateEvent('popstate', { state: null }));
+  }, ziel);
+});
+
+Given(/^ich im Chat den Modus «(.+)» wähle$/, async function (modus) {
+  await this.seite.getByRole('textbox').first().waitFor();
+  const knopf = this.seite.getByRole('group', { name: 'Modus für ein neues Gespräch', exact: true })
+    .getByRole('button', { name: modus, exact: true });
+  await knopf.click();
+  await this.seite.waitForFunction((name) => [...document.querySelectorAll('button[aria-pressed="true"]')]
+    .some((b) => b.textContent.trim() === name), modus);
+});
+
+Then('ist im Chat kein Gespräch im Modus «Wissen befragen» mehr offen', async function () {
+  await this.seite.getByRole('group', { name: 'Modus für ein neues Gespräch', exact: true })
+    .waitFor({ state: 'detached' });
+  assert.equal(await anzahl(this.seite.getByText('Wissen befragen', { exact: true })), 0, 'Modus «Wissen befragen»');
+  await this.seite.getByRole('textbox').first().waitFor();
+});
+
+Then('verschwinden die Punkte «Wissen» und «Entwürfe» aus dem Menü', async function () {
+  // ohne Warten im Seitenkontext: die Uhr der Seite ist in diesem Szenario simuliert
+  const nav = this.seite.getByRole('navigation', { name: 'Hauptnavigation' });
+  await nav.locator('a[href="/wissen"]').waitFor({ state: 'detached' });
+  await nav.locator('a[href="/wissen/entwuerfe"]').waitFor({ state: 'detached' });
+  assert.equal(await anzahl(nav.locator('a[href^="/wissen"]')), 0, 'Wissen im Menü');
+});
