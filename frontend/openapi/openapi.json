@@ -7106,6 +7106,10 @@
                   "metadaten" : {
                     "type" : "string",
                     "description" : "GeneratorMetadaten als JSON-Text"
+                  },
+                  "quelllauf" : {
+                    "type" : "string",
+                    "description" : "Optionaler offener Quelllauf der Quelle «generatoren»"
                   }
                 }
               }
@@ -7140,7 +7144,7 @@
             }
           },
           "400" : {
-            "description" : "Metadaten kein gültiges JSON, unbekanntes Feld, unbekannte Art oder ungültiger Wert (Richtung, Währung, Betrag, Vertraulichkeit)"
+            "description" : "Metadaten kein gültiges JSON, unbekanntes Feld, unbekannte Art oder ungültiger Wert (Richtung, Währung, Betrag, Vertraulichkeit); ungültige Quelllauf-ID oder ein Quelllauf, der nicht zur Quelle «generatoren» gehört"
           },
           "403" : {
             "description" : "Kein API-Token vom Scope generator"

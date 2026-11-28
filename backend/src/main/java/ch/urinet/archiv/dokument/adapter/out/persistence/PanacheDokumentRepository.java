@@ -8,6 +8,8 @@ import ch.urinet.archiv.dokument.application.NeueDatei;
 import ch.urinet.archiv.dokument.application.NeuesDokument;
 import ch.urinet.archiv.dokument.application.Seite;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVersionsPort;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentFinanz;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
@@ -33,6 +35,7 @@ import java.util.UUID;
 @ApplicationScoped
 public class PanacheDokumentRepository implements DokumentRepository {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
     /**
      * Sperrt die Prüfsumme im Schema des Mandanten bis zum Ende der Transaktion; zwei gleichzeitige Uploads derselben
      * Datei laufen so nacheinander, der zweite sieht die erste als Dublette (Req 3.4).
@@ -47,8 +50,9 @@ public class PanacheDokumentRepository implements DokumentRepository {
 
     private static final String DOKUMENT_ANLEGEN = """
             insert into dokument (id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis, dateiname,
-                konfiguration_version)
+                dateiname_regel, konfiguration_version)
             values (:id, :eingang, :quelle, 'PERSONAL', :erstelltVon, 'NEU', :hinweis, :dateiname,
+                cast(:dateinameRegel as jsonb),
                 :konfigurationVersion)""";
 
     private static final String ART_VORBELEGEN = """
@@ -179,8 +183,18 @@ public class PanacheDokumentRepository implements DokumentRepository {
                 .setParameter("erstelltVon", dokument.erstelltVon())
                 .setParameter("hinweis", dokument.hinweis().orElse(null))
                 .setParameter("dateiname", dokument.dateiname().orElse(null))
+                .setParameter("dateinameRegel", dokument.dateinameRegel().map(treffer -> json(treffer.alsMap()))
+                        .orElse(null))
                 .setParameter("konfigurationVersion", konfiguration.aktuelleVersion())
                 .executeUpdate();
+    }
+
+    private static String json(Object wert) {
+        try {
+            return JSON.writeValueAsString(wert);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Dateinamen-Regel nicht serialisierbar", e);
+        }
     }
 
     @Override

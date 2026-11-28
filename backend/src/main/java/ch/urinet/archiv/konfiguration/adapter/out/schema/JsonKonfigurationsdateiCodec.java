@@ -136,7 +136,7 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
             Konfiguration typisiert = new Konfiguration(inhalt.version(), inhalt.einstellungen(),
                     inhalt.arten().stream().map(art -> art.mitZusatzFeldTypen(
                             schemaPruefer.feldTypen(art.zusatzSchema()))).toList(),
-                    inhalt.klassifikationen(), inhalt.regeln(), inhalt.kiTexte());
+                    inhalt.klassifikationen(), inhalt.regeln(), inhalt.kiTexte(), inhalt.dateinamenRegeln());
             return new KonfigurationsdateiCodec.Datei(basisVersion, typisiert);
         } catch (FachFehler e) {
             if (e.code() == Fehlercode.DATEI_ZU_GROSS || e instanceof KonfigurationUngueltig) {
@@ -166,6 +166,7 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
                 arten.add(artJson);
             }
             root.set("regeln", json.valueToTree(inhalt.regeln()));
+            root.set("dateinamenRegeln", json.valueToTree(inhalt.dateinamenRegeln()));
             return json.writeValueAsString(root);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Konfiguration nicht exportierbar", e);

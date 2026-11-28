@@ -1,5 +1,7 @@
 package ch.urinet.archiv.ki.domain;
 
+import ch.urinet.archiv.gemeinsam.domain.RegexZeitgrenze;
+
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.math.BigInteger;
@@ -47,8 +49,6 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
             "FR", 27, "IT", 27);
     private static final int IBAN_MIN = 15;
     private static final int IBAN_MAX = 34;
-    /** Wie {@code NetworkntZusatzSchemaPruefer}: die Uhr wird nur bei jedem 1024. Zeichen gelesen. */
-    private static final int PRUEF_INTERVALL = 1024;
 
     public Merkmale {
         ibans = Set.copyOf(Objects.requireNonNull(ibans, "ibans"));
@@ -114,16 +114,8 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
 
     /** Prüft ein ganzes Feld mit derselben Zeitgrenze, die auch für die Beispielmerkmale gilt. */
     public static MusterErgebnis musterTrifft(Pattern muster, String text, Frist frist, long ende) {
-        try {
-            if (frist.uhr().getAsLong() > ende) {
-                return new MusterErgebnis(false, true);
-            }
-            boolean trifftZu = muster.matcher(new MitFrist(text, frist.uhr(), ende)).matches();
-            return frist.uhr().getAsLong() > ende
-                    ? new MusterErgebnis(false, true) : new MusterErgebnis(trifftZu, false);
-        } catch (FristAbgelaufen e) {
-            return new MusterErgebnis(false, true);
-        }
+        RegexZeitgrenze.Ergebnis ergebnis = RegexZeitgrenze.pruefen(muster, text, List.of(), frist.uhr(), ende);
+        return new MusterErgebnis(ergebnis.trifft(), ergebnis.abgebrochen());
     }
 
     /** Kompiliert ein validiertes Konfigurationsmuster erst innerhalb seiner Laufzeitgrenze. */
@@ -191,26 +183,29 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
     private enum Auswertung { JA, NEIN, ABGEBROCHEN }
 
     private static Auswertung trifft(String muster, String[] woerter, Frist frist, long ende) {
-        try {
+        if (frist.uhr().getAsLong() > ende) {
+            return Auswertung.ABGEBROCHEN;
+        }
+        Pattern kompiliert = Pattern.compile(muster);
+        if (frist.uhr().getAsLong() > ende) {
+            return Auswertung.ABGEBROCHEN;
+        }
+        for (String wort : woerter) {
             if (frist.uhr().getAsLong() > ende) {
                 return Auswertung.ABGEBROCHEN;
             }
-            Pattern kompiliert = Pattern.compile(muster);
-            if (frist.uhr().getAsLong() > ende) {
-                return Auswertung.ABGEBROCHEN;
-            }
-            for (String wort : woerter) {
-                if (frist.uhr().getAsLong() > ende) {
+            if (!wort.isEmpty()) {
+                RegexZeitgrenze.Ergebnis auswertung = RegexZeitgrenze.pruefen(kompiliert, wort, List.of(),
+                        frist.uhr(), ende);
+                if (auswertung.abgebrochen()) {
                     return Auswertung.ABGEBROCHEN;
                 }
-                if (!wort.isEmpty() && kompiliert.matcher(new MitFrist(wort, frist.uhr(), ende)).matches()) {
+                if (auswertung.trifft()) {
                     return Auswertung.JA;
                 }
             }
-            return Auswertung.NEIN;
-        } catch (FristAbgelaufen e) {
-            return Auswertung.ABGEBROCHEN;
         }
+        return Auswertung.NEIN;
     }
 
     /**
@@ -262,46 +257,4 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         return Optional.empty();
     }
 
-    private static final class FristAbgelaufen extends RuntimeException {
-        FristAbgelaufen() {
-            super(null, null, false, false);
-        }
-    }
-
-    /** Text, der beim Lesen die Frist prüft, damit auch ein langsames Muster nach der Grenze abbricht. */
-    private static final class MitFrist implements CharSequence {
-        private final CharSequence text;
-        private final LongSupplier uhr;
-        private final long ende;
-        private int zugriffe;
-
-        MitFrist(CharSequence text, LongSupplier uhr, long ende) {
-            this.text = text;
-            this.uhr = uhr;
-            this.ende = ende;
-        }
-
-        @Override
-        public int length() {
-            return text.length();
-        }
-
-        @Override
-        public char charAt(int index) {
-            if (++zugriffe % PRUEF_INTERVALL == 0 && uhr.getAsLong() > ende) {
-                throw new FristAbgelaufen();
-            }
-            return text.charAt(index);
-        }
-
-        @Override
-        public CharSequence subSequence(int start, int end) {
-            return new MitFrist(text.subSequence(start, end), uhr, ende);
-        }
-
-        @Override
-        public String toString() {
-            return text.toString();
-        }
-    }
 }

@@ -126,6 +126,10 @@ public class DokumentEintrag extends PanacheEntityBase {
     public String dateiname;
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "dateiname_regel", updatable = false, columnDefinition = "jsonb")
+    public String dateinameRegel;
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "zusatz", columnDefinition = "jsonb")
     public String zusatz;
 

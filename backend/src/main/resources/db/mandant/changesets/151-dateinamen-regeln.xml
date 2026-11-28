@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Spec 09, Aufgabe 29.3: versionierte Dateinamen-Regeln, Belegnummer-Aliasse und Erkennungsergebnis am Dokument. -->
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="151-dateinamen-regeln" author="archiv">
+        <sql>
+            create table dateinamen_regel (
+                nr int primary key constraint dateinamen_regel_nr_ck check (nr &gt; 0),
+                muster text not null constraint dateinamen_regel_muster_ck check (length(muster) between 1 and 1000),
+                art text not null constraint dateinamen_regel_art_fk references dokumentart (code),
+                felder jsonb not null
+                    constraint dateinamen_regel_felder_ck check (jsonb_typeof(felder) = 'object')
+            );
+            create table belegnummer_alias (
+                art text not null constraint belegnummer_alias_art_fk references dokumentart (code),
+                alias text not null constraint belegnummer_alias_alias_ck check (length(alias) between 1 and 100),
+                belegnummer text not null
+                    constraint belegnummer_alias_belegnummer_ck check (length(belegnummer) between 1 and 100),
+                erstellt_von text not null,
+                zeit timestamptz not null,
+                primary key (art, alias)
+            );
+            alter table dokument add column dateiname_regel jsonb;
+        </sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                do $$
+                begin
+                    if exists (select 1 from dateinamen_regel)
+                        or exists (select 1 from belegnummer_alias)
+                        or exists (select 1 from dokument where dateiname_regel is not null) then
+                        raise exception 'Rollback 151-dateinamen-regeln nur vor der ersten Nutzung';
+                    end if;
+                end
+                $$
+            ]]></sql>
+            <sql>
+                alter table dokument drop column dateiname_regel;
+                drop table belegnummer_alias;
+                drop table dateinamen_regel
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

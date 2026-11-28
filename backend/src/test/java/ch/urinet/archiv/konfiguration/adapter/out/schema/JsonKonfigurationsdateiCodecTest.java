@@ -102,6 +102,33 @@ class JsonKonfigurationsdateiCodecTest {
     }
 
     @Test
+    void dateinamenRegelnBleibenBeimRundlaufErhalten() {
+        KonfigurationsdateiCodec codec = codec();
+        KonfigurationsdateiCodec.Datei datei = codec.lesen("""
+                {
+                  "format": 1, "basisVersion": 4,
+                  "einstellungen": { "geschaeftsjahrEnde": "12-31", "kennungen": { "uid": null, "ibans": [] } },
+                  "kiTexte": { "rolle": "", "feldregeln": "", "kiFreigegeben": false },
+                  "klassifikationen": [], "regeln": [],
+                  "arten": [{
+                    "code": "RECHNUNG", "name": "Rechnung", "gruppen": ["finanz"],
+                    "pflichtfelder": ["titel", "datum"], "vertraulichkeit": "NORMAL",
+                    "aufbewahrung": { "jahre": 10, "ab": "GESCHAEFTSJAHR" },
+                    "gesetzlichePflicht": false, "selbstAusgestellt": true,
+                    "zusatzSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+                  }],
+                  "dateinamenRegeln": [{
+                    "nr": 1, "muster": "^(?<nr>\\\\d{4}-\\\\d{3})_(?<partner>.+)\\\\.pdf$",
+                    "art": "RECHNUNG", "felder": { "belegnummer": "nr", "partner": "partner" }
+                  }]
+                }
+                """);
+
+        assertThat(codec.lesen(codec.schreiben(datei.inhalt())).inhalt().dateinamenRegeln())
+                .containsExactlyElementsOf(datei.inhalt().dateinamenRegeln());
+    }
+
+    @Test
     void weistDateienUeberEinMiBAb() {
         KonfigurationsdateiCodec codec = codec();
 

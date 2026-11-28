@@ -4,6 +4,7 @@ import ch.urinet.archiv.dokument.application.Bestaetigung;
 import ch.urinet.archiv.dokument.application.DokumentGenerator;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.importe.application.quelle.QuellLaufZuordnung;
 import ch.urinet.archiv.protokoll.application.Protokolliert;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
@@ -61,12 +62,15 @@ public class DokumentGeneratorResource {
     private final SecurityIdentity identitaet;
     private final Berechtigung berechtigung;
     private final ObjectReader leser;
+    private final QuellLaufZuordnung quellLaeufe;
 
     public DokumentGeneratorResource(DokumentGenerator generator, SecurityIdentity identitaet,
-                                     Berechtigung berechtigung, ObjectMapper mapper) {
+                                     Berechtigung berechtigung, ObjectMapper mapper,
+                                     QuellLaufZuordnung quellLaeufe) {
         this.generator = generator;
         this.identitaet = identitaet;
         this.berechtigung = berechtigung;
+        this.quellLaeufe = quellLaeufe;
         // ein Tippfehler im Feldnamen soll nicht still verloren gehen; Kommazahlen als BigDecimal wie bei PATCH, damit
         // der Prüfer genau die Zahl prüft, die gespeichert wird (ZusatzJson); doppelte Schlüssel im Zusatz ungültig
         this.leser = mapper.readerFor(GeneratorMetadatenDto.class)
@@ -142,7 +146,8 @@ public class DokumentGeneratorResource {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = GeneratorAntwortDto.class)))
     @APIResponse(responseCode = "400", description = "Metadaten kein gültiges JSON, unbekanntes Feld, unbekannte "
-            + "Art oder ungültiger Wert (Richtung, Währung, Betrag, Vertraulichkeit)")
+            + "Art oder ungültiger Wert (Richtung, Währung, Betrag, Vertraulichkeit); ungültige Quelllauf-ID oder ein "
+            + "Quelllauf, der nicht zur Quelle «generatoren» gehört")
     @APIResponse(responseCode = "403", description = "Kein API-Token vom Scope generator")
     @APIResponse(responseCode = "409", description = "BELEGNUMMER_VERGEBEN (Req 11.3) oder FRIST_ABGELAUFEN "
             + "(Req 9.8); nichts angelegt, nicht erneut senden (Req 11.9)")
@@ -155,6 +160,9 @@ public class DokumentGeneratorResource {
     public Response ablegen(@RestForm("datei") @Schema(description = "PDF bis 50 MB") FileUpload datei,
                             @RestForm("metadaten") @Schema(description = "GeneratorMetadaten als JSON-Text")
                             String metadaten,
+                            @RestForm("quelllauf") @Schema(description = "Optionaler offener Quelllauf "
+                                    + "der Quelle «generatoren»")
+                            String quelllauf,
                             @Context UriInfo uri) {
         String principal = identitaet.getPrincipal().getName();
         if (identitaet.getAttribute(TokenIdentitaet.SCOPE) == null) {
@@ -164,9 +172,14 @@ public class DokumentGeneratorResource {
         if (datei == null || metadaten == null || metadaten.isBlank()) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
+        Optional<QuellLaufZuordnung.Ziel> ziel = quelllauf == null || quelllauf.isBlank()
+                ? Optional.empty() : quellLaeufe.bestimmen("generatoren", quelllauf);
         // die Metadaten erst nach der Prüfsumme lesen (Regel 3)
         DokumentGenerator.Ergebnis ergebnis = generator.annehmen(principal, datei.uploadedFile(),
                 datei.fileName(), () -> anfrage(metadaten));
+        ziel.ifPresent(lauf -> quellLaeufe.verbuchen(lauf, List.of(new QuellLaufZuordnung.Eintrag(
+                ergebnis.neu() ? QuellLaufZuordnung.Ergebnis.NEU : QuellLaufZuordnung.Ergebnis.DUBLETTE,
+                ergebnis.neu() ? Optional.of(ergebnis.id()) : Optional.empty()))));
         List<DokumentResource.WarnungDto> warnungen = ergebnis.warnungen().stream()
                 .map(w -> new DokumentResource.WarnungDto(w.code(), null, w.meldung())).toList();
         GeneratorAntwortDto antwort = new GeneratorAntwortDto(ergebnis.id(), ergebnis.status().name(), warnungen);

@@ -71,6 +71,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 /**
@@ -743,14 +744,15 @@ public class DokumentResource {
     }
 
     // Vorgeschlagen ist jedes Feld mit Wert; die Sicherheit steht in ki_sicherheit, sonst im Vorschlag selbst
-    private static List<String> unsicher(JsonNode vorschlag, JsonNode sicherheit, BigDecimal schwelle) {
+    static List<String> unsicher(JsonNode vorschlag, JsonNode sicherheit, BigDecimal schwelle) {
         if (vorschlag == null && sicherheit == null) {
             return List.of();
         }
         Set<String> vorgeschlagen = new HashSet<>();
         if (vorschlag != null && vorschlag.isObject()) {
             vorschlag.properties().forEach(feld -> {
-                if (!feld.getKey().equals(SICHERHEIT) && !feld.getValue().isNull()) {
+                if (!Set.of(SICHERHEIT, "herkunft", "bittePruefen").contains(feld.getKey())
+                        && !feld.getValue().isNull()) {
                     vorgeschlagen.add(feld.getKey());
                 }
             });
@@ -761,7 +763,16 @@ public class DokumentResource {
             quelle.properties().forEach(feld -> werte.put(feld.getKey(),
                     feld.getValue().isNumber() ? feld.getValue().decimalValue() : null));
         }
-        return KiSicherheit.unsicher(vorgeschlagen, werte, schwelle);
+        TreeSet<String> unsicher = new TreeSet<>(KiSicherheit.unsicher(vorgeschlagen, werte, schwelle));
+        JsonNode explizitZuPruefen = vorschlag == null ? null : vorschlag.get("bittePruefen");
+        if (explizitZuPruefen != null && explizitZuPruefen.isArray()) {
+            explizitZuPruefen.elements().forEachRemaining(feld -> {
+                if (feld.isTextual() && vorgeschlagen.contains(feld.textValue())) {
+                    unsicher.add(feld.textValue());
+                }
+            });
+        }
+        return List.copyOf(unsicher);
     }
 
     private static JsonNode lesenJson(Dokument d, String wert, String spalte, ObjectMapper json) {

@@ -14,7 +14,8 @@ import java.util.regex.Pattern;
 
 /** Unveränderliches Abbild der fachlichen Konfiguration eines Mandanten. */
 public record Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
-                            List<Klassifikation> klassifikationen, List<Regel> regeln, KiTexte kiTexte) {
+                            List<Klassifikation> klassifikationen, List<Regel> regeln, KiTexte kiTexte,
+                            List<DateinamenRegel> dateinamenRegeln) {
 
     /** Schema einer Art ohne Zusatzfelder. */
     public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
@@ -36,7 +37,12 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
                          List<Klassifikation> klassifikationen, List<Regel> regeln) {
-        this(version, einstellungen, arten, klassifikationen, regeln, KiTexte.LEER);
+        this(version, einstellungen, arten, klassifikationen, regeln, KiTexte.LEER, List.of());
+    }
+
+    public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
+                         List<Klassifikation> klassifikationen, List<Regel> regeln, KiTexte kiTexte) {
+        this(version, einstellungen, arten, klassifikationen, regeln, kiTexte, List.of());
     }
 
     /** Die Arten stehen nach Code sortiert, damit Abbilder aus Migration und App gleich aufgebaut sind. */
@@ -50,6 +56,8 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 : regeln.stream().sorted(Comparator.comparing(Regel::code, Comparator.nullsFirst(String::compareTo)))
                         .toList();
         kiTexte = kiTexte == null ? KiTexte.LEER : kiTexte;
+        dateinamenRegeln = dateinamenRegeln == null ? List.of()
+                : dateinamenRegeln.stream().sorted(Comparator.comparingInt(DateinamenRegel::nr)).toList();
     }
 
     /**
@@ -201,7 +209,76 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             }
         }
         regelnPruefen(befunde, nachCode);
+        dateinamenRegelnPruefen(befunde, nachCode);
         return List.copyOf(befunde);
+    }
+
+    private void dateinamenRegelnPruefen(List<Befund> befunde, Map<String, Art> artenNachCode) {
+        if (dateinamenRegeln.size() > 100) {
+            befunde.add(new Befund("dateinamenRegeln", "ANZAHL_UNGUELTIG",
+                    "Die Konfiguration enthält zu viele Dateinamen-Regeln."));
+        }
+        Set<Integer> nummern = new HashSet<>();
+        for (int i = 0; i < dateinamenRegeln.size(); i++) {
+            DateinamenRegel regel = dateinamenRegeln.get(i);
+            String pfad = "dateinamenRegeln[" + i + "]";
+            if (regel == null || regel.nr() < 1 || !nummern.add(regel.nr())) {
+                befunde.add(new Befund(pfad + ".nr", "WERT_UNGUELTIG",
+                        "Die Nummer einer Dateinamen-Regel muss positiv und eindeutig sein."));
+                continue;
+            }
+            if (regel.muster() == null || regel.muster().isBlank() || regel.muster().length() > 1000) {
+                befunde.add(new Befund(pfad + ".muster", "MUSTER_UNGUELTIG",
+                        "Das Muster der Dateinamen-Regel ist ungültig."));
+                continue;
+            }
+            Set<String> gruppen;
+            try {
+                Pattern.compile(regel.muster(), Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+                gruppen = benannteGruppen(regel.muster());
+            } catch (java.util.regex.PatternSyntaxException e) {
+                befunde.add(new Befund(pfad + ".muster", "MUSTER_UNGUELTIG",
+                        "Das Muster der Dateinamen-Regel ist ungültig."));
+                continue;
+            }
+            Art art = regel.art() == null ? null : artenNachCode.get(regel.art());
+            if (art == null || !art.aktiv()) {
+                befunde.add(new Befund(pfad + ".art", "ART_UNGUELTIG",
+                        "Die Dokumentart der Dateinamen-Regel fehlt oder ist inaktiv."));
+            }
+            if (regel.felder().isEmpty() || regel.felder().entrySet().stream().anyMatch(e ->
+                    !Set.of("belegnummer", "periode", "partner", "person").contains(e.getKey())
+                            || e.getValue() == null || !gruppen.contains(e.getValue()))) {
+                befunde.add(new Befund(pfad + ".felder", "FELDER_UNGUELTIG",
+                        "Jedes Dateinamen-Feld muss auf eine benannte Gruppe des Musters verweisen."));
+            }
+        }
+    }
+
+    private static Set<String> benannteGruppen(String muster) {
+        Set<String> gruppen = new HashSet<>();
+        boolean escaped = false;
+        boolean zeichenklasse = false;
+        for (int i = 0; i < muster.length(); i++) {
+            char zeichen = muster.charAt(i);
+            if (escaped) {
+                escaped = false;
+            } else if (zeichen == '\\') {
+                escaped = true;
+            } else if (zeichen == '[') {
+                zeichenklasse = true;
+            } else if (zeichen == ']') {
+                zeichenklasse = false;
+            } else if (!zeichenklasse && muster.startsWith("(?<", i)
+                    && i + 3 < muster.length() && muster.charAt(i + 3) != '=' && muster.charAt(i + 3) != '!') {
+                int ende = muster.indexOf('>', i + 3);
+                if (ende > i + 3) {
+                    gruppen.add(muster.substring(i + 3, ende));
+                    i = ende;
+                }
+            }
+        }
+        return gruppen;
     }
 
     private void regelnPruefen(List<Befund> befunde, Map<String, Art> artenNachCode) {
@@ -461,7 +538,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
     public boolean gleicherInhalt(Konfiguration andere) {
         return andere != null && einstellungen.equals(andere.einstellungen) && arten.equals(andere.arten)
                 && klassifikationen.equals(andere.klassifikationen) && regeln.equals(andere.regeln)
-                && kiTexte.equals(andere.kiTexte);
+                && kiTexte.equals(andere.kiTexte) && dateinamenRegeln.equals(andere.dateinamenRegeln);
     }
 
     public List<Aenderung> aenderungen(Konfiguration neu) {
@@ -493,6 +570,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         feld(aenderungen, "kiTexte.rolle", kiTexte.rolle(), neu.kiTexte.rolle());
         feld(aenderungen, "kiTexte.feldregeln", kiTexte.feldregeln(), neu.kiTexte.feldregeln());
         feld(aenderungen, "kiTexte.kiFreigegeben", kiTexte.kiFreigegeben(), neu.kiTexte.kiFreigegeben());
+        feld(aenderungen, "dateinamenRegeln", dateinamenRegeln, neu.dateinamenRegeln);
 
         Map<String, Art> vorher = nachCode(arten);
         Map<String, Art> nachher = nachCode(neu.arten);
@@ -740,6 +818,13 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         public KiTexte {
             rolle = rolle == null ? "" : rolle;
             feldregeln = feldregeln == null ? "" : feldregeln;
+        }
+
+    }
+
+    public record DateinamenRegel(int nr, String muster, String art, Map<String, String> felder) {
+        public DateinamenRegel {
+            felder = felder == null ? Map.of() : Map.copyOf(felder);
         }
     }
 

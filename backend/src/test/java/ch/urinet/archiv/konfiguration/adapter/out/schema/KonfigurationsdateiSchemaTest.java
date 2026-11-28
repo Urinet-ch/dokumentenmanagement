@@ -52,6 +52,10 @@ class KonfigurationsdateiSchemaTest {
                     "code": "protokoll_erwartet", "art": "PROTOKOLL", "typ": "ERWARTET",
                     "parameter": { "je": "MONAT", "datum": "BELEGDATUM" }, "schwere": "WARNUNG",
                     "meldung": "Ein Protokoll fehlt."
+                  }],
+                  "dateinamenRegeln": [{
+                    "nr": 1, "muster": "^(?<partner>.+)\\\\.pdf$", "art": "PROTOKOLL",
+                    "felder": { "partner": "partner" }
                   }]
                 }
                 """;

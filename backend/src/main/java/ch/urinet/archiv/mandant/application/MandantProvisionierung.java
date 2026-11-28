@@ -110,7 +110,7 @@ public class MandantProvisionierung {
                         seedKonfiguration.einstellungen().branding(), seedKonfiguration.einstellungen().chat(),
                         seedKonfiguration.einstellungen().webseitenChat(), seedKonfiguration.einstellungen().wissen()),
                 seedKonfiguration.arten(), seedKonfiguration.klassifikationen(), seedKonfiguration.regeln(),
-                seedKonfiguration.kiTexte());
+                seedKonfiguration.kiTexte(), seedKonfiguration.dateinamenRegeln());
         datenbank.schemaAnlegen(mandantCode.schema());
         if (fortsetzen.isEmpty()) {
             register.eintragen(mandant);

@@ -29,13 +29,17 @@ Aufruf von der Kommandozeile:
     python3 tools/archiv_client.py ausgabe/rechnung-2026-003.pdf metadaten.json
     python3 tools/archiv_client.py --nachsenden ausgabe
     python3 tools/archiv_client.py --import-quelle <quellcode> [--trocken] <datei.pdf>
+    python3 tools/archiv_client.py nachlauf --rechnungen ausgabe/rechnungen [--trocken] [--quelllauf <id>]
 
 Der Generator-Aufruf verwendet Scope `generator`; `--import-quelle` verwendet Scope `import`, fragt im Trockenlauf
 Prüfsummen ab und ordnet Upload und Zähler einem Quelllauf zu (Spec 09, Req 10.7).
+`nachlauf` liest über `RechnungGenJsonAdapter` die Zuordnung `pdf`/`metadaten`, fragt im Trockenlauf
+Prüfsummen ab und verschiebt PDFs bei keinem Ergebnis nicht.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -102,6 +106,79 @@ class QuelllaufErgebnis:
 
 class _NichtErreichbar(Exception):
     pass
+
+
+class RechnungGenJsonAdapter:
+    """Zuordnung des synthetisch dokumentierten RechnungGen-Formats zur Generator-Schnittstelle."""
+
+    FELDZUORDNUNG = {"pdf": "pdf", "metadaten": "metadaten"}
+
+    @classmethod
+    def lesen(cls, json_datei: Path, ordner: Path) -> tuple[Path, dict[str, Any]]:
+        try:
+            eintrag = json.loads(json_datei.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as fehler:
+            raise ArchivFehler(f"{json_datei.name}: JSON kann nicht gelesen werden ({fehler}).") from None
+        if not isinstance(eintrag, dict):
+            raise ArchivFehler(f"{json_datei.name}: erwartet wird ein JSON-Objekt.")
+        fehlend = [feld for feld in cls.FELDZUORDNUNG if feld not in eintrag]
+        if fehlend:
+            raise ArchivFehler(f"{json_datei.name}: fehlende JSON-Felder: {', '.join(fehlend)}.")
+        pdf_name = eintrag[cls.FELDZUORDNUNG["pdf"]]
+        metadaten = eintrag[cls.FELDZUORDNUNG["metadaten"]]
+        if not isinstance(pdf_name, str) or not pdf_name.strip():
+            raise ArchivFehler(f"{json_datei.name}: JSON-Feld «pdf» muss ein Dateiname sein.")
+        if not isinstance(metadaten, dict):
+            raise ArchivFehler(f"{json_datei.name}: JSON-Feld «metadaten» muss ein Objekt sein.")
+        basis = ordner.resolve()
+        pdf = (ordner / pdf_name).resolve()
+        if not pdf.is_relative_to(basis):
+            raise ArchivFehler(f"{json_datei.name}: PDF muss im Ausgabeordner liegen.")
+        if pdf.suffix.lower() != ".pdf" or not pdf.is_file():
+            raise ArchivFehler(f"{json_datei.name}: PDF «{pdf_name}» fehlt oder ist keine PDF-Datei.")
+        return pdf, metadaten
+
+
+def nachlauf(rechnungen: str | os.PathLike, *, trocken: bool = False, quelllauf: str | None = None,
+             url: str | None = None) -> Mapping[str, Any]:
+    """Liest RechnungGen-JSON-Dateien und sendet ihre PDF-Dateien über die Generatorschnittstelle."""
+    ordner = Path(rechnungen)
+    if not ordner.is_dir():
+        raise ArchivFehler(f"Der Ausgabeordner {ordner} gibt es nicht.")
+    if quelllauf is not None:
+        try:
+            quelllauf = str(uuid.UUID(quelllauf))
+        except ValueError:
+            raise ArchivFehler("Die Quelllauf-ID ist ungültig.") from None
+    dateien = sorted(ordner.glob("*.json"))
+    eintraege = [(json_datei, *RechnungGenJsonAdapter.lesen(json_datei, ordner)) for json_datei in dateien]
+    adresse = _adresse(url)
+    token = token_lesen()
+    pruefsummen = [_sha256(pdf) for _, pdf, _ in eintraege]
+    vorhanden: set[str] = set()
+    if trocken:
+        for start in range(0, len(pruefsummen), 1000):
+            vorhanden.update(_pruefsummen_abfragen(adresse, token, pruefsummen[start:start + 1000]))
+
+    ergebnisse = []
+    anzahl = {"gefunden": len(eintraege), "neu": 0, "schonVorhanden": 0, "fehler": 0}
+    for (json_datei, pdf, metadaten), pruefsumme in zip(eintraege, pruefsummen):
+        if trocken:
+            status = "SCHON_VORHANDEN" if pruefsumme in vorhanden else "WIRD_GESENDET"
+            anzahl["schonVorhanden" if pruefsumme in vorhanden else "neu"] += 1
+        else:
+            code, antwort = _senden(adresse, token, pdf, metadaten, quelllauf=quelllauf)
+            if code in (200, 201, 202):
+                status = "SCHON_VORHANDEN" if code == 200 else "NEU"
+                anzahl["schonVorhanden" if code == 200 else "neu"] += 1
+            elif code == 409 and antwort.get("fehlercode") == "BELEGNUMMER_VERGEBEN":
+                status = "SCHON_VORHANDEN"
+                anzahl["schonVorhanden"] += 1
+            else:
+                raise ArchivFehler(_meldung(code, antwort), status=code, code=antwort.get("fehlercode"),
+                                   felder=antwort.get("felder"))
+        ergebnisse.append({"json": json_datei.name, "pdf": pdf.name, "status": status})
+    return {"anzahl": anzahl, "ergebnisse": ergebnisse}
 
 
 def archivieren(pdf: str | os.PathLike, metadaten: Mapping[str, Any], *, url: str | None = None,
@@ -247,20 +324,30 @@ def _behandeln(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]
     raise ArchivFehler(meldung, status=status, code=antwort.get("fehlercode"), felder=antwort.get("felder"))
 
 
-def _senden(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]) -> tuple[int, dict]:
+def _senden(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any], *,
+            quelllauf: str | None = None) -> tuple[int, dict]:
     grenze = f"----archiv-client-{uuid.uuid4().hex}"
     dateiname = _dateiname(pdf.name)
-    koerper = b"".join([
+    teile = [
         f"--{grenze}\r\n".encode("ascii"),
         f'Content-Disposition: form-data; name="datei"; filename="{dateiname}"\r\n'.encode("utf-8"),
         b"Content-Type: application/pdf\r\n\r\n",
         pdf.read_bytes(),
+    ]
+    if quelllauf is not None:
+        teile.extend([
+            f"\r\n--{grenze}\r\n".encode("ascii"),
+            b'Content-Disposition: form-data; name="quelllauf"\r\n\r\n',
+            quelllauf.encode("ascii"),
+        ])
+    teile.extend([
         f"\r\n--{grenze}\r\n".encode("ascii"),
         b'Content-Disposition: form-data; name="metadaten"\r\n',
         b"Content-Type: text/plain; charset=UTF-8\r\n\r\n",
         json.dumps(metadaten, ensure_ascii=False).encode("utf-8"),
         f"\r\n--{grenze}--\r\n".encode("ascii"),
     ])
+    koerper = b"".join(teile)
     anfrage = urllib.request.Request(adresse + PFAD, data=koerper, method="POST", headers={
         "Authorization": f"Bearer {token}",
         "Content-Type": f"multipart/form-data; boundary={grenze}",
@@ -428,6 +515,16 @@ def _freier_name(ordner: Path, name: str) -> Path:
 
 def main(argumente: list[str]) -> int:
     try:
+        if argumente and argumente[0] == "nachlauf":
+            parser = argparse.ArgumentParser(prog="archiv_client.py nachlauf")
+            parser.add_argument("--rechnungen", required=True)
+            parser.add_argument("--trocken", action="store_true")
+            parser.add_argument("--quelllauf")
+            optionen = parser.parse_args(argumente[1:])
+            ergebnis = nachlauf(optionen.rechnungen, trocken=optionen.trocken,
+                                quelllauf=optionen.quelllauf)
+            print(json.dumps(ergebnis, ensure_ascii=False))
+            return 0
         if argumente and argumente[0] == "--import-quelle":
             if len(argumente) < 2:
                 print("Aufruf: archiv_client.py --import-quelle QUELLE [--trocken] PDF", file=sys.stderr)

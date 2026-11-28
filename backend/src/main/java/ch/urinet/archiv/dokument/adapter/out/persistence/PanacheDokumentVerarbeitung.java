@@ -2,9 +2,11 @@ package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort;
+import ch.urinet.archiv.konfiguration.application.DateinamenTreffer;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
@@ -33,6 +35,10 @@ public class PanacheDokumentVerarbeitung implements DokumentVerarbeitungPort {
     static final String ZEITGRENZE = "30s";
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final TypeReference<Map<String, Object>> DATEINAMEN_REGEL_TYP = new TypeReference<>() {
+    };
+    private static final TypeReference<Map<String, String>> DATEINAMEN_FELDER_TYP = new TypeReference<>() {
+    };
 
     private static final String OFFEN = "status in ('NEU', 'VERARBEITUNG')";
 
@@ -111,7 +117,7 @@ public class PanacheDokumentVerarbeitung implements DokumentVerarbeitungPort {
                         select status, bestaetigt is not null, version, pdfa_fehlt, ki_vorschlag is not null, volltext,
                             eingang, s3_pdfa, s3_version_pdfa, sha256_pdfa,
                             (select mime from dokument_datei where dokument_id = d.id and rolle = 'ORIGINAL'
-                                and status = 'AKTIV' order by nr limit 1)
+                                and status = 'AKTIV' order by nr limit 1), dateiname_regel::text
                         from dokument d where id = :id""")
                 .setParameter("id", id).getResultList();
         if (zeilen.isEmpty()) {
@@ -123,7 +129,20 @@ public class PanacheDokumentVerarbeitung implements DokumentVerarbeitungPort {
                         (String) d[9]));
         return Optional.of(new KiStand(id, DokumentStatus.valueOf((String) d[0]), (Boolean) d[1],
                 ((Number) d[2]).intValue(), (Boolean) d[3], (Boolean) d[4], (String) d[5], zeitpunkt(d[6]), pdfa,
-                (String) d[10]));
+                (String) d[10], dateinamenRegel((String) d[11])));
+    }
+
+    private static Optional<DateinamenTreffer> dateinamenRegel(String json) {
+        if (json == null) {
+            return Optional.empty();
+        }
+        try {
+            Map<String, Object> werte = JSON.readValue(json, DATEINAMEN_REGEL_TYP);
+            return Optional.of(new DateinamenTreffer(((Number) werte.get("nr")).intValue(),
+                    (String) werte.get("art"), JSON.convertValue(werte.get("felder"), DATEINAMEN_FELDER_TYP)));
+        } catch (JsonProcessingException | ClassCastException e) {
+            throw new IllegalStateException("Dateinamen-Regel am Dokument nicht lesbar", e);
+        }
     }
 
     @Override

@@ -16,7 +16,8 @@ public record Vorschlag(String art, String titel, LocalDate datum, String partne
                         String waehrung, LocalDate faelligkeit, String qrReferenz, String vertraulichkeit,
                         List<String> tags, Map<Feld, BigDecimal> sicherheit, boolean mandantIstAussteller,
                         String umstufung, Map<String, Object> dynamischeWerte,
-                        Map<String, BigDecimal> dynamischeSicherheit) {
+                        Map<String, BigDecimal> dynamischeSicherheit, Map<String, String> herkunft,
+                        List<String> bittePruefen) {
 
     public Vorschlag {
         tags = List.copyOf(tags);
@@ -25,6 +26,19 @@ public record Vorschlag(String art, String titel, LocalDate datum, String partne
         sicherheit = java.util.Collections.unmodifiableMap(kopie);
         dynamischeWerte = dynamischeWerte == null ? Map.of() : Map.copyOf(dynamischeWerte);
         dynamischeSicherheit = dynamischeSicherheit == null ? Map.of() : Map.copyOf(dynamischeSicherheit);
+        herkunft = herkunft == null ? Map.of() : Map.copyOf(herkunft);
+        bittePruefen = bittePruefen == null ? List.of() : List.copyOf(bittePruefen);
+    }
+
+    public Vorschlag(String art, String titel, LocalDate datum, String partnerName, String partnerUid,
+                     String partnerIban, String partnerEmail, String belegnummer, String richtung, BigDecimal betrag,
+                     String waehrung, LocalDate faelligkeit, String qrReferenz, String vertraulichkeit,
+                     List<String> tags, Map<Feld, BigDecimal> sicherheit, boolean mandantIstAussteller,
+                     String umstufung, Map<String, Object> dynamischeWerte,
+                     Map<String, BigDecimal> dynamischeSicherheit) {
+        this(art, titel, datum, partnerName, partnerUid, partnerIban, partnerEmail, belegnummer, richtung, betrag,
+                waehrung, faelligkeit, qrReferenz, vertraulichkeit, tags, sicherheit, mandantIstAussteller,
+                umstufung, dynamischeWerte, dynamischeSicherheit, Map.of(), List.of());
     }
 
     public Vorschlag(String art, String titel, LocalDate datum, String partnerName, String partnerUid,
