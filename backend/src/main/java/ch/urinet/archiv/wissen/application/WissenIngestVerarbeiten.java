@@ -999,6 +999,10 @@ public class WissenIngestVerarbeiten {
                 protokolliert = true;
                 tokensEin = addiere(tokensEin, aufrufVerbrauch.tokensEin());
                 tokensAus = addiere(tokensAus, aufrufVerbrauch.tokensAus());
+            } catch (WissenAusgeschaltet e) {
+                // Req 22.9: der Adapter prüft unmittelbar vor dem Aufruf; nichts ging hinaus, die Reservierung entfällt
+                speichern.budgetFreigeben(reservierung.id());
+                throw e;
             } finally {
                 if (protokolliert) {
                     speichern.budgetFreigeben(reservierung.id());

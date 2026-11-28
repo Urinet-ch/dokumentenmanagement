@@ -77,7 +77,7 @@ Ein Image vor PR #751 hat folgende Folgen:
   antwortet mit 500, sobald die angefragte Seite einen solchen Eintrag enthält. Dadurch bricht die Seite
   «Zugriffsprotokoll». Ein Filter auf eine andere Aktion und das Schreiben neuer Einträge funktionieren weiter.
 
-Abhilfe ist ein Deploy nach vorn, nicht das Löschen von Protokolleinträgen. Vor dem ersten Schalten (kein Eintrag
+Entscheid Fabian 28.11.2026: Rückfall auf ein Image vor #751 wird nicht unterstützt; Abhilfe ist ein Deploy nach vorn. Protokolleinträge werden dafür nie gelöscht. Vor dem ersten Schalten (kein Eintrag
 mit den beiden Aktionen) bleibt ein Rückfall ohne Folgen für das Protokoll; die erste Folge oben gilt dann trotzdem.
 
 ## Router und Sicherheits-Header

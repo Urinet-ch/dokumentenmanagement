@@ -122,11 +122,7 @@ public class ZugangFilter {
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
             return;
         }
-        Instant ausgestellt = identitaet.getPrincipal() instanceof JsonWebToken jwt
-                ? Instant.ofEpochSecond(jwt.getIssuedAtTime()) : Instant.EPOCH;
-        if (tokenWiderruf.widerrufen(benutzerId.get(), ausgestellt)) {
-            throw new FachFehler(Fehlercode.NICHT_ANGEMELDET);
-        }
+        sitzungPruefen(identitaet, tokenWiderruf, benutzerId.get());
         wissenPruefen(ressource, mandant);
         if (aktion.isPresent()) {
             aktion(new Benutzer(benutzerId.get(), rolle.get()), aktion.get(),
@@ -134,6 +130,18 @@ public class ZugangFilter {
                             : anfrage.getUriInfo().getPathParameters().getFirst(DOKUMENT_ID));
         } else if (!methode.isAnnotationPresent(AlleArchivRollen.class)) {
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
+        }
+    }
+
+    /**
+     * Widerrufene Sitzung (Abmelden überall, Austritt): 401 {@code NICHT_ANGEMELDET}, vor Wissenssperre, Rechtematrix
+     * und 404. Auch {@link RollenVerweigerungAbbildung} prüft so, weil {@code @RolesAllowed} vor diesem Filter läuft.
+     */
+    static void sitzungPruefen(SecurityIdentity identitaet, TokenWiderruf widerruf, String benutzerId) {
+        Instant ausgestellt = identitaet.getPrincipal() instanceof JsonWebToken jwt
+                ? Instant.ofEpochSecond(jwt.getIssuedAtTime()) : Instant.EPOCH;
+        if (widerruf.widerrufen(benutzerId, ausgestellt)) {
+            throw new FachFehler(Fehlercode.NICHT_ANGEMELDET);
         }
     }
 

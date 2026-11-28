@@ -73,6 +73,12 @@ public class WissenFreischaltungSchritte {
     @Inject
     ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung tokens;
 
+    @Inject
+    ch.urinet.archiv.sicherheit.application.TokenWiderruf tokenWiderruf;
+
+    /** Benutzer mit widerrufener Sitzung und ihr Token von vorher; das {@code @After} hebt den Widerruf auf. */
+    private final Map<String, String> widerrufeneSitzungen = new LinkedHashMap<>();
+
     private final List<String> tokenIds = new ArrayList<>();
 
     private final Map<String, List<Long>> gezaehlt = new LinkedHashMap<>();
@@ -92,6 +98,27 @@ public class WissenFreischaltungSchritte {
             }
         }
         tokenIds.clear();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement loeschen = verbindung.prepareStatement(
+                     "delete from public.token_widerruf where benutzer = ?")) {
+            for (String benutzer : widerrufeneSitzungen.keySet()) {
+                loeschen.setString(1, Testanmeldung.sub(benutzer));
+                loeschen.executeUpdate();
+            }
+        }
+        for (String benutzer : widerrufeneSitzungen.keySet()) {
+            // der Zwischenspeicher des Widerrufs hält höchstens wenige Sekunden
+            long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+            while (tokenWiderruf.widerrufen(Testanmeldung.sub(benutzer), Instant.EPOCH) && System.nanoTime() < bis) {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        widerrufeneSitzungen.clear();
         for (String code : List.of(WissenInTestdaten.URINET, WissenInTestdaten.VHF_GSK)) {
             ohneAnfrage(() -> freischalten.setzen(new MandantCode(code), true));
         }
@@ -234,6 +261,25 @@ public class WissenFreischaltungSchritte {
             Response antwort = senden(given().auth().oauth2(erstellt.token().text()), zeile);
             assertThat(ProblemDetails.pruefen(antwort, status))
                     .as(zeile.get("methode") + " " + zeile.get("pfad") + ": " + antwort.asString()).isEqualTo(fehlercode);
+        }
+    }
+
+    /** Wie «Abmelden überall»: Tokens, die vor jetzt (plus Reserve für die Sekunden-Genauigkeit) ausgestellt wurden. */
+    @Angenommen("die Sitzung von «{word}» ist widerrufen")
+    public void sitzungWiderrufen(String benutzer) {
+        widerrufeneSitzungen.put(benutzer, Testanmeldung.token(benutzer));
+        tokenWiderruf.setzen(Testanmeldung.sub(benutzer), Instant.now().plusSeconds(2));
+    }
+
+    /** Req 22.6 «nach 401»: auch wenn die Rolle den Endpunkt nie darf ({@code @RolesAllowed} läuft vor dem Filter). */
+    @Dann("antworten mit der widerrufenen Sitzung von «{word}» diese Anfragen mit Status {int} und Fehlercode «{word}»:")
+    public void widerrufeneSitzung(String benutzer, int status, String code, DataTable tabelle) {
+        String token = widerrufeneSitzungen.get(benutzer);
+        assertThat(token).as("Sitzung von " + benutzer + " widerrufen").isNotNull();
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Response antwort = senden(given().auth().oauth2(token), zeile);
+            assertThat(ProblemDetails.pruefen(antwort, status))
+                    .as(zeile.get("methode") + " " + zeile.get("pfad") + ": " + antwort.asString()).isEqualTo(code);
         }
     }
 

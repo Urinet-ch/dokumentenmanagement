@@ -266,6 +266,10 @@ public class WissenLintVerarbeiten {
             }
             return new KiAntwort(antwort instanceof KiPort.WissensGueltig gueltig ? gueltig.inhalt() : null,
                     false, antwort instanceof KiPort.WissensOhneZugang, false);
+        } catch (WissenAusgeschaltet e) {
+            // Req 22.9: der Adapter prüft unmittelbar vor dem Aufruf; nichts ging hinaus, die Reservierung entfällt
+            speichern.budgetFreigeben(budget.id());
+            throw e;
         } finally {
             if (protokolliert) {
                 speichern.budgetFreigeben(budget.id());

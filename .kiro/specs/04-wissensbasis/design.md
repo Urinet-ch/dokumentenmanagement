@@ -1711,7 +1711,7 @@ Requirements bleiben unverändert.
   Standard `false`, `true` für `urinet`, Rollback entfernt die Spalte) und `db/mandant`
   `142-protokoll-wissen-freischaltung` (Aktionen `WISSEN_FREIGESCHALTET`, `WISSEN_ABGESCHALTET`; der Rollback lässt
   die Aktionen bewusst zu, weil das Protokoll unveränderlich ist, wie `083`; Folgen eines Rückfalls auf ein älteres
-  Image in `docs/betrieb/deploy-rollback.md`). Port
+  Image in `docs/betrieb/deploy-rollback.md`; Entscheid Fabian 28.11.2026: Rückfall auf ein Image vor #751 wird nicht unterstützt; Abhilfe ist ein Deploy nach vorn). Port
   `WissensfreischaltungPort` (JDBC `JdbcWissensfreischaltung`, `public.mandant` qualifiziert), die eine Stelle
   `Wissensfreischaltung` (Zwischenspeicher je Mandant, `archiv.wissen.freischaltung-zwischenspeicher`, Standard und
   Höchstwert 30 s, damit Archiv und App zusammen unter 60 s bleiben; Review PR #751; Lesefehler und unbekannte Mandanten werden nicht zwischengespeichert und gelten als nicht
@@ -1722,7 +1722,9 @@ Requirements bleiben unverändert.
   Testdaten: Der Decorator `WissenInTestdaten` (nur `src/test`) schaltet für die Standard-Testmandanten `urinet` und
   `vhf-gsk` bei der Aktivierung ein; jeder andere Testmandant bleibt ohne Wissen, Unit-Tests übergeben
   `FesteWissensfreischaltung.ein()` ausdrücklich.
-- **25.2 Sperre:** im gemeinsamen `ZugangFilter` nach Mandant und Anmeldung (401 auch bei widerrufener Sitzung) und vor
+- **25.2 Sperre:** im gemeinsamen `ZugangFilter` nach Mandant und Anmeldung (401 auch bei widerrufener Sitzung; dieselbe
+  Prüfung `ZugangFilter.sitzungPruefen` nutzt `RollenVerweigerungAbbildung`, wenn `@RolesAllowed` vorher scheitert,
+  Review PR #751) und vor
   Rechtematrix, Dokumentprüfung (404) und Laden von Daten, für Rollen und API-Tokens gleich. Erfasst ist jede
   Pfadvorlage aus `@Path` mit einem Abschnitt, der mit `wissen` beginnt (`Wissenspfade`, ausser `/public/`);
   `WissenspfadeVertragTest` prüft alle Operationen, auch künftige. Der Modus `WISSEN` steht nicht im Pfad: Anlegen,
@@ -1731,7 +1733,9 @@ Requirements bleiben unverändert.
   closed); ab der ersten Antwort mit einem Wissenswerkzeug geht beim Fortsetzen keine Antwort des Gesprächs mehr an das
   Modell, auch keine, die darauf aufbaut; die Fragen bleiben (`ChatSpeicher.verlaufOhneWissen`, Review PR #751). Fällt
   Wissen während eines Durchgangs weg (Archivchat und öffentlicher Chat), endet er vor dem nächsten Werkzeug und damit
-  vor der nächsten Modellrunde mit dem festen Ausfalltext (`AgentWerkzeug`, `AgentLauf.wissenBeobachten`); Quellen auf Wissensseiten erscheinen im Verlauf ohne Titel und Link, und keine
+  vor der nächsten Modellrunde mit dem festen Ausfalltext (`AgentWerkzeug`, `AgentLauf.wissenBeobachten`); das Modell
+  der Chat-Durchgänge (`EntkoppeltesModell`) prüft zusätzlich vor jedem Aufruf, auch wenn Wissen während eines
+  Werkzeugs wegfällt; Quellen auf Wissensseiten erscheinen im Verlauf ohne Titel und Link, und keine
   Nachricht bietet eine Analyse an. Dokumentansicht ohne Wissensseiten (`WissenLesen.seitenFuerDokument`). Der
   öffentliche Wissenschat antwortet wie bei ausgeschaltetem Schalter (403 `NICHT_ERLAUBT`). Einstellungen: ein Patch
   mit `wissen` und das Zurücksetzen der Gruppe `WISSEN` ergeben 403 `WISSEN_NICHT_FREIGESCHALTET` vor A19;
@@ -1743,7 +1747,8 @@ Requirements bleiben unverändert.
   `archiv konfiguration` ist nicht betroffen.
 - **25.3 Keine KI-Läufe:** Ingest-Start (manuell, nach Markierung, Abschnitt wiederholen) und Lint von Hand ergeben 403;
   Nachholen und Lint-Zeitplan überspringen den Mandanten (kein späteres Nachholen). `Wissensfreischaltung
-  .modellaufrufPruefen` steht unmittelbar vor jedem Modellaufruf von Ingest, Neuerzeugung und Lint; zusätzlich prüfen
+  .modellaufrufPruefen` steht unmittelbar vor jedem Modellaufruf von Ingest, Neuerzeugung und Lint (an einer Stelle im
+  KI-Adapter direkt vor `chat(...)`, `LangChain4jKiAdapter.wissensIngest`, Review PR #751); zusätzlich prüfen
   Ingest und Lint vor jedem Schritt. Ein laufender oder wartender Auftrag endet dann ohne neuen Entwurf mit dem Hinweis
   `WISSEN_AUSGESCHALTET` (Ingest `FEHLER`, Lint unvollständig ohne gespeicherte Änderungsvorschläge, auch im Schritt
   `ABSCHLUSS`, manuelle Neuerzeugung abgebrochen). Embeddings der

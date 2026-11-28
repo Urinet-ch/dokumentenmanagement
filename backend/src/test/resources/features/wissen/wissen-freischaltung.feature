@@ -76,6 +76,16 @@ Funktionalität: Wissen je Mandant freischalten (Requirement 22, Aufgaben 25.1 b
     Und zeigt der Einstellungskatalog für «inhaber-urinet» die Wissensbasis
 
   @req-22.6
+  Szenario: Eine widerrufene Sitzung erhält zuerst 401, auch wenn ihre Rolle den Endpunkt nie darf
+    Angenommen Wissen ist für «urinet» abgeschaltet
+    Und die Sitzung von «mitarbeiter-urinet» ist widerrufen
+    Dann antworten mit der widerrufenen Sitzung von «mitarbeiter-urinet» diese Anfragen mit Status 401 und Fehlercode «NICHT_ANGEMELDET»:
+      | methode | pfad | koerper |
+      | GET | /api/v1/wissensbasis/einstellungen | |
+      | GET | /api/v1/wissensseiten | |
+      | GET | /api/v1/mandant/einstellungen | |
+
+  @req-22.6
   Szenario: Ohne Freischaltung zeigen Konfigurationsdatei und Versionen die Wissenseinstellungen nicht und ändern sie nicht
     Angenommen «inhaber-urinet» hat das Budget je Wissens-Ingest auf 234567 gesetzt
     Und Wissen ist für «urinet» abgeschaltet

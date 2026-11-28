@@ -9,6 +9,9 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
+import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
+import ch.urinet.archiv.sicherheit.application.TokenWiderruf;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.sicherheit.application.Verweigerung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -36,7 +39,8 @@ import java.util.function.Supplier;
  * <p>
  * Wissensbasis (Spec 04, Req 22.6): Gehört der Endpunkt zur Wissensbasis und ist Wissen für den Mandanten nicht
  * freigeschaltet, antwortet sie wie der {@link ZugangFilter} mit 403 {@code WISSEN_NICHT_FREIGESCHALTET}, damit diese
- * Antwort unabhängig von der Rolle auch {@code @RolesAllowed} vorgeht.
+ * Antwort unabhängig von der Rolle auch {@code @RolesAllowed} vorgeht. Davor gilt wie im {@link ZugangFilter} die
+ * widerrufene Sitzung einer Rolle (401 {@code NICHT_ANGEMELDET}, Req 22.6 «nach 401»), auch für die übrigen Verweigerungen.
  */
 public class RollenVerweigerungAbbildung {
 
@@ -44,13 +48,16 @@ public class RollenVerweigerungAbbildung {
     private final MandantAufloesung aufloesung;
     private final Berechtigung berechtigung;
     private final Wissensfreischaltung wissen;
+    private final TokenWiderruf widerruf;
 
     public RollenVerweigerungAbbildung(SecurityIdentity identitaet, MandantAufloesung aufloesung,
-                                       Berechtigung berechtigung, Wissensfreischaltung wissen) {
+                                       Berechtigung berechtigung, Wissensfreischaltung wissen,
+                                       TokenWiderruf widerruf) {
         this.identitaet = identitaet;
         this.aufloesung = aufloesung;
         this.berechtigung = berechtigung;
         this.wissen = wissen;
+        this.widerruf = widerruf;
     }
 
     @ServerExceptionMapper
@@ -86,17 +93,24 @@ public class RollenVerweigerungAbbildung {
             } catch (MandantVerweigert e) {
                 berechtigung.ohneMandant(benutzerId);
             }
+            Optional<Rolle> rolle = Rolle.ausRealmRollen(identitaet.getRoles());
+            if (rolle.isPresent() && benutzerId.isPresent()
+                    && identitaet.getAttribute(TokenIdentitaet.SCOPE) == null) {
+                // widerrufene Sitzung: 401 wie im ZugangFilter, vor Wissenssperre und Verweigerung (Spec 04, Req 22.6)
+                ZugangFilter.sitzungPruefen(identitaet, widerruf, benutzerId.get());
+            }
             if (mandant != null && methode != null && ZugangFilter.wissenspfad(klasse, methode)
                     && !wissen.freigeschaltet(mandant)) {
                 return ProblemAbbildung.antwort(ProblemAntwort.fuer(Fehlercode.WISSEN_NICHT_FREIGESCHALTET));
             }
             Optional<Aktion> aktion = Optional.ofNullable(methode)
                     .map(m -> m.getAnnotation(ErfordertAktion.class)).map(ErfordertAktion::value);
-            Optional<Rolle> rolle = Rolle.ausRealmRollen(identitaet.getRoles());
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
             throw new IllegalStateException("Berechtigung hat nicht verweigert");
         } catch (Verweigerung v) {
             return ProblemAbbildung.antwort(ProblemAntwort.fuer(v.code()));
+        } catch (FachFehler f) {
+            return new ProblemAbbildung().fachFehler(f);
         }
     }
 }

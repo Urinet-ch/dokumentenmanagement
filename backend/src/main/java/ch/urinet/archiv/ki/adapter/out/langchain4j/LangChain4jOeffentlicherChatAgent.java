@@ -123,7 +123,7 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
         String prompt = anfrage.wissen() == null ? OeffentlicherSystemPrompt.system(anfrage.mandantenname(), uhr.instant())
                 : OeffentlicherWissenSystemPrompt.system();
         TokenStream strom = agent.antworten(lauf.id(), prompt, anfrage.frage());
-        strom.onPartialResponseWithContext((teil, kontext) -> {
+        TokenStream bereit = strom.onPartialResponseWithContext((teil, kontext) -> {
                     lauf.handle(kontext.streamingHandle());
                     if (!teil.text().isEmpty()) {
                         lauf.melden(new ChatEreignis.Text(teil.text()));
@@ -137,8 +137,9 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
                     modellaufruf(lauf, anfrage, antwort, true);
                     lauf.ende();
                 })
-                .onError(fehler -> lauf.ausfall(KiFehler.grund(fehler)))
-                .start();
+                .onError(fehler -> lauf.ausfall(KiFehler.grund(fehler)));
+        // jeder Modellaufruf des Durchgangs prüft vor dem Hinausgehen die Freischaltung (EntkoppeltesModell, Req 22.9)
+        EntkoppeltesModell.imLauf(lauf, bereit::start);
     }
 
     /**

@@ -136,7 +136,7 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         String prompt = wissen ? ChatSystemPrompt.wissenChat(anfrage.mandantenname(), uhr.instant())
                 : ChatSystemPrompt.system(anfrage.mandantenname(), uhr.instant());
         TokenStream strom = agent.antworten(lauf.id(), prompt, anfrage.frage());
-        strom.onPartialResponseWithContext((teil, kontext) -> {
+        TokenStream bereit = strom.onPartialResponseWithContext((teil, kontext) -> {
                     lauf.handle(kontext.streamingHandle());
                     if (!teil.text().isEmpty()) {
                         lauf.melden(new ChatEreignis.Text(teil.text()));
@@ -152,8 +152,9 @@ public class LangChain4jChatAgent implements ChatAgentPort {
                     modellaufruf(lauf, antwort, true);
                     lauf.ende();
                 })
-                .onError(fehler -> lauf.ausfall(KiFehler.grund(fehler)))
-                .start();
+                .onError(fehler -> lauf.ausfall(KiFehler.grund(fehler)));
+        // jeder Modellaufruf des Durchgangs prüft vor dem Hinausgehen die Freischaltung (EntkoppeltesModell, Req 22.9)
+        EntkoppeltesModell.imLauf(lauf, bereit::start);
     }
 
     /**
