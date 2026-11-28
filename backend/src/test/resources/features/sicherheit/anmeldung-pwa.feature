@@ -24,7 +24,7 @@ Funktionalität: Anmeldung in der PWA mit OIDC und PKCE
   @req-2.1
   Szenario: Abmelden beendet die Sitzung auch bei Keycloak
     Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
-    Wenn ich auf «Abmelden» klicke
+    Wenn ich mich unter «Mein Konto» abmelde
     Dann hat Keycloak die Abmeldung erhalten
     Und sehe ich kein Menü
 

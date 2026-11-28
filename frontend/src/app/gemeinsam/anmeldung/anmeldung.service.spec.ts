@@ -99,6 +99,8 @@ describe('AnmeldungService (Req 2.1)', () => {
   const accessToken = jwt({
     sub: 'u-1',
     name: 'Fabian Aschwanden',
+    preferred_username: 'benutzer-1',
+    email: 'benutzer-1@example.invalid',
     mandant: 'urinet',
     realm_access: { roles: ['inhaber', 'offline_access'] },
   });
@@ -174,7 +176,14 @@ describe('AnmeldungService (Req 2.1)', () => {
     expect(await rueckruf).toBe('/erfassen');
     expect(dienst.angemeldet()).toBe(true);
     expect(dienst.accessToken()).toBe(accessToken);
-    expect(dienst.benutzer()).toEqual({ id: 'u-1', name: 'Fabian Aschwanden', mandant: 'urinet', rolle: 'inhaber' });
+    expect(dienst.benutzer()).toEqual({
+      id: 'u-1',
+      name: 'Fabian Aschwanden',
+      mandant: 'urinet',
+      rolle: 'inhaber',
+      benutzername: 'benutzer-1',
+      email: 'benutzer-1@example.invalid',
+    });
     expect(dienst.darf('A13')).toBe(true);
     expect(speicher.length).toBe(0);
     expect(localStorage.length).toBe(0);

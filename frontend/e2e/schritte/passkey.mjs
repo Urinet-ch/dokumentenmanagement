@@ -377,3 +377,177 @@ Then(
     }
   },
 );
+
+// Spec 06, Req 11.5: Kontoverwaltung gegen das Keycloak des Test-Realms (gleiche Einschränkungen wie der Export,
+// RealmExportTest). Das Token holt ein Code-Flow des Clients account-console über die bestehende Sitzung; die Seite der
+// Kontoverwaltung wird dabei abgefangen, damit sie den Code nicht selbst einlöst.
+When('er ein Token der Kontoverwaltung erhält', { timeout: 60_000 }, async function () {
+  const { realm } = this.passkey;
+  const verifier = randomBytes(32).toString('base64url');
+  const rueckruf = `${realm}/account/`;
+  const mitCode = (url) => url.toString().startsWith(rueckruf) && url.searchParams.has('code');
+  await this.kontext.route(mitCode, (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'ok' }));
+  try {
+    await this.seite.goto(`${realm}/protocol/openid-connect/auth?${new URLSearchParams({
+      client_id: 'account-console',
+      response_type: 'code',
+      scope: 'openid',
+      redirect_uri: rueckruf,
+      state: randomBytes(16).toString('hex'),
+      code_challenge_method: 'S256',
+      code_challenge: createHash('sha256').update(verifier).digest('base64url'),
+    })}`);
+    await this.seite.waitForURL(mitCode);
+  } finally {
+    await this.kontext.unroute(mitCode);
+  }
+  const antwort = await fetch(`${realm}/protocol/openid-connect/token`, {
+    method: 'POST',
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: 'account-console',
+      code: new URL(this.seite.url()).searchParams.get('code'),
+      redirect_uri: rueckruf,
+      code_verifier: verifier,
+    }),
+  });
+  await pruefeAntwort(antwort, 200, 'Token der Kontoverwaltung beziehen');
+  this.passkey.kontoToken = (await antwort.json()).access_token;
+});
+
+function konto(welt, pfad = '', optionen = {}) {
+  return fetch(`${welt.passkey.realm}/account/${pfad}`, {
+    ...optionen,
+    headers: {
+      authorization: `Bearer ${welt.passkey.kontoToken}`,
+      accept: 'application/json',
+      'content-type': 'application/json',
+    },
+  });
+}
+
+Then(
+  'lehnt die Kontoverwaltung Änderungen an Benutzername, Vor- und Nachname, E-Mail und Mandant ab',
+  async function () {
+    const profil = await konto(this, '?userProfileMetadata=true');
+    await pruefeAntwort(profil, 200, 'Persönliche Angaben lesen');
+    const angaben = await profil.json();
+    const nurLesen = Object.fromEntries(
+      angaben.userProfileMetadata.attributes.map((attribut) => [attribut.name, attribut.readOnly]),
+    );
+    for (const name of ['username', 'email', 'firstName', 'lastName']) assert.equal(nurLesen[name], true, name);
+    assert.equal('mandant' in nurLesen, false, 'Mandant sichtbar');
+    const vorher = { username: angaben.username, email: angaben.email, firstName: angaben.firstName, lastName: angaben.lastName };
+    this.passkey.angabenVorher = vorher;
+    for (const aenderung of [
+      { username: 'konto-neu' },
+      { email: 'neu@example.invalid' },
+      { firstName: 'Neu' },
+      { lastName: 'Neu' },
+      { attributes: { mandant: ['fremd'] } },
+    ]) {
+      const antwort = await konto(this, '', { method: 'POST', body: JSON.stringify({ ...vorher, ...aenderung }) });
+      assert.equal(antwort.status, 400, JSON.stringify(aenderung));
+      assert.match(await antwort.text(), /error-user-attribute-read-only/);
+    }
+  },
+);
+
+Then('bleiben seine Angaben in Keycloak unverändert', async function () {
+  const header = await adminHeader(new URL(this.passkey.adminUrl), 'Angaben prüfen');
+  const antwort = await fetch(`${this.passkey.adminUrl}/users/${this.passkey.id}`, { headers: header });
+  await pruefeAntwort(antwort, 200, 'Benutzer lesen');
+  const benutzer = await antwort.json();
+  const { username, email, firstName, lastName } = benutzer;
+  assert.deepEqual({ username, email, firstName, lastName }, this.passkey.angabenVorher);
+  assert.deepEqual(benutzer.attributes.mandant, ['urinet']);
+});
+
+Then('bietet die Kontoverwaltung keine Verknüpfung mit Google an', async function () {
+  const alt = await konto(
+    this,
+    `linked-accounts/google?providerId=google&redirectUri=${encodeURIComponent(`${this.passkey.realm}/account/`)}`,
+  );
+  assert.notEqual(alt.status, 200, 'alter Weg zum Verknüpfen');
+  const header = await adminHeader(new URL(this.passkey.adminUrl), 'Pflichtaktionen lesen');
+  const aktionen = await fetch(`${this.passkey.adminUrl}/authentication/required-actions`, { headers: header });
+  await pruefeAntwort(aktionen, 200, 'Pflichtaktionen lesen');
+  assert.equal(
+    (await aktionen.json()).some((aktion) => aktion.alias === 'idp_link' && aktion.enabled),
+    false,
+    'idp_link aktiv',
+  );
+});
+
+When('er seinen Einmalcode in der Kontoverwaltung entfernt', async function () {
+  const header = await adminHeader(new URL(this.passkey.adminUrl), 'Zugangsdaten lesen');
+  const antwort = await fetch(`${this.passkey.adminUrl}/users/${this.passkey.id}/credentials`, { headers: header });
+  await pruefeAntwort(antwort, 200, 'Zugangsdaten lesen');
+  const otp = (await antwort.json()).find((credential) => credential.type === 'otp');
+  assert.ok(otp, 'kein Einmalcode eingerichtet');
+  await pruefeAntwort(await konto(this, `credentials/${otp.id}`, { method: 'DELETE' }), 204, 'Einmalcode entfernen');
+});
+
+Then(
+  'verlangt die nächste Anmeldung mit Passwort die Einrichtung des Einmalcodes',
+  { timeout: 60_000 },
+  async function () {
+    const kontext = await this.browser.newContext({ locale: 'de-CH' });
+    try {
+      const seite = await kontext.newPage();
+      await seite.goto(anmeldeUrl(this.passkey));
+      await seite.locator('#username').fill(this.passkey.name);
+      await seite.locator('#password').fill(PASSWORT);
+      await seite.locator('#kc-login').click();
+      await seite.waitForURL((url) => url.pathname.endsWith('/login-actions/required-action'));
+      assert.equal(new URL(seite.url()).searchParams.get('execution'), 'CONFIGURE_TOTP');
+      await seite.locator('#totp').waitFor();
+      assert.equal(amCallback(this.passkey)(new URL(seite.url())), false);
+    } finally {
+      await kontext.close();
+    }
+  },
+);
+
+Given('ein Admin hat sein Konto mit Google verknüpft', async function () {
+  const header = await adminHeader(new URL(this.passkey.adminUrl), 'Google verknüpfen');
+  const antwort = await fetch(`${this.passkey.adminUrl}/users/${this.passkey.id}/federated-identity/google`, {
+    method: 'POST',
+    headers: header,
+    body: JSON.stringify({ identityProvider: 'google', userId: `google-${this.passkey.name}`, userName: this.passkey.name }),
+  });
+  await pruefeAntwort(antwort, 204, 'Google verknüpfen');
+});
+
+async function googleVerknuepfungen(welt) {
+  const header = await adminHeader(new URL(welt.passkey.adminUrl), 'Verknüpfungen lesen');
+  const antwort = await fetch(`${welt.passkey.adminUrl}/users/${welt.passkey.id}/federated-identity`, { headers: header });
+  await pruefeAntwort(antwort, 200, 'Verknüpfungen lesen');
+  return (await antwort.json()).filter((v) => v.identityProvider === 'google');
+}
+
+Then('kann er die Google-Verknüpfung in der Kontoverwaltung selbst lösen', async function () {
+  assert.equal((await googleVerknuepfungen(this)).length, 1);
+  await pruefeAntwort(await konto(this, 'linked-accounts/google', { method: 'DELETE' }), 204, 'Verknüpfung lösen');
+  assert.equal((await googleVerknuepfungen(this)).length, 0);
+});
+
+Then('steht das Lösen im Ereignisprotokoll von Keycloak', async function () {
+  const header = await adminHeader(new URL(this.passkey.adminUrl), 'Ereignisse lesen');
+  const parameter = new URLSearchParams({ user: this.passkey.id, type: 'REMOVE_FEDERATED_IDENTITY' });
+  const antwort = await fetch(`${this.passkey.adminUrl}/events?${parameter}`, { headers: header });
+  await pruefeAntwort(antwort, 200, 'Ereignisse lesen');
+  assert.equal((await antwort.json()).length, 1);
+});
+
+Then(
+  /^zeigt die Kontoverwaltung unter «(.+)» die Bereiche «(.+)»$/,
+  { timeout: 60_000 },
+  async function (pfad, bereiche) {
+    await this.seite.goto(`${this.passkey.realm}/account/${pfad}`);
+    await this.seite.waitForURL((url) => url.pathname.endsWith(`/account/${pfad}`), { timeout: 30_000 });
+    for (const name of bereiche.split(', ')) {
+      await this.seite.getByRole('heading', { name, exact: true }).first().waitFor({ timeout: 30_000 });
+    }
+  },
+);

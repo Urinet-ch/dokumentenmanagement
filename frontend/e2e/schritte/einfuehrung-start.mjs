@@ -64,7 +64,7 @@ Given(/^ein bekannter Benutzer «(.+)» im Mandanten «(.+)» ist angemeldet$/, 
     }));
   }, k);
   await this.seite.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await this.seite.getByRole('button', { name: 'Abmelden', exact: true }).waitFor();
+  await this.seite.getByRole('link', { name: /^Mein Konto/ }).waitFor();
 });
 
 Then(/^sehe ich die Einführung mit meiner Rolle «(.+)» über den Kacheln$/, async function (rolle) {
@@ -131,7 +131,7 @@ Then('sendet die Startseite mit Einführung dieselben API-Anfragen wie ohne Einf
       });
 
       await seite.getByRole('button', { name: 'Anmelden', exact: true }).click();
-      await seite.getByRole('button', { name: 'Abmelden', exact: true }).waitFor();
+      await seite.getByRole('link', { name: /^Mein Konto/ }).waitFor();
       if (!bekannt) await seite.locator('app-start .einfuehrung').waitFor();
       await seite.waitForLoadState('networkidle');
       return anfragen.sort();
@@ -206,7 +206,7 @@ Then('ist noch kein Einführungsvermerk gespeichert', async function () {
 When('ich die Seite neu lade und mich erneut anmelde', async function () {
   await this.seite.reload();
   await this.seite.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await this.seite.getByRole('button', { name: 'Abmelden', exact: true }).waitFor();
+  await this.seite.getByRole('link', { name: /^Mein Konto/ }).waitFor();
 });
 
 Then('bleibt die Startseite mit dem aktuellen Einführungsschritt geöffnet', async function () {
