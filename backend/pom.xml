@@ -479,6 +479,13 @@
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <version>${spotbugs-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>jakarta.json.bind</groupId>
+                        <artifactId>jakarta.json.bind-api</artifactId>
+                        <version>3.0.2</version>
+                    </dependency>
+                </dependencies>
                 <configuration>
                     <threshold>High</threshold>
                     <failOnError>true</failOnError>
