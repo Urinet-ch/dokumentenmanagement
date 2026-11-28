@@ -2,10 +2,11 @@
 
 Diese Änderungen werden erst beim Wechsel 31.7 gemergt und deployt. `web-archiv` wird in 31.10 im Infra-Repo
 angelegt, nicht durch Compose. Fabian prüft, dass nur Traefik und Archivdienste angeschlossen sind.
-Das Netz ist im Infra-Repo angelegt (Werte nur dort, README «Netze»). Die GitHub-Variable
+Das Netz ist im Infra-Repo vorgesehen (Urinet-ch/infomaniak-vps#7; Werte nur dort, README «Netze»). Die GitHub-Variable
 `ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE` erhält dessen CIDR-Bereich; Fabian vergleicht ihn vor Freigabe mit dem
 tatsächlich angelegten Netz; ein leerer Wert vertraut keinem Proxy. Die Netz-Policy erlaubt `web-archiv` nur für `archiv`, nie
 zugleich mit `web`; Compose setzt bei `api` und `kc` das Label `traefik.docker.network: web-archiv`.
+Die Übergabe der GitHub-Variable im Deploy-Workflow wurde durch #762 übernommen.
 
 ## Leerstart
 
@@ -18,6 +19,22 @@ Compose-Datei und sichert Archiv- und Keycloak-Datenbank über `pg_dump` im lauf
 hängt gemäss Compose `archiv_daten_b` ein; ein Volume-Eintrag in `backup-apps` ist dafür nicht vorgesehen.
 Beim Wechsel die Anbindung des Sicherungslaufs an die deployte Compose-Datei und die Sicherung beider Datenbanken
 prüfen. Das Arbeits-Volume bleibt von der Sicherung ausgenommen. Schlüssel und Zugangsdaten bleiben bestehen.
+
+## Abbruch und Rückfall
+
+Bei fehlgeschlagenem Deploy oder fehlendem Nachweis den Wechsel anhalten, keine echten Belege erfassen und den
+Stand im Wechselprotokoll festhalten. Der automatische Rollback setzt nur Images zurück; Compose-Datei, Netz,
+Volumes und Datenbank bleiben unverändert ([Deploy und Rollback](deploy-rollback.md)). Ein zurückgesetztes Image
+stellt daher weder die Stufe-A-Konfiguration noch deren Daten wieder her. Fabian und Infra prüfen Deploy-Ergebnis,
+Konfiguration, Netz, Volumes und Health; Korrekturen erfolgen über einen freigegebenen Deploy-Workflow.
+
+Vor der Bereinigung kann Stufe A weiterhin nur mit Testdaten laufen; nach neuen Uploads beginnt die Wartefrist der
+betroffenen Test-Buckets erneut. Nach dem Verwerfen der Test-Buckets in 31.7 sind deren Daten endgültig weg, auch
+wenn die alten Datenbank-Volumes noch vorhanden sind; sie ergeben keinen vollständigen Stufe-A-Stand. Fabian
+entscheidet über die Wiederholung des Wechsels oder eine neu eingerichtete, ausschliesslich synthetische Stufe A.
+Nach Eingang echter Belege nicht auf Stufe A mit verkürzten Sperren zurückschalten und keine produktiven Daten
+verwerfen; Eingänge stoppen und nach [Wiederherstellung](../wiederherstellung.md) vorgehen. Die ausführliche
+Reihenfolge steht in [Wechsel von Stufe A auf Stufe B](wechsel-stufe-b.md#rückweg).
 
 ## Restore-Probe
 

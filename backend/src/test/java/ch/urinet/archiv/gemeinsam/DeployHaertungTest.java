@@ -104,8 +104,9 @@ class DeployHaertungTest {
     void netzeUndSecretsNurAnVorgesehenenDiensten() throws IOException {
         Map<String, Map<String, Object>> dienste = dienste();
         assertThat(fehlerNetzeUndSecrets(dienste)).isEmpty();
-        assertThat(karte(karte(yaml(COMPOSE).get("networks")).get("intern")).get("internal")).isEqualTo(true);
-        assertThat(karte(karte(yaml(COMPOSE).get("networks")).get("web-archiv")).get("external")).isEqualTo(true);
+        Map<String, Object> netze = karte(yaml(COMPOSE).get("networks"));
+        assertThat(karte(netze.get("intern")).get("internal")).isEqualTo(true);
+        assertThat(fehlerNetznamen(netze)).isEmpty();
         dienste.get("db").put("networks", Map.of("intern", Map.of(), "web-archiv", Map.of()));
         assertThat(fehlerNetzeUndSecrets(dienste)).contains("db: Netze");
         dienste.get("db").put("secrets", List.of("archiv_manifest_key"));
@@ -118,6 +119,38 @@ class DeployHaertungTest {
         assertThat(fehlerNetzeUndSecrets(dienste)).contains("sftp: Netze");
         dienste.get("sftp").put("ports", List.of("2222:22"));
         assertThat(fehlerNetzeUndSecrets(dienste)).contains("sftp: Ports");
+    }
+
+    @Test
+    void tatsaechlicheNetznamenWerdenGeprueft() throws IOException {
+        Map<String, Object> netze = karte(yaml(COMPOSE).get("networks"));
+        netze.put("web-archiv", Map.of("external", true, "name", "web-archiv"));
+        assertThat(fehlerNetznamen(netze)).isEmpty();
+        netze.put("web-archiv", Map.of("external", true, "name", "web"));
+        assertThat(fehlerNetznamen(netze)).contains("web-archiv: Name oder external", "web-archiv: geteiltes Netz");
+        netze.put("web-archiv", Map.of("external", true, "name", "anderes-netz"));
+        assertThat(fehlerNetznamen(netze)).contains("web-archiv: Name oder external");
+        netze.put("web-archiv", Map.of("external", false, "name", "web-archiv"));
+        assertThat(fehlerNetznamen(netze)).contains("web-archiv: Name oder external");
+        netze.put("web-archiv", Map.of("external", true));
+        netze.put("intern", Map.of("internal", true, "name", "web"));
+        assertThat(fehlerNetznamen(netze)).contains("intern: geteiltes Netz");
+    }
+
+    private static List<String> fehlerNetznamen(Map<String, Object> netze) {
+        List<String> fehler = new ArrayList<>();
+        Map<String, Object> archivnetz = karte(netze.get("web-archiv"));
+        if (!Boolean.TRUE.equals(archivnetz.get("external"))
+                || !"web-archiv".equals(archivnetz.getOrDefault("name", "web-archiv"))) {
+            fehler.add("web-archiv: Name oder external");
+        }
+        netze.forEach((name, wert) -> {
+            Map<String, Object> netz = wert == null ? Map.of() : karte(wert);
+            if ("web".equals(netz.getOrDefault("name", name))) {
+                fehler.add(name + ": geteiltes Netz");
+            }
+        });
+        return fehler;
     }
 
     private static List<String> fehlerNetzeUndSecrets(Map<String, Map<String, Object>> dienste) {

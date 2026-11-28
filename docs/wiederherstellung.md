@@ -22,8 +22,7 @@ Den freigegebenen Stand über die Pipeline deployen und Datenbanken und Realm so
 nicht verfügbar ist, die Dateien aus der Zweitkopie nach der Reihenfolge unten wiederherstellen. Einen intakten Bucket
 nicht überschreiben. Bei Wiederaufbau aus der Zweitkopie Sperren unverändert nach Inventar neu setzen, nie `--kappen`.
 Anmeldung, Datenbestand, Sperren, Manifestkette und Prüflauf prüfen; Sicherung, Restore-Probe und Alarme wieder
-einrichten und prüfen, bevor Fabian den Betrieb freigibt. Abweichungen verhindern die Freigabe. Die unten beschriebene
-offene Auflösung der Manifest-Versions-IDs (Aufgabe 5.12) kann den Prüflauf derzeit verhindern.
+einrichten und prüfen, bevor Fabian den Betrieb freigibt. Abweichungen verhindern die Freigabe.
 
 Die Zielzeit für den Wiederanlauf ist **[offen: Entscheid Fabian, Aufgabe 31.1]**.
 
@@ -86,7 +85,11 @@ Die Zielzeit für den Wiederanlauf ist **[offen: Entscheid Fabian, Aufgabe 31.1]
 
    S3 vergibt beim Schreiben neue Versions-IDs. Das Wiederherstellungskommando aktualisiert deshalb nach erfolgreichem
    Schreiben und Sperren die passenden Referenzen der Dokumentdateien unter `archiv/` und `eingang/` in der
-   wiederhergestellten Datenbank. Die unveränderlichen Manifest-Dateien unter `manifest/` werden nicht umgeschrieben. Die Datenbankzeilen `manifest.s3_version`, `manifest.sig_s3_version` und `manifest_zeitstempel.s3_version` bleiben ebenfalls unverändert: Die Tabellen sind per Trigger nur einfügbar (Req 15), ein Umschreiben würde die Beweiskette verletzen. Nach einer Wiederherstellung zeigen diese drei Spalten deshalb auf Versions-IDs der alten Quelle, die im neuen Bucket nicht existieren. Bei der Prüfung (Schritt 5) Manifeste über Schlüssel und SHA-256 auflösen, nicht über die gespeicherte Versions-ID; Code, der Manifeste über diese Versions-ID liest (Export, Prüfwerkzeug), kann im Ziel scheitern, bis Aufgabe 5.12 die Auflösung festlegt.
+   wiederhergestellten Datenbank. Die unveränderlichen Manifest-Dateien unter `manifest/` werden nicht umgeschrieben.
+   Die Datenbankzeilen `manifest.s3_version`, `manifest.sig_s3_version` und `manifest_zeitstempel.s3_version`
+   bleiben als Quellenachweis unverändert: Die Tabellen sind per Trigger nur einfügbar. Nach dem Restore gelten
+   diese alten Versions-IDs im Ziel nicht. Prüfwerkzeug und Exporte lesen die Manifest-Teile über Schlüssel und
+   SHA-256; fehlende Teile, abweichende Hashes, zusätzliche Versionen oder Löschmarken sind Fehler (Aufgabe 5.12).
 5. **Prüfen.** Die Anzahl wiederhergestellter Objekte mit den Datenbankeinträgen abgleichen, Manifeste prüfen und den
    vorgesehenen Prüflauf erfolgreich abschliessen. Abweichungen sind vor der Freigabe zu klären.
 

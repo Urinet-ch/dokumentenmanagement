@@ -88,8 +88,12 @@ def pruefe_compose(compose):
             melde("DIENST_FEHLT", name, "Erwarteter Dienst fehlt.")
     if not netze.get("intern", {}).get("internal"):
         melde("NETZ_INTERN", "networks.intern", "Internes Netz fehlt oder ist nicht isoliert.")
-    if not netze.get("web-archiv", {}).get("external"):
-        melde("NETZ_WEB", "networks.web-archiv", "Externes Archivnetz fehlt.")
+    archivnetz = netze.get("web-archiv") or {}
+    if archivnetz.get("external") is not True or archivnetz.get("name", "web-archiv") != "web-archiv":
+        melde("NETZ_WEB", "networks.web-archiv", "Externes Netz mit Namen web-archiv erforderlich.")
+    for name, netz in netze.items():
+        if (netz or {}).get("name", name) == "web":
+            melde("NETZ_GETEILT", f"networks.{name}", "Das geteilte Netz web ist nicht zulässig.")
 
     summe_bytes = Decimal(0) if "sftp" in dienste else Decimal(SFTP_RESERVE_BYTES)
     summe_cpus = Decimal(0) if "sftp" in dienste else SFTP_RESERVE_CPUS

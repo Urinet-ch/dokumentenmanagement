@@ -41,6 +41,21 @@ class ComposePruefungTest(unittest.TestCase):
     def test_synthetische_vorlage_ohne_befund(self):
         self.assertEqual([], pruefung.pruefe_compose(modell()))
 
+    def test_tatsaechliche_netzwerk_namen(self):
+        daten = modell()
+        daten["networks"]["web-archiv"]["name"] = "web-archiv"
+        self.assertEqual([], pruefung.pruefe_compose(daten))
+        daten["networks"]["web-archiv"]["name"] = "web"
+        codes = {b["code"] for b in pruefung.pruefe_compose(daten)}
+        self.assertTrue({"NETZ_WEB", "NETZ_GETEILT"} <= codes)
+        daten["networks"]["web-archiv"]["name"] = "anderes-netz"
+        self.assertIn("NETZ_WEB", {b["code"] for b in pruefung.pruefe_compose(daten)})
+        daten["networks"]["web-archiv"]["name"] = "web-archiv"
+        daten["networks"]["intern"]["name"] = "web"
+        self.assertIn("NETZ_GETEILT", {b["code"] for b in pruefung.pruefe_compose(daten)})
+        daten["networks"]["web-archiv"]["external"] = False
+        self.assertIn("NETZ_WEB", {b["code"] for b in pruefung.pruefe_compose(daten)})
+
     def test_auth_router_darf_nicht_middleware_der_api_nutzen(self):
         daten = modell()
         daten["services"]["api"]["labels"]["traefik.http.middlewares.archiv-sts.headers.stsseconds"] = "86400"

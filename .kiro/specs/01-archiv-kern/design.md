@@ -200,9 +200,12 @@ den Auftrags-Poller ein. Aus einem Build entstehen zwei Images: `archiv` (API mi
   - Schutz gegen die anderen Apps der VPS: Netze und Ports (Req 16.28), Geheimnisse nur im Archiv (Req 16.29), Limits und Alarm (Req 16.30), Wiederaufbau auf einer neuen VPS (Req 16.31). Netz (entschieden von Fabian am 28.11.2026): `api` und `kc` hängen nur am internen Netz und an einem eigenen Netz nur für Traefik und das Archiv aus dem Infra-Repo (Aufgabe 31.10), nicht mehr am geteilten Netz «web»; `archiv.api-token.vertrauenswuerdige-proxies` nennt dieses Netz. Zugangsdaten, Daten- und Manifest-Schlüssel der Stufe A bleiben (entschieden von Fabian am 28.11.2026); Restrisiko: was in der Testphase sichtbar war, gilt produktiv weiter.
   - Wechsel (Aufgabe 31.7): Testdaten verwerfen (Test-Buckets frühestens 1 Tag nach dem letzten Upload, Datenbanken und Realm leer neu, Testschlüsselpaar), Stufenwerte der Stufe B deployen, produktiver Bucket, Zeitstempeldienst, Sicherung und Überwachung; Deploy-Ziel und DNS bleiben.
   - Vorbereitung 31.2: Neue Volumes `archiv_daten_b` und `archiv_arbeit_b` trennen den Leerstart von Stufe A;
-    das Daten-Volume muss in die Sicherung aufgenommen werden, das Arbeits-Volume bleibt flüchtig. Das externe Netz
+    `deploy/backup/taeglich.sh` sichert die Datenbanken über `pg_dump` im `db`-Dienst der deployten Compose-Datei,
+    der das Daten-Volume einhängt; ein eigener Volume-Eintrag in `backup-apps` ist nicht vorgesehen. Das
+    Arbeits-Volume bleibt flüchtig und wird nicht gesichert. Das externe Netz
     heisst `web-archiv`; dessen tatsächlicher CIDR-Bereich wird beim Deploy als Variable bereitgestellt und vor der
-    Freigabe mit dem Netz verglichen. Anleitung und Workflow-Patch liegen unter `docs/betrieb/`.
+    Freigabe mit dem Netz verglichen. Die Übergabe im Deploy-Workflow wurde durch #762 übernommen; die Anleitung
+    liegt unter `docs/betrieb/`.
 
 ### Secrets und Konfiguration (Req 16.9)
 - Alle Secrets liegen als Dateien unter `/run/secrets/` (Compose `secrets:` mit `file:` aus dem Bundle), Quelle sind die GitHub-Secrets des Repos; nie `environment` oder `env_file`. Quarkus liest sie über die File-System-Config-Source (`smallrye.config.source.file.locations=/run/secrets`, Dateiname = Konfigurationsschlüssel). PostgreSQL nutzt `POSTGRES_PASSWORD_FILE`, Keycloak einen Einstiegs-Wrapper, der die Dateien liest.
