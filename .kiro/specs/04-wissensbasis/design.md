@@ -1669,6 +1669,37 @@ Hinweis «Vertraulichkeitsvermerk erkannt …»; Quelldokument und dessen Metada
 11.7). Die bestehenden Freigabeprüfungen liefern keine Seiten mit Stufe `INTERN` für Webseite oder Mitglieder aus.
 Requirements bleiben unverändert.
 
+
+## Wissen je Mandant freischalten (Requirement 22, Entscheid Fabian 28.11.2026)
+- **Datenmodell:** Changeset `db/public`: `mandant.wissen_freigeschaltet boolean not null default false` (Rollback);
+  derselbe Changeset setzt `true` für den Code `urinet`. Lokale Profile, Tests und eine neue Installation schalten
+  Wissen ausdrücklich mit dem Kommando bzw. in den Testdaten ein; kein Sonderfall im Programmcode für einen Mandanten.
+- **Eine Stelle:** Ein Port «Wissensfreischaltung» (Anwendungsschicht) liest den Zustand mit einem Zwischenspeicher von
+  höchstens 60 Sekunden. REST-Zugang, Chat-Werkzeugliste, Suche, öffentlicher Wissenschat, Auftragsarbeiter,
+  Lint-Zeitplan, Wochenbericht und `GET /mandant/funktionen` fragen nur diesen Port. Kann der Zustand nicht gelesen
+  werden, gilt «nicht freigeschaltet».
+- **REST:** Ein gemeinsamer Filter für die Ressourcen der Wissensbasis, nach der Anmeldung und vor Rechteprüfung und
+  Laden von Daten; Fehlercode `WISSEN_NICHT_FREIGESCHALTET` (403). Ein ArchUnit- oder Vertragstest stellt sicher, dass
+  jede Operation unter `/wissen` und `/wissensbasis` erfasst ist, auch künftige.
+- **Modellaufrufe:** Der Zustand wird unmittelbar vor jedem Modellaufruf der Wissensbasis geprüft, nicht nur beim
+  Start eines Auftrags.
+- **Kommando:** `archiv mandant wissen <code> [ein|aus]` neben den übrigen Mandanten-Kommandos; Protokoll mit Akteur
+  Betreiber, ohne Inhalte; die zulässigen Protokollaktionen werden per Changeset `db/mandant` ergänzt.
+- **Oberfläche:** Navigation, Routen-Wächter, Dokumentansicht, Chat, Suche, Einstellungen, Einführung und Hilfe richten
+  sich nach `wissenVerfuegbar`. Die Prüfung im Server bleibt massgebend.
+- **Abrechnung:** Die Freischaltung ist ein reiner Schalter. Vertrag, Preis und Rechnungsstellung eines Zusatzabos sind
+  nicht Teil dieser Spec.
+
+### Folgeänderungen (mit der Umsetzung nachführen)
+| Dokument | Änderung |
+| --- | --- |
+| Spec 02, 3.1 und 4 | Wissenswerkzeuge und Wissensquellen nur bei Freischaltung (22.7). |
+| Spec 03, öffentliche Schnittstelle | Wissenschat zusätzlich an die Freischaltung gebunden (22.8). |
+| Spec 05, 8.8 und design.md | `GET /mandant/funktionen` um `wissenVerfuegbar` ergänzt (22.4). |
+| Spec 06, Einstellungen | Gruppe der Wissensbasis nur bei Freischaltung; Freischaltung nicht im Katalog (22.3, 22.5). |
+| Spec 07, Einführung und Hilfe | Wissens-Schritte und Hilfeseiten nur bei Freischaltung (22.5). |
+| `docs/` | Betriebsanleitung für das Kommando, Anleitung zum Anlegen eines Mandanten. |
+
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
 1. Lage zu Spec 03: Spec 04 wird nach Spec 03 umgesetzt, Wellen 13–16 (tasks.md). Der Nachtrag in
