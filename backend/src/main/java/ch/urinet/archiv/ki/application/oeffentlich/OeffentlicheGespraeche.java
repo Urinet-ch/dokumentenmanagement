@@ -6,7 +6,6 @@ import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
 import ch.urinet.archiv.ki.domain.oeffentlich.FrageBereinigung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.wissen.application.OeffentlichesWissenPort;
-import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -156,9 +155,7 @@ public class OeffentlicheGespraeche {
         return gespraeche.size();
     }
 
-    @Scheduled(every = "10s", identity = "oeffentliche-gespraeche-aufraeumen",
-            concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    synchronized void abgelaufeneAufraeumen() {
+    public synchronized void abgelaufeneAufraeumen() {
         abgelaufeneEntfernen();
     }
 
