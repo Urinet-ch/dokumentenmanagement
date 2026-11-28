@@ -335,3 +335,23 @@ auf Server oder Secrets aus der Sitzung.
     `passkey-einstieg-pwa.feature` (Browser: Knopf sichtbar, öffnet die Kontoverwaltung in neuem Tab, Seite bleibt, axe), `npm run pruefe:gestaltung`.
   - _Anforderungen: 10.1_
   - _Abhängig von: 24.1_
+
+## Welle 26 — Mein Konto (Entscheid Fabian 28.11.2026, Requirement 11)
+- [ ] 26.1 Seite «Mein Konto» und aufgeräumte Kopfzeile [Frontend]
+  - Benutzerelement als Link, Abschnitte Angaben zur Person, Darstellung, Hilfe und Einführung, Abmelden;
+    Browser-Szenarien `@req-11.x` mit axe bei 375 und 1280 px, hell und dunkel; bestehende Szenarien der Kopfzeile anpassen.
+  - _Anforderungen: 11.1–11.3, 11.6, 11.7, 11.10–11.12_
+- [ ] 26.2 Anmeldung und Sicherheit [Frontend] [Backend] [Infra]
+  - Pfade der Kontoverwaltung gegen ein Wegwerf-Keycloak prüfen, Einschränkungen im Realm-Export, Nachweis nach 11.5.
+  - _Anforderungen: 11.4, 11.5_
+  - _Abhängig von: 26.1_
+- [ ] 26.3 Dieses Gerät [Frontend]
+  - _Anforderungen: 11.8, 11.9_
+  - _Abhängig von: 26.1_
+- [ ] 26.4 Folgeänderungen und Anleitung [Frontend]
+  - Tabelle «Folgeänderungen» in design.md abarbeiten.
+  - _Anforderungen: 11.1, 11.2_
+  - _Abhängig von: 26.1–26.3_
+- [ ] 26.5 Abnahme auf iPhone und Mac [QA] [Fabian]
+  - _Anforderungen: 11.4, 11.12_
+  - _Abhängig von: 26.4_
