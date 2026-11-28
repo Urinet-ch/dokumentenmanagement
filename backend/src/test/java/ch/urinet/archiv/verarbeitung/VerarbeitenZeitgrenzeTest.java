@@ -8,6 +8,7 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -42,12 +43,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class VerarbeitenZeitgrenzeTest {
 
     private static final int SEITEN = 48;
+    private static final Path LAUF_BASIS = Path.of("target", "ocr-zeitgrenze-" + UUID.randomUUID())
+            .toAbsolutePath().normalize();
 
     public static class KurzeZeitgrenze implements QuarkusTestProfile {
         @Override
         public Map<String, String> getConfigOverrides() {
-            return Map.of("archiv.ocr.zeitgrenze", "PT15S", "archiv.auftrag.zeitgrenze.VERARBEITEN", "PT60S");
+            return Map.of("archiv.ocr.zeitgrenze", "PT15S", "archiv.auftrag.zeitgrenze.VERARBEITEN", "PT60S",
+                    "archiv.ocr.arbeitsverzeichnis", LAUF_BASIS.toString());
         }
+    }
+
+    @AfterEach
+    void arbeitsverzeichnisEntfernen() throws IOException {
+        Files.deleteIfExists(arbeitsverzeichnis);
     }
 
     @Inject
@@ -58,6 +67,35 @@ class VerarbeitenZeitgrenzeTest {
 
     @ConfigProperty(name = "archiv.ocr.arbeitsverzeichnis")
     Path arbeitsverzeichnis;
+
+    @ConfigProperty(name = "archiv.ocr.container-image")
+    String image;
+
+    @Test
+    void fremderContainerMitGleichemImageWirdIgnoriert() throws Exception {
+        String name = "archiv-ocr-fremd-" + UUID.randomUUID();
+        Process start = new ProcessBuilder("docker", "run", "-d", "--rm", "--pull", "never", "--name", name,
+                "--network", "none", "--entrypoint", "sleep", image, "60")
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        boolean gestartet = false;
+        try {
+            assertThat(start.waitFor(30, TimeUnit.SECONDS)).as("Fremden Testcontainer starten").isTrue();
+            assertThat(start.exitValue()).as("Fremden Testcontainer starten").isZero();
+            gestartet = true;
+            assertThat(containerZeilen()).anyMatch(zeile -> zeile.startsWith(name + "\t"));
+            assertThat(container()).noneMatch(zeile -> zeile.startsWith(name + "\t"));
+        } finally {
+            if (start.isAlive()) {
+                start.destroyForcibly();
+            }
+            Process entfernen = new ProcessBuilder("docker", "rm", "-f", name)
+                    .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            assertThat(entfernen.waitFor(30, TimeUnit.SECONDS)).as("Testcontainer entfernen").isTrue();
+            if (gestartet) {
+                assertThat(entfernen.exitValue()).isZero();
+            }
+        }
+    }
 
     @Test
     void zeitueberschreitungInOcrMyPdfSchreibtNichtsUndDerNaechsteVersuchVerarbeitetEinmal() throws Exception {
@@ -117,11 +155,18 @@ class VerarbeitenZeitgrenzeTest {
         assertThat(hilfe.auftragStatus("KI_VORSCHLAG", id)).containsExactly("FERTIG");
     }
 
-    /** Laufende Werkzeug-Container des Adapters ({@code archiv-ocr-<uuid>}) mit vollem Befehl. */
-    private static List<String> container() {
+    private List<String> container() {
+        return containerZeilen().stream().filter(zeile -> {
+            String[] felder = zeile.split("\t", -1);
+            return felder.length == 3 && Stream.of(felder[2].split(","))
+                    .anyMatch(mount -> mount.startsWith(arbeitsverzeichnis.toAbsolutePath().normalize() + "/lauf-"));
+        }).toList();
+    }
+
+    private static List<String> containerZeilen() {
         try {
             Process ps = new ProcessBuilder("docker", "ps", "--no-trunc", "--filter", "name=archiv-ocr-",
-                    "--format", "{{.Names}} {{.Command}}").redirectErrorStream(true).start();
+                    "--format", "{{.Names}}\t{{.Command}}\t{{.Mounts}}").redirectErrorStream(true).start();
             String ausgabe = new String(ps.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             if (!ps.waitFor(10, TimeUnit.SECONDS) || ps.exitValue() != 0) {
                 throw new IllegalStateException("docker ps gescheitert: " + ausgabe);
