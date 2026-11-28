@@ -98,11 +98,28 @@ class ComposePruefungTest(unittest.TestCase):
     def test_sftp_nutzt_nur_archivnetz_und_keine_hostports(self):
         daten = modell()
         daten["services"]["sftp"] = copy.deepcopy(daten["services"]["kc"])
+        daten["services"]["sftp"]["cpus"] = "0.1"
         self.assertEqual([], pruefung.pruefe_compose(daten))
         daten["services"]["sftp"]["networks"]["web"] = {}
         daten["services"]["sftp"]["ports"] = ["2222:22"]
         codes = {b["code"] for b in pruefung.pruefe_compose(daten)}
         self.assertTrue({"WEB_ZUGRIFF", "PORTS"} <= codes)
+
+    def test_budget_mit_reserve_oder_tatsaechlichem_sftp(self):
+        for sftp in (False, True):
+            with self.subTest(sftp=sftp):
+                daten = modell()
+                for name, mem, cpu in (("api", "1024m", "0.6"), ("db", "256m", "0.3"),
+                                       ("kc", "768m", "0.6")):
+                    daten["services"][name].update(mem_limit=mem, cpus=cpu)
+                if sftp:
+                    daten["services"]["sftp"] = copy.deepcopy(daten["services"]["kc"])
+                    daten["services"]["sftp"].update(mem_limit="96m", cpus="0.1")
+                self.assertNotIn("BUDGET", {b["code"] for b in pruefung.pruefe_compose(daten)})
+                daten["services"]["api"]["mem_limit"] = "1025m"
+                self.assertIn("BUDGET", {b["code"] for b in pruefung.pruefe_compose(daten)})
+                daten["services"]["api"].update(mem_limit="1024m", cpus="0.61")
+                self.assertIn("BUDGET", {b["code"] for b in pruefung.pruefe_compose(daten)})
 
     def test_klartext_und_defaultwerte_werden_ohne_wert_gemeldet(self):
         daten = modell()

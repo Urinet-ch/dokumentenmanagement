@@ -44,6 +44,11 @@ class DeployHaertungTest {
     private static final Pattern ROUTER_REGEL = Pattern.compile("traefik\\.http\\.routers\\.([^.]+)\\.rule");
     private static final Pattern HOST = Pattern.compile("Host\\(`([^`]*)`\\)");
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)}");
+    // Reserve für den noch fehlenden Scan-Eingang, Spec 09 E11.
+    private static final long SFTP_RESERVE_BYTES = 96L * 1024 * 1024;
+    private static final BigDecimal SFTP_RESERVE_CPUS = new BigDecimal("0.1");
+    private static final long BUDGET_BYTES = 2144L * 1024 * 1024;
+    private static final BigDecimal BUDGET_CPUS = new BigDecimal("1.6");
     /** Schreibt in eine Datei (nicht {@code >&}, nicht {@code /dev/null}). */
     /** Schreibt eine Datei: Umleitung (auch {@code 2>}) ausser nach /dev/null, auf einen Deskriptor oder in die
      *  Dateien von Actions ({@code $GITHUB_OUTPUT} u. a.), oder ein Befehl, der Dateien anlegt. */
@@ -105,6 +110,14 @@ class DeployHaertungTest {
         assertThat(fehlerNetzeUndSecrets(dienste)).contains("db: Netze");
         dienste.get("db").put("secrets", List.of("archiv_manifest_key"));
         assertThat(fehlerNetzeUndSecrets(dienste)).contains("db: Secrets");
+        dienste.put("sftp", new TreeMap<>(Map.of(
+                "networks", Map.of("intern", Map.of(), "web-archiv", Map.of()),
+                "labels", Map.of("traefik.docker.network", "web-archiv"))));
+        assertThat(fehlerNetzeUndSecrets(dienste)).doesNotContain("sftp: Netze");
+        dienste.get("sftp").put("networks", Map.of("intern", Map.of(), "web", Map.of()));
+        assertThat(fehlerNetzeUndSecrets(dienste)).contains("sftp: Netze");
+        dienste.get("sftp").put("ports", List.of("2222:22"));
+        assertThat(fehlerNetzeUndSecrets(dienste)).contains("sftp: Ports");
     }
 
     private static List<String> fehlerNetzeUndSecrets(Map<String, Map<String, Object>> dienste) {
@@ -124,6 +137,9 @@ class DeployHaertungTest {
                     : netze instanceof List<?> liste ? Set.copyOf(liste) : Set.of();
             if (!angebunden.equals(erwartet)) {
                 fehler.add(name + ": Netze");
+            }
+            if (dienst.containsKey("ports")) {
+                fehler.add(name + ": Ports");
             }
             if (Set.of("api", "kc", "sftp").contains(name)
                     && !"web-archiv".equals(karte(dienst.get("labels")).get("traefik.docker.network"))) {
@@ -170,14 +186,47 @@ class DeployHaertungTest {
             summeCpus = summeCpus.add(new BigDecimal(String.valueOf(dienst.get("cpus"))));
         }
         Map<String, Object> sftp = alleDienste.get("sftp");
-        long sftpBytes = sftp == null ? 0 : bytes(String.valueOf(sftp.get("mem_limit")));
-        BigDecimal sftpCpus = sftp == null ? BigDecimal.ZERO : new BigDecimal(String.valueOf(sftp.get("cpus")));
-        assertThat(summeBytes - sftpBytes).isLessThanOrEqualTo(budgetMib * 1024 * 1024);
-        assertThat(summeCpus.subtract(sftpCpus)).isLessThanOrEqualTo(budgetCpus);
-        assertThat(sftpBytes).isLessThanOrEqualTo(96L * 1024 * 1024);
-        assertThat(sftpCpus).isLessThanOrEqualTo(new BigDecimal("0.1"));
-        assertThat(summeBytes).isLessThanOrEqualTo(2144L * 1024 * 1024);
-        assertThat(summeCpus).isLessThanOrEqualTo(new BigDecimal("1.6"));
+        if (sftp != null) {
+            summeBytes -= bytes(String.valueOf(sftp.get("mem_limit")));
+            summeCpus = summeCpus.subtract(new BigDecimal(String.valueOf(sftp.get("cpus"))));
+        }
+        assertThat(summeBytes).isLessThanOrEqualTo(budgetMib * 1024 * 1024);
+        assertThat(summeCpus).isLessThanOrEqualTo(budgetCpus);
+        assertThat(imBudget(alleDienste)).isTrue();
+    }
+
+    @Test
+    void budgetMitReserveOderSftp() throws IOException {
+        Map<String, Map<String, Object>> dienste = dienste();
+        dienste.remove("sftp");
+        assertThat(imBudget(dienste)).isTrue();
+        dienste.get("api").put("mem_limit", "1025m");
+        assertThat(imBudget(dienste)).isFalse();
+        dienste.get("api").put("mem_limit", "1024m");
+        dienste.get("api").put("cpus", "0.61");
+        assertThat(imBudget(dienste)).isFalse();
+        dienste.get("api").put("cpus", "0.6");
+        dienste.put("sftp", Map.of("mem_limit", "96m", "cpus", "0.1"));
+        assertThat(imBudget(dienste)).isTrue();
+        dienste.put("sftp", Map.of("mem_limit", "97m", "cpus", "0.1"));
+        assertThat(imBudget(dienste)).isFalse();
+        dienste.put("sftp", Map.of("mem_limit", "96m", "cpus", "0.11"));
+        assertThat(imBudget(dienste)).isFalse();
+    }
+
+    private static boolean imBudget(Map<String, Map<String, Object>> dienste) {
+        long summeBytes = dienste.containsKey("sftp") ? 0 : SFTP_RESERVE_BYTES;
+        BigDecimal summeCpus = dienste.containsKey("sftp") ? BigDecimal.ZERO : SFTP_RESERVE_CPUS;
+        for (Map<String, Object> dienst : dienste.values()) {
+            long speicher = bytes(String.valueOf(dienst.get("mem_limit")));
+            BigDecimal cpus = new BigDecimal(String.valueOf(dienst.get("cpus")));
+            if (speicher <= 0 || cpus.signum() <= 0) {
+                return false;
+            }
+            summeBytes += speicher;
+            summeCpus = summeCpus.add(cpus);
+        }
+        return summeBytes <= BUDGET_BYTES && summeCpus.compareTo(BUDGET_CPUS) <= 0;
     }
 
     /** Die Compose-Policy der VPS lehnt {@code priority} überall ab (Deploy vom 18.11.2026, PR #299). */

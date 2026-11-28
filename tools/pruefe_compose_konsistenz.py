@@ -25,6 +25,11 @@ DIENST_SECRETS = {
     "db": {"archiv_db_postgres", "archiv_db_owner_scram", "archiv_db_app_scram", "keycloak_db_scram"},
     "kc": {"keycloak_db", "keycloak_admin", "keycloak_smtp_passwort", "google_client_id", "google_client_secret"},
 }
+# Spec 09 E11: Platz für den noch nicht vorhandenen Scan-Eingang.
+SFTP_RESERVE_BYTES = 96 * 1024 * 1024
+SFTP_RESERVE_CPUS = Decimal("0.1")
+BUDGET_BYTES = 2144 * 1024 * 1024
+BUDGET_CPUS = Decimal("1.6")
 
 
 def positiv(wert):
@@ -36,8 +41,16 @@ def positiv(wert):
 
 
 def limit(wert):
-    treffer = re.fullmatch(r"(\d+(?:\.\d+)?)(?:[kmg](?:b)?)?", str(wert), re.IGNORECASE)
+    treffer = re.fullmatch(r"(\d+(?:\.\d+)?)([kmg]?)(?:b)?", str(wert), re.IGNORECASE)
     return bool(treffer and positiv(treffer.group(1)))
+
+
+def limit_bytes(wert):
+    treffer = re.fullmatch(r"(\d+(?:\.\d+)?)([kmg]?)(?:b)?", str(wert), re.IGNORECASE)
+    if not treffer or not positiv(treffer.group(1)):
+        return None
+    faktor = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3}[treffer.group(2).lower()]
+    return Decimal(treffer.group(1)) * faktor
 
 
 def dauer(wert):
@@ -78,6 +91,8 @@ def pruefe_compose(compose):
     if not netze.get("web-archiv", {}).get("external"):
         melde("NETZ_WEB", "networks.web-archiv", "Externes Archivnetz fehlt.")
 
+    summe_bytes = Decimal(0) if "sftp" in dienste else Decimal(SFTP_RESERVE_BYTES)
+    summe_cpus = Decimal(0) if "sftp" in dienste else SFTP_RESERVE_CPUS
     for name, dienst in sorted(dienste.items()):
         ort = f"services.{name}"
         health = dienst.get("healthcheck") or {}
@@ -88,6 +103,9 @@ def pruefe_compose(compose):
             melde("HEALTHCHECK", ort, "Aktiver Healthcheck mit positiven Grenzen fehlt.")
         if not limit(dienst.get("mem_limit")) or not positiv(dienst.get("cpus")):
             melde("RESSOURCEN", ort, "Positives Speicher- und CPU-Limit erforderlich.")
+        else:
+            summe_bytes += limit_bytes(dienst["mem_limit"])
+            summe_cpus += Decimal(str(dienst["cpus"]))
         dienstnetze = set(dienst.get("networks") or [])
         if "intern" not in dienstnetze or not dienstnetze <= set(netze):
             melde("DIENST_NETZ", ort, "Internes oder deklariertes Netz fehlt.")
@@ -138,6 +156,9 @@ def pruefe_compose(compose):
                 if len(teile) > 2 or (len(teile) == 2 and teile[1] != "docker") or teile[0] not in definiert:
                     melde("MIDDLEWARE_FREMDER_DIENST", f"{ort}.routers.{router.group(1)}",
                           f"Middleware {mittel} ist nicht am Dienst des Routers definiert.")
+
+    if summe_bytes > BUDGET_BYTES or summe_cpus > BUDGET_CPUS:
+        melde("BUDGET", "services", "Speicher- oder CPU-Budget inklusive SFTP ist überschritten.")
 
     labels = dienste.get("api", {}).get("labels") or {}
     if isinstance(labels, list):
