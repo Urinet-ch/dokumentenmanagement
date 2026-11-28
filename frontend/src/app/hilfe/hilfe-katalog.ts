@@ -80,6 +80,15 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     bedingung: { eine: ['A1'] },
     abgemeldet: true,
   },
+  // Trennblätter (Spec 09, Aufgabe 27.5): wie der Menüpunkt mit A1
+  {
+    anker: 'erfassen-trennblaetter',
+    titel: TEXTE.hilfe.abschnitte['erfassen-trennblaetter'],
+    datei: '/anleitung/erfassen-trennblaetter.md',
+    eltern: 'erfassen',
+    bedingung: { eine: ['A1'] },
+    pfade: ['/trennblaetter'],
+  },
   {
     anker: 'eingangskorb',
     titel: TEXTE.hilfe.abschnitte['eingangskorb'],

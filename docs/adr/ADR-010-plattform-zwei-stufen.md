@@ -1,6 +1,8 @@
 # ADR-010: Plattform auf Infomaniak-VPS in zwei Stufen, Deploy nur über GitHub Actions
 
-**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026)
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026). Teilweise
+abgelöst durch [ADR-020](ADR-020-produktiv-auf-bestehender-vps.md) (entschieden von Fabian am 28.11.2026, Variante B):
+Punkte 5 und 6 und die Alternative «Dauerhaft auf der bestehenden VPS» gelten nicht mehr, siehe Nachtrag 28.11.2026.
 
 **Datum:** 08.11.2026
 
@@ -141,6 +143,15 @@ Entschieden von Fabian am 27.11.2026 nach der VPS-Erweiterung vom 23.11.2026: Di
 2048 MiB für die Summe der `mem_limit` und 1.5 für die Summe der `cpus`. Eine erneute Messung ist freigegeben und
 bleibt Aufgabe 1.10. Die Messwerte vom 22.11.2026 bleiben unverändert als historischer Messstand; Req 16.18,
 `tech.md`, design.md und tasks.md führen die aktualisierten Grenzen.
+
+## Nachtrag 28.11.2026 (Variante B: diese VPS wird produktiv)
+Entschieden von Fabian am 28.11.2026 (Entscheidungshilfe PR #731): Es wird keine eigene VPS für Stufe B bestellt; die
+bestehende VPS wird nach den Gates aus Spec 01, Welle 31 produktiv ([ADR-020](ADR-020-produktiv-auf-bestehender-vps.md)).
+Folgen für dieses ADR: Punkt 4 gilt bis zum Wechsel; Punkt 5 (eigene VPS, K5, Nachtrag 12.11.2026) und Punkt 6 (Wechsel
+mit neuer VPS, DNS und Rückbau der Stufe A) gelten nicht mehr, der Wechsel läuft nach Req 16.17 (geändert 28.11.2026)
+auf derselben VPS; die Alternative «Dauerhaft auf der bestehenden VPS» ist nicht mehr abgelehnt, die Risiken der
+geteilten VPS tragen Req 16.28 bis 16.31. Punkte 1 bis 3 und 7 bleiben. Budget der Stufe B: wie Stufe A, 2144 MiB und
+1.6 CPU inklusive `sftp` (Entscheid Fabian 28.11.2026, Spec 09, E11; Req 16.30).
 
 ## Verweise
 - Req 3.2, 5.5, 14.3, 16.1, 16.4, 16.7, 16.9–16.11, 16.15–16.19, 16.26; P1 (geändert 08.11.2026), P5, P15, K5

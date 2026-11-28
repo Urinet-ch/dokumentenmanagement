@@ -8,6 +8,8 @@ package ch.urinet.archiv.gemeinsam.domain;
 public enum Fehlercode {
     ANFRAGE_UNGUELTIG(400, "Anfrage ungültig",
             "Die Anfrage ist unvollständig oder hat ein falsches Format. Bitte prüfen Sie die Angaben und senden Sie sie erneut."),
+    TRENNBLATT_UNGUELTIG(400, "Titel des Deckblatts ungültig",
+            "Der Titel des Ordner-Deckblatts fehlt, ist länger als 60 Zeichen oder enthält Steuer- oder Formatzeichen. Bitte kürzen oder korrigieren Sie ihn."),
     NICHT_ANGEMELDET(401, "Nicht angemeldet",
             "Für diese Anfrage ist eine gültige Anmeldung nötig. Bitte melden Sie sich neu an."),
     STEP_UP_NOETIG(401, "Erneute Anmeldung nötig",

@@ -154,6 +154,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.erfassen,
         TEXTE.menue.suche,
         TEXTE.menue.chat,
+        TEXTE.menue.trennblaetter,
         TEXTE.menue.kontakte,
         TEXTE.menue.wissen,
         TEXTE.wissen.entwuerfe.titel,
@@ -169,7 +170,15 @@ describe('App (Req 2.6, 8.6)', () => {
     ],
     [
       'mitarbeiter',
-      [TEXTE.menue.uebersicht, TEXTE.menue.eingangskorb, TEXTE.menue.erfassen, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.wissen],
+      [
+        TEXTE.menue.uebersicht,
+        TEXTE.menue.eingangskorb,
+        TEXTE.menue.erfassen,
+        TEXTE.menue.suche,
+        TEXTE.menue.chat,
+        TEXTE.menue.trennblaetter,
+        TEXTE.menue.wissen,
+      ],
     ],
     [
       'geschaeftsstelle',
@@ -179,6 +188,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.erfassen,
         TEXTE.menue.suche,
         TEXTE.menue.chat,
+        TEXTE.menue.trennblaetter,
         TEXTE.menue.kontakte,
         TEXTE.menue.wissen,
         TEXTE.wissen.entwuerfe.titel,
