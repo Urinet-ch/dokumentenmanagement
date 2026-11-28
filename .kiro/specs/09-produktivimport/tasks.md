@@ -30,14 +30,17 @@ abgeschlossen (Richtwert 24.12. bis 28.12.2026, bisher «vom 28.12. bis 31.12.20
 zu den Wellen 27 bis 29.
 
 ## Welle 27 — Entscheide, Grundlagen und Spike
-- [ ] 27.1 Entscheide und Bestandsaufnahme [Fabian]
+- [x] 27.1 Entscheide und Bestandsaufnahme [Fabian]
+  - Erledigt 28.11.2026: Entscheide E8 bis E13 von Fabian, datiert in design.md, «Open Points» (nachgetragen mit
+    Aufgabe 27.2); die Bestandsaufnahme ist mit dem Merge von #745 bestätigt. E6 folgt nach 27.4; E7 ist mit #755
+    entschieden.
   - Bestandsaufnahme `docs/spikes/09-bestandsaufnahme.md` prüfen und bestätigen.
   - Entscheide E8, E9, E10 (Weg nach aussen), E11 (Budget Stufe A), E12 (Dateinamen-Regeln), E13 (verworfene
     Seiten im Stapel-Original); E6 vorläufig, endgültig nach 27.4. Ergebnisse datiert in design.md, «Open Points».
   - Werte aus der privaten Liste (Platzhalter in design.md) bereithalten, nicht ins Repo schreiben.
   - _Anforderungen: 0.1_
 
-- [ ] 27.2 Folgeänderungen und Rechte [Backend]
+- [x] 27.2 Folgeänderungen und Rechte [Backend]
   - Folgeänderungen nach design.md, «Folgeänderungen», Spalte «27.1», als ein PR (Steering, Spec 01, 02, 05, 06 als
     ausgewiesene Ergänzungen mit Datum des Entscheids, nie stillschweigend).
   - Enum `Aktion` um A25 bis A29, `rechtematrix.json`, `RechtematrixSpecTest` liest Spec 09 als vierte Quelle;
@@ -70,7 +73,7 @@ zu den Wellen 27 bis 29.
   - Unit-Test: QR-Inhalte inklusive URL-Kodierung von Umlauten; Szenario für `TRENNBLATT_UNGUELTIG`.
   - _Anforderungen: 6.1, 6.2, 6.3, 6.5_
 
-- [ ] 27.6 Quellenregister, Quellläufe und Prüfsummen-Abfrage [Backend]
+- [x] 27.6 Quellenregister, Quellläufe und Prüfsummen-Abfrage [Backend]
   - Changesets `quelle`, `quelle_lauf`, Spalte `dokument.quelle_lauf_id`, `dokument_quelle_ck` mit `GMAIL` und
     `ORDNER`; Seed der allgemeinen Quellen für `urinet` (ohne Zugang, ohne Geschäftsangaben).
   - Endpunkte nach design.md, Abschnitt 5, inklusive `POST /api/v1/dokumente/pruefsummen`; Formularfelder
@@ -83,7 +86,10 @@ zu den Wellen 27 bis 29.
 ## Welle 28 — Scan-Eingang und Stapelverarbeitung
 - [x] 28.1 Datenmodell Stapel [Backend]
   - Changesets `stapel`, `stapel_seite`, Spalten `dokument.stapel_id`, `stapel_von`, `stapel_bis`; Auftragstypen.
-  - _Anforderungen: 5.1, 5.2_
+  - Verbindlich (10.6): Die Prüfsummen-Abfrage aus 27.6 (`JdbcQuellenRegister.vorhandenePruefsummen`) meldet auch
+    die SHA-256 nicht verworfener Stapel-Originale; für Benutzer nur Stapel, die sie sehen dürfen (Sichtregel mit
+    dieser Aufgabe festlegen, Vorgabe wie bei Dokumenten), für das Import-Token alle. Szenario dazu unter `@req-10.6`.
+  - _Anforderungen: 5.1, 5.2, 10.6_
 
 - [ ] 28.2 Dienst `sftp` vollständig [Backend]
   - Ausbau des Prototyps nach dem Spike: Rechte nach 1.4 im Accessor, Sperre je Quelladresse, Sitzungs- und

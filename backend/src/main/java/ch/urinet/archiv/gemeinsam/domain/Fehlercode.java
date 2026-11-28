@@ -47,6 +47,11 @@ public enum Fehlercode {
     DOKUMENTART_EXISTIERT(409, "Dokumentart existiert",
             "Diesen Code hat schon eine Dokumentart. Bitte wählen Sie einen anderen Code oder ändern Sie die "
                     + "bestehende Art."),
+    QUELLE_EXISTIERT(409, "Quelle existiert",
+            "Diesen Code hat schon eine Quelle im Register. Bitte wählen Sie einen anderen Code."),
+    QUELLE_LAEUFT(409, "Quelle läuft",
+            "Für diese Quelle läuft schon ein Trocken- oder echter Lauf. Schliessen Sie ihn zuerst ab und starten Sie "
+                    + "dann den neuen Lauf."),
     CURSOR_ABGELAUFEN(410, "Cursor abgelaufen",
             "Der Cursor ist älter als die Aufbewahrung des Feeds. Bitte laden Sie den Bestand neu und beginnen Sie "
                     + "ohne Cursor."),

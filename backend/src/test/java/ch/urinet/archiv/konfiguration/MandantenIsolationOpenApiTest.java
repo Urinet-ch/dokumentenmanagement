@@ -85,6 +85,10 @@ class MandantenIsolationOpenApiTest {
                 "POST /api/v1/benutzer/{benutzerId}/zugang-zuruecksetzen");
         belege(nachweise, "ch.urinet.archiv.ki.chat.ChatSchritte", "verlaufFehlerGegenprobe",
                 "GET /api/v1/chat/gespraeche/{id}");
+        belege(nachweise, "ch.urinet.archiv.importe.QuellenSchritte", "fremdeQuellenUnsichtbar",
+                "PATCH /api/v1/quellen/{code}", "PUT /api/v1/quellen/{code}/geheimnis",
+                "POST /api/v1/quellen/{code}/laeufe", "GET /api/v1/quellen/{code}/laeufe",
+                "POST /api/v1/quellen/laeufe/{laufId}/abschliessen");
         belege(nachweise, "ch.urinet.archiv.ki.chat.ChatBewertungSchritte", "fremdeBewertungWieUnbekannt",
                 "DELETE /api/v1/chat/nachrichten/{id}/bewertung",
                 "GET /api/v1/chat/nachrichten/{id}/bewertung",

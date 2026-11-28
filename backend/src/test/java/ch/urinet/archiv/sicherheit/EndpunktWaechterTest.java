@@ -106,6 +106,14 @@ class EndpunktWaechterTest {
     private static final String TRENNBLAETTER = "/trennblaetter";
     private static final Map<ApiTokenScope, String> SCOPE_PFAD =
             Map.of(ApiTokenScope.IMPORT, "/dokumente", ApiTokenScope.GENERATOR, "/dokumente/generator");
+    /**
+     * Ausdrücklich gelistete Ausnahmen für den Scope {@code import} (Spec 09, 10.9, Aufgabe 27.6): Prüfsummen-Abfrage
+     * mit A1 sowie Start und Abschluss von Quellläufen mit A28, je nur {@code POST}.
+     */
+    static final Map<String, Aktion> IMPORT_AUSNAHMEN = Map.of(
+            "/dokumente/pruefsummen", Aktion.A1,
+            "/quellen/{code}/laeufe", Aktion.A28,
+            "/quellen/laeufe/{laufId}/abschliessen", Aktion.A28);
 
     @Test
     void jederEndpunktFragtDieRegelAb() {
@@ -274,6 +282,10 @@ class EndpunktWaechterTest {
                 .contains("@ErlaubtScope(IMPORT) nur an POST /dokumente");
         assertThat(verstoesse(ScopeFalscheAktion.class)).singleElement().asString()
                 .contains("@ErlaubtScope(GENERATOR) nur an POST /dokumente/generator");
+        // Spec 09, 10.9: die gelisteten Ausnahmen gelten nur mit ihrer Aktion
+        assertThat(verstoesse(ScopeAusnahmeFalscheAktion.class)).singleElement().asString()
+                .contains("@ErlaubtScope(IMPORT) nur an POST /dokumente");
+        assertThat(verstoesse(KorrekteScopeAusnahme.class)).isEmpty();
         assertThat(verstoesse(ScopeOhneRolle.class)).singleElement().asString().contains("@RolesAllowed");
         assertThat(verstoesse(ScopeRolleOhneErklaerung.class)).singleElement().asString().contains("@RolesAllowed");
         assertThat(verstoesse(IdMitRegex.class)).singleElement().asString()
@@ -416,8 +428,10 @@ class EndpunktWaechterTest {
             ErlaubtScope scope = methode.getAnnotation(ErlaubtScope.class);
             if (scope != null) {
                 boolean post = deklarationen.stream().anyMatch(m -> m.isAnnotationPresent(POST.class));
-                if (aktion == null || aktion.value() != Aktion.A1 || !post
-                        || !normalisiert(pfad).equals(SCOPE_PFAD.get(scope.value()))) {
+                boolean ausnahme = scope.value() == ApiTokenScope.IMPORT && post && aktion != null
+                        && IMPORT_AUSNAHMEN.get(normalisiert(pfad)) == aktion.value();
+                if (!ausnahme && (aktion == null || aktion.value() != Aktion.A1 || !post
+                        || !normalisiert(pfad).equals(SCOPE_PFAD.get(scope.value())))) {
                     verstoesse.add(name + ": @ErlaubtScope(" + scope.value() + ") nur an POST "
                             + SCOPE_PFAD.get(scope.value()) + " mit A1 (" + pfad + ")");
                     continue;
@@ -459,8 +473,10 @@ class EndpunktWaechterTest {
     static Optional<ProtokollAktion> erwartetesProtokoll(Aktion aktion, String pfad, boolean lesend) {
         boolean mitId = DOKUMENT_ID.matcher(pfad).find();
         return Optional.ofNullable(switch (aktion) {
-            // Trennblätter erzeugen gehört zu A1 (Spec 09, Req 15.1), legt aber kein Dokument an
-            case A1 -> normalisiert(pfad).equals(TRENNBLAETTER) ? null : ProtokollAktion.ERFASSEN;
+            // Trennblätter erzeugen und die Prüfsummen-Abfrage gehören zu A1 (Spec 09, 15.1 und 10.6), legen aber
+            // kein Dokument an und nennen keines
+            case A1 -> normalisiert(pfad).equals(TRENNBLAETTER) || normalisiert(pfad).equals("/dokumente/pruefsummen")
+                    ? null : ProtokollAktion.ERFASSEN;
             case A2, A3, A4 -> !mitId ? null
                     : HERUNTERLADEN.matcher(pfad).matches() ? ProtokollAktion.HERUNTERLADEN
                     : ProtokollAktion.ANZEIGEN;
@@ -468,7 +484,8 @@ class EndpunktWaechterTest {
             case A7 -> ProtokollAktion.BESTAETIGEN;
             case A9 -> ProtokollAktion.VERWERFEN;
             case A10 -> ProtokollAktion.WIEDERHOLEN;
-            case A5, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23, A24 -> null;
+            case A5, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23, A24, A25, A26, A27, A28, A29 ->
+                    null;
         });
     }
 
@@ -763,6 +780,30 @@ class EndpunktWaechterTest {
         @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
         @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
         public void lesen(String id) {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/quellen")
+    static class ScopeAusnahmeFalscheAktion {
+        @POST
+        @Path("/{code}/laeufe")
+        @ErfordertAktion(Aktion.A27)
+        @ErlaubtScope(ApiTokenScope.IMPORT)
+        @RolesAllowed({"inhaber", "treuhaender", "geschaeftsstelle", ApiTokenScope.ROLLE_IMPORT})
+        public void starten() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/quellen")
+    static class KorrekteScopeAusnahme {
+        @POST
+        @Path("/laeufe/{laufId}/abschliessen")
+        @ErfordertAktion(Aktion.A28)
+        @ErlaubtScope(ApiTokenScope.IMPORT)
+        @RolesAllowed({"inhaber", ApiTokenScope.ROLLE_IMPORT})
+        public void abschliessen() {
         }
     }
 

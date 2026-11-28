@@ -106,8 +106,8 @@ Image `archiv:sftp-…` nach dem Muster von `db` und `kc`) auf Basis Apache MINA
 - Verfahren: Standard sind die sicheren Voreinstellungen von MINA SSHD (Ed25519/ECDSA, curve25519, AES-GCM/ChaCha20). Ältere Verfahren aus dem Spike (z. B. `ssh-rsa` mit SHA-1, `diffie-hellman-group14-sha1`) nur über eine ausdrückliche Liste im README und in der Konfiguration des Dienstes (Requirement 1.5).
 - Sperre je Quelladresse: nach 5 Fehlschlägen in 10 Minuten 1 Stunde gesperrt; höchstens 4 gleichzeitige Sitzungen, Leerlauf-Zeitgrenze 2 Minuten, höchstens eine Datei von 200 MB je Sitzung (Requirement 1.6). Hinter einem TCP-Eingang von Traefik sieht der Dienst nur Traefik als Quelle; dann trägt die IP-Freigabe von Traefik die Begrenzung (E10).
 - Log als JSON auf stdout: Anmeldung (Zeit, Benutzer, Quelladresse, Ergebnis) und je Datei Zeit, Benutzer, Unterordner, Grösse, Dateiname des Geräts (Requirement 1.7, Auslegung: der Name stammt vom Profil des Scanners und trägt nach 0.3 keinen Inhalt; der Worker loggt nur die Stapel-ID).
-- Compose: Dienst `sftp`, `read_only`, `tmpfs` nur klein, `cap_drop: ALL`, `no-new-privileges`, uid/gid wie `api` (gemeinsame Gruppe für das Volume), Volume `archiv_eingang` (flüchtig wie `archiv_arbeit`, ohne Eintrag für die Sicherung: was dort liegt, ist noch nicht übernommen), Netz `archiv_intern`, Healthcheck über einen Port-Test im Container. Vorschlag Limits: `mem_limit` 96m, Heap 48m, `cpus` 0.1 (E11).
-- Weg nach aussen (E10), Varianten: **(a)** TCP-Eingang `sftp` in Traefik im Infra-Repo (EntryPoint, Port in der Traefik-Compose, `ipAllowList` für `<heim-adresse>`, Router-Label `traefik.tcp.*` und neue Erlaubnis in `compose-policy.py`, ufw-Regel und Cloud-Firewall) – empfohlen, weil die App-Compose dann keinen Port veröffentlicht und die Prüfungen unverändert bleiben; **(b)** `ports:` im Dienst `sftp` – braucht Ausnahmen in `DeployHaertungTest`, `tools/pruefe_compose_konsistenz.py` und der Compose-Policy, und Docker umgeht ufw, nur die Cloud-Firewall filtert; **(c)** kein Eingang von aussen: Rückfall E6 (Scan per E-Mail an `<archiv-postfach>` oder Netzwerkordner auf dem Mac). Alles im Infra-Repo und in der Cloud-Firewall macht Fabian; kein Agent greift auf die VPS zu.
+- Compose: Dienst `sftp`, `read_only`, `tmpfs` nur klein, `cap_drop: ALL`, `no-new-privileges`, uid/gid wie `api` (gemeinsame Gruppe für das Volume), Volume `archiv_eingang` (flüchtig wie `archiv_arbeit`, ohne Eintrag für die Sicherung: was dort liegt, ist noch nicht übernommen), Netz `archiv_intern`, Healthcheck über einen Port-Test im Container. Limits: `mem_limit` 96m, Heap 48m, `cpus` 0.1 (E11, entschieden von Fabian am 28.11.2026; in Compose und Budget-Tests erst mit Aufgabe 28.3).
+- Weg nach aussen (E10, entschieden von Fabian am 28.11.2026: Variante (a); die Traefik- und VPS-Seite im Infra-Repo macht Fabian in Aufgabe 28.4), Varianten: **(a)** TCP-Eingang `sftp` in Traefik im Infra-Repo (EntryPoint, Port in der Traefik-Compose, `ipAllowList` für `<heim-adresse>`, Router-Label `traefik.tcp.*` und neue Erlaubnis in `compose-policy.py`, ufw-Regel und Cloud-Firewall) – empfohlen, weil die App-Compose dann keinen Port veröffentlicht und die Prüfungen unverändert bleiben; **(b)** `ports:` im Dienst `sftp` – braucht Ausnahmen in `DeployHaertungTest`, `tools/pruefe_compose_konsistenz.py` und der Compose-Policy, und Docker umgeht ufw, nur die Cloud-Firewall filtert; **(c)** kein Eingang von aussen: Rückfall E6 (Scan per E-Mail an `<archiv-postfach>` oder Netzwerkordner auf dem Mac). Alles im Infra-Repo und in der Cloud-Firewall macht Fabian; kein Agent greift auf die VPS zu.
 - Deploy-Workflow: Bau des Images und Schreiben der zwei Secret-Dateien brauchen eine Änderung an `.github/workflows/infomaniak-deploy.yml`. Agenten ändern Workflows nicht; die Umsetzungsaufgabe legt den Vorschlag als Patch unter `docs/betrieb/` ab (Muster `docs/betrieb/secretformate-workflow.diff`), Fabian übernimmt ihn.
 
 Einrichtung am Scanner (Aufgabe 28.6, Fabian): Client-Schlüsselpaar am Gerät erzeugen, öffentlichen Schlüssel als
@@ -281,6 +281,39 @@ Umsetzung (Aufgabe 27.5, 28.11.2026):
 
 `EndpunktWaechterTest` erlaubt `@ErlaubtScope` heute nur an `POST` mit A1 auf dem Pfad des Scopes; die
 Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderung Spec 01, design.md).
+
+#### Umsetzung (Aufgabe 27.6, 28.11.2026)
+- Fachbereich `importe/` mit eigenen Unterpaketen `domain/quelle`, `application/quelle` (`QuellenVerwaltung`,
+  `QuellLaufZuordnung`, Port `QuellenRegister`), `adapter/out/persistence/JdbcQuellenRegister`,
+  `adapter/in/rest/QuellenResource` und `PruefsummenResource`. Changeset `150-quelle` (Nummer mit Abstand, weil
+  parallel weitere Changesets entstehen): Tabellen `quelle`, `quelle_lauf`, Spalte `dokument.quelle_lauf_id`,
+  `dokument_quelle_ck` mit `GMAIL` und `ORDNER`, Seed der sechs allgemeinen Quellen nur für `m_urinet`.
+- Höchstens ein laufender Lauf je Quelle (eindeutiger Teilindex `status = 'LAEUFT'`); der Check
+  `quelle_lauf_zaehler_ck` erzwingt `gefunden = neu + dublette_pruefsumme + uebersprungen + fehler` in der Datenbank.
+  Läuft ein Trocken- oder echter Lauf, gibt der Start 409 `QUELLE_LAEUFT`; ein automatischer Lauf endet beim Start
+  eines echten Laufs und am Folgetag (Europe/Zurich) beim nächsten Upload.
+- Upload: `quelllauf` oder `quelle` nur mit Token (Scope `import`), sonst 400; ein Trockenlauf oder beendeter Lauf
+  gibt 409 `STATUS_KONFLIKT`, eine Quelle im Trockenlauf 409 `QUELLE_LAEUFT`; nichts wird angelegt. Gezählt wird im
+  selben Upload: neu, Dublette nach Prüfsumme, abgelehnt als Fehler; neue Dokumente erhalten `quelle_lauf_id` und bei
+  `MAC_EINGANG` und `ORDNER` die Quelle `ORDNER`, bei `GMAIL_LABEL` `GMAIL`.
+- Abschluss: Beim Trockenlauf meldet das Werkzeug alle Zähler (sie müssen aufgehen, ohne fachliche Dubletten), beim
+  echten Lauf zählt der Server und das Werkzeug ergänzt nur übersprungene Dateien und Meldungen.
+- Prüfsummen-Abfrage: A1 und Scope `import`, höchstens 1'000, nur nicht verworfene Originale nicht verworfener
+  Dokumente, Antwort nur `vorhanden` ohne IDs; Stapel (10.6) kommen verbindlich mit Aufgabe 28.1 dazu. Ein Benutzer
+  erfährt nur von Dokumenten, die er sieht (dasselbe Prädikat `SichtregelSql` wie Suche und Listen, also auch
+  `PERSONAL` und unbestätigte nach Spec 01, 2.21): Sonst verriete die Antwort einem `mitarbeiter`, dass ein
+  vertrauliches Dokument mit dieser Datei existiert (Nachtrag aus dem Review). Das Import-Token fragt ohne Sichtfilter,
+  weil nur der Inhaber es anlegt (A14) und der Inhaber alle Dokumente sieht.
+- Nebenläufigkeit: Der Upload sperrt den Lauf (`for update`) bis zu seinem Commit; der Abschluss wartet darauf und
+  zählt den Upload mit, ein späterer Upload erhält 409 `STATUS_KONFLIKT`. `verbuchen` zählt zudem nur, solange der
+  Lauf `LAEUFT` (Nachtrag aus dem Review, Test `QuellLaufWettlaufTest`).
+- Rückfall: Das Rollback von `150-quelle` gilt nur vor der ersten Nutzung und bricht sonst über eine Wache ab; was
+  ein Image vor 27.6 auf dem neueren Schema bedeutet, steht in `docs/betrieb/deploy-rollback.md`. Kein Eintrag `ERFASSEN`
+  (es entsteht nichts); `EndpunktWaechterTest` führt die drei Ausnahmen des Scopes in `IMPORT_AUSNAHMEN`.
+- Protokoll: Änderungen am Register und Start und Abschluss von Läufen als `KONFIGURATION_AENDERN` ohne Details;
+  eigene Aktionen `QUELLE_*` bräuchten eine Änderung von `zugriff_protokoll_aktion_ck`, die parallel auch andere
+  Aufgaben ändern, und folgen bei Bedarf. Neue Fehlercodes `QUELLE_LAEUFT` und `QUELLE_EXISTIERT` (409); keine neuen
+  Konfigurationsschlüssel. Die Lauf-Art `GMAIL_LABEL` startet noch keinen Worker (Aufgabe 29.4, Gmail-Import).
 
 ### 6. Gmail-Import (`integration/`, Quelllauf in `importe/`)
 - Konfiguration der Quelle: `{"host":"imap.gmail.com","port":993,"benutzer":"<gmail-konto>","label":"<gmail-label>","seit":"2026-01-01","ohneAnhang":false,"maxJeLauf":500}`; App-Passwort in `quelle.geheimnis` über `Verschluesselung` (wie `integration_mail.passwort_verschluesselt`).
@@ -500,6 +533,27 @@ Alle Fixtures sind synthetisch (wie `tools/golden_synth`); keine echten Belege, 
 | Infra-Repo der VPS | TCP-Eingang, Compose-Policy, ufw, Cloud-Firewall (E10); Fremd-Image entfällt, eigenes Image `archiv:sftp-…` | 28.4 (Fabian) |
 | Benutzeranleitung `frontend/public/anleitung/`, Hilfe-Katalog | Trennblätter, Stapel, Quellen, Dubletten, Vollständigkeit (Spec 07, 7.5) | mit der jeweiligen Oberflächen-Aufgabe |
 
+### Umsetzung (Aufgabe 27.2, 28.11.2026)
+- Die Zeilen mit Spalte «27.1» sind nachgeführt, jede als «Spec 09 ergänzt …» mit dem Merge von #745 bzw. dem
+  Entscheid vom 28.11.2026 (E10 bis E12) und ohne Umnummerierung: Steering (`tech.md` Regel 13, Tag `@spec-09`,
+  Netz, Erreichbarkeit, Compose-Policy und Budget Stufe A; `structure.md`; `product.md` Phase 5), Spec 01 (2.5, Absatz
+  nach der Matrix, 3.11, 3.12, 15.1, Aufgabe 5.8), Spec 02 (1.2, 3.1, 3.6, 7.1), Spec 05 (5.1, 5.4, 6.6), Spec 06 (4.1).
+  Das Budget nach E11 und der Dienst `sftp` in Compose und Tests bleiben bei Aufgabe 28.3.
+- E10 Variante (a) heisst: Traefik erreicht den Dienst `sftp` nur über ein gemeinsames Netz. Das ist nicht das
+  geteilte Netz «web», sondern das eigene Netz nur für Traefik und das Archiv (Spec 01, 16.28, Entscheid Fabian
+  28.11.2026); `tech.md` und ADR-016 nennen es für den TCP-Router (ab 28.3). Requirement 1.1 deckt das («am für E10
+  bestimmten Eingang»). Spec 01, 16.28 nimmt `sftp` dafür ausdrücklich aus (entschieden von Fabian am 28.11.2026):
+  am internen Netz des Archivs und zusätzlich am eigenen Netz von Traefik und Archiv, von aussen nur über den
+  TCP-Router mit IP-Freigabe.
+- Die `[offen]`-Marker in 1.6 (E10), 1.9 (E11), 5.8 (E13) und 9.1 (E12) tragen jetzt den Entscheid mit Datum.
+- Rechte: Enum `Aktion` um A25 bis A29, `Rechtematrix` (Fussnote ¹ für `geschaeftsstelle` auch bei A28 und A29),
+  `rechtematrix.json` mit Quelle «Spec 09, Req 15.1», `RechtematrixSpecTest` liest diese Spec als vierte Quelle und
+  verlangt genau A25 bis A29. Die Rechte-Übersicht (Spec 06) zeigt die neuen Zeilen; in der Web-App gehören A25 und
+  A27 zur Gruppe «lesen», A26 zu «erfassen», A28 und A29 zu «verwalten». Endpunkte mit diesen Rechten kommen mit
+  27.6 (A27, A28) und Welle 28 und 29 (A25, A26, A29).
+- Den Ordner `features/produktivimport/` mit der ersten Feature-Datei `@spec-09` legt Aufgabe 27.3 an
+  (`scan-eingang.feature`); `SzenarienRestTest` erfasst ihn (Shard 2, alle Tags ausser `@spec-01`).
+
 ## Abgelehnte Optionen
 - **OpenSSH mit `ChrootDirectory`:** braucht Root und Capabilities, verletzt die Härtung und die Compose-Policy (siehe Abschnitt 1).
 - **Fremd-Image SFTPGo:** läuft ohne Root, bringt aber Weboberfläche, Datenbank und viele Funktionen, die abgeschaltet und geprüft werden müssten; zusätzlich Eintrag im Infra-Repo. Ein kleiner eigener Dienst mit MINA SSHD ist im Java-Stack testbar und wird von Dependabot gepflegt.
@@ -512,11 +566,12 @@ Alle Fixtures sind synthetisch (wie `tools/golden_synth`); keine echten Belege, 
 ## Open Points
 - E6: Übertragungsweg des Scanners (SFTP, Rückfall E-Mail-Eingang oder Mac-Netzwerkordner); Empfehlung SFTP nach erfolgreichem Spike 27.3, sonst E-Mail-Eingang (besteht schon).
 - E7: **entschieden von Fabian am 28.11.2026** mit Variante B: Stichtag 01.01.2027, Bestand 2026 bis 31.01.2027 importiert (bisher «Richtwert 01.01.2027 … Richtwert 31.01.2027, abhängig vom Entscheid #731»).
-- E8: private Zahlungsquittungen als Anhang zum Beleg (Aktion `ANHANG`).
-- E9: Projektdokumente nur als freigegebene PDF (Quelle `<quelle-projekt>`).
-- E10: Weg des Scan-Eingangs nach aussen, Varianten (a) bis (c) in Abschnitt 1; Empfehlung (a).
-- E11: Speicherbudget Stufe A für den Dienst `sftp` (Budget 2048 MiB und 1.5 CPU sind heute voll belegt; Vorschlag +96 MiB und +0.1 CPU oder Abzug bei `api`), sonst greift Spec 01, 16.18.
-- E12: Dateinamen-Regeln dürfen Vorschlagsfelder mit Sicherheit 1.0 setzen (Ergänzung zu Spec 01, 3.11 und 3.12; der Dateiname bleibt aus dem Prompt).
-- E13: Seiten verworfener Dokumente bleiben im gesperrten Stapel-Original (ADR-018); Alternative: Stapel-Original nur bis zur Entscheidung aller Dokumente aufbewahren und danach durch die Auszüge ersetzen (schwächerer Nachweis der Trennung).
+- E8 (entschieden von Fabian am 28.11.2026): ja, private Zahlungsquittungen kommen als Anhang zum Beleg (Aktion `ANHANG`, Requirement 11.6).
+- E9 (entschieden von Fabian am 28.11.2026): ja, Projektdokumente nur als freigegebene PDF (Quelle `<quelle-projekt>`).
+- E10 (entschieden von Fabian am 28.11.2026): Variante (a), TCP-Eingang `sftp` in Traefik mit IP-Freigabe für `<heim-adresse>`; die App-Compose bleibt ohne `ports:`, die Härtung (`DeployHaertungTest`, `tools/pruefe_compose_konsistenz.py`) bleibt unverändert. Traefik, Compose-Policy, ufw und Cloud-Firewall richtet Fabian im Infra-Repo ein (Aufgabe 28.4); kein Agent greift darauf zu.
+- E11 (entschieden von Fabian am 28.11.2026): Budget Stufe A +96 MiB und +0.1 CPU für den Dienst `sftp` (`mem_limit` 96m, Heap 48m, `cpus` 0.1), neu höchstens 2144 MiB und 1.6 CPU; Compose, `DeployHaertungTest` und `.github/scripts/pruefe-speicherbudget.py` ziehen das mit Aufgabe 28.3 nach, bis dahin gilt 2048 MiB und 1.5 CPU.
+- E12 (entschieden von Fabian am 28.11.2026): ja, Dateinamen-Regeln dürfen Vorschlagsfelder mit Sicherheit 1.0 vorsetzen; der Mensch bestätigt wie bisher im Eingangskorb, ein Widerspruch zur OCR ergibt einen Hinweis (9.3); der Dateiname bleibt aus dem Prompt (Ergänzung zu Spec 01, 3.11 und 3.12).
+- E13 (entschieden von Fabian am 28.11.2026): Seiten verworfener Dokumente bleiben im gesperrten Stapel-Original (ADR-018); die Alternative (Original nach der Entscheidung durch die Auszüge ersetzen) entfällt.
+- E6 entscheidet Fabian nach dem Spike 27.4.
 - Entscheid #731: Start mit Echtbelegen (Varianten A, B, C); bestimmt, wann und wo Welle 30 laufen darf. **Entschieden von Fabian am 28.11.2026: Variante B** – Welle 30 läuft auf der bestehenden VPS (Stufe B), nach den Gates aus Spec 01, Welle 31 (ADR-020). E11 (entschieden von Fabian am 28.11.2026: +96 MiB / +0.1 CPU für `sftp`, Budget 2144 MiB / 1.6 CPU; Eintrag oben mit PR #749) gilt auch für Stufe B (Spec 01, 16.30).
 - K6 feste Adresse oder DNS-Name; K7 Verfahren des Geräts (Spike 27.3); K8 `<papierbestand>`; K9 Gmail-Zugang; K11 `<startwerte-vollstaendigkeit>` und Begründungen `<erwartete-luecken>`. K10 ist mit der Bestandsaufnahme erledigt.

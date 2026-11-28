@@ -72,7 +72,8 @@ Checkboxen bleiben offen, bis Fabian den Betriebsnachweis geprüft hat.
 - [ ] **Req 16.28 – Netze und Ports:** Am Netz «web» hängen nur `api` und `kc`; in den internen Netzen des Archivs
   hängen nur Container des Archivs; kein veröffentlichter Port ausser dem nach Spec 09, 1.6 freigegebenen Eingang;
   `api` und `kc` hängen nur am internen Netz und am eigenen Netz von Traefik und Archiv (Aufgabe 31.10), an dem
-  keine andere App hängt; kein Container einer anderen App erreicht einen Dienst des Archivs an Traefik vorbei. Beleg:
+  keine andere App hängt; `sftp` (Spec 09) hängt am internen Netz und am eigenen Netz von Traefik und Archiv, nie
+  am Netz «web»; kein Container einer anderen App erreicht einen Dienst des Archivs an Traefik vorbei. Beleg:
   Netzprüfung auf der VPS im Wechselprotokoll; [Aufgabe 31.3](../../.kiro/specs/01-archiv-kern/tasks.md).
 - [ ] **Req 16.29 – Geheimnisse nur im Archiv:** Secret-Dateien nur in den Diensten des Archivs, die sie brauchen;
   keine geteilten Zugänge mit anderen Apps; Zugangsdaten, Daten- und Manifest-Schlüssel der Stufe A bleiben (Entscheid 28.11.2026), darum keine Testbenutzer,
