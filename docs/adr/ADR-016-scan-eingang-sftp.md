@@ -24,7 +24,8 @@
 - Der Weg nach aussen (E10) wird im Infra-Repo der VPS eingerichtet, als TCP-Eingang von Traefik mit
   IP-Freigabe für den Heimanschluss; die App-Compose veröffentlicht keinen Port (entschieden von Fabian am
   28.11.2026, Variante (a)). Dafür hängt der Dienst zusätzlich am eigenen Netz nur für Traefik und das
-  Archiv (Spec 01, 16.28), nie am geteilten Netz «web», nur für den TCP-Router von Traefik.
+  Archiv, nie am geteilten Netz «web», nur für den TCP-Router von Traefik; Spec 01, 16.28 führt diese Ausnahme
+  (entschieden von Fabian am 28.11.2026).
 
 ## Alternativen
 - OpenSSH mit Chroot: verletzt die Härtung. SFTPGo: läuft ohne Root, bringt aber viele abzuschaltende Funktionen und ein
