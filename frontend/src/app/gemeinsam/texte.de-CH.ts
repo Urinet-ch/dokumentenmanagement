@@ -81,7 +81,7 @@ export const TEXTE = {
     erfassen: 'Unter «Erfassen» fotografieren Sie Papier mit dem Handy oder laden Dateien hoch. Ohne Netz wartet die Aufnahme auf dem Gerät und wird nach der Anmeldung hochgeladen, sobald wieder eine Verbindung besteht.',
     pruefen: 'Neue Dokumente kommen in den «Eingangskorb». Das Archiv schlägt Art und Angaben vor; Sie prüfen den Vorschlag, korrigieren ihn wo nötig und bestätigen.',
     eigene: 'Im «Eingangskorb» sehen Sie die Dokumente, die Sie erfasst haben, mit dem Vorschlag des Archivs. Bestätigt werden sie von einer Person mit diesem Recht.',
-    ansehen: 'Im «Eingangskorb» sehen Sie, welche Dokumente noch auf Prüfung warten, nur zur Ansicht. Prüfen und Bestätigen sind anderen Rollen vorbehalten.',
+    ansehen: 'Im Eingangskorb sehen Sie die für Sie sichtbaren, bereits bestätigten Dokumente nur zur Ansicht. Unbestätigte Dokumente bleiben ausgeblendet. Prüfen und Bestätigen sind anderen Rollen vorbehalten.',
     finden: 'Mit der «Suche» finden Sie Dokumente über Wörter, Belegnummern oder Partner und öffnen ihre Dokumentansicht. Im «Chat» fragen Sie in eigenen Worten; jede Antwort nennt ihre Quelle.',
     wissen: 'Unter «Wissen» finden Sie geprüftes Wissen aus Ihren Unterlagen.',
     hilfe: 'Über «Hilfe» oben rechts öffnen Sie jederzeit die Anleitung zur Seite, auf der Sie gerade sind. Dort können Sie auch diese Einführung erneut ansehen.',

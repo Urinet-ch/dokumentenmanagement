@@ -79,6 +79,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.Socket;
 import java.net.URI;
 import java.net.SocketTimeoutException;
@@ -352,6 +353,50 @@ class FehlerInjektionTest {
                     () -> assertThat(antwort.toLowerCase(java.util.Locale.ROOT).contains("application/problem+json"))
                             .as("Antwort ist Problem Detail").isTrue(),
                     () -> assertThat(antwort.contains("\"fehlercode\"")).as("Antwort enthält Fehlercode").isTrue());
+        }
+    }
+
+    @Test
+    void chunkedAnfrageKnappUnterDerGrenzeWirdVollstaendigVerarbeitet() throws Exception {
+        int grenze = Math.toIntExact(ConfigProvider.getConfig()
+                .getValue("archiv.http.max-anfrage", MemorySize.class).asLongValue());
+        String name = "Chunked " + UUID.randomUUID();
+        String json = "{\"typ\":\"ORGANISATION\",\"name\":\"" + name + "\"}";
+        String body = json + " ".repeat(grenze - json.length() - 1);
+        assertThat(body.getBytes(StandardCharsets.UTF_8)).hasSize(grenze - 1);
+
+        String token = Testanmeldung.token("inhaber-urinet");
+        UUID kontaktId = null;
+        HttpURLConnection verbindung = (HttpURLConnection) URI.create(
+                "http://127.0.0.1:" + RestAssured.port + "/api/v1/kontakte").toURL().openConnection();
+        try {
+            verbindung.setConnectTimeout(10_000);
+            verbindung.setReadTimeout(30_000);
+            verbindung.setRequestMethod("POST");
+            verbindung.setDoOutput(true);
+            verbindung.setChunkedStreamingMode(8192);
+            verbindung.setRequestProperty("Authorization", "Bearer " + token);
+            verbindung.setRequestProperty("Content-Type", "application/json");
+            try (var aus = verbindung.getOutputStream()) {
+                aus.write(body.getBytes(StandardCharsets.UTF_8));
+            }
+
+            assertThat(verbindung.getResponseCode()).isEqualTo(201);
+            try (var antwort = verbindung.getInputStream()) {
+                var kontakt = new ObjectMapper().readTree(antwort);
+                kontaktId = UUID.fromString(kontakt.path("id").asText());
+                assertThat(kontakt.path("name").asText()).isEqualTo(name);
+            }
+        } finally {
+            verbindung.disconnect();
+            if (kontaktId != null) {
+                try (Connection c = datenbank.getConnection();
+                     PreparedStatement s = c.prepareStatement(
+                             "delete from " + new MandantCode("urinet").schema() + ".kontakt where id = ?")) {
+                    s.setObject(1, kontaktId);
+                    s.executeUpdate();
+                }
+            }
         }
     }
 
