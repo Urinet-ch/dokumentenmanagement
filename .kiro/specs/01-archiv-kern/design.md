@@ -647,14 +647,13 @@ verfügbar, nur `archiv_ki_beispiele{mandant}` fehlt bis zur nächsten erfolgrei
 kein Wert null. `JdbcKiBeispielTest` prüft den SQL-Fehlerpfad von `anzahl`; `MicrometerKennzahlenTest` prüft die
 fehlende Gauge bei weiterhin vorhandenen übrigen Reihen.
 
-#### Vorschlag nach Erreichbarkeitsausfall (Aufgabe 5.9, 27.11.2026)
+#### Umsetzung (Aufgabe 5.9, 28.11.2026)
 
-`docs/betrieb/ueberwachung-erreichbarkeit.md` hält fest, dass Anwendungsalarme nicht greifen, wenn die Anwendung selbst
-nicht erreichbar ist. Der Deploy-Workflow prüft Health und öffentliche Antworten nur während eines Deploys; die
-vorhandene Monitoring-Compose-Datei enthält keine externen HTTP- oder Zertifikatsproben. Vorgeschlagen sind
-unabhängige HTTP-Prüfungen beider Hosts, Zertifikatsablauf-Warnungen und ein Alarm bei fehlgeschlagenem Deploy.
-Aufwand und mögliche Ablageorte sind Schätzungen. Es wurde weder ein Infrastruktur- noch ein Workflow-Eingriff
-vorgenommen; die Auswahl bleibt unter «Offen für Fabian».
+Der Entscheid vom 27.11.2026 (PR #724) wählte eine unabhängige Erreichbarkeitsprüfung beider Hosts und eine Meldung bei
+fehlgeschlagenem Deploy; beides ist im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Eine
+unabhängige externe HTTP-Prüfung des Anwendungs-Hosts bestand seit dem 13.11.2026 ausserhalb der VPS-Konfiguration
+und erfasste den Ausfall vom 26.11.2026 (rund 75 Minuten). Eine Aussage zur Benachrichtigung ist nicht belegt. Der
+Betriebsnachweis für die Prüfung des Anmelde-Hosts bleibt bei Fabian; Aufgabe 5.9 bleibt offen.
 
 ### KI (`ki`)
 - `MetadatenExtraktor` als LangChain4j-`@RegisterAiService` ohne Chat-Memory (`NoChatMemoryProviderSupplier`; sonst vermischen sich Belege im selben Request-Kontext), Antwort als Java-Record `MetadatenVorschlag` im JSON-Schema-Antwortformat (`response-format=json_schema`, `strict-json-schema=true`). Infomaniak lehnt den JSON-Modus (`json_object`) ab; einen Rückfall gibt es nicht, ohne gültige Antwort gilt Req 7.1 (ohne Vorschlag in den Eingangskorb). Spike 0.3: `docs/spikes/infomaniak-ai.md`.

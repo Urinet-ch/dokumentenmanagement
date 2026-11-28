@@ -2,8 +2,9 @@
 
 ## Umfang und Ergebnis
 
-Abgleich gegen `origin/main` bei `8fa74d3a9` (PR #724). In den sieben Taskdateien stehen 41 offene
-Checkboxen; Spec 05 und Spec 07 haben keine offenen Checkboxen. Keine Checkbox wurde geändert. Ein gemergter Teil-PR
+Abgleich gegen `origin/main` bei `b1112c4ca` nach den Merges #674, #725, #730, #732, #733 und #735. In den sieben
+Taskdateien stehen 41 offene Checkboxen; Spec 05 und Spec 07 haben keine offenen Checkboxen. Keine Checkbox wurde
+geändert. Ein gemergter Teil-PR
 allein gilt nicht als Abschluss, wenn die Taskdatei noch Abnahme, Betrieb, Messung oder Folgearbeiten nennt.
 
 **Faktisch vollständig erledigt:** keine der 41 offenen Checkboxen konnte anhand der Taskdateien und der darin
@@ -26,7 +27,7 @@ erledigten Umsetzungen.
 | 5.6 | App-Alarme und Kennzahlen in #91, #114, #191, #566 und #639; Aktivierung und Betriebsnachweise bleiben offen. | Backend / Infra |
 | 5.7 | Entwurf #283 ist keine Freigabe; Gegenlesen und Freigabe sind laut Taskdatei offen. | Fabian |
 | 5.8 | Abnahme-Gate und Belegübernahme offen; Voraussetzungen aus 5.9 und 5.11 fehlen. | Fabian / QA; blockiert |
-| 5.9 | Checkliste #569, App-Messung #597 und der Erreichbarkeitsvorschlag #724 sind auf `main`. Die Auswahl der Varianten durch Fabian sowie VPS-Anbindung und Betriebsnachweise bleiben offen. | Fabian / Infra |
+| 5.9 | Die Varianten 1 (Erreichbarkeit beider Hosts) und 3 (fehlgeschlagener Deploy) aus #724 sind seit 27.11.2026 entschieden und im Infra-Repo umgesetzt. Der Betriebsnachweis der Prüfung des Anmelde-Hosts bleibt bei Fabian; die Zertifikatsprüfung wurde nicht gewählt. | Fabian; Betriebsnachweis |
 | 5.10 | Entwurf #284 ist keine geprüfte Notfallunterlage. | Fabian |
 | 5.11 | Kein vollständiger Wechsel- und Betriebsnachweis im geprüften Stand. | Fabian / Infra |
 | O.8 | Kein Umsetzungs- oder Entscheidungsnachweis gefunden. | Fabian / Infra / Backend |
@@ -73,6 +74,13 @@ erledigten Umsetzungen.
 |---|---|---|
 | 21.6 | #684 dokumentiert den Zwischenstand; die Speichermessung auf Stufe A und damit die Abnahme bleiben offen. | Fabian |
 
+## Gemergte PRs seit dem letzten Stand
+
+Die Merges #674, #725, #730, #732, #733 und #735 ergänzen QA-, Deploy- und
+Messvorbereitungsnachweise. Sie schliessen keine der 41 offenen Checkboxen
+vollständig ab; die nötigen Abnahmen und Betriebsnachweise bleiben gemäss
+Taskdateien offen.
+
 ## Seit dem letzten Abgleich abgeschlossene Checkboxen
 
 - Spec 02 10.4 (#602); Spec 03 11.4 (#616) und 11.6 (#594); Spec 04 18.4 (#605).
@@ -85,6 +93,6 @@ erledigten Umsetzungen.
 
 ## Grenzen des Abgleichs
 
-- Offene PRs zum Zeitpunkt dieses Abgleichs: Draft #674 und #729; Ready #725, #728, #730, #731, #732 und #733. Kein offener PR zählt als Nachweis auf `main`.
+- Offene PRs zum Zeitpunkt dieses Abgleichs: Ready #728, #729, #731, #734, #736 und #737. #728 und #731 warten auf einen Entscheid; offene PRs zählen nicht als Nachweis auf `main`.
 - Der Stand der Taskdateien und offenen PRs ist eine Momentaufnahme; die Checkboxen wurden nicht verändert.
 - Dieser Bericht enthält keine Betriebsdetails oder Zugangsdaten.
