@@ -3837,6 +3837,48 @@
           }
         }
       },
+      "TrennblattAnfrage" : {
+        "type" : "object",
+        "required" : [ "blaetter" ],
+        "properties" : {
+          "blaetter" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TrennblattWunsch"
+            },
+            "description" : "Sätze in der Reihenfolge des PDF; zusammen höchstens 100 Blätter",
+            "maxItems" : 100,
+            "minItems" : 1
+          }
+        }
+      },
+      "TrennblattWunsch" : {
+        "type" : "object",
+        "required" : [ "typ", "anzahl" ],
+        "properties" : {
+          "typ" : {
+            "type" : "string",
+            "description" : "TRENN = Trennblatt, ORDNER = Ordner-Deckblatt",
+            "enum" : [ "TRENN", "ORDNER" ]
+          },
+          "art" : {
+            "type" : [ "string", "null" ],
+            "description" : "nur bei TRENN: Code einer aktiven Dokumentart; fehlt er, ist es ein Trennblatt ohne Art"
+          },
+          "titel" : {
+            "type" : [ "string", "null" ],
+            "maxLength" : 60,
+            "description" : "nur bei ORDNER, Pflicht: Titel des Deckblatts"
+          },
+          "anzahl" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 1,
+            "description" : "Zahl der Blätter"
+          }
+        }
+      },
       "Typ" : {
         "type" : "string",
         "enum" : [ "DATUM", "UID", "IBANS", "TEXT", "FARBE", "GANZZAHL", "WOCHENTAG" ]
@@ -4647,6 +4689,8 @@
     "name" : "Kontakte"
   }, {
     "name" : "Protokoll"
+  }, {
+    "name" : "Trennblaetter"
   }, {
     "name" : "Wissensbasis"
   } ],
@@ -9663,6 +9707,51 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/trennblaetter" : {
+      "post" : {
+        "summary" : "Trennblätter und Ordner-Deckblätter als PDF",
+        "description" : "A4 für beidseitigen Druck, je Blatt zwei gleiche Seiten mit QR-Code (Spec 09, Req 6.1–6.3). Nicht im Archiv abgelegt. Recht A1.",
+        "tags" : [ "Trennblaetter" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TrennblattAnfrage"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "PDF zum Herunterladen",
+            "content" : {
+              "application/pdf" : {
+                "schema" : {
+                  "format" : "binary",
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "TRENNBLATT_UNGUELTIG: Titel fehlt, ist länger als 60 Zeichen oder enthält Steuer- oder Formatzeichen (Req 6.5); ANFRAGE_UNGUELTIG: Format, Anzahl, mehr als 100 Blätter oder Art keine aktive Dokumentart"
+          },
+          "403" : {
+            "description" : "NICHT_ERLAUBT: ohne Recht A1"
+          },
+          "413" : {
+            "description" : "DATEI_ZU_GROSS: Anfrage über 64 KiB"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "geschaeftsstelle" ]
         } ]
       }
     },

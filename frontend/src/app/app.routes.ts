@@ -46,6 +46,12 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.erfassen),
   },
   {
+    path: 'trennblaetter',
+    loadComponent: () => import('./trennblaetter/trennblaetter').then((m) => m.Trennblaetter),
+    canActivate: [rechtGuard('A1')],
+    title: titel(TEXTE.trennblaetter.titel),
+  },
+  {
     path: 'eingangskorb',
     loadComponent: () => import('./eingangskorb/eingangskorb').then((m) => m.Eingangskorb),
     canActivate: [rechtGuard('A5')],
