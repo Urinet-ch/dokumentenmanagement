@@ -9,15 +9,17 @@ Stand 26.11.2026. Anlass: Der Job «Browser-Szenarien (Cucumber.js, Playwright)�
   «Testbenutzer entfernen: HTTP 401»), dazu `apt-get` beim Bauen des Werkzeug-Images (nicht Browser, siehe unten).
   Details: `docs/ci-flakes-2026-11.md`, `docs/ci-laufzeit-2026-11.md`.
 
-## Nachmessung (27.11.2026)
-`python3 tools/ci_browser_quote.py 80 --seit 2026-11-26T12:10:27Z` zählt 29 abgeschlossene Läufe mit Browser-Job;
-kein Browser-Job war rot (0 %), kein Lauf war ausschliesslich wegen des Browser-Jobs rot. Der Aufruf wertet die 80
-jüngsten CI-Läufe unabhängig vom Branch aus.
+## Nachmessung (28.11.2026)
+`python3 tools/ci_browser_quote.py 80 --seit 2026-11-26T12:10:27Z` zählt 28 abgeschlossene Läufe mit Browser-Job;
+einer war rot (4 %), keiner war ausschliesslich wegen des Browser-Jobs rot. Der Aufruf wertet die 80 jüngsten CI-Läufe
+unabhängig vom Branch aus. Der rote Browser-Job (`46039218320`) brach beim Installieren der Playwright-Browser ab:
+das Ubuntu-Repository `packages.microsoft.com` antwortete mit HTTP 403 und wurde als nicht signiert gemeldet. Kein
+Cucumber-Szenario lief; dies ist kein nachgewiesener Test-Flake.
 
-Für dieselben 80 jüngsten CI-Läufe auf `main` gab es seit dem Stichtag 54 abgeschlossene Läufe und zwei fehlgeschlagene
-Backend-Jobs. Beide scheiterten bei der Maven-Auflösung von Versionsbereichen für `io.cucumber:messages` bzw.
-`io.cucumber:query` (Runs `45888823376` und `45953018945`); es gab keinen Port-Konflikt, Docker-Netzfehler oder echten
-Testfehler. Der Run-Zähler umfasst damit Maven-Auflösungsfehler 2, Port-Konflikte 0, Docker-Netzfehler 0 und Testfehler 0.
+Auf `main` gab es seit `2026-11-27T00:00:00Z` 23 abgeschlossene CI-Läufe (20 erfolgreich, 3 fehlgeschlagen). Kein
+Backend-Job war rot. Die fehlgeschlagenen Jobs waren «Spec-Prüfungen» (`45953018945`), «Browser-Szenarien» und
+«WordPress-Plugin» (`46039218320`) sowie «WordPress-Plugin» (`46039250227`). Damit gibt es für diesen Zeitraum keine
+rote Backend-Ausführung, deren Ursache zuzuordnen wäre.
 
 ## Entscheid: im Build lassen und entschärfen
 Die Szenarien sind der einzige Test, der die Oberfläche bedient; sie haben am 26.11. echte Brüche gefunden (Treuhänder-Menü,
