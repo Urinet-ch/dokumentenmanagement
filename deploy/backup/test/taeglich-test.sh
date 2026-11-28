@@ -16,6 +16,7 @@ export MOCK_LOG="$temp/commands.log"
 export MOCK_STDIN_DIR="$temp/stdin"
 export MOCK_REALM_CONTAINER_DIR="$temp/realm-containers"
 export MOCK_REALM_VOLUMES="$temp/realm-volumes"
+export MOCK_REALM_VOLUME_IN_USE=
 export MOCK_FAIL_ZUWACHS=0
 export MOCK_FAIL_FESTHALTEN=0
 export MOCK_FAIL_REALM=0
@@ -55,6 +56,30 @@ if [[ $1 == container && $2 == inspect ]]; then
 fi
 if [[ $1 == volume ]]; then
   case ${2:-} in
+    ls)
+      filter=
+      shift 2
+      while (($#)); do
+        case "$1" in
+          --filter)
+            filter=${2#name=}
+            shift 2
+            ;;
+          --format)
+            [[ $2 == '{{.Name}}' ]] || exit 1
+            shift 2
+            ;;
+          *)
+            exit 1
+            ;;
+        esac
+      done
+      for volume in "$MOCK_REALM_VOLUMES"/*; do
+        [[ -f $volume ]] || continue
+        name=${volume##*/}
+        [[ $name == *"$filter"* ]] && printf '%s\n' "$name"
+      done
+      ;;
     inspect)
       [[ -f $MOCK_REALM_VOLUMES/${3:-} ]]
       ;;
@@ -70,6 +95,29 @@ if [[ $1 == volume ]]; then
       ;;
   esac
   exit
+fi
+if [[ $1 == ps && ${2:-} == -a ]]; then
+  shift 2
+  volume=
+  while (($#)); do
+    case "$1" in
+      --filter)
+        volume=${2#volume=}
+        shift 2
+        ;;
+      --format)
+        [[ $2 == '{{.Names}}' ]] || exit 1
+        shift 2
+        ;;
+      *)
+        exit 1
+        ;;
+    esac
+  done
+  if [[ ${MOCK_REALM_VOLUME_IN_USE:-} == "$volume" ]]; then
+    printf '%s\n' "$volume"
+  fi
+  exit 0
 fi
 if [[ $1 == rm ]]; then
   for argument in "$@"; do
@@ -271,6 +319,12 @@ erwarte_konfigurationsfehler() {
 }
 
 # ---- Erfolgsfall -------------------------------------------------------------------------------------------------
+verwaistes_volume=archiv-realm-export-20000101T000000Z-42
+fremdes_volume=archiv-realm-export-not-a-run
+sonstiges_volume=anderes-volume
+: > "$MOCK_REALM_VOLUMES/$verwaistes_volume"
+: > "$MOCK_REALM_VOLUMES/$fremdes_volume"
+: > "$MOCK_REALM_VOLUMES/$sonstiges_volume"
 if ! "$script" 2> "$temp/success.stderr"; then
   cat "$temp/success.stderr" >&2
   exit 1
@@ -353,8 +407,15 @@ assert grep -q 'stop --timeout 60 kc' "$MOCK_LOG"
 assert grep -q 'start kc' "$MOCK_LOG"
 assert grep -q 'docker rm archiv-realm-export-' "$MOCK_LOG"
 assert grep -q 'docker volume rm archiv-realm-export-' "$MOCK_LOG"
-assert test -z "$(find "$MOCK_REALM_VOLUMES" -mindepth 1 -maxdepth 1 -type f -print -quit)"
+assert test -z "$(find "$MOCK_REALM_VOLUMES" -mindepth 1 -maxdepth 1 -type f \
+  -name 'archiv-realm-export-????????T??????Z-*' -print -quit)"
+assert test ! -e "$MOCK_REALM_VOLUMES/$verwaistes_volume"
+assert test -e "$MOCK_REALM_VOLUMES/$fremdes_volume"
+assert test -e "$MOCK_REALM_VOLUMES/$sonstiges_volume"
+assert grep -q "volume rm $verwaistes_volume" "$MOCK_LOG"
+assert grep -q "Verwaistes Realm-Export-Volume entfernt: $verwaistes_volume" "$temp/success.stderr"
 assert grep -q 'Hinweis: Erster Export' "$temp/success.stderr"
+rm -- "$MOCK_REALM_VOLUMES/$fremdes_volume" "$MOCK_REALM_VOLUMES/$sonstiges_volume"
 
 # ---- Zweiter Lauf: Vorinventar kommt über stdin an, Aufbewahrung -------------------------------------------------
 old_run="$ARCHIV_SICHERUNGSVERZEICHNIS/laeufe/lauf-20000101T000000Z-1"
@@ -410,6 +471,25 @@ if grep -q -- '--inventar-vorher' "$MOCK_LOG"; then
 fi
 export MOCK_EMPFAENGER_PROBE=$schluessel_b
 export ARCHIV_AGE_EMPFAENGER_PROBE=$schluessel_b
+
+# Ein Volume, das noch von einem Container verwendet wird, wird weder entfernt noch übergangen.
+in_use_volume=archiv-realm-export-20000102T000000Z-43
+: > "$MOCK_REALM_VOLUMES/$in_use_volume"
+export MOCK_REALM_VOLUME_IN_USE=$in_use_volume
+in_use_root="$temp/realm-volume-in-use-backup"
+export ARCHIV_SICHERUNGSVERZEICHNIS=$in_use_root
+if "$script" > /dev/null 2> "$temp/realm-volume-in-use.stderr"; then
+  printf 'Ein noch verwendetes Realm-Export-Volume hätte den Lauf abbrechen müssen.\n' >&2
+  exit 1
+fi
+assert grep -q "$in_use_volume ist noch an einen Container gebunden" "$temp/realm-volume-in-use.stderr"
+assert test -e "$MOCK_REALM_VOLUMES/$in_use_volume"
+if grep -q "volume rm $in_use_volume" "$MOCK_LOG"; then
+  printf 'Ein noch verwendetes Realm-Export-Volume wurde entfernt.\n' >&2
+  exit 1
+fi
+assert test ! -e "$in_use_root/.taeglich.lock"
+export MOCK_REALM_VOLUME_IN_USE=
 
 # ---- Fehlerfälle -------------------------------------------------------------------------------------------------
 failed_root="$temp/failed-backup"

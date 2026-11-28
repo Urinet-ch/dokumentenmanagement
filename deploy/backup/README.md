@@ -1,5 +1,14 @@
 # Täglicher Export
 
+## Voraussetzung und Reihenfolge bei der Einführung
+
+Der Realm-Export schreibt im Keycloak-Container nach
+`/opt/keycloak/data/archiv-export`. Dieses Verzeichnis ist im Keycloak-Image ab PR #729
+vorbereitet, damit der Export auch mit `read_only: true` funktioniert. Bei der Einführung
+oder Aktualisierung deshalb zuerst das neue Keycloak-Image deployen und erst danach die
+geänderte `taeglich.sh` einsetzen. Mit dem alten Image bricht das Skript beim Export
+sichtbar ab; es erstellt keinen erfolgreichen Sicherungslauf.
+
 `taeglich.sh` erzeugt einen Lauf unter `ARCHIV_SICHERUNGSVERZEICHNIS/laeufe/`.
 Erst wenn alle Exporte und Prüfsummen bereitstehen, wird das Verzeichnis atomar veröffentlicht.
 Nur Läufe mit der Datei `FERTIG` sind für die Abholung bereit. Sie enthalten Chiffrate,
@@ -78,8 +87,8 @@ Die Quarkus-Adminbefehle (`inventar`, `zuwachs`, `festhalten`) laufen wie in der
 traefik.enable=false api …`), nie per `exec` im laufenden API-Container: Eine zweite JVM sprengt dessen `mem_limit`.
 Auf der VPS muss dafür kurz Platz für einen zweiten API-Container sein. Der Manifest-Schlüssel wird mit `compose cp`
 als Datei aus dem laufenden Container kopiert; dabei startet keine JVM. Für den konsistenten Realm-Export wird
-Keycloak kurz angehalten und ein Wegwerf-Container verwendet. Dessen Export schreibt in ein Bind-Mount unter dem
-Arbeitsverzeichnis, weil `/tmp` des Dienstes ein 32-MiB-tmpfs ist, das mit dem Container verschwindet. Ab Keycloak 26.8
+Keycloak kurz angehalten und ein Wegwerf-Container verwendet. Der Export schreibt in ein eigenes, zugriffsbeschränktes
+Docker-Volume, weil `/tmp` des Dienstes ein 32-MiB-tmpfs ist, das mit dem Container verschwindet. Ab Keycloak 26.8
 bricht `kc.sh export` ab, wenn `KC_BOOTSTRAP_ADMIN_USERNAME` ohne Passwort gesetzt ist; der Wegwerf-Container entfernt
 die Variable darum vor dem Export. Der Realm-Export läuft in der lokalen Restore-Übung echt; der Lauf gegen die
 Compose-Umgebung der VPS ist Teil der Inbetriebnahme (Infra). Die Shell-Skripte transportieren keine
@@ -101,6 +110,10 @@ und meldet `Hinweis: Veraltete Sperre …`. Er startet dann Keycloak (falls der 
 lag) und entfernt verwaiste `.arbeit.*`-Verzeichnisse, die Klartext enthalten können. Gehört die Prozess-ID einem
 lebenden Prozess, bricht der Lauf mit Exit-Code `3` ab. Nach einem Neustart kann eine alte ID von einem fremden Prozess
 belegt sein; dann hilft nur, `.taeglich.lock` von Hand zu entfernen, nachdem man geprüft hat, dass kein Lauf aktiv ist.
+Unter derselben Sperre prüft der nächste Lauf auch Volumes mit dem eindeutigen Skript-Namensformat
+`archiv-realm-export-<UTC-Zeitstempel>-<PID>`. Verwaiste Volumes dieses Präfixes werden entfernt. Ist ein solches Volume
+noch an einen Container gebunden, bricht das Skript mit Exit-Code `3` und einer Meldung ab; es entfernt weder das
+Volume noch einen laufenden Container.
 
 ## Zeitsteuerung
 Die tägliche Ausführung (Timer oder Cron auf der VPS, vor dem Abholfenster des Infra-Repositorys) ist nicht Teil dieses
