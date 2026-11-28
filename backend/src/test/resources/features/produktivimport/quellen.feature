@@ -112,6 +112,24 @@ Funktionalität: Quellenregister, Quellläufe und Prüfsummen-Abfrage
     Wenn das Werkzeug die Prüfsummen der Dateien «G, H, P, Q» abfragt
     Dann meldet die Prüfsummen-Abfrage genau die Dateien «G, H, P, Q» als vorhanden
 
+  @req-10.6
+  Szenario: Stapel-Prüfsummen sind nur für Berechtigte sichtbar
+    Angenommen ein Werkzeug von «urinet» hat ein Token vom Scope «import»
+    Und das Stapel-Original der Datei «R» liegt im Status «EMPFANGEN»
+    Und das Stapel-Original der Datei «S» liegt im Status «VERWORFEN»
+    Wenn «mitarbeiter-urinet» die Prüfsummen der Dateien «R, S» abfragt
+    Dann meldet die Prüfsummen-Abfrage keine Datei als vorhanden
+    Wenn «inhaber-urinet» die Prüfsummen der Dateien «R, S» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «R» als vorhanden, ohne IDs
+    Wenn das Werkzeug die Prüfsummen der Dateien «R, S» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «R» als vorhanden, ohne IDs
+    Angenommen ein Werkzeug von «vhf-gsk» hat ein Token vom Scope «import»
+    Und das Stapel-Original der Datei «T» liegt im Status «EMPFANGEN»
+    Wenn «geschaeftsstelle-vhf-gsk» die Prüfsummen der Dateien «R, T» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «T» als vorhanden, ohne IDs
+    Wenn das Werkzeug die Prüfsummen der Dateien «R, T» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «T» als vorhanden, ohne IDs
+
   @req-10.1
   Szenario: Quellen und Läufe sind je Mandant getrennt
     Angenommen ein Werkzeug von «urinet» hat ein Token vom Scope «import»

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="143-stapel-datenmodell" author="copilot">
+        <sql>
+            create table stapel (
+                id uuid not null constraint stapel_pk primary key,
+                profil text not null constraint stapel_profil_ck
+                    check (profil in ('STAPEL', 'EINZELN', 'GLAS')),
+                eingang text not null constraint stapel_eingang_ck
+                    check (eingang in ('SFTP', 'EMAIL')),
+                sha256 text not null constraint stapel_sha256_ck check (sha256 ~ '^[0-9a-f]{64}$'),
+                groesse bigint not null constraint stapel_groesse_ck check (groesse >= 0),
+                s3_schluessel text not null,
+                s3_version text,
+                seiten int constraint stapel_seiten_ck check (seiten >= 0),
+                inhalt int constraint stapel_inhalt_ck check (inhalt >= 0),
+                trenn int constraint stapel_trenn_ck check (trenn >= 0),
+                ordner int constraint stapel_ordner_ck check (ordner >= 0),
+                leer int constraint stapel_leer_ck check (leer >= 0),
+                dokumente int constraint stapel_dokumente_ck check (dokumente >= 0),
+                status text not null constraint stapel_status_ck
+                    check (status in ('EMPFANGEN', 'ANALYSIERT', 'GETRENNT', 'ANGEHALTEN',
+                        'ABGESCHLOSSEN', 'VERWORFEN')),
+                bilanz_ok boolean,
+                meldungen jsonb not null default '[]' constraint stapel_meldungen_ck
+                    check (jsonb_typeof(meldungen) = 'array'),
+                quelle_lauf_id uuid,
+                empfangen timestamptz not null,
+                abgeschlossen timestamptz,
+                constraint stapel_sha256_uk unique (sha256)
+            );
+            create index stapel_status_ix on stapel (status);
+
+            create table stapel_seite (
+                stapel_id uuid not null constraint stapel_seite_stapel_fk references stapel (id),
+                nr int not null constraint stapel_seite_nr_ck check (nr > 0),
+                typ text not null constraint stapel_seite_typ_ck
+                    check (typ in ('INHALT', 'LEER', 'TRENN', 'ORDNER')),
+                qr_inhalt text,
+                tinte_anteil numeric(6, 5) constraint stapel_seite_tinte_ck
+                    check (tinte_anteil between 0 and 1),
+                dokument_id uuid constraint stapel_seite_dokument_fk references dokument (id),
+                seite_im_dokument int constraint stapel_seite_seite_ck check (seite_im_dokument > 0),
+                constraint stapel_seite_pk primary key (stapel_id, nr),
+                constraint stapel_seite_dokument_seite_ck
+                    check ((dokument_id is null) = (seite_im_dokument is null))
+            );
+            create index stapel_seite_dokument_ix on stapel_seite (dokument_id)
+                where dokument_id is not null;
+            create unique index stapel_seite_dokument_seite_ux on stapel_seite (dokument_id, seite_im_dokument)
+                where dokument_id is not null;
+
+            alter table dokument
+                add column stapel_id uuid constraint dokument_stapel_fk references stapel (id),
+                add column stapel_von int,
+                add column stapel_bis int,
+                add constraint dokument_stapel_bereich_ck
+                    check ((stapel_id is null and stapel_von is null and stapel_bis is null)
+                        or (stapel_id is not null and stapel_von is not null and stapel_bis is not null
+                            and stapel_von > 0 and stapel_bis >= stapel_von));
+            create index dokument_stapel_ix on dokument (stapel_id) where stapel_id is not null;
+        </sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                do $$
+                begin
+                    if exists (select 1 from stapel)
+                        or exists (select 1 from stapel_seite)
+                        or exists (select 1 from dokument where stapel_id is not null) then
+                        raise exception 'Rollback 143-stapel-datenmodell nur vor der ersten Nutzung (Stapel, Seiten oder Dokumentverweise)';
+                    end if;
+                end
+                $$
+            ]]></sql>
+            <sql>
+                alter table dokument drop constraint dokument_stapel_bereich_ck;
+                drop index dokument_stapel_ix;
+                alter table dokument drop column stapel_bis, drop column stapel_von, drop column stapel_id;
+                drop index stapel_seite_dokument_seite_ux;
+                drop table stapel_seite;
+                drop index stapel_status_ix;
+                drop table stapel;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
