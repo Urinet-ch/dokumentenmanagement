@@ -15,6 +15,7 @@ mkdir -p "$mock_bin" "$temp/stdin"
 export MOCK_LOG="$temp/commands.log"
 export MOCK_STDIN_DIR="$temp/stdin"
 export MOCK_REALM_CONTAINER_DIR="$temp/realm-containers"
+export MOCK_REALM_VOLUMES="$temp/realm-volumes"
 export MOCK_FAIL_ZUWACHS=0
 export MOCK_FAIL_FESTHALTEN=0
 export MOCK_FAIL_REALM=0
@@ -27,7 +28,7 @@ export MOCK_HANG_ZUWACHS=0
 export MOCK_STARTED="$temp/gestartet"
 export MOCK_RELEASE="$temp/freigabe"
 : "${MOCK_REALM_CONTAINER_DIR:?}"
-mkdir -p "$MOCK_REALM_CONTAINER_DIR"
+mkdir -p "$MOCK_REALM_CONTAINER_DIR" "$MOCK_REALM_VOLUMES"
 : > "$MOCK_LOG"
 
 # Die Attrappe von docker bildet die echten Werkzeuge nach: «run» und «exec» lesen stdin, wie «docker compose -T»
@@ -42,6 +43,7 @@ if [[ $1 == cp ]]; then
   ziel=$3
   container=${quelle%%:*}
   [[ $quelle == "$container:/opt/keycloak/data/archiv-export/." ]] || exit 1
+  [[ -f $MOCK_REALM_VOLUMES/$container ]] || exit 1
   [[ ${MOCK_FAIL_REALM_COPY:-0} != 1 ]] || exit 3
   [[ -f $MOCK_REALM_CONTAINER_DIR/$container/urinet-archiv-realm.json ]] || exit 1
   mkdir -p "$ziel"
@@ -50,6 +52,24 @@ if [[ $1 == cp ]]; then
 fi
 if [[ $1 == container && $2 == inspect ]]; then
   exit 1
+fi
+if [[ $1 == volume ]]; then
+  case ${2:-} in
+    inspect)
+      [[ -f $MOCK_REALM_VOLUMES/${3:-} ]]
+      ;;
+    create)
+      : > "$MOCK_REALM_VOLUMES/${3:-}"
+      printf '%s\n' "$3"
+      ;;
+    rm)
+      rm -- "$MOCK_REALM_VOLUMES/${3:-}"
+      ;;
+    *)
+      exit 1
+      ;;
+  esac
+  exit
 fi
 if [[ $1 == rm ]]; then
   for argument in "$@"; do
@@ -142,10 +162,15 @@ case "$subcommand" in
     ;;
   run)
     container=
+    volume=
     while [[ ${1:-} == -* ]]; do
       case "$1" in
         --name)
           container=$2
+          shift 2
+          ;;
+        --volume)
+          volume=$2
           shift 2
           ;;
         --entrypoint|-l|--label)
@@ -161,8 +186,10 @@ case "$subcommand" in
     if [[ $service == kc ]]; then
       if [[ $MOCK_FAIL_REALM == 1 ]]; then exit 3; fi
       # Keycloak 26.8 bricht den Export ab, wenn der Bootstrap-Admin ohne Passwort gesetzt ist
-      [[ -n $container && ${1:-} == -c && ${2:-} == *'unset KC_BOOTSTRAP_ADMIN_USERNAME;'* \
+      [[ -n $container && $volume == "$container:/opt/keycloak/data/archiv-export" \
+        && ${1:-} == -c && ${2:-} == *'unset KC_BOOTSTRAP_ADMIN_USERNAME;'* \
         && ${2:-} == *'--dir /opt/keycloak/data/archiv-export'* && ${2:-} == *'kc.sh export'* ]] || exit 1
+      [[ -f $MOCK_REALM_VOLUMES/$container ]] || exit 1
       mkdir -p "$MOCK_REALM_CONTAINER_DIR/$container"
       printf '{"realm":"synthetic"}\n' > "$MOCK_REALM_CONTAINER_DIR/$container/urinet-archiv-realm.json"
     elif [[ $service == api ]]; then
@@ -317,17 +344,16 @@ while read -r summe _; do
   assert grep -q -- "--sha256 $summe" "$MOCK_LOG"
 done < "$run_dir/SHA256SUMS"
 
-# Realm-Export aus dem beschreibbaren Container-Dateisystem kopieren, ohne Host-Bind-Mount.
+# Realm-Export aus dem Wegwerf-Volume kopieren und das Volume entfernen.
 assert grep -Fq 'docker cp archiv-realm-export-' "$MOCK_LOG"
 assert grep -Fq '/opt/keycloak/data/archiv-export/.' "$MOCK_LOG"
 assert grep -Fq '/klartext/realm/' "$MOCK_LOG"
-if grep -q -- '--volume .*:/archiv-export' "$MOCK_LOG"; then
-  printf 'Der Realm-Export darf nicht in ein Host-Bind-Mount schreiben.\n' >&2
-  exit 1
-fi
+assert grep -Eq 'docker compose --file .* run --no-deps -T --name archiv-realm-export-.* --volume archiv-realm-export-.*:/opt/keycloak/data/archiv-export' "$MOCK_LOG"
 assert grep -q 'stop --timeout 60 kc' "$MOCK_LOG"
 assert grep -q 'start kc' "$MOCK_LOG"
 assert grep -q 'docker rm archiv-realm-export-' "$MOCK_LOG"
+assert grep -q 'docker volume rm archiv-realm-export-' "$MOCK_LOG"
+assert test -z "$(find "$MOCK_REALM_VOLUMES" -mindepth 1 -maxdepth 1 -type f -print -quit)"
 assert grep -q 'Hinweis: Erster Export' "$temp/success.stderr"
 
 # ---- Zweiter Lauf: Vorinventar kommt über stdin an, Aufbewahrung -------------------------------------------------
@@ -421,6 +447,8 @@ fi
 assert test -z "$(find "$realm_failed_root/laeufe" -mindepth 1 -maxdepth 1 -type d -print -quit)"
 assert grep -q 'Keycloak-Realm konnte nicht exportiert werden' "$temp/realm-failure.stderr"
 assert grep -q 'docker rm -f archiv-realm-export-' "$MOCK_LOG"
+assert grep -q 'docker volume rm archiv-realm-export-' "$MOCK_LOG"
+assert test -z "$(find "$MOCK_REALM_VOLUMES" -mindepth 1 -maxdepth 1 -type f -print -quit)"
 assert grep -q 'start kc' "$MOCK_LOG"
 
 realm_copy_failed_root="$temp/realm-copy-failed-backup"
@@ -434,6 +462,8 @@ fi
 assert grep -q 'Keycloak-Realm-Export konnte nicht aus dem Container kopiert werden' \
   "$temp/realm-copy-failure.stderr"
 assert grep -q 'docker rm -f archiv-realm-export-' "$MOCK_LOG"
+assert grep -q 'docker volume rm archiv-realm-export-' "$MOCK_LOG"
+assert test -z "$(find "$MOCK_REALM_VOLUMES" -mindepth 1 -maxdepth 1 -type f -print -quit)"
 assert grep -q 'start kc' "$MOCK_LOG"
 export MOCK_FAIL_REALM_COPY=0
 

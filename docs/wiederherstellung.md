@@ -119,8 +119,10 @@ Sicherungs-Shellablauf mit Attrappen sowie S3-Restore und Dateireferenzen mit lo
 Datenbank-Restore vergleicht sie je Mandant die Zahlen für Wissensseiten, Versionen, Quelleneinträge, Dokumente,
 Webfreigaben, öffentliche Fragen und Benutzereinladungen mit dem vor der Sicherung erfassten Stand. Die vollständige
 lokale synthetische Wiederherstellung einschliesslich Datenbank-Dumps und Keycloak-Realm wurde am 28.11.2026
-durchgespielt. Die wiederkehrende betriebliche Probe bleibt offen.
+durchgespielt. Der Quell-Keycloak lief dabei mit den `read_only`-, tmpfs- und uid/gid-Vorgaben der Produktion. Der
+Realm-Export lag während des Containerlaufs in einem eigenen, zugriffsbeschränkten Volume; dessen Entfernung wird auch
+in Fehlerfällen geprüft. Die wiederkehrende betriebliche Probe bleibt offen.
 
 | Lauf | Dauer (s) | Exit-Code |
 | --- | ---: | ---: |
-| 28.11.2026, lokal, synthetisch | 2838 | 0 |
+| 28.11.2026, lokal, synthetisch | 306 | 0 |

@@ -1130,9 +1130,9 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   mit dem Stand vor der Sicherung (**Umsetzung (Aufgabe 13.7, 26.11.2026)**). Offen bleibt der Zählvergleich in der
   wiederkehrenden betrieblichen Restore-Probe (4.7); Aufgabe 13.7 bleibt dafür offen.
   Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis (Review PR #295, M1).
-- Nachtrag 28.11.2026: Der vollständige lokale synthetische Lauf prüft zusätzlich Webfreigaben, öffentliche Fragen
-  und Benutzereinladungen. Das belegt weiterhin nicht den Zählvergleich in der wiederkehrenden betrieblichen Probe;
-  Aufgabe 13.7 bleibt offen.
+- Nachtrag 28.11.2026: Der vollständige lokale synthetische Lauf (306 s, Exit 0) prüft zusätzlich Webfreigaben,
+  öffentliche Fragen und Benutzereinladungen. Das belegt weiterhin nicht den Zählvergleich in der wiederkehrenden
+  betrieblichen Probe; Aufgabe 13.7 bleibt offen.
 - Das Secret `keycloak_verwaltung_secret` steht seit PR #397 in der Secret-Liste von `restore-uebung-lokal.sh` und im
   Restore-Compose-Stack: `application.properties` (`%prod`, Spec 06, ADR-015) verlangt es, der Stack startet sonst
   nicht. Es hat mit dem Wissensvergleich nichts zu tun.

@@ -118,6 +118,8 @@ arbeitsverzeichnis=
 keycloak_angehalten=0
 realm_container=
 realm_container_angelegt=0
+realm_export_volume=
+realm_export_volume_angelegt=0
 lauf_veroeffentlicht=0
 registrierung_begonnen=0
 zustand_angelegt=0
@@ -170,6 +172,12 @@ cleanup() {
   if (( realm_container_angelegt )); then
     if ! "$ARCHIV_DOCKER_BIN" rm -f "$realm_container" >/dev/null; then
       printf 'Fehler: Temporärer Realm-Export-Container konnte nicht entfernt werden.\n' >&2
+      (( status != 0 )) || status=3
+    fi
+  fi
+  if (( realm_export_volume_angelegt )); then
+    if ! "$ARCHIV_DOCKER_BIN" volume rm "$realm_export_volume" >/dev/null; then
+      printf 'Fehler: Temporäres Realm-Export-Volume konnte nicht entfernt werden.\n' >&2
       (( status != 0 )) || status=3
     fi
   fi
@@ -313,14 +321,22 @@ if ! compose exec -T "$ARCHIV_DB_SERVICE" pg_dump --no-password --format=custom 
 fi
 [[ -s $plain/keycloak.dump ]] || fehler 3 "Export der Keycloak-Datenbank ist leer."
 verschluesseln keycloak - "$plain/keycloak.dump"
-realm_container_angelegt=1
 # shellcheck disable=SC2016 # Der Befehl wird im Container ausgewertet, nicht im Host-Shellprozess.
-# Der Export bleibt im beschreibbaren Container-Dateisystem; docker cp überträgt ihn nach dem Containerlauf in das
-# private Arbeitsverzeichnis. So hängt der Keycloak-Benutzer (uid 1000) nicht von Host-Bind-Mount-Rechten ab.
+# Das Wegwerf-Volume bleibt nach dem Containerlauf für docker cp verfügbar. Das Image legt den Zielordner bereits mit
+# restriktiven Rechten für uid 1000 an; so funktioniert der Export trotz read_only ohne Klartext-Bind-Mount.
 # Der Export braucht keinen Bootstrap-Admin; Keycloak 26.8 bricht ab, wenn der Name ohne Passwort gesetzt ist.
 realm_export_pfad=/opt/keycloak/data/archiv-export
+realm_export_volume=$realm_container
+if "$ARCHIV_DOCKER_BIN" volume inspect "$realm_export_volume" >/dev/null 2>&1; then
+  fehler 3 "Name des temporären Realm-Export-Volumes ist bereits belegt."
+fi
+"$ARCHIV_DOCKER_BIN" volume create "$realm_export_volume" >/dev/null \
+  || fehler 3 "Temporäres Realm-Export-Volume konnte nicht angelegt werden."
+realm_export_volume_angelegt=1
+realm_container_angelegt=1
 realm_export_befehl='set -euo pipefail; umask 077; unset KC_BOOTSTRAP_ADMIN_USERNAME; mkdir -p /opt/keycloak/data/archiv-export; export KC_DB_PASSWORD="$(< /run/secrets/keycloak_db)"; exec /opt/keycloak/bin/kc.sh export --optimized --dir /opt/keycloak/data/archiv-export --realm urinet-archiv --users same_file'
-compose run --no-deps -T --name "$realm_container" --entrypoint /bin/bash \
+compose run --no-deps -T --name "$realm_container" --volume "$realm_export_volume:$realm_export_pfad" \
+  --entrypoint /bin/bash \
   "$ARCHIV_KEYCLOAK_SERVICE" -c "$realm_export_befehl" \
   || fehler 3 "Keycloak-Realm konnte nicht exportiert werden."
 "$ARCHIV_DOCKER_BIN" cp "$realm_container:$realm_export_pfad/." "$plain/realm/" \
