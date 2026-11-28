@@ -50,7 +50,11 @@ public class WissenIngestStarten {
     private final WissenKonfiguration konfiguration;
     private final AuftragService auftraege;
 
-    public WissenIngestStarten(WissenIngestPort port, WissenKonfiguration konfiguration, AuftragService auftraege) {
+    private final Wissensfreischaltung freischaltung;
+
+    public WissenIngestStarten(WissenIngestPort port, WissenKonfiguration konfiguration, AuftragService auftraege,
+                               Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.port = port;
         this.konfiguration = konfiguration;
         this.auftraege = auftraege;
@@ -68,6 +72,7 @@ public class WissenIngestStarten {
 
     @Transactional
     public Ergebnis abschnittWiederholen(UUID entwurfId, int abschnittNr, String akteur) {
+        freischaltung.pruefen();
         if (abschnittNr < 1) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -137,6 +142,8 @@ public class WissenIngestStarten {
     }
 
     private Ergebnis starten(UUID dokumentId, Integer seiteVon, Integer seiteBis, String akteur, boolean manuell) {
+        // Spec 04, Req 22.9: ohne Freischaltung startet kein Ingest, auch nicht automatisch nach der Markierung
+        freischaltung.pruefen();
         auftraege.offen(TYP, Optional.empty(), true);
         // Reihenfolge nach design.md: 404, (403 im ZugangFilter), 409, 422/400
         Quelle quelle = port.quelleLaden(dokumentId)

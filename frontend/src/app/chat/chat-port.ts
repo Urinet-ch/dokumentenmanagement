@@ -16,7 +16,8 @@ export interface DatenstandQuelle {
 }
 
 export interface WissenQuelle {
-  wissen: { titel: string; link: string };
+  /** Ohne Freischaltung von Wissen ohne Titel und Link (Spec 04, Req 22.7). */
+  wissen: { titel: string | null; link: string | null };
   dokumente: DokumentQuelle[];
 }
 

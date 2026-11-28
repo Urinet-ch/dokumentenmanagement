@@ -1,4 +1,4 @@
-Unter «Wissen» finden Sie geprüftes Wissen aus Ihren Unterlagen: Seiten, die das Archiv aus Wissensquellen zusammenstellt. Jede Aussage trägt eine Fussnote auf ihre Quelle. Eine Seite oder Änderung wird erst wirksam, wenn ein Mensch sie freigegeben hat. Sie sehen nur Seiten, deren Vertraulichkeit Ihre Rolle sehen darf.
+Unter «Wissen» finden Sie geprüftes Wissen aus Ihren Unterlagen: Seiten, die das Archiv aus Wissensquellen zusammenstellt. Jede Aussage trägt eine Fussnote auf ihre Quelle. Eine Seite oder Änderung wird erst wirksam, wenn ein Mensch sie freigegeben hat. Sie sehen nur Seiten, deren Vertraulichkeit Ihre Rolle sehen darf. Der Bereich steht nur zur Verfügung, wenn er für Ihr Archiv freigeschaltet ist.
 
 ## Wissen nachschlagen
 1. Wählen Sie in der Seitenleiste «Wissen». Die Seite zeigt alle Seiten der Wissensbasis, gruppiert nach Seitentyp, zum Beispiel «Konzept», «Quelle» oder «Analyse».

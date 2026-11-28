@@ -1,22 +1,40 @@
 package ch.urinet.archiv.wissen.adapter.out;
 
 import ch.urinet.archiv.ki.application.WissenschatZugang;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.wissen.application.WissenModellBudget;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import jakarta.enterprise.context.ApplicationScoped;
 
-/** {@link WissenschatZugang}: A15 über die Rechtematrix und das Monatsbudget der Wissensbasis (Requirement 13.6). */
+/**
+ * {@link WissenschatZugang}: Freischaltung (Requirement 22), A15 über die Rechtematrix und das Monatsbudget der
+ * Wissensbasis (Requirement 13.6).
+ */
 @ApplicationScoped
 public class WissenschatZugangAdapter implements WissenschatZugang {
 
     private final Berechtigung berechtigung;
     private final WissenModellBudget budget;
+    private final Wissensfreischaltung freischaltung;
 
-    public WissenschatZugangAdapter(Berechtigung berechtigung, WissenModellBudget budget) {
+    public WissenschatZugangAdapter(Berechtigung berechtigung, WissenModellBudget budget,
+                                    Wissensfreischaltung freischaltung) {
         this.berechtigung = berechtigung;
         this.budget = budget;
+        this.freischaltung = freischaltung;
+    }
+
+    @Override
+    public boolean freigeschaltet(MandantCode mandant) {
+        return freischaltung.freigeschaltet(mandant);
+    }
+
+    @Override
+    public boolean freigeschaltet() {
+        return freischaltung.aktuell();
     }
 
     @Override

@@ -233,7 +233,7 @@
       }
     </div>
 
-    @if (wissenBegriff()) {
+    @if (wissenBegriff() && wissen()) {
       <section class="karte wissen" aria-labelledby="wissen-titel" [attr.aria-busy]="wissenLaeuft()" data-test="wissen">
         <div class="kopf">
           <h2 id="wissen-titel"><app-symbol name="wissen" />{{ texte.wissen }}</h2>

@@ -225,7 +225,7 @@ export async function sucheAttrappe(welt) {
     if (anfrage.method() !== 'GET' && !aendern) {
       return route.fallback();
     }
-    if (pfad === '/api/v1/branding' || pfad === '/api/v1/wissensentwuerfe') {
+    if (pfad === '/api/v1/branding' || pfad === '/api/v1/wissensentwuerfe' || pfad === '/api/v1/mandant/funktionen') {
       // Diese Endpunkte gehören nicht zur Such-API; die jeweils zuständige Attrappe beantwortet sie.
       return route.fallback();
     }

@@ -40,15 +40,15 @@
           {{ neuLadenText }}
         </button>
       }
-      @if (gespraeche() === null) {
+      @if (sichtbareGespraeche() === null) {
         <p class="gedaempft">{{ texte.gespraecheLaden }}</p>
-      } @else if (gespraeche()!.length === 0) {
+      } @else if (sichtbareGespraeche()!.length === 0) {
         @if (!listeFehler()) {
           <p class="gedaempft">{{ texte.keineGespraeche }}</p>
         }
       } @else {
         <ul class="liste">
-          @for (kopf of gespraeche(); track kopf.id) {
+          @for (kopf of sichtbareGespraeche(); track kopf.id) {
             <li>
               <button
                 type="button"
@@ -59,7 +59,9 @@
                 [attr.aria-current]="kopf.id === gespraechId() ? 'true' : null"
               >
                 <span class="titel">{{ kopf.titel }}</span>
-                <span class="pille" data-test="gespraech-modus">{{ kopf.modus === 'WISSEN' ? modusTexte.wissen : modusTexte.archiv }}</span>
+                @if (wissen()) {
+                  <span class="pille" data-test="gespraech-modus">{{ kopf.modus === 'WISSEN' ? modusTexte.wissen : modusTexte.archiv }}</span>
+                }
                 <span class="datum">{{ tag(kopf.geaendert) }}</span>
               </button>
             </li>
@@ -71,12 +73,12 @@
 
   <section class="gespraech karte" aria-labelledby="verlauf-titel">
     <h2 id="verlauf-titel" class="nur-screenreader">{{ texte.verlauf }}</h2>
-    @if (anmeldung.darf('A15') && !gespraechId() && nachrichten().length === 0 && !laedt()) {
+    @if (wissen() && !gespraechId() && nachrichten().length === 0 && !laedt()) {
       <div class="segment" role="group" [attr.aria-label]="modusTexte.auswahl">
         <button type="button" [attr.aria-pressed]="modus() === 'ARCHIV'" (click)="modusWaehlen('ARCHIV')">{{ modusTexte.archiv }}</button>
         <button type="button" [attr.aria-pressed]="modus() === 'WISSEN'" (click)="modusWaehlen('WISSEN')">{{ modusTexte.wissen }}</button>
       </div>
-    } @else {
+    } @else if (wissen() || modus() === 'WISSEN') {
       <p data-test="aktiver-modus">{{ modus() === 'WISSEN' ? modusTexte.wissen : modusTexte.archiv }}</p>
     }
     @if (laedt()) {

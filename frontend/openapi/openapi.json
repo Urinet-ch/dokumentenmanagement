@@ -1027,10 +1027,12 @@
         "type" : "object",
         "properties" : {
           "titel" : {
-            "type" : "string"
+            "type" : [ "string", "null" ],
+            "description" : "leer, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.7)"
           },
           "link" : {
-            "type" : "string"
+            "type" : [ "string", "null" ],
+            "description" : "leer, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.7)"
           },
           "stand" : {
             "$ref" : "#/components/schemas/Instant"
@@ -1815,8 +1817,9 @@
             "$ref" : "#/components/schemas/OeffentlichesChatBudget"
           },
           "wissenMonatsbudgetTokens" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "fehlt, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.6)"
           }
         }
       },
@@ -3346,11 +3349,15 @@
       },
       "Mandantenfunktionen" : {
         "type" : "object",
-        "required" : [ "finanzVerfuegbar" ],
+        "required" : [ "finanzVerfuegbar", "wissenVerfuegbar" ],
         "properties" : {
           "finanzVerfuegbar" : {
             "type" : "boolean",
             "description" : "Mindestens eine aktive Dokumentart hat die Gruppe «finanz» (Spec 05, Req 8.8)"
+          },
+          "wissenVerfuegbar" : {
+            "type" : "boolean",
+            "description" : "Wissen ist für den Mandanten freigeschaltet (Spec 04, Req 22.4)"
           }
         }
       },
@@ -3399,7 +3406,7 @@
       },
       "ProtokollAktion" : {
         "type" : "string",
-        "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "WISSEN_IMPORT", "WISSENSQUELLE_MARKIERT", "WISSENSQUELLE_ENTFERNT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV", "BENUTZER_ANLEGEN", "BENUTZER_AENDERN", "BENUTZER_LOESCHEN", "ROLLE_ZUWEISEN", "BENUTZER_ANTRAG", "BENUTZER_ABWEICHUNG", "CHAT_BEWERTUNG_EXPORT" ]
+        "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "WISSEN_IMPORT", "WISSENSQUELLE_MARKIERT", "WISSENSQUELLE_ENTFERNT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV", "BENUTZER_ANLEGEN", "BENUTZER_AENDERN", "BENUTZER_LOESCHEN", "ROLLE_ZUWEISEN", "BENUTZER_ANTRAG", "BENUTZER_ABWEICHUNG", "CHAT_BEWERTUNG_EXPORT", "WISSEN_FREIGESCHALTET", "WISSEN_ABGESCHALTET" ]
       },
       "ProtokollEintrag" : {
         "description" : "Eintrag des Zugriffsprotokolls; Name und Rolle aus dem Benutzerverzeichnis zur Zeit des Eintrags (Req 10.10)",

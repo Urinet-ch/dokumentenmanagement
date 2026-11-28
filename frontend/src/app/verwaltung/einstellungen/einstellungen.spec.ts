@@ -11,7 +11,9 @@ import { EinstellungenSeite } from './einstellungen';
 
 describe('Einstellungskatalog', () => {
   const service = { apiV1MandantEinstellungenGet: vi.fn() };
+  const wissen = { verfuegbar: true };
   const anmeldung = { benutzer: () => ({ id: 'test-id', mandant: 'test-mandant' }),
+    darf: (aktion: string) => aktion !== 'A19' || wissen.verfuegbar,
     anmelden: vi.fn().mockResolvedValue(undefined), fortsetzungEntnehmen: vi.fn().mockReturnValue(null) };
   const dialog = { open: vi.fn().mockReturnValue({ afterClosed: () => of(true) }) };
   const inhalt = new Map<string, string>();
@@ -55,6 +57,23 @@ describe('Einstellungskatalog', () => {
     expect(element.textContent).toContain("10'000 – 5'000'000");
     expect(element.textContent).toContain('Beim nächsten Lauf');
     expect(element.textContent).toContain('CH00, CH01');
+  });
+
+  it('blendet die Gruppe der Wissensbasis ohne freigeschaltetes Wissen aus (Spec 04, Req 22.5)', () => {
+    wissen.verfuegbar = false;
+    try {
+      service.apiV1MandantEinstellungenGet.mockReturnValue(of(antwort([
+          { gruppe: 'WISSEN', schluessel: 'wissen.budgetTokens', name: 'Budget', aktuellerWert: 600000,
+            standard: 100000, minimum: 10000, maximum: 5000000, einheit: 'Tokens', typ: 'GANZZAHL' },
+          { gruppe: 'KENNUNGEN', schluessel: 'kennungen.ibans', name: 'IBANs', aktuellerWert: ['CH00'], typ: 'IBANS' },
+        ])));
+      const element = starten().nativeElement as HTMLElement;
+      expect(element.textContent).not.toContain('Wissensbasis');
+      expect(element.textContent).not.toContain("600'000");
+      expect(element.textContent).toContain('CH00');
+    } finally {
+      wissen.verfuegbar = true;
+    }
   });
 
   it('zeigt einen Fehler mit erneutem Laden statt einen leeren Katalog', () => {

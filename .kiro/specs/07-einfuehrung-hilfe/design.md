@@ -173,8 +173,10 @@ Verhalten (z. B. «bestätigen») müssen der umgesetzten App entsprechen (Requi
 | `eingangskorb-bestaetigen` | Prüfen, korrigieren und bestätigen | `eingangskorb`   | A7                | –                           | –          |
 | `eingangskorb-eigene`      | Ihre erfassten Dokumente verfolgen | `eingangskorb`   | A1 ohne A7        | –                           | –          |
 | `suche`                    | Suche                              | –                | A2                | `/suche`                    | –          |
+| `suche-wissen`             | Wissen in der Suche                | `suche`          | A15               | –                           | –          |
 | `chat`                     | Chat                               | –                | A2                | `/chat`                     | –          |
 | `chat-bewerten`            | Antworten bewerten                 | `chat`           | A2                | –                           | –          |
+| `chat-wissen`              | Wissen im Chat                     | `chat`           | A15               | –                           | –          |
 | `dokument`                 | Dokumentansicht                    | –                | A2                | `/dokument`                 | –          |
 | `dokument-aendern`         | Angaben ändern                     | `dokument`       | A6                | –                           | –          |
 | `kontakte`                 | Kontakte                           | –                | A6                | `/kontakte`                 | –          |
@@ -190,6 +192,12 @@ Verhalten (z. B. «bestätigen») müssen der umgesetzten App entsprechen (Requi
 
 - Ein Unterabschnitt erscheint nur, wenn auch sein Abschnitt erscheint. Ein Abschnitt mit Unterabschnitten hat eine
   eigene, kurze Datei (Einleitung).
+- Spec 04 ergänzt (Spec 04, Req 22.5, Entscheid Fabian 28.11.2026): Die Abschnitte `wissen`, `wissen-entwuerfe` und
+  `wissen-quellen` sowie der Satz zu ‹Wissen› im Einführungsschritt 4 erscheinen nur, wenn Wissen für den Mandanten
+  freigeschaltet ist (`wissenVerfuegbar`); bis die Funktionen geladen sind oder wenn die Abfrage scheitert, fehlen sie.
+  Die Rechte A15 bis A19 wirken in der App nur bei Freischaltung, darum folgen Menü, Einführung und Hilfe derselben
+  Bedingung. Was Suche und Chat über Wissen sagen, steht in eigenen Unterabschnitten `suche-wissen` und `chat-wissen`
+  (Bedingung A15), weil die Markdown-Teilmenge keine bedingten Blöcke kennt (Review PR #751).
 - Die Bedingungen entsprechen den Aktionen der Menüpunkte in `MENUE` (z. B. Kontakte A6, Wissensentwürfe A17), damit
   Menü, Einführung und Anleitung dasselbe zeigen; `hilfe-katalog.spec.ts` vergleicht beide für jeden Pfad, den beide
   kennen.

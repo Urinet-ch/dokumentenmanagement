@@ -18,9 +18,11 @@ public class WissensEmbeddingHandler implements AuftragHandler {
     private final WissensEmbeddingSpeichern speichern;
     private final EmbeddingService embedding;
     private final WissenModellBudget budget;
+    private final Wissensfreischaltung freischaltung;
 
     public WissensEmbeddingHandler(WissensEmbeddingSpeichern speichern, EmbeddingService embedding,
-                                   WissenModellBudget budget) {
+                                   WissenModellBudget budget, Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.speichern = speichern;
         this.embedding = embedding;
         this.budget = budget;
@@ -35,6 +37,11 @@ public class WissensEmbeddingHandler implements AuftragHandler {
                 .orElseThrow(() -> new IllegalArgumentException("Wissensembedding ohne seiteId"));
         int version = Math.toIntExact(auftrag.nutzlast().zahl("version")
                 .orElseThrow(() -> new IllegalArgumentException("Wissensembedding ohne version")));
+        if (!freischaltung.aktuell()) {
+            // Spec 04, Req 22.9: kein Embedding-Aufruf der Wissensbasis ohne Freischaltung
+            LOG.infof("Wissensembedding übersprungen: Seite %s, %s", id, Wissensfreischaltung.GRUND_AUSGESCHALTET);
+            return;
+        }
         var stand = speichern.laden(id);
         if (stand.isEmpty() || stand.get().version() != version) {
             LOG.infof("Wissensembedding übersprungen: Seite %s, Version %d überholt", id, version);

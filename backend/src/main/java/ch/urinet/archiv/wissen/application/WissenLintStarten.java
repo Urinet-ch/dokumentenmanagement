@@ -26,12 +26,14 @@ public class WissenLintStarten {
     private final WissenEinstellungenRepository einstellungen;
     private final AuftragService auftraege;
     private final String standardZeitplan;
+    private final Wissensfreischaltung freischaltung;
 
     public WissenLintStarten(WissenLintRepository lint, WissenLintSpeichern speichern,
                              WissenKonfiguration konfiguration, WissenEinstellungenRepository einstellungen,
                              AuftragService auftraege,
                              @ConfigProperty(name = "archiv.wissen.lint-zeitplan", defaultValue = "0 0 4 ? * SUN")
-                             String standardZeitplan) {
+                             String standardZeitplan, Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.lint = lint;
         this.speichern = speichern;
         this.konfiguration = konfiguration;
@@ -42,11 +44,16 @@ public class WissenLintStarten {
 
     @Transactional
     public UUID manuell(String benutzer) {
+        freischaltung.pruefen();
         return starten("human:" + benutzer, null).orElseThrow(() -> new FachFehler(Fehlercode.STATUS_KONFLIKT));
     }
 
     @Transactional
     public Optional<UUID> geplant(Instant termin) {
+        // Spec 04, Req 22.9: ohne Freischaltung kein Lauf; wieder freigeschaltet gilt der nächste fällige Termin
+        if (!freischaltung.aktuell()) {
+            return Optional.empty();
+        }
         return starten(SYSTEM, termin);
     }
 

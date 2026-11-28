@@ -1887,6 +1887,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 403 | `MANDANT_FEHLT` | kein gültiger oder inaktiver Mandant (Req 1.3) |
 | 403 | `NICHT_ERLAUBT` | Rolle oder Token-Scope ohne Recht (Req 2.4–2.20) |
 | 403 | `ESKALATION_VERBOTEN` | Benutzerverwaltung würde die Rolle des Akteurs überschreiten oder die festgelegten Vergaberegeln verletzen (Spec 06, Req 4.6) |
+| 403 | `WISSEN_NICHT_FREIGESCHALTET` | Wissen für den Mandanten nicht freigeschaltet; nach 401, vor Rechtematrix und 404, auf allen internen Wissenspfaden (Spec 04, Req 22.6) |
 | 404 | `NICHT_GEFUNDEN` | fremder Mandant oder unsichtbar, vor 403 (Req 1.4, 2.3) |
 | 409 | `API_TOKEN_ABGELAUFEN` | Ablauf eines abgelaufenen API-Tokens setzen oder entfernen; ein neues Token muss ausgestellt werden (Req 2.5, Review PR #248) |
 | 409 | `STATUS_KONFLIKT` | Aktion im falschen Status (Req 6.7, 6.13, 8.8) |

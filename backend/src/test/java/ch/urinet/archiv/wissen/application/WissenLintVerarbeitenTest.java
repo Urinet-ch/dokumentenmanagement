@@ -86,10 +86,40 @@ class WissenLintVerarbeitenTest {
                 .contains("LINT_UNVOLLSTAENDIG");
     }
 
+    /** Spec 04, Req 22.9: auch der Schritt ABSCHLUSS speichert nach dem Abschalten nichts und endet mit dem Grund. */
+    @Test
+    @org.junit.jupiter.api.Tag("req-22.9")
+    void abschlussNachDemAbschaltenSpeichertNichtsUndEndetMitDemGrund() {
+        var aenderung = new WissenIngestPort.NeueAenderung(C, 1, "AENDERN", A, "regeln/probe", 1, null, "Lint",
+                List.of(), List.of(), List.of(), List.of(), null, null);
+        var fortschritt = new Fortschritt(List.of(), List.of(), 0, List.of(), 0, List.of(), WissensStufe.NORMAL, null,
+                false, List.of(), List.of(aenderung));
+        var repository = new AbschlussRepository(new WissenLintRepository.Lauf(A, B, "test", "test",
+                "ABSCHLUSS", 10, 5, fortschritt));
+        var auftraege = new AuftragService(null, null, null, null) {
+            @Override public void anspruchSichern(Auftrag auftrag) { }
+            @Override public boolean nachfolgerVorhanden(Auftrag auftrag, String schluessel) { return false; }
+        };
+        var ingest = WissenIngestPort.class.cast(Proxy.newProxyInstance(WissenIngestPort.class.getClassLoader(),
+                new Class<?>[]{WissenIngestPort.class}, (proxy, methode, args) -> {
+                    throw new AssertionError("Unerwarteter Aufruf: " + methode.getName());
+                }));
+        var speichern = new WissenLintSpeichern(repository, ingest, null, null, null, auftraege, null, 100, 30);
+        var auftrag = new Auftrag(1, new MandantCode("urinet"), WissenLintSpeichern.TYP, Nutzlast.leer(), 1);
+
+        new WissenLintVerarbeiten(speichern, null, null, null, null, ch.urinet.archiv.wissen.FesteWissensfreischaltung.aus())
+                .ausfuehren(auftrag, A);
+
+        assertThat(repository.unvollstaendig).isTrue();
+        assertThat(repository.hinweis).isEqualTo(Wissensfreischaltung.GRUND_AUSGESCHALTET);
+        assertThat(repository.abgeschlossen.aenderungen()).isEmpty();
+    }
+
     private static final class AbschlussRepository implements WissenLintRepository {
         private final Lauf lauf;
         private Fortschritt abgeschlossen;
         private boolean unvollstaendig;
+        private String hinweis;
 
         private AbschlussRepository(Lauf lauf) { this.lauf = lauf; }
         @Override public Optional<Lauf> laden(UUID id) { return id.equals(lauf.id()) ? Optional.of(lauf) : Optional.empty(); }
@@ -101,6 +131,7 @@ class WissenLintVerarbeitenTest {
             assertThat(hatAenderungen).isFalse();
             this.abgeschlossen = stand;
             this.unvollstaendig = unvollstaendig;
+            this.hinweis = hinweis;
         }
         @Override public void budgetsperre() { throw new UnsupportedOperationException(); }
         @Override public long lintVerbrauch(UUID id) { throw new UnsupportedOperationException(); }

@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.application.chat;
 
+import ch.urinet.archiv.ki.application.WissenschatZugang;
 import ch.urinet.archiv.ki.domain.chat.Chatmodus;
 import ch.urinet.archiv.konfiguration.application.Funktionen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
@@ -20,7 +21,8 @@ import java.util.function.Predicate;
  * {@link Funktionen#finanzVerfuegbar()} des Mandanten (Aufgabe 7.1b, Spec 05, Req 8.8); {@code vollstaendigkeit} nur für Rollen, die A3 und A4
  * uneingeschränkt sehen (Aufgabe 7.1c, {@link #vollstaendigkeitErlaubt}; für andere fehlt es in der Liste, Spec 05,
  * Req 5.4). Im Modus {@link Chatmodus#WISSEN} nur {@value #WISSEN_INDEX} und {@value #WISSEN_SEITE_ZEIGEN}
- * (Spec 04, Requirement 21.2). Jede
+ * (Spec 04, Requirement 21.2). Beide Wissenswerkzeuge nur, wenn Wissen für den Mandanten freigeschaltet ist (Spec 04,
+ * Requirement 22.7); sonst bietet sie weder der Archivchat noch der Wissenschat an. Jede
  * Werkzeugmethode prüft die Auswahl beim Aufruf nochmals, ein nicht angebotenes Werkzeug antwortet nicht (fail closed).
  */
 @ApplicationScoped
@@ -38,26 +40,36 @@ public class WerkzeugAuswahl {
     private static final Logger LOG = Logger.getLogger(WerkzeugAuswahl.class);
 
     private final Predicate<MandantCode> finanzVerfuegbar;
+    private final Predicate<MandantCode> wissenVerfuegbar;
 
     /**
      * Die Frage nach den Finanzfunktionen läuft im Mandanten des Kontexts in einer eigenen, kurzen Transaktion, weil
      * die Auswahl auch vor der Arbeit des Werkzeugs gefragt wird ({@link Werkzeuglauf}).
      */
     @Inject
-    public WerkzeugAuswahl(Funktionen funktionen, MandantKontext mandanten, WerkzeugTransaktion transaktion) {
-        this(mandant -> mandanten.mit(mandant, () -> transaktion.neu(funktionen::finanzVerfuegbar)));
+    public WerkzeugAuswahl(Funktionen funktionen, MandantKontext mandanten, WerkzeugTransaktion transaktion,
+                           WissenschatZugang wissenschat) {
+        this(mandant -> mandanten.mit(mandant, () -> transaktion.neu(funktionen::finanzVerfuegbar)),
+                wissenschat::freigeschaltet);
     }
 
-    /** Mit eigener Antwort auf «Finanzfunktionen im Mandanten?» (Tests). */
-    public WerkzeugAuswahl(Predicate<MandantCode> finanzVerfuegbar) {
+    /** Mit eigenen Antworten auf «Finanzfunktionen im Mandanten?» und «Wissen freigeschaltet?» (Tests). */
+    public WerkzeugAuswahl(Predicate<MandantCode> finanzVerfuegbar, Predicate<MandantCode> wissenVerfuegbar) {
         this.finanzVerfuegbar = finanzVerfuegbar;
+        this.wissenVerfuegbar = wissenVerfuegbar;
+    }
+
+    /** Gehört das Werkzeug zur Wissensbasis ({@value #WISSEN_INDEX}, {@value #WISSEN_SEITE_ZEIGEN})? */
+    public static boolean wissenswerkzeug(String name) {
+        return WISSEN_INDEX.equals(name) || WISSEN_SEITE_ZEIGEN.equals(name);
     }
 
     /** Namen der angebotenen Werkzeuge in fester Reihenfolge. */
     public List<String> angeboten(WerkzeugKontext kontext) {
+        boolean wissen = wissen(kontext.mandant());
         if (kontext.modus() == Chatmodus.WISSEN) {
             // Wissenschat (Spec 04, Requirement 21.2): nur die beiden Wissenswerkzeuge, kein Archivwerkzeug
-            return List.of(WISSEN_INDEX, WISSEN_SEITE_ZEIGEN);
+            return wissen ? List.of(WISSEN_INDEX, WISSEN_SEITE_ZEIGEN) : List.of();
         }
         List<String> namen = new ArrayList<>(List.of(DOKUMENTE_SUCHEN, DOKUMENT_ZEIGEN, FRISTEN));
         if (finanz(kontext.mandant())) {
@@ -67,8 +79,10 @@ public class WerkzeugAuswahl {
         if (vollstaendigkeitErlaubt(kontext.sicht())) {
             namen.add(VOLLSTAENDIGKEIT);
         }
-        namen.add(WISSEN_INDEX);
-        namen.add(WISSEN_SEITE_ZEIGEN);
+        if (wissen) {
+            namen.add(WISSEN_INDEX);
+            namen.add(WISSEN_SEITE_ZEIGEN);
+        }
         return List.copyOf(namen);
     }
 
@@ -83,6 +97,16 @@ public class WerkzeugAuswahl {
      */
     public static boolean vollstaendigkeitErlaubt(Sichtregel sicht) {
         return sicht.normal() && sicht.intern() && sicht.personal() == Sichtregel.Personal.ALLE;
+    }
+
+    /** Fail closed: Scheitert die Frage, gibt es die Wissenswerkzeuge nicht (Spec 04, Requirement 22.7). */
+    private boolean wissen(MandantCode mandant) {
+        try {
+            return wissenVerfuegbar.test(mandant);
+        } catch (RuntimeException e) {
+            LOG.errorf("Freischaltung der Wissensbasis nicht ermittelbar: %s", e.getClass().getName());
+            return false;
+        }
     }
 
     /** Fail closed: Scheitert die Frage, gibt es die Finanzwerkzeuge nicht (kein Wert im Log). */

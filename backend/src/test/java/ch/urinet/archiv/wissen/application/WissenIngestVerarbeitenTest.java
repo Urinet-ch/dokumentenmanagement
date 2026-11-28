@@ -669,7 +669,8 @@ class WissenIngestVerarbeitenTest {
         WissenKonfiguration konfiguration = new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
                 20_000, 12_000, 300_000, 1_000_000);
         return new WissenIngestVerarbeiten(speichern, konfiguration, ki, verbrauch,
-                new DiffDienst(new JavaWissenZeilendiff()), new WissenIngestIndex(speichern, null, konfiguration));
+                new DiffDienst(new JavaWissenZeilendiff()), new WissenIngestIndex(speichern, null, konfiguration),
+                ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
     }
 
     private static Stand stand(Lauf lauf, long monatsverbrauch) {

@@ -17,6 +17,8 @@ import dev.langchain4j.service.TokenStream;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import org.jboss.logging.Logger;
 
 import java.time.Clock;
@@ -52,12 +54,14 @@ public class LangChain4jChatAgent implements ChatAgentPort {
     private final int runden;
     private final int fenster;
     private final Duration zeitgrenze;
+    private final Wissensfreischaltung freischaltung;
 
     public LangChain4jChatAgent(ArchivAgent agent, ChatModell modell, AgentLaeufe laeufe, WerkzeugKontextRegister register,
                          KiVerbrauchPort verbrauch, MandantKontext mandanten,
                          @ConfigProperty(name = "archiv.ki.chat.runden") int runden,
                          @ConfigProperty(name = "archiv.ki.chat.fenster") int fenster,
-                         @ConfigProperty(name = "archiv.ki.chat.zeitgrenze") Duration zeitgrenze) {
+                         @ConfigProperty(name = "archiv.ki.chat.zeitgrenze") Duration zeitgrenze,
+                         Wissensfreischaltung freischaltung) {
         if (runden < 1 || runden >= ArchivAgent.MAX_RUNDEN) {
             throw new IllegalArgumentException("archiv.ki.chat.runden muss zwischen 1 und "
                     + (ArchivAgent.MAX_RUNDEN - 1) + " liegen (Obergrenze der Bibliothek: " + ArchivAgent.MAX_RUNDEN + ")");
@@ -72,6 +76,7 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         this.runden = runden;
         this.fenster = fenster;
         this.zeitgrenze = zeitgrenze;
+        this.freischaltung = freischaltung;
     }
 
     @Override
@@ -85,6 +90,11 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         }
         UUID id = UUID.randomUUID();
         AgentLauf lauf = new AgentLauf(id, anfrage, ausgabe, abbruch, fenster);
+        MandantCode wissensMandant = anfrage.mandant();
+        if (freischaltung.freigeschaltet(wissensMandant)) {
+            // Spec 04, Req 22.9: fällt Wissen während des Durchgangs weg, endet er vor dem nächsten Werkzeug
+            lauf.wissenBeobachten(() -> freischaltung.freigeschaltet(wissensMandant));
+        }
         laeufe.festhalten(lauf);
         register.festhalten(id, new WerkzeugKontext(anfrage.mandant(), anfrage.benutzer(), anfrage.benutzer().rolle(),
                 anfrage.sichtregel(), anfrage.ip(), anfrage.modus()), anfrage.geseheneDokumente(),
@@ -126,7 +136,7 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         String prompt = wissen ? ChatSystemPrompt.wissenChat(anfrage.mandantenname(), uhr.instant())
                 : ChatSystemPrompt.system(anfrage.mandantenname(), uhr.instant());
         TokenStream strom = agent.antworten(lauf.id(), prompt, anfrage.frage());
-        strom.onPartialResponseWithContext((teil, kontext) -> {
+        TokenStream bereit = strom.onPartialResponseWithContext((teil, kontext) -> {
                     lauf.handle(kontext.streamingHandle());
                     if (!teil.text().isEmpty()) {
                         lauf.melden(new ChatEreignis.Text(teil.text()));
@@ -142,8 +152,9 @@ public class LangChain4jChatAgent implements ChatAgentPort {
                     modellaufruf(lauf, antwort, true);
                     lauf.ende();
                 })
-                .onError(fehler -> lauf.ausfall(KiFehler.grund(fehler)))
-                .start();
+                .onError(fehler -> lauf.ausfall(KiFehler.grund(fehler)));
+        // jeder Modellaufruf des Durchgangs prüft vor dem Hinausgehen die Freischaltung (EntkoppeltesModell, Req 22.9)
+        EntkoppeltesModell.imLauf(lauf, bereit::start);
     }
 
     /**

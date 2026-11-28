@@ -132,7 +132,12 @@ public class ChatFragen {
             modus = speicher.gespraechSperren(gespraechId.get(), benutzer.id())
                     .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         }
+        boolean wissen = wissenschat.freigeschaltet(mandant);
         if (modus == Chatmodus.WISSEN) {
+            if (!wissen) {
+                // Spec 04, Req 22.6: Gespräch im Modus WISSEN nicht fortsetzen, vor Recht und Budget
+                throw new FachFehler(Fehlercode.WISSEN_NICHT_FREIGESCHALTET);
+            }
             wissenschat.rechtPruefen(benutzer);
             wissenschat.budgetPruefen();
         }
@@ -162,8 +167,11 @@ public class ChatFragen {
             // ein über POST /chat/gespraeche angelegtes Gespräch erhält mit der ersten Frage seinen Titel
             speicher.titelSetzenWennLeer(id, Gespraechstitel.aus(text));
         }
-        List<VerlaufEintrag> verlauf = VerlaufEintrag.normalisieren(speicher.verlauf(id, VERLAUF));
-        List<ChatWerkzeugDokument> werkzeugDokumente = speicher.werkzeugDokumente(id);
+        // Spec 04, Req 22.7: ohne Freischaltung gehen Antworten aus Wissenswerkzeugen nicht erneut an das Modell
+        List<VerlaufEintrag> verlauf = VerlaufEintrag.normalisieren(wissen ? speicher.verlauf(id, VERLAUF)
+                : speicher.verlaufOhneWissen(id, VERLAUF));
+        List<ChatWerkzeugDokument> werkzeugDokumente = speicher.werkzeugDokumente(id).stream()
+                .filter(w -> wissen || !WerkzeugAuswahl.wissenswerkzeug(w.werkzeug())).toList();
         List<UUID> geseheneDokumente = werkzeugDokumente.stream()
                 .map(ChatWerkzeugDokument::dokumentId).distinct().toList();
         List<UUID> nummerierteTreffer = werkzeugDokumente.stream()

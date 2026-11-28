@@ -368,7 +368,9 @@
               </ol>
             }
           </section>
-          <app-wissen-verwendung class="karte wissen" [dokumentId]="d.id" />
+          @if (wissen()) {
+            <app-wissen-verwendung class="karte wissen" [dokumentId]="d.id" />
+          }
         </div>
       </div>
     }
