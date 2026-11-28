@@ -12,6 +12,7 @@ import com.icegreen.greenmail.user.GreenMailUser;
 import com.icegreen.greenmail.user.UserManager;
 import com.icegreen.greenmail.util.GreenMail;
 import com.icegreen.greenmail.util.ServerSetup;
+import jakarta.mail.Flags;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.GeneralName;
@@ -38,6 +39,7 @@ import java.util.Date;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -102,8 +104,25 @@ public final class TestPostfach {
         return ordner.getMessages().stream().map(TestPostfach::messageId).toList();
     }
 
+    public Set<Flags.Flag> flags(String ordnerName, String id) throws Exception {
+        MailFolder ordner = server.getManagers().getImapHostManager().getFolder(benutzer, ordnerName);
+        if (ordner == null) {
+            return Set.of();
+        }
+        return ordner.getMessages().stream().filter(n -> id.equals(messageId(n))).findFirst()
+                .map(n -> Set.of(n.getFlags().getSystemFlags())).orElse(Set.of());
+    }
+
     public void ordnerAnlegen(String name) throws Exception {
         server.getManagers().getImapHostManager().createMailbox(benutzer, name);
+    }
+
+    public void kopieren(String von, String nach, String id) throws Exception {
+        MailFolder quelle = server.getManagers().getImapHostManager().getFolder(benutzer, von);
+        MailFolder ziel = server.getManagers().getImapHostManager().getFolder(benutzer, nach);
+        StoredMessage nachricht = quelle.getMessages().stream()
+                .filter(n -> id.equals(messageId(n))).findFirst().orElseThrow();
+        quelle.copyMessage(nachricht.getUid(), ziel);
     }
 
     public void abonnierenFehlschlagen(String name) {

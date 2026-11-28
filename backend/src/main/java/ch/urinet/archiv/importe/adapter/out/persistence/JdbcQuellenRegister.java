@@ -118,6 +118,22 @@ public class JdbcQuellenRegister implements QuellenRegister {
     }
 
     @Override
+    public Optional<byte[]> geheimnisLaden(String code) {
+        String sql = "select geheimnis from " + schema() + ".quelle where code = ?";
+        try (Connection verbindung = verbindung(); PreparedStatement befehl = verbindung.prepareStatement(sql)) {
+            befehl.setString(1, code);
+            try (ResultSet ergebnis = befehl.executeQuery()) {
+                if (!ergebnis.next()) {
+                    return Optional.empty();
+                }
+                return Optional.ofNullable(ergebnis.getBytes(1));
+            }
+        } catch (SQLException e) {
+            throw fehler("Geheimnis nicht geladen", e);
+        }
+    }
+
+    @Override
     public Optional<QuellLauf> laufenderLauf(UUID quelleId) {
         return laeufe(laufAbfrage(schema()) +  " where l.quelle_id = ? and l.status = 'LAEUFT' for update of l",
                 List.of(quelleId))

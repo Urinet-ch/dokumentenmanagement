@@ -75,4 +75,5 @@
     <include file="changesets/142-protokoll-wissen-freischaltung.xml" relativeToChangelogFile="true"/>
     <include file="changesets/143-stapel-datenmodell.xml" relativeToChangelogFile="true"/>
     <include file="changesets/150-quelle.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/151-mail-eingang-herkunft.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

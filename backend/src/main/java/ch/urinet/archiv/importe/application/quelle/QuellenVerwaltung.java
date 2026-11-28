@@ -9,6 +9,8 @@ import ch.urinet.archiv.importe.domain.quelle.Quelle;
 import ch.urinet.archiv.importe.domain.quelle.QuellenStatus;
 import ch.urinet.archiv.importe.domain.quelle.QuellenTyp;
 import ch.urinet.archiv.importe.domain.quelle.Zaehler;
+import ch.urinet.archiv.integration.application.mail.GmailLabelKonfiguration;
+import ch.urinet.archiv.integration.application.mail.GmailLabelKonfigurationLeser;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.Verschluesselung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
@@ -34,6 +36,11 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class QuellenVerwaltung {
 
+    /** Interne Worker-Ansicht; das Passwort wird nie an REST oder Logs ausgegeben. */
+    public record GmailVerbindung(String code, GmailLabelKonfiguration konfiguration, String appPasswort,
+                                  LaufArt art) {
+    }
+
     /** Höchstens so viele Prüfsummen je Abfrage (10.6). */
     public static final int PRUEFSUMMEN_MAX = 1000;
     static final int LAEUFE_MAX = 100;
@@ -43,12 +50,14 @@ public class QuellenVerwaltung {
     private final QuellenRegister register;
     private final Verschluesselung verschluesselung;
     private final MandantAufloesung aufloesung;
+    private final GmailLabelKonfigurationLeser gmailKonfigurationLeser;
 
     public QuellenVerwaltung(QuellenRegister register, Verschluesselung verschluesselung,
-                             MandantAufloesung aufloesung) {
+                             MandantAufloesung aufloesung, GmailLabelKonfigurationLeser gmailKonfigurationLeser) {
         this.register = register;
         this.verschluesselung = verschluesselung;
         this.aufloesung = aufloesung;
+        this.gmailKonfigurationLeser = gmailKonfigurationLeser;
     }
 
     @Transactional
@@ -63,8 +72,12 @@ public class QuellenVerwaltung {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         QuellenTyp quellenTyp = aufzaehlung(QuellenTyp.class, typ);
+        String json = konfiguration == null ? "{}" : konfiguration;
+        if (quellenTyp == QuellenTyp.GMAIL_LABEL) {
+            gmailKonfigurationPruefen(json);
+        }
         if (!register.anlegen(UUID.randomUUID(), code, name.strip(), quellenTyp,
-                konfiguration == null ? "{}" : konfiguration, Optional.ofNullable(bemerkung).filter(b -> !b.isBlank()))) {
+                json, Optional.ofNullable(bemerkung).filter(b -> !b.isBlank()))) {
             throw new FachFehler(Fehlercode.QUELLE_EXISTIERT);
         }
         return quelle(code);
@@ -76,7 +89,10 @@ public class QuellenVerwaltung {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         QuellenStatus neuerStatus = status == null ? null : aufzaehlung(QuellenStatus.class, status);
-        quelle(code);
+        Quelle bestehend = quelle(code);
+        if (konfiguration != null && bestehend.typ() == QuellenTyp.GMAIL_LABEL) {
+            gmailKonfigurationPruefen(konfiguration);
+        }
         return register.aendern(code, version, neuerStatus, bemerkung, konfiguration)
                 .orElseThrow(() -> new FachFehler(Fehlercode.VERSION_KONFLIKT));
     }
@@ -114,6 +130,54 @@ public class QuellenVerwaltung {
             register.laufBeenden(laufend.get().id(), QuellLaufStatus.FERTIG, Optional.empty(), 0, List.of());
         }
         return register.laufAnlegen(quelle.id(), laufArt, benutzer);
+    }
+
+    @Transactional
+    public QuellenTyp typ(String code) {
+        return quelle(code).typ();
+    }
+
+    /**
+     * Lädt Gmail-Konfiguration und Geheimnis ausschliesslich für einen laufenden echten Gmail-Quelllauf.
+     * Der entschlüsselte Wert bleibt innerhalb des Workers.
+     */
+    @Transactional
+    public GmailVerbindung gmailVerbindung(UUID laufId) {
+        QuellLauf lauf = register.lauf(laufId, true)
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        if (lauf.status() != QuellLaufStatus.LAEUFT || lauf.art() == LaufArt.AUTOMATISCH) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        Quelle quelle = register.finde(lauf.quelleCode(), true)
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        if (quelle.typ() != QuellenTyp.GMAIL_LABEL) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        GmailLabelKonfiguration konfiguration;
+        try {
+            konfiguration = gmailKonfigurationLeser.lesen(quelle.konfiguration());
+        } catch (IllegalArgumentException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        byte[] chiffrat = register.geheimnisLaden(quelle.code())
+                .orElseThrow(() -> new FachFehler(Fehlercode.STATUS_KONFLIKT));
+        if (!verschluesselung.verfuegbar()) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        try {
+            String passwort = new String(verschluesselung.entschluesseln(chiffrat, bezug(quelle.code())),
+                    StandardCharsets.UTF_8);
+            return new GmailVerbindung(quelle.code(), konfiguration, passwort, lauf.art());
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+    }
+
+    @Transactional
+    public void gmailFehlerVerbuchen(UUID laufId, int fehler) {
+        if (fehler < 0 || !register.verbuchen(laufId, 0, 0, fehler)) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
     }
 
     /**
@@ -176,6 +240,14 @@ public class QuellenVerwaltung {
 
     private String bezug(String code) {
         return "quelle:" + aufloesung.schema() + ":" + code;
+    }
+
+    private void gmailKonfigurationPruefen(String json) {
+        try {
+            gmailKonfigurationLeser.lesen(json);
+        } catch (IllegalArgumentException e) {
+            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+        }
     }
 
     /** Ein JSON-Objekt als Text; geprüft wird nur die Form, der Inhalt gehört zum Typ der Quelle. */

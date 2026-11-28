@@ -196,11 +196,12 @@ zu den Wellen 27 bis 29.
   - _Anforderungen: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
   - _Abhängig von: 27.1, 29.1_
 
-- [ ] 29.4 Gmail-Import [Backend]
+- [x] 29.4 Gmail-Import [Backend]
   - Quelle `GMAIL_LABEL`, Geheimnis über `Verschluesselung`, Betriebsart «nur lesend» von `ImapPostfach`, Auftrag
     `QUELLLAUF_GMAIL`, Spalte `mail_eingang.herkunft`.
   - GreenMail-Tests: Flags unverändert, zweiter Lauf ohne neue Dokumente, gemeinsame Message-IDs mit dem
     E-Mail-Eingang, Fehlermeldung bei falschem Passwort ohne Passwort im Log.
+  - Erledigt 28.11.2026; Szenarien `@req-7.1` bis `@req-7.8`, Umsetzung in design.md.
   - _Anforderungen: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8_
   - _Abhängig von: 27.6_
 

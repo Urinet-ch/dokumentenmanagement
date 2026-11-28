@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="151-mail-eingang-herkunft" author="archiv">
+        <sql>
+            alter table mail_eingang add column herkunft text not null default 'POSTFACH'
+                constraint mail_eingang_herkunft_ck check (herkunft in ('POSTFACH', 'GMAIL_LABEL'))
+        </sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                do $$
+                begin
+                    if exists (select 1 from mail_eingang where herkunft = 'GMAIL_LABEL') then
+                        raise exception 'Rollback 151-mail-eingang-herkunft nur vor Gmail-Nachrichten';
+                    end if;
+                end
+                $$
+            ]]></sql>
+            <dropColumn tableName="mail_eingang" columnName="herkunft"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

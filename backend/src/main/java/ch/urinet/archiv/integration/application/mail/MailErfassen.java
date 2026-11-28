@@ -4,12 +4,14 @@ import ch.urinet.archiv.dokument.application.DokumentErfassen;
 import ch.urinet.archiv.dokument.application.Typerkennung;
 import ch.urinet.archiv.dokument.application.UploadAnfrage;
 import ch.urinet.archiv.dokument.domain.DateiName;
+import ch.urinet.archiv.dokument.domain.Dateityp;
 import ch.urinet.archiv.dokument.domain.UploadErgebnis;
 import ch.urinet.archiv.integration.application.mail.PostfachPort.Anhang;
 import ch.urinet.archiv.integration.application.mail.PostfachPort.Nachricht;
 import ch.urinet.archiv.integration.application.mail.PostfachPort.Ziel;
 import ch.urinet.archiv.integration.domain.mail.MailHinweis;
 import ch.urinet.archiv.integration.domain.mail.MailKopf;
+import ch.urinet.archiv.integration.domain.mail.MailHerkunft;
 import ch.urinet.archiv.integration.domain.mail.MailStatus;
 import ch.urinet.archiv.integration.domain.mail.Zulassungsliste;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -88,7 +90,7 @@ public class MailErfassen {
             LOG.infof("Mail aus der Quarantäne neu geprüft: mandant=%s nachricht=%s", mandant.wert(), kurz);
         } else {
             MailStatus status = zugelassen ? MailStatus.ERFASST : MailStatus.QUARANTAENE;
-            if (!register.eintragen(mandant, id, absender, betreff, status)) {
+            if (!register.eintragen(mandant, id, absender, betreff, status, MailHerkunft.POSTFACH)) {
                 // gleichzeitig von einem anderen Lauf eingetragen; der Status steht erst nach dessen Commit fest
                 throw new IllegalStateException("Nachricht wird gleichzeitig verarbeitet");
             }
@@ -131,14 +133,104 @@ public class MailErfassen {
         return Ziel.ARCHIVIERT;
     }
 
+    /**
+     * Erfasst eine Gmail-Nachricht über denselben Dokumentpfad wie den E-Mail-Eingang. Die Message-ID ist mandantenweit
+     * eindeutig; eine bereits bekannte Nachricht erzeugt nichts. Pro Anhang wird genau ein Zähler verbucht.
+     */
+    @Transactional
+    public GmailErgebnis erfassenGmail(MandantCode mandant, Nachricht nachricht, boolean ohneAnhang) {
+        String id = MailKopf.messageId(nachricht.messageId())
+                .orElseThrow(() -> new IllegalArgumentException("Nachricht ohne Message-ID"));
+        int gefunden = Math.max(1, nachricht.anhaenge().size());
+        Optional<String> absender = MailKopf.wert(nachricht.absender(), MailKopf.MAX_ABSENDER);
+        Optional<String> betreff = MailKopf.wert(nachricht.betreff(), MailKopf.MAX_BETREFF);
+        String kurz = kurzform(id);
+        if (register.status(mandant, id).isPresent()) {
+            LOG.infof("Gmail-Import: Nachricht schon verarbeitet, mandant=%s nachricht=%s", mandant.wert(), kurz);
+            return new GmailErgebnis(gefunden, 0, 0, gefunden, 0, List.of());
+        }
+        if (!register.eintragen(mandant, id, absender, betreff, MailStatus.ERFASST, MailHerkunft.GMAIL_LABEL)) {
+            throw new IllegalStateException("Nachricht wird gleichzeitig verarbeitet");
+        }
+
+        String hinweis = MailHinweis.text(nachricht.absender(), nachricht.betreff(), nachricht.datum());
+        List<UploadAnfrage.Seite> seiten = new ArrayList<>();
+        int uebersprungen = 0;
+        int fehler = 0;
+        if (nachricht.anhaenge().isEmpty()) {
+            if (ohneAnhang) {
+                UploadErgebnis korrespondenz = korrespondenz(nachricht, hinweis,
+                        DokumentErfassen.QUELLE_GMAIL);
+                if (korrespondenz instanceof UploadErgebnis.Angenommen angenommen) {
+                    register.dokumenteSetzen(mandant, id, List.of(angenommen.id()));
+                    return new GmailErgebnis(1, 1, 0, 0, 0, List.of(angenommen.id()));
+                }
+                if (korrespondenz instanceof UploadErgebnis.Dublette) {
+                    register.dokumenteSetzen(mandant, id, List.of());
+                    return new GmailErgebnis(1, 0, 1, 0, 0, List.of());
+                }
+                register.dokumenteSetzen(mandant, id, List.of());
+                return new GmailErgebnis(1, 0, 0, 0, 1, List.of());
+            }
+            uebersprungen = 1;
+        } else {
+            for (Anhang anhang : nachricht.anhaenge()) {
+                Optional<Dateityp> typ = typerkennung.erkennen(anhang.datei());
+                if (typ.isEmpty()) {
+                    uebersprungen++;
+                    continue;
+                }
+                if (typ.get() != Dateityp.PDF) {
+                    try {
+                        if (Files.size(anhang.datei()) < 20 * 1024) {
+                            uebersprungen++;
+                            continue;
+                        }
+                    } catch (IOException e) {
+                        fehler++;
+                        continue;
+                    }
+                }
+                seiten.add(new UploadAnfrage.Seite(anhang.datei(), name(anhang), Optional.empty()));
+            }
+        }
+
+        List<UUID> neu = new ArrayList<>();
+        int dubletten = 0;
+        if (!seiten.isEmpty()) {
+            UploadAnfrage.Erfasser gmail = new UploadAnfrage.Erfasser("gmail-import", Optional.empty(),
+                    DokumentErfassen.QUELLE_GMAIL);
+            for (UploadErgebnis ergebnis : dokumente.imKontextErfassen(new UploadAnfrage(seiten, false,
+                    Optional.of(hinweis), gmail))) {
+                switch (ergebnis) {
+                    case UploadErgebnis.Angenommen angenommen -> neu.add(angenommen.id());
+                    case UploadErgebnis.Dublette ignored -> dubletten++;
+                    case UploadErgebnis.Abgelehnt ignored -> fehler++;
+                }
+            }
+        }
+        register.dokumenteSetzen(mandant, id, neu);
+        return new GmailErgebnis(gefunden, neu.size(), dubletten, uebersprungen, fehler, List.copyOf(neu));
+    }
+
+    public record GmailErgebnis(int gefunden, int neu, int dublettePruefsumme, int uebersprungen, int fehler,
+                                List<UUID> dokumente) {
+    }
+
     /** Req 1.3: die Nachricht als «Korrespondenz», {@code .eml} und PDF aus dem Text. */
     private Optional<UUID> korrespondenz(Nachricht nachricht, String hinweis) {
+        UploadErgebnis ergebnis = korrespondenz(nachricht, hinweis, DokumentErfassen.QUELLE_EMAIL);
+        return ergebnis instanceof UploadErgebnis.Angenommen angenommen ? Optional.of(angenommen.id())
+                : Optional.empty();
+    }
+
+    private UploadErgebnis korrespondenz(Nachricht nachricht, String hinweis, String quelle) {
         Path datei = nachricht.eml().resolveSibling("text-" + UUID.randomUUID() + ".pdf");
         try {
             pdf.erzeugen(kopf(nachricht), nachricht.text(), datei);
             UploadErgebnis ergebnis = dokumente.korrespondenzErfassen(nachricht.eml(), datei, Optional.of(hinweis),
-                    ERFASSER);
-            return ergebnis instanceof UploadErgebnis.Angenommen a ? Optional.of(a.id()) : Optional.empty();
+                    ERFASSER, quelle);
+            return ergebnis;
         } finally {
             try {
                 Files.deleteIfExists(datei);

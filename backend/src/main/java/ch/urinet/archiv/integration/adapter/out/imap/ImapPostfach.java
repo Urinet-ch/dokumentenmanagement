@@ -9,6 +9,7 @@ import io.quarkus.runtime.configuration.MemorySize;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
 import jakarta.inject.Inject;
+import jakarta.mail.AuthenticationFailedException;
 import jakarta.mail.FetchProfile;
 import jakarta.mail.Flags;
 import jakarta.mail.Folder;
@@ -19,6 +20,8 @@ import jakarta.mail.Session;
 import jakarta.mail.Store;
 import jakarta.mail.StoreClosedException;
 import jakarta.mail.UIDFolder;
+import jakarta.mail.search.ComparisonTerm;
+import jakarta.mail.search.ReceivedDateTerm;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.util.SharedFileInputStream;
 import org.eclipse.angus.mail.imap.IMAPFolder;
@@ -48,6 +51,8 @@ import java.security.cert.CertificateFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -126,6 +131,7 @@ public class ImapPostfach implements PostfachPort {
         } catch (RuntimeException e) {
             throw new PostfachNichtErreichbar("TLS-Einstellungen", e);
         }
+
         Store store;
         try {
             store = session.getStore("imaps");
@@ -205,6 +211,79 @@ public class ImapPostfach implements PostfachPort {
         } catch (MessagingException e) {
             throw new PostfachNichtErreichbar("Ordner", e);
         } finally {
+            schliessen(store);
+        }
+    }
+
+    /**
+     * Liest ein Gmail-Label nur lesend (Spec 09, Req 7.2). Der Ordner wird weder angelegt noch abonniert, wird
+     * ausschliesslich mit {@code READ_ONLY} geöffnet und beim Schliessen nie expunged.
+     */
+    @Override
+    public Abruf abrufenNurLesend(Postfach postfach, String passwort, String label, LocalDate seit, int max,
+                                  Verarbeiter verarbeiter) {
+        if (max < 1) {
+            throw new IllegalArgumentException("max muss mindestens 1 sein");
+        }
+        Session session;
+        try {
+            session = Session.getInstance(eigenschaften(true));
+        } catch (RuntimeException e) {
+            throw new PostfachNichtErreichbar("TLS-Einstellungen", e);
+        }
+        Store store;
+        try {
+            store = session.getStore("imaps");
+            store.connect(postfach.host(), postfach.port(), postfach.benutzer(), passwort);
+        } catch (AuthenticationFailedException e) {
+            throw new PostfachNichtErreichbar("Anmeldung", e);
+        } catch (MessagingException e) {
+            throw new PostfachNichtErreichbar("Verbindung", e);
+        }
+        Folder ordner = null;
+        boolean geoeffnet = false;
+        try {
+            ordner = store.getFolder(label);
+            if (!ordner.exists()) {
+                throw new MessagingException("IMAP-Label nicht gefunden");
+            }
+            ordner.open(Folder.READ_ONLY);
+            geoeffnet = true;
+            Date ab = Date.from(seit.atStartOfDay(ZoneOffset.UTC).toInstant());
+            Message[] nachrichten = ordner.search(new ReceivedDateTerm(ComparisonTerm.GE, ab));
+            FetchProfile profil = new FetchProfile();
+            profil.add(FetchProfile.Item.SIZE);
+            profil.add(UIDFolder.FetchProfileItem.UID);
+            ordner.fetch(nachrichten, profil);
+            int verarbeitet = 0;
+            int gescheitert = 0;
+            for (Message nachricht : nachrichten) {
+                if (verarbeitet + gescheitert >= max) {
+                    break;
+                }
+                try {
+                    verarbeiten(session, nachricht, verarbeiter);
+                    verarbeitet++;
+                } catch (FolderClosedException | StoreClosedException e) {
+                    throw new PostfachNichtErreichbar("Verbindung", e);
+                } catch (Exception e) {
+                    gescheitert++;
+                    LOG.warnf("Gmail-Import: Nachricht nicht verarbeitet, ursache=%s", e.getClass().getName());
+                }
+            }
+            return new Abruf(verarbeitet, gescheitert);
+        } catch (PostfachNichtErreichbar e) {
+            throw e;
+        } catch (MessagingException e) {
+            throw new PostfachNichtErreichbar("Ordner", e);
+        } finally {
+            if (geoeffnet && ordner != null) {
+                try {
+                    ordner.close(false);
+                } catch (MessagingException e) {
+                    LOG.debugf("Gmail-Import: Label nicht sauber geschlossen (%s)", e.getClass().getName());
+                }
+            }
             schliessen(store);
         }
     }
@@ -318,6 +397,10 @@ public class ImapPostfach implements PostfachPort {
     }
 
     private Properties eigenschaften() {
+        return eigenschaften(false);
+    }
+
+    private Properties eigenschaften(boolean nurLesend) {
         String ms = Long.toString(zeitgrenze.toMillis());
         Properties p = new Properties();
         p.put("mail.store.protocol", "imaps");
@@ -326,6 +409,9 @@ public class ImapPostfach implements PostfachPort {
         p.put("mail.imaps.connectiontimeout", ms);
         p.put("mail.imaps.timeout", ms);
         p.put("mail.imaps.writetimeout", ms);
+        if (nurLesend) {
+            p.put("mail.imaps.peek", "true");
+        }
         caDatei.ifPresent(datei -> p.put("mail.imaps.ssl.socketFactory", socketFactory(datei)));
         return p;
     }

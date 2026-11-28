@@ -319,7 +319,24 @@ Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderu
 - Konfiguration der Quelle: `{"host":"imap.gmail.com","port":993,"benutzer":"<gmail-konto>","label":"<gmail-label>","seit":"2026-01-01","ohneAnhang":false,"maxJeLauf":500}`; App-Passwort in `quelle.geheimnis` über `Verschluesselung` (wie `integration_mail.passwort_verschluesselt`).
 - `ImapPostfach` erhält eine Betriebsart nur lesend: `Folder.open(Folder.READ_ONLY)`, Inhalte über `BODY.PEEK`, kein `copy`, kein `setFlags`, kein Verschieben (7.2). Der Test prüft die Flags vorher und nachher.
 - Je Nachricht: Message-ID gegen `mail_eingang` (neue Spalte `herkunft` `POSTFACH|GMAIL_LABEL`), Anhänge filtern, Erfassung über `MailErfassen` mit Quelle `GMAIL`; Absender, Betreff, Datum als Hinweis wie D7.
-- Auftrag `QUELLLAUF_GMAIL` mit Zeitgrenze und `maxJeLauf`; Netzwerkfehler → Lauf `ABGEBROCHEN`, ein neuer Lauf setzt dank Message-ID ohne Dubletten fort.
+- Auftrag `QUELLLAUF_GMAIL` mit Zeitgrenze `archiv.auftrag.zeitgrenze.QUELLLAUF_GMAIL` (15 min) und `maxJeLauf`; Netzwerkfehler → Lauf `ABGEBROCHEN`; ein neuer Lauf setzt dank Message-ID ohne Dubletten fort.
+
+#### Umsetzung (Aufgabe 29.4, 28.11.2026)
+- `GmailLabelKonfiguration` validiert Quelle, Startdatum und Laufgrenze; `quelle.geheimnis` speichert das App-Passwort über
+  `Verschluesselung` mit mandantenspezifischem Bezug. Nur der Worker entschlüsselt es; Antworten und Logs enthalten es nicht.
+- `GmailQuelllaufStarten` reiht `QUELLLAUF_GMAIL` ein. `GmailImportHandler` liest das Label über
+  `ImapPostfach.abrufenNurLesend`; der Ordner ist `READ_ONLY`, Abrufe verwenden `BODY.PEEK`, das Schliessen expungiert
+  nicht, und es gibt keinen Aufruf zum Anlegen, Abonnieren, Verschieben oder Markieren.
+- `MailErfassen.erfassenGmail` verwendet `mail_eingang` für gemeinsame Message-ID-Deduplizierung mit dem normalen
+  E-Mail-Eingang. Unterstützte Anhänge gehen einzeln über `DokumentErfassen`, kleine Bilder und unbekannte Typen
+  werden im Quelllauf übersprungen; Korrespondenz ohne Anhang ist optional.
+- Der JSON-Adapter liest die Quellkonfiguration ausserhalb der Anwendungslogik. Changeset 151 ergänzt `herkunft`
+  rückwärtskompatibel mit Standard `POSTFACH`; sein Rollback wird abgebrochen, sobald Gmail-Nachrichten die Herkunft
+  `GMAIL_LABEL` verwenden.
+- Nachweise: `quellen.feature` (`@req-7.1` bis `@req-7.8`), `ImapPostfachTest` (GreenMail: Flags, Grenzen,
+  falsches Passwort), `MailErfassenGmailTest` (Anhänge, Hinweis, Korrespondenz und Deduplizierung),
+  `GmailImportHandlerTest` (sicherer Anmeldefehler und abgebrochener Trockenlauf), `JdbcQuellenRegisterTest`
+  (Mandantentrennung und Herkunftsspalte).
 
 ### 7. Mac-Eingang (`tools/drive_import`, Betriebsart `eingang`)
 - Das Drive-Import-Werkzeug hat Token-Datei (`TokenDatei`), Client mit Wiederholung bei 429/503 und Ordner-Hinweis schon; der Mac-Eingang wird ein Unterbefehl desselben Jars statt eines neuen Werkzeugs: `eingang einrichten` (Ordner anlegen, launchd-Plist schreiben), `eingang starten` (von launchd aufgerufen), `eingang status`.
@@ -462,7 +479,7 @@ Einstellungen» ein.
 | stapel.leer-rand | 0.05 | Rand der Leerseiten-Prüfung |
 | stapel.leer-schwelle | 0.005 | Standard; je Mandant als Einstellung der Klasse (a) in Spec 06 (4.2) |
 | dublette.simhash-abstand | 3 | Schwelle MOEGLICH |
-| quelle.gmail.zeitgrenze | 15m | Zeitgrenze eines Laufs |
+| auftrag.zeitgrenze.QUELLLAUF_GMAIL | 15m | Zeitgrenze eines Gmail-Quelllaufs |
 | qualitaet.aktiv | false | Option Q3 |
 
 Dienst `sftp` (eigene Konfiguration, nicht im Backend): Port im Container, Benutzerwurzel, Sperre je Quelladresse,

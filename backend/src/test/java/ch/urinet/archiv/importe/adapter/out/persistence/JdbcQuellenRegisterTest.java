@@ -61,6 +61,14 @@ class JdbcQuellenRegisterTest {
 
             assertThat(in(thread, "vhf-gsk", () -> register.anlegen(UUID.randomUUID(), code, "Probe", QuellenTyp.ORDNER,
                     "{}", Optional.empty()))).isTrue();
+            byte[] chiffrat = {11, 22, 33};
+            in(thread, "vhf-gsk", () -> {
+                register.geheimnisSetzen(code, chiffrat);
+                return null;
+            });
+            assertThat(in(thread, "vhf-gsk", () -> register.geheimnisLaden(code)).orElseThrow())
+                    .containsExactly(chiffrat);
+            assertThat(in(thread, "urinet", () -> register.geheimnisLaden(code))).isEmpty();
             assertThat(in(thread, "urinet", () -> register.finde(code, false))).isEmpty();
             assertThat(in(thread, "vhf-gsk", () -> register.anlegen(UUID.randomUUID(), code, "Doppelt",
                     QuellenTyp.ORDNER, "{}", Optional.empty()))).isFalse();

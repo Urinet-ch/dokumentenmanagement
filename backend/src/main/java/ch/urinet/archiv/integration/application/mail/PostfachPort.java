@@ -4,6 +4,7 @@ import ch.urinet.archiv.integration.domain.mail.Postfach;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -18,6 +19,15 @@ public interface PostfachPort {
 
     /** @throws PostfachNichtErreichbar wenn Verbindung, Anmeldung oder Ordner scheitern */
     Abruf abrufen(Postfach postfach, String passwort, int max, Verarbeiter verarbeiter);
+
+    /**
+     * Liest ein Label ab einem Datum, ohne Ordner- oder Nachrichtenstatus zu verändern (Spec 09, Req 7.2).
+     * Adapter ohne diese Betriebsart unterstützen keinen Gmail-Import.
+     */
+    default Abruf abrufenNurLesend(Postfach postfach, String passwort, String label, LocalDate seit, int max,
+                                   Verarbeiter verarbeiter) {
+        throw new UnsupportedOperationException("Nur lesender IMAP-Abruf ist nicht verfügbar");
+    }
 
     @FunctionalInterface
     interface Verarbeiter {

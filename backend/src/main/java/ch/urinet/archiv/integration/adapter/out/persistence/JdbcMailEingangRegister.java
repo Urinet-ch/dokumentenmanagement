@@ -1,6 +1,7 @@
 package ch.urinet.archiv.integration.adapter.out.persistence;
 
 import ch.urinet.archiv.integration.application.mail.MailEingangRegister;
+import ch.urinet.archiv.integration.domain.mail.MailHerkunft;
 import ch.urinet.archiv.integration.domain.mail.MailStatus;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
@@ -44,14 +45,15 @@ public class JdbcMailEingangRegister implements MailEingangRegister {
 
     @Override
     public boolean eintragen(MandantCode mandant, String messageId, Optional<String> absender,
-                             Optional<String> betreff, MailStatus status) {
+                             Optional<String> betreff, MailStatus status, MailHerkunft herkunft) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement neu =
                 verbindung.prepareStatement("insert into " + tabelle(mandant) + " (message_id, absender, betreff, "
-                        + "status) values (?, ?, ?, ?) on conflict (message_id) do nothing")) {
+                        + "status, herkunft) values (?, ?, ?, ?, ?) on conflict (message_id) do nothing")) {
             neu.setString(1, messageId);
             neu.setString(2, absender.orElse(null));
             neu.setString(3, betreff.orElse(null));
             neu.setString(4, status.name());
+            neu.setString(5, herkunft.name());
             return neu.executeUpdate() == 1;
         } catch (SQLException e) {
             throw JdbcMailKonfiguration.fehler("Mail-Eingang nicht eingetragen", e);
