@@ -1,6 +1,7 @@
 package ch.urinet.archiv.dokument.adapter.in.rest;
 
 import ch.urinet.archiv.dokument.application.DokumentErfassen;
+import ch.urinet.archiv.importe.application.quelle.QuellLaufZuordnung;
 import ch.urinet.archiv.dokument.application.UploadAnfrage;
 import ch.urinet.archiv.dokument.domain.DateiName;
 import ch.urinet.archiv.dokument.domain.UploadErgebnis;
@@ -69,12 +70,15 @@ public class DokumentUploadResource {
     static final String QUELLE_HANDY = DokumentErfassen.QUELLE_SCAN;
 
     private final DokumentErfassen erfassen;
+    private final QuellLaufZuordnung quellLaeufe;
     private final SecurityIdentity identitaet;
     private final ObjectMapper json;
 
     @Inject
-    public DokumentUploadResource(DokumentErfassen erfassen, SecurityIdentity identitaet, ObjectMapper json) {
+    public DokumentUploadResource(DokumentErfassen erfassen, QuellLaufZuordnung quellLaeufe,
+                                  SecurityIdentity identitaet, ObjectMapper json) {
         this.erfassen = erfassen;
+        this.quellLaeufe = quellLaeufe;
         this.identitaet = identitaet;
         this.json = json;
     }
@@ -111,7 +115,8 @@ public class DokumentUploadResource {
                     + "Für unbestätigte Importe können «art» und «klassifikationen» als JSON-Objekt mit Codes "
                     + "übergeben werden; Werte werden nach Req 3.5 geprüft. "
                     + "Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und "
-                    + "der Erweiterung «ergebnisse».")
+                    + "der Erweiterung «ergebnisse». Werkzeuge mit Token vom Scope import ordnen die Dateien mit "
+                    + "«quelllauf» (ID) oder «quelle» (Code) einem Quelllauf zu (Spec 09, 10.4).")
     @APIResponse(responseCode = "202", description = "Mindestens eine Datei angenommen oder als Dublette erkannt",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(type = SchemaType.ARRAY, implementation = UploadErgebnisDto.class)))
@@ -119,6 +124,8 @@ public class DokumentUploadResource {
             + "Arbeitsfassungen passt nicht) oder alle Dateien abgelehnt, erste mit Steuerzeichen im Namen")
     @APIResponse(responseCode = "413", description = "Anfrage über archiv.upload.max-anfrage oder alle Dateien "
             + "abgelehnt, erste über 50 MB")
+    @APIResponse(responseCode = "409", description = "STATUS_KONFLIKT: Quelllauf beendet oder Trockenlauf; "
+            + "QUELLE_LAEUFT: Quelle im Trockenlauf; nichts wurde angelegt")
     @APIResponse(responseCode = "415", description = "Alle Dateien abgelehnt, erste mit unbekanntem Typ")
     @APIResponse(responseCode = "422", description = "Alle Dateien abgelehnt, erste leer oder beschädigt")
     @APIResponse(responseCode = "503", description = "Speicher nicht erreichbar; nichts wurde angelegt",
@@ -129,9 +136,14 @@ public class DokumentUploadResource {
                               @RestForm("hinweis") String hinweis,
                               @RestForm("art") String art,
                               @RestForm("klassifikationen") String klassifikationen,
+                              @RestForm("quelle") String quelle,
+                              @RestForm("quelllauf") String quelllauf,
                               @Parameter(hidden = true) MultipartFormDataInput formular) {
+        Optional<QuellLaufZuordnung.Ziel> ziel = quellLauf(quelle, quelllauf);
         List<UploadErgebnis> ergebnisse = new ArrayList<>(erfassen(dateien, arbeitsfassungen, zusammenfassen,
                 hinweis, art, klassifikationen, formular));
+        ziel.ifPresent(z -> quellLaeufe.verbuchen(z, ergebnisse.stream().map(DokumentUploadResource::eintrag)
+                .toList()));
         List<UploadErgebnisDto> antwort = ergebnisse.stream().map(DokumentUploadResource::dto).toList();
         if (ergebnisse.stream().allMatch(UploadErgebnis.Abgelehnt.class::isInstance)) {
             Fehlercode erster = ((UploadErgebnis.Abgelehnt) ergebnisse.getFirst()).fehler();
@@ -227,6 +239,29 @@ public class DokumentUploadResource {
         }
         return new UploadAnfrage.Erfasser(id, Optional.of(DokumentResource.benutzer(identitaet)),
                 mitArbeitsfassung ? QUELLE_HANDY : DokumentErfassen.QUELLE_UPLOAD);
+    }
+
+    /**
+     * Quelllauf der Anfrage (Spec 09, 10.4, 10.7); die Felder setzen nur Werkzeuge mit einem Token (Scope
+     * {@code import}), für angemeldete Benutzer setzt die Web-App keinen Lauf: dann 400.
+     */
+    private Optional<QuellLaufZuordnung.Ziel> quellLauf(String quelle, String quelllauf) {
+        boolean gesetzt = (quelle != null && !quelle.isBlank()) || (quelllauf != null && !quelllauf.isBlank());
+        if (gesetzt && identitaet.getAttribute(TokenIdentitaet.SCOPE) == null) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        return quellLaeufe.bestimmen(quelle, quelllauf);
+    }
+
+    private static QuellLaufZuordnung.Eintrag eintrag(UploadErgebnis ergebnis) {
+        return switch (ergebnis) {
+            case UploadErgebnis.Angenommen a ->
+                    new QuellLaufZuordnung.Eintrag(QuellLaufZuordnung.Ergebnis.NEU, Optional.of(a.id()));
+            case UploadErgebnis.Dublette d ->
+                    new QuellLaufZuordnung.Eintrag(QuellLaufZuordnung.Ergebnis.DUBLETTE, Optional.empty());
+            case UploadErgebnis.Abgelehnt a ->
+                    new QuellLaufZuordnung.Eintrag(QuellLaufZuordnung.Ergebnis.ABGELEHNT, Optional.empty());
+        };
     }
 
     static UploadErgebnisDto dto(UploadErgebnis ergebnis) {

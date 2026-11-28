@@ -282,6 +282,39 @@ Umsetzung (Aufgabe 27.5, 28.11.2026):
 `EndpunktWaechterTest` erlaubt `@ErlaubtScope` heute nur an `POST` mit A1 auf dem Pfad des Scopes; die
 Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderung Spec 01, design.md).
 
+#### Umsetzung (Aufgabe 27.6, 28.11.2026)
+- Fachbereich `importe/` mit eigenen Unterpaketen `domain/quelle`, `application/quelle` (`QuellenVerwaltung`,
+  `QuellLaufZuordnung`, Port `QuellenRegister`), `adapter/out/persistence/JdbcQuellenRegister`,
+  `adapter/in/rest/QuellenResource` und `PruefsummenResource`. Changeset `150-quelle` (Nummer mit Abstand, weil
+  parallel weitere Changesets entstehen): Tabellen `quelle`, `quelle_lauf`, Spalte `dokument.quelle_lauf_id`,
+  `dokument_quelle_ck` mit `GMAIL` und `ORDNER`, Seed der sechs allgemeinen Quellen nur für `m_urinet`.
+- Höchstens ein laufender Lauf je Quelle (eindeutiger Teilindex `status = 'LAEUFT'`); der Check
+  `quelle_lauf_zaehler_ck` erzwingt `gefunden = neu + dublette_pruefsumme + uebersprungen + fehler` in der Datenbank.
+  Läuft ein Trocken- oder echter Lauf, gibt der Start 409 `QUELLE_LAEUFT`; ein automatischer Lauf endet beim Start
+  eines echten Laufs und am Folgetag (Europe/Zurich) beim nächsten Upload.
+- Upload: `quelllauf` oder `quelle` nur mit Token (Scope `import`), sonst 400; ein Trockenlauf oder beendeter Lauf
+  gibt 409 `STATUS_KONFLIKT`, eine Quelle im Trockenlauf 409 `QUELLE_LAEUFT`; nichts wird angelegt. Gezählt wird im
+  selben Upload: neu, Dublette nach Prüfsumme, abgelehnt als Fehler; neue Dokumente erhalten `quelle_lauf_id` und bei
+  `MAC_EINGANG` und `ORDNER` die Quelle `ORDNER`, bei `GMAIL_LABEL` `GMAIL`.
+- Abschluss: Beim Trockenlauf meldet das Werkzeug alle Zähler (sie müssen aufgehen, ohne fachliche Dubletten), beim
+  echten Lauf zählt der Server und das Werkzeug ergänzt nur übersprungene Dateien und Meldungen.
+- Prüfsummen-Abfrage: A1 und Scope `import`, höchstens 1'000, nur nicht verworfene Originale nicht verworfener
+  Dokumente, Antwort nur `vorhanden` ohne IDs; Stapel (10.6) kommen verbindlich mit Aufgabe 28.1 dazu. Ein Benutzer
+  erfährt nur von Dokumenten, die er sieht (dasselbe Prädikat `SichtregelSql` wie Suche und Listen, also auch
+  `PERSONAL` und unbestätigte nach Spec 01, 2.21): Sonst verriete die Antwort einem `mitarbeiter`, dass ein
+  vertrauliches Dokument mit dieser Datei existiert (Nachtrag aus dem Review). Das Import-Token fragt ohne Sichtfilter,
+  weil nur der Inhaber es anlegt (A14) und der Inhaber alle Dokumente sieht.
+- Nebenläufigkeit: Der Upload sperrt den Lauf (`for update`) bis zu seinem Commit; der Abschluss wartet darauf und
+  zählt den Upload mit, ein späterer Upload erhält 409 `STATUS_KONFLIKT`. `verbuchen` zählt zudem nur, solange der
+  Lauf `LAEUFT` (Nachtrag aus dem Review, Test `QuellLaufWettlaufTest`).
+- Rückfall: Das Rollback von `150-quelle` gilt nur vor der ersten Nutzung und bricht sonst über eine Wache ab; was
+  ein Image vor 27.6 auf dem neueren Schema bedeutet, steht in `docs/betrieb/deploy-rollback.md`. Kein Eintrag `ERFASSEN`
+  (es entsteht nichts); `EndpunktWaechterTest` führt die drei Ausnahmen des Scopes in `IMPORT_AUSNAHMEN`.
+- Protokoll: Änderungen am Register und Start und Abschluss von Läufen als `KONFIGURATION_AENDERN` ohne Details;
+  eigene Aktionen `QUELLE_*` bräuchten eine Änderung von `zugriff_protokoll_aktion_ck`, die parallel auch andere
+  Aufgaben ändern, und folgen bei Bedarf. Neue Fehlercodes `QUELLE_LAEUFT` und `QUELLE_EXISTIERT` (409); keine neuen
+  Konfigurationsschlüssel. Die Lauf-Art `GMAIL_LABEL` startet noch keinen Worker (Aufgabe 29.4, Gmail-Import).
+
 ### 6. Gmail-Import (`integration/`, Quelllauf in `importe/`)
 - Konfiguration der Quelle: `{"host":"imap.gmail.com","port":993,"benutzer":"<gmail-konto>","label":"<gmail-label>","seit":"2026-01-01","ohneAnhang":false,"maxJeLauf":500}`; App-Passwort in `quelle.geheimnis` über `Verschluesselung` (wie `integration_mail.passwort_verschluesselt`).
 - `ImapPostfach` erhält eine Betriebsart nur lesend: `Folder.open(Folder.READ_ONLY)`, Inhalte über `BODY.PEEK`, kein `copy`, kein `setFlags`, kein Verschieben (7.2). Der Test prüft die Flags vorher und nachher.

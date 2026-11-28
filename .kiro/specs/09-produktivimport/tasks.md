@@ -70,7 +70,7 @@ zu den Wellen 27 bis 29.
   - Unit-Test: QR-Inhalte inklusive URL-Kodierung von Umlauten; Szenario für `TRENNBLATT_UNGUELTIG`.
   - _Anforderungen: 6.1, 6.2, 6.3, 6.5_
 
-- [ ] 27.6 Quellenregister, Quellläufe und Prüfsummen-Abfrage [Backend]
+- [x] 27.6 Quellenregister, Quellläufe und Prüfsummen-Abfrage [Backend]
   - Changesets `quelle`, `quelle_lauf`, Spalte `dokument.quelle_lauf_id`, `dokument_quelle_ck` mit `GMAIL` und
     `ORDNER`; Seed der allgemeinen Quellen für `urinet` (ohne Zugang, ohne Geschäftsangaben).
   - Endpunkte nach design.md, Abschnitt 5, inklusive `POST /api/v1/dokumente/pruefsummen`; Formularfelder
@@ -83,7 +83,10 @@ zu den Wellen 27 bis 29.
 ## Welle 28 — Scan-Eingang und Stapelverarbeitung
 - [ ] 28.1 Datenmodell Stapel [Backend]
   - Changesets `stapel`, `stapel_seite`, Spalten `dokument.stapel_id`, `stapel_von`, `stapel_bis`; Auftragstypen.
-  - _Anforderungen: 5.1, 5.2_
+  - Verbindlich (10.6): Die Prüfsummen-Abfrage aus 27.6 (`JdbcQuellenRegister.vorhandenePruefsummen`) meldet auch
+    die SHA-256 nicht verworfener Stapel-Originale; für Benutzer nur Stapel, die sie sehen dürfen (Sichtregel mit
+    dieser Aufgabe festlegen, Vorgabe wie bei Dokumenten), für das Import-Token alle. Szenario dazu unter `@req-10.6`.
+  - _Anforderungen: 5.1, 5.2, 10.6_
 
 - [ ] 28.2 Dienst `sftp` vollständig [Backend]
   - Ausbau des Prototyps nach dem Spike: Rechte nach 1.4 im Accessor, Sperre je Quelladresse, Sitzungs- und
