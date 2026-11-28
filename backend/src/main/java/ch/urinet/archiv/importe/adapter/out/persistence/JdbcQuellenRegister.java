@@ -169,11 +169,11 @@ public class JdbcQuellenRegister implements QuellenRegister {
     }
 
     @Override
-    public boolean verbuchen(UUID laufId, int neu, int duplettePruefsumme, int fehler) {
+    public boolean verbuchen(UUID laufId, int neu, int dublettePruefsumme, int fehler) {
         return ausfuehren("update " + schema() + ".quelle_lauf set gefunden = gefunden + ?, neu = neu + ?, "
                 + "dublette_pruefsumme = dublette_pruefsumme + ?, fehler = fehler + ? where id = ? "
                 + "and status = 'LAEUFT'",
-                List.of(neu + duplettePruefsumme + fehler, neu, duplettePruefsumme, fehler, laufId)) == 1;
+                List.of(neu + dublettePruefsumme + fehler, neu, dublettePruefsumme, fehler, laufId)) == 1;
     }
 
     @Override

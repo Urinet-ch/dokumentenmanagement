@@ -3304,12 +3304,12 @@ components:
           - ECHT
     Quellzaehler:
       type: object
-      description: "Zähler eines Quelllaufs (Spec 09, 10.3); gefunden = neu + duplettePruefsumme\
+      description: "Zähler eines Quelllaufs (Spec 09, 10.3); gefunden = neu + dublettePruefsumme\
         \ + uebersprungen + fehler"
       required:
       - gefunden
       - neu
-      - duplettePruefsumme
+      - dublettePruefsumme
       - dubletteFachlich
       - uebersprungen
       - fehler
@@ -3320,7 +3320,7 @@ components:
         neu:
           type: integer
           format: int32
-        duplettePruefsumme:
+        dublettePruefsumme:
           type: integer
           format: int32
         dubletteFachlich:

@@ -68,9 +68,9 @@ public class QuellenResource {
     }
 
     @Schema(name = "Quellzaehler", description = "Zähler eines Quelllaufs (Spec 09, 10.3); gefunden = neu + "
-            + "duplettePruefsumme + uebersprungen + fehler")
+            + "dublettePruefsumme + uebersprungen + fehler")
     public record ZaehlerDto(@Schema(required = true) int gefunden, @Schema(required = true) int neu,
-                             @Schema(required = true) int duplettePruefsumme,
+                             @Schema(required = true) int dublettePruefsumme,
                              @Schema(required = true, description = "im Trockenlauf immer 0") int dubletteFachlich,
                              @Schema(required = true) int uebersprungen, @Schema(required = true) int fehler) {
 
@@ -262,7 +262,7 @@ public class QuellenResource {
         Optional<Zaehler> zaehler;
         try {
             zaehler = Optional.ofNullable(a.zaehler()).map(z -> new Zaehler(z.gefunden(), z.neu(),
-                    z.duplettePruefsumme(), z.dubletteFachlich(), z.uebersprungen(), z.fehler()));
+                    z.dublettePruefsumme(), z.dubletteFachlich(), z.uebersprungen(), z.fehler()));
         } catch (IllegalArgumentException e) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }

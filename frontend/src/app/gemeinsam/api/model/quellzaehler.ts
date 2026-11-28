@@ -10,12 +10,12 @@
 
 
 /**
- * Zähler eines Quelllaufs (Spec 09, 10.3); gefunden = neu + duplettePruefsumme + uebersprungen + fehler
+ * Zähler eines Quelllaufs (Spec 09, 10.3); gefunden = neu + dublettePruefsumme + uebersprungen + fehler
  */
 export interface Quellzaehler { 
     gefunden: number;
     neu: number;
-    duplettePruefsumme: number;
+    dublettePruefsumme: number;
     /**
      * im Trockenlauf immer 0
      */

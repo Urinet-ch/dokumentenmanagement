@@ -236,7 +236,7 @@ public class QuellenSchritte {
     @Wenn("das Werkzeug den Lauf mit den Zählern gefunden {int}, neu {int}, Dublette nach Prüfsumme {int}, Fehler {int} "
             + "abschliesst")
     public void trockenAbschliessen(int gefunden, int neu, int dublette, int fehler) {
-        antwort = abschluss(Map.of("zaehler", Map.of("gefunden", gefunden, "neu", neu, "duplettePruefsumme", dublette,
+        antwort = abschluss(Map.of("zaehler", Map.of("gefunden", gefunden, "neu", neu, "dublettePruefsumme", dublette,
                 "dubletteFachlich", 0, "uebersprungen", 0, "fehler", fehler)));
     }
 
@@ -244,7 +244,7 @@ public class QuellenSchritte {
             + "Fehler {int}, und sie gehen auf")
     public void zaehler(int gefunden, int neu, int dublette, int uebersprungen, int fehler) {
         assertThat(antwort.jsonPath().getMap("zaehler")).containsEntry("gefunden", gefunden)
-                .containsEntry("neu", neu).containsEntry("duplettePruefsumme", dublette)
+                .containsEntry("neu", neu).containsEntry("dublettePruefsumme", dublette)
                 .containsEntry("uebersprungen", uebersprungen).containsEntry("fehler", fehler)
                 .containsEntry("dubletteFachlich", 0);
         assertThat(gefunden).isEqualTo(neu + dublette + uebersprungen + fehler);

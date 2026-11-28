@@ -54,7 +54,7 @@ public interface QuellenRegister {
      *
      * @return {@code false}, wenn der Lauf nicht mehr läuft (dann bleiben die Zähler)
      */
-    boolean verbuchen(UUID laufId, int neu, int duplettePruefsumme, int fehler);
+    boolean verbuchen(UUID laufId, int neu, int dublettePruefsumme, int fehler);
 
     /** Verweist ein Dokument auf seinen Quelllauf (10.4), mit {@code quelle} auch die Quelle des Dokuments. */
     void dokumentZuordnen(UUID dokumentId, UUID laufId, Optional<String> quelle);

@@ -3679,8 +3679,8 @@
       },
       "Quellzaehler" : {
         "type" : "object",
-        "description" : "Zähler eines Quelllaufs (Spec 09, 10.3); gefunden = neu + duplettePruefsumme + uebersprungen + fehler",
-        "required" : [ "gefunden", "neu", "duplettePruefsumme", "dubletteFachlich", "uebersprungen", "fehler" ],
+        "description" : "Zähler eines Quelllaufs (Spec 09, 10.3); gefunden = neu + dublettePruefsumme + uebersprungen + fehler",
+        "required" : [ "gefunden", "neu", "dublettePruefsumme", "dubletteFachlich", "uebersprungen", "fehler" ],
         "properties" : {
           "gefunden" : {
             "type" : "integer",
@@ -3690,7 +3690,7 @@
             "type" : "integer",
             "format" : "int32"
           },
-          "duplettePruefsumme" : {
+          "dublettePruefsumme" : {
             "type" : "integer",
             "format" : "int32"
           },
