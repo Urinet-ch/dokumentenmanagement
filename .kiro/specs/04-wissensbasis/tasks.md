@@ -302,6 +302,31 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
   - Nach 19.1 bis 19.5 das Quelldokument des Befunds erneut ingestieren (lokal oder Stufe A, nur durch Fabian) und mit der Auswertung vom 26.11.2026 vergleichen: erwartet sind keine Aussagen mit Kopfzeilen-Auszug, keine Antworten auf offene Fragen, die Optionentabelle als Zeilen und kein Verlust ganzer Abschnitte. Ergebnis (nur Zahlen, keine Inhalte) in `docs/abnahme/wissen.md`.
   - _Abhängig von: 19.1–19.5_
 
+
+## Welle 25 — Wissen je Mandant freischalten (Entscheid Fabian 28.11.2026, Requirement 22)
+- [ ] 25.1 Zustand, Kommando und Funktionsabfrage [Backend]
+  - Changeset `db/public` (Standard nein, `urinet` ja), Port «Wissensfreischaltung», Kommando
+    `archiv mandant wissen <code> [ein|aus]` mit Protokoll, `wissenVerfuegbar` in `GET /mandant/funktionen`;
+    bestehende Tests schalten Wissen in den Testdaten ausdrücklich ein.
+  - _Anforderungen: 22.1–22.4_
+- [ ] 25.2 Sperre in API, Chat, Suche und öffentlicher Schnittstelle [Backend]
+  - _Anforderungen: 22.6–22.8_
+  - _Abhängig von: 25.1_
+- [ ] 25.3 Keine KI-Läufe, Daten bleiben erhalten [Backend]
+  - _Anforderungen: 22.9, 22.10_
+  - _Abhängig von: 25.1_
+- [ ] 25.4 Oberfläche ausblenden, Einführung und Hilfe [Frontend]
+  - Browser-Szenario mit zwei Mandanten (ein, aus) und axe.
+  - _Anforderungen: 22.5_
+  - _Abhängig von: 25.1_
+- [ ] 25.5 Folgeänderungen und Betriebsanleitung [Backend] [Infra]
+  - Tabelle «Folgeänderungen» in design.md abarbeiten.
+  - _Anforderungen: 22.2, 22.3_
+  - _Abhängig von: 25.2–25.4_
+- [ ] 25.6 Abnahme: ein- und ausschalten auf Stufe A [QA] [Fabian]
+  - _Anforderungen: 22.2, 22.5, 22.10_
+  - _Abhängig von: 25.5_
+
 ## Optionen
 Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort. O.5 ist seit dem 18.11.2026 in den Plan übernommen (15.6 bis 15.8).
 

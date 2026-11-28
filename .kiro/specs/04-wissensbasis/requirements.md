@@ -437,6 +437,60 @@ Webseiten** (ändert 8.9 und Spec 03, 6.1 in der unten genannten Weise). (4) Spe
    (403), Modus nicht wechselbar, Archivwerkzeug im Modus `WISSEN` nicht aufrufbar (simulierter Tool-Call), öffentliche Auslieferung
    nur mit Kennzeichen und Zugriffsstufe `oeffentlich` und sofortiger Entzug.
 
+
+### Requirement 22: Wissen je Mandant freischalten (ohne Konzept-ID, Entscheid Fabian 28.11.2026)
+**User Story:** Als Betreiber möchte ich den Bereich Wissen je Mandant ein- und ausschalten, damit ich ihn als
+Zusatzleistung anbieten kann und er ohne Freischaltung weder sichtbar ist noch Kosten verursacht.
+
+#### Acceptance Criteria
+1. Das Archiv SOLL je Mandant den Zustand «Wissen freigeschaltet» (ja oder nein) in `public.mandant` führen; für neu
+   angelegte Mandanten SOLL er nein sein. WENN die Migration läuft, DANN SOLL sie ihn für den bestehenden Mandanten
+   `urinet` auf ja und für jeden anderen bestehenden Mandanten auf nein setzen. Nachweis: JUnit (Migrationstest, zwei
+   Mandanten).
+2. WENN der Betreiber `archiv mandant wissen <code> ein` oder `archiv mandant wissen <code> aus` ausführt, DANN SOLL das
+   Archiv den Zustand setzen, ihn mit Zeitpunkt und Aktion `WISSEN_FREIGESCHALTET` oder `WISSEN_ABGESCHALTET` im
+   Zugriffsprotokoll des Mandanten festhalten und die Änderung ohne Deploy und ohne Neustart nach höchstens 60 Sekunden
+   anwenden. Ohne `ein` oder `aus` SOLL das Kommando nur den Zustand ausgeben. Entspricht der Zustand schon dem Wunsch,
+   ändert und protokolliert es nichts und endet mit Exit-Code 0. FALLS der Mandant unbekannt oder das Argument ungültig
+   ist, DANN SOLL es mit einem Exit-Code ungleich 0 enden und nichts ändern. Nachweis: JUnit.
+3. Das Archiv SOLL den Zustand ausschliesslich über dieses Betreiber-Kommando (und die Migration nach 1) ändern lassen:
+   weder Oberfläche, REST-Schnittstelle, API-Token, Konfigurationsdatei noch Einstellungskatalog (Spec 06) bieten einen
+   Weg dazu, auch nicht für die Rolle `inhaber`.
+4. Spec 04 ergänzt Spec 05, 8.8: `GET /mandant/funktionen` SOLL zusätzlich `wissenVerfuegbar` mit dem Zustand des
+   eigenen Mandanten liefern.
+5. SOLANGE Wissen nicht freigeschaltet ist, SOLL die App den Bereich vollständig ausblenden: die Menüpunkte «Wissen»
+   und «Entwürfe» samt Zähler, die Aktionen «Als Wissensquelle verwenden», «Wissensquelle entfernen» und «Als Analyse
+   vorschlagen», die Liste der Wissensquellen, die Wahl des Chat-Modus, Gespräche im Modus `WISSEN`, Wissensseiten in
+   Suchtreffern und Dokumentansicht, die Einstellungsgruppe der Wissensbasis sowie die zugehörigen Schritte der
+   Einführung und Hilfeseiten (Spec 07). Der Direktaufruf einer Wissensroute SOLL «Seite nicht gefunden» zeigen. Die App
+   SOLL weder auf eine Zusatzleistung hinweisen noch dafür werben. SOLANGE die Funktionen nicht geladen sind oder die
+   Abfrage fehlschlägt, bleibt der Bereich ausgeblendet. Nachweis: Browser-Szenario.
+6. SOLANGE Wissen nicht freigeschaltet ist, SOLL jede interne Anfrage, die Wissen liest oder ändert (alle Pfade unter
+   `/wissen` und `/wissensbasis`, Markieren und Entfernen einer Wissensquelle, Gespräch im Modus `WISSEN` anlegen,
+   lesen oder fortsetzen, Analyse vorschlagen), mit HTTP 403 `WISSEN_NICHT_FREIGESCHALTET` enden und nichts ändern,
+   unabhängig von Rolle und Anmeldeweg. Nach 401 geht diese Antwort der Rechtematrix und HTTP 404 vor, damit sie nichts
+   über vorhandene Seiten verrät. Die Rechte A15 bis A19 (12.1) wirken nur bei freigeschaltetem Wissen.
+7. SOLANGE Wissen nicht freigeschaltet ist, SOLL der Archivchat die Werkzeuge `wissen_index` und
+   `wissen_seite_zeigen` weder anbieten noch ausführen, und Suche sowie Antworten SOLLEN keine Wissensseite enthalten.
+   Frühere Gespräche im Modus `ARCHIV` bleiben lesbar und fortsetzbar; ihre Quellenangaben auf Wissensseiten erscheinen
+   ohne Titel und Link, und frühere Ergebnisse der Wissenswerkzeuge sowie darauf beruhende Antworten gehen beim
+   Fortsetzen nicht erneut an das Modell.
+8. SOLANGE Wissen nicht freigeschaltet ist, SOLL sich `POST /public/v1/wissen/chat` unabhängig vom Schalter
+   `archiv.mandant.<code>.oeffentlich.wissenschat` (21.6) gleich verhalten wie bei ausgeschaltetem Schalter.
+9. SOLANGE Wissen nicht freigeschaltet ist, SOLL das Archiv für diesen Mandanten keinen KI-Aufruf der Wissensbasis
+   starten (Ingest samt automatischem Start und Nachholen, Abschnitt neu verarbeiten, Lint samt Zeitplan, Prüfung eines
+   Imports, Wissenschat) und keine Warnungen oder Berichtsteile zur Wissensbasis versenden. WENN während eines laufenden
+   Auftrags abgeschaltet wird, DANN SOLL das Archiv vor dem nächsten Modellaufruf abbrechen und keinen neuen Entwurf
+   anlegen; laufende und wartende Aufträge enden mit dem Grund `WISSEN_AUSGESCHALTET`. WENN Wissen wieder freigeschaltet
+   wird, DANN SOLL kein beendeter oder verpasster Auftrag von selbst starten: Ein Ingest wird von Hand wiederholt (A16),
+   der Lint läuft zum nächsten fälligen Termin.
+10. Das Abschalten SOLL keine Daten löschen: Seiten, Versionen, Entwürfe, Log, Markierungen, Einstellungen und
+    Webfreigaben bleiben erhalten. Regeln ohne KI, die Daten schützen oder aktuell halten (Sichtbarkeit und
+    Vertraulichkeit, Hinweise bei geänderten Quelldokumenten nach Requirement 15, Aufbewahrung, Sicherung,
+    Wiederherstellung und Vollexport durch den Betreiber), SOLLEN weiterlaufen. WENN Wissen wieder freigeschaltet wird,
+    DANN SOLL der erhaltene Stand samt zwischenzeitlicher Hinweise sichtbar sein; eine Webfreigabe wirkt nur, wenn ihre
+    Bedingungen (21.6) dann erfüllt sind.
+
 ## Optionen (nicht Teil des Plans, Aufgaben mit `*`)
 - Wissensseiten für Verbandsmitglieder von VHF/GSK über die öffentliche Schnittstelle und den Chatbot (ändert Spec 03, 6.1).
 - ~~Import eines bestehenden OKF-Bundles (z. B. eines LLM-Wikis) als Entwurf mit Freigabe.~~ **Übernommen in den Plan als Requirement 19** (entschieden von Fabian am 18.11.2026; Aufgaben 15.6 bis 15.8, tasks.md, Option O.5). Zugelassen sind Pakete im OKF-Format mit Quellen über SHA-256 (19.3); Quellen ohne zuordenbares Archivdokument sind Befund `QUELLE_UNBEKANNT` (19.14).
@@ -454,3 +508,4 @@ Webseiten** (ändert 8.9 und Spec 03, 6.1 in der unten genannten Weise). (4) Spe
 | Erweiterung S1, S2 (Suche) | 9 |
 | Erweiterung B2 (Protokoll) | 14 |
 | Gate Phase 4 | 18 |
+| ohne Konzept-ID (Entscheid 28.11.2026, Wissen als Zusatzleistung) | 22 |
