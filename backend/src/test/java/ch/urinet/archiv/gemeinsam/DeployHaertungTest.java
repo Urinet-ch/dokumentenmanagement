@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -95,16 +96,65 @@ class DeployHaertungTest {
     }
 
     @Test
-    void amNetzWebNurApiUndKeycloak() throws IOException {
-        List<String> amWeb = new ArrayList<>();
-        dienste().forEach((name, dienst) -> {
-            if (dienst.get("networks") instanceof Map<?, ?> netze && netze.containsKey("web")
-                    || dienst.get("networks") instanceof List<?> liste && liste.contains("web")) {
-                amWeb.add(name);
+    void netzeUndSecretsNurAnVorgesehenenDiensten() throws IOException {
+        Map<String, Map<String, Object>> dienste = dienste();
+        assertThat(fehlerNetzeUndSecrets(dienste)).isEmpty();
+        assertThat(karte(karte(yaml(COMPOSE).get("networks")).get("intern")).get("internal")).isEqualTo(true);
+        assertThat(karte(karte(yaml(COMPOSE).get("networks")).get("web-archiv")).get("external")).isEqualTo(true);
+        dienste.get("db").put("networks", Map.of("intern", Map.of(), "web-archiv", Map.of()));
+        assertThat(fehlerNetzeUndSecrets(dienste)).contains("db: Netze");
+        dienste.get("db").put("secrets", List.of("archiv_manifest_key"));
+        assertThat(fehlerNetzeUndSecrets(dienste)).contains("db: Secrets");
+    }
+
+    private static List<String> fehlerNetzeUndSecrets(Map<String, Map<String, Object>> dienste) {
+        Map<String, Set<String>> secrets = Map.of(
+                "api", Set.of("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id",
+                        "s3_app_zugang_geheimnis", "infomaniak_ai_token", "archiv_manifest_key",
+                        "archiv_data_key", "archiv_smtp_passwort", "namenssperre_salz", "keycloak_verwaltung_secret"),
+                "db", Set.of("archiv_db_postgres", "archiv_db_owner_scram", "archiv_db_app_scram", "keycloak_db_scram"),
+                "kc", Set.of("keycloak_db", "keycloak_admin", "keycloak_smtp_passwort",
+                        "google_client_id", "google_client_secret"));
+        List<String> fehler = new ArrayList<>();
+        dienste.forEach((name, dienst) -> {
+            Set<String> erwartet = Set.of("api", "kc", "sftp").contains(name)
+                    ? Set.of("intern", "web-archiv") : Set.of("intern");
+            Object netze = dienst.get("networks");
+            Set<?> angebunden = netze instanceof Map<?, ?> map ? map.keySet()
+                    : netze instanceof List<?> liste ? Set.copyOf(liste) : Set.of();
+            if (!angebunden.equals(erwartet)) {
+                fehler.add(name + ": Netze");
+            }
+            if (Set.of("api", "kc", "sftp").contains(name)
+                    && !"web-archiv".equals(karte(dienst.get("labels")).get("traefik.docker.network"))) {
+                fehler.add(name + ": Traefik-Netz");
+            }
+            if (!Set.copyOf((List<?>) dienst.getOrDefault("secrets", List.of()))
+                    .equals(secrets.getOrDefault(name, Set.of()))) {
+                fehler.add(name + ": Secrets");
             }
         });
-        assertThat(amWeb).containsExactlyInAnyOrder("api", "kc");
-        assertThat(karte(karte(yaml(COMPOSE).get("networks")).get("intern")).get("internal")).isEqualTo(true);
+        return fehler;
+    }
+
+    @Test
+    void probeBleibtImAnteilDerAngehaltenenApi() throws IOException {
+        Map<String, Map<String, Object>> probe = dienste(REPO.resolve("deploy/probe/compose.yml"));
+        Map<String, Object> api = dienste().get("api");
+        assertThat(probeImApiAnteil(probe, api)).isTrue();
+        probe.get("worker").put("cpus", "0.61");
+        assertThat(probeImApiAnteil(probe, api)).isFalse();
+        probe.get("worker").put("cpus", "0.15");
+        probe.get("worker").put("mem_limit", "1024m");
+        assertThat(probeImApiAnteil(probe, api)).isFalse();
+    }
+
+    private static boolean probeImApiAnteil(Map<String, Map<String, Object>> probe, Map<String, Object> api) {
+        long speicher = probe.values().stream().mapToLong(d -> bytes(String.valueOf(d.get("mem_limit")))).sum();
+        BigDecimal cpus = probe.values().stream().map(d -> new BigDecimal(String.valueOf(d.get("cpus"))))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return speicher <= bytes(String.valueOf(api.get("mem_limit")))
+                && cpus.compareTo(new BigDecimal(String.valueOf(api.get("cpus")))) <= 0;
     }
 
     @Test
@@ -114,12 +164,20 @@ class DeployHaertungTest {
         BigDecimal budgetCpus = new BigDecimal(String.valueOf(env.get("BUDGET_CPUS")));
         long summeBytes = 0;
         BigDecimal summeCpus = BigDecimal.ZERO;
-        for (Map<String, Object> dienst : dienste().values()) {
+        Map<String, Map<String, Object>> alleDienste = dienste();
+        for (Map<String, Object> dienst : alleDienste.values()) {
             summeBytes += bytes(String.valueOf(dienst.get("mem_limit")));
             summeCpus = summeCpus.add(new BigDecimal(String.valueOf(dienst.get("cpus"))));
         }
-        assertThat(summeBytes).isLessThanOrEqualTo(budgetMib * 1024 * 1024);
-        assertThat(summeCpus).isLessThanOrEqualTo(budgetCpus);
+        Map<String, Object> sftp = alleDienste.get("sftp");
+        long sftpBytes = sftp == null ? 0 : bytes(String.valueOf(sftp.get("mem_limit")));
+        BigDecimal sftpCpus = sftp == null ? BigDecimal.ZERO : new BigDecimal(String.valueOf(sftp.get("cpus")));
+        assertThat(summeBytes - sftpBytes).isLessThanOrEqualTo(budgetMib * 1024 * 1024);
+        assertThat(summeCpus.subtract(sftpCpus)).isLessThanOrEqualTo(budgetCpus);
+        assertThat(sftpBytes).isLessThanOrEqualTo(96L * 1024 * 1024);
+        assertThat(sftpCpus).isLessThanOrEqualTo(new BigDecimal("0.1"));
+        assertThat(summeBytes).isLessThanOrEqualTo(2144L * 1024 * 1024);
+        assertThat(summeCpus).isLessThanOrEqualTo(new BigDecimal("1.6"));
     }
 
     /** Die Compose-Policy der VPS lehnt {@code priority} überall ab (Deploy vom 18.11.2026, PR #299). */

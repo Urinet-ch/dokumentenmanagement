@@ -19,4 +19,10 @@ if [[ ! "$host" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z
   echo "::error::Variable HOST_ARCHIV fehlt oder ist kein Hostname; kein Deploy."
   exit 1
 fi
-printf 'ARCHIV_ALARM_EMPFAENGER_URINET=%s\nARCHIV_BASIS_URL=https://%s\n' "$empfaenger" "$host" > "$ziel"
+netz="${ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE:-}"
+if ! python3 -c 'import ipaddress,sys; n=ipaddress.ip_network(sys.argv[1], strict=True); sys.exit(0 if n.is_private and n.prefixlen > 0 else 1)' "$netz" 2>/dev/null; then
+  echo "::error::ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE muss das gültige CIDR-Netz von web-archiv enthalten; kein Deploy."
+  exit 1
+fi
+printf 'ARCHIV_ALARM_EMPFAENGER_URINET=%s\nARCHIV_BASIS_URL=https://%s\nARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE=%s\n' \
+  "$empfaenger" "$host" "$netz" > "$ziel"

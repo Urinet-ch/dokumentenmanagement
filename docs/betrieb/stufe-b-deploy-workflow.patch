@@ -1,0 +1,10 @@
+diff --git a/.github/workflows/infomaniak-deploy.yml b/.github/workflows/infomaniak-deploy.yml
+--- a/.github/workflows/infomaniak-deploy.yml
++++ b/.github/workflows/infomaniak-deploy.yml
+@@ -165,5 +165,6 @@ jobs:
+           # Empfänger der Benachrichtigungen je Mandant (kein Geheimnis, GitHub-Variable); optional, leer heisst nur Log
+           ARCHIV_ALARM_EMPFAENGER_URINET: ${{ vars.ARCHIV_ALARM_EMPFAENGER_URINET }}
++          ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE: ${{ vars.ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE }}
+         run: |
+           umask 077
+           mkdir -p bundle/secrets

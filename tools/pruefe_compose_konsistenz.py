@@ -18,6 +18,13 @@ DOCKERFILES = (
     "deploy/infomaniak/db/Dockerfile",
     "deploy/infomaniak/keycloak/Dockerfile",
 )
+DIENST_SECRETS = {
+    "api": {"archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis",
+            "infomaniak_ai_token", "archiv_manifest_key", "archiv_data_key", "archiv_smtp_passwort",
+            "namenssperre_salz", "keycloak_verwaltung_secret"},
+    "db": {"archiv_db_postgres", "archiv_db_owner_scram", "archiv_db_app_scram", "keycloak_db_scram"},
+    "kc": {"keycloak_db", "keycloak_admin", "keycloak_smtp_passwort", "google_client_id", "google_client_secret"},
+}
 
 
 def positiv(wert):
@@ -68,8 +75,8 @@ def pruefe_compose(compose):
             melde("DIENST_FEHLT", name, "Erwarteter Dienst fehlt.")
     if not netze.get("intern", {}).get("internal"):
         melde("NETZ_INTERN", "networks.intern", "Internes Netz fehlt oder ist nicht isoliert.")
-    if not netze.get("web", {}).get("external"):
-        melde("NETZ_WEB", "networks.web", "Externes Webnetz fehlt.")
+    if not netze.get("web-archiv", {}).get("external"):
+        melde("NETZ_WEB", "networks.web-archiv", "Externes Archivnetz fehlt.")
 
     for name, dienst in sorted(dienste.items()):
         ort = f"services.{name}"
@@ -84,10 +91,22 @@ def pruefe_compose(compose):
         dienstnetze = set(dienst.get("networks") or [])
         if "intern" not in dienstnetze or not dienstnetze <= set(netze):
             melde("DIENST_NETZ", ort, "Internes oder deklariertes Netz fehlt.")
-        if ("web" in dienstnetze) != (name in {"api", "kc"}):
-            melde("WEB_ZUGRIFF", ort, "Webnetz darf nur API und Keycloak verbinden.")
+        erwartet = {"intern", "web-archiv"} if name in {"api", "kc", "sftp"} else {"intern"}
+        if dienstnetze != erwartet:
+            melde("WEB_ZUGRIFF", ort, "Dienst ist nicht ausschliesslich mit den vorgesehenen Netzen verbunden.")
         if dienst.get("ports"):
             melde("PORTS", ort, "Direkt veröffentlichte Ports sind nicht vorgesehen.")
+        for secret in dienst.get("secrets") or []:
+            quelle = secret.get("source") if isinstance(secret, dict) else secret
+            ziel = secret.get("target", quelle) if isinstance(secret, dict) else quelle
+            if quelle not in DIENST_SECRETS.get(name, set()) or ziel not in (quelle, f"/run/secrets/{quelle}"):
+                melde("SECRET_ZUGRIFF", ort, "Secret ist für diesen Dienst oder dieses Ziel nicht vorgesehen.")
+        for volume in dienst.get("volumes") or []:
+            ziel = volume.get("target", "") if isinstance(volume, dict) else str(volume).split(":")[1:2]
+            if isinstance(ziel, list):
+                ziel = ziel[0] if ziel else ""
+            if ziel == "/run/secrets" or ziel.startswith("/run/secrets/"):
+                melde("SECRET_VOLUME", ort, "Secret-Dateien dürfen nicht über Volumes eingehängt werden.")
         if not DIGEST.fullmatch(str(dienst.get("image", ""))):
             melde("IMAGE_DIGEST", ort, "Dienstimage ist nicht mit SHA-256-Digest gepinnt.")
         umgebung = dienst.get("environment") or {}
@@ -100,6 +119,8 @@ def pruefe_compose(compose):
         dienstlabels = dienst.get("labels") or {}
         if isinstance(dienstlabels, list):
             dienstlabels = dict(e.split("=", 1) if "=" in e else (e, "") for e in dienstlabels)
+        if name in {"api", "kc", "sftp"} and dienstlabels.get("traefik.docker.network") != "web-archiv":
+            melde("TRAEFIK_NETZ", ort, "Traefik muss das Archivnetz verwenden.")
         definiert = {
             treffer.group(1)
             for label in dienstlabels

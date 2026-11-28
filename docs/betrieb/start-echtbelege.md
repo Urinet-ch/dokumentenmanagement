@@ -31,7 +31,8 @@ Geänderte und neue Kriterien in [Spec 01](../../.kiro/specs/01-archiv-kern/requ
 | **B – Bestehende VPS wird produktiv** | **Gewählt am 28.11.2026.** Zulässig nach den geänderten Kriterien, erst nach den Gates unten. |
 | **C – Stufe B auf eigener VPS nach Spec** | Nicht gewählt. |
 
-Die aktuelle Compose-Datei unter `deploy/infomaniak/compose.yml` beschreibt Stufe A (`ARCHIV_STUFE: A`).
+Der laufende Deploy beschreibt bis zum Wechsel Stufe A (`ARCHIV_STUFE: A`); die für 31.7 vorbereitete
+Compose-Datei auf dem Branch 31.2 beschreibt Stufe B und darf erst beim Wechsel gemergt und deployt werden.
 `ARCHIV_ABLAGE_MAX_SPERRFRIST: P1D` und `ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST: P1D` begrenzen dort die Sperren der
 Test-Buckets, damit diese beim Wechsel aufgeräumt werden können. Für Stufe B gelten die produktiven Sperrregeln
 (Req 6.11, 15.4): Stufe `B`, Präfix `urinet-archiv-`, keine Höchstfristen, `manifest/` im Modus COMPLIANCE. Die

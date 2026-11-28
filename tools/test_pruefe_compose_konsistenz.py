@@ -26,13 +26,15 @@ def modell():
             "image": "example.invalid/test@sha256:" + "a" * 64,
             "healthcheck": {"test": ["CMD", "true"], "interval": "1s", "timeout": "1s", "retries": 1},
             "mem_limit": "64m", "cpus": "0.5",
-            "networks": {"intern": {}, **({"web": {}} if web else {})},
+            "networks": {"intern": {}, **({"web-archiv": {}} if web else {})},
             "environment": {},
         }
     api, db, kc = dienst(True), dienst(False), dienst(True)
+    labels["traefik.docker.network"] = "web-archiv"
     api["labels"] = labels
+    kc["labels"] = {"traefik.docker.network": "web-archiv"}
     return {"services": {"api": api, "db": db, "kc": kc},
-            "networks": {"intern": {"internal": True}, "web": {"external": True}}}
+            "networks": {"intern": {"internal": True}, "web-archiv": {"external": True}}}
 
 
 class ComposePruefungTest(unittest.TestCase):
@@ -43,6 +45,7 @@ class ComposePruefungTest(unittest.TestCase):
         daten = modell()
         daten["services"]["api"]["labels"]["traefik.http.middlewares.archiv-sts.headers.stsseconds"] = "86400"
         daten["services"]["kc"]["labels"] = [
+            "traefik.docker.network=web-archiv",
             "traefik.http.routers.archiv-auth.middlewares=archiv-sts",
         ]
         befunde = pruefung.pruefe_compose(daten)
@@ -54,11 +57,12 @@ class ComposePruefungTest(unittest.TestCase):
     def test_auth_router_mit_eigener_middleware_und_docker_provider(self):
         daten = modell()
         daten["services"]["kc"]["labels"] = [
+            "traefik.docker.network=web-archiv",
             "traefik.http.routers.archiv-auth.middlewares= archiv-auth-sts@docker ",
             "traefik.http.middlewares.archiv-auth-sts.headers.stsseconds=86400",
         ]
         self.assertEqual([], pruefung.pruefe_compose(daten))
-        daten["services"]["kc"]["labels"][0] = "traefik.http.routers.archiv-auth.middlewares=archiv-auth-sts@file"
+        daten["services"]["kc"]["labels"][1] = "traefik.http.routers.archiv-auth.middlewares=archiv-auth-sts@file"
         self.assertIn("MIDDLEWARE_FREMDER_DIENST", {b["code"] for b in pruefung.pruefe_compose(daten)})
 
     def test_jede_kategorie_meldet_regression(self):
@@ -67,7 +71,13 @@ class ComposePruefungTest(unittest.TestCase):
             ("HEALTHCHECK", lambda d: d["services"]["db"]["healthcheck"].update(timeout="0s")),
             ("RESSOURCEN", lambda d: d["services"]["api"].update(cpus="0")),
             ("DIENST_NETZ", lambda d: d["services"]["db"].update(networks={"fremd": {}})),
-            ("WEB_ZUGRIFF", lambda d: d["services"]["db"]["networks"].update(web={})),
+            ("WEB_ZUGRIFF", lambda d: d["services"]["db"]["networks"].update({"web-archiv": {}})),
+            ("WEB_ZUGRIFF", lambda d: d["services"]["api"]["networks"].update(web={})),
+            ("TRAEFIK_NETZ", lambda d: d["services"]["kc"]["labels"].update({"traefik.docker.network": "web"})),
+            ("SECRET_ZUGRIFF", lambda d: d["services"]["kc"].update(secrets=[{"source": "archiv_manifest_key"}])),
+            ("SECRET_ZUGRIFF", lambda d: d["services"]["db"].update(
+                secrets=[{"source": "archiv_db_postgres", "target": "fremd"}])),
+            ("SECRET_VOLUME", lambda d: d["services"]["db"].update(volumes=["./datei:/run/secrets/fremd:ro"])),
             ("PORTS", lambda d: d["services"]["db"].update(ports=["1234:1234"])),
             ("IMAGE_DIGEST", lambda d: d["services"]["kc"].update(image="example.invalid/test:latest")),
             ("PUBLIC_ROUTER", lambda d: d["services"]["api"]["labels"].pop(
@@ -84,6 +94,15 @@ class ComposePruefungTest(unittest.TestCase):
                 daten = modell()
                 aendern(daten)
                 self.assertIn(code, {b["code"] for b in pruefung.pruefe_compose(daten)})
+
+    def test_sftp_nutzt_nur_archivnetz_und_keine_hostports(self):
+        daten = modell()
+        daten["services"]["sftp"] = copy.deepcopy(daten["services"]["kc"])
+        self.assertEqual([], pruefung.pruefe_compose(daten))
+        daten["services"]["sftp"]["networks"]["web"] = {}
+        daten["services"]["sftp"]["ports"] = ["2222:22"]
+        codes = {b["code"] for b in pruefung.pruefe_compose(daten)}
+        self.assertTrue({"WEB_ZUGRIFF", "PORTS"} <= codes)
 
     def test_klartext_und_defaultwerte_werden_ohne_wert_gemeldet(self):
         daten = modell()

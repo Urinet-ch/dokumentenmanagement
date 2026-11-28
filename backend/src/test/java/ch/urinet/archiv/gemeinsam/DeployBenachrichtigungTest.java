@@ -97,7 +97,8 @@ class DeployBenachrichtigungTest {
 
         assertThat(schreibeEnv(wert, env)).isZero();
         assertThat(Files.readAllLines(env, StandardCharsets.UTF_8)).containsExactly(VARIABLE + "=" + wert,
-                "ARCHIV_BASIS_URL=https://archiv.example.invalid");
+                "ARCHIV_BASIS_URL=https://archiv.example.invalid",
+                "ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE=192.0.2.0/24");
     }
 
     /** Injektionsschutz: keine weitere Zeile, keine Interpolation, keine zweite Adresse; ohne .env kein Deploy. */
@@ -123,6 +124,20 @@ class DeployBenachrichtigungTest {
         assertThat(env).doesNotExist();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"", "0.0.0.0/0", "kein-netz", "192.0.2.1/24", "192.0.2.0/24\nFREMD=x"})
+    void ungueltigesProxyNetzBrichtAb(String netz, @TempDir Path ordner) throws Exception {
+        Path env = ordner.resolve(".env");
+        ProcessBuilder pb = new ProcessBuilder("bash", SCHREIBE_ENV.toString(), env.toString())
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        pb.environment().put("HOST_ARCHIV", "archiv.example.invalid");
+        pb.environment().put("ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE", netz);
+        Process p = pb.start();
+        assertThat(p.waitFor(30, TimeUnit.SECONDS)).isTrue();
+        assertThat(p.exitValue()).isEqualTo(1);
+        assertThat(env).doesNotExist();
+    }
+
     private static int schreibeEnv(String wert, Path env) throws Exception {
         return schreibeEnv(wert, "archiv.example.invalid", env);
     }
@@ -132,6 +147,7 @@ class DeployBenachrichtigungTest {
                 .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
         pb.environment().put(VARIABLE, wert);
         pb.environment().put("HOST_ARCHIV", host);
+        pb.environment().put("ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE", "192.0.2.0/24");
         Process p = pb.start();
         assertThat(p.waitFor(30, TimeUnit.SECONDS)).isTrue();
         return p.exitValue();
