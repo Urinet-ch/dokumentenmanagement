@@ -58,7 +58,7 @@ class ZugangFilterScopeTest {
                 public int aufraeumen(Instant vor) {
                     return 0;
                 }
-            });
+            }, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
 
     static class Endpunkte {
         @ErfordertAktion(Aktion.A1)
@@ -113,7 +113,8 @@ class ZugangFilterScopeTest {
         var filter = new ZugangFilter(benutzerIdentitaet(), new MandantAufloesung(null,
                 () -> new MandantAusAnmeldung.Gueltig(new MandantCode("urinet")), code -> Optional.of("m_urinet")),
                 new Berechtigung((benutzer, id) -> true,
-                        (benutzerId, rolle, aktion, dokumentId, grund) -> verweigert.add(aktion)), widerruf);
+                        (benutzerId, rolle, aktion, dokumentId, grund) -> verweigert.add(aktion)), widerruf,
+                ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
 
         assertThatThrownBy(() -> filter.pruefen(ressource("ohneScope"), anfrage()))
                 .isInstanceOfSatisfying(FachFehler.class, fehler ->
@@ -142,7 +143,8 @@ class ZugangFilterScopeTest {
         var filter = new ZugangFilter(benutzerIdentitaet(3), new MandantAufloesung(null,
                 () -> new MandantAusAnmeldung.Gueltig(new MandantCode("urinet")), code -> Optional.of("m_urinet")),
                 new Berechtigung((benutzer, id) -> true,
-                        (benutzerId, rolle, aktion, dokumentId, grund) -> verweigert.add(aktion)), widerruf);
+                        (benutzerId, rolle, aktion, dokumentId, grund) -> verweigert.add(aktion)), widerruf,
+                ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
 
         filter.pruefen(ressource("ohneScope"), anfrage());
 

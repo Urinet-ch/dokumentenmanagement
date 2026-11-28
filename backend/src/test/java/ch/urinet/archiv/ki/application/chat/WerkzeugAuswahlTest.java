@@ -7,6 +7,7 @@ import ch.urinet.archiv.sicherheit.domain.Ergebnis;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -25,7 +26,7 @@ class WerkzeugAuswahlTest {
 
     @Test
     void vollstaendigkeitFehltFuerRollenOhneA3UndA4() {
-        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> false);
+        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> false, m -> true);
         for (Rolle rolle : Rolle.values()) {
             WerkzeugKontext kontext = WerkzeugKontext.fuer(URINET, new Benutzer("b", rolle), null);
             // aus der Rechtematrix: A3 und A4 ohne Einschränkung auf eigene Dokumente
@@ -43,7 +44,7 @@ class WerkzeugAuswahlTest {
     /** Spec 04, Requirement 21.2: Im Wissenschat gibt es nur die beiden Wissenswerkzeuge, für jede Rolle und jeden Mandanten. */
     @Test
     void wissensmodusBietetNurDieWissenswerkzeuge() {
-        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> true);
+        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> true, m -> true);
         for (Rolle rolle : Rolle.values()) {
             Benutzer benutzer = new Benutzer("b", rolle);
             WerkzeugKontext wissen = new WerkzeugKontext(URINET, benutzer, rolle, Sichtregel.fuer(benutzer),
@@ -64,7 +65,7 @@ class WerkzeugAuswahlTest {
     @Test
     void finanzwerkzeugeNurMitFinanzfunktionen() {
         MandantCode ohne = new MandantCode("ohne-finanz");
-        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> URINET.equals(m));
+        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> URINET.equals(m), m -> true);
         for (Rolle rolle : Rolle.values()) {
             assertThat(auswahl.angeboten(WerkzeugKontext.fuer(URINET, new Benutzer("b", rolle), null))).as(rolle.name())
                     .startsWith("dokumente_suchen", "dokument_zeigen", "fristen", "kennzahl", "offene_posten");
@@ -79,10 +80,26 @@ class WerkzeugAuswahlTest {
     void scheitertDieFrageNachFinanzfunktionenGibtEsDieWerkzeugeNicht() {
         WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> {
             throw new IllegalStateException("Datenbank weg");
-        });
+        }, m -> true);
         assertThat(auswahl.angeboten(WerkzeugKontext.fuer(URINET, new Benutzer("b", Rolle.INHABER), null)))
                 .containsExactly("dokumente_suchen", "dokument_zeigen", "fristen", "vollstaendigkeit",
                         "wissen_index", "wissen_seite_zeigen");
+    }
+
+    /** Spec 04, Req 22.7: ohne Freischaltung weder im Archivchat noch im Wissenschat Wissenswerkzeuge. */
+    @Test
+    @Tag("req-22.7")
+    void ohneFreischaltungKeineWissenswerkzeuge() {
+        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> true, m -> false);
+        WerkzeugKontext archiv = WerkzeugKontext.fuer(URINET, new Benutzer("b", Rolle.INHABER), null);
+        assertThat(auswahl.angeboten(archiv)).doesNotContain("wissen_index", "wissen_seite_zeigen")
+                .contains("dokumente_suchen");
+        assertThat(auswahl.erlaubt(archiv, "wissen_index")).isFalse();
+        assertThat(auswahl.erlaubt(archiv, "wissen_seite_zeigen")).isFalse();
+        WerkzeugAuswahl scheitert = new WerkzeugAuswahl(m -> true, m -> {
+            throw new IllegalStateException("Datenbank weg");
+        });
+        assertThat(scheitert.angeboten(archiv)).as("fail closed").doesNotContain("wissen_index");
     }
 
     /** Spec 05, Req 5.4: nur Rollen, die A3 und A4 uneingeschränkt sehen. */

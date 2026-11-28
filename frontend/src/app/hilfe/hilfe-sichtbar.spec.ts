@@ -130,6 +130,20 @@ describe('Sichtbare Abschnitte der Anleitung (Spec 07, Req 6.2, 6.3)', () => {
     });
   }
 
+  it('blendet ohne freigeschaltetes Wissen die Abschnitte der Wissensbasis für jede Rolle aus (Spec 04, Req 22.5)', () => {
+    const wissensAnker = ['suche-wissen', 'chat-wissen', 'wissen', 'wissen-entwuerfe', 'wissen-quellen'];
+    for (const rolle of ['inhaber', 'geschaeftsstelle', 'mitarbeiter', 'treuhaender'] as Rolle[]) {
+      const mit = sichtbareAnker(sichtbareAbschnitte(HILFE_KATALOG, rolle, true));
+      const ohne = sichtbareAnker(sichtbareAbschnitte(HILFE_KATALOG, rolle, false));
+      expect(wissensAnker.filter((a) => ohne.has(a)), rolle).toEqual([]);
+      expect([...mit].filter((a) => !wissensAnker.includes(a)), rolle).toEqual([...ohne]);
+    }
+    expect(sichtbareAnker(sichtbareAbschnitte(HILFE_KATALOG, 'inhaber', true)).has('wissen')).toBe(true);
+    for (const anker of ['suche-wissen', 'chat-wissen']) {
+      expect(sichtbareAnker(sichtbareAbschnitte(HILFE_KATALOG, 'mitarbeiter', true)).has(anker), anker).toBe(true);
+    }
+  });
+
   it('zeigt abgemeldet im echten Katalog nur Einträge mit «abgemeldet»', () => {
     const anker = sichtbareAnker(sichtbareAbschnitte(HILFE_KATALOG, null));
     expect([...anker]).toEqual(HILFE_KATALOG.filter((e) => e.abgemeldet).map((e) => e.anker));

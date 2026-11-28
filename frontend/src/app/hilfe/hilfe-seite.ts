@@ -19,6 +19,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { AnleitungLader } from './anleitung-lader';
 import { AnleitungText } from './anleitung-text';
 import { EinfuehrungVermerk } from './einfuehrung-vermerk';
+import { MandantFunktionen } from '../gemeinsam/mandant-funktionen';
 import { HILFE_EINTRAEGE, sichtbareAbschnitte, sichtbareAnker } from './hilfe-sichtbar';
 
 /**
@@ -39,6 +40,7 @@ export class HilfeSeite {
   private readonly anmeldung = inject(AnmeldungService);
   private readonly lader = inject(AnleitungLader);
   private readonly katalog = inject(HILFE_EINTRAEGE);
+  private readonly funktionen = inject(MandantFunktionen);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly texte = TEXTE.hilfe;
   protected readonly texteEinfuehrung = TEXTE.einfuehrung;
@@ -49,7 +51,7 @@ export class HilfeSeite {
     const benutzer = this.anmeldung.benutzer();
     return this.anmeldung.angemeldet() && benutzer?.mandant && benutzer.rolle ? benutzer.rolle : null;
   });
-  protected readonly abschnitte = computed(() => sichtbareAbschnitte(this.katalog, this.rolle()));
+  protected readonly abschnitte = computed(() => sichtbareAbschnitte(this.katalog, this.rolle(), this.funktionen.wissenVerfuegbar()));
   private readonly anker = computed(() => sichtbareAnker(this.abschnitte()));
   private readonly geladen = computed(() =>
     this.abschnitte()

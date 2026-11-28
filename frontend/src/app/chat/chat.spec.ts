@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { Aktion, WISSEN_AKTIONEN } from '../gemeinsam/anmeldung/rechte';
 import { ChatService } from '../gemeinsam/api/api/chat.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Chat } from './chat';
@@ -67,6 +68,8 @@ describe('Chat (Req 6.1–6.3)', () => {
   let port: ChatAttrappe;
   let element: HTMLElement;
   let darfAnalyse: boolean;
+  // Testdaten: Wissen ist freigeschaltet (Spec 04, Req 22.5); einzelne Tests schalten es aus
+  let wissen: boolean;
   const t = TEXTE.chat;
 
   async function oeffnen() {
@@ -78,6 +81,7 @@ describe('Chat (Req 6.1–6.3)', () => {
   beforeEach(async () => {
     port = new ChatAttrappe();
     darfAnalyse = true;
+    wissen = true;
     port.liste = [
       { id: 'g1', titel: 'Offene Rechnungen im November', geaendert: '2026-11-13T23:30:00Z', modus: 'ARCHIV' },
       { id: 'g2', titel: 'Fristen 2027', geaendert: '2026-11-01T08:00:00Z', modus: 'WISSEN' },
@@ -87,7 +91,7 @@ describe('Chat (Req 6.1–6.3)', () => {
       providers: [provideRouter([]), { provide: ChatPort, useValue: port },
         { provide: ChatService, useValue: { apiV1ChatNachrichtenIdBewertungGet: () =>
           throwError(() => new HttpErrorResponse({ status: 404 })) } },
-        { provide: AnmeldungService, useValue: { darf: () => darfAnalyse } }],
+        { provide: AnmeldungService, useValue: { darf: (a: Aktion) => darfAnalyse && (wissen || !WISSEN_AKTIONEN.has(a)) } }],
     });
     await oeffnen();
   });
@@ -293,6 +297,44 @@ describe('Chat (Req 6.1–6.3)', () => {
     expect(quellen[0].getAttribute('aria-label')).toBe('Wissensseite: Konzept');
     expect(quellen[1].getAttribute('href')).toBe('/dokument/d1');
     expect(quellen[1].getAttribute('aria-label')).toBeNull();
+  });
+
+  describe('ohne freigeschaltetes Wissen (Spec 04, Req 22.5, 22.7)', () => {
+    beforeEach(async () => {
+      wissen = false;
+      fixture.destroy();
+      await oeffnen();
+    });
+
+    it('zeigt keine Moduswahl, keinen Modus und keine Gespräche im Modus WISSEN', () => {
+      expect(element.querySelector('[role=group]')).toBeNull();
+      expect(element.querySelector('[data-test=aktiver-modus]')).toBeNull();
+      expect(element.querySelectorAll('[data-test=gespraech-modus]').length).toBe(0);
+      const titel = [...element.querySelectorAll('[data-test=gespraech]')].map((g) => g.textContent ?? '');
+      expect(titel.length).toBe(1);
+      expect(titel[0]).toContain('Offene Rechnungen im November');
+      expect(element.querySelector(`a[href="/wissen/entwuerfe/meine"]`)).toBeNull();
+    });
+
+    it('fragt im Archivchat ohne Anlegen eines Wissensgesprächs', async () => {
+      await senden('Frage');
+      expect(port.angelegt).toEqual([]);
+      expect(port.fragen_.at(-1)!.gespraechId).toBeNull();
+    });
+
+    it('zeigt von einer Wissensquelle nur die Quelldokumente, ohne Titel und Link der Seite', async () => {
+      await senden('Früher?');
+      await ereignis({
+        typ: 'quellen',
+        quellen: [
+          { wissen: { titel: null, link: null }, dokumente: [{ titel: 'Beleg', link: '/dokument/d1' }] },
+          { wissen: { titel: 'Konzept', link: '/wissen/konzepte/test' }, dokumente: [] },
+        ],
+      });
+      const quellen = [...element.querySelectorAll('[data-test=quelle]')];
+      expect(quellen.map((q) => q.textContent?.trim())).toEqual(['Beleg']);
+      expect(element.querySelector('a[href^="/wissen"]')).toBeNull();
+    });
   });
 
   it('zeigt die Meldung aus fehler und übernimmt die gespraechId', async () => {

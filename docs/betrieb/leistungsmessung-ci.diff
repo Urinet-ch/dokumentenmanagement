@@ -1,0 +1,14 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -403,6 +403,9 @@
+       - name: Lastskripte (tools/last, unittest)
+-        run: python3 -m unittest tools/last/test_last.py
++        run: |
++          python3 -m venv "$RUNNER_TEMP/last-tests"
++          "$RUNNER_TEMP/last-tests/bin/python" -m pip install --requirement tools/golden_synth/requirements.txt
++          PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/last-tests/bin/python" -m unittest discover -s tools/last -p 'test_*.py'
+
+   browser:
+     name: Browser-Szenarien (Cucumber.js, Playwright)
+     if: needs.art.outputs.nur-spec != 'true'

@@ -43,8 +43,10 @@ const SOLL: readonly Soll[] = [
   { anker: 'eingangskorb-bestaetigen', titel: 'Prüfen, korrigieren und bestätigen', eltern: 'eingangskorb', eine: ['A7'] },
   { anker: 'eingangskorb-eigene', titel: 'Ihre erfassten Dokumente verfolgen', eltern: 'eingangskorb', eine: ['A1'], ohne: ['A7'] },
   { anker: 'suche', titel: 'Suche', eine: ['A2'], pfade: ['/suche'] },
+  { anker: 'suche-wissen', titel: 'Wissen in der Suche', eltern: 'suche', eine: ['A15'] },
   { anker: 'chat', titel: 'Chat', eine: ['A2'], pfade: ['/chat'] },
   { anker: 'chat-bewerten', titel: 'Antworten bewerten', eltern: 'chat', eine: ['A2'] },
+  { anker: 'chat-wissen', titel: 'Wissen im Chat', eltern: 'chat', eine: ['A15'] },
   { anker: 'chat-auswertung', titel: 'Chat-Auswertung', eltern: 'chat', eine: ['A24'], pfade: ['/chat/auswertung'] },
   { anker: 'dokument', titel: 'Dokumentansicht', eine: ['A2'], pfade: ['/dokument'] },
   { anker: 'dokument-aendern', titel: 'Angaben ändern', eltern: 'dokument', eine: ['A6'] },
@@ -117,6 +119,16 @@ describe('Abschnitte der Anleitung (Spec 07, Req 6.1)', () => {
 
   it('enthält alle Abschnitte der Aufgabe 22.5', () => {
     for (const anker of AUFGABE_22_5) expect(hilfeEintrag(anker), anker).toBeDefined();
+  });
+
+  it('beschreibt Wissen in Suche und Chat nur in eigenen Abschnitten mit Bedingung A15 (Spec 04, Req 22.5)', () => {
+    for (const anker of ['suche', 'chat']) {
+      expect(lesen(`public/anleitung/${anker}.md`), anker).not.toMatch(/wissen|analyse vorschlagen/i);
+    }
+    for (const anker of ['suche-wissen', 'chat-wissen']) {
+      expect(hilfeEintrag(anker)?.bedingung?.eine, anker).toEqual(['A15']);
+      expect(lesen(`public/anleitung/${anker}.md`), anker).toMatch(/Wissensbasis/);
+    }
   });
 
   it('verweist nur auf Abschnitte, die jeder sieht, der den verweisenden Abschnitt sieht (Req 6.2, 6.3)', () => {

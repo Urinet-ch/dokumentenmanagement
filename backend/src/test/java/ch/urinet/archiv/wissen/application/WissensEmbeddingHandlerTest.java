@@ -26,7 +26,8 @@ class WissensEmbeddingHandlerTest {
     private final List<String> zwecke = new ArrayList<>();
     private final WissensEmbeddingHandler handler = new WissensEmbeddingHandler(speichern,
             new EmbeddingService(modell, (zweck, verbrauch) -> zwecke.add(zweck)),
-            new WissenModellBudget(null, null, true, true));
+            new WissenModellBudget(null, null, true, true, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein()),
+            ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
 
     @Test
     void freigegebeneFassungErhaeltAbschnitteMitTitelTypUndWissensVerbrauch() throws InterruptedException {
@@ -36,6 +37,20 @@ class WissensEmbeddingHandlerTest {
         assertThat(speichern.geschrieben.getFirst().chunk().text()).contains("Titel", "Konzept", "Inhalt");
         assertThat(speichern.geschrieben.getFirst().vektor()).hasSize(EmbeddingPort.DIMENSION);
         assertThat(zwecke).containsExactly("WISSEN_EMBEDDING");
+    }
+
+    /** Spec 04, Req 22.9: ohne Freischaltung kein Embedding-Aufruf der Wissensbasis, der Auftrag endet ohne Wirkung. */
+    @Test
+    @org.junit.jupiter.api.Tag("req-22.9")
+    void ohneFreischaltungKeinModellaufruf() throws InterruptedException {
+        var aus = ch.urinet.archiv.wissen.FesteWissensfreischaltung.aus();
+        var gesperrt = new WissensEmbeddingHandler(speichern,
+                new EmbeddingService(modell, (zweck, verbrauch) -> zwecke.add(zweck)),
+                new WissenModellBudget(null, null, false, false, aus), aus);
+        gesperrt.ausfuehren(auftrag(1));
+        assertThat(modell.aufrufe).isZero();
+        assertThat(speichern.geschrieben).isEmpty();
+        assertThat(zwecke).isEmpty();
     }
 
     @Test

@@ -18,8 +18,11 @@ public class ManuelleNeuerzeugung {
     private final WissenIngestVerarbeiten ki;
     private final WissenKonfiguration konfiguration;
 
+    private final Wissensfreischaltung freischaltung;
+
     public ManuelleNeuerzeugung(ManuelleNeuerzeugungSpeichern speichern, WissenIngestVerarbeiten ki,
-                                WissenKonfiguration konfiguration) {
+                                WissenKonfiguration konfiguration, Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.speichern = speichern;
         this.ki = ki;
         this.konfiguration = konfiguration;
@@ -31,6 +34,10 @@ public class ManuelleNeuerzeugung {
             return;
         }
         var stand = geladen.get();
+        if (!freischaltung.aktuell()) {
+            speichern.abbrechen(auftrag, entwurfId, Wissensfreischaltung.GRUND_AUSGESCHALTET);
+            return;
+        }
         Wissensseite vorher = stand.vorschlag().fassung();
         Wissensseite basis = ManuelleNeuerzeugungSpeichern.seite(stand.basis());
         Map<String, Quelleneintrag> quellen = new LinkedHashMap<>();
@@ -59,8 +66,15 @@ public class ManuelleNeuerzeugung {
                                 + "Verwende nur die angegebenen Quellenschlüssel.");
         long budget = begrenzt(stand.budget().budgetTokens(), konfiguration.ingest().budgetTokens());
         long monat = begrenzt(stand.budget().monatsbudgetTokens(), konfiguration.ingest().monatsbudgetTokens());
-        var antwort = ki.aufrufen(entwurfId, konfiguration.modell(), stand.lauf().tokensEin(),
-                stand.lauf().tokensAus(), stand.monatsverbrauch(), KiPort.WissensSchritt.SEITE, nachricht, budget, monat);
+        WissenIngestVerarbeiten.KiErgebnis antwort;
+        try {
+            antwort = ki.aufrufen(entwurfId, konfiguration.modell(), stand.lauf().tokensEin(),
+                    stand.lauf().tokensAus(), stand.monatsverbrauch(), KiPort.WissensSchritt.SEITE, nachricht, budget,
+                    monat);
+        } catch (WissenAusgeschaltet e) {
+            speichern.abbrechen(auftrag, entwurfId, Wissensfreischaltung.GRUND_AUSGESCHALTET);
+            return;
+        }
         if (!(antwort.inhalt() instanceof KiPort.Seite inhalt) || inhalt.inhalt() == null) {
             speichern.abbrechen(auftrag, entwurfId, antwort.budgetErreicht()
                     ? "Budget erschöpft" : "Die Änderung konnte nicht neu erzeugt werden. Bitte erneut versuchen.");

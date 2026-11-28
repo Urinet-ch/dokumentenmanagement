@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <!-- Protokollaktionen des Betreiber-Kommandos «archiv mandant wissen» (Spec 04, Req 22.2) -->
+    <changeSet id="142-protokoll-wissen-freischaltung" author="claude">
+        <sql>
+            alter table zugriff_protokoll drop constraint zugriff_protokoll_aktion_ck;
+            alter table zugriff_protokoll add constraint zugriff_protokoll_aktion_ck
+                check (aktion in ('ERFASSEN', 'ANZEIGEN', 'HERUNTERLADEN', 'AENDERN', 'BESTAETIGEN',
+                    'VERWERFEN', 'WIEDERHOLEN', 'EXPORTIEREN', 'VERWEIGERT', 'SPERRE_KONFLIKT',
+                    'REGEL_AENDERN', 'KONFIGURATION_AENDERN', 'WISSEN_ANZEIGEN', 'WISSEN_ANNEHMEN',
+                    'WISSEN_VERWERFEN', 'WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_IMPORT',
+                    'WISSENSQUELLE_MARKIERT', 'WISSENSQUELLE_ENTFERNT',
+                    'KONTAKT_ZUSAMMENFUEHREN', 'KONTAKT_INAKTIV', 'KONTAKT_AKTIV',
+                    'BENUTZER_ANLEGEN', 'BENUTZER_AENDERN', 'BENUTZER_LOESCHEN',
+                    'ROLLE_ZUWEISEN', 'BENUTZER_ANTRAG', 'BENUTZER_ABWEICHUNG', 'CHAT_BEWERTUNG_EXPORT',
+                    'WISSEN_FREIGESCHALTET', 'WISSEN_ABGESCHALTET'));
+        </sql>
+        <!--
+            Bewusst kein Rückbau der Bedingung (wie 083): Das Zugriffsprotokoll ist unveränderlich, Einträge
+            WISSEN_FREIGESCHALTET und WISSEN_ABGESCHALTET dürfen weder gelöscht noch ungültig werden. Eine engere
+            Bedingung liesse sich nach dem ersten Schalten nicht mehr anlegen; darum lässt der Rollback die beiden
+            Aktionen zu. Folgen eines Rückfalls auf ein älteres Image: docs/betrieb/deploy-rollback.md.
+        -->
+        <rollback/>
+    </changeSet>
+</databaseChangeLog>

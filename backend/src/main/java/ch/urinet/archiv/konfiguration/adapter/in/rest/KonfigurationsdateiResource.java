@@ -10,6 +10,8 @@ import ch.urinet.archiv.konfiguration.domain.Konfiguration.Befund;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -50,12 +52,16 @@ public class KonfigurationsdateiResource {
     private final KonfigurationsdateiVerwaltung verwaltung;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
+    private final Wissensfreischaltung wissen;
+    private final ObjectMapper json;
 
     public KonfigurationsdateiResource(KonfigurationsdateiVerwaltung verwaltung, MandantAufloesung aufloesung,
-                                       SecurityIdentity identitaet) {
+                                       SecurityIdentity identitaet, Wissensfreischaltung wissen, ObjectMapper json) {
         this.verwaltung = verwaltung;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
+        this.wissen = wissen;
+        this.json = json;
     }
 
     @Schema(name = "KonfigurationsdateiAnalyse")
@@ -91,7 +97,8 @@ public class KonfigurationsdateiResource {
     public Response exportieren() {
         aufloesung.pruefen();
         KonfigurationsdateiVerwaltung.Export export = verwaltung.exportieren();
-        return Response.ok(export.datei(), MediaType.APPLICATION_JSON_TYPE)
+        String datei = wissen.aktuell() ? export.datei() : WissenOhneFreischaltung.ohneWissen(json, export.datei());
+        return Response.ok(datei, MediaType.APPLICATION_JSON_TYPE)
                 .tag(new EntityTag(Integer.toString(export.version()))).build();
     }
 
@@ -106,7 +113,7 @@ public class KonfigurationsdateiResource {
     @APIResponse(responseCode = "422", description = "KONFIGURATION_UNGUELTIG")
     public AnalyseDto pruefen(String body) {
         aufloesung.pruefen();
-        return AnalyseDto.aus(verwaltung.pruefen(body));
+        return AnalyseDto.aus(verwaltung.pruefen(wissenBehalten(body)));
     }
 
     @POST
@@ -120,7 +127,7 @@ public class KonfigurationsdateiResource {
     @APIResponse(responseCode = "422", description = "KONFIGURATION_UNGUELTIG")
     public AnalyseDto vergleichen(String body) {
         aufloesung.pruefen();
-        return AnalyseDto.aus(verwaltung.vergleichen(body));
+        return AnalyseDto.aus(verwaltung.vergleichen(wissenBehalten(body)));
     }
 
     @PUT
@@ -142,7 +149,8 @@ public class KonfigurationsdateiResource {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         KonfigurationsdateiVerwaltung.Ergebnis gespeichert =
-                verwaltung.einspielen(body, wer(), grund, bestaetigt, EinstellungsAenderungsPruefung.Ursprung.APP);
+                verwaltung.einspielen(wissenBehalten(body), wer(), grund, bestaetigt,
+                        EinstellungsAenderungsPruefung.Ursprung.APP);
         return Response.ok(ErgebnisDto.aus(gespeichert))
                 .tag(new EntityTag(Integer.toString(gespeichert.version()))).build();
     }
@@ -182,6 +190,12 @@ public class KonfigurationsdateiResource {
 
     private String wer() {
         return identitaet.getPrincipal().getName();
+    }
+
+    /** Ohne Freischaltung ändert eine Datei die Einstellungen der Wissensbasis nicht (Spec 04, Req 22.6). */
+    private String wissenBehalten(String body) {
+        return wissen.aktuell() ? body
+                : WissenOhneFreischaltung.wissenBehalten(json, body, verwaltung.exportieren().datei(), BODY_MAX);
     }
 
     private static JsonNode objekt(String text, Set<String> felder) {

@@ -12,6 +12,9 @@ import { OeffentlichesChatBudget } from './oeffentliches-chat-budget';
 
 export interface EinstellungenBetrieb { 
     oeffentlicherChat?: OeffentlichesChatBudget;
-    wissenMonatsbudgetTokens?: number;
+    /**
+     * fehlt, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.6)
+     */
+    wissenMonatsbudgetTokens?: number | null;
 }
 

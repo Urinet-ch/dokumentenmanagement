@@ -108,7 +108,7 @@ Checkboxen bleiben offen, bis Fabian den Betriebsnachweis geprüft hat.
   Dokumente und dokumentierte Prüfung; [Aufgaben 5.7 und 5.10](../../.kiro/specs/01-archiv-kern/tasks.md).
 - [ ] **Req 16.16, 16.26 – Leistungsziele:** vor dem Stichtag gemessen auf der VPS als eigenes Compose-Projekt mit
   synthetischen Daten (Entscheid 28.11.2026); ein verfehltes Ziel ist Fabian als Entscheid vorgelegt. Beleg: Messbericht; [Aufgabe 31.6](../../.kiro/specs/01-archiv-kern/tasks.md),
-  [Messanleitung Stufe B](./stufe-b-messung.md).
+  [Messvorbereitung Stufe B](./leistungsmessung-stufe-b.md) (noch nicht ausführungsbereit).
 
 ### Wechsel und Übernahme
 

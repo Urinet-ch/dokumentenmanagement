@@ -397,10 +397,40 @@ public class AgentSchritte {
     }
 
     @Dann("fehlt das noch nicht gefragte Gespräch in der Liste von «{word}»")
+    @Dann("fehlt das angelegte Gespräch in der Liste von «{word}»")
     public void leeresGespraechNichtInDerListe(String benutzer) throws IOException {
         JsonNode liste = JSON.readTree(RestAssured.given().auth().oauth2(Testanmeldung.token(benutzer)).when()
                 .get("/api/v1/chat/gespraeche").then().statusCode(200).extract().asString());
         liste.forEach(g -> assertThat(g.path("id").asText()).isNotEqualTo(gespraech));
+    }
+
+    /** Spec 04, Req 22.6: ohne Freischaltung ergibt der Verlauf eines Gesprächs im Modus WISSEN 403. */
+    @Dann("antwortet der Verlauf des angelegten Gesprächs für «{word}» mit Status {int} und Fehlercode «{word}»")
+    public void verlaufVerweigert(String benutzer, int erwartet, String code) {
+        io.restassured.response.Response antwort = RestAssured.given().auth().oauth2(Testanmeldung.token(benutzer))
+                .when().get("/api/v1/chat/gespraeche/" + gespraech);
+        assertThat(ch.urinet.archiv.sicherheit.ProblemDetails.pruefen(antwort, erwartet)).isEqualTo(code);
+    }
+
+    /** Spec 04, Req 22.7: frühere Quellen auf Wissensseiten ohne Titel und Link, Quelldokumente bleiben, keine Analyse. */
+    @Dann("zeigt der Verlauf von «{word}» die Wissensquelle ohne Titel und Link, mit Quelldokument und ohne Analyse")
+    public void verlaufOhneWissen(String benutzer) throws IOException {
+        JsonNode verlauf = JSON.readTree(RestAssured.given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                .get("/api/v1/chat/gespraeche/" + gespraech).then().statusCode(200).extract().asString());
+        List<JsonNode> wissen = new ArrayList<>();
+        verlauf.path("nachrichten").forEach(n -> {
+            assertThat(n.path("analyseMoeglich").asBoolean()).as("keine Analyse").isFalse();
+            n.path("quellen").forEach(q -> {
+                if (!q.path("wissen").isMissingNode() && !q.path("wissen").isNull()) {
+                    wissen.add(q);
+                }
+            });
+        });
+        assertThat(wissen).isNotEmpty().allSatisfy(q -> {
+            assertThat(q.path("wissen").path("titel").isNull()).isTrue();
+            assertThat(q.path("wissen").path("link").isNull()).isTrue();
+            assertThat(q.path("dokumente").size()).isPositive();
+        });
     }
 
     @Wenn("«{word}» im angelegten Gespräch die Frage «{}» stellt")

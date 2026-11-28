@@ -42,9 +42,11 @@ public class WissenLintVerarbeiten {
     private final KiVerbrauchPort verbrauch;
     private final DiffDienst diff;
     private final WissenLintSerialisierung json;
+    private final Wissensfreischaltung freischaltung;
 
     public WissenLintVerarbeiten(WissenLintSpeichern speichern, KiPort ki, KiVerbrauchPort verbrauch,
-                                 DiffDienst diff, WissenLintSerialisierung json) {
+                                 DiffDienst diff, WissenLintSerialisierung json, Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.speichern = speichern;
         this.ki = ki;
         this.verbrauch = verbrauch;
@@ -58,18 +60,38 @@ public class WissenLintVerarbeiten {
             return;
         }
         Fortschritt stand = lauf.fortschritt();
-        switch (lauf.schritt()) {
-            case "PLANEN" -> {
-                var plan = speichern.planen(LocalDate.now(ZoneId.of("Europe/Zurich")));
-                Fortschritt geplant = neu(stand, plan.befunde(), plan.paare(), 0, List.of(), 0, List.of(),
-                        null, false, stand.hinweise(), stand.aenderungen());
-                speichern.fortsetzen(auftrag, id, "PLANEN", "PAAR", geplant, lauf.ein(), lauf.aus());
-            }
-            case "PAAR" -> paar(auftrag, lauf, stand);
-            case "SEITE" -> seite(auftrag, lauf, stand);
-            case "ABSCHLUSS" -> abschliessen(auftrag, lauf, stand, false, null);
-            default -> abschliessen(auftrag, lauf, stand, true, "Unbekannter Lint-Schritt.");
+        if (!freischaltung.aktuell()) {
+            // Spec 04, Req 22.9: wartender oder laufender Lint nach dem Abschalten, auch im Schritt ABSCHLUSS
+            ausgeschaltet(auftrag, lauf, stand);
+            return;
         }
+        try {
+            switch (lauf.schritt()) {
+                case "PLANEN" -> {
+                    var plan = speichern.planen(LocalDate.now(ZoneId.of("Europe/Zurich")));
+                    Fortschritt geplant = neu(stand, plan.befunde(), plan.paare(), 0, List.of(), 0, List.of(),
+                            null, false, stand.hinweise(), stand.aenderungen());
+                    speichern.fortsetzen(auftrag, id, "PLANEN", "PAAR", geplant, lauf.ein(), lauf.aus());
+                }
+                case "PAAR" -> paar(auftrag, lauf, stand);
+                case "SEITE" -> seite(auftrag, lauf, stand);
+                case "ABSCHLUSS" -> abschliessen(auftrag, lauf, stand, false, null);
+                default -> abschliessen(auftrag, lauf, stand, true, "Unbekannter Lint-Schritt.");
+            }
+        } catch (WissenAusgeschaltet e) {
+            ausgeschaltet(auftrag, lauf, stand);
+        }
+    }
+
+    /**
+     * Wissen ist abgeschaltet (Req 22.9): Der Lauf endet unvollständig mit dem Grund {@code WISSEN_AUSGESCHALTET}, ohne
+     * Modellaufruf und ohne seine Ergebnisse zu speichern (keine Änderungsvorschläge); der Bestand bleibt (Req 22.10).
+     */
+    private void ausgeschaltet(Auftrag auftrag, Lauf lauf, Fortschritt stand) {
+        Fortschritt ohneErgebnis = neu(stand, stand.befunde(), stand.paare(), stand.paarIndex(), stand.seiten(),
+                stand.seitenIndex(), stand.geprueft(), stand.aufrufStufe(), stand.nachfrage(), stand.hinweise(),
+                List.of());
+        abschliessen(auftrag, lauf, ohneErgebnis, true, Wissensfreischaltung.GRUND_AUSGESCHALTET);
     }
 
     private void paar(Auftrag auftrag, Lauf lauf, Fortschritt stand) {
@@ -218,6 +240,8 @@ public class WissenLintVerarbeiten {
 
     private KiAntwort aufrufen(Lauf lauf, KiPort.WissensSchritt schritt, String nachricht,
                                BooleanSupplier freigabe) {
+        // Spec 04, Req 22.9: unmittelbar vor jedem Modellaufruf
+        freischaltung.modellaufrufPruefen();
         long eingabe = (SYSTEM + nachricht).getBytes(StandardCharsets.UTF_8).length + 64L;
         var reservierung = speichern.budgetFuerAufruf(lauf.entwurfId(), eingabe, AUSGABE_TOKENS, Instant.now());
         if (reservierung.isEmpty()) {
@@ -242,6 +266,10 @@ public class WissenLintVerarbeiten {
             }
             return new KiAntwort(antwort instanceof KiPort.WissensGueltig gueltig ? gueltig.inhalt() : null,
                     false, antwort instanceof KiPort.WissensOhneZugang, false);
+        } catch (WissenAusgeschaltet e) {
+            // Req 22.9: der Adapter prüft unmittelbar vor dem Aufruf; nichts ging hinaus, die Reservierung entfällt
+            speichern.budgetFreigeben(budget.id());
+            throw e;
         } finally {
             if (protokolliert) {
                 speichern.budgetFreigeben(budget.id());

@@ -24,6 +24,7 @@ import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { EingangskorbEntwurfSpeicher } from './eingangskorb/entwurf-speicher';
 import { BUILD_INFO, gebautAm } from './gemeinsam/build-info';
 import { FarbschemaService } from './gemeinsam/farbschema';
+import { MandantFunktionen } from './gemeinsam/mandant-funktionen';
 import { MENUE, abschnitte, aktiverPfad } from './gemeinsam/navigation';
 import { Symbol } from './gemeinsam/symbol';
 import { ONLINE } from './gemeinsam/online';
@@ -70,6 +71,7 @@ export class App {
   private readonly swUpdate = inject(SwUpdate);
   private readonly seiteNeuLaden = inject(SEITE_NEU_LADEN);
   private readonly hilfeKatalog = inject(HILFE_EINTRAEGE);
+  private readonly funktionen = inject(MandantFunktionen);
 
   protected readonly mobil = toSignal(
     inject(BreakpointObserver)
@@ -90,7 +92,8 @@ export class App {
   protected readonly abschnitte = computed(() => abschnitte(this.menue()));
   protected readonly darfSuchen = computed(() => this.menue().length > 0 && this.anmeldung.darf('A2'));
   private readonly hilfeAnker = computed(() =>
-    hilfeKontext(this.url(), this.hilfe.rolle(), this.hilfeKatalog, !this.anmeldung.angemeldet() && !this.online()),
+    hilfeKontext(this.url(), this.hilfe.rolle(), this.hilfeKatalog, !this.anmeldung.angemeldet() && !this.online(),
+      this.funktionen.wissenVerfuegbar()),
   );
   protected readonly farbschema = inject(FarbschemaService);
   private readonly abmeldung = inject(Abmeldung);

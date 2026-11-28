@@ -14,7 +14,7 @@ import {
   WissensbasisService,
 } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
-import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
+import { Aktion, Rolle, WISSEN_AKTIONEN, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentAnsicht, sichereAdresse } from './dokument-ansicht';
 import { Ansicht, DokumentPort, Variante } from './dokument-port';
@@ -119,6 +119,8 @@ describe('DokumentAnsicht (Req 14.6)', () => {
   let port: DokumentAttrappe;
   let element: HTMLElement;
   const rolle = signal<Rolle>('inhaber');
+  // Testdaten: Wissen ist freigeschaltet (Spec 04, Req 22.5); einzelne Tests schalten es aus
+  const wissen = signal(true);
   let klassifikationen: DokumentKlassifikationen;
   let quellen: Quelle[];
   let markierungAntwort: Observable<unknown>;
@@ -151,6 +153,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
       }),
     };
     rolle.set('inhaber');
+    wissen.set(true);
     TestBed.configureTestingModule({
       imports: [DokumentAnsicht],
       providers: [
@@ -166,7 +169,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
         {
           provide: AnmeldungService,
           useValue: {
-            darf: (a: Aktion) => darf(rolle(), a),
+            darf: (a: Aktion) => darf(rolle(), a) && (wissen() || !WISSEN_AKTIONEN.has(a)),
             benutzer: () => ({
               id: 'sub-inhaber',
               name: 'Inhaber',
@@ -348,6 +351,30 @@ describe('DokumentAnsicht (Req 14.6)', () => {
       .toBe(TEXTE.dokument.wissensquelleEntfernen);
     expect(element.querySelector('[data-test=wissensquelle-meldung]')?.textContent?.trim())
       .toBe(TEXTE.dokument.wissensquelleMarkiert);
+  });
+
+  it('zeigt ohne freigeschaltetes Wissen weder Wissensquelle noch Wissensseiten und fragt nicht ab (Spec 04, Req 22.5)', async () => {
+    wissen.set(false);
+    quellen = [{
+      dokumentId: 'd1',
+      titel: 'Rechnung 2026-003',
+      art: 'AUSGANGSRECHNUNG',
+      markiertAm: '2026-11-23T09:00:00Z',
+      ingestStatus: 'IN_ARBEIT',
+    }];
+    await oeffnen();
+
+    expect(wissensbasis.apiV1WissenQuellenGet).not.toHaveBeenCalled();
+    expect(element.querySelector('[data-test=wissensquelle-kennzeichen]')).toBeNull();
+    expect(element.querySelector('[data-test=wissensquelle-markieren]')).toBeNull();
+    expect(element.querySelector('[data-test=wissensquelle-entfernen]')).toBeNull();
+    expect(element.querySelector('app-wissen-verwendung')).toBeNull();
+    expect(element.textContent).not.toContain(TEXTE.dokument.alsWissensquelleMarkieren);
+
+    wissen.set(true);
+    await fixture.whenStable();
+    expect(wissensbasis.apiV1WissenQuellenGet).toHaveBeenCalledTimes(1);
+    expect(element.querySelector('[data-test=wissensquelle-kennzeichen]')).not.toBeNull();
   });
 
   it('zeigt den Grund einer abgelehnten Markierung', async () => {

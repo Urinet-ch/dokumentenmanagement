@@ -42,6 +42,15 @@ const json = (route, status, body) =>
     body: body === undefined ? '' : JSON.stringify(body),
   });
 
+/** Mandant aus dem (unsignierten) Token der Keycloak-Attrappe; ohne lesbares Token keiner. */
+function mandantAusToken(kopf) {
+  try {
+    return JSON.parse(Buffer.from(kopf.slice('Bearer '.length).split('.')[1], 'base64url').toString('utf8')).mandant ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Bei aktivem Service Worker den Browser-Kontext als Ziel übergeben. */
 export async function archivAttrappe(welt, ziel = welt.seite) {
   if (welt.archiv) {
@@ -55,12 +64,19 @@ export async function archivAttrappe(welt, ziel = welt.seite) {
     aktionen: [],
     ablehnung: null,
     abfragen: [],
+    // Funktionen des Mandanten (Spec 05, Req 8.8; Spec 04, Req 22.4): Testdaten schalten Wissen für jeden Mandanten
+    // ausdrücklich ein; ein Szenario trägt Mandanten ohne Freischaltung in `wissenAus` ein oder setzt
+    // `funktionenStatus` auf einen Fehlerstatus
+    wissenAus: new Set(),
+    funktionenStatus: 200,
+    funktionenAbfragen: 0,
   };
   welt.archiv = archiv;
   const origin = new URL(basisUrl).origin;
   const zustaendig = (url) =>
     url.origin === origin &&
     (url.pathname === '/api/v1/eingangskorb' ||
+      url.pathname === '/api/v1/mandant/funktionen' ||
       url.pathname === '/api/v1/wissensentwuerfe' ||
       url.pathname === '/api/v1/dokumentarten' ||
       url.pathname === '/api/v1/klassifikationen' ||
@@ -77,6 +93,14 @@ export async function archivAttrappe(welt, ziel = welt.seite) {
     const url = new URL(anfrage.url());
     if (!(await anfrage.headerValue('authorization'))?.startsWith('Bearer ')) {
       return json(route, 401, { fehlercode: 'NICHT_ANGEMELDET' });
+    }
+    if (url.pathname === '/api/v1/mandant/funktionen') {
+      archiv.funktionenAbfragen++;
+      if (archiv.funktionenStatus !== 200) {
+        return json(route, archiv.funktionenStatus, { fehlercode: 'INTERNER_FEHLER' });
+      }
+      const mandant = mandantAusToken(await anfrage.headerValue('authorization'));
+      return json(route, 200, { finanzVerfuegbar: true, wissenVerfuegbar: !archiv.wissenAus.has(mandant) });
     }
     if (url.pathname === '/api/v1/eingangskorb') {
       archiv.abfragen.push(url.search);
