@@ -135,6 +135,8 @@ class OeffentlicheGespraecheTest {
         assertThat(g.anzahl()).as("höchstens max-gespraeche").isEqualTo(2);
         assertThat(g.oeffnen(erstes, URINET, z).verlauf()).as("das älteste fiel weg").isEmpty();
         uhr.jetzt = uhr.jetzt.plus(Duration.ofMinutes(31));
+        assertThat(g.anzahl()).as("die Ablaufbereinigung läuft unabhängig von Folgeanfragen").isEqualTo(2);
+        g.abgelaufeneAufraeumen();
         assertThat(g.anzahl()).isZero();
         assertThat(g.oeffnen(drittes, URINET, z).verlauf()).isEmpty();
     }
