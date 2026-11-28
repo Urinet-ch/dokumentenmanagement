@@ -1,0 +1,179 @@
+<div class="seitenkopf">
+  <p class="vorzeile">{{ gruppe }}</p>
+  <h1>{{ texte.titel }}</h1>
+  <p>{{ texte.einleitung }}</p>
+</div>
+
+<div class="raster">
+  <div class="spalte">
+    <section class="karte bereich" aria-labelledby="trenn-titel">
+      <h2 id="trenn-titel">{{ texte.trennTitel }}</h2>
+      <p class="nebentext">{{ texte.trennHinweis }}</p>
+      <div class="tabelle-rahmen randbuendig">
+        <table class="tabelle" [attr.aria-label]="texte.trennTitel">
+          <thead>
+            <tr>
+              <th scope="col">{{ texte.art }}</th>
+              <th scope="col" class="zahl">{{ texte.anzahl }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-test="trenn-ohne-art">
+              <td>{{ texte.ohneArt }}</td>
+              <td class="zahl">
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  min="0"
+                  [max]="max"
+                  step="1"
+                  [value]="ohneArt()"
+                  [attr.aria-label]="texte.anzahlFuer(texte.ohneArt)"
+                  [attr.aria-invalid]="ungueltig().has('ohne')"
+                  (input)="anzahlSetzen('ohne', $any($event.target).value)"
+                />
+              </td>
+            </tr>
+            @for (art of arten() ?? []; track art.code) {
+              <tr data-test="trenn-art" [attr.data-art]="art.code">
+                <td>
+                  <span class="name">{{ art.name }}</span>
+                  <span class="pille mono">{{ art.code }}</span>
+                </td>
+                <td class="zahl">
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    [max]="max"
+                    step="1"
+                    [value]="jeArt()[art.code] ?? 0"
+                    [attr.aria-label]="texte.anzahlFuer(art.name)"
+                    [attr.aria-invalid]="ungueltig().has(art.code)"
+                    (input)="anzahlSetzen(art.code, $any($event.target).value)"
+                  />
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (arten() === null) {
+        <p class="nebentext" role="status">{{ texte.artenLaden }}</p>
+      }
+      @if (artenFehler()) {
+        <div class="hinweis warnung" role="alert">
+          <app-symbol name="warnung" />
+          <p>
+            {{ texte.artenFehler }}
+            <button mat-button type="button" (click)="artenLaden()">{{ texte.erneut }}</button>
+          </p>
+        </div>
+      }
+    </section>
+
+    <section class="karte bereich" aria-labelledby="ordner-titel">
+      <h2 id="ordner-titel">{{ texte.ordnerTitel }}</h2>
+      <p class="nebentext">{{ texte.ordnerHinweis }}</p>
+      <div class="formular">
+        <label class="feld">
+          <span>{{ texte.titelFeld }}</span>
+          <input
+            type="text"
+            autocomplete="off"
+            [value]="titel()"
+            [attr.aria-invalid]="titelMeldung() !== null"
+            aria-describedby="titel-zaehler titel-meldung"
+            data-test="deckblatt-titel"
+            (input)="titelSetzen($any($event.target).value)"
+            (keydown.enter)="deckblattHinzufuegen()"
+          />
+        </label>
+        <button mat-stroked-button type="button" data-test="deckblatt-hinzufuegen" (click)="deckblattHinzufuegen()">
+          <app-symbol name="plus" />
+          {{ texte.hinzufuegen }}
+        </button>
+      </div>
+      <p id="titel-zaehler" class="nebentext" [class.zu-lang]="titelZeichen() > titelMax">
+        {{ texte.titelZaehler(titelZeichen()) }}
+      </p>
+      <p id="titel-meldung" class="fehlertext" role="alert">{{ titelMeldung() }}</p>
+      @if (deckblaetter().length === 0) {
+        <p class="nebentext">{{ texte.keineDeckblaetter }}</p>
+      } @else {
+        <div class="tabelle-rahmen randbuendig">
+          <table class="tabelle" [attr.aria-label]="texte.ordnerTitel">
+            <thead>
+              <tr>
+                <th scope="col">{{ texte.titelSpalte }}</th>
+                <th scope="col" class="zahl">{{ texte.anzahl }}</th>
+                <th scope="col"><span class="nur-screenreader">{{ texte.aktionen }}</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (blatt of deckblaetter(); track $index) {
+                <tr data-test="deckblatt">
+                  <td><bdi class="name">{{ blatt.titel }}</bdi></td>
+                  <td class="zahl">
+                    <input
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      [max]="max"
+                      step="1"
+                      [value]="blatt.anzahl"
+                      [attr.aria-label]="texte.anzahlFuer(blatt.titel)"
+                      [attr.aria-invalid]="ungueltig().has('deckblatt-' + $index)"
+                      (input)="anzahlSetzen('deckblatt-' + $index, $any($event.target).value)"
+                    />
+                  </td>
+                  <td class="rechts">
+                    <button
+                      mat-button
+                      type="button"
+                      class="gefahr"
+                      [attr.aria-label]="texte.entfernenFuer(blatt.titel)"
+                      (click)="deckblattEntfernen($index)"
+                    >
+                      {{ texte.entfernen }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  </div>
+
+  <section class="karte bereich drucken" aria-labelledby="drucken-titel">
+    <h2 id="drucken-titel">{{ texte.druckTitel }}</h2>
+    <div class="kachel" [class.gefahr]="blaetter() > max">
+      <span class="beschriftung">{{ texte.blaetter }}</span>
+      <strong class="kennzahl" data-test="summe">{{ blaetter() }}</strong>
+    </div>
+    <p class="nebentext">{{ texte.summeHinweis(max) }}</p>
+    @if (blaetter() > max) {
+      <p class="fehlertext">{{ texte.zuViele }}</p>
+    }
+    @if (ungueltig().size > 0) {
+      <p class="fehlertext">{{ texte.anzahlUngueltig }}</p>
+    }
+    <div class="hinweis info">
+      <app-symbol name="info" />
+      <p>{{ texte.druckhinweis }}</p>
+    </div>
+    <button mat-flat-button type="button" data-test="pdf-erstellen" [disabled]="!bereit()" (click)="erstellen()">
+      <app-symbol name="herunterladen" />
+      {{ laeuft() ? texte.laeuft : texte.erstellen }}
+    </button>
+    <p class="status" role="status" aria-live="polite">{{ meldung() }}</p>
+    @if (fehler()) {
+      <div class="hinweis gefahr" role="alert">
+        <app-symbol name="warnung" />
+        <p>{{ fehler() }}</p>
+      </div>
+    }
+  </section>
+</div>

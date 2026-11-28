@@ -8,4 +8,6 @@ Die Seite hat drei Teile:
 
 Auf dem Handy stehen «Mit der Kamera» und «Warteschlange» zuerst.
 
+Für den Stapelscan mit dem Scanner drucken Sie Trennblätter und Ordner-Deckblätter, siehe [Trennblätter drucken](#erfassen-trennblaetter).
+
 > **Hinweis:** Ein Dokument erscheint erst im Eingangskorb, wenn das Archiv es gelesen hat. Bis dahin sehen Sie es dort noch nicht.
