@@ -90,9 +90,16 @@ export function vermerkEntfernen(speicher: Storage | null, k: string): boolean {
   if (!speicher) {
     return false;
   }
+  let roh: string | null;
+  try {
+    roh = speicher.getItem(VERMERK_SCHLUESSEL);
+  } catch {
+    // Lesen gesperrt: ob ein eigener Vermerk besteht, ist unbekannt, also kein Erfolg
+    return false;
+  }
   let inhalt: Record<string, unknown>;
   try {
-    inhalt = objekt(JSON.parse(speicher.getItem(VERMERK_SCHLUESSEL) ?? 'null'));
+    inhalt = objekt(JSON.parse(roh ?? 'null'));
   } catch {
     // Fehlender oder unlesbarer Wert: kein eigener Vermerk, nichts zu tun
     return true;

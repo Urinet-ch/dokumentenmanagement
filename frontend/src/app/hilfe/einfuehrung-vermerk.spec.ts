@@ -361,6 +361,15 @@ describe('Einführungsvermerk (Spec 07, Req 1.3–1.6)', () => {
     expect(await dienst().entfernen()).toBe(false);
   });
 
+  it('meldet keinen Erfolg, wenn der Browser das Lesen beim Entfernen sperrt (Req 11.9)', async () => {
+    vermerkAblegen(localStorage, { k: HASH_A, version: 1, art: 'ABGESCHLOSSEN', am: '2026-11-21' });
+    const vermerk = dienst();
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('gesperrt');
+    });
+    expect(await vermerk.entfernen()).toBe(false);
+  });
+
   it('Datum in Europe/Zurich, ohne Uhrzeit', () => {
     expect(vermerkDatum(new Date('2026-11-21T23:30:00Z'))).toBe('2026-11-22');
     expect(vermerkDatum(new Date('2026-07-01T21:59:00Z'))).toBe('2026-07-01');
