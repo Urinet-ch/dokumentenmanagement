@@ -12,7 +12,8 @@ Löst ADR-010 teilweise ab (Punkte 5 und 6 sowie die Alternative «Dauerhaft auf
   «web» mit anderen Apps und hatte keine Reserven.
 - Die VPS wurde am 23.11.2026 erweitert (tech.md); Fabian hat am 24.11.2026 entschieden, sie so zu belassen. Das
   Budget der Stufe A beträgt seit dem Entscheid vom 27.11.2026 höchstens 2048 MiB und 1.5 CPU (ADR-010, Nachtrag
-  27.11.2026); Spec 09 schlägt für den Dienst `sftp` +96 MiB und +0.1 CPU vor (E11, noch offen).
+  27.11.2026); für den Dienst `sftp` kommen +96 MiB und +0.1 CPU dazu (Spec 09, E11, entschieden von Fabian am 28.11.2026), zusammen
+  2144 MiB und 1.6 CPU.
 - Spec 09 legt den Stichtag auf den 01.01.2027 und den Import des Bestands 2026 bis 31.01.2027 (E7). Die
   Entscheidungshilfe `docs/betrieb/start-echtbelege.md` (PR #731) stellte drei Varianten zur Wahl: A (Pilot mit
   Kopien), B (bestehende VPS wird produktiv), C (Stufe B auf eigener VPS nach Spec).
@@ -49,7 +50,7 @@ Löst ADR-010 teilweise ab (Punkte 5 und 6 sowie die Alternative «Dauerhaft auf
   - Eine einzige VPS ohne Ausweichmaschine: Fällt sie aus, ist das Archiv bis zum Wiederaufbau nicht erreichbar.
     Die Daten tragen Object Lock, Manifeste, Zweitkopie und Restore-Probe (ADR-007, ADR-008); der Wiederaufbau ist
     beschrieben (Req 16.31).
-  - Ressourcen: Das Archiv bleibt im Budget von 2048 MiB / 1.5 CPU; OCR teilt sich den Container mit der API, und die
+  - Ressourcen: Das Archiv bleibt im Budget von 2144 MiB / 1.6 CPU inklusive `sftp`; OCR teilt sich den Container mit der API, und die
     Restore-Probe braucht ein eigenes Budget oder ein kurzes Anhalten der API (Req 16.30). Ob die Leistungsziele
     (Req 16.16) damit erreicht werden, zeigt erst die Messung nach Req 16.26.
   - Der private Probe-Schlüssel liegt auf einer VPS, die auch andere Apps betreibt (nur root-lesbar, Req 16.29).

@@ -625,7 +625,7 @@ der Bestand 2026 ist bis 31.01.2027 importiert. Kein Agent greift auf die VPS, d
 Betriebswerte (Hostnamen, Adressen, Kapazitäten) stehen nicht im Repo. Häkchen nur mit Betriebsnachweis.
 
 - [ ] 31.1 Entscheide zu Variante B [Fabian]
-  - Richtwert bis 02.12.2026. Offene Punkte entscheiden und datiert nachführen: Leistungsmessung vor oder nach dem ersten echten Beleg und Folge bei verfehltem Ziel (16.17, 16.26); Weg gegen Zugriffe anderer Apps am Netz «web» (16.28); Umfang des Ersatzes der Zugangsdaten der Stufe A, Manifest- und Datenschlüssel (16.29); Budget der Restore-Probe (16.30); Zielzeit für den Wiederanlauf auf einer neuen VPS (16.31); dazu Spec 09, E11 (Budget `sftp`)
+  - Richtwert bis 02.12.2026. Offene Punkte entscheiden und datiert nachführen: Leistungsmessung vor oder nach dem ersten echten Beleg und Folge bei verfehltem Ziel (16.17, 16.26); Weg gegen Zugriffe anderer Apps am Netz «web» (16.28); Umfang des Ersatzes der Zugangsdaten der Stufe A, Manifest- und Datenschlüssel (16.29); Budget der Restore-Probe (16.30); Zielzeit für den Wiederanlauf auf einer neuen VPS (16.31). Spec 09, E11 ist entschieden (Fabian, 28.11.2026: Budget 2144 MiB / 1.6 CPU inklusive `sftp`)
   - _Anforderungen: 16.17, 16.26, 16.28, 16.29, 16.30, 16.31_
 
 - [ ] 31.2 Stufenwerte der Stufe B und Prüfungen im Repo [Backend] [Infra]
@@ -637,7 +637,7 @@ Betriebswerte (Hostnamen, Adressen, Kapazitäten) stehen nicht im Repo. Häkchen
   - _Abhängig von: 31.1_
 
 - [ ] 31.3 Speichermessung und Schutzmassnahmen auf der VPS prüfen [Fabian] [Infra] [QA]
-  - Richtwert bis 11.12.2026. Messung aus 1.10 mit Budget 2048 MiB / 1.5 CPU abschliessen (Messbericht ohne Namen anderer Apps), Health und Speicherabbrüche der anderen Apps während der Messung (16.18)
+  - Richtwert bis 11.12.2026. Messung aus 1.10 mit Budget 2144 MiB / 1.6 CPU inklusive `sftp` (Entscheid Fabian 28.11.2026, Spec 09, E11) abschliessen (Messbericht ohne Namen anderer Apps), Health und Speicherabbrüche der anderen Apps während der Messung (16.18)
   - Auf der VPS prüfen: in den internen Netzen des Archivs nur Container des Archivs, am Netz «web» nur `api` und `kc`, keine veröffentlichten Ports ausser dem Eingang nach Spec 09, 1.6, Weg nach 31.1 gegen Zugriffe an Traefik vorbei umgesetzt (16.28; Infra-Repo der VPS [Fabian]); Secret-Dateien nur in Diensten des Archivs (16.29)
   - Ergebnis im Wechselprotokoll (nur Namen und Zähler, keine Werte)
   - _Anforderungen: 16.15, 16.18, 16.28, 16.29, 16.30_

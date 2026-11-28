@@ -46,7 +46,7 @@ Checkboxen bleiben offen, bis Fabian den Betriebsnachweis geprüft hat.
 
 - [ ] **Aufgabe 31.1 – offene Punkte entschieden:** Leistungsmessung vor oder nach dem ersten echten Beleg
   (Req 16.17, 16.26), Weg gegen Zugriffe an Traefik vorbei (16.28), Ersatz der Zugangsdaten der Stufe A (16.29),
-  Budget der Restore-Probe (16.30), Zielzeit für den Wiederanlauf (16.31), Spec 09, E11. Beleg: datierte Einträge in
+  Budget der Restore-Probe (16.30), Zielzeit für den Wiederanlauf (16.31); Spec 09, E11 ist entschieden (28.11.2026). Beleg: datierte Einträge in
   der Spec.
 
 ### Plattform, Daten und Deploy
@@ -76,8 +76,8 @@ Checkboxen bleiben offen, bis Fabian den Betriebsnachweis geprüft hat.
 - [ ] **Req 16.29 – Geheimnisse nur im Archiv:** Secret-Dateien nur in den Diensten des Archivs, die sie brauchen;
   keine geteilten Zugänge mit anderen Apps; Zugangsdaten der Stufe A nach dem Entscheid aus 31.1 ersetzt; privater
   Probe-Schlüssel nur root-lesbar. Beleg: Wechselprotokoll (nur Namen); Test der Compose-Datei aus 31.2.
-- [ ] **Req 16.18, 16.30 – Ressourcen:** Speichermessung aus 1.10 mit 2048 MiB / 1.5 CPU abgeschlossen, ohne
-  Speicherabbruch und ohne kranke andere App; Budget der Stufe B eingehalten (für `sftp` nach E11); Alarm bei
+- [ ] **Req 16.18, 16.30 – Ressourcen:** Speichermessung aus 1.10 mit 2144 MiB / 1.6 CPU inklusive `sftp` abgeschlossen
+  (Entscheid Fabian 28.11.2026, Spec 09, E11), ohne Speicherabbruch und ohne kranke andere App; Budget eingehalten; Alarm bei
   Speicherabbruch oder kranker anderer App eingerichtet. Beleg: Messbericht und Alarmprotokoll;
   [Messanleitung Stufe A](./speichermessung-stufe-a.md), [Aufgaben 31.3 und 31.5](../../.kiro/specs/01-archiv-kern/tasks.md).
 - [ ] **Req 16.31 – Wiederaufbau:** Die Anleitung beschreibt den Wiederaufbau auf einer neuen VPS. Beleg:

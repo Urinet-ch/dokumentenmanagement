@@ -150,8 +150,8 @@ bestehende VPS wird nach den Gates aus Spec 01, Welle 31 produktiv ([ADR-020](AD
 Folgen für dieses ADR: Punkt 4 gilt bis zum Wechsel; Punkt 5 (eigene VPS, K5, Nachtrag 12.11.2026) und Punkt 6 (Wechsel
 mit neuer VPS, DNS und Rückbau der Stufe A) gelten nicht mehr, der Wechsel läuft nach Req 16.17 (geändert 28.11.2026)
 auf derselben VPS; die Alternative «Dauerhaft auf der bestehenden VPS» ist nicht mehr abgelehnt, die Risiken der
-geteilten VPS tragen Req 16.28 bis 16.31. Punkte 1 bis 3 und 7 bleiben. Budget der Stufe B: wie Stufe A, 2048 MiB und
-1.5 CPU, für `sftp` nach Spec 09, E11 (Req 16.30).
+geteilten VPS tragen Req 16.28 bis 16.31. Punkte 1 bis 3 und 7 bleiben. Budget der Stufe B: wie Stufe A, 2144 MiB und
+1.6 CPU inklusive `sftp` (Entscheid Fabian 28.11.2026, Spec 09, E11; Req 16.30).
 
 ## Verweise
 - Req 3.2, 5.5, 14.3, 16.1, 16.4, 16.7, 16.9–16.11, 16.15–16.19, 16.26; P1 (geändert 08.11.2026), P5, P15, K5
