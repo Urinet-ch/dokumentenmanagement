@@ -131,9 +131,10 @@ wieder aufrufen können, damit sie mir hilft und mich nicht aufhält.
 4. WENN der Benutzer «Überspringen» wählt, DANN SOLL die App den Vermerk `UEBERSPRUNGEN` ablegen, die Karte schliessen,
    den Fokus auf die Überschrift des Seitenkopfs setzen und als Statusmeldung «Einführung übersprungen. Sie finden sie
    jederzeit unter ‹Hilfe›.» zeigen.
-5. WENN der Benutzer in der Anleitung «Einführung erneut zeigen» wählt, DANN SOLL die App die Startseite mit der
-   Einführung ab Schritt 1 zeigen (Adresse `/?einfuehrung`), auch wenn ein Vermerk besteht; Abschluss oder Überspringen
-   SOLLEN den Vermerk ersetzen.
+5. WENN der Benutzer in der Anleitung oder auf «Mein Konto» (Spec 06, 11.7) «Einführung erneut zeigen» wählt, DANN SOLL
+   die App die Startseite mit der Einführung ab Schritt 1 zeigen (Adresse `/?einfuehrung`), auch wenn ein Vermerk besteht;
+   Abschluss oder Überspringen SOLLEN den Vermerk ersetzen (ergänzt «oder auf «Mein Konto»» nach Entscheid Fabian
+   28.11.2026, Spec 06, Requirement 11).
 6. WENN der Benutzer die Startseite verlässt, ohne die Einführung abzuschliessen oder zu überspringen, DANN SOLL kein
    Vermerk entstehen und die App den aktuellen Schritt bis zum Neuladen der Seite behalten; nach dem Neuladen beginnt die
    Einführung wieder bei Schritt 1.
@@ -190,7 +191,8 @@ springen können, damit ich nachschlagen und Links auf eine Stelle weitergeben k
    setzen und nach 5.2 springen; der Zurück-Knopf des Browsers SOLL zur vorherigen Stelle führen.
 4. Die Seite SOLL bei 375 px einspaltig sein (Inhaltsverzeichnis als Karte oben) und ab etwa 1100 px zweispaltig mit dem
    Inhaltsverzeichnis links, das beim Scrollen sichtbar bleibt.
-5. Die Seite SOLL angemeldeten Benutzern mit Rolle den Knopf «Einführung erneut zeigen» anbieten (Requirement 3.5).
+5. Die Seite SOLL angemeldeten Benutzern mit Rolle den Knopf «Einführung erneut zeigen» anbieten (Requirement 3.5);
+   denselben Knopf bietet zusätzlich «Mein Konto» (Spec 06, 11.7; ergänzt nach Entscheid Fabian 28.11.2026).
 
 ### Requirement 6: Inhalt der Anleitung nach Rolle (ohne Konzept-ID)
 **User Story:** Als Benutzer möchte ich in der Anleitung genau die Bereiche finden, die ich nutzen darf, beschrieben mit

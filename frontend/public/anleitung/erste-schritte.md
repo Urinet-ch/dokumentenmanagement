@@ -10,7 +10,7 @@ Im {name} legen Sie Dokumente einmal ab und finden sie danach wieder, immer mit 
 Wenn Sie diesen Browser erstmals mit Ihrem Zugang nutzen, erscheint auf der Startseite zusätzlich die Einführung.
 Mit «Weiter» und «Zurück» gehen Sie durch die Schritte; «In der Anleitung lesen» öffnet die Hilfe zum aktuellen Schritt,
 ohne die Startseite zu verlassen. Mit «Fertig» schliessen Sie die Einführung ab, mit «Überspringen» schliessen Sie sie
-vorzeitig. Unter «Hilfe» und «Ganze Anleitung öffnen» können Sie sie mit «Einführung erneut zeigen» wieder aufrufen.
+vorzeitig. Unter «Hilfe» und «Ganze Anleitung öffnen» oder auf «Mein Konto» können Sie sie mit «Einführung erneut zeigen» wieder aufrufen.
 
 Statt Passwort und Code können Sie sich mit einem Passkey anmelden, wenn Sie einen eingerichtet haben; siehe «Mit Passkey anmelden».
 
@@ -26,21 +26,23 @@ Ein Zurücksetzen des Passworts auf der Anmeldeseite gibt es nicht. Haben Sie Ih
 
 ## Ihre Rolle
 
-Auf breiten Bildschirmen stehen oben rechts Ihr Name, Ihre Rolle und der Mandant, auf dem Handy nur Ihre Initialen. Die Rolle bestimmt, welche Bereiche Sie sehen. Fehlt Ihnen ein Bereich, wenden Sie sich an die Person, die Ihren Zugang eingerichtet hat. Daneben führt «Passkey einrichten» (Schlüssel-Symbol) in einem neuen Tab zur Kontoverwaltung der Anmeldung; wie das geht, steht im Abschnitt «Mit Passkey anmelden».
+Auf breiten Bildschirmen stehen oben rechts Ihr Name, Ihre Rolle und der Mandant, auf dem Handy nur Ihre Initialen. Die Rolle bestimmt, welche Bereiche Sie sehen. Fehlt Ihnen ein Bereich, wenden Sie sich an die Person, die Ihren Zugang eingerichtet hat. Ein Klick auf Ihren Namen öffnet «Mein Konto» mit Ihren Angaben, der Anmeldung (Passkey, Passwort, Einmalcode), der Darstellung und dem Abmelden; siehe Abschnitt «Mein Konto».
 
 ## Hell oder dunkel
 
-Die App folgt dem hellen oder dunklen Farbschema Ihres Geräts. Mit dem Knopf mit Sonne oder Mond oben rechts wechseln Sie das Farbschema. Diese Wahl merkt sich nur der Browser, in dem Sie sie treffen.
+Die App folgt dem hellen oder dunklen Farbschema Ihres Geräts. Angemeldet wählen Sie auf «Mein Konto» unter «Darstellung» «Wie das Gerät», «Hell» oder «Dunkel»; vor der Anmeldung wechselt der Knopf mit Sonne oder Mond oben rechts das Farbschema. Diese Wahl merkt sich nur der Browser, in dem Sie sie treffen.
 
 ## Hilfe
 
-Wählen Sie oben neben dem Farbschema «Hilfe». Die Hilfe-Leiste zeigt den Abschnitt zur aktuellen Seite, ohne sie zu verlassen. Über «Ganze Anleitung öffnen» lesen Sie alle für Ihre Rolle sichtbaren Bereiche; dort können Sie auch einen Abschnitt direkt öffnen.
+Wählen Sie oben rechts «Hilfe» (angemeldet neben Ihrem Namen, sonst neben dem Farbschema). Die Hilfe-Leiste zeigt den Abschnitt zur aktuellen Seite, ohne sie zu verlassen. Über «Ganze Anleitung öffnen» lesen Sie alle für Ihre Rolle sichtbaren Bereiche; dort können Sie auch einen Abschnitt direkt öffnen.
 
 Auf breiten Bildschirmen öffnet sich die Hilfe-Leiste rechts mit mehr Platz; auf kleinen Bildschirmen nimmt sie die ganze Breite ein. Mit «Abschnitte» klappen Sie das Verzeichnis auf oder zu. Ist beim Öffnen ein Abschnitt zur Seite gewählt, ist das Verzeichnis zuerst zugeklappt; ohne gewählten Abschnitt ist es offen. Wenn Sie einen Abschnitt wählen, klappt es zu.
 
 ## Abmelden
 
-1. Wählen Sie oben rechts «Abmelden». Auf dem Handy zeigt der Knopf nur das Symbol.
+1. Öffnen Sie oben rechts mit Ihrem Namen «Mein Konto» und wählen Sie dort «Abmelden».
 2. Danach zeigt die App wieder die Startseite mit «Anmelden».
+
+Ist Ihre Sitzung abgelaufen, steht «Abmelden» weiterhin oben rechts; damit beenden Sie auch die Sitzung bei der Anmeldung.
 
 > **Achtung:** Melden Sie sich auf einem Gerät, das auch andere benutzen, nach der Arbeit immer ab.

@@ -46,6 +46,7 @@ export async function keycloakAttrappe(welt) {
       exp: jetzt + kc.ablaufSekunden,
       name: b.name,
       preferred_username: b.name.toLowerCase().replace(/\s+/g, '.'),
+      email: `${b.name.toLowerCase().replace(/\s+/g, '.')}@example.invalid`,
       realm_access: { roles: b.rollen },
       ...(b.mandant ? { mandant: b.mandant } : {}),
       jti: randomUUID(),

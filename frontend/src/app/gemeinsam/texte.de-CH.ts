@@ -36,8 +36,9 @@ export const TEXTE = {
     suchePlatzhalter: 'Dokumente, Belegnummern, Partner suchen …',
     hell: 'Helles Farbschema verwenden',
     dunkel: 'Dunkles Farbschema verwenden',
-    passkeyEinrichten: 'Passkey einrichten',
-    passkeyEinrichtenNeuerTab: 'Passkey einrichten (öffnet die Kontoverwaltung in einem neuen Tab)',
+    // Nur für Screenreader vor dem sichtbaren Namen: zugänglicher Name mit Benutzername (Spec 06, Req 11.1)
+    kontoName: (benutzername: string | null | undefined) =>
+      benutzername ? `Mein Konto (${benutzername}): ` : 'Mein Konto: ',
     rollen: {
       inhaber: 'Inhaber',
       geschaeftsstelle: 'Geschäftsstelle',
@@ -389,6 +390,70 @@ export const TEXTE = {
     ohneZugang:
       'Ihrem Benutzer ist kein Mandant oder keine Rolle im Archiv zugeordnet. Bitte wenden Sie sich an den Inhaber.',
     funktionen: 'Ihre Funktionen',
+  },
+  // Seite «Mein Konto» (Spec 06, Requirement 11)
+  konto: {
+    titel: 'Mein Konto',
+    vorzeile: 'Persönlich',
+    untertitel: 'Ihre Angaben, Ihre Anmeldung und Ihre Einstellungen auf diesem Gerät.',
+    abgelaufen:
+      'Ihre Sitzung ist abgelaufen. Darstellung, «Dieses Gerät» und «Abmelden» bleiben hier nutzbar; Ihre Angaben und die Anmeldung erscheinen nach der nächsten Anmeldung.',
+    person: {
+      titel: 'Angaben zur Person',
+      name: 'Name',
+      benutzername: 'Benutzername',
+      email: 'E-Mail-Adresse',
+      rolle: 'Rolle',
+      mandant: 'Mandant',
+      hinweis: 'Diese Angaben ändert eine Inhaberin oder ein Inhaber Ihres Mandanten in der Verwaltung.',
+    },
+    sicherheit: {
+      titel: 'Anmeldung und Sicherheit',
+      hinweis:
+        'Passkeys, Passwort, Einmalcode und angemeldete Geräte verwalten Sie in der Kontoverwaltung der Anmeldung. Sie öffnet sich in einem neuen Tab; das Archiv bleibt hier offen.',
+      passkeys: 'Passkeys verwalten',
+      passwort: 'Passwort ändern',
+      einmalcode: 'Einmalcode (Authenticator) verwalten',
+      geraete: 'Angemeldete Geräte',
+      neuerTab: (text: string) => `${text} (öffnet die Kontoverwaltung in einem neuen Tab)`,
+      offline:
+        'Ohne Verbindung ist die Kontoverwaltung nicht erreichbar. Die Einstiege sind wieder bereit, sobald das Gerät online ist.',
+    },
+    darstellung: {
+      titel: 'Darstellung',
+      hinweis: 'Die Wahl gilt sofort und nur in diesem Browser.',
+      gruppe: 'Farbschema',
+      system: 'Wie das Gerät',
+      hell: 'Hell',
+      dunkel: 'Dunkel',
+    },
+    hilfe: {
+      titel: 'Hilfe und Einführung',
+      hinweis: 'Die Einführung zeigt Ihnen in wenigen Schritten, was Sie im Archiv tun können.',
+      anleitung: 'Anleitung öffnen',
+    },
+    geraet: {
+      titel: 'Dieses Gerät',
+      // Gezählt wie die Liste in «Erfassen»: eigene Aufnahmen und solche, die ohne Anmeldung aufgenommen wurden
+      aufnahmen: (anzahl: number) =>
+        anzahl === 0
+          ? 'Auf diesem Gerät wartet keine Aufnahme von Ihnen oder ohne Anmeldung auf den Upload.'
+          : anzahl === 1
+            ? '1 Aufnahme (von Ihnen oder ohne Anmeldung aufgenommen) wartet auf diesem Gerät auf den Upload oder wurde nicht hochgeladen.'
+            : `${anzahl} Aufnahmen (von Ihnen oder ohne Anmeldung aufgenommen) warten auf diesem Gerät auf den Upload oder wurden nicht hochgeladen.`,
+      zurListe: 'Zur Warteschlange in «Erfassen»',
+      entfernen: 'Lokale Einstellungen entfernen',
+      frage:
+        'Auf diesem Gerät werden entfernt: Ihre Wahl des Farbschemas, Ihr Vermerk zur Einführung, Ihre lokal gemerkten Entwürfe im Eingangskorb und das zwischengespeicherte Erscheinungsbild. Aufnahmen in der Warteschlange bleiben erhalten, und Sie bleiben angemeldet.',
+      bestaetigen: 'Entfernen',
+      abbrechen: 'Abbrechen',
+      entfernt: 'Die lokalen Einstellungen wurden entfernt.',
+      fehler:
+        'Die lokalen Einstellungen konnten nicht vollständig entfernt werden, weil der Browser den Speicher nicht freigibt. Bitte versuchen Sie es erneut oder löschen Sie die Website-Daten in den Einstellungen des Browsers.',
+    },
+    abmelden: {
+      hinweis: 'Melden Sie sich auf einem Gerät, das auch andere benutzen, nach der Arbeit immer ab.',
+    },
   },
   httpFehler: {
     verbindung:
@@ -2007,6 +2072,7 @@ export const TEXTE = {
     abschnitte: {
       'erste-schritte': 'Erste Schritte',
       'erste-schritte-passkey': 'Mit Passkey anmelden',
+      'erste-schritte-konto': 'Mein Konto',
       // Aufgabe 22.5
       erfassen: 'Erfassen',
       'erfassen-handy': 'Mit dem Handy fotografieren',
