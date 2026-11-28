@@ -557,6 +557,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 10.9, 16.6, 16.12_
 
 - [ ] 5.8 Übernahme Belege 2026 und Abnahme [Fabian] [QA]
+  - Spec 09 ergänzt (Spec 09, 16.7, freigegeben mit dem Merge von #745 am 28.11.2026): Die Übernahme der Belege 2026 läuft über Spec 09, Welle 30; der Abschluss nach Spec 09, 16.6 liefert zugleich den Nachweis dieser Aufgabe, damit der Bestand nicht zweimal übernommen wird.
   - Voraussetzung: Wechsel auf Stufe B abgeschlossen (5.11, 16.17), Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün; Realitätsprüfung nach Auflage A2 aus Gate 0 erneut gelaufen und Ziel aus 2.9 erreicht (`docs/umsetzungsplan.md`, Abschnitt 6)
   - CRM-Kontakte per CSV importieren, Drive-Altbestand importieren und im Eingangskorb bestätigen, Papierbelege 2026 fotografieren, Generatoren umstellen
   - Abnahmetest: Stichprobe 20 Dokumente auffindbar, Schlussbericht des Drive-Imports geht auf, Prüflauf ohne Abweichung, Mandantentrennung mit Testmandant `test` geprüft

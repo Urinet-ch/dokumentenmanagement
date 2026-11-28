@@ -22,14 +22,16 @@ Zeitrahmen (Richtwert, gebunden an Entscheid #731): Welle 27 vom 01.12. bis 04.1
 (Stichtag, Richtwert 01.01.2027, Bestand bis 31.01.2027) beginnt erst nach Aufgabe 30.1.
 
 ## Welle 27 — Entscheide, Grundlagen und Spike
-- [ ] 27.1 Entscheide und Bestandsaufnahme [Fabian]
+- [x] 27.1 Entscheide und Bestandsaufnahme [Fabian]
+ - Erledigt 28.11.2026: Entscheide E8 bis E13 von Fabian, datiert in design.md, «Open Points» (nachgetragen mit
+ Aufgabe 27.2); die Bestandsaufnahme ist mit dem Merge von #745 bestätigt. E6 folgt nach 27.4, E7 nach #731.
   - Bestandsaufnahme `docs/spikes/09-bestandsaufnahme.md` prüfen und bestätigen.
   - Entscheide E8, E9, E10 (Weg nach aussen), E11 (Budget Stufe A), E12 (Dateinamen-Regeln), E13 (verworfene
     Seiten im Stapel-Original); E6 vorläufig, endgültig nach 27.4. Ergebnisse datiert in design.md, «Open Points».
   - Werte aus der privaten Liste (Platzhalter in design.md) bereithalten, nicht ins Repo schreiben.
   - _Anforderungen: 0.1_
 
-- [ ] 27.2 Folgeänderungen und Rechte [Backend]
+- [x] 27.2 Folgeänderungen und Rechte [Backend]
   - Folgeänderungen nach design.md, «Folgeänderungen», Spalte «27.1», als ein PR (Steering, Spec 01, 02, 05, 06 als
     ausgewiesene Ergänzungen mit Datum des Entscheids, nie stillschweigend).
   - Enum `Aktion` um A25 bis A29, `rechtematrix.json`, `RechtematrixSpecTest` liest Spec 09 als vierte Quelle;

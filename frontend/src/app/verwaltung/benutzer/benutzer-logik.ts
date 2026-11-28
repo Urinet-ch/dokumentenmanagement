@@ -19,6 +19,9 @@ const GRUPPEN: Record<string, Gruppe> = {
   A17: 'bestaetigen',
   A18: 'erfassen',
   A24: 'lesen',
+  A25: 'lesen',
+  A26: 'erfassen',
+  A27: 'lesen',
 };
 
 export function name(benutzer: BenutzerAnsicht): string {
