@@ -19,7 +19,7 @@ erledigten Umsetzungen.
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
 | 0.7 | PR #18 belegt die Zugangsvorbereitung, nicht den Abschluss der gesamten Stufe A. | Fabian / Infra |
-| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. Entscheid Fabian (27.11.2026): Budget 2048 MiB / 1.5 CPU und erneute Messung. Der Generator #727 ist gemergt; er und der offene lokale Trockenlauf-PR #730 belegen weder VPS-Messung noch Health-/OOM-Prüfung. | Fabian / Infra; Messung und Nachweis |
+| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. Entscheid Fabian (27.11.2026): Budget 2048 MiB / 1.5 CPU und erneute Messung. Der Generator #727 und der lokale Speichermessungs-Trockenlauf #730 sind gemergt; sie belegen weder VPS-Messung noch Health-/OOM-Prüfung. | Fabian / Infra; Messung und Nachweis |
 | 2.6 | Teilumsetzungen in #46, #54, #266, #568, #638 sowie den am 25.11. gemergten #644 und #645; Stufe-B-Leistungsnachweis fehlt. | Backend / Infra |
 | 3.7 | PWA und Eingabegrenzen in #123 und #472; die Abnahme bleibt ausstehend. | Fabian / Frontend |
 | 5.4 | Kein vollständiger Produktiv- und Stufe-B-Nachweis in den geprüften Belegen. | Fabian / Infra; abhängig von 5.11 |
@@ -27,7 +27,7 @@ erledigten Umsetzungen.
 | 5.6 | App-Alarme und Kennzahlen in #91, #114, #191, #566 und #639; Aktivierung und Betriebsnachweise bleiben offen. | Backend / Infra |
 | 5.7 | Entwurf #283 ist keine Freigabe; Gegenlesen und Freigabe sind laut Taskdatei offen. | Fabian |
 | 5.8 | Abnahme-Gate und Belegübernahme offen; Voraussetzungen aus 5.9 und 5.11 fehlen. | Fabian / QA; blockiert |
-| 5.9 | Die Varianten 1 (Erreichbarkeit beider Hosts) und 3 (fehlgeschlagener Deploy) aus #724 sind seit 27.11.2026 entschieden und im Infra-Repo umgesetzt. Der Betriebsnachweis der Prüfung des Anmelde-Hosts bleibt bei Fabian; die Zertifikatsprüfung wurde nicht gewählt. | Fabian; Betriebsnachweis |
+| 5.9 | Die externe Erreichbarkeitsprüfung des Anwendungs-Hosts und die Meldung bei fehlgeschlagenem Deploy aus #724 sind im Infra-Repo umgesetzt. Fabian entschied am 28.11.2026, den Anmelde-Host nicht extern zu überwachen; die Prüfung wurde entfernt, da die Prüfung des Anwendungs-Hosts genügt. Fällt nur der Anmeldedienst aus, bleibt die Health der App grün. Kein Betriebsnachweis für den Anmelde-Host offen; die übrigen Schritte bleiben offen. | Fabian / Infra; übrige Schritte |
 | 5.10 | Entwurf #284 ist keine geprüfte Notfallunterlage. | Fabian |
 | 5.11 | Kein vollständiger Wechsel- und Betriebsnachweis im geprüften Stand. | Fabian / Infra |
 | O.8 | Kein Umsetzungs- oder Entscheidungsnachweis gefunden. | Fabian / Infra / Backend |

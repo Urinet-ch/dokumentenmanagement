@@ -571,7 +571,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Vorbereitung ohne Betriebseingriff (PR #569): Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; Anbindung und Nachweise bleiben offen.
   - Folgeumsetzung (24.11.2026): App-Gauge `archiv_ki_beispiele{mandant}` und Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` ab 1'000 Beispielen; dokumentiert in `docs/alarme.md`. Die VPS-Anbindung und Betriebsnachweise bleiben offen, daher bleibt die Aufgabe ungeprüft.
   - Nachtrag (25.11.2026): Ein Fehler beim Zählen der KI-Beispiele lässt die übrigen Kennzahlen des Mandanten bestehen; die fehlende KI-Gauge signalisiert den Messfehler statt eines Nullwerts. Tests in `JdbcKiBeispielTest` und `MicrometerKennzahlenTest`.
-  - Entscheid Fabian (27.11.2026, PR #724): unabhängige Erreichbarkeitsprüfung beider Hosts und Meldung bei fehlgeschlagenem Deploy gewählt; beides im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Der Betriebsnachweis für die Prüfung des Anmelde-Hosts bleibt bei Fabian offen; Aufgabe 5.9 bleibt bis zu diesem Nachweis ungeprüft.
+  - Entscheid Fabian (27.11.2026, PR #724; präzisiert am 28.11.2026): unabhängige externe Erreichbarkeitsprüfung des Anwendungs-Hosts und Meldung bei fehlgeschlagenem Deploy gewählt; beides im Infra-Repo umgesetzt. Fabian entschied am 28.11.2026, den Anmelde-Host bewusst nicht extern zu überwachen: Die Prüfung des Anwendungs-Hosts genügt, die externe Prüfung des Anmelde-Hosts wurde wieder entfernt. Fällt nur der Anmeldedienst aus, bleibt die Health der App grün. Für den Anmelde-Host bleibt deshalb kein Betriebsnachweis offen; die übrigen Schritte aus 5.9 bleiben ungeprüft.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 
