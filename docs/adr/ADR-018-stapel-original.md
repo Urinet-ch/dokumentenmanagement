@@ -13,7 +13,7 @@
   aller Dokumente unter `archiv/`, im Manifest und im Prüflauf; gesperrt im Modus GOVERNANCE bis zum spätesten
   `aufbewahren_bis` seiner pflichtigen Dokumente. Sind alle Dokumente verworfen, wird es gelöscht.
 - Jedes Dokument verweist auf Stapel und Seitenbereich; das Stapelprotokoll hält die Seitenbilanz fest.
-- Das archivierte Original wird nie verändert, auch nicht, um Seiten verworfener Dokumente zu entfernen (E13).
+- Das archivierte Original wird nie verändert, auch nicht, um Seiten verworfener Dokumente zu entfernen (E13, entschieden von Fabian am 28.11.2026).
 
 ## Folgen
 - Seiten verworfener Dokumente bleiben bis zum Ende der Sperre im Original; darum sieht Stapel nur, wer alle

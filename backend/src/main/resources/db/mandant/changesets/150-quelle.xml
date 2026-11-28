@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Spec 09, Aufgabe 27.6: Quellenregister und Quellläufe (design.md «Data Models»), Verweis des Dokuments auf seinen
+     Quelllauf, Quellen GMAIL und ORDNER. Rückwärtskompatibel: nur neue Tabellen und eine Spalte ohne Pflicht. Seed nur
+     der allgemeinen Quellen für urinet (Spec 09, 10.2), ohne Zugang und ohne Geschäftsangaben. -->
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="150-quelle" author="archiv">
+        <sql>
+            create table quelle (
+                id uuid primary key,
+                code text not null constraint quelle_code_ux unique
+                    constraint quelle_code_ck check (code ~ '^[a-z0-9][a-z0-9-]{0,39}$'),
+                name text not null constraint quelle_name_ck check (length(name) between 1 and 100),
+                typ text not null constraint quelle_typ_ck
+                    check (typ in ('GENERATOR', 'DRIVE', 'ORDNER', 'MAC_EINGANG', 'GMAIL_LABEL', 'CRM_CSV', 'SCAN')),
+                konfiguration jsonb not null default '{}'
+                    constraint quelle_konfiguration_ck check (jsonb_typeof(konfiguration) = 'object'),
+                geheimnis bytea,
+                status text not null default 'OFFEN'
+                    constraint quelle_status_ck check (status in ('OFFEN', 'LAEUFT', 'ABGESCHLOSSEN', 'LAUFEND')),
+                bemerkung text constraint quelle_bemerkung_ck check (length(bemerkung) &lt;= 1000),
+                letzter_lauf uuid,
+                version int not null default 0,
+                geaendert timestamptz
+            );
+            create table quelle_lauf (
+                id uuid primary key,
+                quelle_id uuid not null constraint quelle_lauf_quelle_fk references quelle (id),
+                art text not null constraint quelle_lauf_art_ck check (art in ('TROCKEN', 'ECHT', 'AUTOMATISCH')),
+                status text not null
+                    constraint quelle_lauf_status_ck check (status in ('LAEUFT', 'FERTIG', 'ABGEBROCHEN')),
+                gefunden int not null default 0,
+                neu int not null default 0,
+                dublette_pruefsumme int not null default 0,
+                dublette_fachlich int not null default 0,
+                uebersprungen int not null default 0,
+                fehler int not null default 0,
+                import_lauf_id uuid constraint quelle_lauf_import_fk references import_lauf (id),
+                meldungen jsonb not null default '[]'
+                    constraint quelle_lauf_meldungen_ck check (jsonb_typeof(meldungen) = 'array'),
+                benutzer text,
+                gestartet timestamptz not null,
+                beendet timestamptz,
+                constraint quelle_lauf_zaehler_ck check (least(gefunden, neu, dublette_pruefsumme, dublette_fachlich,
+                    uebersprungen, fehler) >= 0
+                    and gefunden = neu + dublette_pruefsumme + uebersprungen + fehler)
+            );
+            create unique index quelle_lauf_laeuft_ux on quelle_lauf (quelle_id) where status = 'LAEUFT';
+            create index quelle_lauf_quelle_ix on quelle_lauf (quelle_id, gestartet desc);
+            alter table quelle add constraint quelle_letzter_lauf_fk foreign key (letzter_lauf) references quelle_lauf (id);
+            alter table dokument add column quelle_lauf_id uuid constraint dokument_quelle_lauf_fk references quelle_lauf (id);
+            create index dokument_quelle_lauf_ix on dokument (quelle_lauf_id) where quelle_lauf_id is not null;
+            alter table dokument drop constraint dokument_quelle_ck;
+            alter table dokument add constraint dokument_quelle_ck
+                check (quelle in ('SCAN', 'UPLOAD', 'GENERATOR', 'DRIVE', 'EMAIL', 'ABANINJA', 'WEBSEITE', 'GMAIL',
+                    'ORDNER'));
+            insert into quelle (id, code, name, typ, geaendert)
+            select gen_random_uuid(), q.code, q.name, q.typ, clock_timestamp()
+            from (values ('generatoren', 'Generatoren', 'GENERATOR'), ('drive', 'Google Drive', 'DRIVE'),
+                         ('mac-ordner', 'Mac-Eingangsordner', 'MAC_EINGANG'), ('gmail', 'Gmail', 'GMAIL_LABEL'),
+                         ('crm-csv', 'CRM-CSV', 'CRM_CSV'), ('papier', 'Papier', 'SCAN')) as q (code, name, typ)
+            where current_schema() = 'm_urinet'
+        </sql>
+        <!--
+            Rückfall nur vor der ersten Nutzung: Danach verlöre er Läufe, Zählerstände, Verweise der Dokumente,
+            Konfiguration und Geheimnisse der Quellen, und die alte Prüfung von dokument.quelle schlüge bei GMAIL
+            und ORDNER fehl. Die Wache bricht dann ab, statt Daten zu verwerfen; was ein Rückfall auf ein Image vor
+            diesem Changeset danach bedeutet, steht in docs/betrieb/deploy-rollback.md («Schema neuer als Image»).
+        -->
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                do $$
+                begin
+                    if exists (select 1 from quelle_lauf)
+                        or exists (select 1 from dokument where quelle_lauf_id is not null
+                            or quelle in ('GMAIL', 'ORDNER'))
+                        or exists (select 1 from quelle where version <> 0 or geheimnis is not null
+                            or code not in ('generatoren', 'drive', 'mac-ordner', 'gmail', 'crm-csv', 'papier')) then
+                        raise exception 'Rollback 150-quelle nur vor der ersten Nutzung (Läufe, Verweise oder Quellen vorhanden)';
+                    end if;
+                end
+                $$
+            ]]></sql>
+            <sql>
+                alter table dokument drop constraint dokument_quelle_ck;
+                alter table dokument add constraint dokument_quelle_ck
+                    check (quelle in ('SCAN', 'UPLOAD', 'GENERATOR', 'DRIVE', 'EMAIL', 'ABANINJA', 'WEBSEITE'));
+                drop index dokument_quelle_lauf_ix;
+                alter table dokument drop column quelle_lauf_id;
+                alter table quelle drop constraint quelle_letzter_lauf_fk;
+                drop table quelle_lauf;
+                drop table quelle
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

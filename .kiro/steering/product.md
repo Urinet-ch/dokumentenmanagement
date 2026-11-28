@@ -57,6 +57,7 @@ Zeilen A15–A19 in Spec 04, Requirement 12.1). Wissen darf auch lokal erarbeite
 | 2 Abgleich und Chat | `02-abgleich-chat` | E-Mail-Eingang, semantische Suche, Chat-Agent, Jahresexport; AbaNinja entfällt (kein Abo, E1 = nein, 15.11.2026) | 7 Beispielfragen richtig und mit Quelle |
 | 3 Zweiter Mandant | `03-zweiter-mandant` | VHF/GSK: Mandant, Webseiten-Schnittstelle (Lesen und Erfassung, versionierter Vertrag), WordPress-Plugin, Chatbot | VHF/GSK-Archiv online |
 | 4 Wissensbasis | `04-wissensbasis` | Wissensbasis nach LLM-Wiki-Muster | Gate Phase 4: 5 Wissensquellen, ≥ 47 von 50 Fussnoten belegt, ≥ 14 von 15 Fragen mit Seite und Quelldokument richtig |
+| 5 Produktivimport | `09-produktivimport` | Scan-Eingang mit QR-Trennblättern, Stapel-Original, Quellenregister, Gmail-Import, Mac-Eingang, fachliche Dubletten, Vollständigkeitsbericht, Übernahme des Bestands 2026 (Spec 09 ergänzt, freigegeben mit dem Merge von #745 am 28.11.2026) | Gate «Probelauf» (Spec 09, 16.1) und Gate «Abschluss» (Spec 09, 16.6) |
 
 ## Beispielfragen (Abnahme Chat, Phase 2)
 1. «Zeig mir die letzte Rechnung an den FC Schattdorf.»
