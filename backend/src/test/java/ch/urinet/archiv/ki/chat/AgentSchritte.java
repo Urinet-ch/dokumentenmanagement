@@ -528,6 +528,13 @@ public class AgentSchritte {
                 .path("meldung").asText()).isEqualTo(meldung);
     }
 
+    @Dann("enthält der Stream des Agenten weder «{}» noch einen Stacktrace")
+    public void streamOhneInhalt(String marker) {
+        String text = ereignisse.toString();
+        assertThat(text.contains(marker) || text.contains("Exception") || text.contains("\\tat ")
+                || text.contains("Caused by:")).as("Stream enthält Eingabe oder Stacktrace").isFalse();
+    }
+
     @Dann("nennt «fertig» {int} Tokens ein und {int} Tokens aus")
     public void fertigTokens(int ein, int aus) {
         JsonNode fertig = ereignis("fertig");
