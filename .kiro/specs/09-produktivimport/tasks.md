@@ -20,6 +20,11 @@ solche Schritte sind Aufgaben **[Fabian]**, vorbereitet als Patch oder Anleitung
 Zeitrahmen (Richtwert, gebunden an Entscheid #731): Welle 27 vom 01.12. bis 04.12.2026, Welle 28 vom 07.12. bis
 15.12.2026, Welle 29 vom 15.12. bis 23.12.2026, synthetischer Probelauf (29.10) vom 28.12. bis 31.12.2026; Welle 30
 (Stichtag, Richtwert 01.01.2027, Bestand bis 31.01.2027) beginnt erst nach Aufgabe 30.1.
+**Geändert 28.11.2026 (entschieden von Fabian am 28.11.2026, Variante B):** Stichtag 01.01.2027 und Bestand bis
+31.01.2027 sind entschieden (E7). Weil der Wechsel auf Stufe B (Spec 01, 31.7) nach dem synthetischen Probelauf auf
+Stufe A liegt und Test-Buckets erst 1 Tag nach dem letzten Upload gelöscht werden können, ist 29.10 bis 28.12.2026
+abgeschlossen (Richtwert 24.12. bis 28.12.2026, bisher «vom 28.12. bis 31.12.2026»); Spec 01, Welle 31 läuft parallel
+zu den Wellen 27 bis 29.
 
 ## Welle 27 — Entscheide, Grundlagen und Spike
 - [ ] 27.1 Entscheide und Bestandsaufnahme [Fabian]
@@ -231,14 +236,17 @@ Zeitrahmen (Richtwert, gebunden an Entscheid #731): Welle 27 vom 01.12. bis 04.1
   - _Anforderungen: 2.9, 16.1_
   - _Abhängig von: 28.6, 28.10, 29.1_
 
-## Welle 30 — Stichtag und Produktivimport (Fabian, erst nach Entscheid #731)
+## Welle 30 — Stichtag und Produktivimport (Fabian, erst nach Spec 01, Welle 31)
 - [ ] 30.1 Gate Echtbelege [Fabian]
-  - Entscheid #731 (Variante A, B oder C) liegt vor; die dann geltenden Voraussetzungen sind erfüllt (z. B. Spec 01,
-    5.11 Stufe B, 5.4 Produktivbetrieb, 5.5 Sicherung, oder die Änderung von 16.15 und 16.17 durch den Entscheid).
-  - Probelauf mit wenigen echten Belegen auf der freigegebenen Plattform; Messung nach 3.10, falls Stufe B.
+  - Geändert 28.11.2026 (entschieden von Fabian am 28.11.2026, Variante B; bisher «Entscheid #731 (Variante A, B
+    oder C) liegt vor; die dann geltenden Voraussetzungen sind erfüllt (z. B. Spec 01, 5.11 Stufe B, 5.4
+    Produktivbetrieb, 5.5 Sicherung, oder die Änderung von 16.15 und 16.17 durch den Entscheid)»): Das Archiv läuft
+    auf Stufe B auf der bestehenden VPS (Spec 01, 16.17); die Gates aus Spec 01, Welle 31 sind mit Betriebsnachweis
+    erfüllt und das Go/No-go (Spec 01, 31.8) ist «Go».
+  - Probelauf mit wenigen echten Belegen auf Stufe B, Richtwert 31.12.2026; Messung nach 3.10.
   - Ergebnis in `docs/abnahme/09-echtbelege.md` (ohne Inhalte und Nummern echter Belege).
   - _Anforderungen: 3.10, 16.2_
-  - _Abhängig von: 29.10_
+  - _Abhängig von: 29.10, Spec 01: 31.8_
 
 - [ ] 30.2 Umstellung zum Stichtag [Fabian]
   - Generatoren auf Archiv-Versand, Mac-Eingang einrichten, Weiterleitung an `<archiv-postfach>`, Scanprofile auf den
@@ -250,7 +258,7 @@ Zeitrahmen (Richtwert, gebunden an Entscheid #731): Welle 27 vom 01.12. bis 04.1
   - Reihenfolge nach 16.3; je Quelle Trockenlauf, dann echter Lauf; Aliasse `<alias-startwerte>` vorher anlegen.
   - Eingangskorb und Dubletten abarbeiten; Quelle danach `ABGESCHLOSSEN` bzw. `LAUFEND`.
   - _Anforderungen: 16.3, 16.4_
-  - _Abhängig von: 30.2_
+  - _Abhängig von: 30.2, Spec 01: 31.9 (Restore-Probe auf Stufe B, ergänzt 28.11.2026)_
 
 - [ ] 30.4 Papier 2026 scannen [Fabian]
   - Ordner für Ordner mit Deckblatt und Trennblättern; digital vorhandene Belege nur scannen, wenn unterschrieben
