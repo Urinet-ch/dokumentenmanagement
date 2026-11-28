@@ -5,8 +5,10 @@ import {
   DestroyRef,
   ElementRef,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -94,6 +96,8 @@ export class Suche {
   private wissenLaufend?: Subscription;
 
   protected readonly darfKontakte = computed(() => this.anmeldung.darf('A6'));
+  /** Wissensseiten in den Treffern nur bei freigeschaltetem Wissen (Spec 04, Req 22.5); bis geladen keine. */
+  protected readonly wissen = computed(() => this.anmeldung.darf('A15'));
   protected readonly partnerEingabe = signal('');
   protected readonly partnerVorschlaege = signal<Kontakt[] | null>(null);
   private readonly partnerSuche = new Subject<string>();
@@ -121,6 +125,14 @@ export class Suche {
   private laufend?: Subscription;
 
   constructor() {
+    // Werden die Funktionen erst nach der Suche geladen, folgt die Wissenssuche für den gesendeten Begriff nach
+    effect(() => {
+      if (this.wissen()) {
+        untracked(() => {
+          if (this.wissenAnfrage?.q && this.wissenBegriff() === null) this.wissenSuchen(this.wissenAnfrage);
+        });
+      }
+    });
     this.zustand.fuer(`${this.anmeldung.benutzer()?.mandant ?? ''}/${this.anmeldung.benutzer()?.id ?? ''}`);
     const arten = this.port
       .dokumentarten()
@@ -252,10 +264,11 @@ export class Suche {
     this.wissenFehler.set(null);
     this.wissenDegradiert.set(false);
     this.wissenWiederholbar.set(false);
-    this.wissenBegriff.set(anfrage.q ?? null);
-    this.wissenLaeuft.set(!!anfrage.q);
-    if (!anfrage.q) return;
-    this.wissenLaufend = this.port.wissen(anfrage.q, anfrage.modus).subscribe({
+    const q = untracked(() => this.wissen()) ? anfrage.q : undefined;
+    this.wissenBegriff.set(q ?? null);
+    this.wissenLaeuft.set(!!q);
+    if (!q) return;
+    this.wissenLaufend = this.port.wissen(q, anfrage.modus).subscribe({
       next: (ergebnis) => {
         this.wissenTreffer.set(ergebnis.treffer);
         this.wissenDegradiert.set(ergebnis.degradiert);

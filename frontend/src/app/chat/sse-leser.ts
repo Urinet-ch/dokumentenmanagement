@@ -75,8 +75,9 @@ function quelle(wert: unknown): Quelle | null {
     return null;
   }
   const wissen = wert['wissen'];
-  if (objekt(wissen) && typeof wissen['titel'] === 'string' && typeof wissen['link'] === 'string'
-      && Array.isArray(wert['dokumente'])) {
+  // Ohne Freischaltung kommt die Wissensseite ohne Titel und Link (Spec 04, Req 22.7); die Quelldokumente bleiben
+  const text = (feld: unknown): feld is string | null => typeof feld === 'string' || feld === null;
+  if (objekt(wissen) && text(wissen['titel']) && text(wissen['link']) && Array.isArray(wert['dokumente'])) {
     const dokumente = wert['dokumente'].flatMap((d) =>
       objekt(d) && typeof d['titel'] === 'string' && typeof d['link'] === 'string'
         ? [{ titel: d['titel'], link: d['link'],

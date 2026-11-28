@@ -1,4 +1,4 @@
-import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
+import { Aktion, Rolle, WISSEN_AKTIONEN, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
 /** Erfüllt, wenn die Rolle mindestens eine Aktion aus «eine» darf und keine aus «ohne» (Glossar Spec 07, «Bedingung»). */
@@ -222,10 +222,15 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
   },
 ];
 
-/** Dieselbe Prüfung wie das Menü («darf» in rechte.ts); ohne Bedingung immer erfüllt. */
-export function bedingungErfuellt(bedingung: Bedingung | undefined, rolle: Rolle | null): boolean {
+/**
+ * Dieselbe Prüfung wie das Menü («darf» in rechte.ts und `AnmeldungService`); ohne Bedingung immer erfüllt. `wissen`:
+ * Ist Wissen für den Mandanten freigeschaltet? Sonst gelten A15–A19 als nicht erlaubt (Spec 04, Req 22.5). Die Seiten
+ * übergeben den geladenen Stand; der Standard `true` prüft nur die Rolle (Katalogprüfungen).
+ */
+export function bedingungErfuellt(bedingung: Bedingung | undefined, rolle: Rolle | null, wissen = true): boolean {
   if (!bedingung) return true;
-  return bedingung.eine.some((aktion) => darf(rolle, aktion)) && !(bedingung.ohne ?? []).some((aktion) => darf(rolle, aktion));
+  const erlaubt = (aktion: Aktion) => darf(rolle, aktion) && (wissen || !WISSEN_AKTIONEN.has(aktion));
+  return bedingung.eine.some(erlaubt) && !(bedingung.ohne ?? []).some(erlaubt);
 }
 
 export function hilfeEintrag(anker: string): HilfeEintrag | undefined {

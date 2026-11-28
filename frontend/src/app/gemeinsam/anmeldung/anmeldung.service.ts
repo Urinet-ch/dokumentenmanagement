@@ -1,9 +1,10 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
-import { DOCUMENT, DestroyRef, Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
+import { DOCUMENT, DestroyRef, Injectable, InjectionToken, computed, effect, inject, signal, untracked } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import { UMGEBUNG } from '../../../umgebung/umgebung';
 import { codeChallengeS256, jwtNutzlast, zufall } from './pkce';
-import { Aktion, Rolle, darf, rolleAusRealmRollen } from './rechte';
+import { MandantFunktionen, funktionenSchluessel } from '../mandant-funktionen';
+import { Aktion, Rolle, WISSEN_AKTIONEN, darf, rolleAusRealmRollen } from './rechte';
 
 export interface OidcKonfiguration {
   aussteller: string;
@@ -74,6 +75,7 @@ interface Vorgang {
 @Injectable({ providedIn: 'root' })
 export class AnmeldungService {
   private readonly http = inject(HttpClient);
+  private readonly funktionen = inject(MandantFunktionen);
   private readonly konfiguration = inject(OIDC_KONFIGURATION);
   private readonly fenster = inject(FENSTER);
 
@@ -101,6 +103,12 @@ export class AnmeldungService {
   });
 
   constructor() {
+    // Funktionen des Mandanten je Anmeldung laden (Spec 04, Req 22.4, 22.5); abgemeldet oder ohne Mandant: keine
+    const funktionen = this.funktionen;
+    effect(() => {
+      const schluessel = this.angemeldet() ? funktionenSchluessel(this.benutzer()) : null;
+      untracked(() => (schluessel ? funktionen.fuer(schluessel) : funktionen.zuruecksetzen()));
+    });
     // Mobile Browser halten Timer im Hintergrund an; beim Zurückkehren die Frist selbst prüfen
     const dokument = inject(DOCUMENT);
     const sichtbar = () => {
@@ -115,10 +123,14 @@ export class AnmeldungService {
     });
   }
 
-  /** Ohne Mandant im Token gibt es kein Recht (fail closed, wie im Backend). */
+  /**
+   * Ohne Mandant im Token gibt es kein Recht (fail closed, wie im Backend). Die Rechte der Wissensbasis (A15–A19)
+   * gelten nur, solange Wissen für den Mandanten freigeschaltet ist (Spec 04, Req 22.5, 22.6).
+   */
   darf(aktion: Aktion): boolean {
     const benutzer = this.benutzer();
-    return this.angemeldet() && !!benutzer?.mandant && darf(benutzer.rolle, aktion);
+    return this.angemeldet() && !!benutzer?.mandant && darf(benutzer.rolle, aktion)
+      && (!WISSEN_AKTIONEN.has(aktion) || this.funktionen.wissenVerfuegbar());
   }
 
   accessToken(): string | null {

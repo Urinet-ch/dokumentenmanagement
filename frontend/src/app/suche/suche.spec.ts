@@ -61,6 +61,8 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
   let port: SucheAttrappe;
   let element: HTMLElement;
   const benutzer = signal({ id: 'u1', name: 'Joel', mandant: 'urinet', rolle: 'mitarbeiter' });
+  // Testdaten: Wissen ist freigeschaltet (Spec 04, Req 22.5); einzelne Tests schalten es aus
+  const wissen = signal(true);
 
   async function oeffnen() {
     fixture = TestBed.createComponent(Suche);
@@ -71,6 +73,7 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
   beforeEach(async () => {
     port = new SucheAttrappe();
     benutzer.set({ id: 'u1', name: 'Joel', mandant: 'urinet', rolle: 'mitarbeiter' });
+    wissen.set(true);
     TestBed.configureTestingModule({
       imports: [Suche],
       providers: [
@@ -78,7 +81,10 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
         { provide: SuchePort, useValue: port },
         {
           provide: AnmeldungService,
-          useValue: { benutzer, darf: (aktion: string) => aktion === 'A6' && benutzer().rolle === 'inhaber' },
+          useValue: {
+            benutzer,
+            darf: (aktion: string) => (aktion === 'A15' ? wissen() : aktion === 'A6' && benutzer().rolle === 'inhaber'),
+          },
         },
       ],
     });
@@ -160,6 +166,31 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
       ),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(port.wissensAnfragen.at(-1)).toEqual({ q: 'Vertrag', modus: 'hybrid' });
+  });
+
+  it('fragt ohne freigeschaltetes Wissen keine Wissensseiten ab und zeigt keinen Bereich (Spec 04, Req 22.5)', async () => {
+    wissen.set(false);
+    port.wissenManuell = true;
+    const vorher = port.wissensAnfragen.length;
+    eingeben('q', 'Vertrag');
+    await absenden();
+    await antworten(ergebnis(treffer({ titel: 'Dokument' })));
+    expect(port.wissensAnfragen.length).toBe(vorher);
+    expect(element.querySelector('[data-test=wissen]')).toBeNull();
+  });
+
+  it('holt die Wissenssuche nach, sobald die Freischaltung geladen ist (Spec 04, Req 22.5)', async () => {
+    wissen.set(false);
+    port.wissenManuell = true;
+    eingeben('q', 'Vertrag');
+    await absenden();
+    await antworten(ergebnis(treffer({ titel: 'Dokument' })));
+    const vorher = port.wissensAnfragen.length;
+    wissen.set(true);
+    await fixture.whenStable();
+    expect(port.wissensAnfragen.length).toBe(vorher + 1);
+    expect(port.wissensAnfragen.at(-1)).toEqual({ q: 'Vertrag', modus: 'hybrid' });
+    expect(element.querySelector('[data-test=wissen]')).not.toBeNull();
   });
 
   it('zeigt Wissensfehler unabhängig von Dokumenten und wiederholt nur die Wissenssuche', async () => {

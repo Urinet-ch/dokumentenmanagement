@@ -13,7 +13,7 @@ import {
   Benutzer,
   Sitzungszustand,
 } from './gemeinsam/anmeldung/anmeldung.service';
-import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
+import { Aktion, Rolle, WISSEN_AKTIONEN, darf } from './gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
@@ -26,9 +26,12 @@ class AnmeldungAttrappe {
   readonly benutzer = signal<Benutzer | null>(null);
   readonly abmelden = vi.fn();
   readonly anmelden = vi.fn();
+  /** Wie `AnmeldungService`: A15–A19 nur bei freigeschaltetem Wissen; Testdaten schalten es ein (Spec 04, Req 22.5). */
+  readonly wissen = signal(true);
   darf(aktion: Aktion) {
     const benutzer = this.benutzer();
-    return this.angemeldet() && !!benutzer?.mandant && darf(benutzer.rolle, aktion);
+    return this.angemeldet() && !!benutzer?.mandant && darf(benutzer.rolle, aktion)
+      && (this.wissen() || !WISSEN_AKTIONEN.has(aktion));
   }
   als(rolle: Rolle | null, mandant: string | null = 'urinet') {
     this.benutzer.set({ id: 'u', name: 'Test Benutzer', mandant, rolle });
@@ -380,6 +383,16 @@ describe('App (Req 2.6, 8.6)', () => {
       a.getAttribute('href'),
     );
     expect(aktiv).toEqual(['/wissen/entwuerfe']);
+  });
+
+  it('zeigt ohne freigeschaltetes Wissen weder «Wissen» noch «Entwürfe» samt Zähler (Spec 04, Req 22.5)', async () => {
+    anmeldung.als('inhaber');
+    anmeldung.wissen.set(false);
+    const element = await zeigen();
+    const pfade = [...element.querySelectorAll('nav a')].map((a) => a.getAttribute('href'));
+    expect(pfade).toContain('/suche');
+    expect(pfade.filter((pfad) => pfad?.startsWith('/wissen'))).toEqual([]);
+    expect(element.querySelector('nav .zaehler')).toBeNull();
   });
 
   it('zeigt unten Version und Build der App, auch ohne Anmeldung', async () => {

@@ -1856,6 +1856,8 @@ export const TEXTE = {
       BENUTZER_ANTRAG: 'Benutzerantrag',
       BENUTZER_ABWEICHUNG: 'Benutzerabweichung',
       CHAT_BEWERTUNG_EXPORT: 'Chat-Bewertungen exportiert',
+      WISSEN_FREIGESCHALTET: 'Wissen freigeschaltet (Betreiber)',
+      WISSEN_ABGESCHALTET: 'Wissen abgeschaltet (Betreiber)',
     } as Record<string, string>,
     rollen: {
       INHABER: 'Inhaber',

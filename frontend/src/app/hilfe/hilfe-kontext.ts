@@ -9,6 +9,7 @@ export function hilfeKontext(
   rolle: Rolle | null,
   katalog: readonly HilfeEintrag[],
   abgemeldetOffline = false,
+  wissen = true,
 ): string | null {
   const eintraege = katalog.filter((eintrag) => eintrag.pfade?.length);
   const pfad = aktiverPfad(
@@ -17,7 +18,7 @@ export function hilfeKontext(
   );
   const eintrag = eintraege.find((kandidat) => kandidat.pfade?.includes(pfad ?? ''));
   if (!eintrag) return null;
-  const sichtbar = sichtbareAnker(sichtbareAbschnitte(katalog, rolle));
+  const sichtbar = sichtbareAnker(sichtbareAbschnitte(katalog, rolle, wissen));
   if (abgemeldetOffline && eintrag.anker === 'erfassen' && sichtbar.has('erfassen-offline')) {
     return 'erfassen-offline';
   }

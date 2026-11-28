@@ -43,4 +43,11 @@ describe('hilfeKontext (Spec 07, Req 4.3)', () => {
       expect(hilfeKontext('/chat', rolle, HILFE_KATALOG)).toBe('chat');
     },
   );
+
+  it('ordnet Wissensseiten ohne freigeschaltetes Wissen keinem Abschnitt zu (Spec 04, Req 22.5)', () => {
+    expect(hilfeKontext('/wissen', 'inhaber', HILFE_KATALOG, false, true)).toBe('wissen');
+    expect(hilfeKontext('/wissen', 'inhaber', HILFE_KATALOG, false, false)).toBeNull();
+    expect(hilfeKontext('/wissen/entwuerfe', 'inhaber', HILFE_KATALOG, false, false)).toBeNull();
+    expect(hilfeKontext('/suche', 'inhaber', HILFE_KATALOG, false, false)).toBe('suche');
+  });
 });
