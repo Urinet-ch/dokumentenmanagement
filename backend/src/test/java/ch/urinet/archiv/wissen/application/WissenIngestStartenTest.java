@@ -6,6 +6,9 @@ import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.BudgetReservierung;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Abschnittsfehler;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Fortschritt;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.Lauf;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.NeuerEntwurf;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Quelle;
 import org.junit.jupiter.api.Test;
@@ -23,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class WissenIngestStartenTest {
 
     private static final UUID DOKUMENT_ID = UUID.randomUUID();
+    private static final UUID ENTWURF_ID = UUID.randomUUID();
     /** Startwerte aus design.md, «Konfiguration und Aufträge». */
     private static final WissenKonfiguration STARTWERTE = new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
             20_000, 12_000, 600_000, 1_000_000);
@@ -327,6 +331,137 @@ class WissenIngestStartenTest {
     }
 
     @Test
+    void abschnittWiederholenErlaubtExaktAusgeschoepftesIngestBudget() {
+        long schaetzung = wiederholungsSchaetzung();
+        int bisher = 17;
+        Quelle quelle = wiederholungsQuelle("NORMAL", Math.toIntExact(schaetzung) + bisher, null);
+        Speicher speicher = wiederholungsSpeicher(quelle, "OFFEN", bisher, 0);
+        Auftraege auftraege = new Auftraege(true);
+
+        WissenIngestStarten.Ergebnis ergebnis = wiederholungsStarten(speicher, auftraege, 1);
+
+        assertThat(ergebnis.geschaetzteTokens()).isEqualTo(schaetzung);
+        assertThat(speicher.wiederholungAufgerufen).isTrue();
+        assertThat(auftraege.eingereiht).hasSize(1);
+    }
+
+    @Test
+    void abschnittWiederholenLehntUmEinenTokenUeberschrittenesIngestBudgetAb() {
+        long schaetzung = wiederholungsSchaetzung();
+        int bisher = 17;
+        Quelle quelle = wiederholungsQuelle("NORMAL", Math.toIntExact(schaetzung) + bisher - 1, null);
+        Speicher speicher = wiederholungsSpeicher(quelle, "OFFEN", bisher, 0);
+        Auftraege auftraege = new Auftraege(true);
+
+        assertThatThrownBy(() -> wiederholungsStarten(speicher, auftraege, 1))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.BUDGET));
+        assertThat(speicher.wiederholungAufgerufen).isFalse();
+        assertThat(auftraege.eingereiht).isEmpty();
+    }
+
+    @Test
+    void abschnittWiederholenErlaubtExaktAusgeschoepftesMonatsbudget() {
+        long schaetzung = wiederholungsSchaetzung();
+        int bisher = 23;
+        Quelle quelle = wiederholungsQuelle("NORMAL", null, Math.toIntExact(schaetzung) + bisher);
+        Speicher speicher = wiederholungsSpeicher(quelle, "OFFEN", 0, 0);
+        speicher.verbrauch = bisher;
+        Auftraege auftraege = new Auftraege(true);
+
+        WissenIngestStarten.Ergebnis ergebnis = wiederholungsStarten(speicher, auftraege, 1);
+
+        assertThat(ergebnis.geschaetzteTokens()).isEqualTo(schaetzung);
+        assertThat(speicher.wiederholungAufgerufen).isTrue();
+        assertThat(auftraege.eingereiht).hasSize(1);
+    }
+
+    @Test
+    void abschnittWiederholenLehntUmEinenTokenUeberschrittenesMonatsbudgetAb() {
+        long schaetzung = wiederholungsSchaetzung();
+        int bisher = 23;
+        Quelle quelle = wiederholungsQuelle("NORMAL", null, Math.toIntExact(schaetzung) + bisher - 1);
+        Speicher speicher = wiederholungsSpeicher(quelle, "OFFEN", 0, 0);
+        speicher.verbrauch = bisher;
+        Auftraege auftraege = new Auftraege(true);
+
+        assertThatThrownBy(() -> wiederholungsStarten(speicher, auftraege, 1))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.BUDGET));
+        assertThat(speicher.wiederholungAufgerufen).isFalse();
+        assertThat(auftraege.eingereiht).isEmpty();
+    }
+
+    @Test
+    void abschnittWiederholenLehntUngueltigeUndNichtVorhandeneAbschnitteAb() {
+        Speicher speicher = wiederholungsSpeicher(wiederholungsQuelle("NORMAL", null, null), "OFFEN", 0, 0);
+
+        assertThatThrownBy(() -> wiederholungsStarten(speicher, new Auftraege(true), 0))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.ANFRAGE_UNGUELTIG));
+        assertThatThrownBy(() -> wiederholungsStarten(speicher, new Auftraege(true), 2))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+    }
+
+    @Test
+    void abschnittWiederholenLehntVerworfenenEntwurfUndBereitsLaufendenIngestAb() {
+        Quelle quelle = wiederholungsQuelle("NORMAL", null, null);
+        Speicher verworfen = wiederholungsSpeicher(quelle, "VERWORFEN", 0, 0);
+        Speicher laufend = wiederholungsSpeicher(quelle, "OFFEN", 0, 0);
+        laufend.laufend = true;
+
+        assertThatThrownBy(() -> wiederholungsStarten(verworfen, new Auftraege(true), 1))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+        assertThatThrownBy(() -> wiederholungsStarten(laufend, new Auftraege(true), 1))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+    }
+
+    @Test
+    void abschnittWiederholenPrueftAktuelleMarkierungUndVertraulichkeitErneut() {
+        Quelle vorher = wiederholungsQuelle("NORMAL", null, null);
+        Speicher nichtMehrMarkiert = wiederholungsSpeicher(vorher, "OFFEN", 0, 0,
+                wiederholungsQuelle(false, "NORMAL", null, null));
+        Speicher jetztPersonal = wiederholungsSpeicher(vorher, "OFFEN", 0, 0,
+                wiederholungsQuelle("PERSONAL", null, null));
+
+        assertThatThrownBy(() -> wiederholungsStarten(nichtMehrMarkiert, new Auftraege(true), 1))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+        assertThatThrownBy(() -> wiederholungsStarten(jetztPersonal, new Auftraege(true), 1))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+    }
+
+    @Test
+    void abschnittWiederholenAkzeptiertEineErhoehungAufIntern() {
+        Quelle vorher = wiederholungsQuelle("NORMAL", null, null);
+        Speicher speicher = wiederholungsSpeicher(vorher, "OFFEN", 0, 0,
+                wiederholungsQuelle("INTERN", null, null));
+        Auftraege auftraege = new Auftraege(true);
+
+        WissenIngestStarten.Ergebnis ergebnis = wiederholungsStarten(speicher, auftraege, 1);
+
+        assertThat(ergebnis.status()).isEqualTo("IN_ARBEIT");
+        assertThat(speicher.wiederholungAufgerufen).isTrue();
+        assertThat(auftraege.eingereiht).hasSize(1);
+    }
+
+    @Test
+    void abschnittWiederholenLehntVerlorenesPersistenzrennenAb() {
+        Speicher speicher = wiederholungsSpeicher(wiederholungsQuelle("NORMAL", null, null), "OFFEN", 0, 0);
+        speicher.abschnittWiederholen = false;
+        Auftraege auftraege = new Auftraege(true);
+
+        assertThatThrownBy(() -> wiederholungsStarten(speicher, auftraege, 1))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+        assertThat(auftraege.eingereiht).isEmpty();
+    }
+
+    @Test
     void monatsgrenzenFolgenDerZeitzoneZuerich() {
         // 31.10.2026 23:30 UTC ist in Zürich schon der 1. November (00:30 MEZ)
         WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.parse("2026-10-31T23:30:00Z"));
@@ -351,13 +486,54 @@ class WissenIngestStartenTest {
         return quelle(vertraulichkeit, 2);
     }
 
+    private static Quelle wiederholungsQuelle(String vertraulichkeit, Integer budgetTokens,
+                                               Integer monatsbudgetTokens) {
+        return wiederholungsQuelle(true, vertraulichkeit, budgetTokens, monatsbudgetTokens);
+    }
+
+    private static Quelle wiederholungsQuelle(boolean markiert, String vertraulichkeit, Integer budgetTokens,
+                                               Integer monatsbudgetTokens) {
+        return quelle(markiert, "ARCHIVIERT", vertraulichkeit, "eins\fzwei\f", 2, true,
+                budgetTokens, monatsbudgetTokens);
+    }
+
+    private static Speicher wiederholungsSpeicher(Quelle quelle, String entwurfStatus, int tokensEin, int tokensAus) {
+        return wiederholungsSpeicher(quelle, entwurfStatus, tokensEin, tokensAus, quelle);
+    }
+
+    private static Speicher wiederholungsSpeicher(Quelle laufQuelle, String entwurfStatus, int tokensEin,
+                                                  int tokensAus, Quelle aktuelleQuelle) {
+        Speicher speicher = new Speicher(aktuelleQuelle);
+        speicher.lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, entwurfStatus, laufQuelle.status(), laufQuelle.markiert(),
+                laufQuelle.vertraulichkeit(), laufQuelle.bestaetigt(), null, null, laufQuelle.volltext(),
+                laufQuelle.seiten(), laufQuelle.pdfaVorhanden(), null, null, "KERNAUSSAGEN", tokensEin, tokensAus,
+                "test-modell", false, laufQuelle.budgetTokens(), laufQuelle.monatsbudgetTokens(),
+                new Fortschritt(0, 0, false, List.of(), List.of(), List.of(), List.of(), null,
+                        List.of(new Abschnittsfehler(1, 1, 1, 0, true, 12_000)), null, null, 0));
+        return speicher;
+    }
+
+    private static long wiederholungsSchaetzung() {
+        Speicher speicher = wiederholungsSpeicher(wiederholungsQuelle("NORMAL", null, null), "OFFEN", 0, 0);
+        return wiederholungsStarten(speicher, new Auftraege(true), 1).geschaetzteTokens();
+    }
+
+    private static WissenIngestStarten.Ergebnis wiederholungsStarten(Speicher speicher, Auftraege auftraege,
+                                                                      int abschnittNr) {
+        return new WissenIngestStarten(speicher, GROSSES_BUDGET, auftraege)
+                .abschnittWiederholen(ENTWURF_ID, abschnittNr, "benutzer-id");
+    }
+
     private static final class Speicher implements WissenIngestPort {
         private final Quelle quelle;
+        private Lauf lauf;
         private NeuerEntwurf entwurf;
         private boolean geladen;
         private boolean laufend;
         private boolean warteschlangeBelegt;
         private long verbrauch;
+        private boolean abschnittWiederholen = true;
+        private boolean wiederholungAufgerufen;
 
         private Speicher(Quelle quelle) {
             this.quelle = quelle;
@@ -409,12 +585,13 @@ class WissenIngestStartenTest {
 
         @Override
         public Optional<Lauf> laufLaden(UUID entwurfId) {
-            return Optional.empty();
+            return Optional.ofNullable(lauf);
         }
 
         @Override
         public boolean abschnittWiederholen(UUID entwurfId, int abschnittNr, Fortschritt fortschritt) {
-            return false;
+            wiederholungAufgerufen = true;
+            return abschnittWiederholen;
         }
 
         @Override
