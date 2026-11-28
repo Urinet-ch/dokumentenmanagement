@@ -161,9 +161,14 @@ async function einrichten(welt) {
   const { realm, cdp, authenticatorId } = welt.passkey;
   await welt.seite.goto(`${realm}/account/account-security/signing-in`);
   welt.passkey.label = `Virtueller Passkey ${randomBytes(8).toString('hex')}`;
-  welt.seite.once('dialog', (dialog) => dialog.accept(welt.passkey.label));
   await welt.seite.getByTestId('webauthn-passwordless/create').click();
-  await welt.seite.locator('#registerWebAuthn').click();
+  const dialogBehandlung = welt.seite
+    .waitForEvent('dialog')
+    .then((dialog) => dialog.accept(welt.passkey.label));
+  await Promise.all([
+    welt.seite.locator('#registerWebAuthn').click(),
+    dialogBehandlung,
+  ]);
   await welt.seite.getByText(welt.passkey.label, { exact: true }).waitFor({ timeout: 60_000 });
   const { credentials } = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
   assert.equal(credentials.length, 1);
