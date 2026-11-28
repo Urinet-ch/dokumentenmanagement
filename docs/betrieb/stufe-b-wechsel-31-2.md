@@ -2,10 +2,9 @@
 
 Diese Änderungen werden erst beim Wechsel 31.7 gemergt und deployt. `web-archiv` wird in 31.10 im Infra-Repo
 angelegt, nicht durch Compose. Fabian prüft, dass nur Traefik und Archivdienste angeschlossen sind.
-Das im noch offenen Infra-PR Urinet-ch/infomaniak-vps#7 vorgesehene Netz ist eine nicht interne Bridge mit
-Traefik und dem CIDR-Bereich `172.31.254.0/28`. Die GitHub-Variable
-`ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE` erhält diesen Wert. Fabian vergleicht ihn vor Freigabe mit dem tatsächlich
-angelegten Netz; ein leerer Wert vertraut keinem Proxy. Die Netz-Policy erlaubt `web-archiv` nur für `archiv`, nie
+Das Netz ist im Infra-Repo angelegt (Werte nur dort, README «Netze»). Die GitHub-Variable
+`ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE` erhält dessen CIDR-Bereich; Fabian vergleicht ihn vor Freigabe mit dem
+tatsächlich angelegten Netz; ein leerer Wert vertraut keinem Proxy. Die Netz-Policy erlaubt `web-archiv` nur für `archiv`, nie
 zugleich mit `web`; Compose setzt bei `api` und `kc` das Label `traefik.docker.network: web-archiv`.
 
 ## Leerstart
