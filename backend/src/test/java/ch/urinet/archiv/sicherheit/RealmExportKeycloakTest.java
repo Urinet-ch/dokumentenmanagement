@@ -451,6 +451,18 @@ class RealmExportKeycloakTest {
             throw new IllegalStateException("Zu viele Weiterleitungen bei der PWA-Anmeldung");
         }
 
+        /** Nur der erste Schritt im Browser-Flow: Benutzername und Passwort; liefert die Antwort danach. */
+        private HttpResponse<String> nurPasswort(String benutzer) throws Exception {
+            String url = realmUrl() + "/protocol/openid-connect/auth?client_id=archiv-pwa&response_type=code"
+                    + "&scope=openid&redirect_uri=" + enc(rueckruf) + "&code_challenge_method=S256&code_challenge="
+                    + enc(Base64.getUrlEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256")
+                            .digest(verifier.getBytes(StandardCharsets.US_ASCII))))
+                    + "&state=" + enc(UUID.randomUUID().toString());
+            HttpResponse<String> antwort = senden(HttpRequest.newBuilder(URI.create(url)).GET());
+            assertThat(antwort.statusCode()).isEqualTo(200);
+            return absenden(antwort, "password", Map.of("username", benutzer, "password", PASSWORT));
+        }
+
         private HttpResponse<String> absenden(HttpResponse<String> seite, String feld, Map<String, String> werte)
                 throws Exception {
             Matcher form = FORM.matcher(seite.body());
@@ -490,6 +502,103 @@ class RealmExportKeycloakTest {
 
         private static String enc(String wert) {
             return URLEncoder.encode(wert, StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
+     * Spec 06, Req 11.5: Die Kontoverwaltung ändert weder Benutzername, Name, E-Mail noch Mandant, verknüpft kein
+     * Google-Konto (eine bestehende Verknüpfung darf der Benutzer lösen, protokolliert), und ohne Einmalcode verlangt die
+     * nächste Anmeldung mit Passwort dessen neue Einrichtung. Der
+     * Probe-Client hat dieselbe Rollenzuordnung wie {@code account-console}, damit das Token dieselben Rechte trägt.
+     */
+    @Test
+    @Order(4)
+    void kontoverwaltungAendertKeineStammdatenUndVerlangtDenZweitenFaktor() throws Exception {
+        String benutzer = "konto-probe";
+        importieren(Map.of("ifResourceExists", "SKIP", "users", List.of(benutzer(benutzer, true)),
+                "clients", List.of(Map.of("clientId", "probe-kontoverwaltung", "enabled", true, "publicClient", true,
+                        "standardFlowEnabled", false, "directAccessGrantsEnabled", true, "fullScopeAllowed", false,
+                        "defaultClientScopes", List.of("web-origins", "acr", "profile", "roles", "basic", "email")))));
+        String id = adminGet(REALM + "/users?exact=true&username=" + benutzer).path("[0].id");
+        String probe = clientId("probe-kontoverwaltung");
+        try {
+            // Wie beim Anlegen über die Verwaltung: Standardrolle mit manage-account und view-profile
+            Map<String, Object> standard = adminGet(REALM + "/roles/default-roles-urinet-archiv").as(Map.class);
+            given().auth().oauth2(admin).contentType(ContentType.JSON).body(List.of(standard))
+                    .post(ExportKeycloak.basisUrl + REALM + "/users/{id}/role-mappings/realm", id).then().statusCode(204);
+            List<Map<String, Object>> kontoRollen = adminGet(REALM + "/clients/{id}/scope-mappings/clients/{account}",
+                    clientId("account-console"), clientId("account")).jsonPath().getList("$");
+            given().auth().oauth2(admin).contentType(ContentType.JSON).body(kontoRollen)
+                    .post(ExportKeycloak.basisUrl + REALM + "/clients/{id}/scope-mappings/clients/{account}",
+                            probe, clientId("account")).then().statusCode(204);
+            String token = Testanmeldung.anmelden(realmUrl(), "probe-kontoverwaltung", benutzer, PASSWORT,
+                    Testanmeldung.OTP_SECRET).then().statusCode(200).extract().path("access_token");
+            String konto = realmUrl() + "/account/";
+
+            Response profil = given().auth().oauth2(token).accept(ContentType.JSON).queryParam("userProfileMetadata", true).get(konto);
+            assertThat(profil.statusCode()).isEqualTo(200);
+            Map<String, Boolean> nurLesen = new HashMap<>();
+            for (Map<String, Object> attribut : profil.jsonPath().<Map<String, Object>>getList("userProfileMetadata.attributes")) {
+                nurLesen.put((String) attribut.get("name"), (Boolean) attribut.get("readOnly"));
+            }
+            assertThat(nurLesen).containsEntry("username", true).containsEntry("email", true)
+                    .containsEntry("firstName", true).containsEntry("lastName", true).doesNotContainKey("mandant");
+            Map<String, Object> vorher = Map.of("username", benutzer, "email", benutzer + "@example.invalid",
+                    "firstName", "Probe", "lastName", benutzer);
+            for (Map.Entry<String, Object> aenderung : List.of(Map.entry("username", (Object) "konto-neu"),
+                    Map.entry("email", (Object) "neu@example.invalid"), Map.entry("firstName", (Object) "Neu"),
+                    Map.entry("lastName", (Object) "Neu"),
+                    Map.entry("attributes", (Object) Map.of("mandant", List.of("fremd"))))) {
+                Map<String, Object> koerper = new HashMap<>(vorher);
+                koerper.put(aenderung.getKey(), aenderung.getValue());
+                Response antwort = given().auth().oauth2(token).accept(ContentType.JSON).contentType(ContentType.JSON).body(koerper).post(konto);
+                assertThat(antwort.statusCode()).as(aenderung.getKey()).isEqualTo(400);
+                assertThat(antwort.asString()).as(aenderung.getKey()).contains("error-user-attribute-read-only");
+            }
+            Response nachher = adminGet(REALM + "/users/{id}", id);
+            assertThat(nachher.jsonPath().getString("username")).isEqualTo(benutzer);
+            assertThat(nachher.jsonPath().getString("email")).isEqualTo(benutzer + "@example.invalid");
+            assertThat(nachher.jsonPath().getString("firstName")).isEqualTo("Probe");
+            assertThat(nachher.jsonPath().getString("lastName")).isEqualTo(benutzer);
+            assertThat(nachher.jsonPath().<String>getList("attributes.mandant")).containsExactly("urinet");
+
+            // Google verknüpfen: der alte Weg ist in Keycloak abgeschaltet, der neue (AIA idp_link) im Realm nicht aktiv
+            Response verknuepfen = given().auth().oauth2(token).accept(ContentType.JSON).queryParam("providerId", "google")
+                    .queryParam("redirectUri", konto).get(konto + "linked-accounts/google");
+            assertThat(verknuepfen.statusCode()).isNotEqualTo(200);
+            assertThat(adminGet(REALM + "/authentication/required-actions").jsonPath().<Map<String, Object>>getList("$"))
+                    .noneMatch(aktion -> "idp_link".equals(aktion.get("alias")) && Boolean.TRUE.equals(aktion.get("enabled")));
+
+            // Eine bestehende Verknüpfung darf der Benutzer selbst lösen (Spec 01, 2.27, entschieden von Fabian am
+            // 28.11.2026); Keycloak hält das im Ereignisprotokoll fest
+            given().auth().oauth2(admin).contentType(ContentType.JSON)
+                    .body(Map.of("identityProvider", "google", "userId", "google-konto-probe", "userName", benutzer))
+                    .post(ExportKeycloak.basisUrl + REALM + "/users/{id}/federated-identity/google", id)
+                    .then().statusCode(204);
+            given().auth().oauth2(token).accept(ContentType.JSON).delete(konto + "linked-accounts/google")
+                    .then().statusCode(204);
+            assertThat(adminGet(REALM + "/users/{id}/federated-identity", id).jsonPath().<Object>getList("$")).isEmpty();
+            assertThat(given().auth().oauth2(admin).queryParam("user", id).queryParam("type", "REMOVE_FEDERATED_IDENTITY")
+                    .get(ExportKeycloak.basisUrl + REALM + "/events").then().statusCode(200).extract().jsonPath()
+                    .<Object>getList("$")).hasSize(1);
+
+            // Einmalcode entfernen: danach kein Token mit Passwort allein, die Anmeldung verlangt die neue Einrichtung
+            String otp = adminGet(REALM + "/users/{id}/credentials", id).jsonPath()
+                    .<Map<String, Object>>getList("$").stream().filter(c -> "otp".equals(c.get("type")))
+                    .map(c -> (String) c.get("id")).findFirst().orElseThrow();
+            given().auth().oauth2(token).accept(ContentType.JSON).delete(konto + "credentials/{id}", otp).then().statusCode(204);
+            Response ohneCode = Testanmeldung.anmelden(realmUrl(), "probe-kontoverwaltung", benutzer, PASSWORT, null);
+            assertThat(ohneCode.statusCode()).isNotEqualTo(200);
+            assertThat(ohneCode.asString()).doesNotContain("access_token");
+            String rueckruf = adminGet(REALM + "/clients/{id}", clientId("archiv-pwa"))
+                    .jsonPath().<String>getList("redirectUris").getFirst().replace("*", "test-callback");
+            HttpResponse<String> nachPasswort = new PwaBrowser(rueckruf).nurPasswort(benutzer);
+            assertThat(nachPasswort.statusCode()).isBetween(300, 399);
+            assertThat(nachPasswort.headers().firstValue("location").orElseThrow())
+                    .contains("required-action").contains("CONFIGURE_TOTP").doesNotStartWith(rueckruf);
+        } finally {
+            loeschen("/users/" + id);
+            loeschen("/clients/" + probe);
         }
     }
 

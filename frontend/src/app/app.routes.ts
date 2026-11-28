@@ -5,6 +5,7 @@ import { HttpUploadService } from './erfassen/http-upload.service';
 import { UploadPort } from './erfassen/upload-port';
 import { HttpKontakteService } from './kontakte/http-kontakte.service';
 import { KontaktePort } from './kontakte/kontakte-port';
+import { anmeldungGuard } from './gemeinsam/anmeldung/anmeldung.guard';
 import { erfassenGuard } from './gemeinsam/anmeldung/erfassen.guard';
 import { rechtGuard } from './gemeinsam/anmeldung/recht.guard';
 import { TEXTE } from './gemeinsam/texte.de-CH';
@@ -29,6 +30,13 @@ export const routes: Routes = [
     path: 'hilfe',
     loadComponent: () => import('./hilfe/hilfe-seite').then((m) => m.HilfeSeite),
     title: titel(TEXTE.hilfe.titel),
+  },
+  // Mein Konto (Spec 06, Req 11): nur mit Anmeldung, ohne Recht der Rechtematrix; Einstieg über die Kopfzeile
+  {
+    path: 'konto',
+    loadComponent: () => import('./konto/konto-seite').then((m) => m.KontoSeite),
+    canActivate: [anmeldungGuard],
+    title: titel(TEXTE.konto.titel),
   },
   {
     path: 'erfassen',

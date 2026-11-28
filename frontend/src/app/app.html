@@ -127,15 +127,18 @@
         </form>
       }
       <span class="abstand"></span>
-      <button
-        type="button"
-        class="knopf"
-        data-test="farbschema"
-        [attr.aria-label]="farbschema.dunkel() ? texte.kopf.hell : texte.kopf.dunkel"
-        (click)="farbschema.umschalten()"
-      >
-        <app-symbol [name]="farbschema.dunkel() ? 'sonne' : 'mond'" />
-      </button>
+      <!-- Angemeldet nur «Hilfe» und das Benutzerelement; Farbschema und Abmelden auf «Mein Konto» (Spec 06, Req 11.2) -->
+      @if (!anmeldung.angemeldet()) {
+        <button
+          type="button"
+          class="knopf"
+          data-test="farbschema"
+          [attr.aria-label]="farbschema.dunkel() ? texte.kopf.hell : texte.kopf.dunkel"
+          (click)="farbschema.umschalten()"
+        >
+          <app-symbol [name]="farbschema.dunkel() ? 'sonne' : 'mond'" />
+        </button>
+      }
       <button
         #hilfeKnopf
         type="button"
@@ -148,21 +151,17 @@
         <app-symbol name="hilfe" />
         <span class="nur-breit">{{ texte.hilfe.titel }}</span>
       </button>
-      @if (anmeldung.angemeldet() && kontoverwaltung) {
-        <a
-          class="knopf"
-          data-test="passkey-einrichten"
-          [href]="kontoverwaltung"
-          target="_blank"
-          rel="noopener noreferrer"
-          [attr.aria-label]="texte.kopf.passkeyEinrichtenNeuerTab"
-        >
-          <app-symbol name="schluessel" />
-          <span class="nur-breit" aria-hidden="true">{{ texte.kopf.passkeyEinrichten }}</span>
-        </a>
+      @if (anmeldung.angemeldet()) {
         @if (anmeldung.benutzer(); as benutzer) {
-          <span class="benutzer" data-test="benutzer">
+          <a
+            class="benutzer"
+            data-test="benutzer"
+            routerLink="/konto"
+            [attr.aria-current]="aufKonto() ? 'page' : null"
+          >
             <span class="avatar" aria-hidden="true">{{ initialen(benutzer.name) }}</span>
+            <!-- Zugänglicher Name «Mein Konto (<Benutzername>): <Name> …» enthält den sichtbaren Text (WCAG 2.5.3) -->
+            <span class="nur-screenreader">{{ texte.kopf.kontoName(benutzer.benutzername) }}</span>
             <span class="wer">
               {{ benutzer.name }}
               <small>
@@ -174,10 +173,9 @@
                 }
               </small>
             </span>
-          </span>
+          </a>
         }
-      }
-      @if (anmeldung.zustand() !== 'abgemeldet') {
+      } @else if (anmeldung.zustand() !== 'abgemeldet') {
         <button type="button" class="knopf breit" (click)="abmelden()">
           <app-symbol name="abmelden" />
           <span class="nur-breit">{{ texte.anmeldung.abmelden }}</span>

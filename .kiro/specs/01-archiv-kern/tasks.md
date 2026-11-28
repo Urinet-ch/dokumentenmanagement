@@ -116,6 +116,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `ExceptionMapper` → RFC 9457 mit `fehlercode`
   - Tabelle `zugriff_protokoll` mit Trigger (nur `INSERT`); `@Protokolliert`-Interceptor schreibt synchron in derselben Transaktion, IP aus `X-Real-Ip`; schlägt der Eintrag fehl, wird die Aktion nicht ausgeführt; verweigerte Zugriffe mit Aktion `VERWEIGERT`
   - ArchUnit-Regeln aus `structure.md` (Blueprint)
+  - Nachtrag (28.11.2026): `FehlerInjektionTest` prüft übergrosse und knapp unter der Grenze liegende chunked-Anfragen auf einem `/api`-Pfad ohne eigene Grenze; die gültige Anfrage erreicht die Resource vollständig. `fehlerseiten-pwa.feature` trägt nur `@qa-fehlerseiten`: sein Szenario prüft den Offline-Hinweis, nicht Req 4.4 (IndexedDB-Warteschlange und Zähler), das weiterhin durch die Erfassungsszenarien belegt wird.
   - _Anforderungen: 10.2, 10.3, 10.7, 10.8, 16.13_
 
 - [x] 1.7 Stammdaten der Dokumentarten festlegen [Fabian]
@@ -138,6 +139,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - nach jedem Deploy auf Stufe A Speicherabbrüche der VPS und Health der anderen Apps prüfen; tritt 16.18 ein, gilt das Abbruchkriterium aus 1.10
   - Stand 10.11.2026 (PR #42, Copilot): `compose.yml`, abgeleitete Images, `infomaniak-deploy.yml` (nur `workflow_dispatch` und Tags `v*`), Szenarien `@req-16.7` (Allowlist) und `@req-16.11`; lokal gemessen braucht das Gerüst 820 MiB (api 320, db 100, kc 400); Fabian hat das Budget am 10.11.2026 von 700 auf 900 MiB angehoben (16.18, design.md «Stufen der Plattform»). Nachbesserung 10.11.2026: Prüfung «Commit liegt auf main», Neustart-Erkennung über die Laufzeit der Container, Rollback-Exit-Code, strengere Secret-Prüfung, Keycloak in der Readiness der API (nach Review-Befund M1 wieder entfernt: Readiness nur Datenbank), `postgres` nur über den Socket. Entscheide 11.11.2026 (Fabian, PR #42): Keycloak wieder in der Readiness, dazu Selbstheilung (OIDC-Wächter: nach 5 Minuten nicht bereit Exit-Code 75 und Neustart, P42-1); kein Environment mit Required Reviewer (P42-2); umask-Prüfung auf alle Schritte, die Dateien schreiben. Haken erst nach dem ersten Deploy durch Fabian
   - Erster Deploy bestätigt (Fabian, 22.11.2026): Der Deploy vom 21.11. (c78a53d) scheiterte an der fehlenden Pflicht-Secret-Datei und rollte automatisch zurück (Hotfix #430, Speicherbudget #433); der Deploy vom 22.11.2026 auf grüner CI von `main` lief erfolgreich. Damit ist der Haken gesetzt.
+  - Vorschlag (27.11.2026): `docs/betrieb/deploy-rollback-pruefung.diff` schlägt eine zusätzliche Gesundheitsprüfung nach dem bestehenden automatischen Rollback vor. Der Diff wird ausdrücklich nicht angewendet; Aufgabe 1.9 bleibt wie dokumentiert abgeschlossen.
   - Nachtrag (27.11.2026): Der lokale Laufzeittest `tools/traefik_rauchtest.py` prüft Router-Zuordnung und HSTS auf HTTP 200 und gedrosseltem 429; der Vorschlag zur CI-Anbindung liegt in `docs/betrieb/traefik-rauchtest-ci.diff`. Siehe design.md «Umsetzung (Aufgabe 1.9, lokaler Router-Rauchtest)».
   - _Anforderungen: 16.1, 16.9, 16.10, 16.11, 16.18_
   - _Abhängig von: 0.7, 1.1_
@@ -153,6 +155,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nachtrag 26.11.2026: Die statische Prüfung erkennt Router-Middlewares auf einem fremden Dienst; die Grenzen des Image-Rollbacks sind dokumentiert. Der Messnachweis bleibt offen.
   - Messvorbereitung 26.11.2026: Stichproben- und Auswertungswerkzeug mit synthetischen Tests sowie Anleitung liegen vor. Entscheid Fabian 27.11.2026: Budget 2048 MiB/1.5 CPU, erneute Messung freigegeben; der Nachzug der älteren Budgetangaben in Req 16.18 erfolgt separat. Messung, Health- und OOM-Prüfung sowie Nachweis bleiben bei Fabian offen.
   - Folgeauftrag 27.11.2026: `tools/last/testdaten_erzeugen.py` erstellt lokal einen 20-seitigen Bildscan ohne Textebene und ein synthetisches 12-MP-Foto; Unit-Test und Anleitung ergänzt. Keine Daten hochgeladen oder VPS angesprochen. Messung und Betriebsnachweis bleiben offen.
+  - Lokaler Werkzeug-Trockenlauf 27.11.2026: synthetische Daten, Docker-Stichproben aller drei Phasen, Vorprüfung und Gesamtauswertung liefen gegen lokale Wegwerf-Container mit den erwarteten Compose-Labels und Limits. Die Container führten keine Anwendung, Uploads oder OCR aus; die Ausgabe ist kein Mess- oder Betriebsnachweis. Die Anleitung nennt jetzt die Docker-Filter für die IDs und direkte Testdatei-Aufrufe; Stufe-A-Messung, Health-/OOM-Prüfung und Betriebsnachweis bleiben offen.
   - _Anforderungen: 16.1, 16.10, 16.15, 16.18_
   - _Abhängig von: 0.7, 1.9_
 
@@ -568,7 +571,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Vorbereitung ohne Betriebseingriff (PR #569): Checkliste und vorhandene Kennzahlen mit Tags in `docs/alarme.md`; Anbindung und Nachweise bleiben offen.
   - Folgeumsetzung (24.11.2026): App-Gauge `archiv_ki_beispiele{mandant}` und Timer `archiv_ki_beispiel_kandidaten_seconds_*{mandant}` ab 1'000 Beispielen; dokumentiert in `docs/alarme.md`. Die VPS-Anbindung und Betriebsnachweise bleiben offen, daher bleibt die Aufgabe ungeprüft.
   - Nachtrag (25.11.2026): Ein Fehler beim Zählen der KI-Beispiele lässt die übrigen Kennzahlen des Mandanten bestehen; die fehlende KI-Gauge signalisiert den Messfehler statt eines Nullwerts. Tests in `JdbcKiBeispielTest` und `MicrometerKennzahlenTest`.
-  - Vorschlag nach Erreichbarkeitsausfall (27.11.2026): `docs/betrieb/ueberwachung-erreichbarkeit.md` vergleicht Anwendungsalarme und Deploy-Prüfungen mit der Lücke bei einem Ausfall zwischen Deploys und skizziert externe HTTP-, Zertifikats- und Deploy-Fehlermeldungen mit Aufwand und Ablageort. Keine Änderung an Infra oder Workflow; Auswahl durch Fabian offen. Aufgabe 5.9 bleibt bis zur freigegebenen Umsetzung und den Betriebsnachweisen ungeprüft.
+  - Entscheid Fabian (27.11.2026, PR #724): unabhängige Erreichbarkeitsprüfung beider Hosts und Meldung bei fehlgeschlagenem Deploy gewählt; beides im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Der Betriebsnachweis für die Prüfung des Anmelde-Hosts bleibt bei Fabian offen; Aufgabe 5.9 bleibt bis zu diesem Nachweis ungeprüft.
   - _Anforderungen: 16.4, 16.5, 16.25_
   - _Abhängig von: 5.11_
 

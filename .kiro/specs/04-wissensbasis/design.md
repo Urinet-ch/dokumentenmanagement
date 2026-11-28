@@ -1130,6 +1130,9 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   mit dem Stand vor der Sicherung (**Umsetzung (Aufgabe 13.7, 26.11.2026)**). Offen bleibt der Zählvergleich in der
   wiederkehrenden betrieblichen Restore-Probe (4.7); Aufgabe 13.7 bleibt dafür offen.
   Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein Nachweis (Review PR #295, M1).
+- Nachtrag 28.11.2026: Der vollständige lokale synthetische Lauf (282 s, Exit 0) prüft zusätzlich Webfreigaben,
+  öffentliche Fragen und Benutzereinladungen. Das belegt weiterhin nicht den Zählvergleich in der wiederkehrenden
+  betrieblichen Probe; Aufgabe 13.7 bleibt offen.
 - Das Secret `keycloak_verwaltung_secret` steht seit PR #397 in der Secret-Liste von `restore-uebung-lokal.sh` und im
   Restore-Compose-Stack: `application.properties` (`%prod`, Spec 06, ADR-015) verlangt es, der Stack startet sonst
   nicht. Es hat mit dem Wissensvergleich nichts zu tun.
@@ -1653,6 +1656,12 @@ Nachtrag (27.11.2026): Nach erfolgreicher Wiederholung bleibt die Meldung «Der 
 während des erneuten Ladens sichtbar und erhält nach dem Rendern den Fokus. Das Browser-Szenario prüft Statusmeldung,
 Fokus, axe und horizontalen Überlauf bei 375 und 1280 px in beiden Farbschemata.
 
+Nachtrag (28.11.2026): JUnit prüft die exakte Grenze und eine Überschreitung um einen Token für Einzel- und
+Monatsbudget, ungültige bzw. nicht vorhandene Abschnitte, verworfene oder parallel laufende Entwürfe sowie die
+erneute Prüfung der aktiven Markierung und Vertraulichkeit. Eine Erhöhung auf `INTERN` bleibt zulässig; `PERSONAL`
+wird wie bisher abgewiesen. Ein Cucumber-Szenario prüft zwei gleichzeitig eintreffende Wiederholungen: genau eine
+wird angenommen (202), die andere mit 409 abgewiesen. Keine neue Fachregel oder Datenbankschemaänderung.
+
 ### Umsetzung (Aufgabe 19.5, 27.11.2026)
 Die Kernaussagen-Extraktion erhält zwei globale Konfigurationswerte für Tabellen: Gruppierung aktiviert und höchstens
 eine Gruppe je Kennzahlen-, Persona- oder Positionstabelle. Der Startwert wurde mit einer synthetischen Tabelle mit
@@ -1665,6 +1674,37 @@ und gilt damit für alle Ingest-Schritte, Sichtbarkeitsprüfungen und Seitenvors
 Hinweis «Vertraulichkeitsvermerk erkannt …»; Quelldokument und dessen Metadaten bleiben unverändert (Requirement
 11.7). Die bestehenden Freigabeprüfungen liefern keine Seiten mit Stufe `INTERN` für Webseite oder Mitglieder aus.
 Requirements bleiben unverändert.
+
+
+## Wissen je Mandant freischalten (Requirement 22, Entscheid Fabian 28.11.2026)
+- **Datenmodell:** Changeset `db/public`: `mandant.wissen_freigeschaltet boolean not null default false` (Rollback);
+  derselbe Changeset setzt `true` für den Code `urinet`. Lokale Profile, Tests und eine neue Installation schalten
+  Wissen ausdrücklich mit dem Kommando bzw. in den Testdaten ein; kein Sonderfall im Programmcode für einen Mandanten.
+- **Eine Stelle:** Ein Port «Wissensfreischaltung» (Anwendungsschicht) liest den Zustand mit einem Zwischenspeicher von
+  höchstens 60 Sekunden. REST-Zugang, Chat-Werkzeugliste, Suche, öffentlicher Wissenschat, Auftragsarbeiter,
+  Lint-Zeitplan, Wochenbericht und `GET /mandant/funktionen` fragen nur diesen Port. Kann der Zustand nicht gelesen
+  werden, gilt «nicht freigeschaltet».
+- **REST:** Ein gemeinsamer Filter für die Ressourcen der Wissensbasis, nach der Anmeldung und vor Rechteprüfung und
+  Laden von Daten; Fehlercode `WISSEN_NICHT_FREIGESCHALTET` (403). Ein ArchUnit- oder Vertragstest stellt sicher, dass
+  jede Operation unter `/wissen` und `/wissensbasis` erfasst ist, auch künftige.
+- **Modellaufrufe:** Der Zustand wird unmittelbar vor jedem Modellaufruf der Wissensbasis geprüft, nicht nur beim
+  Start eines Auftrags.
+- **Kommando:** `archiv mandant wissen <code> [ein|aus]` neben den übrigen Mandanten-Kommandos; Protokoll mit Akteur
+  Betreiber, ohne Inhalte; die zulässigen Protokollaktionen werden per Changeset `db/mandant` ergänzt.
+- **Oberfläche:** Navigation, Routen-Wächter, Dokumentansicht, Chat, Suche, Einstellungen, Einführung und Hilfe richten
+  sich nach `wissenVerfuegbar`. Die Prüfung im Server bleibt massgebend.
+- **Abrechnung:** Die Freischaltung ist ein reiner Schalter. Vertrag, Preis und Rechnungsstellung eines Zusatzabos sind
+  nicht Teil dieser Spec.
+
+### Folgeänderungen (mit der Umsetzung nachführen)
+| Dokument | Änderung |
+| --- | --- |
+| Spec 02, 3.1 und 4 | Wissenswerkzeuge und Wissensquellen nur bei Freischaltung (22.7). |
+| Spec 03, öffentliche Schnittstelle | Wissenschat zusätzlich an die Freischaltung gebunden (22.8). |
+| Spec 05, 8.8 und design.md | `GET /mandant/funktionen` um `wissenVerfuegbar` ergänzt (22.4). |
+| Spec 06, Einstellungen | Gruppe der Wissensbasis nur bei Freischaltung; Freischaltung nicht im Katalog (22.3, 22.5). |
+| Spec 07, Einführung und Hilfe | Wissens-Schritte und Hilfeseiten nur bei Freischaltung (22.5). |
+| `docs/` | Betriebsanleitung für das Kommando, Anleitung zum Anlegen eines Mandanten. |
 
 ## Open Points
 Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
