@@ -1,0 +1,89 @@
+// Seite «Mein Konto» (Spec 06, Req 11): Karten untereinander, ab 1100 px zweispaltig
+:host {
+  display: block;
+}
+
+.raster {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+  max-width: 72rem;
+}
+
+@media (min-width: 1100px) {
+  .raster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.karte {
+  min-width: 0;
+
+  h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 0.75rem;
+  }
+
+  > p {
+    margin: 0 0 0.75rem;
+  }
+}
+
+.nebentext {
+  color: var(--text-2);
+}
+
+dl {
+  display: grid;
+  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+  margin: 0 0 0.75rem;
+}
+
+dt {
+  color: var(--text-gedaempft);
+}
+
+dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.einstiege {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  a,
+  button {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.knopf-gefahr {
+  --mat-button-text-label-text-color: var(--gefahr);
+}
+
+@media (max-width: 599.98px) {
+  dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+
+    dd + dt {
+      margin-top: 0.5rem;
+    }
+  }
+}

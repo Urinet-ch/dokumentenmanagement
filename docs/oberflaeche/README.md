@@ -49,7 +49,7 @@ Mischfarben nur mit `color-mix()` aus Tokens. Ein neues Token gehört nach `styl
 | **Zeitleiste, Diff, Schlüssel-Wert-Liste** | Versionen als Punkte auf einer Linie; Diff in Mono mit «+»/«−» und Durchstreichen; `dl` zweispaltig, auf dem Handy untereinander | Dokumentansicht, `wissen/wissen-entwuerfe.*` |
 | **Leer, Laden, Fehler** | Leerzustand global `.leer` (ein Satz, was hier erscheint, zentriert und gedämpft) oder als Karte mit Symbol; Laden mit `mat-progress-bar`; Fehler als `.hinweis gefahr` mit «Erneut versuchen» | Eingangskorb, Kontakte, Suche |
 
-Seitenleiste, Kopfzeile, Farbschema-Knopf und Kopfzeilen-Suche gehören dem App-Rahmen (`app.*`). Seiten ändern ihn nicht. Ein neuer Menüpunkt kommt mit Gruppe und Symbol in `gemeinsam/navigation.ts`.
+Seitenleiste, Kopfzeile, Farbschema-Knopf und Kopfzeilen-Suche gehören dem App-Rahmen (`app.*`). Seiten ändern ihn nicht. Angemeldet zeigt die Kopfzeile rechts nur «Hilfe» und das Benutzerelement (Link zu «Mein Konto»); den Farbschema-Knopf gibt es nur ohne Anmeldung (Spec 06, Req 11.2). Ein neuer Menüpunkt kommt mit Gruppe und Symbol in `gemeinsam/navigation.ts`.
 
 ## Layout und Barrierefreiheit
 - **Mobile first:** Jede Seite ist bei 375 px ohne horizontales Scrollen bedienbar. Breite Inhalte scrollen in einem eigenen Container. Ab 960 px steht die Seitenleiste fest; zweispaltige Seiten ab etwa 1100–1180 px.

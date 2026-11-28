@@ -1169,6 +1169,9 @@ Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabia
 - **Nachweis:** Komponententests (`app.spec.ts`, `kontoverwaltung.spec.ts`); Browser-Szenario `@req-10.1` in
   `features/verwaltung/passkey-einstieg-pwa.feature` (mit Attrappe, ohne echtes Keycloak: Knopf sichtbar, neuer Tab zeigt die Kontoverwaltung,
   die App-Seite bleibt, ohne Überlauf und axe-Befund bei 375/1280 px, hell/dunkel).
+- **Nachtrag (Aufgabe 26.4, 28.11.2026):** Der Einstieg liegt jetzt auf «Mein Konto» («Passkeys verwalten»,
+  `…/account/account-security/signing-in`), die Kopfzeile zeigt «Passkey einrichten» nicht mehr (Spec 06, Req 11.2, 11.4).
+  Das Szenario `@req-10.1` prüft den Einstieg auf «Mein Konto».
 
 ## Mein Konto (Requirement 11, Entscheid Fabian 28.11.2026)
 - **Route:** `/konto`, nur mit Anmeldung, ohne Recht der Rechtematrix; kein Menüpunkt in der Seitenleiste, Einstieg ist das
@@ -1190,3 +1193,104 @@ Hilfsmittel für die Probe aus Req 10.7. Die Abnahme von 24.3 ist erfolgt (Fabia
 | Spec 07, design.md E3 und «Kopfzeile» | «Hilfe» steht neben dem Benutzerelement; der Farbschema-Knopf nur noch ohne Anmeldung. |
 | Spec 07, 3.5 und 5.5 | «Einführung erneut zeigen» zusätzlich auf «Mein Konto». |
 | `docs/anleitung/`, Hilfe-Katalog | Seite «Mein Konto» beschreiben, Texte zu Kopfzeile, Abmelden und Passkey anpassen. |
+
+## Umsetzung (Aufgabe 26.1, 28.11.2026)
+- **Kopfzeile (Req 11.1, 11.2):** Das Benutzerelement ist ein Link auf `/konto` (`aria-current="page"` auf der Seite), für
+  jeden angemeldeten Benutzer, auch ohne Mandant, Rolle oder Kontoverwaltung. Zugänglicher Name ohne `aria-label`: ein nur
+  für Screenreader sichtbares «Mein Konto: », danach der sichtbare Text (Name, Rolle, Mandant); so enthält der Name den
+  sichtbaren Text (WCAG 2.5.3, axe `label-content-name-mismatch`). Unter 960 px bleiben die Initialen sichtbar, Name, Rolle
+  und Mandant sind nur sichtbar ausgeblendet. Angemeldet entfallen Farbschema-Knopf, «Passkey einrichten» und «Abmelden»;
+  ohne Anmeldung bleibt der Farbschema-Knopf, bei abgelaufener Sitzung «Abmelden».
+- **Seite:** `konto/konto-seite.*`, Route mit `anmeldungGuard` (nur Anmeldung, kein Recht der Rechtematrix; ohne Anmeldung
+  zur Startseite mit `ziel`), Titel «Mein Konto». Je Abschnitt eine Karte; ab 1100 px zweispaltig. Keine Anfrage an die API.
+- **Angaben (11.3):** aus dem Access-Token `name`, `preferred_username`, `email`, Rolle und `mandant` (`Benutzer` um
+  `benutzername` und `email` ergänzt); fehlende entfallen, `sub` und Token erscheinen nie.
+- **Darstellung (11.6):** Segment «Wie das Gerät», «Hell», «Dunkel» über `FarbschemaService.waehlen()`; «Wie das Gerät»
+  entfernt den Schlüssel `archiv.farbschema`, eine gespeicherte Wahl gilt weiter.
+- **Hilfe und Einführung (11.7):** nur mit Mandant und Rolle, wie `/hilfe` (Spec 07, 5.5): «Einführung erneut zeigen»
+  (`/?einfuehrung`, `neuBeginnen()`) und «Anleitung öffnen» (`/hilfe`).
+- **Abmelden (11.10):** Dienst `Abmeldung` (Entwürfe verwerfen, `AnmeldungService.abmelden()`), derselbe für die Kopfzeile
+  bei abgelaufener Sitzung.
+- **Nachweis:** `konto-seite.spec.ts`, `abmeldung.spec.ts`, `app.spec.ts`; `features/verwaltung/mein-konto-pwa.feature`
+  (`@req-11.1` bis `@req-11.12` ohne 11.5, axe bei 375 und 1280 px in hell und dunkel, keine schreibende API-Anfrage).
+
+## Umsetzung (Aufgabe 26.2, 28.11.2026)
+- **Geprüft** gegen ein Wegwerf-Keycloak `26.8.2-3` mit dem Realm-Export (synthetische Benutzer, keine Betriebswerte).
+  Kontoverwaltung `keycloak.v3`, Routen laut `content.json` des Bundles `keycloak-account-ui-26.8.2`: `""` (Persönliche
+  Angaben), `account-security/signing-in` (Anmeldung: Standardauthentifizierung = Passwort, Zwei-Faktor-Authentifizierung
+  = Einmalcode, Passwortlos = Passkeys), `account-security/device-activity` (Geräteaktivität: Sitzungen ansehen und
+  beenden), `account-security/linked-accounts` (nur mit aktivem Identitätsanbieter). Eine eigene Adresse je Anmeldeart gibt
+  es nicht. Die tiefen Adressen überstehen die Anmeldung (Browser mit neuer Sitzung, Passwort und TOTP, die Adresse bleibt).
+- **Einstiege (11.4):** `kontoverwaltungEinstiege()` leitet aus dem Aussteller ab: «Passkeys verwalten», «Passwort ändern»
+  und «Einmalcode (Authenticator) verwalten» → `…/account/account-security/signing-in`, «Angemeldete Geräte» →
+  `…/account/account-security/device-activity`. Application Initiated Actions (`kc_action`) sind bewusst nicht der Weg: Sie
+  laufen über den Client der App mit Rücksprung, nicht als Tab der Kontoverwaltung. Offline sind die Einstiege deaktivierte
+  Knöpfe mit Hinweis (`aria-describedby`); ohne Kontoverwaltung entfällt der Abschnitt.
+- **Grenzen (11.5), Befund:**
+  - Benutzername, E-Mail und Mandant: im Benutzerprofil schon nur für `admin` änderbar; die Account-REST-Schnittstelle
+    antwortet `400 error-user-attribute-read-only`.
+  - Vor- und Nachname waren für Benutzer änderbar (`["admin", "user"]`, Review PR #88). Jetzt nur noch `admin` im Export und
+    in `realm-test.json` (Ansehen bleibt). Bestehende Realms: `deploy/infomaniak/keycloak/konto-einschraenken-vorlage.sh`
+    (README «Kontoverwaltung einschränken»); sie entfernt nur `user` aus den Bearbeitungsrechten und erweitert strengere
+    Rechte nie (Nachbesserung Review #743). Der Lauf auf Stufe A steht aus. `NameAusAnmeldung` (Spec 01) nutzt weiter den
+    Benutzernamen, das bleibt richtig.
+  - Rollen: Die Kontoverwaltung hat keine Schnittstelle dafür; das Token von `account-console` trägt nur `manage-account`
+    und `view-profile`.
+  - Google verknüpfen: Der alte Weg (`GET /account/linked-accounts/{alias}?providerId=…`) ist in 26.8 abgeschaltet (404
+    «Legacy client-initiated account linking is disabled»). Der neue Weg (`kc_action=idp_link:<alias>`) braucht die
+    Pflichtaktion `idp_link`; der importierte Export registriert sie nicht, ein neu angelegter Realm hätte sie aktiv. Die
+    Vorlage schaltet sie ab, die Tests prüfen, dass sie nicht aktiv ist.
+  - **Google lösen:** `DELETE /account/linked-accounts/{alias}` verlangt in 26.8.2 nur `manage-account` (geprüft am
+    Bytecode von `LinkedAccountsResource.removeLinkedAccount`: Rolle, Verknüpfung vorhanden, nicht an eine Organisation
+    gebunden, nicht der letzte Anmeldeweg); Probe: `204`, auch bei deaktiviertem Google-Anbieter. **Entscheid Fabian
+    28.11.2026:** Das Lösen durch den Benutzer selbst ist erlaubt (es entzieht nur einen Anmeldeweg; Passwort plus
+    Einmalcode bleiben), selbst verknüpfen bleibt ausgeschlossen; 11.5 und Spec 01, 2.27 sind angepasst. Keycloak hält das
+    Lösen als Benutzerereignis `REMOVE_FEDERATED_IDENTITY` fest (im Realm aktiv, Tests prüfen es). Die Sitzungen enden dabei
+    nicht von selbst; 2.27 verlangt das nur nach dem Lösen durch den Admin (Auslegung im PR).
+  - Zweiter Faktor: Entfernt die Person den Einmalcode (Kontoverwaltung oder Account-REST), führt die nächste Anmeldung mit
+    Passwort in die Pflichtaktion `CONFIGURE_TOTP`; ein Direct Grant ohne Code liefert kein Token. Die Pflichtaktion
+    `delete_account` ist aus.
+- **Nachweis:** `RealmExportKeycloakTest#kontoverwaltungAendertKeineStammdatenUndVerlangtDenZweitenFaktor` (Export),
+  `RealmExportTest#benutzerprofilBehaeltSeineBerechtigungen`, `features/verwaltung/kontoverwaltung-pwa.feature`
+  (`@req-11.5`, Test-Realm, mit Lösen und Ereignis), `test/konto-einschraenken-keycloak-test.sh` (auch mit strengerem
+  Ausgangszustand).
+
+## Umsetzung (Aufgabe 26.3, 28.11.2026)
+- **Dieses Gerät (11.8):** Die Zahl kommt aus `WarteschlangeService.eintraege()`, derselben Menge wie die Liste in
+  «Erfassen»: eigene Aufnahmen (Benutzer und Mandant) und solche ohne Benutzer, die die nächste Anmeldung mit A1 übernimmt;
+  Aufnahmen anderer Benutzer oder Mandanten nie. Den Link zur Liste gibt es nur mit A1 (sonst ist «Erfassen» gesperrt).
+- **Lokale Einstellungen entfernen (11.9):** Dienst `LokaleEinstellungen` nach der Rückfrage (Inline-Bestätigung wie in
+  «Erfassen»): `archiv.farbschema`; der eigene Einführungsvermerk (`vermerkEntfernen`, nur die Kennung
+  SHA-256 von `<mandant>:<sub>`, andere und ein unlesbarer Wert bleiben); die eigenen Entwürfe des Eingangskorbs im
+  `sessionStorage` (`benutzerLoeschen`, Präfix mit der eigenen Benutzer-ID, Marker nur wenn eigener) und
+  `archiv.branding.<Domain dieser Seite>` (das angezeigte Erscheinungsbild bleibt bis zum Neuladen). Nie der ganze Speicher,
+  nie IndexedDB, keine Abmeldung.
+- **Nachweis:** `konto-seite.spec.ts`, `einfuehrung-vermerk.spec.ts`; Szenarien `@req-11.8`, `@req-11.9` (IndexedDB zählt
+  danach dieselbe Aufnahme).
+
+## Umsetzung (Aufgabe 26.4, 28.11.2026)
+- Folgeänderungen der Tabelle oben erledigt: 24.4 (Nachtrag dort, Szenario `passkey-einstieg-pwa.feature` auf «Mein
+  Konto»); Spec 07 design.md E3, «Kopfzeile» und Hilfe-Katalog; Spec 07 3.5 und 5.5 (Änderung im PR ausgewiesen);
+  Anleitung `erste-schritte.md`, `erste-schritte-passkey.md`, neu `erste-schritte-konto.md` («Mein Konto», Pfad `/konto`);
+  `docs/oberflaeche/README.md`, `tech.md` (Farbschema), `docs/passkey-inbetriebnahme-checkliste.md`. Die Anleitung liegt
+  nach Spec 07, 7.1 unter `frontend/public/anleitung/`, nicht unter `docs/anleitung/` (gibt es nicht).
+- Angepasste Szenarien: Anmeldung wartet auf das Benutzerelement statt «Abmelden» (`anmeldung.mjs`,
+  `einfuehrung-start.mjs`); «Abmelden» über «Mein Konto» (`anmeldung-pwa.feature`, `erfassen-handy-pwa.feature`).
+
+## Nachbesserung Review PR #743 (28.11.2026)
+- **11.5 und Spec 01, 2.27:** nach Entscheid Fabian 28.11.2026 angepasst (Lösen erlaubt, Verknüpfen nur durch den Admin);
+  `kontoverwaltung-pwa.feature` trägt `@req-11.5`, 26.2 ist abgehakt.
+- **Vorlage:** entfernt nur `user` aus den Bearbeitungsrechten von Vor- und Nachname; der Test beginnt mit einem strengeren
+  Nachnamen (für niemanden änderbar), der unverändert bleibt.
+- **Vermerk (11.9):** `vermerkEntfernen` entfernt nur Einträge mit der eigenen Kennung und lässt alle übrigen roh stehen,
+  auch unlesbare und weitere Felder des Werts.
+- **Zähler (11.8):** nur mit Mandant und Recht A1; der Text nennt, dass auch ohne Anmeldung aufgenommene Aufnahmen zählen.
+- **Ablauf offline (11.11):** Läuft die Sitzung ab, während «Mein Konto» offline offen ist, bleibt die Seite stehen
+  (`app.ts`, wie bei «Erfassen»), zeigt einen Hinweis und keine Angaben, Einstiege und Einführung mehr; Darstellung, «Dieses
+  Gerät» (für den zuletzt angemeldeten Benutzer, nur im Arbeitsspeicher wie die Warteschlange) und «Abmelden» bleiben.
+  Sobald das Gerät wieder online ist, geht es zur Anmeldung mit `/konto` als Ziel. Der Wächter bleibt unverändert: Nach dem
+  Neuladen gibt es keine Anmeldung mehr, `/konto` führt dann zur Anmeldung. «Abmelden» braucht für Keycloak eine Verbindung
+  (wie bisher in der Kopfzeile).
+- **Zugänglicher Name (11.1):** «Mein Konto (<Benutzername>): » vor dem sichtbaren Text.
+- **Fehler beim Entfernen (11.9):** Farbschema, Entwürfe, Erscheinungsbild und Vermerk melden Speicherfehler; die Seite
+  zeigt dann einen Fehlerhinweis statt der Erfolgsmeldung.
