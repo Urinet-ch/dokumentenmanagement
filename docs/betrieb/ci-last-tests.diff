@@ -1,0 +1,15 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -400,7 +400,10 @@
+           test "$status" -le 1
+           jq -e 'all(.befunde[]; .code == "IMAGE_DIGEST" and (.ort == "services.api" or .ort == "services.db" or .ort == "services.kc"))' "$RUNNER_TEMP/compose-befunde.json"
+       - name: Lastskripte (tools/last, unittest)
+-        run: python3 -m unittest tools/last/test_last.py
++        run: |
++          python3 -m venv "$RUNNER_TEMP/last-tests"
++          "$RUNNER_TEMP/last-tests/bin/python" -m pip install --requirement tools/golden_synth/requirements.txt
++          PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/last-tests/bin/python" tools/last/tests_ausfuehren.py
+ 
+   browser:
+     name: Browser-Szenarien (Cucumber.js, Playwright)
