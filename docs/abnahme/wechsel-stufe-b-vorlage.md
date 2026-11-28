@@ -12,6 +12,8 @@ freigegebene Nachweise verwenden.
 | Probelauf Spec 09, 29.10 / letzter Upload Stufe A | [offen] |
 | Art der ausschliesslich synthetischen oder anonymisierten Testdaten auf Stufe A | [offen] |
 | Nachweise 31.2–31.6, 31.10 und 1.10 | [offen] |
+| #757: freigegebener Merge- und Deploy-Stand | [offen] |
+| Probe-Gate: api angehalten, bei jedem Ende gestartet, Probe und Alarme nach Fensterende | [offen] |
 | Verfehltes Leistungsziel / Entscheid Fabian, falls nötig | [offen] |
 
 ## Bereinigung und Prüfung
@@ -27,6 +29,7 @@ freigegebene Nachweise verwenden.
 | Je Mandant: Dokumente, Test-API-Tokens und Test-Webseiten-Schlüssel nicht mehr vorhanden | [offen] |
 | Realmweit: Testbenutzer und Testrollen nicht mehr vorhanden, auch ohne gültigen Mandanten | [offen] |
 | Prüfverfahren, Zeitpunkt, Zähler und Nachweis der Vollständigkeit | [offen] |
+| `wechsel_pruefen.py`: Soll-Freigabe, Schreibstopp, Ergebnis und Abgleich der tatsächlichen Rollenzuweisungen | [offen] |
 
 ## Produktiver Aufbau und Entscheid
 
