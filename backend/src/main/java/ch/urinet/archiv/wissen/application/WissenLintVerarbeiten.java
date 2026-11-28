@@ -60,9 +60,9 @@ public class WissenLintVerarbeiten {
             return;
         }
         Fortschritt stand = lauf.fortschritt();
-        if (!freischaltung.aktuell() && !"ABSCHLUSS".equals(lauf.schritt())) {
-            // Spec 04, Req 22.9: wartender oder laufender Lint nach dem Abschalten, ohne Modellaufruf
-            abschliessen(auftrag, lauf, stand, true, Wissensfreischaltung.GRUND_AUSGESCHALTET);
+        if (!freischaltung.aktuell()) {
+            // Spec 04, Req 22.9: wartender oder laufender Lint nach dem Abschalten, auch im Schritt ABSCHLUSS
+            ausgeschaltet(auftrag, lauf, stand);
             return;
         }
         try {
@@ -79,8 +79,19 @@ public class WissenLintVerarbeiten {
                 default -> abschliessen(auftrag, lauf, stand, true, "Unbekannter Lint-Schritt.");
             }
         } catch (WissenAusgeschaltet e) {
-            abschliessen(auftrag, lauf, stand, true, Wissensfreischaltung.GRUND_AUSGESCHALTET);
+            ausgeschaltet(auftrag, lauf, stand);
         }
+    }
+
+    /**
+     * Wissen ist abgeschaltet (Req 22.9): Der Lauf endet unvollständig mit dem Grund {@code WISSEN_AUSGESCHALTET}, ohne
+     * Modellaufruf und ohne seine Ergebnisse zu speichern (keine Änderungsvorschläge); der Bestand bleibt (Req 22.10).
+     */
+    private void ausgeschaltet(Auftrag auftrag, Lauf lauf, Fortschritt stand) {
+        Fortschritt ohneErgebnis = neu(stand, stand.befunde(), stand.paare(), stand.paarIndex(), stand.seiten(),
+                stand.seitenIndex(), stand.geprueft(), stand.aufrufStufe(), stand.nachfrage(), stand.hinweise(),
+                List.of());
+        abschliessen(auftrag, lauf, ohneErgebnis, true, Wissensfreischaltung.GRUND_AUSGESCHALTET);
     }
 
     private void paar(Auftrag auftrag, Lauf lauf, Fortschritt stand) {

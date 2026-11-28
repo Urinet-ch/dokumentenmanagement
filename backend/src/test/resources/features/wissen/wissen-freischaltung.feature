@@ -75,6 +75,18 @@ Funktionalität: Wissen je Mandant freischalten (Requirement 22, Aufgaben 25.1 b
       | GET     | /api/v1/wissensbasis/einstellungen |         |
     Und zeigt der Einstellungskatalog für «inhaber-urinet» die Wissensbasis
 
+  @req-22.6
+  Szenario: Ohne Freischaltung zeigen Konfigurationsdatei und Versionen die Wissenseinstellungen nicht und ändern sie nicht
+    Angenommen «inhaber-urinet» hat das Budget je Wissens-Ingest auf 234567 gesetzt
+    Und Wissen ist für «urinet» abgeschaltet
+    Dann zeigen Konfigurationsdatei und Versionsabbild für «inhaber-urinet» die Einstellungen der Wissensbasis nicht
+    Wenn «inhaber-urinet» eine Konfigurationsdatei mit dem Budget je Wissens-Ingest 345678 einspielt
+    Und «inhaber-urinet» die Einstellungen auf die Version vor dem Budget je Wissens-Ingest zurücksetzt
+    Dann beträgt das Budget je Wissens-Ingest von «urinet» 234567
+    Wenn Wissen für «urinet» wieder freigeschaltet wird
+    Dann zeigen Konfigurationsdatei und Versionsabbild für «inhaber-urinet» die Einstellungen der Wissensbasis
+    Und beträgt das Budget je Wissens-Ingest von «urinet» 234567
+
   @req-22.6 @req-22.7
   Szenario: Gespräche im Modus WISSEN sind ohne Freischaltung weder sichtbar noch lesbar noch fortsetzbar
     Angenommen der Chat nutzt den Agenten mit dem simulierten Sprachmodell

@@ -117,6 +117,14 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     bedingung: { eine: ['A2'] },
     pfade: ['/suche'],
   },
+  // Wissensteil der Suche: nur mit freigeschaltetem Wissen (Spec 04, Req 22.5; A15 wirkt nur dann)
+  {
+    anker: 'suche-wissen',
+    titel: TEXTE.hilfe.abschnitte['suche-wissen'],
+    datei: '/anleitung/suche-wissen.md',
+    eltern: 'suche',
+    bedingung: { eine: ['A15'] },
+  },
   {
     anker: 'chat',
     titel: TEXTE.hilfe.abschnitte['chat'],
@@ -130,6 +138,14 @@ export const HILFE_KATALOG: readonly HilfeEintrag[] = [
     datei: '/anleitung/chat-bewerten.md',
     eltern: 'chat',
     bedingung: { eine: ['A2'] },
+  },
+  // Wissensteil des Chats: nur mit freigeschaltetem Wissen (Spec 04, Req 22.5; A15 wirkt nur dann)
+  {
+    anker: 'chat-wissen',
+    titel: TEXTE.hilfe.abschnitte['chat-wissen'],
+    datei: '/anleitung/chat-wissen.md',
+    eltern: 'chat',
+    bedingung: { eine: ['A15'] },
   },
   {
     anker: 'chat-auswertung',

@@ -20,13 +20,14 @@ import java.util.function.LongSupplier;
  * Die eine Stelle für «Wissen freigeschaltet» (Spec 04, Req 22; design.md «Wissen je Mandant freischalten»): REST-Sperre,
  * Chat, Suche, öffentlicher Wissenschat, Auftragsarbeiter, Lint-Zeitplan, Wochenbericht und {@code GET
  * /mandant/funktionen} fragen nur hier. Der Zustand wird höchstens {@value #HOECHSTENS_SEKUNDEN} Sekunden
- * zwischengespeichert, damit das Betreiber-Kommando ohne Neustart wirkt (Req 22.2); kann er nicht gelesen werden oder
+ * zwischengespeichert, damit das Betreiber-Kommando ohne Neustart wirkt (Req 22.2: höchstens 60 s; die App lädt ihren
+ * Stand höchstens alle 30 s neu, beide zusammen bleiben darunter); kann er nicht gelesen werden oder
  * ist der Mandant unbekannt, gilt «nicht freigeschaltet» (fail closed). Kein Sonderfall für einen Mandantencode.
  */
 @ApplicationScoped
 public class Wissensfreischaltung {
 
-    static final long HOECHSTENS_SEKUNDEN = 60;
+    static final long HOECHSTENS_SEKUNDEN = 30;
     /** Grund, mit dem laufende und wartende Aufträge der Wissensbasis nach dem Abschalten enden (Req 22.9). */
     public static final String GRUND_AUSGESCHALTET = "WISSEN_AUSGESCHALTET";
     private static final Logger LOG = Logger.getLogger(Wissensfreischaltung.class);
@@ -44,7 +45,7 @@ public class Wissensfreischaltung {
     @Inject
     public Wissensfreischaltung(WissensfreischaltungPort port, MandantKontext kontext, MandantAusAnmeldung anmeldung,
                                 @ConfigProperty(name = "archiv.wissen.freischaltung-zwischenspeicher",
-                                        defaultValue = "60s") Duration zwischenspeicher) {
+                                        defaultValue = "30s") Duration zwischenspeicher) {
         this(port, kontext, anmeldung, zwischenspeicher, System::nanoTime);
     }
 
@@ -52,7 +53,7 @@ public class Wissensfreischaltung {
                          Duration zwischenspeicher, LongSupplier uhr) {
         if (zwischenspeicher.isNegative() || zwischenspeicher.compareTo(Duration.ofSeconds(HOECHSTENS_SEKUNDEN)) > 0) {
             throw new IllegalArgumentException(
-                    "archiv.wissen.freischaltung-zwischenspeicher muss zwischen 0 und 60 Sekunden liegen");
+                    "archiv.wissen.freischaltung-zwischenspeicher muss zwischen 0 und 30 Sekunden liegen");
         }
         this.port = port;
         this.kontext = kontext;
@@ -78,7 +79,7 @@ public class Wissensfreischaltung {
             return false;
         }
         if (gelesen.isEmpty()) {
-            // unbekannt: nicht zwischenspeichern, damit ein eben angelegter Mandant nicht 60 s als gesperrt gilt
+            // unbekannt: nicht zwischenspeichern, damit ein eben angelegter Mandant nicht 30 s als gesperrt gilt
             return false;
         }
         boolean wert = gelesen.get();
@@ -107,7 +108,7 @@ public class Wissensfreischaltung {
         }
     }
 
-    /** Nach einer Änderung im selben Prozess sofort neu lesen; andere Prozesse lesen spätestens nach 60 s neu. */
+    /** Nach einer Änderung im selben Prozess sofort neu lesen; andere Prozesse lesen spätestens nach 30 s neu. */
     public void vergessen(MandantCode mandant) {
         zwischenspeicher.remove(mandant);
     }

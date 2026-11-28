@@ -80,7 +80,7 @@ class StubSchalterTest {
     void chatSchalterWaehltStubOderAgent() {
         ChatAgentStub stub = new ChatAgentStub();
         LangChain4jChatAgent agent = new LangChain4jChatAgent(null, null, null, null, null, null, 5, 10,
-                java.time.Duration.ofSeconds(20));
+                java.time.Duration.ofSeconds(20), null);
         assertThat(new ChatAuswahl().chat(true, stub, instanz(agent))).isSameAs(stub);
         assertThat(new ChatAuswahl().chat(false, stub, instanz(agent))).isSameAs(agent);
         PortAuswahl.Befund befund = PortAuswahl.pruefe(List.of(new ChatAuswahl().auswahl(false)));

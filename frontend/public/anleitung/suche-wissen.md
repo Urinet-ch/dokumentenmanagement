@@ -1,0 +1,1 @@
+Suchen Sie mit einem Suchbegriff, zeigt die Suche über den Dokumenttreffern unter «Wissen» die besten passenden Seiten der Wissensbasis. Die Filter für Dokumente gelten dort nicht. Wie Sie mit Wissensseiten arbeiten, lesen Sie unter [Wissen](#wissen).

@@ -1,5 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import {
+  DOCUMENT,
+  DestroyRef,
   EnvironmentProviders,
   Injectable,
   Injector,
@@ -14,8 +16,11 @@ import { Mandantenfunktionen } from './api';
 
 export type FunktionenStand = 'offen' | 'laedt' | 'geladen' | 'fehler';
 
-/** Höchstalter des geladenen Stands: so lange wie der Zwischenspeicher im Archiv (Spec 04, Req 22.2). */
-export const FUNKTIONEN_HOECHSTALTER_MS = 60_000;
+/**
+ * Höchstalter des geladenen Stands (Spec 04, Req 22.2, 22.5): Die App lädt spätestens nach 30 s neu, das Archiv
+ * speichert den Schalter höchstens 30 s zwischen; zusammen wirkt ein Umschalten nach höchstens 60 s.
+ */
+export const FUNKTIONEN_HOECHSTALTER_MS = 30_000;
 
 /** Fehlercode des Archivs, wenn Wissen für den Mandanten nicht freigeschaltet ist (Spec 04, Req 22.6). */
 export const WISSEN_NICHT_FREIGESCHALTET = 'WISSEN_NICHT_FREIGESCHALTET';
@@ -25,21 +30,25 @@ export const WISSENSROUTE = 'wissen';
 
 /**
  * Funktionen des eigenen Mandanten aus `GET /api/v1/mandant/funktionen` (Spec 05, Req 8.8; Spec 04, Req 22.4, 22.5).
- * Geladen wird je Anmeldung (Schlüssel aus Mandant und Benutzer, gesetzt von `AnmeldungService`) und bei jeder
- * Navigation erneut, sobald der Stand älter als {@link FUNKTIONEN_HOECHSTALTER_MS} ist; meldet das Archiv
- * `WISSEN_NICHT_FREIGESCHALTET`, gilt Wissen sofort als ausgeschaltet und der Stand wird neu geladen. Fällt Wissen
- * weg, wechselt eine offene Wissensroute auf «Seite nicht gefunden». Solange die Funktionen nicht geladen sind oder die
- * Abfrage fehlschlägt, gilt «nicht verfügbar» (fail closed); die Prüfung im Archiv bleibt massgebend.
+ * Geladen wird je Anmeldung (Schlüssel aus Mandant und Benutzer, gesetzt von `AnmeldungService`), danach alle
+ * {@link FUNKTIONEN_HOECHSTALTER_MS} im Hintergrund, solange die App sichtbar ist, sowie beim Seitenwechsel und beim
+ * Zurückkehren in die App, sobald der Stand älter ist. Meldet das Archiv `WISSEN_NICHT_FREIGESCHALTET`, gilt Wissen sofort
+ * als ausgeschaltet und der Stand wird neu geladen; eine ältere, noch laufende Abfrage zählt dann nicht mehr. Fällt
+ * Wissen weg, wechselt eine offene Wissensroute auf «Seite nicht gefunden». Solange die Funktionen nicht geladen sind oder
+ * die Abfrage fehlschlägt, gilt «nicht verfügbar» (fail closed); die Prüfung im Archiv bleibt massgebend.
  */
 @Injectable({ providedIn: 'root' })
 export class MandantFunktionen {
   private readonly http = inject(HttpClient);
   private readonly injector = inject(Injector);
-  private navigationGebunden = false;
+  private readonly dokument = inject(DOCUMENT);
+  private gebunden = false;
   private readonly standIntern = signal<FunktionenStand>('offen');
   private readonly werte = signal<Mandantenfunktionen | null>(null);
   private schluessel: string | null = null;
   private laufend?: Subscription;
+  /** Folgenummer der Abfragen: Nur die Antwort der jüngsten Abfrage zählt. */
+  private folge = 0;
   private geladenAm = 0;
   private wartende: (() => void)[] = [];
 
@@ -55,13 +64,30 @@ export class MandantFunktionen {
     return this.injector.get(Router);
   }
 
-  /** Prüft bei jedem Navigationsbeginn, ob der Stand aufzufrischen ist (einmalig). */
-  anNavigationBinden(): void {
-    if (this.navigationGebunden) return;
-    this.navigationGebunden = true;
+  /**
+   * Bindet das Auffrischen an Navigation, Sichtbarkeit und einen Takt von {@link FUNKTIONEN_HOECHSTALTER_MS} (einmalig).
+   * Bei verstecktem Tab fragt der Takt nicht ab; beim Zurückkehren wird ein zu alter Stand sofort neu geladen.
+   */
+  binden(): void {
+    if (this.gebunden) return;
+    this.gebunden = true;
     this.router.events
       .pipe(filter((ereignis) => ereignis instanceof NavigationStart))
       .subscribe(() => this.auffrischen());
+    const fenster = this.dokument.defaultView;
+    if (!fenster) return;
+    const sichtbar = () => this.dokument.visibilityState !== 'hidden';
+    const takt = fenster.setInterval(() => {
+      if (sichtbar()) this.auffrischen(Date.now(), true);
+    }, FUNKTIONEN_HOECHSTALTER_MS);
+    const zurueck = () => {
+      if (sichtbar()) this.auffrischen();
+    };
+    this.dokument.addEventListener('visibilitychange', zurueck);
+    this.injector.get(DestroyRef).onDestroy(() => {
+      fenster.clearInterval(takt);
+      this.dokument.removeEventListener('visibilitychange', zurueck);
+    });
   }
 
   /** Lädt die Funktionen für diese Anmeldung, falls noch nicht geschehen; ein anderer Schlüssel lädt neu. */
@@ -73,27 +99,31 @@ export class MandantFunktionen {
     this.abfragen();
   }
 
-  /** Lädt neu, wenn der Stand älter als das Höchstalter ist; der bisherige Stand gilt bis zur Antwort weiter. */
-  auffrischen(jetzt = Date.now()): void {
+  /**
+   * Lädt neu, wenn der Stand älter als das Höchstalter ist (im Takt: immer); der bisherige Stand gilt bis zur Antwort
+   * weiter.
+   */
+  auffrischen(jetzt = Date.now(), immer = false): void {
     if (this.schluessel === null || this.laufend || this.standIntern() === 'offen') return;
-    if (jetzt - this.geladenAm < FUNKTIONEN_HOECHSTALTER_MS) return;
+    if (!immer && jetzt - this.geladenAm < FUNKTIONEN_HOECHSTALTER_MS) return;
     this.abfragen();
   }
 
-  /** Das Archiv meldete `WISSEN_NICHT_FREIGESCHALTET`: sofort ausblenden und den Stand neu laden. */
+  /** Das Archiv meldete `WISSEN_NICHT_FREIGESCHALTET`: sofort ausblenden und neu laden; eine laufende Abfrage verfällt. */
   gesperrt(): void {
     const bisher = this.werte();
     if (bisher?.wissenVerfuegbar) {
       this.werte.set({ ...bisher, wissenVerfuegbar: false });
       this.wissenrouteVerlassen();
     }
-    if (this.schluessel !== null && !this.laufend) this.abfragen();
+    if (this.schluessel !== null) this.abfragen();
   }
 
   /** Abmelden oder Anmeldung ohne Mandant: nichts verfügbar, eine laufende Abfrage endet. */
   zuruecksetzen(): void {
     this.laufend?.unsubscribe();
     this.laufend = undefined;
+    this.folge++;
     this.schluessel = null;
     this.geladenAm = 0;
     this.werte.set(null);
@@ -117,12 +147,16 @@ export class MandantFunktionen {
 
   private abfragen(): void {
     this.laufend?.unsubscribe();
+    const nummer = ++this.folge;
+    const aktuell = () => nummer === this.folge;
     this.laufend = this.http.get<Mandantenfunktionen>('/api/v1/mandant/funktionen').subscribe({
       next: (werte) => {
+        if (!aktuell()) return;
         this.laufend = undefined;
         this.uebernehmen(werte);
       },
       error: () => {
+        if (!aktuell()) return;
         this.laufend = undefined;
         const vorher = this.wissenVerfuegbar();
         this.geladenAm = Date.now();
@@ -151,9 +185,9 @@ export class MandantFunktionen {
   }
 }
 
-/** Bindet {@link MandantFunktionen} an die Navigation des Routers (Auffrischen nach dem Höchstalter, Req 22.5). */
+/** Bindet {@link MandantFunktionen} an Navigation, Sichtbarkeit und Takt (Auffrischen, Spec 04, Req 22.5). */
 export function provideMandantFunktionen(): EnvironmentProviders {
-  return provideEnvironmentInitializer(() => inject(MandantFunktionen).anNavigationBinden());
+  return provideEnvironmentInitializer(() => inject(MandantFunktionen).binden());
 }
 
 /** Schlüssel der Anmeldung für {@link MandantFunktionen.fuer}; ohne Mandant keiner. */

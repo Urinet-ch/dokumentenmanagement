@@ -37,6 +37,24 @@ Ein erfolgreicher Health-Aufruf allein beweist weder Anmeldung noch
 Datenbankintegrität. Bei Fehlern nicht von einem erfolgreichen Rollback
 ausgehen; die Prüfung der Anmeldung und weitere Diagnose erfolgen separat.
 
+## Rückfall vor «Wissen je Mandant freischalten» (Spec 04, Req 22)
+Der Rollback lässt die Datenbank stehen: die Spalte `public.mandant.wissen_freigeschaltet`
+(Changeset `045`) und die Protokollaktionen `WISSEN_FREIGESCHALTET` und `WISSEN_ABGESCHALTET`
+(Changeset `142`). Auch `liquibase rollback` baut die Bedingung der Aktionen in `142` bewusst nicht zurück,
+weil das Zugriffsprotokoll unveränderlich ist; solche Einträge werden nie gelöscht.
+
+Ein Image vor PR #751 hat folgende Folgen:
+- Es kennt den Schalter nicht. Wissen ist dann für **alle** Mandanten verfügbar (Menü, Chat, Suche,
+  öffentlicher Wissenschat, Ingest, Lint), auch für Mandanten, für die es abgeschaltet ist. Das Kommando
+  `archiv mandant wissen` fehlt.
+- Sobald ein Mandant einmal geschaltet wurde, enthält sein Zugriffsprotokoll Einträge mit den neuen Aktionen. Das
+  ältere Image kann sie nicht lesen (`ProtokollResource`, `ProtokollAktion.valueOf`): `GET /api/v1/protokoll`
+  antwortet mit 500, sobald die angefragte Seite einen solchen Eintrag enthält. Dadurch bricht die Seite
+  «Zugriffsprotokoll». Ein Filter auf eine andere Aktion und das Schreiben neuer Einträge funktionieren weiter.
+
+Abhilfe ist ein Deploy nach vorn, nicht das Löschen von Protokolleinträgen. Vor dem ersten Schalten (kein Eintrag
+mit den beiden Aktionen) bleibt ein Rückfall ohne Folgen für das Protokoll; die erste Folge oben gilt dann trotzdem.
+
 ## Router und Sicherheits-Header
 
 Die Router der Anwendung (PWA, API, öffentliche Schnittstelle und Health) in

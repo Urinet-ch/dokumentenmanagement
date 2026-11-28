@@ -66,15 +66,14 @@ Funktionalität: Wissen je Mandant freischalten – Oberfläche
     Und ruft die PWA keine Schnittstelle der Wissensbasis auf
 
   @browser @req-22.5
-  Szenario: Nach dem Abschalten in einer offenen Sitzung verschwindet der Bereich nach höchstens 60 Sekunden
+  Szenario: Nach dem Abschalten in einer offenen Sitzung verschwindet der Bereich ohne Seitenwechsel nach höchstens 30 Sekunden
     Angenommen die Uhr der App ist steuerbar
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
     Dann zeigt das Menü die Punkte «Wissen» und «Entwürfe»
     Und zeigt der Chat die Wahl des Modus
     Wenn ich im Chat den Modus «Wissen befragen» wähle
     Und Wissen für den Mandanten «urinet» während der Sitzung abgeschaltet wird
-    Und mehr als 60 Sekunden vergehen
-    Und ich in der App die Seite «/chat?neu=1» öffne
+    Und mehr als 30 Sekunden vergehen
     Dann ist im Chat kein Gespräch im Modus «Wissen befragen» mehr offen
     Und verschwinden die Punkte «Wissen» und «Entwürfe» aus dem Menü
 

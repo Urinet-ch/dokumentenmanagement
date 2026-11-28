@@ -312,6 +312,43 @@ class JdbcChatSpeicherWerkzeugDokumenteTest {
                 new ChatWerkzeugDokument("dokumente_suchen", eins));
     }
 
+    /** Spec 04, Req 22.7: ab der ersten Wissensantwort keine Antwort mehr ans Modell, die Fragen schon. */
+    @Test
+    @org.junit.jupiter.api.Tag("req-22.7")
+    void verlaufOhneWissenLaesstAbDerErstenWissensantwortAlleAntwortenWeg() throws SQLException {
+        if (!vorhanden(URINET)) {
+            provisionierung.anlegen(URINET.wert(), null, null);
+        }
+        UUID g = gespraech(URINET, "benutzer-a", urinetGespraeche);
+        frage(g, "Frage eins");
+        antwort(URINET, g, "Antwort eins", new WerkzeugAufruf("dokumente_suchen", Map.of(), List.of(), Optional.empty()));
+        frage(g, "Frage zwei");
+        antwort(URINET, g, "Antwort aus Wissen",
+                new WerkzeugAufruf("wissen_seite_zeigen", Map.of(), List.of(), Optional.empty()));
+        frage(g, "Frage drei");
+        antwort(URINET, g, "Antwort, die auf Wissen aufbaut");
+
+        assertThat(im(URINET, () -> speicher.verlaufOhneWissen(g, 20)))
+                .extracting(ch.urinet.archiv.ki.domain.chat.VerlaufEintrag::inhalt)
+                .containsExactly("Frage eins", "Antwort eins", "Frage zwei", "Frage drei");
+        assertThat(im(URINET, () -> speicher.verlauf(g, 20))).hasSize(6);
+    }
+
+    private void frage(UUID gespraech, String text) {
+        im(URINET, () -> {
+            speicher.frageSpeichern(gespraech, text, Instant.now());
+            return null;
+        });
+    }
+
+    private void antwort(MandantCode mandant, UUID gespraech, String text, WerkzeugAufruf... aufrufe) {
+        ChatAntwort antwort = new ChatAntwort(text, List.of(aufrufe), List.of(), Optional.empty(), ChatStatus.OK);
+        im(mandant, () -> {
+            speicher.antwortSpeichern(gespraech, antwort, Instant.now());
+            return null;
+        });
+    }
+
     private UUID gespraech(MandantCode mandant, String benutzer, List<UUID> merken) {
         UUID id = UUID.randomUUID();
         im(mandant, () -> {

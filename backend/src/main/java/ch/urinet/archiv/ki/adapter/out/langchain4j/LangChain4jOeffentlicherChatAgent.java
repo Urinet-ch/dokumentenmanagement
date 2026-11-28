@@ -19,6 +19,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import org.jboss.logging.Logger;
 
 import java.time.Clock;
@@ -52,6 +54,7 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
     private final int runden;
     private final int fenster;
     private final Duration zeitgrenze;
+    private final Wissensfreischaltung freischaltung;
 
     public LangChain4jOeffentlicherChatAgent(OeffentlicherAgent agent, ChatModell modell, AgentLaeufe laeufe,
                                              OeffentlicherKontextRegister register, KiVerbrauchPort verbrauch,
@@ -59,7 +62,8 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
                                              MeterRegistry registry,
                                              @ConfigProperty(name = "archiv.webseite.chat.runden") int runden,
                                              @ConfigProperty(name = "archiv.webseite.chat.fenster") int fenster,
-                                             @ConfigProperty(name = "archiv.ki.chat.zeitgrenze") Duration zeitgrenze) {
+                                             @ConfigProperty(name = "archiv.ki.chat.zeitgrenze") Duration zeitgrenze,
+                         Wissensfreischaltung freischaltung) {
         if (runden < 1 || runden >= ArchivAgent.MAX_RUNDEN) {
             throw new IllegalArgumentException("archiv.webseite.chat.runden muss zwischen 1 und "
                     + (ArchivAgent.MAX_RUNDEN - 1) + " liegen");
@@ -76,6 +80,7 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
         this.runden = runden;
         this.fenster = fenster;
         this.zeitgrenze = zeitgrenze;
+        this.freischaltung = freischaltung;
     }
 
     @Override
@@ -89,6 +94,11 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
         }
         UUID id = UUID.randomUUID();
         AgentLauf lauf = new AgentLauf(id, anfrage.mandant(), anfrage.verlauf(), ausgabe, abbruch, fenster);
+        MandantCode wissensMandant = anfrage.mandant();
+        if (freischaltung.freigeschaltet(wissensMandant)) {
+            // Spec 04, Req 22.9: fällt Wissen während des Durchgangs weg, endet er vor dem nächsten Werkzeug
+            lauf.wissenBeobachten(() -> freischaltung.freigeschaltet(wissensMandant));
+        }
         laeufe.festhalten(lauf);
         register.festhalten(id, new OeffentlicherKontext(anfrage.mandant(), anfrage.zugriff(), anfrage.wissen()));
         try {

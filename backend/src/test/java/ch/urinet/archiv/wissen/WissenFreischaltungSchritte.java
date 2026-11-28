@@ -78,6 +78,9 @@ public class WissenFreischaltungSchritte {
     private final Map<String, List<Long>> gezaehlt = new LinkedHashMap<>();
     private Optional<UUID> geplanterLint;
     private long lintLaeufeVorher;
+    /** Konfigurationsversion vor einer im Szenario gesetzten Wissenseinstellung; das {@code @After} stellt sie wieder her. */
+    private Integer versionVorWissen;
+    private String benutzerVorWissen;
 
     @After("@wissen-freischaltung")
     public void standardWiederherstellen() throws SQLException {
@@ -92,6 +95,89 @@ public class WissenFreischaltungSchritte {
         for (String code : List.of(WissenInTestdaten.URINET, WissenInTestdaten.VHF_GSK)) {
             ohneAnfrage(() -> freischalten.setzen(new MandantCode(code), true));
         }
+        if (versionVorWissen != null) {
+            String token = Testanmeldung.token(benutzerVorWissen);
+            String etag = given().auth().oauth2(token).get(EINSTELLUNGEN).getHeader("ETag");
+            given().auth().oauth2(token).header("If-Match", etag).contentType(ContentType.JSON)
+                    .body("{\"version\":" + versionVorWissen + "}").post(EINSTELLUNGEN + "/zuruecksetzen")
+                    .then().statusCode(200);
+            versionVorWissen = null;
+        }
+    }
+
+    private static final String EINSTELLUNGEN = "/api/v1/mandant/einstellungen";
+
+    /** Setzt bei Freischaltung ein eigenes Budget je Wissens-Ingest und merkt die Version davor. */
+    @Angenommen("«{word}» hat das Budget je Wissens-Ingest auf {int} gesetzt")
+    public void wissensbudgetSetzen(String benutzer, int budget) {
+        String token = Testanmeldung.token(benutzer);
+        Response vorher = given().auth().oauth2(token).get(EINSTELLUNGEN);
+        assertThat(vorher.statusCode()).as(vorher.asString()).isEqualTo(200);
+        versionVorWissen = vorher.jsonPath().getInt("version");
+        benutzerVorWissen = benutzer;
+        Response gesetzt = given().auth().oauth2(token).header("If-Match", vorher.getHeader("ETag"))
+                .contentType("application/merge-patch+json").body("{\"wissen\":{\"budgetTokens\":" + budget + "}}")
+                .patch(EINSTELLUNGEN);
+        assertThat(gesetzt.statusCode()).as(gesetzt.asString()).isEqualTo(200);
+    }
+
+    /** Req 22.6: Export und Versionsdetails ohne {@code einstellungen.wissen}, solange gesperrt. */
+    @Dann("zeigen Konfigurationsdatei und Versionsabbild für «{word}» die Einstellungen der Wissensbasis nicht")
+    public void konfigurationOhneWissen(String benutzer) {
+        konfigurationPruefen(benutzer, false);
+    }
+
+    @Dann("zeigen Konfigurationsdatei und Versionsabbild für «{word}» die Einstellungen der Wissensbasis")
+    public void konfigurationMitWissen(String benutzer) {
+        konfigurationPruefen(benutzer, true);
+    }
+
+    private static void konfigurationPruefen(String benutzer, boolean mitWissen) {
+        String token = Testanmeldung.token(benutzer);
+        var datei = given().auth().oauth2(token).get("/api/v1/konfiguration").then().statusCode(200).extract()
+                .jsonPath();
+        assertThat(datei.getMap("einstellungen")).isNotEmpty();
+        assertThat(datei.getMap("einstellungen").containsKey("wissen")).as("Export mit Wissen").isEqualTo(mitWissen);
+        List<Integer> versionen = given().auth().oauth2(token).get("/api/v1/konfiguration/versionen").then()
+                .statusCode(200).extract().jsonPath().getList("version", Integer.class);
+        for (int version : List.of(versionen.stream().max(Integer::compare).orElseThrow(),
+                versionen.stream().min(Integer::compare).orElseThrow())) {
+            var detail = given().auth().oauth2(token).get("/api/v1/konfiguration/versionen/" + version).then()
+                    .statusCode(200).extract().jsonPath();
+            assertThat(detail.getMap("inhalt.einstellungen")).isNotEmpty();
+            assertThat(detail.getMap("inhalt.einstellungen").containsKey("wissen"))
+                    .as("Version " + version + " mit Wissen").isEqualTo(mitWissen);
+        }
+    }
+
+    /** Ohne Freischaltung: Die Datei kommt an (200), ihr Wissensblock ändert nichts (Req 22.6). */
+    @Wenn("«{word}» eine Konfigurationsdatei mit dem Budget je Wissens-Ingest {int} einspielt")
+    public void dateiMitWissen(String benutzer, int budget) throws Exception {
+        String token = Testanmeldung.token(benutzer);
+        JsonNode datei = JSON.readTree(given().auth().oauth2(token).get("/api/v1/konfiguration").then()
+                .statusCode(200).extract().asString());
+        ((com.fasterxml.jackson.databind.node.ObjectNode) datei.path("einstellungen")).putObject("wissen")
+                .put("budgetTokens", budget);
+        Response eingespielt = given().auth().oauth2(token).contentType(ContentType.JSON)
+                .body(JSON.writeValueAsString(datei)).put("/api/v1/konfiguration");
+        assertThat(eingespielt.statusCode()).as(eingespielt.asString()).isEqualTo(200);
+        assertThat(eingespielt.jsonPath().getList("aenderungen.pfad", String.class))
+                .noneMatch(pfad -> pfad.contains("wissen"));
+    }
+
+    @Wenn("«{word}» die Einstellungen auf die Version vor dem Budget je Wissens-Ingest zurücksetzt")
+    public void versionZuruecksetzen(String benutzer) {
+        String token = Testanmeldung.token(benutzer);
+        String etag = given().auth().oauth2(token).get(EINSTELLUNGEN).getHeader("ETag");
+        Response zurueck = given().auth().oauth2(token).header("If-Match", etag).contentType(ContentType.JSON)
+                .body("{\"version\":" + versionVorWissen + "}").post(EINSTELLUNGEN + "/zuruecksetzen");
+        assertThat(zurueck.statusCode()).as(zurueck.asString()).isEqualTo(200);
+    }
+
+    @Dann("beträgt das Budget je Wissens-Ingest von «{word}» {int}")
+    public void wissensbudget(String code, int budget) throws SQLException {
+        assertThat(zahl("select budget_tokens from " + new MandantCode(code).schema()
+                + ".wissens_einstellung where id = 1")).isEqualTo(budget);
     }
 
     /** Wie das Kommando: eigener Plattform-Thread ohne Anmeldung und ohne Request-Kontext des Schritts. */

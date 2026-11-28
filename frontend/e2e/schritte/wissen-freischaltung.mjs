@@ -145,8 +145,9 @@ Then('sind Dokumentansicht und Chat ohne Wissen bei 375 und 1280 Pixeln in hell 
     }
   });
 
-// Abschalten während einer offenen Sitzung (Spec 04, Req 22.2, 22.5): Nach höchstens 60 s oder bei der ersten Antwort
-// 403 WISSEN_NICHT_FREIGESCHALTET verschwindet der Bereich ohne Neuladen; die Uhr der Seite ist dafür steuerbar.
+// Abschalten während einer offenen Sitzung (Spec 04, Req 22.2, 22.5): Die App lädt die Funktionen alle 30 s neu (das
+// Archiv speichert höchstens 30 s zwischen); bei der ersten Antwort 403 WISSEN_NICHT_FREIGESCHALTET verschwindet der
+// Bereich sofort, beides ohne Neuladen. Die Uhr der Seite ist dafür steuerbar.
 Given('die Uhr der App ist steuerbar', async function () {
   await this.seite.clock.install();
 });
@@ -162,8 +163,8 @@ Given(/^Wissen für den Mandanten «(.+)» während der Sitzung abgeschaltet wir
     }));
 });
 
-Given('mehr als 60 Sekunden vergehen', async function () {
-  await this.seite.clock.fastForward(61_000);
+Given('mehr als 30 Sekunden vergehen', async function () {
+  await this.seite.clock.fastForward(31_000);
   // danach wieder mit der Wanduhr, damit Warteschritte mit requestAnimationFrame weiterlaufen
   await this.seite.clock.resume();
 });

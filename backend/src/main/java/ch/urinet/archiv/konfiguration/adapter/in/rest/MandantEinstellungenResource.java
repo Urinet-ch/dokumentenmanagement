@@ -187,11 +187,14 @@ public class MandantEinstellungenResource {
                 || "WISSEN".equals(anfrage.json().path("gruppe").asText()))) {
             rechte.aktion(benutzer(), Aktion.A19);
         }
+        boolean wissenFrei = freischaltung.aktuell();
         Function<Einstellungen, EinstellungenVerwaltung.Eingabe> eingabe = vorher -> {
             var auftrag = EinstellungenZuruecksetzen.lesen(anfrage.wert());
             if (auftrag.version() != null) {
+                Einstellungen ziel = konfiguration.version(auftrag.version()).inhalt().einstellungen();
+                // ohne Freischaltung bleiben die Einstellungen der Wissensbasis wie sie sind (Spec 04, Req 22.6)
                 return new EinstellungenVerwaltung.Eingabe(
-                        konfiguration.version(auftrag.version()).inhalt().einstellungen(), List.of());
+                        wissenFrei ? ziel : ziel.mitWissen(vorher.wissen()), List.of());
             }
             return patch(vorher, EinstellungenZuruecksetzen.gruppenPatch(json, auftrag.gruppe()));
         };

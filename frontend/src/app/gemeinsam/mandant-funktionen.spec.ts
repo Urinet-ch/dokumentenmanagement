@@ -151,6 +151,52 @@ describe('MandantFunktionen (Spec 04, Req 22.4, 22.5)', () => {
       expect(router.url).toBe('/chat');
     });
 
+    it('verwirft nach 403 die Antwort einer älteren, noch laufenden Abfrage', () => {
+      funktionen.fuer('urinet|u1');
+      http.expectOne('/api/v1/mandant/funktionen').flush(ein);
+      funktionen.auffrischen(Date.now() + FUNKTIONEN_HOECHSTALTER_MS);
+      const alt = http.expectOne('/api/v1/mandant/funktionen');
+      funktionen.gesperrt();
+      expect(alt.cancelled).toBe(true);
+      expect(funktionen.wissenVerfuegbar()).toBe(false);
+      http.expectOne('/api/v1/mandant/funktionen').flush(aus);
+      expect(funktionen.wissenVerfuegbar()).toBe(false);
+    });
+
+    it('lädt im Takt von 30 s ohne Navigation neu, aber nicht bei verstecktem Tab', () => {
+      vi.useFakeTimers();
+      let zustand: DocumentVisibilityState = 'visible';
+      vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => zustand);
+      // Takt erst mit Fake-Timern anlegen: neuer Injector
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient(), provideHttpClientTesting(), provideMandantFunktionen(), provideRouter([])],
+      });
+      const funktionen = TestBed.inject(MandantFunktionen);
+      const http = TestBed.inject(HttpTestingController);
+      try {
+        funktionen.fuer('urinet|u1');
+        http.expectOne('/api/v1/mandant/funktionen').flush(ein);
+        vi.advanceTimersByTime(FUNKTIONEN_HOECHSTALTER_MS - 1);
+        http.expectNone('/api/v1/mandant/funktionen');
+        vi.advanceTimersByTime(1);
+        http.expectOne('/api/v1/mandant/funktionen').flush(aus);
+        expect(funktionen.wissenVerfuegbar()).toBe(false);
+        zustand = 'hidden';
+        vi.advanceTimersByTime(3 * FUNKTIONEN_HOECHSTALTER_MS);
+        http.expectNone('/api/v1/mandant/funktionen');
+        zustand = 'visible';
+        document.dispatchEvent(new Event('visibilitychange'));
+        http.expectOne('/api/v1/mandant/funktionen').flush(ein);
+        expect(funktionen.wissenVerfuegbar()).toBe(true);
+        http.verify();
+      } finally {
+        TestBed.resetTestingModule();
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+      }
+    });
+
     it('liest den Fehlercode auch aus einem Textkörper', () => {
       expect(fehlercodeAus('{"fehlercode":"WISSEN_NICHT_FREIGESCHALTET"}')).toBe('WISSEN_NICHT_FREIGESCHALTET');
       expect(fehlercodeAus('kein json')).toBeNull();

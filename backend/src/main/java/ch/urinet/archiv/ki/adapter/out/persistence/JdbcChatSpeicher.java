@@ -119,10 +119,15 @@ public class JdbcChatSpeicher implements ChatSpeicher {
 
     @Override
     public List<VerlaufEintrag> verlaufOhneWissen(UUID gespraech, int anzahl) {
-        List<VerlaufEintrag> neueste = abfragen("select rolle, inhalt from " + schema() + ".chat_nachricht "
-                        + "where gespraech_id = ? and inhalt <> '' and not (rolle = 'ASSISTENT' and coalesce("
-                        + "jsonb_path_exists(werkzeuge, '$[*] ? (@.name starts with \"wissen_\")'), false)) "
-                        + "order by id desc limit ?",
+        // Req 22.7: ab der ersten Antwort mit einem Wissenswerkzeug keine Antwort mehr, auch keine, die darauf aufbaut;
+        // die Fragen bleiben
+        String s = schema();
+        List<VerlaufEintrag> neueste = abfragen("select n.rolle, n.inhalt from " + s + ".chat_nachricht n "
+                        + "where n.gespraech_id = ? and n.inhalt <> '' and not (n.rolle = 'ASSISTENT' and exists ("
+                        + "select 1 from " + s + ".chat_nachricht w where w.gespraech_id = n.gespraech_id "
+                        + "and w.rolle = 'ASSISTENT' and w.id <= n.id and coalesce(jsonb_path_exists(w.werkzeuge, "
+                        + "'$[*] ? (@.name starts with \"wissen_\")'), false))) "
+                        + "order by n.id desc limit ?",
                 z -> new VerlaufEintrag(ChatRolle.valueOf(z.getString(1)), z.getString(2)), gespraech, anzahl);
         List<VerlaufEintrag> verlauf = new ArrayList<>(neueste);
         Collections.reverse(verlauf);

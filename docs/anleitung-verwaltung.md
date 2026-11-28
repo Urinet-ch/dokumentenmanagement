@@ -83,8 +83,8 @@ Der Bereich Wissen ist eine Zusatzleistung und je Mandant ein- oder ausgeschalte
 Geschaltet wird nur mit dem Admin-Kommando `mandant wissen <code> [ein|aus]` (Aufruf, Wirkung und Exit-Codes im README
 unter [«Wissen je Mandant freischalten»](../README.md#wissen-je-mandant-freischalten)); der Inhaber kann es in der App
 nicht selbst einschalten. Ausgeschaltet sieht der Mandant den Bereich nicht, und die Wissensbasis verursacht keine
-KI-Kosten; gelöscht wird nichts. Die Änderung wirkt nach spätestens 60 Sekunden, in einer offenen App beim nächsten
-Seitenwechsel danach oder sofort, wenn sie eine gesperrte Funktion anfragt.
+KI-Kosten; gelöscht wird nichts. Die Änderung wirkt nach spätestens 60 Sekunden, auch in einer offenen App ohne
+Seitenwechsel; fragt die App vorher eine gesperrte Funktion an, sofort.
 
 ### Normaler Weg: Admin-Kommando
 Die Kommandos laufen im Wegwerf-Container wie im README unter «Admin-Kommandos auf der VPS» beschrieben, nie in einem laufenden

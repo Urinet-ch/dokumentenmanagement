@@ -56,7 +56,7 @@ class ChatModellTest {
     void derAgentMeldetOhneTokenSofortAusfallOhneRequest() {
         ChatModell m = modell(INFOMANIAK, Optional.empty());
         LangChain4jChatAgent agent = new LangChain4jChatAgent(null, m, new AgentLaeufe(), null, null, null, 5, 10,
-                Duration.ofSeconds(20));
+                Duration.ofSeconds(20), null);
         Benutzer benutzer = new Benutzer("u1", Rolle.INHABER);
         List<ChatEreignis> ereignisse = new ArrayList<>();
 
@@ -71,7 +71,7 @@ class ChatModellTest {
         ChatAbbruch abbruch = new ChatAbbruch();
         abbruch.setzen();
         LangChain4jChatAgent agent = new LangChain4jChatAgent(null, modell(INFOMANIAK, Optional.empty()), new AgentLaeufe(),
-                null, null, null, 5, 10, Duration.ofSeconds(20));
+                null, null, null, 5, 10, Duration.ofSeconds(20), null);
         Benutzer benutzer = new Benutzer("u1", Rolle.INHABER);
         List<ChatEreignis> ereignisse = new ArrayList<>();
 
