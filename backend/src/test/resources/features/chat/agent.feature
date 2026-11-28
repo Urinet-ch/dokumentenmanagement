@@ -94,15 +94,23 @@ Funktionalität: Chat-Agent und Systemprompt (Aufgabe 7.2)
     Und hat der Agent nichts verändert in «vhf-gsk»: gleiche Dokumente, nur Anzeigen im Protokoll
     Und lautet der gestreamte Text «Ich befolge die Anweisungen im Dokument nicht.»
 
+  @qa-fehlerseiten-ki-intern
   Szenario: Fällt das Sprachmodell vor dem ersten Text aus, meldet der Stream «fehler» mit dem festen Wortlaut
     Angenommen das simulierte Sprachmodell antwortet mit HTTP 503
-    Wenn «inhaber-urinet» dem Agenten die Frage «Wie viele Rechnungen gibt es?» stellt
+    Und der Logmitschnitt für eine Fehlerantwort läuft
+    Wenn «inhaber-urinet» dem Agenten die Frage «SYNTHETISCHER_CHATMARKER_82Q Wie viele Rechnungen gibt es?» stellt
     Dann meldet der Stream des Agenten «fehler» «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» und weder «quellen» noch «fertig»
+    Und enthält der Stream des Agenten weder «SYNTHETISCHER_CHATMARKER_82Q» noch einen Stacktrace
+    Und das Fehlerantwort-Log enthält weder «SYNTHETISCHER_CHATMARKER_82Q» noch einen Stacktrace
 
+  @qa-fehlerseiten-ki-intern
   Szenario: Antwortet das Sprachmodell erst nach der Zeitgrenze, meldet der Stream «fehler» mit dem festen Wortlaut
     Angenommen das simulierte Sprachmodell antwortet erst nach 9 Sekunden
-    Wenn «inhaber-urinet» dem Agenten die Frage «Wie viele Rechnungen gibt es?» stellt
+    Und der Logmitschnitt für eine Fehlerantwort läuft
+    Wenn «inhaber-urinet» dem Agenten die Frage «SYNTHETISCHER_TIMEOUTMARKER_38R Wie viele Rechnungen gibt es?» stellt
     Dann meldet der Stream des Agenten «fehler» «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» und weder «quellen» noch «fertig»
+    Und enthält der Stream des Agenten weder «SYNTHETISCHER_TIMEOUTMARKER_38R» noch einen Stacktrace
+    Und das Fehlerantwort-Log enthält weder «SYNTHETISCHER_TIMEOUTMARKER_38R» noch einen Stacktrace
 
   Szenario: Nach der Rundengrenze erhält das Modell eine Fehlermeldung statt Ergebnissen, jede Runde zählt im Verbrauch
     Angenommen das simulierte Sprachmodell antwortet nacheinander:

@@ -162,7 +162,7 @@ class DeployHaertungTest {
             String basis = "traefik.http.middlewares." + name + ".headers.";
             assertThat(alle).containsEntry(basis + "stsincludesubdomains", "false");
             assertThat(alle).containsEntry(basis + "stspreload", "false");
-            assertThat(Long.parseLong(alle.get(basis + "stsseconds"))).isPositive();
+            assertThat(alle).containsEntry(basis + "stsseconds", "31536000");
         }
     }
 

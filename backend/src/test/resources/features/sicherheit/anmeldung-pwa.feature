@@ -28,7 +28,7 @@ Funktionalität: Anmeldung in der PWA mit OIDC und PKCE
     Dann hat Keycloak die Abmeldung erhalten
     Und sehe ich kein Menü
 
-  @req-2.1
+  @req-2.1 @qa-fehlerseiten
   Szenario: Lehnt Keycloak die Erneuerung ab, meldet die PWA die abgelaufene Sitzung
     Angenommen Keycloak stellt Tokens mit 6 Sekunden Gültigkeit aus
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
@@ -36,6 +36,7 @@ Funktionalität: Anmeldung in der PWA mit OIDC und PKCE
     Dann sehe ich die Meldung «Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.»
     Und sehe ich den Knopf «Anmelden»
     Und sehe ich kein Menü
+    Und ist die Fehleransicht bei 375 und 1280 Pixeln in hell und dunkel ohne axe-Befund
 
   @req-2.1
   Szenario: Antwortet die API mit 401, meldet die PWA die abgelaufene Sitzung

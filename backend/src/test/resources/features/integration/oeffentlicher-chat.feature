@@ -414,12 +414,15 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
 
   # ---- Fehler ohne interne Angaben, Eingabegrenzen, Verlauf
 
-  @req-6.1
+  @req-6.1 @qa-fehlerseiten-ki
   Szenario: Fällt das Modell aus, meldet der Stream «fehler» mit festem Text ohne interne Angaben, und nichts wird gespeichert
     Angenommen das simulierte Sprachmodell antwortet mit HTTP 500
-    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Hallo?»
+    Und der Logmitschnitt für eine Fehlerantwort läuft
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «SYNTHETISCHER_INHALT_7F42?»
     Dann meldet der Stream des Chatbots «fehler» «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» und weder «quellen» noch «fertig»
     Und steht in der Chatbot-Antwort weder «500» noch «simuliert»
+    Und steht in der Chatbot-Antwort weder «500» noch «SYNTHETISCHER_INHALT_7F42»
+    Und das Fehlerantwort-Log enthält weder «SYNTHETISCHER_INHALT_7F42» noch einen Stacktrace
     Und hat «urinet» genau 0 gespeicherte öffentliche Frage
 
   @req-6.1
