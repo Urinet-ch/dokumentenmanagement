@@ -40,22 +40,27 @@ public class OeffentlicheGespraeche {
 
     private final Map<UUID, Gespraech> gespraeche = new LinkedHashMap<>();
     private final Duration dauer;
+    private final Duration aufraeumtakt;
     private final int maxGespraeche;
     private final int fenster;
     private final Clock uhr;
 
     @Inject
     public OeffentlicheGespraeche(@ConfigProperty(name = "archiv.webseite.chat.gespraech-dauer") Duration dauer,
+                                  @ConfigProperty(name = "archiv.webseite.chat.gespraech-aufraeumtakt") Duration aufraeumtakt,
                                   @ConfigProperty(name = "archiv.webseite.chat.max-gespraeche") int maxGespraeche,
                                   @ConfigProperty(name = "archiv.webseite.chat.fenster") int fenster) {
-        this(dauer, maxGespraeche, fenster, Clock.systemUTC());
+        this(dauer, aufraeumtakt, maxGespraeche, fenster, Clock.systemUTC());
     }
 
-    OeffentlicheGespraeche(Duration dauer, int maxGespraeche, int fenster, Clock uhr) {
-        if (dauer.isNegative() || dauer.isZero() || maxGespraeche < 1 || fenster < 2) {
-            throw new IllegalArgumentException("archiv.webseite.chat.(gespraech-dauer|max-gespraeche|fenster) ungültig");
+    OeffentlicheGespraeche(Duration dauer, Duration aufraeumtakt, int maxGespraeche, int fenster, Clock uhr) {
+        if (dauer.isNegative() || dauer.isZero() || aufraeumtakt.isNegative() || aufraeumtakt.isZero()
+                || aufraeumtakt.compareTo(dauer) >= 0 || maxGespraeche < 1 || fenster < 2) {
+            throw new IllegalArgumentException(
+                    "archiv.webseite.chat.(gespraech-dauer|gespraech-aufraeumtakt|max-gespraeche|fenster) ungültig");
         }
         this.dauer = dauer;
+        this.aufraeumtakt = aufraeumtakt;
         this.maxGespraeche = maxGespraeche;
         this.fenster = fenster;
         this.uhr = uhr;
@@ -156,11 +161,15 @@ public class OeffentlicheGespraeche {
     }
 
     public synchronized void abgelaufeneAufraeumen() {
-        abgelaufeneEntfernen();
+        abgelaufeneEntfernen(aufraeumtakt);
     }
 
     private void abgelaufeneEntfernen() {
-        Instant grenze = uhr.instant().minus(dauer);
+        abgelaufeneEntfernen(Duration.ZERO);
+    }
+
+    private void abgelaufeneEntfernen(Duration vorlauf) {
+        Instant grenze = uhr.instant().minus(dauer).plus(vorlauf);
         gespraeche.values().removeIf(g -> !g.geaendert().isAfter(grenze));
     }
 

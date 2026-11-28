@@ -14,7 +14,7 @@ public class OeffentlicheGespraecheAufraeumer {
         this.gespraeche = gespraeche;
     }
 
-    @Scheduled(every = "10s", identity = "oeffentliche-gespraeche-aufraeumen",
+    @Scheduled(every = "${archiv.webseite.chat.gespraech-aufraeumtakt}", identity = "oeffentliche-gespraeche-aufraeumen",
             concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
             skipExecutionIf = VorMigrationUeberspringen.class)
     void takt() {
