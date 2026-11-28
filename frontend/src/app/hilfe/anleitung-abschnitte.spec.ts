@@ -37,6 +37,8 @@ const SOLL: readonly Soll[] = [
   { anker: 'erfassen-handy', titel: 'Mit dem Handy fotografieren', eltern: 'erfassen', eine: ['A1'] },
   { anker: 'erfassen-dateien', titel: 'Dateien hochladen', eltern: 'erfassen', eine: ['A1'] },
   { anker: 'erfassen-offline', titel: 'Ohne Netz erfassen', eltern: 'erfassen', eine: ['A1'], abgemeldet: true },
+  // Spec 09, Aufgabe 27.5: Seite /trennblaetter mit A1 wie der Menüpunkt
+  { anker: 'erfassen-trennblaetter', titel: 'Trennblätter drucken', eltern: 'erfassen', eine: ['A1'], pfade: ['/trennblaetter'] },
   { anker: 'eingangskorb', titel: 'Eingangskorb', eine: ['A5'], pfade: ['/eingangskorb'] },
   { anker: 'eingangskorb-bestaetigen', titel: 'Prüfen, korrigieren und bestätigen', eltern: 'eingangskorb', eine: ['A7'] },
   { anker: 'eingangskorb-eigene', titel: 'Ihre erfassten Dokumente verfolgen', eltern: 'eingangskorb', eine: ['A1'], ohne: ['A7'] },

@@ -69,7 +69,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Req 10.2: Jede Methode, deren Aktion in der Tabelle «Protokoll und Manifest» (design.md) steht, trägt
  * {@link Protokolliert} mit der passenden Protokoll-Aktion ({@link #erwartetesProtokoll}); ausgenommen sind Listen und
  * Suchen ohne {@code {id}} (A2–A4; bei A6 und A8 nur lesend per {@code GET}, z. B. die Partnerauswahl
- * {@code GET /kontakte}), der Eingangskorb (A5) und A11–A14 (dort protokolliert nur {@code VERWEIGERT}).
+ * {@code GET /kontakte}), der Eingangskorb (A5), A11–A14 (dort protokolliert nur {@code VERWEIGERT}) und
+ * {@code POST /trennblaetter} (A1 ohne Dokument, Spec 09, Req 6.1).
  * <p>
  * Req 2.5: {@link ErlaubtScope} steht nur an {@code POST /dokumente} ({@code import}) und
  * {@code POST /dokumente/generator} ({@code generator}), beide mit A1; {@code @RolesAllowed} nennt dort zusätzlich die
@@ -102,6 +103,7 @@ class EndpunktWaechterTest {
     private static final java.nio.file.Path OPENAPI = java.nio.file.Path.of("../frontend/openapi/openapi.json");
     private static final java.nio.file.Path MATRIX = java.nio.file.Path.of("src/test/resources/rechtematrix.json");
     private static final List<String> HTTP_NAMEN = List.of("get", "post", "put", "patch", "delete", "head", "options");
+    private static final String TRENNBLAETTER = "/trennblaetter";
     private static final Map<ApiTokenScope, String> SCOPE_PFAD =
             Map.of(ApiTokenScope.IMPORT, "/dokumente", ApiTokenScope.GENERATOR, "/dokumente/generator");
 
@@ -457,7 +459,8 @@ class EndpunktWaechterTest {
     static Optional<ProtokollAktion> erwartetesProtokoll(Aktion aktion, String pfad, boolean lesend) {
         boolean mitId = DOKUMENT_ID.matcher(pfad).find();
         return Optional.ofNullable(switch (aktion) {
-            case A1 -> ProtokollAktion.ERFASSEN;
+            // Trennblätter erzeugen gehört zu A1 (Spec 09, Req 15.1), legt aber kein Dokument an
+            case A1 -> normalisiert(pfad).equals(TRENNBLAETTER) ? null : ProtokollAktion.ERFASSEN;
             case A2, A3, A4 -> !mitId ? null
                     : HERUNTERLADEN.matcher(pfad).matches() ? ProtokollAktion.HERUNTERLADEN
                     : ProtokollAktion.ANZEIGEN;
