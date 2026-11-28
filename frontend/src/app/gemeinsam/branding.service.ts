@@ -107,6 +107,17 @@ export class BrandingService {
       });
   }
 
+  /** Entfernt das zwischengespeicherte Erscheinungsbild dieser Domain (Spec 06, Req 11.9); `false` bei gesperrtem Speicher. */
+  zwischenspeicherEntfernen(): boolean {
+    try {
+      const fenster = this.dokument.defaultView;
+      fenster?.localStorage.removeItem(SPEICHER + (fenster.location.hostname ?? ''));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** Letzte gültige Antwort: Offline-Kaltstart der PWA behält so das Branding des Mandanten. */
   private merken(domain: string, branding: Branding): void {
     try {

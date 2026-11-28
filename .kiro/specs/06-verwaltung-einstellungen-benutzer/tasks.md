@@ -335,21 +335,34 @@ auf Server oder Secrets aus der Sitzung.
     `passkey-einstieg-pwa.feature` (Browser: Knopf sichtbar, öffnet die Kontoverwaltung in neuem Tab, Seite bleibt, axe), `npm run pruefe:gestaltung`.
   - _Anforderungen: 10.1_
   - _Abhängig von: 24.1_
+  - Nachtrag 28.11.2026 (Aufgabe 26.4): Der Einstieg liegt jetzt auf «Mein Konto» («Passkeys verwalten»), nicht mehr in der
+    Kopfzeile; `passkey-einstieg-pwa.feature` prüft ihn dort.
 
 ## Welle 26 — Mein Konto (Entscheid Fabian 28.11.2026, Requirement 11)
-- [ ] 26.1 Seite «Mein Konto» und aufgeräumte Kopfzeile [Frontend]
+- [x] 26.1 Seite «Mein Konto» und aufgeräumte Kopfzeile [Frontend]
   - Benutzerelement als Link, Abschnitte Angaben zur Person, Darstellung, Hilfe und Einführung, Abmelden;
     Browser-Szenarien `@req-11.x` mit axe bei 375 und 1280 px, hell und dunkel; bestehende Szenarien der Kopfzeile anpassen.
+  - Nachweis 28.11.2026: `konto-seite.spec.ts`, `abmeldung.spec.ts`, `app.spec.ts`; `features/verwaltung/mein-konto-pwa.feature`
+    (design.md, «Umsetzung (Aufgabe 26.1, 28.11.2026)»).
   - _Anforderungen: 11.1–11.3, 11.6, 11.7, 11.10–11.12_
-- [ ] 26.2 Anmeldung und Sicherheit [Frontend] [Backend] [Infra]
+- [x] 26.2 Anmeldung und Sicherheit [Frontend] [Backend] [Infra]
   - Pfade der Kontoverwaltung gegen ein Wegwerf-Keycloak prüfen, Einschränkungen im Realm-Export, Nachweis nach 11.5.
+  - Nachweis 28.11.2026: Pfade geprüft und Einstiege umgesetzt (11.4, Szenario `@req-11.4`); Vor- und Nachname nur noch für
+    `admin` änderbar, `idp_link` nicht aktiv, Lösen einer Google-Verknüpfung erlaubt und protokolliert (Entscheid Fabian
+    28.11.2026, 11.5 und Spec 01, 2.27 angepasst), Einmalcode-Pflicht nach dem Entfernen belegt (`RealmExportKeycloakTest`,
+    `kontoverwaltung-pwa.feature` mit `@req-11.5`). Offen nur der Betrieb: Lauf von `konto-einschraenken-vorlage.sh` auf
+    Stufe A ([Fabian], README «Kontoverwaltung einschränken»); design.md, «Umsetzung (Aufgabe 26.2, 28.11.2026)».
   - _Anforderungen: 11.4, 11.5_
   - _Abhängig von: 26.1_
-- [ ] 26.3 Dieses Gerät [Frontend]
+- [x] 26.3 Dieses Gerät [Frontend]
+  - Nachweis 28.11.2026: `konto-seite.spec.ts`, `einfuehrung-vermerk.spec.ts`; Szenarien `@req-11.8`, `@req-11.9` in
+    `mein-konto-pwa.feature` (design.md, «Umsetzung (Aufgabe 26.3, 28.11.2026)»).
   - _Anforderungen: 11.8, 11.9_
   - _Abhängig von: 26.1_
-- [ ] 26.4 Folgeänderungen und Anleitung [Frontend]
+- [x] 26.4 Folgeänderungen und Anleitung [Frontend]
   - Tabelle «Folgeänderungen» in design.md abarbeiten.
+  - Nachweis 28.11.2026: design.md, «Umsetzung (Aufgabe 26.4, 28.11.2026)»; Anleitung `erste-schritte-konto.md`,
+    `anleitung-abschnitte.spec.ts`, angepasste Szenarien der Kopfzeile.
   - _Anforderungen: 11.1, 11.2_
   - _Abhängig von: 26.1–26.3_
 - [ ] 26.5 Abnahme auf iPhone und Mac [QA] [Fabian]
