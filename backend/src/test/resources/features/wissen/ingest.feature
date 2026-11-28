@@ -59,6 +59,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Angenommen WireMock liefert gültige Antworten für alle vier Ingest-Schritte
     Wenn «inhaber-urinet» Abschnitt 1 des Ingest-Entwurfs gleichzeitig zweimal erneut verarbeitet
     Dann wird genau eine Wiederholung angenommen und die andere abgewiesen
+    Und ist für «QUELLE» genau ein zusätzlicher Auftrag «WISSEN_INGEST» eingereiht
     Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
     Und ist der Abschnittsfehler nach der Wiederholung behoben
 

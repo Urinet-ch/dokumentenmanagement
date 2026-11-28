@@ -6,6 +6,7 @@ import ch.urinet.archiv.verarbeitung.domain.OcrFehlgeschlagen;
 import ch.urinet.archiv.verarbeitung.domain.OcrQuelle;
 import ch.urinet.archiv.verarbeitung.domain.PdfaFehlt;
 import ch.urinet.archiv.verarbeitung.domain.Quelltyp;
+import ch.urinet.archiv.wissen.domain.WissenVertraulichkeitsvermerk;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,8 +136,7 @@ class OcrMyPdfAdapterTest {
                 "CHF", "Service B", "85.00");
         assertThat(p.ergebnis.volltext())
                 .containsPattern("(?m)^.*Service A\\s+120\\.00\\s+CHF.*$");
-        assertThat(ch.urinet.archiv.wissen.domain.WissenVertraulichkeitsvermerk
-                .istIntern(p.ergebnis.volltext())).isTrue();
+        assertThat(WissenVertraulichkeitsvermerk.istIntern(p.ergebnis.volltext())).isTrue();
         assertThat(befehle).filteredOn(b -> b.programm().equals("pdftotext"))
                 .anySatisfy(b -> assertThat(b.argumente()).contains("-layout"));
         assertThat(befehle).extracting(Befehl::programm).contains("ocrmypdf");
