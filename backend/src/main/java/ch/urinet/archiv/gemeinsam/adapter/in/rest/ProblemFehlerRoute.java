@@ -27,13 +27,12 @@ import java.util.Optional;
  * {@code NICHT_ERLAUBT}; Keycloak nicht erreichbar ({@code OIDCException}) gilt als nicht angemeldet. Andere Fehler gehen
  * an den nächsten Handler.
  * <p>
- * Die Grenze der Anfrage ({@code quarkus.http.limits.max-body-size}) prüft Quarkus vor allen Handlern und antwortet mit
- * einer leeren 413. Darum prüft {@link #grenzePruefen} sie für {@code /api/*} kurz davor am {@code Content-Length} und
- * antwortet mit Problem Details. Seit Aufgabe 2.4 ist die Grenze von Quarkus die für Uploads ({@code multipart/form-data},
- * {@code archiv.upload.max-anfrage}); alle anderen Anfragen prüft sie gegen die kleinere {@code archiv.http.max-anfrage}.
- * Die Verbindung wird danach wie bei Quarkus geschlossen, weil der Rest der Anfrage nicht gelesen wird. Eine Anfrage
- * ohne {@code Content-Length} (chunked), die erst beim Lesen zu gross wird, beantwortet Quarkus weiter selbst mit 413
- * ohne Inhalt.
+ * Die Grenze der Anfrage ({@code quarkus.http.limits.max-body-size}) prüft Quarkus vor der REST-Ressource. Darum
+ * prüft {@link #grenzePruefen} sie für {@code /api/*} vorab am {@code Content-Length}; ein früher BodyHandler fängt
+ * zudem übergrosse nicht-multipart Anfragen ohne {@code Content-Length} ab. Für Uploads
+ * ({@code multipart/form-data}) gilt {@code archiv.upload.max-anfrage}, für alle anderen Anfragen die kleinere Grenze
+ * {@code archiv.http.max-anfrage}. Die Verbindung wird danach wie bei Quarkus geschlossen, weil der Rest der Anfrage
+ * nicht gelesen wird.
  * <p>
  * {@code UEBERLASTET} aus der Prüfung eines API-Tokens (Req 2.5) entsteht bei der proaktiven Anmeldung auf jedem Pfad,
  * auch unter {@code /q/}; {@link #ueberlastet} antwortet darum auf allen Pfaden mit 503, {@code Retry-After} und Problem
@@ -88,6 +87,9 @@ public class ProblemFehlerRoute {
         router.putWithRegex(WISSEN_EINSTELLUNGEN_PUT).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
                 .handler(BodyHandler.create(false).setBodyLimit(EINSTELLUNGEN_MAX_BYTES))
                 .failureHandler(this::begrenzteAnfrageZuGross);
+        router.route(API).order(RouteConstants.ROUTE_ORDER_BODY_HANDLER - 1)
+                .handler(this::chunkedBegrenzen)
+                .failureHandler(this::begrenzteAnfrageZuGross);
         router.route(API).order(RouteConstants.ROUTE_ORDER_UPLOAD_LIMIT - 1).handler(this::grenzePruefen);
         router.route().order(-2).failureHandler(this::ueberlastet);
         router.route(API).order(-1).failureHandler(this::behandeln);
@@ -105,6 +107,7 @@ public class ProblemFehlerRoute {
             }
         });
         kontext.response().putHeader(HttpHeaders.CONNECTION, "close")
+                .putHeader(HttpHeaders.CACHE_CONTROL, "no-store")
                 .endHandler(ende -> kontext.request().connection().close());
         senden(kontext, ProblemAntwort.fuer(Fehlercode.DATEI_ZU_GROSS), false);
     }
@@ -151,10 +154,39 @@ public class ProblemFehlerRoute {
         kontext.next();
     }
 
+    void chunkedBegrenzen(RoutingContext kontext) {
+        String inhaltstyp = kontext.request().getHeader(HttpHeaders.CONTENT_TYPE);
+        if (hatEigeneGrenze(kontext) || istMultipart(inhaltstyp)
+                || kontext.request().getHeader(HttpHeaders.CONTENT_LENGTH) != null || !hatKoerper(kontext)) {
+            kontext.next();
+            return;
+        }
+        BodyHandler.create(false).setBodyLimit(grenze(inhaltstyp)).handle(kontext);
+    }
+
+    private static boolean hatEigeneGrenze(RoutingContext kontext) {
+        String methode = kontext.request().method().name();
+        String pfad = kontext.request().path();
+        return (methode.equals("PUT") && (pfad.matches(BEWERTUNG_PFAD) || pfad.matches(WISSEN_EINSTELLUNGEN_PUT)))
+                || (methode.equals("POST") && (pfad.matches(GESPRAECHE_POST) || pfad.matches(EINSTELLUNGEN_POST)))
+                || (methode.equals("PATCH") && pfad.matches(EINSTELLUNGEN_PATCH));
+    }
+
+    private static boolean istMultipart(String inhaltstyp) {
+        return inhaltstyp != null
+                && inhaltstyp.strip().toLowerCase(java.util.Locale.ROOT).startsWith(MULTIPART);
+    }
+
+    private static boolean hatKoerper(RoutingContext kontext) {
+        String laenge = kontext.request().getHeader(HttpHeaders.CONTENT_LENGTH);
+        return (laenge != null && !laenge.equals("0"))
+                || kontext.request().getHeader(HttpHeaders.TRANSFER_ENCODING) != null;
+    }
+
     /** Grenze je Art der Anfrage; die kleinere Grenze gilt für alles ausser {@code multipart/form-data}. */
     long grenze(String inhaltstyp) {
         long gesamt = grenze.map(MemorySize::asLongValue).orElse(Long.MAX_VALUE);
-        boolean upload = inhaltstyp != null && inhaltstyp.strip().toLowerCase(java.util.Locale.ROOT).startsWith(MULTIPART);
+        boolean upload = istMultipart(inhaltstyp);
         return upload ? gesamt : Math.min(gesamt, grenzeOhneUpload.asLongValue());
     }
 
