@@ -2,13 +2,17 @@ package ch.urinet.archiv.ki.adapter.out.langchain4j;
 
 import ch.urinet.archiv.ki.KiWireMock;
 import ch.urinet.archiv.ki.application.KiPort;
+import ch.urinet.archiv.wissen.FesteWissensfreischaltung;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import io.quarkus.test.common.TestResourceScope;
 import io.quarkus.test.common.WithTestResource;
+import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -29,6 +33,15 @@ class LangChain4jKiAdapterWissenTimeoutTest {
 
     @ConfigProperty(name = "archiv.ki.timeout")
     Duration timeout;
+
+    /**
+     * Der Adapter prüft vor dem Aufruf die Freischaltung (Spec 04, Req 22.9); dieser Test gilt der Zeitüberschreitung,
+     * darum ist Wissen hier fest eingeschaltet (das Probe-Register kennt keinen Mandanten).
+     */
+    @BeforeEach
+    void wissenEin() {
+        QuarkusMock.installMockForType(FesteWissensfreischaltung.ein(), Wissensfreischaltung.class);
+    }
 
     @Test
     void modellzeitueberschreitungIstEinAusfallUndKeinSchemafehler() {
