@@ -299,7 +299,16 @@ Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderu
 - Abschluss: Beim Trockenlauf meldet das Werkzeug alle Zähler (sie müssen aufgehen, ohne fachliche Dubletten), beim
   echten Lauf zählt der Server und das Werkzeug ergänzt nur übersprungene Dateien und Meldungen.
 - Prüfsummen-Abfrage: A1 und Scope `import`, höchstens 1'000, nur nicht verworfene Originale nicht verworfener
-  Dokumente, Antwort nur `vorhanden` ohne IDs; Stapel (10.6) kommen mit Aufgabe 28.1 dazu. Kein Eintrag `ERFASSEN`
+  Dokumente, Antwort nur `vorhanden` ohne IDs; Stapel (10.6) kommen verbindlich mit Aufgabe 28.1 dazu. Ein Benutzer
+  erfährt nur von Dokumenten, die er sieht (dasselbe Prädikat `SichtregelSql` wie Suche und Listen, also auch
+  `PERSONAL` und unbestätigte nach Spec 01, 2.21): Sonst verriete die Antwort einem `mitarbeiter`, dass ein
+  vertrauliches Dokument mit dieser Datei existiert (Nachtrag aus dem Review). Das Import-Token fragt ohne Sichtfilter,
+  weil nur der Inhaber es anlegt (A14) und der Inhaber alle Dokumente sieht.
+- Nebenläufigkeit: Der Upload sperrt den Lauf (`for update`) bis zu seinem Commit; der Abschluss wartet darauf und
+  zählt den Upload mit, ein späterer Upload erhält 409 `STATUS_KONFLIKT`. `verbuchen` zählt zudem nur, solange der
+  Lauf `LAEUFT` (Nachtrag aus dem Review, Test `QuellLaufWettlaufTest`).
+- Rückfall: Das Rollback von `150-quelle` gilt nur vor der ersten Nutzung und bricht sonst über eine Wache ab; was
+  ein Image vor 27.6 auf dem neueren Schema bedeutet, steht in `docs/betrieb/deploy-rollback.md`. Kein Eintrag `ERFASSEN`
   (es entsteht nichts); `EndpunktWaechterTest` führt die drei Ausnahmen des Scopes in `IMPORT_AUSNAHMEN`.
 - Protokoll: Änderungen am Register und Start und Abschluss von Läufen als `KONFIGURATION_AENDERN` ohne Details;
   eigene Aktionen `QUELLE_*` bräuchten eine Änderung von `zugriff_protokoll_aktion_ck`, die parallel auch andere

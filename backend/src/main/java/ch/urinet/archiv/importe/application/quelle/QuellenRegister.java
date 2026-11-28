@@ -7,6 +7,7 @@ import ch.urinet.archiv.importe.domain.quelle.Quelle;
 import ch.urinet.archiv.importe.domain.quelle.QuellenStatus;
 import ch.urinet.archiv.importe.domain.quelle.QuellenTyp;
 import ch.urinet.archiv.importe.domain.quelle.Zaehler;
+import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 
 import java.util.Collection;
 import java.util.List;
@@ -34,6 +35,7 @@ public interface QuellenRegister {
 
     void geheimnisSetzen(String code, byte[] chiffrat);
 
+    /** Der laufende Lauf der Quelle, gesperrt bis zum Ende der Transaktion (Abschluss und Uploads nacheinander). */
     Optional<QuellLauf> laufenderLauf(UUID quelleId);
 
     /** Legt einen laufenden Lauf an und vermerkt ihn als letzten Lauf der Quelle. */
@@ -47,12 +49,19 @@ public interface QuellenRegister {
     QuellLauf laufBeenden(UUID id, QuellLaufStatus status, Optional<Zaehler> zaehler, int zusaetzlichUebersprungen,
                           List<String> meldungen);
 
-    /** Zählt Uploads eines Laufs hoch: gefunden um die Summe, dazu neu, Dublette nach Prüfsumme und Fehler. */
-    void verbuchen(UUID laufId, int neu, int duplettePruefsumme, int fehler);
+    /**
+     * Zählt Uploads eines laufenden Laufs hoch: gefunden um die Summe, dazu neu, Dublette nach Prüfsumme und Fehler.
+     *
+     * @return {@code false}, wenn der Lauf nicht mehr läuft (dann bleiben die Zähler)
+     */
+    boolean verbuchen(UUID laufId, int neu, int duplettePruefsumme, int fehler);
 
     /** Verweist ein Dokument auf seinen Quelllauf (10.4), mit {@code quelle} auch die Quelle des Dokuments. */
     void dokumentZuordnen(UUID dokumentId, UUID laufId, Optional<String> quelle);
 
-    /** Prüfsummen, die im Mandanten zu einem nicht verworfenen Dokument gehören (10.6). */
-    Set<String> vorhandenePruefsummen(Collection<String> sha256);
+    /**
+     * Prüfsummen, die im Mandanten zu einem nicht verworfenen Dokument gehören (10.6), das nach {@code sicht} sichtbar
+     * ist (Spec 01, 2.3, 2.21); leer nur für das Import-Token, das ohne Sichtfilter fragt.
+     */
+    Set<String> vorhandenePruefsummen(Collection<String> sha256, Optional<Sichtregel> sicht);
 }

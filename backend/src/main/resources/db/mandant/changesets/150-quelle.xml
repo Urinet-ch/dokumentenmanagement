@@ -62,7 +62,26 @@
                          ('crm-csv', 'CRM-CSV', 'CRM_CSV'), ('papier', 'Papier', 'SCAN')) as q (code, name, typ)
             where current_schema() = 'm_urinet'
         </sql>
+        <!--
+            Rückfall nur vor der ersten Nutzung: Danach verlöre er Läufe, Zählerstände, Verweise der Dokumente,
+            Konfiguration und Geheimnisse der Quellen, und die alte Prüfung von dokument.quelle schlüge bei GMAIL
+            und ORDNER fehl. Die Wache bricht dann ab, statt Daten zu verwerfen; was ein Rückfall auf ein Image vor
+            diesem Changeset danach bedeutet, steht in docs/betrieb/deploy-rollback.md («Schema neuer als Image»).
+        -->
         <rollback>
+            <sql splitStatements="false"><![CDATA[
+                do $$
+                begin
+                    if exists (select 1 from quelle_lauf)
+                        or exists (select 1 from dokument where quelle_lauf_id is not null
+                            or quelle in ('GMAIL', 'ORDNER'))
+                        or exists (select 1 from quelle where version <> 0 or geheimnis is not null
+                            or code not in ('generatoren', 'drive', 'mac-ordner', 'gmail', 'crm-csv', 'papier')) then
+                        raise exception 'Rollback 150-quelle nur vor der ersten Nutzung (Läufe, Verweise oder Quellen vorhanden)';
+                    end if;
+                end
+                $$
+            ]]></sql>
             <sql>
                 alter table dokument drop constraint dokument_quelle_ck;
                 alter table dokument add constraint dokument_quelle_ck

@@ -95,6 +95,23 @@ Funktionalität: Quellenregister, Quellläufe und Prüfsummen-Abfrage
     Wenn das Werkzeug 1001 Prüfsummen abfragt
     Dann antwortet die Prüfsummen-Abfrage mit Status 400
 
+  @req-10.6
+  Szenario: Die Prüfsummen-Abfrage verrät Benutzern keine Dokumente, die sie nicht sehen
+    Angenommen ein Werkzeug von «urinet» hat ein Token vom Scope «import»
+    Und das Werkzeug hat die Datei «G» ohne Lauf hochgeladen
+    Und das Werkzeug hat die Datei «H» ohne Lauf hochgeladen
+    Und das Werkzeug hat die Datei «P» ohne Lauf hochgeladen
+    Und das Werkzeug hat die Datei «Q» ohne Lauf hochgeladen
+    Und das Dokument der Datei «H» ist bestätigt mit der Vertraulichkeit «NORMAL»
+    Und das Dokument der Datei «P» ist bestätigt als «PERSONAL» von «inhaber-urinet»
+    Und das Dokument der Datei «Q» ist bestätigt als «PERSONAL» von «mitarbeiter-urinet»
+    Wenn «mitarbeiter-urinet» die Prüfsummen der Dateien «G, H, P, Q» abfragt
+    Dann meldet die Prüfsummen-Abfrage genau die Dateien «H, Q» als vorhanden
+    Wenn «inhaber-urinet» die Prüfsummen der Dateien «G, H, P, Q» abfragt
+    Dann meldet die Prüfsummen-Abfrage genau die Dateien «G, H, P, Q» als vorhanden
+    Wenn das Werkzeug die Prüfsummen der Dateien «G, H, P, Q» abfragt
+    Dann meldet die Prüfsummen-Abfrage genau die Dateien «G, H, P, Q» als vorhanden
+
   @req-10.1
   Szenario: Quellen und Läufe sind je Mandant getrennt
     Angenommen ein Werkzeug von «urinet» hat ein Token vom Scope «import»

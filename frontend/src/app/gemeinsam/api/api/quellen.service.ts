@@ -53,7 +53,7 @@ export class QuellenService extends BaseService {
 
     /**
      * Prüfsummen abfragen
-     * Höchstens 1\&#39;000 Prüfsummen; Antwort ohne IDs (A1, Scope import)
+     * Höchstens 1\&#39;000 Prüfsummen; Antwort ohne IDs, für Benutzer nur sichtbare Dokumente (A1, Scope import)
      * @endpoint post /api/v1/dokumente/pruefsummen
      * @param pruefsummenAnfrage 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.

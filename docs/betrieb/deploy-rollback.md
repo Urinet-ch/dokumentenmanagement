@@ -23,6 +23,31 @@ Die tatsächliche Rollback-Dauer ist **nicht geprüft**. Das Skript begrenzt
 Sperrwartezeit und weitere Schritte kommen hinzu, und ein Timeout bedeutet
 keinen erfolgreichen Rollback.
 
+### Schema neuer als Image
+Nach einem Rückfall läuft das ältere Image auf dem neueren Schema; Liquibase
+lässt Changesets, die das ältere Image nicht kennt, stehen. Für
+`150-quelle` (Quellenregister und Quellläufe, Spec 09, Aufgabe 27.6) heisst
+das nach der ersten Nutzung:
+
+- Tabellen `quelle` und `quelle_lauf` und die Spalte
+  `dokument.quelle_lauf_id` bleiben mit ihren Daten; das ältere Image liest
+  und schreibt sie nicht. Uploads in dieser Zeit erhalten keinen Quelllauf,
+  und ein laufender Lauf zählt sie nicht.
+- Dokumente mit `dokument.quelle` `GMAIL` oder `ORDNER` bleiben gültig; das
+  ältere Image zeigt den Wert unverändert, kennt ihn aber nicht als
+  Auswahlwert.
+- Die Werkzeuge erhalten für `/quellen` und `/dokumente/pruefsummen` einen
+  Fehler (404 oder 405), und das ältere Image übergeht die Formularfelder
+  `quelle` und `quelllauf` beim Upload; Läufe deshalb vor dem Rückfall abschliessen oder danach als abgebrochen
+  behandeln und neu starten.
+- Das Rollback des Changesets selbst gilt nur vor der ersten Nutzung: Seine
+  Wache bricht ab, sobald Läufe, Verweise, `GMAIL`/`ORDNER` oder geänderte
+  Quellen bestehen, statt sie zu verwerfen. Ein Schema-Rückbau danach ist
+  ein Datenbank-Restore, kein Rollback.
+
+Kehrt das neuere Image zurück, übernimmt es den Stand wieder; Uploads aus der
+Zwischenzeit bleiben ohne Quelllauf.
+
 ## Prüfung danach
 
 Rollback-Ergebnis und Containerzustand im Deploy-Protokoll prüfen, auch

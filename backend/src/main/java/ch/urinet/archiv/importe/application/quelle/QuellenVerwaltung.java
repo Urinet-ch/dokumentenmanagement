@@ -11,6 +11,8 @@ import ch.urinet.archiv.importe.domain.quelle.QuellenTyp;
 import ch.urinet.archiv.importe.domain.quelle.Zaehler;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.Verschluesselung;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -142,9 +144,13 @@ public class QuellenVerwaltung {
         return register.laeufe(quelle(code).id(), LAEUFE_MAX);
     }
 
-    /** Welche Prüfsummen schon zu einem nicht verworfenen Dokument gehören; ohne IDs (10.6). */
+    /**
+     * Welche Prüfsummen schon zu einem nicht verworfenen Dokument gehören; ohne IDs (10.6). Ein Benutzer erfährt nur
+     * von Dokumenten, die er sieht (Spec 01, 2.3, 2.21), sonst verriete die Antwort vertrauliche Dokumente; ohne
+     * Benutzer fragt das Import-Token, das nur der Inhaber anlegt (A14), ohne Sichtfilter.
+     */
     @Transactional
-    public Set<String> pruefsummen(List<String> sha256) {
+    public Set<String> pruefsummen(List<String> sha256, Optional<Benutzer> benutzer) {
         if (sha256 == null || sha256.size() > PRUEFSUMMEN_MAX) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -156,7 +162,7 @@ public class QuellenVerwaltung {
             }
             gesucht.add(klein);
         }
-        return gesucht.isEmpty() ? Set.of() : register.vorhandenePruefsummen(gesucht);
+        return gesucht.isEmpty() ? Set.of() : register.vorhandenePruefsummen(gesucht, benutzer.map(Sichtregel::fuer));
     }
 
     private Quelle quelle(String code) {

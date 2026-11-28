@@ -9,6 +9,8 @@ import ch.urinet.archiv.importe.domain.quelle.QuellenStatus;
 import ch.urinet.archiv.importe.domain.quelle.QuellenTyp;
 import ch.urinet.archiv.importe.domain.quelle.Zaehler;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
+import ch.urinet.archiv.sicherheit.application.SichtregelSql;
+import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,9 +29,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -114,7 +119,8 @@ public class JdbcQuellenRegister implements QuellenRegister {
 
     @Override
     public Optional<QuellLauf> laufenderLauf(UUID quelleId) {
-        return laeufe(laufAbfrage(schema()) + " where l.quelle_id = ? and l.status = 'LAEUFT'", List.of(quelleId))
+        return laeufe(laufAbfrage(schema()) +  " where l.quelle_id = ? and l.status = 'LAEUFT' for update of l",
+                List.of(quelleId))
                 .stream().findFirst();
     }
 
@@ -163,10 +169,11 @@ public class JdbcQuellenRegister implements QuellenRegister {
     }
 
     @Override
-    public void verbuchen(UUID laufId, int neu, int duplettePruefsumme, int fehler) {
-        ausfuehren("update " + schema() + ".quelle_lauf set gefunden = gefunden + ?, neu = neu + ?, "
-                + "dublette_pruefsumme = dublette_pruefsumme + ?, fehler = fehler + ? where id = ?",
-                List.of(neu + duplettePruefsumme + fehler, neu, duplettePruefsumme, fehler, laufId));
+    public boolean verbuchen(UUID laufId, int neu, int duplettePruefsumme, int fehler) {
+        return ausfuehren("update " + schema() + ".quelle_lauf set gefunden = gefunden + ?, neu = neu + ?, "
+                + "dublette_pruefsumme = dublette_pruefsumme + ?, fehler = fehler + ? where id = ? "
+                + "and status = 'LAEUFT'",
+                List.of(neu + duplettePruefsumme + fehler, neu, duplettePruefsumme, fehler, laufId)) == 1;
     }
 
     @Override
@@ -176,13 +183,27 @@ public class JdbcQuellenRegister implements QuellenRegister {
     }
 
     @Override
-    public Set<String> vorhandenePruefsummen(Collection<String> sha256) {
+    public Set<String> vorhandenePruefsummen(Collection<String> sha256, Optional<Sichtregel> sicht) {
+        // dasselbe Prädikat wie Suche und Listen (SichtregelSql), benannte Parameter als Platzhalter der Reihe nach
+        SichtregelSql.Ausdruck filter = sicht.map(r -> SichtregelSql.dokument(r, "d"))
+                .orElseGet(() -> new SichtregelSql.Ausdruck("1 = 1", Map.of()));
+        List<Object> werte = new ArrayList<>();
+        Matcher name = BENANNT.matcher(filter.bedingung());
+        StringBuilder bedingung = new StringBuilder();
+        while (name.find()) {
+            werte.add(Objects.requireNonNull(filter.parameter().get(name.group(1)), name.group(1)));
+            name.appendReplacement(bedingung, "?");
+        }
+        name.appendTail(bedingung);
         String sql = "select distinct f.sha256 from " + schema() + ".dokument_datei f join " + schema()
                 + ".dokument d on d.id = f.dokument_id where f.rolle = 'ORIGINAL' and f.status <> 'VERWORFEN' "
-                + "and d.status <> 'VERWORFEN' and f.sha256 = any (?)";
+                + "and d.status <> 'VERWORFEN' and f.sha256 = any (?) and " + bedingung;
         Set<String> vorhanden = new HashSet<>();
         try (Connection verbindung = verbindung(); PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setArray(1, verbindung.createArrayOf("text", sha256.toArray()));
+            for (int i = 0; i < werte.size(); i++) {
+                abfrage.setObject(i + 2, werte.get(i));
+            }
             try (ResultSet zeile = abfrage.executeQuery()) {
                 while (zeile.next()) {
                     vorhanden.add(zeile.getString(1));
@@ -193,6 +214,9 @@ public class JdbcQuellenRegister implements QuellenRegister {
         }
         return vorhanden;
     }
+
+    /** Benannter Parameter im Prädikat von {@link SichtregelSql} (kein Cast {@code ::}). */
+    private static final Pattern BENANNT = Pattern.compile("(?<!:):([a-zA-Z][a-zA-Z0-9_]*)");
 
     /** Platzhalter für einen SQL-Wert {@code null} vom Typ Text in einer Werteliste. */
     private enum Leer { TEXT }
@@ -252,10 +276,10 @@ public class JdbcQuellenRegister implements QuellenRegister {
                 z.getTimestamp(ab + 13).toInstant(), Optional.ofNullable(beendet).map(Timestamp::toInstant));
     }
 
-    private void ausfuehren(String sql, List<Object> werte) {
+    private int ausfuehren(String sql, List<Object> werte) {
         try (Connection verbindung = verbindung(); PreparedStatement befehl = verbindung.prepareStatement(sql)) {
             setzen(befehl, werte);
-            befehl.executeUpdate();
+            return befehl.executeUpdate();
         } catch (SQLException e) {
             throw fehler("Quellenregister nicht geschrieben", e);
         }

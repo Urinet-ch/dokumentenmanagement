@@ -6059,7 +6059,8 @@ paths:
   /api/v1/dokumente/pruefsummen:
     post:
       summary: Prüfsummen abfragen
-      description: "Höchstens 1'000 Prüfsummen; Antwort ohne IDs (A1, Scope import)"
+      description: "Höchstens 1'000 Prüfsummen; Antwort ohne IDs, für Benutzer nur\
+        \ sichtbare Dokumente (A1, Scope import)"
       tags:
       - Quellen
       requestBody:

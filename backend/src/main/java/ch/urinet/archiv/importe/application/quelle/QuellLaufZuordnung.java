@@ -53,6 +53,10 @@ public class QuellLaufZuordnung {
         this.uhr = uhr;
     }
 
+    /**
+     * Sperrt den Lauf bis zum Ende der Upload-Transaktion: Ein Abschluss ({@code QuellenVerwaltung#laufAbschliessen})
+     * wartet, bis der Upload verbucht ist; wer nach dem Abschluss kommt, erhält 409 {@code STATUS_KONFLIKT}.
+     */
     @Transactional(Transactional.TxType.MANDATORY)
     public Optional<Ziel> bestimmen(String quelleCode, String laufId) {
         boolean mitCode = quelleCode != null && !quelleCode.isBlank();
@@ -61,7 +65,7 @@ public class QuellLaufZuordnung {
             return Optional.empty();
         }
         if (mitLauf) {
-            QuellLauf lauf = register.lauf(uuid(laufId), false)
+            QuellLauf lauf = register.lauf(uuid(laufId), true)
                     .orElseThrow(() -> new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG));
             if (mitCode && !lauf.quelleCode().equals(quelleCode.strip())) {
                 throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
@@ -106,7 +110,10 @@ public class QuellLaufZuordnung {
                 case ABGELEHNT -> fehler++;
             }
         }
-        register.verbuchen(ziel.laufId(), neu, dublette, fehler);
+        if (!register.verbuchen(ziel.laufId(), neu, dublette, fehler)) {
+            // unerreichbar, solange bestimmen() den Lauf sperrt; sonst lieber der ganze Upload zurück als falsche Zähler
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
     }
 
     private Quelle quelle(String code) {

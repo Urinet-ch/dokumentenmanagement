@@ -276,12 +276,44 @@ public class QuellenSchritte {
     }
 
     @Wenn("das Werkzeug die Prüfsummen der Dateien «{}» abfragt")
-    public void pruefsummen(String liste) {
+    public void pruefsummenAlsWerkzeug(String liste) {
+        antwort = alsWerkzeug().contentType(ContentType.JSON).body(Map.of("sha256", pruefsummen(liste))).when()
+                .post(PRUEFSUMMEN);
+    }
+
+    private List<String> pruefsummen(String liste) {
         List<String> werte = new ArrayList<>();
         for (String datei : liste.split(",\\s*")) {
             werte.add(sha256(datei(datei)));
         }
-        antwort = alsWerkzeug().contentType(ContentType.JSON).body(Map.of("sha256", werte)).when().post(PRUEFSUMMEN);
+        return werte;
+    }
+
+    @Wenn("«{word}» die Prüfsummen der Dateien «{}» abfragt")
+    public void pruefsummenAlsBenutzer(String benutzer, String liste) {
+        antwort = alsBenutzer(benutzer).contentType(ContentType.JSON).body(Map.of("sha256", pruefsummen(liste)))
+                .when().post(PRUEFSUMMEN);
+    }
+
+    /** Ein Dokument des Uploads gilt als bestätigt (Spec 01, 2.21); synthetisch direkt in der Datenbank. */
+    @Angenommen("das Dokument der Datei «{word}» ist bestätigt mit der Vertraulichkeit «{word}»")
+    public void bestaetigt(String datei, String vertraulichkeit) throws SQLException {
+        ausfuehren("update " + schema(tokenMandant) + ".dokument set bestaetigt = clock_timestamp(), "
+                + "vertraulichkeit = ?, person_benutzer = null where id = ?", vertraulichkeit, dokumente.get(datei));
+    }
+
+    @Angenommen("das Dokument der Datei «{word}» ist bestätigt als «PERSONAL» von «{word}»")
+    public void personal(String datei, String benutzer) throws SQLException {
+        ausfuehren("update " + schema(tokenMandant) + ".dokument set bestaetigt = clock_timestamp(), "
+                + "vertraulichkeit = 'PERSONAL', person_benutzer = ? where id = ?", Testanmeldung.sub(benutzer),
+                dokumente.get(datei));
+    }
+
+    @Dann("meldet die Prüfsummen-Abfrage genau die Dateien «{}» als vorhanden")
+    public void genauVorhanden(String liste) {
+        status(200);
+        assertThat(antwort.jsonPath().getList("vorhanden", String.class))
+                .containsExactlyInAnyOrderElementsOf(pruefsummen(liste));
     }
 
     @Wenn("das Werkzeug {int} Prüfsummen abfragt")
