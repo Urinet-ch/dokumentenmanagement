@@ -29,7 +29,7 @@ erledigten Umsetzungen.
 | 5.8 | Abnahme-Gate und Belegübernahme offen; Voraussetzungen aus 5.9 und 5.11 fehlen. Nachtrag 28.11.2026: Voraussetzung ist Welle 31 statt 5.11, Übernahme über Spec 09, Welle 30. | Fabian / QA; blockiert bis 31.8 |
 | 5.9 | Die Varianten 1 (Erreichbarkeit beider Hosts) und 3 (fehlgeschlagener Deploy) aus #724 sind seit 27.11.2026 entschieden und im Infra-Repo umgesetzt. Der Betriebsnachweis der Prüfung des Anmelde-Hosts bleibt bei Fabian; die Zertifikatsprüfung wurde nicht gewählt. Nachtrag 28.11.2026: Fabian verzichtet auf eine eigene externe Prüfung des Anmelde-Hosts (bekannte Lücke); Rest in 31.5. | Fabian; Betriebsnachweis |
 | 5.10 | Entwurf #284 ist keine geprüfte Notfallunterlage. | Fabian |
-| 5.11 | Kein vollständiger Wechsel- und Betriebsnachweis im geprüften Stand. Nachtrag 28.11.2026: ersetzt durch Welle 31 (Variante B, keine eigene VPS). | Fabian / Infra; ersetzt durch 31.1–31.9 |
+| 5.11 | Kein vollständiger Wechsel- und Betriebsnachweis im geprüften Stand. Nachtrag 28.11.2026: ersetzt durch Welle 31 (Variante B, keine eigene VPS). | Fabian / Infra; ersetzt durch 31.1–31.10 |
 | O.8 | Kein Umsetzungs- oder Entscheidungsnachweis gefunden. | Fabian / Infra / Backend |
 
 ### Spec 02 – Abgleich-Chat (11)

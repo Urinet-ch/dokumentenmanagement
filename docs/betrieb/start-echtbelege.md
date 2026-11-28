@@ -20,7 +20,7 @@ Geänderte und neue Kriterien in [Spec 01](../../.kiro/specs/01-archiv-kern/requ
   Wechsel verwirft die Testdaten der Stufe A und setzt die Stufenwerte der Stufe B, statt eine neue VPS einzurichten.
 - Req 16.28 bis 16.31 neu: Netze und Ports, Geheimnisse nur im Archiv, Limits und Alarm, Wiederaufbau auf einer
   neuen VPS.
-- Gates als [Aufgaben 31.1 bis 31.9](../../.kiro/specs/01-archiv-kern/tasks.md); Aufgabe 5.11 ist dadurch ersetzt,
+- Gates als [Aufgaben 31.1 bis 31.10](../../.kiro/specs/01-archiv-kern/tasks.md); Aufgabe 5.11 ist dadurch ersetzt,
   5.4, 5.5, 5.8 und 5.9 sind ergänzt.
 - [Spec 09](../../.kiro/specs/09-produktivimport/requirements.md): Req 16.2 und Aufgabe 30.1 verweisen auf diese
   Gates; E7 ist entschieden.
@@ -44,10 +44,10 @@ Checkboxen bleiben offen, bis Fabian den Betriebsnachweis geprüft hat.
 
 ### Entscheide
 
-- [ ] **Aufgabe 31.1 – offene Punkte entschieden:** Leistungsmessung vor oder nach dem ersten echten Beleg
-  (Req 16.17, 16.26), Weg gegen Zugriffe an Traefik vorbei (16.28), Ersatz der Zugangsdaten der Stufe A (16.29),
-  Budget der Restore-Probe (16.30), Zielzeit für den Wiederanlauf (16.31); Spec 09, E11 ist entschieden (28.11.2026). Beleg: datierte Einträge in
-  der Spec.
+- [ ] **Aufgabe 31.1 – Entscheide:** Am 28.11.2026 entschieden von Fabian: Leistungsmessung vor dem Stichtag,
+  verfehlte Ziele als Entscheid an Fabian (16.17, 16.26); eigenes Netz für Traefik und das Archiv (16.28);
+  Zugangsdaten und Schlüssel der Stufe A bleiben (16.29); Restore-Probe mit angehaltener API im Wartungsfenster
+  (16.30); Spec 09, E11. Offen: Zielzeit für den Wiederanlauf (16.31). Beleg: datierte Einträge in der Spec.
 
 ### Plattform, Daten und Deploy
 
@@ -71,10 +71,12 @@ Checkboxen bleiben offen, bis Fabian den Betriebsnachweis geprüft hat.
 
 - [ ] **Req 16.28 – Netze und Ports:** Am Netz «web» hängen nur `api` und `kc`; in den internen Netzen des Archivs
   hängen nur Container des Archivs; kein veröffentlichter Port ausser dem nach Spec 09, 1.6 freigegebenen Eingang;
-  kein Container einer anderen App erreicht einen Dienst des Archivs an Traefik vorbei (Weg nach 31.1). Beleg:
+  `api` und `kc` hängen nur am internen Netz und am eigenen Netz von Traefik und Archiv (Aufgabe 31.10), an dem
+  keine andere App hängt; kein Container einer anderen App erreicht einen Dienst des Archivs an Traefik vorbei. Beleg:
   Netzprüfung auf der VPS im Wechselprotokoll; [Aufgabe 31.3](../../.kiro/specs/01-archiv-kern/tasks.md).
 - [ ] **Req 16.29 – Geheimnisse nur im Archiv:** Secret-Dateien nur in den Diensten des Archivs, die sie brauchen;
-  keine geteilten Zugänge mit anderen Apps; Zugangsdaten der Stufe A nach dem Entscheid aus 31.1 ersetzt; privater
+  keine geteilten Zugänge mit anderen Apps; Zugangsdaten, Daten- und Manifest-Schlüssel der Stufe A bleiben (Entscheid 28.11.2026), darum keine Testbenutzer,
+  Test-API-Tokens oder Test-Webseiten-Schlüssel übrig; privater
   Probe-Schlüssel nur root-lesbar. Beleg: Wechselprotokoll (nur Namen); Test der Compose-Datei aus 31.2.
 - [ ] **Req 16.18, 16.30 – Ressourcen:** Speichermessung aus 1.10 mit 2144 MiB / 1.6 CPU inklusive `sftp` abgeschlossen
   (Entscheid Fabian 28.11.2026, Spec 09, E11), ohne Speicherabbruch und ohne kranke andere App; Budget eingehalten; Alarm bei
@@ -103,9 +105,8 @@ Checkboxen bleiben offen, bis Fabian den Betriebsnachweis geprüft hat.
 - [ ] **Req 16.6, 16.12 – Verfahren und Notfallunterlagen:** Die freigegebene Verfahrensbeschreibung und
   versiegelte Notfallunterlagen sind vorhanden; keine Zugangsdaten stehen im Repository. Beleg: freigegebene
   Dokumente und dokumentierte Prüfung; [Aufgaben 5.7 und 5.10](../../.kiro/specs/01-archiv-kern/tasks.md).
-- [ ] **Req 16.16, 16.26 – Leistungsziele:** gemessen auf der VPS als eigenes Compose-Projekt mit synthetischen
-  Daten, falls Fabian die Messung in 31.1 vor den ersten echten Beleg legt; sonst als offener Punkt nach dem Stichtag
-  vermerkt. Beleg: Messbericht; [Aufgabe 31.6](../../.kiro/specs/01-archiv-kern/tasks.md),
+- [ ] **Req 16.16, 16.26 – Leistungsziele:** vor dem Stichtag gemessen auf der VPS als eigenes Compose-Projekt mit
+  synthetischen Daten (Entscheid 28.11.2026); ein verfehltes Ziel ist Fabian als Entscheid vorgelegt. Beleg: Messbericht; [Aufgabe 31.6](../../.kiro/specs/01-archiv-kern/tasks.md),
   [Messanleitung Stufe B](./stufe-b-messung.md).
 
 ### Wechsel und Übernahme
@@ -124,10 +125,11 @@ Checkboxen bleiben offen, bis Fabian den Betriebsnachweis geprüft hat.
 
 | Bis | Schritt |
 | --- | --- |
-| 02.12.2026 | 31.1 Entscheide |
+| 02.12.2026 | 31.1 Zielzeit für den Wiederanlauf (übrige Entscheide gefallen am 28.11.2026) |
+| 09.12.2026 | 31.10 eigenes Netz für Traefik und das Archiv (Infra-Repo) |
 | 11.12.2026 | 31.2 Stufenwerte und Prüfungen im Repo; 31.3 Speichermessung und Schutzmassnahmen |
 | 18.12.2026 | 31.4 Sicherung und Restore-Probe; 31.5 Überwachung |
-| 22.12.2026 | 31.6 Leistungsmessung, falls vor dem Wechsel |
+| 22.12.2026 | 31.6 Leistungsmessung |
 | 28.12.2026 | synthetischer Probelauf auf Stufe A (Spec 09, 29.10), danach keine Uploads mehr auf Stufe A |
 | 29.–30.12.2026 | 31.7 Wechsel |
 | 31.12.2026 | 31.8 Go/No-go; Probelauf mit echten Belegen (Spec 09, 30.1) |
