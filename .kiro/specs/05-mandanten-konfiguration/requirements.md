@@ -215,6 +215,8 @@ Jahr nur einmal vorkommt, damit Fehler beim Erfassen auffallen, ohne dass dafür
      Eingangskorb;
    - `ERWARTET`: Je Zeitraum (`MONAT` oder `JAHR`) wird mindestens ein Dokument der Art erwartet, ab einem Datum
      oder ohne Datum ab dem ersten bestätigten Dokument der Art.
+ Spec 09, 11.8 ergänzt dieses Kriterium für `EINDEUTIG` (freigegeben mit dem Merge von #745 am 28.11.2026): Die Regel
+ zählt nur Hauptfassungen; eine verknüpfte Fassung mit derselben Belegnummer verletzt die Regel nicht.
 2. WENN ein Dokument bestätigt, über einen Generator archiviert oder in seinen Metadaten geändert wird, DANN SOLL
    das Archiv die aktiven Regeln der Typen `PFLICHT_WENN` und `EINDEUTIG` prüfen; eine verletzte Regel mit
    Schwere `FEHLER` SOLL es mit HTTP 422 `REGEL_VERLETZT` und den Codes und Meldungen der Regeln ablehnen, eine
@@ -228,6 +230,8 @@ Jahr nur einmal vorkommt, damit Fehler beim Erfassen auffallen, ohne dass dafür
    Lückenbericht je Art und Zeitraum liefern, nur für Rollen, die alle Vertraulichkeitsstufen uneingeschränkt sehen
    (A3 und A4 «erlaubt»: `inhaber`, `treuhaender`, `geschaeftsstelle`), sonst HTTP 403; so meldet der Bericht keine
    Lücke, die nur durch ein unsichtbares Dokument entsteht.
+ Spec 09, 11.8 ergänzt dieses Kriterium (freigegeben mit dem Merge von #745 am 28.11.2026): Der Lückenbericht zählt
+ nur Hauptfassungen; der Vollständigkeitsbericht (Spec 09, 12.1) baut auf ihm auf.
 5. FALLS sich eine Regel auf ein Feld bezieht, das kein Grundfeld (Spec 01 design.md, Dokumentart), kein Feld der
    Gruppen der Art, kein Zusatzfeld aus ihrem Zusatz-Schema und keine Klassifikation der Art ist, oder ein Feldname
    nicht dem Muster `^[a-z][a-z0-9_]{0,39}$` (mit Präfix `zusatz.` bzw. `klassifikation.`) folgt, DANN SOLL das
@@ -266,6 +270,9 @@ ist.
    Archiv sie mit HTTP 422 `KONFIGURATION_UNGUELTIG` ablehnen; der Mandant ergibt sich beim Einspielen nur aus dem
    Aufruf (`<code>` bzw. Anmeldung), nie aus der Datei. FALLS eine eingespielte Datei `kiFreigegeben` anders setzt als
    der aktuelle Stand, DANN SOLL das Archiv sie ebenso ablehnen; die Freigabe setzt nur das Admin-Kommando (8.4).
+ Spec 09, 9.1 ergänzt dieses Kriterium (entschieden von Fabian am 28.11.2026, E12): `konfiguration.schema.json` erhält
+ den Abschnitt `dateinamenRegeln` (geordnete Liste mit Nummer, Muster, Art und Feldern; Spec 09 design.md, Abschnitt
+ 8), eingeführt mit der Umsetzung von Spec 09, Requirement 9.
 7. Ein Test SOLL jede Datei `backend/src/main/resources/seed/*/konfiguration.json`, zusammengeführt mit dem
    Seed-Teil `_alle` (Spec 04, 1.1) so wie 1.6 sie einspielt, gegen `konfiguration.schema.json` und alle Prüfungen
    dieser Spec prüfen und sie Feld für Feld gegen die

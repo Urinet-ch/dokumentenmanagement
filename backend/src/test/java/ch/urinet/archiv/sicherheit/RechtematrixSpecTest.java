@@ -32,6 +32,9 @@ class RechtematrixSpecTest {
     private static final Path WISSEN_REQUIREMENTS = Path.of("../.kiro/specs/04-wissensbasis/requirements.md");
     private static final Path VERWALTUNG_REQUIREMENTS =
             Path.of("../.kiro/specs/06-verwaltung-einstellungen-benutzer/requirements.md");
+    /** Spec 09, Requirement 15.1: A25 bis A29 (Stapel, Quellen, Begründungen von Lücken; Aufgabe 27.2). */
+    private static final Path PRODUKTIVIMPORT_REQUIREMENTS =
+            Path.of("../.kiro/specs/09-produktivimport/requirements.md");
     private static final Path MASCHINENLESBARE_MATRIX = Path.of("src/test/resources/rechtematrix.json");
     private static final Pattern ZEILE = Pattern.compile("^\\| (A\\d+) \\|.*");
     private static final Pattern TRENNZEILE = Pattern.compile("^\\|( --- \\|)+$");
@@ -44,11 +47,18 @@ class RechtematrixSpecTest {
                 lesen(Files.readAllLines(REQUIREMENTS)));
         Map<Aktion, Map<Rolle, Ergebnis>> wissen = lesen(Files.readAllLines(WISSEN_REQUIREMENTS));
         Map<Aktion, Map<Rolle, Ergebnis>> verwaltung = lesen(Files.readAllLines(VERWALTUNG_REQUIREMENTS));
-        assertThat(spec.keySet()).doesNotContainAnyElementsOf(wissen.keySet());
-        assertThat(spec.keySet()).doesNotContainAnyElementsOf(verwaltung.keySet());
-        assertThat(wissen.keySet()).doesNotContainAnyElementsOf(verwaltung.keySet());
+        Map<Aktion, Map<Rolle, Ergebnis>> produktivimport = lesen(Files.readAllLines(PRODUKTIVIMPORT_REQUIREMENTS));
+        List<Map<Aktion, Map<Rolle, Ergebnis>>> quellen = List.of(spec, wissen, verwaltung, produktivimport);
+        for (int i = 0; i < quellen.size(); i++) {
+            for (int j = i + 1; j < quellen.size(); j++) {
+                assertThat(quellen.get(i).keySet()).doesNotContainAnyElementsOf(quellen.get(j).keySet());
+            }
+        }
+        assertThat(produktivimport.keySet()).containsExactly(Aktion.A25, Aktion.A26, Aktion.A27, Aktion.A28,
+                Aktion.A29);
         spec.putAll(wissen);
         spec.putAll(verwaltung);
+        spec.putAll(produktivimport);
 
         assertThat(spec.keySet()).containsExactlyInAnyOrder(Aktion.values());
         spec.forEach((aktion, zeile) -> zeile.forEach((rolle, ergebnis) ->
@@ -64,6 +74,7 @@ class RechtematrixSpecTest {
                 lesen(Files.readAllLines(REQUIREMENTS)));
         spec.putAll(lesen(Files.readAllLines(WISSEN_REQUIREMENTS)));
         spec.putAll(lesen(Files.readAllLines(VERWALTUNG_REQUIREMENTS)));
+        spec.putAll(lesen(Files.readAllLines(PRODUKTIVIMPORT_REQUIREMENTS)));
 
         Map<Aktion, JsonNode> dateizeilen = new java.util.LinkedHashMap<>();
         json.path("aktionen").forEach(zeile -> {
@@ -165,6 +176,9 @@ class RechtematrixSpecTest {
         }
         if (aktion == Aktion.A24) {
             return "Spec 02, Req 15.5";
+        }
+        if (aktion.compareTo(Aktion.A25) >= 0 && aktion.compareTo(Aktion.A29) <= 0) {
+            return "Spec 09, Req 15.1";
         }
         return "Spec 01, Req 2.6";
     }
