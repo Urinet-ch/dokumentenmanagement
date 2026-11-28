@@ -66,5 +66,6 @@ public interface QuellenRegister {
      * Prüfsummen, die im Mandanten zu einem nicht verworfenen Dokument gehören (10.6), das nach {@code sicht} sichtbar
      * ist (Spec 01, 2.3, 2.21); leer nur für das Import-Token, das ohne Sichtfilter fragt.
      */
-    Set<String> vorhandenePruefsummen(Collection<String> sha256, Optional<Sichtregel> sicht);
+    Set<String> vorhandenePruefsummen(Collection<String> sha256, Optional<Sichtregel> sicht,
+                                      boolean stapelEinsehbar);
 }

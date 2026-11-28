@@ -199,7 +199,8 @@ public class JdbcQuellenRegister implements QuellenRegister {
     }
 
     @Override
-    public Set<String> vorhandenePruefsummen(Collection<String> sha256, Optional<Sichtregel> sicht) {
+    public Set<String> vorhandenePruefsummen(Collection<String> sha256, Optional<Sichtregel> sicht,
+                                              boolean stapelEinsehbar) {
         // dasselbe Prädikat wie Suche und Listen (SichtregelSql), benannte Parameter als Platzhalter der Reihe nach
         SichtregelSql.Ausdruck filter = sicht.map(r -> SichtregelSql.dokument(r, "d"))
                 .orElseGet(() -> new SichtregelSql.Ausdruck("1 = 1", Map.of()));
@@ -211,14 +212,22 @@ public class JdbcQuellenRegister implements QuellenRegister {
             name.appendReplacement(bedingung, "?");
         }
         name.appendTail(bedingung);
-        String sql = "select distinct f.sha256 from " + schema() + ".dokument_datei f join " + schema()
+        String schema = schema();
+        String sql = "select distinct f.sha256 from " + schema + ".dokument_datei f join " + schema
                 + ".dokument d on d.id = f.dokument_id where f.rolle = 'ORIGINAL' and f.status <> 'VERWORFEN' "
                 + "and d.status <> 'VERWORFEN' and f.sha256 = any (?) and " + bedingung;
+        if (stapelEinsehbar) {
+            sql += " union select s.sha256 from " + schema
+                    + ".stapel s where s.status <> 'VERWORFEN' and s.sha256 = any (?)";
+        }
         Set<String> vorhanden = new HashSet<>();
         try (Connection verbindung = verbindung(); PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setArray(1, verbindung.createArrayOf("text", sha256.toArray()));
             for (int i = 0; i < werte.size(); i++) {
                 abfrage.setObject(i + 2, werte.get(i));
+            }
+            if (stapelEinsehbar) {
+                abfrage.setArray(werte.size() + 2, verbindung.createArrayOf("text", sha256.toArray()));
             }
             try (ResultSet zeile = abfrage.executeQuery()) {
                 while (zeile.next()) {
