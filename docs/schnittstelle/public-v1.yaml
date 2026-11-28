@@ -53,9 +53,12 @@ paths:
       description: |
         Nur für ausdrücklich freigegebene Wissensseiten, deren Quellen öffentlich und NORMAL sind. Der Betreiber
         schaltet den Wissenschat je Mandant ein; standardmässig ist er aus. Gleiche Grenzen und dasselbe Monatsbudget
-        wie `/public/v1/chat`. Eine gebundene `gespraechId` setzt den höchstens 30 Minuten im Speicher gehaltenen Verlauf
-        fort; eine unbekannte, fremde oder abgelaufene ID beginnt ein neues Gespräch. Das persistierte Fragenprotokoll
-        enthält eine feste Ereignisbezeichnung, Quellen-IDs und Tokenzahlen, aber weder Freitext noch Quellentitel.
+        wie `/public/v1/chat`. Die Webseite zeigt vor dem Eingabefeld den Hinweis «Bitte geben Sie keine Personendaten
+        ein.» an. Frage und Antwort werden nach Bereinigung ausschliesslich im Arbeitsspeicher für Folgefragen gehalten
+        und spätestens 30 Minuten nach der letzten Frage gelöscht; sie werden nie auf Platte, in Logs oder in der
+        Datenbank gespeichert. Eine gebundene `gespraechId` setzt diesen Verlauf fort; eine unbekannte, fremde oder
+        abgelaufene ID beginnt ein neues Gespräch. Das persistierte Fragenprotokoll enthält eine feste Ereignisbezeichnung,
+        Quellen-IDs und Tokenzahlen, aber weder Freitext noch Quellentitel.
         Bei einem Entzug oder einer Änderung bisher verwendeter Quellen wird eine Fortsetzung vor einem weiteren
         Modellaufruf verworfen.
         Der Stream enthält `werkzeug`, `text`, `quellen` und `fertig` oder `fehler`.

@@ -46,7 +46,8 @@ class OeffentlicheGespraecheTest {
 
     @Test
     void verlaufBleibtAufDieLetztenNachrichtenBegrenztUndBeginntMitEinerFrage() {
-        OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 10, 6, new Uhr());
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(
+                Duration.ofMinutes(30), Duration.ofSeconds(10), 10, 6, new Uhr());
         Lesezugriff z = zugriff("w", "a".repeat(64));
         UUID id = g.oeffnen(null, URINET, z).id();
         for (int i = 1; i <= 5; i++) {
@@ -61,7 +62,8 @@ class OeffentlicheGespraecheTest {
 
     @Test
     void einFremderClientEineAndereWebseiteOderMandantBekommtEinNeuesGespraech() {
-        OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 10, 6, new Uhr());
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(
+                Duration.ofMinutes(30), Duration.ofSeconds(10), 10, 6, new Uhr());
         Lesezugriff anna = zugriff("w", "a".repeat(64));
         UUID id = g.oeffnen(null, URINET, anna).id();
         g.merken(id, URINET, anna, "Frage", "Antwort");
@@ -77,7 +79,8 @@ class OeffentlicheGespraecheTest {
 
     @Test
     void einStufenwechselBeginntEinNeuesGespraech() {
-        OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 10, 6, new Uhr());
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(
+                Duration.ofMinutes(30), Duration.ofSeconds(10), 10, 6, new Uhr());
         String client = "a".repeat(64);
         Lesezugriff vorstand = new Lesezugriff("w", Zugriffsstufe.VORSTAND, Zugriffsstufe.VORSTAND, Optional.of(client));
         Lesezugriff oeffentlich = zugriff("w", client);
@@ -91,7 +94,8 @@ class OeffentlicheGespraecheTest {
 
     @Test
     void wissenschatFortsetzungBewahrtNurBereinigtenVerlaufUndQuellenstand() {
-        OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 10, 6, new Uhr());
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(
+                Duration.ofMinutes(30), Duration.ofSeconds(10), 10, 6, new Uhr());
         Lesezugriff z = zugriff("w", "a".repeat(64));
         UUID id = g.oeffnenWissen(null, URINET, z).id();
         var stand = new OeffentlichesWissenPort.Stand(UUID.randomUUID(), 2, 4);
@@ -114,7 +118,8 @@ class OeffentlicheGespraecheTest {
 
     @Test
     void unbekannteIdBeginntStillEinNeuesGespraech() {
-        OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 10, 6, new Uhr());
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(
+                Duration.ofMinutes(30), Duration.ofSeconds(10), 10, 6, new Uhr());
         UUID unbekannt = UUID.randomUUID();
         var geoeffnet = g.oeffnen(unbekannt, URINET, zugriff("w", null));
         assertThat(geoeffnet.id()).isNotEqualTo(unbekannt);
@@ -124,7 +129,8 @@ class OeffentlicheGespraecheTest {
     @Test
     void nachDerDauerIstDasGespraechVergessenUndDerSpeicherIstBegrenzt() {
         Uhr uhr = new Uhr();
-        OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 2, 6, uhr);
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(
+                Duration.ofMinutes(30), Duration.ofSeconds(10), 2, 6, uhr);
         Lesezugriff z = zugriff("w", "a".repeat(64));
         UUID erstes = g.oeffnen(null, URINET, z).id();
         g.merken(erstes, URINET, z, "Eins", "A");
@@ -135,17 +141,50 @@ class OeffentlicheGespraecheTest {
         assertThat(g.anzahl()).as("höchstens max-gespraeche").isEqualTo(2);
         assertThat(g.oeffnen(erstes, URINET, z).verlauf()).as("das älteste fiel weg").isEmpty();
         uhr.jetzt = uhr.jetzt.plus(Duration.ofMinutes(31));
+        assertThat(g.anzahl()).as("die Ablaufbereinigung läuft unabhängig von Folgeanfragen").isEqualTo(2);
+        g.abgelaufeneAufraeumen();
         assertThat(g.anzahl()).isZero();
         assertThat(g.oeffnen(drittes, URINET, z).verlauf()).isEmpty();
     }
 
     @Test
+    void aufraeumungEntferntVorDerLeseablauffristMitSicherheitsabstand() {
+        Uhr uhr = new Uhr();
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(
+                Duration.ofMinutes(30), Duration.ofSeconds(10), 10, 6, uhr);
+        Lesezugriff z = zugriff("w", "a".repeat(64));
+        UUID id = g.oeffnen(null, URINET, z).id();
+        g.merken(id, URINET, z, "Frage", "Antwort");
+
+        uhr.jetzt = uhr.jetzt.plus(Duration.ofMinutes(29)).plusSeconds(49);
+        g.abgelaufeneAufraeumen();
+        assertThat(g.anzahl()).isOne();
+        assertThat(g.oeffnen(id, URINET, z).verlauf()).hasSize(2);
+
+        uhr.jetzt = uhr.jetzt.plusSeconds(2);
+        assertThat(g.oeffnen(id, URINET, z).verlauf()).hasSize(2);
+        g.abgelaufeneAufraeumen();
+        assertThat(g.anzahl()).isZero();
+    }
+
+    @Test
     void ungueltigeKonfigurationBrichtAb() {
         org.assertj.core.api.Assertions.assertThatThrownBy(
-                () -> new OeffentlicheGespraeche(Duration.ZERO, 10, 6, new Uhr())).isInstanceOf(IllegalArgumentException.class);
+                () -> new OeffentlicheGespraeche(Duration.ZERO, Duration.ofSeconds(10), 10, 6, new Uhr()))
+                .isInstanceOf(IllegalArgumentException.class);
         org.assertj.core.api.Assertions.assertThatThrownBy(
-                () -> new OeffentlicheGespraeche(Duration.ofMinutes(1), 0, 6, new Uhr())).isInstanceOf(IllegalArgumentException.class);
+                () -> new OeffentlicheGespraeche(Duration.ofMinutes(1), Duration.ZERO, 10, 6, new Uhr()))
+                .isInstanceOf(IllegalArgumentException.class);
         org.assertj.core.api.Assertions.assertThatThrownBy(
-                () -> new OeffentlicheGespraeche(Duration.ofMinutes(1), 1, 1, new Uhr())).isInstanceOf(IllegalArgumentException.class);
+                () -> new OeffentlicheGespraeche(Duration.ofMinutes(1), Duration.ofMinutes(1), 10, 6, new Uhr()))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> new OeffentlicheGespraeche(
+                        Duration.ofMinutes(1), Duration.ofSeconds(10), 0, 6, new Uhr()))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> new OeffentlicheGespraeche(
+                        Duration.ofMinutes(1), Duration.ofSeconds(10), 1, 1, new Uhr()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

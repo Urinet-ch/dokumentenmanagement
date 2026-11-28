@@ -65,6 +65,17 @@ class PublicVertragTest {
     }
 
     @Test
+    void wissenschatVerlangtHinweisUndBeschreibtDieBefristeteSpeicherung() {
+        String beschreibung = PublicVertrag.roh(vertrag).path("paths").path("/public/v1/wissen/chat")
+                .path("post").path("description").asText().replaceAll("\\s+", " ");
+        assertThat(beschreibung)
+                .contains("vor dem Eingabefeld den Hinweis «Bitte geben Sie keine Personendaten ein.»")
+                .contains("ausschliesslich im Arbeitsspeicher")
+                .contains("spätestens 30 Minuten nach der letzten Frage gelöscht")
+                .contains("nie auf Platte, in Logs oder in der Datenbank gespeichert");
+    }
+
+    @Test
     void vertragEnthaeltKeineDoppeltenYamlSchluessel() {
         LoaderOptions optionen = new LoaderOptions();
         optionen.setAllowDuplicateKeys(false);
