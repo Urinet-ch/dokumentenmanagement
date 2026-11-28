@@ -3,7 +3,7 @@
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet id="142-stapel-datenmodell" author="copilot">
+    <changeSet id="143-stapel-datenmodell" author="copilot">
         <sql>
             create table stapel (
                 id uuid not null constraint stapel_pk primary key,
@@ -64,6 +64,17 @@
             create index dokument_stapel_ix on dokument (stapel_id) where stapel_id is not null;
         </sql>
         <rollback>
+            <sql splitStatements="false"><![CDATA[
+                do $$
+                begin
+                    if exists (select 1 from stapel)
+                        or exists (select 1 from stapel_seite)
+                        or exists (select 1 from dokument where stapel_id is not null) then
+                        raise exception 'Rollback 143-stapel-datenmodell nur vor der ersten Nutzung (Stapel, Seiten oder Dokumentverweise)';
+                    end if;
+                end
+                $$
+            ]]></sql>
             <sql>
                 alter table dokument drop constraint dokument_stapel_bereich_ck;
                 drop index dokument_stapel_ix;

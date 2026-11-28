@@ -299,11 +299,11 @@ Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderu
 - Abschluss: Beim Trockenlauf meldet das Werkzeug alle Zähler (sie müssen aufgehen, ohne fachliche Dubletten), beim
   echten Lauf zählt der Server und das Werkzeug ergänzt nur übersprungene Dateien und Meldungen.
 - Prüfsummen-Abfrage: A1 und Scope `import`, höchstens 1'000, nur nicht verworfene Originale nicht verworfener
-  Dokumente, Antwort nur `vorhanden` ohne IDs; Stapel (10.6) kommen verbindlich mit Aufgabe 28.1 dazu. Ein Benutzer
-  erfährt nur von Dokumenten, die er sieht (dasselbe Prädikat `SichtregelSql` wie Suche und Listen, also auch
-  `PERSONAL` und unbestätigte nach Spec 01, 2.21): Sonst verriete die Antwort einem `mitarbeiter`, dass ein
-  vertrauliches Dokument mit dieser Datei existiert (Nachtrag aus dem Review). Das Import-Token fragt ohne Sichtfilter,
-  weil nur der Inhaber es anlegt (A14) und der Inhaber alle Dokumente sieht.
+  Dokumente und nicht verworfene Stapel-Originale, Antwort nur `vorhanden` ohne IDs. Ein Benutzer erfährt nur von
+  Dokumenten, die er sieht (dasselbe Prädikat `SichtregelSql` wie Suche und Listen, also auch `PERSONAL` und
+  unbestätigte nach Spec 01, 2.21), und nur von Stapeln, die er mit A25 sehen darf. Sonst verriete die Antwort einem
+  `mitarbeiter`, dass ein vertrauliches Dokument oder Stapel-Original existiert. Das Import-Token fragt ohne
+  Sichtfilter; es sieht alle Stapel-Originale.
 - Nebenläufigkeit: Der Upload sperrt den Lauf (`for update`) bis zu seinem Commit; der Abschluss wartet darauf und
   zählt den Upload mit, ein späterer Upload erhält 409 `STATUS_KONFLIKT`. `verbuchen` zählt zudem nur, solange der
   Lauf `LAEUFT` (Nachtrag aus dem Review, Test `QuellLaufWettlaufTest`).
@@ -433,12 +433,16 @@ create table dokument_seite_vermerk (dokument_id uuid, seite int, grund text, we
 rückwärtskompatibel (tech.md Regel 11); die neuen Spalten haben Standardwerte, alte Releases lesen sie nicht.
 
 ### Umsetzung (Aufgabe 28.1, 28.11.2026)
-- Changeset `142-stapel-datenmodell` ergänzt `stapel`, `stapel_seite` und die Stapel-/Seitenbereich-Verweise am
+- Changeset `143-stapel-datenmodell` ergänzt `stapel`, `stapel_seite` und die Stapel-/Seitenbereich-Verweise am
   Dokument. Die Mandantentrennung folgt dem bestehenden Schema-pro-Mandant-Modell.
+- Die Prüfsummen-Abfrage bezieht nicht verworfene Stapel-Originale ein. App-Benutzer sehen deren Prüfsummen nur mit
+  Recht A25; das Import-Token sieht alle. Der Rollback bricht ab, sobald Stapel, Seiten oder Dokumentverweise existieren.
 - Die Auftragsnamen `STAPEL_ANALYSE`, `STAPEL_TRENNEN` und `STAPEL_ABSCHLUSS` sind als typisierte Auftragskonstanten
   zentral definiert.
 - Diese Aufgabe liefert nur das Datenmodell und den Auftragstyp-Vertrag. Rechte A25/A26 und ihre Einträge in der
   Rechtematrix wurden in der Folgearbeit 27.2 (#749) umgesetzt; diese Aufgabe ändert keine Rechte.
+- Die Szenarien zu 5.1 und 5.2 sind Teilnachweise, weil sie das Schema direkt statt den späteren Erfassungs- und
+  Zuordnungsweg prüfen. 10.6 wird mit sichtbaren, verworfenen und nicht sichtbaren Stapel-Prüfsummen belegt.
 
 ## Konfiguration (neu, Klasse (b) nach Spec 06, ausser Leer-Schwelle)
 Die Schlüssel stehen hier ohne das Präfix «archiv» und ohne Code-Formatierung, bis sie im Code bestehen

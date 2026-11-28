@@ -18,6 +18,7 @@ import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
@@ -58,6 +59,9 @@ public class QuellenSchritte {
 
     private final Map<String, byte[]> dateien = new HashMap<>();
     private final Map<String, UUID> dokumente = new HashMap<>();
+    private final Map<String, UUID> stapelOriginale = new HashMap<>();
+    private final Map<String, String> stapelMandanten = new HashMap<>();
+    private final Map<String, String> stapelPruefsummen = new HashMap<>();
     private final Map<String, List<UUID>> hochgeladen = new HashMap<>();
     private final Set<String> angelegt = new HashSet<>();
     private final Map<String, Long> stand = new HashMap<>();
@@ -73,6 +77,10 @@ public class QuellenSchritte {
 
     @After("@quellenregister")
     public void aufraeumen() throws SQLException {
+        for (Map.Entry<String, UUID> eintrag : stapelOriginale.entrySet()) {
+            ausfuehren("delete from " + stapelMandanten.get(eintrag.getKey()) + ".stapel where id = ?",
+                    eintrag.getValue());
+        }
         for (Map.Entry<String, List<UUID>> eintrag : hochgeladen.entrySet()) {
             ausfuehren("delete from public.auftrag where typ = 'VERARBEITEN' "
                     + "and nutzlast->>'dokumentId' = any (string_to_array(?, ','))",
@@ -284,9 +292,22 @@ public class QuellenSchritte {
     private List<String> pruefsummen(String liste) {
         List<String> werte = new ArrayList<>();
         for (String datei : liste.split(",\\s*")) {
-            werte.add(sha256(datei(datei)));
+            werte.add(stapelPruefsummen.getOrDefault(datei, sha256(datei(datei))));
         }
         return werte;
+    }
+
+    @Angenommen("das Stapel-Original der Datei «{word}» liegt im Status «{word}»")
+    public void stapelOriginal(String datei, String status) throws SQLException {
+        UUID id = UUID.randomUUID();
+        String checksum = sha256(("synthetischer Stapel " + datei).getBytes(StandardCharsets.UTF_8));
+        ausfuehren("insert into " + schema(tokenMandant) + ".stapel "
+                        + "(id, profil, eingang, sha256, groesse, s3_schluessel, status, empfangen) "
+                        + "values (?, 'STAPEL', 'SFTP', ?, 1, ?, ?, clock_timestamp())",
+                id, checksum, "eingang/stapel/" + id + ".pdf", status);
+        stapelOriginale.put(datei, id);
+        stapelMandanten.put(datei, schema(tokenMandant));
+        stapelPruefsummen.put(datei, checksum);
     }
 
     @Wenn("«{word}» die Prüfsummen der Dateien «{}» abfragt")
@@ -329,8 +350,10 @@ public class QuellenSchritte {
 
     @Dann("meldet die Prüfsummen-Abfrage nur die Datei «{word}» als vorhanden, ohne IDs")
     public void nurVorhanden(String datei) {
-        assertThat(antwort.jsonPath().getList("vorhanden")).containsExactly(sha256(datei(datei)));
+        assertThat(antwort.jsonPath().getList("vorhanden")).containsExactly(
+                stapelPruefsummen.getOrDefault(datei, sha256(datei(datei))));
         dokumente.values().forEach(id -> assertThat(antwort.asString()).doesNotContain(id.toString()));
+        stapelOriginale.values().forEach(id -> assertThat(antwort.asString()).doesNotContain(id.toString()));
         assertThat(antwort.jsonPath().getMap("$")).containsOnlyKeys("vorhanden");
     }
 
