@@ -498,9 +498,11 @@ Alle Fixtures sind synthetisch (wie `tools/golden_synth`); keine echten Belege, 
   Netz, Erreichbarkeit, Compose-Policy und Budget Stufe A; `structure.md`; `product.md` Phase 5), Spec 01 (2.5, Absatz
   nach der Matrix, 3.11, 3.12, 15.1, Aufgabe 5.8), Spec 02 (1.2, 3.1, 3.6, 7.1), Spec 05 (5.1, 5.4, 6.6), Spec 06 (4.1).
   Das Budget nach E11 und der Dienst `sftp` in Compose und Tests bleiben bei Aufgabe 28.3.
-- E10 Variante (a) heisst: Traefik erreicht den Dienst `sftp` nur über ein gemeinsames Netz; `tech.md` und ADR-016
-  nennen darum das Netz «web» für den TCP-Router (ab 28.3). Requirement 1.1 deckt das («am für E10 bestimmten
-  Eingang»).
+- E10 Variante (a) heisst: Traefik erreicht den Dienst `sftp` nur über ein gemeinsames Netz. Das ist nicht das
+  geteilte Netz «web», sondern das eigene Netz nur für Traefik und das Archiv (Spec 01, 16.28, Entscheid Fabian
+  28.11.2026); `tech.md` und ADR-016 nennen es für den TCP-Router (ab 28.3). Requirement 1.1 deckt das («am für E10
+  bestimmten Eingang»). Spec 01, 16.28 zählt `sftp` wörtlich zu den Diensten nur in internen Netzen; der TCP-Eingang
+  braucht diese eine Ausnahme (offen für Fabian, vor Aufgabe 28.3).
 - Die `[offen]`-Marker in 1.6 (E10), 1.9 (E11), 5.8 (E13) und 9.1 (E12) tragen jetzt den Entscheid mit Datum.
 - Rechte: Enum `Aktion` um A25 bis A29, `Rechtematrix` (Fussnote ¹ für `geschaeftsstelle` auch bei A28 und A29),
   `rechtematrix.json` mit Quelle «Spec 09, Req 15.1», `RechtematrixSpecTest` liest diese Spec als vierte Quelle und
