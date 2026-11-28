@@ -21,8 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Die Rechtematrix der Domain stimmt Zelle für Zelle mit der Tabelle in Req 2.6 überein; {@code requirements.md} ist
- * die einzige Quelle. Unbekannter Zellentext, eine fehlende oder eine zusätzliche Zeile, eine Zeile ohne Nummer
+ * Die Rechtematrix der Domain stimmt Zelle für Zelle mit den Tabellen der Specs überein: Spec 01, Req 2.6 (A1–A14,
+ * A24), Spec 04, Req 12.1 (A15–A19), Spec 06, Req 4.1 (A20–A23) und Spec 09, Req 15.1 (A25–A29); die
+ * {@code requirements.md} dieser Specs sind die einzigen Quellen. Unbekannter Zellentext, eine fehlende oder eine zusätzliche Zeile, eine Zeile ohne Nummer
  * {@code A<n>} (z. B. {@code | B1 |} oder {@code |A15|}) und eine abweichende Aktion machen den Test rot.
  */
 class RechtematrixSpecTest {
@@ -128,7 +129,10 @@ class RechtematrixSpecTest {
                 .hasMessageContaining("Bestätigen");
     }
 
-    /** Liest die Zeilen A1 … der ersten Tabelle mit dem Kopf von Req 2.6; spätere Tabellen (z. B. A15–A19) nicht. */
+    /**
+     * Liest die Zeilen der ersten Tabelle mit dem Kopf von Spec 01, Req 2.6 in einer {@code requirements.md}; spätere
+     * Tabellen derselben Datei nicht. Jede der vier Quellen hat genau eine solche Tabelle.
+     */
     static Map<Aktion, Map<Rolle, Ergebnis>> lesen(List<String> zeilen) {
         Map<Aktion, Map<Rolle, Ergebnis>> matrix = new java.util.LinkedHashMap<>();
         boolean inTabelle = false;
