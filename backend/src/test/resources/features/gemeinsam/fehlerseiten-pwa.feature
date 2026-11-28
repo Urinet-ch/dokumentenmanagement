@@ -2,7 +2,7 @@
 @spec-01 @browser
 Funktionalität: Fehleransichten der PWA
 
-  @req-4.4 @qa-fehlerseiten
+  @qa-fehlerseiten
   Szenario: Der Offline-Hinweis auf der Startseite ist barrierefrei
     Wenn ich die Startseite öffne
     Und das Handy offline ist

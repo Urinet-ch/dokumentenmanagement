@@ -37,4 +37,13 @@ describe('Einführung nach Rechten', () => {
       expect(mit.some((schritt) => schritt.text.includes(TEXTE.einfuehrung.wissen))).toBe(true);
     },
   );
+
+  it('sagt Treuhändern, dass im Eingangskorb nur bestätigte Dokumente sichtbar sind', () => {
+    const schritt = einfuehrungSchritte((aktion) => darf('treuhaender', aktion), 'Archiv', 'Treuhänder')
+      .find(({ titel }) => titel === 'Eingangskorb ansehen');
+
+    expect(schritt?.text).toBe(
+      'Im Eingangskorb sehen Sie die für Sie sichtbaren, bereits bestätigten Dokumente nur zur Ansicht. Unbestätigte Dokumente bleiben ausgeblendet. Prüfen und Bestätigen sind anderen Rollen vorbehalten.',
+    );
+  });
 });

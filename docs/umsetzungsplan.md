@@ -22,6 +22,7 @@ die nächste Phase beginnt erst, wenn es erfüllt ist.**
 | `.kiro/specs/05-mandanten-konfiguration/` | Konfiguration je Mandant: 9 Requirements, Design, Aufgaben (Dokumentarten, Klassifikationen, Fristen, Regeln) | 17–18, umgesetzt nach Gate Phase 1 und spätestens vor Welle 10 (Entscheid Fabian 11.11.2026) | noch nicht geschätzt |
 | `.kiro/specs/06-verwaltung-einstellungen-benutzer/` | Einstellungen, Benutzer und Rollen in der App verwalten: 9 Requirements, Design, Aufgaben (Keycloak-Dienstkonto, Benutzer, Rollen, Einstellungen; ADR-015) | 19–21, Welle 19 nach Gate Phase 1 und parallel zu 17–18, Welle 20 nach Spec 05, 17.7 | noch nicht geschätzt (27 Aufgaben bis je 3 Stunden) |
 | `.kiro/specs/07-einfuehrung-hilfe/` | Einführung für neue Benutzer auf der Startseite und Benutzeranleitung «Hilfe» (Hilfe-Leiste, Seite `/hilfe`, offline): 10 Requirements, Design, Aufgaben; nur Frontend, keine Änderung an Rechten | 22–23, nach dem Merge parallel zu den übrigen Wellen (hängt nur vom bestehenden Frontend ab; vorgeschlagen 21.11.2026, entschieden mit dem Merge von Spec 07); Welle 22 Anleitung und Hilfe, Welle 23 Einführung und Abnahme (nach 22.3) | noch nicht geschätzt (13 Aufgaben bis je 3 Stunden) |
+| `.kiro/specs/09-produktivimport/` | Produktivimport: 17 Requirements (0 bis 16), Design, Aufgaben (Scan-Eingang per SFTP, QR-Trennblätter, Stapel-Original, Quellenregister, Gmail-Import, Mac-Eingang, Dateinamen-Regeln, fachliche Dubletten, Vollständigkeitsbericht; ADR-016 bis ADR-019) | 27–30, Welle 27 nach dem Merge; Welle 30 (Echtbelege, Stichtag, Bestand 2026) erst nach dem Entscheid zum Start mit Echtbelegen (PR #731) | noch nicht geschätzt (Richtwert Wellen 27 bis 29 bis 23.12.2026) |
 
 Jede Spec folgt dem Kiro-Muster: `requirements.md` (User Stories + Akzeptanzkriterien in EARS),
 `design.md` (Architektur, Schnittstellen, Datenmodell, Fehler, Tests), `tasks.md` (Aufgaben mit
@@ -99,6 +100,10 @@ und Chat-Agent aus Spec 02 (Wellen 6–7) auf.
 | 14 | Ingest, Entwurf und Freigabe, Widerspruchsschutz, Änderungen an Quelldokumenten, Oberflächen | 04: 14.1–14.6 | Backend ∥ Frontend | noch nicht geschätzt |
 | 15 | Seiten-Embeddings und Suche, Chat-Werkzeuge, Analyse-Vorschlag, Lint, OKF-Export | 04: 15.1–15.5 | Backend ∥ Frontend | noch nicht geschätzt |
 | 16 | Sicherheits- und Isolationstests, Prüfliste und Gate | 04: 16.1–16.2 | QA ∥ Fabian | noch nicht geschätzt |
+| 27 | Entscheide E8–E13, Folgeänderungen und Rechte A25–A29, Prototyp und Spike SFTP (lokal im Heimnetz), Trennblatt-Generator, Quellenregister und Prüfsummen-Abfrage | 09: 27.1–27.6 | Fabian ∥ Backend ∥ Frontend | noch nicht geschätzt |
+| 28 | Dienst `sftp`, Compose und Härtung, Weg nach aussen (Fabian, Infra-Repo), Scan-Eingang im Worker, Seitenanalyse, Trennung, Stapel-Original, Stapel in der Web-App, Rückfall E-Mail | 09: 28.1–28.12 (28.12 optional) | Backend ∥ Infra ∥ Frontend ∥ Fabian | noch nicht geschätzt |
+| 29 | Quellen in Werkzeugen und Web-App, Mac-Eingang, Dateinamen-Regeln und Nachlauf, Gmail-Import, fachliche Dubletten, Vollständigkeitsbericht, Verfahrensbeschreibung, synthetischer Probelauf (Gate Probelauf) | 09: 29.1–29.10 | Backend ∥ Frontend ∥ Fabian ∥ QA | noch nicht geschätzt |
+| 30 | Gate Echtbelege (nach Entscheid #731), Umstellung zum Stichtag, Import des Bestands 2026, Papier, Abschluss (Gate Abschluss, Nachweis Spec 01, 5.8) | 09: 30.1–30.5 | Fabian ∥ QA | noch nicht geschätzt |
 | | **Total** | | | **ca. 35 T** (Wellen 0–12; Wellen 13–16 noch nicht geschätzt) |
 
 Die Tage sind Aufwand von Fabian (Steuern, Prüfen, manuelle Aufgaben) bei Umsetzung durch
@@ -115,6 +120,8 @@ Agenten; ohne Agenten ist mit etwa dem doppelten Aufwand zu rechnen.
 | nach Gate 2 und Gate 3 | 4 Wissensbasis | 13–16 | 5 Wissensquellen, ≥ 47/50 Fussnoten belegt, ≥ 14/15 Fragen mit Seite und Quelldokument |
 
 Spec 04 folgt nach Spec 02 und nach Spec 03 (entschieden von Fabian am 09.11.2026); Spec 01 bleibt im Umfang stabil.
+
+Spec 09 (Produktivimport, Wellen 27–30, ergänzt 28.11.2026): Richtwerte Welle 27 vom 01.12. bis 04.12.2026, Welle 28 vom 07.12. bis 15.12.2026, Welle 29 vom 15.12. bis 23.12.2026, synthetischer Probelauf vom 28.12. bis 31.12.2026, Stichtag 01.01.2027 und Bestand 2026 bis 31.01.2027. Welle 30 mit echten Belegen beginnt erst nach dem Entscheid zum Start mit Echtbelegen (PR #731) und den dann geltenden Voraussetzungen (Spec 01, 16.15 und 16.17); bis dahin gelten die Zeitpunkte nur als Richtwert.
 
 Plattform (P1): Wellen 1–4 laufen auf Stufe A (bestehende VPS, nur Testdaten). K5 fällt in Welle 4
 (Aufgabe 4.9, Richtwert März 2027); Bestellung, Einrichtung und Wechsel auf Stufe B (Aufgabe 5.11)

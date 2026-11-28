@@ -28,7 +28,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -63,6 +66,7 @@ public class WissenIngestSchritte {
     private Response antwort;
     private UUID entwurfId;
     private Long kiVerbrauchId;
+    private List<Integer> gleichzeitigeWiederholungen;
 
     @After
     public void aufraeumen() throws SQLException {
@@ -114,6 +118,7 @@ public class WissenIngestSchritte {
         verbrauch.clear();
         entwurfId = null;
         kiVerbrauchId = null;
+        gleichzeitigeWiederholungen = null;
     }
 
     @Angenommen("das Dokument «{word}» hat Seitentext und eine PDF\\/A-Fassung")
@@ -716,6 +721,34 @@ public class WissenIngestSchritte {
             UUID zurueckgegeben = UUID.fromString(antwort.jsonPath().getString("entwurfId"));
             assertThat(zurueckgegeben).isEqualTo(entwurfId);
         }
+    }
+
+    @Wenn("«{word}» Abschnitt {int} des Ingest-Entwurfs gleichzeitig zweimal erneut verarbeitet")
+    public void abschnittGleichzeitigWiederholen(String benutzer, int nummer)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        String token = Testanmeldung.token(benutzer);
+        String pfad = "/api/v1/wissensentwuerfe/" + entwurfId + "/abschnitte/" + nummer + "/wiederholen";
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService parallel = Executors.newFixedThreadPool(2)) {
+            var erster = parallel.submit(() -> {
+                start.await();
+                return given().auth().oauth2(token).contentType(ContentType.JSON).body(Map.of())
+                        .when().post(pfad).statusCode();
+            });
+            var zweiter = parallel.submit(() -> {
+                start.await();
+                return given().auth().oauth2(token).contentType(ContentType.JSON).body(Map.of())
+                        .when().post(pfad).statusCode();
+            });
+            start.countDown();
+            gleichzeitigeWiederholungen = List.of(erster.get(30, TimeUnit.SECONDS),
+                    zweiter.get(30, TimeUnit.SECONDS));
+        }
+    }
+
+    @Dann("wird genau eine Wiederholung angenommen und die andere abgewiesen")
+    public void eineWiederholungAngenommen() {
+        assertThat(gleichzeitigeWiederholungen).containsExactlyInAnyOrder(202, 409);
     }
 
     @Wenn("«{word}» den Ingest für ein unbekanntes Dokument startet")

@@ -2,7 +2,7 @@
 
 Je Entscheid eine Datei `ADR-<nnn>-<stichwort>.md` (Status, Kontext, Entscheid, Alternativen,
 Folgen, Verweise). Quelle der Liste: `.kiro/specs/01-archiv-kern/design.md`, Abschnitt Overview;
-ADR-013: `.kiro/specs/04-wissensbasis/design.md`; ADR-014: `.kiro/specs/03-zweiter-mandant/design.md`; ADR-015: `.kiro/specs/06-verwaltung-einstellungen-benutzer/design.md`.
+ADR-013: `.kiro/specs/04-wissensbasis/design.md`; ADR-014: `.kiro/specs/03-zweiter-mandant/design.md`; ADR-015: `.kiro/specs/06-verwaltung-einstellungen-benutzer/design.md`; ADR-016 bis ADR-019: `.kiro/specs/09-produktivimport/design.md`.
 Freigabe: per Merge im Rahmen von Aufgabe 0.6 (Gate 0).
 
 | ADR | Entscheid | Status |
@@ -22,3 +22,7 @@ Freigabe: per Merge im Rahmen von Aufgabe 0.6 (Gate 0).
 | [ADR-013](ADR-013-wissensbasis-nach-llm-wiki-muster.md) | Die Wissensbasis folgt dem LLM-Wiki-Muster (OKF), liegt im Mandanten-Schema, und die KI schreibt nur Entwürfe, die ein Mensch mit Recht A17 freigibt. | Vorgeschlagen (Freigabe per eigenem Merge mit Spec 04) |
 | [ADR-014](ADR-014-webseiten-schnittstelle.md) | Webseiten binden das Archiv nur serverseitig über einen versionierten Vertrag `/public/v<n>` ein, mit getrennten Lese- und Erfassungs-Schlüsseln je Mandant und Webseite, drei Zugriffsstufen, Stream statt Datei-URL für geschützte Dokumente und einem Änderungs-Feed statt Webhooks. | Vorgeschlagen (Freigabe per Merge mit der Erweiterung von Spec 03) |
 | [ADR-015](ADR-015-benutzerverwaltung-keycloak-admin-api.md) | Benutzer, Rollen und Einladungen verwaltet der Inhaber über die Keycloak-Admin-API mit eigenem Dienstkonto ohne Realm-Admin-Rechte; Keycloak bleibt Identitätsquelle, die Mandantentrennung erzwingt das Archiv; Rollen statt einzelner Rechte, Step-up, Deaktivieren vor Löschen. | Vorgeschlagen (Freigabe per Merge des Spec-PR von Spec 06) |
+| [ADR-016](ADR-016-scan-eingang-sftp.md) | Der Scan-Eingang ist ein eigener SFTP-Dienst auf Basis Apache MINA SSHD ohne Root, Shell und Weiterleitung, nur mit Schlüssel und virtueller Wurzel je Mandant; ältere SSH-Verfahren nur dort, der Weg nach aussen über das Infra-Repo (E10). | Vorgeschlagen (Freigabe per Merge des Spec-PR von Spec 09) |
+| [ADR-017](ADR-017-trennung-qr-trennblatt.md) | Stapel werden per QR-Trennblatt und Ordner-Deckblatt getrennt, als reine Funktion mit Seitenbilanz; geht sie nicht auf, wird nichts getrennt. | Vorgeschlagen (Freigabe per Merge des Spec-PR von Spec 09) |
+| [ADR-018](ADR-018-stapel-original.md) | Das empfangene Stapel-PDF bleibt als eigenes Archivobjekt mit Manifest und Sperre erhalten, die Dokumente sind seitengenaue Auszüge mit Verweis auf den Seitenbereich. | Vorgeschlagen (Freigabe per Merge des Spec-PR von Spec 09) |
+| [ADR-019](ADR-019-dubletten-hauptfassung.md) | Fachliche Dubletten werden in drei Stufen vorgeschlagen und nie selbständig verworfen; je Beleg zählt genau eine Hauptfassung. | Vorgeschlagen (Freigabe per Merge des Spec-PR von Spec 09) |

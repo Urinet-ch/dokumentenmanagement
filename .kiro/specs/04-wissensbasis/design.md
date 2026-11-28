@@ -1656,6 +1656,12 @@ Nachtrag (27.11.2026): Nach erfolgreicher Wiederholung bleibt die Meldung «Der 
 während des erneuten Ladens sichtbar und erhält nach dem Rendern den Fokus. Das Browser-Szenario prüft Statusmeldung,
 Fokus, axe und horizontalen Überlauf bei 375 und 1280 px in beiden Farbschemata.
 
+Nachtrag (28.11.2026): JUnit prüft die exakte Grenze und eine Überschreitung um einen Token für Einzel- und
+Monatsbudget, ungültige bzw. nicht vorhandene Abschnitte, verworfene oder parallel laufende Entwürfe sowie die
+erneute Prüfung der aktiven Markierung und Vertraulichkeit. Eine Erhöhung auf `INTERN` bleibt zulässig; `PERSONAL`
+wird wie bisher abgewiesen. Ein Cucumber-Szenario prüft zwei gleichzeitig eintreffende Wiederholungen: genau eine
+wird angenommen (202), die andere mit 409 abgewiesen. Keine neue Fachregel oder Datenbankschemaänderung.
+
 ### Umsetzung (Aufgabe 19.5, 27.11.2026)
 Die Kernaussagen-Extraktion erhält zwei globale Konfigurationswerte für Tabellen: Gruppierung aktiviert und höchstens
 eine Gruppe je Kennzahlen-, Persona- oder Positionstabelle. Der Startwert wurde mit einer synthetischen Tabelle mit
