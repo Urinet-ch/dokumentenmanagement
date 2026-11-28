@@ -1,5 +1,23 @@
 # Design Document
 
+### Umsetzung (Aufgabe 31.6 Repo-Vorbereitung, 28.11.2026)
+
+`deploy/last/compose.yml` beschreibt ein isoliertes Messprojekt mit Stufe-A-Buckets,
+echter OCR/S3 und KI-Stub, ohne veröffentlichte Ports. `seed/last/konfiguration.json`
+enthält ausschliesslich synthetische Messarten. `tools/last/bestand.py` erzeugt und
+prüft eine deterministische Suchfixture, keine archivierten Dateien. Die bestehende
+HTTP-Servermetrik erhält nur mit `archiv.last.histogramme=true` feste 1-/2-s-Buckets
+für `/api/v1/dokumente` (keine neuen Labels); Differenzen zweier interner Abrufe
+belegen die Grenzbuckets, nicht ein exaktes Perzentil. Die Fotoauswertung verwendet
+vorhandene Auftragszeitstempel vom Start von `VERARBEITEN` bis zum Ende von
+`KI_VORSCHLAG`, bei bestätigtem KI-Stub und ohne Fehlversuch. Zwischenwarteschlange
+und Abschlussarbeiten zählen konservativ mit. HEIC und dreiseitiges farbiges
+Bild-PDF entstehen lokal mit den vorhandenen Generator-Bibliotheken.
+Durchführung, isoliertes Deploy-Ziel im Betriebsweg, tatsächliche OCR-Überlappung,
+Renderdauer/Bildweg und Hybrid-Nachweis bleiben bei Fabian beziehungsweise offen;
+Anleitung und Grenzen: `docs/betrieb/leistungsmessung-stufe-b.md`. Requirements
+und Checkbox 31.6 bleiben unverändert.
+
 ### Umsetzung (Aufgabe 1.9 Vorschlag, 27.11.2026)
 
 `docs/betrieb/deploy-rollback-pruefung.diff` ist ein nicht angewendeter Vorschlag; der Workflow bleibt unverändert.

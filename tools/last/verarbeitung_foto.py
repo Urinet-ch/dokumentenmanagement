@@ -33,6 +33,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from bestand import schreiben
+
 ZIEL_P95_SEKUNDEN = 30.0
 ENDSTATUS = {"EINGANGSKORB", "FEHLER"}
 
@@ -118,7 +120,8 @@ def auf_abschluss_warten(basis: str, token: str, dokument: str, intervall: float
     raise RuntimeError(f"Dokument {dokument} nach {grenze:.0f} s nicht im Eingangskorb.")
 
 
-def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float, beobachten=None) -> float:
+def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float, beobachten=None,
+             angenommen=None) -> float:
     endung, typ = fototyp(foto)
     koerper, medientyp = multipart("dateien", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
@@ -126,6 +129,8 @@ def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: floa
     if (status != 202 or not isinstance(ergebnis, list) or not ergebnis or not isinstance(ergebnis[0], dict)
             or ergebnis[0].get("status") != "NEU" or not ergebnis[0].get("id")):
         raise RuntimeError(f"Upload nicht angenommen (HTTP {status}).")
+    if angenommen:
+        angenommen(ergebnis[0]["id"])
     return auf_abschluss_warten(basis, token, ergebnis[0]["id"], intervall, grenze, start, beobachten)
 
 
@@ -166,6 +171,7 @@ def main() -> int:
     parser.add_argument("--intervall", type=float, default=0.5, help="Abfrageintervall in Sekunden")
     parser.add_argument("--grenze", type=float, default=600.0, help="Abbruch je Lauf in Sekunden")
     parser.add_argument("--csv", type=Path, help="Messwerte ausserhalb des Repositories als CSV speichern")
+    parser.add_argument("--ids", type=Path, help="IDs nur der Messfotos für den serverseitigen Export")
     args = parser.parse_args()
 
     if args.anzahl < 1 or args.aufwaermen < 0:
@@ -174,6 +180,9 @@ def main() -> int:
         parser.error("--intervall und --grenze müssen endlich und grösser als 0 sein")
     if args.csv and args.csv.exists():
         parser.error("--csv darf keine bestehende Datei überschreiben")
+    if args.ids:
+        if args.ids.exists() or args.ids.resolve().is_relative_to(Path(__file__).resolve().parents[2]):
+            parser.error("--ids muss neu und ausserhalb des Repositories sein")
     token = token_lesen()
     foto = args.foto.read_bytes()
     fototyp(foto)
@@ -188,6 +197,7 @@ def main() -> int:
     zeiten = []
     messwerte = []
     ueberlappung = 0
+    ids = []
     for nr in range(1, args.anzahl + 1):
         scan_aktiv = False
 
@@ -202,11 +212,14 @@ def main() -> int:
                 scan_aktiv = True
 
         try:
-            dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze, scan_beobachten if scan else None)
+            dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze, scan_beobachten if scan else None,
+                             ids.append)
         except (RuntimeError, OSError) as fehler:
             messwerte.append((nr, "fehler", ""))
             if args.csv:
                 csv_schreiben(args.csv, messwerte)
+            if args.ids:
+                schreiben(args.ids, json.dumps(ids))
             print(f"Messung abgebrochen: {fehler}", file=sys.stderr)
             return 1
         zeiten.append(dauer)
@@ -215,6 +228,8 @@ def main() -> int:
         print(f"Lauf {nr:3d}: {dauer:6.1f} s")
     if args.csv:
         csv_schreiben(args.csv, messwerte)
+    if args.ids:
+        schreiben(args.ids, json.dumps(ids))
     if scan:
         auf_abschluss_warten(basis, token, scan, args.intervall, args.grenze, time.monotonic())
         print("Begleit-Scan im Eingangskorb.")
@@ -230,7 +245,10 @@ def main() -> int:
 
 
 def csv_schreiben(pfad: Path, messwerte: list[tuple[int, str, str]]) -> None:
-    with pfad.open("x", encoding="utf-8", newline="") as datei:
+    if pfad.resolve().is_relative_to(Path(__file__).resolve().parents[2]):
+        raise ValueError("Messdaten müssen ausserhalb des Repositories liegen.")
+    fd = os.open(pfad, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as datei:
         writer = csv.writer(datei)
         writer.writerow(("lauf", "status", "dauer_s"))
         writer.writerows(messwerte)

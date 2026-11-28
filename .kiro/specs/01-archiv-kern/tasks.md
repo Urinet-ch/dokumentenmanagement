@@ -660,6 +660,7 @@ Betriebswerte (Hostnamen, Adressen, Kapazitäten) stehen nicht im Repo. Häkchen
   - _Abhängig von: 5.6, 5.9 (Teile im Repo)_
 
 - [ ] 31.6 Leistungsmessung auf der VPS [Fabian] [Infra]
+  - Repo-Vorbereitung: `deploy/last/compose.yml`, `seed/last/konfiguration.json`, Generator und Prüfung des Suchbestands, HEIC-/Bild-PDF-Generator sowie Auswertung der Serverhistogramme und Auftragszeitstempel unter `tools/last/`; Ablauf und Grenzen in `docs/betrieb/leistungsmessung-stufe-b.md`. Messprojekt-Ziel im freigegebenen Deploy-Betriebsweg, Bildweg-/Hybrid-Nachweis und Durchführung bleiben offen; kein Betriebsnachweis.
   - Richtwert bis 22.12.2026, vor dem Wechsel (entschieden von Fabian am 28.11.2026). Messung nach 16.26 als eigenes Compose-Projekt (z. B. `archiv-last`) mit Mandant `last` und Bucket `urinet-archiv-a-last`, Limits nach 16.30, nur synthetische Daten; Messbedingungen, Bildweg und Dateinamen wie in 5.11; der Archiv-Stack ruht während der Messung; Health der anderen Apps (16.18); danach Projekt, Messdaten und Bucket verwerfen
   - Verfehlt die Messung ein Ziel: Ergebnis Fabian als Entscheid vorlegen (16.17, 16.26); kein automatischer Stopp, kein Aufrüsten ohne Entscheid
   - _Anforderungen: 3.2, 5.5, 14.3, 16.16, 16.26_

@@ -240,10 +240,11 @@ class SkriptTest(unittest.TestCase):
         foto.write_bytes(HEIC)
         scan = Path(self.ordner.name) / "scan.pdf"
         scan.write_bytes(b"%PDF-1.7 synthetischer 20-Seiten-Scan")
+        ids = Path(self.ordner.name) / "foto-ids.json"
 
         lauf = self.starten("verarbeitung_foto.py", "--basis-url", self.url, "--foto", str(foto),
                             "--begleit-pdf", str(scan), "--anzahl", "2", "--aufwaermen", "1",
-                            "--intervall", "0.01")
+                            "--intervall", "0.01", "--ids", str(ids))
 
         self.assertEqual(lauf.returncode, 0, lauf.stderr)
         uploads = [a[2] for a in Server.anfragen if a[0] == "POST"]
@@ -255,6 +256,10 @@ class SkriptTest(unittest.TestCase):
         self.assertIn("Begleit-Scan im Eingangskorb.", lauf.stdout)
         self.assertIn("Fotoläufe mit beobachtetem Scan in VERARBEITUNG: 1", lauf.stdout)
         self.assertEqual(Server.anfragen[-1][:2], ("GET", "/api/v1/dokumente/scan"))
+        mess_ids = json.loads(ids.read_text())
+        self.assertEqual(len(mess_ids), 2)
+        self.assertNotIn("scan", mess_ids)
+        self.assertEqual(ids.stat().st_mode & 0o777, 0o600)
 
     def test_begleit_scan_ohne_beobachtete_ueberlappung_ist_kein_nachweis(self):
         foto = Path(self.ordner.name) / "foto-heic.heic"
@@ -287,14 +292,16 @@ class SkriptTest(unittest.TestCase):
     def test_foto_standardwerte_entsprechen_messbedingungen(self):
         foto = Path(self.ordner.name) / "foto.jpg"
         foto.write_bytes(JPEG)
+        ids = Path(self.ordner.name) / "standard-ids.json"
 
         lauf = self.starten("verarbeitung_foto.py", "--basis-url", self.url, "--foto", str(foto),
-                            "--intervall", "0.01")
+                            "--intervall", "0.01", "--ids", str(ids))
 
         self.assertEqual(lauf.returncode, 0, lauf.stderr)
         self.assertIn("p95 über 50 Läufe", lauf.stdout)
         self.assertEqual(lauf.stdout.count("zählt nicht"), 20)
         self.assertEqual(len([a for a in Server.anfragen if a[0] == "POST"]), 70)
+        self.assertEqual(len(json.loads(ids.read_text())), 50)
 
 
 class AuswertungTest(unittest.TestCase):
