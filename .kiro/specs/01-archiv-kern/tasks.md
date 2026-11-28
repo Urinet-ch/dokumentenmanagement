@@ -682,8 +682,9 @@ Betriebswerte (Hostnamen, Adressen, Kapazitäten) stehen nicht im Repo. Häkchen
   - _Anforderungen: 16.3, 16.23_
   - _Abhängig von: 31.8, Spec 09: 30.1_
 
-- [ ] 31.10 Eigenes Netz für Traefik und das Archiv [Infra] [Fabian]
+- [x] 31.10 Eigenes Netz für Traefik und das Archiv [Infra] [Fabian]
   - Richtwert bis 09.12.2026 (entschieden von Fabian am 28.11.2026): im Infra-Repo der VPS ein eigenes Docker-Netz, an dem nur Traefik und das Archiv hängen, keine andere App; Traefik zusätzlich daran anschliessen; Vorschlag als Patch oder Anleitung, Fabian merged und rollt aus; Name des Netzes für 31.2 (kein Betriebswert)
+  - Erledigt 28.11.2026 (Fabian): eigenes Netz im Infra-Repo umgesetzt und ausgerollt; Betriebswerte nur im Infra-Repo. Das Archiv wechselt mit #757 in 31.7
   - Ausrollen zusammen mit 31.2 in 31.7 abstimmen, damit Traefik `api` und `kc` beim Wechsel des Netzes ohne Unterbruch erreicht oder der Unterbruch im Wechselfenster liegt
   - _Anforderungen: 16.28_
 
