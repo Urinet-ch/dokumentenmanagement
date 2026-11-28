@@ -38,6 +38,11 @@ services:
 
   kc:
     image: archiv:restore-roundtrip-kc-${COMPOSE_PROJECT_NAME:?}
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+      - /opt/keycloak/data/tmp:size=32m,uid=1000,gid=1000,mode=0700
     # Speichergrenze, damit drei JVMs in eine kleine Docker-VM passen (z. B. Colima mit 6 GB)
     mem_limit: 768m
     environment:

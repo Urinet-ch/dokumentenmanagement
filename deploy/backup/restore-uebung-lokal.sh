@@ -371,7 +371,7 @@ test_maven() {
   fi
   if (cd "$backend" && mvn "${args[@]}" test) >"$temp/$phase-test.log" 2>&1; then
     if [[ $phase == ziel ]]; then
-      bericht OK "Restore-Zählvergleich je Mandant: Wissensseiten, Versionen, Quellen, Dokumente" "$((SECONDS - start))"
+      bericht OK "Restore-Zählvergleich je Mandant: Wissensseiten, Versionen, Quellen, Dokumente, Webfreigaben, öffentliche Fragen, Benutzereinladungen" "$((SECONDS - start))"
     else
       bericht OK "Echter Sicherungs-Roundtrip: Phase $phase" "$((SECONDS - start))"
     fi

@@ -1,12 +1,13 @@
-# Aufgabenstand der Specs (26.11.2026)
+# Aufgabenstand der Specs (28.11.2026)
 
 ## Umfang und Ergebnis
 
-Abgleich gegen `origin/main` bei `83e53278e` (PR #702). In den sieben Taskdateien stehen 43 offene
-Checkboxen; Spec 05 und Spec 07 haben keine offenen Checkboxen. Keine Checkbox wurde geändert. Ein gemergter Teil-PR
+Abgleich gegen `origin/main` bei `b1112c4ca` nach den Merges #674, #725, #730, #732, #733 und #735. In den sieben
+Taskdateien stehen 41 offene Checkboxen; Spec 05 und Spec 07 haben keine offenen Checkboxen. Keine Checkbox wurde
+geändert. Ein gemergter Teil-PR
 allein gilt nicht als Abschluss, wenn die Taskdatei noch Abnahme, Betrieb, Messung oder Folgearbeiten nennt.
 
-**Faktisch vollständig erledigt:** keine der 43 offenen Checkboxen konnte anhand der Taskdateien und der darin
+**Faktisch vollständig erledigt:** keine der 41 offenen Checkboxen konnte anhand der Taskdateien und der darin
 verlinkten PR-/Testnachweise als vollständig abgeschlossen bestätigt werden. Wo ein gemergter PR nur einen Teil
 abdeckt, ist er als solcher aufgeführt. Die Entfallen- und Übernahmeentscheide sind separat ausgewiesen und keine
 erledigten Umsetzungen.
@@ -18,7 +19,7 @@ erledigten Umsetzungen.
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
 | 0.7 | PR #18 belegt die Zugangsvorbereitung, nicht den Abschluss der gesamten Stufe A. | Fabian / Infra |
-| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. Fabian hat in #699 das Budget 2048 MiB / 1.5 CPU und eine erneute Messung bestätigt; das Messwerkzeug in #699 ist noch offen. | Fabian / Infra; Messung und Nachweis |
+| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. Entscheid Fabian (27.11.2026): Budget 2048 MiB / 1.5 CPU und erneute Messung. Der Generator #727 ist gemergt; er und der offene lokale Trockenlauf-PR #730 belegen weder VPS-Messung noch Health-/OOM-Prüfung. | Fabian / Infra; Messung und Nachweis |
 | 2.6 | Teilumsetzungen in #46, #54, #266, #568, #638 sowie den am 25.11. gemergten #644 und #645; Stufe-B-Leistungsnachweis fehlt. | Backend / Infra |
 | 3.7 | PWA und Eingabegrenzen in #123 und #472; die Abnahme bleibt ausstehend. | Fabian / Frontend |
 | 5.4 | Kein vollständiger Produktiv- und Stufe-B-Nachweis in den geprüften Belegen. | Fabian / Infra; abhängig von 5.11 |
@@ -26,7 +27,7 @@ erledigten Umsetzungen.
 | 5.6 | App-Alarme und Kennzahlen in #91, #114, #191, #566 und #639; Aktivierung und Betriebsnachweise bleiben offen. | Backend / Infra |
 | 5.7 | Entwurf #283 ist keine Freigabe; Gegenlesen und Freigabe sind laut Taskdatei offen. | Fabian |
 | 5.8 | Abnahme-Gate und Belegübernahme offen; Voraussetzungen aus 5.9 und 5.11 fehlen. | Fabian / QA; blockiert |
-| 5.9 | Checkliste in #569 und App-Messung in #597 auf `main`; Anbindung und Betriebsnachweise bleiben offen. | Infra |
+| 5.9 | Die Varianten 1 (Erreichbarkeit beider Hosts) und 3 (fehlgeschlagener Deploy) aus #724 sind seit 27.11.2026 entschieden und im Infra-Repo umgesetzt. Der Betriebsnachweis der Prüfung des Anmelde-Hosts bleibt bei Fabian; die Zertifikatsprüfung wurde nicht gewählt. | Fabian; Betriebsnachweis |
 | 5.10 | Entwurf #284 ist keine geprüfte Notfallunterlage. | Fabian |
 | 5.11 | Kein vollständiger Wechsel- und Betriebsnachweis im geprüften Stand. | Fabian / Infra |
 | O.8 | Kein Umsetzungs- oder Entscheidungsnachweis gefunden. | Fabian / Infra / Backend |
@@ -51,10 +52,10 @@ erledigten Umsetzungen.
 | 10.5 | Importwerkzeug in #504; der PR ordnet weitere Req-4.2-Arbeit Spec 05 zu. Keine abgeschlossene Übernahme und Abnahme der Altbestände belegt. | Backend / Fabian |
 | 10.6 | Repo-Teile in #331 und #497; vollständiger Backup-Nachweis für Mandant 2 bleibt offen. | Infra |
 | 11.11 | #495 belegt Repo-Umsetzung und Tests; laut Taskdatei fehlen Messung der Startwerte am Livegang und deren Nachweis. | Backend; Messung beim Livegang |
-| 12.3 | Manueller ZAP-Lauf am 26.11.: 0 FAIL. HSTS #690, Korrektur #694, Ausgabeschutz #692, App-Header #689, authentisierter lokaler Scan #691 und Staging-Anleitung #697 sind gemergt. Abhaken erst nach Header-Nachweis. | QA / Fabian / Infra |
+| 12.3 | Lokaler ZAP-Lauf #719 mit sechs erfolgreichen Scans; HSTS-Reihenfolge #722 und lokaler Router-Rauchtest #723 sind gemergt. Die Staging-Baseline bleibt ausstehend; deshalb bleibt die Checkbox offen. | QA / Fabian / Infra |
 | 12.4 | Abnahme nicht belegt. | Fabian |
 
-### Spec 04 – Wissensbasis (10)
+### Spec 04 – Wissensbasis (8)
 
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
@@ -62,8 +63,6 @@ erledigten Umsetzungen.
 | 13.7 | #688 ergänzt den lokalen synthetischen Restore-Zählvergleich je Mandant; die wiederkehrende betriebliche Restore-Probe ist damit nicht nachgewiesen. | Infra |
 | 16.2 | Prüfliste und Gate nicht abgenommen. | Fabian / QA |
 | 18.3 | PR #576 ist gemergt; Plugin-Hinweis und vollständige Abnahme fehlen laut Taskdatei. | Backend / Frontend |
-| 19.4 | Umsetzung gemergt (#707); Abnahme der sichtbaren Abschnittsbefunde und Wiederholung bleibt in 19.6 offen. | QA / Fabian |
-| 19.5 | Umsetzung gemergt (#714); Gruppierung und Vertraulichkeitsvorschlag bleiben in 19.6 manuell zu prüfen. | QA / Fabian |
 | 19.6 | #702 enthält die Checkliste; Test-Ingest und Auswertung bleiben offen, Voraussetzungen 19.1–19.5 sind umgesetzt. | QA / Fabian |
 | O.4 | Keine Umsetzung belegt. | Backend |
 | O.5 | Laut Taskdatei in 15.6–15.8 übernommen; nicht doppelt umsetzen. | In den übernommenen Aufgaben nachverfolgen |
@@ -75,6 +74,13 @@ erledigten Umsetzungen.
 |---|---|---|
 | 21.6 | #684 dokumentiert den Zwischenstand; die Speichermessung auf Stufe A und damit die Abnahme bleiben offen. | Fabian |
 
+## Gemergte PRs seit dem letzten Stand
+
+Die Merges #674, #725, #730, #732, #733 und #735 ergänzen QA-, Deploy- und
+Messvorbereitungsnachweise. Sie schliessen keine der 41 offenen Checkboxen
+vollständig ab; die nötigen Abnahmen und Betriebsnachweise bleiben gemäss
+Taskdateien offen.
+
 ## Seit dem letzten Abgleich abgeschlossene Checkboxen
 
 - Spec 02 10.4 (#602); Spec 03 11.4 (#616) und 11.6 (#594); Spec 04 18.4 (#605).
@@ -82,10 +88,11 @@ erledigten Umsetzungen.
   (Abnahme und Ereignisnachweis belegt, #627 und #637).
 - Spec 06 19.3, 20.6 und 21.2 (#686; 20.6 mit Nachtrag #685); Spec 07 23.6 (#683, Abnahme vom 26.11.).
 - Spec 04 19.2 (#687, Tabellen und Seitenbilder).
-- Spec 04 19.3 (#682, Fragen, Optionen und Bedingungen).
+- Spec 04 19.3 (#682, Fragen, Optionen und Bedingungen), 19.4 (#707, Abschnittsbefunde) und
+  19.5 (#714, Tabellen-Gruppierung und Vertraulichkeitsvermerk); 19.6 bleibt offen.
 
 ## Grenzen des Abgleichs
 
-- Offene PRs zum Zeitpunkt dieses Abgleichs: #674 und #707 sind Draft; #699, #703, #704, #705 und #706 sind Ready. Kein offener PR zählt als Nachweis auf `main`.
+- Offene PRs zum Zeitpunkt dieses Abgleichs: Ready #728, #729, #731, #734, #736 und #737. #728 und #731 warten auf einen Entscheid; offene PRs zählen nicht als Nachweis auf `main`.
 - Der Stand der Taskdateien und offenen PRs ist eine Momentaufnahme; die Checkboxen wurden nicht verändert.
-- Betriebsdetails und Zugangsdaten wurden nicht erhoben oder in diesen Bericht übernommen.
+- Dieser Bericht enthält keine Betriebsdetails oder Zugangsdaten.

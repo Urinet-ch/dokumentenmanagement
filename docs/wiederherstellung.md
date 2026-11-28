@@ -116,8 +116,13 @@ nichts daran, dass ein Snapshot nur mit passendem Manifestnachweis verwendet wer
 
 Die lokale synthetische Teilprobe steht unter `deploy/backup/restore-uebung-lokal.sh`. Sie prüft den
 Sicherungs-Shellablauf mit Attrappen sowie S3-Restore und Dateireferenzen mit lokalen Dev Services. Beim
-Datenbank-Restore vergleicht sie je Mandant die Zahlen für Wissensseiten, Versionen, Quelleneinträge und Dokumente mit
-dem vor der Sicherung erfassten Stand. Die Backend-Sperrprüfung ist implementiert. Eine vollständige manuelle
-Wiederherstellung einschliesslich Datenbank-Dumps und Keycloak-Realm in einer getrennten Testumgebung bleibt als
-Nachweis nach tasks.md 5.5 offen;
-die wiederkehrende Probe auf der VPS gehört zur Infra.
+Datenbank-Restore vergleicht sie je Mandant die Zahlen für Wissensseiten, Versionen, Quelleneinträge, Dokumente,
+Webfreigaben, öffentliche Fragen und Benutzereinladungen mit dem vor der Sicherung erfassten Stand. Die vollständige
+lokale synthetische Wiederherstellung einschliesslich Datenbank-Dumps und Keycloak-Realm wurde am 28.11.2026
+durchgespielt. Der Quell-Keycloak lief dabei mit den `read_only`-, tmpfs- und uid/gid-Vorgaben der Produktion. Der
+Realm-Export lag während des Containerlaufs in einem eigenen, zugriffsbeschränkten Volume; dessen Entfernung wird auch
+in Fehlerfällen geprüft. Die wiederkehrende betriebliche Probe bleibt offen.
+
+| Lauf | Dauer (s) | Exit-Code |
+| --- | ---: | ---: |
+| 28.11.2026, lokal, synthetisch | 282 | 0 |

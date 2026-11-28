@@ -137,9 +137,10 @@ geschützte API aufrufen kann. Vor dem Export legt die Übung im temporären Que
 Dienstkonto-Client mit Mandanten-Mapper und Rolle an. Seine JSON-Dateien werden mit `jq` erzeugt und vor dem
 Keycloak-Aufruf geprüft. Der Client und sein Dienstkonto bleiben ausschliesslich in den Wegwerf-Datenbanken;
 Realm-Dateien, TOTP-Pflicht und Produktionsflows werden nicht geändert. Die OIDC-Issuer-URL des Ziel-Realm ist an den
-Loopback-Port gebunden. Die Daten von PostgreSQL und MinIO liegen in tmpfs; es entstehen keine Volumes. Keycloak und
-die API haben ein `mem_limit` von 768 MiB, Keycloak dazu eine Heap-Grenze; ohne sie beendet der OOM-Killer einer
-knappen Docker-VM Keycloak.
+Loopback-Port gebunden. Die Daten von PostgreSQL und MinIO liegen in tmpfs. Für den Realm-Export erstellt
+`taeglich.sh` ein eigenes, zugriffsbeschränktes Docker-Volume, kopiert den Export daraus und entfernt das Volume auch
+bei Fehlern. Keycloak und die API haben ein `mem_limit` von 768 MiB, Keycloak dazu eine Heap-Grenze; ohne sie beendet
+der OOM-Killer einer knappen Docker-VM Keycloak.
 
 Das temporäre Verzeichnis entsteht unter `${TMPDIR:-/tmp}`. Läuft Docker in einer VM, die nur das Home-Verzeichnis
 einbindet (z. B. Colima unter macOS), muss `TMPDIR` auf ein Verzeichnis darunter zeigen:

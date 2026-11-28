@@ -647,14 +647,13 @@ verfügbar, nur `archiv_ki_beispiele{mandant}` fehlt bis zur nächsten erfolgrei
 kein Wert null. `JdbcKiBeispielTest` prüft den SQL-Fehlerpfad von `anzahl`; `MicrometerKennzahlenTest` prüft die
 fehlende Gauge bei weiterhin vorhandenen übrigen Reihen.
 
-#### Vorschlag nach Erreichbarkeitsausfall (Aufgabe 5.9, 27.11.2026)
+#### Umsetzung (Aufgabe 5.9, 28.11.2026)
 
-`docs/betrieb/ueberwachung-erreichbarkeit.md` hält fest, dass Anwendungsalarme nicht greifen, wenn die Anwendung selbst
-nicht erreichbar ist. Der Deploy-Workflow prüft Health und öffentliche Antworten nur während eines Deploys; die
-vorhandene Monitoring-Compose-Datei enthält keine externen HTTP- oder Zertifikatsproben. Vorgeschlagen sind
-unabhängige HTTP-Prüfungen beider Hosts, Zertifikatsablauf-Warnungen und ein Alarm bei fehlgeschlagenem Deploy.
-Aufwand und mögliche Ablageorte sind Schätzungen. Es wurde weder ein Infrastruktur- noch ein Workflow-Eingriff
-vorgenommen; die Auswahl bleibt unter «Offen für Fabian».
+Der Entscheid vom 27.11.2026 (PR #724) wählte eine unabhängige Erreichbarkeitsprüfung beider Hosts und eine Meldung bei
+fehlgeschlagenem Deploy; beides ist im Infra-Repo umgesetzt. Die Zertifikatsprüfung wurde nicht gewählt. Eine
+unabhängige externe HTTP-Prüfung des Anwendungs-Hosts bestand seit dem 13.11.2026 ausserhalb der VPS-Konfiguration
+und erfasste den Ausfall vom 26.11.2026 (rund 75 Minuten). Eine Aussage zur Benachrichtigung ist nicht belegt. Der
+Betriebsnachweis für die Prüfung des Anmelde-Hosts bleibt bei Fabian; Aufgabe 5.9 bleibt offen.
 
 ### KI (`ki`)
 - `MetadatenExtraktor` als LangChain4j-`@RegisterAiService` ohne Chat-Memory (`NoChatMemoryProviderSupplier`; sonst vermischen sich Belege im selben Request-Kontext), Antwort als Java-Record `MetadatenVorschlag` im JSON-Schema-Antwortformat (`response-format=json_schema`, `strict-json-schema=true`). Infomaniak lehnt den JSON-Modus (`json_object`) ab; einen Rückfall gibt es nicht, ohne gültige Antwort gilt Req 7.1 (ohne Vorschlag in den Eingangskorb). Spike 0.3: `docs/spikes/infomaniak-ai.md`.
@@ -1371,6 +1370,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
 - Umsetzung Shell-Aufgabe 5.5: `deploy/backup/taeglich.sh` erstellt die Datenbank-Dumps, den Realm-Export, den Manifest-Schlüssel sowie je Mandant Inventar und Bucket-Zuwachs; alle Artefakte werden mit `age` an Sicherungs- und Probe-Empfänger verschlüsselt und ihre SHA-256-Werte im Sicherungsregister festgehalten. Inventar und Zuwachs werden in der geforderten Reihenfolge gelesen, das Vorinventar bleibt mit restriktiven Dateirechten ausserhalb der abgeholten Läufe. Der Realm-Export stoppt Keycloak kurz, weil der offizielle Export bei laufendem Dienst keine konsistente Sicherung garantiert; ein Trap startet den Dienst auch bei Fehlern erneut. Die Backend-Kommandos laufen im Wegwerf-Container (`compose run --rm --no-deps`), nie per `exec`; der Realm-Export schreibt in ein Bind-Mount statt ins tmpfs; ein Wechsel des Probe-Schlüssels (Prüfsumme im Zustand) oder `ARCHIV_VOLLEXPORT=1` erzwingt einen Vollexport (Req 16.23); eine veraltete Sperre wird übernommen (Nachbesserung Review PR #209). restic und Probe-Workflow bleiben im Infra-Repository.
 - Umsetzung (Aufgabe 5.5/5.12, lokaler Nachweis, 25.11.2026): Die Restore-Übung vergleicht Dokument-, Wissensseiten- und Versionszahlen je Mandant zwischen Quelle und wiederhergestelltem Ziel und prüft fremde Dokumente und Originaldateien auf Abwesenheit. Ein eindeutiger Projektname isoliert Compose und die gebauten Image-Tags; beim Aufräumen werden nur die eigenen Tags entfernt. `SicherungPaketRoundtripTest` und `restore-uebung-lokal-test.sh` belegen den lokalen Ablauf mit synthetischen Daten. Die betriebliche Restore-Probe mit Zählvergleich (Spec 04, 13.7) ist damit nicht nachgewiesen.
 - Umsetzung (Aufgabe 5.5, Nachtrag 26.11.2026): Der lokale Roundtrip prüft in beiden Ziel-Buckets auch, dass weder Versionen noch Löschmarken des fremden PDF/A-Schlüssels vorhanden sind (Req 16.3).
+- Umsetzung (Aufgabe 5.12, lokaler Nachweis, 28.11.2026): Der vollständige synthetische Roundtrip stellt Archiv- und Keycloak-Datenbank sowie den Realm wieder her und vergleicht je Mandant die Zahlen für Wissensseiten, Versionen, Quelleneinträge, Dokumente, Webfreigaben, öffentliche Fragen und Benutzereinladungen. Exportintegrität, Zurückweisung eines falschen Schlüssels und manipulierter Prüfsummen sowie die Erreichbarkeit des wiederhergestellten Realms werden ebenfalls geprüft. Der Quell-Keycloak läuft mit den Produktionsvorgaben `read_only`, tmpfs und uid/gid 1000; der Realm-Export nutzt ein eigenes Volume mit einem für uid 1000 vorbereiteten Zielordner, das auch bei Fehlern entfernt wird. Der Lauf vom 28.11.2026 dauerte 282 s (Exit 0; `docs/wiederherstellung.md`). Die betriebliche Restore-Probe bleibt ein separater Nachweis; Aufgabe 5.5 und Spec 04, Aufgabe 13.7 bleiben offen.
 
 ### Frontend
 - Routen: `/erfassen`, `/eingangskorb`, `/suche`, `/dokument/:id`, `/importe`, `/importe/:id`, `/verwaltung/dokumentarten`, `/verwaltung/protokoll`, `/verwaltung/api-tokens`; Spec 02 ergänzt `/chat` (Spec 02, Aufgabe 7.4; Recht wie A2, Menüpunkt erst mit Aufgabe 7.4b).
