@@ -148,6 +148,46 @@ public final class OcrTestdateien {
         }
     }
 
+    /** Gescannte Tabelle als Bild-PDF mit eigenständigem Vertraulichkeitsvermerk. */
+    public static byte[] tabellenScanPdf() {
+        BufferedImage bild = new BufferedImage(1240, 1754, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = bild.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, bild.getWidth(), bild.getHeight());
+        g.setColor(Color.BLACK);
+        g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 40));
+        g.drawString("Vertraulichkeit: INTERN", 100, 330);
+
+        int links = 100;
+        int spalte1 = 520;
+        int spalte2 = 900;
+        int rechts = 1140;
+        int oben = 480;
+        int zeilenhoehe = 120;
+        for (int zeile = 0; zeile <= 3; zeile++) {
+            int y = oben + zeile * zeilenhoehe;
+            g.drawLine(links, y, rechts, y);
+        }
+        for (int x : new int[]{links, spalte1, spalte2, rechts}) {
+            g.drawLine(x, oben, x, oben + 3 * zeilenhoehe);
+        }
+
+        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 34));
+        g.drawString("Leistung", links + 20, oben + 78);
+        g.drawString("Betrag", spalte1 + 20, oben + 78);
+        g.drawString("Waehrung", spalte2 + 20, oben + 78);
+        g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 34));
+        g.drawString("Service A", links + 20, oben + 198);
+        g.drawString("120.00", spalte1 + 20, oben + 198);
+        g.drawString("CHF", spalte2 + 20, oben + 198);
+        g.drawString("Service B", links + 20, oben + 318);
+        g.drawString("85.00", spalte1 + 20, oben + 318);
+        g.drawString("CHF", spalte2 + 20, oben + 318);
+        g.dispose();
+        return bildPdf(List.of(bild));
+    }
+
     /** PDF mit Benutzerpasswort: ohne Passwort nicht lesbar. */
     public static byte[] verschluesseltesPdf() {
         try (PDDocument dok = new PDDocument()) {

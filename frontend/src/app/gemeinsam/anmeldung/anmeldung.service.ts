@@ -31,6 +31,9 @@ export interface Benutzer {
   name: string;
   mandant: string | null;
   rolle: Rolle | null;
+  /** Nur zur Anzeige auf «Mein Konto» (Spec 06, Req 11.3), soweit das Token sie enthält. */
+  benutzername?: string | null;
+  email?: string | null;
 }
 
 export class AnmeldungFehler extends Error {}
@@ -97,6 +100,8 @@ export class AnmeldungService {
       name: typeof name === 'string' ? name : '',
       mandant: mandantAusClaim(nutzlast['mandant']),
       rolle: rolleAusRealmRollen(realm?.roles),
+      benutzername: text(nutzlast['preferred_username']),
+      email: text(nutzlast['email']),
     };
   });
 
@@ -294,6 +299,10 @@ export class AnmeldungService {
   private rueckrufAdresse(): string {
     return `${this.fenster.location.origin}/anmeldung`;
   }
+}
+
+function text(wert: unknown): string | null {
+  return typeof wert === 'string' && wert.trim().length > 0 ? wert : null;
 }
 
 function mandantAusClaim(wert: unknown): string | null {
