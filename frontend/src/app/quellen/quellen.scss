@@ -1,0 +1,166 @@
+:host {
+  display: grid;
+  gap: 1rem;
+  max-width: 76rem;
+  min-width: 0;
+}
+
+:host > p,
+.quelle > p,
+.geheimnis-formular p {
+  margin: 0;
+}
+
+.seitenkopf {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+
+.quelle,
+.neue-quelle {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.quelle-kopf {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quelle-kopf h2,
+.neue-quelle h2,
+.quelle h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.quelle-kopf .vorzeile {
+  margin: 0 0 0.25rem;
+}
+
+.quelle-daten {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.quelle-daten dt,
+label {
+  color: var(--text-gedaempft);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.quelle-daten dd {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.bemerkung {
+  grid-column: 1 / -1;
+}
+
+.zaehler {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+}
+
+.zaehler .kachel {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.zaehler .kennzahl {
+  font-variant-numeric: tabular-nums;
+}
+
+.bearbeitung,
+.neue-quelle form,
+.geheimnis-formular {
+  display: grid;
+  gap: 0.75rem;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+input,
+textarea,
+select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--linie-stark);
+  border-radius: var(--radius-klein);
+  color: var(--text);
+  background: var(--karte);
+  font: inherit;
+}
+
+textarea {
+  min-height: 4rem;
+  resize: vertical;
+}
+
+.json,
+.mono {
+  font-family: var(--schrift-mono);
+}
+
+pre.json {
+  max-width: 100%;
+  margin: 0.5rem 0 0;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.geheimnis-formular {
+  max-width: 34rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--linie);
+}
+
+.geheimnis-formular p,
+.gedaempft {
+  color: var(--text-gedaempft);
+  font-size: 0.8rem;
+}
+
+.tabelle-rahmen {
+  min-width: 0;
+}
+
+.laeufe .tabelle {
+  min-width: 68rem;
+}
+
+.laeufe .tabelle td:first-child {
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .quelle-kopf {
+    align-items: flex-start;
+  }
+
+  .zaehler {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

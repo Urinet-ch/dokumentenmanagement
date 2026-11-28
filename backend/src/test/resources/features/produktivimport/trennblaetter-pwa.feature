@@ -35,5 +35,5 @@ Funktionalität: Trennblätter in der PWA
     Wenn ich die Seite «/trennblaetter» öffne
     Und ich mich anmelde
     Dann bin ich auf der Seite «/»
-    Und sehe ich im Menü genau «Übersicht, Eingangskorb, Suche, Chat, Wissen, Jahresexport»
+    Und sehe ich im Menü genau «Übersicht, Eingangskorb, Suche, Chat, Wissen, Jahresexport, Quellen»
     Und hat die PWA die Trennblatt-Schnittstelle nicht aufgerufen

@@ -315,6 +315,21 @@ Quelllauf-Endpunkte brauchen eine ausdrücklich gelistete Ausnahme (Folgeänderu
   Aufgaben ändern, und folgen bei Bedarf. Neue Fehlercodes `QUELLE_LAEUFT` und `QUELLE_EXISTIERT` (409); keine neuen
   Konfigurationsschlüssel. Die Lauf-Art `GMAIL_LABEL` startet noch keinen Worker (Aufgabe 29.4, Gmail-Import).
 
+#### Umsetzung (Aufgabe 29.1, 28.11.2026)
+- Drive-Import startet vor dem Import einen Quelllauf und übergibt dessen ID mit jedem Upload. Der Trockenlauf
+  benötigt ebenfalls ein Import-Token: Er berechnet SHA-256 lokal, fragt vorhandene Prüfsummen in Batches zu höchstens
+  1'000 ab, lädt keine PDF-Dateien hoch und schliesst den Lauf mit den Zählern ab. Der Bericht enthält Lauf-ID und
+  serverseitig bestätigte Zähler.
+- `archiv_client.py` hat einen getrennten Aufruf `--import-quelle <quellcode> [--trocken] <pdf>` und die Funktion
+  `quelle_importieren`; der bestehende Generator-Aufruf samt Scope `generator` bleibt unverändert. Auch der
+  Quellen-Trockenlauf fragt die Prüfsumme ab und meldet seine Zähler an den Quelllauf.
+- Die Seite `/quellen` zeigt Register, Status, Konfiguration, Geheimnis-Status, Zähler und bis zu 100 Quellläufe.
+  A27 darf lesen; Pflege, Geheimnis setzen und Laufstart sind in der Oberfläche auf A28 beschränkt. Änderungen
+  verwenden die Quellversion als starkes `If-Match`; Geheimnisse werden nie angezeigt. Ein echter Lauf verlangt eine
+  Bestätigung. Hilfe-Katalog und Anleitung sind ergänzt.
+- Nachweise: `DriveImportTest`, `test_archiv_client.py`, `rechte.spec.ts`, `quellen.spec.ts` (A27/A28 und axe),
+  `quellen-pwa.feature` (A27/A28, vier Ansichten mit axe und ohne Überlauf) sowie der vollständige Frontend-Testlauf.
+
 ### 6. Gmail-Import (`integration/`, Quelllauf in `importe/`)
 - Konfiguration der Quelle: `{"host":"imap.gmail.com","port":993,"benutzer":"<gmail-konto>","label":"<gmail-label>","seit":"2026-01-01","ohneAnhang":false,"maxJeLauf":500}`; App-Passwort in `quelle.geheimnis` über `Verschluesselung` (wie `integration_mail.passwort_verschluesselt`).
 - `ImapPostfach` erhält eine Betriebsart nur lesend: `Folder.open(Folder.READ_ONLY)`, Inhalte über `BODY.PEEK`, kein `copy`, kein `setFlags`, kein Verschieben (7.2). Der Test prüft die Flags vorher und nachher.

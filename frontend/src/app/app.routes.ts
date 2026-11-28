@@ -158,6 +158,12 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.kontakte),
   },
   {
+    path: 'quellen',
+    loadComponent: () => import('./quellen/quellen').then((m) => m.QuellenSeite),
+    canActivate: [rechtGuard('A27')],
+    title: titel(TEXTE.menue.quellen),
+  },
+  {
     path: 'importe',
     loadComponent: () => import('./importe/importe').then((m) => m.Importe),
     canActivate: [rechtGuard('A12')],

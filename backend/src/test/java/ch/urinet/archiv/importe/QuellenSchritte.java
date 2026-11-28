@@ -44,6 +44,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class QuellenSchritte {
 
+    private record AngelegteQuelle(String mandant, String code) {
+    }
+
     private static final String QUELLEN = "/api/v1/quellen";
     private static final String UPLOAD = "/api/v1/dokumente";
     private static final String PRUEFSUMMEN = "/api/v1/dokumente/pruefsummen";
@@ -63,7 +66,7 @@ public class QuellenSchritte {
     private final Map<String, String> stapelMandanten = new HashMap<>();
     private final Map<String, String> stapelPruefsummen = new HashMap<>();
     private final Map<String, List<UUID>> hochgeladen = new HashMap<>();
-    private final Set<String> angelegt = new HashSet<>();
+    private final Set<AngelegteQuelle> angelegt = new HashSet<>();
     private final Map<String, Long> stand = new HashMap<>();
     private Response antwort;
     private String token;
@@ -96,8 +99,8 @@ public class QuellenSchritte {
             ausfuehren("delete from " + schema + ".quelle_lauf");
             ausfuehren("update " + schema + ".quelle set status = 'OFFEN', bemerkung = null, geheimnis = null");
         }
-        for (String code : angelegt) {
-            ausfuehren("delete from m_urinet.quelle where code = ?", code);
+        for (AngelegteQuelle quelle : angelegt) {
+            ausfuehren("delete from " + schema(quelle.mandant()) + ".quelle where code = ?", quelle.code());
         }
     }
 
@@ -113,7 +116,7 @@ public class QuellenSchritte {
         antwort = alsBenutzer(benutzer).contentType(ContentType.JSON)
                 .body(Map.of("code", code, "name", "Probe " + code, "typ", typ)).when().post(QUELLEN);
         if (antwort.statusCode() == 201) {
-            angelegt.add(code);
+            angelegt.add(new AngelegteQuelle(mandant(benutzer), code));
         }
     }
 
@@ -426,9 +429,13 @@ public class QuellenSchritte {
 
     /** Version der Quelle im Mandanten des Benutzers; unbekannte Quelle: 0 (die Anfrage scheitert ohnehin). */
     private int version(String benutzer, String code) throws SQLException {
-        String mandant = benutzer.endsWith("-vhf-gsk") ? "vhf-gsk" : "urinet";
+        String mandant = mandant(benutzer);
         String wert = text("select version::text from " + schema(mandant) + ".quelle where code = ?", code);
         return wert == null ? 0 : Integer.parseInt(wert);
+    }
+
+    private static String mandant(String benutzer) {
+        return benutzer.endsWith("-vhf-gsk") ? "vhf-gsk" : "urinet";
     }
 
     private byte[] datei(String name) {

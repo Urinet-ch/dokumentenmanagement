@@ -1,5 +1,7 @@
 package ch.urinet.archiv.driveimport;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -20,8 +22,10 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
@@ -35,10 +39,17 @@ class DriveImportTest {
     private HttpServer server;
     private final Deque<Antwort> antworten = new ArrayDeque<>();
     private final List<String> anfragen = new ArrayList<>();
+    private final List<String> quellenanfragen = new ArrayList<>();
+    private final Set<String> vorhandenePruefsummen = new HashSet<>();
     private final List<Duration> gewartet = new ArrayList<>();
     private final StringWriter aus = new StringWriter();
     private final StringWriter fehler = new StringWriter();
     private Path tokenDatei;
+    private int neu;
+    private int dublette;
+    private int abgelehnt;
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String LAUF_ID = "865335ab-8ea9-4c50-a1dd-ff7c2748e3ee";
 
     record Antwort(int status, String typ, String inhalt, String retryAfter) {
     }
@@ -46,7 +57,7 @@ class DriveImportTest {
     @BeforeEach
     void starten() throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-        server.createContext("/api/v1/dokumente", this::beantworten);
+        server.createContext("/api/v1", this::beantworten);
         server.start();
         tokenDatei = tmp.resolve("token");
         Files.writeString(tokenDatei, TokenDateiTest.TOKEN);
@@ -60,17 +71,71 @@ class DriveImportTest {
 
     private void beantworten(HttpExchange tausch) throws IOException {
         byte[] koerper = tausch.getRequestBody().readAllBytes();
-        anfragen.add(tausch.getRequestHeaders().getFirst("Authorization") + "|"
-                + tausch.getRequestHeaders().getFirst("Content-Length") + "|" + koerper.length + "|"
-                + new String(koerper, StandardCharsets.UTF_8));
-        Antwort antwort = antworten.isEmpty() ? neu() : antworten.poll();
-        tausch.getResponseHeaders().add("Content-Type", antwort.typ());
-        if (antwort.retryAfter() != null) {
-            tausch.getResponseHeaders().add("Retry-After", antwort.retryAfter());
+        String pfad = tausch.getRequestURI().getPath();
+        String inhalt = new String(koerper, StandardCharsets.UTF_8);
+        if (pfad.equals("/api/v1/dokumente/pruefsummen")) {
+            quellenanfragen.add(pfad + "|" + inhalt);
+            JsonNode hashes = JSON.readTree(inhalt).path("sha256");
+            List<String> vorhanden = new ArrayList<>();
+            hashes.forEach(hash -> {
+                if (vorhandenePruefsummen.contains(hash.asText())) {
+                    vorhanden.add(hash.asText());
+                }
+            });
+            antwort(tausch, 200, "{\"vorhanden\":" + JSON.writeValueAsString(vorhanden) + "}",
+                    "application/json");
+        } else if (pfad.matches("/api/v1/quellen/[^/]+/laeufe")) {
+            quellenanfragen.add(pfad + "|" + inhalt);
+            if (!pfad.equals("/api/v1/quellen/drive/laeufe")) {
+                antwort(tausch, 404, "{\"status\":404,\"fehlercode\":\"NICHT_GEFUNDEN\","
+                        + "\"detail\":\"Quelle nicht gefunden\"}", "application/problem+json");
+                return;
+            }
+            antwort(tausch, 201, "{\"id\":\"" + LAUF_ID + "\"}", "application/json");
+        } else if (pfad.endsWith("/abschliessen")) {
+            quellenanfragen.add(pfad + "|" + inhalt);
+            JsonNode koerperJson = JSON.readTree(inhalt);
+            JsonNode zaehler = koerperJson.path("zaehler");
+            if (!zaehler.isObject()) {
+                int uebersprungen = koerperJson.path("uebersprungen").asInt();
+                zaehler = JSON.createObjectNode()
+                        .put("gefunden", neu + dublette + abgelehnt + uebersprungen)
+                        .put("neu", neu)
+                        .put("dublettePruefsumme", dublette)
+                        .put("dubletteFachlich", 0)
+                        .put("uebersprungen", uebersprungen)
+                        .put("fehler", abgelehnt);
+            }
+            antwort(tausch, 200, "{\"id\":\"" + LAUF_ID + "\",\"zaehler\":" + zaehler
+                    + "}", "application/json");
+        } else {
+            anfragen.add(tausch.getRequestHeaders().getFirst("Authorization") + "|"
+                    + tausch.getRequestHeaders().getFirst("Content-Length") + "|" + koerper.length + "|" + inhalt);
+            Antwort antwort = antworten.isEmpty() ? neu() : antworten.poll();
+            if (antwort.inhalt().contains("\"status\":\"NEU\"")) {
+                neu++;
+            } else if (antwort.inhalt().contains("\"status\":\"DUBLETTE\"")) {
+                dublette++;
+            } else if (antwort.inhalt().contains("\"status\":\"ABGELEHNT\"")) {
+                abgelehnt++;
+            }
+            antwort(tausch, antwort.status(), antwort.inhalt(), antwort.typ(), antwort.retryAfter());
         }
-        byte[] inhalt = antwort.inhalt().getBytes(StandardCharsets.UTF_8);
-        tausch.sendResponseHeaders(antwort.status(), inhalt.length);
-        tausch.getResponseBody().write(inhalt);
+    }
+
+    private static void antwort(HttpExchange tausch, int status, String inhalt, String typ) throws IOException {
+        antwort(tausch, status, inhalt, typ, null);
+    }
+
+    private static void antwort(HttpExchange tausch, int status, String inhalt, String typ, String retryAfter)
+            throws IOException {
+        tausch.getResponseHeaders().add("Content-Type", typ);
+        if (retryAfter != null) {
+            tausch.getResponseHeaders().add("Retry-After", retryAfter);
+        }
+        byte[] bytes = inhalt.getBytes(StandardCharsets.UTF_8);
+        tausch.sendResponseHeaders(status, bytes.length);
+        tausch.getResponseBody().write(bytes);
         tausch.close();
     }
 
@@ -194,7 +259,6 @@ class DriveImportTest {
     @Test
     void altbestandTrockenlaufErkenntDateienOhneKlassifikationZuLesen() throws IOException {
         datei("Merkblatt/2025/12-2025.pdf", "%PDF-a");
-        tokenDatei = tmp.resolve("fehlt");
 
         assertThat(lauf("--altbestand", "--trockenlauf")).isEqualTo(DriveImport.OK);
 
@@ -259,16 +323,61 @@ class DriveImportTest {
     }
 
     @Test
-    void trockenlaufLiestKeinTokenUndSendetNichts() throws IOException {
+    void trockenlaufBrauchtTokenUndUebertraegtNichts() throws IOException {
         datei("Buchhaltung 2026/a.pdf", "%PDF-a");
         datei("x.gsheet", "{}");
         tokenDatei = tmp.resolve("fehlt");
 
-        assertThat(lauf("--trockenlauf")).isEqualTo(DriveImport.OK);
+        assertThat(lauf("--trockenlauf")).isEqualTo(DriveImport.UNGUELTIG);
         assertThat(anfragen).isEmpty();
-        assertThat(aus.toString()).contains("würde übertragen: UriNet/Buchhaltung 2026/a.pdf  [Drive-Import; "
-                + "Ordner: UriNet/Buchhaltung 2026; Bereich: Buchhaltung; Jahr: 2026]",
-                "Kontrolle: 2 = 1 + 1 + 0 (geht auf)");
+        assertThat(quellenanfragen).isEmpty();
+        assertThat(aus.toString()).isEmpty();
+        assertThat(fehler.toString()).contains("Token-Datei", "nicht gefunden");
+    }
+
+    @Test
+    void trockenlaufFragtPruefsummenAbUndSchliesstZaehlerAufServerAb() throws IOException {
+        datei("a.pdf", "%PDF-same");
+        datei("b.pdf", "%PDF-same");
+        datei("c.pdf", "%PDF-existing");
+        vorhandenePruefsummen.add(ArchivClient.sha256(tmp.resolve("UriNet/c.pdf")));
+
+        assertThat(lauf("--trockenlauf")).isEqualTo(DriveImport.OK);
+
+        assertThat(anfragen).isEmpty();
+        assertThat(quellenanfragen).hasSize(3);
+        assertThat(quellenanfragen.get(0)).contains("\"sha256\"");
+        assertThat(quellenanfragen.get(1)).contains("\"art\":\"TROCKEN\"");
+        assertThat(quellenanfragen.get(2)).contains("\"gefunden\":3", "\"neu\":1",
+                "\"dublettePruefsumme\":2", "\"uebersprungen\":0", "\"fehler\":0");
+        assertThat(aus.toString()).contains("schon vorhanden:  UriNet/b.pdf",
+                "schon vorhanden:  UriNet/c.pdf", "Kontrolle: 3 = 1 + 2 + 0 + 0 (geht auf)",
+                "Serverzähler: gefunden 3, neu 1, Dublette nach Prüfsumme 2, übersprungen 0, Fehler 0");
+    }
+
+    @Test
+    void echterLaufOrdnetUploadZuUndMeldetUebersprungeneDateien() throws IOException {
+        datei("a.pdf", "%PDF-a");
+        datei("x.gsheet", "{}");
+
+        assertThat(lauf()).isEqualTo(DriveImport.OK);
+
+        assertThat(anfragen).hasSize(1);
+        assertThat(anfragen.getFirst()).contains("name=\"quelllauf\"", LAUF_ID);
+        assertThat(quellenanfragen).hasSize(2);
+        assertThat(quellenanfragen.get(0)).contains("\"art\":\"ECHT\"");
+        assertThat(quellenanfragen.get(1)).contains("\"uebersprungen\":1");
+    }
+
+    @Test
+    void quellenlaufStartfehlerWirdAngezeigtUndKeinUploadGesendet() throws IOException {
+        datei("a.pdf", "%PDF-a");
+        // A bad source code is rejected by the source registry; the client validates only the code's shape.
+
+        assertThat(lauf("--quelle", "unbekannt")).isEqualTo(DriveImport.ABGELEHNT);
+
+        assertThat(anfragen).isEmpty();
+        assertThat(fehler.toString()).contains("Quelle nicht gefunden (404 NICHT_GEFUNDEN)");
     }
 
     @Test
@@ -295,7 +404,7 @@ class DriveImportTest {
         try {
             assumeFalse(Files.isReadable(zu), "läuft als root, Leserechte greifen nicht");
             assertThat(lauf("--trockenlauf")).isEqualTo(DriveImport.ABGELEHNT);
-            assertThat(aus.toString()).contains("Abgelehnt:       1", "Kontrolle: 2 = 1 + 0 + 1 (geht auf)");
+            assertThat(aus.toString()).contains("Abgelehnt:       1", "Kontrolle: 2 = 1 + 0 + 0 + 1 (geht auf)");
         } finally {
             Files.setPosixFilePermissions(zu, PosixFilePermissions.fromString("rwx------"));
         }
@@ -309,10 +418,11 @@ class DriveImportTest {
         Files.writeString(wurzel.resolve(".tmp.drivedownload/teil.pdf"), "%PDF-t");
 
         assertThat(DriveImport.ausfuehren(new PrintWriter(aus), new PrintWriter(fehler), Map.of(), gewartet::add,
-                "--trockenlauf", wurzel.toString())).isEqualTo(DriveImport.OK);
+                "--trockenlauf", "--archiv", "http://127.0.0.1:" + server.getAddress().getPort(),
+                "--token-datei", tokenDatei.toString(), wurzel.toString())).isEqualTo(DriveImport.OK);
         assertThat(aus.toString()).contains("würde übertragen: .drive/a.pdf",
                 "übersprungen:     .drive/.tmp.drivedownload/teil.pdf – " + Einordnung.GRUND_VERSTECKTER_ORDNER,
-                "Kontrolle: 2 = 1 + 1 + 0 (geht auf)");
+                "Kontrolle: 2 = 1 + 0 + 1 + 0 (geht auf)");
     }
 
     @Test

@@ -41,7 +41,7 @@ Funktionalität: Einmaliger Import des Google-Drive-Altbestands
       | Kunden/FC Muster/Rechnungen/Rechnung_2026.pdf | Rechnung_2026.pdf | Drive-Import; Ordner: UriNet/Kunden/FC Muster/Rechnungen; Partner: FC Muster; Art: AUSGANGSRECHNUNG |
 
   @req-12.1
-  Szenario: Ohne Token-Datei mit Rechten 600 oder mit falschem Scope überträgt das Werkzeug nichts
+  Szenario: Bei unzulässiger Token-Datei oder falschem Scope überträgt das Werkzeug nichts
     Angenommen ein Ordner «UriNet» mit diesen synthetischen Dateien:
       | pfad       | typ |
       | a/eins.pdf | pdf |
@@ -53,21 +53,19 @@ Funktionalität: Einmaliger Import des Google-Drive-Altbestands
     Und ist im Mandanten «urinet» keine Datei des Ordners gespeichert
     Angenommen ein Token vom Scope «generator» für «urinet» liegt in einer Datei mit Rechten 600
     Wenn der Drive-Import den Ordner «UriNet» ins Archiv lädt
-    Dann endet der Drive-Import mit Exit-Code 3
-    Und nennt der Bericht des Drive-Imports diese Dateien:
-      | pfad              | ergebnis     | grund                          |
-      | UriNet/a/eins.pdf | abgelehnt    | Token darf nicht erfassen (403 |
-      | UriNet/a/zwei.pdf | übersprungen | Lauf abgebrochen               |
+    Dann endet der Drive-Import mit Exit-Code 1
+    Und meldet der Drive-Import «403 NICHT_ERLAUBT»
     Und ist im Mandanten «urinet» keine Datei des Ordners gespeichert
     Und enthält die Ausgabe des Drive-Imports das Token nicht
 
   @req-12.3
-  Szenario: Der Trockenlauf zählt und listet auf, ohne Token und ohne etwas zu übertragen
+  Szenario: Der Trockenlauf zählt und listet auf, ohne Dateien zu übertragen
     Angenommen ein Ordner «UriNet» mit diesen synthetischen Dateien:
       | pfad                              | typ  |
       | Kunden/FC Muster/Rechnungen/r.pdf | pdf  |
       | Ablage/Notiz.gdoc                 | gdoc |
       | Ablage/Brief.docx                 | docx |
+    Und ein Token vom Scope «import» für «urinet» liegt in einer Datei mit Rechten 600
     Wenn der Drive-Import den Ordner «UriNet» im Trockenlauf durchgeht
     Dann endet der Drive-Import mit Exit-Code 0
     Und nennt der Bericht des Drive-Imports diese Dateien:
@@ -75,7 +73,7 @@ Funktionalität: Einmaliger Import des Google-Drive-Altbestands
       | UriNet/Kunden/FC Muster/Rechnungen/r.pdf | würde übertragen | Ordner: UriNet/Kunden/FC Muster/Rechnungen; Partner: FC Muster; Art: AUSGANGSRECHNUNG |
       | UriNet/Ablage/Notiz.gdoc                 | übersprungen     | bitte in Google Drive als PDF exportieren                                             |
       | UriNet/Ablage/Brief.docx                 | übersprungen     | Office-Datei                                                                          |
-    Und geht der Bericht des Trockenlaufs auf: 3 gefunden = 1 würde übertragen + 2 übersprungen + 0 abgelehnt
+    Und geht der Bericht des Trockenlaufs auf: 3 gefunden = 1 würde übertragen + 0 Dublette nach Prüfsumme + 2 übersprungen + 0 Fehler
     Und ist im Mandanten «urinet» keine Datei des Ordners gespeichert
 
   @req-12.4

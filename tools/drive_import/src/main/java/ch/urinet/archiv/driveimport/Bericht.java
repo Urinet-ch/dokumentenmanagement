@@ -87,6 +87,18 @@ final class Bericht {
         return gefunden;
     }
 
+    int anzahlUebertragen() {
+        return uebertragen;
+    }
+
+    int anzahlSchonVorhanden() {
+        return schonVorhanden;
+    }
+
+    int uebersprungen() {
+        return uebersprungen;
+    }
+
     int abgelehnt() {
         return abgelehnt;
     }
@@ -117,10 +129,11 @@ final class Bericht {
         aus.println("Gefunden:        " + gefunden);
         if (trockenlauf) {
             aus.println("Würde übertragen: " + uebertragen);
+            aus.println("Schon vorhanden: " + schonVorhanden);
             aus.println("Übersprungen:    " + uebersprungen);
             aus.println("Abgelehnt:       " + abgelehnt);
-            aus.println("Kontrolle: " + gefunden + " = " + uebertragen + " + " + uebersprungen + " + " + abgelehnt
-                    + (gehtAuf() ? " (geht auf)" : " (GEHT NICHT AUF)"));
+            aus.println("Kontrolle: " + gefunden + " = " + uebertragen + " + " + schonVorhanden + " + "
+                    + uebersprungen + " + " + abgelehnt + (gehtAuf() ? " (geht auf)" : " (GEHT NICHT AUF)"));
         } else {
             aus.println("Übertragen:      " + uebertragen);
             aus.println("Schon vorhanden: " + schonVorhanden);
@@ -129,6 +142,15 @@ final class Bericht {
             aus.println("Kontrolle: " + gefunden + " = " + uebertragen + " + " + schonVorhanden + " + "
                     + uebersprungen + " + " + abgelehnt + (gehtAuf() ? " (geht auf)" : " (GEHT NICHT AUF)"));
         }
+        aus.flush();
+    }
+
+    void ausgebenQuelllauf(PrintWriter aus, String laufId, ArchivClient.QuelllaufZaehler zaehler) {
+        aus.println();
+        aus.println("Quelllauf: " + laufId);
+        aus.println("Serverzähler: gefunden " + zaehler.gefunden() + ", neu " + zaehler.neu()
+                + ", Dublette nach Prüfsumme " + zaehler.dublettePruefsumme() + ", übersprungen "
+                + zaehler.uebersprungen() + ", Fehler " + zaehler.fehler());
         aus.flush();
     }
 }
