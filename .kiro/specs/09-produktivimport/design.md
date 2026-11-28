@@ -220,6 +220,47 @@ bilanz: inhalt + trenn + ordner + leer == n und jedes Dokument hat >= 1 Seite
 - Schrift: eingebettete Schrift aus dem Image (PDFBox `PDType0Font`), damit Umlaute und Guillemets sicher sind.
 - Frontend: Seite `/trennblaetter` in der Gruppe «Archiv» (Gestaltung nach `docs/oberflaeche/README.md`), Auswahl Art, Anzahl, Deckblatt-Titel; Download. Anleitung unter `frontend/public/anleitung/` (Spec 07, 7.5).
 
+Umsetzung (Aufgabe 27.5, 28.11.2026):
+- Fachbereich `stapel/`: `TrennblattCode` (Domain: QR-Inhalte, Prüfung des Titels, `lesen` für die Seitenanalyse in
+  28.7), `TrennblattService` (Application: höchstens 100 Blätter, Arten nur aus den aktiven Dokumentarten des eigenen
+  Mandanten über `DokumentartVerwaltung`), `PdfBoxTrennblattPdf` (Adapter mit ZXing und PDFBox), `TrennblattResource`.
+- Titel: NFC, Leerraum aussen entfernt, höchstens 60 Unicode-Codepunkte. URL-Kodierung mit `URLEncoder` (UTF-8), das
+  Leerzeichen als `%20` statt `+`; der Code enthält so nur ASCII, und `;`, `=`, `+` und `%` im Titel bleiben eindeutig.
+  Fehlt der Titel oder ist er nach dem Kürzen leer, gilt ebenfalls 400 `TRENNBLATT_UNGUELTIG`. Alle übrigen
+  Formfehler (Typ, Anzahl unter 1, mehr als 100 Blätter, unbekanntes Feld, Feld des anderen Typs, Art keine aktive
+  Dokumentart des Mandanten) ergeben 400 `ANFRAGE_UNGUELTIG`. Der Körper wird streng gelesen (`StrengesJson`: keine
+  doppelten Schlüssel, nichts nach dem JSON-Wert) und ist vor der Ressource auf 64 KiB begrenzt
+  (`ProblemFehlerRoute`, 413 `DATEI_ZU_GROSS`); 100 Deckblätter mit je 60 als JSON-Escape geschriebenen Zeichen
+  brauchen rund 39 KiB.
+- `TrennblattCode.lesen` ist streng: Der Inhalt muss genau dem entsprechen, was `inhalt()` erzeugt; ungültiges UTF-8
+  (z. B. `%FF`), unkodierte Trennzeichen (`=`, `+`, Leerzeichen), Hex in Kleinbuchstaben oder nicht NFC sind kein
+  Trennblatt-Code.
+- Schrift: Liberation Sans aus dem PDFBox-Artefakt (`org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf`, SIL
+  Open Font License), als Teilmenge eingebettet. Das Image bringt keine Schrift mit; statt eines neuen Pakets im
+  Dockerfile dient die Schrift, die PDFBox ohnehin mitliefert (gleiche Wirkung wie «aus dem Image»). Damit das Blatt
+  den Titel trägt (6.2), lehnt das Archiv einen Titel mit Zeichen, die die Schrift nicht enthält (z. B. Emoji,
+  chinesische Schriftzeichen), ebenfalls mit 400 `TRENNBLATT_UNGUELTIG` ab (Auslegung zu 6.5, Review PR #747). Die
+  Oberfläche prüft das schon bei der Eingabe mit den Unicode-Bereichen der Schrift (`schrift-abdeckung.ts`);
+  `PdfBoxTrennblattPdfTest` vergleicht diese Bereiche mit der Schrift. Nur der Name einer Art kann noch Zeichen ohne
+  Glyphe enthalten; sie erscheinen als «?», darunter steht der Code der Art.
+- Seite: «TRENNBLATT» bzw. «ORDNER» in 22 pt, Aufschrift (Name der Art, «Ohne Art» oder Titel) in 36 pt, bei mehr als
+  drei Zeilen in 30 bzw. 24 pt, beim Trennblatt mit Art darunter «Art <CODE>»; QR-Symbol 60 mm (ohne Ruhezone), Mitte
+  15 mm unter der Seitenmitte, Ruhezone mindestens 4 Module weiss. Der QR-Code ist eine Vektor-Form (XObject), die alle
+  Seiten eines Satzes zeichnen: 100 Blätter (200 Seiten) bleiben unter 512 KB. Der längste Titel (60 × «€», 60 × «ẞ»)
+  bleibt bei 150 dpi lesbar. Erkenntnis für 28.7: Ein einzelner ZXing-`QRCodeReader` verfehlt bei 150 dpi einzelne,
+  sonst einwandfreie Codes (z. B. 20 × «ж», 60 × «ẞ»); mit `QRCodeMultiReader` und zwei Binarisierern (wie
+  `ZxingQrLeser`) werden alle gelesen.
+- Protokoll: Das PDF wird nicht abgelegt und berührt kein Dokument, darum kein Eintrag `ERFASSEN`; `EndpunktWaechterTest`
+  nimmt `POST /trennblaetter` von der Regel «A1 verlangt `ERFASSEN`» aus.
+- Frontend: Menüpunkt «Trennblätter» in der Gruppe «Archiv» nach «Chat» (A1), Route mit `rechtGuard('A1')`;
+  Hilfe-Abschnitt `erfassen-trennblaetter` («Trennblätter drucken») unter «Erfassen» mit A1 und Pfad `/trennblaetter`
+  (Pflegeregel Spec 07, Req 7.5).
+- Tests: `TrennblattCodeTest` (QR-Inhalte, URL-Kodierung von Umlauten, Guillemets und Trennzeichen, Titelgrenzen),
+  `PdfBoxTrennblattPdfTest` (Rundlauf PDF → 150 dpi → ZXing, Kante, Fehlerkorrektur, Schrift eingebettet),
+  `features/produktivimport/trennblaetter.feature` (`@req-6.1`, `@req-6.2`, `@req-6.3`, `@req-6.5`, A1 je Rolle),
+  `trennblaetter-pwa.feature` (Browser mit Attrappe, axe, 375 und 1280 px hell und dunkel), Vitest `trennblaetter*.spec.ts`.
+  Der Rundlauf mit einem Stapel (6.4) folgt mit 28.8.
+
 ### 5. Quellenregister und Quellläufe (`importe/`)
 - Quellentypen: `GENERATOR`, `DRIVE`, `ORDNER`, `MAC_EINGANG`, `GMAIL_LABEL`, `CRM_CSV`, `SCAN`.
 - Seed `urinet` (nur allgemeine Quellen, 10.2): `generatoren` (GENERATOR), `drive` (DRIVE), `mac-ordner` (MAC_EINGANG), `gmail` (GMAIL_LABEL, ohne Zugang), `crm-csv` (CRM_CSV, Lauf verweist auf `import_lauf`), `papier` (SCAN). Weitere Quellen (`<quelle-bank>`, `<quelle-projekt>`, `<buchhaltung-downloads>`) legt Fabian im Register an.

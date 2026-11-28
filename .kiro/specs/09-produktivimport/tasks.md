@@ -60,7 +60,7 @@ zu den Wellen 27 bis 29.
   - _Anforderungen: 0.2, 0.3, 0.4, 0.5_
   - _Abhängig von: 27.3_
 
-- [ ] 27.5 Trennblatt-Generator [Backend] [Frontend]
+- [x] 27.5 Trennblatt-Generator [Backend] [Frontend]
   - `TrennblattService` (ZXing `QRCodeWriter`, PDFBox A4 doppelseitig, eingebettete Schrift), `POST /api/v1/trennblaetter`.
   - Seite `/trennblaetter` (Arten aus den aktiven Dokumentarten, Anzahl, Deckblatt-Titel bis 60 Zeichen), Gestaltung
     nach `docs/oberflaeche/README.md`, Anleitung und Hilfe-Katalog nachgeführt.
