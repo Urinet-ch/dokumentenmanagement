@@ -79,6 +79,11 @@ export class EinstellungenSeite implements OnInit {
   protected readonly texte = TEXTE.einstellungen;
   protected readonly bereich = TEXTE.menueGruppen.verwaltung;
   protected readonly gruppen = signal<Einstellungsgruppe[] | null>(null);
+  /** Die Gruppe der Wissensbasis nur bei freigeschaltetem Wissen (Spec 04, Req 22.5; Spec 06); bis geladen verborgen. */
+  protected readonly sichtbareGruppen = computed(() => {
+    const gruppen = this.gruppen();
+    return gruppen === null || this.anmeldung.darf('A19') ? gruppen : gruppen.filter((gruppe) => gruppe.code !== 'WISSEN');
+  });
   protected readonly fehler = signal<string | null>(null);
   protected readonly eingaben = signal<Readonly<Record<string, string | null>>>({});
   protected readonly hatEingaben = computed(() => Object.keys(this.eingaben()).length > 0);

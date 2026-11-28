@@ -221,7 +221,8 @@ dass ein Passwort durch meine Hände oder durch das Archiv geht, damit ich Zugä
 15. WO die Anmeldung mit Google eingerichtet ist (Spec 01, 2.25 bis 2.29, Option O.8), SOLL die Verwaltung den Status
     «Google verknüpft» zeigen und einem Benutzer mit Recht A22 das Lösen der Verknüpfung erlauben (Step-up, danach enden
     die Sitzungen, Spec 01, 2.27); das Archiv SOLL nie selbst ein Google-Konto verknüpfen und nie eine Kennung von
-    Google entgegennehmen. Das Verknüpfen selbst bleibt nach dem Entscheid in O.8 (Kontoportal oder Admin).
+    Google entgegennehmen. Das Verknüpfen selbst bleibt dem Admin vorbehalten (Folgeänderung zum Entscheid Fabian vom
+    28.11.2026; Spec 01, 2.27).
 16. Das Archiv SOLL nur diese Statusübergänge zulassen: `EINGELADEN` → `AKTIV` (durch den Benutzer, nicht das
     Archiv), `AKTIV` → `GESPERRT` → `AKTIV`, `AKTIV` oder `GESPERRT` oder `EINGELADEN` → `DEAKTIVIERT` → `EINGELADEN`,
     `DEAKTIVIERT` → `GELOESCHT`; jeder andere Übergang ergibt HTTP 409 `STATUS_KONFLIKT`. Nachweis: JUnit

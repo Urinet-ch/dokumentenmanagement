@@ -14,10 +14,13 @@ public class WissenModellBudget {
     private final WissenKonfiguration konfiguration;
     private final boolean embeddingStub;
     private final boolean rerankerStub;
+    private final Wissensfreischaltung freischaltung;
 
     public WissenModellBudget(WissenIngestPort port, WissenKonfiguration konfiguration,
                              @ConfigProperty(name = "archiv.ki.embedding-stub") boolean embeddingStub,
-                             @ConfigProperty(name = "archiv.ki.reranker-stub") boolean rerankerStub) {
+                             @ConfigProperty(name = "archiv.ki.reranker-stub") boolean rerankerStub,
+                             Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.port = port;
         this.konfiguration = konfiguration;
         this.embeddingStub = embeddingStub;
@@ -45,6 +48,8 @@ public class WissenModellBudget {
     }
 
     private void pruefen() {
+        // Spec 04, Req 22.9: vor jedem Modellaufruf der Wissensbasis auch die Freischaltung (403, vor dem Budget)
+        freischaltung.pruefen();
         var einstellungen = port.budgetEinstellungenLaden();
         long grenze = einstellungen.monatsbudgetTokens() == null
                 ? konfiguration.ingest().monatsbudgetTokens() : einstellungen.monatsbudgetTokens();

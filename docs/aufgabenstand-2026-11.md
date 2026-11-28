@@ -19,7 +19,7 @@ erledigten Umsetzungen.
 | Aufgabe | Stand auf `main` / Beleg | Zuständig bzw. nächster Schritt |
 |---|---|---|
 | 0.7 | PR #18 belegt die Zugangsvorbereitung, nicht den Abschluss der gesamten Stufe A. | Fabian / Infra |
-| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. Entscheid Fabian (27.11.2026): Budget 2048 MiB / 1.5 CPU und erneute Messung. Der Generator #727 ist gemergt; er und der offene lokale Trockenlauf-PR #730 belegen weder VPS-Messung noch Health-/OOM-Prüfung. | Fabian / Infra; Messung und Nachweis; seit 28.11.2026 auch Gate für Stufe B auf derselben VPS (31.3) |
+| 1.10 | Messbericht #462 hält ein erreichtes Abbruchkriterium fest; #695 ergänzt die statische Compose-Prüfung und Rollback-Grenzen, keinen Messnachweis. Entscheid Fabian (27.11.2026): Budget 2048 MiB / 1.5 CPU und erneute Messung. Der Generator #727 und der lokale Speichermessungs-Trockenlauf #730 sind gemergt; sie belegen weder VPS-Messung noch Health-/OOM-Prüfung. | Fabian / Infra; Messung und Nachweis; seit 28.11.2026 auch Gate für Stufe B auf derselben VPS (31.3) |
 | 2.6 | Teilumsetzungen in #46, #54, #266, #568, #638 sowie den am 25.11. gemergten #644 und #645; Stufe-B-Leistungsnachweis fehlt. | Backend / Infra |
 | 3.7 | PWA und Eingabegrenzen in #123 und #472; die Abnahme bleibt ausstehend. | Fabian / Frontend |
 | 5.4 | Kein vollständiger Produktiv- und Stufe-B-Nachweis in den geprüften Belegen. Nachtrag 28.11.2026 (Variante B): Produktion auf der bestehenden VPS, Schritte in 31.7. | Fabian / Infra; abhängig von 31.7 (bisher 5.11) |
@@ -27,7 +27,7 @@ erledigten Umsetzungen.
 | 5.6 | App-Alarme und Kennzahlen in #91, #114, #191, #566 und #639; Aktivierung und Betriebsnachweise bleiben offen. | Backend / Infra |
 | 5.7 | Entwurf #283 ist keine Freigabe; Gegenlesen und Freigabe sind laut Taskdatei offen. | Fabian |
 | 5.8 | Abnahme-Gate und Belegübernahme offen; Voraussetzungen aus 5.9 und 5.11 fehlen. Nachtrag 28.11.2026: Voraussetzung ist Welle 31 statt 5.11, Übernahme über Spec 09, Welle 30. | Fabian / QA; blockiert bis 31.8 |
-| 5.9 | Die Varianten 1 (Erreichbarkeit beider Hosts) und 3 (fehlgeschlagener Deploy) aus #724 sind seit 27.11.2026 entschieden und im Infra-Repo umgesetzt. Der Betriebsnachweis der Prüfung des Anmelde-Hosts bleibt bei Fabian; die Zertifikatsprüfung wurde nicht gewählt. Nachtrag 28.11.2026: Fabian verzichtet auf eine eigene externe Prüfung des Anmelde-Hosts (bekannte Lücke); Rest in 31.5. | Fabian; Betriebsnachweis |
+| 5.9 | Die externe Erreichbarkeitsprüfung des Anwendungs-Hosts und die Meldung bei fehlgeschlagenem Deploy aus #724 sind im Infra-Repo umgesetzt. Fabian entschied am 28.11.2026, auf eine eigene externe Prüfung des Anmelde-Hosts zu verzichten, da die Prüfung des Anwendungs-Hosts genügt; die separate Prüfung wurde entfernt. Fällt nur der Anmeldedienst aus, bleibt die Health der App grün. Kein Betriebsnachweis für den Anmelde-Host offen; die übrigen Schritte laufen in 31.5. | Fabian / Infra; übrige Schritte |
 | 5.10 | Entwurf #284 ist keine geprüfte Notfallunterlage. | Fabian |
 | 5.11 | Kein vollständiger Wechsel- und Betriebsnachweis im geprüften Stand. Nachtrag 28.11.2026: ersetzt durch Welle 31 (Variante B, keine eigene VPS). | Fabian / Infra; ersetzt durch 31.1–31.10 |
 | O.8 | Kein Umsetzungs- oder Entscheidungsnachweis gefunden. | Fabian / Infra / Backend |

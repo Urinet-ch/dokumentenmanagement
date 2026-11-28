@@ -241,7 +241,7 @@ class WissenIngestStartenTest {
         Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(true);
 
-        WissenIngestStarten.Ergebnis ergebnis = new WissenIngestStarten(speicher, kleinesBudget, auftraege)
+        WissenIngestStarten.Ergebnis ergebnis = new WissenIngestStarten(speicher, kleinesBudget, auftraege, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein())
                 .manuell(DOKUMENT_ID, null, null, "benutzer-id");
 
         assertThat(ergebnis.status()).isEqualTo("FEHLER");
@@ -259,7 +259,7 @@ class WissenIngestStartenTest {
         Speicher tief = new Speicher(quelle(true, "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
                 1_000, null));
 
-        WissenIngestStarten.Ergebnis durch = new WissenIngestStarten(hoch, STARTWERTE, new Auftraege(true))
+        WissenIngestStarten.Ergebnis durch = new WissenIngestStarten(hoch, STARTWERTE, new Auftraege(true), ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein())
                 .manuell(DOKUMENT_ID, null, null, "benutzer-id");
         WissenIngestStarten.Ergebnis zuGross = starten(tief, new Auftraege(true))
                 .manuell(DOKUMENT_ID, null, null, "benutzer-id");
@@ -479,7 +479,7 @@ class WissenIngestStartenTest {
     }
 
     private static WissenIngestStarten starten(Speicher speicher, Auftraege auftraege) {
-        return new WissenIngestStarten(speicher, GROSSES_BUDGET, auftraege);
+        return new WissenIngestStarten(speicher, GROSSES_BUDGET, auftraege, ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein());
     }
 
     private static Quelle quelle(String vertraulichkeit) {
@@ -520,7 +520,8 @@ class WissenIngestStartenTest {
 
     private static WissenIngestStarten.Ergebnis wiederholungsStarten(Speicher speicher, Auftraege auftraege,
                                                                       int abschnittNr) {
-        return new WissenIngestStarten(speicher, GROSSES_BUDGET, auftraege)
+        return new WissenIngestStarten(speicher, GROSSES_BUDGET, auftraege,
+                ch.urinet.archiv.wissen.FesteWissensfreischaltung.ein())
                 .abschnittWiederholen(ENTWURF_ID, abschnittNr, "benutzer-id");
     }
 

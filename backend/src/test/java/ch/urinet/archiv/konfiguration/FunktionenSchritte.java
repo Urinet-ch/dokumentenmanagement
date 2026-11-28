@@ -37,6 +37,18 @@ public class FunktionenSchritte {
         assertThat(antwort.jsonPath().getBoolean("finanzVerfuegbar")).isFalse();
     }
 
+    @Dann("ist Wissen in den Funktionen verfügbar")
+    public void wissenVerfuegbar() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getBoolean("wissenVerfuegbar")).isTrue();
+    }
+
+    @Dann("ist Wissen in den Funktionen nicht verfügbar")
+    public void wissenNichtVerfuegbar() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getBoolean("wissenVerfuegbar")).isFalse();
+    }
+
     @Dann("antwortet der Jahresexport mit Status {int} und Fehlercode «{word}»")
     public void exportAntwort(int status, String fehlercode) {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(status);

@@ -131,6 +131,7 @@ flowchart LR
 
 - Spec 01 ergänzt (Req 3.13; Review #104): `dokumente_suchen` und `dokument_zeigen` nutzen die Suche ohne Dateinamen (`mitDateiname=false`) und geben das Feld `dateiname` nicht weiter. Diese Variante prüft über `ts_filter(volltext_tsv, '{a,b,c}')`, was den GIN-Index nicht nutzt; Aufgabe 7.1 legt als erster Konsument einen passenden Index oder Vorfilter an (Spec 01, design.md, «Umsetzung 4.10»).
 - Spec 04 ergänzt den Systemprompt um die Regel für Fragen nach Wissen (zuerst `wissen_index`, dann `wissen_seite_zeigen`, Hinweise nennen; Wortlaut in Spec 04, design.md, «Chat-Werkzeuge»).
+- Spec 04 ergänzt (Spec 04, Req 22.7, Entscheid Fabian 28.11.2026): `wissen_index` und `wissen_seite_zeigen` bietet der Chat nur an und führt er nur aus, wenn Wissen für den Mandanten freigeschaltet ist (`WerkzeugAuswahl`, fail closed). Ohne Freischaltung bleiben Gespräche im Modus `ARCHIV` lesbar und fortsetzbar; Quellen auf Wissensseiten erscheinen im Verlauf ohne Titel und Link (Quelldokumente bleiben), Antworten mit Wissenswerkzeugen gehen beim Fortsetzen nicht erneut an das Modell, und Gespräche im Modus `WISSEN` fehlen in der Liste (Verlauf, Fortsetzen und Anlegen 403 `WISSEN_NICHT_FREIGESCHALTET`).
 
 - Kennzahl-SQL (Beispiel EINNAHMEN, BELEGDATUM, Gruppierung JAHR):
   ```sql

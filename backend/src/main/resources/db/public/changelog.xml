@@ -26,4 +26,5 @@
     <include file="changesets/042-verwaltung-vorgang-phase.xml" relativeToChangelogFile="true"/>
     <include file="changesets/043-benutzername-sperre.xml" relativeToChangelogFile="true"/>
     <include file="changesets/044-token-widerruf.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/045-mandant-wissen-freigeschaltet.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

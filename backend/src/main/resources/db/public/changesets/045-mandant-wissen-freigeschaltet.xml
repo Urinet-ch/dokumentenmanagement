@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Wissen je Mandant freischalten (Spec 04, Req 22.1, Entscheid Fabian 28.11.2026): neue Mandanten ohne Wissen,
+        der bestehende Mandant urinet behält es. Geändert wird der Zustand danach nur über das Betreiber-Kommando
+        «archiv mandant wissen <code> ein|aus» (Req 22.2, 22.3). Rückwärtskompatibel: der Vorgänger kennt die Spalte
+        nicht und liest sie nicht.
+    -->
+    <changeSet id="045-mandant-wissen-freigeschaltet" author="claude">
+        <addColumn tableName="mandant">
+            <column name="wissen_freigeschaltet" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>
+            update mandant set wissen_freigeschaltet = true where code = 'urinet';
+        </sql>
+        <rollback>
+            <dropColumn tableName="mandant" columnName="wissen_freigeschaltet"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

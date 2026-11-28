@@ -107,6 +107,29 @@ java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsja
   `MANDANT_EXISTIERT`). Ohne `--rollen` bleibt der eingetragene Rollensatz erhalten.
 - Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf (geprüft
   vor dem Start, mit Aufrufhilfe), 3 technischer Fehler, auch ein abgebrochener Start (design.md, «Mandant»).
+- Ein neuer Mandant hat den Bereich Wissen nicht (Spec 04, Req 22.1); freigeschaltet wird er danach mit
+  `mandant wissen <code> ein` (nächster Abschnitt).
+
+## Wissen je Mandant freischalten
+```bash
+java -jar quarkus-run.jar mandant wissen <code> [ein|aus]
+```
+- Schaltet den Bereich Wissen (Wissensbasis, Wissenschat, Wissensquellen) für einen Mandanten ein oder aus (Spec 04,
+  Requirement 22, Zusatzleistung). Ohne `ein` oder `aus` gibt das Kommando nur den Zustand aus. Auf der VPS als
+  Admin-Kommando (unten); ein anderer Weg (Oberfläche, REST, API-Token, Konfigurationsdatei, Einstellungen) existiert
+  nicht, auch nicht für die Rolle `inhaber`.
+- Die laufende App übernimmt die Änderung ohne Deploy und ohne Neustart nach spätestens 60 Sekunden. Ausgeschaltet
+  ist der Bereich in der App unsichtbar, die Schnittstelle antwortet auf Wissenspfade mit 403
+  `WISSEN_NICHT_FREIGESCHALTET`, der öffentliche Wissenschat ist aus, und die Wissensbasis ruft keine KI auf; laufende
+  und wartende Aufträge enden mit dem Grund `WISSEN_AUSGESCHALTET`. Es werden keine Daten gelöscht: Seiten, Versionen,
+  Entwürfe, Log, Markierungen, Einstellungen und Webfreigaben bleiben und sind nach dem Einschalten wieder sichtbar.
+  Nach dem Einschalten startet nichts von selbst: einen Ingest von Hand wiederholen, der Lint läuft zum nächsten Termin.
+- Jede Änderung steht im Zugriffsprotokoll des Mandanten mit Akteur `betreiber` und Aktion `WISSEN_FREIGESCHALTET`
+  bzw. `WISSEN_ABGESCHALTET`, ohne Inhalte. Entspricht der Zustand schon dem Wunsch, ändert und protokolliert das
+  Kommando nichts.
+- Exit-Code 0 ausgeführt oder unverändert, 1 Mandant unbekannt oder nicht aktiv, 2 falscher Aufruf (geprüft vor dem
+  Start, mit Aufrufhilfe), 3 technischer Fehler; ausser bei 0 ändert sich nichts.
+- Bei der Einführung (Migration) behält `urinet` Wissen, jeder andere bestehende Mandant hat es nicht.
 
 ### Admin-Kommandos auf der VPS
 Nie per `docker exec` im laufenden API- oder Keycloak-Container: Eine zweite JVM sprengt dessen `mem_limit`

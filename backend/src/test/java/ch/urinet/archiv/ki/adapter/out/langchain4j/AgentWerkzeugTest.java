@@ -159,6 +159,40 @@ class AgentWerkzeugTest {
         }
     }
 
+    /** Spec 04, Req 22.9: fällt Wissen während des Durchgangs weg, kein Werkzeug und keine weitere Modellrunde mehr. */
+    @Test
+    @org.junit.jupiter.api.Tag("req-22.9")
+    void nachDemAbschaltenVonWissenEndetDerDurchgangVorDemNaechstenWerkzeug() {
+        java.util.concurrent.atomic.AtomicBoolean frei = new java.util.concurrent.atomic.AtomicBoolean(true);
+        AgentLauf lauf = lauf();
+        lauf.wissenBeobachten(frei::get);
+        lauf.rundeBeginnt();
+        new AgentWerkzeug("dokumente_suchen", echt, lauf, JSON, 5).execute(anfrage(), lauf.id());
+        assertThat(aufrufe).hasSize(1);
+        frei.set(false);
+        ereignisse.clear();
+        try {
+            for (String name : List.of("wissen_seite_zeigen", "dokumente_suchen")) {
+                assertThatThrownBy(() -> new AgentWerkzeug(name, echt, lauf, JSON, 5)
+                        .execute(anfrage(), lauf.id())).isInstanceOf(AgentWerkzeug.Abgebrochen.class);
+            }
+            assertThat(aufrufe).hasSize(1);
+            assertThat(ereignisse).containsExactly(new ChatEreignis.Ausfall(AgentLauf.WISSEN_AUSGESCHALTET));
+            assertThat(lauf.beendet()).isTrue();
+        } finally {
+            EntkoppeltesModell.verhinderungZuruecksetzen();
+        }
+    }
+
+    @Test
+    void ohneBeobachtungZaehltDieFreischaltungNicht() {
+        AgentLauf lauf = lauf();
+        lauf.rundeBeginnt();
+        assertThat(lauf.wissenWeggefallen()).isFalse();
+        new AgentWerkzeug("dokumente_suchen", echt, lauf, JSON, 5).execute(anfrage(), lauf.id());
+        assertThat(aufrufe).hasSize(1);
+    }
+
     @Test
     void nachEndeDesGespraechsWirdKeinWeiteresWerkzeugAusgefuehrt() {
         AgentLauf lauf = lauf();

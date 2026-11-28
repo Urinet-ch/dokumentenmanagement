@@ -13,6 +13,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { AnleitungText } from './anleitung-text';
+import { MandantFunktionen } from '../gemeinsam/mandant-funktionen';
 import { HILFE_EINTRAEGE, sichtbareAbschnitte } from './hilfe-sichtbar';
 import { HilfeLeiste } from './hilfe-leiste.service';
 
@@ -26,6 +27,7 @@ import { HilfeLeiste } from './hilfe-leiste.service';
 export class HilfeLeisteAnsicht {
   protected readonly hilfe = inject(HilfeLeiste);
   private readonly katalog = inject(HILFE_EINTRAEGE);
+  private readonly funktionen = inject(MandantFunktionen);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly texte = TEXTE.hilfe;
   readonly navigiert = output<void>();
@@ -38,7 +40,7 @@ export class HilfeLeisteAnsicht {
   protected readonly verzeichnisOffen = computed(() => this.verzeichnisWunsch() ?? !this.ausgewaehlt());
 
   protected readonly eintraege = computed(() =>
-    sichtbareAbschnitte(this.katalog, this.hilfe.rolle()).flatMap(({ eintrag, unter }) => [eintrag, ...unter]),
+    sichtbareAbschnitte(this.katalog, this.hilfe.rolle(), this.funktionen.wissenVerfuegbar()).flatMap(({ eintrag, unter }) => [eintrag, ...unter]),
   );
 
   protected readonly ausgewaehlt = computed(

@@ -54,6 +54,12 @@ public interface ChatSpeicher {
     /** Die letzten {@code anzahl} Fragen und Antworten mit Inhalt, älteste zuerst. */
     List<VerlaufEintrag> verlauf(UUID gespraech, int anzahl);
 
+    /**
+     * Wie {@link #verlauf}, aber ohne Antworten, die ein Wissenswerkzeug ({@code wissen_…}) aufgerufen haben (Spec 04,
+     * Req 22.7: ohne Freischaltung gehen sie nicht erneut an das Modell).
+     */
+    List<VerlaufEintrag> verlaufOhneWissen(UUID gespraech, int anzahl);
+
     /** Werkzeugname und Dokument-IDs aus gespeicherten Ergebnissen, in Gesprächsreihenfolge. */
     List<ChatWerkzeugDokument> werkzeugDokumente(UUID gespraech);
 

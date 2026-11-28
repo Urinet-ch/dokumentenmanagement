@@ -27,5 +27,7 @@ public enum ProtokollAktion {
     /** Kontakt als inaktiv markiert bzw. wieder aktiviert (Req 17.11, 17.15), ohne Dokument */
     KONTAKT_INAKTIV, KONTAKT_AKTIV,
     BENUTZER_ANLEGEN, BENUTZER_AENDERN, BENUTZER_LOESCHEN, ROLLE_ZUWEISEN, BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG,
-    CHAT_BEWERTUNG_EXPORT
+    CHAT_BEWERTUNG_EXPORT,
+    /** Betreiber-Kommando {@code archiv mandant wissen <code> ein|aus} (Spec 04, Req 22.2), ohne Dokument und Inhalte */
+    WISSEN_FREIGESCHALTET, WISSEN_ABGESCHALTET
 }

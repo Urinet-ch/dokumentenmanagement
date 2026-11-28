@@ -7,6 +7,8 @@ import ch.urinet.archiv.konfiguration.domain.KonfigurationsVersion;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -31,10 +33,15 @@ public class KonfigurationVersionResource {
 
     private final KonfigurationVerwaltung verwaltung;
     private final MandantAufloesung aufloesung;
+    private final Wissensfreischaltung wissen;
+    private final ObjectMapper json;
 
-    public KonfigurationVersionResource(KonfigurationVerwaltung verwaltung, MandantAufloesung aufloesung) {
+    public KonfigurationVersionResource(KonfigurationVerwaltung verwaltung, MandantAufloesung aufloesung,
+                                        Wissensfreischaltung wissen, ObjectMapper json) {
         this.verwaltung = verwaltung;
         this.aufloesung = aufloesung;
+        this.wissen = wissen;
+        this.json = json;
     }
 
     @Schema(name = "KonfigurationsVersion")
@@ -59,6 +66,12 @@ public class KonfigurationVersionResource {
 
         static VersionDetailDto aus(KonfigurationsVersion version) {
             return new VersionDetailDto(VersionDto.aus(version), version.inhalt());
+        }
+
+        /** Ohne Freischaltung ohne {@code einstellungen.wissen} (Spec 04, Req 22.6). */
+        static VersionDetailDto ohneWissen(KonfigurationsVersion version, ObjectMapper json) {
+            return new VersionDetailDto(VersionDto.aus(version),
+                    WissenOhneFreischaltung.ohneWissen(json, (Object) version.inhalt()));
         }
     }
 
@@ -89,7 +102,8 @@ public class KonfigurationVersionResource {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
         KonfigurationsVersion version = verwaltung.version(nummer);
-        return Response.ok(VersionDetailDto.aus(version))
+        return Response.ok(wissen.aktuell() ? VersionDetailDto.aus(version)
+                        : VersionDetailDto.ohneWissen(version, json))
                 .tag(new EntityTag(Integer.toString(version.version()))).build();
     }
 }

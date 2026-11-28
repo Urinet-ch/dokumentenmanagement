@@ -304,22 +304,22 @@ Anlass: Ein Ingest eines 17-seitigen, tabellenreichen PDF (internes Konzeptpapie
 
 
 ## Welle 25 — Wissen je Mandant freischalten (Entscheid Fabian 28.11.2026, Requirement 22)
-- [ ] 25.1 Zustand, Kommando und Funktionsabfrage [Backend]
+- [x] 25.1 Zustand, Kommando und Funktionsabfrage [Backend]
   - Changeset `db/public` (Standard nein, `urinet` ja), Port «Wissensfreischaltung», Kommando
     `archiv mandant wissen <code> [ein|aus]` mit Protokoll, `wissenVerfuegbar` in `GET /mandant/funktionen`;
     bestehende Tests schalten Wissen in den Testdaten ausdrücklich ein.
   - _Anforderungen: 22.1–22.4_
-- [ ] 25.2 Sperre in API, Chat, Suche und öffentlicher Schnittstelle [Backend]
+- [x] 25.2 Sperre in API, Chat, Suche und öffentlicher Schnittstelle [Backend]
   - _Anforderungen: 22.6–22.8_
   - _Abhängig von: 25.1_
-- [ ] 25.3 Keine KI-Läufe, Daten bleiben erhalten [Backend]
+- [x] 25.3 Keine KI-Läufe, Daten bleiben erhalten [Backend]
   - _Anforderungen: 22.9, 22.10_
   - _Abhängig von: 25.1_
-- [ ] 25.4 Oberfläche ausblenden, Einführung und Hilfe [Frontend]
+- [x] 25.4 Oberfläche ausblenden, Einführung und Hilfe [Frontend]
   - Browser-Szenario mit zwei Mandanten (ein, aus) und axe.
   - _Anforderungen: 22.5_
   - _Abhängig von: 25.1_
-- [ ] 25.5 Folgeänderungen und Betriebsanleitung [Backend] [Infra]
+- [x] 25.5 Folgeänderungen und Betriebsanleitung [Backend] [Infra]
   - Tabelle «Folgeänderungen» in design.md abarbeiten.
   - _Anforderungen: 22.2, 22.3_
   - _Abhängig von: 25.2–25.4_

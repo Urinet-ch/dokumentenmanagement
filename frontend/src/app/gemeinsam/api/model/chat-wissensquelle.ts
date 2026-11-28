@@ -10,8 +10,14 @@
 
 
 export interface ChatWissensquelle { 
-    titel?: string;
-    link?: string;
+    /**
+     * leer, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.7)
+     */
+    titel?: string | null;
+    /**
+     * leer, solange Wissen nicht freigeschaltet ist (Spec 04, Req 22.7)
+     */
+    link?: string | null;
     stand?: string;
 }
 

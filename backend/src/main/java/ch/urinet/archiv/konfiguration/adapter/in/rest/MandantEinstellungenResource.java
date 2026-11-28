@@ -1,5 +1,6 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
+import ch.urinet.archiv.wissen.application.Wissensfreischaltung;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.ProblemAbbildung;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -69,7 +70,9 @@ public class MandantEinstellungenResource {
     }
 
     @Schema(name = "EinstellungenBetrieb")
-    public record BetriebDto(ChatBudgetDto oeffentlicherChat, long wissenMonatsbudgetTokens) {
+    public record BetriebDto(ChatBudgetDto oeffentlicherChat,
+                             @Schema(nullable = true, description = "fehlt, solange Wissen nicht freigeschaltet ist "
+                                     + "(Spec 04, Req 22.6)") Long wissenMonatsbudgetTokens) {
     }
 
     @Schema(name = "EinstellungskatalogAntwort")
@@ -91,11 +94,14 @@ public class MandantEinstellungenResource {
     private final Berechtigung rechte;
     private final SecurityIdentity identitaet;
     private final ObjectMapper json;
+    private final Wissensfreischaltung freischaltung;
 
     public MandantEinstellungenResource(EinstellungenVerwaltung verwaltung, EinstellungskatalogLesen katalog,
                                         KonfigurationVerwaltung konfiguration,
                                         MandantAufloesung aufloesung, Berechtigung rechte,
-                                        SecurityIdentity identitaet, ObjectMapper json) {
+                                        SecurityIdentity identitaet, ObjectMapper json,
+                                        Wissensfreischaltung freischaltung) {
+        this.freischaltung = freischaltung;
         this.verwaltung = verwaltung;
         this.katalog = katalog;
         this.konfiguration = konfiguration;
@@ -174,15 +180,21 @@ public class MandantEinstellungenResource {
                                   @QueryParam("bestaetigt") String bestaetigt, InputStream body) throws IOException {
         aufloesung.pruefen();
         Anfrage anfrage = lesen(body);
+        if (anfrage.json() != null && "WISSEN".equals(anfrage.json().path("gruppe").asText())) {
+            freischaltung.pruefen();
+        }
         if (anfrage.json() != null && (anfrage.json().has("version")
                 || "WISSEN".equals(anfrage.json().path("gruppe").asText()))) {
             rechte.aktion(benutzer(), Aktion.A19);
         }
+        boolean wissenFrei = freischaltung.aktuell();
         Function<Einstellungen, EinstellungenVerwaltung.Eingabe> eingabe = vorher -> {
             var auftrag = EinstellungenZuruecksetzen.lesen(anfrage.wert());
             if (auftrag.version() != null) {
+                Einstellungen ziel = konfiguration.version(auftrag.version()).inhalt().einstellungen();
+                // ohne Freischaltung bleiben die Einstellungen der Wissensbasis wie sie sind (Spec 04, Req 22.6)
                 return new EinstellungenVerwaltung.Eingabe(
-                        konfiguration.version(auftrag.version()).inhalt().einstellungen(), List.of());
+                        wissenFrei ? ziel : ziel.mitWissen(vorher.wissen()), List.of());
             }
             return patch(vorher, EinstellungenZuruecksetzen.gruppenPatch(json, auftrag.gruppe()));
         };
@@ -209,6 +221,8 @@ public class MandantEinstellungenResource {
 
     private void wissenPruefen(Anfrage anfrage) {
         if (anfrage.json() != null && anfrage.json().has("wissen")) {
+            // Einstellungen der Wissensbasis nur bei Freischaltung (Spec 04, Req 22.6), vor dem Recht A19
+            freischaltung.pruefen();
             rechte.aktion(benutzer(), Aktion.A19);
         }
     }

@@ -34,9 +34,6 @@ Alle Filter gelten zusammen. Mehrere Tags trennen Sie mit Komma; ein Dokument mu
 
 **Nach Partner filtern:** Bei jedem Treffer mit Partner steht «Nach Partner filtern». Damit zeigt die Suche nur noch Dokumente dieses Partners. Bietet Ihnen der Filter unter «Partner» ein eigenes Suchfeld an, können Sie den Partner auch dort suchen: Geben Sie mindestens zwei Zeichen ein und wählen Sie ihn unter den gefundenen Partnern. Mit dem Kreuz neben dem Namen entfernen Sie den Partnerfilter wieder.
 
-## Wissen in der Suche
-Suchen Sie mit einem Suchbegriff, zeigt die Suche über den Dokumenttreffern unter «Wissen» die besten passenden Seiten der Wissensbasis. Die Filter für Dokumente gelten dort nicht. Wie Sie mit Wissensseiten arbeiten, lesen Sie unter [Wissen](#wissen).
-
 ## Häufige Meldungen
 - «Keine Dokumente gefunden. Bitte Suchbegriff oder Filter anpassen.» Versuchen Sie andere Wörter, schalten Sie «Volltext» ein oder heben Sie Filter mit «Filter zurücksetzen» auf.
 - «Nur im Volltext gesucht: Die semantische Suche ist gerade nicht verfügbar.» Die Suche nach Bedeutung ist kurz ausgefallen, die Treffer stammen nur aus dem Wortlaut. Mit «Alle Treffer im Volltext zeigen» sehen Sie alle Treffer mit Gesamtzahl. Versuchen Sie es später noch einmal.

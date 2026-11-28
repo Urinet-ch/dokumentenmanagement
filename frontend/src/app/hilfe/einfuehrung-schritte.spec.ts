@@ -1,4 +1,5 @@
-import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
+import { Aktion, Rolle, WISSEN_AKTIONEN, darf } from '../gemeinsam/anmeldung/rechte';
+import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { einfuehrungSchritte } from './einfuehrung-schritte';
 
 describe('Einführung nach Rechten', () => {
@@ -24,6 +25,16 @@ describe('Einführung nach Rechten', () => {
       expect(zweite[0].titel).toContain('Muster Zwei');
       expect({ ...erste[0], titel: '' }).toEqual({ ...zweite[0], titel: '' });
       expect(erste.slice(1)).toEqual(zweite.slice(1));
+    },
+  );
+
+  it.each<Rolle>(['inhaber', 'mitarbeiter', 'treuhaender', 'geschaeftsstelle'])(
+    'nennt bei %s ohne freigeschaltetes Wissen die Wissensbasis nicht (Spec 04, Req 22.5)',
+    (rolle) => {
+      const ohne = einfuehrungSchritte((aktion) => darf(rolle, aktion) && !WISSEN_AKTIONEN.has(aktion), 'Archiv', rolle);
+      const mit = einfuehrungSchritte((aktion) => darf(rolle, aktion), 'Archiv', rolle);
+      expect(ohne.some((schritt) => schritt.text.includes(TEXTE.einfuehrung.wissen))).toBe(false);
+      expect(mit.some((schritt) => schritt.text.includes(TEXTE.einfuehrung.wissen))).toBe(true);
     },
   );
 

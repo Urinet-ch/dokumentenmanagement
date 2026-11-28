@@ -14,5 +14,9 @@ export interface Mandantenfunktionen {
      * Mindestens eine aktive Dokumentart hat die Gruppe «finanz» (Spec 05, Req 8.8)
      */
     finanzVerfuegbar: boolean;
+    /**
+     * Wissen ist für den Mandanten freigeschaltet (Spec 04, Req 22.4)
+     */
+    wissenVerfuegbar: boolean;
 }
 
