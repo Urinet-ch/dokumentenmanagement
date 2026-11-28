@@ -125,7 +125,9 @@ Funktionalität: Quellenregister, Quellläufe und Prüfsummen-Abfrage
     Dann meldet die Prüfsummen-Abfrage nur die Datei «R» als vorhanden, ohne IDs
     Angenommen ein Werkzeug von «vhf-gsk» hat ein Token vom Scope «import»
     Und das Stapel-Original der Datei «T» liegt im Status «EMPFANGEN»
-    Wenn «geschaeftsstelle-vhf-gsk» die Prüfsummen der Dateien «T» abfragt
+    Wenn «geschaeftsstelle-vhf-gsk» die Prüfsummen der Dateien «R, T» abfragt
+    Dann meldet die Prüfsummen-Abfrage nur die Datei «T» als vorhanden, ohne IDs
+    Wenn das Werkzeug die Prüfsummen der Dateien «R, T» abfragt
     Dann meldet die Prüfsummen-Abfrage nur die Datei «T» als vorhanden, ohne IDs
 
   @req-10.1
