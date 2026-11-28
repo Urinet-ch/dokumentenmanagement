@@ -117,7 +117,8 @@ class OeffentlicheWissenAusgabeTest {
         WerkzeugTransaktion transaktion = new WerkzeugTransaktion() {
             public <T> T neu(Supplier<T> arbeit) { return arbeit.get(); }
         };
-        var gespraeche = new OeffentlicheGespraeche(java.time.Duration.ofMinutes(30), 2, 6, Clock.systemUTC());
+        var gespraeche = new OeffentlicheGespraeche(
+                java.time.Duration.ofMinutes(30), java.time.Duration.ofSeconds(10), 2, 6, Clock.systemUTC());
         vorbereiten.accept(gespraeche);
         var protokollierteFrage = new AtomicReference<String>();
         OeffentlicheFragenSpeicher speicher = new OeffentlicheFragenSpeicher() {

@@ -380,6 +380,12 @@ Grenzen und dasselbe Monatsbudget. Der Betreiber aktiviert ihn je Mandant mit
 Er berücksichtigt nur ausdrücklich freigegebene Seiten mit ausschliesslich
 öffentlichen Quellen der Vertraulichkeit NORMAL.
 
+Die Webseite zeigt vor dem Eingabefeld den Hinweis «Bitte geben Sie keine
+Personendaten ein.» an. Bereinigte Frage und Antwort bleiben für Folgefragen
+ausschliesslich im Arbeitsspeicher und werden spätestens 30 Minuten nach der
+letzten Frage gelöscht. Sie werden nie auf Platte, in Logs oder in der
+Datenbank gespeichert.
+
 Der JSON-Körper enthält `frage` und optional `gespraechId`. Eine gültige,
 gebundene Gesprächs-ID setzt das höchstens 30 Minuten im Speicher gehaltene
 Gespräch fort; eine unbekannte, abgelaufene oder fremde ID beginnt ohne Hinweis
