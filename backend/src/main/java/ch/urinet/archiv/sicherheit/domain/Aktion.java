@@ -2,7 +2,7 @@ package ch.urinet.archiv.sicherheit.domain;
 
 /**
  * Zeilen der Rechtematrix (Req 2.6). Die Nummer entspricht der Spalte «Nr.» in requirements.md; Spec 04 ergänzt A15–A19,
- * Spec 06 A20–A23 und Spec 02 A24.
+ * Spec 06 A20–A23, Spec 02 A24 und Spec 09 A25–A29 (Requirement 15.1).
  */
 public enum Aktion {
     A1("Dokumente erfassen (Upload, Handy)"),
@@ -29,7 +29,12 @@ public enum Aktion {
     A22("Benutzer verwalten (einladen, sperren, entsperren, deaktivieren, reaktivieren, Zugang zurücksetzen, E-Mail ändern, "
             + "Google-Verknüpfung lösen, löschen)"),
     A23("Rollen zuweisen"),
-    A24("Chat-Auswertung ansehen und exportieren");
+    A24("Chat-Auswertung ansehen und exportieren"),
+    A25("Stapel ansehen (Liste, Protokoll, Seitenvorschau)"),
+    A26("Angehaltenen Stapel neu analysieren oder als ein Dokument übernehmen"),
+    A27("Quellenregister und Quellläufe ansehen"),
+    A28("Quellen pflegen (Status, Bemerkung, Konfiguration, Geheimnis, Lauf starten)"),
+    A29("Lücken begründen und Begründung zurückziehen");
 
     private final String bezeichnung;
 

@@ -256,6 +256,9 @@ Rechte hat als nötig und ich keine Rechtetabelle pflegen muss.
    verwaltet die Benutzer von `vhf-gsk` per Admin-Kommando; A20 bis A23 bleiben für `geschaeftsstelle` gesperrt, bis Spec 03, 3.5
    entscheidet].
    Ein Benutzer braucht für das Anlegen A22 und A23, weil das Anlegen eine Rolle vergibt.
+   Spec 09, Requirement 15.1 ergänzt die Matrix um die Zeilen A25 bis A29 (Stapel, Quellen, Begründungen von Lücken;
+   freigegeben mit dem Merge von #745 am 28.11.2026); sie stehen nur dort, `Aktion` und `RechtematrixSpecTest`
+   übernehmen sie mit Spec 09, Aufgabe 27.2.
 2. FALLS ein Benutzer ohne das Recht einer Aktion A20 bis A23 sie ausführt, DANN SOLL das Archiv mit HTTP 403
    `NICHT_ERLAUBT` antworten und `VERWEIGERT` protokollieren (Spec 01, 10.7). Nachweis: Szenarien je Rolle und Zeile.
 3. Das Archiv SOLL Berechtigungen ausschliesslich durch Zuweisen genau einer der vier Archiv-Rollen vergeben; es SOLL

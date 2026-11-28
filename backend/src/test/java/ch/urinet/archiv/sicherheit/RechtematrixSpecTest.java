@@ -21,8 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Die Rechtematrix der Domain stimmt Zelle für Zelle mit der Tabelle in Req 2.6 überein; {@code requirements.md} ist
- * die einzige Quelle. Unbekannter Zellentext, eine fehlende oder eine zusätzliche Zeile, eine Zeile ohne Nummer
+ * Die Rechtematrix der Domain stimmt Zelle für Zelle mit den Tabellen der Specs überein: Spec 01, Req 2.6 (A1–A14,
+ * A24), Spec 04, Req 12.1 (A15–A19), Spec 06, Req 4.1 (A20–A23) und Spec 09, Req 15.1 (A25–A29); die
+ * {@code requirements.md} dieser Specs sind die einzigen Quellen. Unbekannter Zellentext, eine fehlende oder eine zusätzliche Zeile, eine Zeile ohne Nummer
  * {@code A<n>} (z. B. {@code | B1 |} oder {@code |A15|}) und eine abweichende Aktion machen den Test rot.
  */
 class RechtematrixSpecTest {
@@ -32,6 +33,9 @@ class RechtematrixSpecTest {
     private static final Path WISSEN_REQUIREMENTS = Path.of("../.kiro/specs/04-wissensbasis/requirements.md");
     private static final Path VERWALTUNG_REQUIREMENTS =
             Path.of("../.kiro/specs/06-verwaltung-einstellungen-benutzer/requirements.md");
+    /** Spec 09, Requirement 15.1: A25 bis A29 (Stapel, Quellen, Begründungen von Lücken; Aufgabe 27.2). */
+    private static final Path PRODUKTIVIMPORT_REQUIREMENTS =
+            Path.of("../.kiro/specs/09-produktivimport/requirements.md");
     private static final Path MASCHINENLESBARE_MATRIX = Path.of("src/test/resources/rechtematrix.json");
     private static final Pattern ZEILE = Pattern.compile("^\\| (A\\d+) \\|.*");
     private static final Pattern TRENNZEILE = Pattern.compile("^\\|( --- \\|)+$");
@@ -44,11 +48,18 @@ class RechtematrixSpecTest {
                 lesen(Files.readAllLines(REQUIREMENTS)));
         Map<Aktion, Map<Rolle, Ergebnis>> wissen = lesen(Files.readAllLines(WISSEN_REQUIREMENTS));
         Map<Aktion, Map<Rolle, Ergebnis>> verwaltung = lesen(Files.readAllLines(VERWALTUNG_REQUIREMENTS));
-        assertThat(spec.keySet()).doesNotContainAnyElementsOf(wissen.keySet());
-        assertThat(spec.keySet()).doesNotContainAnyElementsOf(verwaltung.keySet());
-        assertThat(wissen.keySet()).doesNotContainAnyElementsOf(verwaltung.keySet());
+        Map<Aktion, Map<Rolle, Ergebnis>> produktivimport = lesen(Files.readAllLines(PRODUKTIVIMPORT_REQUIREMENTS));
+        List<Map<Aktion, Map<Rolle, Ergebnis>>> quellen = List.of(spec, wissen, verwaltung, produktivimport);
+        for (int i = 0; i < quellen.size(); i++) {
+            for (int j = i + 1; j < quellen.size(); j++) {
+                assertThat(quellen.get(i).keySet()).doesNotContainAnyElementsOf(quellen.get(j).keySet());
+            }
+        }
+        assertThat(produktivimport.keySet()).containsExactly(Aktion.A25, Aktion.A26, Aktion.A27, Aktion.A28,
+                Aktion.A29);
         spec.putAll(wissen);
         spec.putAll(verwaltung);
+        spec.putAll(produktivimport);
 
         assertThat(spec.keySet()).containsExactlyInAnyOrder(Aktion.values());
         spec.forEach((aktion, zeile) -> zeile.forEach((rolle, ergebnis) ->
@@ -64,6 +75,7 @@ class RechtematrixSpecTest {
                 lesen(Files.readAllLines(REQUIREMENTS)));
         spec.putAll(lesen(Files.readAllLines(WISSEN_REQUIREMENTS)));
         spec.putAll(lesen(Files.readAllLines(VERWALTUNG_REQUIREMENTS)));
+        spec.putAll(lesen(Files.readAllLines(PRODUKTIVIMPORT_REQUIREMENTS)));
 
         Map<Aktion, JsonNode> dateizeilen = new java.util.LinkedHashMap<>();
         json.path("aktionen").forEach(zeile -> {
@@ -117,7 +129,11 @@ class RechtematrixSpecTest {
                 .hasMessageContaining("Bestätigen");
     }
 
-    /** Liest die Zeilen A1 … der ersten Tabelle mit dem Kopf von Req 2.6; spätere Tabellen (z. B. A15–A19) nicht. */
+    /**
+     * Liest die Zeilen der ersten Tabelle mit dem gemeinsamen Tabellenkopf der vier Quellen ({@code | Nr. | Aktion |}
+     * und die Rollen wie in Spec 01, Req 2.6) in einer {@code requirements.md}; spätere Tabellen derselben Datei nicht.
+     * Jede der vier Quellen hat genau eine solche Tabelle.
+     */
     static Map<Aktion, Map<Rolle, Ergebnis>> lesen(List<String> zeilen) {
         Map<Aktion, Map<Rolle, Ergebnis>> matrix = new java.util.LinkedHashMap<>();
         boolean inTabelle = false;
@@ -165,6 +181,9 @@ class RechtematrixSpecTest {
         }
         if (aktion == Aktion.A24) {
             return "Spec 02, Req 15.5";
+        }
+        if (aktion.compareTo(Aktion.A25) >= 0 && aktion.compareTo(Aktion.A29) <= 0) {
+            return "Spec 09, Req 15.1";
         }
         return "Spec 01, Req 2.6";
     }

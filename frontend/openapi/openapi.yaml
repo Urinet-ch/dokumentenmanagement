@@ -112,6 +112,11 @@ components:
       - A22
       - A23
       - A24
+      - A25
+      - A26
+      - A27
+      - A28
+      - A29
     Ansicht:
       type: object
       properties:

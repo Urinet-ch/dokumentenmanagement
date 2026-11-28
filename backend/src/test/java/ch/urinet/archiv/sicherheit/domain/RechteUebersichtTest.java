@@ -34,6 +34,9 @@ class RechteUebersichtTest {
         }
         assertThat(Rechtematrix.fussnoten(Rolle.GESCHAEFTSSTELLE, Aktion.A22)).containsExactly(Fussnote.GESCHAEFTSSTELLE_OFFEN);
         assertThat(Rechtematrix.fussnoten(Rolle.GESCHAEFTSSTELLE, Aktion.A11)).containsExactly(Fussnote.GESCHAEFTSSTELLE_OFFEN);
+        // Spec 09, Requirement 15.1, Fussnote ¹: A28 und A29 bis Spec 03, 3.5; A25 bis A27 ohne Fussnote
+        assertThat(Rechtematrix.fussnoten(Rolle.GESCHAEFTSSTELLE, Aktion.A29)).containsExactly(Fussnote.GESCHAEFTSSTELLE_OFFEN);
+        assertThat(Rechtematrix.fussnoten(Rolle.GESCHAEFTSSTELLE, Aktion.A25)).isEmpty();
         assertThat(Rechtematrix.fussnoten(Rolle.MITARBEITER, Aktion.A4)).containsExactly(Fussnote.NUR_EIGENE);
         assertThat(Rechtematrix.fussnoten(Rolle.INHABER, Aktion.A22)).isEmpty();
         assertThat(Rechtematrix.fussnoten(Rolle.GESCHAEFTSSTELLE, Aktion.A1)).isEmpty();

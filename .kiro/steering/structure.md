@@ -18,7 +18,8 @@ dokumentenmanagement/
 │       ├── 04-wissensbasis/
 │       ├── 05-mandanten-konfiguration/
 │       ├── 06-verwaltung-einstellungen-benutzer/
-│       └── 07-einfuehrung-hilfe/   Einführung für neue Benutzer, Benutzeranleitung «Hilfe»
+│       ├── 07-einfuehrung-hilfe/   Einführung für neue Benutzer, Benutzeranleitung «Hilfe»
+│       └── 09-produktivimport/     Scan-Eingang, Stapel, Quellen, Dubletten, Vollständigkeit (Spec 09)
 ├── backend/                 Quarkus (API + Worker), liefert die PWA über Quinoa aus
 │   ├── compose-devservices.yml   MinIO und Mailpit als Compose Dev Services (dev und Tests)
 │   └── src/main/java/ch/urinet/archiv/
@@ -30,7 +31,9 @@ dokumentenmanagement/
 │       ├── verarbeitung/    Auftragsschlange, Normalisieren, OCR, Indexieren
 │       ├── ki/              Metadaten-Extraktor, Beispiele, Embeddings, Chat (Spec 02)
 │       ├── kontakt/         Kontakte, Verkaufschancen, Partner-Abgleich
-│       ├── importe/         CSV-Import CRM, Drive-Import
+│       ├── importe/         CSV-Import CRM, Drive-Import, Quellenregister und Quellläufe (Spec 09)
+│       ├── stapel/          Scan-Eingang, Stapelverarbeitung, Trennblätter (Spec 09)
+│       ├── vollstaendigkeit/   Vollständigkeitsbericht und Begründungen von Lücken (Spec 09)
 │       ├── suche/           Volltext, Filter, später Hybridsuche
 │       ├── protokoll/       Zugriffsprotokoll, Tages-Manifest
 │       ├── export/          Jahresexport (Spec 02)
@@ -43,7 +46,7 @@ dokumentenmanagement/
 │       ├── db/mandant/      Liquibase: Schema je Mandant
 │       ├── seed/<code>/konfiguration.json   Konfiguration je Mandant, einschliesslich Dokumentarten (Spec 05)
 │       └── seed/_alle/dokumentarten-wissen.json   Art WISSENSQUELLE für jeden Mandanten (Spec 04)
-│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>, je Datei genau ein @spec-NN); Spec 04 unter features/wissen/, Spec 05 unter features/konfiguration/, Spec 06 unter features/verwaltung/, Spec 07 unter features/hilfe/
+│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>, je Datei genau ein @spec-NN); Spec 04 unter features/wissen/, Spec 05 unter features/konfiguration/, Spec 06 unter features/verwaltung/, Spec 07 unter features/hilfe/, Spec 09 unter features/produktivimport/
 ├── frontend/                Angular PWA (Build über Quinoa)
 │   ├── public/anleitung/    Benutzeranleitung als Markdown, eine Datei je Abschnitt (Spec 07)
 │   └── src/app/
@@ -56,6 +59,7 @@ dokumentenmanagement/
 ├── wordpress/urinet-archiv-plugin/   (Spec 03)
 ├── deploy/
 │   ├── infomaniak/compose.yml   Produktion: Dienste mit Traefik-Labels, Secrets als Dateien
+│   ├── infomaniak/sftp/     Dienst sftp (Scan-Eingang, Apache MINA SSHD), eigenes Maven-Projekt (Spec 09, ADR-016)
 │   ├── keycloak/realm-export.json
 │   ├── keycloak/realm-test.json   nur dev und Tests: Export plus Testbenutzer und Client archiv-test
 │   ├── backup/              Verschlüsselung und Export für die zentrale Sicherung
@@ -90,9 +94,9 @@ ArchUnit prüft: `domain` hängt von nichts ab, `application` nur von `domain`, 
 - Tabellen und Spalten `snake_case`, Singular: `dokument`, `dokument_datei`, `dokument_finanz`, `import_lauf`.
 - Enums als Text speichern: `status IN ('NEU','VERARBEITUNG','EINGANGSKORB','ARCHIVIERUNG','ARCHIVIERUNG_FEHLER','ARCHIVIERT','FEHLER','VERWORFEN')`; `vertraulichkeit IN ('NORMAL','INTERN','PERSONAL')`.
 - REST: Plural, Kleinschreibung: `/api/v1/dokumente`, `/api/v1/dokumente/{id}/wiederholen`, `/api/v1/importe/crm`.
-- API-Token-Scopes: `generator`, `import` (Spec 01), `webseite-lesen` und `webseite-erfassung` (Webseiten-Schlüssel, Spec 03, Requirement 12; bisher `wordpress` als Site-Key, geändert 13.11.2026).
+- API-Token-Scopes: `generator`, `import` (Spec 01; Spec 09 ergänzt: `import` erreicht zusätzlich die Prüfsummen-Abfrage und Start, Meldung und Abschluss von Quellläufen, Spec 09, 10.9), `webseite-lesen` und `webseite-erfassung` (Webseiten-Schlüssel, Spec 03, Requirement 12; bisher `wordpress` als Site-Key, geändert 13.11.2026).
 - Webseiten-Schnittstelle: Pfade unter `/public/v<n>` (Lesen) und `/public/v<n>/erfassung`; Vertrag `docs/schnittstelle/public-v<n>.yaml` (Spec 03, Requirement 11, ADR-014).
-- Branches `feature/<spec>-<aufgabe>-<stichwort>` (z. B. `feature/01-2.6-ocr`), Commits nach Conventional Commits, Text deutsch, Verweis auf das Kriterium als `req-<x.y>`: `feat(verarbeitung): OCR mit OCRmyPDF (req-5.1)`. `A1`–`A19` bezeichnen nur die Zeilen der Rechtematrix (Spec 01, Requirement 2.6; A15–A19 aus Spec 04, Requirement 12.1).
+- Branches `feature/<spec>-<aufgabe>-<stichwort>` (z. B. `feature/01-2.6-ocr`), Commits nach Conventional Commits, Text deutsch, Verweis auf das Kriterium als `req-<x.y>`: `feat(verarbeitung): OCR mit OCRmyPDF (req-5.1)`. `A1`–`A19` bezeichnen nur die Zeilen der Rechtematrix (Spec 01, Requirement 2.6; A15–A19 aus Spec 04, Requirement 12.1); Spec 09 ergänzt A25–A29 (Requirement 15.1).
 
 ## Belegnummern (Erkennung und Validierung)
 | Art | Muster | Beispiel |

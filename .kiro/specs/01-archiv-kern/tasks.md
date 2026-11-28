@@ -560,6 +560,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 10.9, 16.6, 16.12_
 
 - [ ] 5.8 Übernahme Belege 2026 und Abnahme [Fabian] [QA]
+  - Spec 09 ergänzt (Spec 09, 16.7, freigegeben mit dem Merge von #745 am 28.11.2026): Die Übernahme der Belege 2026 läuft über Spec 09, Welle 30; der Abschluss nach Spec 09, 16.6 liefert zugleich den Nachweis dieser Aufgabe, damit der Bestand nicht zweimal übernommen wird.
   - Voraussetzung: Wechsel auf Stufe B abgeschlossen (5.11, 16.17), Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün; Realitätsprüfung nach Auflage A2 aus Gate 0 erneut gelaufen und Ziel aus 2.9 erreicht (`docs/umsetzungsplan.md`, Abschnitt 6)
   - CRM-Kontakte per CSV importieren, Drive-Altbestand importieren und im Eingangskorb bestätigen, Papierbelege 2026 fotografieren, Generatoren umstellen
   - Abnahmetest: Stichprobe 20 Dokumente auffindbar, Schlussbericht des Drive-Imports geht auf, Prüflauf ohne Abweichung, Mandantentrennung mit Testmandant `test` geprüft
@@ -640,7 +641,7 @@ Betriebswerte (Hostnamen, Adressen, Kapazitäten) stehen nicht im Repo. Häkchen
 
 - [ ] 31.3 Speichermessung und Schutzmassnahmen auf der VPS prüfen [Fabian] [Infra] [QA]
   - Richtwert bis 11.12.2026. Messung aus 1.10 mit Budget 2144 MiB / 1.6 CPU inklusive `sftp` (Entscheid Fabian 28.11.2026, Spec 09, E11) abschliessen (Messbericht ohne Namen anderer Apps), Health und Speicherabbrüche der anderen Apps während der Messung (16.18)
-  - Auf der VPS prüfen: in den internen Netzen des Archivs nur Container des Archivs, `api` und `kc` nur am internen Netz und am eigenen Netz von Traefik und Archiv, an dem keine andere App hängt, nicht mehr am Netz «web», keine veröffentlichten Ports ausser dem Eingang nach Spec 09, 1.6 (16.28); Secret-Dateien nur in Diensten des Archivs (16.29)
+  - Auf der VPS prüfen: in den internen Netzen des Archivs nur Container des Archivs, `api` und `kc` nur am internen Netz und am eigenen Netz von Traefik und Archiv, an dem keine andere App hängt, nicht mehr am Netz «web», `sftp` am internen Netz und am eigenen Netz von Traefik und Archiv, nie am Netz «web», keine veröffentlichten Ports ausser dem Eingang nach Spec 09, 1.6 (16.28); Secret-Dateien nur in Diensten des Archivs (16.29)
   - Ergebnis im Wechselprotokoll (nur Namen und Zähler, keine Werte)
   - _Anforderungen: 16.15, 16.18, 16.28, 16.29, 16.30_
   - _Abhängig von: 1.10, 31.10_

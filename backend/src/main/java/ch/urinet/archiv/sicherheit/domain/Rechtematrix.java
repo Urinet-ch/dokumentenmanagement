@@ -50,6 +50,11 @@ public final class Rechtematrix {
         zeile(Aktion.A22, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
         zeile(Aktion.A23, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
         zeile(Aktion.A24, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A25, ERLAUBT, VERBOTEN, NUR_LESEND, ERLAUBT);
+        zeile(Aktion.A26, ERLAUBT, VERBOTEN, VERBOTEN, ERLAUBT);
+        zeile(Aktion.A27, ERLAUBT, VERBOTEN, NUR_LESEND, ERLAUBT);
+        zeile(Aktion.A28, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A29, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
         if (ZEILEN.size() != Aktion.values().length) {
             throw new IllegalStateException("Rechtematrix unvollständig");
         }
@@ -73,14 +78,15 @@ public final class Rechtematrix {
     }
 
     /**
-     * Fussnoten der Zelle (Req 4.12): ¹ für {@code geschaeftsstelle} bei A11 bis A14 und A20 bis A23 (403, bis Spec 03
-     * entscheidet), ² bei «nur eigene».
+     * Fussnoten der Zelle (Req 4.12): ¹ für {@code geschaeftsstelle} bei A11 bis A14, A20 bis A23 sowie A28 und A29
+     * (403, bis Spec 03 entscheidet; Spec 09, Requirement 15.1), ² bei «nur eigene».
      */
     public static List<Fussnote> fussnoten(Rolle rolle, Aktion aktion) {
         List<Fussnote> fussnoten = new ArrayList<>();
         if (rolle == Rolle.GESCHAEFTSSTELLE && ergebnis(rolle, aktion) == VERBOTEN
                 && (aktion.compareTo(Aktion.A11) >= 0 && aktion.compareTo(Aktion.A14) <= 0
-                || aktion.compareTo(Aktion.A20) >= 0 && aktion.compareTo(Aktion.A23) <= 0)) {
+                || aktion.compareTo(Aktion.A20) >= 0 && aktion.compareTo(Aktion.A23) <= 0
+                || aktion == Aktion.A28 || aktion == Aktion.A29)) {
             fussnoten.add(Fussnote.GESCHAEFTSSTELLE_OFFEN);
         }
         if (ergebnis(rolle, aktion) == NUR_EIGENE) {
