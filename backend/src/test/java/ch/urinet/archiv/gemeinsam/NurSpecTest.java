@@ -152,7 +152,8 @@ class NurSpecTest {
         assertThat(ausDocs).as("Ressource mit dem Manifest-Schlüssel aus docs/").isEqualTo(1);
         for (String datei : List.of("tools/drive_import/pom.xml", "frontend/angular.json", "frontend/package.json",
                 "backend/src/main/docker/Dockerfile.jvm", "deploy/infomaniak/db/Dockerfile",
-                "deploy/infomaniak/keycloak/Dockerfile", "backend/src/main/resources/application.properties")) {
+                "deploy/infomaniak/keycloak/Dockerfile", "deploy/infomaniak/sftp/pom.xml",
+                "deploy/infomaniak/sftp/Dockerfile", "backend/src/main/resources/application.properties")) {
             assertThat(Files.readString(REPO.resolve(datei), StandardCharsets.UTF_8)).as(datei)
                     .doesNotContain(".kiro", "../docs");
         }

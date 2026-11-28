@@ -114,6 +114,34 @@ Einrichtung am Scanner (Aufgabe 28.6, Fabian): Client-Schlüsselpaar am Gerät e
 GitHub-Secret für `archiv_sftp_schluessel`, Host-Schlüssel des Dienstes im Profil hinterlegen, Ziel `<sftp-host>`,
 Port `<sftp-port>`, Zielordner `/stapel`, `/einzeln`, `/glas`.
 
+#### Umsetzung (Aufgabe 27.3, 28.11.2026)
+- Modul `deploy/infomaniak/sftp/` (Artefakt `scan-eingang-sftp`, Hauptklasse `ScanEingang`): Apache MINA SSHD 2.20.1,
+  BouncyCastle für Ed25519 (MINA SSHD kann Ed25519 sonst nicht lesen), `slf4j-simple` nur für Warnungen von MINA auf
+  stderr; stdout gehört dem JSON-Log. Konfiguration über Umgebungsvariablen `ARCHIV_SFTP_PORT`, `ARCHIV_SFTP_WURZEL`,
+  `ARCHIV_SFTP_HOSTSCHLUESSEL`, `ARCHIV_SFTP_SCHLUESSEL`, `ARCHIV_SFTP_AELTERE_VERFAHREN` (nur Pfade und Schalter,
+  Standardpfade der Secret-Dateien `archiv_sftp_hostkey`, `archiv_sftp_schluessel`); Port unter 1025 und uid 0 brechen
+  den Start ab. Die Datei des Host-Schlüssels darf mehrere Schlüssel enthalten (z. B. Ed25519 und RSA), falls das Gerät
+  kein Ed25519 kann.
+- Verfahren: Standard von MINA SSHD ohne die SHA-1-Verfahren, die MINA noch anbietet (`ssh-rsa`, `hmac-sha1`,
+  `hmac-sha1-etm@openssh.com`); mit BouncyCastle kommen die hybriden Verfahren `mlkem768x25519-sha256` und
+  `sntrup761x25519-sha512` dazu. Als «älter» gilt jedes Verfahren mit SHA-1, MD5, CBC, `arcfour`, `ssh-dss` sowie
+  `ssh-rsa`; es kommt nur über die Liste hinzu, hinten angehängt; unbekannte Namen brechen den Start ab.
+- Prototyp für den Spike: In der eigenen Wurzel sind alle SFTP-Operationen erlaubt und werden als Ereignis `sftp`
+  protokolliert (Operation, Pfad in der Wurzel, Ergebnis), damit der Spike die nötigen Operationen (0.3) aus dem Log
+  ablesen kann. Die Einschränkung nach 1.4 baut Aufgabe 28.2 nach dem Spike-Bericht. Weitere Ereignisse: `start` (mit
+  den angebotenen Verfahren), `verfahren` (ausgehandelt oder bei fehlender Einigung das Angebot des Geräts),
+  `anmeldung`, `datei` (Unterordner, Dateiname, Grösse), `stopp`. Bei abgelehnten Anmeldungen steht der Benutzer nur,
+  wenn das Gerät einen Schlüssel versucht hat (MINA SSHD setzt den Namen sonst erst nach erfolgreicher Anmeldung).
+- Szenarien: Das Backend übersetzt die Quellen des Moduls als Testquellen (`build-helper`, wie `tools/drive_import`)
+  und startet den Dienst in `features/produktivimport/scan-eingang.feature` in-process (`ScanEingangSchritte`); MINA
+  SSHD dafür im Test-Scope, `sshd-common` ausdrücklich, weil die Quarkus-BOM eine ältere Version verwaltet.
+  `ScanEingangVersionTest` hält `sshd.version` in beiden Maven-Projekten gleich. Die Unit-Tests des Moduls laufen in der
+  CI erst mit dem Patch `docs/betrieb/sftp-ci-dependabot.diff` (Schritt im Job «Build» und Einträge für Dependabot,
+  Maven und Docker); Workflows ändert nur Fabian.
+- Image: Basis wie die API (Temurin 25 JRE per Digest), uid 10001, Heap 48 MiB, `-XX:+UseSerialGC`. Lokal mit
+  `--read-only`, `--cap-drop ALL`, `--memory 96m`, `--cpus 0.1` gestartet: nach Anmeldung und Upload rund 56 MiB belegt
+  (Richtwert, Messung mit Compose in 28.3). Healthcheck, Compose und Deploy folgen in 28.2 bis 28.4.
+
 ### 2. Scan-Eingang im Worker (`stapel/`)
 - `ScanEingangTakt` (Quarkus Scheduler, nur Rolle `worker`, Muster `MailTakt` mit `skipExecutionIf=VorMigrationUeberspringen`), alle 10 s: liest je konfiguriertem Mandanten `stapel/`, `einzeln/`, `glas/`; merkt sich je Datei Grösse und Änderungszeit; nach der Stabilitätszeit → `StapelEmpfang.annehmen(mandant, profil, pfad)`.
 - Zuordnung Verzeichnis → Mandant nur aus der Konfiguration des Deploys (Requirement 2.8), nie aus dem Dateinamen.

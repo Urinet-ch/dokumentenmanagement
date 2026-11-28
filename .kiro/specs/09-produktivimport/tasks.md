@@ -37,7 +37,7 @@ Zeitrahmen (Richtwert, gebunden an Entscheid #731): Welle 27 vom 01.12. bis 04.1
   - _Anforderungen: 15.1_
   - _Abhängig von: 27.1_
 
-- [ ] 27.3 Prototyp Dienst `sftp` für den Spike [Backend]
+- [x] 27.3 Prototyp Dienst `sftp` für den Spike [Backend]
   - Maven-Modul `deploy/infomaniak/sftp/` (Java 25, Apache MINA SSHD) mit Grundfunktion nach design.md, Abschnitt 1:
     nur Schlüssel, nur SFTP, virtuelle Wurzel, Unterordner, Log als JSON; Liste älterer Verfahren konfigurierbar,
     Standard leer.
